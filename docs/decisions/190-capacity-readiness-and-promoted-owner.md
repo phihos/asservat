@@ -3,17 +3,17 @@
 > Superseded in part by ADR-328 (2026-11-13): the capacity, namespace and processing guards with their pins and digests, the observation pin's protection digest, the dedicated probe namespace and account with minted tokens (decision 6), and the continuation ordering around a single immutable launch no longer apply. Helm renders the pool, policy and source objects and the `setup` Job seeds the capacity rows. Still valid: the hub-api reading audit profiles at runtime and failing closed until they exist (decision 2), the promoted process serving observation by TLS server name (decisions 4 and 7, without the probe account), and operator profile inputs (decision 5, now chart values).
 
 Date: 2026-10-15. Status: accepted; steps 1–4 implemented and natively qualified
-([continuation run 33](../../test/results/adr183-continuation-native-33/result.json));
+(continuation run 33);
 step 5 implemented with unit tests. Step 7 is natively qualified with an
 observation-mode owner, through capacity root `ReadyAt`
-([run 43](../../test/results/adr183-continuation-native-43/result.json),
+(run 43,
 [ADR-192](192-capacity-before-download-paths.md)). Step 6 and the promoted
 binding of step 7 are implemented with unit tests (ADR-194 step 9): a
 raw-connection server-name router (`native.ServerNameRouter`) hands each
 ClientHello, unterminated and replayed, to the unchanged native or
 observation server, and both handler sets share the process's one server
 credential. The promoted variant is natively qualified by
-[ADR-194 run 9](../../test/results/adr194-continuation-native-9/environment.json):
+ADR-194 run 9:
 capacity reaches `ReadyAt` through the promoted owner's observation handler.
 Pending: step 8's audit profile reads by a promoted hub-api, which need a
 public operation. Runs 27–32 are retained

@@ -67,10 +67,10 @@ older build tags but is not selected by our Go toolchain. `xdg-go/stringprep`
 v1.0.4 is also retained transitively. These graph facts are distinct from a claim
 that every historical build mode is audited.
 
-The [initial scan](../../test/results/initial-role-vulnerability.log),
+The initial scan,
 `make go-vuln-check`, reported no vulnerabilities in imported packages or called
 symbols. It still reports the previously documented module-only advisory in an
-unused package. The [provider regression](../../test/results/initial-role-ambient-after.log)
+unused package. The provider regression
 qualifies actual PostgreSQL SCRAM authentication, unchanged replay and retirement,
 including indirect PUBLIC grants and application SECURITY DEFINER rejection.
 This is not a complete supply-chain or production-installation certification.
@@ -94,8 +94,8 @@ fetch. The smaller ajv-formats helper's latest inspected release is from March
 Its format behavior is covered by generated-contract and browser tests.
 
 The full npm dependency audit and production-dependency audit both reported zero
-known vulnerabilities in [the recorded full report](../../test/results/console-dependency-audit.json)
-and [runtime report](../../test/results/console-runtime-audit.json). The full
+known vulnerabilities in the recorded full report
+and runtime report. The full
 report matters because generated validators bundle helpers from build-time
 dependencies. Audits do not establish the absence of unknown vulnerabilities.
 Dependency lifecycle scripts are disabled by the workspace `.npmrc`; the build

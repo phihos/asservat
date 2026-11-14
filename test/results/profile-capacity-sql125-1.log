@@ -1,7 +1,0 @@
-=== RUN   TestProfileCapacityBackingWithRealPostgres
---- PASS: TestProfileCapacityBackingWithRealPostgres (0.07s)
-=== RUN   TestCustodyUpgradeSchemaWithRealPostgres
-    upgrade_schema_test.go:340: upgrade schema: 124 to 125 by the schema owner, idempotent, floor "asservat:oldest-binary-schema=102", unknown history refused
---- PASS: TestCustodyUpgradeSchemaWithRealPostgres (2.57s)
-PASS
-ok  	asservat.local/asservat/test/integration	3.741s

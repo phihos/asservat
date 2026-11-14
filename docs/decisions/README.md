@@ -37,7 +37,7 @@ Implementation and qualification are pending.
 applies the accepted bounded Go mechanism to a dedicated ordinary aggregate of
 an unchanged raw original. Raw-only unclassified counts preserve truncated
 prefixes. PR167 merged with the reference installed MCP/React/same-original
-native-tshark workflow qualified; [proof](../../test/results/raw-packet-summary-native-41960249012/README.md).
+native-tshark workflow qualified; proof.
 Local browser, real-service lifecycle/upgrade and named resource checks retain
 their separate scopes. Arbitrary raw queries and broader maxima remain pending.
 
@@ -647,16 +647,16 @@ frames are removed.
 connector-facing hub duties into a separate process kind outside the 32-connection hub
 budget and adds eight permanent connector duty roles (ordinals 48–55) to the
 fixed public runtime layout. All 41 roles pass the
-[real PostgreSQL role matrix](../../test/results/adr170-roles-1/result.json). The
+real PostgreSQL role matrix. The
 product `hub-federation` and regional `connector` processes
-[pass as Pods in two clusters](../../test/results/adr170-product-native-10/result.json)
+pass as Pods in two clusters
 with synthetic setup roots; installer provisioning is pending.
 
 [ADR-169 — Delegated regional lifecycle channel](169-delegated-regional-lifecycle-channel.md)
 lets the outbound regional process supply ADR-153 phase observations as
 delegated proof over one ADR-168-authenticated full-duplex HTTP/2 conversation,
 while the hub keeps every effect. It also delegates source staging and leaf
-registration. The [two-cluster native fixture](../../test/results/adr169-direct-native-4/result.json)
+registration. The two-cluster native fixture
 passes with no hub connector SQL credential in the regional Pod; production
 processes are pending.
 
@@ -1123,11 +1123,11 @@ The brief's domain-registration and trademark work remains a maintainer-owned pu
 
 - **ADR-153 — Operation-owned connector enrollment:** [Original native admission and signing boundaries](153-operation-owned-connector-enrollment.md), distinct complete initial/final enforcement observations and current intermediate source/token/controller reads inside one original operation. Legacy interfaces, SQL checks and unknown spend remain unchanged; component and native qualification are pending.
 
-- **ADR-155 — Unchanged fleet persistence contention:** [Failed persistence with original expiry](155-unchanged-fleet-persistence-contention.md), exact aborted lock classification, independent before/after source/incarnation checks and unchanged negative fencing. Component races pass (119 top-level / 605 named) and all ten focused native SQL cases pass; [integration evidence](../../test/results/fleet-persistence-contention-integration.json) preserves the original failures. Broad fleet and installed owner qualification remain pending.
+- **ADR-155 — Unchanged fleet persistence contention:** [Failed persistence with original expiry](155-unchanged-fleet-persistence-contention.md), exact aborted lock classification, independent before/after source/incarnation checks and unchanged negative fencing. Component races pass (119 top-level / 605 named) and all ten focused native SQL cases pass; integration evidence preserves the original failures. Broad fleet and installed owner qualification remain pending.
 
-- **ADR-157 — Protected observation dial endpoint:** [External connectivity and original serving identity](157-protected-observation-dial-endpoint.md), fixed installation-owned TCP port translation with unchanged original Service/SNI/HTTP authority, current peer checks and no replay. Translated-port TLS components and the [original direct native reference](../../test/results/direct-observation-native-6/result.json) pass with unchanged five-second bounds and positive joins/cleanup. Synthetic setup/issuer roots remain explicit; no installed endpoint producer or runtime selection is enabled.
+- **ADR-157 — Protected observation dial endpoint:** [External connectivity and original serving identity](157-protected-observation-dial-endpoint.md), fixed installation-owned TCP port translation with unchanged original Service/SNI/HTTP authority, current peer checks and no replay. Translated-port TLS components and the original direct native reference pass with unchanged five-second bounds and positive joins/cleanup. Synthetic setup/issuer roots remain explicit; no installed endpoint producer or runtime selection is enabled.
 
-- **ADR-156 — Finite owner configuration audit epochs:** [Independent full-snapshot acceptance](156-finite-owner-audit-epochs.md), explicit automatic rollover overlap, finite charged capacity and distinct current/admitted dependency values. The [integrated foundation](../../test/results/owner-audit-epoch-integration.json) passes component qualification (144 top-level / 807 named race-test passes plus compilation, vet and canonical gates). The [separate codec](../../test/results/owner-epoch-codec-integration.json) passes 42 top-level / 99 named framed race tests and affected gates. Both remain unselected; current SQL29 v1 configuration receipts and runtime behavior are unchanged. SQL effects, reserve/checkpoint production, complete consumer composition, physical retirement and installed sustainability remain pending.
+- **ADR-156 — Finite owner configuration audit epochs:** [Independent full-snapshot acceptance](156-finite-owner-audit-epochs.md), explicit automatic rollover overlap, finite charged capacity and distinct current/admitted dependency values. The integrated foundation passes component qualification (144 top-level / 807 named race-test passes plus compilation, vet and canonical gates). The separate codec passes 42 top-level / 99 named framed race tests and affected gates. Both remain unselected; current SQL29 v1 configuration receipts and runtime behavior are unchanged. SQL effects, reserve/checkpoint production, complete consumer composition, physical retirement and installed sustainability remain pending.
 
 - [252 — Approved capture acceptance](252-approved-capture-acceptance.md): retain bounded immutable review blueprints and fix a separately bounded capture deadline under the original current grant.
 

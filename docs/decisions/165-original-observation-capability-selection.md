@@ -39,17 +39,17 @@ their readers are unchanged.
 
 ## Verification
 
-- [component-1](../../test/results/installed-observation-selection-component-1/result.json)
+- component-1
   failed in one never-before-run staged test. That test built a second resource
   root inside an operation fixture whose API state had already advanced past the
   root's source-guard pins. The test now builds both roots from the same fresh
   preparer. Its final `Read` assertion was removed: without a v1 journal it could
   not prove non-adoption, which the mixed-state test checks through the same
   `valid()` predicate.
-- [component-2](../../test/results/installed-observation-selection-component-2/result.json)
+- component-2
   passed every race group but failed its canonical step, because the runner
   invoked the system Python without the required spec extras.
-- [component-3](../../test/results/installed-observation-selection-component-3/result.json)
+- component-3
   passes compile, six race groups (64 parents), vet, and the spec, architecture
   and Go-architecture checks, with unchanged sources and removed scratch.
 

@@ -156,7 +156,7 @@ Tests:
   their whole-table INSERT; triggers guard them.
 - **Real PostgreSQL.** The initial-installation suite provisioned all 64
   roles through the product role producer with exact ACL verification
-  ([result](../../test/results/adr177-roles-1/result.json): exit 0, 87 tests).
+  (result: exit 0, 87 tests).
   An earlier run failed because the exact table inventory did not yet list
   migration 62's `context_key_wrap`; first activation correctly rejected the
   unknown relation.

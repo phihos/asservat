@@ -113,13 +113,13 @@ blocked operation, frame order and per-exchange frame budget) now run against
 the operation frames, over actual TLS 1.3/h2 in `adapters/mtls`. Diagnostic
 stage labels are `hub-operations` and `regional-operations`.
 
-Native: [the public journey run 2](../../test/results/adr171-journey-2/result.json)
+Native: the public journey run 2
 passes on this path (exit 0, no validation errors). It covers preview, request,
 hub-run execution with regional capture, encryption and upload, publication,
 case, native download with continuation, Stop and revocation, all against real
 PostgreSQL, Kubernetes, S3 and TLS. The first request took 4.285 s, the same as
 the three earlier passes (4.27–4.28 s).
-[Run 1](../../test/results/adr171-journey-1/result.json) failed and is
+Run 1 failed and is
 retained: the regional binding check also compared the work's capture budget
 digest with the execution binding's, which is a different value, so every start
 was refused. Capture, attempt, cluster, Pod and plan scope now bind exactly.

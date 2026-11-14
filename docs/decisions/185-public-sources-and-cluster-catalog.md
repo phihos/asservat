@@ -5,7 +5,7 @@
 Date: 2026-10-15. Status: accepted; steps 1–4 implemented with unit tests
 (catalog source, hub-api composition, fixed names, probes and RBAC, public
 sources step). The public sources step passed natively
-([continuation run 18](../../test/results/adr183-continuation-native-18/result.json));
+(continuation run 18);
 cluster addition and two-cluster qualification are pending.
 Requirements: REQ-DEP-001/003/005, S-02; TASK-11.
 Builds on [ADR-180](180-hub-api-public-composition.md),

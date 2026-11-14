@@ -108,12 +108,12 @@ qualification requirements; host tests and compilation are not substitutes.
 
 ## Component validation and remaining integration
 
-The [retained component report](../../test/results/syscall-argument-runtime-local/final-checks.json)
+The retained component report
 records passing affected Go race tests, gadget-tag loader tests, fixture host
 checks, vet, C concurrency tests, and 263,898 decoder fuzz executions in ten
 seconds. Its source hashes describe that checkpoint; the later cancellation and
 canonical accounting-pin changes and final source pins have
-[passing frozen checkpoint checks](../../test/results/syscall-argument-runtime-local/checkpoint-checks.json). The final comment-corrected compile yields the exact 694,968-byte object SHA-256
+passing frozen checkpoint checks. The final comment-corrected compile yields the exact 694,968-byte object SHA-256
 `4c548b54bf9cc0850352d8a4e4cc23cc5ddc7d50cfbc4bfb96913f319ec1784d`.
 No local eBPF program was loaded. The old eleven-case native report describes a
 different object and does not qualify this one.

@@ -1189,10 +1189,10 @@ Both policy and manual reply paths account for transport-dropped rows.
 - `make console-browser-check` passed 29 journeys and 28 accessibility scans.
   The actual built React/Go HTTPS journey renders loss, reply drops and pending
   occupancy through the canonical operation and regenerated closed contract.
-- [Policy native evidence](../test/results/live-lag-drop-policy-42803550038/README.md):
+- Policy native evidence:
   run 42803550038 passed at `d65ccbd0` (package 426.241 s, focus 152.71 s),
   covering all three policy projections and 32 bounded live MCP operations.
-- [Manual native evidence](../test/results/live-lag-drop-manual-42800188004/README.md):
+- Manual native evidence:
   run 42800188004 passed at the same commit (package 379.554 s, focus 100.87 s),
   covering all three finite manual projections and 34 bounded operations. Both
   environments recorded unchanged sources, removed build scratch and no cleanup
@@ -1200,7 +1200,7 @@ Both policy and manual reply paths account for transport-dropped rows.
 
 Earlier policy attempts are not passes: run 42800184032 failed once at the
 second-principal handle check and once at an earlier transient `LiveUnavailable`.
-A [same-suite main control](../test/results/live-policy-main-control-42803544505/README.md)
+A same-suite main control
 passed after its own retryable `LiveUnavailable`, confirming that this transient
 behavior exists independently of the increment. These native workflows exercise
 real policy/manual live sources but not the fleet-administrator operation or a
@@ -1218,7 +1218,7 @@ when any current live-enabled node lacks a valid predecessor. The UI-053 React
 page uses explicit refresh only, with no background polling, source enumeration
 or acquisition.
 
-- [Browser evidence](../test/results/live-capacity-browser/README.md): the
+- Browser evidence: the
   packaged journey passed with 29 journeys and 28 accessibility scans, using the
   actual Go HTTPS operation and built React result. Full `make pre-push`, all
   613 console tests, final-head PR CI run 42792664049 and Gitar review passed.
@@ -1271,7 +1271,7 @@ preserves the existing limits while public totals remain cumulative. Report
 ordering cannot reject a newer live window, and disabled live viewing leaves
 reports unchanged.
 
-- [Native evidence](../test/results/live-node-status-42766629788/README.md): run
+- Native evidence: run
   42766629788 attempt 2 passed at `30bf1950` (Go test 439.47 s, package
   439.506 s, focus 161.96 s), with all three policy projections and 33 bounded
   live MCP operations. Sources were unchanged, build scratch was removed and
@@ -1300,11 +1300,11 @@ approved content. Cumulative delivery spend matches the minimized SQL ledger.
 This is test-only qualification with no production change or additional load
 generator.
 
-- [Policy native evidence](../test/results/live-sustained-policy-42755991162/README.md):
+- Policy native evidence:
   run 42755991162 passed at `f36aed40` (Go test 437.40 s, package 437.430 s,
   focus 163.58 s), with all three policy projections and 31 bounded live MCP
   operations.
-- [Manual native evidence](../test/results/live-sustained-manual-42757257065/README.md):
+- Manual native evidence:
   run 42757257065 passed at the same commit (Go test 382.20 s, package 382.228 s,
   focus 105.34 s), with all three finite sessions and 35 operations. Both runs
   had unchanged sources, removed build scratch and no cleanup failures.
@@ -1323,7 +1323,7 @@ recorder. Replay and payload remain bounded, and closing leaves the source's
 original permit active. This is test-only qualification with no production
 change.
 
-- [Component evidence](../test/results/live-cohort-throughput/README.md): the
+- Component evidence: the
   race-enabled libpcap test passed all 20 runs in 73.412 seconds. Full
   `make pre-push` also passed, including affected libpcap/integration tests and
   all 611 console tests. Earlier exact-batch/zero-loss and stale-timestamp fixture
@@ -1341,7 +1341,7 @@ closing releases the original workload slot. Four unspent controls and six fully
 refilled accounts are pruned before restoring the original limits for all
 existing assertions. This is test-only qualification with no production change.
 
-- [Real-PostgreSQL evidence](../test/results/live-workload-ceiling/README.md):
+- Real-PostgreSQL evidence:
   the focused test passed in 18.74 seconds and the package in 19.812 seconds,
   with unchanged sources and no cleanup failures. Full `make pre-push` also
   passed, including the affected integration suite and all 611 console tests.
@@ -1359,7 +1359,7 @@ before a real container restart. The original control stays active. This is
 test-only qualification with no production or permission change and no load
 generator.
 
-- [Native evidence](../test/results/incident-live-priority-42744615343/README.md):
+- Native evidence:
   run 42744615343 passed at `d45b7838` (Go test 412.03 s, package 412.057 s,
   focus 132.67 s). The original view remained `Active` with continuation after
   incident admission. The 812-byte PCAPNG retained six pre-restart marker packets
@@ -1383,11 +1383,11 @@ original close releases the slot without extending the deadline. SQL verifies
 three controls across two principal keys, then two across one. This is test-only
 qualification with no production or permission change and no additional suite.
 
-- [Policy native evidence](../test/results/live-principals-policy-42730471915-pass/README.md):
+- Policy native evidence:
   run 42730471915 attempt 2 passed at `55cd5861` (Go test 419.34 s, package
   419.365 s, focus 145.46 s). All three policy projections completed, including
   packet owner failover and the 2,810-byte HTTP native Save.
-- [Manual native evidence](../test/results/live-principals-manual-42733127220/README.md):
+- Manual native evidence:
   run 42733127220 passed at the same commit (Go test 362.90 s, package 362.930 s,
   focus 89.47 s). All three finite sessions attached before publication and
   cancelled without replacement. Both runs had unchanged sources, removed build
@@ -1412,7 +1412,7 @@ ceiling. Closing the second principal's control releases its installation slot;
 the original expiry/debt checks remain at `n == 4` and `a == 2`. This is a
 test-only qualification with no production or permission change.
 
-- [Real-PostgreSQL evidence](../test/results/installation-live-ceiling/README.md):
+- Real-PostgreSQL evidence:
   `TestLiveWatchLedgerWithRealServices` passed in 10.53 seconds and the package
   completed in 11.596 seconds. Sources were unchanged and cleanup had no
   failures. Full `make pre-push` also passed on the same working tree, including
@@ -1432,7 +1432,7 @@ active.
 The installed live-observation fixture now proves that React and MCP views share one principal's two watch slots. The browser emits an explicit `opened` event and remains open until Go sends `release`; the third concurrent open with a fresh idempotency key must return `CapacityUnavailable`. Both original controls remain active, and subsequent policy episodes complete. This is test-only qualification with no production or permission change.
 
 - Guarded native `continuation-ongoing-live` run
-  [42718907496](../test/results/live-principal-ceiling-42718907496/README.md)
+  42718907496
   passed at `4fdb3fb2` (Go test 422.27 s, focus 146.53 s). The third open was
   refused while React and MCP were verifiably active. The original MCP view
   then completed owner-failover recovery and all three policy projections
@@ -1457,7 +1457,7 @@ qualification. The broader specification remains active.
 [ADR-317](decisions/317-terminal-live-owner-recovery.md) and migration 00147 close a live view after original-owner route/transport loss without adopting its private source/filter session. The receiving owner verifies the original cursor against the complete principal/client and minimized control, then closes only that control. Revision, accepted/idle/hard expiry and cumulative spend are unchanged; the terminal empty batch carries a reconnect gap and no continuation. A dedicated `ErrOwnerLost` distinguishes route, dial/TLS and premature-stream failures from every reachable-owner error frame, including ordinary and transient unavailability.
 
 - Guarded native `continuation-ongoing-live` run
-  [42705246482](../test/results/live-owner-failover-42705246482/README.md)
+  42705246482
   passed at `c890dc86` (Go test 428.42 s, focus 157.14 s). The exact original
   owner Pod was replaced with a distinct activated server epoch while retaining
   Deployment and ReplicaSet identity. The MCP view closed at its original
@@ -1498,7 +1498,7 @@ production behavior, authority and deadlines are unchanged.
 - The recording start fixture uses ADR-311's 30-second target/capability/process
   observations and refreshes the separate five-second permission observation
   immediately before preparation.
-- [Complete real-SQL evidence](../test/results/custody-fixtures-complete-verification/README.md):
+- Complete real-SQL evidence:
   877.834 s, unchanged sources, removed build scratch and no cleanup failures.
   The targeted recording case also passes. Full `make pre-push` passes,
   including the affected integration suite and all 611 console tests.
@@ -1511,7 +1511,7 @@ pre-start KMS failure. No production behavior changed in this slice; the fixture
 was simplified after process-kill attempts proved too racy for a small capture.
 
 - Guarded native `continuation-journey-start-failure` run
-  [42630012490](../test/results/lost-completion-native-42630012490/README.md)
+  42630012490
   passed at `20e56205`: Go test 611.45 s, focus 331.58 s. A scoped trigger
   rejected only the exact `started → stored` transition after all four regional
   ciphertext objects committed. Execution stayed `started`, custody `reserved`,
@@ -1524,7 +1524,7 @@ was simplified after process-kill attempts proved too racy for a small capture.
 - The KMS leg returned `OutcomeUnknown` after its audited Begin, remained
   `Pending` after reconnection with zero executions, and reached the same
   terminal reason at its original deadline. KMS connectivity was restored.
-- The [targeted real-SQL observer run](../test/results/lost-completion-sql.log)
+- The targeted real-SQL observer run
   passed (3.021 s), including concurrent once-only observation through both the
   original and installed cleanup roles, denied history rewrites and retained
   charges. A separate full `custody-integration` run also passed this subtest but
@@ -1539,8 +1539,8 @@ was simplified after process-kill attempts proved too racy for a small capture.
 ADR-310's accepted live workflow now has installed qualification for all three
 approved projections on both ongoing policy sources and finite manual sessions.
 No product or test code changed in this evidence slice. Committed provenance:
-[policy run](../test/results/live-observation-policy-native-42542873758/README.md),
-[manual run](../test/results/live-observation-manual-native-42542876337/README.md).
+policy run,
+manual run.
 
 - Guarded native `continuation-ongoing-live` run 42542873758 at `beff40d2`
   passed (Go test 431.893 s, focus 150.46 s). Packet, syscall and HTTP policy
@@ -1760,7 +1760,7 @@ race tests pass; the real-service custody selection
 `^TestContextAdmissionWithRealServices$/^d` passes (263 s, including the new
 `started-response-continues-after-permission-suspension`). `make context-integration`
 passed (Go test 1027.230 s). Installed run
-[42591125143](../test/results/started-downloads-native-42591125143/README.md)
+42591125143
 passed on `724f7860`: the final 8,388,476-byte response crossed permission
 suspension with unchanged bytes, fresh preparation was refused, and all four
 paced/range/stale sessions completed. Go test took 479.054 s; source hashes were
@@ -1792,7 +1792,7 @@ failure, causal read-only facts and strict cleanup](../test/results/finite-saved
 are retained. The whole run fails586.752s; strict cleanup separately exits0.
 The one-predicate planner correction now matches the existing reader; composed
 RED/GREEN,101 selected affected races and two independent reviews pass.
-[Exact local fix evidence](../test/results/finite-saved-logs-read-plan-local/README.md)
+Exact local fix evidence
 is separate from the pending fresh installed native parity qualification.
 
 ## Confirmed permission-epoch restart (2026-11-06)
@@ -1803,7 +1803,7 @@ second only when the exact old epoch is suspended and all readers have joined;
 unknown suspension retains31seconds. Each successor rebuilds current authority.
 Controlled-port RED/GREEN, full pre-push and independent review pass. Actual
 PostgreSQL/S3 authority tests pass5.538s/23entries; all4,311 inputs match Git and
-cleanup is complete. [Original evidence and scope](../test/results/permission-restart-confirmed-local/README.md)
+cleanup is complete. Original evidence and scope
 remain explicit. Fresh installed browser/log qualification is next; this service
 run does not prove installed recovery availability.
 
@@ -1816,7 +1816,7 @@ then refuses authority/data-class (whole run1/644.649s). The missing exact raw
 logs native-type branch is corrected without changing current grant, audience,
 permission, quota or deadline checks. Old-authority RED.020s, full authorization
 race0/1.677s and independent two-file review pass.
-[Original run, local fix and strict cleanup](../test/results/finite-saved-logs-native-download/README.md)
+Original run, local fix and strict cleanup
 retain4,367 verified unchanged inputs and the failed whole-workflow verdict.
 Complete native parity and fresh installed qualification remain pending.
 
@@ -1828,11 +1828,11 @@ and no paired SQL rows: later attempts cannot finish an uncommitted first setup.
 The exact original postclaim failure remains unknown. All4,366 inputs match Git;
 source is unchanged. Diagnostics finish before separate strict cleanup0 and
 independent zero-resource read-back. No original initialization/capture is retried.
-[Original reports, diagnosis and cleanup](../test/results/finite-saved-logs-bootstrap-f941/README.md)
+Original reports, diagnosis and cleanup
 do not establish installed query-parser or complete saved-log qualification.
 The separately reviewed repair finishes only the original unacknowledged absent
 pair under current locked authority; original identity and timestamps remain
-unchanged. [Actual service qualification](../test/results/capacity-unacknowledged-pair-local/README.md)
+unchanged. Actual service qualification
 passes the full selected matrix (83.524s,106 names), with both original failed
 and corrected campaigns preserved and independently verified. Final integrated
 pre-push passes; fresh installed logs qualification follows.
@@ -1848,7 +1848,7 @@ repair preserves that original pending handle/deadline after full tool-schema
 and SDK-error validation. Synchronous completed reads keep their ok requirement;
 no production authority, budget, retry or deadline changes. Selected journey,
 logs and packet-helper races pass16.148s; independent two-file review is clear.
-[Original failed runs and separate strict cleanup](../test/results/finite-saved-logs-query-admission/README.md)
+Original failed runs and separate strict cleanup
 remain explicit. Full installed query/download/browser qualification is pending.
 
 ## Finite logs approval view contract correction (2026-11-06)
@@ -1875,7 +1875,7 @@ The repaired `a03baf86` constructor reaches output preparation in a fresh
 installed fixture, then fails at PrepareStart (Go/harness1,470.496s). Native
 server dry-run reproduces the installed CRD rejecting the exact `logs` type.
 All4,365 original sources match Git; retained original diagnostics and separate
-strict cleanup readback are [preserved](../test/results/finite-saved-logs-start-contract/README.md).
+strict cleanup readback are preserved.
 Signed `94519f1b` adds only the existing API logs type and positive64MiB ceiling
 to the canonical start contract, reviewed CEL and CRD. Golden/negative gates,
 existing local-start races and synthetic CRD server compilation pass. Original
@@ -1890,7 +1890,7 @@ The original accepted capture remains prepared without a start object. A retaine
 local fixture reproduces this boundary and identifies the constructor discarding
 its initialized logs holder when assigning the complete output struct. No original
 uncertain capture is retried. Both original failures and separate strict cleanup
-readback are [preserved with exact hashes](../test/results/finite-saved-logs-start-diagnosis/README.md).
+readback are preserved with exact hashes.
 
 Signed `a03baf86` moves the existing holder initialization after that assignment.
 Its regression fails on the old constructor; full affected bootstrap/privacy
@@ -1904,7 +1904,7 @@ is in progress; these local fixes are not an installed-success claim.
 
 Signed `67a28e07` passes all15 CI jobs. Its installed run still fails before
 collection (Go/harness1,486.522s), after original Pod restart/listener readiness
-succeed. All4,363 sources match Git and cleanup completes. The [original report](../test/results/finite-saved-logs-native-42107433129/README.md)
+succeed. All4,363 sources match Git and cleanup completes. The original report
 and local actual-compiler/C20 regression isolate a public lifecycle schema
 rejecting finite logs' requested1h history. The dedicated finite-log onTrigger
 shape now accepts historical/future windows with at least one positive interval;
@@ -1950,7 +1950,7 @@ logs retain their separate `f8c8eb5c` pass in13.320s. The20-case content-free
 PostgreSQL sizing probe passes with maximum complete key binding9,669B compact/
 11,053B JSONB under the unchanged16KiB bound. These are actual service/role
 fixtures; paid read-loop crypto/Job/issuer/transport proofs remain synthetic.
-[Original qualification history](../test/results/finite-saved-logs-service-local/README.md)
+Original qualification history
 retains all prior failures and only supersedes their specific corrected boundary.
 Installed/browser/native/history/Stop and fresh-host resource qualification are
 still pending; full S-05 and the complete specification goal remain active.
@@ -2061,7 +2061,7 @@ complete tree `1f400fa8108ef87fa4a1318349d57c121c216fab`. Eligible pull-request
 CI42065525559 passes all15 jobs. Native42065554713 has actual Go exit0 in827.907s,
 harness exit0, unchanged sources, removed build scratch and complete cleanup[].
 Root and independent review match all4,293 input hashes to the candidate.
-[Original evidence](../test/results/saved-syscall-query-native-42065554713/README.md)
+Original evidence
 retains both terminal test facts and the cancelled outer job.
 
 All five fixed views and raw MCP/actual React queries pass same-original parity,
@@ -2113,7 +2113,7 @@ fixtures; these results do not establish installed Kubernetes retirement.
 
 On signed `5c4fc02e`, make pre-push exits0, including561 console tests/49 files;
 the full compiled console-browser gate exits0 across8 top-level fixtures in
-118.349s. [Original local evidence](../test/results/saved-syscall-query-worker-lifecycle-local/README.md)
+118.349s. Original local evidence
 retains baseline failures, the fixture error, final source maps, reviews and gate
 logs. No installed capacity saving or full20-minute syscall workflow pass is
 asserted; fresh final-candidate CI and installed Repeat/Stop/cleanup remain.
@@ -2126,7 +2126,7 @@ fixed-view assertions and both raw MCP/actual React queries retain native
 parity/accounting/key/worker checks. Repeat preview returns ok in4.430s. The next
 history read fails263ms after cancellation was reported, so it does not establish
 an independent product defect. Initial4,291 source hashes match Git; Go/test
-exits and final-source/cleanup evidence remain absent. [Originals](../test/results/saved-syscall-query-native-42044789919/README.md)
+exits and final-source/cleanup evidence remain absent. Originals
 preserve the explicitly running/incomplete checkpoint. Stop is unqualified.
 
 The actual preview producer/browser controls had omitted combined syscall-query
@@ -2136,7 +2136,7 @@ unions now preserve mixed packet/syscall/profile-download scope and frozen
 approval receipts. Targeted three-package races,91 React tests and TypeScript
 pass. A fresh build and actual compiled-plan/C20/GoTLS/builtReact authoring race
 passes query-only and combined cases in6.257s. Its authority/approval storage are
-synthetic; no collection/read occurs. [Local originals](../test/results/saved-syscall-query-approval-authoring-local/README.md)
+synthetic; no collection/read occurs. Local originals
 bind13 final owned sources and preserve meaningful REDs separately from fixture
 setup failures. Independent reviews are clear; installed qualification remains.
 
@@ -2165,7 +2165,7 @@ separate child-exit control preserves exact output and nonzero status.
 These changes do not explain the installed runtime overrun, extend20 minutes,
 assert cleanup after a kill, or establish Repeat/Stop success. Original failed
 and cancelled evidence remains. Required local pre-push checks and independent
-review pass; [local originals](../test/results/saved-syscall-query-cancellation-local/README.md)
+review pass; local originals
 retain all results. One observable installed campaign remains required before
 merging PR171.
 
@@ -2182,7 +2182,7 @@ The installed artifact ZIP3,699B matches the server digest. Its four originals
 contain a complete50-record native JSONL (48 events), setup output and empty
 Go/timing logs. No terminal Go/harness exit, source inventory or cleanup report
 was emitted. Recording bytes do not establish query/Repeat/Stop completion.
-[Cancellation originals](../test/results/saved-syscall-query-native-42038849665/README.md)
+Cancellation originals
 retain full API/workflow metadata and separate CI failure. The harness's loss of
 partial diagnostics is being resolved before another hosted attempt. PR171 is
 open; no full workflow, S-05 or project completion follows.
@@ -2201,7 +2201,7 @@ Affected capture races pass25.794s. Existing C20 audit/schema/serialization race
 pass7.622s: a3,570-byte successful response takes3.130ms after injected preview
 completion, leaving743.154ms. Its providers are in-memory; this is not installed
 success-tail latency. The initial expired-assessment and test compile failures
-are retained with [local originals](../test/results/saved-syscall-query-readiness-local/README.md).
+are retained with local originals.
 Required `make pre-push` passes, including552 console tests.
 
 The separate history test correction and first failed native campaign are
@@ -2217,7 +2217,7 @@ Repeat preview at `facts/storage/expired/readiness-tail` (Go/harness1,
 884.527s). It read history successfully; fresh capacity publication finished
 31.675ms after the preview's readiness refusal. Exact original cutoff dates
 are unlogged; later current snapshots are not failure-time proof. Stop was not
-reached. [Originals and scope](../test/results/saved-syscall-query-native-42030863610/README.md)
+reached. Originals and scope
 retain4,291 exact Git hashes, unchanged sources, clean teardown and native data.
 
 CI separately exposed a pre-existing synthetic history transport close race.
@@ -2240,7 +2240,7 @@ live SQL/key checks; its advancing-clock model is not a measured speedup.
 Review reproduced the fixture's missing console `evidence:raw` scope for
 arguments; the corrected actual scope producer and four controls pass. Helper
 races,36 selectors and independent reviews pass. Full integration unit races
-pass54.345s with external fixtures skipped. [Preflight originals](../test/results/saved-syscall-query-native-preflight-local/README.md)
+pass54.345s with external fixtures skipped. Preflight originals
 retain exact hashes, setup failures, native oracle/replay tests and pending
 installed SQL proof scope. New SQL readbacks, same-original installed argument
 parity and a complete20-minute workflow pass remain required.
@@ -2254,10 +2254,10 @@ allocations,48KiB/two operations, six one-use key roles and joined SQL closure
 pass. These paid loops use synthetic crypto/join proofs; actual parser/decrypt
 execution is separate. Actual PostgreSQL JSONB sizing passes20 cases with a
 35,750-byte maximal binding under the unchanged48KiB bound.
-[Originals, two failed fixtures and corrections](../test/results/saved-syscall-query-services-local/README.md)
+Originals, two failed fixtures and corrections
 retain all scopes and actual failures. No product authority was relaxed.
 
-Four separate [encrypted-reader resource cases](../test/results/saved-syscall-query-resource-local/README.md)
+Four separate encrypted-reader resource cases
 pass against1,821 exact compiled inputs plus a recorded overlay. Two legitimate
 near8MiB raw originals authenticate complete EOF despite page stops; cancellation
 and source error yield no page and join. The largest observed cgroup peak is
@@ -2266,7 +2266,7 @@ configuration-only evidence. Root independently verifies inputs, actual limits,
 outcomes and exact-name/matching-label container cleanup. The earlier wrong
 cleanup-label readback is retained alongside the corrected observation.
 
-[Component/console originals](../test/results/saved-syscall-query-local/README.md)
+Component/console originals
 retain552 console tests, production build, actual React/GoTLS two-case race
 pass, C20 raw/refusal/maximum-page checks and independent reviews. The broad
 Go gate's obsolete bootstrap expectation was corrected; full bootstrap passes
@@ -2314,7 +2314,7 @@ Go/harness0, four tests/769.146s,4,258 exact Git source hashes, unchanged inputs
 removed scratch and cleanup[]. Both fixed summaries and MCP/actual React packet
 queries match the same authenticated PCAPNG/tshark original. SQL grant/query/
 key accounting, exact keyed replay and original worker joins/retirement pass.
-[Qualified originals and merge readback](../test/results/saved-packet-query-native-42023214158/README.md)
+Qualified originals and merge readback
 retain the9,400-byte native file, independent source/hash checks and precise
 scope. The earlier SQL/replay failures and outer-cancelled inner pass remain.
 
@@ -2332,7 +2332,7 @@ removed scratch and cleanup[]. MCP and actual React queries and fixed
 summaries matched the same authenticated PCAPNG/tshark original; query rows,
 times, exact saved frame prefixes, grant/accounting and original worker joins
 passed. The outer job was nevertheless cancelled at its20-minute limit and is
-not a green workflow. [Originals and scope](../test/results/saved-packet-query-native-42019184868/README.md)
+not a green workflow. Originals and scope
 retain the native file and exact stage chronology. This attempt reported no
 audit-profile23514; the earlier rejection's cause and sustained availability
 remain unproven.
@@ -2356,7 +2356,7 @@ pristine upgrade139 passed 401 tests in 8.073s; harness/Go exits were 0/0.
 Each matched all 4,197 Git hashes, retained unchanged sources and cleaned up.
 Fresh controls and identical-state permission/source/trust expiry checks retain
 SQL23514/message, with 809–818 bytes of operator detail and a generic public
-adapter. [Originals and limits](../test/results/saved-packet-query-audit-diagnostics-local/README.md)
+adapter. Originals and limits
 also retain exact actual function restoration through 139→138→139.
 
 This is observability for the proven installed failure, not an availability
@@ -2370,7 +2370,7 @@ fixed summaries, MCP keyed replay/query delivery, actual React query delivery,
 covering-grant reuse, exact accounting/key checks and original worker joins.
 The later native GET failed at current audit-profile preflight (Go/harness 1,
 Go811.852s). The specific failing combined SQL guard term was not retained.
-[Original campaign and diagnoses](../test/results/saved-packet-query-native-42011944382/README.md)
+Original campaign and diagnoses
 preserve 4,257 exact Git source hashes, unchanged inputs and clean teardown.
 
 No native download/hash/tshark parity or complete S-05 exit follows. The next
@@ -2383,7 +2383,7 @@ diagnostic work, not an asserted availability fix. PR169 remains open.
 Candidate `9bf84fcc` passed all 15 CI jobs. Its installed run41990901022
 passed both fixed summaries and returned Pending for the first raw packet query,
 then failed the immediate same-key Begin retry with HTTP503 (Go/harness 1,
-Go713.646s). [Original failed evidence](../test/results/saved-packet-query-native-41990901022/README.md)
+Go713.646s). Original failed evidence
 has 4,255 exact Git hashes, unchanged sources and clean teardown.
 
 The retry's new audited operation was absent from the existing query-call
@@ -2401,9 +2401,9 @@ include exact registration/idempotence, current grant/MAC refusals and proof
 that the replay call cannot fund a read. Corrected installed qualification
 remains pending.
 
-[Replay service originals](../test/results/saved-packet-query-services-local/replay-registration/README.md)
+Replay service originals
 retain the real refusal and all three corrected campaigns. Fresh
-[resource checks](../test/results/saved-packet-query-resource-c6b87702-local/README.md)
+resource checks
 also passed four cases on `c6b87702`, with 1,812 exact inputs and complete
 cleanup. The complete-case peaks were 87,736,320 and 136,445,952 bytes under
 256 MiB; 500m CPU remains verified configuration rather than sustained
@@ -2432,11 +2432,11 @@ metadata lifecycle in 13.526s, raw lifecycle in 15.325s and separate upgrade139
 round trip in 6.492s (401 tests). All four campaigns matched their 4,194 reported
 Git hashes, kept sources unchanged and cleaned up. The regression uses a valid
 nonempty BPF instruction representation; it does not invoke libpcap itself.
-[Corrected service originals](../test/results/saved-packet-query-services-local/compiled-program/README.md)
+Corrected service originals
 preserve the old failure and each new pass. SQL generation, spec/architecture
 checks and Go vet also pass. Corrected installed qualification remains pending.
 
-[Failed installed originals](../test/results/saved-packet-query-native-41986407470/README.md)
+Failed installed originals
 preserve the terminal run, verified ZIP and exact 4,255 Git source hashes.
 Sources stayed unchanged, cleanup was empty and scratch was removed. Those
 facts do not establish query delivery or native parity. PR169 remains open.
@@ -2460,7 +2460,7 @@ authenticates complete EOF even after a logical scan/output stop. Primitive
 zero/null fields, typed time/flags and raw saved-frame prefixes retain exact
 source classification.
 
-[Local evidence](../test/results/saved-packet-query-local/README.md) retains focused RED/GREEN checks, independent reviews and
+Local evidence retains focused RED/GREEN checks, independent reviews and
 source-scoped repository checks. The full built React/Go TLS gate passed at
 `bb936966` in 107.539 seconds, including metadata ordinary access, raw
 zero/null/prefix fields and a limited nested reply; existing browser cases and
@@ -2470,7 +2470,7 @@ outer hint now pass both validators. The 4096-byte wrapper reserve keeps the
 measured maximal admitted primitive page at 20,424 B, direct reply 21,254 B and
 nested reply 21,955 B within 24 KiB.
 
-[Service evidence](../test/results/saved-packet-query-services-local/README.md) records separate pristine managed metadata (13.764 seconds,
+Service evidence records separate pristine managed metadata (13.764 seconds,
 `5722a38e`) and raw (15.639 seconds, `b2759438`) lifecycle passes. Each matched
 all 4,194 reported Git hashes, kept sources unchanged and cleaned up. Actual
 compiled hub/key roles, encrypted audit, original query/key identity, two
@@ -2483,7 +2483,7 @@ key-binding CHECK and trust; all four new helpers are absent after Down.
 Historical setup checks logical schema before rebinding the full snapshot; the
 actual 139 round trip still compares physical ordinals exactly.
 
-[Resource evidence](../test/results/saved-packet-query-resource-local/README.md) at `b2759438` passed four fresh consumers against 1,812 exact
+Resource evidence at `b2759438` passed four fresh consumers against 1,812 exact
 dependency hashes: two 8 MiB originals exercise 256-instruction GoVM filtering,
 long raw fields/prefix output and 233,011 tiny records with wire-length cache
 overflow. Complete peaks were 94,838,784 B and 134,688,768 B under the observed
@@ -2512,7 +2512,7 @@ PR167 merged normally as `897fd783d6963073ce421cb6a211ffd59a1cdebf` at
 03:38:53Z. Reviewed `b6e2c084`, merge and fresh main share complete tree
 `33a5659402e0bb2ea520802d6708c2a6424f1a64`. Eligible pull-request
 CI41960208068 passed all15 jobs including ci-ok.
-[Installed41960249012](../test/results/raw-packet-summary-native-41960249012/README.md)
+Installed41960249012
 passed Go/harness0 in773.697s. Independent read-only MCP and actual installed
 React fixed summaries completed before separately authorized raw download and
 matched the same9,400-byte authenticated original through native/tshark parity:
@@ -2533,9 +2533,9 @@ raw query/download grants remain independent. Tiny stored prefixes count as
 unclassified saved records rather than guessed endpoints. No derivative or
 additional human approval is introduced. Source/authority/SQL/worker/public
 composition, built React and named raw-input resource checks pass locally.
-[Local originals](../test/results/raw-packet-summary-local/README.md),
-[service evidence](../test/results/raw-packet-summary-services-local/README.md) and
-[resource evidence](../test/results/raw-packet-summary-resource-local/README.md)
+Local originals,
+service evidence and
+resource evidence
 retain exact source scopes and failures. The installed pass above closes the
 named reference workflow; no complete S-05 exit is claimed.
 
@@ -2570,7 +2570,7 @@ MCP/React/same-original native-tshark pass has the separate scope recorded above
 
 PR165 merged as `8bea063222b873283d210264e88d286efa0a2a86` after required
 CI41945402872 passed all15 jobs and
-[installed41945434872](../test/results/saved-packet-summary-native-41945434872/README.md)
+installed41945434872
 passed Go/harness0 in757.951s. MCP and actual React summaries matched the same
 13,460-byte authenticated PCAPNG through tshark:132 saved records/two directional
 groups. Both paid-query source/account/key/batch checks and original worker
@@ -2583,7 +2583,7 @@ candidate and failure evidence follows.
 
 PR164 merged normally as `b06b59c78cc778c036b6969f5fe84802e3d6bf37`; fresh
 main has the identical complete tree as reviewed `2bb27caf`. Required pull-request
-CI41926030097 passed all15 jobs. [Installed auth41926293863](../test/results/profile-auth-native-41926293863/README.md)
+CI41926030097 passed all15 jobs. Installed auth41926293863
 exited Go/harness0 after641.287s: actual installer/private input, one authenticated
 TLS CPU request from the original Restricted Pod, encrypted publication, native
 882B hash/local pprof, read-only summary, history and fresh Repeat4.021s passed.
@@ -2603,7 +2603,7 @@ records fixed bounds and the distinction between saved records, reported
 exclusions and unknown network loss. No acquisition is implicit in a summary.
 
 The integrated source is frozen at `6eee3964` after independent producer/consumer
-review and focused races. [Local originals](../test/results/saved-packet-summary-local/README.md)
+review and focused races. Local originals
 retain actual failures and source scopes. Initial pre-push exited2 solely because
 an old selector test expected heap to be the final browser case; the corrected
 selector checks every retained/new case and passed. Other pre-push targets passed,
@@ -2618,7 +2618,7 @@ Git, unchanged sources and empty cleanup. Runtime/key SQL roles and managed
 publication are real; Job/Pod/issuer/join inputs remain synthetic.
 
 Eligible pull-request CI41936804544 passed all15 jobs on published `928eae4d`.
-[Installed attempt41937101838](../test/results/saved-packet-summary-native-41937101838/README.md)
+Installed attempt41937101838
 failed (Go/harness1,636.411s): capture/publication and summary admission passed,
 the first result poll was Pending, then the second returned HTTP503. No replay
 was attempted; the React view, SQL joined proof and native PCAPNG comparison
@@ -2632,11 +2632,11 @@ original deadline and one-use batch checks remain. The complete populated
 top100 public poll envelope also passes for both exclusion labels and unknown
 statistics. Failure-only manual-mixed diagnostics now reuse existing hub/SQL/Pod
 reports and add a bounded query Job status read. No happy-path reads, privileges,
-timeouts or retries are added. [Final local checks](../test/results/saved-packet-summary-receiver-local/README.md)
+timeouts or retries are added. Final local checks
 pass integrated pre-push and packet preflight, including the actual receiver,
 outer encrypted/TLS key reader and fresh raw/wrong-Pod denial. Independent review
 found no blockers. Corrected `e280290e` passed all15 eligible CI41941071465 jobs.
-[Installed attempt41941094248](../test/results/saved-packet-summary-native-41941094248/README.md)
+Installed attempt41941094248
 then reached successful MCP summary, exact SQL/key/batch proof and actual React
 rendered values. It exited1/704.734s at the browser's later accounting assertion:
 the fixture expected one two-unit principal allocation although MCP and browser
@@ -2649,7 +2649,7 @@ sum for that account/root. Its fresh real-service run passed11.264s, with six
 consumed key roles and both native/public batches joined. Both runs matched all
 4,140 source hashes against Git plus their three exact test overrides, retained
 unchanged sources and clean cleanup. Production quota semantics are unchanged;
-[Exact local originals](../test/results/saved-packet-summary-shared-account-local/README.md)
+Exact local originals
 retain both runs, affected race exit0 and final integrated pre-push exit0.
 Final CI and the scoped installed workflow passed as recorded above.
 Maximum-shape/cgroup and raw-query qualification remain open. Broader S-05 and
@@ -2662,13 +2662,13 @@ owner-observation phase fixes. Required pull-request CI41900935231 passed every
 job, including `ci-ok`.
 Previous
 `1cba8f74` passed genuine pull-request CI41879540541 and
-[installed heap41879673486](../test/results/heap-browser-native-41879673486/README.md)
+installed heap41879673486
 (Go/harness0,587.634s): actual React summary, ten-unit/three-role SQL proof,
 authenticated534B native download, local pprof and fresh Repeat passed. All4,135
 submitted sources matched Git; cleanup passed. Heavy comparison remains qualified
-at c6 in [41863091784](../test/results/profile-heavy-native-41863091784/README.md).
+at c6 in 41863091784.
 
-[Trace41879675203](../test/results/runtime-trace-native-41879675203/README.md)
+Trace41879675203
 exited1/508.941s after capture, semantic refusal/zero-query checks, authenticated
 74,983B trace/hash and offline Go trace parsing passed. Repeat preview refused
 at17:55:47.091773703Z; the existing demand succeeded1.508s later after4.5s work.
@@ -2694,21 +2694,21 @@ roles, owners, watches, pools or capture requests. The measured composed path
 passes5.684s; fifteen source/deadline cases and actual late-return/reserve/browser
 regressions pass. Both independent reviews found no blockers. Exact commands,
 intermediate failures and source identities are in
-[profile-repeat-phase-local](../test/results/profile-repeat-phase-local/README.md).
+profile-repeat-phase-local.
 
 Complete local pre-push/profile/Go architecture/specification/architecture/design/
 full-browser/service gates passed at8cde9451. Browser passed70.715s with28journeys/
 27accessibility scans. Both real SQL/S3/KMS service fixtures passed; each matched
 all4,077 submitted Git blobs with unchanged sources, clean cleanup and no owned
 containers left. Original reports and output readbacks are in
-[profile-repeat-phase-final-local](../test/results/profile-repeat-phase-final-local/README.md).
-Fresh [heap41891716697 attempt2](../test/results/heap-browser-native-41891716697/README.md)
+profile-repeat-phase-final-local.
+Fresh heap41891716697 attempt2
 passed at `c2d4f74b` (Go/harness0,601.602s): actual React summary, ten-unit/three-key
 SQL proof, authenticated903B native/localpprof and fresh Repeat5.228s. Attempt1
 failed the runner's4GiB build-scratch precheck before Go or source inventory;
 the one failed-job infrastructure retry is recorded separately.
 
-[Trace41891721966](../test/results/runtime-trace-native-41891721966/README.md)
+Trace41891721966
 failed at the same head (Go/harness1,532.931s). Capture, semantic summary refusal,
 authenticated81,056B native download and offline Go trace parsing passed; Repeat
 waited7.875s before refusing. The first storage demand expired after3.97s at
@@ -2737,8 +2737,8 @@ a real one-second context deadline, leaving0–1s of actual time. The correction
 allocates the intended real second within the unchanged original request;
 30 repeated race runs passed and expiry negatives are unchanged. The initial
 batch exit1 and final selected-race exit0 remain distinct in
-[owner-observation-phase-local](../test/results/owner-observation-phase-local/README.md).
-Fresh [trace41901024982](../test/results/runtime-trace-native-41901024982/README.md)
+owner-observation-phase-local.
+Fresh trace41901024982
 at `00fca3ee` exited Go/harness1 after500.682s. Capture, publication, semantic
 refusal, authenticated85,612B native download and offline trace parsing passed.
 History had already failed `write/reserve/live`: PostgreSQL23514 from
@@ -2781,7 +2781,7 @@ submitted source hashes in each fixture matched Git; sources stayed unchanged
 and cleanup was empty. Root integrated pre-push and affected races passed at
 0ff891ee (capture2.415s/PostgreSQL1.191s). Originals, source identities and failed
 setup/RED scopes are retained in
-[accepted-history-capacity-local](../test/results/accepted-history-capacity-local/README.md).
+accepted-history-capacity-local.
 New final-candidate CI and fresh installed trace qualification remain required;
 no installed history/Repeat success is claimed yet.
 TLS is a private, locally checked follow-up; full S-05/specification completion
@@ -4145,8 +4145,8 @@ Local verification: `make console-check` passed 298 tests; the final stricter
 outer-class regression passed all 44 focused projection tests. The actual built
 Chromium fixture passed 26 journeys and 25 accessibility scans (final run 25.862s), including
 synthetic summary responses, 320px layout and no external requests. The retained
-[report](../test/results/profile-summary-browser/report.json) and
-[mobile view](../test/results/profile-summary-browser/profile-summary-mobile.png)
+report and
+mobile view
 record that component boundary. Its current
 identity/summary facts are synthetic. Affected C-03/C-16/contracts/presentation
 races passed (presentation 173.328s); protected bootstrap registration races passed
@@ -4501,7 +4501,7 @@ uncertain application profiler. No cancellation refunds storage reservations or
 renews the original profiling/exclusion interval. An observation-completion
 fix retains the cancellation operation's original five-second upper bound.
 
-Real PostgreSQL/S3 run [`profile-stop-sql124-3`](../test/results/profile-stop-sql124-3.log)
+Real PostgreSQL/S3 run `profile-stop-sql124-3`
 passed in 9.185 seconds, with unchanged frozen sources and no cleanup failures.
 It covers approved profile admission, full final/temporary reservations, exact
 writer binding, replay/replacement refusal, both cancellation outcomes, retained
@@ -9028,14 +9028,14 @@ copy. Installed re-qualification is pending.
 [ADR-225](decisions/225-context-capture-failure-causes.md) adds `targetGone`/`denied` capture
 outcomes (migration 00079, schema 79) and returns `TargetGone` for a request whose reviewed Pod
 is gone. Custody (468 PASS, including a rolled-back real-SQL check of the new phases and the
-unchanged five-second `not_after` bound) and [native109](../test/results/resumed-c62e02ac-native109/README.md)
+unchanged five-second `not_after` bound) and native109
 pass. native108 failed only the demand-lane rate check after the PR #48 bound let discovery step
 every 10 s under demand; the bound is now 30 s. Local runs: selected custody tests get 900 s, and
 the installed journey's retention is 330 s (it idled 7m11s of 600 s in native109; 330 s not yet run).
 
 ## S-02 installed exit in two workload clusters (2026-10-24)
 
-[native107](../test/results/resumed-c62e02ac-native107/README.md) passes the installed journey
+native107 passes the installed journey
 with a second workload cluster joined through the same hub (catalog slot 2). Fixes from
 native99–106: the join derives its catalog slot (8 slots), refresh owners removed (ADR-224),
 transient refresh tables tolerated during initial replay, router ceilings summed per cluster,
@@ -9060,7 +9060,7 @@ pass; the real-SQL custody, browser-session (Keycloak) and installed journey run
 ## S-02 exit checks in the installed journey (2026-10-24)
 
 Installed runs native93–99 added the remaining S-02 exit checks to the installed journey and
-fixed what they exposed. [native99](../test/results/resumed-c62e02ac-native99/README.md) passes
+fixed what they exposed. native99 passes
 all of them in one regional workload cluster: browser submission, MCP/browser preview, case,
 approved extract and native download parity, exact duplicate replay and idempotency Conflict,
 Range/If-Range resume, catalog minimization, an unrelated eligible user refused exactly as for
@@ -9081,7 +9081,7 @@ regional enrollment, Keycloak MCP capture, regional collection/verification/publ
 approved pod-status inspection via the shared acquisition worker (read-only scope refused for
 download), native download, query-worker retirement, Stop after Deny, Deny revocation,
 cleanup-lease denial safety, expiry refusal and verified deletion. The
-[record](../test/results/resumed-c62e02ac-native92/README.md) lists every milestone. Runs
+record lists every milestone. Runs
 native58–91 drove the fixes recorded in their own `resumed-c62e02ac-nativeNN` folders: grant and
 storage-prefix gaps from credential consolidation, 5 s freshness windows relaxed to the
 authorized 30 s (bindings, capacity, permission, trust, retention, topology, self-proofs),
@@ -9550,7 +9550,7 @@ demand cleanup to retain positive retirement before the distinct Stop case.
 It neither rewrites dates nor releases capacity itself. Focused owner/projection
 tests pass in 25.120 seconds; PostgreSQL facet and regional diagnostic race tests
 pass in 39.846 seconds, with recorded sources unchanged. The
-[integrated archive](../test/results/resumed-c62e02ac-integrated-simplification/README.md)
+integrated archive
 retains the preceding failures and exact receipts. Full integrated Go/SQL and
 installed qualification remain next; implementation continues.
 
@@ -9568,7 +9568,7 @@ Four dedicated query deployment/capacity components are replaced by the actual
 shared installed resources and logical query charges. Cleanup is bounded work
 on demand; unknown physical state remains charged.
 
-The [component archive](../test/results/resumed-c62e02ac-approved-projection-component/README.md)
+The component archive
 records passing focused tests, complete affected evidence/native/worker race tests
 (43.204 seconds), console check/build and browser checks. The console check runs
 168 tests; the browser gate covers 19 journeys plus native restart. Actual HTTP/2
@@ -9600,7 +9600,7 @@ process boundaries and database state-transition checks remain. Unused installed
 browser-cleanup credentials are retired; its component still lacks runtime
 composition and this change does not implement it.
 
-The [component archive](../test/results/resumed-c62e02ac-hub-credentials/README.md)
+The component archive
 retains passing focused contract/bootstrap/PostgreSQL tests, integration
 compilation, Kubernetes adapter tests (595.418 seconds), and design/import checks
 (11.142 seconds). All recorded source hashes remain unchanged during their runs.
@@ -9628,13 +9628,13 @@ It cannot admit, repeat audit or start again, replace the capture, or extend dat
 Unexpired metadata is returned without renewal. The persisted audit first-write
 cutoff remains binding.
 
-The [regression archive](../test/results/resumed-c62e02ac-capture-phase-lifetime/README.md)
+The regression archive
 records a genuine failing baseline for request and continuation across intent/start
 work. Focused tests and the complete capture/audit race suites pass; the latter
 runs in 18.949 seconds with all 2,613 Go/module hashes unchanged. Exact operation
 replacement, identity changes, cancellation, real caller expiry and the actual
 audit publisher's original first-write cutoff retain negative coverage. An
-independent source review passes. The [combined design checks](../test/results/resumed-c62e02ac-capture-phase-design/README.md)
+independent source review passes. The combined design checks
 exit 0 in 13.011 seconds with 3,793 source hashes unchanged.
 
 This fixes a reproduced phase-lifetime defect; it does not identify which source
@@ -9648,10 +9648,10 @@ The implementation mandate remains active. Candidate `17e0ff63` includes the
 response-owned 30-second ordinary-permission cadence, one complete authority
 construction per finite download preparation, and removal of two namespace GETs
 from candidate-only workload listing. The latter still requires exact target and
-guarded reads before effects; its [component archive](../test/results/resumed-c62e02ac-capacity-candidate-list/README.md)
+guarded reads before effects; its component archive
 records the genuine failing baseline and passing synthetic TLS/race checks.
 
-The [combined gates](../test/results/resumed-c62e02ac-download-finite-cadence-gates/README.md)
+The combined gates
 pass on frozen sources: specification/architecture/design/dependency checks
 (11.126 seconds) and the selected real SQL/S3 launch/response cases (67.863 seconds
 wrapper). The response case verifies current SQL suspension inside the relaxed
@@ -9660,7 +9660,7 @@ hashes remain unchanged; cleanup and independent resource absence pass. The
 initial design run's generated assertion-count update and repeat are retained.
 The full current Go gate remains pending.
 
-Installed [native57](../test/results/resumed-c62e02ac-native57/README.md) exits 1
+Installed native57 exits 1
 (1,228.512 seconds Go; 1,342.424 seconds wrapper). Initial activation, interrupted
 installer resume, runtime startup, regional enrollment and capacity readiness
 pass. Demand readiness records six distinct binding observations and 33 samples
@@ -9698,7 +9698,7 @@ cache, timer, durable state, credential or timeout. Standalone runtime calls and
 each new public request still authorize afresh. Original deadlines, exact scope,
 current SQL observations, final identity checks and unknown-effect refusal remain.
 
-The [composed regression](../test/results/resumed-c62e02ac-download-coordinator-observation/README.md)
+The composed regression
 records genuine baseline failures: three full reconstructions; successful Job
 recording/observation followed by expiry in the final reconstruction under synthetic
 1.6-second authority cost. Warm Ready replay also reconstructs three times. After
@@ -9712,7 +9712,7 @@ request-digest mismatch and corrected genuine baseline are both retained.
 ADR-220 is integrated: one active response reconstructs ordinary permissions at
 30 seconds while shorter identity/retention/recovery and current SQL checks remain.
 Its independent component/race evidence is in the
-[response cadence archive](../test/results/resumed-c62e02ac-response-permission-cadence/README.md).
+response cadence archive.
 Combined design/real SQL checks subsequently pass as recorded above. Native57
 fails before reaching downloads; installed download qualification remains pending.
 Neither refinement is claimed to explain native56's exact refusal.
@@ -9726,7 +9726,7 @@ and all typed read/prepare/record checks. Two credentials and pools disappear;
 no new grants, schema migration, background work or public option are added.
 The shared pool permits three connections within the unchanged global budget.
 
-The [combined gates](../test/results/resumed-c62e02ac-combined-simplification-gates/README.md)
+The combined gates
 pass: specification/architecture/design/dependency checks (12.461 seconds),
 selected real SQL/S3 execution and download-launch cases (74.734 seconds wrapper),
 and five fresh installation-role cases (41.147 seconds wrapper). The SQL runs
@@ -9736,7 +9736,7 @@ through launch claim. Both fixture cleanups and independent absence checks pass;
 2,759 harness hashes per run match the candidate and remain unchanged. The full
 current Go gate remains pending.
 
-Installed [native56](../test/results/resumed-c62e02ac-native56/README.md) exits 1
+Installed native56 exits 1
 (1,248.277 seconds Go; 1,360.834 seconds wrapper). Installer interruption/resume,
 five runtime Deployments, regional enrollment/join and demand readiness progress.
 The Keycloak/MCP journey collects, verifies, audits and publishes the regional
@@ -9773,7 +9773,7 @@ Original caller, authority, recovery, retention, source and session bounds remai
 worker reservation/launch and evidence effects retain their current SQL checks.
 No timeout, permission, request count, durable state or background task is added.
 
-The [focused real SQL/S3 reproduction](../test/results/resumed-c62e02ac-download-preparation-claim/README.md)
+The focused real SQL/S3 reproduction
 passes on frozen `d47f9a3c` (actual wrapper exit 0, 43.882 seconds; selected subtest
 2.29 seconds). The actual dispatcher and compiled session/worker/audit grants
 carry one original authority through reserve, encrypted intent audit,
@@ -9783,7 +9783,7 @@ readiness/plan latency. All 2,754 harness hashes match the commit and remain
 unchanged; cleanup and independent absence checks pass. This does not reproduce
 native55's failure and does not establish native transfer success.
 
-The [composed preflight regression](../test/results/resumed-c62e02ac-download-preflight-freshness/README.md)
+The composed preflight regression
 does reproduce an availability defect. Three baseline cases cross a 200-millisecond
 readiness/configuration/plan observation during 400 milliseconds of simulated audit
 work. All acknowledge the synthetic audit then refuse with zero claims and Jobs,
@@ -9818,7 +9818,7 @@ observation instead of three. The composed pre-preparation capability path drops
 from 48 HTTP requests to 24. These counts have component regressions; they are not
 claims about installed latency or a completed architecture rewrite.
 
-The [selected real SQL and design gates](../test/results/resumed-c62e02ac-capture-start-gates/README.md)
+The selected real SQL and design gates
 pass on that commit. PostgreSQL/S3 execution cases exit 0 (14.395 seconds Go /
 50.458 seconds wrapper), including a permission change committed during a real
 lock wait, all four preparation-boundary cases and both compiled
@@ -9827,7 +9827,7 @@ commit and remain unchanged; cleanup and independent resource-absence checks
 pass. Specification, architecture, design and Go dependency checks exit 0 in
 13.203 seconds. The full Go gate has not yet run on this candidate.
 
-Installed [native55](../test/results/resumed-c62e02ac-native55/README.md) exits 1
+Installed native55 exits 1
 (1,247.424 seconds Go / 1,373.129 seconds wrapper).
 The unified installer, interruption/resume and regional join progress. The MCP
 journey reaches a real regional pod-status capture, verification and publication
@@ -9898,12 +9898,12 @@ Kubernetes/installer/metadata tests and metadata/bootstrap contract checks pass.
 The composed cold preparation takes 66.822 milliseconds; the near-expiry case takes
 413.885 milliseconds including a synthetic 350-millisecond permission delay.
 These are component measurements with synthetic SQL and worker effects, not
-installed timings. The [qualification archive](../test/results/resumed-c62e02ac-structural-simplification/README.md)
+installed timings. The qualification archive
 records exact commands, scopes, failures and unchanged-source checks. At that
 component checkpoint, PostgreSQL, Helm lifecycle and installed qualification
 were still pending; the completed external checks follow below.
 
-The [real SQL qualification](../test/results/resumed-c62e02ac-simplification-sql/README.md)
+The real SQL qualification
 now passes on frozen `114dd899`. All five role scenarios pass (actual exit 0,
 46.527 seconds Go / 131.646 seconds harness), including the compiled grant matrix,
 unknown claim, lost completion, held lock and recovery after lock. The full
@@ -9924,7 +9924,7 @@ later assertions. Observation intervals and production code are unchanged;
 deliberate unknown-result, privilege, lock and recovery cases retain their
 controlled negative state.
 
-The [Helm lifecycle qualification](../test/results/resumed-c62e02ac-simplification-helm/README.md)
+The Helm lifecycle qualification
 passes on frozen `c6be50ca` (actual exit 0, 50.352 seconds). All 22 recorded inputs
 remain unchanged; lifecycle and legacy-guard tests pass, and no owned resources
 remain. This qualifies the chart lifecycle, not execution of the combined
@@ -9933,7 +9933,7 @@ the full Go gate remain pending.
 
 ## Baseline installed failure and discovery follow-up (2026-10-22)
 
-The frozen `b9e63320` [native52 run](../test/results/resumed-c62e02ac-native52/README.md)
+The frozen `b9e63320` native52 run
 exits 1 after 1,425.418 seconds, before the installed download. Regional workload
 readiness times out despite an acknowledged permission assignment for the exact
 target. The workload discovery cursor advances after a failed LIST of the target
@@ -9956,7 +9956,7 @@ readiness after this correction is still unqualified.
 
 ## First simplified installed run: fixture join identity (2026-10-22)
 
-Frozen `15702681` [native53](../test/results/resumed-c62e02ac-native53/README.md)
+Frozen `15702681` native53
 exits 1 (932.362 seconds Go / 1,046.914 seconds harness). The fresh unified runner
 performs original activation, retirement and managed-copy closure. Its continuation
 is interrupted before the first provider apply, positively terminates, and resumes
@@ -9969,7 +9969,7 @@ the public compiler and installed guards pin only the bootstrap runner as
 installation administrator. The first regional capability ConfigMap remains
 absent. An exact server-side dry-run CREATE is denied under the old identity and
 accepted under the pinned runner, with the object still absent afterward.
-The [admission proof](../test/results/resumed-c62e02ac-native53/admission-proof/README.md)
+The admission proof
 establishes this fixture mismatch without a persistent write or relaxed guard;
 it does not qualify later join stages. Capture, execution, publication and download
 rows are zero. Installed capture/download/Stop remain pending.
@@ -9982,7 +9982,7 @@ limits. The next run must use the existing pinned runner identity for the fixtur
 join and requalify the remaining installed path.
 
 The fixture correction and minimal chart RBAC follow-up pass the
-[recorded gates](../test/results/resumed-c62e02ac-native54/native53-followup-gates/README.md)
+recorded gates
 on `840f27fc`: specification, architecture, design and Go dependency checks exit 0
 in 13.820 seconds; race-instrumented integration compilation with no selected
 tests exits 0 in 23.560 seconds; Helm lifecycle integration exits 0 in 53.985
@@ -9992,7 +9992,7 @@ their stated component scopes, not a completed installed investigation.
 
 ## Accepted capture remains pending (2026-10-22)
 
-Frozen `840f27fc` [native54](../test/results/resumed-c62e02ac-native54/README.md)
+Frozen `840f27fc` native54
 exits 1 (1,191.451 seconds Go / 1,292.094 seconds harness). Regional join and
 readiness now progress. One capture is accepted and its intent audit acknowledged;
 the same accepted capture remains Pending after four explicit continuations and
@@ -10041,7 +10041,7 @@ composed fixture setup failure is retained separately from the genuine baseline
 failures. The complete affected race suites also pass: execution 1.259 seconds,
 bootstrap 32.260 seconds, context-start 2.784 seconds and mTLS 35.042 seconds,
 with all six recorded sources unchanged. Independent review finds no remaining
-blockers. The [component archive](../test/results/resumed-c62e02ac-capture-start-observation/README.md)
+blockers. The component archive
 retains exact commands, original failures and qualification limits. Real SQL
 lock-wait revocation and the installed journey are still pending at this checkpoint.
 
@@ -10050,7 +10050,7 @@ lock-wait revocation and the installed journey are still pending at this checkpo
 Frozen candidate `768316a3` passes the full `make go-check` gate: actual exit 0,
 2,924.562 seconds, with all 3,765 tracked source hashes unchanged. Specification,
 architecture, design and Go dependency checks also pass. The
-[complete qualification archive](../test/results/resumed-c62e02ac-download-observation-gates/README.md)
+complete qualification archive
 retains the exact commands, logs and hashes.
 
 `make permission-integration` passes against real Kubernetes, PostgreSQL and S3
@@ -10073,10 +10073,10 @@ complete identity/authorization, SQL permission, retention, recovery, processing
 and spend decisions are not cached. The interval does not renew caller, session
 or evidence deadlines.
 
-The [narrow cache/domain/environment race selection](../test/results/resumed-c62e02ac-download-policy-observation/README.md)
+The narrow cache/domain/environment race selection
 passes after a genuine failing baseline (exit 1, then exit 0; authorization 1.035
 seconds and privacy 1.008 seconds). Independent review found no blockers. The
-[composed first-Job regression](../test/results/resumed-c62e02ac-download-composed-budget/README.md)
+composed first-Job regression
 now passes in 6.884 milliseconds with
 one protected policy read (14 observer and three probe requests) across ten
 authority evaluations. Its other ports remain synthetic. This removes the
@@ -10101,7 +10101,7 @@ had inherited only 247.6 milliseconds despite a 4.99-second caller budget. All
 eight relevant source hashes remain unchanged. Independent review finds no
 blockers in either final cache change.
 
-The [download observation headroom regression](../test/results/resumed-c62e02ac-download-policy-observation/headroom/README.md)
+The download observation headroom regression
 also reproduces an availability edge: a new request using a 59.9-second-old
 observation inherited roughly 100 milliseconds, so a 150-millisecond processing
 read failed despite its original five-second request budget (exit 1, package
@@ -10111,7 +10111,7 @@ privacy 1.008 seconds), including preservation of an original 40-millisecond
 caller deadline. All five relevant source hashes stay unchanged. Successful
 refresh creates a new source observation; a cache hit never renews one.
 
-The [installed Stop fixture addition](../test/results/resumed-c62e02ac-installed-stop-fixture/README.md)
+The installed Stop fixture addition
 uses a second nonterminal download within existing allocations, after the first
 native download succeeds. It then stops that session after accepted Deny,
 verifies exact-key receipt replay, and requires continued cancellation/content
@@ -10127,7 +10127,7 @@ next; no new installed result is claimed here.
 
 The focused investigation now exposes a composition budget problem before any
 further installed run. The
-[actual TLS policy-reader measurement](../test/results/resumed-c62e02ac-download-policy-budget/README.md)
+actual TLS policy-reader measurement
 counts 14 observer requests and three independent probe requests per policy read.
 Each complete download-authority evaluation reads that policy twice. After the
 adjacent duplicate correction below, the new-worker path still requires ten full
@@ -10139,7 +10139,7 @@ and the composed source path, not a measured complete operation or proof of the
 exact check that failed in native50.
 
 The
-[initial-authority handoff](../test/results/resumed-c62e02ac-download-initial-authority/README.md)
+initial-authority handoff
 removes one immediately duplicated evaluation before attachment SQL. Only local
 validation separates the original observation from that read; later checks after
 blocking work stay current. The genuine before-fix regression exits 1; focused
@@ -10151,7 +10151,7 @@ These results qualify the narrow correction and establish the reader's request
 cost. They do not resolve the complete preparation budget or justify another
 full installed run by themselves.
 
-The [complete first-Job phase reproducer](../test/results/resumed-c62e02ac-download-whole-phase-budget/README.md)
+The complete first-Job phase reproducer
 now fails with the actual coordinator, native runtime, dispatcher, current
 environment and TLS policy reader under one original five-second request.
 Identity/catalog/retention, SQL/audit, readiness and Job ports are explicitly
@@ -10171,7 +10171,7 @@ or cause performance problems. This supersedes the earlier pending decision and
 is recorded prominently in `AGENTS.md`; the exact interval and runtime correction
 remain to be implemented and qualified.
 
-The [latest frozen installed run `context-cqjvthn6`](../test/results/resumed-c62e02ac-native50/result.json)
+The latest frozen installed run `context-cqjvthn6`
 on `b4fbd37d` again completes installed acquisition, verification, publication and
 authorized capture/case retrieval. The request eventually receives an acknowledged
 success for its original capture. The corrected deletion fixture also establishes
@@ -10179,7 +10179,7 @@ the exact cleaner inventory denial while preserving the independent-prefix contr
 The first `prepare_artifact_download` then returns acknowledged unavailable after
 4.433 seconds. The test exits 1 after 1,226.986 seconds.
 
-The [read-only download state](../test/results/resumed-c62e02ac-native50/postmortem-download.log)
+The read-only download state
 contains one `Preparing` session, created at `19:24:29.457101Z`, with its original
 `19:29:29.374261Z` deadline and reserved output/read/session allocation. There is
 no worker, batch, response or native owner, and no emitted bytes. Failure is after
@@ -10196,7 +10196,7 @@ Native download, revocation/expiry and failed-deletion recovery remain unqualifi
 Current work isolates the pre-worker preparation path; another installed run must
 follow a focused defect/reproduction, not a larger retry or authority interval.
 
-The [preceding frozen installed run `context-sagzb681`](../test/results/resumed-c62e02ac-native49/result.json)
+The preceding frozen installed run `context-sagzb681`
 on `62bfc0bb` reaches installed acquisition, independent publication and fresh
 authorized public capture/case retrieval. Bootstrap, exact regional join replay,
 console processing initialization and capacity readiness pass; the demand lane
@@ -10212,7 +10212,7 @@ capture. Its accepted identity survives an unknown continuation reply: fresh
 Preparation retains 1.858338 seconds, and start, acquisition and stored completion
 precede its original cutoff. Verification, audit acknowledgement and publication
 complete independently; a fresh `get_case` succeeds and returns the one artifact.
-The [operation audit](../test/results/resumed-c62e02ac-native49/postmortem-requests.log)
+The operation audit
 records three successful capture reads and one successful case read. These
 ordinary reads do not renew acquisition or infer success from `OutcomeUnknown`.
 
@@ -10220,7 +10220,7 @@ The next failure is in the deletion fixture's setup, before download or fault
 injection. Its original writer, four current/versioned objects and retained
 allocation checks pass, but strict bucket-policy equality rejects the provider's
 JSON representation. The
-[read-only policy response](../test/results/resumed-c62e02ac-native49/postmortem-bucket-policy.json)
+read-only policy response
 returns `DenyEvidenceWrite.Action` as `"s3:PutObject"`; the fixture builder emits
 the one-element array `["s3:PutObject"]`. All other policy fields match.
 The correction emits the provider's scalar form and adds strict PUT/GET
@@ -10229,7 +10229,7 @@ remain unchanged. There are zero download sessions. Native download, revocation,
 expiry, failed-cleanup recovery and deletion charge release remain unqualified
 in the installed journey.
 
-The [bucket-policy regression](../test/results/resumed-c62e02ac-bucket-policy/result.json)
+The bucket-policy regression
 uses the exact provider response retained above. It fails with the original
 builder (exit 1, 0.015 seconds), then passes the focused race selection after
 the one-action scalar correction (exit 0, 1.068 seconds). The combined in-process
@@ -10238,7 +10238,7 @@ corrections. All 2,582 recorded Go/module hashes stay unchanged during each
 phase. Strict scalar/array distinction, scope and uncertain restoration controls
 remain passing. Independent review found no blockers.
 
-The [exact real-provider qualification](../test/results/resumed-c62e02ac-bucket-policy-native/result.json)
+The exact real-provider qualification
 on frozen `ddfcbd0f` now passes: the selected
 `TestInstalledEvidenceDeleteCredentialWithRealServices` test takes 0.26 seconds
 (race package 1.321 seconds), and the harness exits 0. Strict policy PUT/GET
@@ -10250,7 +10250,7 @@ The complete installed journey still needs a passing rerun.
 Read-only review also found that the fixture ends its terminal wait too early
 when `Succeeded` omits its independently authorized case link. The service
 intentionally permits that response when current navigation is unavailable.
-The [separate regression](../test/results/resumed-c62e02ac-case-link/README.md)
+The separate regression
 fails on the original immediate refusal (exit 1, 0.016 seconds), then passes
 the focused race suite with the correction (exit 0, 1.063 seconds). Capture and
 case waits share one original five-minute deadline. Exact identity, cancellation,
@@ -10259,7 +10259,7 @@ review found no blockers; source hashes stayed unchanged during the passing
 selection. Native49 did receive an authorized link, so it does not reproduce
 that separate fixture defect. Installed qualification of the correction is next.
 
-The [preceding frozen installed run `context-siix2l2z`](../test/results/resumed-c62e02ac-native48/result.json)
+The preceding frozen installed run `context-siix2l2z`
 on `d6dabdab` passed bootstrap, exact regional join replay, capacity readiness
 and console processing initialization. Capacity supplied six distinct
 observations and 25 usable samples over 15 seconds. The first reviewed request
@@ -10276,13 +10276,13 @@ recovery or process cutoff used by preparation. The exact winning observation
 was not recorded. The second continuation became the first preparation winner
 with 1.095163 seconds remaining, committed the regional start, acquired and
 stored the artifact before its original cutoff. Its
-[execution row](../test/results/resumed-c62e02ac-native48/postmortem-execution.log)
+execution row
 is `stored`, and the exact
-[CapacityReservation](../test/results/resumed-c62e02ac-native48/postmortem-regional-capacity.json)
+CapacityReservation
 is `StartCommitted`. No preparation was renewed or repeated.
 
 Independent publication also completed. The
-[read-only SQL transaction](../test/results/resumed-c62e02ac-native48/postmortem-publication.log)
+read-only SQL transaction
 records verification at `18:09:05.706456Z`, acknowledged audit at
 `18:09:05.728939Z` and catalog publication at `18:09:06.234647Z`, matching the
 installed publisher's log. Generic custody remains `stored_unpublished`;
@@ -10305,7 +10305,7 @@ execution progress. The product retains that accepted ID and offers a fresh,
 independently authorized `get_capture` read; the fixture must use that path
 before considering another explicit continuation.
 
-The [known-capture recovery regression](../test/results/resumed-c62e02ac-known-capture-recovery/verification.json)
+The known-capture recovery regression
 reproduces the third redundant resolution before correction (exit 1), then
 passes the focused race suite (1.068 seconds) and the full in-process integration
 race suite (6.250 seconds), both exit 0. The corrected fixture retains the
@@ -10320,7 +10320,7 @@ during the full suite. Native49 subsequently qualifies this correction through
 terminal success and an authorized case read, as recorded above. Native bytes,
 revocation, expiry and independent deletion checks remain required.
 
-The preceding [frozen installed run `context-4b2d6czv`](../test/results/resumed-c62e02ac-native47/result.json)
+The preceding frozen installed run `context-4b2d6czv`
 on `f7d3fe14` passed bootstrap, exact regional join replay, capacity readiness
 and console processing initialization. Capacity supplied six distinct
 observations and 37 usable samples over 15 seconds. Test and harness exited 1
@@ -10339,7 +10339,7 @@ defines a bounded consumption phase for the same owned storage wait. Its
 implementation and component checks now pass; native47 did not test it.
 
 The third request admitted one capture and acknowledged its intent. Its
-[SQL postmortem](../test/results/resumed-c62e02ac-native47/postmortem-execution.log)
+SQL postmortem
 shows `intent_audited`, one reserved custody row, zero execution rows and no
 regional CapacityReservation. The original intent interval was 1.370169 seconds,
 with 1.095886 seconds remaining after acknowledgement. Execution stopped under
@@ -10351,7 +10351,7 @@ same-capture continuation was not reached. No quota or deadline was enlarged.
 Acquisition, publication, native download, revocation and deletion remain
 unqualified in the complete installed journey.
 
-The [execution diagnostic regression](../test/results/resumed-c62e02ac-api-check-diagnostics/result.json)
+The execution diagnostic regression
 first reproduces the ambiguous check labels, then passes the full execution
 package under race detection (1.169 seconds, exit 0). Actual SQL reads retain
 `ReadAPIContextWork`; subsequent checks distinguish exact target, eligibility,
@@ -10361,7 +10361,7 @@ chains, ordered reads, deadlines and effect counts remain unchanged.
 Independent review found no blockers. These synthetic component cases do not
 identify the specific dependency that failed in native47.
 
-The [storage consumption regression](../test/results/resumed-c62e02ac-storage-consumption/verification.json)
+The storage consumption regression
 first fails against the old immediate margin refusal, then passes with the
 same owned hint transferring into consumption. It retains the one demand
 attempt, 250 ms cadence, exact storage selection and all original non-storage
@@ -10371,11 +10371,11 @@ the exact one-second margin. Successful Request retains its existing final
 eligibility recheck; no extra facts refresh or admission retry is introduced.
 The full capture race suite passes in 10.066 seconds, and the integration
 package compiles with no tests selected. Independent review found no blockers.
-[Specification, architecture, design and Go vet checks](../test/results/resumed-c62e02ac-storage-consumption-gates/result.json)
+Specification, architecture, design and Go vet checks
 pass. Native48 above includes the correction and reaches admission; its timing
 logs do not establish whether a consumption-phase poll was required.
 
-The [scoped storage-reader SQL regression](../test/results/resumed-c62e02ac-storage-diagnostic-sql/result.json)
+The scoped storage-reader SQL regression
 on `f7d3fe14` passes with the actual compiled read-only role: original binding
 freshness is preserved, a missing exact workload emits the closed diagnostic,
 and writes remain denied. Test and harness exited 0 in 1.989 seconds; all 2,730
@@ -10383,7 +10383,7 @@ source hashes match and stayed unchanged. Both owned containers and their
 network were independently confirmed absent. Synthetic authority in this
 component fixture does not qualify the installed lifecycle.
 
-The preceding [frozen installed run `context-hsp75ign`](../test/results/resumed-c62e02ac-native46/result.json)
+The preceding frozen installed run `context-hsp75ign`
 on `8b153eb2` includes the preparation and pool-cleanup corrections below.
 Bootstrap, exact regional join replay, capacity readiness and processing
 initialization passed. Capacity supplied six distinct observations and 30 usable
@@ -10392,15 +10392,15 @@ samples over 15 seconds. The installed test and harness exited 1 after
 unchanged.
 
 Three original capture requests, each following a fresh review, returned
-`OutcomeUnknown`. Their [retained audit outcomes](../test/results/resumed-c62e02ac-native46/postmortem-requests.log)
+`OutcomeUnknown`. Their retained audit outcomes
 are acknowledged `authority_unavailable` results. The first two resolutions
 acknowledged closure of their reviews; the third resolution exhausted the
 unchanged two-record audit reservation. These were not same-capture
-continuations. [SQL inspection](../test/results/resumed-c62e02ac-native46/postmortem-sql.log)
+continuations. SQL inspection
 found no capture, execution or custody rows, so this run did not reach
 preparation or exercise its new floor/passive replay.
 
-The [first request's timing](../test/results/resumed-c62e02ac-native46/context-storage.log)
+The first request's timing
 reaches the final storage read, then stops before processing/admission. Its
 private error stage was not reported, so storage-read failure and insufficient
 remaining storage margin cannot be distinguished. The second request failed
@@ -10409,7 +10409,7 @@ suppressed by the existing sampling. Successful capacity refresh samples do
 not establish the remaining interval at any later authoritative request read.
 No new deadline, quota or refresh relaxation follows from these observations.
 
-[Closed diagnostic regressions](../test/results/resumed-c62e02ac-request-route-diagnostics/result.json)
+Closed diagnostic regressions
 reproduce the missing request and route labels, then pass under race detection.
 Request distinguishes storage-read failure, insufficient margin and stale
 current facts while retaining the existing preview stages and error causes.
@@ -10427,7 +10427,7 @@ owned cleanup exited 0 with no failures. Independent read-back confirmed all
 12 recorded Docker resources absent, and build scratch was removed. Acquisition,
 publication, native download, revocation and deletion remain unqualified.
 
-The preceding [frozen installed run `context-boqlf6my`](../test/results/resumed-c62e02ac-native45/result.json)
+The preceding frozen installed run `context-boqlf6my`
 on `a6546de8` passed bootstrap, exact regional join replay, processing
 initialization and preview. The demand lane produced six distinct observations
 and 32 usable samples in 15 seconds. [CI on this commit](https://github.com/phihos/asservat/actions/runs/39446523599)
@@ -10436,10 +10436,10 @@ The installed test and harness nevertheless exited 1 after 1,222.530 seconds.
 All 2,752 source hashes match the commit and stayed unchanged.
 
 The first capture reached execution preparation and `ReadyStart`. Its
-[read-only SQL postmortem](../test/results/resumed-c62e02ac-native45/postmortem-execution.log)
+read-only SQL postmortem
 shows only 433.731 ms remained between the preparation insert and its immutable
 `NotAfter`. The exact regional
-[CapacityReservation](../test/results/resumed-c62e02ac-native45/postmortem-regional-capacity.json)
+CapacityReservation
 reached `Ready`, with no `StartCommitted` status; SQL remained `prepared` with
 no start, acquisition or completion timestamps. The first invocation's inherited
 cutoff was preserved. Its equality with the capture-intent deadline reflects a
@@ -10455,7 +10455,7 @@ resolution exhausted the unchanged two-record audit reservation. The separate
 correction and its qualification follow; existing preparation must never acquire a new
 deadline, key attempt or start authority.
 
-The [real PostgreSQL/S3 preparation regression](../test/results/resumed-c62e02ac-api-preparation-red/result.json)
+The real PostgreSQL/S3 preparation regression
 on `815c42db` reproduces both defects with the compiled narrow runtime grants.
 Both observation and caller deadlines started above one second; an independently
 observed capture-row lock consumed headroom, yet the old code inserted a
@@ -10472,13 +10472,13 @@ the new first-insert floor and the unchanged no-create replay contract.
 The correction checks database time immediately before a first insert and
 returns exact existing `prepared` rows without creation, including after their
 stored interval. Current authority and exact identity/scope checks still run
-before and after that result. The [local race suites](../test/results/resumed-c62e02ac-preparation-local/result.json)
+before and after that result. The local race suites
 pass for PostgreSQL (2.454 seconds), execution (1.146 seconds) and the in-process
 integration package (6.488 seconds); independent review found no blockers.
 The final real-service green result is recorded below; installed qualification
 remains pending.
 
-The first [real-service correction run](../test/results/resumed-c62e02ac-api-preparation-classification/result.json)
+The first real-service correction run
 on `e19738c8` passed expired-row uncertainty, zero-effect headroom refusal
 and both compiled execution/publication role cases. Three assertions still
 failed because custody normalized the new
@@ -10495,7 +10495,7 @@ and error chain to survive; only the explicitly recorded headroom/client
 combination becomes execution-unavailable. The full PostgreSQL race suite
 passes in 2.466 seconds with identical before/after source hashes.
 
-The [final real PostgreSQL/S3 run](../test/results/resumed-c62e02ac-api-preparation-green/result.json)
+The final real PostgreSQL/S3 run
 on `899f6433` passes all four preparation-boundary cases, including a fresh
 first winner and unchanged replay after each post-lock refusal, and both
 compiled verifier/publisher execution and historical-publication lifecycles.
@@ -10522,7 +10522,7 @@ Independent Docker read-back confirmed all 12 recorded resources absent;
 private postmortem kubeconfigs and build scratch were removed. Acquisition,
 publication, native download, revocation and deletion remain unqualified.
 
-An independent [TCP/TLS protocol regression](../test/results/resumed-c62e02ac-sql-governor/result.json)
+An independent TCP/TLS protocol regression
 reproduced a separate SQL pool cleanup defect. pgx's asynchronous cancellation
 attempted another governed socket while the failed connection retained its
 sole dedicated slot. All four explicit-cancellation/deadline cases failed the
@@ -10578,11 +10578,11 @@ full in-process integration race suite (6.286 seconds). Native45 above
 qualifies these sources only to its recorded failure; local limiter versus
 network failure and client-side SQL contention are not established causes.
 
-The [frozen diagnostic run `context-5ngvkl2b`](../test/results/resumed-c62e02ac-native44/result.json)
+The frozen diagnostic run `context-5ngvkl2b`
 on `ccdde1a3` passed bootstrap, regional join/replay, processing initialization
 and preview. The demand lane produced six distinct observations and 27 usable
 samples in 15 seconds. Unlike native43, capture-intent persistence completed.
-The retained fixture's [read-only SQL postmortem](../test/results/resumed-c62e02ac-native44/postmortem-sql.log)
+The retained fixture's read-only SQL postmortem
 shows its original intent interval was 1.578494 seconds from capture insertion,
 the encrypted intent was stored after 157 ms, both audit phases were acknowledged,
 and the capture remained `intent_audited` with one reserved custody attempt and
@@ -10609,7 +10609,7 @@ the owned volume, image and two networks absent. Build scratch was removed.
 The first postmortem query used an incorrect table name and exited 3; the
 corrected read-only query exited 0. Both outputs remain in the local full archive.
 
-The [subsequent frozen run `context-mcw3di7n`](../test/results/resumed-c62e02ac-native43/result.json)
+The subsequent frozen run `context-mcw3di7n`
 on `a565c2db` includes the canonical regional start CRD prerequisite and
 corrected publication grants. Bootstrap, exact regional join replay, readiness,
 processing initialization and preview passed. The regional demand lane returned
@@ -10642,7 +10642,7 @@ embedded schema/CRD and `go vet ./...` gates pass. These diagnostics do not fix
 or establish the underlying native43 failure. Native44 above includes them
 and its retained-fixture postmortem.
 
-The [frozen run `context-thfmy2s8`](../test/results/resumed-c62e02ac-native42/result.json)
+The frozen run `context-thfmy2s8`
 on `4110072f` progressed beyond the previous target-query failures. The preview
 and exact-Pod request queries completed in 840 ms and 1.1 seconds. The request
 reached SQL admission and capture-intent handling; two acknowledged original-key
@@ -10666,14 +10666,14 @@ effect transactions. Existing fixture roles grant those reads separately,
 masking this installed-role defect. The run did not reach publication.
 A regression using the exact compiled roles and the new `PrepareStart`
 failure investigation reproduced two independent defects. The
-[real SQL/S3 regression](../test/results/resumed-c62e02ac-publication-grants-red/result.json)
+real SQL/S3 regression
 on `67638285` failed both fresh compiled-role publication cases; PostgreSQL
 reported `permission denied for table retention_source` at each transaction's
 accepted-source read. Test and harness exited 1, all 2,713 source hashes
 matched, sources stayed unchanged and cleanup reported no failures.
 The grant correction adds only the five retention SELECTs to each purpose.
 PostgreSQL package race checks (2.111 seconds) and SQL generation checks
-(54 matching files) pass. The [corrected real SQL/S3 run](../test/results/resumed-c62e02ac-publication-grants-green/result.json)
+(54 matching files) pass. The corrected real SQL/S3 run
 on `45e509cc` passes both independent fresh compiled-role lifecycles, including
 publication, historical replay, purpose isolation and deletion assertions.
 The test package completed in 8.673 seconds; test and harness exited 0, all
@@ -10733,7 +10733,7 @@ and mTLS packages passed `go test -race -count=1 -timeout=180s` (2.783 and
 architecture, Go dependency, embedded schema/CRD gates and `go vet ./...` pass.
 These changes still require a fresh frozen installed qualification.
 
-The [next owned run `context--pw-gu20`](../test/results/resumed-c62e02ac-native41/result.json)
+The next owned run `context--pw-gu20`
 on frozen `4db57af3` used the corrected 114 ordinary/118 total SQL connection
 budget. The test failed after 1,313.476 seconds; test and harness both exited 1.
 All 2,735 recorded source hashes match the commit, sources stayed unchanged,
@@ -10799,7 +10799,7 @@ No role ceiling or individual pool limit changes. Contract/PostgreSQL race
 tests, six fixture-selection tests and specification/architecture gates pass.
 This corrects a declared maximum, not a measured connection leak.
 
-The [owned two-cluster run `context-9vds9lz9`](../test/results/resumed-c62e02ac-native40/result.json)
+The owned two-cluster run `context-9vds9lz9`
 failed at `534b0735`, before these review fixes, with its original
 116-connection fixture budget. The test and harness both exited 1. All 2,731
 recorded source hashes match the commit; sources stayed unchanged, build
@@ -10836,7 +10836,7 @@ that it caused native40's request failure.
 ## Recovered installed journey, hold 38 (2026-10-20)
 
 Claude session `c62e02ac-2970-4821-8f4d-d584e5ea4d8c` stopped before
-reading hold 38 on `007f1fb5`. The [recovered result](../test/results/resumed-c62e02ac-hold38/result.json)
+reading hold 38 on `007f1fb5`. The recovered result
 records the actual test exit 1; the local shell wrapper incorrectly returned 0.
 All 2,716 recorded source hashes match that commit. The harness retained its
 owned resources; an empty cleanup-failure list does not mean those resources
@@ -11014,7 +11014,7 @@ the ledger transaction normalizes errors returned through it; the coverage read
 now keeps its step beside the transaction and reports `tx` for pool, BEGIN or
 COMMIT failures.
 
-[Archive verification](../test/results/installed-journey-ci-70/verification.json)
+Archive verification
 matched all source hashes to the frozen commit; sources were unchanged, test
 exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
 
@@ -11043,7 +11043,7 @@ which the journey rejects (the unexpected code in native 63 too). A preview has
 no earlier review to resolve, so preview `ErrChanged` now maps to the retryable
 `NotAvailable`; request and resolution keep `ReviewChanged`.
 
-[Archive verification](../test/results/installed-journey-ci-69/verification.json)
+Archive verification
 matched all source hashes to the frozen commit; sources were unchanged, test
 exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
 
@@ -11073,7 +11073,7 @@ preview's later checks; without that room it fails at once as before. The
 harness's in-Pod build scratch now honours `TMPDIR` (CI is unchanged), so the
 suite also runs locally with `--keep-on-failure` on disk-backed scratch.
 
-[Archive verification](../test/results/installed-journey-ci-68/verification.json)
+Archive verification
 matched all source hashes to the frozen commit; sources were unchanged, test
 exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
 
@@ -11090,7 +11090,7 @@ known coverage limitation). The others found no idle standby, a broken hub
 query (`hub-query/unavailable`) or ran out of time at eligibility. Processing
 coverage reads now name their failing step. The local Go gate passed.
 
-[Archive verification](../test/results/installed-journey-ci-67/verification.json)
+Archive verification
 matched all source hashes to the frozen commit; sources were unchanged, test
 exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
 
@@ -11110,7 +11110,7 @@ other ends keep the one-second retry, and every opening check is unchanged.
 Retention steps for a failed accepted-policy read are also named now. The local
 Go gate for this commit passed.
 
-[Archive verification](../test/results/installed-journey-ci-66/verification.json)
+Archive verification
 matched all source hashes to the frozen commit; sources were unchanged, test
 exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
 
@@ -11130,7 +11130,7 @@ local Go gate failed once in the browser test
 five isolated race runs on this commit and on the commit before the MCP timing
 change.
 
-[Archive verification](../test/results/installed-journey-ci-65/verification.json)
+Archive verification
 matched all source hashes to the frozen commit; sources were unchanged, test
 exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
 
@@ -11149,7 +11149,7 @@ one second after ending and often after several refused attempts. ADR-209 now
 allows two exchanges per owner within the hub's existing per-cluster standby
 limit. Native 63's unexpected public code did not recur.
 
-[Archive verification](../test/results/installed-journey-ci-64/verification.json)
+Archive verification
 matched all source hashes to the frozen commit; sources were unchanged, test
 exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
 
@@ -11166,7 +11166,7 @@ collects diagnostics before failing. The local Go gate failed once in
 passed three of three isolated race runs and is in code this branch does not
 change.
 
-[Archive verification](../test/results/installed-journey-ci-63/verification.json)
+Archive verification
 matched all source hashes to the frozen commit; sources were unchanged, test
 exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
 
@@ -11183,7 +11183,7 @@ ADR-208 its two clients now use the opening limiter; the proofs and the
 request's original five seconds are unchanged. The local Go gate for this
 commit passed.
 
-[Archive verification](../test/results/installed-journey-ci-62/verification.json)
+Archive verification
 matched all source hashes to the frozen commit; sources were unchanged, test
 exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
 
@@ -11201,7 +11201,7 @@ reserve/claim/object/acknowledge steps, and the installed object path
 credential observation, seal, put and verify. The local Go gate for this commit
 passed.
 
-[Archive verification](../test/results/installed-journey-ci-61/verification.json)
+Archive verification
 matched all source hashes to the frozen commit; sources were unchanged, test
 exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
 
@@ -11231,7 +11231,7 @@ The full local Go gate for this commit passed; an additional isolated rerun of
 the three load-sensitive owner fixture tests failed once under a load average
 of about 23.
 
-[Archive verification](../test/results/installed-journey-ci-60/verification.json)
+Archive verification
 matched all source hashes to the frozen commit; sources were unchanged, test
 exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
 
@@ -11251,7 +11251,7 @@ the change and passes after it. The hub's context-start clients made about
 limiter. A one-time `publisher/catalog-changed` service restart was also
 logged.
 
-[Archive verification](../test/results/installed-journey-ci-59/verification.json)
+Archive verification
 matched all source hashes to the frozen commit; sources were unchanged, test
 exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
 
@@ -11275,7 +11275,7 @@ different timing-sensitive Kubernetes fixture tests while an unrelated build on
 this host held the load average near 60 on 16 cores; each failure is in code
 this branch does not change.
 
-[Archive verification](../test/results/installed-journey-ci-58/verification.json)
+Archive verification
 matched all source hashes to the frozen commit; sources were unchanged, test
 exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
 
@@ -11294,7 +11294,7 @@ drained 100-token bucket at 20 QPS. ADR-208 now gives the four opening clients
 `permission_stream` denial for `permission-read` recurs once per run, as in
 earlier runs; its statement is not logged and it is not yet tied to a step.
 
-[Archive verification](../test/results/installed-journey-ci-57/verification.json)
+Archive verification
 matched all source hashes to the frozen commit; sources were unchanged, test
 exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
 
@@ -11318,7 +11318,7 @@ stream's first fixed stage/reason (new `hub-query-source`, `hub-query-check`,
 `regional-query-owner`, `regional-query-write`), a closed regional `answer`
 label or `router`, with remaining-time buckets at start and end.
 
-[Archive verification](../test/results/installed-journey-ci-56/verification.json)
+Archive verification
 matched all source hashes to the frozen commit; sources were unchanged, test
 exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
 
@@ -11349,7 +11349,7 @@ the time fits the fixed 20 QPS/burst-20 client bucket (about 50 ms per call
 after the burst) rather than API latency. Changing that documented limit or the
 five-second window is a maintainer decision; neither was changed.
 
-[Archive verification](../test/results/installed-journey-ci-55/verification.json)
+Archive verification
 matched all 2702 source hashes to the frozen commit; sources were unchanged,
 test exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
 
@@ -11380,7 +11380,7 @@ self-authentication may share the owner's API clients with its readiness and
 observer loops, as the regional context did; that, and why `route` fails with
 time remaining, are unmeasured.
 
-[Archive verification](../test/results/installed-journey-ci-54/verification.json)
+Archive verification
 matched all source hashes to the frozen commit; sources were unchanged, test
 exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
 
@@ -11400,7 +11400,7 @@ builds its own observer/probe instances and its own guard and source readers
 from the same plans: same identities, rights and fixed limits, separate
 buckets. That this removes the queueing is a hypothesis for the next run.
 
-[Archive verification](../test/results/installed-journey-ci-53/verification.json)
+Archive verification
 matched all source hashes to the frozen commit; sources were unchanged, test
 exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
 
@@ -11413,7 +11413,7 @@ with 10–70 milliseconds left). Marks were still absent: the setup producer's
 re-wrap kept only the fixed code and cutoff. It now also keeps the completed
 check marks, which the receiving diagnostic restricts again.
 
-[Archive verification](../test/results/installed-journey-ci-52/verification.json)
+Archive verification
 matched all source hashes to the frozen commit; sources were unchanged, test
 exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
 
@@ -11429,7 +11429,7 @@ place about three seconds in the first four setup checks (source open, owned
 process, process proof, execution account). Which of those dominates is not
 yet measured.
 
-[Archive verification](../test/results/installed-journey-ci-51/verification.json)
+Archive verification
 matched all source hashes to the frozen commit; sources were unchanged, test
 exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
 
@@ -11447,7 +11447,7 @@ proof's per-check marks were not forwarded; the timing line now carries them
 checks. Review follow-ups now always join the closing ingress read and stop
 step reports from a deliberately abandoned opening read.
 
-[Archive verification](../test/results/installed-journey-ci-50/verification.json)
+Archive verification
 matched all source hashes to the frozen commit; sources were unchanged, test
 exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
 
@@ -11467,7 +11467,7 @@ certificate and registration reads, and the closing source and hub rechecks
 together, after both opening results. Every read and check remains and every
 result still narrows the bound.
 
-[Archive verification](../test/results/installed-journey-ci-49/verification.json)
+Archive verification
 matched all source hashes to the frozen commit; sources were unchanged, test
 exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
 
@@ -11485,7 +11485,7 @@ between, still completed. A remaining-time shortage after narrowing to the
 connector's lent source is a hypothesis, not established; refusals now carry a
 coarse remaining-time bucket and closing-step detail for the next run.
 
-[Archive verification](../test/results/installed-journey-ci-48/verification.json)
+Archive verification
 matched all source hashes to the frozen commit; sources were unchanged, test
 exit was 1 and owned cleanup reported no failures. Capture and later steps were
 not reached. PR40/41 remain held.
@@ -11506,10 +11506,10 @@ refusals remain unexplained; the owner authenticator now reports its failing
 step for the next run. A separate `permission denied for table
 permission_stream` on one publisher login is not yet explained.
 
-The [retained log](../test/results/installed-journey-ci-47/context-storage.log)
+The retained log
 shows the passive-command and administrator-removal subcases passing; capture
 and later steps were not reached. PR40/41 remain held.
-[Archive verification](../test/results/installed-journey-ci-47/verification.json)
+Archive verification
 matched all 2,701 source hashes to the frozen commit; sources were unchanged,
 test exit was 1 and owned cleanup reported no failures.
 
@@ -11526,11 +11526,11 @@ failures. The hub handler and ingress refuse silently, so the refusing check is
 not identified; they now report fixed stage names to the owner log for the next
 run. This does not establish the underlying cause.
 
-The [retained log](../test/results/installed-journey-ci-46/context-storage.log)
+The retained log
 records the continuation subtest failing after 963.46 seconds; passive-command
 and administrator-removal subcases passed. Capture, publication, native
 download, expiry/deletion and faulted cleanup were not reached. PR40/41 remain
-held. [Archive verification](../test/results/installed-journey-ci-46/verification.json)
+held. Archive verification
 matched all 2,700 source hashes to the frozen commit; sources were unchanged,
 test exit was 1 and owned cleanup reported no failures.
 
@@ -11548,13 +11548,13 @@ not establish the underlying refusal cause. No successful owner-authentication
 conversation timing was recorded. The independent capacity channel continued
 to complete observations.
 
-The [retained log](../test/results/installed-journey-ci-45/context-storage.log)
+The retained log
 records a 1,281.73-second top-level failure and a 958.17-second continuation
 failure (package 1,281.826 seconds). Passive-command and administrator-removal
 subcases passed. Capture, publication, native download, expiry/deletion and
 faulted cleanup were not reached. PR40/41 remain held.
 
-[Independent archive verification](../test/results/installed-journey-ci-45/verification.json)
+Independent archive verification
 matched all 2,699 source hashes to the frozen commit. Sources remained unchanged,
 test exit was 1 and owned cleanup completed with no failures. The environment
 report SHA-256 is `cd7178b984c94ec75dd92d86177085166d20eadd4f6c2be1059a34b7836ced00`.
@@ -11600,14 +11600,14 @@ separate regional capacity observations succeeded. This does not establish
 which context setup, owner or source boundary failed. The selected one-input
 native setup pass above did not qualify this installed graph.
 
-[The retained log](../test/results/installed-journey-ci-44/context-storage.log)
+The retained log
 records the top-level failure after 1,346.49 seconds and the continuation failure
 after 1,023.35 seconds (package 1,346.583 seconds). Passive command and final
 administrator-removal subcases passed. Capture, publication, native download,
 expiry/deletion and faulted-cleanup continuation were not reached. PR40/41
 remain held; no complete installed user workflow is claimed.
 
-[Independent archive verification](../test/results/installed-journey-ci-44/verification.json)
+Independent archive verification
 matched all 2,695 hashes to the frozen commit. Sources remained unchanged,
 test exit was 1 and owned cleanup completed without failures. The environment
 report SHA-256 is `8fe6447c666c2ad55f7ee06d4392a69587896897b79d097c57bd287508e615e5`.
@@ -11616,7 +11616,7 @@ boundary without changing original deadlines, permissions or retry ceilings.
 
 ## Context setup native 2: selected fixture passed (2026-10-18)
 
-The [corrected owned run](../test/results/context-setup-native-2/context-storage-environment.json)
+The corrected owned run
 on frozen `0099e2295d3fdd63cb2892170a6152872e2e56b8` passed the selected
 `TestConnectorAPIProcessWithRealKubernetes` and all five children: named whole
 Secret/foreign denial, original setup bracket, actual start status under both
@@ -11633,7 +11633,7 @@ Kubernetes API/admission results with one startup input and synthetic connector
 source, issuer and registry facts; they do not qualify the complete installed
 source graph, owner authentication or investigation journey.
 
-[Independent archive verification](../test/results/context-setup-native-2/verification.json)
+Independent archive verification
 matched all 2,695 source hashes, unchanged throughout the test. Test exit was
 zero and cleanup reported no failures. Environment report SHA-256 is
 `4fb2b6d2890ff4d7ff2448498b18be0f47deb5f1904c1d68432c0e747d07cc6e`.
@@ -11643,7 +11643,7 @@ journey qualified before PR40/41 can merge.
 
 ## Context setup native 1: setup passed, selected fixture failed (2026-10-18)
 
-The [owned native run](../test/results/context-setup-native-1/context-storage-environment.json)
+The owned native run
 on frozen `b705387f600982903aec500e1cc9becc35eaf147` passed the new cold setup
 case: complete opening proof took 1.805 seconds and current closing native
 checks took 0.699 seconds. Local reads/source reuse performed no additional API
@@ -11659,7 +11659,7 @@ observation. Ready refused a binding read with only 17 milliseconds remaining
 in that original interval. The later input-change case could not open its proof,
 so it did not qualify input-change denial. The full fixture is not a pass.
 
-[Archive verification](../test/results/context-setup-native-1/verification.json)
+Archive verification
 matched all 2,695 source hashes; source bytes stayed unchanged and cleanup
 reported no failures. The fixture now waits for the preceding independent
 phase's recorded original end before opening a new operation, after CRD
@@ -11789,9 +11789,9 @@ Collection, publication, transfer, revocation, expiry and deletion were not reac
 The parent test failed after 1,318.12 seconds; the continuation failed after
 994.37 seconds. Terminal exit is 1. All 2,688 recorded source hashes independently
 match the frozen commit archive, tested sources were unchanged and cleanup
-failures are empty. The [environment report](../test/results/installed-journey-ci-43/context-storage-environment.json)
+failures are empty. The environment report
 has SHA-256 `b4cf399bdc683996049b76d1afa01c547254a789d10427a1ab563110c80f9121`;
-the adjacent [archive verification](../test/results/installed-journey-ci-43/verification.json)
+the adjacent archive verification
 and original run, PostgreSQL and kubelet logs retain the failure. The next task
 is the focused context-start opening investigation under unchanged original
 five-second bounds and 20-QPS clients. There is no automatic full rerun or S-02
@@ -11843,7 +11843,7 @@ revocation, expiry and deletion assertions were not reached.
 The parent test failed after 1,332.72 seconds; the continuation failed after
 1,009.47 seconds. Terminal exit is 1, all 2,684 recorded source hashes independently
 match the frozen commit archive, tested sources were unchanged and cleanup
-failures are empty. The [environment report](../test/results/installed-journey-ci-42/context-storage-environment.json)
+failures are empty. The environment report
 has SHA-256 `3070b2188b0583535b89f4cd4ce6adcd92de930946523627b051e9127267d1a3`;
 the adjacent run, PostgreSQL and kubelet logs preserve the failure. The next task
 is bounded diagnosis of the structured refusal before another full campaign.
@@ -11915,7 +11915,7 @@ expiry and faulted cleanup assertions were not reached.
 The parent test failed after 1,344.97 seconds (continuation: 1,023.51 seconds).
 The harness reports terminal exit 1, unchanged sources and no cleanup failures;
 all 2,630 recorded hashes independently match the frozen commit archive.
-Report: [`test/results/installed-journey-ci-41/context-storage-environment.json`](../test/results/installed-journey-ci-41/context-storage-environment.json),
+Report: `test/results/installed-journey-ci-41/context-storage-environment.json`,
 SHA-256 `7b708a3ef8f7e45438b88fcc98f19a51cbc0c9eea9d62c0418701649f287e4ae`.
 This supersedes native40's immediate permission-constructor blocker, not its
 unqualified lifecycle outcome. Preserve the original five-second proof/request
@@ -11943,8 +11943,8 @@ Purpose-specific Kubernetes clients also isolate owner readiness, provider
 refresh and audit credential reads; their original five-second bounds and
 20-QPS client limits remain unchanged.
 
-The subsequent [run 37](../test/results/installed-journey-ci-37/context-storage-environment.json)
-and [run 38](../test/results/installed-journey-ci-38/context-storage-environment.json)
+The subsequent run 37
+and run 38
 both failed before collection: the regional workload never reached `ready_at`.
 Both exercised `179c376f752285a035de1ac8e4d939beb32cb6bc`, exited 1 with
 unchanged source hashes and no cleanup failures. The retained logs show
@@ -11956,7 +11956,7 @@ Neither run reached the MCP capture/download/expiry checks.
 `9ef1103f83fd8377d007de89cedbb4aef5855c6d`, stopped at the deletion credential's
 positive multipart-abort probe: the owned S3 backend returned `AccessDenied`.
 It did not reach regional collection or the user journey. The
-[report](../test/results/installed-journey-ci-39/context-storage-environment.json)
+report
 records exit 1, unchanged sources, no cleanup failures, and the earlier
 107-ordinary/110-total SQL profile. All 2,627 source hashes match that commit.
 The subsequent complete inventory counts five additional installer pools;
@@ -11971,7 +11971,7 @@ observations and fourteen samples with at least one second left in fifteen
 seconds. It then failed before collection when the fixture passed its plaintext
 administrator pool to `NewPermissions`. That constructor correctly requires
 verified TLS and a restricted runtime role. The
-[report](../test/results/installed-journey-ci-40/context-storage-environment.json)
+report
 records exit 1, the 112-ordinary/116-total fixture profile, all 2,629 hashes
 matching the frozen commit and no cleanup failures. This run does not qualify
 collection, native download or installed expiry/deletion.
@@ -11981,11 +11981,11 @@ TLS with one scoped monitoring connection, closed when the journey returns.
 This fits the existing operator/monitoring reserve; no connection limit or
 runtime grant was raised. Four issuance helper pools now close before regional
 installation instead of remaining open until the parent test ends. The focused
-[PostgreSQL regression](../test/results/installed-permission-observer-native-1/custody.log)
+PostgreSQL regression
 at `1b989271b572d5055230dea5ee00ea2efde65d97` passes: both administrator paths
 are rejected, the projected scoped reader constructs and rejects authority
 mutation, and its connection closes. Its
-[report](../test/results/installed-permission-observer-native-1/custody-environment.json)
+report
 records exit 0, 2,602 matching hashes and no cleanup failures. The projection in
 that focused check is synthetic; installed projection protection and the
 complete journey still require the next frozen run. The subsequent probe also
@@ -11998,8 +11998,8 @@ Gitar review. The exact SQL candidate `22c19dae9588618545b5baf2312cb6a64235dc99`
 passed [native run 39119394822](https://github.com/phihos/asservat/actions/runs/39119394822):
 `TestContextAdmissionWithRealServices` and its `native-api-runner` subtest,
 exit 0, unchanged sources and no cleanup failures. All 2,602 hashes in the
-[retained report](../test/results/adr205-context-sql-ci-2/context-storage-environment.json)
-match that candidate; the [test log](../test/results/adr205-context-sql-ci-2/context-storage.log)
+retained report
+match that candidate; the test log
 records the selected execution. That context-harness branch does not run the
 SQL deletion regression. The separate custody run 39122322616 on
 `25c7195900dd2d323c6a848cdb0e19bc19d0016a` passes the actual
@@ -12039,9 +12039,9 @@ restrictive write under the caller's original 50 ms deadline. Existing source
 claim, unknown reply, concurrency, joined completion and exhaustion assertions
 remain selected.
 
-The [failing report](../test/results/context-query-stale-negative-failing-1/fleet-environment.json),
-[first passing report](../test/results/context-query-stale-negative-passing-1/fleet-environment.json)
-and [final assembled report](../test/results/context-query-stale-negative-assembled-1/fleet-environment.json)
+The failing report,
+first passing report
+and final assembled report
 retain exact source manifests; their sibling logs and verification records
 retain outcomes and independent archive comparisons. The final report SHA-256 is
 `c535b51c280c3fdc747074d3d62caf66b2b247fca036223c8246ff1a2cebaaff`.
@@ -12050,7 +12050,7 @@ CI on the preceding `4157b8c` candidate failed its evidence-package shard becaus
 one synthetic worker fixture omitted the newly mandatory ephemeral-storage
 dimension. The final freeze adds that fixture's original 4 MiB value; it changes
 no production limit. The complete evidence-package race suite then passed in
-3.857 seconds ([log](../test/results/context-query-stale-negative-assembled-1/evidence-race.log)).
+3.857 seconds (log).
 Touched PostgreSQL/integration vet and Go/specification/architecture gates also
 passed for the correction. The full ledger qualification below remains evidence
 for `51fd2e9`; it was not repeated for this restrictive adapter-only correction.
@@ -12073,9 +12073,9 @@ protocol; the older reports below qualify only their earlier source.
 
 Each report independently matches all 2,652 source hashes to the frozen commit
 archive, records unchanged source and exit zero, and has no cleanup failures.
-The [capacity report](../test/results/context-query-source-spend-capacity-1/fleet-environment.json)
+The capacity report
 has SHA-256 `2a545c3199e09790ea11f32c21cb62b09bc456e26d219f38d27b149c3ff6a017`;
-the [ledger report](../test/results/context-query-source-spend-ledger-1/fleet-environment.json)
+the ledger report
 has SHA-256 `64cadc8209909a990398b861d017dee1254e9d98227e676b1e47441ad64921e5`.
 Assembled gates passed: 54 generated SQL files, 58 Go packages/338 allowed edges,
 11,375 specification assertions and 1,316 architecture positive/120 invalid cases.
@@ -12103,9 +12103,9 @@ The final-bound regression fix is included in this frozen tree.
 
 Each report independently matches all 2,651 recorded source hashes to the frozen
 archive, records unchanged sources and exit zero, and has no cleanup failures.
-The [capacity report](../test/results/context-query-capacity-assembled-1/fleet-environment.json)
+The capacity report
 has SHA-256 `66b1793afd9f6d37d89889274a1d2c898b75e6021ec86f4cc046352c6fb79608`;
-the [ledger report](../test/results/context-query-ledger-assembled-1/fleet-environment.json)
+the ledger report
 has SHA-256 `b0d1002c6c2518d62b8adc09ee5c2918806e1cb5800d5bc125f4cd7bb4e11935`.
 Combined capacity, authorization, analysis/domain and PostgreSQL package race
 tests passed, along with scoped vet, SQL generation, Go architecture, specification
@@ -12141,7 +12141,7 @@ covers all three source transactions without increasing the original limit.
 The original guard-entry regression failed before the change. Full capacity and
 PostgreSQL race tests, focused source-history/join regressions, integration
 compilation, vet, SQL generation and design gates passed. The later frozen native runs above qualify the new protocol; older native
-reports predate it and do not qualify it. [Component evidence](../test/results/context-query-source-spend-component.json)
+reports predate it and do not qualify it. Component evidence
 records the exact commands and scope.
 
 Full capacity/authorization/PostgreSQL race tests passed before the final history
@@ -12151,7 +12151,7 @@ also passed. Two regressions failed before their fixes: reader buffer reuse
 changed the original accepted policy, and blocking guards/final source reads
 outlived the first backing deadline. Their corrected race runs passed. Recorded
 commands, exits and counts are in
-[test/results/context-query-capacity-component.json](../test/results/context-query-capacity-component.json).
+test/results/context-query-capacity-component.json.
 The duplicate-deployment regression also failed with its protection removed and
 passed restored: four role names cannot pledge the same physical deployment
 limits four times.
@@ -12159,14 +12159,14 @@ limits four times.
 The selected owned fleet test
 `TestContextQueryCapacityWithRealPostgres` passed on frozen commit
 `896e491a3e7ceb610a3ce3a4fb228c9f34628933` (9.37 seconds). The
-[first run](../test/results/context-query-capacity-first-run.log) reached original
+first run reached original
 acceptance but failed because a PL/pgSQL variable and digest byte-index alias
 were ambiguous. The corrected explicit aliases passed the same bounded
-[selection](../test/results/context-query-capacity-native-run.log). Both runs
+selection. Both runs
 preserved all 2,642 source hashes against their exact committed blobs and had
 empty cleanup failures; see the
-[first environment](../test/results/context-query-capacity-first-environment.json)
-and [passing environment](../test/results/context-query-capacity-native-environment.json).
+first environment
+and passing environment.
 The fixture used the unchanged 48-connection component profile.
 
 This composes actual original setup, role/audit/root/workload activation and
@@ -12184,11 +12184,11 @@ are reserved in the original setup. It retains every earlier ledger assertion,
 including lock synchronization, unknown replies, original lease expiry and
 cross-client aggregate charges. Its integration compilation, original
 qualification race test and integration vet pass. The
-[first native ledger run](../test/results/context-query-ledger-first-run.log)
+first native ledger run
 on `1ca69f2592d40cb20b468e6097fa3569db0c34d2` reached the late poll assertions
 but failed: the inherited 20-second evidence lifetime did not cover preparation
 plus the 18.54-second ledger subtest. Its
-[report](../test/results/context-query-ledger-first-environment.json) records
+report records
 all 2,662 source hashes independently matched and empty cleanup failures.
 The dedicated fixture now selects 60-second evidence retention and a covering
 120-second base backing interval before original installation/submission;
@@ -12233,8 +12233,8 @@ excerpt before passive effects. A failing-first layout observation reproduces
 that commit; rendering and actions now require an exact active attachment to
 the current session, scope, case and artifact. Build output retains the existing
 large-bundle warning.
-The [component report](../test/results/adr206-console-component/report.json)
-records the exercised source hashes; the [gate log](../test/results/adr206-console-component/console.log)
+The component report
+records the exercised source hashes; the gate log
 retains the actual test output.
 
 The new view is deliberately unregistered pending protected query runtime
@@ -12257,7 +12257,7 @@ proofs and human identity remain explicit synthetic inputs.
 
 All 2,637 recorded source hashes independently match the frozen commit archive;
 terminal exit is zero, sources stayed unchanged and cleanup failures are empty.
-Report: [`test/results/context-query-ci-2/custody-environment.json`](../test/results/context-query-ci-2/custody-environment.json),
+Report: `test/results/context-query-ci-2/custody-environment.json`,
 SHA-256 `9ea012bbf23fd60b34451adb83212d183f3a980c77399f5bf14963bddf90e8bd`.
 This resolves the earlier migration syntax/fixture blockers and qualifies the
 combined catalog changes. It does not qualify installed queries, worker dispatch,
@@ -12279,7 +12279,7 @@ while applying migration 00068 with PostgreSQL syntax error `42601`, before any
 Go test ran. All 2,637 recorded source hashes independently match that frozen
 commit's archive; the harness reports unchanged sources, terminal exit 1 and no
 cleanup failures. The retained report is
-[`test/results/context-query-ci-1/custody-environment.json`](../test/results/context-query-ci-1/custody-environment.json),
+`test/results/context-query-ci-1/custody-environment.json`,
 SHA-256 `f62f17dbbcd4c9dc2ff6953732f2a5934c7906a6660980fab737fd6c0ea9ffcc`.
 This is a migration failure, not native query qualification. The subsequent
 correction and passing combined run are recorded above.
@@ -12301,10 +12301,10 @@ Pinned SQL generation, focused PostgreSQL query/initial-schema race tests,
 integration-package compilation, touched-package vet and Go architecture checks
 passed. Two failing regressions reproduced loss of an earlier guard deadline and
 success after that deadline expired; the guarded callback now preserves both.
-The [selected native SQL/S3 ledger test](../test/results/adr206-context-query-local-2/custody.log)
+The selected native SQL/S3 ledger test
 passes in 7.33 seconds, including acknowledged audit lineage, actual SQL lock
 synchronization, one-use starts, unknown closure and retained aggregate charges.
-Its [report](../test/results/adr206-context-query-local-2/custody-environment.json)
+Its report
 records exit 0, all 2,615 source hashes independently matching its frozen
 component revision `b959360e6c4055541750e1761b609c22b500d719`, and empty cleanup
 failures. That branch differs from the combined implementation in 21 recorded
@@ -12349,10 +12349,10 @@ refreshed within five seconds, and a regional discovery pass takes minutes, so
 (migration 00066, schema 66) that the hub-worker's demand lane serves back to
 back; capture preview and request wait for it within their original deadline.
 The PostgreSQL stage passes on CI
-([fleet run](../test/results/adr200-fleet-ci-4/native-fleet-1/fleet-environment.json)).
-Native CI continuation runs [24a](../test/results/adr200-continuation-ci-24a/native-continuation-1/context-storage-environment.json),
-[25a](../test/results/adr200-continuation-ci-25a/native-continuation-1/context-storage-environment.json) and
-[25c](../test/results/adr200-continuation-ci-25c/native-continuation-1/context-storage-environment.json)
+(fleet run).
+Native CI continuation runs 24a,
+25a and
+25c
 pass: after one demand the regional binding had five or six refreshes and seven
 to nine samples with at least a second of freshness in 15 s. Three of the last
 six runs pass. The failures are the hub-worker's permission reconciler stopping
@@ -12363,8 +12363,8 @@ now labelled for the next failure. Hub-cluster capacity observation was
 throttled past its window on a shared client (PR #8 gives it its own). Downloads
 still rely on discovery refreshes; the installed S-02 journey is not complete.
 
-Runs 26a–28b (eight, [26a](../test/results/adr200-continuation-ci-26a/native-continuation-1/context-storage-environment.json)
-to [28b](../test/results/adr200-continuation-ci-28b/native-continuation-1/context-storage-environment.json)):
+Runs 26a–28b (eight, 26a
+to 28b):
 26a, 26c, 27c, 28a and 28b pass. 26b and 27a stop at "owner native port not
 reachable"; 27b's regional workload never reached `ready_at` while the
 connector's local source failed at `source-snapshot`. The owner diagnostics
@@ -12378,8 +12378,8 @@ exporter-bound signing, migration 00060, the SQL lineage/credential store,
 transport over real TLS, the connector rotator and the single-Secret
 compare-and-swap store. The SQL store passes on real PostgreSQL inside
 `connector-identity-fast`
-([1](../test/results/adr168-cluster-credential-sql-1/result.json),
-[2](../test/results/adr168-cluster-credential-sql-2/result.json)). Implementation
+(1,
+2). Implementation
 removed a 10-minute replay cap from the draft design. That cap would have fenced
 a connector that crashed after an unacknowledged rotation, and it added no
 protection. Audit records, hub composition, the installer step and installed
@@ -12387,21 +12387,21 @@ qualification remain.
 
 ADR-166 storage components are implemented (migration 00061) and pass the whole
 `TestCustodyWithRealServices` on real PostgreSQL and SeaweedFS
-([run 6](../test/results/adr166-streaming-custody-6/result.json)). The
+(run 6). The
 migration renumbering, the five failed attempts and remaining composition are in
 the ADR. Full gates passed after the 00060 schema bump
-([log](../test/results/adr168-go-check-1/go-check.log)). They also pass at
-schema 61 ([log](../test/results/adr166-go-check-1/go-check.log): 55 packages and
+(log). They also pass at
+schema 61 (log: 55 packages and
 543 Kubernetes tests). An earlier 61 attempt
-([retained](../test/results/adr166-go-check-1/go-check-failed-timeout.log))
+(retained)
 exceeded Kubernetes group 6's 15-minute package timeout at host load ~11; the
 alarm fired 0 s into an unrelated subtest, not a hang. The
-[full custody suite](../test/results/custody-full-schema61-1/result.json) passed
+full custody suite passed
 437 named tests but failed `TestEnrollmentFleetFreshnessWithRealPostgres`. That
 fixture migrated to exactly 59 and then built adapters that now pin the head
 schema. After it migrates to head following its migration-59 checks, it
-[passes](../test/results/fleet-freshness-schema61-1/result.json).
-[Native38](../test/results/public-context-journey-native-38/result.json) passes
+passes.
+Native38 passes
 the full regional journey at schema 61, the third consecutive pass.
 
 [ADR-169](decisions/169-delegated-regional-lifecycle-channel.md) adds the
@@ -12412,7 +12412,7 @@ and hub runner adapter (`connectorlifecycle.Runners`) exist;
 Ed25519/CSR verification. The channel also delegates source staging and
 leaf-registration lookups. In the two-cluster direct observation fixture, the
 regional Pod now enrolls through the owner Pod with no hub connector SQL
-credential. [Run 4](../test/results/adr169-direct-native-4/result.json) passed
+credential. Run 4 passed
 (exit 0, six required tests, empty cleanup, unchanged sources). Runs 1–3 are
 retained failures: a start-order race and a 30-second context passed where the
 regional reader requires the operation's own deadline; both are fixed. The
@@ -12423,14 +12423,14 @@ a separate federation compartment, because the hub replica already uses exactly
 its 32 allowed connections. Eight connector duty roles (ordinals 48–55) join the
 fixed public runtime layout. The initial-installation suite provisioned and
 verified all 41 roles on real PostgreSQL
-([result](../test/results/adr170-roles-1/result.json): exit 0, 87 tests, empty
+(result: exit 0, 87 tests, empty
 cleanup). This qualifies grants, not yet the adapters running under them. The
 connection plan adds the compartment, so one hub needs 63 ordinary connections
 and four retained hubs need 159.
 
 The product processes now exist: `asservat hub-federation` and the regional
 `asservat connector`. Run 10 of
-[the product test](../test/results/adr170-product-native-10/result.json) passed
+the product test passed
 as Restricted Pods in two owned clusters: product role grants, real OpenBao
 PKI/transit and S3 audit, and no Secret mount in the regional Pod. The regional
 Pod enrolled with both leaves activated in 21 s. Runs 1–9 are retained
@@ -12441,19 +12441,19 @@ remains.
 runner and all its SQL and authority ports to the hub. The region answers only
 cluster-local operations for a verified signed work, and captures, encrypts and
 uploads in place, so plaintext evidence and data keys never leave it.
-[The native public journey](../test/results/adr171-journey-2/result.json) passes
+The native public journey passes
 on this path with an unchanged first-request time (4.285 s).
-[Run 1](../test/results/adr171-journey-1/result.json) is a retained failure: a
+Run 1 is a retained failure: a
 binding check compared two different budget digests.
 
 The legacy identity-question protocol is removed (frame kinds 3/4 retired and
 always rejected; transport properties now run on operation frames). The
-[full Go gate after that removal](../test/results/legacy-removal-go-check-1/result.json)
+full Go gate after that removal
 passes: exit 0, 55 packages and 543 Kubernetes tests in seven groups, no
 failures, unchanged source hashes; the one explicit skip is the pre-existing
 group-4 skip. It is the complete rerun owed below.
 
-The [full Go gate after ADR-172–174](../test/results/adr174-go-check-1/result.json)
+The full Go gate after ADR-172–174
 passes: exit 0, 55 packages, 543 Kubernetes tests, no failures, unchanged
 source hashes (only the pre-existing group-4 skip).
 
@@ -12470,20 +12470,20 @@ ADR-175 to ADR-178 are being implemented in this order:
   plan counts the governor cap (32) with the owner `routing` and `native-read`
   pools included.
 - **ADR-175 passes natively**
-  ([run 4](../test/results/adr175-native-4/result.json)). The capacity token
+  (run 4). The capacity token
   is an unbound 600-second token, because the API server refuses Pod binding
   for another account. A per-condition native diagnostic located the
   empty-reference admission detail.
 - **The full Go gate passes over these changes**
-  ([result](../test/results/adr178-go-check-1/result.json): exit 0, 55
+  (result: exit 0, 55
   packages, 543 Kubernetes tests, unchanged sources).
 - **ADR-178's source frames pass the native public journey**
-  ([run 2](../test/results/adr178-journey-2/result.json), first request
+  (run 2, first request
   3.48 s). Run 1 failed intermittently in the unchanged download phase.
 - **ADR-176's wrap authority and ADR-177's 22 hub extension roles pass on
-  real PostgreSQL** ([wrap](../test/results/adr176-sql-1/result.json),
-  [64 roles](../test/results/adr177-roles-1/result.json)). The
-  [full custody suite at schema 62](../test/results/custody-full-schema62-1/result.json)
+  real PostgreSQL** (wrap,
+  64 roles). The
+  full custody suite at schema 62
   passes: exit 0, 453 named tests in 13 top-level tests, empty cleanup,
   unchanged sources. That includes `TestEnrollmentFleetFreshnessWithRealPostgres`,
   which failed the schema-61 run.
@@ -12500,10 +12500,10 @@ ADR-175 to ADR-178 are being implemented in this order:
   not compose its regional client and serves a different owner pool. A
   real-TLS test passes four queries, a closed failure, the budget cap and the
   following signed work on the same standby. The
-  [full Go gate](../test/results/adr179-go-check-2/result.json) passes over
+  full Go gate passes over
   ADR-176, 177 and 179: exit 0, 55 packages, 543 Kubernetes tests, unchanged
   sources, only the pre-existing group-4 skip. The
-  [first attempt](../test/results/adr179-go-check-1-failed-vet/result.json)
+  first attempt
   failed at `go vet`: an integration test still passed a ResolvePod-only
   resolver as the regional query targets.
 - **ADR-180 hub-api public composition (P1–P5) is product code.** It is
@@ -12523,13 +12523,13 @@ ADR-175 to ADR-178 are being implemented in this order:
   holds read-only evidence access and an attempt-scoped, bounded verification
   unwrap authority (migration 63, schema head 63). Both pass on real
   PostgreSQL:
-  - the [authority and queue](../test/results/adr181-sql-2/result.json);
-  - the [66-role layout](../test/results/adr181-roles-1/result.json): exit 0,
+  - the authority and queue;
+  - the 66-role layout: exit 0,
     87 tests.
-- **The [full Go gate](../test/results/adr181-go-check-2/result.json) passes
+- **The full Go gate passes
   over ADR-180 and ADR-181:** exit 0, 55 packages, 544 Kubernetes tests,
   unchanged sources. The
-  [first attempt](../test/results/adr181-go-check-1/result.json) failed in
+  first attempt failed in
   group 7, because the projection's outside-hub predicate did not yet include
   the publisher compartment.
 - **ADR-182 is implemented in code, with unit tests.** The installed,
@@ -12542,7 +12542,7 @@ ADR-175 to ADR-178 are being implemented in this order:
 
   An installer inventory found that no post-activation runtime producer has a
   product caller yet, which makes the installer the critical path. The
-  [full Go gate](../test/results/adr182-go-check-1/result.json) passes over
+  full Go gate passes over
   ADR-182: exit 0, 55 packages, 544 Kubernetes tests, unchanged sources.
 - **ADR-183 is implemented in code, with unit and render checks.**
   `asservat installer-continue` runs phases 1–4 inside the original
@@ -12561,22 +12561,22 @@ ADR-175 to ADR-178 are being implemented in this order:
 
   The continuation ClusterRole holds exactly the runtime Roles' rules (no
   escalate or bind). The
-  [full Go gate](../test/results/adr183-go-check-1/result.json) passes over
+  full Go gate passes over
   ADR-183: exit 0, 55 packages, 547 Kubernetes tests, unchanged sources.
   Native qualification uses the bootstrap-chain harness
   (`--installer-continuation`): the actual continuation Pod under the
   runner account with the chart's rules, and the actual applier.
-  - Runs [1](../test/results/adr183-continuation-native-1/result.json)–[4](../test/results/adr183-continuation-native-4/result.json)
+  - Runs 1–4
     found and fixed:
     - a missing step name in the stop message;
     - an immutability assumption about the installer input;
     - two post-bridge handover reads.
-  - [Run 5](../test/results/adr183-continuation-native-5/result.json)
+  - Run 5
     completed phase 1 in product code: outbox, applier, inbox, provider
     inspection and audit Secret. It then stopped at the configuration roles.
   - Runs 6–9 traced the stop to a role operation overrunning its original
     five-second window at 20 QPS after the role existed.
-  - **[Run 10](../test/results/adr183-continuation-native-10/result.json)
+  - **Run 10
     passed.** The fix replays role provisioning by lookup. From a completed
     product bootstrap, the actual continuation Pod and the actual applier
     did this:
@@ -12587,7 +12587,7 @@ ADR-175 to ADR-178 are being implemented in this order:
     Worker and owner run on the compiled image, inside the original
     30-minute window (subtest 236.6 s), with unchanged sources and clean
     teardown.
-  - The [full Go gate](../test/results/adr183-go-check-5/result.json)
+  - The full Go gate
     passes after the native fixes: exit 0, 55 packages, 547 Kubernetes
     tests.
     - Gates 2 and 4 failed on two timer-race tests: the code under test
@@ -12613,7 +12613,7 @@ ADR-175 to ADR-178 are being implemented in this order:
   The producer map records every
   remaining promoted input. Today most exist only as test setup.
 - **Native continuation run 18 passes with ADR-184/185/186**
-  ([result](../test/results/adr183-continuation-native-18/result.json)).
+  (result).
   - The public sources were created.
   - All 66 public runtime roles were provisioned and the public projection
     published before the owner's one launch.
@@ -12631,7 +12631,7 @@ ADR-175 to ADR-178 are being implemented in this order:
   - a hard-coded identity file list in the `kms` adapter; all such lists
     now derive from `OwnerIdentityProjectionFiles`.
 - **Native continuation run 23 passes with ADR-187 and ADR-188**
-  ([result](../test/results/adr183-continuation-native-23/result.json)).
+  (result).
   - [ADR-187](decisions/187-replay-after-guard-bridge.md): after completion,
     the bootstrap hook replays passively and a second continuation exits as
     already complete. The guard generation and the resource journal stay
@@ -12648,7 +12648,7 @@ ADR-175 to ADR-178 are being implemented in this order:
     the stop message now carries: the first `converge` attempt, the SQL
     role sub-step and the source recheck check.
 - **Native continuation run 26 passes with the installed permission stream**
-  ([result](../test/results/adr183-continuation-native-26/result.json)).
+  (result).
   - [ADR-189](decisions/189-installed-permission-stream.md): after the owner
     selection, the continuation applies the permission guard and publishes
     the permission projection. The hub-worker's new fourth child opens it,
@@ -12665,7 +12665,7 @@ ADR-175 to ADR-178 are being implemented in this order:
     and a closing policy read.
   - Open: authority outbox retention (ADR-189 decision 8).
 - **Native continuation run 33 initializes capacity**
-  ([result](../test/results/adr183-continuation-native-33/result.json)).
+  (result).
   [ADR-190](decisions/190-capacity-readiness-and-promoted-owner.md) steps
   1–4:
   - shipped `EvidenceStoragePool` and `EvidenceBudgetPolicy` CRDs
@@ -12683,7 +12683,7 @@ ADR-175 to ADR-178 are being implemented in this order:
   setup's five-second budget; stage labels located each. Step 5, runtime
   audit profile selection in the hub-api, is in code with unit tests.
 - **Regional capacity's SQL passes on real PostgreSQL**
-  ([adr197-custody-7](../test/results/adr197-custody-7/environment.json):
+  (adr197-custody-7:
   exit 0, 99 passed tests, no cleanup failures, source unchanged).
   [ADR-197](decisions/197-regional-capacity.md) migration 00065 runs under
   the whole existing capacity lifecycle (enrollment, sessions, renewal), then
@@ -12707,7 +12707,7 @@ ADR-175 to ADR-178 are being implemented in this order:
   audit-profile reader, which now accept the same pending or adopted
   revision.
 - **The installed key service and the regional join pass natively**
-  ([continuation run 8](../test/results/adr196-continuation-native-8/environment.json):
+  (continuation run 8:
   exit 0, all four tests, no cleanup failures, source unchanged).
   - [ADR-198](decisions/198-installed-key-service.md): the continuation
     installs the key service. Its configuration is accepted in SQL, it
@@ -12727,15 +12727,15 @@ ADR-175 to ADR-178 are being implemented in this order:
     and makes the close local. Runs 1–7 are retained failures.
   - Regional capacity (ADR-197) and the capture run remain.
   - **Full Go gate.**
-    [adr196-go-check-1](../test/results/adr196-go-check-1/go-check.log) failed
+    adr196-go-check-1 failed
     on one pinned privilege test. It still expected the hub-api's old
     get-only rule, without the slot topology names step 5 adds. After that
     test was updated,
-    [adr196-go-check-2](../test/results/adr196-go-check-2/go-check.log)
+    adr196-go-check-2
     passed: 55 packages and 574 Kubernetes tests in 15 groups, source hash
     unchanged.
 - **The owner's native port is reachable from another cluster**
-  ([continuation run 1](../test/results/adr196-continuation-native-1/environment.json)).
+  (continuation run 1).
   [ADR-196](decisions/196-regional-cluster-join.md) decision 5: the
   continuation creates an L4 Service (pinned NodePort) for the owner's port
   9444, and the regional offer names its address and the accepted owner
@@ -12747,7 +12747,7 @@ ADR-175 to ADR-178 are being implemented in this order:
   catalog restart, regional capacity (ADR-197) and the installed key
   service (ADR-198) remain.
 - **The hub retention source becomes Ready**
-  ([continuation run 8](../test/results/adr195-continuation-native-8/environment.json)).
+  (continuation run 8).
   [ADR-195](decisions/195-installed-hub-retention-source.md): the hub-worker
   runs the retention reconciler, acceptance publisher and catch-up pager
   from logins carried in the permission projection. The source accepts the
@@ -12756,16 +12756,16 @@ ADR-175 to ADR-178 are being implemented in this order:
   edit and returns to Ready after a hub-worker crash, under a new epoch. The
   Transit-backed lifecycle signer (step 5b) is deferred to the capture
   composition. The full Go gate passes on these sources
-  ([adr195-go-check-1](../test/results/adr195-go-check-1/go-check.log): 55
+  (adr195-go-check-1: 55
   packages and 570 Kubernetes tests in 15 groups, source hash unchanged).
 - **The continuation launches a promoted owner**
-  ([continuation run 9](../test/results/adr194-continuation-native-9/environment.json)).
+  (continuation run 9).
   The promoted owner is Ready, capacity reaches `ReadyAt` through its 9444
   observation handler, and the regional cluster still enrolls at generation
   1. Runs 1–8 are retained failures; run 6 found the cause of the
   intermittent owner installation failures (the administrator token's
   credential ID changes on kubelet refresh). The full Go gate passes on
-  the same sources ([adr194-go-check-1](../test/results/adr194-go-check-1/go-check.log):
+  the same sources (adr194-go-check-1:
   55 packages and 568 Kubernetes tests in 15 sequential groups, source hash
   unchanged).
   [ADR-194](decisions/194-promoted-owner-inputs.md):
@@ -12784,7 +12784,7 @@ ADR-175 to ADR-178 are being implemented in this order:
   - The 9444 server-name router (ADR-190 step 6) serves observation and
     native from one server credential.
 - **Helm `mode=cluster` installs a regional connector**
-  ([Helm cluster run 4](../test/results/adr193-helm-cluster-native-4/result.json)).
+  (Helm cluster run 4).
   ADR-193 step 6: the packaged chart's post-install hook runs
   `installer-cluster --in-cluster` from the authenticated registry. The
   release's installer account administers both guards; the Deployment is
@@ -12792,7 +12792,7 @@ ADR-175 to ADR-178 are being implemented in this order:
   administrator's token request and source write are denied. Runs 1–3 are
   retained failures (missing `fsGroup`; the test's own denied token request).
 - **Continuation run 53 installs a regional cluster**
-  ([environment](../test/results/adr183-continuation-native-53/environment.json)).
+  (environment).
   [ADR-193](decisions/193-installed-federation-and-regional-enrollment.md)
   step 5, with two owned clusters:
   - The hub comes from the continuation, and a fleet operator slot is issued
@@ -12812,10 +12812,10 @@ ADR-175 to ADR-178 are being implemented in this order:
   - 52: the continuation derived a connector backing too short for the
     regional deployment shape. The continuation now refuses that.
 
-  The focused [installer run 2](../test/results/adr193-installer-native-2/result.json)
+  The focused installer run 2
   isolates the installer.
 - **Intermittent owner-launch check: instrumented (open).** Continuation
-  [run 48](../test/results/adr183-continuation-native-48/context-storage.log)
+  run 48
   stopped at `projection.final-native (unavailable after 1.256s)` before
   reaching the new regional step: the fourth occurrence (runs 35, 41, 46,
   48). Those messages named no step, because the SQL facet replaced callback
@@ -12830,7 +12830,7 @@ ADR-175 to ADR-178 are being implemented in this order:
   native failure. The next failing run will identify the condition; no fix
   is claimed yet.
 - **Fleet-operator bootstrap issuance with Keycloak**
-  ([identity run 3](../test/results/adr193-identity-3/identity-provider-environment.json)).
+  (identity run 3).
   [ADR-193](decisions/193-installed-federation-and-regional-enrollment.md)
   step 4 as components:
   - Four hub SQL purposes keep reservation, credential recording, audit
@@ -12846,7 +12846,7 @@ ADR-175 to ADR-178 are being implemented in this order:
   route is not installed. The fleet settings reader and trust row in this run
   are fixture setup. Identity runs 1–2 are retained fixture failures.
 - **Federation run 3 enrolls generation 1 from a bootstrap**
-  ([result](../test/results/adr193-federation-native-3/result.json)).
+  (result).
   [ADR-193](decisions/193-installed-federation-and-regional-enrollment.md)
   step 3, in two owned clusters with the product `hub-federation` and
   `connector` Pods:
@@ -12866,14 +12866,14 @@ ADR-175 to ADR-178 are being implemented in this order:
   Run 2 is a retained failure. The regional workload guard refused the
   connector's Secret CAS write; it now admits exactly that UPDATE.
 
-  Full Go gates [2](../test/results/adr193-go-check-2/go-check.log) and
-  [3](../test/results/adr193-go-check-3/go-check.log) are retained failures
+  Full Go gates 2 and
+  3 are retained failures
   with unchanged sources. In gate 3 the Kubernetes owner-projection group hit
   its 15-minute timeout while host load reached about 11 from another
   project's race tests. Its slowest tests ran 5–10 times their usual time;
   no test hung. A passing full gate is still owed.
 - **Native continuation run 47 provisions the federation**
-  ([result](../test/results/adr183-continuation-native-47/result.json)).
+  (result).
   [ADR-193](decisions/193-installed-federation-and-regional-enrollment.md)
   steps 1–2:
   - The federation resolves peers from staged SQL profiles, with no pinned
@@ -12892,7 +12892,7 @@ ADR-175 to ADR-178 are being implemented in this order:
   now reports its class and timing. Another project's race tests were running
   on the host during some runs.
 - **Native continuation run 43 publishes capacity readiness**
-  ([result](../test/results/adr183-continuation-native-43/result.json)).
+  (result).
   [ADR-192](decisions/192-capacity-before-download-paths.md):
   - Capacity identities derive from the public role setup, so replays match
     the committed claim.
@@ -12908,7 +12908,7 @@ ADR-175 to ADR-178 are being implemented in this order:
 
   Still open: an intermittent owner launch finalization failure
   (`final-native`, runs 35 and 41), terminal by design.
-  [Run 34](../test/results/adr183-continuation-native-34/result.json) launches
+  Run 34 launches
   the owner with step 7's `Observation.LocalCapacity` input composed (probe
   tokens, selector guard, caller admission); no request reached that path.
 
@@ -12932,7 +12932,7 @@ proof, which cannot fit the original five seconds at 20 QPS. One verified work
 now reuses its single complete process observation, never renewed; capacity,
 start-guard and CAS checks stay current.
 `TestConnectorAPIProcessWithRealKubernetes` passes natively for the first time
-([run 6](../test/results/connector-api-timing-6/result.json): 2.57 s of 5 s).
+(run 6: 2.57 s of 5 s).
 Runs 1–5 are retained failures: a test-created CRD that admission refused for
 about 2 s, the per-call rechecks, and a non-canonical test binding.
 
@@ -12942,25 +12942,25 @@ the optional `FederationDeployment.Owner` copied from the hub-api input by
 `OwnerDeployment.Guard()`, and the hub-api's unchanged registry, route and
 guard readers built from that identical plan. Unit and race tests pass. The
 initial-installation suite provisioned and verified all 42 roles on real
-PostgreSQL ([result](../test/results/adr172-roles-1/result.json): exit 0, 87
+PostgreSQL (result: exit 0, 87
 tests, empty cleanup, unchanged sources). Native qualification follows with the
 regional composition.
 
 The earlier full Go gate after ADR-171/172
-([log](../test/results/adr172-go-check-1/go-check.log)) failed, exit 2. All
+(log) failed, exit 2. All
 non-Kubernetes packages and Kubernetes groups 1–6 passed; group 4's one
 explicit skip is pre-existing. One group-7 test failed,
 `TestPublicRoleStateRejectsIncompletePriorInventory`. It pinned the pre-ADR-170
 role count (31 after removing two of 33) instead of deriving it from the layout
 (now 41). The count is derived now, and the public-role Kubernetes tests pass;
 a complete gate rerun is still owed. The earlier
-[ADR-170 gate](../test/results/adr170-go-check-1/INCOMPLETE.txt) was interrupted
+ADR-170 gate was interrupted
 by a host reboot during group 7 and never reached this test.
 
 ## Original observation selection and SQL connection budget components
 
 [ADR-165](decisions/165-original-observation-capability-selection.md)'s staged
-17-file subset is integrated. Its [component gate](../test/results/installed-observation-selection-component-3/result.json)
+17-file subset is integrated. Its component gate
 passes compile, 64 race parents in six groups, vet and canonical checks. Two
 earlier runs are retained as failures: a never-run staged test with a wrong
 fixture premise, and a runner that used the system Python for spec checks.
@@ -12989,8 +12989,8 @@ Native installed qualification of this correction remains pending.
 
 ## Regional investigation journey passes end to end (native36/37)
 
-The [thirty-sixth](../test/results/public-context-journey-native-36/result.json)
-and [thirty-seventh](../test/results/public-context-journey-native-37/result.json)
+The thirty-sixth
+and thirty-seventh
 native regional investigations pass. Each runs one shared operation factory,
 browser- and MCP-shaped current requests, and the real first regional capture
 (one collector call). It then covers accepted resolution, independent
@@ -13017,8 +13017,8 @@ Two further corrections followed native31–35:
   native-transition expectations in four suites.
 
 The changed real-service download modes pass:
-[content/resume/interrupted](../test/results/adr167-native-content-modes-2/result.json)
-and the complete [41-mode download-worker family](../test/results/adr167-download-worker-family-1/result.json),
+content/resume/interrupted
+and the complete 41-mode download-worker family,
 in 202 s with no cleanup failures and unchanged sources.
 
 This is a two-cluster *fixture* journey with explicit synthetic identity,
@@ -13030,9 +13030,9 @@ remain open.
 ## Download enrollment failure resolved into three phase defects
 
 The staged continuation-outcome diagnostic passed its
-[component gate](../test/results/public-context-continuation-outcome-component-1/result.json)
+component gate
 (nine race parents, compile, vet, unchanged sources). The
-[fourteenth native investigation](../test/results/public-context-journey-native-14/result.json)
+fourteenth native investigation
 then recovered the decisive fact: enrollment was refused 5.6 ms after the original
 continuation started, before that continuation could register. Native13's
 refusal was a **fixture** defect. The one-shot owner-claim notification had been
@@ -13040,7 +13040,7 @@ consumed by the first preparation's own registration, which claims and releases
 fence 1. The waiter now arms explicitly before the continuation and accepts only
 the next fence (`TestPublicJourneyOwnerClaimArmIgnoresEarlierRegistration`).
 
-[Native15](../test/results/public-context-journey-native-15/result.json) reached
+Native15 reached
 proof and CSR, then reproduced native12's SQLSTATE 53300 on
 `context_catalog_read_runtime`. The journey used the 16-connection fixture pool
 profile with pgx's 30-minute idle default. It now uses the installed
@@ -13058,11 +13058,11 @@ open, and this tight fixture margin is evidence for it.
 Subsequent runs isolated three production phase defects, recorded in
 [ADR-167](decisions/167-phase-bounded-download-continuation.md):
 
-- [Native16](../test/results/public-context-journey-native-16/result.json)
+- Native16
   completed enrollment, then ran the native exchange out of the original
   five-second bound. A continuation that produced a new enrollment now returns
   Preparing.
-- [Native20](../test/results/public-context-journey-native-20/result.json)
+- Native20
   joined the prepare conversation in the next continuation, but its Ready view
   needed a second Observe conversation with 0.62 s left. Acknowledged prepared
   facts are now handed once to the same process's metadata cache.
@@ -13087,27 +13087,27 @@ changed with the handoff and need their own real-service rerun.
 ## Profile endpoint planning passes; download enrollment exhausts catalog connections
 
 Passive Go profile endpoint planning now passes its
-[second component gate](../test/results/runtime-profile-endpoint-component-2/result.json):
+second component gate:
 all 30 selected parents / 269 named race tests, compilation, vet and canonical
 specification, architecture, Go architecture and design checks. The earlier
-[failed gate](../test/results/runtime-profile-endpoint-component-1/result.json)
+failed gate
 passed its tests but rejected domain imports. Bounded pure Host/port validation
 replaces those imports without changing the architecture rule. Exact 3,116
 sources, 36 archives, reviewed payloads and joined cleanup are independently
 verified. This qualifies passive planning and synthetic API observation, not
 protected catalog acceptance, node dialing or installed profile collection.
 
-The [eleventh native investigation](../test/results/public-context-journey-native-11/result.json)
+The eleventh native investigation
 failed before enrollment: test instrumentation added a pgx tracer that the
 production SQL constructor correctly rejects. That rejection remains intact.
-The [corrected diagnostic component](../test/results/public-context-download-log-prefix-component-1/result.json)
+The corrected diagnostic component
 passes five harness tests and three Go parents / 20 named race tests, integration
 compilation and vet. It tests the actual constructor boundary and records only
 the synthetic database role and SQLSTATE through the owned server's log prefix;
 statement and bind-parameter logging remain disabled. Exact 3,116 sources,
 174 archives and joined cleanup are independently verified.
 
-The [twelfth native investigation](../test/results/public-context-journey-native-12/result.json)
+The twelfth native investigation
 again completes collection, publication and case lookup. Its original regional
 request invokes the collector once in 4.270563878 seconds. Enrollment then fails
 at the original current-authority check; PostgreSQL rejects a connection for
@@ -13128,14 +13128,14 @@ owner/regional/capacity composition; public runtime enablement remains closed.
 [ADR-164](decisions/164-owner-launch-receipt-convergence.md) now lets startup
 passively await only the original launch receipt, pins the first complete receipt
 and reruns the entire current native identity proof before credential use. The
-preserved [before regression](../test/results/owner-launch-receipt-before-1/result.json)
+preserved before regression
 rejects the valid pending launch while accepting its completed control. The
-[corrected component gate](../test/results/owner-launch-receipt-component-1/result.json)
+corrected component gate
 passes all 16 parents / 74 named race tests, compilation, vet and canonical
 specification/architecture checks. Exact 3,105 sources, 22 archives and joined
 cleanup are independently verified.
 
-The [fourteenth installed-owner run](../test/results/runtime-provider-owner-native-14/result.json)
+The fourteenth installed-owner run
 passes all four original required cases. It provisions the original roles and
 projections, launches the original owner Pod and verifies both client/server
 identities for the same process, including version-pinned encrypted enrollment
@@ -13152,14 +13152,14 @@ serving, full public runtime provisioning or the complete installed investigatio
 original transport peer observation across correctly ordered identity frames,
 with a separate complete final check and no extension of the original interval.
 Human identity and application effect checks remain current. The
-[before regression](../test/results/context-frame-lease-before-1/result.json)
+before regression
 reproduces seventeen full observations and failure under the original rate/time
-budget. The [corrected component gate](../test/results/context-frame-lease-component-1/result.json)
+budget. The corrected component gate
 passes 48 parents / 157 named tests, including actual HTTP/2, plus integration
 compilation, vet and canonical checks. Exact 3,105 sources, 168 archives and
 joined cleanup are independently verified.
 
-The [tenth native investigation](../test/results/public-context-journey-native-10/result.json)
+The tenth native investigation
 now completes the original regional exchange with one collector invocation in
 4.267659428 seconds. Capture, publication and case lookup pass; download worker
 enrollment then fails at the original enrollment call. PostgreSQL records a
@@ -13173,7 +13173,7 @@ qualification; the full installed UI/MCP/download flow remains unfinished.
 
 ## Native startup refusal and transport read amplification isolated
 
-The [thirteenth installed-owner run](../test/results/runtime-provider-owner-native-13/result.json)
+The thirteenth installed-owner run
 passes activation, role/projection finalization and acknowledged original launch,
 then the original owner process exits before identity. Its bounded diagnostic is
 `phase=native-identity`, `native=initial-journal`, `detail=journal-state`.
@@ -13183,7 +13183,7 @@ exits 1 after 577.951 seconds. Passive commands and administrator-removal checks
 pass. Exact 2,544 outer / 2,347 native sources, seven archives and owned cleanup
 are independently verified. A focused producer/reader regression is next.
 
-The [ninth native investigation](../test/results/public-context-journey-native-9/result.json)
+The ninth native investigation
 refuses at the regional stream's original `receive-peer` check with `unavailable`;
 the hub records `read/other`. The whole request takes 4.919341134 seconds and the
 collector remains uncalled. This narrows the boundary to the connector/process
@@ -13210,20 +13210,20 @@ profile collection. A real Go CPU handler and bounded synthetic HTTP fixtures
 exercise the mechanism. Current observations cannot extend the caller, action or
 channel deadline, and uncertain starts remain spent.
 
-The [before-fix regression](../test/results/runtime-profile-caller-deadline-before-1/result.json)
+The before-fix regression
 proves an admitted ten-second recording could begin under a three-second caller.
 The production fit check now uses the earliest original deadline before dialing
-and HTTP. The [first component gate](../test/results/runtime-profile-component-1/result.json)
+and HTTP. The first component gate
 passes all 28 parents / 97 named tests but fails vet on cancellation cleanup.
 After separating the channel child context from the watched action context,
-the [second gate](../test/results/runtime-profile-component-2/result.json) passes
+the second gate passes
 all 97 named race tests, full vet, specification, architecture, Go architecture
 and design checks. Exact 3,095 sources, 18 archives and process/scratch cleanup
 are independently verified. Production endpoint resolution, profile-specific
 admission, node routing, semantic publication, analysis and UI/MCP/native-download
 composition remain pending.
 
-The [owner startup diagnostic gate](../test/results/owner-startup-diagnostics-component-2/result.json)
+The owner startup diagnostic gate
 passes 15 parents / 57 named race tests, full vet, specification and architecture
 checks. Closed diagnostic fields identify the original startup stage without
 rendering private provider errors. The fixture retains bounded current/previous
@@ -13232,7 +13232,7 @@ the next native read after clock expiry; only that expectation was corrected.
 Exact 3,089 sources, 26 archives and process/scratch cleanup are independently
 verified. This provides failure evidence, not a startup correction.
 
-The [context-stream diagnostic gate](../test/results/public-context-stream-diagnostics-component-1/result.json)
+The context-stream diagnostic gate
 passes 31 parents / 92 named race tests, integration compilation and full vet.
 It preserves original I/O, authority reads, deadline sampling and errors while
 retaining the first observed local refusal at each endpoint. Its retained-read
@@ -13241,7 +13241,7 @@ the separate native journey failure. Native qualification follows below.
 
 ## Owner projection finalization and regional investigation diagnostics
 
-The [twelfth installed-owner run](../test/results/runtime-provider-owner-native-12/result.json)
+The twelfth installed-owner run
 passes all eight original execution SQL calls and all eight separate read-only
 finalizations, crossing the previous second-call failure with unchanged deadlines
 and 20-QPS/burst-20 clients. Their trace records no limiter refusal or expired
@@ -13258,10 +13258,10 @@ the process-start failure and the regional eligibility failure below.
 the original bounded owner projection effects from mandatory read-only
 finalization. No effect deadline, rate limit, SQL connection ceiling or permission
 is increased. Its original
-[component run](../test/results/owner-projection-finalization-component-1/result.json)
+component run
 reaches the fifteen-minute package limit after 101 passing parents and exposes
 a whole-sequence test watchdog that incorrectly allowed only five seconds.
-The [follow-up](../test/results/owner-projection-finalization-component-2/result.json)
+The follow-up
 runs all twelve unfinished/failed parents: eleven pass, including the corrected
 three cancellation cases. One older private-read fixture still assumes a single
 execution phase. That run also retains a runner bookkeeping/source-change failure;
@@ -13269,7 +13269,7 @@ its failed verdict is not relabeled.
 
 After correcting the fixture to require zero private reads before execution and
 two before independent finalization, the
-[third component gate](../test/results/owner-projection-finalization-component-3/result.json)
+third component gate
 passes the parent and all four cases, all 110 PostgreSQL parents (689 named
 passes), full vet and Go architecture checks. Production code was unchanged by
 these two fixture corrections. All 3,082 source paths/hashes, 35 archives and
@@ -13280,11 +13280,11 @@ The regional investigation diagnostic fixture is now integrated with fixed,
 content-free counters around the original verifier and pre-collection runner
 ports. It preserves original calls, arguments, optional completion capabilities
 and prepared handles; it adds no request replay or authority refresh. Its
-[component gate](../test/results/public-context-regional-diagnostics-component-1/result.json)
+component gate
 passes integration compilation, six diagnostic parents (17 named passes) and
 full vet. Exact 3,084 sources, 116 archives and owned process/scratch cleanup are
 independently verified. Specification, architecture and design gates also pass.
-The [seventh native journey](../test/results/public-context-journey-native-7/result.json)
+The seventh native journey
 exits 1 after 107.581 seconds (native Go 11.097 seconds). It verifies the signed
 regional request and succeeds through the initial runner checks, SQL preparation
 and key preparation. The second eligibility check refuses; the original collector
@@ -13294,14 +13294,14 @@ paths, nine archives and owned process/Docker/Kind/scratch cleanup are independe
 verified. No uncertain request was replayed. Continue that eligibility boundary
 and the original installed-owner qualification; public runtime remains disabled.
 
-The [eligibility diagnostic follow-up](../test/results/public-context-eligibility-diagnostics-component-1/result.json)
+The eligibility diagnostic follow-up
 now retains only whitelisted reasons from the original result and observes the
 original identity calls without adding reads or changing their bounds. Integration
 compilation, seven diagnostic parents (24 named passes) and full vet pass. Exact
 3,084 sources, 116 archives and owned process/scratch cleanup are independently
 verified. No production cause or correction is claimed from this instrumentation.
 
-The [eighth native journey](../test/results/public-context-journey-native-8/result.json)
+The eighth native journey
 exits 1 after 99.175 seconds. Its second eligibility evaluation returns
 `IdentityUnavailable`: the first identity resolution in that evaluation fails
 while receiving the original regional exchange reply. The original evaluator
@@ -13316,52 +13316,52 @@ is a correction for this failure.
 
 [ADR-161](decisions/161-fleet-observation-separation.md) now passes its actual
 PostgreSQL migration/producer/activation qualification: all 31 named cases in the
-[native run](../test/results/fleet-freshness-native-1/result.json), exit 0 in
+native run, exit 0 in
 46.536 seconds. These cover unchanged renewal under retained SHARE locks,
 restrictive serialization, original basis/deadline and incarnation checks,
 explicit first activation, and migration privilege/hook refusals. Synthetic
 protected source inputs remain explicit; this is not installed owner availability.
 
-The [second component gate](../test/results/fleet-freshness-component-2/result.json)
+The second component gate
 passes 265 top-level race tests (1,428 named passes, no skips), SQL generation,
 eight embedded schema checks and Go/specification/architecture/design gates.
 Integration compilation and full vet passed separately. The
-[first component failure](../test/results/fleet-freshness-component-1/result.json)
+first component failure
 is preserved: three existing reconciler fixtures lacked the newly required
 original observation basis. Only those fixed fixture inputs were corrected;
 no timeout or production authority was relaxed. Exact source/archive inventories,
 joined process groups and scratch cleanup are independently verified for both
 component runs and the native qualification.
 
-The [full initial-installation run](../test/results/fleet-freshness-initial-installation-1/result.json)
+The full initial-installation run
 still exits 1, with 87 named executions, 84 passes and two failed leaf cases
 (their parent also fails). Both retained pre-SQL59 expectations: a base-only source
 change now projects unavailable authority until a coherent observation exists,
 and unchanged positive observation now succeeds while the bridge holds SHARE.
 The reviewed fixture correction preserves changed-source rejection, restrictive
 writer blocking and the original in-flight deadline. The
-[second full run](../test/results/fleet-freshness-initial-installation-2/result.json)
+second full run
 now passes all 87 named cases with no skips, including unchanged renewal under
 bridge SHARE and the original 200ms deadline remaining binding. It exits 0 in
 59.543 seconds. All 3,075 outer and 2,304 native source paths/hashes, seven archives
 and owned process/Docker/scratch cleanup are independently verified. The first
 failed run remains preserved. The
-[full fleet run](../test/results/fleet-freshness-fleet-1/result.json) also passes
+full fleet run also passes
 all 176 named tests in 66.950 seconds, with exact 3,075 outer / 2,304 native
 source inventories, seven archives and owned cleanup independently verified.
-The [database recovery run](../test/results/fleet-freshness-database-recovery-1/result.json)
+The database recovery run
 passes all three actual phases—initial, restarted and restored—in 30.722 seconds.
 The server-start identity changes on restart and the database OID changes after
 restore. Its exact 3,075 outer / 2,304 native source inventories, seven archives
 and owned cleanup are independently verified.
-The [full custody run](../test/results/fleet-freshness-custody-1/result.json)
+The full custody run
 also passes, with 452 named passes in 716.417 seconds. Its three expected skips
 are the separate owner PKI/provider suites and optional 31-minute connector
 retirement; these are not claimed as custody coverage. Exact 3,076 outer / 2,305
 native sources, seven archives and owned process/Docker/scratch cleanup are
 independently verified. Full-Go qualification remains pending.
 
-The [eleventh original installed-owner run](../test/results/runtime-provider-owner-native-11/result.json)
+The eleventh original installed-owner run
 passes setup-free replay and administrator-removal rejection, but owner startup
 still fails. Projection SQL call one succeeds; call two refuses at `final-native`
 with one same-call source-client limiter refusal while its context remains live.
@@ -13374,17 +13374,17 @@ repairs the qualified locking defect but has not completed startup availability;
 these counters do not identify an individual refused HTTP request or prove a new
 SQL predicate failure.
 
-The [third combined investigation run](../test/results/public-context-journey-native-3/result.json)
+The third combined investigation run
 gets beyond the prior connection-exhaustion failures after setup-only pool closure
 and same-purpose reuse. It reaches the shared assembly with 43 observed database
 connections under the unchanged 48-connection ceiling, then fails at browser
 preview with `durable audit unavailable`; no connection-exhaustion error is
 recorded in this run. This is not a passing capture/case/native-download journey.
 Its failed result, exact frozen inputs and owned cleanup are preserved. The
-[subsequent fixture component gate](../test/results/public-context-journey-component-7/result.json)
+subsequent fixture component gate
 passes compilation, two selected race parents (seven named passes) and full vet
 after the reviewed diagnostics and bridge-expectation corrections. The
-[fourth journey run](../test/results/public-context-journey-native-4/result.json)
+fourth journey run
 also exits 1 (96.392 seconds; native Go 5.557 seconds). Every instrumented audit
 and preview dependency succeeds, including both eligibility reads and preview
 creation; the frozen operation outcome is still unavailable. The generic outward
@@ -13393,30 +13393,30 @@ verification confirms all 3,075 outer / 2,327 native source paths/hashes, nine
 archives and owned cleanup. Source review identifies the API-only impact
 explanation at 290 characters, exceeding the canonical output maximum of 256;
 the existing unit fixture used shorter synthetic text. The actual compiler-to-wire
-regression [reproduces](../test/results/context-assessment-wire-before-1/result.json)
+regression reproduces
 those invalid output fields and the public preview failure while the node path
 passes. Shorter product wording is integrated. The
-[corrected component gate](../test/results/context-assessment-wire-component-1/result.json)
+corrected component gate
 passes all 52 planning/presentation test parents (132 named passes), full vet,
 specification and Go architecture checks. Exact 3,076 source paths/hashes, twelve
 archives, joined processes and removed scratch are independently verified.
 The canonical output limit is unchanged. The
-[fifth native journey](../test/results/public-context-journey-native-5/result.json)
+fifth native journey
 now returns a successful audited browser preview, then stops at the first capture
 request with `OutcomeUnknown`. It does not repeat that uncertain request or select
 another capture. The wrapper exits 1 after 139.042 seconds; native Go takes 11.887
 seconds. Exact 3,076 outer and 2,328 native source paths/hashes, nine archives and
 owned process/Docker/Kind/scratch cleanup are independently verified. The preview
 defect is corrected; request-to-download completion remains unqualified.
-The [reviewed first-request diagnostic fixture](../test/results/public-context-request-diagnostics-integration/integration.json)
+The reviewed first-request diagnostic fixture
 now observes the original admission, capture-intent audit and regional-dispatch
 calls once, after the preview has returned. It adds no production behavior,
 dependency read or request replay. Its
-[component gate](../test/results/public-context-request-diagnostics-component-1/result.json)
+component gate
 passes integration compilation, all three selected diagnostic race parents and
 full vet; exact 3,077 sources, 91 archives and joined process/scratch cleanup are
 independently verified. The
-[sixth native journey](../test/results/public-context-journey-native-6/result.json)
+sixth native journey
 still exits 1 (96.278 seconds; native Go 11.852 seconds), but establishes that
 original admission, the complete paired capture-intent audit and regional
 accepted-read/signing all succeeded. The original collector invocation count is
@@ -13445,7 +13445,7 @@ checkpoints and failures below remain historical evidence.
 
 [ADR-161](decisions/161-fleet-observation-separation.md) and migration 00059 are
 integrated with their focused and existing fixture adaptations: 70 source paths.
-The [integration record](../test/results/fleet-freshness-integration/integration.json)
+The integration record
 binds the reviewed payloads and preserved originals. Positive observations now
 bind semantic authority and database incarnation separately from restrictive
 locks. Review also closed trigger/reference privilege prerequisites and corrected
@@ -13455,8 +13455,8 @@ qualification have not run yet; no installed availability claim follows.
 The combined shared capture/case/native-download fixture is integrated. Its first
 owned two-cluster run failed on PostgreSQL connection exhaustion. Nine completed
 setup pools now close earlier; compilation and full vet pass in the fifth
-[component run](../test/results/public-context-journey-component-5/result.json).
-The second [native run](../test/results/public-context-journey-native-2/result.json)
+component run.
+The second native run
 gets further but still exhausts the unchanged 48-connection service at operation
 audit setup. It exits 1 after 112.190 seconds; Go exits after 6.343 seconds. Exact
 3,063 outer and 2,316 native source sets/hashes, archived files, joined processes
@@ -13480,10 +13480,10 @@ the harness interval including compilation is 65.662 seconds. This uses the
 existing explicitly synthetic protected Kubernetes inputs, not an installed
 browser/MCP investigation.
 
-The [original wrapper result](../test/results/public-context-assembly-initial-installation-1/result.json)
+The original wrapper result
 retains exit 1: its expected inventory omitted four existing historical-reader
 subtests. Both wrapper errors come from that omission, not changed selection or
-time bounds. The [independent verification](../test/results/public-context-assembly-native-verification/result.json)
+time bounds. The independent verification
 derives all 87 names from the unchanged source, checks exact RUN/PASS counts and
 zero skips/failures, and verifies 3,061 outer and 2,291 native source paths/hashes,
 all six archives, terminated processes and fresh Docker/scratch absence. The
@@ -13505,7 +13505,7 @@ complete the compiled purpose inventory without granting either capture or
 custody writes. Existing ordinals and per-role connection limits are unchanged;
 the two additional roles must be included in installation connection planning.
 
-The [component gate](../test/results/public-context-assembly-component-1/result.json)
+The component gate
 passes integration compilation, 300 exact top-level race tests (1,367 named
 passes, no skips), full vet and SQL/Go-architecture/specification/architecture/
 design checks. Exact 3,061 source/document paths and hashes, 31 archives, eleven
@@ -13521,7 +13521,7 @@ download composition remain in progress. No public or Helm runtime is enabled.
 
 ## First projection passes; the next phase still lacks sustained availability
 
-The [tenth original installed scenario](../test/results/runtime-provider-owner-native-10/result.json)
+The tenth original installed scenario
 passes activation, setup-free replay and administrator-removal rejection. The
 first projection SQL call completes, including the previously failing final
 SQL check, with zero limiter refusals across its six original clients. No final
@@ -13552,14 +13552,14 @@ shared public investigation assembly and missing preview/resolution role facets.
 
 ## Final projection SQL diagnostic passes component qualification
 
-The [four-path diagnostic](../test/results/owner-projection-final-current-integration/integration.json)
+The four-path diagnostic
 now preserves the fixed reason from the existing `current-after-final` check.
 It distinguishes the SQL prerequisite, context cancellation/deadline and final
 local expiry without changing the query, short-circuit order, time samples,
 original bounds or unavailable result. Unknown provider errors are neither
 rendered nor unwrapped; the native fixture logs only the closed classifications.
 
-The [component gate](../test/results/owner-projection-final-current-component-1/result.json)
+The component gate
 passes integration compilation, all 109 PostgreSQL unit-test parents under the
 race detector (685 named passes, no skips), full vet and Go/specification/
 architecture/design checks. All 3,057 source/document paths and hashes, eleven
@@ -13569,7 +13569,7 @@ diagnostic alone does not repair startup or enable public investigation.
 
 ## Projection completes the native graph, then fails the final SQL check
 
-The [ninth original scenario](../test/results/runtime-provider-owner-native-9/result.json)
+The ninth original scenario
 passes activation, setup-free replay and administrator-removal rejection. The
 first projection SQL operation now completes its independent final native
 graph. Its actual source-client wait count is 48 inside that SQL operation,
@@ -13606,7 +13606,7 @@ version may be selected at this later first read. All subsequent exact-version,
 postclaim and independent final checks remain, along with original deadlines and
 nonrefundable attempts. Other fresh owner paths retain ADR-158.
 
-The [component gate](../test/results/owner-projection-split-component-2/result.json)
+The component gate
 passes integration compilation, 99 top-level race tests in four bounded groups
 (461 named passes, no skips), full vet and specification/architecture/design
 checks. The actual fixture paths confirm thirteen fewer source-client requests:
@@ -13618,7 +13618,7 @@ component results, not measured installed availability.
 
 The first compile gate caught an unused import; its failed output is retained
 and the import-only correction is archived with the
-[integration record](../test/results/owner-projection-split-integration/integration.json).
+integration record.
 The corrected run independently verifies all 3,056 source/document paths and
 hashes, fourteen archives, seven joined process groups and removed scratch.
 The new race group takes 288.253 seconds including compilation; the existing
@@ -13628,7 +13628,7 @@ deadline, permission, SQL schema or public-runtime enablement changed.
 
 ## Original projection reaches a final guard read and limiter refusal
 
-The [eighth original scenario](../test/results/runtime-provider-owner-native-8/result.json)
+The eighth original scenario
 passes activation, the corrected observation-account copy probe, setup-free
 replay and administrator-removal rejection. Owner installation still fails at
 the first projection SQL operation. Its retained deciding chain is
@@ -13648,7 +13648,7 @@ The original flags, operation deadlines and 20-QPS/burst-20 clients are unchange
 This qualifies the earlier fixture identity correction and narrows the installed
 availability defect; it does not qualify owner startup.
 
-The [four-path projection correction](../test/results/owner-projection-split-integration/integration.json)
+The four-path projection correction
 is now integrated for qualification. It completes the actual first native source
 bracket across bridge acquisition and selects the already-pinned private role
 journal only after complete native and accepted SQL checks under that bridge.
@@ -13660,7 +13660,7 @@ source reviews are not passing tests.
 
 ## Native rerun exposes a fixture identity error before owner startup
 
-The [seventh original scenario](../test/results/runtime-provider-owner-native-7/result.json)
+The seventh original scenario
 passes actual original activation, then fails the copy-closure marker assertion
 before passive replay or owner startup. The fixture sends the marker's dry-run
 UPDATE as an administrator. The bootstrap policy permits that probe only for the
@@ -13683,14 +13683,14 @@ and no admission policy is relaxed. The original failing source is archived unde
 `test/results/bootstrap-copy-probe-fix/`. Independent review found no blocker.
 The first compilation exposed three additional Helm fixture callers of the
 shared helper; all five callers now pass their original connection. The
-[corrected gate](../test/results/bootstrap-copy-probe-fix-component-2/result.json)
+corrected gate
 passes integration compilation, affected vet and canonical checks with unchanged
 sources and removed scratch. This three-file fixture correction still requires
 the eighth original native run; compilation is not enforcement qualification.
 
 ## Exact source and original limiter diagnostics pass component qualification
 
-The [twelve-path diagnostic integration](../test/results/owner-source-limiter-diagnostics-integration/integration.json)
+The twelve-path diagnostic integration
 adds closed codes at the existing native source predicates and preserves their
 original evaluation order, error classification and clock samples. Owner and
 projection normalization clone only these codes, without raw causes or protected
@@ -13700,7 +13700,7 @@ around the existing SQL call ordinal and phases. It creates no additional bucket
 native time sample, request, retry or token reservation.
 
 Independent source reviews of both stages found no blocking defect. The
-[component run](../test/results/owner-source-limiter-diagnostics-component-1/result.json)
+component run
 passes integration compilation, all 41 source/shared-guard, 33 owner/projection
 and four limiter top-level race tests (362 named passes), full vet and canonical
 specification/architecture/design checks. No selected test is absent or skipped.
@@ -13712,7 +13712,7 @@ qualification, not a correction of the installed startup failure.
 
 ## Full fleet regression passes before the next source diagnostic
 
-The [unchanged full fleet target](../test/results/fleet-regression-20261014-1/result.json)
+The unchanged full fleet target
 passes all twelve required top-level scenarios and 130 named tests against
 PostgreSQL, S3 and OpenBao. Go completes in 47.963 seconds and the wrapper exits
 0 after 55.769 seconds. All 2,501 outer and 2,281 native source paths/hashes, five
@@ -13723,7 +13723,7 @@ owner startup. It precedes the finer source-reader diagnostic integration.
 
 ## Original projection fails inside its final native source check
 
-The [sixth unchanged installation scenario](../test/results/runtime-provider-owner-native-6/result.json)
+The sixth unchanged installation scenario
 passes activation, setup-free replay, administrator-removal rejection, actual
 worker launch and three advancing observations. Owner construction, original
 selection and worker-caller verification pass again. The first projection SQL
@@ -13753,7 +13753,7 @@ startup or public investigation success is established.
 
 ## Original projection and inspection failures remain distinguishable
 
-The [nine-path diagnostic integration](../test/results/owner-projection-diagnostics-integration/integration.json)
+The nine-path diagnostic integration
 retains fixed original projection-stage/native-check codes through SQL error
 normalization. The driver preserves the first failed Advance's codes when its
 already-allowed independent Inspect also fails; only the inspection error remains
@@ -13762,7 +13762,7 @@ error or protected value and cannot be changed through copied handles. The real
 SQL adapter exposes fixed deciding-stage codes to the native fixture, which calls
 the original operation exactly once. Queries, time samples, predicate order,
 deadlines, claim/effect counts and error classifications remain unchanged.
-The [component gate](../test/results/owner-projection-diagnostics-component-1/result.json)
+The component gate
 passes integration compilation, 33 affected Kubernetes and all 106 PostgreSQL
 top-level race tests (745 named passes), full vet and specification/architecture/
 design checks. No selected test is missing or skipped. All 2,807 source/document
@@ -13773,7 +13773,7 @@ branch; these diagnostics do not repair or enable installed startup.
 
 ## Installed owner advances through selection, then stops at projection
 
-The [fifth original native run](../test/results/runtime-provider-owner-native-5/result.json)
+The fifth original native run
 passes the previous selection failure with ADR-158. Original activation, passive
 replay and administrator-removal rejection pass. The ordinary worker supplies
 three advancing observations; owner construction completes in 2.416 seconds,
@@ -13803,7 +13803,7 @@ This run establishes progress beyond selection, not complete owner startup.
 ## Owner startup preflight precedes the retained recovery lock
 
 [ADR-158](decisions/158-owner-startup-critical-sections.md) and the
-[twenty-path integration](../test/results/owner-preflight-integration/integration.json)
+twenty-path integration
 move the first full native check of each fresh owner phase before the long SQL
 bridge. The new source-bound bridge compares the exact independently observed
 fleet identity and revision under the original recovery/activation locks. Current
@@ -13812,7 +13812,7 @@ independent native bracket remains locked. Original deadlines, joined shutdown,
 single-use attempts and the short SQL check before private-journal reads remain
 binding. No migration, rate, pool or observation-cadence change is introduced.
 
-The [component run](../test/results/owner-preflight-component-1/result.json) passes
+The component run passes
 integration compilation, 81 selected Kubernetes and 188 PostgreSQL/application
 top-level race tests (1,391 named passes), full vet and canonical gates. The
 Kubernetes portion takes 375.981 seconds, including the credential-reader test
@@ -13821,7 +13821,7 @@ sets, six archives, joined processes and removed scratch are independently
 verified. The native run above passes original selection but fails later at
 projection. Eleven new real SQL modes additionally cover exact
 post-lock source/expiry/recovery checks and owner reads/refreshes while a fleet
-writer queues. The [native SQL run](../test/results/runtime-owner-bridge-sql-native-1/result.json)
+writer queues. The native SQL run
 passes all eleven legacy and eleven new owner modes plus the original parent in
 34.870 seconds overall. The accepted reader and two owner-head refreshes succeed
 while the bridge remains held; the queued fleet writer returns the exact existing
@@ -13831,7 +13831,7 @@ removed scratch and fresh positive Docker cleanup checks are independently
 verified. These are real SQL/S3/OpenBao component tests with synthetic initial
 native authority, not the installed startup result.
 
-The preceding [full Go baseline](../test/results/go-regression-20261013-1/result.json)
+The preceding full Go baseline
 fails because the Kubernetes package reaches its fifteen-minute aggregate timeout.
 The active top-level test had run for seventeen seconds and its current child
 had just begun; this does not establish a deadlock or a full-suite pass. Other
@@ -13839,11 +13839,11 @@ package results are retained, and the architecture target was not reached.
 All 2,491 source hashes/file sets, three archive hashes, joined processes and
 removed scratch are independently verified. Qualify the affected components and
 real SQL/startup next, then complete the broad gate with bounded full coverage.
-The [gate correction](../test/results/go-shards-integration/integration.json)
+The gate correction
 preserves all packages and tests, race detection, count=1 and the fifteen-minute
 timeout. It discovers Kubernetes tests, fuzz seeds and examples and runs exact
 whole-parent groups of at most eighty sequentially, verifying actual run/result
-sets. The [complete revised gate](../test/results/go-regression-sharded-20261014-1/result.json)
+sets. The complete revised gate
 passes in 1,474.079 seconds: vet, four pure selection/parser tests, all other 52
 packages and all 486 Kubernetes top-level names in seven groups. The independently
 parsed Kubernetes events contain 2,675 named passes and one existing explicit
@@ -13855,7 +13855,7 @@ verified. This broad regression result precedes the diagnostic integration above
 
 ## Installed startup refuses an expired fleet observation
 
-The [fourth original installed-owner run](../test/results/runtime-provider-owner-native-4/result.json)
+The fourth original installed-owner run
 identifies the exact refusal at the accepted reader's original database clock:
 `fleet-interval/expired-interval`. The second selection phase stops at its initial
 native bracket. This is not a SQL query error, owner-configuration cutoff,
@@ -13881,7 +13881,7 @@ qualified by this diagnostic run.
 
 ## Accepted owner reads now identify their exact failed check
 
-The [four-path diagnostic integration](../test/results/owner-accepted-read-diagnostics-integration.json)
+The four-path diagnostic integration
 adds fixed statement, predicate and failure-class enums from the original
 accepted configuration read. It preserves the SQL statements, single database
 clock sample, predicate order, locks, deadlines, retries and normalized errors.
@@ -13890,7 +13890,7 @@ attributed to a later transaction attempt. No raw driver message or row value is
 rendered. The native fixture delegates once to the actual reader and logs only
 these enums; production Kubernetes error normalization remains unchanged.
 
-The [isolated component gate](../test/results/owner-accepted-read-diagnostics-package/checks/component-1/result.json)
+The isolated component gate
 passes integration compilation, all 101 top-level PostgreSQL adapter race tests
 (636 named passes), affected vet and canonical gates. All 4,391 dependencies,
 complete source/mirror sets, payloads and log hashes remain unchanged. Owned
@@ -13899,14 +13899,14 @@ identifies fleet expiry; neither this diagnostic nor its tests repair startup.
 
 ## Finite owner audit snapshots have a qualified encryption codec
 
-The [two-path codec integration](../test/results/owner-epoch-codec-integration.json)
+The two-path codec integration
 adds purpose-bound sealing and exact original-snapshot verification for ADR156's
 finite owner audit epochs. It enforces the original byte allowance and fixed
 plaintext/envelope limits, uses one bounded key wrap, rejects malformed envelopes
 before key access and preserves cancellation after key calls. Legacy configuration
 audit bytes remain separate; this supplies no effect permit or current authority.
 
-The [isolated component run](../test/results/owner-epoch-codec-package/checks/component-1/result.json)
+The isolated component run
 passes compilation, all 42 top-level framed race tests (99 named passes), vet and
 specification/architecture/design/import gates. All 4,387 dependency hashes,
 complete source and mirror sets, payloads and log hashes are independently
@@ -13917,7 +13917,7 @@ rollover and complete physical retirement remain unfinished.
 
 ## Installed owner failure is localized to accepted configuration read
 
-The [third original installed-owner run](../test/results/runtime-provider-owner-native-3/result.json)
+The third original installed-owner run
 preserves the original selection, four flags, fourteen-minute aggregate timeout,
 shared clients and individual operation deadlines. Activation, setup-free replay
 and administrator-removal rejection pass. The actual configuration worker
@@ -13942,7 +13942,7 @@ lock behavior or retry policy.
 
 ## Full custody regression passes after SQL and fixture corrections
 
-The [second full custody run](../test/results/custody-regression-20261013-2/result.json)
+The second full custody run
 passes the unchanged target: all eleven required top-level tests and 406 named
 tests, including both capture-retirement cases and all five worker-identity
 failures from the retained first run. Wrapper and native test exits are zero;
@@ -13961,14 +13961,14 @@ public collection. Earlier failure records below are historical evidence.
 
 ## Original owner selection has bounded diagnostic coverage
 
-The [five-path integration](../test/results/owner-selection-diagnostics-integration.json)
+The five-path integration
 adds fixed internal failure codes for the original selection phase, native reads,
 accepted-source checks and exact identity comparisons. It preserves short-circuit
 clock reads, one passive inspection after an uncertain result, original attempts
 and error classification; driver values are never rendered. This identifies a
 future native failure without relaxing the failed startup's checks.
 
-The [component run](../test/results/owner-selection-diagnostics-package/component-1/result.json)
+The component run
 first reproduces the missing diagnostic against the original code, then passes
 all 76 selected top-level race tests (376 named passes), compilation, vet and
 canonical checks. All 4,378 dependencies and source sets remain unchanged; owned
@@ -13994,11 +13994,11 @@ The migration and stronger role/stranded-transaction regressions passed independ
 source review and are integrated for qualification;
 the full custody gate remains failed until corrected qualification completes.
 
-The [SQL58 component gate](../test/results/audit-retirement-validator-component-1/result.json)
+The SQL58 component gate
 passes integration compilation, the full Postgres adapter race package, affected
 vet, sqlc comparison and canonical spec/architecture/design/import checks. Source
 hashes and complete file sets stay unchanged; owned process groups join and
-scratch is removed. [Integrated sources](../test/results/audit-retirement-validator-integration.json)
+scratch is removed. Integrated sources
 retain the seven-path correction and separately reviewed two-path worker fixture.
 These component checks do not execute the real deferred SQL checks. The next
 qualification is the unchanged full custody target, covering both corrected
@@ -14006,12 +14006,12 @@ paths, healthy/uncertain retirement and the remaining storage regressions.
 
 ## Finite owner audit epoch values pass component qualification
 
-The [ADR156 value integration](../test/results/owner-audit-epoch-integration.json)
+The ADR156 value integration
 adds separate finite epoch/reserve/dependency values, conservative accounting and
 current-versus-admitted reader ports. It preserves all selected legacy runtime
 formats and introduces no schema, grant, installer selector or automatic rollover.
 
-The [component run](../test/results/owner-audit-epoch-package/component-1/result.json)
+The component run
 passes 35 fleet-domain, 25 audit-domain and 84 application top-level race tests
 (807 named passes), compilation, vet and canonical gates. A deliberately retained
 unshipped draft reproduces its two elapsed-dependency boundary failures; that is
@@ -14022,7 +14022,7 @@ rollover and physical retirement remain separate unfinished work.
 
 ## Full custody regression exposes retirement and worker-role gaps
 
-The [full custody run](../test/results/custody-regression-20261013-1/result.json)
+The full custody run
 finishes with wrapper exit 1 after 681.892 seconds harness / 653.197 seconds Go.
 It passes 396 named cases and ten of eleven required top-level cases. Seven leaves
 fail: two capture-intent healthy-retirement cases (H0 and H2), and five download
@@ -14040,13 +14040,13 @@ repeat the full target before declaring it green.
 
 ## Shared deletion inventory rejects unknown completeness
 
-The [six-path correction](../test/results/custody-inventory-completeness-integration.json)
+The six-path correction
 requires an explicit completeness flag from all three object-store LIST APIs.
 An omitted flag can no longer certify absence and allow a cleanup caller to
 release its reservation. Malformed initial inventory causes no mutation;
 malformed final inventory remains a failure after any completed exact effects.
 
-The [component run](../test/results/custody-inventory-completeness-package/checks/component-1/result.json)
+The component run
 first reproduces all six failures against the original product, then passes the
 full objectstore race suite: 34 top-level / 166 named cases. Compilation, vet,
 Go architecture, spec, architecture and design checks pass. All 4,363 dependencies,
@@ -14057,7 +14057,7 @@ and complete physical audit retirement are separate unfinished work.
 
 ## Installed owner clears SQL prerequisite, then stops at original selection
 
-The [second original installed-owner run](../test/results/runtime-provider-owner-native-2/result.json)
+The second original installed-owner run
 finishes with wrapper exit 1 after 477.299 seconds harness / 433.214 seconds Go.
 Original activation and setup-free replay pass. The actual configuration worker
 produces three advancing audited observations. The formerly failing SQL
@@ -14080,7 +14080,7 @@ remain separate pending work.
 
 ## Original cross-cluster observation path passes native qualification
 
-The [sixth direct H/A/R run](../test/results/direct-observation-native-6/result.json)
+The sixth direct H/A/R run
 returns terminal exit 0 in 227.398 seconds harness / 41.401 seconds Go. All four
 original observation purposes pass, followed by rejection of a changed original
 regional template. The operations complete in 2.398, 2.563, 2.502 and 2.780 seconds,
@@ -14100,12 +14100,12 @@ installed owner startup and broader regression checks are next.
 
 ## Translated observation ports pass component qualification
 
-The [ADR157 integration](../test/results/observation-dial-integration.json)
+The ADR157 integration
 allows the installer-owned TCP connection port to differ from the original
 service port. The original service identity, TLS roots/name/candidates and HTTP
 authority remain fixed. No caller-selected endpoint, redirect or replay is added.
 
-The [component result](../test/results/observation-dial-package/evidence/RESULT.json)
+The component result
 first reproduces the original constructor failure in all three client modes,
 then passes five top-level / 44 named translated-port TLS race cases and fourteen
 top-level / 45 named existing stream race cases. The explicit ignored-helper
@@ -14118,16 +14118,16 @@ production and full runtime availability remain separate qualification.
 
 ## Fleet contention and historical inventory pass scoped native checks
 
-The [ADR155 integration](../test/results/fleet-persistence-contention-integration.json)
+The ADR155 integration
 keeps an unchanged positive fleet observation at its original expiry after one
 exact aborted SQL lock attempt. It never reports successful persistence or emits
 a scheduling notice. Changed, expired, recovery-blocked and uncertain outcomes
 retain fencing. The original shared recovery lock and all role grants remain.
 
-The [component result](../test/results/fleet-persistence-contention-package/component-1/result.json)
+The component result
 reproduces both intended old-application failures, then passes 119 top-level /
 605 named corrected race cases, compilation, vet and canonical gates. The
-[real SQL run](../test/results/fleet-persistence-contention-package/native-1/result.json)
+real SQL run
 passes all ten selected children in 54.209 seconds harness / 17.808 seconds Go.
 An unchanged conflict retains byte-identical SQL and the original deadline;
 actual post-abort changes/recovery/expiry deny the special classification;
@@ -14139,9 +14139,9 @@ All 4,336 original dependencies, 2,253 native source hashes and exact source set
 remain unchanged, with joined cleanup and scratch removal. Full fleet/custody
 regression and original installed owner startup remain separate checks.
 
-The [six-path historical inventory integration](../test/results/owner-audit-inventory-native-integration.json)
+The six-path historical inventory integration
 adds the complete-LIST mismatch correction and the explicit native inspection
-fixture. Its [final native run](../test/results/owner-audit-inventory-native-package/native-policy-real-2/result.json)
+fixture. Its final native run
 passes all five children and their parent in 39.738 seconds harness / 1.365
 seconds Go. Bucket-scoped coarse List initially allows versions but denies
 multipart listing, retaining five validated entries. An exact principal/bucket/
@@ -14150,9 +14150,9 @@ bounded three-LIST operation. Other prefixes/buckets, part/body reads and
 mutations remain denied. Independent reads confirm all seven actual version/
 marker entries, their bytes, unfinished upload and part remain unchanged.
 
-The [original List-only failure](../test/results/owner-audit-inventory-native-package/native-real-1/result.json)
-and [test tracing constructor failure](../test/results/owner-audit-inventory-native-package/native-policy-real-1/result.json)
-remain preserved. A new [real TLS constructor regression](../test/results/owner-audit-inventory-native-package/native-policy-component-2/result.json)
+The original List-only failure
+and test tracing constructor failure
+remain preserved. A new real TLS constructor regression
 passes after moving tracing to the owned server; production transport checks
 are unchanged. Earlier 11 top-level / 47 named inventory race cases retain their
 exact production dependency provenance. The final 2,309 dependencies and 2,249
@@ -14162,7 +14162,7 @@ writer quiescence, retirement or public access. No runtime service is enabled.
 
 ## Regional native enrollment succeeds; backend construction still fails
 
-The [fifth direct observation run](../test/results/direct-observation-native-5/result.json)
+The fifth direct observation run
 returns exit 1 after 128.686 seconds harness / 32.362 seconds Go. Original owner
 enrollment succeeds in 2.930 seconds and original regional enrollment succeeds in
 14.808 seconds after the fixture certificate-time correction. The next regional
@@ -14178,7 +14178,7 @@ no current route, installed runtime or real issuer latency is qualified.
 
 ## Regional native run remains blocked before observation requests
 
-The [fourth direct observation run](../test/results/direct-observation-native-4/result.json)
+The fourth direct observation run
 fails in 153.707 seconds harness / 26.496 seconds Go. The original owner enrolls
 in 2.931 seconds; the original regional enrollment returns denied after 8.916
 seconds. No direct observation case runs. A later restarted process is separate
@@ -14190,7 +14190,7 @@ remain unchanged. Owned service cleanup and both scratch removals complete.
 The actual helper digest is recorded in the result. Setup/issuer authority is
 still synthetic, and no installed runtime or real issuer latency is qualified.
 
-The [actual-helper regression](../test/results/regional-fixture-issuer-time-integration.json)
+The actual-helper regression
 now reproduces a fixture certificate-time mismatch for both client and server:
 signing-time NotBefore is later than the original permit start, so the unchanged
 verifier rejects a still-live permit. The two fixture issuers now use the original
@@ -14203,14 +14203,14 @@ No production verifier, proof, provider or reconciliation deadline is changed.
 
 ## Owner startup diagnostics and actual SQL contention reproduction
 
-The [seven-path diagnostic change](../test/results/owner-sql-prerequisite-integration.json)
+The seven-path diagnostic change
 retains current SQL acceptance and reports fixed sanitized failure reasons from
 the same deciding statement. Compilation, the original-code negative, four
 top-level / 18 named focused race cases and vet pass. The first native invocation
 omitted OpenBao and failed before either selected case; that setup failure is
 preserved rather than counted as product evidence.
 
-The [corrected native run](../test/results/owner-sql-prerequisite-package/prerequisite-2/result.json)
+The corrected native run
 passes both cases in 43.011 seconds harness / 3.003 seconds Go. An independently
 persisted observation expires at its original deadline and the constructor
 reports source-current unavailable. The actual installer bridge holds a shared
@@ -14227,13 +14227,13 @@ suspension, deadline, grant or runtime enablement change is included here.
 
 ## Historical owner audit inventory passes component checks
 
-The [three-path inventory implementation](../test/results/owner-audit-inventory-integration.json)
+The three-path inventory implementation
 reports actual versions, markers, unfinished uploads and current-key consistency
 for one original owner configuration. It retains partial validated findings on
 later failure and supports expired historical sources without treating them as
 current authority. It performs no deletion or quota release.
 
-The [component run](../test/results/owner-audit-inventory-package/result.json)
+The component run
 passes compilation, ten top-level / 42 named race cases, vet and Go architecture.
 Four negatives reproduce findings loss against the prior unrun draft; they are
 not evidence of an earlier production vulnerability. All 2,299 dependencies and
@@ -14241,19 +14241,19 @@ source mirrors remain unchanged; owned scratch is removed after joined exit.
 Actual scoped SeaweedFS inventory, pagination, physical backing and retirement
 remain pending.
 
-The [ADR153 native helper selection](../test/results/regional-native-selection-integration.json)
+The ADR153 native helper selection
 is also integrated. The exact six build-ignore helper files compile and pass vet
 with unchanged dependencies; the resulting helper was not executed by that
 component check. The original three-party Kubernetes observation rerun is next.
 
 ## Regional enrollment operation passes the reproduced deadline regression
 
-The [ADR153 implementation](../test/results/regional-lifecycle-integration.json)
+The ADR153 implementation
 adds an explicit per-enrollment/signing native operation while preserving general
 attesters and the existing SQL/audit/provider effects. Fifteen tested paths are
 integrated; no production selector, schema or role grant changes.
 
-The [component qualification](../test/results/regional-lifecycle-package/evidence/RESULT.json)
+The component qualification
 first reproduces the old path's failure after valid admission and stored outcome:
 two complete 54-observer/12-probe checks consume most of the original five seconds,
 and the third fails before acceptance at 4.989 seconds. The corrected real HTTPS
@@ -14272,7 +14272,7 @@ are next; its test issuer is a separately stated qualification limit.
 
 ## Original owner startup exposes a SQL provider-construction blocker
 
-The [first actual owner continuation](../test/results/runtime-provider-owner-native-1/result.json)
+The first actual owner continuation
 fails in 470.467 seconds harness / 425.675 seconds Go. Original protected
 activation, setup-free command replay and worker startup succeed. Three advancing
 worker observations retain 3.556, 3.804 and 4.454 seconds after independently
@@ -14293,7 +14293,7 @@ Product deadlines, connection limits and permissions remain unchanged.
 
 ## Current retention and full Kubernetes permissions regression pass
 
-The [corrected native run](../test/results/retention-permission-native-1/result.json)
+The corrected native run
 passes the unchanged full permissions harness in 111.396 seconds, including
 actual retention guard enforcement, ordered policy changes and durable SQL/S3
 reconciliation. Both observation and admission phases exit zero, every required
@@ -14309,7 +14309,7 @@ its receipt-gated regional observation backend remains separate unfinished work.
 
 ## Retention and bootstrap storage matrix: three passes, Kubernetes fixture selection corrected
 
-The [native matrix](../test/results/retention-bootstrap-native-1/result.json)
+The native matrix
 passes actual SQL57 parser/planner/populated-index checks (101 named cases,
 23.208 seconds harness), current retention history/effects/restrictive catch-up
 (11 named cases, 12.350 seconds), and the full fleet suite (130 named cases,
@@ -14331,7 +14331,7 @@ three passes do not need repetition for this wrapper correction.
 
 ## Original owner continuation passes component checks; native storage matrix next
 
-The [owner continuation](../test/results/runtime-provider-owner-integration.json)
+The owner continuation
 adds a separately selected real owner startup after the qualified running worker.
 Nine selector checks, integration/command compilation, 26 top-level owner race
 cases (73 named cases), affected vet and Go architecture checks pass. The final
@@ -14350,12 +14350,12 @@ the corrected fleet seeds and the actual Kubernetes retention reconciler.
 
 ## Bootstrap native issuance passes; two synthetic enrollment seeds need typed parameters
 
-The [actual fleet report](../test/results/bootstrap-receipt-native-1/actual-report-interpretation.json)
+The actual fleet report
 records a failed first run (69.496 seconds harness / 34.076 seconds Go), with
 2,227 unchanged sources and complete owned teardown. All six actual versioned
 issuance/replay/claim history cases pass. Two synthetic enrollment fixtures fail
 before signing because SQL infers the same parameter as both text and UUID.
-The [two-line fixture correction](../test/results/bootstrap-receipt-fixture-uuid-casts/integration.json)
+The two-line fixture correction
 uses explicit UUID-to-text casts; product authority and deadlines are unchanged.
 Its real rerun remains pending. The original wrapper also used the wrong report
 prefix for fleet mode; its failed output is preserved alongside the actual
@@ -14364,7 +14364,7 @@ fleet logs and separate interpretation, rather than relabeled as a pass.
 
 ## Retention history and bootstrap receipts pass component regression gates
 
-The [retention correction](../test/results/retention-receipt-versions-integration.json)
+The retention correction
 adds migration 57 with two fixed input-only invoker predicates and partial indexes.
 Current readiness rejects any affected earlier or latest invalid checkpoint or
 lifecycle receipt. Structural historical replay and restrictive catch-up remain
@@ -14372,7 +14372,7 @@ available. PUBLIC EXECUTE is explicit for these two table-free predicates; no
 security-definer or role-specific write grant is added. The existing completion
 history scan remains, so this is not constant-time readiness.
 
-The [retention component run](../test/results/retention-receipt-versions-package/retention-component-2/result.json)
+The retention component run
 passes compilation, 213 top-level / 998 named race cases, vet, pinned generation
 and SQL/spec/architecture/design gates. All 3,114 dependencies remain unchanged
 and scratch is removed. Four original-code counterexamples are retained. The
@@ -14382,10 +14382,10 @@ changes, alongside nineteen authored paths and the guarded schema-head advance.
 Actual PostgreSQL parser, planner, history and populated index-build checks remain
 next; no production migration-time claim follows from these component results.
 
-The [bootstrap correction](../test/results/bootstrap-receipt-versions-integration.json)
+The bootstrap correction
 validates full issuance receipts at activation and retained minimized provenance
 at claim/signing/activation. Historical provider-result accounting stays possible.
-Its [component run](../test/results/bootstrap-receipt-versions-package/result.json)
+Its component run
 passes seven-package compilation, 249 top-level / 1,204 named affected race cases,
 vet and SQL/spec/architecture/design gates; two old-code assertions fail as intended.
 All 4,393 dependencies remain unchanged, with clean scratch removal. This adds no
@@ -14395,7 +14395,7 @@ signing integrations remain required. Public investigation remains disabled.
 
 ## Direct helper inputs now arrive before startup; regional enrollment remains blocked
 
-The [third owned multi-cluster run](../test/results/direct-observation-native-3/result.json)
+The third owned multi-cluster run
 returns 1 after 140.671 seconds harness / 22.522 seconds Go. All 2,238 source
 hashes remain unchanged and owned Docker teardown completes. Required immutable
 inputs arrive in less than one millisecond after process startup; the original
@@ -14414,7 +14414,7 @@ no deadline, client-rate limit or authorization requirement has been widened.
 
 ## Protected provider worker passes the original installed startup path
 
-The [owned native run](../test/results/runtime-sustainability-native-1/result.json)
+The owned native run
 returns 0 after 527.344 seconds. All 2,238 source hashes remain unchanged and
 owned teardown reports no failures. The actual compiled worker launches through
 protected generated inputs and records three advancing SQL owner observations,
@@ -14424,7 +14424,7 @@ The pass also includes passive replay and administrator-removal negatives.
 
 This is short startup/source/audit qualification. It does not establish sustained
 provider renewal, capacity/cleanup availability, full installation load or public
-investigation. The [two-file direct-observation fixture correction](../test/results/direct-observation-projection-order-integration.json)
+investigation. The two-file direct-observation fixture correction
 also passes integration race compilation, 33 named setup/identity assertions,
 vet and Go architecture with all 2,252 dependencies unchanged. Required inputs
 now precede container startup, retaining the same Pending Pod identity and
@@ -14433,7 +14433,7 @@ original two-minute setup deadline. Its multi-cluster native rerun is next.
 
 ## Worker provider coordination passes component gates; native startup is next
 
-The [59-path runtime composition](../test/results/runtime-sustainability-integration.json)
+The 59-path runtime composition
 keeps five finite FIFO purposes and one expensive operation active per worker.
 The concrete SQL source observer supplies scheduling notices after acknowledged
 observations; those notices grant no authority and cannot extend a selected
@@ -14442,7 +14442,7 @@ that same ticket once. Only this worker's retained observer changes to the
 reviewed 40 QPS / burst 20; five other clients stay at 20/20. The per-process
 budget is 140 QPS / burst 120, not an installation-wide measurement.
 
-The [component evidence chain](../test/results/runtime-sustainability-package/runtime-sustainability-4/qualification-chain.json)
+The component evidence chain
 retains the intended early-selection counterexample, passed fleet/capacity,
 Kubernetes contention, KMS and full bootstrap races, and the two intermediate
 failures. A test-only clock correction preserves the original backoff; removing
@@ -14461,20 +14461,20 @@ that fixture; sustained active-capacity/cleanup availability is not yet qualifie
 
 ## Permission and publication receipt corrections pass combined component gates
 
-The [41-path combined change](../test/results/permission-publication-audit-integration.json)
+The 41-path combined change
 validates complete retained receipts at permission assignment/reset/initial,
 automation-policy, capture publication, catalog and current download/key fences.
 Deny assignments survive missing or foreign-root audit joins. Existing bounded
 queries return the required receipt fields together, without per-assignment
 lookups; historical progress and completed-effect accounting stay distinct.
 
-The [combined component run](../test/results/permission-publication-audit-package/result.json)
+The combined component run
 passes seven-package compilation, 280 top-level / 1,185 named affected race cases,
 vet, pinned SQL generation and spec/architecture/design/Go-architecture gates.
 Four original permission/policy checks fail as intended, alongside the separately
 retained twenty original publication assertions. Only the two expected generated
 query files change. All 4,336 dependencies stay unchanged and scratch is removed.
-The [real-service qualification](../test/results/permission-publication-native-1/result.json)
+The real-service qualification
 passes permission/policy scenarios (40.568 seconds harness) and the twelve
 publication/download history cases (19.835 seconds harness). Both retain 2,184
 unchanged source hashes and complete owned cleanup. Retained empty/null versions
@@ -14486,14 +14486,14 @@ with indexed readiness remain a separate continuation.
 
 ## Multi-cluster startup diagnostics identify delayed input projection
 
-The [five-path diagnostic fixture](../test/results/direct-observation-diagnostic-integration.json)
+The five-path diagnostic fixture
 passes standalone helper/integration compilation, fourteen named label/parity
 checks, both vet selections and Go architecture. Root verifies all 2,210
 component dependencies and exact payload/base hashes before integration. The
 helper reports only fixed setup labels and bounded durations; no credential or
 arbitrary error content is rendered.
 
-The [second native run](../test/results/direct-observation-native-2/result.json)
+The second native run
 fails after 190.483 seconds harness / 85.376 seconds Go, with all 2,196 sources
 unchanged and owned Docker teardown complete. The original owner Pod is running
 without restarts, but its optional immutable input projection has not arrived at
@@ -14519,7 +14519,7 @@ returns its two records together; no new query, grant, provider call or authorit
 interval is added. Permission-transaction fence changes will be composed before
 integration, with source ownership kept explicit.
 
-The [second preliminary run](../test/results/publication-audit-versions-preliminary/preliminary-2/result.json)
+The second preliminary run
 passes six-package compilation, 264 top-level / 1,074 named affected race cases
 and vet. Old code fails twenty intended receipt assertions. SQL generation changes
 only the expected publication query output; all 3,072 dependencies remain unchanged
@@ -14529,13 +14529,13 @@ remain required. Historical receipts are not rewritten or assigned invented vers
 
 ## Direct multi-cluster fixture compiles; first native run stops at setup
 
-The [thirteen-path test fixture](../test/results/direct-observation-native-fixture-integration.json)
+The thirteen-path test fixture
 compiles its actual standalone helper and integration package, passes DTO parity,
 both vet selections, Go architecture and offline harness checks. All 2,198
 component dependencies stay unchanged and build scratch is removed. Root checks
 all payload/base/freeze hashes before integration. This adds no runtime selector.
 
-The [first native run](../test/results/direct-observation-native-1/result.json)
+The first native run
 fails during helper readiness, before the first H/A/R purpose is issued. Harness
 elapsed time is 175.387 seconds, with 75.096 seconds reported by Go; all 2,196
 native source hashes stay unchanged. Owned Docker teardown completes, but the
@@ -14547,7 +14547,7 @@ availability is qualified by this run.
 
 ## Current routing and download audit versions pass real-service tests
 
-The [second native run](../test/results/current-audit-versions-native-2/result.json)
+The second native run
 passes the targeted worker/native/window historical-receipt matrix (30.144 seconds
 harness, 11.000 seconds reported by Go) and fleet/provider suite (55.305 seconds
 harness, 47.495 seconds reported by Go). Both retain 2,168 unchanged source hashes
@@ -14556,7 +14556,7 @@ worker configuration, identity, signing, activation, locators, native reads and
 connector registry use. Historical accounting and cancellation remain possible.
 The fixtures still supply synthetic protected roots; public runtime stays disabled.
 
-The [first native attempt](../test/results/current-audit-versions-native-1/result.json)
+The first native attempt
 passes response-window cases but fails the longer history matrix after its ordinary
 fixture's only five-second permission observation expires. The fixture correction
 uses the existing joined background source owner and attributes child failures to
@@ -14565,7 +14565,7 @@ The original failure, exact source changes and subsequent passing result remain
 in the integration package. Approximately 398 GiB is free after teardown.
 
 
-The [43-path correction](../test/results/current-audit-versions-integration.json)
+The 43-path correction
 requires immutable original versions at current worker configuration, dispatch,
 enrollment/certificate, connector activation/registry and native batch/window
 consumption. Existing historical decoders still permit accounting for already
@@ -14573,14 +14573,14 @@ performed I/O and cancellation. Locator validation projects its already-joined
 worker in the same query; certificate reads add one bounded enrollment lookup.
 No source deadline, role grant, schema head or public runtime selector changes.
 
-The [completed component run](../test/results/current-audit-versions-package/result.json)
+The completed component run
 passes compilation, 310 top-level / 1,347 named race cases, affected vet and
 SQL/spec/architecture/design gates. Twenty old-predicate empty/null cases fail
 as intended. Pinned sqlc changes only the expected locator query file. All 42
 payload/base checks and 3,052 dependencies stay unchanged, and scratch is removed.
 Root independently verifies those hashes after the power outage before integration.
 
-The [first attempt](../test/results/current-audit-versions-package/interrupted-priority1-1/reboot-interruption.json)
+The first attempt
 lost power during compilation and remains unqualified. The replacement actually
 finished before the second outage; its durable terminal result is retained.
 Both JSONB and bytea fixture readbacks now compare the intended receipt fields
@@ -14590,18 +14590,18 @@ and other effect-audit families remain a separate continuation.
 
 ## Connector profile cleanup SQL correction passes focused qualification
 
-The [focused original-schema run](../test/results/connector-profile-cleanup-alias-package/before/result.json)
+The focused original-schema run
 reaches the actual cleanup UPDATE trigger under the original private cleanup
 login and fails with SQLSTATE 42703: its outer audit variable `a` has no
 `process_id` field. The runner predicted an ambiguous `a.id` error (42702), so
-both its nonzero exit and the [actual-error interpretation](../test/results/connector-profile-cleanup-alias-package/before/interpretation.json)
+both its nonzero exit and the actual-error interpretation
 are retained. All 2,158 sources remained unchanged and cleanup completed.
 
-The [four-path correction](../test/results/connector-profile-cleanup-alias-integration.json)
+The four-path correction
 adds migration 56, advances the embedded runtime head, and adds the focused
 negative regression. Reversing only the nested alias change reconstructs SQL51's
 original function byte-for-byte. No stored dates, permissions, reference checks
-or accounting change. The [corrected checks](../test/results/connector-profile-cleanup-alias-checks/result.json)
+or accounting change. The corrected checks
 pass deterministic SQL generation, focused embedded-schema races, canonical
 spec/architecture/design/Go-architecture gates and the real connector identity/
 fast-retirement matrix (62.439 seconds harness, 36.816 seconds reported by Go).
@@ -14612,7 +14612,7 @@ retirement remains a separate unrun real-time gate.
 
 ## Full custody passes after releasing completed fixture bursts
 
-The [fourth native run](../test/results/session-capacity-native-4/result.json)
+The fourth native run
 passes `make custody-integration`: 11 top-level / 336 named cases, 678.925 seconds
 including harness work (653.396 seconds reported by Go). All 2,158 source hashes
 remain unchanged and cleanup completes. Context takes 618.46 seconds and the
@@ -14629,7 +14629,7 @@ installed public investigation workflow. Approximately 398 GiB remains free.
 
 ## Configuration-worker contention remains a measured blocker
 
-The [fourth component candidate](../test/results/configuration-runtime-admission-4-package/result.json)
+The fourth component candidate
 compiles seven packages and passes six selectors, both controlled-before failure
 assertions, and fleet/capacity races (119 top-level / 496 named cases). Kubernetes
 races pass 29 top-level / 76 named cases but fail the persisted-source contention
@@ -14647,7 +14647,7 @@ custody rerun with the independent pool correction passes as recorded above.
 
 ## Full custody reproduces retained connection bursts; fleet and initial pass
 
-The [third native run](../test/results/session-capacity-native-3/result.json)
+The third native run
 passes fleet (60.216 seconds, 116 named cases) and initial installation (47.3
 seconds, 62 named cases), including both owner PKI profiles' twelve historical
 empty/null-version denials and initial schema 55. Every phase retains 2,158
@@ -14662,7 +14662,7 @@ eight idle permission connections retained from the earlier publication burst;
 the passing selected sequences had 38 and 39. Native exchange, control and
 window cases pass with migration 55, but the whole suite remains failed.
 
-The [three-path fixture correction](../test/results/publication-burst-pool-integration.json)
+The three-path fixture correction
 lets the outer fixture release its idle permission burst at the existing
 publication/download boundary after child work has joined. It keeps the
 48-connection server, sixteen-connection pools and eight-way race unchanged.
@@ -14674,7 +14674,7 @@ subsequently passes in the fourth-run checkpoint above.
 
 ## Native-key SQL alias correction follows real transfer failure
 
-The [second session-capacity native run](../test/results/session-capacity-native-2/result.json)
+The second session-capacity native run
 passes the expanded publication/preparation/request-owner sequence (47.771 seconds),
 then fails the transfer matrix (89.27 seconds). Native control races, admission
 races and response-window accounting pass, but four transfer cases encounter
@@ -14682,7 +14682,7 @@ SQLSTATE 42702 in migration 54's native-key trigger: its PL/pgSQL session variab
 and nested table alias both use `s`. Each phase retains 2,157 unchanged source
 hashes and complete cleanup. Capture-intent and fleet phases did not run.
 
-The [additive migration 55 correction](../test/results/native-key-alias-integration.json)
+The additive migration 55 correction
 changes only that table alias and its generation/scope
 references; migration 54, stored sessions, ACLs, accounting and all original
 authority/deadline checks remain unchanged. The shared runtime schema head is
@@ -14693,7 +14693,7 @@ that run reproduces the separate connection-exhaustion cause.
 
 ## Typed observation listener and regional metadata component
 
-The [five-path addition](../test/results/observation-v2-listener-integration.json)
+The five-path addition
 supplies the fixed v2 listener and concrete four-purpose metadata reader. The
 listener retains separate finite-proof/standby slots and joined cancellation;
 workload discovery brackets its namespace-name LIST with exact original UID
@@ -14704,7 +14704,7 @@ removed. No runtime selector or actual multi-cluster workflow is qualified.
 
 ## Session-capacity reads no longer require private helper privileges
 
-The [real initial/custody run](../test/results/audit-create-native-1/result.json)
+The real initial/custody run
 passes initial installation (53.2 seconds, 62 named cases), then fails full custody
 (491.759 seconds Go / 509.64 seconds total). Both phases retain 2,150 unchanged
 source hashes and complete cleanup; fleet did not run. SQL diagnostics identify
@@ -14713,14 +14713,14 @@ plus native/content window queries executing SQL54 helpers whose private ACLs
 exclude runtime roles. A separate request-owner race hits the 48-connection lab's
 reserved-slot boundary; its cause is under investigation, without raising limits.
 
-The [ten-path session projection correction](../test/results/session-capacity-reads-integration.json)
+The ten-path session projection correction
 uses ordinary SELECT and the existing strict snapshot/digest decoder. Exact
 session/account/allocation/root/deadline identities remain required; only original
 policy dates/limits replace renewed parent values. Current counters, residual
 retention and overdue state remain unchanged. No helper grants or SECURITY
 DEFINER expansion is added. Compilation, focused races, vet, SQL generation and
 spec/architecture/design gates pass; the new managed-session read-only-role
-regression now passes the [real managed-capacity suite](../test/results/session-capacity-native-1/result.json)
+regression now passes the real managed-capacity suite
 (82.25 seconds, 95 named cases). Its runtime read role has no private-helper
 execution privilege, and renewal retains the original session facts. The
 publication/request-owner diagnostic pair also passes (34.116 seconds), without
@@ -14732,7 +14732,7 @@ changes no connection limit or cleanup behavior.
 
 ## Required audit versions reach owner runtime composition
 
-The [eighteen-path correction](../test/results/owner-audit-versions-integration.json)
+The eighteen-path correction
 selects required-version audit stores for the remaining owner/configuration and
 cleanup runtime constructors. Current owner configuration, enrollment and
 certificate receipts reject missing/null versions while preserving original
@@ -14749,7 +14749,7 @@ availability remain separate unfinished work.
 
 ## Direct regional-observation holder component integrated
 
-The [twenty-path component](../test/results/observation-direct-holder-integration.json)
+The twenty-path component
 removes the intermediate owner hop while retaining current native/SQL/TLS checks,
 original deadlines, bounded discovery and one-use pending claims. A failed
 candidate no longer cancels another already-running authenticated positive;
@@ -14767,7 +14767,7 @@ remain pending; request-count estimates are not measured performance.
 
 ## Initial audit history requires the original immutable version
 
-The [five-path history correction](../test/results/initial-audit-history-version-integration.json)
+The five-path history correction
 closes a separate ADR-151 gap: new writes already required versions, but the
 shared initial-receipt predicate still accepted old empty/null values at SQL
 acknowledgement, activation, historical observation and runtime-bridge setup.
@@ -14781,7 +14781,7 @@ version. They are added but not yet native-qualified.
 
 ## Audit creation retains successful versions across existing writers
 
-The [twenty-path extension](../test/results/audit-create-pinning-integration.json)
+The twenty-path extension
 now applies exact acknowledged-version readback to the remaining reconciling
 audit creators and download-window creation. Definite HTTP 412 retains existing
 semantic reconciliation; unknown PUTs do not trigger GET, and Find remains
@@ -14795,7 +14795,7 @@ remains next; the previous five-path native results are not reused as its pass.
 
 ## Original configuration-worker caller provenance integrated
 
-The [four-path caller producer](../test/results/owner-worker-caller-integration.json)
+The four-path caller producer
 returns only public provenance derived from the original positive account,
 Deployment, full template/image, owner selection and configuration launch.
 Two genuine native brackets and two exact reads of each original journal/child
@@ -14811,7 +14811,7 @@ and complete native observation remain pending.
 
 ## Audit receipt pinning passes initial and retirement services
 
-The [third retained native run](../test/results/audit-pinning-native-3/result.json)
+The third retained native run
 passes the full initial-installation suite (47.061 seconds) against PostgreSQL,
 S3 and OpenBao. Both selected operation-audit retirement cases also pass,
 including finite accounts, retained history and uncertain writers. The combined
@@ -14819,7 +14819,7 @@ retirement command fails before download-stop setup: its legacy fixture role
 lacks EXECUTE on migration 54's `capacity_managed_admission_until`. The PostgreSQL
 log identifies that denial; it is not a stop-writer or receipt-verification result.
 
-The [targeted fourth run](../test/results/audit-pinning-native-4/result.json)
+The targeted fourth run
 passes download-stop retirement after the fixture receives the exact existing
 production capture/storage function grant. It exits zero in 75.081 seconds with
 2,128 unchanged source hashes and no cleanup failures. Each preceding native
@@ -14829,8 +14829,8 @@ receipt correction against the selected real services; they do not qualify an
 installed public download workflow or complete version retirement for every
 other audit family.
 
-Earlier [first](../test/results/audit-pinning-native-1/result.json) and
-[second](../test/results/audit-pinning-native-2/result.json) initial-installation
+Earlier first and
+second initial-installation
 failures remain retained. Their fixture corrections mirror the production
 observer's column-level view-lock grant and separate the hub's exact credential
 manifest from the installer's larger hub-plus-reconciler inventory. The fixture
@@ -14840,7 +14840,7 @@ credential acceptance were not broadened.
 
 ## Known audit receipts select their exact immutable version
 
-The [five-path readback correction](../test/results/audit-version-pinning-integration.json)
+The five-path readback correction
 now pins successful initial audit writes, positive operation/download-stop writes
 and retained deletion-certificate verification to the acknowledged version and
 ETag. It verifies complete byte count and ciphertext digest before decoding.
@@ -14855,7 +14855,7 @@ actual-service initial/retirement verification is recorded above.
 
 ## Required initial audit versions pass the original native bootstrap
 
-The [fresh versioned-audit native run](../test/results/initial-versioned-audit-native-1/result.json)
+The fresh versioned-audit native run
 completed with exit zero in 515.704 seconds, four named passing cases, all 2,142
 source hashes unchanged and no cleanup failures. It executes the actual fresh
 bootstrap v4 → preparation v2 → installer v2 chain against Kubernetes,
@@ -14868,7 +14868,7 @@ is `a349f23cdaa0dabd853a725739ee84f1916b80e450790a03b59cb6e70a9eb68c`, image
 Both runtime Deployments remain at zero replicas. Temporary node volume and build
 scratch were removed; this does not qualify persistent power-loss behavior.
 
-The preceding [combined live-source checks](../test/results/initial-owner-integration-1/result.json)
+The preceding combined live-source checks
 passed whole-repository compilation, 9 top-level / 28 named race interactions
 with no skips, Go architecture, specification, architecture and design gates.
 All 3,018 retained source hashes were unchanged. These results establish the
@@ -14880,7 +14880,7 @@ consulting the mutable latest-key pointer; it is not part of this native result.
 
 ## Initial audit versions and original owner selection integrated
 
-The [33-path initial audit change](../test/results/initial-audit-version-integration.json)
+The 33-path initial audit change
 now enforces [ADR-151](decisions/151-initial-audit-version-requirement.md): both
 accepted active installer formats require a nonempty immutable audit version.
 Fresh bootstrap v4 binds preparation services v2 and installer v2 before effects.
@@ -14895,7 +14895,7 @@ symlinked-embed mirror failure is retained; the corrected mirror uses real files
 Actual fresh-bootstrap version enforcement and full version retirement are still
 pending native qualification.
 
-The [21-path original owner selection](../test/results/owner-bootstrap-selection-integration.json)
+The 21-path original owner selection
 allocates permission-root and logical peer identities once in the retained
 resource journal and a fixed immutable public child. Generated owner inputs
 require its original receipt and current native proof. Lost replies remain
@@ -14917,7 +14917,7 @@ checkpoint; component evidence does not enable a public debugging workflow.
 
 ## Pending observation receiver preserves one original operation
 
-The [ten-path receiver integration](../test/results/observation-pending-receiver-integration.json)
+The ten-path receiver integration
 passes compilation, vet, architecture and 81 top-level / 295 named race entries
 with no skips and 2,082 unchanged dependencies. Actual HTTP/2 tests cover bounded
 locator GET, one exact claim POST, all four framed ordinals and Receipt/EOF joins;
@@ -14927,7 +14927,7 @@ This component does not select an installed route. A direct configuration-worker
 to exact regional-stream holder path is under implementation to remove a redundant
 owner hop while preserving the original caller and deadlines.
 
-The [two-path live-channel deadline fix](../test/results/observation-channel-bounds-integration.json)
+The two-path live-channel deadline fix
 now immediately carries each shorter observed cutoff into the next candidate/SQL
 read, metadata result and current-key lock wait. The original implementation
 fails four intended regressions. The corrected checkpoint passes 44 top-level /
@@ -14939,7 +14939,7 @@ remain separate work.
 
 ## Fresh provider pair passes the real bootstrap-to-input path
 
-The [third native run](../test/results/provider-pair-native-3/result.json) returns
+The third native run returns
 zero after owned cleanup: 411.662 seconds for the Go integration package,
 602.932 seconds for setup/build/test/cleanup, four named PASS entries, all 2,116
 source hashes unchanged and no cleanup failures. The actual product binary is
@@ -14962,7 +14962,7 @@ version enforcement for initial/recovery audit, full physical-copy retirement
 and the installed investigation remain pending. Earlier setup failures remain
 recorded below; no chart runtime enablement follows from this test.
 
-The [isolated fixture diagnostic](../test/results/kind-startup-diagnostic-3/result.json)
+The isolated fixture diagnostic
 starts the same pinned Kubernetes image in 31.155 seconds and passes `/readyz`,
 using a dedicated bounded 3 GiB tmpfs volume for this disposable node's `/var`.
 All 2,105 source hashes are unchanged and owned cluster/seed/volume cleanup
@@ -14975,7 +14975,7 @@ retained. The provider-pair fixture now uses the qualified ephemeral setup with
 normal startup and product deadlines. This is not Kubernetes persistence or
 product installation qualification; the subsequent native result is above.
 
-The [three-path owner operation refinement](../test/results/owner-projection-identity-integration.json)
+The three-path owner operation refinement
 now rejects copied outer handles at all five native boundaries before touching
 the original operation. The controlled original-boundary variant fails all five
 intended assertions; corrected race tests pass five top-level/thirteen named
@@ -14983,7 +14983,7 @@ entries, including the composed projection/launch positive. Compilation and vet
 also pass, all 2,593 dependency hashes remain unchanged and owned build scratch
 is removed. This is component verification, not an installed runtime result.
 
-The [second fresh provider-pair run](../test/results/provider-pair-native-2/result.json)
+The second fresh provider-pair run
 also stops before product tests: PostgreSQL becomes ready in 15.266 seconds,
 but the owned Kind control plane never starts its API server during bootstrap.
 Containerd records the four control-plane container creation requests without
@@ -14995,7 +14995,7 @@ were investigated before the passing third run above.
 
 ## Original launch phases and joined shutdown components
 
-The [55-path continuation](../test/results/provider-launch-integration.json)
+The 55-path continuation
 integrates the finite worker launch, owner role/projection/launch phases and
 joined provider shutdown. The worker checkpoint passes 47 top-level/121 named
 corrected race entries; its three controlled-before cases reproduce deadline
@@ -15006,7 +15006,7 @@ component entries and five named PostgreSQL zero-handle checks. Its actual
 PostgreSQL role flow and installed process remain unqualified. The analogous
 owner wrapper identity refinement is qualified separately above.
 
-The [combined check](../test/results/provider-launch-combined/result.json)
+The combined check
 returns zero: native integration package compilation 14.960 seconds, selected
 joined-shutdown/copy races 22.428 seconds and Go architecture/specification/design
 gates 10.778 seconds, with unchanged sources and removed owned build scratch.
@@ -15018,7 +15018,7 @@ still comes from the operation's independent native reads.
 
 The first fresh provider-pair native run stopped before cluster creation or Go
 tests: owned PostgreSQL was still initializing after the fixture's short startup
-poll. [Its failure record](../test/results/provider-pair-native-1/result.json)
+poll. Its failure record
 preserves the actual binary identity, all 2,074 unchanged sources, successful
 owned cleanup and removed build scratch. The new qualification mode now gives
 fixture initialization a measured, bounded 90-second wait before any product
@@ -15028,7 +15028,7 @@ recorded above.
 
 ## Fresh provider pair and actual framed observation components integrated
 
-The [164-path integration](../test/results/provider-pair-framing-integration.json)
+The 164-path integration
 joins the provider-installed foundations, the qualified schema contracts and
 [ADR-149](decisions/149-fresh-provider-installed-pair.md), the actual HTTP/2 v2
 framing component, and the fresh original-bootstrap qualification fixture.
@@ -15055,7 +15055,7 @@ workflow remain unqualified. No runtime enablement follows from this integration
 
 ## Typed observation coordinator retains the original proof through completion
 
-The [seven-path v2 coordinator](../test/results/observation-operation-coordinator-integration.json)
+The seven-path v2 coordinator
 passes compilation, 35 top-level/154 named race entries, vet and Go architecture
 checks. The four phases took 11.069, 15.861, 1.891 and 1.940 seconds respectively;
 all 1,937 dependencies and the tested payloads remained unchanged. Its owned
@@ -15074,7 +15074,7 @@ the complete multi-cluster path are the next work; this is not a deployed route.
 
 ## Real SQL observation pairs reject changed authority
 
-The [SQL49 operation regression](../test/results/observation-operation-sql-integration.json)
+The SQL49 operation regression
 passes its owned PostgreSQL/S3 run: 14.596 seconds for the selected Go package,
 73.332 seconds including harness setup/build/cleanup, all 1,956 source hashes
 unchanged and no cleanup failures. Eight cases cover both original source pairs,
@@ -15103,7 +15103,7 @@ runtime profile or resolve the earlier restart-read failure.
 
 ## Regional source and producer preserve one original operation
 
-The [seven-path source/producer component](../test/results/observation-operation-source-integration.json)
+The seven-path source/producer component
 retains one native operation across four numbered replies, current process keys,
 the actual TLS exporter and both exact SQL registration results. Returning from
 one frame does not cancel the owned stream; failed, changed or repeated phases
@@ -15122,7 +15122,7 @@ implementation work. No new runtime profile is enabled.
 
 ## Actual native observation primitive passes consecutive requests
 
-The [native primitive run](../test/results/owner-operation-native-integration.json)
+The native primitive run
 returned 0 after complete owned cleanup. The selected Go package passed in
 11.995 seconds (10.93 seconds for the test), with eight named PASS entries and
 all 1,964 source hashes unchanged. Full harness setup/build/cleanup took
@@ -15145,7 +15145,7 @@ replaced by this narrower success.
 
 ## Explicit observation consumers pass component checks
 
-The [ten-path consumer checkpoint](../test/results/observation-operation-consumer-integration.json)
+The ten-path consumer checkpoint
 adds native-operation values, closed application ports and a separate SQL49
 reader for actual numbered source values. The original SQL query, roles and
 legacy source brackets remain unchanged. The second source pair must continue
@@ -15161,7 +15161,7 @@ the unchanged compilation/race/vet evidence is reused explicitly. These are
 component tests, including a synthetic fixed-query SQL seam, not native SQL or
 an installed observation conversation.
 
-The [one-file native primitive regression](../test/results/owner-operation-native-integration.json)
+The one-file native primitive regression
 also compiles and passes vet; its subsequent native run passes as recorded above. It exercises
 six consecutive operations through the same API clients and an actual Pod
 mutation between native boundaries. Full v2 wire/channel lifetime, current
@@ -15170,7 +15170,7 @@ qualification remain active work. Runtime selection stays disabled.
 
 ## Integrated repository checks pass; installed availability remains open
 
-The [combined repository gate](../test/results/operation-and-shutdown-gates.json)
+The combined repository gate
 returned 0: full Go vet/race checks completed in 926.433 seconds, followed by
 specification, architecture, Go dependency and interface-design checks in
 10.410 seconds. All 2,354 tracked source hashes remained unchanged throughout.
@@ -15191,7 +15191,7 @@ installation/investigation qualification.
 
 ## Regional observation and legacy shutdown components pass
 
-The [regional observation primitive](../test/results/regional-observation-operation-integration.json)
+The regional observation primitive
 now performs two independent native checks and four actual protected source-value
 reads. Its counted synthetic API uses 50 observer and 12 probe calls. All original
 request, token, root and backing deadlines remain binding; changed or unavailable
@@ -15202,7 +15202,7 @@ in the new component. Both checks are restored. Compilation, 14 top-level/120
 named race entries, vet and Go architecture pass with 1,805 unchanged dependencies.
 This is actual TLS around a synthetic API, not qualified native routing.
 
-The separate [legacy shutdown correction](../test/results/owner-deployment-join-integration.json)
+The separate legacy shutdown correction
 waits for runtime readiness work, route registration/delivery and admitted SQL
 wrapper calls before closing shared pools. Shutdown admits no new wrapper work;
 an unissued release remains occupied until its original lease expires. The
@@ -15214,7 +15214,7 @@ subsequently passed as recorded above.
 
 ## Native observation operation primitive passes component checks
 
-The [four-path observation component](../test/results/owner-observation-operation-integration.json)
+The four-path observation component
 owns the original native observations and performs one independent final native
 check before returning them. Cancellation joins admitted reads; final mutation,
 unknown results and expired original deadlines close the operation. The focused
@@ -15228,16 +15228,16 @@ remain pending. No runtime route is selected by this component.
 
 ## Narrow cleanup policy resolves the multipart permission failure
 
-The [corrected scoped-storage run](../test/results/scoped-audit-retirement.log)
+The corrected scoped-storage run
 passes all ten named entries, including complete version/marker retirement and
 multipart inventory/abort. Retirement now has no base Write permission; an
 independently administered policy allows only exact-prefix deletion and abort.
 It cannot upload a part, create an upload or ordinary object, read/delete a
 foreign object, or change bucket policies/versioning. Runtime writer restrictions
 remain in force. Actual test time is 5.28 seconds; the
-[environment report](../test/results/scoped-audit-retirement-environment.json)
+environment report
 records 1,934 unchanged sources and complete cleanup. Compile and vet passed
-before the [two-path fixture correction](../test/results/scoped-audit-retirement-policy-integration.json).
+before the two-path fixture correction.
 
 The pinned provider treats abort as a legacy PutObject policy match, so the old
 explicit write denial also denied cleanup. The narrower recipe and primary
@@ -15248,19 +15248,19 @@ profile is enabled.
 
 ### Preserved failed multipart run
 
-The [multipart follow-up](../test/results/scoped-audit-multipart-test.log)
+The multipart follow-up
 retains all earlier runtime audit/version/permission passes but fails independent
 `AbortMultipartUpload` with a real backend 403. Listing the exact incomplete
 upload succeeds and retirement is correctly denied adding a part. That complete
 test fails, so its subsequent version-retirement phase
-does not run. The [report](../test/results/scoped-audit-multipart-environment.json)
+does not run. The report
 records 1,931 unchanged sources and complete lab cleanup. The first successful
 version/marker run is preserved separately below. The correction above retains
 the failed assertion and does not give cleanup administrator access.
 
 ## Scoped immutable-audit permissions and independent retirement pass
 
-The [owned scoped-storage run](../test/results/scoped-audit-storage-first/scoped-audit-storage.log) passes
+The owned scoped-storage run passes
 the actual SDK, adapter-facing TLS and encrypted owner-configuration writer
 with separate configuration, owner and retirement credentials. Eight concurrent
 configuration writes converge on one version. The original committed version
@@ -15269,7 +15269,7 @@ latest content cannot be reconciled. Both runtime identities are denied deletion
 and bucket-policy/versioning changes. Cross-service and anonymous reads fail.
 Independent retirement inventories four bounded pages, deletes five versions
 including an unacknowledged null copy plus one deletion marker, and verifies
-complete absence. The [environment report](../test/results/scoped-audit-storage-first/scoped-audit-storage-environment.json)
+complete absence. The environment report
 records the actual 2.15-second test, 1,931 unchanged sources and clean teardown.
 
 `make audit-storage-integration` reproduces this exact owned fixture. Ordinary
@@ -15284,7 +15284,7 @@ profile and the operation-owned native routing proof together.
 
 ## Native routing deadline failure reproduced; versioned audit adapter qualified
 
-The [owned native receiver test](../test/results/regional-observation-native-cost-test.log)
+The owned native receiver test
 reproduces the availability defect with actual Kubernetes, SQL and mutual TLS.
 Its first complete pair proof takes 3.715 seconds and 94 observer/24 probe API
 requests. Repeating that proof returns unavailable after another 1.199 seconds:
@@ -15292,16 +15292,16 @@ requests. Repeating that proof returns unavailable after another 1.199 seconds:
 of the original query remaining. The named test passes because it expects this
 failure; **routing itself does not succeed**. Expected admission-denial probes
 account for the HTTP failure counters. SQL pool acquisitions are not statement
-or lock counts. The [terminal report](../test/results/regional-observation-native-cost-environment.json)
+or lock counts. The terminal report
 records 1,946 unchanged source hashes and complete cleanup. Initial roots,
 source/registration facts and wrapping keys remain explicit fixture authority.
 The next change must address hub and regional proof amplification together,
 retain the original deadline/rate bounds and prove the complete exchange.
 
-The [explicit versioned audit adapter](../test/results/versioned-audit-store-integration.json)
+The explicit versioned audit adapter
 rejects empty/null version IDs in write receipts, audit reconciliation and pinned
 reads. Its affected object-store race suite passes 61 top-level tests/225 named
-entries and vet. The [actual S3/SDK/encrypted-audit test](../test/results/versioned-audit-native-test.log)
+entries and vet. The actual S3/SDK/encrypted-audit test
 passes eight concurrent writers resolving to one receipt, preserved original
 bytes after latest-key replacement, rejected malformed reconciliation and
 unversioned/suspended writes, and deletion of all four versions including
@@ -15316,24 +15316,24 @@ fallback. The optional maintainer preference question was unanswered; this is
 an implementation assumption, **not user-confirmed approval**. The source graph
 still requires its complete installation qualification before enablement.
 
-The [installed reader copy correction](../test/results/configuration-worker-reader-copy-integration.json)
+The installed reader copy correction
 also reproduces caller mutation before the fix, then passes its three reader
 race tests/14 named entries and vet. It changes no profile or authority scope.
 
 ## Further input ownership fixes pass; routing availability needs correction
 
-The [three-path projection correction and regression](../test/results/projection-input-ownership-integration.json)
+The three-path projection correction and regression
 prevents callers changing retained nested scope and prevents material generation
 mutating its input. All three original regressions fail before the fix; the
 corrected selection passes 28 top-level tests/264 named PASS entries and vet.
-The [seven-file follow-up](../test/results/legacy-input-ownership-integration.json)
+The seven-file follow-up
 fixes the same defect in bootstrap construction, bootstrap state creation,
 public observation, bridge administration and cleanup projection construction.
 All five original defects reproduce; 47 top-level tests/253 named race entries
 and vet pass with 2,078 unchanged dependencies. These changes preserve existing
 layouts, deadlines and authority checks.
 
-The [regional forwarding component](../test/results/regional-observation-forwarder-integration.json)
+The regional forwarding component
 passes 152 named race entries using real TLS/HTTP2 with synthetic authority
 ports. Its concrete native composition is **not available within its deadline**:
 expanding the measured port calls requires at least 304 requests on the shared
@@ -15350,7 +15350,7 @@ the earlier 500 response or qualify production storage/accounting/recovery.
 
 ## Worker shutdown joins are corrected; storage permissions are under qualification
 
-The [five-path shutdown correction](../test/results/configuration-worker-join-integration.json)
+The five-path shutdown correction
 reproduces both previous defects before the fix: cancelled configuration observers
 could outlive Run, and externally initiated Close could release provider resources
 before its active leader call finished. The corrected full application/fleet and
@@ -15370,7 +15370,7 @@ versus an enforcement gateway is pending; no unsafe runtime fallback is enabled.
 
 ## Provider setup and complete candidate reads pass actual-service retries
 
-The [fresh provider run](../test/results/owner-provider-setup-native-retry-result.json)
+The fresh provider run
 passes all seven child scenarios and their parent, including sixteen read-only
 setup checks, denial of inspection-token encryption, changed-purpose rejection,
 generated pool-scoped certificate roles and maintained Transit/PKI effects.
@@ -15380,39 +15380,39 @@ while preserving its first failed run. Privileged provider setup and accepted
 installation/recovery/signing facts remain synthetic; installed startup and
 elapsed credential rollover remain unqualified.
 
-The [candidate SQL/S3 fixture](../test/results/regional-observation-candidates-native-result.json)
+The candidate SQL/S3 fixture
 also passes, in 3.853 seconds of Go execution with 1,917 unchanged source hashes
 and clean teardown. It retains all seventeen same-Pod process candidates,
 denies eighteen at the configured bound, preserves legacy overflow denial,
 excludes retired entries and rejects original source expiry/configuration
 changes. Initial source/recovery/native proof inputs remain synthetic.
-[Specification and architecture gates](../test/results/provider-correction-candidates-contracts.json)
+Specification and architecture gates
 pass in 7.189 seconds. Work continues on the complete fresh installation profile
 and regional forwarding; no public or Helm runtime is enabled.
 
 
 ## Provider compatibility corrections and complete observation candidates
 
-The first [setup native run](../test/results/owner-provider-setup-native.log)
+The first setup native run
 failed at the authentication-mount read. All 1,918 source hashes stayed unchanged
 and the owned lab cleaned up. Isolated pinned OpenBao diagnostics show that
 `sys/auth/<mount>` requires more than the named read ACL; the equivalent
 `sys/mounts/auth/<mount>` works with the intended read-only credential. The
-[archived diagnostics](../test/results/owner-provider-setup-diagnostics/archive.json)
+archived diagnostics
 also establish the exact returned role fields. Generated PKI roles now explicitly
 forbid caller-supplied not-before and constrain not-after to the existing
 21-minute provider ceiling (the runtime certificate periods remain unchanged).
 Actual scoped signing accepts 20m30s and rejects 22m and supplied not-before.
 Global authentication mount TTLs are not changed.
 
-The [seven-path correction](../test/results/owner-provider-setup-correction-integration.json)
+The seven-path correction
 passes compilation, provider-configuration and selected owner-provider races,
 and vet. Its full-input binding preserves exact integer generations above 2^53;
 the targeted regression first failed and then passed. Actual public provider
 read shapes are retained as test inputs. The complete Kubernetes/provider retry
 remains pending; diagnostics do not qualify installed operation.
 
-The [complete candidate component](../test/results/regional-observation-candidates-integration.json)
+The complete candidate component
 passes SQL generation, seven-package compilation/vet, Go architecture and
 185 named race entries. Explicitly opted observation pools use the separate
 bounded complete SQL candidate reader and one complete Ready endpoint scan;
@@ -15423,7 +15423,7 @@ multi-owner forwarding are not yet qualified. No public or Helm runtime is enabl
 
 ## Provider setup reader and regional receiver pass component checks
 
-The [provider setup component](../test/results/owner-provider-setup-component-integration.json)
+The provider setup component
 passes affected compilation, all provider-configuration races, selected owner
 provider races and vet. Its read-only client verifies sixteen named setup
 objects through pinned TLS, preserves one original at-most-five-second interval,
@@ -15434,9 +15434,9 @@ Real OpenBao response-shape and generated PKI-role qualification is the next run
 synthetic HTTPS component tests do not establish that compatibility. No installed
 profile or public serving is enabled.
 
-The [regional receiver](../test/results/regional-observation-routing-receiver-integration.json)
+The regional receiver
 passes 90 named race entries, compilation, vet and Go architecture. The separate
-[configuration-worker component](../test/results/configuration-provider-component-integration.json)
+configuration-worker component
 passes 44 top-level tests/266 PASS entries, compilation and vet. Those packages
 provide the closed receiver, pure two-purpose provider recipe and fixed worker
 shape; actual installed selection and end-to-end availability remain pending.
@@ -15444,7 +15444,7 @@ shape; actual installed selection and end-to-end availability remain pending.
 
 ## Leased provider effects pass real Kubernetes/OpenBao checks
 
-The [extended owned-provider run](../test/results/owner-provider-leased-effects-native-check.log)
+The extended owned-provider run
 passes all seven child scenarios and their parent in 11.468 seconds of Go
 execution, with 1,889 unchanged source hashes and no cleanup failures. The new
 child exercises the maintained Transit binding roundtrip, both actual verified
@@ -15456,37 +15456,37 @@ account tests continue to pass.
 Provider setup is privileged fixture work; installation/current-source/recovery
 and signing-permit facts remain explicitly synthetic. This does not qualify the
 installed supervisor, elapsed token rollover or production provider setup. The
-[joint specification/architecture checks](../test/results/routing-effects-integrated-contracts.json)
+joint specification/architecture checks
 also pass in 7.676 seconds. Work continues on the genuine pre-launch configuration
 input producer, the coherent fresh worker/owner v2 profile and regional routing.
 
 ## Full Go gate passes; routing and leased effects are integrated
 
-The [full Go retry](../test/results/projection-owner-lifetime-full-go-result.json)
+The full Go retry
 passes the schema prerequisites, vet and complete repository race suite in
 875.144 seconds. Kubernetes completes in 856.445 seconds; all 2,013 source hashes
 remain unchanged. Native tests requiring owned fixtures skip in this gate. The
 earlier failed full run and focused fixture failures remain recorded below.
 
-The [routing contract integration](../test/results/regional-observation-routing-contract-integration.json)
+The routing contract integration
 passes compilation, 154 named race entries, vet and Go architecture with 1,894
 unchanged dependencies. It preserves exact uint64 sequence values, original
 request bytes and all existing proof ordinals. This provides typed locator/claim
 values, not an installed receiving or forwarding route.
 
-The [leased provider effects](../test/results/owner-provider-effects-integration.json)
+The leased provider effects
 pass compilation, 28 selected top-level race tests and vet with 1,984 unchanged
 dependencies. The fixed four-purpose clients reuse existing Transit and issuer
 codecs, reject foreign paths before credential borrowing, and do not authenticate
 or replay signing from the effect path. Their current-proof inputs remain
-synthetic in these tests. The [native extension](../test/results/owner-provider-effects-native-component-integration.json)
+synthetic in these tests. The native extension
 compiles and passes vet; its subsequent real-provider result is recorded above. Fresh
 installation input production and the shared worker/owner v2 composition remain
 in progress. Public serving and the Helm runtime remain disabled.
 
 ## Projection timing and provider lifetime corrections pass component tests
 
-The [eleven-path projection integration](../test/results/public-projection-enforcement-integration.json)
+The eleven-path projection integration
 removes repeated operation-local enforcement traversals while retaining the
 original deadline, default 20-QPS limiter and five explicit current-authority
 boundaries. The measured regression fails before the correction and passes
@@ -15496,11 +15496,11 @@ unknown writes, expiry, cancellation and permanent failure. The original namespa
 fixture UID correction is included. All 2,600 dependencies stayed unchanged.
 Two subsequent static mirror attempts failed because their copies omitted link
 targets; their actual failures are archived. The subsequent
-[live specification and architecture checks](../test/results/projection-owner-lifetime-contracts.json)
+live specification and architecture checks
 pass in 7.152 seconds. The full Go gate subsequently passes as recorded above;
 native installed publication is still unqualified.
 
-The [six-path provider lifetime integration](../test/results/owner-provider-lifetime-integration.json)
+The six-path provider lifetime integration
 passes compilation, 25 selected top-level race tests and vet with 1,976 unchanged
 dependencies. It serializes each of four fixed credential owners, bounds failure
 backoff and current/draining credentials, preserves admitted effect deadlines
@@ -15511,7 +15511,7 @@ supervisor qualification. No runtime selector or public listener is enabled.
 
 ## Regional receiving listener passes bounded socket checks
 
-The [five-path listener integration](../test/results/regional-observation-listener-integration.json)
+The five-path listener integration
 passes compilation, 24 named race entries and vet. Seven new regional listener
 tests and seventeen existing observation entries pass in 9.455 seconds of Go
 execution; all 1,884 dependencies remain unchanged. Actual loopback TLS/HTTP2
@@ -15522,7 +15522,7 @@ forwarding and installed two-cluster qualification remain pending.
 
 ## Standard provider authentication passes real Kubernetes/OpenBao checks
 
-The [owned provider qualification](../test/results/owner-provider-auth-native-check.log)
+The owned provider qualification
 exits 0 with all six child scenarios and their parent passing in 11.568 seconds
 of Go execution. All 1,872 source hashes remain unchanged; cleanup reports no
 failures. The actual provider accepts the four generated login/renewal profiles,
@@ -15537,7 +15537,7 @@ They do not qualify installed owner authority, elapsed 600-second token expiry,
 kubelet rotation or the pending four-purpose credential supervisor. No runtime
 selector or Helm workload is enabled. The provider qualification uses a closed,
 single-cluster harness selection whose compile/vet and selector checks are
-[recorded separately](../test/results/owner-provider-native-component-integration.json).
+recorded separately.
 
 The separate projection timing diagnostic confirms that nested proof traversals
 exhaust the original verified interval: 86 HTTP requests spend 46 milliseconds
@@ -15549,7 +15549,7 @@ Go gate remains open until the integrated retry completes.
 
 ## Provider control and regional holder pass; full Go gate remains open
 
-The [regional holder integration](../test/results/regional-observation-holder-integration.json)
+The regional holder integration
 adds the bounded receiving handler, one-use local stream ownership, current
 same-channel coordinator and scoped SQL49 reader. Compilation, 111 selected race
 entries, vet and Go architecture pass; all 1,866 dependencies stayed unchanged.
@@ -15557,7 +15557,7 @@ Actual loopback HTTP/2 and mutual TLS still use synthetic source/registry facts.
 The installed listener, exact-owner forwarding and two-cluster availability have
 not been qualified.
 
-The [private provider control integration](../test/results/owner-provider-control-integration.json)
+The private provider control integration
 passes compilation, 65 selected race entries and vet with 1,956 unchanged
 dependencies. It retains the original credential/body deadlines, disallows
 transparent effect replay, and authenticates HTTPS against the configured roots.
@@ -15566,7 +15566,7 @@ to the test endpoint; this is not a claim about a previously deployed defect.
 Actual Kubernetes/OpenBao authentication and the four-purpose runtime supervisor
 remain separate work. No provider selector is enabled.
 
-The [configuration generator correction](../test/results/capacity-configuration-probe-integration.json)
+The configuration generator correction
 now preserves the original installed capacity probe and rejects an unsupported
 start-admission branch instead of silently changing the generated guard. Both
 regressions reproduced before the correction; five tests/25 PASS entries and vet
@@ -15574,7 +15574,7 @@ pass afterward, including unchanged legacy omission. All 2,579 dependencies
 remain unchanged. The first build was interrupted by filesystem allocation
 failure before tests started; its record is retained beside the successful retry.
 
-The [full Go gate](../test/results/capacity-owner-provider-full-go-result.json)
+The full Go gate
 exited 2 after 848 seconds with unchanged sources. Five public-role tests failed
 in a shared fixture that reused the bootstrap namespace UID for runtime. A
 staged test-only correction reproduces that failure before the change and lets
@@ -15586,7 +15586,7 @@ limits remain unchanged. Public serving and the Helm runtime remain disabled.
 
 ## Capacity owner reads and updated resource layout pass native checks
 
-The [full native capacity SQL matrix](../test/results/capacity-local-owner-native-check.log)
+The full native capacity SQL matrix
 passes 95 entries in 75.544 seconds of Go execution. The new generated role70
 reads exact current owner candidates and activated leaves, denies unrelated
 owner writes, rejects a replaced source, and retains its original 400-millisecond
@@ -15596,14 +15596,14 @@ pass. All 1,838 source hashes remain unchanged and cleanup reports no failures.
 Kubernetes source/owner proof and the initial CA in this SQL fixture are
 explicitly synthetic; this does not qualify installed owner routing.
 
-The [updated Kubernetes resource round-trip](../test/results/capacity-owner-resource-roundtrip-native-check.log)
+The updated Kubernetes resource round-trip
 passes both layouts and all nineteen generated resources per layout, including
 the installed capacity observer/probe RBAC. The children take 9.80 and 10.74
 seconds; total Go execution is 21.585 seconds. All 1,854 source hashes remain
 unchanged and cleanup reports no failures. Both Deployments remain at zero;
 this verifies API admission/defaulting/readback, not active worker startup.
 
-The [integrated static gates](../test/results/capacity-owner-provider-integrated-contracts.log)
+The integrated static gates
 pass SQL generation, Go architecture, 114 schemas/10,396 specification assertions
 and 1,218 positive/120 negative design cases. The full repository Go race gate
 is next. Provider login/lease lifecycle, the regional stream holder and actual
@@ -15611,7 +15611,7 @@ projection-to-worker composition remain in progress; public serving stays disabl
 
 ## Installed capacity inputs and provider recipes pass component checks
 
-The [33-path capacity integration](../test/results/capacity-local-owner-integration.json)
+The 33-path capacity integration
 adds receipt-bound original owner inputs, the protected capacity projection,
 current installed owner client, exact role70 reads and fresh worker RBAC. Full
 contracts/bootstrap races pass 490 entries; corrected Kubernetes races pass 222
@@ -15621,7 +15621,7 @@ nil receipt dereference in the fake API. Their exact test-only corrections and
 the failed run remain archived. All 2,687 dependencies stayed unchanged. The new
 actual role70 registry/denial/lock cases are compiled but have not run yet.
 
-The [eight-path provider/composed-projection integration](../test/results/owner-provider-recipe-composed-integration.json)
+The eight-path provider/composed-projection integration
 passes compilation, six provider recipe tests, the composed interrupted-installation
 race and vet, with all 1,926 dependencies unchanged. The production projection
 and launch code preserves lookup-only handling after unknown replies and passive
@@ -15638,7 +15638,7 @@ developer workflow or public runtime is declared ready.
 
 ## Concrete regional stream passes component checks
 
-The [seven-path stream component](../test/results/regional-observation-stream-integration.json)
+The seven-path stream component
 passes compilation, 62 named race cases, vet and Go architecture (1.659,
 8.519, 0.407 and 1.509 seconds). All 1,684 dependencies, payloads, original
 path states and source-file inventory remain unchanged. Tests use actual
@@ -15654,14 +15654,14 @@ the component evidence without treating it as native deployment qualification.
 
 ## Fresh installed-owner bootstrap guard handover passes
 
-The [full fresh bootstrap run](../test/results/installed-owner-bootstrap-bridge-native-check.log)
+The full fresh bootstrap run
 passes all four selected entries. The actual four-command Restricted bootstrap
 and original compiled activation complete, setup-free replay passes, and the
 fresh installed-owner layout completes its runtime-resource/guard bridge in
 88.16 seconds. Administrator removal is detected without recreation. Total
 Go execution is 388.313 seconds, with all 1,821 source hashes unchanged and
 no cleanup failures. The original compiled image digest and detailed assertions
-remain in the [test log](../test/results/installed-owner-bootstrap-bridge-native.log).
+remain in the test log.
 
 This run selects the new layout before the first original journal claim; it
 does not adopt or rewrite a completed legacy installation. It retains the
@@ -15676,14 +15676,14 @@ packages are being reviewed and tested; public runtime stays disabled.
 
 ## Fresh resource layouts and early coverage pass native checks
 
-The [real API round-trip](../test/results/owner-fresh-layout-roundtrip-native-check.log)
+The real API round-trip
 passes both legacy and installed-owner layouts: nineteen actual generated
 resources each, zero replicas, API defaulting and exact readback. The two children
 take 9.82 and 11.41 seconds; total Go execution is 22.280 seconds. All 1,821
 source hashes remain unchanged and cleanup reports no failures. This qualifies
 the fresh resource layout, not installed owner execution or provider production.
 
-The [full PostgreSQL capacity matrix](../test/results/capacity-processing-coverage-native-check.log)
+The full PostgreSQL capacity matrix
 passes 87 entries in 73.917 seconds of Go execution. The three added cases reach
 the actual purpose15 and purpose40 coverage gates: uncovered retention is
 rejected, all listed budget/audit/lineage charges stay unchanged, and an original
@@ -15692,7 +15692,7 @@ The original supported request still completes encrypted publication and its
 download session. All 1,805 source hashes remain unchanged and cleanup reports
 no failures. Synthetic human/source/bootstrap inputs remain explicit.
 
-The [integrated static gates](../test/results/owner-input-processing-contracts.log)
+The integrated static gates
 pass SQL generation (47 files), Go dependency checks (53 packages/297 edges),
 10,374 specification assertions and 1,218 positive/120 negative design cases.
 This resolves the isolated mirror's missing-evidence link failure without
@@ -15702,7 +15702,7 @@ unfinished.
 
 ## Original installation inputs and early retention coverage integrated
 
-The [eight-path original-input change](../test/results/owner-original-input-integration.json)
+The eight-path original-input change
 rejects changed original endpoints, roots, guard pins and workload templates
 before new owner projection or launch effects. The new constructor regression
 fails before the correction; six-package compilation, targeted races and vet
@@ -15710,7 +15710,7 @@ pass, with all 1,906 dependency hashes unchanged. Two compiled native fixtures
 now distinguish the fresh installed-owner layout from the legacy layout; neither
 new native branch has run yet.
 
-The [twenty-path coverage change](../test/results/processing-coverage-admission-integration.json)
+The twenty-path coverage change
 adds a current retention-coverage check before preview and admission. Actual
 SQL admission repeats it before charging resources; known insufficient coverage
 has a shared browser/MCP explanation that preserves uncertainty about earlier
@@ -15729,7 +15729,7 @@ separately. Public runtime remains disabled.
 
 ## Eight native owner-role cases pass
 
-The [actual owner-role SQL matrix](../test/results/owner-identity-roles-native-matrix-check.log)
+The actual owner-role SQL matrix
 passes all eight selected children (3.63 seconds for the test; Go 4.684 seconds).
 It uses real PostgreSQL, S3 and OpenBao and independently audited initial
 activation for each fixture scope. Four-purpose role creation, SCRAM login,
@@ -15746,7 +15746,7 @@ staged. Public runtime remains disabled until the complete workflow qualifies.
 
 ## Owner root fixture passes; shared digest respects the application boundary
 
-The [corrected owner-root fixture](../test/results/owner-identity-root-fixtures-integration.json)
+The corrected owner-root fixture
 passes six-package compilation, actual private-root races and vet (18.535,
 36.669 and 2.301 seconds). All 1,906 dependencies and four test-only payloads
 remain unchanged. Current enforcement, ordered claims/completions, lost committed
@@ -15755,28 +15755,28 @@ API and accepted-source facts. The integrated eight-case native SQL hook has
 compiled but has not yet run. Provider-material production, full original-input
 validation and installed layout/launch qualification remain pending.
 
-The [first combined static gate](../test/results/regional-observation-owner-fixes-contracts.log)
+The first combined static gate
 passes SQL generation and rejects the new domain hashing imports. The
-[seven-path correction](../test/results/regional-observation-digest-layer-integration.json)
+seven-path correction
 moves the unchanged deterministic digest to the existing C-04 application
 package. The architecture gate is unchanged. A first correction fails compilation
 because of an import-alias shadow; the corrected version passes architecture,
 wire parity/channel races and vet (2.634, 8.856 and 3.551 seconds), with all 1,833
-dependencies unchanged. The [combined contract gates](../test/results/regional-observation-owner-root-contracts.log)
+dependencies unchanged. The combined contract gates
 now pass: 47 SQL-generated files, 53 Go packages/297 import edges, 112 schemas,
 10,366 specification assertions and the architecture catalog. The native SQL
 role matrix remains next; this does not enable public serving.
 
 ## Native capacity guard passes; regional conversation foundations integrated
 
-The [corrected real Kubernetes capacity-probe case](../test/results/owner-capacity-probe-native-rv-corrected-check.log)
+The corrected real Kubernetes capacity-probe case
 passes in 8.00 seconds (Go 9.059 seconds), with 1,786 unchanged source hashes and
 no cleanup failures. It verifies the exact dry-run capacity branch, persistent
 and differently scoped denials, and the independent capacity guard with both
 policies installed. Its permissive fixture CRDs do not qualify the production
 CRD schema or an installed worker. The earlier failed case remains recorded.
 
-The [regional conversation foundation](../test/results/regional-observation-foundations-integration.json)
+The regional conversation foundation
 adds fresh process-owned proof replies, exact installed workload checks, closed
 framing/order, bounded channel state and unchanged request-digest bytes.
 Six-package compilation and vet pass; focused races execute five packages with
@@ -15786,7 +15786,7 @@ the private key snapshot removes redundant local registry recursion without
 supplying activation authority. Concrete streaming, holder routing and installed
 two-cluster availability remain pending.
 
-The [four installation corrections](../test/results/owner-installed-probe-template-fixes-integration.json)
+The four installation corrections
 retain the required third processing-source probe and explicit existing bounded
 eviction tolerations in the fresh original template. Their named regressions
 fail before and pass after the corrections; broader existing initial-runtime,
@@ -15800,30 +15800,30 @@ declared ready.
 
 ## SQL54 native matrix passes; installed guard qualification continues
 
-The [next actual PostgreSQL matrix](../test/results/capacity-production-native-lineage-fixed-check.log)
+The next actual PostgreSQL matrix
 passes: 84 passing entries, 73.657 seconds of Go execution, 1,770 unchanged source
 hashes and no cleanup failures. It covers the separate purpose roles, three
 root/workload phases, lost-reply recovery, managed capture intent/publication,
 original download-session allocation, retained spend, expiry and atomic renewal.
 Capture admission plus encrypted intent acknowledgement takes 197 ms with 4,786 ms
 of the original interval remaining. All actual publication-lineage predicates
-pass. The [fixture correction](../test/results/capacity-lineage-fixture-integration.json)
+pass. The fixture correction
 selects 20-second retention and a one-second deletion budget before policy
 acceptance, within its existing 60-second backing; no SQL threshold or authority
 interval was expanded. Longer product retention needs sufficient prepaid backing
 and an early preview/admission check, still being implemented. This component
 pass does not establish continuous replenishment or installed multi-cluster work.
 
-The [original capacity-probe component](../test/results/owner-capacity-probe-integration.json)
+The original capacity-probe component
 retains the exact original worker account/UID throughout the guard and activation
 contracts. Affected compilation, focused races and vet pass; SQL generation,
 Go/specification/architecture gates pass with 10,354 specification assertions.
-The [owned two-case Kubernetes run](../test/results/owner-capacity-probe-and-endpoints-native-check.log)
+The owned two-case Kubernetes run
 returns exit 1. The existing owner endpoint case passes in 87.46 seconds, including
 the explicit three-port profile, pre-Ready identity and actual provider/TLS paths.
 The new capacity-probe case fails at its fixture administrator's stale policy
 resourceVersion after a status update. All 1,785 hashes remain unchanged and
-cleanup is complete. The [fixture correction](../test/results/owner-capacity-native-fixture-integration.json)
+cleanup is complete. The fixture correction
 requires the unchanged original policy UID/spec/generation and uses its current
 resourceVersion; compile and vet pass, native rerun pending. A separately found
 third-probe constructor omission and original-template tolerations are still
@@ -15831,13 +15831,13 @@ staged. No public runtime or installed developer workflow is enabled.
 
 ## Capacity admission advances; publication remains blocked
 
-The [four-path SQL54 timestamp correction](../test/results/capacity-policy-time-correction-integration.json)
+The four-path SQL54 timestamp correction
 preserves the original cutoff while producing the exact UTC JSON representation
 used by the typed Go boundary. The native diagnostic previously established that
 only timestamp spelling differed: non-time fields and the represented instant
 were equal. SQL52's immutable whole-policy equality remains unchanged.
 
-The [actual PostgreSQL rerun](../test/results/capacity-production-native-policy-time-fixed-check.log)
+The actual PostgreSQL rerun
 passes the formatter's valid/invalid cases and now reaches managed capture
 admission: exact policy equality is true, and the admission/audit pair takes
 241 ms with 4,738 ms of the original request interval remaining. The run still
@@ -15847,7 +15847,7 @@ source hashes and no cleanup failures. This is not a passed complete capacity
 matrix; the next task is to correct that lineage mismatch without extending
 retention, authority or backing.
 
-The [owner producer component](../test/results/owner-identity-producer-integration.json)
+The owner producer component
 is also integrated: separate four-role verification, original projection child
 attempts and launch reconciliation. Its affected compilation, focused races and
 vet pass; the subsequent contract gates pass with 10,345 specification assertions.
@@ -15857,7 +15857,7 @@ readiness. No installed developer workflow or implementation slice is complete.
 
 ## Original owner startup and local observation components integrated
 
-The [sixty-nine-path integration](../test/results/installed-owner-observation-integration.json)
+The sixty-nine-path integration
 joins the original installed owner layout, four-purpose role verification,
 independent credential/configuration child receipts, current native startup
 reader and observation-only runtime. The local client authenticates the actual
@@ -15873,14 +15873,14 @@ specification assertions. The owner role producer/projection/launch component
 has a separate passing source check, but is not integrated here. Native installed
 startup, backend promotion and multi-cluster observation remain unqualified.
 
-The [SQL54 sentinel correction](../test/results/capacity-root-sentinel-integration.json)
+The SQL54 sentinel correction
 now passes all 35 actual SQL validator cases and the three root phases
 (162 ms, with 4,781 ms of the original authority interval remaining). The
-[owned run](../test/results/capacity-production-native-sentinel-fixed-check.log)
+owned run
 still returns exit 1: the next readiness fixture omitted its Pod UID, rejecting
 before SQL and allowing earlier expected-denial assertions to pass for the
 wrong reason. All 1,705 source hashes are unchanged and cleanup is complete.
-The [two-path fixture correction](../test/results/capacity-storage-target-integration.json)
+The two-path fixture correction
 uses the complete target and explicitly refuses structural-invalid errors as
 fence evidence. Its regression fails before and passes under race afterward;
 the actual matrix must be rerun. No complete capacity or installed workflow
@@ -15888,7 +15888,7 @@ pass follows from these component results.
 
 ## Cleanup supervision integrated; native capacity reaches root reservation
 
-The [forty-path cleanup integration](../test/results/capture-cleanup-runtime-integration.json)
+The forty-path cleanup integration
 adds separate cleanup SQL/storage/key facets and receipt-gated configuration,
 capacity and cleanup supervision. A subsystem stops and joins its siblings on
 failure. Historical cleanup retains its original policy and uncertain spend;
@@ -15896,13 +15896,13 @@ optional mounted files alone confer no authority. The immutable component check
 passes SQLc generation, affected compilation, focused races and vet. This
 constructor is not yet selected by the installed command.
 
-The [six-path fixture correction](../test/results/capacity-native-inputs-integration.json)
+The six-path fixture correction
 adds positive synthetic safety/burst allowances and fixes the fixture's request
 count to its existing prepaid bound. Shared native input preflight passes; no
 production ceiling was raised. The combined SQL, Go architecture, specification
 and architecture gates pass with 10,289 specification assertions.
 
-The [next owned PostgreSQL run](../test/results/capacity-production-native-inputs-fixed-check.log)
+The next owned PostgreSQL run
 returns exit 1 (Go 3.283 seconds). Actual function identity, paired-root lost-reply
 recovery and purpose-separated role checks pass. Root reservation then fails:
 `capacity_root_configuration_valid` calls `connector_digest` with an empty
@@ -15922,12 +15922,12 @@ failed runs and their complete cleanup/source reports remain under
 
 The latter run also exposed a production role-verifier defect: PostgreSQL's
 `timestamptz` display spelling differs from the compiled function signature.
-The [three-path correction](../test/results/runtime-role-function-identity-integration.json)
+The three-path correction
 compares exact resolved function OIDs and retains the existing grant allowlist,
 layout digest and connection limits. Its regression fails before the correction;
 corrected focused races, integration compilation and PostgreSQL adapter vet pass.
 
-The [next actual run](../test/results/capacity-production-native-function-fixed-check.log)
+The next actual run
 returns exit 1 (Go 2.782 seconds). Actual alias/OID qualification passes and all
 fixed SQL roles are produced in 2,078 ms. Setup then rejects a synthetic capacity
 budget before the capacity scenario matrix starts. All 1,674 source hashes are
@@ -15937,7 +15937,7 @@ real role-separated capacity qualification and protected service provisioning.
 
 ## SQL54 integrated; first actual migration fails before capacity tests
 
-The [161-path integration](../test/results/capacity-production-integration.json)
+The 161-path integration
 combines the immutable capacity component, installed-worker/role inventory and
 new SQL fixture with its one-line compile correction. Reviewed parent changes
 advance the schema to 54 and add exactly five first-installation inventory
@@ -15945,7 +15945,7 @@ relations. SQLc independently reproduces all 47 generated files; Go architecture
 specification and architecture gates pass (10,258 specification assertions).
 These are source checks, not an accepted runtime migration.
 
-The [first owned PostgreSQL run](../test/results/capacity-production-native-check.log)
+The first owned PostgreSQL run
 returns exit 1 during migration, before any selected test passes. PostgreSQL
 reports a syntax error at the end of a PL/pgSQL block ending in the root-marker
 trigger definition. All 1,673 source hashes are unchanged and owned cleanup is
@@ -15954,7 +15954,7 @@ no SQL54 native pass, operating envelope or installed activation is claimed.
 
 ## Owner bootstrap profile passes actual provider and registration tests
 
-The [combined owned run](../test/results/owner-bootstrap-provider-native-fixed-check.log)
+The combined owned run
 returns exit 0 (Go 24.877 seconds): both the legacy and opted owner certificate
 profiles pass actual OpenBao signing, SQL registration/activation and encrypted
 object audit. All 1,554 source hashes remain unchanged and cleanup is complete.
@@ -15962,7 +15962,7 @@ The opted case uses actual TLS 1.3/HTTP2 for common-name verification and reject
 an absent independent candidate, common-name use of exact-owner verification,
 legacy acceptance of an opted leaf and an unapproved third provider SAN.
 
-The [first run](../test/results/owner-bootstrap-provider-native-check.log)
+The first run
 failed before signing because the new fixture constructed an invalid ACL string;
 its exit 1, unchanged hashes and complete cleanup are retained. The correction
 changes that fixture string only. Provider/Pod/recovery inputs remain synthetic
@@ -15973,7 +15973,7 @@ receipt-gated startup and regional observation composition.
 
 ## Cluster-local transport and optional owner TLS profile integrated
 
-The [42-path integration](../test/results/cluster-local-profile-integration.json)
+The 42-path integration
 retains checked local observation components, strict actual TLS-name/HTTP-authority
 matching and the optional fresh-install owner bootstrap certificate profile.
 Local-hop compile/race/vet checks passed. Actual HTTP/2 regressions fail before
@@ -15989,7 +15989,7 @@ composition; repository gates for this combined source follow separately.
 
 ## Original bootstrap and runtime guard handover pass together
 
-The [full native rerun](../test/results/initial-runtime-object-defaults-bridge-check.log)
+The full native rerun
 returns exit 0 (Go 384.982 seconds), with all 1,548 source hashes unchanged and
 complete owned cleanup. Original preparation/activation/retirement and setup-free
 replay pass. The runtime bridge creates all nineteen fixed inert resources,
@@ -16007,14 +16007,14 @@ unfinished; no completion percentage or ETA follows from this component pass.
 
 ## Generated runtime resources pass actual API round trip
 
-The [five-path correction](../test/results/initial-runtime-object-defaults-integration.json)
+The five-path correction
 sets `Always` explicitly on both fixed Deployment templates and permits only
 their original controller revision `1`, retaining exact UID/generation/spec
 checks. The focused regression fails before the correction; corrected races,
 affected compilation and vet pass with all 1,533 dependency hashes unchanged.
 Existing claims are not migrated or adopted.
 
-The [owned Kubernetes run](../test/results/initial-runtime-object-roundtrip-check.log)
+The owned Kubernetes run
 returns exit 0 (Go 10.464 seconds), with all 1,548 source hashes unchanged and
 complete cleanup. All nineteen generated objects pass CREATE, independent GET
 and final readback. Both Deployments remain at zero replicas; actual first
@@ -16026,14 +16026,14 @@ then configuration/capacity/public startup.
 
 ## Original root pin fixed; native Deployment round trip remains failing
 
-The [five-path correction](../test/results/initial-runtime-root-pin-integration.json)
+The five-path correction
 retains the actual acknowledged preparation-root UID independently of the
 optional original create-input field. The composed failing-before test reproduces
 the earlier identity error; corrected resource/bridge races, affected compilation
 and vet pass with all 1,702 dependencies unchanged. Replacement and explicit-pin
 checks remain mandatory. Static gates pass with 10,208 specification assertions.
 
-The [native rerun](../test/results/initial-runtime-root-pin-native-check.log)
+The native rerun
 returns exit 1 (Go 332.287 seconds), with all 1,546 hashes unchanged and complete
 cleanup. Original bootstrap and passive replay pass, the corrected constructor
 and earlier resources proceed, and resource index 10 (the inert owner Deployment)
@@ -16045,12 +16045,12 @@ The context harness now has a closed `--runtime-object-roundtrip` mode: one owne
 cluster, the exact package-local test, a distinct opt-in and required named PASS.
 It cannot be combined with another qualification or arbitrary test selection.
 All 16 pure new/existing selection regressions pass in
-[the harness record](../test/results/runtime-object-harness-selection.json).
+the harness record.
 Actual round-trip qualification and the complete native bridge remain pending.
 
 ## Native runtime bridge stops at original identity check
 
-The opt-in [bootstrap-chain run](../test/results/initial-runtime-bridge-native-check.log)
+The opt-in bootstrap-chain run
 returns exit 1 (Go 299.342 seconds), with all 1,545 source hashes unchanged and
 complete cleanup. The actual four installation commands, original activation,
 manager retirement and setup-free replay pass. The new runtime bridge child
@@ -16068,7 +16068,7 @@ transition before installed configuration/capacity/public startup.
 
 ## Combined native downloads and retention expiry pass
 
-The [corrected seven-case run](../test/results/native-retention-observer-combined-check.log)
+The corrected seven-case run
 returns exit 0 (Go 119.311 seconds), all 1,513 source hashes unchanged and cleanup
 complete. Ordinary content, range resume, interrupted original/new sessions,
 original control negatives, exactly-one-winner admission and native exchange all
@@ -16079,7 +16079,7 @@ source and that its actual original expiry denies subsequent reads.
 The fixture previously wrote retention observations during permission reads,
 including through a captured authority closure. Native cases now use the actual
 read-only accepted-source reader and a separate joined source owner, started
-before publication. The [counterfactual run](../test/results/native-retention-observer-before-check.log)
+before publication. The counterfactual run
 with the old consumer fails the combined current-read/proof/deadline check with
 a nil port error (Go 1.529 seconds); it does not reach the later row-equality
 assertion. Its 1,513 hashes and cleanup also verify. Earlier failures remain above
@@ -16096,13 +16096,13 @@ provisioning and real regional startup remain the next composition work.
 
 The new post-activation administrator facet incorrectly used the runtime Ledger
 constructor, which rejects administrator credentials. The
-[actual failing-before run](../test/results/initial-runtime-bridge-sql-before-check.log)
+actual failing-before run
 reproduces that exact failure before its effect callback (Go 0.497 seconds).
 The purpose-specific correction keeps the runtime restriction and independently
 checks its own current applied schema, original database incarnation and required
 administrator role before locking recovery and the original activation.
 
-The [corrected matrix](../test/results/initial-runtime-bridge-sql-after-check.log)
+The corrected matrix
 passes all eleven actual SQL/provider cases (Go 2.432 seconds), including changed
 schema/incarnation, runtime credentials, recovery after a lock wait and expired
 effects. Both runs retain all 1,512 source hashes and complete cleanup. Only the
@@ -16112,7 +16112,7 @@ provisioning and installed public workflow are still pending.
 
 ## Untraced six-case download run still fails
 
-The [combined untraced run](../test/results/native-active-enrollment-untraced-final-check.log)
+The combined untraced run
 returns exit 1 (Go 109.193 seconds), with all 1,509 source hashes unchanged and
 cleanup complete. Ordinary content passes. Resume reaches its third range before
 the HTTP/2 stream fails; interruption, both control cases and exchange fail during
@@ -16123,31 +16123,31 @@ native admission and preparation lifetimes rather than repeating the same suite.
 
 ## Four remaining native cases pass with bounded diagnostics
 
-The [diagnostic native run](../test/results/native-phase-diagnostic-remaining-check.log)
+The diagnostic native run
 returns exit 0 (Go 71.809 seconds), all 1,510 source hashes unchanged and cleanup
 complete. Interrupted original/new sessions, original control negatives, fresh
 exactly-one-winner admission and native exchange all pass. The
-[start observation](../test/results/native-phase-diagnostic-remaining-host.json)
+start observation
 records low CPU contention. This does not establish the exclusive cause of the
 earlier failures or qualify sustained operation under contention.
 
 The bounded timings recorded no error in instrumented ports. One fixed attachment
 label fell back to `other`; its timing remains present without a distinct name.
-The [removal record](../test/results/native-phase-diagnostic-removal.json)
+The removal record
 verifies restoration of the exact three original files and removal of the owned
 diagnostic file. Archived source/results remain available. A combined untraced
 six-case run follows; no deadline, authority, pool or retry behavior changed.
 
 ## Full Go baseline passes; bounded native diagnostics integrated
 
-The [full Go gate](../test/results/native-active-enrollment-go-result.json)
+The full Go gate
 returns exit 0 after 797.042 seconds: embedded contracts, all-package vet and
 all-package race tests pass. All 1,641 checked source hashes remain unchanged.
-The [static gates](../test/results/native-active-enrollment-contracts.log) also
+The static gates also
 pass: 10,182 specification assertions, Go dependency rules, architecture and
 63 screen contracts. These do not override the native failures below.
 
-The [four-path temporary diagnostic package](../test/results/native-phase-diagnostic-package/HANDOFF.md.txt)
+The four-path temporary diagnostic package
 is integrated with all original/payload and 1,507 dependency hashes verified.
 It times existing fixture calls and retains bounded fixed-label results without
 extra reads, query hooks, deadline changes or renewed authority. Its two recorder
@@ -16157,27 +16157,27 @@ are not a product fix.
 
 ## Active enrollment removes redundant setup; combined native result remains mixed
 
-The [three-path change](../test/results/native-active-enrollment-integration.json)
+The three-path change
 omits unused enrollment-route setup only when independent current Job/Pod and SQL
 observations preserve the exact already-active worker, key and peer. Original
 request bounds, renewal boundaries, native TLS/admission and subsequent authority
 checks remain binding. The staged regression failed before the change; 110 named
 race-test entries and affected vet pass afterward, with unchanged dependencies.
 
-The [combined native run](../test/results/native-active-enrollment-qualified-check.log)
+The combined native run
 returns exit 1 (Go 155.395 seconds), with all 1,509 source hashes unchanged and
 cleanup complete. Ordinary content and range resume pass; resume reconstructs
 352 original bytes without budget refill. Interruption fails before receiving its
 first response or deliberately disconnecting. Both control cases fail during
 preparation, before their concurrency assertions; the exchange case fails earlier
-at publication permission setup. The [host observation](../test/results/native-active-enrollment-qualified-host.json)
+at publication permission setup. The host observation
 records unrelated compilation and sharply increased CPU contention during the run.
 That does not establish the exclusive cause. These failures remain unresolved;
 there is no combined-suite, sustained-availability or installed-workflow pass.
 
 ## Native installer launch matrix passes
 
-The [corrected Kubernetes run](../test/results/configuration-launch-kubernetes-distinct-check.log)
+The corrected Kubernetes run
 returns exit 0 (Go 137.201 seconds), with all 1,524 source hashes unchanged and
 cleanup complete. All five cases pass: exact launch/replay, lost claim reply with
 no launch, lost committed Deployment reply with lookup-only recovery, changed
@@ -16195,25 +16195,25 @@ recorded rather than replaced by the passing result.
 
 ## Installer SQL launch checks pass; native Kubernetes fixture corrected
 
-The [actual SQL matrix](../test/results/configuration-launched-sql-check.log)
+The actual SQL matrix
 returns exit 0 (Go 3.812 seconds): six cases cover positive launched replay,
 missing roles, ambient privileges, changed sources, original lock expiry and
 recovery after a lock wait. All 1,508 source hashes are unchanged and cleanup is
 complete. Protected Kubernetes launch facts remain synthetic in this SQL matrix.
 
-The [first Kubernetes attempt](../test/results/configuration-launch-kubernetes-check.log)
+The first Kubernetes attempt
 fails during Kind bootstrap, before Go tests. Exported owned-node logs show
 control-plane container creation taking roughly 49–52 seconds, with API/etcd
 startup reaching the bootstrap deadline. All 1,524 source hashes are unchanged
 and cleanup is complete; this is no application test verdict.
 
-The [same-image retry](../test/results/configuration-launch-kubernetes-retry-check.log)
+The same-image retry
 reaches the actual Kubernetes API: positive launch, exact readback/replay,
 scheduling-gated Pod creation and protected foreground cleanup pass (29.71 seconds).
 Its four negative cases fail before their bodies because a fixture truncated
 `custodyID` to its fixed prefix and reused the same terminating namespace. The
 run returns exit 1 (Go 29.812 seconds), all 1,524 hashes unchanged and clean teardown.
-The [one-path correction](../test/results/configuration-launch-kubernetes-namespace-fix.json)
+The one-path correction
 keeps the complete generated UUID, giving each case its own valid 53-character
 namespace. Full native negative qualification remains pending; no product limit
 or authority changed. The image stays nonexecuting, and SQL/provider facts in
@@ -16221,14 +16221,14 @@ this API matrix remain synthetic.
 
 ## Fresh concurrency and ordinary download pass; resume delay persists
 
-The [isolated real-service run](../test/results/native-fresh-content-isolated-check.log)
+The isolated real-service run
 returns exit 1 (Go 38.457 seconds), with all 1,506 source hashes unchanged and
 cleanup complete. Ordinary authenticated content passes (21.86 seconds), and
 the separately prepared concurrent Observe/response case passes (8.25 seconds):
 one winner, exact original identity and budgets, unchanged losing-side spend.
 
 Resume fails during preparation continuation (7.94 seconds), before its range
-assertions. The [host observation](../test/results/native-fresh-content-isolated-host.json)
+assertions. The host observation
 records that the earlier unrelated heavy job had finished; CPU pressure was low.
 The worker reaches connector admission with about 2.07 seconds of the original
 interval left, then becomes uncertain. This narrows investigation to preparation
@@ -16238,7 +16238,7 @@ the installed developer flow remain unqualified.
 
 ## Native combined run remains mixed; installer launch integrated
 
-The [untraced combined download run](../test/results/native-admission-consolidated-final-check.log)
+The untraced combined download run
 returns exit 1 (Go 93.977 seconds), with all 1,504 source hashes unchanged and
 cleanup complete. Interrupted original/new sessions, the original control case
 and the exact native exchange pass. Ordinary content and range resume fail during
@@ -16247,21 +16247,21 @@ pressure; that observation does not isolate the cause or qualify performance.
 The separate fresh-admission case reaches preparation but fails a duplicated
 old-case completion assertion before its actual concurrency check.
 
-The [one-path fixture correction](../test/results/native-fresh-race-separation-package/HANDOFF.md.txt)
+The one-path fixture correction
 keeps that completion assertion in its original control case and leaves the fresh
 case's authority, exactly-one-winner and ten accounting assertions intact.
 Compile/vet passed before integration, with all 1,525 dependencies unchanged.
 Its actual native concurrency behavior remains pending.
 
-The [eleven-path installer launch component](../test/results/configuration-launch-package/HANDOFF.md.txt)
+The eleven-path installer launch component
 is also integrated. A retained one-use claim permits the exact stopped-to-running
 Deployment CAS; lost replies allow readback only. Original SQL role provenance
 remains immutable, with a separate current read-only verification path after
-launch. The [integration record](../test/results/configuration-launch-integration.json)
+launch. The integration record
 verifies all payload/base hashes and records the five unrelated parent fixture
 changes since the stage's dependency snapshot. The stage's focused loopback TLS
 races and vet pass; actual Kubernetes/SQL and installed handoff remain pending.
-The [integrated launch race/vet check](../test/results/configuration-launch-integrated-go.log)
+The integrated launch race/vet check
 returns exit 0 (Kubernetes package 74.947 seconds); other selected packages have
 no matching tests and are compiled/vetted only. Integrated Go architecture,
 specification, architecture and design gates pass (10,165 specification assertions,
@@ -16270,9 +16270,9 @@ do not establish native installed behavior.
 
 ## Independent control-race fixture integrated; temporary callbacks removed
 
-The [six-path fixture correction](../test/results/native-control-fixture-package/HANDOFF.md.txt)
+The six-path fixture correction
 is integrated after all 1,525 dependency and original/payload hashes matched in
-the [integration record](../test/results/native-control-fixture-integration.json).
+the integration record.
 The original control case now requires both admissions to remain denied after
 an incomplete response. A separate `native-control-admission-race` case obtains
 its own original allocation, session, worker and preparation before testing one
@@ -16284,13 +16284,13 @@ Compile and integration vet pass; native behavior still requires the combined
 run. Temporary callback wrappers and timing state are removed, preserving direct
 original calls and the content fixture's finite two-minute aggregate bound. The
 earlier query tracer is also absent. The integrated
-[Go/specification/architecture checks](../test/results/native-admission-consolidated-contract-check.log)
+Go/specification/architecture checks
 pass (10,155 specification assertions and 1,206 architecture checks with 120
 negative cases); those checks do not qualify native behavior.
 
 ## Interrupted transfer passes; control fixture reused an uncertain response
 
-The [follow-up native run](../test/results/native-admission-consolidated-controls-check.log)
+The follow-up native run
 returns exit 1 (Go 53.762 seconds), with all 1,504 source hashes unchanged and
 cleanup complete. The interrupted original session and separately admitted new
 session both pass. The control case now also executes and passes the exact
@@ -16307,7 +16307,7 @@ rule, charge or deadline will be weakened to satisfy the old assertion.
 
 ## Consolidated native exchange passes with query tracing disabled
 
-The [selected real-service exchange](../test/results/native-admission-consolidated-exchange-check.log)
+The selected real-service exchange
 returns exit 0 (Go 13.526 seconds), with all 1,505 source hashes unchanged and
 cleanup complete. Preparation, committed metadata observation and exact native
 content transfer pass through actual SQL, encrypted object storage and TLS. Human,
@@ -16322,7 +16322,7 @@ and interrupted/new-session cases; no broader SQL optimization is justified yet.
 
 ## SQL tracing diagnostic rejected before the workflow
 
-The [first instrumented run](../test/results/native-admission-sql-diagnostic-check.log)
+The first instrumented run
 returns exit 1 before any selected native case executes: `postgres.New` correctly
 rejects a pool configured with a query tracer. The temporary diagnostic therefore
 cannot measure this path through the supported constructor. All 1,505 source
@@ -16330,12 +16330,12 @@ hashes remain unchanged and cleanup is complete. Its synthetic trace tests did
 not qualify this composition. The production tracer prohibition remains intact;
 the next functional run leaves the diagnostic disabled. An unrelated HAPTIC race
 run was also present on the host, recorded in the
-[host observation](../test/results/native-admission-sql-diagnostic-host.json);
+host observation;
 no performance or SQL contention conclusion follows from this run.
 
 ## Native admission checks consolidated; SQL timing diagnosis prepared
 
-The [seven-path correction](../test/results/native-admission-checks-package/HANDOFF.md.txt)
+The seven-path correction
 removes two immediately repeated permission traversals in synchronous native
 construction and attachment. A private one-use value carries the just-completed
 check through local validation; original context, clock, exact operation and
@@ -16343,10 +16343,10 @@ known shortening are checked again. Public constructors, effect boundaries and
 frame checks retain their full current checks. The meaningful original-budget
 regression fails before the correction; the affected full native race suite and
 vet pass afterward. All 1,505 dependency and payload/base hashes match in the
-[integration record](../test/results/native-admission-checks-integration.json).
+integration record.
 This does not yet establish real-service availability.
 
-The preceding [callback diagnostic](../test/results/native-admission-callback-diagnostic-check.log)
+The preceding callback diagnostic
 returns exit 1 (Go 75.977 seconds): ordinary content and the original interrupted
 session pass; the new session, control-race and standalone exchange cases fail.
 All 1,501 source hashes remain unchanged and cleanup reports no failures. These
@@ -16356,7 +16356,7 @@ The new SQL completion-negative assertions are still not reached. Increasing
 the ordinary-content aggregate fixture context separately allows that case to
 pass; no product authority interval was changed.
 
-A [two-file opt-in SQL timing observer](../test/results/native-sql-timing-integration.json)
+A two-file opt-in SQL timing observer
 now records at most 32 slowest query/acquire durations using fixed labels, totals
 and outcome booleans. Unknown names become `other`; no SQL text, arguments,
 credentials, error bodies or evidence is retained. Compile, focused race tests
@@ -16368,7 +16368,7 @@ real-service case will measure the remaining path before further optimization.
 
 ## Inert deployment credential provisioning corrected
 
-The [four-path correction](../test/results/configuration-inert-package-v1/HANDOFF.md.txt)
+The four-path correction
 removes a startup dependency cycle: the workload builder creates zero replicas,
 but the credential source previously required one. The exact zero-replica
 deployment may now supply the provisioning observation. Rollout capacity is still
@@ -16378,9 +16378,9 @@ launch. Successful-launch disposition/replay and the installed command handoff
 remain required.
 
 All original/payload hashes and 1,372 dependencies were verified in the
-[integration record](../test/results/configuration-inert-integration.json).
+integration record.
 The staged regression fails before the correction; affected compile/races/vet pass
-after it. The [integrated focused race and contract gate](../test/results/configuration-inert-integrated-check.log)
+after it. The integrated focused race and contract gate
 returns exit 0, including zero-to-one and zero-to-one-to-zero invalidation,
 unchanged original claims and the existing current-enforcement cases. These use
 synthetic Kubernetes enforcement and SQL receipts; native installed provisioning
@@ -16388,7 +16388,7 @@ is still unqualified.
 
 ## Native completion run exposes separate admission and fixture limits
 
-The [five-case real-service run](../test/results/native-terminal-handoff-qualified-check.log)
+The five-case real-service run
 returns exit 1 (Go 164.627 seconds); all 1,499 source hashes remain unchanged and
 cleanup has no failures. Authenticated two-range reconstruction passes, including
 four positively joined worker conversations through the new exact SQL close.
@@ -16408,9 +16408,9 @@ the unexecuted assertions or permits a longer product authority interval.
 
 ## Exact native completion handoff integrated
 
-The [18-file handoff](../test/results/native-terminal-handoff-package/HANDOFF.md.txt)
+The 18-file handoff
 is integrated after verification of all payload/base hashes and 1,497 dependencies
-in the [integration record](../test/results/native-terminal-handoff-integration.json).
+in the integration record.
 Successful final Done now requires an acknowledged exact SQL owner closure under
 the original lease. Ordinary cleanup, an already closed row, expiry and unknown
 COMMIT results cannot certify success. The existing wire format and worker backoff
@@ -16421,7 +16421,7 @@ The staged two-hop TLS regression fails before the change and passes afterward,
 including ordinary relay checks denying after closure. Its initial broader race
 run exposed a fixture HTTP handler outliving its test; joining admitted handlers
 fixed that separate defect. Corrected affected races, compile/vet and static checks
-pass in the archived package. The [integrated affected gate](../test/results/native-terminal-handoff-integrated-check.log)
+pass in the archived package. The integrated affected gate
 also returns exit 0: native/evidence/PostgreSQL/bootstrap/integration race tests,
 their vet checks, Go architecture and specification/architecture/design checks.
 The real SQL/native positive, held-lock, already-closed and interrupted-transfer
@@ -16429,7 +16429,7 @@ cases remain to run.
 
 ## Integrated configuration composition gates pass
 
-The [complete integrated gate](../test/results/configuration-role-composition-integrated-gates.log)
+The complete integrated gate
 returns exit 0: Go vet and all package race tests, Go architecture, specification,
 architecture and design checks pass. The Kubernetes package completes in 771.171
 seconds within the fifteen-minute aggregate package bound. This supersedes the
@@ -16441,7 +16441,7 @@ and contract gates, not an installed workflow or production qualification.
 
 ## Configuration credentials pass real service qualification
 
-The [14-case native matrix](../test/results/configuration-runtime-roles-native-check.log)
+The 14-case native matrix
 passes (Go 12.274 seconds), with all 1,488 source hashes unchanged and no cleanup
 failures. Actual PostgreSQL role creation/readback and scoped login, encrypted
 S3/OpenBao audit and current acknowledgement pass, including lost claims,
@@ -16450,8 +16450,8 @@ blocking locks. The three-role observation/audit/read path completes under its
 original five-second bound. Kubernetes source/Secret and initial witness inputs
 are synthetic in this fixture; installed provisioning remains unqualified.
 
-The [seven-file follow-up](../test/results/configuration-composition-package-v1/HANDOFF.md.txt)
-is now integrated with exact [payload/base verification](../test/results/configuration-composition-integration.json).
+The seven-file follow-up
+is now integrated with exact payload/base verification.
 It registers the private configuration installer command and generates its
 closed inputs and separate immutable credential projection from existing
 installation records. The workload builder remains inert and Restricted.
@@ -16459,26 +16459,26 @@ The installed hub-worker constructor switch and actual protected handoff remain
 pending. Extraction changed a test helper and excluded an unfinished public
 command; integrated compilation/races still require a new run.
 
-The corrected [specification/architecture/design checks](../test/results/configuration-role-corrected-design-check.log)
+The corrected specification/architecture/design checks
 pass: 10,133 specification assertions, 1,206 architecture checks with 120 negative
 cases, and the existing 63-screen/nine-journey contract mapping. The initial
 contract run rejected four fragment-only schema self references; the
-[correction](../test/results/configuration-schema-reference-correction.json)
+correction
 uses canonical registered IDs without changing schema constraints. The earlier
 Go import check passes for 52 packages/280 edges. The full Go gate's aggregate
 timeout remains recorded below and its rerun is pending.
 
 ## Configuration credential component integrated; native qualification next
 
-The [42-file package](../test/results/configuration-role-package-v1/HANDOFF.md.txt)
+The 42-file package
 is integrated with all payload and existing-base hashes verified in the
-[integration record](../test/results/configuration-role-integration.json).
+integration record.
 ADR-140 supplies the three fixed configuration SQL roles, protected claim and
 projection components, and current audit acknowledgement. Generated installation
 and the installed command switch remain separate pending work; the chart and
 public services remain disabled.
 
-The [first integrated gate](../test/results/configuration-role-integrated-gates.log)
+The first integrated gate
 returns exit 2. Go vet and every other package's race tests pass. The Kubernetes
 package reaches its aggregate ten-minute timeout while the current projection
 test has run for six seconds. Its expanded suite has 200 top-level tests,
@@ -16489,7 +16489,7 @@ qualification and the subsequent contract gates still require actual runs.
 
 ## Interrupted native reconstruction passes; terminal-ordering fix remains
 
-The [supervised-source native run](../test/results/native-interrupted-supervised-original-scheduling-check.log)
+The supervised-source native run
 returns exit 0 (Go 42.560 seconds), with all 1,461 source hashes unchanged and no
 cleanup failures. Its original interrupted session and explicit new session both
 pass: cancellation preserves uncertain spend and denies reuse; only an independently
@@ -16498,7 +16498,7 @@ The fixture uses real SQL, object storage, encryption and TLS, with synthetic hu
 Pod and installation inputs. This does not qualify an installed user workflow or
 large-file throughput.
 
-The [bounded preparation/metadata trace](../test/results/native-preparation-and-cold-trace-check.log)
+The bounded preparation/metadata trace
 identified an independent fixture problem: refreshing permission/configuration
 values did not renew their controllers' original 30-second permission and retention
 leases or the synthetic fleet observation. The second phase therefore entered with
@@ -16507,26 +16507,26 @@ now renews those exact leases while it remains alive. Its fleet update preserves
 the original source, activation, incarnation, suspension and recovery fields and
 cannot revive an expired root. A synthetic login has one fixed end and returns fresh
 five-second identity observations; the first attempted two-minute identity was
-invalid and its [failed run](../test/results/native-interrupted-renewed-source-owners-check.log)
+invalid and its failed run
 is preserved. No product request deadline or authority was extended.
 
 An attempted immediate reconnect after a locally Joined worker conversation exposed
-a separate runtime ordering defect in the [native test](../test/results/native-interrupted-supervised-sources-check.log):
+a separate runtime ordering defect in the native test:
 the worker can observe completion before the hub removes the original SQL locator.
-The [exact reversion](../test/results/native-joined-scheduling-reversion.json)
+The exact reversion
 restores the previous scheduling behavior. Its one-second delay is scheduling slack,
 not proof of remote cleanup; a deliberate terminal-ordering correction and delayed
 cleanup regression remain required. The passing run above does not settle that race.
 
 Temporary timing and connection instrumentation is now removed, with exact
-[archived sources and removal hashes](../test/results/native-diagnostic-removal/removal.json).
+archived sources and removal hashes.
 An uninstrumented run and integrated Go checks remain pending. The
 [capability baseline](implementation-status.md) replaces inconsistent percentage
 estimates with explicit implemented, integrated and installed-workflow evidence.
 
 ## Native interruption ownership and bounded-worker continuation correction
 
-The [connection diagnostic](../test/results/native-interrupted-connection-counts-check.log)
+The connection diagnostic
 returns exit 1 with 1,459 unchanged source hashes and clean teardown. The actual
 fixture server allows 48 connections. After a positively canceled content exchange,
 41 connections remain across 37 roles; after the explicit new session is prepared,
@@ -16535,17 +16535,17 @@ the first phase's listeners, routing and purpose-specific SQL pools alive while
 allocating the second phase. The diagnostic reads bounded connection counts only;
 it changes no limits, evidence or authority.
 
-The [phase ownership correction](../test/results/native-interrupted-phase-ownership/)
+The phase ownership correction
 now runs the interrupted session and explicit new session as sequential owned
 subtests. First-phase defers and cleanups finish before second-phase resource
 allocation. Only the shared HTTP/audit fixture and original two-minute fixture
 deadline span both. Original SQL spend, denial and uncertain-work assertions remain;
 cleanup does not release their charges. Integration compilation passes (exit 0,
-[compile log](../test/results/native-phase-compile.log)); native qualification is next.
+compile log); native qualification is next.
 
-The [bound-worker package](../test/results/native-bound-worker-package/HANDOFF.md)
+The bound-worker package
 is integrated after verifying both payload/base hashes and 1,210 dependency hashes
-([record](../test/results/native-bound-worker-integration.json)). A currently bound
+(record). A currently bound
 worker receives fresh exact live Job/Pod checks, independent SQL attachment checks
 and current authority after blocking reads, without replaying completed launch
 operations. Unbound launch recovery and all original deadlines remain unchanged.
@@ -16553,7 +16553,7 @@ The meaningful regression failed before this correction. Its first after-test ha
 an incorrect cleanup-deadline assertion, preserved with the failure; the corrected
 race selection passes 22 top-level tests/76 named entries, and affected vet passes.
 These synthetic port tests do not establish native timing or availability. The
-combined [frozen real-service run](../test/results/native-interrupted-phase-owned-check.log)
+combined frozen real-service run
 returns exit 1 (Go 30.509 seconds), with all 1,460 source hashes unchanged and no
 cleanup failures. Its original interrupted-session subtest passes, including
 canceled content, retained uncertain spend, denied reuse and explicitly admitted
@@ -16565,30 +16565,30 @@ complete interrupted-download verdict. The next diagnostic must isolate the cold
 metadata operation within its unchanged original five-second interval; no retry
 of uncertain work or authority extension follows from this test.
 
-The integrated [specification/architecture gate](../test/results/native-phase-owned-design-check.log)
+The integrated specification/architecture gate
 returns exit 0: 10,040 specification assertions, 1,206 architecture checks and 120
 rejected invalid cases. Full integrated Go qualification after the bound-worker
 change remains pending; its focused race/vet results above retain their exact scope.
 
 ## Native range download passes after preserving its original audit profile
 
-The [HTTP-only diagnostic run](../test/results/native-http-port-trace-check.log)
+The HTTP-only diagnostic run
 returns exit 1 with 1,460 unchanged source hashes and clean teardown. Its first
 HTTP preflight audit reservation fails with nearly five seconds still remaining.
-The [PostgreSQL log](../test/results/native-http-port-trace-postgres.log) identifies
+The PostgreSQL log identifies
 `outstanding audit history profile mismatch`: the fixture had replaced the
 normal lane's store and backup identities after processing initialization had
 already committed records under the original profile. The database correctly
 retained that obligation.
 
-The [fixture correction](../test/results/native-audit-profile-fixture/change.diff)
+The fixture correction
 reuses the exact acknowledged original policy through a bounded fixture-admin
 read. It changes only the explicitly provisioned revision, capacity/reserves and
 new-admission validity. Existing records, child dates, storage/backup identities,
 history qualification and spend remain intact. No runtime role or authority
 check was broadened; this read is not an installation policy producer.
 
-The [next real SQL/S3/TLS run](../test/results/native-range-retained-audit-profile-check.log)
+The next real SQL/S3/TLS run
 returns exit 0 (Go 31.489 seconds), with all 1,460 source hashes unchanged and no
 cleanup failures. Two authenticated HTTP/2 byte ranges reconstruct the original
 352-byte native artifact after the earlier identity observation expires. Four
@@ -16600,18 +16600,18 @@ installation authority inputs remain synthetic. This is neither installed runtim
 qualification nor large-artifact throughput evidence.
 
 Temporary preparation and HTTP decorators are now removed, with exact archive
-and [restoration hashes](../test/results/native-audit-profile-fixture/trace-removal.json)
-preserved. The [uninstrumented range/interruption follow-up](../test/results/native-range-interrupted-clean-check.log)
+and restoration hashes
+preserved. The uninstrumented range/interruption follow-up
 returns exit 1 (Go 33.022 seconds), with all 1,458 sources unchanged and clean
 teardown. Range preparation again becomes uncertain before content. The
 interruption case reaches a real canceled content conversation, then fails with
-custody unavailable; its [database log](../test/results/native-range-interrupted-clean-postgres.log)
+custody unavailable; its database log
 records exhausted ordinary connection slots. Exact failure labels are added for
 the next diagnostic. Preparation availability and fixture connection ownership
 are separate unresolved issues; neither this run nor the earlier positive range
 result qualifies interrupted reconstruction or the installed workflow.
 
-The [post-correction specification/architecture checks](../test/results/native-profile-fix-design-check.log)
+The post-correction specification/architecture checks
 return exit 0: 10,033 specification assertions, 1,206 architecture checks and 120
 rejected invalid architecture cases. Production Go is unchanged by these fixture
 corrections; the earlier full Go gate remains the code evidence. Next investigate
@@ -16621,7 +16621,7 @@ capacity. Neither failure permits a deadline extension or uncertain-work replay.
 
 ## Regional owner ledger passes real SQL/object-store qualification
 
-The [selected ADR-139 owner-ledger run](../test/results/regional139-owner-ledger-check.log)
+The selected ADR-139 owner-ledger run
 returns exit 0 (Go 3.840 seconds, five PASS entries), with all 1,459 tested source
 hashes unchanged and no cleanup failures. It verifies separately credentialed
 SQL/S3 discovery, missing/audit/activation/purpose/retirement rejection, bounded
@@ -16632,21 +16632,21 @@ routing and the installed developer workflow are still separate pending checks.
 
 ## Native phase trace reaches the first HTTP range; transfer remains failing
 
-The [bounded fixture-only trace](../test/results/native-preparation-trace-package/HANDOFF.md)
+The bounded fixture-only trace
 passed its focused compile/race check before integration. Its decorators forward
 the original contexts, calls, results and errors; they record only fixed phase
 names, timing/deadlines and closed error categories. They change no product
 authority or deadline. The original fixture and trace are preserved for removal
 after diagnosis.
 
-The [selected real SQL/S3/TLS run](../test/results/native-preparation-port-trace-check.log)
+The selected real SQL/S3/TLS run
 returns exit 1 in 18.790 seconds, with 1,459 unchanged source hashes and no cleanup
 failures. Preparation and metadata observation both positively join. The first
 HTTP byte-range request then returns 503 before native content delivery. This
 reaches the revised audit-pool setup without its earlier configuration conflict,
 but does not qualify the actual HTTP audit/transfer path.
 
-The [retained phase timings](../test/results/native-preparation-port-trace-phases.json)
+The retained phase timings
 show original preparation reaching its final metadata permit with about 495 ms
 remaining. No deadline was extended. The diagnostic retains its first 512 events
 and a separate first-error slot; 791 later events were omitted, and none of its
@@ -16657,9 +16657,9 @@ fix. Range/resume and interrupted transfer qualification are still pending.
 
 ## Incremental framed reader integrated; Go and design checks pass
 
-The [seven-file reader package](../test/results/framed-cursor-package/HANDOFF.md)
+The seven-file reader package
 is integrated after verifying all payload/base hashes and 356 dependency hashes;
-the [integration record](../test/results/framed-cursor-integration.json) preserves
+the integration record preserves
 those exact inputs. The reader now yields at most one MiB per call, retains one
 authenticated index page and decoded frame, and performs no next-frame prefetch.
 Cancellation joins actual outstanding I/O before releasing owned buffers. Full
@@ -16675,12 +16675,12 @@ tail decoding, not multi-GiB network transfer or production memory/throughput.
 The existing push API now uses the same incremental decoder. Persistent format,
 key-opening count, SQL and application authorization are unchanged.
 
-The [integrated gate run](../test/results/framed-cursor-integrated-gates.log)
+The integrated gate run
 passes full Go vet/races and the dependency check (52 packages/280 internal
 edges), then returns exit 2 at the documentation check: the archived copy of an
 architecture document retained links relative to its original location. Its exact
 bytes are now archived as `.md.txt`, like the inert `.go.txt` code evidence.
-The [subsequent specification/architecture/design gates](../test/results/framed-cursor-integrated-design-gates.log)
+The subsequent specification/architecture/design gates
 return exit 0 (10,020 specification assertions). No Go change was needed for that
 archive correction. Generic large-object publication,
 window-owned key/reader lifetime, finite window history retirement and installed
@@ -16690,7 +16690,7 @@ below remains unresolved; fixture-only phase tracing is the next diagnosis.
 
 ## Browser restart passes; native idle-response delivery corrected
 
-The [combined built-browser gate](../test/results/console-restart-integrated-browser-refresh.log)
+The combined built-browser gate
 returns exit 0: the existing console journey passes 19 checks and 15 accessibility
 scans, and the new native-restart journey passes four boundaries and two scans.
 These use the actual compiled React console, Go HTTPS/session/CSRF and operation
@@ -16699,14 +16699,14 @@ case exercises an interrupted browser attachment, lost Stop/preparation replies,
 reuse of the original request keys and a new transfer only after explicit user
 action. It is not encrypted SQL/object-store transfer qualification.
 
-The [first combined run](../test/results/console-restart-integrated-browser.log)
+The first combined run
 passed restart but failed the existing journey because Chromium discarded the
 navigation response body from its debugging protocol. The test still checks the
 first real response and rendered evidence; complete canonical wire assertions now
 run on an explicit same-page Refresh evidence details operation. No response is
 mocked or assertion removed. The corrected combined Go run took 19.401 seconds.
 
-The [native listener correction](../test/results/native-idle-integration.json)
+The native listener correction
 is integrated after exact base/payload and dependency checks. An actual
 listener/client regression first reproduced loss of the authenticated no-command
 response: Go HTTP/2 could report idle before its buffered final frames were
@@ -16717,10 +16717,10 @@ in the isolated package; the next real-service range/interruption runs must veri
 the integrated SQL/S3/TLS path. The full combined repository gates below predate
 this listener correction and the browser fixture changes.
 
-The [first integrated native range run after the listener fix](../test/results/native-retry-range-after-idle-fix-check.log)
+The first integrated native range run after the listener fix
 returns exit 1 with 1,453 unchanged sources and clean teardown. It now receives
 positive no-command responses correctly, but its active preparation becomes
-uncertain. A [test-only phase diagnostic](../test/results/native-retry-preparation-phases-check.log)
+uncertain. A test-only phase diagnostic
 then positively joins preparation and metadata observation, before failing in
 HTTP preflight audit fixture setup. That diagnostic was removed byte-identically;
 its exact instrumented source is retained as a `.go.txt` artifact. Neither run
@@ -16731,14 +16731,14 @@ normal audit pool already created by the processing fixture. The correction uses
 the actual revisioned configuration API, retains the existing spend and funds
 four HTTP preflight pairs in addition to earlier processing work. The multi-request
 fixture timeout is now finite two minutes; every product authority, worker,
-operation and socket deadline is unchanged. The [next run](../test/results/native-retry-range-after-audit-fixture-fix-check.log)
+operation and socket deadline is unchanged. The next run
 returns exit 1 earlier at dispatch because an observation expires; it also records
 1,453 unchanged sources and clean teardown. The native fixture now refreshes its
 explicitly synthetic protected source observations before dispatch, using the same
 observer subsequently maintained by the native loop. This does not renew a human
 request or operation. Qualification of these fixture corrections remains next.
 
-The [next current-observation run](../test/results/native-retry-range-current-fixture-check.log)
+The next current-observation run
 still encounters an expired earlier observation during the separate initial worker
 reservation (exit 1; 1,453 unchanged sources; clean teardown). Fixture observation
 ownership now begins before that reservation and remains single and joined through
@@ -16746,7 +16746,7 @@ all native phases, including the interrupted case's later fresh session. Each
 independent admission obtains its own observation; an in-flight authority is never
 renewed. This also removes nested duplicate fixture observers.
 
-The [supervised-fixture run](../test/results/native-retry-range-supervised-fixture-check.log)
+The supervised-fixture run
 passes those setup boundaries but still returns exit 1 during the original metadata
 preparation continuation (Go 11.497 seconds; 1,453 unchanged sources; no cleanup
 failures). There is no successful range-transfer result yet. Preparation's bounded
@@ -16754,9 +16754,9 @@ critical path remains the next diagnosis; no deadline, permission check or spent
 budget was weakened. The audit-fixture revision correction has not yet been reached
 successfully in this final run, and actual interruption qualification remains unrun.
 
-After these fixture changes, the [local follow-up design gates](../test/results/native-browser-followup-design-gates.log)
+After these fixture changes, the local follow-up design gates
 pass with exit 0: spec (10,016 assertions), architecture, Go dependency ownership
-and UI/interface design. The [integrated affected race suites](../test/results/native-browser-followup-race.log)
+and UI/interface design. The integrated affected race suites
 also pass (native transport 15.079 seconds; mTLS adapters 9.568 seconds). They do
 not supersede the failing real-service range run. The next implementation task is
 to diagnose and reduce unnecessary work on the original bounded preparation path,
@@ -16766,7 +16766,7 @@ remains isolated and does not enable the public service.
 
 ## Native retry and regional serving pass combined gates; real-service qualification next
 
-The [combined integrated gates](../test/results/combined139-retry-integrated-gates.log)
+The combined integrated gates
 return exit 0 for Go vet/full races, Go architecture (52 packages/280 internal
 edges), SQL generation (46 matching bindings), specification (91 schemas/10,002
 assertions), architecture, Helm and design checks. Console contract validation,
@@ -16774,7 +16774,7 @@ TypeScript and all 133 tests also pass. These checks cover the integrated ADR139
 and retry V2 sources; external SQL/S3/TLS and built-browser qualifications are
 separate and still pending.
 
-The [retry V2 package](../test/results/native-retry-v2-HANDOFF.md) is integrated
+The retry V2 package is integrated
 after all 17 payload/base hashes and 1,427 current dependencies matched. Closed
 local response state now needs an independently acknowledged successful window
 before another first-context attempt is eligible. The console offers an explicit
@@ -16792,17 +16792,17 @@ and built-browser qualification remain pending. This does not enable public runt
 large-artifact transfers.
 
 The first real-service range run and its labeled rerun fail before preparation:
-[initial](../test/results/native-retry-range-first-check.log),
-[labeled](../test/results/native-retry-range-diagnostic-check.log). Both record
+initial,
+labeled. Both record
 exit 1, zero selected passes, 1,451 unchanged sources and no cleanup failures.
-A [temporary diagnostic run](../test/results/native-retry-source-stage-diagnostic-check.log)
+A temporary diagnostic run
 isolates the copy-record lookup; its production-file logging was then removed
 byte-identically. The dedicated new fixture lacked the existing context
 source/locator SELECT grants that older control fixtures supplied. The
-[test-only role correction](../test/results/native-retry-source-role-correction.patch)
+test-only role correction
 adds those two existing reads, with no effect privilege or caller authority.
 
-The [next run](../test/results/native-retry-range-after-role-fix-check.log) confirms
+The next run confirms
 initial session, pending metadata and source reads now succeed. It fails during
 preparation because the worker receives a generic transport failure after the
 connector has returned the positively checked no-command disposition. It records
@@ -16812,12 +16812,12 @@ qualify range bytes or justify treating generic network errors as retryable.
 
 ## Packaged Helm bootstrap passes; native content and public workflow remain in progress
 
-The [packaged Helm diagnostic run](../test/results/helm137-native-hook-diagnostic-check.log)
+The packaged Helm diagnostic run
 returns exit 0 with four passing entries. The actual chart/product on empty
 PostgreSQL and real TLS OpenBao/S3 passes original manager/schema/activation/audit
 and retirement, positive managed-copy closure, setup-free replay, retained
 failed-hook CLI resume and uninstall preservation. Its
-[environment report](../test/results/helm137-native-hook-diagnostic-environment.json)
+environment report
 records anonymous exact-image denial, authenticated manifest GETs from both
 owned nodes, the exact image absent before both pulls, 1,458 unchanged sources
 and no cleanup failures. The registry, private network and fixture TLS/auth files
@@ -16831,7 +16831,7 @@ failure or long-running availability. That failure remains recorded below.
 Public runtime, installed capacity/source/role production, restore and the full
 capture-to-download workflow remain unfinished. No whole slice is complete.
 
-The [ADR139 package](../test/results/regional139-HANDOFF.md) is now integrated
+The ADR139 package is now integrated
 after all 14 payloads, seven existing bases and 1,461 dependencies matched.
 It composes the two fixed private purposes on the accepted native port and fixes
 an owner shutdown that returned after six seconds with a child still running.
@@ -16843,16 +16843,16 @@ public route is enabled. The shared raw pre-TLS ceiling does not promise fairnes
 against unclassified connection pressure; admitted purpose slots remain separate.
 
 The post-Helm `make spec-check architecture-check helm-check` run returns exit 0
-in [the contract log](../test/results/helm137-qualified-contracts.log). It precedes
+in the contract log. It precedes
 the ADR139 integration and its new documentation; combined verification follows.
 
-The [combined repository gates](../test/results/combined136-138-integrated-gates.log)
+The combined repository gates
 now return exit 0: full Go vet/races, 52 packages/279 import edges, 46 matching
 sqlc bindings, 91 schemas/9,976 assertions, architecture, Helm render/package and
 design checks. These precede the focused HTTP/2 correction below; external
 fixture suites are separate and remain pending.
 
-The [ADR136 package](../test/results/native136-HANDOFF.md) is integrated after
+The ADR136 package is integrated after
 46 payload/base hashes and 1,373 dependencies were checked. Fifteen dependency
 changes match the independently integrated ADR137 package exactly; no unreviewed
 source replacement was accepted. SQL53 changes only the fixed content-preflight
@@ -16861,7 +16861,7 @@ head. Combined sqlc regeneration produces the supplied attachment binding and
 preserves ADR135's owner query. The package's affected races/vet and fixture
 compilation pass; its three new real-service selectors remain unrun.
 
-The [ADR137 package](../test/results/helm137-HANDOFF.md) is integrated after
+The ADR137 package is integrated after
 58 payload/base hashes and 21 dependencies matched. It adds the optional fixed
 four-command Helm hook, immutable public input revisions, terminal-only resume
 and explicit private-registry propagation through the existing managed copy.
@@ -16870,36 +16870,36 @@ Focused Go, Helm/schema/package and offline checks passed in isolation. The new
 setup/hook failures remain below. The chart continues to reject public runtime
 enablement.
 
-The [first packaged Helm run](../test/results/helm137-native-first-check.log)
+The first packaged Helm run
 fails before Kubernetes setup: the registry fixture incorrectly equated Docker's
 image ID with the exported configuration digest. The daemon uses containerd's
 image store and reports an index digest instead. No product command or native
 case ran. All 1,457 source files compare unchanged after exit; the harness did
 not yet set its in-run comparison field on setup failure. Owned registry/network
 and private credential/TLS files were positively removed.
-The [fixture correction](../test/results/helm137-registry-identity-correction.patch)
+The fixture correction
 now verifies the exact image's bounded hash-checked descriptor chain to its
 exported platform/configuration, preserving separate binary, image, configuration
 and uploaded-manifest identities. An actual tiny Docker build/export passes
-[that check](../test/results/helm137-docker-containerd-identity-after.json), and
+that check, and
 four offline selector/identity/cleanup tests pass. No product input or image was
 substituted. Setup failures now also record the source comparison before their
 terminal report; this never counts an unexecuted test as passed. Packaged native
 requalification remains pending.
 
-The [second attempt](../test/results/helm137-native-after-image-identity-check.log)
+The second attempt
 passes the descriptor identity check, then fails before Kubernetes because the
 Docker archive contains gzip-compressed layers. The original fixture compared
 their compressed hashes directly with uncompressed rootfs diffIDs. Its terminal
 report records exit 1, zero selected passes, 1,457 unchanged sources and complete
-owned cleanup. The [layer correction](../test/results/helm137-registry-layer-correction.patch)
+owned cleanup. The layer correction
 preserves exact exported bytes, checks bounded decompression against the original
 rootfs identities and uploads the matching OCI media type. Five offline tests
 pass, including invalid digest, corrupt gzip and decompression-bound rejection.
 No product image or authority change is involved; the next packaged run remains
 required.
 
-The [third packaged run](../test/results/helm137-native-after-export-fixes-check.log)
+The third packaged run
 passes archive setup and reaches the actual Helm-installed bootstrap Pod, which
 fails during the four-command chain. It returns exit 1 with zero selected
 passes, all 1,458 tested source hashes unchanged, no cleanup failures and
@@ -16909,7 +16909,7 @@ bounded logs/status for the exact original hook before cleanup. That diagnostic
 addition is not a product fix or a passing installation qualification. The next
 run must identify the underlying failure before changing product behavior.
 
-The [native download fixture correction](../test/results/native136-fixture-HANDOFF.md)
+The native download fixture correction
 now maps the exact HTTP-shaped synthetic cookie to its existing synthetic session
 and waits for handler return before asserting final SQL/audit outcomes. The cookie
 regression failed against the original fixture, then focused races/vet passed.
@@ -16923,7 +16923,7 @@ their hashes and reviewing three final ADR136 changes against the earlier
 and installed qualification remain pending. A parallel review identified a
 native HTTP/2 transition defect: the preflight socket deadline remained armed
 while the first content phase obtained fresh authority. The
-[focused correction](../test/results/native136-h2-HANDOFF.md) is now integrated
+focused correction is now integrated
 after five payload/base and six dependency hashes matched. The actual TLS/HTTP2
 regression fails before with a stream reset at the old deadline; focused
 browser/evidence races and vet pass afterward. Positive preflight now advances
@@ -16931,11 +16931,11 @@ only the socket idle bound before fresh setup; all byte authority and original
 response bounds remain unchanged. A second actual HTTP/2 test covers a pause
 between independently leased chunks. This is local transport evidence, not an
 installed worker/provider result. The
-[integrated correction races](../test/results/combined136-138-corrections-races.log)
+integrated correction races
 now pass for affected Kubernetes, evidence, browser and bootstrap tests; affected
 vet also returns 0. External qualification remains next.
 
-The [connector proof-reuse correction](../test/results/regional135-reuse-HANDOFF.md)
+The connector proof-reuse correction
 is integrated after five payload/base and 1,289 dependency hashes were checked;
 three dependency changes match the recorded HTTP/2 correction. One completed
 native process proof may be reused only inside its original interval, with
@@ -16948,7 +16948,7 @@ frame amplification remain separate follow-up work.
 
 ## Regional context transport: repository checks passed, native setup corrected
 
-The [ADR135 package](../test/results/regional135-HANDOFF.md) is integrated after
+The ADR135 package is integrated after
 all 45 original/payload hashes and 1,305 current dependency hashes matched. It
 adds a connector-originated signed HTTP/2 exchange, request-owned current
 identity checks, joined cancellation and concrete connector API process/start
@@ -16956,41 +16956,41 @@ adapters. The owner enumeration query changes no SQL migration or schema head.
 The two existing-file edits retain omitted-capability behavior and add only the
 exact optional capacity/main-CREATE and status-UPDATE admission branch.
 
-The [integrated gates](../test/results/regional135-integrated-gates.log) return
+The integrated gates return
 0 for full Go vet/races, Go architecture (52 packages/278 internal edges), SQL
 generation (45 matching bindings), specification (89 schemas/9,937 assertions)
 and architecture contracts. This resolves the earlier sparse-overlay vet
 limitation at the new package's actual path. The
-[first Kubernetes run](../test/results/regional135-native-reader-first.log)
+first Kubernetes run
 failed in fixture setup: the Deployment controller updated status while guards
 were installed, making the original scale request's resourceVersion stale. Its
-[terminal report](../test/results/regional135-native-reader-first-check.log)
+terminal report
 records exit 1, no passing selected case, 1,385 unchanged source hashes and
 complete cleanup; the Go case took 1.040 seconds. No API-process or local-start
 assertion had been reached. The fixture now retries only definite conflicts after
 rereading and checking the original UID and complete spec; it never adopts a
 replacement or retries an uncertain update. Native requalification is pending.
-The [second run](../test/results/regional135-native-reader-after-scale-fix.log)
+The second run
 passes that setup and reaches current process observation, which fails after
 2.800203409 seconds. Its
-[terminal report](../test/results/regional135-native-reader-after-scale-fix-check.log)
+terminal report
 records exit 1, 1,385 unchanged hashes and complete cleanup; Go took 8.237 seconds.
 Review found that `ReadAPIProcess` recorded its observation start before the
 nested guard started a new five-second interval, then copied that later cutoff
 unchanged. The outer observation could therefore exceed its own maximum even
 when the guard succeeded. The caller now bounds the entire guard by its original
-start plus five seconds. [Affected races](../test/results/regional135-process-deadline-races.log)
+start plus five seconds. Affected races
 pass (exit 0, 1.085 seconds); real-service requalification remains pending.
 The measured API operation counts and elapsed phases are retained separately
 from this timestamp defect; repeated checking under the existing rate limiter
 still needs measurement through the complete local-start sequence.
-The [third native run](../test/results/regional135-native-reader-after-deadline-fix.log)
+The third native run
 now accepts the actual defaulted process and passes both named Secret/foreign
 denial and changed-input rejection. Its local-start subcase fails after one
 CapacityReservation CREATE: the repeated post-create check returns at
 4.995665377 seconds, with only 4.333884 milliseconds left in the original
 five-second interval. Ready/start assertions are not reached. The
-[terminal report](../test/results/regional135-native-reader-after-deadline-fix-check.log)
+terminal report
 records exit 1, two passing subcases, 1,385 unchanged source hashes and complete
 cleanup; Go took 15.122 seconds. The enclosing test remains failed. The native
 timings now establish a separate repeated-check cost problem under the existing
@@ -17005,7 +17005,7 @@ independent capacity and joined cancellation.
 
 ## Public endpoint composition: staged routing qualification
 
-The [ADR138 source checkpoint](../test/results/public-context138-HANDOFF.md)
+The ADR138 source checkpoint
 composes the existing public transports around one healthy audited backend.
 Five focused routing regressions pass with the race detector, including actual
 loopback TLS preserving native response deadlines, flush and exact bytes;
@@ -17019,7 +17019,7 @@ isolated agent stages; their component results do not establish installed flows.
 
 ## Corrected installation and continuation: combined repository checks passed
 
-The [combined rerun](../test/results/bootstrap133-continuation134-corrected-gates-rerun.log)
+The combined rerun
 returns 0 for `make go-check go-architecture-check spec-check architecture-check`:
 full Go vet/race suites, 51 packages/269 internal import edges, 85 schemas/9,918
 assertions and the design catalog pass. Native suites below qualify the actual
@@ -17030,14 +17030,14 @@ package. Its bytes were preserved as
 `bootstrap133-stage-legacy_compatibility_test.go.txt` before the passing rerun;
 no product behavior or gate was relaxed.
 
-The [schema52 database-recovery run](../test/results/database-recovery52-after-native-corrections.log)
+The schema52 database-recovery run
 now passes actual initial, PostgreSQL restart and logical restore phases. Its
-[terminal report](../test/results/database-recovery52-after-native-corrections-check.log)
+terminal report
 records exit 0, three passing phases, 1,348 unchanged source hashes and complete
 cleanup. This proves the current incarnation fence, not operator-approved
 restore activation or preservation of every feature's state across restore.
-The [full schema52 custody run](../test/results/custody52-after-native-corrections.log)
-also passes. Its [terminal report](../test/results/custody52-after-native-corrections-check.log)
+The full schema52 custody run
+also passes. Its terminal report
 records exit 0, 318 passing entries, 1,348 unchanged source hashes and complete
 owned cleanup; the Go suite took 540.852 seconds. This supersedes the earlier
 schema50 full result for the current integrated source. The separately timed
@@ -17048,7 +17048,7 @@ Helm bootstrap workflow (ADR137) remain staged work, not enabled product routes.
 
 ## Managed setup-copy cleanup: corrected native v3 chain passed
 
-The [ADR133 package](../test/results/bootstrap133-HANDOFF.md) is integrated
+The ADR133 package is integrated
 after all 30 original/payload hashes and eleven dependencies matched. New
 installations select bootstrap v3; retained v1/v2 guards keep their existing
 wire bytes and v2/v3 retries use their original version. After independently
@@ -17059,23 +17059,23 @@ The guard objects remain protected by trusted installer/RBAC authority;
 Kubernetes admission policies cannot protect their own mutation.
 
 Staged affected races/vet, complete legacy guard-byte comparison and contract
-checks pass. The [integrated contract gates](../test/results/bootstrap133-integrated-contracts.log)
-also return 0. The [first actual four-command v3 run](../test/results/bootstrap133-native-first.log)
+checks pass. The integrated contract gates
+also return 0. The first actual four-command v3 run
 fails in the retirement phase with `setup differs from the saved installation`.
-Its [terminal report](../test/results/bootstrap133-native-first-check.log)
+Its terminal report
 records exit 1, zero passing entries, 1,345 unchanged source hashes and complete
 owned cleanup. The Go case took 236.895 seconds. The
-[metadata correction](../test/results/bootstrap133-metadata-HANDOFF.md) is now
+metadata correction is now
 integrated: cleanup previously rejected the installation/request annotations
 that the actual producer places on both copies. It now verifies both exact
 values against the retained claim and keeps the closed metadata checks.
 Producer-shaped regressions reproduce four failures before the correction;
 affected races and vet pass afterward. The
-[corrected native chain](../test/results/bootstrap133-native-after-metadata.log)
+corrected native chain
 now passes: all four compiled commands, positive managed-copy deletion,
 immutable seed sanitization, fresh setup-free replay and administrator guard
 removal detected without recreation. Its
-[terminal report](../test/results/bootstrap133-native-after-metadata-check.log)
+terminal report
 records exit 0, three passing entries, 1,348 unchanged source hashes and complete
 cleanup; the Go suite took 291.326 seconds. The original activation Pod was
 `c0d3d988-20e0-4d6e-aa3a-b2453ec35dbb`, running
@@ -17087,7 +17087,7 @@ pre-seed and expired/uncertain cleanup recovery remain explicit gaps.
 
 ## Explicit collection continuation: corrected native acquisition passed
 
-The [ADR134 package](../test/results/continuation134-HANDOFF.md) is integrated
+The ADR134 package is integrated
 after all 32 payload/base hashes and eight current SQL52 dependencies matched.
 Browser and MCP share optional `continue_acquisition: true` on the original
 preview/key request. The console exposes a deliberate action for retained,
@@ -17098,46 +17098,46 @@ to create wrapping keys. The package preserves failing-before evidence for
 concurrent/lost-reply preparation and an expired original preparation interval.
 Staged affected races/vet, OpenAPI and all 49 browser/MCP contracts pass; the
 console's 125 unit tests and production build pass. The
-[integrated repository gates](../test/results/continuation134-integrated-gates.log)
+integrated repository gates
 return 0: full Go vet/race suites, 51 packages/269 import edges, 44 matching SQL
 bindings, 84 schemas/9,876 assertions and the architecture catalog. These gates
 precede the subsequent ADR133 integration. The
-[built-browser journey](../test/results/continuation134-browser.log) also returns
+built-browser journey also returns
 0: nineteen journeys, fifteen accessibility scans and no external requests or
 CSP/runtime errors. It uses actual Go TLS/session/operation transports and the
 built React console with synthetic identity/capture/case services.
 
-The [first actual regional continuation run](../test/results/continuation134-native-first.log)
+The first actual regional continuation run
 fails before its unavailable-start injection: the initial request returns
 `context admission unavailable` and records zero start calls. Its
-[terminal report](../test/results/continuation134-native-first-check.log) records
+terminal report records
 exit 1, no selected pass, 1,345 unchanged source hashes and complete cleanup.
 The Go case took 5.038 seconds including setup; that duration is not evidence
 that the request's authority interval expired. Diagnosis is in progress.
 The context harness now retains bounded owned-PostgreSQL failure logs before
-cleanup. The [diagnostic rerun](../test/results/continuation134-native-diagnostic.log)
+cleanup. The diagnostic rerun
 locates the failure inside reviewed SQL admission: 28.849261 ms, no accepted
 capture or audit reservation; the complete request took 415.800818 ms. Its
-[terminal report](../test/results/continuation134-native-diagnostic-check.log)
+terminal report
 records exit 1, zero passing entries, 1,345 unchanged source hashes and complete
 cleanup. The bounded PostgreSQL log was retained successfully and shows no
 unexpected driver error for that admission. Audit deadline precision and the
 fixture lifecycle budget caused the failure. The
-[five-path correction](../test/results/continuation134-admission-fix-HANDOFF.md)
+five-path correction
 is integrated after exact base/payload checks: truncate only the live audit
 cutoff downward to SQL precision, and fund the fixture's unchanged 30-second
 write interval with 120-second audit retention. Both defects have failing-before
 regressions; affected races, integration compilation and vet pass. No caller,
 capture, cleanup or proof interval is extended.
 
-The [corrected native continuation](../test/results/continuation134-native-after-admission-fix.log)
+The corrected native continuation
 now passes actual C09 preview/request, SQL52 admission and encrypted intent
 acknowledgement, passive replay and explicit fresh-current continuation. Its
 initial injected unavailable start occurs after admission; the subsequent call
 uses one original execution and local CAS. The fixture verifies, publishes and
 reads 362 exact native bytes after deleting the actual target and executor Pods;
 Nodes, exec, Secret reads and token minting remain denied to the collector.
-Its [terminal report](../test/results/continuation134-native-after-admission-fix-check.log)
+Its terminal report
 records exit 0, two passing entries, 1,348 unchanged source hashes and complete
 cleanup; the Go suite took 10.912 seconds. Reviewed admission took 59.860327 ms
 and original encrypted intent publication 119.208141 ms in this local fixture.
@@ -17147,11 +17147,11 @@ No installed transport or public runtime is enabled by these component results.
 
 ## SQL52 capture-intent lifecycle: native qualification passed after two corrections
 
-The [frozen 39-path package](../test/results/capture52-HANDOFF.md) is integrated
+The frozen 39-path package is integrated
 after every current-base and payload hash matched. Parent regeneration matches
 all seven changed/generated payloads; the whole SQL check covers 44 bindings.
 Schema head is now 52 with 91 permanent installation tables. The
-[integrated gates](../test/results/capture52-integrated-contracts.log) pass:
+integrated gates pass:
 51 packages/269 internal edges, SQL generation, 84 schemas/9,860 assertions
 and the architecture catalog. Staged affected races, helper compilation, vet
 and actual Go embedded digest pass with the exact integrated51 plus52 bundle;
@@ -17163,31 +17163,31 @@ for cleanup. Review reproduced a completed-acknowledgement retry failure after
 the original audit write cutoff. The included correction uses a separate exact
 read-only retained acknowledgement before any active journal or object I/O;
 failed/malformed reads never fall through into effects. Original acquisition
-and write deadlines are unchanged. The [first actual SQL/S3 run](../test/results/capture52-native-first.log)
+and write deadlines are unchanged. The first actual SQL/S3 run
 fails all seven cases while refreshing retention in the new fixture, before
-their audit assertions. Its [terminal report](../test/results/capture52-native-first-check.log)
+their audit assertions. Its terminal report
 records exit 1, no selected pass, 1,333 unchanged source hashes and complete
 cleanup. The fixture evaluates freshly observed policy/proof against a timestamp
 taken before the blocking read. The fixture correction preserves every original
 authority deadline and evaluates the newly observed facts at the current time.
-The [second native run](../test/results/capture52-native-after-time.log) reaches
+The second native run reaches
 admission: legacy/wrong-key rejection and the held-pool deadline case pass,
 while five cases fail with `context admission inputs changed`. Its
-[terminal report](../test/results/capture52-native-after-time-check.log) records
+terminal report records
 exit 1, two passing entries, 1,333 unchanged source hashes and complete cleanup.
 The actual PostgreSQL log identifies a missing column-level lock privilege for
-the new admission role. The [reviewed correction](../test/results/capture52-storage-lock-HANDOFF.md)
+the new admission role. The reviewed correction
 adds the existing narrow `UPDATE(source_uid)` lock profile, while preserving
 denial of allocation, generation, digest, freshness, insertion and deletion
 writes. It also maps dependency failures to unavailable service; a missing
 binding still reports changed input. This column privilege is not a claim that
 PostgreSQL offers a separate lock-only privilege.
 
-The [corrected native run](../test/results/capture52-native-after-storage-lock.log)
+The corrected native run
 passes all selected cases, including the real role regressions, concurrent
 writer claims, original reconciliation cutoffs, passive acknowledgement reuse
 and healthy retirement with zero/two-second fixture backup horizons. Its
-[terminal report](../test/results/capture52-native-after-storage-lock-check.log)
+terminal report
 records exit 0, eleven passing entries, 1,333 unchanged source hashes and complete
 cleanup. The Go suite took 112.324 seconds. Admission plus both encrypted audit
 acknowledgements took 157.845935 ms under the original live caller interval in
@@ -17203,31 +17203,31 @@ uses the concrete capability reader and admission guard with separate
 read-only and probe accounts. It verifies actual guard denial, unchanged
 dry-run resource versions, fixed cluster/image/recovery-epoch selection,
 immediate missing-protection rejection and binding/source replacement denial.
-The [native result](../test/results/context-capability-native-first.log)
-passes; its [terminal report](../test/results/context-capability-native-first-check.log)
+The native result
+passes; its terminal report
 records exit 0, one selected passing entry, 1,315 unchanged source hashes and
 complete owned-service cleanup. The Go package took 7.267 seconds. Initial
 image qualification and accepted recovery are explicit fixture facts; this
 does not qualify installer provisioning or a running regional collector.
 
 The opt-in `make connector-retirement-integration` harness is also integrated.
-Its [eleven synthetic harness cases](../test/results/connector-retirement-harness-integrated.log)
+Its eleven synthetic harness cases
 pass, including rejection of missing/too-short exact test evidence and removal
 of the opt-in from ordinary runs. The real-time native gate remains unrun.
 
 ## SQL51 connector retirement: integrated fast native qualification passed
 
-The [thirty-path connector package](../test/results/connector51-HANDOFF.md)
+The thirty-path connector package
 is integrated with schema head 51, the 88-table installation inventory and
 regenerated SQL. Parent integration preserved the existing `processing-result/v1`
 MAC domain: the frozen candidate omitted it, and the
-[before regression](../test/results/connector51-processing-mac-before.log)
+before regression
 reproduced three existing privacy-workflow failures. The corrected
-[six-package race run](../test/results/connector51-integrated-race.log) returns
+six-package race run returns
 0, including those workflows and the actual embedded 51-migration digest
 `8c01f3a8ec8632900871388b2c03ac01692dc7a4e40057d8a087a66fc4358396`.
 External fixture cases skip in that ordinary Go run. The
-[integrated contract checks](../test/results/connector51-integrated-contracts.log)
+integrated contract checks
 return 0: 42 generated SQL files match, 51 packages/268 internal edges pass,
 84 canonical schemas/9,845 assertions pass, and the architecture catalog passes.
 
@@ -17235,10 +17235,10 @@ Each accepted connector cohort now reserves its own bounded retirement
 operation before ordinary admissions can spend that capacity. Restriction
 commits independently of encrypted audit; unknown outcomes retain original
 identity, dates and spend. SQL51 adds no public collection or disclosure route.
-The [actual SQL/S3 fast run](../test/results/connector51-fast-first.log) passes
+The actual SQL/S3 fast run passes
 prepaid retirement, original connector/backing behavior and both existing
 processing restriction/native-output cases. Its
-[terminal report](../test/results/connector51-fast-first-check.log) records
+terminal report records
 exit 0, nine passing entries, 1,314 unchanged source hashes and complete owned
 cleanup; the Go package took 39.147 seconds. Current protected source/issuer
 facts remain explicit fixture inputs. Real-time ticket cleanup and schema51
@@ -17248,18 +17248,18 @@ results below do not establish those outcomes.
 
 ## Corrected full custody baseline passed
 
-The [full schema50 custody rerun](../test/results/custody50-final-after-worker-facets.log)
+The full schema50 custody rerun
 now passes, including the worker cases that previously failed for missing
-processing-state reads. Its [terminal report](../test/results/custody50-final-after-worker-facets-check.log)
+processing-state reads. Its terminal report
 records exit 0, 303 passing entries, 1,296 unchanged source hashes and complete
 owned-service cleanup; the Go suite took 395.413 seconds. It covers actual
 SQL/S3/TLS custody, current permissions, constrained key use, worker admission,
 native transfer, cancellation/history accounting and automation acceptance.
 Fixture identity/installation authority remains explicit, so this is component
 regression evidence, not an installed browser/MCP workflow. The separate
-[database recovery baseline](../test/results/database-recovery50-after-bootstrap.log)
+database recovery baseline
 also passes actual initial, PostgreSQL process restart and logical restore
-phases. Its [terminal report](../test/results/database-recovery50-after-bootstrap-check.log)
+phases. Its terminal report
 records exit 0, three passing entries, the same 1,296 unchanged hashes and
 complete cleanup. It verifies the incarnation fence; it does not implement
 operator-authorized restore activation. Staged SQL51/52 and bootstrap-v3 work is
@@ -17267,17 +17267,17 @@ not part of either result.
 
 ## All four private installation commands: native command-chain qualification passed
 
-The [nine-path scratch/runner package](../test/results/bootstrap-chain-HANDOFF.md)
+The nine-path scratch/runner package
 is integrated after verifying every original and payload hash. Kubernetes'
 native memory-backed scratch mount now contains an exact process-owned `0700`
 projection child; the existing private-file and exclusive-lock checks remain.
 No privileged initialization or change to the v2 admission guard is involved.
-The [affected integrated race tests](../test/results/bootstrap-chain-integrated-race.log),
-three selector regressions and [specification/architecture checks](../test/results/bootstrap-chain-integrated-contracts.log)
+The affected integrated race tests,
+three selector regressions and specification/architecture checks
 pass. The preserved before regression rejects the former direct shared-volume
 composition at the unchanged private-directory gate.
 
-The [actual empty-database command-chain run](../test/results/bootstrap-chain-native-first.log)
+The actual empty-database command-chain run
 passes all four compiled commands in a Restricted Pod with native tmpfs,
 fsGroup and sequential subPath mounts. Product code creates its own original
 manager/credentials/projections, initializes the exact compiled schema50 bundle,
@@ -17286,7 +17286,7 @@ retires the manager's privileges, sessions and login. Independent checks verify
 the encrypted immutable activation audit. After the fixture removes its
 operator-owned setup inputs and revokes its supplied issuer token, a fresh Pod
 runs all four commands successfully with original identities/progress unchanged.
-The [terminal report](../test/results/bootstrap-chain-native-first-check.log)
+The terminal report
 records exit 0, two passing entries, 1,296 unchanged source hashes and complete
 owned-lab cleanup; the Go package took 249.300 seconds. The original activation
 Pod UID and exact compiled image digest are retained in the test log.
@@ -17302,54 +17302,54 @@ progress. Public and chart runtime remain disabled.
 
 ## Bootstrap commands integrated; broad custody exposed missing fence reads
 
-The [integrated repository checks](../test/results/bootstrap-command-integrated-gates.log)
+The integrated repository checks
 pass vet, every Go race suite, the 51-package/268-edge dependency check and
 41 matching generated SQL files. The same invocation then fails specification
 validation because the new provider-name definition used fragment-only schema
 references, which this repository's offline registry does not accept. Replacing
 those five references with the existing canonical schema ID preserves validation;
-the [corrected contract run](../test/results/bootstrap-command-contracts-after.log)
+the corrected contract run
 passes 84 schemas, 9,832 assertions and the architecture catalog. This correction
 does not change runtime code or repeat the already-passing Go suites.
 
-The [28-path bootstrap package](../test/results/bootstrap-command-HANDOFF.md)
+The 28-path bootstrap package
 is integrated after verifying every original/payload hash and ten source
 dependencies. It adds the four private command phases, bounded observation
 credential replacement and v2 passive-history routing before broad setup reads.
 The staged race/vet/schema results are retained in the handoff. The first
-[real Kubernetes passive-replay run](../test/results/bootstrap-passive-native-first.log)
+real Kubernetes passive-replay run
 fails while constructing the original preparation projection, with unchanged
 sources and complete lab cleanup. The guard-only fixture reused duplicate
 provider role/policy names that the eventual provider profile correctly rejects.
 Bootstrap's earlier validation had only checked string length, so this is also
-a product early-validation gap. The [new before regression](../test/results/bootstrap-provider-names-before.log)
+a product early-validation gap. The new before regression
 reproduces acceptance of duplicate, reserved and malformed provider names before
 effects. Static input and final profile now share the strict name validator;
 fixtures use distinct names and the canonical schema carries the same name
-limits. The [corrected affected race run](../test/results/bootstrap-provider-names-after.log)
-passes; the [native rerun](../test/results/bootstrap-passive-native-after.log)
+limits. The corrected affected race run
+passes; the native rerun
 also passes original seed/guard/projection, a lost committed history CREATE,
 exact restart recovery without another CREATE, metadata-only replay and native
 locator/history mutation denial. Its
-[terminal report](../test/results/bootstrap-passive-native-after-check.log)
+terminal report
 records exit 0, three passing entries, 1,293 unchanged source hashes and complete
 cleanup. This API test explicitly supplies a synthetic SQL manager receipt and
 does not qualify SQL activation or manager retirement. Restricted tmpfs
 runner preparation, complete command-chain qualification and managed credential
 copy deletion remain separate work. Helm/public runtime stays disabled.
 
-The [full schema50 custody run](../test/results/custody50-full.log) failed in
+The full schema50 custody run failed in
 seventeen worker enrollment/active-owner cases while recording 285 passing test
-entries. Its [terminal report](../test/results/custody50-full-check.log) confirms
+entries. Its terminal report confirms
 1,279 unchanged source hashes and complete owned-lab cleanup. Actual PostgreSQL
 errors identify missing `processing_root` reads: the existing enrollment,
 activation and active-owner test roles lacked SQL50's three read-only processing
 tables used by their current download fence. The fixture grants now include
 only those reads; added native assertions retain denied state mutation and no
 current-processing access for historical audit/passive locator roles. The
-affected [native rerun](../test/results/processing50-worker-facets-after.log)
+affected native rerun
 now passes all selected worker cases and both processing cases. Its
-[terminal report](../test/results/processing50-worker-facets-after-check.log)
+terminal report
 records exit 0, 36 passing entries, 1,292 unchanged source hashes and complete
 cleanup. This includes the actual encrypted SQL/S3/key-service and two-hop TLS
 native exchange with explicitly synthetic peer/Pod/issuer authority. No runtime
@@ -17357,12 +17357,12 @@ authority check was bypassed. The broader suite still needs a final rerun.
 
 ## Schema50 initialization through original activation: native qualification passed
 
-The [fresh empty-database run](../test/results/initial-schema-handover50.log)
+The fresh empty-database run
 uses the actual protected schema loader, all embedded migrations through 50,
 the original compiled activation Pod, encrypted activation audit and the eight
 handover cleanup steps. It rejects the mismatched original database incarnation
 before active preparation, then verifies passive reopening with setup
-credentials unavailable. The [terminal report](../test/results/initial-schema-handover50-check.log)
+credentials unavailable. The terminal report
 records exit 0, thirteen passing entries, 1,279 unchanged source hashes and
 complete owned-lab cleanup. The actual activation image digest and Pod UID are
 recorded in the test log; no replacement workload supplied the success.
@@ -17376,7 +17376,7 @@ recovery regressions remain next alongside staged installer/retirement work.
 
 ## Context capability and request connection: integrated, runtime disabled
 
-The [fourteen-file checkpoint](../test/results/context-capability-HANDOFF.md)
+The fourteen-file checkpoint
 is integrated after every original and payload hash was verified. The
 [capability contract](architecture/context-capability.md) supplies the same
 protected immutable collector/projection tuple to preview and execution, exact
@@ -17385,7 +17385,7 @@ runner. Acknowledged intent reuse performs no new object write. Historical
 accepted replay remains passive; pending legacy intents cannot start through
 this connection. The SQL schema stays at 50.
 
-The [full integrated gates](../test/results/processing50-capability-final-gates.log)
+The full integrated gates
 return 0: repository vet and every Go race suite, all embedded contracts,
 51-package/268-edge architecture checks, 41 matching generated SQL files,
 81 canonical schemas and specification/architecture checks. These ordinary Go
@@ -17398,12 +17398,12 @@ connector retirement work while their bounded cached checks run separately.
 
 ## Current processing and native placement: SQL50 integrated
 
-The [combined source package](../test/results/processing50-combined-HANDOFF.md)
+The combined source package
 is integrated after all 81 original/payload hashes were checked. It preserves
 SQL49's private connector actors, lifecycle duties and backing-acceptance audit
 classification. The current schema is 50 with 87 permanent inventory tables;
 local SQL generation returned 0. The original isolated regressions and review
-remain in the [source handoff](../test/results/processing50-original-HANDOFF.md).
+remain in the source handoff.
 
 [ADR-127](decisions/127-current-processing-and-download-placement.md) adds
 explicitly initialized durable processing restrictions, verified context lineage,
@@ -17412,31 +17412,31 @@ Ordinary case metadata and native download effects consume the current decision;
 new publication and capacity renewal cannot erase restrictions or extend original
 history dates. Unknown state and unsupported ancestry deny.
 
-The [integrated affected race suites](../test/results/processing50-integrated-race.log)
-pass for thirteen packages; the [corrected contract checks](../test/results/processing50-contracts-after.log)
+The integrated affected race suites
+pass for thirteen packages; the corrected contract checks
 pass 80 schemas and the architecture catalog. The initial contract run rejected
 relative schema references; using the schema's existing canonical ID fixed the
 references without relaxing validation. Kubernetes adapter races, integration
 compilation and affected vet also pass.
 
-The [first actual SQL/S3 run](../test/results/processing50-native-first.log)
+The first actual SQL/S3 run
 passes connector renewal/exhausted-source handling and processing restriction,
 immutable-date renewal and prepaid release. The transfer case fails; its helper
-initially hid the exact failure location. The [focused diagnostic](../test/results/processing50-native-transfer-diagnostic.log)
+initially hid the exact failure location. The focused diagnostic
 reaches publication and prepared-download audit, then rejects an unchanged
 round-tripped audit intent. Comparing Go timestamp representation treated
 process-local monotonic clock data as persisted identity. The
-[failing-before unit regression](../test/results/download-audit-equality-before.log)
-and [passing affected race suites](../test/results/download-audit-equality-after.log)
+failing-before unit regression
+and passing affected race suites
 cover the correction: exact time instants and every other field stay binding.
 The correction changes no authority, deadline, accounting or wire format.
-The [combined rerun after the time fix](../test/results/processing50-native-equality-after.log)
+The combined rerun after the time fix
 also identified a fixture connection leak: connector child tests retained their
 SQL pools until the entire parent suite ended, exhausting the unchanged
 48-connection lab. Child-owned closure fixes that leak without changing server
-capacity, roles or product behavior. The [corrected selected run](../test/results/processing50-native-pools-after.log)
+capacity, roles or product behavior. The corrected selected run
 now passes connector renewal plus both processing cases. Its
-[terminal report](../test/results/processing50-native-pools-after-check.log)
+terminal report
 records exit 0, five passing entries, 1,270 unchanged source hashes and complete
 cleanup. Restricting an acknowledged prepaid batch blocks its stale proof and
 new reservations; release permits the exact original batch without refund,
@@ -17451,26 +17451,26 @@ unfinished; this component does not enable Helm or public evidence access.
 
 ## Connector renewal and bootstrap guard: native corrections qualified
 
-The [complete selected connector run](../test/results/connector49-fast-qualified.log)
+The complete selected connector run
 now passes actual SQL/S3 process admission, distinct client/server activation,
 backing continuation, original-date preservation and both exhausted-source
-close/promotion cases. The [terminal report](../test/results/connector49-fast-qualified-check.log)
+close/promotion cases. The terminal report
 records exit 0, 1,236 unchanged source hashes and complete cleanup. Protected
 source/Pod/issuer/backing inputs remain explicitly synthetic. Installed issuer
 composition, prepaid historical retirement and the real minimum-time lifecycle
 test remain unfinished.
 
-The [corrected native bootstrap guard](../test/results/bootstrap-guard-native-after.log)
+The corrected native bootstrap guard
 passes eleven named entries against Kubernetes, including rejection of the
 original invalid expression, exact private creation/update, namespace and RBAC
 protection, unrelated-name behavior, independent dry-run observation and token
-audience/lifetime/anchor restrictions. The [terminal report](../test/results/bootstrap-guard-native-after-check.log)
+audience/lifetime/anchor restrictions. The terminal report
 records exit 0, 1,237 unchanged source hashes and complete cleanup of both owned
 clusters. This fixture exercises the actual guard and observer credentials; it
 does not provision the private seed, SQL/provider credentials or full installer.
 
-The [role-name correction](../test/results/connector-role-fixture-HANDOFF.md)
-preserves the complete deterministic UUID. The [variable correction](../test/results/bootstrap-variables-HANDOFF.md)
+The role-name correction
+preserves the complete deterministic UUID. The variable correction
 removes three unused policy declarations while retaining the original rule
 expressions and subresource restrictions. Both have retained failing-before
 regressions. The latter's first integration compilation overlapped the two-file
@@ -17478,8 +17478,8 @@ fixture integration and failed; the stable-tree compile and vet passed. All
 earlier actual-service failures remain recorded below.
 
 Specification and architecture checks pass in the
-[contract log](../test/results/connector-overlap-bootstrap-contracts.log).
-The [combined final gates](../test/results/connector-bootstrap-final-gates.log)
+contract log.
+The combined final gates
 return 0: repository vet and every Go race suite, embedded contracts, 51-package
 ownership/dependency checks, 40 matching generated SQL files, 79 canonical
 schemas and the specification/architecture checks. These ordinary Go tests do
@@ -17500,31 +17500,31 @@ enablement. These are implementation findings, not completed user workflows.
 
 ## Original schema binding passes; connector and bootstrap follow-ups remain
 
-The corrected [schema-consumption SQL run](../test/results/schema-consumption-after.log)
+The corrected schema-consumption SQL run
 passes fourteen named entries, including changed database/postmaster rejection,
 original unaudited activation and exact scoped-role cleanup. Its
-[terminal report](../test/results/schema-consumption-after-check.log) records
+terminal report records
 exit 0, 1,235 unchanged source hashes and complete cleanup. This uses fixture
 protected roots and does not qualify production restart/restore.
 
-The [connector overlap rerun](../test/results/connector49-overlap-after.log)
+The connector overlap rerun
 reaches real SQL/S3 client/server activation and backing continuation, resolving
 the earlier issuance failure. Two later exhausted-source subcases fail because
 their fixture truncates away the unique suffix of its role identifiers. The
-[terminal report](../test/results/connector49-overlap-after-check.log) records
+terminal report records
 exit 1, unchanged sources and complete cleanup; the full connector selection
 remains unqualified pending the test-only naming correction.
 
-The [first native bootstrap guard run](../test/results/bootstrap-guard-native-first.log)
+The first native bootstrap guard run
 confirms actual API rejection of the original variable-dependent match condition.
 It then rejects the corrected policy's unused `namespace` variable as an invalid
-CEL identifier. The [terminal report](../test/results/bootstrap-guard-native-first-check.log)
+CEL identifier. The terminal report
 records exit 1, unchanged sources and complete cleanup. Removal of the now-unused
 declarations is being prepared; no native enforcement success is claimed yet.
 
 ## Connector observation overlap: regression reproduced and correction integrated
 
-The [historical permit correction](../test/results/connector-overlap-HANDOFF.md)
+The historical permit correction
 reproduces the generic issuance failure in the actual persisted-result decoder,
 both coordinator purposes and the X.509 verifier. Current observations obtained
 sequentially can legitimately start after the immutable request start. Historical
@@ -17532,8 +17532,8 @@ validation now checks the original intervals' intersection; actual signing and
 delivery retain current authority and the original expiry limits.
 
 All nine original/payload hashes were verified before integration. The retained
-[failing-before tests](../test/results/connector-overlap-before.log) exit 1; the
-[five staged package race suites](../test/results/connector-overlap-after-race.log),
+failing-before tests exit 1; the
+five staged package race suites,
 vet and integration compilation pass. The actual SQL/S3 connector rerun remains
 required before attributing the previous native failure solely to this defect.
 The one-path schema fixture cleanup correction is also integrated: it retires
@@ -17542,18 +17542,18 @@ correction enables public runtime or completes connector lifecycle qualification
 
 ## Generated SQL manager and positive retirement: native qualification passed
 
-The [owned PostgreSQL/OpenBao/S3 manager run](../test/results/initial-bootstrap-manager-first.log)
+The owned PostgreSQL/OpenBao/S3 manager run
 passes its parent and three named subcases in 9.029 seconds. It creates the actual
 finite original manager, initializes a separate empty database, provisions the
 existing purpose/history roles and verifies encrypted activation. It also proves
 that changing login flags alone leaves an existing session alive, then exercises
-exact history-grant transfer and positive session/login closure. The [terminal report](../test/results/initial-bootstrap-manager-first-check.log)
+exact history-grant transfer and positive session/login closure. The terminal report
 records exit 0, 1,230 unchanged source hashes and complete cleanup. Kubernetes
 seed, witness and history-read authority remain synthetic in this SQL fixture.
 
-The separate [schema-consumption SQL run](../test/results/schema-consumption-first.log)
+The separate schema-consumption SQL run
 rejects both wrong database and earlier postmaster pins without activation rows,
-but exits 1 because its new scoped-role fixture cleanup fails. Its [terminal report](../test/results/schema-consumption-first-check.log)
+but exits 1 because its new scoped-role fixture cleanup fails. Its terminal report
 records unchanged sources and successful outer lab cleanup. PostgreSQL's retained
 diagnostics identify remaining manager-origin grant dependencies; the fixture
 must use the existing exact role-retirement facet before dropping those roles.
@@ -17566,31 +17566,31 @@ the full Kubernetes bootstrap producer remains unqualified and disabled.
 
 ## Connector SQL49 native fast qualification: first failure retained
 
-The [first real SQL/S3 connector run](../test/results/connector49-fast-first.log)
+The first real SQL/S3 connector run
 fails at initial client issuance with the generic fleet error text
 "current signing trust unavailable", before
-the intended paired activation/renewal matrix. The [terminal report](../test/results/connector49-fast-first-check.log)
+the intended paired activation/renewal matrix. The terminal report
 records exit 1, 1,230 unchanged source hashes and complete cleanup. No native
 connector activation or renewal success is claimed; the exact underlying
 issuance boundary is not yet identified. Diagnosis preserves source, role,
 recovery and deadline checks.
 
-Integrated [SQL49 contract/SQL generation gates](../test/results/connector49-integrated-contracts.log),
-[seven affected package race suites](../test/results/connector49-integrated-race.log)
-and [Kubernetes connector races, integration compilation and vet](../test/results/connector49-integrated-targeted.log)
-pass. The later [combined bootstrap/schema contract gate](../test/results/bootstrap-schema-integrated-contracts.log)
+Integrated SQL49 contract/SQL generation gates,
+seven affected package race suites
+and Kubernetes connector races, integration compilation and vet
+pass. The later combined bootstrap/schema contract gate
 also passes. None substitutes for the failed external-service case.
 
 ## Original schema consumption and generated bootstrap inputs: integrated
 
-The verified [16-path schema correction](../test/results/schema-consumption-HANDOFF.md)
+The verified 16-path schema correction
 now checks completed schema provenance on direct active preparation and carries
 its database-incarnation binding through the protected activation projection
 into each SQL effect. Completed passive reopening still precedes setup credential
 loads. Retained failing-before decoder/producer tests reproduce the missing
 binding; staged corrected races, vet, compilation and schema checks pass.
 
-The disjoint [20-path bootstrap checkpoint](../test/results/initial-bootstrap-HANDOFF.md)
+The disjoint 20-path bootstrap checkpoint
 adds guarded seed/projection generation and finite original SQL-manager
 creation/retirement. All base, payload and dependency hashes were verified before
 integration. Its staged focused races/vet and canonical schema checks pass.
@@ -17602,7 +17602,7 @@ unfinished; no public runtime is enabled.
 
 ## Connector process identity and renewal: SQL49 component integrated
 
-The verified [62-path source package](../test/results/connector49-HANDOFF.md)
+The verified 62-path source package
 is integrated, with generated queries rebuilt locally. The shared schema head is
 49 and first-installation inventory contains 83 permanent tables. New connector
 processes retain a stable logical account while using separate client/server
@@ -17620,24 +17620,24 @@ the initial-schema incarnation correction remain separate active work.
 
 ## Initial schema integrated gates: passing
 
-The [full Go gate](../test/results/initial-schema-full-go.log) passes embedded
+The full Go gate passes embedded
 contracts, repository vet, every Go race suite and dependency ownership
-(51 packages, 264 internal edges). The [detailed vulnerability scan](../test/results/initial-schema-vulnerabilities-verbose.log)
+(51 packages, 264 internal edges). The detailed vulnerability scan
 reports no affected code or imported packages. Its sole module-level advisory,
 GO-2026-5932, concerns the unimported OpenPGP package; the passing architecture
-gate explicitly rejects importing that package. The [specification and architecture gates](../test/results/initial-schema-qualified-contracts.log)
+gate explicitly rejects importing that package. The specification and architecture gates
 also pass. These results cover the healthy schema/handover checkpoint below,
 before the pending original-incarnation consumption correction.
 
 ## Empty database through original installation handover: native composition passed
 
-The [composed real-service run](../test/results/initial-schema-handover-first.log)
+The composed real-service run
 passes twelve named entries in 193.961 seconds. The harness starts with no schema
 or application grants; the actual protected schema loader runs the embedded
 migrations, replays its original completed binding and removes its distinct DDL
 projection before preparation. The original activation Pod then completes SQL
 activation, independent encrypted audit verification, all eight cleanup steps
-and passive reopening without setup credentials. The [terminal report](../test/results/initial-schema-handover-first-check.log)
+and passive reopening without setup credentials. The terminal report
 records exit 0, 1,157 unchanged source hashes and complete cleanup.
 
 This is a healthy-path qualification with fixture-supplied bootstrap identities,
@@ -17650,11 +17650,11 @@ pending; this run does not qualify restart/restore or enable the chart.
 
 ## Initial schema metadata correction: native PostgreSQL qualification passed
 
-The [corrected selected PostgreSQL run](../test/results/initial-schema-metadata-after.log)
+The corrected selected PostgreSQL run
 passes the parent and ten named subcases: original-prefix recovery and lost
 completion, exact manager privileges, hostile metadata/history, changed database
 incarnation, expired authority, held-lock rejection and read-only completion after
-child-role creation. The [terminal report](../test/results/initial-schema-metadata-after-check.log)
+child-role creation. The terminal report
 records exit 0, 1,157 unchanged source hashes and complete cleanup. The validator
 now requires PostgreSQL18's exact primary-key plus four NOT NULL constraints;
 extra checks, missing nullability and a different primary-key column reject.
@@ -17664,10 +17664,10 @@ automatic bootstrap provisioning and the public workflow remain pending.
 
 ## Initial schema metadata: actual PostgreSQL constraint mismatch confirmed
 
-The [bounded diagnostic rerun](../test/results/initial-schema-metadata-before.log)
+The bounded diagnostic rerun
 confirms one retained original claim, version zero and exactly one primary-key
 plus four NOT NULL constraints in PostgreSQL's metadata catalog. The validator
-incorrectly expected only one constraint row. The [terminal report](../test/results/initial-schema-metadata-before-check.log)
+incorrectly expected only one constraint row. The terminal report
 records the expected failure, 1,157 unchanged source hashes and complete cleanup.
 Dependent checks now stop when schema initialization fails, preventing invalid
 baseline state from appearing to qualify later negative cases. The exact
@@ -17676,20 +17676,20 @@ native migration and installation success remain unclaimed.
 
 ## Initial schema native SQL: first failure retained
 
-The [first selected real PostgreSQL run](../test/results/initial-schema-first.log)
+The first selected real PostgreSQL run
 fails before retaining the expected first migration prefix. Later dependent
 cases consequently lack a completed schema; their negative results are not
-independent qualification. The [terminal report](../test/results/initial-schema-first-check.log)
+independent qualification. The terminal report
 records exit 1, 1,157 unchanged source hashes and complete lab cleanup. The
 metadata constraint verifier is the next diagnosis; no schema initialization
-success is claimed. The [integrated specification and architecture gates](../test/results/initial-schema-integrated-contracts.log)
+success is claimed. The integrated specification and architecture gates
 pass, but do not establish native migration behavior. The composed installation
 run remains pending until this prerequisite passes.
 
 ## Separate initial schema loader: integrated, native qualification pending
 
-The verified 23-path [ADR-130 package](../test/results/initial-schema-HANDOFF.md)
-and seven-path [schema-to-handover fixture](../test/results/schema-handover-HANDOFF.md)
+The verified 23-path ADR-130 package
+and seven-path schema-to-handover fixture
 are integrated. The private schema role applies only the binary's embedded
 migrations under its original protected database-incarnation claim; preparation
 and activation receive no DDL credentials. An interrupted post-schema setup has
@@ -17707,17 +17707,17 @@ automatic bootstrap provisioning and general restart/restore are unfinished.
 
 ## Combined handover corrections: healthy native installation passed
 
-The [combined real-service run](../test/results/initial-handover-conflicts-qualified.log)
+The combined real-service run
 passes twelve named entries, including original image/Pod activation, independent
 SQL/encrypted-audit verification, eight cleanup acknowledgements and passive
-reopening after setup credentials are unavailable. The [terminal report](../test/results/initial-handover-conflicts-qualified-check.log)
+reopening after setup credentials are unavailable. The terminal report
 records exit 0, 1,146 unchanged source hashes and complete lab cleanup. This source
 includes both bounded confirmed-conflict handling and the Pod-before-SQL
 observation correction. Synthetic status-only native API tests qualify the exact
 HTTP409 bodies; this healthy actual-loader run does not inject a conflict into
 the original activation effects. The separate synthetic TLS suite covers that
-retry state machine. Integrated [specification, architecture and Go dependency checks](../test/results/handover-conflicts-integrated-contracts.log)
-pass. The [full integrated Go gate](../test/results/handover-conflicts-full-go.log)
+retry state machine. Integrated specification, architecture and Go dependency checks
+pass. The full integrated Go gate
 also exits 0: embedded/schema checks, repository vet, every Go race suite and
 dependency ownership pass on this combined checkpoint. Fixture-supplied bootstrap
 inputs, general exceptional/restart/restore recovery, production provisioning and
@@ -17725,7 +17725,7 @@ public workflows remain separate requirements.
 
 ## Bounded installation conflict recovery: integrated, combined qualification pending
 
-The ten-path [confirmed-conflict package](../test/results/handover-conflicts-HANDOFF.md)
+The ten-path confirmed-conflict package
 is integrated after verifying every base and payload hash. Original staging and
 Pod launch may make one second conditional UPDATE only after the real HTTP409
 response is durably acknowledged and a separate retry claim succeeds. Original
@@ -17739,7 +17739,7 @@ below; repository gates and the original-command native handover are next.
 
 ## Successful activation observation race: correction integrated
 
-The two-path [observation-order correction](../test/results/handover-observation-HANDOFF.md)
+The two-path observation-order correction
 is integrated with verified base/payload hashes. The supervisor now observes the
 original Pod before reading independent SQL history, preventing a successful
 terminal Pod from being paired with a pre-commit SQL snapshot. The returned
@@ -17752,13 +17752,13 @@ below remains evidence for its exact earlier source.
 
 ## Original activation handover and healthy cleanup: native composition passed
 
-The [owned real-service handover run](../test/results/initial-handover-history-qualified.log)
+The owned real-service handover run
 passes all twelve named entries (119.161 seconds including Go overhead). It
 executes the actual `initial-prepare` loader and the original `initial-install`
 Pod, checks the exact compiled image and zero exit/restarts, verifies original
 SQL activation and the immutable encrypted S3 audit, completes all eight ordered
 retirement steps and reopens history after setup credentials are unavailable.
-The [terminal report](../test/results/initial-handover-history-qualified-check.log)
+The terminal report
 records exit 0, 1,143 unchanged source hashes and complete lab cleanup.
 
 Separate synthetic admission cases in that run establish exact native HTTP409
@@ -17773,51 +17773,51 @@ not supply general unknown-request recovery, restart/restore activation, complet
 production provisioning or an enabled Helm/public investigation workflow.
 Bounded confirmed-conflict recovery, connector lifecycle and processing
 restrictions remain active continuation work. Full integrated Go gates are
-now [passing](../test/results/handover-history-full-go.log), including repository
+now passing, including repository
 vet, all Go race tests, embedded/schema consistency checks and Go dependency
-ownership. The [specification and architecture gates](../test/results/handover-history-final-contracts.log)
+ownership. The specification and architecture gates
 also pass. A subsequent source review identified a separate SQL-before-Pod
 observation race; its deterministic regression and correction are being staged
 without rewriting this passing native checkpoint's scope.
 
 ## Original history manager: selected real PostgreSQL qualification passed
 
-The [corrected selected PostgreSQL suite](../test/results/initial-history-qualified.log)
+The corrected selected PostgreSQL suite
 passes all twelve named entries, including original history-role creation/replay,
 passive SELECT-only access and the membership/privilege/identity mutations.
 The final hostile case now establishes a real manager-attributed grant to a
 separate NOLOGIN fixture member, verifies its catalog attribution and tests
-product rejection before removing that exact grant. The [fixture-only correction](../test/results/history-grant-fixture-HANDOFF.md)
-does not alter product permissions. The [terminal report](../test/results/initial-history-qualified-check.log)
+product rejection before removing that exact grant. The fixture-only correction
+does not alter product permissions. The terminal report
 records exit 0, 1,143 unchanged source hashes and complete cleanup. This qualifies
 the bounded history-role component; actual original-Pod activation, cleanup and
 passive installer replay still require the composed handover run.
 
 ## Original history manager correction: integrated, native fixture refinement pending
 
-The thirteen-path [history-manager correction](../test/results/history-manager-HANDOFF.md)
+The thirteen-path history-manager correction
 is integrated with verified original/payload hashes. New explicit handover plans
 pin the original SQL manager name/OID before declaration; passive verification
 accepts only its exact incoming bootstrap-superuser administrative grant. The
 loader preflights that identity without changing the completed passive path.
 The parent fixture now provisions and pins the actual synthetic manager before
 creating guards/root and adds separate native Pod/VAP conflict-wire checks.
-Integrated compilation, affected vet and [contract/dependency gates](../test/results/handover-history-integrated-contracts.log)
+Integrated compilation, affected vet and contract/dependency gates
 pass.
 
-The [first corrected real PostgreSQL run](../test/results/initial-history-after.log)
+The first corrected real PostgreSQL run
 passes original creation/replay and passive access, along with ten named
 subcases covering platform membership behavior, changed options, missing/extra
 memberships, extra writes, replaced manager identity and passive access after
 manager privilege retirement. The suite exits 1 because one adversarial
 fixture's manager self-grant is rejected before reaching the product verifier;
-its mutation must be corrected. The [terminal report](../test/results/initial-history-after-check.log)
+its mutation must be corrected. The terminal report
 records 1,143 unchanged hashes and complete cleanup. Full selected-suite and
 actual activation/handover success remain unclaimed.
 
 ## Installation history role: isolated native failure reproduced
 
-The six-path [diagnostic package](../test/results/history-diagnostic-HANDOFF.md)
+The six-path diagnostic package
 is integrated with verified original/payload hashes and retained focused race/vet
 results. It separates history-role creation from final binding and exposes only
 a fixed phase, validated SQLSTATE and cancellation flag. The [selected real
@@ -17825,15 +17825,15 @@ PostgreSQL run](../test/results/initial-history-before.log) fails at
 `history-role-privileges`, with no SQLSTATE and no deadline expiry (0.311 seconds
 including Go overhead). The REVOKE statement itself did not return an error;
 the exact remaining catalog state still needs confirmation before changing the
-contract. The [terminal report](../test/results/initial-history-before-check.log)
+contract. The terminal report
 records 1,143 unchanged source hashes and complete lab cleanup. No installation
 activation success follows from this diagnostic.
 
-The [separate catalog probe](../test/results/initial-history-membership-before.log)
+The separate catalog probe
 now confirms exactly one original-manager membership before and after REVOKE,
 with the bootstrap grantor and ADMIN-only options unchanged. It rolls back its
 synthetic role, then reproduces the unchanged product verifier failure. The
-[terminal report](../test/results/initial-history-membership-before-check.log)
+terminal report
 records one passing diagnostic subcase, the expected product failure, 1,143
 unchanged hashes and complete cleanup. This matches PostgreSQL's documented
 non-superuser creator behavior. The correction will pin that original manager
@@ -17843,8 +17843,8 @@ memberships. Implementation and after-fix qualification remain pending.
 
 ## Original installation handover: integrated, native qualification pending
 
-The 42-path [ADR-129 package](../test/results/handover-implementation-HANDOFF.md)
-and five-path [native fixture](../test/results/handover-fixture-HANDOFF.md)
+The 42-path ADR-129 package
+and five-path native fixture
 are integrated after verifying every original and payload hash. The supervisor
 now composes original Pod handover, historical activation observation and eight
 ordered cleanup steps. A separate SELECT-only history login supports passive
@@ -17856,16 +17856,16 @@ parent fixture compiles and passes vet against all 36 exact frozen Go dependency
 paths. The new `make initial-handover-integration` owns a fresh database and exact
 test selection. Its separate synthetic API-status admission checks are not
 actual activation evidence; the other fixture path must execute the original
-compiled image and verify its SQL and encrypted object audit. Integrated [specification, architecture and Go dependency gates](../test/results/handover-integrated-contracts.log)
-pass. The [first real-service handover run](../test/results/initial-handover-first.log)
+compiled image and verify its SQL and encrypted object audit. Integrated specification, architecture and Go dependency gates
+pass. The first real-service handover run
 exits 1 (6.932 seconds including Go overhead): the separate synthetic admission
 fixture incorrectly set a node before removing its scheduling gate, and the
 actual constructor then failed at SQL-material preflight before Run. Its
-[terminal report](../test/results/initial-handover-first-check.log) records 1,140
+terminal report records 1,140
 unchanged source hashes and complete lab cleanup. The admission fixture is being
 corrected without changing the actual activation Pod. The loader failure traces
 to using a root-bound credential read merely to compare a fourth password before
-Declare. The three-path [preflight correction](../test/results/handover-preflight-HANDOFF.md)
+Declare. The three-path preflight correction
 is integrated with matching original/payload hashes and passing focused race/vet
 regressions. It compares the fourth password without returning credentials or
 manufacturing a preparation record; bound issuance still requires its original
@@ -17873,47 +17873,47 @@ record. The admission fixture now clears its synthetic gate before assignment
 and retains only a successful CREATE identity for cleanup. Integration-source
 compilation and spec-check pass. The explicit first-installation harness now
 creates only its one used cluster; ordinary context selections still create two.
-The [corrected run](../test/results/initial-handover-preflight-corrected.log)
+The corrected run
 passes six admission subcases and advances through constructor preflight into
 Run, then fails at `sql-and-providers/history-role-provision` (72.951 seconds
 including Go overhead). The wrong-node case is denied earlier by Kubernetes
 NodeRestriction; its assertion now identifies that exact rejection instead of
-claiming the request reached Asservat's policy. The [terminal report](../test/results/initial-handover-preflight-corrected-check.log)
+claiming the request reached Asservat's policy. The terminal report
 records 1,140 unchanged source hashes and complete cleanup. History-role SQL
 provisioning is the next diagnosis. No activation or complete installation
 success is claimed.
 
 ## Initial provider provisioning: actual loader and retirement qualification passed
 
-The five-file [retirement response correction](../test/results/provider-retirement-encoding-HANDOFF.md)
+The five-file retirement response correction
 is integrated after verifying every original and payload hash. The retained
 failing unit regression now passes with the affected race tests and vet. Only
 the existing exact invalid-accessor message and its pinned single-error wrapper
 are accepted; malformed raw bodies, other errors/statuses and a still-authenticated
 original token remain rejected. No deadline, issue retry or permission changed.
 
-The [small real-provider test](../test/results/initial-provider-retirement-corrected.log)
+The small real-provider test
 passes all four named entries, including both purpose-specific issue, verification,
 revocation and replay paths (1.177 seconds including Go test overhead). The actual
 trace confirms the exact wrapped accessor rejection and independent original-token
-HTTP 403. Its [terminal report](../test/results/initial-provider-retirement-corrected-check.log)
+HTTP 403. Its terminal report
 records 1,123 unchanged source hashes and complete cleanup.
 
-The [full actual-loader fixture](../test/results/initial-provider-loader-qualified.log)
+The full actual-loader fixture
 also passes all 19 named entries (100.390 seconds including Go test overhead),
 using owned Kubernetes, PostgreSQL and OpenBao services. It exercises fixed-file
 loader/Run preparation, replay of the original immutable seven-file projection,
 separate live Transit encrypt/decrypt rights, original provider revocation/replay,
 and the existing native retirement-denial checks. Its
-[terminal report](../test/results/initial-provider-loader-qualified-check.log)
+terminal report
 records the same 1,123 unchanged hashes and complete cleanup. Bootstrap identities,
 provider configuration and supplied S3 credentials remain fixture inputs. The
 original activation Pod stays gated: this qualifies preparation and provider
 retirement components, not actual activation or composed installation cleanup.
 
-The integrated [Go vet/race and dependency gates](../test/results/provider-retirement-integrated-code.log)
+The integrated Go vet/race and dependency gates
 pass (50 packages, 263 internal edges), as do the
-[specification and architecture checks](../test/results/provider-retirement-integrated-contracts.log)
+specification and architecture checks
 (75 schemas, 49 MCP contracts, 173 examples and 176 requirement/scenario pairs).
 These contract counts do not describe enabled runtime interfaces. The continuing installer work covers
 the exact original Pod handover, actual activation outcome, passive historical
@@ -17923,35 +17923,35 @@ runtime is enabled by this checkpoint.
 
 ## Initial provider provisioning: role-cap and retirement diagnostic history
 
-The [minimal real-provider regression](../test/results/provider-issuer-fixture-HANDOFF.md)
+The minimal real-provider regression
 is integrated and included in the normal fleet suite. Its
-[before-fix run](../test/results/initial-provider-issuer-before.log) confirms the
+before-fix run confirms the
 pinned OpenBao role-only child lookup reports a zero `explicit_max_ttl` despite
 nonrenewability and finite actual expiry; both product issuance cases reject it.
-The [terminal report](../test/results/initial-provider-issuer-before-check.log)
+The terminal report
 records 1,121 unchanged source hashes and complete cleanup.
 
-The four-file [child-role compatibility fix](../test/results/provider-role-cap-HANDOFF.md)
+The four-file child-role compatibility fix
 is integrated with verified hashes, a retained failing unit regression, passing
 affected races and vet. The issuer still requires a positive explicit cap.
 Child admission retains exact current role/ACL, purpose/parent/metadata,
 nonrenewability and original issue/expiry checks. No deadline, QPS, issue retry
 or permission was changed. The
-[after-fix provider run](../test/results/initial-provider-issuer-after.log)
+after-fix provider run
 now completes issuance and verification for both purposes, then fails their
 revocation-confirmation step (0.146 seconds including Go overhead). Its
-[terminal report](../test/results/initial-provider-issuer-after-check.log)
+terminal report
 records 1,122 unchanged hashes and complete cleanup. The next diagnostic checks
 only bounded static response facts; complete provider retirement and the full
 loader rerun remain unqualified.
 
-The [retirement wire diagnostic](../test/results/initial-provider-retirement-diagnostic.log)
+The retirement wire diagnostic
 now confirms that the actual provider accepts each accessor revocation with HTTP
 204. The subsequent accessor lookup returns HTTP 400 with a single error, but
 that error does not match the adapter's exact `invalid accessor` string. The
 original-token authentication rejection check is therefore not reached. This
 locates a provider error-response compatibility issue, not a measured timeout or
-revocation refusal. Its [terminal report](../test/results/initial-provider-retirement-diagnostic-check.log)
+revocation refusal. Its terminal report
 records one passing shape subcase, two failed retirement cases, 1,122 unchanged
 source hashes and complete cleanup. The correction must retain an explicit
 qualified invalid-accessor response plus actual rejection of the original token;
@@ -17959,7 +17959,7 @@ arbitrary HTTP 400 is not retirement evidence.
 
 ## Initial provider provisioning: integration and diagnostic history
 
-The 25-file [ADR-128 checkpoint](../test/results/initial-provider-stage-HANDOFF.md)
+The 25-file ADR-128 checkpoint
 is integrated after exact original and payload hash verification. The actual
 private preparation loader now composes original SQL/probe credentials, two
 one-use scoped OpenBao issue claims and the fixed seven-file immutable activation
@@ -17969,45 +17969,45 @@ deadline is not provider expiry or revocation. The original Pod remains gated.
 Staged focused race/vet/schema checks pass. The schema test initially omitted a
 canonical dependency while constructing its test fragment; that failure and the
 corrected standalone result are retained. No canonical requirement was weakened.
-Integrated [specification and architecture checks](../test/results/initial-provider-integrated-contracts.log)
+Integrated specification and architecture checks
 pass (75 schemas, 49 MCP tools and 176 requirement/scenario pairs). The full
-integrated [Go vet/race and dependency checks](../test/results/initial-provider-integrated-code.log)
+integrated Go vet/race and dependency checks
 also pass (50 packages, 263 import edges). The first actual
-[Kubernetes/PostgreSQL/OpenBao loader run](../test/results/initial-provider-loader-native.log)
+Kubernetes/PostgreSQL/OpenBao loader run
 fails in constructor preflight with the generic protected-input error, before
 credential issuance (31.964 seconds; two setup subcases pass). The
-[terminal report](../test/results/initial-provider-loader-native-check.log) records
+terminal report records
 1,116 unchanged source hashes and complete cleanup. The pinned OpenBao ACL
 response then reproduced a strict-decoder incompatibility in a failing unit
-regression. The seven-file [correction](../test/results/provider-loader-correction-HANDOFF.md)
+regression. The seven-file correction
 accepts documented typed metadata while retaining exact ACL matching, false
 template-expansion flags, bounded bodies and rejection of policy expiry. It also
 adds fixed phase diagnostics without displaying secret-bearing causes.
-Integrated [affected race tests](../test/results/provider-loader-correction-integrated-race.log)
-and [contract/dependency gates](../test/results/provider-loader-correction-integrated-contracts.log)
-pass. The [corrected native run](../test/results/initial-provider-loader-corrected-native.log)
+Integrated affected race tests
+and contract/dependency gates
+pass. The corrected native run
 now passes loader construction but fails in `Run` with the generic permission
 configuration error (62.581 seconds; two setup subcases pass). Its
-[terminal report](../test/results/initial-provider-loader-corrected-native-check.log)
+terminal report
 records 1,118 unchanged hashes and complete cleanup. The fix resolves the
 constructor compatibility issue; finer execution-phase diagnostics are required
 before the remaining setup failure can be located. The three-file
-[execution diagnostics](../test/results/provider-run-diagnostic-HANDOFF.md)
+execution diagnostics
 are now integrated with verified original/payload hashes and a passing
-[focused race check](../test/results/provider-run-diagnostic-integrated-race.log).
-The next [native run](../test/results/initial-provider-run-diagnostic-native.log)
+focused race check.
+The next native run
 locates the failure at `sql-and-providers/provider-wrap`, after loader,
 public-input and SQL preparation succeed (63.642 seconds including Go overhead;
 two setup subcases pass). Its
-[terminal report](../test/results/initial-provider-run-diagnostic-native-check.log)
+terminal report
 records 1,118 unchanged source hashes and complete cleanup. The five-file
-[provider timing diagnostics](../test/results/provider-phase-diagnostic-HANDOFF.md)
+provider timing diagnostics
 are subsequently integrated with verified hashes and passing staged race/vet
-checks. The [timed native run](../test/results/initial-provider-phase-diagnostic-native.log)
+checks. The timed native run
 locates the failure inside `provider-issue`: 2,427 ms elapsed, 28,953 ms remaining
 on the parent and 2,572 ms on the original operation. This disproves the timeout
 hypothesis; the 62.630-second test duration includes cleanup. Its
-[terminal report](../test/results/initial-provider-phase-diagnostic-native-check.log)
+terminal report
 records 1,120 unchanged source hashes and complete cleanup. Provider response
 validation is the next investigation; no process, authority or retry bounds were
 changed. No complete provider or installer success is claimed.
@@ -18017,19 +18017,19 @@ collection or disclosure.
 
 ## Combined schema48 qualification passed
 
-The [final full custody run](../test/results/verifier-installer-connector-custody-final.log)
+The final full custody run
 passes all 298 named entries (359.716 seconds including Go test overhead).
-Its [terminal report](../test/results/verifier-installer-connector-custody-final-check.log)
+Its terminal report
 records 1,105 unchanged source hashes and complete cleanup. The two overdue
 fixtures described below now use qualified current admission while preserving
-their original denial assertions; the [targeted rerun](../test/results/operation-overdue-verifier-profile-native-check.log)
+their original denial assertions; the targeted rerun
 also passes both cases. No production guard was relaxed.
 
-The current [first-installation suite](../test/results/verifier-connector-initial-installation-check.log)
-passes 16 entries, and [database recovery](../test/results/verifier-connector-recovery-check.log)
+The current first-installation suite
+passes 16 entries, and database recovery
 passes all three initial, process-restarted and logically restored phases.
 Each records the same 1,105 unchanged source hashes and complete cleanup.
-The final [specification and architecture gates](../test/results/schema48-final-contracts.log)
+The final specification and architecture gates
 also pass (73 schemas, 49 MCP tools and 176 requirement/scenario pairs).
 These results qualify the implemented component boundaries, including retained
 historical audit spend and scoped SQL provisioning. They do not establish an
@@ -18039,7 +18039,7 @@ handover, connector renewal and durable processing restrictions remain active wo
 
 ## Initial connector key ownership: integrated
 
-The first [combined full custody run](../test/results/verifier-installer-connector-full-custody.log)
+The first combined full custody run
 exits 1 with 295 passing entries and two failing overdue-cleanup fixtures. Both
 fixtures attempted new admission using a historical unqualified profile, which
 SQL48's constructor correctly rejects. The test setup now keeps required v3
@@ -18049,22 +18049,22 @@ migration fixture. Production guards and constructors are unchanged. The failed
 run records 1,105 unchanged hashes and complete cleanup. The targeted and full
 requalification results are recorded above; the failed result is retained.
 
-The five-file [connector checkpoint](../test/results/connector-initial-stage-HANDOFF.md)
+The five-file connector checkpoint
 is integrated after original and payload hash checks. It owns one process-local
 key/CSR, retains original bootstrap timing and checks independently activated
 registration. It also fixes a reproduced TLS callback failure: native preflight
 must provide supported signature schemes to a real process-owned callback.
 Actual connection verification remains mandatory. Staged race/vet and loopback
-TLS/current-revocation tests pass, as do integrated [affected race tests](../test/results/connector-initial-integrated-race.log),
-[vet](../test/results/connector-initial-integrated-vet.log) and [Go/specification/architecture checks](../test/results/connector-verifier-installer-contracts.log)
+TLS/current-revocation tests pass, as do integrated affected race tests,
+vet and Go/specification/architecture checks
 (50 packages, 261 import edges).
 Synthetic bootstrap/issuer/registry tests do not qualify production enrollment,
 server issuance, renewal or an installed connector. Those remain in progress.
 
 ## Original SQL provisioning and prepaid audit verification: integrated
 
-The eighteen-file [original SQL provisioning package](../test/results/initial-sql-provisioning-stage-HANDOFF.md)
-and eighteen-file [SQL48/ADR-125 correction](../test/results/operation-verifier-stage-HANDOFF.md)
+The eighteen-file original SQL provisioning package
+and eighteen-file SQL48/ADR-125 correction
 are integrated after checking every original and payload hash. SQL has been
 regenerated. No new permanent table was added, and the strict installation
 inventory ordering regression remains covered.
@@ -18078,10 +18078,10 @@ admission requires explicit version-three history-budget acceptance, including
 zero-backup-horizon configurations. Migration alone grants no such acceptance.
 
 Staged race/vet/schema checks and fixture compilation passed as recorded in the
-handoffs. The combined [Go vet/race, dependency and SQL generation checks](../test/results/verifier-installer-combined-code.log)
-and [specification, architecture, design and download checks](../test/results/verifier-installer-combined-contracts.log)
-now pass. The [actual migration-history fixture](../test/results/operation-verifier-migration-native.log)
-passes (15.70 seconds for the selected case); the [native Kubernetes/SQL provisioning fixture](../test/results/initial-sql-provisioning-native.log)
+handoffs. The combined Go vet/race, dependency and SQL generation checks
+and specification, architecture, design and download checks
+now pass. The actual migration-history fixture
+passes (15.70 seconds for the selected case); the native Kubernetes/SQL provisioning fixture
 passes all 20 named entries (74.595 seconds including Go test overhead). Both
 terminal reports record 1,102 unchanged source hashes and complete cleanup.
 Original Secret/role replay, wrong-password refusal and irreversible role retirement
@@ -18091,32 +18091,32 @@ custody and current installation/recovery checks remain next. Public runtime sta
 
 ## Private native listener and schema47: combined qualification passed
 
-The twenty-four-file [ADR-122 listener package](../test/results/native-owner-listener-stage-HANDOFF.md)
+The twenty-four-file ADR-122 listener package
 is integrated with original and payload hashes verified. It composes optional
 private HTTP/2 serving, a distinct audited native port, protected API/topology
 inputs and separately credentialed native metadata reads. Historical omitted
 fields preserve their original encoding. Staged races, actual listener tests,
 schema checks and integration compilation pass. The combined
-[Go vet/race, architecture and SQL checks](../test/results/native-owner-stop-combined-code.log)
-and [specification/architecture checks](../test/results/native-owner-stop-combined-contracts.log)
+Go vet/race, architecture and SQL checks
+and specification/architecture checks
 also pass (50 packages, 260 import edges, 38 generated SQL files).
-The [changed real SQL/S3/listener fixture](../test/results/native-owner-listener-qualified.log)
+The changed real SQL/S3/listener fixture
 passes the separately credentialed read facet's mutation denials, exact 352-byte
 native file/checksum, SQL completion and three distinct Joined conversations.
-Its [terminal report](../test/results/native-owner-listener-qualified-check.log)
+Its terminal report
 records 1,090 unchanged source hashes and complete cleanup. Human/Pod/issuer and
 initial backing authority remain explicit fixture inputs. Connector identity/renewal,
 protected projection provisioning and public workflow composition remain open.
 
 The new SQL47 tables exposed an inventory-order regression in first activation.
-The [real before-fix suite](../test/results/stop-retirement-initial-inventory-before.log)
+The real before-fix suite
 fails the positive preparation/provisioning cases; its
-[terminal report](../test/results/stop-retirement-initial-inventory-before-check.log)
+terminal report
 records 1,081 unchanged hashes and complete cleanup. The fixed list retains exact
 catalog equality and adds a fast strict-order/duplicate regression. The
-[after-fix first-installation suite](../test/results/stop-retirement-initial-inventory-after.log)
+after-fix first-installation suite
 now passes all 16 cases, including actual scoped SQL role provisioning/retirement.
-The [database recovery suite](../test/results/native-owner-stop-recovery.log)
+The database recovery suite
 also passes initial, process-restarted and logically restored phases. Both
 terminal reports record 1,090 unchanged hashes and complete cleanup. These are
 component qualification, not the complete installed workflow or a production
@@ -18125,7 +18125,7 @@ ordinary-audit verifier correction when it is integrated.
 
 ## Prepaid Stop retirement: selected provider qualification passed
 
-The twenty-three-file [SQL47/ADR-124 package](../test/results/download-stop-lifecycle-stage-HANDOFF.md)
+The twenty-three-file SQL47/ADR-124 package
 is integrated after original and payload hash verification. It adds positive
 writer completion, finite object/SQL cleanup, independent prepaid certificate
 verification and backed cooling history for new explicitly qualified Stop
@@ -18134,13 +18134,13 @@ unchanged. Pending reconciliation continues independent eligible records after
 a provider failure without renewing its original pass. Staged race/vet and SQL
 generation checks are recorded in the handoff; combined gates and actual
 PostgreSQL/S3 execution are pending. The schema head is now 47. Combined
-[Go vet/race, architecture and SQL generation](../test/results/download-stop-lifecycle-combined-code.log)
+Go vet/race, architecture and SQL generation
 pass (50 packages, 260 import edges, 38 generated SQL files), as do the
-[specification and architecture contracts](../test/results/download-stop-lifecycle-combined-contracts.log).
-The [selected real PostgreSQL/S3 run](../test/results/stop-retirement-native-combined.log)
+specification and architecture contracts.
+The selected real PostgreSQL/S3 run
 now passes both strict joined native exchange (10.10 seconds) and the new Stop
 retirement/backup-history/unknown-writer case (64.08 seconds). Its
-[terminal report](../test/results/stop-retirement-native-combined-check.log) records
+terminal report records
 two selected passes, 1,081 unchanged source hashes and complete cleanup. This
 qualifies the implemented Stop lifecycle and final upstream cancellation fix
 under the fixture's explicit synthetic authority/backing boundaries. Full custody,
@@ -18157,35 +18157,35 @@ The private installer diagnostic run remains a qualification failure. It records
 one TokenRequest returning HTTP 422 and no TokenReview, with the original anchor
 and irreversible issuance claim retained. The continuity policy currently omits
 the exact intended token subresource operation; a bounded correction and negative
-cases are in progress. Its [terminal report](../test/results/initial-private-probe-diagnostic-native-check.log)
+cases are in progress. Its terminal report
 records 1,066 unchanged source hashes and complete cleanup. No failed issuance
-claim is reset or retried. The [three-file correction](../test/results/initial-private-probe-token-admission-HANDOFF.md)
+claim is reset or retried. The three-file correction
 is now integrated with verified hashes. It preserves historical policy bytes
 and adds ten native negative cases; its staged races and fixture compilation
-pass. The [after-fix native run](../test/results/initial-private-probe-token-native.log)
+pass. The after-fix native run
 passes 31 cases, including original-token replay and all ten new scope negatives.
-Its [terminal report](../test/results/initial-private-probe-token-native-check.log)
+Its terminal report
 records 1,081 unchanged hashes and complete cleanup. The combined Go gate above
 predates this separate Kubernetes policy correction; protected SQL/provider
 provisioning and actual installer handover remain required.
 
 ## Joined native download and private installation probe
 
-The nine-file [terminal closure correction](../test/results/native-content-closure-HANDOFF.md)
+The nine-file terminal closure correction
 is integrated after original/payload hash verification. Its deterministic real
 two-hop HTTP/2 regression fails before the fix and passes afterward. Only an exact
 zero-byte final relay marker can use the original checked, monotonically shortened
 lease after the hub's own successful retirement. No data, command or new-work
 authority is added. Cancellation, expiry, malformed markers and failed writes
-retain their negative checks. The [strict real SQL/S3 rerun](../test/results/native-exchange-sql-joined.log)
+retain their negative checks. The strict real SQL/S3 rerun
 now verifies the exact 352 native bytes/checksum, SQL completion, original key
 spend and three distinct positively Joined worker conversations. Its
-[terminal report](../test/results/native-exchange-sql-joined-check.log) records
+terminal report records
 all 1,060 source hashes unchanged and complete cleanup. This resolves the logged
 worker uncertainty below for the tested bounded context path; large artifacts
 and installed public downloads remain unqualified.
 
-A subsequent [two-file upstream cancellation correction](../test/results/native-upstream-cancel-HANDOFF.md)
+A subsequent two-file upstream cancellation correction
 is integrated. The queued relay now retains actual upstream/process cancellation
 after buffering a final marker and joins its cancellation callback on close.
 Its deterministic real-HTTP/2 case fails before and the full native race suite
@@ -18193,27 +18193,27 @@ passes after. Normal terminal EOF remains distinct from explicit stream closure.
 The strict SQL/S3 run above predates this final correction; combined provider
 requalification is still required for the latest source.
 
-The nineteen-file [private installation probe checkpoint](../test/results/initial-private-probe-stage-HANDOFF.md)
+The nineteen-file private installation probe checkpoint
 is integrated with verified hashes and C-21 ownership for pure provider-input
 validation. Original private Secret identity, one acknowledged issuance claim,
 authenticated token response and unchanged expiry survive replay; an unknown
 issuance cannot become another TokenRequest. Historical plans preserve their
 compiled protection-policy bytes. Staged races and schema checks pass. Actual
-[integrated vet](../test/results/native-private-integrated-vet.log) and
-[specification/architecture checks](../test/results/native-private-contracts.log)
-pass, replacing the overlay-only vet limitation. The [real Kubernetes run](../test/results/initial-private-probe-native.log)
+integrated vet and
+specification/architecture checks
+pass, replacing the overlay-only vet limitation. The real Kubernetes run
 passes the public-input producer and its protection cases, but private probe
 preparation fails with configuration unavailable before the replay assertions.
-The overall result is exit 1; the [terminal report](../test/results/initial-private-probe-native-check.log)
+The overall result is exit 1; the terminal report
 records 1,066 unchanged source hashes and complete cleanup. Private probe runtime
 qualification is open and targeted diagnosis is in progress. SQL/provider provisioning, credential retirement,
 guarded handover and activation remain separate work, and Helm runtime stays off.
 
 Cleanup review separately found repeatable independent certificate verification
 after an unavailable acknowledgement in the existing operation-audit lifecycle.
-The isolated [failing-before regression](../test/results/operation-verifier-budget-before.log)
+The isolated failing-before regression
 demonstrates eight provider calls with zero durable verifier claims. The
-[open correction design](../test/results/operation-verifier-budget-open-design.md)
+open correction design
 reserves migration48 separately from the Stop lifecycle's migration47. It requires
 prepaid independent verification and explicit history-budget compatibility;
 neither correction nor runtime qualification is claimed yet.
@@ -18223,7 +18223,7 @@ neither correction nor runtime qualification is claimed yet.
 The forty-six-file SQL46/ADR-119 package is integrated with verified base/payload
 hashes; combined SQL has been regenerated at schema head 46 with 76 permanent
 tables. Its
-[handoff](../test/results/public-context-download-stage-HANDOFF.md) records the
+handoff records the
 actual staged Go race/vet, browser/MCP, UI and schema checks. Ordinary context
 prepare/status/cancel now share the canonical browser/MCP operations. Browser
 preparation attaches bounded server-side refresh ownership; status stays read-only.
@@ -18232,19 +18232,19 @@ so exhausted normal operation-audit capacity cannot prevent its original actor
 from stopping it. Restriction precedes provider I/O; separate recovery checks
 gate the bounded encrypted audit effects. Full Stop retirement and protected
 backing issuance remain required. No listener or Helm runtime has been enabled.
-The combined [Go vet/race, Go architecture and SQL generation checks](../test/results/public-download-combined-code.log)
+The combined Go vet/race, Go architecture and SQL generation checks
 pass, including all 49 packages and 37 generated SQL files. Combined
-[specification, architecture, design, download and console checks/build](../test/results/public-download-combined-contracts-console.log)
+specification, architecture, design, download and console checks/build
 also pass. The console build retains a bundle-size warning; no limit was raised
-to hide it. The [selected real PostgreSQL/S3 Stop fixture](../test/results/public-download-stop-selected.log)
+to hide it. The selected real PostgreSQL/S3 Stop fixture
 passes original-actor cancellation without evidence scopes, exhausted normal
 audit capacity, stable replay, separate SQL roles and a recovery-incarnation
 mismatch that allows restriction while preventing new audit spend. Its
-[terminal report](../test/results/public-download-stop-selected-check.log) records
+terminal report records
 all 1,058 source hashes unchanged and complete cleanup. Accepted backing and
 human identity remain explicit fixture inputs; provider/backup retirement and
-installed public composition remain unqualified. The [combined custody suite](../test/results/public-download-combined-custody.log)
-also passes all 296 named entries. Its [terminal report](../test/results/public-download-combined-custody-check.log)
+installed public composition remain unqualified. The combined custody suite
+also passes all 296 named entries. Its terminal report
 records the same 1,058 unchanged source hashes and complete cleanup. This includes
 the existing native-exchange test whose final worker uncertainty was only logged;
 the explicit qualification limit below still applies.
@@ -18252,7 +18252,7 @@ the explicit qualification limit below still applies.
 ## Typed installation inputs and deployed native startup: selected cases passed
 
 The thirteen-file ADR-123 package is integrated after all base/payload hash checks.
-Its [handoff](../test/results/initial-final-inputs-stage-HANDOFF.md) records staged
+Its handoff records staged
 race/vet and schema checks. The private preparer creates the nine fixed public
 startup/guard resources while retaining original UIDs, one-use effects and a
 gated Pod. Private credentials, handover and activation are still separate work.
@@ -18260,8 +18260,8 @@ The parent native-worker fixture now exercises v2 alongside the existing v1
 executable: an immutable credential projection, actual TLS and Pod-token checks,
 distinct valid nonces, bounded idle backoff and positive retirement. Its operation
 admission is explicitly an empty synthetic registry; it does not test evidence
-transfer. Integrated [focused races and fixture compilation](../test/results/native-startup-installer-focused.log)
-pass. The [first combined native run](../test/results/native-startup-installer-first.log)
+transfer. Integrated focused races and fixture compilation
+pass. The first combined native run
 passes the legacy worker (18.36 seconds) and the installer public-input case
 (57.63 seconds, sixteen subtests). The v2 worker fails after exactly one accepted
 native idle exchange; the whole run exits 1. Its terminal report records all
@@ -18269,13 +18269,13 @@ native idle exchange; the whole run exits 1. Its terminal report records all
 positive selected evidence; it does not qualify v2 startup or the combined suite.
 The worker's client-start-relative idle deadline is being corrected against
 the independently bounded server observation and original client setup budget.
-The [focused regression fails before](../test/results/worker-native-idle-before.log)
-and [passes after](../test/results/worker-native-idle-final.log), including rejection
+The focused regression fails before
+and passes after, including rejection
 after the original setup budget. Full bootstrap races and current specification,
-architecture and design checks also pass. The [v2 native rerun](../test/results/native-worker-pod-second.log)
+architecture and design checks also pass. The v2 native rerun
 passes the actual compiled Restricted Pod, immutable secret projection, two
 separate current mTLS/Pod-token idle exchanges and confirmed foreground retirement.
-Its [terminal report](../test/results/native-worker-pod-second-check.log) records
+Its terminal report records
 all 1,039 source hashes unchanged and complete cleanup. This qualifies deployed
 startup/idle supervision; it does not exercise native evidence bytes, timed
 certificate renewal or production credential provisioning. Those remain required.
@@ -18286,54 +18286,54 @@ The 53-file SQL45/ADR-116 payload and 24-file parent ADR-121 startup payload are
 integrated after original/payload hash checks. That checkpoint introduced schema
 45 with 73 permanent tables; the SQL46 checkpoint above is the current head.
 Generated queries were regenerated against the combined tree.
-The [exchange handoff](../test/results/native-exchange-stage-HANDOFF.md) records
+The exchange handoff records
 actual staged tests and the remaining fixture boundaries. The native v2 worker
 composes its process-owned credentials with the separate HTTP/2 transfer loop,
 scoped fixed storage projection and remote unwrap service. Temporary storage
 credentials must cover the original worker lifetime. The 64 MiB v2 minimum is
 a provisional configured floor, not measured RSS.
 
-[Staged startup vet/race tests](../test/results/worker-startup-native-supervision-v2-final.log)
+Staged startup vet/race tests
 pass against the frozen v2 API. The exchange regressions found an undersized
 command limit and two-hop cancellation loss. The guarded four-file follow-up
 now routes production ConnectorAdmission through the same joined receive owner
 and gives the SQL45 window alias a distinct name from its PL/pgSQL record. Its
 production-constructor test failed before at one second and passes after the
-fix; [the handoff](../test/results/native-admission-fix-stage-HANDOFF.md) records
-that evidence. Combined [full Go vet/race, architecture and SQL generation](../test/results/native-startup-combined-code-first.log)
+fix; the handoff records
+that evidence. Combined full Go vet/race, architecture and SQL generation
 pass (49 packages, 252 import edges, 36 generated SQL files), as do
-[specification, architecture, design and download checks](../test/results/native-startup-combined-contracts-first.log).
+specification, architecture, design and download checks.
 The first selected SQL/S3 invocation used the wrong enclosing test name and
 was correctly rejected as an empty selection. The
-[correctly selected run](../test/results/native-exchange-sql-second.log) fails
+correctly selected run fails
 during regional preparation. A subsequent
-[diagnostic run](../test/results/native-exchange-sql-diagnostic.log) shows that
+diagnostic run shows that
 both relay admissions succeed, all three unwrap slots are consumed and the
 worker reaches Joined before preparation returns unavailable. Both executed
 runs preserve all 1,034 source hashes and complete owned-service cleanup;
 neither qualifies the transfer. A real HTTP/2 regression reproduces a terminal
 ordering race: the server began another blocking current check after flushing
 the positive final marker, which the worker could already receive and close.
-The [three-file correction](../test/results/native-terminal-frame-HANDOFF.md)
+The three-file correction
 moves the required blocking check before Done and preserves original deadlines,
 known cancellation and the data path's post-write checks. One hundred focused
 repetitions and all native/mTLS/evidence race tests pass. The
-[corrected real-service run](../test/results/native-exchange-sql-terminal-fix.log)
+corrected real-service run
 now completes preparation and metadata observation with Joined worker results,
 then fails the content transfer with zero output bytes. Its final operation has
 about one second of original authority remaining at connector admission. The
 run exits 1 with all 1,039 hashes unchanged and complete cleanup. This verifies
 progress through the earlier failure, not successful download qualification;
 the same identity batch had covered both metadata lookup and subsequent content
-admission. The [five-file phase correction](../test/results/native-response-phase-HANDOFF.md)
+admission. The five-file phase correction
 closes the joined metadata batch, acquires fresh current authority from the same
 live reader, and intersects retention/original response bounds before admission.
 The before regression fails; affected evidence/native/browser races pass with
 revocation, changed-client, cancellation and shortened-retention negatives.
 The native fixture now uses the actual browser live-reader component over its
-explicit synthetic session store. The [phase-corrected real-service run](../test/results/native-exchange-sql-phase-fix.log)
+explicit synthetic session store. The phase-corrected real-service run
 exits 0, delivers the exact 352-byte context file, verifies its checksum and records
-DownloadCompleted. Its [terminal report](../test/results/native-exchange-sql-phase-fix-check.log)
+DownloadCompleted. Its terminal report
 records all 1,040 source hashes unchanged and complete cleanup. However, the
 content worker reports an uncertain final acknowledgement, which this version of
 the fixture only logs. The passing test therefore does not prove a clean joined
@@ -18351,15 +18351,15 @@ composition and full installed workflow remain required. Helm stays disabled.
 Startup review also found a separate protocol mismatch: the actual v2 worker
 generated UUID nonces, while the native encoder requires canonical base64url
 encoding of 32 random bytes. The added wire-contract regression
-[fails before correction](../test/results/worker-native-nonce-before.log), and
+fails before correction, and
 the corrected generator plus all focused worker-native startup/supervision
-[race tests pass](../test/results/worker-native-nonce-after.log). This does not
+race tests pass. This does not
 explain the SQL fixture failure, whose separate worker already used valid nonces.
 
 ## Gated installation preparation: integrated and native qualification passed
 
 The seventeen-file ADR-120 package is integrated after verifying every original
-and payload hash. [The handoff](../test/results/initial-activation-preparation-stage-HANDOFF.md)
+and payload hash. The handoff
 records focused staged race/vet/schema results. The private preparation command
 now supports an explicit immutable continuation that creates only the exact inert
 scheduling-gated Pod. Each actual POST consumes one of sixteen original request
@@ -18367,12 +18367,12 @@ records; a known UID prohibits replacement, and only the original joined respons
 can close its request. Shutdown joins the full preparation call. A separate
 credential binder persists one original fifteen-minute interval against the exact
 private material and full startup identity, without issuing SQL/provider rights.
-Integrated [affected race/vet checks](../test/results/initial-activation-preparation-integrated.log)
-and [specification/architecture gates](../test/results/initial-activation-preparation-contracts.log)
-pass. The [selected native Kubernetes run](../test/results/initial-activation-preparation-native.log)
+Integrated affected race/vet checks
+and specification/architecture gates
+pass. The selected native Kubernetes run
 passes 35 named entries, including actual 201 request drain, delayed original
 POST, retained uncertainty, original UID and late 409 after the fixture guard
-transition. Its [terminal report](../test/results/initial-activation-preparation-native-check.log)
+transition. Its terminal report
 records 975 unchanged source hashes, no post-exit changes and complete cleanup.
 The fixture supplies the final guard transition explicitly; this does not qualify
 the unfinished production handover.
@@ -18382,32 +18382,32 @@ positive retirement remain required. Public services and Helm runtime stay disab
 ## Retained installation state: integrated and selected native qualification
 
 The sixteen-file ADR-118 package is integrated after verifying every original
-and payload hash. [The handoff](../test/results/initial-preparation-state-stage-HANDOFF.md)
+and payload hash. The handoff
 records its focused staged tests and remaining scope. The protected immutable
 private-material reader and exact original-interval codec do not issue roles or
 choose a new credential interval. A separate SELECT-only historical reader binds
 the exact original installation, startup plan, claim and audit receipt. Missing
 state does not prove no effect; historical activation does not clear recovery.
 Integrated Go vet/race, architecture and all 35 SQL generation checks pass in
-[the combined code log](../test/results/refresh-installation-combined-code-gates.log).
+the combined code log.
 The first contract check rejected fragment-only schema references; canonical
 self-document references now pass specification, architecture, design and download
-checks in [the corrected contract log](../test/results/refresh-installation-combined-contract-gates-after.log).
-The [fresh-installation suite](../test/results/refresh-installation-pristine.log)
+checks in the corrected contract log.
+The fresh-installation suite
 passes sixteen named entries, including the exact 70-table inventory and the
 new SELECT-only history reader, real blocked-read expiry, denied current operator
 and unchanged later recovery fence. Its
-[terminal report](../test/results/refresh-installation-pristine-check.log)
+terminal report
 records 968 unchanged source hashes and complete cleanup. Current Kubernetes
 read authority is synthetic in that SQL suite. The combined
-[native Kubernetes selection](../test/results/refresh-installation-native.log)
+native Kubernetes selection
 passes 36 named entries in 98.826 seconds, including the actual Restricted
 installer, historical read after its exit, missing-guard/unbound/wrong-SQL-role
 rejections, protected preparation and all retirement/cleanup checks. The
-[native terminal report](../test/results/refresh-installation-native-check.log)
+native terminal report
 records 968 unchanged source hashes, no post-exit changes and complete cleanup.
 That fixture still supplies the trusted bootstrap and provider inputs; it is not
-an automatically provisioned Helm installation. The [database recovery qualification](../test/results/refresh-installation-recovery-check.log)
+an automatically provisioned Helm installation. The database recovery qualification
 also passes all three actual initial/restart/logical-restore phases with the same
 source and cleanup guarantees; independent activation remains fixture-supplied.
 Production material persistence, the gated Pod, provider/SQL provisioning and original guard
@@ -18418,35 +18418,35 @@ handover remain separate work; no installer or Helm runtime completion is claime
 The reviewed SQL43 package is integrated after all 25 base/payload hash checks;
 22 source files were copied and SQL was regenerated against the combined schema.
 Migration 43 now precedes 44; the schema head remains 44 and the exact initial
-installation inventory includes 70 tables. The [handoff](../test/results/browser-refresh-owner-stage-HANDOFF.md)
+installation inventory includes 70 tables. The handoff
 records focused staged race/vet checks and the limits of its compile-only native hooks.
 The owner contract (removed by ADR-224) bound explicit browser
 POST consent to the original session, current accepted download, finite demand,
 one-use provider refresh and positive joined cleanup. Logout removes authority
 without refunding unjoined work. Public operation attachment, native browser
 transfer, process-loss reconciliation and metadata retirement remain unfinished.
-Integrated [code gates](../test/results/browser-refresh-owner-integrated-code.log)
+Integrated code gates
 passed full Go vet/race, Go architecture and all 35 generated SQL files.
-[Contract gates](../test/results/browser-refresh-owner-integrated-contracts.log)
+Contract gates
 passed specification, architecture, design and download checks. The
-[first SQL/S3 run](../test/results/browser-refresh-owner-native-first.log) failed
+first SQL/S3 run failed
 because the native fixture used the legacy authority field while calling the
 current-identity preparation method. The fixture now supplies CurrentAuthority;
 production method checks were unchanged. The
-[second run](../test/results/browser-refresh-owner-native-second.log) reached
+second run reached
 prepared evidence and owner admission, then exposed a production observation
 interval defect: the outer observation start and a later nested five-second end
 made an interval longer than its maximum. The
-[focused before regression](../test/results/browser-refresh-owner-interval-before.log)
+focused before regression
 reproduces the one-microsecond extension. The view now preserves the outer end,
 and maintenance also retains the original settings/session deadline. Focused
-[race tests after correction](../test/results/browser-refresh-owner-interval-after.log)
+race tests after correction
 pass. Both failed native runs recorded unchanged source and complete cleanup.
 The third and fourth SQL runs reached current response demand but failed while
 binding its one-use claim. A diagnostic run identified PostgreSQL SQLSTATE 42702:
 the trigger's local record and an EXISTS alias both used `c`. The migration now
 uses an unambiguous alias; temporary diagnostics were removed. The
-[fifth run](../test/results/browser-refresh-owner-native-fifth.log) passed that
+fifth run passed that
 claim and reached pending-pause lookup, where PostgreSQL rejected the generic
 session query's unnecessary UPDATE privilege requirement. Pause now uses a
 dedicated SELECT under the existing exclusive browser-root lock, preserving a
@@ -18454,24 +18454,24 @@ coherent session/claim observation without granting session writes. Its native
 regression requires SQLSTATE 42501 for attempted session UPDATE and DELETE.
 All five failed selected runs and the diagnostic run recorded unchanged source
 and complete owned-lab cleanup; none is a passing qualification. The corrected
-[sixth selected run](../test/results/browser-refresh-owner-native-sixth.log)
+sixth selected run
 passed the complete owner case in 2.09 seconds: actual publication/preparation,
 response-bound pending/settled lookup, one-use claims, delayed-COMMIT closure,
 logout capacity and exact privilege denial. Its
-[terminal report](../test/results/browser-refresh-owner-native-sixth-check.log)
+terminal report
 records 958 unchanged source hashes, no post-exit changes and complete cleanup.
-The [full combined custody suite](../test/results/refresh-installation-full-custody.log)
+The full combined custody suite
 then passed 294 named entries in 271.827 seconds. Its
-[terminal report](../test/results/refresh-installation-full-custody-check.log)
+terminal report
 records 968 unchanged source hashes, no post-exit changes and complete cleanup.
 Process authority in the owner case remains explicitly synthetic; these results
 do not establish a public native transfer. Fresh-installation, recovery and native
 Kubernetes installation results are recorded above.
 
 The actual Keycloak/PostgreSQL/OpenBao
-[provider run](../test/results/browser-refresh-owner-provider-first.log) passed
+provider run passed
 13 named entries, including explicit-POST-owned rotation without tab polling.
-Its [terminal report](../test/results/browser-refresh-owner-provider-first-check.log)
+Its terminal report
 records 913 unchanged source hashes, no post-exit changes and complete cleanup.
 That provider helper deliberately supplies synthetic accepted download/process
 demand; the separate real SQL owner test now passes as recorded above. No runtime
@@ -18485,34 +18485,34 @@ declarative resources under independently checked continuity protection, with a
 producer-owned public root and original per-effect deadlines. Roles/bindings can
 retire only in place, leaving their keys occupied against delayed CREATEs.
 Credentials, provider calls, executable Pods, witnesses and activation remain
-outside this retry set. The [staged handoff](../test/results/initial-preparer-stage-HANDOFF.md)
+outside this retry set. The staged handoff
 records actual focused checks and explicit remaining work. Integrated focused
-race/compile checks pass in [the focused log](../test/results/initial-preparer-focused.log),
+race/compile checks pass in the focused log,
 and specification/architecture checks pass in
-[the contract log](../test/results/initial-preparer-contract-gates.log).
-The [first native run](../test/results/initial-preparer-native-first.log) failed:
+the contract log.
+The first native run failed:
 target-namespace deletion was not denied by the continuity policy. Test cleanup
 also encountered admission rejection while deleting retired cluster RBAC objects.
 The other selected deletion, retired-authority and delayed-CREATE checks passed;
 the enclosing test failed and is not qualified. Its
-[terminal report](../test/results/initial-preparer-native-first-check.log)
+terminal report
 records 942 unchanged source hashes, no post-exit changes and removal of both
 owned clusters/services. That lab cleanup result does not erase the test's own
 cleanup failures. The namespace rule and cleanup convergence are being corrected;
 native qualification of the integrated source has not yet completed. The reviewed
 two-file correction removes the invalid empty-request-namespace assumption for
 core Namespace keys while keeping exact resource/name matching. The
-[second native run](../test/results/initial-preparer-native-second.log) passes all
+second native run passes all
 14 functional subtests, including target and bootstrap namespace deletion denial.
 It still exits 1 because fixture cleanup does not recognize the returned policy
-rejection. The [second terminal report](../test/results/initial-preparer-native-second-check.log)
+rejection. The second terminal report
 records 942 unchanged source hashes, no post-exit changes and complete owned-lab
 cleanup. Those facts do not make the failed test qualified; the teardown
 classification has been corrected in the fixture: it recognizes only structured
 403/422 denial from the exact owned policy/binding, keeps the original cleanup
 deadline and retries the same UID. Focused race tests pass in
-[the cleanup regression log](../test/results/initial-preparer-cleanup-status-integrated.log);
-the [combined native rerun](../test/results/refresh-installation-native.log) now
+the cleanup regression log;
+the combined native rerun now
 passes the enclosing preparation test and all fourteen functional subtests,
 with unchanged source and complete cleanup. Credential-state persistence,
 finite activation-Pod recovery and guarded handover continue separately; this
@@ -18532,42 +18532,42 @@ logout POST's CSRF check. Canonical HTTP 409 now promises that revocation has no
 started. The console retries only that response within the original shared
 CSRF/logout budget. Once revocation starts, uncertain errors cannot become
 retryable Busy; lost replies and generic failures still require explicit retry.
-The [Go before log](../test/results/browser-logout-busy-before-go.log) records
+The Go before log records
 the incorrect post-effect 409 (and an initial test assumption corrected to retain
 the existing generic 503 Retry-After header); the
-[console before log](../test/results/browser-logout-busy-before-console.log)
+console before log
 reproduces both the failed one-click logout and lost shared retry budget.
 Focused after checks pass, as do full
-[Go vet/race and architecture gates](../test/results/browser-busy-final-code-gates.log)
-and [console contract/TypeScript/tests](../test/results/browser-busy-final-console-gates.log)
+Go vet/race and architecture gates
+and console contract/TypeScript/tests
 with 115 tests in eight files. Public authentication documentation and generated
 TypeScript now describe the exact pre-revocation retry boundary.
 
 The actual Keycloak/PostgreSQL/OpenBao
-[identity run](../test/results/browser-busy-native.log) passed 12 named entries
+identity run passed 12 named entries
 in 9.639 seconds. A real decrypted CSRF read held across an actual committed
 provider rotation returns Busy, and a fresh lookup recovers without another
 rotation. Eight concurrent refresh callers accept only success or canonical
-Busy. Its [terminal report](../test/results/browser-busy-native-check.log)
+Busy. Its terminal report
 records 890 unchanged source hashes, no post-exit changes and complete cleanup.
 Protected identity/settings inputs remain fixture-owned; this does not qualify
 SQL43 download-owned refresh or a production installation.
 
 The first built-console attempt failed before launching a browser because the
 pinned Playwright browser executable was missing. After installing that exact
-headless Chromium build, the [second run](../test/results/browser-busy-console-browser-after.log)
+headless Chromium build, the second run
 passed 18 journeys and 14 accessibility scans in 16.864 seconds, with no external
 requests, CSP errors or JavaScript errors. Both CSRF-GET and logout-POST Busy
 cases reach sign-out with one click and exactly one revocation. The
-[archived report](../test/results/browser-busy-console-browser-report.json)
-and [package hashes](../test/results/browser-busy-console-package-hashes.json)
+archived report
+and package hashes
 identify this result. This uses the real compiled React/Go HTTPS transport with
 synthetic session/capture/case services, not public-runtime authority. Runtime
 Helm services remain disabled. Specification, architecture and design checks passed in the
-[contract gate log](../test/results/browser-busy-final-contract-gates-after.log).
+contract gate log.
 The optional full OpenAPI gate initially lacked its development validator;
 after installing the previously recorded 0.9.0 version, its
-[separate run](../test/results/browser-busy-openapi-after.log) passed. Next
+separate run passed. Next
 continue SQL43 ownership, the native evidence exchange and protected installation
 composition.
 
@@ -18587,11 +18587,11 @@ current absence acknowledgement still gates identifying SQL retirement and
 capacity release. Original dates, finite cleanup generations, uncertain charges
 and backup-history floors remain binding. Old records, unknown writers, claimed
 certificates and restart/restore are explicitly excluded pending reconciliation.
-Integrated [code gates](../test/results/overdue-audit-code-gates.log) returned 0
+Integrated code gates returned 0
 for Go vet/race, architecture and SQL generation (34 generated files).
-[Contract gates](../test/results/overdue-audit-contract-gates.log) returned 0
+Contract gates returned 0
 for specification, architecture, design and downloads. The
-[first native attempt](../test/results/overdue-audit-native-first-check.log)
+first native attempt
 failed during migration, before any selected test ran: a `CASE` expression in a
 PL/pgSQL `IF` condition needed parentheses. The one-expression correction is
 integrated. The failed attempt's
@@ -18599,22 +18599,22 @@ environment report records complete cleanup; it did not record a source-freeze
 verdict. The harness now creates a fresh empty test log and records source hashes
 and provider diagnostics on setup failures too.
 
-The [second native run](../test/results/overdue-audit-native-second.log) passed
+The second native run passed
 both existing healthy/cooling cases and both new overdue-original cases in
-114.510 seconds. Its [terminal report](../test/results/overdue-audit-native-second-check.log)
+114.510 seconds. Its terminal report
 records 933 unchanged source hashes, no post-exit changes and complete cleanup.
 The cases use actual SQL locks, object deletion and independent absence checks;
 their backup-history qualification inputs remain synthetic. The
-[full custody regression](../test/results/overdue-audit-full.log) also passed:
+full custody regression also passed:
 293 named passing entries in 267.478 seconds. Its
-[terminal report](../test/results/overdue-audit-full-check.log) records the same
+terminal report records the same
 933 unchanged source hashes, no post-exit changes and complete cleanup.
-The [pristine-installation suite](../test/results/overdue-audit-initial.log)
+The pristine-installation suite
 passed 12 named entries in 2.473 seconds, including the 68-table inventory and
 temporary purpose-role provisioning/retirement. Its
-[terminal report](../test/results/overdue-audit-initial-check.log) records the
+terminal report records the
 same source and cleanup guarantees. The
-[database recovery run](../test/results/overdue-audit-recovery-check.log) passed
+database recovery run passed
 all three actual PostgreSQL initial/restart/logical-restore phases, again with
 933 unchanged hashes and complete cleanup. That test establishes incarnation
 fencing with synthetic independent activation; it does not implement production
@@ -18622,7 +18622,7 @@ recovery or historical cleanup reconciliation. No runtime endpoint is enabled.
 
 After the SQL correction, `make sql-check spec-check architecture-check
 design-check download-check` returned 0 in the
-[final gate log](../test/results/overdue-audit-final-gates.log), including all 34
+final gate log, including all 34
 generated SQL files. Go sources were unchanged from the earlier full Go
 vet/race gates; the subsequent real-service suites exercised the corrected
 migration. Download-owned refresh, the native relay and the preparation
@@ -18630,36 +18630,36 @@ supervisor remain separately staged work.
 
 ## Native response accounting: selected real-service qualification
 
-The [first selected run](../test/results/native-response-first.log) passed five
+The first selected run passed five
 affected legacy download/control cases but failed the new response/window case:
 the separate audit role lacked PostgreSQL's UPDATE privilege for a response-row
 lock. Its preserved provider log identified `LockDownloadResponse` precisely.
 The correction grants only UPDATE on the immutable ID column; no lease or
-counter mutation was added. The [second run](../test/results/native-response-second.log)
+counter mutation was added. The second run
 passed the new case in 2.06 seconds; its
-[terminal check](../test/results/native-response-second-check.log) records 925
+terminal check records 925
 unchanged source hashes, no post-exit changes and complete cleanup. Byte counts
 above the real bounded context size are synthetic accounting inputs, not actual
 large-artifact decoding or network throughput.
 
-Integrated [code gates](../test/results/native-response-refresh-code-gates.log)
+Integrated code gates
 returned 0: full Go vet/race, 48 packages/247 allowed import edges and 33 matching
-generated SQL files. [Contract gates](../test/results/native-response-refresh-contract-gates.log)
+generated SQL files. Contract gates
 also returned 0 for specification, architecture, design and download contracts.
 The subsequent native-test-only strengthening requires exact privilege-denial
 SQLSTATEs and rejects changing the lock-only immutable ID. The combined full
-[custody run](../test/results/native-response-refresh-full.log) passed with those
+custody run passed with those
 assertions: 291 named passing entries in 213.643 seconds. Its
-[terminal check](../test/results/native-response-refresh-full-check.log) records
+terminal check records
 925 unchanged source hashes, no post-exit changes and complete cleanup. The
-[recovery run](../test/results/native-response-refresh-recovery-check.log) also
+recovery run also
 passed all three actual PostgreSQL initial/restart/logical-restore phases with
 the same unchanged-source and cleanup guarantees. These recovery tests retain
 their synthetic independent activation boundary. The schema42
-[first-installation suite](../test/results/native-response-refresh-initial.log)
+first-installation suite
 passed 12 named entries in 2.490 seconds, including the exact 68-table inventory,
 current activation/audit checks and scoped role provisioning/retirement. Its
-[terminal check](../test/results/native-response-refresh-initial-check.log) also
+terminal check also
 confirms 925 unchanged hashes and complete cleanup. Protected fixture inputs
 still do not qualify the complete production installer; no public endpoint is
 enabled.
@@ -18679,15 +18679,15 @@ observations. The scheduling predicate preserves the original session and
 one-use claim deadlines but allows work whose scheduled time has already arrived.
 It does not grant background ownership or extend authentication.
 
-The [native before run](../test/results/refresh-scheduling-native-before.log)
+The native before run
 reproduced rejection of a still-valid replacement after `pg_blocking_pids`
 confirmed an actual session-row lock wait. Only that new scheduling case failed;
-the [terminal check](../test/results/refresh-scheduling-native-before-check.log)
+the terminal check
 records unchanged sources and clean teardown. After applying the reviewed SQL
 adapter correction, the full owned Keycloak/PostgreSQL/OpenBao fixture passed
 11 named entries in 9.908 seconds. Its
-[after log](../test/results/refresh-scheduling-native-after.log) and
-[terminal check](../test/results/refresh-scheduling-native-after-check.log) record
+after log and
+terminal check record
 880 unchanged source hashes, no post-exit changes and complete cleanup. The new
 lock test uses synthetic opaque credentials; the surrounding suite exercises
 actual provider login, refresh, current group replacement and logout. This does
@@ -18698,17 +18698,17 @@ not qualify an unattended download or the staged durable refresh owner.
 Migration 00041 and the explicitly selected healthy presentation wrapper are now
 integrated. The wrapper's missing-constructor regression failed before the fix;
 the affected presentation/browser/MCP race tests then passed in
-[the focused log](../test/results/healthy-audit-presentation-after.log).
-The [code gates](../test/results/operation-lifecycle-code-gates.log) passed
+the focused log.
+The code gates passed
 Go vet/race, 48 packages/246 import edges and 32 matching generated SQL files;
-[contract gates](../test/results/operation-lifecycle-contract-gates.log) also
+contract gates also
 passed. These gates preceded the two SQL expression corrections below.
 
 The first real PostgreSQL/S3 run failed because JSON field extraction and array
 subtraction needed explicit parentheses in two migration expressions. The
-[failed run](../test/results/operation-lifecycle-native-first-check.log) and
+failed run and
 provider logs remain preserved. After correcting both expressions, the
-[second run](../test/results/operation-lifecycle-native-second-check.log) returned
+second run returned
 0: both selected healthy/cooling lifecycle cases passed, with 900 unchanged
 source hashes, no post-exit changes and complete fixture cleanup. This verifies
 on-time object retirement, conservative uncertain spend and backed cooling with
@@ -18740,7 +18740,7 @@ capacity bound. Verified group-age scheduling is an independent implementation
 fix in progress.
 
 `make spec-check architecture-check design-check download-check` returned 0 for
-the design changes in the [gate log](../test/results/download-refresh-design-check.log).
+the design changes in the gate log.
 This is contract validation, not server refresh or large-file qualification.
 Parallel staged work continues on download-owned refresh and overdue audit
 retirement. Healthy public-operation audit retirement is integrated as recorded
@@ -18759,18 +18759,18 @@ session, and a concurrent committed refresh produces a bounded busy result
 without returning the old identity. Revocation, changed actor/client and expired
 credentials stop the reader. No native byte relay or public runtime is enabled.
 
-The integrated [code gates](../test/results/native-reader-code-gates.log)
+The integrated code gates
 returned 0 for `make go-check go-architecture-check sql-check`, including race
 tests, 48 packages/243 import edges and 31 matching sqlc files. The
-[contract gates](../test/results/native-reader-contract-gates.log) also returned
+contract gates also returned
 0 for `make spec-check architecture-check design-check download-check`.
 
-The [real Keycloak/PostgreSQL/OpenBao fixture](../test/results/native-reader-identity.log)
+The real Keycloak/PostgreSQL/OpenBao fixture
 returned 0 with 10 named passing entries in 9.525 seconds. It exercises
 continuation beyond the original short observation, explicit POST refresh with
 the same session, and logout rejection. Its
-[terminal check](../test/results/native-reader-identity-check.log) and
-[environment report](../test/results/native-reader-identity-environment.json)
+terminal check and
+environment report
 record 840 unchanged source hashes, no post-exit changes and complete cleanup.
 These results qualify the identity composition, not native payload delivery or
 an installable investigation flow. The server-side refresh owner needed for
@@ -18787,22 +18787,22 @@ deadline. Human credentials stay in the hub, and existing private channels remai
 certificate-only. No SQL migration or public runtime was enabled.
 
 The missing typed API and shorter-effect-context regressions failed before the
-change; their [API baseline](../test/results/worker-current-lifecycle-stage-api-before.log)
-and [deadline baseline](../test/results/worker-current-lifecycle-stage-shorter-before.log)
-are retained. The [staged race run](../test/results/worker-current-lifecycle-stage-focused-race-final.log)
+change; their API baseline
+and deadline baseline
+are retained. The staged race run
 passed for the evidence and TLS adapters. After integration,
 `make go-check go-architecture-check sql-check` returned 0 in the
-[code gate log](../test/results/worker-current-lifecycle-code-gates.log):
+code gate log:
 vet/race, 48 packages/243 import edges and 31 matching sqlc files.
 `make spec-check architecture-check design-check download-check` also returned 0
-in the [contract log](../test/results/worker-current-lifecycle-contract-gates.log).
+in the contract log.
 
-The [owned SQL/S3/TLS fixture](../test/results/worker-current-lifecycle-native.log)
+The owned SQL/S3/TLS fixture
 passed all 15 selected worker cases in 32.355 seconds, including enrollment under
 an actual `NewBrowserRequest`, an exclusive SQL lock crossing its original expiry,
 and a separate fresh request attaching to the same admitted worker. Its
-[terminal check](../test/results/worker-current-lifecycle-native-check.log) and
-[environment report](../test/results/worker-current-lifecycle-native-environment.json)
+terminal check and
+environment report
 record exit 0, 882 unchanged source hashes, no post-exit hash changes and complete
 cleanup. Current authorization, SQL roles, encrypted audit and TLS are real;
 session storage, Job/Pod proofs and the certificate issuer remain explicit fixture
@@ -18818,7 +18818,7 @@ will not become renewable. [ADR-113](decisions/113-large-native-response-account
 now records the accepted response/window/lease design: 64 MiB prepaid accounting
 windows, current leases of at most five seconds and checked writes of at most
 1 MiB. Its specification/architecture/design/download checks returned 0 in the
-[design gate log](../test/results/large-native-response-design-check.log).
+design gate log.
 The new runtime path remains open work, not a qualified large-file fix.
 Protected runtime/install composition, all remaining collection mechanisms and
 the complete S-01/S-02 and later slice exits remain unfinished.
@@ -18834,8 +18834,8 @@ finalization for the new protocol and retains unknown write obligations. The
 first staged unit/race and contract checks passed. The first focused real SQL/S3
 run failed with `retention decision mismatch` when the new deletion fixture tried
 to shorten the effective cutoff; the existing retention guard rejected that
-setup. Its [log](../test/results/context-deletion-first.log) and
-[environment report](../test/results/context-deletion-first-environment.json)
+setup. Its log and
+environment report
 record exit 1, 848 unchanged source hashes and complete cleanup. The correction
 and subsequent passing runs are recorded below; runtime retention checks were
 not relaxed. No public runtime, general writer drain, metadata retirement or
@@ -18878,14 +18878,14 @@ current managed access; it never prepares from a status timer. A Completed resul
 does not prove that a client saved the local file.
 
 Failing-before regressions are preserved for
-[audit classification](../test/results/operation-audit-classification-before.log),
-[terminal status](../test/results/download-terminal-status-before.log),
-[late continuation](../test/results/download-terminal-continuation-before.log),
-[terminal cleanup timers](../test/results/download-terminal-timer-before.log)
-and [the HTTP deadline callback](../test/results/download-sink-join-before.log).
-The combined [code gates](../test/results/context-audit-download-final-code-gates.log)
+audit classification,
+terminal status,
+late continuation,
+terminal cleanup timers
+and the HTTP deadline callback.
+The combined code gates
 returned 0 with vet/race, 48 packages/243 import edges and 31 matching sqlc files.
-The [interface gates](../test/results/context-audit-download-final-interface-gates.log)
+The interface gates
 returned 0 with 104 Web tests, TypeScript/native-ESM validators, console build,
 specification/architecture/design checks and 29 positive/137 negative download
 contract cases. The existing main-bundle size advisory remains. These gates skip
@@ -18896,40 +18896,40 @@ changes. Broader provider and actual-browser qualification remain pending.
 The first combined focused SQL/S3 run passed all three operation-audit cases and
 the API execution/deletion case, then failed the new terminal-download fixture
 after its thirty-second wait: the fixture's permission-observer lease had also
-expired. The [first log](../test/results/context-audit-download-focused-before.log)
-and [report](../test/results/context-audit-download-focused-before-environment.json)
+expired. The first log
+and report
 record exit 1, 871 unchanged hashes and complete cleanup. Renewing that observer
 lease exposed the independently expiring thirty-second synthetic fleet source;
-the [second log](../test/results/context-audit-download-focused-second.log) and
-[report](../test/results/context-audit-download-focused-second-environment.json)
+the second log and
+report
 again record exit 1, unchanged sources and complete cleanup. The test now requests
 an original fifteen-second transfer session and waits beyond it, within unchanged
 source lifetimes. The temporary observer renewal was removed. This retains real
 session expiry, old-preparation rejection and read-only terminal-status checks
 without extending source authority or changing production limits. The corrected
-[focused run](../test/results/context-audit-download-focused-final.log) returned 0:
+focused run returned 0:
 all five selected cases passed in 20.996 seconds. Its
-[report](../test/results/context-audit-download-focused-final-environment.json)
+report
 records 871 unchanged source hashes and complete cleanup, checked after terminal
 exit. This qualifies the selected SQL/S3 compositions with explicit synthetic
 identity, source, placement and installation inputs. The subsequent
-[full custody suite](../test/results/context-audit-download-full-custody.log)
+full custody suite
 returned 0 with 287 named test entries in 139.453 seconds. Its
-[environment report](../test/results/context-audit-download-full-custody-environment.json)
+environment report
 records 871 unchanged hashes and complete cleanup, independently rechecked after
-terminal exit. The [full Kubernetes/provider suite](../test/results/context-audit-download-full-context.log)
+terminal exit. The full Kubernetes/provider suite
 then returned 0 with 110 named test entries in 241.483 seconds. Its
-[report](../test/results/context-audit-download-full-context-environment.json)
+report
 records the same 871 unchanged hashes and complete cleanup. Six real OpenBao/S3
 audit intent/outcome pairs used exactly 12 wraps, 12 unwraps, 12 PUTs and 12 GETs;
 pair latency was 13.506 ms p50 and 233.415 ms maximum in this small synthetic
 fixture. This is provider integration evidence, not production burst or latency
-qualification. The [database restart/restore run](../test/results/context-audit-download-recovery-environment.json)
-returned 0 in all three phases, and the [first-installation run](../test/results/context-audit-download-installation-environment.json)
+qualification. The database restart/restore run
+returned 0 in all three phases, and the first-installation run
 returned 0 with 12 named entries. Both retained 871 unchanged hashes and complete
 cleanup. Their explicit fixture activation/provisioning boundaries remain;
 passing them does not implement production restart/restore or Helm provisioning.
-The [actual-browser check](../test/results/context-audit-download-browser.json)
+The actual-browser check
 also returned 0: 16 journeys, 14 accessibility scans, no external requests and no
 CSP/runtime errors. All 916 source/build hashes stayed unchanged and matched the
 post-exit files. This uses the built React console and actual Go TLS/static/
@@ -18943,7 +18943,7 @@ worker/process/session identity, at most two calls, one native attempt and joine
 shutdown. A fresh authorized read can recover those facts without another native
 read, unwrap or batch. Unknown acknowledgements remain unavailable and spent.
 The expiry regression failed with the old retention ordering and passes with the
-new ordering; the [integrated evidence-package race run](../test/results/context-download-result-integrated-race.log)
+new ordering; the integrated evidence-package race run
 returned 0 in 1.154 seconds. These tests use synthetic worker/current-authority
 ports; preceding native reports do not qualify this new owner or a native-work
 transport.
@@ -18956,20 +18956,20 @@ strict constructors bind one audited service and preserve the original HTTP
 deadline/cancellation for both supported MCP revisions. SDK parameter errors are
 sanitized before release. The live identity check now precedes SQL timestamp
 flooring, fixing an independently reproduced false denial. Both defects have
-[failing-before evidence](../test/results/operation-ingress-before.log).
+failing-before evidence.
 Unauthenticated/oversized/overload counters remain bounded and process-local;
 reserved audit backing does not establish whole-HTTP-ingress availability.
 
-The combined [code gates](../test/results/context-ingress-result-code-gates.log)
+The combined code gates
 returned 0 with vet/all-package race checks, 48 packages/243 allowed edges and
-31 unchanged generated SQL files. [Contract/design gates](../test/results/context-ingress-result-contract-gates.log)
+31 unchanged generated SQL files. Contract/design gates
 returned 0, including 1170 architecture checks and the unchanged download wire
-contract. The targeted [SQL/S3 rerun](../test/results/context-ingress-result-native.log)
+contract. The targeted SQL/S3 rerun
 returned 0 with all four selected operation-audit/download-control cases in
-19.344 seconds; its [report](../test/results/context-ingress-result-native-environment.json)
+19.344 seconds; its report
 records 879 unchanged hashes and clean teardown. It exercises the existing real
 storage composition, not the new owner's synthetic current-worker proof as a
-production runtime. The [combined browser run](../test/results/context-ingress-result-browser.json)
+production runtime. The combined browser run
 returned 0 with 16 journeys, 14 accessibility scans, no external requests/CSP/
 runtime errors and 924 unchanged source/build hashes, checked again after exit.
 The prior full native/recovery/installation results remain source-specific
@@ -19000,17 +19000,17 @@ evidence loses its Download affordance without polling or changing dates.
 The native download
 affordance supports all canonical artifact kinds, retains uncertain preparation
 keys and uses direct authenticated same-origin attachments; no backend transfer
-is fabricated when the service is unavailable. The [actual-browser run](../test/results/context-case-browser.json)
+is fabricated when the service is unavailable. The actual-browser run
 passed 16 journeys and 14 accessibility scans with 881 unchanged source/build
 hashes, no external requests and no CSP/runtime errors. Desktop and 320px evidence
 screens were visually inspected. Its real Go TLS/session/CSRF/case routes use
 synthetic case/capture authority and deliberately have no native-download backend;
 they qualify UI behavior, not a public transfer. The
-[first browser failure](../test/results/context-case-browser-before.log) retained
+first browser failure retained
 unchanged sources; consuming the response body immediately fixed a navigation
 race in the test harness without removing wire/UI assertions.
 
-The [targeted native API run](../test/results/context-api-runner-native-environment.json)
+The targeted native API run
 passed acquisition, encrypted custody, independent publication and exact 362-byte
 native retrieval, with 802 unchanged source hashes and no cleanup failures. It
 also deleted the actual target and executor before historical publication/read.
@@ -19020,40 +19020,40 @@ a deployed regional executable. Qualification exposed an admission defect in
 normal foreground deletion, now corrected by allowing only the exact controller
 to remove an existing foreground finalizer without changing Pod content.
 
-The schema-37 [Go/SQL gates](../test/results/context-evidence-capacity-code-gates.log)
-and [specification/design/Helm gates](../test/results/context-evidence-capacity-document-gates.log)
-passed. Its subsequent [full custody run](../test/results/context-evidence-capacity-custody-before-environment.json)
+The schema-37 Go/SQL gates
+and specification/design/Helm gates
+passed. Its subsequent full custody run
 failed with 811 unchanged sources and no cleanup failures. The failures exposed
 fixture timestamp precision, a cyclic migration-copy transaction and retained
 concurrency pools that starved later tests. Those fixture corrections are now
 applied without changing production denials or database connection limits;
 schema-38 combined Go/SQL and document gates passed (48 packages, 238 import
-edges, 28 generated SQL files). Its [first full custody run](../test/results/context-case-custody-timeout-environment.json)
+edges, 28 generated SQL files). Its first full custody run
 passed 259 entries, including new case navigation and all context admission
 cases, before the aggregate two-minute timeout interrupted the later policy
 suite. It retained 829 unchanged hashes and no cleanup failures. The context
 parent alone took 86.15 seconds; earlier parents account for the exhausted
 budget. The harness now records a finite three-minute Go process allowance plus
 one minute of outer cleanup allowance; individual authority, lock and provider
-deadlines are unchanged. The next [timing-failure run](../test/results/context-case-custody-contention-environment.json)
+deadlines are unchanged. The next timing-failure run
 retained 831 unchanged hashes and clean cleanup, but several original five-second
 operations expired while a separate staged build was active. PostgreSQL connection
 saturation was absent; observed WAL sync delays and host write activity suggest
 I/O contention, not yet a proven sole cause. The source-identical
-[full rerun with staged builds held](../test/results/context-case-custody-final-environment.json)
+full rerun with staged builds held
 passed 283 named parent/subtest entries in 122.637 seconds, with 831 unchanged
 hashes and no cleanup failures. This includes the new case/current-audience
 projection, all metadata-capacity cases and the existing download SQL/TLS/S3
 components. The earlier loaded failure remains evidence of a qualification
 availability limit, not a waived success or measured production SLO. The
-[full Kubernetes/context run](../test/results/context-case-native-full-environment.json)
+full Kubernetes/context run
 then passed 109 named parent/subtest entries in 242.822 seconds, with 831 unchanged
 source hashes and no cleanup failures. It includes the real API executor,
 worker/owner identity, protected configuration and native context paths; each
 fixture's synthetic initial authority boundaries still apply.
-[Database recovery](../test/results/context-case-recovery-environment.json) passed
+Database recovery passed
 its three initial/restarted/restored phases and
-[initial installation](../test/results/context-case-installation-environment.json)
+initial installation
 passed 12 named checks against schema 38. Both retained 831 unchanged source hashes
 and had no cleanup failures. These are component qualifications; protected full
 installation provisioning and the public investigation workflow remain pending.
@@ -19082,12 +19082,12 @@ retain the original preview/key and accepted work cannot be cancelled by closure
 Closing an own passive review remains possible after target access is lost;
 returning accepted metadata still requires current target read rights.
 
-The combined [Go/SQL gates](../test/results/context-execution-resolution-code-gates.log)
+The combined Go/SQL gates
 passed: vet/race suites, 46 packages/225 architecture edges and 26 matching sqlc
-files. [Specification/design/Helm gates](../test/results/context-execution-resolution-document-gates.log)
+files. Specification/design/Helm gates
 passed, including 49 MCP/browser pairs and configuration-only chart validation.
 The console passed 66 tests, native ESM validation and its production build.
-The [actual browser run](../test/results/context-execution-resolution-browser.json)
+The actual browser run
 passed 11 journeys and nine accessibility scans with 858 unchanged source/build
 hashes, terminal 0 and no external requests or CSP/runtime errors. Its actual Go
 TLS/session/operation routes still use explicitly synthetic identity/capture
@@ -19097,21 +19097,21 @@ A further response regression reproduced final identity checks returning a
 shorter deadline that presentation and transport ignored. The corrected browser
 and both MCP revisions clamp the actual socket to that deadline as well as the
 original metadata bound. Before/after evidence is in
-[the failing regression](../test/results/context-resolution-identity-shortening-before.log)
-and [passing transport race suites](../test/results/context-resolution-transport-final.log).
+the failing regression
+and passing transport race suites.
 The request-owned identity handle also now retains the earliest deadline across
 sequential and concurrently completing observations. Its
-[before regression](../test/results/context-identity-monotonic-before.log) failed;
-the [identity and transport race rerun](../test/results/context-identity-monotonic-after.log)
+before regression failed;
+the identity and transport race rerun
 passed after the fix.
 
 The first combined native custody run failed seven request-resolution fixtures:
 their authenticated test identity had capture scope but lacked the required read
 scope. The production denial was correct; the fixture now supplies both scopes,
 and an explicit negative case verifies that capture-only resolution cannot create
-a closure fence. The [failed combined report](../test/results/context-execution-resolution-custody-before-environment.json)
+a closure fence. The failed combined report
 retains test exit 1, 801 unchanged hashes and no cleanup failures; its new API
-execution/publication case passed. The [focused SQL/S3 resolution rerun](../test/results/context-resolution-focused-environment.json)
+execution/publication case passed. The focused SQL/S3 resolution rerun
 passed 15 named tests, also with 801 unchanged hashes and no cleanup failures.
 This targeted pass does not replace the pending full combined qualification.
 Other external results below predate migrations 00035/00036 unless explicitly
@@ -19128,14 +19128,14 @@ current facts without silently changing the reviewed scope.
 Review found a response-freshness gap: a final identity lookup could finish after
 the shorter permission observation expired. Successful service replies now
 carry the earliest original metadata deadline privately through presentation
-and the final transport write. The [focused regression log](../test/results/context-response-deadline-final.log)
+and the final transport write. The focused regression log
 records passing presentation/browser/application race tests, including a blocked
 final identity check that must suppress the accepted receipt. This does not
 claim real execution or publication.
 
-The [final Go/architecture/SQL gates](../test/results/context-public-code-gates-final.log)
+The final Go/architecture/SQL gates
 returned 0 (46 packages, 215 internal edges, 25 matching generated SQL files).
-The [specification/architecture/design gates](../test/results/context-public-document-gates-final.log)
+The specification/architecture/design gates
 returned 0, including 1130 positive architecture checks and 120 rejected cases.
 The first gate caught a stale embedded policy preset schema; its exact canonical
 change was reviewed and regenerated. The failed gate remains recorded separately.
@@ -19146,21 +19146,21 @@ it, then passed after the build adapter correction without changing validator
 rules. Browser testing also corrected explicit form labels and an incorrect test
 expectation for the existing CSRF-denial status. `npm run check` now passes 49
 component tests plus native positive/negative validator cases; production build
-passes. The [browser terminal log](../test/results/context-public-browser-after.log)
-and [environment](../test/results/context-public-browser-environment.json) record
+passes. The browser terminal log
+and environment record
 10 passed journeys, eight accessibility scans, no external/CSP/runtime errors,
 885 unchanged source/build hashes and the exact installed Chrome test binary.
 The session/capture ports in that browser fixture remain explicitly synthetic.
 
-The source-frozen [custody suite](../test/results/context-public-custody-environment.json)
-passed 255 named tests; [database recovery](../test/results/context-public-recovery-environment.json)
-passed all three initial/restarted/restored phases; [initial installation](../test/results/context-public-installation-environment.json)
+The source-frozen custody suite
+passed 255 named tests; database recovery
+passed all three initial/restarted/restored phases; initial installation
 passed 12 tests. Each reported terminal 0, 773 unchanged source hashes and no
 cleanup failures. These qualify components with the fixtures' documented
 synthetic authority boundaries. The full current Kubernetes/context suite
 failed in `TestOwnerEndpointsWithRealKubernetes`: the current workload-protection
 check became unavailable immediately after a controller replaced a Pod. Its
-[preserved report](../test/results/context-public-native-before-environment.json)
+preserved report
 records unchanged sources, test exit 1 and no cleanup failures. The new
 unscheduled API-only test passed, including denial of Node/exec access and exact
 362-byte encrypted/verified native retrieval. That component result does not
@@ -19169,7 +19169,7 @@ the resource-version race: an update between GET and dry-run returns HTTP 409
 before admission is checked. The bounded exact-conflict retry retains the
 original five-second deadline and rejects unrelated denials. Unit regressions
 failed before and passed after the fix. The
-[targeted native rerun](../test/results/owner-probe-race-after-environment.json)
+targeted native rerun
 passed `TestOwnerEndpointsWithRealKubernetes`, including deterministic version
 advancement, with 773 unchanged sources and no cleanup failures. This targeted
 result does not replace the pending combined full-suite qualification. The
@@ -19221,38 +19221,38 @@ the protected manifest. Relative access, deletion due and administrator maximum
 ages remain distinct; no preview promises an absolute future evidence expiry.
 
 Focused coordinator, resolver, storage-reader and assessment race tests passed.
-[Combined Go/architecture/SQL gates](../test/results/context-preview-code-gates.log)
+Combined Go/architecture/SQL gates
 returned 0: vet/all race tests, 46 packages/205 internal edges and 24 matching SQLc
-files. [Specification/architecture/design gates](../test/results/context-preview-document-gates.log)
+files. Specification/architecture/design gates
 also returned 0, including 1123 positive architecture checks and 120 rejected cases.
 The read-only storage adapter preserves source freshness and exact revisions
 without reserving capacity or accepting configuration.
 
 Native qualification completed with the results below. The first full custody run failed after
 the new concurrency fixture retained its preview pools into later download tests,
-exhausting PostgreSQL connections. [The failed test log](../test/results/context-preview-custody-before.log),
-[provider log](../test/results/context-preview-custody-before-postgres.log) and
-[environment](../test/results/context-preview-custody-before-environment.json)
+exhausting PostgreSQL connections. The failed test log,
+provider log and
+environment
 are retained: 744 unchanged source hashes, no cleanup failures, and an actual
 nonzero terminal result. Helper/subtest pool cleanup is now bounded correctly;
 database limits were not increased. A storage denial assertion also now uses a
-real column and requires SQLSTATE 42501. The [complete custody rerun](../test/results/context-preview-custody-final.log)
+real column and requires SQLSTATE 42501. The complete custody rerun
 returned 0 with 248 passing parent/subtest entries. Its
-[environment report](../test/results/context-preview-custody-final-environment.json)
+environment report
 records 744 unchanged hashes and no cleanup failures; those hashes and actual
 terminal completion were checked again after cleanup. The
-[recovery regression](../test/results/context-preview-recovery.log) returned 0
+recovery regression returned 0
 across initial, restarted and restored database phases. Its
-[environment report](../test/results/context-preview-recovery-environment.json)
+environment report
 records 744 unchanged hashes and no cleanup failures. The
-[first-installation suite](../test/results/context-preview-installation.log)
+first-installation suite
 also returned 0 with 12 passing entries; its
-[environment report](../test/results/context-preview-installation-environment.json)
+environment report
 has the same verified hash count and clean removal. These are component fixtures,
 not qualified production restore or installer provisioning. The
-[full Kubernetes regression](../test/results/context-preview-native.log) returned 0
+full Kubernetes regression returned 0
 with 106 passing entries in 232.891 seconds, including workload selection in both
-owned clusters. Its [report](../test/results/context-preview-native-environment.json)
+owned clusters. Its report
 records 744 unchanged hashes and no cleanup failures, verified after the actual
 harness terminated. The source freeze is released for the next implementation batch.
 
@@ -19276,7 +19276,7 @@ OpenAPI types and standalone response validators, explicit session/outage/logout
 states and an abortable identity scope. The first npm resolution rejected
 TypeScript 7 against the generator's TypeScript 5 peer requirement; the product
 uses 5.9.3 without a peer override. Full and runtime npm audit reports contain
-zero known vulnerabilities. A [failing UI regression](../test/results/console-unit-before.log)
+zero known vulnerabilities. A failing UI regression
 showed that returning to a tab after uncertain logout lost its failed-sign-out
 state. Retaining logout intent fixes that race; subsequent component checks
 passed all 19 tests. Automatic mutation retry and browser credential/evidence
@@ -19284,33 +19284,33 @@ persistence were not introduced.
 
 The Go asset handler snapshots bounded packaged files, serves only the current
 root page and exact hashed assets, and never substitutes HTML for API/auth/native
-download paths. The [static race tests](../test/results/console-delivery-final-unit.log)
+download paths. The static race tests
 passed, including the actual built bundle. The
-[first browser run](../test/results/console-browser-before.log) failed: its expiry
+first browser run failed: its expiry
 setup shortened the old session before login created a new one. The retained
-[failure report](../test/results/console-browser-before-report.json) also exposed
+failure report also exposed
 React Aria's fixed pressable CSS being blocked by CSP. The test now shortens the
 actual new session, and the handler permits only that reviewed CSS hash without
 unsafe-inline/eval. An independent source/hash regression guards that exception.
 
-The [final browser run](../test/results/console-browser-final.log) returned 0 in
+The final browser run returned 0 in
 3.022 seconds: eight journeys, four accessibility scans, zero external requests,
 runtime/CSP errors or reported accessibility violations. Its
-[environment report](../test/results/console-browser-final-environment.json)
+environment report
 records 653 unchanged scoped Go/web/bundle hashes. The fixture uses actual
 loopback HTTPS, Go static/session handlers and built React with an explicitly
 synthetic current-identity service. It is not real-provider, installation or
-full investigation qualification. [Screenshots and report](../test/results/console-browser/report.json)
-include the [sign-in page](../test/results/console-browser/sign-in.png) and
-[320px layout](../test/results/console-browser/sign-in-mobile.png).
+full investigation qualification. Screenshots and report
+include the sign-in page and
+320px layout.
 
 MCP uses official Go SDK v1.8.0 with current bearer resolution, resource metadata,
 finite request/output/concurrency bounds and no invented tools. Actual official
 clients negotiate both required revisions in
-[the passing race suite](../test/results/mcp-boundary-final.log). Separate
+the passing race suite. Separate
 before-fix tests reproduced inconsistent legacy routing hints and method-case
 aliases; their rejection is now covered. Targeted vet, module verification and
-the [targeted vulnerability scan](../test/results/mcp-boundary-vulnerability.log)
+the targeted vulnerability scan
 passed. Current identity and empty SDK discovery do not implement evidence tools
 or qualify real-provider MCP OAuth.
 
@@ -19318,21 +19318,21 @@ The new C-02 request-owned identity source supports browser cookies and bearer
 tokens without exporting OIDC credentials or adding a second policy evaluator.
 Current checks retain original cancellation/deadlines and reject changed
 principal/policy/groups/scopes. Existing C-03 capture/read/download evaluators
-consume it. [Affected race tests](../test/results/current-request-identity-race.log)
-passed. The [real-provider suite](../test/results/current-request-provider.log)
+consume it. Affected race tests
+passed. The real-provider suite
 subsequently returned 0: eight passing parent/subtest entries in 4.465 seconds,
 including current request resolution before and after actual HTTPS logout with
 no refresh/credential rotation or recreated session. The
-[environment report](../test/results/current-request-provider-environment.json)
+environment report
 records 679 unchanged hashes and empty cleanup failures, verified after actual
 harness termination. This uses real Keycloak/PostgreSQL/OpenBao with fixture
 administrator provisioning; it does not enable the production workflow.
 
-[Combined Go/architecture/SQL gates](../test/results/console-mcp-code-gates.log)
+Combined Go/architecture/SQL gates
 returned 0 with vet/race tests, 45 packages/192 internal edges and 22 matching
-sqlc files. [Console gates](../test/results/console-product-gates.log) returned 0
+sqlc files. Console gates returned 0
 with generated-contract checks, strict TypeScript, all 19 behavior tests and the
-static build. [Specification/architecture/design gates](../test/results/console-mcp-document-gates.log)
+static build. Specification/architecture/design gates
 also passed; final documentation links are rechecked after recording these results.
 
 The remaining path to S-02 is a shared capture preview/request/progress service,
@@ -19349,41 +19349,41 @@ The maintainer explicitly resumed after the fulfilled ADR-098 pause and requeste
 
 [ADR-099](decisions/099-protected-initial-installer.md) and its execution contract now describe the private executable, closed provider/pin projection, finite Restricted Pod, native namespace guard and exact live Pod/account proof. The startup file determines the immutable plan digest. Separate preparation/audit/activation roles and the existing encrypted object audit preserve ADR-098; no schema migration, public route or chart runtime switch was added.
 
-The [first native run](../test/results/initial-installer-native-first.log), [environment report](../test/results/initial-installer-native-first-environment.json) and [terminal harness](../test/results/initial-installer-native-first-check.log) returned 1. All 692 recorded source hashes matched after actual termination and cleanup was empty. The actual image reached activation with exit 0 and rejected missing protection/unbound writer tokens with exit 1, but all three cases failed their subsequent immediate token-retirement assertion. Kubernetes's positive authentication cache invalidates that assertion. The installer now independently reads live account objects; retirement waits for measured authentication denial. The same run exposed an older concurrent-test assumption: independently timed source snapshots can legitimately lose to a newer stored observation. The race now shares one observation and a separate regression requires older observations to remain rejected; production SQL semantics are unchanged. These partial outcomes are not a passing suite.
+The first native run, environment report and terminal harness returned 1. All 692 recorded source hashes matched after actual termination and cleanup was empty. The actual image reached activation with exit 0 and rejected missing protection/unbound writer tokens with exit 1, but all three cases failed their subsequent immediate token-retirement assertion. Kubernetes's positive authentication cache invalidates that assertion. The installer now independently reads live account objects; retirement waits for measured authentication denial. The same run exposed an older concurrent-test assumption: independently timed source snapshots can legitimately lose to a newer stored observation. The race now shares one observation and a separate regression requires older observations to remain rejected; production SQL semantics are unchanged. These partial outcomes are not a passing suite.
 
-The [affected race tests](../test/results/initial-installer-unit-race.log) returned 0, including deleted/replaced accounts despite accepted authentication, wrong/unbound Pod identity, privileged principals and Pod specification mutation. [Specification/architecture/design gates](../test/results/initial-installer-document-first.log) returned 0 with 65 schemas and 12 application roles.
+The affected race tests returned 0, including deleted/replaced accounts despite accepted authentication, wrong/unbound Pod identity, privileged principals and Pod specification mutation. Specification/architecture/design gates returned 0 with 65 schemas and 12 application roles.
 
-The [corrected native run](../test/results/initial-installer-native-second.log), [environment report](../test/results/initial-installer-native-second-environment.json) and [terminal harness](../test/results/initial-installer-native-second-check.log) returned 0: 15 passing parent/subtest entries in 39.098 seconds, all 693 captured source hashes verified after termination and no cleanup failures. The actual Restricted installer Pod `58f2f6f3-25bf-4ecb-b615-048abd15f4fa` completed with exit 0, using image `sha256:09f753af6cae994416e606ed1116c46b1a9f6c5e52a900890a2de1218ba8d7a8` built from binary SHA-256 `2cca176b5c6c960a7c60153c9b6611842cf12bd0dcfeeb55ece9196290f43f45`. Missing-guard and unbound-token Pods exited 1 without consuming a witness or inserting an attempt. Native namespace protection rejected RBAC-permitted workload creation, pinned-Pod updates and writer-token minting; fixture-only attack rights were removed before launch. Probe-token retirement was confirmed after the actual authentication cache ceased accepting it, not assumed from Secret deletion. All three Pods were removed normally and the harness removed its owned clusters/image.
+The corrected native run, environment report and terminal harness returned 0: 15 passing parent/subtest entries in 39.098 seconds, all 693 captured source hashes verified after termination and no cleanup failures. The actual Restricted installer Pod `58f2f6f3-25bf-4ecb-b615-048abd15f4fa` completed with exit 0, using image `sha256:09f753af6cae994416e606ed1116c46b1a9f6c5e52a900890a2de1218ba8d7a8` built from binary SHA-256 `2cca176b5c6c960a7c60153c9b6611842cf12bd0dcfeeb55ece9196290f43f45`. Missing-guard and unbound-token Pods exited 1 without consuming a witness or inserting an attempt. Native namespace protection rejected RBAC-permitted workload creation, pinned-Pod updates and writer-token minting; fixture-only attack rights were removed before launch. Probe-token retirement was confirmed after the actual authentication cache ceased accepting it, not assumed from Secret deletion. All three Pods were removed normally and the harness removed its owned clusters/image.
 
-[Full code gates](../test/results/initial-installer-code-gates.log), `make go-check go-architecture-check sql-check`, returned 0 with vet/race tests, 43 packages/189 internal edges and 22 matching sqlc files. The [full context regression](../test/results/initial-installer-full-context.log), [environment/source report](../test/results/initial-installer-full-context-environment.json) and [terminal harness](../test/results/initial-installer-full-context-check.log) subsequently returned 0: 102 passing entries in 184.060 seconds, all 693 captured source hashes matched after termination and cleanup was empty. The actual hub-worker Pod `302ad0ed-ce0f-4ff7-89c4-72faaaa49532` used image `sha256:2dcce337c1fac4c16097b02ee443c7263d622b1c8a3df16074f6af6785bdf208`, built from the same `2cca176b5c6c960a7c60153c9b6611842cf12bd0dcfeeb55ece9196290f43f45` binary. This snapshot predates the ADR-100 dependency/credential changes below and is not their qualification. Production provider/pin provisioning, credential retirement, local-key bootstrap and restart/restore remain required; the passing fixture still provisions synthetic external credentials and is not the product installer lifecycle.
+Full code gates, `make go-check go-architecture-check sql-check`, returned 0 with vet/race tests, 43 packages/189 internal edges and 22 matching sqlc files. The full context regression, environment/source report and terminal harness subsequently returned 0: 102 passing entries in 184.060 seconds, all 693 captured source hashes matched after termination and cleanup was empty. The actual hub-worker Pod `302ad0ed-ce0f-4ff7-89c4-72faaaa49532` used image `sha256:2dcce337c1fac4c16097b02ee443c7263d622b1c8a3df16074f6af6785bdf208`, built from the same `2cca176b5c6c960a7c60153c9b6611842cf12bd0dcfeeb55ece9196290f43f45` binary. This snapshot predates the ADR-100 dependency/credential changes below and is not their qualification. Production provider/pin provisioning, credential retirement, local-key bootstrap and restart/restore remain required; the passing fixture still provisions synthetic external credentials and is not the product installer lifecycle.
 
 ## Continuing: temporary SQL credential lifecycle (ADR-100)
 
 [ADR-100](decisions/100-temporary-initial-sql-credentials.md) and its contract add three random expiring purpose logins, client-derived SCRAM verifiers, exact direct/ambient privilege validation, replay without renewal, and idempotent retirement of both new-login and existing-session effect authority. A closed 4096-byte private state codec binds persisted passwords to the complete startup plan. There is no SQL migration or public API change. The trusted maintenance principal and Secret/provider orchestration remain separate from the activation Pod.
 
-The [first provider suite](../test/results/initial-role-provider-first.log), [source/cleanup report](../test/results/initial-role-provider-first-environment.json) and [harness](../test/results/initial-role-provider-first-check.log) returned 0 with 12 passing entries, all 696 captured hashes verified and empty cleanup. Subsequent review identified a missing ambient privilege check. The [before-fix regression](../test/results/initial-role-ambient-before.log), [report](../test/results/initial-role-ambient-before-environment.json) and [harness](../test/results/initial-role-ambient-before-check.log) returned 1 because a PUBLIC table grant was accepted. After implementing indirect privilege checks, the [corrected provider regression](../test/results/initial-role-ambient-after.log), [report](../test/results/initial-role-ambient-after-environment.json) and [harness](../test/results/initial-role-ambient-after-check.log) returned 0: 12 entries in 2.364 seconds, all 696 hashes verified and no cleanup failures. Table/column grants via PUBLIC, public schema creation and a callable SECURITY DEFINER function are all rejected. Fault injection uses only the owned test database.
+The first provider suite, source/cleanup report and harness returned 0 with 12 passing entries, all 696 captured hashes verified and empty cleanup. Subsequent review identified a missing ambient privilege check. The before-fix regression, report and harness returned 1 because a PUBLIC table grant was accepted. After implementing indirect privilege checks, the corrected provider regression, report and harness returned 0: 12 entries in 2.364 seconds, all 696 hashes verified and no cleanup failures. Table/column grants via PUBLIC, public schema creation and a callable SECURITY DEFINER function are all rejected. Fault injection uses only the owned test database.
 
-The [private-state race tests](../test/results/initial-role-state-unit.log) returned 0. They cover exact round trip, expired-state retirement decoding, wrong installation/plan, duplicate/unknown/case-aliased/trailing JSON, malformed credentials, bounded input and redacted formatting. The [dependency scan](../test/results/initial-role-vulnerability.log) found no vulnerabilities in imported packages or called symbols; the earlier module-only unused-package advisory remains documented.
+The private-state race tests returned 0. They cover exact round trip, expired-state retirement decoding, wrong installation/plan, duplicate/unknown/case-aliased/trailing JSON, malformed credentials, bounded input and redacted formatting. The dependency scan found no vulnerabilities in imported packages or called symbols; the earlier module-only unused-package advisory remains documented.
 
-The [first native selection](../test/results/initial-role-native-selection.log), [report](../test/results/initial-role-native-selection-environment.json) and [harness](../test/results/initial-role-native-check.log) returned 1 because the native opt-in environment variable was omitted: the selected test skipped. All 698 hashes matched and cleanup was empty. This provides no product-test qualification. The [corrected native invocation](../test/results/initial-role-native-corrected-check.log), [suite](../test/results/initial-role-native-final.log) and [source/cleanup report](../test/results/initial-role-native-final-environment.json) returned 0: 16 passing entries in 39.019 seconds, all 698 hashes verified and no cleanup failures. It persisted and reread exact immutable Secret state before the product manager provisioned random expiring roles. The actual activation Pod used those credentials and all three native cases retired them through the product adapter. Image `sha256:227f6b9bb2f309720a1ad4741919830e67e47b8bf756c9bd48d883a4686d529e` was built from binary SHA-256 `0bf7d639822a9fa78171a99b5c096a863c766234561072e5c304a3261cb03e7a`. Maintenance principals, provider setup and Kubernetes writes still belong to the fixture, not a product supervisor.
+The first native selection, report and harness returned 1 because the native opt-in environment variable was omitted: the selected test skipped. All 698 hashes matched and cleanup was empty. This provides no product-test qualification. The corrected native invocation, suite and source/cleanup report returned 0: 16 passing entries in 39.019 seconds, all 698 hashes verified and no cleanup failures. It persisted and reread exact immutable Secret state before the product manager provisioned random expiring roles. The actual activation Pod used those credentials and all three native cases retired them through the product adapter. Image `sha256:227f6b9bb2f309720a1ad4741919830e67e47b8bf756c9bd48d883a4686d529e` was built from binary SHA-256 `0bf7d639822a9fa78171a99b5c096a863c766234561072e5c304a3261cb03e7a`. Maintenance principals, provider setup and Kubernetes writes still belong to the fixture, not a product supervisor.
 
-[Code gates](../test/results/initial-role-code-gates.log), `make go-check go-architecture-check sql-check`, returned 0: vet/race, 43 packages/190 internal edges and 22 matching sqlc files. The first [document gate](../test/results/initial-role-document-gates.log) rejected relative schema references; the schema now follows the repository's absolute-reference convention. The [recheck](../test/results/initial-role-document-recheck.log) returned 0: 66 schemas, 541 rejected examples/8780 assertions, architecture 1103 positive/120 negative checks and the existing 63-screen design checks. These are design gates, not participant testing or full platform qualification.
+Code gates, `make go-check go-architecture-check sql-check`, returned 0: vet/race, 43 packages/190 internal edges and 22 matching sqlc files. The first document gate rejected relative schema references; the schema now follows the repository's absolute-reference convention. The recheck returned 0: 66 schemas, 541 rejected examples/8780 assertions, architecture 1103 positive/120 negative checks and the existing 63-screen design checks. These are design gates, not participant testing or full platform qualification.
 
 Continuing into production protected credential persistence and provider lifecycle. The installation supervisor, local-key pre-activation path, restart/restore, complete public investigation workflow and later collection mechanisms remain unfinished; no slice exit or full product completion is claimed.
 
-The protected Kubernetes state adapter now owns current administrator/guard/startup checks, one create-only Secret request, exact-content lookup after an uncertain reply and UID-bound reads suitable for later retirement. The [race tests](../test/results/initial-state-unit.log) returned 0 for nine modes, including wrong administrators, an already-launched Pod, missing/lost guards, expired final observations, forbidden writes and an uncertain response without POST replay. The [native suite](../test/results/initial-state-native-final.log), [source report](../test/results/initial-state-native-final-environment.json) and [terminal harness](../test/results/initial-state-native-check.log) returned 0: 16 passing entries in 51.853 seconds, all 700 hashes verified and no cleanup failures. The product adapter persisted and reread the Secret before role provisioning, rejected changed contents/wrong UIDs, allowed exact retained-state retirement after Pod termination and denied creation after launch. Image `sha256:f36ee36c2a445713c52f295e72374b4bea0879513c2ac92dbf182c27c96e2674` was built from binary SHA-256 `6e127a1441a691f309cfc816e50836b99b0c88ea7d4aa78d34a97f26cc6d60e9`. The fixture still establishes the clean namespace, guards, startup inputs, maintenance principal and external providers; persistent supervisor orchestration remains unfinished.
+The protected Kubernetes state adapter now owns current administrator/guard/startup checks, one create-only Secret request, exact-content lookup after an uncertain reply and UID-bound reads suitable for later retirement. The race tests returned 0 for nine modes, including wrong administrators, an already-launched Pod, missing/lost guards, expired final observations, forbidden writes and an uncertain response without POST replay. The native suite, source report and terminal harness returned 0: 16 passing entries in 51.853 seconds, all 700 hashes verified and no cleanup failures. The product adapter persisted and reread the Secret before role provisioning, rejected changed contents/wrong UIDs, allowed exact retained-state retirement after Pod termination and denied creation after launch. Image `sha256:f36ee36c2a445713c52f295e72374b4bea0879513c2ac92dbf182c27c96e2674` was built from binary SHA-256 `6e127a1441a691f309cfc816e50836b99b0c88ea7d4aa78d34a97f26cc6d60e9`. The fixture still establishes the clean namespace, guards, startup inputs, maintenance principal and external providers; persistent supervisor orchestration remains unfinished.
 
-The [credential substitution regression](../test/results/initial-role-binding-before.log), [report](../test/results/initial-role-binding-before-environment.json) and [harness](../test/results/initial-role-binding-before-check.log) reproduced a real loader gap: otherwise functional fixture SQL roles for an unrelated scope were accepted and the invalid Pod reported success. Exit 1; all 700 hashes matched and cleanup was empty. The executable now derives the exact installation/purpose username before any connection and requires actual SCRAM-SHA-256 authentication. The [affected race tests](../test/results/initial-role-binding-unit.log) returned 0 across PostgreSQL, Kubernetes and bootstrap packages.
+The credential substitution regression, report and harness reproduced a real loader gap: otherwise functional fixture SQL roles for an unrelated scope were accepted and the invalid Pod reported success. Exit 1; all 700 hashes matched and cleanup was empty. The executable now derives the exact installation/purpose username before any connection and requires actual SCRAM-SHA-256 authentication. The affected race tests returned 0 across PostgreSQL, Kubernetes and bootstrap packages.
 
-The [corrected native suite](../test/results/initial-role-binding-after.log), [source report](../test/results/initial-role-binding-after-environment.json) and [harness](../test/results/initial-role-binding-after-check.log) returned 0: 17 passing entries in 60.117 seconds, all 700 hashes verified and empty cleanup failures. The wrong-role Pod now fails before witness consumption/SQL attempt creation; the valid Pod still activates and protected state persistence/retirement remains qualified. The [full code gate](../test/results/initial-state-code-gates.log) then returned 2 due to an existing mTLS fixture failure; it is not a passing gate. A 200-run [targeted repetition](../test/results/initial-state-forwarder-repeat.log) happened to pass, so it was not treated as a fix. The [deterministic regression](../test/results/initial-state-fixture-before.log) instead reproduced the cause: the fixture regenerated immutable enrollment `ClaimedAt` on every observation, allowing a second boundary between the authenticator's two reads to simulate a replacement. The fixture now keeps its first enrollment while observations and certificate renewal remain current. The [whole mTLS race suite](../test/results/initial-state-fixture-after.log) returned 0; production checks were not weakened. The [full code recheck](../test/results/initial-state-code-recheck.log), `make go-check go-architecture-check sql-check`, subsequently returned 0 with vet/race, 43 packages/190 internal edges and 22 matching sqlc files, including stable enrollment through certificate renewal. The earlier native report therefore differs from current source only in this test fixture; its runtime binary remains the qualified one. The [document/design gates](../test/results/initial-state-document-gates.log) returned 0 with 66 schemas, 541 rejected examples/8790 assertions, 1104 positive/120 negative architecture checks and 63 design screens. These results still do not supply the clean-namespace/provider/launch supervisor or full installation/user workflow.
+The corrected native suite, source report and harness returned 0: 17 passing entries in 60.117 seconds, all 700 hashes verified and empty cleanup failures. The wrong-role Pod now fails before witness consumption/SQL attempt creation; the valid Pod still activates and protected state persistence/retirement remains qualified. The full code gate then returned 2 due to an existing mTLS fixture failure; it is not a passing gate. A 200-run targeted repetition happened to pass, so it was not treated as a fix. The deterministic regression instead reproduced the cause: the fixture regenerated immutable enrollment `ClaimedAt` on every observation, allowing a second boundary between the authenticator's two reads to simulate a replacement. The fixture now keeps its first enrollment while observations and certificate renewal remain current. The whole mTLS race suite returned 0; production checks were not weakened. The full code recheck, `make go-check go-architecture-check sql-check`, subsequently returned 0 with vet/race, 43 packages/190 internal edges and 22 matching sqlc files, including stable enrollment through certificate renewal. The earlier native report therefore differs from current source only in this test fixture; its runtime binary remains the qualified one. The document/design gates returned 0 with 66 schemas, 541 rejected examples/8790 assertions, 1104 positive/120 negative architecture checks and 63 design screens. These results still do not supply the clean-namespace/provider/launch supervisor or full installation/user workflow.
 
 ## Continuing: installation namespace staging (ADR-101)
 
 [ADR-101](decisions/101-installation-namespace-staging.md) and its contract add an inert pre-namespace policy plan and a current reader bound to actual namespace/guard identities. Setup permits only configured administrators; the single non-administrative exception is an explicit dry-run UPDATE of the named final startup inputs. A distinct preparation marker remains denied, so staging and final protection can be probed independently. This adds no runtime activation, SQL migration, public API, dependency or Helm switch.
 
-[Unit/race checks](../test/results/initial-namespace-unit.log) returned 0. The [native test](../test/results/initial-namespace-native-final.log), [source/cleanup report](../test/results/initial-namespace-native-final-environment.json) and [terminal harness](../test/results/initial-namespace-native-check.log) returned 0: one test in 7.933 seconds, all 704 hashes verified after actual termination and no cleanup failures. The policy/binding were installed before a fresh owned namespace; the future writer account was created only after an independent native proof. Actual RBAC-permitted Secret/Pod/token/persisted-input operations were denied; harmless final-input dry runs were initially allowed and then independently denied by a separate final policy. Removing the staging binding invalidated the current reader. The namespace was removed normally after owned guard retirement. No provider credentials or activation were installed; this is not a complete clean-history or multi-API-server qualification.
+Unit/race checks returned 0. The native test, source/cleanup report and terminal harness returned 0: one test in 7.933 seconds, all 704 hashes verified after actual termination and no cleanup failures. The policy/binding were installed before a fresh owned namespace; the future writer account was created only after an independent native proof. Actual RBAC-permitted Secret/Pod/token/persisted-input operations were denied; harmless final-input dry runs were initially allowed and then independently denied by a separate final policy. Removing the staging binding invalidated the current reader. The namespace was removed normally after owned guard retirement. No provider credentials or activation were installed; this is not a complete clean-history or multi-API-server qualification.
 
-[Code gates](../test/results/initial-namespace-code-gates.log), `make go-check go-architecture-check`, returned 0 with vet/race and 43 packages/190 internal edges. [Specification/architecture/design gates](../test/results/initial-namespace-document-gates.log) returned 0. Production create-only namespace/bootstrap journal, provider provisioning, guarded handover, local-key bootstrap, restart/restore and complete user workflows remain pending. Continue into those producers without treating the guard observation as historical integrity or a completed installation.
+Code gates, `make go-check go-architecture-check`, returned 0 with vet/race and 43 packages/190 internal edges. Specification/architecture/design gates returned 0. Production create-only namespace/bootstrap journal, provider provisioning, guarded handover, local-key bootstrap, restart/restore and complete user workflows remain pending. Continue into those producers without treating the guard observation as historical integrity or a completed installation.
 
 ### Namespace creation and exact resumption
 
@@ -19394,17 +19394,17 @@ repair/adoption. Read-only resumption checks exact retained native identities an
 the original preparation request. No provider credentials or activation are
 created by this adapter; the durable supervisor journal remains in progress.
 
-The [failing response regression](../test/results/initial-namespace-creation-before.log)
+The failing response regression
 returned 1: omitted namespace reply labels/annotations inherited fields from the
 outgoing request. Decoding into an empty response fixes both cases. The
-[affected race tests](../test/results/initial-namespace-creation-after.log) returned
+affected race tests returned
 0, covering lost replies without POST replay, partial acknowledged identities,
 administrator loss, collisions, changed/replaced/missing guards and namespace
 replacement. Integration cases in that command skip without the external fixture.
 
-The [actual Kubernetes test](../test/results/initial-namespace-creation-native-final.log),
-[source/cleanup report](../test/results/initial-namespace-creation-native-final-environment.json)
-and [terminal harness](../test/results/initial-namespace-creation-native-check.log)
+The actual Kubernetes test,
+source/cleanup report
+and terminal harness
 returned 0: one test in 8.193 seconds, all 706 source hashes verified after
 termination, unchanged sources and no cleanup failures. It uses the product
 creator, waits for read-only native resumption, rejects an existing namespace,
@@ -19413,8 +19413,8 @@ independent staging/final guard checks. Removal of the binding denies both
 current protection and resumption. Complete resource inventory, durable
 preparation state and the provider/handover supervisor remain required.
 
-The subsequent [code gates](../test/results/initial-namespace-creation-code-gates.log)
-and [document/design gates](../test/results/initial-namespace-creation-document-gates.log)
+The subsequent code gates
+and document/design gates
 returned 0 before the journal continuation below.
 
 ## Continuing: durable preparation creates (ADR-102)
@@ -19428,13 +19428,13 @@ cannot renew it. No SQL migration, dependency, public endpoint or runtime Helm
 switch changed. Initial root persistence and the actual setup effect supervisor
 remain unfinished.
 
-The [journal race tests](../test/results/initial-preparation-unit.log) returned 0
+The journal race tests returned 0
 in 17.496 seconds. They exercise concurrency, persisted-but-lost update replies,
 expiry/guard loss after a write, administrator loss, journal replacement, malformed
 history, pending-intent exclusion, immutable receipts and replay without a new
-attempt. The [native run](../test/results/initial-preparation-native-final.log),
-[source/cleanup report](../test/results/initial-preparation-native-final-environment.json)
-and [terminal harness](../test/results/initial-preparation-native-check.log)
+attempt. The native run,
+source/cleanup report
+and terminal harness
 returned 0: one actual Kubernetes test in 10.381 seconds, all 709 captured source
 hashes verified after termination, unchanged sources and no cleanup failures.
 The product creator persists the root ConfigMap, two concurrent journal callers
@@ -19444,9 +19444,9 @@ second attempt. Plan substitution, journal recreation and removed staging
 protection deny. The account mutation and harmless probe provisioning are still
 fixture-owned; the journal itself is not an implemented resource supervisor.
 
-[Full code gates](../test/results/initial-preparation-code-gates.log),
+Full code gates,
 `make go-check go-architecture-check`, returned 0 with vet/race, 43 packages and
-190 internal edges. [Specification/architecture/design gates](../test/results/initial-preparation-document-gates.log)
+190 internal edges. Specification/architecture/design gates
 returned 0: 67 schemas, 550 rejected examples/8842 assertions, 1106 positive and
 120 negative architecture checks, and the existing 63 design screens. Continue
 with exact setup resource creation/reconciliation, root retention, complete
@@ -19465,16 +19465,16 @@ Pods, Secrets, arbitrary bodies and extra RBAC rules are unavailable through thi
 producer. Probe bootstrap, root retention and the remaining supervisor remain
 separate work.
 
-The [derived-name regression](../test/results/initial-preparation-names-before.log)
+The derived-name regression
 returned 1: a valid account name could produce an invalid overlong Role name.
 The shared workload builder now rejects that plan before any side effect.
-[Affected race checks](../test/results/initial-preparation-resources-after.log)
+Affected race checks
 returned 0 in 29.790 seconds, including lost resource replies, missing/replaced
 accounts, changed/omitted automount settings and no recreation on retry.
 
-The [native resource run](../test/results/initial-preparation-resources-native-final.log),
-[source/cleanup report](../test/results/initial-preparation-resources-native-final-environment.json)
-and [terminal harness](../test/results/initial-preparation-resources-native-check.log)
+The native resource run,
+source/cleanup report
+and terminal harness
 returned 0: one Kubernetes test in 36.195 seconds, all 710 captured source hashes
 verified after terminal completion, unchanged sources and no cleanup failures.
 The product created all seven exact setup resources and repeated `Ensure`
@@ -19482,10 +19482,10 @@ preserved their UIDs. The journal also retained its independent concurrent
 intent/receipt test, changed-plan/removed-guard denials and separate final-input
 proof. Owned cluster RBAC and namespace resources were removed normally. This
 test creates no workload or provider credentials and supplies no activation.
-[Document/design gates](../test/results/initial-preparation-resources-document-gates.log)
+Document/design gates
 returned 0 with 67 schemas, 550 rejected examples/8852 assertions, 1106 positive
 and 120 negative architecture checks, and the existing 63 screens. The
-[full code gates](../test/results/initial-preparation-resources-code-gates.log),
+full code gates,
 `make go-check go-architecture-check`, subsequently returned 0 with vet/race,
 43 packages and 190 internal import edges. These passing component results do
 not enable a public collection route or complete the installation supervisor.
@@ -19502,23 +19502,23 @@ The maintainer resumed the full implementation goal after the ADR-097 pause. [AD
 
 Current measured evidence:
 
-- [Deterministic failing clock regression](../test/results/owner-fixture-clock-before.log) reproduced the old mTLS fixture problem: setup and client clocks straddled a renewal boundary. The fixture now follows the caller's clock with X.509 second precision. [Whole mTLS race suite](../test/results/owner-fixture-clock-after.log) returned 0; production credential validation was unchanged.
-- [First-installation provider tests](../test/results/initial-installation-first.log), [source/cleanup report](../test/results/initial-installation-first-environment.json), [terminal harness](../test/results/initial-installation-native-check.log): `make initial-installation-integration` returned 0, ten parent/subtest entries, all 683 captured source hashes verified after termination and empty cleanup failures. The case took 0.97 seconds; this is not capacity qualification. It composes real PostgreSQL/S3/OpenBao with explicit synthetic Kubernetes witness/source observations.
+- Deterministic failing clock regression reproduced the old mTLS fixture problem: setup and client clocks straddled a renewal boundary. The fixture now follows the caller's clock with X.509 second precision. Whole mTLS race suite returned 0; production credential validation was unchanged.
+- First-installation provider tests, source/cleanup report, terminal harness: `make initial-installation-integration` returned 0, ten parent/subtest entries, all 683 captured source hashes verified after termination and empty cleanup failures. The case took 0.97 seconds; this is not capacity qualification. It composes real PostgreSQL/S3/OpenBao with explicit synthetic Kubernetes witness/source observations.
 - The provider cases cover one retained attempt under four concurrent preparations; missing witness/audit; interrupted audit and exact resumption; existing operational rows before or after preparation; SQL loss after witness consumption; unknown tables/row security; source/incarnation substitution; original expiry through a lock wait; and actual SQLSTATE `42501` cross-role denials. A completed retry preserves a subsequently restored recovery block. The new migration does not activate existing roots.
-- [Code gates](../test/results/initial-installation-code-gates.log): `make go-check go-architecture-check sql-check` returned 0 with vet/race, 43 packages/189 internal edges and 22 generated SQL files. Subsequent changes add native composition and audit-negative tests; their qualification is tracked separately below.
-- [Audit and credential tests](../test/results/initial-installation-audit-clock-tests.log) returned 0. The purpose-separated encrypted audit rejects changed witness scope, plan/source/claim/database, wrong format and corrupt bytes, and denies failed encryption.
-- [First native fixture attempt](../test/results/initial-installation-context-check.log), [environment](../test/results/initial-installation-context-first-environment.json) failed before product tests: Kind's first control plane could not bootstrap its administrator before the deadline. Exit 1; all 685 captured hashes still matched, owned fixtures removed, no cleanup failures. No product qualification follows. The harness now retains failed nodes only until its existing finally cleanup and exports owned-node diagnostics on setup failure.
-- The old temporary validation environment had disappeared. Installing the previous requirements in a fresh environment [failed the negative schema checks](../test/results/initial-installation-document-gates.log) because jsonschema's optional URI/date-time checkers were absent. The requirements now select its maintained `format-nongpl` extra, and [an explicit preflight regression](../test/results/spec-missing-format-regression.log) rejects incomplete environments. [Specification/architecture/design recheck](../test/results/initial-installation-document-recheck.log) returned 0 after installing the declared dependencies. This follows the [library's documented format dependencies](https://python-jsonschema.readthedocs.io/en/stable/validate/#validating-formats); no product runtime dependency changed.
+- Code gates: `make go-check go-architecture-check sql-check` returned 0 with vet/race, 43 packages/189 internal edges and 22 generated SQL files. Subsequent changes add native composition and audit-negative tests; their qualification is tracked separately below.
+- Audit and credential tests returned 0. The purpose-separated encrypted audit rejects changed witness scope, plan/source/claim/database, wrong format and corrupt bytes, and denies failed encryption.
+- First native fixture attempt, environment failed before product tests: Kind's first control plane could not bootstrap its administrator before the deadline. Exit 1; all 685 captured hashes still matched, owned fixtures removed, no cleanup failures. No product qualification follows. The harness now retains failed nodes only until its existing finally cleanup and exports owned-node diagnostics on setup failure.
+- The old temporary validation environment had disappeared. Installing the previous requirements in a fresh environment failed the negative schema checks because jsonschema's optional URI/date-time checkers were absent. The requirements now select its maintained `format-nongpl` extra, and an explicit preflight regression rejects incomplete environments. Specification/architecture/design recheck returned 0 after installing the declared dependencies. This follows the [library's documented format dependencies](https://python-jsonschema.readthedocs.io/en/stable/validate/#validating-formats); no product runtime dependency changed.
 
-The [native protected-input composition](../test/results/initial-installation-native-context.log), [environment report](../test/results/initial-installation-native-context-environment.json) and [terminal harness](../test/results/initial-installation-context-diagnostic-check.log) now pass: exit 0, 15 passing parent/subtest entries, all 685 captured hashes verified after termination and no cleanup failures. The real protected witness/fleet-source case took 6.71 seconds and the separate witness suite 6.85 seconds. It uses actual Kubernetes API identities, UID pins and native admission with real SQL/S3/OpenBao; the SQL coordinator enables the initial root without a fixture administrator activation UPDATE. After the fixture independently sets a later recovery block and removes source protection, the coordinator cannot clear it. Tokens, plan digest, roles and provider setup remain fixture-provisioned, not a protected installer Pod. Both owned clusters and the synthetic worker image were removed. The preceding Kind startup failure remains failed historical evidence; no host setting or other cluster was changed.
+The native protected-input composition, environment report and terminal harness now pass: exit 0, 15 passing parent/subtest entries, all 685 captured hashes verified after termination and no cleanup failures. The real protected witness/fleet-source case took 6.71 seconds and the separate witness suite 6.85 seconds. It uses actual Kubernetes API identities, UID pins and native admission with real SQL/S3/OpenBao; the SQL coordinator enables the initial root without a fixture administrator activation UPDATE. After the fixture independently sets a later recovery block and removes source protection, the coordinator cannot clear it. Tokens, plan digest, roles and provider setup remain fixture-provisioned, not a protected installer Pod. Both owned clusters and the synthetic worker image were removed. The preceding Kind startup failure remains failed historical evidence; no host setting or other cluster was changed.
 
-[Final code gates](../test/results/initial-installation-final-code-gates.log) returned 0 after the native-composition and audit-negative tests were added. [Final specification/architecture/design gates](../test/results/initial-installation-final-document-gates.log) also returned 0.
+Final code gates returned 0 after the native-composition and audit-negative tests were added. Final specification/architecture/design gates also returned 0.
 
-The full schema-32 [custody suite](../test/results/initial-installation-full-custody.log), [report](../test/results/initial-installation-full-custody-environment.json), [terminal harness](../test/results/initial-installation-full-custody-check.log) returned 0 with 240 passing entries in 106.456 seconds. The full [fleet suite](../test/results/initial-installation-full-fleet.log), [report](../test/results/initial-installation-full-fleet-environment.json), [terminal harness](../test/results/initial-installation-full-fleet-check.log) returned 0 with 99 passing entries in 35.189 seconds. All 685 source hashes matched each report after termination and both cleanup lists are empty.
+The full schema-32 custody suite, report, terminal harness returned 0 with 240 passing entries in 106.456 seconds. The full fleet suite, report, terminal harness returned 0 with 99 passing entries in 35.189 seconds. All 685 source hashes matched each report after termination and both cleanup lists are empty.
 
-The full [native context suite](../test/results/initial-installation-full-context.log), [report](../test/results/initial-installation-full-context-environment.json), [terminal harness](../test/results/initial-installation-full-context-check.log) also returned 0: 102 passing entries in 185.500 seconds, all 685 hashes matched and cleanup is empty. The actual Restricted worker case passed in 17.61 seconds including normal deletion. Observed Pod `17cb9b4e-b2e4-4af0-81bf-7c25bcc7d07f` used image `sha256:2f77e8dc37a876625aeb59bae7d6234663fe32869507fd0ab78be8e6871d7aaf`, built from binary SHA-256 `c57c6aeefd76d29d7a62c299aaa2a17a6dbb10d18aab5bc45fd1b2c923b079ba`. Both owned clusters and the test image were removed. Native first-installation composition runs separately under its explicit fresh-database selection; the full context suite retains synthetic recovery in its older worker/owner fixtures. No production timed token renewal, deployment capacity or end-user slice completion follows.
+The full native context suite, report, terminal harness also returned 0: 102 passing entries in 185.500 seconds, all 685 hashes matched and cleanup is empty. The actual Restricted worker case passed in 17.61 seconds including normal deletion. Observed Pod `17cb9b4e-b2e4-4af0-81bf-7c25bcc7d07f` used image `sha256:2f77e8dc37a876625aeb59bae7d6234663fe32869507fd0ab78be8e6871d7aaf`, built from binary SHA-256 `c57c6aeefd76d29d7a62c299aaa2a17a6dbb10d18aab5bc45fd1b2c923b079ba`. Both owned clusters and the test image were removed. Native first-installation composition runs separately under its explicit fresh-database selection; the full context suite retains synthetic recovery in its older worker/owner fixtures. No production timed token renewal, deployment capacity or end-user slice completion follows.
 
-The [database recovery run](../test/results/initial-installation-recovery.log), [report](../test/results/initial-installation-recovery-environment.json), [terminal harness](../test/results/initial-installation-recovery-check.log) returned 0 for all three actual phases against schema 32, with 685 matching source hashes and clean removal. The PostgreSQL start changed from `2026-10-11T11:33:58.286602Z` to `11:34:02.513348Z` on restart while OID stayed 16384; logical restore kept that process time and changed the database OID to 18111. Both denied saved activation. The test's subsequent recovery acceptance remains explicitly synthetic, not the new first-installation method.
+The database recovery run, report, terminal harness returned 0 for all three actual phases against schema 32, with 685 matching source hashes and clean removal. The PostgreSQL start changed from `2026-10-11T11:33:58.286602Z` to `11:34:02.513348Z` on restart while OID stayed 16384; logical restore kept that process time and changed the database OID to 18111. Both denied saved activation. The test's subsequent recovery acceptance remains explicitly synthetic, not the new first-installation method.
 
 No old fixture result is presented as a run of changed source. Next finish protected installer plan/credential/pin provisioning, including a pre-activation local-key audit capability without a recovery dependency cycle, and the separate qualified restart/restore protocol. Then continue the end-user context/download flow and remaining product slices.
 
@@ -19528,12 +19528,12 @@ The maintainer requested a neutral stopping point. [ADR-097](decisions/097-one-u
 
 Actual verification:
 
-- [Affected race tests](../test/results/installation-witness-unit.log): `go test -race ./internal/domain/fleet ./internal/adapters/kubernetes -run 'TestInitialWitness|TestFleetAdministration'` returned 0. Closed-wire tests include duplicate/unknown/case-alias members, zero digests/OID, excessive intervals, submicrosecond/noncanonical timestamps and equal source/plan digests.
-- [Native Kubernetes suite](../test/results/installation-witness-native.log), [environment report](../test/results/installation-witness-native-environment.json), [terminal harness](../test/results/installation-witness-first-check.log): the targeted `TestInstallationWitnessWithRealKubernetes` run returned 0, with all four parent/subtest entries passing. The case took 9.26 seconds. All 674 captured source hashes matched after actual harness termination, `sourceUnchangedDuringTest` is true and cleanup failures are empty. Both owned Kind clusters were removed. These times are not throughput measurements.
+- Affected race tests: `go test -race ./internal/domain/fleet ./internal/adapters/kubernetes -run 'TestInitialWitness|TestFleetAdministration'` returned 0. Closed-wire tests include duplicate/unknown/case-alias members, zero digests/OID, excessive intervals, submicrosecond/noncanonical timestamps and equal source/plan digests.
+- Native Kubernetes suite, environment report, terminal harness: the targeted `TestInstallationWitnessWithRealKubernetes` run returned 0, with all four parent/subtest entries passing. The case took 9.26 seconds. All 674 captured source hashes matched after actual harness termination, `sourceUnchangedDuringTest` is true and cleanup failures are empty. Both owned Kind clusters were removed. These times are not throughput measurements.
 - The native case verifies consumption/repeat, four competing claims with one retained winner, immutable reset denial, writer CREATE/DELETE denial, missing/recreated UID rejection, expired-attempt denial and missing-admission refusal without consumption. It uses real Kubernetes API tokens and synthetic database/source/plan facts. It does not qualify a Pod-bound protected installer, SQL pristine-state checks or activation audit.
-- [First broader Go check](../test/results/installation-witness-go-gates.log) returned 2 from Make: the existing `TestOwnerForwarderCancellationBeforeTransmission/client-after-lookup` failed during credential fixture enrollment with `signed control work rejected`. The witness/Kubernetes package passed. No mTLS source was changed. [Ten targeted race-enabled repeats](../test/results/installation-witness-existing-mtls-recheck.log) returned 0; the intermittent fixture failure remains an open qualification issue rather than a claimed fix.
-- [Full Go recheck](../test/results/installation-witness-go-recheck.log): `make go-check go-architecture-check` returned 0, including vet/race tests and the 43-package/189-edge architecture check. A passing repeat does not erase the preceding intermittent failure.
-- [Documentation gates](../test/results/installation-witness-document-gates.log): `make spec-check architecture-check design-check` returned 0, including 64 schemas, 176 requirements/scenarios and 63 design screens. Native source hashes were reverified after these documentation edits; all 674 still match. These design checks do not qualify deployment or cryptography.
+- First broader Go check returned 2 from Make: the existing `TestOwnerForwarderCancellationBeforeTransmission/client-after-lookup` failed during credential fixture enrollment with `signed control work rejected`. The witness/Kubernetes package passed. No mTLS source was changed. Ten targeted race-enabled repeats returned 0; the intermittent fixture failure remains an open qualification issue rather than a claimed fix.
+- Full Go recheck: `make go-check go-architecture-check` returned 0, including vet/race tests and the 43-package/189-edge architecture check. A passing repeat does not erase the preceding intermittent failure.
+- Documentation gates: `make spec-check architecture-check design-check` returned 0, including 64 schemas, 176 requirements/scenarios and 63 design screens. Native source hashes were reverified after these documentation edits; all 674 still match. These design checks do not qualify deployment or cryptography.
 
 The full native context, custody and fleet suites were not rerun for this component. Earlier broad qualification below retains its original source scope. The witness remains unwired, so it cannot enable collection or relax the existing recovery fence.
 
@@ -19547,17 +19547,17 @@ The runtime change is C-21 SQL enforcement with existing C-04/C-14 consumers und
 
 Actual verification:
 
-- [Failing regression](../test/results/recovery-incarnation-before-custody.log), [report](../test/results/recovery-incarnation-before-custody-environment.json): real PostgreSQL reproduced old enabled flags plus source refresh reactivating authority. Exit 1, 665 unchanged source hashes, owned fixtures removed.
-- [First integration attempt](../test/results/recovery-incarnation-first-custody.log), [report](../test/results/recovery-incarnation-first-custody-environment.json): the observer lacked the new view's row-lock permission. Exit 1, 666 unchanged hashes, clean removal. The correction grants UPDATE only on its installation column, never the activation fields.
-- [Exact-denial test correction](../test/results/recovery-incarnation-permission-custody.log), [report](../test/results/recovery-incarnation-permission-custody-environment.json): PostgreSQL structurally rejects writes to a computed view column with SQLSTATE `0A000` before checking ACLs. The fixture had incorrectly required `42501` for that operation. Other activation writes still require actual `42501` permission denial. Exit 1, 667 unchanged hashes, clean removal.
-- [Corrected observer tests](../test/results/recovery-incarnation-observer.log), [report](../test/results/recovery-incarnation-observer-environment.json): ordinary observation, stale activation, equal-time/expired-lock behavior and exact SQL role denials pass. Exit 0 with 667 verified source hashes and clean removal.
-- [Final local gates](../test/results/recovery-incarnation-legacy-final-gates.log): `make go-check go-architecture-check sql-check spec-check architecture-check design-check` returned 0. Vet/race tests pass; 43 Go packages/189 internal edges and 22 generated SQL files match. These gates alone do not qualify database restore.
-- [Full custody suite](../test/results/recovery-incarnation-final-custody.log), [report](../test/results/recovery-incarnation-final-custody-environment.json), [terminal harness](../test/results/recovery-incarnation-final-custody-check.log): exit 0, 240 passing test entries, 667 verified unchanged source hashes, no cleanup failures. Includes denial of a previously obtained recovery proof after database activation changes, current peer denial, and existing admission/download/accounting behavior.
-- [Full fleet suite](../test/results/recovery-incarnation-final-fleet.log), [report](../test/results/recovery-incarnation-final-fleet-environment.json), [terminal harness](../test/results/recovery-incarnation-final-fleet-check.log): exit 0, 99 passing entries, 667 verified source hashes and clean fixture removal. Uses real scoped PostgreSQL/S3/OpenBao provider compositions.
-- [Final database recovery phases](../test/results/recovery-incarnation-database-final.log), [report](../test/results/recovery-incarnation-database-final-environment.json), [terminal harness](../test/results/recovery-incarnation-database-final-check.log): `make database-recovery-integration` returned 0 for legacy-root migration, actual restart and actual logical restore. All 667 hashes matched and all owned fixtures were removed. The original server start was `2026-10-11T00:29:07.505461Z`, changing to `00:29:12.472916Z` on restart while database OID remained 16384; restoring into a new database retained that process time but changed OID to 18091. Both rejected saved activation even after source refresh and clearing suspension. Activation itself is explicitly fixture-only.
+- Failing regression, report: real PostgreSQL reproduced old enabled flags plus source refresh reactivating authority. Exit 1, 665 unchanged source hashes, owned fixtures removed.
+- First integration attempt, report: the observer lacked the new view's row-lock permission. Exit 1, 666 unchanged hashes, clean removal. The correction grants UPDATE only on its installation column, never the activation fields.
+- Exact-denial test correction, report: PostgreSQL structurally rejects writes to a computed view column with SQLSTATE `0A000` before checking ACLs. The fixture had incorrectly required `42501` for that operation. Other activation writes still require actual `42501` permission denial. Exit 1, 667 unchanged hashes, clean removal.
+- Corrected observer tests, report: ordinary observation, stale activation, equal-time/expired-lock behavior and exact SQL role denials pass. Exit 0 with 667 verified source hashes and clean removal.
+- Final local gates: `make go-check go-architecture-check sql-check spec-check architecture-check design-check` returned 0. Vet/race tests pass; 43 Go packages/189 internal edges and 22 generated SQL files match. These gates alone do not qualify database restore.
+- Full custody suite, report, terminal harness: exit 0, 240 passing test entries, 667 verified unchanged source hashes, no cleanup failures. Includes denial of a previously obtained recovery proof after database activation changes, current peer denial, and existing admission/download/accounting behavior.
+- Full fleet suite, report, terminal harness: exit 0, 99 passing entries, 667 verified source hashes and clean fixture removal. Uses real scoped PostgreSQL/S3/OpenBao provider compositions.
+- Final database recovery phases, report, terminal harness: `make database-recovery-integration` returned 0 for legacy-root migration, actual restart and actual logical restore. All 667 hashes matched and all owned fixtures were removed. The original server start was `2026-10-11T00:29:07.505461Z`, changing to `00:29:12.472916Z` on restart while database OID remained 16384; restoring into a new database retained that process time but changed OID to 18091. Both rejected saved activation even after source refresh and clearing suspension. Activation itself is explicitly fixture-only.
 
-- [Full native Kubernetes suite](../test/results/recovery-incarnation-before-legacy-block-context.log), [report](../test/results/recovery-incarnation-before-legacy-block-context-environment.json), [terminal harness](../test/results/recovery-incarnation-before-legacy-block-context-check.log): exit 0, 98 passing entries, 667 source hashes verified after terminal cleanup, no cleanup failures. The suite took 186.926 seconds; the actual Restricted worker case passed in 17.61 seconds including normal foreground deletion. Its observed Pod `67e77b46-fb1a-4154-a503-fecd95a2badc` used the exact loaded image `sha256:2488107ceb13ac1bb4cdd1a260ea5dfbfb3f6771fe3a8995f78ad5601b24fd42`, built from binary SHA-256 `11d896b63de865f0c18f7089d56567dc0e8b393a93af3897e4c434d7e7a1e92b`. No timed native token renewal or production capacity claim follows.
-- [Final legacy-reader hardening](../test/results/recovery-incarnation-legacy-final.log), [report](../test/results/recovery-incarnation-legacy-final-environment.json), [terminal harness](../test/results/recovery-incarnation-legacy-final-check.log): the final migration additionally blocks stored flags under its table lock, protecting old queries as well as the new view. `make database-recovery-integration` returned 0 again for the enabled legacy root, actual restart and actual logical restore. All 667 source hashes match the final source; cleanup is empty. Restart changed server start `2026-10-11T00:34:57.563366Z` to `00:35:05.824545Z` while OID stayed 16384; logical restore retained that process time and changed OID to 18091.
+- Full native Kubernetes suite, report, terminal harness: exit 0, 98 passing entries, 667 source hashes verified after terminal cleanup, no cleanup failures. The suite took 186.926 seconds; the actual Restricted worker case passed in 17.61 seconds including normal foreground deletion. Its observed Pod `67e77b46-fb1a-4154-a503-fecd95a2badc` used the exact loaded image `sha256:2488107ceb13ac1bb4cdd1a260ea5dfbfb3f6771fe3a8995f78ad5601b24fd42`, built from binary SHA-256 `11d896b63de865f0c18f7089d56567dc0e8b393a93af3897e4c434d7e7a1e92b`. No timed native token renewal or production capacity claim follows.
+- Final legacy-reader hardening, report, terminal harness: the final migration additionally blocks stored flags under its table lock, protecting old queries as well as the new view. `make database-recovery-integration` returned 0 again for the enabled legacy root, actual restart and actual logical restore. All 667 source hashes match the final source; cleanup is empty. Restart changed server start `2026-10-11T00:34:57.563366Z` to `00:35:05.824545Z` while OID stayed 16384; logical restore retained that process time and changed OID to 18091.
 
 Qualification scope after the last review: only `migrations/00031_database_activation.sql` and its dedicated `test/integration/database_recovery_test.go` changed after the full custody/fleet/native runs. Every other recorded source hash, including all production Go/query bindings, provider/harness code and native worker sources, still matches those reports. The final database-recovery run qualifies that exact upgrade-path change; final vet/race, SQL-generation and design gates also pass. The broad suites are not represented as reruns of the final migration bytes. Their fresh databases had no existing trust rows to backfill.
 
@@ -19573,16 +19573,16 @@ Native execution exposed lifecycle defects beyond template validation. [ADR-095]
 
 Recorded unsuccessful runs are retained:
 
-- [Initial launch](../test/results/native-worker-first-context-storage.log), [harness](../test/results/native-worker-first-check.log), [report](../test/results/native-worker-first-context-storage-environment.json): the newly created Deployment's resourceVersion raced its controller. Launch now retries only the same UID and unchanged spec. The harness returned 1 with 665 unchanged source hashes and clean fixture removal.
-- [Initial Pod startup](../test/results/native-worker-second-context-storage.log), [harness](../test/results/native-worker-second-check.log), [report](../test/results/native-worker-second-context-storage-environment.json): provider connection timeout. The separate [gateway probe](../test/results/native-worker-gateway-probe.log) confirmed host-to-gateway connectivity but timeout from an owned container. No workstation firewall change was made. The fixture now runs TLS bridges in an owned private container with no published ports; its backend hops remain private plaintext. The report returned 1 with 665 unchanged hashes and clean removal.
-- [Native operation before teardown fixes](../test/results/native-worker-third-context-storage.log), [harness](../test/results/native-worker-third-check.log), [report](../test/results/native-worker-third-context-storage-environment.json): actual worker observation, encrypted audit, source-removal denial and Lease-loss shutdown succeeded, but foreground deletion failed. The entire case therefore failed. All 666 hashes matched, with clean harness removal.
-- [Exact garbage-collector regression](../test/results/native-worker-gc-before-context-storage.log), [harness](../test/results/native-worker-gc-before-check.log), [report](../test/results/native-worker-gc-before-context-storage-environment.json): native RBAC-permitted metadata update received the exact namespace-policy denial and foreground finalizers remained. The harness returned 1 with 665 unchanged hashes and clean removal.
-- [Assigned-node regression](../test/results/native-worker-node-before-context-storage.log), [kubelet journal](../test/results/native-worker-node-before-context-storage-kubelet.log), [harness](../test/results/native-worker-node-before-check.log), [report](../test/results/native-worker-node-before-context-storage-environment.json): metadata maintenance succeeded after its correction, while the actual kubelet could not remove its terminated Pod. The fixture also had an overly generic error predicate for negative admission checks; it now verifies exact native policy/binding causes, as the existing guard tests do. This run failed, with 665 verified hashes and clean removal.
-- The [first broad gate](../test/results/native-worker-before-tool-isolation-gates.log) passed vet/race but rejected the standalone fixture bridge as an ordinary product package. The bridge is now an explicitly built, build-ignored fixture tool. The architecture rule is unchanged; no product package can import the tool.
+- Initial launch, harness, report: the newly created Deployment's resourceVersion raced its controller. Launch now retries only the same UID and unchanged spec. The harness returned 1 with 665 unchanged source hashes and clean fixture removal.
+- Initial Pod startup, harness, report: provider connection timeout. The separate gateway probe confirmed host-to-gateway connectivity but timeout from an owned container. No workstation firewall change was made. The fixture now runs TLS bridges in an owned private container with no published ports; its backend hops remain private plaintext. The report returned 1 with 665 unchanged hashes and clean removal.
+- Native operation before teardown fixes, harness, report: actual worker observation, encrypted audit, source-removal denial and Lease-loss shutdown succeeded, but foreground deletion failed. The entire case therefore failed. All 666 hashes matched, with clean harness removal.
+- Exact garbage-collector regression, harness, report: native RBAC-permitted metadata update received the exact namespace-policy denial and foreground finalizers remained. The harness returned 1 with 665 unchanged hashes and clean removal.
+- Assigned-node regression, kubelet journal, harness, report: metadata maintenance succeeded after its correction, while the actual kubelet could not remove its terminated Pod. The fixture also had an overly generic error predicate for negative admission checks; it now verifies exact native policy/binding causes, as the existing guard tests do. This run failed, with 665 verified hashes and clean removal.
+- The first broad gate passed vet/race but rejected the standalone fixture bridge as an ordinary product package. The bridge is now an explicitly built, build-ignored fixture tool. The architecture rule is unchanged; no product package can import the tool.
 
-The [targeted race tests](../test/results/native-worker-final-units.log) passed. The [corrected local gates](../test/results/native-worker-gates.log) returned 0: `make go-check go-architecture-check sql-check spec-check architecture-check design-check`, covering full vet/race, 43 packages/189 internal edges, 22 matching SQL-generation files, 63 schemas/526 rejected invalid examples and 63 mockup screens. The shared PostgreSQL TLS fixture was restored byte-for-byte to the previous qualified source; no SQL implementation changed.
+The targeted race tests passed. The corrected local gates returned 0: `make go-check go-architecture-check sql-check spec-check architecture-check design-check`, covering full vet/race, 43 packages/189 internal edges, 22 matching SQL-generation files, 63 schemas/526 rejected invalid examples and 63 mockup screens. The shared PostgreSQL TLS fixture was restored byte-for-byte to the previous qualified source; no SQL implementation changed.
 
-The final [full native harness](../test/results/native-worker-final-context-check.log) returned 0 after terminal cleanup. Its [suite log](../test/results/native-worker-final-context-storage.log) passed in 185.505 seconds: the outside-Pod worker case took 15.66 seconds, the in-Pod case 17.61 seconds including normal foreground deletion, and the existing owner case 82.70 seconds. The [environment report](../test/results/native-worker-final-context-storage-environment.json) records an unfiltered run, 98 passing top-level/subtests, 665 unchanged source hashes and empty cleanup failures. Every source hash matched after terminal exit. The actual observed Pod image equals the loaded manifest reference recorded with the compiled binary SHA-256; the report retains all three identities. No owned fixture remains. Timings describe entire test cases, not production capacity or stop-latency guarantees.
+The final full native harness returned 0 after terminal cleanup. Its suite log passed in 185.505 seconds: the outside-Pod worker case took 15.66 seconds, the in-Pod case 17.61 seconds including normal foreground deletion, and the existing owner case 82.70 seconds. The environment report records an unfiltered run, 98 passing top-level/subtests, 665 unchanged source hashes and empty cleanup failures. Every source hash matched after terminal exit. The actual observed Pod image equals the loaded manifest reference recorded with the compiled binary SHA-256; the report retains all three identities. No owned fixture remains. Timings describe entire test cases, not production capacity or stop-latency guarantees.
 
 The native case verifies all three garbage-collector metadata shapes, denials for changed spec/labels/annotations and credential/configuration writes, denial of kubelet-initiated running-Pod deletion, and actual subsequent terminal Pod removal and foreground finalization. The test does not force-delete Pods, remove finalizers as administrator or disable admission. Missing fleet roots remain recovery-blocked, and exactly one explicit fixture-only administrator transition enables subsequent audited observations. Removing source protection fences reads; Lease loss ends the original worker process without recreating the Lease.
 
@@ -19592,41 +19592,41 @@ Production installer orchestration, independent initial/recovery/restore activat
 
 [ADR-093](decisions/093-bounded-hub-scheduling-permission.md) closes the mismatch between the configuration worker's named Lease RBAC and the private namespace admission policy. The private owner deployment now requires `schedulingLeases`, at most four exact same-namespace account/Lease pairs, with `[]` granting none. Native admission permits only UPDATE on those named coordination Lease main resources; creation/deletion and every other actor/resource remain guarded. Runtime retains original UID/CAS/record checks and named get/update RBAC. This grants scheduling only, never configuration acceptance, recovery, credentials or evidence authority. No new dependency, SQL migration, public API or developer approval is introduced.
 
-The [native pre-fix regression](../test/results/scheduling-lease-before.log) failed at the actual scoped account's persistent Lease update with the namespace policy's exact denial. Its [harness](../test/results/scheduling-lease-before-check.log) returned 1; the [report](../test/results/scheduling-lease-before-environment.json) records the selected test pattern, 661 unchanged source hashes and empty cleanup failures. Every source hash matched before edits. This proves the composition defect; it is not a broad-suite qualification. The context harness now offers a recorded `--run` pattern and rejects zero passing selected tests; its ordinary Make target still runs the complete suite.
+The native pre-fix regression failed at the actual scoped account's persistent Lease update with the namespace policy's exact denial. Its harness returned 1; the report records the selected test pattern, 661 unchanged source hashes and empty cleanup failures. Every source hash matched before edits. This proves the composition defect; it is not a broad-suite qualification. The context harness now offers a recorded `--run` pattern and rejects zero passing selected tests; its ordinary Make target still runs the complete suite.
 
-The [affected race tests](../test/results/scheduling-lease-units.log) returned 0. The [full local gates](../test/results/scheduling-lease-gates.log) also returned 0: `make go-check go-architecture-check sql-check spec-check architecture-check design-check`, including full vet/race, 43 packages/189 internal edges, 22 matching sqlc files, 63 schemas/526 rejected invalid examples, and the existing 63-screen design validation. Closed input, finite/unique scope, invalid names and caller-memory isolation are covered. The combined native test now installs both source policies and the private namespace policy, confirms actual RBAC scope, and uses temporary broader fixture-only attack rights to distinguish admission rejection from RBAC rejection; those rights must be removed before runtime starts.
+The affected race tests returned 0. The full local gates also returned 0: `make go-check go-architecture-check sql-check spec-check architecture-check design-check`, including full vet/race, 43 packages/189 internal edges, 22 matching sqlc files, 63 schemas/526 rejected invalid examples, and the existing 63-screen design validation. Closed input, finite/unique scope, invalid names and caller-memory isolation are covered. The combined native test now installs both source policies and the private namespace policy, confirms actual RBAC scope, and uses temporary broader fixture-only attack rights to distinguish admission rejection from RBAC rejection; those rights must be removed before runtime starts.
 
-The corrected [full native harness](../test/results/scheduling-lease-context-check.log) returned 0 after terminal cleanup. Its [suite](../test/results/scheduling-lease-final-context-storage.log) passed in 169.481 seconds, including the worker case in 15.86 seconds and the existing owner startup/source-protection cases. The [environment report](../test/results/scheduling-lease-final-context-storage-environment.json) records the unfiltered run, 661 unchanged source hashes and empty cleanup failures. Every hash matched current files after the actual terminal result. Both source and namespace admission coexist, actual runtime RBAC remains scoped, temporary attack permissions are removed, missing source protection fences SQL, and deleting the original Lease cancels and joins runtime without recreating it. These durations describe entire cases/suites, not production capacity. No owned context fixture remained after cleanup. Installer-generated projections/workloads, independent initial/recovery/restore activation and in-Pod/public flows remain incomplete. No complete TASK or S-01/S-02 exit follows from these components.
+The corrected full native harness returned 0 after terminal cleanup. Its suite passed in 169.481 seconds, including the worker case in 15.86 seconds and the existing owner startup/source-protection cases. The environment report records the unfiltered run, 661 unchanged source hashes and empty cleanup failures. Every hash matched current files after the actual terminal result. Both source and namespace admission coexist, actual runtime RBAC remains scoped, temporary attack permissions are removed, missing source protection fences SQL, and deleting the original Lease cancels and joins runtime without recreating it. These durations describe entire cases/suites, not production capacity. No owned context fixture remained after cleanup. Installer-generated projections/workloads, independent initial/recovery/restore activation and in-Pod/public flows remain incomplete. No complete TASK or S-01/S-02 exit follows from these components.
 
 ## Previous protected configuration reconciliation (ADR-091/092)
 
 [ADR-091](decisions/091-protected-configuration-reconciliation.md) and the worker contract add protected fleet-source observation, independent bounded fleet/owner loops, three scoped SQL roles and the fixed private `hub-worker` deployment projection. The pinned client-go scheduling Lease cancels and joins work after loss, cannot create/adopt a replacement, and grants no source or recovery authority. First observation remains recovery-blocked. The same provider input reader now supplies owner and worker composition. Installer provisioning, restore detection, native Pod placement and public investigation flows remain unfinished.
 
-The SQL precision regression failed against the prior implementation: an equal PostgreSQL timestamp extended fleet authority. Its [failed log](../test/results/config-reconcile-clock-before.log) and [source/cleanup report](../test/results/config-reconcile-clock-before-environment.json) retain that evidence. The adapter now normalizes timestamps to database microseconds and rejects equal-time extension, revision changes or unfencing. The final real-SQL qualification below passed the regression, including a replay after a fence.
+The SQL precision regression failed against the prior implementation: an equal PostgreSQL timestamp extended fleet authority. Its failed log and source/cleanup report retain that evidence. The adapter now normalizes timestamps to database microseconds and rejects equal-time extension, revision changes or unfencing. The final real-SQL qualification below passed the regression, including a replay after a fence.
 
-The initial [native context harness](../test/results/config-reconcile-context-check.log) returned 2 from Make (component test exit 1). The [suite](../test/results/config-reconcile-first-context-storage.log) passed the new mounted configuration-worker case in 14.34 seconds: real admission, Lease, SQL/S3/OpenBao, blocked first observation, one explicit fixture recovery acceptance, automatic audited refresh, source loss and joined Lease-loss shutdown. No background fixture timer refreshed that worker's source. The full suite failed in the owner case because the namespace denial masked the independently expected source-policy denial. The [report](../test/results/config-reconcile-first-context-storage-environment.json) records 660 unchanged source hashes and no cleanup failures; every hash matched current files before further edits. That run is not a passing integration qualification.
+The initial native context harness returned 2 from Make (component test exit 1). The suite passed the new mounted configuration-worker case in 14.34 seconds: real admission, Lease, SQL/S3/OpenBao, blocked first observation, one explicit fixture recovery acceptance, automatic audited refresh, source loss and joined Lease-loss shutdown. No background fixture timer refreshed that worker's source. The full suite failed in the owner case because the namespace denial masked the independently expected source-policy denial. The report records 660 unchanged source hashes and no cleanup failures; every hash matched current files before further edits. That run is not a passing integration qualification.
 
 [ADR-092](decisions/092-independent-source-admission-probes.md) fixes that composition through exact installer-selected same-namespace account/ConfigMap dry-run UPDATE exceptions in the namespace policy. Real writes and other requests remain denied even without the source guard. The required private `configurationProbes` array is finite, unique and copied into the protection plan/digest; the independent source denial remains mandatory. No public permission control or extra approval was added. The native case additionally tests both guards together, deliberate source-guard removal and negative scope/persistence controls.
 
-The [local gates](../test/results/source-probe-gates.log) returned 0: `make go-check go-architecture-check sql-check spec-check architecture-check design-check`, including full vet/race, 43 packages/189 internal edges, 22 matching sqlc files, 63 schemas/519 rejected invalid examples and existing design validation. Earlier [corrected reconciliation gates](../test/results/config-reconcile-corrected-gates.log) also passed; their preceding failed lease test used a read-only fixture for a PUT and was corrected with its own protocol fixture. The [dependency scan](../test/results/config-reconcile-vulnerability-check.log) found zero affected code/imported packages and one module-only advisory. Client-go reuse adds an inherited go-difflib runtime dependency and a goleak test checksum without upgrading existing versions, as recorded in ADR-091.
+The local gates returned 0: `make go-check go-architecture-check sql-check spec-check architecture-check design-check`, including full vet/race, 43 packages/189 internal edges, 22 matching sqlc files, 63 schemas/519 rejected invalid examples and existing design validation. Earlier corrected reconciliation gates also passed; their preceding failed lease test used a read-only fixture for a PUT and was corrected with its own protocol fixture. The dependency scan found zero affected code/imported packages and one module-only advisory. Client-go reuse adds an inherited go-difflib runtime dependency and a goleak test checksum without upgrading existing versions, as recorded in ADR-091.
 
-The corrected [native harness](../test/results/source-probe-context-check.log) returned 0 after terminal cleanup. The [suite](../test/results/source-probe-final-context-storage.log) passed in 166.153 seconds; the configuration worker took 14.46 seconds and the combined owner case took 82.51 seconds. Both admission policies remained independently observable, and the new source-guard-removal controls denied every persistent/foreign request while leaving resourceVersion unchanged. The owner loader/token-loss/recovery/shutdown cases also passed. The [environment report](../test/results/source-probe-final-context-storage-environment.json) records 660 unchanged source hashes, exit 0 and empty cleanup failures. Every hash matched current files after actual harness termination, and no owned context container remained before the separate custody suite started. These suite durations are not production capacity measurements.
+The corrected native harness returned 0 after terminal cleanup. The suite passed in 166.153 seconds; the configuration worker took 14.46 seconds and the combined owner case took 82.51 seconds. Both admission policies remained independently observable, and the new source-guard-removal controls denied every persistent/foreign request while leaving resourceVersion unchanged. The owner loader/token-loss/recovery/shutdown cases also passed. The environment report records 660 unchanged source hashes, exit 0 and empty cleanup failures. Every hash matched current files after actual harness termination, and no owned context container remained before the separate custody suite started. These suite durations are not production capacity measurements.
 
-The separate [custody harness](../test/results/source-probe-custody-check.log) returned 0 after cleanup. Its [suite](../test/results/source-probe-final-custody.log) passed in 107.816 seconds, including `equal-or-rounded-observation-cannot-extend-or-unfence` and existing contention/recovery/role cases. Its [report](../test/results/source-probe-final-custody-environment.json) records 661 unchanged source hashes, exit 0 and empty cleanup failures. Every hash matched current files after terminal completion; the earlier native context hashes also still matched the same final code. Next qualify the reconciliation scheduling account against the private workload namespace policy, then complete installer projections and independent installation/restore activation before native in-Pod and public workflow composition. The present worker fixture has source protection but not the owner namespace guard; never grant its runtime identity installation-administrator status to make the Lease work. No full TASK, S-01/S-02 or installation exit is complete.
+The separate custody harness returned 0 after cleanup. Its suite passed in 107.816 seconds, including `equal-or-rounded-observation-cannot-extend-or-unfence` and existing contention/recovery/role cases. Its report records 661 unchanged source hashes, exit 0 and empty cleanup failures. Every hash matched current files after terminal completion; the earlier native context hashes also still matched the same final code. Next qualify the reconciliation scheduling account against the private workload namespace policy, then complete installer projections and independent installation/restore activation before native in-Pod and public workflow composition. The present worker fixture has source protection but not the owner namespace guard; never grant its runtime identity installation-administrator status to make the Lease work. No full TASK, S-01/S-02 or installation exit is complete.
 
 ## Previous protected owner deployment (ADR-090)
 
 [ADR-090](decisions/090-protected-owner-deployment.md) and the deployment contract add the fixed private startup projection, explicit provider trust, five distinct SQL role pools, native Kubernetes proof/protection, scoped S3/OpenBao audit and purpose-specific certificate issuance. `asservat hub-api` now starts this owner subsystem through the existing runtime/router. The loader reads current accepted configuration/recovery but has no acceptance or recovery-write credential. Public browser/MCP/federation/evidence routes and automatic installation provisioning remain unavailable. Three private schemas were added; no SQL migration or dependency changed.
 
-The [pre-fix regression](../test/results/owner-loader-before.log) returned 1: opening a FIFO token file blocked before type validation. The shared mounted-file reader now confines relative projection symlinks, opens nonblocking and reads only bounded regular files without group/world write permissions. Owner and worker startup use it. Current provider token and storage reads never fall back after projection loss; SQL password rotation applies to new connections while retaining the selected username. Existing SQL connections retain their original finite lifetime and database privileges. Temporary-buffer clearing is best effort, not a Go/SDK zeroization guarantee.
+The pre-fix regression returned 1: opening a FIFO token file blocked before type validation. The shared mounted-file reader now confines relative projection symlinks, opens nonblocking and reads only bounded regular files without group/world write permissions. Owner and worker startup use it. Current provider token and storage reads never fall back after projection loss; SQL password rotation applies to new connections while retaining the selected username. Existing SQL connections retain their original finite lifetime and database privileges. Temporary-buffer clearing is best effort, not a Go/SDK zeroization guarantee.
 
-`make go-check go-architecture-check sql-check spec-check architecture-check design-check` returned 0 in [the gate log](../test/results/owner-loader-gates.log): full vet/race suite, 43 packages/189 internal edges, 22 matching sqlc files, 62 schemas/506 rejected invalid examples and 63 design screens. Unit tests cover mounted-file confinement/rotation/FIFO rejection, explicit SQL TLS/no fallback, ambient credential rejection, password/role continuity, current Kubernetes/OpenBao tokens, missing storage credentials and malformed closed credential input. The [documentation continuation](../test/results/owner-loader-document-gates.log) also returned 0 after adding ADR-090 and its cross-references. These checks are not native installation evidence.
+`make go-check go-architecture-check sql-check spec-check architecture-check design-check` returned 0 in the gate log: full vet/race suite, 43 packages/189 internal edges, 22 matching sqlc files, 62 schemas/506 rejected invalid examples and 63 design screens. Unit tests cover mounted-file confinement/rotation/FIFO rejection, explicit SQL TLS/no fallback, ambient credential rejection, password/role continuity, current Kubernetes/OpenBao tokens, missing storage credentials and malformed closed credential input. The documentation continuation also returned 0 after adding ADR-090 and its cross-references. These checks are not native installation evidence.
 
-The [native context harness](../test/results/owner-loader-context-check.log) returned 0 after test completion and cleanup. Its [suite log](../test/results/owner-loader-final-context-storage.log) passed in 157.105 seconds; the owner case passed in 82.15 seconds. The [environment/source report](../test/results/owner-loader-final-context-storage-environment.json) records 651 unchanged source hashes, test exit 0 and empty cleanup failures. Every recorded hash matched current files after actual harness termination. No owned fixture containers remained before starting the separate custody suite.
+The native context harness returned 0 after test completion and cleanup. Its suite log passed in 157.105 seconds; the owner case passed in 82.15 seconds. The environment/source report records 651 unchanged source hashes, test exit 0 and empty cleanup failures. Every recorded hash matched current files after actual harness termination. No owned fixture containers remained before starting the separate custody suite.
 
 The new native case constructs the actual loader from fixed files using distinct real SQL grants, Kubernetes Pod/token/admission proof, TLS S3 encrypted audit and scoped OpenBao wrapping/signing. It establishes identity before Pod Ready, loses readiness when the original Pod token file disappears, recovers after restoration, and cancels/joins runtime work after invalid current bundle input. The listener is reserved on an owned ephemeral port; the fixture does not take over a workstation service. Initial recovery, source freshness and mount provisioning are explicitly fixture-owned. The loader still runs outside the protected pause Pod; this does not qualify native in-Pod routing, public transfers or production credential delivery.
 
-The separate [custody harness](../test/results/owner-loader-custody-check.log) also returned 0 after cleanup. Its [suite](../test/results/owner-loader-final-custody.log) passed in 107.824 seconds. The [report](../test/results/owner-loader-final-custody-environment.json) records 652 unchanged source hashes, test exit 0 and empty cleanup failures; all hashes matched current files after terminal completion. The earlier native context hashes still matched the same final code. No owned fixture containers remained. These times describe full suites, not per-operation latency or production capacity.
+The separate custody harness also returned 0 after cleanup. Its suite passed in 107.824 seconds. The report records 652 unchanged source hashes, test exit 0 and empty cleanup failures; all hashes matched current files after terminal completion. The earlier native context hashes still matched the same final code. No owned fixture containers remained. These times describe full suites, not per-operation latency or production capacity.
 
 Next complete installation-generated projections and protected source/recovery reconciliation, then native in-Pod routing, connector proof mediation, actual evidence transfer and public investigation workflows. Full S-01/S-02 and later slices remain unfinished; the implementation goal stays active.
 
@@ -19634,11 +19634,11 @@ Next complete installation-generated projections and protected source/recovery r
 
 [ADR-089](decisions/089-multicluster-worker-routing.md) and the routing contract remove the owner runtime's single-profile assumption. A shared installation/root-bound SQL read facet resolves exact stored cluster profiles; effect stores keep their original profile constraints. An atomic bounded catalog supplies only public control documents selected by current profile digest and cluster. The actual forwarder checks that trust before token transmission and after current-state revalidation; roots from another catalog cluster cannot verify the result. Shared receiving uses each original registration's own store, without a global mutation store. No SQL migration, dependency, public wire or permission model changed.
 
-The [initial regression](../test/results/worker-multicluster-before.log) failed to compile because the catalog constructor did not exist. The first combined fixture compilation then found a missing `strings` test import; [that failed run](../test/results/worker-multicluster-components.log) is retained. After correction, [affected race/component tests](../test/results/worker-multicluster-components-final.log) returned 0. Real-crypto/TLS tests cover two clusters through one forwarder, separate CA trust, cross-cluster issuer rejection, absent/changed/removed profile material, caller-owned pool/input isolation and failed replacement preservation. Authority ports and address remapping in these TLS fixtures remain synthetic.
+The initial regression failed to compile because the catalog constructor did not exist. The first combined fixture compilation then found a missing `strings` test import; that failed run is retained. After correction, affected race/component tests returned 0. Real-crypto/TLS tests cover two clusters through one forwarder, separate CA trust, cross-cluster issuer rejection, absent/changed/removed profile material, caller-owned pool/input isolation and failed replacement preservation. Authority ports and address remapping in these TLS fixtures remain synthetic.
 
 The shared SQL identity helper now explicitly intersects the caller and parent session deadlines and rereads worker/session state after blocking configuration checks. Existing dispatch already caps worker run time by the parent deadline; this change does not claim that the old dispatcher extended parent lifetime. The new independently enforced caller cutoff and post-wait cancellation are material changes.
 
-`make go-check go-architecture-check sql-check spec-check architecture-check design-check` returned 0 in [the gate log](../test/results/worker-multicluster-gates.log): full vet/race suite, 42 packages/188 internal edges, 22 matching sqlc files, 59 schemas/476 invalid examples/8424 assertions, 24 components/14 interfaces/49 entities and 63 design screens. The [real custody harness](../test/results/worker-multicluster-custody-check.log) then returned 0 after cleanup. [The archived SQL/S3 suite](../test/results/worker-multicluster-final-custody.log) passed in 107.654 seconds, including the two-cluster read-facet case (1.39 seconds) and exact request-owner receiver case (2.74 seconds). It verifies separate simultaneously admitted profiles through one reader, unchanged per-profile denial, root/installation/worker mismatch, a shorter caller cutoff, role mutation rejection, isolated profile fencing and parent cancellation during an observed PostgreSQL configuration-lock wait. Initial accepted configuration/dispatch inputs remain explicitly synthetic. [The environment report](../test/results/worker-multicluster-final-custody-environment.json) records test exit 0, unchanged sources and no cleanup failures; all 639 recorded hashes matched current files after actual harness termination and no labeled containers remained. The [native context harness](../test/results/worker-multicluster-context-check.log) subsequently returned 0 after cleanup. [Its archived suite](../test/results/worker-multicluster-final-context-storage.log) passed in 131.168 seconds, including the native owner case in 67.20 seconds. [The report](../test/results/worker-multicluster-final-context-storage-environment.json) records test exit 0, unchanged source and no cleanup failures; all 638 recorded hashes matched current files after termination and no labeled fixture containers remained. This preserves actual two-cluster context storage and Kubernetes/OpenBao/SQL owner proof, activation, readiness and revocation behavior. It does not run the new cross-cluster forwarder inside a Pod: that path still has the separately described synthetic-authority TLS and SQL qualification boundaries.
+`make go-check go-architecture-check sql-check spec-check architecture-check design-check` returned 0 in the gate log: full vet/race suite, 42 packages/188 internal edges, 22 matching sqlc files, 59 schemas/476 invalid examples/8424 assertions, 24 components/14 interfaces/49 entities and 63 design screens. The real custody harness then returned 0 after cleanup. The archived SQL/S3 suite passed in 107.654 seconds, including the two-cluster read-facet case (1.39 seconds) and exact request-owner receiver case (2.74 seconds). It verifies separate simultaneously admitted profiles through one reader, unchanged per-profile denial, root/installation/worker mismatch, a shorter caller cutoff, role mutation rejection, isolated profile fencing and parent cancellation during an observed PostgreSQL configuration-lock wait. Initial accepted configuration/dispatch inputs remain explicitly synthetic. The environment report records test exit 0, unchanged sources and no cleanup failures; all 639 recorded hashes matched current files after actual harness termination and no labeled containers remained. The native context harness subsequently returned 0 after cleanup. Its archived suite passed in 131.168 seconds, including the native owner case in 67.20 seconds. The report records test exit 0, unchanged source and no cleanup failures; all 638 recorded hashes matched current files after termination and no labeled fixture containers remained. This preserves actual two-cluster context storage and Kubernetes/OpenBao/SQL owner proof, activation, readiness and revocation behavior. It does not run the new cross-cluster forwarder inside a Pod: that path still has the separately described synthetic-authority TLS and SQL qualification boundaries.
 
 Next: protected installation/connector synchronization of the same immutable control documents, deployment/credential loading and the hub entry point, continuously reconciled recovery/configuration, then actual in-Pod routing/native transfers and the public UI/MCP/download flow. No full TASK or S-01/S-02 exit is complete; the full implementation goal remains active.
 
@@ -19650,9 +19650,9 @@ The maintainer requested completion of the remaining implementation without stop
 
 `bootstrap.OwnerRuntime` validates the protected pool/source and current configuration, suppresses only its own process's core dumps, generates a fresh random process epoch and independent keys, then joins enrollment/renewal, actual private TLS receiving, live forwarding and serial expiring readiness. It clears failed/stale readiness, gates new forwarded work, closes keys/sockets on cancellation/failure and joins started tasks within six seconds. The runtime is private composition, not the missing deployment loader or hub command. No schema, SQL migration, dependency, public API or user approval changes.
 
-The [before-implementation regression](../test/results/owner-startup-before.log) returned 1 because the native test's readiness check did not exist. The initial [compile run](../test/results/owner-startup-compile.log) returned 1 for a misnamed process-protection helper; it was corrected to the existing process-local implementation. [Affected race tests](../test/results/owner-startup-unit.log), [expanded snapshot/proof tests](../test/results/owner-startup-final-unit.log) and [final lifecycle tests](../test/results/owner-startup-lifecycle.log) returned 0. The synthetic runtime fixture uses real generated CSR/certificates and mutual TLS with explicit synthetic configuration/registry/proof ports. It becomes locally ready while real HTTP admission still returns 403 because current peer/route protection is unavailable. Tests cover readiness loss/recovery without extra signing, exact source mismatch, copied public bytes, closed/changed keys, proof/configuration changes, short/expired parents, new epochs, stale/rolled-back hints, shutdown during enrollment, listener failure and owned listener/key cleanup.
+The before-implementation regression returned 1 because the native test's readiness check did not exist. The initial compile run returned 1 for a misnamed process-protection helper; it was corrected to the existing process-local implementation. Affected race tests, expanded snapshot/proof tests and final lifecycle tests returned 0. The synthetic runtime fixture uses real generated CSR/certificates and mutual TLS with explicit synthetic configuration/registry/proof ports. It becomes locally ready while real HTTP admission still returns 403 because current peer/route protection is unavailable. Tests cover readiness loss/recovery without extra signing, exact source mismatch, copied public bytes, closed/changed keys, proof/configuration changes, short/expired parents, new epochs, stale/rolled-back hints, shutdown during enrollment, listener failure and owned listener/key cleanup.
 
-`make go-check go-architecture-check spec-check architecture-check design-check` returned 0 in [the gate log](../test/results/owner-startup-gates.log): full vet/race suite, 42 packages/188 allowed edges, 59 schemas/476 invalid examples/8398 assertions, 24 components/14 interfaces/49 entities and 63 design screens. The [native harness](../test/results/owner-startup-context-check.log) subsequently returned 0 after test completion and cleanup. [Its archived suite](../test/results/owner-startup-final-context-storage.log) passed in 128.963 seconds, including the owner case in 66.75 seconds. The [environment/source report](../test/results/owner-startup-final-context-storage-environment.json) records 635 unchanged source hashes, test exit 0 and empty cleanup failures. Every hash matched current files after actual terminal completion; no labeled test containers remained. These are whole-suite/case durations, not readiness latency or throughput measurements.
+`make go-check go-architecture-check spec-check architecture-check design-check` returned 0 in the gate log: full vet/race suite, 42 packages/188 allowed edges, 59 schemas/476 invalid examples/8398 assertions, 24 components/14 interfaces/49 entities and 63 design screens. The native harness subsequently returned 0 after test completion and cleanup. Its archived suite passed in 128.963 seconds, including the owner case in 66.75 seconds. The environment/source report records 635 unchanged source hashes, test exit 0 and empty cleanup failures. Every hash matched current files after actual terminal completion; no labeled test containers remained. These are whole-suite/case durations, not readiness latency or throughput measurements.
 
 Actual Kubernetes Pod/token/CSR and admission proof plus OpenBao/SQL activation established readiness before Kubernetes Ready while existing peer admission still denied it. Readiness remained valid while current and rejected removed roots and a deleted Pod. This native run exercises the readiness checker; the runtime lifecycle fixture remains synthetic, and neither runs the new composition inside a Pod. Provider credentials, initial recovery and accepted installation facts remain fixture inputs. The serial readiness loop's fleet-wide API/SQL load and long-duration stability remain unqualified. No SQL adapter or migration changed, so the separate custody suite was not repeated in this continuation.
 
@@ -19662,9 +19662,9 @@ Next implement the protected deployment/credential loader and hub entry point wi
 
 [ADR-087](decisions/087-live-owner-delivery.md) and the sender contract implement the missing live last hop. The private owner-relay/v2 response is one bounded length-prefixed certificate frame followed by an open silent HTTP body. The original receiver retains its exact operation; the forwarder now supplies `WorkerEnrollmentExchange` directly to the existing worker handler. Both slots remain charged through delivery/cleanup. EOF, extra bytes, errors and caller/owner/root cancellation end delivery; Close cancels the socket and joins the monitor. The received deadline is intersected with independent local checks and the current worker interval. No SQL migration, dependency, public API or user approval changes.
 
-The [before-implementation regression](../test/results/owner-live-before.log) returned 1 because the forwarder did not implement the live exchange. [Initial live tests](../test/results/owner-live-unit.log), [affected component tests](../test/results/owner-live-components.log), [actual worker-response tests](../test/results/owner-live-worker-response.log) and [final stream/cancellation cases](../test/results/owner-live-stream-tests.log) returned 0 under the race detector. Synthetic real-TLS tests cover owner/caller/root cancellation, Close, network loss, the unchanged final deadline and held concurrency. They reject fixed-length, oversized, foreign-format and expired frames; EOF and extra bytes cancel any already-returned delivery. Strict codec tests reject truncated, duplicate/unknown/missing/aliased fields and consume exactly one frame. The real worker handler's blocked TLS response is deterministically interrupted by remote owner cancellation; normal delivery succeeds and both sides release exactly once. Test authority remains explicit synthetic ports with owned address remapping.
+The before-implementation regression returned 1 because the forwarder did not implement the live exchange. Initial live tests, affected component tests, actual worker-response tests and final stream/cancellation cases returned 0 under the race detector. Synthetic real-TLS tests cover owner/caller/root cancellation, Close, network loss, the unchanged final deadline and held concurrency. They reject fixed-length, oversized, foreign-format and expired frames; EOF and extra bytes cancel any already-returned delivery. Strict codec tests reject truncated, duplicate/unknown/missing/aliased fields and consume exactly one frame. The real worker handler's blocked TLS response is deterministically interrupted by remote owner cancellation; normal delivery succeeds and both sides release exactly once. Test authority remains explicit synthetic ports with owned address remapping.
 
-`make go-check go-architecture-check spec-check architecture-check design-check` returned 0 in [the gate log](../test/results/owner-live-gates.log): full vet/race suite; 42 packages/188 internal edges; 59 schemas, 476 rejected invalid examples and 8376 assertions; 24 components/14 interfaces/49 entities and 63 design screens. The [native harness](../test/results/owner-live-context-check.log) subsequently returned 0 after test completion and cleanup. [Its archived suite](../test/results/owner-live-final-context-storage.log) passed in 124.990 seconds; the owner case passed in 60.57 seconds. The [source/environment report](../test/results/owner-live-final-context-storage-environment.json) records 631 unchanged source hashes, test exit 0 and no cleanup failures. All hashes matched current files after actual harness termination, and no labeled test containers remained. These are whole-suite/case durations, not per-operation latency.
+`make go-check go-architecture-check spec-check architecture-check design-check` returned 0 in the gate log: full vet/race suite; 42 packages/188 internal edges; 59 schemas, 476 rejected invalid examples and 8376 assertions; 24 components/14 interfaces/49 entities and 63 design screens. The native harness subsequently returned 0 after test completion and cleanup. Its archived suite passed in 124.990 seconds; the owner case passed in 60.57 seconds. The source/environment report records 631 unchanged source hashes, test exit 0 and no cleanup failures. All hashes matched current files after actual harness termination, and no labeled test containers remained. These are whole-suite/case durations, not per-operation latency.
 
 The native owner fixture retains actual Kubernetes protected configuration, purpose-separated OpenBao certificates, SQL activation and current Ready/root/deletion checks, using the updated v2 receiver request. Its inner enrollment operation deliberately remains unavailable; it does not qualify this sender inside a Pod or the native cross-replica live path. The two-hop live response and blocked worker TLS behavior are covered by the separately described synthetic-authority tests. No SQL adapter or migration changed, so this continuation did not repeat the separate custody suite.
 
@@ -19676,13 +19676,13 @@ A silent partition cannot provide instantaneous remote revocation; the independe
 
 The sender returns a verified public certificate and deliberately does not implement the existing live `WorkerEnrollmentDelivery` interface. A completed HTTP reply cannot stand in for the remote human request's still-live cancellation context. Receiver ownership remains live through its network flush, and sender ownership through receiving/revalidation. Protected startup, complete native routing, original control ownership through final downstream delivery, connector proof mediation and evidence transfer remain mandatory. Do not use a fabricated background delivery to conceal that gap.
 
-The [before-implementation build](../test/results/owner-forward-before.log) returned 1 with missing local-client methods. The first sender-test build failed on unused test imports; [the corrected sender/receiver race tests](../test/results/owner-forward-unit-after.log), [composed unit tests](../test/results/owner-forward-composed-unit.log) and [final cancellation/race tests](../test/results/owner-forward-final-unit.log) returned 0. They use the actual sender, receiver and TLS/certificate implementations with explicit synthetic registry/route/worker/signing ports. An unexported unit-only dial remapping reaches an owned loopback listener; production constructors expose no such override.
+The before-implementation build returned 1 with missing local-client methods. The first sender-test build failed on unused test imports; the corrected sender/receiver race tests, composed unit tests and final cancellation/race tests returned 0. They use the actual sender, receiver and TLS/certificate implementations with explicit synthetic registry/route/worker/signing ports. An unexported unit-only dial remapping reaches an owned loopback listener; production constructors expose no such override.
 
 These tests assert zero HTTP requests for revoked local/remote identity, removed roots, foreign process, stale locator and cancellation before transmission; rejection after locator/worker/identity changes during the reply; exact CSR/worker/root/expiry verification; one POST after a lost reply; redirect/malformed/oversized-header rejection; address fallback before HTTP; bounded concurrency; and interruption of a stalled response on sender closure. The worker and sender now share their certificate validator. Current local-client orchestration runs the same rejection matrix as actual-peer and local-server checks without fabricating TLS.
 
-`make go-check go-architecture-check spec-check architecture-check design-check` returned 0 in [the gate log](../test/results/owner-forward-gates.log): full vet/race suite; 42 packages/188 allowed internal edges; 59 schemas, 470 rejected invalid examples and 8354 assertions; 24 components/14 interfaces/49 entities; and 63 design screens. These are component/design checks, not a deployed workflow.
+`make go-check go-architecture-check spec-check architecture-check design-check` returned 0 in the gate log: full vet/race suite; 42 packages/188 allowed internal edges; 59 schemas, 470 rejected invalid examples and 8354 assertions; 24 components/14 interfaces/49 entities; and 63 design screens. These are component/design checks, not a deployed workflow.
 
-The [native harness](../test/results/owner-forward-context-check.log) returned 0 after test completion and cleanup. [Its suite](../test/results/owner-forward-final-context-storage.log) passed in 124.524 seconds; the owner case passed in 60.75 seconds. The [environment/source report](../test/results/owner-forward-final-context-storage-environment.json) records 628 unchanged source hashes, test exit 0 and empty cleanup failures. Every hash matched current source after actual termination. These are whole test durations, not per-operation latency.
+The native harness returned 0 after test completion and cleanup. Its suite passed in 124.524 seconds; the owner case passed in 60.75 seconds. The environment/source report records 628 unchanged source hashes, test exit 0 and empty cleanup failures. Every hash matched current source after actual termination. These are whole test durations, not per-operation latency.
 
 The native owner fixture adds current local-client checks with actual Kubernetes/OpenBao/SQL/S3 state before readiness, while Ready, after root removal and after Pod deletion, retaining the existing receiver and worker-credential cases. It does not place this sender inside the protected Pod or establish native routing to that process. The protocol sender/receiver combination remains a separately qualified synthetic-authority test. No owned containers remain. No SQL adapter or migration changed in this continuation; the preceding SQL receiver qualification remains historical evidence, not a new SQL-suite run.
 
@@ -19692,15 +19692,15 @@ Next complete protected startup, native routing and live original control owners
 
 [ADR-085](decisions/085-private-owner-enrollment-receiver.md) and the receiver contract add a real bounded mutual-TLS HTTP receiver, distinct current local serving checks, exact existing owner-registration lookup, response-time peer revalidation and owned socket shutdown. The private owner-relay/v1 request carries the existing worker request and a non-authorizing locator; the public worker response is unchanged. No SQL migration or user approval is added. Outbound forwarding, protected in-Pod startup, connector proof mediation and native transfer remain unfinished.
 
-The [initial missing-method regression](../test/results/owner-relay-before.log) returned 1 before implementation. The first [transport race run](../test/results/owner-relay-unit.log) rejected valid requests because an outer start was compared against a slightly later underlying observation end; the receiver now intersects both original deadlines. A shutdown test initially required a connection error and was corrected to also permit an empty 503 racing immediate socket closure; it still rejects successful output. [Composed component tests](../test/results/owner-relay-composed-unit.log) then returned 0. These use synthetic peer/operation ports; integration cases skip without native fixtures.
+The initial missing-method regression returned 1 before implementation. The first transport race run rejected valid requests because an outer start was compared against a slightly later underlying observation end; the receiver now intersects both original deadlines. A shutdown test initially required a connection error and was corrected to also permit an empty 503 racing immediate socket closure; it still rejects successful output. Composed component tests then returned 0. These use synthetic peer/operation ports; integration cases skip without native fixtures.
 
-A subsequent [response regression](../test/results/owner-relay-chain-before.log) returned 1 when a zero-length certificate chain was serialized as null. The receiver now emits the contract's empty array. [Response tests](../test/results/owner-relay-response-unit.log) returned 0 under race detection, including deterministic blocked TLS writing over net.Pipe: cancelling the exact delivery owner interrupts the write and releases it once. Additional application tests check replacement during shared-store lookup, serialization-stable locator equality, and all current boundaries for both local and remote identities.
+A subsequent response regression returned 1 when a zero-length certificate chain was serialized as null. The receiver now emits the contract's empty array. Response tests returned 0 under race detection, including deterministic blocked TLS writing over net.Pipe: cancelling the exact delivery owner interrupts the write and releases it once. Additional application tests check replacement during shared-store lookup, serialization-stable locator equality, and all current boundaries for both local and remote identities.
 
-`make go-check go-architecture-check spec-check architecture-check design-check` returned 0 in [the final component/design gates](../test/results/owner-relay-final-gates.log): full vet/race suite, 42 packages/187 allowed internal edges, 59 schemas/470 rejected invalid examples/8329 assertions, 24 components/14 interfaces/49 entities and 63 design screens. The schema reference checker now handles standard JSON Pointer array indices, allowing the relay schema to reuse the existing request variant without duplicating it. Those contract/UI checks do not prove a deployed runtime.
+`make go-check go-architecture-check spec-check architecture-check design-check` returned 0 in the final component/design gates: full vet/race suite, 42 packages/187 allowed internal edges, 59 schemas/470 rejected invalid examples/8329 assertions, 24 components/14 interfaces/49 entities and 63 design screens. The schema reference checker now handles standard JSON Pointer array indices, allowing the relay schema to reuse the existing request variant without duplicating it. Those contract/UI checks do not prove a deployed runtime.
 
-The [native harness](../test/results/owner-relay-context-check.log) returned 0 after test completion and cleanup. [Its suite](../test/results/owner-relay-final-context-storage.log) passed in 125.381 seconds, including the native owner case in 57.65 seconds. The [report](../test/results/owner-relay-final-context-storage-environment.json) records 626 unchanged source hashes, test exit 0 and empty cleanup failures; each hash matched current source after actual termination. Actual Kubernetes/OpenBao/S3/SQL owner credentials and current protection/Ready checks reach the new listener, whose inner operation deliberately returns unavailable. Root removal and Pod deletion deny admission.
+The native harness returned 0 after test completion and cleanup. Its suite passed in 125.381 seconds, including the native owner case in 57.65 seconds. The report records 626 unchanged source hashes, test exit 0 and empty cleanup failures; each hash matched current source after actual termination. Actual Kubernetes/OpenBao/S3/SQL owner credentials and current protection/Ready checks reach the new listener, whose inner operation deliberately returns unavailable. Root removal and Pod deletion deny admission.
 
-The separate [SQL/S3 harness](../test/results/owner-relay-custody-check.log) also returned 0 after cleanup. [Its suite](../test/results/owner-relay-final-custody.log) passed in 105.756 seconds; `download-worker-request-owners` passed in 2.78 seconds through the new registration lookup and stale-owner rejection. The [report](../test/results/owner-relay-final-custody-environment.json) records unchanged sources, test exit 0 and empty cleanup failures, with every source hash verified after termination. These times describe complete test cases, not per-request latency. No owned test containers remain.
+The separate SQL/S3 harness also returned 0 after cleanup. Its suite passed in 105.756 seconds; `download-worker-request-owners` passed in 2.78 seconds through the new registration lookup and stale-owner rejection. The report records unchanged sources, test exit 0 and empty cleanup failures, with every source hash verified after termination. These times describe complete test cases, not per-request latency. No owned test containers remain.
 
 Do not infer a fully composed native forwarding workflow, protected installation, production load capacity or release readiness from these component integrations. Next implement outbound discovery/current verification before credential transmission, protected in-Pod startup and connector proof mediation, then native evidence transfer and the public UI/MCP flow. Complete S-01/S-02 and all later slices remain unfinished; the full implementation goal stays active.
 
@@ -19708,21 +19708,21 @@ Do not infer a fully composed native forwarding workflow, protected installation
 
 [ADR-084](decisions/084-process-owned-owner-credentials.md) and the credential lifecycle contract add separate P-256 server/client key custody, independently checked audited enrollment/registry results, copied actual-TLS callbacks, original-expiry signer snapshots and bounded paired renewal. No SQL migration or public wire contract changes. Protected bootstrap/listener composition and exact-request forwarding remain pending.
 
-The [credential before-implementation build](../test/results/owner-credentials-before.log) returned 1 with missing credential types and an unused import caused by those missing types. The [supervisor before-implementation build](../test/results/owner-runtime-before.log) likewise returned 1 with missing runtime types. The [credential race tests](../test/results/owner-credentials-unit.log), [combined credential/supervisor race tests](../test/results/owner-credentials-runtime-unit.log), and [composition build/race tests](../test/results/owner-credentials-composition-build.log) returned 0. Native cases skip without fixture variables. Actual mutual TLS is exercised in unit tests with synthetic enrollment/registry; eight-hour supervisor tests advance a synthetic clock and do not qualify eight hours of provider operation.
+The credential before-implementation build returned 1 with missing credential types and an unused import caused by those missing types. The supervisor before-implementation build likewise returned 1 with missing runtime types. The credential race tests, combined credential/supervisor race tests, and composition build/race tests returned 0. Native cases skip without fixture variables. Actual mutual TLS is exercised in unit tests with synthetic enrollment/registry; eight-hour supervisor tests advance a synthetic clock and do not qualify eight hours of provider operation.
 
-`make go-check go-architecture-check` returned 0 in [the code gate log](../test/results/owner-credentials-code-gates.log): vet, full Go/race suite and 41 packages/182 allowed internal import edges. The native Kubernetes/OpenBao/S3/PostgreSQL test was extended to enroll separately owned keys, reject a replacement key before provider signing, exercise actual TLS callbacks and retain current peer checks. `make spec-check architecture-check design-check` returned 0 in [the initial document gate log](../test/results/owner-credentials-design-gates.log); these are design checks only.
+`make go-check go-architecture-check` returned 0 in the code gate log: vet, full Go/race suite and 41 packages/182 allowed internal import edges. The native Kubernetes/OpenBao/S3/PostgreSQL test was extended to enroll separately owned keys, reject a replacement key before provider signing, exercise actual TLS callbacks and retain current peer checks. `make spec-check architecture-check design-check` returned 0 in the initial document gate log; these are design checks only.
 
-The [first native harness](../test/results/owner-credentials-context-check.log) returned 2. Its [suite](../test/results/owner-credentials-first-context-storage.log) passed the new owner case in 53.56 seconds, but later failed the existing connector bootstrap fixture: immediate KV configuration after mounting returned HTTP 400 instead of 204. The whole suite therefore failed (115.149 seconds), despite the owner case passing. [The report](../test/results/owner-credentials-first-context-storage-environment.json) records 618 unchanged hashes, test exit 1 and empty cleanup failures, verified after actual termination.
+The first native harness returned 2. Its suite passed the new owner case in 53.56 seconds, but later failed the existing connector bootstrap fixture: immediate KV configuration after mounting returned HTTP 400 instead of 204. The whole suite therefore failed (115.149 seconds), despite the owner case passing. The report records 618 unchanged hashes, test exit 1 and empty cleanup failures, verified after actual termination.
 
-Two separate pinned-image diagnostics, [ordinary](../test/results/owner-credentials-kv-diagnostic.log) and [CPU-throttled](../test/results/owner-credentials-kv-throttled-diagnostic.log), each created 100 fresh KV mounts without reproducing the response. Both scripts returned 1 because reproduction was not achieved, and both removed their owned container/network. The original response body was not retained, so its exact cause remains unconfirmed. OpenBao's [KV upgrade guard](https://github.com/openbao/openbao/blob/main/internal/builtin/logical/kv/upgrade.go) demonstrates a temporary invalid-request response during backend initialization. The fixture now polls only the read-only configuration route, with finite attempts/deadline and retry restricted to that exact documented startup error, before its single configuration write. Other errors fail; no credential/configuration writes are replayed. [The new readiness before-implementation build](../test/results/owner-credentials-kv-readiness-before.log) failed with missing helper definitions; [the implemented focused race tests](../test/results/owner-credentials-kv-readiness-unit.log) passed. This fixture improvement is not proof that the original 400 was the upgrade response. Broader rerun results follow when complete.
+Two separate pinned-image diagnostics, ordinary and CPU-throttled, each created 100 fresh KV mounts without reproducing the response. Both scripts returned 1 because reproduction was not achieved, and both removed their owned container/network. The original response body was not retained, so its exact cause remains unconfirmed. OpenBao's [KV upgrade guard](https://github.com/openbao/openbao/blob/main/internal/builtin/logical/kv/upgrade.go) demonstrates a temporary invalid-request response during backend initialization. The fixture now polls only the read-only configuration route, with finite attempts/deadline and retry restricted to that exact documented startup error, before its single configuration write. Other errors fail; no credential/configuration writes are replayed. The new readiness before-implementation build failed with missing helper definitions; the implemented focused race tests passed. This fixture improvement is not proof that the original 400 was the upgrade response. Broader rerun results follow when complete.
 
 Remaining work includes protected runtime installation/recovery/issuer bootstrap, process execution inside the intended Pod, socket/session lifetime, private request forwarding, native transfer, local CA and public UI/MCP/download workflows. The earlier startup configuration-availability uncertainty remains recorded below. Full S-01/S-02 and later slices remain incomplete; the implementation goal stays active.
 
-The [readiness rerun harness](../test/results/owner-credentials-readiness-context-check.log) returned 0. [Its complete suite](../test/results/owner-credentials-readiness-context-storage.log) passed in 115.938 seconds, including the owner case in 54.29 seconds and the previously failing connector KV setup. [Its report](../test/results/owner-credentials-readiness-context-storage-environment.json) records 619 unchanged source hashes, test exit 0 and empty cleanup failures; all hashes matched after actual termination. These are complete-test durations, not per-operation latency. This success does not retroactively identify the original 400 response.
+The readiness rerun harness returned 0. Its complete suite passed in 115.938 seconds, including the owner case in 54.29 seconds and the previously failing connector KV setup. Its report records 619 unchanged source hashes, test exit 0 and empty cleanup failures; all hashes matched after actual termination. These are complete-test durations, not per-operation latency. This success does not retroactively identify the original 400 response.
 
-Subsequent review found cancellation between the initial check and credential-lock acquisition. [The deterministic regression](../test/results/owner-credentials-cancel-before.log) failed both the cached-identity and fresh-enrollment paths. The adapter now rechecks cancellation after the lock before either path. Final checks below must cover that source change; the earlier native report predates it.
+Subsequent review found cancellation between the initial check and credential-lock acquisition. The deterministic regression failed both the cached-identity and fresh-enrollment paths. The adapter now rechecks cancellation after the lock before either path. Final checks below must cover that source change; the earlier native report predates it.
 
-Final qualification covers that cancellation fix and the KV readiness fixture change. `make go-check go-architecture-check` returned 0 in [the final code log](../test/results/owner-credentials-final-code-gates.log), including vet, the complete Go/race suite and 41 packages/182 allowed import edges. `make context-integration` returned 0 in [the final harness log](../test/results/owner-credentials-final-context-check.log). [The full native suite](../test/results/owner-credentials-final-context-storage.log) passed in 116.810 seconds; the owner case passed in 53.35 seconds and the connector case in 0.73 seconds. These are whole-test timings. [The final report](../test/results/owner-credentials-final-context-storage-environment.json) records 619 unchanged source hashes, test exit 0 and empty cleanup failures, all verified against current files after terminal cleanup. No containers with the owned fixture label remained. Final document/architecture/design validation is recorded in [the final design log](../test/results/owner-credentials-final-design-gates.log).
+Final qualification covers that cancellation fix and the KV readiness fixture change. `make go-check go-architecture-check` returned 0 in the final code log, including vet, the complete Go/race suite and 41 packages/182 allowed import edges. `make context-integration` returned 0 in the final harness log. The full native suite passed in 116.810 seconds; the owner case passed in 53.35 seconds and the connector case in 0.73 seconds. These are whole-test timings. The final report records 619 unchanged source hashes, test exit 0 and empty cleanup failures, all verified against current files after terminal cleanup. No containers with the owned fixture label remained. Final document/architecture/design validation is recorded in the final design log.
 
 Next compose protected hub startup, projected owner-token access and listener/connection lifetime, then exact-request private forwarding and native transfer. Long-duration real-provider renewal and aggregate issuance load remain unqualified. The successful component tests do not implement the complete debugging platform, qualify protected installation history, or enable public collection/disclosure.
 
@@ -19732,24 +19732,24 @@ Next compose protected hub startup, projected owner-token access and listener/co
 
 Verification history and final qualification:
 
-- The [before-implementation check](../test/results/owner-authentication-before.log) returned 1 because the required authentication types/service did not exist. The [first implementation unit run](../test/results/owner-authentication-first-unit.log), [composition compile/unit run](../test/results/owner-authentication-composition-build.log) and [focused race suite](../test/results/owner-authentication-unit.log) returned 0. Integration cases skip without owned fixture variables; these are not native integration results.
-- `make go-check go-architecture-check` returned 0 in [the code gate log](../test/results/owner-authentication-code-gates.log): vet, Go/race suite, 41 packages and 182 permitted import edges. This includes exact workload-pool rejection before native API I/O and the new peer/TLS boundary tests.
-- The first full `make context-integration` returned 2 in [the harness log](../test/results/owner-authentication-first-context-check.log). [The suite](../test/results/owner-authentication-first-context-storage.log) returned 1 because the new fixture expected HTTP 204 from Transit key creation, whose actual response was HTTP 200. [Its report](../test/results/owner-authentication-first-context-storage-environment.json) records 611 unchanged source hashes and empty cleanup failures; all hashes matched after actual process termination. The corrected fixture expects the actual successful response. No native composition success is claimed from the failed run.
-- The corrected HTTP fixture reached native pre-Ready enrollment but exposed a product timing defect: structural checks evaluated the nested configuration at the proof start, before that native read had completed. [The second suite](../test/results/owner-authentication-corrected-context-storage.log) failed, and [its report](../test/results/owner-authentication-corrected-context-storage-environment.json) records 611 unchanged source hashes and empty cleanup failures. The [focused regression](../test/results/owner-authentication-proof-order-before.log) independently failed on the same ordering. Structural checks now require an overlap of the original intervals; current SQL checks and the original deadline remain unchanged. The synthetic provider fixture now uses the native start-before-configuration ordering too. [The affected race tests](../test/results/owner-authentication-proof-order-unit.log) returned 0; external tests skip without fixtures.
-- The next [full context run](../test/results/owner-authentication-proof-order-context-storage.log) passed the corrected SQL/provider lifecycle but failed earlier during the initial native Pod proof. [Its report](../test/results/owner-authentication-proof-order-context-storage-environment.json) records 612 unchanged hashes, exit 1 and empty cleanup failures, checked after terminal cleanup. No earlier proof or SQL invariant was relaxed. The native adapter now identifies the failed phase with fixed sanitized error text while preserving the underlying error category; it never includes API responses, tokens or workload data. [The affected native-adapter race test](../test/results/owner-authentication-proof-diagnostics-unit.log) passed. These failed runs did not establish native composition qualification.
+- The before-implementation check returned 1 because the required authentication types/service did not exist. The first implementation unit run, composition compile/unit run and focused race suite returned 0. Integration cases skip without owned fixture variables; these are not native integration results.
+- `make go-check go-architecture-check` returned 0 in the code gate log: vet, Go/race suite, 41 packages and 182 permitted import edges. This includes exact workload-pool rejection before native API I/O and the new peer/TLS boundary tests.
+- The first full `make context-integration` returned 2 in the harness log. The suite returned 1 because the new fixture expected HTTP 204 from Transit key creation, whose actual response was HTTP 200. Its report records 611 unchanged source hashes and empty cleanup failures; all hashes matched after actual process termination. The corrected fixture expects the actual successful response. No native composition success is claimed from the failed run.
+- The corrected HTTP fixture reached native pre-Ready enrollment but exposed a product timing defect: structural checks evaluated the nested configuration at the proof start, before that native read had completed. The second suite failed, and its report records 611 unchanged source hashes and empty cleanup failures. The focused regression independently failed on the same ordering. Structural checks now require an overlap of the original intervals; current SQL checks and the original deadline remain unchanged. The synthetic provider fixture now uses the native start-before-configuration ordering too. The affected race tests returned 0; external tests skip without fixtures.
+- The next full context run passed the corrected SQL/provider lifecycle but failed earlier during the initial native Pod proof. Its report records 612 unchanged hashes, exit 1 and empty cleanup failures, checked after terminal cleanup. No earlier proof or SQL invariant was relaxed. The native adapter now identifies the failed phase with fixed sanitized error text while preserving the underlying error category; it never includes API responses, tokens or workload data. The affected native-adapter race test passed. These failed runs did not establish native composition qualification.
 
 The test process owns CSR/private keys and the loopback TLS listener; the controller-created pause Pod does not run a hub executable. Initial installation recovery/issuer bootstrap and its fresh observation are explicit fixture inputs. Protected runtime installation, owner credential transport/supervision, locator-bound forwarding, native transfer, local CA and the public workflow remain pending. No S-01/S-02 or TASK completion is implied.
 
 Further native composition diagnostics:
 
-- [The phase-diagnostic run](../test/results/owner-authentication-diagnostic-context-storage.log) reached a custody failure after initial proof; [its report](../test/results/owner-authentication-diagnostic-context-storage-environment.json) records 612 unchanged hashes, exit 1 and empty cleanup failures. [The following run](../test/results/owner-authentication-sql-diagnostic-context-storage.log) identified intermittent initial accepted-configuration unavailability before the new SQL path; [its report](../test/results/owner-authentication-sql-diagnostic-context-storage-environment.json) likewise records 612 unchanged hashes and complete cleanup.
-- Inspection found an independent durable-comparison defect: raw equality on the recovery observation included Go's process-local monotonic clock representation. [A JSON round-trip regression](../test/results/owner-authentication-clock-before.log) failed with an otherwise valid, identical signing attempt. Comparison now uses exact identity/revision and time instants. [The corrected focused race test](../test/results/owner-authentication-clock-unit.log) passed.
-- [The policy-composition run](../test/results/owner-authentication-policy-composition-before-context-storage.log) completed sixteen exact source-policy dry-run denials while namespace protection was active. It then failed because the diagnostic fixture installed a SQL tracer that the production constructor explicitly forbids. The tracer was removed; the constructor restriction remains. [Its report](../test/results/owner-authentication-policy-composition-before-context-storage-environment.json) records 612 unchanged hashes, exit 1 and empty cleanup failures. No policy exception or weaker admission was introduced on this evidence.
-- [The corrected affected unit/race run](../test/results/owner-authentication-corrected-unit.log) returned 0. The final native run below includes both timing fixes and the original no-tracer SQL wiring.
+- The phase-diagnostic run reached a custody failure after initial proof; its report records 612 unchanged hashes, exit 1 and empty cleanup failures. The following run identified intermittent initial accepted-configuration unavailability before the new SQL path; its report likewise records 612 unchanged hashes and complete cleanup.
+- Inspection found an independent durable-comparison defect: raw equality on the recovery observation included Go's process-local monotonic clock representation. A JSON round-trip regression failed with an otherwise valid, identical signing attempt. Comparison now uses exact identity/revision and time instants. The corrected focused race test passed.
+- The policy-composition run completed sixteen exact source-policy dry-run denials while namespace protection was active. It then failed because the diagnostic fixture installed a SQL tracer that the production constructor explicitly forbids. The tracer was removed; the constructor restriction remains. Its report records 612 unchanged hashes, exit 1 and empty cleanup failures. No policy exception or weaker admission was introduced on this evidence.
+- The corrected affected unit/race run returned 0. The final native run below includes both timing fixes and the original no-tracer SQL wiring.
 
-The final `make context-integration` returned 0 in [the harness log](../test/results/owner-authentication-clock-context-check.log). [The complete Kubernetes/OpenBao/S3/PostgreSQL suite](../test/results/owner-authentication-final-context-storage.log) passed in 103.903 seconds, including the native owner case in 40.15 seconds; these are whole-test durations, not per-operation latency. [Its report](../test/results/owner-authentication-final-context-storage-environment.json) records 612 unchanged source hashes, exit 0 and empty cleanup failures; all hashes matched after actual process termination. The case proved native pre-Ready proof through signing/audit/activation, suspension/resume with exact certificate reuse, readiness gating, current-root removal, per-purpose retirement and deleted-Pod denial on retained TLS snapshots. Sixteen source-policy probes passed with workload protection active. Earlier initial-configuration unavailability was observed and is retained above; this successful run does not qualify long-duration startup availability or replace the remaining protected runtime/bootstrap work.
+The final `make context-integration` returned 0 in the harness log. The complete Kubernetes/OpenBao/S3/PostgreSQL suite passed in 103.903 seconds, including the native owner case in 40.15 seconds; these are whole-test durations, not per-operation latency. Its report records 612 unchanged source hashes, exit 0 and empty cleanup failures; all hashes matched after actual process termination. The case proved native pre-Ready proof through signing/audit/activation, suspension/resume with exact certificate reuse, readiness gating, current-root removal, per-purpose retirement and deleted-Pod denial on retained TLS snapshots. Sixteen source-policy probes passed with workload protection active. Earlier initial-configuration unavailability was observed and is retained above; this successful run does not qualify long-duration startup availability or replace the remaining protected runtime/bootstrap work.
 
-The final `make go-check go-architecture-check sql-check` returned 0 in [the code gate log](../test/results/owner-authentication-final-code-gates.log): vet, the full Go/race suite, 41 packages/182 allowed import edges and 22 matching generated SQL files. `make custody-integration` also returned 0 in [its harness log](../test/results/owner-authentication-custody-check.log). [The full custody suite](../test/results/owner-authentication-final-custody.log) passed in 106.258 seconds. [Its report](../test/results/owner-authentication-final-custody-environment.json) records 613 unchanged source hashes, exit 0 and empty cleanup failures; all hashes matched after terminal cleanup. `make spec-check architecture-check design-check` returned 0 in [the final design log](../test/results/owner-authentication-final-design-gates.log). These remain component/design qualifications; full S-01/S-02 and subsequent platform slices are unfinished. Next implement process-owned runtime credentials and renewal, protected bootstrap and exact-request private forwarding, retaining the recorded startup-availability uncertainty.
+The final `make go-check go-architecture-check sql-check` returned 0 in the code gate log: vet, the full Go/race suite, 41 packages/182 allowed import edges and 22 matching generated SQL files. `make custody-integration` also returned 0 in its harness log. The full custody suite passed in 106.258 seconds. Its report records 613 unchanged source hashes, exit 0 and empty cleanup failures; all hashes matched after terminal cleanup. `make spec-check architecture-check design-check` returned 0 in the final design log. These remain component/design qualifications; full S-01/S-02 and subsequent platform slices are unfinished. Next implement process-owned runtime credentials and renewal, protected bootstrap and exact-request private forwarding, retaining the recorded startup-availability uncertainty.
 
 ## Current durable owner enrollment and activation
 
@@ -19757,13 +19757,13 @@ The final `make go-check go-architecture-check sql-check` returned 0 in [the cod
 
 Verification so far:
 
-- The focused current-root/resumed-certificate test returned 0 in [the unit log](../test/results/owner-registration-current-trust-unit.log). `make go-check go-architecture-check sql-check` returned 0 in [the code gate log](../test/results/owner-registration-code-gates.log): vet, Go/race suite, 41 packages/181 import edges and 22 sqlc-generated files.
+- The focused current-root/resumed-certificate test returned 0 in the unit log. `make go-check go-architecture-check sql-check` returned 0 in the code gate log: vet, Go/race suite, 41 packages/181 import edges and 22 sqlc-generated files.
 - An initial harness invocation rejected the unsupported `--test-pattern` argument before starting fixtures (exit 2); the documented `--run` option was then used.
-- The [first actual provider run](../test/results/owner-registration-first-fleet.log) reached stored-certificate retry but failed a synthetic recovery refresh: two `clock_timestamp()` calls exceeded the exact thirty-second SQL interval by one microsecond. The fixture now derives both ends from one statement timestamp; no product freshness limit changed. [That report](../test/results/owner-registration-first-fleet-environment.json) records unchanged sources, exit 1 and empty cleanup failures.
-- The [corrected targeted real SQL/S3/OpenBao suite](../test/results/owner-registration-corrected-fleet.log) returned 0 in 12.939 seconds (whole test suite, not per-operation latency). It proves interrupted audit after signing, exact retry without a new provider call after the original deadline, immutable keys, separate purposes/roles, concurrent spend, finite uncertain retry, post-lock expiry, retirement without refund, source/recovery fences, 32 retained registrations per Pod and expired restored-state cleanup. [The corrected report](../test/results/owner-registration-corrected-fleet-environment.json) records 605 unchanged hashes and empty cleanup failures; all hashes matched at archival after actual process termination. Later audit-conflict assertions and log clarification require the final broader run below.
-- The initial `make spec-check architecture-check design-check` returned 0 in [the design log](../test/results/owner-registration-design-gates.log). Design gates do not establish runtime authority.
+- The first actual provider run reached stored-certificate retry but failed a synthetic recovery refresh: two `clock_timestamp()` calls exceeded the exact thirty-second SQL interval by one microsecond. The fixture now derives both ends from one statement timestamp; no product freshness limit changed. That report records unchanged sources, exit 1 and empty cleanup failures.
+- The corrected targeted real SQL/S3/OpenBao suite returned 0 in 12.939 seconds (whole test suite, not per-operation latency). It proves interrupted audit after signing, exact retry without a new provider call after the original deadline, immutable keys, separate purposes/roles, concurrent spend, finite uncertain retry, post-lock expiry, retirement without refund, source/recovery fences, 32 retained registrations per Pod and expired restored-state cleanup. The corrected report records 605 unchanged hashes and empty cleanup failures; all hashes matched at archival after actual process termination. Later audit-conflict assertions and log clarification require the final broader run below.
+- The initial `make spec-check architecture-check design-check` returned 0 in the design log. Design gates do not establish runtime authority.
 
-The full `make context-integration` returned 0 in [the harness log](../test/results/owner-registration-context-check.log). [The complete Kubernetes/OpenBao/S3/SQL regression](../test/results/owner-registration-final-context-storage.log) passed in 76.367 seconds, including the added conflicting-audit assertions. [Its environment report](../test/results/owner-registration-final-context-storage-environment.json) records 604 unchanged hashes, exit 0 and empty cleanup failures; every hash matched after actual process termination. `make custody-integration` also returned 0 in [its harness log](../test/results/owner-registration-custody-check.log); [the full custody regression](../test/results/owner-registration-final-custody.log) passed in 106.431 seconds. [Its environment report](../test/results/owner-registration-final-custody-environment.json) records 605 unchanged hashes, exit 0 and empty cleanup failures, verified after actual process termination. A final review then strengthened the owner-role test to require SQLSTATE `42501`, distinguishing permission denial from immutable-row guards. Only `test/integration/owner_registration_test.go` changed after these two broad runs; no runtime/migration/fixture source changed. The [final affected real-provider/race test](../test/results/owner-registration-final-fleet.log) returned 0 in 13.060 seconds with the strict privilege assertions. [Its final report](../test/results/owner-registration-final-fleet-environment.json) records 605 unchanged current source hashes and empty cleanup failures; all hashes matched after actual termination. Comparing the broad-run reports confirms that the strengthened owner test is their only subsequent source difference. The final `make spec-check architecture-check design-check` also returned 0 in [the final design log](../test/results/owner-registration-final-design-gates.log). Their Pod proof or initial recovery/issuer bootstrap boundaries remain explicit. Complete protected installation, native Pod-proof-to-activation composition, owner credential transport, long-duration renewal/restore qualification, private forwarding/native transfer, local CA and public UI/MCP/download workflows remain pending. No S-01/S-02 or whole TASK is checked off.
+The full `make context-integration` returned 0 in the harness log. The complete Kubernetes/OpenBao/S3/SQL regression passed in 76.367 seconds, including the added conflicting-audit assertions. Its environment report records 604 unchanged hashes, exit 0 and empty cleanup failures; every hash matched after actual process termination. `make custody-integration` also returned 0 in its harness log; the full custody regression passed in 106.431 seconds. Its environment report records 605 unchanged hashes, exit 0 and empty cleanup failures, verified after actual process termination. A final review then strengthened the owner-role test to require SQLSTATE `42501`, distinguishing permission denial from immutable-row guards. Only `test/integration/owner_registration_test.go` changed after these two broad runs; no runtime/migration/fixture source changed. The final affected real-provider/race test returned 0 in 13.060 seconds with the strict privilege assertions. Its final report records 605 unchanged current source hashes and empty cleanup failures; all hashes matched after actual termination. Comparing the broad-run reports confirms that the strengthened owner test is their only subsequent source difference. The final `make spec-check architecture-check design-check` also returned 0 in the final design log. Their Pod proof or initial recovery/issuer bootstrap boundaries remain explicit. Complete protected installation, native Pod-proof-to-activation composition, owner credential transport, long-duration renewal/restore qualification, private forwarding/native transfer, local CA and public UI/MCP/download workflows remain pending. No S-01/S-02 or whole TASK is checked off.
 
 ## Current pre-Ready hub owner enrollment proof
 
@@ -19771,11 +19771,11 @@ The full `make context-integration` returned 0 in [the harness log](../test/resu
 
 Verification completed with actual terminal exits:
 
-- The [initial package/race build](../test/results/owner-enrollment-first-build.log), [focused owner/worker token regression](../test/results/owner-enrollment-unit.log) and [integration compile check](../test/results/owner-enrollment-integration-build.log) returned 0. The latter skips real integration without fixture variables and is not native qualification.
-- `make go-check go-architecture-check` returned 0 in [the code gate log](../test/results/owner-enrollment-code-gates.log): vet, all Go/race tests and 41 packages/181 permitted import edges.
-- `make context-integration` returned 0 in [the harness log](../test/results/owner-enrollment-first-context-check.log). [The complete Kubernetes/OpenBao/S3/PostgreSQL suite](../test/results/owner-enrollment-final-context-storage.log) passed in 66.926 seconds; the combined owner discovery/configuration/protection/enrollment case passed in 14.03 seconds. These are whole-test durations, not operation-latency claims.
-- [The environment report](../test/results/owner-enrollment-final-context-storage-environment.json) records 593 unchanged source hashes, test exit 0 and empty cleanup failures. All hashes matched current files after the actual harness process terminated; no owned test containers/networks remained.
-- `make spec-check architecture-check design-check` returned 0 in [the final design gate log](../test/results/owner-enrollment-final-design-gates.log). These validate contracts/mappings, not durable enrollment or production startup.
+- The initial package/race build, focused owner/worker token regression and integration compile check returned 0. The latter skips real integration without fixture variables and is not native qualification.
+- `make go-check go-architecture-check` returned 0 in the code gate log: vet, all Go/race tests and 41 packages/181 permitted import edges.
+- `make context-integration` returned 0 in the harness log. The complete Kubernetes/OpenBao/S3/PostgreSQL suite passed in 66.926 seconds; the combined owner discovery/configuration/protection/enrollment case passed in 14.03 seconds. These are whole-test durations, not operation-latency claims.
+- The environment report records 593 unchanged source hashes, test exit 0 and empty cleanup failures. All hashes matched current files after the actual harness process terminated; no owned test containers/networks remained.
+- `make spec-check architecture-check design-check` returned 0 in the final design gate log. These validate contracts/mappings, not durable enrollment or production startup.
 
 The native test composes the actual protected ConfigMap observer, encrypted SQL/S3 configuration acceptance and private workload guard. A new real Deployment revision has an unsatisfied readiness gate and a scheduled Pod; its actual bounded Pod token/CSR obtains a valid proof while the Ready endpoint reader rejects it. Satisfying the gate makes that same Pod routable. Client/server purposes work separately; wrong-audience, unbound, foreign Pod/issuer, invalid CSR and deleted-Pod inputs fail. Existing worker token, startup and provider tests pass through the shared decoder. The initial recovery/issuer roots, process epoch and proof request remain fixture inputs; no certificate is activated by this proof.
 
@@ -19785,16 +19785,16 @@ Next complete trusted clean-installation/workload history and durable owner key/
 
 [ADR-080](decisions/080-private-hub-workload-protection.md) and the workload protection contract add a private namespace admission profile and independent current-enforcement proof. The proof requires an RBAC-permitted unchanged dry-run denied by the exact pinned policy/binding, preserves the original five-second deadline and checks namespace identity before and after. Secret reads and clean installation remain separate prerequisites; this does not implement historical integrity, token/CSR attestation, enrollment or activation. SQL remains migration 29 and public interfaces are unchanged.
 
-The [focused unit/race check](../test/results/owner-workload-first-unit.log) passed. The [full Go/race/import gates](../test/results/owner-workload-code-gates.log) returned 0 with 41 packages/181 allowed import edges. The [initial document/architecture/design gates](../test/results/owner-workload-design-gates.log) returned 0. Tests without fixture variables skip external integration; these results do not replace the native gate.
+The focused unit/race check passed. The full Go/race/import gates returned 0 with 41 packages/181 allowed import edges. The initial document/architecture/design gates returned 0. Tests without fixture variables skip external integration; these results do not replace the native gate.
 
-The [first owned Kubernetes harness](../test/results/owner-workload-first-context-check.log) returned 2 because [the suite](../test/results/owner-workload-first-context-storage.log) failed the real protected Pod replacement check after the attack-denial checks. [Its report](../test/results/owner-workload-first-context-storage-environment.json) records test exit 1, 588 unchanged source hashes and empty cleanup failures; all hashes matched after the process terminated. The [diagnostic rerun](../test/results/owner-workload-diagnostic-context-storage.log) also failed replacement, recording no new Pod or post-policy controller events. [Its report](../test/results/owner-workload-diagnostic-context-storage-environment.json) likewise records unchanged sources and complete cleanup. No native success is claimed from either run.
+The first owned Kubernetes harness returned 2 because the suite failed the real protected Pod replacement check after the attack-denial checks. Its report records test exit 1, 588 unchanged source hashes and empty cleanup failures; all hashes matched after the process terminated. The diagnostic rerun also failed replacement, recording no new Pod or post-policy controller events. Its report likewise records unchanged sources and complete cleanup. No native success is claimed from either run.
 
-The corrected expression normalizes optional API-group/subresource fields rather than broadening any principal's operations. Native assertions now require an intentional static denial, excluding CEL evaluation errors, and test permitted ReplicaSet-controller Pod creation before the actual replacement. The [corrected unit/race build](../test/results/owner-workload-normalized-unit.log) passed. Final code/runtime qualification passed:
+The corrected expression normalizes optional API-group/subresource fields rather than broadening any principal's operations. Native assertions now require an intentional static denial, excluding CEL evaluation errors, and test permitted ReplicaSet-controller Pod creation before the actual replacement. The corrected unit/race build passed. Final code/runtime qualification passed:
 
-- `make go-check go-architecture-check` returned 0 in [the final code gate log](../test/results/owner-workload-final-code-gates.log), including vet, all Go/race tests and 41 packages/181 allowed import edges.
-- `make context-integration` returned 0 in [the final harness log](../test/results/owner-workload-normalized-context-check.log). [The complete Kubernetes/OpenBao/S3/PostgreSQL suite](../test/results/owner-workload-final-context-storage.log) passed in 54.994 seconds; the owner discovery/configuration/workload protection test passed in 6.73 seconds. These durations cover whole tests, not individual lookups.
-- [The final environment report](../test/results/owner-workload-final-context-storage-environment.json) records 588 unchanged source hashes, test exit 0 and empty cleanup failures. All hashes matched current files after the actual harness process terminated; no owned test containers/networks remained.
-- `make spec-check architecture-check design-check` returned 0 in [the final design gate log](../test/results/owner-workload-final-design-gates.log). These remain documentation/contract checks, not owner enrollment or public-workflow qualification.
+- `make go-check go-architecture-check` returned 0 in the final code gate log, including vet, all Go/race tests and 41 packages/181 allowed import edges.
+- `make context-integration` returned 0 in the final harness log. The complete Kubernetes/OpenBao/S3/PostgreSQL suite passed in 54.994 seconds; the owner discovery/configuration/workload protection test passed in 6.73 seconds. These durations cover whole tests, not individual lookups.
+- The final environment report records 588 unchanged source hashes, test exit 0 and empty cleanup failures. All hashes matched current files after the actual harness process terminated; no owned test containers/networks remained.
+- `make spec-check architecture-check design-check` returned 0 in the final design gate log. These remain documentation/contract checks, not owner enrollment or public-workflow qualification.
 
 The real native test proves exact intentional denials for forged Pods with hub/default accounts, forged ReplicaSets, Deployment/account mutation, legacy-token Secret creation, TokenRequest, ephemeral containers and exec CONNECT. It also proves separate observer RBAC, an allowed administrator dry-run, permitted reference-controller creation, actual Restricted Pod replacement to Ready, immediate guard rejection after binding removal and an admitted unchanged dry-run negative control. Neither dry-run persisted changes. The earlier generic denial-prefix assertion would have accepted CEL errors; the tightened assertion is retained.
 
@@ -19804,14 +19804,14 @@ Next complete protected clean-installation/workload history, Pod/token/CSR proof
 
 [ADR-079](decisions/079-owner-certificate-issuance.md) and the owner issuance contract add fixed-purpose OpenBao signing, strict identity-free CSR verification, exact owner client/server leaf checking against both pinned and current roots, and renewable UTC periods for long-lived hubs. Twenty-minute windows allow one-minute advance renewal; retries keep the original expiry. SQL remains migration 29. This provider boundary does not implement enrollment proof, durable signing spend, certificate audit/activation, local CA or forwarding.
 
-The [first real provider attempt](../test/results/owner-issuance-first-fleet.log) rejected server signing. A diagnostic retry was not qualified: [its report](../test/results/owner-issuance-diagnostic-fleet-environment.json) records source mutation before the harness terminated. A premature overlapping attempt failed Docker address-pool allocation before tests ([log](../test/results/owner-issuance-provider-errors-check.log)); no provider success is claimed from it. All owned fixtures were subsequently removed. The final frozen [failing regression](../test/results/owner-issuance-alt-names-before-fleet.log) exposed OpenBao's exact error: `alt_names` requires a string, not an array. [Its report](../test/results/owner-issuance-alt-names-before-fleet-environment.json) records unchanged tested source and complete cleanup.
+The first real provider attempt rejected server signing. A diagnostic retry was not qualified: its report records source mutation before the harness terminated. A premature overlapping attempt failed Docker address-pool allocation before tests (log); no provider success is claimed from it. All owned fixtures were subsequently removed. The final frozen failing regression exposed OpenBao's exact error: `alt_names` requires a string, not an array. Its report records unchanged tested source and complete cleanup.
 
-After fixing that wire field, the [targeted provider harness](../test/results/owner-issuance-corrected-provider-check.log) returned 0 and [the test](../test/results/owner-issuance-corrected-fleet.log) passed in 1.130 seconds overall. It signed real client/server CSRs, completed mutual TLS, verified exact identities/usages/deadlines and provider-role/revocation denial. [The report](../test/results/owner-issuance-corrected-fleet-environment.json) records 584 unchanged sources and empty cleanup failures; hashes matched at terminal cleanup. Enrollment/configuration/recovery/spend are synthetic fixture inputs. The later [unit/race regression](../test/results/owner-issuance-final-unit.log) additionally checks the exact DNS wire type, no automatic retry on 429, no unaudited POST, stable periods and stale/foreign certificate rejection. Final regressions passed:
+After fixing that wire field, the targeted provider harness returned 0 and the test passed in 1.130 seconds overall. It signed real client/server CSRs, completed mutual TLS, verified exact identities/usages/deadlines and provider-role/revocation denial. The report records 584 unchanged sources and empty cleanup failures; hashes matched at terminal cleanup. Enrollment/configuration/recovery/spend are synthetic fixture inputs. The later unit/race regression additionally checks the exact DNS wire type, no automatic retry on 429, no unaudited POST, stable periods and stale/foreign certificate rejection. Final regressions passed:
 
-- `make go-check go-architecture-check` returned 0 in [the code gate log](../test/results/owner-issuance-code-gates.log): vet, all Go/race tests and 41 packages/181 permitted import edges.
-- `make fleet-integration` returned 0 in [the harness log](../test/results/owner-issuance-fleet-check.log); [the full suite](../test/results/owner-issuance-final-fleet.log) passed in 23.387 seconds. [The report](../test/results/owner-issuance-final-fleet-environment.json) records 585 unchanged sources and empty cleanup failures, with hashes matched after terminal cleanup.
-- `make context-integration` returned 0 in [the harness log](../test/results/owner-issuance-context-check.log); [the full Kubernetes/OpenBao/S3/PostgreSQL suite](../test/results/owner-issuance-final-context-storage.log) passed in 63.660 seconds, including actual owner issuance and the existing guarded configuration/worker path. [The report](../test/results/owner-issuance-final-context-storage-environment.json) records 584 unchanged sources and empty cleanup failures; final hashes matched.
-- `make spec-check architecture-check design-check` returned 0 in [the design gate log](../test/results/owner-issuance-doc-gates.log). These remain document/contract checks, not activation evidence.
+- `make go-check go-architecture-check` returned 0 in the code gate log: vet, all Go/race tests and 41 packages/181 permitted import edges.
+- `make fleet-integration` returned 0 in the harness log; the full suite passed in 23.387 seconds. The report records 585 unchanged sources and empty cleanup failures, with hashes matched after terminal cleanup.
+- `make context-integration` returned 0 in the harness log; the full Kubernetes/OpenBao/S3/PostgreSQL suite passed in 63.660 seconds, including actual owner issuance and the existing guarded configuration/worker path. The report records 584 unchanged sources and empty cleanup failures; final hashes matched.
+- `make spec-check architecture-check design-check` returned 0 in the design gate log. These remain document/contract checks, not activation evidence.
 
 Enrollment must independently prove Pod/account/workload membership before readiness. Reusing the Ready-endpoint routing reader here would create a certificate/readiness startup cycle. This separation and the requirement to protect workload/account creation are explicit in the architecture; no readiness check was weakened.
 
@@ -19821,14 +19821,14 @@ Continue with protected owner Pod/process and workload/issuer proof, durable enr
 
 [ADR-078](decisions/078-owner-configuration-acceptance.md) and the extended owner configuration contract add migration 29, immutable source/revision history, negative-observation watermarks, exact encrypted audit and separate SQL roles. Current readers retain the original deadline and require matching active recovery/issuer state. Known rollback/mutation commits a fence before returning conflict; old failure cleanup and historical audit cannot revive or replace newer trust. Already acknowledged observations reuse their receipt without further key operations. No public interface or whole-task/slice completion is implied.
 
-The initial focused real SQL/S3 fixture passed in 1.886 seconds, recorded in [its harness log](../test/results/owner-acceptance-targeted-check.log), [test log](../test/results/owner-acceptance-targeted-custody.log) and [report](../test/results/owner-acceptance-targeted-custody-environment.json). All 577 recorded source hashes matched at terminal cleanup and cleanup failures were empty. This established missing/unaudited denial, restart/replay, eight simultaneous observations, negative watermarks, mutation/rollback fences, source/role immutability, suspension/recovery/issuer changes and expiry after a proven SQL lock wait. The subsequent test revision additionally exercises the 1024-revision application and database bound.
+The initial focused real SQL/S3 fixture passed in 1.886 seconds, recorded in its harness log, test log and report. All 577 recorded source hashes matched at terminal cleanup and cleanup failures were empty. This established missing/unaudited denial, restart/replay, eight simultaneous observations, negative watermarks, mutation/rollback fences, source/role immutability, suspension/recovery/issuer changes and expiry after a proven SQL lock wait. The subsequent test revision additionally exercises the 1024-revision application and database bound.
 
 Final verification passed:
 
-- `make go-check go-architecture-check sql-check` returned 0 in [the code gate log](../test/results/owner-acceptance-code-gates.log): vet, all Go/race tests, 41 packages/181 permitted import edges and 21 matching generated SQL files. Integration tests without fixture variables remain skips in this command.
-- `make custody-integration` returned 0 in [the harness log](../test/results/owner-acceptance-custody-check.log). The [full SQL/S3 suite](../test/results/owner-acceptance-final-custody.log) passed in 106.568 seconds, including the expanded owner test in 0.90 seconds. [Its report](../test/results/owner-acceptance-final-custody-environment.json) records 577 unchanged sources and empty cleanup failures; hashes matched current files after completion.
-- `make context-integration` returned 0 in [the harness log](../test/results/owner-acceptance-context-check.log). The [full Kubernetes/OpenBao/S3/PostgreSQL suite](../test/results/owner-acceptance-final-context-storage.log) passed in 61.069 seconds; the owner discovery/protected-source/SQL/audit/route test passed in 5.05 seconds. These durations cover complete tests, not single calls. [Its report](../test/results/owner-acceptance-final-context-storage-environment.json) records 576 unchanged sources, matching final hashes and empty cleanup failures.
-- `make spec-check architecture-check design-check` returned 0 in [the design gate log](../test/results/owner-acceptance-doc-gates.log). These verify documents/contracts and mappings, not production activation.
+- `make go-check go-architecture-check sql-check` returned 0 in the code gate log: vet, all Go/race tests, 41 packages/181 permitted import edges and 21 matching generated SQL files. Integration tests without fixture variables remain skips in this command.
+- `make custody-integration` returned 0 in the harness log. The full SQL/S3 suite passed in 106.568 seconds, including the expanded owner test in 0.90 seconds. Its report records 577 unchanged sources and empty cleanup failures; hashes matched current files after completion.
+- `make context-integration` returned 0 in the harness log. The full Kubernetes/OpenBao/S3/PostgreSQL suite passed in 61.069 seconds; the owner discovery/protected-source/SQL/audit/route test passed in 5.05 seconds. These durations cover complete tests, not single calls. Its report records 576 unchanged sources, matching final hashes and empty cleanup failures.
+- `make spec-check architecture-check design-check` returned 0 in the design gate log. These verify documents/contracts and mappings, not production activation.
 
 The real Kubernetes route fixture now connects the protected source to these SQL/S3 acceptance components. Recovery activation and audit wrapping roots remain explicitly synthetic fixture inputs; production issuer/bootstrap and certificate activation are unfinished. Next are those prerequisites, authenticated private forwarding, connector-local proof mediation and supervised native transfer, followed by complete UI/MCP/Helm and remaining slices.
 
@@ -19836,9 +19836,9 @@ The real Kubernetes route fixture now connects the protected source to these SQL
 
 [ADR-077](decisions/077-protected-owner-configuration.md) and protected owner configuration add the private owner-pool JSON contract, public CA validation, admission-qualified source and C-04 route composition. The shared ConfigMap proof engine retains the existing worker policy/denial/pins. Observation source, actual owner endpoint and current configuration must agree, with the earliest original five-second/root deadline. No SQL/public wire change or credential/evidence authority is introduced.
 
-The [first focused build](../test/results/owner-config-first-build.log) and [expanded component regression](../test/results/owner-config-second-build.log) passed. A [failing cached-observation regression](../test/results/owner-config-cached-before.log) caught rejection of a still-fresh original observation; composition now accepts it without extending expiry. The corrected [full Go/race/import gates](../test/results/owner-config-final-code-gates.log) returned 0. The [owned service harness](../test/results/owner-config-context-check.log) returned 0 and [its suite](../test/results/owner-config-final-context-storage.log) passed in 57.629 seconds. The owner discovery/configuration composition passed in 5.54 seconds; this is the whole multi-operation test, not one route lookup. It verified actual admission and read/probe roles, unchanged ConfigMap resource versions after dry-run, suspension/resume and missing-protection rejection. The existing restricted worker credential path also passed with the shared guard. [The final report](../test/results/owner-config-final-context-storage-environment.json) records 564 unchanged source files and no cleanup failures; recorded hashes matched current files after terminal cleanup. Process identity and CA issuance remain synthetic inputs.
+The first focused build and expanded component regression passed. A failing cached-observation regression caught rejection of a still-fresh original observation; composition now accepts it without extending expiry. The corrected full Go/race/import gates returned 0. The owned service harness returned 0 and its suite passed in 57.629 seconds. The owner discovery/configuration composition passed in 5.54 seconds; this is the whole multi-operation test, not one route lookup. It verified actual admission and read/probe roles, unchanged ConfigMap resource versions after dry-run, suspension/resume and missing-protection rejection. The existing restricted worker credential path also passed with the shared guard. The final report records 564 unchanged source files and no cleanup failures; recorded hashes matched current files after terminal cleanup. Process identity and CA issuance remain synthetic inputs.
 
-`make spec-check architecture-check design-check` [returned 0](../test/results/owner-config-docs.log): 58 schemas, all 176 requirement/scenario pairs and the architecture/UI/interface mappings. Those design checks do not qualify an issuer or network relay.
+`make spec-check architecture-check design-check` returned 0: 58 schemas, all 176 requirement/scenario pairs and the architecture/UI/interface mappings. Those design checks do not qualify an issuer or network relay.
 
 Next: durable owner-configuration/recovery acceptance, protected issuer enrollment and audited certificate activation, private forwarding, connector-local proof mediation and native evidence delivery. This source reader does not complete certificate bootstrap or any whole task/slice. Local login and bundled installation also remain pending.
 
@@ -19846,13 +19846,13 @@ Next: durable owner-configuration/recovery acceptance, protected issuer enrollme
 
 [ADR-076](decisions/076-hub-owner-discovery.md) and hub owner discovery add exact hub installation/cluster/issuer/Pod/process bindings, the C-04 endpoint reader, a bounded Kubernetes Service/EndpointSlice/Pod/account/ReplicaSet/Deployment adapter and standard-library TLS 1.3 verification. No SQL or public wire change is introduced. Routing observations preserve the original five-second deadline; TLS independently checks the expected process and current certificate lifetime. Neither source construction nor a signed leaf supplies protected bootstrap, issuer activation or evidence authority.
 
-The [focused race regression](../test/results/owner-discovery-unit.log) passed both Kubernetes and mutual TLS tests. The [full Go gate log](../test/results/owner-discovery-go-gates.log) shows successful schema/vet/race tests followed by an import-gate rejection of `net/netip`. The corrected [import gate](../test/results/owner-discovery-import-gate.log) passes with that pure standard-library address parser explicitly allowed; sockets, DNS and HTTP remain forbidden in domain code.
+The focused race regression passed both Kubernetes and mutual TLS tests. The full Go gate log shows successful schema/vet/race tests followed by an import-gate rejection of `net/netip`. The corrected import gate passes with that pure standard-library address parser explicitly allowed; sockets, DNS and HTTP remain forbidden in domain code.
 
-The [first owned Kubernetes suite](../test/results/owner-discovery-first-context-storage.log) failed discovery because real controller target references omit the optional API version. [Its report](../test/results/owner-discovery-first-context-storage-environment.json) records 555 unchanged sources and no cleanup failures. A [focused regression](../test/results/owner-discovery-missing-version-before.log) reproduced that failure before fixing the adapter to accept absent or `v1` and still independently GET the exact core/v1 Pod. Explicit foreign versions remain rejected.
+The first owned Kubernetes suite failed discovery because real controller target references omit the optional API version. Its report records 555 unchanged sources and no cleanup failures. A focused regression reproduced that failure before fixing the adapter to accept absent or `v1` and still independently GET the exact core/v1 Pod. Explicit foreign versions remain rejected.
 
-The corrected [full Go/race/import gates](../test/results/owner-discovery-final-go-gates.log) returned 0. The [second owned-service harness](../test/results/owner-discovery-final-context-check.log) returned 0; [its full suite](../test/results/owner-discovery-final-context-storage.log) passed in 54.741 seconds. Actual owner discovery passed in 1.15 seconds, including read-only RBAC, controller output, invalid scope, readiness override and deletion. [The final environment report](../test/results/owner-discovery-final-context-storage-environment.json) records 555 unchanged source files and no cleanup failures; all recorded hashes matched current files after terminal cleanup. Synthetic TLS issuance and process expectations remain explicit; this does not prove production issuer activation or a running hub relay.
+The corrected full Go/race/import gates returned 0. The second owned-service harness returned 0; its full suite passed in 54.741 seconds. Actual owner discovery passed in 1.15 seconds, including read-only RBAC, controller output, invalid scope, readiness override and deletion. The final environment report records 555 unchanged source files and no cleanup failures; all recorded hashes matched current files after terminal cleanup. Synthetic TLS issuance and process expectations remain explicit; this does not prove production issuer activation or a running hub relay.
 
-`make spec-check architecture-check design-check` also [returned 0](../test/results/owner-discovery-final-docs.log). These are design/contract gates, not runtime forwarding qualification. No SQL contracts changed in this continuation; the earlier SQL-owner qualification remains separately recorded below.
+`make spec-check architecture-check design-check` also returned 0. These are design/contract gates, not runtime forwarding qualification. No SQL contracts changed in this continuation; the earlier SQL-owner qualification remains separately recorded below.
 
 Next: protected owner-pool/issuer configuration, certificate issuance/activation, private forwarding before credential transmission, connector proof mediation and supervised native delivery. Local login and bundled-service installation also remain incomplete. No S-01/S-02 or whole TASK exit is claimed.
 
@@ -19860,9 +19860,9 @@ Next: protected owner-pool/issuer configuration, certificate issuance/activation
 
 [ADR-075](decisions/075-worker-owner-locator.md) and shared owner locators add migration 28, a purpose-specific PostgreSQL store, separate claim/lookup fixture roles, local-registration publication and exact-owner enrollment receiving. SQL stores opaque request/process IDs and original deadlines/fences; it stores no credentials, Pod tokens, evidence or endpoint URLs. Current human/recovery/configuration/session/worker checks precede a claim and are repeated after locks. Active ownership cannot be renewed or silently replaced; stale release cannot delete a replacement. Registration failure closes local ownership, and unknown SQL outcomes remain bounded by original expiry.
 
-The [first scoped SQL harness](../test/results/worker-owners-first-custody-check.log) returned 0; [its suite](../test/results/worker-owners-first-custody.log) passed in 4.071 seconds with 548 unchanged source files and [complete cleanup](../test/results/worker-owners-first-custody-environment.json). It exercised two owner pools/registries, an independent lookup role, eight competing claims, immutable deadline replay, direct transition/role attacks, current actor/session binding, actual row-lock expiry and cancellation. The subsequent exact-owner receiving check and same-certificate replay passed in the expanded full regression below.
+The first scoped SQL harness returned 0; its suite passed in 4.071 seconds with 548 unchanged source files and complete cleanup. It exercised two owner pools/registries, an independent lookup role, eight competing claims, immutable deadline replay, direct transition/role attacks, current actor/session binding, actual row-lock expiry and cancellation. The subsequent exact-owner receiving check and same-certificate replay passed in the expanded full regression below.
 
-[Focused race tests](../test/results/worker-owners-third-build.log) pass. [The code gates](../test/results/worker-owners-code-gates.log) returned 0: vet/race, 41 packages/178 allowed internal imports and all 20 generated SQL files. The full `make custody-integration` returned 0 in [the harness](../test/results/worker-owners-full-custody-check.log); [the suite](../test/results/worker-owners-full-custody.log) passed in 105.315 seconds. [Its environment report](../test/results/worker-owners-full-custody-environment.json) records 548 unchanged source files, 231 passed test names and no cleanup failures; the current-source comparison also found no changes. The first spec/architecture/design checks returned 0 in [the documentation gate](../test/results/worker-owners-first-docs.log). The sequential `make context-integration` returned 0 in [the harness](../test/results/worker-owners-context-check.log); [the suite](../test/results/worker-owners-context-storage.log) passed in 50.460 seconds, including the compiled restricted-Pod credential runtime and verified termination. [Its environment report](../test/results/worker-owners-context-storage-environment.json) records 547 unchanged source files, no current-source differences and no cleanup failures. No fixture process identity or synthetic Pod/CA proof qualifies authenticated hub discovery or network forwarding.
+Focused race tests pass. The code gates returned 0: vet/race, 41 packages/178 allowed internal imports and all 20 generated SQL files. The full `make custody-integration` returned 0 in the harness; the suite passed in 105.315 seconds. Its environment report records 548 unchanged source files, 231 passed test names and no cleanup failures; the current-source comparison also found no changes. The first spec/architecture/design checks returned 0 in the documentation gate. The sequential `make context-integration` returned 0 in the harness; the suite passed in 50.460 seconds, including the compiled restricted-Pod credential runtime and verified termination. Its environment report records 547 unchanged source files, no current-source differences and no cleanup failures. No fixture process identity or synthetic Pod/CA proof qualifies authenticated hub discovery or network forwarding.
 
 Next complete protected process discovery and private forwarding, connector-local proof/reference mediation, public owner registration and native evidence delivery. S-01/S-02 and all complete TASK exits remain unfinished.
 
@@ -19870,7 +19870,7 @@ Next complete protected process discovery and private forwarding, connector-loca
 
 [ADR-074](decisions/074-worker-request-routing.md) and worker request routing add bounded process-local registration of current authenticated owners against the admitted SQL worker registry. Each worker retains separate token readers and exact actor/client/artifact scope. Registration I/O, active owners and closing in-flight work share a finite limit; old-handle cleanup cannot remove a replacement. A mandatory-close private delivery keeps the original cancellation/deadline effective through certificate response write/flush, including blocked writes. Public JSON, SQL schema, dependencies and developer approvals are unchanged.
 
-The recovered prior focused build passed; no previous test process remained active. The expanded [focused race tests](../test/results/worker-routes-final-focused.log) pass for distinct concurrent workers, current installation/scope, stale registration after I/O, cancellation/shutdown, held capacity and response lifetime. [The complete code gates](../test/results/worker-routes-code-gates.log) returned 0: Go vet/race, 41 packages/178 permitted internal import edges and all 19 generated SQL files. The full `make custody-integration` returned 0 in [the harness](../test/results/worker-routes-full-custody-check.log); [the suite](../test/results/worker-routes-full-custody.log) passed in 102.701 seconds, including the routed enrollment/current SQL binding and held-delivery/same-certificate replay case. [The environment report](../test/results/worker-routes-full-custody-environment.json) records 540 unchanged source files, 230 passed test names and no cleanup failures. The current-source comparison also found no changes. The sequential `make context-integration` also returned 0 in [the harness](../test/results/worker-routes-context-check.log). [The complete suite](../test/results/worker-routes-context-storage.log) passed in 51.111 seconds, including the actual compiled restricted-Pod credential startup/OpenBao issuance and confirmed retirement. [Its environment report](../test/results/worker-routes-context-storage-environment.json) records 539 unchanged source files and no cleanup failures; the current-source comparison found no changes. The SQL case retains synthetic Pod/CA inputs, while the Kubernetes case retains synthetic dispatch/issuance authority. Neither is a fully composed public download.
+The recovered prior focused build passed; no previous test process remained active. The expanded focused race tests pass for distinct concurrent workers, current installation/scope, stale registration after I/O, cancellation/shutdown, held capacity and response lifetime. The complete code gates returned 0: Go vet/race, 41 packages/178 permitted internal import edges and all 19 generated SQL files. The full `make custody-integration` returned 0 in the harness; the suite passed in 102.701 seconds, including the routed enrollment/current SQL binding and held-delivery/same-certificate replay case. The environment report records 540 unchanged source files, 230 passed test names and no cleanup failures. The current-source comparison also found no changes. The sequential `make context-integration` also returned 0 in the harness. The complete suite passed in 51.111 seconds, including the actual compiled restricted-Pod credential startup/OpenBao issuance and confirmed retirement. Its environment report records 539 unchanged source files and no cleanup failures; the current-source comparison found no changes. The SQL case retains synthetic Pod/CA inputs, while the Kubernetes case retains synthetic dispatch/issuance authority. Neither is a fully composed public download.
 
 Distributed owner rendezvous, authenticated browser/MCP registration, outbound connector mediation, protected listener/issuer bootstrap and actual native transfer remain required. This does not complete a TASK or S-01/S-02 exit.
 
@@ -19880,13 +19880,13 @@ Distributed owner rendezvous, authenticated browser/MCP registration, outbound c
 
 The changed startup template also exposed a historical cleanup defect. Cleanup now validates stored original Job/Pod identities and spec digests, while fresh launch/binding still require the current template. Additional/replacement or uncertain Pods retain their capacity charge for a separate orphan path. Termination persistence, exact-UID foreground deletion and verified absence remain unchanged. No SQL migration, developer approval or dependency was added.
 
-Focused race tests passed in [the sixth build](../test/results/worker-startup-sixth-build.log). They cover complete original renewal periods, bounded initial failure, cancellation, an unconsumed notification channel, strict configuration/argument parsing, process-local core-limit readback and cleanup of an original older template. The [compiled CLI check](../test/results/worker-startup-cli.log) passes without Kubernetes/SQL dependencies and rejects unknown/incomplete startup without echoing inputs. [The first complete gates](../test/results/worker-startup-first-gates.log) returned 0 before final documentation updates: Go vet/race/import, SQL generation, specification, architecture and design checks.
+Focused race tests passed in the sixth build. They cover complete original renewal periods, bounded initial failure, cancellation, an unconsumed notification channel, strict configuration/argument parsing, process-local core-limit readback and cleanup of an original older template. The compiled CLI check passes without Kubernetes/SQL dependencies and rejects unknown/incomplete startup without echoing inputs. The first complete gates returned 0 before final documentation updates: Go vet/race/import, SQL generation, specification, architecture and design checks.
 
-The first real-service run failed before Job creation because its two-minute synthetic dispatch exceeded the existing one-minute protected fixture profile. [The failure](../test/results/worker-startup-first-context-storage.log) and [environment](../test/results/worker-startup-first-context-storage-environment.json) are retained; tested sources were unchanged and cleanup completed. The fixture now retains the original one-minute deadline. Production limits were not relaxed. The second run created the restricted worker but did not observe its credential-ready diagnostic; [its log](../test/results/worker-startup-second-context-storage.log) and [cleaned environment](../test/results/worker-startup-second-context-storage-environment.json) are retained. The third run added bounded enrollment-stage and Pod-state diagnostics: the process remained running, logs were readable/empty, and no enrollment request reached the host bridge listener ([log](../test/results/worker-startup-third-context-storage.log), [cleaned environment](../test/results/worker-startup-third-context-storage-environment.json)). The next fixture uses an owned non-root container to relay encrypted TCP to a private Unix listener, retaining the exact TLS trust checks and leaving host firewall/settings untouched. Combined Kubernetes/OpenBao and full SQL regression remained pending at that checkpoint. An independent runtime/schema mismatch for an empty endpoint fragment was reproduced in [the failing test](../test/results/worker-startup-endpoint-before.log) and corrected with [passing race tests](../test/results/worker-startup-endpoint-after.log).
+The first real-service run failed before Job creation because its two-minute synthetic dispatch exceeded the existing one-minute protected fixture profile. The failure and environment are retained; tested sources were unchanged and cleanup completed. The fixture now retains the original one-minute deadline. Production limits were not relaxed. The second run created the restricted worker but did not observe its credential-ready diagnostic; its log and cleaned environment are retained. The third run added bounded enrollment-stage and Pod-state diagnostics: the process remained running, logs were readable/empty, and no enrollment request reached the host bridge listener (log, cleaned environment). The next fixture uses an owned non-root container to relay encrypted TCP to a private Unix listener, retaining the exact TLS trust checks and leaving host firewall/settings untouched. Combined Kubernetes/OpenBao and full SQL regression remained pending at that checkpoint. An independent runtime/schema mismatch for an empty endpoint fragment was reproduced in the failing test and corrected with passing race tests.
 
-The corrected `make context-integration` returned 0 in [the fourth harness run](../test/results/worker-startup-fourth-context-check.log). [The complete suite](../test/results/worker-startup-fourth-context-storage.log) passed in 49.266 seconds. The actual compiled command ran in its digest-pinned restricted Pod, loaded the mounted public trust and projected token, generated its own key/CSR, enrolled through the real TLS handler and OpenBao issuer, and emitted the fixed credential-phase diagnostic only after installing the returned credential. Independent token/Pod proof, sign-role denial/revocation, SIGTERM shutdown and confirmed Job/Pod retirement passed. The [environment report](../test/results/worker-startup-fourth-context-storage-environment.json) records 535 unchanged source files and complete cleanup; a subsequent current-source comparison found no changes. The separate owned TLS relay/image cleaned up through the Go fixture's checked cleanup hooks. This proves the initial credential runtime in a Pod; dispatch registry and issuance audit remain synthetic in this case, and native transfer is absent.
+The corrected `make context-integration` returned 0 in the fourth harness run. The complete suite passed in 49.266 seconds. The actual compiled command ran in its digest-pinned restricted Pod, loaded the mounted public trust and projected token, generated its own key/CSR, enrolled through the real TLS handler and OpenBao issuer, and emitted the fixed credential-phase diagnostic only after installing the returned credential. Independent token/Pod proof, sign-role denial/revocation, SIGTERM shutdown and confirmed Job/Pod retirement passed. The environment report records 535 unchanged source files and complete cleanup; a subsequent current-source comparison found no changes. The separate owned TLS relay/image cleaned up through the Go fixture's checked cleanup hooks. This proves the initial credential runtime in a Pod; dispatch registry and issuance audit remain synthetic in this case, and native transfer is absent.
 
-The full `make custody-integration` returned 0 in [the harness](../test/results/worker-startup-full-custody-check.log); [the suite](../test/results/worker-startup-full-custody.log) passed in 102.444 seconds. [Its environment report](../test/results/worker-startup-full-custody-environment.json) records actual selected/passed tests, unchanged sources and empty cleanup failures. The current-source comparison for both final service reports found no changed Go/SQL/fixture files. `make go-check go-architecture-check sql-check` returned 0 in [the final code gates](../test/results/worker-startup-final-go-gates.log): vet/race, 41 packages/178 allowed imports and all 19 generated SQL files. The current executable was rebuilt and its negative CLI/import checks passed. `make spec-check architecture-check design-check` returned 0 in [the final documentation gates](../test/results/worker-startup-final-docs.log): 57 schemas, 443 rejected invalid examples, all 176 requirement/scenario mappings and the existing 63-screen/browser/MCP contracts. These design checks do not qualify public routing or native transfer.
+The full `make custody-integration` returned 0 in the harness; the suite passed in 102.444 seconds. Its environment report records actual selected/passed tests, unchanged sources and empty cleanup failures. The current-source comparison for both final service reports found no changed Go/SQL/fixture files. `make go-check go-architecture-check sql-check` returned 0 in the final code gates: vet/race, 41 packages/178 allowed imports and all 19 generated SQL files. The current executable was rebuilt and its negative CLI/import checks passed. `make spec-check architecture-check design-check` returned 0 in the final documentation gates: 57 schemas, 443 rejected invalid examples, all 176 requirement/scenario mappings and the existing 63-screen/browser/MCP contracts. These design checks do not qualify public routing or native transfer.
 
 Next: protected issuer/endpoint initialization, active browser/MCP/connector request-owner routing and actual native work/byte relay. Continue connection/orphan cleanup, local CA/login, bundled services and remaining collection/UI/MCP requirements. Neither a TASK nor an end-to-end slice is complete.
 
@@ -19896,18 +19896,18 @@ Next: protected issuer/endpoint initialization, active browser/MCP/connector req
 
 The private handler accepts only the worker CSR/token exchange. `WorkerEnrollmentOperation` binds current human authority to one active request and exact admitted worker for at most thirty seconds, preserving parent cancellation and keeping user credentials outside the worker wire. Its request-owned proof reader avoids token substitution between concurrent calls. Installation identity is separately checked from the permission-root ID. The existing independent SQL signing/audit/activation roles and original deadlines remain unchanged; no migration, developer permission or extra approval was added. C-20 now consumes C-14's narrow enrollment port. The closed JSON schema is private; public browser/MCP operations and UX remain unchanged.
 
-A regression demonstrated that keeping the bootstrap TLS connection alive allowed renewal to send a Pod token after the server certificate expired. The [pre-fix test](../test/results/worker-channel-server-expiry-before.log) failed with that behavior; [the corrected race test](../test/results/worker-channel-server-expiry-after.log) passes with a fresh server handshake for every actual enrollment. A current-period credential performs no network request, so this does not create per-frame or per-key traffic. Failed renewal keeps the original credential only through its original expiry.
+A regression demonstrated that keeping the bootstrap TLS connection alive allowed renewal to send a Pod token after the server certificate expired. The pre-fix test failed with that behavior; the corrected race test passes with a fresh server handshake for every actual enrollment. A current-period credential performs no network request, so this does not create per-frame or per-key traffic. Failed renewal keeps the original credential only through its original expiry.
 
 Verification uses build TMPDIR `/home/phil/.cache/asservat-build/tmp` and Make PYTHON `/tmp/asservat-openapi-validation/bin/python`:
 
-- `make go-check go-architecture-check sql-check spec-check architecture-check design-check` returned 0 in [the first complete gate run](../test/results/worker-channel-first-gates.log). After expanding the actual provider fixture, `make go-check go-architecture-check sql-check` returned 0 again in [the second gate run](../test/results/worker-channel-second-gates.log). Vet/race tests pass, 39 packages/177 allowed imports and 19 generated SQL files match. Initial design checks cover 56 schemas, 429 rejected examples, 176 requirements/scenarios and the existing 63-screen/49-entity/browser/MCP mappings.
+- `make go-check go-architecture-check sql-check spec-check architecture-check design-check` returned 0 in the first complete gate run. After expanding the actual provider fixture, `make go-check go-architecture-check sql-check` returned 0 again in the second gate run. Vet/race tests pass, 39 packages/177 allowed imports and 19 generated SQL files match. Initial design checks cover 56 schemas, 429 rejected examples, 176 requirements/scenarios and the existing 63-screen/49-entity/browser/MCP mappings.
 - Local real-TLS tests cover actual mTLS use of the process-owned key, renewal with token reread, finite old-certificate overlap, wrong key/Pod/role/installation/usages/expiry, wrong nonce/response identity, untrusted endpoint/issuer, malformed/oversized/duplicate JSON, redirects/lost replies without replay, cancelled/parallel requests, failed-renewal expiry and closed signer snapshots. The projected-token test follows actual filesystem symlink replacement and checks fresh buffers, invalid size/syntax and cancellation. These tests use a test CA and synthetic token authentication, not production authority.
-- The first targeted fixture invocation used an incorrect test selector and ran no tests despite Go exit 0: [log](../test/results/worker-channel-first-custody.log). It is not qualification. The fixture runner now rejects empty selection and root-only success when a subtest was requested, and records the actual passed test names. The [correctly selected run](../test/results/worker-channel-second-custody-check.log) passed; [its environment](../test/results/worker-channel-second-custody-environment.json) records the exact new subtest and complete cleanup.
-- The full `make custody-integration` returned 0 in [the harness log](../test/results/worker-channel-full-custody-check.log); [the suite](../test/results/worker-channel-full-custody.log) passed in 101.903 seconds. The added case composes the real TLS client/handler/process key and bound control operation with the existing current authorizer, separate SQL enrollment/audit/activation roles and encrypted S3 audit. Foreign worker selection and cancelled parent authority deny. [The environment report](../test/results/worker-channel-full-custody-environment.json) records 524 unchanged source files, 230 passed test names and complete cleanup. Its Pod proof and CA remain fixtures; a valid TLS certificate alone does not stand in for activated SQL identity.
+- The first targeted fixture invocation used an incorrect test selector and ran no tests despite Go exit 0: log. It is not qualification. The fixture runner now rejects empty selection and root-only success when a subtest was requested, and records the actual passed test names. The correctly selected run passed; its environment records the exact new subtest and complete cleanup.
+- The full `make custody-integration` returned 0 in the harness log; the suite passed in 101.903 seconds. The added case composes the real TLS client/handler/process key and bound control operation with the existing current authorizer, separate SQL enrollment/audit/activation roles and encrypted S3 audit. Foreign worker selection and cancelled parent authority deny. The environment report records 524 unchanged source files, 230 passed test names and complete cleanup. Its Pod proof and CA remain fixtures; a valid TLS certificate alone does not stand in for activated SQL identity.
 
-- `make context-integration` returned 0 in [the context harness](../test/results/worker-channel-first-context-check.log); [the complete suite](../test/results/worker-channel-first-context-storage.log) passed in 49.485 seconds. The actual worker case now uses the production credential client/handler and its process-owned key with real Kubernetes Pod TokenReview and fixed-role OpenBao CSR signing, followed by a real mTLS handshake, certificate-bound worker proof and Job retirement. Its dispatch registry, signing permit/audit and active requester remain fixtures, and the key-owning client runs in the test runner rather than the fixture Job. [The environment report](../test/results/worker-channel-first-context-storage-environment.json) records 523 unchanged source files, exit 0 and complete cleanup of both owned clusters and service fixtures.
+- `make context-integration` returned 0 in the context harness; the complete suite passed in 49.485 seconds. The actual worker case now uses the production credential client/handler and its process-owned key with real Kubernetes Pod TokenReview and fixed-role OpenBao CSR signing, followed by a real mTLS handshake, certificate-bound worker proof and Job retirement. Its dispatch registry, signing permit/audit and active requester remain fixtures, and the key-owning client runs in the test runner rather than the fixture Job. The environment report records 523 unchanged source files, exit 0 and complete cleanup of both owned clusters and service fixtures.
 
-Both final service reports were compared with the current Go/SQL/fixture sources after completion; no tested source changed. Final documentation gates are recorded in [the documentation log](../test/results/worker-channel-final-docs.log).
+Both final service reports were compared with the current Go/SQL/fixture sources after completion; no tested source changed. Final documentation gates are recorded in the documentation log.
 
 Next: protected endpoint/issuer and exact worker startup pins, active browser/MCP/connector routing, the acquisition executable and renewal/connection supervisor. Then complete native-file delivery, local CA/login, bundled-service installation and the remaining collectors and S-00–S-09 requirements. No complete TASK, slice or public investigation workflow is claimed.
 
@@ -19921,10 +19921,10 @@ The coordinator keeps signing, audit and activation on separate credentials. The
 
 Verification used `TMPDIR=/home/phil/.cache/asservat-build/tmp` and Make `PYTHON=/tmp/asservat-openapi-validation/bin/python`:
 
-- The first focused real PostgreSQL/S3 flow passed in [worker-enrollment-first-custody.log](../test/results/worker-enrollment-first-custody.log): unregistered-certificate denial followed by enrollment/audit/activation and normal dispatch/retirement. This preceded the expanded tests and final deadline propagation; it is retained as early evidence.
-- `make go-check go-architecture-check sql-check spec-check architecture-check design-check` returned 0 in [worker-enrollment-first-gates.log](../test/results/worker-enrollment-first-gates.log): vet/race, 38 packages/171 allowed imports, 19 matching sqlc files, 55 schemas/165 examples/412 rejected cases and unchanged public UI/API mappings. The focused race run is in [worker-enrollment-fourth-build.log](../test/results/worker-enrollment-fourth-build.log).
-- The full `make custody-integration` returned 0 in [worker-enrollment-second-custody-check.log](../test/results/worker-enrollment-second-custody-check.log); [the suite](../test/results/worker-enrollment-second-custody.log) passed in 100.529 seconds. New cases exercise audit-before-signing/activation, signed-result recovery after missing audit without another provider call, exact replay, key replacement denial, eight-way single-use signing, two uncertain-attempt exhaustion, separate SQL role privileges, acknowledgement reuse and expiry behind the worker lock without a spend. Existing dispatch, key access, downloads, retention, policy and custody cases pass. [The environment report](../test/results/worker-enrollment-second-custody-environment.json) records 516 unchanged source files, exit 0 and complete cleanup. Worker token/registry authority and the CA are synthetic; certificates and chain verification, SQL transactions and encrypted S3 audit are real.
-- `make context-integration` returned 0 in [worker-enrollment-first-context-check.log](../test/results/worker-enrollment-first-context-check.log); [the suite](../test/results/worker-enrollment-first-context-storage.log) passed in 47.979 seconds. The real worker test (16.01 seconds) uses actual Kubernetes Pod-bound token proof before a certificate exists, OpenBao sign-only CSR issuance, a real TLS handshake with that certificate, then certificate-bound worker proof and Job retirement. Foreign key/issuer epoch and signer credential/role failures deny. Existing context/storage/provider tests pass. [The environment report](../test/results/worker-enrollment-first-context-storage-environment.json) records 515 unchanged source files, exit 0 and complete cleanup of both owned clusters/services. The private key is generated in the test, and signing permits/audit, dispatch registry and issuer provisioning remain fixtures. It is not the production worker executable or a fully composed public download.
+- The first focused real PostgreSQL/S3 flow passed in worker-enrollment-first-custody.log: unregistered-certificate denial followed by enrollment/audit/activation and normal dispatch/retirement. This preceded the expanded tests and final deadline propagation; it is retained as early evidence.
+- `make go-check go-architecture-check sql-check spec-check architecture-check design-check` returned 0 in worker-enrollment-first-gates.log: vet/race, 38 packages/171 allowed imports, 19 matching sqlc files, 55 schemas/165 examples/412 rejected cases and unchanged public UI/API mappings. The focused race run is in worker-enrollment-fourth-build.log.
+- The full `make custody-integration` returned 0 in worker-enrollment-second-custody-check.log; the suite passed in 100.529 seconds. New cases exercise audit-before-signing/activation, signed-result recovery after missing audit without another provider call, exact replay, key replacement denial, eight-way single-use signing, two uncertain-attempt exhaustion, separate SQL role privileges, acknowledgement reuse and expiry behind the worker lock without a spend. Existing dispatch, key access, downloads, retention, policy and custody cases pass. The environment report records 516 unchanged source files, exit 0 and complete cleanup. Worker token/registry authority and the CA are synthetic; certificates and chain verification, SQL transactions and encrypted S3 audit are real.
+- `make context-integration` returned 0 in worker-enrollment-first-context-check.log; the suite passed in 47.979 seconds. The real worker test (16.01 seconds) uses actual Kubernetes Pod-bound token proof before a certificate exists, OpenBao sign-only CSR issuance, a real TLS handshake with that certificate, then certificate-bound worker proof and Job retirement. Foreign key/issuer epoch and signer credential/role failures deny. Existing context/storage/provider tests pass. The environment report records 515 unchanged source files, exit 0 and complete cleanup of both owned clusters/services. The private key is generated in the test, and signing permits/audit, dispatch registry and issuer provisioning remain fixtures. It is not the production worker executable or a fully composed public download.
 
 Next: protected issuer/bootstrap configuration and the bounded authenticated worker/control transport, acquisition executable with process-owned key handling, and continuous supervision. Compose these with the public browser/MCP/native-file flow and implement the local-CA alternative, local login, bundled storage/database and installation/recovery gates. General collectors, full orphan cleanup and the remaining S-00–S-09 product work remain unfinished; no whole TASK or slice is complete.
 
@@ -19932,13 +19932,13 @@ Next: protected issuer/bootstrap configuration and the bounded authenticated wor
 
 [ADR-070](decisions/070-protected-worker-configuration.md) and the worker configuration contract add the protected administrator source, migration 26 current/revision projections and encrypted configuration audit. The real source qualifies an exact pinned native admission policy with a separate non-administrator dry-run probe, validates the closed ConfigMap twice and preserves its original five-second deadline. Dispatch and worker identity require the current audited profile; a new unaudited revision supersedes old authority immediately. Profile rollout never rewrites a worker identity or resets uncertain charges, and historical cleanup remains available after expiry/suspension. This closes the constructor-profile authority gap without enabling a public endpoint.
 
-The missing-projection defect was first reproduced in [worker-config-before-custody.log](../test/results/worker-config-before-custody.log): an unaccepted constructor profile could reserve a worker. The regression now rejects that call. The first real Kubernetes run failed when a fixture assumed its administrator belonged to `system:masters`; the native guard correctly refused that user's later update. [The failed run](../test/results/worker-config-first-context-storage.log) is preserved. The fixture now pins its actual authenticated administrator username as trusted bootstrap input; the guard remains unchanged.
+The missing-projection defect was first reproduced in worker-config-before-custody.log: an unaccepted constructor profile could reserve a worker. The regression now rejects that call. The first real Kubernetes run failed when a fixture assumed its administrator belonged to `system:masters`; the native guard correctly refused that user's later update. The failed run is preserved. The fixture now pins its actual authenticated administrator username as trusted bootstrap input; the guard remains unchanged.
 
 Verification used `TMPDIR=/home/phil/.cache/asservat-build/tmp` and Make `PYTHON=/tmp/asservat-openapi-validation/bin/python`:
 
-- `make go-check go-architecture-check sql-check spec-check architecture-check design-check` returned 0 in [worker-config-first-gates.log](../test/results/worker-config-first-gates.log). Vet/race tests, 38 packages/171 allowed imports, 18 matching sqlc files, 55 schemas/165 examples/412 rejected cases and the existing interface/UI mappings pass. The new synthetic parser tests reject omitted/aliased/duplicate/unknown fields, foreign scopes, unpinned images and invalid limits; they do not supply admission authority.
-- `make context-integration` returned 0 in [worker-config-second-context-check.log](../test/results/worker-config-second-context-check.log). [The real Kubernetes/OpenBao/S3/PostgreSQL suite](../test/results/worker-config-final-context-storage.log) passed in 48.497 seconds. The worker test (16.53 seconds) exercises distinct source/probe identities, actual native admission, mutation/deletion denial, protection removal and SQL fencing, explicit new protection/revision acceptance and the restricted Job/TokenReview/retirement path. [Its environment report](../test/results/worker-config-final-context-storage-environment.json) records 498 unchanged source files, exit 0 and no cleanup failures. Recovery trust, audit wrapping material, bootstrap pins, executable and certificate issuer remain explicit fixtures; this is not a deployed download service.
-- `make custody-integration` returned 0 in [worker-config-final-custody-check.log](../test/results/worker-config-final-custody-check.log). [The full SQL/S3 suite](../test/results/worker-config-final-custody.log) passed in 88.347 seconds. New cases cover missing/changed/suspended/fenced profiles, same-revision substitution, rollback, unaudited supersession, exact audit reuse, five SQL role boundaries, older failed-observation fencing, original identity expiry, cleanup after expiry and observation expiry behind a held lock. Existing download, custody, enrollment, permission and policy tests pass. [Its environment report](../test/results/worker-config-final-custody-environment.json) records 499 unchanged source files, exit 0 and complete cleanup. Kubernetes inputs/Job effects in this SQL suite remain synthetic and are independently exercised by the real API suite above.
+- `make go-check go-architecture-check sql-check spec-check architecture-check design-check` returned 0 in worker-config-first-gates.log. Vet/race tests, 38 packages/171 allowed imports, 18 matching sqlc files, 55 schemas/165 examples/412 rejected cases and the existing interface/UI mappings pass. The new synthetic parser tests reject omitted/aliased/duplicate/unknown fields, foreign scopes, unpinned images and invalid limits; they do not supply admission authority.
+- `make context-integration` returned 0 in worker-config-second-context-check.log. The real Kubernetes/OpenBao/S3/PostgreSQL suite passed in 48.497 seconds. The worker test (16.53 seconds) exercises distinct source/probe identities, actual native admission, mutation/deletion denial, protection removal and SQL fencing, explicit new protection/revision acceptance and the restricted Job/TokenReview/retirement path. Its environment report records 498 unchanged source files, exit 0 and no cleanup failures. Recovery trust, audit wrapping material, bootstrap pins, executable and certificate issuer remain explicit fixtures; this is not a deployed download service.
+- `make custody-integration` returned 0 in worker-config-final-custody-check.log. The full SQL/S3 suite passed in 88.347 seconds. New cases cover missing/changed/suspended/fenced profiles, same-revision substitution, rollback, unaudited supersession, exact audit reuse, five SQL role boundaries, older failed-observation fencing, original identity expiry, cleanup after expiry and observation expiry behind a held lock. Existing download, custody, enrollment, permission and policy tests pass. Its environment report records 499 unchanged source files, exit 0 and complete cleanup. Kubernetes inputs/Job effects in this SQL suite remain synthetic and are independently exercised by the real API suite above.
 
 Configuration history has a finite 1024-revision ceiling; safe history retirement is pending. Current observation is a component method, not a supervised runtime: the real Job fixture explicitly refreshes it before effects. Installer/bootstrap pin provisioning, acquisition certificate enrollment/issuance, the finite authenticated worker/control executable and its supervisor remain next. Public UI/MCP/native-download composition, full orphan cleanup, local login and bundled-service installation remain unfinished. No complete TASK or S-01/S-02 exit is claimed.
 
@@ -19946,17 +19946,17 @@ Configuration history has a finite 1024-revision ceiling; safe history retiremen
 
 [ADR-069](decisions/069-download-worker-dispatch.md) adds [audited worker dispatch](architecture/download-worker-dispatch.md), migration 25 and the restricted Kubernetes Job driver. Original intent, audit, single-use launch, Job/Pod binding and termination/retirement are durable; a lost create response does not create another Job, and cleanup persists termination before deletion. The dispatched proof source now reads SQL identity and immutable current worker configuration before TokenReview. The product acquisition command and issuer remain unfinished.
 
-Focused race tests passed in [dispatch-fifth-build.log](../test/results/dispatch-fifth-build.log). The first owned SQL/S3 run passed the new coordinator/ledger cases in [dispatch-first-custody.log](../test/results/dispatch-first-custody.log), with unchanged sources and complete cleanup recorded in [its environment](../test/results/dispatch-first-custody-environment.json). That targeted run preceded the fixes below. SQL job effects and authority inputs remain synthetic; the actual Kubernetes test is separate.
+Focused race tests passed in dispatch-fifth-build.log. The first owned SQL/S3 run passed the new coordinator/ledger cases in dispatch-first-custody.log, with unchanged sources and complete cleanup recorded in its environment. That targeted run preceded the fixes below. SQL job effects and authority inputs remain synthetic; the actual Kubernetes test is separate.
 
-The next continuation verified that the interrupted Kubernetes run had terminated with failure and cleaned its fixtures; it did not restart an unknown live test. [First run](../test/results/dispatch-first-context-storage.log) and [diagnostic rerun](../test/results/dispatch-second-context-storage.log) reproduce Pod admission rejecting `Never` against the cluster's default preempting PriorityClass. The driver now pins a dedicated zero-priority, non-preempting class and requires exact named read-only access. A separate [failing parser regression](../test/results/dispatch-list-before.log) exposed rejection of standard PodList items without redundant TypeMeta; the typed-list path now permits omitted kind/version while rejecting foreign explicit types and preserving full spec checks.
+The next continuation verified that the interrupted Kubernetes run had terminated with failure and cleaned its fixtures; it did not restart an unknown live test. First run and diagnostic rerun reproduce Pod admission rejecting `Never` against the cluster's default preempting PriorityClass. The driver now pins a dedicated zero-priority, non-preempting class and requires exact named read-only access. A separate failing parser regression exposed rejection of standard PodList items without redundant TypeMeta; the typed-list path now permits omitted kind/version while rejecting foreign explicit types and preserving full spec checks.
 
-[Failing SQL regressions](../test/results/dispatch-retry-before-custody.log) also reproduced unnecessary encrypted audit work on retries and unusable sub-second worker reservations. The dispatcher now reuses exact acknowledged receipts, and admission rejects a sub-second interval without charging a worker. [Focused race tests](../test/results/dispatch-sixth-build.log) pass. These fixes are not yet a runnable download service.
+Failing SQL regressions also reproduced unnecessary encrypted audit work on retries and unusable sub-second worker reservations. The dispatcher now reuses exact acknowledged receipts, and admission rejects a sub-second interval without charging a worker. Focused race tests pass. These fixes are not yet a runnable download service.
 
 Current verification uses `TMPDIR=/home/phil/.cache/asservat-build/tmp` and Make `PYTHON=/tmp/asservat-openapi-validation/bin/python`:
 
-- `make go-check go-architecture-check sql-check spec-check architecture-check design-check` returned 0 in [repository gates](../test/results/dispatch-final-gates.log): vet/race, 38 packages/171 allowed edges, 17 matching sqlc files, 54 schemas/165 examples/391 rejected cases, 176 requirements/scenarios and the existing 63-screen/49-entity/browser/MCP mappings.
-- `make context-integration` returned 0 in [the third harness run](../test/results/dispatch-third-context-check.log). The [final suite](../test/results/dispatch-final-context-storage.log) passed in 46.652 seconds, including actual Job creation, exact image/config/Pod identity, non-preempting PriorityClass admission and source-change denial, projected-token proof, known termination and foreground deletion. It also reran the existing Kubernetes/OpenBao/S3/PostgreSQL context and local-key lifecycle tests. The [environment report](../test/results/dispatch-final-context-storage-environment.json) confirms 482 unchanged source files and complete cleanup of both owned clusters and service fixtures. The acquisition executable, human dispatch authority, identity-registry response and peer-certificate issuance in the new Job test are explicit fixtures, not the production runtime.
-- The full `make custody-integration` returned 0 in [the harness log](../test/results/dispatch-final-custody-check.log). The [suite](../test/results/dispatch-final-custody.log) passes all new dispatch cases: unaudited denial, fresh audit and acknowledged-receipt reuse, mismatched-receipt identity, eight-way single-use launch, no sub-second reservation/charge, exact Pod binding, pending/cancelled capacity retention, expiry after a held child lock, cancellation, lost-create lookup and persisted-termination recovery after a lost delete reply. Existing native-file/TLS/S3, permission, policy, enrollment and custody regressions also pass. [Its environment report](../test/results/dispatch-final-custody-environment.json) confirms unchanged tested sources and complete fixture cleanup. Kubernetes Job effects in this SQL suite are simulated; the separate real Job suite above establishes the adapter behavior. Neither fixture provides protected profile enrollment or production certificate issuance.
+- `make go-check go-architecture-check sql-check spec-check architecture-check design-check` returned 0 in repository gates: vet/race, 38 packages/171 allowed edges, 17 matching sqlc files, 54 schemas/165 examples/391 rejected cases, 176 requirements/scenarios and the existing 63-screen/49-entity/browser/MCP mappings.
+- `make context-integration` returned 0 in the third harness run. The final suite passed in 46.652 seconds, including actual Job creation, exact image/config/Pod identity, non-preempting PriorityClass admission and source-change denial, projected-token proof, known termination and foreground deletion. It also reran the existing Kubernetes/OpenBao/S3/PostgreSQL context and local-key lifecycle tests. The environment report confirms 482 unchanged source files and complete cleanup of both owned clusters and service fixtures. The acquisition executable, human dispatch authority, identity-registry response and peer-certificate issuance in the new Job test are explicit fixtures, not the production runtime.
+- The full `make custody-integration` returned 0 in the harness log. The suite passes all new dispatch cases: unaudited denial, fresh audit and acknowledged-receipt reuse, mismatched-receipt identity, eight-way single-use launch, no sub-second reservation/charge, exact Pod binding, pending/cancelled capacity retention, expiry after a held child lock, cancellation, lost-create lookup and persisted-termination recovery after a lost delete reply. Existing native-file/TLS/S3, permission, policy, enrollment and custody regressions also pass. Its environment report confirms unchanged tested sources and complete fixture cleanup. Kubernetes Job effects in this SQL suite are simulated; the separate real Job suite above establishes the adapter behavior. Neither fixture provides protected profile enrollment or production certificate issuance.
 
 Next: protected profile acceptance/rollout, peer issuance and actual authenticated acquisition/control runtime. Full pending/orphan cleanup, public collection/UI/MCP/native-download and small-profile installation remain unfinished. No complete S-01/S-02 or other TASK exit is claimed.
 
@@ -19964,14 +19964,14 @@ Next: protected profile acceptance/rollout, peer issuance and actual authenticat
 
 [ADR-068](decisions/068-download-worker-attestation.md) adds Kubernetes worker proofs to the local download key binding. The source checks actual TokenReview, dedicated audience, account/Pod identity and current namespace/Job/Pod specifications against protected dispatch inputs. The C-14 coordinator and migration 24 SQL consumer preserve original five-second proof deadlines, exact certificates, legacy denial and irreversible key slots. This does not issue peers, produce trusted dispatch or add a runtime endpoint.
 
-Focused race tests pass in [worker-proof-targeted.log](../test/results/worker-proof-targeted.log). The earlier coordinator fixture used its own session ID in the wrong-session test; [worker-proof-third-build.log](../test/results/worker-proof-third-build.log) records that test failure and the fixture now substitutes a distinct ID. `make go-check go-architecture-check sql-check spec-check architecture-check design-check` returned 0 in [worker-proof-first-gates.log](../test/results/worker-proof-first-gates.log): vet/race, 38 packages/169 allowed imports, 16 matching sqlc files and unchanged public schema/UI mappings.
+Focused race tests pass in worker-proof-targeted.log. The earlier coordinator fixture used its own session ID in the wrong-session test; worker-proof-third-build.log records that test failure and the fixture now substitutes a distinct ID. `make go-check go-architecture-check sql-check spec-check architecture-check design-check` returned 0 in worker-proof-first-gates.log: vet/race, 38 packages/169 allowed imports, 16 matching sqlc files and unchanged public schema/UI mappings.
 
-The first real Kubernetes/TLS/context suite passed with unchanged sources and complete cleanup in [worker-proof-first-context-storage.log](../test/results/worker-proof-first-context-storage.log). It verifies actual TokenReview, dedicated audiences, exact Pod/account identity, spec mutation/deletion and reviewer RBAC. Its dispatcher pins and certificate issuer remain fixtures. The first full SQL suite failed because the narrowly scoped fixture coordinator role lacked INSERT on the newly added proof column; [worker-proof-first-custody.log](../test/results/worker-proof-first-custody.log) preserves the failure. Only that column's insertion permission was added; proof UPDATE remains forbidden. Final real-service reruns now pass:
+The first real Kubernetes/TLS/context suite passed with unchanged sources and complete cleanup in worker-proof-first-context-storage.log. It verifies actual TokenReview, dedicated audiences, exact Pod/account identity, spec mutation/deletion and reviewer RBAC. Its dispatcher pins and certificate issuer remain fixtures. The first full SQL suite failed because the narrowly scoped fixture coordinator role lacked INSERT on the newly added proof column; worker-proof-first-custody.log preserves the failure. Only that column's insertion permission was added; proof UPDATE remains forbidden. Final real-service reruns now pass:
 
-- `make custody-integration` returned 0 in [worker-proof-second-custody-check.log](../test/results/worker-proof-second-custody-check.log). The [full SQL suite](../test/results/worker-proof-final-custody.log) passed in 72.632 seconds, including missing/stale/foreign proofs, replay preserving original proof/deadline, forbidden proof updates, legacy NULL denial, expiry behind parent and child locks without spending, failed renewal of expired proofs, and native download through real SQL/TLS/S3. Its worker proofs, human/configuration authority and certificates are explicit test inputs. The [environment record](../test/results/worker-proof-final-custody-environment.json) confirms 469 unchanged source files, exit 0 and complete cleanup.
-- `make context-integration` returned 0 in [worker-proof-final-context-check.log](../test/results/worker-proof-final-context-check.log). The [final Kubernetes/OpenBao/S3/PostgreSQL suite](../test/results/worker-proof-final-context-storage.log) passed in 32.156 seconds. This includes actual dedicated-audience Pod-bound TokenReview, restricted reviewer RBAC, live account/Job/Pod/spec checks and mTLS identity, plus existing context/native-file and protected key-lifecycle regressions. The [environment record](../test/results/worker-proof-final-context-storage-environment.json) confirms 468 unchanged source files, exit 0 and removal of both owned clusters and all service fixtures. It does not compose real dispatch/issuer enrollment with a public user download.
+- `make custody-integration` returned 0 in worker-proof-second-custody-check.log. The full SQL suite passed in 72.632 seconds, including missing/stale/foreign proofs, replay preserving original proof/deadline, forbidden proof updates, legacy NULL denial, expiry behind parent and child locks without spending, failed renewal of expired proofs, and native download through real SQL/TLS/S3. Its worker proofs, human/configuration authority and certificates are explicit test inputs. The environment record confirms 469 unchanged source files, exit 0 and complete cleanup.
+- `make context-integration` returned 0 in worker-proof-final-context-check.log. The final Kubernetes/OpenBao/S3/PostgreSQL suite passed in 32.156 seconds. This includes actual dedicated-audience Pod-bound TokenReview, restricted reviewer RBAC, live account/Job/Pod/spec checks and mTLS identity, plus existing context/native-file and protected key-lifecycle regressions. The environment record confirms 468 unchanged source files, exit 0 and removal of both owned clusters and all service fixtures. It does not compose real dispatch/issuer enrollment with a public user download.
 
-Build commands used `TMPDIR=/home/phil/.cache/asservat-build/tmp` and Make `PYTHON=/tmp/asservat-openapi-validation/bin/python`. The final documentation/catalog gate results are in [worker-proof-final-docs.log](../test/results/worker-proof-final-docs.log). No runtime/chart collection was enabled.
+Build commands used `TMPDIR=/home/phil/.cache/asservat-build/tmp` and Make `PYTHON=/tmp/asservat-openapi-validation/bin/python`. The final documentation/catalog gate results are in worker-proof-final-docs.log. No runtime/chart collection was enabled.
 
 Remaining: protected dispatch and Job creation, certificate enrollment/issuance and authenticated token delivery; then current authorities for other key purposes and runnable small-profile bootstrap. Full collection/UI/MCP/native-download workflows remain unfinished.
 
@@ -19979,13 +19979,13 @@ Remaining: protected dispatch and Job creation, certificate enrollment/issuance 
 
 [ADR-067](decisions/067-protected-local-key-lifecycle.md) adds protected local key lifecycle: pinned ConfigMap/immutable Secret reads, five-second coalesced observations, mandatory pre/post-crypto guards and migration 23 public version history. Additive rotation preserves retained keys and rejects accepted rollback/material substitution/reuse. Safe retirement and deployment/source enrollment/PKI remain unfinished.
 
-The missing guard was reproduced by [a failing regression](../test/results/key-lifecycle-before.log): an otherwise authorized service accepted an operation with no current configuration. Targeted race tests now pass in [component checks](../test/results/key-lifecycle-third-build.log), including protected source bounds, original deadline checks and coalesced refreshes. The real-service tests below now pass; no production throughput or installation claim follows from them.
+The missing guard was reproduced by a failing regression: an otherwise authorized service accepted an operation with no current configuration. Targeted race tests now pass in component checks, including protected source bounds, original deadline checks and coalesced refreshes. The real-service tests below now pass; no production throughput or installation claim follows from them.
 
 Verification used `TMPDIR=/home/phil/.cache/asservat-build/tmp` and Make `PYTHON=/tmp/asservat-openapi-validation/bin/python`:
 
-- `make go-check go-architecture-check sql-check spec-check architecture-check design-check` returned 0: [repository gate log](../test/results/key-lifecycle-final-gates.log). Vet/race tests, 38 packages/168 allowed edges, 16 matching sqlc files, 54 schemas/165 examples/391 rejected cases and all architecture/UI mappings pass. The earlier [first gate log](../test/results/key-lifecycle-first-gates.log) returned 2 because the specification checker requires a registered absolute schema reference instead of a bare local fragment; the schema now uses its canonical registered ID. No runtime validation was weakened.
-- `make context-integration` returned 0: [harness log](../test/results/key-lifecycle-context-check.log), [suite log](../test/results/key-lifecycle-final-context-storage.log), 30.115 seconds. The new 5.92-second lifecycle case used actual Kubernetes named read-only RBAC/immutable Secrets, SQL version acceptance and real mTLS wrap/unwrap. Rotation preserved old reads and fenced old instances; rollback, suspension, changed/removed/reused material, active-version rollback, expiry during a held SQL lock, blocked recovery, Secret deletion/replacement and runtime mutation privileges were checked. Its operation approval resolver remains test-only; this is not end-to-end user authorization. The [environment report](../test/results/key-lifecycle-final-context-storage-environment.json) confirms 461 current source hashes, unchanged execution and complete cleanup of both owned clusters and service fixtures.
-- `make custody-integration` returned 0: [harness log](../test/results/key-lifecycle-custody-check.log), [suite log](../test/results/key-lifecycle-final-custody.log), 68.075 seconds. Existing SQL authority, context publication, local/external native-download, retention, peer and policy tests pass under migration 23. The [environment report](../test/results/key-lifecycle-final-custody-environment.json) confirms unchanged sources and complete fixture cleanup. This suite's existing key-service cases use synthetic configuration guards; the actual protected Kubernetes lifecycle is the separate context case above.
+- `make go-check go-architecture-check sql-check spec-check architecture-check design-check` returned 0: repository gate log. Vet/race tests, 38 packages/168 allowed edges, 16 matching sqlc files, 54 schemas/165 examples/391 rejected cases and all architecture/UI mappings pass. The earlier first gate log returned 2 because the specification checker requires a registered absolute schema reference instead of a bare local fragment; the schema now uses its canonical registered ID. No runtime validation was weakened.
+- `make context-integration` returned 0: harness log, suite log, 30.115 seconds. The new 5.92-second lifecycle case used actual Kubernetes named read-only RBAC/immutable Secrets, SQL version acceptance and real mTLS wrap/unwrap. Rotation preserved old reads and fenced old instances; rollback, suspension, changed/removed/reused material, active-version rollback, expiry during a held SQL lock, blocked recovery, Secret deletion/replacement and runtime mutation privileges were checked. Its operation approval resolver remains test-only; this is not end-to-end user authorization. The environment report confirms 461 current source hashes, unchanged execution and complete cleanup of both owned clusters and service fixtures.
+- `make custody-integration` returned 0: harness log, suite log, 68.075 seconds. Existing SQL authority, context publication, local/external native-download, retention, peer and policy tests pass under migration 23. The environment report confirms unchanged sources and complete fixture cleanup. This suite's existing key-service cases use synthetic configuration guards; the actual protected Kubernetes lifecycle is the separate context case above.
 
 Configuration observations are reused only for their original five seconds, with coalesced refresh and SQL checks before/after crypto. This avoids repeated Kubernetes Secret reads per key operation without adding an indefinite cache; provider/API aggregate burst performance is still unqualified. Additive rotation is implemented, but historical-key removal is refused until a retirement operation checks retained-data and recovery obligations.
 
@@ -19999,10 +19999,10 @@ The initial reader is the existing complete 4096-byte pod-status slice. The shar
 
 Verification for this continuation, using build TMPDIR `/home/phil/.cache/asservat-build/tmp` and Make PYTHON `/tmp/asservat-openapi-validation/bin/python`:
 
-- Owned targeted SQL/S3/TLS tests returned 0 in [download-key-targeted-check.log](../test/results/download-key-targeted-check.log), 9.046 seconds: wrong peer/artifact, absent audit, cancellation, permission/recovery changes, expiry after a blocking lock, binding replay and eight-way slot contention. A 352-byte encrypted context was recovered from real S3 through the actual TLS handler and SQL resolver, with native checksum equality and three unwrap slots each for preparation/content. [Log](../test/results/download-key-targeted-custody.log) and [environment](../test/results/download-key-targeted-custody-environment.json) record unchanged tested source and complete cleanup. Collection/identity/configuration inputs and peer issuance remain fixtures; the key authorizer itself is the real SQL implementation.
-- Initial Go/vet/race/import/sqlc gates returned 0. Full custody subsequently exposed two fixture mistakes: the new test attempted retention mutation without its mandatory lifecycle decision, and an existing expired-source test evaluated `clock_timestamp()` twice, making a nominal five-second interval one microsecond too long. The [failed suite](../test/results/download-key-first-full-custody.log) and [environment](../test/results/download-key-first-full-custody-environment.json) are retained. The tests now use the actual retention-tightening transaction and one exact timestamp respectively; no product guard was loosened. Both corrected cases returned 0 in [targeted check](../test/results/download-key-fixture-fixes-check.log), with [unchanged source/complete cleanup](../test/results/download-key-fixture-fixes-custody-environment.json).
-- `make go-check go-architecture-check sql-check spec-check architecture-check design-check` returned 0 in [final repository gates](../test/results/download-key-final-gates.log): vet/race checks, 38 packages/167 allowed edges, 15 matching sqlc files, 53 schemas/165 examples/380 rejected cases and existing architecture/UI mappings.
-- `make custody-integration` returned 0 in [final full check](../test/results/download-key-final-custody-check.log), 68.826 seconds: [suite log](../test/results/download-key-final-custody.log). Retention shortening and failed crypto retaining its paid slot now pass alongside the complete existing custody/permission/peer/policy suite. The [environment report](../test/results/download-key-final-custody-environment.json) confirms unchanged tested sources and complete cleanup. The final `make context-integration` also returned 0 in [context check](../test/results/download-key-final-context-check.log), 24.990 seconds: real Kubernetes/OpenBao/S3/PostgreSQL context and native-file regression under migration 22. Its [log](../test/results/download-key-final-context-storage.log) and [environment](../test/results/download-key-final-context-storage-environment.json) confirm unchanged tested sources and complete cleanup of both owned clusters. This suite exercises the existing external-provider context path; the local SQL/TLS/S3 reader was qualified in the full custody run above.
+- Owned targeted SQL/S3/TLS tests returned 0 in download-key-targeted-check.log, 9.046 seconds: wrong peer/artifact, absent audit, cancellation, permission/recovery changes, expiry after a blocking lock, binding replay and eight-way slot contention. A 352-byte encrypted context was recovered from real S3 through the actual TLS handler and SQL resolver, with native checksum equality and three unwrap slots each for preparation/content. Log and environment record unchanged tested source and complete cleanup. Collection/identity/configuration inputs and peer issuance remain fixtures; the key authorizer itself is the real SQL implementation.
+- Initial Go/vet/race/import/sqlc gates returned 0. Full custody subsequently exposed two fixture mistakes: the new test attempted retention mutation without its mandatory lifecycle decision, and an existing expired-source test evaluated `clock_timestamp()` twice, making a nominal five-second interval one microsecond too long. The failed suite and environment are retained. The tests now use the actual retention-tightening transaction and one exact timestamp respectively; no product guard was loosened. Both corrected cases returned 0 in targeted check, with unchanged source/complete cleanup.
+- `make go-check go-architecture-check sql-check spec-check architecture-check design-check` returned 0 in final repository gates: vet/race checks, 38 packages/167 allowed edges, 15 matching sqlc files, 53 schemas/165 examples/380 rejected cases and existing architecture/UI mappings.
+- `make custody-integration` returned 0 in final full check, 68.826 seconds: suite log. Retention shortening and failed crypto retaining its paid slot now pass alongside the complete existing custody/permission/peer/policy suite. The environment report confirms unchanged tested sources and complete cleanup. The final `make context-integration` also returned 0 in context check, 24.990 seconds: real Kubernetes/OpenBao/S3/PostgreSQL context and native-file regression under migration 22. Its log and environment confirm unchanged tested sources and complete cleanup of both owned clusters. This suite exercises the existing external-provider context path; the local SQL/TLS/S3 reader was qualified in the full custody run above.
 
 Next: protected acquisition-peer issuance/control mediation and key-source/issuer/Secret lifecycle, then remaining purpose-specific key authorities and runnable local-provider composition. The current local service still lacks installation/bootstrap; the public browser/MCP investigation and other collection mechanisms remain unfinished. Earlier checkpoints follow.
 
@@ -20010,15 +20010,15 @@ Next: protected acquisition-peer issuance/control mediation and key-source/issue
 
 [ADR-065](decisions/065-local-key-service-boundary.md) adds the [private local key boundary](architecture/local-key-service.md): I-14/A-KEY, TLS 1.3 peer verification, separate remote wrapping/unwrapping/signing facets, a bounded HTTP handler and C-03 current-operation coordination. Client identity/role is only a negative guard; a mandatory resolver must bind the exact request and peer to current accepted authority for at most five seconds. The coordinator checks deadlines after blocking resolution and crypto, and the transport bounds delivery. Production authority resolvers, protected key/issuer lifecycle and runnable service/bootstrap are still missing. No chart runtime, new dependency, SQL migration or public collection was enabled.
 
-Actual TLS fixture tests compose the new clients, server and real local crypto with **test-only** exact authority mappings. They pass role/purpose separation, revocation and certificate expiry on reused connections, signing with a pinned public key, bounded concurrency, request/response substitution and no redirect/replay. An irrelevant explicit `sealed` object was accepted by both a wrap handler and unwrap response reader before the shape fix: [failing regression](../test/results/key-service-irrelevant-before.log), [passing targeted suite](../test/results/key-service-tls-final-targeted.log). The fixture does not establish current SQL authority or Secret/certificate lifecycle behavior.
+Actual TLS fixture tests compose the new clients, server and real local crypto with **test-only** exact authority mappings. They pass role/purpose separation, revocation and certificate expiry on reused connections, signing with a pinned public key, bounded concurrency, request/response substitution and no redirect/replay. An irrelevant explicit `sealed` object was accepted by both a wrap handler and unwrap response reader before the shape fix: failing regression, passing targeted suite. The fixture does not establish current SQL authority or Secret/certificate lifecycle behavior.
 
 The maintainer asked whether concurrent cores would send their payloads through OpenBao. The existing storage implementation already uses envelope encryption: three bounded keysets are wrapped before acquiring each artifact, and all payload encryption/upload is local. Added `TestArtifactKeyCallsIndependentOfPayloadSize` verifies three wraps and three unwraps for empty, 4096-byte and 16,777,295-byte synthetic artifacts, with no further calls during full/range reads. The largest serialized keyset was 131 bytes; the enforced bound is 4096 bytes. [REQ-EVD-001](../specs/evidence.md), [artifact format](architecture/artifact-format.md) and REQ-CAP-003 now explicitly distinguish this fixed storage-key work from aggregate authentication/audit/attempt load. Provider burst capacity remains unqualified.
 
 Verification for this continuation (build TMPDIR `/home/phil/.cache/asservat-build/tmp`, Make PYTHON `/tmp/asservat-openapi-validation/bin/python`):
 
-- Targeted `go test -race` across authorization, TLS integration and framed-codec tests returned 0 in [key-service-tls-final-targeted.log](../test/results/key-service-tls-final-targeted.log).
-- `make go-check go-architecture-check spec-check architecture-check design-check` returned 0 in [key-service-final-gates.log](../test/results/key-service-final-gates.log): vet/race checks, 38 packages/164 allowed import edges, 53 schemas/165 examples/380 rejected invalid cases, 11 application roles/14 interfaces and existing UI/API mappings. First-run vet rejected four unkeyed literals; these were corrected. The second run exposed a schema regex accepting trailing newline in base64; the schema now rejects it, as the strict runtime decoder already did. Both failed logs are retained as `key-service-first-gates.log` and `key-service-second-gates.log`.
-- `make context-integration` returned 0 in [key-service-final-context-check.log](../test/results/key-service-final-context-check.log). The actual S3/OpenBao/PostgreSQL/two-cluster Kubernetes suite, including the standalone real-TLS key-service fixtures, passed in 24.189 seconds: [component log](../test/results/key-service-final-context-storage.log). The [environment report](../test/results/key-service-final-context-storage-environment.json) confirms unchanged tested Go sources and no cleanup failures; both owned clusters were removed. Local key-service authority remains synthetic and its TLS fixtures are separate from the real S3/context path. These results do not qualify production authority, key-service restart/restore or aggregated provider load.
+- Targeted `go test -race` across authorization, TLS integration and framed-codec tests returned 0 in key-service-tls-final-targeted.log.
+- `make go-check go-architecture-check spec-check architecture-check design-check` returned 0 in key-service-final-gates.log: vet/race checks, 38 packages/164 allowed import edges, 53 schemas/165 examples/380 rejected invalid cases, 11 application roles/14 interfaces and existing UI/API mappings. First-run vet rejected four unkeyed literals; these were corrected. The second run exposed a schema regex accepting trailing newline in base64; the schema now rejects it, as the strict runtime decoder already did. Both failed logs are retained as `key-service-first-gates.log` and `key-service-second-gates.log`.
+- `make context-integration` returned 0 in key-service-final-context-check.log. The actual S3/OpenBao/PostgreSQL/two-cluster Kubernetes suite, including the standalone real-TLS key-service fixtures, passed in 24.189 seconds: component log. The environment report confirms unchanged tested Go sources and no cleanup failures; both owned clusters were removed. Local key-service authority remains synthetic and its TLS fixtures are separate from the real S3/context path. These results do not qualify production authority, key-service restart/restore or aggregated provider load.
 
 Next: implement current operation authority and protected Secret/issuer/bootstrap/recovery lifecycle for A-KEY, retaining stale-process fencing and exact existing operation deadlines, then continue local identity and bundled-service work alongside S-01/S-02 public workflow composition. Key-service TLS components are not a completed small-deployment profile.
 
@@ -20030,10 +20030,10 @@ Unit/race tests pass for malformed material, rotation, binding/version/purpose s
 
 Verification for this continuation (all build commands used `TMPDIR=/home/phil/.cache/asservat-build/tmp` and Make checks used `PYTHON=/tmp/asservat-openapi-validation/bin/python`):
 
-- `make go-check go-architecture-check spec-check architecture-check design-check` returned 0 after both fixes: [final gate log](../test/results/local-keys-final-gates.log). Vet/race tests pass; 37 packages/157 allowed import edges, 52 schemas/165 examples/359 rejected cases and all architecture/UI mappings validate.
-- `go test ./internal/adapters/kms -run '^$' -fuzz '^FuzzLocalKeySecret$' -fuzztime=15s -parallel=2` returned 0: [fuzz log](../test/results/local-keys-fuzz.log), 141,369 executions. This bounded fuzz run covered the unchanged local Secret loader, not the subsequent OpenBao nil-instance guards.
-- `make identity-integration` returned 0 after the final guards: actual Keycloak/PostgreSQL/OpenBao browser/signing regression passed in 4.294 seconds. The [provider log](../test/results/local-keys-final-identity-provider.log) and [environment report](../test/results/local-keys-final-identity-provider-environment.json) record unchanged sources and complete cleanup. The earlier successful pre-guard run is retained separately as `local-keys-first-identity-provider*`.
-- `make context-integration` returned 0: actual S3/Kubernetes/OpenBao/PostgreSQL components passed in 23.749 seconds. The new local-key/S3 test recovered the encrypted manifest and an exact 8,389,341-byte native file/hash plus a cross-frame range; existing context/PKI paths also passed. See [context log](../test/results/local-keys-final-context-storage.log) and [environment report](../test/results/local-keys-final-context-storage-environment.json): unchanged sources, both owned clusters removed and empty cleanup failures. Local root-key operations are in-process test fixtures and S3 uses the harness TLS bridge; this does not qualify local key-service authentication, production S3 TLS/IAM or Helm restart/backup behavior.
+- `make go-check go-architecture-check spec-check architecture-check design-check` returned 0 after both fixes: final gate log. Vet/race tests pass; 37 packages/157 allowed import edges, 52 schemas/165 examples/359 rejected cases and all architecture/UI mappings validate.
+- `go test ./internal/adapters/kms -run '^$' -fuzz '^FuzzLocalKeySecret$' -fuzztime=15s -parallel=2` returned 0: fuzz log, 141,369 executions. This bounded fuzz run covered the unchanged local Secret loader, not the subsequent OpenBao nil-instance guards.
+- `make identity-integration` returned 0 after the final guards: actual Keycloak/PostgreSQL/OpenBao browser/signing regression passed in 4.294 seconds. The provider log and environment report record unchanged sources and complete cleanup. The earlier successful pre-guard run is retained separately as `local-keys-first-identity-provider*`.
+- `make context-integration` returned 0: actual S3/Kubernetes/OpenBao/PostgreSQL components passed in 23.749 seconds. The new local-key/S3 test recovered the encrypted manifest and an exact 8,389,341-byte native file/hash plus a cross-frame range; existing context/PKI paths also passed. See context log and environment report: unchanged sources, both owned clusters removed and empty cleanup failures. Local root-key operations are in-process test fixtures and S3 uses the harness TLS bridge; this does not qualify local key-service authentication, production S3 TLS/IAM or Helm restart/backup behavior.
 
 Next small-profile work: authenticated purpose-scoped remote key facets, current operation authority, protected Secret/bootstrap/recovery lifecycle, PKI/local enrollment delivery, then local accounts/OAuth and bundled PostgreSQL/pgBackRest/SeaweedFS packaging with operational qualification. [REQ-DEP-001–005](../specs/deployment-profiles.md) remain incomplete. The official Helm chart remains configuration-only; S-01/S-02 public authorization/custody composition and the developer workflow remain unfinished.
 
@@ -20041,7 +20041,7 @@ Next small-profile work: authenticated purpose-scoped remote key facets, current
 
 The initial small-deployment research established [ADR-063](decisions/063-small-deployment-alternatives.md), REQ-DEP-001–005 and candidate qualifications. That documentation-only checkpoint introduced no runtime/provider implementation; the local key continuation above is subsequent work.
 
-Documentation verification: `make spec-check architecture-check design-check PYTHON=/tmp/asservat-openapi-validation/bin/python` returned 0; [gate log](../test/results/small-deployment-design-check.log) records 176 requirements/scenarios, 51 schemas, 165 examples, all requirement owners and existing UI/API mappings passing. These are static design checks, not deployment or local-provider tests. No runtime suite was rerun for this documentation-only change.
+Documentation verification: `make spec-check architecture-check design-check PYTHON=/tmp/asservat-openapi-validation/bin/python` returned 0; gate log records 176 requirements/scenarios, 51 schemas, 165 examples, all requirement owners and existing UI/API mappings passing. These are static design checks, not deployment or local-provider tests. No runtime suite was rerun for this documentation-only change.
 
 ## Previous implementation continuation
 

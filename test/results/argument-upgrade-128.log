@@ -1,6 +1,0 @@
-=== RUN   TestCustodyUpgradeSchemaWithRealPostgres
-    upgrade_schema_test.go:377: SQL128 empty Down restored exact four functions/session constraints/column shapes; Up reapplied
-    upgrade_schema_test.go:386: upgrade schema: 127 to 128 by the schema owner, idempotent, floor "asservat:oldest-binary-schema=102", unknown history refused
---- PASS: TestCustodyUpgradeSchemaWithRealPostgres (2.56s)
-PASS
-ok  	asservat.local/asservat/test/integration	3.626s

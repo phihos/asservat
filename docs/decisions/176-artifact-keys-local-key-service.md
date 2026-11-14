@@ -120,7 +120,7 @@ its own verifier unwrap resolver; the hub must not receive unwrap.
   its expectation under the recovery lock, checks the executor's activated
   client leaf of a serving process, and spends each keyset role once.
   `postgres.ContextKeyWrapGrantSQL` is the exact grant list of its login.
-- **Real PostgreSQL.** [Result](../../test/results/adr176-sql-1/result.json):
+- **Real PostgreSQL.** Result:
   the authority runs under its own NOINHERIT login with exactly that grant
   list. The executor leaf wraps the data and manifest keysets. Denied are a
   repeated role, another certificate, an attempt that is not prepared, a

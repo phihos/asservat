@@ -5,7 +5,7 @@ profile or establish general evidence-store support.
 
 ## Conditional writes and their permission enforcement differ
 
-The owned [policy diagnostic](../../test/results/audit-s3-scope-probe-1/result.json)
+The owned policy diagnostic
 used the existing pinned SeaweedFS image
 `chrislusf/seaweedfs@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d`.
 Image labels identify 4.48 and upstream revision
@@ -51,7 +51,7 @@ early erasure or maximum retention.
 
 ## Immutable-version candidate
 
-A [second owned diagnostic](../../test/results/audit-s3-scope-probe-2/result.json)
+A second owned diagnostic
 enables bucket versioning and denies runtime deletion. A conditional creation
 returns a non-null version ID; a repeated conditional write returns 412.
 Unconditional PUT creates a new version, including when a caller supplies the
@@ -71,7 +71,7 @@ qualification verdict or waive unfinished runtime checks.
 
 ## Concurrent creation, restart and exact deletion
 
-The [third diagnostic](../../test/results/audit-s3-scope-probe-3/result.json)
+The third diagnostic
 sent twelve conditional creates through four concurrent clients. Exactly one
 succeeded and eleven returned 412. The complete version inventory contained
 four versions: the three intentional versions of the original record and the
@@ -84,7 +84,7 @@ the original version returned 500. The writer's delete denial still returned
 403. This completed diagnostic reports `immutableVersionCandidateChecksPassed:
 false`; its exit zero is not a successful qualification verdict.
 
-The [fourth diagnostic](../../test/results/audit-s3-scope-probe-4/result.json)
+The fourth diagnostic
 retained the same assertions and added bounded, read-only sampling after an
 initial 500, without retrying any write or changing product deadlines. In that
 fresh run, the first version read succeeded immediately, so no recovery samples
@@ -107,7 +107,7 @@ Neither constructor establishes IAM restrictions or storage quota by inspecting
 an object response. Failed or unacknowledged writes may leave physical copies;
 their reservations and cleanup obligations remain intact.
 
-The [real-store product test](../../test/results/versioned-audit-native-test.log)
+The real-store product test
 uses the existing owned SeaweedFS fixture and adapter-facing TLS, including its
 private plaintext fixture hop. Eight concurrent `WriteOwnerConfiguration`
 operations resolve to one encrypted object version and the same receipt. An
@@ -139,7 +139,7 @@ configuration may defeat early erasure.
 
 ## Scoped runtime credentials and independent retirement
 
-The [scoped product run](../../test/results/scoped-audit-storage-first/scoped-audit-storage.log), reproduced
+The scoped product run, reproduced
 with `make audit-storage-integration`, supplies three separate non-administrator
 identities in the pinned backend. Configuration writes are confined to the exact
 installation/cluster/source prefix; owner writes are confined to that
@@ -157,7 +157,7 @@ including one unacknowledged null copy and one deletion marker across four
 bounded inventory pages, then independently observes empty inventories. The
 actual test takes 2.15 seconds; all 1,931 sources remain unchanged and owned
 resources are removed without failures. The
-[report](../../test/results/scoped-audit-storage-first/scoped-audit-storage-environment.json) records exact
+report records exact
 images and selected cases.
 
 The test uses synthetic administrator provisioning and wrapping keys, plus an
@@ -168,7 +168,7 @@ or persistent power-loss behavior. The earlier restart readiness failure
 remains open. Versioning is still the stated implementation assumption for the
 fresh worker2/owner2 pair, not a user-confirmed preference or enabled profile.
 
-The [multipart follow-up](../../test/results/scoped-audit-multipart-test.log)
+The multipart follow-up
 fails the complete test: retirement can list the exact incomplete upload and is
 denied adding a part, but its abort receives 403. Earlier audit/version/access
 checks pass again; the later version-deletion phase is not reached. All 1,931
@@ -178,7 +178,7 @@ grant the retirement identity administrator access.
 
 ## Corrected multipart retirement permissions
 
-The [corrected SDK/TLS run](../../test/results/scoped-audit-retirement.log)
+The corrected SDK/TLS run
 passes the entire matrix, including multipart abort, complete version/marker
 retirement and new retirement isolation checks. The initial base Write permission
 and explicit PutObject denial are removed from the retirement identity. It has
@@ -197,7 +197,7 @@ qualification, not a claim that AWS IAM has identical action matching.
 [pinned multipart action set](https://github.com/seaweedfs/seaweedfs/blob/530be3e37337488ecc34d58441e0bc476e121c93/weed/s3api/policy_engine/types.go#L41).
 
 The actual named test takes 5.28 seconds; its
-[report](../../test/results/scoped-audit-retirement-environment.json) records ten
+report records ten
 named passes, 1,934 unchanged sources and complete cleanup. The harness takes
 39.678 seconds including setup/build/teardown. The earlier failing run remains
 separate evidence. This qualifies the fixture's permission and cleanup behavior;

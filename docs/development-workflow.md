@@ -61,11 +61,9 @@ relevant sources and environment are unchanged, and state its scope.
 
 ## Generated validation output
 
-Keep generated logs, environment inventories, screenshots and Pod logs in CI run
-artifacts or an external local archive, rather than adding them to a PR. Commit
-concise provenance summaries with exact source, command, exit, cleanup and known
-gaps. Existing tracked historical evidence remains available; do not treat a
-summary as proof of a run that was not performed.
+Harnesses write logs and reports to the ignored `test/results/`; CI uploads
+them as run artifacts. Do not commit them. Record the command, commit, exit and
+known gaps in the PR or in `docs/implementation-progress.md`.
 
 ## Required PR check events
 

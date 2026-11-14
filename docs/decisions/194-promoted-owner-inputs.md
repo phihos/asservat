@@ -3,7 +3,7 @@
 > Superseded in part by ADR-328 (2026-11-13): the continuation deriving and guarding inputs no longer applies: the guarded worker configuration and download environment sources (decisions 4 and 7) become ConfigMaps read under RBAC; the owner's startup check that the projection Secret is immutable with the same UID and annotations (decision 10) and the inspection-token readback of keys and roots (decision 3) are removed; the operator public Secret (decision 11) is an ordinary administrator- or Helm-managed Secret; and the order of decision 12 is replaced by Helm rendering plus the `setup` hook Job. Still valid: the fail-closed unconfigured worker configuration, empty worker API and topology lists, the limit defaults and the artifact key ID.
 
 Date: 2026-10-16. Status: accepted; implemented and natively qualified
-([continuation run 9](../../test/results/adr194-continuation-native-9/environment.json):
+(continuation run 9:
 the promoted owner is Ready, capacity reaches `ReadyAt` through its 9444
 observation handler, and the regional cluster still enrolls).
 Requirements: REQ-DEP-001/003/005, REQ-DLD-001–004, S-02; TASK-11.
@@ -145,8 +145,8 @@ Steps 1-9 are implemented with unit tests:
 The derivation runs `validateUnprojectedOwnerDeployment`: the owner's own
 check, minus the observation activation, which the owner projection
 attaches later. The launched owner still runs the full check.
-[Run 1](../../test/results/adr194-continuation-native-1/) and
-[run 2](../../test/results/adr194-continuation-native-2/) are retained
+Run 1 and
+run 2 are retained
 failures:
 
 - Run 1 stopped at `public/derive`, which carried no cause yet. The

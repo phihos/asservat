@@ -108,7 +108,7 @@ Federation composition:
 
 Real PostgreSQL: the initial-installation suite provisioned all 42 public
 runtime roles through the product role producer with exact ACL verification
-([result](../../test/results/adr172-roles-1/result.json): exit 0, 87 tests,
+(result: exit 0, 87 tests,
 empty cleanup, unchanged sources).
 
 ## Remaining

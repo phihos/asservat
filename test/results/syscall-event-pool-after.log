@@ -1,8 +1,0 @@
-=== RUN   TestContextAdmissionWithRealServices
-=== RUN   TestContextAdmissionWithRealServices/adhoc-observation-pool
-=== RUN   TestContextAdmissionWithRealServices/adhoc-observation-event-pool
---- PASS: TestContextAdmissionWithRealServices (4.28s)
-    --- PASS: TestContextAdmissionWithRealServices/adhoc-observation-pool (2.00s)
-    --- PASS: TestContextAdmissionWithRealServices/adhoc-observation-event-pool (1.90s)
-PASS
-ok  	asservat.local/asservat/test/integration	5.352s

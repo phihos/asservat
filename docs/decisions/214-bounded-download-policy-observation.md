@@ -15,7 +15,7 @@ requests. The download environment repeats it before and after SQL reads, and th
 first worker-preparation phase evaluates that environment ten times. At the existing
 20 QPS/burst-20 rate, its 280 observer requests alone require at least 13 seconds
 inside a five-second request. The actual composed regression fails before Job creation.
-See the [recorded baseline](../../test/results/resumed-c62e02ac-download-whole-phase-budget/README.md)
+See the recorded baseline
 and [complexity review](../reviews/complexity-2026-10-20/README.md).
 
 The maintainer did not require immediate interruption when permissions change and

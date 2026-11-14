@@ -93,8 +93,8 @@ by the migration or the transition adapter alone.
 `python3 scripts/test-custody.py --run
 '^Test(ContextAdmissionWithRealServices|CustodyUpgradeSchemaWithRealPostgres)$/^profile-approved-admission-stream-binding$'
 --result-name profile-admission-sql123-3` passed with real PostgreSQL and S3:
-[terminal log](../../test/results/profile-admission-sql123-3.log),
-[environment and cleanup](../../test/results/profile-admission-sql123-3-environment.json).
+terminal log,
+environment and cleanup.
 Sources stayed unchanged and cleanup reported no failures. It covers the raw
 review gate, 16 MiB profile admission, final plus temporary precharge, replay,
 unbound-write refusal, encrypted capture-intent audit, actual API preparation's
@@ -205,8 +205,8 @@ The owned versioned-S3 regression
 `python3 scripts/test-custody.py --run
 '^TestCustodyProfileWriteOnlyWithRealServices$' --result-name profile-write-only-after-2`
 passed all five cases (2.197 seconds including race runtime):
-[terminal log](../../test/results/profile-write-only-after-2.log),
-[source freeze and cleanup](../../test/results/profile-write-only-after-2-environment.json).
+terminal log,
+source freeze and cleanup.
 The 16 MiB registration stored a 127-byte valid synthetic CPU profile with
 actual Write-only credentials. GET, LIST and DELETE were independently denied
 by the backend. The generic writer still refused its readback after acknowledged
@@ -218,12 +218,12 @@ fixture while preserving its version, ETag and length; it is a deliberate fault,
 not a claim that S3 rewrote an immutable version. These are component verification
 verdicts, not installed catalog publication or SQL admission evidence.
 
-The [corrected pre-fix run](../../test/results/profile-write-only-before-2.log)
+The corrected pre-fix run
 failed at all four default-limit stores (0.822 seconds):
-[source freeze and cleanup](../../test/results/profile-write-only-before-2-environment.json).
+source freeze and cleanup.
 Two fixture errors are retained separately: the
-[first setup](../../test/results/profile-write-only-before.log) omitted bucket
-versioning, and the [first after-run](../../test/results/profile-write-only-after.log)
+first setup omitted bucket
+versioning, and the first after-run
 used a synthetic positive profile without its required location information.
 The latter already passed write-only storage and all negative publisher cases;
 the publisher correctly refused that invalid positive sample. Every run reported

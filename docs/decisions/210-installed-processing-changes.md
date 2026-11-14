@@ -7,7 +7,7 @@ Requirements: REQ-CAP-005, REQ-EXE-002, S-02; ADR-127, ADR-146, ADR-192, ADR-194
 
 Current qualification (2026-10-20): the configured operator initializes
 processing through the authenticated console route before preview, including
-in [resumed native47](../../test/results/resumed-c62e02ac-native47/context-storage.log).
+in resumed native47.
 Original request and receipt deadlines remain binding. The release audit lane
 and browser-session cleanup remain unimplemented. Installed initialization
 does not qualify restriction changes or the complete capture lifecycle.

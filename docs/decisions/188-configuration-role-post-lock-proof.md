@@ -3,7 +3,7 @@
 > Superseded (2026-11-13): The configuration role proofs, their post-lock rechecks and the Deployment identity comparisons verified installer-created objects at runtime. Administrators are trusted inside the namespace; the `setup` hook Job creates roles idempotently and components read their configuration under RBAC.
 
 Date: 2026-10-15. Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan. Formerly accepted; implemented. Native qualification passed
-([continuation run 23](../../test/results/adr183-continuation-native-23/result.json));
+(continuation run 23);
 diagnostic runs 19–22 are retained failures.
 Requirements: REQ-DEP-005, REQ-DB-005, S-02; TASK-11.
 Builds on [ADR-186](186-operation-scoped-public-role-proof.md).

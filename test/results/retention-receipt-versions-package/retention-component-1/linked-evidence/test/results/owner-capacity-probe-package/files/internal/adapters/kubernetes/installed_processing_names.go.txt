@@ -1,8 +1,0 @@
-package kubernetes
-
-import "strings"
-
-// Fixed original namespace source. It is never selected by a capture caller.
-func installedProcessingSource(installationID string) string {
-	return "asservat-" + strings.ReplaceAll(installationID, "-", "") + "-processing-source"
-}

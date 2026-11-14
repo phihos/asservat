@@ -90,7 +90,7 @@ Each shard uploads a record of the plan, its executed units and measured times;
 `ci-ok` fails unless all fourteen records share one plan and together executed
 every unit exactly once. `check-go-tests.py --update-weights <dir>` refreshes the
 weights from downloaded records. Pushes that change only documentation outside
-`docs/interfaces/`, recorded results, the design prototype or root Markdown run
+`docs/interfaces/`, the design prototype or root Markdown run
 only the documentation and schema gates. The documentation, schema, SQL, Helm,
 console (`console-check`, no Go) and console browser gates run as parallel jobs. Native suites run only
 on dispatch (`native.yml`, suites from `scripts/ci-native.sh --list`; grouped
@@ -129,7 +129,7 @@ the full installation replay.
 S-01/S-02 qualification includes the actual installed constructor and every
 nested authority/provider read on its successful path. Passing isolated
 components does not establish that their composition can finish. The recorded
-[native observation failure](../test/results/regional-observation-native-cost-test.log)
+native observation failure
 is an expected-denial regression, not a successful routing result.
 
 Before an expensive native run, count requests by the actual shared API client
