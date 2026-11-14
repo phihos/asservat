@@ -38,8 +38,7 @@
       "anyOf": [
         {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 4096
+          "minLength": 1
         },
         {
           "type": "null"
@@ -50,8 +49,7 @@
       "anyOf": [
         {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
+          "minLength": 1
         },
         {
           "type": "null"
@@ -62,8 +60,7 @@
       "type": "array",
       "items": {
         "type": "string",
-        "minLength": 1,
-        "maxLength": 1024
+        "minLength": 1
       },
       "minItems": 0,
       "uniqueItems": true
@@ -105,8 +102,7 @@
         "properties": {
           "narrowing_hint": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 1024
+            "minLength": 1
           }
         }
       }

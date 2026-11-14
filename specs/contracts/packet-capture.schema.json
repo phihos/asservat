@@ -125,13 +125,11 @@
     },
     "before": {
       "type": "string",
-      "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
-      "maxLength": 16
+      "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$"
     },
     "after": {
       "type": "string",
-      "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
-      "maxLength": 16
+      "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$"
     },
     "filter": {
       "type": "string",
@@ -170,8 +168,7 @@
         },
         "storageProfileRef": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 63
+          "minLength": 1
         }
       },
       "required": [
@@ -198,8 +195,7 @@
                     "type": "array",
                     "items": {
                       "type": "string",
-                      "minLength": 1,
-                      "maxLength": 64
+                      "minLength": 1
                     },
                     "minItems": 1,
                     "uniqueItems": true

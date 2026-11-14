@@ -53,13 +53,11 @@
             },
             "namespaceUID": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 64
+              "minLength": 1
             },
             "workloadUID": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 64
+              "minLength": 1
             },
             "acquiredFrom": {
               "type": "string",
@@ -92,7 +90,7 @@
         "revision": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 16
+          "maximum": 9007199254740991
         },
         "state": {
           "enum": [
@@ -140,7 +138,7 @@
         "sequence": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 1152921504606846976
+          "maximum": 9007199254740991
         },
         "rules": {
           "type": "array",
@@ -304,12 +302,12 @@
         "revision": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 16
+          "maximum": 9007199254740991
         },
         "sequence": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 1152921504606846976
+          "maximum": 9007199254740991
         },
         "observedAt": {
           "type": "string",
@@ -358,7 +356,7 @@
         "sequence": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 1152921504606846976
+          "maximum": 9007199254740991
         },
         "observedAt": {
           "type": "string",

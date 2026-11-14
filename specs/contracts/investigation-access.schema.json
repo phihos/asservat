@@ -12,8 +12,7 @@
           "type": "array",
           "items": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 128
+            "minLength": 1
           },
           "minItems": 1,
           "uniqueItems": true
@@ -31,7 +30,6 @@
             ]
           },
           "minItems": 1,
-          "maxItems": 5,
           "uniqueItems": true
         },
         "maxArtifacts": {
@@ -72,8 +70,7 @@
           "type": "array",
           "items": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 128
+            "minLength": 1
           },
           "minItems": 1,
           "uniqueItems": true
@@ -91,7 +88,6 @@
             ]
           },
           "minItems": 1,
-          "maxItems": 5,
           "uniqueItems": true
         },
         "maxArtifacts": {
@@ -150,8 +146,7 @@
         },
         "actionID": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 128
+          "minLength": 1
         }
       },
       "required": [

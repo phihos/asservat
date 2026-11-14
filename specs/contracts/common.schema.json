@@ -17,9 +17,7 @@
     },
     "duration": {
       "type": "string",
-      "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
-      "maxLength": 16,
-      "description": "Length bound keeps the value inside the int64-nanosecond duration range."
+      "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$"
     },
     "metadata": {
       "type": "object",
@@ -27,8 +25,7 @@
       "properties": {
         "name": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 63
+          "minLength": 1
         },
         "namespace": {
           "type": "string",
@@ -52,13 +49,11 @@
         "subject": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 256,
           "description": "OIDC Core: sub is at most 255 ASCII characters."
         },
         "clientID": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 256
+          "minLength": 1
         },
         "identityType": {
           "type": "string",
@@ -92,8 +87,7 @@
         },
         "id": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 256
+          "minLength": 1
         }
       },
       "required": [
@@ -131,8 +125,7 @@
         },
         "timeout": {
           "type": "string",
-          "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
-          "maxLength": 16
+          "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$"
         }
       },
       "required": [

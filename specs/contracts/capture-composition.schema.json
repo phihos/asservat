@@ -305,8 +305,7 @@
       ],
       "valueSchema": {
         "type": "string",
-        "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
-        "maxLength": 16
+        "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$"
       }
     },
     "logAfter": {
@@ -319,8 +318,7 @@
       ],
       "valueSchema": {
         "type": "string",
-        "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
-        "maxLength": 16
+        "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$"
       }
     },
     "logStream": {
@@ -358,7 +356,6 @@
         "version": {
           "type": "string",
           "pattern": "^v[1-9][0-9]*$",
-          "maxLength": 32,
           "description": "Optional; omitted, the hub resolves the current version and records it."
         }
       },
@@ -375,8 +372,7 @@
           "properties": {
             "actionID": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 63
+              "minLength": 1
             },
             "field": {
               "const": "packetPeers"
@@ -397,8 +393,7 @@
           "properties": {
             "actionID": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 63
+              "minLength": 1
             },
             "field": {
               "const": "packetFilter"
@@ -419,8 +414,7 @@
           "properties": {
             "actionID": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 63
+              "minLength": 1
             },
             "field": {
               "const": "packetBefore"
@@ -441,8 +435,7 @@
           "properties": {
             "actionID": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 63
+              "minLength": 1
             },
             "field": {
               "const": "packetAfter"
@@ -463,8 +456,7 @@
           "properties": {
             "actionID": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 63
+              "minLength": 1
             },
             "field": {
               "const": "packetRing"
@@ -485,8 +477,7 @@
           "properties": {
             "actionID": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 63
+              "minLength": 1
             },
             "field": {
               "const": "processSelector"
@@ -507,8 +498,7 @@
           "properties": {
             "actionID": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 63
+              "minLength": 1
             },
             "field": {
               "const": "processBatch"
@@ -529,8 +519,7 @@
           "properties": {
             "actionID": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 63
+              "minLength": 1
             },
             "field": {
               "const": "profileDuration"
@@ -551,8 +540,7 @@
           "properties": {
             "actionID": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 63
+              "minLength": 1
             },
             "field": {
               "const": "syscallFilter"
@@ -573,8 +561,7 @@
           "properties": {
             "actionID": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 63
+              "minLength": 1
             },
             "field": {
               "const": "syscallMode"
@@ -595,8 +582,7 @@
           "properties": {
             "actionID": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 63
+              "minLength": 1
             },
             "field": {
               "const": "syscallBefore"
@@ -617,8 +603,7 @@
           "properties": {
             "actionID": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 63
+              "minLength": 1
             },
             "field": {
               "const": "syscallAfter"
@@ -639,8 +624,7 @@
           "properties": {
             "actionID": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 63
+              "minLength": 1
             },
             "field": {
               "const": "syscallRing"
@@ -661,8 +645,7 @@
           "properties": {
             "actionID": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 63
+              "minLength": 1
             },
             "field": {
               "const": "syscallArguments"
@@ -683,8 +666,7 @@
           "properties": {
             "actionID": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 63
+              "minLength": 1
             },
             "field": {
               "const": "syscallMaxEvents"
@@ -705,8 +687,7 @@
           "properties": {
             "actionID": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 63
+              "minLength": 1
             },
             "field": {
               "const": "syscallRate"
@@ -727,16 +708,14 @@
           "properties": {
             "actionID": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 63
+              "minLength": 1
             },
             "field": {
               "const": "filePath"
             },
             "value": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 4096
+              "minLength": 1
             }
           },
           "required": [
@@ -751,8 +730,7 @@
           "properties": {
             "actionID": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 63
+              "minLength": 1
             },
             "field": {
               "const": "commandArgv"
@@ -780,8 +758,7 @@
           "properties": {
             "actionID": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 63
+              "minLength": 1
             },
             "field": {
               "const": "actionMaxBytes"
@@ -804,8 +781,7 @@
           "properties": {
             "actionID": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 63
+              "minLength": 1
             },
             "field": {
               "const": "actionTimeout"
@@ -826,8 +802,7 @@
           "properties": {
             "actionID": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 63
+              "minLength": 1
             },
             "field": {
               "const": "actionExecutionMode"
@@ -851,16 +826,14 @@
           "properties": {
             "actionID": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 63
+              "minLength": 1
             },
             "field": {
               "const": "logBefore"
             },
             "value": {
               "type": "string",
-              "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
-              "maxLength": 16
+              "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$"
             }
           },
           "required": [
@@ -875,16 +848,14 @@
           "properties": {
             "actionID": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 63
+              "minLength": 1
             },
             "field": {
               "const": "logAfter"
             },
             "value": {
               "type": "string",
-              "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
-              "maxLength": 16
+              "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$"
             }
           },
           "required": [
@@ -899,8 +870,7 @@
           "properties": {
             "actionID": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 63
+              "minLength": 1
             },
             "field": {
               "const": "logStream"
@@ -950,13 +920,11 @@
       "properties": {
         "componentID": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 24
+          "minLength": 1
         },
         "localActionID": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 63
+          "minLength": 1
         },
         "actionID": {
           "type": "string",
@@ -979,16 +947,14 @@
       "properties": {
         "componentID": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 24
+          "minLength": 1
         },
         "profileRef": {
           "$ref": "https://asservat.io/spec/v1/capture-composition.schema.json#/$defs/profileRef"
         },
         "sourceUID": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 64
+          "minLength": 1
         },
         "definitionDigest": {
           "type": "string",
@@ -1000,8 +966,7 @@
         },
         "sourceNamespaceUID": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 64
+          "minLength": 1
         }
       },
       "required": [

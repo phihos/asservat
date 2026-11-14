@@ -30,8 +30,7 @@
         },
         "nodeUID": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 64
+          "minLength": 1
         },
         "nodeBootID": {
           "type": "string",
@@ -39,8 +38,7 @@
         },
         "podUID": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 64
+          "minLength": 1
         },
         "namespace": {
           "type": "string",
@@ -49,13 +47,11 @@
         },
         "workloadUID": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 64
+          "minLength": 1
         },
         "containerID": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 256
+          "minLength": 1
         },
         "restartCount": {
           "type": "integer",
@@ -221,13 +217,11 @@
     },
     "mediaType": {
       "type": "string",
-      "minLength": 1,
-      "maxLength": 128
+      "minLength": 1
     },
     "format": {
       "type": "string",
-      "minLength": 1,
-      "maxLength": 64
+      "minLength": 1
     },
     "dataClass": {
       "type": "string",
@@ -243,8 +237,7 @@
       "properties": {
         "requested": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 512
+          "minLength": 1
         },
         "resolvedDigest": {
           "anyOf": [
@@ -269,8 +262,7 @@
           "anyOf": [
             {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 256
+              "minLength": 1
             },
             {
               "type": "null"
@@ -291,8 +283,7 @@
       "properties": {
         "version": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 64
+          "minLength": 1
         },
         "imageDigest": {
           "type": "string",
@@ -418,13 +409,11 @@
             },
             "keyRef": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 256
+              "minLength": 1
             },
             "wrappedKeyset": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 16384
+              "minLength": 1
             },
             "aadSHA256": {
               "type": "string",
@@ -457,8 +446,7 @@
         },
         "transform": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 128
+          "minLength": 1
         },
         "toolDigests": {
           "type": "array",
@@ -473,8 +461,7 @@
           "type": "array",
           "items": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 128
+            "minLength": 1
           },
           "minItems": 0,
           "uniqueItems": true
@@ -507,8 +494,7 @@
       "properties": {
         "captureUID": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 128
+          "minLength": 1
         },
         "actionID": {
           "type": "string",
@@ -768,9 +754,7 @@
               },
               "sizes": {
                 "properties": {
-                  "plaintextBytes": {
-                    "maximum": 1572864
-                  }
+                  "plaintextBytes": {}
                 }
               }
             }

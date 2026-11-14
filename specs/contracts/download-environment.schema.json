@@ -36,7 +36,7 @@
     "revision": {
       "type": "integer",
       "minimum": 1,
-      "maximum": 2147483647
+      "maximum": 9007199254740991
     },
     "suspended": {
       "type": "boolean"
@@ -45,8 +45,7 @@
       "type": "array",
       "items": {
         "type": "string",
-        "minLength": 1,
-        "maxLength": 63
+        "minLength": 1
       },
       "minItems": 0,
       "uniqueItems": true
@@ -149,8 +148,7 @@
         },
         "storageRegion": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 63
+          "minLength": 1
         },
         "acquisitionClusterID": {
           "type": "string",
@@ -158,8 +156,7 @@
         },
         "acquisitionRegion": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 63
+          "minLength": 1
         },
         "connectorClusterID": {
           "type": "string",
@@ -167,8 +164,7 @@
         },
         "connectorRegion": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 63
+          "minLength": 1
         },
         "hubClusterID": {
           "type": "string",
@@ -176,8 +172,7 @@
         },
         "hubRegion": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 63
+          "minLength": 1
         },
         "workerConfiguration": {
           "$ref": "https://asservat.io/spec/v1/download-environment.schema.json#/$defs/revision"
@@ -204,13 +199,11 @@
         "issuer": {
           "type": "string",
           "format": "uri",
-          "pattern": "^https://",
-          "maxLength": 2048
+          "pattern": "^https://"
         },
         "id": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 256
+          "minLength": 1
         },
         "kind": {
           "enum": [
@@ -228,7 +221,6 @@
             ]
           },
           "minItems": 0,
-          "maxItems": 3,
           "uniqueItems": true
         },
         "privacyClasses": {
@@ -239,7 +231,6 @@
             ]
           },
           "minItems": 0,
-          "maxItems": 1,
           "uniqueItems": true
         },
         "evidenceTypes": {
@@ -254,7 +245,6 @@
             ]
           },
           "minItems": 0,
-          "maxItems": 5,
           "uniqueItems": true
         },
         "purposes": {
@@ -263,8 +253,7 @@
           "uniqueItems": true,
           "items": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 128
+            "minLength": 1
           }
         },
         "pathIDs": {
@@ -295,13 +284,11 @@
         "issuer": {
           "type": "string",
           "format": "uri",
-          "pattern": "^https://",
-          "maxLength": 2048
+          "pattern": "^https://"
         },
         "clientID": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 256
+          "minLength": 1
         },
         "kind": {
           "enum": [
@@ -311,8 +298,7 @@
         },
         "id": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 256
+          "minLength": 1
         }
       }
     },
@@ -328,7 +314,6 @@
       "properties": {
         "projections": {
           "type": "array",
-          "maxItems": 3,
           "uniqueItems": true,
           "items": {
             "enum": [
@@ -353,13 +338,11 @@
             "properties": {
               "issuer": {
                 "type": "string",
-                "format": "uri",
-                "maxLength": 2048
+                "format": "uri"
               },
               "id": {
                 "type": "string",
-                "minLength": 1,
-                "maxLength": 256
+                "minLength": 1
               },
               "kind": {
                 "enum": [
@@ -470,13 +453,11 @@
         "id": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 64,
           "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]+$"
         },
         "name": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 160,
           "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]+$"
         },
         "activities": {
@@ -486,7 +467,6 @@
           "items": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 128,
             "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]+$"
           }
         },
@@ -496,7 +476,6 @@
           "items": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 128,
             "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]+$"
           }
         }

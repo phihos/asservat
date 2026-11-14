@@ -63,8 +63,7 @@
                 },
                 "workloadUID": {
                   "type": "string",
-                  "minLength": 1,
-                  "maxLength": 64
+                  "minLength": 1
                 },
                 "executionDigest": {
                   "type": "string",
@@ -76,8 +75,7 @@
                 },
                 "policyUID": {
                   "type": "string",
-                  "minLength": 1,
-                  "maxLength": 64
+                  "minLength": 1
                 }
               },
               "required": [
@@ -101,8 +99,7 @@
                 },
                 "workloadUID": {
                   "type": "string",
-                  "minLength": 1,
-                  "maxLength": 64
+                  "minLength": 1
                 },
                 "executionDigest": {
                   "type": "string",
@@ -131,8 +128,7 @@
           "type": "array",
           "items": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 64
+            "minLength": 1
           },
           "minItems": 1,
           "uniqueItems": true
@@ -163,8 +159,7 @@
             },
             "maxDuration": {
               "type": "string",
-              "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
-              "maxLength": 16
+              "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$"
             }
           },
           "required": [
@@ -185,8 +180,7 @@
           "properties": {
             "name": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 63
+              "minLength": 1
             },
             "digest": {
               "type": "string",

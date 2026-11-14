@@ -20,8 +20,7 @@
       "properties": {
         "storageProfileRef": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 63
+          "minLength": 1
         },
         "capacity": {
           "type": "object",
@@ -186,8 +185,7 @@
             "properties": {
               "budgetPolicyRef": {
                 "type": "string",
-                "minLength": 1,
-                "maxLength": 63
+                "minLength": 1
               },
               "workloadSlots": {
                 "type": "integer",

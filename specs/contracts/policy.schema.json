@@ -40,8 +40,7 @@
               "properties": {
                 "name": {
                   "type": "string",
-                  "minLength": 1,
-                  "maxLength": 63
+                  "minLength": 1
                 },
                 "digest": {
                   "type": "string",
@@ -59,8 +58,7 @@
               "properties": {
                 "cooldown": {
                   "type": "string",
-                  "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
-                  "maxLength": 16
+                  "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$"
                 },
                 "burst": {
                   "type": "integer",
@@ -78,8 +76,7 @@
             },
             "retention": {
               "type": "string",
-              "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
-              "maxLength": 16
+              "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$"
             },
             "suspend": {
               "type": "boolean"
@@ -174,8 +171,7 @@
               "properties": {
                 "cooldown": {
                   "type": "string",
-                  "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
-                  "maxLength": 16
+                  "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$"
                 },
                 "burst": {
                   "type": "integer",
@@ -193,8 +189,7 @@
             },
             "retention": {
               "type": "string",
-              "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
-              "maxLength": 16
+              "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$"
             },
             "suspend": {
               "type": "boolean"

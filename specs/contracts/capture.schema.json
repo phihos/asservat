@@ -29,8 +29,7 @@
               "properties": {
                 "name": {
                   "type": "string",
-                  "minLength": 1,
-                  "maxLength": 63
+                  "minLength": 1
                 },
                 "digest": {
                   "type": "string",
@@ -55,7 +54,6 @@
             "idempotencyKey": {
               "type": "string",
               "minLength": 1,
-              "maxLength": 128,
               "description": "Browser/MCP replay key; Kubernetes writes use the object UID and generation."
             },
             "deadline": {
@@ -101,7 +99,6 @@
             "idempotencyKey": {
               "type": "string",
               "minLength": 1,
-              "maxLength": 128,
               "description": "Browser/MCP replay key; Kubernetes writes use the object UID and generation."
             },
             "deadline": {

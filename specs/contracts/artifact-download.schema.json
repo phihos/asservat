@@ -21,8 +21,7 @@
         },
         "idempotency_key": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 128
+          "minLength": 1
         },
         "representation": {
           "enum": [
@@ -61,8 +60,7 @@
         },
         "idempotency_key": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 128
+          "minLength": 1
         }
       },
       "required": [
@@ -100,8 +98,7 @@
         },
         "native_format": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 96
+          "minLength": 1
         },
         "size_bytes": {
           "type": "integer",

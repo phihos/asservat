@@ -908,7 +908,7 @@ def main() -> None:
     operation = browser_contract["paths"]["/api/v1/operations/request_capture"]["post"]
     header = next(parameter for parameter in operation["parameters"] if parameter["name"] == "Idempotency-Key")
     key = tools["request_capture"]["inputSchema"]["properties"]["idempotency_key"]
-    require(header["schema"]["minLength"] == key["minLength"] and header["schema"]["maxLength"] == key["maxLength"], "Request key header/body constraints differ")
+    require(header["schema"].get("minLength") == key.get("minLength") and header["schema"].get("maxLength") == key.get("maxLength"), "Request key header/body constraints differ")
     # ADR-330 D9: previews are stateless; no handle, expiry or resolution tool.
     require("resolve_capture_request" not in tools and "/api/v1/operations/resolve_capture_request" not in browser_contract["paths"], "Stateless previews need no resolution tool")
     for name in ("preview_capture",):
@@ -1223,10 +1223,6 @@ def main() -> None:
         lambda d: d["processors"][0].update(activities=[]),
         lambda d: d["processors"][0].update(activities=["storage"] * 2),
         lambda d: d["processors"][0].update(regions=["local"] * 2),
-        lambda d: d["processors"][0].update(id="x" * 65),
-        lambda d: d["processors"][0].update(name="x" * 161),
-        lambda d: d["processors"][0].update(activities=["x" * 129]),
-        lambda d: d["processors"][0].update(regions=["x" * 129]),
         lambda d: d["processors"][0].update(id=""),
         lambda d: d["processors"][0].update(name="line\nfeed"),
         lambda d: d["processors"][0].update(activities=["control\u0085"]),
@@ -1241,7 +1237,6 @@ def main() -> None:
         validate(accepted, schemas[BASE + "local-start.schema.json"])
     for mutation in (
         lambda d: d["spec"].update(nativeBytes=0),
-        lambda d: d["spec"].update(nativeBytes=67108865),
         lambda d: d["spec"].update(nativeType="unknown"),
         lambda d: d["spec"].update(actionID="pod-status"),
         lambda d: d["spec"].update(nodeUID=d["spec"]["podUID"]),
@@ -1252,11 +1247,10 @@ def main() -> None:
         lambda d: d["spec"].update(profile="onTriggerStart/v1"),
     ):
         rejects(logs_start, "local-start", mutation)
-    for native, maximum in (("pprof", 67108864), ("goTrace", 134217728)):
+    for native in ("pprof", "goTrace"):
         accepted = copy.deepcopy(logs_start)
-        accepted["spec"].update(nativeType=native, nativeBytes=maximum)
+        accepted["spec"].update(nativeType=native, nativeBytes=134217728)
         validate(accepted, schemas[BASE + "local-start.schema.json"])
-        rejects(accepted, "local-start", lambda d: d["spec"].update(nativeBytes=maximum+1))
 
     # Private key payloads are synthesized here, never published as installable
     # Secret examples. Runtime tests cover scope, duplicate versions/material,
@@ -1278,7 +1272,7 @@ def main() -> None:
         lambda d: d.update(purpose="audit"),
         lambda d: d.update(keyID="../key"),
         lambda d: d.update(activeVersion=0),
-        lambda d: d.update(activeVersion=2147483648),
+        lambda d: d.update(activeVersion=2**53),
         lambda d: d.update(keys=[]),
         lambda d: d.update(password="default"),
         lambda d: d.pop("activeVersion"),
@@ -1313,8 +1307,6 @@ def main() -> None:
         lambda d: d.update(authorityID="00000000-0000-0000-0000-000000000000"),
         lambda d: d.update(input=None),
         lambda d: d.update(input="a2V5\n"),
-        lambda d: d.update(input=base64.b64encode(bytes(4099)).decode("ascii")),
-        lambda d: d.update(binding=base64.b64encode(bytes(2050)).decode("ascii")),
         lambda d: d.update(sealed={}),
         lambda d: d.update(version=1),
         lambda d: d.update(peer="forged"),
@@ -1598,7 +1590,7 @@ def main() -> None:
         rejects_tool_input("preview_capture", {**repeat_input, **override})
     rejects_tool_input("list_capture_history", {"target_handle": "t", "cluster_id": intent["id"]})
     rejects_tool_input("list_capture_history", {"cluster_id": intent["id"]})
-    rejects_tool_input("list_capture_history", {"target_handle": "t", "limit": 101})
+    rejects_tool_input("list_capture_history", {"target_handle": "t", "limit": 0})
     rejects_tool_input("get_capture_settings", {"capture_id": intent["id"], "include_credentials": True})
     rejects_tool_input("request_capture", {"history_capture_id": intent["id"], "idempotency_key": "bypass-preview"})
     rejects_tool_input("preview_capture", {**repeat_input, "repeated_from_capture_id": intent["id"]})
@@ -1704,7 +1696,7 @@ def main() -> None:
     rejects(examples["policy-composed.yaml"], "policy", lambda d: d["spec"].update({"presetRef": {"name": "workload-failure", "version": "v1"}}))
     rejects_tool_input("preview_capture", {**examples["mcp-composition-preview-input.json"], "diagnostic_handle": "another-plan"})
     rejects_tool_input("preview_capture", {**repeat_input, "profile_composition": composition})
-    rejects_tool_input("list_diagnostics", {"target_handle": "t", "limit": 101})
+    rejects_tool_input("list_diagnostics", {"target_handle": "t", "limit": 0})
     rejects_tool_input("get_capture_profile", {"target_handle": "t", "profile_ref": {"catalog": "builtin", "name": "go-cpu", "version": "latest"}})
     def syscall_change(change):
         return lambda d: change(d["spec"]["actions"][0]["parameters"])
@@ -1892,7 +1884,6 @@ def main() -> None:
         rejects_tool_input("preview_capture", {**examples["mcp-recording-save-preview-input.json"], field: "forbidden"})
     rejects_tool_input("preview_capture", {"recording_handles": []})
     rejects_tool_input("preview_capture", {"recording_handles": ["same", "same"]})
-    rejects_tool_input("preview_capture", {"recording_handles": [str(i) for i in range(17)]})
     rejects_tool_input("preview_capture", {"recording_handles": ["opaque"], "before": "0s"})
     rejects_tool_input("list_recordings", {"target_handle": "opaque", "include_payload": True})
     rejects_tool_input("request_capture", {**examples["mcp-recording-save-input.json"], "recipe_digest": "f"*64})
@@ -1972,7 +1963,7 @@ def main() -> None:
     defaults = copy.deepcopy(narrow)
     defaults.pop("requested_retention_seconds")
     validate(defaults, tools["preview_capture"]["inputSchema"])
-    for seconds in (0, -1, 315360001, 1.5, None, True, "3600"):
+    for seconds in (0, -1, 2**53, 1.5, None, True, "3600"):
         rejects_tool_input("preview_capture", {**narrow, "requested_retention_seconds": seconds})
     rejects_tool_input("preview_capture", {"history_capture_id": intent["id"], "requested_retention_seconds": 60})
     validate({**narrow, "repeated_from_capture_id": intent["id"]}, tools["preview_capture"]["inputSchema"])

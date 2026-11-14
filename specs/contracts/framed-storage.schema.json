@@ -20,13 +20,11 @@
       "properties": {
         "reference": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 256
+          "minLength": 1
         },
         "ciphertext": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 16384
+          "minLength": 1
         }
       },
       "required": [
@@ -55,8 +53,7 @@
         },
         "mediaType": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 128
+          "minLength": 1
         }
       },
       "required": [
@@ -286,8 +283,7 @@
       "properties": {
         "etag": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
+          "minLength": 1
         },
         "versionID": {
           "anyOf": [
@@ -342,7 +338,7 @@
             "ciphertextBytes": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 1114112
+              "maximum": 9007199254740991
             },
             "ciphertextSHA256": {
               "type": "string",

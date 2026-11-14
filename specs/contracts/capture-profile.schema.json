@@ -26,8 +26,7 @@
             "properties": {
               "actionID": {
                 "type": "string",
-                "minLength": 1,
-                "maxLength": 63
+                "minLength": 1
               },
               "field": {
                 "enum": [
@@ -112,8 +111,7 @@
         },
         "version": {
           "type": "string",
-          "pattern": "^v[1-9][0-9]*$",
-          "maxLength": 32
+          "pattern": "^v[1-9][0-9]*$"
         },
         "definition": {
           "$ref": "https://asservat.io/spec/v1/capture-profile.schema.json#/$defs/definition"

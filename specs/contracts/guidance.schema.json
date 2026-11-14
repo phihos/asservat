@@ -50,8 +50,7 @@
         },
         "uid": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 64
+          "minLength": 1
         }
       },
       "required": [
@@ -67,13 +66,11 @@
       "properties": {
         "process_ref": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 128
+          "minLength": 1
         },
         "pod_uid": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 64
+          "minLength": 1
         },
         "display_pid": {
           "type": "integer",
@@ -106,8 +103,7 @@
         },
         "parent_ref": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 128
+          "minLength": 1
         },
         "rss_bytes": {
           "type": "integer",
@@ -121,8 +117,7 @@
           "type": "array",
           "items": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 128
+            "minLength": 1
           },
           "uniqueItems": true
         },
@@ -146,13 +141,11 @@
       "properties": {
         "flow_ref": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 128
+          "minLength": 1
         },
         "pod_uid": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 64
+          "minLength": 1
         },
         "transport": {
           "enum": [
@@ -164,8 +157,7 @@
         },
         "peer_address": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 64
+          "minLength": 1
         },
         "peer_port": {
           "type": "integer",
@@ -205,8 +197,7 @@
           "type": "array",
           "items": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 128
+            "minLength": 1
           },
           "minItems": 0
         },
@@ -215,8 +206,7 @@
         },
         "observation_point": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 128
+          "minLength": 1
         }
       },
       "required": [
@@ -296,12 +286,12 @@
         "observed_wire_bytes": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 1099511627776
+          "maximum": 9007199254740991
         },
         "retained_bytes": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 1099511627776
+          "maximum": 9007199254740991
         },
         "coverage": {
           "$ref": "https://asservat.io/spec/v1/guidance.schema.json#/$defs/coverage"
@@ -365,16 +355,14 @@
           "items": {
             "$ref": "https://asservat.io/spec/v1/guidance.schema.json#/$defs/process"
           },
-          "minItems": 0,
-          "maxItems": 100
+          "minItems": 0
         },
         "flows": {
           "type": "array",
           "items": {
             "$ref": "https://asservat.io/spec/v1/guidance.schema.json#/$defs/flow"
           },
-          "minItems": 0,
-          "maxItems": 100
+          "minItems": 0
         },
         "gaps": {
           "type": "array",
@@ -452,7 +440,7 @@
         "retained_bytes_per_second": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 1073741824
+          "maximum": 9007199254740991
         },
         "history_seconds": {
           "type": "integer",
@@ -504,13 +492,11 @@
       "properties": {
         "code": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 64
+          "minLength": 1
         },
         "message": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
+          "minLength": 1
         },
         "responsible_role": {
           "enum": [
@@ -537,13 +523,11 @@
       "properties": {
         "diagnostic_handle": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 128
+          "minLength": 1
         },
         "title": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 128
+          "minLength": 1
         },
         "explanation": {
           "type": "string",
@@ -572,8 +556,7 @@
           "type": "array",
           "items": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 64
+            "minLength": 1
           },
           "minItems": 1
         },
@@ -624,7 +607,7 @@
         "process_match_count": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 256
+          "maximum": 9007199254740991
         },
         "process_inventory_complete": {
           "type": "boolean"
@@ -668,8 +651,7 @@
         },
         "target_handle": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 128
+          "minLength": 1
         },
         "goal": {
           "enum": [

@@ -9,10 +9,12 @@ import copy
 import json
 from pathlib import Path
 
+import implemented_contracts
+
 ROOT = Path(__file__).resolve().parents[1]
 
 def render():
-    schema = json.loads((ROOT/'specs/contracts/local-start.schema.json').read_text())
+    schema = json.loads(implemented_contracts.path('local-start.schema.json').read_text())
     spec = copy.deepcopy(schema['properties']['spec'])
     status = copy.deepcopy(schema['properties']['status'])
     class_rules = spec.pop('allOf')

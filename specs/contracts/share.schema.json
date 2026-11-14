@@ -43,7 +43,6 @@
               "raw"
             ]
           },
-          "maxItems": 3,
           "minItems": 1,
           "uniqueItems": true
         },
@@ -51,10 +50,8 @@
           "type": "array",
           "items": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 64
+            "minLength": 1
           },
-          "maxItems": 32,
           "minItems": 1,
           "uniqueItems": true
         },
@@ -82,8 +79,7 @@
             },
             "captureUID": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 128
+              "minLength": 1
             },
             "selectionID": {
               "type": "string",

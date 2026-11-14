@@ -36,6 +36,7 @@ def sources():
     paths.append(ROOT/"scripts/permission-crds.py")
     paths.append(ROOT/"scripts/start-crd.py")
     paths.append(ROOT/"specs/contracts/local-start.schema.json")
+    paths.append(ROOT/"specs/contracts/implemented/local-start.schema.json")
     paths.append(ROOT/"specs/contracts/retention-policy.schema.json")
     paths.append(ROOT/"scripts/retention-crd.py")
     paths.extend((ROOT/"migrations").rglob("*.sql"))

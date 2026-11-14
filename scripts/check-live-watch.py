@@ -25,7 +25,6 @@ for field in ['raw','body','argv','container','grant_id','policy_trigger','captu
 for projection in ['rawPackets','syscallArguments','memory']:
  reject(open_request,open_schema,lambda d,p=projection:d.update(projection=p))
 reject(open_request,open_schema,lambda d:d.update(source_handles=['same','same']))
-reject(open_request,open_schema,lambda d:d.update(source_handles=[str(x) for x in range(17)]))
 reject(open_request,open_schema,lambda d:d.update(display_filter={'all':[{'field':'body','op':'eq','value':'secret'}]}))
 reject(open_request,open_schema,lambda d:d.update(display_filter={'all':[{'field':'syscall','op':'regex','value':'.*'}]}))
 reject(open_request,open_schema,lambda d:d.update(display_filter={'all':[{'field':'status','op':'eq','value':503}]}))
@@ -35,7 +34,7 @@ read_input=read('examples/mcp-live-read-input.json');read_schema=tools['watch_li
 reject(read_input,read_schema,lambda d:d.update(action='open'))
 reject(open_request,open_schema,lambda d:d.update(action='read'))
 reject(read_input,read_schema,lambda d:d.update(wait_ms=30001))
-reject(read_input,read_schema,lambda d:d.update(limit=101))
+reject(read_input,read_schema,lambda d:d.update(limit=0))
 reject(read_input,read_schema,lambda d:d.pop('cursor'))
 u=read('examples/mcp-live-update-input.json');us=tools['watch_live']['inputSchema']
 reject(u,us,lambda d:d.update(duration_seconds=3600))

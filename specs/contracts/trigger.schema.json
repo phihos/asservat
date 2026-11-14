@@ -11,8 +11,7 @@
           "properties": {
             "id": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 63
+              "minLength": 1
             },
             "kind": {
               "const": "log"
@@ -80,8 +79,7 @@
           "properties": {
             "id": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 63
+              "minLength": 1
             },
             "kind": {
               "const": "resource"
@@ -119,8 +117,7 @@
                 },
                 "sampleInterval": {
                   "type": "string",
-                  "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
-                  "maxLength": 16
+                  "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$"
                 }
               },
               "required": [
@@ -166,8 +163,7 @@
           "properties": {
             "id": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 63
+              "minLength": 1
             },
             "kind": {
               "const": "probe"
@@ -191,8 +187,7 @@
                 },
                 "window": {
                   "type": "string",
-                  "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
-                  "maxLength": 16
+                  "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$"
                 },
                 "source": {
                   "type": "string",
@@ -223,8 +218,7 @@
           "properties": {
             "id": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 63
+              "minLength": 1
             },
             "kind": {
               "const": "exit"
@@ -286,8 +280,7 @@
           "properties": {
             "id": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 63
+              "minLength": 1
             },
             "kind": {
               "const": "alert"
@@ -298,8 +291,7 @@
               "properties": {
                 "receiverRef": {
                   "type": "string",
-                  "minLength": 1,
-                  "maxLength": 63
+                  "minLength": 1
                 },
                 "matchLabels": {
                   "type": "object",
@@ -337,8 +329,7 @@
           "properties": {
             "id": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 63
+              "minLength": 1
             },
             "kind": {
               "const": "crashArtifact"
@@ -383,8 +374,7 @@
           "properties": {
             "id": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 63
+              "minLength": 1
             },
             "kind": {
               "const": "schedule"
@@ -395,18 +385,15 @@
               "properties": {
                 "cron": {
                   "type": "string",
-                  "minLength": 1,
-                  "maxLength": 128
+                  "minLength": 1
                 },
                 "timeZone": {
                   "type": "string",
-                  "minLength": 1,
-                  "maxLength": 64
+                  "minLength": 1
                 },
                 "jitter": {
                   "type": "string",
-                  "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
-                  "maxLength": 16
+                  "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$"
                 }
               },
               "required": [
@@ -431,8 +418,7 @@
           "properties": {
             "id": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 63
+              "minLength": 1
             },
             "kind": {
               "const": "file"
@@ -444,7 +430,8 @@
                 "path": {
                   "type": "string",
                   "minLength": 1,
-                  "maxLength": 4096
+                  "maxLength": 4096,
+                  "description": "Linux PATH_MAX (4096 bytes)."
                 },
                 "condition": {
                   "type": "string",
@@ -462,7 +449,6 @@
                 "pollInterval": {
                   "type": "string",
                   "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
-                  "maxLength": 16,
                   "description": "Only for a path inotify cannot watch; the watch is used wherever it works. Omitted, an unwatchable path reports the detector unavailable instead of sampling."
                 }
               },
@@ -510,8 +496,7 @@
           "properties": {
             "id": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 63
+              "minLength": 1
             },
             "kind": {
               "const": "network"
@@ -534,8 +519,7 @@
                 },
                 "window": {
                   "type": "string",
-                  "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
-                  "maxLength": 16
+                  "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$"
                 }
               },
               "required": [
@@ -557,8 +541,7 @@
           "properties": {
             "id": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 63
+              "minLength": 1
             },
             "kind": {
               "const": "kubernetesCondition"
@@ -578,8 +561,7 @@
                 },
                 "window": {
                   "type": "string",
-                  "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
-                  "maxLength": 16
+                  "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$"
                 }
               },
               "required": [
@@ -604,8 +586,7 @@
           "properties": {
             "detector": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 63
+              "minLength": 1
             }
           },
           "required": [
@@ -671,8 +652,7 @@
                 },
                 "duration": {
                   "type": "string",
-                  "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
-                  "maxLength": 16
+                  "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$"
                 }
               },
               "required": [
@@ -695,8 +675,7 @@
               "properties": {
                 "detector": {
                   "type": "string",
-                  "minLength": 1,
-                  "maxLength": 63
+                  "minLength": 1
                 },
                 "atLeast": {
                   "type": "integer",
@@ -705,8 +684,7 @@
                 },
                 "within": {
                   "type": "string",
-                  "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
-                  "maxLength": 16
+                  "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$"
                 }
               },
               "required": [
@@ -732,16 +710,14 @@
                   "type": "array",
                   "items": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 63
+                    "minLength": 1
                   },
                   "minItems": 2,
                   "uniqueItems": true
                 },
                 "within": {
                   "type": "string",
-                  "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
-                  "maxLength": 16
+                  "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$"
                 }
               },
               "required": [

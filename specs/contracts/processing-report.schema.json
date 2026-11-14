@@ -8,8 +8,7 @@
       "properties": {
         "uid": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 64
+          "minLength": 1
         },
         "generation": {
           "type": "integer",
@@ -65,7 +64,7 @@
         "ordinal": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 2147483647
+          "maximum": 9007199254740991
         }
       },
       "required": [
@@ -85,7 +84,7 @@
         "ordinal": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 2147483647
+          "maximum": 9007199254740991
         }
       },
       "required": [
@@ -111,8 +110,7 @@
       "properties": {
         "id": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 64
+          "minLength": 1
         }
       },
       "required": [
@@ -132,7 +130,7 @@
             "limit": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 100,
+              "maximum": 9007199254740991,
               "default": 3
             },
             "created_before": {
@@ -171,7 +169,7 @@
             "limit": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 100,
+              "maximum": 9007199254740991,
               "default": 3
             },
             "created_before": {
@@ -212,7 +210,7 @@
             "limit": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 100,
+              "maximum": 9007199254740991,
               "default": 3
             },
             "created_before": {
@@ -253,7 +251,7 @@
             "limit": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 100,
+              "maximum": 9007199254740991,
               "default": 3
             },
             "created_before": {
@@ -294,7 +292,7 @@
             "limit": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 100,
+              "maximum": 9007199254740991,
               "default": 3
             },
             "created_before": {
@@ -335,7 +333,7 @@
             "limit": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 100,
+              "maximum": 9007199254740991,
               "default": 3
             },
             "created_before": {
@@ -376,7 +374,7 @@
             "limit": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 100,
+              "maximum": 9007199254740991,
               "default": 3
             },
             "created_before": {
@@ -435,13 +433,11 @@
         },
         "namespace_uid": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 64
+          "minLength": 1
         },
         "workload_uid": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 64
+          "minLength": 1
         },
         "store_id": {
           "type": "string",
@@ -449,13 +445,11 @@
         },
         "purpose_ref": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 128
+          "minLength": 1
         },
         "native_type": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 64
+          "minLength": 1
         },
         "data_class": {
           "enum": [
@@ -612,18 +606,16 @@
         },
         "recipient_issuer": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 2048
+          "minLength": 1
         },
         "recipient_id": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 256
+          "minLength": 1
         },
         "ordinal": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 2147483647
+          "maximum": 9007199254740991
         },
         "created_at": {
           "type": "string",
@@ -671,18 +663,15 @@
         },
         "issuer": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 2048
+          "minLength": 1
         },
         "subject": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 256
+          "minLength": 1
         },
         "client_id": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 256
+          "minLength": 1
         },
         "principal_kind": {
           "enum": [
@@ -749,30 +738,26 @@
         "ordinal": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 2147483647
+          "maximum": 9007199254740991
         },
         "name": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 64,
           "not": {
             "const": "get_processing_report"
           }
         },
         "issuer": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 2048
+          "minLength": 1
         },
         "subject": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 256
+          "minLength": 1
         },
         "client_id": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 256
+          "minLength": 1
         },
         "principal_kind": {
           "enum": [
@@ -928,13 +913,11 @@
             },
             "namespace_uid": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 64
+              "minLength": 1
             },
             "workload_uid": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 64
+              "minLength": 1
             },
             "acquired_from": {
               "type": "string",
@@ -971,7 +954,7 @@
         "revision": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 16
+          "maximum": 9007199254740991
         },
         "state": {
           "enum": [
@@ -1019,8 +1002,7 @@
         },
         "storage_region": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 63
+          "minLength": 1
         },
         "acquisition_cluster_id": {
           "type": "string",
@@ -1028,8 +1010,7 @@
         },
         "acquisition_region": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 63
+          "minLength": 1
         },
         "connector_cluster_id": {
           "type": "string",
@@ -1037,8 +1018,7 @@
         },
         "connector_region": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 63
+          "minLength": 1
         },
         "hub_cluster_id": {
           "type": "string",
@@ -1046,8 +1026,7 @@
         },
         "hub_region": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 63
+          "minLength": 1
         }
       },
       "required": [
@@ -1069,20 +1048,17 @@
       "properties": {
         "id": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 64
+          "minLength": 1
         },
         "name": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 160
+          "minLength": 1
         },
         "activities": {
           "type": "array",
           "items": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 128
+            "minLength": 1
           },
           "minItems": 1,
           "uniqueItems": true
@@ -1091,8 +1067,7 @@
           "type": "array",
           "items": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 128
+            "minLength": 1
           },
           "minItems": 0,
           "uniqueItems": true
@@ -1283,8 +1258,7 @@
           "$ref": "https://asservat.io/spec/v1/processing-report.schema.json#/$defs/PolicyRevision"
         },
         "records": {
-          "type": "array",
-          "maxItems": 100
+          "type": "array"
         },
         "next": {
           "$ref": "https://asservat.io/spec/v1/processing-report.schema.json#/$defs/Continuation"
@@ -1336,8 +1310,7 @@
               "items": {
                 "$ref": "https://asservat.io/spec/v1/processing-report.schema.json#/$defs/ArtifactRecord"
               },
-              "minItems": 0,
-              "maxItems": 100
+              "minItems": 0
             },
             "next": {
               "allOf": [
@@ -1389,8 +1362,7 @@
               "items": {
                 "$ref": "https://asservat.io/spec/v1/processing-report.schema.json#/$defs/ShareRecord"
               },
-              "minItems": 0,
-              "maxItems": 100
+              "minItems": 0
             },
             "next": {
               "allOf": [
@@ -1442,8 +1414,7 @@
               "items": {
                 "$ref": "https://asservat.io/spec/v1/processing-report.schema.json#/$defs/DownloadRecord"
               },
-              "minItems": 0,
-              "maxItems": 100
+              "minItems": 0
             },
             "next": {
               "allOf": [
@@ -1495,8 +1466,7 @@
               "items": {
                 "$ref": "https://asservat.io/spec/v1/processing-report.schema.json#/$defs/OperationRecord"
               },
-              "minItems": 0,
-              "maxItems": 100
+              "minItems": 0
             },
             "next": {
               "allOf": [
@@ -1548,8 +1518,7 @@
               "items": {
                 "$ref": "https://asservat.io/spec/v1/processing-report.schema.json#/$defs/RuleRecord"
               },
-              "minItems": 0,
-              "maxItems": 100
+              "minItems": 0
             },
             "next": {
               "allOf": [
@@ -1601,8 +1570,7 @@
               "items": {
                 "$ref": "https://asservat.io/spec/v1/processing-report.schema.json#/$defs/PathRecord"
               },
-              "minItems": 0,
-              "maxItems": 100
+              "minItems": 0
             },
             "next": {
               "allOf": [
@@ -1654,8 +1622,7 @@
               "items": {
                 "$ref": "https://asservat.io/spec/v1/processing-report.schema.json#/$defs/ProcessorRecord"
               },
-              "minItems": 0,
-              "maxItems": 100
+              "minItems": 0
             },
             "next": {
               "allOf": [
@@ -1720,21 +1687,18 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "minLength": 1,
-                      "maxLength": 64
+                      "minLength": 1
                     },
                     "message": {
                       "type": "string",
-                      "minLength": 1,
-                      "maxLength": 1024
+                      "minLength": 1
                     },
                     "retryable": {
                       "type": "boolean"
                     },
                     "navigation_uri": {
                       "type": "string",
-                      "format": "uri",
-                      "maxLength": 2048
+                      "format": "uri"
                     },
                     "responsible_role": {
                       "enum": [
@@ -1747,7 +1711,7 @@
                     "retry_after_seconds": {
                       "type": "integer",
                       "minimum": 1,
-                      "maximum": 2147483647
+                      "maximum": 9007199254740991
                     }
                   },
                   "required": [
@@ -1801,8 +1765,7 @@
               }
             ]
           },
-          "minItems": 1,
-          "maxItems": 32
+          "minItems": 1
         },
         "next": {
           "$ref": "https://asservat.io/spec/v1/processing-report.schema.json#/$defs/Query"

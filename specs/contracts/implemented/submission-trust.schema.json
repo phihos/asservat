@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/submission-trust.schema.json",
+  "title": "Protected policy submission signing trust v1",
+  "description": "Pinned administrator ConfigMap submission.json; public Ed25519 keys only. Empty or missing trust fails closed. Never caller supplied.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": "submission-trust/v1"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2147483647
+    },
+    "rootID": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f-]{36}$",
+      "not": {
+        "const": "00000000-0000-0000-0000-000000000000"
+      }
+    },
+    "installationID": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f-]{36}$",
+      "not": {
+        "const": "00000000-0000-0000-0000-000000000000"
+      }
+    },
+    "issuerEpoch": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f-]{36}$",
+      "not": {
+        "const": "00000000-0000-0000-0000-000000000000"
+      }
+    },
+    "keys": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+          },
+          "publicKey": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9+/]{43}=$"
+          },
+          "notBefore": {
+            "type": "string",
+            "format": "date-time",
+            "maxLength": 40
+          },
+          "notAfter": {
+            "type": "string",
+            "format": "date-time",
+            "maxLength": 40
+          }
+        },
+        "required": [
+          "id",
+          "publicKey",
+          "notBefore",
+          "notAfter"
+        ]
+      },
+      "minItems": 1,
+      "maxItems": 32,
+      "uniqueItems": true
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "revision",
+    "rootID",
+    "installationID",
+    "issuerEpoch",
+    "keys"
+  ]
+}

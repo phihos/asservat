@@ -27,8 +27,7 @@
         },
         "poolRef": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 63
+          "minLength": 1
         },
         "scope": {
           "type": "object",
@@ -41,9 +40,7 @@
                 "matchLabels": {
                   "type": "object",
                   "minProperties": 1,
-                  "propertyNames": {
-                    "maxLength": 253
-                  },
+                  "propertyNames": {},
                   "additionalProperties": {
                     "type": "string",
                     "minLength": 1,
@@ -329,8 +326,7 @@
             },
             "impactProfileRef": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 63
+              "minLength": 1
             },
             "pressureTriggers": {
               "description": "Linux PSI triggers (/proc/pressure/<resource>, 'some|full <stall> <window>'). A delivered trigger event trips the breaker for new expensive work.",

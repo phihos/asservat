@@ -39,7 +39,6 @@
         "uid": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 64,
           "description": "Optional pin with adoption: pinUID; otherwise provenance only."
         }
       },

@@ -52,7 +52,6 @@
         "uid": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 64,
           "description": "Kubernetes UID (a UUID; 64 characters leaves room for its textual forms)."
         }
       },
@@ -81,7 +80,6 @@
         "uid": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 64,
           "description": "Kubernetes UID (a UUID; 64 characters leaves room for its textual forms)."
         }
       },
@@ -148,7 +146,6 @@
         "key": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 253,
           "description": "Kubernetes label or annotation key (at most 253 characters)."
         },
         "mode": {
@@ -263,7 +260,6 @@
         "namespaceUID": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 64,
           "description": "Kubernetes namespace UID."
         },
         "assignments": {
@@ -291,7 +287,6 @@
               "basisUID": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 64,
                 "description": "Kubernetes UID of the basis object."
               },
               "basisDigest": {
