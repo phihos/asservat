@@ -11,7 +11,6 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/collector"
 	"asservat.local/asservat/internal/domain/configuration"
-	value "asservat.local/asservat/internal/domain/execution"
 	"asservat.local/asservat/internal/domain/targets"
 )
 
@@ -92,7 +91,7 @@ func TestArgumentSourceOperationNeverFallsBackOrRefreshes(t *testing.T) {
 }
 func TestArgumentStartOperationBindsIndependentWorkSourceAndCommittedStart(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Microsecond)
-	for _, mode := range []string{"exact", "source-epoch", "source-cutoff", "permit-epoch", "program", "definitions", "expectation", "action", "capture", "read-width", "buffers", "byte-rate", "event-rate", "threads", "duration", "committed-start", "deadline", "expired", "no-source", "packet-source", "class", "legacy-start", "packet-start"} {
+	for _, mode := range []string{"exact", "source-epoch", "source-cutoff", "permit-epoch", "program", "definitions", "expectation", "action", "capture", "read-width", "buffers", "byte-rate", "event-rate", "threads", "duration", "deadline", "expired", "no-source", "packet-source", "class", "legacy-start", "packet-start"} {
 		t.Run(mode, func(t *testing.T) {
 			w := workFixture().Work
 			e := argumentOperationExpectation(w.CaptureID, w.Target.PodUID, now)
@@ -103,7 +102,7 @@ func TestArgumentStartOperationBindsIndependentWorkSourceAndCommittedStart(t *te
 			output := &argumentRecorderOutput{}
 			local := (&countingLocal{}).local()
 			local.Now = func() time.Time { return now }
-			s := &regionalSession{local: local, work: w, prepared: output, resolved: &targets.PodResolution{Pin: pin}, argumentSource: &source, expectation: &e, consumed: &value.Disposition{MayStart: true, Phase: value.StartCommitted, CommittedAt: now, ValidUntil: request.Until}}
+			s := &regionalSession{local: local, work: w, prepared: output, resolved: &targets.PodResolution{Pin: pin}, argumentSource: &source, expectation: &e}
 			switch mode {
 			case "source-epoch":
 				request.Source.CollectorEpoch = "replacement"
@@ -133,10 +132,8 @@ func TestArgumentStartOperationBindsIndependentWorkSourceAndCommittedStart(t *te
 				request.Permit.MaxTrackedThreads++
 			case "duration":
 				request.Permit.Duration += time.Second
-			case "committed-start":
-				request.Started = now.Add(time.Microsecond)
 			case "deadline":
-				request.Until = request.Until.Add(time.Second)
+				request.Until = s.work.NotAfter.Add(time.Second)
 			case "expired":
 				request.Permit.StartBy = now
 			case "no-source":

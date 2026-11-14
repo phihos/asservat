@@ -53,14 +53,13 @@ func connectorAPIDigest(s string) (artifact.Digest, error) {
 }
 
 // ConnectorAPISettings derives the executor's startup facts from the
-// connector's own workload (UIDs read by name at start), the capacity account
-// and the image digest of its Helm values. Template, input and guard pins of
+// connector's own workload (UIDs read by name at start) and the image digest of its Helm values. Template, input and guard pins of
 // the former installer are gone; Kubernetes RBAC protects the objects.
-func ConnectorAPISettings(rootID string, binding fleet.PeerBinding, workload ConnectorWorkload, capacityAccount, capacityAccountUID, imageDigest string) (contracts.ConnectorAPIContextSettings, error) {
+func ConnectorAPISettings(rootID string, binding fleet.PeerBinding, workload ConnectorWorkload, imageDigest string) (contracts.ConnectorAPIContextSettings, error) {
 	projection := compiler.ProjectionDigest()
 	s := contracts.ConnectorAPIContextSettings{Format: contracts.ConnectorAPIContextFormat, RootID: rootID, InstallationID: binding.InstallationID, ClusterID: binding.ClusterID, IssuerEpoch: binding.IssuerEpoch,
 		Namespace: workload.Namespace, NamespaceUID: workload.NamespaceUID, Account: workload.Account, AccountUID: workload.AccountUID, Deployment: workload.Deployment, DeploymentUID: workload.DeploymentUID,
-		ImageDigest: imageDigest, ProjectionDigest: hex.EncodeToString(projection[:]), WorkloadProtectionDigest: hex.EncodeToString(workload.Digest[:]), CapacityAccount: capacityAccount, CapacityAccountUID: capacityAccountUID}
+		ImageDigest: imageDigest, ProjectionDigest: hex.EncodeToString(projection[:]), WorkloadProtectionDigest: hex.EncodeToString(workload.Digest[:])}
 	if !connectorAPISettingsValid(s) {
 		return contracts.ConnectorAPIContextSettings{}, cfg.ErrInvalid
 	}
@@ -71,17 +70,17 @@ func connectorAPISettingsValid(p contracts.ConnectorAPIContextSettings) bool {
 	if p.Format != contracts.ConnectorAPIContextFormat || len(p.Inputs) != 0 || p.StartGuard != (contracts.ConnectorAPIStartGuard{}) || p.TemplateDigest != "" || p.ConnectorRevision != (contracts.APIContextRevision{}) {
 		return false
 	}
-	for _, id := range []string{p.RootID, p.InstallationID, p.ClusterID, p.IssuerEpoch, p.NamespaceUID, p.AccountUID, p.DeploymentUID, p.CapacityAccountUID} {
+	for _, id := range []string{p.RootID, p.InstallationID, p.ClusterID, p.IssuerEpoch, p.NamespaceUID, p.AccountUID, p.DeploymentUID} {
 		if !authorization.UUID(id) {
 			return false
 		}
 	}
-	for _, name := range []string{p.Account, p.Deployment, p.CapacityAccount} {
+	for _, name := range []string{p.Account, p.Deployment} {
 		if len(validation.IsDNS1123Subdomain(name)) != 0 {
 			return false
 		}
 	}
-	if len(validation.IsDNS1123Label(p.Namespace)) != 0 || p.Account == p.CapacityAccount || p.AccountUID == p.CapacityAccountUID {
+	if len(validation.IsDNS1123Label(p.Namespace)) != 0 {
 		return false
 	}
 	for _, s := range []string{p.ImageDigest, p.ProjectionDigest, p.WorkloadProtectionDigest} {
@@ -107,13 +106,13 @@ func NewConnectorAPIExecutionProtection(a *ConnectorProcessAttester, credentials
 
 // ConnectorAPIStartupDigest is the executor's startup pin, which the hub's
 // catalog entry names. It binds only values both sides know from Helm: the
-// cluster binding, the workload and capacity account names and the image.
+// cluster binding, the workload names and the image.
 func ConnectorAPIStartupDigest(s contracts.ConnectorAPIContextSettings) artifact.Digest {
 	bound, _ := json.Marshal(struct {
 		Format, RootID, InstallationID, ClusterID, IssuerEpoch string
-		Namespace, Account, Deployment, CapacityAccount        string
+		Namespace, Account, Deployment                         string
 		ImageDigest, ProjectionDigest                          string
-	}{"asservat-connector-api-startup/v2", s.RootID, s.InstallationID, s.ClusterID, s.IssuerEpoch, s.Namespace, s.Account, s.Deployment, s.CapacityAccount, s.ImageDigest, s.ProjectionDigest})
+	}{"asservat-connector-api-startup/v3", s.RootID, s.InstallationID, s.ClusterID, s.IssuerEpoch, s.Namespace, s.Account, s.Deployment, s.ImageDigest, s.ProjectionDigest})
 	return sha256.Sum256(bound)
 }
 

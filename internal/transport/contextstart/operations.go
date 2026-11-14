@@ -33,9 +33,6 @@ const (
 	opStartArgumentRecording = "start-argument-recording"
 	opStartPolicyRecording   = "start-policy-recording"
 	opReadProcess            = "read-process"
-	opPrepareStart           = "prepare-start"
-	opReadyStart             = "ready-start"
-	opConsumeStart           = "consume-start"
 	opPrepareOutput          = "prepare-output"
 	opAcquire                = "acquire-context"
 	opComplete               = "complete-stored"
@@ -134,11 +131,9 @@ type HubOperations struct {
 }
 
 var (
-	_ executionapp.APIProcessReader    = (*HubOperations)(nil)
-	_ executionapp.APIStartPreparation = (*HubOperations)(nil)
-	_ executionapp.StartJournal        = (*HubOperations)(nil)
-	_ executionapp.ContextCollector    = (*HubOperations)(nil)
-	_ evidence.ContextProducer         = (*HubOperations)(nil)
+	_ executionapp.APIProcessReader = (*HubOperations)(nil)
+	_ executionapp.ContextCollector = (*HubOperations)(nil)
+	_ evidence.ContextProducer      = (*HubOperations)(nil)
 )
 
 // call sends one operation and decodes its reply. A failure may still carry
@@ -228,26 +223,6 @@ func (h *HubOperations) ReadAPIProcess(ctx context.Context) (value.APIProcessObs
 	var out value.APIProcessObservation
 	err := h.call(ctx, opReadProcess, struct{}{}, &out)
 	return out, err
-}
-func (h *HubOperations) PrepareStart(ctx context.Context, c value.PreparationCheck) (value.PreparedStart, error) {
-	var out value.PreparedStart
-	err := h.call(ctx, opPrepareStart, c, &out)
-	return out, err
-}
-func (h *HubOperations) ReadyStart(ctx context.Context, r value.Request) (value.Disposition, error) {
-	var out value.Disposition
-	err := h.call(ctx, opReadyStart, r, &out)
-	return out, err
-}
-func (h *HubOperations) ConsumeStart(ctx context.Context, r value.Request) (value.Disposition, error) {
-	var out value.Disposition
-	err := h.call(ctx, opConsumeStart, r, &out)
-	return out, err
-}
-
-// LookupStart is not part of the runner's fresh execution path.
-func (h *HubOperations) LookupStart(context.Context, value.Request) (value.Disposition, error) {
-	return value.Disposition{}, value.ErrUnavailable
 }
 
 // Capture never runs on the hub; acquisition belongs to the regional output.
@@ -398,8 +373,6 @@ type RegionalLocal struct {
 	Process executionapp.APIProcessReader
 	// Targets also answers the hub's pre-work queries (ADR-179).
 	Targets   QueryTargets
-	Local     executionapp.APIStartPreparation
-	Starts    executionapp.StartJournal
 	Output    evidence.ContextProducer
 	Collector executionapp.ContextCollector
 	// Source is this region's own connector source reader (ADR-178).
@@ -419,7 +392,7 @@ type RegionalRecordings interface {
 }
 
 func (l RegionalLocal) valid() bool {
-	return l.Process != nil && l.Targets != nil && l.Local != nil && l.Starts != nil && l.Output != nil && l.Collector != nil && l.Now != nil
+	return l.Process != nil && l.Targets != nil && l.Output != nil && l.Collector != nil && l.Now != nil
 }
 
 // regionalSession answers operations for exactly one verified work. Every
@@ -437,7 +410,6 @@ type regionalSession struct {
 	argumentSource *targets.PacketSourceObservation
 	expectation    *artifact.ContextExpectation
 	prepared       evidence.PreparedContext
-	consumed       *value.Disposition
 	acquired       bool
 }
 
@@ -446,14 +418,6 @@ func (s *regionalSession) close() {
 		s.prepared.Close()
 		s.prepared = nil
 	}
-}
-
-// binding ties a start to the verified work. The work's BudgetDigest is the
-// capture budget, a different value from an execution binding's, so it is not
-// compared; capture, attempt, cluster, Pod and plan scope are exact.
-func (s *regionalSession) binding(b value.Binding) bool {
-	w := s.work
-	return b.CaptureID == w.CaptureID && b.AttemptID == w.AttemptID && b.ClusterID == w.Target.ClusterID && b.PodUID == w.Target.PodUID && b.ScopeDigest == w.ScopeDigest
 }
 
 // readProcess answers from the work's observation while it is within its
@@ -468,11 +432,6 @@ func (s *regionalSession) readProcess(ctx context.Context) (value.APIProcessObse
 		s.process = &out
 	}
 	return out, err
-}
-
-// observed reports whether the work's observation still covers this start.
-func (s *regionalSession) observed(b value.Binding) bool {
-	return s.process != nil && s.process.Valid(s.local.Now()) && s.process.Matches(b)
 }
 
 func decodeOperationBody(body []byte, out any) error {
@@ -554,40 +513,6 @@ func (s *regionalSession) handle(ctx context.Context, q contracts.APIContextOper
 		return out, nil
 	case opReadProcess:
 		return s.readProcess(ctx)
-	case opPrepareStart:
-		var c value.PreparationCheck
-		if err := decodeOperationBody(q.Body, &c); err != nil {
-			return nil, err
-		}
-		if !s.binding(c.Binding) {
-			return nil, value.ErrDenied
-		}
-		if observed, ok := l.Local.(executionapp.ObservedAPIStartPreparation); ok && s.observed(c.Binding) {
-			return observed.PrepareObservedStart(ctx, c, *s.process)
-		}
-		return l.Local.PrepareStart(ctx, c)
-	case opReadyStart, opConsumeStart:
-		var r value.Request
-		if err := decodeOperationBody(q.Body, &r); err != nil {
-			return nil, err
-		}
-		if !s.binding(r.Binding) {
-			return nil, value.ErrDenied
-		}
-		if q.Method == opReadyStart {
-			if observed, ok := l.Local.(executionapp.ObservedAPIStartPreparation); ok && s.observed(r.Binding) {
-				return observed.ReadyObservedStart(ctx, r, *s.process)
-			}
-			return l.Local.ReadyStart(ctx, r)
-		}
-		if s.consumed != nil {
-			return nil, value.ErrConflict
-		}
-		d, err := l.Starts.ConsumeStart(ctx, r)
-		if err == nil {
-			s.consumed = &d
-		}
-		return d, err
 	case opPrepareOutput:
 		var e artifact.ContextExpectation
 		if err := decodeOperationBody(q.Body, &e); err != nil {
@@ -608,8 +533,7 @@ func (s *regionalSession) handle(ctx context.Context, q contracts.APIContextOper
 		if err := decodeOperationBody(q.Body, &r); err != nil {
 			return nil, err
 		}
-		d := s.consumed
-		if s.acquired || s.prepared == nil || s.resolved == nil || d == nil || !d.MayStart || d.Phase != value.StartCommitted || r.Until.After(d.ValidUntil) || r.Pin != s.resolved.Pin {
+		if s.acquired || s.prepared == nil || s.resolved == nil || r.Until.After(s.work.NotAfter) || r.Pin != s.resolved.Pin {
 			return nil, value.ErrDenied
 		}
 		s.acquired = true
@@ -625,9 +549,8 @@ func (s *regionalSession) handle(ctx context.Context, q contracts.APIContextOper
 		if err := decodeOperationBody(q.Body, &r); err != nil {
 			return nil, err
 		}
-		d := s.consumed
 		recorder, ok := s.prepared.(evidence.LogsRecorder)
-		if s.acquired || !ok || s.resolved == nil || s.expectation == nil || s.expectation.Logs == nil || d == nil || !d.MayStart || d.Phase != value.StartCommitted || !r.Started.Equal(d.CommittedAt) || r.Until.After(d.ValidUntil) || r.Pin != s.resolved.Pin || !l.Now().Before(r.Until) {
+		if s.acquired || !ok || s.resolved == nil || s.expectation == nil || s.expectation.Logs == nil || r.Until.After(s.work.NotAfter) || r.Pin != s.resolved.Pin || !l.Now().Before(r.Until) {
 			return nil, value.ErrDenied
 		}
 		s.acquired = true
@@ -641,9 +564,8 @@ func (s *regionalSession) handle(ctx context.Context, q contracts.APIContextOper
 		if err := decodeOperationBody(q.Body, &r); err != nil {
 			return nil, err
 		}
-		d := s.consumed
 		recorder, ok := s.prepared.(evidence.ProfileRecorder)
-		if s.acquired || !ok || s.resolved == nil || s.expectation == nil || s.expectation.Profile == nil || d == nil || !d.MayStart || d.Phase != value.StartCommitted || !r.Started.Equal(d.CommittedAt) || r.Until.After(d.ValidUntil) || r.Pin != s.resolved.Pin || !l.Now().Before(r.Until) {
+		if s.acquired || !ok || s.resolved == nil || s.expectation == nil || s.expectation.Profile == nil || r.Until.After(s.work.NotAfter) || r.Pin != s.resolved.Pin || !l.Now().Before(r.Until) {
 			return nil, value.ErrDenied
 		}
 		s.acquired = true
@@ -660,9 +582,8 @@ func (s *regionalSession) handle(ctx context.Context, q contracts.APIContextOper
 		if err := decodeOperationBody(q.Body, &r); err != nil {
 			return nil, err
 		}
-		d := s.consumed
 		recorder, ok := s.prepared.(evidence.ContextRecorder)
-		if s.acquired || !ok || s.resolved == nil || d == nil || !d.MayStart || d.Phase != value.StartCommitted || r.Until.After(d.ValidUntil) || r.Pin != s.resolved.Pin {
+		if s.acquired || !ok || s.resolved == nil || r.Until.After(s.work.NotAfter) || r.Pin != s.resolved.Pin {
 			return nil, value.ErrDenied
 		}
 		s.acquired = true
@@ -678,14 +599,13 @@ func (s *regionalSession) handle(ctx context.Context, q contracts.APIContextOper
 		if err := decodeOperationBody(q.Body, &r); err != nil {
 			return nil, err
 		}
-		d := s.consumed
 		recorder, ok := s.prepared.(evidence.PolicyContextRecorder)
 		// A policy raw predicate (ADR-261) or a human's approved rawPackets
 		// (ADR-279) or httpHeaders (ADR-282) recording, judged on the
 		// verified expectation.
 		_, _, policy := authorization.PolicyExecutor(s.work.Actor)
 		metered := policy || s.expectation != nil && s.expectation.Recording != nil && (s.expectation.Recording.Profile == "rawPackets" || s.expectation.Recording.Profile == "httpHeaders")
-		if s.acquired || !metered || !ok || s.resolved == nil || s.packetSource == nil || s.expectation == nil || d == nil || !d.MayStart || d.Phase != value.StartCommitted || !r.Started.Equal(d.CommittedAt) || r.Until.After(d.ValidUntil) || r.Pin != s.resolved.Pin || !samePacketSource(r.Source, *s.packetSource) || !r.Source.Valid(l.Now()) || !r.Permit.ValidFinite(l.Now()) || r.Permit.Binding.ExpectationDigest != [32]byte(s.work.ExpectationDigest) || r.Permit.Binding.CaptureID != s.work.CaptureID || r.Permit.Binding.ActionID != s.expectation.ActionID || !policyRecordingMatches(*s.expectation, r.Source, r.Permit) || !l.Now().Before(r.Until) {
+		if s.acquired || !metered || !ok || s.resolved == nil || s.packetSource == nil || s.expectation == nil || r.Until.After(s.work.NotAfter) || r.Pin != s.resolved.Pin || !samePacketSource(r.Source, *s.packetSource) || !r.Source.Valid(l.Now()) || !r.Permit.ValidFinite(l.Now()) || r.Permit.Binding.ExpectationDigest != [32]byte(s.work.ExpectationDigest) || r.Permit.Binding.CaptureID != s.work.CaptureID || r.Permit.Binding.ActionID != s.expectation.ActionID || !policyRecordingMatches(*s.expectation, r.Source, r.Permit) || !l.Now().Before(r.Until) {
 			return nil, value.ErrDenied
 		}
 		s.acquired = true
@@ -699,11 +619,10 @@ func (s *regionalSession) handle(ctx context.Context, q contracts.APIContextOper
 		if err := decodeOperationBody(q.Body, &r); err != nil {
 			return nil, err
 		}
-		d := s.consumed
 		recorder, ok := s.prepared.(evidence.ArgumentContextRecorder)
 		now := l.Now()
-		if s.acquired || !ok || s.resolved == nil || s.argumentSource == nil || s.expectation == nil || d == nil || !d.MayStart || d.Phase != value.StartCommitted ||
-			!r.Started.Equal(d.CommittedAt) || r.Until.After(d.ValidUntil) || r.Pin != s.resolved.Pin || !samePacketSource(r.Source, *s.argumentSource) || !r.Source.Valid(now) || !r.Permit.ValidFinite(now) ||
+		if s.acquired || !ok || s.resolved == nil || s.argumentSource == nil || s.expectation == nil ||
+			r.Until.After(s.work.NotAfter) || r.Pin != s.resolved.Pin || !samePacketSource(r.Source, *s.argumentSource) || !r.Source.Valid(now) || !r.Permit.ValidFinite(now) ||
 			r.Permit.Binding.ExpectationDigest != [32]byte(s.work.ExpectationDigest) || r.Permit.Binding.CaptureID != s.work.CaptureID || r.Permit.Binding.ActionID != s.expectation.ActionID || !argumentRecordingMatches(*s.expectation, r.Source, r.Permit) || !now.Before(r.Until) {
 			return nil, value.ErrDenied
 		}
@@ -716,7 +635,7 @@ func (s *regionalSession) handle(ctx context.Context, q contracts.APIContextOper
 	case opCollect:
 		// Collecting needs no start: the verified work names the capture
 		// whose held outcome is returned. Nothing is acquired or spent.
-		if l.Recordings == nil || s.prepared != nil || s.consumed != nil {
+		if l.Recordings == nil || s.prepared != nil || s.acquired {
 			return nil, value.ErrUnavailable
 		}
 		return l.Recordings.Collect(s.work)

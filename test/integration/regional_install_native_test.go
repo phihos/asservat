@@ -114,62 +114,6 @@ func regionalEnrollmentDiagnostics(t *testing.T, ctx context.Context, admin *pgx
 	t.Logf("regional enrollment checkpoint: %s", state)
 }
 
-// installRegionalStartCRD is the owned fixture's operator setup, equivalent to
-// applying the canonical chart CRD before a regional Helm hook or CLI install.
-// The fresh regional cluster must not already contain a CRD to adopt.
-func installRegionalStartCRD(t *testing.T, ctx context.Context, api kubernetes.Interface) {
-	t.Helper()
-	data, err := os.ReadFile("../../charts/asservat/crds/capacityreservations.yaml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	path := "/apis/apiextensions.k8s.io/v1/customresourcedefinitions"
-	client := api.CoreV1().RESTClient()
-	call, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-	if err := client.Post().AbsPath(path).MaxRetries(0).Body(data).Do(call).Error(); err != nil {
-		t.Fatal("operator regional start CRD create", err)
-	}
-	path += "/capacityreservations.asservat.io"
-	// The harness removes this owned cluster after the runtime has stopped.
-	// Do not independently delete its start journal while producers may live.
-	for {
-		raw, err := client.Get().AbsPath(path).MaxRetries(0).DoRaw(call)
-		var crd struct {
-			Status struct {
-				Conditions []struct{ Type, Status string } `json:"conditions"`
-			} `json:"status"`
-		}
-		established := false
-		if err == nil && json.Unmarshal(raw, &crd) == nil {
-			for _, condition := range crd.Status.Conditions {
-				established = established || condition.Type == "Established" && condition.Status == "True"
-			}
-		}
-		if established {
-			// Established precedes discovery propagation on the API server.
-			var resources meta.APIResourceList
-			raw, err = client.Get().AbsPath("/apis/asservat.io/v1alpha1").MaxRetries(0).DoRaw(call)
-			if err == nil && json.Unmarshal(raw, &resources) == nil {
-				main, status := false, false
-				for _, resource := range resources.APIResources {
-					main = main || resource.Name == "capacityreservations"
-					status = status || resource.Name == "capacityreservations/status"
-				}
-				if main && status {
-					t.Log("operator installed canonical regional CapacityReservation CRD")
-					return
-				}
-			}
-		}
-		select {
-		case <-call.Done():
-			t.Fatal("operator regional start CRD was not established and served", call.Err())
-		case <-time.After(100 * time.Millisecond):
-		}
-	}
-}
-
 // issueInstalledBootstrap issues one slot through the product BootstrapIssuer
 // on the installed hub's SQL trust with the projected product issuance
 // logins, then reads the KV record as the operator would. It returns that

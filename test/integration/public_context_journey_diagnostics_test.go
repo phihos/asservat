@@ -62,10 +62,6 @@ const (
 	journeyRunnerProcess
 	journeyRunnerPrepare
 	journeyRunnerKeys
-	journeyRunnerLocalPrepare
-	journeyRunnerBind
-	journeyRunnerReady
-	journeyRunnerConsume
 	journeyRunnerRecord
 	journeyRunnerEligibilityIdentity
 	journeyDiagnosticStages
@@ -81,7 +77,7 @@ var journeyDiagnosticNames = [journeyDiagnosticStages]string{
 	"capture-claim-outcome", "capture-write-outcome", "capture-complete-outcome", "capture-ack-outcome", "capture-ack-pair",
 	"capture-reconcile-claim-intent", "capture-reconcile-claim-outcome", "capture-find-intent", "capture-find-outcome", "capture-reconcile-ack-intent", "capture-reconcile-ack-outcome",
 	"regional-read", "regional-sign",
-	"regional-verify", "runner-recovery", "runner-read", "runner-target", "runner-eligibility", "runner-capability", "runner-retention", "runner-process", "runner-prepare", "runner-keys", "runner-local-prepare", "runner-bind", "runner-ready", "runner-consume", "runner-record-start", "runner-eligibility-identity",
+	"regional-verify", "runner-recovery", "runner-read", "runner-target", "runner-eligibility", "runner-capability", "runner-retention", "runner-process", "runner-prepare", "runner-keys", "runner-record-start", "runner-eligibility-identity",
 }
 
 type publicJourneyDiagnostics struct {

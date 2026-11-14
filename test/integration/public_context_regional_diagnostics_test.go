@@ -107,12 +107,6 @@ func (s *publicJourneyDiagnostics) Runner(in executionapp.APIContextRunner) exec
 	if in.Output != nil {
 		in.Output = p
 	}
-	if in.Local != nil {
-		in.Local = p
-	}
-	if in.Starts != nil {
-		in.Starts = p
-	}
 	if in.Record != nil {
 		in.Record = p
 		if stored, ok := p.in.Record.(executionapp.APIStoredCompletionRecorder); ok {
@@ -169,31 +163,8 @@ func (s *publicJourneyRunnerDiagnostics) PrepareContext(c context.Context, in ar
 	s.trace.record(journeyRunnerKeys, journeyRegionalCode(e))
 	return v, e
 }
-func (s *publicJourneyRunnerDiagnostics) PrepareStart(c context.Context, in executionvalue.PreparationCheck) (executionvalue.PreparedStart, error) {
-	v, e := s.in.Local.PrepareStart(c, in)
-	s.trace.record(journeyRunnerLocalPrepare, journeyRegionalCode(e))
-	return v, e
-}
-func (s *publicJourneyRunnerDiagnostics) BindAPIStart(c context.Context, in executionapp.APIExecutionCheck, r executionvalue.APIExecution, start executionvalue.PreparedStart) (executionvalue.APIExecution, error) {
-	v, e := s.in.Prepare.BindAPIStart(c, in, r, start)
-	s.trace.record(journeyRunnerBind, journeyRegionalCode(e))
-	return v, e
-}
-func (s *publicJourneyRunnerDiagnostics) ReadyStart(c context.Context, in executionvalue.Request) (executionvalue.Disposition, error) {
-	v, e := s.in.Local.ReadyStart(c, in)
-	s.trace.record(journeyRunnerReady, journeyRegionalCode(e))
-	return v, e
-}
-func (s *publicJourneyRunnerDiagnostics) ConsumeStart(c context.Context, in executionvalue.Request) (executionvalue.Disposition, error) {
-	v, e := s.in.Starts.ConsumeStart(c, in)
-	s.trace.record(journeyRunnerConsume, journeyRegionalCode(e))
-	return v, e
-}
-func (s *publicJourneyRunnerDiagnostics) LookupStart(c context.Context, in executionvalue.Request) (executionvalue.Disposition, error) {
-	return s.in.Starts.LookupStart(c, in)
-}
-func (s *publicJourneyRunnerDiagnostics) RecordAPIStart(c context.Context, in executionapp.APIExecutionCheck, r executionvalue.APIExecution, d executionvalue.Disposition) (executionvalue.APIExecution, error) {
-	v, e := s.in.Record.RecordAPIStart(c, in, r, d)
+func (s *publicJourneyRunnerDiagnostics) RecordAPIStart(c context.Context, in executionapp.APIExecutionCheck, r executionvalue.APIExecution) (executionvalue.APIExecution, error) {
+	v, e := s.in.Record.RecordAPIStart(c, in, r)
 	s.trace.record(journeyRunnerRecord, journeyRegionalCode(e))
 	return v, e
 }
@@ -219,8 +190,6 @@ type journeyDiagnosticRunnerSources struct {
 	executionapp.APIExecutionPreparer
 	executionapp.APIExecutionRecorder
 	executionapp.APIProcessReader
-	executionapp.APIStartPreparation
-	executionapp.StartJournal
 	executionapp.APIContextEligibility
 	executionapp.APIContextCapability
 	executionapp.APIContextRetention
@@ -337,7 +306,7 @@ func TestPublicJourneyDiagnosticsOriginalRegionalRunner(t *testing.T) {
 				}
 				return targets.PodResolution{}, private
 			}
-			runner := executionapp.APIContextRunner{Read: f, Prepare: f, Record: f, Process: f, Local: f, Starts: f, Targets: f, Eligibility: f, Capabilities: f, Retention: f, Recovery: f, Output: f, Collector: f, Now: func() time.Time { return now }}
+			runner := executionapp.APIContextRunner{Read: f, Prepare: f, Record: f, Process: f, Targets: f, Eligibility: f, Capabilities: f, Retention: f, Recovery: f, Output: f, Collector: f, Now: func() time.Time { return now }}
 			identityCalls := 0
 			result, e := trace.Runner(runner).Execute(ctx, journeyDiagnosticRunnerIdentity(func(c context.Context) (identity.Identity, error) { check(c); identityCalls++; return actor, nil }), id)
 			expectedStage := journeyRunnerRead

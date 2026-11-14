@@ -28,30 +28,12 @@ func ownerWorkloadGuard(observer, probe *kube.PermissionClient, pool value.Owner
 	if p := c.InitialHistoryProbe; p != nil {
 		history = &cfg.OwnerInitialHistoryProbe{Namespace: cfg.NamespaceRef{Name: p.Namespace.Name, UID: p.Namespace.UID}, ServiceAccount: p.ServiceAccount.Name, ServiceAccountUID: p.ServiceAccount.UID, Configuration: p.Configuration}
 	}
-	starts, err := ownerDeploymentStarts(c.APIContextStarts)
-	if err != nil {
-		return nil, mounts.ErrUnavailable
-	}
 	capacity, err := ownerDeploymentCapacityProbe(c.CapacityProbe)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
 	control := cfg.NamespaceRef{Name: c.Namespace.Name, UID: c.Namespace.UID}
-	return kube.NewOwnerWorkloadProtection(observer, probe, cfg.OwnerWorkloadAdministration{Name: g.Name, Deployment: pool.Deployment, DeploymentUID: pool.DeploymentUID, ControlNamespace: control, Administrators: actors, ConfigurationProbes: probes, SchedulingLeases: leases, InitialHistoryProbe: history, APIContextStarts: starts, CapacityProbe: capacity}, kube.GuardPin{PolicyUID: g.PolicyUID, PolicyGeneration: g.PolicyGeneration, BindingUID: g.BindingUID, BindingResourceVersion: g.BindingResourceVersion})
-}
-
-func ownerDeploymentStarts(in *contracts.OwnerDeploymentAPIContextStarts) (*cfg.OwnerAPIContextStarts, error) {
-	if in == nil {
-		return nil, nil
-	}
-	if len(validation.IsDNS1123Subdomain(in.CapacityAccount.Name)) != 0 || len(validation.IsDNS1123Subdomain(in.ExecutionAccount.Name)) != 0 {
-		return nil, mounts.ErrUnavailable
-	}
-	out := &cfg.OwnerAPIContextStarts{CapacityAccount: in.CapacityAccount.Name, CapacityAccountUID: in.CapacityAccount.UID, ExecutionAccount: in.ExecutionAccount.Name, ExecutionAccountUID: in.ExecutionAccount.UID, CapacityAudience: in.CapacityAudience}
-	if !out.Valid() {
-		return nil, mounts.ErrUnavailable
-	}
-	return out, nil
+	return kube.NewOwnerWorkloadProtection(observer, probe, cfg.OwnerWorkloadAdministration{Name: g.Name, Deployment: pool.Deployment, DeploymentUID: pool.DeploymentUID, ControlNamespace: control, Administrators: actors, ConfigurationProbes: probes, SchedulingLeases: leases, InitialHistoryProbe: history, CapacityProbe: capacity}, kube.GuardPin{PolicyUID: g.PolicyUID, PolicyGeneration: g.PolicyGeneration, BindingUID: g.BindingUID, BindingResourceVersion: g.BindingResourceVersion})
 }
 
 func ownerDeploymentCapacityProbe(in *contracts.OwnerDeploymentCapacityProbe) (*cfg.OwnerCapacityProbe, error) {

@@ -38,21 +38,6 @@ func (o APIProcessObservation) Matches(b Binding) bool {
 	return b.ExecutionClass == artifact.ContextAPIExecution && b.ClusterID == o.Binding.ClusterID && b.IssuerEpoch == o.Binding.IssuerEpoch && b.ExecutorPodUID == o.Binding.PodUID && b.ExecutorAccountUID == o.Binding.AccountUID && b.CollectorEpoch == o.Binding.ProcessEpoch
 }
 
-// PreparationCheck authorizes no acquisition. MayCreate must come only from an
-// acknowledged first SQL execution preparation. Retry and unknown replies pass
-// false, permitting only exact object lookup, never another CREATE.
-type PreparationCheck struct {
-	Binding               Binding
-	CheckedAt, ValidUntil time.Time
-	MayCreate             bool
-}
-
-func (p PreparationCheck) Valid(now time.Time) bool {
-	return p.Binding.Valid() && p.Binding.ExecutionClass == artifact.ContextAPIExecution && identity.Fresh(p.CheckedAt, p.ValidUntil, now, identity.AuthorityRecheckInterval) && !p.ValidUntil.After(p.Binding.NotAfter) && !now.Before(p.Binding.NotBefore)
-}
-
-type PreparedStart struct{ ObjectUID, ResourceVersion string }
-
 // APIExecution is immutable accepted effect identity and monotonic local outcome.
 // Prepared alone permits no acquisition. Unknown starts cannot become a new one.
 type APIExecution struct {

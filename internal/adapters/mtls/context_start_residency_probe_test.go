@@ -123,7 +123,7 @@ func TestContextStartOriginalResidencyCanEndSelectedQuery(t *testing.T) {
 	}
 	work, signer, _, _ := f.work(t, exchange.Receiver())
 	regional.work = work
-	local := contextstart.RegionalLocal{Process: regional, Targets: regional, Local: regional, Starts: regional, Output: regional, Collector: regional, Source: f.connector, Now: time.Now}
+	local := contextstart.RegionalLocal{Process: regional, Targets: regional, Output: regional, Collector: regional, Source: f.connector, Now: time.Now}
 	joined := make(chan struct{})
 	go func() {
 		defer close(joined)

@@ -109,21 +109,6 @@ func (s *groupRegionalStream) Send(ctx context.Context, frame contracts.APIConte
 			if json.Unmarshal(op.Body, &e) != nil || evidence.ContextExpectationDigest(e) != evidence.ContextExpectationDigest(f.work.Accepted.Expectation) {
 				return execution.ErrConflict
 			}
-		case "prepare-start":
-			body = execution.PreparedStart{ObjectUID: f.work.Accepted.Expectation.Registration.Location.AttemptID, ResourceVersion: "1"}
-		case "ready-start", "consume-start":
-			var request execution.Request
-			if json.Unmarshal(op.Body, &request) != nil || request.Validate(time.Now()) != nil {
-				return execution.ErrDenied
-			}
-			body = execution.Disposition{ObjectUID: request.ObjectUID, ResourceVersion: "1", Phase: execution.Ready, ValidUntil: request.ValidUntil}
-			if op.Method == "consume-start" {
-				v := body.(execution.Disposition)
-				v.Phase = execution.StartCommitted
-				v.MayStart = true
-				v.CommittedAt = time.Now().UTC().Truncate(time.Microsecond)
-				body = v
-			}
 		case "start-source-snapshot":
 			if extra, err := f.router.Attach(ctx, f.work.Target.ClusterID, regionalObservationID(9999)); !errors.Is(err, fleet.ErrCapacity) {
 				if extra != nil {
@@ -359,14 +344,10 @@ func (f *groupRegionalFixture) PrepareAPIExecution(ctx context.Context, c execut
 	f.records[e.CaptureUID] = r
 	return r, true, nil
 }
-func (f *groupRegionalFixture) BindAPIStart(ctx context.Context, c executionapp.APIExecutionCheck, r execution.APIExecution, p execution.PreparedStart) (execution.APIExecution, error) {
-	r.ObjectUID = p.ObjectUID
-	f.records[c.Work.Accepted.CaptureID] = r
-	return r, ctx.Err()
-}
-func (f *groupRegionalFixture) RecordAPIStart(ctx context.Context, c executionapp.APIExecutionCheck, r execution.APIExecution, d execution.Disposition) (execution.APIExecution, error) {
+func (f *groupRegionalFixture) RecordAPIStart(ctx context.Context, c executionapp.APIExecutionCheck, r execution.APIExecution) (execution.APIExecution, error) {
 	r.Phase = "started"
-	r.StartedAt = d.CommittedAt
+	r.ObjectUID = r.Binding.AttemptID
+	r.StartedAt = time.Now().UTC().Truncate(time.Microsecond)
 	if !r.Valid() {
 		return r, execution.ErrInvalid
 	}
@@ -501,7 +482,7 @@ func TestRegionalGroupRouterQueuesEarlierChildWhileLastAuditBlocked(t *testing.T
 	if len(f.queued) != 16 || len(f.records) != 16 || f.preparations != 16 || f.maximum.Load() != 1 || f.ackActive.Load() != 0 || f.ackMaximum.Load() > 16 || f.capacityRefusals != 16 {
 		t.Fatal("group lost work or ownership", len(f.queued), len(f.records), f.preparations, f.maximum.Load(), f.ackActive.Load())
 	}
-	for _, method := range []string{"resolve-source-snapshot", "read-process", "prepare-output", "prepare-start", "ready-start", "consume-start", "start-source-snapshot", "finish"} {
+	for _, method := range []string{"resolve-source-snapshot", "read-process", "prepare-output", "start-source-snapshot", "finish"} {
 		if f.methods[method] != 16 {
 			t.Fatal("control pipeline missing", method, f.methods)
 		}

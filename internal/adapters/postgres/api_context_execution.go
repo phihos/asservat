@@ -450,33 +450,26 @@ func apiPreparationRefusalError(err error, headroomRefused bool) error {
 	return err
 }
 
-func (s *APIContextExecutions) BindAPIStart(ctx context.Context, c app.APIExecutionCheck, r value.APIExecution, p value.PreparedStart) (value.APIExecution, error) {
-	return s.changeAPIStart(ctx, c, r, func(q *custodydb.Queries, old value.APIExecution) (custodydb.ContextExecution, error) {
-		if !authorization.UUID(p.ObjectUID) || !identity.Text(p.ResourceVersion, 128) {
-			return custodydb.ContextExecution{}, value.ErrInvalid
-		}
-		if old.ObjectUID != "" {
-			if old.ObjectUID != p.ObjectUID {
-				return custodydb.ContextExecution{}, value.ErrConflict
-			}
-			return q.ReadAPIExecution(ctx, custodydb.ReadAPIExecutionParams{RootID: id(s.root), CaptureID: id(r.Binding.CaptureID)})
-		}
-		return q.BindAPIStart(ctx, custodydb.BindAPIStartParams{RootID: id(s.root), CaptureID: id(r.Binding.CaptureID), ObjectUid: id(p.ObjectUID)})
-	})
-}
-func (s *APIContextExecutions) RecordAPIStart(ctx context.Context, c app.APIExecutionCheck, r value.APIExecution, d value.Disposition) (value.APIExecution, error) {
+// RecordAPIStart is the single start right (ADR-330 D7): one conditional
+// update from prepared to started. The start object UID column records the
+// attempt ID; no Kubernetes object exists per attempt.
+func (s *APIContextExecutions) RecordAPIStart(ctx context.Context, c app.APIExecutionCheck, r value.APIExecution) (value.APIExecution, error) {
 	return s.changeAPIStart(ctx, c, r, func(q *custodydb.Queries, old value.APIExecution) (custodydb.ContextExecution, error) {
 		now, err := q.CurrentTime(ctx)
 		if err != nil {
 			return custodydb.ContextExecution{}, err
 		}
-		if !d.MayStart || d.Phase != value.StartCommitted || d.ObjectUID != old.ObjectUID || d.CommittedAt.Before(old.Binding.NotBefore) || !d.CommittedAt.Before(old.Binding.NotAfter) || d.CommittedAt.After(now.Time) || !now.Time.Before(d.ValidUntil) || d.ValidUntil.After(old.Binding.NotAfter) || d.ValidUntil.After(c.ValidUntil) {
-			return custodydb.ContextExecution{}, value.ErrDenied
-		}
-		if old.Phase != "prepared" {
+		started := now.Time.UTC().Truncate(time.Microsecond)
+		if old.Phase != "prepared" || old.ObjectUID != "" {
 			return custodydb.ContextExecution{}, value.ErrConflict
 		}
-		return q.RecordAPIStart(ctx, custodydb.RecordAPIStartParams{RootID: id(s.root), CaptureID: id(r.Binding.CaptureID), StartedAt: ts(d.CommittedAt)})
+		if started.Before(old.Binding.NotBefore) || !started.Before(identity.Earlier(old.Binding.NotAfter, c.ValidUntil)) {
+			return custodydb.ContextExecution{}, value.ErrExpired
+		}
+		if _, err = q.BindAPIStart(ctx, custodydb.BindAPIStartParams{RootID: id(s.root), CaptureID: id(r.Binding.CaptureID), ObjectUid: id(old.Binding.AttemptID)}); err != nil {
+			return custodydb.ContextExecution{}, err
+		}
+		return q.RecordAPIStart(ctx, custodydb.RecordAPIStartParams{RootID: id(s.root), CaptureID: id(r.Binding.CaptureID), StartedAt: ts(started)})
 	})
 }
 func (s *APIContextExecutions) changeAPIStart(ctx context.Context, c app.APIExecutionCheck, r value.APIExecution, change func(*custodydb.Queries, value.APIExecution) (custodydb.ContextExecution, error)) (value.APIExecution, error) {

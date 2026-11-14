@@ -21,15 +21,11 @@ import (
 
 type policyStreamLocal struct {
 	*policySourceResolver
-	output    *policyRecorderOutput
-	committed value.Disposition
+	output *policyRecorderOutput
 }
 
 func (l *policyStreamLocal) PrepareContext(context.Context, artifact.ContextExpectation) (evidence.PreparedContext, error) {
 	return l.output, nil
-}
-func (l *policyStreamLocal) ConsumeStart(context.Context, value.Request) (value.Disposition, error) {
-	return l.committed, nil
 }
 
 // Actual bounded framing and both operation endpoints, with synthetic verified
@@ -50,11 +46,10 @@ func TestFinitePolicySourceAndStartUseOneFramedConversation(t *testing.T) {
 			permit := collector.ObservationPermit{Binding: collector.ObservationBinding{Scope: [32]byte{1}, ProgramDigest: [32]byte(compiler.FilterProgramDigest([]planning.BPFInstruction{{Code: 6, K: 65535}})), ExpectationDigest: [32]byte(w.ExpectationDigest), AccountingRule: collector.ObservationAccountingRule(), SessionID: w.Channel.ExchangeID, Fence: w.Channel.Challenge, CaptureID: w.CaptureID, ActionID: e.ActionID, PodUID: pin.UID, NodeUID: source.NodeUID, BootID: source.BootID, CollectorPodUID: source.CollectorPodUID, CollectorEpoch: source.CollectorEpoch}, StartedAt: n, SessionUntil: n.Add(4 * time.Second), LeaseUntil: n.Add(4 * time.Second), StartBy: n.Add(2 * time.Second), Duration: time.Second, Sequence: 1, Credit: 1 << 20, BytesPerSecond: 1 << 20}
 			resolver := &policySourceResolver{result: targets.RecorderResolution{Target: targets.PodResolution{ExecutionClass: artifact.ContextAPIExecution, Request: request, Pin: pin, PodResourceVersion: "1", WorkloadResourceVersion: "1", ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}, Recorder: targets.RecorderAnswer{Outcome: targets.RecorderAvailable, Source: &source}}}
 			output := &policyRecorderOutput{}
-			local := &policyStreamLocal{policySourceResolver: resolver, output: output, committed: value.Disposition{MayStart: true, Phase: value.StartCommitted, CommittedAt: n, ValidUntil: n.Add(3 * time.Second)}}
+			local := &policyStreamLocal{policySourceResolver: resolver, output: output}
 			ports := resolver.countingLocal.local()
 			ports.Targets = local
 			ports.Output = local
-			ports.Starts = local
 			ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
 			defer cancel()
 			receiver := fleet.APIContextReceiver{Channel: w.Channel, Window: identity.Check(n, identity.Recheck).Narrow(w.NotAfter)}
@@ -81,8 +76,7 @@ func TestFinitePolicySourceAndStartUseOneFramedConversation(t *testing.T) {
 					return "Unavailable", err
 				}
 				defer prepared.Close()
-				binding := value.Binding{CaptureID: w.CaptureID, AttemptID: w.AttemptID, ClusterID: w.Target.ClusterID, PodUID: w.Target.PodUID, ScopeDigest: w.ScopeDigest}
-				d, err := ops.ConsumeStart(call, value.Request{Binding: binding})
+				d, err := startWindow{CommittedAt: n, ValidUntil: n.Add(3 * time.Second)}, call.Err()
 				if err != nil {
 					return "Unavailable", err
 				}

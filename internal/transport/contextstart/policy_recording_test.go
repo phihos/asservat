@@ -13,7 +13,6 @@ import (
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/collector"
 	"asservat.local/asservat/internal/domain/configuration"
-	value "asservat.local/asservat/internal/domain/execution"
 	"asservat.local/asservat/internal/domain/planning"
 	"asservat.local/asservat/internal/domain/targets"
 )
@@ -54,7 +53,7 @@ func TestPolicyRecordingOperationPinsIndependentWorkAndSource(t *testing.T) {
 		{"capture", func(r *policyRecordingRequest, _ *regionalSession) { r.Permit.Binding.CaptureID = id("40") }},
 		{"action", func(r *policyRecordingRequest, _ *regionalSession) { r.Permit.Binding.ActionID = "another" }},
 		{"duration", func(r *policyRecordingRequest, _ *regionalSession) { r.Permit.Duration = 2 * time.Second }},
-		{"committed-start", func(r *policyRecordingRequest, _ *regionalSession) { r.Started = r.Started.Add(time.Microsecond) }},
+		{"deadline", func(r *policyRecordingRequest, s *regionalSession) { r.Until = s.work.NotAfter.Add(time.Second) }},
 		{"expired-start", func(r *policyRecordingRequest, _ *regionalSession) { r.Permit.StartBy = now }},
 		{"ordinary-actor", func(_ *policyRecordingRequest, s *regionalSession) { s.work.Actor = workFixture().Work.Actor }},
 		{"no-local-source", func(_ *policyRecordingRequest, s *regionalSession) { s.packetSource = nil }},
@@ -67,7 +66,7 @@ func TestPolicyRecordingOperationPinsIndependentWorkAndSource(t *testing.T) {
 			w.ExpectationDigest = evidence.ContextExpectationDigest(e)
 			local := (&countingLocal{}).local()
 			local.Now = func() time.Time { return now }
-			s := &regionalSession{local: local, work: w, prepared: output, resolved: &targets.PodResolution{Pin: pin}, packetSource: &source, expectation: &e, consumed: &value.Disposition{MayStart: true, Phase: value.StartCommitted, CommittedAt: now, ValidUntil: now.Add(3 * time.Second)}}
+			s := &regionalSession{local: local, work: w, prepared: output, resolved: &targets.PodResolution{Pin: pin}, packetSource: &source, expectation: &e}
 			r := base
 			test.change(&r, s)
 			b, _ := json.Marshal(r)
@@ -195,7 +194,7 @@ func TestManualHTTPHeadersRecordingStartsMetered(t *testing.T) {
 			w.ExpectationDigest = evidence.ContextExpectationDigest(e)
 			local := (&countingLocal{}).local()
 			local.Now = func() time.Time { return now }
-			s := &regionalSession{local: local, work: w, prepared: output, resolved: &targets.PodResolution{Pin: pin}, packetSource: &source, expectation: &e, consumed: &value.Disposition{MayStart: true, Phase: value.StartCommitted, CommittedAt: now, ValidUntil: now.Add(3 * time.Second)}}
+			s := &regionalSession{local: local, work: w, prepared: output, resolved: &targets.PodResolution{Pin: pin}, packetSource: &source, expectation: &e}
 			b, _ := json.Marshal(policyRecordingRequest{Pin: pin, Started: now, Until: now.Add(3 * time.Second), Source: source, Permit: permit})
 			_, err := s.handle(t.Context(), contracts.APIContextOperation{Method: opStartPolicyRecording, Body: b})
 			if name == "httpHeaders" && (err != nil || output.policyStarts != 1) || name != "httpHeaders" && (err == nil || output.policyStarts != 0) {

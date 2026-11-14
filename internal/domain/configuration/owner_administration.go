@@ -15,7 +15,6 @@ type OwnerWorkloadAdministration struct {
 	SchedulingLeases                []OwnerSchedulingLease
 	CredentialSecrets               []OwnerCredentialSecret   `json:",omitempty"`
 	CapacityProbe                   *OwnerCapacityProbe       `json:",omitempty"`
-	APIContextStarts                *OwnerAPIContextStarts    `json:",omitempty"`
 	InitialHistoryProbe             *OwnerInitialHistoryProbe `json:",omitempty"`
 }
 
@@ -60,21 +59,6 @@ type OwnerCredentialSecret struct {
 	Secret, ServiceAccount string
 }
 
-// OwnerAPIContextStarts is an explicit installed API-only profile. It grants
-// no RBAC and never substitutes for the independent StartAdmission policy.
-type OwnerAPIContextStarts struct {
-	CapacityAccount, CapacityAccountUID   string
-	ExecutionAccount, ExecutionAccountUID string
-	// CapacityAudience, when set, admits the execution Pod's own 600-second
-	// Pod-bound TokenRequest for the capacity account with exactly this API
-	// audience (ADR-175). Empty keeps the guard bytes of earlier plans.
-	CapacityAudience string
-}
-
-func (p OwnerAPIContextStarts) Valid() bool {
-	return identity.Text(p.CapacityAccount, 253) && authorization.UUID(p.CapacityAccountUID) && identity.Text(p.ExecutionAccount, 253) && authorization.UUID(p.ExecutionAccountUID) && p.CapacityAccount != p.ExecutionAccount && p.CapacityAccountUID != p.ExecutionAccountUID && (p.CapacityAudience == "" || identity.Text(p.CapacityAudience, 256))
-}
-
 // OwnerCapacityProbe allows only the exact installed worker to perform two
 // nonpersistent capacity-source probes. It grants neither RBAC nor source authority.
 type OwnerCapacityProbe struct{ ServiceAccount, ServiceAccountUID string }
@@ -88,9 +72,6 @@ func (p OwnerWorkloadAdministration) Valid() bool {
 		return false
 	}
 	if p.InitialHistoryProbe != nil && (!p.InitialHistoryProbe.Valid() || p.InitialHistoryProbe.Namespace.Name == p.ControlNamespace.Name || p.InitialHistoryProbe.Namespace.UID == p.ControlNamespace.UID) {
-		return false
-	}
-	if p.APIContextStarts != nil && !p.APIContextStarts.Valid() {
 		return false
 	}
 	if !identity.Text(p.Name, 253) || !identity.Text(p.Deployment, 253) || !authorization.UUID(p.DeploymentUID) || !identity.Text(p.ControlNamespace.Name, 63) || !authorization.UUID(p.ControlNamespace.UID) || !actorsValid(p.Administrators) || len(p.ConfigurationProbes) > MaxOwnerConfigurationProbes || len(p.SchedulingLeases) > 4 {
