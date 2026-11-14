@@ -64,9 +64,6 @@ type InstallerPublicSettings struct {
 	GroupMaxAgeSeconds int                      `json:"groupMaxAgeSeconds"`
 	// Approvals passes protected step-up and manual-recording policy unchanged.
 	Approvals *IdentityApprovals `json:"approvals,omitempty"`
-	// PermissionDelegations are the trusted delegated AccessBinding writers
-	// of the installed permission guard (ADR-189); empty by default.
-	PermissionDelegations []PermissionDelegation `json:"permissionDelegations,omitempty"`
 	// Capacity is the operator's capacity profile and ProcessingOperators the
 	// processing release operators (ADR-190). Both are required for capacity.
 	Capacity            *InstallerCapacitySettings `json:"capacity,omitempty"`

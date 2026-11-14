@@ -47,7 +47,7 @@ Apply configuration changes with `helm upgrade` and the same values file.
 | `image.pullPolicy`, `image.pullSecrets` | `IfNotPresent`, `[]` | Pull settings for every product Pod |
 | `installation.name` | `asservat` | Prefix of every object name (DNS label, at most 30 characters) |
 | `origin` | empty | Browser origin of the console and API, e.g. `https://asservat.example.org` |
-| `identity.*` | see values.yaml | Issuer, console client, clients, eligibility, session limits, `approvals`, `processingOperators`, `permissionDelegations` |
+| `identity.*` | see values.yaml | Issuer, console client, clients, eligibility, session limits, `approvals`, `processingOperators` |
 | `processors`, `captureHistory` | omitted | Privacy inventory organizations; history view/cache ceilings |
 | `exposure.service` | `ClusterIP` | Service type of hub-api (port 9445) |
 | `exposure.tls.mode`, `exposure.tlsSecret` | `pod`, empty | ADR-327: TLS in hub-api with `tlsSecret`, or `proxy` behind an Ingress/Gateway |

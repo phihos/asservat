@@ -126,9 +126,8 @@ type HubAPIPublic struct {
 	DownloadMaxSeconds   int                     `json:"downloadMaxSeconds"`
 	// OperationAudit.RetentionSeconds is ignored: the current capacity
 	// qualification supplies it.
-	OperationAudit        OwnerPublicOperationAudit `json:"operationAudit"`
-	Fleet                 *HubAPIFleet              `json:"fleet,omitempty"`
-	PermissionDelegations []PermissionDelegation    `json:"permissionDelegations,omitempty"`
+	OperationAudit OwnerPublicOperationAudit `json:"operationAudit"`
+	Fleet          *HubAPIFleet              `json:"fleet,omitempty"`
 	// RegionalOffer publishes ConfigMap <name>-regional-offer for the
 	// combined-mode connector (mode=combined).
 	RegionalOffer *HubAPIRegionalOffer `json:"regionalOffer,omitempty"`

@@ -43,8 +43,14 @@
           "maxItems": 4,
           "uniqueItems": true
         },
-        "scope": {
-          "$ref": "https://asservat.io/spec/v1/permission-common.schema.json#/$defs/scope"
+        "workloads": {
+          "type": "array",
+          "items": {
+            "$ref": "https://asservat.io/spec/v1/permission-common.schema.json#/$defs/workloadRef"
+          },
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true
         },
         "notAfter": {
           "type": "string",
@@ -63,7 +69,6 @@
         "effect",
         "subjects",
         "roles",
-        "scope",
         "reason"
       ],
       "allOf": [

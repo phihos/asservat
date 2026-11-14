@@ -34,6 +34,11 @@ func (w *hubWorker) runCleanup(ctx context.Context) error {
 	if err := w.validCleanupConfig(); err != nil {
 		return err
 	}
+	// Setup's capacity source row and the stored qualification exist once
+	// the capacity child has started; opening earlier only fails.
+	if !w.awaitCapacity(ctx) {
+		return ctx.Err()
+	}
 	report := eventLog(os.Stderr, "operation cleanup")
 	for {
 		d, err := w.openCleanup(ctx)

@@ -3151,7 +3151,7 @@ paths:
   /api/v1/operations/preview_access_change:
     post:
       operationId: preview_access_change
-      summary: 'Fleet operators and delegation previewers preview the Allow/Deny/Indeterminate changes that proposed permission objects would cause, using the same evaluator; paged, changes nothing (browser only, ADR-237).'
+      summary: 'Fleet operators preview the Allow/Deny/Indeterminate changes that proposed permission objects would cause, using the same evaluator; paged, changes nothing (browser only, ADR-237).'
       tags:
       - Human console
       x-domain-contract: preview_access_change
@@ -5833,10 +5833,17 @@ components:
                   const: AccessBinding
                 spec:
                   $ref: https://asservat.io/spec/v1/access-binding.schema.json#/properties/spec
+                clusterID:
+                  type: string
+                  format: uuid
+                namespace:
+                  $ref: https://asservat.io/spec/v1/permission-common.schema.json#/$defs/namespaceRef
               required:
               - action
               - kind
               - spec
+              - clusterID
+              - namespace
             - type: object
               additionalProperties: false
               properties:
@@ -5850,11 +5857,18 @@ components:
                   maxLength: 64
                 spec:
                   $ref: https://asservat.io/spec/v1/access-binding.schema.json#/properties/spec
+                clusterID:
+                  type: string
+                  format: uuid
+                namespace:
+                  $ref: https://asservat.io/spec/v1/permission-common.schema.json#/$defs/namespaceRef
               required:
               - action
               - kind
               - uid
               - spec
+              - clusterID
+              - namespace
             - type: object
               additionalProperties: false
               properties:

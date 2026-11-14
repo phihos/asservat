@@ -128,6 +128,15 @@ def check_secrets(render):
     assert not any(r["kind"] == "Job" for r in render({"mode": "cluster"}))
 
 
+def check_keycloak_waits_for_database(render):
+    # Keycloak exits on an unreachable database; its Pod waits for PostgreSQL first.
+    pod = named(render(bundled_values("combined")), "Deployment", "asservat-keycloak")["spec"]["template"]["spec"]
+    wait, = pod["initContainers"]
+    assert wait["name"] == "wait-database" and wait["image"] == pod["containers"][0]["image"]
+    assert wait["command"][:2] == ["bash", "-c"] and "/dev/tcp/asservat-postgres.asservat-system.svc/5432" in wait["command"][2]
+    assert wait["securityContext"]["allowPrivilegeEscalation"] is False
+
+
 def check_setup(render):
     docs = render(bundled_values("combined"))
     jobs = [r for r in docs if r["kind"] == "Job" and r["metadata"]["name"].startswith("asservat-setup-")]
@@ -173,6 +182,34 @@ def check_setup(render):
     external = hub_values()
     external["services"]["postgres"]["external"]["adminSecret"] = ""
     assert "services.postgres.external.adminSecret is required" in render(external, ok=False)
+
+
+def check_accessbindings(render):
+    """ADR-329: namespace RBAC governs AccessBindings; bind on each role."""
+    docs = render(bundled_values("combined"))
+    base = "asservat-system-asservat-accessbindings"
+    view = named(docs, "ClusterRole", base + "-view")
+    assert {k for k, v in view["metadata"]["labels"].items() if k.startswith("rbac.authorization.k8s.io/aggregate-to-") and v == "true"} == {
+        "rbac.authorization.k8s.io/aggregate-to-view", "rbac.authorization.k8s.io/aggregate-to-edit", "rbac.authorization.k8s.io/aggregate-to-admin"}
+    assert view["rules"] == [{"apiGroups": ["asservat.io"], "resources": ["accessbindings"], "verbs": ["get", "list", "watch"]}]
+    admin = named(docs, "ClusterRole", base + "-admin")
+    assert admin["metadata"]["labels"].get("rbac.authorization.k8s.io/aggregate-to-admin") == "true"
+    assert "rbac.authorization.k8s.io/aggregate-to-edit" not in admin["metadata"]["labels"]
+    assert {"apiGroups": ["asservat.io"], "resources": ["accessroles"], "resourceNames": ["evidence-reader", "workload-maintainer", "evidence-owner", "action-approver"], "verbs": ["bind"]} in admin["rules"]
+    automation = named(docs, "ClusterRole", base + "-automation")
+    assert not any(k.startswith("rbac.authorization.k8s.io/aggregate") for k in automation["metadata"]["labels"])
+    assert automation["rules"] == [{"apiGroups": ["asservat.io"], "resources": ["accessroles"], "resourceNames": ["automation"], "verbs": ["bind"]}]
+    policy = named(docs, "ValidatingAdmissionPolicy", base)
+    rule, = policy["spec"]["matchConstraints"]["resourceRules"]
+    # DELETE stays unchecked, like RoleBindings: the namespace controller
+    # must be able to remove a deleted namespace's bindings.
+    assert rule["operations"] == ["CREATE", "UPDATE"] and rule["resources"] == ["accessbindings"] and policy["spec"]["failurePolicy"] == "Fail"
+    expressions = [v["expression"] for v in policy["spec"]["validations"]]
+    assert any("object.spec.roles.all(r, (request.operation == 'UPDATE' && has(oldObject.spec.roles) && r in oldObject.spec.roles) || authorizer.group('asservat.io').resource('accessroles').namespace(request.namespace).name(r).check('bind')" in e for e in expressions)
+    assert any("name('automation').check('bind')" in e for e in expressions)
+    assert named(docs, "ValidatingAdmissionPolicyBinding", base)["spec"] == {"policyName": base, "validationActions": ["Deny"]}
+    # A workload-cluster release observes no AccessBindings yet.
+    assert not any(r["metadata"]["name"].startswith(base) for r in render({"mode": "cluster"}))
 
 
 def check_exposure(render):
@@ -315,6 +352,8 @@ def main():
         run(["template", "asservat", str(CHART), "-f", str(values), "--kube-version", "1.34.9"], ok=False)
         check_secrets(render)
         check_setup(render)
+        check_accessbindings(render)
+        check_keycloak_waits_for_database(render)
         check_exposure(render)
         check_examples(render, directory)
         check_collector(directory)
@@ -327,7 +366,7 @@ def main():
                 assert yaml.safe_load(bundle.extractfile("asservat/crds/" + name).read()) == content
         run(["lint", "--strict", str(archive), "-f", str(values)])
         assert run(["template", "asservat", str(archive), "--include-crds", "-f", str(values)]) == run(["template", "asservat", str(CHART), "--include-crds", "-f", str(values)])
-    print("Helm schema/render/package checks passed: 3 modes, 8 canonical CRDs, secrets hook Job and Role, setup Job, Ingress/HTTPRoute exposure, examples, the guarded collector DaemonSet and invalid values rejected.")
+    print("Helm schema/render/package checks passed: 3 modes, 8 canonical CRDs, secrets hook Job and Role, setup Job, AccessBinding RBAC and bind policy, Ingress/HTTPRoute exposure, examples, the guarded collector DaemonSet and invalid values rejected.")
     print(run(["version", "--short"]).strip())
 
 

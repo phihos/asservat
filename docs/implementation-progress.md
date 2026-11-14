@@ -38,6 +38,21 @@ Schemas kept because Go still embeds them with production code paths:
 `charts/asservat/crds/capacityreservations.yaml`
 (`internal/adapters/kubernetes/start_admission.go`). Remove each with its code.
 `local-key-configuration.schema.json` had no runtime consumer and is deleted.
+## AccessBindings in application namespaces (ADR-329, 2026-11-14)
+
+Branch `feat/hn-accessbindings` on the Helm-native candidate. AccessBindings
+live in the namespace they grant (no `spec.scope`; optional `spec.workloads`);
+the hub-worker lists and watches them in every namespace of the hub cluster.
+Namespace RBAC governs writers; a Helm-rendered ValidatingAdmissionPolicy
+requires `bind` on `accessroles.asservat.io/<role>` (and `automation` for
+`spec.automation`). The delegation envelope, the permission admission builder
+and delegated previewers are removed. On a fresh all-bundled combined install
+on the owned kind cluster `asservat-ab`, `TestHelmNativeKindJourney` passed
+with the maintainer AccessBinding in the workload namespace `apps-hn`;
+server dry-runs confirmed `edit` refused by RBAC, `admin` allowed, a writer
+without `bind` refused, automation refused without the automation ClusterRole.
+Not run: `make permission-integration` (its suite was adapted, not executed).
+Pending: `mode: cluster` regions deliver no AccessBindings yet.
 
 ## Helm-native installation (2026-11-14)
 

@@ -460,3 +460,18 @@ Rollback is a binary scheduling rollback with no schema/data migration. Local
 controlled-port regressions establish scheduling, joins and fresh reconstruction;
 they do not establish corrected installed availability or real SQL contention
 qualification.
+
+## Demands for not-yet-enrolled workloads (2026-11-14)
+
+On a fresh Helm-native kind install the first `preview_capture` after deploying
+a workload was refused at `facts/storage` after its full readiness wait, and the
+retry passed. The workload was created at 02:30:00, discovery enrolled it
+(`ready_at`) at 02:30:11.7, and `capacity_refresh_demand` held zero rows: the
+function silently dropped every demand for a workload without a ready
+`capacity_workload` row, so the demand lane never ran. Migration 00161 records
+the demand for any validated workload name/UID, bounded to sixteen active demands
+per root (the existing read limit), and deletes expired rows again (00076 removed
+the download re-arming that kept them). The demand lane already runs the same
+guarded observation and enrollment as discovery, so it enrolls the demanded
+workload within the preview's existing wait. A demand still confers no authority;
+no deadline, role, privilege or loop is added.

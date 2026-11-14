@@ -8,7 +8,7 @@ export interface components {
             effect: "Allow" | "Deny";
             subjects: components["schemas"]["Contract_permission_common_3ecc34f302c77f66"][];
             roles: components["schemas"]["Contract_permission_common_4158ef06eeec0fc1"][];
-            scope: components["schemas"]["Contract_permission_common_5df8ba27f204b8b8"];
+            workloads?: components["schemas"]["Contract_permission_common_a7eab82de91b4ad7"][];
             /** Format: date-time */
             notAfter?: string;
             reason: string;
@@ -23,16 +23,6 @@ export interface components {
         };
         /** @enum {string} */
         Contract_permission_common_4158ef06eeec0fc1: "evidence-reader" | "workload-maintainer" | "evidence-owner" | "action-approver";
-        Contract_permission_common_5df8ba27f204b8b8: {
-            /** Format: uuid */
-            clusterID: string;
-            namespaceRef: components["schemas"]["Contract_permission_common_94881780cf4467f4"];
-            workloads?: components["schemas"]["Contract_permission_common_a7eab82de91b4ad7"][];
-        };
-        Contract_permission_common_94881780cf4467f4: {
-            name: string;
-            uid: string;
-        };
         Contract_permission_common_a7eab82de91b4ad7: {
             /** @enum {string} */
             kind: "Deployment" | "StatefulSet";
@@ -46,6 +36,10 @@ export interface components {
             maxBytes: number;
             maxObservedBytes: number;
             maxObservedEvents?: number;
+        };
+        Contract_permission_common_94881780cf4467f4: {
+            name: string;
+            uid: string;
         };
         Contract_permission_source_ad816c81a7733f89: {
             enabled: boolean;
@@ -103,6 +97,9 @@ export interface components {
                 /** @constant */
                 kind: "AccessBinding";
                 spec: components["schemas"]["Contract_access_binding_ad816c81a7733f89"];
+                /** Format: uuid */
+                clusterID: string;
+                namespace: components["schemas"]["Contract_permission_common_94881780cf4467f4"];
             } | {
                 /** @constant */
                 action: "update";
@@ -110,6 +107,9 @@ export interface components {
                 kind: "AccessBinding";
                 uid: string;
                 spec: components["schemas"]["Contract_access_binding_ad816c81a7733f89"];
+                /** Format: uuid */
+                clusterID: string;
+                namespace: components["schemas"]["Contract_permission_common_94881780cf4467f4"];
             } | {
                 /** @constant */
                 action: "create";

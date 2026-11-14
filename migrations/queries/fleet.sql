@@ -74,7 +74,9 @@ SELECT * FROM fleet_peer_certificate WHERE installation_id=$1 AND peer_id=$2 ORD
 SELECT * FROM fleet_bootstrap_intent WHERE installation_id=$1 AND actor_digest=$2 AND key_digest=$3;
 
 -- name: LatestPeerBootstrapIntent :one
-SELECT sqlc.embed(i), (b.claimed_at IS NOT NULL)::boolean AS claimed FROM fleet_bootstrap_intent i
+SELECT sqlc.embed(i), (b.claimed_at IS NOT NULL)::boolean AS claimed,
+ EXISTS(SELECT 1 FROM cluster_bootstrap_activation a WHERE a.installation_id=i.installation_id AND a.peer_id=i.peer_id AND a.activated_at IS NOT NULL)::boolean AS activated
+FROM fleet_bootstrap_intent i
 LEFT JOIN fleet_bootstrap b ON b.installation_id=i.installation_id AND b.id=i.id
 WHERE i.installation_id=$1 AND i.peer_id=$2 ORDER BY i.not_before DESC LIMIT 1;
 

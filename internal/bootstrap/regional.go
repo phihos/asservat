@@ -94,8 +94,13 @@ func RunRegional(ctx context.Context, podUID string) error {
 		return errors.Join(mounts.ErrUnavailable, err)
 	}
 	defer files.Close()
-	r, err := NewRegional(ctx, files, podUID)
-	if err != nil {
+	// Combined mode: the hub-api writes the offer after it starts, so the
+	// connector waits in-process instead of exiting into kubelet back-off.
+	var r *Regional
+	if err = waitStartup(ctx, "connector", startupLog, func(ctx context.Context) (err error) {
+		r, err = NewRegional(ctx, files, podUID)
+		return err
+	}, nil); err != nil {
 		return err
 	}
 	defer r.Close()

@@ -246,9 +246,9 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 	case "ongoing-mixed":
 		ongoingAction, allowed = "packetCapture and syscallTrace", []any{"packetCapture", "syscallTrace"}
 	}
-	binding := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "AccessBinding", "metadata": map[string]any{"name": "ongoing-packet-automation"}, "spec": map[string]any{"effect": "Allow", "subjects": f.binding["subjects"], "roles": []any{"workload-maintainer", "evidence-owner"}, "scope": f.binding["scope"], "reason": "installed ongoing packet Save qualification", "automation": map[string]any{"allowedActions": allowed, "maxLifetimeSeconds": ongoingSaveLifetime, "maxExecutions": 8, "maxBytes": 64 << 20, "maxObservedBytes": 128 << 20}}}
+	binding := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "AccessBinding", "metadata": map[string]any{"name": "ongoing-packet-automation"}, "spec": map[string]any{"effect": "Allow", "subjects": f.binding["subjects"], "roles": []any{"workload-maintainer", "evidence-owner"}, "workloads": f.binding["workloads"], "reason": "installed ongoing packet Save qualification", "automation": map[string]any{"allowedActions": allowed, "maxLifetimeSeconds": ongoingSaveLifetime, "maxExecutions": 8, "maxBytes": 64 << 20, "maxObservedBytes": 128 << 20}}}
 	body, _ := json.Marshal(binding)
-	if err = f.hub.Post().AbsPath(f.base + "accessbindings").Body(body).Do(ctx).Error(); err != nil {
+	if err = f.region.CoreV1().RESTClient().Post().AbsPath("/apis/asservat.io/v1alpha1/namespaces/" + f.namespace + "/accessbindings").Body(body).Do(ctx).Error(); err != nil {
 		t.Fatal("operator packet automation envelope", err)
 	}
 	policy := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "DebugPolicy", "metadata": map[string]any{"name": installedOngoingSaveName}, "spec": installedOngoingSaveSpec(f.cluster, f.namespace, f.workload)}

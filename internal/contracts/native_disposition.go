@@ -14,6 +14,17 @@ type NativeNoCommand struct {
 
 func (*NativeNoCommand) Error() string { return "no native command admitted" }
 
+// NativeFinished is the positively checked answer that the worker's download
+// parent ended. NativeClient constructs it only after an exact nonce/worker
+// response over the verified h2/TLS connection; the worker then stops cleanly.
+// It never authorizes, replays or retries any operation.
+type NativeFinished struct {
+	Reference NativeReference
+	Nonce     string
+}
+
+func (*NativeFinished) Error() string { return "native download parent finished" }
+
 const NativeIdleRetry = time.Second
 const NativeMaximumConversations = 32768
 

@@ -6,8 +6,8 @@ import { validInput_preview_access_change, validOutput_preview_access_change } f
 import { id, result, session } from '../capture/test-fixtures';
 
 // Synthetic, content-free preview fixtures for unit tests only.
-const spec = { effect: 'Deny', subjects: [{ kind: 'Group', issuer: 'https://identity.invalid', id: 'team-a' }], roles: ['evidence-reader'], scope: { clusterID: id(1), namespaceRef: { name: 'payments', uid: 'ns' } }, reason: 'Synthetic review' };
-const changes = [{ action: 'create', kind: 'AccessBinding', spec }];
+const spec = { effect: 'Deny', subjects: [{ kind: 'Group', issuer: 'https://identity.invalid', id: 'team-a' }], roles: ['evidence-reader'], reason: 'Synthetic review' };
+const changes = [{ action: 'create', kind: 'AccessBinding', clusterID: id(1), namespace: { name: 'payments', uid: 'ns' }, spec }];
 const cell = { cluster_id: id(1), namespace_uid: 'ns', workload_uid: '*', other_workloads: true };
 const revision = 'ab'.repeat(32);
 const delta = (subject: string) => ({ ...cell, subject: { kind: 'Group', issuer: 'https://identity.invalid', id: subject }, operation: 'read', before: 'Allow', after: 'Deny', after_unmet: 'ExplicitDeny',

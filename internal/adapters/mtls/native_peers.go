@@ -48,6 +48,10 @@ func (p *NativePeerChecks) worker(ctx context.Context, h contracts.NativeHello) 
 			return w, nil, artifact.ErrInvalid
 		}
 		original, err := p.Workers.ReadDownloadWorkerEnrollment(ctx, parent.ID, h.Reference.WorkerID)
+		var finished *evidence.NativeParentFinished
+		if errors.As(err, &finished) {
+			return p.finishedWorker(finished, parent, h)
+		}
 		if err != nil || !original.Valid(p.Now()) {
 			return w, nil, artifact.ErrDownloadUnavailable
 		}
@@ -73,9 +77,37 @@ func (p *NativePeerChecks) worker(ctx context.Context, h contracts.NativeHello) 
 	verifier, e := NewKeyPeerVerifier(roots, h.Reference.InstallationID, p.Now)
 	return w, verifier, e
 }
+
+// finishedWorker returns the finished observation with the exact worker's
+// issuer verifier, so the caller still authenticates the actual TLS peer
+// before it answers that worker's lookup with "finished".
+func (p *NativePeerChecks) finishedWorker(finished *evidence.NativeParentFinished, parent value.AcquisitionParent, h contracts.NativeHello) (value.AcquisitionWorkerIdentity, *KeyPeerVerifier, error) {
+	w := finished.Worker
+	if !w.Valid() || w.Intent.ID != h.Reference.WorkerID || w.Intent.Acquisition().Parent != parent || w.Binding.InstallationID != h.Reference.InstallationID {
+		return value.AcquisitionWorkerIdentity{}, nil, artifact.ErrDownloadUnavailable
+	}
+	roots, e := p.WorkerTrust.IssuerRoots(w.Intent.Profile, p.Now())
+	if e != nil {
+		return value.AcquisitionWorkerIdentity{}, nil, e
+	}
+	verifier, e := NewKeyPeerVerifier(roots, h.Reference.InstallationID, p.Now)
+	if e != nil {
+		return value.AcquisitionWorkerIdentity{}, nil, e
+	}
+	return value.AcquisitionWorkerIdentity{}, verifier, finished
+}
 func (p *NativePeerChecks) CheckWorkerNative(ctx context.Context, state *tls.ConnectionState, h contracts.NativeHello) (evidence.NativeOrigin, error) {
 	var zero evidence.NativeOrigin
 	w, v, e := p.worker(ctx, h)
+	var finished *evidence.NativeParentFinished
+	if errors.As(e, &finished) && v != nil {
+		// Only the exact admitted Pod's own certificate learns that its parent ended.
+		peer, err := v.Verify(state)
+		if err != nil || peer.Role != "acquisition" || peer.PeerID != finished.Worker.Binding.PodUID || len(h.WorkerLeaf) != 0 {
+			return zero, artifact.ErrDownloadUnavailable
+		}
+		return zero, finished
+	}
 	if e != nil {
 		return zero, e
 	}

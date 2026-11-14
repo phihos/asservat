@@ -5,6 +5,9 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/pem"
+	"errors"
+	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/netip"
@@ -118,7 +121,51 @@ func readOwnerInputs(ctx context.Context, files *os.Root) (*ownerInputs, error) 
 	} else {
 		defer public.Close()
 	}
-	return loadHubAPIInputs(ctx, files, config, ids, public)
+	return waitHubAPIInputs(ctx, os.Stderr, func(ctx context.Context) (*ownerInputs, error) {
+		return loadHubAPIInputs(ctx, files, config, ids, public)
+	})
+}
+
+// waitHubAPIInputs retries the input load in process while a dependency that
+// another component produces after the first install is still missing (the
+// hub-worker's capacity qualification, setup-configured OpenBao mounts and
+// keys, objects read by name). Readiness is served only after the inputs
+// load, so it stays false meanwhile. Invalid inputs stay fatal.
+func waitHubAPIInputs(ctx context.Context, out io.Writer, load func(context.Context) (*ownerInputs, error)) (*ownerInputs, error) {
+	var in *ownerInputs
+	waiting := map[string]bool{}
+	err := waitStartup(ctx, "hub-api inputs", func(line string) { fmt.Fprintln(out, line) }, func(ctx context.Context) error {
+		v, err := load(ctx)
+		if err != nil {
+			var step hubAPIInputError
+			if errors.As(err, &step) && hubAPIInputWaits(err) && !waiting[string(step)] {
+				waiting[string(step)] = true
+				fmt.Fprintln(out, "hub-api inputs: waiting for "+step.FixedStep())
+			}
+			return err
+		}
+		in = v
+		return nil
+	}, hubAPIInputWaits)
+	if err != nil {
+		return nil, err
+	}
+	return in, nil
+}
+
+// hubAPIInputWaits names the input steps whose source another component
+// creates or configures at first run; every other input fault is fatal.
+func hubAPIInputWaits(err error) bool {
+	var step hubAPIInputError
+	if !errors.As(err, &step) {
+		return false
+	}
+	switch s := string(step); s {
+	case "capacity-qualification", "connector-roots", "worker-roots", "work-signing-key":
+		return true
+	default:
+		return strings.HasSuffix(s, "-uid")
+	}
 }
 
 // ownerInputCheck names the failed owner input check; the name is fixed text,

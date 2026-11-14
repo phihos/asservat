@@ -55,7 +55,7 @@ func journalFixture(t *testing.T) (*BindingJournal, value.Snapshot, value.Permis
 	t.Helper()
 	now := time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC)
 	s := value.Snapshot{ClusterID: journalID, ControlNamespace: value.NamespaceRef{Name: "asservat", UID: "control"}, BindingResourceVersion: "list-rv", ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
-	s.Bindings = []value.Binding{{Resource: value.Resource{ClusterID: journalID, Namespace: "asservat", NamespaceUID: "control", Kind: "AccessBinding", Name: "owners", UID: "binding", Generation: 1, ResourceVersion: "item-rv", SpecDigest: artifact.Digest{1}}, Scope: value.Scope{ClusterID: journalID, Namespace: value.NamespaceRef{Name: "payments", UID: "payments"}}, Effect: "Allow", Subjects: []value.Subject{{Kind: "Group", Issuer: "https://id.example.test", ID: "team-a"}}, Roles: []string{"workload-maintainer"}}}
+	s.Bindings = []value.Binding{{Resource: value.Resource{ClusterID: journalID, Namespace: "payments", NamespaceUID: "payments", Kind: "AccessBinding", Name: "owners", UID: "binding", Generation: 1, ResourceVersion: "item-rv", SpecDigest: artifact.Digest{1}}, Scope: value.Scope{ClusterID: journalID, Namespace: value.NamespaceRef{Name: "payments", UID: "payments"}}, Effect: "Allow", Subjects: []value.Subject{{Kind: "Group", Issuer: "https://id.example.test", ID: "team-a"}}, Roles: []string{"workload-maintainer"}}}
 	j, err := NewBindingJournal(s, now)
 	if err != nil {
 		t.Fatal(err)
@@ -150,5 +150,38 @@ func TestBindingJournalKeepsPendingRequestForAmbiguousCommitAfterExpiry(t *testi
 	}
 	if again.Bases[0].Subjects[0].ID != "team-a" || !again.ObservedAt.Equal(now) || !again.FreshUntil.Equal(now.Add(5*time.Second)) {
 		t.Fatal("replay mutated request or renewed deadline")
+	}
+}
+
+// ADR-329: a binding's scope is exactly its own namespace of the journal's
+// cluster; an invalid binding keeps its identity but grants nothing.
+func TestBindingJournalScopeIsTheBindingsNamespace(t *testing.T) {
+	_, snapshot, fence, now := journalFixture(t)
+	for name, mutate := range map[string]func(*value.Binding){
+		"other namespace": func(b *value.Binding) { b.Scope.Namespace = value.NamespaceRef{Name: "orders", UID: "orders"} },
+		"other uid":       func(b *value.Binding) { b.Resource.NamespaceUID = "replaced" },
+		"other cluster":   func(b *value.Binding) { b.Scope.ClusterID = "22222222-2222-4222-8222-222222222222" },
+	} {
+		s := snapshot
+		s.Bindings = []value.Binding{cloneBinding(snapshot.Bindings[0])}
+		mutate(&s.Bindings[0])
+		if _, err := NewBindingJournal(s, now); err == nil {
+			t.Fatal("binding outside its namespace accepted:", name)
+		}
+	}
+	s := snapshot
+	invalid := value.Binding{Resource: snapshot.Bindings[0].Resource, Scope: snapshot.Bindings[0].Scope, Invalid: true}
+	invalid.Resource.UID, invalid.Resource.Name = "invalid", "invalid"
+	s.Bindings = []value.Binding{cloneBinding(snapshot.Bindings[0]), invalid}
+	j, err := NewBindingJournal(s, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := j.Prepare(fence, journalID, now, Inheritance{})
+	if err != nil || len(b.Bases) != 1 || b.Bases[0].Resource.UID != "binding" {
+		t.Fatalf("invalid binding granted: %v %+v", err, b.Bases)
+	}
+	if bases, _ := j.Budget(now); bases != 1 {
+		t.Fatal("invalid binding counted", bases)
 	}
 }

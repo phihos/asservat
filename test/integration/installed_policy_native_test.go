@@ -190,10 +190,10 @@ func installedPolicyJourney(t *testing.T, ctx context.Context, admin *pgxpool.Po
 	// The administrator's automation envelope for the team: the existing
 	// maintainer binding's group and scope, kubernetesSnapshot only.
 	binding := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "AccessBinding", "metadata": map[string]any{"name": "policy-automation"}, "spec": map[string]any{
-		"effect": "Allow", "subjects": f.binding["subjects"], "roles": []any{"workload-maintainer", "evidence-owner"}, "scope": f.binding["scope"], "reason": "ADR-228 installed policy journey",
+		"effect": "Allow", "subjects": f.binding["subjects"], "roles": []any{"workload-maintainer", "evidence-owner"}, "workloads": f.binding["workloads"], "reason": "ADR-228 installed policy journey",
 		"automation": map[string]any{"allowedActions": []any{"kubernetesSnapshot"}, "maxLifetimeSeconds": 3600, "maxExecutions": 10, "maxBytes": 1073741824, "maxObservedBytes": 0}}}
 	body, _ := json.Marshal(binding)
-	if err = f.hub.Post().AbsPath(f.base + "accessbindings").Body(body).Do(ctx).Error(); err != nil {
+	if err = f.region.CoreV1().RESTClient().Post().AbsPath("/apis/asservat.io/v1alpha1/namespaces/" + f.namespace + "/accessbindings").Body(body).Do(ctx).Error(); err != nil {
 		t.Fatal("administrator automation binding", err)
 	}
 	digest := planning.RecipeDigest()

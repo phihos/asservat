@@ -635,10 +635,11 @@ func (b *regionalBudget) addBinding(w regionalWorkload) {
 	roles := installedRegionalBindingRoles()
 	b.binding = map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "AccessBinding", "metadata": map[string]any{"name": b.bindingName}, "spec": map[string]any{"effect": "Allow",
 		"subjects": []any{map[string]any{"kind": b.subjectKindValue(), "issuer": b.issuer, "id": b.subjectIDValue()}}, "roles": roles,
-		"scope":  map[string]any{"clusterID": b.cluster, "namespaceRef": map[string]any{"name": w.ns.Name, "uid": string(w.ns.UID)}, "workloads": []any{map[string]any{"kind": "Deployment", "name": w.app.Name, "uid": string(w.app.UID)}}},
-		"reason": "ADR-197 native regional capacity"}}
+		"workloads": []any{map[string]any{"kind": "Deployment", "name": w.app.Name, "uid": string(w.app.UID)}},
+		"reason":    "ADR-197 native regional capacity"}}
 	body, _ := json.Marshal(b.binding)
-	if err := b.client.Post().AbsPath(b.base + "accessbindings").Body(body).Do(b.ctx).Error(); err != nil {
+	// ADR-329: the binding lives in the workload's namespace it grants.
+	if err := b.client.Post().AbsPath("/apis/asservat.io/v1alpha1/namespaces/" + w.ns.Name + "/accessbindings").Body(body).Do(b.ctx).Error(); err != nil {
 		b.t.Fatal("operator regional maintainer binding", err)
 	}
 }

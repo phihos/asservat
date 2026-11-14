@@ -31,12 +31,7 @@ func permissionTestConfig() contracts.HubWorkerConfig {
 			ContextDeletionSigning:   contracts.OwnerPublicTransit{Mount: "asservat-audit", Key: "context-deletion"},
 		},
 		Permission: &contracts.HubWorkerPermission{
-			StatusUsers: []string{"system:serviceaccount:asservat:asservat-hub-worker"},
-			Delegations: []contracts.PermissionDelegation{{
-				Writers:   []contracts.OwnerDeploymentActor{{Kind: "Group", Name: "team-a"}},
-				ClusterID: permissionTestCluster, Namespace: contracts.WorkerObjectReference{Name: "team-a", UID: "44444444-4444-4444-8444-444444444444"},
-				Workloads: []contracts.PermissionWorkload{}, Roles: []string{"evidence-reader"}, Issuers: []string{"https://id.example.test/realms/a"},
-			}},
+			StatusUsers:         []string{"system:serviceaccount:asservat:asservat-hub-worker"},
 			Review:              "asservat-permission-review",
 			Retention:           true,
 			WorkerConfiguration: &contracts.HubWorkerWorkerConfiguration{Namespace: "asservat-workers", Source: "asservat-worker-profile"},
@@ -48,14 +43,14 @@ func permissionTestConfig() contracts.HubWorkerConfig {
 }
 
 func TestHubWorkerPermissionConfigDecodesClosed(t *testing.T) {
-	body := `{"format":"` + contracts.HubWorkerConfigFormat + `","permission":{"statusUsers":["u"],"delegations":[],"retention":true,` +
+	body := `{"format":"` + contracts.HubWorkerConfigFormat + `","permission":{"statusUsers":["u"],"retention":true,` +
 		`"workerConfiguration":{"namespace":"w","source":"s"},"contextDeletion":{"evidenceStore":{"endpoint":"https://e","region":"r","bucket":"b"}},` +
 		`"browser":{"settings":"b"},"identity":{"settings":"i","issuer":"https://i"},"review":"r"}}`
 	c, err := contracts.DecodeHubWorkerConfig(strings.NewReader(body))
 	if err != nil || c.Permission == nil || !c.Permission.Retention || c.Permission.WorkerConfiguration.Source != "s" || c.Permission.ContextDeletion.EvidenceStore.Bucket != "b" {
 		t.Fatal("permission section not decoded", err)
 	}
-	for _, removed := range []string{`"rootID":"x"`, `"guard":{}`, `"uid":"x"`} {
+	for _, removed := range []string{`"rootID":"x"`, `"guard":{}`, `"uid":"x"`, `"delegations":[]`} {
 		if _, err := contracts.DecodeHubWorkerConfig(strings.NewReader(strings.Replace(body, `"retention":true`, `"retention":true,`+removed, 1))); err == nil {
 			t.Fatal("removed installer field accepted", removed)
 		}
@@ -73,11 +68,9 @@ func TestHubWorkerPermissionValidation(t *testing.T) {
 		t.Fatal("minimal section refused", err)
 	}
 	for name, mutate := range map[string]func(*contracts.HubWorkerConfig){
-		"no-status-users":      func(c *contracts.HubWorkerConfig) { c.Permission.StatusUsers = nil },
-		"unknown-role":         func(c *contracts.HubWorkerConfig) { c.Permission.Delegations[0].Roles = []string{"admin"} },
-		"delegation-no-writer": func(c *contracts.HubWorkerConfig) { c.Permission.Delegations[0].Writers = nil },
-		"review-name":          func(c *contracts.HubWorkerConfig) { c.Permission.Review = "Bad_Name" },
-		"worker-in-hub":        func(c *contracts.HubWorkerConfig) { c.Permission.WorkerConfiguration.Namespace = control.Name },
+		"no-status-users": func(c *contracts.HubWorkerConfig) { c.Permission.StatusUsers = nil },
+		"review-name":     func(c *contracts.HubWorkerConfig) { c.Permission.Review = "Bad_Name" },
+		"worker-in-hub":   func(c *contracts.HubWorkerConfig) { c.Permission.WorkerConfiguration.Namespace = control.Name },
 		"worker-no-transit": func(c *contracts.HubWorkerConfig) {
 			c.Provider.WorkerConfigurationAudit = contracts.OwnerPublicTransit{}
 		},
@@ -105,11 +98,11 @@ func TestPermissionTrustDigestIsDeterministic(t *testing.T) {
 	if err != nil || err2 != nil || a != b || a == (artifact.Digest{}) {
 		t.Fatal("digest not deterministic", err, err2)
 	}
-	c.Delegations[0].Roles = []string{"evidence-owner"}
+	c.StatusUsers = []string{"system:serviceaccount:asservat:other"}
 	changed, _ := permissionTrustDigest(permissionTestCluster, permissionPlan(c, control))
 	other, _ := permissionTrustDigest("55555555-5555-4555-8555-555555555555", permissionPlan(*permissionTestConfig().Permission, control))
 	if changed == a || other == a {
-		t.Fatal("digest ignores the installed delegations or the cluster")
+		t.Fatal("digest ignores the installed status users or the cluster")
 	}
 }
 

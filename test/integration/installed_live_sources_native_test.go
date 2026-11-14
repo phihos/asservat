@@ -540,9 +540,9 @@ func qualifyInstalledLiveSources(t *testing.T, ctx context.Context, admin *pgxpo
 		t.Fatal("LIVE original workload Pod unavailable")
 	}
 	publishManualHTTPProfile(t, ctx, regionalConfig, f.namespace)
-	binding := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "AccessBinding", "metadata": map[string]any{"name": "installed-live-automation"}, "spec": map[string]any{"effect": "Allow", "subjects": f.binding["subjects"], "roles": []any{"workload-maintainer", "evidence-owner"}, "scope": f.binding["scope"], "reason": "bounded installed LIVE source qualification", "automation": map[string]any{"allowedActions": []any{"packetCapture", "syscallTrace"}, "maxLifetimeSeconds": 300, "maxExecutions": 8, "maxBytes": 64 << 20, "maxObservedBytes": 256 << 20}}}
+	binding := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "AccessBinding", "metadata": map[string]any{"name": "installed-live-automation"}, "spec": map[string]any{"effect": "Allow", "subjects": f.binding["subjects"], "roles": []any{"workload-maintainer", "evidence-owner"}, "workloads": f.binding["workloads"], "reason": "bounded installed LIVE source qualification", "automation": map[string]any{"allowedActions": []any{"packetCapture", "syscallTrace"}, "maxLifetimeSeconds": 300, "maxExecutions": 8, "maxBytes": 64 << 20, "maxObservedBytes": 256 << 20}}}
 	raw, _ := json.Marshal(binding)
-	if e = f.hub.Post().AbsPath(f.base + "accessbindings").Body(raw).Do(ctx).Error(); e != nil {
+	if e = f.region.CoreV1().RESTClient().Post().AbsPath("/apis/asservat.io/v1alpha1/namespaces/" + f.namespace + "/accessbindings").Body(raw).Do(ctx).Error(); e != nil {
 		t.Fatal("LIVE actual automation envelope", e)
 	}
 	traffic, cancel := context.WithCancel(ctx)

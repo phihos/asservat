@@ -46,7 +46,7 @@ BUNDLED = {
 CONFIG_KEYS = {"format", "name", "namespace", "postgres", "objectStore", "openBao", "connections", "concurrency", "observation", "native", "public"}
 PUBLIC_KEYS = {"origin", "browserAudience", "processing", "captureHistory", "standby", "captures", "previewSeconds", "downloadPlan", "proxyTLS", "version",
                "operationConcurrency", "mcpPerIdentity", "downloadConcurrency", "downloadsPerIdentity", "downloadMaxSeconds", "operationAudit", "fleet",
-               "permissionDelegations", "regionalOffer"}
+               "regionalOffer"}
 # Files the loader and runtime open under each mount.
 INPUT_FILES = {"sql-owner-runtime.json", "owner-pod.token", "kube-observer.token", "provider-auth.token", "provider-audit-storage.json",
                "kube-ca.crt", "postgres-ca.crt", "audit-store-ca.crt", "key-service-ca.crt", "identity-ca.crt", "federation-ca.crt", "download-key-service-ca.crt"}

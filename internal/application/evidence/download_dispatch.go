@@ -78,6 +78,42 @@ type DownloadDispatcher struct {
 	Profile           value.DownloadWorkerProfile
 	Now               func() time.Time
 	ProjectionCleanup *ProjectionWorkerCleanup
+	// PodStart bounds how long one dispatch keeps observing a launched but
+	// not yet running worker Pod before it answers pending. Binding right
+	// when the Pod runs lets the worker's first enrollment find its admitted
+	// identity instead of waiting for the client's next poll (first-run
+	// "worker enrollment refused: native-download/identity"). Zero answers
+	// pending at once.
+	PodStart time.Duration
+}
+
+// downloadPodPoll is the observation interval while a launched Pod starts.
+const downloadPodPoll = 200 * time.Millisecond
+
+// observeStarting repeats the exact Pod observation while it is pending, at
+// most PodStart (counted in polls, independent of the injected clock) and
+// never within one second of the request deadline or of the authority
+// observation that admitted the launch. Each
+// observation is complete; the caller rechecks current authority afterwards.
+func (s *DownloadDispatcher) observeStarting(ctx context.Context, i value.DownloadWorkerIntent, job value.DownloadWorkerJob, authorityUntil time.Time) (value.DownloadWorker, error) {
+	w, e := s.Jobs.ObserveDownloadWorker(ctx, i, job)
+	var pending *DownloadWorkerPending
+	for n := int(s.PodStart / downloadPodPoll); n > 0 && errors.As(e, &pending); n-- {
+		// Keep a second of the request and of the current authority
+		// observation for the binding effects that follow.
+		if d, ok := ctx.Deadline(); ok && time.Until(d) < time.Second+downloadPodPoll || !s.Now().Add(time.Second+downloadPodPoll).Before(authorityUntil) {
+			break
+		}
+		timer := time.NewTimer(downloadPodPoll)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return w, e
+		case <-timer.C:
+		}
+		w, e = s.Jobs.ObserveDownloadWorker(ctx, i, job)
+	}
+	return w, e
 }
 
 func (s *DownloadDispatcher) Ensure(ctx context.Context, credential, session, intentID string, scope artifact.DownloadScope) (value.DownloadWorker, error) {
@@ -194,7 +230,7 @@ func (s *DownloadDispatcher) ensureChecked(ctx context.Context, session, intentI
 	if e = s.Ledger.RecordDownloadWorkerJob(ctx, i, job); e != nil {
 		return zero, stepped("job-record", e)
 	}
-	w, e := s.Jobs.ObserveDownloadWorker(ctx, i, job)
+	w, e := s.observeStarting(ctx, i, job, a.ValidUntil)
 	if e != nil {
 		var pending *DownloadWorkerPending
 		if errors.As(e, &pending) {

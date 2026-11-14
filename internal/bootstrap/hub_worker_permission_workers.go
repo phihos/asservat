@@ -363,11 +363,24 @@ func (d *contextDeletionWorker) run(ctx context.Context) {
 				fmt.Fprintln(os.Stderr, "hub-worker context deletion: "+outcome)
 			}
 		}
+		// A failed prepare or list is keyed by the zero location; its
+		// absence in this sweep is the recovery, logged once.
+		if contextDeletionRecovered(last, outcomes) && ctx.Err() == nil {
+			fmt.Fprintln(os.Stderr, "hub-worker context deletion: ok")
+		}
 		last = outcomes
 		if !sleepContext(ctx, contextDeletionSweep) {
 			return
 		}
 	}
+}
+
+// contextDeletionRecovered reports whether the previous sweep failed to
+// prepare or list (the zero location) and this one did not.
+func contextDeletionRecovered(last, outcomes map[artifact.Location]string) bool {
+	_, failed := last[artifact.Location{}]
+	_, still := outcomes[artifact.Location{}]
+	return failed && !still
 }
 
 // Sweep exactly one bounded page. Listing advances the scheduling cursor even

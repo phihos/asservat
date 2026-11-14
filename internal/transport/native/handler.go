@@ -140,6 +140,19 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
+	var finished *evidence.NativeParentFinished
+	if conversation == nil && h.path == contracts.NativeWorkerPath && errors.As(err, &finished) && finished.Worker.Intent.ID == hello.Reference.WorkerID && finished.Worker.Intent.SessionID == hello.Reference.SessionID && hello.Reference.QueryID == "" && finished.Worker.Binding.InstallationID == hello.Reference.InstallationID && ctx.Err() == nil {
+		// The authenticated worker's parent ended: tell it to stop cleanly.
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Asservat-Native-Disposition", "finished")
+		w.Header().Set("Asservat-Native-Nonce", hello.Nonce)
+		w.Header().Set("Asservat-Native-Installation", hello.Reference.InstallationID)
+		w.Header().Set("Asservat-Native-Session", hello.Reference.SessionID)
+		w.Header().Set("Asservat-Native-Worker", hello.Reference.WorkerID)
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 	if err != nil || conversation == nil {
 		if conversation != nil {
 			conversation.Close()

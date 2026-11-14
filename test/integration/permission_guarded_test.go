@@ -69,7 +69,7 @@ func (d realDirectory) GroupDirectory(ctx context.Context, issuer string) (cfg.G
 func testGuardedAndGroupInheritance(t *testing.T, c *rest.Config, reader *kube.PermissionClient, trust *kube.PermissionGuard, plan cfg.PermissionAdministration, dsn, s3endpoint string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
-	cluster, control := plan.Delegations[0].Scope.ClusterID, plan.ControlNamespace
+	cluster, control := permissionFixtureCluster, plan.ControlNamespace
 	issuer := "https://id.example.invalid"
 	native, err := kubernetes.NewForConfig(c)
 	if err != nil {

@@ -171,7 +171,7 @@ func qualifyInstalledFiniteRawPolicy(t *testing.T, ctx context.Context, admin *p
 		publishNamespaceCaptureProfile(t, ctx, regionalConfig, f.namespace, manualArgumentsProfile, "v1", definition)
 	}
 	body, _ := json.Marshal(binding)
-	if err = f.hub.Post().AbsPath(f.base + "accessbindings").Body(body).Do(ctx).Error(); err != nil {
+	if err = f.region.CoreV1().RESTClient().Post().AbsPath("/apis/asservat.io/v1alpha1/namespaces/" + f.namespace + "/accessbindings").Body(body).Do(ctx).Error(); err != nil {
 		t.Fatal("operator finite automation envelope", err)
 	}
 	policy := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "DebugPolicy", "metadata": map[string]any{"name": name}, "spec": policySpec}

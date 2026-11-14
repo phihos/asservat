@@ -28,33 +28,28 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 )
 
-// permissionAdministrators is the administrator set of the permission plan:
-// Kubernetes RBAC in the release namespace decides who writes
-// PermissionSources and AccessBindings, so the plan names the cluster
-// administrators. It only enters the deterministic trust digest and the plan
-// validation; no admission policy is derived from it.
+// permissionAdministrators is the administrator set of the permission plan.
+// Kubernetes RBAC decides who writes PermissionSources in the release
+// namespace and AccessBindings in application namespaces (ADR-329), so the
+// plan names the cluster administrators. It only enters the deterministic
+// trust digest and the plan validation; no admission policy is derived from it.
 var permissionAdministrators = []cfg.KubernetesActor{{Kind: "Group", Name: "system:masters"}}
 
 // permissionPlan is the installed permission configuration of the release
-// namespace: status users and delegations from Helm.
+// namespace: the status users from Helm.
 func permissionPlan(c contracts.HubWorkerPermission, control cfg.NamespaceRef) cfg.PermissionAdministration {
-	p := kube.PermissionAdministrationOf(contracts.PermissionControlDeployment{
-		Namespace:   contracts.WorkerObjectReference{Name: control.Name, UID: control.UID},
-		StatusUsers: c.StatusUsers, Delegations: c.Delegations,
-	})
-	p.Name, p.Administrators = "asservat-permission", slices.Clone(permissionAdministrators)
-	return p
+	return cfg.PermissionAdministration{Name: "asservat-permission", ControlNamespace: control, Administrators: slices.Clone(permissionAdministrators), StatusUsers: slices.Clone(c.StatusUsers)}
 }
 
 // permissionTrustDigest is the stream's deterministic trust digest: the
-// cluster and the installed plan. A changed status user or delegation is a
-// new trust revision; the SQL stream starts a new epoch under it.
+// cluster and the installed plan. A changed status user is a new trust
+// revision; the SQL stream starts a new epoch under it.
 func permissionTrustDigest(cluster string, plan cfg.PermissionAdministration) (artifact.Digest, error) {
 	b, err := json.Marshal(struct {
 		Format  string
 		Cluster string
 		Plan    cfg.PermissionAdministration
-	}{"asservat-permission-trust/v2", cluster, plan})
+	}{"asservat-permission-trust/v3", cluster, plan})
 	if err != nil {
 		return artifact.Digest{}, mounts.ErrUnavailable
 	}
@@ -98,7 +93,33 @@ type permissionWorker struct {
 	contextDeletion     *contextDeletionWorker
 	browser             *identities.BrowserSettingsObserver
 	policyGrantSettings *app.PolicyGrantSettingsObserver
-	closers             []func()
+	// Startup ordering (scheduling only, never authority): audit writers
+	// start after the provider's first login, and the retention and context
+	// deletion loops after the capacity child, which exists only once the
+	// permission stream they lock is current. Nil means ready.
+	auditReady    func() bool
+	capacityReady func(context.Context) bool
+	closers       []func()
+}
+
+// startupReadyPoll spaces readiness checks of an in-process prerequisite.
+const startupReadyPoll = 250 * time.Millisecond
+
+// awaitReady polls ready until it reports true or ctx ends.
+func awaitReady(ctx context.Context, ready func() bool) bool {
+	for ready != nil && !ready() {
+		if !sleepContext(ctx, startupReadyPoll) {
+			return false
+		}
+	}
+	return ctx.Err() == nil
+}
+
+func (p *permissionWorker) awaitCapacity(ctx context.Context) bool {
+	if p.capacityReady == nil {
+		return ctx.Err() == nil
+	}
+	return p.capacityReady(ctx)
 }
 
 func (p *permissionWorker) Close() {
@@ -161,7 +182,7 @@ func (w *hubWorker) permissionPools(ctx context.Context, p *permissionWorker, c 
 
 func (w *hubWorker) openPermission(ctx context.Context) (_ *permissionWorker, err error) {
 	c := *w.config.Permission
-	p := &permissionWorker{authority: w.authority}
+	p := &permissionWorker{authority: w.authority, auditReady: w.providers.AuditAvailable, capacityReady: w.awaitCapacity}
 	defer func() {
 		if err != nil {
 			p.Close()
@@ -313,7 +334,11 @@ func (p *permissionWorker) run(ctx context.Context) error {
 			joins[i]()
 		}
 	}()
-	joins = append(joins, goJoined(func() { p.publish(ctx) }))
+	joins = append(joins, goJoined(func() {
+		if awaitReady(ctx, p.auditReady) {
+			p.publish(ctx)
+		}
+	}))
 	// ADR-210: one projection per second keeps the five-second settings
 	// observation current for console logins; a failed read fences it.
 	if p.policyGrantSettings != nil {
@@ -331,13 +356,25 @@ func (p *permissionWorker) run(ctx context.Context) error {
 		}))
 	}
 	if p.retention != nil {
-		joins = append(joins, goJoined(func() { p.retention.run(ctx) }))
+		joins = append(joins, goJoined(func() {
+			if p.awaitCapacity(ctx) {
+				p.retention.run(ctx)
+			}
+		}))
 	}
 	if p.workerConfiguration != nil {
-		joins = append(joins, goJoined(func() { p.workerConfiguration.run(ctx) }))
+		joins = append(joins, goJoined(func() {
+			if awaitReady(ctx, p.auditReady) {
+				p.workerConfiguration.run(ctx)
+			}
+		}))
 	}
 	if p.contextDeletion != nil {
-		joins = append(joins, goJoined(func() { p.contextDeletion.run(ctx) }))
+		joins = append(joins, goJoined(func() {
+			if p.awaitCapacity(ctx) {
+				p.contextDeletion.run(ctx)
+			}
+		}))
 	}
 	// Unknown suspension waits out the 30-second SQL controller lease. A
 	// positively suspended, joined epoch can rebuild from current facts sooner.

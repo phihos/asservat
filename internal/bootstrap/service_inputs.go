@@ -22,6 +22,7 @@ import (
 	auditapp "asservat.local/asservat/internal/application/audit"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/authorization"
+	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
 	"k8s.io/apimachinery/pkg/util/validation"
 )
@@ -97,7 +98,8 @@ func readServiceConfig[T any](ctx context.Context, files *os.Root, decode func(i
 	}
 	c, err := decode(bytes.NewReader(b))
 	if err != nil {
-		return zero, &fixedStepError{"config", mounts.ErrUnavailable}
+		// Helm-rendered values do not heal by waiting.
+		return zero, &fixedStepError{"config", cfg.ErrInvalid}
 	}
 	return c, nil
 }

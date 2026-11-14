@@ -1,6 +1,6 @@
 {
   "name": "preview_access_change",
-  "description": "Preview the effect of proposed AccessBinding and PermissionSource changes before applying them through Kubernetes (ADR-237). For each workload scope of the affected namespaces (at most 1,000) within your administration, reports which users, groups or workloads named by the added or removed assignments would change between Allow, Deny and Indeterminate for capture, read and download, with the assignment revisions that decide each side, evaluated by the same rules as the operations themselves over the current accepted permission data. Targets whose permission data is unavailable or outside the enrolled clusters, and PermissionSource creations or edits whose namespace metadata the accepted observation lacks, are Indeterminate. Namespace-metadata sources are evaluated against the accepted namespace observation (ADR-242). The result is bounded to 256 KiB and delivered in pages: repeat the same request with next_cursor. Group members are never listed and no evidence is read. For fleet operators and configured delegation previewers; it changes nothing: apply the change with kubectl or GitOps.",
+  "description": "Preview the effect of proposed AccessBinding and PermissionSource changes before applying them through Kubernetes (ADR-237). For each workload scope of the affected namespaces (at most 1,000) within your administration, reports which users, groups or workloads named by the added or removed assignments would change between Allow, Deny and Indeterminate for capture, read and download, with the assignment revisions that decide each side, evaluated by the same rules as the operations themselves over the current accepted permission data. Targets whose permission data is unavailable or outside the enrolled clusters, and PermissionSource creations or edits whose namespace metadata the accepted observation lacks, are Indeterminate. Namespace-metadata sources are evaluated against the accepted namespace observation (ADR-242). The result is bounded to 256 KiB and delivered in pages: repeat the same request with next_cursor. Group members are never listed and no evidence is read. An AccessBinding change names the cluster and namespace it lives in (ADR-329). For fleet operators; it changes nothing: apply the change with kubectl or GitOps.",
   "transports": [
     "browser"
   ],
@@ -31,12 +31,21 @@
                 },
                 "spec": {
                   "$ref": "#/$defs/d0"
+                },
+                "clusterID": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "namespace": {
+                  "$ref": "#/$defs/d5"
                 }
               },
               "required": [
                 "action",
                 "kind",
-                "spec"
+                "spec",
+                "clusterID",
+                "namespace"
               ]
             },
             {
@@ -56,13 +65,22 @@
                 },
                 "spec": {
                   "$ref": "#/$defs/d0"
+                },
+                "clusterID": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "namespace": {
+                  "$ref": "#/$defs/d5"
                 }
               },
               "required": [
                 "action",
                 "kind",
                 "uid",
-                "spec"
+                "spec",
+                "clusterID",
+                "namespace"
               ]
             },
             {
@@ -76,7 +94,7 @@
                   "const": "PermissionSource"
                 },
                 "spec": {
-                  "$ref": "#/$defs/d7"
+                  "$ref": "#/$defs/d6"
                 }
               },
               "required": [
@@ -101,7 +119,7 @@
                   "maxLength": 64
                 },
                 "spec": {
-                  "$ref": "#/$defs/d7"
+                  "$ref": "#/$defs/d6"
                 }
               },
               "required": [
@@ -185,27 +203,7 @@
           "action-approver"
         ]
       },
-      "d4": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "name": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 63
-          },
-          "uid": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 64
-          }
-        },
-        "required": [
-          "name",
-          "uid"
-        ]
-      },
-      "d5": {
+      "d3": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -233,33 +231,7 @@
           "uid"
         ]
       },
-      "d3": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "clusterID": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "namespaceRef": {
-            "$ref": "#/$defs/d4"
-          },
-          "workloads": {
-            "type": "array",
-            "items": {
-              "$ref": "#/$defs/d5"
-            },
-            "minItems": 1,
-            "maxItems": 64,
-            "uniqueItems": true
-          }
-        },
-        "required": [
-          "clusterID",
-          "namespaceRef"
-        ]
-      },
-      "d6": {
+      "d4": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -351,8 +323,14 @@
             "maxItems": 4,
             "uniqueItems": true
           },
-          "scope": {
-            "$ref": "#/$defs/d3"
+          "workloads": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/d3"
+            },
+            "minItems": 1,
+            "maxItems": 64,
+            "uniqueItems": true
           },
           "notAfter": {
             "type": "string",
@@ -364,14 +342,13 @@
             "maxLength": 512
           },
           "automation": {
-            "$ref": "#/$defs/d6"
+            "$ref": "#/$defs/d4"
           }
         },
         "required": [
           "effect",
           "subjects",
           "roles",
-          "scope",
           "reason"
         ],
         "allOf": [
@@ -405,7 +382,27 @@
           }
         ]
       },
-      "d8": {
+      "d5": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63
+          },
+          "uid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "name",
+          "uid"
+        ]
+      },
+      "d7": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -423,7 +420,7 @@
           "matchLabels"
         ]
       },
-      "d9": {
+      "d8": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -466,7 +463,7 @@
           }
         ]
       },
-      "d10": {
+      "d9": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -544,7 +541,7 @@
           }
         ]
       },
-      "d7": {
+      "d6": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -565,7 +562,7 @@
             ]
           },
           "namespaceSelector": {
-            "$ref": "#/$defs/d8"
+            "$ref": "#/$defs/d7"
           },
           "excludedNamespaces": {
             "type": "array",
@@ -591,13 +588,13 @@
             "maximum": 1000
           },
           "protection": {
-            "$ref": "#/$defs/d9"
+            "$ref": "#/$defs/d8"
           },
           "metadataMapping": {
-            "$ref": "#/$defs/d10"
+            "$ref": "#/$defs/d9"
           },
           "workloadSelector": {
-            "$ref": "#/$defs/d8"
+            "$ref": "#/$defs/d7"
           },
           "identityMappingRef": {
             "type": "string",

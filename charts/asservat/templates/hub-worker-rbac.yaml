@@ -33,9 +33,9 @@ rules:
     resources: [leases]
     resourceNames: [{{ printf "%s-hub-worker-leader" $n | quote }}]
     verbs: [get, update]
-  # Permission reconciler: AccessBindings and PermissionSources.
+  # Permission reconciler: the administrators' PermissionSources.
   - apiGroups: [asservat.io]
-    resources: [accessbindings, permissionsources]
+    resources: [permissionsources]
     verbs: [get, list, watch]
   # Hub retention source (ADR-195).
   - apiGroups: [asservat.io]
@@ -67,6 +67,11 @@ rules:
   # which lists and watches the hub cluster's namespaces.
   - apiGroups: [""]
     resources: [namespaces]
+    verbs: [get, list, watch]
+  # Permission reconciler: AccessBindings live in the namespaces they grant
+  # (ADR-329).
+  - apiGroups: [asservat.io]
+    resources: [accessbindings]
     verbs: [get, list, watch]
   {{- if $capacity }}
   # Capacity local workload observation: Pods and their owning workloads.

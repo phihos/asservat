@@ -14,6 +14,7 @@ import (
 	"asservat.local/asservat/internal/adapters/mounts"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/authorization"
+	cfg "asservat.local/asservat/internal/domain/configuration"
 	value "asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
 	core "k8s.io/api/core/v1"
@@ -52,7 +53,8 @@ func readConnectorConfig(ctx context.Context, in *providerInputs) (contracts.Con
 	defer clear(b)
 	c, err := contracts.DecodeConnectorConfig(bytes.NewReader(b))
 	if err != nil || validConnectorConfig(c) != nil {
-		return zero, mounts.ErrUnavailable
+		// Helm-rendered values do not heal by waiting.
+		return zero, &fixedStepError{"config", cfg.ErrInvalid}
 	}
 	return c, nil
 }
@@ -209,11 +211,16 @@ func readCombinedOffer(ctx context.Context, in *providerInputs, namespace, name 
 		return zero, &fixedStepError{step, mounts.ErrUnavailable}
 	}
 	raw := object.Data[contracts.RegionalOfferFile]
+	if raw == "" {
+		// Helm renders the ConfigMap empty; the hub-api writes the offer once
+		// its own startup has the values.
+		return zero, &fixedStepError{"pending", mounts.ErrUnavailable}
+	}
 	d := json.NewDecoder(bytes.NewReader([]byte(raw)))
 	d.DisallowUnknownFields()
 	var offer contracts.RegionalOffer
 	if len(raw) > 1<<20 || d.Decode(&offer) != nil || d.More() {
-		return zero, &fixedStepError{"decode", mounts.ErrUnavailable}
+		return zero, &fixedStepError{"decode", cfg.ErrInvalid}
 	}
 	return offer, nil
 }

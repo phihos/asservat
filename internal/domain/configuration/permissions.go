@@ -36,6 +36,9 @@ type Scope struct {
 	Namespace NamespaceRef
 	Workloads []WorkloadRef
 }
+
+// Binding is one observed AccessBinding. Its Scope is its own namespace in
+// the observed cluster, optionally narrowed to workloads (ADR-329).
 type Binding struct {
 	Resource   Resource
 	Effect     string
@@ -44,6 +47,9 @@ type Binding struct {
 	Scope      Scope
 	NotAfter   time.Time
 	Automation *authorization.AutomationEnvelope
+	// Invalid marks a stored binding whose spec failed validation: it grants
+	// and denies nothing and only keeps its identity in the journal.
+	Invalid bool `json:",omitempty"`
 }
 type Protection struct{ Mode, ReviewRef, GuardRef string }
 type Mapping struct {
@@ -75,7 +81,8 @@ type Source struct {
 // source's authorizer decision is not narrowed by admission (REQ-PER-004).
 type AdmissionParity struct{ Mode, ReviewRef, AdapterRef string }
 
-// Snapshot contains a complete binding list and an independently observed
+// Snapshot contains a complete list of the cluster's bindings in every
+// namespace (ADR-329) and an independently observed
 // allow-only source list, NOT an atomic snapshot across
 // resource kinds, an admission receipt, or a SQL accepted projection. RVs are
 // opaque. Status/field managers/writer annotations are deliberately absent.
@@ -249,7 +256,7 @@ func ProposeBinding(b Binding, target Target, now time.Time) Proposal {
 	if b.Scope.ClusterID != target.ClusterID || b.Scope.Namespace != target.Namespace || (len(b.Scope.Workloads) != 0 && !slices.Contains(b.Scope.Workloads, target.Workload)) {
 		return Proposal{Reason: "OutsideScope"}
 	}
-	if (b.Resource.Deleting && b.Effect == "Allow") || (!b.NotAfter.IsZero() && !now.Before(b.NotAfter)) {
+	if b.Invalid || (b.Resource.Deleting && b.Effect == "Allow") || (!b.NotAfter.IsZero() && !now.Before(b.NotAfter)) {
 		return Proposal{Reason: "InactiveBinding"}
 	}
 	if b.Effect != "Allow" && b.Effect != "Deny" {

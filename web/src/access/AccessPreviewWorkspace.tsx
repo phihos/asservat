@@ -4,10 +4,12 @@ import type { Session } from '../auth/session';
 import { operationMessage } from '../capture/http';
 import { previewClient, validPreviewInput, type Preview, type PreviewClient, type PreviewInput } from './preview-http';
 
-const example = JSON.stringify([{ action: 'create', kind: 'AccessBinding', spec: {
-  effect: 'Deny', subjects: [{ kind: 'Group', issuer: 'https://identity.example/realms/company', id: 'team-id' }], roles: ['evidence-reader'],
-  scope: { clusterID: '00000000-0000-4000-8000-000000000001', namespaceRef: { name: 'payments', uid: 'namespace-uid' } }, reason: 'Why this change is needed',
-} }], null, 2);
+// ADR-329: an AccessBinding lives in the namespace it grants; a proposed one
+// names that cluster and namespace next to its spec.
+const example = JSON.stringify([{ action: 'create', kind: 'AccessBinding',
+  clusterID: '00000000-0000-4000-8000-000000000001', namespace: { name: 'payments', uid: 'namespace-uid' }, spec: {
+    effect: 'Deny', subjects: [{ kind: 'Group', issuer: 'https://identity.example/realms/company', id: 'team-id' }], roles: ['evidence-reader'], reason: 'Why this change is needed',
+  } }], null, 2);
 const operations: Record<string, string> = { capture: 'Collect', read: 'Read', download: 'Download' };
 const unmet: Record<string, string> = {
   PermissionObservationStale: 'permission data is not current',
@@ -28,8 +30,7 @@ function basis(rows: Delta['before_basis']) {
   </li>)}</ul>;
 }
 
-// Permission impact preview for fleet operators and configured delegation
-// previewers (ADR-237). The proposed changes are evaluated by the server
+// Permission impact preview for fleet operators (ADR-237, ADR-329). The proposed changes are evaluated by the server
 // against the current accepted permission data; nothing is applied here.
 // Changes are made with kubectl or GitOps. Large results arrive in pages.
 export function AccessPreviewWorkspace({ session, scope, client = previewClient }: { session: Session; scope: AbortSignal; client?: PreviewClient }) {
@@ -62,7 +63,7 @@ export function AccessPreviewWorkspace({ session, scope, client = previewClient 
     try { changes = JSON.parse(text); } catch { setMessage('The proposed changes are not valid JSON.'); return; }
     const input = { changes };
     if (!validPreviewInput(input)) {
-      setMessage('Enter a JSON list of 1 to 16 changes: create with a complete AccessBinding or PermissionSource spec, update with the object\'s UID and spec, or delete with its UID.');
+      setMessage('Enter a JSON list of 1 to 16 changes: create with a complete AccessBinding (with its clusterID and namespace) or PermissionSource spec, update with the object\'s UID and spec, or delete with its UID.');
       return;
     }
     setRequest(input);
@@ -71,7 +72,7 @@ export function AccessPreviewWorkspace({ session, scope, client = previewClient 
   const more = async () => { if (request && cursor) await load({ ...request, cursor }, true); };
   return <div className="capture-workspace">
     <div className="page-intro"><h1 ref={heading} tabIndex={-1}>Preview permission changes</h1>
-      <p>For fleet operators and configured delegation previewers. Shows whose collect, read and download access the proposed AccessBinding or PermissionSource changes would allow or deny, using the current permission data. Nothing is applied: apply the reviewed objects with kubectl or GitOps.</p>
+      <p>For fleet operators. Shows whose collect, read and download access the proposed AccessBinding or PermissionSource changes would allow or deny, using the current permission data. Nothing is applied: apply the reviewed objects with kubectl or GitOps.</p>
     </div>
     <section className="review-section" aria-labelledby="proposed-changes">
       <h2 id="proposed-changes">Proposed changes</h2>

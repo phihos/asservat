@@ -282,14 +282,6 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 		if len(snap.Cells) != 3 || len(snap.Unmatched) != 1 || snap.Unmatched[0].UID != "absent" {
 			t.Fatalf("cells %d unmatched %+v", len(snap.Cells), snap.Unmatched)
 		}
-		// A delegated previewer's read (Allowed = their envelope namespaces)
-		// does not match an object in another namespace: it is reported
-		// Unmatched like a nonexistent UID and its namespace is not read.
-		elsewhere := cfg.PreviewNamespace{ClusterID: s.target.ClusterID, NamespaceUID: "envelope-namespace"}
-		limited, err := s.p.PreviewProjections(ctx, cfg.PreviewRead{Namespaces: []cfg.PreviewNamespace{elsewhere}, Allowed: []cfg.PreviewNamespace{elsewhere}, Bases: []cfg.PreviewBasis{{Kind: "AccessBinding", UID: wide.Resource.UID}, {Kind: "AccessBinding", UID: "absent"}}})
-		if err != nil || len(limited.Unmatched) != 2 || len(limited.Cells) != 1 || limited.Cells[0].Target.NamespaceUID != elsewhere.NamespaceUID {
-			t.Fatalf("envelope read: %v %+v", err, limited)
-		}
 		allows := map[string]int{}
 		for _, c := range snap.Cells {
 			if c.Unavailable != "" || c.Projection.Target != c.Target {
@@ -300,12 +292,12 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 		if allows[named] != 2 || allows[proposed] != 1 || allows[cfg.OtherWorkloads] != 1 {
 			t.Fatalf("allows per cell %v", allows)
 		}
-		changes, _, err := cfg.PreviewChanges([]cfg.AccessChange{{Action: "delete", Kind: "AccessBinding", UID: wide.Resource.UID}}, nil)
+		changes, _, err := cfg.PreviewChanges([]cfg.AccessChange{{Action: "delete", Kind: "AccessBinding", UID: wide.Resource.UID}})
 		if err != nil {
 			t.Fatal(err)
 		}
 		policy := identity.Revision{UID: "policy", Generation: 1, Digest: [32]byte{1}}
-		got, err := cfg.PreviewAccess(changes, snap, []string{s.target.ClusterID}, nil, policy, time.Now())
+		got, err := cfg.PreviewAccess(changes, snap, []string{s.target.ClusterID}, policy, time.Now())
 		// Two cells (the proposal-named workload and all other workloads)
 		// lose all three operations; the workload the narrowed binding names
 		// keeps them.
@@ -346,7 +338,7 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 		}
 		binding := cfg.Binding{Resource: cfg.Resource{SpecDigest: artifact.Digest{4}}, Effect: "Deny", Subjects: []cfg.Subject{{Kind: "Group", Issuer: "https://id.example.test", ID: "team-a"}}, Roles: []string{"workload-maintainer"},
 			Scope: cfg.Scope{ClusterID: s.target.ClusterID, Namespace: ns, Workloads: proposed}}
-		changes, read, err := cfg.PreviewChanges([]cfg.AccessChange{{Action: "create", Kind: "AccessBinding", Binding: binding}, {Action: "delete", Kind: "AccessBinding", UID: s.b.Bases[0].Resource.UID}}, nil)
+		changes, read, err := cfg.PreviewChanges([]cfg.AccessChange{{Action: "create", Kind: "AccessBinding", Binding: binding}, {Action: "delete", Kind: "AccessBinding", UID: s.b.Bases[0].Resource.UID}})
 		if err != nil || read.Namespaces[0] != key {
 			t.Fatal(err)
 		}
@@ -357,7 +349,7 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 			t.Fatalf("%v cells=%d", err, len(snap.Cells))
 		}
 		policy := identity.Revision{UID: "policy", Generation: 1, Digest: [32]byte{1}}
-		got, err := cfg.PreviewAccess(changes, snap, []string{s.target.ClusterID}, nil, policy, time.Now())
+		got, err := cfg.PreviewAccess(changes, snap, []string{s.target.ClusterID}, policy, time.Now())
 		total := time.Since(started)
 		if err != nil || !got.Complete() || got.Targets != cfg.MaxPreviewTargets || got.DeltasTotal == 0 {
 			t.Fatalf("%v %+v", err, got.Targets)
@@ -802,7 +794,7 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 			Mapping: cfg.Mapping{Field: "annotation", Key: "owner", Mode: "valueMap", Issuer: issuer, Values: map[string][]string{"payments": {"team-p"}}}}
 		unobserved := spec
 		unobserved.Mapping.Key = "team"
-		changes, read, err := cfg.PreviewChanges([]cfg.AccessChange{{Action: "create", Kind: "PermissionSource", Source: spec}, {Action: "create", Kind: "PermissionSource", Source: unobserved}}, nil)
+		changes, read, err := cfg.PreviewChanges([]cfg.AccessChange{{Action: "create", Kind: "PermissionSource", Source: spec}, {Action: "create", Kind: "PermissionSource", Source: unobserved}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -810,7 +802,7 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 		if err != nil || len(snap.Sources) != 2 || len(snap.Sources[0].Grants) != 1 || snap.Sources[1].Unevaluated != cfg.MetadataNotObserved {
 			t.Fatalf("source preview read: %v %+v", err, snap.Sources)
 		}
-		got, err := cfg.PreviewAccess(changes, snap, []string{s.target.ClusterID}, nil, identity.Revision{UID: "policy", Generation: 1, Digest: [32]byte{1}}, time.Now())
+		got, err := cfg.PreviewAccess(changes, snap, []string{s.target.ClusterID}, identity.Revision{UID: "policy", Generation: 1, Digest: [32]byte{1}}, time.Now())
 		if err != nil || got.Complete() || len(got.NotEvaluated) != 1 || got.DeltasTotal != 2 {
 			t.Fatalf("source preview: %v %+v", err, got)
 		}
@@ -980,7 +972,7 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 		// Preview of deleting the source: the persistent assignments it minted
 		// are removed (alice and bob hold current decisions: Allow -> Deny).
 		deleting := []cfg.AccessChange{{Action: "delete", Kind: "PermissionSource", UID: source.Resource.UID}}
-		deleting, read, err := cfg.PreviewChanges(deleting, nil)
+		deleting, read, err := cfg.PreviewChanges(deleting)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -988,7 +980,7 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 		if err != nil || len(snap.Unmatched) != 0 {
 			t.Fatalf("decision-time source unmatched in preview: %v %+v", err, snap.Unmatched)
 		}
-		preview2, err := cfg.PreviewAccess(deleting, snap, []string{s.target.ClusterID}, nil, identity.Revision{UID: "policy", Generation: 1, Digest: [32]byte{1}}, time.Now())
+		preview2, err := cfg.PreviewAccess(deleting, snap, []string{s.target.ClusterID}, identity.Revision{UID: "policy", Generation: 1, Digest: [32]byte{1}}, time.Now())
 		if err != nil {
 			t.Fatal(err)
 		}
