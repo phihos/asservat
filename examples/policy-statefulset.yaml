@@ -32,7 +32,6 @@ spec:
   recipeRef:
     name: bounded-live-diagnostics
     digest: 5a5eff2029e270d2ec764af201abcb29dfaa0305071797ffca2ef784a788af43
-  grantRef: 00000000-0000-4000-8000-000000000040
   budgets:
     cooldown: 30m
     burst: 1

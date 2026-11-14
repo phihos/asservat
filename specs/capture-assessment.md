@@ -90,9 +90,10 @@ Given the same target and composed plan in browser, MCP and GitOps, when assesse
 
 For operation=recordingSave, the same assessment service binds the recording-save/v1 scope digest. Selected actions remain executionMode=ongoing, but the preview context expressly describes **saving existing recordings**: no new observation pods or recorder attachment is requested. scope.observationPods counts distinct selected source pods already recording, separately from snapshot incident pods; do not label it new arming. Assess incremental frozen-buffer/encryption/upload/analysis costs, with any continuing-recorder baseline explicitly identified. No application-pause estimate is invented from an unrelated liveCore action in the policy. Sensitivity and automatic-deletion ages come from original source acquisition and earliest source/parent ceilings, with actual remaining time/coverage computed at submission. Existing disclosure rules remain mandatory.
 
-For policy observation, explain that a source runs to its accepted hard end and
-stops earlier only when a revocation event reaches its connector; while the
-connector is disconnected the source runs to that hard end (REQ-LIF-004). Do not
-promise immediate packet cancellation. Display the observed-byte budget separately
-from actual measured input and retained output; budgets are charged by actual
-consumption. A rate ceiling is not a throughput estimate.
+For policy observation, explain that a source records for as long as the policy
+applies (and, for sensitive sources, its grant is unexpired), re-armed at each
+session end, and stops when a revocation event reaches its connector; while the
+connector is disconnected a session runs to its session end (REQ-LIF-004). Do not
+promise immediate packet cancellation. Show rate and ring ceilings, and for a
+finite manual sensitive session its observed-byte limit, separately from actual
+measured input and retained output. A rate ceiling is not a throughput estimate.
