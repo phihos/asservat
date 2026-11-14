@@ -329,6 +329,12 @@ it.
 
 ## Restore
 
+> **Not implemented yet.** The `recovery` values and setup's recovery step
+> below are the specified procedure; the chart does not have them yet. Until
+> it does, a restored database serves the grants and shares it contained,
+> including ones revoked after the backup. Restore only into a fresh install,
+> and revoke again whatever was revoked after the restore point.
+
 Restore in this order:
 
 1. The generated Secrets, then OpenBao if used.
