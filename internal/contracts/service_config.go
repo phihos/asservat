@@ -83,6 +83,9 @@ type KeyServiceConfig struct {
 // the topologies (plus the catalog's joined slots) bound retention.
 type KeyServiceDownloadsConfig struct {
 	RetentionTopologies []ServiceTopology `json:"retentionTopologies"`
+	// RemoteClusters are the joined mode=cluster clusters' IDs; each gets
+	// the in-process topology of the hub retention source.
+	RemoteClusters []string `json:"remoteClusters,omitempty"`
 }
 
 type PublisherConfig struct {
@@ -95,6 +98,7 @@ type PublisherConfig struct {
 	Evidence            ServiceObjectStore `json:"evidence"`
 	OpenBao             string             `json:"openBao"`
 	RetentionTopologies []ServiceTopology  `json:"retentionTopologies"`
+	RemoteClusters      []string           `json:"remoteClusters,omitempty"`
 }
 
 // decodeServiceConfig is a closed decode (no unknown fields, one value) that,

@@ -1,5 +1,25 @@
 # Sustained implementation progress
 
+## Joining workload clusters with `mode: cluster` (ADR-330, 2026-11-14)
+
+Branch `feat/hn-cluster-join` (on `feat/hn-remote-bindings`). The hub's
+`clusters` values register remote clusters; the hub-api issues each join
+Secret `<name>-join-<cluster>` (IDs, offer with `remote.*` addresses and
+in-cluster server names, the cluster's own regional object-store
+capabilities, a one-use bootstrap), derives each context-start entry and
+in-process topology, and the connector delivers its capacity observation over
+the lifecycle channel (migration 00163, to follow the 00161→00162
+renumbering). Owned kind clusters `asservat-cj-hub` (combined, bundled
+services) and `asservat-cj-work` (`mode: cluster`, `region.joinSecret`):
+`TestHelmNativeKindClusterJoin` passed (24.6 s) on a fresh install: Keycloak
+sign-in, processing initialization, AccessBinding in the work cluster's
+`apps-hn`, budget policy naming the joined cluster, MCP preview/request,
+regional collection, verification, publication and native download through
+the hub-local worker. `TestHelmNativeKindJourney` (combined, same values)
+passed (45.5 s) on a second fresh install. The local runs used an uncommitted
+no-op `00162` placeholder because the embedded schema requires contiguous
+versions.
+
 ## AccessBindings in application namespaces (ADR-329, 2026-11-14)
 
 Branch `feat/hn-accessbindings` on the Helm-native candidate. AccessBindings

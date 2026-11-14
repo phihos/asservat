@@ -96,12 +96,12 @@ spec:
               {{- include "asservat.providerRoots" (dict "root" . "provider" "postgres" "path" "postgres-ca.crt") | nindent 14 }}
               {{- include "asservat.providerRoots" (dict "root" . "provider" "objectStore" "path" "audit-store-ca.crt") | nindent 14 }}
               {{- include "asservat.providerRoots" (dict "root" . "provider" "openBao" "path" "key-service-ca.crt") | nindent 14 }}
-              {{- if and $public (include "asservat.hubApi.combined" .) }}
+              {{- if and $public (include "asservat.hubApi.offer" .) }}
               - secret:
                   name: {{ include "asservat.svc.tlsSecret" (list . "federation") | quote }}
                   items: [{key: ca.crt, path: federation-ca.crt}]
               {{- end }}
-              {{- if and $public (or (include "asservat.hubApi.workerNamespaces" . | fromJsonArray) (include "asservat.hubApi.combined" .)) }}
+              {{- if and $public (or (include "asservat.hubApi.workerNamespaces" . | fromJsonArray) (include "asservat.hubApi.offer" .)) }}
               # The key service's serving CA for the hub-local download
               # workers' control and the combined-mode regional offer.
               - secret:

@@ -169,7 +169,7 @@ func newRegionalContext(ctx context.Context, c regionalConfig, in *providerInput
 		return nil, closers, mounts.ErrUnavailable
 	}
 	a := c.store
-	storage, err := ownerHTTP(a.Endpoint, a.Roots)
+	storage, err := ownerHTTPNamed(a.Endpoint, a.ServerName, a.Roots)
 	if err != nil {
 		return nil, closers, mounts.ErrUnavailable
 	}
@@ -197,7 +197,7 @@ func newRegionalContext(ctx context.Context, c regionalConfig, in *providerInput
 	if err != nil {
 		return nil, closers, mounts.ErrUnavailable
 	}
-	keyTransport := &http.Transport{Proxy: nil, TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS13, RootCAs: keyRoots, GetClientCertificate: credentials.GetClientCertificate}, DialContext: (&net.Dialer{Timeout: 2 * time.Second, KeepAlive: -1}).DialContext, TLSHandshakeTimeout: 2 * time.Second, ResponseHeaderTimeout: 5 * time.Second, IdleConnTimeout: 5 * time.Second, MaxConnsPerHost: 8, DisableCompression: true}
+	keyTransport := &http.Transport{Proxy: nil, TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS13, RootCAs: keyRoots, ServerName: c.keys.ServerName, GetClientCertificate: credentials.GetClientCertificate}, DialContext: (&net.Dialer{Timeout: 2 * time.Second, KeepAlive: -1}).DialContext, TLSHandshakeTimeout: 2 * time.Second, ResponseHeaderTimeout: 5 * time.Second, IdleConnTimeout: 5 * time.Second, MaxConnsPerHost: 8, DisableCompression: true}
 	closers = append(closers, keyTransport.CloseIdleConnections)
 	out.output = regionalArtifactOutput{store: custody, endpoint: c.keys.Endpoint, scope: authorization.KeyScope{InstallationID: c.binding.InstallationID, Purpose: "artifact", KeyID: c.keys.KeyID}, client: &http.Client{Transport: keyTransport, Timeout: 5 * time.Second}, now: time.Now}
 	out.output.recordings = NewConnectorRecordings(nil, out.collector, time.Now, eventLog(os.Stderr, "regional collection"))

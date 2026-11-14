@@ -99,9 +99,31 @@ fleet:
   subjects: []
   groups: []
   deliveryProfiles: []
+  # Raised to the hub-issued slots (the combined-mode connector plus one per
+  # clusters[] entry) when lower.
   maxActiveBootstraps: 1
   maxBootstrapHistory: 16
   maxClusters: 1
+
+# Workload clusters joined with `mode: cluster` (hub or combined releases).
+# The hub-api issues each one's bootstrap into the join Secret
+# `<name>-join-<name>`, which the operator copies to that cluster.
+clusters: []
+# - name: payments-eu        # DNS label; names the join Secret
+#   clusterID: ""            # a lowercase UUID you choose (uuidgen); budget
+#                            # policies name it in scope.clusterID
+#   namespace: ""            # its release namespace; default: this one
+#   standby: 2               # context-start standby connections
+#   captures: 1              # concurrent captures
+
+# How joined clusters reach this hub. TCP passthrough to the Services
+# (LoadBalancer, NodePort or a TLS-passthrough route): connectors verify the
+# in-cluster names, so never terminate TLS in front of them.
+remote:
+  federation: ""   # https://host:port -> <name>-federation:9446
+  owners: ""       # host:port         -> <name>-hub-api-native:9444
+  keyService: ""   # https://host:port -> <name>-key-service:9447
+  objectStore: ""  # https://host:port -> the evidence object store
 
 # Initial capacity sources (the former bootstrap.continuation.public.capacity,
 # same field names). Set to enable capacity; poolSpec and policySpec render
@@ -118,23 +140,22 @@ retention: {}
 # federation: {...}
 
 # Regional connector (mode=cluster or mode=combined).
-# mode=cluster: issue a cluster bootstrap in the console (Fleet), set clusterID
-# and peerID from the receipt and store the bootstrap record as
-# `bootstrap.json` in an existing Secret named by bootstrapSecret. The
-# connector seeds its rotating cluster credential from that record once,
-# within the record's five minutes; afterwards the record Secret may be
-# deleted.
-# mode=combined: leave clusterID and peerID empty; the connector uses the
-# generated `<name>-ids` clusterID and peerID and reads its bootstrap record
-# from bootstrapSecret (default `<name>-region-bootstrap`).
+# mode=cluster: register the cluster in the hub's `clusters` values and copy
+# the hub's join Secret `<name>-join-<cluster>` unchanged into this release's
+# namespace; joinSecret names it. It carries the cluster and peer IDs, the
+# hub's regional offer, the executor's object-store capabilities and the
+# one-use bootstrap record, valid for five minutes from issuance (delete the
+# hub's Secret to get a fresh one). The connector seeds its rotating cluster
+# credential from that record once; keep the Secret for the other values.
+# mode=combined: the connector uses the generated `<name>-ids` clusterID and
+# peerID and reads its bootstrap record from bootstrapSecret (default
+# `<name>-region-bootstrap`).
 region:
   enabled: false
-  clusterID: ""
-  peerID: ""
+  # mode=cluster only: the copied join Secret.
+  joinSecret: ""
+  # mode=combined only.
   bootstrapSecret: ""
-  # mode=cluster only: the hub's public regional-offer.json
-  # (`--set-file region.offer=regional-offer.json`).
-  offer: ""
   # mode=combined only: the hub's offer ConfigMap in the release namespace
   # and the in-cluster addresses the connector dials. Empty values use the
   # chart's Service names.
@@ -150,10 +171,11 @@ region:
     concurrency: 4
     # Empty uses the API server's default token audience.
     capacityAudience: ""
-    # mode=cluster: existing Secret with evidence-storage.json and
+    # mode=cluster: Secret with evidence-storage.json and
     # history-storage.json (and profile-authorization.json with
-    # profileAuthorization). mode=combined uses `<name>-s3-regional-write`
-    # and `<name>-s3-regional-history` (key credentials.json).
+    # profileAuthorization); default: the join Secret. mode=combined uses
+    # `<name>-s3-regional-write` and `<name>-s3-regional-history` (key
+    # credentials.json).
     evidenceSecret: ""
     profileAuthorization: false
     # ADR-231: in-cluster Alertmanager base URL for alert policies.
@@ -397,6 +419,12 @@ services:
       rootsPEM: ""
     seaweedfs:
       image: chrislusf/seaweedfs@sha256:ccad23e18639c8b98cee17e7100b95830a06077b56d8e5b006d6dcf8ec5e94a0
+      # The S3 Service. NodePort or LoadBalancer when joined clusters
+      # (clusters, remote.objectStore) write evidence.
+      service:
+        type: ClusterIP
+        nodePort: null
+        annotations: {}
       persistence:
         storageClass: ""
         size: 32Gi

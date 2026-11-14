@@ -54,6 +54,7 @@ installation ID in Go, object UIDs are read by name.
 {{- $_ := set $c "processingSource" (printf "%s-processing-source" $n) -}}
 {{- $_ := set $c "paths" list -}}
 {{- $_ := set $c "sharedQueries" (gt (int (default 0 .Values.hub.publisher.replicas)) 0) -}}
+{{- with include "asservat.hubApi.clusters" . | fromJsonArray }}{{ $_ := set $c "remoteClusters" . }}{{ end -}}
 {{- $_ := set $v "capacity" $c -}}
 {{- $_ := set $v "cleanup" dict -}}
 {{- $_ := set $roles "cleanupWrap" (get $role "cleanup-wrap") -}}
@@ -73,10 +74,14 @@ installation ID in Go, object UIDs are read by name.
 {{- $f := .Values.fleet -}}
 {{- $clients := $f.clients -}}
 {{- if not $clients }}{{ $clients = list (default "asservat-console" .Values.identity.clientID) }}{{ end -}}
+{{- /* The hub-issued slots (the local connector and each joined cluster) may
+     be live at once and each is a cluster. */ -}}
+{{- $issued := len (default list .Values.clusters) -}}
+{{- if include "asservat.hubApi.combined" . }}{{ $issued = add1 $issued }}{{ end -}}
 {{- toJson (dict "schemaVersion" "fleet-settings/v1" "revision" (int .Release.Revision) "suspended" false
   "issuer" (default (include "asservat.hubWorker.identityIssuer" .) $f.issuer)
   "clients" $clients "subjects" (default list $f.subjects) "groups" (default list $f.groups) "deliveryProfiles" (include "asservat.hubApi.deliveryProfiles" . | fromJsonArray)
-  "maxActiveBootstraps" (int $f.maxActiveBootstraps) "maxBootstrapHistory" (int $f.maxBootstrapHistory) "maxClusters" (int $f.maxClusters)) -}}
+  "maxActiveBootstraps" (max (int $f.maxActiveBootstraps) $issued) "maxBootstrapHistory" (int $f.maxBootstrapHistory) "maxClusters" (max (int $f.maxClusters) $issued)) -}}
 {{- end -}}
 
 {{/* owner-pool.json (contracts.OwnerSource): the hub-api owner pool by name.

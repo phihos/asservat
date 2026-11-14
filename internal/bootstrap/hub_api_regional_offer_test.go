@@ -146,7 +146,7 @@ func TestHubAPIRegionalOfferExecutorSection(t *testing.T) {
 		t.Fatal("ensure", err)
 	}
 	c.Namespace, c.PermissionRootID, c.Public.Standby, c.Public.Captures = contracts.WorkerObjectReference{Name: "hub", UID: runtimeID}, runtimeID, 2, 1
-	local, err := localCatalogCluster(ctx, api, c, o, stored)
+	local, err := localCatalogCluster(c, o, stored)
 	if err != nil {
 		t.Fatal("local cluster", err)
 	}
@@ -160,8 +160,45 @@ func TestHubAPIRegionalOfferExecutorSection(t *testing.T) {
 		t.Fatal(err)
 	}
 	startup := kube.ConnectorAPIStartupDigest(settings)
-	if local.Executor.StartupDigest != hex.EncodeToString(startup[:]) || local.Executor.AccountUID != accountUID || local.Executor.NamespaceUID != runtimeID || local.Trust.Keys[0].ID != "work-v1" || local.Standby != 2 {
+	if local.Executor.StartupDigest != hex.EncodeToString(startup[:]) || local.Trust.Keys[0].ID != "work-v1" || local.Standby != 2 {
 		t.Fatal("local executor pin differs from the connector's", local.Executor)
+	}
+	// A joined mode=cluster cluster derives the same entry for its own IDs
+	// and release namespace, and its connector computes the same pin.
+	const remote = "40000000-0000-4000-8000-000000000001"
+	remotePeer, ok := contracts.RemotePeerID(runtimeID, remote)
+	if !ok || remotePeer == peer {
+		t.Fatal("remote peer", remotePeer)
+	}
+	entry, err := catalogCluster(stored, stored.Image, remote, remotePeer, "asservat-system", "asservat", 2, 1, "remote-cluster")
+	if err != nil {
+		t.Fatal("remote cluster", err)
+	}
+	if profile, err := publicConnectorProfile(entry, runtimeID, runtimeID); err != nil || profile.Binding.PeerID != remotePeer || profile.Binding.ClusterID != remote || profile.Deployment.Namespace != "asservat-system" {
+		t.Fatal("remote connector profile", err)
+	}
+	binding = value.PeerBinding{InstallationID: runtimeID, ClusterID: remote, IssuerEpoch: runtimeID, PeerID: remotePeer, Role: value.ConnectorPeer}
+	settings, err = kube.ConnectorAPISettings(runtimeID, binding, kube.ConnectorWorkload{Namespace: "asservat-system", NamespaceUID: "40000000-0000-4000-8000-000000000002", Account: "asservat-connector", AccountUID: accountUID, Deployment: "asservat-connector", DeploymentUID: runtimeID, Digest: kube.ConnectorWorkloadDigest(remote, "asservat-system", "asservat-connector")}, "asservat-connector-capacity", capacityUID, strings.Repeat("a", 64))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if startup = kube.ConnectorAPIStartupDigest(settings); entry.Executor.StartupDigest != hex.EncodeToString(startup[:]) {
+		t.Fatal("remote executor pin differs from the connector's")
+	}
+	// The join offer dials the configured addresses and verifies the
+	// in-cluster names; backing and roots are the stored offer's.
+	addresses := &contracts.HubAPIRemote{Federation: "https://hub.example.test:31446", Owners: "hub.example.test:31447", KeyService: "https://hub.example.test:31448", ObjectStore: "https://hub.example.test:31433"}
+	join, err := remoteJoinOffer(stored, addresses)
+	if err != nil {
+		t.Fatal("join offer", err)
+	}
+	if join.Federation.Endpoint != addresses.Federation || join.Federation.ServerName != stored.Federation.ServerName || join.Owners.Address != addresses.Owners || join.KeyService.Endpoint != addresses.KeyService || join.KeyService.ServerName != "asservat-key-service.hub.svc" ||
+		join.EvidenceStore.Endpoint != addresses.ObjectStore || join.EvidenceStore.ServerName == "" || !bytes.Equal(join.ConnectorBacking, stored.ConnectorBacking) || stored.KeyService.ServerName != "" {
+		t.Fatalf("join offer %+v", join.KeyService)
+	}
+	addresses.Owners = "https://hub.example.test:31447"
+	if _, err = remoteJoinOffer(stored, addresses); err == nil {
+		t.Fatal("owners URL accepted as a dial address")
 	}
 	// The first stored offer stays: a second ensure returns it unchanged.
 	again, err := o.ensure(ctx, api)

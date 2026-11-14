@@ -2437,6 +2437,13 @@ type RemoteAccessBindingDelivery struct {
 	Bindings   []byte
 }
 
+type RemoteCapacityDelivery struct {
+	RootID     pgtype.UUID
+	ClusterID  pgtype.UUID
+	ObservedAt pgtype.Timestamptz
+	Namespaces []byte
+}
+
 type RetentionCatchup struct {
 	CheckpointID pgtype.UUID
 	AfterAttempt pgtype.UUID

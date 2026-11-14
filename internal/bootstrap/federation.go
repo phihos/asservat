@@ -24,6 +24,7 @@ import (
 	"asservat.local/asservat/internal/adapters/postgres"
 	"asservat.local/asservat/internal/adapters/providerconfig"
 	auditapp "asservat.local/asservat/internal/application/audit"
+	capacityapp "asservat.local/asservat/internal/application/capacity"
 	fleetapp "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -216,7 +217,11 @@ func NewFederation(ctx context.Context, files, ids *os.Root) (f *Federation, err
 	if err != nil {
 		return f, mounts.ErrUnavailable
 	}
-	f.handler, err = connectorlifecycle.NewHandler(presenter, mtls.EnrollmentProof{}, federationServices{connectorlifecycle.Runners(peers.resolve), peers, &federationBindings{decoder, remote}}, c.Concurrency)
+	capacity, err := postgres.NewRemoteCapacity(pools["cluster-credential"], c.PermissionRootID)
+	if err != nil {
+		return f, mounts.ErrUnavailable
+	}
+	f.handler, err = connectorlifecycle.NewHandler(presenter, mtls.EnrollmentProof{}, federationServices{connectorlifecycle.Runners(peers.resolve), peers, &federationBindings{decoder, remote}, capacity}, c.Concurrency)
 	if err != nil {
 		return f, mounts.ErrUnavailable
 	}
@@ -461,6 +466,34 @@ type federationServices struct {
 	connectorlifecycle.Runners
 	peers    *federationPeers
 	bindings *federationBindings
+	capacity interface {
+		StoreRemoteCapacity(context.Context, capacityapp.RemoteCapacity) error
+	}
+}
+
+// Capacity stores the presenting connector's capacity observation under its
+// authenticated cluster, observed no later than the presentation (ADR-330).
+func (s federationServices) Capacity(ctx context.Context, region *connectorlifecycle.Region) error {
+	if s.capacity == nil || region == nil {
+		return mounts.ErrUnavailable
+	}
+	p := region.Presented()
+	if p.Profile.RootID != s.peers.ids.PermissionRootID || p.Profile.InstallationID != s.peers.ids.InstallationID || p.Profile.ClusterID == s.peers.ids.ClusterID {
+		return mounts.ErrUnavailable
+	}
+	delivery, err := region.ReadCapacity(ctx)
+	if err != nil {
+		return err
+	}
+	observed, err := kube.DeliveredCapacity(p.Profile.ClusterID, p.CheckedAt, delivery)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "federation capacity refused: invalid delivery")
+		return err
+	}
+	if err = s.capacity.StoreRemoteCapacity(ctx, observed); err != nil {
+		fmt.Fprintln(os.Stderr, "federation capacity store failed: "+federationCause(err))
+	}
+	return err
 }
 
 // federationBindings records connectors' AccessBinding deliveries (ADR-329)

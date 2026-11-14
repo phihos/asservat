@@ -310,18 +310,33 @@ func (s secretStore) objectStore(ctx context.Context, p contracts.SecretsPlan, i
 			grants[i].Credential.SecretAccessKey = ""
 		}
 	}()
+	type principal struct{ purpose, scope, secret string }
+	var principals []principal
 	for _, purpose := range contracts.ObjectStorePrincipals(p.Mode) {
 		scope := installation
 		if strings.HasPrefix(purpose, "regional-") {
 			scope = cluster
 		}
+		principals = append(principals, principal{purpose, scope, p.Name + "-s3-" + purpose})
+	}
+	// ADR-330: each joined cluster's regional capabilities, scoped to it.
+	for _, r := range p.RemoteClusters {
+		if !authorization.UUID(r.ClusterID) || r.ClusterID == cluster {
+			return secretsFailure("InvalidRemoteCluster " + r.Name)
+		}
+		for _, purpose := range contracts.RemoteObjectStorePrincipals() {
+			principals = append(principals, principal{purpose, r.ClusterID, contracts.RemoteObjectStoreSecret(p.Name, purpose, r.Name)})
+		}
+	}
+	for _, x := range principals {
+		purpose, scope := x.purpose, x.scope
 		key := contracts.SeaweedPrincipalKey{Purpose: purpose, ScopeID: scope}
 		generated, err := providerconfig.GenerateSeaweedCredential(key)
 		if err != nil {
 			return secretsFailure("ObjectStoreCredentialUnavailable " + purpose)
 		}
 		want, _ := json.Marshal(contracts.OwnerStorageCredential{AccessKeyID: generated.AccessKeyID, SecretAccessKey: generated.SecretAccessKey})
-		name := p.Name + "-s3-" + purpose
+		name := x.secret
 		data, err := s.ensure(ctx, name, map[string][]byte{contracts.ObjectStoreCredentialFile: want})
 		clear(want)
 		if err != nil {
@@ -338,6 +353,9 @@ func (s secretStore) objectStore(ctx context.Context, p contracts.SecretsPlan, i
 			bucket = p.Name + "-evidence"
 		}
 		grant := contracts.SeaweedGrant{Credential: credential, Bucket: bucket, InstallationID: installation, ClusterID: cluster, RootID: root}
+		if strings.HasPrefix(purpose, "regional-") {
+			grant.ClusterID = scope
+		}
 		if strings.HasSuffix(purpose, "-audit") {
 			grant.Prefixes = providerconfig.SeaweedAuditPrefixes(grant)
 		}

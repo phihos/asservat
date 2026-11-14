@@ -43,6 +43,10 @@ const (
 	// LIST of its cluster (ADR-329). The hub asks for it only after the
 	// presentation verified; the delivery is attributed to that cluster.
 	PurposeAccessBindings value.ConnectorLifecyclePurpose = "access-bindings"
+	// PurposeCapacity delivers the connector's capacity observation of its
+	// cluster (ADR-330), attributed to the presented cluster like
+	// PurposeAccessBindings.
+	PurposeCapacity value.ConnectorLifecyclePurpose = "capacity"
 	// PurposeBootstrap enrolls cluster credential generation 1 from a fleet
 	// operator's one-use bootstrap (ADR-193). It carries no presentation.
 	PurposeBootstrap value.ConnectorLifecyclePurpose = "bootstrap"
@@ -104,6 +108,14 @@ type RegionFrame struct {
 	Configuration *app.ConnectorIdentityConfiguration  `json:",omitempty"`
 	// AccessBindings answers the hub's "access-bindings" request (ADR-329).
 	AccessBindings *contracts.AccessBindingDelivery `json:",omitempty"`
+	// Capacity answers the hub's "capacity" request (ADR-330).
+	Capacity *contracts.CapacityDelivery `json:",omitempty"`
+}
+
+// CapacityLocal is the regional reader of the connector's capacity
+// observation (ADR-330), offered only by a delivering conversation.
+type CapacityLocal interface {
+	ReadCapacity(context.Context) (contracts.CapacityDelivery, error)
 }
 
 // AccessBindingsLocal is the regional reader of the connector's own

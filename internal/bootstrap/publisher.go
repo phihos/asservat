@@ -192,6 +192,11 @@ func NewPublisher(ctx context.Context, files, ids *os.Root) (_ *Publisher, err e
 			return nil, mounts.ErrUnavailable
 		}
 	}
+	for _, cluster := range c.RemoteClusters {
+		if err = topologies.AddRemoteTopology(observer, root, cluster); err != nil {
+			return nil, mounts.ErrUnavailable
+		}
+	}
 	retentionGuard, err := postgres.NewRetentionTransactionGuard(root, topologies)
 	if err != nil {
 		return nil, mounts.ErrUnavailable

@@ -42,6 +42,12 @@ type AccessBindingsService interface {
 	AccessBindings(context.Context, *Region) error
 }
 
+// CapacityService records a connector's capacity delivery for its presented
+// cluster (ADR-330), as AccessBindingsService.
+type CapacityService interface {
+	Capacity(context.Context, *Region) error
+}
+
 type Handler struct {
 	presenter clustercredential.Presenter
 	keys      app.EnrollmentProofVerifier
@@ -147,6 +153,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		} else {
 			err = ErrChannel
 		}
+	case PurposeCapacity:
+		if sink, ok := h.services.(CapacityService); ok {
+			err = sink.Capacity(ctx, region)
+		} else {
+			err = ErrChannel
+		}
 	case PurposeRegistration:
 		var registration app.ConnectorLeafRegistration
 		registration, err = h.services.Registration(ctx, region, *opening.Certificate)
@@ -225,7 +237,7 @@ func (h *Handler) admit(ctx context.Context, o Opening, exporter []byte) (value.
 		if o.Certificate == nil || o.Certificate.Binding != o.Request.Process.Binding {
 			return zero, false
 		}
-	case PurposeOwnerCandidates, PurposeRecovery, PurposeOwnerObservationCandidates, PurposeAccessBindings:
+	case PurposeOwnerCandidates, PurposeRecovery, PurposeOwnerObservationCandidates, PurposeAccessBindings, PurposeCapacity:
 	case PurposeOwnerAuthentication, PurposeOwnerRegistration:
 		if o.Owner == nil || o.Owner.Usage != "server" || o.Owner.Binding.InstallationID != o.Request.Process.Binding.InstallationID {
 			return zero, false
@@ -269,7 +281,8 @@ type Region struct {
 	// slot is the claimed bootstrap slot of a bootstrap conversation; every
 	// source value is checked against it instead of a presentation.
 	slot *value.PeerBinding
-	// delivered marks the conversation's one AccessBinding request.
+	// delivered marks the conversation's one AccessBinding or capacity
+	// request.
 	delivered bool
 }
 
@@ -361,6 +374,28 @@ func (r *Region) ReadAccessBindings(ctx context.Context) (contracts.AccessBindin
 		return contracts.AccessBindingDelivery{}, ErrChannel
 	}
 	return *reply.AccessBindings, nil
+}
+
+// ReadCapacity asks the presenting connector for its capacity observation
+// (ADR-330), once per conversation, raising the read bound by the
+// delivery's own byte bound.
+func (r *Region) ReadCapacity(ctx context.Context) (contracts.CapacityDelivery, error) {
+	r.conn.mu.Lock()
+	defer r.conn.mu.Unlock()
+	if r.slot != nil || r.delivered {
+		return contracts.CapacityDelivery{}, ErrChannel
+	}
+	r.delivered = true
+	r.conn.limit.n += contracts.CapacityDeliveryMaxBytes
+	var reply RegionFrame
+	if err := r.ask(ctx, "capacity", &reply); err != nil {
+		return contracts.CapacityDelivery{}, err
+	}
+	if reply.Capacity == nil || reply.AccessBindings != nil || reply.Source != nil || reply.Configuration != nil || reply.Observation != nil {
+		r.closed = true
+		return contracts.CapacityDelivery{}, ErrChannel
+	}
+	return *reply.Capacity, nil
 }
 
 func (r *Region) BeginConnectorLifecycle(ctx context.Context, req app.ConnectorLifecycleRequest) (app.ConnectorLifecycleOperation, error) {

@@ -395,6 +395,72 @@
         }
       }
     },
+    "clusters": {
+      "type": "array",
+      "maxItems": 15,
+      "description": "Workload clusters joined with mode=cluster; the hub-api issues each one's join Secret <name>-join-<name>.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "clusterID"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 40,
+            "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+          },
+          "clusterID": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+          },
+          "namespace": {
+            "type": "string",
+            "maxLength": 63,
+            "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+          },
+          "standby": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 16
+          },
+          "captures": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 16
+          }
+        }
+      }
+    },
+    "remote": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Addresses joined clusters dial: TCP passthrough to the hub Services; connectors verify the in-cluster names.",
+      "properties": {
+        "federation": {
+          "type": "string",
+          "maxLength": 512,
+          "pattern": "^$|^https://[^/@?#\\s]+/?$"
+        },
+        "owners": {
+          "type": "string",
+          "maxLength": 512,
+          "pattern": "^$|^[^/@?#\\s:]+:[0-9]{1,5}$"
+        },
+        "keyService": {
+          "type": "string",
+          "maxLength": 512,
+          "pattern": "^$|^https://[^/@?#\\s]+/?$"
+        },
+        "objectStore": {
+          "type": "string",
+          "maxLength": 512,
+          "pattern": "^$|^https://[^/@?#\\s]+/?$"
+        }
+      }
+    },
     "capacity": {
       "anyOf": [
         {
@@ -428,25 +494,17 @@
         "enabled": {
           "type": "boolean"
         },
-        "clusterID": {
+        "joinSecret": {
           "type": "string",
-          "pattern": "^$|^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
-          "description": "mode=cluster: the console bootstrap receipt's cluster ID. mode=combined uses the generated <name>-ids clusterID."
-        },
-        "peerID": {
-          "type": "string",
-          "pattern": "^$|^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
-          "description": "mode=cluster: the receipt's peer ID. mode=combined uses the generated <name>-ids peerID."
+          "maxLength": 253,
+          "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$",
+          "description": "mode=cluster: the hub's join Secret <name>-join-<cluster>, copied into this release's namespace."
         },
         "bootstrapSecret": {
           "type": "string",
           "maxLength": 253,
           "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$",
-          "description": "Existing Secret with bootstrap.json; mode=combined defaults to <name>-region-bootstrap."
-        },
-        "offer": {
-          "type": "string",
-          "maxLength": 1048576
+          "description": "mode=combined: existing Secret with bootstrap.json; default <name>-region-bootstrap."
         },
         "offerConfigMap": {
           "type": "string",
@@ -1456,6 +1514,33 @@
                       }
                     }
                   }
+                },
+                "service": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "type": {
+                      "enum": [
+                        "ClusterIP",
+                        "NodePort",
+                        "LoadBalancer"
+                      ]
+                    },
+                    "nodePort": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "minimum": 0
+                    },
+                    "annotations": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "description": "The S3 Service; NodePort or LoadBalancer when joined clusters write evidence (remote.objectStore)."
                 }
               },
               "required": [

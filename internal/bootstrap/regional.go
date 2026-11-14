@@ -35,7 +35,11 @@ type Regional struct {
 	// nil in mode=combined, where the hub-worker observes the hub cluster.
 	bindings  AccessBindingReader
 	lifecycle *RegionalLifecycle
-	closers   []func()
+	// capacity delivers this cluster's capacity observation under the join
+	// offer's capacityKeys (ADR-330); nil without them.
+	capacity     CapacityReader
+	capacityKeys []string
+	closers      []func()
 	// API round trips of the shared observer client, for the executor's stop
 	// line (ADR-196): counts and transport time only.
 	observerStats regionalAPIStats
@@ -91,6 +95,10 @@ const (
 	// regionalBindingDelivery spaces AccessBinding deliveries: three per
 	// 30-second ADR-311 window, so one lost delivery keeps allows current.
 	regionalBindingDelivery = 10 * time.Second
+	// regionalCapacityDelivery spaces capacity deliveries: an observation is
+	// current for five seconds from the hub's admission (ADR-330), so two
+	// seconds leave the reconciler at least three.
+	regionalCapacityDelivery = 2 * time.Second
 )
 
 func RunRegional(ctx context.Context, podUID string) error {
@@ -280,6 +288,9 @@ func NewRegional(ctx context.Context, files *os.Root, podUID string) (r *Regiona
 	r.bootstrap = regionalBootstrap{store: secret, seed: secret, record: regionalBootstrapRecord{in}, channel: channel, local: regionalLocal{native, source}, binding: c.binding, root: c.rootID(), now: time.Now}
 	if raw.Mode == contracts.ConnectorModeCluster {
 		r.bindings, r.lifecycle = observer, lifecycle
+		if c.executor && len(c.offer.CapacityKeys) != 0 {
+			r.capacity, r.capacityKeys = observer, c.offer.CapacityKeys
+		}
 	}
 	r.credentials, err = mtls.NewConnectorProcessCredentials(ctx, current.Source.Observation.Profile, podUID, lifecycle, lifecycle, source, lifecycle, time.Now)
 	if err != nil {
@@ -369,6 +380,14 @@ func (r *Regional) Run(ctx context.Context) error {
 		wait := goJoined(func() { r.deliverBindings(contextCtx, &delivering) })
 		defer func() { stopContext(); wait() }()
 	}
+	if r.capacity != nil {
+		wait := goJoined(func() {
+			r.deliver(contextCtx, &delivering, regionalCapacityDelivery, "capacity", func(ctx context.Context) error {
+				return r.lifecycle.DeliverCapacity(ctx, r.capacity, r.capacityKeys)
+			})
+		})
+		defer func() { stopContext(); wait() }()
+	}
 	var attemptAt time.Time
 	var observerAt int64
 	var observerTime time.Duration
@@ -453,8 +472,16 @@ func (r *Regional) Run(ctx context.Context) error {
 // regionalBindingDelivery while enrolled (ADR-329) and logs each change of
 // outcome. A failed delivery is retried at the next interval.
 func (r *Regional) deliverBindings(ctx context.Context, enrolled *atomic.Bool) {
+	r.deliver(ctx, enrolled, regionalBindingDelivery, "access binding", func(ctx context.Context) error {
+		return r.lifecycle.DeliverAccessBindings(ctx, r.bindings)
+	})
+}
+
+// deliver runs one delivery every interval while enrolled and logs each
+// change of outcome. A failed delivery is retried at the next interval.
+func (r *Regional) deliver(ctx context.Context, enrolled *atomic.Bool, interval time.Duration, name string, send func(context.Context) error) {
 	last := "ok"
-	tick := time.NewTicker(regionalBindingDelivery)
+	tick := time.NewTicker(interval)
 	defer tick.Stop()
 	for {
 		select {
@@ -465,10 +492,10 @@ func (r *Regional) deliverBindings(ctx context.Context, enrolled *atomic.Bool) {
 		if !enrolled.Load() {
 			continue
 		}
-		err := r.lifecycle.DeliverAccessBindings(ctx, r.bindings)
+		err := send(ctx)
 		if cause := regionalOutcome(err); cause != last && ctx.Err() == nil {
 			last = cause
-			fmt.Fprintln(os.Stderr, "connector access binding delivery: "+cause)
+			fmt.Fprintln(os.Stderr, "connector "+name+" delivery: "+cause)
 		}
 	}
 }

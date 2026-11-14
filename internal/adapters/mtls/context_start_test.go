@@ -128,7 +128,7 @@ func newContextStartTLSFixture(t *testing.T) *contextStartTLSFixture {
 		return execution.APIProcessObservation{Binding: api, CheckedAt: now, ValidUntil: now.Add(5 * time.Second)}, nil
 	})
 	fixture.api = process
-	pin := ContextStartExecutorPin{NamespaceUID: api.NamespaceUID, AccountUID: api.AccountUID, StartupDigest: api.StartupDigest, ImageDigest: api.ImageDigest}
+	pin := ContextStartExecutorPin{StartupDigest: api.StartupDigest, ImageDigest: api.ImageDigest}
 	ingress, e := NewContextStartIngress(fixture.rootID, owner, owners, []ContextStartConnectorAdmission{{Profile: cf.profile, Executor: pin, Registry: contextStartObservationRegistry{cf}}}, time.Now)
 	if e != nil {
 		t.Fatal(e)

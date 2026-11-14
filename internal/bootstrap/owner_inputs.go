@@ -77,6 +77,20 @@ type ownerInputs struct {
 	// local is the combined-mode hub cluster's own context-start entry,
 	// composed at startup from the stored offer; nil otherwise.
 	local *contracts.OwnerPublicCluster
+	// release is installation.name. remote are the joined mode=cluster
+	// clusters with remoteConfig their addresses and capability Secrets;
+	// remoteOffers and remoteEntries are composed at startup from the
+	// stored offer, one per remote cluster.
+	release       string
+	remote        []hubAPIRemoteCluster
+	remoteConfig  *contracts.HubAPIRemote
+	remoteOffers  []contracts.RegionalOffer
+	remoteEntries []contracts.OwnerPublicCluster
+}
+
+// hubOnly reports mode=hub: the offer serves remote clusters only.
+func (in *ownerInputs) hubOnly() bool {
+	return in.offer == nil || in.offer.hubOnly
 }
 
 func ownerEndpoint(endpoint string) bool {
@@ -91,14 +105,20 @@ func ownerDialAddress(s string) bool {
 	return err == nil && perr == nil && host != "" && len(host) <= 253 && number >= 1 && number <= 65535 && !strings.ContainsAny(host, "/\\@?#% \t\r\n")
 }
 func ownerHTTP(endpoint string, raw [][]byte) (*http.Client, error) {
-	if !ownerEndpoint(endpoint) {
+	return ownerHTTPNamed(endpoint, "", raw)
+}
+
+// ownerHTTPNamed verifies serverName instead of the endpoint host when set
+// (a TCP passthrough address in front of an in-cluster Service).
+func ownerHTTPNamed(endpoint, serverName string, raw [][]byte) (*http.Client, error) {
+	if !ownerEndpoint(endpoint) || len(serverName) > 253 {
 		return nil, mounts.ErrUnavailable
 	}
 	roots, _, err := mtls.OwnerTrustRoots(raw, time.Now())
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	return &http.Client{Timeout: 5 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return mounts.ErrUnavailable }, Transport: &http.Transport{Proxy: nil, TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS13, RootCAs: roots}, DialContext: (&net.Dialer{Timeout: 2 * time.Second, KeepAlive: -1}).DialContext, TLSHandshakeTimeout: 2 * time.Second, ResponseHeaderTimeout: 5 * time.Second, IdleConnTimeout: 5 * time.Second, MaxIdleConns: 4, MaxIdleConnsPerHost: 4, MaxConnsPerHost: 16, DisableCompression: true}}, nil
+	return &http.Client{Timeout: 5 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return mounts.ErrUnavailable }, Transport: &http.Transport{Proxy: nil, TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS13, RootCAs: roots, ServerName: serverName}, DialContext: (&net.Dialer{Timeout: 2 * time.Second, KeepAlive: -1}).DialContext, TLSHandshakeTimeout: 2 * time.Second, ResponseHeaderTimeout: 5 * time.Second, IdleConnTimeout: 5 * time.Second, MaxIdleConns: 4, MaxIdleConnsPerHost: 4, MaxConnsPerHost: 16, DisableCompression: true}}, nil
 }
 
 // readOwnerInputs loads the Helm-native hub-api inputs from their fixed

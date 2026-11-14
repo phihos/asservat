@@ -1206,3 +1206,5 @@ The brief's domain-registration and trademark work remains a maintainer-owned pu
 - [ADR-328 — Administrator-only Asservat namespaces](328-administrator-only-namespaces.md) trusts everyone inside the Asservat namespaces and cluster administrators; earlier namespace-writer threat assumptions are superseded.
 
 - [ADR-329 — AccessBindings in application namespaces](329-accessbindings-in-application-namespaces.md) moves AccessBindings next to the workloads they grant, managed by namespace RBAC with a `bind` check on each role (and on `automation`); the hub-worker reads the hub cluster's bindings, and `mode: cluster` connectors deliver theirs over the lifecycle channel, attributed to their authenticated cluster.
+
+- [ADR-330 — Joining workload clusters with `mode: cluster`](330-remote-cluster-join.md) registers clusters in the hub's values; the hub-api issues each one's join Secret (IDs, offer with external addresses and in-cluster server names, its own object-store capabilities, a one-use bootstrap), derives its context-start entry and topology, and the connector delivers its capacity observation over the lifecycle channel.
