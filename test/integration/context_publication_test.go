@@ -114,7 +114,6 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 		if initialize {
 			processing = newProcessingTestFixture(t, ctx, poolFor, store, keys, s, f.e, shareCohort...)
 			defer processing.Close()
-			initializeProcessingTestFixtureWith(t, ctx, processing)
 		}
 		for _, pair := range []struct {
 			pool *pgxpool.Pool

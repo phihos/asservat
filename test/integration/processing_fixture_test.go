@@ -244,17 +244,12 @@ func newProcessingTestFixture(t *testing.T, ctx context.Context, poolFor func(st
 	failed = false
 	return f
 }
+
+// initializeProcessingTestFixture creates the processing root, which is
+// initialized at creation (ADR-335 D1).
 func initializeProcessingTestFixture(t *testing.T, ctx context.Context, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, s captureAdmissionScenario, e artifact.ContextExpectation) {
 	t.Helper()
-	f := newProcessingTestFixture(t, ctx, poolFor, store, keys, s, e)
-	defer f.Close()
-	initializeProcessingTestFixtureWith(t, ctx, f)
-}
-func initializeProcessingTestFixtureWith(t *testing.T, ctx context.Context, f *processingTestFixture) {
-	t.Helper()
-	if _, err := f.service.Change(ctx, f.actor, privacyvalue.ProcessingChange{RequestID: custodyID(), Action: "initialize_processing"}); err != nil {
-		t.Fatal("actual processing initialization", err)
-	}
+	newProcessingTestFixture(t, ctx, poolFor, store, keys, s, e).Close()
 }
 func syntheticDownloadPlacement(r artifact.Registration) artifact.DownloadPath {
 	return artifact.DownloadPath{ID: custodyID(), TargetClusterID: r.Location.ClusterID, StoreID: r.StoreID, StorageRegion: "synthetic-region", AcquisitionClusterID: r.Location.ClusterID, AcquisitionRegion: "synthetic-region", ConnectorClusterID: r.Location.ClusterID, ConnectorRegion: "synthetic-region", HubClusterID: r.Location.ClusterID, HubRegion: "synthetic-region", WorkerConfiguration: identity.Revision{UID: custodyID(), Generation: 1, Digest: artifact.Digest{81}}, HubConfiguration: identity.Revision{UID: custodyID(), Generation: 1, Digest: artifact.Digest{82}}}

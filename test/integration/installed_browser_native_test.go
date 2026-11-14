@@ -53,8 +53,8 @@ func installedConsoleDialTarget(origin *url.URL, target, address string) string 
 	return target
 }
 
-// consoleSession logs the synthetic user in through the console client, like
-// initializeProcessing, and keeps the cookie session for the browser journey.
+// consoleSession logs the synthetic user in through the console client and
+// keeps the cookie session for the browser journey.
 func (i *installedIdentity) consoleSession(t *testing.T, ctx context.Context, publicRoot *x509.Certificate, address, origin string) *installedBrowser {
 	t.Helper()
 	roots := x509.NewCertPool()

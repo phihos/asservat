@@ -164,11 +164,6 @@ func withProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *p
 	// The existing capacity role published the anchor/allocation in its own
 	// transactions. There is no query producer or extra source-observation claim.
 	query := &queryLedgerFixture{base: f, enrolled: enrolled, root: root}
-	processingPools := len(pools)
-	f.initializeManagedProcessing(t, root)
-	for _, p := range pools[processingPools:] {
-		p.Close()
-	}
 	query.scenario, query.published = publishQueryLedgerContext(t, f, root, enrolled, isProfile, legacyTiming, isPacket, rawPacket, rawSyscall, isLogs)
 	if hook := liveManualFixtureHook(ctx); hook != nil && hook.handled {
 		return // Explicit manual-live fixture ends before publication/query setup.

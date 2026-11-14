@@ -116,9 +116,6 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 		if runs > 1 {
 			keys += fmt.Sprintf("-run%d", runs)
 		}
-		// The focused restart run (ASSERVAT_JOURNEY_FOCUS=restart) starts with a
-		// short journey, which must initialize processing itself.
-		initialize := !short || (installedJourneyFocus() == "restart" || installedJourneyFocus() == "clusters" || installedJourneyFocus() == "upgrade" || installedJourneyFocus() == "chain" || installedJourneyFocus() == "share" || postDownload != nil) && runs == 1
 		cert, err := x509.ParseCertificate(publicRoot)
 		if err != nil {
 			t.Fatal("public listener root", err)
@@ -134,10 +131,6 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 		wire, err := contracts.NewInvestigationContracts()
 		if err != nil {
 			t.Fatal("installed wire contracts", err)
-		}
-		// ADR-210: processing is initialized once, before any preview.
-		if initialize {
-			identity.initializeProcessing(t, ctx, cert, address, origin, diagnose)
 		}
 		tokens := identity.mcpTokenSource(origin)
 		client := sdk.NewClient(&sdk.Implementation{Name: "installed-journey", Version: "1"}, &sdk.ClientOptions{Capabilities: &sdk.ClientCapabilities{}})

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
-	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -724,9 +723,8 @@ func nativeOperationAuditServices(t, owner *testing.T, ctx context.Context, root
 		n := time.Now().UTC().Truncate(time.Microsecond)
 		backing := auditapp.OperationAuditPool{RootID: root, Lane: lane, AccountVersion: "accounts-v1", Accounts: 2, RecordsPerAccount: 4, RetainedSeconds: 3600, ObservedAt: n, FreshUntil: n.Add(5 * time.Second), ValidUntil: n.Add(time.Hour)}
 		if lane == "normal" {
-			// The actual processing initialization already provisioned revision
-			// one and spent a normal-lane record. Extend that known synthetic
-			// configuration through its real revisioned API, retaining spend.
+			// The processing fixture already provisioned revision one. Extend
+			// that synthetic configuration through its real revisioned API.
 			// Fund all four HTTP preflights independently of transfer depletion.
 			var revision, accounts, records int64
 			if e = cp.QueryRow(ctx, "SELECT revision,account_limit,records_per_account FROM operation_audit_pool WHERE root_id=$1 AND lane='normal'", backing.RootID).Scan(&revision, &accounts, &records); e != nil || revision != 1 || accounts != 2 || records != 2 {
@@ -739,27 +737,6 @@ func nativeOperationAuditServices(t, owner *testing.T, ctx context.Context, root
 			t.Fatal(e)
 		}
 		policy := audit.OperationLifecyclePolicy{RootID: root, Lane: lane, InstallationID: installation, StoreID: storeID, PolicyID: custodyID(), BackupProfileID: custodyID(), PolicyDigest: artifact.Digest{1}, BackupProfileDigest: artifact.Digest{2}, BackingRevision: backing.ExpectedRevision + 1, MetadataSlots: backing.Accounts * backing.RecordsPerAccount, MaxPurgeLeases: 4, CleanupBudgetSeconds: 8, ProofWindowSeconds: 2, ValidUntil: backing.ValidUntil, History: &audit.OperationHistoryQualification{ID: custodyID(), Digest: artifact.Digest{5}, Layout: audit.OperationVerificationHistoryLayout, MaximumRowFootprintBytes: 128 << 10, MaximumTransitionWALBytes: 128 << 10, BackupCopies: 2, WALCopies: 2}}
-		if lane == "normal" {
-			// This fixture's earlier processing initialization owns the same
-			// audit lane. Preserve its storage/backup/history identity while
-			// enlarging the explicitly synthetic backing through the real API.
-			// An administrator-only fixture read is not a runtime producer.
-			var count int64
-			var retained []byte
-			var original audit.OperationLifecyclePolicy
-			if e = admin.QueryRow(ctx, `SELECT count(*), min(policy)::jsonb FROM (
- SELECT (intent->'Lifecycle'->'Policy')::text AS policy
- FROM operation_audit WHERE root_id=$1 AND lane='normal'
- AND intent->>'Name'='initialize_processing'
- AND intent_receipt IS NOT NULL AND outcome_receipt IS NOT NULL LIMIT 2
-) original`, backing.RootID).Scan(&count, &retained); e != nil || count != 1 || json.Unmarshal(retained, &original) != nil || !original.CertificateVerificationBacked() || original.RootID != backing.RootID || original.Lane != lane || original.InstallationID != installation || original.BackingRevision != backing.ExpectedRevision {
-				t.Fatal("original acknowledged processing audit policy unavailable")
-			}
-			policy = original
-			policy.BackingRevision = backing.ExpectedRevision + 1
-			policy.MetadataSlots = backing.Accounts * backing.RecordsPerAccount
-			policy.ValidUntil = backing.ValidUntil
-		}
 		bb, ww := policy.History.SlotBacking(policy.MaxPurgeLeases)
 		policy.BackupReservedBytes = bb * policy.MetadataSlots
 		policy.WALReservedBytes = ww * policy.MetadataSlots

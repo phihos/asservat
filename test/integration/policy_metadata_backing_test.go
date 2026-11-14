@@ -35,7 +35,6 @@ func TestPolicyMetadataBackingWithRealPostgres(t *testing.T) {
 				t.Error(err)
 			}
 		}()
-		f.initializeManagedProcessing(t, root)
 		var metadata app.RootMetadataQualification
 		var raw []byte
 		if err := admin.QueryRow(ctx, "SELECT qualification->'RootBacking'->'Metadata' FROM capacity_settings WHERE root_id=$1", f.input.PermissionRootID).Scan(&raw); err != nil || json.Unmarshal(raw, &metadata) != nil {

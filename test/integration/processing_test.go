@@ -34,6 +34,13 @@ func qualifyProcessingRestrictions(t *testing.T, ctx context.Context, admin *pgx
 		t.Fatal(err)
 	}
 	scope := privacyvalue.ProcessingScope{Kind: "workloadInterval", ClusterID: e.Registration.Location.ClusterID, NamespaceUID: e.NamespaceUID, WorkloadUID: e.WorkloadUID, AcquiredFrom: e.Registration.AnchorAt.Add(-time.Second), AcquiredUntil: e.Registration.AnchorAt.Add(time.Second)}
+	// Processing is initialized at root creation; an unrelated earlier rule
+	// fills the two-record normal account before the measured restriction.
+	earlier := scope
+	earlier.AcquiredFrom, earlier.AcquiredUntil = scope.AcquiredFrom.Add(-time.Hour), scope.AcquiredFrom.Add(-time.Minute)
+	if _, err = f.service.Change(ctx, f.actor, privacyvalue.ProcessingChange{RequestID: custodyID(), RuleID: custodyID(), Action: "restrict_processing", Scope: earlier}); err != nil {
+		t.Fatal("unrelated earlier restriction", err)
+	}
 	restrict := privacyvalue.ProcessingChange{RequestID: custodyID(), RuleID: custodyID(), Action: "restrict_processing", Scope: scope}
 	blocked, err := f.service.Change(ctx, f.actor, restrict)
 	if err != nil || blocked.State != "restricted" || blocked.Revision != 1 {

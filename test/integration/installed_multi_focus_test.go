@@ -27,9 +27,6 @@ func installedJourneyFoci() []string {
 // installedEachFocus evaluates); empty otherwise.
 var installedFocusCurrent string
 
-// installedProcessingInitialized records that this test process initialized
-// processing (ADR-210: once per installation).
-var installedProcessingInitialized bool
 
 // installedEachFocus calls fn once per listed focus with that focus current
 // (once with the single focus otherwise).

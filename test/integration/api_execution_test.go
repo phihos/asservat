@@ -64,7 +64,6 @@ func qualifyAPIExecutionTransactions(t *testing.T, ctx context.Context, admin *p
 				if roleCase.name == "early-erasure" {
 					erasure = newProcessingTestFixture(t, ctx, poolFor, store, keys, s, accepted.Expectation)
 					defer erasure.Close()
-					initializeProcessingTestFixtureWith(t, ctx, erasure)
 				} else {
 					initializeProcessingTestFixture(t, ctx, poolFor, store, keys, s, accepted.Expectation)
 				}
