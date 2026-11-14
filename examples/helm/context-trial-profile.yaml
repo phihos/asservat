@@ -30,7 +30,8 @@ fleet:
 capacity:
   evidenceStorage: 8Gi
   storageAssurance: qualifiedReservedBackend
-  workload: {share: 256Mi, limit: 1536Mi}
+  # Two alert episodes in the installed journeys share one workload bucket.
+  workload: {share: 256Mi, limit: 1536Mi, dump: {burst: 2, minimumIntervalSeconds: 300}}
 retention:
   purposeRef: context-trial
   defaults: {evidenceSeconds: 300, caseMetadataSeconds: 3600, auditMetadataSeconds: 3600}
