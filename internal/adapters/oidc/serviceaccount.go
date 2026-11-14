@@ -127,8 +127,7 @@ func (c *saCluster) candidate(issuer, subject string) bool {
 
 // current returns the discovered verifier, discovering the issuer on demand
 // (once at a time, outside any lock, within its own I/O timeout). A failed
-// discovery is not cached; the next request that needs it tries again. The
-// remote key set refreshes itself on an unknown key ID.
+// discovery is not cached; the next request that needs it tries again.
 func (c *saCluster) current(ctx context.Context) (*saState, error) {
 	if s := c.state.Load(); s != nil {
 		return s, nil
@@ -179,9 +178,67 @@ func (c *saCluster) discover(ctx context.Context) (*saState, error) {
 		// jwks_uri may name an address only reachable outside the cluster.
 		jwks = strings.TrimSuffix(c.cluster.Discovery, "/") + "/openid/v1/jwks"
 	}
-	keys := gooidc.NewRemoteKeySet(gooidc.ClientContext(context.Background(), c.cluster.Client), jwks)
+	keys := &remoteKeys{url: jwks, client: c.cluster.Client}
 	return &saState{issuer: doc.Issuer, verifier: gooidc.NewVerifier(doc.Issuer, keys, saConfig)}, nil
 }
+
+// remoteKeys is a discovered JWKS: cached, and fetched again (once at a
+// time, within the I/O timeout) when a token names an unknown key ID, such
+// as after the cluster rotated its ServiceAccount signing key.
+type remoteKeys struct {
+	url    string
+	client *http.Client
+	keys   atomic.Pointer[jose.JSONWebKeySet]
+	flight singleflight.Group
+}
+
+func (r *remoteKeys) VerifySignature(ctx context.Context, raw string) ([]byte, error) {
+	jws, err := jose.ParseSigned(raw, saAlgorithms)
+	if err != nil || len(jws.Signatures) != 1 {
+		return nil, ErrServiceAccountDenied
+	}
+	kid := jws.Signatures[0].Header.KeyID
+	set := r.keys.Load()
+	if set == nil || len(set.Key(kid)) == 0 {
+		if set, err = r.fetch(ctx); err != nil {
+			return nil, err
+		}
+	}
+	for _, k := range set.Key(kid) {
+		if payload, err := jws.Verify(k); err == nil {
+			return payload, nil
+		}
+	}
+	return nil, ErrServiceAccountDenied
+}
+
+func (r *remoteKeys) fetch(ctx context.Context) (*jose.JSONWebKeySet, error) {
+	out, err, _ := r.flight.Do("jwks", func() (any, error) {
+		call, cancel := context.WithTimeout(context.WithoutCancel(ctx), discoveryTimeout)
+		defer cancel()
+		req, err := http.NewRequestWithContext(call, http.MethodGet, r.url, nil)
+		if err != nil {
+			return nil, err
+		}
+		resp, err := r.client.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		defer resp.Body.Close()
+		var set jose.JSONWebKeySet
+		if resp.StatusCode != http.StatusOK || json.NewDecoder(http.MaxBytesReader(nil, resp.Body, 256<<10)).Decode(&set) != nil {
+			return nil, ErrServiceAccountDenied
+		}
+		r.keys.Store(&set)
+		return &set, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out.(*jose.JSONWebKeySet), nil
+}
+
+var saAlgorithms = []jose.SignatureAlgorithm{jose.RS256, jose.RS384, jose.RS512, jose.ES256, jose.ES384, jose.ES512, jose.PS256, jose.PS384, jose.PS512, jose.EdDSA}
 
 // saConfig checks the audience itself (any of the hub's URLs) and accepts
 // the asymmetric algorithms Kubernetes can sign ServiceAccount tokens with.
