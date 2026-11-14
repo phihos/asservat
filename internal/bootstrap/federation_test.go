@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	fleetapp "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/fleet"
@@ -90,5 +91,40 @@ func TestFederationEnrollmentDiagnosticNamesCompositionBoundary(t *testing.T) {
 	}
 	if strings.Contains(err.Error(), "synthetic") {
 		t.Fatal("provider text entered fixed diagnostic")
+	}
+}
+
+type scriptedStaged struct {
+	errs  []error
+	reads int
+}
+
+func (s *scriptedStaged) ReadStagedConnector(context.Context, value.ConnectorCluster) (value.ConnectorCredentialProfile, fleetapp.ConnectorIdentityBacking, error) {
+	err := s.errs[min(s.reads, len(s.errs)-1)]
+	s.reads++
+	return value.ConnectorCredentialProfile{}, fleetapp.ConnectorIdentityBacking{}, err
+}
+
+// Only a never staged peer is staged; a suspended or blocked peer and a
+// transient read failure return their error without writing.
+func TestFederationStagesOnlyNeverStagedPeers(t *testing.T) {
+	for name, tc := range map[string]struct {
+		errs   []error
+		staged bool
+		want   error
+	}{
+		"never staged":    {[]error{value.ErrNotStaged, nil}, true, nil},
+		"staged":          {[]error{nil}, false, nil},
+		"suspended":       {[]error{value.ErrDenied}, false, value.ErrDenied},
+		"transient":       {[]error{value.ErrUnavailable}, false, value.ErrUnavailable},
+		"staging refused": {[]error{value.ErrNotStaged, value.ErrDenied}, true, value.ErrDenied},
+	} {
+		t.Run(name, func(t *testing.T) {
+			staged := false
+			_, _, err := stagedProfile(context.Background(), &scriptedStaged{errs: tc.errs}, value.ConnectorCluster{}, func(context.Context) error { staged = true; return nil })
+			if staged != tc.staged || tc.want == nil && err != nil || tc.want != nil && !errors.Is(err, tc.want) {
+				t.Fatal("staging", staged, err)
+			}
+		})
 	}
 }

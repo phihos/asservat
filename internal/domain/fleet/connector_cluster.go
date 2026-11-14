@@ -1,6 +1,14 @@
 package fleet
 
-import "asservat.local/asservat/internal/domain/authorization"
+import (
+	"errors"
+
+	"asservat.local/asservat/internal/domain/authorization"
+)
+
+// ErrNotStaged reports that a registered cluster's connector source was
+// never staged; only this case stages it on the first conversation.
+var ErrNotStaged = errors.New("connector source not staged")
 
 // ConnectorCluster is the registered workload cluster a connector's
 // ServiceAccount token was attributed to (ADR-334): the hub's values name

@@ -334,16 +334,12 @@ func (s *federationPeers) resolve(ctx context.Context, region *connectorlifecycl
 	if p.RootID != s.ids.PermissionRootID || p.InstallationID != s.ids.InstallationID {
 		return zero, value.ErrDenied
 	}
-	profile, backing, err := s.profiles.ReadStagedConnector(ctx, p)
+	profile, backing, err := stagedProfile(ctx, s.profiles, p, func(ctx context.Context) error {
+		_, err := s.stage(ctx, region, region.Binding())
+		return err
+	})
 	if err != nil {
-		// A registered cluster's first conversation stages its source.
-		if _, err = s.stage(ctx, region, region.Binding()); err != nil {
-			return zero, federationEnrollmentError{"stage", err}
-		}
-		profile, backing, err = s.profiles.ReadStagedConnector(ctx, p)
-	}
-	if err != nil {
-		return zero, federationEnrollmentError{"staged-profile", value.ErrDenied} // never staged, suspended or blocked
+		return zero, err
 	}
 	staged, err := json.Marshal(struct {
 		Profile value.ConnectorCredentialProfile
@@ -366,6 +362,28 @@ func (s *federationPeers) resolve(ctx context.Context, region *connectorlifecycl
 	d.Owners, d.Recovery = s.owners, s.recovery
 	s.duties[p] = federationPeerEntry{staged: staged, duties: d}
 	return d, nil
+}
+
+// stagedConnectors reads one peer's staged profile and root backing.
+type stagedConnectors interface {
+	ReadStagedConnector(context.Context, value.ConnectorCluster) (value.ConnectorCredentialProfile, fleetapp.ConnectorIdentityBacking, error)
+}
+
+// stagedProfile stages a registered cluster's source only when it was never
+// staged; a suspended or blocked peer stays refused and a failed read
+// returns without writing.
+func stagedProfile(ctx context.Context, profiles stagedConnectors, p value.ConnectorCluster, stage func(context.Context) error) (value.ConnectorCredentialProfile, fleetapp.ConnectorIdentityBacking, error) {
+	profile, backing, err := profiles.ReadStagedConnector(ctx, p)
+	if errors.Is(err, value.ErrNotStaged) {
+		if err = stage(ctx); err != nil {
+			return profile, backing, federationEnrollmentError{"stage", err}
+		}
+		profile, backing, err = profiles.ReadStagedConnector(ctx, p)
+	}
+	if err != nil {
+		return profile, backing, federationEnrollmentError{"staged-profile", err}
+	}
+	return profile, backing, nil
 }
 
 // federationPeer composes one staged peer's unchanged ADR-153 duties.

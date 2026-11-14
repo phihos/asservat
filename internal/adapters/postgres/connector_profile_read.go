@@ -29,7 +29,8 @@ func NewConnectorIdentityProfiles(ctx context.Context, pool *pgxpool.Pool) (*Con
 
 // ReadStagedConnector returns the staged profile (with the regional guard's
 // protection digest) and the root's current backing for exactly the
-// presented peer. A suspended, blocked or never staged peer is unavailable.
+// presented peer. A never staged peer is ErrNotStaged, a suspended or
+// blocked one ErrDenied; anything else is unavailable.
 func (s *ConnectorIdentityProfiles) ReadStagedConnector(ctx context.Context, p value.ConnectorCluster) (value.ConnectorCredentialProfile, app.ConnectorIdentityBacking, error) {
 	var profile value.ConnectorCredentialProfile
 	var backing app.ConnectorIdentityBacking
@@ -43,7 +44,13 @@ func (s *ConnectorIdentityProfiles) ReadStagedConnector(ctx context.Context, p v
 	err := s.ledger.pool.QueryRow(call, `SELECT p.configuration::text, r.backing::text, p.suspended, p.blocked
 		FROM public.connector_identity_profile p JOIN public.connector_identity_root r ON r.root_id=p.root_id
 		WHERE p.root_id=$1 AND p.peer_id=$2 AND p.installation_id=$3 AND p.cluster_id=$4`, p.RootID, p.PeerID, p.InstallationID, p.ClusterID).Scan(&rawProfile, &rawBacking, &suspended, &blocked)
-	if err != nil || suspended || blocked || strictJSON(rawProfile, &profile) != nil || strictJSON(rawBacking, &backing) != nil {
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+		return profile, backing, value.ErrNotStaged
+	case err == nil && (suspended || blocked):
+		return profile, backing, value.ErrDenied
+	}
+	if err != nil || strictJSON(rawProfile, &profile) != nil || strictJSON(rawBacking, &backing) != nil {
 		return value.ConnectorCredentialProfile{}, app.ConnectorIdentityBacking{}, value.ErrUnavailable
 	}
 	b := profile.Binding

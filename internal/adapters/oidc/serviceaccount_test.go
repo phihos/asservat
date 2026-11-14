@@ -136,3 +136,44 @@ func TestServiceAccountVerifierLocalDiscovery(t *testing.T) {
 		t.Fatal("local token", got, err)
 	}
 }
+
+// Candidates are chosen by the token's issuer before any network call: a
+// token of another issuer never triggers this cluster's discovery. A failed
+// discovery is not cached; the next request discovers again.
+func TestServiceAccountVerifierSelectsByIssuerAndRetriesFailedDiscovery(t *testing.T) {
+	key := newSAKey(t, "k1")
+	var discoveries, failures atomic.Int32
+	failures.Store(1)
+	mux := http.NewServeMux()
+	server := httptest.NewTLSServer(mux)
+	defer server.Close()
+	mux.HandleFunc("/.well-known/openid-configuration", func(w http.ResponseWriter, _ *http.Request) {
+		discoveries.Add(1)
+		if failures.Add(-1) >= 0 {
+			http.Error(w, "unavailable", http.StatusServiceUnavailable)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]string{"issuer": server.URL, "jwks_uri": server.URL + "/openid/v1/jwks"})
+	})
+	mux.HandleFunc("/openid/v1/jwks", func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(jose.JSONWebKeySet{Keys: []jose.JSONWebKey{key.public()}})
+	})
+	v, err := NewServiceAccountVerifier([]string{saAudience}, []ServiceAccountCluster{{ClusterID: "eu", PeerID: "eu-peer", Issuer: server.URL, Namespace: "asservat-system", Account: "asservat-connector", Client: server.Client()}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	if _, err = v.VerifyConnector(ctx, key.token(t, "https://other.example.test", saSubject, saAudience, time.Now().Add(time.Minute))); err == nil || discoveries.Load() != 0 {
+		t.Fatal("foreign issuer reached discovery", err, discoveries.Load())
+	}
+	token := key.token(t, server.URL, saSubject, saAudience, time.Now().Add(time.Minute))
+	if _, err = v.VerifyConnector(ctx, token); err == nil || discoveries.Load() != 1 {
+		t.Fatal("failed discovery accepted", err, discoveries.Load())
+	}
+	if _, err = v.VerifyConnector(ctx, token); err != nil || discoveries.Load() != 2 {
+		t.Fatal("discovery not retried", err, discoveries.Load())
+	}
+	if _, err = v.VerifyConnector(ctx, token); err != nil || discoveries.Load() != 2 {
+		t.Fatal("discovery repeated after success", err, discoveries.Load())
+	}
+}

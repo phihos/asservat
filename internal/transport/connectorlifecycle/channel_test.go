@@ -6,6 +6,8 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
+	"io"
+	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
@@ -252,5 +254,46 @@ func TestDelegatedLifecycleChannelOverRealHTTP2(t *testing.T) {
 		if _, err = client.Run(context.Background(), bad, localReader{}); err == nil {
 			t.Fatal("registration opening for another peer or without a leaf accepted")
 		}
+	}
+}
+
+// The token is verified before a concurrency slot is taken or the opening is
+// read: an invalid token is refused while its body stays open, and it never
+// holds the only slot.
+func TestHandlerVerifiesTokenBeforeSlotAndOpening(t *testing.T) {
+	h, err := NewHandler(&acceptTokens{}, &scriptedServices{}, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewUnstartedServer(h)
+	server.EnableHTTP2 = true
+	server.TLS = &tls.Config{MinVersion: tls.VersionTLS13}
+	server.StartTLS()
+	defer server.Close()
+	body, writer := io.Pipe()
+	defer writer.Close()
+	req, _ := http.NewRequest(http.MethodPost, server.URL+Path, body)
+	req.Header.Set("Content-Type", ContentType)
+	req.Header.Set("Authorization", "Bearer other-token")
+	done := make(chan int, 1)
+	go func() {
+		resp, err := server.Client().Do(req)
+		if err != nil {
+			done <- 0
+			return
+		}
+		resp.Body.Close()
+		done <- resp.StatusCode
+	}()
+	select {
+	case code := <-done:
+		if code != http.StatusUnauthorized {
+			t.Fatal("invalid token status", code)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("invalid token waited for the opening")
+	}
+	if len(h.slots) != 0 {
+		t.Fatal("invalid token held a slot")
 	}
 }

@@ -70,6 +70,16 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		fail(http.StatusUnauthorized)
 		return
 	}
+	// The token is verified before any slot or opening read: an
+	// unauthenticated caller holds no concurrency slot and sends no frame.
+	verify, endVerify := context.WithTimeout(r.Context(), 5*time.Second)
+	presented, err := h.tokens.VerifyConnector(verify, token)
+	endVerify()
+	if err != nil {
+		fail(http.StatusUnauthorized)
+		return
+	}
+	verifiedAt := time.Now()
 	select {
 	case h.slots <- struct{}{}:
 		defer func() { <-h.slots }()
@@ -92,8 +102,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		fail(http.StatusBadRequest)
 		return
 	}
-	presented, ok := h.admit(ctx, opening, token)
-	if !ok {
+	if !admit(opening, presented) {
 		fail(http.StatusForbidden)
 		return
 	}
@@ -102,10 +111,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if control.Flush() != nil {
 		return
 	}
-	region := &Region{conn: conn, presented: presented, verifiedAt: time.Now(), process: opening.Request.Process}
+	region := &Region{conn: conn, presented: presented, verifiedAt: verifiedAt, process: opening.Request.Process}
 	defer region.closeChannel()
 	result := HubFrame{Kind: "result"}
-	var err error
 	switch opening.Purpose {
 	case value.ConnectorLifecycleEnroll:
 		var process value.ConnectorCredentialProcess
@@ -174,36 +182,31 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	_ = conn.Send(result)
 }
 
-// admit attributes the token to its registered cluster and binds the
-// opening to it: the process binding must name that cluster's peer.
-func (h *Handler) admit(ctx context.Context, o Opening, token string) (value.ConnectorCluster, bool) {
-	var zero value.ConnectorCluster
+// admit binds the opening to the token's registered cluster: the process
+// binding must name that cluster's peer.
+func admit(o Opening, p value.ConnectorCluster) bool {
 	if !authorization.UUID(o.OperationID) || !o.Request.Valid() {
-		return zero, false
+		return false
 	}
 	switch o.Purpose {
 	case value.ConnectorLifecycleEnroll, value.ConnectorLifecycleClient, value.ConnectorLifecycleServer:
 	case PurposeRegistration:
 		if o.Certificate == nil || o.Certificate.Binding != o.Request.Process.Binding {
-			return zero, false
+			return false
 		}
 	case PurposeOwnerCandidates, PurposeRecovery, PurposeOwnerObservationCandidates, PurposeAccessBindings, PurposeCapacity:
 	case PurposeOwnerAuthentication, PurposeOwnerRegistration:
 		if o.Owner == nil || o.Owner.Usage != "server" || o.Owner.Binding.InstallationID != o.Request.Process.Binding.InstallationID {
-			return zero, false
+			return false
 		}
 	default:
-		return zero, false
+		return false
 	}
 	if o.Purpose != PurposeRegistration && o.Certificate != nil || o.Purpose != PurposeOwnerAuthentication && o.Purpose != PurposeOwnerRegistration && o.Owner != nil {
-		return zero, false
+		return false
 	}
-	p, err := h.tokens.VerifyConnector(ctx, token)
 	b := o.Request.Process.Binding
-	if err != nil || p.InstallationID != b.InstallationID || p.ClusterID != b.ClusterID || p.PeerID != b.PeerID {
-		return zero, false
-	}
-	return p, true
+	return p.InstallationID == b.InstallationID && p.ClusterID == b.ClusterID && p.PeerID == b.PeerID
 }
 
 // Region is one conversation's delegated regional reader: ADR-153 native

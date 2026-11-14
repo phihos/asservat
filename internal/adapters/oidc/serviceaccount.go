@@ -8,14 +8,19 @@ import (
 	"net/http"
 	"slices"
 	"strings"
-	"sync"
+	"sync/atomic"
+	"time"
 
 	gooidc "github.com/coreos/go-oidc/v3/oidc"
 	jose "github.com/go-jose/go-jose/v4"
+	"golang.org/x/sync/singleflight"
 )
 
 // ErrServiceAccountDenied refuses a connector token (ADR-334).
 var ErrServiceAccountDenied = errors.New("connector service account token denied")
+
+// discoveryTimeout bounds one issuer discovery (ADR-330 D5 I/O timeout).
+const discoveryTimeout = 5 * time.Second
 
 // ServiceAccountCluster is one registered workload cluster: its connector
 // ServiceAccount and either a static JWKS or discovery of its issuer.
@@ -39,9 +44,16 @@ type ServiceAccountVerifier struct {
 	clusters  []*saCluster
 }
 
+// saCluster keeps its registration immutable; the discovered issuer and
+// verifier are published once through state.
 type saCluster struct {
-	ServiceAccountCluster
-	mu       sync.Mutex
+	cluster ServiceAccountCluster
+	state   atomic.Pointer[saState]
+	flight  singleflight.Group
+}
+
+type saState struct {
+	issuer   string
 	verifier *gooidc.IDTokenVerifier
 }
 
@@ -59,7 +71,7 @@ func NewServiceAccountVerifier(audiences []string, clusters []ServiceAccountClus
 		if c.Client == nil {
 			c.Client = http.DefaultClient
 		}
-		s := &saCluster{ServiceAccountCluster: c}
+		s := &saCluster{cluster: c}
 		if len(c.JWKS) != 0 {
 			var set jose.JSONWebKeySet
 			if json.Unmarshal(c.JWKS, &set) != nil || len(set.Keys) == 0 || c.Issuer == "" {
@@ -69,14 +81,16 @@ func NewServiceAccountVerifier(audiences []string, clusters []ServiceAccountClus
 			for _, k := range set.Keys {
 				keys.PublicKeys = append(keys.PublicKeys, k.Key)
 			}
-			s.verifier = gooidc.NewVerifier(c.Issuer, keys, saConfig)
+			s.state.Store(&saState{issuer: c.Issuer, verifier: gooidc.NewVerifier(c.Issuer, keys, saConfig)})
 		}
 		v.clusters = append(v.clusters, s)
 	}
 	return v, nil
 }
 
-// Verify returns the cluster the token belongs to.
+// VerifyConnector returns the cluster the token belongs to. Candidates are
+// selected by the token's unverified issuer and subject before any key
+// lookup; the verifier then checks signature, issuer, audience and expiry.
 func (v *ServiceAccountVerifier) VerifyConnector(ctx context.Context, raw string) (ServiceAccountCluster, error) {
 	var zero ServiceAccountCluster
 	issuer, subject, ok := unverifiedClaims(raw)
@@ -84,42 +98,70 @@ func (v *ServiceAccountVerifier) VerifyConnector(ctx context.Context, raw string
 		return zero, ErrServiceAccountDenied
 	}
 	for _, c := range v.clusters {
-		if subject != "system:serviceaccount:"+c.Namespace+":"+c.Account {
+		if !c.candidate(issuer, subject) {
 			continue
 		}
-		verifier, err := c.current(ctx, issuer)
-		if err != nil {
+		state, err := c.current(ctx)
+		if err != nil || state.issuer != issuer {
 			continue
 		}
-		if t, err := verifier.Verify(gooidc.ClientContext(ctx, c.Client), raw); err == nil && t.Subject == subject && slices.ContainsFunc(t.Audience, func(a string) bool { return slices.Contains(v.audiences, a) }) {
-			c.mu.Lock()
-			defer c.mu.Unlock()
-			return c.ServiceAccountCluster, nil
+		if t, err := state.verifier.Verify(gooidc.ClientContext(ctx, c.cluster.Client), raw); err == nil && t.Subject == subject && slices.ContainsFunc(t.Audience, func(a string) bool { return slices.Contains(v.audiences, a) }) {
+			return c.cluster, nil
 		}
 	}
 	return zero, ErrServiceAccountDenied
 }
 
-// current discovers the issuer once; the remote key set refreshes itself on
-// an unknown key ID.
-func (c *saCluster) current(ctx context.Context, issuer string) (*gooidc.IDTokenVerifier, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.Issuer != "" && c.Issuer != issuer {
-		return nil, ErrServiceAccountDenied
+// candidate matches the connector subject and the registered issuer, or,
+// for the hub's own API server, the issuer it published once discovered.
+func (c *saCluster) candidate(issuer, subject string) bool {
+	if subject != "system:serviceaccount:"+c.cluster.Namespace+":"+c.cluster.Account {
+		return false
 	}
-	if c.verifier != nil {
-		return c.verifier, nil
+	if c.cluster.Issuer != "" {
+		return c.cluster.Issuer == issuer
 	}
-	base := c.Discovery
+	s := c.state.Load()
+	return s == nil || s.issuer == issuer
+}
+
+// current returns the discovered verifier, discovering the issuer on demand
+// (once at a time, outside any lock, within its own I/O timeout). A failed
+// discovery is not cached; the next request that needs it tries again. The
+// remote key set refreshes itself on an unknown key ID.
+func (c *saCluster) current(ctx context.Context) (*saState, error) {
+	if s := c.state.Load(); s != nil {
+		return s, nil
+	}
+	out, err, _ := c.flight.Do("discover", func() (any, error) {
+		if s := c.state.Load(); s != nil {
+			return s, nil
+		}
+		call, cancel := context.WithTimeout(context.WithoutCancel(ctx), discoveryTimeout)
+		defer cancel()
+		s, err := c.discover(call)
+		if err != nil {
+			return nil, err
+		}
+		c.state.Store(s)
+		return s, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out.(*saState), nil
+}
+
+func (c *saCluster) discover(ctx context.Context) (*saState, error) {
+	base := c.cluster.Discovery
 	if base == "" {
-		base = c.Issuer
+		base = c.cluster.Issuer
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimSuffix(base, "/")+"/.well-known/openid-configuration", nil)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := c.Client.Do(req)
+	resp, err := c.cluster.Client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -128,19 +170,17 @@ func (c *saCluster) current(ctx context.Context, issuer string) (*gooidc.IDToken
 		Issuer  string `json:"issuer"`
 		JWKSURI string `json:"jwks_uri"`
 	}
-	if resp.StatusCode != http.StatusOK || json.NewDecoder(http.MaxBytesReader(nil, resp.Body, 64<<10)).Decode(&doc) != nil || doc.Issuer == "" || c.Issuer != "" && doc.Issuer != c.Issuer {
+	if resp.StatusCode != http.StatusOK || json.NewDecoder(http.MaxBytesReader(nil, resp.Body, 64<<10)).Decode(&doc) != nil || doc.Issuer == "" || c.cluster.Issuer != "" && doc.Issuer != c.cluster.Issuer {
 		return nil, ErrServiceAccountDenied
 	}
 	jwks := doc.JWKSURI
-	if c.Discovery != "" {
+	if c.cluster.Discovery != "" {
 		// The API server serves its keys at a fixed path; its advertised
 		// jwks_uri may name an address only reachable outside the cluster.
-		jwks = strings.TrimSuffix(c.Discovery, "/") + "/openid/v1/jwks"
+		jwks = strings.TrimSuffix(c.cluster.Discovery, "/") + "/openid/v1/jwks"
 	}
-	c.Issuer = doc.Issuer
-	keys := gooidc.NewRemoteKeySet(gooidc.ClientContext(context.WithoutCancel(ctx), c.Client), jwks)
-	c.verifier = gooidc.NewVerifier(doc.Issuer, keys, saConfig)
-	return c.verifier, nil
+	keys := gooidc.NewRemoteKeySet(gooidc.ClientContext(context.Background(), c.cluster.Client), jwks)
+	return &saState{issuer: doc.Issuer, verifier: gooidc.NewVerifier(doc.Issuer, keys, saConfig)}, nil
 }
 
 // saConfig checks the audience itself (any of the hub's URLs) and accepts
