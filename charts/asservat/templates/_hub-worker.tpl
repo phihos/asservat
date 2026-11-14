@@ -49,12 +49,13 @@ installation ID in Go, object UIDs are read by name.
   "postgres" $p.postgres
   "auditStore" (dict "endpoint" $p.objectStore.endpoint "region" $p.objectStore.region "bucket" $p.objectStore.auditBucket)
   "keyService" (dict "endpoint" $p.openBao.endpoint) -}}
-{{- if .Values.capacity -}}
-{{- $c := deepCopy .Values.capacity -}}
+{{- with include "asservat.capacity" . -}}
+{{- $c := fromJson . -}}
+{{- $_ := set $c "revision" $.Release.Revision -}}
 {{- $_ := set $c "processingSource" (printf "%s-processing-source" $n) -}}
 {{- $_ := set $c "paths" list -}}
-{{- $_ := set $c "sharedQueries" (gt (int (default 0 .Values.hub.publisher.replicas)) 0) -}}
-{{- with include "asservat.hubApi.clusters" . | fromJsonArray }}{{ $_ := set $c "remoteClusters" . }}{{ end -}}
+{{- $_ := set $c "sharedQueries" (gt (int (default 0 $.Values.hub.publisher.replicas)) 0) -}}
+{{- with include "asservat.hubApi.clusters" $ | fromJsonArray }}{{ $_ := set $c "remoteClusters" . }}{{ end -}}
 {{- $_ := set $v "capacity" $c -}}
 {{- $_ := set $v "cleanup" dict -}}
 {{- $_ := set $roles "cleanupWrap" (get $role "cleanup-wrap") -}}

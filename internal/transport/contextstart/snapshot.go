@@ -24,14 +24,13 @@ func (s *regionalSession) startSourceSnapshot(ctx context.Context, raw []byte) (
 		return nil, err
 	}
 	recorder, ok := s.prepared.(evidence.SourceSnapshotRecorder)
-	d := s.consumed
-	if x.WriterPodUID != s.work.Channel.Executor.PodUID || x.WriterEpoch != s.work.Channel.Executor.ProcessEpoch || x.AttemptID != s.work.AttemptID || s.snapshotTarget == nil || !s.snapshotTarget.Valid(s.local.Now()) || x.Binding.NodeUID != s.snapshotTarget.Original.NodeUID || x.Binding.BootID != s.snapshotTarget.Original.BootID || x.Binding.CollectorPodUID != s.snapshotTarget.Original.CollectorPodUID || x.Binding.CollectorEpoch != s.snapshotTarget.Original.CollectorEpoch || x.Binding.SourceID != s.snapshotTarget.Original.SourceID || x.Binding.Fence != s.snapshotTarget.Original.Fence || x.Request.SourceBindingDigest != s.snapshotTarget.Original.BindingDigest || s.acquired || !ok || s.expectation == nil || s.expectation.Snapshot == nil || d == nil || !d.MayStart || d.Phase != value.StartCommitted || !x.Valid() || x.CaptureID != s.work.CaptureID || x.ExpectationDigest != [32]byte(s.work.ExpectationDigest) || !s.expectation.Snapshot.Equal(x.Request) || !s.local.Now().Before(x.Request.StartBy) {
+	if x.WriterPodUID != s.work.Channel.Executor.PodUID || x.WriterEpoch != s.work.Channel.Executor.ProcessEpoch || x.AttemptID != s.work.AttemptID || s.snapshotTarget == nil || !s.snapshotTarget.Valid(s.local.Now()) || x.Binding.NodeUID != s.snapshotTarget.Original.NodeUID || x.Binding.BootID != s.snapshotTarget.Original.BootID || x.Binding.CollectorPodUID != s.snapshotTarget.Original.CollectorPodUID || x.Binding.CollectorEpoch != s.snapshotTarget.Original.CollectorEpoch || x.Binding.SourceID != s.snapshotTarget.Original.SourceID || x.Binding.Fence != s.snapshotTarget.Original.Fence || x.Request.SourceBindingDigest != s.snapshotTarget.Original.BindingDigest || s.acquired || !ok || s.expectation == nil || s.expectation.Snapshot == nil || !x.Valid() || x.CaptureID != s.work.CaptureID || x.ExpectationDigest != [32]byte(s.work.ExpectationDigest) || !s.expectation.Snapshot.Equal(x.Request) || !s.local.Now().Before(x.Request.StartBy) {
 		return nil, value.ErrDenied
 	}
-	if !s.local.Now().Before(d.ValidUntil) {
+	if !s.local.Now().Before(s.work.NotAfter) {
 		return nil, value.ErrExpired
 	}
-	cutoff := d.ValidUntil
+	cutoff := s.work.NotAfter
 	if s.snapshotTarget.FreshUntil.Before(cutoff) {
 		cutoff = s.snapshotTarget.FreshUntil
 	}

@@ -67,7 +67,6 @@ type APIExecutionReader interface {
 }
 type APIExecutionPreparer interface {
 	PrepareAPIExecution(context.Context, APIExecutionCheck) (value.APIExecution, bool, error)
-	BindAPIStart(context.Context, APIExecutionCheck, value.APIExecution, value.PreparedStart) (value.APIExecution, error)
 }
 
 // PolicyRecordingPreparer is the finite policy-only companion. It atomically
@@ -84,8 +83,11 @@ type ArgumentRecordingPreparer interface {
 	PrepareArgumentRecording(context.Context, APIExecutionCheck, targets.PacketSourceObservation) (value.APIExecution, bool, collector.ArgumentObservationPermit, error)
 }
 
+// APIExecutionRecorder.RecordAPIStart consumes the start right with one
+// conditional SQL update (ADR-330 D7). Only its successful reply authorizes
+// the effect; a lost reply never justifies a second start.
 type APIExecutionRecorder interface {
-	RecordAPIStart(context.Context, APIExecutionCheck, value.APIExecution, value.Disposition) (value.APIExecution, error)
+	RecordAPIStart(context.Context, APIExecutionCheck, value.APIExecution) (value.APIExecution, error)
 	RecordAPIOutcome(context.Context, value.APIExecution, value.APIProcessObservation) (value.APIExecution, error)
 }
 type APIStoredCompletionRecorder interface {
@@ -108,18 +110,13 @@ type APISnapshotCancellationRecorder interface {
 type APIProcessReader interface {
 	ReadAPIProcess(context.Context) (value.APIProcessObservation, error)
 }
-type APIStartPreparation interface {
-	PrepareStart(context.Context, value.PreparationCheck) (value.PreparedStart, error)
-	ReadyStart(context.Context, value.Request) (value.Disposition, error)
+type ContextCollector interface {
+	Capture(context.Context, artifact.PinnedPod) ([]byte, error)
 }
 
-// ObservedAPIStartPreparation checks a start against a complete process
-// observation the caller already holds for the same verified work (ADR-173),
-// instead of reading the process again. The observation must come from the
-// same in-process reader; it is never accepted from a remote party.
-type ObservedAPIStartPreparation interface {
-	PrepareObservedStart(context.Context, value.PreparationCheck, value.APIProcessObservation) (value.PreparedStart, error)
-	ReadyObservedStart(context.Context, value.Request, value.APIProcessObservation) (value.Disposition, error)
+type ContextResult struct {
+	State  string // AlreadyStarted, Indeterminate, Recording or StoredPendingVerification.
+	Copies artifact.Copies
 }
 
 type APIContextRunner struct {
@@ -127,8 +124,6 @@ type APIContextRunner struct {
 	Prepare APIExecutionPreparer
 	Record  APIExecutionRecorder
 	Process APIProcessReader
-	Local   APIStartPreparation
-	Starts  StartJournal
 	Targets interface {
 		ResolvePod(context.Context, targets.Request) (targets.PodResolution, error)
 	}
@@ -393,7 +388,7 @@ func (c APIExecutionCheck) current(ctx context.Context, now time.Time) error {
 }
 
 func (s APIContextRunner) valid(ctx context.Context, current identities.CurrentIdentity, captureID string) bool {
-	return ctx != nil && current != nil && s.Read != nil && s.Prepare != nil && s.Record != nil && s.Process != nil && s.Local != nil && s.Starts != nil && s.Targets != nil && s.Eligibility != nil && s.Capabilities != nil && s.Retention != nil && s.Recovery != nil && s.Output != nil && s.Collector != nil && s.Now != nil && authorization.UUID(captureID)
+	return ctx != nil && current != nil && s.Read != nil && s.Prepare != nil && s.Record != nil && s.Process != nil && s.Targets != nil && s.Eligibility != nil && s.Capabilities != nil && s.Retention != nil && s.Recovery != nil && s.Output != nil && s.Collector != nil && s.Now != nil && authorization.UUID(captureID)
 }
 
 // Execute starts only within the original request-owned identity interval. It
@@ -516,49 +511,17 @@ func (s APIContextRunner) execute(ctx context.Context, current identities.Curren
 	if err := check.current(startCtx, s.Now()); err != nil {
 		return zero, executeStep{"PrepareContext", err}
 	}
-	c := value.PreparationCheck{Binding: r.Binding, CheckedAt: check.CheckedAt, ValidUntil: identity.Earlier(check.ValidUntil, r.Binding.NotAfter), MayCreate: mayCreate}
-	object, err := s.Local.PrepareStart(startCtx, c)
-	if err != nil {
-		return zero, executeStep{"PrepareStart", err}
-	}
-	r, err = s.Prepare.BindAPIStart(startCtx, check, r, object)
-	if err != nil {
-		return zero, executeStep{"BindAPIStart", err}
-	}
-	request := value.Request{Binding: r.Binding, ObjectUID: r.ObjectUID, CheckedAt: c.CheckedAt, ValidUntil: c.ValidUntil}
-	ready, err := s.Local.ReadyStart(startCtx, request)
-	if err != nil {
-		return zero, executeStep{"ReadyStart", err}
-	}
-	if ready.MayStart || ready.ObjectUID != r.ObjectUID {
-		return zero, executeStep{"ReadyStart", value.ErrDenied}
-	}
-	if ready.Phase == value.StartCommitted {
-		return ContextResult{State: "AlreadyStarted"}, nil
-	}
-	// Capacity waits consume the same observation's original interval. They do
-	// not trigger another provider graph or authorize a replacement target.
-	if err := check.current(startCtx, s.Now()); err != nil {
-		return zero, executeStep{"ReadyStart", err}
-	}
 	if check.Process.Binding != r.Process {
-		return zero, executeStep{"ReadyStart", value.ErrConflict}
+		return zero, executeStep{"PrepareContext", value.ErrConflict}
 	}
-	d, err := s.Starts.ConsumeStart(startCtx, request)
+	// The hub SQL row is the only start right (ADR-330 D7/D8): no Kubernetes
+	// object per attempt. A failed or lost reply stays spent.
+	r, err = s.Record.RecordAPIStart(startCtx, check, r)
 	if err != nil {
 		return ContextResult{State: "Indeterminate"}, err
 	}
-	if !d.MayStart {
-		return ContextResult{State: "AlreadyStarted"}, nil
-	}
-	if d.ObjectUID != r.ObjectUID || d.Phase != value.StartCommitted || !d.CommittedAt.Before(d.ValidUntil) || d.ValidUntil.After(request.ValidUntil) || !s.Now().Before(d.ValidUntil) {
-		return ContextResult{State: "Indeterminate"}, value.ErrDenied
-	}
-	r, err = s.Record.RecordAPIStart(startCtx, check, r, d)
-	if err != nil {
-		return ContextResult{State: "Indeterminate"}, err
-	}
-	if startCtx.Err() != nil || !s.Now().Before(d.ValidUntil) {
+	until := identity.Earlier(check.ValidUntil, r.Binding.NotAfter)
+	if startCtx.Err() != nil || !r.StartedAt.Before(until) || !s.Now().Before(until) {
 		return ContextResult{State: "Indeterminate"}, value.ErrExpired
 	}
 	result := r
@@ -567,8 +530,8 @@ func (s APIContextRunner) execute(ctx context.Context, current identities.Curren
 		if !ok {
 			return zero, executeStep{"StartLogs", value.ErrUnavailable}
 		}
-		queued, startErr := logs.StartLogs(startCtx, w.Accepted.Pin, r.StartedAt, d.ValidUntil)
-		if startErr == nil && !queued.IsZero() && queued.Before(d.ValidUntil) && !queued.Before(r.StartedAt) {
+		queued, startErr := logs.StartLogs(startCtx, w.Accepted.Pin, r.StartedAt, until)
+		if startErr == nil && !queued.IsZero() && queued.Before(until) && !queued.Before(r.StartedAt) {
 			return ContextResult{State: "Recording"}, nil
 		}
 		result.CompletedAt, result.Phase = s.Now().UTC().Truncate(time.Microsecond), "captureFailed"
@@ -584,7 +547,7 @@ func (s APIContextRunner) execute(ctx context.Context, current identities.Curren
 		}
 		request := collector.SourceSnapshot{Binding: *w.SourceBinding, CaptureID: e.CaptureUID, AttemptID: e.Registration.Location.AttemptID, WriterPodUID: r.Process.PodUID, WriterEpoch: r.Process.ProcessEpoch, ExpectationDigest: [32]byte(evidence.ContextExpectationDigest(e)), Request: *e.Snapshot}
 		queued, startErr := snapshot.StartSourceSnapshot(startCtx, request)
-		if startErr == nil && !queued.IsZero() && queued.Before(d.ValidUntil) && !queued.Before(r.StartedAt) {
+		if startErr == nil && !queued.IsZero() && queued.Before(until) && !queued.Before(r.StartedAt) {
 			return ContextResult{State: "Recording"}, nil
 		}
 		result.CompletedAt, result.Phase = s.Now().UTC().Truncate(time.Microsecond), "captureFailed"
@@ -599,8 +562,8 @@ func (s APIContextRunner) execute(ctx context.Context, current identities.Curren
 		if !ok || decodeErr != nil {
 			return zero, executeStep{"StartProfile", value.ErrUnavailable}
 		}
-		queued, startErr := profile.StartProfile(startCtx, w.Accepted.Pin, r.StartedAt, d.ValidUntil, frozen.Endpoints[0].Request)
-		if startErr == nil && !queued.IsZero() && queued.Before(d.ValidUntil) && !queued.Before(r.StartedAt) {
+		queued, startErr := profile.StartProfile(startCtx, w.Accepted.Pin, r.StartedAt, until, frozen.Endpoints[0].Request)
+		if startErr == nil && !queued.IsZero() && queued.Before(until) && !queued.Before(r.StartedAt) {
 			return ContextResult{State: "Recording"}, nil
 		}
 		result.CompletedAt, result.Phase = s.Now().UTC().Truncate(time.Microsecond), "captureFailed"
@@ -620,21 +583,21 @@ func (s APIContextRunner) execute(ctx context.Context, current identities.Curren
 			if !ok || source == nil {
 				return zero, executeStep{"StartArgumentRecording", value.ErrUnavailable}
 			}
-			queued, err = recorder.StartArgumentRecording(startCtx, w.Accepted.Pin, r.StartedAt, d.ValidUntil, *source, argumentPermit)
+			queued, err = recorder.StartArgumentRecording(startCtx, w.Accepted.Pin, r.StartedAt, until, *source, argumentPermit)
 		} else if source != nil {
 			sensitive, ok := prepared.(evidence.PolicyContextRecorder)
 			if !ok {
 				return zero, executeStep{"StartPolicyRecording", value.ErrUnavailable}
 			}
-			queued, err = sensitive.StartPolicyRecording(ctx, w.Accepted.Pin, r.StartedAt, d.ValidUntil, *source, permit)
+			queued, err = sensitive.StartPolicyRecording(ctx, w.Accepted.Pin, r.StartedAt, until, *source, permit)
 		} else {
 			recorder, ok := prepared.(evidence.ContextRecorder)
 			if !ok {
 				return zero, executeStep{"StartRecording", value.ErrUnavailable}
 			}
-			queued, err = recorder.StartRecording(ctx, w.Accepted.Pin, r.StartedAt, d.ValidUntil)
+			queued, err = recorder.StartRecording(ctx, w.Accepted.Pin, r.StartedAt, until)
 		}
-		if err == nil && !queued.IsZero() && queued.Before(d.ValidUntil) && !queued.Before(r.StartedAt) {
+		if err == nil && !queued.IsZero() && queued.Before(until) && !queued.Before(r.StartedAt) {
 			return ContextResult{State: "Recording"}, nil
 		}
 		result.CompletedAt, result.Phase = s.Now().UTC().Truncate(time.Microsecond), "captureFailed"
@@ -646,11 +609,11 @@ func (s APIContextRunner) execute(ctx context.Context, current identities.Curren
 	if acquirer, ok := prepared.(evidence.ContextAcquirer); ok {
 		// ADR-171: capture and store happen where the plaintext is. Only the
 		// acquisition instant and the copy receipts return here.
-		acquired, copies, acquireErr := acquirer.AcquireContext(ctx, w.Accepted.Pin, r.StartedAt, d.ValidUntil)
+		acquired, copies, acquireErr := acquirer.AcquireContext(ctx, w.Accepted.Pin, r.StartedAt, until)
 		err = acquireErr
 		result.CompletedAt = s.Now().UTC().Truncate(time.Microsecond)
 		switch {
-		case err == nil && !acquired.IsZero() && acquired.Before(d.ValidUntil) && copies.Validate(w.Accepted.Expectation.Registration) == nil:
+		case err == nil && !acquired.IsZero() && acquired.Before(until) && copies.Validate(w.Accepted.Expectation.Registration) == nil:
 			result.AcquiredAt, result.Copies, result.Phase = acquired, copies, "stored"
 		case err == nil || errors.Is(err, evidence.ErrContextStoreUnconfirmed):
 			result.AcquiredAt, result.Phase = acquired, "storeUnconfirmed"
@@ -665,7 +628,7 @@ func (s APIContextRunner) execute(ctx context.Context, current identities.Curren
 		}
 		return s.finishAcquisition(ctx, w, prepared, closer, completionRecorder, result, err)
 	}
-	captureCtx, end := context.WithDeadline(startCtx, d.ValidUntil)
+	captureCtx, end := context.WithDeadline(startCtx, until)
 	native, err := s.Collector.Capture(captureCtx, w.Accepted.Pin)
 	acquired := s.Now().UTC().Truncate(time.Microsecond)
 	captureErr := captureCtx.Err()
@@ -673,7 +636,7 @@ func (s APIContextRunner) execute(ctx context.Context, current identities.Curren
 	defer clear(native)
 	result.CompletedAt = acquired
 	result.Phase = captureFailurePhase(err)
-	if err == nil && captureErr == nil && acquired.Before(d.ValidUntil) && len(native) > 0 && len(native) <= artifact.MaxContextBytes {
+	if err == nil && captureErr == nil && acquired.Before(until) && len(native) > 0 && len(native) <= artifact.MaxContextBytes {
 		result.AcquiredAt = acquired
 		result.Copies, err = prepared.StoreContext(ctx, native, r.StartedAt, acquired)
 		result.CompletedAt = s.Now().UTC().Truncate(time.Microsecond)

@@ -421,7 +421,7 @@ func qualifyManualRecordingSaveGroup(t *testing.T, ctx context.Context, f *capac
 				t.Fatal("child shifted t0 or impersonated parent")
 			}
 		}
-		for key, interval := range map[string]time.Duration{"": value.WorkloadTriggerInterval, policy.Authority.PolicyUID: policy.Compiled.Interval} {
+		for key, interval := range map[string]time.Duration{"": value.DefaultWorkloadRate().Interval, policy.Authority.PolicyUID: policy.Compiled.Interval} {
 			var tat time.Time
 			if err := f.admin.QueryRow(ctx, `SELECT tat FROM policy_workload_window WHERE root_id=$1 AND cluster_id=$2 AND workload_uid=$3 AND policy_uid=$4`, group.RootID, policy.Authority.ClusterID, policy.Authority.WorkloadUID, key).Scan(&tat); err != nil || !tat.Equal(accepted.CreatedAt.Add(interval)) {
 				t.Fatal("group advanced occurrence window more than once", key, tat, err)

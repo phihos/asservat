@@ -322,19 +322,14 @@ func qualifyPolicyObservationCompanion(t *testing.T, ctx context.Context, admin,
 	channel.SetPacketSink(holder)
 	prepared := holder.Prepare(preparedArtifact, e)
 	defer prepared.Close()
-	r, err = executions.BindAPIStart(ctx, check, r, executionvalue.PreparedStart{ObjectUID: custodyID(), ResourceVersion: "1"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	disposition := executionvalue.Disposition{ObjectUID: r.ObjectUID, ResourceVersion: "2", Phase: executionvalue.StartCommitted, CommittedAt: clock(), MayStart: true, ValidUntil: r.Binding.NotAfter}
-	r, err = executions.RecordAPIStart(ctx, check, r, disposition)
+	r, err = executions.RecordAPIStart(ctx, check, r)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !originalSource.Valid(clock()) || !permit.ValidFinite(clock()) {
 		t.Fatal("fixture consumed original source/start before typed holder")
 	}
-	queued, err := prepared.StartPolicyRecording(ctx, accepted.Pin, r.StartedAt, disposition.ValidUntil, originalSource, permit)
+	queued, err := prepared.StartPolicyRecording(ctx, accepted.Pin, r.StartedAt, r.Binding.NotAfter, originalSource, permit)
 	if err != nil {
 		t.Fatal("actual typed policy holder", err)
 	}

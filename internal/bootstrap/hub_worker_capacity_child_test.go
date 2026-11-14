@@ -13,6 +13,7 @@ import (
 	"asservat.local/asservat/internal/adapters/postgres"
 	app "asservat.local/asservat/internal/application/capacity"
 	"asservat.local/asservat/internal/contracts"
+	cfg "asservat.local/asservat/internal/domain/configuration"
 )
 
 func hubWorkerCapacityIDs() contracts.InstallationIDs {
@@ -22,7 +23,7 @@ func hubWorkerCapacityIDs() contracts.InstallationIDs {
 }
 
 func hubWorkerCapacityFixture() *contracts.HubWorkerCapacity {
-	return &contracts.HubWorkerCapacity{InstallerCapacitySettings: capacityProfileFixture(), ProcessingSource: "asservat-processing"}
+	return &contracts.HubWorkerCapacity{CapacityValues: contracts.CapacityValues{EvidenceStorage: "128Gi", Workload: contracts.CapacityWorkloadValues{Share: "16Gi", Limit: "32Gi"}}, Revision: 1, ProcessingSource: "asservat-processing"}
 }
 
 func TestHubWorkerCapacitySectionValidation(t *testing.T) {
@@ -31,15 +32,12 @@ func TestHubWorkerCapacitySectionValidation(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, edit := range map[string]func(*contracts.HubWorkerCapacity){
-		"pool":       func(c *contracts.HubWorkerCapacity) { c.Pool = "Bad_Name" },
-		"policy":     func(c *contracts.HubWorkerCapacity) { c.Policy = "" },
 		"processing": func(c *contracts.HubWorkerCapacity) { c.ProcessingSource = "" },
-		"keys":       func(c *contracts.HubWorkerCapacity) { c.NamespaceKeys = nil },
-		"backends": func(c *contracts.HubWorkerCapacity) {
-			c.Backends = append(c.Backends, c.Backends[0])
-		},
-		"accounts": func(c *contracts.HubWorkerCapacity) { c.Accounts = 0 },
-		"path":     func(c *contracts.HubWorkerCapacity) { c.Paths = []contracts.DownloadEnvironmentPath{{ID: "x"}} },
+		"revision":   func(c *contracts.HubWorkerCapacity) { c.Revision = 0 },
+		"storage":    func(c *contracts.HubWorkerCapacity) { c.EvidenceStorage = "" },
+		"share":      func(c *contracts.HubWorkerCapacity) { c.Workload.Share = "200Gi" },
+		"percent":    func(c *contracts.HubWorkerCapacity) { c.Workload.Limit = "101%" },
+		"path":       func(c *contracts.HubWorkerCapacity) { c.Paths = []contracts.DownloadEnvironmentPath{{ID: "x"}} },
 	} {
 		c := hubWorkerCapacityFixture()
 		edit(c)
@@ -52,14 +50,14 @@ func TestHubWorkerCapacitySectionValidation(t *testing.T) {
 	}
 }
 
-// The section is the Helm `capacity` values plus the processing source name:
+// The section is the Helm `capacity` values plus the derived names:
 // a rendered document decodes with no unknown field.
 func TestHubWorkerCapacitySectionDecodes(t *testing.T) {
 	raw, err := json.Marshal(hubWorkerCapacityFixture())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Contains(raw, []byte(`"pool":"capacity"`)) || !bytes.Contains(raw, []byte(`"processingSource":"asservat-processing"`)) {
+	if !bytes.Contains(raw, []byte(`"evidenceStorage":"128Gi"`)) || !bytes.Contains(raw, []byte(`"processingSource":"asservat-processing"`)) {
 		t.Fatalf("settings are not inline: %s", raw)
 	}
 	doc := `{"format":"` + contracts.HubWorkerConfigFormat + `","capacity":` + string(raw) + `}`
@@ -71,37 +69,29 @@ func TestHubWorkerCapacitySectionDecodes(t *testing.T) {
 
 var capacityTestInitialized = time.Date(2026, 11, 14, 10, 0, 0, 123456789, time.UTC)
 
-// Every retry and restart builds the same qualification from the same
-// settings and IDs; CR specs and key order do not change it.
+// Every retry and restart builds the same qualification from the same IDs;
+// the capacity values do not change it (the pool carries them).
 func TestHubWorkerQualificationIsDeterministic(t *testing.T) {
 	ids := hubWorkerCapacityIDs()
-	a, err := buildHubWorkerQualification(hubWorkerCapacityFixture(), ids, "asservat", "30000000-0000-4000-8000-0000000000a1", "30000000-0000-4000-8000-0000000000a2", capacityTestInitialized)
+	a, err := buildHubWorkerQualification(hubWorkerCapacityFixture(), ids, "asservat", "30000000-0000-4000-8000-0000000000a2", capacityTestInitialized)
 	if err != nil {
 		t.Fatal(err)
 	}
 	c := hubWorkerCapacityFixture()
-	c.NamespaceKeys = []string{"z", "team"}
-	b, _ := buildHubWorkerQualification(c, ids, "asservat", "30000000-0000-4000-8000-0000000000a1", "30000000-0000-4000-8000-0000000000a2", capacityTestInitialized)
-	c.NamespaceKeys = []string{"team", "z"}
-	d, _ := buildHubWorkerQualification(c, ids, "asservat", "30000000-0000-4000-8000-0000000000a1", "30000000-0000-4000-8000-0000000000a2", capacityTestInitialized)
-	again, _ := buildHubWorkerQualification(hubWorkerCapacityFixture(), ids, "asservat", "30000000-0000-4000-8000-0000000000a1", "30000000-0000-4000-8000-0000000000a2", capacityTestInitialized)
+	c.EvidenceStorage = "1Ti"
+	b, _ := buildHubWorkerQualification(c, ids, "asservat", "30000000-0000-4000-8000-0000000000a2", capacityTestInitialized)
+	again, _ := buildHubWorkerQualification(hubWorkerCapacityFixture(), ids, "asservat", "30000000-0000-4000-8000-0000000000a2", capacityTestInitialized)
 	x, _ := json.Marshal(a)
 	y, _ := json.Marshal(again)
-	if !bytes.Equal(x, y) || !reflect.DeepEqual(b, d) {
+	if !bytes.Equal(x, y) || b.Digest != a.Digest {
 		t.Fatal("qualification is not deterministic")
 	}
 	r := a.RootBacking
 	if r.RootID != ids.PermissionRootID || r.InstallationID != ids.InstallationID || r.AccountVersion != ids.RoleSetupID+"-account/v1" ||
 		r.ProcessingProtectionDigest != contracts.ConfigMapSourceDigest(ids.ClusterID, "asservat", "asservat-processing") ||
 		a.NamespaceGuards[0].Digest != contracts.NamespaceSourceDigest(ids.ClusterID, "asservat") || a.NamespaceGuards[0].ClusterID != ids.ClusterID ||
-		a.Backends[0].PoolUID != "30000000-0000-4000-8000-0000000000a1" || r.ProcessingSourceUID != "30000000-0000-4000-8000-0000000000a2" {
+		a.Backends[0].PoolUID != app.SystemPoolUID(ids.InstallationID) || r.ProcessingSourceUID != "30000000-0000-4000-8000-0000000000a2" {
 		t.Fatal("derived values not bound", r)
-	}
-	withSpec := hubWorkerCapacityFixture()
-	withSpec.WorkloadKeys = &contracts.InstallerWorkloadKeys{Labels: []string{"a"}}
-	z, _ := buildHubWorkerQualification(withSpec, ids, "asservat", "30000000-0000-4000-8000-0000000000a1", "30000000-0000-4000-8000-0000000000a2", capacityTestInitialized)
-	if z.Digest != a.Digest {
-		t.Fatal("workload keys changed the qualification")
 	}
 }
 
@@ -133,7 +123,7 @@ func (f *fakeCapacityRoots) InitializeCapacity(_ context.Context, in postgres.Ca
 func TestCapacityInitializationIsIdempotent(t *testing.T) {
 	ids := hubWorkerCapacityIDs()
 	input := func() postgres.CapacityInitialization {
-		q, err := buildHubWorkerQualification(hubWorkerCapacityFixture(), ids, "asservat", "30000000-0000-4000-8000-0000000000a1", "30000000-0000-4000-8000-0000000000a2", capacityTestInitialized)
+		q, err := buildHubWorkerQualification(hubWorkerCapacityFixture(), ids, "asservat", "30000000-0000-4000-8000-0000000000a2", capacityTestInitialized)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -163,7 +153,7 @@ func TestCapacityInitializationIsIdempotent(t *testing.T) {
 
 func TestPlatformCapacityProtectionIsFresh(t *testing.T) {
 	ids := hubWorkerCapacityIDs()
-	p := platformCapacityProtection{clusterID: ids.ClusterID, namespaceUID: "ns-uid", digest: contracts.NamespaceSourceDigest(ids.ClusterID, "asservat"), keys: []string{"team"}}
+	p := platformCapacityProtection{clusterID: ids.ClusterID, namespaceUID: "ns-uid", digest: contracts.NamespaceSourceDigest(ids.ClusterID, "asservat"), keys: contracts.CapacityNamespaceKeys()}
 	s, err := p.CapacityProtection(t.Context())
 	if err != nil || !s.Valid(time.Now()) {
 		t.Fatal("source protection", err, s)
@@ -207,7 +197,7 @@ func TestHubWorkerPublishesEvidenceStoreIDForContextDeletion(t *testing.T) {
 func TestHubWorkerQualificationRebuildsFromStoredInitializationTime(t *testing.T) {
 	ids := hubWorkerCapacityIDs()
 	first := time.Now()
-	q, err := buildHubWorkerQualification(hubWorkerCapacityFixture(), ids, "asservat", "30000000-0000-4000-8000-0000000000a1", "30000000-0000-4000-8000-0000000000a2", first)
+	q, err := buildHubWorkerQualification(hubWorkerCapacityFixture(), ids, "asservat", "30000000-0000-4000-8000-0000000000a2", first)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -219,11 +209,63 @@ func TestHubWorkerQualificationRebuildsFromStoredInitializationTime(t *testing.T
 	if err = json.Unmarshal(raw, &stored); err != nil {
 		t.Fatal(err)
 	}
-	again, err := buildHubWorkerQualification(hubWorkerCapacityFixture(), ids, "asservat", "30000000-0000-4000-8000-0000000000a1", "30000000-0000-4000-8000-0000000000a2", capacityInitializedAt(stored))
+	again, err := buildHubWorkerQualification(hubWorkerCapacityFixture(), ids, "asservat", "30000000-0000-4000-8000-0000000000a2", capacityInitializedAt(stored))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if rebuilt, _ := json.Marshal(again); !bytes.Equal(raw, rebuilt) {
 		t.Fatal("restart did not rebuild the stored qualification")
+	}
+}
+
+// REQ-CAP-004: a 128 GiB store with an 8 GiB reserve and 16 GiB shares
+// protects seven workloads and leaves 8 GiB of burst; the defaults divide
+// the rest by eight and keep a positive burst.
+func TestCapacityValuesDeriveSpecExample(t *testing.T) {
+	ids := hubWorkerCapacityIDs()
+	c := hubWorkerCapacityFixture()
+	v, err := capacityValues(c.CapacityValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pool, policies, err := app.DeriveBudget(v, capacityClusters(c, ids))
+	if err != nil || len(policies) != 1 || pool.Slots[0].Workloads != 7 || policies[0].Hard.Bytes != 32<<30 || pool.Burst.Bytes != 8<<30-4096 {
+		t.Fatal("derived budget", err, pool, policies)
+	}
+	c.Workload = contracts.CapacityWorkloadValues{}
+	v, _ = capacityValues(c.CapacityValues)
+	pool, policies, err = app.DeriveBudget(v, capacityClusters(c, ids))
+	if err != nil || pool.Slots[0].Workloads != 7 || policies[0].Hard != policies[0].Protected {
+		t.Fatal("defaults", err, pool, policies)
+	}
+}
+
+// The internal qualification backs the values-derived pool, for the
+// smallest and the largest evidence storage the backend accepts.
+func TestCapacityQualificationBacksValuesPool(t *testing.T) {
+	ids := hubWorkerCapacityIDs()
+	q, err := buildHubWorkerQualification(hubWorkerCapacityFixture(), ids, "asservat", "30000000-0000-4000-8000-0000000000a2", capacityTestInitialized)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, storage := range []string{"8Gi", "1Pi"} {
+		c := hubWorkerCapacityFixture()
+		c.EvidenceStorage, c.Workload = storage, contracts.CapacityWorkloadValues{}
+		v, err := capacityValues(c.CapacityValues)
+		if err != nil {
+			t.Fatal(err)
+		}
+		s := &app.ValuesSource{Installation: ids.InstallationID, Cluster: ids.ClusterID, Control: cfg.NamespaceRef{Name: "asservat", UID: "ns-uid"}, Revision: 1, Values: v, Clusters: capacityClusters(c, ids), Now: time.Now}
+		o, err := s.ReadCapacitySource(t.Context())
+		if err != nil {
+			t.Fatal(storage, err)
+		}
+		plan, err := app.CompileProtectedPoolPlan(o.Snapshot, o.Snapshot.Pools[0].Resource.Name)
+		if err != nil {
+			t.Fatal(storage, err)
+		}
+		if _, err = app.CompileQualifiedRootBacking(q, plan); err != nil {
+			t.Fatal(storage, "qualification does not back the pool", err)
+		}
 	}
 }

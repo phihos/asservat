@@ -170,27 +170,12 @@ func (f *apiRunnerFixture) PrepareAPIExecution(_ context.Context, c APIExecution
 	}
 	return f.record, first, nil
 }
-func (f *apiRunnerFixture) BindAPIStart(_ context.Context, _ APIExecutionCheck, _ value.APIExecution, p value.PreparedStart) (value.APIExecution, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	if f.record.ObjectUID != "" && f.record.ObjectUID != p.ObjectUID {
-		return value.APIExecution{}, value.ErrConflict
-	}
-	f.record.ObjectUID = p.ObjectUID
-	return f.record, nil
-}
-func (f *apiRunnerFixture) PrepareStart(_ context.Context, c value.PreparationCheck) (value.PreparedStart, error) {
+func (f *apiRunnerFixture) Capture(ctx context.Context, pin artifact.PinnedPod) ([]byte, error) {
 	if f.mode == "restarted-process" {
 		// A restarted regional process loses the exact live exchange. It cannot
 		// answer this operation with a replacement process or inherit its work.
-		return value.PreparedStart{}, context.Canceled
+		return nil, context.Canceled
 	}
-	if f.mode == "lost-create-reply" && c.MayCreate {
-		return value.PreparedStart{}, value.ErrUnavailable
-	}
-	return value.PreparedStart{ObjectUID: f.resolved.Start.ObjectUID, ResourceVersion: "1"}, nil
-}
-func (f *apiRunnerFixture) Capture(ctx context.Context, pin artifact.PinnedPod) ([]byte, error) {
 	if f.mode == "replacement-pod" {
 		// The native collector rechecks the pinned Pod/controller at acquisition;
 		// a new full runner observation is not needed to prevent substitution.
@@ -198,20 +183,20 @@ func (f *apiRunnerFixture) Capture(ctx context.Context, pin artifact.PinnedPod) 
 	}
 	return f.contextExecutionFixture.Capture(ctx, pin)
 }
-func (f *apiRunnerFixture) ReadyStart(ctx context.Context, r value.Request) (value.Disposition, error) {
-	return f.LookupStart(ctx, r)
-}
-func (f *apiRunnerFixture) RecordAPIStart(_ context.Context, _ APIExecutionCheck, _ value.APIExecution, d value.Disposition) (value.APIExecution, error) {
+func (f *apiRunnerFixture) RecordAPIStart(_ context.Context, _ APIExecutionCheck, _ value.APIExecution) (value.APIExecution, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if f.mode == "lost-start-record-reply" {
-		return value.APIExecution{}, value.ErrUnavailable
-	}
+	f.consumes.Add(1)
 	if f.record.Phase != "prepared" {
 		return value.APIExecution{}, value.ErrConflict
 	}
+	f.spent.Store(true)
 	f.record.Phase = "started"
-	f.record.StartedAt = d.CommittedAt
+	f.record.ObjectUID = f.record.Binding.AttemptID
+	f.record.StartedAt = f.now
+	if f.mode == "lost-start-record-reply" {
+		return value.APIExecution{}, value.ErrUnavailable
+	}
 	if f.mode == "expired-start-record-reply" {
 		f.now = f.now.Add(6 * time.Second)
 	}
@@ -238,7 +223,7 @@ func (f *apiRunnerFixture) RecordAPIStoredCompletion(ctx context.Context, r valu
 }
 func apiRunner(t *testing.T) (*apiRunnerFixture, APIContextRunner, identities.CurrentIdentity) {
 	t.Helper()
-	base, _ := executionFixture()
+	base := executionFixture()
 	f := &apiRunnerFixture{contextExecutionFixture: base}
 	e := base.resolved.Expectation
 	e.ExecutionClass = artifact.ContextAPIExecution
@@ -267,7 +252,7 @@ func apiRunner(t *testing.T) (*apiRunnerFixture, APIContextRunner, identities.Cu
 	e.PlanDigest = plan.ScopeDigest
 	e.RecipeDigest = plan.RecipeDigest
 	f.work = APIContextWork{Accepted: capture.Accepted{CaptureID: e.CaptureUID, State: capture.IntentAudited, ScopeDigest: e.PlanDigest, Expectation: e, Pin: pin, CreatedAt: f.now, Deadline: e.Registration.WriteUntil}, Target: f.target.Request, Actor: f.actor.Principal, IntentDigest: artifact.Digest{1}}
-	svc := APIContextRunner{Read: f, Prepare: f, Record: f, Process: f, Local: f, Starts: f, Targets: f, Eligibility: access.Evaluator{Permissions: f, Now: func() time.Time { return f.now }}, Capabilities: f, Retention: apiFixtureRetention{f}, Recovery: f, Output: f, Collector: f, Now: func() time.Time { return f.now }}
+	svc := APIContextRunner{Read: f, Prepare: f, Record: f, Process: f, Targets: f, Eligibility: access.Evaluator{Permissions: f, Now: func() time.Time { return f.now }}, Capabilities: f, Retention: apiFixtureRetention{f}, Recovery: f, Output: f, Collector: f, Now: func() time.Time { return f.now }}
 	source, _, err := identities.NewBearerRequest(context.Background(), f, "synthetic-token", svc.Now)
 	if err != nil {
 		t.Fatal(err)
@@ -291,7 +276,7 @@ func TestAPIContextRunnerOneEffectAndClosedKeys(t *testing.T) {
 	}
 }
 func TestAPIContextRunnerBlockingOrUncertainBoundaryDoesNotReacquire(t *testing.T) {
-	for _, mode := range []string{"legacy-writer-protocol", "replacement-pod", "restarted-process", "lost-preparation-reply", "lost-create-reply", "lost-start-reply", "lost-start-record-reply", "expired-start-record-reply"} {
+	for _, mode := range []string{"legacy-writer-protocol", "replacement-pod", "restarted-process", "lost-preparation-reply", "lost-start-record-reply", "expired-start-record-reply"} {
 		t.Run(mode, func(t *testing.T) {
 			f, s, current := apiRunner(t)
 			f.mode = mode

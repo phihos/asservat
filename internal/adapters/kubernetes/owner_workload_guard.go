@@ -81,31 +81,7 @@ func OwnerWorkloadAdmission(p cfg.OwnerWorkloadAdministration) (*admission.Valid
 		if len(validation.IsDNS1123Subdomain(a.ServiceAccount)) != 0 {
 			return nil, nil, cfg.ErrInvalid
 		}
-		allowed = append(allowed, "(has(request.dryRun) && request.dryRun && request.operation == 'CREATE' && request.resource.group == 'asservat.io' && request.resource.version == 'v1alpha1' && request.resource.resource in ['evidencestoragepools', 'evidencebudgetpolicies', 'accessbindings', 'evidenceretentionpolicies'] && request.subResource == '' && request.userInfo.username == "+ownerCELString("system:serviceaccount:"+p.ControlNamespace.Name+":"+a.ServiceAccount)+" && request.userInfo.uid == "+ownerCELString(a.ServiceAccountUID)+")")
-	}
-	if a := p.APIContextStarts; a != nil {
-		if len(validation.IsDNS1123Subdomain(a.CapacityAccount)) != 0 || len(validation.IsDNS1123Subdomain(a.ExecutionAccount)) != 0 {
-			return nil, nil, cfg.ErrInvalid
-		}
-		account := func(name, uid string) string {
-			return "(request.userInfo.username == " + ownerCELString("system:serviceaccount:"+p.ControlNamespace.Name+":"+name) + " && request.userInfo.uid == " + ownerCELString(uid) + ")"
-		}
-		capacity := account(a.CapacityAccount, a.CapacityAccountUID)
-		execution := account(a.ExecutionAccount, a.ExecutionAccountUID)
-		// Only the main CREATE and exact status UPDATE exist in the first profile.
-		// StartAdmission independently pins body, immutable binding and Ready/start.
-		allowed = append(allowed, "(request.resource.group == 'asservat.io' && request.resource.resource == 'capacityreservations' && ((request.operation == 'CREATE' && request.subResource == '' && "+capacity+") || (request.operation == 'UPDATE' && request.subResource == 'status' && ("+capacity+" || "+execution+"))))")
-		if a.CapacityAudience != "" {
-			// ADR-175: only the execution Pod's own Pod-bound credential may mint
-			// the capacity account's token: 600 seconds, one audience, unbound
-			// (the API server refuses to bind it to a Pod of another account).
-			extra := func(key string) string {
-				return "request.userInfo.extra[" + ownerCELString(key) + "]"
-			}
-			pod := "has(request.userInfo.extra) && " + ownerCELString("authentication.kubernetes.io/pod-uid") + " in request.userInfo.extra && size(" + extra("authentication.kubernetes.io/pod-uid") + ") == 1"
-			token := "has(object.spec) && has(object.spec.audiences) && object.spec.audiences == [" + ownerCELString(a.CapacityAudience) + "] && has(object.spec.expirationSeconds) && object.spec.expirationSeconds == 600 && " + capacityTokenUnbound
-			allowed = append(allowed, "(request.operation == 'CREATE' && request.resource.group == '' && request.resource.resource == 'serviceaccounts' && request.subResource == 'token' && request.name == "+ownerCELString(a.CapacityAccount)+" && "+execution+" && "+pod+" && "+token+")")
-		}
+		allowed = append(allowed, "(has(request.dryRun) && request.dryRun && request.operation == 'CREATE' && request.resource.group == 'asservat.io' && request.resource.version == 'v1alpha1' && request.resource.resource in ['accessbindings', 'evidenceretentionpolicies'] && request.subResource == '' && request.userInfo.username == "+ownerCELString("system:serviceaccount:"+p.ControlNamespace.Name+":"+a.ServiceAccount)+" && request.userInfo.uid == "+ownerCELString(a.ServiceAccountUID)+")")
 	}
 	for _, lease := range p.SchedulingLeases {
 		if len(validation.IsDNS1123Subdomain(lease.Lease)) != 0 || len(validation.IsDNS1123Subdomain(lease.ServiceAccount)) != 0 {
@@ -205,10 +181,6 @@ func NewOwnerWorkloadProtection(observer, probe *PermissionClient, plan cfg.Owne
 	if plan.CapacityProbe != nil {
 		p := *plan.CapacityProbe
 		plan.CapacityProbe = &p
-	}
-	if plan.APIContextStarts != nil {
-		p := *plan.APIContextStarts
-		plan.APIContextStarts = &p
 	}
 	if plan.InitialHistoryProbe != nil {
 		p := *plan.InitialHistoryProbe
@@ -358,15 +330,6 @@ func callerBound(ctx context.Context, until time.Time) time.Time {
 	}
 	return until
 }
-
-// capacityTokenUnbound accepts the absent or empty boundObjectRef the API
-// server presents for an unbound TokenRequest (observed natively: has() is
-// true without a binding), and rejects any reference naming an object.
-const capacityTokenUnbound = "(!has(object.spec.boundObjectRef) || ((!has(object.spec.boundObjectRef.kind) || object.spec.boundObjectRef.kind == '') && (!has(object.spec.boundObjectRef.name) || object.spec.boundObjectRef.name == '') && (!has(object.spec.boundObjectRef.uid) || object.spec.boundObjectRef.uid == '')))"
-
-// CapacityTokenUnboundCondition exposes the exact condition for native
-// diagnostics only.
-const CapacityTokenUnboundCondition = capacityTokenUnbound
 
 // WithClients rebuilds this exact protection, from a fresh decoded copy of
 // its plan and the same pin, over other client instances of the same

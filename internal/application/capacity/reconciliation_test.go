@@ -23,9 +23,9 @@ func TestCapacityCurrentSourceNeverRenewsOrAliasesAnIssuedObservation(t *testing
 	if !ok {
 		t.Fatal("first current source unavailable")
 	}
-	first.Observation.Snapshot.Policies[0].Scope.NamespaceLabels["team"] = "mutated"
+	first.Observation.Snapshot.Policies[0].Scope.NamespaceLabels[EligibilityLabel] = "mutated"
 	_, independent, ok := current.read(f.now)
-	if !ok || independent.Observation.Snapshot.Policies[0].Scope.NamespaceLabels["team"] == "mutated" {
+	if !ok || independent.Observation.Snapshot.Policies[0].Scope.NamespaceLabels[EligibilityLabel] == "mutated" {
 		t.Fatal("returned source aliases protected snapshot")
 	}
 	oldEnd := independent.FreshUntil

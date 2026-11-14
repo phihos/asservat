@@ -141,10 +141,12 @@ type HubAPIPublic struct {
 	Origin          string `json:"origin"`
 	BrowserAudience string `json:"browserAudience"`
 	// Processing reads the capacity processing source <name>-processing-source.
-	Processing           bool                    `json:"processing,omitempty"`
-	CaptureHistory       *CaptureHistoryLimits   `json:"captureHistory,omitempty"`
-	Standby              int                     `json:"standby"`
-	Captures             int                     `json:"captures"`
+	Processing     bool                  `json:"processing,omitempty"`
+	CaptureHistory *CaptureHistoryLimits `json:"captureHistory,omitempty"`
+	Standby        int                   `json:"standby"`
+	Captures       int                   `json:"captures"`
+	// WorkloadRate is capacity.workload.dump: each workload's token bucket.
+	WorkloadRate         *CapacityDumpValues     `json:"workloadRate,omitempty"`
 	PreviewSeconds       int                     `json:"previewSeconds"`
 	DownloadPlan         OwnerPublicDownloadPlan `json:"downloadPlan"`
 	ProxyTLS             bool                    `json:"proxyTLS,omitempty"`
@@ -171,14 +173,12 @@ type HubAPIFleet struct {
 
 // HubAPIRegionalOffer holds the offer's Helm-known values: the in-cluster
 // federation endpoint and serving name, the image and the operator's
-// connector limits and backup profile (values federation.connector and
-// capacity.backup), from which the hub-api derives the connector backing.
+// connector limits (values federation.connector), from which the hub-api derives the connector backing.
 type HubAPIRegionalOffer struct {
 	Federation string                     `json:"federation"`
 	ServerName string                     `json:"serverName"`
 	Image      string                     `json:"image"`
 	Connector  InstallerConnectorSettings `json:"connector"`
-	Backup     InstallerCapacityBackup    `json:"backup"`
 	// HubOnly is mode=hub: no local connector, so no local bootstrap or
 	// hub-cluster catalog entry; the offer serves remote clusters only.
 	HubOnly bool `json:"hubOnly,omitempty"`

@@ -67,12 +67,7 @@ SELECT count(*)::bigint FROM policy_pod_watermark WHERE root_id=$1 AND policy_ui
 -- name: ListActivePolicies :many
 SELECT s.policy_uid, s.name, s.namespace_uid FROM policy_source s JOIN policy_acceptance a ON a.id=s.active_id AND a.root_id=s.root_id
 WHERE s.root_id=$1 AND NOT s.deleted AND (a.record#>>'{Authority,NotAfter}')::timestamptz>clock_timestamp()
-ORDER BY s.policy_uid LIMIT 65;
-
--- name: CountActiveClusterPolicies :one
-SELECT count(*)::bigint FROM policy_source s JOIN policy_acceptance a ON a.id=s.active_id AND a.root_id=s.root_id
-WHERE s.root_id=$1 AND s.policy_uid<>$2 AND NOT s.deleted AND a.record#>>'{Authority,ClusterID}'=$3::text
-AND (a.record#>>'{Authority,NotAfter}')::timestamptz>clock_timestamp();
+ORDER BY s.policy_uid;
 
 -- name: FindAutomationBases :many
 SELECT b.uid, b.generation, b.spec_digest FROM permission_basis b

@@ -11,25 +11,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const countActiveClusterPolicies = `-- name: CountActiveClusterPolicies :one
-SELECT count(*)::bigint FROM policy_source s JOIN policy_acceptance a ON a.id=s.active_id AND a.root_id=s.root_id
-WHERE s.root_id=$1 AND s.policy_uid<>$2 AND NOT s.deleted AND a.record#>>'{Authority,ClusterID}'=$3::text
-AND (a.record#>>'{Authority,NotAfter}')::timestamptz>clock_timestamp()
-`
-
-type CountActiveClusterPoliciesParams struct {
-	RootID    pgtype.UUID
-	PolicyUid string
-	Column3   string
-}
-
-func (q *Queries) CountActiveClusterPolicies(ctx context.Context, arg CountActiveClusterPoliciesParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countActiveClusterPolicies, arg.RootID, arg.PolicyUid, arg.Column3)
-	var column_1 int64
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
 const countPolicyOccurrences = `-- name: CountPolicyOccurrences :one
 SELECT count(*)::bigint AS total, count(capture_id)::bigint AS captured FROM policy_occurrence WHERE root_id=$1 AND policy_uid=$2
 `
@@ -271,7 +252,7 @@ func (q *Queries) LinkPolicyOccurrence(ctx context.Context, arg LinkPolicyOccurr
 const listActivePolicies = `-- name: ListActivePolicies :many
 SELECT s.policy_uid, s.name, s.namespace_uid FROM policy_source s JOIN policy_acceptance a ON a.id=s.active_id AND a.root_id=s.root_id
 WHERE s.root_id=$1 AND NOT s.deleted AND (a.record#>>'{Authority,NotAfter}')::timestamptz>clock_timestamp()
-ORDER BY s.policy_uid LIMIT 65
+ORDER BY s.policy_uid
 `
 
 type ListActivePoliciesRow struct {

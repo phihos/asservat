@@ -166,21 +166,15 @@ func TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects(t *testing.T) {
 
 func TestAPIContextCheckDiagnosticsRetainLaterEffectBoundary(t *testing.T) {
 	for _, tc := range []struct {
-		check int
-		want  string
+		want string
 	}{
-		{2, "PrepareContext/Context"},
-		{3, "ReadyStart/Context"},
+		{"PrepareContext/Context"},
 	} {
 		t.Run(tc.want, func(t *testing.T) {
 			p, runner, current, ctx := apiCheckDiagnosticRunner(t, "", nil, 0)
 			boundary := &apiObservationBoundary{apiRunnerFixture: p.apiRunnerFixture}
-			if tc.check == 2 {
-				boundary.wrapped = func(context.Context) { p.cancel() }
-			} else {
-				boundary.ready = func(context.Context) { p.cancel() }
-			}
-			runner.Output, runner.Local = boundary, boundary
+			boundary.wrapped = func(context.Context) { p.cancel() }
+			runner.Output = boundary
 			_, err := runner.Execute(ctx, current, p.work.Accepted.CaptureID)
 			if !errors.Is(err, value.ErrDenied) || p.check != 1 || p.record.Phase != "prepared" || p.prepares.Load() != 1 || p.closes.Load() != 1 || p.consumes.Load() != 0 || p.captures.Load() != 0 || p.stores.Load() != 0 {
 				t.Fatal("later check changed preparation ownership or allowed acquisition")

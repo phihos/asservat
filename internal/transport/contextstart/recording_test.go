@@ -36,9 +36,9 @@ func (r *fakeRecordings) Collect(w fleet.APIContextWork) (evidence.RecordingColl
 	return evidence.RecordingCollection{State: evidence.RecordingPending}, nil
 }
 
-// ADR-248: start-recording needs the committed start and the exact resolved
-// pin, runs once, and collect-recording answers only for a session that
-// prepared nothing and consumed no start.
+// ADR-248: start-recording needs the exact resolved pin and the work's
+// deadline, runs once, and collect-recording answers only for a session that
+// prepared nothing and started nothing.
 func TestRegionalSessionStartsAndCollectsRecordings(t *testing.T) {
 	w := workFixture().Work
 	now := time.Now().UTC().Truncate(time.Microsecond)
@@ -51,10 +51,11 @@ func TestRegionalSessionStartsAndCollectsRecordings(t *testing.T) {
 	out := &fakeRecorderOutput{}
 	s := &regionalSession{local: local, work: w, prepared: out, resolved: &targets.PodResolution{Pin: pin}}
 	req := acquireRequest{Pin: pin, Started: now, Until: now.Add(time.Second)}
-	if _, err := s.handle(context.Background(), op(opStartRecording, req)); !errors.Is(err, value.ErrDenied) || out.started != 0 {
-		t.Fatal("a recording started without a committed start", err)
+	late := req
+	late.Until = w.NotAfter.Add(time.Second)
+	if _, err := s.handle(context.Background(), op(opStartRecording, late)); !errors.Is(err, value.ErrDenied) || out.started != 0 {
+		t.Fatal("a recording started past the work deadline", err)
 	}
-	s.consumed = &value.Disposition{MayStart: true, Phase: value.StartCommitted, ValidUntil: now.Add(2 * time.Second)}
 	other := req
 	other.Pin.UID = "another-pod"
 	if _, err := s.handle(context.Background(), op(opStartRecording, other)); !errors.Is(err, value.ErrDenied) {

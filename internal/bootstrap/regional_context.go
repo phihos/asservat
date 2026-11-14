@@ -43,8 +43,6 @@ type regionalContext struct {
 	roots      *x509.CertPool
 	attester   *kube.ConnectorProcessAttester
 	settings   contracts.ConnectorAPIContextSettings
-	capacity   *kube.PermissionClient
-	journal    *kube.StartJournal
 	targets    *kube.PodTargets
 	// peers re-resolves frozen Kubernetes packet peers for the running
 	// recordings' membership verifiers (ADR-283 part 3) with its own client
@@ -113,26 +111,8 @@ func newRegionalContext(ctx context.Context, c regionalConfig, in *providerInput
 	if out.attester, err = kube.NewConnectorProcessAttester(observer, source, workload, regionalPodToken{in}); err != nil {
 		return nil, closers, mounts.ErrUnavailable
 	}
-	// ADR-175: the capacity token is minted in memory by this Pod's own
-	// account, bound to this Pod, never mounted or written.
-	capacity, err := kube.NewCapacityTokens(ctx, observer, x.CapacityAccount, x.CapacityAudience, podUID)
-	if err != nil {
-		return nil, closers, &fixedStepError{"capacity-token", err}
-	}
-	closers = append(closers, capacity.Close)
-	capacityAccount, err := kube.ReadConnectorWorkload(ctx, in.kubernetes(token), c.ClusterID, c.Namespace, x.CapacityAccount, c.Deployment)
-	if err != nil {
-		return nil, closers, &fixedStepError{"capacity-account", err}
-	}
-	if out.settings, err = kube.ConnectorAPISettings(c.rootID(), c.binding, workload, x.CapacityAccount, capacityAccount.AccountUID, c.ImageDigest); err != nil {
+	if out.settings, err = kube.ConnectorAPISettings(c.rootID(), c.binding, workload, c.ImageDigest); err != nil {
 		return nil, closers, &fixedStepError{"settings", err}
-	}
-	if out.capacity, err = kube.NewPermissionClient(in.kubernetesToken(capacity.Token), c.ClusterID, control, time.Now); err != nil {
-		return nil, closers, mounts.ErrUnavailable
-	}
-	// The execution account's own Pod-bound token consumes Ready starts.
-	if out.journal, err = kube.NewStartJournal(in.kubernetes(token), c.ClusterID, control, time.Now); err != nil {
-		return nil, closers, mounts.ErrUnavailable
 	}
 	if out.targets, err = kube.NewAPIContextTargets(observer); err != nil {
 		return nil, closers, mounts.ErrUnavailable
@@ -228,10 +208,6 @@ func (r *regionalContext) run(ctx context.Context, credentials *mtls.ConnectorPr
 	if err != nil {
 		return &fixedStepError{"execution-process", err}
 	}
-	preparer, err := kube.NewConnectorAPIStartPreparer(process, r.capacity)
-	if err != nil {
-		return &fixedStepError{"start-preparer", err}
-	}
 	client, err := mtls.NewRegionalContextStartClient(ctx, r.rootID, r.pool, r.roots, r.c.owners.Address, r.owners, credentials, process, r.c.Executor.Concurrency, time.Now)
 	if err != nil {
 		return &fixedStepError{"start-client", err}
@@ -242,7 +218,7 @@ func (r *regionalContext) run(ctx context.Context, credentials *mtls.ConnectorPr
 		output.recordings.configureLogs(ctx, r.rootID, r.logsClient, r.podUID, process.ProcessEpoch())
 		defer output.recordings.closeLogs()
 	}
-	local := contextstart.RegionalLocal{Process: process, Targets: reportedTargets{r.targets, timedEventLog(os.Stderr, "regional target answer"), r.output.recordings, timedEventLog(os.Stderr, "regional source snapshot refused")}, Local: preparer, Starts: r.journal, Output: output, Collector: r.collector, Source: r.source, Now: time.Now}
+	local := contextstart.RegionalLocal{Process: process, Targets: reportedTargets{r.targets, timedEventLog(os.Stderr, "regional target answer"), r.output.recordings, timedEventLog(os.Stderr, "regional source snapshot refused")}, Output: output, Collector: r.collector, Source: r.source, Now: time.Now}
 	local.History = &contextstart.HistoryLocal{Verifier: r.verifier, Effects: regionalHistoryObjects{objects: r.history, root: r.rootID, cluster: r.c.ClusterID, epoch: process.ProcessEpoch(), now: time.Now}, Report: timedEventLog(os.Stderr, "regional history timing")}
 	if r.output.recordings != nil {
 		local.Recordings = r.output.recordings

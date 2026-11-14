@@ -52,7 +52,7 @@ func contextStartCompletedQueryLifecycle(t *testing.T, phase string) {
 	exchange, stream := f.open(t)
 	work, signer, signed, _ := f.work(t, exchange.Receiver())
 	regional.work = work
-	local := contextstart.RegionalLocal{Process: regional, Targets: regional, Local: regional, Starts: regional, Output: regional, Collector: regional, Source: f.connector, Now: time.Now}
+	local := contextstart.RegionalLocal{Process: regional, Targets: regional, Output: regional, Collector: regional, Source: f.connector, Now: time.Now}
 	regionalDone := make(chan struct{})
 	go func() {
 		defer close(regionalDone)

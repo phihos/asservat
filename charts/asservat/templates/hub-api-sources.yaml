@@ -38,7 +38,7 @@ metadata:
 data:
   download-environment.json: {{ include "asservat.hubApi.downloadEnvironment" . | quote }}
 {{- end }}
-{{- if and (include "asservat.hub" .) (or .Values.capacity (and .Values.origin (index .Values.hub "hub-api").public.processing)) }}
+{{- if and (include "asservat.hub" .) (or (include "asservat.capacity" .) (and .Values.origin (index .Values.hub "hub-api").public.processing)) }}
 ---
 # The capacity processing source (ADR-192, ADR-210): the same settings.
 apiVersion: v1

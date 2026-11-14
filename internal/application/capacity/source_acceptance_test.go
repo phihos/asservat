@@ -113,7 +113,7 @@ func enrollmentObservationFacts() (AcceptedCapacitySource, CapacityNamespaceProt
 	prior.Key.NamespaceUID = ns.Namespace.UID
 	o := sourceObservationFixture(s)
 	a := AcceptedCapacitySource{Format: CapacityAcceptedSourceFormat, RootID: prior.Key.RootID, InstallationID: prior.Recovery.InstallationID, QualificationID: prior.Recovery.InstallationID, Revision: 1, QualificationDigest: artifact.Digest{4}, ProtectionDigest: artifact.Digest{5}, Observation: o, ObservedAt: now, FreshUntil: s.FreshUntil}
-	g := CapacityNamespaceProtection{ClusterID: capacityTestCluster, Digest: artifact.Digest{6}, Keys: []string{"team"}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
+	g := CapacityNamespaceProtection{ClusterID: capacityTestCluster, Digest: artifact.Digest{6}, Keys: []string{EligibilityLabel}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
 	w := CapacityWorkloadObservation{Namespace: ns, Workload: cfg.WorkloadRef{Kind: "Deployment", Name: "app", UID: prior.Key.WorkloadUID}, WorkloadResourceVersion: "workload-rv", ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
 	p := AcceptedCapacityPermissions{RootID: prior.Key.RootID, Epoch: prior.PermissionEpoch, Sequence: prior.PermissionSequence, TrustDigest: prior.PermissionTrust, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), Scopes: []AcceptedCapacityScope{{BasisKey: "accepted-basis", BasisUID: "basis-uid", ClusterID: capacityTestCluster, NamespaceUID: ns.Namespace.UID, ScopeDigest: artifact.Digest{7}}}}
 	return a, g, w, p, prior, now

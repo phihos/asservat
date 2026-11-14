@@ -102,15 +102,12 @@ func runHelmNativeKindJourney(t *testing.T, joined bool) {
 	}
 	workload := createHelmNativeWorkload(t, ctx, target)
 	if joined {
-		// The operator's budget policy names the joined cluster (in the hub
-		// namespace); the maintainer AccessBinding lives in that cluster's
+		// The maintainer AccessBinding lives in the joined cluster's
 		// application namespace.
-		policy := newRegionalBudget(t, ctx, api, k.Namespace, identity.Issuer, cluster, 1)
-		policy.addPolicy()
 		binding := newRegionalBudget(t, ctx, target, k.Namespace, identity.Issuer, cluster, 1)
 		binding.subjectKind, binding.subjectID = "User", identity.SubjectID
 		binding.addBinding(workload)
-		t.Logf("hn journey: budget policy and remote AccessBinding for cluster %s created", cluster)
+		t.Logf("hn journey: remote AccessBinding for cluster %s created", cluster)
 	} else {
 		budget := newRegionalBudget(t, ctx, api, k.Namespace, identity.Issuer, cluster, 1)
 		budget.subjectKind, budget.subjectID = "User", identity.SubjectID
@@ -145,14 +142,10 @@ func runHelmNativeKindJourney(t *testing.T, joined bool) {
 }
 
 // createHelmNativeWorkload is the synthetic capture target: a restricted
-// namespace with the context trial's selector labels and one pause Pod.
+// namespace and one pause Pod.
 func createHelmNativeWorkload(t *testing.T, ctx context.Context, api kubernetes.Interface) regionalWorkload {
 	t.Helper()
-	labels := helmContextTrialProfile(t).Public.Capacity.PolicySpec.Scope.NamespaceSelector.MatchLabels
 	nsLabels := map[string]string{"pod-security.kubernetes.io/enforce": "restricted"}
-	for k, v := range labels {
-		nsLabels[k] = v
-	}
 	ns, err := api.CoreV1().Namespaces().Create(ctx, &core.Namespace{ObjectMeta: meta.ObjectMeta{Name: "apps-hn", Labels: nsLabels}}, meta.CreateOptions{})
 	if err != nil {
 		t.Fatal("workload namespace", err)

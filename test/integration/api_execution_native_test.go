@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"slices"
 	"strings"
 	"sync/atomic"
@@ -41,11 +40,8 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -53,20 +49,19 @@ import (
 )
 
 type nativeAPIEnvironment struct {
-	admin                     kubernetes.Interface
-	garbageCollector          kubernetes.Interface
-	control                   cfg.NamespaceRef
-	plan                      cfg.APIExecutionAdministration
-	executor, capacity, probe *rest.Config
-	unboundExecutor           *rest.Config
-	process                   *kube.APIExecutionProcess
-	capacityGuard             *kube.APIExecutionProtection
-	protectionPin, startPin   kube.GuardPin
-	resolver                  *kube.PodTargets
-	target                    targets.WorkloadRequest
-	image                     artifact.Digest
-	pod                       *core.Pod
-	deployment                *apps.Deployment
+	admin            kubernetes.Interface
+	garbageCollector kubernetes.Interface
+	control          cfg.NamespaceRef
+	plan             cfg.APIExecutionAdministration
+	executor, probe  *rest.Config
+	unboundExecutor  *rest.Config
+	process          *kube.APIExecutionProcess
+	protectionPin    kube.GuardPin
+	resolver         *kube.PodTargets
+	target           targets.WorkloadRequest
+	image            artifact.Digest
+	pod              *core.Pod
+	deployment       *apps.Deployment
 }
 
 // These components run in the fixture process with an actual API-server-issued
@@ -96,7 +91,7 @@ func newNativeAPIEnvironment(t *testing.T, ctx context.Context, f fixture) *nati
 		t.Fatal(err)
 	}
 	accounts := map[string]*core.ServiceAccount{}
-	for _, name := range []string{"executor", "capacity", "probe"} {
+	for _, name := range []string{"executor", "probe"} {
 		sa, e := admin.CoreV1().ServiceAccounts(nsName).Create(ctx, &core.ServiceAccount{ObjectMeta: meta.ObjectMeta{Name: name, Namespace: nsName}, AutomountServiceAccountToken: ptr.To(false)}, meta.CreateOptions{})
 		if e != nil {
 			t.Fatal(e)
@@ -130,7 +125,7 @@ func newNativeAPIEnvironment(t *testing.T, ctx context.Context, f fixture) *nati
 	if err != nil {
 		t.Fatal(err)
 	}
-	n.plan = cfg.APIExecutionAdministration{Name: "api-execution-native", ControlNamespace: n.control, ClusterID: custodyID(), PodName: pod.Name, PodUID: string(pod.UID), Account: "executor", AccountUID: string(accounts["executor"].UID), CapacityAccount: "capacity", CapacityAccountUID: string(accounts["capacity"].UID), ProbeAccount: "probe", ProbeAccountUID: string(accounts["probe"].UID), PodSpecDigest: kube.APIExecutionPodDigest(pod.Spec), ImageDigest: n.image, Administrators: []cfg.KubernetesActor{{Kind: "User", Name: adminWho.Status.UserInfo.Username}}}
+	n.plan = cfg.APIExecutionAdministration{Name: "api-execution-native", ControlNamespace: n.control, ClusterID: custodyID(), PodName: pod.Name, PodUID: string(pod.UID), Account: "executor", AccountUID: string(accounts["executor"].UID), ProbeAccount: "probe", ProbeAccountUID: string(accounts["probe"].UID), PodSpecDigest: kube.APIExecutionPodDigest(pod.Spec), ImageDigest: n.image, Administrators: []cfg.KubernetesActor{{Kind: "User", Name: adminWho.Status.UserInfo.Username}}}
 	// Fixture-only administrator mints exact bound credentials. No production
 	// capture caller or execution account receives token-mint permission.
 	tokenConfig := func(name string, bound bool) *rest.Config {
@@ -146,7 +141,7 @@ func newNativeAPIEnvironment(t *testing.T, ctx context.Context, f fixture) *nati
 		c.BearerToken = tok.Status.Token
 		return c
 	}
-	n.executor, n.capacity, n.probe, n.unboundExecutor = tokenConfig("executor", true), tokenConfig("capacity", false), tokenConfig("probe", false), tokenConfig("executor", false)
+	n.executor, n.probe, n.unboundExecutor = tokenConfig("executor", true), tokenConfig("probe", false), tokenConfig("executor", false)
 	subject := func(name string) rbac.Subject {
 		return rbac.Subject{Kind: "ServiceAccount", Name: name, Namespace: nsName}
 	}
@@ -160,53 +155,17 @@ func newNativeAPIEnvironment(t *testing.T, ctx context.Context, f fixture) *nati
 			t.Fatal(e)
 		}
 	}
-	common := []rbac.PolicyRule{{APIGroups: []string{""}, Resources: []string{"pods"}, ResourceNames: []string{pod.Name}, Verbs: []string{"get"}}, {APIGroups: []string{""}, Resources: []string{"serviceaccounts"}, ResourceNames: []string{"executor", "capacity", "probe"}, Verbs: []string{"get"}}}
-	createRole(nsName, "api-proof-reader", common, []rbac.Subject{subject("executor"), subject("capacity")})
+	common := []rbac.PolicyRule{{APIGroups: []string{""}, Resources: []string{"pods"}, ResourceNames: []string{pod.Name}, Verbs: []string{"get"}}, {APIGroups: []string{""}, Resources: []string{"serviceaccounts"}, ResourceNames: []string{"executor", "probe"}, Verbs: []string{"get"}}}
+	createRole(nsName, "api-proof-reader", common, []rbac.Subject{subject("executor")})
 	createRole(nsName, "api-independent-probe", []rbac.PolicyRule{{APIGroups: []string{""}, Resources: []string{"pods"}, ResourceNames: []string{pod.Name}, Verbs: []string{"update"}}}, []rbac.Subject{subject("probe")})
-	createRole(nsName, "api-capacity", []rbac.PolicyRule{{APIGroups: []string{"asservat.io"}, Resources: []string{"capacityreservations"}, Verbs: []string{"get", "create"}}, {APIGroups: []string{"asservat.io"}, Resources: []string{"capacityreservations/status"}, Verbs: []string{"get", "update"}}}, []rbac.Subject{subject("capacity")})
-	createRole(nsName, "api-executor", []rbac.PolicyRule{{APIGroups: []string{"asservat.io"}, Resources: []string{"capacityreservations"}, Verbs: []string{"get"}}, {APIGroups: []string{"asservat.io"}, Resources: []string{"capacityreservations/status"}, Verbs: []string{"get", "update"}}}, []rbac.Subject{subject("executor")})
 	createRole("synthetic", "api-execution-reader", []rbac.PolicyRule{{APIGroups: []string{""}, Resources: []string{"pods"}, Verbs: []string{"get", "list"}}, {APIGroups: []string{"apps"}, Resources: []string{"deployments", "replicasets", "statefulsets"}, Verbs: []string{"get"}}}, []rbac.Subject{subject("executor")})
-	rules := []rbac.PolicyRule{{APIGroups: []string{""}, Resources: []string{"namespaces"}, ResourceNames: []string{nsName, "synthetic"}, Verbs: []string{"get"}}, {APIGroups: []string{"admissionregistration.k8s.io"}, Resources: []string{"validatingadmissionpolicies", "validatingadmissionpolicybindings"}, ResourceNames: []string{"api-execution-native", "api-execution-start"}, Verbs: []string{"get"}}, {APIGroups: []string{"authentication.k8s.io"}, Resources: []string{"selfsubjectreviews"}, Verbs: []string{"create"}}}
+	rules := []rbac.PolicyRule{{APIGroups: []string{""}, Resources: []string{"namespaces"}, ResourceNames: []string{nsName, "synthetic"}, Verbs: []string{"get"}}, {APIGroups: []string{"admissionregistration.k8s.io"}, Resources: []string{"validatingadmissionpolicies", "validatingadmissionpolicybindings"}, ResourceNames: []string{"api-execution-native"}, Verbs: []string{"get"}}, {APIGroups: []string{"authentication.k8s.io"}, Resources: []string{"selfsubjectreviews"}, Verbs: []string{"create"}}}
 	_, err = admin.RbacV1().ClusterRoles().Create(ctx, &rbac.ClusterRole{ObjectMeta: meta.ObjectMeta{Name: "api-execution-native"}, Rules: rules}, meta.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = admin.RbacV1().ClusterRoleBindings().Create(ctx, &rbac.ClusterRoleBinding{ObjectMeta: meta.ObjectMeta{Name: "api-execution-native"}, Subjects: []rbac.Subject{subject("executor"), subject("capacity"), subject("probe")}, RoleRef: rbac.RoleRef{APIGroup: rbac.GroupName, Kind: "ClusterRole", Name: "api-execution-native"}}, meta.CreateOptions{})
+	_, err = admin.RbacV1().ClusterRoleBindings().Create(ctx, &rbac.ClusterRoleBinding{ObjectMeta: meta.ObjectMeta{Name: "api-execution-native"}, Subjects: []rbac.Subject{subject("executor"), subject("probe")}, RoleRef: rbac.RoleRef{APIGroup: rbac.GroupName, Kind: "ClusterRole", Name: "api-execution-native"}}, meta.CreateOptions{})
 	if err != nil {
-		t.Fatal(err)
-	}
-	// Install the shipped structural CRD unchanged. All local records are removed
-	// by the owned cluster teardown; no policy is disabled to force their deletion.
-	dc, err := dynamic.NewForConfig(config)
-	if err != nil {
-		t.Fatal(err)
-	}
-	data, err := os.ReadFile("../../charts/asservat/crds/capacityreservations.yaml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	var crd unstructured.Unstructured
-	if json.Unmarshal(data, &crd.Object) != nil {
-		t.Fatal("invalid shipped start CRD")
-	}
-	crds := dc.Resource(schema.GroupVersionResource{Group: "apiextensions.k8s.io", Version: "v1", Resource: "customresourcedefinitions"})
-	if _, err = crds.Create(ctx, &crd, meta.CreateOptions{}); err != nil {
-		t.Fatal("exact fixture CRD create", err)
-	}
-	if err = wait.PollUntilContextTimeout(ctx, 50*time.Millisecond, 10*time.Second, true, func(c context.Context) (bool, error) {
-		v, e := crds.Get(c, crd.GetName(), meta.GetOptions{})
-		if e != nil {
-			return false, e
-		}
-		conds, _, _ := unstructured.NestedSlice(v.Object, "status", "conditions")
-		for _, r := range conds {
-			m, _ := r.(map[string]any)
-			if m["type"] == "Established" && m["status"] == "True" {
-				return true, nil
-			}
-		}
-		return false, nil
-	}); err != nil {
 		t.Fatal(err)
 	}
 	// Own unscheduled target: publishing later must survive its actual deletion.
@@ -258,19 +217,6 @@ func (n *nativeAPIEnvironment) protect(t *testing.T, ctx context.Context, recove
 		t.Fatal(err)
 	}
 	n.protectionPin = kube.GuardPin{PolicyUID: string(p.UID), PolicyGeneration: p.Generation, BindingUID: string(b.UID), BindingResourceVersion: b.ResourceVersion}
-	sp, sb, err := kube.StartAdmission(cfg.LocalStartAdministration{Name: "api-execution-start", ControlNamespace: n.control, CapacityUser: "system:serviceaccount:" + n.control.Name + ":capacity", ExecutionUser: "system:serviceaccount:" + n.control.Name + ":executor"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	p, err = n.admin.AdmissionregistrationV1().ValidatingAdmissionPolicies().Create(ctx, sp, meta.CreateOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	b, err = n.admin.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Create(ctx, sb, meta.CreateOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	n.startPin = kube.GuardPin{PolicyUID: string(p.UID), PolicyGeneration: p.Generation, BindingUID: string(b.UID), BindingResourceVersion: b.ResourceVersion}
 	client := func(c *rest.Config) *kube.PermissionClient {
 		r, e := kube.NewPermissionClient(c, n.plan.ClusterID, n.control, time.Now)
 		if e != nil {
@@ -282,10 +228,6 @@ func (n *nativeAPIEnvironment) protect(t *testing.T, ctx context.Context, recove
 	if err != nil {
 		t.Fatal(err)
 	}
-	n.capacityGuard, err = kube.NewAPIExecutionProtection(client(n.capacity), n.plan)
-	if err != nil {
-		t.Fatal(err)
-	}
 	n.process, err = kube.NewAPIExecutionProcess(ctx, guard)
 	if err != nil {
 		t.Fatal(err)
@@ -293,7 +235,7 @@ func (n *nativeAPIEnvironment) protect(t *testing.T, ctx context.Context, recove
 	if err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 20*time.Second, true, func(c context.Context) (bool, error) { _, e := n.process.ReadAPIProcess(c); return e == nil, nil }); err != nil {
 		t.Fatal("exact native API process guard unavailable", err)
 	}
-	for _, name := range []string{n.plan.Name, "api-execution-start"} {
+	for _, name := range []string{n.plan.Name} {
 		e := wait.PollUntilContextTimeout(ctx, 50*time.Millisecond, 10*time.Second, true, func(c context.Context) (bool, error) {
 			p, e := n.admin.AdmissionregistrationV1().ValidatingAdmissionPolicies().Get(c, name, meta.GetOptions{})
 			if e != nil {
@@ -457,14 +399,6 @@ func qualifyNativeAPIExecution(t *testing.T, ctx context.Context, f fixture, adm
 		return v
 	}
 	prepare, execute, read := x("api_execution_prepare_runtime", "synthetic-api-execution-prepare"), x("api_execution_runtime", "synthetic-api-execution"), x("api_execution_read_runtime", "synthetic-api-execution-read")
-	local, err := kube.NewAPIStartPreparer(n.capacityGuard)
-	if err != nil {
-		t.Fatal(err)
-	}
-	journal, err := kube.NewStartJournal(n.executor, n.plan.ClusterID, n.control, time.Now)
-	if err != nil {
-		t.Fatal(err)
-	}
 	rawCollector, err := kube.NewAPIContextClient(n.executor)
 	if err != nil {
 		t.Fatal(err)
@@ -485,7 +419,7 @@ func qualifyNativeAPIExecution(t *testing.T, ctx context.Context, f fixture, adm
 	if err != nil {
 		t.Fatal(err)
 	}
-	runner := executionapp.APIContextRunner{Read: read, Prepare: prepare, Record: execute, Process: n.process, Local: local, Starts: journal, Targets: n.resolver, Eligibility: authapp.Evaluator{Permissions: s.p, Now: time.Now}, Capabilities: nativeAPICapability{s.a.Plan.Input.Capability}, Retention: nativeAPIRetention{s.retention}, Recovery: s.recovery.reader, Output: producer, Collector: collector, Now: time.Now}
+	runner := executionapp.APIContextRunner{Read: read, Prepare: prepare, Record: execute, Process: n.process, Targets: n.resolver, Eligibility: authapp.Evaluator{Permissions: s.p, Now: time.Now}, Capabilities: nativeAPICapability{s.a.Plan.Input.Capability}, Retention: nativeAPIRetention{s.retention}, Recovery: s.recovery.reader, Output: producer, Collector: collector, Now: time.Now}
 	if regionalMode == "journey" {
 		qualifyPublicContextJourney(t, ctx, f, n, s, admin, poolFor, store, keys, journeyKeys, runner, collector, journeyPools)
 		return

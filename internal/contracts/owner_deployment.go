@@ -23,28 +23,27 @@ func DecodeOwnerWorkerTrust(r io.Reader) (OwnerWorkerTrust, error) {
 // Installation-owned public startup inputs. Credentials have fixed, separate
 // projected filenames and cannot be embedded or redirected through this DTO.
 type OwnerDeployment struct {
-	Format                 string                           `json:"format"`
-	InstallationID         string                           `json:"installationID"`
-	ClusterID              string                           `json:"clusterID"`
-	PermissionRootID       string                           `json:"permissionRootID"`
-	Namespace              WorkerObjectReference            `json:"namespace"`
-	ConfigurationUID       string                           `json:"configurationUID"`
-	Kubernetes             OwnerProviderEndpoint            `json:"kubernetes"`
-	WorkloadGuard          OwnerDeploymentGuard             `json:"workloadGuard"`
-	ConfigurationProbes    []OwnerConfigurationProbe        `json:"configurationProbes"`
-	SchedulingLeases       []OwnerSchedulingLease           `json:"schedulingLeases"`
-	APIContextStarts       *OwnerDeploymentAPIContextStarts `json:"apiContextStarts,omitempty"`
-	CapacityProbe          *OwnerDeploymentCapacityProbe    `json:"capacityProbe,omitempty"`
-	InitialHistoryProbe    *OwnerInitialHistoryProbe        `json:"initialHistoryProbe,omitempty"`
-	Postgres               OwnerPostgresEndpoint            `json:"postgres"`
-	AuditStore             OwnerAuditStore                  `json:"auditStore"`
-	KeyService             OwnerKeyService                  `json:"keyService"`
-	Connections            int                              `json:"connections"`
-	Concurrency            int                              `json:"concurrency"`
-	Native                 *OwnerNativeDeployment           `json:"native,omitzero"`
-	Public                 *OwnerPublicDeployment           `json:"public,omitempty"`
-	ProviderAuthentication *OwnerProviderAuthentication     `json:"providerAuthentication,omitempty"`
-	Observation            *OwnerObservationBootstrap       `json:"observation,omitempty"`
+	Format                 string                        `json:"format"`
+	InstallationID         string                        `json:"installationID"`
+	ClusterID              string                        `json:"clusterID"`
+	PermissionRootID       string                        `json:"permissionRootID"`
+	Namespace              WorkerObjectReference         `json:"namespace"`
+	ConfigurationUID       string                        `json:"configurationUID"`
+	Kubernetes             OwnerProviderEndpoint         `json:"kubernetes"`
+	WorkloadGuard          OwnerDeploymentGuard          `json:"workloadGuard"`
+	ConfigurationProbes    []OwnerConfigurationProbe     `json:"configurationProbes"`
+	SchedulingLeases       []OwnerSchedulingLease        `json:"schedulingLeases"`
+	CapacityProbe          *OwnerDeploymentCapacityProbe `json:"capacityProbe,omitempty"`
+	InitialHistoryProbe    *OwnerInitialHistoryProbe     `json:"initialHistoryProbe,omitempty"`
+	Postgres               OwnerPostgresEndpoint         `json:"postgres"`
+	AuditStore             OwnerAuditStore               `json:"auditStore"`
+	KeyService             OwnerKeyService               `json:"keyService"`
+	Connections            int                           `json:"connections"`
+	Concurrency            int                           `json:"concurrency"`
+	Native                 *OwnerNativeDeployment        `json:"native,omitzero"`
+	Public                 *OwnerPublicDeployment        `json:"public,omitempty"`
+	ProviderAuthentication *OwnerProviderAuthentication  `json:"providerAuthentication,omitempty"`
+	Observation            *OwnerObservationBootstrap    `json:"observation,omitempty"`
 }
 
 // Only the acknowledged original bootstrap account may observe the retained
@@ -65,6 +64,7 @@ type CaptureHistoryLimits struct {
 
 type OwnerPublicDeployment struct {
 	CaptureHistory *CaptureHistoryLimits `json:"captureHistory,omitempty"`
+	WorkloadRate   *CapacityDumpValues   `json:"workloadRate,omitempty"`
 	Format         string                `json:"format"`
 	Origin         string                `json:"origin"`
 	// Identity (ADR-180 decision 3): the pinned browser settings supply the
@@ -270,19 +270,18 @@ type OwnerNativeTopology struct {
 // workload guard plan. The federation's owner reads (ADR-172) receive exactly
 // the hub-api values, so both prove the same protection digest.
 type OwnerGuardInputs struct {
-	Namespace           WorkerObjectReference            `json:"namespace"`
-	ConfigurationUID    string                           `json:"configurationUID"`
-	Kubernetes          OwnerProviderEndpoint            `json:"kubernetes"`
-	WorkloadGuard       OwnerDeploymentGuard             `json:"workloadGuard"`
-	ConfigurationProbes []OwnerConfigurationProbe        `json:"configurationProbes"`
-	SchedulingLeases    []OwnerSchedulingLease           `json:"schedulingLeases"`
-	APIContextStarts    *OwnerDeploymentAPIContextStarts `json:"apiContextStarts,omitempty"`
-	CapacityProbe       *OwnerDeploymentCapacityProbe    `json:"capacityProbe,omitempty"`
-	InitialHistoryProbe *OwnerInitialHistoryProbe        `json:"initialHistoryProbe,omitempty"`
+	Namespace           WorkerObjectReference         `json:"namespace"`
+	ConfigurationUID    string                        `json:"configurationUID"`
+	Kubernetes          OwnerProviderEndpoint         `json:"kubernetes"`
+	WorkloadGuard       OwnerDeploymentGuard          `json:"workloadGuard"`
+	ConfigurationProbes []OwnerConfigurationProbe     `json:"configurationProbes"`
+	SchedulingLeases    []OwnerSchedulingLease        `json:"schedulingLeases"`
+	CapacityProbe       *OwnerDeploymentCapacityProbe `json:"capacityProbe,omitempty"`
+	InitialHistoryProbe *OwnerInitialHistoryProbe     `json:"initialHistoryProbe,omitempty"`
 }
 
 func (c OwnerDeployment) Guard() OwnerGuardInputs {
-	return OwnerGuardInputs{c.Namespace, c.ConfigurationUID, c.Kubernetes, c.WorkloadGuard, c.ConfigurationProbes, c.SchedulingLeases, c.APIContextStarts, c.CapacityProbe, c.InitialHistoryProbe}
+	return OwnerGuardInputs{c.Namespace, c.ConfigurationUID, c.Kubernetes, c.WorkloadGuard, c.ConfigurationProbes, c.SchedulingLeases, c.CapacityProbe, c.InitialHistoryProbe}
 }
 
 type OwnerConfigurationProbe struct {
@@ -349,15 +348,6 @@ func DecodeOwnerSQLCredential(r io.Reader) (OwnerSQLCredential, error) {
 }
 func DecodeOwnerStorageCredential(r io.Reader) (OwnerStorageCredential, error) {
 	return decodeClosedRPC[OwnerStorageCredential](r, 32<<10)
-}
-
-// Explicit original guard scope only. It neither grants RBAC nor replaces the
-// independent start admission and original installation journal acceptance.
-type OwnerDeploymentAPIContextStarts struct {
-	CapacityAccount  WorkerObjectReference `json:"capacityAccount"`
-	ExecutionAccount WorkerObjectReference `json:"executionAccount"`
-	// CapacityAudience enables the ADR-175 capacity TokenRequest.
-	CapacityAudience string `json:"capacityAudience,omitempty"`
 }
 
 // OwnerPublicCapacity pins the capacity qualification whose accepted audit

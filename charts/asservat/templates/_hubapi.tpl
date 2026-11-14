@@ -64,7 +64,7 @@
 {{- $out := list -}}
 {{- range .Values.clusters -}}
 {{- if not (regexMatch "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" (toString .clusterID)) }}{{ fail (printf "clusters[%s].clusterID must be a lowercase UUID (uuidgen)" (toString .name)) }}{{ end -}}
-{{- $out = append $out (dict "name" (required "clusters[].name is required" .name) "clusterID" .clusterID "namespace" (default $root.Release.Namespace .namespace) "standby" (int (default 2 .standby)) "captures" (int (default 1 .captures))) -}}
+{{- $out = append $out (dict "name" (required "clusters[].name is required" .name) "clusterID" .clusterID "namespace" (default $root.Release.Namespace .namespace) "standby" (int (default 2 .standby)) "captures" (int (dig "capturesPerCluster" 8 (default dict $root.Values.capacity)))) -}}
 {{- end -}}
 {{- toJson $out -}}
 {{- end -}}
@@ -81,9 +81,9 @@
 {{- $_ := set $c "concurrency" (int $h.concurrency) -}}
 {{- $obs := dict -}}
 {{- with $h.peers }}{{ $_ := set $obs "peers" . }}{{ end -}}
-{{- with .Values.capacity -}}
-{{- $lc := dict "keys" (sortAlpha (required "capacity.namespaceKeys is required" .namespaceKeys)) -}}
-{{- with .workloadKeys -}}
+{{- if include "asservat.capacity" . -}}
+{{- $lc := dict "keys" (list "asservat.io/evidence") -}}
+{{- with .Values.workloadKeys -}}
 {{- with .labels }}{{ $_ := set $lc "labelKeys" . }}{{ end -}}
 {{- with .annotations }}{{ $_ := set $lc "annotationKeys" . }}{{ end -}}
 {{- end -}}
@@ -95,10 +95,12 @@
 {{- $u := $h.public -}}
 {{- $id := fromJson (include "asservat.hubApi.identity" .) -}}
 {{- $pub := dict "origin" .Values.origin "browserAudience" $id.browserAudience "version" (.Chart.AppVersion | default .Chart.Version) -}}
-{{- range $key := list "standby" "captures" "previewSeconds" "operationConcurrency" "mcpPerIdentity" "downloadConcurrency" "downloadsPerIdentity" "downloadMaxSeconds" "operationAudit" "downloadPlan" -}}
+{{- $_ := set $pub "captures" (int (dig "capturesPerCluster" 8 (default dict .Values.capacity))) -}}
+{{- with dig "workload" "dump" nil (default dict .Values.capacity) }}{{ $_ := set $pub "workloadRate" . }}{{ end -}}
+{{- range $key := list "standby" "previewSeconds" "operationConcurrency" "mcpPerIdentity" "downloadConcurrency" "downloadsPerIdentity" "downloadMaxSeconds" "operationAudit" "downloadPlan" -}}
 {{- $_ := set $pub $key (index $u $key) -}}
 {{- end -}}
-{{- if or $u.processing .Values.capacity }}{{ $_ := set $pub "processing" true }}{{ end -}}
+{{- if or $u.processing (include "asservat.capacity" .) }}{{ $_ := set $pub "processing" true }}{{ end -}}
 {{- with .Values.captureHistory }}{{ $_ := set $pub "captureHistory" . }}{{ end -}}
 {{- if eq .Values.exposure.tls.mode "proxy" }}{{ $_ := set $pub "proxyTLS" true }}{{ end -}}
 {{- if or .Values.fleet.issuer (include "asservat.hubApi.offer" .) -}}
@@ -109,8 +111,7 @@
 {{- if include "asservat.hubApi.offer" . -}}
 {{- $fed := include "asservat.fullname" (list . "federation") -}}
 {{- $connector := required "mode=combined and clusters require federation.connector (the regional offer's connector limits)" (dig "connector" nil (default dict .Values.federation)) -}}
-{{- $backup := required "mode=combined and clusters require capacity.backup (the regional offer's backup profile)" (dig "backup" nil (default dict .Values.capacity)) -}}
-{{- $offer := dict "federation" (printf "https://%s.%s.svc:9446" $fed .Release.Namespace) "serverName" (printf "%s.%s.svc" $fed .Release.Namespace) "image" (include "asservat.image" .) "connector" $connector "backup" $backup -}}
+{{- $offer := dict "federation" (printf "https://%s.%s.svc:9446" $fed .Release.Namespace) "serverName" (printf "%s.%s.svc" $fed .Release.Namespace) "image" (include "asservat.image" .) "connector" $connector -}}
 {{- if not (include "asservat.hubApi.combined" .) }}{{ $_ := set $offer "hubOnly" true }}{{ end -}}
 {{- if .Values.clusters -}}
 {{- $r := .Values.remote -}}
