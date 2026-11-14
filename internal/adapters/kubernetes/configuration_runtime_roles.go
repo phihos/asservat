@@ -94,10 +94,7 @@ func (s *ConfigurationRuntimeRoleRoot) name() string {
 func (s *ConfigurationRuntimeRoleRoot) path() string {
 	return "/api/v1/namespaces/" + s.input.Namespace.Name + "/secrets"
 }
-func (s *ConfigurationRuntimeRoleRoot) current(ctx context.Context) (time.Time, error) {
-	p, e := s.source.ReadConfigurationRoleSource(ctx)
-	return p.FreshUntil, e
-}
+
 func configurationRoleStateValid(input contracts.ConfigurationRuntimeRoles, v contracts.ConfigurationRuntimeRoleState, now time.Time) bool {
 	if v.Format != contracts.ConfigurationRuntimeRoleStateFormat || v.Input != input || !authorization.UUID(v.OperationID) || v.CreatedAt.Year() < 2020 || v.CreatedAt.After(now) || v.Until.Sub(v.CreatedAt) != 30*time.Minute || !v.CreatedAt.Equal(v.CreatedAt.Truncate(time.Microsecond)) {
 		return false

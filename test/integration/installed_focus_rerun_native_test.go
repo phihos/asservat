@@ -39,16 +39,6 @@ func installedRunSuffix() string {
 	return "-r" + os.Getenv("ASSERVAT_INSTALLED_RERUN_ID")
 }
 
-// installedKeptLifetime extends synthetic fixture credential lifetimes (never
-// product settings) to three hours in a keep run, so reruns outlive the
-// 30-minute continuation window; ordinary runs keep the original value.
-func installedKeptLifetime(seconds int64) int64 {
-	if installedKeepMode() {
-		return 3 * 3600
-	}
-	return seconds
-}
-
 // installedRerunStartedAt is when a development-only rerun started; zero in
 // every ordinary run. Checks of root-wide totals subtract what earlier runs
 // on the kept installation charged before it.
@@ -87,20 +77,6 @@ const installedKeptStateFormat = "asservat-installed-focus-state/v1"
 
 func (s installedKeptState) desired() contracts.InitialBootstrap {
 	return contracts.InitialBootstrap{Name: s.Name, BootstrapNamespace: s.BootstrapNamespace, TargetNamespace: s.TargetNamespace, Image: s.Image, Postgres: s.Postgres}
-}
-
-func writeInstalledKeptState(t *testing.T, s installedKeptState) {
-	t.Helper()
-	path := os.Getenv("ASSERVAT_INSTALLED_STATE")
-	if path == "" || !installedRerunFocus(s.Focus) {
-		t.Fatal("keep mode requires a harness state path and a rerun focus")
-	}
-	s.Format, s.WrittenAt = installedKeptStateFormat, time.Now().UTC()
-	body, _ := json.MarshalIndent(s, "", "  ")
-	if err := os.WriteFile(path, append(body, '\n'), 0o600); err != nil {
-		t.Fatal("kept installation state", err)
-	}
-	t.Log("keep mode: installation state recorded for focus reruns")
 }
 
 // installedHubDiagnose logs the hub capacity, SQL activity and process state.

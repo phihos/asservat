@@ -33,13 +33,6 @@ func installedApprovedScopes(scope string) bool {
 
 type installedProjectionCheck func(artifactID string) func(queryID, operationID string) func()
 
-// Operator-only readback proves that the approved path did not create a dummy
-// native session, used one original query worker and consumed actual key slots.
-// It supplies no runtime input, grants or product authority.
-func installedProjectionSQLCheck(t *testing.T, ctx context.Context, admin *pgxpool.Pool, api kubernetes.Interface, root string, terminalSink ...func(func())) installedProjectionCheck {
-	return installedProjectionSQLCheckPods(t, ctx, admin, api, installedRecordWorkerPods(t, ctx, api), root, terminalSink...)
-}
-
 // installedProjectionSQLCheckPods reuses a caller's Pod recorder that was
 // started before the query, so a worker retired before this check is built
 // remains observable.

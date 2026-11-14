@@ -1,16 +1,17 @@
 package integration
 
 import (
-	query "asservat.local/asservat/internal/domain/analysis"
-	"asservat.local/asservat/internal/domain/artifact"
-	value "asservat.local/asservat/internal/domain/authorization"
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/jackc/pgx/v5/pgxpool"
-	"k8s.io/client-go/kubernetes"
 	"testing"
 	"time"
+
+	query "asservat.local/asservat/internal/domain/analysis"
+	"asservat.local/asservat/internal/domain/artifact"
+	value "asservat.local/asservat/internal/domain/authorization"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"k8s.io/client-go/kubernetes"
 )
 
 // This is operator-only readback. It permits ONLY the explicitly reviewed page

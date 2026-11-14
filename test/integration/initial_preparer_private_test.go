@@ -1,7 +1,6 @@
 package integration
 
 import (
-	cfg "asservat.local/asservat/internal/domain/configuration"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -11,6 +10,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	cfg "asservat.local/asservat/internal/domain/configuration"
 
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/contracts"

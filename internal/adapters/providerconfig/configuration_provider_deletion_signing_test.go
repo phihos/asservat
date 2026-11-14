@@ -5,12 +5,10 @@ import (
 	"crypto/ed25519"
 	"crypto/sha256"
 	"crypto/x509"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"math/big"
 	"slices"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -152,16 +150,4 @@ func TestConfigurationProviderRecipeLetsOnlyAuditWrapSignDeletions(t *testing.T)
 			t.Fatal("invalid deletion signing key accepted", name)
 		}
 	}
-}
-
-// signingKeyResponse is Transit's read of an Ed25519 key with the given
-// public keys by version.
-func signingKeyResponse(t *testing.T, name string, latest int, keys map[int]ed25519.PublicKey) map[string]json.RawMessage {
-	t.Helper()
-	versions := map[string]any{}
-	for v, k := range keys {
-		versions[strconv.Itoa(v)] = map[string]any{"name": "ed25519", "public_key": base64.StdEncoding.EncodeToString(k), "creation_time": "2026-10-18T00:00:00Z", "certificate_chain": ""}
-	}
-	return setupMap(t, map[string]any{"name": name, "type": "ed25519", "derived": false, "exportable": false, "allow_plaintext_backup": false, "deletion_allowed": false,
-		"supports_signing": true, "supports_encryption": false, "supports_decryption": false, "latest_version": latest, "min_decryption_version": 1, "min_encryption_version": 0, "keys": versions})
 }

@@ -1,18 +1,12 @@
 package integration
 
 import (
-	"context"
 	"encoding/json"
-	"errors"
-	"net/url"
-	"os"
 	"reflect"
-	"strings"
 	"testing"
 	"time"
 
 	"asservat.local/asservat/internal/contracts"
-	"github.com/google/pprof/profile"
 )
 
 // The named template is operator configuration; the request cannot supply a
@@ -99,159 +93,6 @@ func manualRecorderStopRequests(preview installedApprovedRecordingPreview, now t
 	return original, resolution
 }
 
-// This is a second, independently reviewed capture. Stop never mutates or
-// deletes the successfully downloaded first profile, and no endpoint probe
-// starts an unapproved sampler to discover whether the target is busy.
-func qualifyManualRecorderStop(t *testing.T, ctx context.Context, kind string, arguments map[string]any, read func(string, any, any), invoke func(string, any) (installedJourneyEnvelope, string), approve func(string)) {
-	t.Helper()
-	var preview installedApprovedRecordingPreview
-	read("preview_capture", arguments, &preview)
-	if !preview.readyForApproval(time.Now()) || len(preview.Lifecycle.Actions) != 1 {
-		t.Fatal("Stop recorder lacks an approvable preview", preview.Blockers)
-	}
-	original, resolution := manualRecorderStopRequests(preview, time.Now(), kind)
-	pending, code := invoke("request_capture", original)
-	var review struct {
-		URI string `json:"navigation_uri"`
-	}
-	if code != "ApprovalRequired" || json.Unmarshal(pending.Data, &review) != nil {
-		t.Fatal("Stop recorder did not require separate approval", code)
-	}
-	u, err := url.Parse(review.URI)
-	if err != nil {
-		t.Fatal(err)
-	}
-	grant := strings.TrimPrefix(u.Path, "/approvals/")
-	if len(grant) != 36 || grant == u.Path {
-		t.Fatal("Stop recorder review identity")
-	}
-	approve(grant)
-	var receipt struct {
-		CaptureID string `json:"capture_id"`
-	}
-	submit := func(input map[string]any) string {
-		reply, code := invoke("request_capture", input)
-		if code == "" && json.Unmarshal(reply.Data, &receipt) != nil {
-			t.Fatal("Stop recorder receipt")
-		}
-		return code
-	}
-	initial := submit(original)
-	for retry := 0; initial == "StorageRefreshing" && retry < 5; retry++ {
-		if err := installedJourneyPause(ctx, 2*time.Second); err != nil {
-			t.Fatal(err)
-		}
-		initial = submit(original)
-	}
-	continuation := map[string]any{"preview_id": preview.ID, "idempotency_key": original["idempotency_key"], "continue_acquisition": true}
-	resolve := func() (installedJourneyDisposition, error) {
-		var d installedJourneyDisposition
-		read("resolve_capture_request", resolution, &d)
-		if d.State == "accepted" {
-			receipt.CaptureID = d.CaptureID
-		}
-		return d, nil
-	}
-	closed, err := installedJourneyRecoverCapture(ctx, initial, resolve, func() (string, string) { code := submit(continuation); return code, receipt.CaptureID }, func() error {
-		d, err := resolve()
-		if err != nil || d.State != "accepted" || d.CaptureID != receipt.CaptureID {
-			return errors.New("Stop recorder original request not accepted")
-		}
-		return nil
-	}, installedJourneyPause, func(id string) (installedJourneyCaptureProgress, error) {
-		var p installedJourneyCaptureProgress
-		read("get_capture", map[string]string{"capture_id": id}, &p)
-		return p, nil
-	})
-	if err != nil || closed || receipt.CaptureID == "" {
-		t.Fatal("Stop recorder was not admitted", err, closed)
-	}
-	admittedAt := time.Now()
-	t.Logf("manual recorder Stop %s: admitted at %s", receipt.CaptureID, admittedAt.UTC().Format(time.RFC3339Nano))
-	var current struct {
-		CaptureID string `json:"capture_id"`
-		Phase     string `json:"phase"`
-		Revision  int64  `json:"revision"`
-		CaseID    string `json:"case_id"`
-	}
-	end := time.Now().Add(time.Minute)
-	for time.Now().Before(end) {
-		read("get_capture", map[string]string{"capture_id": receipt.CaptureID}, &current)
-		if current.CaptureID != receipt.CaptureID || current.Revision < 1 {
-			t.Fatal("Stop recorder progress identity", current)
-		}
-		if current.Phase == "Running" {
-			break
-		}
-		if current.Phase == "Succeeded" || current.Phase == "Failed" || current.Phase == "Partial" || current.Phase == "Cancelled" || current.Phase == "Indeterminate" {
-			t.Fatal("Stop recorder ended before live Stop", current)
-		}
-		if err := installedJourneyPause(ctx, time.Second); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if current.Phase != "Running" {
-		t.Fatal("Stop recorder never entered Running", current)
-	}
-	if err := installedJourneyPause(ctx, 2*time.Second); err != nil {
-		t.Fatal(err)
-	}
-	read("get_capture", map[string]string{"capture_id": receipt.CaptureID}, &current)
-	if current.Phase != "Running" {
-		t.Fatal("Stop recorder completed before cancellation", current)
-	}
-	var stopped struct {
-		CaptureID string `json:"capture_id"`
-		Requested bool   `json:"cancellation_requested"`
-	}
-	stopAt := time.Now()
-	reply, code := invoke("cancel_capture", map[string]any{"capture_id": receipt.CaptureID, "expected_revision": current.Revision, "idempotency_key": "stop-" + receipt.CaptureID})
-	t.Logf("manual recorder Stop %s: single attempt at %s, since admission=%s, elapsed=%s, last phase=%s revision=%d, status=%s code=%s warnings=%v", receipt.CaptureID, stopAt.UTC().Format(time.RFC3339Nano), stopAt.Sub(admittedAt), time.Since(stopAt), current.Phase, current.Revision, reply.Status, code, reply.Warnings)
-	if code != "" || reply.Status != "ok" || json.Unmarshal(reply.Data, &stopped) != nil {
-		t.Fatal("live Stop request failed", reply.Status, code)
-	}
-	for _, warning := range reply.Warnings {
-		if kind == "arguments" && strings.Contains(warning, "application stopped profiling") {
-			t.Fatal("collector argument Stop inherited a remote-profile uncertainty warning", warning)
-		}
-		if strings.HasPrefix(warning, "Cancellation delivery is unconfirmed;") {
-			t.Fatal("live Stop was persisted but not confirmed delivered", warning)
-		}
-	}
-	if stopped.CaptureID != receipt.CaptureID || !stopped.Requested {
-		t.Fatal("live Stop was not accepted", stopped)
-	}
-	for time.Now().Before(end) {
-		read("get_capture", map[string]string{"capture_id": receipt.CaptureID}, &current)
-		if current.Phase == "Cancelled" {
-			break
-		}
-		if current.Phase == "Succeeded" || current.Phase == "Failed" || current.Phase == "Partial" || current.Phase == "Indeterminate" {
-			t.Fatalf("recorder ended without joined Stop after %s: %+v", time.Since(stopAt), current)
-		}
-		if err := installedJourneyPause(ctx, time.Second); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if current.CaptureID != receipt.CaptureID || current.Phase != "Cancelled" {
-		t.Fatal("Stop recorder did not reach terminal cancellation", current)
-	}
-	if current.CaseID != "" {
-		var evidence struct {
-			Artifacts []json.RawMessage `json:"artifacts"`
-		}
-		read("get_case", map[string]string{"case_id": current.CaseID}, &evidence)
-		if len(evidence.Artifacts) != 0 {
-			t.Fatal("stopped recorder published an artifact")
-		}
-	}
-	if kind == "profile" {
-		t.Logf("manual profile %s: public Stop accepted while Running and terminal Cancelled observed; application profiler stop is not claimed", receipt.CaptureID)
-	} else {
-		t.Logf("manual arguments %s: public Stop accepted while Running, joined collector cancellation and terminal Cancelled observed; no artifact published", receipt.CaptureID)
-	}
-}
-
 func manualProfileArguments(cluster, namespace, workload string) map[string]any {
 	return map[string]any{
 		"target_ref":                  map[string]string{"cluster_id": cluster, "namespace": namespace, "kind": "Deployment", "name": workload},
@@ -261,46 +102,4 @@ func manualProfileArguments(cluster, namespace, workload string) map[string]any 
 			"maxTotalBytes": 16 << 20, "maxDuration": "30s",
 		},
 	}
-}
-
-func qualifyManualProfileNative(t *testing.T, ctx context.Context, native []byte, captureID string) {
-	t.Helper()
-	p, err := profile.ParseData(native)
-	if err != nil || p.CheckValid() != nil || len(p.Sample) == 0 || p.DurationNanos < 9_000_000_000 {
-		t.Fatal("downloaded CPU profile has no valid ten-second sample interval", err)
-	}
-	prefix := "../results/manual-profile"
-	if installedJourneyFocus() == "profile-comparison" {
-		prefix += "-" + captureID
-	}
-	path := prefix + ".pb.gz"
-	if err := os.WriteFile(path, native, 0600); err != nil {
-		t.Fatal(err)
-	}
-	// Disable symbol lookup: all names must come from the native artifact.
-	args := []string{"tool", "pprof", "-top", "-symbolize=none"}
-	wantFunction := "main.burnCPU"
-	heavy := installedAcceptedHeavyComparison()
-	if heavy {
-		// The accepted fixture has sixteen counters and 100k functions:
-		// pprof's last-counter/default fraction hides its small CPU entries.
-		// Compact labels omit the native padding comment without editing it.
-		args = append(args, "-sample_index=cpu", "-nodecount=20", "-nodefraction=0", "-compact_labels=true")
-		wantFunction = "synthetic."
-	}
-	out, err := installedCombinedOutput(ctx, installedLocalToolTimeout, "go", append(args, path)...)
-	if err != nil || !strings.Contains(string(out), wantFunction) {
-		diagnostic := out
-		if heavy && len(diagnostic) > 16<<10 {
-			diagnostic = diagnostic[:16<<10]
-		}
-		t.Fatalf("native pprof cannot open the synthetic CPU sample: %v (output %d bytes; diagnostic prefix)\n%s", err, len(out), diagnostic)
-	}
-	if installedAcceptedHeavyComparison() {
-		t.Log("accepted-heavy synthetic pprof input opened locally; this is worker containment input, not sampled application CPU or overhead qualification")
-	}
-	if err := os.WriteFile(prefix+"-pprof.txt", out, 0600); err != nil {
-		t.Fatal(err)
-	}
-	t.Logf("manual profile %s: %d native bytes, %d samples, duration %dns; authenticated download hash matched; go tool pprof opened the original", captureID, len(native), len(p.Sample), p.DurationNanos)
 }

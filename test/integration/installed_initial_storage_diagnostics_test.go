@@ -2,7 +2,6 @@ package integration
 
 import (
 	"context"
-	"testing"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -95,26 +94,4 @@ func readInstalledInitialStorage(ctx context.Context, pool *pgxpool.Pool, root, 
 		&f.PermissionStream, &f.PermissionCurrent, &f.InitialACK, &f.EpochACK,
 		&f.TargetBasisWithinLimit, &f.TargetBasis, &f.TargetSequence, &f.TargetLifetime, &f.TargetMaintainer, &f.TargetActivationACK)
 	return f, err
-}
-
-func installedInitialStorageDiagnostics(t *testing.T, ctx context.Context, pool *pgxpool.Pool, root, preview string) {
-	t.Helper()
-	f, err := readInstalledInitialStorage(ctx, pool, root, preview)
-	if err != nil {
-		t.Log("installed initial storage diagnostic unavailable")
-		return
-	}
-	date := func(v pgtype.Timestamptz) string {
-		if !v.Valid || v.InfinityModifier != pgtype.Finite {
-			return "absent"
-		}
-		return v.Time.UTC().Format(time.RFC3339Nano)
-	}
-	t.Logf("installed initial storage: preview=%t binding=%t enrolled=%t ready=%t selectedAllocation=%t enrolledAllocation=%t shortInterval=%t thirtySecondInterval=%t readyPublication=%t demandRecorded=%t demandCurrent=%t observedAt=%s freshUntil=%s now=%s demandRequested=%s demandNotAfter=%s",
-		f.Preview, f.Binding, f.Enrolled, f.Ready, f.SelectedAllocation, f.EnrolledAllocation,
-		f.ShortInterval, f.ThirtySecondInterval, f.ReadyPublication, f.DemandRecorded, f.DemandCurrent,
-		date(f.ObservedAt), date(f.FreshUntil), date(f.Now), date(f.DemandRequested), date(f.DemandNotAfter))
-	t.Logf("installed stored/current permission state: stream=%t current=%t initialACK=%t epochACK=%t targetAllowBasisWithinLimit=%t targetAllowBasis=%t targetSequence=%t targetLifetime=%t targetMaintainer=%t targetActivationACK=%t",
-		f.PermissionStream, f.PermissionCurrent, f.InitialACK, f.EpochACK,
-		f.TargetBasisWithinLimit, f.TargetBasis, f.TargetSequence, f.TargetLifetime, f.TargetMaintainer, f.TargetActivationACK)
 }

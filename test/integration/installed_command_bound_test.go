@@ -41,20 +41,6 @@ func installedOutput(ctx context.Context, timeout time.Duration, name string, ar
 	return command.Output()
 }
 
-// installedCombinedOutput is the CombinedOutput form of installedOutput.
-func installedCombinedOutput(ctx context.Context, timeout time.Duration, name string, args ...string) ([]byte, error) {
-	command, cancel := installedBoundedCommand(ctx, timeout, name, args...)
-	defer cancel()
-	return command.CombinedOutput()
-}
-
-// installedRun is the Run form of installedOutput.
-func installedRun(ctx context.Context, timeout time.Duration, name string, args ...string) error {
-	command, cancel := installedBoundedCommand(ctx, timeout, name, args...)
-	defer cancel()
-	return command.Run()
-}
-
 // installedAwait receives one value from a helper goroutine during cleanup,
 // giving up after limit so a stuck helper is reported instead of holding the
 // test until the CI job is cancelled without logs.
