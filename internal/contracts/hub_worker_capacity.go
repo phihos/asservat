@@ -17,6 +17,10 @@ type HubWorkerCapacity struct {
 	// SharedQueries reserves shared context query capacity; true when
 	// downloads (the publisher) are enabled.
 	SharedQueries bool `json:"sharedQueries"`
+	// RemoteClusters are the joined mode=cluster clusters (values clusters):
+	// each is qualified once and observed from its connector's deliveries
+	// (ADR-331).
+	RemoteClusters []RemoteCluster `json:"remoteClusters,omitempty"`
 }
 
 // Fixed capacity files under HubWorkerDeploymentRoot.

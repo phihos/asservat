@@ -121,13 +121,13 @@ func (s ConnectorIdentityObserver) ObserveConfiguration(ctx context.Context) (Co
 	live, end := context.WithTimeout(ctx, 5*time.Second)
 	defer end()
 	c, e := s.Reader.ReadConnectorIdentityConfiguration(live)
-	if e != nil || !c.Valid(s.Now()) || c.Source.Observation.Profile.Binding != s.Binding || !s.Qualification.Matches(c) || live.Err() != nil || s.Backing != nil && !sameBacking(c.Backing, *s.Backing) {
+	if refused := identityRefusal(e, c, s, live); refused != "" {
 		// Failure fencing is an independently bounded restrictive action and cannot
 		// manufacture a later positive observation or acknowledge a candidate.
 		stop, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer cancel()
 		_ = s.Journal.FenceConnectorIdentity(stop, s.Binding, start)
-		return zero, value.ErrUnavailable
+		return zero, &BootstrapIssueStage{refused, value.ErrUnavailable}
 	}
 	until := identity.Earlier(start.Add(5*time.Second), identity.Earlier(c.Source.Observation.FreshUntil, c.Backing.Policy.ValidUntil))
 	bounded, cancel := context.WithDeadline(live, until)
@@ -148,6 +148,28 @@ func (s ConnectorIdentityObserver) ObserveConfiguration(ctx context.Context) (Co
 		return zero, value.ErrUnavailable
 	}
 	return c.Clone(), nil
+}
+
+// identityRefusal names the first failed check of a read configuration
+// (a fixed word), or "" when it may be staged.
+func identityRefusal(e error, c ConnectorIdentityConfiguration, s ConnectorIdentityObserver, live context.Context) string {
+	switch {
+	case e != nil:
+		return "read"
+	case !c.Source.Valid(s.Now()):
+		return "source"
+	case !c.Valid(s.Now()):
+		return "backing"
+	case c.Source.Observation.Profile.Binding != s.Binding:
+		return "binding"
+	case !s.Qualification.Matches(c):
+		return "qualification"
+	case live.Err() != nil:
+		return "deadline"
+	case s.Backing != nil && !sameBacking(c.Backing, *s.Backing):
+		return "hub-backing"
+	}
+	return ""
 }
 
 func sameBacking(a, b ConnectorIdentityBacking) bool {

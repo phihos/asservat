@@ -46,6 +46,10 @@ type RegionalOffer struct {
 	// Capacity is the ADR-197 regional capacity section. It requires the
 	// executor section.
 	Capacity *RegionalCapacityOffer `json:"capacity,omitempty"`
+	// CapacityKeys are the hub's capacity namespace label keys; a joined
+	// cluster's connector delivers the namespaces carrying any of them
+	// (ADR-331). Only a join Secret's offer names them.
+	CapacityKeys []string `json:"capacityKeys,omitempty"`
 }
 
 // RegionalCapacityOffer is what a region needs to serve the hub-worker's v2

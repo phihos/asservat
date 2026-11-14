@@ -5,14 +5,19 @@
 {{- $mode := .Values.mode }}
 {{- if not (has $mode (list "cluster" "combined")) }}{{ fail "region.enabled requires mode=cluster or mode=combined" }}{{ end }}
 {{- $image := include "asservat.image" . }}
-{{- /* mode=cluster: the console's bootstrap receipt names the cluster and
-  peer. mode=combined: the connector reads clusterID and peerID from the
-  `<name>-ids` Secret, the hub's own cluster and local connector peer. */}}
+{{- /* mode=cluster: the copied join Secret supplies the cluster and peer
+  IDs, the offer, the bootstrap record and (by default) the executor's
+  object-store capabilities as files. mode=combined: the connector reads
+  clusterID and peerID from the `<name>-ids` Secret, the hub's own cluster
+  and local connector peer. */}}
 {{- $bootstrap := $r.bootstrapSecret }}
+{{- $join := $r.joinSecret }}
 {{- if eq $mode "cluster" }}
-{{- if not $bootstrap }}{{ fail "region.bootstrapSecret names the existing Secret with the console-issued bootstrap.json" }}{{ end }}
+{{- if not $join }}{{ fail "region.joinSecret names the hub's join Secret <name>-join-<cluster>, copied into this namespace" }}{{ end }}
+{{- if $bootstrap }}{{ fail "region.bootstrapSecret is for mode=combined; mode=cluster reads bootstrap.json from region.joinSecret" }}{{ end }}
+{{- $bootstrap = $join }}
 {{- else }}
-{{- if or $r.clusterID $r.peerID }}{{ fail "region.clusterID and region.peerID are for mode=cluster; mode=combined uses the generated IDs" }}{{ end }}
+{{- if $join }}{{ fail "region.joinSecret is for mode=cluster" }}{{ end }}
 {{- $bootstrap = $bootstrap | default (printf "%s-region-bootstrap" $n) }}
 {{- end }}
 {{- $account := printf "%s-connector" $n }}
@@ -23,17 +28,8 @@
 {{- $x := $r.executor }}
 {{- $executor := $x.enabled }}
 {{- $cfg := dict "format" "asservat-connector-config/v1" "mode" $mode "namespace" $ns "deployment" $account "serviceAccount" $account "clusterCredential" $credential "imageDigest" (trimPrefix "sha256:" .Values.image.digest) }}
-{{- $offer := "" }}
-{{- if eq $mode "cluster" }}
-{{- $_ := set $cfg "clusterID" (include "asservat.region.uuid" (dict "value" $r.clusterID "field" "region.clusterID")) }}
-{{- $_ := set $cfg "peerID" (include "asservat.region.uuid" (dict "value" $r.peerID "field" "region.peerID")) }}
-{{- $offer = $r.offer | trim }}
-{{- $parsed := fromJson $offer }}
-{{- if or (hasKey $parsed "Error") (ne (get $parsed "format") "asservat-regional-offer/v1") }}{{ fail "region.offer must be the hub's regional-offer.json (mode=cluster)" }}{{ end }}
-{{- $executor = and $executor (hasKey $parsed "owners") (hasKey $parsed "keyService") (hasKey $parsed "workKey") (hasKey $parsed "evidenceStore") }}
-{{- if and $executor (not $x.evidenceSecret) }}{{ fail "region.executor.evidenceSecret is required when the offer names the regional executor" }}{{ end }}
-{{- else }}
-{{- if $r.offer }}{{ fail "region.offer is for mode=cluster; mode=combined reads the hub's offer ConfigMap" }}{{ end }}
+{{- $evidence := $x.evidenceSecret | default $join }}
+{{- if ne $mode "cluster" }}
 {{- $_ := set $cfg "offerConfigMap" ($r.offerConfigMap | default (printf "%s-regional-offer" $n)) }}
 {{- $_ := set $cfg "hub" (dict "federation" ($r.hub.federation | default (printf "https://%s-federation.%s.svc:9446" $n $ns)) "owners" ($r.hub.owners | default (printf "%s-hub-api-native.%s.svc:9444" $n $ns)) "keyService" ($r.hub.keyService | default (printf "https://%s-key-service.%s.svc:9447" $n $ns))) }}
 {{- end }}
@@ -50,7 +46,6 @@
 {{- $_ := set $cfg "collector" (dict "namespace" .Values.collector.namespace "daemonSet" (printf "%s-node" $n) "serviceAccount" (printf "%s-node" $n) "listenerSecret" $nodes "rootConfigMap" (printf "%s-node-connector-ca" $n) "serverName" (printf "%s.%s.svc" $nodes $ns)) }}
 {{- end }}
 {{- $json := toJson $cfg }}
-{{- if $offer }}{{ $json = printf "%s,\"offer\":%s}" (trimSuffix "}" $json) $offer }}{{ end }}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -151,16 +146,24 @@ rules:
     verbs: [get{{ if $executor }}, list, watch{{ end }}]
   - apiGroups: [""]
     resources: [pods]
-    verbs: [get{{ if $executor }}, list{{ end }}]
+    verbs: [get{{ if $executor }}, list{{ end }}{{ if and $executor (eq $mode "cluster") }}, watch{{ end }}]
   - apiGroups: [apps]
     resources: [replicasets]
     verbs: [get]
+  {{- if eq $mode "cluster" }}
+  # ADR-329: the connector delivers this cluster's AccessBindings to the hub
+  # (with namespaces get above for their namespace UIDs).
+  - apiGroups: [asservat.io]
+    resources: [accessbindings]
+    verbs: [get, list, watch]
+  {{- end }}
   {{- if $executor }}
   # ADR-179/230/241/283: target resolution, probe Events, logs, metrics,
-  # capture profiles and Kubernetes packet peers in this cluster.
+  # capture profiles and Kubernetes packet peers in this cluster; in
+  # mode=cluster also the capacity delivery's workload watches (ADR-331).
   - apiGroups: [apps]
     resources: [deployments, statefulsets]
-    verbs: [get]
+    verbs: [get{{ if eq $mode "cluster" }}, list, watch{{ end }}]
   - apiGroups: [""]
     resources: [events]
     verbs: [list]
@@ -348,6 +351,15 @@ spec:
                   path: connector-pod.token
                   audience: asservat-connector-process-enrollment
                   expirationSeconds: 600
+              {{- if eq $mode "cluster" }}
+              # The copied join Secret: the Pod waits until it exists.
+              - secret:
+                  name: {{ $join }}
+                  items:
+                    - { key: clusterID, path: clusterID }
+                    - { key: peerID, path: peerID }
+                    - { key: regional-offer.json, path: regional-offer.json }
+              {{- end }}
               # Read only while the cluster credential Secret is empty.
               - secret:
                   name: {{ $bootstrap }}
@@ -356,7 +368,7 @@ spec:
               {{- if $executor }}
               {{- if eq $mode "cluster" }}
               - secret:
-                  name: {{ $x.evidenceSecret }}
+                  name: {{ $evidence }}
                   items:
                     - { key: evidence-storage.json, path: evidence-storage.json }
                     - { key: history-storage.json, path: history-storage.json }

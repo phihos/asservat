@@ -120,11 +120,15 @@ func (o *hubAPIDownloadControl) publish(ctx context.Context, api kubernetes.Inte
 }
 
 // pathTargets are the clusters with a template-derived download path: the
-// guarded catalog's clusters and, in mode=combined, the hub cluster itself.
+// guarded catalog's clusters, in mode=combined the hub cluster itself and the
+// joined mode=cluster clusters.
 func (in *ownerInputs) pathTargets(catalog publicCatalog) []string {
 	targets := catalogTargets(catalog.catalog)
 	if in.local != nil {
 		targets = append([]string{in.local.ClusterID}, targets...)
+	}
+	for _, v := range in.remoteEntries {
+		targets = append(targets, v.ClusterID)
 	}
 	return targets
 }

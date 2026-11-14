@@ -9,6 +9,7 @@ import (
 	"encoding/json/jsontext"
 	"net/http"
 	"os"
+	"slices"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/jose"
@@ -256,6 +257,9 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	}
 	out.clusters, out.clustersDigest = catalog.source, catalog.digest
 	out.clusterIDs = append([]string{c.ClusterID}, catalogTargets(catalog.catalog)...)
+	for _, v := range in.remoteEntries {
+		out.clusterIDs = append(out.clusterIDs, v.ClusterID)
+	}
 	// admit adds one cluster's connector admission, capability, work-trust
 	// signer and limits.
 	admit := func(v contracts.OwnerPublicCluster, capability *kube.ContextCapabilitySource, trust *kube.APIContextWorkTrustSource) error {
@@ -272,7 +276,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 		if err != nil {
 			return mounts.ErrUnavailable
 		}
-		admissions = append(admissions, mtls.ContextStartConnectorAdmission{Profile: profile, Executor: mtls.ContextStartExecutorPin{NamespaceUID: v.Executor.NamespaceUID, AccountUID: v.Executor.AccountUID, StartupDigest: startup, ImageDigest: image}, Registry: registry})
+		admissions = append(admissions, mtls.ContextStartConnectorAdmission{Profile: profile, Executor: mtls.ContextStartExecutorPin{StartupDigest: startup, ImageDigest: image}, Registry: registry})
 		capabilities[v.ClusterID] = capability
 		if signers[v.ClusterID], err = jose.NewAPIContextWorkSignatures(trust, s.KeyID, key.ForContext, time.Now); err != nil {
 			return mounts.ErrUnavailable
@@ -308,18 +312,29 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	}
 	// mode=combined: the hub admits its own cluster's connector itself; its
 	// capability and work trust are the hub's own settings (no catalog entry).
+	// Joined mode=cluster clusters are admitted the same way: their entries
+	// derive from the stored offer and values, not from the catalog.
+	derived := slices.Clone(in.remoteEntries)
 	if in.local != nil {
-		v := *in.local
+		derived = append([]contracts.OwnerPublicCluster{*in.local}, derived...)
+	}
+	for _, v := range derived {
+		step := "remote-cluster"
+		if v.ClusterID == c.ClusterID {
+			step = "local-cluster"
+		} else if _, dup := capabilities[v.ClusterID]; dup {
+			return nil, &fixedStepError{step + "-duplicate", mounts.ErrUnavailable}
+		}
 		capability, err := kube.NewLocalContextCapabilitySource(observer, out.recovery, v.Connector.SourceUID, v.Settings)
 		if err != nil {
-			return nil, &fixedStepError{"local-cluster-capability", mounts.ErrUnavailable}
+			return nil, &fixedStepError{step + "-capability", mounts.ErrUnavailable}
 		}
 		trust, err := kube.NewLocalAPIContextWorkTrustSource(observer, out.recovery, v.Connector.SourceUID, v.Trust)
 		if err != nil {
-			return nil, &fixedStepError{"local-cluster-trust", mounts.ErrUnavailable}
+			return nil, &fixedStepError{step + "-trust", mounts.ErrUnavailable}
 		}
 		if err = admit(v, capability, trust); err != nil {
-			return nil, &fixedStepError{"local-cluster", err}
+			return nil, &fixedStepError{step, err}
 		}
 	}
 	// The installation-wide ceilings cover every joined cluster's own

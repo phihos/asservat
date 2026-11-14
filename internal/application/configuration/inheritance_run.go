@@ -215,6 +215,10 @@ func (s *bindingRun) inheritance(now time.Time) inheritanceState {
 		// The first acceptance binds the reviewed explicit baseline only.
 		return out
 	}
+	bases, rows := s.journal.Budget(now)
+	// ADR-329: joined clusters' AccessBindings do not depend on the hub
+	// cluster's PermissionSource list.
+	s.remoteBindingBases(now, &out, &bases, &rows)
 	if !s.sourcesComplete {
 		out.SourcesUnavailable = true
 		return out
@@ -229,7 +233,6 @@ func (s *bindingRun) inheritance(now time.Time) inheritanceState {
 			out.Namespaces = s.namespaces.Observation(false)
 		}
 	}
-	bases, rows := s.journal.Budget(now)
 	sources := slices.Clone(s.sources)
 	slices.SortFunc(sources, func(a, b value.Source) int { return cmp.Compare(a.Resource.UID, b.Resource.UID) })
 	remote := slices.Sorted(maps.Keys(s.remote))

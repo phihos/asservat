@@ -35,6 +35,19 @@ type BootstrapService interface {
 	Bootstrap(context.Context, *Region, value.ClusterBootstrapRequest, ed25519.PublicKey) (value.ClusterBootstrapResult, error)
 }
 
+// AccessBindingsService records a connector's AccessBinding delivery for its
+// presented cluster (ADR-329). The Region reads the delivery; the service
+// must attribute it to region.Presented().Profile.ClusterID only.
+type AccessBindingsService interface {
+	AccessBindings(context.Context, *Region) error
+}
+
+// CapacityService records a connector's capacity delivery for its presented
+// cluster (ADR-331), as AccessBindingsService.
+type CapacityService interface {
+	Capacity(context.Context, *Region) error
+}
+
 type Handler struct {
 	presenter clustercredential.Presenter
 	keys      app.EnrollmentProofVerifier
@@ -134,6 +147,18 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			err = ErrChannel // only the observed certificate, never another owner
 		}
 		result.Owner = &owner
+	case PurposeAccessBindings:
+		if sink, ok := h.services.(AccessBindingsService); ok {
+			err = sink.AccessBindings(ctx, region)
+		} else {
+			err = ErrChannel
+		}
+	case PurposeCapacity:
+		if sink, ok := h.services.(CapacityService); ok {
+			err = sink.Capacity(ctx, region)
+		} else {
+			err = ErrChannel
+		}
 	case PurposeRegistration:
 		var registration app.ConnectorLeafRegistration
 		registration, err = h.services.Registration(ctx, region, *opening.Certificate)
@@ -212,7 +237,7 @@ func (h *Handler) admit(ctx context.Context, o Opening, exporter []byte) (value.
 		if o.Certificate == nil || o.Certificate.Binding != o.Request.Process.Binding {
 			return zero, false
 		}
-	case PurposeOwnerCandidates, PurposeRecovery, PurposeOwnerObservationCandidates:
+	case PurposeOwnerCandidates, PurposeRecovery, PurposeOwnerObservationCandidates, PurposeAccessBindings, PurposeCapacity:
 	case PurposeOwnerAuthentication, PurposeOwnerRegistration:
 		if o.Owner == nil || o.Owner.Usage != "server" || o.Owner.Binding.InstallationID != o.Request.Process.Binding.InstallationID {
 			return zero, false
@@ -256,6 +281,9 @@ type Region struct {
 	// slot is the claimed bootstrap slot of a bootstrap conversation; every
 	// source value is checked against it instead of a presentation.
 	slot *value.PeerBinding
+	// delivered marks the conversation's one AccessBinding or capacity
+	// request.
+	delivered bool
 }
 
 // BindBootstrap binds a bootstrap conversation to its claimed slot, once.
@@ -281,10 +309,15 @@ func (r *Region) peer(b value.PeerBinding) bool {
 // ask sends one payload-free request frame and receives its reply under the
 // channel lock. Any failure closes the channel.
 func (r *Region) ask(ctx context.Context, kind string, reply *RegionFrame) error {
+	return r.askFrame(ctx, HubFrame{Kind: kind}, reply)
+}
+
+func (r *Region) askFrame(ctx context.Context, frame HubFrame, reply *RegionFrame) error {
+	kind := frame.Kind
 	if r.closed || ctx == nil {
 		return ErrChannel
 	}
-	if r.conn.Send(HubFrame{Kind: kind}) != nil {
+	if r.conn.Send(frame) != nil {
 		r.closed = true
 		return ErrChannel
 	}
@@ -324,6 +357,58 @@ func (r *Region) ReadConnectorIdentityConfiguration(ctx context.Context) (app.Co
 		return app.ConnectorIdentityConfiguration{}, ErrChannel
 	}
 	return *reply.Configuration, nil
+}
+
+// ReadAccessBindings asks the presenting connector for its cluster's complete
+// AccessBinding LIST (ADR-329), once per conversation, with the hub's stored
+// digest: unchanged reports that the connector's current delivery has it.
+// Only this request raises the conversation's read bound, by the delivery's
+// own byte bound.
+func (r *Region) ReadAccessBindings(ctx context.Context, stored string) (_ contracts.AccessBindingDelivery, unchanged bool, _ error) {
+	r.conn.mu.Lock()
+	defer r.conn.mu.Unlock()
+	if r.slot != nil || r.delivered {
+		return contracts.AccessBindingDelivery{}, false, ErrChannel
+	}
+	r.delivered = true
+	r.conn.limit.n += contracts.AccessBindingDeliveryMaxBytes
+	var reply RegionFrame
+	if err := r.askFrame(ctx, HubFrame{Kind: "access-bindings", Digest: stored}, &reply); err != nil {
+		return contracts.AccessBindingDelivery{}, false, err
+	}
+	if reply.Unchanged && reply.AccessBindings == nil && stored != "" {
+		return contracts.AccessBindingDelivery{}, true, nil
+	}
+	if reply.Unchanged || reply.AccessBindings == nil || reply.Capacity != nil || reply.Source != nil || reply.Configuration != nil || reply.Observation != nil {
+		r.closed = true
+		return contracts.AccessBindingDelivery{}, false, ErrChannel
+	}
+	return *reply.AccessBindings, false, nil
+}
+
+// ReadCapacity asks the presenting connector for its capacity observation
+// (ADR-331) like ReadAccessBindings, raising the read bound by the
+// delivery's own byte bound.
+func (r *Region) ReadCapacity(ctx context.Context, stored string) (_ contracts.CapacityDelivery, unchanged bool, _ error) {
+	r.conn.mu.Lock()
+	defer r.conn.mu.Unlock()
+	if r.slot != nil || r.delivered {
+		return contracts.CapacityDelivery{}, false, ErrChannel
+	}
+	r.delivered = true
+	r.conn.limit.n += contracts.CapacityDeliveryMaxBytes
+	var reply RegionFrame
+	if err := r.askFrame(ctx, HubFrame{Kind: "capacity", Digest: stored}, &reply); err != nil {
+		return contracts.CapacityDelivery{}, false, err
+	}
+	if reply.Unchanged && reply.Capacity == nil && stored != "" {
+		return contracts.CapacityDelivery{}, true, nil
+	}
+	if reply.Unchanged || reply.Capacity == nil || reply.AccessBindings != nil || reply.Source != nil || reply.Configuration != nil || reply.Observation != nil {
+		r.closed = true
+		return contracts.CapacityDelivery{}, false, ErrChannel
+	}
+	return *reply.Capacity, false, nil
 }
 
 func (r *Region) BeginConnectorLifecycle(ctx context.Context, req app.ConnectorLifecycleRequest) (app.ConnectorLifecycleOperation, error) {

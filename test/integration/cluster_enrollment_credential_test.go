@@ -5,11 +5,14 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres"
 	fleetapp "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/domain/artifact"
+	cfg "asservat.local/asservat/internal/domain/configuration"
 	value "asservat.local/asservat/internal/domain/fleet"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -108,5 +111,56 @@ func qualifyClusterEnrollmentCredential(t *testing.T, ctx context.Context, poolF
 	if err = store.Revoke(ctx, profile); err != nil {
 		t.Fatal("revoke", err)
 	}
+	qualifyRemoteAccessBindings(t, ctx, pool, profile)
 	t.Log("ADR-168/193 cluster enrollment credential: bootstrap generation 1 and replay, admission, rotation, replay, fork fence, append-only guard and direct-insert refusal on real PostgreSQL")
+}
+
+// ADR-329: the federation's cluster-credential login stores a connector's
+// AccessBinding delivery; an older delivery never replaces a newer one, and
+// a reader decodes only changed rows.
+func qualifyRemoteAccessBindings(t *testing.T, ctx context.Context, pool *pgxpool.Pool, profile value.ClusterCredentialProfile) {
+	t.Helper()
+	store, err := postgres.NewRemoteAccessBindings(ctx, pool, profile.RootID)
+	if err != nil {
+		t.Fatal("remote access bindings", err)
+	}
+	ns := cfg.NamespaceRef{Name: "payments", UID: "payments-uid"}
+	binding := cfg.Binding{Resource: cfg.Resource{ClusterID: profile.ClusterID, Namespace: ns.Name, NamespaceUID: ns.UID, Kind: "AccessBinding", Name: "readers", UID: "b-1", ResourceVersion: "3", Generation: 1, SpecDigest: artifact.Digest{1}},
+		Scope: cfg.Scope{ClusterID: profile.ClusterID, Namespace: ns}, Effect: "Allow", Subjects: []cfg.Subject{{Kind: "Group", Issuer: "https://id.example.test", ID: "team-a"}}, Roles: []string{"evidence-reader"}}
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	// ADR-329 (revised): the table's trigger notifies the hub-worker.
+	listening, stop := context.WithCancel(ctx)
+	defer stop()
+	changes := postgres.Listen(listening, pool, postgres.RemoteBindingsChannel)
+	select {
+	case <-changes: // the established connection signals once
+	case <-time.After(10 * time.Second):
+		t.Fatal("notification connection not established")
+	}
+	first, second := strings.Repeat("1", 64), strings.Repeat("2", 64)
+	if err = store.StoreRemoteBindings(ctx, cfg.RemoteBindings{ClusterID: profile.ClusterID, ObservedAt: now, Bindings: []cfg.Binding{binding}}, first); err != nil {
+		t.Fatal("store delivery", err)
+	}
+	select {
+	case <-changes:
+	case <-time.After(10 * time.Second):
+		t.Fatal("stored delivery not notified")
+	}
+	if d, err := store.RemoteBindingsDigest(ctx, profile.ClusterID); err != nil || d != first {
+		t.Fatal("stored digest", d, err)
+	}
+	if err = store.StoreRemoteBindings(ctx, cfg.RemoteBindings{ClusterID: profile.ClusterID, ObservedAt: now.Add(-time.Second)}, second); err != nil {
+		t.Fatal("store older delivery", err)
+	}
+	got, err := store.RemoteBindings(ctx)
+	if err != nil || len(got) != 1 || got[0].ClusterID != profile.ClusterID || !got[0].ObservedAt.Equal(now) || len(got[0].Bindings) != 1 || got[0].Bindings[0].Resource.UID != "b-1" {
+		t.Fatal("read delivery", got, err)
+	}
+	later := now.Add(time.Second)
+	if err = store.StoreRemoteBindings(ctx, cfg.RemoteBindings{ClusterID: profile.ClusterID, ObservedAt: later}, second); err != nil {
+		t.Fatal("store newer delivery", err)
+	}
+	if got, err = store.RemoteBindings(ctx); err != nil || len(got) != 1 || !got[0].ObservedAt.Equal(later) || len(got[0].Bindings) != 0 {
+		t.Fatal("newer delivery not read", got, err)
+	}
 }

@@ -16,18 +16,28 @@ data:
     enabled = true
     dir = "/data/filerldb2"
 ---
+{{- $svc := default dict $p.service }}
+{{- $type := default "ClusterIP" $svc.type }}
 apiVersion: v1
 kind: Service
 metadata:
   name: {{ $name }}
   namespace: {{ .Release.Namespace }}
+  {{- with $svc.annotations }}
+  annotations: {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
+  # NodePort or LoadBalancer only when joined clusters write evidence.
+  type: {{ $type }}
   selector:
     asservat.io/objectstore: {{ $name }}
   ports:
     - name: s3-tls
       port: 8333
       targetPort: s3-tls
+      {{- if and (ne $type "ClusterIP") $svc.nodePort }}
+      nodePort: {{ $svc.nodePort }}
+      {{- end }}
 ---
 apiVersion: apps/v1
 kind: StatefulSet

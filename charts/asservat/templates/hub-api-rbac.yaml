@@ -28,13 +28,37 @@ rules:
       - {{ printf "%s-%s" $n . | quote }}
       {{- end }}
     verbs: [get]
-  {{- if include "asservat.hubApi.combined" . }}
-  # The combined-mode connector's offer, written by the hub-api.
+  {{- if include "asservat.hubApi.offer" . }}
+  # The regional offer, written by the hub-api.
   - apiGroups: [""]
     resources: [configmaps]
     resourceNames: [{{ printf "%s-regional-offer" $n | quote }}]
     verbs: [get, update]
-  {{- if .Values.region.enabled }}
+  {{- if .Values.clusters }}
+  # Joined clusters: the hub-api creates each join Secret when it is missing
+  # (create cannot be limited by name), keeps its public values current and
+  # copies the cluster's two regional object-store capabilities into it.
+  - apiGroups: [""]
+    resources: [secrets]
+    verbs: [create]
+  - apiGroups: [""]
+    resources: [secrets]
+    resourceNames:
+      {{- range .Values.clusters }}
+      - {{ printf "%s-join-%s" $n .name | quote }}
+      {{- end }}
+    # watch: the join runner reacts to the Secret's deletion or change.
+    verbs: [get, update, list, watch]
+  - apiGroups: [""]
+    resources: [secrets]
+    resourceNames:
+      {{- range .Values.clusters }}
+      - {{ printf "%s-s3-regional-write-%s" $n .name | quote }}
+      - {{ printf "%s-s3-regional-history-%s" $n .name | quote }}
+      {{- end }}
+    verbs: [get]
+  {{- end }}
+  {{- if and .Values.region.enabled (include "asservat.hubApi.combined" .) }}
   # The combined-mode connector's bootstrap record, written by the hub-api.
   - apiGroups: [""]
     resources: [secrets]

@@ -304,7 +304,7 @@ func (w *hubWorker) runCapacityOnce(ctx context.Context) (err error) {
 		return err
 	}
 	closers = append(closers, accounts.Close)
-	reconciler, err := w.capacityReconciler(startup, q, pools, observer, accounts, digest)
+	reconciler, err := w.capacityReconciler(startup, ctx, q, pools, observer, accounts, digest)
 	if err != nil {
 		return err
 	}
@@ -315,7 +315,8 @@ func (w *hubWorker) runCapacityOnce(ctx context.Context) (err error) {
 	return reconciler.Run(ctx)
 }
 
-func (w *hubWorker) capacityReconciler(ctx context.Context, q app.CapacityQualification, pools map[string]*pgxpool.Pool, observer *kube.PermissionClient, accounts *auditapp.CaptureAccounts, digest artifact.Digest) (*app.CapacityReconciler, error) {
+// run bounds background readers (the joined clusters' observation watch).
+func (w *hubWorker) capacityReconciler(ctx, run context.Context, q app.CapacityQualification, pools map[string]*pgxpool.Pool, observer *kube.PermissionClient, accounts *auditapp.CaptureAccounts, digest artifact.Digest) (*app.CapacityReconciler, error) {
 	c := w.config.Capacity
 	root, installation, cluster := w.ids.PermissionRootID, w.ids.InstallationID, w.ids.ClusterID
 	source, err := kube.NewCapacitySource(observer)
@@ -330,10 +331,19 @@ func (w *hubWorker) capacityReconciler(ctx context.Context, q app.CapacityQualif
 	if err != nil {
 		return nil, err
 	}
-	// Only the hub cluster is observed directly with the worker's account.
-	// Regional clusters (SQL capacity cluster qualifications) are not read:
-	// their v2 observation needs the owner hub-api's channel.
+	// Only the hub cluster is observed directly with the worker's account;
+	// joined mode=cluster clusters from their connectors' deliveries
+	// (ADR-331).
 	protection := platformCapacityProtection{clusterID: cluster, namespaceUID: w.namespace.UID, digest: digest}
+	regionalStore, err := postgres.NewRemoteCapacity(pools["capacity"], root)
+	if err != nil {
+		return nil, err
+	}
+	if len(c.RemoteClusters) != 0 {
+		// The delivered observations stay in memory, reloaded on the table's
+		// change notification (ADR-331); the reconciler's reads never poll SQL.
+		go regionalStore.Watch(run, eventLog(os.Stderr, "capacity remote observations"))
+	}
 	clusters := make([]app.CapacityClusterReaders, 0, len(q.NamespaceGuards))
 	for _, pin := range q.NamespaceGuards {
 		if pin.ClusterID != cluster {
@@ -346,6 +356,14 @@ func (w *hubWorker) capacityReconciler(ctx context.Context, q app.CapacityQualif
 		guard := protection
 		guard.digest, guard.keys = pin.Digest, slices.Clone(pin.Keys)
 		clusters = append(clusters, app.CapacityClusterReaders{ClusterID: cluster, Workloads: workloads, Guard: guard})
+	}
+	regional, err := w.remoteCapacityClusters(ctx, c, pools["capacity"])
+	if err != nil {
+		return nil, err
+	}
+	for _, pin := range regional {
+		reader := app.RemoteCapacityReader{Store: regionalStore, Pin: pin, Now: time.Now}
+		clusters = append(clusters, app.CapacityClusterReaders{ClusterID: pin.ClusterID, Workloads: reader, Guard: reader, Guarded: reader, Pace: regionalCapacityPace})
 	}
 	general, capture := pools["capacity"], pools["capacity-capture"]
 	journal, err := postgres.NewCapacitySourceJournal(ctx, general, root, installation, q.ID, q.Digest)
@@ -379,7 +397,7 @@ func (w *hubWorker) capacityReconciler(ctx context.Context, q app.CapacityQualif
 	return &app.CapacityReconciler{
 		Source: &app.CapacitySourceObserver{RootID: root, InstallationID: installation, QualificationID: q.ID, QualificationDigest: q.Digest, Source: source, Protection: protection, Recovery: journal, Journal: journal, Now: time.Now},
 		Work: &app.CapacityWorkReconciler{Qualification: q, Recovery: journal, Permissions: permissions, Processing: processing, Root: &app.RootBackingCoordinator{Store: rootStore, Capture: rootCapture, Now: time.Now},
-			Enrollment: &app.EnrollmentCoordinator{Store: enroll, Capture: captureEnroll, Accounts: accounts, Now: time.Now}, Bindings: enroll, Now: time.Now},
+			Enrollment: &app.EnrollmentCoordinator{Store: enroll, Capture: captureEnroll, Accounts: accounts, Now: time.Now}, Bindings: enroll, Now: time.Now, Regional: regional},
 		Clusters:     clusters,
 		SourceReport: capacitySourceReporter("capacity source: "), RootReport: capacitySourceReporter("capacity root: "),
 		Demands: demands, DemandReport: capacityDemandReporter(),
@@ -417,4 +435,42 @@ func capacityDemandReporter() func(error, time.Duration, time.Duration, string) 
 		}
 		fmt.Fprintf(os.Stderr, "capacity demand refresh: %s after %s, read left %s [%s]\n", regionalOutcome(err), elapsed.Round(10*time.Millisecond), readLeft, stages)
 	}
+}
+
+// regionalCapacityPace spaces a joined cluster's reconcile loop iterations:
+// its observation changes only with a delivery (every two seconds).
+const regionalCapacityPace = 2 * time.Second
+
+// remoteCapacityClusters qualifies each joined mode=cluster cluster once
+// (write-once SQL rows; a replay is unchanged) with its namespace digest and
+// the hub's capacity keys, and returns the stored regional pins (ADR-331).
+func (w *hubWorker) remoteCapacityClusters(ctx context.Context, c *contracts.HubWorkerCapacity, pool *pgxpool.Pool) ([]app.CapacityNamespaceQualification, error) {
+	if len(c.RemoteClusters) == 0 {
+		return nil, nil
+	}
+	q, err := postgres.NewCapacityClusterQualifications(ctx, pool, w.ids.PermissionRootID)
+	if err != nil {
+		return nil, err
+	}
+	keys := capacityNamespaceKeys(c)
+	for _, r := range c.RemoteClusters {
+		peer, ok := contracts.RemotePeerID(w.ids.InstallationID, r.ClusterID)
+		if !ok || r.ClusterID == w.ids.ClusterID {
+			return nil, errHubWorkerCapacityConfig
+		}
+		if err = q.QualifyCapacityCluster(ctx, r.ClusterID, peer, w.ids.IssuerEpoch, contracts.NamespaceSourceDigest(r.ClusterID, r.Namespace), keys); err != nil {
+			return nil, err
+		}
+	}
+	pins, err := q.ReadCapacityClusterQualifications(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var out []app.CapacityNamespaceQualification
+	for _, p := range pins {
+		if slices.ContainsFunc(c.RemoteClusters, func(r contracts.RemoteCluster) bool { return r.ClusterID == p.ClusterID }) {
+			out = append(out, p)
+		}
+	}
+	return out, nil
 }

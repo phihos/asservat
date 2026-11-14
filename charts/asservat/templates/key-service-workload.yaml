@@ -18,7 +18,11 @@
 {{- range (default list $d.retentionTopologies) }}
 {{- $topologies = append $topologies (dict "targetClusterID" .targetClusterID "name" .name) }}
 {{- end }}
-{{- $_ := set $config "downloads" (dict "retentionTopologies" $topologies) }}
+{{- $downloads := dict "retentionTopologies" $topologies }}
+{{- $remote := list }}
+{{- range (include "asservat.hubApi.clusters" . | fromJsonArray) }}{{ $remote = append $remote .clusterID }}{{ end }}
+{{- with $remote }}{{ $_ := set $downloads "remoteClusters" . }}{{ end }}
+{{- $_ := set $config "downloads" $downloads }}
 {{- $purposes = append $purposes "key-acquisition" }}
 {{- /* Worker configuration, cluster catalog and topologies; catalog slot
   topologies are named by the catalog. No Secret is read through the API. */}}

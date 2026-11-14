@@ -48,8 +48,15 @@ type BindingReconciler struct {
 	// unavailable.
 	Workloads      RemoteWorkloadReader
 	WorkloadGuards WorkloadGuardReader
-	Now            func() time.Time
-	NewID          func() string
+	// RemoteBindings reads the AccessBinding deliveries of workload
+	// clusters joined with mode: cluster (ADR-329). Without it their
+	// AccessBindings grant and deny nothing.
+	RemoteBindings RemoteBindingReader
+	// RemoteBindingChanges signals a changed stored delivery (PostgreSQL
+	// LISTEN/NOTIFY); deliveries are reread only on a signal and at start.
+	RemoteBindingChanges <-chan struct{}
+	Now                  func() time.Time
+	NewID                func() string
 }
 
 // NamespaceGuardReader proves, within its original interval, that one
@@ -89,6 +96,13 @@ type RemoteWorkloadReader interface {
 // WorkloadGuardReader proves a cluster's workload metadata guard (ADR-247).
 type WorkloadGuardReader interface {
 	WorkloadGuard(context.Context, string) (value.NamespaceGuardProof, error)
+}
+
+// RemoteBindingReader returns the latest AccessBinding delivery of each
+// joined workload cluster (ADR-329), attributed by the hub to the
+// delivering connector's authenticated cluster.
+type RemoteBindingReader interface {
+	RemoteBindings(context.Context) ([]value.RemoteBindings, error)
 }
 
 // MaxWorkloadSelections bounds the workload journals the reconciler reads.
@@ -136,6 +150,8 @@ type bindingRun struct {
 	// and workloadGuards the last workload guard proof per cluster.
 	workloads      map[string]*remoteWorkloads
 	workloadGuards map[string]*value.NamespaceGuardProof
+	// remoteBindings is the last valid delivery per joined cluster (ADR-329).
+	remoteBindings map[string]value.RemoteBindings
 }
 
 // refreshWorkloads rereads, like refreshRemote, the workload journals the
@@ -416,6 +432,9 @@ func (s *bindingRun) start(ctx context.Context) error {
 			return reconcileStep("review", err)
 		}
 	}
+	// The joined clusters' stored deliveries, before the first acceptance
+	// (ADR-329): later changes arrive as RemoteBindingChanges.
+	s.refreshRemoteBindings(ctx)
 	if err = s.accept(ctx, false); err != nil {
 		return reconcileStep("accept", err)
 	}
@@ -544,6 +563,13 @@ func (s *bindingRun) consume(ctx context.Context, watch BindingWatch, ticks <-ch
 		case <-ticks:
 			if err := s.refresh(ctx); err != nil && !errors.Is(err, errWatchBehind) {
 				return reconcileStep("refresh", err)
+			}
+		case <-s.r.RemoteBindingChanges:
+			// ADR-329: a stored delivery changed (or the notification
+			// connection was re-established): reread and accept.
+			s.refreshRemoteBindings(ctx)
+			if err := s.accept(ctx, false); err != nil {
+				return reconcileStep("accept", err)
 			}
 		case item := <-s.feedItems():
 			if err := s.namespaceItem(ctx, item); err != nil {

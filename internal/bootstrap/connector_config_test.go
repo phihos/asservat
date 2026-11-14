@@ -50,10 +50,38 @@ func connectorTestOffer(t *testing.T, roots [][]byte) contracts.RegionalOffer {
 		EvidenceStore: &contracts.RegionalEvidenceStore{Endpoint: "https://evidence.synthetic.invalid", Roots: roots, Region: "local", Bucket: "evidence", StoreID: connectorTestID("14")}}
 }
 
-func connectorTestConfig(offer contracts.RegionalOffer) contracts.ConnectorConfig {
-	return contracts.ConnectorConfig{Format: contracts.ConnectorConfigFormat, Mode: contracts.ConnectorModeCluster, ClusterID: connectorTestID("02"), PeerID: connectorTestID("05"), Namespace: "asservat-region",
-		Deployment: "asservat-connector", ServiceAccount: "asservat-connector", ClusterCredential: "asservat-cluster-credential", ImageDigest: strings.Repeat("a", 64), Offer: &offer,
+func connectorTestConfig() contracts.ConnectorConfig {
+	return contracts.ConnectorConfig{Format: contracts.ConnectorConfigFormat, Mode: contracts.ConnectorModeCluster, Namespace: "asservat-region",
+		Deployment: "asservat-connector", ServiceAccount: "asservat-connector", ClusterCredential: "asservat-cluster-credential", ImageDigest: strings.Repeat("a", 64),
 		Executor: &contracts.ConnectorExecutorConfig{CapacityAccount: "asservat-connector-capacity", CapacityAudience: "https://kubernetes.default.svc", Concurrency: 4}}
+}
+
+// writeConnectorJoin writes the cluster-mode join Secret's files (cluster
+// 02, peer 05 and offer) into dir.
+func writeConnectorJoin(t *testing.T, dir string, offer contracts.RegionalOffer) {
+	t.Helper()
+	raw, err := json.Marshal(offer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, v := range map[string][]byte{contracts.ConnectorJoinClusterFile: []byte(connectorTestID("02")), contracts.ConnectorJoinPeerFile: []byte(connectorTestID("05")), contracts.RegionalOfferFile: raw} {
+		if err := os.WriteFile(filepath.Join(dir, name), v, 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+// connectorJoinInputs is a file root holding only the join files.
+func connectorJoinInputs(t *testing.T, offer contracts.RegionalOffer) *providerInputs {
+	t.Helper()
+	dir := t.TempDir()
+	writeConnectorJoin(t, dir, offer)
+	files, err := os.OpenRoot(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = files.Close() })
+	return &providerInputs{files: files}
 }
 
 // The loader accepts exactly one topology's inputs and the Helm-rendered
@@ -61,13 +89,12 @@ func connectorTestConfig(offer contracts.RegionalOffer) contracts.ConnectorConfi
 func TestConnectorConfigIsClosed(t *testing.T) {
 	f, _, l := newRuntimeFixture(t)
 	l.Close()
-	offer := connectorTestOffer(t, [][]byte{f.ca.Raw})
-	if err := validConnectorConfig(connectorTestConfig(offer)); err != nil {
+	_ = f
+	if err := validConnectorConfig(connectorTestConfig()); err != nil {
 		t.Fatal("cluster mode", err)
 	}
-	combined := connectorTestConfig(offer)
-	combined.Mode, combined.Offer, combined.OfferConfigMap = contracts.ConnectorModeCombined, nil, "asservat-regional-offer"
-	combined.ClusterID, combined.PeerID = "", "" // read from the IDs Secret
+	combined := connectorTestConfig()
+	combined.Mode, combined.OfferConfigMap = contracts.ConnectorModeCombined, "asservat-regional-offer"
 	combined.Hub = &contracts.ConnectorHubAddresses{Federation: "https://asservat-federation.asservat.svc:8443", Owners: "asservat-hub-api.asservat.svc:9444", KeyService: "https://asservat-key-service.asservat.svc:8448"}
 	if err := validConnectorConfig(combined); err != nil {
 		t.Fatal("combined mode", err)
@@ -75,10 +102,10 @@ func TestConnectorConfigIsClosed(t *testing.T) {
 	for name, mutate := range map[string]func(*contracts.ConnectorConfig){
 		"format":                    func(c *contracts.ConnectorConfig) { c.Format = "asservat-regional-deployment/v1" },
 		"mode":                      func(c *contracts.ConnectorConfig) { c.Mode = "hub" },
-		"cluster without offer":     func(c *contracts.ConnectorConfig) { c.Offer = nil },
+		"cluster with offer map":    func(c *contracts.ConnectorConfig) { c.OfferConfigMap = "asservat-regional-offer" },
 		"cluster with addresses":    func(c *contracts.ConnectorConfig) { c.Hub = combined.Hub },
-		"cluster ID":                func(c *contracts.ConnectorConfig) { c.ClusterID = "cluster" },
-		"peer ID":                   func(c *contracts.ConnectorConfig) { c.PeerID = "" },
+		"values cluster ID":         func(c *contracts.ConnectorConfig) { c.ClusterID = connectorTestID("02") },
+		"values peer ID":            func(c *contracts.ConnectorConfig) { c.PeerID = connectorTestID("05") },
 		"namespace":                 func(c *contracts.ConnectorConfig) { c.Namespace = "Region" },
 		"credential name":           func(c *contracts.ConnectorConfig) { c.ClusterCredential = "" },
 		"image digest":              func(c *contracts.ConnectorConfig) { c.ImageDigest = "latest" },
@@ -89,7 +116,7 @@ func TestConnectorConfigIsClosed(t *testing.T) {
 			c.Collector = &contracts.RegionalCollector{Namespace: c.Namespace, DaemonSet: "node", ServiceAccount: "node", ListenerSecret: "nodes", RootConfigMap: "nodes", ServerName: "nodes.svc"}
 		},
 	} {
-		c := connectorTestConfig(offer)
+		c := connectorTestConfig()
 		x := *c.Executor
 		c.Executor = &x
 		mutate(&c)
@@ -131,30 +158,40 @@ func TestCombinedOfferMatchesInstallationIDs(t *testing.T) {
 	}
 }
 
-// Combined mode dials the in-cluster addresses but keeps the offer's server
-// names and roots; the binding is the browser receipt's cluster and peer.
+// Cluster mode reads the join Secret's cluster, peer and offer; combined
+// mode dials the in-cluster addresses but keeps the offer's server names and
+// roots.
 func TestResolveConnectorConfigAppliesAddressesAndBinding(t *testing.T) {
 	f, _, l := newRuntimeFixture(t)
 	l.Close()
 	offer := connectorTestOffer(t, [][]byte{f.ca.Raw})
-	c := connectorTestConfig(offer)
-	out, err := resolveRegionalConfig(t.Context(), nil, c)
+	offer.KeyService.ServerName = "asservat-key-service.asservat.svc"
+	c := connectorTestConfig()
+	out, err := resolveRegionalConfig(t.Context(), connectorJoinInputs(t, offer), c)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !out.executor || out.binding.ClusterID != c.ClusterID || out.binding.PeerID != c.PeerID || out.binding.InstallationID != offer.InstallationID || out.binding.IssuerEpoch != offer.IssuerEpoch || out.hub.Endpoint != offer.Federation.Endpoint || out.owners.Address != offer.Owners.Address {
+	if !out.executor || out.ClusterID != connectorTestID("02") || out.binding.ClusterID != connectorTestID("02") || out.binding.PeerID != connectorTestID("05") || out.binding.InstallationID != offer.InstallationID || out.binding.IssuerEpoch != offer.IssuerEpoch ||
+		out.hub.Endpoint != offer.Federation.Endpoint || out.owners.Address != offer.Owners.Address || out.keys.ServerName != "asservat-key-service.asservat.svc" {
 		t.Fatalf("cluster mode resolution %+v", out.binding)
 	}
 	c.Executor = nil
-	if out, err = resolveRegionalConfig(t.Context(), nil, c); err != nil || out.executor {
+	if out, err = resolveRegionalConfig(t.Context(), connectorJoinInputs(t, offer), c); err != nil || out.executor {
 		t.Fatal("executor without config", err)
 	}
-	c = connectorTestConfig(offer)
+	c = connectorTestConfig()
 	plain := offer
 	plain.Owners, plain.KeyService, plain.WorkKey, plain.EvidenceStore = nil, nil, nil, nil
-	c.Offer = &plain
-	if out, err = resolveRegionalConfig(t.Context(), nil, c); err != nil || out.executor {
+	if out, err = resolveRegionalConfig(t.Context(), connectorJoinInputs(t, plain), c); err != nil || out.executor {
 		t.Fatal("plain connector offer", err)
+	}
+	empty, err := os.OpenRoot(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer empty.Close()
+	if _, err = resolveRegionalConfig(t.Context(), &providerInputs{files: empty}, c); err == nil {
+		t.Fatal("cluster mode without the join Secret accepted")
 	}
 	// The combined offer comes from the hub's named ConfigMap in the same
 	// namespace.
@@ -224,13 +261,14 @@ func TestRegionalContextComposesWithoutInstallerInputs(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	writeConnectorJoin(t, dir, offer)
 	files, err := os.OpenRoot(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer files.Close()
 	in := &providerInputs{files: files, kubernetesEndpoint: contracts.OwnerProviderEndpoint{Endpoint: server.URL, Roots: [][]byte{server.Certificate().Raw}}}
-	c, err := resolveRegionalConfig(t.Context(), in, connectorTestConfig(offer))
+	c, err := resolveRegionalConfig(t.Context(), in, connectorTestConfig())
 	if err != nil {
 		t.Fatal(err)
 	}

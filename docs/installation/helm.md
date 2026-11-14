@@ -13,8 +13,9 @@ remove a release. For step-by-step walkthroughs, use one of these:
 them to your own registry. A fresh all-bundled `mode: combined` install passes
 the full journey in `test/integration/helm_native_kind_test.go` on kind:
 Keycloak sign-in, processing initialization, pod-status capture, inspection and
-native download. External providers and separate workload clusters
-(`mode: cluster`) are not qualified with this chart yet. The
+native download, and so does a second workload cluster joined with
+`mode: cluster` (owned kind clusters). External providers are not qualified
+with this chart yet. The
 [implementation ledger](../implementation-progress.md) records actual results.
 
 ## What the chart installs
@@ -106,12 +107,15 @@ The Ingress and HTTPRoute take their host from `origin`, which must then carry
 no port. The chart adds no controller-specific annotations.
 
 The peer listeners stay `ClusterIP` in a single cluster: federation (9446),
-key service (9447) and the hub-api native listener (9444). Only remote regions
-need them reachable, through `hub.federation.service`,
-`hub.key-service.service` and `hub.hub-api.nativeService` of type `NodePort`
-or `LoadBalancer`. Route these as TCP; never terminate their mTLS at an HTTP
-proxy. Their serving certificates come from `hub.<component>.tls.existingSecret`,
-a cert-manager `issuerRef`, or a CA that the `secrets` hook generates once.
+key service (9447) and the hub-api native listener (9444). Only joined
+workload clusters need them, and the evidence object store, reachable (see
+[Join a workload cluster](#join-a-workload-cluster)), through
+`hub.federation.service`, `hub.key-service.service`,
+`hub.hub-api.nativeService` and `services.objectStore.seaweedfs.service` of
+type `NodePort` or `LoadBalancer`. Route these as TCP; never terminate their
+mTLS at an HTTP proxy. Their serving certificates come from
+`hub.<component>.tls.existingSecret`, a cert-manager `issuerRef`, or a CA that
+the `secrets` hook generates once.
 
 ## Install
 
@@ -282,6 +286,7 @@ an older image refuses a newer schema.
 - the CRDs in `crds/`, which Helm never deletes,
 - the PVCs of bundled services,
 - the Secrets created by the `secrets` hook, which carry no Helm ownership,
+- the join Secrets `<name>-join-<cluster>` the hub-api creates,
 - objects marked `helm.sh/resource-policy: keep`: `<name>-regional-offer`,
   `<name>-region-bootstrap`, `<name>-cluster-credential` and the
   `<name>-downloads` namespace.
@@ -303,16 +308,63 @@ explicit step.
 - **`hub`** plus one **`cluster`** release per workload cluster. Bundled
   services require `hub` or `combined`.
 
-A `mode: cluster` release takes `region.clusterID` and `region.peerID` from a
-bootstrap issued in the console (`/fleet`), the hub's `regional-offer.json` as
-`region.offer`, and `region.bootstrapSecret`, a Secret with the bootstrap
-record as `bootstrap.json`. The record is stored in OpenBao KV mount
-`fleet-bootstrap` under `connector/<installationID>/<bootstrapID>`, is valid
-for five minutes and works once. The connector seeds
-`<name>-cluster-credential` from it and then rotates that credential itself.
+### Join a workload cluster
 
-The hub publishes its regional offer only in `mode: combined`, so remote
-regions cannot be completed with this chart yet.
+[ADR-331](../decisions/331-remote-cluster-join.md). Register the cluster in
+the hub's values and expose the four endpoints its connector dials:
+
+```yaml
+clusters:
+  - name: eu                 # DNS label; names the join Secret
+    clusterID: 6f2d...       # a lowercase UUID you choose (uuidgen)
+    # namespace: asservat-system   # its release namespace, default: the hub's
+remote:
+  federation: https://hub.example:9446    # -> <name>-federation:9446
+  owners: hub.example:9444                # -> <name>-hub-api-native:9444
+  keyService: https://hub.example:9447    # -> <name>-key-service:9447
+  objectStore: https://hub.example:8333   # -> the evidence object store
+federation:
+  connector:
+    profiles: 2   # every connector: the combined-mode one plus each cluster
+    accounts: 2
+```
+
+Expose the federation (`hub.federation.service`), key service
+(`hub.key-service.service`), hub-api native listener
+(`hub.hub-api.nativeService`) and, with bundled SeaweedFS, the object store
+(`services.objectStore.seaweedfs.service`) as `LoadBalancer`, `NodePort` or a
+TLS-passthrough route. Connectors verify the in-cluster Service names, so the
+serving certificates need no external name, and no proxy may terminate TLS in
+front of them. `federation.connector` is fixed at the first install: size
+`profiles` for every cluster you will join.
+
+After `helm upgrade` of the hub, the hub-api creates the join Secret
+`<name>-join-<cluster>` in the release namespace. It holds the cluster and
+peer IDs, the offer, the cluster's object-store capabilities
+(`<name>-s3-regional-write-<cluster>`, `-regional-history-<cluster>`, which
+the secrets hook generates with bundled SeaweedFS; create them yourself for
+an external store) and a one-use bootstrap record that is valid for five
+minutes from issuance. Get a fresh record and copy it to the workload
+cluster, then install there:
+
+```sh
+kubectl --context hub -n asservat-system delete secret asservat-join-eu --ignore-not-found
+kubectl --context hub -n asservat-system wait --for=create secret/asservat-join-eu --timeout=60s
+kubectl --context hub -n asservat-system get secret asservat-join-eu -o json \
+  | jq '{apiVersion, kind, type, data, metadata: {name: .metadata.name}}' \
+  | kubectl --context eu -n asservat-system apply -f -
+kubectl --context eu apply --server-side --field-manager=asservat-crd-upgrade -f ./charts/asservat/crds
+helm --kube-context eu upgrade --install asservat ./charts/asservat -n asservat-system \
+  --set mode=cluster --set region.enabled=true --set region.joinSecret=asservat-join-eu \
+  --set image.repository=<hub image> --set image.digest=<hub digest>
+```
+
+The workload cluster runs the hub's image digest; captures there are refused
+while the two differ. The connector seeds `<name>-cluster-credential` from the
+record once and rotates it itself; keep the join Secret, which also carries
+the offer. When the hub's offer changes, the hub-api updates its copy: copy
+it again and restart the connector. A budget policy for the joined cluster
+names its `clusterID` in `scope.clusterID`.
 
 ### Regional connector options
 
@@ -392,16 +444,21 @@ Ordinary Kubernetes RBAC decides who writes them:
   enforces both checks on create and update. Deletion is not checked, as for
   RoleBindings: whoever may delete AccessBindings in a namespace can also
   remove a deny there.
-- The hub cluster's bindings share one bound of 1,024 AccessBindings and
+- Each cluster's bindings share one bound of 1,024 AccessBindings and
   4,096 subject-role rows. A namespace can exhaust it for every namespace;
   limit object counts with a ResourceQuota on
   `count/accessbindings.asservat.io` where teams are not trusted with that.
 - A binding the schema refuses grants and denies nothing; it does not stop the
   others.
 
-AccessBindings in workload clusters joined with `mode: cluster` are not read
-yet: grant access there with PermissionSources (for example
-`kubernetesExec`) until the connectors deliver them. The permission impact
+A workload cluster joined with `mode: cluster` needs no extra step: its
+release renders the same RBAC and policy, and its connector (with
+`get/list/watch accessbindings`) delivers the cluster's bindings to the hub
+whenever they change (a watch, at most once per second). A binding change
+there takes effect at the hub within about a second. If the connector cannot
+reach the hub, its last delivered bindings stay in effect, allows and denies,
+until it delivers again. Each cluster has its own
+1,024-binding and 4,096-row bound. The permission impact
 preview is for fleet operators; teams check a binding with
 `kubectl apply --dry-run=server` and their own access with `explain_access`.
 

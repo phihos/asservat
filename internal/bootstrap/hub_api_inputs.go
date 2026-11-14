@@ -384,6 +384,10 @@ func loadHubAPIInputs(ctx context.Context, files, configRoot, idsRoot, public *o
 	if err != nil {
 		return nil, err
 	}
+	remote, err := hubAPIRemoteClusters(h, ids)
+	if err != nil {
+		return nil, err
+	}
 	var control *hubAPIDownloadControl
 	if workers := c.Public != nil && len(c.Native.WorkerAPIs) == 1; workers || offer != nil {
 		// The evidence store the hub-local download workers read and the
@@ -403,5 +407,12 @@ func loadHubAPIInputs(ctx context.Context, files, configRoot, idsRoot, public *o
 			}
 		}
 	}
-	return &ownerInputs{providerInputs: &providerInputs{files: files, kubernetesEndpoint: c.Kubernetes, postgresEndpoint: c.Postgres}, config: c, offer: offer, downloadControl: control}, nil
+	out := &ownerInputs{providerInputs: &providerInputs{files: files, kubernetesEndpoint: c.Kubernetes, postgresEndpoint: c.Postgres}, config: c, offer: offer, downloadControl: control, release: h.Name, remote: remote}
+	if remote != nil {
+		if !validRemoteAddresses(h.Public.RegionalOffer.Remote) {
+			return nil, hubAPIInputError("remote")
+		}
+		out.remoteConfig = h.Public.RegionalOffer.Remote
+	}
+	return out, nil
 }

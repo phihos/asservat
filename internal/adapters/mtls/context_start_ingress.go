@@ -18,19 +18,20 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 )
 
-// ContextStartExecutorPin is independently installed alongside the regional
-// startup projection. Hello supplies neither this image nor its configuration.
-// The dynamic Pod/API epoch is additionally checked by the regional producer.
+// ContextStartExecutorPin is the hub-derived startup and image digest of a
+// cluster's regional executor (over Helm-known values, ADR-196). Hello
+// supplies neither. The executor's namespace and account UIDs are not pinned
+// (ADR-328: writers of the Asservat namespace are trusted); the dynamic
+// Pod/API epoch is checked by the regional producer.
 type ContextStartExecutorPin struct {
-	NamespaceUID, AccountUID   string
 	StartupDigest, ImageDigest artifact.Digest
 }
 
 func (p ContextStartExecutorPin) valid() bool {
-	return authorization.UUID(p.NamespaceUID) && authorization.UUID(p.AccountUID) && p.StartupDigest != (artifact.Digest{}) && p.ImageDigest != (artifact.Digest{})
+	return p.StartupDigest != (artifact.Digest{}) && p.ImageDigest != (artifact.Digest{})
 }
 func (p ContextStartExecutorPin) matches(e value.APIContextExecutor) bool {
-	return p.valid() && e.Valid() && p.NamespaceUID == e.NamespaceUID && p.AccountUID == e.AccountUID && p.StartupDigest == e.StartupDigest && p.ImageDigest == e.ImageDigest
+	return p.valid() && e.Valid() && p.StartupDigest == e.StartupDigest && p.ImageDigest == e.ImageDigest
 }
 
 // ContextStartConnectorAdmission is constructor-owned protected input, not

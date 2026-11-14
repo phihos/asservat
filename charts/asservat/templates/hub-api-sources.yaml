@@ -50,11 +50,12 @@ metadata:
 data:
   download-environment.json: {{ include "asservat.hubApi.downloadEnvironment" . | quote }}
 {{- end }}
-{{- if and (include "asservat.hubApi.combined" .) .Values.origin }}
+{{- if and (include "asservat.hubApi.offer" .) .Values.origin }}
 ---
 # The hub's regional offer (contracts.RegionalOffer) for the combined-mode
-# connector. hub-api writes regional-offer.json once its provider values
-# exist; Helm only creates the object and keeps it.
+# connector and the joined clusters' join Secrets. hub-api writes
+# regional-offer.json once its provider values exist; Helm only creates the
+# object and keeps it.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -63,7 +64,7 @@ metadata:
   labels: {{ include "asservat.labels" (list . "hub-api") | nindent 4 }}
   annotations:
     helm.sh/resource-policy: keep
-{{- if .Values.region.enabled }}
+{{- if and .Values.region.enabled (include "asservat.hubApi.combined" .) }}
 ---
 # The combined-mode connector's bootstrap record: hub-api writes
 # bootstrap.json for the generated local cluster and peer (the installation's
