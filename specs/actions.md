@@ -19,7 +19,7 @@ Sensitivity and impact are independent. A read-only file can contain a credentia
 | `command` | On trigger | Absolute executable/argv, pod-resolved runtime roots, working directory, limits | Treat as mutating/credential-bearing; approval required; no default shell |
 | `httpDiagnostic` | On trigger | Named preconfigured endpoint, method GET, response bound | May expose pprof/metrics; SSRF-safe endpoint policy, no arbitrary URL |
 | `artifactCollect` | On trigger | Runtime-produced report/core path, readiness condition | Exact allowed path; incomplete files distinguished |
-| `profile` | On trigger | Go pprof CPU/heap/allocs/goroutine/block/mutex, runtime traces, JFR/EventPipe, qualified sampled profiles and the node collector's eBPF CPU sampler for any runtime ([ADR-201](../docs/decisions/201-ebpf-cpu-profiles.md)) | Named source, explicit live-profiling grant, rate/overhead budget; details in [profiles](profiles.md) |
+| `profile` | On trigger | Go pprof CPU/heap/allocs/goroutine/block/mutex, runtime traces, JFR/EventPipe, qualified sampled profiles and the node collector's eBPF CPU sampler for any runtime ([ADR-201](../docs/decisions/201-ebpf-cpu-profiles.md)) | Named endpoint or sampler, rate/overhead budget. A pprof GET that changes no runtime setting is `observe`; forced GC, sampling changes, traces and attaching profilers are intrusive; details in [profiles](profiles.md) |
 
 [Action lifecycles](action-lifecycle.md) define arming, incident saves, manual sessions and the explicit post-trigger-only variants. Mode is independent of sensitivity; an ongoing recorder needs authority and capacity before its first observation.
 
@@ -29,7 +29,7 @@ Sensitivity and impact are independent. A read-only file can contain a credentia
 
 [Capture profiles](capture-profiles.md) compile versioned reusable building blocks into this same recipe model; there is no separate executor or approval path.
 
-A recipe resolves into source arming plus an incident graph. Ongoing sources have no dependsOn edges; incoming dependencies from onTrigger actions wait for their incident snapshots. A recipe MUST be an acyclic graph of at most 16 typed actions with explicit IDs, dependencies, required/optional flags, byte limits, timeouts and impact. Defaults run independent snapshots in parallel, then costly diagnostics; two actions that pause the same process MUST serialize. Never delay all light evidence waiting for a heap dump. Before expensive acquisition, reserve the resources and storage defined in [capacity](capacity.md); grants alone cannot authorize work that lacks safe capacity.
+A recipe resolves into source arming plus an incident graph. Ongoing sources have no dependsOn edges; incoming dependencies from onTrigger actions wait for their incident snapshots. A recipe MUST be an acyclic graph of at most 16 typed actions with explicit IDs, dependencies and required/optional flags. Byte limits and timeouts default from the tables below. Impact is derived from the action kind and its parameters; an authored `impact` may only raise it, never lower it. Defaults run independent snapshots in parallel, then costly diagnostics; two actions that pause the same process MUST serialize. Never delay all light evidence waiting for a heap dump. Before expensive acquisition, reserve the resources and storage defined in [capacity](capacity.md); grants alone cannot authorize work that lacks safe capacity.
 
 Every action MUST end in `Succeeded`, `Partial`, `Skipped`, `Denied`, `TimedOut`, `Failed`, `TargetGone`, `Unsupported` or `Indeterminate`, with reason and timing. Failed optional actions do not discard successful artifacts. A capture MUST distinguish a partial action set from fully successful collection. An intrusive action with unknown execution outcome MUST NOT be retried automatically.
 
@@ -80,7 +80,7 @@ Inspektor Gadget MUST be invoked through a private authenticated integration wit
 
 The default `networkHeaders` profile MUST parse and retain only approved L2/L3/L4 headers. Fixed snaplen does not establish that property. Limit parser depth/extension chains; drop unsupported or ambiguous packets and count them. Preserve original/captured lengths and indicate omitted payload. A raw bounded packet may exist transiently inside the trusted capture process, but MUST NOT enter the retained ring, logs or uploads in networkHeaders mode.
 
-Pre-trigger rings are opt-in per target, bounded by duration and bytes; default 30 seconds and 16 MiB per target, maximum 256 MiB aggregate per node. Rings hold segments in collector memory locked against swapping (mlock) and are never written to disk; expired segments are dropped. At an admitted trigger, preserve the selected window under separate snapshot reservations and encrypt it under artifact keys as it leaves memory (spool/upload) while the authorized source continues. A trigger does not start another recorder. Record actual oldest/newest timestamps, dropped packets, filter generations and sensor gaps. No guarantee of full 30-second coverage if the byte cap was reached.
+Pre-trigger rings are opt-in per target, bounded by duration and bytes; default 30 seconds and 16 MiB per target, maximum 256 MiB aggregate per node by default, sized from the node collector's memory limit. Rings hold segments in collector memory locked against swapping (mlock) and are never written to disk; expired segments are dropped. At an admitted trigger, preserve the selected window under separate snapshot reservations and encrypt it under artifact keys as it leaves memory (spool/upload) while the authorized source continues. A trigger does not start another recorder. Record actual oldest/newest timestamps, dropped packets, filter generations and sensor gaps. No guarantee of full 30-second coverage if the byte cap was reached.
 
 Payload captures require an appropriate grant before the ring is armed, including pre-trigger time. A later grant cannot retroactively authorize a raw ring. TLS plaintext collection/key logging is a separate optional grant and runtime-specific capability. Application TLS remains encrypted in ordinary pcap. Network-header-only inputs cannot yield HTTP bodies or complete Zeek application logs. The distinct httpHeaders profile retains approved structured plain HTTP/1 fields through bounded reassembly. Filter syntax, live Service/workload peers, segment sizing, protocol limits and MCP behavior are normative in [packet capture](packets.md).
 
@@ -112,7 +112,7 @@ Given an unsupported .NET diagnostic port, missing Java attach tools, stripped b
 
 ## Proposed default ceilings
 
-Defaults are starting points to validate, not benchmark results. Administrator ceilings override narrower user values; users cannot raise ceilings through a grant request alone.
+Defaults are starting points to validate, not benchmark results. Administrator ceilings are Helm values that apply on `helm upgrade`; they override user values, and users cannot raise ceilings through a grant request alone.
 
 | Evidence | Default cap | Timeout | Initial administrator maximum |
 | --- | --- | --- | --- |
@@ -120,7 +120,8 @@ Defaults are starting points to validate, not benchmark results. Administrator c
 | Log window | 10 MiB/pod | 10 s | 64 MiB / 60 s |
 | Process/network metadata | 4 MiB | 5 s | 16 MiB / 15 s |
 | Custom stdout + stderr | 4 MiB combined | 10 s | 16 MiB / 60 s |
-| Packet artifact | 64 MiB, 30 s before + 30 s after | 90 s overall | 256 MiB frozen output / 300 s; larger profile needs a contract revision; payload explicitly granted |
+| Packet recording | 256 MiB; policy window 30 s before + 30 s after; manual `duration` 60 s | window or duration + 60 s | 4 GiB / 1 h manual duration, 10 min post-trigger window; payload explicitly granted |
+| Syscall recording | 64 MiB; policy window 30 s before + 10 s after; manual `duration` 60 s | window or duration + 60 s | 1 GiB / 1 h manual duration, 10 min post-trigger window |
 | Native/Rust/Go core | 2 GiB uncompressed input | 30 s | 8 GiB / 120 s |
 | .NET heap/native dump | 2 GiB input | 30 s | 8 GiB / 120 s |
 | JVM/Node heap snapshot | Disabled in default recipes | 30 s when enabled | 4 GiB / 120 s plus memory-headroom gate |
@@ -137,11 +138,11 @@ One fileRead path is applied to each available pod root or selected process, pre
 
 artifactCollect uses confined pinned descriptors and bounded waiting. settleFor only means size/mtime were unchanged, not completeness. Record inode/file generation, before/after stat and readiness basis; require a qualified format parser or trusted producer completion marker before claiming Complete. A file replaced, still growing, or left by a prior process is partial/unattributed until proved otherwise. Never delete application-owned output files as implicit cleanup. httpDiagnostic restricts path/method to its resolved endpoint profile; absolute URLs, query/fragment overrides, redirects and path escapes cannot bypass it.
 
-Per-action WaitingApproval is distinct from Queued/Running. Independently authorized context starts promptly and is not repeated when approval arrives. At the original capture/action deadline, unstarted work becomes Skipped/Denied with ApprovalDeadlineExpired; keep useful results and explain Partial. No silent retarget, deadline extension or Retry for an uncertain start. An explicit new request is required if the incident/process is no longer current.
+Per-action WaitingApproval is distinct from Queued/Running. Independently authorized context starts promptly and is not repeated when approval arrives. A pending approval waits for the approval window (default 1 hour, administrator maximum 24 hours); when it ends undecided, unstarted work becomes Skipped with ApprovalDeadlineExpired; keep useful results and explain Partial. An approved action's own deadline starts at approval. No silent retarget, deadline extension or Retry for an uncertain start. An explicit new request is required if the incident/process is no longer current.
 
 ### SC-ACT-007
 
-Given a shared-process pod and an ad hoc worker dump, when only a PID is supplied or that process restarts, then admission/execution refuses the ambiguous target. Given slow approval and useful logs, the logs remain visible while the dump waits and after it misses its deadline. A stable-size half-written runtime file is not labeled complete.
+Given a shared-process pod and an ad hoc worker dump, when only a PID is supplied or that process restarts, then admission/execution refuses the ambiguous target. Given slow approval and useful logs, the logs remain visible while the dump waits and after its approval window ends undecided. A stable-size half-written runtime file is not labeled complete.
 
 ## REQ-ACT-008 — Reload-safe process selectors and multi-process dumps
 

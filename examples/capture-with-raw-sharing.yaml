@@ -20,7 +20,6 @@ spec:
     name: bounded-live-diagnostics
     digest: 5a5eff2029e270d2ec764af201abcb29dfaa0305071797ffca2ef784a788af43
   reason: Investigate a synthetic ledger stall.
-  grantRef: 00000000-0000-4000-8000-000000000044
   idempotencyKey: manual-ledger-shared-001
   deadline: '2026-10-09T12:05:00Z'
   sharing:

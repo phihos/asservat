@@ -1,13 +1,10 @@
 apiVersion: asservat.io/v1alpha1
 kind: DebugPolicy
 metadata:
-  # Hub-held (ADR-228): in the hub control namespace, like AccessBindings.
   name: checkout-restarts
-  namespace: asservat-system
+  namespace: payments
 spec:
   target:
-    # The workload cluster and the namespace there.
-    cluster: 00000000-0000-4000-8000-000000000001
     namespace: payments
     workloadRef:
       apiVersion: apps/v1
