@@ -52,9 +52,6 @@ identity:
   # Stable identities allowed to run processing initialization.
   # processingOperators:
   #   - { clientID: asservat-console, issuer: https://id.example/realms/org, kind: Group, id: GROUP-ID }
-  # Trusted initial AccessBinding writer envelopes and their browser
-  # permission previewers (stable issuer subject/group IDs).
-  permissionDelegations: []
 
 # Optional operator-declared organizations for privacy inventory reports.
 # Omitted means undeclared; an explicit empty list declares none.
@@ -251,9 +248,10 @@ hub:
     tolerations: []
     # Audience of the projected cluster-observation token (with capacity).
     clusterObservationAudience: asservat-cluster-observation
-    # The permission child always runs: AccessBindings, PermissionSources,
-    # the browser/identity settings projections and, with `retention`, the
-    # hub retention source. Writer envelopes are identity.permissionDelegations.
+    # The permission child always runs: the hub cluster's AccessBindings in
+    # every namespace (written by namespace RBAC, ADR-329), PermissionSources
+    # of the release namespace, the browser/identity settings projections
+    # and, with `retention`, the hub retention source.
     # Capacity, operation audit cleanup and expired context evidence deletion
     # run with `capacity`.
     permission:

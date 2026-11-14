@@ -14,7 +14,7 @@ func installedPolicyArgumentsSpec(cluster, namespace, workload string) map[strin
 
 func installedPolicyArgumentsBinding(original map[string]any) map[string]any {
 	return map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "AccessBinding", "metadata": map[string]any{"name": "policy-argument-automation"}, "spec": map[string]any{
-		"effect": "Allow", "subjects": original["subjects"], "roles": []any{"workload-maintainer", "evidence-owner"}, "scope": original["scope"], "reason": "finite installed policy argument qualification",
+		"effect": "Allow", "subjects": original["subjects"], "roles": []any{"workload-maintainer", "evidence-owner"}, "workloads": original["workloads"], "reason": "finite installed policy argument qualification",
 		"automation": map[string]any{"allowedActions": []any{"syscallTrace"}, "maxLifetimeSeconds": 3600, "maxExecutions": 1, "maxBytes": artifact.RecordingNativeLimit, "maxObservedBytes": 128 << 20, "maxObservedEvents": 10000},
 	}}
 }

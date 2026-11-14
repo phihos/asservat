@@ -40,7 +40,7 @@ import (
 // deliberately keeps key custody synthetic; no production IdP/collector exists.
 func testGuardedReconciliation(t *testing.T, ctx context.Context, c *rest.Config, reader *kube.PermissionClient, guard *kube.PermissionGuard, plan cfg.PermissionAdministration, dsn, s3endpoint, readerToken string) {
 	t.Helper()
-	cluster := plan.Delegations[0].Scope.ClusterID
+	cluster, targetNS := permissionFixtureCluster, permissionFixtureTarget(t, ctx, c)
 	control := plan.ControlNamespace
 	native, err := kubernetes.NewForConfig(c)
 	if err != nil {
@@ -52,10 +52,9 @@ func testGuardedReconciliation(t *testing.T, ctx context.Context, c *rest.Config
 	if err != nil {
 		t.Fatal(err)
 	}
-	targetNS := plan.Delegations[0].Scope.Namespace
 	resource := schema.GroupVersionResource{Group: "asservat.io", Version: "v1alpha1", Resource: "accessbindings"}
-	binding := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "AccessBinding", "metadata": map[string]any{"name": "reconciled-owners", "namespace": control.Name}, "spec": map[string]any{"effect": "Allow", "subjects": []any{map[string]any{"kind": "Group", "issuer": "https://id.example.invalid", "id": "original-owner"}}, "roles": []any{"workload-maintainer"}, "scope": map[string]any{"clusterID": cluster, "namespaceRef": map[string]any{"name": targetNS.Name, "uid": targetNS.UID}}, "reason": "synthetic reconciliation"}}}
-	binding, err = api.Resource(resource).Namespace(control.Name).Create(ctx, binding, meta.CreateOptions{})
+	binding := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "AccessBinding", "metadata": map[string]any{"name": "reconciled-owners", "namespace": targetNS.Name}, "spec": map[string]any{"effect": "Allow", "subjects": []any{map[string]any{"kind": "Group", "issuer": "https://id.example.invalid", "id": "original-owner"}}, "roles": []any{"workload-maintainer"}, "reason": "synthetic reconciliation"}}}
+	binding, err = api.Resource(resource).Namespace(targetNS.Name).Create(ctx, binding, meta.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,7 +74,7 @@ func testGuardedReconciliation(t *testing.T, ctx context.Context, c *rest.Config
 	automationBinding.SetManagedFields(nil)
 	_ = unstructured.SetNestedSlice(automationBinding.Object, []any{map[string]any{"kind": "Group", "issuer": "https://id.example.invalid", "id": "automation-team"}}, "spec", "subjects")
 	_ = unstructured.SetNestedMap(automationBinding.Object, map[string]any{"allowedActions": []any{"logs"}, "maxLifetimeSeconds": int64(3600), "maxExecutions": int64(10), "maxBytes": int64(1000), "maxObservedBytes": int64(0)}, "spec", "automation")
-	automationBinding, err = adminAPI.Resource(resource).Namespace(control.Name).Create(ctx, automationBinding, meta.CreateOptions{})
+	automationBinding, err = adminAPI.Resource(resource).Namespace(targetNS.Name).Create(ctx, automationBinding, meta.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -242,18 +241,18 @@ func testGuardedReconciliation(t *testing.T, ctx context.Context, c *rest.Config
 		current, e := automationReader.PolicyAutomationAuthority(ctx, accepted, target)
 		return e == nil && current.Envelope.MaxBytes == 1000 && authorization.EvaluatePolicy(accepted, current, authorization.PolicyUse{PolicyUID: accepted.PolicyUID, ScopeDigest: accepted.ScopeDigest, Target: target, Purpose: authorization.PolicyIncident}, time.Now()).Eligible
 	})
-	if _, err = api.Resource(resource).Namespace(control.Name).Patch(ctx, binding.GetName(), types.MergePatchType, []byte(`{"metadata":{"labels":{"fixture":"metadata-only"}}}`), meta.PatchOptions{}); err != nil {
+	if _, err = api.Resource(resource).Namespace(targetNS.Name).Patch(ctx, binding.GetName(), types.MergePatchType, []byte(`{"metadata":{"labels":{"fixture":"metadata-only"}}}`), meta.PatchOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	// Both writes complete before waiting for SQL; final-state polling alone would
 	// miss the intermediate owner's retirement.
 	for _, subject := range []string{"temporary-owner", "original-owner"} {
-		live, e := api.Resource(resource).Namespace(control.Name).Get(ctx, binding.GetName(), meta.GetOptions{})
+		live, e := api.Resource(resource).Namespace(targetNS.Name).Get(ctx, binding.GetName(), meta.GetOptions{})
 		if e != nil {
 			t.Fatal(e)
 		}
 		_ = unstructured.SetNestedSlice(live.Object, []any{map[string]any{"kind": "Group", "issuer": "https://id.example.invalid", "id": subject}}, "spec", "subjects")
-		if _, e = api.Resource(resource).Namespace(control.Name).Update(ctx, live, meta.UpdateOptions{}); e != nil {
+		if _, e = api.Resource(resource).Namespace(targetNS.Name).Update(ctx, live, meta.UpdateOptions{}); e != nil {
 			t.Fatal(e)
 		}
 	}

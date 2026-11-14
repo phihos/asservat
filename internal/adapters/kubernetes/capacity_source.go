@@ -53,11 +53,11 @@ func (s *CapacitySource) ReadCapacitySource(ctx context.Context) (port.CapacityS
 		return zero, step("namespace", e)
 	}
 	budget := 8 << 20
-	pRV, pools, pRefs, e := s.client.list(call, "EvidenceStoragePool", "evidencestoragepools", start, &budget)
+	pRV, pools, pRefs, _, e := s.client.list(call, "EvidenceStoragePool", "evidencestoragepools", start, &budget)
 	if e != nil || len(pools) > port.CapacityPoolLimit {
 		return zero, step("pools", e)
 	}
-	bRV, policies, bRefs, e := s.client.list(call, "EvidenceBudgetPolicy", "evidencebudgetpolicies", start, &budget)
+	bRV, policies, bRefs, _, e := s.client.list(call, "EvidenceBudgetPolicy", "evidencebudgetpolicies", start, &budget)
 	if e != nil || len(policies) > port.CapacityPolicyLimit {
 		return zero, step("policies", e)
 	}

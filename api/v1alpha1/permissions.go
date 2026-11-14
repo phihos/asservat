@@ -8,25 +8,19 @@ type Subject struct {
 	Issuer string `json:"issuer"`
 	ID     string `json:"id"`
 }
-type NamespaceRef struct {
-	Name string `json:"name"`
-	UID  string `json:"uid"`
-}
 type WorkloadRef struct {
 	Kind string `json:"kind"`
 	Name string `json:"name"`
 	UID  string `json:"uid"`
 }
-type Scope struct {
-	ClusterID    string        `json:"clusterID"`
-	NamespaceRef NamespaceRef  `json:"namespaceRef"`
-	Workloads    []WorkloadRef `json:"workloads,omitempty"`
-}
+
+// AccessBindingSpec grants within the binding's own namespace (ADR-329):
+// the observing cluster and the namespace UID complete its scope.
 type AccessBindingSpec struct {
 	Effect     string              `json:"effect"`
 	Subjects   []Subject           `json:"subjects"`
 	Roles      []string            `json:"roles"`
-	Scope      Scope               `json:"scope"`
+	Workloads  []WorkloadRef       `json:"workloads,omitempty"`
 	NotAfter   string              `json:"notAfter,omitempty"`
 	Reason     string              `json:"reason"`
 	Automation *AutomationEnvelope `json:"automation,omitempty"`

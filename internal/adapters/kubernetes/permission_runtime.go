@@ -24,13 +24,6 @@ func PermissionAdministrationOf(c contracts.PermissionControlDeployment) cfg.Per
 		return out
 	}
 	p := cfg.PermissionAdministration{Name: c.Guard.Name, ControlNamespace: cfg.NamespaceRef{Name: c.Namespace.Name, UID: c.Namespace.UID}, Administrators: actors(c.Guard.Administrators), StatusUsers: append([]string(nil), c.StatusUsers...)}
-	for _, d := range c.Delegations {
-		scope := cfg.Scope{ClusterID: d.ClusterID, Namespace: cfg.NamespaceRef{Name: d.Namespace.Name, UID: d.Namespace.UID}}
-		for _, w := range d.Workloads {
-			scope.Workloads = append(scope.Workloads, cfg.WorkloadRef{Kind: w.Kind, Name: w.Name, UID: w.UID})
-		}
-		p.Delegations = append(p.Delegations, cfg.PermissionDelegation{Writers: actors(d.Writers), Scope: scope, Roles: append([]string(nil), d.Roles...), Issuers: append([]string(nil), d.Issuers...)})
-	}
 	return p
 }
 

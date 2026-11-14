@@ -40,7 +40,7 @@ import (
 func testInheritedReconciliation(t *testing.T, c *rest.Config, reader *kube.PermissionClient, guard *kube.PermissionGuard, plan cfg.PermissionAdministration, dsn, s3endpoint string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
-	cluster := plan.Delegations[0].Scope.ClusterID
+	cluster := permissionFixtureCluster
 	control := plan.ControlNamespace
 	issuer := "https://id.example.invalid"
 	native, err := kubernetes.NewForConfig(c)
@@ -76,9 +76,9 @@ func testInheritedReconciliation(t *testing.T, c *rest.Config, reader *kube.Perm
 	if source, err = admin.Resource(sources).Namespace(control.Name).Create(ctx, source, meta.CreateOptions{FieldValidation: "Strict"}); err != nil {
 		t.Fatal(err)
 	}
-	explicit := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "AccessBinding", "metadata": map[string]any{"name": "inherit-explicit", "namespace": control.Name},
-		"spec": map[string]any{"effect": "Allow", "subjects": []any{map[string]any{"kind": "Group", "issuer": issuer, "id": "team-explicit"}}, "roles": []any{"evidence-reader"}, "scope": map[string]any{"clusterID": cluster, "namespaceRef": map[string]any{"name": ns.Name, "uid": string(ns.UID)}}, "reason": "synthetic inheritance"}}}
-	if _, err = admin.Resource(bindings).Namespace(control.Name).Create(ctx, explicit, meta.CreateOptions{}); err != nil {
+	explicit := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "AccessBinding", "metadata": map[string]any{"name": "inherit-explicit", "namespace": ns.Name},
+		"spec": map[string]any{"effect": "Allow", "subjects": []any{map[string]any{"kind": "Group", "issuer": issuer, "id": "team-explicit"}}, "roles": []any{"evidence-reader"}, "reason": "synthetic inheritance"}}}
+	if _, err = admin.Resource(bindings).Namespace(ns.Name).Create(ctx, explicit, meta.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	snapshot, err := reader.PermissionSnapshot(ctx)
@@ -269,7 +269,7 @@ func testInheritedReconciliation(t *testing.T, c *rest.Config, reader *kube.Perm
 	_ = unstructured.SetNestedField(deny.Object, "Deny", "spec", "effect")
 	_ = unstructured.SetNestedSlice(deny.Object, []any{map[string]any{"kind": "Group", "issuer": issuer, "id": "team-inherited"}}, "spec", "subjects")
 	_ = unstructured.SetNestedSlice(deny.Object, []any{"workload-maintainer"}, "spec", "roles")
-	if _, err = admin.Resource(bindings).Namespace(control.Name).Create(ctx, deny, meta.CreateOptions{}); err != nil {
+	if _, err = admin.Resource(bindings).Namespace(ns.Name).Create(ctx, deny, meta.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	member := func() authorization.Result {
@@ -282,7 +282,7 @@ func testInheritedReconciliation(t *testing.T, c *rest.Config, reader *kube.Perm
 		return authorization.ScopeEligibility(i, p, authorization.CollectContext, target, now)
 	}
 	wait("explicit deny", func() bool { return member().Reason == "ExplicitDeny" })
-	if err = admin.Resource(bindings).Namespace(control.Name).Delete(ctx, "inherit-deny", meta.DeleteOptions{}); err != nil {
+	if err = admin.Resource(bindings).Namespace(ns.Name).Delete(ctx, "inherit-deny", meta.DeleteOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	wait("deny removal", func() bool { return member().Eligible })
@@ -324,5 +324,5 @@ func testInheritedReconciliation(t *testing.T, c *rest.Config, reader *kube.Perm
 		_ = native.CoreV1().Namespaces().Delete(ctx, name, meta.DeleteOptions{})
 	}
 	_ = admin.Resource(sources).Namespace(control.Name).Delete(ctx, source.GetName(), meta.DeleteOptions{})
-	_ = admin.Resource(bindings).Namespace(control.Name).Delete(ctx, "inherit-explicit", meta.DeleteOptions{})
+	_ = admin.Resource(bindings).Namespace(ns.Name).Delete(ctx, "inherit-explicit", meta.DeleteOptions{})
 }

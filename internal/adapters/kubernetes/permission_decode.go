@@ -156,6 +156,9 @@ type permissionMetadata struct {
 	Generation               int64
 	Deleting                 bool
 	Labels, Annotations      map[string]string
+	// Created is metadata.creationTimestamp (zero when absent); it orders a
+	// binding against its namespace's incarnation (ADR-329).
+	Created time.Time
 }
 
 // Exact map keys avoid encoding/json's case-insensitive field matching for
@@ -201,6 +204,11 @@ func decodeMetadata(b []byte, namespace bool) (permissionMetadata, error) {
 			}
 		}
 	}
+	if raw, exists := fields["creationTimestamp"]; exists && string(raw) != "null" {
+		if json.Unmarshal(raw, &out.Created) != nil {
+			return out, value.ErrUnavailable
+		}
+	}
 	if raw, exists := fields["deletionTimestamp"]; exists && string(raw) != "null" {
 		var stamp time.Time
 		if json.Unmarshal(raw, &stamp) != nil || stamp.IsZero() {
@@ -234,8 +242,11 @@ func (v *permissionValidator) binding(object permissionObject, ref value.Resourc
 		return value.Binding{}, err
 	}
 	ref.SpecDigest = digest
-	b := value.Binding{Resource: ref, Effect: spec.Effect, Roles: spec.Roles, Scope: value.Scope{ClusterID: spec.Scope.ClusterID, Namespace: value.NamespaceRef{Name: spec.Scope.NamespaceRef.Name, UID: spec.Scope.NamespaceRef.UID}}}
-	if !authorization.UUID(b.Scope.ClusterID) || !namespaceRefValid(b.Scope.Namespace) {
+	// ADR-329: the binding grants within its own namespace of the observed
+	// cluster. A proposed spec (preview) has no placement yet; its caller
+	// supplies the scope.
+	b := value.Binding{Resource: ref, Effect: spec.Effect, Roles: spec.Roles, Scope: value.Scope{ClusterID: ref.ClusterID, Namespace: value.NamespaceRef{Name: ref.Namespace, UID: ref.NamespaceUID}}}
+	if ref.ClusterID != "" && (!authorization.UUID(b.Scope.ClusterID) || !namespaceRefValid(b.Scope.Namespace)) {
 		return value.Binding{}, value.ErrUnavailable
 	}
 	for _, s := range spec.Subjects {
@@ -245,7 +256,7 @@ func (v *permissionValidator) binding(object permissionObject, ref value.Resourc
 		b.Subjects = append(b.Subjects, value.Subject{Kind: s.Kind, Issuer: s.Issuer, ID: s.ID})
 	}
 	seen := map[string]bool{}
-	for _, w := range spec.Scope.Workloads {
+	for _, w := range spec.Workloads {
 		if len(validation.IsDNS1123Subdomain(w.Name)) != 0 || !identity.Text(w.UID, 64) || seen[w.UID] {
 			return value.Binding{}, value.ErrUnavailable
 		}
@@ -266,6 +277,19 @@ func (v *permissionValidator) binding(object permissionObject, ref value.Resourc
 		}
 	}
 	return b, nil
+}
+
+// observedBinding decodes an observed binding. A spec that fails validation
+// grants and denies nothing: any namespace writer can store one (ADR-329), so
+// it must not stop the cluster's permission stream. It keeps its identity
+// with the digest of its raw spec, so the journal still sees each change.
+func (v *permissionValidator) observedBinding(object permissionObject, ref value.Resource) value.Binding {
+	b, err := v.binding(object, ref)
+	if err == nil {
+		return b
+	}
+	ref.SpecDigest = artifact.Digest(sha256.Sum256(object.Spec))
+	return value.Binding{Resource: ref, Invalid: true, Scope: value.Scope{ClusterID: ref.ClusterID, Namespace: value.NamespaceRef{Name: ref.Namespace, UID: ref.NamespaceUID}}}
 }
 
 // AccessBindingSpecDecoder decodes a proposed AccessBinding spec with the same

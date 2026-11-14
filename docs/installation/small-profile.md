@@ -170,22 +170,20 @@ the users group maintainer rights on one Deployment:
 ```sh
 NS=my-app
 DEPLOYMENT=my-app
-CLUSTER=$(kubectl -n asservat-system get secret asservat-ids \
-  -o jsonpath='{.data.clusterID}' | base64 -d)
 kubectl label namespace "$NS" asservat-trial=true
-jq -n --arg cluster "$CLUSTER" --arg ns "$NS" \
-  --arg nsUID "$(kubectl get namespace "$NS" -o jsonpath='{.metadata.uid}')" \
-  --arg app "$DEPLOYMENT" \
+jq -n --arg ns "$NS" --arg app "$DEPLOYMENT" \
   --arg appUID "$(kubectl -n "$NS" get deployment "$DEPLOYMENT" -o jsonpath='{.metadata.uid}')" \
   --arg issuer https://login.lab.example.invalid:31451/realms/asservat --arg group "$USERS" \
   '{apiVersion:"asservat.io/v1alpha1",kind:"AccessBinding",
-    metadata:{name:"trial-maintainers",namespace:"asservat-system"},
+    metadata:{name:"trial-maintainers",namespace:$ns},
     spec:{effect:"Allow",subjects:[{kind:"Group",issuer:$issuer,id:$group}],
       roles:["workload-maintainer"],
-      scope:{clusterID:$cluster,namespaceRef:{name:$ns,uid:$nsUID},
-        workloads:[{kind:"Deployment",name:$app,uid:$appUID}]},
+      workloads:[{kind:"Deployment",name:$app,uid:$appUID}],
       reason:"Pod-status trial"}}' | kubectl create -f -
 ```
+
+The AccessBinding lives in the application namespace it grants
+([grant teams access](helm.md#grant-teams-access)).
 
 Open `/captures/new`, choose the cluster and your Deployment, then **Find
 diagnostics**, **Review collection** and **Collect pod status**. Open the

@@ -334,49 +334,76 @@ Log and resource DebugPolicies
 `get pods/log` and `list pods.metrics.k8s.io`; resource policies need the
 metrics API.
 
-## Delegate permission management
+## Grant teams access
 
-`identity.permissionDelegations` lets selected Kubernetes identities write
-AccessBindings within a fixed envelope. The same entry names browser
-identities allowed to preview those changes. The default `[]` delegates
-nothing. See [permission acceptance](../architecture/permission-acceptance.md)
-and the [access preview](../decisions/237-permission-impact-preview.md).
+An AccessBinding lives in the application namespace it grants access to, like
+a RoleBinding ([ADR-329](../decisions/329-accessbindings-in-application-namespaces.md)).
+Its scope is that namespace, optionally narrowed to named workloads; it names
+no cluster or namespace UID. The hub-worker reads the hub cluster's
+AccessBindings in every namespace. Cluster-wide or multi-namespace grants are
+PermissionSources, which administrators keep in the release namespace.
 
 ```yaml
-identity:
-  permissionDelegations:
-    - writers:
-        - kind: Group
-          name: payments-admins
-      clusterID: 10000000-0000-4000-8000-000000000001
-      namespace:
-        name: payments
-        uid: replace-with-the-existing-namespace-uid
-      workloads: []
-      roles: [evidence-reader, workload-maintainer]
-      issuers: [https://identity.example/realms/company]
-      previewers:
-        - issuer: https://identity.example/realms/company
-          kind: Group
-          id: payments-leads-stable-group-id
+apiVersion: asservat.io/v1alpha1
+kind: AccessBinding
+metadata:
+  name: payments-maintainers
+  namespace: payments
+spec:
+  effect: Allow
+  subjects:
+    - kind: Group
+      issuer: https://identity.example/realms/company
+      id: payments-team-stable-group-id
+  roles: [workload-maintainer]
+  # Optional: only these workloads of the namespace.
+  # workloads: [{kind: Deployment, name: api, uid: replace-with-the-uid}]
+  reason: Payments team maintainers
 ```
 
-- `clusterID` and `namespace.uid` are the enrolled cluster ID and the current
-  namespace UID. An empty `workloads` list covers the namespace; otherwise
-  name each `Deployment` or `StatefulSet` with `kind`, `name` and `uid`.
-  Recreating the namespace or workload needs a new envelope.
-- `roles` may contain only `workload-maintainer`, `evidence-reader`,
-  `evidence-owner` and `action-approver`. `issuers` limits which subject
-  issuers a writer may bind.
-- `writers` are Kubernetes usernames or groups (`kind: User` or `Group`); a
-  service account is `system:serviceaccount:NAMESPACE:NAME`. Writers still
-  need ordinary RBAC to write AccessBindings in the hub namespace.
-- `previewers` are stable browser subject or group IDs. They gain no
-  Kubernetes rights.
+Ordinary Kubernetes RBAC decides who writes them:
 
-At most 64 envelopes are accepted, each with at least one writer and one
-previewer. This delegates neither PermissionSource trust nor retention
-administration.
+- The chart aggregates read access into the `view`, `edit` and `admin`
+  ClusterRoles and write access into `admin`, so a namespace administrator
+  manages that namespace's AccessBindings, as with RoleBindings.
+- Like the RoleBinding `bind` check, a writer needs the `bind` verb on the
+  virtual resource `accessroles.asservat.io` named after each role the binding
+  grants (`evidence-reader`, `workload-maintainer`, `evidence-owner`,
+  `action-approver`). `admin` includes it for all four. A narrower writer, for
+  example a GitOps account that may grant only `evidence-reader`, gets a Role
+  like this (`kubectl create role` does not accept the virtual resource):
+
+  ```yaml
+  apiVersion: rbac.authorization.k8s.io/v1
+  kind: Role
+  metadata: {name: asservat-readers, namespace: payments}
+  rules:
+    - {apiGroups: [asservat.io], resources: [accessbindings], verbs: [get, list, create, update, patch, delete]}
+    - {apiGroups: [asservat.io], resources: [accessroles], resourceNames: [evidence-reader], verbs: [bind]}
+  ```
+
+- `spec.automation` (team policy delegation) additionally needs `bind` on
+  `accessroles` named `automation`, which no aggregated role grants. An
+  administrator binds `<release-namespace>-<name>-accessbindings-automation`
+  in each namespace whose team may delegate policies:
+  `kubectl -n payments create rolebinding payments-automation
+  --clusterrole=asservat-system-asservat-accessbindings-automation --group=payments-admins`.
+- The ValidatingAdmissionPolicy `<release-namespace>-<name>-accessbindings`
+  enforces both checks on create and update. Deletion is not checked, as for
+  RoleBindings: whoever may delete AccessBindings in a namespace can also
+  remove a deny there.
+- The hub cluster's bindings share one bound of 1,024 AccessBindings and
+  4,096 subject-role rows. A namespace can exhaust it for every namespace;
+  limit object counts with a ResourceQuota on
+  `count/accessbindings.asservat.io` where teams are not trusted with that.
+- A binding the schema refuses grants and denies nothing; it does not stop the
+  others.
+
+AccessBindings in workload clusters joined with `mode: cluster` are not read
+yet: grant access there with PermissionSources (for example
+`kubernetesExec`) until the connectors deliver them. The permission impact
+preview is for fleet operators; teams check a binding with
+`kubectl apply --dry-run=server` and their own access with `explain_access`.
 
 ## Node collector (test hosts only)
 

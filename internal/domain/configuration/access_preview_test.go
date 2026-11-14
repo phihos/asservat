@@ -39,11 +39,11 @@ func previewBinding(effect, group string, workloads ...string) Binding {
 func runPreview(t *testing.T, changes []AccessChange, cells ...PreviewCell) AccessPreview {
 	t.Helper()
 	now := time.Date(2026, 10, 26, 12, 0, 0, 0, time.UTC)
-	changes, _, err := PreviewChanges(changes, nil)
+	changes, _, err := PreviewChanges(changes)
 	if err != nil {
 		t.Fatal(err)
 	}
-	out, err := PreviewAccess(changes, PreviewSnapshot{Cells: cells}, []string{previewCluster}, nil, previewPolicy, now)
+	out, err := PreviewAccess(changes, PreviewSnapshot{Cells: cells}, []string{previewCluster}, previewPolicy, now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -148,15 +148,15 @@ func TestPreviewBounds(t *testing.T) {
 	for n := range many {
 		many[n] = change
 	}
-	if _, _, err := PreviewChanges(many, nil); !errors.Is(err, ErrLimit) {
+	if _, _, err := PreviewChanges(many); !errors.Is(err, ErrLimit) {
 		t.Fatalf("17 changes: %v", err)
 	}
 	cells := make([]PreviewCell, MaxPreviewTargets+1)
 	for n := range cells {
 		cells[n] = previewCell(now, "wl")
 	}
-	changes, _, _ := PreviewChanges([]AccessChange{change}, nil)
-	if _, err := PreviewAccess(changes, PreviewSnapshot{Cells: cells}, []string{previewCluster}, nil, previewPolicy, now); !errors.Is(err, ErrLimit) {
+	changes, _, _ := PreviewChanges([]AccessChange{change})
+	if _, err := PreviewAccess(changes, PreviewSnapshot{Cells: cells}, []string{previewCluster}, previewPolicy, now); !errors.Is(err, ErrLimit) {
 		t.Fatalf("1,001 targets: %v", err)
 	}
 	for _, bad := range [][]AccessChange{
@@ -165,7 +165,7 @@ func TestPreviewBounds(t *testing.T) {
 		{{Action: "delete", Kind: "AccessBinding", UID: "a"}, {Action: "update", Kind: "AccessBinding", UID: "a", Binding: previewBinding("Allow", "x")}},
 		{{Action: "create", Kind: "AccessBinding", Binding: previewBinding("Allow", "x", OtherWorkloads)}},
 	} {
-		if _, _, err := PreviewChanges(bad, nil); !errors.Is(err, ErrInvalid) {
+		if _, _, err := PreviewChanges(bad); !errors.Is(err, ErrInvalid) {
 			t.Fatalf("%+v: %v", bad, err)
 		}
 	}

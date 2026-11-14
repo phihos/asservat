@@ -25,7 +25,7 @@ const permissionCluster = "11111111-1111-4111-8111-111111111111"
 var permissionControl = value.NamespaceRef{Name: "asservat-system", UID: "control-ns-uid"}
 
 func permissionBinding(index int) map[string]any {
-	return map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "AccessBinding", "metadata": map[string]any{"name": fmt.Sprintf("binding-%d", index), "namespace": permissionControl.Name, "uid": fmt.Sprintf("uid-%d", index), "generation": 1, "resourceVersion": "opaque:item"}, "spec": map[string]any{"effect": "Allow", "subjects": []any{map[string]any{"kind": "Group", "issuer": "https://id.example.invalid", "id": "team-a"}}, "roles": []string{"workload-maintainer"}, "scope": map[string]any{"clusterID": permissionCluster, "namespaceRef": map[string]any{"name": "payments", "uid": "payments-uid"}}, "reason": "synthetic fixture"}, "status": map[string]any{"phase": "Ready", "observedGeneration": 999}}
+	return map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "AccessBinding", "metadata": map[string]any{"name": fmt.Sprintf("binding-%d", index), "namespace": "payments", "uid": fmt.Sprintf("uid-%d", index), "generation": 1, "resourceVersion": "opaque:item", "creationTimestamp": "2026-10-10T11:00:00Z"}, "spec": map[string]any{"effect": "Allow", "subjects": []any{map[string]any{"kind": "Group", "issuer": "https://id.example.invalid", "id": "team-a"}}, "roles": []string{"workload-maintainer"}, "reason": "synthetic fixture"}, "status": map[string]any{"phase": "Ready", "observedGeneration": 999}}
 }
 func permissionSource() map[string]any {
 	return map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "PermissionSource", "metadata": map[string]any{"name": "owners", "namespace": permissionControl.Name, "uid": "source-uid", "generation": 1, "resourceVersion": "opaque:source"}, "spec": map[string]any{"enabled": true, "clusterID": permissionCluster, "type": "namespaceMetadata", "namespaceSelector": map[string]any{"matchLabels": map[string]any{"example.invalid/managed": "true"}}, "excludedNamespaces": []string{"kube-system"}, "role": "evidence-owner", "maxDecisionAgeSeconds": 30, "maxNamespaces": 200, "protection": map[string]any{"mode": "administratorManaged", "reviewRef": "synthetic-review"}, "metadataMapping": map[string]any{"field": "annotation", "key": "example.invalid/owner", "mode": "valueMap", "issuer": "https://id.example.invalid", "values": map[string]any{"payments": []string{"team-a", "team-b"}}}}}
@@ -37,7 +37,7 @@ func permissionList(kind, rv, next string, items ...map[string]any) map[string]a
 	return map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": kind + "List", "metadata": map[string]any{"resourceVersion": rv, "continue": next}, "items": items}
 }
 func permissionNamespace(name, uid string) map[string]any {
-	return map[string]any{"apiVersion": "v1", "kind": "Namespace", "metadata": map[string]any{"name": name, "uid": uid, "resourceVersion": "opaque:ns", "labels": map[string]string{"example.invalid/managed": "true", "unrelated": "MUST-NOT-LEAK"}, "annotations": map[string]string{"example.invalid/owner": "payments", "unrelated": "MUST-NOT-LEAK"}}}
+	return map[string]any{"apiVersion": "v1", "kind": "Namespace", "metadata": map[string]any{"name": name, "uid": uid, "resourceVersion": "opaque:ns", "creationTimestamp": "2026-10-01T00:00:00Z", "labels": map[string]string{"example.invalid/managed": "true", "unrelated": "MUST-NOT-LEAK"}, "annotations": map[string]string{"example.invalid/owner": "payments", "unrelated": "MUST-NOT-LEAK"}}}
 }
 func permissionReply(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
@@ -69,7 +69,7 @@ func newPermissionFixture(t *testing.T, extra func(http.ResponseWriter, *http.Re
 			permissionReply(w, permissionNamespace(permissionControl.Name, permissionControl.UID))
 		case "/api/v1/namespaces/payments":
 			permissionReply(w, permissionNamespace("payments", "payments-uid"))
-		case "/apis/asservat.io/v1alpha1/namespaces/asservat-system/accessbindings":
+		case "/apis/asservat.io/v1alpha1/accessbindings":
 			permissionReply(w, permissionList("AccessBinding", "opaque:bindings", "", permissionBinding(1)))
 		case "/apis/asservat.io/v1alpha1/namespaces/asservat-system/permissionsources":
 			permissionReply(w, permissionList("PermissionSource", "opaque:sources", "", permissionSource()))
@@ -97,8 +97,12 @@ func TestPermissionSnapshotAndMinimizedNamespace(t *testing.T) {
 		t.Fatal("incomplete snapshot")
 	}
 	b := s.Bindings[0]
-	if b.Resource.UID != "uid-1" || b.Resource.Generation != 1 || b.Resource.NamespaceUID != permissionControl.UID || b.Resource.SpecDigest == ([32]byte{}) {
+	if b.Resource.UID != "uid-1" || b.Resource.Generation != 1 || b.Resource.Namespace != "payments" || b.Resource.NamespaceUID != "payments-uid" || b.Resource.SpecDigest == ([32]byte{}) || b.Invalid {
 		t.Fatal("source provenance lost")
+	}
+	// ADR-329: the binding's scope is its own namespace in the observed cluster.
+	if b.Scope.ClusterID != permissionCluster || b.Scope.Namespace != (value.NamespaceRef{Name: "payments", UID: "payments-uid"}) || len(b.Scope.Workloads) != 0 {
+		t.Fatalf("scope %+v", b.Scope)
 	}
 	ns, err := f.client.NamespaceMetadata(context.Background(), value.NamespaceQuery{Namespace: value.NamespaceRef{Name: "payments", UID: "payments-uid"}, LabelKeys: []string{"example.invalid/managed"}, AnnotationKeys: []string{"example.invalid/owner"}})
 	if err != nil {
@@ -143,6 +147,10 @@ func TestPermissionPaginationIsCompleteOrUnavailable(t *testing.T) {
 			f := newPermissionFixture(t, func(w http.ResponseWriter, r *http.Request) bool {
 				if !strings.HasSuffix(r.URL.Path, "/accessbindings") {
 					return false
+				}
+				// A first LIST places the bindings, a second is the snapshot.
+				if r.URL.Query().Get("continue") == "" {
+					calls.Store(0)
 				}
 				page := calls.Add(1)
 				if r.URL.Query().Get("limit") != "64" {
@@ -222,20 +230,12 @@ func TestPermissionPaginationIsCompleteOrUnavailable(t *testing.T) {
 
 func TestPermissionMalformedObjectsAndIdentity(t *testing.T) {
 	cases := map[string]func(map[string]any){
-		"wrong kind":       func(o map[string]any) { o["kind"] = "PermissionSource" },
-		"wrong namespace":  func(o map[string]any) { o["metadata"].(map[string]any)["namespace"] = "other" },
-		"missing uid":      func(o map[string]any) { delete(o["metadata"].(map[string]any), "uid") },
-		"uid alias":        func(o map[string]any) { m := o["metadata"].(map[string]any); m["UID"] = m["uid"]; delete(m, "uid") },
-		"generation zero":  func(o map[string]any) { o["metadata"].(map[string]any)["generation"] = 0 },
-		"effect alias":     func(o map[string]any) { s := o["spec"].(map[string]any); s["Effect"] = "Allow"; delete(s, "effect") },
-		"effect unknown":   func(o map[string]any) { o["spec"].(map[string]any)["effect"] = "Maybe" },
-		"unknown spec key": func(o map[string]any) { o["spec"].(map[string]any)["grantAll"] = true },
-		"empty subjects":   func(o map[string]any) { o["spec"].(map[string]any)["subjects"] = []any{} },
-		"wildcard role":    func(o map[string]any) { o["spec"].(map[string]any)["roles"] = []string{"*"} },
-		"null roles":       func(o map[string]any) { o["spec"].(map[string]any)["roles"] = nil },
-		"invalid scope name": func(o map[string]any) {
-			o["spec"].(map[string]any)["scope"].(map[string]any)["namespaceRef"] = map[string]string{"name": "../other", "uid": "uid"}
-		},
+		"wrong kind":      func(o map[string]any) { o["kind"] = "PermissionSource" },
+		"missing uid":     func(o map[string]any) { delete(o["metadata"].(map[string]any), "uid") },
+		"uid alias":       func(o map[string]any) { m := o["metadata"].(map[string]any); m["UID"] = m["uid"]; delete(m, "uid") },
+		"generation zero": func(o map[string]any) { o["metadata"].(map[string]any)["generation"] = 0 },
+		// ADR-329: a namespace younger than the binding is a later incarnation.
+		"namespace younger": func(o map[string]any) { o["metadata"].(map[string]any)["creationTimestamp"] = "2026-09-01T00:00:00Z" },
 	}
 	for name, mutate := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -252,6 +252,84 @@ func TestPermissionMalformedObjectsAndIdentity(t *testing.T) {
 				t.Fatal("malformed authority accepted")
 			}
 		})
+	}
+}
+
+// ADR-329: any namespace writer can store a binding the schema refuses. It
+// grants and denies nothing and must not stop the cluster's stream.
+func TestPermissionInvalidSpecGrantsNothing(t *testing.T) {
+	cases := map[string]func(map[string]any){
+		"effect alias":     func(o map[string]any) { s := o["spec"].(map[string]any); s["Effect"] = "Allow"; delete(s, "effect") },
+		"effect unknown":   func(o map[string]any) { o["spec"].(map[string]any)["effect"] = "Maybe" },
+		"unknown spec key": func(o map[string]any) { o["spec"].(map[string]any)["grantAll"] = true },
+		"old scope field": func(o map[string]any) {
+			o["spec"].(map[string]any)["scope"] = map[string]any{"clusterID": permissionCluster}
+		},
+		"empty subjects": func(o map[string]any) { o["spec"].(map[string]any)["subjects"] = []any{} },
+		"wildcard role":  func(o map[string]any) { o["spec"].(map[string]any)["roles"] = []string{"*"} },
+		"null roles":     func(o map[string]any) { o["spec"].(map[string]any)["roles"] = nil },
+		"http issuer": func(o map[string]any) {
+			o["spec"].(map[string]any)["subjects"] = []any{map[string]any{"kind": "Group", "issuer": "http://id.example.invalid", "id": "team-a"}}
+		},
+		"invalid workload name": func(o map[string]any) {
+			o["spec"].(map[string]any)["workloads"] = []any{map[string]any{"kind": "Deployment", "name": "../other", "uid": "uid"}}
+		},
+	}
+	for name, mutate := range cases {
+		t.Run(name, func(t *testing.T) {
+			f := newPermissionFixture(t, func(w http.ResponseWriter, r *http.Request) bool {
+				if !strings.HasSuffix(r.URL.Path, "/accessbindings") {
+					return false
+				}
+				o := permissionBinding(1)
+				mutate(o)
+				permissionReply(w, permissionList("AccessBinding", "rv", "", o))
+				return true
+			})
+			s, err := f.client.PermissionSnapshot(context.Background())
+			if err != nil || len(s.Bindings) != 1 || !s.Bindings[0].Invalid || len(s.Bindings[0].Subjects) != 0 || len(s.Bindings[0].Roles) != 0 || s.Bindings[0].Resource.SpecDigest == ([32]byte{}) {
+				t.Fatalf("invalid binding: %v %+v", err, s.Bindings)
+			}
+			target := value.Target{ClusterID: permissionCluster, Namespace: value.NamespaceRef{Name: "payments", UID: "payments-uid"}, Workload: value.WorkloadRef{Kind: "Deployment", Name: "api", UID: "w"}}
+			if p := value.ProposeBinding(s.Bindings[0], target, s.ObservedAt); len(p.Candidates) != 0 {
+				t.Fatal("invalid binding proposed candidates")
+			}
+		})
+	}
+}
+
+// ADR-329: bindings in other namespaces are listed cluster-wide; each
+// namespace UID is read once per binding and remembered.
+func TestPermissionBindingsAcrossNamespaces(t *testing.T) {
+	var reads atomic.Int64
+	f := newPermissionFixture(t, func(w http.ResponseWriter, r *http.Request) bool {
+		switch r.URL.Path {
+		case "/api/v1/namespaces/orders":
+			reads.Add(1)
+			permissionReply(w, permissionNamespace("orders", "orders-uid"))
+			return true
+		case "/apis/asservat.io/v1alpha1/accessbindings":
+			other := permissionBinding(2)
+			other["metadata"].(map[string]any)["namespace"] = "orders"
+			other["metadata"].(map[string]any)["name"] = "binding-1"
+			permissionReply(w, permissionList("AccessBinding", "rv", "", permissionBinding(1), other))
+			return true
+		}
+		return false
+	})
+	for range 2 {
+		s, err := f.client.PermissionSnapshot(context.Background())
+		if err != nil || len(s.Bindings) != 2 {
+			t.Fatal(err)
+		}
+		for _, b := range s.Bindings {
+			if b.Scope.Namespace.Name != b.Resource.Namespace || b.Scope.Namespace.UID != b.Resource.Namespace+"-uid" || b.Scope.ClusterID != permissionCluster {
+				t.Fatalf("scope %+v of %+v", b.Scope, b.Resource)
+			}
+		}
+	}
+	if reads.Load() != 1 {
+		t.Fatalf("namespace read %d times", reads.Load())
 	}
 }
 

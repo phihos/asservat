@@ -9,9 +9,6 @@ type HubWorkerPermission struct {
 	// StatusUsers may write PermissionSource/AccessBinding status (the
 	// reconciler's own account, system:serviceaccount:<ns>:<account>).
 	StatusUsers []string `json:"statusUsers"`
-	// Delegations are product permission configuration: writers who may
-	// author bindings inside one scope for the listed roles and issuers.
-	Delegations []PermissionDelegation `json:"delegations"`
 	// Review names the administrator-created initial review ConfigMap,
 	// needed only when bindings exist at the first acceptance.
 	Review string `json:"review,omitempty"`

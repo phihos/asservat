@@ -81,7 +81,6 @@
 {{- $_ := set $pub $key (index $u $key) -}}
 {{- end -}}
 {{- if or $u.processing .Values.capacity }}{{ $_ := set $pub "processing" true }}{{ end -}}
-{{- with .Values.identity.permissionDelegations }}{{ $_ := set $pub "permissionDelegations" . }}{{ end -}}
 {{- with .Values.captureHistory }}{{ $_ := set $pub "captureHistory" . }}{{ end -}}
 {{- if eq .Values.exposure.tls.mode "proxy" }}{{ $_ := set $pub "proxyTLS" true }}{{ end -}}
 {{- if or .Values.fleet.issuer (include "asservat.hubApi.combined" .) -}}

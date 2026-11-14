@@ -119,72 +119,40 @@
                     "maxItems": 4,
                     "x-kubernetes-list-type": "set"
                   },
-                  "scope": {
-                    "type": "object",
-                    "properties": {
-                      "clusterID": {
-                        "type": "string",
-                        "format": "uuid"
-                      },
-                      "namespaceRef": {
-                        "type": "object",
-                        "properties": {
-                          "name": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 63
-                          },
-                          "uid": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 64
-                          }
-                        },
-                        "required": [
-                          "name",
-                          "uid"
-                        ]
-                      },
-                      "workloads": {
-                        "type": "array",
-                        "items": {
-                          "type": "object",
-                          "properties": {
-                            "kind": {
-                              "type": "string",
-                              "enum": [
-                                "Deployment",
-                                "StatefulSet"
-                              ]
-                            },
-                            "name": {
-                              "type": "string",
-                              "minLength": 1,
-                              "maxLength": 253
-                            },
-                            "uid": {
-                              "type": "string",
-                              "minLength": 1,
-                              "maxLength": 64
-                            }
-                          },
-                          "required": [
-                            "kind",
-                            "name",
-                            "uid"
+                  "workloads": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "Deployment",
+                            "StatefulSet"
                           ]
                         },
-                        "minItems": 1,
-                        "maxItems": 64,
-                        "x-kubernetes-list-type": "map",
-                        "x-kubernetes-list-map-keys": [
-                          "uid"
-                        ]
-                      }
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 253
+                        },
+                        "uid": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 64
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "name",
+                        "uid"
+                      ]
                     },
-                    "required": [
-                      "clusterID",
-                      "namespaceRef"
+                    "minItems": 1,
+                    "maxItems": 64,
+                    "x-kubernetes-list-type": "map",
+                    "x-kubernetes-list-map-keys": [
+                      "uid"
                     ]
                   },
                   "notAfter": {
@@ -263,7 +231,6 @@
                   "effect",
                   "subjects",
                   "roles",
-                  "scope",
                   "reason"
                 ],
                 "x-kubernetes-validations": [

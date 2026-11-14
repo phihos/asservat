@@ -88,32 +88,6 @@
         "uid"
       ]
     },
-    "scope": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "clusterID": {
-          "type": "string",
-          "format": "uuid"
-        },
-        "namespaceRef": {
-          "$ref": "https://asservat.io/spec/v1/permission-common.schema.json#/$defs/namespaceRef"
-        },
-        "workloads": {
-          "type": "array",
-          "items": {
-            "$ref": "https://asservat.io/spec/v1/permission-common.schema.json#/$defs/workloadRef"
-          },
-          "minItems": 1,
-          "maxItems": 64,
-          "uniqueItems": true
-        }
-      },
-      "required": [
-        "clusterID",
-        "namespaceRef"
-      ]
-    },
     "selector": {
       "type": "object",
       "additionalProperties": false,

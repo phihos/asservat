@@ -18,7 +18,8 @@ installation ID in Go, object UIDs are read by name.
 {{- end -}}
 
 {{/* The rendered config.json (contracts.HubWorkerConfig). Children: the
-     configuration child always; permission always (AccessBindings, browser
+     configuration child always; permission always (the hub cluster's
+     AccessBindings in every namespace, ADR-329; browser
      and identity settings projections, needed by a usable console);
      capacity, cleanup and context deletion with `capacity`; the hub
      retention source with `retention`; worker configuration acceptance with
@@ -36,7 +37,6 @@ installation ID in Go, object UIDs are read by name.
 {{- $account := include "asservat.fullname" (list . "hub-worker") -}}
 {{- $permission := dict
   "statusUsers" (default (list (printf "system:serviceaccount:%s:%s" .Release.Namespace $account)) $perm.statusUsers)
-  "delegations" (default list .Values.identity.permissionDelegations)
   "browser" (dict "settings" (printf "%s-browser-settings" $n))
   "identity" (dict "settings" (printf "%s-identity-settings" $n) "issuer" (include "asservat.hubWorker.identityIssuer" .)) -}}
 {{- with $perm.review }}{{ $_ := set $permission "review" . }}{{ end -}}
