@@ -47,8 +47,8 @@ func TestEnrollmentSyntheticFleetObservationBinding(t *testing.T) {
 		}
 		t.Cleanup(func() { _ = tx.Rollback(context.Background()) })
 		id := custodyID()
-		_, err = tx.Exec(ctx, `INSERT INTO public.fleet_trust(installation_id,issuer_epoch,source_uid,source_generation,source_digest,suspended,recovery_blocked,activated_postmaster_at,activated_database_oid,observed_at,fresh_until)
-  VALUES($1,$2,'synthetic-binding-regression',1,decode(repeat('61',32),'hex'),false,false,pg_catalog.pg_postmaster_start_time(),(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()),statement_timestamp(),statement_timestamp()+interval '30 seconds')`, id, custodyID())
+		_, err = tx.Exec(ctx, `INSERT INTO public.fleet_trust(installation_id,issuer_epoch,source_uid,source_generation,source_digest,suspended,activated_postmaster_at,activated_database_oid,observed_at,fresh_until)
+  VALUES($1,$2,'synthetic-binding-regression',1,decode(repeat('61',32),'hex'),false,pg_catalog.pg_postmaster_start_time(),(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()),statement_timestamp(),statement_timestamp()+interval '30 seconds')`, id, custodyID())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -89,8 +89,6 @@ func TestEnrollmentSyntheticFleetObservationBinding(t *testing.T) {
 		{"source-generation", "source_generation=source_generation+1"},
 		{"source-digest", "source_digest=decode(repeat('62',32),'hex')"},
 		{"suspension", "suspended=true"},
-		{"recovery", "recovery_blocked=true"},
-		{"postmaster", "activated_postmaster_at=activated_postmaster_at-interval '1 microsecond'"},
 		{"database", "activated_database_oid=0::oid"},
 	} {
 		t.Run("renew-rejects-"+change.name, func(t *testing.T) {
@@ -138,13 +136,13 @@ func TestEnrollmentSyntheticFleetObservationBinding(t *testing.T) {
 	})
 	t.Run("explicit-reactivation-cannot-be-hidden-in-renewal", func(t *testing.T) {
 		tx, b := setup(t)
-		if _, err := tx.Exec(ctx, "UPDATE fleet_trust SET recovery_blocked=true WHERE installation_id=$1", b.installation); err != nil {
+		if _, err := tx.Exec(ctx, "UPDATE fleet_trust SET suspended=true WHERE installation_id=$1", b.installation); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := replaceSyntheticFleetObservationAfterActivation(ctx, tx, b.installation); err == nil {
 			t.Fatal("replacement cleared recovery")
 		}
-		if _, err := tx.Exec(ctx, "UPDATE fleet_trust SET recovery_blocked=false WHERE installation_id=$1", b.installation); err != nil {
+		if _, err := tx.Exec(ctx, "UPDATE fleet_trust SET suspended=false WHERE installation_id=$1", b.installation); err != nil {
 			t.Fatal(err)
 		}
 		if err := renewSyntheticFleetObservation(ctx, tx, b, 30*time.Second, false); err == nil {

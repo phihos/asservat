@@ -33,7 +33,6 @@ const (
 	ownerReadAuditBinding
 	ownerReadClock
 	ownerReadRecoverySuspended
-	ownerReadRecoveryBlocked
 	ownerReadRecoveryFleetInterval
 	ownerReadRecoveryIdentity
 	ownerReadRecoveryProofInterval
@@ -47,7 +46,7 @@ func (c OwnerConfigurationReadCheck) String() string {
 		"transaction", "share-fleet", "share-owner", "head-source", "head-generation",
 		"revision", "snapshot-decode", "snapshot-binding", "snapshot-suspended",
 		"snapshot-generation", "snapshot-issuer", "audit-decode", "audit-binding",
-		"database-time", "recovery-suspended", "recovery-blocked", "fleet-interval",
+		"database-time", "recovery-suspended", "fleet-interval",
 		"recovery-identity", "recovery-proof-interval", "recovery-other",
 		"owner-configuration", "owner-interval",
 	}
@@ -186,9 +185,6 @@ func (d *ownerConfigurationReadDiagnostic) query(check OwnerConfigurationReadChe
 func ownerReadRecoveryFailure(row custodydb.FleetCurrentTrust, started, now time.Time) ownerConfigurationReadDiagnostic {
 	if row.Suspended {
 		return ownerConfigurationReadDiagnostic{ownerReadRecoverySuspended, ownerReadPredicate}
-	}
-	if row.RecoveryBlocked {
-		return ownerConfigurationReadDiagnostic{ownerReadRecoveryBlocked, ownerReadPredicate}
 	}
 	if !identity.Fresh(row.ObservedAt.Time, row.FreshUntil.Time, now, 30*time.Second) {
 		return ownerConfigurationReadDiagnostic{ownerReadRecoveryFleetInterval, ownerReadIntervalFailure(row.ObservedAt.Time, row.FreshUntil.Time, now, 30*time.Second)}

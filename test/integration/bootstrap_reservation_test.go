@@ -57,7 +57,7 @@ func TestEnrollmentBootstrapReservationsWithRealServices(t *testing.T) {
 		t.Helper()
 		now := time.Now().UTC().Truncate(time.Microsecond)
 		authority := value.EnrollmentAuthority{InstallationID: uuid.NewString(), IssuerEpoch: uuid.NewString(), DeliveryProfile: "operator-channel", Actor: identity.Principal{Issuer: "https://identity.example.test", Subject: "synthetic-operator", ClientID: "console", Kind: identity.Human}, IdentityRevision: identity.Revision{UID: "id-policy", Generation: 1, Digest: [32]byte{1}}, AdministrationRevision: identity.Revision{UID: "fleet-config", Generation: 1, Digest: [32]byte{2}}, CheckedAt: now, ValidUntil: now.Add(5 * time.Second), MaxActiveBootstraps: active, MaxBootstrapHistory: history, MaxClusters: clusters}
-		_, err := admin.Exec(ctx, `INSERT INTO fleet_trust(activated_postmaster_at,activated_database_oid,installation_id,issuer_epoch,source_uid,source_generation,source_digest,suspended,recovery_blocked,observed_at,fresh_until) VALUES(pg_catalog.pg_postmaster_start_time(),(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()),$1,$2,$3,1,$4,false,false,$5,$6)`, authority.InstallationID, authority.IssuerEpoch, authority.AdministrationRevision.UID, authority.AdministrationRevision.Digest[:], now, now.Add(30*time.Second))
+		_, err := admin.Exec(ctx, `INSERT INTO fleet_trust(activated_postmaster_at,activated_database_oid,installation_id,issuer_epoch,source_uid,source_generation,source_digest,suspended,observed_at,fresh_until) VALUES(pg_catalog.pg_postmaster_start_time(),(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()),$1,$2,$3,1,$4,false,$5,$6)`, authority.InstallationID, authority.IssuerEpoch, authority.AdministrationRevision.UID, authority.AdministrationRevision.Digest[:], now, now.Add(30*time.Second))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -201,7 +201,7 @@ func TestEnrollmentBootstrapReservationsWithRealServices(t *testing.T) {
 			case "suspended":
 				sql = "UPDATE fleet_trust SET suspended=true WHERE installation_id=$1"
 			case "recovery":
-				sql = "UPDATE fleet_trust SET recovery_blocked=true WHERE installation_id=$1"
+				sql = "UPDATE fleet_trust SET suspended=true WHERE installation_id=$1"
 			case "epoch":
 				sql = "UPDATE fleet_trust SET issuer_epoch=gen_random_uuid() WHERE installation_id=$1"
 			case "revision":
@@ -326,7 +326,7 @@ func TestEnrollmentBootstrapReservationsWithRealServices(t *testing.T) {
 		if _, err := reservations.ReserveBootstrap(ctx, request); err != nil {
 			t.Fatal(err)
 		}
-		for _, sql := range []string{"UPDATE fleet_bootstrap_intent SET not_after=not_after+interval '1 minute' WHERE installation_id=$1", "DELETE FROM fleet_bootstrap_intent WHERE installation_id=$1", "UPDATE fleet_peer SET enabled=true WHERE installation_id=$1", "UPDATE fleet_trust SET recovery_blocked=false WHERE installation_id=$1", "UPDATE fleet_bootstrap SET revoked=false WHERE installation_id=$1"} {
+		for _, sql := range []string{"UPDATE fleet_bootstrap_intent SET not_after=not_after+interval '1 minute' WHERE installation_id=$1", "DELETE FROM fleet_bootstrap_intent WHERE installation_id=$1", "UPDATE fleet_peer SET enabled=true WHERE installation_id=$1", "UPDATE fleet_trust SET suspended=false WHERE installation_id=$1", "UPDATE fleet_bootstrap SET revoked=false WHERE installation_id=$1"} {
 			if _, err := pool.Exec(ctx, sql, request.Authority.InstallationID); err == nil {
 				t.Fatal("reservation role widened authority")
 			}

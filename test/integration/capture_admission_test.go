@@ -370,13 +370,13 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 	create := func(t *testing.T, slots int64) scenario { return createForTarget(t, slots, nil, artifact.Digest{}) }
 	qualifyHistoryParameters(t, ctx, admin, poolFor, store, keys, create)
 	qualifyContextControlCapacity(t, ctx, admin, capturePool, controlPool, ledger, controlBacking, poolFor, createWithControl)
-	t.Run("recovery-blocks-new-context-admission", func(t *testing.T) {
+	t.Run("suspended-installation-blocks-new-context-admission", func(t *testing.T) {
 		s := create(t, 1)
-		if _, err := admin.Exec(ctx, "UPDATE fleet_trust SET recovery_blocked=true WHERE installation_id=$1", s.recovery.installation); err != nil {
+		if _, err := admin.Exec(ctx, "UPDATE fleet_trust SET suspended=true WHERE installation_id=$1", s.recovery.installation); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := s.s.AdmitContext(ctx, s.a); err == nil {
-			t.Fatal("recovery-blocked installation admitted new capture")
+			t.Fatal("suspended installation admitted new capture")
 		}
 	})
 	t.Run("database-change-invalidates-already-read-recovery-proof", func(t *testing.T) {

@@ -2059,7 +2059,6 @@
 "TestCustodyProfileWriteOnlyWithRealServices": 0,
 "TestCustodyUpgradeSchemaWithRealPostgres": 0,
 "TestCustodyWithRealServices": 0,
-"TestDatabaseRecoveryAfterRestartAndRestore": 0,
 "TestDirectHolderObservationWithRealKubernetes": 0,
 "TestDirectNativeFixtureDiagnosticLabels": 0,
 "TestDirectNativeFixtureWireParity": 0,

@@ -201,7 +201,7 @@ func qualifyProcessingRestrictions(t *testing.T, ctx context.Context, admin *pgx
 	if err = <-done; err == nil {
 		t.Fatal("processing proof survived original catalog deadline after lock wait")
 	}
-	if _, err = admin.Exec(ctx, "UPDATE fleet_trust SET recovery_blocked=true WHERE installation_id=$1", s.recovery.installation); err != nil {
+	if _, err = admin.Exec(ctx, "UPDATE fleet_trust SET suspended=true WHERE installation_id=$1", s.recovery.installation); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = readProof(); err == nil {

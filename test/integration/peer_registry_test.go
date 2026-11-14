@@ -51,18 +51,18 @@ func TestPeerRegistryWithRealServices(t *testing.T) {
 	}
 	defer pool.Close()
 	t.Run("read-role-cannot-mint-authority", func(t *testing.T) {
-		for _, sql := range []string{"UPDATE fleet_peer SET enabled=true", "DELETE FROM fleet_peer_certificate", "UPDATE fleet_trust SET recovery_blocked=false", "UPDATE permission_stream SET suspended=false", "UPDATE context_capture SET state='intent_audited'"} {
+		for _, sql := range []string{"UPDATE fleet_peer SET enabled=true", "DELETE FROM fleet_peer_certificate", "UPDATE fleet_trust SET suspended=false", "UPDATE permission_stream SET suspended=false", "UPDATE context_capture SET state='intent_audited'"} {
 			if _, e := pool.Exec(ctx, sql); e == nil {
 				t.Fatal("read role mutated authority")
 			}
 		}
 	})
-	for _, mode := range []string{"active", "revocation", "root-suspended", "recovery", "database-process-changed", "database-recreated", "epoch", "cluster", "missing-audit", "empty-audit-version", "null-audit-version", "expired-trust", "invalid-trust-revision", "expired-peer", "unknown-certificate", "rotation", "blocked-read"} {
+	for _, mode := range []string{"active", "revocation", "root-suspended", "database-process-changed", "database-recreated", "epoch", "cluster", "missing-audit", "empty-audit-version", "null-audit-version", "expired-trust", "invalid-trust-revision", "expired-peer", "unknown-certificate", "rotation", "blocked-read"} {
 		t.Run(mode, func(t *testing.T) {
 			now := time.Now().UTC().Truncate(time.Microsecond)
 			binding := value.PeerBinding{InstallationID: uuid.NewString(), ClusterID: uuid.NewString(), IssuerEpoch: uuid.NewString(), PeerID: uuid.NewString(), Role: value.ConnectorPeer}
 			cert := value.PeerCertificate{Binding: binding, Digest: artifact.Digest{1}, NotBefore: now, NotAfter: now.Add(time.Hour)}
-			_, err = admin.Exec(ctx, `INSERT INTO fleet_trust(activated_postmaster_at,activated_database_oid,installation_id,issuer_epoch,source_uid,source_generation,source_digest,suspended,recovery_blocked,observed_at,fresh_until) VALUES(pg_catalog.pg_postmaster_start_time(),(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()),$1,$2,'fixture',1,$3,false,false,$4,$5)`, binding.InstallationID, binding.IssuerEpoch, cert.Digest[:], now, now.Add(30*time.Second))
+			_, err = admin.Exec(ctx, `INSERT INTO fleet_trust(activated_postmaster_at,activated_database_oid,installation_id,issuer_epoch,source_uid,source_generation,source_digest,suspended,observed_at,fresh_until) VALUES(pg_catalog.pg_postmaster_start_time(),(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()),$1,$2,'fixture',1,$3,false,$4,$5)`, binding.InstallationID, binding.IssuerEpoch, cert.Digest[:], now, now.Add(30*time.Second))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -97,8 +97,6 @@ func TestPeerRegistryWithRealServices(t *testing.T) {
 				update("UPDATE fleet_peer SET enabled=false,revision=revision+1 WHERE installation_id=$1", binding.InstallationID)
 			case "root-suspended":
 				update("UPDATE fleet_trust SET suspended=true WHERE installation_id=$1", binding.InstallationID)
-			case "recovery":
-				update("UPDATE fleet_trust SET recovery_blocked=true WHERE installation_id=$1", binding.InstallationID)
 			case "database-process-changed":
 				update("UPDATE fleet_trust SET activated_postmaster_at=activated_postmaster_at-interval '1 microsecond' WHERE installation_id=$1", binding.InstallationID)
 			case "database-recreated":

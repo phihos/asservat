@@ -586,7 +586,7 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 					t.Fatal(err)
 				}
 			}
-			if _, err = admin.Exec(ctx, "UPDATE fleet_trust SET recovery_blocked=true WHERE installation_id=$1", f.scenario.recovery.installation); err != nil {
+			if _, err = admin.Exec(ctx, "UPDATE fleet_trust SET suspended=true WHERE installation_id=$1", f.scenario.recovery.installation); err != nil {
 				t.Fatal(err)
 			}
 			if phase == "verification" {

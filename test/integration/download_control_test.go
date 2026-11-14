@@ -320,7 +320,7 @@ func qualifyDownloadControl(t *testing.T, ctx context.Context, admin *pgxpool.Po
 			t.Fatal("blocking status read renewed authority")
 		}
 		a = current()
-		if _, err = admin.Exec(ctx, "UPDATE fleet_trust SET recovery_blocked=true WHERE installation_id=$1", scenario.recovery.installation); err != nil {
+		if _, err = admin.Exec(ctx, "UPDATE fleet_trust SET suspended=true WHERE installation_id=$1", scenario.recovery.installation); err != nil {
 			t.Fatal(err)
 		}
 		if _, err = ledger.ObserveDownload(ctx, session.ID, a, &prep); err == nil {

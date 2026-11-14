@@ -90,8 +90,6 @@ The [original brief](research/original-brief.md) is preserved verbatim for prove
 
 `make custody-integration` creates owned PostgreSQL/S3 fixtures for storage-accounting races and verified version/multipart cleanup. `make sql-tools` installs pinned development tools; `make sql-check` detects generated query drift. Set `TMPDIR` to a filesystem with adequate space when building Go; on this workstation use `/home/phil/.cache/asservat-build/tmp`.
 
-`make database-recovery-integration` upgrades an enabled synthetic legacy root, restarts its owned PostgreSQL container, and restores a logical backup into a new database. Product authority readers must reject each unaccepted incarnation. Independent activation is fixture-only; this does not qualify production disaster recovery.
-
 `make context-integration` also verifies the complete pod-status artifact through Kubernetes, OpenBao, S3 and PostgreSQL in one fixture. `make manifest-schema-check`, included in `go-check`, rejects drift between canonical and embedded schemas. These checks do not provide end-user authority or publish evidence.
 
 `make permission-integration` creates and removes its own Kind cluster for permission observation/RBAC tests. Its permissive test CRDs are not production installation manifests. `make permission-schema-check`, included in `go-check`, validates the reader's embedded schema bundle.

@@ -118,7 +118,7 @@ func TestEnrollmentBootstrapIssuanceWithRealServices(t *testing.T) {
 		t.Helper()
 		now := time.Now().UTC().Truncate(time.Microsecond)
 		a := value.EnrollmentAuthority{InstallationID: uuid.NewString(), IssuerEpoch: uuid.NewString(), DeliveryProfile: "operator-channel", Actor: identity.Principal{Issuer: "https://identity.example.test", Subject: "synthetic-operator", ClientID: "console", Kind: identity.Human}, IdentityRevision: identity.Revision{UID: "identity-policy", Generation: 1, Digest: artifact.Digest{1}}, AdministrationRevision: identity.Revision{UID: "fleet-policy", Generation: 1, Digest: artifact.Digest{2}}, CheckedAt: now, ValidUntil: now.Add(5 * time.Second), MaxActiveBootstraps: 8, MaxBootstrapHistory: 16, MaxClusters: 16}
-		if _, err := admin.Exec(ctx, `INSERT INTO fleet_trust(activated_postmaster_at,activated_database_oid,installation_id,issuer_epoch,source_uid,source_generation,source_digest,suspended,recovery_blocked,observed_at,fresh_until) VALUES(pg_catalog.pg_postmaster_start_time(),(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()),$1,$2,$3,1,$4,false,false,$5,$6)`, a.InstallationID, a.IssuerEpoch, a.AdministrationRevision.UID, a.AdministrationRevision.Digest[:], now, now.Add(30*time.Second)); err != nil {
+		if _, err := admin.Exec(ctx, `INSERT INTO fleet_trust(activated_postmaster_at,activated_database_oid,installation_id,issuer_epoch,source_uid,source_generation,source_digest,suspended,observed_at,fresh_until) VALUES(pg_catalog.pg_postmaster_start_time(),(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()),$1,$2,$3,1,$4,false,$5,$6)`, a.InstallationID, a.IssuerEpoch, a.AdministrationRevision.UID, a.AdministrationRevision.Digest[:], now, now.Add(30*time.Second)); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := seedSyntheticFleetObservation(ctx, admin, a.InstallationID); err != nil {
@@ -338,7 +338,7 @@ func TestEnrollmentBootstrapIssuanceWithRealServices(t *testing.T) {
 			case "suspended":
 				sql = "UPDATE fleet_trust SET suspended=true WHERE installation_id=$1"
 			case "recovery":
-				sql = "UPDATE fleet_trust SET recovery_blocked=true WHERE installation_id=$1"
+				sql = "UPDATE fleet_trust SET suspended=true WHERE installation_id=$1"
 			case "epoch":
 				sql = "UPDATE fleet_trust SET issuer_epoch=gen_random_uuid() WHERE installation_id=$1"
 			case "revision":
@@ -421,7 +421,7 @@ func TestEnrollmentBootstrapIssuanceWithRealServices(t *testing.T) {
 			t.Fatal("issued state reset")
 		}
 		for _, p := range []*pgxpool.Pool{reservePool, recordPool, auditPool, activatePool} {
-			for _, sql := range []string{"UPDATE fleet_trust SET recovery_blocked=false WHERE installation_id=$1", "UPDATE fleet_bootstrap SET revoked=false WHERE installation_id=$1", "DELETE FROM fleet_bootstrap_intent WHERE installation_id=$1", "UPDATE fleet_peer SET enabled=true WHERE installation_id=$1"} {
+			for _, sql := range []string{"UPDATE fleet_trust SET suspended=false WHERE installation_id=$1", "UPDATE fleet_bootstrap SET revoked=false WHERE installation_id=$1", "DELETE FROM fleet_bootstrap_intent WHERE installation_id=$1", "UPDATE fleet_peer SET enabled=true WHERE installation_id=$1"} {
 				if _, err = p.Exec(ctx, sql, s.request.Authority.InstallationID); err == nil {
 					t.Fatal("purpose role widened authority")
 				}

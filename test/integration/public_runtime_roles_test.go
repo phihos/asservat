@@ -176,7 +176,7 @@ func qualifyPublicRuntimeRoles(t *testing.T, ctx context.Context, admin *pgxpool
 	// Match the production configuration observer's column-scoped recovery-lock
 	// permission. SELECT FOR UPDATE on the view requires this even though the
 	// observation never changes installation identity or recovery authority.
-	if _, e := admin.Exec(ctx, "CREATE ROLE "+qname+" LOGIN PASSWORD 'synthetic-observer'; GRANT USAGE ON SCHEMA public TO "+qname+"; GRANT SELECT ON goose_db_version,fleet_trust,fleet_current_trust TO "+qname+"; GRANT UPDATE(installation_id) ON fleet_current_trust TO "+qname+"; GRANT EXECUTE ON FUNCTION observe_fleet_administration(uuid,bigint,timestamptz,oid,timestamptz,uuid,text,bigint,bytea,boolean,timestamptz,timestamptz),fence_fleet_observation(uuid,bigint,timestamptz,oid,timestamptz),reactivate_restarted_database(uuid) TO "+qname); e != nil {
+	if _, e := admin.Exec(ctx, "CREATE ROLE "+qname+" LOGIN PASSWORD 'synthetic-observer'; GRANT USAGE ON SCHEMA public TO "+qname+"; GRANT SELECT ON goose_db_version,fleet_trust,fleet_current_trust TO "+qname+"; GRANT UPDATE(installation_id) ON fleet_current_trust TO "+qname+"; GRANT EXECUTE ON FUNCTION observe_fleet_administration(uuid,bigint,timestamptz,oid,timestamptz,uuid,text,bigint,bytea,boolean,timestamptz,timestamptz),fence_fleet_observation(uuid,bigint,timestamptz,oid,timestamptz) TO "+qname); e != nil {
 		t.Fatal(e)
 	}
 	observerConfig, e := pgxpool.ParseConfig("")
@@ -226,7 +226,7 @@ func qualifyPublicRuntimeRoles(t *testing.T, ctx context.Context, admin *pgxpool
 	}
 	refresh()
 	for _, query := range []string{
-		"UPDATE fleet_trust SET recovery_blocked=false WHERE installation_id=$1",
+		"UPDATE fleet_trust SET suspended=false WHERE installation_id=$1",
 		"UPDATE fleet_current_trust SET issuer_epoch=issuer_epoch WHERE installation_id=$1",
 	} {
 		if _, e := observerPool.Exec(ctx, query, scope.InstallationID); e == nil {
@@ -287,7 +287,7 @@ func qualifyPublicRuntimeRoles(t *testing.T, ctx context.Context, admin *pgxpool
 			t.Fatal(e)
 		}
 		defer blocker.Rollback(context.Background())
-		if _, e = blocker.Exec(ctx, "UPDATE fleet_trust SET recovery_blocked=true WHERE installation_id=$1", scope.InstallationID); e != nil {
+		if _, e = blocker.Exec(ctx, "UPDATE fleet_trust SET suspended=true WHERE installation_id=$1", scope.InstallationID); e != nil {
 			t.Fatal(e)
 		}
 		claimed := make(chan struct{})
@@ -381,7 +381,7 @@ func qualifyPublicRuntimeRoles(t *testing.T, ctx context.Context, admin *pgxpool
 		if e != nil {
 			t.Fatal("runtime SCRAM authentication", e)
 		}
-		for _, statement := range []string{"UPDATE public.fleet_trust SET recovery_blocked=false", "INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')", "CREATE TABLE public.forbidden_public_runtime(id int)"} {
+		for _, statement := range []string{"UPDATE public.fleet_trust SET suspended=false", "INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')", "CREATE TABLE public.forbidden_public_runtime(id int)"} {
 			_, e = conn.Exec(ctx, statement)
 			var denied *pgconn.PgError
 			if !errors.As(e, &denied) || denied.Code != "42501" {
@@ -484,9 +484,9 @@ func qualifyPublicRuntimeRoles(t *testing.T, ctx context.Context, admin *pgxpool
 		// the installed API execution lock privilege after removing this fault.
 		{"direct-extra", "GRANT UPDATE ON public.custody_pool TO " + pgx.Identifier{firstName}.Sanitize(), "REVOKE UPDATE ON public.custody_pool FROM " + pgx.Identifier{firstName}.Sanitize() + "; GRANT UPDATE(id) ON public.custody_pool TO " + pgx.Identifier{firstName}.Sanitize()},
 		{"public-table", "GRANT SELECT ON public.custody_pool TO PUBLIC", "REVOKE SELECT ON public.custody_pool FROM PUBLIC"},
-		{"public-column", "GRANT UPDATE(recovery_blocked) ON public.fleet_trust TO PUBLIC", "REVOKE UPDATE(recovery_blocked) ON public.fleet_trust FROM PUBLIC"},
+		{"public-column", "GRANT UPDATE(suspended) ON public.fleet_trust TO PUBLIC", "REVOKE UPDATE(suspended) ON public.fleet_trust FROM PUBLIC"},
 		{"public-schema", "GRANT CREATE ON SCHEMA public TO PUBLIC", "REVOKE CREATE ON SCHEMA public FROM PUBLIC"},
-		{"public-definer", "CREATE FUNCTION public.public_role_escape() RETURNS void LANGUAGE sql SECURITY DEFINER AS 'UPDATE public.fleet_trust SET recovery_blocked=false'", "DROP FUNCTION public.public_role_escape()"},
+		{"public-definer", "CREATE FUNCTION public.public_role_escape() RETURNS void LANGUAGE sql SECURITY DEFINER AS 'UPDATE public.fleet_trust SET suspended=false'", "DROP FUNCTION public.public_role_escape()"},
 		{"direct-default", "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO " + pgx.Identifier{firstName}.Sanitize(), "ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE SELECT ON TABLES FROM " + pgx.Identifier{firstName}.Sanitize()},
 		{"public-default", "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO PUBLIC", "ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE SELECT ON TABLES FROM PUBLIC"},
 		{"type-owner", "CREATE TYPE public.public_role_owned_type AS ENUM ('fixed'); ALTER TYPE public.public_role_owned_type OWNER TO " + pgx.Identifier{firstName}.Sanitize(), "DROP TYPE public.public_role_owned_type"},
@@ -535,7 +535,7 @@ func qualifyPublicRuntimeRoles(t *testing.T, ctx context.Context, admin *pgxpool
 	if _, e = provisionCurrent(); e != nil {
 		t.Fatal("original exact roles unavailable after fault removal", e)
 	}
-	if _, e = admin.Exec(ctx, "UPDATE fleet_trust SET recovery_blocked=true WHERE installation_id=$1", scope.InstallationID); e != nil {
+	if _, e = admin.Exec(ctx, "UPDATE fleet_trust SET suspended=true WHERE installation_id=$1", scope.InstallationID); e != nil {
 		t.Fatal(e)
 	}
 	if _, e = producer.Provision(ctx); e == nil {

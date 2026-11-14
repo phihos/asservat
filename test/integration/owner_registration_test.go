@@ -359,7 +359,7 @@ func exerciseOwnerRegistration(t *testing.T, f fixture, c value.OwnerConfigurati
 	if _, err = refresh(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = l.admin.Exec(ctx, "UPDATE fleet_trust SET recovery_blocked=true WHERE installation_id=$1", c.Pool.InstallationID); err != nil {
+	if _, err = l.admin.Exec(ctx, "UPDATE fleet_trust SET suspended=true WHERE installation_id=$1", c.Pool.InstallationID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = registry.ReadOwnerRegistration(ctx, clientCert.Certificate); err == nil {
@@ -368,7 +368,7 @@ func exerciseOwnerRegistration(t *testing.T, f fixture, c value.OwnerConfigurati
 	if _, err = refresh(ctx); err == nil {
 		t.Fatal("source refresh cleared blocked recovery")
 	}
-	if _, err = l.admin.Exec(ctx, "UPDATE fleet_trust SET recovery_blocked=false WHERE installation_id=$1", c.Pool.InstallationID); err != nil {
+	if _, err = l.admin.Exec(ctx, "UPDATE fleet_trust SET suspended=false WHERE installation_id=$1", c.Pool.InstallationID); err != nil {
 		t.Fatal(err)
 	}
 	if restored, err := replaceSyntheticFleetObservationAfterActivation(ctx, l.admin, c.Pool.InstallationID); err != nil {
@@ -391,7 +391,7 @@ func exerciseOwnerRegistration(t *testing.T, f fixture, c value.OwnerConfigurati
 		{"activate_", "UPDATE hub_owner_enrollment SET audit_receipt_json='x' WHERE id=$1", e.ID},
 		{"cleanup_", "UPDATE hub_owner_enrollment SET highest_epoch=0 WHERE id=$1", e.ID},
 		{"", "UPDATE hub_owner_configuration SET generation=0 WHERE installation_id=$1", c.Pool.InstallationID},
-		{"", "UPDATE fleet_trust SET recovery_blocked=false WHERE installation_id=$1", c.Pool.InstallationID},
+		{"", "UPDATE fleet_trust SET suspended=false WHERE installation_id=$1", c.Pool.InstallationID},
 	} {
 		_, err = pools[tc.role].Exec(ctx, tc.sql, tc.arg)
 		var denied *pgconn.PgError

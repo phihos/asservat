@@ -38,7 +38,7 @@ func fleetObservationLockTimeout(err error) bool {
 // Both callers check database time after the actual potentially blocking row
 // read. This validates only a failed unchanged observation classification.
 func unchangedFleetObservation(a value.Administration, row custodydb.FleetCurrentTrust, now time.Time) bool {
-	if !a.Valid(now) || a.Suspended || row.Suspended || row.RecoveryBlocked || row.InstallationID != id(a.InstallationID) || row.IssuerEpoch != id(a.IssuerEpoch) || row.SourceUid != a.Revision.UID || row.SourceGeneration != a.Revision.Generation || !bytes.Equal(row.SourceDigest, a.Revision.Digest[:]) {
+	if !a.Valid(now) || a.Suspended || row.Suspended || row.InstallationID != id(a.InstallationID) || row.IssuerEpoch != id(a.IssuerEpoch) || row.SourceUid != a.Revision.UID || row.SourceGeneration != a.Revision.Generation || !bytes.Equal(row.SourceDigest, a.Revision.Digest[:]) {
 		return false
 	}
 	if !row.ObservedAt.Valid || !row.FreshUntil.Valid || row.ObservedAt.InfinityModifier != 0 || row.FreshUntil.InfinityModifier != 0 || row.ObservedAt.Time.After(now) || !now.Before(row.FreshUntil.Time) || !row.ObservedAt.Time.Before(row.FreshUntil.Time) || row.FreshUntil.Time.Sub(row.ObservedAt.Time) > 30*time.Second {
@@ -48,7 +48,7 @@ func unchangedFleetObservation(a value.Administration, row custodydb.FleetCurren
 }
 
 func sameFleetObservationRow(a, b custodydb.FleetCurrentTrust) bool {
-	return a.InstallationID == b.InstallationID && a.IssuerEpoch == b.IssuerEpoch && a.SourceUid == b.SourceUid && a.SourceGeneration == b.SourceGeneration && bytes.Equal(a.SourceDigest, b.SourceDigest) && a.Suspended == b.Suspended && a.RecoveryBlocked == b.RecoveryBlocked && a.ObservedAt.Valid == b.ObservedAt.Valid && a.ObservedAt.InfinityModifier == b.ObservedAt.InfinityModifier && a.ObservedAt.Time.Equal(b.ObservedAt.Time) && a.FreshUntil.Valid == b.FreshUntil.Valid && a.FreshUntil.InfinityModifier == b.FreshUntil.InfinityModifier && a.FreshUntil.Time.Equal(b.FreshUntil.Time)
+	return a.InstallationID == b.InstallationID && a.IssuerEpoch == b.IssuerEpoch && a.SourceUid == b.SourceUid && a.SourceGeneration == b.SourceGeneration && bytes.Equal(a.SourceDigest, b.SourceDigest) && a.Suspended == b.Suspended && a.ObservedAt.Valid == b.ObservedAt.Valid && a.ObservedAt.InfinityModifier == b.ObservedAt.InfinityModifier && a.ObservedAt.Time.Equal(b.ObservedAt.Time) && a.FreshUntil.Valid == b.FreshUntil.Valid && a.FreshUntil.InfinityModifier == b.FreshUntil.InfinityModifier && a.FreshUntil.Time.Equal(b.FreshUntil.Time)
 }
 
 func (s *FleetObservation) confirmFleetObservationContention(ctx context.Context, basis value.ObservationBasis, a value.Administration, before custodydb.FleetCurrentTrust) bool {

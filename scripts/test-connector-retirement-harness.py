@@ -56,7 +56,7 @@ exercise(True,1861,'TestContextAdmissionWithRealServices/connector-identity-fast
 exercise(True,1861,'TestContextAdmissionWithRealServices',1)
 exercise(True,1861,m.CONNECTOR_RETIREMENT_TEST,1,reported_elapsed=1)
 exercise(False,1,'TestCustodyWithRealServices',0)
-for flag in ['--fleet','--database-recovery','--initial-installation']:
+for flag in ['--fleet']:
  p=subprocess.run([os.sys.executable,str(script),'--connector-retirement',flag],capture_output=True,text=True)
  assert p.returncode==2 and 'owns its exact' in p.stderr,p.stderr
  checks+=1

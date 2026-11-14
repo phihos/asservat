@@ -57,7 +57,7 @@ func (p *EnrollmentClaims) ClaimConnector(ctx context.Context, c value.Enrollmen
 		}
 		revision := identity.Revision{UID: root.SourceUid, Generation: root.SourceGeneration}
 		copy(revision.Digest[:], root.SourceDigest)
-		if !currentIssuedBootstrapAudit(slot) || root.Suspended || root.RecoveryBlocked || !revision.Valid() || !identity.Fresh(root.ObservedAt.Time, root.FreshUntil.Time, now.Time, 30*time.Second) || slot.IssuerEpoch != root.IssuerEpoch || slot.Revoked || now.Time.Before(slot.NotBefore.Time) || !now.Time.Before(slot.NotAfter.Time) || subtle.ConstantTimeCompare(slot.SecretSha256, c.SecretDigest[:]) != 1 {
+		if !currentIssuedBootstrapAudit(slot) || root.Suspended || !revision.Valid() || !identity.Fresh(root.ObservedAt.Time, root.FreshUntil.Time, now.Time, 30*time.Second) || slot.IssuerEpoch != root.IssuerEpoch || slot.Revoked || now.Time.Before(slot.NotBefore.Time) || !now.Time.Before(slot.NotAfter.Time) || subtle.ConstantTimeCompare(slot.SecretSha256, c.SecretDigest[:]) != 1 {
 			return value.ErrDenied
 		}
 		out = value.Enrollment{BootstrapID: c.BootstrapID, Binding: value.PeerBinding{InstallationID: c.InstallationID, ClusterID: uid(slot.ClusterID), IssuerEpoch: uid(slot.IssuerEpoch), PeerID: uid(slot.PeerID), Role: value.ConnectorPeer}, PublicKeyDigest: c.PublicKeyDigest, NotAfter: slot.NotAfter.Time.UTC(), Replay: slot.ClaimedAt.Valid}

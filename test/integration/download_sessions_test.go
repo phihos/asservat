@@ -105,12 +105,12 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 		query string
 	}{
 		{runtimePool, "UPDATE artifact_download SET deadline=deadline"},
-		{runtimePool, "UPDATE fleet_trust SET recovery_blocked=false"},
+		{runtimePool, "UPDATE fleet_trust SET suspended=false"},
 		{runtimePool, "UPDATE fleet_trust SET issuer_epoch=issuer_epoch"},
 		{runtimePool, "UPDATE fleet_trust SET fresh_until=clock_timestamp()"},
 		{runtimePool, "UPDATE fleet_observation SET fresh_until=fresh_until"},
 		{recoveryPool, "UPDATE fleet_observation SET fresh_until=fresh_until"},
-		{recoveryPool, "UPDATE fleet_trust SET recovery_blocked=false"},
+		{recoveryPool, "UPDATE fleet_trust SET suspended=false"},
 		{runtimePool, "UPDATE download_batch SET audit_acknowledged_at=clock_timestamp()"},
 		{runtimePool, "UPDATE download_allocation SET output_limit=output_limit"},
 		{auditPool, "UPDATE artifact_download SET charged_output=0"},
@@ -919,7 +919,7 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 	}
 
 	for _, change := range []struct{ name, sql string }{
-		{"blocked", "UPDATE fleet_trust SET recovery_blocked=true WHERE installation_id=$1"},
+		{"blocked", "UPDATE fleet_trust SET suspended=true WHERE installation_id=$1"},
 		{"suspended", "UPDATE fleet_trust SET suspended=true WHERE installation_id=$1"},
 		{"epoch", "UPDATE fleet_trust SET issuer_epoch=gen_random_uuid() WHERE installation_id=$1"},
 		{"revision", "UPDATE fleet_trust SET source_generation=source_generation+1 WHERE installation_id=$1"},
@@ -1325,7 +1325,7 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 				}
 			}
 			if mode == "recovery-blocked" {
-				if _, err = admin.Exec(ctx, "UPDATE fleet_trust SET recovery_blocked=true WHERE installation_id=$1", f.installation); err != nil {
+				if _, err = admin.Exec(ctx, "UPDATE fleet_trust SET suspended=true WHERE installation_id=$1", f.installation); err != nil {
 					t.Fatal(err)
 				}
 			}

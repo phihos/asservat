@@ -24,7 +24,7 @@ func newRecoveryEffectFixtures(t *testing.T, ctx context.Context, admin *pgxpool
 	return func(t *testing.T, root string) *recoveryEffectFixture {
 		t.Helper()
 		f := &recoveryEffectFixture{installation: custodyID()}
-		if _, err := admin.Exec(ctx, "INSERT INTO fleet_trust(activated_postmaster_at,activated_database_oid,installation_id,issuer_epoch,source_uid,source_generation,source_digest,suspended,recovery_blocked,observed_at,fresh_until) VALUES(pg_catalog.pg_postmaster_start_time(),(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()),$1,$2,'synthetic-recovery',1,$3,false,false,statement_timestamp(),statement_timestamp()+interval '30 seconds')", f.installation, custodyID(), bytes.Repeat([]byte{97}, 32)); err != nil {
+		if _, err := admin.Exec(ctx, "INSERT INTO fleet_trust(activated_postmaster_at,activated_database_oid,installation_id,issuer_epoch,source_uid,source_generation,source_digest,suspended,observed_at,fresh_until) VALUES(pg_catalog.pg_postmaster_start_time(),(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()),$1,$2,'synthetic-recovery',1,$3,false,statement_timestamp(),statement_timestamp()+interval '30 seconds')", f.installation, custodyID(), bytes.Repeat([]byte{97}, 32)); err != nil {
 			t.Fatal(err)
 		}
 		var err error

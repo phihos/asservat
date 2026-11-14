@@ -247,7 +247,7 @@ func qualifyPositiveContextDeletion(t *testing.T, ctx context.Context, admin *pg
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = recoveryChange.Exec(ctx, "UPDATE fleet_trust SET recovery_blocked=true WHERE installation_id=$1", originalProof.InstallationID); err != nil {
+	if _, err = recoveryChange.Exec(ctx, "UPDATE fleet_trust SET suspended=true WHERE installation_id=$1", originalProof.InstallationID); err != nil {
 		_ = recoveryChange.Rollback(ctx)
 		t.Fatal(err)
 	}
@@ -268,7 +268,7 @@ func qualifyPositiveContextDeletion(t *testing.T, ctx context.Context, admin *pg
 	if err = finalize.FinalizeContextDeletion(ctx, result, originalProof); err == nil {
 		t.Fatal("recovery fence ignored by deletion finalization")
 	}
-	if _, err = admin.Exec(ctx, "UPDATE fleet_trust SET recovery_blocked=false WHERE installation_id=$1", originalProof.InstallationID); err != nil {
+	if _, err = admin.Exec(ctx, "UPDATE fleet_trust SET suspended=false WHERE installation_id=$1", originalProof.InstallationID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := replaceSyntheticFleetObservationAfterActivation(ctx, admin, originalProof.InstallationID); err != nil {

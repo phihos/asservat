@@ -79,7 +79,7 @@ func (p *PeerRegistry) PeerRegistration(ctx context.Context, b value.PeerBinding
 	if len(r.SourceDigest) != 32 || !rootRevision.Valid() {
 		return out, value.ErrDenied
 	}
-	if r.Suspended || r.RecoveryBlocked || !r.Enabled || !r.AuditID.Valid || !r.AuditObjectKey.Valid || !r.AuditObjectVersion.Valid || r.AuditObjectVersion.String == "null" || !identity.Text(r.AuditObjectVersion.String, 1024) || len(r.AuditObjectSha256) != 32 || uid(r.ClusterID) != b.ClusterID || uid(r.CurrentEpoch) != b.IssuerEpoch || uid(r.IssuerEpoch) != b.IssuerEpoch || r.Role != string(b.Role) || !identity.Fresh(r.ObservedAt.Time, r.FreshUntil.Time, now.Time, 30*time.Second) || !now.Time.Before(r.PeerNotAfter.Time) {
+	if r.Suspended || !r.Enabled || !r.AuditID.Valid || !r.AuditObjectKey.Valid || !r.AuditObjectVersion.Valid || r.AuditObjectVersion.String == "null" || !identity.Text(r.AuditObjectVersion.String, 1024) || len(r.AuditObjectSha256) != 32 || uid(r.ClusterID) != b.ClusterID || uid(r.CurrentEpoch) != b.IssuerEpoch || uid(r.IssuerEpoch) != b.IssuerEpoch || r.Role != string(b.Role) || !identity.Fresh(r.ObservedAt.Time, r.FreshUntil.Time, now.Time, 30*time.Second) || !now.Time.Before(r.PeerNotAfter.Time) {
 		return out, value.ErrDenied
 	}
 	// Hash the entire bounded statement projection, including root revision and

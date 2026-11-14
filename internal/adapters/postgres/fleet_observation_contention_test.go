@@ -18,7 +18,7 @@ func fleetContentionValues() (value.Administration, custodydb.FleetCurrentTrust,
 	return a, r, n
 }
 func TestFleetObservationContentionRequiresCurrentExactPositiveSource(t *testing.T) {
-	for _, mode := range []string{"same", "missing", "new-uid", "generation", "digest", "long-digest", "epoch", "installation", "source-suspended", "stored-suspended", "recovery", "stored-expired", "source-expired", "future", "older", "equal-time-extension", "missing-date", "infinite-date", "long-interval"} {
+	for _, mode := range []string{"same", "missing", "new-uid", "generation", "digest", "long-digest", "epoch", "installation", "source-suspended", "stored-suspended", "stored-expired", "source-expired", "future", "older", "equal-time-extension", "missing-date", "infinite-date", "long-interval"} {
 		t.Run(mode, func(t *testing.T) {
 			a, r, n := fleetContentionValues()
 			switch mode {
@@ -40,8 +40,6 @@ func TestFleetObservationContentionRequiresCurrentExactPositiveSource(t *testing
 				a.Suspended = true
 			case "stored-suspended":
 				r.Suspended = true
-			case "recovery":
-				r.RecoveryBlocked = true
 			case "stored-expired":
 				r.FreshUntil = ts(n)
 			case "source-expired":
@@ -70,7 +68,7 @@ func TestFleetObservationContentionRequiresCurrentExactPositiveSource(t *testing
 }
 func TestFleetObservationContentionFinalRowCannotRefreshOrReplace(t *testing.T) {
 	_, original, _ := fleetContentionValues()
-	for _, mode := range []string{"same-instant", "observation", "expiry", "suspension", "recovery", "source", "digest", "generation", "epoch", "installation"} {
+	for _, mode := range []string{"same-instant", "observation", "expiry", "suspension", "source", "digest", "generation", "epoch", "installation"} {
 		t.Run(mode, func(t *testing.T) {
 			current := original
 			current.SourceDigest = append([]byte(nil), original.SourceDigest...)
@@ -83,8 +81,6 @@ func TestFleetObservationContentionFinalRowCannotRefreshOrReplace(t *testing.T) 
 				current.FreshUntil.Time = current.FreshUntil.Time.Add(time.Microsecond)
 			case "suspension":
 				current.Suspended = true
-			case "recovery":
-				current.RecoveryBlocked = true
 			case "source":
 				current.SourceUid = "other"
 			case "digest":

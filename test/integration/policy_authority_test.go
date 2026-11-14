@@ -163,7 +163,7 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 		actor := identity.Principal{Issuer: basis.Subjects[0].Issuer, Subject: "developer", ClientID: "console", Kind: identity.Human}
 		authority := authorization.AcceptedPolicyAuthority{InstallationID: installation, PolicyUID: policy, Creator: actor, Executor: authorization.PolicyPrincipal(installation, policy), ScopeDigest: artifact.Digest{10}, ClusterID: cluster, NamespaceUID: ns, WorkloadUID: workload, Delegation: identity.Revision{UID: basis.Resource.UID, Generation: 1, Digest: basis.Resource.SpecDigest}, Owners: []artifact.AudienceAssignment{projection.Allows[0].Audience}, Actions: []string{"packetCapture"}, Limits: authorization.AutomationLimits{MaxExecutions: 10, MaxBytes: maxOutput, MaxObservedBytes: 2000}, IssuedAt: now, NotAfter: now.Add(time.Hour)}
 		rproof := artifact.RecoveryProof{InstallationID: installation, IssuerEpoch: custodyID(), Revision: identity.Revision{UID: "recovery", Generation: 1, Digest: artifact.Digest{4}}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
-		if _, err = admin.Exec(ctx, `INSERT INTO fleet_trust(activated_postmaster_at,activated_database_oid,installation_id,issuer_epoch,source_uid,source_generation,source_digest,suspended,recovery_blocked,observed_at,fresh_until) VALUES(pg_catalog.pg_postmaster_start_time(),(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()),$1,$2,'recovery',1,$3,false,false,$4,$5)`, installation, rproof.IssuerEpoch, rproof.Revision.Digest[:], now, now.Add(30*time.Second)); err != nil {
+		if _, err = admin.Exec(ctx, `INSERT INTO fleet_trust(activated_postmaster_at,activated_database_oid,installation_id,issuer_epoch,source_uid,source_generation,source_digest,suspended,observed_at,fresh_until) VALUES(pg_catalog.pg_postmaster_start_time(),(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()),$1,$2,'recovery',1,$3,false,$4,$5)`, installation, rproof.IssuerEpoch, rproof.Revision.Digest[:], now, now.Add(30*time.Second)); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := seedSyntheticFleetObservation(ctx, admin, installation); err != nil {
@@ -598,7 +598,7 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 					t.Fatal(err)
 				}
 			case "recovery-blocked":
-				if _, err = admin.Exec(ctx, "UPDATE fleet_trust SET recovery_blocked=true WHERE installation_id=$1", s.input.Authority.InstallationID); err != nil {
+				if _, err = admin.Exec(ctx, "UPDATE fleet_trust SET suspended=true WHERE installation_id=$1", s.input.Authority.InstallationID); err != nil {
 					t.Fatal(err)
 				}
 			case "issuer-epoch":

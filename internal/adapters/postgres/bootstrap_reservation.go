@@ -92,7 +92,7 @@ func bootstrapRequestDigest(r value.BootstrapRequest) []byte {
 	}{"bootstrap-request/v1", r.Authority.Actor, r.DisplayName, r.Region, r.Authority.DeliveryProfile})
 }
 func checkEnrollmentAuthority(root custodydb.FleetCurrentTrust, a value.EnrollmentAuthority, now time.Time) error {
-	if !a.Valid(now) || root.InstallationID != id(a.InstallationID) || root.IssuerEpoch != id(a.IssuerEpoch) || root.Suspended || root.RecoveryBlocked || trustRevision(root) != a.AdministrationRevision || !identity.Fresh(root.ObservedAt.Time, root.FreshUntil.Time, now, 30*time.Second) {
+	if !a.Valid(now) || root.InstallationID != id(a.InstallationID) || root.IssuerEpoch != id(a.IssuerEpoch) || root.Suspended || trustRevision(root) != a.AdministrationRevision || !identity.Fresh(root.ObservedAt.Time, root.FreshUntil.Time, now, 30*time.Second) {
 		return value.ErrDenied
 	}
 	return nil

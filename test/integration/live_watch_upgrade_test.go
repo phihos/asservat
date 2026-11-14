@@ -152,7 +152,7 @@ func TestLiveWatchUpgradeWithRealPostgres(t *testing.T) {
 	// hub duty. Trust, permission root and owner identity are synthetic here;
 	// this is retained-ledger rollback proof, not owner/C3 admission proof.
 	installation, issuer, root, owner := custodyID(), custodyID(), custodyID(), custodyID()
-	if _, err = pool.Exec(ctx, `INSERT INTO fleet_trust(activated_postmaster_at,activated_database_oid,installation_id,issuer_epoch,source_uid,source_generation,source_digest,suspended,recovery_blocked,observed_at,fresh_until) VALUES(pg_catalog.pg_postmaster_start_time(),(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()),$1,$2,'synthetic-live-rollback',1,$3,false,false,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP+interval '30 seconds')`, installation, issuer, bytes.Repeat([]byte{42}, 32)); err != nil {
+	if _, err = pool.Exec(ctx, `INSERT INTO fleet_trust(activated_postmaster_at,activated_database_oid,installation_id,issuer_epoch,source_uid,source_generation,source_digest,suspended,observed_at,fresh_until) VALUES(pg_catalog.pg_postmaster_start_time(),(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()),$1,$2,'synthetic-live-rollback',1,$3,false,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP+interval '30 seconds')`, installation, issuer, bytes.Repeat([]byte{42}, 32)); err != nil {
 		t.Fatal("synthetic rollback trust", err)
 	}
 	if _, err = seedSyntheticFleetObservation(ctx, pool, installation); err != nil {

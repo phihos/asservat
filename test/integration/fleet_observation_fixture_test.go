@@ -39,7 +39,7 @@ func seedSyntheticFleetObservation(ctx context.Context, db syntheticFleetDB, ins
 	return scanSyntheticFleetBinding(db.QueryRow(ctx, `INSERT INTO public.fleet_observation
  (installation_id,semantic_version,issuer_epoch,source_uid,source_generation,source_digest,activated_postmaster_at,activated_database_oid,observed_at,fresh_until)
  SELECT installation_id,semantic_version,issuer_epoch,source_uid,source_generation,source_digest,activated_postmaster_at,activated_database_oid,observed_at,fresh_until
- FROM public.fleet_trust WHERE installation_id=$1 AND NOT suspended AND NOT recovery_blocked
+ FROM public.fleet_trust WHERE installation_id=$1 AND NOT suspended
  AND activated_postmaster_at=pg_catalog.pg_postmaster_start_time()
  AND activated_database_oid=(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database())
  AND NOT pg_catalog.pg_is_in_recovery()
@@ -54,7 +54,7 @@ func replaceSyntheticFleetObservationAfterActivation(ctx context.Context, db syn
 	return scanSyntheticFleetBinding(db.QueryRow(ctx, `INSERT INTO public.fleet_observation AS previous
  (installation_id,semantic_version,issuer_epoch,source_uid,source_generation,source_digest,activated_postmaster_at,activated_database_oid,observed_at,fresh_until)
  SELECT installation_id,semantic_version,issuer_epoch,source_uid,source_generation,source_digest,activated_postmaster_at,activated_database_oid,observed_at,fresh_until
- FROM public.fleet_trust WHERE installation_id=$1 AND NOT suspended AND NOT recovery_blocked
+ FROM public.fleet_trust WHERE installation_id=$1 AND NOT suspended
  AND activated_postmaster_at=pg_catalog.pg_postmaster_start_time()
  AND activated_database_oid=(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database())
  AND NOT pg_catalog.pg_is_in_recovery()
@@ -81,7 +81,7 @@ func renewSyntheticFleetObservation(ctx context.Context, db syntheticFleetDB, b 
  AND o.activated_postmaster_at=$7 AND o.activated_database_oid=$8
  AND f.semantic_version=o.semantic_version AND f.issuer_epoch=o.issuer_epoch AND f.source_uid=o.source_uid AND f.source_generation=o.source_generation AND f.source_digest=o.source_digest
  AND f.activated_postmaster_at=o.activated_postmaster_at AND f.activated_database_oid=o.activated_database_oid
- AND NOT f.suspended AND NOT f.recovery_blocked AND NOT pg_catalog.pg_is_in_recovery()
+ AND NOT f.suspended AND NOT pg_catalog.pg_is_in_recovery()
  AND f.activated_postmaster_at=pg_catalog.pg_postmaster_start_time()
  AND f.activated_database_oid=(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database())
  AND o.observed_at<=n.at AND (o.observed_at<n.at OR n.at+make_interval(secs=>$9)<=o.fresh_until)
@@ -104,7 +104,7 @@ func readSyntheticFleetObservationBinding(ctx context.Context, db syntheticFleet
  WHERE f.installation_id=o.installation_id AND f.semantic_version=o.semantic_version
  AND f.issuer_epoch=o.issuer_epoch AND f.source_uid=o.source_uid AND f.source_generation=o.source_generation AND f.source_digest=o.source_digest
  AND f.activated_postmaster_at=o.activated_postmaster_at AND f.activated_database_oid=o.activated_database_oid
- AND NOT f.suspended AND NOT f.recovery_blocked AND NOT pg_catalog.pg_is_in_recovery()
+ AND NOT f.suspended AND NOT pg_catalog.pg_is_in_recovery()
  AND f.activated_postmaster_at=pg_catalog.pg_postmaster_start_time()
  AND f.activated_database_oid=(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()))`, installation))
 }
