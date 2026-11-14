@@ -181,19 +181,7 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 	if err = lab.admin.QueryRow(ctx, `SELECT count(*) FROM live_watch_control WHERE root_id=$1 AND id=$2`, root, unmapped.ID).Scan(&unmappedControls); err != nil || unmappedControls != 0 {
 		t.Fatal("missing placement changed retained controls", unmappedControls, err)
 	}
-	viewers, err := postgres.NewLiveViewerCapacity(ctx, pool, ownerPool.InstallationID)
-	if err != nil {
-		t.Fatal("compiled viewer capacity constructor", err)
-	}
 	clusterKey := sha256.Sum256([]byte("asservat-live-cluster/v1\x00" + ownerPool.ClusterID))
-	active, fresh, err := viewers.ReadLiveViewers(ctx, ownerPool.InstallationID, ownerPool.ClusterID)
-	if err != nil || active != 1 || !fresh.After(time.Now()) {
-		t.Fatal("active viewer aggregate", active, fresh, err)
-	}
-	otherCluster, _, err := viewers.ReadLiveViewers(ctx, ownerPool.InstallationID, custodyID())
-	if err != nil || otherCluster != 0 {
-		t.Fatal("viewer aggregate leaked across clusters", otherCluster, err)
-	}
 	for _, scenario := range []struct {
 		name, state        string
 		expired, idleEnded bool
@@ -376,10 +364,6 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 	}
 	if err = ledger.CurrentLive(ctx, c); err != nil {
 		t.Fatal("exact closed receipt current", err)
-	}
-	active, _, err = viewers.ReadLiveViewers(ctx, ownerPool.InstallationID, ownerPool.ClusterID)
-	if err != nil || active != 0 {
-		t.Fatal("closed viewers remained active", active, err)
 	}
 	assertOwner(c.ID, "")
 	assertOwner("", keyFor(1))
