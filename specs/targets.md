@@ -12,7 +12,7 @@ Given a policy pinned to Deployment UID A, when a ReplicaSet rolls to a new imag
 
 ## REQ-TGT-002 — Execution identity
 
-Each action MUST bind cluster UUID, node UID/boot ID, pod UID, full runtime container ID, restart count, host PID and process start time where applicable. Revalidate before opening a namespace, file, socket or debugger. A mismatch MUST produce `TargetGone` or `TargetChanged`, not silently retarget a restarted process.
+Each action MUST bind cluster UUID, node UID/boot ID, pod UID, full runtime container ID, restart count, host PID and process start time where applicable. Check this identity locally on the node immediately before opening a namespace, file, socket or debugger; authorization is the operation's single decision under REQ-EXE-002 and is not repeated per attach. A mismatch MUST produce `TargetGone` or `TargetChanged`, not silently retarget a restarted process.
 
 ### SC-TGT-002
 
@@ -30,7 +30,7 @@ Given a broad selector and an opted-out namespace or workload outside the reques
 
 Peer filters MUST support IP/CIDR, ports/protocols, authorized pod selectors and Pod/Service/Deployment/StatefulSet references with explicit namespaces, plus checked pcap expressions under [packet requirements](packets.md). Resolve pod selectors to pod UID/IP sets, supporting IPv4/IPv6 and EndpointSlice context. Record resolution time and every effective filter generation. The capture target and traffic peer are distinct; permission to collect one workload does not imply permission to collect the peer's logs or memory.
 
-Expanded requests choose frozen or follow explicitly; UI network presets default to follow with a visible preview. Frozen sets pin membership at arming but still remove known deleted/reassigned unsafe IPs, never authorize their replacement. An explicitly enabled follow mode may update the set during a capture, but MUST revalidate enrolled cluster and namespace/workload scope and bound changes. IP reuse and NAT mean peer identity is best-effort observation, not cryptographic attribution. Service VIP, backend IP and observed tuple are separate fields.
+Expanded requests choose frozen or follow explicitly; UI network presets default to follow with a visible preview. Frozen sets pin membership at arming but still remove known deleted/reassigned unsafe IPs, never authorize their replacement. An explicitly enabled follow mode updates the set from the connector's EndpointSlice and Pod informers: each membership change produces a new filter generation that the connector pushes to the node collector (no resolution polling). New members MUST be within the enrolled cluster and the authorized namespace/workload scope, and changes are bounded. IP reuse and NAT mean peer identity is best-effort observation, not cryptographic attribution. Service VIP, backend IP and observed tuple are separate fields.
 
 ### SC-TGT-004
 
@@ -38,7 +38,7 @@ Given a peer selector `app=database`, when database pods rotate IPs during a fro
 
 ## REQ-TGT-005 — Observation coverage and incident selection
 
-An expanded policy MUST declare `observation.mode: allAuthorized`; presets resolve that automatically. Watch every authorized matching pod, including unready/crashing replicas, within administrator workload/node/cluster sensor ceilings. An optional observation.maxPods may only narrow those ceilings; the initial portable ceiling is 1,000 pods per policy, intersected with the qualified installation envelope. No per-replica approval or user-entered container choice. Attach new replicas under the same workload UID after current pod authorization; do not equate an attached collector with fresh observations.
+An expanded policy MUST declare `observation.mode: allAuthorized`; presets resolve that automatically. Observe every authorized matching pod through the connector's shared Pod informer, including unready/crashing replicas, within administrator workload/node/cluster sensor ceilings. An optional observation.maxPods may only narrow those ceilings; the initial portable ceiling is 1,000 pods per policy, intersected with the qualified installation envelope. No per-replica approval or user-entered container choice. Attach new replicas under the same workload UID after current pod authorization; do not equate an attached collector with fresh observations.
 
 On overflow, keep the already armed eligible set stable, fill vacancies in creation-time/UID order and report `CoverageLimited` with observed/eligible counts and authorized skipped pod references. Do not silently rotate sampling or call the workload fully monitored. Permission-denied pods are never observed; only authorized inventory is exposed. Ring/parser memory is reserved separately for each armed pod; adding a ring can reduce that action's coverage without stopping cheap log/resource observation.
 
