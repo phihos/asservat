@@ -17,11 +17,10 @@ renewal.
 2. The workload cluster's release (`mode: cluster`) receives only `hub.url`
    and, for a private CA, `hub.caBundle`. No Secret is copied between
    clusters.
-3. If the hub can neither reach the issuer nor be given its JWKS, an
-   administrator issues a kubeadm-style join token (valid 24 hours), passed
-   to the workload cluster's release with the hub CA certificate hash. The
-   connector uses it only to register its cluster's ServiceAccount public
-   keys; the hub stores only the token hash and writes an audit row.
+3. There is no other registration path: no console page, API operation,
+   CLI command or join token. The JWKS is public key material any
+   administrator of the workload cluster can read
+   (`kubectl get --raw /openid/v1/jwks`).
 
 ## Authentication
 

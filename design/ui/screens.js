@@ -938,7 +938,7 @@ window.ASSERVAT_SCREENS = [
       "admin"
     ],
     "entity": "ClusterRegistration",
-    "purpose": "See connectivity, enrollment and capability coverage by region",
+    "purpose": "See connectivity and capability coverage by region; clusters are registered in Helm values",
     "route": "#/clusters",
     "states": [
       "normal",
@@ -961,27 +961,6 @@ window.ASSERVAT_SCREENS = [
     "entity": "ClusterRegistration",
     "purpose": "Inspect node pools, local ceilings and bounded disconnected authority",
     "route": "#/cluster",
-    "states": [
-      "normal",
-      "loading",
-      "empty",
-      "denied",
-      "expired",
-      "offline",
-      "quota"
-    ]
-  },
-  {
-    "id": "enroll",
-    "surface_id": "UI-045",
-    "title": "Enroll a cluster",
-    "group": "Operate",
-    "personas": [
-      "admin"
-    ],
-    "entity": "ClusterRegistration",
-    "purpose": "Prepare a short-lived bootstrap credential and bounded installation bundle",
-    "route": "#/enroll",
     "states": [
       "normal",
       "loading",

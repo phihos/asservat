@@ -5,7 +5,6 @@ import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { evidenceJourney } from '../tests/evidence-journey.mjs';
-import { fleetJourney } from '../tests/fleet-journey.mjs';
 
 const origin = process.argv[2];
 const url = new URL(origin);
@@ -57,9 +56,6 @@ try {
   const stats = await (await page.request.get(origin + '/test/stats')).json();
   assert.equal(stats.refresh_calls, 1);
   checks.push('real cookie, CSRF and POST-refresh transport; no duplicate pageshow refresh or web storage');
-
-  await fleetJourney({ page, origin, scan });
-  checks.push('Fleet explicit issuance, original-key uncertain retry, exact receipt/expiry and real operator refusal');
 
   const rejected = await page.request.post(origin + '/auth/logout', { headers: { Origin: 'https://outside.invalid', 'X-CSRF-Token': 'C'.repeat(43) } });
   assert.equal(rejected.status(), 403);
@@ -366,7 +362,7 @@ try {
   assert.deepEqual(errors, []);
   assert.deepEqual(external, []);
   assert.deepEqual(violations, []);
-  await writeFile(output + '/report.json', JSON.stringify({ passed: true, checks, errors, external, violations, authority: 'synthetic session, fleet issuance, capture/C16 facts, intercepted profile-summary/approved-syscall-view responses and grant store/projections; real C03 policy-manager eligibility/control, HTTPS Go handlers, canonical operations and built React; no native-download service, IdP/SQL/collection/audit/deployment qualification' }, null, 2) + '\n');
+  await writeFile(output + '/report.json', JSON.stringify({ passed: true, checks, errors, external, violations, authority: 'synthetic session, capture/C16 facts, intercepted profile-summary/approved-syscall-view responses and grant store/projections; real C03 policy-manager eligibility/control, HTTPS Go handlers, canonical operations and built React; no native-download service, IdP/SQL/collection/audit/deployment qualification' }, null, 2) + '\n');
   console.log(`Console browser checks passed: ${checks.length} journeys, ${scans} accessibility scans, no external requests or CSP/runtime errors.`);
 } catch (error) {
   const visiblePage = await page.locator('body').ariaSnapshot().catch(() => 'Page unavailable');

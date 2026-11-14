@@ -1,14 +1,16 @@
 # Fleet administration and trust
 
-C-04/C-21 under REQ-FED-001, REQ-DB-005 and TASK-03. Fleet operators enroll and
-revoke clusters. That responsibility grants no workload collection, evidence
+C-04/C-21 under REQ-FED-001, REQ-DB-005 and TASK-03. Clusters are registered,
+changed and revoked only in the hub's Helm values
+([ADR-334](../decisions/334-connector-workload-identity.md)); there is no
+console or API enrollment. Fleet administration grants no workload collection, evidence
 reading or approval, and is separate from workload AccessBinding roles. There
 is no public permission CRUD API.
 
 ## Fleet settings
 
 [ADR-335](../decisions/335-usable-by-default.md) D14 removes the separate fleet
-operator list: administrators (`identity.administrators`) enroll clusters, and
+operator list: administrators (`identity.administrators`) administer the fleet, and
 the canonical fleet-settings contract is deleted. The runtime still reads the
 earlier `fleet.json`, described below
 ([implemented schema](../../specs/contracts/implemented/fleet-settings.schema.json),
@@ -20,7 +22,7 @@ ConfigMap in the Asservat namespace. It declares:
 - one organization issuer (HTTPS, no user info, query or fragment) and the
   allowed clients;
 - explicit human/workload operator subjects or stable operator group IDs
-  (empty lists deny all new enrollment);
+  (empty lists grant fleet administration to nobody);
 - approved credential-delivery profile names; no field selects a URL or
   carries a secret;
 - enrollment ceilings: 1–128 active bootstrap slots, 1–65,536 retained bootstrap
@@ -46,18 +48,3 @@ read the stored incarnation and suspension with plain MVCC in their own
 transaction and include the expected incarnation in their conditional write;
 they do not lock the trust row. A configuration change by itself never clears
 recovery or changes the issuer epoch.
-
-## Enrollment authorization
-
-`EnrollmentAuthorizer` authorizes a fleet operation once, using the caller's
-identity handle ([current request identity](current-request-identity.md)) and
-the current fleet revision. It requires an explicit operator subject or group,
-an allowed client and an approved delivery profile. A subject's human/workload
-class is significant: a same-named service account does not inherit a human
-assignment, and a workload-maintainer group cannot enroll clusters. The decision
-carries the identity and fleet revisions and the ceilings for the issuance
-transaction, which enforces them with conditional counts.
-
-The hub creates the bootstrap token and shows it once
-([connector identity](connector-credentials.md)); the connector then enrolls as
-described in [connector enrollment](enrollment-activation.md).

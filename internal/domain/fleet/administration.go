@@ -62,18 +62,6 @@ func (a EnrollmentAuthority) Valid(now time.Time) bool {
 	return authorization.UUID(a.InstallationID) && authorization.UUID(a.IssuerEpoch) && identity.Text(a.DeliveryProfile, 64) && a.Actor.Valid() && a.IdentityRevision.Valid() && a.AdministrationRevision.Valid() && identity.Fresh(a.CheckedAt, a.ValidUntil, now, 5*time.Second) && a.MaxActiveBootstraps >= 1 && a.MaxActiveBootstraps <= 128 && a.MaxBootstrapHistory >= a.MaxActiveBootstraps && a.MaxBootstrapHistory <= 65536 && a.MaxClusters >= 1 && a.MaxClusters <= 1024
 }
 
-func AuthorizeEnrollment(i identity.Identity, a Administration, profile string, now time.Time) (EnrollmentAuthority, error) {
-	var out EnrollmentAuthority
-	if !a.Valid(now) || !i.Valid(now) {
-		return out, ErrUnavailable
-	}
-	if !a.Operator(i) || !slices.Contains(a.DeliveryProfiles, profile) {
-		return out, ErrDenied
-	}
-	out = EnrollmentAuthority{InstallationID: a.InstallationID, IssuerEpoch: a.IssuerEpoch, DeliveryProfile: profile, Actor: i.Principal, IdentityRevision: i.Policy, AdministrationRevision: a.Revision, CheckedAt: now, ValidUntil: identity.Earlier(i.ValidUntil, a.FreshUntil), MaxActiveBootstraps: a.MaxActiveBootstraps, MaxBootstrapHistory: a.MaxBootstrapHistory, MaxClusters: a.MaxClusters}
-	return out, nil
-}
-
 // InstallationEnrollmentActor is the installation itself, the actor of the
 // combined-mode connector's own bootstrap (no human session).
 func InstallationEnrollmentActor(installationID string) identity.Principal {

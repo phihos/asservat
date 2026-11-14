@@ -260,20 +260,6 @@ operations:
   effect: read
   role: fleet-operator
   contract: docs/interfaces/browser-openapi.yaml
-- operation: enroll_cluster
-  path: /api/v1/console/enroll_cluster
-  transport:
-  - browser
-  effect: command
-  role: fleet-operator
-  contract: docs/interfaces/browser-openapi.yaml
-- operation: revoke_cluster
-  path: /api/v1/console/revoke_cluster
-  transport:
-  - browser
-  effect: command
-  role: fleet-operator
-  contract: docs/interfaces/browser-openapi.yaml
 - operation: list_capabilities
   path: /api/v1/console/list_capabilities
   transport:
