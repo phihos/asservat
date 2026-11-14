@@ -214,6 +214,12 @@ func newOwnerDeployment(ctx context.Context, files *os.Root, podUID string, in *
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
+	if in.offer != nil && in.offer.ownersAddress != "" {
+		// The combined-mode regional executor dials the accepted owner pool.
+		if err = in.offer.setOwners(parts.pool, parts.revision, parts.issuerRoots); err != nil {
+			return nil, &fixedStepError{"regional-offer-owners", err}
+		}
+	}
 	if in.downloadControl != nil && c.Public != nil {
 		api, e := kubernetes.NewForConfig(in.kubernetes(contracts.HubAPIKubernetesTokenFile))
 		if e != nil {

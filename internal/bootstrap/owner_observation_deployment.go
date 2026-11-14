@@ -212,8 +212,10 @@ type ownerIdentityParts struct {
 	providers       *kms.InstalledOwnerProviderEffects
 	// audit is the legacy static audit store and keys; empty with providers.
 	audit publicAuditStore
-	// issuerRoots are roots' accepted DER certificates.
+	// issuerRoots are roots' accepted DER certificates and revision the
+	// accepted owner configuration's source generation.
 	issuerRoots [][]byte
+	revision    int64
 }
 
 // composeOwnerIdentity opens the owner's SQL credential, reads the accepted
@@ -354,7 +356,7 @@ func composeOwnerIdentity(root, startup context.Context, files *os.Root, podUID 
 		services[usage] = &app.OwnerEnrollmentCoordinator{Verifier: verifier, Proofs: proofs, Ledger: ledgers["enrollment"], Activation: ledgers["activation"], Audit: audits, Acknowledgements: ledgers["audit"], Issuer: issuers[usage], Now: time.Now}
 	}
 	parts.observer, parts.guard, parts.pools, parts.configs, parts.pool, parts.roots = observer, guard, pools, configs, pool, roots
-	parts.issuerRoots = current.Configuration.IssuerRoots
+	parts.issuerRoots, parts.revision = current.Configuration.IssuerRoots, current.Configuration.Revision.Generation
 	parts.ledgers, parts.proofs, parts.endpoints, parts.routes, parts.services = ledgers, proofs, endpoints, routes, services
 	return parts, nil
 }

@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"os"
 	"time"
@@ -12,6 +13,8 @@ import (
 	"asservat.local/asservat/internal/adapters/mounts"
 	"asservat.local/asservat/internal/adapters/postgres"
 	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/authorization"
+	value "asservat.local/asservat/internal/domain/fleet"
 )
 
 // hubAPIRegionalOffer is the combined-mode offer (decision 11): the hub-api
@@ -26,6 +29,54 @@ type hubAPIRegionalOffer struct {
 	// peerID and bootstrapSecret are the local connector's generated peer
 	// and the Secret its bootstrap record is written to (mode=combined).
 	peerID, bootstrapSecret string
+	// ownersAddress is the hub-api native Service the regional executor
+	// dials; setOwners adds the accepted owner configuration at startup.
+	ownersAddress string
+}
+
+// regionalWorkKeyValidity bounds the offered work key: the offer is
+// written once per installation.
+const regionalWorkKeyValidity = 5 * 365 * 24 * time.Hour
+
+// addExecutor completes the regional executor section (ADR-196/198) of the
+// combined-mode offer except Owners: the key service (its Service endpoint,
+// serving CA and artifact key), the hub's work-signing public key and the
+// evidence store (from the capacity qualification).
+func (o *hubAPIRegionalOffer) addExecutor(ctx context.Context, files *os.Root, h contracts.HubAPIConfig, c contracts.OwnerDeployment, storeID string, now time.Time) error {
+	p := c.Public
+	if p == nil || !authorization.UUID(storeID) {
+		return hubAPIInputError("regional-offer-store")
+	}
+	keyRoots, err := readCA(ctx, files, HubAPIDownloadKeyServiceCAFile, now)
+	if err != nil {
+		return err
+	}
+	if len(p.WorkSigning.PublicKey) != 32 || p.WorkSigning.KeyID == "" {
+		return hubAPIInputError("regional-offer-work-key")
+	}
+	from := now.UTC().Truncate(time.Second)
+	o.offer.KeyService = &contracts.RegionalWrapService{Endpoint: "https://" + contracts.HubAPIName(h.Name, "key-service") + "." + h.Namespace + ".svc:9447", Roots: keyRoots, KeyID: p.ArtifactKeyID}
+	o.offer.WorkKey = &contracts.APIContextWorkPublicKey{ID: p.WorkSigning.KeyID, PublicKey: base64.RawURLEncoding.EncodeToString(p.WorkSigning.PublicKey), NotBefore: from.Format(time.RFC3339Nano), NotAfter: from.Add(regionalWorkKeyValidity).Format(time.RFC3339Nano)}
+	o.offer.EvidenceStore = &contracts.RegionalEvidenceStore{Endpoint: h.ObjectStore.Endpoint, Roots: c.AuditStore.Roots, Region: h.ObjectStore.Region, Bucket: h.ObjectStore.EvidenceBucket, StoreID: storeID}
+	o.ownersAddress = contracts.HubAPIName(h.Name, "hub-api-native") + "." + h.Namespace + ".svc:9444"
+	return nil
+}
+
+// setOwners pins the accepted owner configuration (pool and issuer roots),
+// completing the executor section.
+func (o *hubAPIRegionalOffer) setOwners(pool value.OwnerPool, revision int64, roots [][]byte) error {
+	if o == nil || o.ownersAddress == "" || !pool.Valid() || pool.NativePort == 0 || len(roots) == 0 {
+		return mounts.ErrUnavailable
+	}
+	o.offer.Owners = &contracts.RegionalContextOwners{Address: o.ownersAddress, Configuration: contracts.OwnerConfiguration{Format: contracts.OwnerConfigurationFormat,
+		InstallationID: pool.InstallationID, ClusterID: pool.ClusterID, IssuerEpoch: pool.IssuerEpoch, Revision: revision,
+		Namespace: contracts.WorkerObjectReference{Name: pool.Namespace, UID: pool.NamespaceUID}, Service: contracts.WorkerObjectReference{Name: pool.Service, UID: pool.ServiceUID},
+		Deployment: contracts.WorkerObjectReference{Name: pool.Deployment, UID: pool.DeploymentUID}, ServiceAccount: contracts.WorkerObjectReference{Name: pool.ServiceAccount, UID: pool.AccountUID},
+		Port: pool.Port, NativePort: pool.NativePort, NativeBootstrap: pool.NativeBootstrap, NativeCandidateLimit: pool.NativeCandidateLimit, OperationPort: pool.OperationPort, IssuerRoots: roots}}
+	if offered, err := o.offer.RegionalExecutorOffered(); err != nil || !offered {
+		return mounts.ErrUnavailable
+	}
+	return nil
 }
 
 // buildHubAPIRegionalOffer derives the plain connector offer (no regional

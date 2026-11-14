@@ -385,13 +385,22 @@ func loadHubAPIInputs(ctx context.Context, files, configRoot, idsRoot, public *o
 		return nil, err
 	}
 	var control *hubAPIDownloadControl
-	if c.Public != nil && len(c.Native.WorkerAPIs) == 1 {
+	if workers := c.Public != nil && len(c.Native.WorkerAPIs) == 1; workers || offer != nil {
+		// The evidence store the hub-local download workers read and the
+		// combined-mode regional executor writes.
 		pin, err := resolver.CapacityPin(call, c.PermissionRootID, c.InstallationID)
 		if err != nil {
 			return nil, hubAPIInputError("capacity-qualification")
 		}
-		if control, err = buildHubAPIDownloadControl(call, files, h, c, pin.EvidenceStoreID, now); err != nil {
-			return nil, err
+		if workers {
+			if control, err = buildHubAPIDownloadControl(call, files, h, c, pin.EvidenceStoreID, now); err != nil {
+				return nil, err
+			}
+		}
+		if offer != nil {
+			if err = offer.addExecutor(call, files, h, c, pin.EvidenceStoreID, now); err != nil {
+				return nil, err
+			}
 		}
 	}
 	return &ownerInputs{providerInputs: &providerInputs{files: files, kubernetesEndpoint: c.Kubernetes, postgresEndpoint: c.Postgres}, config: c, offer: offer, downloadControl: control}, nil
