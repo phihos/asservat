@@ -30,6 +30,29 @@ issuance problem outside these limits, still open; no second workload
 cluster was installed. Older installations keep their finite stored
 backing and must be reinstalled.
 
+## Capacity from Helm values (2026-11-14)
+
+Branch `clean/capacity`. The `capacity` values follow
+`specs/contracts/capacity.schema.json` (now in the chart schema). The
+hub-worker derives one pool and one policy per cluster from them and the
+release revision; audit lanes, footprints and the backup profile are
+internal. Namespaces take part unless they are system namespaces, the
+release namespace or labelled `asservat.io/evidence: disabled`.
+`capturesPerCluster` (default 8) and `workload.dump` (burst 1, 900 s) reach
+the hub-api. Removed: EvidenceStoragePool/EvidenceBudgetPolicy and
+CapacityReservation CRDs with their decoders, guards and gates; the
+lifetime `max_captures` counter (migration 00165); the 16-capture and
+active-policy caps; per-policy cooldown/burst ceilings. Migration 00166
+lets `bestEffort` storage enroll.
+
+Verified: unit tests of the changed packages, `make helm-check`, the CI gate
+set, `TestCapacityValuesSourceWithRealPostgres` (real PostgreSQL). Gaps: the
+default share uses eight, not the eligible-workload count; the
+`capturesPerCluster` default ignores node count; `maxConcurrentExpensive`
+and `onFull` are not enforced; capacity is on only when a value is set; the
+SQL capacity subsystem (00054, object counts, five-second observation
+loops) is unchanged.
+
 ## ADR-330 contract divergence (2026-11-14)
 
 The canonical contracts in `specs/contracts/` and `docs/interfaces/` follow
