@@ -8,8 +8,8 @@ Secret `<name>-join-<cluster>` (IDs, offer with `remote.*` addresses and
 in-cluster server names, the cluster's own regional object-store
 capabilities, a one-use bootstrap), derives each context-start entry and
 in-process topology, and the connector delivers its capacity observation over
-the lifecycle channel (migration 00163, to follow the 00161→00162
-renumbering). Owned kind clusters `asservat-cj-hub` (combined, bundled
+the lifecycle channel (migration 00163, after 00162 remote AccessBindings
+). Owned kind clusters `asservat-cj-hub` (combined, bundled
 services) and `asservat-cj-work` (`mode: cluster`, `region.joinSecret`):
 `TestHelmNativeKindClusterJoin` passed (24.6 s) on a fresh install: Keycloak
 sign-in, processing initialization, AccessBinding in the work cluster's
@@ -56,11 +56,11 @@ Follow-up branch `feat/hn-remote-bindings` (ADR-329 decision (c)):
 `mode: cluster` connectors deliver their cluster's AccessBinding LIST every
 10 seconds over the lifecycle channel (purpose `access-bindings`); the
 federation validates and stores it under the cluster credential's cluster
-(migration 00161); the hub-worker reconciler accepts it scoped to that
+(migration 00162); the hub-worker reconciler accepts it scoped to that
 cluster (allows within 30 s of the delivery, denies until removed). Component
 tests cover the reconciler, the real HTTP/2 lifecycle channel with a 4 MiB
 delivery, federation attribution and the Kubernetes LIST/decode round trip.
-Migration 00161 and the store/read adapter passed on real PostgreSQL in
+Migration 00162 and the store/read adapter passed on real PostgreSQL in
 `scripts/test-custody.py --run '^TestContextAdmissionWithRealServices$/^connector-identity-fast$'`
 (store, older-delivery refusal, changed-row reread);
 `make permission-integration` passed. Not run: a kind journey with a joined

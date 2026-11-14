@@ -133,7 +133,7 @@ new purpose `access-bindings`, whenever it changes (maintainer correction
 - The federation validates every spec with the same embedded schema: a
   refused spec becomes an invalid entry that grants and denies nothing. A
   delivery over 1,024 bindings or 4,096 subject-role rows is refused.
-- It is stored in `remote_access_binding_delivery` (migration 00161), one row
+- It is stored in `remote_access_binding_delivery` (migration 00162), one row
   per cluster; an older delivery never replaces a newer one. A trigger
   (migration 00163) notifies `asservat_remote_bindings` in the writing
   transaction.
