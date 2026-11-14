@@ -302,8 +302,15 @@ func (c *ContextStartClient) currentWithOpeningDiagnostic(ctx context.Context, c
 	ownerStart := time.Now()
 	owner, e := c.owners.AuthenticateOwner(call, remote)
 	auditapp.MarkStep(ctx, "r-owner", ownerStart)
-	if e != nil || !owner.Valid(c.now()) || owner.Certificate.Binding != channel.Hub || owner.Pool != c.pool {
-		return zero, receiverCheckStep{"owner", value.ErrDenied}
+	switch {
+	case e != nil:
+		return zero, receiverCheckStep{"owner/authenticate", value.ErrDenied}
+	case !owner.Valid(c.now()):
+		return zero, receiverCheckStep{"owner/expired", value.ErrDenied}
+	case owner.Certificate.Binding != channel.Hub:
+		return zero, receiverCheckStep{"owner/binding", value.ErrDenied}
+	case owner.Pool != c.pool:
+		return zero, receiverCheckStep{"owner/pool", value.ErrDenied}
 	}
 	// The owner was authenticated by this check; the receiver uses that one
 	// check for the ADR-311 interval, never past the owner's certificate.

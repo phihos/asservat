@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 )
 
@@ -27,6 +28,11 @@ func (s RegionalContextStartConnections) reportFailure(stage string, cause error
 			"setup-source-open", "setup-owned-process", "setup-process-proof", "setup-process-match", "setup-execution-account", "setup-settings-guard", "setup-settings-snapshot", "setup-workload", "setup-settings-guard-after", "setup-settings-snapshot-after", "setup-workload-guard-after", "setup-source-close", "setup-owned-process-after", "setup-fresh":
 			stage += "/" + step
 		}
+	}
+	// The fixed receiver check (for example owner/pool) inside the stage.
+	var check interface{ ReceiverCheckStep() string }
+	if errors.As(cause, &check) && strings.HasPrefix(check.ReceiverCheckStep(), "owner/") {
+		stage += "/" + check.ReceiverCheckStep()
 	}
 	var exchange interface{ ExchangeStep() string }
 	if stage == "exchange" && errors.As(cause, &exchange) {
