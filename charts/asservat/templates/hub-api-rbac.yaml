@@ -47,7 +47,8 @@ rules:
       {{- range .Values.clusters }}
       - {{ printf "%s-join-%s" $n .name | quote }}
       {{- end }}
-    verbs: [get, update]
+    # watch: the join runner reacts to the Secret's deletion or change.
+    verbs: [get, update, list, watch]
   - apiGroups: [""]
     resources: [secrets]
     resourceNames:

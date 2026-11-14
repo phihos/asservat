@@ -105,16 +105,20 @@ type remoteJoinSecret struct {
 	cluster, peer             string
 	offer                     []byte
 	evidenceName, historyName string
+	// seen is the resourceVersion of the last read or write; Changed
+	// watches from it so no change between them is missed.
+	seen string
 }
 
 // Present updates an existing Secret's public join values in place (the
 // offer changes with the hub's configuration); bootstrap.json stays.
-func (s remoteJoinSecret) Present(ctx context.Context) (bool, error) {
+func (s *remoteJoinSecret) Present(ctx context.Context) (bool, error) {
 	call, end := context.WithTimeout(ctx, 5*time.Second)
 	defer end()
 	secrets := s.api.CoreV1().Secrets(s.namespace)
 	current, err := secrets.Get(call, s.name, meta.GetOptions{})
 	if apierrors.IsNotFound(err) {
+		s.seen = ""
 		return false, nil
 	}
 	if err != nil {
@@ -134,14 +138,34 @@ func (s remoteJoinSecret) Present(ctx context.Context) (bool, error) {
 			next.Data[k], changed = v, true
 		}
 	}
+	s.seen = current.ResourceVersion
 	if changed {
-		_, err = secrets.Update(call, next, meta.UpdateOptions{})
+		var updated *core.Secret
+		if updated, err = secrets.Update(call, next, meta.UpdateOptions{}); err == nil {
+			s.seen = updated.ResourceVersion
+		}
 	}
 	return true, err
 }
 
+// Changed watches this one Secret by name from the last seen version and
+// returns on its first event or when the watch ends.
+func (s *remoteJoinSecret) Changed(ctx context.Context) error {
+	w, err := s.api.CoreV1().Secrets(s.namespace).Watch(ctx, meta.ListOptions{FieldSelector: "metadata.name=" + s.name, ResourceVersion: s.seen, AllowWatchBookmarks: false})
+	if err != nil {
+		return err
+	}
+	defer w.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-w.ResultChan():
+		return nil
+	}
+}
+
 // public is the Secret's data without the record.
-func (s remoteJoinSecret) public(ctx context.Context) (map[string][]byte, error) {
+func (s *remoteJoinSecret) public(ctx context.Context) (map[string][]byte, error) {
 	data := map[string][]byte{contracts.ConnectorJoinClusterFile: []byte(s.cluster), contracts.ConnectorJoinPeerFile: []byte(s.peer), contracts.RegionalOfferFile: s.offer}
 	for file, name := range map[string]string{contracts.ConnectorEvidenceFile: s.evidenceName, contracts.RegionalHistoryCredentialFile: s.historyName} {
 		source, err := s.api.CoreV1().Secrets(s.namespace).Get(ctx, name, meta.GetOptions{})
@@ -153,7 +177,7 @@ func (s remoteJoinSecret) public(ctx context.Context) (map[string][]byte, error)
 	return data, nil
 }
 
-func (s remoteJoinSecret) Create(ctx context.Context, e *value.BootstrapEnvelope) error {
+func (s *remoteJoinSecret) Create(ctx context.Context, e *value.BootstrapEnvelope) error {
 	call, end := context.WithTimeout(ctx, 5*time.Second)
 	defer end()
 	data, err := s.public(call)
@@ -169,7 +193,10 @@ func (s remoteJoinSecret) Create(ctx context.Context, e *value.BootstrapEnvelope
 		data[contracts.ConnectorBootstrapFile] = raw
 	}
 	object := &core.Secret{ObjectMeta: meta.ObjectMeta{Name: s.name, Namespace: s.namespace, Labels: map[string]string{"app.kubernetes.io/part-of": "asservat", "app.kubernetes.io/component": "cluster-join"}}, Type: core.SecretTypeOpaque, Data: data}
-	_, err = s.api.CoreV1().Secrets(s.namespace).Create(call, object, meta.CreateOptions{})
+	created, err := s.api.CoreV1().Secrets(s.namespace).Create(call, object, meta.CreateOptions{})
+	if err == nil {
+		s.seen = created.ResourceVersion
+	}
 	return err
 }
 
@@ -208,7 +235,7 @@ func newRemoteClusterJoins(ctx context.Context, in *ownerInputs, pools *publicPo
 		release := in.release
 		out = append(out, fleetapp.RemoteClusterJoin{
 			Bootstrap: fleetapp.LocalClusterBootstrap{Issuer: issuer, Envelopes: channel, Binding: binding, DeliveryProfile: c.Public.Fleet.DeliveryProfile, DisplayName: r.Name, Region: "remote"},
-			Records: remoteJoinSecret{api: api, namespace: c.Namespace.Name, name: contracts.RemoteJoinSecretName(release, r.Name), cluster: r.ClusterID, peer: r.peerID, offer: offer,
+			Records: &remoteJoinSecret{api: api, namespace: c.Namespace.Name, name: contracts.RemoteJoinSecretName(release, r.Name), cluster: r.ClusterID, peer: r.peerID, offer: offer,
 				evidenceName: contracts.RemoteObjectStoreSecret(release, "regional-write", r.Name), historyName: contracts.RemoteObjectStoreSecret(release, "regional-history", r.Name)}})
 	}
 	return out, nil

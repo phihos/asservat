@@ -343,7 +343,7 @@ def check_cluster_join(render):
     assert not [r for r in docs if r["kind"] == "Secret" and r["metadata"]["name"] == "asservat-region-bootstrap"]
     rules = named(docs, "Role", "asservat-hub-api")["rules"]
     assert {"apiGroups": [""], "resources": ["secrets"], "verbs": ["create"]} in rules
-    assert {"apiGroups": [""], "resources": ["secrets"], "resourceNames": ["asservat-join-eu"], "verbs": ["get", "update"]} in rules
+    assert {"apiGroups": [""], "resources": ["secrets"], "resourceNames": ["asservat-join-eu"], "verbs": ["get", "update", "list", "watch"]} in rules
     plan = json.loads(named(docs, "ConfigMap", "asservat-secrets")["data"]["secrets.json"])
     assert plan["remoteClusters"] == [{"name": "eu", "clusterID": cluster}], plan.get("remoteClusters")
     hook = set(named(docs, "Role", "asservat-secrets")["rules"][1]["resourceNames"])

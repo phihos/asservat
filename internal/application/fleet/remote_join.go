@@ -16,6 +16,9 @@ import (
 type RemoteJoinRecords interface {
 	Present(context.Context) (bool, error)
 	Create(context.Context, *value.BootstrapEnvelope) error
+	// Changed blocks until the Secret changes or is deleted after the last
+	// Present or Create, or the watch ends; the caller then checks again.
+	Changed(context.Context) error
 }
 
 // RemoteClusterJoin issues a remote cluster's bootstrap through the same
@@ -30,14 +33,15 @@ type RemoteClusterJoin struct {
 	Records   RemoteJoinRecords
 }
 
-// Run checks the join Secret every 15 seconds until ctx ends. report receives
-// fixed outcome words only.
+// Run checks the join Secret once and again whenever a watch reports that it
+// changed or was deleted (ADR-330 D1), until ctx ends. Only a failed read or
+// watch waits a fixed retry delay. report receives fixed outcome words only.
 func (r RemoteClusterJoin) Run(ctx context.Context, report func(string)) error {
+	if r.Records == nil {
+		return value.ErrUnavailable
+	}
 	var k localKey
 	for {
-		if r.Records == nil {
-			return value.ErrUnavailable
-		}
 		exists, err := r.Records.Present(ctx)
 		switch {
 		case err != nil:
@@ -45,15 +49,26 @@ func (r RemoteClusterJoin) Run(ctx context.Context, report func(string)) error {
 		case !exists:
 			report(r.create(ctx, &k))
 		}
-		timer := time.NewTimer(15 * time.Second)
-		select {
-		case <-ctx.Done():
-			timer.Stop()
+		if err == nil {
+			err = r.Records.Changed(ctx)
+		}
+		if ctx.Err() != nil {
 			return ctx.Err()
-		case <-timer.C:
+		}
+		if err != nil {
+			timer := time.NewTimer(remoteJoinRetry)
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return ctx.Err()
+			case <-timer.C:
+			}
 		}
 	}
 }
+
+// remoteJoinRetry spaces retries after a failed read or watch only.
+var remoteJoinRetry = 5 * time.Second
 
 // create issues (or, within the same five-minute key, resumes) the slot and
 // creates the Secret with its record; a claimed slot creates it without one.

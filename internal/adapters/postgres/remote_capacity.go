@@ -53,7 +53,8 @@ func (s *RemoteCapacity) StoreRemoteCapacity(ctx context.Context, c app.RemoteCa
 	defer end()
 	_, err = s.pool.Exec(call, `INSERT INTO public.remote_capacity_delivery(root_id,cluster_id,observed_at,digest,namespaces) VALUES($1,$2,$3,$4,$5)
 ON CONFLICT(root_id,cluster_id) DO UPDATE SET observed_at=excluded.observed_at,digest=excluded.digest,namespaces=excluded.namespaces
-WHERE remote_capacity_delivery.observed_at<excluded.observed_at`, id(s.root), id(c.ClusterID), ts(c.ObservedAt), sum, body)
+WHERE remote_capacity_delivery.observed_at<excluded.observed_at
+ OR (remote_capacity_delivery.observed_at=excluded.observed_at AND remote_capacity_delivery.digest<>excluded.digest)`, id(s.root), id(c.ClusterID), ts(c.ObservedAt), sum, body)
 	if err != nil {
 		return cfg.ErrUnavailable
 	}

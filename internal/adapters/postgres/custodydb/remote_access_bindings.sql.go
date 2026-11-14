@@ -85,6 +85,7 @@ VALUES($1,$2,$3,$4,$5)
 ON CONFLICT(root_id,cluster_id) DO UPDATE SET observed_at=excluded.observed_at,digest=excluded.digest,
  bindings=CASE WHEN remote_access_binding_delivery.digest=excluded.digest THEN remote_access_binding_delivery.bindings ELSE excluded.bindings END
 WHERE remote_access_binding_delivery.observed_at<excluded.observed_at
+ OR (remote_access_binding_delivery.observed_at=excluded.observed_at AND remote_access_binding_delivery.digest<>excluded.digest)
 `
 
 type StoreRemoteAccessBindingsParams struct {
