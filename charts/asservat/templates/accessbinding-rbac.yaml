@@ -65,10 +65,12 @@ spec:
         operations: [CREATE, UPDATE]
         resources: [accessbindings]
   validations:
-    - expression: "!has(object.spec.roles) || object.spec.roles.all(r, authorizer.group('asservat.io').resource('accessroles').namespace(request.namespace).name(r).check('bind').allowed())"
+    # Only roles and automation that a write adds or changes need bind, as for
+    # RoleBindings; metadata-only updates (finalizers, labels) pass.
+    - expression: "!has(object.spec.roles) || object.spec.roles.all(r, (request.operation == 'UPDATE' && has(oldObject.spec.roles) && r in oldObject.spec.roles) || authorizer.group('asservat.io').resource('accessroles').namespace(request.namespace).name(r).check('bind').allowed())"
       messageExpression: "'granting ' + (has(object.spec.roles) ? object.spec.roles.join(', ') : '') + ' needs the bind verb on accessroles.asservat.io with each role name in namespace ' + request.namespace"
       reason: Forbidden
-    - expression: "!has(object.spec.automation) || authorizer.group('asservat.io').resource('accessroles').namespace(request.namespace).name('automation').check('bind').allowed()"
+    - expression: "!has(object.spec.automation) || (request.operation == 'UPDATE' && has(oldObject.spec.automation) && object.spec.automation == oldObject.spec.automation) || authorizer.group('asservat.io').resource('accessroles').namespace(request.namespace).name('automation').check('bind').allowed()"
       messageExpression: "'spec.automation needs the bind verb on accessroles.asservat.io named automation in namespace ' + request.namespace"
       reason: Forbidden
 ---

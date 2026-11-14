@@ -82,9 +82,13 @@ grant any role there. It adds no runtime component, request or state.
   namespace's UID.
 - The hub-worker LISTs and watches AccessBindings in every namespace of the
   hub cluster (ClusterRole `get/list/watch accessbindings`). It reads a
-  binding's namespace once per binding UID and refuses a namespace created
-  after the binding (a later incarnation). PermissionSources stay in the
-  release namespace.
+  binding's namespace once per binding UID. A binding whose namespace is
+  gone, lacks timestamps or was created after the binding (a later
+  incarnation) grants and denies nothing; it does not stop the stream.
+  PermissionSources stay in the release namespace.
+- The bind check covers roles and automation that a CREATE or UPDATE adds
+  or changes; metadata-only updates (finalizers, labels) pass, as for
+  RoleBindings, whose roleRef is immutable.
 - Any namespace writer can store a binding the embedded schema refuses; it
   is kept as an invalid entry that grants and denies nothing instead of
   stopping the whole stream. The shared bounds (1,024 bindings, 4,096 rows,

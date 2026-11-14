@@ -3,6 +3,7 @@ package kubernetes
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -222,11 +223,34 @@ func (c *PermissionClient) cached(m permissionMetadata) (value.NamespaceRef, boo
 
 // placeBinding reads the namespace of a binding seen for the first time and
 // remembers its UID (ADR-329). The namespace must not be younger than the
-// binding: then it is a later incarnation of the same name.
+// binding: then it is a later incarnation of the same name. A binding that
+// cannot be placed (namespace gone, younger or without timestamps) is
+// remembered with an empty namespace UID and grants and denies nothing, so
+// it cannot stop the cluster's permission stream.
 func (c *PermissionClient) placeBinding(ctx context.Context, m permissionMetadata) (value.NamespaceRef, error) {
 	if ref, ok := c.cached(m); ok {
 		return ref, nil
 	}
+	ref, err := c.bindingNamespace(ctx, m)
+	if errors.Is(err, value.ErrChanged) {
+		ref, err = value.NamespaceRef{Name: m.Namespace}, nil
+	}
+	if err != nil {
+		return value.NamespaceRef{}, err
+	}
+	if c.bindings == nil {
+		return value.NamespaceRef{}, value.ErrUnavailable
+	}
+	c.bindings.mu.Lock()
+	defer c.bindings.mu.Unlock()
+	if len(c.bindings.byBinding) >= 4*permissionMaxObjects {
+		c.bindings.byBinding = map[string]value.NamespaceRef{}
+	}
+	c.bindings.byBinding[m.UID] = ref
+	return ref, nil
+}
+
+func (c *PermissionClient) bindingNamespace(ctx context.Context, m permissionMetadata) (value.NamespaceRef, error) {
 	b, err := c.raw(ctx, "/api/v1/namespaces/"+m.Namespace, nil)
 	if err != nil {
 		return value.NamespaceRef{}, err
@@ -242,17 +266,7 @@ func (c *PermissionClient) placeBinding(ctx context.Context, m permissionMetadat
 	if ns.Name != m.Namespace || ns.Created.IsZero() || m.Created.IsZero() || ns.Created.After(m.Created) {
 		return value.NamespaceRef{}, value.ErrChanged
 	}
-	ref := value.NamespaceRef{Name: ns.Name, UID: ns.UID}
-	if c.bindings == nil {
-		return value.NamespaceRef{}, value.ErrUnavailable
-	}
-	c.bindings.mu.Lock()
-	defer c.bindings.mu.Unlock()
-	if len(c.bindings.byBinding) >= 4*permissionMaxObjects {
-		c.bindings.byBinding = map[string]value.NamespaceRef{}
-	}
-	c.bindings.byBinding[m.UID] = ref
-	return ref, nil
+	return value.NamespaceRef{Name: ns.Name, UID: ns.UID}, nil
 }
 
 // listPath is a kind's LIST path: every namespace for AccessBindings

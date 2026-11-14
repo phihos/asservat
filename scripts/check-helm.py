@@ -196,7 +196,7 @@ def check_accessbindings(render):
     # must be able to remove a deleted namespace's bindings.
     assert rule["operations"] == ["CREATE", "UPDATE"] and rule["resources"] == ["accessbindings"] and policy["spec"]["failurePolicy"] == "Fail"
     expressions = [v["expression"] for v in policy["spec"]["validations"]]
-    assert any("object.spec.roles.all(r, authorizer.group('asservat.io').resource('accessroles').namespace(request.namespace).name(r).check('bind')" in e for e in expressions)
+    assert any("object.spec.roles.all(r, (request.operation == 'UPDATE' && has(oldObject.spec.roles) && r in oldObject.spec.roles) || authorizer.group('asservat.io').resource('accessroles').namespace(request.namespace).name(r).check('bind')" in e for e in expressions)
     assert any("name('automation').check('bind')" in e for e in expressions)
     assert named(docs, "ValidatingAdmissionPolicyBinding", base)["spec"] == {"policyName": base, "validationActions": ["Deny"]}
     # A workload-cluster release observes no AccessBindings yet.

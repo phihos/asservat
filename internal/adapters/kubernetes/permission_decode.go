@@ -281,11 +281,12 @@ func (v *permissionValidator) binding(object permissionObject, ref value.Resourc
 
 // observedBinding decodes an observed binding. A spec that fails validation
 // grants and denies nothing: any namespace writer can store one (ADR-329), so
-// it must not stop the cluster's permission stream. It keeps its identity
+// it must not stop the cluster's permission stream. Neither does a binding
+// that could not be placed in its namespace (empty NamespaceUID). It keeps its identity
 // with the digest of its raw spec, so the journal still sees each change.
 func (v *permissionValidator) observedBinding(object permissionObject, ref value.Resource) value.Binding {
 	b, err := v.binding(object, ref)
-	if err == nil {
+	if err == nil && ref.NamespaceUID != "" {
 		return b
 	}
 	ref.SpecDigest = artifact.Digest(sha256.Sum256(object.Spec))

@@ -234,8 +234,6 @@ func TestPermissionMalformedObjectsAndIdentity(t *testing.T) {
 		"missing uid":     func(o map[string]any) { delete(o["metadata"].(map[string]any), "uid") },
 		"uid alias":       func(o map[string]any) { m := o["metadata"].(map[string]any); m["UID"] = m["uid"]; delete(m, "uid") },
 		"generation zero": func(o map[string]any) { o["metadata"].(map[string]any)["generation"] = 0 },
-		// ADR-329: a namespace younger than the binding is a later incarnation.
-		"namespace younger": func(o map[string]any) { o["metadata"].(map[string]any)["creationTimestamp"] = "2026-09-01T00:00:00Z" },
 	}
 	for name, mutate := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -330,6 +328,49 @@ func TestPermissionBindingsAcrossNamespaces(t *testing.T) {
 	}
 	if reads.Load() != 1 {
 		t.Fatalf("namespace read %d times", reads.Load())
+	}
+}
+
+// Gitar review on #236: a binding whose namespace is gone, younger than the
+// binding or lacks timestamps grants and denies nothing; the snapshot of the
+// other bindings still completes.
+func TestUnplaceableBindingGrantsNothing(t *testing.T) {
+	for _, mode := range []string{"missing", "younger", "noTimestamp"} {
+		t.Run(mode, func(t *testing.T) {
+			f := newPermissionFixture(t, func(w http.ResponseWriter, r *http.Request) bool {
+				switch r.URL.Path {
+				case "/api/v1/namespaces/orders":
+					if mode == "missing" {
+						http.Error(w, `{"kind":"Status","apiVersion":"v1","status":"Failure","reason":"NotFound","code":404}`, http.StatusNotFound)
+						return true
+					}
+					ns := permissionNamespace("orders", "orders-uid")
+					if mode == "younger" {
+						ns["metadata"].(map[string]any)["creationTimestamp"] = "2026-10-10T11:30:00Z"
+					}
+					permissionReply(w, ns)
+					return true
+				case "/apis/asservat.io/v1alpha1/accessbindings":
+					other := permissionBinding(2)
+					other["metadata"].(map[string]any)["namespace"] = "orders"
+					if mode == "noTimestamp" {
+						delete(other["metadata"].(map[string]any), "creationTimestamp")
+					}
+					permissionReply(w, permissionList("AccessBinding", "rv", "", permissionBinding(1), other))
+					return true
+				}
+				return false
+			})
+			s, err := f.client.PermissionSnapshot(context.Background())
+			if err != nil || len(s.Bindings) != 2 {
+				t.Fatal(err, len(s.Bindings))
+			}
+			for _, b := range s.Bindings {
+				if (b.Resource.Namespace == "orders") != b.Invalid {
+					t.Fatalf("%s invalid=%v", b.Resource.Namespace, b.Invalid)
+				}
+			}
+		})
 	}
 }
 
