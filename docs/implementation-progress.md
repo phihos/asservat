@@ -47,7 +47,8 @@ lets `bestEffort` storage enroll.
 
 Verified: unit tests of the changed packages, `make helm-check`, the CI gate
 set, `TestCapacityValuesSourceWithRealPostgres` (real PostgreSQL). Gaps: the
-default share uses eight, not the eligible-workload count; the
+default share divides by max(8, clusters + 1), not the eligible-workload
+count; the
 `capturesPerCluster` default ignores node count; `maxConcurrentExpensive`
 and `onFull` are not enforced; capacity is on only when a value is set; the
 SQL capacity subsystem (00054, object counts, five-second observation
