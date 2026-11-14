@@ -16613,12 +16613,21 @@
                     },
                     "spec": {
                       "$ref": "https://asservat.io/spec/v1/access-binding.schema.json#/properties/spec"
+                    },
+                    "clusterID": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "namespace": {
+                      "$ref": "https://asservat.io/spec/v1/permission-common.schema.json#/$defs/namespaceRef"
                     }
                   },
                   "required": [
                     "action",
                     "kind",
-                    "spec"
+                    "spec",
+                    "clusterID",
+                    "namespace"
                   ]
                 },
                 {
@@ -16638,13 +16647,22 @@
                     },
                     "spec": {
                       "$ref": "https://asservat.io/spec/v1/access-binding.schema.json#/properties/spec"
+                    },
+                    "clusterID": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "namespace": {
+                      "$ref": "https://asservat.io/spec/v1/permission-common.schema.json#/$defs/namespaceRef"
                     }
                   },
                   "required": [
                     "action",
                     "kind",
                     "uid",
-                    "spec"
+                    "spec",
+                    "clusterID",
+                    "namespace"
                   ]
                 },
                 {
