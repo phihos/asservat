@@ -34,6 +34,27 @@ type SecretsPlan struct {
 	// download workers' namespace (Pods mount only their own namespace's
 	// Secrets), immutable, created once.
 	DownloadStore *SecretsCopy `json:"downloadStore,omitempty"`
+	// RemoteClusters are the joined mode=cluster clusters (values
+	// clusters): with the bundled object store each gets its own regional
+	// capabilities, scoped to its cluster ID (RemoteObjectStoreSecret).
+	RemoteClusters []SecretsRemoteCluster `json:"remoteClusters,omitempty"`
+}
+
+type SecretsRemoteCluster struct {
+	Name      string `json:"name"`
+	ClusterID string `json:"clusterID"`
+}
+
+// RemoteObjectStorePrincipals are a joined cluster's regional executor
+// capabilities (ADR-331), each scoped to that cluster's ID.
+func RemoteObjectStorePrincipals() []string { return []string{"regional-write", "regional-history"} }
+
+// RemoteObjectStoreSecret is the Secret (key credentials.json) of one
+// joined cluster's regional capability: `<name>-s3-<principal>-<cluster>`.
+// The secrets hook generates it with the bundled object store; with an
+// external store the operator creates it.
+func RemoteObjectStoreSecret(release, principal, cluster string) string {
+	return release + "-s3-" + principal + "-" + cluster
 }
 
 // SecretsCopy names a Secret in the release namespace and its copy.

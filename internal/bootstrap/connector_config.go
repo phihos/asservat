@@ -66,18 +66,17 @@ func validConnectorConfig(c contracts.ConnectorConfig) error {
 	}
 	switch c.Mode {
 	case contracts.ConnectorModeCluster:
-		if c.Offer == nil || c.Hub != nil || c.OfferConfigMap != "" {
+		if c.Hub != nil || c.OfferConfigMap != "" {
 			return bad("cluster-offer")
 		}
 	case contracts.ConnectorModeCombined:
-		if c.Offer != nil || len(validation.IsDNS1123Subdomain(c.OfferConfigMap)) != 0 || c.Hub == nil || !ownerEndpoint(c.Hub.Federation) || c.Hub.Owners != "" && !ownerDialAddress(c.Hub.Owners) || c.Hub.KeyService != "" && !ownerEndpoint(c.Hub.KeyService) {
+		if len(validation.IsDNS1123Subdomain(c.OfferConfigMap)) != 0 || c.Hub == nil || !ownerEndpoint(c.Hub.Federation) || c.Hub.Owners != "" && !ownerDialAddress(c.Hub.Owners) || c.Hub.KeyService != "" && !ownerEndpoint(c.Hub.KeyService) {
 			return bad("combined-hub")
 		}
 	default:
 		return bad("mode")
 	}
-	if c.Mode == contracts.ConnectorModeCluster && (!authorization.UUID(c.ClusterID) || !authorization.UUID(c.PeerID)) ||
-		c.Mode == contracts.ConnectorModeCombined && (c.ClusterID != "" || c.PeerID != "") || len(validation.IsDNS1123Label(c.Namespace)) != 0 {
+	if c.ClusterID != "" || c.PeerID != "" || len(validation.IsDNS1123Label(c.Namespace)) != 0 {
 		return bad("binding")
 	}
 	for _, name := range []string{c.Deployment, c.ServiceAccount, c.ClusterCredential} {
@@ -145,13 +144,47 @@ func kubernetesRoots(ctx context.Context, in *providerInputs) ([][]byte, error) 
 	return roots, nil
 }
 
-// resolveRegionalConfig completes c with the hub's offer. Cluster mode uses
-// the offer from values. Combined mode reads the hub's published offer
-// ConfigMap in the shared release namespace (get on that one name).
+// readJoinFiles reads the cluster-mode join Secret's cluster ID, peer ID
+// and regional offer (the files next to config.json).
+func readJoinFiles(ctx context.Context, in *providerInputs) (cluster, peer string, offer contracts.RegionalOffer, err error) {
+	id := func(name string) (string, error) {
+		b, err := in.read(ctx, name, 64)
+		if err != nil || !authorization.UUID(string(b)) {
+			return "", &fixedStepError{"join/" + name, mounts.ErrUnavailable}
+		}
+		return string(b), nil
+	}
+	if cluster, err = id(contracts.ConnectorJoinClusterFile); err != nil {
+		return
+	}
+	if peer, err = id(contracts.ConnectorJoinPeerFile); err != nil {
+		return
+	}
+	b, err := in.read(ctx, contracts.RegionalOfferFile, 1<<20)
+	if err != nil {
+		return "", "", offer, &fixedStepError{"join/offer", mounts.ErrUnavailable}
+	}
+	d := json.NewDecoder(bytes.NewReader(b))
+	d.DisallowUnknownFields()
+	if d.Decode(&offer) != nil || d.More() || cluster == peer {
+		return "", "", offer, &fixedStepError{"join/offer", mounts.ErrUnavailable}
+	}
+	return cluster, peer, offer, nil
+}
+
+// resolveRegionalConfig completes c with the hub's offer. Cluster mode reads
+// the offer from the join Secret's file. Combined mode reads the hub's
+// published offer ConfigMap in the shared release namespace (get on that one
+// name).
 func resolveRegionalConfig(ctx context.Context, in *providerInputs, c contracts.ConnectorConfig) (regionalConfig, error) {
 	out := regionalConfig{ConnectorConfig: c}
 	if c.Mode == contracts.ConnectorModeCluster {
-		out.offer = *c.Offer
+		cluster, peer, offer, err := readJoinFiles(ctx, in)
+		if err != nil {
+			return out, err
+		}
+		out.ClusterID, out.PeerID, out.offer = cluster, peer, offer
+		c.ClusterID, c.PeerID = cluster, peer
 	} else {
 		offer, err := readCombinedOffer(ctx, in, c.Namespace, c.OfferConfigMap)
 		if err != nil {

@@ -5,8 +5,9 @@
   on the virtual resource `accessroles.asservat.io` named after each role it
   grants, and `bind` on `automation` for spec.automation (ADR-059: never an
   ordinary namespace grant). Cluster administrators hold both; the automation
-  ClusterRole below is bound per namespace by an administrator. */}}
-{{- if include "asservat.hub" . }}
+  ClusterRole below is bound per namespace by an administrator. Every mode
+  renders them: a mode=cluster connector delivers its cluster's bindings to
+  the hub. */}}
 {{- $base := printf "%s-%s" .Release.Namespace (include "asservat.fullname" (list . "accessbindings")) }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -82,4 +83,3 @@ metadata:
 spec:
   policyName: {{ $base }}
   validationActions: [Deny]
-{{- end }}

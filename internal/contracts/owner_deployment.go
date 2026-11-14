@@ -214,8 +214,6 @@ type OwnerPublicClusterCapacity struct {
 	Keys                 []string `json:"keys"`
 }
 type OwnerPublicExecutor struct {
-	NamespaceUID  string `json:"namespaceUID"`
-	AccountUID    string `json:"accountUID"`
 	StartupDigest string `json:"startupDigest"`
 	ImageDigest   string `json:"imageDigest"`
 }

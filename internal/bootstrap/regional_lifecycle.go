@@ -8,6 +8,7 @@ import (
 
 	"asservat.local/asservat/internal/adapters/mtls"
 	fleetapp "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/contracts"
 	value "asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/transport/clustercredential"
@@ -301,4 +302,71 @@ func (r *RegionalLifecycle) AuthenticateOwner(ctx context.Context, connection fl
 		return zero, value.ErrUnavailable
 	}
 	return out, nil
+}
+
+// AccessBindingReader is the connector's own AccessBinding LIST (ADR-329).
+type AccessBindingReader interface {
+	AccessBindingDelivery(context.Context) (contracts.AccessBindingDelivery, error)
+}
+
+// deliveringLocal answers the hub's delivery request of one conversation
+// with a LIST taken after the hub verified the presentation.
+type deliveringLocal struct {
+	connectorlifecycle.Local
+	bindings AccessBindingReader
+}
+
+func (d deliveringLocal) ReadAccessBindings(ctx context.Context) (contracts.AccessBindingDelivery, error) {
+	out, err := d.bindings.AccessBindingDelivery(ctx)
+	regionalLocalFailed("access bindings", err)
+	return out, err
+}
+
+// DeliverAccessBindings sends this cluster's complete AccessBinding LIST to
+// the hub in one lifecycle conversation, presented by the admitted process
+// (ADR-329). The hub attributes it to the cluster credential's cluster.
+func (r *RegionalLifecycle) DeliverAccessBindings(ctx context.Context, bindings AccessBindingReader) error {
+	request, ok := r.admitted()
+	if !ok || bindings == nil || ctx == nil {
+		return value.ErrUnavailable
+	}
+	_, err := r.runLocal(ctx, connectorlifecycle.PurposeAccessBindings, value.ClusterRenewal, uuid.NewString(), request, nil, deliveringLocal{r.Local, bindings})
+	if err != nil {
+		return unavailable(err)
+	}
+	return nil
+}
+
+// CapacityReader is the connector's capacity observation of its cluster
+// (ADR-331).
+type CapacityReader interface {
+	CapacityDelivery(context.Context, []string) (contracts.CapacityDelivery, error)
+}
+
+// deliveringCapacity answers the hub's capacity request of one conversation
+// with reads taken after the hub verified the presentation.
+type deliveringCapacity struct {
+	connectorlifecycle.Local
+	capacity CapacityReader
+	keys     []string
+}
+
+func (d deliveringCapacity) ReadCapacity(ctx context.Context) (contracts.CapacityDelivery, error) {
+	out, err := d.capacity.CapacityDelivery(ctx, d.keys)
+	regionalLocalFailed("capacity", err)
+	return out, err
+}
+
+// DeliverCapacity sends this cluster's capacity observation to the hub in
+// one lifecycle conversation, presented by the admitted process (ADR-331).
+func (r *RegionalLifecycle) DeliverCapacity(ctx context.Context, capacity CapacityReader, keys []string) error {
+	request, ok := r.admitted()
+	if !ok || capacity == nil || len(keys) == 0 || ctx == nil {
+		return value.ErrUnavailable
+	}
+	_, err := r.runLocal(ctx, connectorlifecycle.PurposeCapacity, value.ClusterRenewal, uuid.NewString(), request, nil, deliveringCapacity{r.Local, capacity, keys})
+	if err != nil {
+		return unavailable(err)
+	}
+	return nil
 }

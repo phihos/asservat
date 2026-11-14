@@ -39,6 +39,14 @@ const (
 	// PurposeRecovery asks for the hub's current recovery state, which the
 	// region's verify-only work-trust reader requires. It is read-only.
 	PurposeRecovery value.ConnectorLifecyclePurpose = "recovery"
+	// PurposeAccessBindings delivers the connector's complete AccessBinding
+	// LIST of its cluster (ADR-329). The hub asks for it only after the
+	// presentation verified; the delivery is attributed to that cluster.
+	PurposeAccessBindings value.ConnectorLifecyclePurpose = "access-bindings"
+	// PurposeCapacity delivers the connector's capacity observation of its
+	// cluster (ADR-331), attributed to the presented cluster like
+	// PurposeAccessBindings.
+	PurposeCapacity value.ConnectorLifecyclePurpose = "capacity"
 	// PurposeBootstrap enrolls cluster credential generation 1 from a fleet
 	// operator's one-use bootstrap (ADR-193). It carries no presentation.
 	PurposeBootstrap value.ConnectorLifecyclePurpose = "bootstrap"
@@ -90,6 +98,10 @@ type HubFrame struct {
 	Recovery          *value.RecoveryState                `json:",omitempty"`
 	Bootstrap         *value.ClusterBootstrapResult       `json:",omitempty"`
 	Failure           string                              `json:",omitempty"`
+	// Digest is the hub's stored delivery digest of an "access-bindings" or
+	// "capacity" request; the connector answers Unchanged when its current
+	// delivery has the same digest (ADR-329, ADR-331).
+	Digest string `json:",omitempty"`
 }
 
 // RegionFrame answers one hub frame.
@@ -98,6 +110,24 @@ type RegionFrame struct {
 	Observation   *value.ConnectorLifecycleObservation `json:",omitempty"`
 	Source        *value.ConnectorIdentitySource       `json:",omitempty"`
 	Configuration *app.ConnectorIdentityConfiguration  `json:",omitempty"`
+	// AccessBindings answers the hub's "access-bindings" request (ADR-329).
+	AccessBindings *contracts.AccessBindingDelivery `json:",omitempty"`
+	// Capacity answers the hub's "capacity" request (ADR-331).
+	Capacity *contracts.CapacityDelivery `json:",omitempty"`
+	// Unchanged answers a delivery request whose digest matches.
+	Unchanged bool `json:",omitempty"`
+}
+
+// CapacityLocal is the regional reader of the connector's capacity
+// observation (ADR-331), offered only by a delivering conversation.
+type CapacityLocal interface {
+	ReadCapacity(context.Context) (contracts.CapacityDelivery, error)
+}
+
+// AccessBindingsLocal is the regional reader of the connector's own
+// AccessBinding LIST (ADR-329), offered only by a delivering conversation.
+type AccessBindingsLocal interface {
+	ReadAccessBindings(context.Context) (contracts.AccessBindingDelivery, error)
 }
 
 // Local is the regional process's in-cluster reader set: the native lifecycle
@@ -111,6 +141,7 @@ type Local interface {
 // Conn is one decoded/encoded frame stream with a per-read deadline control.
 type Conn struct {
 	mu       sync.Mutex
+	limit    *frameLimit
 	dec      *json.Decoder
 	enc      *json.Encoder
 	flush    func() error
@@ -119,9 +150,29 @@ type Conn struct {
 }
 
 func NewConn(r io.Reader, w io.Writer, flush func() error, deadline func(time.Time) error) *Conn {
-	d := json.NewDecoder(io.LimitReader(r, int64(MaxRegionFrame+1)*MaxFrameBytes))
+	limit := &frameLimit{r: r, n: int64(MaxRegionFrame+1) * MaxFrameBytes}
+	d := json.NewDecoder(limit)
 	d.DisallowUnknownFields()
-	return &Conn{dec: d, enc: json.NewEncoder(w), flush: flush, deadline: deadline}
+	return &Conn{limit: limit, dec: d, enc: json.NewEncoder(w), flush: flush, deadline: deadline}
+}
+
+// frameLimit bounds the bytes a conversation reads; only an authenticated
+// AccessBinding delivery raises it, once, by its own bound (ADR-329).
+type frameLimit struct {
+	r io.Reader
+	n int64
+}
+
+func (l *frameLimit) Read(p []byte) (int, error) {
+	if l.n <= 0 {
+		return 0, io.EOF
+	}
+	if int64(len(p)) > l.n {
+		p = p[:l.n]
+	}
+	n, err := l.r.Read(p)
+	l.n -= int64(n)
+	return n, err
 }
 
 func (c *Conn) Send(v any) error {

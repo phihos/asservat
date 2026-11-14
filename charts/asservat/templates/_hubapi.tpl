@@ -37,18 +37,36 @@
 {{- end -}}
 {{- end -}}
 
-{{/* fleet.deliveryProfiles (JSON list). mode=combined defaults to
-     ["local"]: the hub-api issues the local connector's bootstrap itself
-     through the fleet issuance with the first profile. */}}
+{{/* fleet.deliveryProfiles (JSON list). mode=combined and clusters default
+     to ["local"]: the hub-api issues the local connector's and the remote
+     clusters' bootstraps itself through the fleet issuance with the first
+     profile. */}}
 {{- define "asservat.hubApi.deliveryProfiles" -}}
 {{- $default := list -}}
-{{- if include "asservat.hubApi.combined" . }}{{ $default = list "local" }}{{ end -}}
+{{- if include "asservat.hubApi.offer" . }}{{ $default = list "local" }}{{ end -}}
 {{- toJson (default $default .Values.fleet.deliveryProfiles) -}}
 {{- end -}}
 
 {{/* True when the regional connector shares this release (mode=combined). */}}
 {{- define "asservat.hubApi.combined" -}}
 {{- if eq .Values.mode "combined" }}true{{ end -}}
+{{- end -}}
+
+{{/* True when the hub publishes its regional offer: mode=combined or
+     remote clusters joined with mode=cluster (values clusters). */}}
+{{- define "asservat.hubApi.offer" -}}
+{{- if or (include "asservat.hubApi.combined" .) (and (include "asservat.hub" .) .Values.clusters) }}true{{ end -}}
+{{- end -}}
+
+{{/* The joined remote clusters (contracts.RemoteCluster, JSON list). */}}
+{{- define "asservat.hubApi.clusters" -}}
+{{- $root := . -}}
+{{- $out := list -}}
+{{- range .Values.clusters -}}
+{{- if not (regexMatch "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" (toString .clusterID)) }}{{ fail (printf "clusters[%s].clusterID must be a lowercase UUID (uuidgen)" (toString .name)) }}{{ end -}}
+{{- $out = append $out (dict "name" (required "clusters[].name is required" .name) "clusterID" .clusterID "namespace" (default $root.Release.Namespace .namespace) "standby" (int (default 2 .standby)) "captures" (int (default 1 .captures))) -}}
+{{- end -}}
+{{- toJson $out -}}
 {{- end -}}
 
 {{/* The hub-api config.json (contracts.HubAPIConfig): render-time values
@@ -83,18 +101,31 @@
 {{- if or $u.processing .Values.capacity }}{{ $_ := set $pub "processing" true }}{{ end -}}
 {{- with .Values.captureHistory }}{{ $_ := set $pub "captureHistory" . }}{{ end -}}
 {{- if eq .Values.exposure.tls.mode "proxy" }}{{ $_ := set $pub "proxyTLS" true }}{{ end -}}
-{{- if or .Values.fleet.issuer (include "asservat.hubApi.combined" .) -}}
+{{- if or .Values.fleet.issuer (include "asservat.hubApi.offer" .) -}}
 {{- $profiles := include "asservat.hubApi.deliveryProfiles" . | fromJsonArray -}}
 {{- if not $profiles }}{{ fail "fleet.deliveryProfiles needs at least one profile when fleet.issuer is set" }}{{ end -}}
 {{- $_ := set $pub "fleet" (dict "deliveryProfile" (first $profiles)) -}}
 {{- end -}}
-{{- if include "asservat.hubApi.combined" . -}}
+{{- if include "asservat.hubApi.offer" . -}}
 {{- $fed := include "asservat.fullname" (list . "federation") -}}
-{{- $connector := required "mode=combined requires federation.connector (the regional offer's connector limits)" (dig "connector" nil (default dict .Values.federation)) -}}
-{{- $backup := required "mode=combined requires capacity.backup (the regional offer's backup profile)" (dig "backup" nil (default dict .Values.capacity)) -}}
-{{- $_ := set $pub "regionalOffer" (dict "federation" (printf "https://%s.%s.svc:9446" $fed .Release.Namespace) "serverName" (printf "%s.%s.svc" $fed .Release.Namespace) "image" (include "asservat.image" .) "connector" $connector "backup" $backup) -}}
+{{- $connector := required "mode=combined and clusters require federation.connector (the regional offer's connector limits)" (dig "connector" nil (default dict .Values.federation)) -}}
+{{- $backup := required "mode=combined and clusters require capacity.backup (the regional offer's backup profile)" (dig "backup" nil (default dict .Values.capacity)) -}}
+{{- $connectors := len (default list .Values.clusters) -}}
+{{- if include "asservat.hubApi.combined" . }}{{ $connectors = add1 $connectors }}{{ end -}}
+{{- if lt (int64 $connector.profiles) (int64 $connectors) }}{{ fail (printf "federation.connector.profiles must cover every connector (%d: the combined-mode one plus clusters); it is fixed at the first install" $connectors) }}{{ end -}}
+{{- $offer := dict "federation" (printf "https://%s.%s.svc:9446" $fed .Release.Namespace) "serverName" (printf "%s.%s.svc" $fed .Release.Namespace) "image" (include "asservat.image" .) "connector" $connector "backup" $backup -}}
+{{- if not (include "asservat.hubApi.combined" .) }}{{ $_ := set $offer "hubOnly" true }}{{ end -}}
+{{- if .Values.clusters -}}
+{{- $r := .Values.remote -}}
+{{- $_ := set $offer "remote" (dict "federation" (required "clusters require remote.federation" $r.federation) "owners" (required "clusters require remote.owners" $r.owners) "keyService" (required "clusters require remote.keyService" $r.keyService) "objectStore" (required "clusters require remote.objectStore" $r.objectStore)) -}}
+{{- end -}}
+{{- $_ := set $pub "regionalOffer" $offer -}}
 {{- end -}}
 {{- $_ := set $c "public" $pub -}}
+{{- end -}}
+{{- with include "asservat.hubApi.clusters" . | fromJsonArray -}}
+{{- if not $.Values.origin }}{{ fail "clusters require origin (the hub-api issues their bootstraps)" }}{{ end -}}
+{{- $_ := set $c "clusters" . -}}
 {{- end -}}
 {{- toJson $c -}}
 {{- end -}}

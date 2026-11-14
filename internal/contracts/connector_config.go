@@ -30,17 +30,26 @@ const (
 	ConnectorModeCluster          = "cluster"
 	ConnectorModeCombined         = "combined"
 	RegionalHistoryCredentialFile = "history-storage.json"
+	// Cluster mode: the hub-issued join Secret (RemoteJoinSecretName) also
+	// supplies the cluster and peer IDs and the regional offer, as files
+	// next to config.json.
+	ConnectorJoinClusterFile = "clusterID"
+	ConnectorJoinPeerFile    = "peerID"
 )
 
+// RemoteJoinSecretName is the hub-api's join Secret for one remote workload
+// cluster (values clusters[].name), in the hub's release namespace. The
+// operator copies it unchanged to the cluster's release namespace.
+func RemoteJoinSecretName(release, cluster string) string { return release + "-join-" + cluster }
+
 // ConnectorConfig holds only Helm values and chart constants (field map
-// class H). In cluster mode Offer is the hub's public regional offer copied
-// into values; in combined mode the connector reads the hub's offer ConfigMap
-// OfferConfigMap in its own (the release) namespace and dials the in-cluster
-// Service addresses in Hub. In cluster mode ClusterID and PeerID are the
-// browser-issued bootstrap receipt's; in combined mode they are absent and
-// the connector reads the generated clusterID and peerID from the IDs Secret
-// (InstallationIDsRoot). The bootstrap record itself is a Secret file, never
-// a value.
+// class H). In cluster mode the connector reads the hub's regional offer and
+// its cluster and peer IDs from the copied join Secret's files; in combined
+// mode it reads the hub's offer ConfigMap OfferConfigMap in its own (the
+// release) namespace, dials the in-cluster Service addresses in Hub and reads
+// the generated clusterID and peerID from the IDs Secret
+// (InstallationIDsRoot). ClusterID and PeerID are never values: the startup
+// fills them. The bootstrap record itself is a Secret file, never a value.
 type ConnectorConfig struct {
 	Format            string                   `json:"format"`
 	Mode              string                   `json:"mode"`
@@ -51,7 +60,6 @@ type ConnectorConfig struct {
 	ServiceAccount    string                   `json:"serviceAccount"`
 	ClusterCredential string                   `json:"clusterCredential"`
 	ImageDigest       string                   `json:"imageDigest"`
-	Offer             *RegionalOffer           `json:"offer,omitempty"`
 	OfferConfigMap    string                   `json:"offerConfigMap,omitempty"`
 	Hub               *ConnectorHubAddresses   `json:"hub,omitempty"`
 	Executor          *ConnectorExecutorConfig `json:"executor,omitempty"`
@@ -165,20 +173,25 @@ type RegionalIdentityMapping struct {
 }
 
 type RegionalEvidenceStore struct {
-	Endpoint string   `json:"endpoint"`
-	Roots    [][]byte `json:"roots"`
-	Region   string   `json:"region"`
-	Bucket   string   `json:"bucket"`
-	StoreID  string   `json:"storeID"`
+	Endpoint string `json:"endpoint"`
+	// ServerName, when set, is the name the endpoint's certificate carries
+	// (the in-cluster Service name behind a TCP passthrough address).
+	ServerName string   `json:"serverName,omitempty"`
+	Roots      [][]byte `json:"roots"`
+	Region     string   `json:"region"`
+	Bucket     string   `json:"bucket"`
+	StoreID    string   `json:"storeID"`
 }
 
 // RegionalWrapService is the hub cluster's local key service for the artifact
 // purpose (ADR-176). The connector presents its own client leaf; each wrap is
 // authorized for one prepared attempt.
 type RegionalWrapService struct {
-	Endpoint string   `json:"endpoint"`
-	Roots    [][]byte `json:"roots"`
-	KeyID    string   `json:"keyID"`
+	Endpoint string `json:"endpoint"`
+	// ServerName as RegionalEvidenceStore.ServerName.
+	ServerName string   `json:"serverName,omitempty"`
+	Roots      [][]byte `json:"roots"`
+	KeyID      string   `json:"keyID"`
 }
 
 // RegionalContextOwners pins the hub's native listener address and its exact

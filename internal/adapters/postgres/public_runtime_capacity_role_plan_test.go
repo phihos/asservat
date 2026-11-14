@@ -38,8 +38,9 @@ func TestCapacityRolePlansKeepClosedRPCsAndPurposeFixedPeerReads(t *testing.T) {
 			}
 		}
 		// ADR-219 shares root/allocation publication with query backing; the
-		// Helm-native hub-worker initializes the root and reads its qualification.
-		want := 21
+		// Helm-native hub-worker initializes the root and reads its qualification
+		// and qualifies the joined mode=cluster clusters (ADR-331).
+		want := 22
 		if purpose == "capacity-capture" {
 			want = 5
 		}
@@ -71,6 +72,8 @@ func capacityExpectedOwnerReadGrants() []publicRuntimeGrant {
 		{"table", "hub_owner_configuration_revision", "", "SELECT"},
 		{"table", "hub_owner_enrollment", "", "SELECT"},
 		{"table", "hub_owner_certificate", "", "SELECT"},
+		// ADR-331: the joined clusters' delivered capacity observations.
+		{"table", "remote_capacity_delivery", "", "SELECT"},
 	}
 }
 

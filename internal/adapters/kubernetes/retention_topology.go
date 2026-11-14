@@ -77,29 +77,45 @@ func (r *RetentionTopologies) RetentionTopology(ctx context.Context, target stri
 // observes in the release namespace (contracts.RetentionSourceDigest). A
 // ConfigMap pin for the same target is refused.
 func (r *RetentionTopologies) AddHubTopology(client *PermissionClient, root string) error {
-	if r == nil || client == nil || !authorization.UUID(root) || r.readers[client.clusterID] != nil {
+	if client == nil {
+		return value.ErrInvalid
+	}
+	return r.AddRemoteTopology(client, root, client.clusterID)
+}
+
+// AddRemoteTopology serves a joined mode=cluster cluster's topology in
+// process: like the hub cluster's, its only source is the hub retention
+// source (ADR-195), so the hub's retention policies bound its evidence.
+func (r *RetentionTopologies) AddRemoteTopology(client *PermissionClient, root, target string) error {
+	if r == nil || client == nil || !authorization.UUID(root) || !authorization.UUID(target) || r.readers[target] != nil {
 		return value.ErrInvalid
 	}
 	hub := privacy.PolicySourceRef{ClusterID: client.clusterID, ControlNamespaceUID: client.control.UID, Hub: true, ProtectionDigest: artifact.Digest(contracts.RetentionSourceDigest(client.clusterID, client.control.Name))}
 	if !port.ValidRetentionSource(hub) {
 		return value.ErrInvalid
 	}
-	r.readers[client.clusterID] = hubTopology{client: client, root: root, hub: hub}
+	r.readers[target] = hubTopology{client: client, root: root, target: target, hub: hub}
 	return nil
 }
 
 type hubTopology struct {
-	client *PermissionClient
-	root   string
-	hub    privacy.PolicySourceRef
+	client       *PermissionClient
+	root, target string
+	hub          privacy.PolicySourceRef
 }
 
 func (h hubTopology) RetentionTopology(ctx context.Context, target string) (privacy.PolicyTopology, error) {
-	if ctx == nil || ctx.Err() != nil || target != h.client.clusterID {
+	if ctx == nil || ctx.Err() != nil || target != h.target {
 		return privacy.PolicyTopology{}, value.ErrDenied
 	}
 	start := h.client.now()
-	digest := sha256.Sum256([]byte("asservat-hub-topology/v1\x00" + h.root + "\x00" + h.client.clusterID + "\x00" + h.client.control.UID))
+	// The hub cluster's own digest input is unchanged; a remote target adds
+	// its cluster ID.
+	input := "asservat-hub-topology/v1\x00" + h.root + "\x00" + h.client.clusterID + "\x00" + h.client.control.UID
+	if target != h.client.clusterID {
+		input += "\x00" + target
+	}
+	digest := sha256.Sum256([]byte(input))
 	out := privacy.PolicyTopology{RootID: h.root, TargetClusterID: target, Revision: identity.Revision{UID: h.client.control.UID, Generation: 1, Digest: digest}, Sources: []privacy.PolicySourceRef{h.hub}, ObservedAt: start, FreshUntil: start.Add(privacy.PolicyTopologyInterval)}
 	if !out.Valid(h.client.now()) {
 		return privacy.PolicyTopology{}, value.ErrUnavailable

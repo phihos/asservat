@@ -1,6 +1,10 @@
 package contracts
 
-import "io"
+import (
+	"io"
+
+	"github.com/google/uuid"
+)
 
 // Helm-native hub-api inputs (docs/reviews/helm-native-field-map.md). The
 // chart renders HubAPIConfig into ConfigMap <name>-hub-api-config, key
@@ -54,6 +58,32 @@ type HubAPIConfig struct {
 	Observation HubAPIObservation `json:"observation"`
 	Native      HubAPINative      `json:"native"`
 	Public      *HubAPIPublic     `json:"public,omitempty"`
+	// Clusters are the remote workload clusters joined with mode=cluster.
+	Clusters []RemoteCluster `json:"clusters,omitempty"`
+}
+
+// RemoteCluster is one workload cluster an operator registered in the hub's
+// values (clusters[]): its DNS-label name (the join Secret's suffix), its
+// operator-chosen cluster ID, its release namespace and its context-start
+// reservations. The connector peer ID derives from installation and cluster
+// (RemotePeerID). The release name (installation.name) is the hub's.
+type RemoteCluster struct {
+	Name      string `json:"name"`
+	ClusterID string `json:"clusterID"`
+	Namespace string `json:"namespace"`
+	Standby   int    `json:"standby"`
+	Captures  int    `json:"captures"`
+}
+
+// RemotePeerID is a remote cluster's connector peer: a name-based UUID of
+// the installation and cluster IDs, so every hub component derives it
+// without shared state.
+func RemotePeerID(installationID, clusterID string) (string, bool) {
+	ns, err := uuid.Parse(installationID)
+	if err != nil {
+		return "", false
+	}
+	return uuid.NewSHA1(ns, []byte("asservat-remote-connector-peer/v1\x00"+clusterID)).String(), true
 }
 
 type HubAPIPostgres struct {
@@ -149,6 +179,22 @@ type HubAPIRegionalOffer struct {
 	Image      string                     `json:"image"`
 	Connector  InstallerConnectorSettings `json:"connector"`
 	Backup     InstallerCapacityBackup    `json:"backup"`
+	// HubOnly is mode=hub: no local connector, so no local bootstrap or
+	// hub-cluster catalog entry; the offer serves remote clusters only.
+	HubOnly bool `json:"hubOnly,omitempty"`
+	// Remote are the externally reachable addresses remote connectors dial
+	// (values remote.*), which the join Secret's offer carries with the
+	// in-cluster server names their certificates name.
+	Remote *HubAPIRemote `json:"remote,omitempty"`
+}
+
+// HubAPIRemote: Federation, KeyService and ObjectStore are https endpoints,
+// Owners a host:port (the hub-api native listener).
+type HubAPIRemote struct {
+	Federation  string `json:"federation"`
+	Owners      string `json:"owners"`
+	KeyService  string `json:"keyService"`
+	ObjectStore string `json:"objectStore"`
 }
 
 // HubAPIFederationCAFile is the federation serving CA (combined mode) in

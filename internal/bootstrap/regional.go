@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"k8s.io/client-go/rest"
 	"net/http"
 	"os"
 	"sync"
@@ -31,7 +32,16 @@ type Regional struct {
 	bootstrap   regionalBootstrap
 	context     *regionalContext // nil without the optional ADR-171 input
 	nodes       *regionalNodes   // nil without the optional ADR-246 input
-	closers     []func()
+	// bindings delivers this cluster's AccessBindings to the hub (ADR-329);
+	// nil in mode=combined, where the hub-worker observes the hub cluster.
+	bindings  AccessBindingReader
+	lifecycle *RegionalLifecycle
+	// capacityKeys select this cluster's delivered capacity observation
+	// (ADR-331); empty without them. watchConfig is the connector's API
+	// configuration for the delivery watches.
+	capacityKeys []string
+	watchConfig  *rest.Config
+	closers      []func()
 	// API round trips of the shared observer client, for the executor's stop
 	// line (ADR-196): counts and transport time only.
 	observerStats regionalAPIStats
@@ -271,6 +281,12 @@ func NewRegional(ctx context.Context, files *os.Root, podUID string) (r *Regiona
 	r.rotator = fleetapp.ClusterCredentialRotator{Profile: value.ClusterCredentialProfile{RootID: c.rootID(), PeerID: c.PeerID, InstallationID: c.binding.InstallationID, ClusterID: c.ClusterID}, Policy: value.DefaultClusterCredentialPolicy(), Store: secret, Exchange: rotation, Now: time.Now}
 	lifecycle := &RegionalLifecycle{Client: channel, Local: regionalLocal{native, source}, Credential: r.rotator, Now: time.Now, Timing: r.lifecycleTiming()}
 	r.bootstrap = regionalBootstrap{store: secret, seed: secret, record: regionalBootstrapRecord{in}, channel: channel, local: regionalLocal{native, source}, binding: c.binding, root: c.rootID(), now: time.Now}
+	if raw.Mode == contracts.ConnectorModeCluster {
+		r.bindings, r.lifecycle, r.watchConfig = observer, lifecycle, in.kubernetes(contracts.ConnectorKubeTokenFile)
+		if c.executor && len(c.offer.CapacityKeys) != 0 {
+			r.capacityKeys = c.offer.CapacityKeys
+		}
+	}
 	r.credentials, err = mtls.NewConnectorProcessCredentials(ctx, current.Source.Observation.Profile, podUID, lifecycle, lifecycle, source, lifecycle, time.Now)
 	if err != nil {
 		return r, mounts.ErrUnavailable
@@ -353,6 +369,14 @@ func (r *Regional) Run(ctx context.Context) error {
 			r.nodes = nil
 		}
 	}()
+	// ADR-329/330: watch-driven deliveries beside the supervision loop,
+	// starting once enrolled.
+	enrolledDeliveries := make(chan struct{})
+	var enrolledOnce sync.Once
+	if r.bindings != nil || len(r.capacityKeys) != 0 {
+		wait := goJoined(func() { r.runDeliveries(contextCtx, enrolledDeliveries) })
+		defer func() { stopContext(); wait() }()
+	}
 	var attemptAt time.Time
 	var observerAt int64
 	var observerTime time.Duration
@@ -410,6 +434,7 @@ func (r *Regional) Run(ctx context.Context) error {
 			err := r.credentials.Reconcile(ctx)
 			if err == nil && !enrolled {
 				enrolled = true
+				enrolledOnce.Do(func() { close(enrolledDeliveries) })
 				fmt.Fprintln(os.Stderr, "connector process credentials active")
 			}
 			// One closed cause per change, never inputs or remote text.

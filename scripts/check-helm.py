@@ -208,8 +208,11 @@ def check_accessbindings(render):
     assert any("object.spec.roles.all(r, (request.operation == 'UPDATE' && has(oldObject.spec.roles) && r in oldObject.spec.roles) || authorizer.group('asservat.io').resource('accessroles').namespace(request.namespace).name(r).check('bind')" in e for e in expressions)
     assert any("name('automation').check('bind')" in e for e in expressions)
     assert named(docs, "ValidatingAdmissionPolicyBinding", base)["spec"] == {"policyName": base, "validationActions": ["Deny"]}
-    # A workload-cluster release observes no AccessBindings yet.
-    assert not any(r["metadata"]["name"].startswith(base) for r in render({"mode": "cluster"}))
+    # A workload-cluster release renders the same RBAC and policy: its
+    # connector delivers the cluster's bindings to the hub.
+    cluster = render({"mode": "cluster"})
+    assert named(cluster, "ValidatingAdmissionPolicy", base)["spec"] == policy["spec"]
+    assert named(cluster, "ClusterRole", base + "-admin")["rules"] == admin["rules"]
 
 
 def check_exposure(render):
@@ -258,10 +261,7 @@ def check_collector(directory):
     # privileged Pod Security exception is its namespace. It needs the
     # regional connector (mode=cluster or combined).
     path = Path(directory) / "collector-values.yaml"
-    offer = {"format": "asservat-regional-offer/v1", "installationID": "10000000-0000-4000-8000-000000000001"}
-    base = {**hub_values(), "mode": "cluster", "collector": {"enabled": True},
-            "region": {"enabled": True, "clusterID": "50000000-0000-4000-8000-000000000001", "peerID": "50000000-0000-4000-8000-000000000002",
-                       "bootstrapSecret": "operator-bootstrap", "offer": json.dumps(offer)}}
+    base = {**hub_values(), "mode": "cluster", "collector": {"enabled": True}, "region": {"enabled": True, "joinSecret": "asservat-join-region"}}
     del base["services"]
 
     def render(v, ok=True, namespace="asservat-region"):
@@ -270,6 +270,8 @@ def check_collector(directory):
         return result if not ok else [r for r in yaml.safe_load_all(result) if r]
 
     docs = render(base)
+    # ADR-329: the mode=cluster connector lists this cluster's AccessBindings.
+    assert {"apiGroups": ["asservat.io"], "resources": ["accessbindings"], "verbs": ["get", "list", "watch"]} in named(docs, "ClusterRole", "asservat-region-asservat-connector")["rules"]
     collector = [r for r in docs if r["metadata"].get("namespace") == "asservat-collector" or r["kind"] == "Namespace" and r["metadata"]["name"] == "asservat-collector"]
     assert sorted(r["kind"] for r in collector) == ["ConfigMap", "ConfigMap", "DaemonSet", "Namespace", "Role", "RoleBinding", "ServiceAccount"], [r["kind"] for r in collector]
     namespace = next(r for r in collector if r["kind"] == "Namespace")
@@ -323,6 +325,66 @@ def check_collector(directory):
     render(base, ok=False, namespace="asservat-collector")
 
 
+def check_cluster_join(render):
+    # ADR-331: clusters[] in the hub's values: the hub-api issues each join
+    # Secret, the offer and the regional capabilities exist in mode=hub, and
+    # the hub components know the joined cluster IDs.
+    cluster = "50000000-0000-4000-8000-000000000001"
+    remote = {"federation": "https://hub.example:31446", "owners": "hub.example:31444", "keyService": "https://hub.example:31448", "objectStore": "https://hub.example:31433"}
+    v = bundled_values("hub")
+    v["federation"] = {"connector": {**PROFILE["federation"]["connector"], "profiles": 1}}
+    v.update({"clusters": [{"name": "eu", "clusterID": cluster}], "remote": remote})
+    docs = render(v)
+    config = json.loads(named(docs, "ConfigMap", "asservat-hub-api-config")["data"]["config.json"])
+    assert config["clusters"] == [{"name": "eu", "clusterID": cluster, "namespace": "asservat-system", "standby": 2, "captures": 1}], config.get("clusters")
+    offer = config["public"]["regionalOffer"]
+    assert offer["hubOnly"] is True and offer["remote"] == remote, offer
+    named(docs, "ConfigMap", "asservat-regional-offer")
+    assert not [r for r in docs if r["kind"] == "Secret" and r["metadata"]["name"] == "asservat-region-bootstrap"]
+    rules = named(docs, "Role", "asservat-hub-api")["rules"]
+    assert {"apiGroups": [""], "resources": ["secrets"], "verbs": ["create"]} in rules
+    assert {"apiGroups": [""], "resources": ["secrets"], "resourceNames": ["asservat-join-eu"], "verbs": ["get", "update", "list", "watch"]} in rules
+    plan = json.loads(named(docs, "ConfigMap", "asservat-secrets")["data"]["secrets.json"])
+    assert plan["remoteClusters"] == [{"name": "eu", "clusterID": cluster}], plan.get("remoteClusters")
+    hook = set(named(docs, "Role", "asservat-secrets")["rules"][1]["resourceNames"])
+    assert {"asservat-s3-regional-write-eu", "asservat-s3-regional-history-eu"} <= hook and "asservat-s3-regional-write" not in hook
+    assert {"apiGroups": [""], "resources": ["secrets"], "resourceNames": ["asservat-s3-regional-write-eu", "asservat-s3-regional-history-eu"], "verbs": ["get"]} in rules
+    key = json.loads(named(docs, "ConfigMap", "asservat-key-service-config")["data"]["config.json"])
+    assert key["downloads"]["remoteClusters"] == [cluster], key
+    publisher = json.loads(named(docs, "ConfigMap", "asservat-publisher-config")["data"]["config.json"])
+    assert publisher["remoteClusters"] == [cluster]
+    worker = json.loads(named(docs, "ConfigMap", "asservat-hub-worker-config")["data"]["config.json"])
+    assert worker["capacity"]["remoteClusters"] == config["clusters"], worker["capacity"].get("remoteClusters")
+    fleet = json.loads(named(docs, "ConfigMap", "asservat-fleet")["data"]["fleet.json"])
+    assert fleet["maxClusters"] >= 1 and fleet["maxActiveBootstraps"] >= 1
+    # combined plus one cluster: two connectors need two profiles.
+    v2 = copy.deepcopy(v)
+    v2["mode"] = "combined"
+    assert "federation.connector.profiles must cover every connector" in render(v2, ok=False)
+    v2["federation"]["connector"]["profiles"] = 2
+    v2["federation"]["connector"]["accounts"] = 2
+    fleet = json.loads(named(render(v2), "ConfigMap", "asservat-fleet")["data"]["fleet.json"])
+    assert fleet["maxClusters"] == 2 and fleet["maxActiveBootstraps"] == 2, fleet
+    for bad in [{"remote": {}}, {"clusters": [{"name": "eu", "clusterID": "not-a-uuid"}]}, {"clusters": [{"name": "Bad", "clusterID": cluster}]}]:
+        render({**v, **bad}, ok=False)
+    # The workload cluster: the copied join Secret supplies IDs and offer.
+    work = {"mode": "cluster", "image": hub_values()["image"], "region": {"enabled": True, "joinSecret": "asservat-join-eu"}}
+    docs = render(work)
+    cfg = json.loads(named(docs, "ConfigMap", "asservat-connector-config")["data"]["config.json"])
+    assert "clusterID" not in cfg and "offer" not in cfg and cfg["mode"] == "cluster", cfg
+    pod = named(docs, "Deployment", "asservat-connector")["spec"]["template"]["spec"]
+    sources = pod["volumes"][-1]["projected"]["sources"]
+    join = [x["secret"] for x in sources if "secret" in x and x["secret"]["name"] == "asservat-join-eu"]
+    assert any(not j.get("optional") and {i["key"] for i in j["items"]} == {"clusterID", "peerID", "regional-offer.json"} for j in join), join
+    assert any(j.get("optional") and j["items"] == [{"key": "bootstrap.json", "path": "bootstrap.json"}] for j in join), join
+    assert any({i["key"] for i in j["items"]} == {"evidence-storage.json", "history-storage.json"} for j in join), join
+    connector = named(docs, "ClusterRole", "asservat-system-asservat-connector")["rules"]
+    assert {"apiGroups": ["apps"], "resources": ["deployments", "statefulsets"], "verbs": ["get", "list", "watch"]} in connector
+    assert {"apiGroups": [""], "resources": ["pods"], "verbs": ["get", "list", "watch"]} in connector
+    for bad in [{"region": {"enabled": True}}, {"region": {"enabled": True, "joinSecret": "x", "bootstrapSecret": "y"}}, {"region": {"enabled": True, "clusterID": cluster}}]:
+        render({**work, **bad}, ok=False)
+
+
 def main():
     schema = json.loads((CHART / "values.schema.json").read_text())
     jsonschema.Draft7Validator.check_schema(schema)
@@ -355,6 +417,7 @@ def main():
         check_accessbindings(render)
         check_keycloak_waits_for_database(render)
         check_exposure(render)
+        check_cluster_join(render)
         check_examples(render, directory)
         check_collector(directory)
         run(["package", str(CHART), "--destination", directory])
@@ -366,7 +429,7 @@ def main():
                 assert yaml.safe_load(bundle.extractfile("asservat/crds/" + name).read()) == content
         run(["lint", "--strict", str(archive), "-f", str(values)])
         assert run(["template", "asservat", str(archive), "--include-crds", "-f", str(values)]) == run(["template", "asservat", str(CHART), "--include-crds", "-f", str(values)])
-    print("Helm schema/render/package checks passed: 3 modes, 8 canonical CRDs, secrets hook Job and Role, setup Job, AccessBinding RBAC and bind policy, Ingress/HTTPRoute exposure, examples, the guarded collector DaemonSet and invalid values rejected.")
+    print("Helm schema/render/package checks passed: 3 modes, 8 canonical CRDs, secrets hook Job and Role, setup Job, AccessBinding RBAC and bind policy, Ingress/HTTPRoute exposure, cluster join, examples, the guarded collector DaemonSet and invalid values rejected.")
     print(run(["version", "--short"]).strip())
 
 

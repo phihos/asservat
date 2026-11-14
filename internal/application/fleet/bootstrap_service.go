@@ -44,6 +44,9 @@ func (e *BootstrapIssueStage) Error() string {
 }
 func (e *BootstrapIssueStage) Unwrap() error { return e.Err }
 
+// FixedStep lets stop messages name the stage (bootstrap fixedStepError).
+func (e *BootstrapIssueStage) FixedStep() string { return e.Stage }
+
 func (s BootstrapIssuer) Issue(ctx context.Context, token string, in BootstrapInput) (_ value.BootstrapIntent, err error) {
 	var empty value.BootstrapIntent
 	stage := "inputs"

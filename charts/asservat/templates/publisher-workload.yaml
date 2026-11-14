@@ -7,6 +7,8 @@
 {{- range (default list $v.retentionTopologies) }}
 {{- $topologies = append $topologies (dict "targetClusterID" .targetClusterID "name" .name) }}
 {{- end }}
+{{- $remote := list }}
+{{- range (include "asservat.hubApi.clusters" . | fromJsonArray) }}{{ $remote = append $remote .clusterID }}{{ end }}
 {{- $store := $p.objectStore }}
 {{- $config := toJson (dict
   "name" $n
@@ -17,7 +19,8 @@
   "auditStore" (dict "endpoint" $store.endpoint "region" $store.region "bucket" $store.auditBucket)
   "evidence" (dict "endpoint" $store.endpoint "region" $store.region "bucket" $store.evidenceBucket)
   "openBao" $p.openBao.endpoint
-  "retentionTopologies" $topologies) }}
+  "retentionTopologies" $topologies
+  "remoteClusters" $remote) }}
 {{- /* Cluster catalog and retention topology reads; slot topologies are
   named by the catalog, so ConfigMap reads are not name-restricted. */}}
 {{- $rules := list (dict "apiGroups" (list "") "resources" (list "configmaps") "verbs" (list "get")) }}

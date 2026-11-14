@@ -205,6 +205,11 @@ func keyServiceAcquisition(ctx context.Context, c keyServiceInputs, api *rest.Co
 			return nil, none, &fixedStepError{"key-service/hub-topology", err}
 		}
 	}
+	for _, cluster := range d.RemoteClusters {
+		if err = topologies.AddRemoteTopology(observer, c.PermissionRootID, cluster); err != nil {
+			return nil, none, &fixedStepError{"key-service/remote-topology", err}
+		}
+	}
 	retention, err := postgres.NewRetentionTransactionGuard(c.PermissionRootID, topologies)
 	if err != nil {
 		return nil, none, mounts.ErrUnavailable

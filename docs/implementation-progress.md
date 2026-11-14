@@ -38,6 +38,43 @@ Schemas kept because Go still embeds them with production code paths:
 `charts/asservat/crds/capacityreservations.yaml`
 (`internal/adapters/kubernetes/start_admission.go`). Remove each with its code.
 `local-key-configuration.schema.json` had no runtime consumer and is deleted.
+## Joining workload clusters with `mode: cluster` (ADR-331, 2026-11-14)
+
+Branch `feat/hn-cluster-join` (on `feat/hn-remote-bindings`). The hub's
+`clusters` values register remote clusters; the hub-api issues each join
+Secret `<name>-join-<cluster>` (IDs, offer with `remote.*` addresses and
+in-cluster server names, the cluster's own regional object-store
+capabilities, a one-use bootstrap), derives each context-start entry and
+in-process topology, and the connector delivers its capacity observation over
+the lifecycle channel (migration 00163, after 00162 remote AccessBindings
+). Owned kind clusters `asservat-cj-hub` (combined, bundled
+services) and `asservat-cj-work` (`mode: cluster`, `region.joinSecret`):
+`TestHelmNativeKindClusterJoin` passed (24.6 s) on a fresh install: Keycloak
+sign-in, processing initialization, AccessBinding in the work cluster's
+`apps-hn`, budget policy naming the joined cluster, MCP preview/request,
+regional collection, verification, publication and native download through
+the hub-local worker. `TestHelmNativeKindJourney` (combined, same values)
+passed (45.5 s) on a second fresh install. The local runs used an uncommitted
+no-op `00162` placeholder because the embedded schema requires contiguous
+versions.
+
+Maintainer correction (no polling where an event source exists), applied to
+ADR-329 (c) and ADR-331: connectors watch AccessBindings and capacity
+metadata (informers) and deliver only on change (≤ 1/s, digest-compared with
+the hub's stored copy, no periodic resend); remote allows no longer expire;
+a trigger in migration 00163 notifies `asservat_remote_bindings` /
+`asservat_remote_capacity`, and the hub-worker LISTENs instead of reading the
+rows each second (capacity rows stay in memory). Fresh kind runs:
+`TestHelmNativeKindClusterJoin` passed (21.4 s); idle, neither delivery row
+changed for 40 s; labelling the remote AccessBinding stored a new delivery
+within 0.24 s. `TestHelmNativeKindJourney` passed (31.0 s) on another fresh
+install. Real PostgreSQL: `scripts/test-custody.py --run
+'^TestContextAdmissionWithRealServices$/^connector-identity-fast$'` passed,
+including the trigger notification, stored digest and older-delivery
+refusal (with the local `00162` placeholder). Not run: `make
+permission-integration`, an image upgrade of a joined cluster, external
+providers, a LoadBalancer or Gateway passthrough.
+
 ## AccessBindings in application namespaces (ADR-329, 2026-11-14)
 
 Branch `feat/hn-accessbindings` on the Helm-native candidate. AccessBindings
@@ -52,7 +89,21 @@ with the maintainer AccessBinding in the workload namespace `apps-hn`;
 server dry-runs confirmed `edit` refused by RBAC, `admin` allowed, a writer
 without `bind` refused, automation refused without the automation ClusterRole.
 Not run: `make permission-integration` (its suite was adapted, not executed).
-Pending: `mode: cluster` regions deliver no AccessBindings yet.
+
+Follow-up branch `feat/hn-remote-bindings` (ADR-329 decision (c)):
+`mode: cluster` connectors deliver their cluster's AccessBinding LIST every
+10 seconds over the lifecycle channel (purpose `access-bindings`); the
+federation validates and stores it under the cluster credential's cluster
+(migration 00162); the hub-worker reconciler accepts it scoped to that
+cluster (allows within 30 s of the delivery, denies until removed). Component
+tests cover the reconciler, the real HTTP/2 lifecycle channel with a 4 MiB
+delivery, federation attribution and the Kubernetes LIST/decode round trip.
+Migration 00162 and the store/read adapter passed on real PostgreSQL in
+`scripts/test-custody.py --run '^TestContextAdmissionWithRealServices$/^connector-identity-fast$'`
+(store, older-delivery refusal, changed-row reread);
+`make permission-integration` passed. Not run: a kind journey with a joined
+`mode: cluster` connector (the chart cannot complete a `mode: cluster` join
+yet) and the full custody suite.
 
 ## Helm-native installation (2026-11-14)
 

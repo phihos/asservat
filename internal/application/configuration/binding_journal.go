@@ -46,9 +46,7 @@ func cloneBinding(b value.Binding) value.Binding {
 // journalIdentity checks a binding of the journal's cluster: it lives in any
 // namespace and its scope is exactly that namespace (ADR-329).
 func journalIdentity(b value.Binding, cluster string) bool {
-	r := b.Resource
-	return r.ClusterID == cluster && identity.Text(r.Namespace, 63) && identity.Text(r.NamespaceUID, 64) && b.Scope.ClusterID == cluster && b.Scope.Namespace == value.NamespaceRef{Name: r.Namespace, UID: r.NamespaceUID} &&
-		r.Kind == "AccessBinding" && identity.Text(r.Name, 253) && identity.Text(r.UID, 64) && identity.Text(r.ResourceVersion, 128) && r.Generation > 0 && r.Generation <= 2147483647 && r.SpecDigest != (artifact.Digest{})
+	return value.BindingInCluster(b, cluster)
 }
 
 // bindingName keys a binding by namespace and name.

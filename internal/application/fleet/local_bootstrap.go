@@ -59,6 +59,9 @@ type LocalClusterBootstrap struct {
 	Records         LocalBootstrapRecords
 	Binding         value.PeerBinding
 	DeliveryProfile string
+	// DisplayName and Region label the slot in the issue audit; empty is
+	// the hub cluster's own slot.
+	DisplayName, Region string
 }
 
 // The local slot's display values in the issue audit.
@@ -86,28 +89,48 @@ func (l LocalClusterBootstrap) key(k *localKey, now time.Time) (artifact.Digest,
 // issue reserves or resumes the local slot, completes its audited issuance
 // and writes the record; it returns the slot's expiry.
 func (l LocalClusterBootstrap) issue(ctx context.Context, key artifact.Digest) (time.Time, error) {
-	if l.Envelopes == nil || l.Records == nil || l.Issuer.Now == nil || !l.Binding.Valid() || l.Binding.Role != value.ConnectorPeer {
+	if l.Records == nil {
 		return time.Time{}, value.ErrUnavailable
 	}
-	intent, err := l.Issuer.Issue(ctx, "", BootstrapInput{KeyDigest: key, DisplayName: localDisplayName, Region: localRegion, DeliveryProfile: l.DeliveryProfile})
-	if err != nil {
-		return time.Time{}, err
-	}
-	if intent.Slot.Binding != l.Binding {
-		return time.Time{}, &BootstrapIssueStage{"binding", value.ErrDenied}
-	}
-	envelope, err := l.Envelopes.ReadBootstrapEnvelope(ctx, intent.Slot.ID)
+	envelope, err := l.envelope(ctx, key)
 	defer func() { envelope.Secret = "" }()
 	if err != nil {
-		return time.Time{}, &BootstrapIssueStage{"envelope", err}
-	}
-	if envelope.Binding != l.Binding || envelope.BootstrapID != intent.Slot.ID || !envelope.NotAfter.Equal(intent.Slot.NotAfter) {
-		return time.Time{}, &BootstrapIssueStage{"envelope", value.ErrDenied}
+		return time.Time{}, err
 	}
 	if err = l.Records.WriteBootstrapRecord(ctx, envelope); err != nil {
 		return time.Time{}, &BootstrapIssueStage{"record-secret", err}
 	}
-	return intent.Slot.NotAfter, nil
+	return envelope.NotAfter, nil
+}
+
+// envelope reserves or resumes the slot of Binding, completes its audited
+// issuance and returns its one-use record.
+func (l LocalClusterBootstrap) envelope(ctx context.Context, key artifact.Digest) (value.BootstrapEnvelope, error) {
+	var zero value.BootstrapEnvelope
+	if l.Envelopes == nil || l.Issuer.Now == nil || !l.Binding.Valid() || l.Binding.Role != value.ConnectorPeer {
+		return zero, value.ErrUnavailable
+	}
+	name, region := l.DisplayName, l.Region
+	if name == "" {
+		name, region = localDisplayName, localRegion
+	}
+	intent, err := l.Issuer.Issue(ctx, "", BootstrapInput{KeyDigest: key, DisplayName: name, Region: region, DeliveryProfile: l.DeliveryProfile})
+	if err != nil {
+		return zero, err
+	}
+	if intent.Slot.Binding != l.Binding {
+		return zero, &BootstrapIssueStage{"binding", value.ErrDenied}
+	}
+	envelope, err := l.Envelopes.ReadBootstrapEnvelope(ctx, intent.Slot.ID)
+	if err != nil {
+		envelope.Secret = ""
+		return zero, &BootstrapIssueStage{"envelope", err}
+	}
+	if envelope.Binding != l.Binding || envelope.BootstrapID != intent.Slot.ID || !envelope.NotAfter.Equal(intent.Slot.NotAfter) {
+		envelope.Secret = ""
+		return zero, &BootstrapIssueStage{"envelope", value.ErrDenied}
+	}
+	return envelope, nil
 }
 
 // Run keeps one live record for the local connector until its enrollment

@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"slices"
 	"sync"
 	"time"
 
@@ -76,7 +77,10 @@ type OwnerDeployment struct {
 	// localBootstrap issues the combined-mode connector's own bootstrap
 	// record; RunPublic supervises it.
 	localBootstrap *app.LocalClusterBootstrap
-	shared         publicShared
+	// remoteJoins issue the joined mode=cluster clusters' bootstraps into
+	// their join Secrets.
+	remoteJoins []app.RemoteClusterJoin
+	shared      publicShared
 	// localControls are the control documents this process wrote (the
 	// hub-local download workers'); the trust catalog holds them beside the
 	// mounted worker-controls.json.
@@ -227,11 +231,34 @@ func newOwnerDeployment(ctx context.Context, files *os.Root, podUID string, in *
 		if e != nil {
 			return nil, e
 		}
-		local, e := localCatalogCluster(startup, api, c, in.offer, stored)
-		if e != nil {
-			return nil, e
+		if !in.offer.hubOnly {
+			local, e := localCatalogCluster(c, in.offer, stored)
+			if e != nil {
+				return nil, e
+			}
+			in.local = &local
 		}
-		in.local = &local
+		// Joined mode=cluster clusters: the same derived entry with their own
+		// IDs and namespace, and the offer their join Secret carries.
+		for _, r := range in.remote {
+			entry, e := catalogCluster(stored, in.offer.offer.Image, r.ClusterID, r.peerID, r.Namespace, in.release, r.Standby, r.Captures, "remote-cluster")
+			if e != nil {
+				return nil, e
+			}
+			offer, e := remoteJoinOffer(stored, in.remoteConfig)
+			if e != nil {
+				return nil, e
+			}
+			// ADR-331: the connector delivers the namespaces carrying a
+			// capacity key.
+			if c.Observation != nil && c.Observation.LocalCapacity != nil {
+				offer.CapacityKeys = slices.Clone(c.Observation.LocalCapacity.Keys)
+			}
+			offer.Image = in.offer.offer.Image
+			in.remoteEntries, in.remoteOffers = append(in.remoteEntries, entry), append(in.remoteOffers, offer)
+		}
+	} else if len(in.remote) != 0 {
+		return nil, &fixedStepError{"remote-clusters-offer", mounts.ErrUnavailable}
 	}
 	if in.downloadControl != nil && c.Public != nil {
 		api, e := kubernetes.NewForConfig(in.kubernetes(contracts.HubAPIKubernetesTokenFile))
@@ -309,10 +336,13 @@ func newOwnerDeployment(ctx context.Context, files *os.Root, podUID string, in *
 		if err != nil {
 			return nil, &fixedStepError{"public-context", err}
 		}
-		if in.offer != nil && d.publicContext.fleet != nil {
+		if !in.hubOnly() && d.publicContext.fleet != nil {
 			if d.localBootstrap, err = newLocalClusterBootstrap(startup, in, d.public, d.publicContext.fleet, d.providers.BootstrapChannel()); err != nil {
 				return nil, err
 			}
+		}
+		if d.remoteJoins, err = newRemoteClusterJoins(startup, in, d.public, d.publicContext.fleet, d.providers.BootstrapChannel()); err != nil {
+			return nil, err
 		}
 		nativeConfig.ContextStarts = d.publicContext.starts
 		if nativeConfig.ContextStarts.Authenticator, err = contextStartOwnerAuthenticator(in, c, guard, pool, configs, ledgers["registry"], &d.contextStartStats); err != nil {
@@ -576,6 +606,13 @@ func (d *OwnerDeployment) RunPublic(listener net.Listener) error {
 		go func() {
 			defer d.owners.Done()
 			_ = d.localBootstrap.Run(d.root, eventLog(os.Stderr, "local cluster bootstrap"))
+		}()
+	}
+	for _, join := range d.remoteJoins {
+		d.owners.Add(1)
+		go func() {
+			defer d.owners.Done()
+			_ = join.Run(d.root, eventLog(os.Stderr, "remote cluster join "+join.Bootstrap.DisplayName))
 		}()
 	}
 	if d.history != nil {

@@ -27,6 +27,8 @@ func publicRuntimeCapacityGrants(purpose string) ([]publicRuntimeGrant, bool) {
 			"refresh_capacity_enrollment(uuid,jsonb,bytea,bytea,bytea,jsonb)",
 			// ADR-197: the regional namespace pins.
 			"read_capacity_cluster_qualifications(uuid)",
+			// ADR-331: the joined clusters' write-once qualifications.
+			"qualify_capacity_cluster(uuid,uuid,uuid,uuid,bytea,jsonb)",
 			// ADR-200: active refresh demands.
 			"read_capacity_refresh_demands(uuid)",
 			// ADR-219: shared query backing follows these existing publications.
@@ -59,7 +61,9 @@ func publicRuntimeCapacityGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		}
 		out = append(out,
 			publicRuntimeGrant{"table", "fleet_current_trust", "installation_id", "UPDATE"},
-			publicRuntimeGrant{"table", "hub_owner_configuration", "source_uid", "UPDATE"})
+			publicRuntimeGrant{"table", "hub_owner_configuration", "source_uid", "UPDATE"},
+			// ADR-331: the joined clusters' delivered capacity observations.
+			publicRuntimeGrant{"table", "remote_capacity_delivery", "", "SELECT"})
 	}
 	for _, signature := range signatures {
 		out = append(out, publicRuntimeGrant{"function", signature, "", "EXECUTE"})

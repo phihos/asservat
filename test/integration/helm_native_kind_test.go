@@ -27,6 +27,9 @@ import (
 type helmNativeKind struct {
 	Kubeconfig, Namespace, NodeIP, ConsoleCAFile, KeycloakCAFile string
 	ConsolePort                                                  int
+	// WorkKubeconfig and WorkClusterID name a second cluster joined with
+	// mode=cluster (TestHelmNativeKindClusterJoin only).
+	WorkKubeconfig, WorkClusterID string
 }
 
 // TestHelmNativeKindJourney drives the real user journey against a running
@@ -35,6 +38,18 @@ type helmNativeKind struct {
 // inspection and native download. Development harness: it only runs with
 // ASSERVAT_HN_KIND naming the driver's JSON description.
 func TestHelmNativeKindJourney(t *testing.T) {
+	runHelmNativeKindJourney(t, false)
+}
+
+// TestHelmNativeKindClusterJoin is the same journey against a workload in a
+// second cluster joined with mode=cluster: the operator's AccessBinding
+// lives in that cluster's application namespace (ADR-329 decision (c)) and
+// the budget policy names the joined cluster's ID.
+func TestHelmNativeKindClusterJoin(t *testing.T) {
+	runHelmNativeKindJourney(t, true)
+}
+
+func runHelmNativeKindJourney(t *testing.T, joined bool) {
 	path := os.Getenv("ASSERVAT_HN_KIND")
 	if path == "" {
 		t.Skip("ASSERVAT_HN_KIND unset")
@@ -43,6 +58,9 @@ func TestHelmNativeKindJourney(t *testing.T) {
 	var k helmNativeKind
 	if err != nil || json.Unmarshal(raw, &k) != nil {
 		t.Fatal("kind description", err)
+	}
+	if joined && (k.WorkKubeconfig == "" || k.WorkClusterID == "") {
+		t.Skip("no joined workload cluster described")
 	}
 	t.Setenv("ASSERVAT_HELM_BUNDLED_IDENTITY", "1")
 	ctx, cancel := context.WithTimeout(t.Context(), 18*time.Minute)
@@ -74,13 +92,33 @@ func TestHelmNativeKindJourney(t *testing.T) {
 	t.Logf("hn journey: synthetic humans created (developer %s) in the bundled realm", identity.SubjectID)
 
 	root, cluster, installation := string(ids["permissionRootID"]), string(ids["clusterID"]), string(ids["installationID"])
-	workload := createHelmNativeWorkload(t, ctx, api)
-	budget := newRegionalBudget(t, ctx, api, k.Namespace, identity.Issuer, cluster, 1)
-	budget.subjectKind, budget.subjectID = "User", identity.SubjectID
-	// Combined mode: the chart's EvidenceBudgetPolicy (no clusterID: the hub
-	// cluster) already covers the workload namespace; only the maintainer
-	// AccessBinding is the operator's step.
-	budget.addBinding(workload)
+	target := api
+	if joined {
+		work, err := clientcmd.BuildConfigFromFlags("", k.WorkKubeconfig)
+		if err != nil {
+			t.Fatal(err)
+		}
+		target, cluster = kubernetes.NewForConfigOrDie(work), k.WorkClusterID
+	}
+	workload := createHelmNativeWorkload(t, ctx, target)
+	if joined {
+		// The operator's budget policy names the joined cluster (in the hub
+		// namespace); the maintainer AccessBinding lives in that cluster's
+		// application namespace.
+		policy := newRegionalBudget(t, ctx, api, k.Namespace, identity.Issuer, cluster, 1)
+		policy.addPolicy()
+		binding := newRegionalBudget(t, ctx, target, k.Namespace, identity.Issuer, cluster, 1)
+		binding.subjectKind, binding.subjectID = "User", identity.SubjectID
+		binding.addBinding(workload)
+		t.Logf("hn journey: budget policy and remote AccessBinding for cluster %s created", cluster)
+	} else {
+		budget := newRegionalBudget(t, ctx, api, k.Namespace, identity.Issuer, cluster, 1)
+		budget.subjectKind, budget.subjectID = "User", identity.SubjectID
+		// Combined mode: the chart's EvidenceBudgetPolicy (no clusterID: the hub
+		// cluster) already covers the workload namespace; only the maintainer
+		// AccessBinding is the operator's step.
+		budget.addBinding(workload)
+	}
 
 	admin := helmNativeAdminPool(t, ctx, k, secret("asservat-postgres-state"))
 	consolePEM, err := os.ReadFile(k.ConsoleCAFile)

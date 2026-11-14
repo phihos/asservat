@@ -1,7 +1,9 @@
 # ADR-329 — AccessBindings in application namespaces
 
 Date: 2026-11-13. Status: accepted (maintainer decision); implemented
-2026-11-14 for the hub cluster (see Implementation). Supersedes the hub-control-namespace storage of
+2026-11-14 for the hub cluster and for workload clusters joined with
+`mode: cluster` (see Implementation and decision (c), revised 2026-11-14 to
+watch-driven delivery without expiry). Supersedes the hub-control-namespace storage of
 AccessBindings in `specs/permissions.md`, the delegated-writer envelope of
 ADR-189/ADR-237 and the permission guard.
 
@@ -99,8 +101,99 @@ grant any role there. It adds no runtime component, request or state.
   admission policy builder and the delegated previewers. The permission
   impact preview is for fleet operators; an AccessBinding change names its
   `clusterID` and `namespace`.
-- Pending: workload clusters joined with `mode: cluster`. Their connectors do
-  not yet serve the cluster-observation channel (the namespace and workload
-  journals of ADR-247 are equally uncomposed), so AccessBindings there grant
-  nothing; PermissionSources (for example `kubernetesExec`) cover them until
-  the connector delivers its cluster's bindings with that channel.
+- Workload clusters joined with `mode: cluster`: see decision (c).
+
+## Decision (c): workload clusters joined with `mode: cluster`
+
+Date: 2026-11-14. The first implementation read AccessBindings in the hub
+cluster only, so bindings in a joined workload cluster granted nothing, a
+regression against the earlier `scope.clusterID` bindings stored in the hub.
+
+Each `mode: cluster` connector delivers its cluster's complete AccessBinding
+LIST to the hub over the existing connector lifecycle channel (ADR-169), as a
+new purpose `access-bindings`, whenever it changes (maintainer correction
+2026-11-14: no polling where an event source exists):
+
+- The connector watches AccessBindings (a metadata informer). An event
+  triggers a LIST with the hub cluster's LIST code (paginated, 1,024 objects,
+  8 MiB, each binding's namespace UID read once, a younger namespace
+  refused); bursts coalesce to at most one delivery per second, and a set
+  whose digest equals the last delivered one is not sent. A failed delivery is
+  retried after five seconds; nothing is resent periodically.
+- Every delivery conversation carries the hub's stored digest; the connector
+  answers "unchanged" when its set has it. The first conversation after a
+  connector (re)start is therefore a digest comparison.
+- The connector presents its cluster credential on that channel (ADR-168,
+  exporter-bound signature, checked under the SQL lineage lock). The
+  federation asks for the delivery only after that check and stores it under
+  the lineage's cluster ID. The payload names no cluster; a delivery for the
+  hub cluster is refused (the hub-worker observes it directly). The chart
+  grants `get/list/watch accessbindings` to the connector's ClusterRole in
+  `mode: cluster` only.
+- The federation validates every spec with the same embedded schema: a
+  refused spec becomes an invalid entry that grants and denies nothing. A
+  delivery over 1,024 bindings or 4,096 subject-role rows is refused.
+- It is stored in `remote_access_binding_delivery` (migration 00162), one row
+  per cluster; an older delivery never replaces a newer one. A trigger
+  (migration 00163) notifies `asservat_remote_bindings` in the writing
+  transaction.
+- The hub-worker's permission reconciler LISTENs on that channel on its own
+  connection and rereads the rows on a notification, when the connection is
+  (re)established and at the start of each epoch; it no longer reads them on
+  its one-second tick. It adds each cluster's bindings to the same accepted
+  batch as the hub cluster's, scoped to that cluster. The last delivered set
+  stays in effect, allows included, until a newer delivery replaces it:
+  connector liveness is a health signal, not authority; every new remote
+  action needs the connector anyway, and expiring allows broke stored-evidence
+  reads during connector outages. A cluster whose bindings do not fit the
+  stream's remaining 1,024 bases and 4,096 rows contributes nothing rather
+  than a partial set.
+- The escalation ValidatingAdmissionPolicy and the aggregated ClusterRoles
+  render in every mode.
+
+Precedent: Open Cluster Management's klusterlet keeps the managed cluster's
+key and reports status into the hub's per-cluster namespace under its own
+identity ([architecture](https://open-cluster-management.io/docs/concepts/architecture/));
+Karmada's pull-mode `karmada-agent` reports its cluster's status to the
+control plane ([cluster registration](https://karmada.io/docs/userguide/clustermanager/cluster-registration/)).
+Both attribute an agent's report to the cluster its credential names, as here.
+
+Rejected: the ADR-247 cluster-observation channel (per-exchange SQL
+registration reads, four fresh proofs, owner routing), because this
+attribution needs only the existing cluster credential check; and a
+hub-initiated pull, because connectors are outbound-only.
+
+Complexity gate:
+
+1. Problem: every AccessBinding in a joined workload cluster grants nothing
+   (deterministic, all `mode: cluster` users), a regression.
+2. Not accepted as a limitation; the maintainer asked for parity.
+3. Typical deployments with more than one cluster.
+4. OCM and Karmada agents report per-cluster state under their own identity
+   (above).
+5. Privilege: `get/list/watch accessbindings` on the workload-cluster
+   connector; the federation's existing `cluster-credential` login gets
+   SELECT/INSERT/UPDATE on one table, the hub-worker's `permission-accept`
+   login SELECT. No new credential, endpoint, listener or exposure.
+6. Degraded states: one, an unreachable connector (its last delivered set
+   stays in effect until it delivers again); an over-budget cluster grants
+   nothing.
+7. No configuration.
+8. Depends on the connector reaching the federation, which every
+   `mode: cluster` function already needs.
+9. Per cluster: one AccessBinding watch on the member's API server; one
+   LIST and one lifecycle conversation per change (at most one per second,
+   bounded by 8 MiB; typical deliveries are kilobytes), plus one digest
+   comparison per connector start; one upsert and one notification per
+   delivered change; the hub-worker holds one LISTEN connection and reads
+   rows only on a notification. Linear in clusters.
+10. Upgrade adds a table; downgrade drops it; without deliveries remote
+    bindings grant nothing, as before.
+11. Smaller alternatives (documenting the gap, PermissionSources only) leave
+    the regression in place.
+
+Known limits: a remote change reaches the hub within about a second of the
+watch event while the connector is connected; a binding removed during a
+connector outage keeps granting until the next delivery, and a deny created
+during an outage applies only after it (connector liveness is not authority). Decision-time review sources (`kubernetesExec`) of that
+cluster are not gated on the delivery.
