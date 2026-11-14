@@ -135,7 +135,7 @@ type APIContextHello struct {
 	// Original connector conversation end; availability only, never authority.
 	StandbyUntil time.Time `json:"standbyUntil"`
 	// Protocol is the connector's ConnectorProtocolMajor and Capabilities the
-	// operations and queries it answers (ADR-332). The hub sends only announced
+	// operations and queries it answers (ADR-333). The hub sends only announced
 	// ones; they are availability facts, never authority.
 	Protocol     int      `json:"protocol,omitempty"`
 	Capabilities []string `json:"capabilities,omitempty"`

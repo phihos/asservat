@@ -164,7 +164,7 @@ func readJoinFiles(ctx context.Context, in *providerInputs) (cluster, peer strin
 	if err != nil {
 		return "", "", offer, &fixedStepError{"join/offer", mounts.ErrUnavailable}
 	}
-	// The hub writes the offer; fields of a newer hub are ignored (ADR-332).
+	// The hub writes the offer; fields of a newer hub are ignored (ADR-333).
 	d := json.NewDecoder(bytes.NewReader(b))
 	if d.Decode(&offer) != nil || d.More() || cluster == peer {
 		return "", "", offer, &fixedStepError{"join/offer", mounts.ErrUnavailable}

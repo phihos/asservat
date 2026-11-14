@@ -30,7 +30,7 @@ func TestAPIContextHelloRequiresOriginalConversationEnd(t *testing.T) {
 	if e = json.Unmarshal(encoded, &fields); e != nil {
 		t.Fatal(e)
 	}
-	// ADR-332: a field of a newer connector is ignored, never interpreted.
+	// ADR-333: a field of a newer connector is ignored, never interpreted.
 	fields["addedByNewerConnector"] = true
 	unknown, _ := json.Marshal(fields)
 	if _, e = DecodeAPIContextHello(unknown); e != nil {

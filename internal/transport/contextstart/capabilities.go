@@ -7,7 +7,7 @@ import (
 	"asservat.local/asservat/internal/domain/targets"
 )
 
-// ADR-332 capability names. A connector announces what its release answers
+// ADR-333 capability names. A connector announces what its release answers
 // (contracts.APIContextCapabilities); the hub sends an operation, query or
 // history work only when it is announced and otherwise refuses that one
 // request as "connector too old". A test keeps the lists below and the

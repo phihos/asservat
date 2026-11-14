@@ -23,7 +23,7 @@ import (
 )
 
 // The connector's announcement names exactly the operations, queries and
-// history work this package sends and answers (ADR-332).
+// history work this package sends and answers (ADR-333).
 func TestAnnouncedCapabilitiesMatchEveryMethod(t *testing.T) {
 	want := []string{capabilityHistory}
 	for _, m := range operationMethods {

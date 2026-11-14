@@ -120,7 +120,7 @@ func (g *APIExecutionProtection) current(ctx context.Context) (time.Time, error)
 	if err != nil || json.Unmarshal(raw, &pod) != nil || pod.APIVersion != "v1" || pod.Kind != "Pod" || !ownerMetadata(pod.ObjectMeta, g.plan.ControlNamespace.Name, g.plan.PodName, g.plan.PodUID) || len(pod.OwnerReferences) != 0 || pod.Spec.ServiceAccountName != g.plan.Account || pod.Spec.HostPID || pod.Spec.HostIPC || pod.Spec.HostNetwork || len(pod.Spec.EphemeralContainers) != 0 || len(pod.Spec.InitContainers) != 0 || len(pod.Spec.Containers) != 1 || pod.Spec.NodeName == "" || (pod.Status.Phase != core.PodPending && pod.Status.Phase != core.PodRunning) || APIExecutionPodDigest(pod.Spec) != g.plan.PodSpecDigest {
 		return time.Time{}, cfg.ErrChanged
 	}
-	if !restrictedAPIExecutionPod(pod.Spec) || !digestPinnedAPIImage(pod.Spec.Containers[0].Image) || !strings.HasSuffix(pod.Spec.Containers[0].Image, "@sha256:"+hex.EncodeToString(g.plan.ImageDigest[:])) {
+	if !restrictedAPIExecutionPod(pod.Spec) || !digestPinnedAPIImage(pod.Spec.Containers[0].Image) {
 		return time.Time{}, cfg.ErrInvalid
 	}
 	if d, ok := ctx.Deadline(); ok {

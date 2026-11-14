@@ -126,7 +126,7 @@ func TestAPIContextWorkRejectsWrongHeaderAndUnclosedPayload(t *testing.T) {
 		t.Fatal(e)
 	}
 	s := apiSignatures(t, func(context.Context) (value.APIContextWorkTrust, error) { return trust, nil }, key, now)
-	// ADR-332: a field of a newer hub is ignored; the known fields still
+	// ADR-333: a field of a newer hub is ignored; the known fields still
 	// decide, and invalid JSON (a duplicate name) is refused.
 	if _, e := s.VerifyAPIContextWork(context.Background(), signWork(t, append([]byte(`{"addedByNewerHub":{"x":1},`), b[1:]...), key, jwa.EdDSAEd25519(), map[string]any{"typ": APIContextWorkType}), r); e != nil {
 		t.Fatal("newer hub field refused", e)

@@ -187,7 +187,7 @@ func (s *APIContextWorkSignatures) VerifyAPIContextWork(ctx context.Context, enc
 	// The known fields must be this release's canonical profile (fixed
 	// format, purpose, class, action and size; canonical digest/time
 	// spelling). Fields of a newer hub that this release does not know are
-	// ignored (ADR-332); the signature covers the received bytes.
+	// ignored (ADR-333); the signature covers the received bytes.
 	canonical, e := wire.EncodeAPIContextWork(apiContextWire(w))
 	defer clear(canonical)
 	known, k := wire.EncodeAPIContextWork(d)

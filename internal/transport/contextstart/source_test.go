@@ -49,7 +49,7 @@ func TestSourceFeedBindsExchangeSequenceAndOrder(t *testing.T) {
 	if _, err := feed.ReadConnectorIdentitySource(context.Background()); err == nil {
 		t.Fatal("invalid observation returned")
 	}
-	// ADR-332: a field of a newer connector is ignored.
+	// ADR-333: a field of a newer connector is ignored.
 	unknown := bytes.Replace(sourcePayload(t, "exchange-a", 2, now.Add(2*time.Second)), []byte(`{`), []byte(`{"AddedByNewerConnector":1,`), 1)
 	if err := feed.accept(unknown, 2); err != nil {
 		t.Fatal("newer source field refused", err)

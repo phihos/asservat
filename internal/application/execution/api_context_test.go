@@ -255,7 +255,7 @@ func apiRunner(t *testing.T) (*apiRunnerFixture, APIContextRunner, identities.Cu
 	f.retention = privacy.Resolution{Target: f.target.Target(), PolicyRevision: rev, PurposeRef: e.PurposeRef, PrivacyClass: "potentialPersonalData", EvidenceType: "context", RequestedSeconds: e.RequestedAgeSeconds, MaximumSeconds: e.MaximumAgeSeconds, DeletionBudgetSeconds: e.DeletionBudgetSeconds, Policies: e.RetentionRules, Deadlines: privacy.Deadlines{AnchorAt: e.Registration.AnchorAt, ExpiresAt: e.Registration.ExpiresAt, DeleteBy: e.Registration.DeleteBy}, ValidUntil: f.now.Add(5 * time.Second), Proof: proof}
 	f.recovery = artifact.RecoveryProof{InstallationID: contextID(44), IssuerEpoch: base.receiver.IssuerEpoch, Revision: rev, ObservedAt: f.now, FreshUntil: f.now.Add(5 * time.Second)}
 	f.process = value.APIProcessBinding{InstallationID: f.recovery.InstallationID, ClusterID: f.target.Target().ClusterID, IssuerEpoch: f.recovery.IssuerEpoch, NamespaceUID: contextID(45), AccountUID: contextID(46), PodUID: contextID(47), ProcessEpoch: contextID(48), StartupDigest: artifact.Digest{1}, ImageDigest: artifact.Digest{0xee}}
-	// ADR-332: the executor runs another image than the capability names; the
+	// ADR-333: the executor runs another image than the capability names; the
 	// digest is provenance, never an admission criterion.
 	if f.process.ImageDigest == e.CollectorImageDigest {
 		panic("fixture must differ from the capability image")

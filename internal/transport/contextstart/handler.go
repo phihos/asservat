@@ -95,7 +95,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.refuse(w, "hello")
 		return
 	}
-	// ADR-332: one protocol major; within it the announced capabilities decide
+	// ADR-333: one protocol major; within it the announced capabilities decide
 	// which operations this connector receives.
 	capabilities := contracts.NewConnectorCapabilities(hello.Capabilities)
 	if hello.Protocol != contracts.ConnectorProtocolMajor || capabilities == nil {

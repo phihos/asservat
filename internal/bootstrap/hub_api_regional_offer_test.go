@@ -155,7 +155,7 @@ func TestHubAPIRegionalOfferExecutorSection(t *testing.T) {
 		t.Fatal("local catalog entry", local.Trust.Keys, local.Standby)
 	}
 	// A joined mode=cluster cluster derives the same entry for its own IDs
-	// and release namespace; no executor digest is pinned (ADR-332).
+	// and release namespace; no executor digest is pinned (ADR-333).
 	const remote = "40000000-0000-4000-8000-000000000001"
 	remotePeer, ok := contracts.RemotePeerID(runtimeID, remote)
 	if !ok || remotePeer == peer {

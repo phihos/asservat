@@ -31,7 +31,7 @@ type HistoryLocal struct {
 func historyJSON(v any) json.RawMessage { b, _ := json.Marshal(v); return b }
 func historyDecode(b []byte, out any) error {
 	d := json.NewDecoder(bytes.NewReader(b))
-	// Unknown fields of a newer peer are ignored (ADR-332).
+	// Unknown fields of a newer peer are ignored (ADR-333).
 	if d.Decode(out) != nil || d.Decode(new(any)) != io.EOF {
 		return contracts.ErrAPIContextProtocol
 	}

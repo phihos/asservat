@@ -153,7 +153,7 @@ func (h *HubOperations) call(ctx context.Context, method string, in, out any) er
 	if h.broken || ctx == nil || h.seq >= contracts.APIContextMaximumOperations {
 		return value.ErrUnavailable
 	}
-	// ADR-332: nothing is sent for an operation the connector did not
+	// ADR-333: nothing is sent for an operation the connector did not
 	// announce; the exchange stays intact for the run's own failure handling.
 	if e := requireCapability(h.stream, operationCapability(method), errOperationClass); e != nil {
 		return e
@@ -477,7 +477,7 @@ func (s *regionalSession) observed(b value.Binding) bool {
 
 func decodeOperationBody(body []byte, out any) error {
 	d := json.NewDecoder(bytes.NewReader(body))
-	// Unknown fields of a newer peer are ignored (ADR-332).
+	// Unknown fields of a newer peer are ignored (ADR-333).
 	if d.Decode(out) != nil || d.More() {
 		return value.ErrInvalid
 	}

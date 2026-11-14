@@ -1,4 +1,4 @@
-# ADR-332 — Hub and connector version skew
+# ADR-333 — Hub and connector version skew
 
 Date: 2026-11-14. Status: accepted (maintainer decision: "the same image
 digest [on hub and workload clusters] is an absolute no-go"). Supersedes the
@@ -35,6 +35,9 @@ release newer that added a field would break every older connector.
    outcome audit its startup digest. The capability's collector digest names
    the hub release that compiled the recipe and projection; the manifest
    records it as before.
+   Repeating a capture from history no longer refuses because the hub's
+   collector image changed; it still requires an available collector and
+   refuses changed projection or capture-profile content.
    Removed: `ContextStartExecutorPin` and the catalog's `executor` section;
    the executor-image = capability-image checks in API context execution,
    reference verification, completed-execution publication, live manual

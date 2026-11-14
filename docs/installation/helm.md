@@ -368,7 +368,7 @@ names its `clusterID` in `scope.clusterID`.
 
 ### Version skew
 
-[ADR-332](../decisions/332-connector-version-skew.md). A workload cluster's
+[ADR-333](../decisions/333-connector-version-skew.md). A workload cluster's
 connector and node collectors may run one minor release older or newer than
 the hub, as long as both speak the same connector protocol major (during 0.x
 development, the protocol major is the boundary). Upgrade the hub first,

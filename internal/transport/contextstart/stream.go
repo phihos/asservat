@@ -41,7 +41,7 @@ type frameStream struct {
 	terminalReceiptSent          bool
 	historyWork                  bool
 	// capabilities is the hub end's record of the connector's Hello
-	// announcement (ADR-332); nil on the connector's end.
+	// announcement (ADR-333); nil on the connector's end.
 	capabilities contracts.ConnectorCapabilities
 	lease        *framePeerLease
 	leaseBounds  []framePeerBound

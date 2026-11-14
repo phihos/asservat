@@ -53,7 +53,7 @@ func historyWorkValue(b []byte) (app.HistoryWork, error) {
 	}
 	w := app.HistoryWork{Channel: historyChannelValue(d.Channel), Authority: a}
 	// The signature covers the received bytes; unknown fields of a newer hub
-	// are ignored (ADR-332).
+	// are ignored (ADR-333).
 	if _, e := historyWorkBytes(w); e != nil {
 		return app.HistoryWork{}, value.ErrInvalid
 	}

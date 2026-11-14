@@ -7,7 +7,7 @@ import (
 	"io"
 )
 
-// ConnectorProtocolMajor is the hub↔connector protocol generation (ADR-332).
+// ConnectorProtocolMajor is the hub↔connector protocol generation (ADR-333).
 // A hub admits connectors of the same major only; within it, releases differ
 // by announced capabilities, and decoders ignore fields they do not know.
 // Raise it only for a change an older peer cannot ignore or refuse per
@@ -77,7 +77,7 @@ func (e *ConnectorTooOldError) FixedStep() string { return "connector-too-old/" 
 
 // decodeOpenRPC decodes one bounded JSON value of a cross-release channel:
 // unknown fields are ignored so a peer one release newer stays readable
-// (ADR-332). Signed payloads keep their signature over the received bytes.
+// (ADR-333). Signed payloads keep their signature over the received bytes.
 func decodeOpenRPC[T any](source io.Reader, limit int64) (T, error) {
 	var out T
 	if source == nil {

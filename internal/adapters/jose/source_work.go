@@ -120,7 +120,7 @@ func sourceWorkValue(b []byte) (app.SourceWork, error) {
 		w.StopRecording = &x
 	}
 	// The signature covers the received bytes; fields of a newer hub that this
-	// release does not know are ignored (ADR-332).
+	// release does not know are ignored (ADR-333).
 	if _, e := sourceWorkBytes(w); e != nil {
 		return app.SourceWork{}, value.ErrInvalid
 	}

@@ -152,7 +152,7 @@ type Conn struct {
 func NewConn(r io.Reader, w io.Writer, flush func() error, deadline func(time.Time) error) *Conn {
 	limit := &frameLimit{r: r, n: int64(MaxRegionFrame+1) * MaxFrameBytes}
 	d := json.NewDecoder(limit)
-	// Unknown fields of a newer peer are ignored (ADR-332).
+	// Unknown fields of a newer peer are ignored (ADR-333).
 	return &Conn{limit: limit, dec: d, enc: json.NewEncoder(w), flush: flush, deadline: deadline}
 }
 

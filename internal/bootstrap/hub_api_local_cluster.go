@@ -63,7 +63,7 @@ func localCatalogCluster(c contracts.OwnerDeployment, o *hubAPIRegionalOffer, st
 // in-process one of the hub retention source. image is the hub's current
 // chart image: the capability names it as the collector release that plans
 // the capture (provenance). The connector may run another release within the
-// skew window (ADR-332); its own digests are recorded with each execution.
+// skew window (ADR-333); its own digests are recorded with each execution.
 func catalogCluster(stored contracts.RegionalOffer, image, cluster, peerID, namespace, release string, standby, captures int, step string) (contracts.OwnerPublicCluster, error) {
 	var zero contracts.OwnerPublicCluster
 	if executor, err := stored.RegionalExecutorOffered(); err != nil || !executor {

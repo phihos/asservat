@@ -23,7 +23,7 @@ import (
 // The profile is the installer-pinned expected profile; each exchange binds
 // the registry to its own ADR-178 feed of regional source observations.
 // The executor's startup and image digests in Hello are provenance only: a
-// connector of another release is admitted (ADR-332 version skew).
+// connector of another release is admitted (ADR-333 version skew).
 type ContextStartConnectorAdmission struct {
 	Profile  value.ConnectorCredentialProfile
 	Registry app.ConnectorObservationRegistry
