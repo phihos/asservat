@@ -46,7 +46,6 @@ spec:
         - 8080
         resolution: follow
         maxEndpoints: 256
-        maxStaleness: 5s
       maxFrozenBytes: 67108864
       maxConcurrentSnapshots: 1
       filter: tcp and port 8080

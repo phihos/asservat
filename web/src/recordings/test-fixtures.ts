@@ -1,5 +1,5 @@
 // Synthetic canonical fixtures for console tests only, never imported by UI.
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import type { Data, Input, Output, Operation, Operations, Recording } from './http';
 import { id } from '../capture/test-fixtures';
 export const recording = (n = 1): Recording => ({
@@ -15,7 +15,7 @@ export function inventoryResult(rows = [recording()], cursor: string | null = nu
 }
 export function savePreviewResult(rows = [recording()]): Output<'preview_recording_save'> {
   const name = 'mcp-recording-save-preview-result.json';
-  const fixture = JSON.parse(readFileSync(new URL('../../../examples/' + name, import.meta.url), 'utf8'));
+  const fixture = JSON.parse(readFileSync(existsSync(new URL('../../../examples/implemented/' + name, import.meta.url)) ? new URL('../../../examples/implemented/' + name, import.meta.url) : new URL('../../../examples/' + name, import.meta.url), 'utf8'));
   const data = fixture.data;
   data.selected_recordings = rows;
   data.windows = rows.map(row => ({ recording_handle: row.recording_handle, before: '30s', after: '0s' }));

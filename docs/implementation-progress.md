@@ -1,5 +1,44 @@
 # Sustained implementation progress
 
+## ADR-330 contract divergence (2026-11-14)
+
+The canonical contracts in `specs/contracts/` and `docs/interfaces/` follow
+ADR-330. The runtime still implements the earlier versions, which are kept
+byte-for-byte under `specs/contracts/implemented/` and `examples/implemented/`.
+Runtime consumers read through them: the embedded Go schema bundles
+(`scripts/manifest-schemas.py`, `scripts/investigation-schemas.py`), the
+generated CRDs (`scripts/policy-crd.py`, `scripts/capacity-crds.py`), the
+console contract generator (`web/scripts/contracts.mjs`) and the Go/console
+tests that load contracts or examples. Spec gates validate only the canonical
+files. Delete an `implemented/` file in the change that makes its runtime
+implement the canonical contract.
+
+| Contract | Canonical change | Runtime still implements (code) |
+| --- | --- | --- |
+| `mcp-tools.json`, `browser-openapi.yaml` | Stateless previews: `plan_digest` out, `preview` + `expected_plan_digest` + `idempotency_key` in; `resolve_capture_request` and `continue_acquisition` removed | Stored preview handles, resolution tool and continue flag: `internal/transport/presentation/context_operations.go`, `recording_save_operations.go`, `recorder_preview.go`; `internal/domain/audit/operation.go`; `internal/bootstrap/public_context.go`; console `web/src/capture`, `web/src/recordings` |
+| `mcp-tools.json`, `browser-openapi.yaml` | Pending results carry `revision`; `get_capture`/`get_grant`/`get_query_result`/`get_artifact_download` take `after_revision` and wait ≤30 s; `get_capture` has no poll advice | `retry_after_seconds` poll advice: `internal/transport/presentation/context_projection_operations.go`, `context_operations.go`; console status polling |
+| `browser-openapi.yaml` | SSE: `GET /api/v1/events` (`StatusEvent`), `GET /api/v1/live/watches/{watch_id}/events` (`live-watch.schema.json#/$defs/event`) | Not implemented; console polls |
+| `mcp-tools.json` | `get_grant`/`list_reviews`/`request_policy_grant` drop `preview_id`, `can_resolve`, `resume_requires_original_client` | `internal/application/authorization/grants.go`, `internal/transport/presentation/grant_operations.go` |
+| `mcp-tools.json` | `explain_access`/`preview_access_change`: `ClusterNotObserved` replaces `PermissionObservationStale`; no `valid_until` | `internal/domain/authorization/explain.go`, `internal/transport/presentation/access_preview_operations.go` |
+| `mcp-tools.json`, `live-capacity.schema.json` (deleted) | `get_live_capacity` removed; live load is Prometheus metrics (REQ-LIV-004) | `internal/transport/presentation/live_capacity_operations.go`, `internal/contracts/investigation_schema.go`, `internal/domain/audit/operation.go`, `web/src/capacity` |
+| `live-watch.schema.json`, `read_live_watch` | `wait_ms` ≤30000; no `retry_after_ms`, `row_max_age_seconds`, `managed_row_max_age_seconds`, source `handle_expires_at`; row expiry is min(privacy, watch deadline) | `internal/domain/live/watch.go`, `internal/domain/live/source.go`, `internal/application/live/service.go` |
+| `recording-save.schema.json` | Preview has `plan_digest` instead of `preview_id`/`capture_id`/`expires_at`/`save_scope_digest`; no recording `handle_expires_at` | `internal/transport/presentation/recording_save_operations.go`, `internal/domain/live/source.go` |
+| `capture-assessment.schema.json` | No `validUntil` | `internal/application/planning/context_assessment.go`, `recorder_assessment.go` |
+| `packet-capture.schema.json` | No `peers.maxStaleness` (peers follow watch events) | `internal/application/planning/peers.go`, `recorder.go`, builtin profiles `internal/application/planning/profiles/*.json`, `internal/bootstrap/regional_peer_verifier.go`; DebugPolicy/CaptureProfile CRDs |
+| `browser-settings.schema.json` | No `revision`, `rootID`, `sessionEpoch`, `suspended` | `internal/adapters/kubernetes/browser_settings.go`, `internal/bootstrap/hub_api_inputs.go`, session-epoch SQL (`internal/adapters/postgres/custodydb`) |
+| `budget-policy.schema.json` | `spec.priority`; breaker `pressureTriggers` (PSI) + `recoverySeconds` replace `unhealthySamples`/`sampleIntervalSeconds`/`recoveryHealthySeconds` | Embedded copy `internal/adapters/kubernetes/capacity-schemas/`, chart CRD `evidencebudgetpolicies.yaml`, Helm values (`examples/helm/context-trial-profile.yaml`, `internal/bootstrap/testdata/`); no priority selection |
+| `internal-work.schema.json` | Stream message on the connector connection: no `issuerEpoch`, `deliveryFence`, `*Ref`, `nodeBootID`, `StaleFence`, JWS wrapper; analysis input by `inputArtifactId` | `internal/adapters/jose/work.go`, `internal/contracts/work.go`, `internal/domain/fleet/work.go` |
+| `local-key-service.schema.json`, `local-key-secret.schema.json` | wrap/unwrap only, no `validUntil`; purposes `artifact`, `browser-credentials` | `internal/contracts/key_service.go`, `internal/adapters/kms/local_signing.go`, `local_keys.go`, `protected_local_keys.go` |
+| (no JSON schema) node channel | Hello with version and capabilities; no enroll/poll, CSR, boot ID or epoch | `internal/contracts/node_channel.go`, `internal/bootstrap/node_channel.go` |
+
+Schemas kept because Go still embeds them with production code paths:
+`work-trust`, `submission-trust`, `installation-witness`, `retention-topology`
+(`internal/adapters/kubernetes/permission_decode.go` and their readers), and
+`local-start` with `scripts/start-crd.py` and
+`charts/asservat/crds/capacityreservations.yaml`
+(`internal/adapters/kubernetes/start_admission.go`). Remove each with its code.
+`local-key-configuration.schema.json` had no runtime consumer and is deleted.
+
 ## Helm-native installation (2026-11-14)
 
 Candidate: PR #233 `feat/helm-native-install` (head `189f7f68`), following the

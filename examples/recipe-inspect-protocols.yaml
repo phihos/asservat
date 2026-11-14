@@ -53,7 +53,6 @@ spec:
         protocol: any
         resolution: frozen
         maxEndpoints: 1
-        maxStaleness: 5s
       maxFrozenBytes: 8388608
       maxConcurrentSnapshots: 1
     required: true

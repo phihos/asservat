@@ -1,4 +1,12 @@
 {
-  "preview_id": "00000000-0000-4000-8000-000000000194",
+  "preview": {
+    "recording_handles": [
+      "recording-synthetic-traffic",
+      "recording-synthetic-syscalls"
+    ],
+    "before": "20s",
+    "reason": "Preserve the current latency incident."
+  },
+  "expected_plan_digest": "92f59428a7fd2274641d92ef9d272f79bb1ed87f5701da5e76196bec295dce30",
   "idempotency_key": "save-recordings-synthetic-001"
 }

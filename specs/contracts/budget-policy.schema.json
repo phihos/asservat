@@ -18,6 +18,13 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "priority": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000,
+          "default": 0,
+          "description": "The matching policy with the highest priority applies; ties are broken by policy name."
+        },
         "poolRef": {
           "type": "string",
           "minLength": 1,
@@ -319,20 +326,54 @@
               "minLength": 1,
               "maxLength": 63
             },
-            "unhealthySamples": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 60
+            "pressureTriggers": {
+              "description": "Linux PSI triggers (/proc/pressure/<resource>, 'some|full <stall> <window>'). A delivered trigger event trips the breaker for new expensive work.",
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 6,
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "resource": {
+                    "enum": [
+                      "cpu",
+                      "memory",
+                      "io"
+                    ]
+                  },
+                  "kind": {
+                    "enum": [
+                      "some",
+                      "full"
+                    ]
+                  },
+                  "stallMicroseconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10000000
+                  },
+                  "windowMicroseconds": {
+                    "type": "integer",
+                    "minimum": 500000,
+                    "maximum": 10000000
+                  }
+                },
+                "required": [
+                  "resource",
+                  "kind",
+                  "stallMicroseconds",
+                  "windowMicroseconds"
+                ]
+              }
             },
-            "sampleIntervalSeconds": {
+            "recoverySeconds": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 60
-            },
-            "recoveryHealthySeconds": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 3600
+              "maximum": 3600,
+              "default": 60,
+              "description": "The breaker closes after this long without a new trip event."
             },
             "maxActiveSources": {
               "type": "integer",
@@ -356,9 +397,7 @@
             "upload",
             "maxSpoolBytes",
             "impactProfileRef",
-            "unhealthySamples",
-            "sampleIntervalSeconds",
-            "recoveryHealthySeconds"
+            "pressureTriggers"
           ]
         }
       },

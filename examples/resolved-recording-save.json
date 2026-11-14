@@ -18,7 +18,7 @@
     "clusterID": "00000000-0000-4000-8000-000000000001",
     "namespaceUID": "namespace-payments-uid",
     "policyUID": "policy-trigger-lifecycles-uid",
-    "executionDigest": "4920c87bc4d15f2d7adbdde931973b7047c24a9bd0a086065f541a547bc41cb3"
+    "executionDigest": "fa9e4f0a03e4f48858dac605353f44623f3bafa509f31986cd8179fb892774db"
   },
   "workloadUID": "workload-api-uid",
   "sources": [
@@ -29,7 +29,7 @@
       "nodeBootID": "00000000-0000-4000-8000-000000000006",
       "actionID": "traffic",
       "kind": "packetCapture",
-      "sourceDefinitionDigest": "64cf8228cf2c57d404d4e3e1240695358e19677aba820414387fd4ea4c296583",
+      "sourceDefinitionDigest": "a977d6c2ae4e3286193ddebaae89581a5248807350a9e638478eb9432c8f3c1a",
       "retainedAudienceDigest": "9999999999999999999999999999999999999999999999999999999999999999",
       "before": "20s",
       "after": "0s",

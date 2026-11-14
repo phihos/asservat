@@ -209,8 +209,7 @@ def capture_assessment_checks(doc):
     data = doc.get("data") if isinstance(doc.get("data"), dict) else {}
     assessment = doc if doc.get("schemaVersion") == "capture-assessment/v1" else data.get("capture_assessment")
     if assessment:
-        generated, valid = timestamp(assessment["generatedAt"]), timestamp(assessment["validUntil"])
-        require(0 < (valid - generated).total_seconds() <= 300, "Invalid assessment freshness window")
+        generated = timestamp(assessment["generatedAt"])
         metrics = assessment["basis"]["metrics"]
         if "observedAt" in metrics:
             require(timestamp(metrics["observedAt"]) <= generated, "Assessment metrics come from the future")
@@ -241,7 +240,6 @@ def capture_assessment_checks(doc):
                 require(timestamp(quantity["measuredAt"]) <= generated, "Impact measurement comes from the future")
         if "execution_digest" in data:
             require(assessment["planDigest"] == data["execution_digest"], "Assessment bound to another plan")
-            require(valid <= timestamp(data["expires_at"]), "Assessment outlives preview")
             lifecycle = {a["actionID"]: a for a in data["lifecycle_plan"]["actions"]}
             require(set(ids) == set(lifecycle), "Assessment omits plan actions")
             require(all(a["executionMode"] == lifecycle[a["actionID"]]["executionMode"] for a in actions), "Assessment changes action lifecycle")
@@ -409,7 +407,6 @@ def recording_save_checks(doc: dict) -> None:
         handles = [r["recording_handle"] for r in rows]
         require(len(handles) == len(set(handles)), "Duplicate recording handle")
         for row in rows:
-            require(0 < (timestamp(row["handle_expires_at"]) - timestamp(row["observed_at"])).total_seconds() <= 60, "Recording handle exceeds freshness bound")
             require(not row["save_eligible"] or not row["blockers"], "Blocked recording advertised as savable")
             require(not row["save_eligible"] or duration_seconds(row["maximum_before"]) > 0, "Zero-history recorder advertised as savable")
     if data.get("kind") == "recordingSavePreview":
@@ -421,10 +418,7 @@ def recording_save_checks(doc: dict) -> None:
         require(all(duration_seconds(w["before"]) <= bounds[w["recording_handle"]] for w in windows), "Save widens configured history")
         require(not any(not r["save_eligible"] for r in rows) or data["blockers"], "Save hides source blockers")
         a = data["capture_assessment"]
-        require(a["planDigest"] == data["save_scope_digest"], "Save assessment scope mismatch")
-        require(a["validUntil"] == data["expires_at"], "Save assessment expiry mismatch")
-        require(0 < (timestamp(data["expires_at"]) - timestamp(a["generatedAt"])).total_seconds() <= 60, "Save preview exceeds freshness bound")
-        require(all(timestamp(data["expires_at"]) <= timestamp(r["handle_expires_at"]) for r in rows), "Save outlives source handles")
+        require(a["planDigest"] == data["plan_digest"], "Save assessment scope mismatch")
         require({a_["actionID"] for a_ in a["actions"]} == {r["action_id"] for r in rows}, "Save assessment includes unselected actions")
         require(all(a_["executionMode"] == "ongoing" for a_ in a["actions"]), "Save assessment starts on-trigger work")
         pods = len({r["pod_uid"] for r in rows})
@@ -454,7 +448,6 @@ def pod_status_preview_checks(doc):
         require((pod["workload"]["name"], pod["workload"]["uid"]) == (pod["name"], pod["uid"]), "Unowned pod has a different workload identity")
     assessment = data["capture_assessment"]
     require(all(a["retention"]["anchorRule"] == "submissionPreparation" for a in assessment["actions"]), "Pod-status retention must include waiting after submission")
-    require((timestamp(assessment["validUntil"]) - timestamp(assessment["generatedAt"])).total_seconds() <= 5, "Pod-status assessment renewed observation freshness")
     require(not data["capture_enabled"] or not data["blockers"], "Blocked pod-status preview enables collection")
     require(len(json.dumps(doc, separators=(",", ":")).encode()) <= 32768, "Pod-status preview exceeds hard structured-result bound")
 
@@ -611,7 +604,6 @@ def semantic_checks(doc: dict) -> None:
                 seconds = duration_seconds
                 require(ring["segmentBytes"] * ring["maxSegments"] <= ring["maxBytes"], "Ring segment allocation exceeds bytes")
                 require(seconds(params["before"]) <= seconds(ring["maxAge"]) <= 3600, "Invalid ring history bound")
-                require(seconds(peers["maxStaleness"]) <= 5, "Peer freshness exceeds ceiling")
                 require(ring["segmentBytes"] <= params["maxFrozenBytes"] <= a["limits"]["maxBytes"], "Invalid frozen output reservation")
                 require(seconds(params["before"]) + seconds(params["after"]) > 0, "Empty packet window")
                 require(seconds(params["after"]) < seconds(a["limits"]["timeout"]), "Packet action lacks completion margin")
@@ -853,15 +845,17 @@ def main() -> None:
         require(tools[name]["annotations"]["readOnlyHint"], "Approved query semantics changed")
     query_success = tools["get_query_result"]["outputSchema"]["allOf"][1]["oneOf"][0]["properties"]["data"]
     require("const" not in query_success["properties"]["tool_name"], "Canonical query catalog excludes future specified tools")
-    for name in ("request_capture", "resolve_capture_request"):
-        operation = browser_contract["paths"]["/api/v1/operations/" + name]["post"]
-        header = next(parameter for parameter in operation["parameters"] if parameter["name"] == "Idempotency-Key")
-        key = tools[name]["inputSchema"]["properties"]["idempotency_key"]
-        require(header["schema"]["minLength"] == key["minLength"] and header["schema"]["maxLength"] == key["maxLength"], "Request key header/body constraints differ")
-    require(browser_contract["paths"]["/api/v1/operations/resolve_capture_request"]["post"]["summary"] == tools["resolve_capture_request"]["description"], "Request resolution browser/MCP authority descriptions differ")
-    resolution = tools["resolve_capture_request"]
-    require(resolution["enabledByDefault"], "Own request resolution must remain available without new collection")
-    require(resolution["annotations"] == {"readOnlyHint": False, "destructiveHint": True, "idempotentHint": True, "openWorldHint": False}, "Request resolution must declare its bounded closure mutation")
+    operation = browser_contract["paths"]["/api/v1/operations/request_capture"]["post"]
+    header = next(parameter for parameter in operation["parameters"] if parameter["name"] == "Idempotency-Key")
+    key = tools["request_capture"]["inputSchema"]["properties"]["idempotency_key"]
+    require(header["schema"]["minLength"] == key["minLength"] and header["schema"]["maxLength"] == key["maxLength"], "Request key header/body constraints differ")
+    # ADR-330 D9: previews are stateless; no handle, expiry or resolution tool.
+    require("resolve_capture_request" not in tools and "/api/v1/operations/resolve_capture_request" not in browser_contract["paths"], "Stateless previews need no resolution tool")
+    for name in ("preview_capture", "preview_recording_save"):
+        require("preview_id" not in json.dumps(tools[name]["outputSchema"]) and "preview_id" not in json.dumps(tools["request_capture"]["inputSchema"]), "Preview handle reintroduced")
+    for name in ("get_capture", "get_grant", "get_query_result", "get_artifact_download"):
+        wait = tools[name]["inputSchema"]["properties"]["after_revision"]
+        require(wait["type"] == "integer" and wait["minimum"] == 1, "Status tool lacks the server-side revision wait")
 
     registered = read(ROOT / "specs/examples.yaml")["examples"]
     examples = {}
@@ -1015,12 +1009,12 @@ def main() -> None:
         require(duration_seconds(selected["before"]) <= duration_seconds(action["parameters"]["before"]), "Save widens source history")
         require(selected["maxBytes"] <= action["limits"]["maxBytes"], "Save widens source bytes")
     sp = examples["mcp-recording-save-preview-result.json"]["data"]
-    require(sp["save_scope_digest"] == canonical_digest(save_scope) and sp["capture_id"] == save_scope["captureID"], "Save preview differs from immutable scope")
+    require(sp["plan_digest"] == canonical_digest(save_scope), "Save preview differs from immutable scope")
     require({(r["pod_uid"], r["action_id"]) for r in sp["selected_recordings"]} == {(r["podUID"], r["actionID"]) for r in save_scope["sources"]}, "Save preview selects different sources")
     require(len(json.dumps(sp, separators=(",", ":")).encode()) <= 24576, "Save preview exceeds default result bytes")
     acq = examples["lifecycle-recording-save.json"]
     require(acq["sourceSessionID"] in {r["sourceSessionID"] for r in save_scope["sources"]} and acq["recordingSaveOrigin"]["policyExecutionDigest"] == save_scope["policy"]["executionDigest"], "Save acquisition lost source origin")
-    require(examples["mcp-recording-save-input.json"]["preview_id"] == sp["preview_id"], "Save submit lost preview identity")
+    require(examples["mcp-recording-save-input.json"]["expected_plan_digest"] == sp["plan_digest"], "Save submit lost the reviewed plan")
     require(examples["mcp-recording-save-result.json"]["data"]["capture_id"] == save_scope["captureID"], "Save result lost capture identity")
     sm = examples["manifest-recording-save.json"]
     require(sm["collectionProvenance"]["planDigest"] == canonical_digest(save_scope) and sm["collectionProvenance"]["captureUID"] == save_scope["captureID"], "Saved artifact lost execution identity")
@@ -1197,13 +1191,15 @@ def main() -> None:
         "purpose": "artifact", "keyID": "synthetic-only", "activeVersion": 1,
         "keys": [{"version": 1, "material": base64.b64encode(bytes(range(32))).decode("ascii")}],
     }
-    for purpose in ("artifact", "audit", "browser-credentials", "policy-submission"):
+    for purpose in ("artifact", "browser-credentials"):
         local_key["purpose"] = purpose
         validate(local_key, schemas[BASE + "local-key-secret.schema.json"])
     for mutation in (
         lambda d: d.update(format="another-format"),
         lambda d: d.update(installationID="00000000-0000-0000-0000-000000000000"),
         lambda d: d.update(purpose="any-purpose"),
+        lambda d: d.update(purpose="policy-submission"),
+        lambda d: d.update(purpose="audit"),
         lambda d: d.update(keyID="../key"),
         lambda d: d.update(activeVersion=0),
         lambda d: d.update(activeVersion=2147483648),
@@ -1221,18 +1217,6 @@ def main() -> None:
 
     # Private RPC examples use synthetic byte strings, never installable keys.
     key_scope = {"installationID": local_key["installationID"], "purpose": "artifact", "keyID": "synthetic-only"}
-    key_configuration = {"format": "asservat-local-key-configuration/v1", **key_scope,
-                         "recoveryEpoch": "00000000-0000-4000-8000-000000000003",
-                         "revision": 1, "suspended": False,
-                         "secret": {"name": "keys-v1", "uid": "synthetic-key-uid", "sha256": "1" * 64}}
-    validate(key_configuration, schemas[BASE + "local-key-configuration.schema.json"])
-    for mutation in [lambda d: d.update(revision=0), lambda d: d.update(revision=2147483648),
-                     lambda d: d.update(privateKey="forbidden"), lambda d: d.update(purpose="policy-submission"),
-                     lambda d: d.update(signingPublicKey="AQ=="), lambda d: d.update(suspended="false"),
-                     lambda d: d["secret"].update(sha256="0" * 64), lambda d: d["secret"].update(name="../keys"),
-                     lambda d: d["secret"].update(name="keys\n"), lambda d: d["secret"].update(uid=""),
-                     lambda d: d["secret"].update(sha256="1" * 64 + "\n")]:
-        rejects(key_configuration, "local-key-configuration", mutation)
     key_request = {"format": "asservat-local-key-rpc/v1", "scope": key_scope,
                    "authorityID": "00000000-0000-4000-8000-000000000002", "operation": "wrap",
                    "binding": "YmluZGluZw==", "input": "a2V5"}
@@ -1241,18 +1225,12 @@ def main() -> None:
     key_unwrap = copy.deepcopy(key_request)
     key_unwrap.pop("input")
     key_unwrap.update(operation="unwrap", sealed=key_sealed)
-    key_sign = copy.deepcopy(key_request)
-    key_sign.pop("binding")
-    key_sign["scope"]["purpose"] = "policy-submission"
-    key_sign.update(operation="sign", version=1)
     key_response = {"format": "asservat-local-key-rpc/v1", "operation": "wrap", "sealed": key_sealed,
-                    "requestSHA256": "a" * 64, "validUntil": "2026-10-10T12:00:00Z"}
+                    "requestSHA256": "a" * 64}
     key_opened = copy.deepcopy(key_response)
     key_opened.pop("sealed")
     key_opened.update(operation="unwrap", output="a2V5")
-    key_signature = copy.deepcopy(key_opened)
-    key_signature.update(operation="sign", output=base64.b64encode(bytes(range(64))).decode("ascii"))
-    for doc in (key_request, key_unwrap, key_sign, key_response, key_opened, key_signature):
+    for doc in (key_request, key_unwrap, key_response, key_opened):
         validate(doc, schemas[BASE + "local-key-service.schema.json"])
     for mutation in (
         lambda d: d.update(format="wrong"),
@@ -1266,18 +1244,15 @@ def main() -> None:
         lambda d: d.update(version=1),
         lambda d: d.update(peer="forged"),
         lambda d: d["scope"].update(purpose="policy-submission"),
+        lambda d: d.update(operation="sign"),
     ):
         rejects(key_request, "local-key-service", mutation)
     rejects(key_unwrap, "local-key-service", lambda d: d.update(input="a2V5"))
     rejects(key_unwrap, "local-key-service", lambda d: d.pop("sealed"))
-    rejects(key_sign, "local-key-service", lambda d: d.update(binding="a2V5"))
-    rejects(key_sign, "local-key-service", lambda d: d["scope"].update(purpose="artifact"))
-    rejects(key_sign, "local-key-service", lambda d: d.update(version=0))
     rejects(key_response, "local-key-service", lambda d: d.update(output="a2V5"))
     rejects(key_opened, "local-key-service", lambda d: d.update(sealed={}))
     rejects(key_response, "local-key-service", lambda d: d.update(requestSHA256="A" * 64))
-    rejects(key_response, "local-key-service", lambda d: d.update(validUntil="2026-10-10T12:00:00+00:00"))
-    rejects(key_signature, "local-key-service", lambda d: d.update(output="a2V5"))
+    rejects(key_response, "local-key-service", lambda d: d.update(validUntil="2026-10-10T12:00:00Z"))
 
     rejects(examples["recipe-context.yaml"], "recipe", lambda d: d["spec"]["actions"][0].pop("limits"))
     rejects(examples["policy-deployment.yaml"], "policy", lambda d: d["spec"].update({"unlimited": True}))
@@ -1447,36 +1422,13 @@ def main() -> None:
             return
         raise ValueError("Invalid MCP input accepted: " + name)
 
-    resolution_pair = examples["mcp-resolve-capture-input.json"]
-    for extra in ({"target_ref": {}}, {"capture_id": intent["id"]}, {"force": True}, {"idempotency_key": ""}):
-        rejects_tool_input("resolve_capture_request", {**resolution_pair, **extra})
-    for missing in ("preview_id", "idempotency_key"):
-        rejects_tool_input("resolve_capture_request", {k: v for k, v in resolution_pair.items() if k != missing})
-    for data in ({"state": "pending"}, {"state": "accepted"}, {"state": "closed", "capture_id": intent["id"]}, {"state": "closed", "target_ref": {}}, {"state": "closed", "phase": "Pending"}, {"state": "closed", "operation": "collect"}):
-        invalid = copy.deepcopy(examples["mcp-resolve-capture-closed.json"])
-        invalid["data"] = data
-        try:
-            validate(invalid, tools["resolve_capture_request"]["outputSchema"])
-        except __import__("jsonschema").ValidationError:
-            negative_checks += 1
-        else:
-            raise ValueError("Invalid request disposition accepted")
-    for extra in ({"warnings": ["private target"]}, {"data_class": "extract"}, {"next_cursor": "private cursor"}):
-        invalid = {**examples["mcp-resolve-capture-closed.json"], **extra}
-        try:
-            validate(invalid, tools["resolve_capture_request"]["outputSchema"])
-        except __import__("jsonschema").ValidationError:
-            negative_checks += 1
-        else:
-            raise ValueError("Closed receipt exposed envelope metadata")
-    invalid = copy.deepcopy(examples["mcp-resolve-capture-closed.json"])
-    invalid["status"] = "pending"
-    try:
-        validate(invalid, tools["resolve_capture_request"]["outputSchema"])
-    except __import__("jsonschema").ValidationError:
-        negative_checks += 1
-    else:
-        raise ValueError("Pending request disposition accepted")
+    # ADR-330 D9: a submission carries the reviewed request and its plan digest.
+    submission = examples["mcp-preview-capture-input.json"]
+    for extra in ({"preview_id": intent["id"]}, {"continue_acquisition": True}, {"reason": "override"}, {"result_access": {}}, {"cluster_id": intent["id"]}):
+        rejects_tool_input("request_capture", {**submission, **extra})
+    for missing in ("preview", "expected_plan_digest", "idempotency_key"):
+        rejects_tool_input("request_capture", {k: v for k, v in submission.items() if k != missing})
+    rejects_tool_input("request_capture", {**submission, "expected_plan_digest": "A" * 64})
 
     rejects_tool_input("list_shares", {"view": "received", "include_intents": True})
     revoke = {"sharing_intent_id": intent["id"], "expected_revision": 1, "idempotency_key": "revoke-001"}

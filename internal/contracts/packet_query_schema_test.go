@@ -62,7 +62,7 @@ func TestPacketQueryCombinedReviewChoicesAndCurrentClientDefault(t *testing.T) {
 	if err := wire.ValidateInput("request_capture", input); err != nil {
 		t.Fatal("current-client request", err)
 	}
-	body, err := os.ReadFile("../../examples/mcp-composition-preview-result.json")
+	body, err := readImplementedExample("../../examples/", "mcp-composition-preview-result.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,7 +71,7 @@ func TestPacketQueryCombinedReviewChoicesAndCurrentClientDefault(t *testing.T) {
 		t.Fatal(err)
 	}
 	data := output["data"].(map[string]any)
-	podBody, err := os.ReadFile("../../examples/mcp-pod-status-preview-result.json")
+	podBody, err := readImplementedExample("../../examples/", "mcp-pod-status-preview-result.json")
 	if err != nil {
 		t.Fatal(err)
 	}

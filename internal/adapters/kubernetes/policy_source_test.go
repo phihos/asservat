@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"os"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -18,7 +17,7 @@ import (
 func TestPolicySourceBoundedObservationAndIntent(t *testing.T) {
 	read := func(mode string) (value.PolicySource, error) {
 		t.Helper()
-		y, e := os.ReadFile("../../../examples/policy-deployment.yaml")
+		y, e := readImplementedExample("../../../examples/", "policy-deployment.yaml")
 		if e != nil {
 			t.Fatal(e)
 		}

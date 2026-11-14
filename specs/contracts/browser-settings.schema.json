@@ -2,33 +2,12 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://asservat.io/spec/v1/browser-settings.schema.json",
   "title": "Protected browser session settings v1",
-  "description": "Content of browser.json in a pinned administrator-protected ConfigMap. No credentials or public configuration API. A Helm-rendered document omits rootID and sessionEpoch; the reader supplies them from the installation IDs. Epoch changes invalidate existing browser credentials; current user permissions remain independently required.",
+  "description": "Content of browser.json in the Helm-rendered settings ConfigMap. No credentials or public configuration API. The hub watches the ConfigMap; a change applies to new sessions and shortens existing ones to the new maxLifetimeSeconds. Current user permissions remain independently required.",
   "type": "object",
   "additionalProperties": false,
   "properties": {
     "schemaVersion": {
       "const": "browser-settings/v1"
-    },
-    "revision": {
-      "type": "integer",
-      "minimum": 1,
-      "maximum": 2147483647
-    },
-    "rootID": {
-      "type": "string",
-      "format": "uuid",
-      "pattern": "^[0-9a-f-]{36}$",
-      "not": {
-        "const": "00000000-0000-0000-0000-000000000000"
-      }
-    },
-    "sessionEpoch": {
-      "type": "string",
-      "format": "uuid",
-      "pattern": "^[0-9a-f-]{36}$",
-      "not": {
-        "const": "00000000-0000-0000-0000-000000000000"
-      }
     },
     "issuer": {
       "type": "string",
@@ -47,9 +26,6 @@
       "format": "uri",
       "pattern": "^https://",
       "maxLength": 2048
-    },
-    "suspended": {
-      "type": "boolean"
     },
     "maxLifetimeSeconds": {
       "type": "integer",
@@ -74,11 +50,9 @@
   },
   "required": [
     "schemaVersion",
-    "revision",
     "issuer",
     "clientID",
     "origin",
-    "suspended",
     "maxLifetimeSeconds",
     "maxLogins",
     "maxSessions",

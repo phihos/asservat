@@ -1,0 +1,626 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/internal-work.schema.json",
+  "title": "Minimized internal control work and receipt, before authenticated transport wrapping",
+  "description": "Strict DTO shapes only. Signature, freshness, authority, receipt correlation and effect fencing require semantic/runtime checks. No evidence rows.",
+  "oneOf": [
+    {
+      "$ref": "https://asservat.io/spec/v1/internal-work.schema.json#/$defs/work"
+    },
+    {
+      "$ref": "https://asservat.io/spec/v1/internal-work.schema.json#/$defs/receipt"
+    }
+  ],
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "instant": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "region": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,62}$"
+        },
+        "expiresAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "digest",
+        "region",
+        "expiresAt"
+      ]
+    },
+    "nodeTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "podUID": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "nodeUID": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "nodeBootID": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "podUID",
+        "nodeUID",
+        "nodeBootID"
+      ]
+    },
+    "clusterTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "clusterOnly": {
+          "const": true
+        }
+      },
+      "required": [
+        "clusterOnly"
+      ]
+    },
+    "armSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sourceSessionId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "sourceEpoch": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "actionId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,62}$"
+        },
+        "activationId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "sourceSessionId",
+        "sourceEpoch",
+        "actionId",
+        "activationId"
+      ]
+    },
+    "runAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "captureId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "actionId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,62}$"
+        },
+        "attemptId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "captureId",
+        "actionId",
+        "attemptId"
+      ]
+    },
+    "saveRecording": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "captureId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "snapshotId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "sourceSessionId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "sourceEpoch": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "windowEnd": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "lookbackMillis": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3600000
+        },
+        "policyExecutionDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "captureId",
+        "snapshotId",
+        "sourceSessionId",
+        "sourceEpoch",
+        "windowEnd",
+        "lookbackMillis",
+        "policyExecutionDigest"
+      ]
+    },
+    "analysisStage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "analysisId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "stage": {
+          "enum": [
+            "acquire",
+            "analyze",
+            "publish"
+          ]
+        },
+        "stageGeneration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "inputRef": {
+          "$ref": "https://asservat.io/spec/v1/internal-work.schema.json#/$defs/reference"
+        },
+        "outputSlotId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "analysisId",
+        "stage",
+        "stageGeneration",
+        "inputRef",
+        "outputSlotId"
+      ]
+    },
+    "eraseCopy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "copyId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "copyGeneration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "deletionWorkId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "copyId",
+        "copyGeneration",
+        "deletionWorkId"
+      ]
+    },
+    "projectLive": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "watchId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "sourceSessionId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "sourceEpoch": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "projection": {
+          "enum": [
+            "packetMetadata",
+            "httpHeaders",
+            "syscallMetadata"
+          ]
+        },
+        "viewRevision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "watchId",
+        "sourceSessionId",
+        "sourceEpoch",
+        "projection",
+        "viewRevision"
+      ]
+    },
+    "work": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": {
+          "const": "internal-work/v1"
+        },
+        "kind": {
+          "const": "controlWork"
+        },
+        "purpose": {
+          "enum": [
+            "armSource",
+            "runAction",
+            "saveRecording",
+            "analysisStage",
+            "eraseCopy",
+            "projectLive",
+            "downloadArtifact"
+          ]
+        },
+        "workId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "operationId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "clusterId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "issuerEpoch": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "deliveryFence": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "recipient": {
+          "enum": [
+            "connector",
+            "node"
+          ]
+        },
+        "issuedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "notAfter": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "scopeDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "scopeRef": {
+          "$ref": "https://asservat.io/spec/v1/internal-work.schema.json#/$defs/reference"
+        },
+        "authorityRef": {
+          "$ref": "https://asservat.io/spec/v1/internal-work.schema.json#/$defs/reference"
+        },
+        "budgetRef": {
+          "$ref": "https://asservat.io/spec/v1/internal-work.schema.json#/$defs/reference"
+        },
+        "auditRef": {
+          "$ref": "https://asservat.io/spec/v1/internal-work.schema.json#/$defs/reference"
+        },
+        "requiredCapabilities": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-zA-Z0-9./-]{0,95}$"
+          }
+        },
+        "target": {
+          "oneOf": [
+            {
+              "$ref": "https://asservat.io/spec/v1/internal-work.schema.json#/$defs/nodeTarget"
+            },
+            {
+              "$ref": "https://asservat.io/spec/v1/internal-work.schema.json#/$defs/clusterTarget"
+            }
+          ]
+        },
+        "payload": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "purpose",
+        "workId",
+        "operationId",
+        "clusterId",
+        "issuerEpoch",
+        "deliveryFence",
+        "recipient",
+        "issuedAt",
+        "notAfter",
+        "scopeDigest",
+        "scopeRef",
+        "authorityRef",
+        "budgetRef",
+        "auditRef",
+        "requiredCapabilities",
+        "target",
+        "payload"
+      ],
+      "oneOf": [
+        {
+          "properties": {
+            "purpose": {
+              "const": "armSource"
+            },
+            "payload": {
+              "$ref": "https://asservat.io/spec/v1/internal-work.schema.json#/$defs/armSource"
+            },
+            "target": {
+              "$ref": "https://asservat.io/spec/v1/internal-work.schema.json#/$defs/nodeTarget"
+            },
+            "recipient": {
+              "const": "node"
+            }
+          }
+        },
+        {
+          "properties": {
+            "purpose": {
+              "const": "runAction"
+            },
+            "payload": {
+              "$ref": "https://asservat.io/spec/v1/internal-work.schema.json#/$defs/runAction"
+            },
+            "target": {
+              "$ref": "https://asservat.io/spec/v1/internal-work.schema.json#/$defs/nodeTarget"
+            },
+            "recipient": {
+              "const": "node"
+            }
+          }
+        },
+        {
+          "properties": {
+            "purpose": {
+              "const": "saveRecording"
+            },
+            "payload": {
+              "$ref": "https://asservat.io/spec/v1/internal-work.schema.json#/$defs/saveRecording"
+            },
+            "target": {
+              "$ref": "https://asservat.io/spec/v1/internal-work.schema.json#/$defs/nodeTarget"
+            },
+            "recipient": {
+              "const": "node"
+            }
+          }
+        },
+        {
+          "properties": {
+            "purpose": {
+              "const": "analysisStage"
+            },
+            "payload": {
+              "$ref": "https://asservat.io/spec/v1/internal-work.schema.json#/$defs/analysisStage"
+            },
+            "target": {
+              "$ref": "https://asservat.io/spec/v1/internal-work.schema.json#/$defs/clusterTarget"
+            },
+            "recipient": {
+              "const": "connector"
+            }
+          }
+        },
+        {
+          "properties": {
+            "purpose": {
+              "const": "eraseCopy"
+            },
+            "payload": {
+              "$ref": "https://asservat.io/spec/v1/internal-work.schema.json#/$defs/eraseCopy"
+            },
+            "target": {
+              "$ref": "https://asservat.io/spec/v1/internal-work.schema.json#/$defs/clusterTarget"
+            },
+            "recipient": {
+              "const": "connector"
+            }
+          }
+        },
+        {
+          "properties": {
+            "purpose": {
+              "const": "projectLive"
+            },
+            "payload": {
+              "$ref": "https://asservat.io/spec/v1/internal-work.schema.json#/$defs/projectLive"
+            },
+            "target": {
+              "$ref": "https://asservat.io/spec/v1/internal-work.schema.json#/$defs/nodeTarget"
+            },
+            "recipient": {
+              "const": "node"
+            }
+          }
+        },
+        {
+          "properties": {
+            "purpose": {
+              "const": "downloadArtifact"
+            },
+            "payload": {
+              "$ref": "https://asservat.io/spec/v1/internal-work.schema.json#/$defs/downloadArtifact"
+            },
+            "target": {
+              "$ref": "https://asservat.io/spec/v1/internal-work.schema.json#/$defs/clusterTarget"
+            },
+            "recipient": {
+              "const": "connector"
+            }
+          }
+        }
+      ]
+    },
+    "receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": {
+          "const": "internal-work/v1"
+        },
+        "kind": {
+          "const": "workReceipt"
+        },
+        "workId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "operationId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "clusterId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "issuerEpoch": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "deliveryFence": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "executionDisposition": {
+          "enum": [
+            "Accepted",
+            "Running",
+            "Completed",
+            "Rejected",
+            "Indeterminate"
+          ]
+        },
+        "observedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "reason": {
+          "enum": [
+            "Accepted",
+            "Progress",
+            "Completed",
+            "Denied",
+            "Expired",
+            "CapacityUnavailable",
+            "UnsupportedCapability",
+            "TargetLost",
+            "StaleFence",
+            "ConflictingIdentity",
+            "UnknownStart",
+            "Partial"
+          ]
+        },
+        "resultRef": {
+          "$ref": "https://asservat.io/spec/v1/internal-work.schema.json#/$defs/reference"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "workId",
+        "operationId",
+        "clusterId",
+        "issuerEpoch",
+        "deliveryFence",
+        "sequence",
+        "executionDisposition",
+        "observedAt",
+        "reason"
+      ]
+    },
+    "downloadArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "downloadId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "artifactId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "artifactDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "transferGeneration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "downloadId",
+        "artifactId",
+        "artifactDigest",
+        "transferGeneration"
+      ]
+    }
+  }
+}

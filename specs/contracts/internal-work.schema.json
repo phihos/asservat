@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://asservat.io/spec/v1/internal-work.schema.json",
-  "title": "Minimized internal control work and receipt, before authenticated transport wrapping",
-  "description": "Strict DTO shapes only. Signature, freshness, authority, receipt correlation and effect fencing require semantic/runtime checks. No evidence rows.",
+  "title": "Internal control work and receipt on the connector connection",
+  "description": "Strict DTO shapes of command and receipt messages on the connector's mutual-TLS hub connection (ADR-330 D2). No signature wrapper: the connection authenticates the cluster. operationId is the idempotency key; a resend after reconnect returns the existing outcome. No evidence rows.",
   "oneOf": [
     {
       "$ref": "https://asservat.io/spec/v1/internal-work.schema.json#/$defs/work"
@@ -24,34 +24,6 @@
       "type": "string",
       "format": "date-time"
     },
-    "reference": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "id": {
-          "type": "string",
-          "format": "uuid"
-        },
-        "digest": {
-          "type": "string",
-          "pattern": "^[a-f0-9]{64}$"
-        },
-        "region": {
-          "type": "string",
-          "pattern": "^[a-z][a-z0-9-]{0,62}$"
-        },
-        "expiresAt": {
-          "type": "string",
-          "format": "date-time"
-        }
-      },
-      "required": [
-        "id",
-        "digest",
-        "region",
-        "expiresAt"
-      ]
-    },
     "nodeTarget": {
       "type": "object",
       "additionalProperties": false,
@@ -63,16 +35,11 @@
         "nodeUID": {
           "type": "string",
           "format": "uuid"
-        },
-        "nodeBootID": {
-          "type": "string",
-          "format": "uuid"
         }
       },
       "required": [
         "podUID",
-        "nodeUID",
-        "nodeBootID"
+        "nodeUID"
       ]
     },
     "clusterTarget": {
@@ -202,10 +169,11 @@
           "minimum": 1,
           "maximum": 9007199254740991
         },
-        "inputRef": {
-          "$ref": "https://asservat.io/spec/v1/internal-work.schema.json#/$defs/reference"
-        },
         "outputSlotId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "inputArtifactId": {
           "type": "string",
           "format": "uuid"
         }
@@ -214,7 +182,7 @@
         "analysisId",
         "stage",
         "stageGeneration",
-        "inputRef",
+        "inputArtifactId",
         "outputSlotId"
       ]
     },
@@ -312,15 +280,6 @@
           "type": "string",
           "format": "uuid"
         },
-        "issuerEpoch": {
-          "type": "string",
-          "format": "uuid"
-        },
-        "deliveryFence": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 9007199254740991
-        },
         "recipient": {
           "enum": [
             "connector",
@@ -338,18 +297,6 @@
         "scopeDigest": {
           "type": "string",
           "pattern": "^[a-f0-9]{64}$"
-        },
-        "scopeRef": {
-          "$ref": "https://asservat.io/spec/v1/internal-work.schema.json#/$defs/reference"
-        },
-        "authorityRef": {
-          "$ref": "https://asservat.io/spec/v1/internal-work.schema.json#/$defs/reference"
-        },
-        "budgetRef": {
-          "$ref": "https://asservat.io/spec/v1/internal-work.schema.json#/$defs/reference"
-        },
-        "auditRef": {
-          "$ref": "https://asservat.io/spec/v1/internal-work.schema.json#/$defs/reference"
         },
         "requiredCapabilities": {
           "type": "array",
@@ -381,16 +328,10 @@
         "workId",
         "operationId",
         "clusterId",
-        "issuerEpoch",
-        "deliveryFence",
         "recipient",
         "issuedAt",
         "notAfter",
         "scopeDigest",
-        "scopeRef",
-        "authorityRef",
-        "budgetRef",
-        "auditRef",
         "requiredCapabilities",
         "target",
         "payload"
@@ -532,15 +473,6 @@
           "type": "string",
           "format": "uuid"
         },
-        "issuerEpoch": {
-          "type": "string",
-          "format": "uuid"
-        },
-        "deliveryFence": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 9007199254740991
-        },
         "sequence": {
           "type": "integer",
           "minimum": 1,
@@ -569,14 +501,10 @@
             "CapacityUnavailable",
             "UnsupportedCapability",
             "TargetLost",
-            "StaleFence",
             "ConflictingIdentity",
             "UnknownStart",
             "Partial"
           ]
-        },
-        "resultRef": {
-          "$ref": "https://asservat.io/spec/v1/internal-work.schema.json#/$defs/reference"
         }
       },
       "required": [
@@ -585,8 +513,6 @@
         "workId",
         "operationId",
         "clusterId",
-        "issuerEpoch",
-        "deliveryFence",
         "sequence",
         "executionDisposition",
         "observedAt",
