@@ -83,7 +83,7 @@ func readPublisherInputs(ctx context.Context, files, ids *os.Root) (publisherInp
 	_, pg := servicePostgres(c.Postgres, nil)
 	if !validServiceScope(c.Name, c.Namespace) || c.PollSeconds < 1 || c.PollSeconds > 300 || c.Batch < 1 || c.Batch > 64 || !pg || !validServiceStore(c.AuditStore) || !validServiceStore(c.Evidence) ||
 		!ownerEndpoint(c.OpenBao) || !artifactScope(v.InstallationID).Valid() {
-		return publisherInputs{}, &fixedStepError{"config", mounts.ErrUnavailable}
+		return publisherInputs{}, &fixedStepError{"config", cfg.ErrInvalid}
 	}
 	if _, err = serviceTopologyPins(c.RetentionTopologies, nil); err != nil {
 		return publisherInputs{}, &fixedStepError{"config", err}
@@ -459,8 +459,13 @@ func RunPublisher(ctx context.Context) error {
 		return errors.Join(mounts.ErrUnavailable, err)
 	}
 	defer ids.Close()
-	p, err := NewPublisher(ctx, files, ids)
-	if err != nil {
+	// The setup Job creates the worker PKI and provider state after this
+	// Pod starts: wait in-process for them.
+	var p *Publisher
+	if err = waitStartup(ctx, "publisher", startupLog, func(ctx context.Context) (err error) {
+		p, err = NewPublisher(ctx, files, ids)
+		return err
+	}, nil); err != nil {
 		return err
 	}
 	defer p.Close()

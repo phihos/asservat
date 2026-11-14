@@ -72,8 +72,13 @@ func RunFederation(ctx context.Context) error {
 		return errors.Join(mounts.ErrUnavailable, err)
 	}
 	defer ids.Close()
-	f, err := NewFederation(ctx, files, ids)
-	if err != nil {
+	// Setup and the hub write the accepted owner configuration and provider
+	// state after this Pod starts: wait in-process for them.
+	var f *Federation
+	if err = waitStartup(ctx, "federation", startupLog, func(ctx context.Context) (err error) {
+		f, err = NewFederation(ctx, files, ids)
+		return err
+	}, nil); err != nil {
 		return err
 	}
 	defer f.Close()
@@ -101,7 +106,7 @@ func readFederationInputs(ctx context.Context, files, ids *os.Root) (federationI
 		return federationInputs{}, err
 	}
 	if !validFederationConfig(c) {
-		return federationInputs{}, &fixedStepError{"config", mounts.ErrUnavailable}
+		return federationInputs{}, &fixedStepError{"config", configuration.ErrInvalid}
 	}
 	v, err := readServiceIDs(ctx, ids)
 	if err != nil {
