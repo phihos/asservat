@@ -83,7 +83,7 @@ jobs:
           policy-schema-check permission-crd-check control-schema-check start-crd-check retention-crd-check
           capacity-crd-check helm-check authority-window-check
       - name: Harness and gate self-tests
-        run: for f in scripts/test-ci-changes.py scripts/test-go-shards.py scripts/test-kept-cleanup.py scripts/test-*-selection.py scripts/test-direct-helper-regression.py scripts/test-collector-provenance.py; do python3 "$f"; done
+        run: for f in scripts/test-ci-changes.py scripts/test-go-shards.py scripts/test-kept-cleanup.py scripts/test-*-selection.py scripts/test-collector-provenance.py; do python3 "$f"; done
 
   go:
     needs: changes

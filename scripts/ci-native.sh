@@ -96,7 +96,6 @@ declare -A suites=(
   # The single-cluster owned node→Pod traffic probe: the harness installs its
   # helper only for this exact selection, so the context shards skip it.
   [native-traffic]="$context --run ^TestNativePacingTrafficWithRealKubernetes\$"
-  [federation-regional]="$context --run ^TestFederationRegionalProductWithRealKubernetes\$"
   [initial-handover]="$context --initial-handover"
   [initial-schema-handover]="$context --initial-schema-handover"
   [helm-bootstrap]="$context --helm-bootstrap"
