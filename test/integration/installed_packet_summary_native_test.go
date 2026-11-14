@@ -1,71 +1,18 @@
 package integration
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"net/http"
-	"strings"
 	"testing"
 	"time"
 
-	"asservat.local/asservat/internal/contracts"
 	query "asservat.local/asservat/internal/domain/analysis"
-	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 type installedPacketSummarySource struct {
 	CaseID, ArtifactID, Version, PodUID string
 	CaptureMode                         string
 	Expires                             time.Time
-}
-
-// Read the same existing published source with ordinary read-only OAuth. No
-// acquisition, raw grant or native-download authority is supplied by this view.
-func queryInstalledPacketSummary(t *testing.T, ctx context.Context, identity *installedIdentity, transport http.RoundTripper, origin string, source installedPacketSummarySource, check installedProjectionCheck) query.PacketSummary {
-	t.Helper()
-	if check == nil {
-		t.Fatal("packet summary requires independent SQL proof")
-	}
-	verify := check(source.ArtifactID)
-	token := identity.approvedTokenSource(origin)
-	if _, err := token.Token(ctx); err != nil {
-		t.Fatal(err)
-	}
-	wire, err := contracts.NewInvestigationContracts()
-	if err != nil {
-		t.Fatal(err)
-	}
-	client := sdk.NewClient(&sdk.Implementation{Name: "installed-packet-summary", Version: "1"}, nil)
-	session, err := client.Connect(ctx, &sdk.StreamableClientTransport{Endpoint: strings.TrimSuffix(origin, "/") + "/mcp", HTTPClient: &http.Client{Transport: installedJourneyBearer{transport, token.Token}, Timeout: 60 * time.Second}, MaxRetries: -1, DisableStandaloneSSE: true}, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer session.Close()
-	call := func(name string, args any) installedComparisonReply {
-		t.Helper()
-		started := time.Now()
-		result, err := session.CallTool(ctx, &sdk.CallToolParams{Name: name, Arguments: args})
-		if err != nil {
-			t.Fatal("packet summary outcome unavailable; no replay", name, err)
-		}
-		raw, err := json.Marshal(result.StructuredContent)
-		if source.CaptureMode == "rawPackets" && bytes.Contains(raw, []byte("synthetic-approved-recording")) {
-			t.Fatal("raw marker escaped public packet response")
-		}
-		var out installedComparisonReply
-		if err != nil || wire.ValidateOutput(name, raw) != nil || json.Unmarshal(raw, &out) != nil || result.IsError != (out.Status == "error") {
-			t.Fatal("canonical packet summary response", name)
-		}
-		t.Logf("installed packet summary %s status=%s elapsed=%s", name, out.Status, time.Since(started))
-		return out
-	}
-	denied := call("prepare_artifact_download", map[string]string{"artifact_id": source.ArtifactID, "idempotency_key": "packet-read-only-denied"})
-	if denied.Status != "error" {
-		t.Fatal("read-only packet session obtained native download")
-	}
-	verify("", "")
-	return queryInstalledPacketSummaryWithCall(t, ctx, source, call, verify)
 }
 
 func queryInstalledPacketSummaryWithCall(t *testing.T, ctx context.Context, source installedPacketSummarySource, call func(string, any) installedComparisonReply, verify func(string, string) func()) query.PacketSummary {

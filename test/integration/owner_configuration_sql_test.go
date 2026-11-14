@@ -46,7 +46,7 @@ func ownerConfigurationLab(t *testing.T, ctx context.Context, f fixture, c value
 		t.Fatal(e)
 	}
 	t.Cleanup(l.admin.Close)
-	_, e = l.admin.Exec(ctx, "INSERT INTO fleet_trust(activated_postmaster_at,activated_database_oid,installation_id,issuer_epoch,source_uid,source_generation,source_digest,suspended,recovery_blocked,observed_at,fresh_until) VALUES(pg_catalog.pg_postmaster_start_time(),(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()),$1,$2,'synthetic-owner-configuration',1,$3,false,false,statement_timestamp(),statement_timestamp()+interval '30 seconds')", c.Pool.InstallationID, c.Pool.IssuerEpoch, bytes.Repeat([]byte{42}, 32))
+	_, e = l.admin.Exec(ctx, "INSERT INTO fleet_trust(activated_postmaster_at,activated_database_oid,installation_id,issuer_epoch,source_uid,source_generation,source_digest,suspended,observed_at,fresh_until) VALUES(pg_catalog.pg_postmaster_start_time(),(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()),$1,$2,'synthetic-owner-configuration',1,$3,false,statement_timestamp(),statement_timestamp()+interval '30 seconds')", c.Pool.InstallationID, c.Pool.IssuerEpoch, bytes.Repeat([]byte{42}, 32))
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -286,7 +286,7 @@ func TestEnrollmentOwnerConfigurationWithRealServices(t *testing.T) {
 		t.Fatal("source replacement silently accepted")
 	}
 	for name, p := range map[string]*pgxpool.Pool{"writer": l.writerPool, "audit": l.ackPool, "reader": l.readerPool} {
-		for _, sql := range []string{"DELETE FROM hub_owner_configuration", "UPDATE hub_owner_configuration SET source_uid=gen_random_uuid()", "UPDATE fleet_trust SET recovery_blocked=false", "UPDATE hub_owner_configuration_revision SET snapshot_json=decode('00','hex')"} {
+		for _, sql := range []string{"DELETE FROM hub_owner_configuration", "UPDATE hub_owner_configuration SET source_uid=gen_random_uuid()", "UPDATE fleet_trust SET suspended=false", "UPDATE hub_owner_configuration_revision SET snapshot_json=decode('00','hex')"} {
 			if _, e = p.Exec(ctx, sql); e == nil {
 				t.Fatalf("%s bypassed immutable source: %s", name, sql)
 			}
@@ -309,7 +309,7 @@ func TestEnrollmentOwnerConfigurationWithRealServices(t *testing.T) {
 	c4.Revision.Digest = artifact.Digest{5}
 	c4.Suspended = false
 	accept(c4)
-	if _, e = l.admin.Exec(ctx, "UPDATE fleet_trust SET recovery_blocked=true WHERE installation_id=$1", c.Pool.InstallationID); e != nil {
+	if _, e = l.admin.Exec(ctx, "UPDATE fleet_trust SET suspended=true WHERE installation_id=$1", c.Pool.InstallationID); e != nil {
 		t.Fatal(e)
 	}
 	denied("blocked recovery usable")
@@ -319,7 +319,7 @@ func TestEnrollmentOwnerConfigurationWithRealServices(t *testing.T) {
 	if e = l.writer.FenceOwnerConfiguration(ctx, time.Now()); e != nil {
 		t.Fatal("negative fence requires active recovery", e)
 	}
-	if _, e = l.admin.Exec(ctx, "UPDATE fleet_trust SET recovery_blocked=false WHERE installation_id=$1", c.Pool.InstallationID); e != nil {
+	if _, e = l.admin.Exec(ctx, "UPDATE fleet_trust SET suspended=false WHERE installation_id=$1", c.Pool.InstallationID); e != nil {
 		t.Fatal(e)
 	}
 	if restored, err := replaceSyntheticFleetObservationAfterActivation(ctx, l.admin, c.Pool.InstallationID); err != nil {

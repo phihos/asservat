@@ -75,7 +75,7 @@ func TestEnrollmentWithRealServices(t *testing.T) {
 				notAfter = now.Add(200 * time.Millisecond)
 			}
 		}
-		_, e := admin.Exec(ctx, `INSERT INTO fleet_trust(activated_postmaster_at,activated_database_oid,installation_id,issuer_epoch,source_uid,source_generation,source_digest,suspended,recovery_blocked,observed_at,fresh_until) VALUES(pg_catalog.pg_postmaster_start_time(),(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()),$1,$2,'fixture',1,$3,false,false,$4,$5)`, claim.InstallationID, epoch, claim.SecretDigest[:], now, now.Add(30*time.Second))
+		_, e := admin.Exec(ctx, `INSERT INTO fleet_trust(activated_postmaster_at,activated_database_oid,installation_id,issuer_epoch,source_uid,source_generation,source_digest,suspended,observed_at,fresh_until) VALUES(pg_catalog.pg_postmaster_start_time(),(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()),$1,$2,'fixture',1,$3,false,$4,$5)`, claim.InstallationID, epoch, claim.SecretDigest[:], now, now.Add(30*time.Second))
 		if e != nil {
 			t.Fatal(e)
 		}
@@ -294,7 +294,7 @@ func TestEnrollmentWithRealServices(t *testing.T) {
 			case "epoch":
 				update("UPDATE fleet_trust SET issuer_epoch=$2 WHERE installation_id=$1", claim.InstallationID, uuid.NewString())
 			case "recovery":
-				update("UPDATE fleet_trust SET recovery_blocked=true WHERE installation_id=$1", claim.InstallationID)
+				update("UPDATE fleet_trust SET suspended=true WHERE installation_id=$1", claim.InstallationID)
 			case "stale-trust":
 				update("UPDATE fleet_observation SET observed_at=clock_timestamp()-interval '30 seconds',fresh_until=clock_timestamp()-interval '1 second' WHERE installation_id=$1", claim.InstallationID)
 			case "expired":

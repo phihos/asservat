@@ -673,7 +673,7 @@ func qualifyOperationAuditLifecycle(t *testing.T, ctx context.Context, admin *pg
 			}
 			// Recovery loss denies new cleanup and release; immutable admission incarnation
 			// is intentionally not remapped by an ordinary observer or this fixture.
-			if _, e = admin.Exec(ctx, "UPDATE fleet_trust SET recovery_blocked=true WHERE installation_id=$1", policy.InstallationID); e != nil {
+			if _, e = admin.Exec(ctx, "UPDATE fleet_trust SET suspended=true WHERE installation_id=$1", policy.InstallationID); e != nil {
 				t.Fatal(e)
 			}
 			if _, e = cleanup.ReadOperationLifecycle(ctx, uncertain.ID); !errors.Is(e, app.ErrUnavailable) {

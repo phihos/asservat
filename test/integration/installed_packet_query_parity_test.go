@@ -1,43 +1,22 @@
 package integration
 
 import (
-	query "asservat.local/asservat/internal/domain/analysis"
-	"asservat.local/asservat/internal/domain/artifact"
 	"bytes"
-	"context"
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/gopacket/gopacket/pcapgo"
 	"io"
 	"net/netip"
 	"reflect"
 	"strconv"
 	"strings"
-	"testing"
 	"time"
+
+	query "asservat.local/asservat/internal/domain/analysis"
+	"asservat.local/asservat/internal/domain/artifact"
+	"github.com/gopacket/gopacket/pcapgo"
 )
 
-func installedPacketQueryTshark(t *testing.T, ctx context.Context, path string, native []byte, pages ...query.PacketQueryResult) {
-	t.Helper()
-	// Decode the ORIGINAL complete native file without a display filter, so its
-	// original ordinal and scan-byte work include rejected packets as well.
-	fields := []string{"frame.number", "frame.time_epoch", "frame.cap_len", "frame.len", "ip.src", "ip.dst", "ipv6.src", "ipv6.dst", "tcp.srcport", "tcp.dstport", "tcp.flags", "tcp.seq_raw", "tcp.ack_raw", "tcp.window_size_value", "ip.hdr_len", "tcp.hdr_len"}
-	args := []string{"-n", "-r", path, "-T", "fields", "-E", "occurrence=f"}
-	for _, f := range fields {
-		args = append(args, "-e", f)
-	}
-	out, err := installedOutput(ctx, installedLocalToolTimeout, "tshark", args...)
-	if err != nil {
-		t.Fatal("original raw packet query tshark", err)
-	}
-	for _, page := range pages {
-		if err = installedPacketQueryMatchesNative(page, native, string(out)); err != nil {
-			t.Fatal("packet query/tshark original field/time/prefix parity", err)
-		}
-		t.Logf("installed packet query: %d original-order rows/%d scanned records/%d captured bytes match SAME authenticated native+tshark numeric fields, timestamps and exact64byte frame prefixes", len(page.Rows), page.ScannedPackets, page.ScannedBytes)
-	}
-}
 func installedPacketQueryMatchesNative(page query.PacketQueryResult, native []byte, fields string) error {
 	selection := installedPacketQuerySelection()
 	if !page.Valid(selection, artifact.RawPCAPNGArtifact) {

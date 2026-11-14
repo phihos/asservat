@@ -53,7 +53,7 @@ func recoveryStateWithin(row custodydb.FleetCurrentTrust, started, now time.Time
 	if window <= 0 || window > identity.AuthorityRecheckInterval {
 		window = 5 * time.Second
 	}
-	if row.Suspended || row.RecoveryBlocked || !identity.Fresh(row.ObservedAt.Time, row.FreshUntil.Time, now, 30*time.Second) {
+	if row.Suspended || !identity.Fresh(row.ObservedAt.Time, row.FreshUntil.Time, now, 30*time.Second) {
 		return value.RecoveryState{}, value.ErrUnavailable
 	}
 	out := value.RecoveryState{InstallationID: uid(row.InstallationID), IssuerEpoch: uid(row.IssuerEpoch), Revision: trustRevision(row), ObservedAt: started, FreshUntil: identity.Earlier(started.Add(window), row.FreshUntil.Time)}
@@ -147,7 +147,7 @@ func (g *RecoveryTransactionGuard) lockStarted(ctx context.Context, q *custodydb
 	return row, g.checkStarted(row, root, a)
 }
 func (g *RecoveryTransactionGuard) checkStarted(row custodydb.FleetCurrentTrust, root string, a artifact.RecoveryProof) error {
-	if g == nil || root != g.root || a.InstallationID != g.installation || uid(row.InstallationID) != g.installation || a.IssuerEpoch != uid(row.IssuerEpoch) || row.Suspended || row.RecoveryBlocked {
+	if g == nil || root != g.root || a.InstallationID != g.installation || uid(row.InstallationID) != g.installation || a.IssuerEpoch != uid(row.IssuerEpoch) || row.Suspended {
 		return value.ErrDenied
 	}
 	return nil

@@ -1,12 +1,11 @@
 package contracts
 
 import (
-	"io"
 	"time"
 )
 
 const InitialRuntimeResourcesFormat = "asservat-initial-runtime-resources/v1"
-const InitialRuntimeResourcesMaxBytes = 32 << 10
+
 const InitialRuntimeResourceCount = 19
 
 // The private installation journal carries only public template provenance.
@@ -54,8 +53,4 @@ type InitialRuntimeResourceSnapshot struct {
 	State                InitialRuntimeResourceState
 	UID, ResourceVersion string
 	ValidUntil           time.Time
-}
-
-func DecodeInitialRuntimeResourceState(r io.Reader) (InitialRuntimeResourceState, error) {
-	return decodeClosedRPC[InitialRuntimeResourceState](r, InitialRuntimeResourcesMaxBytes)
 }

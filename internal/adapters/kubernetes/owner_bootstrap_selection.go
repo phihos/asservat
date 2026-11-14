@@ -7,17 +7,6 @@ import (
 	"asservat.local/asservat/internal/contracts"
 )
 
-type OwnerBootstrapAdvanceStatus string
-
-type OwnerBootstrapAdvance struct {
-	Stop        OwnerInstallationStop
-	OperationID string
-	Status      OwnerBootstrapAdvanceStatus
-	Snapshot    contracts.InitialRuntimeResourceSnapshot
-	Selection   contracts.OwnerBootstrapSelection
-	Input       contracts.OwnerDeployment
-}
-
 // This fixed installer owns only original public allocation and its immutable
 // child. It cannot create SQL permissions, enroll a peer or read credentials.
 // The caller retains the root; Close cancels and joins this producer's calls.

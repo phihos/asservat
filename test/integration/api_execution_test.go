@@ -79,7 +79,7 @@ func qualifyAPIExecutionTransactions(t *testing.T, ctx context.Context, admin *p
 					"UPDATE context_execution SET binding_json=binding_json WHERE false",
 					"INSERT INTO context_capture SELECT * FROM context_capture WHERE false",
 					"UPDATE context_capture SET expectation_json=expectation_json WHERE false",
-					"UPDATE fleet_trust SET recovery_blocked=false WHERE false",
+					"UPDATE fleet_trust SET suspended=false WHERE false",
 					"INSERT INTO context_catalog(artifact_id,capture_id,root_id) SELECT id,id,root_id FROM context_capture WHERE false",
 					"UPDATE custody_copy SET attempt_id=attempt_id WHERE false",
 					"INSERT INTO context_key_unwrap SELECT * FROM context_key_unwrap WHERE false",

@@ -5,8 +5,6 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
-	"encoding/base64"
-	"encoding/json"
 	"encoding/pem"
 	"math/big"
 	"testing"
@@ -25,8 +23,4 @@ func bootstrapInputCA(t *testing.T, now time.Time, n int64) []byte {
 		t.Fatal(err)
 	}
 	return pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
-}
-func bootstrapInputHint(now time.Time, aud any) []byte {
-	raw, _ := json.Marshal(map[string]any{"aud": aud, "exp": now.Add(time.Hour).Unix()})
-	return []byte("e30." + base64.RawURLEncoding.EncodeToString(raw) + ".not-a-signature")
 }

@@ -20,7 +20,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/smithy-go"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 const installedDeletionFaultSID = "DenyInstalledJourneyAttemptInventory"
@@ -185,20 +184,6 @@ func installedDeletionInventoryAccess(ctx context.Context, store *s3.Client, buc
 	return matched, nil
 }
 
-func installedDeletionWaitAccess(ctx context.Context, store *s3.Client, bucket, prefix string, denied bool) error {
-	call, end := context.WithTimeout(ctx, 10*time.Second)
-	defer end()
-	for {
-		ok, err := installedDeletionInventoryAccess(call, store, bucket, prefix, denied)
-		if err != nil || ok {
-			return err
-		}
-		if err := installedJourneyPause(call, 100*time.Millisecond); err != nil {
-			return err
-		}
-	}
-}
-
 type installedDeletionState struct {
 	Now, ExpiresAt, DeleteBy                    time.Time
 	State, Allocation                           string
@@ -206,16 +191,6 @@ type installedDeletionState struct {
 	Lease                                       pgtype.Timestamptz
 	Deleted, Checkpoint                         bool
 	Receipts, Writer                            []byte
-}
-
-func readInstalledDeletionState(ctx context.Context, pool *pgxpool.Pool, root string, loc artifact.Location) (installedDeletionState, error) {
-	call, end := context.WithTimeout(ctx, 5*time.Second)
-	defer end()
-	var s installedDeletionState
-	err := pool.QueryRow(call, installedDeletionStateSQL, root, loc.AttemptID, loc.ArtifactID, loc.ClusterID).Scan(
-		&s.Now, &s.State, &s.Allocation, &s.Fence, &s.Lease, &s.ExpiresAt, &s.DeleteBy, &s.Deleted, &s.Checkpoint,
-		&s.Bytes, &s.Objects, &s.Full, &s.Replay, &s.Copies, &s.Receipts, &s.Writer)
-	return s, err
 }
 
 // Retain the first observed installed lease. A later retry may already exist
@@ -392,20 +367,3 @@ func TestInstalledDeletionFailureRequiresClaimAndOriginalLease(t *testing.T) {
 		t.Fatal("a later retry reset the failed lease observation", err)
 	}
 }
-
-// Match the initial/final observer: other retained context charges survive
-// their evidence deletion, while the original capture must still own its row.
-const installedDeletionStateSQL = `
-SELECT clock_timestamp(), a.state, a.allocation_id::text, a.deletion_fence, a.lease_until,
-       a.effective_expires_at, a.effective_delete_by, a.deleted_at IS NOT NULL, d.attempt_id IS NOT NULL,
-       ca.charged_bytes-(SELECT coalesce(sum(x.reserved_bytes),0) FROM custody_attempt x WHERE x.allocation_id=a.allocation_id AND x.id<>a.id AND x.state<>'deleted'), ca.charged_objects-4*(SELECT count(*) FROM custody_attempt x WHERE x.allocation_id=a.allocation_id AND x.id<>a.id AND x.state<>'deleted'), cc.charged_full-(SELECT count(*) FROM context_control_charge other WHERE other.root_id=cc.root_id AND other.allocation_id=cc.allocation_id AND other.capture_id<>own_charge.capture_id), cc.charged_replay-(SELECT count(*) FROM context_control_charge other WHERE other.root_id=cc.root_id AND other.allocation_id=cc.allocation_id AND other.capture_id<>own_charge.capture_id),
-       (SELECT count(*) FROM custody_copy cp WHERE cp.attempt_id=a.id AND cp.ciphertext_bytes IS NOT NULL),
-       (SELECT jsonb_agg(jsonb_build_array(cp.role, cp.ciphertext_bytes, cp.ciphertext_sha256, cp.etag, cp.version_id) ORDER BY cp.role)
-        FROM custody_copy cp WHERE cp.attempt_id=a.id), w.completion_digest
-FROM custody_attempt a
-JOIN context_writer_completion w ON w.attempt_id=a.id AND w.root_id=$1
-JOIN custody_allocation ca ON ca.id=a.allocation_id
-JOIN context_control_account cc ON cc.allocation_id=ca.id AND cc.root_id=w.root_id
-JOIN context_control_charge own_charge ON own_charge.capture_id=w.capture_id AND own_charge.root_id=w.root_id AND own_charge.allocation_id=a.allocation_id
-LEFT JOIN context_deletion_checkpoint d ON d.attempt_id=a.id AND d.root_id=$1
-WHERE a.id=$2 AND a.artifact_id=$3 AND a.cluster_id=$4`

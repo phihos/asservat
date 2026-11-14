@@ -1,12 +1,8 @@
 package contracts
 
 import (
-	"io"
 	"time"
 )
-
-const InitialInstallerFormat = "asservat-initial-installer/v1"
-const InitialInstallerRoot = "/run/asservat/initial-installer"
 
 // Installation-owned inputs; no credentials or user-supplied activation flag.
 // InitialSchemaExpectation is immutable preparation provenance. SQL still checks
@@ -41,8 +37,4 @@ type InitialInstaller struct {
 	Postgres             OwnerPostgresEndpoint     `json:"postgres"`
 	AuditStore           OwnerAuditStore           `json:"auditStore"`
 	KeyService           ConfigurationKeyService   `json:"keyService"`
-}
-
-func DecodeInitialInstaller(r io.Reader) (InitialInstaller, error) {
-	return decodeClosedRPC[InitialInstaller](r, OwnerDeploymentMaxBytes)
 }

@@ -141,19 +141,14 @@ func TestOwnerConfigurationReadDiagnosticPredicatesAndSingleClock(t *testing.T) 
 		}},
 		{"audit-decode-before-recovery", "audit-decode", "predicate", 3, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
 			q.revision.AuditReceiptJson = nil
-			q.trust.RecoveryBlocked = true
+			q.trust.Suspended = true
 		}},
 		{"audit-binding-before-recovery", "audit-binding", "predicate", 3, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
 			q.revision.AuditReceiptJson = []byte("{}")
 			q.trust.Suspended = true
 		}},
-		{"suspended-before-blocked", "recovery-suspended", "predicate", 4, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
+		{"suspended-before-expiry", "recovery-suspended", "predicate", 4, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
 			q.trust.Suspended = true
-			q.trust.RecoveryBlocked = true
-			q.trust.FreshUntil = q.now
-		}},
-		{"blocked-before-expiry", "recovery-blocked", "predicate", 4, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
-			q.trust.RecoveryBlocked = true
 			q.trust.FreshUntil = q.now
 		}},
 		{"fleet-future-before-closed", "fleet-interval", "future-start", 4, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
@@ -287,11 +282,10 @@ func TestOwnerConfigurationReadDiagnosticRecoveryParityAndErrorIdentity(t *testi
 				}
 			}
 		}
-		for mask := 0; mask < 8; mask++ {
+		for mask := 0; mask < 4; mask++ {
 			row := q.trust
 			row.Suspended = mask&1 != 0
-			row.RecoveryBlocked = mask&2 != 0
-			if mask&4 != 0 {
+			if mask&2 != 0 {
 				row.SourceUid = ""
 			}
 			_, err := recoveryState(row, start, now)

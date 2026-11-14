@@ -182,21 +182,3 @@ func checkManualArgumentsNative(native []byte, pod string, expected installedArg
 	}
 	return footer, nil
 }
-
-func qualifyManualArgumentsNative(t *testing.T, native []byte, captureID, pod string, source installedArgumentsSourceReader) {
-	t.Helper()
-	// The caller has already authenticated the download and verified size/hash.
-	// Retain synthetic fixture bytes even if a later semantic assertion fails.
-	if err := os.WriteFile("../results/manual-arguments.jsonl", native, 0600); err != nil {
-		t.Fatal(err)
-	}
-	if source == nil {
-		t.Fatal("missing independent original-session verifier")
-	}
-	original := source(captureID)
-	footer, err := checkManualArgumentsNative(native, pod, original)
-	if err != nil {
-		t.Fatal("downloaded argument provenance/counters/payload", err)
-	}
-	t.Logf("manual arguments %s: authenticated native hash matched; %d bytes, %d retained writes, %d observed probes/%d charged bytes within original %d/%d credit; source matched immutable SQL session; coverage remains explicitly unknown", captureID, len(native), footer.Retained, *footer.ObservedEvents, *footer.ObservedBytes, original.EventCredit, original.ByteCredit)
-}

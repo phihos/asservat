@@ -378,7 +378,7 @@ func TestContextStartOwnersWithRealServices(t *testing.T) {
 		t.Fatal("configuration fence yielded successful discovery")
 	}
 	read(0)
-	if _, e = l.admin.Exec(ctx, "UPDATE fleet_trust SET recovery_blocked=true WHERE installation_id=$1", pool.InstallationID); e != nil {
+	if _, e = l.admin.Exec(ctx, "UPDATE fleet_trust SET suspended=true WHERE installation_id=$1", pool.InstallationID); e != nil {
 		t.Fatal(e)
 	}
 	if _, e = s.reader.ReadContextStartOwners(ctx); e == nil {

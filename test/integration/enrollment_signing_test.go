@@ -167,7 +167,7 @@ func TestEnrollmentSigningWithRealServices(t *testing.T) {
 		}
 		claim := value.EnrollmentClaim{InstallationID: uuid.NewString(), BootstrapID: uuid.NewString(), SecretDigest: artifact.Digest{1}, PublicKeyDigest: publicKey}
 		epoch := uuid.NewString()
-		_, err = admin.Exec(ctx, `INSERT INTO fleet_trust(activated_postmaster_at,activated_database_oid,installation_id,issuer_epoch,source_uid,source_generation,source_digest,suspended,recovery_blocked,observed_at,fresh_until) VALUES(pg_catalog.pg_postmaster_start_time(),(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()),$1,$2,'fixture',1,$3,false,false,$4,$5)`, claim.InstallationID, epoch, claim.SecretDigest[:], now, now.Add(30*time.Second))
+		_, err = admin.Exec(ctx, `INSERT INTO fleet_trust(activated_postmaster_at,activated_database_oid,installation_id,issuer_epoch,source_uid,source_generation,source_digest,suspended,observed_at,fresh_until) VALUES(pg_catalog.pg_postmaster_start_time(),(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()),$1,$2,'fixture',1,$3,false,$4,$5)`, claim.InstallationID, epoch, claim.SecretDigest[:], now, now.Add(30*time.Second))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -445,7 +445,7 @@ func TestEnrollmentSigningWithRealServices(t *testing.T) {
 			case "new-epoch":
 				sql = "UPDATE fleet_trust SET issuer_epoch=gen_random_uuid() WHERE installation_id=$1"
 			case "recovery":
-				sql = "UPDATE fleet_trust SET recovery_blocked=true WHERE installation_id=$1"
+				sql = "UPDATE fleet_trust SET suspended=true WHERE installation_id=$1"
 			}
 			if sql != "" {
 				if _, err := admin.Exec(ctx, sql, s.claim.InstallationID); err != nil {

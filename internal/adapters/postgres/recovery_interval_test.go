@@ -37,8 +37,4 @@ func TestRecoveryObservationUsesRecheckIntervalWithinTrustRow(t *testing.T) {
 	if w := reader.ForEvidenceReads().window; w != identity.AuthorityRecheckInterval {
 		t.Fatal("evidence-read recovery reader does not use the recheck interval", w)
 	}
-	row.RecoveryBlocked = true
-	if _, err = recoveryStateWithin(row, n, n, identity.AuthorityRecheckInterval); err == nil {
-		t.Fatal("blocked recovery observed as current")
-	}
 }

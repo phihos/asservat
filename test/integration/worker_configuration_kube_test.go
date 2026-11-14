@@ -123,7 +123,7 @@ func qualifiedWorkerConfiguration(t *testing.T, ctx context.Context, f fixture, 
 		t.Fatal(e)
 	}
 	t.Cleanup(sqlAdmin.Close)
-	if _, e = sqlAdmin.Exec(ctx, "INSERT INTO fleet_trust(activated_postmaster_at,activated_database_oid,installation_id,issuer_epoch,source_uid,source_generation,source_digest,suspended,recovery_blocked,observed_at,fresh_until) VALUES(pg_catalog.pg_postmaster_start_time(),(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()),$1,$2,'synthetic-worker-configuration',1,$3,false,false,statement_timestamp(),statement_timestamp()+interval '30 seconds')", p.InstallationID, epoch, bytes.Repeat([]byte{42}, 32)); e != nil {
+	if _, e = sqlAdmin.Exec(ctx, "INSERT INTO fleet_trust(activated_postmaster_at,activated_database_oid,installation_id,issuer_epoch,source_uid,source_generation,source_digest,suspended,observed_at,fresh_until) VALUES(pg_catalog.pg_postmaster_start_time(),(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()),$1,$2,'synthetic-worker-configuration',1,$3,false,statement_timestamp(),statement_timestamp()+interval '30 seconds')", p.InstallationID, epoch, bytes.Repeat([]byte{42}, 32)); e != nil {
 		t.Fatal(e)
 	}
 	if _, err := seedSyntheticFleetObservation(ctx, sqlAdmin, p.InstallationID); err != nil {

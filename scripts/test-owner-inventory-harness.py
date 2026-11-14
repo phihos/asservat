@@ -12,13 +12,13 @@ fixture=importlib.util.module_from_spec(spec);spec.loader.exec_module(fixture)
 
 class OwnerInventorySelection(unittest.TestCase):
     def test_closed_cli_selection(self):
-        for arguments in [['--fleet'],['--run','TestAnything'],['--database-recovery'],['--initial-installation'],['--connector-retirement'],['--scoped-audit']]:
+        for arguments in [['--fleet'],['--run','TestAnything'],['--connector-retirement'],['--scoped-audit']]:
             with self.subTest(arguments=arguments):
                 result=subprocess.run([sys.executable,str(script),'--owner-audit-inventory',*arguments],capture_output=True,text=True,timeout=5)
                 self.assertEqual(result.returncode,2)
                 self.assertIn('owns its exact',result.stderr)
     def test_closed_programmatic_selection(self):
-        for option in ['fleet','test_pattern','database_recovery','initial_installation','connector_retirement','scoped_audit']:
+        for option in ['fleet','test_pattern','connector_retirement','scoped_audit']:
             with self.subTest(option=option):
                 with self.assertRaisesRegex(ValueError,'Owner audit inventory owns its exact'):
                     fixture.main(owner_audit_inventory=True,**{option:'TestAnything' if option=='test_pattern' else True})

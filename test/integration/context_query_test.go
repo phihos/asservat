@@ -101,7 +101,7 @@ func qualifyContextQueries(t *testing.T, f *queryLedgerFixture) {
 		for _, statement := range []string{
 			"UPDATE context_query_backing SET suspended=false", "UPDATE context_query_allocation SET query_limit=query_limit+1",
 			"UPDATE context_query SET deadline=deadline+interval '1 second'", "UPDATE context_query_key_binding SET used_roles=0",
-			"UPDATE fleet_trust SET recovery_blocked=false", "UPDATE operation_audit SET intent_receipt='{}'::jsonb",
+			"UPDATE fleet_trust SET suspended=false", "UPDATE operation_audit SET intent_receipt='{}'::jsonb",
 			"INSERT INTO context_query_worker SELECT * FROM context_query_worker LIMIT 0",
 			"SELECT context_query_complete_object('{\"a\":1}'::jsonb,ARRAY['a'])",
 			"SELECT context_query_outcome_closed('00000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000002','{}'::jsonb,'00000000-0000-4000-8000-000000000003')",
