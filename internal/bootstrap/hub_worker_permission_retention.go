@@ -5,7 +5,9 @@ import (
 	"crypto/ed25519"
 	"errors"
 	"fmt"
+	"io"
 	"os"
+	"sync/atomic"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/jose"
@@ -31,6 +33,32 @@ type retentionWorker struct {
 	catchup              privacyapp.RetentionCatchup
 	source               privacy.PolicySourceRef
 	lastLifecycleOutcome string
+	// recovery logs the first current observation after a reported
+	// reconciler failure.
+	recovery *retentionRecovery
+}
+
+// retentionRecovery makes a retried reconciler's recovery visible: after a
+// logged failure, the next successful source observation logs one line.
+type retentionRecovery struct {
+	failed atomic.Bool
+	out    io.Writer // nil is stderr
+}
+
+func (r *retentionRecovery) fail() {
+	if r != nil {
+		r.failed.Store(true)
+	}
+}
+
+func (r *retentionRecovery) observed() {
+	if r != nil && r.failed.CompareAndSwap(true, false) {
+		out := r.out
+		if out == nil {
+			out = os.Stderr
+		}
+		fmt.Fprintln(out, "hub-worker retention: ok")
+	}
 }
 
 // newRetentionWorker composes the source with the deterministic retention
@@ -61,8 +89,9 @@ func newRetentionWorker(ctx context.Context, root, cluster string, control cfg.N
 		return nil, mounts.ErrUnavailable
 	}
 	source := privacy.PolicySourceRef{ClusterID: cluster, ControlNamespaceUID: control.UID, Hub: true, ProtectionDigest: protection.Digest()}
-	worker := &retentionWorker{source: source, catchup: catchup,
-		reconciler: app.RetentionReconciler{RootID: root, Source: source, Reader: stagedRetentionPolicies{policies}, Watcher: stagedRetentionPolicies{policies}, Protection: protection, Store: stagedRetentionStore{store}, Now: time.Now, NewID: uuid.NewString},
+	recovery := &retentionRecovery{}
+	worker := &retentionWorker{source: source, catchup: catchup, recovery: recovery,
+		reconciler: app.RetentionReconciler{RootID: root, Source: source, Reader: stagedRetentionPolicies{policies}, Watcher: stagedRetentionPolicies{policies}, Protection: protection, Store: stagedRetentionStore{store, recovery}, Now: time.Now, NewID: uuid.NewString},
 		acceptance: app.RetentionAcceptancePublisher{Journal: journal, Writer: &installedRetentionAcceptance{root: root, audit: writer}}}
 	if signing != nil {
 		lifecycle, err := postgres.NewRetention(ctx, pools["retention-lifecycle-audit"], root)
@@ -104,6 +133,7 @@ func (r *retentionWorker) run(ctx context.Context) {
 	for ctx.Err() == nil {
 		if err := r.reconciler.Run(ctx); err != nil && ctx.Err() == nil {
 			retentionDiagnostic("reconciler", err)
+			r.recovery.fail()
 		}
 		if !sleepContext(ctx, 31*time.Second) {
 			return
@@ -189,7 +219,10 @@ func retentionDiagnostic(stage string, err error) {
 
 // stagedRetentionStore and stagedRetentionPolicies name the reconciler call
 // that failed, for the diagnostic above; they change no behavior.
-type stagedRetentionStore struct{ app.RetentionCheckpointStore }
+type stagedRetentionStore struct {
+	app.RetentionCheckpointStore
+	recovery *retentionRecovery
+}
 
 func (s stagedRetentionStore) BeginRetention(ctx context.Context, root string, source privacy.PolicySourceRef, epoch string) (app.RetentionStart, error) {
 	out, err := s.RetentionCheckpointStore.BeginRetention(ctx, root, source, epoch)
@@ -200,7 +233,11 @@ func (s stagedRetentionStore) AcceptRetention(ctx context.Context, t app.Retenti
 	return out, stagedRetention("store.accept", err)
 }
 func (s stagedRetentionStore) ObserveRetention(ctx context.Context, o app.RetentionObservation) error {
-	return stagedRetention("store.observe", s.RetentionCheckpointStore.ObserveRetention(ctx, o))
+	err := s.RetentionCheckpointStore.ObserveRetention(ctx, o)
+	if err == nil {
+		s.recovery.observed()
+	}
+	return stagedRetention("store.observe", err)
 }
 func (s stagedRetentionStore) RenewRetention(ctx context.Context, f app.RetentionFence) (app.RetentionFence, error) {
 	out, err := s.RetentionCheckpointStore.RenewRetention(ctx, f)

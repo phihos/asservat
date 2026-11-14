@@ -48,6 +48,13 @@ func (s *InstalledConfigurationProviderEffects) configurationAuditAvailable() bo
 	return s != nil && s.effects != nil && s.effects.wrap.configurationAuditAvailable() && s.effects.unwrap.configurationAuditAvailable()
 }
 
+// AuditAvailable reports whether both audit provider slots currently hold a
+// login, so a loop can wait for the first login instead of failing at
+// BeginAuthorityAudit. It is scheduling only; Begin rechecks everything.
+func (s *InstalledConfigurationProviderEffects) AuditAvailable() bool {
+	return s.configurationAuditAvailable()
+}
+
 func (s *InstalledConfigurationProviderEffects) BeginOwnerConfigurationAudit(ctx context.Context, c fleet.OwnerConfiguration) (*ConfigurationProviderAuditOperation, error) {
 	if s == nil || s.admission == nil || ctx == nil || ctx.Err() != nil || !c.Valid() ||
 		c.Pool.InstallationID != s.input.InstallationID || c.Pool.ClusterID != s.input.ClusterID ||
