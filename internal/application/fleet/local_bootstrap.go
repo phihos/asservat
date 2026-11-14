@@ -93,18 +93,18 @@ func (l LocalClusterBootstrap) issue(ctx context.Context, key artifact.Digest) (
 		return time.Time{}, err
 	}
 	if intent.Slot.Binding != l.Binding {
-		return time.Time{}, value.ErrDenied
+		return time.Time{}, &BootstrapIssueStage{"binding", value.ErrDenied}
 	}
 	envelope, err := l.Envelopes.ReadBootstrapEnvelope(ctx, intent.Slot.ID)
 	defer func() { envelope.Secret = "" }()
 	if err != nil {
-		return time.Time{}, err
+		return time.Time{}, &BootstrapIssueStage{"envelope", err}
 	}
 	if envelope.Binding != l.Binding || envelope.BootstrapID != intent.Slot.ID || !envelope.NotAfter.Equal(intent.Slot.NotAfter) {
-		return time.Time{}, value.ErrDenied
+		return time.Time{}, &BootstrapIssueStage{"envelope", value.ErrDenied}
 	}
 	if err = l.Records.WriteBootstrapRecord(ctx, envelope); err != nil {
-		return time.Time{}, err
+		return time.Time{}, &BootstrapIssueStage{"record-secret", err}
 	}
 	return intent.Slot.NotAfter, nil
 }
@@ -137,7 +137,7 @@ func (l LocalClusterBootstrap) Run(ctx context.Context, report func(string)) err
 			case errors.Is(err, value.ErrPending):
 				report("pending")
 			default:
-				report("not-issued")
+				report("not-issued: " + localIssueCause(err))
 			}
 		}
 		timer := time.NewTimer(max(wait, time.Second))
@@ -148,4 +148,24 @@ func (l LocalClusterBootstrap) Run(ctx context.Context, report func(string)) err
 		case <-timer.C:
 		}
 	}
+}
+
+// localIssueCause is the failing stage and a closed cause class, never
+// dependency error text: "reserve/denied".
+func localIssueCause(err error) string {
+	stage := "unknown"
+	var s *BootstrapIssueStage
+	if errors.As(err, &s) {
+		stage = s.Stage
+	}
+	for _, c := range []struct {
+		err  error
+		word string
+	}{{value.ErrDenied, "denied"}, {value.ErrCapacity, "capacity"}, {value.ErrConflict, "conflict"}, {value.ErrInvalid, "invalid"}, {value.ErrUnavailable, "unavailable"},
+		{context.Canceled, "cancelled"}, {context.DeadlineExceeded, "deadline"}} {
+		if errors.Is(err, c.err) {
+			return stage + "/" + c.word
+		}
+	}
+	return stage + "/other"
 }

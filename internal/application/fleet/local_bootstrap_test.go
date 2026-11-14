@@ -136,3 +136,18 @@ func TestLocalClusterBootstrapWaitsForTheRecordSecret(t *testing.T) {
 		t.Fatal("slot reserved without the record Secret", events, err)
 	}
 }
+
+// A refused issuance names its stage and a closed cause class.
+func TestLocalClusterBootstrapNamesTheFailingStage(t *testing.T) {
+	f, l, records := newLocalFixture()
+	f.failObject = true
+	if _, err := l.issue(context.Background(), f.intent.Slot.RequestDigest); localIssueCause(err) != "audit-write/unavailable" || len(records.written) != 0 {
+		t.Fatal("stage", localIssueCause(err))
+	}
+	f, l, _ = newLocalFixture()
+	records.fail = errors.New("forbidden")
+	l.Records = records
+	if _, err := l.issue(context.Background(), f.intent.Slot.RequestDigest); localIssueCause(err) != "record-secret/other" {
+		t.Fatal("stage", localIssueCause(err))
+	}
+}
