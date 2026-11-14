@@ -113,7 +113,6 @@ clusters: []
 #   clusterID: ""            # a lowercase UUID you choose (uuidgen)
 #   namespace: ""            # its release namespace; default: this one
 #   standby: 2               # context-start standby connections
-#   captures: 8              # concurrent captures
 
 # How joined clusters reach this hub. TCP passthrough to the Services
 # (LoadBalancer, NodePort or a TLS-passthrough route): connectors verify the
@@ -131,7 +130,7 @@ capacity: {}
 #   evidenceStorage: 128Gi     # default: the bundled store's volume size;
 #                              # required for an external store
 #   storageAssurance: bestEffort   # or qualifiedReservedBackend
-#   capturesPerCluster: 8      # concurrent captures per cluster
+#   capturesPerCluster: 8      # concurrent captures in each cluster
 #   namespaceLimit: 25%        # default: no namespace cap
 #   workload:
 #     share: 16Gi              # protected per workload; default 1/8 of the rest
@@ -254,8 +253,6 @@ hub:
     peers: []
     public:
       standby: 2
-      # Concurrent captures of this cluster (ADR-335 D8: at least 8).
-      captures: 8
       previewSeconds: 120
       operationConcurrency: 8
       mcpPerIdentity: 2

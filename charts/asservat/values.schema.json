@@ -425,10 +425,6 @@
             "type": "integer",
             "minimum": 1,
             "maximum": 16
-          },
-          "captures": {
-            "type": "integer",
-            "minimum": 1
           }
         }
       }
@@ -481,7 +477,7 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 9007199254740991,
-          "description": "Concurrent captures per cluster. Default max(8, node count)."
+          "description": "Concurrent captures per cluster. Default 8."
         },
         "namespaceLimit": {
           "$ref": "#/definitions/capacityshare",
@@ -1240,10 +1236,6 @@
                 "standby": {
                   "type": "integer",
                   "minimum": 0
-                },
-                "captures": {
-                  "type": "integer",
-                  "minimum": 1
                 },
                 "previewSeconds": {
                   "type": "integer",

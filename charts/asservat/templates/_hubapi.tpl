@@ -64,7 +64,7 @@
 {{- $out := list -}}
 {{- range .Values.clusters -}}
 {{- if not (regexMatch "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" (toString .clusterID)) }}{{ fail (printf "clusters[%s].clusterID must be a lowercase UUID (uuidgen)" (toString .name)) }}{{ end -}}
-{{- $out = append $out (dict "name" (required "clusters[].name is required" .name) "clusterID" .clusterID "namespace" (default $root.Release.Namespace .namespace) "standby" (int (default 2 .standby)) "captures" (int (default 8 .captures))) -}}
+{{- $out = append $out (dict "name" (required "clusters[].name is required" .name) "clusterID" .clusterID "namespace" (default $root.Release.Namespace .namespace) "standby" (int (default 2 .standby)) "captures" (int (dig "capturesPerCluster" 8 (default dict $root.Values.capacity)))) -}}
 {{- end -}}
 {{- toJson $out -}}
 {{- end -}}
@@ -95,7 +95,8 @@
 {{- $u := $h.public -}}
 {{- $id := fromJson (include "asservat.hubApi.identity" .) -}}
 {{- $pub := dict "origin" .Values.origin "browserAudience" $id.browserAudience "version" (.Chart.AppVersion | default .Chart.Version) -}}
-{{- range $key := list "standby" "captures" "previewSeconds" "operationConcurrency" "mcpPerIdentity" "downloadConcurrency" "downloadsPerIdentity" "downloadMaxSeconds" "operationAudit" "downloadPlan" -}}
+{{- $_ := set $pub "captures" (int (dig "capturesPerCluster" 8 (default dict .Values.capacity))) -}}
+{{- range $key := list "standby" "previewSeconds" "operationConcurrency" "mcpPerIdentity" "downloadConcurrency" "downloadsPerIdentity" "downloadMaxSeconds" "operationAudit" "downloadPlan" -}}
 {{- $_ := set $pub $key (index $u $key) -}}
 {{- end -}}
 {{- if or $u.processing (include "asservat.capacity" .) }}{{ $_ := set $pub "processing" true }}{{ end -}}
