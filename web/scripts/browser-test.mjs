@@ -131,8 +131,8 @@ try {
   await expect(page.getByRole('heading', { name: 'Waiting to start' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Continue collection', exact: true })).toHaveCount(0);
   checks.push('explicit same-key acquisition continuation uses retained receipt, no new request or preview; reload remains passive');
+  // The open capture page receives the change over GET /api/v1/events.
   await captureControl('finalizing');
-  await page.getByRole('button', { name: 'Check status' }).click();
   await expect(page.getByRole('heading', { name: 'Verifying and publishing evidence' })).toBeVisible();
   await expect(page.getByText(/still needs verification and publication/)).toBeVisible();
   await scan('capture-progress');
@@ -144,7 +144,7 @@ try {
   // Problem for invalid cookie/current identity and CSRF authentication.
   assert.equal(badCSRF.status(), 401);
   assert.deepEqual(await badCSRF.json(), { type: 'about:blank', title: 'Unauthorized', status: 401 });
-  checks.push('same-user session refresh preserves only reviewed handle, uncertain commit retries same key, accepted Pending, Finalizing, exact progress reload, real operation CSRF denial');
+  checks.push('same-user session refresh preserves only reviewed handle, uncertain commit retries same key, accepted Pending, Finalizing pushed over the status stream, exact progress reload, real operation CSRF denial');
   await evidenceJourney({ page, origin, output, scan, checks, captureControl, control, evidenceLoads });
   await page.goto(origin + '/captures/new');
   await page.getByLabel('Cluster ID').fill('00000000-0000-4000-8000-000000000001');

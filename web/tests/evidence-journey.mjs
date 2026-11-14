@@ -19,8 +19,8 @@ export async function evidenceJourney({ page, origin, output, scan, checks, capt
   try {
     assert.deepEqual(evidenceLoads, [], 'evidence bundle should stay unloaded during capture review/progress');
     await expect(page.getByRole('link', { name: 'View evidence', exact: true })).toHaveCount(0);
+    // The open capture page receives completion over the status stream.
     await captureControl('evidence-ready');
-    await page.getByRole('button', { name: 'Check status' }).click();
     await expect(page.getByRole('heading', { name: 'Collection complete', exact: true })).toBeVisible();
     await expect(page.getByRole('link', { name: 'View evidence', exact: true })).toHaveAttribute('href', casePath);
     // Navigation and its first real response must succeed. Read the complete

@@ -489,7 +489,9 @@ func (s *consoleSyntheticCaptures) Get(ctx context.Context, current app.CurrentI
 		return capture.ContextProgress{}, capture.ErrUnavailable
 	}
 	p := capture.ContextProgress{CaptureID: id, Revision: 1, Phase: "Pending", ActionPhase: "Pending", ReasonCode: "DispatchUnconfirmed", ValidUntil: identity.Earlier(started.Add(5*time.Second), i.ValidUntil)}
-	if s.historyMode == "history-ready" || s.historyMode == "history-large" {
+	// history-expired models expiry between this progress read and the
+	// settings read: progress still offers settings, the settings read fails.
+	if s.historyMode == "history-ready" || s.historyMode == "history-large" || s.historyMode == "history-expired" {
 		p.HistoryState = "available"
 	} else if s.historyMode != "" {
 		p.HistoryState = "unavailable"
