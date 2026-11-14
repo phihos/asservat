@@ -250,6 +250,37 @@ func qualifyContextProgress(t *testing.T, ctx context.Context, admin *pgxpool.Po
 			}
 		}
 	})
+	t.Run("revision-change-notifies-status-readers", func(t *testing.T) {
+		s := create(t, 1)
+		if _, err := s.s.AdmitContext(ctx, s.a); err != nil {
+			t.Fatal(err)
+		}
+		listening, stop := context.WithCancel(ctx)
+		defer stop()
+		payloads := make(chan string, 8)
+		postgres.ListenPayloads(listening, admin, postgres.CaptureProgressChannel, func(p string) { payloads <- p })
+		if p := <-payloads; p != "" {
+			t.Fatal("listener did not report its connection first", p)
+		}
+		retentionPool := poolFor("retention_runtime", "synthetic-retention")
+		t.Cleanup(retentionPool.Close)
+		retention, err := postgres.NewRetention(ctx, retentionPool, s.a.RootID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		d := retentionTestDecision(t, ctx, retention, s.a.Registration.Location, s.a.Registration.ExpiresAt.Add(-time.Second), s.a.Registration.DeleteBy.Add(-time.Second))
+		if err = retention.TightenRetention(ctx, d); err != nil {
+			t.Fatal(err)
+		}
+		select {
+		case p := <-payloads:
+			if p != s.a.Plan.Input.CaptureID {
+				t.Fatal("notified another capture", p)
+			}
+		case <-time.After(10 * time.Second):
+			t.Fatal("committed progress change sent no notification")
+		}
+	})
 	t.Run("revision-overflow-does-not-block-retention-or-deletion", func(t *testing.T) {
 		s := create(t, 1)
 		if _, err := s.s.AdmitContext(ctx, s.a); err != nil {
