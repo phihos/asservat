@@ -15,6 +15,7 @@
 {{- $rules := list
   (dict "apiGroups" (list "") "resources" (list "configmaps") "resourceNames" (list (printf "%s-owner-source" $n) (printf "%s-regional-offer" $n)) "verbs" (list "get"))
   (dict "apiGroups" (list "") "resources" (list "pods" "services") "verbs" (list "get"))
+  (dict "apiGroups" (list "") "resources" (list "serviceaccounts") "resourceNames" (list (printf "%s-hub-api" $n)) "verbs" (list "get"))
   (dict "apiGroups" (list "apps") "resources" (list "replicasets" "deployments") "verbs" (list "get"))
   (dict "apiGroups" (list "discovery.k8s.io") "resources" (list "endpointslices") "verbs" (list "list")) }}
 {{- $tls := include "asservat.svc.tlsSecret" (list . "federation") }}
