@@ -151,25 +151,24 @@ func buildConnectorBacking(c contracts.InstallerConnectorSettings, b contracts.I
 	}
 	q := audit.OperationHistoryQualification{ID: newID(), Digest: profileDigest("history/"+audit.ConnectorRetirementHistoryLayout, c.Footprint), Layout: audit.ConnectorRetirementHistoryLayout,
 		MaximumRowFootprintBytes: c.Footprint.RowBytes, MaximumTransitionWALBytes: c.Footprint.TransitionWALBytes, BackupCopies: b.BackupCopies, WALCopies: b.WALCopies}
-	slots := c.Accounts * c.RecordsPerAccount
+	accounts, records := fleetapp.ConnectorStandingAccounts, fleetapp.ConnectorStandingRecordsPerAccount
+	profiles, transitions := fleetapp.ConnectorStandingProfiles, fleetapp.ConnectorStandingSourceTransitions
+	slots := accounts * records
 	backupBytes, walBytes := q.SlotBacking(c.PurgeLeases)
 	now = now.UTC().Truncate(time.Microsecond)
-	out := fleetapp.ConnectorIdentityBacking{AccountVersion: accountVersion, AccountLimit: c.Accounts, RecordsPerAccount: c.RecordsPerAccount, RetainedSeconds: c.RetainedSeconds,
-		ProfileLimit: c.Profiles, SourceTransitionLimit: c.SourceTransitions, Policy: audit.OperationLifecyclePolicy{
+	out := fleetapp.ConnectorIdentityBacking{AccountVersion: accountVersion, AccountLimit: accounts, RecordsPerAccount: records, RetainedSeconds: c.RetainedSeconds,
+		ProfileLimit: profiles, SourceTransitionLimit: transitions, Policy: audit.OperationLifecyclePolicy{
 			RootID: root, Lane: "identity", InstallationID: installation, StoreID: newID(), PolicyID: newID(), BackupProfileID: newID(),
 			PolicyDigest: profileDigest("connector", c), BackupProfileDigest: profileDigest("backup", b),
 			BackingRevision: 1, MetadataSlots: slots, BackupReservedBytes: slots * backupBytes, WALReservedBytes: slots * walBytes,
 			BackupHorizonSeconds: b.HorizonSeconds, CleanupBudgetSeconds: b.CleanupBudgetSeconds, ProofWindowSeconds: b.ProofWindowSeconds,
 			ValidUntil: fleetapp.ConnectorBackingStanding, MaxPurgeLeases: c.PurgeLeases, History: &q, OverdueTerminal: audit.OperationOverdueTerminal}}
-	// ponytail: at most 256 regional peers and 4096 source transitions each,
-	// which keeps the reservation products below int64; raise both with
-	// checked multiplication if an installation needs more.
-	if c.Accounts < 1 || c.Accounts > 4096 || c.RecordsPerAccount < 2 || c.RecordsPerAccount > 1000000 || c.Profiles < 1 || c.Profiles > 256 || c.Profiles > c.Accounts || c.SourceTransitions < c.Profiles || c.SourceTransitions > 4096 || !q.Valid() {
+	if !q.Valid() {
 		return zero, mounts.ErrUnavailable
 	}
-	rows := 1 + c.Profiles + c.Profiles*(c.SourceTransitions+1)
+	rows := 1 + profiles + profiles*(transitions+1)
 	out.SourceBackupReservedBytes = rows * 2 * q.MaximumRowFootprintBytes * q.BackupCopies
-	out.SourceWALReservedBytes = (2*c.SourceTransitions + fleetapp.ConnectorRetirementTicketTransitions*c.Profiles*(c.SourceTransitions+1)) * q.MaximumTransitionWALBytes * q.WALCopies
+	out.SourceWALReservedBytes = (2*transitions + fleetapp.ConnectorRetirementTicketTransitions*profiles*(transitions+1)) * q.MaximumTransitionWALBytes * q.WALCopies
 	// The process run time is the retention minus two backup horizons, three
 	// cleanup budgets, the proof window and a minute; it must cover the fixed
 	// regional deployment shape.

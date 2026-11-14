@@ -2327,30 +2327,10 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "accounts": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 4096
-        },
-        "recordsPerAccount": {
-          "type": "integer",
-          "minimum": 2,
-          "maximum": 1000000
-        },
         "retainedSeconds": {
           "type": "integer",
           "minimum": 60,
           "maximum": 316224000
-        },
-        "profiles": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 256
-        },
-        "sourceTransitions": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 4096
         },
         "purgeLeases": {
           "type": "integer",
@@ -2362,11 +2342,7 @@
         }
       },
       "required": [
-        "accounts",
-        "recordsPerAccount",
         "retainedSeconds",
-        "profiles",
-        "sourceTransitions",
         "purgeLeases",
         "footprint"
       ]

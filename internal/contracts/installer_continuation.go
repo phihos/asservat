@@ -161,16 +161,12 @@ type InstallerFleetIssuance struct {
 }
 
 // InstallerConnectorSettings are the operator-qualified connector identity
-// limits. Profiles bounds the staged regional peers. The backing is a standing
-// configuration, valid until replaced (ADR-332).
+// retention and footprint. The backing is a standing configuration, valid
+// until replaced, with no install-time connector count (ADR-332).
 type InstallerConnectorSettings struct {
-	Accounts          int64                      `json:"accounts"`
-	RecordsPerAccount int64                      `json:"recordsPerAccount"`
-	RetainedSeconds   int64                      `json:"retainedSeconds"`
-	Profiles          int64                      `json:"profiles"`
-	SourceTransitions int64                      `json:"sourceTransitions"`
-	PurgeLeases       int64                      `json:"purgeLeases"`
-	Footprint         InstallerCapacityFootprint `json:"footprint"`
+	RetainedSeconds int64                      `json:"retainedSeconds"`
+	PurgeLeases     int64                      `json:"purgeLeases"`
+	Footprint       InstallerCapacityFootprint `json:"footprint"`
 }
 
 // FederationServingSecretName is the operator's kubernetes.io/tls Secret

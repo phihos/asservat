@@ -101,7 +101,7 @@ func TestCapacityQualificationReplayIsIdentical(t *testing.T) {
 // the prepaid-retirement validator; a replay is identical and oversized
 // profiles are refused.
 func TestConnectorBackingDerivation(t *testing.T) {
-	c := contracts.InstallerConnectorSettings{Accounts: 4, RecordsPerAccount: 256, RetainedSeconds: 15000, Profiles: 4, SourceTransitions: 64, PurgeLeases: 2,
+	c := contracts.InstallerConnectorSettings{RetainedSeconds: 15000, PurgeLeases: 2,
 		Footprint: contracts.InstallerCapacityFootprint{RowBytes: 1 << 20, TransitionWALBytes: 1 << 20}}
 	backup := capacityProfileFixture().Backup
 	root, installation, setup := "30000000-0000-4000-8000-000000000003", "30000000-0000-4000-8000-000000000004", "30000000-0000-4000-8000-000000000001"
@@ -117,8 +117,6 @@ func TestConnectorBackingDerivation(t *testing.T) {
 		t.Fatal("replay built a different backing")
 	}
 	for i, mutate := range []func(*contracts.InstallerConnectorSettings){
-		func(c *contracts.InstallerConnectorSettings) { c.Profiles = 257 },
-		func(c *contracts.InstallerConnectorSettings) { c.SourceTransitions = 4097 },
 		func(c *contracts.InstallerConnectorSettings) { c.Footprint.RowBytes = 1 << 10 },
 		// Continuation run 52: a 3600-second retention with a 3600-second
 		// backup horizon leaves no process run time for the regional shape.
@@ -216,7 +214,7 @@ func TestProfileCapacityQualificationFundsRenewalsWithinFiniteEnvelope(t *testin
 // ADR-332: the backing is standing (valid until replaced) at any setup time,
 // and its retention must still leave the regional shape a process run time.
 func TestConnectorBackingIsStanding(t *testing.T) {
-	c := contracts.InstallerConnectorSettings{Accounts: 1, RecordsPerAccount: 96, RetainedSeconds: 3902, Profiles: 1, SourceTransitions: 8, PurgeLeases: 2,
+	c := contracts.InstallerConnectorSettings{RetainedSeconds: 3902, PurgeLeases: 2,
 		Footprint: contracts.InstallerCapacityFootprint{RowBytes: 1 << 20, TransitionWALBytes: 1 << 20}}
 	backup := contracts.InstallerCapacityBackup{HorizonSeconds: 1, CleanupBudgetSeconds: 60, ProofWindowSeconds: 60, BackupCopies: 1, WALCopies: 1}
 	d := capacityDerivedFixture()

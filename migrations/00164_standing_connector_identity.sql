@@ -6,10 +6,14 @@
 -- time (homelab: one hour after install). They are removed, not renewed:
 -- 1. a cohort's retirement ticket admits processes until the backing is
 --    replaced, independent of the accepting record's retention;
--- 2. process admission no longer counts earlier process rows (of restarted
---    or rotated processes) against the deployment's retained-process limit;
+-- 2. process admission and serving no longer count earlier processes (of
+--    restarted Pods, which stay serving because nothing retires them)
+--    against the deployment's retained-process and serving-slot limits;
 -- 3. identity-lane audit records are not capped per account, so ordinary
---    connector work and ticket reservations no longer hold back records.
+--    connector work and ticket reservations no longer hold back records;
+-- 4. connectors are not counted against an install-time limit: profiles
+--    (one per registered cluster), source transitions and identity audit
+--    accounts are created on demand, keyed by peer/cluster.
 -- +goose StatementBegin
 DO $$
 DECLARE c text;
@@ -83,7 +87,6 @@ BEGIN
   IF OLD.serving AND NOT NEW.serving AND NEW.retired_at IS NULL OR NEW.retired_at IS NOT NULL AND (NEW.serving OR NEW.retired_at<n-interval '5 seconds' OR NEW.retired_at>n) THEN RAISE EXCEPTION 'connector retirement transition unavailable' USING ERRCODE='23514';END IF;
   IF NEW.serving AND NOT OLD.serving THEN
    IF cfg.fenced OR cfg.blocked OR cfg.suspended OR n>=backing.valid_until OR n>=NEW.run_until OR NOT EXISTS(SELECT 1 FROM public.connector_credential_attempt a WHERE a.id=NEW.client_current_id AND a.process_id=NEW.id AND a.usage='client' AND a.activated_at IS NOT NULL AND a.detached_at IS NULL AND n<a.certificate_not_after) OR NOT EXISTS(SELECT 1 FROM public.connector_credential_attempt a WHERE a.id=NEW.server_current_id AND a.process_id=NEW.id AND a.usage='server' AND a.activated_at IS NOT NULL AND a.detached_at IS NULL AND n<a.certificate_not_after) THEN RAISE EXCEPTION 'paired connector serving identity unavailable' USING ERRCODE='23514';END IF;
-   IF NOT OLD.serving AND (SELECT count(*) FROM public.connector_identity_process c WHERE c.root_id=NEW.root_id AND c.peer_id=NEW.peer_id AND c.serving)>=(cfg.configuration->'Deployment'->>'ServingSlots')::bigint THEN RAISE EXCEPTION 'connector serving slots exhausted' USING ERRCODE='23514';END IF;
   END IF;
  END IF;
  RETURN NEW;
@@ -118,7 +121,7 @@ BEGIN
    RAISE EXCEPTION 'operation audit unavailable' USING ERRCODE='23514'; END IF;
   SELECT * INTO a FROM public.operation_audit_account WHERE root_id=NEW.root_id AND lane=NEW.lane AND principal_digest=NEW.principal_digest FOR UPDATE;
   IF NOT FOUND THEN
-   IF p.accounts>=p.account_limit THEN RAISE EXCEPTION 'audit accounts exhausted' USING ERRCODE='23514'; END IF;
+   IF NEW.lane<>'identity' AND p.accounts>=p.account_limit THEN RAISE EXCEPTION 'audit accounts exhausted' USING ERRCODE='23514'; END IF;
    UPDATE public.operation_audit_pool SET accounts=accounts+1 WHERE root_id=NEW.root_id AND lane=NEW.lane;
    INSERT INTO public.operation_audit_account(root_id,lane,principal_digest) VALUES(NEW.root_id,NEW.lane,NEW.principal_digest) RETURNING * INTO a;
   END IF;
@@ -311,7 +314,7 @@ BEGIN
   RAISE EXCEPTION 'connector reservation acceptance closed or cohort retired' USING ERRCODE='23514';END IF;
  SELECT * INTO account FROM public.operation_audit_account WHERE root_id=NEW.root_id AND lane='identity' AND principal_digest=NEW.principal_digest FOR UPDATE;
  IF NOT FOUND THEN
-  IF pool.accounts>=pool.account_limit THEN RAISE EXCEPTION 'connector reservation accounts exhausted' USING ERRCODE='23514';END IF;
+  IF false THEN RAISE EXCEPTION 'connector reservation accounts exhausted' USING ERRCODE='23514';END IF;
   UPDATE public.operation_audit_pool SET accounts=accounts+1 WHERE root_id=NEW.root_id AND lane='identity';
   INSERT INTO public.operation_audit_account(root_id,lane,principal_digest) VALUES(NEW.root_id,'identity',NEW.principal_digest) RETURNING * INTO account;
  END IF;
@@ -357,6 +360,170 @@ BEGIN
  IF NEW.lane<>'identity' AND EXISTS(SELECT 1 FROM public.operation_audit_account WHERE root_id=NEW.root_id AND lane=NEW.lane AND charged>NEW.records_per_account) THEN
   RAISE EXCEPTION 'audit backing below retained spend' USING ERRCODE='23514'; END IF;
  RETURN NEW;
+END $$;
+-- +goose StatementEnd
+-- +goose StatementBegin
+DO $$
+DECLARE c text;
+BEGIN
+ FOR c IN SELECT conname FROM pg_catalog.pg_constraint WHERE conrelid='public.connector_identity_root'::regclass AND contype='c'
+  AND (pg_catalog.pg_get_constraintdef(oid) LIKE '%profiles <= profile_limit%' OR pg_catalog.pg_get_constraintdef(oid) LIKE '%source_transitions <= source_transition_limit%') LOOP
+  EXECUTE format('ALTER TABLE public.connector_identity_root DROP CONSTRAINT %I',c);
+ END LOOP;
+ FOR c IN SELECT conname FROM pg_catalog.pg_constraint WHERE conrelid='public.operation_audit_account'::regclass AND contype='c'
+  AND pg_catalog.pg_get_constraintdef(oid) LIKE '%charged <= 1000000%' LOOP
+  EXECUTE format('ALTER TABLE public.operation_audit_account DROP CONSTRAINT %I',c);
+ END LOOP;
+ FOR c IN SELECT conname FROM pg_catalog.pg_constraint WHERE conrelid='public.operation_audit_pool'::regclass AND contype='c'
+  AND pg_catalog.pg_get_constraintdef(oid) LIKE '%accounts <= account_limit%' LOOP
+  EXECUTE format('ALTER TABLE public.operation_audit_pool DROP CONSTRAINT %I',c);
+ END LOOP;
+END $$;
+-- +goose StatementEnd
+ALTER TABLE connector_identity_root ADD CONSTRAINT connector_identity_root_counts CHECK(profiles>=0 AND source_transitions>=0);
+ALTER TABLE operation_audit_account ADD CONSTRAINT operation_audit_account_charged CHECK(charged>=0 AND (lane='identity' OR charged<=1000000));
+ALTER TABLE operation_audit_pool ADD CONSTRAINT operation_audit_pool_accounts CHECK(accounts>=0 AND (lane='identity' OR accounts<=account_limit));
+-- +goose StatementBegin
+CREATE OR REPLACE FUNCTION guard_connector_identity_profile() RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
+DECLARE r public.connector_identity_root; n timestamptz; c jsonb; a public.operation_audit; attempt public.connector_credential_attempt; child public.connector_identity_process;
+BEGIN
+ IF TG_RELID<>'public.connector_identity_profile'::regclass OR TG_WHEN<>'BEFORE' OR TG_LEVEL<>'ROW' OR TG_OP='DELETE' THEN RAISE EXCEPTION 'connector profile retirement unavailable' USING ERRCODE='23514';END IF;
+ SELECT * INTO STRICT r FROM public.connector_identity_root WHERE root_id=NEW.root_id FOR UPDATE;
+ n:=clock_timestamp();
+ IF TG_OP='INSERT' AND (NEW.retirement_ticket IS NOT NULL OR NEW.retirement_at IS NOT NULL) THEN RAISE EXCEPTION 'new profile cannot invent retirement' USING ERRCODE='23514';END IF;
+ IF TG_OP='UPDATE' AND OLD.retirement_ticket IS NULL AND NEW.retirement_ticket IS NOT NULL THEN
+  IF NOT public.connector_identity_role_ok(NEW.root_id,'journal') OR NOT NEW.fenced OR NEW.retirement_at IS NULL OR NEW.retirement_at>n OR NEW.retirement_at<n-interval '5 seconds' OR
+   (to_jsonb(NEW)-ARRAY['fenced','retirement_ticket','retirement_at']) IS DISTINCT FROM (to_jsonb(OLD)-ARRAY['fenced','retirement_ticket','retirement_at']) OR
+   NOT EXISTS(SELECT 1 FROM public.connector_retirement_ticket t WHERE t.id=NEW.retirement_ticket AND t.root_id=NEW.root_id AND t.peer_id=NEW.peer_id AND t.activated_at IS NOT NULL AND t.superseded_at IS NULL AND t.restriction_at=NEW.retirement_at AND
+    t.behavior_uid=NEW.source_uid AND t.backing_revision=NEW.backing_revision AND t.backing_digest=NEW.backing_digest AND t.principal_digest=NEW.account_digest) THEN RAISE EXCEPTION 'connector restriction is not prepaid for this cohort' USING ERRCODE='23514';END IF;
+  -- Its original ticket prepaid this fixed control transition. Exhaustion of
+  -- ordinary source/admission counters cannot block a restrictive close.
+  RETURN NEW;
+ END IF;
+ IF TG_OP='UPDATE' AND (ROW(NEW.retirement_ticket,NEW.retirement_at) IS DISTINCT FROM ROW(OLD.retirement_ticket,OLD.retirement_at) OR
+  OLD.retirement_ticket IS NOT NULL AND (NOT NEW.fenced OR NOT public.connector_identity_role_ok(NEW.root_id,'cleanup'))) THEN RAISE EXCEPTION 'irreversible connector retirement fence' USING ERRCODE='23514';END IF;
+ IF TG_OP='UPDATE' AND public.connector_identity_role_ok(NEW.root_id,'cleanup') THEN
+  IF NOT NEW.fenced OR NEW.candidate_id IS NOT NULL OR NEW.accepted_id IS NOT NULL OR (to_jsonb(NEW)-ARRAY['fenced','candidate_id','accepted_id']) IS DISTINCT FROM (to_jsonb(OLD)-ARRAY['fenced','candidate_id','accepted_id']) OR
+   EXISTS(SELECT 1 FROM public.connector_identity_process p WHERE p.root_id=OLD.root_id AND p.peer_id=OLD.peer_id AND (p.id IN(OLD.candidate_id,OLD.accepted_id) OR EXISTS(SELECT 1 FROM public.connector_credential_attempt credential_attempt_row WHERE credential_attempt_row.process_id=p.id AND credential_attempt_row.id IN(OLD.candidate_id,OLD.accepted_id))) AND n<p.run_until+interval '1 minute') THEN RAISE EXCEPTION 'connector accepted source still referenced' USING ERRCODE='23514';END IF;
+  RETURN NEW;
+ END IF;
+ -- Restrict an already-retained profile even when its backing is no longer
+ -- current. This branch can only add a fence/watermark, never clear either.
+ IF TG_OP='UPDATE' AND public.connector_identity_role_ok(NEW.root_id,'source') AND NEW.fenced AND (NOT OLD.blocked OR NEW.blocked) AND
+  (to_jsonb(NEW)-ARRAY['fenced','blocked'])=(to_jsonb(OLD)-ARRAY['fenced','blocked']) AND ROW(NEW.fenced,NEW.blocked) IS DISTINCT FROM ROW(OLD.fenced,OLD.blocked) THEN
+  IF false THEN RAISE EXCEPTION 'connector restrictive transition backing exhausted' USING ERRCODE='23514';END IF;
+  UPDATE public.connector_identity_root SET source_transitions=source_transitions+1 WHERE root_id=NEW.root_id;
+  RETURN NEW;
+ END IF;c:=NEW.configuration;
+ IF NOT COALESCE(NEW.installation_id=r.installation_id AND NEW.issuer_epoch=r.issuer_epoch AND ((NEW.backing_revision=(r.policy->>'BackingRevision')::bigint AND NEW.backing_digest=r.backing_digest) OR (r.pending_id IS NOT NULL AND NEW.backing_revision=(r.pending_backing->'Policy'->>'BackingRevision')::bigint AND NEW.backing_digest=r.pending_digest)) AND (c->>'RootID')::uuid=NEW.root_id AND (c->'Binding'->>'PeerID')::uuid=NEW.peer_id AND (c->'Binding'->>'InstallationID')::uuid=NEW.installation_id AND (c->'Binding'->>'ClusterID')::uuid=NEW.cluster_id AND (c->'Binding'->>'IssuerEpoch')::uuid=NEW.issuer_epoch AND c->'Binding'->>'Role'='connector' AND public.connector_digest(c->'Revision'->'Digest')=NEW.source_digest AND public.connector_digest(c->'ProtectionDigest')=NEW.protection_digest AND (c->'Revision'->>'UID')::uuid=NEW.source_uid AND (c->'Revision'->>'Generation')::bigint=NEW.source_generation AND (c->>'Suspended')::boolean=NEW.suspended,false) THEN RAISE EXCEPTION 'connector source identity mismatch' USING ERRCODE='23514';END IF;
+ IF TG_OP='UPDATE' AND NEW.configuration=OLD.configuration AND ROW(NEW.complete_digest,NEW.backing_revision,NEW.backing_digest) IS DISTINCT FROM ROW(OLD.complete_digest,OLD.backing_revision,OLD.backing_digest) THEN
+  IF NOT public.connector_identity_role_ok(NEW.root_id,'source') OR n>=r.valid_until OR NEW.backing_revision<>OLD.backing_revision+1 OR NOT ((NEW.backing_revision=(r.policy->>'BackingRevision')::bigint AND NEW.backing_digest=r.backing_digest) OR (r.pending_id IS NOT NULL AND NEW.backing_revision=(r.pending_backing->'Policy'->>'BackingRevision')::bigint AND NEW.backing_digest=r.pending_digest)) OR
+   (to_jsonb(NEW)-ARRAY['complete_digest','backing_revision','backing_digest']) IS DISTINCT FROM (to_jsonb(OLD)-ARRAY['complete_digest','backing_revision','backing_digest']) OR false THEN RAISE EXCEPTION 'connector complete source revision unavailable' USING ERRCODE='23514';END IF;
+  UPDATE public.connector_identity_root SET source_transitions=source_transitions+1 WHERE root_id=NEW.root_id;
+  RETURN NEW;
+ END IF;
+ IF TG_OP='INSERT' OR NEW.configuration IS DISTINCT FROM OLD.configuration THEN
+  IF NOT public.connector_identity_role_ok(NEW.root_id,'source') OR n>=r.valid_until OR NEW.candidate_id IS NOT NULL OR NEW.accepted_id IS NOT NULL OR TG_OP='INSERT' AND NEW.account_digest IS NOT NULL OR TG_OP='UPDATE' AND NEW.account_digest IS DISTINCT FROM OLD.account_digest OR NOT NEW.fenced OR NEW.blocked OR false OR TG_OP='INSERT' AND false THEN RAISE EXCEPTION 'connector profile backing unavailable' USING ERRCODE='23514';END IF;
+  IF TG_OP='UPDATE' AND (ROW(NEW.root_id,NEW.peer_id,NEW.installation_id,NEW.cluster_id,NEW.issuer_epoch,NEW.source_uid) IS DISTINCT FROM ROW(OLD.root_id,OLD.peer_id,OLD.installation_id,OLD.cluster_id,OLD.issuer_epoch,OLD.source_uid) OR NEW.source_generation<=OLD.source_generation) THEN RAISE EXCEPTION 'connector source rollback or replacement' USING ERRCODE='23514';END IF;
+  UPDATE public.connector_identity_root SET profiles=profiles+(CASE WHEN TG_OP='INSERT' THEN 1 ELSE 0 END),source_transitions=source_transitions+1 WHERE root_id=NEW.root_id;
+  RETURN NEW;
+ END IF;
+ IF (to_jsonb(NEW)-ARRAY['candidate_id','accepted_id','fenced','blocked','account_digest']) IS DISTINCT FROM (to_jsonb(OLD)-ARRAY['candidate_id','accepted_id','fenced','blocked','account_digest']) THEN RAISE EXCEPTION 'immutable connector source' USING ERRCODE='23514';END IF;
+ IF NEW.account_digest IS DISTINCT FROM OLD.account_digest AND (OLD.account_digest IS NOT NULL OR NOT public.connector_identity_role_ok(NEW.root_id,'journal')) THEN RAISE EXCEPTION 'immutable logical connector account' USING ERRCODE='23514';END IF;
+ IF NEW.account_digest IS NOT DISTINCT FROM OLD.account_digest AND NEW.candidate_id IS NOT DISTINCT FROM OLD.candidate_id AND NEW.accepted_id IS NOT DISTINCT FROM OLD.accepted_id AND
+   ROW(NEW.fenced,NEW.blocked) IS DISTINCT FROM ROW(OLD.fenced,OLD.blocked) THEN
+  IF NOT public.connector_identity_role_ok(NEW.root_id,'source') OR false OR
+   OLD.blocked AND NOT NEW.blocked OR NEW.blocked AND NOT NEW.fenced OR NOT NEW.fenced AND (NEW.accepted_id IS NULL OR NEW.blocked OR n>=r.valid_until) THEN RAISE EXCEPTION 'connector source transition unavailable' USING ERRCODE='23514';END IF;
+  UPDATE public.connector_identity_root SET source_transitions=source_transitions+1 WHERE root_id=NEW.root_id;
+  RETURN NEW;
+ END IF;
+ IF OLD.account_digest IS NOT NULL AND NEW.account_digest IS DISTINCT FROM OLD.account_digest THEN RAISE EXCEPTION 'immutable logical connector account' USING ERRCODE='23514';END IF;
+ IF OLD.fenced AND OLD.accepted_id IS NOT NULL OR OLD.blocked THEN RAISE EXCEPTION 'connector current source proof unavailable' USING ERRCODE='23514';END IF;
+ IF NOT public.connector_identity_role_ok(NEW.root_id,'journal') OR NEW.suspended OR n>=r.valid_until OR NEW.blocked OR NEW.candidate_id IS NULL THEN RAISE EXCEPTION 'connector candidate unavailable' USING ERRCODE='23514';END IF;
+ SELECT * INTO STRICT a FROM public.operation_audit WHERE id=NEW.candidate_id AND root_id=NEW.root_id AND lane='identity';
+ IF NEW.account_digest IS DISTINCT FROM a.principal_digest THEN RAISE EXCEPTION 'connector account changed' USING ERRCODE='23514';END IF;
+ IF a.intent->>'Name'='connector_process_enrollment' THEN
+  SELECT * INTO STRICT child FROM public.connector_identity_process WHERE id=a.id AND root_id=NEW.root_id AND peer_id=NEW.peer_id;
+  IF ROW(child.source_uid,child.source_generation,child.source_digest) IS DISTINCT FROM ROW(NEW.source_uid,NEW.source_generation,NEW.source_digest) THEN RAISE EXCEPTION 'connector process source mismatch' USING ERRCODE='23514';END IF;
+ ELSE
+  SELECT * INTO STRICT attempt FROM public.connector_credential_attempt WHERE id=a.id AND root_id=NEW.root_id AND peer_id=NEW.peer_id;
+  IF ROW(attempt.source_uid,attempt.source_generation,attempt.source_digest) IS DISTINCT FROM ROW(NEW.source_uid,NEW.source_generation,NEW.source_digest) THEN RAISE EXCEPTION 'connector signing source mismatch' USING ERRCODE='23514';END IF;
+ END IF;
+ IF OLD.accepted_id IS NULL AND NEW.accepted_id IS NULL AND NEW.fenced AND a.intent->>'Name'='connector_process_enrollment' AND child.accepted_at IS NULL AND n<a.request_until THEN RETURN NEW;END IF;
+ IF a.intent_receipt IS NULL OR a.outcome_receipt IS NULL OR a.outcome->>'Status' IS DISTINCT FROM 'success' OR NEW.accepted_id IS DISTINCT FROM NEW.candidate_id OR NEW.fenced OR (a.intent->>'Name'='connector_process_enrollment' AND (child.accepted_at IS NULL OR n>=child.run_until)) OR (a.intent->>'Name'<>'connector_process_enrollment' AND n>=attempt.certificate_not_after) THEN RAISE EXCEPTION 'connector candidate acknowledgement unavailable' USING ERRCODE='23514';END IF;
+ RETURN NEW;
+END $$;
+-- +goose StatementEnd
+-- +goose StatementBegin
+CREATE OR REPLACE FUNCTION lock_connector_process_current(r uuid,c jsonb,allow_candidate boolean) RETURNS public.connector_identity_profile LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
+DECLARE proof jsonb:=c->'Proof'; source jsonb:=proof->'Configuration'; p jsonb:=source->'Profile'; cfg public.connector_identity_profile; root public.connector_identity_root; trust public.fleet_current_trust; n timestamptz;
+BEGIN
+ IF NOT public.connector_identity_role_ok(r,'journal') OR octet_length(c::text)>196608 THEN RAISE EXCEPTION 'connector process current authority unavailable' USING ERRCODE='23514';END IF;
+ SELECT * INTO STRICT trust FROM public.fleet_current_trust WHERE installation_id=(p->'Binding'->>'InstallationID')::uuid FOR SHARE;
+ SELECT * INTO STRICT root FROM public.connector_identity_root WHERE root_id=r FOR UPDATE;
+ SELECT * INTO STRICT cfg FROM public.connector_identity_profile WHERE root_id=r AND peer_id=(proof->'Process'->'Binding'->>'PeerID')::uuid FOR UPDATE;
+ n:=clock_timestamp();
+ IF NOT COALESCE(NOT trust.recovery_blocked AND NOT trust.suspended AND trust.observed_at<=n AND n<trust.fresh_until AND trust.issuer_epoch=root.issuer_epoch AND n<root.valid_until AND true AND
+   NOT cfg.suspended AND NOT cfg.blocked AND (NOT cfg.fenced OR allow_candidate AND cfg.accepted_id IS NULL) AND cfg.configuration=p AND public.connector_backing_observed(root,cfg,source) AND proof->'Process'->'Binding'=p->'Binding' AND (p->>'RootID')::uuid=r AND
+   (c->>'ObservedAt')::timestamptz<=n AND (c->>'Until')::timestamptz>n AND (c->>'Until')::timestamptz<=(c->>'ObservedAt')::timestamptz+interval '5 seconds' AND
+   (proof->>'ObservedAt')::timestamptz<=n AND (proof->>'FreshUntil')::timestamptz>n AND (proof->>'FreshUntil')::timestamptz<=(proof->>'ObservedAt')::timestamptz+interval '5 seconds' AND
+   (source->>'ObservedAt')::timestamptz<=n AND (source->>'FreshUntil')::timestamptz>n AND (source->>'FreshUntil')::timestamptz<=(source->>'ObservedAt')::timestamptz+interval '5 seconds' AND
+   (c->>'Until')::timestamptz<=(proof->>'FreshUntil')::timestamptz AND (c->>'Until')::timestamptz<=(source->>'FreshUntil')::timestamptz AND (c->>'Until')::timestamptz<=(c->'Recovery'->>'FreshUntil')::timestamptz AND
+   (c->'Recovery'->>'InstallationID')::uuid=root.installation_id AND (c->'Recovery'->>'IssuerEpoch')::uuid=root.issuer_epoch AND (c->'Recovery'->>'ObservedAt')::timestamptz<=n AND (c->'Recovery'->>'FreshUntil')::timestamptz>n AND (c->'Recovery'->>'FreshUntil')::timestamptz<=(c->'Recovery'->>'ObservedAt')::timestamptz+interval '5 seconds' AND (c->'Recovery'->>'FreshUntil')::timestamptz<=trust.fresh_until AND c->'Recovery'->'Revision'->>'UID'=trust.source_uid AND (c->'Recovery'->'Revision'->>'Generation')::bigint=trust.source_generation AND public.connector_digest(c->'Recovery'->'Revision'->'Digest')=trust.source_digest AND
+   jsonb_array_length(proof->'WorkloadDigest')=32 AND jsonb_array_length(proof->'ProtectionDigest')=32 AND public.connector_digest(proof->'ClientKeyDigest')<>public.connector_digest(proof->'ServerKeyDigest'),false) THEN RAISE EXCEPTION 'connector process proof unavailable' USING ERRCODE='23514';END IF;
+ RETURN cfg;
+END $$;
+-- +goose StatementEnd
+-- +goose StatementBegin
+CREATE OR REPLACE FUNCTION lock_connector_credential_candidate(r uuid,candidate jsonb) RETURNS public.connector_identity_process LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
+DECLARE cur jsonb:=candidate->'Current'; source jsonb:=cur->'Source'->'Observation'; p jsonb:=source->'Profile'; proof jsonb:=cur->'ProcessProof'; actor jsonb:=cur->'Peer'; cfg public.connector_identity_profile; root public.connector_identity_root; trust public.fleet_current_trust; child public.connector_identity_process; leaf public.connector_credential_attempt; n timestamptz;
+BEGIN
+ IF NOT public.connector_identity_role_ok(r,'journal') OR octet_length(candidate::text)>262144 OR candidate->>'BootstrapID' IS DISTINCT FROM '' OR candidate->>'Usage' NOT IN('client','server') OR candidate->'Attested' IS NULL THEN RAISE EXCEPTION 'connector credential origin unavailable' USING ERRCODE='23514';END IF;
+ SELECT * INTO STRICT trust FROM public.fleet_current_trust WHERE installation_id=(p->'Binding'->>'InstallationID')::uuid FOR SHARE;
+ SELECT * INTO STRICT root FROM public.connector_identity_root WHERE root_id=r FOR UPDATE;
+ SELECT * INTO STRICT cfg FROM public.connector_identity_profile WHERE root_id=r AND peer_id=(candidate->'Attested'->'Binding'->>'PeerID')::uuid FOR UPDATE;
+ SELECT * INTO STRICT child FROM public.connector_identity_process WHERE root_id=r AND peer_id=cfg.peer_id AND pod_uid=(candidate->'Attested'->>'PodUID')::uuid AND process_epoch=(candidate->'Attested'->>'ProcessEpoch')::uuid FOR UPDATE;
+ n:=clock_timestamp();
+ IF NOT COALESCE(NOT trust.recovery_blocked AND NOT trust.suspended AND trust.observed_at<=n AND n<trust.fresh_until AND trust.issuer_epoch=root.issuer_epoch AND n<root.valid_until AND true AND NOT cfg.fenced AND NOT cfg.blocked AND NOT cfg.suspended AND cfg.accepted_id IS NOT NULL AND cfg.configuration=p AND public.connector_backing_observed(root,cfg,source) AND
+   child.accepted_at IS NOT NULL AND child.retired_at IS NULL AND n<child.run_until AND child.process->'Attested'=candidate->'Attested' AND
+   ROW(child.source_uid,child.source_generation,child.source_digest)=ROW(cfg.source_uid,cfg.source_generation,cfg.source_digest) AND
+   (cur->>'ObservedAt')::timestamptz<=n AND (cur->>'Until')::timestamptz>n AND (cur->>'Until')::timestamptz<=(cur->>'ObservedAt')::timestamptz+interval '5 seconds' AND
+   (source->>'ObservedAt')::timestamptz<=n AND (source->>'FreshUntil')::timestamptz>n AND (source->>'FreshUntil')::timestamptz<=(source->>'ObservedAt')::timestamptz+interval '5 seconds' AND (cur->>'Until')::timestamptz<=(source->>'FreshUntil')::timestamptz AND
+   (cur->'Recovery'->>'InstallationID')::uuid=root.installation_id AND (cur->'Recovery'->>'IssuerEpoch')::uuid=root.issuer_epoch AND cur->'Recovery'->'Revision'->>'UID'=trust.source_uid AND (cur->'Recovery'->'Revision'->>'Generation')::bigint=trust.source_generation AND public.connector_digest(cur->'Recovery'->'Revision'->'Digest')=trust.source_digest AND (cur->>'Until')::timestamptz<=(cur->'Recovery'->>'FreshUntil')::timestamptz AND (cur->'Recovery'->>'FreshUntil')::timestamptz<=trust.fresh_until AND
+   (cur->'Recovery'->>'ObservedAt')::timestamptz<=n AND (cur->'Recovery'->>'FreshUntil')::timestamptz<=(cur->'Recovery'->>'ObservedAt')::timestamptz+interval '5 seconds' AND
+   public.connector_digest(candidate->'PublicKeyDigest')=(CASE WHEN candidate->>'Usage'='client' THEN child.client_key ELSE child.server_key END),false) THEN RAISE EXCEPTION 'connector credential current authority unavailable' USING ERRCODE='23514';END IF;
+ IF proof IS NOT NULL AND proof<>'null'::jsonb THEN
+  PERFORM public.lock_connector_process_current(r,jsonb_build_object('Proof',proof,'Recovery',cur->'Recovery','ObservedAt',cur->'ObservedAt','Until',cur->'Until'),false);
+  IF proof->'Process' IS DISTINCT FROM candidate->'Attested' OR public.connector_digest(proof->'ClientKeyDigest')<>child.client_key OR public.connector_digest(proof->'ServerKeyDigest')<>child.server_key OR actor->'Certificate'->'Binding'->>'PeerID' IS DISTINCT FROM '' THEN RAISE EXCEPTION 'connector proof/key origin mismatch' USING ERRCODE='23514';END IF;
+ ELSE
+  SELECT * INTO STRICT leaf FROM public.connector_credential_attempt WHERE root_id=r AND process_id=child.id AND usage='client' AND certificate_digest=public.connector_digest(actor->'Certificate'->'Digest') AND id IN(child.client_current_id,child.client_previous_id);
+  IF NOT COALESCE(child.serving AND leaf.activated_at IS NOT NULL AND leaf.detached_at IS NULL AND n>=leaf.certificate_not_before AND n<leaf.certificate_not_after AND actor->'Certificate'->'Binding'=child.process->'Binding' AND (actor->>'VerifiedAt')::timestamptz<=n AND (actor->>'ValidUntil')::timestamptz>n AND (actor->>'ValidUntil')::timestamptz<=(actor->>'VerifiedAt')::timestamptz+interval '5 seconds' AND (cur->>'Until')::timestamptz<=(actor->>'ValidUntil')::timestamptz,false) THEN RAISE EXCEPTION 'connector actual client leaf unavailable' USING ERRCODE='23514';END IF;
+ END IF;
+ RETURN child;
+END $$;
+-- +goose StatementEnd
+-- +goose StatementBegin
+CREATE OR REPLACE FUNCTION read_connector_activated_leaf(r uuid,peer uuid,usage_value text,digest_value bytea,source_value jsonb) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
+DECLARE started timestamptz:=clock_timestamp(); n timestamptz; until_at timestamptz; cfg public.connector_identity_profile; backing public.connector_identity_root; trust public.fleet_current_trust; child public.connector_identity_process; leaf public.connector_credential_attempt; event public.operation_audit; matched record;
+BEGIN
+ IF usage_value NOT IN('client','server') OR octet_length(digest_value)<>32 OR octet_length(source_value::text)>196608 THEN RAISE EXCEPTION 'connector leaf unavailable' USING ERRCODE='23514';END IF;
+ SELECT * INTO STRICT backing FROM public.connector_identity_root WHERE root_id=r;
+ SELECT * INTO STRICT trust FROM public.fleet_current_trust WHERE installation_id=backing.installation_id;
+ SELECT * INTO STRICT cfg FROM public.connector_identity_profile WHERE root_id=r AND peer_id=peer;
+ SELECT a AS leaf,p AS child INTO STRICT matched FROM public.connector_credential_attempt a JOIN public.connector_identity_process p ON p.id=a.process_id AND p.root_id=a.root_id
+  WHERE a.root_id=r AND a.peer_id=peer AND a.usage=usage_value AND a.certificate_digest=digest_value
+    AND ((usage_value='client' AND a.id IN(p.client_current_id,p.client_previous_id)) OR (usage_value='server' AND a.id IN(p.server_current_id,p.server_previous_id)));
+ leaf:=matched.leaf;child:=matched.child;
+ SELECT * INTO STRICT event FROM public.operation_audit WHERE id=leaf.id AND root_id=r AND lane='identity';
+ n:=clock_timestamp();until_at:=least(started+interval '5 seconds',trust.fresh_until,backing.valid_until,(source_value->>'FreshUntil')::timestamptz,child.run_until,leaf.certificate_not_after);
+ IF NOT COALESCE(NOT trust.recovery_blocked AND NOT trust.suspended AND trust.observed_at<=n AND trust.issuer_epoch=backing.issuer_epoch AND public.incarnation_current(backing.postmaster_at) AND backing.database_oid=(SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database()) AND
+  true AND NOT cfg.fenced AND NOT cfg.blocked AND NOT cfg.suspended AND cfg.accepted_id IS NOT NULL AND cfg.configuration=source_value->'Profile' AND public.connector_backing_observed(backing,cfg,source_value) AND (source_value->>'ObservedAt')::timestamptz<=n AND (source_value->>'FreshUntil')::timestamptz<=(source_value->>'ObservedAt')::timestamptz+interval '5 seconds' AND
+  child.serving AND child.retired_at IS NULL AND child.accepted_at IS NOT NULL AND ROW(child.source_uid,child.source_generation,child.source_digest)=ROW(cfg.source_uid,cfg.source_generation,cfg.source_digest) AND
+  ((usage_value='client' AND leaf.id IN(child.client_current_id,child.client_previous_id)) OR (usage_value='server' AND leaf.id IN(child.server_current_id,child.server_previous_id))) AND leaf.activated_at IS NOT NULL AND leaf.detached_at IS NULL AND n>=leaf.certificate_not_before AND n<until_at AND ROW(leaf.source_uid,leaf.source_generation,leaf.source_digest)=ROW(cfg.source_uid,cfg.source_generation,cfg.source_digest) AND
+  event.intent_receipt IS NOT NULL AND event.outcome_receipt IS NOT NULL AND event.outcome->>'Status'='success',false) THEN RAISE EXCEPTION 'connector activated leaf unavailable' USING ERRCODE='23514';END IF;
+ RETURN jsonb_build_object('Certificate',leaf.issued->'Certificate','Process',child.process->'Attested','Revision',cfg.configuration->'Revision','ObservedAt',started,'FreshUntil',until_at);
 END $$;
 -- +goose StatementEnd
 
@@ -701,5 +868,155 @@ BEGIN
  IF EXISTS(SELECT 1 FROM public.operation_audit_account WHERE root_id=NEW.root_id AND lane=NEW.lane AND charged>NEW.records_per_account) THEN
   RAISE EXCEPTION 'audit backing below retained spend' USING ERRCODE='23514'; END IF;
  RETURN NEW;
+END $$;
+-- +goose StatementEnd
+ALTER TABLE operation_audit_account DROP CONSTRAINT operation_audit_account_charged;
+ALTER TABLE operation_audit_account ADD CHECK(charged>=0 AND charged<=1000000) NOT VALID;
+ALTER TABLE operation_audit_pool DROP CONSTRAINT operation_audit_pool_accounts;
+ALTER TABLE operation_audit_pool ADD CHECK(accounts>=0 AND accounts<=account_limit) NOT VALID;
+ALTER TABLE connector_identity_root DROP CONSTRAINT connector_identity_root_counts;
+ALTER TABLE connector_identity_root ADD CHECK(profiles>=0 AND profiles<=profile_limit) NOT VALID;
+ALTER TABLE connector_identity_root ADD CHECK(source_transitions>=0 AND source_transitions<=source_transition_limit) NOT VALID;
+-- +goose StatementBegin
+CREATE OR REPLACE FUNCTION guard_connector_identity_profile() RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
+DECLARE r public.connector_identity_root; n timestamptz; c jsonb; a public.operation_audit; attempt public.connector_credential_attempt; child public.connector_identity_process;
+BEGIN
+ IF TG_RELID<>'public.connector_identity_profile'::regclass OR TG_WHEN<>'BEFORE' OR TG_LEVEL<>'ROW' OR TG_OP='DELETE' THEN RAISE EXCEPTION 'connector profile retirement unavailable' USING ERRCODE='23514';END IF;
+ SELECT * INTO STRICT r FROM public.connector_identity_root WHERE root_id=NEW.root_id FOR UPDATE;
+ n:=clock_timestamp();
+ IF TG_OP='INSERT' AND (NEW.retirement_ticket IS NOT NULL OR NEW.retirement_at IS NOT NULL) THEN RAISE EXCEPTION 'new profile cannot invent retirement' USING ERRCODE='23514';END IF;
+ IF TG_OP='UPDATE' AND OLD.retirement_ticket IS NULL AND NEW.retirement_ticket IS NOT NULL THEN
+  IF NOT public.connector_identity_role_ok(NEW.root_id,'journal') OR NOT NEW.fenced OR NEW.retirement_at IS NULL OR NEW.retirement_at>n OR NEW.retirement_at<n-interval '5 seconds' OR
+   (to_jsonb(NEW)-ARRAY['fenced','retirement_ticket','retirement_at']) IS DISTINCT FROM (to_jsonb(OLD)-ARRAY['fenced','retirement_ticket','retirement_at']) OR
+   NOT EXISTS(SELECT 1 FROM public.connector_retirement_ticket t WHERE t.id=NEW.retirement_ticket AND t.root_id=NEW.root_id AND t.peer_id=NEW.peer_id AND t.activated_at IS NOT NULL AND t.superseded_at IS NULL AND t.restriction_at=NEW.retirement_at AND
+    t.behavior_uid=NEW.source_uid AND t.backing_revision=NEW.backing_revision AND t.backing_digest=NEW.backing_digest AND t.principal_digest=NEW.account_digest) THEN RAISE EXCEPTION 'connector restriction is not prepaid for this cohort' USING ERRCODE='23514';END IF;
+  -- Its original ticket prepaid this fixed control transition. Exhaustion of
+  -- ordinary source/admission counters cannot block a restrictive close.
+  RETURN NEW;
+ END IF;
+ IF TG_OP='UPDATE' AND (ROW(NEW.retirement_ticket,NEW.retirement_at) IS DISTINCT FROM ROW(OLD.retirement_ticket,OLD.retirement_at) OR
+  OLD.retirement_ticket IS NOT NULL AND (NOT NEW.fenced OR NOT public.connector_identity_role_ok(NEW.root_id,'cleanup'))) THEN RAISE EXCEPTION 'irreversible connector retirement fence' USING ERRCODE='23514';END IF;
+ IF TG_OP='UPDATE' AND public.connector_identity_role_ok(NEW.root_id,'cleanup') THEN
+  IF NOT NEW.fenced OR NEW.candidate_id IS NOT NULL OR NEW.accepted_id IS NOT NULL OR (to_jsonb(NEW)-ARRAY['fenced','candidate_id','accepted_id']) IS DISTINCT FROM (to_jsonb(OLD)-ARRAY['fenced','candidate_id','accepted_id']) OR
+   EXISTS(SELECT 1 FROM public.connector_identity_process p WHERE p.root_id=OLD.root_id AND p.peer_id=OLD.peer_id AND (p.id IN(OLD.candidate_id,OLD.accepted_id) OR EXISTS(SELECT 1 FROM public.connector_credential_attempt credential_attempt_row WHERE credential_attempt_row.process_id=p.id AND credential_attempt_row.id IN(OLD.candidate_id,OLD.accepted_id))) AND n<p.run_until+interval '1 minute') THEN RAISE EXCEPTION 'connector accepted source still referenced' USING ERRCODE='23514';END IF;
+  RETURN NEW;
+ END IF;
+ -- Restrict an already-retained profile even when its backing is no longer
+ -- current. This branch can only add a fence/watermark, never clear either.
+ IF TG_OP='UPDATE' AND public.connector_identity_role_ok(NEW.root_id,'source') AND NEW.fenced AND (NOT OLD.blocked OR NEW.blocked) AND
+  (to_jsonb(NEW)-ARRAY['fenced','blocked'])=(to_jsonb(OLD)-ARRAY['fenced','blocked']) AND ROW(NEW.fenced,NEW.blocked) IS DISTINCT FROM ROW(OLD.fenced,OLD.blocked) THEN
+  IF r.source_transitions>=r.source_transition_limit THEN RAISE EXCEPTION 'connector restrictive transition backing exhausted' USING ERRCODE='23514';END IF;
+  UPDATE public.connector_identity_root SET source_transitions=source_transitions+1 WHERE root_id=NEW.root_id;
+  RETURN NEW;
+ END IF;c:=NEW.configuration;
+ IF NOT COALESCE(NEW.installation_id=r.installation_id AND NEW.issuer_epoch=r.issuer_epoch AND ((NEW.backing_revision=(r.policy->>'BackingRevision')::bigint AND NEW.backing_digest=r.backing_digest) OR (r.pending_id IS NOT NULL AND NEW.backing_revision=(r.pending_backing->'Policy'->>'BackingRevision')::bigint AND NEW.backing_digest=r.pending_digest)) AND (c->>'RootID')::uuid=NEW.root_id AND (c->'Binding'->>'PeerID')::uuid=NEW.peer_id AND (c->'Binding'->>'InstallationID')::uuid=NEW.installation_id AND (c->'Binding'->>'ClusterID')::uuid=NEW.cluster_id AND (c->'Binding'->>'IssuerEpoch')::uuid=NEW.issuer_epoch AND c->'Binding'->>'Role'='connector' AND public.connector_digest(c->'Revision'->'Digest')=NEW.source_digest AND public.connector_digest(c->'ProtectionDigest')=NEW.protection_digest AND (c->'Revision'->>'UID')::uuid=NEW.source_uid AND (c->'Revision'->>'Generation')::bigint=NEW.source_generation AND (c->>'Suspended')::boolean=NEW.suspended,false) THEN RAISE EXCEPTION 'connector source identity mismatch' USING ERRCODE='23514';END IF;
+ IF TG_OP='UPDATE' AND NEW.configuration=OLD.configuration AND ROW(NEW.complete_digest,NEW.backing_revision,NEW.backing_digest) IS DISTINCT FROM ROW(OLD.complete_digest,OLD.backing_revision,OLD.backing_digest) THEN
+  IF NOT public.connector_identity_role_ok(NEW.root_id,'source') OR n>=r.valid_until OR NEW.backing_revision<>OLD.backing_revision+1 OR NOT ((NEW.backing_revision=(r.policy->>'BackingRevision')::bigint AND NEW.backing_digest=r.backing_digest) OR (r.pending_id IS NOT NULL AND NEW.backing_revision=(r.pending_backing->'Policy'->>'BackingRevision')::bigint AND NEW.backing_digest=r.pending_digest)) OR
+   (to_jsonb(NEW)-ARRAY['complete_digest','backing_revision','backing_digest']) IS DISTINCT FROM (to_jsonb(OLD)-ARRAY['complete_digest','backing_revision','backing_digest']) OR r.source_transitions>=r.source_transition_limit THEN RAISE EXCEPTION 'connector complete source revision unavailable' USING ERRCODE='23514';END IF;
+  UPDATE public.connector_identity_root SET source_transitions=source_transitions+1 WHERE root_id=NEW.root_id;
+  RETURN NEW;
+ END IF;
+ IF TG_OP='INSERT' OR NEW.configuration IS DISTINCT FROM OLD.configuration THEN
+  IF NOT public.connector_identity_role_ok(NEW.root_id,'source') OR n>=r.valid_until OR NEW.candidate_id IS NOT NULL OR NEW.accepted_id IS NOT NULL OR TG_OP='INSERT' AND NEW.account_digest IS NOT NULL OR TG_OP='UPDATE' AND NEW.account_digest IS DISTINCT FROM OLD.account_digest OR NOT NEW.fenced OR NEW.blocked OR r.source_transitions>=r.source_transition_limit OR TG_OP='INSERT' AND r.profiles>=r.profile_limit THEN RAISE EXCEPTION 'connector profile backing unavailable' USING ERRCODE='23514';END IF;
+  IF TG_OP='UPDATE' AND (ROW(NEW.root_id,NEW.peer_id,NEW.installation_id,NEW.cluster_id,NEW.issuer_epoch,NEW.source_uid) IS DISTINCT FROM ROW(OLD.root_id,OLD.peer_id,OLD.installation_id,OLD.cluster_id,OLD.issuer_epoch,OLD.source_uid) OR NEW.source_generation<=OLD.source_generation) THEN RAISE EXCEPTION 'connector source rollback or replacement' USING ERRCODE='23514';END IF;
+  UPDATE public.connector_identity_root SET profiles=profiles+(CASE WHEN TG_OP='INSERT' THEN 1 ELSE 0 END),source_transitions=source_transitions+1 WHERE root_id=NEW.root_id;
+  RETURN NEW;
+ END IF;
+ IF (to_jsonb(NEW)-ARRAY['candidate_id','accepted_id','fenced','blocked','account_digest']) IS DISTINCT FROM (to_jsonb(OLD)-ARRAY['candidate_id','accepted_id','fenced','blocked','account_digest']) THEN RAISE EXCEPTION 'immutable connector source' USING ERRCODE='23514';END IF;
+ IF NEW.account_digest IS DISTINCT FROM OLD.account_digest AND (OLD.account_digest IS NOT NULL OR NOT public.connector_identity_role_ok(NEW.root_id,'journal')) THEN RAISE EXCEPTION 'immutable logical connector account' USING ERRCODE='23514';END IF;
+ IF NEW.account_digest IS NOT DISTINCT FROM OLD.account_digest AND NEW.candidate_id IS NOT DISTINCT FROM OLD.candidate_id AND NEW.accepted_id IS NOT DISTINCT FROM OLD.accepted_id AND
+   ROW(NEW.fenced,NEW.blocked) IS DISTINCT FROM ROW(OLD.fenced,OLD.blocked) THEN
+  IF NOT public.connector_identity_role_ok(NEW.root_id,'source') OR r.source_transitions>=r.source_transition_limit OR
+   OLD.blocked AND NOT NEW.blocked OR NEW.blocked AND NOT NEW.fenced OR NOT NEW.fenced AND (NEW.accepted_id IS NULL OR NEW.blocked OR n>=r.valid_until) THEN RAISE EXCEPTION 'connector source transition unavailable' USING ERRCODE='23514';END IF;
+  UPDATE public.connector_identity_root SET source_transitions=source_transitions+1 WHERE root_id=NEW.root_id;
+  RETURN NEW;
+ END IF;
+ IF OLD.account_digest IS NOT NULL AND NEW.account_digest IS DISTINCT FROM OLD.account_digest THEN RAISE EXCEPTION 'immutable logical connector account' USING ERRCODE='23514';END IF;
+ IF OLD.fenced AND OLD.accepted_id IS NOT NULL OR OLD.blocked THEN RAISE EXCEPTION 'connector current source proof unavailable' USING ERRCODE='23514';END IF;
+ IF NOT public.connector_identity_role_ok(NEW.root_id,'journal') OR NEW.suspended OR n>=r.valid_until OR NEW.blocked OR NEW.candidate_id IS NULL THEN RAISE EXCEPTION 'connector candidate unavailable' USING ERRCODE='23514';END IF;
+ SELECT * INTO STRICT a FROM public.operation_audit WHERE id=NEW.candidate_id AND root_id=NEW.root_id AND lane='identity';
+ IF NEW.account_digest IS DISTINCT FROM a.principal_digest THEN RAISE EXCEPTION 'connector account changed' USING ERRCODE='23514';END IF;
+ IF a.intent->>'Name'='connector_process_enrollment' THEN
+  SELECT * INTO STRICT child FROM public.connector_identity_process WHERE id=a.id AND root_id=NEW.root_id AND peer_id=NEW.peer_id;
+  IF ROW(child.source_uid,child.source_generation,child.source_digest) IS DISTINCT FROM ROW(NEW.source_uid,NEW.source_generation,NEW.source_digest) THEN RAISE EXCEPTION 'connector process source mismatch' USING ERRCODE='23514';END IF;
+ ELSE
+  SELECT * INTO STRICT attempt FROM public.connector_credential_attempt WHERE id=a.id AND root_id=NEW.root_id AND peer_id=NEW.peer_id;
+  IF ROW(attempt.source_uid,attempt.source_generation,attempt.source_digest) IS DISTINCT FROM ROW(NEW.source_uid,NEW.source_generation,NEW.source_digest) THEN RAISE EXCEPTION 'connector signing source mismatch' USING ERRCODE='23514';END IF;
+ END IF;
+ IF OLD.accepted_id IS NULL AND NEW.accepted_id IS NULL AND NEW.fenced AND a.intent->>'Name'='connector_process_enrollment' AND child.accepted_at IS NULL AND n<a.request_until THEN RETURN NEW;END IF;
+ IF a.intent_receipt IS NULL OR a.outcome_receipt IS NULL OR a.outcome->>'Status' IS DISTINCT FROM 'success' OR NEW.accepted_id IS DISTINCT FROM NEW.candidate_id OR NEW.fenced OR (a.intent->>'Name'='connector_process_enrollment' AND (child.accepted_at IS NULL OR n>=child.run_until)) OR (a.intent->>'Name'<>'connector_process_enrollment' AND n>=attempt.certificate_not_after) THEN RAISE EXCEPTION 'connector candidate acknowledgement unavailable' USING ERRCODE='23514';END IF;
+ RETURN NEW;
+END $$;
+-- +goose StatementEnd
+-- +goose StatementBegin
+CREATE OR REPLACE FUNCTION lock_connector_process_current(r uuid,c jsonb,allow_candidate boolean) RETURNS public.connector_identity_profile LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
+DECLARE proof jsonb:=c->'Proof'; source jsonb:=proof->'Configuration'; p jsonb:=source->'Profile'; cfg public.connector_identity_profile; root public.connector_identity_root; trust public.fleet_current_trust; n timestamptz;
+BEGIN
+ IF NOT public.connector_identity_role_ok(r,'journal') OR octet_length(c::text)>196608 THEN RAISE EXCEPTION 'connector process current authority unavailable' USING ERRCODE='23514';END IF;
+ SELECT * INTO STRICT trust FROM public.fleet_current_trust WHERE installation_id=(p->'Binding'->>'InstallationID')::uuid FOR SHARE;
+ SELECT * INTO STRICT root FROM public.connector_identity_root WHERE root_id=r FOR UPDATE;
+ SELECT * INTO STRICT cfg FROM public.connector_identity_profile WHERE root_id=r AND peer_id=(proof->'Process'->'Binding'->>'PeerID')::uuid FOR UPDATE;
+ n:=clock_timestamp();
+ IF NOT COALESCE(NOT trust.recovery_blocked AND NOT trust.suspended AND trust.observed_at<=n AND n<trust.fresh_until AND trust.issuer_epoch=root.issuer_epoch AND n<root.valid_until AND root.source_transitions<root.source_transition_limit AND
+   NOT cfg.suspended AND NOT cfg.blocked AND (NOT cfg.fenced OR allow_candidate AND cfg.accepted_id IS NULL) AND cfg.configuration=p AND public.connector_backing_observed(root,cfg,source) AND proof->'Process'->'Binding'=p->'Binding' AND (p->>'RootID')::uuid=r AND
+   (c->>'ObservedAt')::timestamptz<=n AND (c->>'Until')::timestamptz>n AND (c->>'Until')::timestamptz<=(c->>'ObservedAt')::timestamptz+interval '5 seconds' AND
+   (proof->>'ObservedAt')::timestamptz<=n AND (proof->>'FreshUntil')::timestamptz>n AND (proof->>'FreshUntil')::timestamptz<=(proof->>'ObservedAt')::timestamptz+interval '5 seconds' AND
+   (source->>'ObservedAt')::timestamptz<=n AND (source->>'FreshUntil')::timestamptz>n AND (source->>'FreshUntil')::timestamptz<=(source->>'ObservedAt')::timestamptz+interval '5 seconds' AND
+   (c->>'Until')::timestamptz<=(proof->>'FreshUntil')::timestamptz AND (c->>'Until')::timestamptz<=(source->>'FreshUntil')::timestamptz AND (c->>'Until')::timestamptz<=(c->'Recovery'->>'FreshUntil')::timestamptz AND
+   (c->'Recovery'->>'InstallationID')::uuid=root.installation_id AND (c->'Recovery'->>'IssuerEpoch')::uuid=root.issuer_epoch AND (c->'Recovery'->>'ObservedAt')::timestamptz<=n AND (c->'Recovery'->>'FreshUntil')::timestamptz>n AND (c->'Recovery'->>'FreshUntil')::timestamptz<=(c->'Recovery'->>'ObservedAt')::timestamptz+interval '5 seconds' AND (c->'Recovery'->>'FreshUntil')::timestamptz<=trust.fresh_until AND c->'Recovery'->'Revision'->>'UID'=trust.source_uid AND (c->'Recovery'->'Revision'->>'Generation')::bigint=trust.source_generation AND public.connector_digest(c->'Recovery'->'Revision'->'Digest')=trust.source_digest AND
+   jsonb_array_length(proof->'WorkloadDigest')=32 AND jsonb_array_length(proof->'ProtectionDigest')=32 AND public.connector_digest(proof->'ClientKeyDigest')<>public.connector_digest(proof->'ServerKeyDigest'),false) THEN RAISE EXCEPTION 'connector process proof unavailable' USING ERRCODE='23514';END IF;
+ RETURN cfg;
+END $$;
+-- +goose StatementEnd
+-- +goose StatementBegin
+CREATE OR REPLACE FUNCTION lock_connector_credential_candidate(r uuid,candidate jsonb) RETURNS public.connector_identity_process LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
+DECLARE cur jsonb:=candidate->'Current'; source jsonb:=cur->'Source'->'Observation'; p jsonb:=source->'Profile'; proof jsonb:=cur->'ProcessProof'; actor jsonb:=cur->'Peer'; cfg public.connector_identity_profile; root public.connector_identity_root; trust public.fleet_current_trust; child public.connector_identity_process; leaf public.connector_credential_attempt; n timestamptz;
+BEGIN
+ IF NOT public.connector_identity_role_ok(r,'journal') OR octet_length(candidate::text)>262144 OR candidate->>'BootstrapID' IS DISTINCT FROM '' OR candidate->>'Usage' NOT IN('client','server') OR candidate->'Attested' IS NULL THEN RAISE EXCEPTION 'connector credential origin unavailable' USING ERRCODE='23514';END IF;
+ SELECT * INTO STRICT trust FROM public.fleet_current_trust WHERE installation_id=(p->'Binding'->>'InstallationID')::uuid FOR SHARE;
+ SELECT * INTO STRICT root FROM public.connector_identity_root WHERE root_id=r FOR UPDATE;
+ SELECT * INTO STRICT cfg FROM public.connector_identity_profile WHERE root_id=r AND peer_id=(candidate->'Attested'->'Binding'->>'PeerID')::uuid FOR UPDATE;
+ SELECT * INTO STRICT child FROM public.connector_identity_process WHERE root_id=r AND peer_id=cfg.peer_id AND pod_uid=(candidate->'Attested'->>'PodUID')::uuid AND process_epoch=(candidate->'Attested'->>'ProcessEpoch')::uuid FOR UPDATE;
+ n:=clock_timestamp();
+ IF NOT COALESCE(NOT trust.recovery_blocked AND NOT trust.suspended AND trust.observed_at<=n AND n<trust.fresh_until AND trust.issuer_epoch=root.issuer_epoch AND n<root.valid_until AND root.source_transitions<root.source_transition_limit AND NOT cfg.fenced AND NOT cfg.blocked AND NOT cfg.suspended AND cfg.accepted_id IS NOT NULL AND cfg.configuration=p AND public.connector_backing_observed(root,cfg,source) AND
+   child.accepted_at IS NOT NULL AND child.retired_at IS NULL AND n<child.run_until AND child.process->'Attested'=candidate->'Attested' AND
+   ROW(child.source_uid,child.source_generation,child.source_digest)=ROW(cfg.source_uid,cfg.source_generation,cfg.source_digest) AND
+   (cur->>'ObservedAt')::timestamptz<=n AND (cur->>'Until')::timestamptz>n AND (cur->>'Until')::timestamptz<=(cur->>'ObservedAt')::timestamptz+interval '5 seconds' AND
+   (source->>'ObservedAt')::timestamptz<=n AND (source->>'FreshUntil')::timestamptz>n AND (source->>'FreshUntil')::timestamptz<=(source->>'ObservedAt')::timestamptz+interval '5 seconds' AND (cur->>'Until')::timestamptz<=(source->>'FreshUntil')::timestamptz AND
+   (cur->'Recovery'->>'InstallationID')::uuid=root.installation_id AND (cur->'Recovery'->>'IssuerEpoch')::uuid=root.issuer_epoch AND cur->'Recovery'->'Revision'->>'UID'=trust.source_uid AND (cur->'Recovery'->'Revision'->>'Generation')::bigint=trust.source_generation AND public.connector_digest(cur->'Recovery'->'Revision'->'Digest')=trust.source_digest AND (cur->>'Until')::timestamptz<=(cur->'Recovery'->>'FreshUntil')::timestamptz AND (cur->'Recovery'->>'FreshUntil')::timestamptz<=trust.fresh_until AND
+   (cur->'Recovery'->>'ObservedAt')::timestamptz<=n AND (cur->'Recovery'->>'FreshUntil')::timestamptz<=(cur->'Recovery'->>'ObservedAt')::timestamptz+interval '5 seconds' AND
+   public.connector_digest(candidate->'PublicKeyDigest')=(CASE WHEN candidate->>'Usage'='client' THEN child.client_key ELSE child.server_key END),false) THEN RAISE EXCEPTION 'connector credential current authority unavailable' USING ERRCODE='23514';END IF;
+ IF proof IS NOT NULL AND proof<>'null'::jsonb THEN
+  PERFORM public.lock_connector_process_current(r,jsonb_build_object('Proof',proof,'Recovery',cur->'Recovery','ObservedAt',cur->'ObservedAt','Until',cur->'Until'),false);
+  IF proof->'Process' IS DISTINCT FROM candidate->'Attested' OR public.connector_digest(proof->'ClientKeyDigest')<>child.client_key OR public.connector_digest(proof->'ServerKeyDigest')<>child.server_key OR actor->'Certificate'->'Binding'->>'PeerID' IS DISTINCT FROM '' THEN RAISE EXCEPTION 'connector proof/key origin mismatch' USING ERRCODE='23514';END IF;
+ ELSE
+  SELECT * INTO STRICT leaf FROM public.connector_credential_attempt WHERE root_id=r AND process_id=child.id AND usage='client' AND certificate_digest=public.connector_digest(actor->'Certificate'->'Digest') AND id IN(child.client_current_id,child.client_previous_id);
+  IF NOT COALESCE(child.serving AND leaf.activated_at IS NOT NULL AND leaf.detached_at IS NULL AND n>=leaf.certificate_not_before AND n<leaf.certificate_not_after AND actor->'Certificate'->'Binding'=child.process->'Binding' AND (actor->>'VerifiedAt')::timestamptz<=n AND (actor->>'ValidUntil')::timestamptz>n AND (actor->>'ValidUntil')::timestamptz<=(actor->>'VerifiedAt')::timestamptz+interval '5 seconds' AND (cur->>'Until')::timestamptz<=(actor->>'ValidUntil')::timestamptz,false) THEN RAISE EXCEPTION 'connector actual client leaf unavailable' USING ERRCODE='23514';END IF;
+ END IF;
+ RETURN child;
+END $$;
+-- +goose StatementEnd
+-- +goose StatementBegin
+CREATE OR REPLACE FUNCTION read_connector_activated_leaf(r uuid,peer uuid,usage_value text,digest_value bytea,source_value jsonb) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
+DECLARE started timestamptz:=clock_timestamp(); n timestamptz; until_at timestamptz; cfg public.connector_identity_profile; backing public.connector_identity_root; trust public.fleet_current_trust; child public.connector_identity_process; leaf public.connector_credential_attempt; event public.operation_audit; matched record;
+BEGIN
+ IF usage_value NOT IN('client','server') OR octet_length(digest_value)<>32 OR octet_length(source_value::text)>196608 THEN RAISE EXCEPTION 'connector leaf unavailable' USING ERRCODE='23514';END IF;
+ SELECT * INTO STRICT backing FROM public.connector_identity_root WHERE root_id=r;
+ SELECT * INTO STRICT trust FROM public.fleet_current_trust WHERE installation_id=backing.installation_id;
+ SELECT * INTO STRICT cfg FROM public.connector_identity_profile WHERE root_id=r AND peer_id=peer;
+ SELECT a AS leaf,p AS child INTO STRICT matched FROM public.connector_credential_attempt a JOIN public.connector_identity_process p ON p.id=a.process_id AND p.root_id=a.root_id
+  WHERE a.root_id=r AND a.peer_id=peer AND a.usage=usage_value AND a.certificate_digest=digest_value
+    AND ((usage_value='client' AND a.id IN(p.client_current_id,p.client_previous_id)) OR (usage_value='server' AND a.id IN(p.server_current_id,p.server_previous_id)));
+ leaf:=matched.leaf;child:=matched.child;
+ SELECT * INTO STRICT event FROM public.operation_audit WHERE id=leaf.id AND root_id=r AND lane='identity';
+ n:=clock_timestamp();until_at:=least(started+interval '5 seconds',trust.fresh_until,backing.valid_until,(source_value->>'FreshUntil')::timestamptz,child.run_until,leaf.certificate_not_after);
+ IF NOT COALESCE(NOT trust.recovery_blocked AND NOT trust.suspended AND trust.observed_at<=n AND trust.issuer_epoch=backing.issuer_epoch AND public.incarnation_current(backing.postmaster_at) AND backing.database_oid=(SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database()) AND
+  backing.source_transitions<backing.source_transition_limit AND NOT cfg.fenced AND NOT cfg.blocked AND NOT cfg.suspended AND cfg.accepted_id IS NOT NULL AND cfg.configuration=source_value->'Profile' AND public.connector_backing_observed(backing,cfg,source_value) AND (source_value->>'ObservedAt')::timestamptz<=n AND (source_value->>'FreshUntil')::timestamptz<=(source_value->>'ObservedAt')::timestamptz+interval '5 seconds' AND
+  child.serving AND child.retired_at IS NULL AND child.accepted_at IS NOT NULL AND ROW(child.source_uid,child.source_generation,child.source_digest)=ROW(cfg.source_uid,cfg.source_generation,cfg.source_digest) AND
+  ((usage_value='client' AND leaf.id IN(child.client_current_id,child.client_previous_id)) OR (usage_value='server' AND leaf.id IN(child.server_current_id,child.server_previous_id))) AND leaf.activated_at IS NOT NULL AND leaf.detached_at IS NULL AND n>=leaf.certificate_not_before AND n<until_at AND ROW(leaf.source_uid,leaf.source_generation,leaf.source_digest)=ROW(cfg.source_uid,cfg.source_generation,cfg.source_digest) AND
+  event.intent_receipt IS NOT NULL AND event.outcome_receipt IS NOT NULL AND event.outcome->>'Status'='success',false) THEN RAISE EXCEPTION 'connector activated leaf unavailable' USING ERRCODE='23514';END IF;
+ RETURN jsonb_build_object('Certificate',leaf.issued->'Certificate','Process',child.process->'Attested','Revision',cfg.configuration->'Revision','ObservedAt',started,'FreshUntil',until_at);
 END $$;
 -- +goose StatementEnd

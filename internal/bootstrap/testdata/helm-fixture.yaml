@@ -13,11 +13,7 @@ identity:
     existingSecret: operator-oidc
 federation:
   connector:
-    accounts: 1
-    recordsPerAccount: 96
     retainedSeconds: 4000
-    profiles: 1
-    sourceTransitions: 8
     purgeLeases: 2
     footprint:
       rowBytes: 1048576

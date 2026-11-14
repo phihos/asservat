@@ -61,6 +61,16 @@ func (b ConnectorIdentityBacking) Clone() ConnectorIdentityBacking {
 // "no well-defined expiration" time; finite, as the SQL columns require.
 var ConnectorBackingStanding = time.Date(9999, 12, 31, 23, 59, 59, 0, time.UTC)
 
+// The standing backing's structural sizes (ADR-332). They size its accounting
+// only: SQL counts no connector profile, source transition, identity account
+// or record against them, so clusters join on demand without a reinstall.
+const (
+	ConnectorStandingAccounts          int64 = 256
+	ConnectorStandingProfiles          int64 = 256
+	ConnectorStandingSourceTransitions int64 = 4096
+	ConnectorStandingRecordsPerAccount int64 = 1000000
+)
+
 type ConnectorIdentityConfiguration struct {
 	Source  value.ConnectorIdentitySource
 	Backing ConnectorIdentityBacking

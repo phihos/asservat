@@ -114,11 +114,7 @@ federation:
   ownerOperationNodePort: 31449
   keyServiceNodePort: 31448
   connector:
-    accounts: 1
-    recordsPerAccount: 96
     retainedSeconds: 4000
-    profiles: 1
-    sourceTransitions: 8
     purgeLeases: 2
     footprint: {rowBytes: 1048576, transitionWALBytes: 1048576}
   fleet: {channelMount: fleet-bootstrap, deliveryProfile: regional-installer}

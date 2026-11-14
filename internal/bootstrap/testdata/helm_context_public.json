@@ -215,11 +215,7 @@
       "bucket": "evidence"
     },
     "connector": {
-      "accounts": 4,
-      "recordsPerAccount": 256,
       "retainedSeconds": 15000,
-      "profiles": 2,
-      "sourceTransitions": 64,
       "purgeLeases": 2,
       "footprint": {
         "rowBytes": 1048576,

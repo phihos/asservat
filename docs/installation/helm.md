@@ -335,8 +335,8 @@ Expose the federation (`hub.federation.service`), key service
 (`services.objectStore.seaweedfs.service`) as `LoadBalancer`, `NodePort` or a
 TLS-passthrough route. Connectors verify the in-cluster Service names, so the
 serving certificates need no external name, and no proxy may terminate TLS in
-front of them. `federation.connector` is fixed at the first install: size
-`profiles` for every cluster you will join.
+front of them. There is no connector count to size: each joined cluster's
+connector identity is created when it registers (ADR-332).
 
 After `helm upgrade` of the hub, the hub-api creates the join Secret
 `<name>-join-<cluster>` in the release namespace. It holds the cluster and
