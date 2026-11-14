@@ -1,14 +1,15 @@
 package integration
 
 import (
+	"bytes"
+	"testing"
+	"time"
+
 	auditapp "asservat.local/asservat/internal/application/audit"
 	"asservat.local/asservat/internal/domain/artifact"
 	auditvalue "asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
-	"bytes"
-	"testing"
-	"time"
 )
 
 func TestNativeContinuationAuditBackingCoversOriginalWriteInterval(t *testing.T) {

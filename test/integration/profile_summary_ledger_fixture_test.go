@@ -1,20 +1,21 @@
 package integration
 
 import (
+	"context"
+	"crypto/sha256"
+	"errors"
+	"reflect"
+	"strings"
+	"testing"
+	"time"
+
 	capacityapp "asservat.local/asservat/internal/application/capacity"
 	executionapp "asservat.local/asservat/internal/application/execution"
 	"asservat.local/asservat/internal/domain/execution"
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/migrations"
-	"context"
-	"crypto/sha256"
-	"errors"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
-	"reflect"
-	"strings"
-	"testing"
-	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres"
 	authapp "asservat.local/asservat/internal/application/authorization"

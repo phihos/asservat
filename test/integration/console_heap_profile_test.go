@@ -1,18 +1,10 @@
 package integration
 
 import (
-	evidence "asservat.local/asservat/internal/application/evidence"
-	identities "asservat.local/asservat/internal/application/identity"
-	"asservat.local/asservat/internal/console"
-	"asservat.local/asservat/internal/contracts"
-	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/transport/browser"
-	"asservat.local/asservat/internal/transport/presentation"
 	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/json"
-	"github.com/google/pprof/profile"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
@@ -24,6 +16,15 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	evidence "asservat.local/asservat/internal/application/evidence"
+	identities "asservat.local/asservat/internal/application/identity"
+	"asservat.local/asservat/internal/console"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/transport/browser"
+	"asservat.local/asservat/internal/transport/presentation"
+	"github.com/google/pprof/profile"
 )
 
 // Real GoTLS/static React and the exact installed driver; source/profile,

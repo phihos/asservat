@@ -1,6 +1,8 @@
 package integration
 
 import (
+	"time"
+
 	app "asservat.local/asservat/internal/application/capacity"
 	"asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -9,7 +11,6 @@ import (
 	planvalue "asservat.local/asservat/internal/domain/planning"
 	"asservat.local/asservat/internal/domain/privacy"
 	"asservat.local/asservat/internal/domain/targets"
-	"time"
 )
 
 // These builders are shared by the real SQL fixture and its offline preflight.

@@ -3,6 +3,12 @@
 package integration
 
 import (
+	"bytes"
+	"context"
+	"reflect"
+	"testing"
+	"time"
+
 	"asservat.local/asservat/internal/adapters/postgres"
 	auditapp "asservat.local/asservat/internal/application/audit"
 	captureapp "asservat.local/asservat/internal/application/capture"
@@ -15,11 +21,6 @@ import (
 	executionvalue "asservat.local/asservat/internal/domain/execution"
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/privacy"
-	"bytes"
-	"context"
-	"reflect"
-	"testing"
-	"time"
 )
 
 // Same current SQL/authority preflight as the encrypted completion fixture,

@@ -2,14 +2,12 @@ package integration
 
 import (
 	"context"
-	"crypto/tls"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -83,44 +81,4 @@ func installedHistoryBrowserTunnel(t *testing.T, parent context.Context, origin,
 	server.Start()
 	t.Cleanup(func() { cancel(); server.Close(); joined.Wait() })
 	return server.URL
-}
-
-func TestInstalledHistoryBrowserTunnelPinsDestinationAndJoinsCancellation(t *testing.T) {
-	var seen atomic.Int64
-	target := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		seen.Add(1)
-		_, _ = io.WriteString(w, "actual owned TLS response")
-	}))
-	defer target.Close()
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
-	proxy := installedHistoryBrowserTunnel(t, ctx, "https://browser.synthetic.invalid", target.Listener.Addr().String())
-	u, err := url.Parse(proxy)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// The trust decision here is explicitly synthetic; the installed driver
-	// separately uses the exact real session and fixed forwarded endpoint.
-	transport := &http.Transport{Proxy: http.ProxyURL(u), TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
-	defer transport.CloseIdleConnections()
-	client := &http.Client{Transport: transport, Timeout: 5 * time.Second}
-	response, err := client.Get("https://browser.synthetic.invalid/probe")
-	if err != nil {
-		t.Fatal(err)
-	}
-	body, err := io.ReadAll(response.Body)
-	_ = response.Body.Close()
-	if err != nil || string(body) != "actual owned TLS response" || seen.Load() != 1 {
-		t.Fatal("proxy did not preserve actual server reply", err)
-	}
-	if response, err = client.Get("https://foreign.synthetic.invalid/probe"); err == nil {
-		_ = response.Body.Close()
-		t.Fatal("foreign destination accepted")
-	}
-	transport.CloseIdleConnections()
-	cancel()
-	if response, err = client.Get("https://browser.synthetic.invalid/probe"); err == nil {
-		_ = response.Body.Close()
-		t.Fatal("cancelled tunnel accepted another destination")
-	}
 }

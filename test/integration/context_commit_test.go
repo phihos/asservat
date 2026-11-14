@@ -26,10 +26,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-func receipt(o objectstore.Object) artifact.CopyReceipt {
-	return artifact.CopyReceipt{VersionID: o.VersionID, ETag: o.ETag, Bytes: o.Bytes, SHA256: o.SHA256}
-}
-
 func TestContextCommitWithRealServices(t *testing.T) {
 	path := os.Getenv("ASSERVAT_CONTEXT_FIXTURES")
 	if path == "" {

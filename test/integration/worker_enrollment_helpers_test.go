@@ -1,24 +1,25 @@
 package integration
 
 import (
-	"asservat.local/asservat/internal/adapters/mtls"
-	"asservat.local/asservat/internal/adapters/objectstore"
-	"asservat.local/asservat/internal/adapters/postgres"
-	"asservat.local/asservat/internal/application/evidence"
-	"asservat.local/asservat/internal/domain/artifact"
-	value "asservat.local/asservat/internal/domain/authorization"
 	"context"
 	"crypto"
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"math/big"
 	"net/url"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/adapters/mtls"
+	"asservat.local/asservat/internal/adapters/objectstore"
+	"asservat.local/asservat/internal/adapters/postgres"
+	"asservat.local/asservat/internal/application/evidence"
+	"asservat.local/asservat/internal/domain/artifact"
+	value "asservat.local/asservat/internal/domain/authorization"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type syntheticWorkerEnrollmentProof struct{ worker value.DownloadWorker }

@@ -25,7 +25,6 @@ import (
 // EvidenceRetentionPolicy decoder are the production adapters.
 type retentionPreviewAuthority struct {
 	installation string
-	now          time.Time
 }
 
 func (a retentionPreviewAuthority) ResolveIdentity(context.Context) (identity.Identity, error) {

@@ -1,13 +1,6 @@
 package integration
 
 import (
-	"asservat.local/asservat/internal/adapters/kms"
-	kube "asservat.local/asservat/internal/adapters/kubernetes"
-	"asservat.local/asservat/internal/adapters/mtls"
-	"asservat.local/asservat/internal/application/evidence"
-	"asservat.local/asservat/internal/domain/artifact"
-	value "asservat.local/asservat/internal/domain/authorization"
-	workertransport "asservat.local/asservat/internal/transport/worker"
 	"bytes"
 	"context"
 	"crypto/ecdsa"
@@ -28,6 +21,14 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/adapters/kms"
+	kube "asservat.local/asservat/internal/adapters/kubernetes"
+	"asservat.local/asservat/internal/adapters/mtls"
+	"asservat.local/asservat/internal/application/evidence"
+	"asservat.local/asservat/internal/domain/artifact"
+	value "asservat.local/asservat/internal/domain/authorization"
+	workertransport "asservat.local/asservat/internal/transport/worker"
 )
 
 func (f fixtureWorkerIdentity) ReadDownloadWorkerEnrollment(ctx context.Context, session, worker string) (value.DownloadWorkerIdentity, error) {

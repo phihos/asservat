@@ -1,6 +1,12 @@
 package integration
 
 import (
+	"bytes"
+	"context"
+	"crypto/tls"
+	"testing"
+	"time"
+
 	"asservat.local/asservat/internal/adapters/logs"
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
@@ -10,12 +16,7 @@ import (
 	"asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/fleet"
 	planvalue "asservat.local/asservat/internal/domain/planning"
-	"bytes"
-	"context"
-	"crypto/tls"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"testing"
-	"time"
 )
 
 // Real protected admission/publication and compiled query/key roles. The native

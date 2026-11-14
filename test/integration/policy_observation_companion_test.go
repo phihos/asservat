@@ -1,6 +1,14 @@
 package integration
 
 import (
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"encoding/json"
+	"reflect"
+	"testing"
+	"time"
+
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
 	auditapp "asservat.local/asservat/internal/application/audit"
@@ -18,14 +26,7 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/privacy"
 	"asservat.local/asservat/internal/domain/targets"
-	"bytes"
-	"context"
-	"crypto/sha256"
-	"encoding/json"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"reflect"
-	"testing"
-	"time"
 
 	"asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/contracts"

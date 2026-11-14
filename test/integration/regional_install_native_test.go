@@ -9,8 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"asservat.local/asservat/internal/domain/artifact"
-	capture "asservat.local/asservat/internal/domain/capture"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	apps "k8s.io/api/apps/v1"
@@ -124,42 +122,6 @@ func newRegionalBudget(t *testing.T, ctx context.Context, hub kubernetes.Interfa
 	return b
 }
 
-// installedRegionalContextReserve is the workload's context reserve: each
-// focus of a multi-focus run adds its own (installedEachFocus).
-func installedRegionalContextReserve() (bytes, objects int64) {
-	installedEachFocus(func() {
-		b, o := installedFocusContextReserve()
-		bytes, objects = bytes+b, objects+o
-	})
-	return bytes, objects
-}
-
-func installedFocusContextReserve() (bytes, objects int64) {
-	bytes, objects = 8*1544192, 32
-	if installedLogsFocus() {
-		return installedKeptRuns() * installedLogsQueryUnits * 1544192, installedKeptRuns() * installedLogsQueryUnits * 4
-	}
-	if installedRecordingFocus() {
-		bytes = 8 * (artifact.Registration{NativeLimit: artifact.RecordingNativeLimit}).ReservedBytes()
-	}
-	if installedJourneyFocus() == "manual-raw" {
-		// Existing byte reserve already covers sixteen protocol records;
-		// accept their sixty-four object slots before any capture/query.
-		objects = 64
-	}
-	if installedJourneyFocus() == "manual-profile" {
-		// Fund four independently approved 16MiB captures (CPU, busy, missing,
-		// Stop), including each immutable history artifact. Multipart backing
-		// remains charged after successful/refused collection until cleanup.
-		profile := artifact.Registration{NativeLimit: 16 << 20}
-		stream := artifact.StreamingPlan{Registration: profile}
-		history := artifact.Registration{NativeLimit: capture.MaxHistoryParameters}
-		bytes = 4 * (profile.ReservedBytes() + stream.TemporaryBytes() + history.ReservedBytes())
-		objects = 4 * (4 + 1 + int64(stream.PartLimit()) + 4)
-	}
-	return bytes, objects
-}
-
 // installedRegionalBindingRoles are the maintainer binding's roles. Share,
 // browser and privacy inventory focuses add evidence-owner before capture.
 func installedRegionalBindingRoles() []any {
@@ -201,13 +163,6 @@ func (b *regionalBudget) addBinding(w regionalWorkload) {
 	if err := b.client.Post().AbsPath("/apis/asservat.io/v1alpha1/namespaces/" + w.ns.Name + "/accessbindings").Body(body).Do(b.ctx).Error(); err != nil {
 		b.t.Fatal("operator regional maintainer binding", err)
 	}
-}
-
-// regionalPrepared is the fast feature fixture's workload and budget, both in
-// place before the workload cluster joins.
-type regionalPrepared struct {
-	workload regionalWorkload
-	budget   *regionalBudget
 }
 
 // regionalWorkload is the operator's labeled regional namespace and its

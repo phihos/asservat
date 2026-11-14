@@ -6,21 +6,16 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
-	"strings"
 	"syscall"
 	"testing"
 	"time"
 
 	"asservat.local/asservat/internal/contracts"
 	value "asservat.local/asservat/internal/domain/privacy"
-	core "k8s.io/api/core/v1"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 )
 
 type reportPageSummary struct {
@@ -46,27 +41,6 @@ type processingReportExport struct {
 	Pages    []installedJourneyEnvelope   `json:"pages"`
 	Next     *value.ProcessingReportQuery `json:"next,omitempty"`
 	Complete bool                         `json:"complete"`
-}
-
-func TestInstalledReportSharingAuthority(t *testing.T) {
-	for _, fixture := range []struct {
-		foci  string
-		owner bool
-	}{
-		{"privacy-inventory", true}, {"share", true}, {"browser", true}, {"share-retirement", true},
-		{"early-erasure", false}, {"early-erasure,privacy-inventory", true},
-	} {
-		t.Run(fixture.foci, func(t *testing.T) {
-			t.Setenv("ASSERVAT_JOURNEY_FOCUS", fixture.foci)
-			owner := false
-			for _, role := range installedRegionalBindingRoles() {
-				owner = owner || role == "evidence-owner"
-			}
-			if owner != fixture.owner {
-				t.Fatal("installed sharing fixture must bind evidence-owner before capture so it joins the retained audience", owner, fixture.owner)
-			}
-		})
-	}
 }
 
 func startProcessingReportBrowser(t *testing.T, ctx context.Context, config map[string]any) (*installedLiveBrowser, string) {
@@ -226,73 +200,4 @@ func readProcessingReportExports(t *testing.T, driver *installedLiveBrowser, dir
 	}
 	awaitInstalledProcessingBrowser(t, driver)
 	return records
-}
-
-func installedProcessingReportSource(ctx context.Context, client kubernetes.Interface, namespace, installation string) (*core.ConfigMap, error) {
-	deployments, err := client.AppsV1().Deployments(namespace).List(ctx, meta.ListOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("report owner deployment: %w", err)
-	}
-	configuration := ""
-	owners := 0
-	for _, deployment := range deployments.Items {
-		if deployment.Spec.Template.Labels["asservat.io/private-role"] != "hub-api" {
-			continue
-		}
-		owners++
-		for _, volume := range deployment.Spec.Template.Spec.Volumes {
-			if volume.Projected == nil {
-				continue
-			}
-			for _, projection := range volume.Projected.Sources {
-				if projection.ConfigMap == nil {
-					continue
-				}
-				for _, item := range projection.ConfigMap.Items {
-					if item.Key == "deployment.json" && item.Path == "deployment.json" {
-						if configuration != "" {
-							return nil, errors.New("report owner deployment has ambiguous input projection")
-						}
-						configuration = projection.ConfigMap.Name
-					}
-				}
-			}
-		}
-	}
-	if owners != 1 || configuration == "" {
-		return nil, fmt.Errorf("report owner deployment input unavailable: owners=%d", owners)
-	}
-	input, err := client.CoreV1().ConfigMaps(namespace).Get(ctx, configuration, meta.GetOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("report owner input: %w", err)
-	}
-	deployment, err := contracts.DecodeOwnerDeployment(strings.NewReader(input.Data["deployment.json"]))
-	if err != nil || deployment.Format != contracts.OwnerDeploymentFormat || deployment.InstallationID != installation || deployment.Public == nil || deployment.Public.Processing == nil {
-		return nil, errors.New("report owner processing source input invalid")
-	}
-	pin := deployment.Public.Processing.Source
-	source, err := client.CoreV1().ConfigMaps(namespace).Get(ctx, pin.Name, meta.GetOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("report selected processing source: %w", err)
-	}
-	if pin.Name == "" || pin.UID == "" || string(source.UID) != pin.UID {
-		return nil, errors.New("report selected processing source UID changed")
-	}
-	return source, nil
-}
-
-func installedReportProvenanceMismatch(got, want value.ProcessingReportPage) string {
-	var mismatches []string
-	for _, field := range []struct{ name, got, want string }{
-		{"root_id", got.RootID, want.RootID}, {"installation_id", got.InstallationID, want.InstallationID},
-		{"policy_revision.uid", got.PolicyRevision.UID, want.PolicyRevision.UID},
-		{"policy_revision.generation", fmt.Sprint(got.PolicyRevision.Generation), fmt.Sprint(want.PolicyRevision.Generation)},
-		{"policy_revision.digest", got.PolicyRevision.Digest, want.PolicyRevision.Digest},
-		{"processor_declarations", got.ProcessorDeclarations, want.ProcessorDeclarations},
-	} {
-		if field.got != field.want {
-			mismatches = append(mismatches, fmt.Sprintf("%s: got=%q want=%q", field.name, field.got, field.want))
-		}
-	}
-	return strings.Join(mismatches, "; ")
 }

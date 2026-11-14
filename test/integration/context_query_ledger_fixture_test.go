@@ -1,6 +1,14 @@
 package integration
 
 import (
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"crypto/tls"
+	"encoding/json"
+	"testing"
+	"time"
+
 	"asservat.local/asservat/internal/adapters/diagnostics"
 	"asservat.local/asservat/internal/adapters/packets"
 	"asservat.local/asservat/internal/adapters/syscalls"
@@ -8,14 +16,7 @@ import (
 	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/execution"
-	"bytes"
-	"context"
-	"crypto/sha256"
-	"crypto/tls"
-	"encoding/json"
 	pprof "github.com/google/pprof/profile"
-	"testing"
-	"time"
 
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"

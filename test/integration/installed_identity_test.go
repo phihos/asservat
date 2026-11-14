@@ -44,37 +44,6 @@ type installedIdentity struct {
 	MCPClientID, MCPScope, DownloadsScope                          string
 }
 
-// installedConsoleScopes produces the actual owned Keycloak console input.
-func installedConsoleScopes() []string {
-	// evidence:share is a default console scope so the browser can share (ADR-232 console).
-	scopes := []string{"basic", "evidence:read", "evidence:download", "evidence:capture", "evidence:share"}
-	if installedJourneyFocus() == "manual-raw" || installedJourneyFocus() == "manual-arguments" || installedLogsFocus() {
-		scopes = append(scopes, "evidence:raw")
-	}
-	if installedRecordingFocus() || installedLogsFocus() {
-		scopes = append(scopes, "acr")
-	}
-	return scopes
-}
-
-// reopenInstalledIdentity attaches to the realm a keep run created
-// (development-only focus rerun); it creates nothing.
-func reopenInstalledIdentity(t *testing.T, f fixture, reviewer string) *installedIdentity {
-	t.Helper()
-	id := f.Identity
-	roots := x509.NewCertPool()
-	if id == nil || !roots.AppendCertsFromPEM([]byte(id.RootCA)) {
-		t.Fatal("kept Keycloak unavailable")
-	}
-	kc := &kcFixture{t: t, base: id.Base, Issuer: id.Base + "/realms/asservat", AdminUser: id.AdminUser, AdminPassword: id.AdminPassword, UserPassword: id.UserPassword}
-	kc.http = &http.Client{Timeout: 5 * time.Second, Transport: &http.Transport{Proxy: nil, TLSClientConfig: &tls.Config{RootCAs: roots, MinVersion: tls.VersionTLS12}}, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-	kc.admin = kc.tokens(kc.base+"/realms/master/protocol/openid-connect/token", url.Values{"grant_type": {"password"}, "client_id": {"admin-cli"}, "username": {kc.AdminUser}, "password": {kc.AdminPassword}}, 200).Access
-	return &installedIdentity{kc: kc, Issuer: kc.Issuer, RootPEM: id.RootCA, ReviewerSubject: reviewer}
-}
-
-// installedUnrelatedGroup is eligible for sign-in but named by no AccessBinding.
-const installedUnrelatedGroup = "synthetic-unrelated-group"
-
 // unrelated returns the same realm's outsider user with its own HTTP client.
 func (i *installedIdentity) unrelated() *installedIdentity {
 	kc, client := *i.kc, *i.kc.http
@@ -103,12 +72,6 @@ func (i *installedIdentity) downloadResourceScope() string {
 		return i.DownloadsScope
 	}
 	return installedDownloadsScope
-}
-func (i *installedIdentity) usersGroup() string {
-	if i.UsersGroupID != "" {
-		return i.UsersGroupID
-	}
-	return installedIdentityGroup
 }
 
 // downloadToken returns the same client's access token for the download
@@ -324,11 +287,4 @@ func (i *installedIdentity) initializeProcessing(t *testing.T, ctx context.Conte
 		case <-time.After(2 * time.Second):
 		}
 	}
-}
-
-// Raw query inspection is a distinct OAuth session; it has no capture or native-download scope.
-func (i *installedIdentity) packetQueryTokenSource(origin string) *installedJourneyTokenSource {
-	return &installedJourneyTokenSource{issuer: i.Issuer, clientID: i.mcpClient(), resource: strings.TrimSuffix(origin, "/") + "/mcp", now: time.Now, approvedOnly: true, packetQueryOnly: true, login: func() kcTokens {
-		return i.kc.loginScopes(i.mcpClient(), "openid evidence:read evidence:raw "+i.mcpResourceScope())
-	}, refresh: func(token string) kcTokens { return i.kc.refresh(i.mcpClient(), token, http.StatusOK) }}
 }

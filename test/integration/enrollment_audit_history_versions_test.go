@@ -1,13 +1,14 @@
 package integration
 
 import (
-	"asservat.local/asservat/internal/adapters/postgres"
-	value "asservat.local/asservat/internal/domain/fleet"
 	"context"
 	"errors"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/adapters/postgres"
+	value "asservat.local/asservat/internal/domain/fleet"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // This runs after actual provider signing, encrypted S3 audit and SQL activation.
