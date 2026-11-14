@@ -157,6 +157,13 @@ func (d *OwnerDeployment) nativeConfiguration(ctx context.Context, pool *pgxpool
 	if err != nil {
 		return nil, err
 	}
+	// mode=combined: the hub cluster is also a capture target; its topology
+	// names the hub retention source only and is served in process.
+	if d.inputs.offer != nil {
+		if err = topologies.AddHubTopology(observer, c.PermissionRootID); err != nil {
+			return nil, &fixedStepError{"local-cluster-topology", err}
+		}
+	}
 	retention, err := postgres.NewRetentionTransactionGuard(c.PermissionRootID, topologies)
 	if err != nil {
 		return nil, err

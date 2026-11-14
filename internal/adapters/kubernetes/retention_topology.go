@@ -2,6 +2,7 @@ package kubernetes
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"slices"
@@ -10,6 +11,7 @@ import (
 
 	port "asservat.local/asservat/internal/application/configuration"
 	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
@@ -37,7 +39,7 @@ type RetentionTopologyPin struct {
 	TargetClusterID, Name string
 }
 type RetentionTopologies struct {
-	readers map[string]*RetentionTopologyClient
+	readers map[string]port.RetentionTopologyReader
 }
 
 var _ port.RetentionTopologyReader = (*RetentionTopologies)(nil)
@@ -47,7 +49,7 @@ func NewRetentionTopologies(client *PermissionClient, root string, pins []Retent
 	if pins == nil || len(pins) > 1024 {
 		return nil, value.ErrInvalid
 	}
-	out := &RetentionTopologies{readers: make(map[string]*RetentionTopologyClient, len(pins))}
+	out := &RetentionTopologies{readers: make(map[string]port.RetentionTopologyReader, len(pins))}
 	names := map[string]bool{}
 	for _, p := range pins {
 		if out.readers[p.TargetClusterID] != nil || names[p.Name] {
@@ -68,6 +70,41 @@ func (r *RetentionTopologies) RetentionTopology(ctx context.Context, target stri
 		return privacy.PolicyTopology{}, value.ErrDenied
 	}
 	return reader.RetentionTopology(ctx, target)
+}
+
+// AddHubTopology serves the hub cluster's own topology in process
+// (mode=combined): its only source is the hub retention source the hub-worker
+// observes in the release namespace (contracts.RetentionSourceDigest). A
+// ConfigMap pin for the same target is refused.
+func (r *RetentionTopologies) AddHubTopology(client *PermissionClient, root string) error {
+	if r == nil || client == nil || !authorization.UUID(root) || r.readers[client.clusterID] != nil {
+		return value.ErrInvalid
+	}
+	hub := privacy.PolicySourceRef{ClusterID: client.clusterID, ControlNamespaceUID: client.control.UID, Hub: true, ProtectionDigest: artifact.Digest(contracts.RetentionSourceDigest(client.clusterID, client.control.Name))}
+	if !port.ValidRetentionSource(hub) {
+		return value.ErrInvalid
+	}
+	r.readers[client.clusterID] = hubTopology{client: client, root: root, hub: hub}
+	return nil
+}
+
+type hubTopology struct {
+	client *PermissionClient
+	root   string
+	hub    privacy.PolicySourceRef
+}
+
+func (h hubTopology) RetentionTopology(ctx context.Context, target string) (privacy.PolicyTopology, error) {
+	if ctx == nil || ctx.Err() != nil || target != h.client.clusterID {
+		return privacy.PolicyTopology{}, value.ErrDenied
+	}
+	start := h.client.now()
+	digest := sha256.Sum256([]byte("asservat-hub-topology/v1\x00" + h.root + "\x00" + h.client.clusterID + "\x00" + h.client.control.UID))
+	out := privacy.PolicyTopology{RootID: h.root, TargetClusterID: target, Revision: identity.Revision{UID: h.client.control.UID, Generation: 1, Digest: digest}, Sources: []privacy.PolicySourceRef{h.hub}, ObservedAt: start, FreshUntil: start.Add(privacy.PolicyTopologyInterval)}
+	if !out.Valid(h.client.now()) {
+		return privacy.PolicyTopology{}, value.ErrUnavailable
+	}
+	return out, nil
 }
 
 func NewRetentionTopologyClient(client *PermissionClient, name, root, target string) (*RetentionTopologyClient, error) {
