@@ -278,7 +278,7 @@ func (s *PolicyTriggers) RecordOccurrence(ctx context.Context, o value.PolicyOcc
 	}))
 }
 
-// ActivePolicies lists at most 64 policies to poll. Listing confers nothing:
+// ActivePolicies lists the policies to poll. Listing confers nothing:
 // each tick re-reads the source and the current accepted authority.
 func (s *PolicyTriggers) ActivePolicies(ctx context.Context) ([]value.ActivePolicy, error) {
 	var out []value.ActivePolicy
@@ -286,9 +286,6 @@ func (s *PolicyTriggers) ActivePolicies(ctx context.Context) ([]value.ActivePoli
 		rows, err := q.ListActivePolicies(ctx, id(s.root))
 		if err != nil {
 			return err
-		}
-		if len(rows) > 64 {
-			return value.ErrCapacity
 		}
 		out = make([]value.ActivePolicy, 0, len(rows))
 		for _, r := range rows {
@@ -496,18 +493,6 @@ func (s *PolicyTriggers) WorkloadDelegation(ctx context.Context, target authoriz
 		return identity.Revision{}, captureError(err)
 	}
 	return out, nil
-}
-
-// ActiveClusterPolicies counts the other accepted, unexpired policies whose
-// workload is in the cluster (the per-cluster polling bound).
-func (s *PolicyTriggers) ActiveClusterPolicies(ctx context.Context, cluster, except string) (int64, error) {
-	var out int64
-	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		var err error
-		out, err = q.CountActiveClusterPolicies(ctx, custodydb.CountActiveClusterPoliciesParams{RootID: id(s.root), PolicyUid: except, Column3: cluster})
-		return err
-	})
-	return out, captureError(err)
 }
 
 // AcceptanceByNonce returns the immutable acceptance of an earlier

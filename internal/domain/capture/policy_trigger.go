@@ -16,16 +16,14 @@ import (
 // StatefulSet fires the pod-status context diagnostic on the triggering Pod.
 // Every other detector, action or option is rejected with its field path.
 
-// WorkloadTriggerInterval and WorkloadTriggerBurst are the installation-wide
-// trigger budget of one workload (REQ-TRG-004 default): one occurrence per
-// five minutes with a burst of two, shared by every policy on the workload.
+// WorkloadTriggerInterval and WorkloadTriggerBurst are the workload rate
+// limit (REQ-CAP-001 defaults): one token bucket with a burst of one and one
+// occurrence per 900 seconds, shared by every policy on the workload.
 const (
-	WorkloadTriggerInterval = 5 * time.Minute
-	WorkloadTriggerBurst    = 2
+	WorkloadTriggerInterval = 900 * time.Second
+	WorkloadTriggerBurst    = 1
 	// TriggerPollInterval is the restart poll period of one active policy.
 	TriggerPollInterval = 15 * time.Second
-	// MaxActivePoliciesPerCluster bounds polling queries per workload cluster.
-	MaxActivePoliciesPerCluster = 16
 )
 
 // RestartPolicy is the compiled, accepted subset. It contains configuration
@@ -169,7 +167,7 @@ func (p RestartPolicy) Valid() bool {
 	if p.Recorder != nil && !p.Recorder.Valid() || p.GrantRef != "" && !authorization.UUID(p.GrantRef) {
 		return false
 	}
-	if !authorization.UUID(p.ClusterID) || !identity.Text(p.Namespace, 63) || (p.WorkloadKind != "Deployment" && p.WorkloadKind != "StatefulSet") || !identity.Text(p.WorkloadName, 253) || p.Interval < time.Second || p.Interval > 24*time.Hour || p.Burst < 1 || p.Burst > 10 || p.RetentionSeconds < 1 || p.RetentionSeconds > privacy.MaxAgeSeconds || p.ObservedPods < 1 || p.ObservedPods > targets.MaxRestartPods {
+	if !authorization.UUID(p.ClusterID) || !identity.Text(p.Namespace, 63) || (p.WorkloadKind != "Deployment" && p.WorkloadKind != "StatefulSet") || !identity.Text(p.WorkloadName, 253) || p.Interval < time.Second || p.Burst < 1 || p.RetentionSeconds < 1 || p.RetentionSeconds > privacy.MaxAgeSeconds || p.ObservedPods < 1 || p.ObservedPods > targets.MaxRestartPods {
 		return false
 	}
 	if p.Detector != DetectorAlert && len(p.AlertLabels) != 0 || p.Sharing != nil && !p.Sharing.Valid() || (p.Detector == DetectorLog) != (p.Log != nil) || (p.Detector == DetectorResource) != (p.Resource != nil) {

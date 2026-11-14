@@ -832,6 +832,14 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 		}
 		return n
 	}
+	// refill ages every token bucket of the root by a day, as if the workload
+	// rate limit (burst one) had refilled.
+	refill := func(t *testing.T, s setup) {
+		t.Helper()
+		if _, err := admin.Exec(ctx, `UPDATE policy_workload_window SET tat=tat-interval '1 day' WHERE root_id=$1`, s.input.RootID); err != nil {
+			t.Fatal(err)
+		}
+	}
 	t.Run("restart-trigger-baseline-replay-and-concurrent-duplicates", func(t *testing.T) {
 		s, l := activeTrigger(t)
 		a := custodyID()
@@ -846,6 +854,7 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 			t.Fatal("replayed poll fired", again)
 		}
 		// Concurrent duplicate polls of the next restart: one occurrence.
+		refill(t, s)
 		var wg sync.WaitGroup
 		results := make(chan int, 4)
 		o := observed(s, pod(a, 3))
@@ -917,20 +926,20 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 		a, b, c := custodyID(), custodyID(), custodyID()
 		tick(t, s, l, observed(s, pod(a, 1), pod(b, 1), pod(c, 1)))
 		// Three Pods restart in one poll, one of them three times: the shared
-		// burst of two admits two; the rest are one cooldown and two coalesced.
+		// burst of one admits one; the rest are two cooldowns and two coalesced.
 		got := tick(t, s, l, observed(s, pod(a, 2), pod(b, 2), pod(c, 4)))
-		if len(got) != 2 || suppressed(t, s, "cooldown") != 1 || suppressed(t, s, "coalesced") < 2 {
+		if len(got) != 1 || suppressed(t, s, "cooldown") != 2 || suppressed(t, s, "coalesced") < 2 {
 			t.Fatal("burst", len(got), suppressed(t, s, "cooldown"), suppressed(t, s, "coalesced"))
 		}
 		var rows int64
 		if err := admin.QueryRow(ctx, `SELECT count(*) FROM policy_suppression WHERE root_id=$1 AND policy_uid=$2`, s.input.RootID, s.input.Authority.PolicyUID).Scan(&rows); err != nil || rows != 2 {
 			t.Fatal("one suppression row per reason", rows, err)
 		}
-		if got = tick(t, s, l, observed(s, pod(a, 3), pod(b, 3), pod(c, 5))); len(got) != 0 || suppressed(t, s, "cooldown") != 4 {
+		if got = tick(t, s, l, observed(s, pod(a, 3), pod(b, 3), pod(c, 5))); len(got) != 0 || suppressed(t, s, "cooldown") != 5 {
 			t.Fatal("window did not hold", len(got), suppressed(t, s, "cooldown"))
 		}
-		// Ten minutes later (shifted in SQL) both budgets have refilled.
-		if _, err := admin.Exec(ctx, `UPDATE policy_workload_window SET tat=tat-interval '10 minutes' WHERE root_id=$1`, s.input.RootID); err != nil {
+		// Fifteen minutes later (shifted in SQL) both budgets have refilled.
+		if _, err := admin.Exec(ctx, `UPDATE policy_workload_window SET tat=tat-interval '15 minutes' WHERE root_id=$1`, s.input.RootID); err != nil {
 			t.Fatal(err)
 		}
 		if got = tick(t, s, l, observed(s, pod(a, 4), pod(b, 3), pod(c, 5))); len(got) != 1 || got[0].PodUID != a {
@@ -939,10 +948,14 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 		// A second policy on the same workload shares the workload budget.
 		second, l2 := sibling(t, s, s.input.Authority.WorkloadUID, "second-policy", 77)
 		tick(t, second, l2, observed(second, pod(a, 4)))
-		if got := tick(t, second, l2, observed(second, pod(a, 5))); len(got) != 1 {
+		if got := tick(t, second, l2, observed(second, pod(a, 5))); len(got) != 0 {
+			t.Fatal("second policy refilled the spent workload budget", got)
+		}
+		refill(t, s)
+		if got := tick(t, second, l2, observed(second, pod(a, 6))); len(got) != 1 {
 			t.Fatal("second policy within the shared burst", got)
 		}
-		if got := tick(t, second, l2, observed(second, pod(a, 6))); len(got) != 0 {
+		if got := tick(t, second, l2, observed(second, pod(a, 7))); len(got) != 0 {
 			t.Fatal("two policies multiplied the workload budget", got)
 		}
 	})
@@ -994,7 +1007,7 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 			neighbour = got
 		}()
 		wg.Wait()
-		if admitted != 2 || suppressed(t, s, "cooldown") < 1 {
+		if admitted != 1 || suppressed(t, s, "cooldown") < 1 {
 			t.Fatal("storm not held to the workload burst", admitted, suppressed(t, s, "cooldown"))
 		}
 		if len(neighbour) != 1 || neighbour[0].PodUID != quiet {
@@ -1010,7 +1023,7 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 		}
 		// Bounded storm state: occurrences = spend = burst, at most one row per
 		// suppression reason and one watermark per Pod, after 3 Pods x 9 polls.
-		if o, r, w, sp := counts(s); o != 2 || sp != 2 || r > 2 || w != int64(len(stormPods)) {
+		if o, r, w, sp := counts(s); o != 1 || sp != 1 || r > 2 || w != int64(len(stormPods)) {
 			t.Fatal("storm rows", o, r, w, sp)
 		}
 		if o, r, w, sp := counts(n); o != 1 || sp != 1 || r != 0 || w != 1 {
@@ -1067,6 +1080,7 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 			t.Fatal("rising edge", got)
 		}
 		// Concurrent duplicate polls of b's rising edge: one occurrence.
+		refill(t, s)
 		var wg sync.WaitGroup
 		results := make(chan int, 4)
 		o := observed(s, failing(a, 3, t0+110), failing(b, 2, t0+105))
@@ -1249,12 +1263,13 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 			t.Fatal("log occurrence with a restart-count key stored")
 		}
 		// Switching to resource re-baselines: a condition already true waits
-		// for a known false sample; the next true sample fires (the second
-		// token of the shared workload burst).
+		// for a known false sample; the next true sample fires once the
+		// shared workload bucket has refilled.
 		if got := levelTick(resources, level(a, 1, t0+30)); len(got) != 0 {
 			t.Fatal("detector switch fired", got)
 		}
 		levelTick(resources, level(a, 0, 0))
+		refill(t, s)
 		if got = levelTick(resources, level(a, 1, t0+60)); len(got) != 1 || got[0].Restarts != t0+60 {
 			t.Fatal("resource rising edge", got)
 		}

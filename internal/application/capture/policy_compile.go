@@ -233,10 +233,10 @@ func compilePolicy(ctx context.Context, catalogTarget targets.Request, spec []by
 		return reject(".budgets", "invalid")
 	}
 	cooldown, ok := policyDuration(budgets.Cooldown)
-	if !ok || cooldown > 24*time.Hour {
+	if !ok {
 		return reject(".budgets.cooldown", "invalid duration")
 	}
-	if budgets.Burst < 1 || budgets.Burst > 10 || budgets.MaxOccurrencesPerHour < 1 || budgets.MaxConcurrentActions < 1 {
+	if budgets.Burst < 1 || budgets.MaxOccurrencesPerHour < 1 || budgets.MaxConcurrentActions < 1 {
 		return reject(".budgets", "invalid")
 	}
 	out.Interval, out.Burst = max(cooldown, time.Hour/time.Duration(budgets.MaxOccurrencesPerHour), time.Second), budgets.Burst

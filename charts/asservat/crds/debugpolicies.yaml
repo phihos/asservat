@@ -210,8 +210,7 @@
                       },
                       "burst": {
                         "type": "integer",
-                        "minimum": 1,
-                        "maximum": 10
+                        "minimum": 1
                       },
                       "maxOccurrencesPerHour": {
                         "type": "integer",

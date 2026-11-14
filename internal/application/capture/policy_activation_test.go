@@ -79,9 +79,6 @@ func (f *activationFixture) Delegation(context.Context, authorization.Target) (i
 	}
 	return f.delegation, nil
 }
-func (f *activationFixture) ActiveClusterPolicies(context.Context, string, string) (int64, error) {
-	return 0, nil
-}
 func (f *activationFixture) AcceptanceByNonce(context.Context, string) (value.PolicyAcceptance, bool, error) {
 	if f.previous != nil {
 		return *f.previous, true, nil
