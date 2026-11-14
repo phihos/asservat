@@ -40,18 +40,6 @@ func observationOperationConnection(s *tls.ConnectionState, r value.OwnerObserva
 	return out, nil
 }
 
-func connectorOperationReplyWire(v value.ConnectorObservationOperationValue, p value.ConnectorObservationPin, now time.Time) (contracts.ConnectorObservationOperationReply, error) {
-	var zero contracts.ConnectorObservationOperationReply
-	n := v.Native
-	pin, e := connectorObservationPinDigest(p)
-	if e != nil || !v.Matches(p, n.Request, n.Ordinal, now) {
-		return zero, value.ErrDenied
-	}
-	f := func(t time.Time) string { return t.UTC().Format(time.RFC3339Nano) }
-	s, w := n.Source.Observation, n.Workload
-	return contracts.ConnectorObservationOperationReply{Format: contracts.ConnectorObservationOperationFormat, Request: observationOperationRequestWire(n.Request), Ordinal: n.Ordinal, BracketID: v.BracketID, ConnectionBinding: ownerObservationHex(v.ConnectionBinding), ConnectorLeaf: ownerObservationHex(v.Certificate.Digest), PinDigest: ownerObservationHex(pin), PodUID: w.Process.PodUID, ProcessEpoch: w.Process.ProcessEpoch, Pod: w.Pod, ReplicaSetUID: w.ReplicaSetUID, Configuration: contracts.APIContextRevision{UID: s.Profile.Revision.UID, Generation: s.Profile.Revision.Generation, Digest: ownerObservationHex(s.Profile.Revision.Digest)}, BackingRevision: s.Backing.Revision, BackingDigest: ownerObservationHex(s.Backing.Digest), SourceDigest: ownerObservationHex(s.Backing.SourceDigest), NativeStartedAt: f(n.NativeStartedAt), NativeUntil: f(n.NativeUntil), ValueObservedAt: f(n.ValueObservedAt), SourceFreshUntil: f(s.FreshUntil), WorkloadDigest: ownerObservationHex(w.WorkloadDigest), WorkloadFreshUntil: f(w.FreshUntil), Final: n.Final}, nil
-}
-
 func parseConnectorOperationReply(w contracts.ConnectorObservationOperationReply, p value.ConnectorObservationPin, leaf value.ConnectorCredentialCertificate, request value.OwnerObservationRequest, ordinal int, channel artifact.Digest, now time.Time) (value.ConnectorObservationOperationValue, error) {
 	var zero value.ConnectorObservationOperationValue
 	pin, e := connectorObservationPinDigest(p)

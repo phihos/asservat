@@ -1,7 +1,6 @@
 package contracts
 
 import (
-	"io"
 	"strings"
 	"time"
 )
@@ -9,10 +8,7 @@ import (
 const PermissionDeploymentFormat = "asservat-permission-deployment/v1"
 const PermissionDeploymentFile = "permission-deployment.json"
 const PermissionWorkerProjectionDirectory = "permission"
-const PermissionDeploymentMaxBytes = 64 << 10
-const PermissionCredentialManifestFormat = "asservat-permission-credentials/v1"
 const PermissionCredentialManifestFile = "permission-roles.json"
-const PermissionCredentialManifestMaxBytes = 16 << 10
 
 // PermissionRuntimeProjectionName is derived only from a separately validated
 // installation UUID; callers still verify the original journal receipt.
@@ -126,11 +122,6 @@ type RetentionDeployment struct {
 	Guard OwnerDeploymentGuard `json:"guard"`
 }
 
-// RetentionStatusUser is the retention guard's only status user (ADR-195 D1).
-// No built-in Kubernetes authenticator issues it; the hub-worker's probe
-// account must not be a status user, so it cannot be the hub-worker.
-const RetentionStatusUser = "system:asservat:retention-status-unused"
-
 // RetentionGuardName is the installer-applied retention admission policy and
 // binding (ADR-195).
 func RetentionGuardName(installationID string) string {
@@ -176,16 +167,6 @@ type PermissionWorkload struct {
 	UID  string `json:"uid"`
 }
 
-// Only the two permission logins are projected (ADR-189), with the retention
-// (ADR-195) and worker configuration (ADR-204) logins of present sections.
-type PermissionCredentialManifest struct {
-	Format  string                         `json:"format"`
-	Input   PublicRuntimeRoles             `json:"input"`
-	RootUID string                         `json:"rootUID"`
-	SetupID string                         `json:"setupID"`
-	Roles   []PublicRuntimeCredentialProof `json:"roles"`
-}
-
 // PermissionRuntimeProjectionClaim belongs to the original resource journal,
 // like the capacity claim. PublicDigest covers public configuration only.
 type PermissionRuntimeProjectionClaim struct {
@@ -202,11 +183,4 @@ type PermissionRuntimeProjectionReceipt struct {
 	Secret          WorkerObjectReference `json:"secret"`
 	ResourceVersion string                `json:"resourceVersion"`
 	ObservedAt      time.Time             `json:"observedAt"`
-}
-
-func DecodePermissionDeployment(r io.Reader) (PermissionDeployment, error) {
-	return decodeClosedRPC[PermissionDeployment](r, PermissionDeploymentMaxBytes)
-}
-func DecodePermissionCredentialManifest(r io.Reader) (PermissionCredentialManifest, error) {
-	return decodeClosedRPC[PermissionCredentialManifest](r, PermissionCredentialManifestMaxBytes)
 }

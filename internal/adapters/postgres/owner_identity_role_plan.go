@@ -1,8 +1,6 @@
 package postgres
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"slices"
 	"strconv"
 	"strings"
@@ -107,22 +105,4 @@ func ownerIdentityDutyGrants(purpose string) ([]publicRuntimeGrant, bool) {
 func ownerIdentityGrantSet(out []publicRuntimeGrant) []publicRuntimeGrant {
 	slices.SortFunc(out, func(a, b publicRuntimeGrant) int { return strings.Compare(a.key(), b.key()) })
 	return slices.CompactFunc(out, func(a, b publicRuntimeGrant) bool { return a == b })
-}
-
-func OwnerIdentityRoleLayoutDigest() string {
-	h := sha256.New()
-	h.Write([]byte("asservat-owner-identity-role-layout/v1\x00login:noinherit:nosuperuser:nocreatedb:nocreaterole:noreplication:nobypassrls:connections=" + strconv.Itoa(contracts.OwnerIdentityRoleConnections) + "\x00"))
-	for _, purpose := range contracts.OwnerIdentityRolePurposes() {
-		n, _ := contracts.OwnerIdentityRoleOrdinal(purpose)
-		h.Write([]byte(strconv.Itoa(n) + ":" + purpose + "\x00"))
-		grants, _ := ownerIdentityRoleGrants(purpose)
-		for _, g := range grants {
-			h.Write([]byte(g.key() + "\x00"))
-		}
-	}
-	h.Write([]byte("identity-projection\x00" + contracts.OwnerIdentityRoleManifestFile + "\x00"))
-	for _, purpose := range contracts.OwnerIdentityRolePurposes() {
-		h.Write([]byte("sql-" + purpose + ".json\x00"))
-	}
-	return hex.EncodeToString(h.Sum(nil))
 }

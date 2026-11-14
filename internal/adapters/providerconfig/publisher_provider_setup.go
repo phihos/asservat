@@ -58,24 +58,6 @@ func publisherVerifierPKIRole(installation string) (json.RawMessage, error) {
 	})
 }
 
-// requests are the create-only writes the applier performs for the publisher.
-func (s PublisherProviderSetup) requests(in contracts.PublisherDeployment) ([]ownerProviderSetupRequest, error) {
-	p := s.Authentication.Profile
-	var out []ownerProviderSetupRequest
-	for _, role := range s.Authentication.Roles {
-		body, err := ownerProviderCanonical(struct {
-			Policy string `json:"policy"`
-		}{string(role.Policy)})
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, ownerProviderSetupRequest{Method: "POST", Path: "sys/policies/acl/" + role.Name, Body: body},
-			ownerProviderSetupRequest{Method: "POST", Path: "auth/" + p.AuthMount + "/role/" + role.Name, Body: role.Role})
-	}
-	out = append(out, ownerProviderSetupRequest{Method: "POST", Path: in.Verifier.PKIMount + "/roles/" + s.PKIRole.Name, Body: s.PKIRole.Role})
-	return append(out, ownerProviderSetupRequest{Method: "POST", Path: in.AuditKeys.Mount + "/keys/" + in.AuditKeys.Key, Body: s.TransitKey}), nil
-}
-
 // publisherSetupPaths are the named paths the inspection token may read.
 func publisherSetupPaths(in contracts.PublisherDeployment, s PublisherProviderSetup) []string {
 	paths := setupNamedPaths(s.Authentication.Profile.AuthMount, in.AuditKeys.Mount, in.AuditKeys.Key, s.Authentication.Roles[:])

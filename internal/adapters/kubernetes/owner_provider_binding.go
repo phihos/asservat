@@ -1,7 +1,6 @@
 package kubernetes
 
 import (
-	"asservat.local/asservat/internal/adapters/providerconfig"
 	"asservat.local/asservat/internal/contracts"
 )
 
@@ -57,43 +56,4 @@ func initialRuntimeProviderUIDsDistinct(v contracts.InitialRuntimeResourceState)
 		return false
 	}
 	return true
-}
-
-func ownerProviderSelectionFromProfile(p contracts.OwnerProviderAuthentication) contracts.OwnerProviderSelection {
-	return contracts.OwnerProviderSelection{AuthMount: p.AuthMount, AuthMountAccessor: p.AuthMountAccessor, AuditCredentials: p.AuditCredentials}
-}
-
-// Historical shape checks use the original public root's instant; they cannot
-// extend it or establish current provider/native authority. Runtime validates
-// roots and the exact installed setup again before control/effects.
-func ownerProviderActivationSelectionBound(input contracts.OwnerDeployment, a contracts.OwnerIdentityActivation) bool {
-	p := input.ProviderAuthentication
-	switch a.Input.OwnerLayout {
-	case contracts.OwnerInstalledLayout:
-		return p == nil
-	case contracts.OwnerProviderInstalledLayout:
-		return p != nil && p.ServiceAccount == a.Input.ServiceAccount &&
-			providerconfig.ValidateOwnerProviderSelection(a.Input.InstallationID, ownerProviderSelectionFromProfile(*p)) == nil &&
-			providerconfig.ValidateOwnerProviderAuthentication(input, *p, a.ResourcesCreatedAt) == nil
-	default:
-		return false
-	}
-}
-
-func ownerProviderJournalBound(input contracts.OwnerDeployment, a contracts.OwnerIdentityActivation, v contracts.InitialRuntimeResourceState) bool {
-	if v.OwnerLayout != a.Input.OwnerLayout || v.OwnerLayout == "" || !initialRuntimeProviderSelectionValid(input.InstallationID, v.WorkerLayout, v.OwnerLayout, v.WorkerProvider, v.OwnerProvider) || !ownerProviderActivationSelectionBound(input, a) {
-		return false
-	}
-	if v.OwnerLayout == contracts.OwnerProviderInstalledLayout {
-		return *v.OwnerProvider == ownerProviderSelectionFromProfile(*input.ProviderAuthentication) && ownerBootstrapDeploymentBound(input, v)
-	}
-	return true
-}
-
-func ownerIdentityProjectionKeys(input contracts.OwnerDeployment) []string {
-	keys := contracts.OwnerIdentityProjectionFiles()
-	if input.ProviderAuthentication == nil {
-		keys = append(keys, "audit-storage.json", "audit-wrap.token", "audit-unwrap.token", "owner-server-sign.token", "owner-client-sign.token")
-	}
-	return keys
 }

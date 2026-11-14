@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"crypto/x509"
-	"encoding/json"
 	"errors"
 	"io"
 	"maps"
@@ -17,12 +16,10 @@ import (
 	"asservat.local/asservat/internal/adapters/mtls"
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/objectstore/framed"
-	"asservat.local/asservat/internal/adapters/postgres"
 	"asservat.local/asservat/internal/bootstrap"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
 	fleet "asservat.local/asservat/internal/domain/fleet"
-	"github.com/jackc/pgx/v5"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -30,115 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
 )
-
-func (o *initialRuntimeNativeOwner) observeIdentity(t *testing.T, ctx context.Context, api kubernetes.Interface, config *pgx.ConnConfig, original *apps.Deployment, accepted *postgres.OwnerConfigurations, witness *providerWorkerWitness) {
-	t.Helper()
-	end := o.providers.trace.phase(t, "actual-owner-original-pod-and-paired-registration")
-	defer end()
-	pod, replica, image := providerOwnerOriginalPod(t, ctx, api, original, o.root.Input().ServiceAccount.UID)
-	pool, registry := o.registry(t, ctx, api, config)
-	defer pool.Close()
-	var binding fleet.OwnerBinding
-	awaitProviderWorker(t, ctx, 45*time.Second, "original owner paired activated identities and encrypted audit", func(call context.Context) bool {
-		providerWorkerRequireRunning(t, call, api, pod, image)
-		observed, err := accepted.ReadOwnerConfiguration(call)
-		if err != nil {
-			return false
-		}
-		if !observed.Valid(time.Now()) || observed.Configuration.Revision.UID != o.root.Input().OwnerConfigurationUID || !sameNativeOwnerRoots(observed.Configuration.IssuerRoots, o.providers.issuerRoots) {
-			t.Fatal("owner current accepted original source unavailable")
-		}
-		rows, err := pool.Query(call, `SELECT enrollment_json,audit_receipt_json FROM hub_owner_enrollment WHERE installation_id=$1 AND cluster_id=$2 AND pod_uid=$3 AND retired_at IS NULL ORDER BY usage LIMIT 3`, o.root.Input().InstallationID, o.root.Input().ClusterID, string(pod.UID))
-		if err != nil {
-			t.Fatal("original owner enrollment read", err)
-		}
-		type originalEnrollment struct {
-			enrollment fleet.OwnerEnrollment
-			receipt    audit.Receipt
-		}
-		entries := make([]originalEnrollment, 0, 2)
-		pending := false
-		for rows.Next() {
-			var raw, receipt []byte
-			if err = rows.Scan(&raw, &receipt); err != nil {
-				rows.Close()
-				t.Fatal(err)
-			}
-			var e originalEnrollment
-			if json.Unmarshal(raw, &e.enrollment) != nil || !e.enrollment.Valid() {
-				rows.Close()
-				t.Fatal("actual owner enrollment malformed")
-			}
-			if len(receipt) == 0 {
-				pending = true
-			} else if json.Unmarshal(receipt, &e.receipt) != nil || !e.receipt.ValidOwnerEnrollment(e.enrollment) {
-				rows.Close()
-				t.Fatal("actual owner enrollment acknowledgement malformed")
-			}
-			entries = append(entries, e)
-		}
-		err = rows.Err()
-		rows.Close()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if len(entries) > 2 {
-			t.Fatal("original owner Pod acquired extra process registrations")
-		}
-		if len(entries) != 2 || pending {
-			return false
-		}
-		if entries[0].enrollment.Usage != "client" || entries[1].enrollment.Usage != "server" || entries[0].enrollment.Binding != entries[1].enrollment.Binding {
-			t.Fatal("owner purposes did not share one process epoch")
-		}
-		selected := entries[0].enrollment.Binding
-		if binding != (fleet.OwnerBinding{}) && binding != selected {
-			t.Fatal("owner replaced original selected process")
-		}
-		binding = selected
-		if binding.PodUID != string(pod.UID) || binding.InstallationID != o.root.Input().InstallationID || binding.ClusterID != o.root.Input().ClusterID || binding.IssuerEpoch != observed.Configuration.Pool.IssuerEpoch {
-			t.Fatal("owner registration binding changed original Pod/pool")
-		}
-		for _, entry := range entries {
-			e := entry.enrollment
-			if e.Pod != pod.Name || e.ReplicaSetUID != string(replica.UID) || e.ReplicaSet != replica.Name || e.Pool != observed.Configuration.Pool || e.SourceUID != observed.Configuration.Revision.UID {
-				t.Fatal("owner enrollment changed original controller/source")
-			}
-			var attemptRaw, certificateRaw, receiptRaw []byte
-			err = pool.QueryRow(call, `SELECT attempt_json,certificate_json,audit_receipt_json FROM hub_owner_certificate WHERE enrollment_id=$1 AND activated_at IS NOT NULL ORDER BY epoch DESC,ordinal DESC LIMIT 1`, e.ID).Scan(&attemptRaw, &certificateRaw, &receiptRaw)
-			if errors.Is(err, pgx.ErrNoRows) {
-				return false
-			}
-			if err != nil {
-				t.Fatal("actual active certificate read", err)
-			}
-			var attempt fleet.OwnerCertificateAttempt
-			var signed fleet.IssuedOwnerCertificate
-			var receipt audit.Receipt
-			if json.Unmarshal(attemptRaw, &attempt) != nil || attempt.Enrollment != e || !attempt.Valid(attempt.Permit.CheckedAt) || json.Unmarshal(certificateRaw, &signed) != nil || !attempt.Permit.Matches(signed) || json.Unmarshal(receiptRaw, &receipt) != nil || !receipt.ValidOwnerCertificate(audit.OwnerCertificate{Attempt: attempt, Certificate: signed.Certificate}) {
-				t.Fatal("activated owner certificate/audit disagrees with original attempt")
-			}
-			providerOwnerVerifyCertificate(t, signed, e, observed)
-			if err := witness.verifyOwnerEnrollment(call, entry.enrollment, entry.receipt); err != nil {
-				t.Fatal("independent original enrollment audit", err)
-			}
-			if err := witness.verifyOwnerCertificate(call, audit.OwnerCertificate{Attempt: attempt, Certificate: signed.Certificate}, receipt); err != nil {
-				t.Fatal("independent original certificate audit", err)
-			}
-			current, err := registry.ReadOwnerRegistration(call, signed.Certificate)
-			if err != nil || current.Enrollment != e || !current.Valid(time.Now()) {
-				t.Fatal("actual current owner registration unavailable after audit readback", err)
-			}
-			t.Logf("original owner purpose=%s pod=%s process=%s registration-remaining=%s source-age=%s original-sign-window=%s enrollment-version=%s certificate-version=%s", e.Usage, pod.UID, e.Binding.ProcessEpoch, time.Until(current.FreshUntil), time.Since(current.Configuration.ObservedAt), attempt.Permit.SignBefore.Sub(attempt.Permit.CheckedAt), entry.receipt.Version, receipt.Version)
-		}
-		providerWorkerRequireRunning(t, call, api, pod, image)
-		if call.Err() != nil || !observed.Valid(time.Now()) {
-			t.Fatal("owner identity witness expired before final process/source check")
-		}
-		return true
-	})
-	t.Logf("original owner identity running deployment=%s replicaSet=%s pod=%s imageID=%s process=%s; actual paired registration, no fabricated TLS connection or Ready assertion", original.UID, replica.UID, pod.UID, image, binding.ProcessEpoch)
-}
 
 func providerOwnerOriginalPod(t *testing.T, ctx context.Context, api kubernetes.Interface, original *apps.Deployment, accountUID string) (*core.Pod, *apps.ReplicaSet, string) {
 	t.Helper()

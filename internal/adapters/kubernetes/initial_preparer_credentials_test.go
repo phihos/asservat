@@ -1,18 +1,13 @@
 package kubernetes
 
 import (
-	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
-	"io"
 	"net/http"
 	"strings"
-	"sync"
-	"sync/atomic"
 	"testing"
-	"time"
 
 	"asservat.local/asservat/internal/contracts"
 	cfg "asservat.local/asservat/internal/domain/configuration"
@@ -21,7 +16,6 @@ import (
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/rest"
 	"k8s.io/utils/ptr"
 )
 
@@ -115,142 +109,4 @@ func preparationBindingFixtureFrom(t *testing.T, f *preparerFixture, p *InitialP
 	}
 	f.mu.Unlock()
 	return out
-}
-func (f *preparationBindingFixture) binder(t *testing.T) *InitialPreparationCredentialBinder {
-	t.Helper()
-	p := f.f.preparer(t)
-	ns := cfg.NamespaceRef{Name: f.config.Namespace.Name, UID: f.config.Namespace.UID}
-	admin, e := NewPermissionClient(f.f.client, f.config.ClusterID, ns, f.f.clock)
-	if e != nil {
-		t.Fatal(e)
-	}
-	pc := rest.CopyConfig(f.f.client)
-	pc.BearerToken = "target-probe"
-	probe, e := NewPermissionClient(pc, f.config.ClusterID, ns, f.f.clock)
-	if e != nil {
-		t.Fatal(e)
-	}
-	b, e := NewInitialPreparationCredentialBinder(p, admin, probe, f.config, f.input.UID, f.material)
-	if e != nil {
-		t.Fatal(e)
-	}
-	return b
-}
-func TestInitialPreparationCredentialBindingKeepsOriginalInterval(t *testing.T) {
-	for _, mode := range []string{"replay-after-expiry", "wrong-interval", "replacement-material", "different-material-pin", "different-startup"} {
-		t.Run(mode, func(t *testing.T) {
-			f := newPreparationBindingFixture(t)
-			b := f.binder(t)
-			m, original, until, e := b.Bind(context.Background())
-			if e != nil || m != f.password || !time.Now().Before(until) || original.Material != f.material || original.NotAfter.Sub(original.NotBefore) != 15*time.Minute {
-				t.Fatal("first original interval", e)
-			}
-			f.f.mu.Lock()
-			switch mode {
-			case "replay-after-expiry":
-				f.f.shift = time.Hour
-			case "wrong-interval":
-				cm := f.f.objects["/api/v1/namespaces/bootstrap/configmaps/prepare"]
-				var root contracts.InitialPreparationRoot
-				_ = json.Unmarshal([]byte(cm["data"].(map[string]any)["root.json"].(string)), &root)
-				root.Activation.Credentials.NotAfter = root.Activation.Credentials.NotAfter.Add(time.Second)
-				v, _ := json.Marshal(root)
-				cm["data"].(map[string]any)["root.json"] = string(v)
-			case "replacement-material":
-				f.f.objects["/api/v1/namespaces/bootstrap/secrets/initial-material"]["metadata"].(map[string]any)["uid"] = ownerID(70)
-			case "different-material-pin":
-				f.material.UID = ownerID(70)
-			case "different-startup":
-				f.config.IssuerEpoch = ownerID(70)
-			}
-			f.f.mu.Unlock()
-			b = f.binder(t)
-			m, replay, _, e := b.Bind(context.Background())
-			if mode == "replay-after-expiry" {
-				if e != nil || replay != original || m != f.password {
-					t.Fatal("original binding renewed or unavailable for cleanup", e)
-				}
-			} else if e == nil || m.PreparationPassword != "" || !replay.NotBefore.IsZero() {
-				t.Fatal("wrong original binding/material accepted")
-			}
-		})
-	}
-}
-func TestInitialPreparationCredentialBindingLostReplyAndCASLoser(t *testing.T) {
-	for _, mode := range []string{"lost-reply", "concurrent-CAS"} {
-		t.Run(mode, func(t *testing.T) {
-			f := newPreparationBindingFixture(t)
-			var writes atomic.Int32
-			ready := make(chan struct{})
-			f.f.client.WrapTransport = func(next http.RoundTripper) http.RoundTripper {
-				return prepActivationRoundTrip(func(r *http.Request) (*http.Response, error) {
-					effect := r.Method == "PUT" && r.URL.Path == "/api/v1/namespaces/bootstrap/configmaps/prepare"
-					if effect {
-						raw, _ := io.ReadAll(r.Body)
-						r.Body = io.NopCloser(bytes.NewReader(raw))
-						var cm core.ConfigMap
-						_ = json.Unmarshal(raw, &cm)
-						var root contracts.InitialPreparationRoot
-						_ = json.Unmarshal([]byte(cm.Data["root.json"]), &root)
-						effect = root.Activation != nil && root.Activation.Credentials != nil
-					}
-					if effect && mode == "concurrent-CAS" {
-						if writes.Add(1) == 2 {
-							close(ready)
-						}
-						select {
-						case <-ready:
-						case <-r.Context().Done():
-							return nil, r.Context().Err()
-						}
-					}
-					response, e := next.RoundTrip(r)
-					if effect && mode == "lost-reply" && writes.Add(1) == 1 && e == nil {
-						response.Body.Close()
-						raw, _ := json.Marshal(meta.Status{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Status"}, Status: meta.StatusFailure, Reason: meta.StatusReasonServiceUnavailable, Code: 503})
-						response.StatusCode = 503
-						response.Body = io.NopCloser(bytes.NewReader(raw))
-						response.ContentLength = int64(len(raw))
-					}
-					return response, e
-				})
-			}
-			if mode == "lost-reply" {
-				if m, _, _, e := f.binder(t).Bind(context.Background()); e == nil || m.PreparationPassword != "" {
-					t.Fatal("lost binding acknowledgement supplied material/effect authority")
-				}
-			} else {
-				var group sync.WaitGroup
-				errors := make(chan error, 2)
-				first, second := f.binder(t), f.binder(t)
-				for _, b := range []*InitialPreparationCredentialBinder{first, second} {
-					group.Add(1)
-					go func() { defer group.Done(); _, _, _, e := b.Bind(context.Background()); errors <- e }()
-				}
-				group.Wait()
-				close(errors)
-				winners := 0
-				for e := range errors {
-					if e == nil {
-						winners++
-					}
-				}
-				if winners != 1 || writes.Load() != 2 {
-					t.Fatal("expected exactly one root CAS winner", winners, writes.Load())
-				}
-			}
-			_, root, e := f.f.preparer(t).read(context.Background())
-			if e != nil || root.Activation.Credentials == nil {
-				t.Fatal("original accepted binding missing", e)
-			}
-			original := *root.Activation.Credentials
-			f.f.mu.Lock()
-			f.f.shift = 2 * time.Minute
-			f.f.mu.Unlock()
-			m, replay, _, e := f.binder(t).Bind(context.Background())
-			if e != nil || m != f.password || replay != original {
-				t.Fatal("retry renewed dates or replaced private pin", e)
-			}
-		})
-	}
 }

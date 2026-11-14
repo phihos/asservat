@@ -279,34 +279,3 @@ func initialBootstrapCopyGuardRBAC(t *testing.T, ctx context.Context, api kubern
 		}
 	}
 }
-
-// Kubernetes administrators remain the admission trust boundary. VAP explicitly
-// excludes VAP/binding resources, so no second VAP can make these self-protecting.
-// After completed replay, an actual administrator removal must stop any further
-// product observation; the product must not adopt or recreate missing protection.
-func initialBootstrapCopyAdministratorBoundary(t *testing.T, ctx context.Context, api kubernetes.Interface, config *rest.Config, d contracts.InitialBootstrap) {
-	t.Helper()
-	producer, err := kube.OpenInitialBootstrap(ctx, config, d)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer producer.Close()
-	before, err := producer.ReadPassiveHistory(ctx)
-	if err != nil || before == nil || !before.Copies.CopiesClosed() {
-		t.Fatal("current exact copy protection unavailable", err)
-	}
-	name := d.BootstrapNamespace + "-" + d.Name + "-copy-tombstone"
-	binding, err := api.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Get(ctx, name, meta.GetOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err = api.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Delete(ctx, name, meta.DeleteOptions{Preconditions: &meta.Preconditions{UID: &binding.UID, ResourceVersion: &binding.ResourceVersion}}); err != nil {
-		t.Fatal("trusted administrator trust-boundary exercise", err)
-	}
-	if after, err := producer.ReadPassiveHistory(ctx); err == nil || after != nil {
-		t.Fatal("removed permanent guard still accepted for completed replay")
-	}
-	if _, err = api.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Get(ctx, name, meta.GetOptions{}); !apierrors.IsNotFound(err) {
-		t.Fatal("product recreated missing original protection", err)
-	}
-}

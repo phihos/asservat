@@ -1,20 +1,16 @@
 package integration
 
 import (
-	"bytes"
 	"context"
 	"sync"
 	"testing"
 	"time"
 
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
-	"asservat.local/asservat/internal/adapters/postgres"
 	"asservat.local/asservat/internal/contracts"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	apps "k8s.io/api/apps/v1"
-	core "k8s.io/api/core/v1"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -35,78 +31,6 @@ func (o *initialRuntimeOwnerContinuation) cleanup(t *testing.T, api kubernetes.I
 	}
 }
 
-func (o *initialRuntimeOwnerContinuation) qualify(t *testing.T, ctx context.Context, api kubernetes.Interface, config *pgx.ConnConfig, inventory kube.InitialRuntimeResourceInventory, input contracts.HubWorkerDeployment, roles contracts.ConfigurationRuntimeRoleSnapshot, providers *initialRuntimeNativeProviders, witness *providerWorkerWitness, workerPod *core.Pod, workerImage string) {
-	t.Helper()
-	providers.trace.ownerDeadlines.enable()
-	acceptedPool, accepted := providerOwnerAcceptedSource(t, ctx, config, input, roles)
-	defer acceptedPool.Close()
-	original, err := api.AppsV1().Deployments(input.Namespace.Name).Get(ctx, inventory.OwnerDeployment.Name, meta.GetOptions{})
-	if err != nil || string(original.UID) != inventory.OwnerDeployment.UID || original.Spec.Replicas == nil || *original.Spec.Replicas != 0 {
-		t.Fatal("original inert owner missing", err)
-	}
-	// The enclosing worker registered original-UID foreground cleanup before
-	// entering this continuation; pin its sole target before any owner effect.
-	o.original = original.DeepCopy()
-	providerWorkerRequireRunning(t, ctx, api, workerPod, workerImage)
-	plan := contracts.OwnerBootstrapPlan{Format: contracts.OwnerBootstrapPlanFormat, PKIMount: "owner-pki", Connections: 4, Concurrency: 2, Peers: []contracts.OwnerBootstrapPeerPlan{{ClusterID: input.ClusterID, Roots: providers.issuerRoots}}}
-	// The one declared original logical peer and its trust root are fixture
-	// installation input. No SQL49 registration or permission stream is seeded.
-	owner := prepareProviderPairOwner(t, ctx, config, o.resources, o.bridge, providers, accepted, plan)
-	defer owner.Close()
-	inspector := owner.configureProvider(t, ctx, accepted)
-	defer func() {
-		if err := inspector.Close(context.Background()); err != nil {
-			t.Error(err)
-		}
-	}()
-	owner.provisionOwnerAudit(t, ctx, api)
-	providerWorkerRequireRunning(t, ctx, api, workerPod, workerImage)
-	owner.install(t, ctx, api, inspector)
-	providerWorkerRequireRunning(t, ctx, api, workerPod, workerImage)
-	owner.observeIdentity(t, ctx, api, config, original, accepted, witness)
-	providerWorkerRequireRunning(t, ctx, api, workerPod, workerImage)
-	t.Log("actual owner original Pod/image and paired same-process activated SQL30 identities with independent version-pinned encrypted enrollment/certificate audit and current registry checks; no receipt-gated v2 backend, HWORK route, active capacity/cleanup or public workflow claim")
-}
-
-// A real original role is reused under its existing LIMIT3: one running worker,
-// this MaxConns1 installer reader, and the already reserved verifier slot. No
-// new role, privilege, connection limit or write-on-read observer is introduced.
-func providerOwnerAcceptedSource(t *testing.T, ctx context.Context, config *pgx.ConnConfig, input contracts.HubWorkerDeployment, s contracts.ConfigurationRuntimeRoleSnapshot) (*pgxpool.Pool, *postgres.OwnerConfigurations) {
-	t.Helper()
-	if input.Activation == nil || input.ProviderInputs == nil || s.UID != input.ProviderInputs.ConfigurationRoot.UID || s.State.OperationID != input.ProviderInputs.ConfigurationSetupID || s.State.Input.OwnerSource != input.OwnerSource || s.State.Input.Deployment != input.Activation.Deployment || s.State.Input.ServiceAccount != input.Activation.ServiceAccount {
-		t.Fatal("original configuration-source provenance missing")
-	}
-	m := contracts.ConfigurationRuntimeCredentialManifest{Format: contracts.ConfigurationRuntimeCredentialManifestFormat, Input: s.State.Input, RootUID: s.UID, SetupID: s.State.OperationID}
-	var credential contracts.OwnerSQLCredential
-	for _, r := range s.State.Roles {
-		if r.Claim == nil || r.Receipt == nil {
-			t.Fatal("configuration role lacks original receipt")
-		}
-		m.Roles = append(m.Roles, contracts.ConfigurationRuntimeCredentialProof{Purpose: r.Purpose, Claim: *r.Claim, Receipt: *r.Receipt})
-		if r.Purpose == "configuration-source" {
-			credential = contracts.OwnerSQLCredential{Username: r.Receipt.RoleName, Password: r.Password}
-		}
-	}
-	pool := providerOwnerScopedPool(t, ctx, config, credential)
-	complete := false
-	defer func() {
-		if !complete {
-			pool.Close()
-		}
-	}()
-	call, end := context.WithTimeout(ctx, 5*time.Second)
-	defer end()
-	if err := postgres.VerifyConfigurationRuntimeCredential(call, pool, m, "configuration-source"); err != nil {
-		t.Fatal("actual original configuration-source credential verification", err)
-	}
-	reader, err := postgres.NewOwnerConfigurations(call, pool, input.InstallationID, input.ClusterID, input.Namespace.UID, input.OwnerSource.UID)
-	if err != nil {
-		t.Fatal("actual accepted owner reader", err)
-	}
-	complete = true
-	return pool, reader
-}
-
 func providerOwnerScopedPool(t *testing.T, ctx context.Context, config *pgx.ConnConfig, credential contracts.OwnerSQLCredential) *pgxpool.Pool {
 	t.Helper()
 	if credential.Username == "" || credential.Password == "" {
@@ -125,62 +49,6 @@ func providerOwnerScopedPool(t *testing.T, ctx context.Context, config *pgx.Conn
 		t.Fatal("original scoped observer connection", err)
 	}
 	return pool
-}
-
-// Installation has already acknowledged this exact child. This fixture reads
-// the original public journal and immutable mounted registry credential only;
-// these historical bytes do not stand in for current registry/recovery checks.
-func (o *initialRuntimeNativeOwner) registry(t *testing.T, ctx context.Context, api kubernetes.Interface, config *pgx.ConnConfig) (*pgxpool.Pool, *postgres.OwnerEnrollments) {
-	t.Helper()
-	in := o.root.Input()
-	journal, err := api.CoreV1().Secrets(in.Namespace.Name).Get(ctx, in.Resources.Name, meta.GetOptions{})
-	if err != nil || string(journal.UID) != in.Resources.UID {
-		t.Fatal("original owner resource journal", err)
-	}
-	state, err := contracts.DecodeInitialRuntimeResourceState(bytes.NewReader(journal.Data["state.json"]))
-	if err != nil || state.SetupID != in.ResourceSetupID || state.BindingDigest != in.ResourceBinding || state.OwnerIdentity == nil || state.OwnerIdentity.Receipt == nil || state.OwnerLaunch == nil || state.OwnerLaunch.Receipt == nil {
-		t.Fatal("owner identity and launch were not acknowledged", err)
-	}
-	claim := state.OwnerIdentity
-	if claim.Credentials == nil || claim.Credentials.Receipt == nil || claim.Credentials.Receipt.Object != claim.Receipt.Credentials {
-		t.Fatal("original owner credential child missing")
-	}
-	ref := claim.Receipt.Credentials
-	secret, err := api.CoreV1().Secrets(in.Namespace.Name).Get(ctx, ref.Name, meta.GetOptions{})
-	if err != nil || string(secret.UID) != ref.UID || secret.Immutable == nil || !*secret.Immutable || secret.ResourceVersion != claim.Credentials.Receipt.ResourceVersion || len(secret.Data) != 1+len(contracts.OwnerIdentityRolePurposes()) {
-		t.Fatal("original immutable owner credential projection", err)
-	}
-	defer func() {
-		for _, b := range secret.Data {
-			clear(b)
-		}
-	}()
-	manifest, err := contracts.DecodeOwnerIdentityCredentialManifest(bytes.NewReader(secret.Data[contracts.OwnerIdentityRoleManifestFile]))
-	if err != nil || manifest.Input != in || manifest.RootUID != claim.RoleRoot.UID || manifest.SetupID != claim.RoleSetupID {
-		t.Fatal("original owner registry manifest", err)
-	}
-	credential, err := contracts.DecodeOwnerSQLCredential(bytes.NewReader(secret.Data["sql-owner-runtime.json"]))
-	if err != nil {
-		t.Fatal("original owner registry credential", err)
-	}
-	pool := providerOwnerScopedPool(t, ctx, config, credential)
-	complete := false
-	defer func() {
-		if !complete {
-			pool.Close()
-		}
-	}()
-	call, end := context.WithTimeout(ctx, 5*time.Second)
-	defer end()
-	if err = postgres.VerifyOwnerIdentityCredential(call, pool, manifest, "owner-runtime"); err != nil {
-		t.Fatal("actual original owner registry role", err)
-	}
-	reader, err := postgres.NewOwnerEnrollments(call, pool, in.InstallationID, in.ClusterID, in.Namespace.UID, in.OwnerConfigurationUID, custodyID)
-	if err != nil {
-		t.Fatal("actual original owner registry reader", err)
-	}
-	complete = true
-	return pool, reader
 }
 
 // Counts and original request-deadline minima are diagnostics only. This fixed

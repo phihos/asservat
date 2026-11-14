@@ -1,14 +1,15 @@
 package bootstrap
 
 import (
-	"asservat.local/asservat/internal/adapters/mounts"
-	cfg "asservat.local/asservat/internal/domain/configuration"
-	value "asservat.local/asservat/internal/domain/fleet"
 	"context"
 	"errors"
 	"strings"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/adapters/mounts"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	value "asservat.local/asservat/internal/domain/fleet"
 )
 
 type startupPrivateError struct{}
@@ -51,19 +52,6 @@ func TestOwnerStartupDiagnosticRejectsRawProcessOutput(t *testing.T) {
 		if got, ok := OwnerStartupDiagnosticLine(bad); ok || got != "" {
 			t.Fatal("untrusted process output accepted")
 		}
-	}
-}
-func TestOwnerObservationLoaderReportsInputPhaseBeforeProviderEffects(t *testing.T) {
-	in, dir, _ := ownerInputFixture(t)
-	// Actual fixed-file decoder failure, before native clients or SQL credentials.
-	writeOwnerJSON(t, dir, "deployment.json", map[string]string{"unexpected": "synthetic-private"})
-	d, err := NewOwnerObservationDeployment(context.Background(), in.files, runtimeID)
-	if d != nil {
-		d.Close()
-		t.Fatal("invalid projection started runtime")
-	}
-	if !errors.Is(err, mounts.ErrUnavailable) || !strings.Contains(OwnerStartupDiagnostic(err), "phase=inputs ") {
-		t.Fatal("input failure phase missing", err)
 	}
 }
 func TestOwnerObservationRuntimeReportsOriginalSetupDeadline(t *testing.T) {

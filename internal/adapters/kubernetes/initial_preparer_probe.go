@@ -25,12 +25,6 @@ type InitialPreparationProbeObservation struct {
 	ExpiresAt, ValidUntil time.Time
 }
 
-func (InitialPreparationProbeObservation) String() string {
-	return "protected initial probe observation"
-}
-func (InitialPreparationProbeObservation) GoString() string {
-	return "protected initial probe observation"
-}
 func (s *InitialPreparer) probeAnchorName() string { return s.plan.Workload.Credentials + "-probe" }
 func (s *InitialPreparer) probeAnchorPath() string {
 	return "/api/v1/namespaces/" + s.plan.Workload.Namespace + "/secrets/" + s.probeAnchorName()

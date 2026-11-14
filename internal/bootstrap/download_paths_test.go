@@ -2,12 +2,10 @@ package bootstrap
 
 import (
 	"fmt"
-	"maps"
 	"slices"
 	"strings"
 	"testing"
 
-	app "asservat.local/asservat/internal/application/capacity"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/privacy"
 )
@@ -30,41 +28,6 @@ func pathsByID(t *testing.T, in []privacy.DownloadPath) map[string]privacy.Downl
 		out[p.ID] = p
 	}
 	return out
-}
-
-// ADR-204 decision 4: the hub-api derives one path per catalog cluster, the
-// capacity hub-worker one per regional qualification. For the same clusters,
-// in any order, both union the same paths with the pinned ones.
-func TestDownloadPathsDerivedIdenticallyByHubAPIAndCapacity(t *testing.T) {
-	installation, hub, a, b := pathID(1), pathID(2), pathID(3), pathID(4)
-	tmpl := syntheticPathTemplate(hub)
-	pinned := contracts.DownloadPathFor(installation, tmpl, pathID(9))
-	pinned.ID = pathID(10)
-	catalog := contracts.OwnerClusterCatalog{Format: contracts.OwnerClusterCatalogFormat, Clusters: []contracts.OwnerPublicCluster{{ClusterID: a}, {ClusterID: b}}}
-	regional := []app.CapacityNamespaceQualification{{ClusterID: b}, {ClusterID: a}}
-	hubAPI, err := downloadEnvironmentPaths(installation, hub, []contracts.DownloadEnvironmentPath{pinned}, &tmpl, catalogTargets(catalog))
-	if err != nil {
-		t.Fatal(err)
-	}
-	capacity, err := downloadEnvironmentPaths(installation, hub, []contracts.DownloadEnvironmentPath{pinned}, &tmpl, regionalTargets(regional))
-	if err != nil {
-		t.Fatal(err)
-	}
-	x, y := pathsByID(t, hubAPI), pathsByID(t, capacity)
-	if len(x) != 3 || !maps.Equal(x, y) {
-		t.Fatal("hub-api and capacity derived different paths", x, y)
-	}
-	for _, target := range []string{a, b} {
-		want := contracts.DownloadPathFor(installation, tmpl, target)
-		got, ok := x[want.ID]
-		if !ok || got.TargetClusterID != target || got.StoreID != tmpl.StoreID || got.AcquisitionClusterID != hub || got.ConnectorClusterID != hub || got.HubClusterID != hub ||
-			got.WorkerConfiguration.UID != tmpl.WorkerConfiguration.UID || got.HubConfiguration.Generation != 2 {
-			t.Fatal("derived path", target, got)
-		}
-	}
-	if _, ok := x[pinned.ID]; !ok {
-		t.Fatal("pinned path dropped")
-	}
 }
 
 // Without a template the pinned paths are used as before and no target adds

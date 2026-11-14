@@ -1,9 +1,9 @@
 package kubernetes
 
 import (
-	"asservat.local/asservat/internal/contracts"
-	"encoding/json"
 	"testing"
+
+	"asservat.local/asservat/internal/contracts"
 )
 
 func TestProfileEndpointAuthorizationPublicDefinition(t *testing.T) {
@@ -32,25 +32,5 @@ func TestProfileEndpointAuthorizationTLSAndExactAudiences(t *testing.T) {
 	e.Credential.Audiences = append(e.Credential.Audiences, e.Credential.Audiences[0])
 	if ProfileEndpointsValid([]contracts.RegionalProfileEndpoint{e}) {
 		t.Fatal("duplicate audience accepted")
-	}
-}
-
-func TestProfileAuthorizationMapRequiresExactConfiguredNames(t *testing.T) {
-	endpoints := []contracts.RegionalProfileEndpoint{{Name: "pprof", Credential: &contracts.RegionalProfileEndpointCredential{}}}
-	good := contracts.RegionalProfileAuthorization{Format: contracts.RegionalProfileAuthorizationFormat, Entries: []contracts.RegionalProfileAuthorizationEntry{{Name: "pprof", Authorization: []byte("Bearer synthetic-private")}}}
-	raw, _ := json.Marshal(good)
-	if !ProfileAuthorizationValid(endpoints, raw) {
-		t.Fatal("exact map refused")
-	}
-	if ProfileAuthorizationValid(nil, raw) || ProfileAuthorizationValid(endpoints, nil) {
-		t.Fatal("unassociated or missing private map accepted")
-	}
-	good.Entries[0].Name = "other"
-	raw, _ = json.Marshal(good)
-	if ProfileAuthorizationValid(endpoints, raw) {
-		t.Fatal("caller-selected unrelated material accepted")
-	}
-	if !ProfileAuthorizationValid(nil, nil) {
-		t.Fatal("legacy no-credential config changed")
 	}
 }

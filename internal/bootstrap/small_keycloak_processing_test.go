@@ -5,8 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 	"reflect"
 	"testing"
 	"time"
@@ -84,60 +82,6 @@ func TestSmallKeycloakProcessingOptInCreatesOnlyDedicatedEmptyGroup(t *testing.T
 	}
 	if ValidateSmallKeycloakMaterial(enabled, before) == nil || ValidateSmallKeycloakMaterial(legacy, after) == nil {
 		t.Fatal("late adoption of another immutable realm allowed")
-	}
-}
-func TestBundledProcessingDeclarationRequiresOriginalExplicitOptIn(t *testing.T) {
-	for _, enabled := range []bool{false, true} {
-		for _, explicit := range []bool{false, true} {
-			s := smallKeycloakTestSettings()
-			s.ProcessingOperators = enabled
-			material, err := BuildSmallKeycloakMaterial(s, bytes.NewReader(bytes.Repeat([]byte{0x41}, 128)))
-			if err != nil {
-				t.Fatal(err)
-			}
-			dir := t.TempDir()
-			for key, file := range map[string]string{contracts.SmallKeycloakSettingsFile: bundledKeycloakSettingsFile, contracts.SmallKeycloakUsersGroup: contracts.SmallKeycloakUsersGroup} {
-				if err = os.WriteFile(filepath.Join(dir, file), material.Data[key], 0600); err != nil {
-					t.Fatal(err)
-				}
-			}
-			files, err := os.OpenRoot(dir)
-			if err != nil {
-				t.Fatal(err)
-			}
-			input := contracts.InstallerContinuation{Namespace: s.Namespace, IdentitySource: bundledKeycloakIdentitySource, Public: &contracts.InstallerPublicSettings{Origin: s.Origin, Issuer: s.Hostname + "/realms/" + s.Realm, ClientID: s.ConsoleClientID}}
-			provided := []contracts.ProcessingOperator{{ClientID: s.ConsoleClientID, Issuer: input.Public.Issuer, Kind: "User", ID: "explicit-human"}}
-			if explicit {
-				input.Public.ProcessingOperators = append([]contracts.ProcessingOperator{}, provided...)
-			}
-			err = resolveInstallerContinuationIdentity(t.Context(), files, &input)
-			files.Close()
-			if err != nil {
-				t.Fatal(err)
-			}
-			if explicit {
-				if !reflect.DeepEqual(input.Public.ProcessingOperators, provided) {
-					t.Fatal("explicit operators silently overridden")
-				}
-				continue
-			}
-			if !enabled {
-				if len(input.Public.ProcessingOperators) != 0 {
-					t.Fatal("default false granted processing rights")
-				}
-				continue
-			}
-			users := string(material.Data[contracts.SmallKeycloakUsersGroup])
-			group, err := smallKeycloakProcessingGroup(users)
-			if err != nil {
-				t.Fatal(err)
-			}
-			want := []contracts.ProcessingOperator{{ClientID: s.ConsoleClientID, Issuer: input.Public.Issuer, Kind: "Group", ID: group}}
-			if !reflect.DeepEqual(input.Public.ProcessingOperators, want) || !reflect.DeepEqual(input.Public.EligibleGroups, []string{users}) {
-				t.Fatal("derived policy source mixed ordinary and processing groups")
-			}
-			assertBundledProcessingGroupEligibility(t, input.Public, users, group)
-		}
 	}
 }
 

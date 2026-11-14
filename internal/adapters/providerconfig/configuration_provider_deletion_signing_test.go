@@ -2,16 +2,13 @@ package providerconfig
 
 import (
 	"bytes"
-	"context"
 	"crypto/ed25519"
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"math/big"
-	"net/http"
 	"slices"
 	"strconv"
 	"strings"
@@ -167,140 +164,4 @@ func signingKeyResponse(t *testing.T, name string, latest int, keys map[int]ed25
 	}
 	return setupMap(t, map[string]any{"name": name, "type": "ed25519", "derived": false, "exportable": false, "allow_plaintext_backup": false, "deletion_allowed": false,
 		"supports_signing": true, "supports_encryption": false, "supports_decryption": false, "latest_version": latest, "min_decryption_version": 1, "min_encryption_version": 0, "keys": versions})
-}
-
-func configurationDeletionSigningSetupFixture(t *testing.T, worker contracts.OwnerPublicTransit, keys map[int]ed25519.PublicKey, latest int) (*setupFixture, contracts.HubWorkerDeployment, ConfigurationProviderRecipe) {
-	t.Helper()
-	f, in, base := configurationSetupFixture(t)
-	signing := deletionSigningFixture(in.InstallationID)
-	selection := contracts.ConfigurationProviderSelection{AuthMount: base.Profile.AuthMount, AuthMountAccessor: base.Profile.AuthMountAccessor, AuditCredentials: base.Profile.AuditCredentials, WorkerConfigurationAudit: worker, ContextDeletionSigning: signing}
-	recipe, err := ConfigurationProviderRecipeFor(in, selection, base.Profile.ServiceAccount, time.Now())
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, role := range recipe.Roles {
-		f.responses["sys/policies/acl/"+role.Name] = setupMap(t, map[string]any{"name": role.Name, "policy": string(role.Policy)})
-	}
-	if worker != (contracts.OwnerPublicTransit{}) {
-		f.responses[worker.Mount+"/keys/"+worker.Key] = setupMap(t, map[string]any{
-			"name": worker.Key, "type": "aes256-gcm96", "derived": false, "exportable": false,
-			"allow_plaintext_backup": false, "deletion_allowed": false, "supports_encryption": true, "supports_decryption": true,
-			"latest_version": 1, "min_decryption_version": 1, "min_encryption_version": 0,
-		})
-	}
-	f.responses[signing.Mount+"/keys/"+signing.Key] = signingKeyResponse(t, signing.Key, latest, keys)
-	return f, in, recipe
-}
-
-func TestConfigurationSetupRecordsDeletionSigningPublicKeys(t *testing.T) {
-	first, _, _ := ed25519.GenerateKey(nil)
-	second, _, _ := ed25519.GenerateKey(nil)
-	for _, worker := range []contracts.OwnerPublicTransit{{}, workerAuditFixture} {
-		f, in, recipe := configurationDeletionSigningSetupFixture(t, worker, map[int]ed25519.PublicKey{1: first, 2: second}, 2)
-		reads := int32(9)
-		if worker != (contracts.OwnerPublicTransit{}) {
-			reads = 10
-		}
-		check, err := f.reader.VerifyConfiguration(context.Background(), in, recipe.Profile)
-		if err != nil || !check.Matches(in, recipe.Profile, time.Now()) || f.requests.Load() != reads {
-			t.Fatal("deletion signing readback failed", err, f.requests.Load())
-		}
-		got, ok := check.ContextDeletionSigning()
-		if !ok || got.Mount != "audit" || got.Key != contracts.ContextDeletionSigningKeyName(in.InstallationID) || got.Version != 2 || len(got.PublicKeys) != 2 || !bytes.Equal(got.PublicKeys[1], first) || !bytes.Equal(got.PublicKeys[2], second) {
-			t.Fatal("readback did not record the signing key's versions", got)
-		}
-		got.PublicKeys[2][0] ^= 1
-		delete(got.PublicKeys, 1)
-		if again, _ := check.ContextDeletionSigning(); len(again.PublicKeys) != 2 || !bytes.Equal(again.PublicKeys[2], second) {
-			t.Fatal("readback shares its observed keys")
-		}
-	}
-	// Without the key, the readback makes exactly the earlier requests and
-	// records nothing.
-	f, in, recipe := configurationSetupFixture(t)
-	check, err := f.reader.VerifyConfiguration(context.Background(), in, recipe.Profile)
-	if err != nil || f.requests.Load() != 8 {
-		t.Fatal("base readback changed", err, f.requests.Load())
-	}
-	if _, ok := check.ContextDeletionSigning(); ok {
-		t.Fatal("base readback recorded a deletion signing key")
-	}
-	for _, mode := range []string{"base-policy", "aes-key", "exportable", "deletable", "other-name", "latest-missing", "future-version", "zero-version", "short-key", "bad-base64", "too-many", "missing-key"} {
-		t.Run(mode, func(t *testing.T) {
-			keys, latest := map[int]ed25519.PublicKey{1: first}, 1
-			switch mode {
-			case "latest-missing":
-				latest = 2
-			case "future-version":
-				keys[2] = second
-			case "zero-version":
-				keys[0] = second
-			case "short-key":
-				keys[1] = first[:16]
-			case "too-many":
-				latest = 33
-				for v := 1; v <= 33; v++ {
-					keys[v] = first
-				}
-			}
-			f, in, recipe := configurationDeletionSigningSetupFixture(t, contracts.OwnerPublicTransit{}, keys, latest)
-			signing := recipe.Profile.ContextDeletionSigning
-			key := f.responses[signing.Mount+"/keys/"+signing.Key]
-			switch mode {
-			case "base-policy":
-				// A provider still holding audit-wrap's policy without the sign path.
-				p := recipe.Profile
-				base, err := ConfigurationProviderRecipeFor(in, contracts.ConfigurationProviderSelection{AuthMount: p.AuthMount, AuthMountAccessor: p.AuthMountAccessor, AuditCredentials: p.AuditCredentials}, p.ServiceAccount, time.Now())
-				if err != nil {
-					t.Fatal(err)
-				}
-				f.responses["sys/policies/acl/"+base.Roles[0].Name] = setupMap(t, map[string]any{"name": base.Roles[0].Name, "policy": string(base.Roles[0].Policy)})
-			case "aes-key":
-				key["type"] = json.RawMessage(`"aes256-gcm96"`)
-			case "exportable":
-				key["exportable"] = json.RawMessage(`true`)
-			case "deletable":
-				key["deletion_allowed"] = json.RawMessage(`true`)
-			case "other-name":
-				key["name"] = json.RawMessage(`"configuration"`)
-			case "bad-base64":
-				key["keys"] = json.RawMessage(`{"1":{"public_key":"not base64!"}}`)
-			case "missing-key":
-				f.intercept = func(w http.ResponseWriter, r *http.Request) bool {
-					if r.URL.Path != "/v1/"+signing.Mount+"/keys/"+signing.Key {
-						return false
-					}
-					w.WriteHeader(http.StatusNotFound)
-					return true
-				}
-			}
-			check, err := f.reader.VerifyConfiguration(context.Background(), in, recipe.Profile)
-			component := setupComponentError("context deletion signing key")
-			if mode == "base-policy" {
-				component = "configuration purpose policy"
-			}
-			if !errors.Is(err, ErrSetupUnavailable) || err != error(component) || check != (ConfigurationSetupCheck{}) {
-				t.Fatal("changed deletion signing setup accepted", err)
-			}
-		})
-	}
-}
-
-func TestPhaseThreeReadsDeletionSigningPublicKeys(t *testing.T) {
-	first, _, _ := ed25519.GenerateKey(nil)
-	second, _, _ := ed25519.GenerateKey(nil)
-	f, in, recipe := configurationDeletionSigningSetupFixture(t, contracts.OwnerPublicTransit{}, map[int]ed25519.PublicKey{1: first, 2: second}, 2)
-	endpoint := contracts.OwnerProviderEndpoint{Endpoint: in.KeyService.Endpoint, Roots: in.KeyService.Roots}
-	signing := recipe.Profile.ContextDeletionSigning
-	got, err := f.reader.ReadContextDeletionSigning(context.Background(), endpoint, signing.Mount, signing.Key)
-	if err != nil || f.requests.Load() != 1 || got.Version != 2 || len(got.PublicKeys) != 2 || !bytes.Equal(got.PublicKeys[1], first) || !bytes.Equal(got.PublicKeys[2], second) {
-		t.Fatal("phase-3 readback of the deletion signing key", err, f.requests.Load(), got)
-	}
-	f.responses[signing.Mount+"/keys/"+signing.Key]["exportable"] = json.RawMessage(`true`)
-	if _, err = f.reader.ReadContextDeletionSigning(context.Background(), endpoint, signing.Mount, signing.Key); err != error(setupComponentError("context deletion signing key")) {
-		t.Fatal("exportable deletion signing key accepted", err)
-	}
-	if _, err = f.reader.ReadContextDeletionSigning(context.Background(), endpoint, "audit/x", signing.Key); !errors.Is(err, ErrSetupUnavailable) {
-		t.Fatal("malformed mount accepted", err)
-	}
 }

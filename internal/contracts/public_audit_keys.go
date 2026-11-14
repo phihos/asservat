@@ -40,12 +40,7 @@ type CaptureAccountKey struct {
 func DecodePublicAuditKeys(r io.Reader) (PublicAuditKeys, error) {
 	return decodeClosedRPC[PublicAuditKeys](r, PublicAuditKeysMaxBytes)
 }
-func DecodeCaptureAccountKey(r io.Reader) (CaptureAccountKey, error) {
-	return decodeClosedRPC[CaptureAccountKey](r, PublicAuditKeysMaxBytes)
-}
 func (PublicAuditKeyMaterial) String() string   { return "protected public audit HMAC material" }
 func (PublicAuditKeyMaterial) GoString() string { return "protected public audit HMAC material" }
 func (PublicAuditKeys) String() string          { return "protected public audit HMAC projection" }
 func (PublicAuditKeys) GoString() string        { return "protected public audit HMAC projection" }
-func (CaptureAccountKey) String() string        { return "protected capture account HMAC projection" }
-func (CaptureAccountKey) GoString() string      { return "protected capture account HMAC projection" }

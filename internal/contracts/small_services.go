@@ -84,11 +84,6 @@ const ArtifactKeySecretKey = "keys.json"
 // (OwnerStorageCredential JSON).
 const ObjectStoreCredentialFile = "credentials.json"
 
-// SQLComponents are the hub components with their own SQL credential Secret.
-func SQLComponents() []string {
-	return []string{"hub-api", "hub-worker", "federation", "publisher", "key-service"}
-}
-
 // SQLComponentPurposes are the runtime roles of one component's
 // `<name>-sql-<component>` Secret; each is stored as sql-<purpose>.json.
 // Together the components cover every public, configuration and owner role.
@@ -144,4 +139,9 @@ func DecodeSecretsPlan(r io.Reader) (SecretsPlan, error) {
 
 func DecodeSmallKeycloakSettings(r io.Reader) (SmallKeycloakSettings, error) {
 	return decodeClosedRPC[SmallKeycloakSettings](r, SecretsMaxBytes)
+}
+
+// SQLComponents are the hub components with their own SQL credential Secret.
+func SQLComponents() []string {
+	return []string{"hub-api", "hub-worker", "federation", "publisher", "key-service"}
 }

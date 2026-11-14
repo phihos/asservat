@@ -255,14 +255,6 @@ func setupPKIRole(server bool, domains []string, uri string, ttl int64) (json.Ra
 	})
 }
 
-// SetupOpenBaoMounts lists the mounts, by type, that setup ensures (and that
-// an external provider's operator creates).
-func SetupOpenBaoMounts() map[string][]string {
-	return map[string][]string{"transit": {contracts.SmallOpenBaoAuditMount, contracts.SmallOpenBaoTransitMount},
-		"pki":   {contracts.SmallOpenBaoOwnerPKIMount, contracts.SmallOpenBaoConnectorPKIMount, contracts.SmallOpenBaoWorkerPKIMount},
-		"kv-v2": {contracts.SmallOpenBaoBootstrapMount}, "kubernetes": {contracts.SmallOpenBaoConfigurationAuthMount, contracts.SmallOpenBaoOwnerAuthMount}}
-}
-
 // EnsureOpenBaoSetup idempotently ensures the mounts, the Kubernetes auth
 // configuration, transit keys (created if missing, never replaced), PKI
 // roots (generated only when a mount has no issuer), PKI roles and the

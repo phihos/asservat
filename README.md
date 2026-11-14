@@ -133,9 +133,9 @@ seconds before to 10 seconds after the trigger.
 - [Implementation status](docs/implementation-status.md): what works, how it is tested and what is missing
 - [Product definition](docs/product.md): users, workflows and first-release scope
 - [MCP workflows](docs/interfaces/mcp-workflows.md): what an AI agent can do, tool by tool
-- [Try pod-status capture](docs/installation/context-trial.md): source-built Helm trial with your PostgreSQL, S3, OpenBao and Keycloak
-- [Try bundled services](docs/installation/small-profile.md): qualified source-built context trial with independently selectable PostgreSQL, OpenBao, SeaweedFS and Keycloak
-- [Helm installation](docs/installation/helm.md): chart scope and configuration reference
+- [Quick trial](docs/installation/small-profile.md): one Helm release in one cluster with bundled PostgreSQL, OpenBao, SeaweedFS and Keycloak
+- [Install with external services](docs/installation/context-trial.md): your PostgreSQL, S3, OpenBao and Keycloak
+- [Install with Helm](docs/installation/helm.md): values, exposure, upgrade, uninstall and troubleshooting
 - [Decision records](docs/decisions/README.md): every accepted design decision and why
 - [Project guide](docs/project-guide.md): reading map, specifications and checks for contributors
 

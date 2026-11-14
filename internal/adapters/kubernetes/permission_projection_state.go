@@ -43,18 +43,3 @@ func permissionProjectionStateValid(installation string, state contracts.Initial
 	}
 	return true
 }
-
-// Only the permission compartment may change: claim, then its receipt.
-func permissionProjectionTransition(old, next contracts.InitialRuntimeResourceState) bool {
-	a, b := old.PermissionProjection, next.PermissionProjection
-	old.PermissionProjection = b
-	if !equalJSON(old, next) || b == nil {
-		return false
-	}
-	if a == nil {
-		return b.Receipt == nil
-	}
-	x, y := *a, *b
-	x.Receipt, y.Receipt = nil, nil
-	return a.Receipt == nil && b.Receipt != nil && equalJSON(x, y)
-}

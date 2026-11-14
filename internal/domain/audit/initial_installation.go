@@ -14,7 +14,6 @@ type InitialInstallation struct {
 	Claim fleet.InitialActivationClaim
 }
 
-func (r InitialInstallation) Valid() bool { return r.Scope.Valid() && r.Claim.Valid() }
 func InitialInstallationKey(installation, claim string) string {
 	return "initial-installation/v1/" + installation + "/" + claim + "/record"
 }

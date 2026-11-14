@@ -1,20 +1,13 @@
 package kubernetes
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
 	"strings"
 	"time"
 
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/authorization"
-	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
 )
-
-const ownerIdentityProjectionMarker = "asservat.io/owner-identity-projection"
-const ownerIdentityLaunchMarker = "asservat.io/owner-identity-launch"
 
 func ownerIdentityDigestValid(v string) bool {
 	return preparationDigestValid(v) && v != strings.Repeat("0", 64)
@@ -26,36 +19,6 @@ func ownerIdentityMicrotime(t time.Time) bool {
 
 func ownerIdentityInterval(start, until, first, last, now time.Time) bool {
 	return ownerIdentityMicrotime(start) && ownerIdentityMicrotime(until) && !start.Before(first) && !start.After(now) && until.After(start) && until.Sub(start) <= 5*time.Second && !until.After(last)
-}
-
-// This validates historical shape only. Current native enforcement, original
-// journal UID, actual mounted objects and SQL credential checks remain separate.
-func OwnerIdentityActivationBound(input contracts.OwnerDeployment, a contracts.OwnerIdentityActivation) bool {
-	v := a.Input
-	if input.Format != contracts.OwnerDeploymentFormat || !installationRefValid(v.Namespace.Name, v.Namespace.UID) || v.Format != contracts.OwnerIdentityRolesFormat || !ownerProviderActivationSelectionBound(input, a) || v.InstallationID != input.InstallationID || v.ClusterID != input.ClusterID || v.Namespace != input.Namespace || v.OwnerConfigurationUID != input.ConfigurationUID || !ownerIdentityDigestValid(v.ResourceBinding) || !ownerIdentityDigestValid(v.LayoutDigest) || !ownerIdentityMicrotime(a.ResourcesCreatedAt) || a.ResourcesCreatedAt.After(time.Now()) || a.ResourcesUntil.Sub(a.ResourcesCreatedAt) != 30*time.Minute {
-		return false
-	}
-	for _, id := range []string{v.InstallationID, v.InitialClaimID, v.ClusterID, v.Namespace.UID, v.OwnerConfigurationUID, v.ResourceSetupID, a.RoleSetupID} {
-		if !authorization.UUID(id) {
-			return false
-		}
-	}
-	n := runtimeResourceNames(v.InstallationID)
-	seen := map[string]bool{}
-	for _, x := range []struct {
-		got  contracts.WorkerObjectReference
-		name string
-	}{
-		{v.Resources, "asservat-runtime-resources-" + strings.ReplaceAll(v.InstallationID, "-", "")},
-		{a.RoleRoot, "asservat-owner-identity-roles-" + strings.ReplaceAll(v.InstallationID, "-", "")},
-		{v.Deployment, n.Owner}, {v.ServiceAccount, n.Owner},
-	} {
-		if x.got.Name != x.name || !authorization.UUID(x.got.UID) || seen[x.got.UID] {
-			return false
-		}
-		seen[x.got.UID] = true
-	}
-	return true
 }
 
 func ownerIdentityResourceStateValid(v contracts.InitialRuntimeResourceState, now time.Time) bool {
@@ -145,20 +108,4 @@ func ownerIdentityResourceStateValid(v contracts.InitialRuntimeResourceState, no
 		}
 	}
 	return true
-}
-
-// Only public, immutable inputs enter this digest. It is neither a password
-// verifier nor an authority certificate.
-func ownerIdentityPublicDigest(in contracts.OwnerDeployment, m contracts.OwnerIdentityCredentialManifest) (string, error) {
-	b, e := json.Marshal(struct {
-		Input    contracts.OwnerDeployment
-		Manifest contracts.OwnerIdentityCredentialManifest
-	}{in, m})
-	if e != nil || len(b) > contracts.OwnerDeploymentMaxBytes+contracts.OwnerIdentityRoleMaxBytes {
-		return "", cfg.ErrInvalid
-	}
-	h := sha256.New()
-	h.Write([]byte("asservat-owner-identity-projection/v1\x00"))
-	h.Write(b)
-	return hex.EncodeToString(h.Sum(nil)), nil
 }

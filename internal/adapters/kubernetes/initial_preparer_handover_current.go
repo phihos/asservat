@@ -69,14 +69,6 @@ func (s *InitialPreparer) stagingHandover(ctx context.Context, w contracts.Initi
 	return e
 }
 
-// currentHandover is deliberately independent of original token/provider
-// lifetimes: it permits only current administrator review of the same protected
-// public attempt. Every effect separately checks its original launch/material
-// interval. A historical successful attempt never activates a recovered DB.
-func (s *InitialPreparer) currentHandover(ctx context.Context) (*core.ConfigMap, contracts.InitialPreparationRoot, contracts.InitialInstaller, time.Time, error) {
-	return s.currentHandoverWithFinal(ctx, nil)
-}
-
 // Only the concrete runtime bridge supplies an alternate final protection. Its
 // policy is one of the two compiled candidates; every original root/input and
 // bootstrap check below remains mandatory. Ordinary history keeps the nil path.

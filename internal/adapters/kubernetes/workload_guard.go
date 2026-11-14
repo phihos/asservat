@@ -5,7 +5,6 @@ import (
 	"reflect"
 	"slices"
 	"strings"
-	"time"
 
 	"asservat.local/asservat/internal/contracts"
 	cfg "asservat.local/asservat/internal/domain/configuration"
@@ -17,7 +16,6 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 )
 
 const workloadMetadataDenial = "Asservat workload ownership administrator is required."
@@ -154,23 +152,4 @@ func EnsureWorkloadGuard(call context.Context, api kubernetes.Interface, plan cf
 		return zero, cfg.ErrUnavailable
 	}
 	return ensureAdmissionGuard(call, api, policy, binding, plan.Administrators)
-}
-
-// EnsureCapacityWorkloadGuard installs the hub cluster's workload metadata
-// guard over keys, with the capacity probe account of sources (ADR-247).
-func EnsureCapacityWorkloadGuard(ctx context.Context, config *rest.Config, installation string, admins []cfg.KubernetesActor, sources CapacitySources, keys contracts.InstallerWorkloadKeys) (*contracts.WorkloadMetadataGuard, error) {
-	api, err := installerAPI(config)
-	if err != nil {
-		return nil, cfg.ErrInvalid
-	}
-	call, end := context.WithTimeout(ctx, 30*time.Second)
-	defer end()
-	labels, annotations := slices.Sorted(slices.Values(keys.Labels)), slices.Sorted(slices.Values(keys.Annotations))
-	plan := cfg.WorkloadAdministration{Name: WorkloadGuardName(installation), Administrators: admins, LabelKeys: labels, AnnotationKeys: annotations,
-		ProbeNamespace: cfg.NamespaceRef{Name: sources.ProbeNamespace.Name, UID: sources.ProbeNamespace.UID}, ProbeAccount: cfg.NamespaceRef{Name: sources.ProbeAccount.Name, UID: sources.ProbeAccount.UID}}
-	g, err := EnsureWorkloadGuard(call, api, plan)
-	if err != nil {
-		return nil, err
-	}
-	return &contracts.WorkloadMetadataGuard{Guard: g, LabelKeys: labels, AnnotationKeys: annotations}, nil
 }

@@ -1,11 +1,9 @@
 package clusterobservation
 
 import (
-	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -17,7 +15,6 @@ import (
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/fleet"
-	"asservat.local/asservat/internal/domain/identity"
 )
 
 // LocalClient has one installed HTTPS origin and one process Pod identity. It
@@ -36,8 +33,6 @@ type LocalClient struct {
 	maximum, active          int
 	joined                   sync.WaitGroup
 }
-
-var _ app.ClusterObservationExchange = (*LocalClient)(nil)
 
 func NewLocalClient(ctx context.Context, origin, rootID, podUID string, roots *x509.CertPool, tokens app.ClusterObservationTokenReader, maximum int, now func() time.Time) (*LocalClient, error) {
 	u, e := url.Parse(origin)
@@ -71,75 +66,4 @@ func (c *LocalClient) Close() {
 	c.mu.Unlock()
 	c.joined.Wait()
 	c.transport.CloseIdleConnections()
-}
-
-func (c *LocalClient) ObserveCluster(ctx context.Context, request fleet.ClusterObservationRequest) (fleet.ClusterObservationResult, error) {
-	var zero fleet.ClusterObservationResult
-	if c == nil || ctx == nil || ctx.Err() != nil || !request.Valid(c.now()) || request.RootID != c.rootID || !c.enter() {
-		return zero, fleet.ErrUnavailable
-	}
-	defer c.leave()
-	request = request.Clone()
-	started := c.now()
-	until := identity.Earlier(started.Add(5*time.Second), request.NotAfter)
-	if d, ok := ctx.Deadline(); ok {
-		until = identity.Earlier(until, d)
-	}
-	call, cancel := context.WithDeadline(ctx, until)
-	defer cancel()
-	done := make(chan struct{})
-	stop := context.AfterFunc(c.root, func() { cancel(); close(done) })
-	defer func() {
-		if !stop() {
-			<-done
-		}
-	}()
-	token, e := c.tokens.ReadClusterObservationToken(call)
-	defer clear(token)
-	if e != nil || len(token) < 1 || len(token) > 16<<10 || !bytes.Equal(bytes.TrimSpace(token), token) || bytes.ContainsAny(token, " \t\r\n") || call.Err() != nil || !c.now().Before(until) {
-		return zero, fleet.ErrUnavailable
-	}
-	digest, e := RequestDigest(request)
-	if e != nil {
-		return zero, fleet.ErrInvalid
-	}
-	b, e := contracts.EncodeClusterObservationLocalRequest(contracts.ClusterObservationLocalRequest{Format: contracts.ClusterObservationLocalFormat, PodUID: c.podUID, Observation: RequestWire(request)})
-	if e != nil {
-		return zero, fleet.ErrInvalid
-	}
-	// No GetBody/redirect/cookie/proxy/retry path. An unknown POST is returned
-	// unavailable; the caller retains its original reconciliation disposition.
-	r, e := http.NewRequestWithContext(call, http.MethodPost, c.endpoint, io.NopCloser(bytes.NewReader(b)))
-	if e != nil {
-		return zero, fleet.ErrUnavailable
-	}
-	r.ContentLength = int64(len(b))
-	r.Header.Set("Authorization", "Bearer "+string(token))
-	r.Header.Set("Content-Type", contracts.ClusterObservationLocalMedia)
-	r.Header.Set("Accept", contracts.ClusterObservationLocalMedia)
-	response, e := c.client.Do(r)
-	if e != nil {
-		return zero, fleet.ErrUnavailable
-	}
-	defer response.Body.Close()
-	if response.TLS == nil || !response.TLS.HandshakeComplete || response.TLS.Version != tls.VersionTLS13 || response.TLS.NegotiatedProtocol != "h2" || len(response.TLS.VerifiedChains) == 0 || response.ProtoMajor != 2 || response.StatusCode != http.StatusOK || response.ContentLength < 1 || response.ContentLength > contracts.ClusterObservationBytes || len(response.TransferEncoding) != 0 || len(response.Header.Values("Content-Encoding")) != 0 || len(response.Header.Values("Set-Cookie")) != 0 || len(response.Header.Values("Content-Type")) != 1 || response.Header.Get("Content-Type") != contracts.ClusterObservationLocalMedia || len(response.Header.Values("Cache-Control")) != 1 || response.Header.Get("Cache-Control") != "no-store" {
-		return zero, fleet.ErrUnavailable
-	}
-	data, e := io.ReadAll(io.LimitReader(response.Body, contracts.ClusterObservationBytes+1))
-	if e != nil || len(data) != int(response.ContentLength) || len(data) > contracts.ClusterObservationBytes || call.Err() != nil || !c.now().Before(until) {
-		return zero, fleet.ErrUnavailable
-	}
-	w, e := contracts.DecodeClusterObservationResult(data)
-	if e != nil {
-		return zero, fleet.ErrUnavailable
-	}
-	v, e := ParseResult(w, request, digest, c.now())
-	if e != nil {
-		return zero, e
-	}
-	v = v.Restrict(started, until)
-	if !v.Matches(request, digest, c.now()) || call.Err() != nil {
-		return zero, fleet.ErrUnavailable
-	}
-	return v, nil
 }

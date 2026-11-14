@@ -116,9 +116,6 @@ type ClusterObservationReceipt struct {
 	RequestDigest string `json:"requestDigest"`
 }
 
-func EncodeClusterObservationHello(v ClusterObservationHello) ([]byte, error) {
-	return canonicalAPIContext(v, 1024)
-}
 func DecodeClusterObservationHello(b []byte) (ClusterObservationHello, error) {
 	return decodeClosedRPC[ClusterObservationHello](bytes.NewReader(b), 1024)
 }
@@ -130,7 +127,4 @@ func DecodeClusterObservationProbe(b []byte) (ClusterObservationProbe, error) {
 }
 func EncodeClusterObservationReceipt(v ClusterObservationReceipt) ([]byte, error) {
 	return canonicalAPIContext(v, 1024)
-}
-func DecodeClusterObservationReceipt(b []byte) (ClusterObservationReceipt, error) {
-	return decodeClosedRPC[ClusterObservationReceipt](bytes.NewReader(b), 1024)
 }

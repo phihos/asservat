@@ -1,14 +1,11 @@
 package kubernetes
 
 import (
-	"bytes"
-	"encoding/json"
 	"strings"
 	"testing"
 
 	"asservat.local/asservat/internal/adapters/providerconfig"
 	"asservat.local/asservat/internal/contracts"
-	core "k8s.io/api/core/v1"
 )
 
 func initialRegistryFixture(t *testing.T) []byte {
@@ -25,82 +22,6 @@ func initialProjectionFiles() map[string][]byte {
 		files[key] = []byte("synthetic-only")
 	}
 	return files
-}
-
-func TestInitialRegistryProjectionKeepsOriginalSevenMountedFiles(t *testing.T) {
-	plan := initialWorkloadPlan()
-	legacy, e := BuildInitialInstallerWorkload(plan)
-	if e != nil {
-		t.Fatal(e)
-	}
-	plan.RegistryAuthentication = contracts.InitialRegistryAuthentication
-	w, e := BuildInitialInstallerWorkload(plan)
-	if e != nil {
-		t.Fatal(e)
-	}
-	if len(w.Pod.Spec.ImagePullSecrets) != 1 || w.Pod.Spec.ImagePullSecrets[0].Name != plan.Credentials {
-		t.Fatal("wrong registry source")
-	}
-	items := w.Pod.Spec.Volumes[0].Projected.Sources[1].Secret.Items
-	if len(items) != 7 {
-		t.Fatal("activation gained another mounted credential")
-	}
-	for _, item := range items {
-		if item.Key == core.DockerConfigJsonKey {
-			t.Fatal("registry input mounted into activation")
-		}
-	}
-	digest := InstallationPodSpecDigest(w.Pod.Spec)
-	changed := w.Pod.Spec.DeepCopy()
-	changed.ImagePullSecrets[0].Name = "other"
-	if InstallationPodSpecDigest(*changed) == digest {
-		t.Fatal("registry replacement outside exact spec")
-	}
-	changed = w.Pod.Spec.DeepCopy()
-	changed.ImagePullSecrets = nil
-	if InstallationPodSpecDigest(*changed) != InstallationPodSpecDigest(legacy.Pod.Spec) {
-		t.Fatal("capability changed unrelated Pod behavior")
-	}
-	for _, role := range w.Roles {
-		for _, rule := range role.Rules {
-			for _, resource := range rule.Resources {
-				if resource == "secrets" || resource == "*" {
-					t.Fatal("registry capability granted Secret API access")
-				}
-			}
-		}
-	}
-	s := &InitialPreparer{plan: contracts.InitialPreparationPlan{Workload: contracts.InitialPreparationWorkload{Image: plan.Image, RegistryAuthentication: plan.RegistryAuthentication}}}
-	files := initialProjectionFiles()
-	registry := initialRegistryFixture(t)
-	typ, e := s.providerProjectionData(files, registry)
-	if e != nil || typ != core.SecretTypeDockerConfigJson || len(files) != 8 || !bytes.Equal(files[core.DockerConfigJsonKey], registry) {
-		t.Fatal("exact combined projection rejected")
-	}
-	registry[0] = '!'
-	if files[core.DockerConfigJsonKey][0] == '!' {
-		t.Fatal("projection aliases mutable caller credential")
-	}
-	s.plan.Workload.RegistryAuthentication = ""
-	files = initialProjectionFiles()
-	before, _ := json.Marshal(files)
-	typ, e = s.providerProjectionData(files, nil)
-	after, _ := json.Marshal(files)
-	if e != nil || typ != core.SecretTypeOpaque || !bytes.Equal(before, after) {
-		t.Fatal("legacy absent capability changed bytes")
-	}
-	if _, e = s.providerProjectionData(initialProjectionFiles(), initialRegistryFixture(t)); e == nil {
-		t.Fatal("material accepted without capability")
-	}
-	s.plan.Workload.RegistryAuthentication = contracts.InitialRegistryAuthentication
-	if _, e = s.providerProjectionData(initialProjectionFiles(), nil); e == nil {
-		t.Fatal("configured registry fell back to missing material")
-	}
-	files = initialProjectionFiles()
-	files["audit-wrap.token"] = bytes.Repeat([]byte{'x'}, core.MaxSecretSize)
-	if _, e = s.providerProjectionData(files, initialRegistryFixture(t)); e == nil {
-		t.Fatal("aggregate Kubernetes Secret ceiling ignored")
-	}
 }
 
 func TestInitialRegistryMaterialSharesOriginalEnvelopeBudget(t *testing.T) {

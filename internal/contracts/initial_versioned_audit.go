@@ -22,6 +22,3 @@ func InitialInstallerFormatForServices(format string) string {
 		return ""
 	}
 }
-func InitialInstallerFormatSupported(format string) bool {
-	return format == InitialInstallerFormat || format == InitialInstallerVersionedAuditFormat
-}

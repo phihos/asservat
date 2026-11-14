@@ -1,15 +1,15 @@
 # Asservat Helm chart
 
-Helm is Asservat's supported installation method. One hub release per
-installation (`mode: hub`), one release per workload cluster
-(`mode: cluster`), or one release for a single cluster (`mode: combined`).
-Helm renders every Kubernetes object; Plain Kubernetes RBAC and Pod Security
-`restricted` protect the release namespace.
+Helm is the only installation method. Use one release per hub
+(`mode: hub`), one per workload cluster (`mode: cluster`), or one for a single
+cluster (`mode: combined`). Helm renders every Kubernetes object; plain RBAC
+and Pod Security `restricted` protect the release namespace.
 
-PostgreSQL, S3-compatible storage, the key provider and the OpenID Connect
-identity provider default to externally operated services. Each can be
-replaced by a bundled workload (`services.*`); see the
-[bundled-services guide](../../docs/installation/small-profile.md).
+PostgreSQL, the object store, the key service and the OpenID Connect provider
+default to external services. Each can be replaced by a bundled workload
+under `services.*`. [Install with Helm](../../docs/installation/helm.md) is the
+full guide; the [quick trial](../../docs/installation/small-profile.md) installs
+everything bundled in one cluster.
 
 ## Install
 
@@ -22,11 +22,12 @@ helm upgrade --install asservat ./charts/asservat \
   --kube-context MANAGEMENT_CONTEXT \
   --namespace asservat-system --create-namespace \
   --skip-crds -f site-values.yaml
+kubectl --context MANAGEMENT_CONTEXT -n asservat-system wait \
+  --for=condition=Complete --timeout=15m job -l app.kubernetes.io/component=setup
 ```
 
 `site-values.yaml` sets at least `image`, `origin`, `identity` and the
-selected providers. An installation proceeds in three steps, all driven by
-this one command:
+selected providers. This one command drives three steps:
 
 1. The `secrets` hook Job (pre-install, pre-upgrade) creates every missing
    generated Secret and never changes an existing value.
@@ -35,8 +36,7 @@ this one command:
    runtime SQL roles and configures bundled OpenBao and SeaweedFS. Hub
    workloads wait in an init container until the schema is current.
 
-Configuration changes are applied with `helm upgrade` and the same values
-file. There is no installer Pod and no resume command.
+Apply configuration changes with `helm upgrade` and the same values file.
 
 ## Values
 
@@ -54,7 +54,7 @@ file. There is no installer Pod and no resume command.
 | `exposure.ingress` | disabled | Generic Ingress: `className`, `annotations`, `tls`; the host is the origin host |
 | `exposure.httpRoute` | disabled | Generic Gateway API HTTPRoute: `parentRefs`, `annotations`; the hostname is the origin host |
 | `fleet` | see values.yaml | Fleet enrollment identity and bounds |
-| `capacity`, `retention`, `federation` | omitted | Capacity root, baseline retention and federation listeners; former installer field names |
+| `capacity`, `retention`, `federation.connector` | omitted | Capacity sources, baseline retention policy and regional connector limits; `mode: combined` needs `capacity.backup` and `federation.connector` |
 | `region` | see values.yaml | Connector settings for `cluster` and `combined` |
 | `hub.<component>` | see values.yaml | `replicas`, `resources`, `nodeSelector`, `tolerations` of hub-api, hub-worker, federation, key-service, publisher |
 | `secrets.<key>.existingSecret` | none | Use an existing Secret instead of generating it (see below) |
@@ -80,7 +80,8 @@ Its Role can only create Secrets and get or patch the named ones.
 | `<name>-audit-mac` | `inputVersion`, `inputKey`, `accountVersion`, `accountKey` |
 | `<name>-artifact-key` | `keys.json`, the local artifact root keyset |
 | `<name>-s3-<principal>` | `credentials.json`, bundled SeaweedFS only |
-| `<name>-objectstore-iam` | `s3.json`, compiled from the s3 credentials |
+| `<name>-objectstore-iam` | `s3.json` and `bucket-policies.json`, compiled from the s3 credentials |
+| `<name>-federation-tls`, `<name>-key-service-tls` | `tls.crt`, `tls.key`, `ca.crt`; only without `hub.<component>.tls.existingSecret` or `issuerRef` |
 | `<name>-postgres-state`, `-keycloak-state`, `-objectstore-state`, `-openbao-state` | bundled provider state |
 
 Override one with `secrets.<key>.existingSecret`, for example
@@ -93,11 +94,12 @@ Secret; present keys keep their values.
 
 `<name>-setup-<hash>` is an ordinary Job, not a hook. Its name changes with
 the chart version, the image and the values, so every change runs it once.
-It mounts `<name>-ids`, every `<name>-sql-*` Secret, the selected providers'
-administrator credentials and the component ConfigMaps. Its Role allows
-only `get` on ConfigMaps in the release namespace and on the namespace
-itself. External PostgreSQL needs `services.postgres.external.adminSecret`,
-a Secret with an administrator `credentials.json`.
+It mounts `<name>-ids`, every `<name>-sql-*` Secret, the bundled providers'
+administrator credentials or `services.postgres.external.adminSecret`, and
+its own `<name>-setup-config`. Its RBAC allows only `get` on the
+`<name>-fleet` ConfigMap and on the release namespace. It configures OpenBao
+and SeaweedFS only when they are bundled; see
+[external services](../../docs/installation/helm.md#choose-bundled-or-external-services).
 
 ## Node collector (test hosts only)
 
@@ -121,8 +123,9 @@ helm upgrade asservat ./charts/asservat --kube-context MANAGEMENT_CONTEXT \
 ```
 
 The schema only moves forward: a rollback keeps it, and an older image
-refuses a newer schema. `helm uninstall` keeps PVCs, CRDs and the generated
-Secrets. Erasing an installation is a separate, explicit step.
+refuses a newer schema. `helm uninstall` keeps CRDs, PVCs, the generated
+Secrets and objects marked `helm.sh/resource-policy: keep`. Erasing an
+installation is a separate, explicit step.
 
 ## Package without publishing
 
@@ -130,4 +133,5 @@ Secrets. Erasing an installation is a separate, explicit step.
 helm package ./charts/asservat --destination ./dist
 ```
 
-No chart repository or OCI release has been published.
+No chart repository, OCI chart or image release has been published; build
+the images from source.

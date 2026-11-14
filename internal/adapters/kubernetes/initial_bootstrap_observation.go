@@ -32,29 +32,6 @@ func bootstrapObservationValue(d contracts.InitialBootstrap, s contracts.Initial
 	return contracts.InitialBootstrapObservation{Format: contracts.InitialBootstrapObservationFormat, Desired: d, Prelude: s.Prelude, InstallationID: s.InstallationID, RequestID: s.RequestID, ClusterID: s.ClusterID, Projection: *s.Projection, ResourceVersion: s.Creates[7].Receipt.ResourceVersion, OperationID: s.Creates[7].OperationID, PlanDigest: preparationPlanDigest(c.Plan), ProjectionDigest: bootstrapPublicDigest(c)}, nil
 }
 
-// ObservationProjection reads the private seed only in the trusted producer.
-// Consumers receive its fixed public projection and never read the seed.
-func (s *InitialBootstrap) ObservationProjection(ctx context.Context) (contracts.InitialBootstrapObservation, error) {
-	var zero contracts.InitialBootstrapObservation
-	bounded, end, err := s.enter(ctx)
-	if err != nil {
-		return zero, err
-	}
-	defer end()
-	if err = s.current(bounded); err != nil {
-		return zero, err
-	}
-	_, state, err := s.readSeed(bounded)
-	if err != nil {
-		return zero, err
-	}
-	c, ready, err := s.readProjection(bounded, state)
-	if err != nil || !ready {
-		return zero, cfg.ErrUnavailable
-	}
-	return bootstrapObservationValue(s.desired, state, c)
-}
-
 // InitialBootstrapObserver owns only original public observations and a
 // bounded observation-only credential. No method creates identities, reads a
 // private seed, touches SQL/providers or refreshes a target one-use token.
@@ -208,10 +185,4 @@ func (s *InitialBootstrapObserver) Close() {
 	s.mu.Lock()
 	s.token = ""
 	s.mu.Unlock()
-}
-
-// MatchesInitialPreparer is only an immutable public scope comparison. It is
-// not an observation, authentication result or effect permit.
-func (s *InitialBootstrapObserver) MatchesInitialPreparer(c contracts.InitialPreparer) bool {
-	return s != nil && bootstrapObservationMatches(s.projection, c)
 }

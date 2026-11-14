@@ -10,13 +10,11 @@ import (
 )
 
 const SmallOpenBaoFormat = "asservat-small-openbao/v1"
-const SmallOpenBaoImage = "ghcr.io/openbao/openbao@sha256:5046911075e137e154ce49ab051502f4ec7cf367d484ae4a4dce665d9b90561f"
 const SmallOpenBaoVersion = "2.7.2"
 const SmallOpenBaoPlanLimit = 96 << 10
 const SmallOpenBaoStateLimit = 192 << 10
 const SmallOpenBaoRoot = "/run/asservat/openbao"
 const SmallOpenBaoData = "/data"
-const SmallOpenBaoExecutable = "/usr/bin/bao"
 const SmallOpenBaoPlanKey = "plan.json"
 const SmallOpenBaoBackendKey = "backend-id"
 const SmallOpenBaoSealKey = "seal.key"
@@ -36,10 +34,6 @@ const SmallOpenBaoConnectorPKIMount = "connector-pki"
 const SmallOpenBaoWorkerPKIMount = "worker-pki"
 const SmallOpenBaoBootstrapMount = "fleet-bootstrap"
 const SmallOpenBaoInitialIssuerRole = "asservat-install-issuer-issue"
-
-func SmallOpenBaoInitialProviders() InitialBootstrapProviders {
-	return InitialBootstrapProviders{IssuerPolicy: "asservat-install-issuer", WrapRole: "asservat-install-wrap", WrapPolicy: "asservat-install-encrypt", UnwrapRole: "asservat-install-unwrap", UnwrapPolicy: "asservat-install-decrypt"}
-}
 
 var smallOpenBaoImage = regexp.MustCompile(`^[a-zA-Z0-9./:_-]+@sha256:[a-f0-9]{64}$`)
 
@@ -83,10 +77,4 @@ func (p SmallOpenBaoPlan) SetupAudience() string   { return SmallOpenBaoSetupAud
 
 func DecodeSmallOpenBaoPlan(r io.Reader) (SmallOpenBaoPlan, error) {
 	return decodeClosedRPC[SmallOpenBaoPlan](r, SmallOpenBaoPlanLimit)
-}
-
-// SmallOpenBaoServerCommand is a fresh fixed slice, overriding the upstream
-// image's dev-mode default and privileged entrypoint.
-func SmallOpenBaoServerCommand() []string {
-	return []string{SmallOpenBaoExecutable, "server", "-config=" + SmallOpenBaoRoot + "/" + SmallOpenBaoConfigKey}
 }

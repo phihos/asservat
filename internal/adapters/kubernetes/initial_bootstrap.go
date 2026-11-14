@@ -300,20 +300,6 @@ func (s *InitialBootstrap) current(ctx context.Context) error {
 	return nil
 }
 
-// ProbeToken is only for the exact existing initial-schema/initial-prepare
-// fixed private projection. It never supplies a setup interval or effect proof.
-func (s *InitialBootstrap) ProbeToken(ctx context.Context) (string, time.Time, error) {
-	bounded, end, e := s.enter(ctx)
-	if e != nil {
-		return "", time.Time{}, e
-	}
-	defer end()
-	if e = s.current(bounded); e != nil {
-		return "", time.Time{}, e
-	}
-	return s.probeToken, s.probeUntil, nil
-}
-
 func bootstrapProbeMarker(d contracts.InitialBootstrap, name string) *core.ConfigMap {
 	return &core.ConfigMap{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "ConfigMap"}, ObjectMeta: bootstrapMeta(d, name), Data: map[string]string{"purpose": "Asservat independent bootstrap observation"}}
 }

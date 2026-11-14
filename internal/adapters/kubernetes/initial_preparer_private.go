@@ -13,8 +13,6 @@ import (
 	core "k8s.io/api/core/v1"
 )
 
-func (s *InitialPreparer) PrivateInputsEnabled() bool { return s != nil && s.plan.PrivateState != nil }
-
 func validInitialPrivateTime(v time.Time) bool {
 	return !v.IsZero() && v.Location() == time.UTC && v.Equal(v.Truncate(time.Microsecond))
 }

@@ -1,8 +1,6 @@
 package contracts
 
 import (
-	"encoding/json"
-	"io"
 	"strings"
 )
 
@@ -11,59 +9,15 @@ import (
 const (
 	InstallerContinuationFormat = "asservat-installer-continuation/v1"
 	InstallerContinuationRoot   = "/run/asservat/installer-continue"
-	InstallerContinuationFile   = "continuation.json"
 	// The installer runner's retirement step refreshes the preparer here.
 	InstallerContinuationPreparerRoot = "/run/asservat/initial-preparer"
-	InstallerContinuationMaxBytes     = 64 << 10
-	InstallerRecipeOutboxFormat       = "asservat-installer-recipe-outbox/v1"
 	// The operator's inbox Secret keys. Only the continuation reads them and
 	// deletes the inbox after the phase consumed it.
-	InstallerInboxPhase           = "phase"
-	InstallerInboxInspectionToken = "inspection-token"
-	InstallerInboxAuditCredential = "audit-storage.json"
-	// InstallerInboxFederationAuditCredential is the federation's separate
-	// audit storage principal in the phase-3 inbox (ADR-193).
-	InstallerInboxFederationAuditCredential = "federation-audit-storage.json"
-	// The publisher's audit and evidence read principals in the phase-3
-	// inbox (ADR-203).
-	InstallerInboxPublisherAuditCredential = "publisher-audit-storage.json"
-	InstallerInboxEvidenceReadCredential   = "evidence-read.json"
-	// InstallerInboxDownloadEvidenceCredential is the download workers'
-	// separate read-only evidence principal in the phase-3 inbox (ADR-204
-	// decision 5); it is copied only into the worker namespace's store Secret.
-	InstallerInboxDownloadEvidenceCredential = "download-evidence-read.json"
-	// InstallerInboxEvidenceDeleteCredential is the context deletion child's
-	// evidence list-and-delete principal in the phase-3 inbox (ADR-205
-	// decision 4); it is copied only into EvidenceDeleteCredentialName.
-	InstallerInboxEvidenceDeleteCredential = "evidence-delete.json"
-	InstallerInboxCleanupAuditCredential   = "cleanup-audit.json"
-	InstallerInboxCleanupVerifyCredential  = "cleanup-verify.json"
-	InstallerInboxFederationTLSCertificate = "federation-tls.crt"
-	InstallerInboxFederationTLSKey         = "federation-tls.key"
-	InstallerInboxFederationTLSCA          = "federation-ca.crt"
-	InstallerInboxKeyServiceTLSCertificate = "key-service-tls.crt"
-	InstallerInboxKeyServiceTLSKey         = "key-service-tls.key"
-	InstallerInboxKeyServiceTLSCA          = "key-service-ca.crt"
+	InstallerInboxPhase                   = "phase"
+	InstallerInboxAuditCredential         = "audit-storage.json"
+	InstallerInboxCleanupAuditCredential  = "cleanup-audit.json"
+	InstallerInboxCleanupVerifyCredential = "cleanup-verify.json"
 )
-
-// InstallerServingTLSPlan is public hostname selection in the phase-3 recipe.
-// Private material is supplied only through the operator inbox, never values.
-type InstallerServingTLSPlan struct {
-	FederationServerName string `json:"federationServerName,omitempty"`
-	KeyServiceServerName string `json:"keyServiceServerName,omitempty"`
-}
-
-func InstallerInboxServingTLSFiles() []string {
-	return []string{InstallerInboxFederationTLSCertificate, InstallerInboxFederationTLSKey, InstallerInboxFederationTLSCA,
-		InstallerInboxKeyServiceTLSCertificate, InstallerInboxKeyServiceTLSKey, InstallerInboxKeyServiceTLSCA}
-}
-
-// InstallerInboxPublicFiles are the operator's public material in a promoted
-// phase-3 inbox (ADR-194 decision 11), keyed by the owner's fixed public
-// file names; the continuation writes them into OwnerPublicProjectionName.
-func InstallerInboxPublicFiles() []string {
-	return []string{OwnerPublicClientSecretFile, OwnerPublicTLSCertificate, OwnerPublicTLSKey}
-}
 
 type InstallerContinuation struct {
 	Format         string `json:"format"`
@@ -229,47 +183,10 @@ func FederationServingSecretName(installationID string) string {
 	return "asservat-" + strings.ReplaceAll(installationID, "-", "") + "-federation-tls"
 }
 
-// FederationAuditSecretName is the federation's audit storage Secret, filled
-// from the phase-3 inbox.
-func FederationAuditSecretName(installationID string) string {
-	return "asservat-" + strings.ReplaceAll(installationID, "-", "") + "-federation-audit"
-}
-
 // InstallerProviderSelection is an operator-created Kubernetes auth mount.
 type InstallerProviderSelection struct {
 	AuthMount         string `json:"authMount"`
 	AuthMountAccessor string `json:"authMountAccessor"`
-}
-
-// InstallerRecipeOutbox is the public recipe a continuation phase waits on.
-const (
-	InstallerProviderBundledKeyService  = "bundled-keyservice"
-	InstallerProviderBundledObjectStore = "bundled-objectstore"
-)
-
-func InstallerProviderModeValid(mode string) bool {
-	return mode == "" || mode == InstallerProviderBundledObjectStore
-}
-
-type InstallerRecipeOutbox struct {
-	// Present only for mixed provider selections; empty preserves both existing paths.
-	ProviderMode string          `json:"providerMode,omitempty"`
-	Format       string          `json:"format"`
-	Phase        int             `json:"phase"`
-	Purpose      string          `json:"purpose"`
-	Recipe       json.RawMessage `json:"recipe"`
-}
-
-func InstallerRecipeOutboxName(installationID string) string {
-	return "asservat-" + strings.ReplaceAll(installationID, "-", "") + "-installer-outbox"
-}
-
-func InstallerInboxName(installationID string) string {
-	return "asservat-" + strings.ReplaceAll(installationID, "-", "") + "-installer-inbox"
-}
-
-func DecodeInstallerContinuation(r io.Reader) (InstallerContinuation, error) {
-	return decodeClosedRPC[InstallerContinuation](r, InstallerContinuationMaxBytes)
 }
 
 // InstallerRetentionBaseline is the empty-scope baseline policy's operator
@@ -284,9 +201,4 @@ type InstallerRetentionDurations struct {
 	EvidenceSeconds      int64 `json:"evidenceSeconds"`
 	CaseMetadataSeconds  int64 `json:"caseMetadataSeconds"`
 	AuditMetadataSeconds int64 `json:"auditMetadataSeconds"`
-}
-
-// RetentionBaselineName is the fixed baseline policy name (ADR-195).
-func RetentionBaselineName(installationID string) string {
-	return "asservat-" + strings.ReplaceAll(installationID, "-", "") + "-baseline"
 }

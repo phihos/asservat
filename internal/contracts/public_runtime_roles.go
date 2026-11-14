@@ -8,10 +8,8 @@ import (
 
 const PublicRuntimeRolesFormat = "asservat-public-runtime-roles/v1"
 const PublicRuntimeRoleStateFormat = "asservat-public-runtime-role-state/v1"
-const PublicRuntimeRoleMaxBytes = 48 << 10
 const PublicRuntimeCredentialManifestFormat = "asservat-public-runtime-credentials/v1"
 const PublicRuntimeCredentialManifestFile = "public-roles.json"
-const PublicRuntimeCredentialManifestMaxBytes = 32 << 10
 
 // ErrPublicRuntimeLayout refuses unsupported retained development state without
 // adopting, rewriting or removing it.
@@ -311,15 +309,8 @@ type PublicRuntimeCredentialProof struct {
 	Receipt PublicRuntimeRoleReceipt `json:"receipt"`
 }
 
-func DecodePublicRuntimeCredentialManifest(r io.Reader) (PublicRuntimeCredentialManifest, error) {
-	return decodeClosedRPC[PublicRuntimeCredentialManifest](r, PublicRuntimeCredentialManifestMaxBytes)
-}
-
 func DecodePublicRuntimeRoles(r io.Reader) (PublicRuntimeRoles, error) {
 	return decodeClosedRPC[PublicRuntimeRoles](r, 8192)
-}
-func DecodePublicRuntimeRoleState(r io.Reader) (PublicRuntimeRoleState, error) {
-	return decodeClosedRPC[PublicRuntimeRoleState](r, PublicRuntimeRoleMaxBytes)
 }
 func (PublicRuntimeRoleState) String() string      { return "protected public runtime role state" }
 func (PublicRuntimeRoleState) GoString() string    { return "protected public runtime role state" }

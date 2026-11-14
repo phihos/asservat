@@ -24,8 +24,6 @@ import (
 // another CREATE or replacement. Warnings and changed generation are not pending.
 var ErrInitialPreparationPolicyPending = fmt.Errorf("%w: original policy compilation pending", cfg.ErrUnavailable)
 
-func (s *InitialPreparer) FinalInputsEnabled() bool { return s != nil && s.services != nil }
-
 func (s *InitialPreparer) checkedServices(v contracts.InitialPreparationServices) (contracts.InitialPreparationServices, error) {
 	var zero contracts.InitialPreparationServices
 	raw, e := json.Marshal(v)

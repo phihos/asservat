@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"maps"
 	"slices"
-	"strconv"
 	"time"
 
 	"asservat.local/asservat/internal/domain/authorization"
@@ -70,8 +69,6 @@ func NewNamespaceJournal(l value.NamespaceList) (*NamespaceJournal, error) {
 	}
 	return j, nil
 }
-
-func (j *NamespaceJournal) Keys() value.NamespaceKeys { return j.keys }
 
 // Apply processes one watch transition. A namespace without observed keys is
 // not tracked; an invalid or inconsistent transition poisons the journal.
@@ -156,25 +153,5 @@ func (j *NamespaceJournal) Observation(live bool) *value.NamespaceObservation {
 		o.Namespaces = append(o.Namespaces, n)
 	}
 	slices.SortFunc(o.Namespaces, func(a, b value.ObservedNamespace) int { return cmp.Compare(a.UID, b.UID) })
-	return o
-}
-
-// Sequence counts the observed-value transitions this journal applied.
-func (j *NamespaceJournal) Sequence() int64 { return j.sequence }
-
-// VersionedObservation is the current state with each namespace's
-// ResourceVersion replaced by "<journal>:<changes>": a version that stays
-// equal across writes that leave every observed key value unchanged and
-// changes with any transition of one (A -> B -> A included), for as long as
-// this journal lives (ADR-247). A new journal has a new ID, so a relist
-// never claims continuity.
-func (j *NamespaceJournal) VersionedObservation(journal string) *value.NamespaceObservation {
-	o := j.Observation(true)
-	if o == nil {
-		return nil
-	}
-	for i := range o.Namespaces {
-		o.Namespaces[i].ResourceVersion = journal + ":" + strconv.FormatInt(j.changes[o.Namespaces[i].UID], 10)
-	}
 	return o
 }

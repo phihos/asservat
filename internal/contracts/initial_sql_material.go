@@ -1,7 +1,5 @@
 package contracts
 
-import "io"
-
 const InitialSQLMaterialFormat = "asservat-initial-sql-material/v1"
 
 // This immutable private bootstrap input contains unissued random password
@@ -16,8 +14,5 @@ type InitialSQLMaterial struct {
 	ActivationPassword  string `json:"activationPassword"`
 }
 
-func DecodeInitialSQLMaterial(r io.Reader) (InitialSQLMaterial, error) {
-	return decodeClosedRPC[InitialSQLMaterial](r, 2048)
-}
 func (InitialSQLMaterial) String() string   { return "protected initial SQL material" }
 func (InitialSQLMaterial) GoString() string { return "protected initial SQL material" }

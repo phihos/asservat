@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"asservat.local/asservat/internal/contracts"
 	core "k8s.io/api/core/v1"
@@ -138,17 +137,4 @@ func ownerBootstrapPlanFixture(f *ownerIdentityOperationFixture) contracts.Owner
 		roots[i] = append([]byte(nil), r...)
 	}
 	return contracts.OwnerBootstrapPlan{Format: contracts.OwnerBootstrapPlanFormat, PKIMount: "owner-pki", Connections: 4, Concurrency: 2, Peers: []contracts.OwnerBootstrapPeerPlan{{ClusterID: f.root.input.ClusterID, Roots: roots}}}
-}
-
-// Historical state for the existing runtime-reader component fixture only.
-// This does not replace the real allocation/CAS producer in composed tests.
-func ownerBootstrapRuntimeFixture(t *testing.T, in *contracts.OwnerDeployment, state *contracts.InitialRuntimeResourceState, account contracts.WorkerObjectReference) {
-	t.Helper()
-	at := state.OwnerIdentity.ClaimedAt
-	p := &contracts.OwnerBootstrapSelectionClaim{IssuerEpoch: in.Observation.Peers[0].IssuerEpoch, OperationID: ownerID(19500), PermissionRootID: in.PermissionRootID, PKIMount: in.KeyService.PKIMount, Connections: in.Connections, Concurrency: in.Concurrency, PublicDigest: ownerBootstrapDigest("synthetic-runtime-selection", in.PermissionRootID), ClaimedAt: at, Until: at.Add(time.Second), Child: &contracts.OwnerBootstrapObjectAttempt{OperationID: ownerID(19501), ClaimedAt: at, Until: at.Add(time.Second), Receipt: &contracts.OwnerBootstrapObjectReceipt{Object: contracts.WorkerObjectReference{Name: contracts.OwnerBootstrapSelectionName(in.InstallationID), UID: ownerID(19502)}, ResourceVersion: "53", ObservedAt: at}}}
-	for _, peer := range in.Observation.Peers {
-		p.Peers = append(p.Peers, contracts.OwnerBootstrapPeerAllocation{ClusterID: peer.ClusterID, PeerID: peer.PeerID, RootsDigest: ownerBootstrapDigest("roots", peer.Roots)})
-	}
-	in.KeyService.ServerRole, in.KeyService.ClientRole = ownerBootstrapPKIRoles(*in, account)
-	state.OwnerBootstrap = p
 }

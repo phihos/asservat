@@ -14,13 +14,6 @@ type ClusterObservationLocalRequest struct {
 	Observation ClusterObservationRequest `json:"observation"`
 }
 
-func EncodeClusterObservationLocalRequest(v ClusterObservationLocalRequest) ([]byte, error) {
-	b, e := canonicalAPIContext(v, ClusterObservationBytes)
-	if e != nil {
-		return nil, ErrClusterObservationProtocol
-	}
-	return b, nil
-}
 func DecodeClusterObservationLocalRequest(b []byte) (ClusterObservationLocalRequest, error) {
 	v, e := decodeClosedRPC[ClusterObservationLocalRequest](bytes.NewReader(b), ClusterObservationBytes)
 	if e != nil {

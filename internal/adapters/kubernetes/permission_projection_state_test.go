@@ -49,39 +49,3 @@ func TestPermissionProjectionOriginalReceiptBoundary(t *testing.T) {
 		})
 	}
 }
-
-// Only the permission compartment may change, once to claim and once to its
-// receipt, and never its identity, root or digest.
-func TestPermissionProjectionTransitionIsOneWay(t *testing.T) {
-	for _, mode := range []string{"claim", "complete", "claim-with-receipt", "same-pending", "change-root", "change-binding", "delete-claim"} {
-		t.Run(mode, func(t *testing.T) {
-			_, next, _ := permissionProjectionStateFixture()
-			old := next
-			pending := *next.PermissionProjection
-			pending.Receipt = nil
-			old.PermissionProjection = &pending
-			switch mode {
-			case "claim":
-				old.PermissionProjection = nil
-				claim := pending
-				next.PermissionProjection = &claim
-			case "claim-with-receipt":
-				old.PermissionProjection = nil
-			case "same-pending":
-				claim := pending
-				next.PermissionProjection = &claim
-			case "change-root":
-				claim := *next.PermissionProjection
-				claim.RootID = ownerID(1999)
-				next.PermissionProjection = &claim
-			case "change-binding":
-				next.BindingDigest = "changed"
-			case "delete-claim":
-				next.PermissionProjection = nil
-			}
-			if permissionProjectionTransition(old, next) != (mode == "claim" || mode == "complete") {
-				t.Fatal("permission-only CAS boundary differs", mode)
-			}
-		})
-	}
-}

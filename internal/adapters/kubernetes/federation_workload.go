@@ -1,16 +1,9 @@
 package kubernetes
 
 import (
-	"context"
-	"crypto/sha256"
-	"crypto/x509"
 	"encoding/hex"
 	"encoding/json"
-	"encoding/pem"
-	"errors"
-	"reflect"
 	"strings"
-	"time"
 
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/authorization"
@@ -18,12 +11,10 @@ import (
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation"
-	"k8s.io/client-go/rest"
 	"k8s.io/utils/ptr"
 )
 
@@ -123,204 +114,4 @@ func BuildFederationWorkload(namespace, image, ownerDeployment, ownerServiceAcco
 		Binding:        &rbac.RoleBinding{TypeMeta: meta.TypeMeta{APIVersion: rbac.SchemeGroupVersion.String(), Kind: "RoleBinding"}, ObjectMeta: meta.ObjectMeta{Name: name, Namespace: namespace}, Subjects: subjects, RoleRef: rbac.RoleRef{APIGroup: rbac.GroupName, Kind: "Role", Name: name}},
 		ClusterRole:    cluster,
 		ClusterBinding: &rbac.ClusterRoleBinding{TypeMeta: meta.TypeMeta{APIVersion: rbac.SchemeGroupVersion.String(), Kind: "ClusterRoleBinding"}, ObjectMeta: meta.ObjectMeta{Name: clusterName}, Subjects: subjects, RoleRef: rbac.RoleRef{APIGroup: rbac.GroupName, Kind: "ClusterRole", Name: clusterName}}}, nil
-}
-
-const federationTemplateAnnotation = "asservat.io/federation-template"
-
-// EnsureFederationWorkload creates every federation object, or reopens one
-// only when its recorded template digest is exactly this build's. It never
-// updates an existing object; a different template is a change.
-func EnsureFederationWorkload(ctx context.Context, config *rest.Config, w *FederationWorkload) error {
-	if ctx == nil || config == nil || w == nil {
-		return cfg.ErrInvalid
-	}
-	api, err := installerAPI(config)
-	if err != nil {
-		return cfg.ErrInvalid
-	}
-	call, end := context.WithTimeout(ctx, 30*time.Second)
-	defer end()
-	stamp := func(m *meta.ObjectMeta, v any) error {
-		b, e := json.Marshal(v)
-		if e != nil {
-			return cfg.ErrInvalid
-		}
-		d := sha256.Sum256(b)
-		m.Annotations = map[string]string{federationTemplateAnnotation: hex.EncodeToString(d[:])}
-		return nil
-	}
-	same := func(got, want meta.ObjectMeta) bool {
-		return got.DeletionTimestamp == nil && got.Annotations[federationTemplateAnnotation] == want.Annotations[federationTemplateAnnotation]
-	}
-	ns := w.Deployment.Namespace
-	if err = stamp(&w.Inputs.ObjectMeta, w.Inputs.Data); err != nil {
-		return err
-	}
-	if c, e := api.CoreV1().ConfigMaps(ns).Create(call, w.Inputs, meta.CreateOptions{}); apierrors.IsAlreadyExists(e) {
-		if c, e = api.CoreV1().ConfigMaps(ns).Get(call, w.Inputs.Name, meta.GetOptions{}); e == nil && !same(c.ObjectMeta, w.Inputs.ObjectMeta) {
-			return cfg.ErrChanged
-		}
-	} else if e != nil {
-		return cfg.ErrUnavailable
-	}
-	for _, step := range []func() error{
-		func() error {
-			r, e := api.RbacV1().Roles(ns).Create(call, w.Role, meta.CreateOptions{})
-			if apierrors.IsAlreadyExists(e) {
-				if r, e = api.RbacV1().Roles(ns).Get(call, w.Role.Name, meta.GetOptions{}); e == nil && !reflect.DeepEqual(r.Rules, w.Role.Rules) {
-					return cfg.ErrChanged
-				}
-			}
-			return e
-		},
-		func() error {
-			b, e := api.RbacV1().RoleBindings(ns).Create(call, w.Binding, meta.CreateOptions{})
-			if apierrors.IsAlreadyExists(e) {
-				if b, e = api.RbacV1().RoleBindings(ns).Get(call, w.Binding.Name, meta.GetOptions{}); e == nil && (!reflect.DeepEqual(b.Subjects, w.Binding.Subjects) || b.RoleRef != w.Binding.RoleRef) {
-					return cfg.ErrChanged
-				}
-			}
-			return e
-		},
-		func() error {
-			r, e := api.RbacV1().ClusterRoles().Create(call, w.ClusterRole, meta.CreateOptions{})
-			if apierrors.IsAlreadyExists(e) {
-				if r, e = api.RbacV1().ClusterRoles().Get(call, w.ClusterRole.Name, meta.GetOptions{}); e == nil && !reflect.DeepEqual(r.Rules, w.ClusterRole.Rules) {
-					return cfg.ErrChanged
-				}
-			}
-			return e
-		},
-		func() error {
-			b, e := api.RbacV1().ClusterRoleBindings().Create(call, w.ClusterBinding, meta.CreateOptions{})
-			if apierrors.IsAlreadyExists(e) {
-				if b, e = api.RbacV1().ClusterRoleBindings().Get(call, w.ClusterBinding.Name, meta.GetOptions{}); e == nil && (!reflect.DeepEqual(b.Subjects, w.ClusterBinding.Subjects) || b.RoleRef != w.ClusterBinding.RoleRef) {
-					return cfg.ErrChanged
-				}
-			}
-			return e
-		},
-		func() error {
-			if w.Service == nil { // the publisher serves nothing (ADR-203)
-				return nil
-			}
-			if e := stamp(&w.Service.ObjectMeta, w.Service.Spec); e != nil {
-				return e
-			}
-			s, e := api.CoreV1().Services(ns).Create(call, w.Service, meta.CreateOptions{})
-			if apierrors.IsAlreadyExists(e) {
-				if s, e = api.CoreV1().Services(ns).Get(call, w.Service.Name, meta.GetOptions{}); e == nil && !same(s.ObjectMeta, w.Service.ObjectMeta) {
-					return cfg.ErrChanged
-				}
-			}
-			return e
-		},
-		func() error {
-			if e := stamp(&w.Deployment.ObjectMeta, w.Deployment.Spec); e != nil {
-				return e
-			}
-			d, e := api.AppsV1().Deployments(ns).Create(call, w.Deployment, meta.CreateOptions{})
-			if apierrors.IsAlreadyExists(e) {
-				if d, e = api.AppsV1().Deployments(ns).Get(call, w.Deployment.Name, meta.GetOptions{}); e == nil && !same(d.ObjectMeta, w.Deployment.ObjectMeta) {
-					return cfg.ErrChanged
-				}
-			}
-			return e
-		},
-	} {
-		if e := step(); e != nil {
-			if errors.Is(e, cfg.ErrChanged) || errors.Is(e, cfg.ErrInvalid) {
-				return e
-			}
-			return cfg.ErrUnavailable
-		}
-	}
-	return nil
-}
-
-// ReadFederationServingRoots reads the operator's federation TLS Secret and
-// returns its CA roots for the offer. The certificate must name serverName
-// and chain to those roots.
-func ReadFederationServingRoots(ctx context.Context, config *rest.Config, namespace, installation, serverName string) ([][]byte, error) {
-	if !authorization.UUID(installation) {
-		return nil, cfg.ErrInvalid
-	}
-	return readServingRoots(ctx, config, namespace, contracts.FederationServingSecretName(installation), serverName)
-}
-
-// ReadKeyServiceServingRoots does the same for the key service's operator
-// TLS Secret (ADR-198); serverName is its endpoint's host.
-func ReadKeyServiceServingRoots(ctx context.Context, config *rest.Config, namespace, installation, serverName string) ([][]byte, error) {
-	if !authorization.UUID(installation) {
-		return nil, cfg.ErrInvalid
-	}
-	return readServingRoots(ctx, config, namespace, contracts.KeyServiceServingSecretName(installation), serverName)
-}
-
-func readServingRoots(ctx context.Context, config *rest.Config, namespace, secret, serverName string) ([][]byte, error) {
-	if ctx == nil || config == nil || namespace == "" || serverName == "" {
-		return nil, cfg.ErrInvalid
-	}
-	api, err := installerAPI(config)
-	if err != nil {
-		return nil, cfg.ErrInvalid
-	}
-	call, end := context.WithTimeout(ctx, 5*time.Second)
-	defer end()
-	s, err := api.CoreV1().Secrets(namespace).Get(call, secret, meta.GetOptions{})
-	if err != nil || s.Type != core.SecretTypeTLS || len(s.Data["tls.key"]) == 0 {
-		return nil, cfg.ErrUnavailable
-	}
-	defer clear(s.Data["tls.key"])
-	roots, err := ValidateInstallerServingTLS(s.Data["tls.crt"], s.Data["tls.key"], s.Data["ca.crt"], serverName, time.Now())
-	if err != nil || call.Err() != nil {
-		return nil, cfg.ErrInvalid
-	}
-	return roots, nil
-}
-
-// PublishRegionalOffer writes the public, immutable regional offer (ADR-193):
-// what a regional installer needs to write its connector source. It holds no
-// credential and confers no enrollment authority; a reopened offer must match.
-func PublishRegionalOffer(ctx context.Context, config *rest.Config, namespace string, offer contracts.RegionalOffer) error {
-	if ctx == nil || config == nil || namespace == "" || offer.Format != contracts.RegionalOfferFormat || !authorization.UUID(offer.InstallationID) {
-		return cfg.ErrInvalid
-	}
-	raw, err := json.Marshal(offer)
-	if err != nil {
-		return cfg.ErrInvalid
-	}
-	api, err := installerAPI(config)
-	if err != nil {
-		return cfg.ErrInvalid
-	}
-	call, end := context.WithTimeout(ctx, 5*time.Second)
-	defer end()
-	want := &core.ConfigMap{ObjectMeta: meta.ObjectMeta{Name: contracts.RegionalOfferName(offer.InstallationID)}, Immutable: ptr.To(true), Data: map[string]string{contracts.RegionalOfferFile: string(raw)}}
-	got, err := api.CoreV1().ConfigMaps(namespace).Create(call, want, meta.CreateOptions{})
-	if apierrors.IsAlreadyExists(err) {
-		if got, err = api.CoreV1().ConfigMaps(namespace).Get(call, want.Name, meta.GetOptions{}); err == nil && !reflect.DeepEqual(got.Data, want.Data) {
-			return cfg.ErrChanged
-		}
-	}
-	if err != nil {
-		return cfg.ErrUnavailable
-	}
-	return nil
-}
-
-// pemRoots parses a PEM bundle of CA certificates into DER roots.
-func pemRoots(bundle []byte) ([][]byte, error) {
-	var roots [][]byte
-	for rest := bundle; ; {
-		var b *pem.Block
-		if b, rest = pem.Decode(rest); b == nil {
-			return roots, nil
-		}
-		c, e := x509.ParseCertificate(b.Bytes)
-		if b.Type != "CERTIFICATE" || e != nil || !c.IsCA {
-			return nil, cfg.ErrInvalid
-		}
-		roots = append(roots, b.Bytes)
-	}
 }

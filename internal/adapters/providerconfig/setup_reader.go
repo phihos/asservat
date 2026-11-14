@@ -3,12 +3,10 @@ package providerconfig
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"encoding/json/jsontext"
 	"errors"
 	"io"
-	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -33,59 +31,6 @@ type SetupReader struct {
 	http              *http.Client
 	closed            bool
 	active            *setupObservation
-}
-
-func NewSetupReader(endpoint contracts.OwnerProviderEndpoint, inspectionToken []byte) (*SetupReader, error) {
-	if !validEndpoint(endpoint.Endpoint) || len(inspectionToken) < 1 || len(inspectionToken) > 4096 {
-		return nil, ErrSetupUnavailable
-	}
-	for _, b := range inspectionToken {
-		if b < 0x21 || b > 0x7e {
-			return nil, ErrSetupUnavailable
-		}
-	}
-	roots, _, err := mtls.OwnerTrustRoots(endpoint.Roots, time.Now())
-	if err != nil {
-		return nil, ErrSetupUnavailable
-	}
-	endpoint.Roots = cloneSetupRoots(endpoint.Roots)
-	transport := &http.Transport{
-		Proxy: nil, DialContext: (&net.Dialer{Timeout: 5 * time.Second}).DialContext,
-		TLSClientConfig:     &tls.Config{MinVersion: tls.VersionTLS12, RootCAs: roots},
-		TLSHandshakeTimeout: 5 * time.Second, ResponseHeaderTimeout: 5 * time.Second,
-		MaxResponseHeaderBytes: 16 << 10, MaxConnsPerHost: 1,
-		// Each named GET uses a fresh connection, avoiding transparent retry of
-		// a reused connection. The whole inspection has one original deadline.
-		DisableKeepAlives: true, DisableCompression: true,
-	}
-	return &SetupReader{endpoint: endpoint, token: bytes.Clone(inspectionToken), http: &http.Client{
-		Transport: transport, Timeout: 5 * time.Second,
-		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
-	}}, nil
-}
-
-// NewBundledSetupReader selects the local reviewer profile from an independently
-// protected original provider plan. The URL alone never selects this profile,
-// and construction grants neither installer nor Kubernetes TokenReview authority.
-// Every operation must match the plan's exact Kubernetes endpoint and DER roots.
-func NewBundledSetupReader(endpoint contracts.OwnerProviderEndpoint, inspectionToken []byte, plan contracts.SmallOpenBaoPlan) (*SetupReader, error) {
-	if !plan.Valid() || endpoint.Endpoint != plan.Endpoint() {
-		return nil, ErrSetupUnavailable
-	}
-	reader, err := NewSetupReader(endpoint, inspectionToken)
-	if err != nil {
-		return nil, err
-	}
-	reader.bundledKubernetes = &contracts.OwnerProviderEndpoint{Endpoint: plan.Kubernetes.Endpoint, Roots: cloneSetupRoots(plan.Kubernetes.Roots)}
-	return reader, nil
-}
-
-func cloneSetupRoots(roots [][]byte) [][]byte {
-	out := make([][]byte, len(roots))
-	for i, b := range roots {
-		out[i] = bytes.Clone(b)
-	}
-	return out
 }
 
 func sameSetupEndpoint(a, b contracts.OwnerProviderEndpoint) bool {

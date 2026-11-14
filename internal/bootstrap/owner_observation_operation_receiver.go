@@ -11,9 +11,7 @@ import (
 	"sync"
 	"time"
 
-	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/mtls"
-	"asservat.local/asservat/internal/adapters/postgres"
 	app "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/contracts"
 	value "asservat.local/asservat/internal/domain/fleet"
@@ -44,20 +42,6 @@ type OwnerObservationOperationReceiver struct {
 	closed                                       bool
 	active, maximum                              int
 	joined                                       sync.WaitGroup
-}
-type ownerRoutingNativeReader struct {
-	reader *kube.OwnerObservationOperationReader
-}
-
-func (r ownerRoutingNativeReader) OpenOwnerObservationOperation(ctx context.Context, q value.OwnerObservationRequest, peers []value.OwnerBinding) (app.OwnerNativeObservationOperation, error) {
-	return r.reader.Begin(ctx, q, peers)
-}
-
-func NewOwnerObservationOperationReceiver(ctx context.Context, pin value.OwnerObservationPin, server *mtls.OwnerCredentials, roots *x509.CertPool, registry *postgres.OwnerEnrollments, native *kube.OwnerObservationOperationReader, holder *wire.HubObservationOperationHolder, maximum int, now func() time.Time) (*OwnerObservationOperationReceiver, error) {
-	if registry == nil || native == nil {
-		return nil, value.ErrInvalid
-	}
-	return newOwnerObservationOperationReceiver(ctx, pin, server, roots, registry, ownerRoutingNativeReader{native}, holder, maximum, now)
 }
 
 // The private port seam is for deterministic failure tests, never deployment

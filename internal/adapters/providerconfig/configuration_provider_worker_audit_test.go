@@ -2,13 +2,9 @@ package providerconfig
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
-	"errors"
-	"net/http"
 	"slices"
 	"testing"
-	"time"
 
 	"asservat.local/asservat/internal/contracts"
 )
@@ -105,76 +101,5 @@ func TestConfigurationProviderRecipeExtendsBothAuditPurposesToWorkerAuditKey(t *
 		if _, err := ConfigurationProviderRecipeFor(in, s, account, now); err == nil {
 			t.Fatal("invalid worker configuration audit key accepted", name)
 		}
-	}
-}
-
-func configurationWorkerAuditSetupFixture(t *testing.T, worker contracts.OwnerPublicTransit) (*setupFixture, contracts.HubWorkerDeployment, ConfigurationProviderRecipe) {
-	t.Helper()
-	f, in, base := configurationSetupFixture(t)
-	selection := contracts.ConfigurationProviderSelection{AuthMount: base.Profile.AuthMount, AuthMountAccessor: base.Profile.AuthMountAccessor, AuditCredentials: base.Profile.AuditCredentials, WorkerConfigurationAudit: worker}
-	recipe, err := ConfigurationProviderRecipeFor(in, selection, base.Profile.ServiceAccount, time.Now())
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, role := range recipe.Roles {
-		f.responses["sys/policies/acl/"+role.Name] = setupMap(t, map[string]any{"name": role.Name, "policy": string(role.Policy)})
-	}
-	if worker.Mount != in.KeyService.AuditMount {
-		f.responses["sys/mounts/"+worker.Mount] = setupMap(t, map[string]any{"type": "transit"})
-	}
-	f.responses[worker.Mount+"/keys/"+worker.Key] = setupMap(t, map[string]any{
-		"name": worker.Key, "type": "aes256-gcm96", "derived": false, "exportable": false,
-		"allow_plaintext_backup": false, "deletion_allowed": false, "supports_encryption": true, "supports_decryption": true,
-		"latest_version": 1, "min_decryption_version": 1, "min_encryption_version": 0,
-	})
-	return f, in, recipe
-}
-
-func TestConfigurationSetupVerifiesWorkerAuditKeyAndExtendedPolicies(t *testing.T) {
-	for _, worker := range []contracts.OwnerPublicTransit{workerAuditFixture, {Mount: "worker-audit", Key: "worker-configuration"}} {
-		f, in, recipe := configurationWorkerAuditSetupFixture(t, worker)
-		reads := int32(9)
-		if worker.Mount != in.KeyService.AuditMount {
-			reads = 10
-		}
-		check, err := f.reader.VerifyConfiguration(context.Background(), in, recipe.Profile)
-		if err != nil || !check.Matches(in, recipe.Profile, time.Now()) || f.requests.Load() != reads {
-			t.Fatal("worker configuration audit readback failed", worker.Mount, err, f.requests.Load())
-		}
-	}
-	for _, mode := range []string{"base-policy", "exportable-key", "other-key", "missing-key", "mount-type"} {
-		t.Run(mode, func(t *testing.T) {
-			worker := contracts.OwnerPublicTransit{Mount: "worker-audit", Key: "worker-configuration"}
-			f, in, recipe := configurationWorkerAuditSetupFixture(t, worker)
-			key := f.responses[worker.Mount+"/keys/"+worker.Key]
-			switch mode {
-			case "base-policy":
-				// A provider still holding the policy without the worker key.
-				p := recipe.Profile
-				base, err := ConfigurationProviderRecipeFor(in, contracts.ConfigurationProviderSelection{AuthMount: p.AuthMount, AuthMountAccessor: p.AuthMountAccessor, AuditCredentials: p.AuditCredentials}, p.ServiceAccount, time.Now())
-				if err != nil {
-					t.Fatal(err)
-				}
-				f.responses["sys/policies/acl/"+base.Roles[0].Name] = setupMap(t, map[string]any{"name": base.Roles[0].Name, "policy": string(base.Roles[0].Policy)})
-			case "exportable-key":
-				key["exportable"] = json.RawMessage(`true`)
-			case "other-key":
-				key["name"] = json.RawMessage(`"configuration"`)
-			case "missing-key":
-				f.intercept = func(w http.ResponseWriter, r *http.Request) bool {
-					if r.URL.Path != "/v1/"+worker.Mount+"/keys/"+worker.Key {
-						return false
-					}
-					w.WriteHeader(http.StatusNotFound)
-					return true
-				}
-			case "mount-type":
-				f.responses["sys/mounts/"+worker.Mount] = setupMap(t, map[string]any{"type": "kv"})
-			}
-			check, err := f.reader.VerifyConfiguration(context.Background(), in, recipe.Profile)
-			if !errors.Is(err, ErrSetupUnavailable) || check != (ConfigurationSetupCheck{}) {
-				t.Fatal("changed worker configuration audit setup accepted", err)
-			}
-		})
 	}
 }

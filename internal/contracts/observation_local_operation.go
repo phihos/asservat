@@ -101,21 +101,8 @@ func EncodeClusterObservationLocalLocator(v ClusterObservationLocalLocator) ([]b
 	}
 	return encodeObservationRouting(v, ClusterObservationLocatorBytes)
 }
-func DecodeClusterObservationLocalLocator(b []byte) (ClusterObservationLocalLocator, error) {
-	v, err := decodeObservationRouting[ClusterObservationLocalLocator](b, ClusterObservationLocatorBytes)
-	if err != nil || !v.shape() {
-		return ClusterObservationLocalLocator{}, ErrClusterObservationProtocol
-	}
-	return v, nil
-}
 func (v ClusterObservationLocalClaim) shape() bool {
 	return v.Format == ClusterObservationLocalClaimFormat && routingUUID(v.PodUID) && (ClusterObservationOperationClaim{Format: ClusterObservationOperationClaimFormat, Request: v.Request, Locator: v.Locator}).shape()
-}
-func EncodeClusterObservationLocalClaim(v ClusterObservationLocalClaim) ([]byte, error) {
-	if !v.shape() {
-		return nil, ErrClusterObservationProtocol
-	}
-	return encodeObservationRouting(v, ClusterObservationClaimBytes)
 }
 func DecodeClusterObservationLocalClaim(b []byte) (ClusterObservationLocalClaim, error) {
 	v, err := decodeObservationRouting[ClusterObservationLocalClaim](b, ClusterObservationClaimBytes)

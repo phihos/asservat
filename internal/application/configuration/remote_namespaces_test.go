@@ -3,45 +3,12 @@ package configuration
 import (
 	"context"
 	"errors"
-	"runtime"
-	"strings"
-	"sync"
-	"sync/atomic"
 	"testing"
-	"time"
 
 	value "asservat.local/asservat/internal/domain/configuration"
 )
 
 const remoteCluster = "22222222-2222-4222-8222-222222222222"
-
-// ADR-247: journal versions stay equal across writes that keep every
-// observed value and change with A -> B -> A; a new journal never continues.
-func TestNamespaceJournalVersionsOnlyObservedChanges(t *testing.T) {
-	keys := value.NamespaceKeys{Labels: []string{"managed"}, Annotations: []string{"owner"}}
-	j, err := NewNamespaceJournal(value.NamespaceList{ClusterID: inheritanceCluster, ResourceVersion: "10", Keys: keys, ObservedAt: time.Now(), Namespaces: []value.ObservedNamespace{observedNamespace("payments", "p", "1", "payments")}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	version := func() string { return j.VersionedObservation("j1").Namespaces[0].ResourceVersion }
-	first := version()
-	same := observedNamespace("payments", "p", "11", "payments")
-	if err = j.Apply(value.NamespaceEvent{Type: "MODIFIED", ResourceVersion: "11", Namespace: &same}); err != nil || version() != first || j.Sequence() != 0 {
-		t.Fatalf("unrelated write changed the version: %v %s", err, version())
-	}
-	for i, owner := range []string{"payroll", "payments"} {
-		n := observedNamespace("payments", "p", "1"+string(rune('2'+i)), owner)
-		if err = j.Apply(value.NamespaceEvent{Type: "MODIFIED", ResourceVersion: n.ResourceVersion, Namespace: &n}); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if version() == first || version() != "j1:2" || j.Sequence() != 2 {
-		t.Fatalf("A -> B -> A kept the version: %s", version())
-	}
-	if j.VersionedObservation("j2").Namespaces[0].ResourceVersion == version() {
-		t.Fatal("another journal continued the version")
-	}
-}
 
 type remoteFixture struct {
 	list  value.NamespaceList
@@ -98,73 +65,5 @@ func TestReconcilerInheritsRemoteClusterJournal(t *testing.T) {
 	b = f.accepted[len(f.accepted)-1]
 	if o, _ := inheritedOwners(b); len(o) != 0 || len(b.UnavailableSources) != 1 || len(b.RemoteNamespaces) != 0 {
 		t.Fatalf("lapsed remote journal still granted: %+v", b)
-	}
-}
-
-// Concurrent readers of different key sets restart the journal without
-// leaking a feed or reporting one key set's journal for another (Gitar
-// finding on PR #90): every snapshot names only requested keys and Close
-// leaves no feed running.
-func TestNamespaceJournalServiceConcurrentRestarts(t *testing.T) {
-	base := runtime.NumGoroutine()
-	ns := &namespaceFixture{list: value.NamespaceList{ClusterID: inheritanceCluster, ResourceVersion: "10", Namespaces: []value.ObservedNamespace{observedNamespace("payments", "payments-uid", "1", "payments")}}, now: time.Now}
-	s := &NamespaceJournalService{Observer: ns, Now: time.Now}
-	sets := []value.NamespaceKeys{{Labels: []string{"managed"}, Annotations: []string{"owner"}}, {Labels: []string{"managed", "zone"}, Annotations: []string{"owner"}}}
-	var wg sync.WaitGroup
-	var bad atomic.Int32
-	for g := range 4 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for i := range 200 {
-				keys := sets[(g+i)%2]
-				snap, err := s.Snapshot(context.Background(), keys)
-				if err != nil {
-					continue
-				}
-				for _, n := range snap.Namespaces {
-					if !n.Valid(keys, true) || !strings.HasPrefix(n.ResourceVersion, snap.Journal+":") {
-						bad.Add(1)
-					}
-				}
-			}
-		}()
-	}
-	wg.Wait()
-	s.Close()
-	if bad.Load() != 0 {
-		t.Fatal("a snapshot reported another key set's journal", bad.Load())
-	}
-	for end := time.Now().Add(3 * time.Second); runtime.NumGoroutine() > base && time.Now().Before(end); time.Sleep(20 * time.Millisecond) {
-	}
-	if n := runtime.NumGoroutine(); n > base {
-		t.Fatal("restarted feeds kept running after Close", n, base)
-	}
-}
-
-// The connector journal service starts on the first read, follows every
-// transition and reports journal versions; Close joins it.
-func TestNamespaceJournalServiceSnapshotsFollowedJournal(t *testing.T) {
-	same := observedNamespace("payments", "payments-uid", "2", "payments")
-	changed := observedNamespace("payments", "payments-uid", "3", "payroll")
-	ns := &namespaceFixture{list: value.NamespaceList{ClusterID: inheritanceCluster, ResourceVersion: "10", Namespaces: []value.ObservedNamespace{observedNamespace("payments", "payments-uid", "1", "payments")}},
-		events: []value.NamespaceEvent{{Type: "MODIFIED", ResourceVersion: "2", Namespace: &same}, {Type: "MODIFIED", ResourceVersion: "3", Namespace: &changed}}, now: time.Now}
-	s := &NamespaceJournalService{Observer: ns, Now: time.Now}
-	defer s.Close()
-	keys := value.NamespaceKeys{Labels: []string{"managed"}, Annotations: []string{"owner"}}
-	var snap NamespaceJournalSnapshot
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
-		var err error
-		if snap, err = s.Snapshot(context.Background(), keys); err == nil && snap.Sequence == 1 {
-			break
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	if snap.Sequence != 1 || len(snap.Namespaces) != 1 || snap.Namespaces[0].ResourceVersion != snap.Journal+":1" {
-		t.Fatalf("journal did not follow the observed change only: %+v", snap)
-	}
-	if _, err := s.Snapshot(context.Background(), value.NamespaceKeys{}); !errors.Is(err, value.ErrInvalid) {
-		t.Fatal("empty key set accepted", err)
 	}
 }

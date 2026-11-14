@@ -34,14 +34,6 @@ func NewRetentionGuard(observer *PermissionClient, plan value.RetentionAdministr
 	return &RetentionGuard{observer: observer, plan: own, digest: digest}, nil
 }
 
-// RetentionGuardDigest is the protection digest of the hub retention source
-// for this cluster, plan and pin: what a retention topology names. The join
-// command computes it from the exact reopened guard (ADR-196 decision 7).
-func RetentionGuardDigest(cluster string, plan value.RetentionAdministration, pin GuardPin) (artifact.Digest, error) {
-	_, d, err := retentionGuardDigest(cluster, plan, pin)
-	return d, err
-}
-
 func retentionGuardDigest(cluster string, plan value.RetentionAdministration, pin GuardPin) (value.RetentionAdministration, artifact.Digest, error) {
 	var own value.RetentionAdministration
 	encoded, err := json.Marshal(plan)

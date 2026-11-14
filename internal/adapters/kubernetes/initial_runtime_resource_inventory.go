@@ -1,8 +1,6 @@
 package kubernetes
 
 import (
-	"context"
-
 	"asservat.local/asservat/internal/contracts"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 )
@@ -18,14 +16,6 @@ type InitialRuntimeResourceInventory struct {
 	OwnerInputs, WorkerInputs, OwnerProviders, WorkerProviders string
 	FleetGuard, OwnerSourceGuard, WorkloadGuard                contracts.OwnerDeploymentGuard
 	BridgeAdministration                                       cfg.InitialRuntimeBridgeAdministration
-}
-
-func (s *InitialRuntimeResources) ReadInventory(ctx context.Context) (InitialRuntimeResourceInventory, error) {
-	v, e := s.Read(ctx)
-	if e != nil {
-		return InitialRuntimeResourceInventory{}, e
-	}
-	return s.inventory(v.State)
 }
 
 func (s *InitialRuntimeResources) inventory(v contracts.InitialRuntimeResourceState) (InitialRuntimeResourceInventory, error) {

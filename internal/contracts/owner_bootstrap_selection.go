@@ -1,14 +1,11 @@
 package contracts
 
 import (
-	"io"
 	"strings"
 	"time"
 )
 
 const OwnerBootstrapPlanFormat = "asservat-owner-bootstrap-plan/v1"
-const OwnerBootstrapSelectionFormat = "asservat-owner-bootstrap-selection/v1"
-const OwnerBootstrapSelectionFile = "owner-bootstrap.json"
 const OwnerBootstrapInitialPeers = 16
 
 // The initial batch is a public installation choice, not a live connector or
@@ -82,10 +79,4 @@ type OwnerBootstrapSelection struct {
 
 func OwnerBootstrapSelectionName(installationID string) string {
 	return "asservat-" + strings.ReplaceAll(installationID, "-", "") + "-owner-bootstrap"
-}
-func DecodeOwnerBootstrapPlan(r io.Reader) (OwnerBootstrapPlan, error) {
-	return decodeClosedRPC[OwnerBootstrapPlan](r, OwnerDeploymentMaxBytes)
-}
-func DecodeOwnerBootstrapSelection(r io.Reader) (OwnerBootstrapSelection, error) {
-	return decodeClosedRPC[OwnerBootstrapSelection](r, OwnerDeploymentMaxBytes)
 }

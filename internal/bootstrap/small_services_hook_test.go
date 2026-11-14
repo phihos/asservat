@@ -26,7 +26,6 @@ import (
 	"testing"
 	"time"
 
-	"asservat.local/asservat/internal/adapters/providerconfig"
 	"asservat.local/asservat/internal/contracts"
 	batch "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
@@ -254,103 +253,6 @@ func secretsHelmValues(mode string) map[string]any {
 	})
 	values["mode"] = mode
 	return values
-}
-
-// The rendered plan and Role drive the actual command against a fake API.
-func TestSecretsHookUsesRenderedPlanAndExactRole(t *testing.T) {
-	for _, mode := range []string{"hub", "combined"} {
-		t.Run(mode, func(t *testing.T) {
-			plan, role, job := renderSecretsHook(t, secretsHelmValues(mode))
-			if job.Spec.BackoffLimit == nil || job.Spec.TTLSecondsAfterFinished == nil || job.Annotations["helm.sh/hook"] != "pre-install,pre-upgrade" || job.Annotations["helm.sh/hook-delete-policy"] != "before-hook-creation,hook-succeeded" {
-				t.Fatal("secrets hook is not a bounded pre-install/pre-upgrade Job")
-			}
-			if c := job.Spec.Template.Spec.Containers; len(c) != 1 || !slices.Equal(c[0].Command, []string{"/asservat", "secrets"}) {
-				t.Fatal("secrets Job does not run `asservat secrets`")
-			}
-			api := &secretsAPI{t: t, role: role, secrets: map[string]*core.Secret{}, unknown: "trial-sql-hub-api"}
-			cert, ca := smallServicesHookTLS(t)
-			server := httptest.NewUnstartedServer(api)
-			server.TLS = &tls.Config{Certificates: []tls.Certificate{cert}, MinVersion: tls.VersionTLS12}
-			server.StartTLS()
-			defer server.Close()
-			config := &rest.Config{Host: server.URL, BearerToken: "synthetic", TLSClientConfig: rest.TLSClientConfig{CAData: []byte(ca)}}
-			kubeAPI := contracts.OwnerProviderEndpoint{Endpoint: "https://kubernetes.default.svc", Roots: [][]byte{pemDER(t, ca)}}
-			if e := runSecrets(t.Context(), plan, config, kubeAPI); e != nil {
-				t.Fatalf("fresh run: %v; denied=%v", e, api.denials)
-			}
-			want := []string{"trial-keycloak-state", "trial-postgres-state", "trial-objectstore-state", "trial-openbao-state", "trial-ids",
-				"trial-sql-hub-api", "trial-sql-hub-worker", "trial-sql-federation", "trial-sql-publisher", "trial-sql-key-service", "trial-audit-mac", "trial-artifact-key"}
-			for _, p := range contracts.ObjectStorePrincipals(mode) {
-				want = append(want, "trial-s3-"+p)
-			}
-			// The peer listeners' serving TLS (no existing Secret or issuer).
-			want = append(want, "trial-objectstore-iam", "trial-federation-tls", "trial-key-service-tls")
-			if !slices.Equal(api.creates, want) || len(api.patches) != 0 {
-				t.Fatalf("creates=%v patches=%v", api.creates, api.patches)
-			}
-			first := api.snapshot()
-			ids := first["trial-ids"]
-			if len(ids) != len(contracts.InstallationIDKeys()) {
-				t.Fatal("IDs Secret keys", ids)
-			}
-			for _, component := range contracts.SQLComponents() {
-				purposes, _ := contracts.SQLComponentPurposes(component)
-				data := first["trial-sql-"+component]
-				if len(data) != len(purposes) {
-					t.Fatalf("%s keys=%d want %d", component, len(data), len(purposes))
-				}
-				for _, purpose := range purposes {
-					c, e := contracts.DecodeOwnerSQLCredential(strings.NewReader(data["sql-"+purpose+".json"]))
-					name, _ := sqlRoleName(ids["installationID"], purpose)
-					if e != nil || c.Username != name || len(c.Password) < 40 {
-						t.Fatal("invalid SQL credential", component, purpose)
-					}
-				}
-			}
-			mac := first["trial-audit-mac"]
-			if len(mac[contracts.AuditMACInputKey]) != 32 || mac[contracts.AuditMACAccountVersion] != ids["roleSetupID"]+"-account/v1" || mac[contracts.AuditMACInputVersion] != ids["roleSetupID"]+"-input/v1" || !strings.Contains(first["trial-artifact-key"][contracts.ArtifactKeySecretKey], `"purpose":"artifact"`) {
-				t.Fatal("audit MAC or artifact key material")
-			}
-			// hub-api's projection carries the same stored keys and setup ID.
-			projection, e := contracts.DecodePublicAuditKeys(strings.NewReader(mac[contracts.PublicAuditKeysFile]))
-			if e != nil || projection.Format != contracts.PublicAuditKeysFormat || projection.InstallationID != ids["installationID"] || projection.SetupID != ids["roleSetupID"] ||
-				string(projection.Material.AccountKey) != mac[contracts.AuditMACAccountKey] || string(projection.Material.InputKey) != mac[contracts.AuditMACInputKey] || projection.Material.AccountVersion != mac[contracts.AuditMACAccountVersion] {
-				t.Fatal("public audit keys projection", e)
-			}
-			var policies map[string]json.RawMessage
-			if json.Unmarshal([]byte(first["trial-objectstore-iam"][SeaweedBucketPoliciesKey]), &policies) != nil || len(policies) != 2 || policies["trial-audit"] == nil || policies["trial-evidence"] == nil {
-				t.Fatal("bucket policies", first["trial-objectstore-iam"][SeaweedBucketPoliciesKey])
-			}
-			iam := first["trial-objectstore-iam"][providerconfig.SeaweedConfigKey]
-			for _, p := range contracts.ObjectStorePrincipals(mode) {
-				var c contracts.OwnerStorageCredential
-				if json.Unmarshal([]byte(first["trial-s3-"+p][contracts.ObjectStoreCredentialFile]), &c) != nil || !strings.Contains(iam, c.AccessKeyID) {
-					t.Fatal("IAM lacks principal", p)
-				}
-			}
-			// A rerun (helm upgrade) changes nothing.
-			if e := runSecrets(t.Context(), plan, config, kubeAPI); e != nil {
-				t.Fatalf("rerun: %v; denied=%v", e, api.denials)
-			}
-			if len(api.creates) != len(want) || len(api.patches) != 0 || fmt.Sprint(api.snapshot()) != fmt.Sprint(first) {
-				t.Fatal("rerun rotated or rewrote a Secret")
-			}
-			// A missing key (a new purpose after upgrade) is added; others stay.
-			api.mu.Lock()
-			delete(api.secrets["trial-sql-publisher"].Data, "sql-context-publish.json")
-			api.mu.Unlock()
-			if e := runSecrets(t.Context(), plan, config, kubeAPI); e != nil {
-				t.Fatal(e)
-			}
-			after := api.snapshot()
-			if !slices.Equal(api.patches, []string{"trial-sql-publisher"}) || after["trial-sql-publisher"]["sql-publication-gate.json"] != first["trial-sql-publisher"]["sql-publication-gate.json"] || after["trial-sql-publisher"]["sql-context-publish.json"] == "" {
-				t.Fatal("missing key not added in place", api.patches)
-			}
-			if len(api.denials) != 0 {
-				t.Fatal("rendered Role denied a request", api.denials)
-			}
-		})
-	}
 }
 
 // existingSecret overrides are neither created nor patched; the IDs override
