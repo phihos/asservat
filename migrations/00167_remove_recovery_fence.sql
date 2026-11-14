@@ -102,7 +102,7 @@ BEGIN
    AND x.activated_postmaster_at IS NOT DISTINCT FROM r.activated_postmaster_at
    AND x.activated_database_oid IS NOT DISTINCT FROM r.activated_database_oid);
  desired_suspended:=source_suspended OR NOT seeded;
- unchanged:=r.source_generation=generation AND r.source_digest=digest AND r.suspended=desired_suspended;
+ unchanged:=seeded AND r.source_generation=generation AND r.source_digest=digest AND r.suspended=desired_suspended;
  BEGIN
  IF unchanged THEN
   SELECT * INTO STRICT r FROM public.fleet_trust WHERE installation_id=i FOR SHARE;
