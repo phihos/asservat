@@ -24,8 +24,11 @@ function crdValidator() {
 function canonicalValidator() {
   const ajv = new Ajv2020({ strict: false });
   addFormats(ajv);
-  const dir = 'specs/contracts/';
-  for (const file of readdirSync(repo(dir)).filter(f => f.endsWith('.schema.json'))) ajv.addSchema(JSON.parse(readFileSync(repo(dir + file), 'utf8')));
+  // The console admits what the runtime implements (scripts/implemented_contracts.py).
+  const dir = 'specs/contracts/', implemented = dir + 'implemented/';
+  const current = new Set(readdirSync(repo(implemented)));
+  const files = new Set([...readdirSync(repo(dir)), ...current]);
+  for (const file of [...files].filter(f => f.endsWith('.schema.json'))) ajv.addSchema(JSON.parse(readFileSync(repo((current.has(file) ? implemented : dir) + file), 'utf8')));
   return ajv.getSchema('https://asservat.io/spec/v1/capture-profile.schema.json')!;
 }
 

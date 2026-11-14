@@ -1,5 +1,7 @@
 # ADR-085 — Private owner enrollment receiver
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded in part by ADR-328 (2026-11-13): namespace-protection rechecks no longer apply; registry and Ready-route checks remain.
 
 Follow-up: [ADR-087](087-live-owner-delivery.md) replaces the finite v1 reply with a live v2 response through downstream worker delivery; identity and original-deadline checks remain mandatory.
@@ -12,7 +14,7 @@ The owner credential and locator components do not yet accept network requests. 
 
 ## Decision
 
-Add the private HTTP/1.1 receiver and versioned [owner relay request](../../specs/contracts/owner-relay.schema.json). The request contains the existing bounded worker enrollment message and the exact shared locator. Its Authorization header carries only the dedicated Pod token; no personal credential, endpoint or authority is accepted. The reply reuses the worker enrollment response. A caller must still discover and authenticate the exact destination before transmitting the token; the outbound adapter is separate unfinished work.
+Add the private HTTP/1.1 receiver and versioned owner relay request. The request contains the existing bounded worker enrollment message and the exact shared locator. Its Authorization header carries only the dedicated Pod token; no personal credential, endpoint or authority is accepted. The reply reuses the worker enrollment response. A caller must still discover and authenticate the exact destination before transmitting the token; the outbound adapter is separate unfinished work.
 
 Check actual client TLS and current local serving eligibility before reading the body. Bound that transfer by the earliest original peer/local observation. The receiving owner resolves the exact currently registered handle and performs existing independent human, Pod, locator, audit and signing checks under the original operation deadline. Recheck both identities before delivering the result, requiring unchanged caller registration/configuration and limiting output to the new original observations plus every operation/owner/certificate deadline. No peer observation becomes an evidence permission. Keep owner cancellation live through the final flush.
 

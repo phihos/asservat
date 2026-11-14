@@ -1,5 +1,7 @@
 # ADR-290 — One-shot regional profile streaming
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 Date: 2026-11-03. Status: implementation in progress; installed qualification pending.
 Requirements: REQ-PRF-001–003, REQ-EVD-005/008, REQ-CAP fair storage,
 REQ-DLD-001–004; S-05 increment 3.

@@ -471,7 +471,7 @@ export interface components {
             query_observed_at?: string;
             /**
              * Format: date-time
-             * @description Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline.
+             * @description Original total query cutoff, irreversibly shortened by effective evidence access. A status read never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline.
              */
             query_expires_at?: string;
         };
@@ -544,7 +544,7 @@ export interface components {
             query_observed_at?: string;
             /**
              * Format: date-time
-             * @description Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline.
+             * @description Original total query cutoff, irreversibly shortened by effective evidence access. A status read never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline.
              */
             query_expires_at?: string;
         };
@@ -637,7 +637,7 @@ export interface components {
             query_observed_at: string;
             /**
              * Format: date-time
-             * @description Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline.
+             * @description Original total query cutoff, irreversibly shortened by effective evidence access. A status read never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline.
              */
             query_expires_at: string;
         };

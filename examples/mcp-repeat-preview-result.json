@@ -4,8 +4,7 @@
   "data_class": "metadata",
   "status": "ok",
   "data": {
-    "preview_id": "00000000-0000-4000-8000-000000000080",
-    "expires_at": "2026-10-09T12:05:00Z",
+    "plan_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
     "execution_digest": "8888888888888888888888888888888888888888888888888888888888888888",
     "pod_count": 1,
     "max_bytes": 16777216,
@@ -50,7 +49,6 @@
       "assessmentID": "00000000-0000-4000-8000-000000000161",
       "planDigest": "8888888888888888888888888888888888888888888888888888888888888888",
       "generatedAt": "2026-10-09T12:00:00Z",
-      "validUntil": "2026-10-09T12:05:00Z",
       "basis": {
         "rulesDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
         "capabilityDigest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",

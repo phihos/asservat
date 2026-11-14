@@ -172,7 +172,7 @@ func TestPodStatusOutputRequiresSubmissionRetentionAnchor(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, err := os.ReadFile("../../examples/mcp-pod-status-preview-result.json")
+	b, err := readImplementedExample("../../examples/", "mcp-pod-status-preview-result.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -210,7 +210,7 @@ func TestCaptureRequestResolutionHasStrictAcknowledgedDisposition(t *testing.T) 
 		}
 	}
 	for _, example := range []string{"mcp-resolve-capture-accepted.json", "mcp-resolve-capture-closed.json"} {
-		b, err := os.ReadFile("../../examples/" + example)
+		b, err := readImplementedExample("../../examples/", example)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -266,4 +266,14 @@ func TestCaptureContinuationStrictInputAndPassiveAlternatives(t *testing.T) {
 	if s.ValidateInput("resolve_capture_request", []byte(pair+`,"continue_acquisition":true}`)) == nil || s.ValidateInput("get_capture", []byte(`{"capture_id":"00000000-0000-4000-8000-000000000008","continue_acquisition":true}`)) == nil {
 		t.Fatal("passive operation accepted acquisition switch")
 	}
+}
+
+// readImplementedExample reads the example this runtime implements:
+// examples/implemented/ (pre-ADR-330 contracts) when present, otherwise the
+// canonical example.
+func readImplementedExample(dir, name string) ([]byte, error) {
+	if b, err := os.ReadFile(dir + "implemented/" + name); err == nil {
+		return b, nil
+	}
+	return os.ReadFile(dir + name)
 }

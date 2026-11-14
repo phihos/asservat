@@ -1,5 +1,7 @@
 # ADR-230 — Probe-failure trigger; log and resource detectors paused
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 Date: 2026-10-26. Status: accepted for the probe detector (implemented; qualification below);
 the log and resource pause is superseded by the maintainer decision of 2026-10-26 and
 [ADR-241](241-log-resource-detectors.md), which implements both. The recommended alert detector is

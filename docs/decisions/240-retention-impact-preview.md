@@ -1,5 +1,7 @@
 # ADR-240 — Retention impact preview (S-06 increment 11)
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 Date: 2026-10-27. Status: accepted; implemented; qualification below.
 Requirements: REQ-PRV-002 (policy updates first produce a bounded impact preview: affected classes,
 counts, earliest deletions, storage-lock conflicts and incomplete clusters), SC-PRV-009, S-06

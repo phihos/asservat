@@ -1,5 +1,7 @@
 # ADR-060 — Bounded server-side browser sessions
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded in part by ADR-328 (2026-11-13): pinning the session root and epoch through a protected bootstrap no longer applies; Helm renders those settings and the generated Secrets. The session, refresh, CSRF and logout decisions remain.
 
 Date: 2026-10-10. Status: engineering refinement of the accepted ADR-059 and existing browser contract; initial runtime components and owned-service qualification, deployment composition pending.

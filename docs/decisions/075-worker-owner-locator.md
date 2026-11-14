@@ -1,5 +1,7 @@
 # ADR-075 — Shared worker request locator
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 Date: 2026-10-10. Status: implemented component refinement; focused SQL/race tests, full SQL/S3 regression and Kubernetes/OpenBao regression pass. Authenticated process discovery and network forwarding remain pending.
 
 ADR-074 provides local request ownership but another hub replica cannot locate that process. Keep credentials in the authenticated owner and store only a short-lived locator in the existing primary PostgreSQL database. Do not add a broker, sticky client sessions, durable personal credentials or caller-selected endpoint addresses.
@@ -12,4 +14,4 @@ Register the local owner before publishing its locator. Close it if publication 
 
 The exact-owner receiver facet checks the shared locator and exact local handle before enrollment, then rechecks the locator before returning a delivery. The operation's existing current human, Pod, audit and activation checks remain mandatory. No artifact bytes, credentials, tokens or endpoint URLs are stored here. One row follows each worker's existing minimized lifecycle record; its eventual metadata cleanup remains tied to that parent, not to evidence-copy deletion or a new indefinite retention policy.
 
-Authenticated process discovery, hub-to-hub mTLS forwarding and connector proof mediation remain required before this becomes a network rendezvous. The locator alone does not attest a Pod/process, qualify HA failover or enable public downloads. See [the implementation contract](../architecture/worker-owner-locator.md) and [actual results](../implementation-progress.md).
+Authenticated process discovery, hub-to-hub mTLS forwarding and connector proof mediation remain required before this becomes a network rendezvous. The locator alone does not attest a Pod/process, qualify HA failover or enable public downloads. See the implementation contract and [actual results](../implementation-progress.md).

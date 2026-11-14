@@ -1,5 +1,7 @@
 # ADR-094 — Native hub-worker credentials and workload
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded in part by ADR-328 (2026-11-13): the source-probe ConfigMap update permission, namespace-protection exceptions and protected startup sequencing no longer apply. One ServiceAccount per process role, kubelet-projected tokens, named RBAC and the Restricted Pod remain.
 
 Date: 2026-10-11. Status: selected under continuing implementation authorization. Requirements: REQ-DEP-003/005, REQ-FED-001, REQ-DB-005; part of TASK-02/07/11 and S-01/S-02.

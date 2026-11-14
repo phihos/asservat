@@ -22,9 +22,9 @@ Kernel-side admission/filtering and bounded maps must limit work before user-mem
 
 `arguments` mode additionally needs explicit settings `maxBytesPerEvent` (maximum 4 KiB) and `captureBuffers` plus a reviewed sensitive-observation grant before arming. Pointer dereference and string/buffer reads are bounded by the adapter/ABI allowlist; arbitrary dereference expressions are forbidden. `captureBuffers: false` can still expose sensitive paths and argument strings and therefore is not harmless metadata. `true` permits bounded buffers only for qualified syscall adapters; never follow arbitrary nested pointers or dump a process's address space. No raw argument values enter control fields or audit.
 
-For argument tracing, observationLimits additionally includes cumulative `maxObservedEvents`; grant status tracks observedEventsReserved/Spent. Reserve event units and requested argument-read bytes before probe processing, including attempted/faulting reads and data later filtered out. Each admitted entry or exit probe consumes one observation event unit and a conservative fixed 256-byte charge plus all requested user-memory read lengths (including failed attempts); the qualified adapter cannot undercharge larger fixed records. Reserve any larger fixed-record charge before processing. The accounting rule and adapter digest are pinned in the permit; it is distinct from wire-byte accounting for packet actions. Combined grants charge both sources against aggregate byte/session/event caps with per-source provenance. A result/errors filter may require inspecting events later discarded and does not narrow observation authority retroactively. Session restart or rolling-ring eviction never refills grant budgets.
+For argument tracing, observationLimits additionally includes cumulative `maxObservedEvents`; grant status tracks observedEventsReserved/Spent. Reserve event units and requested argument-read bytes before probe processing, including attempted/faulting reads and data later filtered out. Each admitted entry or exit probe consumes one observation event unit and a conservative fixed 256-byte charge plus all requested user-memory read lengths (including failed attempts); the qualified adapter cannot undercharge larger fixed records. Reserve any larger fixed-record charge before processing. The accounting rule and adapter digest are pinned in the permit; it is distinct from wire-byte accounting for packet actions. Combined grants charge both sources against aggregate byte/session/event caps with per-source provenance. A result/errors filter may require inspecting events later discarded and does not narrow observation authority retroactively. Grant budgets count observation actually performed; session restart or rolling-ring eviction does not refill them.
 
-Approved automatic policies may arm tracing under their finite matching policy grant; ad hoc argument traces require their individual matching capture grant. Metadata observation uses ordinary scoped collection permission and impact budgets unless an administrator requires more: with `approvals.requireRecordingApproval` in the protected identity settings, every packet/syscall plan needs the same individual approval before it is armed ([ADR-249](../docs/decisions/249-sensitive-acquisition-grants.md)). An action's `mode` determines its minimum impact; overrides cannot label arguments as observe. No syscall evidence authorizes changing seccomp policy, sending signals or injecting calls.
+Approved automatic policies may arm tracing under their finite matching policy grant; ad hoc argument traces require their individual matching capture grant. Metadata observation uses ordinary scoped collection permission and impact budgets unless an administrator requires more: with `approvals.requireRecordingApproval` in the identity settings, every packet/syscall plan needs the same individual approval before it is armed ([ADR-249](../docs/decisions/249-sensitive-acquisition-grants.md)). An action's `mode` determines its minimum impact; overrides cannot label arguments as observe. No syscall evidence authorizes changing seccomp policy, sending signals or injecting calls.
 
 ### SC-SYS-002
 
@@ -36,37 +36,34 @@ Use `syscallTrace` as the manifest kind and privacy evidence type. New types def
 
 `get_syscall_summary` returns bounded per-syscall counts, errors and duration aggregates over an approved projection; missing/partial pairs and gaps are explicit. `get_syscall_events` returns a paginated metadata timeline with no argument option. `syscall_query` is a bounded typed raw operation for already collected artifacts, requiring evidence:raw, current artifact rights and a matching raw-query grant. It can select syscall names/errors and return bounded recorded arguments; no arbitrary code, address dereference, live tracing or new acquisition. Add this operation consistently to raw grant/share contracts and delivery checks. Sharing a metadata projection does not grant raw argument queries or live tracing.
 
-The saved-argument implementation uses the bounded regional Go worker under
-[ADR-306](../docs/decisions/306-bounded-saved-syscall-queries.md), reusing the
-canonical native decoder and full authenticated-source verification. Its input
-requires an idempotency key; omitting `grant_id` permits discovery of the
-missing-approval remedy only, never a raw read. After current checks, an exact
-same-key retry returns the original pending handle and deadline without another
-admission or read. A next-page Begin requires a fresh key. Current argument
-sources are limited to 8 MiB. Every actual raw batch conservatively consumes
-24 KiB and one operation from the existing finite disclosure pool; query
-admission reserves four units and at most two read batches. These are configured
-ceilings, not measured overhead or larger-source qualification.
+Saved-argument queries ([ADR-306](../docs/decisions/306-bounded-saved-syscall-queries.md))
+run in the [regional reader](evidence.md#req-evd-005--analysis-isolation-and-output-classes)
+with the canonical native decoder. Each query carries an operation ID; a retry with
+the same ID and selection returns the existing outcome without another read, and a
+next page uses a new ID. Omitting `grant_id` returns only the missing-approval
+remedy, never a raw read. Each delivered page consumes 24 KiB and one operation
+from the grant's finite disclosure pool; an operation that delivers nothing
+consumes nothing. The current argument source limit is 8 MiB.
 
 Return whole recorded events within a 20 KiB private page and the 24 KiB direct
-or nested public envelope. Continue validating the entire source after the
-logical page stop; a bad tail or cancellation releases no page. Preserve native
-`decimal:`, canonical `base64:` and `unavailable:fault` values verbatim, including
-zero, empty bytes and acquisition truncation. The current 128-byte memory-value
-and 8192-byte line checks remain stricter than public schema ceilings. The
-original artifact remains raw and queries grant no acquisition or native
-download authority.
+or nested public envelope. A page authenticates the manifest and every frame it
+reads; the whole artifact was verified once at publication. A frame that fails
+authentication, or cancellation, releases no page. Preserve native `decimal:`,
+canonical `base64:` and `unavailable:fault` values verbatim, including zero,
+empty bytes and acquisition truncation. The 128-byte memory-value and 8192-byte
+line checks remain stricter than public schema ceilings. The original artifact
+remains raw and queries grant no acquisition or native download authority.
 
-Saved summary/event pages scan the complete authenticated bounded source before
-returning a result. Display filters never reduce the charged source work or
-change acquisition. Continuation binds case, artifact version, view and filter;
-page size may change. Counts describe the recorded file, independently of the
-current display page. Preserve unmatched, unfinished and unknown records
-separately. If the retained format does not establish acquisition loss or
-truncation, report null and an explicit coverage gap; never infer zero loss or
-complete observation from a quiet, empty or filtered page. A fixed approved view
-of an argument source omits its arguments, paths, pointers and buffers and
-conveys no raw query or native download authority.
+Summary counts describe the whole recorded file; they are computed once per
+artifact version and reused. Event pages read frames in order until the page is
+full or the scan bound is reached. Display filters never change acquisition.
+Continuation binds case, artifact version, view and filter; page size may change.
+Preserve unmatched, unfinished and unknown records separately. If the retained
+format does not establish acquisition loss or truncation, report null and an
+explicit coverage gap; never infer zero loss or complete observation from a quiet,
+empty or filtered page. A fixed approved view of an argument source omits its
+arguments, paths, pointers and buffers and conveys no raw query or native
+download authority.
 
 The guidance engine can recommend a narrow syscall include list based on the diagnostic goal (for example file errors or network calls), while explaining ABI/overhead limits. All names and recorded strings remain untrusted data. UI and external agents use the same projections and capture-profile compiler. Unsupported syscall decoders produce partial evidence; they cannot silently broaden collection into a custom command.
 
@@ -76,10 +73,9 @@ Given an argument trace with a synthetic credential buffer, when a reader asks f
 
 Given that same saved original and a covering `syscall_query` approval, browser
 and MCP return matching bounded recorded argument events. A download-only grant
-or metadata source cannot supply them. Exact-key retries retain the original
-handle/deadline and spend, while changed selection or client cannot reuse the
-key. A corrupt authenticated tail yields no page even after enough matching
-events have filled it. Zero, empty bytes, read faults and truncated values remain
+or metadata source cannot supply them. A retry with the same operation ID
+returns the original outcome without new spend, while changed selection or
+client cannot reuse the ID. A frame that fails authentication yields no page. Zero, empty bytes, read faults and truncated values remain
 distinct; expired or revoked authority prevents delivery.
 
 ## Source lifetime versus saved incidents
@@ -90,19 +86,16 @@ For an ongoing source, maxEvents limits resident ring entries and each saved sna
 
 ## Approved live syscall views
 
-[Live watch](live-watch.md) adds a bounded metadata view of an already running syscall source, separate from saved-artifact get_syscall_events/syscall_query. It uses fixed syscall/PID/error/paired-duration fields and typed display filters; no user-memory reads, argument bytes, paths, argv or speculative dereference. Unpaired events and lost/filtered/sampled rows are distinct. A viewer cannot change which processes are observed, prolong a manual session or obtain raw argument access through a live subscription. Closing/pausing the viewer leaves the source under its original acquisition authority and budgets.
+[Live watch](live-watch.md) adds a bounded metadata view of an already running syscall source, separate from saved-artifact get_syscall_events/syscall_query. It uses fixed syscall/PID/error/paired-duration fields and typed display filters, delivered over the browser's Server-Sent Events stream or an MCP long-poll read; no user-memory reads, argument bytes, paths, argv or speculative dereference. Unpaired events and lost/filtered/sampled rows are distinct. A viewer cannot change which processes are observed, prolong a manual session or obtain raw argument access through a live subscription. Closing/pausing the viewer leaves the source under its original acquisition authority and budgets.
 
 ### Qualified argument-engine exception
 
 The maintainer-approved [ADR-281 exception](../docs/decisions/281-syscall-arguments-engine-limit.md)
 allows a narrowly patched, reproducibly built, digest-pinned upstream traceloop
-program to enforce the existing pre-read observation budget. It changes the
-engine sourcing rule only; REQ-SYS-002 accounting, approval, isolation and native
-qualification remain mandatory. The finite manual workflow passed its installed
-acceptance on `9a8e392e`; exact scope and evidence are recorded in
-[implementation progress](../docs/implementation-progress.md). The finite recurring policy workflow also passed on `af8d2b07`, including
-independent personal raw-download approval. Ongoing argument workflows remain
-unavailable pending their own implementation and qualification.
+program to enforce the pre-read observation budget. It changes the engine
+sourcing rule only; REQ-SYS-002 accounting, approval and isolation remain
+mandatory. Qualification status per lifecycle mode is recorded in
+[implementation progress](../docs/implementation-progress.md).
 
 ### Finite argument implementation boundary (ADR-281)
 
@@ -112,28 +105,23 @@ and pins the program, definition and accounting digests in the reviewed scope.
 `captureBuffers: false` disables selected buffer reads; selected path arguments
 still require reviewed user-memory access. Raw approval includes independent
 cumulative byte and eligible entry/exit event limits. Failed reads and observations
-later excluded by result filters consume credit; replay never refills it.
-The initial adapter supports only its closed qualified ABI table and refuses
-unknown names. Planning/component tests alone do not enable the installed
-capability. The qualified finite manual workflow includes raw publication,
-authenticated download and joined Stop; it does not qualify other lifecycle modes.
+later excluded by result filters consume credit; restarts never refill it.
+The adapter supports only its closed ABI table and refuses unknown names.
 
-Publication verifies argument JSONL against the immutable prepaid observation
-session as well as the accepted engine/definition/accounting pins. Native header
-values cannot supply their own trusted source identity. This historical lookup
-does not renew collection authority or require the original observation lease
-to remain active.
+Publication verifies argument JSONL against the accepted observation session
+and engine/definition/accounting pins stored in SQL; native header values cannot
+supply their own source identity. This lookup does not renew collection authority.
 
 For a finite argument capture (and, under
 [ADR-313](../docs/decisions/313-manual-recording-stop.md), every finite manual
-packet/syscall recording), Stop is restricted to its original attempt and
-regional writer. A node acknowledgement means only that cancellation was
-requested. `Cancelled` requires the original acquisition result after reader
-and attachment shutdown, together with regional writer completion. An uncertain
-start, missing holder or Stop delivery failure cannot establish completion or
-refund observation spend. If storage already completed, the stored result wins;
-Stop does not delete it. This introduces no application-profiler uncertainty
-flag because the argument source is owned by Asservat.
+packet/syscall recording), Stop is an idempotent state change on the original
+recording, recorded with one audit row, that reaches the node as an event. The
+node stops the reader and attachments and reports its final counts; the recording
+becomes `Cancelled` when that report and the regional writer's completion arrive.
+The node's reported counts settle the observation reservation. Until a report
+arrives, the reserved amount stays counted against that grant only, because the
+probe may have read it; the kernel-enforced original deadline bounds it. If
+storage already completed, the stored result wins; Stop does not delete it.
 
 Argument JSONL `ended_at` denotes the observation endpoint, bounded by the
 original kernel-enforced deadline. Later perf-buffer draining and detachment

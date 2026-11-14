@@ -18,7 +18,6 @@
         "available_before_seconds": 30,
         "maximum_before": "30s",
         "observed_at": "2026-10-09T12:00:00Z",
-        "handle_expires_at": "2026-10-09T12:01:00Z",
         "save_eligible": true,
         "blockers": [],
         "execution_authority": {
@@ -61,7 +60,6 @@
         "available_before_seconds": 30,
         "maximum_before": "30s",
         "observed_at": "2026-10-09T12:00:00Z",
-        "handle_expires_at": "2026-10-09T12:01:00Z",
         "save_eligible": true,
         "blockers": [],
         "execution_authority": {

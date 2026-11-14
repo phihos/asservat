@@ -1,5 +1,7 @@
 # ADR-096 — Database incarnation fence before recovery activation
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded in part by ADR-328 (2026-11-13): the future activation coordinator with protected installation identity and independent witnesses no longer applies; the Helm `setup` Job seeds the first activation and trust rows. The `fleet_current_trust` view and its database-incarnation fence remain, observed by hub-worker.
 
 Status: accepted engineering refinement of REQ-DB-005. Initial/restore activation

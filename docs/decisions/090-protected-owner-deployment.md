@@ -1,5 +1,7 @@
 # ADR-090 — Protected owner deployment inputs and rotating credentials
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded in part by ADR-328 (2026-11-13): pinning the configuration source and workload protection in `deployment.json` no longer applies; the Helm-native plan replaces `deployment.json` with Helm-rendered configuration read by name. Mounted-file reading, per-request credential reads and no ambient credentials remain.
 
 Date: 2026-10-11. Status: selected for implementation under continuing maintainer authorization. Requirements: REQ-DEP-003, REQ-DEP-005, REQ-FED-001, REQ-DLD-003; part of TASK-02/07/11 and S-01/S-02.
@@ -10,7 +12,7 @@ ADR-088 supplies the owner runtime, but programmatic dependencies alone cannot s
 
 ## Decision
 
-Add a private, versioned deployment document at `/run/asservat/hub/deployment.json`, with fixed separate credential filenames. The installation owns this read-only projection and supplies the Pod UID through the Downward API. The document names provider endpoints/public CA roots, installation/control namespace, configuration source and finite resource limits. It cannot contain credentials, arbitrary paths, callbacks or permission grants. The installer produces it; developers have no new setup or approval. Schemas and the exact file table are in [the deployment contract](../architecture/owner-deployment.md).
+Add a private, versioned deployment document at `/run/asservat/hub/deployment.json`, with fixed separate credential filenames. The installation owns this read-only projection and supplies the Pod UID through the Downward API. The document names provider endpoints/public CA roots, installation/control namespace, configuration source and finite resource limits. It cannot contain credentials, arbitrary paths, callbacks or permission grants. The installer produces it; developers have no new setup or approval. Schemas and the exact file table are in the deployment contract.
 
 `bootstrap.NewOwnerDeployment` builds five independent SQL pools, current owner configuration, native Kubernetes proof/discovery, encrypted owner audit, separate OpenBao server/client signing, the multi-cluster read facet, worker trust catalog and existing runtime/router. Reject duplicate SQL role names. Scope each provider credential to its existing purpose. Constructor success is not recovery acceptance. This process has no recovery-write credential and no artifact unwrap credential.
 

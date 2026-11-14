@@ -20,14 +20,12 @@
       "bytes_per_second": 65536,
       "max_rows_per_batch": 100,
       "max_buffer_bytes": 1048576,
-      "row_max_age_seconds": 30,
       "replay_seconds": 5
     },
     "cursor": "opaque-live-cursor-1",
     "handling": {
       "transient": true,
       "may_contain_user_data": true,
-      "managed_row_max_age_seconds": 30,
       "raw_available_live": false,
       "external_copies_recallable": false,
       "save_semantics": "freshCurrentWindow"

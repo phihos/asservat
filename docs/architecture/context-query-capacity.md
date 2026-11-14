@@ -1,228 +1,26 @@
-# Shared installed context-query capacity
+# Stored-evidence query capacity
 
-[ADR-219](../decisions/219-shared-approved-acquisition.md) replaces the unshipped
-four-deployment query capacity producer. Approved pod-status queries use the
-existing installed acquisition worker, hub, key service and providers. They keep
-separate `ReadApproved` authority, immutable query state and charged work. No
-second source observer, query deployment, physical partition, role or credential
-is introduced by this capacity composition.
+Approved pod-status queries ([context projection](context-projection.md)) and closed profile summaries run on the regional reader (A-READ), the same long-running Deployment that serves native downloads ([ADR-330](../decisions/330-event-driven-system-design.md) D4). No Job, worker enrollment, certificate or key slot is created per query.
 
-## Original acceptance and exact workload
+## Limits
 
-`CapacityQualification.ContextQuery` is a closed original setup extension with
-format `shared-installed-context-query/v1`. An installation without this extension
-cannot create query backing; earlier dedicated layouts are rejected for new work.
-The installer declares logical work/history costs before worker configuration
-exists. Its root profile therefore contains no selected target cluster or worker
-configuration. Each plan combines that immutable budget with the actual protected
-placement for the exact allocated workload and current accepted acquisition
-configuration. Multiple clusters share one root limit; a cluster does not obtain
-a copy of that allowance.
+Query work is bounded by these limits:
 
-The existing root publication transaction accepts one immutable residual query
-reservation. Existing successful workload publication and refresh transactions
-ensure the same exact query allocation. Unknown replies retain the original
-anchor/allocation IDs, charges and dates. They cannot create a new reservation.
-No administrator inserts those rows in the qualification fixture. The same
-original setup receipt, current capacity source, phase-three root readiness,
-permission acknowledgement and recovery/database incarnation remain mandatory
-for creating them; reads use them as described below.
+- **Per principal:** a token-bucket rate limit and a concurrency cap across that principal's OAuth clients.
+- **Per workload:** a concurrency cap on queries against the workload's evidence, so one workload's investigation cannot starve the reader for others.
+- **Per query:** at most 4 MiB read work, a 24 KiB structured result and a 64 KiB wire response for pod status. The source artifact is the 4096-byte pod-status profile.
+- **Reader:** CPU, memory and replica count are Helm values; the reader sheds work with a retryable "busy" result when its queue is full.
 
-## Logical accounting and shared physical admission
+A query charges its concurrency slot at start and releases it when the query ends, fails or is canceled. An unknown outcome is resolved by the query's idempotency key. These are configured ceilings, not measured overhead.
 
-The original base root totals remain exact. Migration71 independently checks the
-query reservation against original SQL, backup, WAL, audit-object and key/provider
-residual budgets and the actual system-pool envelope. It adds no capacity or
-refund. Each principal has one finite account across OAuth clients. Exact workload
-allocations reserve their full slice, and their sum cannot exceed the root.
-Replacement workload identities, timeout, query expiry and restart do not reclaim
-old history or replenish allowances.
+Reads do not depend on live workload capacity (maintainer decision, 2026-10-23): a query over evidence of a deleted or unobserved workload uses the artifact's stored retention deadline and current authorization only.
 
-The installed declaration uses a 60-second query lifetime, four paid status polls,
-32 control transitions, one worker and two charged read batches. Each batch is
-bounded to the existing 4-MiB read-work, 24-KiB structured result and 64-KiB wire
-ceilings; six unwrap attempts cover two sets of three keys. The source artifact
-itself remains the 4096-byte pod-status profile. These are configured ceilings,
-not measured overhead. Worker CPU/memory and 4-MiB ephemeral storage match the
-actual shared Job profile. Both parent purposes consume the same physical worker
-admission limits and hub/key/provider concurrency; logical lifetime counts do not
-multiply those resources or promise spare scheduling capacity.
+## Authority
 
-The `shared-context-query-history/v1` layout includes at least
-`8 + SigningAttempts` fixed rows, `(1 + PollLimit) * InvocationRows`, and
-`ControlTransitionLimit * ControlRows`. Encrypted audits require
-`2 * (1 + PollLimit) + 2 + SigningAttempts`: invocation intent/outcome, separate
-worker-intent and enrollment objects, and certificate objects. The installer
-uses existing operator-declared row/WAL estimates to derive the finite reservation.
-The WAL estimate also includes nine shared worker/enrollment transitions and four
-per certificate attempt, which do not increment the query control counter. These
-sizes are configured estimates, not measured upper bounds. There is no additional
-query source-transition claim or its three-transaction observation history.
+`ContextProjectionPolicies` selects the target/store path from the shared delivery-policy observation (reused for at most 60 s, ADR-311). It returns an approved-projection policy; it never grants evidence download. C-03 requires `ReadApproved`, complete denies, retained audience, stored retention deadline and processing checks.
 
-The hard admission cutoff derives from the original root start plus its accepted
-admission duration. Worker, credential/provider, cleanup and history-retirement
-obligations remain separate, original finite dates. Root renewal, polling and
-source observation never move those dates. A returned query result does not prove
-remote retirement; physical worker release requires the existing terminal proof.
+One public `get_file_excerpt` or `get_query_result` request authorizes once and reuses that decision for every step of the request, never past the request's deadline. Revocation, Stop and retention cut-offs reach a running query as events (D1) and cancel it. There are no per-frame or per-batch rechecks. Each query writes one audit row in the transaction that admits it (D6).
 
-## Current checks and composition
+## Closed profile summaries
 
-`SharedContextQueryPlans` reads the exact installed root/allocation and matches the
-accepted worker profile. Its backing wrapper makes only local scope, cancellation
-and original-deadline checks around the callback. It never reacquires a SQL pool
-or performs provider work inside an effect transaction. The same constructor can
-serve the hub planner and A-KEY backing guard without a second capacity producer
-or human HTTP owner.
-
-The ledger still locks recovery, permission, capacity source/anchor, query backing
-and exact allocation. Before and after effects it checks current permission,
-retention, processing, published source, accepted worker configuration and workload
-allocation under SQL locks, and checks database time against the unchanged
-caller/authority/query limits. Callback success cannot replace these checks.
-Historical backing observation dates do not become a second heartbeat deadline:
-currentness comes from the existing accepted capacity source and configuration.
-
-`ContextProjectionPolicies` selects the exact target/store path from the same
-bounded installed policy observation as native download (ADR-214), not from the
-raw protected source. It preserves original policy dates and returns
-a distinct approved-projection policy; it never consumes a `DownloadAuthority`
-or grants evidence-download permission. The C-03 authorizer still independently
-requires ordinary `ReadApproved`, complete denies, retained audience, retention,
-recovery and processing checks. Direct administration remains at its existing
-five-second policy interval.
-
-One public `get_file_excerpt`/`get_query_result` request constructs this
-complete projection authority once (`projectionRequest.CheckCurrent`) and
-reuses it for every later step of the same request: preparation, each native
-frame gate and disclosure checks. The retained value keeps its original
-`ValidUntil` and the request deadline and is never extended; the next request
-constructs a fresh one. Revocation inside a request is enforced by the
-per-step SQL fences (query/batch permits, native operation lease observation,
-worker enrollment) and the final identity check, not by repeated
-reconstruction (2026-10-23, maintainer-authorized relaxed cadence).
-
-## Qualification
-
-The current shared implementation and adapted SQL fixture require their own
-recorded checks; historical component passes below do not qualify this composition.
-The selected SQL tests retain actual original setup/root/workload publication,
-immutable charge replay, closed-shape/residual negatives, current configuration
-refusal after a lock wait, uncertain query admission and finite spend. Protected
-Kubernetes observations, human identity and C-14 worker ownership remain explicit
-fixture inputs. Full installed UI/MCP query delivery remains a separate gate.
-
-## Historical dedicated-producer results
-
-The following reports qualify their exact earlier source, including the now
-removed observation mechanism. They are retained as history and make no claim
-about the shared installed path above.
-
-The owned `TestContextQueryCapacityWithRealPostgres` selection passed at
-`896e491a3e7ceb610a3ce3a4fb228c9f34628933`, including actual original installation,
-capacity root/workload setup, positive/replay/negative reservation and scoped
-consumer-fence calls. All 2,642 source hashes matched the frozen commit and
-cleanup completed; the [environment report](../../test/results/context-query-capacity-native-environment.json)
-and [run log](../../test/results/context-query-capacity-native-run.log) retain the
-exact selection. The first run exposed an ambiguous PL/pgSQL digest-index alias;
-its correction changes no limit or authority rule. Query resource measurements,
-history measurements and independent native deployment guards remain synthetic
-in this component fixture. The subsequent assembled selection at
-`446eeb5e9ccb083b1919dee4f0cdd835df7e31e5` independently qualifies this producer
-and the full SQL68 ledger in separate fresh owned fixtures. Both reports match
-all 2,651 source hashes and record exit zero with complete cleanup:
-[capacity](../../test/results/context-query-capacity-assembled-1/fleet-environment.json)
-and [ledger](../../test/results/context-query-ledger-assembled-1/fleet-environment.json).
-Real accepted resource proof and installed query composition remain separate.
-
-The source pre-I/O accounting correction is later than those historical reports.
-Fresh separate native capacity and full ledger selections passed at
-`51fd2e94d41d6ce5e9105b755e7e39671df5944e`, each with all 2,652 source hashes matched,
-unchanged source and complete cleanup. The [capacity report](../../test/results/context-query-source-spend-capacity-1/fleet-environment.json)
-and [ledger report](../../test/results/context-query-source-spend-ledger-1/fleet-environment.json)
-qualify the new SQL claim/completion protocol, including failed/unknown starts,
-concurrent work, expiry without completion, exhaustion and negative fencing.
-Synthetic resource measurements and guard/authority inputs retain the limits above.
-
-The delayed-negative adapter regression first failed at `f8d73a8`, then passed
-at `e538a403`. The final assembled capacity selection passed at
-`7fcc30fd0bd4d1896cbe843d555f37b2b211767c`, matching all 2,652 source hashes with
-unchanged source and complete cleanup. Its
-[report](../../test/results/context-query-stale-negative-assembled-1/fleet-environment.json)
-and [log](../../test/results/context-query-stale-negative-assembled-1/fleet.log)
-cover persistence after the original negative is over five seconds old, no
-freshness renewal from an older replay, and the caller's earlier deadline while
-blocked on SQL locks. The full ledger result remains scoped to `51fd2e9`; it was
-not rerun for this restrictive adapter-only change. Installed/public query
-qualification remains pending.
-
-## Reads without workload capacity (2026-10-23)
-
-By explicit maintainer decision, migration 00076 makes query reads independent
-of live capacity observations. The current capacity source, root readiness
-freshness and the workload's binding observation gate collection only. A query
-for evidence of a deleted or unobserved workload uses the workload's original
-immutable allocation, the accepted anchor's `HardUntil`, incarnation and
-recovery epoch, and all current authorization checks. No allowance is
-refunded or replenished.
-
-## Evidence-read request window (2026-10-23)
-
-Installed native78-80 spent each approved `get_query_result` within one
-five-second request: audit Begin, the complete projection authority, the SQL
-poll/permit/batch/claim fences, operation publication, waking the parked
-worker and the worker's three key unwraps and object read. In native80 the
-command reached the worker, which consumed one key role before the request
-expired at its read step; every attempt spent a paid poll. Under the
-maintainer-authorized relaxed intervals, `get_file_excerpt`,
-`get_query_result`, `prepare_artifact_download` and `get_artifact_download`
-now have a twenty-second request window (`identity.EvidenceReadRequestWindow`;
-audit `RequestUntil`, migration 00077's audit guard, `ContextQueryCall`, the
-native projection operation, the MCP request context and response write
-deadline). Other tools keep five seconds; `WriteUntil` stays thirty seconds.
-The window only bounds the request: the projection authority, worker
-observation, batch, native lease and identity keep their own shorter
-`ValidUntil`, so the request still ends when the earliest of them expires
-(the cached projection authority is valid for five seconds from its check).
-Hub `mcp timing` (keyed by tool for evidence reads) and `query refused`
-reports now carry `q-*` step buckets, and the worker prints
-`native read: unwrap-N, object-decrypt, parse, frames` with its outcome, so the
-next installed run shows which step consumes the time.
-
-Follow-up the same day: the projection authority, its environment, recovery,
-processing and catalog-evidence observations, the worker observation and Pod
-proof, the projection key binding, the native projection lease and the hub's
-projection conversation now also allow up to the evidence-read window, still
-bounded by each underlying value; a projection frame gate repeats its full
-SQL/peer check on every frame and closes on the first failure. Key permits
-remain five seconds per unwrap.
-
-## Closed profile summaries (ADR-291)
-
-Migration 127 admits one exact retained raw pprof source for a closed
-`get_profile_summary`, under ordinary current `evidence:read`, audience,
-retention and extract/profile client policy. It does not grant raw download or
-permit `ReadApproved` on arbitrary raw evidence. One summary reserves ten existing
-query units and allows one read batch: the complete 64 MiB maximum source,
-framing/index/manifest work and metadata fit the resulting 80 MiB read-work
-reservation. A smaller authored native ceiling stays smaller.
-
-The physical acquisition worker stays 256 MiB; its original query declaration now
-truthfully reserves 256 MiB transient worker capacity. Summary admission requires
-both bounds. Historical accepted 8 MiB transient profiles remain usable for older
-tools but cannot admit this summary. The existing root/workload/principal caps,
-nonrefundable uncertainty, audit, key slots and original deadlines stay binding.
-Public registration remains absent until installed qualification.
-
-## Exhausted worker completion
-
-[ADR-307](../decisions/307-exhausted-projection-worker-completion.md) permits an
-exhausted single-batch projection worker to exit after its exact final joined
-acknowledgement and joined local shutdown. The private disposition is not wire
-or SQL authority. Original dates and charges remain; only independently observed
-exact termination and recorded retirement can release physical capacity. Existing
-SQL must first prove the sole generation-one batch closed/native-closed with
-exact query/worker/claim/reference association and no active/uncertain read. The
-bounded foreground selector and confirmation recheck reuse those facts; an early
-candidate still running remains charged. Unbound abandonment retains expiry.
-Multi-batch projections and native downloads retain their existing lifetime.
-Implementation and installed qualification are tracked in the progress ledger.
+[ADR-291](../decisions/291-bounded-profile-summary.md) admits one retained raw pprof source for a closed `get_profile_summary` under `evidence:read`, audience, retention and extract/profile client policy. It grants no raw download and no `ReadApproved` on arbitrary raw evidence. One summary may read up to 80 MiB of work (the 64 MiB maximum source plus framing, index and manifest); a smaller authored native ceiling stays smaller. The reader's memory limit must cover this bound; the chart default is 256 MiB.

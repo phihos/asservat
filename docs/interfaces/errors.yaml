@@ -17,6 +17,7 @@ errors:
   - {code: ClusterOffline, http_status: 503, retry: after-reconnect, action: use-stored-evidence, copy: New collection cannot be dispatched to this cluster.}
   - {code: RetryLater, http_status: 429, retry: server-bounded-delay, action: wait, copy: This operation is temporarily limited.}
   - {code: Conflict, http_status: 409, retry: refresh-and-review, action: refresh, copy: The request or resource changed; review the current version.}
+  - {code: ReviewChanged, http_status: 409, retry: after-fresh-review, action: review-changes, copy: The plan changed since your review; review the differences before submitting again.}
   - {code: RecordingSelectionRequired, http_status: 409, retry: fresh-recording-selection, action: list-recordings, copy: Select current recordings to repeat this save.}
   - {code: SharingApprovalRequired, http_status: 403, retry: after-independent-review, action: open-own-review, copy: This evidence selection needs sharing approval.}
   - {code: SharingCapacityUnavailable, http_status: 429, retry: bounded-retry-time-if-known, action: review-sharing-limits, copy: Bounded sharing capacity is unavailable.}

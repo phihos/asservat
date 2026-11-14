@@ -1,5 +1,7 @@
 # ADR-152: Current retention audit receipts
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 Status: implemented in schema 57; component, targeted real SQL/S3 and native
 Kubernetes retention reconciliation checks pass. Applies to REQ-PRV-001/002/004,
 REQ-EVD-002 and TASK-02/07/11. Full installed-runtime qualification remains pending.

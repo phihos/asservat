@@ -1,5 +1,7 @@
 # ADR-214 — Reuse bounded policy observations in download preparation
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded in part by ADR-328 (2026-11-13): the protected policy read (complete protection, guard and probe requests) no longer applies; the download policy is read from its ConfigMap under RBAC. The 60-second reuse bound, identity-policy reuse within its 30 seconds and the current SQL effect checks remain valid. With the cheaper read, the reuse store should be re-measured and dropped if it no longer pays for itself.
 
 Date: 2026-10-20. Status: selected under the maintainer's explicit complexity-review
@@ -113,7 +115,7 @@ operation, as does cancellation at any point.
 This removes repeated work from dispatch and enrollment without another timer,
 configuration option, durable record or credential. It amends the per-step
 external-identity refresh described in
-[the worker lifecycle contract](../architecture/worker-current-lifecycle.md).
+the worker lifecycle contract.
 The 2026-10-23 refinement extends that ownership to the complete finite prepare
 request: coordinator entry, installed native runtime, and final Preparing/Ready
 view consume the same original authority. The private native handoff validates

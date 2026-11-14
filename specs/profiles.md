@@ -24,42 +24,30 @@ CPU profiles for runtimes without an approved pprof endpoint come from the node 
 
 Acquire through an administrator-approved endpoint profile or a qualified runtime adapter. Resolve endpoints to the selected pod identity; support pod IP and loopback within the target netns. A localhost endpoint MUST NOT resolve to the collector's own loopback. Do not accept arbitrary URLs, redirects, ports, headers or query parameters from an MCP client. TLS/auth credentials come from named profiles and are not captured as evidence.
 
-The acquisition request originates on the exact target node. Under [ADR-287](../docs/decisions/287-go-profile-acquisition.md), the node uploads its bounded in-memory result directly over the existing authenticated mTLS channel to the accepted regional connector writer, which wraps and encrypts it before managed storage. The immutable target and process-bound attempt select the destination; no alternative destination or hub plaintext proxy is allowed. The node receives no evidence key credentials. Plaintext residency is bounded by the admitted node response limit and original acquisition/upload deadlines; regional encryption uses the existing shared frame-bounded working budget. Named endpoint profiles are administrator-managed entries under the local collection ceiling; they pin target/port/path policy, TLS trust and credential references. To avoid per-application setup tickets, an administrator may also publish a reusable endpoint template. A maintainer binds it in `EvidenceRecipe.spec.endpointBindings` with a local binding name, template reference, approved target address mode and declared pod port name. Profile `source.profileRef` resolves to that local binding or a fully configured administrator profile; duplicate/ambiguous names are rejected. Resolve a port name across the pod specification; reject ambiguous duplicate resolutions and enforce the template's allowed port range, fixed path policy and target identity. No free URL, hostname, credential or path override is accepted. Credentialed templates must explicitly scope the credential to permitted workload identities, so a maintainer cannot redirect a privileged credential to their own listener. Approval binds the resolved template digest and endpoint parameters. Autodetection may suggest a declared port/runtime, but never activates profiling or weakens these checks.
+The acquisition request originates on the exact target node. Under [ADR-287](../docs/decisions/287-go-profile-acquisition.md), the node uploads its bounded in-memory result directly over the existing authenticated mTLS channel to the regional connector, which encrypts it before managed storage. The admitted attempt selects the destination; no alternative destination or hub plaintext proxy is allowed. The node receives no evidence key credentials. Plaintext residency is bounded by the admitted node response limit and the acquisition/upload deadlines. Named endpoint profiles are administrator-managed entries under the local collection ceiling; they pin target/port/path policy, TLS trust and credential references. To avoid per-application setup tickets, an administrator may also publish a reusable endpoint template. A maintainer binds it in `EvidenceRecipe.spec.endpointBindings` with a local binding name, template reference, approved target address mode and declared pod port name. Profile `source.profileRef` resolves to that local binding or a fully configured administrator profile; duplicate/ambiguous names are rejected. Resolve a port name across the pod specification; reject ambiguous duplicate resolutions and enforce the template's allowed port range, fixed path policy and target identity. No free URL, hostname, credential or path override is accepted. Credentialed templates must explicitly scope the credential to permitted workload identities, so a maintainer cannot redirect a privileged credential to their own listener. Approval binds the resolved template digest and endpoint parameters. Autodetection may suggest a declared port/runtime, but never activates profiling or weakens these checks.
 
-[ADR-299](../docs/decisions/299-named-go-endpoint-tls.md) defines the TLS-only
-implementation boundary for named Go endpoints: protected regional entries may
-carry explicit public certificate roots and a fixed server name. Approval and
-recurring policy definitions bind the public trust source identity, canonical
-material digest and server name; certificate bytes stay outside approval/SQL
-scopes. The existing exact target-netns socket performs TLS peer verification
-before HTTP, within the original deadline. No system roots, DNS lookup, insecure
-mode, cleartext fallback or acquisition retry is added. Credentials remain
-unsupported by ADR-299 alone. ADR-302 adds a separately qualified authorization
-path below. The fixed 8 KiB public PEM cap and connector-first
-`profileTLS` rollout are engineering choices. The reference TLS CPU and wrong-peer
-journey passed installed41916430295 at abf25590; authenticated endpoints remain
-pending installed qualification. Old nodes can continue HTTP but cannot start TLS captures.
+Named Go endpoints may use TLS ([ADR-299](../docs/decisions/299-named-go-endpoint-tls.md)).
+A regional endpoint entry may carry explicit public certificate roots (at most
+8 KiB PEM) and a fixed server name. Approval and recurring policy definitions
+bind the trust source identity, canonical material digest and server name;
+certificate bytes stay out of approval scopes. The node verifies the peer on the
+socket in the target netns before HTTP, within the action deadline. No system
+roots, DNS lookup, insecure mode, cleartext fallback or acquisition retry exists.
+A node that does not support TLS refuses TLS captures.
 
+Credentialed endpoints ([ADR-302](../docs/decisions/302-named-profile-endpoint-authorization.md))
+keep the credential policy's public identity and exact workload-root audiences
+in the named endpoint definition. The policy name is the endpoint name; manual
+and recurring approval pin the definition/audience digest, never a header value
+or secret digest. The header value comes from a Helm-rendered Secret mounted
+into the connector and is added to the work item when the connector delivers it
+to the node, after the admitted-work and audience checks. Preview and policy
+compilation never read it, and queued work and persistent state stay
+credential-free. The node verifies TLS before sending `Authorization`; a node
+without support refuses. An unavailable credential fails only that profile with
+`ProfileUnavailable` and no acquisition; other work continues.
 
-[ADR-302](../docs/decisions/302-named-profile-endpoint-authorization.md) keeps a
-credential policy's public identity and exact workload-root audiences in the
-protected named endpoint definition. The policy name is the endpoint name;
-manual and recurring approval pin the same definition/audience digest, never a
-header value or secret-payload digest. A fixed-purpose private file in the
-existing immutable connector-only input bundle supplies the selected header at
-final authenticated node-poll delivery after exact admitted-work and audience
-checks. Preview and policy compilation never read it. Public queued work and
-persistent state remain credential-free. The node must verify accepted TLS before
-sending Authorization. Old nodes lacking explicit support refuse, and delivery
-retains the existing 16-item/256 KiB bound using an ordered byte-bounded prefix.
-An unavailable private value refuses only that original profile through the
-existing zero-byte `ProfileUnavailable` result, with no acquisition or refund;
-other original work and cancellations continue. Whole-request cancellation and
-node process replacement still abort delivery. The reference authenticated TLS CPU/native/summary/Repeat and refusal journey
-passed installed41926293863 at2bb27caf; other modes keep their separately
-recorded qualification scope.
-
-For Go, generate only the allowlisted `/debug/pprof/<type>` paths; CPU uses `/debug/pprof/profile`. Prefer binary `debug=0`; do not call `/cmdline` or remote `/symbol` as part of profiling. Missing/disabled endpoints yield `ProfileUnavailable`. After an admitted HTTP attempt, this is a terminal failed action with `reason_code: ProfileUnavailable`; a conflicting application-owned session similarly ends with `reason_code: ProfilerBusy`. Neither result publishes an artifact, retries acquisition or refunds the original admitted spend ([ADR-298](../docs/decisions/298-explicit-go-profile-refusals.md)). Asservat does not inject pprof into an existing binary or enable it through an unapproved application mutation.
+For Go, generate only the allowlisted `/debug/pprof/<type>` paths; CPU uses `/debug/pprof/profile`. Prefer binary `debug=0`; do not call `/cmdline` or remote `/symbol` as part of profiling. Missing/disabled endpoints yield `ProfileUnavailable`. After an admitted HTTP attempt, this is a terminal failed action with `reason_code: ProfileUnavailable`; a conflicting application-owned session similarly ends with `reason_code: ProfilerBusy`. Neither result publishes an artifact or retries acquisition; the admitted reservation is released when the terminal outcome is recorded ([ADR-298](../docs/decisions/298-explicit-go-profile-refusals.md)). Asservat does not inject pprof into an existing binary or enable it through an unapproved application mutation.
 
 ### SC-PRF-001
 
@@ -73,14 +61,14 @@ Do not force GC for a heap profile by default. `forceGC=true`, changes to sample
 
 Only one Asservat CPU/trace recording in a conflicting runtime domain may run at once; the eBPF sampler is one domain per node, so at most one sampler session runs on a node. If the application already owns an incompatible profiling session, return `ProfilerBusy`; do not stop or overwrite it. Record actual start/stop, requested/observed sampling settings and cancellation outcome. HTTP cancellation does not prove the application stopped profiling, so an uncertain outcome is not automatically retried.
 
-Finite manual profiles use the shared revision-bound `cancel_capture` lifecycle.
-Current ordinary rights and the original accepted attempt remain required. A
-queue acknowledgement does not establish `Cancelled`: the exact writer must
-join node acquisition/upload and any in-flight managed storage before the joined
-outcome is recorded. A stored completion wins a concurrent Stop. A known
-pre-endpoint cancellation may report that no profiling started; an uncertain
-application outcome MUST remain explicit in progress and must not authorize a
-retry, replacement process, new acquisition interval or early reservation refund.
+Finite manual profiles use the shared `cancel_capture` operation, which needs
+current ordinary rights. Stop reaches the node as an event and cancels
+acquisition, upload and storage; the profile reports `Cancelled` once the writer
+has stopped. A stored completion wins a concurrent Stop. A cancellation before
+the endpoint request reports that no profiling started; otherwise whether the
+application stopped profiling is reported as unknown. Neither outcome retries or
+starts a replacement acquisition. The reservation is released when the
+cancellation outcome is recorded.
 
 The shared [assessment](capture-assessment.md) considers runtime/options, sampling, current headroom and other profilers/recorders. Flag interference separately from exclusive-session admission. A Go heap pprof profile contains allocation samples rather than a complete object heap; show possible labels/paths and forced-GC effects without falsely presenting it as a full heap dump. Unqualified numeric overhead remains unknown.
 
@@ -90,9 +78,9 @@ Given an existing application CPU profiler, when Asservat requests a conflicting
 
 ## REQ-PRF-003 — Format, identity and pre-analysis
 
-Preserve the original profile as raw evidence, with its true format (`pprof`, `go-trace`, `jfr`, `nettrace`, `speedscope`, `v8-cpuprofile` or qualified pack identifier). Profile manifests MUST record acquisition facts: profile type, requested duration, cumulative/delta/snapshot/interval mode, actual start/stop, source reference and endpoint digest, forced GC and target identity. Semantic facts (sample value types/units, sample period, drop/overflow counters, binary/symbol mappings) are established by the publisher's bounded verification of the native bytes and recomputed for each query; a producer that does not build the profile itself, such as a Go endpoint, does not parse the response and does not record them ([ADR-284](../docs/decisions/284-go-profile-native-types.md)). Go pprof is verified with `google/pprof` after a capped decompression (16 MiB) and Go execution traces (Go 1.22 and later) with `golang.org/x/exp/trace` within an event cap; a profile beyond these bounds is refused, never truncated. Go pprof verification additionally applies the fixed [allocation-shape limits](../docs/reviews/pprof-allocation-preflight.md) before the object parser: at most 100,000 samples, locations and functions each, 64 label records per sample, 300,000 string-table entries, 1,048,576 sample location references and inline lines each (4,096 per sample/location), 16 values per sample and 4,096 comment indices. A shared structural allowance additionally requires `2*samples + locations + functions + 8*labels <= 662144`; these empirical units are not a heap-memory guarantee. All limits apply together, so 100,000 samples is an upper ceiling rather than a promise for every combination of labels and stacks. The 16 sample-type and 4,096 mapping limits also apply before allocation. Unsupported shapes are refused at publication or analysis, never truncated; existing stored evidence and grants are not rewritten. An eBPF sampler profile also records its detected runtimes and unattributed samples; its native mappings carry build IDs, and frames it could not name stay unresolved rather than guessed. Missing values remain unknown.
+Preserve the original profile as raw evidence, with its true format (`pprof`, `go-trace`, `jfr`, `nettrace`, `speedscope`, `v8-cpuprofile` or qualified pack identifier). Profile manifests MUST record acquisition facts: profile type, requested duration, cumulative/delta/snapshot/interval mode, actual start/stop, source reference and endpoint digest, forced GC and target identity. Semantic facts (sample value types/units, sample period, drop/overflow counters, binary/symbol mappings) are established once by the publisher's bounded verification of the native bytes and stored as SQL artifact metadata, which queries reuse; a producer that does not build the profile itself, such as a Go endpoint, does not parse the response and does not record them ([ADR-284](../docs/decisions/284-go-profile-native-types.md)). Go pprof is verified with `google/pprof` after a capped decompression (16 MiB) and Go execution traces (Go 1.22 and later) with `golang.org/x/exp/trace` within an event cap; a profile beyond these bounds is refused, never truncated. Go pprof verification additionally applies the fixed [allocation-shape limits](../docs/reviews/pprof-allocation-preflight.md) before the object parser: at most 100,000 samples, locations and functions each, 64 label records per sample, 300,000 string-table entries, 1,048,576 sample location references and inline lines each (4,096 per sample/location), 16 values per sample and 4,096 comment indices. A shared structural allowance additionally requires `2*samples + locations + functions + 8*labels <= 662144`; these empirical units are not a heap-memory guarantee. All limits apply together, so 100,000 samples is an upper ceiling rather than a promise for every combination of labels and stacks. The 16 sample-type and 4,096 mapping limits also apply before allocation. Unsupported shapes are refused at publication or analysis, never truncated; existing stored evidence and grants are not rewritten. An eBPF sampler profile also records its detected runtimes and unattributed samples; its native mappings carry build IDs, and frames it could not name stay unresolved rather than guessed. Missing values remain unknown.
 
-Qualified bounded Go profile projections run in the regional acquisition worker under REQ-EVD-005 and [ADR-286](../docs/decisions/286-bounded-go-analyzer-isolation.md). Native tools and analyzers that execute evidence-supplied content retain the separate-Job boundary used for cores; choosing Go alone does not qualify a parser. Pprof uses a protobuf profile model with mappings, locations, functions, samples and labels; parse with maintained pprof tooling rather than an improvised format. Use exact local symbols; prohibit HTTP symbol lookup and analysis-time URL fetching. Produce deterministic extracts: total samples, flat/cumulative hotspots, bounded call-tree edges, allocation totals, blocking/lock wait summaries and symbol coverage. Runtime trace/JFR timelines have separate extract schemas; do not mislabel them as pprof. [pprof profile schema](https://github.com/google/pprof/blob/main/proto/profile.proto).
+Qualified bounded Go profile projections run in the [regional evidence reader](evidence.md#req-evd-005--analysis-isolation-and-output-classes) ([ADR-286](../docs/decisions/286-bounded-go-analyzer-isolation.md)). Native tools and analyzers that execute evidence-supplied content keep the isolated analysis boundary used for cores (REQ-EVD-005); choosing Go alone does not qualify a parser. Pprof uses a protobuf profile model with mappings, locations, functions, samples and labels; parse with maintained pprof tooling rather than an improvised format. Use exact local symbols; prohibit HTTP symbol lookup and analysis-time URL fetching. Produce deterministic extracts: total samples, flat/cumulative hotspots, bounded call-tree edges, allocation totals, blocking/lock wait summaries and symbol coverage. Runtime trace/JFR timelines have separate extract schemas; do not mislabel them as pprof. [pprof profile schema](https://github.com/google/pprof/blob/main/proto/profile.proto).
 
 Arbitrary sample labels, comments, paths and thread/goroutine metadata may contain sensitive data. Apply label/field allowlists before extract classification. Retain transform/tool versions and raw provenance. Optional flamegraph views use sanitized locally rendered data with no executable content supplied by the profile.
 
@@ -106,17 +94,16 @@ Profiles MAY be captured periodically as low-frequency baselines through an expl
 
 Cases link profile intervals to metric/log/probe intervals using target identity and source-clock uncertainty. A profile from a different process restart is labeled a different instance. Baseline retention consumes the same budgets and follows the same sharing/expiry rules as incident evidence. No continuous cluster-wide profiling backend is a hard dependency.
 
-[ADR-297](../docs/decisions/297-verified-profile-acquisition-metadata.md) retains
-collector-observed Go endpoint acquisition times only after complete native and
-manifest verification, through existing verification audit/catalog metadata.
-Display windows use explicit UTC microsecond precision; the sealed originals
-remain unchanged. The window covers HTTP acquisition, not precise sampling or
-cumulative counter history. Legacy windows and clock uncertainty remain unknown.
-A preparation/queue/storage timestamp or workload-supplied pprof timestamp is
-never substituted for a verified acquisition window. Pod identity does not
-establish serving-process identity or restart continuity. Cases may show known
-different Pods without claiming known different server processes. No additional
-case-time artifact/key read or disclosure authority is introduced.
+Collector-observed Go endpoint acquisition times are stored as artifact
+metadata once publication verification succeeds
+([ADR-297](../docs/decisions/297-verified-profile-acquisition-metadata.md)).
+Display windows use UTC microsecond precision; the sealed original is unchanged.
+The window covers HTTP acquisition, not precise sampling or cumulative counter
+history. Missing windows and clock uncertainty are shown as unknown. A
+preparation, queue or storage timestamp or a workload-supplied pprof timestamp
+is never substituted for the acquisition window. Pod identity does not establish
+serving-process identity or restart continuity: cases may show different Pods
+without claiming different server processes.
 
 ### SC-PRF-004
 
@@ -124,7 +111,7 @@ Given a trigger that starts a 10-second CPU recording, when the case timeline is
 
 ## REQ-PRF-005 — Bounded MCP profile queries and comparison
 
-[ADR-291](../docs/decisions/291-bounded-profile-summary.md) separates the approved summary operation from raw input disclosure. A closed pprof summary requires current ordinary read rights, the original retained audience and client permission for extract/profile output; it does not confer native download or arbitrary raw query authority. The original input remains raw for processing and retention. Metadata-only shares do not authorize profile summaries; broader profile sharing remains pending.
+[ADR-291](../docs/decisions/291-bounded-profile-summary.md) separates the approved summary operation from raw input disclosure. A closed pprof summary requires current ordinary read rights, the original retained audience and client permission for extract/profile output; it does not confer native download or arbitrary raw query authority. The original input remains raw for processing and retention. Metadata-only shares do not authorize profile summaries.
 
 `get_profile_summary` MUST provide selected sample type, units, duration, total, top-N flat/cumulative functions, and symbol/completeness warnings. `compare_profiles` MUST authorize both artifacts independently, require compatible profile/sample semantics or return a mismatch, and label raw deltas versus duration-normalized rates. Default top-N 20, maximum 100. Cursors, shares, grants, output ceilings and audit rules apply normally. Summary totals, flat and cumulative values retain their signs for delta profiles. The displayed fraction is flat divided by total only when all selected sample values are nonnegative and the total is positive; otherwise it is null, not a fabricated zero or an absolute-value normalization.
 
@@ -151,16 +138,15 @@ build, sampling configuration and symbols remain explicit. Heap and allocation
 handlers may compare matching selected counters with compatible state/window
 semantics; their handler names alone do not establish incompatibility.
 
-Both readers MUST retain independently current rights, original audience,
-client, retention, recovery and permitted processing placement. Authenticate both
-complete native files before a comparison or semantic-mismatch result. Neither
-source's native size limit is enlarged by comparison. Bind both exact versions,
-role order and normalization to one query. A repeated source still has two
-independent key-use identities. The first implementation requires a common
-qualified regional reader/store; wider placements remain unavailable until
-qualified, without a plaintext hub proxy or invented credential union. Charge
-both reads atomically and preserve uncertain spend. These clauses describe the
-implementation contract, not completed public or installed qualification.
+A comparison is one operation with one authorization that covers each source
+independently: current rights, original audience, client, retention and
+processing restriction. Summary and comparison results are computed from the
+verified native file as described for stored-evidence queries in
+[REQ-EVD-005](evidence.md#req-evd-005--analysis-isolation-and-output-classes);
+neither source's native size limit is enlarged by comparison. The query binds
+both exact versions, role order and normalization, and both reads are charged in
+one transaction. Both sources must be readable by the same regional evidence
+reader; other placements return `Unavailable`, never a plaintext hub proxy.
 
 ### SC-PRF-005
 
@@ -170,12 +156,9 @@ A declared port is a routing hint, not proof of its serving process. Within a po
 
 Runtime `profile` acquisition is onTrigger in the initial lifecycle registry, including interval CPU sampling and retrieval of application-owned cumulative counters. The ten-second CPU profile starts at admitted dispatch; it is not a pre-trigger flight recorder. An explicit scheduled baseline is another bounded capture. Adding an Asservat-owned continuous profiling adapter later requires an ongoing lifecycle and qualification; it cannot be inferred from profile.mode or enabled during preview.
 
-The initial [Go acquisition component](../docs/architecture/runtime-profiles.md)
-streams an exact native response into the existing encrypted format. Its current
-observations never renew the original admitted action deadline or permit.
-Profile-specific admission, qualified named node endpoints and semantic
-publication remain prerequisites; this component does not enable a public
-profile capability or widen the pod-status collector.
+Go endpoint acquisition streams the exact native response into the encrypted
+artifact format ([runtime profiles](../docs/architecture/runtime-profiles.md));
+it never extends the admitted action deadline.
 
 
 ### Passive endpoint resolution boundary
@@ -198,30 +181,24 @@ Absent IP does not prevent passive loopback planning. Host-network endpoints rem
 until separately qualified. Planning does not test endpoint reachability.
 Credentialed definitions require pinned TLS trust/server identity and an exact
 permitted workload-root audience. Source and computed endpoint digests bind the
-resolved public configuration and mechanism parameters, while current
-observations retain their original earliest cutoffs. A pure catalog value or
-matching digest is not proof of protected source acceptance or permission to
-use credentials. See the [runtime-profile boundary](../docs/architecture/runtime-profiles.md).
+resolved public configuration and mechanism parameters. Endpoint definitions
+come from Helm-rendered regional configuration; a catalog entry grants no
+credential use by itself. See the [runtime-profile boundary](../docs/architecture/runtime-profiles.md).
 
 ### Manual profile preview
 
-History-backed single-profile repeat previews use a prospectively selected
-eight-second composition inside the existing fifteen-second public request.
-They retain initial recovery before the one readiness hint, then independently
-read final exact-target and current facts after readiness; no old observation
-is renewed. A fresh recovery proof must preserve the original installation,
-issuer epoch and full revision. Original parent/token/policy/source expiry and
-final current checks remain mandatory. This metadata composition neither
-collects another profile nor obtains a new approval.
+A preview is a stateless dry run (ADR-330 D9) under one authorization of the
+public request. History-backed repeat previews resolve the current exact target
+and endpoint once and return the plan and its digest; they neither collect a
+profile nor obtain an approval.
 
 
 [ADR-285](../docs/decisions/285-profile-preview-plans.md) connects the passive
-endpoint planner to manual preview through regional installation configuration.
-The review freezes the public definition and endpoint digests without dialing
-or reading credentials. `builtin/go-cpu/v1` selects a ten-second CPU interval;
-custom profiles may use the supported Go modes or the eBPF CPU sampler. Plans
-state raw native output and the required `liveProfile` approval reason. They
-remain unavailable for submission until acquisition is implemented and qualified.
+endpoint planner to manual preview through regional configuration. The plan
+freezes the public definition and endpoint digests without dialing or reading
+credentials. `builtin/go-cpu/v1` selects a ten-second CPU interval; custom
+profiles may use the supported Go modes or the eBPF CPU sampler. Plans state raw
+native output and the required `liveProfile` approval reason.
 
 ### Finite profile admission and custody
 
@@ -241,17 +218,15 @@ They do not acquire packet or syscall observation budgets. A collection grant
 alone cannot authorize inspection/download of the result; current human raw
 approval must independently cover the exact published artifact. All existing
 finite Go mode limits and prerequisites apply. Runtime trace remains trace
-format and cannot enter pprof analysis. This is an implementation contract;
-installed policy-profile qualification remains pending.
+format and cannot enter pprof analysis.
 
 A qualified manual Go endpoint acquisition is a distinct typed profile request,
 never a packet recorder. Persist the reviewed composition, expanded endpoint
 bindings, definition/endpoint digests, native byte ceiling and action timeout;
 re-resolve the exact endpoint before starting without rewriting the reviewed
-observation. `liveProfile` requires raw approval regardless of the installation's
-optional all-recordings approval setting. Existing same-human result-access
-children govern raw inspection/download; capture-time raw sharing stays refused
-until its separate approval contract is implemented.
+plan. `liveProfile` requires raw approval regardless of the installation's
+optional all-recordings approval setting. Same-human result-access children
+govern raw inspection/download; capture-time raw sharing is refused.
 
 The persisted approval review and shared browser/MCP response carry the profile
 runtime, type, mode, optional duration, timeout, forced-GC choice, native limit
@@ -260,17 +235,10 @@ console presents these parameters and the absence of pre-trigger history;
 profile actions carry no fabricated packet window, filter or recording ring.
 This summary does not replace the canonical execution scope or probe endpoints.
 
-For native limits above 8 MiB, [ADR-290](../docs/decisions/290-one-shot-profile-streaming.md)
-requires atomic final and temporary multipart reservations and a single durable
-binding to the accepted connector process before storage. Its non-resumable
-writer may keep transition bookkeeping locally, but never reconstruct or retry
-an uncertain write or refund temporary charges before verified writer quiescence
-and complete backend inventory cleanup. Cancellation/Stop, no replacement
-profiling, protected publication and native download remain full workflow
-acceptance requirements; component checks do not qualify them.
-
-Fresh qualified capacity roots select the immutable `go-profile/v1` protocol
-marker to fund the maximum native trace, one bounded additional response, and
-multipart temporary obligations within the authored workload slice. Legacy roots
-retain their original limits and charges; schema upgrade alone never enlarges
-their grants or funding. See ADR-290 for exact window, key and retirement costs.
+Profiles are written in one non-resumable upload
+([ADR-290](../docs/decisions/290-one-shot-profile-streaming.md)). Admission
+reserves the maximum native size once in the workload's quota, under the
+profile request's operation ID. Larger limits use multipart upload; the evidence
+bucket's `AbortIncompleteMultipartUpload` lifecycle rule removes abandoned parts.
+The reservation is released to the stored size on completion and fully on abort
+or any other terminal outcome. A failed upload is not retried.

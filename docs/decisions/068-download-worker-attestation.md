@@ -1,5 +1,7 @@
 # ADR-068 — Kubernetes-bound download worker proofs
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded in part by ADR-328 (2026-11-13): reading the worker's namespace, ServiceAccount, Job and Pod to match UIDs, controller identity and spec digests against pinned dispatch facts no longer applies; objects in the download-worker namespace are trusted. Online TokenReview with the dedicated audience, binding to the acquisition certificate and minimized proof persistence remain.
 
 Date: 2026-10-10. Status: implementation refinement of ADR-051/065/066. Proof production and consumption are implemented components; protected dispatch, peer issuance and runtime composition remain required.
@@ -14,4 +16,4 @@ Bind each proof to the exact acquisition certificate whose peer ID is the Pod UI
 
 Persist only the minimized identity/certificate/time proof and token digest in migration 24. Never retain the bearer token or full workload spec. SQL checks original proof freshness after locks and before completing key consumption. Retrying the same batch cannot replace its proof, extend its deadline or refill the three slots. Existing rows without a proof deny access; migration cannot fabricate authority for them.
 
-The dispatcher records these facts when it creates the approved download-only Job, enroll its peer and deliver the token through authenticated control mediation. Those operations, production RBAC/audit configuration, issuer lifecycle, public transfer and installation remain unfinished. [The component contract](../architecture/download-worker-attestation.md) distinguishes these remaining responsibilities from proof validation.
+The dispatcher records these facts when it creates the approved download-only Job, enroll its peer and deliver the token through authenticated control mediation. Those operations, production RBAC/audit configuration, issuer lifecycle, public transfer and installation remain unfinished. The component contract distinguishes these remaining responsibilities from proof validation.

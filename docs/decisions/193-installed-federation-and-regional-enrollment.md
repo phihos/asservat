@@ -20,7 +20,7 @@ Builds on [ADR-168](168-rotating-cluster-enrollment-credential.md),
 [ADR-169](169-delegated-regional-lifecycle-channel.md),
 [ADR-170](170-federation-compartment.md),
 [ADR-185](185-public-sources-and-cluster-catalog.md) and the audited bootstrap
-issuance ([bootstrap issuance](../architecture/bootstrap-issuance.md)).
+issuance (bootstrap issuance).
 
 ## Context
 

@@ -1,5 +1,7 @@
 # ADR-307 — Natural completion of exhausted projection workers
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 Date: 2026-11-05. Status: implemented with named local and installed-test qualification
 under standing engineering delegation. Requirements: REQ-MCP-002, REQ-EVD-005/008,
 REQ-AUT-006; TASK-02/08/11.

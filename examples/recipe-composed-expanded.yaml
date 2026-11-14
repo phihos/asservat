@@ -36,7 +36,6 @@ spec:
         protocol: tcp
         resolution: frozen
         maxEndpoints: 1
-        maxStaleness: 5s
       maxFrozenBytes: 67108864
       maxConcurrentSnapshots: 1
       filter: tcp port 8080

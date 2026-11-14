@@ -25,7 +25,7 @@ func (f trustFunc) WorkTrust(c context.Context, r value.Receiver) (value.WorkTru
 }
 func workFixture(t *testing.T) (map[string]any, value.Receiver, value.WorkTrust, ed25519.PrivateKey, time.Time) {
 	t.Helper()
-	b, err := os.ReadFile("../../../examples/internal-runAction.json")
+	b, err := readImplementedExample("../../../examples/", "internal-runAction.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -253,4 +253,14 @@ func TestRunActionTrustReadDoesNotExtendFreshness(t *testing.T) {
 	if _, err = v.VerifyRunAction(context.Background(), signed, r); err == nil {
 		t.Fatal("trust read freshened expired snapshot")
 	}
+}
+
+// readImplementedExample reads the example this runtime implements:
+// examples/implemented/ (pre-ADR-330 contracts) when present, otherwise the
+// canonical example.
+func readImplementedExample(dir, name string) ([]byte, error) {
+	if b, err := os.ReadFile(dir + "implemented/" + name); err == nil {
+		return b, nil
+	}
+	return os.ReadFile(dir + name)
 }

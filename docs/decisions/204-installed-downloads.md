@@ -1,5 +1,7 @@
 # ADR-204 — Installed native downloads
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded in part by ADR-328 (2026-11-13): the guarded profile source, its guard proof with the `native-kube-probe-*` token, per-read namespace UID checks, the hub namespace guard pairs and the resource-journal template pins no longer apply. The hub-api and hub-worker read the worker profile ConfigMap in the worker namespace under RBAC, and Helm creates the worker namespace and its objects. The separate worker namespace, path template from the catalog, separate read credential, SQL purposes, acquisition unwrap authority and downloads token audience remain valid.
 
 Date: 2026-10-18. Status: accepted; implemented; installed worker/profile provisioning and configuration acceptance pass.

@@ -1,280 +1,95 @@
 # Shared manual context investigation
 
-C-09 now has one internal `ContextInvestigation` service for browser and MCP
-composition under ADR-103, I-09, S-01/S-02 and TASK-02/03/05/07/11. It accepts
-request-owned [current identity](current-request-identity.md) and delegates policy
-evaluation to C-03, target resolution to C-05, compilation and explanation to
-C-06, retention to C-15 and atomic admission to C-21. It does not expose a public
-route, dispatch a collector, publish evidence or establish download authority.
+C-09 has one `ContextInvestigation` service used by browser and MCP under
+ADR-103, I-09, S-01/S-02 and TASK-02/03/05/07/11. It takes the request's
+[current identity](current-request-identity.md) and delegates policy evaluation
+to C-03, target resolution to C-05, compilation and explanation to C-06,
+retention to C-15 and atomic admission to C-21. Mechanisms follow
+[ADR-330](../decisions/330-event-driven-system-design.md) (D5, D7, D8, D9).
 
-The only supported diagnostic is the exact `builtin-pod-status-v1` recipe:
-one whole-pod Kubernetes status projection with a 4096-byte native ceiling.
-`incident-context/v1`, logs, process lists and network counters cannot silently
-resolve to this narrower implementation. The service returns a typed unavailable
-diagnostic error before target preparation for unsupported recipes.
+The supported diagnostic is the exact `builtin-pod-status-v1` recipe: one
+whole-pod Kubernetes status projection with a 4096-byte native ceiling.
+Unsupported recipes (`incident-context/v1`, logs, process lists, network
+counters) return a typed unavailable error before target resolution.
 
-## Passive review
+## Preview
 
-`Preview(ctx, CurrentIdentity, ContextIntent)` returns a `ContextPreviewResult`
-containing an immutable blueprint and a transient `ContextAssessment`. Intent
-contains the public workload name reference, exact diagnostic name, requested
-retention seconds and an optional protected reason reference. Current resolution
-selects and pins one scheduled Pod, its actual supported owner, node and boot
-identity. Submission resolves that exact pin; it cannot select another replica.
+`Preview(ctx, CurrentIdentity, ContextIntent)` is a dry run. It returns the
+resolved plan, its digest and a transient `ContextAssessment`; it stores
+nothing. The intent names the workload, the diagnostic, requested retention
+seconds and an optional reason.
 
-Current ordinary eligibility is checked before returning target metadata. The
-complete default evidence audience is distinct from the requesting developer's
-contributing assignments. The service observes current qualified capability,
-accepted retention proof, workload storage selection and installation recovery.
-An unprotected retention calculation cannot substitute for accepted source proof.
-The original five-second identity and observation intervals bound all reads and
-the final response, including time spent writing the draft. A request cannot
-detach from the originating browser/MCP request by supplying another context.
+- Ordinary eligibility is checked before any target metadata is returned. Before
+  entitlement is established, resolver errors do not reveal whether another
+  team's workload exists.
+- Target resolution reads the [pushed cluster state](cluster-observations.md)
+  and pins one Pod by UID, with its owner and, for the node class, its node.
+- The plan binds the canonical scope, the complete default audience (distinct
+  from the requester's contributing assignments), the workload's storage
+  binding, the retention policy provenance, the reported capability and the
+  assessment rule digest.
+- Preview fails with a typed reason when a required fact is unavailable (no
+  binding, capability mismatch, account full, resource type unavailable). It
+  does not wait for a refresh.
 
-The composed submission owner bounds admission and single-start work separately
-under [ADR-292](../decisions/292-independent-submission-start-phase.md): each
-phase has at most five seconds within the original fifteen-second request.
-Consumed response metadata does not shorten a later independently authorized
-start, and no current authority observation or accepted deadline is extended.
+Fixed private stage labels identify which step refused a preview for operator
+diagnostics; dependency error text is not logged.
 
-Installed preview refusals emit a bounded private stage diagnostic for initial
-identity/recovery/target resolution, each facts dependency, processing coverage,
-compilation, passive draft persistence and final checks. Dependency errors remain
-wrapped for `errors.Is` classification; their text and arbitrary nested stage
-strings are never logged. Only fixed stage labels reach the existing exponentially
-suppressed process logger. This adds no public result field, authority, retry or
-freshness interval. An acknowledged `NotAvailable` envelope remains distinct from
-an audit or transport failure that prevented any valid response.
+## Request
 
-Regional target-query diagnostics report success only after decoded target,
-exact requested identity and original freshness validation. Fixed private
-labels distinguish the hub receiver cutoff from the regional resolution cutoff;
-successful transport alone is not a usable target observation. These diagnostics
-never refresh either interval or substitute another Pod.
+`Request(ctx, CurrentIdentity, plan digest, intent, idempotencyKey)`:
 
-[ADR-260](../decisions/260-api-target-observation-freshness.md) separates completed
-API target metadata from the exchange used to read it. Query I/O and completion
-still require the original current source/peer bounds. After completion, exact
-UID/owner metadata keeps at most five seconds from its earliest target read;
-transport-proof expiry alone does not invalidate that delivered observation.
-All current human, recovery, grant, storage and effect guards remain binding,
-including this coordinator's original five-second request and earlier parent.
+1. Looks up the idempotency key for the actor and client. A stored capture is
+   returned unchanged, even after the Pod or workload is gone; a different
+   digest under the same key is `Conflict`.
+2. Otherwise authorizes once for the operation
+   ([ADR-311](../decisions/311-operation-authority-recheck.md)), re-resolves the
+   plan from current state and compares its digest with the submitted one. A
+   different digest returns the new plan and what changed; the user reviews
+   again. The pinned Pod is never replaced by another replica.
+3. Admits atomically ([context admission](context-admission.md)).
 
-The passive `ContextPreview` holds server-generated preview, capture, case,
-occurrence, artifact, attempt and assessment IDs; original actor/client; exact
-authored intent; target pin; selected storage revisions; relative retention;
-complete audience assignments; canonical scope/digest; assessment rule digest;
-installation/issuer incarnation; and original creation/deadline. The deadline is
-at most five minutes and is never extended on replay. No bearer/session token,
-groups, current identity, recovery/retention proof or observation freshness is
-serialized. The incarnation is a staleness binding, not recovery authority.
+Evidence retention starts when the request is admitted, not at preview, so a
+user may review for two minutes and still get the full requested retention.
+Concurrent requests with different keys create different captures; a
+deliberate repeat needs a new key.
 
-`ContextPreviewStore` requires immutable creation, exact actor/client lookup,
-expiry and atomic active caps of ten per principal across clients and 1000 per
-installation. Unknown create replies may consume a passive slot until expiry;
-they cannot start collection. Serialized previews are bounded to 128 KiB and
-scope bytes to 64 KiB. Domain validation is structural; shared application
-validation additionally checks JSON, scope checksum and actual serialized size.
-The PostgreSQL adapter owns durable enforcement and bounded cleanup separately.
+Acceptance is not execution, a committed artifact or a completed case.
+Dispatch, verification, publication, case presentation and download follow
+separately.
 
-ADR-267 implements recording-save reasons as encrypted descriptive control data.
-The immutable blueprint carries only the ciphertext reference; a separate
-preview ciphertext column is erased after atomic copy to all mandatory child
-audit journals. Scope/grants/repeat remain reason-free. The existing control key
-ports seal once per reason preview; opaque bytes pass through both audit phases
-without a reason unwrap. A zero reference expiry follows audit retirement; a
-nonzero legacy metadata expiry is never collection authority. Missing/retired
-text affects its display only. No plaintext reason enters SQL. Ordinary
-`preview_capture` still has no raw-reason input producer.
+## Recording-save reasons
 
-## Fresh acceptance and original retries
+A recording-save reason is a plain SQL column on the capture under the
+capture's authorization (D8). Scope, grants and repeat selection do not include
+the reason.
 
-`Request(ctx, CurrentIdentity, previewID, idempotencyKey)` first obtains fresh
-identity and recovery and asks `ContextAdmissionReplay` for the original accepted
-operation. The submission digest is derived from the immutable preview ID;
-SQL independently binds the original actor/client and request key. A conflicting
-preview under the same key fails before reading another draft. Lookup rechecks
-current SQL entitlement for the stored target and recovery after locks. It needs
-neither a live Pod nor an unexpired preview, storage selection or acquisition
-retention proof. This is essential when COMMIT succeeded but its response was
-lost. Its result remains private capture navigation/status input, not evidence.
+## Approved recorder acceptance
 
-Only an absent accepted operation proceeds to draft lookup. The service checks
-original actor/client, expiry and installation incarnation, resolves the exact
-Pod and refreshes eligibility, capability, retention and storage. It recompiles
-and compares canonical scope, complete audience, storage revisions, relative
-retention policy provenance and current assessment rules. Material changes
-require a new review. Updated observation times do not change reviewed scope or
-extend a prior observation's deadline.
+Recorders that need approval follow [ADR-252](../decisions/252-approved-capture-acceptance.md).
 
-Each call owns at most one non-authoritative capacity readiness wait.
-For a packet preview with a storage selection, Request starts it after accepted
-replay misses and the actor-matching preview read, before recording grant I/O.
-Other requests retain their existing start beside exact-Pod resolution. Preview
-and CheckDiagnostic start it after target resolution. The
-same wait overlaps eligibility, capability and retention reads in their
-existing order, then joins before the authoritative storage read. Early
-failure cancels and joins it before returning. Under
-[ADR-213](../decisions/213-storage-readiness-at-consumption.md), this same
-owned operation retains its original upper bound and single demand-attempt
-state through consumption. A valid same-selection result below the existing
-one-second freshness margin may poll every 250 ms for an independently
-refreshed binding, while every retained non-storage fact remains current.
-It may use the sole demand attempt only if the hint has not already spent it.
-An early successful hint cannot satisfy the final margin check.
+- The approval stores the reviewed plan and digest. The plan binds action
+  durations, not an absolute preview deadline.
+- Submission by the same requester fixes one capture deadline within five
+  minutes and the grant's expiry, checks current target, eligibility, storage,
+  retention and assessment against the approved digest and admits. Admission
+  checks the grant and its revocation in the same SQL transaction.
+- The administrator's approval-required setting is read once per submission; a
+  change in either direction invalidates the review.
+- Packet submission checks the pinned Pod and recorder availability from pushed
+  cluster state. An unknown or unsupported recorder is a plan blocker; a
+  transient unavailability is a retryable `NotAvailable`.
 
-Readiness scheduling stops at the earlier original authority cutoff or one
-second before the actual parent context deadline. That reserve uses the real
-context clock, independently of the injected authority clock. It applies only
-to the optional hint, demand and polling; it does not shorten any returned
-identity or observation, extend authority, or change the public request deadline.
-A call already in that final second skips the hint. Consumption still gets one
-fresh authoritative read under its unchanged original authority context, even
-for a parent shorter than one second. A sufficiently fresh result can succeed;
-a thin result returns the existing retryable unavailability without demand or
-polling. Ending a wait permits one final authoritative read, with the same
-selection and original fact checks. Audit completion, final identity checks and
-response delivery retain the parent context. The reserve gives those steps an
-opportunity to finish; slow reads or audit can still exhaust the request.
-
-Request pins the preview's exact storage selection; Preview and
-CheckDiagnostic pin their first valid authoritative selection. Read errors,
-invalid bindings, changed selections and cancellation refuse
-consumption. An explicitly typed, naturally expired source may retain its original
-binding/selection metadata solely for comparison. After validating its original
-interval and exact reviewed selection, consumption may use the same bounded
-readiness owner and sole demand attempt as a thin result. No expired value
-authorizes admission: an independently fresh successful read is required.
-Generic read failures and malformed, future or mismatched expired metadata
-remain terminal. Expired metadata does not validate capacity/control; the fresh
-successful read must still pass those unchanged checks. Missing refresh or a failed demand prevents polling for a thin
-result; a valid final read with sufficient margin can still succeed.
-The wait uses the earliest original
-caller, initial identity/recovery, preview, target, eligibility/identity,
-capability and retention/proof/expiry; reason metadata is not an authority cutoff. It never
-refreshes those facts or extends a binding's timestamps. Target resolution,
-ordered initial fact reads and admission remain single operations, with the
-existing final eligibility recheck retained. The bounded early hint behavior
-for a missing/stale binding remains unchanged.
-
-Evidence retention starts at actual submission preparation, not at preview
-creation. A developer can review for two minutes and still request sixty seconds
-of evidence retention. The first admitted registration fixes its anchor and
-cutoffs. Concurrent submissions may calculate different anchors; exact accepted
-replay returns the winner's original registration without altering dates or
-reserving again. The original preview deadline still bounds admission/write time.
-
-`AdmitContext` remains the only transaction that binds the request key, original
-capture IDs and scope while reserving custody obligations. No second independent
-"accepted preview" write is required. Unknown outcomes return an error and retain
-the original IDs/key for the next lookup. A different key cannot reuse the same
-preview to create another capture. A deliberate repeat requires a fresh preview.
-Final current-identity checks reject revocation or changed group/scope/policy
-claims after SQL work, while preserving its original request deadline.
-
-Acceptance returns `accepted_pending_audit` or an exact already accepted retry.
-It is not permission to execute, a committed artifact or a completed case. Intent
-audit, current effect authority, dispatch, independent verification, publication,
-case presentation and native download remain separate required compositions.
-
-## Qualification and remaining composition
-
-Focused `go test -race -count=1 ./internal/application/capture
-./internal/domain/capture` passed with exit 0; output is retained in
-`test/results/context-investigation-unit.log`. Tests exercise passive previews,
-assessment identity, exact diagnostic rejection, relative retention after review,
-immutable pins and material changes, unknown commit recovery after preview/Pod
-disappearance, client/key conflicts, eight concurrent submissions, current proof
-and recovery requirements, protected reason references, serialization/integrity
-bounds, blocking expiry, originating-request cancellation, and changed identity
-groups/scopes/policy after admission and replay. They use the actual shared
-eligibility evaluator and request-owned identity handle with explicit test-only
-dependency/effect ports; this is not real SQL/Kubernetes qualification.
-
-The first material-change test incorrectly changed only a capability generation
-while retaining its content digest. The compiler intentionally binds the ceiling
-content digest; the corrected regression changes that digest. An initial design
-review also removed evidence dates anchored to preview creation before this
-qualification. Neither mistake was worked around by relaxing authority checks.
-
-Public transports must project only the relevant preview/assessment and capture
-navigation fields. Before target entitlement is established, named resolver
-errors must not reveal whether another team's workload exists. Production
-protected capability and storage-configuration producers, encrypted reason runtime/provider qualification,
-public contracts/UI composition and the later audit/execution/publication/download
-path remain required. The existing 1024 historical-capture ceiling still needs
-finite idempotency retirement and fair admission; passive preview cleanup does
-not fix that separate limitation. Native/provider and full repository gates are
-run by the parent task after a coordinated source freeze, with results recorded
-in `docs/implementation-progress.md`.
-
-## Approved recorder acceptance (ADR-252)
-
-An approval review may outlive its passive preview. Its exact immutable blueprint
-is retained, with the existing preview quotas, through the grant's original
-review window/expiry. That permits locating the reviewed plan; it grants no
-collection authority. A new review still requires a current preview.
-
-Marked `approvedAcceptance/v1` recorder scopes bind action durations rather than
-an absolute preview deadline. Same-requester submission fixes one capture deadline
-within five minutes and the grant's original expiry, then performs the existing
-current target/eligibility/storage/retention/incarnation/assessment checks against
-the original identities and digest. Admission and API execution serialize current
-grant use with revocation in SQL. Accepted retries recover their original deadline.
-Legacy absolute-deadline plans cannot gain this interpretation; they require a
-new preview/review. See [ADR-252](../decisions/252-approved-capture-acceptance.md).
-
-Packet submission resolves its exact approved Pod and current recorder
-availability in one regional exchange. This removes duplicate network/API work
-from the original target's five-second observation interval; it does not restart
-that interval or relax any current eligibility, retention, storage, identity or
-recovery check. Unsupported composition types still refuse before that query.
-The connector rechecks the Pod's node and collector before enqueueing. Preview
-selection and its plan-only behavior remain unchanged. See the
-[target composition](workload-target-resolution.md#independent-pins-and-deadlines).
-
-Recorder composition previews preserve plan-only blockers for known unsupported
-inputs, no adapter, or a confirmed unavailable/unsupported recorder answer. An
-operational recorder read/transport/cancellation failure returns the existing
-retryable `NotAvailable` result before compilation or preview persistence. The
-installed approved-recording journey requires exactly the `ApprovalRequired`
-blocker before it requests approval, matching the console's requestability gate;
-its existing four reads retry only typed retryable unavailability. Availability
-never upgrades an already stored or approved plan; its original scope stays fixed.
-
-The existing protected approval-settings reader is consulted once per recorder
-submission. A changed administrator approval requirement invalidates the review
-in either direction. Approval presentation separates passive preview expiry from
-the bounded execution window assigned at acceptance.
-
-
-The browser controller can submit an already-reviewed approval-required recorder
-composition. A known `ApprovalRequired` response links the existing approval and
-retains the original preview-bound intent key; it does not report capture
-acceptance. Detailed `get_grant` outputs provide advisory `can_resume` and
-`can_resolve` flags for the original full requester/client. Resume requires
-capture scope; passive resolution requires the current read scope and a
-previous approved decision, so pending/denied reviews have no close-by-lookup
-control. An explicit button names the close-if-unstarted effect.
-Resume additionally requires a currently usable marked approval and ordinary
-collection rights. Only a user action invokes the existing request operation;
-admission remains authoritative. Passive resolution can still find a previously
-accepted capture after approval expiry without starting acquisition. The server emits `resume_requires_original_client` guidance only for the same
-requesting human on another client while the marked plan is Approved; independent
-reviewers and pending/denied reviews receive no such instruction. No grant is
-transferred. The preview-bound key is stable across pending review, page remount
-and lost replies; no browser credential or private authority is persisted.
+The browser submits an approval-required composition and receives the
+`ApprovalRequired` link; the idempotency key stays stable across pending review,
+page reload and lost replies. `get_grant` tells the original requester and
+client whether resubmission is possible; the server emits
+`resume_requires_original_client` for the same human on another client. No
+grant is transferred.
 
 Manual recorder assessment rules are `recorder-assessment/v2`: retention starts
-at submission preparation, never preview creation. This changes the reviewed
-rules digest so an unsubmitted older review must be refreshed. Existing-source
-snapshot timing remains a distinct contract and is not implemented by this UI.
-The page renders the actual supplied assessment actions, categories and output
-limits; unknown overhead remains unknown.
+at submission. The page renders the supplied actions, categories and output
+limits; unknown overhead stays unknown.
 
-
-The preview-derived intent key is public correlation. The current authenticated
-actor and OAuth client scope SQL lookup; the submission digest binds the preview.
-Knowing the key supplies no authority, another preview conflicts under that key,
-and a closed preview cannot start under either the same or a different key.
-A deliberate new intent requires a new review and preview ID.
+The idempotency key is public correlation. Actor and OAuth client scope its
+lookup; knowing the key confers no authority.

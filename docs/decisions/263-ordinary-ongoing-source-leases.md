@@ -1,5 +1,7 @@
 # ADR-263: Ordinary ongoing source active leases
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 Status: accepted engineering contract (2026-10-29); local source components implemented; full workflow and qualification pending.
 
 ## Decision and scope

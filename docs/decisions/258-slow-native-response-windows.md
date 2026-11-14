@@ -1,5 +1,7 @@
 # ADR-258 — Native response windows under slow delivery
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded in part by ADR-328 (2026-11-13): worker attestation is the TokenReview of the
 > bound Pod token, matched to the worker's stored Job/Pod (ADR-221 as amended). The live
 > namespace, account, Job and Pod reads of ADR-068 no longer apply, because the download-worker

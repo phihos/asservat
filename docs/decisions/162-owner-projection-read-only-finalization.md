@@ -1,5 +1,7 @@
 # ADR-162 — Read-only finalization of original owner projection effects
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded (2026-11-13): read-only finalization re-verified the installer's own projection and launch effects, guards and dry-run probes. Under ADR-328 installer-created objects are trusted; Helm renders them and idempotent hook Jobs replace the installer controller.
 
 Date: 2026-10-14. Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan. Requirements: REQ-DEP-003 and REQ-FED-001; existing

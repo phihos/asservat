@@ -84,7 +84,7 @@ func refusal(t *testing.T, err error, code, path string) {
 
 func TestBuiltinProfilesMatchExampleDefinitions(t *testing.T) {
 	for _, name := range builtinNames {
-		b, err := os.ReadFile("../../../examples/capture-profile-" + name + ".yaml")
+		b, err := readImplementedExample("../../../examples/", "capture-profile-"+name+".yaml")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -320,7 +320,7 @@ func TestRecorderPlanLifecycleAndFilterBinding(t *testing.T) {
 // lifecycle and program digest. The program is libpcap 1.11.0's output for the
 // fixture expression (pinned by the libpcap-tagged adapter test).
 func TestRecorderScopeCrossLanguageFixture(t *testing.T) {
-	b, err := os.ReadFile("../../../examples/resolved-recorder-preview.json")
+	b, err := readImplementedExample("../../../examples/", "resolved-recorder-preview.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -347,7 +347,7 @@ func TestRecorderScopeCrossLanguageFixture(t *testing.T) {
 			var pretty bytes.Buffer
 			_ = json.Indent(&pretty, plan.CanonicalScope, "", "  ")
 			pretty.WriteByte('\n')
-			_ = os.WriteFile("../../../examples/resolved-recorder-preview.json", pretty.Bytes(), 0o644)
+			_ = os.WriteFile("../../../examples/implemented/resolved-recorder-preview.json", pretty.Bytes(), 0o644)
 		}
 		t.Fatalf("compiled plan differs from the fixture:\n%s", plan.CanonicalScope)
 	}
@@ -722,4 +722,14 @@ func TestManualObservationIssued(t *testing.T) {
 			t.Fatal(c.name, got)
 		}
 	}
+}
+
+// readImplementedExample reads the example this runtime implements:
+// examples/implemented/ (pre-ADR-330 contracts) when present, otherwise the
+// canonical example.
+func readImplementedExample(dir, name string) ([]byte, error) {
+	if b, err := os.ReadFile(dir + "implemented/" + name); err == nil {
+		return b, nil
+	}
+	return os.ReadFile(dir + name)
 }

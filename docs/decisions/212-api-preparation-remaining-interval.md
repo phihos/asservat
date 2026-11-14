@@ -1,5 +1,7 @@
 # ADR-212 — Remaining interval before one-use API preparation
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 Date: 2026-10-20. Status: accepted; implemented; SQL boundary checks pass; installed headroom refusal, later acquisition and accepted-result recovery observed.
 Qualification is recorded in [implementation progress](../implementation-progress.md).
 Requirements: REQ-EXE-002, REQ-DB-003–004; S-02.

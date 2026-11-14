@@ -12,7 +12,7 @@ Given deletion/recreation of a namespace/workload or a recycled PID, when a prev
 
 ## REQ-DOM-002 — Capture and source lifecycles
 
-Capture, immutable AcceptedScope, ActionAttempt, PolicyActivation, SourceSession and SourceSnapshot are separate concepts. A recording save binds existing sources and immutable first-acceptance end time. Sources have independent leases/budgets/readiness; cancellation or retry of a snapshot neither starts a source nor stops an unrelated recorder. Track uncertain starts separately from terminal user-visible status.
+Capture, immutable AcceptedScope, ActionAttempt, PolicyActivation, SourceSession and SourceSnapshot are separate concepts. A recording save binds existing sources and immutable first-acceptance end time. Sources have independent hard ends, budgets and readiness; cancellation or retry of a snapshot neither starts a source nor stops an unrelated recorder. Track a start whose outcome is unknown (resolved by its operation ID) separately from terminal user-visible status.
 
 ### SC-DOM-002
 
@@ -20,7 +20,7 @@ Given a saved snapshot whose source rotates during upload, when dispatch or canc
 
 ## REQ-DOM-003 — Evidence lineage and access
 
-Cases group occurrences; access is projected per artifact. Artifact, lineage edge, managed copy, retained audience, analysis result and privacy decision preserve independent identities and constraints. Lineage is acyclic and inherits the strictest applicable authorization/region/deadline. EvidenceShare contains concrete artifacts/recipients; SharingIntent and publication registrations separately bound future shares. Multiple manager assignments do not replace immutable creator/requester/executor identities.
+Cases group occurrences; access is projected per artifact. Artifact, lineage edge, managed copy, retained audience, analysis result and privacy decision preserve independent identities and constraints. Lineage is acyclic and inherits the strictest applicable authorization/region/deadline. EvidenceShare contains concrete artifacts/recipients; The sharing instruction stored with an accepted capture or policy acceptance bounds future shares. Multiple manager assignments do not replace immutable creator/requester/executor identities.
 
 ### SC-DOM-003
 
@@ -28,7 +28,7 @@ Given a case containing artifacts with different audience/deletion limits, when 
 
 ## REQ-DOM-004 — Transactions, liabilities and deletion
 
-Use the persistence specification’s transactional admission, canonical lock order, idempotency, outbox and fences. Capacity and grant reservations precede effects. Preserve uncertain charges/spend and managed-copy obligations across retries, object deletion and restore. Do not use cascade deletion from a workload/CRD/principal to remove evidence liabilities, revocations or replay tombstones. External effects do not occur while holding database locks.
+Use the persistence specification’s transactional admission, canonical lock order, idempotency, outbox and fences. Capacity and grant reservations precede effects. Every effect carries an operation ID: a retry with the same ID returns the existing outcome, an unknown outcome is resolved by looking the ID up, and its charge is released once the outcome is known. Managed-copy obligations survive retries, object deletion and restore. Do not use cascade deletion from a workload/CRD/principal to remove evidence liabilities, revocations or replay tombstones. External effects do not occur while holding database locks.
 
 ### SC-DOM-004
 
@@ -36,7 +36,7 @@ Given an unknown commit/start or storage-delete failure, when a controller resta
 
 ## REQ-DOM-005 — Privacy-aware types and evolution
 
-Use explicit units, overflow-checked counters, time/clock uncertainty, opaque Kubernetes versions, domain revisions and typed operation unions. Raw/extract/metadata is separate from possible personal/user/credential classification. Store sensitive plans/parameters/manifests behind protected references, not generic SQL JSONB. Add fields through reviewed domain-to-wire mappings; existing conceptual enum names cannot silently alter a published schema.
+Use explicit units, overflow-checked counters, time/clock uncertainty, opaque Kubernetes versions, domain revisions and typed operation unions. Raw/extract/metadata is separate from possible personal/user/credential classification. Plans and parameters are typed SQL columns or bounded, versioned JSONB; manifests and evidence stay in the encrypted object store. Add fields through reviewed domain-to-wire mappings; existing conceptual enum names cannot silently alter a published schema.
 
 ### SC-DOM-005
 

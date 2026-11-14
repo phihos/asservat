@@ -13,7 +13,7 @@ import (
 func TestBrowserSettingsProtectedConfig(t *testing.T) {
 	for _, mode := range []string{"valid", "suspended", "replacement", "wrong-root", "zero-epoch", "insecure-issuer", "origin-path", "origin-query", "origin-user", "origin-default-port", "origin-case", "lifetime", "capacity", "unknown", "alias", "extra-data", "expired-read"} {
 		t.Run(mode, func(t *testing.T) {
-			b, e := os.ReadFile("../../../examples/browser-settings.json")
+			b, e := readImplementedExample("../../../examples/", "browser-settings.json")
 			if e != nil {
 				t.Fatal(e)
 			}
@@ -84,4 +84,14 @@ func TestBrowserSettingsProtectedConfig(t *testing.T) {
 			}
 		})
 	}
+}
+
+// readImplementedExample reads the example this runtime implements:
+// examples/implemented/ (pre-ADR-330 contracts) when present, otherwise the
+// canonical example.
+func readImplementedExample(dir, name string) ([]byte, error) {
+	if b, err := os.ReadFile(dir + "implemented/" + name); err == nil {
+		return b, nil
+	}
+	return os.ReadFile(dir + name)
 }

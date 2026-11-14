@@ -6,16 +6,7 @@ The [interface inventory](../docs/interfaces/README.md), [OpenAPI](../docs/inter
 
 Map browser and MCP operations to the same authenticated application services. Reuse canonical MCP input/output schemas for shared operations; human review and operator operations have separate bounded contracts. Keep HTML routes, OAuth, Kubernetes, Alertmanager, CloudEvents, health/metrics and connector interfaces explicitly documented with audiences, versioning and trust boundaries. No generic shell/SQL/Kubernetes proxy is added. Authenticated native evidence downloads are required under [artifact downloads](artifact-downloads.md); anonymous or bearer-only file access remains prohibited.
 
-The initial installed pod-status path MUST use one complete shared application
-assembly under [ADR-160](../docs/decisions/160-public-context-service-assembly.md).
-Submission includes acknowledged intent and regional start; its explicit
-continuation remains accepted-only. Preview persistence and request resolution
-MUST use separate fixed SQL purposes, with no new capture/custody/audit writes.
-Missing or foreign installation dependencies MUST reject startup, not degrade to
-admission-only submission. Case navigation, download preparation and active Stop
-must preserve the same owning services. An incomplete older credential layout
-MUST reject; runtime MUST NOT silently manufacture its missing purpose receipts.
-This composition does not itself qualify or enable installed collection.
+Browser and MCP use one shared application assembly. Previews, submission, case navigation, download preparation and Stop go through the same owning services in both transports.
 
 ### SC-INT-001
 
@@ -23,7 +14,7 @@ Given equivalent browser and MCP requests, when current scope/permissions/limits
 
 ## REQ-INT-002 — Configuration and human authority
 
-Administrator permission/retention/budget configuration writes remain Kubernetes-only. Browser drafts/preview/export do not create a second authority. Authenticated maintainer submission is restricted to reviewed configuration kinds and existing provenance/current-rights rules. Review decisions require independent human authority and verified step-up; no MCP tool approves grants. Enrollment secrets use approved secret delivery, not response bodies or command history.
+Administrator permission/retention/budget configuration writes remain Kubernetes-only. Browser drafts/preview/export do not create a second authority. Authenticated maintainer submission is restricted to reviewed configuration kinds and existing provenance/current-rights rules. Review decisions require independent human authority and verified step-up; no MCP tool approves grants. Connector bootstrap tokens are delivered as Kubernetes Secrets, not in response bodies or command history.
 
 ### SC-INT-002
 
@@ -31,11 +22,11 @@ Given a permission editor draft or an agent attempting review, when it submits t
 
 ## REQ-INT-003 — Bounded errors, retries and asynchronous work
 
-Specify byte/item/time limits, authenticated expiring cursors, idempotency, expected revisions, pending handles and cancellation semantics. Shared operations preserve MCP result envelopes; transport/console failures use safe problem details with stable domain codes. Before visibility is established, avoid existence oracles. Lost responses recover the original operation; changing the body under a key conflicts. Reauthorize every poll and result delivery.
+Specify byte/item/time limits, authenticated cursors, idempotency keys, expected revisions and cancellation semantics. Shared operations preserve MCP result envelopes; transport/console failures use safe problem details with stable domain codes. Before visibility is established, avoid existence oracles. A retry with the same idempotency key returns the original operation; changing the body under a key conflicts. Authorize each operation once and reuse the decision for at most `identity.AuthorityRecheckInterval` (30 s) and never past its original deadline ([ADR-311](../docs/decisions/311-operation-authority-recheck.md)). Status reads wait server-side for the next change (bounded, at most 30 s) instead of being re-called on a timer; the console receives the same changes over its Server-Sent Events stream. Status reads are never charged.
 
 ### SC-INT-003
 
-Given a command accepted before connection loss, when browser or agent retries, then it receives the original bounded operation; a revoked share fails on the next poll and error output contains no evidence or hidden resource details.
+Given a command accepted before connection loss, when browser or agent retries with the same key, then it receives the original bounded operation. A revoked share fails within 30 s, and error output contains no evidence or hidden resource details.
 
 ## REQ-INT-004 — External integration minimization
 

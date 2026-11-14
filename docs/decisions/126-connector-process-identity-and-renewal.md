@@ -1,8 +1,10 @@
 # ADR-126: Bind connector identity to automatic process enrollment and bounded renewal
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded in part by ADR-328 (2026-11-13): Independently protected source/guard proof and live controller-chain reads defended against forged Pods and tampered configuration in the connector namespace and no longer apply. Pod-bound TokenReview, process-epoch enrollment, bounded renewal and SQL lifecycle rows remain valid.
 
-Status: Accepted design; the isolated component checkpoint has no installed runtime enablement. Actual qualification and outstanding retirement work are listed in [the architecture contract](../architecture/connector-renewal.md).
+Status: Accepted design; the isolated component checkpoint has no installed runtime enablement. Actual qualification and outstanding retirement work are listed in the architecture contract.
 
 ## Context
 

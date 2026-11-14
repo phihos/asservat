@@ -1,5 +1,7 @@
 # ADR-132: Atomically backed capture-intent persistence
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 Status: accepted implementation contract; qualification is recorded separately.
 
 The first context request bridge must not call the historical conditional-PUT publisher. That publisher has no irreversible pre-I/O claim, and an exact object lookup does not establish that an earlier writer has finished. An accepted capture must retain its identity and remain recoverable when intent persistence or acquisition fails.
@@ -14,4 +16,4 @@ Completed acknowledgement reuse is a separate exact bounded SELECT, without jour
 
 Public accepted replay stays passive. Runtime composition must add an explicit fresh-current continuation of the original request for a persisted admission whose first start reply was lost. It must preserve the original capture/attempt and never infer that an unknown start had no effect. The current private bridge is not enabled until intent lifecycle, same-request timing, regional start and native transfer are actually qualified.
 
-See [the concrete runtime contract](../architecture/capture-intent-lifecycle.md). This decision adds no public request parameter, regional transport, background acquisition queue or recovery activation.
+See the concrete runtime contract. This decision adds no public request parameter, regional transport, background acquisition queue or recovery activation.

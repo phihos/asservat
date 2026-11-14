@@ -1,5 +1,7 @@
 # ADR-173 — Work-scoped regional process observation
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded (2026-11-13): this ADR made the executor's complete self-observation (namespace, account, guard policies and bindings, settings ConfigMap, Deployment/ReplicaSet/Pod chain and inputs) affordable within one work. ADR-328 trusts those objects, so the executor reads its mounted settings, callers are authenticated by TokenReview and TLS, and RBAC protects the namespace; no per-work process observation is needed.
 
 Date: 2026-10-14. Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan.

@@ -1,5 +1,7 @@
 # ADR-213 — Storage readiness at consumption
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 Date: 2026-10-20. Status: implemented; component races and named installed heap repeat pass; broader lifecycle qualification remains open.
 Requirements: REQ-CAP-002–003, REQ-EXE-002; S-02.
 Refines [ADR-200](200-on-demand-capacity-refresh.md).

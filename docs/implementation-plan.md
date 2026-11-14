@@ -5,47 +5,8 @@ capability baseline and next complete user workflow. The checklist below retains
 the full scope; neither code volume nor component-test counts are a completion
 percentage.
 
-[ADR-098](decisions/098-first-installation-activation.md) implements the first-installation SQL/audit coordinator and its native protected-input composition. Continue protected installer plan/credential/pin provisioning and the separate qualified restart/restore protocol. This does not enable Helm runtime services or complete S-01/S-02.
+Mechanisms follow [ADR-330](decisions/330-event-driven-system-design.md): informers and connector pushes instead of polling, one multiplexed connector connection, standard identity (installation CA, connector bootstrap token plus CSR rotation, projected ServiceAccount tokens), a long-running regional reader, one authorization per operation (ADR-311), `audit_event` rows in the effect transaction, operation-ID idempotency with settle-on-known-outcome, SQL metadata, stateless previews, `observedGeneration` status and stored retention deadlines. Installation is Helm-native (ADR-327/328). Actual progress and qualification are recorded in [implementation progress](implementation-progress.md); no whole TASK or slice exit is complete.
 
-Work has resumed after the [ADR-097 witness component](architecture/installation-witness.md). Its protected one-use record is implemented; production installer provisioning and independent restart/restore activation remain required. Complete atomic eligible-SQL checks, independent encrypted activation audit, protected installer credentials/pins and qualified recovery before enabling activation. Current verification and open gaps are in [implementation progress](implementation-progress.md).
-
-[ADR-096](decisions/096-database-incarnation-fence.md) adds a database-incarnation prerequisite to recovery activation. Continue the independent protected installation/recovery protocol, including retained checkpoints, conservative spend and automated qualified lossless-restart activation. A view or a synthetic administrator fixture is not that protocol.
-
-[ADR-095](decisions/095-hub-workload-garbage-collection.md) qualifies native foreground workload deletion while retaining source, credential and spec-mutation protection. Continue protected installer provisioning and independent restore activation.
-
-[ADR-094](decisions/094-native-hub-worker-projections.md) adds native hub-worker workload/projection composition. The source-matched native worker/lifecycle case now passes in the full context suite; continue protected installer provisioning and independent initial/restore activation before owner/public workflows.
-
-[ADR-093](decisions/093-bounded-hub-scheduling-permission.md) composes named scheduling updates with the private namespace guard. Continue installation provisioning and independent initial/restore activation; native configuration tests remain prerequisites to in-Pod and public workflows.
-
-[ADR-092](decisions/092-independent-source-admission-probes.md) fixes namespace/source admission composition with exact nonpersistent probes. Its actual qualification is recorded in [implementation progress](implementation-progress.md); installation, restore and end-user workflow completion remain open.
-
-[ADR-091](architecture/configuration-reconciliation.md) adds protected fleet/owner source reconciliation through the private hub-worker command. Continue installer-generated inputs/roles, independent initial recovery/restore acceptance and native in-Pod operation before enabling public evidence flows.
-
-[ADR-090](architecture/owner-deployment.md) supplies the owner deployment loader and private `hub-api` command. Continue installation-generated projections, source/recovery reconciliation and native in-Pod routing, followed by actual evidence transfer and public investigation flows. Provider composition tests do not complete a slice.
-
-[ADR-089](architecture/worker-routing.md) removes the single-cluster assumption in owner forwarding. The loader/credential composition is now supplied by ADR-090. Continue protected control-document synchronization and native multi-cluster routing; read-facet and synthetic TLS tests do not complete a slice.
-
-[ADR-088](architecture/owner-startup.md) implements pre-Ready identity checking and a concrete owner runtime lifetime. ADR-090 adds the loader and private entry point. Continue installation provisioning, recovery/source reconciliation and native in-Pod routing before evidence transfer; no full TASK or S-01/S-02 exit follows.
-
-[ADR-087](decisions/087-live-owner-delivery.md) connects remote request cancellation to the existing worker ingress through one finite open TLS response. Continue protected process startup, native routing, connector proof mediation and actual evidence transfer; no complete TASK or S-01/S-02 exit is claimed.
-
-[ADR-086](architecture/owner-forwarding.md) adds outbound owner certificate transfer using current identity and exact locator checks before HTTP, non-replayable transport and verified worker results. Protected startup, native routing, connector proof mediation and evidence transfer remain necessary before enabling the public workflow.
-
-[ADR-085](architecture/owner-relay.md) implements the private enrollment receiving boundary with current local/remote identity checks and socket lifetime. Continue outbound exact-owner forwarding, protected startup, connector proof mediation and native transfer; this does not complete S-01/S-02 or a whole TASK.
-
-[ADR-084 process-owned credentials](architecture/owner-credentials.md) adds private key custody, actual TLS callbacks and paired renewal under TASK-02. Continue protected bootstrap/listener composition and exact-request forwarding. This does not complete a whole TASK or S-01/S-02; measured qualification remains in [implementation progress](implementation-progress.md).
-
-[ADR-083 peer authentication](architecture/owner-authentication.md) adds the current TLS/registry/protection/Ready-route gate and native enrollment-to-activation composition. Continue owner credential transport/supervision, protected bootstrap and locator-bound forwarding; no whole TASK or S-01/S-02 exit follows from component qualification.
-
-[ADR-082 owner registration](architecture/owner-registration.md) implements private durable process/key enrollment, audited bounded signing/activation and finite SQL history under TASK-02. Protected bootstrap, owner transport, native forwarding and full S-01/S-02 acceptance remain pending; component results are in [implementation progress](implementation-progress.md).
-
-Status: the maintainer authorized initial implementation after the feasibility phases. Artifact storage/context, PostgreSQL custody and complete pod-status verification are **in progress** under TASK-02/03/05/11 and S-01/S-02; no whole TASK or slice exit is complete. See the [artifact implementation record](research/artifact-foundation.md), [custody continuation](research/custody-foundation.md) and [manifest verification](research/manifest-foundation.md). Current custody records do not authorize capture or publish readable artifacts. Next connect trusted accepted execution/current authorization, durable object audit and catalog publication, retaining production writer fencing/privacy requirements before the UI/MCP/native-download flow. Other product work remains planned.
-
-TASK-07 now also has an [initial identity/eligibility implementation](research/identity-foundation.md): strict access-token verification, current organization/client policy checks and ordinary retained-audience rules. The production policy/source/catalog readers, actual provider qualification, signed accepted execution and audit remain pending. This advances the prerequisite; it does not complete the OAuth/ACL task or permit public capture.
-
-The [permission observation continuation](research/permission-foundation.md) implements Kubernetes configuration/namespace read ports and unaccepted mapping proposals, with real API/RBAC tests and a corrected five-second deny deadline. Next implement protected configuration acceptance and persistent SQL audience assignment continuity across ownership changes/watch gaps; then supply accepted authorization projections. Raw API observations, CRD status and the test fixture's administrator identity do not fill that gap. TASK-07 and S-01/S-02 remain unchecked.
-
-Current download continuation: [ADR-070](decisions/070-protected-worker-configuration.md) adds protected worker configuration and rollout fencing under TASK-02/07/11. The [progress record](implementation-progress.md) is authoritative for actual qualification and supersedes the older prerequisite snapshots above. [ADR-071](decisions/071-download-worker-enrollment.md) now adds audited acquisition credential issuance/activation and bounded renewal. [ADR-072](decisions/072-worker-credential-channel.md) supplies the bounded private credential transport and process-owned key/renewal client, with a request-bound current-authority operation. [ADR-073](architecture/worker-startup.md) adds typed immutable startup pins and the initial credential-phase executable/supervisor, with original-template cleanup. [ADR-074](architecture/worker-request-routing.md) adds bounded process-local request-owner routing and response lifetime. [ADR-075](architecture/worker-owner-locator.md) adds minimized shared owner locators and exact local receiving under migration 28. [ADR-076](architecture/hub-owner-discovery.md) adds pinned hub endpoint observations and exact TLS process identity verification. [ADR-077](architecture/owner-configuration.md) supplies protected pool/public-root observations and current route composition. [ADR-078](decisions/078-owner-configuration-acceptance.md) adds durable source/revision acceptance and encrypted audit under migration 29, retaining current recovery and original deadlines. [ADR-079](decisions/079-owner-certificate-issuance.md) adds the owner certificate provider/verification boundary and fixed renewal periods. Next compose protected recovery/workload/issuer bootstrap and durable enrollment/activation, authenticated private forwarding, connector proof mediation and actual supervised native transfer before enabling downloads. Continue local identity and bundled-service installation; no whole task or S-01/S-02 exit is complete.
 
 ## Architecture and implementation sequence
 
@@ -75,15 +36,11 @@ Exit: risky mechanisms demonstrated or explicitly excluded, no unapproved paid r
 
 ### TASK-02 — Multi-cluster control foundation
 
-[ADR-081 owner proof](decisions/081-hub-owner-enrollment-proof.md) now supplies current online Pod/token/CSR observations before readiness. Compose them with trusted clean installation and durable enrollment/audit/signing/activation before exposing private forwarding. It does not complete the task or provide execution authority.
-
-[ADR-080](decisions/080-private-hub-workload-protection.md) adds the private hub namespace admission/proof component. Complete clean-installation qualification, Pod/token/CSR proof and durable owner enrollment/signing/audit/activation before private forwarding. The current guard does not prove historical integrity; no whole task exit is complete.
-
-- [ ] Implement hub/connector identity, enrollment, local ceiling and version negotiation.
-- [ ] Implement configuration/local-control CRDs, accepted SQL projections/executions, immutable IDs, outbound poll/ack/records and fencing.
-- [ ] Implement bounded capture history projections, keyed selector/settings indexes and immutable encrypted parameter snapshots with retained audience and independent expiry; no coupling of history eviction to active execution/accounting.
-- [ ] Implement REQ-DB-001 through REQ-DB-005 logical tables/migrations, query contracts, canonical lock order, transactions, work leases, SQL outbox with object-audit gate and bounded connection pools. Keep grants/shares/intents out of CRDs.
-- [ ] Implement storage-pool/budget configuration, bounded capacity accounts/reservations, transactional hub parent allocation and fenced prepaid local slices with conservative failure recovery.
+- [ ] Implement installation CA hub identity, connector bootstrap token and CSR rotation, local ceiling and N/N−1 version negotiation.
+- [ ] Implement configuration CRDs with `observedGeneration`/conditions, connector informers and change pushes with reconnect digest comparison, accepted SQL projections/executions, immutable IDs and the one multiplexed connector connection (`Queued → Sent → Running`, resend on reconnect, deduplication by work ID).
+- [ ] Implement bounded capture history projections, keyed selector/settings indexes and immutable SQL parameter snapshots with retained audience and independent expiry; no coupling of history eviction to active execution/accounting.
+- [ ] Implement REQ-DB-001 through REQ-DB-005 logical tables/migrations, query contracts, canonical lock order, transactions, `FOR UPDATE SKIP LOCKED` work claims woken by `LISTEN/NOTIFY`, outbox, `audit_event` rows in the effect transaction with batched export, and one SQL login and pool per process. Keep grants/shares/intents out of CRDs.
+- [ ] Implement storage-pool/budget configuration, per-workload counters with conditional updates, reservations keyed by operation ID and settled when the outcome is known, and the connector budget lease for natural cores and disconnected work.
 - [ ] Implement authenticated submission provenance and separate resolved collection/sharing digests under REQ-EXE-001; cross-language canonicalization fixtures and late matching-grant binding. Prevent controllers/GitOps from substituting privileged execution identities.
 - [ ] Freeze concrete manual pod/node/boot bindings in execution scope; cross-language digests and replacement/restart rejection under REQ-EXE-002.
 - [ ] Produce internal OpenAPI, RBAC and admission tests; install hub plus two synthetic workload clusters.
@@ -93,12 +50,12 @@ Exit: disconnected/reconnected connector recovers work without duplicate intrusi
 
 ### TASK-03 — Encrypted evidence and durable catalog
 
-- [ ] Implement accepted ADR-036; qualify separate-Job encrypted scratch handoff, single-writer fencing and copy-ledger cleanup under REQ-EVD-005. No shared emptyDir fallback.
+- [ ] Implement accepted ADR-036; qualify separate-Job encrypted scratch handoff, single-writer handoff and copy-inventory cleanup under REQ-EVD-005. No shared emptyDir fallback.
 - [ ] Enforce REQ-EVD-008 bounded child-output handling, no uncontrolled secondary dumps/swap, hostile output-tree rejection and trusted publication metadata.
 
 - [ ] Implement S3/KMS interfaces, streaming encryption, commit protocol, manifests and upload verifier.
-- [ ] Reserve worst-case stored bytes/object count before acquisition; reconcile committed/partial/version/multipart charges and release only on verified deletion. Implement protected workload/context capacity and separate shared burst.
-- [ ] Add content-minimized SQL cases/occurrences/artifact catalog, encrypted immutable outcomes, orphan/multipart reconciliation and regional rebuildable evidence-text index. Keep full manifests and extracted text out of SQL backups.
+- [ ] Reserve worst-case stored bytes/object count before acquisition; settle to actual committed size by operation ID, release on known outcome or verified deletion, and abort orphaned multipart uploads with the bucket lifecycle rule. Implement protected workload/context capacity and separate shared burst.
+- [ ] Add content-minimized SQL cases/occurrences/artifact catalog with stored deletion deadlines, publication per the reader's envelope/manifest/index check and regional rebuildable evidence-text index. Keep full manifests and extracted text out of SQL backups.
 - [ ] Implement EvidenceRetentionPolicy reconciliation, privacy classification/purpose, first-acquisition age, inherited deadlines, deletion budget and policy-impact preview.
 - [ ] Implement managed-copy inventory, absolute residual-backup/WAL horizon arithmetic, bounded memory text indexes (optional qualified expiry cohorts), expiration/tombstones, derived lineage, early erasure, restricted-processing state, hold/lock conflict checks and verified/overdue deletion from the first slice.
 - [ ] Project per-artifact sensitivity, access cutoff, deletion due/state and scoped handling policy from the authoritative privacy/copy ledger; include overdue/unknown/restricted cases.
@@ -148,18 +105,17 @@ Exit: EXP-02/03 and SC-NET-001 through SC-NET-005 pass; no application bytes in 
 
 ### TASK-07 — Identity, grants, sharing and audit
 
-Implement accepted [ADR-059](decisions/059-unattended-policy-authority.md) under [team policy automation](../specs/policy-automation.md): standard human sessions and bounded team execution that survives creator departure. Configuration/eligibility and the initial SQL/encrypted acceptance components do not complete protected submission/source production, transactional spending or worker composition. No mandatory directory reader, stale human-claim extension or silent executor migration.
+Implement accepted [ADR-059](decisions/059-unattended-policy-authority.md) under [team policy automation](../specs/policy-automation.md): standard human sessions and bounded team execution that survives creator departure. Automation-bearing AccessBindings live in application namespaces and need `bind` on `accessroles.asservat.io/automation`. No mandatory directory reader, stale human-claim extension or silent executor migration.
 
-Current component scope and next wiring: [identity and ordinary eligibility](architecture/identity-eligibility.md), [permission acceptance](architecture/permission-acceptance.md) and its [test record](research/permission-acceptance-foundation.md). All task checkboxes below remain open until their complete integration and acceptance gates pass.
 
-- [ ] Implement AccessBinding/PermissionSource CRDs, structural schema/explain documentation, status readiness, server-side apply/conflict behavior and delegated admission checks. Add read-only preview/explanation to the existing browser service.
-- [ ] Implement protected namespace/workload metadata sources, exact exec/generic SAR inheritance and per-cluster identity/admission qualification.
+- [ ] Implement AccessBinding/PermissionSource CRDs, structural schema/explain documentation, status with `observedGeneration`, server-side apply/conflict behavior and the Helm-rendered `bind` ValidatingAdmissionPolicy. Add read-only preview/explanation to the existing browser service.
+- [ ] Implement protected namespace/workload metadata sources, exact exec/generic SubjectAccessReview inheritance (allow reused at most 30 s, deny not cached) and per-cluster identity-mapping qualification.
 - [ ] Implement retained audience provenance and ownership-change handling; run EXP-16 before enabling inheritance.
-- [ ] Implement OAuth and namespace/workload ACLs, SQL grant state/transactional reservations, local prepaid permits and second-person step-up approval.
-- [ ] Implement configurable finite policy-approval lifetimes and separate sensitive-observation session/rate/wire-byte reservations; never extend short permit freshness through a longer grant.
+- [ ] Implement OAuth and namespace/workload ACLs, SQL grant state with reservations keyed by operation ID, finite local policy permits and second-person step-up approval.
+- [ ] Implement configurable finite policy-approval lifetimes and separate sensitive-observation session/rate/wire-byte reservations; a local permit never outlives its grant.
 - [ ] Implement SQL EvidenceShare user/group recipients, projection, revocation and membership freshness.
-- [ ] Separate immutable creator from personal/multiple owner-team management, pinned assignments, team departure/suspension and explicit historical transfer without budget/expiry reset.
-- [ ] Implement optional capture/policy sharing declarations, immutable protected SharingIntents, bounded registration/publication reservations, per-selection reviews, parent/child revocation and replay-safe tombstones. Preserve concrete snapshots and raw-query separation.
+- [ ] Separate immutable creator from personal/multiple owner-team management, stable group IDs, team departure and explicit historical transfer without budget/expiry reset.
+- [ ] Implement optional capture/policy sharing instructions stored on the capture row or `policy_acceptance`, shares created in the publication transaction, per-selection raw-sharing reviews, parent/child revocation and replay-safe tombstones. Preserve concrete snapshots and raw-query separation.
 - [ ] Add capture-time recipient/output preview and distinct collection/sharing progress; recurring count/expiry, Stop versus Revoke, and explicit renewal/resume under current authority.
 - [ ] Build workload/preset, case/approval/sharing pages with one evaluator, grant reuse and bundled review, recipient preview, safe draft/retry handling and durable intent/result audit.
 - [ ] Add bounded retention/rights-request operator workflows, separate retention authority and content-minimized processing reports; respect configured legal-exception mode.
@@ -175,12 +131,12 @@ Exit: EXP-08/12/16 and authorization/permission-management scenarios pass. Intru
 
 - [ ] Implement acquisition/offline-analysis/publication Jobs, trusted pcap/basic file/log analyzers and exact-image staging.
 - [ ] Implement discovery/extract MCP tools plus list_targets/list_diagnostics/preview_capture/get_capture/cancel_capture, expiring handles and idempotent capture-by-preview; result bounds/cursors/query handles and both client protocol paths.
-- [ ] Materialize selected outputs only after commit, projection and complete lineage checks; extend request_capture/list_shares/revoke_share with SharingIntent references and bounded personal/team management views.
+- [ ] Materialize selected outputs only after commit, projection and complete lineage checks; extend request_capture/list_shares/revoke_share with sharing-instruction references and bounded personal/team management views.
 - [ ] Implement stable case-to-agent handoff, authorized baseline selection and actionable own-access/approval errors with current evidence deadlines.
 - [ ] Implement REQ-HIS-001–004 Recent captures/Repeat capture, list_capture_history/get_capture_settings, history-based preview and non-authorizing repeat lineage. Validate idempotency, stale identities, mutable/deleted recipes, retention and 30-second active-effort goal.
 - [ ] Implement REQ-GDE-001–006 deterministic playbooks, shared browser/MCP recommendation compiler, get_target_discovery/recommend_diagnostics, bounded draft/source lifetimes and existing-handle preview flow. Verify task effort and goal relevance in EXP-17/20.
 - [ ] Implement offline pprof parsing, hotspot/call-tree extracts and authorized baseline comparison; distinguish runtime traces and incompatible units.
-- [ ] Add search/index projection and case events/outbox.
+- [ ] Add search/index projection and case events through the outbox and NOTIFY.
 - [ ] Implement catalog/card customization and Save as profile, list_capture_profiles/get_capture_profile, composition previews/history, syscall summaries/events/raw query and approval/retention parity; run EXP-17/21/22.
 - [ ] Expose lifecycle categories in catalog, preview and history; show ongoing versus incident costs and missing/warming prehistory consistently in browser/MCP.
 - [ ] Implement capture_assessment and artifact handling_notice parity across browser/MCP/GitOps projections, direct-query reminders, repeat reassessment and accessible compact warnings; run comprehension and stale-preview cases in EXP-17/18.
@@ -189,10 +145,10 @@ Exit: a trigger in either of two clusters yields encrypted evidence, authorized 
 
 ### TASK-09 — Native crash and live dump support
 
-- [ ] Prove natural-core local admission uses single-use prewrapped keys, prepaid capacity and precommitted authority; remote outages never block the pipe helper while replenishing resources.
+- [ ] Prove natural-core local admission uses single-use prewrapped keys, the connector budget lease and unexpired local policy permits; remote outages never block the pipe helper while replenishing resources.
 
 - [ ] Implement helper installation/ownership/drift/uninstall, node identity enrichment and crash limits.
-- [ ] Qualify prompt natural-core rejection with prepaid local capacity, helper cgroup placement and storm overhead without remote calls on the crash path.
+- [ ] Qualify prompt natural-core rejection when the budget lease is exhausted, helper cgroup placement and storm overhead without remote calls on the crash path.
 - [ ] Add native/Rust/Go symbolized analysis, build/mapping/companion fidelity, exact PID and logical process/descendant selectors, bounded serial multi-process batches, liveCore grant enforcement and provisional/refined signatures.
 - [ ] Measure probe/reaping impact and incomplete large-core behavior; no default fatal signal action.
 
@@ -211,8 +167,8 @@ Exit: every advertised runtime/action has synthetic crash/live tests, licence/eg
 
 - [ ] Replace the installer Pod, continuation, UID-pinned guards and their runtime proofs with Helm-native installation per [ADR-328](decisions/328-administrator-only-namespaces.md) and the [plan](reviews/helm-native-install-plan.md); move AccessBindings to application namespaces per [ADR-329](decisions/329-accessbindings-in-application-namespaces.md); apply the reductions in the [security evidence check](reviews/security-evidence-2026-11-13.md). ADR supersession notes describe this target state until the code lands.
 
-- [ ] Implement REQ-DEP-001–005 and [ADR-063](decisions/063-small-deployment-alternatives.md): independently selectable small/external providers, local accounts/OAuth/step-up/recovery, local purpose-scoped keys/signing/PKI and explicit bundled PostgreSQL/evidence storage. Qualify the [selected candidates](research/small-deployments.md) before adopting exact versions; add canonical identity/key/provider contracts and real consumers together. [ADR-064](decisions/064-local-key-material.md) supplies the private wrapping/signing payload, crypto backends and generic browser credential ports. [ADR-065](decisions/065-local-key-service-boundary.md) adds private mTLS handler/remote facets and exact-authority coordination ports. [ADR-066](decisions/066-download-key-authority.md) adds a concrete SQL authority resolver and remote reader for the audited context-download batch. [ADR-067](decisions/067-protected-local-key-lifecycle.md) adds protected immutable Secret reads, durable additive rotation and mandatory bounded lifecycle checks. [ADR-068](decisions/068-download-worker-attestation.md) adds current Kubernetes worker proofs and immutable SQL proof binding. [ADR-069](decisions/069-download-worker-dispatch.md) adds audited dispatch, exact restricted Job/Pod binding and durable termination/retirement. Remaining key-purpose resolvers, protected profile acceptance/rollout, acquisition issuance/control/runtime, full pending/orphan cleanup, source enrollment/key administration/retirement, PKI, runnable bootstrap and installer remain unfinished.
-- [ ] Package PostgreSQL TLS/Secret/preflight settings, the explicitly selected single-instance Helm bundle and one qualified external/HA failover profile; no implicit operator installation. Test migration interruption, PITR, backup/WAL retention, lost-commit recovery, primary/connector fencing and RecoveryBlocked runbooks.
+- [ ] Implement REQ-DEP-001–005 and [ADR-063](decisions/063-small-deployment-alternatives.md): independently selectable small/external providers, local accounts/OAuth/step-up/recovery, local purpose-scoped keys/signing/PKI and explicit bundled PostgreSQL/evidence storage. Qualify the [selected candidates](research/small-deployments.md) before adopting exact versions; add canonical identity/key/provider contracts and real consumers together. The local key service authorizes by mTLS role and the AEAD binding of each wrapped keyset; the regional reader is the only artifact-unwrap role ([local key service](architecture/local-key-service.md)).
+- [ ] Package PostgreSQL TLS/Secret/preflight settings, the explicitly selected single-instance Helm bundle and one qualified external/HA failover profile; no implicit operator installation. Test migration interruption, PITR, backup/WAL retention, lost-commit recovery and the restore runbook (installation epoch advanced by the setup Job).
 - [ ] Qualify bundled store conditional writes, pinned ranges/checksums, versions/multipart cleanup, physical disk pressure, scoped credentials, restart and deletion. Test stable secret bootstrap, lost-key recovery, upgrades/uninstall and gradual provider migration without extending evidence retention or authority.
 
 - [ ] Finish the officially supported Helm runtime installation: role templates/RBAC/NetworkPolicy/typed values, offline bundles, SBOM/signatures, read-only capability/prerequisite reporting, retention and recovery runbooks. The [foundation chart](installation/helm.md) now packages implemented CRDs; it does not complete this task. Keycloak is the first external browser/MCP provider; the requested local alternative remains to be implemented.
@@ -248,7 +204,7 @@ No calendar estimate is claimed before the high-risk spikes. This is a substanti
 - [ ] TASK-02/04: add recordingSaves policy scope/default/transition handling, bounded current-source inventory, typed recording-save/v1 acceptance/t0/idempotency and content-minimized SQL work/history projections.
 - [ ] TASK-05/06: implement snapshot-only dispatch with current source identity, no recipe DAG traversal, original-window pinning, capacity/retention/grace handling, partial output and cancellation isolated from live sources.
 - [ ] TASK-07: prove caller and original executor checks, reviewed sensitive-source save budgets, source-audience inheritance and independent per-capture sharing; no recurring-sharing inheritance or grant transfer.
-- [ ] TASK-08: add passive MCP inventory/preview, existing submit/poll/cancel dispatch and distinct history/settings repeat; browser parity and incremental impact/privacy disclosure.
+- [ ] TASK-08: add passive MCP inventory/preview, existing submit/wait/cancel dispatch (server-side waits of at most 30 s) and distinct history/settings repeat; browser parity and incremental impact/privacy disclosure.
 - [ ] TASK-03/11: implement the accepted encrypted scratch prerequisite, profile-specific readiness/remediation, isolated per-analysis PVC handoff, independent cleanup and failure qualification.
 
 These tasks remain open. Recording-save component implementation and local
@@ -274,10 +230,10 @@ Use `make design-check` for catalog/schema consistency and optional `make ui-che
 
 [REQ-LIV-001–006](../specs/live-watch.md) are integrated into the design and synthetic mockup; production implementation is **not started**.
 
-- [ ] TASK-02: implement minimized LiveWatch control records, exact source binding, revisions/idempotency, prepaid view resources, finite idle/hard expiry and conservative recovery; no per-row database writes.
+- [ ] TASK-02: implement the LiveWatch SQL control row, exact source binding, revisions/idempotency, view-resource reservations settled at close, finite idle/hard expiry, SSE delivery and an explicit gap after replica loss; no per-row database writes.
 - [ ] TASK-06/10: qualify nonblocking live packet/HTTP/syscall approved projections, bounded scan/parser work and source-cohort reuse; preserve acquisition/snapshot priority and report loss/pairing/clock gaps.
 - [ ] TASK-07: enforce viewer plus source executor/retained-audience eligibility at every delivery; no artifact-share inheritance, raw live content or automatic source expansion. Test region constraints and paused-view revocation.
-- [ ] TASK-08: implement source picker/live console, bounded MCP/browser batches, filter/pause/close and explicit save-current workflow, short client row expiry and accessibility without focus theft.
+- [ ] TASK-08: implement source picker/live console, bounded MCP/browser batches, filter/pause/close and explicit save-current workflow, row deadlines of min(privacy deadline, watch deadline) and accessibility without focus theft.
 - [ ] TASK-11: run storm/fanout/slow-client/failover, quota, cursor, privacy and both MCP profile tests below. Validate that measured live overhead cannot starve protected collection.
 
 ## Minimalist console handoff
@@ -293,8 +249,8 @@ Prototype checks do not complete these production tasks.
 
 [REQ-ARC-001–007](../specs/implementation-architecture.md) and [ADR-042/043](decisions/README.md) refine the implementation baseline. Runtime implementation remains not started.
 
-- [ ] TASK-01/02: implement role composition and catalog-mapped packages; review/generate internal DTOs and version negotiation; qualify JWS/key handling.
-- [ ] TASK-02/07: implement typed local reservation/lookup, stable attempts, explicit SQL facets and receiver fencing; test lost responses, old epochs and duplicated collectors.
+- [ ] TASK-01/02: implement role composition and catalog-mapped packages; review/generate internal DTOs and version negotiation; qualify mTLS and key-service handling.
+- [ ] TASK-02/07: implement typed local reservation/lookup, `capture_start` rows keyed by operation ID and stable attempts; test lost responses, old installation epochs and duplicated collectors.
 - [ ] TASK-05/06/08/09: implement disjoint action/source/snapshot/live/analyzer ports with qualified adapters; retain prepared natural-core special handling.
 - [ ] TASK-11: add real import-graph checks once Go code exists and run each slice's runtime/fault acceptance. `make architecture-check` currently checks design/catalog/DTO/synthetic semantics only.
 
@@ -311,4 +267,4 @@ TASK-07 implements REQ-INV-001/002: paired capture/result decisions, commit regi
 
 [U03–U07 and U09–U11](reviews/user-task-review.md) remain open: bounded temporary watches, time-oriented search, private symbols intake, qualified postmortem access, multi-case investigation, trigger tests, real approval/support routing and portable batches. U10's misleading label is corrected but routing is still absent. These are findings/recommendations, not implemented first-release claims; acceptance and corresponding contracts/UI are required before marking them resolved.
 
-The browser-session continuation implements code/PKCE sign-in, encrypted credential storage, coordinated refresh, current identity checks, logout and bounded credential cleanup under migration 00020. Migration 00021 adds current protected Kubernetes settings, finite SQL observations, runtime issuer/client/origin binding and irreversible shortening of existing session deadlines. Real Keycloak/PostgreSQL/OpenBao/HTTP and Kubernetes/SQL qualification passes; [scope and remaining deployment gates](architecture/browser-sessions.md). TASK-07 and S-01/S-02 remain open until protected bootstrap, independent-review/execution and public developer workflows pass together.
+Browser sessions use code/PKCE sign-in, encrypted provider credentials in SQL, coordinated refresh and logout ([browser sessions](architecture/browser-sessions.md)).

@@ -1,5 +1,7 @@
 # ADR-128: Original installation provider credentials and projection
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded (2026-11-13): Installer-issued OpenBao child tokens, issuer-expiry checks and the seven-file activation projection served the installer Pod. The `setup` hook Job configures bundled OpenBao (mounts, policies, Kubernetes auth, PKI, transit); external providers follow the documented recipe.
 
 Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan.

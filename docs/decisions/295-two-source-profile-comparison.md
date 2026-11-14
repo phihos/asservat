@@ -1,5 +1,7 @@
 # ADR-295 — Two-source approved profile comparison
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 Date: 2026-11-03. Status: implementation candidate; public composition and native
 qualification pending. Requirements: REQ-PRF-005 / SC-PRF-005, S-05 increment 8.
 

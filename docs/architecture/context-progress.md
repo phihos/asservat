@@ -1,79 +1,50 @@
 # Context capture progress
 
-The shared C-09 `ContextProgressService.Get` supplies the first bounded
-`get_capture` use case under [ADR-105](../decisions/105-durable-context-progress.md).
-Browser and MCP adapters use the same application DTO. This is control metadata;
-it contains no evidence bytes, reasons, commands, credentials or hidden sharing
-recipients.
+C-09 `ContextProgressService.Get` serves `get_capture` under
+[ADR-105](../decisions/105-durable-context-progress.md). Browser and MCP use the
+same application DTO. It is control metadata: no evidence bytes, reasons,
+commands, credentials or hidden sharing recipients.
 
-`ContextProgressReads` is a separate PostgreSQL facet. It locks current recovery
-before the permission root, reads immutable capture routing facts internally,
-and evaluates current requester or scoped-maintainer rights before joining
-lifecycle facts. Absent and unauthorized captures return the same denial.
-A single MVCC query then combines admission, custody, semantic verification,
-audit acknowledgement and publication. Original scope and registration digests
-must agree. It checks the earliest original identity, permission, recovery and
-five-second read deadline after all blocking database work.
+## Read
+
+The service takes the request-owned `CurrentIdentity` and authorizes once per
+operation ([ADR-311](../decisions/311-operation-authority-recheck.md)):
+requester or scoped-maintainer rights on the capture's immutable target.
+Absent and unauthorized captures return the same denial. One MVCC select
+combines admission, execution, custody and publication; it takes no locks.
 
 | Durable facts | Capture and action phase | Reason |
 | --- | --- | --- |
-| Accepted intent awaiting audit | Pending | IntentAuditPending |
-| Audited intent without stored outcome, or a prepared API execution without a recorded start | Pending | DispatchUnconfirmed |
-| API execution start recorded, no outcome | Running | AcquisitionStarted |
-| Stored outcome without semantic verification | Finalizing | VerificationPending |
-| Verified outcome awaiting audit acknowledgement | Finalizing | VerificationAuditPending |
-| Audited verified outcome awaiting publication | Finalizing | PublicationPending |
-| Matching audited verified catalog publication | Succeeded | Published |
-| Original deadline observed, no publication | Indeterminate | DeadlineOutcomeUnconfirmed |
+| Accepted, no recorded start | Pending | DispatchUnconfirmed |
+| Start recorded, no outcome | Running | AcquisitionStarted |
+| Stored outcome awaiting publication | Finalizing | PublicationPending |
+| Published catalog entry | Succeeded | Published |
+| Original deadline passed, no publication | Indeterminate | DeadlineOutcomeUnconfirmed |
 
-Publication is historical. Expired or deleted evidence can still have a
-Succeeded capture outcome under the finite control-metadata policy; the case
-navigation port must independently establish current access. Its failure omits
-the link. No artifact reference is automatically exposed from the private
-candidate identifiers. This implementation always returns `can_cancel=false`;
-Pending and Finalizing suggest polling after two seconds.
+Publication is historical: expired or deleted evidence can still show a
+Succeeded capture. Case navigation independently establishes current access
+and omits the link on failure. `can_cancel` is false for this profile.
 
-The application service accepts request-owned `CurrentIdentity`, not a
-caller-selected actor or browser-only session. It preserves the original
-identity/recovery/read interval through optional navigation and final identity
-resolution. Browser and MCP envelope/schema validation remain transport-owned.
+## Change delivery
 
-Migration 00034 adds `progress_revision`, `deadline_observed_at` and one partial
-index without adding tables. Existing intent, custody, verification and catalog
-transactions update revisions through fixed triggers. The overflow sentinel
-1,000,000,001 denies public progress without rolling back privacy transitions.
-There is no use of `xmin`, data hashes or process-local counters as revision.
+Admission, execution, custody and publication transactions advance
+`progress_revision` and issue `NOTIFY capture_progress, '<capture-id>'`. The
+hub API listens and pushes the new projection to the page's SSE stream; MCP
+`get_capture` with a known revision waits server-side up to 30 s and returns on
+the first change. After a reconnect a listener catches up with one query by
+revision. Clients do not poll.
 
-`ContextDeadlines.ObserveOverdueContextCaptures` is a distinct bounded mutation
-facet. The installed hub-worker context deletion sweep calls it every 30 seconds
-under the `context-cleanup` login, up to eight full pages per pass
-([ADR-223](../decisions/223-lost-regional-completion-reply.md)). It locks the permission root and
-marks at most sixteen unpublished admissions whose original deadline elapsed.
-The timestamp is SQL-assigned, immutable, and does not establish writer
-quiescence, refund capacity or change accepted identities. Multiple workers
-serialize safely; retry cannot produce another transition. A stopped observer
-leaves the last durable phase visible. This is explicit operational uncertainty,
-not an automatically inferred Failed/TimedOut/Running status.
+`deadline_observed_at` marks unpublished captures whose original deadline has
+passed. The hub worker keeps one timer to the earliest such deadline from an
+index, marks the due rows in one statement, notifies and re-arms; insertions
+with an earlier deadline wake it by `NOTIFY`. The mark is SQL-timed and
+immutable. It does not refund capacity or infer Failed/TimedOut; it reports
+Indeterminate until the idempotency-key lookup or a late receipt resolves the
+outcome.
 
-The read SQL role can SELECT the relevant projections and take the existing
-identity-column root locks. The deadline grants update only its timestamp
-column; installed, the `context-cleanup` login holds them alongside its deletion
-grants. Neither grant set can change original scope, deadline, intent audit,
-revision or publication. The migration owner owns the fixed SECURITY DEFINER
-revision function, whose pinned trusted search path and revoked public EXECUTE
-are described in ADR-105. Runtime roles cannot attach arbitrary triggers.
+## SQL
 
-Targeted Go unit and race tests cover requester/client identity, ordinary scope,
-complete-deny checks, publication integrity, overflow, preserved original
-freshness, cancellation and separately authorized navigation. The native
-fixture source adds real SQL role denials, API-only admission/replay, concurrent
-once-only deadline observation, retained uncertain storage charges, actual
-retention shortening at revision exhaustion, and verification/audit/publication
-revision transitions. The targeted [real-SQL deadline-observer run](../../test/results/lost-completion-sql.log)
-passed with unchanged sources and complete cleanup; the full custody suite is
-not claimed as a pass. Installed completion-loss evidence is linked in ADR-223.
-
-Pending composition includes protected capability
-production, case navigation, distributed execution/publication and public
-runtime/bootstrap. Historical-row retirement and admission fairness are tracked
-separately by U13 and are not solved by this projection.
+`progress_revision`, `deadline_observed_at` and their partial index live on
+the capture row; fixed triggers in the writing transactions advance the
+revision. The hub API and hub worker use their single SQL logins; neither can
+change scope, deadlines or publication through these columns.

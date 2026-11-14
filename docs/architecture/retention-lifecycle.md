@@ -1,39 +1,115 @@
-# Existing-evidence retention lifecycle
+# Retention
 
-C-15 owns `RetentionShortener`, `RetentionLedger`, `LifecyclePublisher` and the signing/journal ports; C-21 supplies SQL, JOSE and encrypted-object adapters. This implements part of REQ-PRV-002/004, REQ-DB-002/004/005 and REQ-DLD-004 under [ADR-055](../decisions/055-retained-evidence-cutoffs.md). No slice is complete and the public workflow remains disabled.
+C-01 owns the policy source (observation and acceptance), C-15 owns effective
+evidence deadlines and their application to existing artifacts, C-21 supplies
+the Kubernetes and SQL adapters and C-24 the policy and deadline types. This
+implements REQ-PRV-001–004, REQ-DB-002/004/005 and the retention parts of
+REQ-DLD-004 under [ADR-055](../decisions/055-retained-evidence-cutoffs.md) and
+[ADR-330](../decisions/330-event-driven-system-design.md) D1, D5, D6 and D12.
 
-`ResolveRetained` accepts only the original acquisition anchor, recorded requested lifetime/classification, all policy references that have governed a recorded cutoff, and the current complete protected policy intersection. Original policy UIDs remain applicable after label/scope changes. A newly applied rule is carried into later lifecycle decisions so moving labels cannot evade a subsequent shortening. Same-generation/different-digest or reversed revisions fail closed; deleting an override never removes existing deadlines. The initial retained-origin bound is 64 distinct policies; overflow is unavailable, never truncation. It returns monotonic effective read/deletion dates even when they are already past; policy freshness is a separate deadline. Ordinary `Resolve` still rejects an expired new collection. Unavailable/conflicting policy cannot authorize continued disclosure, remove an old deletion obligation or extend its dates. Parent/derivative propagation remains outside this initial acquired-context adapter.
+## Policy source
 
-`RetentionShortener` reads retained facts from the ledger, resolves the current policy, and submits one exact shortening. Unchanged or relaxed policy creates no new decision. This port must be composed with a qualified, accepted policy reader; observed Kubernetes values alone cannot implement that authority.
+`EvidenceRetentionPolicy` is a namespaced CRD. The hub source is the hub
+control namespace; a cluster may add one local source in its connector
+namespace. Both namespaces are administrator-only
+([ADR-328](../decisions/328-administrator-only-namespaces.md)), so Kubernetes
+RBAC decides who writes policies. The CRD schema and CEL rules validate shape
+only: bounded selectors, named rule-list identity and a deletion budget that
+leaves positive usable time. `status.observedGeneration` and conditions report
+what the hub has applied; status is informational and never authority.
 
-## Transaction and storage
+Which sources apply to a cluster (the hub source, plus the cluster's local
+source or none) is a column of the cluster's SQL registration, set from Helm
+values at installation. Requests never select sources, and a missing local
+decision never falls back to a hub-only intersection.
 
-A larger cleanup budget is reserved inside the artifact's already-bound deletion deadline. A relaxed maximum cannot move that deadline out to make room. If the new budget consumes the original lifetime, the effective read cutoff becomes the original acquisition anchor, immediately closing the readable interval. `Deadlines.ValidRetained` represents that restrictive state separately from ordinary positive acquisition dates. Migration 00016 allows it only in the monotonic overlay. This does not claim that the configured physical-deletion budget can still be met; cleanup is due immediately, with the original hard deadline intact.
+The hub runs one shared informer on the hub source; each connector runs one on
+its local source and pushes changes over its hub connection
+([connector connection](regional-context-start.md)). The informer lists once,
+then watches. Its cache stays valid while the watch is established and is
+replaced or invalidated only by watch events; it does not expire with time. A
+watch failure marks the source unavailable until the relist completes. The
+resume cursor stays in memory; after a restart the controller relists.
+Bookmarks are not persisted.
 
-Migration 00014 retains `custody_attempt`'s original registration digest/dates and adds `effective_expires_at`, `effective_delete_by` and `retention_sequence`. Insert initializes the overlay from the registration. SQL triggers reject rewritten registration, increased effective dates, skipped generations or a change without its matching immutable decision. Runtime credentials separate shortening from journal acknowledgement; custody/capture/publication/download roles cannot change the overlay.
+The policy controller runs under client-go `leaderelection` on a Lease. Its SQL
+writes are idempotent upserts keyed by policy UID and `metadata.generation`, so
+a replaced leader repeats nothing and needs no epoch fence.
 
-The lock order is permission root, storage pool, allocation, attempt, then append-only lifecycle decision. The root lock serializes shortening with download/publication admission; it does not require fresh permission to restrict access or preserve deletion duties. Decision freshness is checked after every blocking operation and before commit. Exact-ID replay reports historical completion even after source freshness expires; a different payload conflicts. Unknown commit outcomes keep the original decision and charge for reconciliation.
+Each accepted spec change (a new generation, a creation or a deletion) is one
+SQL policy-revision row plus one append-only audit row in the same
+transaction. Status-only and bookmark events write nothing. The hub source must
+contain exactly one empty-scope baseline; without it new collection stops and
+existing deadlines stay bound.
 
-The same transaction appends a content-minimized record with exact prior/new dates, target/attempt identities, original registration digest and matched policy revisions. No user identifiers, filenames, JWTs, captured bytes or arbitrary reason text are copied into this record. Pending audit is bounded to 64 records per publication pass.
+## Matching
 
-Catalog audience lookup and download fencing use the effective read cutoff. Publication and custody finalization cannot complete beyond it. Downloads must supply current read and deletion dates; metadata notices use those dates, and renewed permits can only shorten the original I/O lease. A known shortening invalidates the next stale permit. Immediate cross-process relay disconnect and the bounded in-flight socket tail still need runtime composition; these SQL tests alone do not prove instant cancellation of bytes already handed to a transport.
+Matching follows [the privacy specification](../../specs/privacy.md): selector
+dimensions are ANDed, cluster IDs and rules ORed, all matching policies apply
+and the shortest maximum wins. Local policies only tighten the hub baseline. At
+most 64 applicable policy references are allowed per artifact; overflow fails
+planning and is never truncated.
 
-Deletion becomes claimable at the effective read cutoff. The deletion lease carries both immutable original registration and effective cleanup dates. Overdue admission uses effective deletion dates in the affected allocation. Neither shortening, an audit receipt nor a deletion claim releases storage. The production writer barrier and verified all-copy purge remain required.
+Selectors match against the namespace and workload labels the connector
+delivers. At admission, the artifact row stores the target identity, the
+selector-relevant namespace and workload labels, the applicable policy UIDs and
+generations, and the resulting deadlines. Later policy changes match against
+these stored labels, so a newly selected label selector can always be evaluated
+for existing evidence and later label edits cannot lengthen retention.
 
-## Journal and signing
+## Stored deadlines
 
-`LifecyclePublisher` reads pending decisions, writes and rereads a create-only object, then acknowledges its exact immutable receipt. Journal failures leave the restrictive SQL state in force. The signed/encrypted record has a versioned purpose independent of execution work, TLS identity and other audits. Standard detached compact JWS contains only protected headers and the signature; the decision is encrypted with the existing Tink/KMS control-record envelope. Verify both the historical signature and exact encrypted payload against the frozen decision before acknowledging it.
+Each artifact row keeps its original registration dates and stores the
+effective read cutoff (`effective_expires_at`), the effective deletion deadline
+(`effective_delete_by`) and a `retention_sequence`. Insert initializes the
+effective dates from the registration. SQL triggers reject rewritten
+registration dates, increased effective dates and skipped sequence numbers.
+Effective dates are monotonic: they only shorten and never extend past the
+original dates.
 
-The JOSE constructor freezes dedicated installation key material and explicit public-key history; it cannot load credentials, discover keys or accept `jku`/unprotected headers. It supports a verifier-only instance. Operator key source, rotation acceptance, key lifetime and restore-journal loading are still composition work. There is no private-key fallback, plaintext journal or automatic trust of a signature supplied by an evidence uploader.
+A larger cleanup budget is reserved inside the already-bound deletion deadline;
+a relaxed maximum never moves that deadline outward. If the budget consumes the
+whole lifetime, the read cutoff becomes the acquisition anchor and cleanup is
+due at once, with the original hard deadline unchanged.
 
-## Verification and limits
+## Applying a policy change
 
-Unit/race tests cover overdue policy calculation, immutable anchor/request, no resurrection, failures, detached-signature purpose/root/key checks, historical verification after rotation, encrypted-record tampering and failed KMS operation. Download worker tests cover current deletion notices and shortening the transport deadline after native verification.
+When a policy event is accepted, C-15 computes the restrictive effect and
+applies it with set-based statements:
 
-The real PostgreSQL/S3 fixture passed in `test/results/retention-lifecycle-integration-check.log` (exit 0; test run 44.509 seconds). It covers concurrent exact replay, immutable dates/receipts, narrower SQL roles, effective catalog/finalization fences, active download denial, overdue cleanup without refund and policy expiry while waiting for a lock. Its environment report records unchanged tested sources and no cleanup failures. `test/results/retention-lifecycle-gates.log` records passing Go/race, import architecture, sqlc, specification, architecture and design gates.
+```sql
+UPDATE custody_attempt
+SET effective_expires_at = LEAST(effective_expires_at, $read_cutoff_expr),
+    effective_delete_by  = LEAST(effective_delete_by,  $delete_expr),
+    retention_sequence   = retention_sequence + 1
+WHERE <stored-label and class/type match>
+  AND (effective_expires_at > $read_cutoff_expr OR effective_delete_by > $delete_expr)
+LIMIT <batch>;   -- via a keyed subselect, repeated until no row changes
+```
 
-Only the accepted pod-status producer is mapped into retained input today. Complete accepted policy sources/metadata, remote propagation, restoration, lineage/derivatives, continuous scheduling, active relay cancellation, operational notices and finite audit/SQL/backup cleanup remain unimplemented. No claim of complete deadline deletion follows from this overlay.
+Each batch writes one append-only `retention_decision` row with the policy
+revision, the number of rows changed and the earliest new dates, in the same
+transaction. No per-artifact signed or encrypted journal exists. A longer
+maximum, a new default or a deleted override changes no row; deleting the
+only baseline stops new collection and shortens nothing. Unchanged or relaxed
+policy creates no decision.
 
-The original lifecycle continuation also passed the real two-cluster Kubernetes/OpenBao/S3/SQL regression (`test/results/retention-lifecycle-context-check.log`, exit 0; 22.496-second Go run). Subsequent origin-union/accepted-reader/watch changes are separately tracked in the current continuation and require their affected gates.
+## Effects
 
-The increased-budget defect was reproduced in `test/results/retention-budget-before.log`. The correction passes domain/application/codec/signature race tests (`retention-budget-after.log`). The full SQL/S3 regression with migration 16 passes in `retention-budget-integration-check.log` (exit 0, 45.662 seconds); it verifies a completely closed readable interval, preserved hard deadline, immediate cleanup eligibility and exact replay. This proves neither physical cleanup within an already-insufficient budget nor source catch-up readiness.
+Capture admission resolves the current policy set from the informer cache and
+stores the result on the new row. Every later effect (verification,
+publication, catalog visibility, download reservation, deletion claim) compares
+database `now()` with the row's stored effective dates inside its own
+transaction. No retention proof, topology read or source-readiness check runs
+inside effect transactions.
+
+A started download continues under its original authorization
+([ADR-312](../decisions/312-started-downloads-run-to-original-bounds.md)) and
+ends at the stored read cutoff it was admitted with. A shortening that lands
+during the stream reaches it as a `LISTEN/NOTIFY` event on the session and ends
+it at the new cutoff.
+
+Deletion becomes claimable at the effective read cutoff and is due at the
+effective deletion deadline. The deletion claim carries both the original and
+the effective dates. A shortening never releases storage by itself; the charge
+is released when deletion completes.

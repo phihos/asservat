@@ -10,8 +10,9 @@ import copy
 import json
 from pathlib import Path
 
+import implemented_contracts
+
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "specs/contracts"
 DEST = ROOT / "internal/contracts/investigation-schemas"
 PREFIX = "https://asservat.io/spec/v1/"
 NAMES = ["cancel_capture", "list_recordings", "preview_recording_save", "list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "get_live_capacity", "search_processing_evidence", "get_processing_erasure", "get_processing_report", "preview_retention_change", "request_policy_grant", "request_raw_access", "get_grant", "list_reviews", "decide_review", "revoke_grant", "list_capture_profiles", "get_capture_profile", "get_http_headers", "get_profile_summary", "get_pcap_summary", "pcap_query", "compare_profiles", "get_syscall_summary", "get_syscall_events", "syscall_query", "get_logs", "list_live_sources", "open_live_watch", "read_live_watch", "update_live_watch", "close_live_watch"]
@@ -118,9 +119,9 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--write", action="store_true")
     args = parser.parse_args()
-    catalog = {t["name"]: t for t in json.loads((SOURCE / "mcp-tools.json").read_text())["tools"]}
-    common = json.loads((SOURCE / "mcp-result.schema.json").read_text())
-    documents = {p.name: json.loads(p.read_text()) for p in SOURCE.glob("*.schema.json")}
+    catalog = {t["name"]: t for t in json.loads(implemented_contracts.path("mcp-tools.json").read_text())["tools"]}
+    common = json.loads(implemented_contracts.path("mcp-result.schema.json").read_text())
+    documents = {name: json.loads(implemented_contracts.path(name).read_text()) for name in implemented_contracts.schema_names()}
     # ADR-243: the runtime models only the packet/syscall window, ring, filter,
     # limit and mode edits. Other registered fields stay canonical but are not
     # accepted by this runtime. Several components are a policy's recorders

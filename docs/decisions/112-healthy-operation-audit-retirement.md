@@ -1,5 +1,7 @@
 # ADR-112: Healthy operation audit retirement and backed history
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 - Status: accepted for staged implementation; runtime remains disabled
 - Date: 2026-10-11
 - Requirements: REQ-AUT-005, REQ-PRV-004; S-02
@@ -62,4 +64,4 @@ required qualified restart/restore bridge remain unfinished. The current
 incarnation fence intentionally denies historical cleanup after a database
 restart; supporting ordinary restart safely is required before enablement.
 The policy does not assert physical media sanitization or make unmanaged
-operator backups disappear. See [the implementation contract](../architecture/operation-audit-lifecycle.md).
+operator backups disappear. See the implementation contract.

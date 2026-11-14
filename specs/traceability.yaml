@@ -75,12 +75,14 @@ requirements:
   - TASK-10
 - requirement: REQ-API-001
   spec: specs/apis.md
+  changed: ADR-330 mechanism; capability unchanged
   scenarios:
   - SC-API-001
   tasks:
   - TASK-02
 - requirement: REQ-API-002
   spec: specs/apis.md
+  changed: ADR-330 mechanism; capability unchanged
   scenarios:
   - SC-API-002
   tasks:
@@ -243,6 +245,7 @@ requirements:
   - TASK-08
 - requirement: REQ-MCP-002
   spec: specs/mcp.md
+  changed: ADR-330 mechanism; capability unchanged
   scenarios:
   - SC-MCP-002
   - SC-MCP-006
@@ -250,6 +253,7 @@ requirements:
   - TASK-08
 - requirement: REQ-MCP-003
   spec: specs/mcp.md
+  changed: ADR-330 mechanism; capability unchanged
   scenarios:
   - SC-MCP-003
   tasks:
@@ -410,6 +414,7 @@ requirements:
   - TASK-07
 - requirement: REQ-UX-001
   spec: specs/ergonomics.md
+  changed: ADR-330 mechanism; capability unchanged
   scenarios:
   - SC-UX-001
   tasks:
@@ -430,6 +435,7 @@ requirements:
   - TASK-07
 - requirement: REQ-UX-004
   spec: specs/ergonomics.md
+  changed: ADR-330 mechanism; capability unchanged
   scenarios:
   - SC-UX-004
   tasks:
@@ -652,6 +658,7 @@ requirements:
   - TASK-07
 - requirement: REQ-MCP-005
   spec: specs/mcp.md
+  changed: ADR-330 mechanism; capability unchanged
   scenarios:
   - SC-MCP-005
   tasks:
@@ -707,6 +714,7 @@ requirements:
   - TASK-09
 - requirement: REQ-GDE-003
   spec: specs/guidance.md
+  changed: ADR-330 mechanism; capability unchanged
   scenarios:
   - SC-GDE-003
   tasks:
@@ -729,6 +737,7 @@ requirements:
   - TASK-08
 - requirement: REQ-GDE-006
   spec: specs/guidance.md
+  changed: ADR-330 mechanism; capability unchanged
   scenarios:
   - SC-GDE-006
   tasks:
@@ -949,6 +958,7 @@ requirements:
   tasks: *id007
 - requirement: REQ-UI-003
   spec: specs/user-experience.md
+  changed: ADR-330 mechanism; capability unchanged
   scenarios:
   - SC-UI-003
   tasks: *id007
@@ -1004,6 +1014,7 @@ requirements:
   tasks: *id008
 - requirement: REQ-INT-001
   spec: specs/interfaces.md
+  changed: ADR-330 mechanism; capability unchanged
   scenarios:
   - SC-INT-001
   tasks: &id009
@@ -1012,11 +1023,13 @@ requirements:
   - TASK-08
 - requirement: REQ-INT-002
   spec: specs/interfaces.md
+  changed: ADR-330 mechanism; capability unchanged
   scenarios:
   - SC-INT-002
   tasks: *id009
 - requirement: REQ-INT-003
   spec: specs/interfaces.md
+  changed: ADR-330 mechanism; capability unchanged
   scenarios:
   - SC-INT-003
   tasks: *id009

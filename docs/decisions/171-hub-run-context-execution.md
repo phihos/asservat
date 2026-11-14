@@ -1,5 +1,7 @@
 # ADR-171 — Hub-run context execution with delegated regional operations
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 Date: 2026-10-14. Status: accepted; implemented, and the native public journey passes on this path.
 Requirements: REQ-FED-001/002, S-02 context collection; TASK-03 / TASK-11.
 

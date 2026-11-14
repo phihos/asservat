@@ -1,5 +1,7 @@
 # ADR-300 — Keep browser observations separate from request lifetime
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 Date: 2026-11-04. Status: selected engineering correction; installed qualification pending.
 Requirements: REQ-AUT-001, REQ-INT-001/003, REQ-PRF-003; S-05.
 

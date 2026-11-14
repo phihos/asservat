@@ -11,8 +11,9 @@ import copy
 import json
 from pathlib import Path
 
+import implemented_contracts
+
 ROOT = Path(__file__).resolve().parents[1]
-CONTRACTS = ROOT / 'specs/contracts'
 DEST = ROOT / 'charts/asservat/crds/debugpolicies.yaml'
 
 
@@ -21,7 +22,7 @@ def resolve(ref):
     base, _, fragment = ref.partition('#')
     if not base.startswith(prefix) or '/' in base[len(prefix):]:
         raise ValueError('nonlocal composition schema reference')
-    value = json.loads((CONTRACTS / base[len(prefix):]).read_text())
+    value = json.loads(implemented_contracts.path(base[len(prefix):]).read_text())
     for key in fragment.removeprefix('/').split('/') if fragment else []:
         value = value[key]
     return value
@@ -50,7 +51,7 @@ def shape(node):
 
 
 def composition_shape():
-    source = json.loads((CONTRACTS / 'capture-composition.schema.json').read_text())
+    source = json.loads(implemented_contracts.path('capture-composition.schema.json').read_text())
     variants = source['$defs']['override']['oneOf']
     fields = [v['properties']['field']['const'] for v in variants]
     assert len(fields) == len(set(fields))
@@ -75,7 +76,7 @@ def composition_shape():
 
 
 def synchronize(crd):
-    source = json.loads((CONTRACTS / 'policy.schema.json').read_text())['properties']['spec']['oneOf']
+    source = json.loads(implemented_contracts.path('policy.schema.json').read_text())['properties']['spec']['oneOf']
     recipe = next(v for v in source if 'recipeRef' in v.get('properties', {}))
     composed = next(v for v in source if 'profileComposition' in v.get('properties', {}))
     assert set(recipe['required']) - {'recipeRef'} == set(composed['required']) - {'profileComposition'}

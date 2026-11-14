@@ -1,5 +1,7 @@
 # ADR-080 — Protect the private hub workload namespace
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded (2026-11-13): the namespace admission policy defended against non-administrator writers in the hub namespace. ADR-328 keeps such writers out with plain RBAC and Pod Security `restricted`; the policy and its dry-run proof are removed.
 
 Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan.
@@ -14,7 +16,7 @@ Prove current enforcement with a separate non-administrator, non-controller iden
 
 ## Limits and consequences
 
-The [private contract](../architecture/owner-workload-protection.md) defines the controller profile, scope and qualification. This is current enforcement, not proof of historical integrity or owner enrollment. Installation must establish a clean protected namespace, least-privilege Secret access and independently trusted workload identity before accepting tokens. Applying this policy after compromise does not repair it. A compromised node/controller, cluster administrator or actor with credential-read/impersonation authority remains outside this boundary.
+The private contract defines the controller profile, scope and qualification. This is current enforcement, not proof of historical integrity or owner enrollment. Installation must establish a clean protected namespace, least-privilege Secret access and independently trusted workload identity before accepting tokens. Applying this policy after compromise does not repair it. A compromised node/controller, cluster administrator or actor with credential-read/impersonation authority remains outside this boundary.
 
 Do not reuse this namespace for user workloads or acquisition Jobs whose application controllers need write access. The installer must arrange separate scopes. Unsupported controller identities/operations fail closed until separately qualified; do not solve an installation failure by granting all service accounts or all authenticated users access. Native integration covers the reference controller path and attack denials; it does not certify every controller branch or managed Kubernetes distribution.
 

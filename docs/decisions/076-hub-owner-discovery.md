@@ -1,5 +1,7 @@
 # ADR-076 — Exact hub owner discovery and TLS identity
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded in part by ADR-328 (2026-11-13): verifying the Pod → ReplicaSet → Deployment chain, service account and pinned Service/Deployment identities against forged hub-namespace objects no longer applies. Discovery reads the named Service's EndpointSlices under RBAC; the TLS identity checks remain.
 
 Date: 2026-10-10. Status: implementation refinement under the maintainer's continuation; full Go/race/import, owned Kubernetes/service and specification/design checks pass. Protected bootstrap, issuer activation and forwarding remain incomplete.
@@ -14,4 +16,4 @@ Require TLS 1.3 and separate server/client leaves, with explicit issuer roots, a
 
 The new verifier establishes a signed identity only. It does not issue or activate a certificate, prove the caller's current membership in the owner pool, accept a locator as a capability, or confer human/evidence access. The future private forwarder must verify both endpoints before sending credentials, retain original cancellation/deadlines, and check the current exact SQL/local request fence at the receiver. Current connector-origin proof and ordinary enrollment authorization remain mandatory.
 
-See [the contract](../architecture/hub-owner-discovery.md) and [verification progress](../implementation-progress.md). The synthetic TLS issuer and restricted pause-Pod fixture are test inputs, never production bootstrap.
+See the contract and [verification progress](../implementation-progress.md). The synthetic TLS issuer and restricted pause-Pod fixture are test inputs, never production bootstrap.

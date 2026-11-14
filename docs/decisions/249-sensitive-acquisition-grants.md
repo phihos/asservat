@@ -1,5 +1,7 @@
 # ADR-249 — Sensitive acquisition grants (S-04 increment 12)
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 Date: 2026-10-27. Status: accepted; implemented; qualification below.
 Requirements: REQ-AUT-003 (SC-AUT-003), REQ-AUT-004, REQ-AUT-005, REQ-AUT-006 (limits bound, spend
 pending), REQ-INV-001–003, REQ-SYS-002 ("unless an administrator requires more"). Plan:

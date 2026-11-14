@@ -1,5 +1,7 @@
 # ADR-131: Produce original installation pins from trusted static inputs
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded (2026-11-13): The trusted producer of installer pins (UIDs, OIDs, seed IDs), its native guard and the temporary setup manager are not needed: ADR-328 removes UID and guard pins. Helm values and the `secrets` hook Job supply IDs and passwords.
 
 Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan.
@@ -18,4 +20,4 @@ Preserve passive history access while removing its manager-origin grant dependen
 
 Completed whole-install replay selects protected passive history before opening any DDL, manager or provider credentials. Interrupted schema-complete preparation uses the original embedded bundle/history/database-incarnation verifier, also enforced at the direct initial-prepare/activation boundaries. A journal completion is not new recovery or restore authority.
 
-The current component does not enable Helm runtime, mount a public interface, or claim final managed credential-copy deletion. Asservat-created SQL/provider source Secrets need a separately qualified exact final-delete transition with positive reader/writer/credential closure and permanently occupied names. Operator-owned originals and upstream credential ownership remain untouched. See the [implementation contract](../architecture/initial-bootstrap.md).
+The current component does not enable Helm runtime, mount a public interface, or claim final managed credential-copy deletion. Asservat-created SQL/provider source Secrets need a separately qualified exact final-delete transition with positive reader/writer/credential closure and permanently occupied names. Operator-owned originals and upstream credential ownership remain untouched. See the implementation contract.

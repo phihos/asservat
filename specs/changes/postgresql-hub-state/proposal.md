@@ -1,6 +1,6 @@
 # PostgreSQL for hub operational state
 
-Date: 2026-10-09. Status: **accepted by the user; integrated into the specifications, not implemented**. ADR-023 supersedes ADR-004's prohibition on a mandatory database. ADR-018's Kubernetes-only permission-configuration interface remains applicable. The following records the reassessment; [hub persistence](../../persistence.md) defines the accepted state and recovery contracts.
+Date: 2026-10-09. Status: **accepted by the user; integrated into the specifications, not implemented**. ADR-023 supersedes ADR-004's prohibition on a mandatory database. ADR-018's Kubernetes-only permission-configuration interface remains applicable. The following records the reassessment; [hub persistence](../../persistence.md) defines the accepted state and recovery contracts. Where this record conflicts with [ADR-329](../../../docs/decisions/329-accessbindings-in-application-namespaces.md) or [ADR-330](../../../docs/decisions/330-event-driven-system-design.md), those decisions apply; the ownership table below is updated accordingly.
 
 ## Recommendation and scope
 
@@ -32,14 +32,16 @@ Case discovery also joins occurrences, artifact classes, expiry, retained audien
 
 | State | Authoritative location after this decision |
 | --- | --- |
-| DebugPolicy, EvidenceRecipe, presets, AccessBinding, PermissionSource, EvidenceRetentionPolicy, EvidenceStoragePool and EvidenceBudgetPolicy configuration | Kubernetes CRDs; ordinary RBAC, admission, kubectl, server-side apply and GitOps |
-| Local CollectionCeiling, sensor readiness, bounded accepted execution/permit state and prepaid local slices | Workload-cluster Kubernetes/control state; node-local bounded runtime state where already specified |
+| DebugPolicy, EvidenceRecipe, presets, PermissionSource, EvidenceRetentionPolicy, EvidenceStoragePool and EvidenceBudgetPolicy configuration | Kubernetes CRDs; ordinary RBAC, admission, kubectl, server-side apply and GitOps |
+| AccessBinding | Kubernetes CRD in the application namespace it grants; namespace RBAC writers; observed by the regional connector through an informer (ADR-329) |
+| Local CollectionCeiling and sensor readiness | Workload-cluster Kubernetes configuration and status |
+| Accepted work and capacity budget held by a connector | Connector memory keyed by operation ID, rebuilt from hub work state after reconnect; no per-attempt or per-delivery CRDs (ADR-330 D8) |
 | User-authored DebugCapture | Kubernetes request envelope and projected status; accepted immutable execution in PostgreSQL, keyed by cluster/request UID and generation; browser/MCP can submit through the existing authenticated capture path |
 | Hub capture executions, action outcomes, cases/occurrences, content-minimized artifact catalog, lineage/copy references and lifecycle work | PostgreSQL rows with indexed identities, versions, deadlines and idempotency keys |
 | Hub AccessGrant, EvidenceShare, SharingIntent, SharingRegistration, quota accounts/reservations and DeliveryWork | PostgreSQL records; controller-owned hub CRDs for these runtime records become unnecessary |
-| Cluster enrollment, certificate/revocation state and heartbeat summaries | PostgreSQL runtime records; declarative enrollment/locality policy stays in protected configuration |
+| Cluster registration and connector certificate state | PostgreSQL runtime records; locality policy stays in Kubernetes configuration |
 | Encrypted cores, packet captures, profiles, files/logs, derived evidence and full manifests | Existing regional object storage and KMS boundaries |
-| Durable content-minimized audit intents/outcomes and sealed history | Existing encrypted object-store audit path; PostgreSQL holds indexes and durable work references, not a claim of tamper-proof SQL storage |
+| Content-minimized audit records | Append-only PostgreSQL rows written in the effect's transaction, exported in batches to the object store or a SIEM (ADR-330 D6) |
 | Logs, packets, samples, protocol reassembly, trigger counters and rings at observation frequency | Node-local bounded pipelines, not database writes for every observation |
 
 A field has one authority. Configuration rows in PostgreSQL are reconciled projections, not a second writable configuration store. CRD statuses are projections of accepted runtime state, not an independent runtime ledger. Deleting a request namespace must not delete historical evidence or erase outstanding quota charges.
@@ -50,15 +52,15 @@ Content-minimized catalog rows may be rebuilt from verified manifests/outcomes; 
 
 For an eligible capture, a hub transaction can check the accepted configuration revision, lock the applicable grant and allocation rows, reserve bytes/object slots/action starts, register a bounded sharing capture if eligible, insert the immutable operation and durable outbound work, then commit together. A sharing dependency that is unavailable may instead record a visible sharing failure without preventing independently authorized collection, as already specified. Unique operation keys make a request retry find the original transaction result.
 
-The transaction does not perform the intrusive action. Required durable audit must succeed before dispatch; an SQL outbox insert alone does not relax the existing audit-before-action/disclosure guarantee. A connector receives a fenced, expiring work item and rechecks local identity, ceilings and prepaid capacity. Ambiguous execution remains Indeterminate; database commit does not imply a dump happened exactly once.
+The transaction does not perform the intrusive action; its audit row commits in the same transaction. A connector receives the work item with its operation ID and checks local ceilings and its capacity budget. Ambiguous execution remains Indeterminate; database commit does not imply a dump happened exactly once.
 
 PostgreSQL does not create a transaction across itself, Kubernetes, an IdP, S3 and a process on another node. Evidence upload/manifest commit, audit persistence, verified deletion, local reservations and connector acknowledgements still need the existing idempotent state machines. Quota is released only after verified deletion. Parent allocation batching/prepaid slices remain useful to reduce central contention and tolerate short outages; a database is not placed on the natural-core pipe path.
 
 ## Configuration and permission freshness
 
-Keep the administrator's workflow: provisioners/GitOps manage CRDs through the Kubernetes API. The reconciler records source cluster/namespace/resource UIDs, opaque source versions, generation, normalized digest and evaluation freshness. New configuration is Ready only after the corresponding accepted state is committed and relevant collectors acknowledge it. Reject authority inferred from a stale database mirror.
+Keep the administrator's workflow: provisioners/GitOps manage CRDs through the Kubernetes API. The reconciler records source cluster/namespace/resource UIDs, generation and normalized digest. New configuration is Ready only after the corresponding accepted state is committed and relevant collectors acknowledge it. Reject authority inferred from a stale database mirror.
 
-Watch loss, source deletion, namespace recreation and ownership changes retain their current fail-closed/freshness behavior. Relist and reconcile authoritative sources before reopening affected authorization after uncertain recovery. Do not invent a global ordering across different Kubernetes resource versions. Exec inheritance still needs the qualified live access-review adapter, and group membership still needs fresh IdP evidence. PostgreSQL does not replace either evaluator.
+Cached Kubernetes state comes from informers and stays valid until a watch event replaces it; a watch failure marks it unavailable until the relist completes (ADR-330 D1). Do not invent a global ordering across different Kubernetes resource versions. PostgreSQL does not replace the Kubernetes or identity-provider evaluators.
 
 Application maintainers continue using the hub UI/MCP without database credentials or a management-cluster kubeconfig. The existing capture/approval/sharing service remains the application interface; adding PostgreSQL does not imply a new permission-configuration HTTP API.
 
@@ -72,7 +74,7 @@ Authorization, revocation and quota decisions use the authoritative primary; sta
 
 Database backups introduce another retention boundary. Store minimal control/catalog data, not dumps, packet bytes, logs, arbitrary analysis snippets or full evidence manifests in PostgreSQL. Identity/control fields still need finite retention and protected storage. Keep payload-derived search content under its existing regional evidence deadlines; initially retain the bounded rebuildable evidence-search cache where required, while SQL serves structured catalog queries.
 
-A DELETE does not remove information from prior base backups/WAL archives; point-in-time recovery intentionally permits reconstructing earlier state. Backup encryption alone does not shorten retention. Minimize database contents, configure compatible finite backup/WAL retention, and gate restore on current configuration, lifecycle tombstones, revocations and accounting reconciliation. Unknown consumed permits stay charged; disaster recovery must fence or invalidate pre-restore execution authority before new issuance. Never promise that restoring an older database safely recreates the latest authorization state by itself. This follows PostgreSQL's recovery mechanism and Asservat's existing privacy requirements, not a new legal-compliance claim. [Continuous archiving and recovery](https://www.postgresql.org/docs/18/continuous-archiving.html), [existing copy/restore requirements](../../privacy.md#req-prv-004--delete-every-managed-copy-and-report-failures).
+A DELETE does not remove information from prior base backups/WAL archives; point-in-time recovery intentionally permits reconstructing earlier state. Backup encryption alone does not shorten retention. Minimize database contents, configure compatible finite backup/WAL retention, and gate restore on current configuration, lifecycle tombstones, revocations and accounting reconciliation. Disaster recovery must fence or invalidate pre-restore execution authority before new issuance. Never promise that restoring an older database safely recreates the latest authorization state by itself. This follows PostgreSQL's recovery mechanism and Asservat's existing privacy requirements, not a new legal-compliance claim. [Continuous archiving and recovery](https://www.postgresql.org/docs/18/continuous-archiving.html), [existing copy/restore requirements](../../privacy.md#req-prv-004--delete-every-managed-copy-and-report-failures).
 
 ## Alternatives
 

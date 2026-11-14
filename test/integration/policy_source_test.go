@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/url"
-	"os"
 	"testing"
 	"time"
 
@@ -64,7 +63,7 @@ func testPolicySourceObservation(t *testing.T, ctx context.Context, config *rest
 		}
 		time.Sleep(25 * time.Millisecond)
 	}
-	data, e := os.ReadFile("../../examples/policy-deployment.yaml")
+	data, e := readImplementedExample("../../examples/", "policy-deployment.yaml")
 	if e != nil {
 		t.Fatal(e)
 	}
