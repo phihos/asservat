@@ -114,11 +114,3 @@ func configurationWorkerInputsStateValid(installation string, state contracts.In
 	}
 	return true
 }
-
-func configurationWorkerInputProvenance(p *contracts.ConfigurationWorkerInputClaim) *contracts.ConfigurationWorkerInputProvenance {
-	if p == nil {
-		return nil
-	}
-	return &contracts.ConfigurationWorkerInputProvenance{OperationID: p.OperationID, ConfigurationRoot: p.ConfigurationRoot,
-		ConfigurationSetupID: p.ConfigurationSetupID, SQLProjection: p.SQLProjection}
-}

@@ -27,7 +27,7 @@ type permissionLoader struct{}
 
 func (permissionLoader) Load(string) (any, error) { return nil, value.ErrInvalid }
 
-type permissionValidator struct{ bindingSchema, sourceSchema, identitySchema, workTrustSchema, fleetSchema, retentionSchema, retentionTopologySchema, browserSchema, submissionSchema, witnessSchema *jsonschema.Schema }
+type permissionValidator struct{ bindingSchema, sourceSchema, identitySchema, workTrustSchema, fleetSchema, retentionSchema, retentionTopologySchema, browserSchema, submissionSchema *jsonschema.Schema }
 
 func newPermissionValidator() (*permissionValidator, error) {
 	c := jsonschema.NewCompiler()
@@ -87,11 +87,7 @@ func newPermissionValidator() (*permissionValidator, error) {
 	if err != nil {
 		return nil, value.ErrUnavailable
 	}
-	witness, err := c.Compile("https://asservat.io/spec/v1/installation-witness.schema.json")
-	if err != nil {
-		return nil, value.ErrUnavailable
-	}
-	return &permissionValidator{b, s, i, w, f, r, t, browser, submission, witness}, nil
+	return &permissionValidator{b, s, i, w, f, r, t, browser, submission}, nil
 }
 
 // Bound syntax before allocation/schema evaluation; reject duplicate keys,

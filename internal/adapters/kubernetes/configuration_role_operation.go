@@ -54,42 +54,6 @@ func (s *ConfigurationRoleSource) operation(ctx context.Context) (context.Contex
 	}, nil
 }
 
-// The callback is the one fixed SQL role operation (or final verification),
-// never a public request or arbitrary authority provider. Close cancels and
-// joins it along with the root's existing operations.
-func (s *ConfigurationRuntimeRoleRoot) WithConfigurationRoleOperation(ctx context.Context, run func(context.Context) error) error {
-	if s == nil || run == nil || ctx == nil || ctx.Err() != nil {
-		return cfg.ErrUnavailable
-	}
-	s.mu.Lock()
-	if s.closed || s.ctx.Err() != nil {
-		s.mu.Unlock()
-		return cfg.ErrUnavailable
-	}
-	s.joined.Add(1)
-	s.mu.Unlock()
-	defer s.joined.Done()
-	live, cancel := context.WithCancel(ctx)
-	joined := make(chan struct{})
-	stop := context.AfterFunc(s.ctx, func() { cancel(); close(joined) })
-	defer func() {
-		cancel()
-		if !stop() {
-			<-joined
-		}
-	}()
-	bound, finish, e := s.source.operation(live)
-	if e != nil {
-		return e
-	}
-	defer finish()
-	e = run(bound)
-	if e == nil && bound.Err() != nil {
-		return cfg.ErrUnavailable
-	}
-	return e
-}
-
 func (s *ConfigurationRoleSource) ReadConfigurationRoleSource(ctx context.Context) (contracts.ConfigurationRoleObservation, error) {
 	var zero contracts.ConfigurationRoleObservation
 	if s == nil || ctx == nil || ctx.Err() != nil {
@@ -123,27 +87,4 @@ func (s *ConfigurationRoleSource) ReadConfigurationRoleSource(ctx context.Contex
 	p.rechecked = p.rechecked || p.proof != nil
 	p.proof = &proof
 	return proof.observation, nil
-}
-
-// latestConfigurationRoleSource reuses the operation's latest proof without
-// new I/O once a recheck followed the opening proof: the role step's post-lock
-// recheck before the CREATE effect (ADR-188). Otherwise it proves afresh.
-func (s *ConfigurationRoleSource) latestConfigurationRoleSource(ctx context.Context) (contracts.ConfigurationRoleObservation, error) {
-	var zero contracts.ConfigurationRoleObservation
-	p, ok := ctx.Value(configurationRoleOperationKey{}).(*configurationRoleOperation)
-	if !ok {
-		return s.ReadConfigurationRoleSource(ctx)
-	}
-	p.mu.Lock()
-	reuse := p.source == s && p.rechecked && p.proof != nil
-	p.mu.Unlock()
-	if !reuse {
-		return s.ReadConfigurationRoleSource(ctx)
-	}
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	if p.closed || p.proof == nil || p.ctx.Err() != nil || ctx.Err() != nil || !configurationRoleSourceMatches(s.input, p.proof.observation, s.client.now()) {
-		return zero, cfg.ErrUnavailable
-	}
-	return p.proof.observation, nil
 }

@@ -138,8 +138,6 @@ func (ConfigurationRuntimeRoleMaterial) GoString() string {
 	return "protected configuration role material"
 }
 
-const ConfigurationRuntimeCredentialManifestFormat = "asservat-configuration-runtime-credentials/v1"
-
 type ConfigurationRuntimeCredentialManifest struct {
 	Format  string                                `json:"format"`
 	Input   ConfigurationRuntimeRoles             `json:"input"`

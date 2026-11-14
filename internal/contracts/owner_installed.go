@@ -29,13 +29,3 @@ func FederationRuntimeProjectionName(installationID string) string {
 
 // FederationAuditKeysFile is the federation projection's MAC key file.
 const FederationAuditKeysFile = "federation-audit-keys.json"
-
-// Inputs are validated installation IDs before constructing a workload. These
-// names identify fixed, complete projections; they do not grant activation.
-func OwnerObservationProjectionName(installationID string) string {
-	return "asservat-" + strings.ReplaceAll(installationID, "-", "") + "-owner-observation"
-}
-
-func OwnerPublicProjectionName(installationID string) string {
-	return "asservat-" + strings.ReplaceAll(installationID, "-", "") + "-owner-public"
-}

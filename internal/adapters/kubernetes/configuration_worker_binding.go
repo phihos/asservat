@@ -1,12 +1,9 @@
 package kubernetes
 
 import (
-	"encoding/json"
-
 	"asservat.local/asservat/internal/adapters/providerconfig"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/authorization"
-	cfg "asservat.local/asservat/internal/domain/configuration"
 )
 
 func configurationWorkerProviderBound(in contracts.PublicRuntimeRoles) bool {
@@ -31,18 +28,4 @@ func configurationWorkerProviderBound(in contracts.PublicRuntimeRoles) bool {
 		}
 	}
 	return true
-}
-
-// The versioned public digest covers the complete generated document. It has
-// no secret bytes and cannot substitute for current source/provider proofs.
-// Both original CREATE and every later independent read use this definition.
-func configurationWorkerInputDigest(in contracts.HubWorkerDeployment) (string, error) {
-	b, err := json.Marshal(in)
-	if err != nil || len(b) > contracts.OwnerDeploymentMaxBytes {
-		return "", cfg.ErrInvalid
-	}
-	return preparationDigest(struct {
-		Format string                        `json:"format"`
-		Input  contracts.HubWorkerDeployment `json:"input"`
-	}{"asservat-configuration-worker-input/v1", in}), nil
 }

@@ -1,7 +1,6 @@
 package contracts
 
 import (
-	"io"
 	"time"
 )
 
@@ -9,16 +8,6 @@ import (
 // Fresh installations now select InitialBootstrapVersionedAuditFormat.
 // Existing v1/v2 guards retain their original bytes and prohibit copy deletion.
 const InitialBootstrapCopyClosureFormat = "asservat-initial-bootstrap/v3"
-const InitialBootstrapCopyClaimFormat = "asservat-bootstrap-copy-closure/v1"
-const InitialBootstrapCopyClaimMaxBytes = 4096
-const InitialBootstrapCopyReceiptMaxBytes = 512
-const InitialBootstrapCopyCleanupDuration = 15 * time.Minute
-
-// InitialBootstrapHasPassiveHistory is a closed wire classification, not proof
-// of completion, protection, current authority or permission to remove copies.
-func InitialBootstrapHasPassiveHistory(format string) bool {
-	return format == InitialBootstrapPassiveFormat || InitialBootstrapHasCopyClosure(format)
-}
 
 // InitialBootstrapCopyClaim contains original public identities only. Its one
 // cleanup interval is persisted before any closure effect and never renewed by
@@ -55,13 +44,6 @@ type InitialBootstrapCopyReceipt struct {
 	ObservedAt      time.Time `json:"observedAt"`
 }
 
-func DecodeInitialBootstrapCopyClaim(r io.Reader) (InitialBootstrapCopyClaim, error) {
-	return decodeClosedRPC[InitialBootstrapCopyClaim](r, InitialBootstrapCopyClaimMaxBytes)
-}
-func DecodeInitialBootstrapCopyReceipt(r io.Reader) (InitialBootstrapCopyReceipt, error) {
-	return decodeClosedRPC[InitialBootstrapCopyReceipt](r, InitialBootstrapCopyReceiptMaxBytes)
-}
-
 // InitialBootstrapManagerRetirement is the public projection of the original
 // positively completed SQL close. It carries no login material and cannot
 // replace current protected SQL handover/history checks.
@@ -71,8 +53,4 @@ type InitialBootstrapManagerRetirement struct {
 	StartedAt   time.Time                `json:"startedAt"`
 	Until       time.Time                `json:"until"`
 	RetiredAt   time.Time                `json:"retiredAt"`
-}
-
-func DecodeInitialBootstrapManagerRetirement(r io.Reader) (InitialBootstrapManagerRetirement, error) {
-	return decodeClosedRPC[InitialBootstrapManagerRetirement](r, 512)
 }
