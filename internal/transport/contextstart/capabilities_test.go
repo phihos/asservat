@@ -163,7 +163,8 @@ func helloBody(t *testing.T, h contracts.APIContextHello) []byte {
 }
 
 // The hub admits connectors of its protocol major regardless of image; an
-// unversioned or other-major Hello is refused with a named stage. Real
+// unversioned or other-major Hello is refused with HTTP 426 and a message
+// naming the hub's protocol, and logged with a named stage. Real
 // HTTP/2 over TLS 1.3, as the handler requires.
 func TestHandlerChecksProtocolMajorOnly(t *testing.T) {
 	router, e := NewRouter(RouterLimits{Standby: 1, Captures: 1})
@@ -213,11 +214,17 @@ func TestHandlerChecksProtocolMajorOnly(t *testing.T) {
 			if e != nil {
 				t.Fatal(e)
 			}
+			text, _ := io.ReadAll(resp.Body)
 			_ = resp.Body.Close()
 			mu.Lock()
 			defer mu.Unlock()
-			if resp.ProtoMajor != 2 || resp.StatusCode != http.StatusNotFound || len(stages) != 1 || stages[0] != c.stage {
-				t.Fatalf("proto=%d status=%d stages=%v", resp.ProtoMajor, resp.StatusCode, stages)
+			want, wantBody := http.StatusNotFound, "Unavailable\n"
+			if c.stage == "connector-protocol" {
+				// A clear refusal naming the hub's protocol, not a bare 404.
+				want, wantBody = http.StatusUpgradeRequired, ConnectorProtocolRefusal(c.protocol)
+			}
+			if resp.ProtoMajor != 2 || resp.StatusCode != want || string(text) != wantBody || len(stages) != 1 || stages[0] != c.stage {
+				t.Fatalf("proto=%d status=%d body=%q stages=%v", resp.ProtoMajor, resp.StatusCode, text, stages)
 			}
 		})
 	}

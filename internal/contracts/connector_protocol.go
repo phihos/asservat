@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"encoding/json/jsontext"
 	"io"
+	"strings"
 )
 
 // ConnectorProtocolMajor is the hub↔connector protocol generation (ADR-333).
@@ -75,11 +76,13 @@ func (e *ConnectorTooOldError) Error() string {
 func (e *ConnectorTooOldError) Unwrap() error     { return e.Class }
 func (e *ConnectorTooOldError) FixedStep() string { return "connector-too-old/" + e.Capability }
 
-// decodeOpenRPC decodes one bounded JSON value of a cross-release channel:
-// unknown fields are ignored so a peer one release newer stays readable
-// (ADR-333). Signed payloads keep their signature over the received bytes.
+// decodeOpenRPC decodes one bounded JSON value of a cross-release channel.
+// Unknown members are ignored so a peer one release newer stays readable
+// (ADR-333); known members keep the closed decoder's rules (exact case, no
+// duplicate, no null for a value, canonical spelling), checked by
+// SameKnownFields against the typed value's re-encoding.
 func decodeOpenRPC[T any](source io.Reader, limit int64) (T, error) {
-	var out T
+	var out, zero T
 	if source == nil {
 		return out, ErrKeyRPC
 	}
@@ -90,7 +93,95 @@ func decodeOpenRPC[T any](source io.Reader, limit int64) (T, error) {
 	}
 	d := json.NewDecoder(bytes.NewReader(b))
 	if d.Decode(&out) != nil || d.Decode(new(any)) != io.EOF {
-		return out, ErrKeyRPC
+		return zero, ErrKeyRPC
+	}
+	normal, err := json.Marshal(out)
+	defer clear(normal)
+	if err != nil || !SameKnownFields(b, normal) {
+		return zero, ErrKeyRPC
 	}
 	return out, nil
+}
+
+// SameKnownFields reports whether received equals canonical after removing
+// the object members of received that canonical (this release's encoding of
+// the decoded value) does not have. Member names are compared exactly, so a
+// wrong-case alias of a known member is not that member, and a null or
+// noncanonical spelling of a known value differs. received must be valid
+// JSON without duplicate names (jsontext validation).
+func SameKnownFields(received, canonical []byte) bool {
+	if !jsontext.Value(received).IsValid() {
+		return false
+	}
+	var r, c any
+	for _, x := range []struct {
+		b   []byte
+		out *any
+	}{{received, &r}, {canonical, &c}} {
+		d := json.NewDecoder(bytes.NewReader(x.b))
+		d.UseNumber()
+		if d.Decode(x.out) != nil || d.Decode(new(any)) != io.EOF {
+			return false
+		}
+	}
+	p, ok := knownProjection(r, c)
+	if !ok {
+		return false
+	}
+	projected, err := json.Marshal(p)
+	if err != nil {
+		return false
+	}
+	want, err := json.Marshal(c)
+	if err != nil {
+		return false
+	}
+	a, b := jsontext.Value(projected), jsontext.Value(want)
+	return a.Canonicalize() == nil && b.Canonicalize() == nil && bytes.Equal(a, b)
+}
+
+// knownProjection keeps the members of r that shape has, recursively. A
+// member that matches a known name only case-insensitively is an alias of a
+// known field (encoding/json would read it), so it is refused.
+func knownProjection(r, shape any) (any, bool) {
+	switch s := shape.(type) {
+	case map[string]any:
+		m, ok := r.(map[string]any)
+		if !ok {
+			return r, true
+		}
+		out := make(map[string]any, len(s))
+		for k, v := range m {
+			sv, known := s[k]
+			if !known {
+				for name := range s {
+					if strings.EqualFold(name, k) {
+						return nil, false
+					}
+				}
+				continue
+			}
+			p, ok := knownProjection(v, sv)
+			if !ok {
+				return nil, false
+			}
+			out[k] = p
+		}
+		return out, true
+	case []any:
+		a, ok := r.([]any)
+		if !ok || len(a) != len(s) {
+			return r, true
+		}
+		out := make([]any, len(a))
+		for i := range a {
+			p, ok := knownProjection(a[i], s[i])
+			if !ok {
+				return nil, false
+			}
+			out[i] = p
+		}
+		return out, true
+	}
+	return r, true
 }

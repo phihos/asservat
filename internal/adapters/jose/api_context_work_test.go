@@ -131,7 +131,7 @@ func TestAPIContextWorkRejectsWrongHeaderAndUnclosedPayload(t *testing.T) {
 	if _, e := s.VerifyAPIContextWork(context.Background(), signWork(t, append([]byte(`{"addedByNewerHub":{"x":1},`), b[1:]...), key, jwa.EdDSAEd25519(), map[string]any{"typ": APIContextWorkType}), r); e != nil {
 		t.Fatal("newer hub field refused", e)
 	}
-	for name, payload := range map[string][]byte{"duplicate": append([]byte(`{"format":"api-context-work/v1",`), b[1:]...)} {
+	for name, payload := range map[string][]byte{"duplicate": append([]byte(`{"format":"api-context-work/v1",`), b[1:]...), "alias": bytesReplace(b, `"captureId"`, `"CaptureId"`), "alias-shadow": append([]byte(`{"CaptureId":"other",`), b[1:]...)} {
 		t.Run(name, func(t *testing.T) {
 			signed := signWork(t, payload, key, jwa.EdDSAEd25519(), map[string]any{"typ": APIContextWorkType})
 			if _, e := s.VerifyAPIContextWork(context.Background(), signed, r); e == nil {
@@ -210,4 +210,8 @@ func TestAPIContextWorkClampsShorterOriginalPeerProof(t *testing.T) {
 	if _, e = s.VerifyAPIContextWork(context.Background(), encoded, receiver); e == nil {
 		t.Fatal("expired original peer observation was refreshed")
 	}
+}
+
+func bytesReplace(b []byte, old, new string) []byte {
+	return []byte(strings.Replace(string(b), old, new, 1))
 }

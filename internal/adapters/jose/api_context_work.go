@@ -7,7 +7,6 @@ import (
 	"crypto/ed25519"
 	"encoding/hex"
 	"encoding/json"
-	"encoding/json/jsontext"
 	"strings"
 	"time"
 
@@ -190,9 +189,7 @@ func (s *APIContextWorkSignatures) VerifyAPIContextWork(ctx context.Context, enc
 	// ignored (ADR-333); the signature covers the received bytes.
 	canonical, e := wire.EncodeAPIContextWork(apiContextWire(w))
 	defer clear(canonical)
-	known, k := wire.EncodeAPIContextWork(d)
-	defer clear(known)
-	if e != nil || k != nil || !jsontext.Value(payload).IsValid() || !bytes.Equal(canonical, known) {
+	if e != nil || !wire.SameKnownFields(payload, canonical) {
 		return out, value.ErrInvalid
 	}
 	call, stop := context.WithDeadline(ctx, identity.Earlier(w.NotAfter, receiver.Window.Until()))

@@ -46,7 +46,12 @@ release newer that added a field would break every older connector.
    carries `protocol` (`contracts.ConnectorProtocolMajor`, now 1) and
    `capabilities`: every operation (`operation/<method>`), pre-work query
    (`query/<method>`) and `history` its release answers. The hub refuses a
-   Hello of another major (refusal stage `connector-protocol`). Within a major
+   Hello of another major, or without one (a connector built before this
+   change), with HTTP 426 Upgrade Required and a text body naming the hub's
+   protocol and "upgrade the connector"; hub-api logs `context start refused
+   connector-protocol`, and the connector logs `open/connector-protocol
+   (denied): hub says: …` and retries after 30 seconds. (HTTP/2 forbids the
+   `Upgrade` header that HTTP/1.1 sends with 426.) Within a major
    it sends only announced requests; an unannounced one is refused before
    anything is sent with `connector too old for <capability>`
    (`ConnectorTooOldError`, diagnostic step `connector-too-old/<capability>`).
@@ -57,9 +62,14 @@ release newer that added a field would break every older connector.
 3. **Tolerant decoders.** The context-start frames (Hello, work, operations,
    replies, results, receipts, source frames, history and source work), the
    cluster-observation frames, the lifecycle channel and the connector's
-   reading of the hub's offer ignore unknown fields. Signed work keeps its
-   signature over the received bytes; its known fields must still be this
-   release's canonical profile. A newer hub sends a new field only together
+   reading of the hub's offer ignore unknown members. Known members keep the
+   closed decoder's rules: exact-case names (encoding/json would otherwise
+   read a wrong-case alias), no duplicate, no null and canonical spelling,
+   checked by comparing the received value, with unknown members removed,
+   against this release's re-encoding (`contracts.SameKnownFields`). Signed
+   work (API context, history and source work) is checked the same way
+   against its value-derived canonical encoding; the signature covers the
+   received bytes. A newer hub sends a new field only together
    with a capability the connector announced.
 4. **Skew policy.** A connector (with its node collectors, which share its
    release) may be one minor release older or newer than the hub, with the
@@ -109,8 +119,8 @@ to equal the hub's.
   the hub needs, but only ±1 minor is supported and tested.
 - The manifest's collector digest names the hub's release, not the executing
   connector's image, which is in the execution record and outcome audit.
-- The connector does not yet check the hub's protocol; a newer major hub
-  refuses the connector's Hello.
+- The connector does not check the hub's protocol itself; the hub's 426
+  refusal tells it which side to upgrade.
 
 ## Verification
 

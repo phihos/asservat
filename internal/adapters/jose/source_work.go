@@ -119,9 +119,11 @@ func sourceWorkValue(b []byte) (app.SourceWork, error) {
 		}
 		w.StopRecording = &x
 	}
-	// The signature covers the received bytes; fields of a newer hub that this
+	// The known fields must equal this release's canonical encoding (no alias,
+	// omission or noncanonical spelling); members of a newer hub that this
 	// release does not know are ignored (ADR-333).
-	if _, e := sourceWorkBytes(w); e != nil {
+	canonical, e := sourceWorkBytes(w)
+	if e != nil || !wire.SameKnownFields(b, canonical) {
 		return app.SourceWork{}, value.ErrInvalid
 	}
 	return w, nil

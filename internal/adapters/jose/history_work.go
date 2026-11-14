@@ -52,9 +52,11 @@ func historyWorkValue(b []byte) (app.HistoryWork, error) {
 		return app.HistoryWork{}, value.ErrInvalid
 	}
 	w := app.HistoryWork{Channel: historyChannelValue(d.Channel), Authority: a}
-	// The signature covers the received bytes; unknown fields of a newer hub
-	// are ignored (ADR-333).
-	if _, e := historyWorkBytes(w); e != nil {
+	// The known fields must equal this release's canonical encoding (no alias,
+	// omission or noncanonical spelling); members of a newer hub that this
+	// release does not know are ignored (ADR-333).
+	canonical, e := historyWorkBytes(w)
+	if e != nil || !wire.SameKnownFields(b, canonical) {
 		return app.HistoryWork{}, value.ErrInvalid
 	}
 	return w, nil
