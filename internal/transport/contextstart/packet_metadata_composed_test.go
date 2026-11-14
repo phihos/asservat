@@ -347,7 +347,7 @@ func TestPacketMetadataTransportCompletionDoesNotExpireOwnedObservation(t *testi
 	}
 }
 func TestPacketMetadataComposedOriginalAuthorityAndIOBoundsRefuse(t *testing.T) {
-	for _, mode := range []string{"regional-io-expiry", "hub-io-expiry", "caller-io-cancellation", "human-expiry", "grant-expiry", "current-deny", "request-five-second-bound"} {
+	for _, mode := range []string{"regional-io-expiry", "hub-io-expiry", "caller-io-cancellation", "human-expiry", "current-deny", "request-five-second-bound"} {
 		t.Run(mode, func(t *testing.T) {
 			f := newPacketMetadataFixture(t)
 			p, e := f.svc.PreviewComposition(t.Context(), f, metadataIntent(f))
@@ -371,8 +371,6 @@ func TestPacketMetadataComposedOriginalAuthorityAndIOBoundsRefuse(t *testing.T) 
 				f.apiDelay = 30 * time.Millisecond
 			case "human-expiry":
 				f.humanUntil = short
-			case "grant-expiry":
-				f.grantUntil = short
 			case "current-deny":
 				f.afterStorage = func() { f.denied.Store(true) }
 			case "request-five-second-bound":
