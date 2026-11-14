@@ -53,7 +53,7 @@ C-20 owns shared `api/v1alpha1` and `internal/contracts` wire shapes as well as 
 
 ## Transaction and lifecycle boundaries
 
-Keep named transaction ports beside their coordinating application service. For example, `capture.AdmissionTransaction` exposes grant/capacity/registration/operation facets over one SQL transaction. Its PostgreSQL implementation is under `adapters/postgres`; facet mutation rules call owner-domain logic. The callback must be deterministic with respect to provided facts and must not invoke an adapter with remote effects. No generic transaction handle leaks back into services.
+Keep named transaction ports beside their coordinating application service. For example, `capture.AdmissionTransaction` exposes grant/capacity/share-instruction/operation facets over one SQL transaction. Its PostgreSQL implementation is under `adapters/postgres`; facet mutation rules call owner-domain logic. The callback must be deterministic with respect to provided facts and must not invoke an adapter with remote effects. No generic transaction handle leaks back into services.
 
 Keep local `execution.StartJournal` and `capacity.LocalAdmission` separate from hub transaction interfaces. They key every start by its operation ID; they cannot satisfy a hub SQL transaction through the same interface. Collection and snapshot/live/cleanup purposes have disjoint argument types and entry methods. Do not create a generic event bus that loses those distinctions.
 

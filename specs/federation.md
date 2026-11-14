@@ -18,11 +18,11 @@ Given an enrollment token used once or a connector from another cluster, when re
 
 Each connector holds one outbound, multiplexed HTTP/2 (or gRPC) connection to the hub with mutual TLS. Commands, cluster-state pushes, events, results, live rows and download bytes are streams on that connection. A SQL row names the hub replica that holds a cluster's connection; other replicas route to it. Internal payloads use versioned JSON contracts; this is an implementation protocol, not a new external agent interface.
 
-The connector pushes the cluster state the hub needs (namespaces, workloads, Pods, EndpointSlices, AccessBindings, permission sources) from its informers when it changes. After a reconnect it compares a digest with the hub and resends only on mismatch.
+The connector pushes the cluster state the hub needs (namespaces, workloads, Pods, EndpointSlices, AccessBindings, permission sources, namespace CaptureProfiles and local retention policies) from its informers when it changes. It also runs the trigger detectors on those informers, `pods/log?follow=true` streams and its Alertmanager webhook receiver, and pushes only occurrences ([triggers](triggers.md)). After a reconnect it compares a digest with the hub and resends only on mismatch.
 
 The hub stores active work in SQL and signals the connection-holding replica with `NOTIFY` in the writing transaction; that replica sends the work on the connection. Each work item binds `workID`, `operationID`, cluster UUID, target and plan digests, the authorizing grant/reservation and an expiry. Delivery is at least once. Work transitions are `Queued → Sent → Running → terminal`. After a reconnect the hub resends every non-terminal item. The connector records each accepted `workID` in its bounded local state before any intrusive start, deduplicates resent work against it and reports the current state. Intrusive work that may have started stays `Indeterminate` until the connector reports the outcome for that start. Result references survive reconnects.
 
-Liveness is the open connection. The hub records `connected_since` and `disconnected_at` on connection events and a last-seen time at most once per minute. A cluster is offline when its connection has been closed for the grace period (default 60 seconds, tunable). Policy acknowledgements are visible as `status.observedGeneration`.
+Liveness is the open connection. The hub records `connected_since` and `disconnected_at` on connection events and a last-seen time at most once per minute. The console shows a cluster as offline once its connection has been closed for 60 seconds; this is a display status, not an authority bound. Started sources run to their admitted hard ends while disconnected, and pending stops are delivered on reconnect. Policy acknowledgements are visible as `status.observedGeneration`.
 
 Support hub/connector N and N-1 minor compatibility within the same API major, with capability negotiation. Unknown required actions or fields fail explicitly.
 
@@ -70,6 +70,6 @@ Events MUST be SQL outbox rows committed with their hub case/grant/share transit
 
 ### SC-EVT-002
 
-Given a receiver that acknowledges then drops its connection before the sender sees the response, when Asservat retries, then the event ID is unchanged. Evidence remains committed and the outbox accurately reports the uncertain delivery.
+Given a receiver that acknowledges then drops its connection before the sender sees the response, when Asservat retries, then the event ID is unchanged. Evidence remains committed and the outbox accurately reports the unknown delivery outcome.
 
 The [internal interfaces](../docs/architecture/interfaces.md) refine these rules into the hub/connector and collector-to-connector protocols, strict purpose-bound control DTOs and separate transient live exchange. Work and start identities follow [REQ-ARC-003/004](implementation-architecture.md); protocol acceptance is not proof of action start or evidence commit.

@@ -27,11 +27,11 @@ No row returned means `CapacityUnavailable`. The charge covers ADR-048's worst-c
 
 ## Integrity and visibility
 
-The writer computes each object's SHA-256 while streaming and sends it as the S3 `x-amz-checksum-sha256` checksum, so the store rejects a corrupted upload. `StoreCopies` records each object's identity, version, length and checksum in one transaction with its outbox event. The resulting state is `stored_unpublished`. It is not a catalog entry, a grant or permission to unwrap or download.
+The writer computes each object's SHA-256 while streaming and sends it as the S3 `x-amz-checksum-sha256` checksum, so the store rejects a corrupted upload. `StoreCopies` records each object's identity, version, length and checksum in one transaction with its outbox event. A stored copy is not a catalog entry, a grant or permission to unwrap or download.
 
 The configured store UUID must match the registration. Absence or a copy on another bucket never releases or publishes this store's charge.
 
-[Manifest verification](manifest-verification.md) checks the small envelope, manifest and index before publication; data frames are authenticated by their AEAD tag when read. Publication ([context publication](context-publication.md)) requires that verification, the current operation's authorization and its SQL audit row; a custody status alone never confers visibility.
+The regional reader checks the envelope, manifest and index before publication ([manifest verification](manifest-verification.md)); data frames are authenticated by their AEAD tag when read. Publication ([context publication](context-publication.md)) requires that verification, the stored deadlines and its `audit_event` row in the publishing transaction; a custody status alone never confers visibility.
 
 SQL holds opaque identities and ciphertext checksums, never evidence bytes, native hashes, plaintext keysets or full manifests.
 

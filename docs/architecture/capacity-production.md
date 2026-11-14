@@ -46,8 +46,8 @@ Each workload account holds byte and object counters for live evidence and a
 count of retained capture metadata rows ([context control capacity](context-control-capacity.md)).
 Admission charges them with a conditional update (`WHERE used + n <= limit`);
 deleting evidence or metadata releases the charge. An effect whose outcome is
-unknown is resolved by its idempotency key (D7); there is no permanent
-uncertain charge and no prepayment of WAL, backup or audit volume.
+unknown is resolved by its idempotency key and its charge is released when the
+outcome is known (D7).
 
 Pool rows hold the pool's protected total and shared burst counters. Parent
 envelopes subtract unused protected allocations of their children before

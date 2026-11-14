@@ -18,7 +18,7 @@ An intrusive `onTrigger` effect starts at most once. The start right is one hub 
    One returned row is `MayStart`. Zero rows means the right was already consumed, expired or never existed; the caller reads the row to learn which.
 3. **Terminal.** Completion, failure or expiry records the outcome and releases unused charges (D7).
 
-The executor reaches this update through its existing connection: collector → connector stream → hub. A lost reply is resolved by reading the row by attempt ID. Only the reply of the successful update authorizes the effect; a later read of `StartCommitted` never does. A crash between consumption and the effect may lose evidence; it never justifies a second start.
+The executor reaches this update through its existing connection: collector → connector stream → hub. The connector keeps per-attempt state only in memory, keyed by the operation ID, and rebuilds it from the hub after a restart. A lost reply is resolved by reading the row by attempt ID. Only the reply of the successful update authorizes the effect; a later read of `StartCommitted` never does. A crash between consumption and the effect may lose evidence; it never justifies a second start.
 
 `StartCommitted` means only that the right was consumed. It does not prove that a process began, a capture succeeded or evidence was committed. The executor still checks the returned deadline immediately before the effect and holds local process exclusion. No HTTP handler accepts an arbitrary `execution.Request` as authority.
 

@@ -3,9 +3,9 @@
 C-04 with C-21 SQL/PKI adapters under TASK-03, S-01 and REQ-FED-001/002. A
 connector obtains its cluster identity from a one-use bootstrap token and a
 certificate signing request, following kubelet TLS bootstrapping and Open
-Cluster Management registration (ADR-330 D3). Bootstrap issuance
-creates the token; connector PKI signs; [peer identity](peer-identity.md)
-checks the certificate on every connection.
+Cluster Management registration (ADR-330 D3). The hub creates the token
+([connector identity](connector-credentials.md)), the installation CA signs and
+[peer identity](peer-identity.md) checks the certificate at each handshake.
 
 ## Bootstrap token
 

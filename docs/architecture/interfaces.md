@@ -6,7 +6,7 @@ Public browser/MCP operations and schemas are in the [interface package](../inte
 
 Internal control uses versioned strict JSON over mutual TLS. Enforce wire limits before decoding; reject duplicate keys, nonfinite numbers, malformed UTF-8, unknown fields and ambiguous normalization. Never put an arbitrary callback, object URL, shell command or evidence row in a control message. Protected references resolve only inside a configured pool and authorized region; they are not bearer capabilities.
 
-The [internal-work/v1 schema](../../specs/contracts/internal-work.schema.json) defines disjoint purposes and their receipts. `operationId` is the idempotency key of the parent operation; action `attemptId`, recording `snapshotId` and analysis `stageGeneration` identify effects independently of delivery. `scopeDigest` binds the accepted scope and `notAfter` caps a new start. The receiver resolves authority, budget and audit state from the hub's SQL rows for that ID; a reference's presence is not proof. No generic "execute this payload" handler exists. Work messages are not signed: the mutually authenticated connection identifies the sender (D2).
+The [internal-work/v1 schema](../../specs/contracts/internal-work.schema.json) defines disjoint purposes and their receipts. `operationId` is the idempotency key of the parent operation; action `attemptId`, recording `snapshotId` and analysis `stageGeneration` identify effects independently of delivery. `scopeDigest` binds the accepted scope and `notAfter` caps a new start. The hub authorized the operation once at admission and recorded its charge and audit row in SQL under that ID; the receiver deduplicates by ID and never treats a reference's presence as authority. No generic "execute this payload" handler exists. Work messages are not signed: the mutually authenticated connection identifies the sender (D2).
 
 | Purpose | Payload | Required receiver behavior |
 | --- | --- | --- |
@@ -28,7 +28,7 @@ Each connector holds one outbound, multiplexed HTTP/2 connection to the hub with
 
 Negotiation binds peer build identity, protocol major/minor, supported action/projection schema versions and maximum byte/item limits. Hub and connector support N/N-1 minors of one major; required capabilities fail explicitly and no downgrade omits a limit.
 
-Work is pushed: a hub transaction that makes work eligible issues `NOTIFY`, and the replica holding the connection sends it on the command stream. After a reconnect the connector resumes from its last acknowledged sequence. One work message is at most 128 KiB; its decoded control payload at most 64 KiB. Receipts are at most 64 KiB or 100 entries per message.
+Work is pushed: a hub transaction that makes work eligible issues `NOTIFY`, and the replica holding the connection sends it on the command stream. Work moves `Queued → Sent → Running` and then to a terminal state; `Sent` records the connection epoch. After a reconnect the hub resends every non-terminal item and the connector returns the existing state for a known `workID`. Commands carry no signatures. One work message is at most 128 KiB; its decoded control payload at most 64 KiB. Receipts are at most 64 KiB or 100 entries per message.
 
 Cluster state (namespaces, workloads, Pods, EndpointSlices, AccessBindings, permission sources) is pushed when it changes. After a reconnect the connector compares a digest and resends only on mismatch. HTTP/2 PING frames detect a dead connection; there is no separate heartbeat request.
 
@@ -38,17 +38,17 @@ Delivery is at least once. The connector acknowledges Accepted only after its du
 
 Each collector holds one mTLS connection to its regional connector, with the same work/receipt message family. The collector authenticates once per connection with its audience-bound projected ServiceAccount token, checked by TokenReview; the connector then issues its client certificate ([node collector](node-collector.md), D3). Node identity comes from the reviewed Pod's node, never from a request field. A collector credential cannot receive another node's work or resolve another source's references. One collector process per node; a replacement process's new connection supersedes the old one.
 
-Work kinds include `armSource`, `stopSource`, `snapshot`, `peerGeneration`, `packetSource` and `stopPacketSource`. Start consumption goes through the [start row](local-start.md). Typed ports `lookup-start`, `checkpoint-source` and `reconcile-spend` accept no CRD YAML or SQL.
+Work kinds include `armSource`, `stopSource`, `snapshot`, `peerGeneration`, `packetSource` and `stopPacketSource`. Start consumption goes through the [start row](local-start.md). Typed ports `lookup-start`, `checkpoint-source` and `report-usage` accept no CRD YAML or SQL.
 
-Node status is sent as a delta when a source, ring or accounting state changes. Live-viewing counters (active cohorts, buffered rows, scan and delivery totals, refused admissions, source-loss and dropped-row counts) are cumulative and included in those deltas; they carry no source, filter or payload labels. C-19 aggregates node totals per cluster; the browser-only `get_live_capacity` operation returns one selected cluster's aggregate to a fleet operator after one authorization. A first report or nonmonotonic counter marks rates incomplete.
+Node status is sent as a delta when a source, ring or accounting state changes. Live-viewing counters (active cohorts, buffered rows, scan and delivery totals, refused admissions, source-loss and dropped-row counts) are cumulative and included in those deltas; they carry no source, filter or payload labels. C-19 aggregates node totals per cluster for fleet status. A first report or nonmonotonic counter marks rates incomplete.
 
-Ongoing sources continue within their admitted resources while the connector is disconnected. A new intrusive start needs its start row, so it waits for the hub. Natural-core acceptance is the prepared path in I-03. Multi-node admission may produce partial outcomes; it is not atomic across nodes.
+A started source runs to its admitted hard end while the connector is disconnected; a pending stop is delivered on reconnect. While disconnected, natural cores (I-03) and policy-triggered starts spend only the connector's budget lease under unexpired local policy permits; other new intrusive starts need their hub `capture_start` row and wait for the connection. Multi-node admission may produce partial outcomes; it is not atomic across nodes.
 
 ### I-03 — Host core handoff
 
 Use an installation-owned Unix-domain stream socket with restricted ownership/mode and peer credentials. The helper verifies the collector peer; the collector verifies the helper and resolves the kernel-provided process identifiers itself. No caller-supplied executable path or argument becomes authority.
 
-A fixed-version header of at most 4 KiB carries numeric IDs, process start identity when available and a nonce. The node refuses promptly or returns an acceptance tied to one prepared envelope, spend allocation and byte/time limit. Only then consume bytes, with bounded backpressure and a hard close deadline. No remote call occurs while the crashed process is held. The encrypted spool has its own budget. Exact Linux header/pidfd behavior is a required native-core spike; socket credentials alone do not solve PID reuse.
+A fixed-version header of at most 4 KiB carries numeric IDs, process start identity when available and a nonce. The node refuses promptly or returns an acceptance tied to one prepared envelope, a budget-lease allocation and a byte/time limit. Only then consume bytes, with bounded backpressure and a hard close deadline. No remote call occurs while the crashed process is held. The encrypted spool has its own budget. Exact Linux header/pidfd behavior is a required native-core spike; socket credentials alone do not solve PID reuse.
 
 ### I-04 — Gadget observation
 
@@ -56,9 +56,9 @@ The C-23 adapter drives pinned approved gadget definitions through the engine li
 
 ### I-07 and I-12 — Live delivery and ingress routing
 
-A-HWORK owns a LiveWatch's projection; SQL stores only control state and charges. The owner holds at most sixteen source references and sixteen typed predicates in memory and never writes details into SQL or audit rows ([ADR-310](../decisions/310-finite-approved-live-observation.md)).
+SQL stores a LiveWatch's control state (filter, view revision, deadline) and charges. A view holds at most sixteen source references and sixteen typed predicates and never writes rows into SQL or audit rows ([ADR-310](../decisions/310-finite-approved-live-observation.md)).
 
-Live rows arrive on the connector's live stream (I-01) at the replica holding the connection. Any A-HAPI replica accepts the viewer's request; if another replica owns the watch, it forwards over hub mTLS using the owner's SQL row (I-12). The browser receives rows over one Server-Sent Events stream per page; MCP waits server-side up to 30 seconds and returns on the first batch. The viewer is authorized once per operation (D5). Rows carry their original observation/expiry/coverage metadata; there is no durable replay, SQL row per event or outbox body. Bounded queues drop with a recorded gap or close; a slow viewer never backs up acquisition. If the owner replica is gone, the watch closes with a terminal batch and the viewer reopens it. A view that would violate region policy is rejected.
+Live rows arrive on the connector's live stream (I-01) at the A-HAPI replica holding the connection. Any A-HAPI replica accepts the viewer's request; if another replica holds the connection, the viewer's replica opens the row stream from it over hub mTLS, found through the connection's SQL row (I-12). There is no separate projection owner. The browser receives rows over one Server-Sent Events stream per page; MCP waits server-side up to 30 seconds and returns on the first batch. The viewer is authorized once per operation (D5). Rows carry their original observation/expiry/coverage metadata; there is no durable replay, SQL row per event or outbox body. Bounded queues drop with a recorded gap or close; a slow viewer never backs up acquisition. If the connection moves to another replica, the stream reports a gap and resumes from the current source head. A view that would violate region policy is rejected.
 
 ## In-process and staged contracts
 
@@ -74,7 +74,7 @@ C-18 owns one stage-generation state machine. C-15 registers input/output volume
 
 C-01 consumes Kubernetes objects through shared informers and keeps each object's resourceVersion. The cache stays valid until a watch event replaces it; a watch failure marks it unavailable until the relist completes. Remote clusters push the same objects through I-01. Permission writes use Kubernetes RBAC; previews never become an alternate configuration store.
 
-The [identity/eligibility facet](identity-eligibility.md) defines `TokenVerifier`, `PolicyReader`, `ProjectionReader` and `AudienceReader`. `Result.ContributingAssignments` explains one caller's eligibility; it is not an execution permit or the audience to persist. Ordinary scope checks precede artifact lookup. The [permission observation](permission-observation.md) facet supplies bindings, denies and namespace metadata from the informer cache.
+The [identity/eligibility facet](identity-eligibility.md) defines `TokenVerifier`, `PolicyReader`, `ProjectionReader` and `AudienceReader`. The eligibility result names the contributing bindings and sources for one caller; it is not an execution permit or the audience to persist. Ordinary scope checks precede artifact lookup. The [permission observation](permission-observation.md) facet supplies bindings, denies and namespace metadata from the informer cache.
 
 ### I-09 — Transactional facets
 
@@ -116,4 +116,4 @@ Downloads and stored-evidence queries are served by the long-running regional re
 
 ### I-14 — Private local key operations
 
-[Local key service](local-key-service.md): the optional A-KEY mTLS wrap/unwrap/sign boundary ([ADR-065](../decisions/065-local-key-service-boundary.md)). It carries key material and signing inputs, never artifact payloads.
+[Local key service](local-key-service.md): the optional A-KEY mTLS wrap/unwrap boundary ([ADR-065](../decisions/065-local-key-service-boundary.md)). Unwrap is authorized by the caller's mTLS role (`download-reader`, the A-READ regional reader) and the AEAD binding of the wrapped keyset; there is no hub ticket or per-call SQL lookup. It carries key material, never artifact payloads.

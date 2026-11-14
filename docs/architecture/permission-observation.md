@@ -13,19 +13,21 @@ and [ADR-330](../decisions/330-event-driven-system-design.md) D1, D5, D6, D11.
 | Source | Where it lives | Who writes it |
 | --- | --- | --- |
 | AccessBinding | The application namespace it grants access to, in the workload's cluster | Anyone ordinary namespace RBAC lets write AccessBindings there |
-| AccessBinding with `spec.automation` (ADR-059) | Hub namespace | Asservat administrators only (ADR-328) |
-| PermissionSource (`namespaceMetadata`, `workloadMetadata`, `groupID`, `kubernetesExec`, `kubernetesAccessReview`) | Hub namespace | Asservat administrators only |
+| AccessBinding with `spec.automation` (ADR-059) | The application namespace it grants access to | Namespace writers who also hold `bind` on `accessroles.asservat.io` named `automation` |
+| PermissionSource (`namespaceMetadata`, `workloadMetadata`, `groupID`, `kubernetesExec`, `kubernetesAccessReview`) | Hub control namespace | Asservat administrators only (ADR-328) |
 
 A binding's scope is its own namespace, optionally narrowed to named
-workloads; it names no cluster or namespace UID. The connector ignores
-`spec.automation` on bindings outside the hub namespace and reports such a
-binding as invalid. Cluster-wide or multi-namespace grants use
-PermissionSources.
+workloads; it names no cluster or namespace UID. A Helm-rendered
+ValidatingAdmissionPolicy requires `bind` on `accessroles.asservat.io` for
+each role a binding adds or changes, and `bind` on `automation` for an added
+or changed `spec.automation`; the chart never aggregates `automation` into
+`admin` ([REQ-PER-001](../../specs/permissions.md)). Cluster-wide or
+multi-namespace grants use PermissionSources.
 
 The generated structural CRDs and their reviewed CEL rules validate shape
 only (`make permission-crd-check`). Who may write a resource is decided by
-Kubernetes RBAC; there is no delegation envelope, permission admission
-policy, dry-run probe, bootstrap review object or namespace UID pin.
+Kubernetes RBAC and the `bind` admission policy above; there is no
+delegation envelope, dry-run probe, bootstrap review object or namespace UID pin.
 Namespace labels that `namespaceMetadata` sources read are protected by the
 Helm-installed admission policies of ADR-247; Asservat does not prove those
 policies at runtime. Status fields, field managers and annotations never
@@ -36,8 +38,8 @@ confer authority.
 Each region's connector runs client-go shared informers for AccessBindings in
 its cluster and for the namespace labels and workload metadata that accepted
 PermissionSources select (only the selected keys are kept; values are
-SHA-256 digests). The hub-worker runs informers for hub-namespace
-AccessBindings and PermissionSources. An informer LISTs once and then
+SHA-256 digests). The hub-worker runs informers for PermissionSources in
+the hub control namespace. An informer LISTs once and then
 WATCHes; it relists only after a watch restart or `410 Gone`. Its cache stays
 valid while the informer is synced and becomes unavailable only when the
 watch is lost and the relist has not completed.
@@ -76,9 +78,10 @@ their status from the connector once the hub acknowledges the push.
 A PermissionSource spanning namespaces records one basis per namespace or
 workload and keeps the source UID as provenance. A source whose inputs are
 unavailable (watch lost, connector disconnected) keeps its rows and grants
-nothing until the informer is synced again. Deny state for a cluster is
-unavailable under the same condition, and allow evaluation for that cluster
-fails closed.
+nothing until the informer is synced again. The deny set is fed by the same
+watch events and pushes and stays valid until replaced; when it is
+unavailable, allow evaluation for that cluster fails closed. No interval
+renews or expires it.
 
 ## Evaluation
 
@@ -105,16 +108,16 @@ sources match one workload per basis.
 `kubernetesExec` and `kubernetesAccessReview` sources carry no subjects. For
 an operation on a Pod, C-03 asks the target cluster's connector whether the
 principal holds the configured Kubernetes permission (for exec,
-`create pods/exec`) on that Pod. The connector answers from an in-memory
-SubjectAccessReview cache (allow 5 minutes, deny 30 seconds, as the
-Kubernetes webhook authorizer caches) and runs a SubjectAccessReview on a
-miss. An allow adds a `Reviewed` user allow for that principal and Pod to the
+`create pods/exec`) on that Pod. The connector caches an allowed review per
+(principal, groups, attributes) for at most `identity.AuthorityRecheckInterval`
+(30 s, ADR-311); denials are not cached; a miss runs a SubjectAccessReview.
+This is the only time-bounded permission cache. An allow adds a `Reviewed` user allow for that principal and Pod to the
 current evaluation only; nothing is stored per decision. The operation that
 used the decision records it in its own audit row.
 
 ## Automation envelopes
 
-An automation-bearing AccessBinding in the hub namespace carries the typed
-envelope of ADR-059 ([policy-automation.md](policy-automation.md)). The
+An automation-bearing AccessBinding in an application namespace carries the
+typed envelope of ADR-059 ([policy-automation.md](policy-automation.md)). The
 envelope is part of the accepted basis and of the audit row; editing it
 changes the basis immediately for later policy evaluations.

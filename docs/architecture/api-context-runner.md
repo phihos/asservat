@@ -7,7 +7,7 @@ needs no Node, exec, Secret, log or container access.
 ## Flow
 
 1. The hub records one `context_execution` row with an operation ID, the
-   accepted expectation, the Pod/owner pin and the intent digest, together with
+   accepted expectation, the Pod/owner pin and the `plan_digest`, together with
    the per-workload storage charge and an audit row, in one SQL transaction
    (ADR-330 D6/D7). Concurrent requests with the same idempotency key receive
    the same row.

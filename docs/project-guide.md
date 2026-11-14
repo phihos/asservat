@@ -86,7 +86,7 @@ The [original brief](research/original-brief.md) is preserved verbatim for prove
 
 `make spec-check` checks local links, JSON/YAML syntax, schema-backed examples, requirement/scenario/task references, and contract consistency. See [the specification format](specification-format.md) for the development-only validator dependencies. This command is not a runtime or Kubernetes feasibility test.
 
-`make architecture-check` adds component/dependency ownership, internal control-contract examples and synthetic retry/fencing checks. `make design-check` checks the domain, screens and browser/MCP contract mapping. These gates validate the design. `make go-check` and `make go-architecture-check` validate the implemented Go components; `make context-integration` creates owned real-service fixtures for their integration test. None establishes a complete production investigation.
+`make architecture-check` adds component/dependency ownership, internal control-contract examples and synthetic retry/idempotency checks. `make design-check` checks the domain, screens and browser/MCP contract mapping. These gates validate the design. `make go-check` and `make go-architecture-check` validate the implemented Go components; `make context-integration` creates owned real-service fixtures for their integration test. None establishes a complete production investigation.
 
 `make custody-integration` creates owned PostgreSQL/S3 fixtures for storage-accounting races and verified version/multipart cleanup. `make sql-tools` installs pinned development tools; `make sql-check` detects generated query drift. Set `TMPDIR` to a filesystem with adequate space when building Go; on this workstation use `/home/phil/.cache/asservat-build/tmp`.
 
@@ -106,4 +106,4 @@ The [review from user outcomes](reviews/user-task-review.md) records additional 
 
 `make helm-check` validates and packages the official chart without a cluster. `make helm-integration` creates and removes its own Kind cluster to test the chart's configuration install/upgrade/rollback/uninstall lifecycle and preserved custom resources. Neither enables collection.
 
-[Native download sessions](architecture/download-sessions.md) now pass bounded SQL/S3/HTTPS component tests, including current permission fencing, encrypted intent/outcome audit, partial/full file recovery and a checksum-verified synthetic local file. This does not enable public downloads: browser/OAuth ingress, production authority/retention/restore composition and regional relay remain required.
+[Native download sessions](architecture/download-sessions.md) describe how the regional reader streams downloads over the connector connection; [implementation progress](implementation-progress.md) records what has been qualified.

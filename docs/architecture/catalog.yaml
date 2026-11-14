@@ -371,7 +371,7 @@ components:
   - C-12
   - C-14
   - C-24
-  responsibility: Local durable start disposition, bounded action DAG, target recheck and cancellation.
+  responsibility: Start disposition by operation ID (`capture_start` row), bounded action DAG, target recheck and cancellation.
   provided_ports:
   - ExecutionDispatcher
   - StartJournal
@@ -388,7 +388,7 @@ components:
   - C-08
   - C-15
   - C-24
-  responsibility: Fenced ongoing source sessions, rings, snapshot pinning, coverage and stopped-source grace.
+  responsibility: Ongoing source sessions run to their admitted hard end, rings, snapshot pinning, coverage and stopped-source grace (REQ-LIF-006).
   provided_ports:
   - SourceManager
   - SnapshotExecutor
@@ -494,7 +494,7 @@ components:
   - C-08
   - C-15
   - C-24
-  responsibility: Manager assignments, concrete shares, bounded future materialization and revocation.
+  responsibility: Share manager groups, concrete shares, capture-time share materialization and revocation.
   provided_ports:
   - SharingService
   - SharingFacet
@@ -667,7 +667,7 @@ interfaces:
   name: Node control
   caller: A-NODE
   provider: A-CONN
-  transport: outbound-mtls-json
+  transport: outbound-mtls-streams
   spec: docs/architecture/interfaces.md
   schema: specs/contracts/internal-work.schema.json
 - id: I-03
@@ -698,8 +698,8 @@ interfaces:
 - id: I-07
   name: Live delivery
   caller: A-CONN
-  provider: A-HWORK
-  transport: outbound-mtls-transient
+  provider: A-HAPI
+  transport: connector-connection-stream
   spec: docs/architecture/interfaces.md
   schema: specs/contracts/live-watch.schema.json
 - id: I-08
@@ -727,16 +727,17 @@ interfaces:
   transport: in-process-and-bounded-child
   spec: docs/architecture/interfaces.md
 - id: I-12
-  name: Ingress to live owner
+  name: Live stream routing between hub replicas
   caller: A-HAPI
-  provider: A-HWORK
-  transport: same-cluster-mtls-json
+  provider: A-HAPI
+  transport: same-cluster-mtls-stream
   spec: docs/architecture/interfaces.md
   schema: specs/contracts/live-watch.schema.json
 - id: I-13
-  name: Native artifact transient relay
+  name: Native artifact byte stream
   caller: A-READ
   provider: A-HAPI
+  transport: connector-connection-stream
   spec: docs/architecture/interfaces.md
   schema: specs/contracts/artifact-download.schema.json
 - id: I-14

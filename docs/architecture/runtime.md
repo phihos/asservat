@@ -37,9 +37,9 @@ A lost submit response is resolved with the original idempotency key. A submit w
 
 C-01 accepts policy/profile generations and executor provenance. C-06 compiles detector and source activation separately from the incident graph. C-10 resolves all authorized replicas under the administrator ceiling; C-07 independently reserves observation resources and smaller incident resources. C-12 arms each admitted source once and reports Warming/Ready/Degraded with actual coverage. Optional source failure cannot suppress independent useful context.
 
-C-10 consumes bounded log/resource/probe/exit/alert signals, applies event/level/rearm/correlation rules, and coalesces repeated matches. An admitted occurrence selects contributing pods and allocates stable incident/action/snapshot identities. C-11 checks the policy's local permit and quota counters, pins the existing source window around original t0 and dispatches eligible onTrigger work. Policy permits allow this local admission during bounded hub disconnection; subsequent hub import uses the cluster occurrence identity and never repeats the effects.
+C-10 consumes bounded log/resource/probe/exit/alert signals, applies event/level/rearm/correlation rules, and coalesces repeated matches. An admitted occurrence selects contributing pods and allocates stable incident/action/snapshot identities. C-11 checks the policy's local permit and quota counters, pins the existing source window around original t0 and dispatches eligible onTrigger work. During a hub disconnection this local admission spends only the connector's budget lease under unexpired permits; subsequent hub import uses the cluster occurrence identity and never repeats the effects.
 
-If 1,000 matches arrive during cooldown, the suppression counter changes; there are not 1,000 core jobs or ring allocations. C-07 protects other workloads' allocations and prioritizes admitted snapshots over live readers. C-12 continues recording under its own lease while each admitted snapshot has a separately charged frozen/upload budget. Missing history is reported; post-window time is not shifted to when upload becomes available. See [triggers](../../specs/triggers.md), [capacity](../../specs/capacity.md) and [action lifecycles](../../specs/action-lifecycle.md).
+If 1,000 matches arrive during cooldown, the suppression counter changes; there are not 1,000 core jobs or ring allocations. C-07 protects other workloads' allocations and prioritizes admitted snapshots over live readers. C-12 continues recording under its admitted source session while each admitted snapshot has a separately charged frozen/upload budget. Missing history is reported; post-window time is not shifted to when upload becomes available. See [triggers](../../specs/triggers.md), [capacity](../../specs/capacity.md) and [action lifecycles](../../specs/action-lifecycle.md).
 
 ## R-03 — Local start and ambiguous retry
 
@@ -59,7 +59,7 @@ sequenceDiagram
 
 Every effect carries an operation ID stored with it. A retry with the same ID returns the existing outcome; it never starts the effect again. An outcome left unknown by a crash is reported as Indeterminate for that operation and the charge is released once the node reports the outcome or the operation's deadline ends. An explicit new capture is a new user/policy decision with a new operation ID, subject to current budgets. No public phase enum is added.
 
-C-11 owns local start records; C-07 owns the per-workload counters; C-09 owns hub attempt projections. Counters change with conditional updates on the affected workload row. Deadline expiry invalidates new starts but does not prove an old start was cancelled. Revocation and Stop reach a running collector as pushed events over its connection; during a hub disconnection the existing finite permit expiry bounds it.
+C-11 owns local start records; C-07 owns the per-workload counters; C-09 owns hub attempt projections. Counters change with conditional updates on the affected workload row. Deadline expiry invalidates new starts but does not prove an old start was cancelled. Revocation and Stop reach a running collector as pushed events over its connection; during a hub disconnection a started source runs to its admitted hard end and a pending stop is delivered on reconnect.
 
 ## R-04 — Save existing recordings now
 
@@ -69,7 +69,7 @@ C-12 freezes the available intersection of requested lookback and source coverag
 
 ## R-05 — Natural crash while remote services fail
 
-Before readiness, C-11/C-14 prepare a finite pool of unique prewrapped encryption envelopes backed by accepted policy authority and C-07 quota. C-22 receives a kernel crash invocation, verifies the local socket peer and passes numeric identity to C-11. Local checks either consume a prepared single-use slot or refuse promptly. Accepted bytes are bounded and immediately encrypted into the admitted spool; remote upload can occur after process handoff ends.
+Before readiness, C-11/C-14 prepare a finite pool of unique prewrapped encryption envelopes backed by unexpired policy permits and the connector's budget lease. C-22 receives a kernel crash invocation, verifies the local socket peer and passes numeric identity to C-11. Local checks either consume a prepared single-use slot or refuse promptly. Accepted bytes are bounded and immediately encrypted into the admitted spool; remote upload can occur after process handoff ends.
 
 A pool entry is single-use and cannot be restored after collector-state loss; a restarted collector prepares a new pool. If KMS, hub, DNS, S3 and Kubernetes are all down, no synchronous refill occurs on the crash path. Pool exhaustion rejects the stream; subsequent loss reporting is content-minimized and bounded. A crashArtifact signal references this already acquired core rather than acquiring it again. OOM/SIGKILL is not evidence of a core. See [natural-core architecture](../architecture.md#natural-core-readiness-without-remote-crash-path-waits).
 
@@ -84,9 +84,9 @@ sequenceDiagram
   participant J as Staged Jobs
   E->>L: Register pending copies and earliest deadlines
   E->>S: Encrypt/upload bounded objects and protected manifest
-  E->>S: Verify committed identities and integrity
-  E->>L: Reconcile actual copies/charges
-  E->>E: Finalize artifact/lineage and publication eligibility
+  E->>S: Regional reader verifies envelope, manifest and index
+  E->>L: Publish in one transaction; settle charge to actual size
+  E->>E: Artifact/lineage, audit row, NOTIFY
   A->>L: Register encrypted input/output scratch copies
   A->>J: Acquire exact inputs with scoped credentials
   J-->>A: Acquisition stopped and unmounted
@@ -97,11 +97,11 @@ sequenceDiagram
   A->>L: Schedule independent scratch cleanup
 ```
 
-An uploaded object awaiting commit is an accounted pending copy, not catalog-visible evidence. C-14 verifies object/manifest identity before final publication. SQL and object storage are reconciled state machines, not one transaction. C-16 indexes only approved committed projections under current access and region rules.
+An uploaded object awaiting commit is an accounted pending copy, not catalog-visible evidence. Publication requires the reader's envelope, manifest and index verification; data frames are authenticated by AEAD on every read. SQL and object storage are not one transaction: an object without a published row is resolved by its operation ID or deleted. C-16 indexes only approved committed projections under current access and region rules.
 
-A stuck analyzer, uncertain volume detach or malicious output tree prevents publication and remains in the copy ledger. C-18 may retry a qualified idempotent offline analysis under the same parent/deadline with a new fenced stage generation; it cannot repeat the original live collection. Raw query grants remain per-principal/purpose/limits. A completed Job does not grant access to raw bytes. See [evidence](../../specs/evidence.md) and [runtime profiles](../../specs/profiles.md).
+A stuck analyzer, unconfirmed volume detach or malicious output tree prevents publication and remains in the copy ledger. C-18 may retry a qualified idempotent offline analysis under the same parent/deadline with a new fenced stage generation; it cannot repeat the original live collection. Raw query grants remain per-principal/purpose/limits. A completed Job does not grant access to raw bytes. See [evidence](../../specs/evidence.md) and [runtime profiles](../../specs/profiles.md).
 
-## R-07 — Live view, slow reader and owner failover
+## R-07 — Live view, slow reader and connection failover
 
 C-13 inventories existing sources and opens an explicitly bounded view after maintainer/source-audience/current-executor checks. C-07 reserves independent projection/transfer/fanout resources. No source activation is part of this command. Node projection reads only approved fields and delivers bounded transient batches as a stream on the connector's hub connection; the browser receives them over one Server-Sent Events stream. The view is authorized once when opened and runs to its original bounds; Stop, revocation and expiry reach it as events.
 
@@ -111,9 +111,9 @@ Rows are never stored in SQL. If the hub replica holding the connection fails, t
 
 ## R-08 — Multiple owner teams and future sharing
 
-C-17 accepts resolved manager/recipient identities and a concrete selection or explicitly bounded future instruction. The immutable creator remains distinct. Capture acceptance registers a finite publication slot when sharing can be authorized; otherwise normal collection can proceed with SharingUnavailable. C-14 commits artifacts, and C-17 materializes only matching authorized projections after current manager, parent, grant, lineage and deadline checks. Each share change writes its audit row in the same transaction.
+C-17 accepts resolved manager/recipient identities and a concrete selection or explicitly bounded future instruction. The immutable creator remains distinct. Capture acceptance stores the share instruction with the capture. When C-14 publishes an artifact, the same transaction materializes only matching authorized projections after manager, parent, grant, lineage and deadline checks. Each share change writes its audit row in the same transaction.
 
-Stopping future publication does not revoke existing concrete children. Revoking an instruction first commits parent denial, then cleans up dependent child shares. C-03 checks that parent when each dependent read operation is authorized, so delayed cleanup cannot preserve access through that path. An unrelated independent entitlement remains separately evaluated. Manager transfer cannot extend retention, mint fresh publication slots or turn ownership into raw access. See [sharing](../../specs/authorization.md).
+Stopping future publication does not revoke existing concrete children. Revoking an instruction first commits parent denial, then cleans up dependent child shares. C-03 checks that parent when each dependent read operation is authorized, so delayed cleanup cannot preserve access through that path. An unrelated independent entitlement remains separately evaluated. Manager transfer cannot extend retention or turn ownership into raw access. See [sharing](../../specs/authorization.md).
 
 ## R-09 — Expiry, storage failure and fair capacity
 
@@ -138,9 +138,9 @@ A changed namespace UID or source definition cannot inherit its namesake's autho
 | Node/collector loss | C-11 / C-12 | Explicit coverage gap; unknown outcomes resolved by operation ID |
 | Interrupted upload / KMS outage | C-14 / C-15 | Bounded encrypted pending copies, no plaintext fallback |
 | Analyzer or volume handoff uncertainty | C-18 / C-15 | Fence stage, retain tracked volumes until safe cleanup |
-| Slow/expired live client | C-13 | Bounded gaps/close and short row expiry; no durable rows |
+| Slow/expired live client | C-13 | Bounded gaps/close; rows end at min(privacy deadline, watch deadline); no durable rows |
 | Watch lost for identity / config source | C-03 / C-01 | Deny dependent starts/reads until the relist completes |
-| SQL outage / restore | C-21 / C-04 | New effects disabled until reconciled; local finite permits and cleanup only |
+| SQL outage / restore | C-21 / C-04 | New effects disabled until reconciled; only the connector's budget lease, unexpired local permits and cleanup |
 | Deletion not verified | C-15 / C-07 | Denied reads, retained charge and explicit overdue remediation |
 
 Runtime tests must exercise these boundaries with actual processes, storage and network failures. The architecture gate only checks documented contracts and synthetic state transitions.
@@ -151,4 +151,4 @@ A maintainer or authorized recipient selects an existing artifact. C-14 authoriz
 
 ## Combined review in the local-investigation flow
 
-Before the native-download flow, a manual capture can ask for collection plus selected output access. One reviewer binds both scopes. On each C-14 verified commit, C-03 idempotently materializes an existing-artifact child for each explicitly approved client of the same human. The parent pool is shared across children. Artifact download/query resolves the child automatically and checks parent, artifact and entitlement. Commit before grant publication shows “Evidence saved; access preparing” and retries publication only. Parent revocation stops output even before asynchronous child cleanup; capture budget exhaustion alone does not. Original expiry never moves. These are required fault cases, not a measured implementation.
+Before the native-download flow, a manual capture can ask for collection plus selected output access. One reviewer binds both scopes. The publication transaction of each verified commit creates an existing-artifact child for each explicitly approved client of the same human. The parent pool is shared across children. Artifact download/query resolves the child automatically and checks parent, artifact and entitlement. Parent revocation stops output even before child cleanup; capture budget exhaustion alone does not. Original expiry never moves. These are required fault cases, not a measured implementation.

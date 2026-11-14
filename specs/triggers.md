@@ -95,8 +95,7 @@ Given replica A logs an error while B is under memory pressure, when default pod
 The first implemented detectors run in each region's connector, for a hub-held DebugPolicy
 (`spec.target.cluster`) that runs the pod-status context recipe on the triggering Pod
 (`maxPods: 1`, `selection: triggeringPod`). No node agent is needed. They are event-driven
-([ADR-330](../docs/decisions/330-event-driven-system-design.md) D1, superseding the polling
-transport of ADR-228/230/231/241):
+([ADR-330](../docs/decisions/330-event-driven-system-design.md) D1):
 
 - The connector keeps shared informers (LIST once, then WATCH): one Pod informer per namespace
   with an active policy and, for probe policies, one Events informer per such namespace with field

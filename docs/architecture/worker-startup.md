@@ -1,7 +1,7 @@
 # Regional reader
 
 Downloads and stored-evidence queries are served by a long-running regional
-reader Deployment (A-ACQUIRE; a hub Deployment in combined mode)
+reader Deployment (A-READ; a hub Deployment in combined mode)
 ([ADR-330](../decisions/330-event-driven-system-design.md) D4). It is scaled
 by replicas. There is no Kubernetes Job, certificate or key slot per download
 or query.
@@ -11,7 +11,8 @@ or query.
 - The reader authenticates to the connector, or in combined mode to the hub,
   with an audience-bound projected ServiceAccount token. The receiver checks
   it once per connection with TokenReview ([peer identity](peer-identity.md)).
-  Server TLS uses the installation CA.
+  Server TLS uses the installation CA. Pod, workload settings and resource
+  limits are in [download reader deployment](download-worker-dispatch.md).
 - Each replica holds one long-lived HTTP/2 stream on which the hub pushes
   work (download, approved pod-status read, query). The reader reconnects only
   after a failure, with exponential backoff. It does not poll for commands.
@@ -28,8 +29,10 @@ reader:
 
 1. reads the encrypted object from the regional object store with its
    read-only store credentials,
-2. asks the key service (I-14) to unwrap the artifact's data key for that
-   session; the key service checks the session row in SQL once,
+2. asks the key service (I-14) to unwrap the artifact's keysets; the key
+   service authorizes by the reader's mTLS role (`download-reader`) and the
+   AEAD binding of the wrapped keyset, with no SQL lookup or ticket
+   ([local key service](local-key-service.md)),
 3. decrypts and streams the plaintext bytes,
 4. stops at the session's original bounds: caller session/token expiry,
    session deadline, `AccessUntil`, the stored retention cutoff, Stop or

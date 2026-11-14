@@ -6,16 +6,19 @@ capture visible in the catalog.
 ## Publish on commit
 
 The producer validates the native format before encryption and writes the
-data, index and manifest objects. When it reports the stored outcome, the hub
-publishes in one SQL transaction:
+data, index and manifest objects with streamed SHA-256 checksums. When it
+reports the stored outcome, the regional reader verifies the commit envelope
+and decrypts and checks the manifest and index against the accepted
+expectation (capture, attempt, scope, reservation;
+[manifest verification](manifest-verification.md)). The hub then publishes in
+one SQL transaction:
 
-1. Check each object's size and ETag/checksum from a HEAD against the commit
-   receipt and the accepted expectation (capture, attempt, scope, reservation).
-2. Insert the catalog entry with the stored effective retention deadlines.
-3. Write the audit row (D6) and `NOTIFY` capture progress.
+1. Insert the catalog entry with the stored effective retention deadlines.
+2. Settle the charge to the actual stored size.
+3. Write the `audit_event` row (D6) and `NOTIFY` capture progress.
 
-The hub does not decrypt the artifact to publish it; AEAD detects corruption
-when a reader decrypts it. A retry of the same outcome is idempotent on the
+Data frames are not reread for publication; each read authenticates every
+frame by AEAD. The hub itself never decrypts the artifact. A retry of the same outcome is idempotent on the
 capture and artifact IDs. A failed check leaves the output stored, charged and
 invisible until deletion.
 

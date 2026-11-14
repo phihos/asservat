@@ -20,8 +20,8 @@ the regional half of a context start. Identities are defined in
   is replaced on reconnect and removed on clean close; a row naming a replica
   that no longer exists is replaced by the next connection.
 - The connector reconnects only after the connection fails, with exponential
-  backoff (1 s doubling to 60 s, with jitter). There are no standby sockets,
-  idle pools or periodic re-dials.
+  backoff (1 s doubling to 60 s, with jitter). There is one connection per
+  cluster; no idle pools or periodic re-dials.
 - The first frame on the connection is `Hello`: cluster ID, connector
   version and a capability list. The hub sends only commands whose capability
   the connector announced. Decoders ignore unknown fields; a field whose
@@ -61,14 +61,15 @@ cluster-local operations: resolve Pod (or `resolve-packet-source` for a policy
 executor), read process, prepare/ready/consume start, prepare output, acquire
 context and complete stored. Plaintext and data keys stay in the region; only
 acquisition instants, copy receipts and a finite disposition cross. Native
-bytes and raw errors do not. Publication follows the separate verification,
-audit and catalog path.
+bytes and raw errors do not. Publication follows [context publication](context-publication.md).
 
 Each regional operation verifies the target Pod UID once at its effect and
 never substitutes a replacement Pod. A retry uses the same idempotency key;
 the region returns the stored outcome for a key it has already executed.
-An unknown outcome is resolved by looking the key up, not by charging it as
-spent ([ADR-330](../decisions/330-event-driven-system-design.md) D7).
+An unknown outcome is resolved by looking the key up ([ADR-330](../decisions/330-event-driven-system-design.md) D7).
+If the connection drops, the hub resends the accepted, non-terminal context
+start after the connector reconnects (I-01), and the region continues from
+the stored outcome of each operation it has already executed.
 
 `start-policy-recording` carries the SQL observation receipt and the exact
 source returned by `resolve-packet-source`. The region checks that the

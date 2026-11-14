@@ -66,8 +66,8 @@ An ongoing HTTP source must be explicitly authored and covered by its original
 reviewed observation grant. It uses the fixed 1,500-byte acquisition prefix and
 reserves its approved reassembly budget plus its ring before starting. An
 ordinary 134-byte network-header source cannot acquire this capability when a
-viewer opens. Source renewals retain the original grant, session end and wire-byte
-accounting; saving does not renew or flush the source.
+viewer opens. The source runs once to its admitted hard end under its original
+grant and wire-byte accounting; saving does not extend or flush it.
 
 For an ongoing source, the ring contains approved records and bounded,
 content-free counter deltas with the original event clock. Save selects these
@@ -97,7 +97,7 @@ Each network artifact records profile/projection and engine/compiler digests, li
 EXP-02/03 must qualify filter compilation, continuous peer updates, CNI/dual-stack/NAT/hostNetwork/loopback behavior, rings under stalls and HTTP secrecy/resource bounds before capability advertisement. Unsupported environments return specific unavailable results; no blanket packet coverage claim.
 
 Saved `get_pcap_summary` ([ADR-303](../docs/decisions/303-saved-packet-summary.md))
-runs in the [regional evidence reader](evidence.md#req-evd-005--analysis-isolation-and-output-classes)
+runs in the [regional reader](evidence.md#req-evd-005--analysis-isolation-and-output-classes)
 over the whole authenticated saved PCAPNG within the reader's source size limit:
 fixed directional numeric endpoint/protocol groups, top 100 of at most 16,384
 aggregates, no filters, DNS, payload or comments. The summary is computed once per
@@ -132,7 +132,7 @@ authority cannot reuse the summary's query or widen its output.
 
 [ADR-305](../docs/decisions/305-bounded-saved-packet-queries.md) applies one bounded
 query to an existing metadata or raw PCAPNG in the
-[regional evidence reader](evidence.md#req-evd-005--analysis-isolation-and-output-classes).
+[regional reader](evidence.md#req-evd-005--analysis-isolation-and-output-classes).
 The filter uses tcpdump/libpcap syntax, compiled by the pinned hub compiler and run
 by the same Go filter VM, with a 512-byte filter cap, the acquisition screening and
 instruction bounds, and no name resolution. Bracket/raw-byte predicates are

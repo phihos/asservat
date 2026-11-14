@@ -119,5 +119,5 @@ reader. A stored artifact keeps at most 32 audience entries.
 
 Raw operations, shares, approvals, step-up authentication, collection
 ceilings, capacity, execution, audit and disclosure are composed by their own
-components before any effect. `AudienceReader` never treats `stored_unpublished`
-custody as a published artifact.
+components before any effect. `AudienceReader` reads only published catalog
+entries, never stored but unpublished custody rows.

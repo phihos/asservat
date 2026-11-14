@@ -17,7 +17,7 @@ The CRD table uses namespaced `asservat.io/v1alpha1` resources unless explicitly
 | `EvidenceRetentionPolicy` | Hub/collector control namespace; retention administrator | Scope, finite default/max ages, privacy/type rules, deletion budget, legal-exception mode; `observedGeneration`, propagation and storage-conflict Conditions |
 | `PermissionSource` | Hub control namespace; permission administrators | Typed derivation rule, scope and trusted mapping; Ready Condition with `observedGeneration` |
 
-Hub runtime records are PostgreSQL rows: ClusterRegistration, AccessGrant, SharingIntent, SharingRegistration, EvidenceShare, capacity accounts and reservations, delivery work, cases, occurrences, accepted executions and audit rows. Their versioned runtime DTOs are service-owned and cannot be applied through Kubernetes. The [persistence contract](persistence.md) defines tables, keys, transactions and recovery.
+Hub runtime records are PostgreSQL rows: ClusterRegistration, AccessGrant, EvidenceShare, per-workload capacity counters and reservations, work rows, cases, occurrences, accepted executions (with their sharing instructions) and `audit_event` rows. Their versioned runtime DTOs are service-owned and cannot be applied through Kubernetes. The [persistence contract](persistence.md) defines tables, keys, transactions and recovery.
 
 Per-attempt and per-delivery state is not a Kubernetes object ([ADR-330](../docs/decisions/330-event-driven-system-design.md) D8). The connector receives accepted work and a capacity budget over its hub connection, keeps per-attempt state in memory keyed by operation ID, and rebuilds it from hub work state after a restart or reconnect; the hub de-duplicates by operation ID. Analysis runs as a Kubernetes Job created directly from hub work and labeled with its operation ID; results return over the connector connection.
 
@@ -66,11 +66,9 @@ Grant: Pending → Approved | Denied
 Share: PendingApproval? → Active | Denied
        Active → Expired | Revoked
 
-SharingIntent: PendingApproval → Active | Denied
-               PendingApproval | Active → Draining → Completed
-               PendingApproval | Active | Draining | Completed → Suspended | Revoked | Expired
-               Suspended → prior operational state only after explicit authorized resume
-               Per-selection approval is independent; approved extracts need not wait for raw.
+Sharing instruction (on an accepted capture or policy acceptance):
+               Active → Stopped | Revoked | Expired
+               Raw selections need independent approval; approved extracts need not wait for raw.
 
 Analysis: Pending → Acquiring → Staged → RunningOffline → Publishing
           → Succeeded | Partial | Failed | Cancelled
@@ -84,7 +82,7 @@ The connector holds one outbound, multiplexed mutual-TLS connection to the hub (
 
 ## User HTTP interface
 
-The case browser, approval page and sharing page use a same-origin HTTP API with OAuth/OIDC sessions and CSRF protection. Read endpoints project the same data as MCP. Mutation endpoints cover capture requests, grant requests/approve/deny/revoke, share create/approve/revoke and sharing-intent stop/revoke/resume, retention holds, restricted-processing decisions and early-erasure requests. Responses include revision/ETag; mutations require the expected revision and an idempotency key. Intrusive/raw approvals are browser-only in the initial product; MCP provides request and status tools but no approve tool. The console receives progress, status and live rows over one Server-Sent Events stream per open page. Permission configuration uses only the [Kubernetes API](permissions.md). The existing browser backend supplies read-only effective-access explanation and impact preview; it does not proxy configuration CRUD.
+The case browser, approval page and sharing page use a same-origin HTTP API with OAuth/OIDC sessions and CSRF protection. Read endpoints project the same data as MCP. Mutation endpoints cover capture requests, grant requests/approve/deny/revoke, share create/approve/revoke, stopping and revoking capture or policy sharing instructions, retention holds, restricted-processing decisions and early-erasure requests. Responses include revision/ETag; mutations require the expected revision and an idempotency key. Intrusive/raw approvals are browser-only in the initial product; MCP provides request and status tools but no approve tool. The console receives progress, status and live rows over one Server-Sent Events stream per open page. Permission configuration uses only the [Kubernetes API](permissions.md). The existing browser backend supplies read-only effective-access explanation and impact preview; it does not proxy configuration CRUD.
 
 ## Schema scope
 
@@ -104,12 +102,12 @@ The [lifecycle contract](contracts/action-lifecycle.schema.json) covers the shar
 
 DebugPolicy's preset/composition/expanded forms accept `recordingSaves: {enabled: true|false}`. Omitted is false; policy authoring may put true visibly into drafts with ongoing actions. Bind it in accepted policy scope, validate that an ongoing action exists, and require normal grant renewal on enablement. This is policy configuration, not a new role or permission CRUD API.
 
-Save operations use a recording-save/v1 DTO and existing SQL accepted executions. They are not a new public CRD and cannot be submitted by forging controller-owned status. The existing browser capture API adds passive recording inventory/preview and routes submit-by-preview to its typed executor; MCP adds only the matching passive tools. Status/cancel, expected revisions, idempotency, optional sharing and audit are shared with ordinary captures. Capture status/history must explicitly label operation=recordingSave; source/policy references never make it a full policy trigger.
+Save operations use a recording-save/v1 DTO and existing SQL accepted executions. They are not a new public CRD and cannot be submitted by forging controller-owned status. The existing browser capture API adds passive recording inventory/preview and submits the previewed request with `expected_plan_digest` and an idempotency key to its typed executor; MCP adds only the matching passive tools. Status/cancel, expected revisions, idempotency, optional sharing and audit are shared with ordinary captures. Capture status/history must explicitly label operation=recordingSave; source/policy references never make it a full policy trigger.
 
 Analysis profiles reference an operator-qualified encrypted scratch StorageClass and bounded input/output/aggregate capacity. Missing readiness is AnalysisScratchUnavailable, with collection readiness separately reported. TASK-03/11 must generate and validate the Helm/configuration fields, CSI qualification evidence and independent cleanup reconciliation before claiming a supported profile; no assumed default StorageClass.
 
 ## Live-view configuration and runtime boundary
 
-`CollectionCeiling` may narrow `liveRead.enabled`, allowed approved projections and per-scope view limits without granting new collection rights. Hub/connector deployment values configure finite installation/node/principal defaults and reserve incident processing/transfer ahead of live work. Initial design defaults are 128 installation watch slots, two per principal, four per workload, 16 source subscriptions per node, 64 KiB/s and 16 MiB total output per watch, 10-minute default / 60-minute maximum lifetime, 30-second idle and row lifetime, and a five-second / 1 MiB Server-Sent Events resume window. Administrator maxima can only narrow effective admission; setting zero supported projections disables live views. Enablement also requires per-mechanism qualification and source entitlement, so a boolean alone cannot expose content.
+`CollectionCeiling` may narrow `liveRead.enabled`, allowed approved projections and per-scope view limits without granting new collection rights. Hub/connector deployment values configure finite installation/node/principal defaults and reserve incident processing/transfer ahead of live work. Initial design defaults are 128 installation watch slots, two per principal, four per workload, 16 source subscriptions per node, 64 KiB/s and 16 MiB total output per watch, 10-minute default / 60-minute maximum lifetime and a 1 MiB replay buffer per watch for Server-Sent Events resume ([REQ-LIV-003](live-watch.md)). Administrator maxima can only narrow effective admission; setting zero supported projections disables live views. Enablement also requires per-mechanism qualification and source entitlement, so a boolean alone cannot expose content.
 
 Before enabling a projection, operators must supply finite CPU-time and examined-event/byte ceilings for the qualified node/profile, with measured supported-environment guidance. No universal parser-throughput default is claimed. Keep these fields typed and bounded in generated Helm/CRD schemas; they belong to existing configuration resources, not a new permission role or live-watch CRD. The hub SQL LiveWatch row only accounts slots and cannot be authored with kubectl. Configuration changes and local deny reach active streams as events and end them.

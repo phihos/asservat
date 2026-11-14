@@ -12,7 +12,7 @@ Given deletion/recreation of a namespace/workload or a recycled PID, when a prev
 
 ## REQ-DOM-002 — Capture and source lifecycles
 
-Capture, immutable AcceptedScope, ActionAttempt, PolicyActivation, SourceSession and SourceSnapshot are separate concepts. A recording save binds existing sources and immutable first-acceptance end time. Sources have independent leases/budgets/readiness; cancellation or retry of a snapshot neither starts a source nor stops an unrelated recorder. Track uncertain starts separately from terminal user-visible status.
+Capture, immutable AcceptedScope, ActionAttempt, PolicyActivation, SourceSession and SourceSnapshot are separate concepts. A recording save binds existing sources and immutable first-acceptance end time. Sources have independent hard ends, budgets and readiness; cancellation or retry of a snapshot neither starts a source nor stops an unrelated recorder. Track a start whose outcome is unknown (resolved by its operation ID) separately from terminal user-visible status.
 
 ### SC-DOM-002
 
@@ -20,7 +20,7 @@ Given a saved snapshot whose source rotates during upload, when dispatch or canc
 
 ## REQ-DOM-003 — Evidence lineage and access
 
-Cases group occurrences; access is projected per artifact. Artifact, lineage edge, managed copy, retained audience, analysis result and privacy decision preserve independent identities and constraints. Lineage is acyclic and inherits the strictest applicable authorization/region/deadline. EvidenceShare contains concrete artifacts/recipients; SharingIntent and publication registrations separately bound future shares. Multiple manager assignments do not replace immutable creator/requester/executor identities.
+Cases group occurrences; access is projected per artifact. Artifact, lineage edge, managed copy, retained audience, analysis result and privacy decision preserve independent identities and constraints. Lineage is acyclic and inherits the strictest applicable authorization/region/deadline. EvidenceShare contains concrete artifacts/recipients; The sharing instruction stored with an accepted capture or policy acceptance bounds future shares. Multiple manager assignments do not replace immutable creator/requester/executor identities.
 
 ### SC-DOM-003
 

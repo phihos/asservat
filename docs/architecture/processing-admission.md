@@ -37,8 +37,8 @@ serialize on that one row. There is no second root read and no writer-specific
 lock order. Root and rule rows are never deleted.
 
 A retry with the same operation ID returns the stored outcome. An unknown
-outcome is resolved by looking up the operation ID; nothing stays charged
-because its outcome was uncertain.
+outcome is resolved by looking up the operation ID; a charge is released
+once the outcome is known.
 
 Insufficient coverage returns a shared browser/MCP message distinct from a
 transient unavailable read.

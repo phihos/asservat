@@ -4,7 +4,7 @@ Approved pod-status queries ([context projection](context-projection.md)) and cl
 
 ## Limits
 
-Query work is bounded by ordinary limits, not prepaid lifetime reservations:
+Query work is bounded by these limits:
 
 - **Per principal:** a token-bucket rate limit and a concurrency cap across that principal's OAuth clients.
 - **Per workload:** a concurrency cap on queries against the workload's evidence, so one workload's investigation cannot starve the reader for others.

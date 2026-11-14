@@ -46,9 +46,9 @@ node boot ID, collector epoch or live owner-chain read is part of the identity.
 ## Messages
 
 Work and results travel unsigned over these mutually authenticated
-connections. Signature validity was never permission: every operation is
-still authorized against current state as described in
-[download authority](download-authority.md) and the owning component.
+connections. A connection identifies the sender; it is not permission. Each
+public operation is authorized once by its owning component (ADR-311), as in
+[download authority](download-authority.md).
 
 References: [Go TLS connection state](https://pkg.go.dev/crypto/tls#ConnectionState),
 [X.509 verification](https://pkg.go.dev/crypto/x509#VerifyOptions),

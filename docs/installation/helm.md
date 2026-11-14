@@ -228,6 +228,8 @@ actions; the bundled store's grants in
 
 ## External OpenBao
 
+The objects below match the current setup Job. [ADR-330](../decisions/330-event-driven-system-design.md) removes the audit transit keys, owner/worker PKI, work-signing key and per-purpose roles; the target needs one installation CA, the connector PKI, artifact wrap/unwrap and browser-credential keys.
+
 Set `services.keyService.provider: external` and
 `services.keyService.external`: `endpoint` and `rootsPEM`. setup configures
 only bundled OpenBao, so create these objects yourself. `<inst>` is the
@@ -322,6 +324,8 @@ Options under `region.executor`:
   Alertmanager base URL for alert policies, for example
   `http://alertmanager-operated.monitoring.svc:9093`. The connector sends
   unauthenticated `GET /api/v2/alerts` requests and follows no redirect.
+  ADR-330 replaces this pull with an in-cluster Alertmanager webhook receiver
+  (connector Service plus a Helm-generated bearer Secret).
 - `identityMappings` ([ADR-245](../decisions/245-decision-time-permission-sources.md)):
   records mapping the hub's principal to this cluster's OIDC identity
   (`usernamePrefix` + OIDC `sub`, optional `groupsPrefix` + stable group IDs).
@@ -335,6 +339,8 @@ Log and resource DebugPolicies
 metrics API.
 
 ## Delegate permission management
+
+[ADR-329](../decisions/329-accessbindings-in-application-namespaces.md) replaces this value: AccessBindings move to the application namespaces they grant, namespace RBAC decides who writes them, and a Helm-rendered ValidatingAdmissionPolicy requires `bind` on `accessroles.asservat.io` for each role (and on `automation` for `spec.automation`). Until that slice lands, the chart still reads the envelope below.
 
 `identity.permissionDelegations` lets selected Kubernetes identities write
 AccessBindings within a fixed envelope. The same entry names browser

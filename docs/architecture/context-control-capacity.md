@@ -17,8 +17,7 @@ Evidence bytes and objects keep their separate C-07 counters
   transaction with a conditional update. It locks that workload's account row
   only, plus the pool row when burst use applies.
 - Deleting a capture's metadata (retention expiry, workload removal) decrements
-  the counter in the deleting transaction. The counter is a count of live rows,
-  not a prepaid allowance.
+  the counter in the deleting transaction. The counter is a count of live rows.
 - Lowering a limit below current use blocks new admissions for that workload
   and reports over-limit; it deletes nothing.
 - An admission whose commit outcome is unknown is resolved by looking up its

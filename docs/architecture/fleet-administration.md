@@ -17,8 +17,7 @@ ConfigMap in the Asservat namespace. It declares:
   allowed clients;
 - explicit human/workload operator subjects or stable operator group IDs
   (empty lists deny all new enrollment);
-- approved credential-delivery profile names, resolved through the separate
-  bootstrap channel catalog; no field selects a URL or
+- approved credential-delivery profile names; no field selects a URL or
   carries a secret;
 - enrollment ceilings: 1–128 active bootstrap slots, 1–65,536 retained bootstrap
   records (≥ the active ceiling) and 1–1,024 registered clusters. These are
@@ -55,5 +54,6 @@ assignment, and a workload-maintainer group cannot enroll clusters. The decision
 carries the identity and fleet revisions and the ceilings for the issuance
 transaction, which enforces them with conditional counts.
 
-Issuance itself is described in bootstrap issuance;
-connector enrollment in [connector enrollment](enrollment-activation.md).
+The hub creates the bootstrap token and shows it once
+([connector identity](connector-credentials.md)); the connector then enrolls as
+described in [connector enrollment](enrollment-activation.md).

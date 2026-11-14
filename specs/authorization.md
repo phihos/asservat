@@ -64,7 +64,7 @@ At most 64 active reservations per grant. Query concurrency defaults to 4 per pr
 
 Collection is admitted once per source start under one permission snapshot and bounded by every hard end (grant, policy, binding, local ceiling, session). A budget slice delegated to a connector lives in the connector's memory and is settled through the same outcome reports; Kubernetes objects are never counters. Work and its admission travel over the connector's mTLS connection and need no signatures.
 
-Revocation refuses new reservations, admissions, cursors and share-dependent reads as soon as it commits. Running sources receive a pushed stop over the connector connection; a disconnected connector stops sources after the installation's offline grace period. Started downloads run to their original bounds (ADR-312). A started upload may finish without new acquisition while the artifact's deadlines allow. A query is one operation: it is authorized at its start and refused at its next start after revocation.
+Revocation refuses new reservations, admissions, cursors and share-dependent reads as soon as it commits. Running sources receive a pushed stop over the connector connection; a source whose connector is disconnected runs to its admitted hard end, and the stop is delivered when the connection returns if that end has not passed. Started downloads run to their original bounds (ADR-312). A started upload may finish without new acquisition while the artifact's deadlines allow. A query is one operation: it is authorized at its start and refused at its next start after revocation.
 
 ### SC-AUT-004
 

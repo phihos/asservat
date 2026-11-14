@@ -10,11 +10,12 @@ D10.
 
 ## Authority
 
-An automation-bearing AccessBinding in the hub namespace carries the typed
-`spec.automation` envelope (allowed actions, counts, bytes, sponsoring and
-maintainer groups). Only Asservat administrators can write it, because the
-hub namespace is administrator-only (ADR-328); application-namespace
-bindings cannot carry it ([permission-observation.md](permission-observation.md)).
+An automation-bearing AccessBinding in the application namespace it grants
+carries the typed `spec.automation` envelope (allowed actions, counts, bytes,
+sponsoring and maintainer groups), as in ADR-329. Adding or changing
+`spec.automation` requires `bind` on `accessroles.asservat.io` named
+`automation`, enforced by the Helm-rendered ValidatingAdmissionPolicy and
+never aggregated into `admin` ([permission-observation.md](permission-observation.md)).
 The structural CRD validates its shape with reviewed CEL rules.
 
 `authorization.PolicyPrincipal` is the installation-local identity a policy
@@ -23,7 +24,7 @@ are distinct types from bearer identity, evidence-read authorization and
 local permits. `ValidatePolicyAcceptance` requires the activating human's
 current entitlement and membership; `EvaluatePolicy` evaluates later team
 authority without a human token. The evaluator pins the accepted policy and
-digest, installation and workload, supports only arm, renew, incident and
+digest, installation and workload, supports only arm, incident and
 recordingSave purposes, intersects the original expiry with current source
 and deny state, and checks the action, count and byte envelope. A personal
 deny of the former creator does not revoke team authority; a sponsor or
@@ -84,9 +85,9 @@ deactivation, both delivered as events.
 A region without a configured Alertmanager receiver reports `unsupported`,
 so activation refuses alert policies there. Each delta carries the Pod, the
 detector level and its time; a Pod whose state is unknown keeps its
-watermark, and an overlong log record is counted under the suppression
+previous detector state, and an overlong log record is counted under the suppression
 reason `overlong`. The hub evaluates level and re-arm against the per-detector
-watermark in the trigger ledger and reuses the S-02 investigation with the
+state in the trigger ledger and reuses the S-02 investigation with the
 policy executor; eligibility and the SQL checks after locks evaluate the
 executor through its current acceptance and team delegation. Each occurrence
 key is the idempotency key of the capture it starts.
@@ -94,7 +95,7 @@ key is the idempotency key of the capture it starts.
 Recorder policies (finite onTrigger and before-zero network headers) compile
 the same accepted composition as activation. The exact recorder scope must
 match the accepted authority before an occurrence is spent; the trigger
-previews the triggering Pod and submits through the normal capture-intent
+previews the triggering Pod and submits through the normal capture request
 pipeline. Atomic admission matches the actual plan action before reserving
 output or grant spend; a snapshot-only grant cannot authorize a recorder.
 Raw predicates stay refused until the live-observation authority and node

@@ -9,7 +9,7 @@ Checked 2026-10-09. These are primary references for architecture organization a
 | [arc42 runtime view](https://docs.arc42.org/section-6/) | Runtime scenarios describe how building blocks interact. | Trace success and failure through state owners, including duplicate starts, revocation and expiry. |
 | [Go module layout](https://go.dev/doc/modules/layout) | Go supports internal packages and command-oriented layouts. | One initial Go module, minimal command entrypoint, internal application/domain/adapter packages and per-role composition roots. This exact decomposition is our choice. |
 | [PostgreSQL SELECT locking](https://www.postgresql.org/docs/18/sql-select.html) | SKIP LOCKED avoids waiting on locked rows and yields an inconsistent view; it can serve queue-like consumers. | Use it for bounded work claiming only. Admission/fairness remains explicit and transactional under the existing persistence contract. |
-| [Kubernetes API concepts](https://kubernetes.io/docs/reference/using-api/api-concepts/) | Resource versions support concurrency/watch behavior and must be treated as opaque. | CAS local control records and reconcile watch/relist freshness; no numeric comparison or claim of multi-object atomicity. |
+| [Kubernetes API concepts](https://kubernetes.io/docs/reference/using-api/api-concepts/) | Resource versions support concurrency/watch behavior and must be treated as opaque. | Informer caches keep resourceVersions as opaque values; no numeric comparison or claim of multi-object atomicity. |
 | [Kubernetes leases](https://kubernetes.io/docs/concepts/architecture/leases/) | Lease objects support coordination such as heartbeats and leader election. | Leader election selects work ownership; application attempt/epoch checks must still fence side effects. A lease is not evidence that an external process stopped. |
 | [Linux Unix sockets](https://man7.org/linux/man-pages/man7/unix.7.html) | Unix-domain sockets support local communication and peer-credential mechanisms. | A restricted local core-helper handoff. Credentials do not prove forensic truth against trusted host root or solve PID reuse. |
 | [Kubernetes informers and watch](https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes) | A LIST followed by WATCH delivers every change; a relist is needed only after the watch ends or its resource version expires (410). | Kubernetes state is held in shared informer caches that stay valid until the watch replaces them (ADR-330). |
@@ -18,7 +18,7 @@ Checked 2026-10-09. These are primary references for architecture organization a
 
 The accepted approach is a modular hub with independently scheduled API/background roles and separate privileged/local/offline roles. A shared Go binary does not make these one security identity. Feature modules remain code modules unless a demonstrated privilege/locality/lifetime/scaling boundary warrants a service. PostgreSQL, Kubernetes and regional objects retain their already accepted authority split.
 
-Internal work and results travel unsigned over mutually authenticated TLS connections ([peer identity](peer-identity.md)); every operation is authorized against current state by its owning component. Evidence keeps streaming envelope encryption.
+Internal work and results travel unsigned over mutually authenticated TLS connections ([peer identity](peer-identity.md)); each operation is authorized once by its owning component (ADR-311). Evidence keeps streaming envelope encryption.
 
 ## Reconciled gaps
 

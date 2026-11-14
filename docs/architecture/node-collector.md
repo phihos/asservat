@@ -39,14 +39,14 @@ pushed work, status on change, standard workload identity.
    sends only work kinds and fields the collector announced. Both sides ignore unknown fields, so
    a DaemonSet rolling update and hub/connector/node N−1 skew work without lockstep upgrades.
 5. Status: one full report after Hello, then a report only when facts, assessment, budget or
-   receipts change, plus a small heartbeat every 10 s (Node Lease pattern). The connector keeps
-   the latest report per node in memory; a node is current while its stream is open and its
-   heartbeat is not older than three intervals. For optional live-runtime status the connector
+   receipts change, plus a small liveness heartbeat every 10 s (Node Lease pattern). The connector
+   keeps the latest report per node in memory; a node is shown current while its stream is open and
+   its heartbeat is not older than three intervals. The heartbeat is liveness only: it grants,
+   renews or revokes no authority, and a missed heartbeat does not stop sources. For optional live-runtime status the connector
    also keeps report-to-report rates in memory. Source-loss events and rows dropped by bounded
    reply encoding are cumulative; pending rows are current shared-buffer occupancy, not exact
    per-viewer lag. `read-live-runtime` aggregates current totals/rates with no node labels;
-   incomplete predecessors suppress the whole rate set. Fleet operators read one selected
-   cluster through the browser-only `get_live_capacity` operation over the same aggregate.
+   incomplete predecessors suppress the whole rate set.
 6. Work: the connector pushes work on the stream. Kinds are `armSource`, `stopSource`,
    `snapshot`, `peerGeneration` (no producer; refused with `RecorderNotImplemented`,
    `WorkExpired` or `WorkUnknown`) and `packetCapture` ([ADR-248](../decisions/248-manual-packet-capture.md),
@@ -75,7 +75,8 @@ recording stays `AdapterUnavailable` with `RecorderNotImplemented`.
    the duration, runs the hub-compiled program on each frame, cuts frames at the transport header
    and streams one bounded PCAPNG back on its connection.
 4. The holder encrypts and stores it with the artifact producer and reports the completion to
-   the hub over the connector connection; publication verifies with the headers-only recheck.
+   the hub over the connector connection; the regional reader verifies envelope, manifest and
+   index before the hub publishes ([context publication](context-publication.md)).
 
 ## Exact packet source
 

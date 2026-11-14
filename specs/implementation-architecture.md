@@ -4,7 +4,7 @@ The [architecture package](../docs/architecture/README.md) maps the accepted pro
 
 ## REQ-ARC-001 — Explicit runtime authority
 
-Each scheduled role MUST have a defined entry point, image/tool set, service identity, network/storage privileges, lifecycle and scaling owner. Share source code and a role-selecting Go binary where appropriate, while retaining separate hub, node collector, regional reader and analyzer authority. The regional reader is a long-running, horizontally scaled Deployment that acquires, publishes and streams stored evidence under one identity; there is no Job per request ([ADR-330](../docs/decisions/330-event-driven-system-design.md) D4). Node control is collector-initiated to the local connector; the hub cannot require inbound node access or workload kubeconfigs. Evidence-bearing caches remain within approved regional boundaries. Optional capabilities degrade independently.
+Each scheduled role MUST have a defined entry point, image/tool set, service identity, network/storage privileges, lifecycle and scaling owner. Share source code and a role-selecting Go binary where appropriate, while retaining separate hub, node collector, regional reader and analyzer authority. The regional reader (A-READ) is a long-running, horizontally scaled Deployment that serves native downloads and stored-evidence queries and verifies committed artifacts for publication under one identity; there is no Job per download or query. Offline analysis keeps its separate acquisition, analyzer and publication Jobs ([ADR-330](../docs/decisions/330-event-driven-system-design.md) D4). Node control is collector-initiated to the local connector; the hub cannot require inbound node access or workload kubeconfigs. Evidence-bearing caches remain within approved regional boundaries. Optional capabilities degrade independently.
 
 ### SC-ARC-001
 
@@ -48,7 +48,7 @@ Every critical runtime flow MUST assign the next transition, retry policy, resid
 
 ### SC-ARC-006
 
-Given hub/database failure and saturated live readers during a triggered save, when the system degrades, then leased local work and local deletion remain bounded, live delivery sheds before protected saving, expired reads are denied and uncertain reservations/copies remain tracked. Recovery revalidates authority instead of trusting restored cache state.
+Given hub/database failure and saturated live readers during a triggered save, when the system degrades, then local work under the connector's budget lease and local deletion remain bounded, live delivery sheds before protected saving, expired reads are denied and reservations or copies with an unknown outcome remain tracked by operation ID until resolved. Recovery revalidates authority instead of trusting restored cache state.
 
 ## REQ-ARC-007 — Traceable implementation slices
 

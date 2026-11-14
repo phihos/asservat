@@ -37,7 +37,7 @@ Use `syscallTrace` as the manifest kind and privacy evidence type. New types def
 `get_syscall_summary` returns bounded per-syscall counts, errors and duration aggregates over an approved projection; missing/partial pairs and gaps are explicit. `get_syscall_events` returns a paginated metadata timeline with no argument option. `syscall_query` is a bounded typed raw operation for already collected artifacts, requiring evidence:raw, current artifact rights and a matching raw-query grant. It can select syscall names/errors and return bounded recorded arguments; no arbitrary code, address dereference, live tracing or new acquisition. Add this operation consistently to raw grant/share contracts and delivery checks. Sharing a metadata projection does not grant raw argument queries or live tracing.
 
 Saved-argument queries ([ADR-306](../docs/decisions/306-bounded-saved-syscall-queries.md))
-run in the [regional evidence reader](evidence.md#req-evd-005--analysis-isolation-and-output-classes)
+run in the [regional reader](evidence.md#req-evd-005--analysis-isolation-and-output-classes)
 with the canonical native decoder. Each query carries an operation ID; a retry with
 the same ID and selection returns the existing outcome without another read, and a
 next page uses a new ID. Omitting `grant_id` returns only the missing-approval
