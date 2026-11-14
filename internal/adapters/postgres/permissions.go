@@ -280,7 +280,6 @@ func projectionDigest(b cfg.PermissionBatch) []byte {
 	b.Epoch = ""
 	b.RequestID = ""
 	b.ExpectedSequence = 0
-	b.Initial = nil
 	b.ObservedAt = time.Time{}
 	b.FreshUntil = time.Time{}
 	for i := range b.Bases {
@@ -385,9 +384,6 @@ func (p *Permissions) AcceptPermissions(ctx context.Context, b cfg.PermissionBat
 		if err = validBatch(b, n.Time); err != nil {
 			return err
 		}
-		if !s.InitialAuditID.Valid && (b.Initial == nil || !b.Initial.Valid(n.Time) || b.Initial.BindingCount < len(b.Bases)) {
-			return cfg.ErrDenied
-		}
 		bases, rows, err := currentPermissionRows(ctx, q, p.root)
 		if err != nil {
 			return err
@@ -403,18 +399,6 @@ func (p *Permissions) AcceptPermissions(ctx context.Context, b cfg.PermissionBat
 			}
 		}
 		record := audit.AuthorityRecord{ID: b.RequestID, RootID: p.root, Epoch: b.Epoch, Sequence: s.Sequence + 1, Kind: "permission-change", CreatedAt: n.Time, InputDigest: b.InputDigest}
-		if !s.InitialAuditID.Valid {
-			initial := b.Initial
-			record.Bootstrap = &audit.PermissionBootstrap{ClusterID: initial.ClusterID, NamespaceUID: initial.Control.UID, BindingsDigest: initial.BindingsDigest, BindingCount: initial.BindingCount}
-			if r := initial.Review; r != nil {
-				record.Bootstrap.ReviewUID = r.Resource.UID
-				record.Bootstrap.ReviewVersion = r.Resource.ResourceVersion
-				record.Bootstrap.ReviewDigest = r.Resource.SpecDigest
-				record.Bootstrap.Reviewer = r.Reviewer
-				record.Bootstrap.ReviewedAt = r.ReviewedAt
-				record.Bootstrap.ExpiresAt = r.ExpiresAt
-			}
-		}
 		record.Namespaces = b.Namespaces
 		record.RemoteNamespaces = b.RemoteNamespaces
 		record.Workloads = b.Workloads
@@ -500,9 +484,6 @@ func (p *Permissions) AcceptPermissions(ctx context.Context, b cfg.PermissionBat
 		}
 		if err = validBatch(b, n.Time); err != nil {
 			return err
-		}
-		if !s.InitialAuditID.Valid && !b.Initial.Valid(n.Time) {
-			return cfg.ErrDenied
 		}
 		s.InitialAuditID = id(record.ID)
 		s.Sequence = record.Sequence

@@ -285,9 +285,6 @@ hub:
       # Accounts that may write PermissionSource/AccessBinding status; empty
       # is the hub-worker's own account.
       statusUsers: []
-      # Administrator-created initial review ConfigMap, needed only when
-      # bindings exist at the first acceptance.
-      review: ""
   federation:
     replicas: 1
     concurrency: 4

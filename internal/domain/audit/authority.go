@@ -22,7 +22,6 @@ type AuthorityRecord struct {
 	InputDigest             artifact.Digest
 	CreatedAt               time.Time
 	Changes                 []AssignmentChange
-	Bootstrap               *PermissionBootstrap
 	Automation              []AutomationDelegation `json:",omitempty"`
 	// Namespaces is the minimized namespace observation that the accepted
 	// PermissionSource assignments were derived from (ADR-242): keys, names,
@@ -102,17 +101,6 @@ type AutomationDelegation struct {
 	Envelope    authorization.AutomationEnvelope
 }
 
-// Minimized first-acceptance provenance. Reviewer is an attested actor label,
-// never an authorization decision. Empty installations have no review fields.
-type PermissionBootstrap struct {
-	ClusterID, NamespaceUID            string
-	BindingsDigest                     artifact.Digest
-	BindingCount                       int
-	ReviewUID, ReviewVersion, Reviewer string
-	ReviewDigest                       artifact.Digest
-	ReviewedAt, ExpiresAt              time.Time
-}
-
 func (r AuthorityRecord) Valid() bool {
 	if !authorization.UUID(r.ID) || !authorization.UUID(r.RootID) || !authorization.UUID(r.Epoch) || r.Sequence < 0 || r.CreatedAt.IsZero() || r.InputDigest == (artifact.Digest{}) || len(r.Changes) > 8192 {
 		return false
@@ -120,7 +108,7 @@ func (r AuthorityRecord) Valid() bool {
 	if r.Kind != "permission-reset" && r.Kind != "permission-change" && r.Kind != "permission-suspend" && r.Kind != "permission-review" {
 		return false
 	}
-	if (r.Kind == "permission-review") != (r.Review != nil) || r.Review != nil && (!r.Review.valid() || len(r.Changes) > 0 || r.Bootstrap != nil || len(r.ReviewRetirements) > 0) {
+	if (r.Kind == "permission-review") != (r.Review != nil) || r.Review != nil && (!r.Review.valid() || len(r.Changes) > 0 || len(r.ReviewRetirements) > 0) {
 		return false
 	}
 	if len(r.Automation) > 1024 || (len(r.Automation) > 0 || r.Namespaces != nil || len(r.RemoteNamespaces) > 0 || len(r.Workloads) > 0 || len(r.ReviewSources) > 0) && r.Kind != "permission-change" || r.Namespaces != nil && !r.Namespaces.Valid() || !configuration.RemoteNamespacesValid(r.Namespaces, r.RemoteNamespaces) || !configuration.WorkloadObservationsValid(r.Workloads) {
@@ -145,18 +133,6 @@ func (r AuthorityRecord) Valid() bool {
 			return false
 		}
 		delegations[a.BasisKey] = true
-	}
-	if p := r.Bootstrap; p != nil {
-		if r.Kind != "permission-change" || !authorization.UUID(p.ClusterID) || !identity.Text(p.NamespaceUID, 64) || p.BindingsDigest == (artifact.Digest{}) || p.BindingCount < 0 || p.BindingCount > 1024 {
-			return false
-		}
-		if p.BindingCount == 0 {
-			if p.ReviewUID != "" || p.ReviewVersion != "" || p.Reviewer != "" || p.ReviewDigest != (artifact.Digest{}) || !p.ReviewedAt.IsZero() || !p.ExpiresAt.IsZero() {
-				return false
-			}
-		} else if !identity.Text(p.ReviewUID, 64) || !identity.Text(p.ReviewVersion, 128) || !identity.Text(p.Reviewer, 256) || p.ReviewDigest == (artifact.Digest{}) || !identity.Fresh(p.ReviewedAt, p.ExpiresAt, r.CreatedAt, time.Hour) {
-			return false
-		}
 	}
 	seen := map[string]bool{}
 	for _, c := range r.Changes {

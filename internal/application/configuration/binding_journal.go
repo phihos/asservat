@@ -28,7 +28,6 @@ type BindingJournal struct {
 	pending         *value.PermissionBatch
 	sequence        int64
 	acceptedFence   value.PermissionFence
-	initial         value.PermissionInitialization
 }
 
 func cloneBinding(b value.Binding) value.Binding {
@@ -66,24 +65,9 @@ func NewBindingJournal(s value.Snapshot, now time.Time) (*BindingJournal, error)
 		j.byUID[b.Resource.UID] = cloneBinding(b)
 		j.names[bindingName(b.Resource)] = b.Resource.UID
 	}
-	j.initial = value.PermissionInitialization{ClusterID: s.ClusterID, Control: s.ControlNamespace, BindingsDigest: InitialBindingDigest(s), BindingCount: len(s.Bindings)}
 	return j, nil
 }
 
-// SetInitialReview attaches only a separately read protected installation
-// review. Runtime composition must qualify that reader independently of sources.
-func (j *BindingJournal) SetInitialReview(r value.BootstrapReview, now time.Time) error {
-	if j.pending != nil || j.sequence != 0 || j.initial.BindingCount == 0 {
-		return value.ErrChanged
-	}
-	p := j.initial
-	p.Review = &r
-	if !p.Valid(now) {
-		return value.ErrDenied
-	}
-	j.initial = p
-	return nil
-}
 func (j *BindingJournal) Cursor() string { return j.cursor }
 
 // Constrain preserves the original list deadline while also bounding it by the
@@ -175,14 +159,6 @@ func (j *BindingJournal) Confirm(s value.Snapshot, now time.Time) error {
 	return nil
 }
 func cloneBatch(b value.PermissionBatch) value.PermissionBatch {
-	if b.Initial != nil {
-		p := *b.Initial
-		if p.Review != nil {
-			r := *p.Review
-			p.Review = &r
-		}
-		b.Initial = &p
-	}
 	b.UnavailableSources = slices.Clone(b.UnavailableSources)
 	b.ReviewSources = slices.Clone(b.ReviewSources)
 	b.Bases = slices.Clone(b.Bases)
@@ -257,16 +233,6 @@ func (j *BindingJournal) Prepare(f value.PermissionFence, request string, now ti
 		return value.PermissionBatch{}, value.ErrLimit
 	}
 	batch := value.PermissionBatch{RootID: f.RootID, Epoch: f.Epoch, RequestID: request, ExpectedSequence: f.Sequence, TrustDigest: f.TrustDigest, InputDigest: artifact.Digest(sha256.Sum256(encoded)), ObservedAt: now, FreshUntil: j.until}
-	if !f.Initialized {
-		p := j.initial
-		batch.Initial = &p
-		if !p.Valid(now) {
-			return value.PermissionBatch{}, value.ErrDenied
-		}
-		if p.Review != nil {
-			batch.FreshUntil = identity.Earlier(batch.FreshUntil, identity.Earlier(p.Review.FreshUntil, p.Review.ExpiresAt))
-		}
-	}
 	for _, b := range bindings {
 		if b.Invalid || (b.Resource.Deleting && b.Effect == "Allow") || (!b.NotAfter.IsZero() && !now.Before(b.NotAfter)) {
 			continue

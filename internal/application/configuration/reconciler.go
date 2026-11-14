@@ -25,7 +25,6 @@ type BindingReconciler struct {
 	Reader  PermissionReader
 	Watcher BindingWatcher
 	Trust   PermissionTrustReader
-	Review  BootstrapReviewReader
 	Store   PermissionStore
 	// Namespaces observes NamespaceClusterID's namespaces for inheritance.
 	// Without it every namespaceMetadata source is unavailable: its accepted
@@ -419,18 +418,6 @@ func (s *bindingRun) start(ctx context.Context) error {
 	s.journal, err = NewBindingJournal(snapshot, s.r.Now())
 	if err != nil {
 		return reconcileStep("journal", err)
-	}
-	if !s.fence.Initialized && len(snapshot.Bindings) > 0 {
-		if s.r.Review == nil {
-			return value.ErrDenied
-		}
-		review, e := s.r.Review.InitialPermissionReview(ctx)
-		if e != nil {
-			return reconcileStep("review", e)
-		}
-		if err = s.journal.SetInitialReview(review, s.r.Now()); err != nil {
-			return reconcileStep("review", err)
-		}
 	}
 	// The joined clusters' stored deliveries, before the first acceptance
 	// (ADR-329): later changes arrive as RemoteBindingChanges.

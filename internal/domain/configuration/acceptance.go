@@ -18,7 +18,6 @@ type PermissionBatch struct {
 	TrustDigest, InputDigest artifact.Digest
 	ObservedAt, FreshUntil   time.Time
 	Bases                    []PermissionBasis
-	Initial                  *PermissionInitialization
 	// UnavailableSources are PermissionSources whose current namespace
 	// observation is unknown (ADR-242). Their accepted assignments are kept,
 	// neither retired nor renewed, and grant nothing until a fresh
