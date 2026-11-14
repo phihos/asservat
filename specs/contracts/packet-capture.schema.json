@@ -146,8 +146,7 @@
       "type": "string",
       "minLength": 1,
       "pattern": "\\S",
-      "description": "At most 4 KiB of filter text; the authoritative bound is the compiled classic BPF program, which must fit the kernel limit BPF_MAXINSNS (4096 instructions), checked at compile.",
-      "maxLength": 4096
+      "description": "No length cap on the text; the bound is the compiled classic BPF program, which must fit the kernel limit BPF_MAXINSNS (4096 instructions), checked at compile, and the enclosing Kubernetes object size."
     },
     "ring": {
       "type": "object",

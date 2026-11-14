@@ -124,7 +124,7 @@ closed packet fields and typed numeric/time/address/flag selections. The
 `packet_filter` input is capture-filter syntax, not Wireshark display-filter
 syntax ([ADR-305](../docs/decisions/305-bounded-saved-packet-queries.md)). The
 same pinned hub compiler and supported Go BPF evaluator used for acquisition are
-reused, without reconfiguring capture. The compiled program is at most 4096 classic-BPF instructions (`BPF_MAXINSNS`, the kernel and evaluator limit) and is the authoritative bound; filter text is at most 4 KiB so the request stays small. There is
+reused, without reconfiguring capture. The compiled program is at most 4096 classic-BPF instructions (`BPF_MAXINSNS`, the kernel and evaluator limit) and is the only bound; the filter text has no separate length cap. There is
 no DNS/service-name resolution, and evaluator compatibility checks stay exact. The
 initial query subset refuses bracket/raw-byte predicates before compilation or
 spend; this is a bounded first-release choice, not full libpcap support.
