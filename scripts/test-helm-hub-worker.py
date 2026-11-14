@@ -147,7 +147,9 @@ class HubWorkerChart(unittest.TestCase):
         path = Path(self.directory.name) / "rendered" / "config.json"
         path.parent.mkdir(exist_ok=True)
         path.write_text(json.dumps(config))
-        env = dict(os.environ, ASSERVAT_HUB_WORKER_CONFIG=str(path), TMPDIR=str(Path.home() / ".cache/go-tmp"))
+        tmp = Path(os.environ.get("TMPDIR") or Path.home() / ".cache/go-tmp")
+        tmp.mkdir(parents=True, exist_ok=True)
+        env = dict(os.environ, ASSERVAT_HUB_WORKER_CONFIG=str(path), TMPDIR=str(tmp))
         go = subprocess.run(["go", "test", "-count=1", "-run", "^TestHubWorkerConfigRendered$", "-v", "./internal/bootstrap"], cwd=helm.ROOT, env=env, text=True, capture_output=True, timeout=600)
         self.assertEqual(go.returncode, 0, go.stdout + go.stderr)
         self.assertIn("--- PASS: TestHubWorkerConfigRendered", go.stdout)

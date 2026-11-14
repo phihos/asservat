@@ -12,7 +12,6 @@ internal/adapters/kubernetes/configuration_role_source.go 4
 internal/adapters/kubernetes/configuration_runtime_roles.go 1
 internal/adapters/kubernetes/connector_api_process.go 2
 internal/adapters/kubernetes/connector_identity.go 1
-internal/adapters/kubernetes/connector_observation_workload.go 1
 internal/adapters/kubernetes/connector_process.go 1
 internal/adapters/kubernetes/context_capability.go 1
 internal/adapters/kubernetes/download_environment.go 1
@@ -31,7 +30,6 @@ internal/adapters/kubernetes/initial_runtime_bridge.go 1
 internal/adapters/kubernetes/initial_runtime_resources.go 1
 internal/adapters/kubernetes/initial_workload.go 1
 internal/adapters/kubernetes/installation_witness.go 1
-internal/adapters/kubernetes/local_keys.go 1
 internal/adapters/kubernetes/owner_configuration.go 1
 internal/adapters/kubernetes/owner_endpoint.go 1
 internal/adapters/kubernetes/owner_enrollment.go 1
@@ -45,7 +43,6 @@ internal/adapters/kubernetes/profile_network.go 1
 internal/adapters/kubernetes/public_projection_operation.go 1
 internal/adapters/kubernetes/public_runtime_roles.go 1
 internal/adapters/kubernetes/retention.go 1
-internal/adapters/kubernetes/retention_bootstrap.go 1
 internal/adapters/kubernetes/retention_guard.go 1
 internal/adapters/kubernetes/submission_trust.go 1
 internal/adapters/kubernetes/target_pod.go 1
@@ -77,7 +74,6 @@ internal/adapters/postgres/bootstrap_reservation.go 1
 internal/adapters/postgres/browser.go 2
 internal/adapters/postgres/browser_settings.go 1
 internal/adapters/postgres/capacity_audit_profiles.go 1
-internal/adapters/postgres/capacity_runtime_credential.go 1
 internal/adapters/postgres/capture.go 2
 internal/adapters/postgres/capture_audit.go 1
 internal/adapters/postgres/capture_audit_backing.go 1
@@ -103,8 +99,6 @@ internal/adapters/postgres/enrollment_signing.go 2
 internal/adapters/postgres/evidence_share.go 1
 internal/adapters/postgres/fleet_observation.go 1
 internal/adapters/postgres/history_parameters.go 1
-internal/adapters/postgres/initial_installation_read.go 1
-internal/adapters/postgres/initial_runtime_owner_bridge.go 2
 internal/adapters/postgres/live_manual.go 1
 internal/adapters/postgres/live_watch.go 1
 internal/adapters/postgres/operation_audit.go 3
@@ -163,7 +157,6 @@ internal/application/privacy/processing.go 1
 internal/application/sharing/share.go 3
 internal/bootstrap/cluster_observation_client.go 1
 internal/bootstrap/context_regional_collect.go 1
-internal/bootstrap/installer_continue.go 1
 internal/bootstrap/live_manual_sources.go 1
 internal/bootstrap/live_sources.go 1
 internal/bootstrap/node_profiles.go 1
@@ -181,7 +174,6 @@ internal/domain/audit/authority.go 1
 internal/domain/audit/bootstrap.go 1
 internal/domain/audit/capacity_profiles.go 1
 internal/domain/audit/connector_retirement.go 1
-internal/domain/audit/retention_acceptance.go 1
 internal/domain/authorization/acquisition_enrollment.go 2
 internal/domain/authorization/acquisition_worker.go 4
 internal/domain/authorization/adhoc_observation.go 1
@@ -206,7 +198,6 @@ internal/domain/catalog/context.go 2
 internal/domain/configuration/acceptance.go 1
 internal/domain/configuration/access_preview.go 1
 internal/domain/configuration/bootstrap.go 2
-internal/domain/configuration/retention_bootstrap.go 2
 internal/domain/execution/context.go 1
 internal/domain/execution/go_profile.go 1
 internal/domain/fleet/administration.go 2
