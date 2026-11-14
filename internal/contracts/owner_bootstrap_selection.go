@@ -1,11 +1,8 @@
 package contracts
 
 import (
-	"strings"
 	"time"
 )
-
-const OwnerBootstrapInitialPeers = 16
 
 // The initial batch is a public installation choice, not a live connector or
 // permission assignment. Later protected enrollment does not edit this batch.
@@ -53,8 +50,4 @@ type OwnerBootstrapObjectReceipt struct {
 	Object          WorkerObjectReference `json:"object"`
 	ResourceVersion string                `json:"resourceVersion"`
 	ObservedAt      time.Time             `json:"observedAt"`
-}
-
-func OwnerBootstrapSelectionName(installationID string) string {
-	return "asservat-" + strings.ReplaceAll(installationID, "-", "") + "-owner-bootstrap"
 }

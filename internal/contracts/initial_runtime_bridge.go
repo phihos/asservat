@@ -1,12 +1,8 @@
 package contracts
 
 import (
-	"io"
 	"time"
 )
-
-const InitialRuntimeBridgeStateFormat = "asservat-initial-runtime-bridge/v1"
-const InitialRuntimeBridgeMaxBytes = 16 << 10
 
 // This private installation journal contains only original public identities,
 // two fixed native policy operations and their observed receipts. It cannot
@@ -38,8 +34,4 @@ type InitialRuntimeBridgeSnapshot struct {
 	State                InitialRuntimeBridgeState
 	UID, ResourceVersion string
 	ValidUntil           time.Time
-}
-
-func DecodeInitialRuntimeBridgeState(r io.Reader) (InitialRuntimeBridgeState, error) {
-	return decodeClosedRPC[InitialRuntimeBridgeState](r, InitialRuntimeBridgeMaxBytes)
 }

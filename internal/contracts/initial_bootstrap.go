@@ -1,19 +1,12 @@
 package contracts
 
 import (
-	"io"
 	"time"
 )
-
-const InitialBootstrapFormat = "asservat-initial-bootstrap/v1"
 
 // InitialBootstrapPassiveFormat is selected by the fixed installer command.
 // Legacy adapter profiles retain their original guard/state contract.
 const InitialBootstrapPassiveFormat = "asservat-initial-bootstrap/v2"
-const InitialBootstrapStateFormat = "asservat-initial-bootstrap-state/v1"
-const InitialBootstrapMaterialFormat = "asservat-initial-bootstrap-material/v1"
-const InitialBootstrapMaxBytes = 48 << 10
-const InitialBootstrapStateMaxBytes = 32 << 10
 
 // InitialBootstrap contains only administrator-selected static desired input.
 // The producer derives object names and obtains every Kubernetes UID/SQL OID.
@@ -132,16 +125,6 @@ type InitialBootstrapCreate struct {
 	OperationID string                     `json:"operationID"`
 	Receipt     *InitialPreparationReceipt `json:"receipt,omitempty"`
 }
-
-func DecodeInitialBootstrapState(r io.Reader) (InitialBootstrapState, error) {
-	return decodeClosedRPC[InitialBootstrapState](r, InitialBootstrapStateMaxBytes)
-}
-func (InitialBootstrapMaterial) String() string    { return "protected initial bootstrap material" }
-func (InitialBootstrapMaterial) GoString() string  { return "protected initial bootstrap material" }
-func (InitialBootstrapState) String() string       { return "protected initial bootstrap state" }
-func (InitialBootstrapState) GoString() string     { return "protected initial bootstrap state" }
-func (InitialBootstrapPasswords) String() string   { return "protected initial bootstrap passwords" }
-func (InitialBootstrapPasswords) GoString() string { return "protected initial bootstrap passwords" }
 
 // InitialBootstrapProviderMint is one original provider POST intent. The token
 // is retained only in private Material; Response is the positive issued identity.

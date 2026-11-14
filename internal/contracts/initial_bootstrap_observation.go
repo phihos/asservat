@@ -1,7 +1,5 @@
 package contracts
 
-const InitialBootstrapObservationFormat = "asservat-bootstrap-observation/v1"
-
 // InitialBootstrapObservation is generated from the retained producer seed.
 // It contains only original public prelude/projection identities. It does not
 // confer SQL, provider, collection, recovery or target activation authority.

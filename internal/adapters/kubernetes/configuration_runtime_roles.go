@@ -7,7 +7,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"reflect"
-	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -172,15 +171,6 @@ func (s *ConfigurationRuntimeRoleRoot) decode(raw []byte, started, until time.Ti
 	}
 	return contracts.ConfigurationRuntimeRoleSnapshot{State: state, UID: string(object.UID), ResourceVersion: object.ResourceVersion, ObservedAt: started, ValidUntil: until}, &object, nil
 }
-func (s *ConfigurationRuntimeRoleRoot) read(ctx context.Context) (contracts.ConfigurationRuntimeRoleSnapshot, *core.Secret, error) {
-	var zero contracts.ConfigurationRuntimeRoleSnapshot
-	started := s.client.now()
-	first, e := s.source.ReadConfigurationRoleSource(ctx)
-	if e != nil {
-		return zero, nil, e
-	}
-	return s.readObserved(ctx, first, started)
-}
 
 // Exact readback uses the operation's current proof and original deadline. It
 // neither starts another nested proof nor creates authority from Secret data.
@@ -211,21 +201,6 @@ func (s *ConfigurationRuntimeRoleRoot) readObserved(ctx context.Context, first c
 	out.Sources = first
 	out.Sources.FreshUntil = until
 	return out, object, nil
-}
-func (s *ConfigurationRuntimeRoleRoot) ReadConfigurationRuntimeRoles(ctx context.Context) (contracts.ConfigurationRuntimeRoleSnapshot, error) {
-	var zero contracts.ConfigurationRuntimeRoleSnapshot
-	ctx, end, err := s.enter(ctx)
-	if err != nil {
-		return zero, err
-	}
-	defer end()
-	started := s.client.now()
-	proof, err := s.source.ReadConfigurationRoleSource(ctx)
-	if err != nil {
-		return zero, err
-	}
-	out, _, err := s.readObserved(ctx, proof, started)
-	return out, err
 }
 
 // Open is called only after the SQL installer independently checked current
@@ -291,107 +266,4 @@ func (s *ConfigurationRuntimeRoleRoot) OpenConfigurationRuntimeRoles(ctx context
 		return zero, cfg.ErrChanged
 	}
 	return observed, nil
-}
-func (s *ConfigurationRuntimeRoleRoot) ClaimConfigurationRuntimeRole(ctx context.Context, purpose string, database uint32, postmaster time.Time) (contracts.ConfigurationRuntimeRoleSnapshot, bool, error) {
-	var zero contracts.ConfigurationRuntimeRoleSnapshot
-	ctx, end, err := s.enter(ctx)
-	if err != nil {
-		return zero, false, err
-	}
-	defer end()
-	old, object, err := s.read(ctx)
-	if err != nil {
-		return zero, false, err
-	}
-	n := slices.Index(contracts.ConfigurationRuntimeRolePurposes(), purpose)
-	if n < 0 || database == 0 || postmaster.Year() < 2020 {
-		return zero, false, cfg.ErrInvalid
-	}
-	if old.State.Roles[n].Claim != nil {
-		return old, false, nil
-	}
-	now := s.client.now().UTC().Truncate(time.Microsecond)
-	until := old.ValidUntil
-	if old.State.Until.Before(until) {
-		until = old.State.Until
-	}
-	until = until.UTC().Truncate(time.Microsecond)
-	if !now.Before(until) || postmaster.After(now) {
-		return zero, false, cfg.ErrUnavailable
-	}
-	next := old.State
-	next.Roles = append([]contracts.ConfigurationRuntimeRoleMaterial(nil), old.State.Roles...)
-	next.Roles[n].Claim = &contracts.ConfigurationRuntimeRoleClaim{OperationID: uuid.NewString(), ClaimedAt: now, Until: until, DatabaseOID: database, PostmasterAt: postmaster.UTC(), Sources: old.Sources}
-	got, err := s.update(ctx, old, object, next, until)
-	if err != nil {
-		return zero, false, err
-	}
-	return got, true, nil
-}
-func (s *ConfigurationRuntimeRoleRoot) CompleteConfigurationRuntimeRole(ctx context.Context, original contracts.ConfigurationRuntimeRoleSnapshot, purpose string, receipt contracts.PublicRuntimeRoleReceipt) error {
-	ctx, end, err := s.enter(ctx)
-	if err != nil {
-		return err
-	}
-	defer end()
-	// The role step's post-lock recheck preceded the CREATE effect; the
-	// receipt write records it under that proof's original deadline (ADR-188).
-	started := s.client.now()
-	proof, err := s.source.latestConfigurationRoleSource(ctx)
-	if err != nil {
-		return err
-	}
-	old, object, err := s.readObserved(ctx, proof, started)
-	if err != nil {
-		return err
-	}
-	n := slices.Index(contracts.ConfigurationRuntimeRolePurposes(), purpose)
-	if n < 0 || old.UID != original.UID || old.State.OperationID != original.State.OperationID || len(original.State.Roles) != len(old.State.Roles) || old.State.Roles[n].Claim == nil || !reflect.DeepEqual(old.State.Roles[n].Claim, original.State.Roles[n].Claim) || old.State.Roles[n].Password != original.State.Roles[n].Password {
-		return cfg.ErrChanged
-	}
-	if current := old.State.Roles[n].Receipt; current != nil {
-		if *current == receipt {
-			return nil
-		}
-		return cfg.ErrChanged
-	}
-	next := old.State
-	next.Roles = append([]contracts.ConfigurationRuntimeRoleMaterial(nil), old.State.Roles...)
-	next.Roles[n].Receipt = &receipt
-	if !configurationRoleStateValid(s.input, next, s.client.now()) {
-		return cfg.ErrInvalid
-	}
-	_, err = s.update(ctx, old, object, next, old.ValidUntil)
-	return err
-}
-func (s *ConfigurationRuntimeRoleRoot) update(ctx context.Context, old contracts.ConfigurationRuntimeRoleSnapshot, object *core.Secret, next contracts.ConfigurationRuntimeRoleState, until time.Time) (contracts.ConfigurationRuntimeRoleSnapshot, error) {
-	var zero contracts.ConfigurationRuntimeRoleSnapshot
-	bounded, end := context.WithDeadline(ctx, until)
-	defer end()
-	if bounded.Err() != nil || !s.client.now().Before(until) {
-		return zero, cfg.ErrUnavailable
-	}
-	b, err := json.Marshal(next)
-	if err != nil || len(b) > contracts.ConfigurationRuntimeRoleMaxBytes {
-		return zero, cfg.ErrUnavailable
-	}
-	defer clear(b)
-	object = object.DeepCopy()
-	object.Data = map[string][]byte{"state.json": b}
-	raw, err := s.client.api.Put().AbsPath(s.path()+"/"+s.name()).Param("fieldValidation", "Strict").Body(object).MaxRetries(0).DoRaw(bounded)
-	// Even an exact lookup after an uncertain CAS cannot positively acknowledge
-	// the first claim. Callers must reopen read-only and never repeat SQL creation.
-	if err != nil {
-		return zero, cfg.ErrUnavailable
-	}
-	out, _, err := s.decode(raw, old.ObservedAt, until)
-	if err != nil || out.UID != old.UID || out.ResourceVersion == old.ResourceVersion || !reflect.DeepEqual(out.State, next) || bounded.Err() != nil {
-		return zero, cfg.ErrChanged
-	}
-	if !configurationRoleSourceMatches(s.input, old.Sources, s.client.now()) || bounded.Err() != nil {
-		return zero, cfg.ErrUnavailable
-	}
-	out.Sources = old.Sources
-	out.Sources.FreshUntil = out.ValidUntil
-	return out, nil
 }
