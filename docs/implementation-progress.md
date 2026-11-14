@@ -198,6 +198,14 @@ hub-local worker. External providers, mixed provider combinations and
 the hub publishes its regional offer only in combined mode. Installation docs:
 [Install with Helm](installation/helm.md).
 
+## Repo hygiene (2026-11-14)
+
+Removed tracked `test/results/`, finished labs, the installer-era harness
+modes and unreachable `test/integration` code. Gap: the installed journey
+(`TestHelmNativeKindJourney`) has no CI suite. `--regional-context-start first`
+fails on main and on this branch at the GC namespace-denial assertion
+(`api_execution_native_test.go`), a guard check for the guards slice.
+
 ## Earlier qualification records
 
 Records before 2026-11-14, and the generated reports under `test/results/`,
