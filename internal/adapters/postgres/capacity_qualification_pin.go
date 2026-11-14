@@ -19,6 +19,9 @@ type CapacityQualificationPin struct {
 	// OperationRetentionSeconds is the shorter retention of the normal and
 	// resolution operation-audit lanes.
 	OperationRetentionSeconds int64 `json:"operationRetentionSeconds"`
+	// EvidenceStoreID is the one qualified backend's evidence store, the
+	// store hub-local download workers read (empty with another layout).
+	EvidenceStoreID string `json:"evidenceStoreID,omitempty"`
 }
 
 // ErrCapacityQualificationPin reports that no capacity qualification exists

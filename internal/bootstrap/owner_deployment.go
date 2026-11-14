@@ -29,6 +29,7 @@ import (
 	configuration "asservat.local/asservat/internal/domain/configuration"
 	value "asservat.local/asservat/internal/domain/fleet"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"k8s.io/client-go/kubernetes"
 )
 
 // OwnerDeployment composes only the private owner subsystem. Installation and
@@ -76,6 +77,10 @@ type OwnerDeployment struct {
 	// record; RunPublic supervises it.
 	localBootstrap *app.LocalClusterBootstrap
 	shared         publicShared
+	// localControls are the control documents this process wrote (the
+	// hub-local download workers'); the trust catalog holds them beside the
+	// mounted worker-controls.json.
+	localControls [][]byte
 	// ADR-182: backend and public input roots (the owner root in the legacy
 	// layout) and, in the installed layout, the provider effects.
 	backend, publicFiles *providerInputs
@@ -208,6 +213,17 @@ func newOwnerDeployment(ctx context.Context, files *os.Root, podUID string, in *
 	reader, err := postgres.NewWorkerRouting(startup, pools["routing"], c.PermissionRootID, c.InstallationID)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
+	}
+	if in.downloadControl != nil && c.Public != nil {
+		api, e := kubernetes.NewForConfig(in.kubernetes(contracts.HubAPIKubernetesTokenFile))
+		if e != nil {
+			return nil, mounts.ErrUnavailable
+		}
+		raw, e := in.downloadControl.publish(startup, api, c.InstallationID, c.ClusterID, parts.pool, parts.issuerRoots, c.Public.WorkerPKI.Roots)
+		if e != nil {
+			return nil, e
+		}
+		d.localControls = [][]byte{raw}
 	}
 	d.trust, err = mtls.NewWorkerTrustCatalog(c.InstallationID, nil)
 	if err != nil {
@@ -351,7 +367,7 @@ func (d *OwnerDeployment) refreshWorkerTrust(ctx context.Context) ([32]byte, err
 	if err != nil || wire.Format != contracts.OwnerWorkerTrustFormat || wire.Controls == nil || len(wire.Controls) > 256 {
 		return zero, mounts.ErrUnavailable
 	}
-	if err = d.trust.Replace(wire.Controls); err != nil {
+	if err = d.trust.Replace(append(wire.Controls, d.localControls...)); err != nil {
 		return zero, mounts.ErrUnavailable
 	}
 	d.catalogDigest = digest

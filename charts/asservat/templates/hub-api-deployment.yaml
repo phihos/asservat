@@ -93,6 +93,13 @@ spec:
                   name: {{ include "asservat.svc.tlsSecret" (list . "federation") | quote }}
                   items: [{key: ca.crt, path: federation-ca.crt}]
               {{- end }}
+              {{- if and $public (include "asservat.hubApi.workerNamespaces" . | fromJsonArray) }}
+              # The key service's serving CA for the hub-local download
+              # workers' control document (written by hub-api).
+              - secret:
+                  name: {{ include "asservat.svc.tlsSecret" (list . "key-service") | quote }}
+                  items: [{key: ca.crt, path: download-key-service-ca.crt}]
+              {{- end }}
               {{- if $public }}
               {{- if .Values.identity.providerRootsPEM }}
               - configMap:

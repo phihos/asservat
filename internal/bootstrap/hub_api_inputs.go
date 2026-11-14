@@ -384,5 +384,15 @@ func loadHubAPIInputs(ctx context.Context, files, configRoot, idsRoot, public *o
 	if err != nil {
 		return nil, err
 	}
-	return &ownerInputs{providerInputs: &providerInputs{files: files, kubernetesEndpoint: c.Kubernetes, postgresEndpoint: c.Postgres}, config: c, offer: offer}, nil
+	var control *hubAPIDownloadControl
+	if c.Public != nil && len(c.Native.WorkerAPIs) == 1 {
+		pin, err := resolver.CapacityPin(call, c.PermissionRootID, c.InstallationID)
+		if err != nil {
+			return nil, hubAPIInputError("capacity-qualification")
+		}
+		if control, err = buildHubAPIDownloadControl(call, files, h, c, pin.EvidenceStoreID, now); err != nil {
+			return nil, err
+		}
+	}
+	return &ownerInputs{providerInputs: &providerInputs{files: files, kubernetesEndpoint: c.Kubernetes, postgresEndpoint: c.Postgres}, config: c, offer: offer, downloadControl: control}, nil
 }

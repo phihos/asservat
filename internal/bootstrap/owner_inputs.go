@@ -68,6 +68,9 @@ type ownerInputs struct {
 	config contracts.OwnerDeployment
 	// offer is the combined-mode regional offer the public layer publishes.
 	offer *hubAPIRegionalOffer
+	// downloadControl is the hub-local download workers' control document
+	// the hub-api writes at startup; nil without download workers.
+	downloadControl *hubAPIDownloadControl
 }
 
 func ownerEndpoint(endpoint string) bool {
