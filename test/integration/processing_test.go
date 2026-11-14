@@ -34,20 +34,13 @@ func qualifyProcessingRestrictions(t *testing.T, ctx context.Context, admin *pgx
 		t.Fatal(err)
 	}
 	scope := privacyvalue.ProcessingScope{Kind: "workloadInterval", ClusterID: e.Registration.Location.ClusterID, NamespaceUID: e.NamespaceUID, WorkloadUID: e.WorkloadUID, AcquiredFrom: e.Registration.AnchorAt.Add(-time.Second), AcquiredUntil: e.Registration.AnchorAt.Add(time.Second)}
-	// Processing is initialized at root creation; an unrelated earlier rule
-	// fills the two-record normal account before the measured restriction.
-	earlier := scope
-	earlier.AcquiredFrom, earlier.AcquiredUntil = scope.AcquiredFrom.Add(-time.Hour), scope.AcquiredFrom.Add(-time.Minute)
-	if _, err = f.service.Change(ctx, f.actor, privacyvalue.ProcessingChange{RequestID: custodyID(), RuleID: custodyID(), Action: "restrict_processing", Scope: earlier}); err != nil {
-		t.Fatal("unrelated earlier restriction", err)
-	}
 	restrict := privacyvalue.ProcessingChange{RequestID: custodyID(), RuleID: custodyID(), Action: "restrict_processing", Scope: scope}
 	blocked, err := f.service.Change(ctx, f.actor, restrict)
 	if err != nil || blocked.State != "restricted" || blocked.Revision != 1 {
 		t.Fatal("actual pre-publication restriction", blocked, err)
 	}
 	var charged, limit int64
-	if err = admin.QueryRow(ctx, "SELECT a.charged,p.records_per_account FROM operation_audit_account a JOIN operation_audit_pool p USING(root_id,lane) WHERE a.root_id=$1 AND a.lane='normal'", s.a.RootID).Scan(&charged, &limit); err != nil || charged != 2 || limit != 2 {
+	if err = admin.QueryRow(ctx, "SELECT a.charged,p.records_per_account FROM operation_audit_account a JOIN operation_audit_pool p USING(root_id,lane) WHERE a.root_id=$1 AND a.lane='normal'", s.a.RootID).Scan(&charged, &limit); err != nil || charged != 1 || limit != 1 {
 		t.Fatal("normal audit pool is not actually full", charged, limit, err)
 	}
 	if err = publish(); err != nil {
@@ -131,7 +124,7 @@ func qualifyProcessingRestrictions(t *testing.T, ctx context.Context, admin *pgx
 		t.Fatal("prepaid release while normal pool full", released, err)
 	}
 	var normalCount, releaseCount int
-	if err = admin.QueryRow(ctx, "SELECT count(*) FILTER(WHERE lane='normal'),count(*) FILTER(WHERE lane='processing') FROM operation_audit WHERE root_id=$1", s.a.RootID).Scan(&normalCount, &releaseCount); err != nil || normalCount != 2 || releaseCount != 1 {
+	if err = admin.QueryRow(ctx, "SELECT count(*) FILTER(WHERE lane='normal'),count(*) FILTER(WHERE lane='processing') FROM operation_audit WHERE root_id=$1", s.a.RootID).Scan(&normalCount, &releaseCount); err != nil || normalCount != 1 || releaseCount != 1 {
 		t.Fatal("release used a new normal account or duplicated audit", normalCount, releaseCount, err)
 	}
 	replay, err := f.service.Change(ctx, f.actor, release)

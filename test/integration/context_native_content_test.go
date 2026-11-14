@@ -727,7 +727,7 @@ func nativeOperationAuditServices(t, owner *testing.T, ctx context.Context, root
 			// that synthetic configuration through its real revisioned API.
 			// Fund all four HTTP preflights independently of transfer depletion.
 			var revision, accounts, records int64
-			if e = cp.QueryRow(ctx, "SELECT revision,account_limit,records_per_account FROM operation_audit_pool WHERE root_id=$1 AND lane='normal'", backing.RootID).Scan(&revision, &accounts, &records); e != nil || revision != 1 || accounts != 2 || records != 2 {
+			if e = cp.QueryRow(ctx, "SELECT revision,account_limit,records_per_account FROM operation_audit_pool WHERE root_id=$1 AND lane='normal'", backing.RootID).Scan(&revision, &accounts, &records); e != nil || revision != 1 || accounts != 2 || records != 1 {
 				t.Fatal("original processing audit backing", revision, accounts, records, e)
 			}
 			backing.ExpectedRevision = revision
