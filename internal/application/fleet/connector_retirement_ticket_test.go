@@ -52,12 +52,10 @@ func TestConnectorRetirementTicketPreservesMinimumOriginalDates(t *testing.T) {
 }
 
 func TestConnectorRetirementTicketRejectsImpossibleUpfrontPromises(t *testing.T) {
-	for _, which := range []string{"admission ends too late", "earlier acceptance purge", "longer retention", "changed process", "wrong account", "identical operation", "short lifetime"} {
+	for _, which := range []string{"earlier acceptance purge", "longer retention", "changed process", "wrong account", "identical operation", "short lifetime"} {
 		t.Run(which, func(t *testing.T) {
 			p := connectorTicketPlan(t)
 			switch which {
-			case "admission ends too late":
-				p.Backing.Policy.ValidUntil = p.Backing.Policy.ValidUntil.Add(time.Microsecond)
 			case "earlier acceptance purge":
 				p.AcceptancePurgeAt = p.AcceptancePurgeAt.Add(-time.Microsecond)
 			case "longer retention":
@@ -76,6 +74,17 @@ func TestConnectorRetirementTicketRejectsImpossibleUpfrontPromises(t *testing.T)
 				t.Fatal("impossible original retirement promise accepted")
 			}
 		})
+	}
+}
+
+// ADR-332: a standing backing admits its cohort until the backing is
+// replaced, beyond the accepting record's retention.
+func TestConnectorRetirementTicketAdmitsUntilBackingReplaced(t *testing.T) {
+	p := connectorTicketPlan(t)
+	p.Backing.Policy.ValidUntil = ConnectorBackingStanding
+	ticket, e := p.Ticket()
+	if e != nil || !ticket.AdmissionUntil.Equal(ConnectorBackingStanding) || !ticket.ConsumeUntil.Before(ticket.RetainUntil) {
+		t.Fatal("standing cohort admission refused", e)
 	}
 }
 

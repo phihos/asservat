@@ -221,7 +221,6 @@
       "profiles": 2,
       "sourceTransitions": 64,
       "purgeLeases": 2,
-      "validSeconds": 7200,
       "footprint": {
         "rowBytes": 1048576,
         "transitionWALBytes": 1048576

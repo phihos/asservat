@@ -141,7 +141,7 @@ func capacityIDs(setup string) func() string {
 // prepaid-retirement layout's own validator accepts.
 func buildConnectorBacking(c contracts.InstallerConnectorSettings, b contracts.InstallerCapacityBackup, root, installation, accountVersion, setup string, now time.Time) (fleetapp.ConnectorIdentityBacking, error) {
 	var zero fleetapp.ConnectorIdentityBacking
-	if !authorization.UUID(setup) || c.ValidSeconds < 3600 || c.ValidSeconds > 366*86400 {
+	if !authorization.UUID(setup) {
 		return zero, mounts.ErrUnavailable
 	}
 	space, n := uuid.MustParse(setup), 0
@@ -160,7 +160,7 @@ func buildConnectorBacking(c contracts.InstallerConnectorSettings, b contracts.I
 			PolicyDigest: profileDigest("connector", c), BackupProfileDigest: profileDigest("backup", b),
 			BackingRevision: 1, MetadataSlots: slots, BackupReservedBytes: slots * backupBytes, WALReservedBytes: slots * walBytes,
 			BackupHorizonSeconds: b.HorizonSeconds, CleanupBudgetSeconds: b.CleanupBudgetSeconds, ProofWindowSeconds: b.ProofWindowSeconds,
-			ValidUntil: now.Add(time.Duration(c.ValidSeconds) * time.Second), MaxPurgeLeases: c.PurgeLeases, History: &q, OverdueTerminal: audit.OperationOverdueTerminal}}
+			ValidUntil: fleetapp.ConnectorBackingStanding, MaxPurgeLeases: c.PurgeLeases, History: &q, OverdueTerminal: audit.OperationOverdueTerminal}}
 	// ponytail: at most 256 regional peers and 4096 source transitions each,
 	// which keeps the reservation products below int64; raise both with
 	// checked multiplication if an installation needs more.
@@ -174,13 +174,6 @@ func buildConnectorBacking(c contracts.InstallerConnectorSettings, b contracts.I
 	// cleanup budgets, the proof window and a minute; it must cover the fixed
 	// regional deployment shape.
 	if !out.Valid() || !out.SupportsProcessLimits(contracts.RegionalServingSlots, contracts.RegionalRetainedProcesses) {
-		return zero, mounts.ErrUnavailable
-	}
-	// The first process acceptance must prepay its original retirement ticket
-	// through the entire promised admission period. The ticket's ordinary end
-	// must precede its original purge by one minute (Go and SQL), using this
-	// original compiler start rather than a later enrollment observation.
-	if out.Policy.ValidUntil.After(now.Add(time.Duration(out.ProcessRunSeconds()) * time.Second)) {
 		return zero, mounts.ErrUnavailable
 	}
 	return out, nil

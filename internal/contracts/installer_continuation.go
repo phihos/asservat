@@ -161,8 +161,8 @@ type InstallerFleetIssuance struct {
 }
 
 // InstallerConnectorSettings are the operator-qualified connector identity
-// limits. Profiles bounds the staged regional peers. ValidSeconds bounds the
-// backing from the role setup time; renewal is a separate operation.
+// limits. Profiles bounds the staged regional peers. The backing is a standing
+// configuration, valid until replaced (ADR-332).
 type InstallerConnectorSettings struct {
 	Accounts          int64                      `json:"accounts"`
 	RecordsPerAccount int64                      `json:"recordsPerAccount"`
@@ -170,7 +170,6 @@ type InstallerConnectorSettings struct {
 	Profiles          int64                      `json:"profiles"`
 	SourceTransitions int64                      `json:"sourceTransitions"`
 	PurgeLeases       int64                      `json:"purgeLeases"`
-	ValidSeconds      int64                      `json:"validSeconds"`
 	Footprint         InstallerCapacityFootprint `json:"footprint"`
 }
 

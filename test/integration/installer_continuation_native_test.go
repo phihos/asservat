@@ -121,7 +121,7 @@ func prepareInstallerContinuationNative(t *testing.T, ctx context.Context, api k
 		}
 	}
 	capacity := nativeCapacityProfile()
-	connector := contracts.InstallerConnectorSettings{Accounts: 4, RecordsPerAccount: 256, RetainedSeconds: 15000, Profiles: 2, SourceTransitions: 64, PurgeLeases: 2, ValidSeconds: 7200,
+	connector := contracts.InstallerConnectorSettings{Accounts: 4, RecordsPerAccount: 256, RetainedSeconds: 15000, Profiles: 2, SourceTransitions: 64, PurgeLeases: 2,
 		Footprint: contracts.InstallerCapacityFootprint{RowBytes: 1 << 20, TransitionWALBytes: 1 << 20}}
 	baseline := &contracts.InstallerRetentionBaseline{PurposeRef: "synthetic-baseline",
 		Defaults:              contracts.InstallerRetentionDurations{EvidenceSeconds: 86400, CaseMetadataSeconds: 86400, AuditMetadataSeconds: 86400},

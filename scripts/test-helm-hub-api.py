@@ -20,7 +20,7 @@ CHART = ROOT / "charts/asservat"
 HELM = os.environ.get("HELM", "helm")
 NS = "asservat-system"
 
-CONNECTOR = {"accounts": 1, "recordsPerAccount": 96, "retainedSeconds": 4000, "profiles": 1, "sourceTransitions": 8, "purgeLeases": 2, "validSeconds": 3600,
+CONNECTOR = {"accounts": 1, "recordsPerAccount": 96, "retainedSeconds": 4000, "profiles": 1, "sourceTransitions": 8, "purgeLeases": 2,
              "footprint": {"rowBytes": 1048576, "transitionWALBytes": 1048576}}
 BACKUP = {"horizonSeconds": 1, "cleanupBudgetSeconds": 60, "proofWindowSeconds": 60, "backupCopies": 1, "walCopies": 1}
 BUNDLED = {

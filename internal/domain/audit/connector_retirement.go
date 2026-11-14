@@ -51,7 +51,10 @@ func (t ConnectorRetirementTicket) Valid() bool {
 		return false
 	}
 	purge := t.OriginalPurgeAt()
-	return t.ReservedAt.Before(t.AdmissionUntil) && !t.AdmissionUntil.After(purge.Add(-time.Minute)) &&
+	// AdmissionUntil is the standing backing's ValidUntil (ADR-332): the
+	// cohort admits processes until the backing is replaced, independent of
+	// the accepting record's retention.
+	return t.ReservedAt.Before(t.AdmissionUntil) &&
 		t.ConsumeUntil.Equal(purge.Add(-30*time.Second)) && p.ValidUntil.Equal(t.ConsumeUntil) &&
 		!purge.After(t.OriginalAcceptancePurgeAt) && purge.After(t.ReservedAt.Add(time.Minute)) &&
 		t.RetainUntil.After(purge) && !t.RetainUntil.After(t.ReservedAt.Add(3660*24*time.Hour))

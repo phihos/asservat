@@ -120,7 +120,6 @@ federation:
     profiles: 1
     sourceTransitions: 8
     purgeLeases: 2
-    validSeconds: 3600
     footprint: {rowBytes: 1048576, transitionWALBytes: 1048576}
   fleet: {channelMount: fleet-bootstrap, deliveryProfile: regional-installer}
 hub:

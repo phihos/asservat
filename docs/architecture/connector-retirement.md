@@ -51,6 +51,11 @@ invent that result. Unknown replies reuse the original ticket/operation and
 original times. An expired audit interval can still leave a useful protective
 fence, but cannot be reported as acknowledged audit or successful cleanup.
 
+[ADR-332](../decisions/332-standing-connector-identity.md): the shipped
+backing is standing, so a ticket's ordinary admission lasts until the backing
+is replaced and is no longer bounded by the accepting record's purge. The
+finite arithmetic below applies to a finite (test) backing.
+
 At the minimum accepted retention of 2100 seconds with zero backup horizon and
 60-second cleanup/proof windows, an acceptance at A fixes original object purge
 at A+1860, ticket consume end at A+1830, ordinary admission no later than A+1800,

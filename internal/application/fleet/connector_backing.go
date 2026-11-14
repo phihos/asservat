@@ -55,13 +55,19 @@ func (b ConnectorIdentityBacking) Clone() ConnectorIdentityBacking {
 	return b
 }
 
+// ConnectorBackingStanding is the connector backing's ValidUntil: the backing
+// is a standing configuration, valid until replaced (ADR-332), not a window a
+// connector must restart or enroll within. The value is RFC 5280's
+// "no well-defined expiration" time; finite, as the SQL columns require.
+var ConnectorBackingStanding = time.Date(9999, 12, 31, 23, 59, 59, 0, time.UTC)
+
 type ConnectorIdentityConfiguration struct {
 	Source  value.ConnectorIdentitySource
 	Backing ConnectorIdentityBacking
 }
 
 func (c ConnectorIdentityConfiguration) Valid(now time.Time) bool {
-	return c.Source.Valid(now) && c.Source.Observation.Backing.Revision == c.Backing.Policy.BackingRevision && c.Backing.Valid() && c.Backing.Policy.RootID == c.Source.Observation.Profile.RootID && c.Backing.Policy.InstallationID == c.Source.Observation.Profile.Binding.InstallationID && c.Backing.SupportsDeployment(c.Source.Observation.Profile.Deployment) && now.Before(c.Backing.Policy.ValidUntil)
+	return c.Source.Valid(now) && c.Source.Observation.Backing.Revision == c.Backing.Policy.BackingRevision && c.Backing.Valid() && c.Backing.Policy.RootID == c.Source.Observation.Profile.RootID && c.Backing.Policy.InstallationID == c.Source.Observation.Profile.Binding.InstallationID && c.Backing.SupportsDeployment(c.Source.Observation.Profile.Deployment)
 }
 func (c ConnectorIdentityConfiguration) Clone() ConnectorIdentityConfiguration {
 	c.Source.Observation.Profile = c.Source.Observation.Profile.Clone()

@@ -2357,11 +2357,6 @@
           "minimum": 2,
           "maximum": 32
         },
-        "validSeconds": {
-          "type": "integer",
-          "minimum": 3600,
-          "maximum": 31622400
-        },
         "footprint": {
           "$ref": "#/definitions/installerFootprint"
         }
@@ -2373,7 +2368,6 @@
         "profiles",
         "sourceTransitions",
         "purgeLeases",
-        "validSeconds",
         "footprint"
       ]
     },

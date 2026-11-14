@@ -237,7 +237,8 @@ func newConnectorSQLFixtureWithOptions(t *testing.T, ctx context.Context, admin 
 		q.BackupCopies, q.WALCopies = h.BackupCopies, h.WALCopies
 		policy.History, policy.MetadataSlots, policy.MaxPurgeLeases = &q, c.Accounts*c.RecordsPerAccount, c.PurgeLeases
 		policy.BackupHorizonSeconds, policy.CleanupBudgetSeconds, policy.ProofWindowSeconds = h.HorizonSeconds, h.CleanupBudgetSeconds, h.ProofWindowSeconds
-		policy.ValidUntil = n.Add(time.Duration(c.ValidSeconds) * time.Second)
+		// ADR-332: the shipped backing is standing, valid until replaced.
+		policy.ValidUntil = app.ConnectorBackingStanding
 		backup, wal := q.SlotBacking(c.PurgeLeases)
 		policy.BackupReservedBytes, policy.WALReservedBytes = backup*policy.MetadataSlots, wal*policy.MetadataSlots
 		b.Policy = policy
@@ -467,6 +468,7 @@ func qualifyConnectorIdentity(t *testing.T, ctx context.Context, admin *pgxpool.
 		if profiles != 1 || transitions != 1 || processes != 1 {
 			t.Fatalf("original profile/transition/process charges changed: %d/%d/%d", profiles, transitions, processes)
 		}
+		qualifyStandingConnectorIdentity(t, f)
 	})
 	t.Run("connector-identity-fast", func(t *testing.T) {
 		f := newConnectorSQLFixture(t, ctx, admin, poolFor, store, keys, create(t, 1), 10800)
@@ -637,5 +639,52 @@ func (f *connectorSQLFixture) qualifyPrivateViews(t *testing.T, poolFor func(str
 	_, e = f.pools["cleanup"].Exec(wait, "SELECT id FROM connector_operation_audit WHERE id=$1 FOR UPDATE", f.processID)
 	if e == nil || time.Since(began) > time.Second {
 		t.Fatal("private view ignored original lock deadline", e, time.Since(began))
+	}
+}
+
+// ADR-332: nothing in an installed system renews the backing, purges the
+// identity audit lane or detaches old processes. A connector must still admit
+// a new process (a restart) after as many earlier processes as the deployment
+// shape names (restarted Pods whose runs have not ended) and after its account
+// has used the record count the backing was sized for.
+func qualifyStandingConnectorIdentity(t *testing.T, f *connectorSQLFixture) {
+	t.Helper()
+	ctx := f.ctx
+	var rootUntil, admissionUntil time.Time
+	if err := f.admin.QueryRow(ctx, "SELECT r.valid_until,t.admission_until FROM connector_identity_root r JOIN connector_retirement_ticket t ON t.root_id=r.root_id WHERE r.root_id=$1", f.scenario.a.RootID).Scan(&rootUntil, &admissionUntil); err != nil || !rootUntil.Equal(app.ConnectorBackingStanding) || !admissionUntil.Equal(app.ConnectorBackingStanding) {
+		t.Fatal("standing backing or ticket admission not stored", rootUntil, admissionUntil, err)
+	}
+	// Synthetic history only: earlier processes of restarted Pods, inserted
+	// beside the guard, and an account charged up to its sized record count.
+	conn, err := f.admin.Acquire(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	limit := f.configuration.Source.Observation.Profile.Deployment.RetainedProcesses
+	_, err = conn.Exec(ctx, "SET session_replication_role=replica")
+	for i := 0; err == nil && i < limit; i++ {
+		_, err = conn.Exec(ctx, `INSERT INTO connector_identity_process(id,root_id,peer_id,pod_uid,process_epoch,client_key,server_key,process,source_uid,source_generation,source_digest,claimed_at,initial_not_after,run_until,accepted_at)
+ SELECT gen_random_uuid(),root_id,peer_id,gen_random_uuid(),gen_random_uuid(),sha256(gen_random_uuid()::text::bytea),sha256(gen_random_uuid()::text::bytea),process,source_uid,source_generation,source_digest,
+  claimed_at-interval '10 minutes',date_trunc('second',claimed_at-interval '10 minutes'+interval '30 minutes'),date_trunc('second',claimed_at-interval '10 minutes'+interval '30 minutes'),claimed_at-interval '10 minutes'
+ FROM connector_identity_process WHERE id=$1`, f.processID)
+	}
+	if err == nil {
+		_, err = conn.Exec(ctx, "UPDATE operation_audit_account a SET charged=p.records_per_account FROM operation_audit_pool p WHERE p.root_id=a.root_id AND p.lane=a.lane AND a.root_id=$1 AND a.lane='identity'", f.scenario.a.RootID)
+	}
+	if _, reset := conn.Exec(ctx, "RESET session_replication_role"); err == nil {
+		err = reset
+	}
+	conn.Release()
+	if err != nil {
+		t.Fatal("synthetic connector history", err)
+	}
+	restart := value.ConnectorProcessRequest{Process: value.ConnectorProcessIdentity{Binding: f.request.Process.Binding, PodUID: custodyID(), ProcessEpoch: custodyID()}, ClientCSRDER: connectorSQLCSR(t), ServerCSRDER: connectorSQLCSR(t)}
+	f.refresh(t)
+	if _, err = f.enrollment.Enroll(ctx, custodyID(), restart); err != nil {
+		t.Fatal("restarted connector process not admitted after earlier processes and a full record count", err)
+	}
+	f.refresh(t)
+	if _, err = f.renewal.IssueProcess(ctx, custodyID(), "client", restart); err != nil {
+		t.Fatal("restarted connector process certificate", err)
 	}
 }
