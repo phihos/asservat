@@ -13,6 +13,7 @@ import (
 	"asservat.local/asservat/internal/adapters/postgres"
 	app "asservat.local/asservat/internal/application/capacity"
 	"asservat.local/asservat/internal/contracts"
+	cfg "asservat.local/asservat/internal/domain/configuration"
 )
 
 func hubWorkerCapacityIDs() contracts.InstallationIDs {
@@ -236,5 +237,35 @@ func TestCapacityValuesDeriveSpecExample(t *testing.T) {
 	pool, policies, err = app.DeriveBudget(v, capacityClusters(c, ids))
 	if err != nil || pool.Slots[0].Workloads != 7 || policies[0].Hard != policies[0].Protected {
 		t.Fatal("defaults", err, pool, policies)
+	}
+}
+
+// The internal qualification backs the values-derived pool, for the
+// smallest and the largest evidence storage the backend accepts.
+func TestCapacityQualificationBacksValuesPool(t *testing.T) {
+	ids := hubWorkerCapacityIDs()
+	q, err := buildHubWorkerQualification(hubWorkerCapacityFixture(), ids, "asservat", "30000000-0000-4000-8000-0000000000a2", capacityTestInitialized)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, storage := range []string{"8Gi", "1Pi"} {
+		c := hubWorkerCapacityFixture()
+		c.EvidenceStorage, c.Workload = storage, contracts.CapacityWorkloadValues{}
+		v, err := capacityValues(c.CapacityValues)
+		if err != nil {
+			t.Fatal(err)
+		}
+		s := &app.ValuesSource{Installation: ids.InstallationID, Cluster: ids.ClusterID, Control: cfg.NamespaceRef{Name: "asservat", UID: "ns-uid"}, Revision: 1, Values: v, Clusters: capacityClusters(c, ids), Now: time.Now}
+		o, err := s.ReadCapacitySource(t.Context())
+		if err != nil {
+			t.Fatal(storage, err)
+		}
+		plan, err := app.CompileProtectedPoolPlan(o.Snapshot, o.Snapshot.Pools[0].Resource.Name)
+		if err != nil {
+			t.Fatal(storage, err)
+		}
+		if _, err = app.CompileQualifiedRootBacking(q, plan); err != nil {
+			t.Fatal(storage, "qualification does not back the pool", err)
+		}
 	}
 }

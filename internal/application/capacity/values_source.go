@@ -2,13 +2,14 @@ package capacity
 
 import (
 	"context"
+	"crypto/sha1"
 	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"math/bits"
 	"strconv"
+	"strings"
 	"time"
-
-	"github.com/google/uuid"
 
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
@@ -118,8 +119,15 @@ func DeriveBudget(v CapacityValues, clusters []string) (PoolBudgetInput, []Polic
 func policyName(cluster string) string { return "cluster-" + cluster }
 
 // SystemPoolUID is the stable identity of the installation's one pool.
-func SystemPoolUID(installation string) string {
-	return uuid.NewSHA1(uuid.MustParse(installation), []byte("capacity/pool")).String()
+func SystemPoolUID(installation string) string { return nameUUID(installation, "capacity/pool") }
+
+// nameUUID is the RFC 9562 version 5 UUID of name in the space UUID.
+func nameUUID(space, name string) string {
+	b, _ := hex.DecodeString(strings.ReplaceAll(space, "-", ""))
+	h := sha1.Sum(append(b, name...))
+	h[6], h[8] = h[6]&0x0f|0x50, h[8]&0x3f|0x80
+	x := hex.EncodeToString(h[:16])
+	return x[:8] + "-" + x[8:12] + "-" + x[12:16] + "-" + x[16:20] + "-" + x[20:]
 }
 
 // ValuesSource is the capacity source: the Helm values of the current
@@ -166,7 +174,7 @@ func (s *ValuesSource) ReadCapacitySource(ctx context.Context) (CapacitySourceOb
 	versions := []CapacitySourceVersion{v}
 	for i := range policies {
 		p := &policies[i]
-		uid := uuid.NewSHA1(uuid.MustParse(s.Installation), []byte("capacity/policy/"+p.Cluster)).String()
+		uid := nameUUID(s.Installation, "capacity/policy/"+p.Cluster)
 		scope := BudgetScope{ClusterID: p.Cluster, NamespaceLabels: map[string]string{EligibilityLabel: eligible}}
 		r, v := resource(PolicyKind, p.Name, uid, struct {
 			Scope  BudgetScope

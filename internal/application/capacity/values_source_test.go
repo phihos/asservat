@@ -39,3 +39,10 @@ func TestValuesSourceObservation(t *testing.T) {
 		t.Fatal("upgrade did not produce a new generation of the same pool", err)
 	}
 }
+
+func TestNameUUIDIsVersion5(t *testing.T) {
+	// RFC 9562 appendix A.4: DNS namespace, "www.example.com".
+	if got := nameUUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8", "www.example.com"); got != "2ed6657d-e927-568b-95e1-2665a8aea6a2" {
+		t.Fatal(got)
+	}
+}
