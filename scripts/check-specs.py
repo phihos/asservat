@@ -764,17 +764,20 @@ def semantic_checks(doc: dict) -> None:
         mapping = spec.get("metadataMapping", {})
         if mapping.get("mode") == "valueMap":
             require(all(group != "*" for groups in mapping["values"].values() for group in groups), "Wildcard mapped group")
-    if doc.get("kind") is None and "workload" in doc and "evidenceStorage" in doc:
+    if doc.get("kind") is None and "workload" in doc:
         # Hub `capacity` values (ADR-335 D2): the protected share fits the hard limit.
+        # Without evidenceStorage, compare only when both sides use the same form.
         def capacity_bytes(value, total):
             if value.endswith("%"):
                 return total * float(value[:-1]) / 100
             units = {"Ki": 2**10, "Mi": 2**20, "Gi": 2**30, "Ti": 2**40, "Pi": 2**50, "k": 10**3, "M": 10**6, "G": 10**9, "T": 10**12, "P": 10**15}
-            number = value.rstrip("KMGTPkimi")
-            return int(number) * units.get(value[len(number):], 1)
-        total = capacity_bytes(doc["evidenceStorage"], 0)
+            number, unit = re.fullmatch(r"([0-9]+)(Ki|Mi|Gi|Ti|Pi|k|M|G|T|P)?", value).groups()
+            return int(number) * units.get(unit, 1)
         workload = doc["workload"]
-        require(capacity_bytes(workload.get("share", "2%"), total) <= capacity_bytes(workload.get("limit", "10%"), total), "Invalid workload protected/hard share")
+        share, limit = workload.get("share", "2%"), workload.get("limit", "10%")
+        if "evidenceStorage" in doc or share.endswith("%") == limit.endswith("%"):
+            total = capacity_bytes(doc.get("evidenceStorage", "100"), 0)
+            require(capacity_bytes(share, total) <= capacity_bytes(limit, total), "Invalid workload protected/hard share")
     if kind == "EvidenceRetentionPolicy":
         budget = spec["deletionBudgetSeconds"]
         require(all(age > budget for age in spec["maxima"].values()), "Retention maximum leaves no deletion budget")
