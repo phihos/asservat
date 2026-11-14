@@ -39,7 +39,6 @@ func qualifyContextCase(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 		t.Helper()
 		now := time.Now().UTC().Truncate(time.Microsecond)
 		batch := s.batch
-		batch.Initial = nil
 		batch.ObservedAt = now
 		batch.FreshUntil = now.Add(5 * time.Second)
 		if err := s.p.RefreshPermissions(ctx, batch); err != nil {

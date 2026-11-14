@@ -337,7 +337,6 @@ func qualifyNativeAPIExecution(t *testing.T, ctx context.Context, f fixture, adm
 	n.protect(t, ctx, s.recovery.installation, s.recovery.observation.issuer)
 	refreshPermissions := func() {
 		now := time.Now().UTC().Truncate(time.Microsecond)
-		s.batch.Initial = nil
 		s.batch.ObservedAt = now
 		s.batch.FreshUntil = now.Add(5 * time.Second)
 		if e := s.p.RefreshPermissions(ctx, s.batch); e != nil {

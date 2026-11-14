@@ -5,7 +5,6 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"net/url"
 	"testing"
@@ -25,14 +24,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/jackc/pgx/v5/pgxpool"
-	core "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
 
@@ -42,10 +38,6 @@ func testGuardedReconciliation(t *testing.T, ctx context.Context, c *rest.Config
 	t.Helper()
 	cluster, targetNS := permissionFixtureCluster, permissionFixtureTarget(t, ctx, c)
 	control := plan.ControlNamespace
-	native, err := kubernetes.NewForConfig(c)
-	if err != nil {
-		t.Fatal(err)
-	}
 	actor := rest.CopyConfig(c)
 	actor.Impersonate = rest.ImpersonationConfig{UserName: "fixture-delegate", Groups: []string{"asservat-fixture-writers", "system:authenticated"}}
 	api, err := dynamic.NewForConfig(actor)
@@ -79,23 +71,6 @@ func testGuardedReconciliation(t *testing.T, ctx context.Context, c *rest.Config
 		t.Fatal(err)
 	}
 	snapshot, err := reader.PermissionSnapshot(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	digest := configapp.InitialBindingDigest(snapshot)
-	now := time.Now().UTC()
-	review, err := native.CoreV1().ConfigMaps(control.Name).Create(ctx, &core.ConfigMap{ObjectMeta: meta.ObjectMeta{Name: "permission-bootstrap"}, Data: map[string]string{"format": "asservat-permission-bootstrap/v1", "reviewer": "fixture-admin", "bindingsSHA256": hex.EncodeToString(digest[:]), "reviewedAt": now.Format(time.RFC3339Nano), "expiresAt": now.Add(time.Hour).Format(time.RFC3339Nano)}}, meta.CreateOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	delegatedNative, err := kubernetes.NewForConfig(actor)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err = delegatedNative.CoreV1().ConfigMaps(control.Name).Patch(ctx, review.Name, types.MergePatchType, []byte(`{"data":{"reviewer":"forged"}}`), meta.PatchOptions{}); !apierrors.IsForbidden(err) {
-		t.Fatalf("delegate can alter bootstrap: %v", err)
-	}
-	reviewReader, err := kube.NewBootstrapReviewClient(reader, review.Name, string(review.UID))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +128,7 @@ func testGuardedReconciliation(t *testing.T, ctx context.Context, c *rest.Config
 	runCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	done := make(chan error, 1)
-	reconciler := configapp.BindingReconciler{RootID: root, Reader: reader, Watcher: reader, Trust: guard, Review: reviewReader, Store: store, Now: time.Now, NewID: custodyID}
+	reconciler := configapp.BindingReconciler{RootID: root, Reader: reader, Watcher: reader, Trust: guard, Store: store, Now: time.Now, NewID: custodyID}
 	go func() { done <- reconciler.Run(runCtx) }()
 	stopped := false
 	defer func() {

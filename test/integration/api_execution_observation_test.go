@@ -63,7 +63,7 @@ func qualifyAPIExecutionRetainedObservation(t *testing.T, ctx context.Context, a
 		// Observe once after fixture provisioning, then retain exactly this check
 		// through successful preparation and the subsequent blocked bind effect.
 		now := time.Now().UTC().Truncate(time.Microsecond)
-		s.batch.ObservedAt, s.batch.FreshUntil, s.batch.Initial = now, now.Add(5*time.Second), nil
+		s.batch.ObservedAt, s.batch.FreshUntil = now, now.Add(5*time.Second)
 		if err = s.p.RefreshPermissions(ctx, s.batch); err != nil {
 			t.Fatal(err)
 		}

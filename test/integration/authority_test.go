@@ -135,9 +135,6 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 		b.FreshUntil = now.Add(5 * time.Second)
 		return b
 	}
-	initialReview := func(cluster string, control cfg.NamespaceRef, d artifact.Digest, now time.Time) cfg.BootstrapReview {
-		return cfg.BootstrapReview{Resource: cfg.Resource{ClusterID: cluster, Namespace: control.Name, NamespaceUID: control.UID, Kind: "ConfigMap", UID: custodyID(), ResourceVersion: "review-1", SpecDigest: artifact.Digest{9}}, Reviewer: "synthetic-administrator", BindingsDigest: d, ReviewedAt: now.Add(-time.Minute), ExpiresAt: now.Add(time.Minute), ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
-	}
 	create := func(t *testing.T) setup {
 		t.Helper()
 		root, epoch, cluster := custodyID(), custodyID(), custodyID()
@@ -152,9 +149,6 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 		basis := cfg.PermissionBasis{Resource: cfg.Resource{Kind: "AccessBinding", UID: custodyID(), Generation: 1, ResourceVersion: "v1", SpecDigest: artifact.Digest{2}}, Scope: cfg.Scope{ClusterID: cluster, Namespace: cfg.NamespaceRef{Name: "app", UID: custodyID()}}, Effect: "Allow", Subjects: []cfg.Subject{{Kind: "Group", Issuer: "https://id.example.test", ID: "team-a"}}, Roles: []string{"workload-maintainer"}}
 		basis.ScopeDigest = configapp.PermissionScopeDigest(basis)
 		b := fresh(cfg.PermissionBatch{RootID: root, Epoch: epoch, TrustDigest: trust, InputDigest: artifact.Digest{3}, Bases: []cfg.PermissionBasis{basis}})
-		control := cfg.NamespaceRef{Name: "asservat", UID: "control"}
-		review := initialReview(cluster, control, artifact.Digest{8}, b.ObservedAt)
-		b.Initial = &cfg.PermissionInitialization{ClusterID: cluster, Control: control, BindingCount: 1, BindingsDigest: review.BindingsDigest, Review: &review}
 		return setup{p, b, authorization.Target{ClusterID: cluster, NamespaceUID: basis.Scope.Namespace.UID, WorkloadUID: custodyID(), PodUID: custodyID()}}
 	}
 	accept := func(t *testing.T, s *setup) {
@@ -394,36 +388,9 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 			t.Fatal("exact restored authority scope changed baseline")
 		}
 	})
-	t.Run("bootstrap-requires-exact-review-and-is-durable", func(t *testing.T) {
+	t.Run("first-acceptance-is-durable", func(t *testing.T) {
 		s := create(t)
-		missing := s.b
-		missing.Initial = nil
-		if _, err := s.p.AcceptPermissions(ctx, missing); !errors.Is(err, cfg.ErrDenied) {
-			t.Fatalf("unreviewed baseline: %v", err)
-		}
-		wrong := *s.b.Initial
-		wrong.BindingsDigest[0]++
-		missing.Initial = &wrong
-		if _, err := s.p.AcceptPermissions(ctx, missing); !errors.Is(err, cfg.ErrDenied) {
-			t.Fatalf("different review: %v", err)
-		}
 		accept(t, &s)
-		pending, err := s.p.PendingAuthorityAudits(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
-		found := false
-		for _, r := range pending {
-			if r.Bootstrap != nil {
-				found = true
-				if r.Bootstrap.ReviewUID != s.b.Initial.Review.Resource.UID || r.Bootstrap.BindingsDigest != s.b.Initial.BindingsDigest {
-					t.Fatal("bootstrap audit lost provenance")
-				}
-			}
-		}
-		if !found {
-			t.Fatal("missing bootstrap audit")
-		}
 		flush(t, s.p)
 		f, err := s.p.BeginPermissions(ctx, s.b.RootID, s.b.Epoch, s.b.TrustDigest)
 		if err != nil || !f.Initialized {
@@ -475,13 +442,9 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 		if err != nil || len(rows) != 2 {
 			t.Fatalf("expected initial and later audit: %v", err)
 		}
-		for _, r := range rows {
-			if r.Bootstrap == nil {
-				ack(r)
-			}
-		}
+		ack(rows[1])
 		if len(projection(t, s).Allows) != 0 {
-			t.Fatal("new access bypassed unacknowledged bootstrap provenance")
+			t.Fatal("new access bypassed the unacknowledged initial audit")
 		}
 		flush(t, s.p)
 		if len(projection(t, s).Allows) != 1 {
@@ -591,9 +554,6 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 		snapshot := cfg.Snapshot{ClusterID: s.target.ClusterID, ControlNamespace: cfg.NamespaceRef{Name: "asservat", UID: "control"}, BindingResourceVersion: "baseline", Bindings: []cfg.Binding{binding}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
 		journal, err := configapp.NewBindingJournal(snapshot, now)
 		if err != nil {
-			t.Fatal(err)
-		}
-		if err = journal.SetInitialReview(initialReview(snapshot.ClusterID, snapshot.ControlNamespace, configapp.InitialBindingDigest(snapshot), now), now); err != nil {
 			t.Fatal(err)
 		}
 		fence := cfg.PermissionFence{RootID: s.b.RootID, Epoch: s.b.Epoch, TrustDigest: s.b.TrustDigest}
@@ -790,8 +750,7 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 			t.Fatal("generation gap preserved the assignment")
 		}
 		// The preview evaluates a proposed source against this observation.
-		spec := cfg.Source{Resource: cfg.Resource{SpecDigest: artifact.Digest{6}}, Enabled: true, Type: "namespaceMetadata", ClusterID: s.target.ClusterID, Role: "evidence-reader", NamespaceSelector: map[string]string{"managed": "true"},
-			MaxDecisionAge: 30 * time.Second, MaxNamespaces: 10, Protection: cfg.Protection{Mode: "administratorManaged", ReviewRef: "review"},
+		spec := cfg.Source{Resource: cfg.Resource{SpecDigest: artifact.Digest{6}}, Enabled: true, Type: "namespaceMetadata", ClusterID: s.target.ClusterID, Role: "evidence-reader", NamespaceSelector: map[string]string{"managed": "true"}, Protection: cfg.Protection{Mode: "administratorManaged", ReviewRef: "review"},
 			Mapping: cfg.Mapping{Field: "annotation", Key: "owner", Mode: "valueMap", Issuer: issuer, Values: map[string][]string{"payments": {"team-p"}}}}
 		unobserved := spec
 		unobserved.Mapping.Key = "team"
@@ -823,7 +782,7 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 		binding := s.b.Bases[0]
 		issuer := "https://id.example.test"
 		spec := cfg.Source{Resource: cfg.Resource{Kind: "PermissionSource", UID: custodyID(), ResourceVersion: "exec-1", Generation: 1, SpecDigest: artifact.Digest{40}}, Enabled: true, Type: cfg.SourceKubernetesExec,
-			ClusterID: s.target.ClusterID, Role: "workload-maintainer", NamespaceSelector: map[string]string{"managed": "true"}, MaxDecisionAge: 30 * time.Second, MaxNamespaces: 10,
+			ClusterID: s.target.ClusterID, Role: "workload-maintainer", NamespaceSelector: map[string]string{"managed": "true"},
 			IdentityMappingRef: "company", AdmissionParity: cfg.AdmissionParity{Mode: "noAdditionalRestrictions", ReviewRef: "synthetic-attestation"}}
 		source, reason := cfg.ReviewSourceFor(spec)
 		if reason != "" {

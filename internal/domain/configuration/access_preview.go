@@ -142,8 +142,8 @@ type AccessPreview struct {
 func (p AccessPreview) Complete() bool { return len(p.Unavailable) == 0 && len(p.NotEvaluated) == 0 }
 
 func validChangeBinding(b Binding) bool {
-	return (b.Effect == "Allow" || b.Effect == "Deny") && len(b.Subjects) > 0 && len(b.Subjects) <= 32 && len(b.Roles) > 0 && len(b.Roles) <= 4 &&
-		authorization.UUID(b.Scope.ClusterID) && identity.Text(b.Scope.Namespace.UID, 64) && len(b.Scope.Workloads) <= 64 && b.Resource.SpecDigest != (artifact.Digest{})
+	return (b.Effect == "Allow" || b.Effect == "Deny") && len(b.Subjects) > 0 && len(b.Roles) > 0 &&
+		authorization.UUID(b.Scope.ClusterID) && identity.Text(b.Scope.Namespace.UID, 64) && b.Resource.SpecDigest != (artifact.Digest{})
 }
 
 // PreviewChanges validates the proposal, names each proposed binding's object

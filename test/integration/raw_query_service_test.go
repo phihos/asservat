@@ -41,7 +41,7 @@ func qualifyRawQueryService(t *testing.T, ctx context.Context, s captureAdmissio
 	approver.ScopeDigest = configapp.PermissionScopeDigest(approver)
 	batch := s.batch
 	batch.Bases = append(slices.Clone(batch.Bases), approver)
-	batch.RequestID, batch.InputDigest, batch.Initial = custodyID(), artifact.Digest{7, 4, 9}, nil
+	batch.RequestID, batch.InputDigest = custodyID(), artifact.Digest{7, 4, 9}
 	batch.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
 	batch.FreshUntil = batch.ObservedAt.Add(5 * time.Second)
 	accepted, err := s.p.AcceptPermissions(ctx, batch)

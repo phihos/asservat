@@ -5,7 +5,6 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"encoding/hex"
 	"net/url"
 	"testing"
 	"time"
@@ -70,8 +69,8 @@ func testInheritedReconciliation(t *testing.T, c *rest.Config, reader *kube.Perm
 	sources := schema.GroupVersionResource{Group: "asservat.io", Version: "v1alpha1", Resource: "permissionsources"}
 	bindings := schema.GroupVersionResource{Group: "asservat.io", Version: "v1alpha1", Resource: "accessbindings"}
 	source := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "PermissionSource", "metadata": map[string]any{"name": "inherited-owners", "namespace": control.Name},
-		"spec": map[string]any{"enabled": true, "clusterID": cluster, "type": "namespaceMetadata", "namespaceSelector": map[string]any{"matchLabels": map[string]any{"inherit.example.invalid/managed": "true"}}, "excludedNamespaces": []any{"kube-system"},
-			"role": "workload-maintainer", "maxDecisionAgeSeconds": int64(30), "maxNamespaces": int64(100), "protection": map[string]any{"mode": "administratorManaged", "reviewRef": "synthetic-platform-attestation"},
+		"spec": map[string]any{"enabled": true, "cluster": kube.LocalClusterName, "type": "namespaceMetadata", "namespaceSelector": map[string]any{"matchLabels": map[string]any{"inherit.example.invalid/managed": "true"}}, "excludedNamespaces": []any{"kube-system"},
+			"role": "workload-maintainer", "protection": map[string]any{"mode": "administratorManaged", "reviewRef": "synthetic-platform-attestation"},
 			"metadataMapping": map[string]any{"field": "annotation", "key": "inherit.example.invalid/owner", "mode": "valueMap", "issuer": issuer, "values": map[string]any{"payments": []any{"team-inherited"}}}}}}
 	if source, err = admin.Resource(sources).Namespace(control.Name).Create(ctx, source, meta.CreateOptions{FieldValidation: "Strict"}); err != nil {
 		t.Fatal(err)
@@ -81,18 +80,7 @@ func testInheritedReconciliation(t *testing.T, c *rest.Config, reader *kube.Perm
 	if _, err = admin.Resource(bindings).Namespace(ns.Name).Create(ctx, explicit, meta.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	snapshot, err := reader.PermissionSnapshot(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	digest := configapp.InitialBindingDigest(snapshot)
-	now := time.Now().UTC()
-	review, err := native.CoreV1().ConfigMaps(control.Name).Create(ctx, &core.ConfigMap{ObjectMeta: meta.ObjectMeta{Name: "permission-bootstrap-inheritance"}, Data: map[string]string{"format": "asservat-permission-bootstrap/v1", "reviewer": "fixture-admin", "bindingsSHA256": hex.EncodeToString(digest[:]), "reviewedAt": now.Format(time.RFC3339Nano), "expiresAt": now.Add(time.Hour).Format(time.RFC3339Nano)}}, meta.CreateOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	reviewReader, err := kube.NewBootstrapReviewClient(reader, review.Name, string(review.UID))
-	if err != nil {
+	if _, err = reader.PermissionSnapshot(ctx); err != nil {
 		t.Fatal(err)
 	}
 	u, err := url.Parse(dsn)
@@ -161,7 +149,7 @@ func testInheritedReconciliation(t *testing.T, c *rest.Config, reader *kube.Perm
 		t.Helper()
 		run, cancel := context.WithCancel(ctx)
 		stop, done = cancel, make(chan error, 1)
-		r := configapp.BindingReconciler{RootID: root, Reader: reader, Watcher: reader, Trust: guard, Review: reviewReader, Store: store, Namespaces: observer, NamespaceClusterID: cluster, Now: time.Now, NewID: custodyID}
+		r := configapp.BindingReconciler{RootID: root, Reader: reader, Watcher: reader, Trust: guard, Store: store, Namespaces: observer, NamespaceClusterID: cluster, Now: time.Now, NewID: custodyID}
 		go func() { done <- r.Run(run) }()
 	}
 	halt := func() {

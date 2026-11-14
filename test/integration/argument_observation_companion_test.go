@@ -154,7 +154,7 @@ func qualifyArgumentObservationCompanion(t *testing.T, ctx context.Context, admi
 	refresh := func() (executionapp.APIExecutionCheck, targets.PacketSourceObservation) {
 		t.Helper()
 		n := clock()
-		s.batch.ObservedAt, s.batch.FreshUntil, s.batch.Initial = n, n.Add(5*time.Second), nil
+		s.batch.ObservedAt, s.batch.FreshUntil = n, n.Add(5*time.Second)
 		if err := s.p.RefreshPermissions(ctx, s.batch); err != nil {
 			t.Fatal("companion current permission facts", err)
 		}

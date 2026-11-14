@@ -212,7 +212,6 @@ func qualifyCaptureShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool,
 		}
 		cases := catalogapp.ContextCaseService{RootID: s.a.RootID, InstallationID: s.recovery.installation, Routes: routes, Permissions: s.p, Catalog: f.reader, Retention: privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, Processing: processing, Shares: store, Now: time.Now}
 		b := s.batch
-		b.Initial = nil
 		now := time.Now().UTC().Truncate(time.Microsecond)
 		b.ObservedAt, b.FreshUntil = now, now.Add(5*time.Second)
 		if err := s.p.RefreshPermissions(ctx, b); err != nil {
@@ -244,7 +243,6 @@ func qualifyCaptureShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool,
 		shareID := instruction(t, f.e.CaptureUID)
 		time.Sleep(2 * time.Second)
 		b := s.batch
-		b.Initial = nil
 		now := time.Now().UTC().Truncate(time.Microsecond)
 		b.ObservedAt, b.FreshUntil = now, now.Add(5*time.Second)
 		if err := s.p.RefreshPermissions(ctx, b); err != nil {

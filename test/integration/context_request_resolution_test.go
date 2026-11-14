@@ -265,7 +265,6 @@ func qualifyContextRequestResolution(t *testing.T, ctx context.Context, admin *p
 					}
 				}
 				batch := s.batch
-				batch.Initial = nil
 				batch.RequestID, batch.InputDigest = custodyID(), artifact.Digest{99}
 				batch.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
 				batch.FreshUntil = batch.ObservedAt.Add(5 * time.Second)

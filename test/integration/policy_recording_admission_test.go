@@ -137,7 +137,6 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 			b.Resource.ResourceVersion = custodyID()
 			b.Continuous = true
 			b.ScopeDigest = configapp.PermissionScopeDigest(*b)
-			s.batch.Initial = nil
 			s.batch.RequestID, s.batch.ObservedAt = custodyID(), clock()
 			s.batch.FreshUntil = s.batch.ObservedAt.Add(5 * time.Second)
 			s.batch.InputDigest[0]++
@@ -146,7 +145,6 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 				t.Fatal("automation envelope", err)
 			}
 			s.batch.ExpectedSequence = changed.Sequence
-			s.batch.Initial = nil
 			if len(protected) > 0 && protected[0].PermissionsAccepted != nil {
 				protected[0].PermissionsAccepted(policyRecorderCloneBatch(s.batch))
 			}

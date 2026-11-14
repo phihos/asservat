@@ -175,8 +175,7 @@ func newCapacitySQLFixture(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 	n := time.Now().UTC().Truncate(time.Microsecond)
 	bases := []cfg.PermissionBasis{{Resource: cfg.Resource{Kind: "AccessBinding", UID: custodyID(), Generation: 1, ResourceVersion: "synthetic-1", SpecDigest: artifact.Digest{2}}, Scope: cfg.Scope{ClusterID: scope.ClusterID, Namespace: f.namespace}, Effect: "Allow", Subjects: []cfg.Subject{{Kind: "Group", Issuer: "https://id.example.test", ID: "maintainers"}}, Roles: []string{"workload-maintainer"}}}
 	bases[0].ScopeDigest = configapp.PermissionScopeDigest(bases[0])
-	review := cfg.BootstrapReview{Resource: cfg.Resource{ClusterID: scope.ClusterID, Namespace: scope.Namespace, NamespaceUID: scope.NamespaceUID, Kind: "ConfigMap", UID: custodyID(), ResourceVersion: "synthetic-review-1", SpecDigest: artifact.Digest{9}}, Reviewer: "synthetic-administrator", BindingsDigest: artifact.Digest{8}, ReviewedAt: n.Add(-time.Minute), ExpiresAt: n.Add(10 * time.Minute), ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}
-	f.batch = cfg.PermissionBatch{RootID: rootID, Epoch: epoch, RequestID: custodyID(), TrustDigest: trust, InputDigest: artifact.Digest{4}, ObservedAt: n, FreshUntil: n.Add(5 * time.Second), Bases: bases, Initial: &cfg.PermissionInitialization{ClusterID: scope.ClusterID, Control: cfg.NamespaceRef{Name: scope.Namespace, UID: scope.NamespaceUID}, BindingCount: 1, BindingsDigest: review.BindingsDigest, Review: &review}}
+	f.batch = cfg.PermissionBatch{RootID: rootID, Epoch: epoch, RequestID: custodyID(), TrustDigest: trust, InputDigest: artifact.Digest{4}, ObservedAt: n, FreshUntil: n.Add(5 * time.Second), Bases: bases}
 	accepted, err := f.permission.AcceptPermissions(ctx, f.batch)
 	if err != nil {
 		t.Fatal("actual permission acceptance", err)
@@ -277,10 +276,6 @@ func (f *capacitySQLFixture) refreshBase(t *testing.T) {
 	}
 	f.batch.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
 	f.batch.FreshUntil = f.batch.ObservedAt.Add(5 * time.Second)
-	if f.batch.Initial != nil && f.batch.Initial.Review != nil {
-		f.batch.Initial.Review.ObservedAt = f.batch.ObservedAt
-		f.batch.Initial.Review.FreshUntil = f.batch.FreshUntil
-	}
 	if err := f.permission.RefreshPermissions(f.ctx, f.batch); err != nil {
 		t.Fatal("current original permission source", err)
 	}
