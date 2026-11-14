@@ -13,7 +13,7 @@ import (
 )
 
 // CapacityDeliveryFromCache builds the capacity delivery from watched
-// metadata (informer caches, ADR-330): the namespaces carrying at least one
+// metadata (informer caches, ADR-331): the namespaces carrying at least one
 // of keys, with only those labels, and their Deployments, StatefulSets and
 // unowned Pods. A workload's version is its generation, so status-only
 // updates change nothing and send nothing.
@@ -67,7 +67,7 @@ func CapacityDeliveryFromCache(keys []string, namespaces, deployments, statefuls
 }
 
 // DeliveredCapacity checks a connector's delivery and attributes it to the
-// authenticated cluster at the hub's admission time (ADR-330). Malformed
+// authenticated cluster at the hub's admission time (ADR-331). Malformed
 // names, label keys or values are refused; the hub-worker reads only its
 // qualification's keys.
 func DeliveredCapacity(cluster string, observedAt time.Time, d contracts.CapacityDelivery) (app.RemoteCapacity, error) {

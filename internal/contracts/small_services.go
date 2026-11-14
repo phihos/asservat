@@ -46,7 +46,7 @@ type SecretsRemoteCluster struct {
 }
 
 // RemoteObjectStorePrincipals are a joined cluster's regional executor
-// capabilities (ADR-330), each scoped to that cluster's ID.
+// capabilities (ADR-331), each scoped to that cluster's ID.
 func RemoteObjectStorePrincipals() []string { return []string{"regional-write", "regional-history"} }
 
 // RemoteObjectStoreSecret is the Secret (key credentials.json) of one

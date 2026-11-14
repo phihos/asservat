@@ -473,7 +473,7 @@ type federationServices struct {
 }
 
 // Capacity stores the presenting connector's capacity observation under its
-// authenticated cluster, observed no later than the presentation (ADR-330).
+// authenticated cluster, observed no later than the presentation (ADR-331).
 func (s federationServices) Capacity(ctx context.Context, region *connectorlifecycle.Region) error {
 	if s.capacity == nil || region == nil {
 		return mounts.ErrUnavailable

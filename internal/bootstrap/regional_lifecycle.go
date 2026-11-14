@@ -338,7 +338,7 @@ func (r *RegionalLifecycle) DeliverAccessBindings(ctx context.Context, bindings 
 }
 
 // CapacityReader is the connector's capacity observation of its cluster
-// (ADR-330).
+// (ADR-331).
 type CapacityReader interface {
 	CapacityDelivery(context.Context, []string) (contracts.CapacityDelivery, error)
 }
@@ -358,7 +358,7 @@ func (d deliveringCapacity) ReadCapacity(ctx context.Context) (contracts.Capacit
 }
 
 // DeliverCapacity sends this cluster's capacity observation to the hub in
-// one lifecycle conversation, presented by the admitted process (ADR-330).
+// one lifecycle conversation, presented by the admitted process (ADR-331).
 func (r *RegionalLifecycle) DeliverCapacity(ctx context.Context, capacity CapacityReader, keys []string) error {
 	request, ok := r.admitted()
 	if !ok || capacity == nil || len(keys) == 0 || ctx == nil {

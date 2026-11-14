@@ -44,7 +44,7 @@ const (
 	// presentation verified; the delivery is attributed to that cluster.
 	PurposeAccessBindings value.ConnectorLifecyclePurpose = "access-bindings"
 	// PurposeCapacity delivers the connector's capacity observation of its
-	// cluster (ADR-330), attributed to the presented cluster like
+	// cluster (ADR-331), attributed to the presented cluster like
 	// PurposeAccessBindings.
 	PurposeCapacity value.ConnectorLifecyclePurpose = "capacity"
 	// PurposeBootstrap enrolls cluster credential generation 1 from a fleet
@@ -100,7 +100,7 @@ type HubFrame struct {
 	Failure           string                              `json:",omitempty"`
 	// Digest is the hub's stored delivery digest of an "access-bindings" or
 	// "capacity" request; the connector answers Unchanged when its current
-	// delivery has the same digest (ADR-329, ADR-330).
+	// delivery has the same digest (ADR-329, ADR-331).
 	Digest string `json:",omitempty"`
 }
 
@@ -112,14 +112,14 @@ type RegionFrame struct {
 	Configuration *app.ConnectorIdentityConfiguration  `json:",omitempty"`
 	// AccessBindings answers the hub's "access-bindings" request (ADR-329).
 	AccessBindings *contracts.AccessBindingDelivery `json:",omitempty"`
-	// Capacity answers the hub's "capacity" request (ADR-330).
+	// Capacity answers the hub's "capacity" request (ADR-331).
 	Capacity *contracts.CapacityDelivery `json:",omitempty"`
 	// Unchanged answers a delivery request whose digest matches.
 	Unchanged bool `json:",omitempty"`
 }
 
 // CapacityLocal is the regional reader of the connector's capacity
-// observation (ADR-330), offered only by a delivering conversation.
+// observation (ADR-331), offered only by a delivering conversation.
 type CapacityLocal interface {
 	ReadCapacity(context.Context) (contracts.CapacityDelivery, error)
 }

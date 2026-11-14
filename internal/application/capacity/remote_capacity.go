@@ -10,14 +10,14 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 )
 
-// Bounds of one joined cluster's capacity observation (ADR-330).
+// Bounds of one joined cluster's capacity observation (ADR-331).
 const (
 	RemoteCapacityNamespaces = 512
 	RemoteCapacityWorkloads  = 4096
 )
 
 // RemoteCapacity is the latest capacity observation a workload cluster
-// joined with mode=cluster delivered through its connector (ADR-330): the
+// joined with mode=cluster delivered through its connector (ADR-331): the
 // namespaces carrying a capacity key, with only those labels, and their
 // capacity workloads. The hub sets ClusterID from the connector's
 // authenticated cluster credential and ObservedAt from its own clock when it
@@ -75,7 +75,7 @@ type RemoteCapacityStore interface {
 }
 
 // RemoteCapacityReader serves the capacity reconciler's reads of one joined
-// cluster from its latest delivered observation (ADR-330). The connector
+// cluster from its latest delivered observation (ADR-331). The connector
 // delivers on change, so the latest delivery stays the cluster's current
 // state until a newer one replaces it; each read is current for
 // CapacitySourceInterval from the read. Connector liveness is a health

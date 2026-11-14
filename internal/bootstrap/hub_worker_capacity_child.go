@@ -333,7 +333,7 @@ func (w *hubWorker) capacityReconciler(ctx, run context.Context, q app.CapacityQ
 	}
 	// Only the hub cluster is observed directly with the worker's account;
 	// joined mode=cluster clusters from their connectors' deliveries
-	// (ADR-330).
+	// (ADR-331).
 	protection := platformCapacityProtection{clusterID: cluster, namespaceUID: w.namespace.UID, digest: digest}
 	regionalStore, err := postgres.NewRemoteCapacity(pools["capacity"], root)
 	if err != nil {
@@ -341,7 +341,7 @@ func (w *hubWorker) capacityReconciler(ctx, run context.Context, q app.CapacityQ
 	}
 	if len(c.RemoteClusters) != 0 {
 		// The delivered observations stay in memory, reloaded on the table's
-		// change notification (ADR-330); the reconciler's reads never poll SQL.
+		// change notification (ADR-331); the reconciler's reads never poll SQL.
 		go regionalStore.Watch(run, eventLog(os.Stderr, "capacity remote observations"))
 	}
 	clusters := make([]app.CapacityClusterReaders, 0, len(q.NamespaceGuards))
@@ -443,7 +443,7 @@ const regionalCapacityPace = 2 * time.Second
 
 // remoteCapacityClusters qualifies each joined mode=cluster cluster once
 // (write-once SQL rows; a replay is unchanged) with its namespace digest and
-// the hub's capacity keys, and returns the stored regional pins (ADR-330).
+// the hub's capacity keys, and returns the stored regional pins (ADR-331).
 func (w *hubWorker) remoteCapacityClusters(ctx context.Context, c *contracts.HubWorkerCapacity, pool *pgxpool.Pool) ([]app.CapacityNamespaceQualification, error) {
 	if len(c.RemoteClusters) == 0 {
 		return nil, nil

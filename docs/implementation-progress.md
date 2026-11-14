@@ -1,6 +1,6 @@
 # Sustained implementation progress
 
-## Joining workload clusters with `mode: cluster` (ADR-330, 2026-11-14)
+## Joining workload clusters with `mode: cluster` (ADR-331, 2026-11-14)
 
 Branch `feat/hn-cluster-join` (on `feat/hn-remote-bindings`). The hub's
 `clusters` values register remote clusters; the hub-api issues each join
@@ -21,7 +21,7 @@ no-op `00162` placeholder because the embedded schema requires contiguous
 versions.
 
 Maintainer correction (no polling where an event source exists), applied to
-ADR-329 (c) and ADR-330: connectors watch AccessBindings and capacity
+ADR-329 (c) and ADR-331: connectors watch AccessBindings and capacity
 metadata (informers) and deliver only on change (≤ 1/s, digest-compared with
 the hub's stored copy, no periodic resend); remote allows no longer expire;
 a trigger in migration 00163 notifies `asservat_remote_bindings` /

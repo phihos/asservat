@@ -1,6 +1,6 @@
 package contracts
 
-// Bounds of one connector's capacity delivery (ADR-330): the namespaces of
+// Bounds of one connector's capacity delivery (ADR-331): the namespaces of
 // its cluster that carry a capacity selector key and their capacity
 // workloads, metadata only.
 const (
@@ -10,7 +10,7 @@ const (
 )
 
 // CapacityDelivery is a mode=cluster connector's capacity observation of its
-// own cluster (ADR-330): every namespace carrying at least one of the
+// own cluster (ADR-331): every namespace carrying at least one of the
 // offered capacity keys (Labels holds only those keys) with its
 // Deployments, StatefulSets and unowned Pods. It names no cluster: the hub
 // attributes it to the connector's authenticated cluster.

@@ -16,7 +16,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-// Watched resources of the connector's deliveries (ADR-329, ADR-330).
+// Watched resources of the connector's deliveries (ADR-329, ADR-331).
 var (
 	accessBindingsResource = schema.GroupVersionResource{Group: "asservat.io", Version: "v1alpha1", Resource: "accessbindings"}
 	capacityResources      = []schema.GroupVersionResource{{Version: "v1", Resource: "namespaces"}, {Group: "apps", Version: "v1", Resource: "deployments"}, {Group: "apps", Version: "v1", Resource: "statefulsets"}, {Version: "v1", Resource: "pods"}}

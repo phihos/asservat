@@ -29,7 +29,7 @@ func remoteTestCapacity(at time.Time) RemoteCapacity {
 		Labels: map[string]string{"asservat-trial": "true", "other": "x"}, Workloads: []RemoteCapacityWorkload{{Workload: cfg.WorkloadRef{Kind: "Deployment", Name: "api", UID: "w-1"}, ResourceVersion: "9"}}}}}
 }
 
-// ADR-330: a joined cluster's reads come from its latest delivery, which
+// ADR-331: a joined cluster's reads come from its latest delivery, which
 // stays current until replaced, under the qualification pin's keys only.
 func TestRemoteCapacityReaderServesTheCurrentDelivery(t *testing.T) {
 	at := time.Date(2026, 11, 14, 12, 0, 0, 0, time.UTC)

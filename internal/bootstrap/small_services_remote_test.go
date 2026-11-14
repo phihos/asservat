@@ -10,7 +10,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-// ADR-330: with the bundled object store every joined cluster gets its own
+// ADR-331: with the bundled object store every joined cluster gets its own
 // regional capabilities, scoped to its cluster ID; mode=hub generates no
 // hub-cluster regional principal.
 func TestSecretsHookScopesJoinedClusterCapabilities(t *testing.T) {

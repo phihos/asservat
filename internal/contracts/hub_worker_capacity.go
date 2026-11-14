@@ -19,7 +19,7 @@ type HubWorkerCapacity struct {
 	SharedQueries bool `json:"sharedQueries"`
 	// RemoteClusters are the joined mode=cluster clusters (values clusters):
 	// each is qualified once and observed from its connector's deliveries
-	// (ADR-330).
+	// (ADR-331).
 	RemoteClusters []RemoteCluster `json:"remoteClusters,omitempty"`
 }
 

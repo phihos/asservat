@@ -37,7 +37,7 @@ type Regional struct {
 	bindings  AccessBindingReader
 	lifecycle *RegionalLifecycle
 	// capacityKeys select this cluster's delivered capacity observation
-	// (ADR-330); empty without them. watchConfig is the connector's API
+	// (ADR-331); empty without them. watchConfig is the connector's API
 	// configuration for the delivery watches.
 	capacityKeys []string
 	watchConfig  *rest.Config

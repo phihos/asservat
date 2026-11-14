@@ -45,7 +45,7 @@ func (d capacityReader) ReadCapacity(context.Context) (contracts.CapacityDeliver
 	return d.delivery, nil
 }
 
-// ADR-330: the capacity delivery follows the AccessBinding delivery's
+// ADR-331: the capacity delivery follows the AccessBinding delivery's
 // rules: asked after the presentation, attributed to the presented cluster,
 // refused by a connector without the reader and by a hub without the
 // service.

@@ -310,7 +310,7 @@ explicit step.
 
 ### Join a workload cluster
 
-[ADR-330](../decisions/330-remote-cluster-join.md). Register the cluster in
+[ADR-331](../decisions/331-remote-cluster-join.md). Register the cluster in
 the hub's values and expose the four endpoints its connector dials:
 
 ```yaml

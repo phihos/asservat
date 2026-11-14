@@ -1,5 +1,5 @@
 -- +goose Up
--- ADR-330: the latest capacity observation of each workload cluster joined
+-- ADR-331: the latest capacity observation of each workload cluster joined
 -- with mode: cluster. The federation writes it under the delivering
 -- connector's authenticated cluster; the hub-worker's capacity reconciler
 -- reads it. A row is an observation, never an accepted capacity fact.

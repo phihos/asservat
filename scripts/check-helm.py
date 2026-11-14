@@ -326,7 +326,7 @@ def check_collector(directory):
 
 
 def check_cluster_join(render):
-    # ADR-330: clusters[] in the hub's values: the hub-api issues each join
+    # ADR-331: clusters[] in the hub's values: the hub-api issues each join
     # Secret, the offer and the regional capabilities exist in mode=hub, and
     # the hub components know the joined cluster IDs.
     cluster = "50000000-0000-4000-8000-000000000001"

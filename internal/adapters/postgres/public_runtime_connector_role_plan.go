@@ -78,7 +78,7 @@ func publicRuntimeConnectorGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		// under the cluster its credential lineage names.
 		for _, privilege := range []string{"SELECT", "INSERT", "UPDATE"} {
 			out = append(out, publicRuntimeGrant{"table", "remote_access_binding_delivery", "", privilege})
-			// ADR-330: likewise its capacity observation.
+			// ADR-331: likewise its capacity observation.
 			out = append(out, publicRuntimeGrant{"table", "remote_capacity_delivery", "", privilege})
 		}
 		functions("reserve_cluster_bootstrap(uuid,uuid,uuid,bytea,uuid,bigint,bytea,bigint,bigint)", "acknowledge_cluster_bootstrap(uuid,uuid,text,text,text,bigint,bytea)", "activate_cluster_bootstrap(uuid,uuid,bytea,bytea)")

@@ -18,7 +18,7 @@ func capacityObject(namespace, name, uid string, labels map[string]string, owned
 	return m
 }
 
-// ADR-330: a connector delivers only the namespaces carrying a capacity key,
+// ADR-331: a connector delivers only the namespaces carrying a capacity key,
 // with only those labels, and their Deployments, StatefulSets and unowned
 // Pods, in a fixed order; status-only changes leave the digest unchanged.
 // The hub attributes the delivery to the authenticated cluster.

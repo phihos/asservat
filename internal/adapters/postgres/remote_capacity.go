@@ -18,7 +18,7 @@ import (
 )
 
 // RemoteCapacity stores and reads the latest capacity observation of each
-// workload cluster joined with mode: cluster (ADR-330). The federation
+// workload cluster joined with mode: cluster (ADR-331). The federation
 // stores a delivery under its connector's authenticated cluster; the
 // hub-worker keeps every cluster's row in memory, reloaded when the table's
 // trigger notifies a change (Watch). A row is an observation only.

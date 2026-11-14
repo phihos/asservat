@@ -43,7 +43,7 @@ type AccessBindingsService interface {
 }
 
 // CapacityService records a connector's capacity delivery for its presented
-// cluster (ADR-330), as AccessBindingsService.
+// cluster (ADR-331), as AccessBindingsService.
 type CapacityService interface {
 	Capacity(context.Context, *Region) error
 }
@@ -387,7 +387,7 @@ func (r *Region) ReadAccessBindings(ctx context.Context, stored string) (_ contr
 }
 
 // ReadCapacity asks the presenting connector for its capacity observation
-// (ADR-330) like ReadAccessBindings, raising the read bound by the
+// (ADR-331) like ReadAccessBindings, raising the read bound by the
 // delivery's own byte bound.
 func (r *Region) ReadCapacity(ctx context.Context, stored string) (_ contracts.CapacityDelivery, unchanged bool, _ error) {
 	r.conn.mu.Lock()

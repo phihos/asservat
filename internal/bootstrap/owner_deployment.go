@@ -249,7 +249,7 @@ func newOwnerDeployment(ctx context.Context, files *os.Root, podUID string, in *
 			if e != nil {
 				return nil, e
 			}
-			// ADR-330: the connector delivers the namespaces carrying a
+			// ADR-331: the connector delivers the namespaces carrying a
 			// capacity key.
 			if c.Observation != nil && c.Observation.LocalCapacity != nil {
 				offer.CapacityKeys = slices.Clone(c.Observation.LocalCapacity.Keys)

@@ -48,7 +48,7 @@ type RegionalOffer struct {
 	Capacity *RegionalCapacityOffer `json:"capacity,omitempty"`
 	// CapacityKeys are the hub's capacity namespace label keys; a joined
 	// cluster's connector delivers the namespaces carrying any of them
-	// (ADR-330). Only a join Secret's offer names them.
+	// (ADR-331). Only a join Secret's offer names them.
 	CapacityKeys []string `json:"capacityKeys,omitempty"`
 }
 

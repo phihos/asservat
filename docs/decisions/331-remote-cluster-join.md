@@ -1,4 +1,4 @@
-# ADR-330 — Joining workload clusters with `mode: cluster`
+# ADR-331 — Joining workload clusters with `mode: cluster`
 
 Date: 2026-11-14. Status: accepted (implements slice 3 of the
 [Helm-native plan](../reviews/helm-native-install-plan.md), "Remote regions").

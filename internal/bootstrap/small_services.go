@@ -319,7 +319,7 @@ func (s secretStore) objectStore(ctx context.Context, p contracts.SecretsPlan, i
 		}
 		principals = append(principals, principal{purpose, scope, p.Name + "-s3-" + purpose})
 	}
-	// ADR-330: each joined cluster's regional capabilities, scoped to it.
+	// ADR-331: each joined cluster's regional capabilities, scoped to it.
 	for _, r := range p.RemoteClusters {
 		if !authorization.UUID(r.ClusterID) || r.ClusterID == cluster {
 			return secretsFailure("InvalidRemoteCluster " + r.Name)
