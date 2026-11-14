@@ -64,7 +64,7 @@
 {{- $out := list -}}
 {{- range .Values.clusters -}}
 {{- if not (regexMatch "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" (toString .clusterID)) }}{{ fail (printf "clusters[%s].clusterID must be a lowercase UUID (uuidgen)" (toString .name)) }}{{ end -}}
-{{- $out = append $out (dict "name" (required "clusters[].name is required" .name) "clusterID" .clusterID "namespace" (default $root.Release.Namespace .namespace) "standby" (int (default 2 .standby)) "captures" (int (default 1 .captures))) -}}
+{{- $out = append $out (dict "name" (required "clusters[].name is required" .name) "clusterID" .clusterID "namespace" (default $root.Release.Namespace .namespace) "standby" (int (default 2 .standby)) "captures" (int (default 8 .captures))) -}}
 {{- end -}}
 {{- toJson $out -}}
 {{- end -}}

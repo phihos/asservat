@@ -428,8 +428,7 @@
           },
           "captures": {
             "type": "integer",
-            "minimum": 1,
-            "maximum": 16
+            "minimum": 1
           }
         }
       }
@@ -1244,7 +1243,7 @@
                 },
                 "captures": {
                   "type": "integer",
-                  "minimum": 0
+                  "minimum": 1
                 },
                 "previewSeconds": {
                   "type": "integer",

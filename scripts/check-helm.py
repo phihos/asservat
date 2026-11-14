@@ -336,7 +336,7 @@ def check_cluster_join(render):
     v.update({"clusters": [{"name": "eu", "clusterID": cluster}], "remote": remote})
     docs = render(v)
     config = json.loads(named(docs, "ConfigMap", "asservat-hub-api-config")["data"]["config.json"])
-    assert config["clusters"] == [{"name": "eu", "clusterID": cluster, "namespace": "asservat-system", "standby": 2, "captures": 1}], config.get("clusters")
+    assert config["clusters"] == [{"name": "eu", "clusterID": cluster, "namespace": "asservat-system", "standby": 2, "captures": 8}], config.get("clusters")
     offer = config["public"]["regionalOffer"]
     assert offer["hubOnly"] is True and offer["remote"] == remote, offer
     named(docs, "ConfigMap", "asservat-regional-offer")

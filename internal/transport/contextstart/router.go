@@ -149,13 +149,13 @@ type Attachment struct {
 }
 
 func NewRouter(l RouterLimits) (*Router, error) {
-	if l.Standby < 1 || l.Standby > 64 || l.Captures < 1 || l.Captures > 16 || len(l.Clusters) > 16 {
+	if l.Standby < 1 || l.Standby > 64 || l.Captures < 1 || len(l.Clusters) > 16 {
 		return nil, fleet.ErrInvalid
 	}
 	clusters := make(map[string]*clusterCount, len(l.Clusters))
 	standby, captures := 0, 0
 	for _, c := range l.Clusters {
-		if !authorization.UUID(c.ClusterID) || c.Standby < 1 || c.Standby > 16 || c.Captures < 1 || c.Captures > 16 || clusters[c.ClusterID] != nil {
+		if !authorization.UUID(c.ClusterID) || c.Standby < 1 || c.Standby > 16 || c.Captures < 1 || clusters[c.ClusterID] != nil {
 			return nil, fleet.ErrInvalid
 		}
 		standby += c.Standby

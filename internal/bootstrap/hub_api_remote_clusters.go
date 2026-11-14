@@ -49,7 +49,7 @@ func hubAPIRemoteClusters(h contracts.HubAPIConfig, ids hubAPIIDs) ([]hubAPIRemo
 		peer, ok := contracts.RemotePeerID(ids.InstallationID, c.ClusterID)
 		if !ok || !authorization.UUID(c.ClusterID) || seen[c.ClusterID] || seen["name/"+c.Name] || len(validation.IsDNS1123Label(c.Name)) != 0 ||
 			len(validation.IsDNS1123Subdomain(contracts.RemoteJoinSecretName(h.Name, c.Name))) != 0 || len(validation.IsDNS1123Label(c.Namespace)) != 0 ||
-			c.Standby < 1 || c.Standby > 16 || c.Captures < 1 || c.Captures > 16 {
+			c.Standby < 1 || c.Standby > 16 || c.Captures < 1 {
 			return nil, hubAPIInputError("clusters")
 		}
 		seen[c.ClusterID], seen["name/"+c.Name] = true, true
