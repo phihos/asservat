@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"slices"
 	"strconv"
 	"time"
 
@@ -197,6 +198,12 @@ func keyServiceAcquisition(ctx context.Context, c keyServiceInputs, api *rest.Co
 	topologies, err := kube.NewRetentionTopologies(observer, c.PermissionRootID, pins)
 	if err != nil {
 		return nil, none, mounts.ErrUnavailable
+	}
+	// Hub-cluster captures (mode=combined): the in-process hub topology.
+	if !slices.ContainsFunc(pins, func(p kube.RetentionTopologyPin) bool { return p.TargetClusterID == c.ClusterID }) {
+		if err = topologies.AddHubTopology(observer, c.PermissionRootID); err != nil {
+			return nil, none, &fixedStepError{"key-service/hub-topology", err}
+		}
 	}
 	retention, err := postgres.NewRetentionTransactionGuard(c.PermissionRootID, topologies)
 	if err != nil {

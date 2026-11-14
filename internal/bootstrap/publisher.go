@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"os"
+	"slices"
 	"sync"
 	"time"
 
@@ -183,6 +184,13 @@ func NewPublisher(ctx context.Context, files, ids *os.Root) (_ *Publisher, err e
 	topologies, err := kube.NewRetentionTopologies(observer, root, pins)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
+	}
+	// The hub cluster's own captures (mode=combined) use the in-process hub
+	// topology, as in the hub-api, unless a pin names the hub cluster.
+	if !slices.ContainsFunc(pins, func(p kube.RetentionTopologyPin) bool { return p.TargetClusterID == c.ClusterID }) {
+		if err = topologies.AddHubTopology(observer, root); err != nil {
+			return nil, mounts.ErrUnavailable
+		}
 	}
 	retentionGuard, err := postgres.NewRetentionTransactionGuard(root, topologies)
 	if err != nil {
