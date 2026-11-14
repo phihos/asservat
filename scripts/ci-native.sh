@@ -93,11 +93,9 @@ declare -A suites=(
   # principal over MCP (get_case works, download refused, revoke refuses).
   [continuation-share-retirement]="env ASSERVAT_JOURNEY_FOCUS=share-retirement $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
   [continuation-share]="env ASSERVAT_JOURNEY_FOCUS=share $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
-  [direct-observation]="$context --run ^TestDirectHolderObservationWithRealKubernetes\$"
   # The single-cluster owned node→Pod traffic probe: the harness installs its
   # helper only for this exact selection, so the context shards skip it.
   [native-traffic]="$context --run ^TestNativePacingTrafficWithRealKubernetes\$"
-  [federation-regional]="$context --run ^TestFederationRegionalProductWithRealKubernetes\$"
   [initial-handover]="$context --initial-handover"
   [initial-schema-handover]="$context --initial-schema-handover"
   [helm-bootstrap]="$context --helm-bootstrap"

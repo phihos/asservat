@@ -48,13 +48,15 @@ func historyWorkValue(b []byte) (app.HistoryWork, error) {
 	}
 	var a capture.HistoryOperationAuthority
 	dec := json.NewDecoder(bytes.NewReader(d.Authority))
-	dec.DisallowUnknownFields()
 	if dec.Decode(&a) != nil {
 		return app.HistoryWork{}, value.ErrInvalid
 	}
 	w := app.HistoryWork{Channel: historyChannelValue(d.Channel), Authority: a}
+	// The known fields must equal this release's canonical encoding (no alias,
+	// omission or noncanonical spelling); members of a newer hub that this
+	// release does not know are ignored (ADR-333).
 	canonical, e := historyWorkBytes(w)
-	if e != nil || !bytes.Equal(canonical, b) {
+	if e != nil || !wire.SameKnownFields(b, canonical) {
 		return app.HistoryWork{}, value.ErrInvalid
 	}
 	return w, nil

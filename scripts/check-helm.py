@@ -332,7 +332,7 @@ def check_cluster_join(render):
     cluster = "50000000-0000-4000-8000-000000000001"
     remote = {"federation": "https://hub.example:31446", "owners": "hub.example:31444", "keyService": "https://hub.example:31448", "objectStore": "https://hub.example:31433"}
     v = bundled_values("hub")
-    v["federation"] = {"connector": {**PROFILE["federation"]["connector"], "profiles": 1}}
+    v["federation"] = {"connector": dict(PROFILE["federation"]["connector"])}
     v.update({"clusters": [{"name": "eu", "clusterID": cluster}], "remote": remote})
     docs = render(v)
     config = json.loads(named(docs, "ConfigMap", "asservat-hub-api-config")["data"]["config.json"])
@@ -357,12 +357,13 @@ def check_cluster_join(render):
     assert worker["capacity"]["remoteClusters"] == config["clusters"], worker["capacity"].get("remoteClusters")
     fleet = json.loads(named(docs, "ConfigMap", "asservat-fleet")["data"]["fleet.json"])
     assert fleet["maxClusters"] >= 1 and fleet["maxActiveBootstraps"] >= 1
-    # combined plus one cluster: two connectors need two profiles.
+    # combined plus one cluster: ADR-332 has no install-time connector
+    # count, and an install-time count field is refused.
     v2 = copy.deepcopy(v)
     v2["mode"] = "combined"
-    assert "federation.connector.profiles must cover every connector" in render(v2, ok=False)
     v2["federation"]["connector"]["profiles"] = 2
-    v2["federation"]["connector"]["accounts"] = 2
+    render(v2, ok=False)
+    del v2["federation"]["connector"]["profiles"]
     fleet = json.loads(named(render(v2), "ConfigMap", "asservat-fleet")["data"]["fleet.json"])
     assert fleet["maxClusters"] == 2 and fleet["maxActiveBootstraps"] == 2, fleet
     for bad in [{"remote": {}}, {"clusters": [{"name": "eu", "clusterID": "not-a-uuid"}]}, {"clusters": [{"name": "Bad", "clusterID": cluster}]}]:

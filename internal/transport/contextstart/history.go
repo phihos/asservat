@@ -31,7 +31,7 @@ type HistoryLocal struct {
 func historyJSON(v any) json.RawMessage { b, _ := json.Marshal(v); return b }
 func historyDecode(b []byte, out any) error {
 	d := json.NewDecoder(bytes.NewReader(b))
-	d.DisallowUnknownFields()
+	// Unknown fields of a newer peer are ignored (ADR-333).
 	if d.Decode(out) != nil || d.Decode(new(any)) != io.EOF {
 		return contracts.ErrAPIContextProtocol
 	}
@@ -129,6 +129,9 @@ func serveHubHistory(ctx context.Context, s Stream, w fleetapp.HistoryWork, sign
 	var out fleetapp.HistoryReply
 	if ctx == nil || s == nil || now == nil || !w.Valid(now()) || ctx.Err() != nil {
 		return out, fleet.ErrInvalid
+	}
+	if e := requireCapability(s, capabilityHistory, errHistoryClass); e != nil {
+		return out, e
 	}
 	call, cancel := context.WithDeadline(ctx, w.Authority.NotAfter)
 	defer cancel()

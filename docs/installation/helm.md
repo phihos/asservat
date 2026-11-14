@@ -413,6 +413,24 @@ keys.
 Removing a cluster from `clusters`, or setting `revoked: true`, closes its
 connection and refuses its tokens.
 
+### Version skew
+
+[ADR-333](../decisions/333-connector-version-skew.md). A workload cluster's
+connector and node collectors may run one minor release older or newer than
+the hub, as long as both speak the same connector protocol major (during 0.x
+development, the protocol major is the boundary). Upgrade the hub first,
+then each workload cluster at its own pace. Image digests are recorded as
+provenance and are never compared.
+
+The connector announces its protocol and capabilities when it connects. The
+hub refuses a connector of another protocol major with HTTP 426 and a
+message naming its protocol (hub-api log `context start refused
+connector-protocol`; connector log `open/connector-protocol (denied): hub
+says: … upgrade the connector …`) and refuses only the requests an older connector
+lacks, with `connector too old for <capability>` (diagnostic step
+`connector-too-old/<capability>`); everything else keeps working. Upgrade
+that cluster's release to use the feature.
+
 ### Regional connector options
 
 Options under `region.executor`:

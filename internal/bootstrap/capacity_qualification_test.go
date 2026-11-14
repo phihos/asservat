@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	fleetapp "asservat.local/asservat/internal/application/fleet"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -100,13 +101,13 @@ func TestCapacityQualificationReplayIsIdentical(t *testing.T) {
 // the prepaid-retirement validator; a replay is identical and oversized
 // profiles are refused.
 func TestConnectorBackingDerivation(t *testing.T) {
-	c := contracts.InstallerConnectorSettings{Accounts: 4, RecordsPerAccount: 256, RetainedSeconds: 15000, Profiles: 4, SourceTransitions: 64, PurgeLeases: 2, ValidSeconds: 7200,
+	c := contracts.InstallerConnectorSettings{RetainedSeconds: 15000, PurgeLeases: 2,
 		Footprint: contracts.InstallerCapacityFootprint{RowBytes: 1 << 20, TransitionWALBytes: 1 << 20}}
 	backup := capacityProfileFixture().Backup
 	root, installation, setup := "30000000-0000-4000-8000-000000000003", "30000000-0000-4000-8000-000000000004", "30000000-0000-4000-8000-000000000001"
 	now := time.Date(2026, 10, 16, 12, 0, 0, 0, time.UTC)
 	b, err := buildConnectorBacking(c, backup, root, installation, "setup-account/v1", setup, now)
-	if err != nil || !b.Valid() || b.Policy.RootID != root || !b.Policy.ValidUntil.Equal(now.Add(2*time.Hour)) {
+	if err != nil || !b.Valid() || b.Policy.RootID != root || !b.Policy.ValidUntil.Equal(fleetapp.ConnectorBackingStanding) {
 		t.Fatal("connector backing", err)
 	}
 	again, _ := buildConnectorBacking(c, backup, root, installation, "setup-account/v1", setup, now)
@@ -116,9 +117,6 @@ func TestConnectorBackingDerivation(t *testing.T) {
 		t.Fatal("replay built a different backing")
 	}
 	for i, mutate := range []func(*contracts.InstallerConnectorSettings){
-		func(c *contracts.InstallerConnectorSettings) { c.Profiles = 257 },
-		func(c *contracts.InstallerConnectorSettings) { c.SourceTransitions = 4097 },
-		func(c *contracts.InstallerConnectorSettings) { c.ValidSeconds = 60 },
 		func(c *contracts.InstallerConnectorSettings) { c.Footprint.RowBytes = 1 << 10 },
 		// Continuation run 52: a 3600-second retention with a 3600-second
 		// backup horizon leaves no process run time for the regional shape.
@@ -213,33 +211,25 @@ func TestProfileCapacityQualificationFundsRenewalsWithinFiniteEnvelope(t *testin
 	t.Logf("installed complete root: accounts=%d records/account=%d SQL=%d backup=%d WAL=%d nativeWAL/workload=%d nativeBackup/workload=%d", p.Accounts, p.Records, totals.SQLBytes, totals.BackupBytes, totals.WALBytes, work.NativeWALBytes, work.NativeBackupBytes)
 }
 
-// The complete source can be valid while promising admission beyond its own
-// earliest prepaid retirement ticket. Reject that relation before installer I/O.
-func TestConnectorBackingRejectsAdmissionPastOriginalRetirement(t *testing.T) {
-	c := contracts.InstallerConnectorSettings{Accounts: 1, RecordsPerAccount: 96, RetainedSeconds: 3902, Profiles: 1, SourceTransitions: 8, PurgeLeases: 2, ValidSeconds: 3600,
+// ADR-332: the backing is standing (valid until replaced) at any setup time,
+// and its retention must still leave the regional shape a process run time.
+func TestConnectorBackingIsStanding(t *testing.T) {
+	c := contracts.InstallerConnectorSettings{RetainedSeconds: 3902, PurgeLeases: 2,
 		Footprint: contracts.InstallerCapacityFootprint{RowBytes: 1 << 20, TransitionWALBytes: 1 << 20}}
 	backup := contracts.InstallerCapacityBackup{HorizonSeconds: 1, CleanupBudgetSeconds: 60, ProofWindowSeconds: 60, BackupCopies: 1, WALCopies: 1}
 	d := capacityDerivedFixture()
 	now := time.Date(2026, 11, 11, 12, 0, 0, 123456789, time.FixedZone("synthetic", 19800))
-	original := now.UTC().Truncate(time.Microsecond)
 	accepted, err := buildConnectorBacking(c, backup, d.Root, d.Installation, d.AccountVersion, d.Root, now)
-	if err != nil || !accepted.Policy.ValidUntil.Equal(original.Add(time.Hour)) || accepted.ProcessRunSeconds() != 3600 {
-		t.Fatal("exact original retirement boundary refused or shifted", err)
+	if err != nil || !accepted.Policy.ValidUntil.Equal(fleetapp.ConnectorBackingStanding) || accepted.ProcessRunSeconds() != 3600 {
+		t.Fatal("standing backing refused or bounded", err)
 	}
-	for _, tc := range []struct {
-		name   string
-		change func(*contracts.InstallerConnectorSettings)
-	}{
-		{"retention-one-second-short", func(c *contracts.InstallerConnectorSettings) { c.RetainedSeconds-- }},
-		{"admission-one-second-long", func(c *contracts.InstallerConnectorSettings) { c.ValidSeconds++ }},
-		{"original-trial-promise", func(c *contracts.InstallerConnectorSettings) { c.RetainedSeconds, c.ValidSeconds = 3600, 7200 }},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			bad := c
-			tc.change(&bad)
-			if _, err := buildConnectorBacking(bad, backup, d.Root, d.Installation, d.AccountVersion, d.Root, now); err == nil {
-				t.Fatal("admission outlives the original prepaid retirement boundary")
-			}
-		})
+	late, err := buildConnectorBacking(c, backup, d.Root, d.Installation, d.AccountVersion, d.Root, now.AddDate(3, 0, 0))
+	if err != nil || !late.Policy.ValidUntil.Equal(accepted.Policy.ValidUntil) {
+		t.Fatal("backing validity depends on the setup time", err)
+	}
+	short := c
+	short.RetainedSeconds = 1800 + 2*1 + 3*60 + 60 + 60 - 1
+	if _, err := buildConnectorBacking(short, backup, d.Root, d.Installation, d.AccountVersion, d.Root, now); err == nil {
+		t.Fatal("retention without a regional process run time accepted")
 	}
 }

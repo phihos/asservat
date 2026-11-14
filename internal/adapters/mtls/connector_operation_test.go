@@ -58,7 +58,7 @@ func (o *connectorOperationNativeHandle) Read(ctx context.Context, n int) (value
 	end, _ := ctx.Deadline()
 	o.until = identity.Earlier(o.until, end)
 	source.Observation.FreshUntil = o.until
-	w := value.ConnectorObservationWorkload{Process: o.process, Pod: "connector-1", ReplicaSetUID: ownerTestID, TemplateDigest: o.f.pin.TemplateDigest, ImageDigest: o.f.pin.ImageDigest, ProtectionDigest: o.f.pin.ProtectionDigest, WorkloadDigest: artifact.Digest{16}, ObservedAt: o.start, FreshUntil: o.until}
+	w := value.ConnectorObservationWorkload{Process: o.process, Pod: "connector-1", ReplicaSetUID: ownerTestID, TemplateDigest: o.f.pin.TemplateDigest, ProtectionDigest: o.f.pin.ProtectionDigest, WorkloadDigest: artifact.Digest{16}, ObservedAt: o.start, FreshUntil: o.until}
 	v := value.ConnectorObservationNativeValue{Request: o.request, Ordinal: n, Source: source, Workload: w, NativeStartedAt: o.start, NativeUntil: o.until, ValueObservedAt: o.f.f.clock(), Final: n == 4}
 	if o.f.readHook != nil {
 		if err := o.f.readHook(ctx, n, &v); err != nil {

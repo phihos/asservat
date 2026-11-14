@@ -117,13 +117,13 @@ type ClusterObservationReceipt struct {
 }
 
 func DecodeClusterObservationHello(b []byte) (ClusterObservationHello, error) {
-	return decodeClosedRPC[ClusterObservationHello](bytes.NewReader(b), 1024)
+	return decodeOpenRPC[ClusterObservationHello](bytes.NewReader(b), 1024)
 }
 func EncodeClusterObservationProbe(v ClusterObservationProbe) ([]byte, error) {
 	return canonicalAPIContext(v, 2*OwnerObservationBytes)
 }
 func DecodeClusterObservationProbe(b []byte) (ClusterObservationProbe, error) {
-	return decodeClosedRPC[ClusterObservationProbe](bytes.NewReader(b), 2*OwnerObservationBytes)
+	return decodeOpenRPC[ClusterObservationProbe](bytes.NewReader(b), 2*OwnerObservationBytes)
 }
 func EncodeClusterObservationReceipt(v ClusterObservationReceipt) ([]byte, error) {
 	return canonicalAPIContext(v, 1024)

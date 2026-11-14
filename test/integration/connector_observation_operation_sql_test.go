@@ -53,12 +53,12 @@ func newConnectorOperationSQLSource(t *testing.T, f *connectorSQLFixture, leaf v
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	end := now.Add(4 * time.Second)
 	profile := f.configuration.Source.Observation.Profile.Clone()
-	pin := value.ConnectorObservationPin{Profile: profile, Roles: f.configuration.Source.Roles, TemplateDigest: artifact.Digest{71}, ImageDigest: artifact.Digest{72}, ProtectionDigest: artifact.Digest{73}}
+	pin := value.ConnectorObservationPin{Profile: profile, Roles: f.configuration.Source.Roles, TemplateDigest: artifact.Digest{71}, ProtectionDigest: artifact.Digest{73}}
 	request := value.OwnerObservationRequest{RootID: profile.RootID, ID: custodyID(), Challenge: custodyID(), RequestedAt: now, NotAfter: end}
 	source := f.configuration.Source
 	source.Observation.Profile = source.Observation.Profile.Clone()
 	source.Observation.ObservedAt, source.Observation.FreshUntil = now, end
-	workload := value.ConnectorObservationWorkload{Process: f.request.Process, Pod: "synthetic-regional", ReplicaSetUID: custodyID(), TemplateDigest: pin.TemplateDigest, ImageDigest: pin.ImageDigest, ProtectionDigest: pin.ProtectionDigest, WorkloadDigest: artifact.Digest{74}, ObservedAt: now, FreshUntil: end}
+	workload := value.ConnectorObservationWorkload{Process: f.request.Process, Pod: "synthetic-regional", ReplicaSetUID: custodyID(), TemplateDigest: pin.TemplateDigest, ProtectionDigest: pin.ProtectionDigest, WorkloadDigest: artifact.Digest{74}, ObservedAt: now, FreshUntil: end}
 	prototype := value.ConnectorObservationOperationValue{
 		Native:    value.ConnectorObservationNativeValue{Request: request, Ordinal: 1, Source: source, Workload: workload, NativeStartedAt: now, NativeUntil: end, ValueObservedAt: now},
 		BracketID: custodyID(), ConnectionBinding: artifact.Digest{75}, Certificate: leaf,

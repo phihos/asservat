@@ -153,15 +153,14 @@ func (d *OwnerDeployment) ownerOperationConfig(ctx context.Context, in *ownerInp
 		k := v.Capacity
 		template, a := publicDigest(k.TemplateDigest)
 		protection, b := publicDigest(k.ProtectionDigest)
-		image, e := publicDigest(v.Executor.ImageDigest)
 		guardDigest, g := publicDigest(k.NamespaceGuardDigest)
-		if !a || !b || !e || !g {
+		if !a || !b || !g {
 			return nil, mounts.ErrUnavailable
 		}
 		if err = qualifications.QualifyCapacityCluster(ctx, v.ClusterID, profile.Binding.PeerID, profile.Binding.IssuerEpoch, guardDigest, k.Keys); err != nil {
 			return nil, err
 		}
-		r := RegionalObservationOperationCluster{Pin: value.ConnectorObservationPin{Profile: profile, Roles: roles, TemplateDigest: template, ImageDigest: image, ProtectionDigest: protection}}
+		r := RegionalObservationOperationCluster{Pin: value.ConnectorObservationPin{Profile: profile, Roles: roles, TemplateDigest: template, ProtectionDigest: protection}}
 		if r.Registry, err = postgres.NewConnectorObservationOperationRegistry(d.root, pool, r.Pin); err != nil {
 			return nil, mounts.ErrUnavailable
 		}

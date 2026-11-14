@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"asservat.local/asservat/internal/adapters/mounts"
+	"asservat.local/asservat/internal/adapters/postgres"
 	"asservat.local/asservat/internal/contracts"
 )
 
@@ -33,7 +34,11 @@ func RunHubAPI(ctx context.Context, podUID string) (result error) {
 	// a promoted installed owner (with Native) runs the full composition.
 	if mode.config.Observation != nil && mode.config.Native == nil {
 		phase = startupObservationRuntime
-		d, err := newOwnerObservationDeployment(ctx, files, podUID, mode)
+		var d *OwnerObservationDeployment
+		err := waitStartup(ctx, "hub-api", startupLog, func(ctx context.Context) (err error) {
+			d, err = newOwnerObservationDeployment(ctx, files, podUID, mode)
+			return err
+		}, ownerStartupRetryable)
 		if err != nil {
 			return errors.Join(mounts.ErrUnavailable, err)
 		}
@@ -49,7 +54,11 @@ func RunHubAPI(ctx context.Context, podUID string) (result error) {
 	}
 
 	phase = startupFullDeployment
-	d, err := newOwnerDeployment(ctx, files, podUID, mode)
+	var d *OwnerDeployment
+	err = waitStartup(ctx, "hub-api", startupLog, func(ctx context.Context) (err error) {
+		d, err = newOwnerDeployment(ctx, files, podUID, mode)
+		return err
+	}, ownerStartupRetryable)
 	if err != nil {
 		return errors.Join(mounts.ErrUnavailable, err)
 	}
@@ -101,4 +110,14 @@ func RunHubAPI(ctx context.Context, podUID string) (result error) {
 	}
 	phase = startupFullRuntime
 	return d.Run(listener)
+}
+
+// ownerStartupRetryable retries, in-process, a startup whose accepted owner
+// configuration is not current yet: the hub-worker renews its SQL recovery
+// and observation intervals, and during an upgrade the new hub-worker waits
+// for its scheduling Lease while those intervals lapse. Other failures keep
+// exiting, as before.
+func ownerStartupRetryable(err error) bool {
+	var read *postgres.OwnerConfigurationReadFailure
+	return errors.As(err, &read) && startupRetryable(err)
 }

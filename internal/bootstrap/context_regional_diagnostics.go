@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	"asservat.local/asservat/internal/adapters/mtls"
 	"errors"
 	"fmt"
 	"io"
@@ -25,6 +26,7 @@ func (s RegionalContextStartConnections) reportFailure(stage string, cause error
 		switch step := fixed.FixedStep(); step {
 		case "local", "route", "dial", "tls", "peer", "request", "response", "current",
 			"discovery", "setup-begin", "process-open", "channel", "process-first", "owner-first", "source", "headers", "hello", "finish", "process-closing", "owner-closing", "process-final", "close",
+			"connector-protocol",
 			"setup-source-open", "setup-owned-process", "setup-process-proof", "setup-process-match", "setup-execution-account", "setup-settings-guard", "setup-settings-snapshot", "setup-workload", "setup-settings-guard-after", "setup-settings-snapshot-after", "setup-workload-guard-after", "setup-source-close", "setup-owned-process-after", "setup-fresh":
 			stage += "/" + step
 		}
@@ -40,6 +42,11 @@ func (s RegionalContextStartConnections) reportFailure(stage string, cause error
 	}
 	if cause != nil {
 		stage += " (" + regionalCause(cause) + ")"
+	}
+	// ADR-333: the hub's own explanation of a protocol refusal.
+	var refusal *mtls.HubProtocolRefusal
+	if errors.As(cause, &refusal) {
+		stage += ": hub says: " + refusal.Message
 	}
 	var timed interface {
 		OpeningTiming() (time.Duration, time.Duration)

@@ -87,7 +87,7 @@ type OwnerPublicDeployment struct {
 	// Pod token instead of reading token files. Empty in the legacy layout.
 	ProviderRecipeSHA256 string `json:"providerRecipeSHA256,omitempty"`
 	// Investigation and regional start (ADR-180 decision 4). Each workload
-	// cluster has its connector source and executor pin, router limits and
+	// cluster has its connector source, router limits and
 	// hub-held guarded capability and work trust (ADR-179). ADR-185: they are
 	// entries of the guarded cluster catalog, read at process start, because
 	// regional clusters enroll after the owner's one launch.
@@ -191,7 +191,6 @@ type OwnerPublicDownloadPlan struct {
 type OwnerPublicCluster struct {
 	ClusterID  string                      `json:"clusterID"`
 	Connector  FederationPeer              `json:"connector"`
-	Executor   OwnerPublicExecutor         `json:"executor"`
 	Standby    int                         `json:"standby"`
 	Captures   int                         `json:"captures"`
 	Capability OwnerPublicGuardedSource    `json:"capability"`
@@ -212,10 +211,6 @@ type OwnerPublicClusterCapacity struct {
 	ProtectionDigest     string   `json:"protectionDigest"`
 	NamespaceGuardDigest string   `json:"namespaceGuardDigest"`
 	Keys                 []string `json:"keys"`
-}
-type OwnerPublicExecutor struct {
-	StartupDigest string `json:"startupDigest"`
-	ImageDigest   string `json:"imageDigest"`
 }
 type OwnerPublicGuardedSource struct {
 	Source WorkerObjectReference `json:"source"`

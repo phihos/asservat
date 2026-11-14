@@ -110,9 +110,6 @@
 {{- $fed := include "asservat.fullname" (list . "federation") -}}
 {{- $connector := required "mode=combined and clusters require federation.connector (the regional offer's connector limits)" (dig "connector" nil (default dict .Values.federation)) -}}
 {{- $backup := required "mode=combined and clusters require capacity.backup (the regional offer's backup profile)" (dig "backup" nil (default dict .Values.capacity)) -}}
-{{- $connectors := len (default list .Values.clusters) -}}
-{{- if include "asservat.hubApi.combined" . }}{{ $connectors = add1 $connectors }}{{ end -}}
-{{- if lt (int64 $connector.profiles) (int64 $connectors) }}{{ fail (printf "federation.connector.profiles must cover every connector (%d: the combined-mode one plus clusters); it is fixed at the first install" $connectors) }}{{ end -}}
 {{- $offer := dict "federation" (printf "https://%s.%s.svc:9446" $fed .Release.Namespace) "serverName" (printf "%s.%s.svc" $fed .Release.Namespace) "image" (include "asservat.image" .) "connector" $connector "backup" $backup -}}
 {{- if not (include "asservat.hubApi.combined" .) }}{{ $_ := set $offer "hubOnly" true }}{{ end -}}
 {{- if .Values.clusters -}}

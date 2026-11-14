@@ -164,8 +164,8 @@ func readJoinFiles(ctx context.Context, in *providerInputs) (cluster, peer strin
 	if err != nil {
 		return "", "", offer, &fixedStepError{"join/offer", mounts.ErrUnavailable}
 	}
+	// The hub writes the offer; fields of a newer hub are ignored (ADR-333).
 	d := json.NewDecoder(bytes.NewReader(b))
-	d.DisallowUnknownFields()
 	if d.Decode(&offer) != nil || d.More() || cluster == peer {
 		return "", "", offer, &fixedStepError{"join/offer", mounts.ErrUnavailable}
 	}
@@ -250,7 +250,6 @@ func readCombinedOffer(ctx context.Context, in *providerInputs, namespace, name 
 		return zero, &fixedStepError{"pending", mounts.ErrUnavailable}
 	}
 	d := json.NewDecoder(bytes.NewReader([]byte(raw)))
-	d.DisallowUnknownFields()
 	var offer contracts.RegionalOffer
 	if len(raw) > 1<<20 || d.Decode(&offer) != nil || d.More() {
 		return zero, &fixedStepError{"decode", cfg.ErrInvalid}

@@ -32,7 +32,7 @@ type SourceWork struct {
 
 func EncodeSourceWork(w SourceWork) ([]byte, error) { return canonicalAPIContext(w, SourceWorkBytes) }
 func DecodeSourceWork(b []byte) (SourceWork, error) {
-	w, e := decodeClosedRPC[SourceWork](bytes.NewReader(b), SourceWorkBytes)
+	w, e := decodeOpenRPC[SourceWork](bytes.NewReader(b), SourceWorkBytes)
 	if e != nil || w.Format != SourceWorkFormat || (len(w.StopProfile) == 0 && len(w.StopRecording) == 0 && (len(w.Target) == 0 || len(w.Node) == 0)) {
 		return SourceWork{}, ErrAPIContextProtocol
 	}
@@ -54,7 +54,7 @@ type SourceReply struct {
 
 func EncodeSourceReply(w SourceReply) ([]byte, error) { return canonicalAPIContext(w, 1024) }
 func DecodeSourceReply(b []byte) (SourceReply, error) {
-	w, e := decodeClosedRPC[SourceReply](bytes.NewReader(b), 1024)
+	w, e := decodeOpenRPC[SourceReply](bytes.NewReader(b), 1024)
 	if e != nil || w.Format != SourceWorkFormat || !(len(w.SourceID) == 36 && len(w.Fence) == 36 && w.ProfileAttemptID == "" && w.RecordingAttemptID == "" || w.SourceID == "" && w.Fence == "" && len(w.CaptureID) == 36 && (len(w.ProfileAttemptID) == 36 && w.RecordingAttemptID == "" || len(w.RecordingAttemptID) == 36 && w.ProfileAttemptID == "") && w.SnapshotID == "") || (w.State != "queued" && w.State != "unavailable" && w.State != "received") {
 		return SourceReply{}, ErrAPIContextProtocol
 	}

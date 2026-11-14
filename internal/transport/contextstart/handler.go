@@ -3,7 +3,9 @@ package contextstart
 import (
 	"context"
 	"crypto/tls"
+	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -41,6 +43,13 @@ func privateUnavailable(w http.ResponseWriter) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	http.Error(w, "Unavailable", http.StatusNotFound)
 }
+
+// ConnectorProtocolRefusal is the hub's answer to a connector of another
+// protocol major (ADR-333).
+func ConnectorProtocolRefusal(sent int) string {
+	return "this hub speaks connector protocol " + strconv.Itoa(contracts.ConnectorProtocolMajor) + "; the connector sent protocol " + strconv.Itoa(sent) + " (0: none); upgrade the connector to a release within one minor version of the hub (or the hub, if the connector is newer)"
+}
+
 func (h *Handler) refuse(w http.ResponseWriter, stage string) {
 	if h != nil && h.Refused != nil {
 		h.Refused(stage)
@@ -93,6 +102,24 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		stop()
 		release()
 		h.refuse(w, "hello")
+		return
+	}
+	// ADR-333: one protocol major; within it the announced capabilities decide
+	// which operations this connector receives.
+	capabilities := contracts.NewConnectorCapabilities(hello.Capabilities)
+	if hello.Protocol != contracts.ConnectorProtocolMajor || capabilities == nil {
+		stop()
+		release()
+		if h.Refused != nil {
+			h.Refused("connector-protocol")
+		}
+		// A clear refusal the connector logs. HTTP/2 forbids the Upgrade
+		// header that HTTP/1.1 pairs with 426.
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.WriteHeader(http.StatusUpgradeRequired)
+		_, _ = io.WriteString(w, ConnectorProtocolRefusal(hello.Protocol))
 		return
 	}
 	// The connector started its finite conversation before dialing. Retain its
@@ -167,6 +194,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	defer stream.Close()
 	stream.sources = sources
+	stream.capabilities = capabilities
 	// Hello and the first source were read before the stream was constructed.
 	stream.frames = 2
 	stream.bytes = contracts.APIContextWorkBytes + 5 + contracts.APIContextSourceBytes + 5 // Same ceilings as the connector.

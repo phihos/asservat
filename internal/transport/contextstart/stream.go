@@ -40,10 +40,13 @@ type frameStream struct {
 	leaseStarted                 bool
 	terminalReceiptSent          bool
 	historyWork                  bool
-	lease                        *framePeerLease
-	leaseBounds                  []framePeerBound
-	stopOwner                    func() bool
-	ownerDone                    chan struct{}
+	// capabilities is the hub end's record of the connector's Hello
+	// announcement (ADR-333); nil on the connector's end.
+	capabilities contracts.ConnectorCapabilities
+	lease        *framePeerLease
+	leaseBounds  []framePeerBound
+	stopOwner    func() bool
+	ownerDone    chan struct{}
 	// ADR-178: sources is the hub's per-exchange feed; local is the region's
 	// own source reader. sourceSeq is the last used source sequence.
 	sources   *SourceFeed
