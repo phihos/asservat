@@ -1,5 +1,7 @@
 # ADR-156: Finite owner configuration audit epochs
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded (2026-11-13): acceptance epochs existed so the runtime could keep re-accepting the installer's owner configuration with a current encrypted acceptance record and an installer-bound reserve. Under ADR-328 the owner reads its mounted configuration; no acceptance epochs, installer facet or epoch reserve are needed. The unselected component is removed.
 
 Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan. Historical status: accepted direction; the standalone value, accounting, reader-port and

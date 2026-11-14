@@ -1,5 +1,7 @@
 # ADR-061 — Current protected browser configuration
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded in part by ADR-328 (2026-11-13): the pinned ConfigMap UID, source-replacement rejection and bootstrap qualification of the protected namespace no longer apply. The hub reads the Helm-rendered browser-settings ConfigMap by name under RBAC. Finite ceilings, irreversible shortening of existing sessions, never-reused epochs and sign-out during outages remain.
 
 Date: 2026-10-10. Status: implementation refinement of ADR-060; production bootstrap and recovery qualification remain open.

@@ -1,5 +1,7 @@
 # ADR-281 — Syscall argument tracing stays disabled with the published traceloop gadget
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 Date: 2026-11-02. Updated: 2026-11-03. Status: accepted; the maintainer
 approved the narrowly scoped engine exception, with native qualification pending. Requirements: REQ-SYS-001, REQ-SYS-002 (arguments
 mode), S-04 increment 15. Related: ADR-273, ADR-279, S-04 plan S1.

@@ -1,5 +1,7 @@
 # ADR-170 — Federation compartment for connector-facing hub duties
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded in part by ADR-328 (2026-11-13): pinning each peer by its original ConfigMap UID and regional guard digest, and the installer verifier, no longer apply; the federation process reads mounted configuration under RBAC. The separate federation process and its connection budget remain valid.
 
 Date: 2026-10-14. Status: accepted; role layout, `hub-federation` and regional `connector` processes implemented and natively qualified with synthetic setup roots; installer provisioning pending.

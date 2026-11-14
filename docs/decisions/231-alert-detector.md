@@ -1,5 +1,7 @@
 # ADR-231 — Alert trigger from the in-cluster Alertmanager API
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 Date: 2026-10-26. Status: accepted; implemented; qualification below.
 Requirements: REQ-TRG-002/004/006/007, S-03 (TASK-04). Extends
 [ADR-228](228-restart-triggered-policy-captures.md) and [ADR-230](230-s03-detectors.md).

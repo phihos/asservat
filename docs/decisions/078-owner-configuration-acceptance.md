@@ -1,5 +1,7 @@
 # ADR-078 — Durable owner configuration acceptance
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded (2026-11-13): durable acceptance existed to detect rollback or unaudited changes of the owner-configuration ConfigMap. Anyone who can write that ConfigMap is trusted under ADR-328; the hub reads the Helm-rendered ConfigMap under RBAC.
 
 Date: 2026-10-10. Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan.

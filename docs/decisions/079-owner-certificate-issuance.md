@@ -1,5 +1,7 @@
 # ADR-079 — Purpose-separated hub owner certificate issuance
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 Date: 2026-10-10. Status: implementation refinement under the maintainer's continuation; full Go/race/import/design and owned fleet/Kubernetes provider regressions pass. Measured results and remaining fixture inputs are tracked in [implementation progress](../implementation-progress.md).
 
 ADR-076 defines exact client/server owner identities and ADR-078 supplies accepted routing/root configuration. Implement provider issuance against those contracts using the existing maintained OpenBao client and Go X.509 primitives. Each issuer instance has one fixed HTTPS provider, mount, role, installation, hub cluster, issuer epoch and leaf purpose. Separate provider credentials/roles issue client and server leaves; neither instance can manage roles, generate/export private keys, activate a registration or grant forwarding authority.

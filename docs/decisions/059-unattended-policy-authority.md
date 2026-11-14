@@ -1,5 +1,7 @@
 # ADR-059 — Separate human SSO from recurring policy authority
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 Date: 2026-10-10. Status: **accepted by the maintainer**. This record supersedes the research recommendation of a mandatory Keycloak directory reader and refines recurring execution under REQ-PER-007. It does not reinterpret existing human-bound grants. The maintainer accepted the recommendation after reviewing the provider-neutral alternatives.
 
 ## Context

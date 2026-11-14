@@ -1,5 +1,7 @@
 # ADR-182 — Promoting the installed owner to native backend and public layers
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded in part by ADR-328 (2026-11-13): enabling layers by projection receipts in the resource journal no longer applies. The `Native` and `Public` sections of the mounted deployment input select the layers, and a missing projection root or file fails startup. Ordered layers, fixed roots and ports, and provider authentication remain valid.
 
 Date: 2026-10-15. Status: accepted; promoted composition and public provider purposes implemented with unit tests; installer producers and native qualification pending.

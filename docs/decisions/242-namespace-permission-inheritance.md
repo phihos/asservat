@@ -1,5 +1,7 @@
 # ADR-242 — Namespace metadata permission inheritance
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 Date: 2026-10-27. Status: accepted; implemented; qualification below.
 Requirements: REQ-PER-003 (namespace metadata inheritance), REQ-PER-006 (freshness, composition),
 REQ-PER-008 (assignment identity and retained evidence), REQ-PER-002 (impact preview, completing

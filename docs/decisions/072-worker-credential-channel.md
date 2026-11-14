@@ -1,5 +1,7 @@
 # ADR-072 — Process-owned acquisition credentials and private enrollment channel
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 Date: 2026-10-10. Status: implemented refinement; qualification is recorded in [implementation progress](../implementation-progress.md).
 
 ADR-071 supplies audited issuance but does not supply the worker's private key or confidential token transport. Add a bounded TLS 1.3 bootstrap operation within the existing download control/relay boundary. Initial server authentication uses explicitly pinned server roots and the endpoint's verified DNS/IP name. Client authentication is the exact dedicated-audience Pod-bound token verified by the existing current worker attester. Do not require the not-yet-issued acquisition certificate or forward a developer's token into the worker.

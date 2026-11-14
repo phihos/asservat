@@ -1,5 +1,7 @@
 # ADR-051 — Initial internal peer identity profile
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 Date: 2026-10-10. Status: selected for implementation under the maintainer's one-shot continuation; runtime qualification remains bounded by the tests actually recorded.
 
 The signed-work verifier needs an independently authenticated peer, and TLS chain validity alone does not establish current cluster enrollment or node generation. Select TLS 1.3 client authentication with an installation-specific SPIFFE URI carrying immutable installation/cluster/peer/issuer-epoch identity. Node certificates additionally bind node UID, boot and collector epoch. Separate client/server certificate purpose, cap client certificates at one hour and consult current registration on every request, including reused TLS connections. The [peer identity contract](../architecture/peer-identity.md) defines exact encoding and bounds.

@@ -1,5 +1,7 @@
 # ADR-176 — Artifact keys through the local key service with attempt-scoped wrap authority
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 Date: 2026-10-14. Status: accepted; wrap authority, connector key peers, per-attempt regional sealer and the `asservat key-service` command implemented; the wrap authority passes on real PostgreSQL; unwrap composition, installer and native end-to-end qualification pending. Amends decision 2 of
 [ADR-174](174-regional-context-start-composition.md).
 Requirements: REQ-DEP-003, REQ-FED-002, artifact-downloads, S-02; TASK-03 / TASK-11.

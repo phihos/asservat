@@ -1,5 +1,7 @@
 # ADR-140 — Protected producers for installed public runtime
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded (2026-11-13): The configuration-role bootstrap with guarded fleet/owner/workload proofs, enforcement probes, one-use launch claims, guard generations and the guard-pinned owner identity projection existed for installer self-verification. The `setup` Job creates runtime roles from the compiled grant plan and Helm renders the Deployments and their config. Still valid: role names and limits come from product contracts, the total PostgreSQL connection budget is validated, multi-cluster serving selects exact profiles without unioned roots, and one normal-lane audit lifecycle per permission root is shared.
 
 Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan.

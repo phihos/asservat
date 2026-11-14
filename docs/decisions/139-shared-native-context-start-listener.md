@@ -1,5 +1,7 @@
 # ADR-139: Share the accepted native port with live context start
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 Status: accepted for implementation; combined native qualification remains pending.
 
 ADR-135's connector opens its live context-start exchange at the audited owner's existing `nativePort`. ADR-122's concrete server previously accepted only native evidence conversations and capped every socket at ten seconds. Replacing that server with a permissive fixture handler would not establish a usable installed composition.

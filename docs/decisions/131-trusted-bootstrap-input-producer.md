@@ -1,5 +1,7 @@
 # ADR-131: Produce original installation pins from trusted static inputs
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded (2026-11-13): The trusted producer of installer pins (UIDs, OIDs, seed IDs), its native guard and the temporary setup manager are not needed: ADR-328 removes UID and guard pins. Helm values and the `secrets` hook Job supply IDs and passwords.
 
 Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan.

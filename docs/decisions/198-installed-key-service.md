@@ -1,5 +1,7 @@
 # ADR-198 — Installed key service
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded in part by ADR-328 (2026-11-13): the continuation generating the key material, the ConfigMap's UID and SHA-256 pins on the key Secret, the admission guard on the key configuration ConfigMap, and the continuation-built SQL projection (decisions 2, 3 and 5) no longer apply. The Helm `secrets` hook Job creates the root key Secret once if missing and never rotates it; Helm renders the configuration ConfigMap and the key-service RBAC. Still valid: a separate key-service Deployment that alone mounts the key (decision 1), permanent SQL logins, connectors resolved from SQL (decision 4), the operator serving Secret, worker-PKI key clients and no download unwrap.
 
 Date: 2026-10-17. Status: accepted; implemented and natively qualified

@@ -1,5 +1,7 @@
 # ADR-145 — Independent capacity admission probe
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded (2026-11-13): this probe existed to prove at runtime that installer-created admission policies deny namespace writers. ADR-328 trusts everyone who can write in Asservat namespaces, so capacity resources are protected by plain RBAC and no dry-run probe account or policy exception is needed.
 
 Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan. Originally selected under continued implementation authorization. Requirements:

@@ -1,5 +1,7 @@
 # ADR-291 — Bounded profile summary authority and query composition
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 Date: 2026-11-03. Status: implemented; named installed CPU/heap summaries pass; maximum-input containment remains pending.
 Requirements: REQ-PRF-003/005, REQ-EVD-005, REQ-MCP-003/005.
 Depends on [ADR-286](286-bounded-go-analyzer-isolation.md).

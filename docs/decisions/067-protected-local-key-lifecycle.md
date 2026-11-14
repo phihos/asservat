@@ -1,5 +1,7 @@
 # ADR-067 — Protected local key source and bounded lifecycle observations
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded in part by ADR-328 (2026-11-13): pinning the key Secret by UID and SHA-256 through an administrator-protected ConfigMap, and rejecting source substitution, no longer apply. The key service reads its mounted key configuration and Secret under RBAC. Keys stay confined to the key service, rotation is additive and old versions remain readable.
 
 Date: 2026-10-10. Status: implementation refinement of accepted ADR-063/064/065. Components implemented; integration qualification and runtime/installer remain separate.

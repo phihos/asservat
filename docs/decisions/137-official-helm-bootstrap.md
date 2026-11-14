@@ -1,5 +1,7 @@
 # ADR-137 — Package the fixed initial installer with Helm
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded (2026-11-13): Packaging the four-command installer Pod as a Helm hook, its `installer-resume` command and revision-named input snapshots are replaced by the idempotent `secrets` and `setup` hook Jobs. Helm remains the official installation method.
 
 Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan.

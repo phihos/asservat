@@ -1,5 +1,7 @@
 # ADR-148 — One public projection enforcement interval
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded (2026-11-13): the reused, independently denied enforcement proof and its five boundary rechecks of policy/binding pins, worker journal, Deployment, account and Lease existed only to verify the installation's own admission policies at runtime. Helm renders the projection Secret and RBAC; the worker reads it as mounted configuration.
 
 Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan. Historical status: accepted; component Go/race/vet checks pass; native qualification was pending.

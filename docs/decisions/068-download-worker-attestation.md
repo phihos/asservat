@@ -1,5 +1,7 @@
 # ADR-068 — Kubernetes-bound download worker proofs
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded in part by ADR-328 (2026-11-13): reading the worker's namespace, ServiceAccount, Job and Pod to match UIDs, controller identity and spec digests against pinned dispatch facts no longer applies; objects in the download-worker namespace are trusted. Online TokenReview with the dedicated audience, binding to the acquisition certificate and minimized proof persistence remain.
 
 Date: 2026-10-10. Status: implementation refinement of ADR-051/065/066. Proof production and consumption are implemented components; protected dispatch, peer issuance and runtime composition remain required.

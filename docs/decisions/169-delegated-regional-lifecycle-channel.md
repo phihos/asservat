@@ -1,5 +1,7 @@
 # ADR-169 — Delegated regional lifecycle channel
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded in part by ADR-328 (2026-11-13): phase observations of the connector's own controller chain and namespace guard no longer apply. The single outbound channel, credential presentation, CSR binding, Pod-token review and hub-only effects remain valid.
 
 Date: 2026-10-14. Status: accepted design (follows ADR-168); channel, both adapters and a two-cluster native fixture qualified; production process composition pending.

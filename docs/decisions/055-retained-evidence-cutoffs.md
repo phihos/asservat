@@ -1,5 +1,7 @@
 # ADR-055 — Monotonic retained-evidence cutoffs and signed lifecycle journal
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 Status: implementation refinement under the maintainer's sustained continuation. Implements the already accepted REQ-PRV-002/004 behavior; it does not enable collection or disclosure.
 
 The deletion-budget correction subtracts a newly required cleanup budget from the already-bound hard deadline, even if the new maximum is longer. Migration 00016 permits the restrictive overlay's read cutoff to equal the original anchor when no positive readable interval remains. Original registration/new collection still require positive time. This closes access and makes deletion claimable; it does not manufacture an already-missing cleanup window or extend the hard deadline.

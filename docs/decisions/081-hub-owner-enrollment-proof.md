@@ -1,5 +1,7 @@
 # ADR-081 — Prove hub owner enrollment before readiness
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded in part by ADR-328 (2026-11-13): the ReplicaSet/Deployment ownership checks and the namespace protection proof no longer apply. Online TokenReview with the dedicated audience and the identity-free CSR remain the enrollment proof.
 
 Status: accepted for component implementation; durable owner registration, signing spend, activation and clean installation remain pending. Implements the proof prerequisite of ADR-079/080 under REQ-FED-001, REQ-DEP-003 and REQ-DLD-003.

@@ -1,5 +1,7 @@
 # ADR-082 — Durable hub process enrollment
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 Date: 2026-10-10. Status: selected for implementation under the maintainer's continuing implementation authorization. Requirements: REQ-FED-001, REQ-DEP-003, REQ-DLD-003, REQ-CAP-003; continuation of TASK-02 and S-01/S-02, not their completion.
 
 ## Problem

@@ -1,5 +1,7 @@
 # ADR-071 — Audited acquisition credentials and bounded renewal
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 Date: 2026-10-10. Status: implemented component refinement; scoped SQL/S3 and Kubernetes/OpenBao/TLS qualification passed. Runtime/bootstrap/local-CA composition remains pending.
 
 ADR-068 checks a certificate-bound worker, but initial enrollment cannot require the certificate it is about to issue. Separate the current Pod/token/CSR-key proof from the later certificate-bound proof. Reuse the exact audited SQL dispatch, administrator profile and dedicated-audience TokenReview checks. Never mint a placeholder certificate or trust a caller-selected Pod label to break the dependency.

@@ -1,5 +1,7 @@
 # ADR-056 — Complete retention history before source availability
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded in part by ADR-328 (2026-11-13): the guard proofs paired with each LIST no longer apply; the retention CRD source is read under RBAC. The watch-watermark completeness rule, the bounded observation window and the no-renewal rules remain valid.
 
 Status: implementation refinement under the maintainer's sustained continuation, preserving REQ-PRV-002/004. Verification results are recorded separately. No new product approval or public collection authority is introduced.

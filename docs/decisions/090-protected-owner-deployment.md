@@ -1,5 +1,7 @@
 # ADR-090 — Protected owner deployment inputs and rotating credentials
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded in part by ADR-328 (2026-11-13): pinning the configuration source and workload protection in `deployment.json` no longer applies; the Helm-native plan replaces `deployment.json` with Helm-rendered configuration read by name. Mounted-file reading, per-request credential reads and no ambient credentials remain.
 
 Date: 2026-10-11. Status: selected for implementation under continuing maintainer authorization. Requirements: REQ-DEP-003, REQ-DEP-005, REQ-FED-001, REQ-DLD-003; part of TASK-02/07/11 and S-01/S-02.

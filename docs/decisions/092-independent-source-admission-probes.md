@@ -1,5 +1,7 @@
 # ADR-092 — Independent source admission probes in the private hub namespace
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded (2026-11-13): the probe exceptions existed only to prove admission guards on hub ConfigMaps. ADR-328 removes those guards and their dry-run probes (including ADR-324's global metadata guards); ConfigMaps are read under RBAC.
 
 Date: 2026-10-11. Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan.

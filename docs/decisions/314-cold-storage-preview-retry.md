@@ -1,5 +1,7 @@
 # ADR-314: A preview that finds cold storage tries once more within its request window
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 Status: accepted (agent decision, 2026-11-08). Refines
 [ADR-213](213-storage-readiness-at-consumption.md) and
 [ADR-200](200-on-demand-capacity-refresh.md); the request-side counterpart is

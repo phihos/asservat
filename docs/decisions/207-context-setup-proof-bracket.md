@@ -1,5 +1,7 @@
 # ADR-207 — One native proof bracket for context-start setup
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded (2026-11-13): this decision amortizes the connector's native proof of its own installation (live namespace/account, guard policy/binding pairs, workload and approved inputs) across one opening. ADR-328 removes that self-verification; the connector reads mounted configuration and the hub authenticates it with TLS and TokenReview. The two remote-owner authentications of decision 5 remain under their own ADRs.
 
 Date: 2026-10-18. Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan.

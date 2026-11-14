@@ -1,5 +1,7 @@
 # ADR-310: Finite approved live observation
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded in part by ADR-328 (2026-11-13): The delivery policy is mounted
 > configuration read under RBAC, not a guarded protected source; changing its
 > root numeric settings needs an ordinary restart. Viewer authority, source

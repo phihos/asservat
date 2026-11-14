@@ -1,5 +1,7 @@
 # ADR-283 — CIDR packet peers in the hub filter (S-04 increment 9, PR 1)
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 Date: 2026-11-02. Status: accepted (agent decision); first slice of increment 9.
 Requirements: REQ-NET-001 (effective selector, SC-NET-001), REQ-NET-002
 (peer queries, frozen/follow), REQ-NET-005 (authored filter digest and

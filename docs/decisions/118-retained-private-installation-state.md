@@ -1,5 +1,7 @@
 # ADR-118: Retain initial private material and read historical completion
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded (2026-11-13): The UID-pinned private material Secret and the guard-checked historical installation reader protected installer state against namespace writers. The Helm `secrets` hook Job creates missing Secrets with fixed names, never rotates them and keeps them on uninstall; the idempotent `setup` Job replaces the activation history.
 
 Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan.

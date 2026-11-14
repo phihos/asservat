@@ -1,5 +1,7 @@
 # ADR-066 — Bind local unwrap to an audited download
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 Status: engineering refinement of ADR-065 under the authorized implementation. Date: 2026-10-10. Implements part of REQ-DEP-003 and REQ-DLD-002/003. No additional human approval or public API.
 
 The local key service must verify current operation authority independently of a valid acquisition certificate. For the initial bounded pod-status download, use its existing prepaid, audited SQL batch as the parent. The trusted download coordinator binds the exact installation/key and acquisition peer/certificate once. The binding expires no later than the original batch, current download decision or peer certificate. Repeating the binding cannot change the peer, refill slots or extend expiry.
