@@ -88,7 +88,7 @@ ArtifactDownload is a C-14-owned minimized SQL row with artifact/version, actor/
 
 ## Investigation approval scope
 
-AccessGrant gains optional ResultAccessScope, ResultGrantOrigin and ResultAccessCounters value objects; no new top-level entity is needed. Map the resolved parent instruction/counters to hub SQL, and exact child origins to a parent FK plus unique output registrations. DebugCapture authored resultAccess is an instruction only; it cannot set issued decisions or child handles. MCP uses result_access with the same strict nested DTO. Case/Artifact identity and C-14 ownership are unchanged. See [REQ-INV-002](../../specs/investigation-approval.md#req-inv-002--materialize-exact-grants-after-verified-commit).
+AccessGrant gains optional ResultAccessScope and ResultAccessCounters value objects; no new top-level entity is needed. Map the resolved instruction and counters to hub SQL; artifacts used count once through a unique (grant, artifact) row. DebugCapture authored resultAccess is an instruction only; it cannot set issued decisions. MCP uses result_access with the same strict nested DTO. Case/Artifact identity and C-14 ownership are unchanged. See [REQ-INV-002](../../specs/investigation-approval.md#req-inv-002--result-access-applies-to-exact-published-artifacts).
 
 BrowserLogin and BrowserSession belong to C-02. SQL stores encrypted provider credentials and minimal principal/session metadata. They are not CRDs, evidence, grants or recurring-policy executors. See [browser sessions](../architecture/browser-sessions.md).
 

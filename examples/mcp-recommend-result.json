@@ -50,8 +50,7 @@
             "maxAge": "30s",
             "maxBytes": 37748736,
             "segmentBytes": 4194304,
-            "maxSegments": 9,
-            "medium": "memory"
+            "maxSegments": 9
           },
           "peers": {
             "entries": [
@@ -69,11 +68,9 @@
             "ports": [
               8080
             ],
-            "resolution": "follow",
-            "maxEndpoints": 256
+            "resolution": "follow"
           },
           "maxFrozenBytes": 50331648,
-          "maxConcurrentSnapshots": 1,
           "filter": "tcp and port 8080"
         },
         "ring_sizing": {

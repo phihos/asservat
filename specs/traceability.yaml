@@ -972,11 +972,6 @@ requirements:
   scenarios:
   - SC-UI-005
   tasks: *id007
-- requirement: REQ-UI-006
-  spec: specs/user-experience.md
-  scenarios:
-  - SC-UI-006
-  tasks: *id007
 - requirement: REQ-UI-007
   spec: specs/user-experience.md
   scenarios:
@@ -1001,16 +996,6 @@ requirements:
   spec: specs/domain-model.md
   scenarios:
   - SC-DOM-003
-  tasks: *id008
-- requirement: REQ-DOM-004
-  spec: specs/domain-model.md
-  scenarios:
-  - SC-DOM-004
-  tasks: *id008
-- requirement: REQ-DOM-005
-  spec: specs/domain-model.md
-  scenarios:
-  - SC-DOM-005
   tasks: *id008
 - requirement: REQ-INT-001
   spec: specs/interfaces.md
@@ -1127,34 +1112,10 @@ requirements:
   - TASK-01
   - TASK-02
   - TASK-11
-- requirement: REQ-ARC-004
-  spec: specs/implementation-architecture.md
-  scenarios:
-  - SC-ARC-004
-  tasks:
-  - TASK-01
-  - TASK-02
-  - TASK-11
 - requirement: REQ-ARC-005
   spec: specs/implementation-architecture.md
   scenarios:
   - SC-ARC-005
-  tasks:
-  - TASK-01
-  - TASK-02
-  - TASK-11
-- requirement: REQ-ARC-006
-  spec: specs/implementation-architecture.md
-  scenarios:
-  - SC-ARC-006
-  tasks:
-  - TASK-01
-  - TASK-02
-  - TASK-11
-- requirement: REQ-ARC-007
-  spec: specs/implementation-architecture.md
-  scenarios:
-  - SC-ARC-007
   tasks:
   - TASK-01
   - TASK-02

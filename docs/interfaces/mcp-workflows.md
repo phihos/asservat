@@ -6,7 +6,7 @@ MCP is the agent-facing investigation interface. The [canonical catalog](../../s
 
 | Agent goal | Tools, in working order | UX contract |
 | --- | --- | --- |
-| Find an incident | `list_cases`, `find_similar_cases`, `get_case`, `get_timeline`, `list_artifacts` | Only visible artifacts affect titles/counts/timelines; provisional similarity is labeled |
+| Find an incident | `list_cases` (optionally ranked by similarity), `get_case` (with its timeline), `list_artifacts` | Only visible artifacts affect titles/counts/timelines; provisional similarity is labeled |
 | Read evidence | `get_extract` with the view `list_artifacts` offers (backtrace, runtime/profile/syscall/packet summaries, HTTP headers, Zeek logs, file excerpts, logs), `compare_profiles` | Approved extracts; build/symbol gaps, coverage and omissions explicit; no live reads |
 | Inspect raw content | `query_artifact` (packets, syscalls, memory, debugger), `get_query_result` | Runs directly for callers with the equivalent Kubernetes right (`pods/exec`); others get a prefilled `request_raw_access` remedy; server-side wait for results |
 | Request missing access | `request_raw_access`, `get_grant` | One bounded review by another person; approval in the human console |
@@ -22,7 +22,7 @@ MCP is the agent-facing investigation interface. The [canonical catalog](../../s
 
 These are semantic sequences, not fabricated protocol-valid JSON. Executable request/result fixtures remain in [examples](../../examples/README.md). Client SDK adapters must validate actual fields against the catalog.
 
-**“Investigate this case.”** Resolve the supplied case ID with get_case. Read get_timeline and list_artifacts. Choose approved extract views based on available types. For each conclusion cite the artifact and coverage; if symbols, prehistory or bodies were not collected, state the limitation. If raw analysis is necessary, call query_artifact; when it returns the raw-access remedy, explain the exact artifact/operation/budget and call request_raw_access, return the review link and follow the decision with get_grant `after_revision`, which waits server-side. Never claim a request is approval.
+**“Investigate this case.”** Resolve the supplied case ID with get_case, which includes the timeline. Read list_artifacts. Choose approved extract views based on available types. For each conclusion cite the artifact and coverage; if symbols, prehistory or bodies were not collected, state the limitation. If raw analysis is necessary, call query_artifact; when it returns the raw-access remedy, explain the exact artifact/operation/budget and call request_raw_access, return the review link and follow the decision with get_grant `after_revision`, which waits server-side. Never claim a request is approval.
 
 **“Save the last 20 seconds.”** list_targets finds the workload by name. list_recordings returns eligible source handles, available history and blockers. preview_capture with those handles and `before: 20s` returns the save plan. Explain incremental copy/upload cost, possible user data and inherited deletion deadline. On explicit user intent, request_capture submits that preview with its `expected_plan_digest` and one stable idempotency key. Retry that same key after an ambiguous response. get_capture reports partial/complete outcomes; it never silently substitutes a new source or starts the policy's core action.
 

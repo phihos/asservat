@@ -82,7 +82,6 @@
         },
         "state": {
           "enum": [
-            "Preparing",
             "Ready",
             "Completed",
             "Failed",
@@ -212,41 +211,6 @@
           "if": {
             "properties": {
               "state": {
-                "const": "Preparing"
-              }
-            }
-          },
-          "then": {
-            "not": {
-              "anyOf": [
-                {
-                  "required": [
-                    "filename"
-                  ]
-                },
-                {
-                  "required": [
-                    "native_format"
-                  ]
-                },
-                {
-                  "required": [
-                    "etag"
-                  ]
-                },
-                {
-                  "required": [
-                    "coverage_notice"
-                  ]
-                }
-              ]
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "state": {
                 "const": "Failed"
               }
             }
@@ -287,7 +251,7 @@
           "etag"
         ]
       },
-      "description": "Current authorized transfer status. Every status carries the verified size and SHA-256; Preparing omits the reader's native metadata group (filename, format, ETag, coverage) until the regional reader returns it. Ready carries content_path and browser_url; terminal states carry neither. Completed records the server transfer outcome, not local file persistence. Status reads never prepare or decrypt a file."
+      "description": "Current authorized transfer status. Prepare returns Ready with the catalog's verified metadata in the same request. Ready carries content_path and browser_url; terminal states carry neither. Completed records the server transfer outcome, not local file persistence. Status reads never decrypt a file."
     },
     "cancelReceipt": {
       "type": "object",
@@ -302,21 +266,13 @@
             "Cancelled",
             "AlreadyTerminal"
           ]
-        },
-        "audit_state": {
-          "enum": [
-            "pending",
-            "recorded",
-            "overdue"
-          ]
         }
       },
       "required": [
         "download_id",
-        "state",
-        "audit_state"
+        "state"
       ],
-      "description": "A minimal receipt for stopping the original caller/client download, even after evidence access is lost. AlreadyTerminal intentionally hides the finer prior state. No artifact or native metadata. Pending/overdue audit never reverses the enforced stop."
+      "description": "A minimal receipt for stopping the original caller/client download, even after evidence access is lost. AlreadyTerminal hides the finer prior state. No artifact or native metadata. The audit row is written in the same transaction (ADR-330 D6)."
     }
   }
 }

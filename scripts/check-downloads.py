@@ -59,32 +59,29 @@ for state in ('Completed', 'Cancelled'):
 failed = copy.deepcopy(terminal); failed['state'] = 'Failed'; invalid(status, failed)
 failed['failure_reason'] = 'Expired'; valid(status, failed)
 bad = copy.deepcopy(terminal); bad['state'] = 'Completed'; bad['failure_reason'] = 'Denied'; invalid(status, bad)
-# Every status, including Preparing and terminal ones, carries the verified size and SHA-256.
+# Prepare returns Ready with the catalog's verified metadata; there is no Preparing state.
 native_fields = ('filename', 'native_format', 'etag', 'coverage_notice')
-preparing = copy.deepcopy(terminal); preparing['state'] = 'Preparing'
-for field in native_fields:
-    preparing.pop(field)
-valid(status, preparing)
 for field in ('size_bytes', 'sha256'):
-    for value in (preparing, terminal):
+    for value in (ready, terminal):
         bad = copy.deepcopy(value); del bad[field]; invalid(status, bad)
 for field in native_fields:
-    bad = copy.deepcopy(preparing); bad[field] = ready[field]; invalid(status, bad)
     bad = copy.deepcopy(ready); del bad[field]; invalid(status, bad)
 # A terminal status stays explainable after AccessUntil without native metadata.
-completed = copy.deepcopy(preparing); completed['state'] = 'Completed'; completed['access_until'] = '2000-01-01T00:00:00Z'
+completed = copy.deepcopy(terminal); completed['state'] = 'Completed'; completed['access_until'] = '2000-01-01T00:00:00Z'
+for field in native_fields:
+    completed.pop(field)
 valid(status, completed)
 browser = yaml.safe_load((ROOT / 'docs/interfaces/browser-openapi.yaml').read_text())
 for output in (tool['outputSchema'], browser['components']['schemas']['McpOutput_download_artifact']):
     v = validator(output)
-    for data in (ready, preparing, completed, failed):
+    for data in (ready, completed, failed):
         envelope = read('examples/download-ready.json'); envelope['data'] = data; valid(v, envelope)
     bad = read('examples/download-ready.json'); bad['data']['sha256'] = 'not-verified'; invalid(v, bad)
 minimal = read('examples/download-ready.json')
-minimal['data'] = {'download_id': ready['download_id'], 'state': 'AlreadyTerminal', 'audit_state': 'pending'}
+minimal['data'] = {'download_id': ready['download_id'], 'state': 'AlreadyTerminal'}
 for output in (tool['outputSchema'], browser['components']['schemas']['McpOutput_download_artifact']):
     v = validator(output); valid(v, minimal)
-    for field, value in (('artifact_id', sample['artifact_id']), ('filename', 'private.core'), ('state', 'Completed'), ('audit_state', 'ignored')):
+    for field, value in (('artifact_id', sample['artifact_id']), ('filename', 'private.core'), ('state', 'Completed'), ('audit_state', 'pending')):
         bad = copy.deepcopy(minimal); bad['data'][field] = value; invalid(v, bad)
 assert datetime.fromisoformat(ready['access_until']) > datetime.fromisoformat('2026-10-09T12:00:00+00:00')
 assert ready['size_bytes'] == 4 * 1024**3  # Multi-GiB native core must fit the contract.

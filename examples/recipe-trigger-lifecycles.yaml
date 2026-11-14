@@ -19,7 +19,6 @@ spec:
         maxBytes: 4194304
         segmentBytes: 1048576
         maxSegments: 4
-        medium: memory
       peers:
         entries:
         - cidrs:
@@ -27,9 +26,7 @@ spec:
           - ::/0
         protocol: any
         resolution: frozen
-        maxEndpoints: 1
       maxFrozenBytes: 4194304
-      maxConcurrentSnapshots: 1
     required: true
     impact: observe
     limits:
@@ -51,9 +48,7 @@ spec:
         maxBytes: 8388608
         segmentBytes: 2097152
         maxSegments: 4
-        medium: memory
       maxFrozenBytes: 16777216
-      maxConcurrentSnapshots: 1
       maxEvents: 100000
       maxEventsPerSecond: 10000
       maxTrackedThreads: 4096

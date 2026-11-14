@@ -159,25 +159,15 @@
           "minimum": 2,
           "maximum": 9007199254740991,
           "description": "Derived bound: ring maxBytes \u00f7 segmentBytes; at least 2 so the ring can rotate."
-        },
-        "medium": {
-          "enum": [
-            "memory",
-            "encryptedDisk"
-          ]
-        },
-        "storageProfileRef": {
-          "type": "string",
-          "minLength": 1
         }
       },
       "required": [
         "maxAge",
         "maxBytes",
         "segmentBytes",
-        "maxSegments",
-        "medium"
-      ]
+        "maxSegments"
+      ],
+      "description": "In-memory ring; the collector memory formula (specs/packets.md REQ-NET-003) bounds all rings on a node."
     },
     "peers": {
       "type": "object",
@@ -347,31 +337,20 @@
             "frozen",
             "follow"
           ]
-        },
-        "maxEndpoints": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 9007199254740991
         }
       },
       "required": [
         "entries",
         "protocol",
-        "resolution",
-        "maxEndpoints"
-      ]
+        "resolution"
+      ],
+      "description": "Peer generations are bounded only by the compiled program limit (BPF_MAXINSNS 4096)."
     },
     "maxFrozenBytes": {
       "type": "integer",
       "minimum": 1,
       "maximum": 9007199254740991,
       "description": "At most the ring maxBytes; derived from the node collector memory/scratch allocation (budget node maxFrozenBytes), not a fixed constant."
-    },
-    "maxConcurrentSnapshots": {
-      "type": "integer",
-      "minimum": 1,
-      "maximum": 9007199254740991,
-      "description": "Bounded by the node frozen byte budget (node maxFrozenBytes \u00f7 ring maxBytes) and the trigger rate limits."
     }
   },
   "required": [
@@ -380,7 +359,6 @@
     "after",
     "ring",
     "peers",
-    "maxFrozenBytes",
-    "maxConcurrentSnapshots"
+    "maxFrozenBytes"
   ]
 }

@@ -9,7 +9,7 @@
       "name": "syscall-activity",
       "version": "v1"
     },
-    "definition_digest": "d372b62bd29c56632939a153dd90da0cbd51bc759f43adea7bf123223d29e180",
+    "definition_digest": "a392a28ddd6b561b61bd3c0160a81c0791583a119271354c3c86eb908d3d1451",
     "definition": {
       "displayName": "System calls of all pod processes",
       "description": "Bounded syscall metadata from all current and new pod processes; no user-memory reads.",
@@ -32,11 +32,9 @@
                 "maxAge": "30s",
                 "maxBytes": 8388608,
                 "segmentBytes": 2097152,
-                "maxSegments": 4,
-                "medium": "memory"
+                "maxSegments": 4
               },
               "maxFrozenBytes": 16777216,
-              "maxConcurrentSnapshots": 1,
               "maxEvents": 100000,
               "maxEventsPerSecond": 10000,
               "maxTrackedThreads": 4096

@@ -1,10 +1,26 @@
 # Domain foundation
 
-The [domain guide](../docs/domain/README.md), [typed catalog](../docs/domain/model.yaml) and [implementation mapping](../docs/domain/implementation-mapping.md) define the conceptual foundation for SQL, CRDs and Go. Existing executable wire contracts retain authority over public enums/field shapes.
+The [domain guide](../docs/domain/README.md) and [typed catalog](../docs/domain/model.yaml) map these concepts to SQL, CRDs and Go. Wire contracts keep authority over public enums and field shapes.
+
+## Core entities
+
+| Entity | Meaning | Stored as |
+| --- | --- | --- |
+| Principal | Issuer-scoped human or OAuth client | Identity provider |
+| AccessBinding, PermissionSource | Who may do what on which workloads ([permissions](permissions.md)) | Kubernetes |
+| DebugPolicy | Recurring detectors plus actions on a workload | Kubernetes |
+| Capture | One accepted collection, manual or triggered, with its immutable plan ([execution](execution.md)) | SQL |
+| ActionAttempt | One start of one action on one pod, keyed by operation ID | SQL |
+| SourceSession | An armed ongoing recorder; snapshots save windows from it ([action lifecycles](action-lifecycle.md)) | Connector, reported to the hub |
+| Artifact | One encrypted evidence object with lineage, audience and deadlines ([evidence](evidence.md)) | Object store, SQL catalog |
+| Case | Groups occurrences and their artifacts | SQL |
+| AccessGrant | Approved expiring authority for intrusive or raw work ([authorization](authorization.md)) | SQL |
+| EvidenceShare | Concrete artifacts shared with named recipients | SQL |
+| Audit event | One append-only row per security-relevant effect (ADR-330 D6) | SQL |
 
 ## REQ-DOM-001 — Identity and authority boundaries
 
-Separate identity-provider principals, Kubernetes configuration, accepted hub execution, node source state and committed evidence. Use typed IDs, immutable Kubernetes UIDs and issuer-scoped subjects; names are display metadata. Domain objects, database rows, CRD spec/status and protocol DTOs are distinct projections with declared write authority. Introduce no tenant or container permission model.
+Identity-provider principals, Kubernetes configuration, accepted hub execution, node source state and committed evidence MUST stay separate. Users author by name; the hub records Kubernetes UIDs, issuer-scoped subjects and digests as provenance ([ADR-335](../docs/decisions/335-usable-by-default.md) D4). Domain types, SQL rows, CRD spec/status and protocol DTOs are distinct projections with declared write authority. Values carry explicit units; plans are typed SQL columns or versioned JSONB; evidence and manifests stay in the encrypted object store. No tenant or container permission model.
 
 ### SC-DOM-001
 
@@ -12,7 +28,7 @@ Given deletion/recreation of a namespace/workload or a recycled PID, when a prev
 
 ## REQ-DOM-002 — Capture and source lifecycles
 
-Capture, immutable AcceptedScope, ActionAttempt, PolicyActivation, SourceSession and SourceSnapshot are separate concepts. A recording save binds existing sources and immutable first-acceptance end time. Sources have independent hard ends, budgets and readiness; cancellation or retry of a snapshot neither starts a source nor stops an unrelated recorder. Track a start whose outcome is unknown (resolved by its operation ID) separately from terminal user-visible status.
+Capture, ActionAttempt, SourceSession and source snapshot are separate. A recording save binds existing sources. A source has its own end, budget and readiness; cancelling or retrying a snapshot neither starts a source nor stops an unrelated recorder. A start with an unknown outcome is resolved by its operation ID ([persistence](persistence.md)).
 
 ### SC-DOM-002
 
@@ -20,24 +36,8 @@ Given a saved snapshot whose source rotates during upload, when dispatch or canc
 
 ## REQ-DOM-003 — Evidence lineage and access
 
-Cases group occurrences; access is projected per artifact. Artifact, lineage edge, managed copy, retained audience, analysis result and privacy decision preserve independent identities and constraints. Lineage is acyclic and inherits the strictest applicable authorization/region/deadline. EvidenceShare contains concrete artifacts/recipients; The sharing instruction stored with an accepted capture or policy acceptance bounds future shares. Multiple manager assignments do not replace immutable creator/requester/executor identities.
+Access is decided per artifact. Lineage is acyclic and a derived artifact inherits the strictest audience, region and deadline of its parents. A share names concrete artifacts and recipients; a sharing instruction on a capture or policy bounds future shares. Manager teams never replace the immutable creator, requester or executor.
 
 ### SC-DOM-003
 
 Given a case containing artifacts with different audience/deletion limits, when a share or derived analysis is created, then hidden artifacts remain undisclosed and every selected parent constrains the result; changing owner teams cannot reset expiry or creator provenance.
-
-## REQ-DOM-004 — Transactions, liabilities and deletion
-
-Use the persistence specification’s transactional admission, canonical lock order, idempotency, outbox and fences. Capacity and grant reservations precede effects. Every effect carries an operation ID: a retry with the same ID returns the existing outcome, an unknown outcome is resolved by looking the ID up, and its charge is released once the outcome is known. Managed-copy obligations survive retries, object deletion and restore. Do not use cascade deletion from a workload/CRD/principal to remove evidence liabilities, revocations or replay tombstones. External effects do not occur while holding database locks.
-
-### SC-DOM-004
-
-Given an unknown commit/start or storage-delete failure, when a controller restarts, then original operation identity, reservation and copy liability survive; re-dispatch cannot manufacture a refund or second authorized start.
-
-## REQ-DOM-005 — Privacy-aware types and evolution
-
-Use explicit units, overflow-checked counters, time/clock uncertainty, opaque Kubernetes versions, domain revisions and typed operation unions. Raw/extract/metadata is separate from possible personal/user/credential classification. Plans and parameters are typed SQL columns or bounded, versioned JSONB; manifests and evidence stay in the encrypted object store. Add fields through reviewed domain-to-wire mappings; existing conceptual enum names cannot silently alter a published schema.
-
-### SC-DOM-005
-
-Given a proposed new counter, plan field or state, when schema/migration review runs, then its unit, authority, privacy/backup effect and public mapping are declared; ambiguous numeric duration, plaintext evidence row or widening conversion is rejected.

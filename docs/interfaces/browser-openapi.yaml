@@ -155,42 +155,6 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
-  /api/v1/operations/find_similar_cases:
-    post:
-      operationId: find_similar_cases
-      summary: Find deterministic matches among authorized cases.
-      tags:
-      - Shared browser and MCP
-      x-domain-contract: find_similar_cases
-      x-effect: read
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/McpInput_find_similar_cases'
-      parameters:
-      - name: X-CSRF-Token
-        in: header
-        required: true
-        description: Required on session-authenticated POST; validate origin and session-bound
-          token.
-        schema: *id001
-      responses:
-        '200':
-          description: Existing bounded MCP domain-result envelope; domain errors
-            remain status=error.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/McpOutput_find_similar_cases'
-        default:
-          description: Transport/session/validation failure; no evidence in error
-            details.
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/Problem'
   /api/v1/operations/list_artifacts:
     post:
       operationId: list_artifacts
@@ -220,42 +184,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/McpOutput_list_artifacts'
-        default:
-          description: Transport/session/validation failure; no evidence in error
-            details.
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/Problem'
-  /api/v1/operations/get_timeline:
-    post:
-      operationId: get_timeline
-      summary: Read authorized incident and collection events.
-      tags:
-      - Shared browser and MCP
-      x-domain-contract: get_timeline
-      x-effect: read
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/McpInput_get_timeline'
-      parameters:
-      - name: X-CSRF-Token
-        in: header
-        required: true
-        description: Required on session-authenticated POST; validate origin and session-bound
-          token.
-        schema: *id001
-      responses:
-        '200':
-          description: Existing bounded MCP domain-result envelope; domain errors
-            remain status=error.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/McpOutput_get_timeline'
         default:
           description: Transport/session/validation failure; no evidence in error
             details.
@@ -2640,7 +2568,7 @@ components:
           enum:
           - none
           - perSecond
-        top_n:
+        limit:
           type: integer
           minimum: 1
           maximum: 9007199254740991
@@ -2924,25 +2852,6 @@ components:
       required:
       - target_ref
       - operation
-    McpInput_find_similar_cases:
-      type: object
-      additionalProperties: false
-      properties:
-        cursor:
-          type: string
-          minLength: 1
-        limit:
-          type: integer
-          minimum: 1
-          maximum: 9007199254740991
-        signature:
-          type: string
-          minLength: 1
-        text:
-          type: string
-          minLength: 1
-      required:
-      - signature
     McpInput_get_capture:
       type: object
       additionalProperties: false
@@ -3025,6 +2934,15 @@ components:
         case_id:
           type: string
           format: uuid
+        cursor:
+          type: string
+          minLength: 1
+          description: Continues the timeline.
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+          description: Timeline events per page.
       required:
       - case_id
     McpInput_get_extract:
@@ -3053,23 +2971,9 @@ components:
         thread_id:
           type: string
           minLength: 1
-        max_threads:
-          type: integer
-          minimum: 1
-          maximum: 9007199254740991
-          description: Threads per page (page size); continue with next_cursor.
-        max_frames:
-          type: integer
-          minimum: 1
-          maximum: 9007199254740991
-          description: Frames per thread per page; deeper stacks continue with next_cursor.
         sample_type:
           type: string
           minLength: 1
-        top_n:
-          type: integer
-          minimum: 1
-          maximum: 9007199254740991
         cursor:
           anyOf:
           - type: string
@@ -3107,16 +3011,10 @@ components:
           type: integer
           minimum: 1
           maximum: 9007199254740991
-        max_lines:
-          type: integer
-          minimum: 1
-          maximum: 9007199254740991
         grant_id:
           type: string
           format: uuid
-          description: Optional. Current covering grants are reused automatically;
-            the equivalent Kubernetes right on the workload (pods/exec) also suffices
-            (ADR-335 D5). Name a grant only to select among several.
+          description: Optional. Current covering grants are reused automatically; the equivalent Kubernetes right on the workload (pods/exec) also suffices (ADR-335 D5). Name a grant only to select among several.
         idempotency_key:
           type: string
           minLength: 1
@@ -3144,17 +3042,6 @@ components:
             thread_id:
               type: string
               minLength: 1
-            max_threads:
-              type: integer
-              minimum: 1
-              maximum: 9007199254740991
-              description: Threads per page (page size); continue with next_cursor.
-            max_frames:
-              type: integer
-              minimum: 1
-              maximum: 9007199254740991
-              description: Frames per thread per page; deeper stacks continue with
-                next_cursor.
             cursor:
               anyOf:
               - type: string
@@ -3162,6 +3049,10 @@ components:
               - type: string
                 minLength: 1
                 pattern: ^[0-9]{1,8}:[0-9]{1,4}:[0-9a-f]{32}$
+            limit:
+              type: integer
+              minimum: 1
+              maximum: 9007199254740991
           required:
           - view
           - case_id
@@ -3209,7 +3100,7 @@ components:
             sample_type:
               type: string
               minLength: 1
-            top_n:
+            limit:
               type: integer
               minimum: 1
               maximum: 9007199254740991
@@ -3402,7 +3293,7 @@ components:
               type: integer
               minimum: 1
               maximum: 9007199254740991
-            max_lines:
+            limit:
               type: integer
               minimum: 1
               maximum: 9007199254740991
@@ -3439,9 +3330,7 @@ components:
             grant_id:
               type: string
               format: uuid
-              description: Optional. Current covering grants are reused automatically;
-                the equivalent Kubernetes right on the workload (pods/exec) also suffices
-                (ADR-335 D5). Name a grant only to select among several.
+              description: Optional. Current covering grants are reused automatically; the equivalent Kubernetes right on the workload (pods/exec) also suffices (ADR-335 D5). Name a grant only to select among several.
             idempotency_key:
               type: string
               minLength: 1
@@ -3547,22 +3436,6 @@ components:
       required:
       - capture_id
       - section
-    McpInput_get_timeline:
-      type: object
-      additionalProperties: false
-      properties:
-        case_id:
-          type: string
-          format: uuid
-        cursor:
-          type: string
-          minLength: 1
-        limit:
-          type: integer
-          minimum: 1
-          maximum: 9007199254740991
-      required:
-      - case_id
     McpInput_list_artifacts:
       type: object
       additionalProperties: false
@@ -3697,6 +3570,10 @@ components:
         since:
           type: string
           format: date-time
+        text:
+          type: string
+          minLength: 1
+          description: Optional bounded text; ranks cases by exact signature and structured similarity, then this text, deterministically. Similarity is labeled provisional.
       required: []
     McpInput_list_diagnostics:
       type: object
@@ -4256,8 +4133,7 @@ components:
           - syscalls
           - memory
           - debugger
-          description: Selects the operation; each value has its own strict argument
-            set.
+          description: Selects the operation; each value has its own strict argument set.
         case_id:
           type: string
           format: uuid
@@ -4267,9 +4143,7 @@ components:
         grant_id:
           type: string
           format: uuid
-          description: Optional. Current covering grants are reused automatically;
-            the equivalent Kubernetes right on the workload (pods/exec) also suffices
-            (ADR-335 D5). Name a grant only to select among several.
+          description: Optional. Current covering grants are reused automatically; the equivalent Kubernetes right on the workload (pods/exec) also suffices (ADR-335 D5). Name a grant only to select among several.
         idempotency_key:
           type: string
           minLength: 1
@@ -4296,25 +4170,17 @@ components:
             - frame_prefix_hex
           minItems: 1
           uniqueItems: true
-        max_packets:
-          type: integer
-          minimum: 1
-          maximum: 9007199254740991
         packet_filter:
           type: string
-          description: Supported tcpdump/libpcap packet-filter subset; no name resolution
-            or bracket predicates. Omitted or empty means no packet-filter restriction.
-            This is not Wireshark display-filter syntax.
+          description: 'tcpdump/libpcap packet filter under the acquisition rules (specs/packets.md REQ-NET-001): no name resolution; header-bound offsets need ordinary rights, payload offsets only match bytes a raw original saved. Omitted means no restriction. Not Wireshark display-filter syntax.'
         start_time:
           type: string
           format: date-time
-          description: Inclusive saved-packet timestamp bound; normalized to UTC.
-            It does not establish clock accuracy.
+          description: Inclusive saved-packet timestamp bound; normalized to UTC. It does not establish clock accuracy.
         end_time:
           type: string
           format: date-time
-          description: Exclusive saved-packet timestamp bound. Must be later than
-            start_time when both are present.
+          description: Exclusive saved-packet timestamp bound. Must be later than start_time when both are present.
         tcp_flags:
           type: object
           additionalProperties: false
@@ -4330,8 +4196,7 @@ components:
           required:
           - mask
           - value
-          description: Only fully decoded TCP headers match (flags & mask) == value;
-            value cannot contain bits outside mask.
+          description: Only fully decoded TCP headers match (flags & mask) == value; value cannot contain bits outside mask.
         frame_prefix:
           type: object
           additionalProperties: false
@@ -4347,9 +4212,7 @@ components:
           required:
           - offset
           - length
-          description: Raw-only actual saved-frame byte window. Offset plus length
-            must not exceed 1500. Missing bytes remain unavailable; no padding or
-            inferred payload start.
+          description: Raw-only actual saved-frame byte window. Offset plus length must not exceed 1500. Missing bytes remain unavailable; no padding or inferred payload start.
         cursor:
           type: string
           minLength: 1
@@ -4374,9 +4237,7 @@ components:
           minimum: 1
           maximum: 32768
           default: 8192
-          description: Bytes to read; at most 32 KiB per call (hex output fits the
-            96 KiB MCP result bound), default 8 KiB (fits the 24 KiB default target).
-            Continue at the next address.
+          description: Bytes to read; at most 32 KiB per call (hex output fits the 96 KiB MCP result bound), default 8 KiB (fits the 24 KiB default target). Continue at the next address.
         command:
           type: string
           enum:
@@ -4392,10 +4253,6 @@ components:
         frame:
           type: integer
           minimum: 0
-          maximum: 9007199254740991
-        max_items:
-          type: integer
-          minimum: 1
           maximum: 9007199254740991
       required:
       - operation
@@ -4421,9 +4278,7 @@ components:
             grant_id:
               type: string
               format: uuid
-              description: Optional. Current covering grants are reused automatically;
-                the equivalent Kubernetes right on the workload (pods/exec) also suffices
-                (ADR-335 D5). Name a grant only to select among several.
+              description: Optional. Current covering grants are reused automatically; the equivalent Kubernetes right on the workload (pods/exec) also suffices (ADR-335 D5). Name a grant only to select among several.
             idempotency_key:
               type: string
               minLength: 1
@@ -4450,25 +4305,17 @@ components:
                 - frame_prefix_hex
               minItems: 1
               uniqueItems: true
-            max_packets:
-              type: integer
-              minimum: 1
-              maximum: 9007199254740991
             packet_filter:
               type: string
-              description: Supported tcpdump/libpcap packet-filter subset; no name
-                resolution or bracket predicates. Omitted or empty means no packet-filter
-                restriction. This is not Wireshark display-filter syntax.
+              description: 'tcpdump/libpcap packet filter under the acquisition rules (specs/packets.md REQ-NET-001): no name resolution; header-bound offsets need ordinary rights, payload offsets only match bytes a raw original saved. Omitted means no restriction. Not Wireshark display-filter syntax.'
             start_time:
               type: string
               format: date-time
-              description: Inclusive saved-packet timestamp bound; normalized to UTC.
-                It does not establish clock accuracy.
+              description: Inclusive saved-packet timestamp bound; normalized to UTC. It does not establish clock accuracy.
             end_time:
               type: string
               format: date-time
-              description: Exclusive saved-packet timestamp bound. Must be later than
-                start_time when both are present.
+              description: Exclusive saved-packet timestamp bound. Must be later than start_time when both are present.
             tcp_flags:
               type: object
               additionalProperties: false
@@ -4484,8 +4331,7 @@ components:
               required:
               - mask
               - value
-              description: Only fully decoded TCP headers match (flags & mask) ==
-                value; value cannot contain bits outside mask.
+              description: Only fully decoded TCP headers match (flags & mask) == value; value cannot contain bits outside mask.
             frame_prefix:
               type: object
               additionalProperties: false
@@ -4501,19 +4347,20 @@ components:
               required:
               - offset
               - length
-              description: Raw-only actual saved-frame byte window. Offset plus length
-                must not exceed 1500. Missing bytes remain unavailable; no padding
-                or inferred payload start.
+              description: Raw-only actual saved-frame byte window. Offset plus length must not exceed 1500. Missing bytes remain unavailable; no padding or inferred payload start.
             cursor:
               type: string
               minLength: 1
+            limit:
+              type: integer
+              minimum: 1
+              maximum: 9007199254740991
           required:
           - operation
           - case_id
           - artifact_id
           - idempotency_key
           - fields
-          - max_packets
           allOf:
           - if:
               properties:
@@ -4557,9 +4404,7 @@ components:
             grant_id:
               type: string
               format: uuid
-              description: Optional. Current covering grants are reused automatically;
-                the equivalent Kubernetes right on the workload (pods/exec) also suffices
-                (ADR-335 D5). Name a grant only to select among several.
+              description: Optional. Current covering grants are reused automatically; the equivalent Kubernetes right on the workload (pods/exec) also suffices (ADR-335 D5). Name a grant only to select among several.
             syscall_names:
               type: array
               items:
@@ -4598,9 +4443,7 @@ components:
             grant_id:
               type: string
               format: uuid
-              description: Optional. Current covering grants are reused automatically;
-                the equivalent Kubernetes right on the workload (pods/exec) also suffices
-                (ADR-335 D5). Name a grant only to select among several.
+              description: Optional. Current covering grants are reused automatically; the equivalent Kubernetes right on the workload (pods/exec) also suffices (ADR-335 D5). Name a grant only to select among several.
             idempotency_key:
               type: string
               minLength: 1
@@ -4612,9 +4455,7 @@ components:
               minimum: 1
               maximum: 32768
               default: 8192
-              description: Bytes to read; at most 32 KiB per call (hex output fits
-                the 96 KiB MCP result bound), default 8 KiB (fits the 24 KiB default
-                target). Continue at the next address.
+              description: Bytes to read; at most 32 KiB per call (hex output fits the 96 KiB MCP result bound), default 8 KiB (fits the 24 KiB default target). Continue at the next address.
           required:
           - operation
           - case_id
@@ -4642,9 +4483,7 @@ components:
             grant_id:
               type: string
               format: uuid
-              description: Optional. Current covering grants are reused automatically;
-                the equivalent Kubernetes right on the workload (pods/exec) also suffices
-                (ADR-335 D5). Name a grant only to select among several.
+              description: Optional. Current covering grants are reused automatically; the equivalent Kubernetes right on the workload (pods/exec) also suffices (ADR-335 D5). Name a grant only to select among several.
             idempotency_key:
               type: string
               minLength: 1
@@ -4664,7 +4503,7 @@ components:
               type: integer
               minimum: 0
               maximum: 9007199254740991
-            max_items:
+            limit:
               type: integer
               minimum: 1
               maximum: 9007199254740991
@@ -5871,18 +5710,11 @@ components:
                 query_observed_at:
                   type: string
                   format: date-time
-                  description: Server time of this prepared query snapshot. This observation
-                    does not renew query or request authority. Together with query_expires_at
-                    it bounds managed-view lifetime independently of the client wall
-                    clock.
+                  description: Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock.
                 query_expires_at:
                   type: string
                   format: date-time
-                  description: Original total query cutoff, irreversibly shortened
-                    by effective evidence access. A status read never extends it.
-                    Managed views clear by this cutoff or earlier on scope loss or
-                    closure; this cannot recall external copies. Distinct from the
-                    current request disclosure deadline.
+                  description: Original total query cutoff, irreversibly shortened by effective evidence access. A status read never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline.
               required:
               - sample_type
               - unit
@@ -5955,18 +5787,11 @@ components:
                 query_observed_at:
                   type: string
                   format: date-time
-                  description: Server time of this prepared query snapshot. This observation
-                    does not renew query or request authority. Together with query_expires_at
-                    it bounds managed-view lifetime independently of the client wall
-                    clock.
+                  description: Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock.
                 query_expires_at:
                   type: string
                   format: date-time
-                  description: Original total query cutoff, irreversibly shortened
-                    by effective evidence access. A status read never extends it.
-                    Managed views clear by this cutoff or earlier on scope loss or
-                    closure; this cannot recall external copies. Distinct from the
-                    current request disclosure deadline.
+                  description: Original total query cutoff, irreversibly shortened by effective evidence access. A status read never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline.
               required:
               - query_handle
               - revision
@@ -6482,109 +6307,6 @@ components:
           required:
           - status
           - data
-    McpOutput_find_similar_cases:
-      allOf:
-      - $ref: https://asservat.io/spec/v1/mcp-result.schema.json
-      - oneOf:
-        - type: object
-          properties:
-            status:
-              const: ok
-            data:
-              type: object
-              additionalProperties: false
-              properties:
-                cases:
-                  type: array
-                  items:
-                    type: object
-                    additionalProperties: false
-                    properties:
-                      case_id:
-                        type: string
-                        format: uuid
-                      title:
-                        type: string
-                        minLength: 1
-                      status:
-                        type: string
-                        minLength: 1
-                      access:
-                        type: string
-                        enum:
-                        - ordinary
-                        - shared
-                      updated_at:
-                        type: string
-                        format: date-time
-                      cluster_id:
-                        type: string
-                        format: uuid
-                    required:
-                    - case_id
-                    - status
-                    - access
-              required:
-              - cases
-          required:
-          - status
-          - data
-        - type: object
-          properties:
-            status:
-              const: pending
-            data:
-              type: object
-              additionalProperties: false
-              properties:
-                query_handle:
-                  type: string
-                  minLength: 1
-                revision:
-                  type: integer
-                  minimum: 1
-                  maximum: 9007199254740991
-              required:
-              - query_handle
-              - revision
-          required:
-          - status
-          - data
-        - type: object
-          properties:
-            status:
-              const: error
-            data:
-              type: object
-              additionalProperties: false
-              properties:
-                code:
-                  type: string
-                  minLength: 1
-                message:
-                  type: string
-                  minLength: 1
-                retryable:
-                  type: boolean
-                navigation_uri:
-                  type: string
-                  format: uri
-                responsible_role:
-                  enum:
-                  - maintainer
-                  - approver
-                  - administrator
-                  - none
-                retry_after_seconds:
-                  type: integer
-                  minimum: 1
-              required:
-              - code
-              - message
-              - retryable
-          required:
-          - status
-          - data
     McpOutput_get_capture:
       allOf:
       - $ref: https://asservat.io/spec/v1/mcp-result.schema.json
@@ -7062,11 +6784,7 @@ components:
                       digest:
                         type: string
                         pattern: ^[a-f0-9]{64}$
-                        description: Immutable verified artifact version. For the
-                          current pod-status artifact this is SHA-256 of the existing
-                          serialized verified ciphertext copy receipts, not the native
-                          file checksum. The prepared download supplies the native
-                          SHA-256 separately.
+                        description: Immutable verified artifact version. For the current pod-status artifact this is SHA-256 of the existing serialized verified ciphertext copy receipts, not the native file checksum. The prepared download supplies the native SHA-256 separately.
                       kind:
                         type: string
                         minLength: 1
@@ -7087,9 +6805,7 @@ components:
                       native_format:
                         type: string
                         minLength: 1
-                        description: Verified native format, when supplied; used to
-                          choose a compatible saved-evidence view. It grants no download
-                          or analysis authority.
+                        description: Verified native format, when supplied; used to choose a compatible saved-evidence view. It grants no download or analysis authority.
                       verified_native_bytes:
                         type: integer
                         minimum: 0
@@ -7137,10 +6853,7 @@ components:
                       profile_acquisition:
                         type: object
                         additionalProperties: false
-                        description: Accepted request parameters and authenticated
-                          HTTP acquisition timing, not the sample interval or cumulative
-                          history. Legacy timing, clock uncertainty and serving-process
-                          attribution may be unknown.
+                        description: Accepted request parameters and authenticated HTTP acquisition timing, not the sample interval or cumulative history. Legacy timing, clock uncertainty and serving-process attribution may be unknown.
                         properties:
                           requested_type:
                             type: string
@@ -7315,8 +7028,7 @@ components:
                             - go-trace
                         required:
                         - native_format
-                  description: First 100 artifacts (page size); list_artifacts pages
-                    through all of them.
+                  description: First 100 artifacts (page size); list_artifacts pages through all of them.
                 timeline:
                   type: array
                   items:
@@ -7605,9 +7317,7 @@ components:
                       cumulative:
                         type: number
                       fraction:
-                        description: Flat divided by total for nonnegative samples
-                          with positive total; null for signed delta samples or a
-                          zero total.
+                        description: Flat divided by total for nonnegative samples with positive total; null for signed delta samples or a zero total.
                         anyOf:
                         - type: number
                           minimum: 0
@@ -7627,18 +7337,11 @@ components:
                 query_observed_at:
                   type: string
                   format: date-time
-                  description: Server time of this prepared query snapshot. This observation
-                    does not renew query or request authority. Together with query_expires_at
-                    it bounds managed-view lifetime independently of the client wall
-                    clock.
+                  description: Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock.
                 query_expires_at:
                   type: string
                   format: date-time
-                  description: Original total query cutoff, irreversibly shortened
-                    by effective evidence access. A status read never extends it.
-                    Managed views clear by this cutoff or earlier on scope loss or
-                    closure; this cannot recall external copies. Distinct from the
-                    current request disclosure deadline.
+                  description: Original total query cutoff, irreversibly shortened by effective evidence access. A status read never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline.
               required:
               - sample_type
               - unit
@@ -7669,18 +7372,11 @@ components:
                 query_observed_at:
                   type: string
                   format: date-time
-                  description: Server time of this prepared query snapshot. This observation
-                    does not renew query or request authority. Together with query_expires_at
-                    it bounds managed-view lifetime independently of the client wall
-                    clock.
+                  description: Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock.
                 query_expires_at:
                   type: string
                   format: date-time
-                  description: Original total query cutoff, irreversibly shortened
-                    by effective evidence access. A status read never extends it.
-                    Managed views clear by this cutoff or earlier on scope loss or
-                    closure; this cannot recall external copies. Distinct from the
-                    current request disclosure deadline.
+                  description: Original total query cutoff, irreversibly shortened by effective evidence access. A status read never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline.
               required:
               - query_handle
               - revision
@@ -7718,18 +7414,11 @@ components:
                 query_observed_at:
                   type: string
                   format: date-time
-                  description: Server time of this prepared query snapshot. This observation
-                    does not renew query or request authority. Together with query_expires_at
-                    it bounds managed-view lifetime independently of the client wall
-                    clock.
+                  description: Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock.
                 query_expires_at:
                   type: string
                   format: date-time
-                  description: Original total query cutoff, irreversibly shortened
-                    by effective evidence access. A status read never extends it.
-                    Managed views clear by this cutoff or earlier on scope loss or
-                    closure; this cannot recall external copies. Distinct from the
-                    current request disclosure deadline.
+                  description: Original total query cutoff, irreversibly shortened by effective evidence access. A status read never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline.
               required:
               - query_handle
               - revision
@@ -7764,17 +7453,14 @@ components:
                   type: integer
                   minimum: 0
                   maximum: 9007199254740991
-                  description: Retained packet records in the authenticated saved
-                    file; this is not a count of unique network datagrams.
+                  description: Retained packet records in the authenticated saved file; this is not a count of unique network datagrams.
                 drops:
                   type:
                   - integer
                   - 'null'
                   minimum: 0
                   maximum: 9007199254740991
-                  description: Producer-reported exclusions with the exact meaning
-                    given by drop_reporting; null means unavailable. This is not measured
-                    network loss.
+                  description: Producer-reported exclusions with the exact meaning given by drop_reporting; null means unavailable. This is not measured network loss.
                 conversations:
                   type: array
                   items:
@@ -7802,9 +7488,7 @@ components:
                     - destination
                     - protocol
                     - packets
-                  description: Top100 directional numeric endpoint/protocol aggregates,
-                    ordered by record count descending then protocol/source/destination;
-                    never DNS, comments or payload.
+                  description: Top100 directional numeric endpoint/protocol aggregates, ordered by record count descending then protocol/source/destination; never DNS, comments or payload.
                 drop_reporting:
                   enum:
                   - captureExclusions
@@ -7819,26 +7503,16 @@ components:
                 query_observed_at:
                   type: string
                   format: date-time
-                  description: Server time of this prepared query snapshot. This observation
-                    does not renew query or request authority. Together with query_expires_at
-                    it bounds managed-view lifetime independently of the client wall
-                    clock.
+                  description: Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock.
                 query_expires_at:
                   type: string
                   format: date-time
-                  description: Original total query cutoff, irreversibly shortened
-                    by effective evidence access. A status read never extends it.
-                    Managed views clear by this cutoff or earlier on scope loss or
-                    closure; this cannot recall external copies. Distinct from the
-                    current request disclosure deadline.
+                  description: Original total query cutoff, irreversibly shortened by effective evidence access. A status read never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline.
                 unclassified_packets:
                   type: integer
                   minimum: 0
                   maximum: 9007199254740991
-                  description: Saved raw packet records without usable complete headers.
-                    These records remain in packets but not conversations; this is
-                    not a drop or network-loss count. Required for rawPackets and
-                    omitted for networkHeaders.
+                  description: Saved raw packet records without usable complete headers. These records remain in packets but not conversations; this is not a drop or network-loss count. Required for rawPackets and omitted for networkHeaders.
               required:
               - capture_mode
               - packets
@@ -8008,18 +7682,11 @@ components:
                 query_observed_at:
                   type: string
                   format: date-time
-                  description: Server time of this prepared query snapshot. This observation
-                    does not renew query or request authority. Together with query_expires_at
-                    it bounds managed-view lifetime independently of the client wall
-                    clock.
+                  description: Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock.
                 query_expires_at:
                   type: string
                   format: date-time
-                  description: Original total query cutoff, irreversibly shortened
-                    by effective evidence access. A status read never extends it.
-                    Managed views clear by this cutoff or earlier on scope loss or
-                    closure; this cannot recall external copies. Distinct from the
-                    current request disclosure deadline.
+                  description: Original total query cutoff, irreversibly shortened by effective evidence access. A status read never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline.
               required:
               - logical_path
               - line_start
@@ -9766,102 +9433,6 @@ components:
           required:
           - status
           - data
-    McpOutput_get_timeline:
-      allOf:
-      - $ref: https://asservat.io/spec/v1/mcp-result.schema.json
-      - oneOf:
-        - type: object
-          properties:
-            status:
-              const: ok
-            data:
-              type: object
-              additionalProperties: false
-              properties:
-                events:
-                  type: array
-                  items:
-                    type: object
-                    additionalProperties: false
-                    properties:
-                      time:
-                        type: string
-                        format: date-time
-                      kind:
-                        type: string
-                        minLength: 1
-                      summary:
-                        type: string
-                        minLength: 1
-                      clock_uncertainty_ms:
-                        type: integer
-                        minimum: 0
-                        maximum: 9007199254740991
-                    required:
-                    - time
-                    - kind
-                    - summary
-              required:
-              - events
-          required:
-          - status
-          - data
-        - type: object
-          properties:
-            status:
-              const: pending
-            data:
-              type: object
-              additionalProperties: false
-              properties:
-                query_handle:
-                  type: string
-                  minLength: 1
-                revision:
-                  type: integer
-                  minimum: 1
-                  maximum: 9007199254740991
-              required:
-              - query_handle
-              - revision
-          required:
-          - status
-          - data
-        - type: object
-          properties:
-            status:
-              const: error
-            data:
-              type: object
-              additionalProperties: false
-              properties:
-                code:
-                  type: string
-                  minLength: 1
-                message:
-                  type: string
-                  minLength: 1
-                retryable:
-                  type: boolean
-                navigation_uri:
-                  type: string
-                  format: uri
-                responsible_role:
-                  enum:
-                  - maintainer
-                  - approver
-                  - administrator
-                  - none
-                retry_after_seconds:
-                  type: integer
-                  minimum: 1
-              required:
-              - code
-              - message
-              - retryable
-          required:
-          - status
-          - data
     McpOutput_list_artifacts:
       allOf:
       - $ref: https://asservat.io/spec/v1/mcp-result.schema.json
@@ -11173,7 +10744,6 @@ components:
                         - Active
                         - Draining
                         - Completed
-                        - Suspended
                         - Revoked
                         - Expired
                         - Denied
@@ -12280,15 +11850,12 @@ components:
                       - 'null'
                       minimum: 0
                       maximum: 9007199254740991
-                  description: Exactly one cell per selected field. Fixed field types,
-                    canonical values and null availability are independently validated;
-                    zero is not null.
+                  description: Exactly one cell per selected field. Fixed field types, canonical values and null availability are independently validated; zero is not null.
                 scanned_bytes:
                   type: integer
                   minimum: 0
                   maximum: 9007199254740991
-                  description: Captured bytes of saved records visited by this call,
-                    including nonmatches.
+                  description: Captured bytes of saved records visited by this call, including nonmatches.
                 scanned_packets:
                   type: integer
                   minimum: 0
@@ -12302,18 +11869,11 @@ components:
                 query_observed_at:
                   type: string
                   format: date-time
-                  description: Server time of this prepared query snapshot. This observation
-                    does not renew query or request authority. Together with query_expires_at
-                    it bounds managed-view lifetime independently of the client wall
-                    clock.
+                  description: Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock.
                 query_expires_at:
                   type: string
                   format: date-time
-                  description: Original total query cutoff, irreversibly shortened
-                    by effective evidence access. A status read never extends it.
-                    Managed views clear by this cutoff or earlier on scope loss or
-                    closure; this cannot recall external copies. Distinct from the
-                    current request disclosure deadline.
+                  description: Original total query cutoff, irreversibly shortened by effective evidence access. A status read never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline.
               required:
               - capture_mode
               - fields
@@ -12414,18 +11974,11 @@ components:
                 query_observed_at:
                   type: string
                   format: date-time
-                  description: Server time of this prepared query snapshot. This observation
-                    does not renew query or request authority. Together with query_expires_at
-                    it bounds managed-view lifetime independently of the client wall
-                    clock.
+                  description: Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock.
                 query_expires_at:
                   type: string
                   format: date-time
-                  description: Original total query cutoff, irreversibly shortened
-                    by effective evidence access. A status read never extends it.
-                    Managed views clear by this cutoff or earlier on scope loss or
-                    closure; this cannot recall external copies. Distinct from the
-                    current request disclosure deadline.
+                  description: Original total query cutoff, irreversibly shortened by effective evidence access. A status read never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline.
               required:
               - query_handle
               - revision
@@ -13127,9 +12680,7 @@ components:
                   format: uuid
                 phase:
                   type: string
-                  enum:
-                  - Active
-                  - Suspended
+                  const: Active
                 revision:
                   type: integer
                   minimum: 2

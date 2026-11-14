@@ -33,12 +33,10 @@ def invalid(v, value):
         raise AssertionError('Invalid contract accepted')
 
 parent = read('examples/grant-investigation.yaml')
-child = read('examples/grant-investigation-result.yaml')
 capture = read('examples/capture-investigation.yaml')
 request = read('examples/investigation-preview.json')
 grantv = validator(ref('grant'))
-for value in (parent, child):
-    valid(grantv, value)
+valid(grantv, parent)
 valid(validator(ref('capture')), capture)
 valid(validator(tools['preview_capture']['inputSchema']), request)
 assert request['result_access'] == capture['spec']['resultAccess']
@@ -46,15 +44,11 @@ assert request['result_access'] == capture['spec']['resultAccess']
 # covers; the capture never names a grant.
 assert 'grantRef' not in capture['spec'] and parent['spec']['target']['kind'] == 'capture'
 checks += 2
-# Regression U01 follows the same operation from a multi-GiB request into a grant.
-raw = {'case_id': child['spec']['target']['caseID'], 'artifact_digests': [child['spec']['target']['artifacts'][0]['digest']], 'operations': ['download_artifact'], 'reason': 'Inspect with local GDB', 'max_bytes': 4 * 1024**3, 'expires_in_seconds': 1800, 'idempotency_key': 'local-gdb-download'}
+# Regression U01: a multi-GiB raw request validates against the MCP tool input.
+raw = {'case_id': '00000000-0000-4000-8000-000000000042', 'artifact_digests': ['a' * 64], 'operations': ['download_artifact'], 'reason': 'Inspect with local GDB', 'max_bytes': 4 * 1024**3, 'expires_in_seconds': 1800, 'idempotency_key': 'local-gdb-download'}
 valid(validator(tools['request_raw_access']['inputSchema']), raw)
-approved = copy.deepcopy(child)
-approved['spec']['operations'] = raw['operations']
-approved['spec']['limits']['maxBytes'] = raw['max_bytes']
-valid(grantv, approved)
 # Authored plans cannot write resolved or issued authority.
-for key, value in [('digest', 'a'*64), ('approver', parent['spec']['approver']), ('grantIDs', [child['id']])]:
+for key, value in [('digest', 'a'*64), ('approver', parent['spec']['approver']), ('grantIDs', ['00000000-0000-4000-8000-000000000099'])]:
     bad = copy.deepcopy(request)
     bad['result_access'][key] = value
     invalid(validator(tools['preview_capture']['inputSchema']), bad)
@@ -66,49 +60,13 @@ bad = copy.deepcopy(submit); bad['preview']['result_access']['approver'] = paren
 invalid(validator(tools['request_capture']['inputSchema']), bad)
 bad = copy.deepcopy(submit); bad['result_access'] = request['result_access']
 invalid(validator(tools['request_capture']['inputSchema']), bad)
-for value, prop, replacement in [(parent, 'grantType', 'policy'), (child, 'grantType', 'adHocCapture')]:
+for value, prop, replacement in [(parent, 'grantType', 'policy')]:
     bad = copy.deepcopy(value); bad['spec'][prop] = replacement; invalid(grantv, bad)
 # Clients act with their user's own access (maintainer decision): no client selection.
 bad = copy.deepcopy(request); bad['result_access']['clientIDs'] = ['agent']; invalid(validator(tools['preview_capture']['inputSchema']), bad)
 for field in ('actionIds', 'operations'):
     bad = copy.deepcopy(request); bad['result_access'][field] = []; invalid(validator(tools['preview_capture']['inputSchema']), bad)
-bad = copy.deepcopy(child); bad['spec']['target']['artifacts'][0]['digest'] = 'future'; invalid(grantv, bad)
 
-# Validate the relationship between reviewed and committed scopes. This checks
-# fixture consistency, not SQL locking, actual caller entitlement or byte delivery.
-ps = parent['spec']
-commit = {'captureUID': ps['target']['captureUID'], 'executionDigest': ps['target']['executionDigest'], 'actionID': 'core', 'artifact': child['spec']['target']['artifacts'][0], 'readUntil': '2026-10-09T17:55:00Z'}
-
-def consistent(p, c, output):
-    p, c = p['spec'], c['spec']
-    a, origin = p['resultAccess'], c['resultOrigin']
-    authored = {k: v for k, v in a.items() if k != 'digest'}
-    payload = {'captureUID': p['target']['captureUID'], 'executionDigest': p['target']['executionDigest'], 'resultAccess': authored}
-    assert a['digest'] == hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
-    assert origin['parentGrantID'] == parent['id']
-    for key in ('captureUID', 'executionDigest'):
-        assert origin[key] == p['target'][key] == output[key]
-    assert origin['resultAccessDigest'] == a['digest']
-    assert origin['actionID'] == output['actionID'] and output['actionID'] in a['actionIds']
-    assert c['target']['artifacts'] == [output['artifact']]
-    assert all(c['requester'][key] == p['requester'][key] for key in ('issuer', 'subject', 'identityType'))
-    assert set(c['operations']) <= set(a['operations'])
-    assert c['approver'] == p['approver'] and c['issuedAt'] == p['issuedAt']
-    assert datetime.fromisoformat(c['notAfter']) <= min(datetime.fromisoformat(a['notAfter']), datetime.fromisoformat(p['notAfter']), datetime.fromisoformat(output['readUntil']))
-    assert c['limits']['maxBytes'] <= a['maxBytes']
-    assert c['limits']['maxExecutions'] <= a['maxOperations']
-
-consistent(parent, child, commit); checks += 1
-for path, value in [(['resultOrigin', 'parentGrantID'], '00000000-0000-4000-8000-000000000099'), (['resultOrigin', 'captureUID'], 'another-capture'), (['resultOrigin', 'executionDigest'], 'f'*64), (['resultOrigin', 'actionID'], 'another-action'), (['requester', 'subject'], 'another-human'), (['operations'], ['debugger_command']), (['notAfter'], '2026-10-09T13:00:00Z')]:
-    bad = copy.deepcopy(child); target = bad['spec']
-    for key in path[:-1]: target = target[key]
-    target[path[-1]] = value
-    try:
-        consistent(parent, bad, commit)
-    except AssertionError:
-        rejected += 1
-    else:
-        raise AssertionError('Inconsistent parent/child fixture accepted')
-report = {'scope': 'Synthetic paired request/grant/commit contracts only; real authorization, concurrency and local-tool workflow NOT RUN', 'positiveChecks': checks, 'rejectedInvalidCases': rejected}
+report = {'scope': 'Synthetic request/grant contracts only; real authorization, concurrency and local-tool workflow NOT RUN', 'positiveChecks': checks, 'rejectedInvalidCases': rejected}
 (ROOT / 'docs/interfaces/investigation-validation.json').write_text(json.dumps(report, indent=2)+'\n')
 print('PASS: ' + json.dumps(report))

@@ -5,7 +5,7 @@
   "components": 24,
   "interfaces": 14,
   "domainEntitiesMapped": 49,
-  "requirementsMapped": 176,
-  "positiveChecks": 1031,
+  "requirementsMapped": 170,
+  "positiveChecks": 1023,
   "rejectedInvalidCases": 127
 }

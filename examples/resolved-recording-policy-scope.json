@@ -77,7 +77,7 @@
       },
       "recipeRef": {
         "name": "trigger-lifecycles",
-        "digest": "04448c6faf2374ef3097ace4526fded6dcd152a15f62f74f35656551acf2f4a7"
+        "digest": "6cc5ec25edf0bbd77f740e039fa51986de1efd4c1d691de732115c80dc0009d8"
       },
       "budgets": {
         "cooldown": "5m",
@@ -102,7 +102,7 @@
     },
     {
       "role": "recipe",
-      "digest": "04448c6faf2374ef3097ace4526fded6dcd152a15f62f74f35656551acf2f4a7"
+      "digest": "6cc5ec25edf0bbd77f740e039fa51986de1efd4c1d691de732115c80dc0009d8"
     },
     {
       "role": "retention",

@@ -23,7 +23,6 @@ spec:
         maxBytes: 16777216
         segmentBytes: 4194304
         maxSegments: 4
-        medium: memory
       peers:
         entries:
         - resourceRef:
@@ -40,9 +39,7 @@ spec:
         ports:
         - 8080
         resolution: follow
-        maxEndpoints: 256
       maxFrozenBytes: 67108864
-      maxConcurrentSnapshots: 1
       filter: tcp and port 8080
     required: false
     impact: sensitiveRead

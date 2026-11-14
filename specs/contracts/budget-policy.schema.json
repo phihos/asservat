@@ -206,27 +206,11 @@
                   "type": "integer",
                   "minimum": 1,
                   "maximum": 9007199254740991
-                },
-                "maxStartsPerRollingHour": {
-                  "type": "integer",
-                  "minimum": 1,
-                  "maximum": 9007199254740991
-                },
-                "maxProcessesPerEpisode": {
-                  "type": "integer",
-                  "minimum": 1,
-                  "maximum": 9007199254740991,
-                  "default": 1
                 }
               },
               "required": []
             },
             "maxConcurrentExpensive": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 9007199254740991
-            },
-            "maxQueuedExpensive": {
               "type": "integer",
               "minimum": 1,
               "maximum": 9007199254740991
@@ -282,11 +266,6 @@
           "additionalProperties": false,
           "properties": {
             "maxConcurrentExpensive": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 9007199254740991
-            },
-            "maxQueuedExpensive": {
               "type": "integer",
               "minimum": 1,
               "maximum": 9007199254740991

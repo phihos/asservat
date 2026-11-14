@@ -17,4 +17,3 @@ spec:
       share: 10%
     dump:
       minimumIntervalSeconds: 900
-      maxStartsPerRollingHour: 2

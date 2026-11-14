@@ -84,15 +84,13 @@
         },
         "state": {
           "enum": [
-            "Unknown",
-            "Ready",
-            "Armed",
+            "Unavailable",
             "Warming",
+            "Ready",
             "Degraded",
-            "Stopped",
-            "Expired",
-            "Unavailable"
-          ]
+            "Stopped"
+          ],
+          "description": "Shared source states (REQ-LIF-002)."
         },
         "history": {
           "enum": [

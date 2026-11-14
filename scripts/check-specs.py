@@ -1193,65 +1193,6 @@ def main() -> None:
             return
         raise ValueError("Invalid example accepted: " + schema_name + " " + __import__("inspect").getsource(mutate).strip()[:200])
 
-    # Synthetic installation provenance, never an installable credential example.
-    # Cross-object order, identity and deadline checks have separate runtime tests.
-    owner_id = lambda n: f"00000000-0000-4000-8000-{n:012d}"
-    # Optional administrator declarations retain absent versus explicit empty.
-    # This synthetic document grants no installation or processing authority.
-    download_environment = {
-        "format": "asservat-download-environment/v1", "rootID": owner_id(1),
-        "installationID": owner_id(2), "recoveryEpoch": owner_id(3), "revision": 1,
-        "suspended": False, "permittedRegions": [], "paths": [], "clients": [],
-        "operators": [{"issuer": "https://identity.invalid", "clientID": "console", "kind": "User", "id": "operator"}],
-    }
-    organization = {"id": "declared-organization", "name": "Declared organization", "activities": ["Evidence storage"], "regions": []}
-    for declarations in (None, [], [organization], [
-        {"id": str(n).zfill(64), "name": "n" * 160, "activities": [str(i).zfill(128) for i in range(8)],
-         "regions": [str(i).zfill(128) for i in range(16)]} for n in range(16)
-    ]):
-        declared_environment = copy.deepcopy(download_environment)
-        if declarations is not None:
-            declared_environment["processors"] = declarations
-        validate(declared_environment, schemas[BASE + "download-environment.schema.json"])
-    declared_environment = {**download_environment, "processors": [organization]}
-    for mutate in (
-        lambda d: d.update(processors=None),
-        lambda d: d.update(processors=[organization, organization]),
-        lambda d: d["processors"][0].update(endpoint="https://unexpected.invalid"),
-        lambda d: d["processors"][0].pop("regions"),
-        lambda d: d["processors"][0].update(regions=None),
-        lambda d: d["processors"][0].update(activities=[]),
-        lambda d: d["processors"][0].update(activities=["storage"] * 2),
-        lambda d: d["processors"][0].update(regions=["local"] * 2),
-        lambda d: d["processors"][0].update(id=""),
-        lambda d: d["processors"][0].update(name="line\nfeed"),
-        lambda d: d["processors"][0].update(activities=["control\u0085"]),
-    ):
-        rejects(declared_environment, "download-environment", mutate)
-    # Finite logs already use the API executor's typed Binding. The
-    # persistent start contract must admit the same closed native bound.
-    logs_start = examples["local-start-logs.json"]
-    for size in (1, 1048576, 67108864):
-        accepted = copy.deepcopy(logs_start)
-        accepted["spec"]["nativeBytes"] = size
-        validate(accepted, schemas[BASE + "local-start.schema.json"])
-    for mutation in (
-        lambda d: d["spec"].update(nativeBytes=0),
-        lambda d: d["spec"].update(nativeType="unknown"),
-        lambda d: d["spec"].update(actionID="pod-status"),
-        lambda d: d["spec"].update(nodeUID=d["spec"]["podUID"]),
-        lambda d: d["spec"].update(nodeBootID=d["spec"]["podUID"]),
-        lambda d: d["spec"].pop("executorPodUID"),
-        lambda d: d["spec"].pop("executorAccountUID"),
-        lambda d: d["spec"].pop("nativeType"),
-        lambda d: d["spec"].update(profile="onTriggerStart/v1"),
-    ):
-        rejects(logs_start, "local-start", mutation)
-    for native in ("pprof", "goTrace"):
-        accepted = copy.deepcopy(logs_start)
-        accepted["spec"].update(nativeType=native, nativeBytes=134217728)
-        validate(accepted, schemas[BASE + "local-start.schema.json"])
-
     # Private key payloads are synthesized here, never published as installable
     # Secret examples. Runtime tests cover scope, duplicate versions/material,
     # byte bounds and active-version presence beyond JSON Schema's contract.
@@ -1286,8 +1227,7 @@ def main() -> None:
 
     # Private RPC examples use synthetic byte strings, never installable keys.
     key_scope = {"installationID": local_key["installationID"], "purpose": "artifact", "keyID": "synthetic-only"}
-    key_request = {"format": "asservat-local-key-rpc/v1", "scope": key_scope,
-                   "authorityID": "00000000-0000-4000-8000-000000000002", "operation": "wrap",
+    key_request = {"format": "asservat-local-key-rpc/v1", "scope": key_scope, "operation": "wrap",
                    "binding": "YmluZGluZw==", "input": "a2V5"}
     key_sealed = {"reference": f"asservat-local-keyset/v1/{local_key['installationID']}/artifact/synthetic-only/1",
                   "ciphertext": "Y2lwaGVydGV4dA=="}
@@ -1304,7 +1244,7 @@ def main() -> None:
     for mutation in (
         lambda d: d.update(format="wrong"),
         lambda d: d.update(operation="encrypt-payload"),
-        lambda d: d.update(authorityID="00000000-0000-0000-0000-000000000000"),
+        lambda d: d.update(authorityID="00000000-0000-4000-8000-000000000002"),
         lambda d: d.update(input=None),
         lambda d: d.update(input="a2V5\n"),
         lambda d: d.update(sealed={}),

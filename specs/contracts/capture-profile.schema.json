@@ -72,13 +72,6 @@
             ]
           },
           "minItems": 0
-        },
-        "origins": {
-          "type": "array",
-          "items": {
-            "$ref": "https://asservat.io/spec/v1/capture-composition.schema.json#/$defs/resolvedProfile"
-          },
-          "minItems": 1
         }
       },
       "required": [

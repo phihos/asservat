@@ -1,10 +1,10 @@
 # User experience
 
-The [UX package](../docs/ux/README.md) and [surface inventory](../docs/ux/surfaces.yaml) are the reviewed-design interface baseline. Mockups demonstrate behavior and layout using synthetic data. The [production console](../docs/architecture/console-runtime.md) now implements the initial session boundary; full investigation authorization, workflows and deployment remain incomplete.
+The [UX package](../docs/ux/README.md), [surface inventory](../docs/ux/surfaces.yaml) and [design system](../docs/ux/design-system.md) are the design baseline; mockups use synthetic data. Task outcomes and acceptance measures are in [ergonomics](ergonomics.md).
 
 ## REQ-UI-001 — One role-aware workspace
 
-Provide the inventoried maintainer, recipient, approver and administrator surfaces in one console. Landing page and navigation use current effective roles. Authorize before rendering resource titles, counts, breadcrumbs, related items or cached content. Keep workload identity and effective access clear. Explain whole-pod scope and Kubernetes configuration handoff at the relevant decision; do not repeat architecture statements in every heading. Use section-level navigation and contextual capture views as specified in the UX package. Operators do not implicitly gain evidence-read or reviewer authority.
+One console serves maintainers, recipients, approvers and administrators. Navigation follows current effective roles. Authorize before rendering titles, counts, breadcrumbs, related items or cached content. Operators do not gain evidence-read or reviewer authority by operating the console.
 
 ### SC-UI-001
 
@@ -12,7 +12,7 @@ Given an evidence-only recipient following a maintainer’s case/workload URL, w
 
 ## REQ-UI-002 — Low-effort bounded authoring
 
-Provide target/goal, typed profile composition and one final review. Users choose clusters, namespaces, workloads, recipes, users and groups by name from search pickers; no form asks for a UUID, UID, digest or grant ID ([ADR-335](../docs/decisions/335-usable-by-default.md) D4). Show process/network guidance provenance and freshness; a discovery or survey is explicit collection. Preserve valid entered values through Back and field errors. Separate observation count, incident pod cap, ongoing recording and on-trigger actions. Preview includes combined effects, uncertainty, possible sensitive data, default audience and inherited deadlines. Do not add generic consent or repeated confirmation to an already reviewed ordinary submission.
+Authoring is target/goal, profile composition and one final review. Every cluster, namespace, workload, recipe, user and group is chosen by name from a search picker; no form asks for a UUID, UID, digest or grant ID ([ADR-335](../docs/decisions/335-usable-by-default.md) D4). Values survive Back and field errors. The review separates ongoing recording from on-trigger actions and shows combined effects, possible user data, audience and deadlines. An already reviewed submission gets no extra consent step.
 
 ### SC-UI-002
 
@@ -20,16 +20,9 @@ Given a maintainer composing context, HTTP evidence and a live core, when they r
 
 ## REQ-UI-003 — Truthful progress and recovery
 
-All surfaces implement relevant loading, empty, denied, stale/expired, disconnected, capacity-blocked and partial states with an actionable next step. Acceptance is not acquisition, configured is not qualified, access expiry is not verified deletion, and cancellation is not instantaneous offline completion. Preserve idempotency after a lost response; distinguish old accepted state from edited drafts. Stored authorized evidence remains usable when new collection/analysis is unavailable.
+Every surface implements loading, empty, denied, expired, disconnected, capacity-blocked and partial states with a next step (reasons and remedies: [REQ-UX-004](ergonomics.md)). Accepted is not acquired, configured is not qualified, access expiry is not verified deletion. Stored evidence stays usable when new collection is unavailable.
 
-Each open page receives progress, status and live rows over one Server-Sent Events stream; the console does not poll operations. Disconnected means that stream is closed: the page shows it, reconnects with backoff and resynchronizes current state once on reconnect.
-
-Session expiry, revocation and unavailable current checks clear protected views.
-Sign-out clears the local view immediately, but an unconfirmed server response
-must retain an explicit retry path and cannot be presented as successful logout.
-Returning to that tab must not silently reopen the workspace. Background and
-page-cache restoration recheck the session before redisplaying protected data;
-every operation is authorized by the server under REQ-INT-003.
+Each open page receives progress, status and live rows over one Server-Sent Events stream and does not poll; on reconnect it resynchronizes once. Session expiry or revocation clears protected views. Sign-out clears the view at once; an unconfirmed server logout keeps a retry path and is not shown as successful. Restored or cached pages recheck the session before showing protected data.
 
 ### SC-UI-003
 
@@ -37,7 +30,7 @@ Given partial packets and an awaiting-approval core, when a cluster disconnects 
 
 ## REQ-UI-004 — Sharing, review and administration
 
-Make concrete sharing, per-capture future sharing, bounded recurring instructions, manager teams and immutable creator distinct. Preview the recipient’s projection. Differentiate stopping future publication from revoking child shares. Human review binds exact scope, current revision and independence, plus step-up re-authentication only where the installation enables it (off by default, [ADR-335](../docs/decisions/335-usable-by-default.md) D5). An approval starts the approved work itself; the requester is never asked to submit again. Configuration previews hand administrator writes back to Kubernetes/GitOps. Privacy/capacity views show managed-copy deadlines and verification gaps.
+Concrete shares, capture-time sharing, recurring policy sharing, manager teams and the immutable creator are visibly distinct; Stop and Revoke have distinct effects ([authorization](authorization.md)). The sender previews the recipient's view. An approval starts the approved work; the requester never submits again. Configuration previews hand administrator writes back to Kubernetes/GitOps.
 
 ### SC-UI-004
 
@@ -45,25 +38,15 @@ Given a bounded recurring share with multiple owner teams, when an owner stops f
 
 ## REQ-UI-005 — Accessible responsive interaction
 
-Target WCAG 2.2 AA. Provide keyboard operation, meaningful focus order/return, labels, accessible errors/status, non-color state cues, chart text equivalents, reflow and accessible authentication. Keep primary actions usable on small screens and zoom; confine necessary table scrolling to tables. No third-party font/script or motion dependency. Use labeled keyboard-scrollable regions for wide tables; state-specific live controls must preserve sensible focus when replaced. Incoming observations must not rebuild focused rows or announce every row count. Automated scans supplement manual assistive-technology and participant tests.
+Target WCAG 2.2 AA: keyboard operation, focus order and return, labels, accessible errors and status, non-color state cues, chart text equivalents, reflow. Primary actions stay usable on small screens and at zoom; only wide tables scroll. No third-party fonts or scripts. Live rows must not steal focus or announce every row. Automated scans supplement manual assistive-technology and participant tests.
 
 ### SC-UI-005
 
 Given keyboard-only and narrow-screen users, when they compose, review, dismiss a dialog and inspect partial evidence, then focus remains visible and returns sensibly, no principal action is clipped, and status/coverage/deadline information is available without color or pointer-only interaction.
 
-## REQ-UI-006 — Reviewable interface coverage
-
-Maintain machine-readable screen/role/state/journey inventory, navigable local mockups, domain mappings and operation contracts together. Shared browser/MCP functions use the same application services and bounded projections. Label synthetic, static and interactive behavior. Verify representative journeys and role-negative views; do not claim a prototype proves runtime security, collector performance or usability targets.
-
-### SC-UI-006
-
-Given a new user-visible capability, when its design is accepted, then its screen, domain entity, public operation and failure behavior are traceable; prototype validation reports actual checks separately from pending runtime and participant testing.
-
 ## REQ-UI-007 — Minimal visual hierarchy without hidden consequences
 
-Use the [design system](../docs/ux/design-system.md) across all cataloged screens. Prefer plain aligned sections and comparable tables to nested cards. Show one emphasized next action per decision context, sentence-case labels and concise task descriptions; stable screen IDs and synthetic test controls do not occupy the normal product workspace. Put prototype controls in an explicit inspector.
-
-Keep target, relevant lifecycle, audience, combined workload effects and uncertainty, possible user data, effective retention/deletion bounds, coverage gaps and blocking prerequisites visible at the decision point. Optional sharing fields, advanced provenance and detailed accounting may be disclosed on demand. Do not hide a consequential condition to make a screenshot simpler, reduce target sizes to fit more controls, or add another confirmation to compensate for poor hierarchy. The source research records which choices are design judgments; automated checks are not a usability result.
+Use plain aligned sections and tables, one emphasized next action per decision, sentence-case labels. Target, lifecycle, audience, workload effects, possible user data, retention and deletion bounds, coverage gaps and blocking prerequisites stay visible at the decision point; optional sharing, provenance and accounting expand on demand. Never hide a consequence to simplify a screen or add a confirmation to compensate for poor hierarchy. Prototype controls live in a closed inspector, not the product workspace.
 
 ### SC-UI-007
 

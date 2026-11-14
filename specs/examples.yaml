@@ -1,10 +1,4 @@
 examples:
-- file: examples/work-trust.json
-  schema: https://asservat.io/spec/v1/work-trust.schema.json
-- file: examples/local-start-logs.json
-  schema: https://asservat.io/spec/v1/local-start.schema.json
-- file: examples/local-start.json
-  schema: https://asservat.io/spec/v1/local-start.schema.json
 - file: examples/recipe-context.yaml
   schema: https://asservat.io/spec/v1/recipe.schema.json
 - file: examples/recipe-intrusive.yaml
@@ -353,8 +347,6 @@ examples:
   schema: https://asservat.io/spec/v1/internal-work.schema.json
 - file: examples/grant-investigation.yaml
   schema: https://asservat.io/spec/v1/grant.schema.json
-- file: examples/grant-investigation-result.yaml
-  schema: https://asservat.io/spec/v1/grant.schema.json
 - file: examples/capture-investigation.yaml
   schema: https://asservat.io/spec/v1/capture.schema.json
 - file: examples/investigation-access.json
@@ -375,15 +367,11 @@ examples:
   schema: https://asservat.io/spec/v1/collection-scope.schema.json
 - file: examples/recipe-pod-status.json
   schema: https://asservat.io/spec/v1/recipe.schema.json
-- file: examples/retention-topology.json
-  schema: https://asservat.io/spec/v1/retention-topology.schema.json
 - file: examples/access-binding-automation.yaml
   schema: https://asservat.io/spec/v1/access-binding.schema.json
 
 - file: examples/browser-settings.json
   schema: https://asservat.io/spec/v1/browser-settings.schema.json
-- file: examples/submission-trust.json
-  schema: https://asservat.io/spec/v1/submission-trust.schema.json
 - file: examples/mcp-pod-status-diagnostics-input.json
   input_tool: list_diagnostics
 - file: examples/mcp-pod-status-diagnostics-result.json

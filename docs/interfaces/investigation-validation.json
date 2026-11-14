@@ -1,5 +1,5 @@
 {
-  "scope": "Synthetic paired request/grant/commit contracts only; real authorization, concurrency and local-tool workflow NOT RUN",
-  "positiveChecks": 10,
-  "rejectedInvalidCases": 18
+  "scope": "Synthetic request/grant contracts only; real authorization, concurrency and local-tool workflow NOT RUN",
+  "positiveChecks": 7,
+  "rejectedInvalidCases": 9
 }

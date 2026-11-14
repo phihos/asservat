@@ -65,7 +65,6 @@ An implementation task should read its requirement, catalog owner, relevant comp
 - [Storage custody transactions](custody-transactions.md)
 - [Current context-download authorization](download-authority.md)
 - [Current processing and download environment](download-environment.md)
-- [Recovery fencing for downloads](download-recovery.md)
 - [Bounded native response accounting](download-responses.md)
 - [Native download sessions and accounting](download-sessions.md)
 - [Download worker dispatch and cleanup](download-worker-dispatch.md)

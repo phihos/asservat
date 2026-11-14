@@ -26,7 +26,6 @@ spec:
             maxBytes: 16777216
             segmentBytes: 4194304
             maxSegments: 4
-            medium: memory
           peers:
             entries:
             - cidrs:
@@ -34,9 +33,7 @@ spec:
               - ::/0
             protocol: any
             resolution: frozen
-            maxEndpoints: 1
           maxFrozenBytes: 16777216
-          maxConcurrentSnapshots: 1
         required: true
         impact: observe
         limits:

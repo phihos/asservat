@@ -87,12 +87,6 @@
       "maximum": 9007199254740991,
       "description": "At most the ring size; derived from the node collector memory allocation (budget node maxFrozenBytes)."
     },
-    "maxConcurrentSnapshots": {
-      "type": "integer",
-      "minimum": 1,
-      "maximum": 9007199254740991,
-      "description": "Bounded by the node frozen byte budget and the trigger rate limits."
-    },
     "maxEvents": {
       "type": "integer",
       "minimum": 1,
@@ -139,7 +133,6 @@
     "result",
     "ring",
     "maxFrozenBytes",
-    "maxConcurrentSnapshots",
     "maxEventsPerSecond",
     "maxTrackedThreads"
   ],

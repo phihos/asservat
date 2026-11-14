@@ -1,7 +1,5 @@
 # Synthetic contract examples
 
-[retention-topology.json](retention-topology.json) shows the exact hub/local source set stored in an immutable installation ConfigMap. Protected enrollment supplies its accepted identity/content pins; capture callers never select or omit sources.
-
 These files illustrate the proposed API. CRD examples cannot be installed until controllers exist. Grant/share/SharingIntent examples are hub runtime DTOs with schemaVersion/id, never kubectl resources. Names, hashes, wrapped keys, timestamps and evidence are synthetic; they are not verification results or live credentials.
 
 | Example | Demonstrates |
@@ -129,7 +127,7 @@ The seven `internal-*.json` work fixtures cover arming a source, running an acti
 Native-download examples illustrate prepare/status/cancel and a synthetic 4 GiB core. They transfer no bytes and prove no GDB/Wireshark compatibility. Internal downloadArtifact work is a separate control purpose. See [downloads](../specs/artifact-downloads.md).
 
 
-The combined-review examples are [capture-investigation.yaml](capture-investigation.yaml), [grant-investigation.yaml](grant-investigation.yaml) and [grant-investigation-result.yaml](grant-investigation-result.yaml). The parent binds one capture and selected output scope; the child names an existing exact artifact for the same human/client. [investigation-preview.json](investigation-preview.json) illustrates the MCP instruction. These are synthetic contracts, not issued permissions. `make investigation-check` validates the paired scopes.
+The combined-review examples are [capture-investigation.yaml](capture-investigation.yaml) and [grant-investigation.yaml](grant-investigation.yaml). The grant binds one capture and its selected output scope; it covers published artifacts whose recorded capture and action match. [investigation-preview.json](investigation-preview.json) illustrates the MCP instruction. These are synthetic contracts, not issued permissions. `make investigation-check` validates the paired scopes.
 
 ## Framed storage contract
 

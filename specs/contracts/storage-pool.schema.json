@@ -29,214 +29,13 @@
             "bytes": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 9007199254740991
-            },
-            "objects": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 9007199254740991
+              "maximum": 9007199254740991,
+              "description": "Usable bytes after the backend full threshold and replication overhead."
             }
           },
           "required": [
             "bytes"
           ]
-        },
-        "safetyHeadroom": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "bytes": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 9007199254740991
-            },
-            "objects": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 9007199254740991
-            },
-            "share": {
-              "type": "string",
-              "pattern": "^(100|[1-9]?[0-9])(\\.[0-9])?%$",
-              "description": "Percentage of the pool's usable capacity (ADR-335 D2)."
-            }
-          },
-          "required": [],
-          "oneOf": [
-            {
-              "required": [
-                "bytes"
-              ],
-              "not": {
-                "required": [
-                  "share"
-                ]
-              }
-            },
-            {
-              "required": [
-                "share"
-              ],
-              "not": {
-                "required": [
-                  "bytes"
-                ]
-              }
-            }
-          ],
-          "description": "Default 5 % of capacity."
-        },
-        "systemReserve": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "bytes": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 9007199254740991
-            },
-            "objects": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 9007199254740991
-            },
-            "share": {
-              "type": "string",
-              "pattern": "^(100|[1-9]?[0-9])(\\.[0-9])?%$",
-              "description": "Percentage of the pool's usable capacity (ADR-335 D2)."
-            }
-          },
-          "required": [],
-          "oneOf": [
-            {
-              "required": [
-                "bytes"
-              ],
-              "not": {
-                "required": [
-                  "share"
-                ]
-              }
-            },
-            {
-              "required": [
-                "share"
-              ],
-              "not": {
-                "required": [
-                  "bytes"
-                ]
-              }
-            }
-          ],
-          "description": "Default 5 % of capacity."
-        },
-        "sharedBurst": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "bytes": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 9007199254740991
-            },
-            "objects": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 9007199254740991
-            },
-            "share": {
-              "type": "string",
-              "pattern": "^(100|[1-9]?[0-9])(\\.[0-9])?%$",
-              "description": "Percentage of the pool's usable capacity (ADR-335 D2)."
-            }
-          },
-          "required": [],
-          "oneOf": [
-            {
-              "required": [
-                "bytes"
-              ],
-              "not": {
-                "required": [
-                  "share"
-                ]
-              }
-            },
-            {
-              "required": [
-                "share"
-              ],
-              "not": {
-                "required": [
-                  "bytes"
-                ]
-              }
-            }
-          ]
-        },
-        "protectedAllocations": {
-          "type": "array",
-          "minItems": 1,
-          "uniqueItems": true,
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "budgetPolicyRef": {
-                "type": "string",
-                "minLength": 1
-              },
-              "workloadSlots": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 9007199254740991
-              },
-              "protectedPerWorkload": {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "bytes": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "maximum": 9007199254740991
-                  },
-                  "objects": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "maximum": 9007199254740991
-                  }
-                },
-                "required": [
-                  "bytes",
-                  "objects"
-                ]
-              }
-            },
-            "required": [
-              "budgetPolicyRef",
-              "workloadSlots",
-              "protectedPerWorkload"
-            ]
-          },
-          "description": "Optional explicit reservations; by default each enrolled workload is allocated its budget policy share at enrollment and the pool invariant is checked then (REQ-CAP-004)."
-        },
-        "upload": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "bytesPerSecond": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 9007199254740991
-            },
-            "burstBytes": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 9007199254740991
-            }
-          },
-          "required": []
         },
         "capacityAssurance": {
           "enum": [
@@ -247,7 +46,8 @@
       },
       "required": [
         "capacity"
-      ]
+      ],
+      "description": "Usable evidence capacity of one storage profile (REQ-CAP-004). System reserve, burst and per-workload allocations are derived, not configured."
     }
   },
   "required": [
