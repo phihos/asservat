@@ -1215,4 +1215,6 @@ The brief's domain-registration and trademark work remains a maintainer-owned pu
 
 - [ADR-333 — Hub and connector version skew](333-connector-version-skew.md) removes the executor image/startup digest pin; the connector's Hello announces protocol major and capabilities, the hub refuses only unannounced requests ("connector too old for …"), cross-release decoders ignore unknown fields, and a connector may be one minor release older or newer than the hub.
 
+- [ADR-334 — Connectors authenticate with their cluster's ServiceAccount tokens](334-connector-workload-identity.md) removes join Secrets and connector certificate enrollment: the hub trusts each workload cluster's ServiceAccount issuer (discovery or public JWKS), connectors use one HTTPS endpoint through ordinary Ingress, with a kubeadm-style join token only as fallback.
+
 - [ADR-335 — Usable by default](335-usable-by-default.md) makes a default install work, removes install-time-fixed values, UUID entry, unnecessary second approvals and step-up, short human-facing deadlines and tiny caps, and adds off-cluster backup/restore, standard external-service setup and zero-downtime upgrades. It supersedes in part ADR-053, 059, 060, 228, 229, 232, 235, 236, 239, 245, 247, 249, 252, 253, 259, 291, 293, 304 and 305; each carries a note under its title.
