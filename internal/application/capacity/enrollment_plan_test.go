@@ -25,10 +25,10 @@ func TestCapacityEnrollmentPlanCarriesCompleteImmutableCompilerInput(t *testing.
 	if json.Unmarshal(plan, &body) != nil || json.Unmarshal(pool, &complete) != nil || body.PoolUID != complete.UID || body.PolicyUID != complete.Policies[0].UID || body.Budget != complete.Policies[0].Budget || body.AccountVersion != "original" {
 		t.Fatal("small plan lost complete pool or selected policy identity")
 	}
-	w.Namespace.Labels["team"] = "changed"
+	w.Namespace.Labels[EligibilityLabel] = "changed"
 	a.Observation.Snapshot.Policies[0].Budget.Context.Bytes++
 	got, pgot, sgot, e := o.Plan.CanonicalValues()
-	if e != nil || !bytes.Equal(plan, got) || !bytes.Equal(pool, pgot) || !bytes.Equal(source, sgot) || o.NamespaceLabels["team"] != "one" {
+	if e != nil || !bytes.Equal(plan, got) || !bytes.Equal(pool, pgot) || !bytes.Equal(source, sgot) || o.NamespaceLabels[EligibilityLabel] != "enabled" {
 		t.Fatal("mutable source rewrote compiled observation")
 	}
 	plan[0] = '!'
@@ -59,7 +59,7 @@ func TestCapacityEnrollmentPlanRejectsChangedSelectionAndQualification(t *testin
 			case "budget":
 				selected.Budget.Context.Bytes++
 			case "scope":
-				selected.Scope.NamespaceLabels["team"] = "other"
+				selected.Scope.NamespaceLabels[EligibilityLabel] = "other"
 			case "pool-uid":
 				selected.Pool.UID = "replacement"
 			case "profile":

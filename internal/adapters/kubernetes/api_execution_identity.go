@@ -34,7 +34,7 @@ func APIExecutionAdmission(p cfg.APIExecutionAdministration) (*admission.Validat
 	if !p.Valid() || len(validation.IsDNS1123Subdomain(p.Name)) != 0 || len(validation.IsDNS1123Label(p.ControlNamespace.Name)) != 0 {
 		return nil, nil, cfg.ErrInvalid
 	}
-	for _, name := range []string{p.PodName, p.Account, p.CapacityAccount, p.ProbeAccount} {
+	for _, name := range []string{p.PodName, p.Account, p.ProbeAccount} {
 		if len(validation.IsDNS1123Subdomain(name)) != 0 {
 			return nil, nil, cfg.ErrInvalid
 		}
@@ -47,9 +47,6 @@ func APIExecutionAdmission(p cfg.APIExecutionAdministration) (*admission.Validat
 			allowed = append(allowed, ownerCELString(a.Name)+" in request.userInfo.groups")
 		}
 	}
-	user := func(name string) string {
-		return ownerCELString("system:serviceaccount:" + p.ControlNamespace.Name + ":" + name)
-	}
 	// After an administrator starts foreground deletion, GC must remove its
 	// own finalizer. Permit only that removal on this exact deleting Pod; it
 	// confers no workload mutation, new deletion, or other finalizer authority.
@@ -60,7 +57,6 @@ func APIExecutionAdmission(p cfg.APIExecutionAdministration) (*admission.Validat
 	}
 	allowed = append(allowed,
 		"(request.userInfo.username in ['system:kube-controller-manager', 'system:serviceaccount:kube-system:generic-garbage-collector'] && variables.group == '' && request.resource.resource == 'pods' && variables.sub == '' && request.operation == 'UPDATE' && request.name == "+ownerCELString(p.PodName)+" && oldObject.metadata.uid == "+ownerCELString(p.PodUID)+" && object.metadata.uid == oldObject.metadata.uid && has(oldObject.metadata.deletionTimestamp) && ("+gcFinalization+"))",
-		"(variables.group == 'asservat.io' && request.resource.resource == 'capacityreservations' && request.operation in ['CREATE','UPDATE'] && ((request.userInfo.username == "+user(p.CapacityAccount)+" && request.userInfo.uid == "+ownerCELString(p.CapacityAccountUID)+") || (request.userInfo.username == "+user(p.Account)+" && request.userInfo.uid == "+ownerCELString(p.AccountUID)+")))",
 		"(request.userInfo.username == 'system:kube-scheduler' && variables.group == '' && request.resource.resource == 'pods' && request.name == "+ownerCELString(p.PodName)+" && ((variables.sub == 'binding' && request.operation == 'CREATE') || (variables.sub == 'status' && request.operation == 'UPDATE')))",
 		"('system:nodes' in request.userInfo.groups && variables.group == '' && request.resource.resource == 'pods' && request.name == "+ownerCELString(p.PodName)+" && has(oldObject.spec.nodeName) && oldObject.spec.nodeName != '' && request.userInfo.username == 'system:node:' + oldObject.spec.nodeName && oldObject.metadata.uid == "+ownerCELString(p.PodUID)+" && ((variables.sub == 'status' && request.operation == 'UPDATE') || (variables.sub == '' && request.operation == 'DELETE' && has(oldObject.metadata.deletionTimestamp) && has(oldObject.status.phase) && oldObject.status.phase in ['Succeeded','Failed'])))",
 		"(request.userInfo.username.startsWith('system:node:') && 'system:nodes' in request.userInfo.groups && variables.group == '' && request.resource.resource == 'serviceaccounts' && variables.sub == 'token' && request.operation == 'CREATE' && request.name == "+ownerCELString(p.Account)+" && has(object.spec.boundObjectRef) && object.spec.boundObjectRef.kind == 'Pod' && object.spec.boundObjectRef.name == "+ownerCELString(p.PodName)+" && object.spec.boundObjectRef.uid == "+ownerCELString(p.PodUID)+")",
@@ -84,7 +80,7 @@ func NewAPIExecutionProtection(observer *PermissionClient, p cfg.APIExecutionAdm
 	if observer == nil || observer.clusterID != p.ClusterID || observer.control != p.ControlNamespace || !p.Valid() || len(validation.IsDNS1123Label(p.ControlNamespace.Name)) != 0 {
 		return nil, cfg.ErrInvalid
 	}
-	for _, name := range []string{p.PodName, p.Account, p.CapacityAccount} {
+	for _, name := range []string{p.PodName, p.Account} {
 		if len(validation.IsDNS1123Subdomain(name)) != 0 {
 			return nil, cfg.ErrInvalid
 		}

@@ -21,7 +21,6 @@
 {{- $bootstrap = $bootstrap | default (printf "%s-region-bootstrap" $n) }}
 {{- end }}
 {{- $account := printf "%s-connector" $n }}
-{{- $capacity := printf "%s-connector-capacity" $n }}
 {{- $credential := printf "%s-cluster-credential" $n }}
 {{- $nodes := printf "%s-connector-nodes" $n }}
 {{- $collector := .Values.collector.enabled }}
@@ -34,8 +33,7 @@
 {{- $_ := set $cfg "hub" (dict "federation" ($r.hub.federation | default (printf "https://%s-federation.%s.svc:9446" $n $ns)) "owners" ($r.hub.owners | default (printf "%s-hub-api-native.%s.svc:9444" $n $ns)) "keyService" ($r.hub.keyService | default (printf "https://%s-key-service.%s.svc:9447" $n $ns))) }}
 {{- end }}
 {{- if $executor }}
-{{- $xc := dict "capacityAccount" $capacity "concurrency" (int $x.concurrency) }}
-{{- with $x.capacityAudience }}{{ $_ := set $xc "capacityAudience" . }}{{ end }}
+{{- $xc := dict "concurrency" (int $x.concurrency) }}
 {{- with $x.alertmanager }}{{ $_ := set $xc "alertmanager" . }}{{ end }}
 {{- with $x.identityMappings }}{{ $_ := set $xc "identityMappings" . }}{{ end }}
 {{- with $x.profileEndpoints }}{{ $_ := set $xc "profileEndpoints" . }}{{ end }}
@@ -91,7 +89,7 @@ rules:
   # Startup reads its account, Deployment and the Pod → ReplicaSet chain by name.
   - apiGroups: [""]
     resources: [serviceaccounts]
-    resourceNames: [{{ $account }}{{ if $executor }}, {{ $capacity }}{{ end }}]
+    resourceNames: [{{ $account }}]
     verbs: [get]
   - apiGroups: [apps]
     resources: [deployments]
@@ -102,19 +100,6 @@ rules:
     resources: [configmaps]
     resourceNames: [{{ get $cfg "offerConfigMap" }}]
     verbs: [get]
-  {{- end }}
-  {{- if $executor }}
-  # ADR-175: the capacity account's Pod-bound token, minted in memory.
-  - apiGroups: [""]
-    resources: [serviceaccounts/token]
-    resourceNames: [{{ $capacity }}]
-    verbs: [create]
-  - apiGroups: [asservat.io]
-    resources: [capacityreservations]
-    verbs: [get]
-  - apiGroups: [asservat.io]
-    resources: [capacityreservations/status]
-    verbs: [update]
   {{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -209,46 +194,6 @@ subjects:
   - kind: ServiceAccount
     namespace: {{ $ns }}
     name: {{ $account }}
-{{- if $executor }}
----
-# ADR-175: the separate capacity identity that creates start reservations.
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: {{ $capacity }}
-  namespace: {{ $ns }}
-  labels: {{- include "asservat.labels" (list $ "connector") | nindent 4 }}
-automountServiceAccountToken: false
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: {{ $capacity }}
-  namespace: {{ $ns }}
-  labels: {{- include "asservat.labels" (list $ "connector") | nindent 4 }}
-rules:
-  - apiGroups: [asservat.io]
-    resources: [capacityreservations]
-    verbs: [create, get]
-  - apiGroups: [asservat.io]
-    resources: [capacityreservations/status]
-    verbs: [update]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: {{ $capacity }}
-  namespace: {{ $ns }}
-  labels: {{- include "asservat.labels" (list $ "connector") | nindent 4 }}
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: {{ $capacity }}
-subjects:
-  - kind: ServiceAccount
-    namespace: {{ $ns }}
-    name: {{ $capacity }}
-{{- end }}
 {{- if $collector }}
 ---
 # ADR-246: the node listener pair, generated once by the connector.

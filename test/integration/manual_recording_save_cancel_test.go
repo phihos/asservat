@@ -124,11 +124,7 @@ func manualCancellationExecution(t *testing.T, ctx context.Context, f *capacityS
 	if err != nil || again || replay != execution {
 		t.Fatal("snapshot preparation replay", again, err)
 	}
-	execution, err = executions.BindAPIStart(ctx, check, execution, executionvalue.PreparedStart{ObjectUID: custodyID(), ResourceVersion: "1"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	execution, err = executions.RecordAPIStart(ctx, check, execution, executionvalue.Disposition{ObjectUID: execution.ObjectUID, ResourceVersion: "2", Phase: executionvalue.StartCommitted, CommittedAt: clock(), MayStart: true, ValidUntil: execution.Binding.NotAfter})
+	execution, err = executions.RecordAPIStart(ctx, check, execution)
 	if err != nil {
 		t.Fatal(err)
 	}

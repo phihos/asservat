@@ -21,7 +21,7 @@ const ConnectorProtocolMajor = 1
 // name with another meaning.
 var apiContextCapabilities = []string{
 	"operation/resolve-pod", "operation/resolve-packet-source", "operation/resolve-argument-source", "operation/start-argument-recording", "operation/start-policy-recording",
-	"operation/read-process", "operation/prepare-start", "operation/ready-start", "operation/consume-start", "operation/prepare-output", "operation/acquire-context",
+	"operation/read-process", "operation/prepare-output", "operation/acquire-context",
 	"operation/complete-stored", "operation/finish", "operation/start-profile", "operation/start-logs", "operation/start-recording", "operation/collect-recording",
 	"operation/start-source-snapshot", "operation/resolve-source-snapshot",
 	"query/resolve-workload", "query/resolve-workload-identity", "query/resolve-pod", "query/observe-workload-restarts", "query/review-access", "query/capture-profiles",

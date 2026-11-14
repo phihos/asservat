@@ -252,12 +252,7 @@ func qualifyProfileAdmission(t *testing.T, ctx context.Context, admin *pgxpool.P
 				}
 				process = original.Process
 				check = refresh()
-				bound, err := execSQL.BindAPIStart(ctx, check, original, execution.PreparedStart{ObjectUID: custodyID(), ResourceVersion: "1"})
-				if err != nil {
-					t.Fatal("profile start bind", err)
-				}
-				disposition := execution.Disposition{ObjectUID: bound.ObjectUID, ResourceVersion: "2", Phase: execution.StartCommitted, CommittedAt: time.Now().UTC().Truncate(time.Microsecond), MayStart: true, ValidUntil: bound.Binding.NotAfter}
-				running, err := execSQL.RecordAPIStart(ctx, check, bound, disposition)
+				running, err := execSQL.RecordAPIStart(ctx, check, original)
 				if err != nil {
 					t.Fatal("profile start", err)
 				}

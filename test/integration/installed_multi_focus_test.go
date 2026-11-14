@@ -253,7 +253,7 @@ func installedFocusTriggerNeed(focus string) int {
 	case "policy-arguments", "policy-profile":
 		return 1
 	}
-	return capture.WorkloadTriggerBurst
+	return capture.DefaultWorkloadRate().Burst
 }
 
 // installedFocusIsolation is what the teardown between two focuses needs:
@@ -369,12 +369,11 @@ WHERE b.uid=ANY($1) AND a.retired_at IS NULL`, removedUIDs).Scan(&left)
 			return left == 0, err
 		})
 	}
-	// 4. The workload's shared policy trigger budget (one occurrence per
-	// five minutes, burst two; policy_uid '') holds what the next focus
-	// spends, as on a fresh installation.
+	// 4. The workload's shared policy trigger budget (policy_uid '') holds
+	// what the next focus spends, as on a fresh installation.
 	need := installedFocusTriggerNeed(next)
-	slack := time.Duration(capture.WorkloadTriggerBurst-need) * capture.WorkloadTriggerInterval
-	wait(fmt.Sprintf("%d trigger budget tokens", need), 11*time.Minute, func(c context.Context) (bool, error) {
+	slack := time.Duration(capture.DefaultWorkloadRate().Burst-need) * capture.DefaultWorkloadRate().Interval
+	wait(fmt.Sprintf("%d trigger budget tokens", need), capture.DefaultWorkloadRate().Interval+time.Minute, func(c context.Context) (bool, error) {
 		var available bool
 		err := iso.SQL.QueryRow(c, `SELECT coalesce(max(tat),clock_timestamp())<=clock_timestamp()+make_interval(secs=>$2) FROM policy_workload_window WHERE root_id=$1 AND policy_uid=''`, iso.Root, slack.Seconds()).Scan(&available)
 		return available, err

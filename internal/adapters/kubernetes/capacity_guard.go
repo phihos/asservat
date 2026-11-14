@@ -13,7 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 )
 
-// Only these two capacity-specific readers share this private state. They
+// The namespace selector reader keeps this private state. They
 // observe that the control (or probe) namespace still exists with its UID;
 // Kubernetes RBAC decides who may write the capacity sources and namespace
 // labels. The runtime no longer re-verifies an admission policy, the probe
@@ -25,7 +25,6 @@ type capacityGuard struct {
 	namespace cfg.NamespaceRef
 	digest    artifact.Digest
 }
-type CapacityGuard struct{ guard *capacityGuard }
 type CapacityNamespaceGuard struct {
 	guard *capacityGuard
 	keys  []string
@@ -40,7 +39,6 @@ func (e *capacityGuardDiagnostic) Error() string     { return "capacity guard: "
 func (e *capacityGuardDiagnostic) Unwrap() error     { return e.cause }
 func (e *capacityGuardDiagnostic) FixedStep() string { return e.step }
 
-var _ port.CapacitySourceProtectionReader = (*CapacityGuard)(nil)
 var _ port.CapacityNamespaceProtectionReader = (*CapacityNamespaceGuard)(nil)
 
 func newCapacityGuard(observer *PermissionClient, namespace cfg.NamespaceRef, pin GuardPin, plan any) (*capacityGuard, error) {
@@ -50,13 +48,6 @@ func newCapacityGuard(observer *PermissionClient, namespace cfg.NamespaceRef, pi
 	// The digest names the cluster and observed namespace only (field map
 	// coupling 3); plan and pin no longer enter it.
 	return &capacityGuard{observer: observer, namespace: namespace, digest: artifact.Digest(contracts.NamespaceSourceDigest(observer.clusterID, namespace.Name))}, nil
-}
-func NewCapacityGuard(observer *PermissionClient, plan cfg.CapacityAdministration, pin GuardPin) (*CapacityGuard, error) {
-	g, err := newCapacityGuard(observer, plan.ControlNamespace, pin, plan)
-	if err != nil {
-		return nil, err
-	}
-	return &CapacityGuard{guard: g}, nil
 }
 func NewCapacityNamespaceGuard(observer *PermissionClient, plan cfg.CapacityNamespaceAdministration, pin GuardPin) (*CapacityNamespaceGuard, error) {
 	// The keys are the namespace label keys this cluster's selectors use.
@@ -96,19 +87,6 @@ func (g *capacityGuard) current(ctx context.Context) (time.Time, time.Time, erro
 		return fail("freshness", cfg.ErrUnavailable)
 	}
 	return start, until, nil
-}
-
-func (g *CapacityGuard) CapacityProtection(ctx context.Context) (port.CapacitySourceProtection, error) {
-	var out port.CapacitySourceProtection
-	if g == nil || g.guard == nil {
-		return out, cfg.ErrUnavailable
-	}
-	s := g.guard
-	start, until, err := s.current(ctx)
-	if err != nil {
-		return out, err
-	}
-	return port.CapacitySourceProtection{ClusterID: s.observer.clusterID, ControlNamespaceUID: s.namespace.UID, Digest: s.digest, ObservedAt: start, FreshUntil: until}, nil
 }
 
 func (g *CapacityNamespaceGuard) CapacityNamespaceProtection(ctx context.Context) (port.CapacityNamespaceProtection, error) {

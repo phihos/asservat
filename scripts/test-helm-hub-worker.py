@@ -24,7 +24,7 @@ helm = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(helm)
 
 CONFIG_KEYS = {"format", "namespace", "serviceAccount", "fleetSource", "ownerSource", "leaderLease", "postgres", "auditStore", "keyService", "provider", "permission"}
-KEEP = ("_", "hub-worker-", "hub-capacity.yaml", "hub-retention-baseline.yaml", "provider-roots.yaml", "download-worker.yaml")
+KEEP = ("_", "hub-worker-", "hub-retention-baseline.yaml", "provider-roots.yaml", "download-worker.yaml")
 FULL = os.environ.get("ASSERVAT_HELM_FULL") == "1"
 
 
@@ -181,7 +181,7 @@ class HubWorkerChart(unittest.TestCase):
 
     def test_capacity_cleanup_deletion_and_retention(self):
         values = copy.deepcopy(self.bundled)
-        values["capacity"] = context_public()["capacity"]
+        values["capacity"] = {"evidenceStorage": "8Gi", "workload": {"share": "256Mi"}}
         values["retention"] = context_public()["retentionBaseline"]
         docs = self.render(values)
         w = self.worker(docs)
@@ -199,9 +199,8 @@ class HubWorkerChart(unittest.TestCase):
         self.assertEqual(files["verify-storage.json"], ("asservat-s3-operation-verify", "credentials.json"))
         self.assertEqual(files["evidence-delete-storage.json"], ("asservat-s3-evidence-delete", "credentials.json"))
         self.assertEqual(tokens["cluster-observation.token"], "asservat-cluster-observation")
-        pool, = [d for d in docs if d["kind"] == "EvidenceStoragePool"]
-        policy, = [d for d in docs if d["kind"] == "EvidenceBudgetPolicy"]
-        self.assertEqual((pool["spec"], policy["spec"]), (values["capacity"]["poolSpec"], values["capacity"]["policySpec"]))
+        self.assertEqual((c["capacity"]["evidenceStorage"], c["capacity"]["revision"]), (values["capacity"]["evidenceStorage"], 1))
+        self.assertFalse([d for d in docs if d["kind"] in ("EvidenceStoragePool", "EvidenceBudgetPolicy")])
         retention, = [d for d in docs if d["kind"] == "EvidenceRetentionPolicy"]
         self.assertEqual((retention["metadata"]["name"], retention["spec"]["legalExceptions"]), ("asservat-baseline", "disabled"))
         self.assertIn({"apiGroups": [""], "resources": ["pods"], "verbs": ["get", "list", "watch"]}, w["ClusterRole"]["rules"])

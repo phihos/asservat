@@ -13,24 +13,23 @@ type APIExecutionAdministration struct {
 	ControlNamespace                       NamespaceRef
 	InstallationID, ClusterID, IssuerEpoch string
 	PodName, PodUID, Account, AccountUID   string
-	CapacityAccount, CapacityAccountUID    string
 	ProbeAccount, ProbeAccountUID          string
 	PodSpecDigest, ImageDigest             artifact.Digest
 	Administrators                         []KubernetesActor
 }
 
 func (p APIExecutionAdministration) Valid() bool {
-	for _, id := range []string{p.InstallationID, p.ClusterID, p.IssuerEpoch, p.ControlNamespace.UID, p.PodUID, p.AccountUID, p.CapacityAccountUID, p.ProbeAccountUID} {
+	for _, id := range []string{p.InstallationID, p.ClusterID, p.IssuerEpoch, p.ControlNamespace.UID, p.PodUID, p.AccountUID, p.ProbeAccountUID} {
 		if !authorization.UUID(id) {
 			return false
 		}
 	}
-	for _, name := range []string{p.Name, p.PodName, p.Account, p.CapacityAccount, p.ProbeAccount} {
+	for _, name := range []string{p.Name, p.PodName, p.Account, p.ProbeAccount} {
 		if !identity.Text(name, 253) {
 			return false
 		}
 	}
-	if !identity.Text(p.ControlNamespace.Name, 63) || p.PodSpecDigest == (artifact.Digest{}) || p.ImageDigest == (artifact.Digest{}) || p.Account == p.CapacityAccount || p.Account == p.ProbeAccount || p.CapacityAccount == p.ProbeAccount || p.AccountUID == p.CapacityAccountUID || p.AccountUID == p.ProbeAccountUID || p.CapacityAccountUID == p.ProbeAccountUID || len(p.Administrators) < 1 || len(p.Administrators) > 32 {
+	if !identity.Text(p.ControlNamespace.Name, 63) || p.PodSpecDigest == (artifact.Digest{}) || p.ImageDigest == (artifact.Digest{}) || p.Account == p.ProbeAccount || p.AccountUID == p.ProbeAccountUID || len(p.Administrators) < 1 || len(p.Administrators) > 32 {
 		return false
 	}
 	for _, a := range p.Administrators {

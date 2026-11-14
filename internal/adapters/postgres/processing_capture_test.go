@@ -35,7 +35,7 @@ func processingCoverageFixture(t *testing.T) (custodydb.ProcessingRoot, capture.
 }
 
 func TestProcessingCaptureCoverageOriginalRootBounds(t *testing.T) {
-	for _, name := range []string{"covered", "exact-boundary", "one-microsecond-too-long", "expired", "missing-initialization", "wrong-installation", "wrong-issuer", "wrong-root", "malformed-backing", "zero-protection", "full", "negative-counter", "overflow-rules", "future-anchor"} {
+	for _, name := range []string{"covered", "exact-boundary", "one-microsecond-too-long", "expired", "missing-initialization", "wrong-installation", "wrong-issuer", "wrong-root", "malformed-backing", "zero-protection", "overflow-rules", "future-anchor"} {
 		t.Run(name, func(t *testing.T) {
 			p, r, n := processingCoverageFixture(t)
 			installation, issuer := uid(p.InstallationID), uid(p.IssuerEpoch)
@@ -66,12 +66,6 @@ func TestProcessingCaptureCoverageOriginalRootBounds(t *testing.T) {
 				want = capture.ErrUnavailable
 			case "zero-protection":
 				clear(p.ProtectionDigest)
-				want = capture.ErrUnavailable
-			case "full":
-				p.Captures = p.MaxCaptures
-				want = capture.ErrCapacity
-			case "negative-counter":
-				p.Captures = -1
 				want = capture.ErrUnavailable
 			case "overflow-rules":
 				p.Rules = p.MaxRules + 1

@@ -67,7 +67,7 @@ func TestContextStartActualHTTP2DispatchProtectionDiagnostic(t *testing.T) {
 			ctx, cancel := context.WithDeadline(t.Context(), parentUntil)
 			work, signer, signed, _ := f.work(t, exchange.Receiver(), func(w *value.APIContextWork) { w.NotAfter = parentUntil })
 			regional := &regionalOperationsFixture{t: t, work: work, process: f.api}
-			local := contextstart.RegionalLocal{Process: regional, Targets: regional, Local: regional, Starts: regional, Output: regional, Collector: regional, Source: f.connector, Now: time.Now}
+			local := contextstart.RegionalLocal{Process: regional, Targets: regional, Output: regional, Collector: regional, Source: f.connector, Now: time.Now}
 			regionalDone := make(chan struct{})
 			go func() {
 				defer close(regionalDone)

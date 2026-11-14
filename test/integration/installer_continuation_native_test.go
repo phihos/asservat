@@ -131,7 +131,7 @@ func prepareInstallerContinuationNative(t *testing.T, ctx context.Context, api k
 	var captureHistory *contracts.CaptureHistoryLimits
 	if os.Getenv("ASSERVAT_HELM_CONTEXT_NATIVE") == "1" {
 		trial := helmContextTrialProfile(t).Public
-		capacity, connector, baseline = trial.Capacity, trial.Federation.Connector, trial.RetentionBaseline
+		connector, baseline = trial.Federation.Connector, trial.RetentionBaseline
 		maxLifetime, maxLogins, maxSessions, maxLogout = trial.MaxLifetimeSeconds, trial.MaxLogins, trial.MaxSessions, trial.MaxLogoutEvents
 		captureHistory, processors = trial.CaptureHistory, trial.Processors
 	}
@@ -182,8 +182,6 @@ func installerContinuationRBAC(t *testing.T, ctx context.Context, api kubernetes
 		{APIGroups: []string{""}, Resources: []string{"services"}, Verbs: []string{"get", "create"}},
 		{APIGroups: []string{"coordination.k8s.io"}, Resources: []string{"leases"}, Verbs: []string{"get", "create", "update"}},
 		{APIGroups: []string{"discovery.k8s.io"}, Resources: []string{"endpointslices"}, Verbs: []string{"list"}},
-		{APIGroups: []string{"asservat.io"}, Resources: []string{"evidencestoragepools", "evidencebudgetpolicies"}, Verbs: []string{"get", "list", "create"}},
-		{APIGroups: []string{"asservat.io"}, Resources: []string{"evidencestoragepools"}, Verbs: []string{"update"}},
 		{APIGroups: []string{"asservat.io"}, Resources: []string{"accessbindings", "permissionsources"}, Verbs: []string{"get", "list", "watch", "create"}},
 		{APIGroups: []string{"asservat.io"}, Resources: []string{"accessbindings"}, Verbs: []string{"delete"}},
 		{APIGroups: []string{"asservat.io"}, Resources: []string{"debugpolicies"}, Verbs: []string{"get", "create"}},
@@ -399,7 +397,7 @@ func installerContinuationLogs(t *testing.T, api kubernetes.Interface, pod *core
 func installShippedPermissionCRDs(t *testing.T, ctx context.Context, api kubernetes.Interface) {
 	t.Helper()
 	client := api.CoreV1().RESTClient()
-	files := []string{"accessbindings.yaml", "permissionsources.yaml", "evidencestoragepools.yaml", "evidencebudgetpolicies.yaml", "evidenceretentionpolicies.yaml", "debugpolicies.yaml"}
+	files := []string{"accessbindings.yaml", "permissionsources.yaml", "evidenceretentionpolicies.yaml", "debugpolicies.yaml"}
 	if os.Getenv("ASSERVAT_HELM_CONTEXT_NATIVE") == "1" {
 		// Match the guide's full canonical operator prerequisite, once, before
 		// Helm runs with --skip-crds. The inventory remains on this real API.
@@ -488,8 +486,7 @@ func nativeCapacityProfile() *contracts.InstallerCapacitySettings {
 		r, n := installedFocusCapacityRecords()
 		records, normal = records+r, normal+n
 	})
-	poolSpec, policySpec := installerDeclaredCapacitySpecs()
-	profile := &contracts.InstallerCapacitySettings{Pool: "capacity", Policy: "applications", PoolSpec: poolSpec, PolicySpec: policySpec, NamespaceKeys: []string{"team"}, Accounts: 16, Records: records, AdmissionSeconds: 86400,
+	profile := &contracts.InstallerCapacitySettings{Accounts: 16, Records: records, AdmissionSeconds: 86400,
 		Lanes:               contracts.InstallerCapacityLanes{CaptureRetainedSeconds: 10000, Normal: lane(4, normal*installedKeptRuns()), Resolution: lane(4, 8*installedFundedRuns()), Processing: lane(2, 16)},
 		StopRetainedSeconds: 10000,
 		Backup:              contracts.InstallerCapacityBackup{HorizonSeconds: 3600, CleanupBudgetSeconds: 60, ProofWindowSeconds: 60, BackupCopies: 2, WALCopies: 3},

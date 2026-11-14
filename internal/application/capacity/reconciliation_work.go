@@ -22,8 +22,11 @@ type CapacityBindingObservations interface {
 
 type CapacityClusterReaders struct {
 	ClusterID string
-	Workloads CapacityWorkloadReader
-	Guard     CapacityNamespaceProtectionReader
+	// ReleaseNamespace is the cluster's Asservat namespace; it never takes
+	// part in evidence collection.
+	ReleaseNamespace string
+	Workloads        CapacityWorkloadReader
+	Guard            CapacityNamespaceProtectionReader
 	// Guarded, when set, observes the guard and then the workload under the
 	// pinned keys in one remote observation (ADR-197): a regional cluster's
 	// two separate observations do not fit one source window.
@@ -286,6 +289,7 @@ func (s *CapacityWorkReconciler) reconcile(ctx context.Context, source AcceptedC
 	if !l.narrow(workload.FreshUntil) || !l.narrow(workload.Namespace.FreshUntil) {
 		return capacityStage("workload-fresh", cfg.ErrUnavailable)
 	}
+	workload.Namespace.Labels = EligibleNamespace(namespace.Name, cluster.ReleaseNamespace, workload.Namespace.Labels)
 	observation, _, err := ComposeEnrollmentObservation(source, guard, workload, permissions, recovery, s.Enrollment.Accounts.AccountVersion(), s.Now())
 	if err != nil {
 		return capacityStage("compose", err)

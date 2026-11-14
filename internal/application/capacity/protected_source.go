@@ -174,7 +174,7 @@ func SelectBudget(s CapacitySnapshot, ns cfg.NamespaceMetadata, protectedKeys []
 			break
 		}
 	}
-	if pool == nil || pool.Resource.Deleting || pool.Resource.SpecDigest == (artifact.Digest{}) || pool.Budget == nil || pool.Budget.Name != pool.Resource.Name || pool.Assurance != "qualifiedReservedBackend" || !identity.Text(pool.StorageProfile, 63) {
+	if pool == nil || pool.Resource.Deleting || pool.Resource.SpecDigest == (artifact.Digest{}) || pool.Budget == nil || pool.Budget.Name != pool.Resource.Name || !identity.Text(pool.StorageProfile, 63) {
 		return zero, cfg.ErrUnavailable
 	}
 	inputs := make([]PolicyBudgetInput, 0, len(pool.Budget.Slots))

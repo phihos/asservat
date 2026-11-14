@@ -336,7 +336,7 @@ def check_cluster_join(render):
     v.update({"clusters": [{"name": "eu", "clusterID": cluster}], "remote": remote})
     docs = render(v)
     config = json.loads(named(docs, "ConfigMap", "asservat-hub-api-config")["data"]["config.json"])
-    assert config["clusters"] == [{"name": "eu", "clusterID": cluster, "namespace": "asservat-system", "standby": 2, "captures": 1}], config.get("clusters")
+    assert config["clusters"] == [{"name": "eu", "clusterID": cluster, "namespace": "asservat-system", "standby": 2, "captures": 8}], config.get("clusters")
     offer = config["public"]["regionalOffer"]
     assert offer["hubOnly"] is True and offer["remote"] == remote, offer
     named(docs, "ConfigMap", "asservat-regional-offer")
@@ -395,7 +395,7 @@ def main():
     expected = {p.name: yaml.safe_load(p.read_text()) for p in (CHART / "crds").glob("*.yaml")}
     # ADR-228 adds the hub-held DebugPolicy CRD (structural accepted subset).
     # S-04 increment 11 adds the CaptureProfile catalog CRD (REQ-CPR-001).
-    assert len(expected) == 8, "review newly added installation resources"
+    assert len(expected) == 5, "review newly added installation resources"
     cache = Path(os.environ.get("ASSERVAT_BUILD_TMP", Path.home() / ".cache/asservat-build/tmp"))
     cache.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="helm-check-", dir=cache) as directory:
@@ -430,7 +430,7 @@ def main():
                 assert yaml.safe_load(bundle.extractfile("asservat/crds/" + name).read()) == content
         run(["lint", "--strict", str(archive), "-f", str(values)])
         assert run(["template", "asservat", str(archive), "--include-crds", "-f", str(values)]) == run(["template", "asservat", str(CHART), "--include-crds", "-f", str(values)])
-    print("Helm schema/render/package checks passed: 3 modes, 8 canonical CRDs, secrets hook Job and Role, setup Job, AccessBinding RBAC and bind policy, Ingress/HTTPRoute exposure, cluster join, examples, the guarded collector DaemonSet and invalid values rejected.")
+    print(f"Helm schema/render/package checks passed: 3 modes, {len(expected)} canonical CRDs, secrets hook Job and Role, setup Job, AccessBinding RBAC and bind policy, Ingress/HTTPRoute exposure, cluster join, examples, the guarded collector DaemonSet and invalid values rejected.")
     print(run(["version", "--short"]).strip())
 
 

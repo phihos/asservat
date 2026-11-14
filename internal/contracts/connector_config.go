@@ -76,12 +76,8 @@ type ConnectorHubAddresses struct {
 }
 
 // ConnectorExecutorConfig enables ADR-171 regional context start when the
-// offer names the regional executor. CapacityAccount is the separate
-// account whose Pod-bound token the connector mints for CapacityReservation
-// starts (ADR-175).
+// offer names the regional executor.
 type ConnectorExecutorConfig struct {
-	CapacityAccount      string                    `json:"capacityAccount"`
-	CapacityAudience     string                    `json:"capacityAudience"`
 	Concurrency          int                       `json:"concurrency"`
 	Alertmanager         string                    `json:"alertmanager,omitempty"`
 	IdentityMappings     []RegionalIdentityMapping `json:"identityMappings,omitempty"`

@@ -16,7 +16,7 @@ func TestCapacityPoolPlanCarriesCompleteCommitmentsAndOneSharedBurst(t *testing.
 	b.Name = "second"
 	b.Cluster = "10000000-0000-4000-8000-000000000002"
 	second.Budget = &b
-	second.Scope = &BudgetScope{ClusterID: b.Cluster, NamespaceLabels: map[string]string{"team": "two"}}
+	second.Scope = &BudgetScope{ClusterID: b.Cluster, NamespaceLabels: map[string]string{EligibilityLabel: "two"}}
 	s.Policies = append(s.Policies, second)
 	s.Pools[0].Budget.Slots[0].Workloads = 2
 	s.Pools[0].Budget.Slots = append(s.Pools[0].Budget.Slots, ProtectedSlotInput{Policy: "second", Workloads: 2, Protected: b.Protected})
@@ -37,8 +37,8 @@ func TestCapacityPoolPlanCarriesCompleteCommitmentsAndOneSharedBurst(t *testing.
 	if p.Clusters[0].ByteLimit+p.Clusters[1].ByteLimit <= p.Capacity.Bytes {
 		t.Fatal("fixture did not exercise shared burst intersection")
 	}
-	s.Policies[0].Scope.NamespaceLabels["team"] = "changed"
-	if p.Policies[0].Scope.NamespaceLabels["team"] != "one" {
+	s.Policies[0].Scope.NamespaceLabels[EligibilityLabel] = "changed"
+	if p.Policies[0].Scope.NamespaceLabels[EligibilityLabel] != "enabled" {
 		t.Fatal("mutable source changed frozen plan")
 	}
 }

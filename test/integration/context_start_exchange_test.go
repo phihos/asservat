@@ -342,7 +342,7 @@ func newRegionalAPIStartFixture(t *testing.T, ctx context.Context, f fixture, n 
 	// ADR-171: the hub runs the runner with its SQL/authority ports; the region
 	// answers only its cluster-local ports over the exchange.
 	hub := executionapp.APIContextRunner{Read: runner.Read, Prepare: runner.Prepare, Record: runner.Record, Eligibility: runner.Eligibility, Capabilities: runner.Capabilities, Retention: runner.Retention, Recovery: runner.Recovery, Now: runner.Now}
-	local := contextstart.RegionalLocal{Process: runner.Process, Targets: regionalQueryTargets(runner.Targets), Local: runner.Local, Starts: runner.Starts, Output: runner.Output, Collector: runner.Collector, Source: source, Now: runner.Now}
+	local := contextstart.RegionalLocal{Process: runner.Process, Targets: regionalQueryTargets(runner.Targets), Output: runner.Output, Collector: runner.Collector, Source: source, Now: runner.Now}
 	out := &regionalAPIStartFixture{bridge: bootstrap.RegionalAPIContextStart{Runner: hub, Signer: signer, Router: router, Now: time.Now}, client: client, candidates: sql.reader, owner: owner, verifier: verifier, local: local}
 	t.Cleanup(func() {
 		client.Close()

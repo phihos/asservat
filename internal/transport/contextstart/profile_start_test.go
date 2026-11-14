@@ -8,7 +8,6 @@ import (
 
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
-	value "asservat.local/asservat/internal/domain/execution"
 	"asservat.local/asservat/internal/domain/targets"
 )
 
@@ -18,22 +17,20 @@ func (o *fakeProfileOutput) StartProfile(_ context.Context, _ artifact.PinnedPod
 	o.started++
 	return started, nil
 }
-func TestProfileStartRequiresOriginalCommittedTimeAndTypedExpectation(t *testing.T) {
+func TestProfileStartRequiresWorkDeadlineAndTypedExpectation(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	w := workFixture().Work
 	pin := artifact.PinnedPod{Namespace: "app", NamespaceUID: "ns", Name: "web", UID: w.Target.PodUID}
 	req := profileRequest{Pin: pin, Started: now, Until: now.Add(time.Second)}
-	for _, change := range []string{"missing", "renewed", "pin", "noProfile", "valid"} {
+	for _, change := range []string{"deadline", "pin", "noProfile", "valid"} {
 		t.Run(change, func(t *testing.T) {
 			local := (&countingLocal{}).local()
 			out := &fakeProfileOutput{}
-			s := &regionalSession{local: local, work: w, prepared: out, resolved: &targets.PodResolution{Pin: pin}, expectation: &artifact.ContextExpectation{Profile: &artifact.GoProfileAcquisition{}}, consumed: &value.Disposition{MayStart: true, Phase: value.StartCommitted, CommittedAt: now, ValidUntil: now.Add(2 * time.Second)}}
+			s := &regionalSession{local: local, work: w, prepared: out, resolved: &targets.PodResolution{Pin: pin}, expectation: &artifact.ContextExpectation{Profile: &artifact.GoProfileAcquisition{}}}
 			r := req
 			switch change {
-			case "missing":
-				s.consumed = nil
-			case "renewed":
-				r.Started = now.Add(time.Microsecond)
+			case "deadline":
+				r.Until = w.NotAfter.Add(time.Second)
 			case "pin":
 				r.Pin.UID = "other"
 			case "noProfile":

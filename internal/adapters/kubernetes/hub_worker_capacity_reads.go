@@ -17,7 +17,6 @@ import (
 func augmentInstalledWorkerCapacityReads(w *HubWorkerWorkload, installationID string) {
 	prefix := "asservat-" + strings.ReplaceAll(installationID, "-", "")
 	w.Role.Rules = append(w.Role.Rules,
-		rbac.PolicyRule{APIGroups: []string{"asservat.io"}, Resources: []string{"evidencestoragepools", "evidencebudgetpolicies"}, Verbs: []string{"get", "list", "create"}},
 		rbac.PolicyRule{APIGroups: []string{""}, Resources: []string{"configmaps"}, ResourceNames: []string{prefix + "-processing-source"}, Verbs: []string{"get", "update"}},
 	)
 	w.ClusterRole.Rules = append(w.ClusterRole.Rules,

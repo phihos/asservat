@@ -113,7 +113,7 @@ func NewHistoryTLSHarness(t *testing.T, delay time.Duration) HistoryTLSHarness {
 		objects.copies[i] = artifact.CopyReceipt{VersionID: "synthetic", ETag: "synthetic", Bytes: int64(len(b)), SHA256: sha256.Sum256(b)}
 	}
 	region := &regionalOperationsFixture{t: t, process: f.api}
-	local := contextstart.RegionalLocal{Process: region, Targets: region, Local: region, Starts: region, Output: region, Collector: region, Source: source, History: &contextstart.HistoryLocal{Verifier: signer, Effects: objects}, Now: time.Now}
+	local := contextstart.RegionalLocal{Process: region, Targets: region, Output: region, Collector: region, Source: source, History: &contextstart.HistoryLocal{Verifier: signer, Effects: objects}, Now: time.Now}
 	joined := make(chan error, 1)
 	go func() {
 		joined <- contextstart.ServeRegionalOperations(owner, stream, receiver, signer, local, time.Now)

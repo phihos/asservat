@@ -42,22 +42,6 @@ func (c *countingLocal) ResolveWorkload(context.Context, targets.WorkloadRequest
 	c.calls++
 	return targets.PodResolution{}, value.ErrUnavailable
 }
-func (c *countingLocal) PrepareStart(context.Context, value.PreparationCheck) (value.PreparedStart, error) {
-	c.calls++
-	return value.PreparedStart{}, value.ErrUnavailable
-}
-func (c *countingLocal) ReadyStart(context.Context, value.Request) (value.Disposition, error) {
-	c.calls++
-	return value.Disposition{}, value.ErrUnavailable
-}
-func (c *countingLocal) ConsumeStart(context.Context, value.Request) (value.Disposition, error) {
-	c.calls++
-	return value.Disposition{}, value.ErrUnavailable
-}
-func (c *countingLocal) LookupStart(context.Context, value.Request) (value.Disposition, error) {
-	c.calls++
-	return value.Disposition{}, value.ErrUnavailable
-}
 func (c *countingLocal) PrepareContext(context.Context, artifact.ContextExpectation) (evidence.PreparedContext, error) {
 	c.calls++
 	return nil, value.ErrUnavailable
@@ -73,5 +57,9 @@ func (c *countingLocal) ReadConnectorIdentitySource(context.Context) (fleet.Conn
 }
 
 func (c *countingLocal) local() RegionalLocal {
-	return RegionalLocal{Process: c, Targets: c, Local: c, Starts: c, Output: c, Collector: c, Source: c, Now: time.Now}
+	return RegionalLocal{Process: c, Targets: c, Output: c, Collector: c, Source: c, Now: time.Now}
 }
+
+// startWindow is the synthetic hub start (SQL started_at and its deadline)
+// the tests send to the region.
+type startWindow struct{ CommittedAt, ValidUntil time.Time }

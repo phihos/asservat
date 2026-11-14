@@ -91,7 +91,7 @@ def check_common(docs, ns, executor=True, bootstrap="operator-bootstrap"):
     role = find(docs, "Role", "asservat-connector")
     secrets = [r for r in role["rules"] if r["resources"] == ["secrets"]][0]
     assert secrets["verbs"] == ["get", "update"] and set(secrets["resourceNames"]) == {"asservat-cluster-credential", "asservat-connector-nodes"}
-    assert (("", "serviceaccounts/token", "create") in rules(role)) == executor
+    assert ("", "serviceaccounts/token", "create") not in rules(role)
     cluster = rules(find(docs, "ClusterRole", ns + "-asservat-connector"))
     for need in [("authentication.k8s.io", "tokenreviews", "create"), ("", "nodes", "get")] + ([("", "pods", "list"), ("", "namespaces", "watch"), ("discovery.k8s.io", "endpointslices", "list")] if executor else []):
         assert need in cluster, need
@@ -118,13 +118,13 @@ def main():
     # mode=cluster with an executor offer.
     docs = render(base("cluster", executor={"enabled": True, "evidenceSecret": "operator-evidence"}), "asservat-region")
     c = check_common(docs, "asservat-region", bootstrap=JOIN)
-    assert c["mode"] == "cluster" and not {"offer", "offerConfigMap", "clusterID", "peerID", "hub"} & set(c) and c["executor"]["capacityAccount"] == "asservat-connector-capacity"
+    assert c["mode"] == "cluster" and not {"offer", "offerConfigMap", "clusterID", "peerID", "hub"} & set(c) and c["executor"]["concurrency"] == 4
     assert not [d for d in docs if d["kind"] == "PriorityClass"], "download workers rendered in a regional release"
     configs.append(c)
     # A plain offer installs no executor objects.
     docs = render(base("cluster", executor={"enabled": False}), "asservat-region")
     c = check_common(docs, "asservat-region", executor=False, bootstrap=JOIN)
-    assert "executor" not in c and not [d for d in docs if d["metadata"]["name"] == "asservat-connector-capacity"]
+    assert "executor" not in c
     configs.append(c)
     # mode=combined: in-cluster addresses, the hub's offer ConfigMap, generated S3 principals, download workers.
     docs = render(base("combined"), "asservat")

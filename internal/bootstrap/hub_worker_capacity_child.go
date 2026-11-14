@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"slices"
+	"strconv"
+	"strings"
 	"time"
 
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
@@ -15,8 +17,10 @@ import (
 	app "asservat.local/asservat/internal/application/capacity"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
+	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/validation"
 )
 
@@ -42,21 +46,70 @@ func capacityAccountVersion(ids contracts.InstallationIDs) string {
 	return ids.RoleSetupID + "-account/v1"
 }
 
-// validateHubWorkerCapacity checks the section's names and that its settings
-// build a valid qualification.
+// validateHubWorkerCapacity checks the section's names and that its values
+// derive a valid pool and qualification.
 func validateHubWorkerCapacity(c *contracts.HubWorkerCapacity, ids contracts.InstallationIDs, namespace string) error {
-	if c == nil || len(validation.IsDNS1123Label(c.Pool)) != 0 || len(validation.IsDNS1123Label(c.Policy)) != 0 ||
-		len(validation.IsDNS1123Subdomain(c.ProcessingSource)) != 0 || len(c.NamespaceKeys) == 0 || !identity.Strings(c.NamespaceKeys, 256, 253) || len(c.Paths) > 32 {
+	if c == nil || len(validation.IsDNS1123Subdomain(c.ProcessingSource)) != 0 || c.Revision < 1 {
 		return errHubWorkerCapacityConfig
 	}
 	if _, err := capacityRuntimeProcessingPaths(capacityPaths(c)); err != nil {
 		return errHubWorkerCapacityConfig
 	}
-	// The derived N values are placeholders here; only the settings decide.
-	if _, err := buildHubWorkerQualification(c, ids, namespace, ids.ClusterID, ids.ClusterID, time.Now()); err != nil {
+	v, err := capacityValues(c.CapacityValues)
+	if err != nil {
+		return errHubWorkerCapacityConfig
+	}
+	if _, _, err = app.DeriveBudget(v, capacityClusters(c, ids)); err != nil {
+		return fmt.Errorf("%w: %w", errHubWorkerCapacityConfig, err)
+	}
+	// The processing source UID is a placeholder here; only the settings decide.
+	if _, err := buildHubWorkerQualification(c, ids, namespace, ids.ClusterID, time.Now()); err != nil {
 		return errHubWorkerCapacityConfig
 	}
 	return nil
+}
+
+// capacityValues converts the Helm quantities and percentages to bytes.
+func capacityValues(c contracts.CapacityValues) (app.CapacityValues, error) {
+	total, err := resource.ParseQuantity(c.EvidenceStorage)
+	if err != nil || total.Value() <= 0 {
+		return app.CapacityValues{}, errHubWorkerCapacityConfig
+	}
+	out := app.CapacityValues{EvidenceBytes: total.Value(), Assurance: c.StorageAssurance}
+	bytes := func(v string) (int64, error) {
+		if v == "" {
+			return 0, nil
+		}
+		if p, ok := strings.CutSuffix(v, "%"); ok {
+			f, err := strconv.ParseFloat(p, 64)
+			if err != nil || f <= 0 || f > 100 {
+				return 0, errHubWorkerCapacityConfig
+			}
+			return int64(float64(out.EvidenceBytes) * f / 100), nil
+		}
+		q, err := resource.ParseQuantity(v)
+		if err != nil || q.Value() <= 0 {
+			return 0, errHubWorkerCapacityConfig
+		}
+		return q.Value(), nil
+	}
+	if out.ShareBytes, err = bytes(c.Workload.Share); err != nil {
+		return out, err
+	}
+	if out.LimitBytes, err = bytes(c.Workload.Limit); err != nil {
+		return out, err
+	}
+	out.NamespaceLimitBytes, err = bytes(c.NamespaceLimit)
+	return out, err
+}
+
+// capacityClusters lists the hub cluster and the joined clusters.
+func capacityClusters(c *contracts.HubWorkerCapacity, ids contracts.InstallationIDs) []string {
+	out := []string{ids.ClusterID}
+	for _, r := range c.RemoteClusters {
+		out = append(out, r.ClusterID)
+	}
+	return out
 }
 
 func capacityPaths(c *contracts.HubWorkerCapacity) []contracts.DownloadEnvironmentPath {
@@ -66,27 +119,40 @@ func capacityPaths(c *contracts.HubWorkerCapacity) []contracts.DownloadEnvironme
 	return c.Paths
 }
 
-// capacityKeys returns the namespace keys in the sorted order that the
-// qualification pin and the runtime compare.
-func capacityNamespaceKeys(c *contracts.HubWorkerCapacity) []string {
-	return slices.Sorted(slices.Values(c.NamespaceKeys))
+// capacitySettings are the internal capacity bookkeeping settings: audit
+// lanes, history footprints and the backup profile (ADR-335 D2: internal
+// estimates, not values). The backend's usable size only bounds the pool,
+// which carries the evidenceStorage value and follows every helm upgrade.
+func capacitySettings() contracts.InstallerCapacitySettings {
+	f := func(row, wal int64) contracts.InstallerCapacityFootprint {
+		return contracts.InstallerCapacityFootprint{RowBytes: row, TransitionWALBytes: wal}
+	}
+	lane := func(accounts, records int64) contracts.InstallerCapacityLane {
+		return contracts.InstallerCapacityLane{Accounts: accounts, Records: records, RetainedSeconds: 10000}
+	}
+	return contracts.InstallerCapacitySettings{Accounts: 2, Records: 8, AdmissionSeconds: 86400,
+		Lanes:               contracts.InstallerCapacityLanes{CaptureRetainedSeconds: 10000, Normal: lane(4, 128), Resolution: lane(4, 8), Processing: lane(2, 16)},
+		StopRetainedSeconds: 10000, Backup: contracts.CapacityBackup(),
+		Footprints: contracts.InstallerCapacityFootprints{Capture: f(128<<10, 256<<10), Operation: f(128<<10, 256<<10), Processing: f(128<<10, 256<<10),
+			Native: f(64<<10, 128<<10), Stop: f(128<<10, 256<<10), ProcessingState: f(16<<10, 64<<10)},
+		PurgeLeases: 4, Processing: contracts.InstallerCapacityProcessing{MaxRules: 2, MaxRootTransitions: 512},
+		Metadata: contracts.InstallerCapacityMetadata{FixedRowBytes: 1 << 20, AccountRowBytes: 256 << 10, RecordRowBytes: 128 << 10, RecordWALBytes: 8 << 20,
+			RecordKeyAttempts: 16, TransitionWALBytes: 1 << 20, ConfigurationTransitions: 4096},
+		Envelope: contracts.InstallerCapacityEnvelope{SystemObjects: contracts.InstallerCapacityAmount{Bytes: 1 << 30, Objects: 4096},
+			SQLBytes: 512 << 20, BackupBytes: 1 << 30, WALBytes: 32 << 30, KeyAttempts: 16384},
+		Backends: []contracts.InstallerCapacityBackend{{StorageProfile: "evidence", Usable: contracts.InstallerCapacityAmount{Bytes: 1 << 50, Objects: 1000000000}}}}
 }
 
-// buildHubWorkerQualification is the installer's capacity/qualification step
-// with Helm-native inputs: S values from ids, N values (pool and processing
-// source UIDs) read by name, deterministic source digests and identities
-// derived from RoleSetupID and the first initialization time, so a retry
-// builds the same qualification.
-func buildHubWorkerQualification(c *contracts.HubWorkerCapacity, ids contracts.InstallationIDs, namespace, poolUID, processingUID string, initialized time.Time) (app.CapacityQualification, error) {
-	settings := c.InstallerCapacitySettings
-	// The CR specs are rendered by Helm and the workload keys belong to the
-	// permission child; neither is part of the qualified capacity input.
-	settings.PoolSpec, settings.PolicySpec, settings.WorkloadKeys = nil, nil, nil
-	settings.NamespaceKeys = capacityNamespaceKeys(c)
-	return buildCapacityQualification(settings, capacityDerived{SharedQueries: c.SharedQueries, Root: ids.PermissionRootID, Installation: ids.InstallationID,
-		AccountVersion: capacityAccountVersion(ids), SystemPoolUID: poolUID, ProcessingSourceUID: processingUID,
+// buildHubWorkerQualification is the capacity qualification with
+// Helm-native inputs: S values from ids, the processing source UID read by
+// name, deterministic source digests and identities derived from
+// RoleSetupID and the first initialization time, so a retry builds the same
+// qualification.
+func buildHubWorkerQualification(c *contracts.HubWorkerCapacity, ids contracts.InstallationIDs, namespace, processingUID string, initialized time.Time) (app.CapacityQualification, error) {
+	return buildCapacityQualification(capacitySettings(), capacityDerived{SharedQueries: c.SharedQueries, Root: ids.PermissionRootID, Installation: ids.InstallationID,
+		AccountVersion: capacityAccountVersion(ids), SystemPoolUID: app.SystemPoolUID(ids.InstallationID), ProcessingSourceUID: processingUID,
 		ProcessingProtection: contracts.ConfigMapSourceDigest(ids.ClusterID, namespace, c.ProcessingSource),
-		NamespaceGuards:      []app.CapacityNamespaceQualification{{ClusterID: ids.ClusterID, Digest: contracts.NamespaceSourceDigest(ids.ClusterID, namespace), Keys: settings.NamespaceKeys}},
+		NamespaceGuards:      []app.CapacityNamespaceQualification{{ClusterID: ids.ClusterID, Digest: contracts.NamespaceSourceDigest(ids.ClusterID, namespace), Keys: contracts.CapacityNamespaceKeys()}},
 		Now:                  initialized}, capacityIDs(ids.RoleSetupID))
 }
 
@@ -243,10 +309,6 @@ func (w *hubWorker) runCapacityOnce(ctx context.Context) (err error) {
 		return err
 	}
 	at = "names"
-	poolUID, err := kube.ReadStoragePoolUID(startup, w.inputs.kubernetes(contracts.HubWorkerKubernetesTokenFile), w.namespace.Name, c.Pool)
-	if err != nil {
-		return err
-	}
 	processingUID, err := observer.ConfigMapUID(startup, c.ProcessingSource)
 	if err != nil {
 		return err
@@ -261,7 +323,7 @@ func (w *hubWorker) runCapacityOnce(ctx context.Context) (err error) {
 	case !errors.Is(err, postgres.ErrCapacityQualificationAbsent):
 		return err
 	}
-	q, err := buildHubWorkerQualification(c, w.ids, w.namespace.Name, poolUID, processingUID, initialized)
+	q, err := buildHubWorkerQualification(c, w.ids, w.namespace.Name, processingUID, initialized)
 	if err != nil {
 		return errHubWorkerCapacityConfig
 	}
@@ -319,10 +381,12 @@ func (w *hubWorker) runCapacityOnce(ctx context.Context) (err error) {
 func (w *hubWorker) capacityReconciler(ctx, run context.Context, q app.CapacityQualification, pools map[string]*pgxpool.Pool, observer *kube.PermissionClient, accounts *auditapp.CaptureAccounts, digest artifact.Digest) (*app.CapacityReconciler, error) {
 	c := w.config.Capacity
 	root, installation, cluster := w.ids.PermissionRootID, w.ids.InstallationID, w.ids.ClusterID
-	source, err := kube.NewCapacitySource(observer)
+	values, err := capacityValues(c.CapacityValues)
 	if err != nil {
-		return nil, err
+		return nil, errHubWorkerCapacityConfig
 	}
+	source := &app.ValuesSource{Installation: installation, Cluster: cluster, Control: cfg.NamespaceRef{Name: w.namespace.Name, UID: w.namespace.UID},
+		Revision: c.Revision, Values: values, Clusters: capacityClusters(c, w.ids), Now: time.Now}
 	paths, err := capacityRuntimeProcessingPaths(capacityPaths(c))
 	if err != nil {
 		return nil, errHubWorkerCapacityConfig
@@ -355,7 +419,7 @@ func (w *hubWorker) capacityReconciler(ctx, run context.Context, q app.CapacityQ
 		}
 		guard := protection
 		guard.digest, guard.keys = pin.Digest, slices.Clone(pin.Keys)
-		clusters = append(clusters, app.CapacityClusterReaders{ClusterID: cluster, Workloads: workloads, Guard: guard})
+		clusters = append(clusters, app.CapacityClusterReaders{ClusterID: cluster, ReleaseNamespace: w.namespace.Name, Workloads: workloads, Guard: guard})
 	}
 	regional, err := w.remoteCapacityClusters(ctx, c, pools["capacity"])
 	if err != nil {
@@ -363,7 +427,13 @@ func (w *hubWorker) capacityReconciler(ctx, run context.Context, q app.CapacityQ
 	}
 	for _, pin := range regional {
 		reader := app.RemoteCapacityReader{Store: regionalStore, Pin: pin, Now: time.Now}
-		clusters = append(clusters, app.CapacityClusterReaders{ClusterID: pin.ClusterID, Workloads: reader, Guard: reader, Guarded: reader, Pace: regionalCapacityPace})
+		release := w.namespace.Name
+		for _, r := range c.RemoteClusters {
+			if r.ClusterID == pin.ClusterID && r.Namespace != "" {
+				release = r.Namespace
+			}
+		}
+		clusters = append(clusters, app.CapacityClusterReaders{ClusterID: pin.ClusterID, ReleaseNamespace: release, Workloads: reader, Guard: reader, Guarded: reader, Pace: regionalCapacityPace})
 	}
 	general, capture := pools["capacity"], pools["capacity-capture"]
 	journal, err := postgres.NewCapacitySourceJournal(ctx, general, root, installation, q.ID, q.Digest)
@@ -452,7 +522,7 @@ func (w *hubWorker) remoteCapacityClusters(ctx context.Context, c *contracts.Hub
 	if err != nil {
 		return nil, err
 	}
-	keys := capacityNamespaceKeys(c)
+	keys := contracts.CapacityNamespaceKeys()
 	for _, r := range c.RemoteClusters {
 		peer, ok := contracts.RemotePeerID(w.ids.InstallationID, r.ClusterID)
 		if !ok || r.ClusterID == w.ids.ClusterID {

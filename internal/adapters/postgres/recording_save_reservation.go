@@ -81,7 +81,7 @@ func lockManualPolicySave(ctx context.Context, q *custodydb.Queries, source cust
 		at       *time.Time
 		interval time.Duration
 		burst    int
-	}{{"", &r.shared, value.WorkloadTriggerInterval, value.WorkloadTriggerBurst}, {authority.PolicyUID, &r.own, p.Interval, p.Burst}} {
+	}{{"", &r.shared, currentWorkloadRate().Interval, currentWorkloadRate().Burst}, {authority.PolicyUID, &r.own, p.Interval, p.Burst}} {
 		stored, e := q.LockPolicyWindow(ctx, custodydb.LockPolicyWindowParams{RootID: id(a.RootID), ClusterID: id(authority.ClusterID), WorkloadUid: authority.WorkloadUID, PolicyUid: cell.policy, Tat: now})
 		if e != nil {
 			return nil, e
@@ -115,7 +115,7 @@ func (r *manualPolicyReservation) spendExecutionAndWindow(ctx context.Context, q
 		policy   string
 		at       time.Time
 		interval time.Duration
-	}{{"", r.shared, value.WorkloadTriggerInterval}, {r.policyUID, r.own, r.interval}} {
+	}{{"", r.shared, currentWorkloadRate().Interval}, {r.policyUID, r.own, r.interval}} {
 		if err = q.UpdatePolicyWindow(ctx, custodydb.UpdatePolicyWindowParams{RootID: id(root), ClusterID: id(a.Plan.Input.Target.Request.ClusterID), WorkloadUid: a.Plan.Input.Target.Request.Workload.UID, PolicyUid: cell.policy, Tat: ts(later(cell.at, r.acceptedAt).Add(cell.interval))}); err != nil {
 			return err
 		}

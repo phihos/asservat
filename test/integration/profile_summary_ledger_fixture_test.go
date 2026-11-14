@@ -283,11 +283,7 @@ func startQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, s captureAdmis
 	if err != nil || !first {
 		t.Fatal("profile source preparation", err)
 	}
-	bound, err := execSQL.BindAPIStart(f.ctx, check, original, execution.PreparedStart{ObjectUID: custodyID(), ResourceVersion: "1"})
-	if err != nil {
-		t.Fatal("profile source binding", err)
-	}
-	started, err := execSQL.RecordAPIStart(f.ctx, check, bound, execution.Disposition{ObjectUID: bound.ObjectUID, ResourceVersion: "2", Phase: execution.StartCommitted, CommittedAt: time.Now().UTC().Truncate(time.Microsecond), MayStart: true, ValidUntil: bound.Binding.NotAfter})
+	started, err := execSQL.RecordAPIStart(f.ctx, check, original)
 	if err != nil {
 		t.Fatal("profile source start", err)
 	}

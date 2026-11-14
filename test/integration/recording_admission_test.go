@@ -280,14 +280,10 @@ func qualifyRecordingTransactions(t *testing.T, ctx context.Context, admin *pgxp
 		nodes := &recordingNodes{}
 		holder := bootstrap.NewConnectorRecordings(nodes, recordingPods{}, time.Now, func(line string) { t.Log(line) })
 		prepared := holder.Prepare(preparedArtifact, e)
-		if execution, err = executions.BindAPIStart(ctx, check, execution, value.PreparedStart{ObjectUID: custodyID(), ResourceVersion: "1"}); err != nil {
+		if execution, err = executions.RecordAPIStart(ctx, check, execution); err != nil {
 			t.Fatal(err)
 		}
-		d := value.Disposition{ObjectUID: execution.ObjectUID, ResourceVersion: "2", Phase: value.StartCommitted, CommittedAt: time.Now().UTC().Truncate(time.Microsecond), MayStart: true, ValidUntil: execution.Binding.NotAfter}
-		if execution, err = executions.RecordAPIStart(ctx, check, execution, d); err != nil {
-			t.Fatal(err)
-		}
-		queued, err := prepared.StartRecording(ctx, accepted.Pin, execution.StartedAt, d.ValidUntil)
+		queued, err := prepared.StartRecording(ctx, accepted.Pin, execution.StartedAt, execution.Binding.NotAfter)
 		if err != nil || len(nodes.work) != 1 {
 			t.Fatal("start recording", err)
 		}

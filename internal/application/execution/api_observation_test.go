@@ -52,11 +52,9 @@ func (p *apiObservationReads) ReadAPIProcess(ctx context.Context) (value.APIProc
 
 type apiObservationBoundary struct {
 	*apiRunnerFixture
-	wrapped, ready func(context.Context)
-	checks         []APIExecutionCheck
-	local          int
-	bindError      error
-	changeProcess  bool
+	wrapped    func(context.Context)
+	checks     []APIExecutionCheck
+	startError error
 }
 
 func (b *apiObservationBoundary) PrepareContext(ctx context.Context, e artifact.ContextExpectation) (evidence.PreparedContext, error) {
@@ -66,35 +64,16 @@ func (b *apiObservationBoundary) PrepareContext(ctx context.Context, e artifact.
 	}
 	return p, err
 }
-func (b *apiObservationBoundary) PrepareStart(ctx context.Context, c value.PreparationCheck) (value.PreparedStart, error) {
-	b.local++
-	return b.apiRunnerFixture.PrepareStart(ctx, c)
-}
-func (b *apiObservationBoundary) ReadyStart(ctx context.Context, r value.Request) (value.Disposition, error) {
-	d, err := b.apiRunnerFixture.ReadyStart(ctx, r)
-	if b.ready != nil {
-		b.ready(ctx)
-	}
-	return d, err
-}
 func (b *apiObservationBoundary) PrepareAPIExecution(ctx context.Context, c APIExecutionCheck) (value.APIExecution, bool, error) {
 	b.checks = append(b.checks, c)
 	return b.apiRunnerFixture.PrepareAPIExecution(ctx, c)
 }
-func (b *apiObservationBoundary) BindAPIStart(ctx context.Context, c APIExecutionCheck, r value.APIExecution, p value.PreparedStart) (value.APIExecution, error) {
+func (b *apiObservationBoundary) RecordAPIStart(ctx context.Context, c APIExecutionCheck, r value.APIExecution) (value.APIExecution, error) {
 	b.checks = append(b.checks, c)
-	if b.bindError != nil {
-		return value.APIExecution{}, b.bindError
+	if b.startError != nil {
+		return value.APIExecution{}, b.startError
 	}
-	out, err := b.apiRunnerFixture.BindAPIStart(ctx, c, r, p)
-	if b.changeProcess {
-		out.Process.ProcessEpoch = contextID(99)
-	}
-	return out, err
-}
-func (b *apiObservationBoundary) RecordAPIStart(ctx context.Context, c APIExecutionCheck, r value.APIExecution, d value.Disposition) (value.APIExecution, error) {
-	b.checks = append(b.checks, c)
-	return b.apiRunnerFixture.RecordAPIStart(ctx, c, r, d)
+	return b.apiRunnerFixture.RecordAPIStart(ctx, c, r)
 }
 
 func observedRunner(t *testing.T) (*apiRunnerFixture, APIContextRunner, identities.CurrentIdentity, *apiObservationReads, *apiObservationBoundary) {
@@ -103,12 +82,12 @@ func observedRunner(t *testing.T) (*apiRunnerFixture, APIContextRunner, identiti
 	p := &apiObservationReads{apiRunnerFixture: f, eligibility: s.Eligibility}
 	b := &apiObservationBoundary{apiRunnerFixture: f}
 	s.Targets, s.Eligibility, s.Capabilities, s.Retention, s.Process = p, p, p, apiObservationRetention{p}, p
-	s.Prepare, s.Record, s.Local, s.Output = b, b, b, b
+	s.Prepare, s.Record, s.Output = b, b, b
 	return f, s, current, p, b
 }
 
 func TestAPIContextObservationRetainsBoundsAfterBlockingEffects(t *testing.T) {
-	for _, boundary := range []string{"wrapping", "readiness"} {
+	for _, boundary := range []string{"wrapping"} {
 		for _, bound := range []string{"caller", "target", "capability", "retention", "recovery", "process", "parent", "cancellation"} {
 			t.Run(boundary+"/"+bound, func(t *testing.T) {
 				f, s, current, p, b := observedRunner(t)
@@ -142,16 +121,9 @@ func TestAPIContextObservationRetainsBoundsAfterBlockingEffects(t *testing.T) {
 						f.now = until
 					}
 				}
-				if boundary == "wrapping" {
-					b.wrapped = wait
-				} else {
-					b.ready = wait
-				}
+				b.wrapped = wait
 				_, err := s.Execute(ctx, current, f.work.Accepted.CaptureID)
 				want := "PrepareContext"
-				if boundary == "readiness" {
-					want = "ReadyStart"
-				}
 				var step interface{ FixedStep() string }
 				if err == nil || !errors.As(err, &step) || (step.FixedStep() != want+"/Current" && step.FixedStep() != want+"/Context") || f.record.Phase != "prepared" || f.prepares.Load() != 1 || f.closes.Load() != 1 || f.consumes.Load() != 0 || f.captures.Load() != 0 || f.stores.Load() != 0 {
 					t.Fatal("blocking effect escaped original bound", err, f.record.Phase, f.prepares.Load(), f.closes.Load())
@@ -159,25 +131,21 @@ func TestAPIContextObservationRetainsBoundsAfterBlockingEffects(t *testing.T) {
 				if p.targets != 1 || p.eligibilityReads != 1 || p.capabilities != 1 || p.retention != 1 || p.processes != 1 {
 					t.Fatal("expiry refreshed an observation", p)
 				}
-				if boundary == "wrapping" && b.local != 0 {
-					t.Fatal("expired wrapping reached local prepare")
-				}
 			})
 		}
 	}
 }
 
 func TestAPIContextObservationRetainsSQLEffectChecks(t *testing.T) {
-	for _, mode := range []string{"same-observation", "fenced-bind", "changed-returned-process"} {
+	for _, mode := range []string{"same-observation", "fenced-start"} {
 		t.Run(mode, func(t *testing.T) {
 			f, s, current, p, b := observedRunner(t)
-			if mode == "fenced-bind" {
-				b.bindError = value.ErrDenied
+			if mode == "fenced-start" {
+				b.startError = value.ErrDenied
 			}
-			b.changeProcess = mode == "changed-returned-process"
 			out, err := s.Execute(t.Context(), current, f.work.Accepted.CaptureID)
 			if mode == "same-observation" {
-				if err != nil || out.State != "StoredPendingVerification" || len(b.checks) != 3 {
+				if err != nil || out.State != "StoredPendingVerification" || len(b.checks) != 2 {
 					t.Fatal("effect sequence", out, err, len(b.checks))
 				}
 				for _, c := range b.checks[1:] {

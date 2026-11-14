@@ -233,7 +233,7 @@ func composePublicContextUseCases(c PublicContextOperationsConfig, s PublicConte
 func regionalHubRunner(r executionapp.APIContextRunner) bool {
 	return r.Read != nil && r.Prepare != nil && r.Record != nil && r.Eligibility != nil && r.Retention != nil &&
 		r.Capabilities == nil && r.Recovery == nil && r.Now == nil &&
-		r.Process == nil && r.Local == nil && r.Starts == nil && r.Targets == nil && r.Output == nil && r.Collector == nil
+		r.Process == nil && r.Targets == nil && r.Output == nil && r.Collector == nil
 }
 
 // composePublicPolicies composes the ADR-228 restart-trigger services onto

@@ -34,9 +34,6 @@ def sources():
     paths.extend((ROOT/"examples").glob("*.yaml"))
     paths.extend((ROOT/"charts/asservat/crds").glob("*.yaml"))
     paths.append(ROOT/"scripts/permission-crds.py")
-    paths.append(ROOT/"scripts/start-crd.py")
-    paths.append(ROOT/"specs/contracts/local-start.schema.json")
-    paths.append(ROOT/"specs/contracts/implemented/local-start.schema.json")
     paths.append(ROOT/"specs/contracts/retention-policy.schema.json")
     paths.append(ROOT/"scripts/retention-crd.py")
     paths.extend((ROOT/"migrations").rglob("*.sql"))
@@ -130,7 +127,7 @@ def main():
                 run(k+["apply", "--server-side", "--force-conflicts", "--field-manager=asservat-owned-fixture"]+[a for p in chart_crds for a in ("-f", str(p))])
                 run(k+["wait", "--for=condition=Established", "--timeout=30s", "crd/evidenceretentionpolicies.asservat.io", "crd/captureprofiles.asservat.io"])
                 with (results/"permission-admission.log").open("w") as log:
-                    result = subprocess.run(["go", "test", "-race", "-v", "-count=1", "-run", "TestPermissionAdmissionWithRealKubernetes|TestLocalStartWithRealKubernetes|TestRetentionWithRealKubernetes|TestCaptureProfilesWithRealKubernetes", "./test/integration"], cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT, timeout=420)
+                    result = subprocess.run(["go", "test", "-race", "-v", "-count=1", "-run", "TestPermissionAdmissionWithRealKubernetes|TestRetentionWithRealKubernetes|TestCaptureProfilesWithRealKubernetes", "./test/integration"], cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT, timeout=420)
                 exit_code = result.returncode
                 report["admissionExit"] = exit_code
             report["sourceUnchangedDuringTest"] = sources() == report["sourceHashes"]

@@ -18,7 +18,7 @@ func operationCapability(method string) string { return "operation/" + method }
 func queryCapability(method string) string     { return "query/" + method }
 
 var (
-	operationMethods = []string{opResolvePod, opResolvePacketSource, opResolveArgumentSource, opStartArgumentRecording, opStartPolicyRecording, opReadProcess, opPrepareStart, opReadyStart, opConsumeStart, opPrepareOutput, opAcquire, opComplete, opFinish, opStartProfile, opStartLogs, opStartRecording, opCollect, opStartSourceSnapshot, opResolveSourceSnapshot}
+	operationMethods = []string{opResolvePod, opResolvePacketSource, opResolveArgumentSource, opStartArgumentRecording, opStartPolicyRecording, opReadProcess, opPrepareOutput, opAcquire, opComplete, opFinish, opStartProfile, opStartLogs, opStartRecording, opCollect, opStartSourceSnapshot, opResolveSourceSnapshot}
 	queryMethods     = []string{queryResolveWorkload, queryResolveWorkloadIdentity, queryResolvePod, queryObserveRestarts, queryReviewAccess, queryCaptureProfiles, queryListCaptureProfiles, queryResolvePacketPeers, queryResolveProfileEndpoint, queryProfileEndpointDefinition, queryPacketRecorder, queryResolvePacketRecorder, queryResolveProfileRecorder, queryResolveSyscallRecorder, queryResolveOngoingRecorders, querySourceWork, queryLiveProjection, queryManualLive}
 )
 

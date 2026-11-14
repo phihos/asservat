@@ -209,17 +209,12 @@ func qualifyAPIExecutionTransactions(t *testing.T, ctx context.Context, admin *p
 					t.Fatal("new process inherited old preparation")
 				}
 				wraps := qualifyContextKeyWraps(t, ctx, admin, poolFor, store, keys, s, accepted.Expectation, c.Process.Binding)
-				execution, err = prepare.BindAPIStart(ctx, c, execution, value.PreparedStart{ObjectUID: custodyID(), ResourceVersion: "1"})
+				execution, err = execute.RecordAPIStart(ctx, c, execution)
 				if err != nil {
 					t.Fatal(err)
 				}
 				if _, err = wraps.resolve(ctx, "index-key"); err == nil {
-					t.Fatal("wrap after the start object was bound")
-				}
-				d := value.Disposition{ObjectUID: execution.ObjectUID, ResourceVersion: "2", Phase: value.StartCommitted, CommittedAt: time.Now().UTC().Truncate(time.Microsecond), MayStart: true, ValidUntil: execution.Binding.NotAfter}
-				execution, err = execute.RecordAPIStart(ctx, c, execution, d)
-				if err != nil {
-					t.Fatal(err)
+					t.Fatal("wrap after the start was recorded")
 				}
 				// Migration 79: a started capture may end targetGone or denied
 				// without an acquisition, never with one. Rolled back. The

@@ -63,7 +63,7 @@ func TestContextStartActualHTTP2RestartObservationQuery(t *testing.T) {
 	exchange, stream := f.open(t)
 	work, signer, _, _ := f.work(t, exchange.Receiver())
 	region.work = work
-	local := contextstart.RegionalLocal{Process: region, Targets: region, Local: region, Starts: region, Output: region, Collector: region, Source: f.connector, Now: time.Now}
+	local := contextstart.RegionalLocal{Process: region, Targets: region, Output: region, Collector: region, Source: f.connector, Now: time.Now}
 	go func() {
 		defer stream.Close()
 		_ = contextstart.ServeRegionalOperations(exchange.Context(), stream, exchange.Receiver(), signer, local, time.Now)

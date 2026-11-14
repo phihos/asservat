@@ -67,9 +67,9 @@ func TestOlderConnectorRunsSupportedWorkAndRefusesMissingOperation(t *testing.T)
 			permit := argumentOperationPermit(e, source, n)
 			resolver := &argumentSourceResolver{result: targets.RecorderResolution{Target: targets.PodResolution{ExecutionClass: artifact.ContextAPIExecution, Request: request, Pin: pin, PodResourceVersion: "1", WorkloadResourceVersion: "1", ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}, Recorder: targets.RecorderAnswer{Outcome: targets.RecorderAvailable, Source: &source}}}
 			output := &argumentRecorderOutput{}
-			local := &argumentStreamLocal{argumentSourceResolver: resolver, output: output, committed: value.Disposition{MayStart: true, Phase: value.StartCommitted, CommittedAt: n, ValidUntil: n.Add(3 * time.Second)}}
+			local := &argumentStreamLocal{argumentSourceResolver: resolver, output: output}
 			ports := resolver.countingLocal.local()
-			ports.Targets, ports.Output, ports.Starts = local, local, local
+			ports.Targets, ports.Output = local, local
 			ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
 			defer cancel()
 			receiver := fleet.APIContextReceiver{Channel: w.Channel, Window: identity.Check(n, identity.Recheck).Narrow(w.NotAfter)}
@@ -96,7 +96,7 @@ func TestOlderConnectorRunsSupportedWorkAndRefusesMissingOperation(t *testing.T)
 					return "Unavailable", err
 				}
 				defer prepared.Close()
-				d, err := ops.ConsumeStart(call, value.Request{Binding: value.Binding{CaptureID: w.CaptureID, AttemptID: w.AttemptID, ClusterID: w.Target.ClusterID, PodUID: w.Target.PodUID, ScopeDigest: w.ScopeDigest}})
+				d, err := startWindow{CommittedAt: n, ValidUntil: n.Add(3 * time.Second)}, call.Err()
 				if err != nil {
 					return "Unavailable", err
 				}

@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"asservat.local/asservat/internal/contracts"
 	"bytes"
 	"context"
 	"crypto/ecdsa"
@@ -229,7 +230,7 @@ func newConnectorSQLFixtureWithOptions(t *testing.T, ctx context.Context, admin 
 	}
 	if retirement.TrialProfile {
 		p := helmContextTrialProfile(t).Public
-		c, h := p.Federation.Connector, p.Capacity.Backup
+		c, h := p.Federation.Connector, contracts.CapacityBackup()
 		b := &f.configuration.Backing
 		// ADR-332: standing sizes, not install-time connector counts.
 		accounts, records, profiles, transitions := app.ConnectorStandingAccounts, app.ConnectorStandingRecordsPerAccount, app.ConnectorStandingProfiles, app.ConnectorStandingSourceTransitions

@@ -85,8 +85,7 @@ func newManualSnapshotWorkflow(t *testing.T, ctx context.Context, f *capacitySQL
 	retained := privacyapp.AcceptedRetentionReader{Topology: policy.Scenario.retention.topology, Sources: policy.Scenario.retention.reader, Now: workflowNow}
 	retention := privacyapp.RetentionResolver{Policies: &retained, RetainedPolicies: &retained, Now: workflowNow}
 	w := &manualSnapshotWorkflow{Facts: facts, Executions: executions, Eligibility: eligibility, Retention: retention, t: t, f: f, policy: policy, nodes: map[manualSnapshotNodeKey]*manualSnapshotNode{}, stages: map[string]*sourceSnapshotCompletionState{}}
-	local := &manualWorkflowStarts{objects: map[string]value.PreparedStart{}, bindings: map[string]value.Binding{}, committed: map[string]value.Disposition{}}
-	w.Runner = executionapp.APIContextRunner{Read: executions, Prepare: executions, Record: executions, Process: facts, Local: local, Starts: local, Targets: facts, Eligibility: eligibility, Capabilities: facts, Retention: retention, Recovery: policy.Scenario.recovery.reader, Output: w, Collector: manualWorkflowNoCapture{}, Now: workflowNow}
+	w.Runner = executionapp.APIContextRunner{Read: executions, Prepare: executions, Record: executions, Process: facts, Targets: facts, Eligibility: eligibility, Capabilities: facts, Retention: retention, Recovery: policy.Scenario.recovery.reader, Output: w, Collector: manualWorkflowNoCapture{}, Now: workflowNow}
 	for _, part := range parts {
 		b := part.Source.Binding
 		if _, ok := w.nodes[manualSnapshotKey(b)]; ok {
@@ -366,72 +365,4 @@ func (f *manualSnapshotWorkflowFacts) ContextCapability(ctx context.Context, tar
 		}
 	}
 	return planvalue.ContextCapability{}, value.ErrDenied
-}
-
-// Explicit synthetic local CapacityReservation attestation. The one-use map
-// models original object identity/CAS only; it supplies no SQL capture authority.
-type manualWorkflowStarts struct {
-	mu        sync.Mutex
-	objects   map[string]value.PreparedStart
-	bindings  map[string]value.Binding
-	committed map[string]value.Disposition
-}
-
-func (s *manualWorkflowStarts) PrepareStart(ctx context.Context, c value.PreparationCheck) (value.PreparedStart, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if ctx.Err() != nil {
-		return value.PreparedStart{}, ctx.Err()
-	}
-	if !c.Valid(workflowNow()) {
-		return value.PreparedStart{}, value.ErrExpired
-	}
-	id := c.Binding.CaptureID
-	if old, ok := s.objects[id]; ok {
-		if s.bindings[id] != c.Binding {
-			return value.PreparedStart{}, value.ErrConflict
-		}
-		return old, nil
-	}
-	if !c.MayCreate {
-		return value.PreparedStart{}, value.ErrDenied
-	}
-	out := value.PreparedStart{ObjectUID: custodyID(), ResourceVersion: "1"}
-	s.objects[id], s.bindings[id] = out, c.Binding
-	return out, nil
-}
-func (s *manualWorkflowStarts) ReadyStart(ctx context.Context, r value.Request) (value.Disposition, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.lookup(ctx, r)
-}
-func (s *manualWorkflowStarts) LookupStart(ctx context.Context, r value.Request) (value.Disposition, error) {
-	return s.ReadyStart(ctx, r)
-}
-func (s *manualWorkflowStarts) lookup(ctx context.Context, r value.Request) (value.Disposition, error) {
-	if ctx.Err() != nil {
-		return value.Disposition{}, ctx.Err()
-	}
-	if err := r.Validate(workflowNow()); err != nil {
-		return value.Disposition{}, err
-	}
-	if s.bindings[r.Binding.CaptureID] != r.Binding || s.objects[r.Binding.CaptureID].ObjectUID != r.ObjectUID {
-		return value.Disposition{}, value.ErrConflict
-	}
-	if old, ok := s.committed[r.Binding.CaptureID]; ok {
-		old.MayStart = false
-		return old, nil
-	}
-	return value.Disposition{ObjectUID: r.ObjectUID, ResourceVersion: "1", Phase: value.Ready, ValidUntil: r.ValidUntil}, nil
-}
-func (s *manualWorkflowStarts) ConsumeStart(ctx context.Context, r value.Request) (value.Disposition, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	old, err := s.lookup(ctx, r)
-	if err != nil || old.Phase == value.StartCommitted {
-		return old, err
-	}
-	out := value.Disposition{ObjectUID: r.ObjectUID, ResourceVersion: "2", Phase: value.StartCommitted, CommittedAt: workflowNow(), MayStart: true, ValidUntil: r.ValidUntil}
-	s.committed[r.Binding.CaptureID] = out
-	return out, nil
 }

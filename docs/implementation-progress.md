@@ -30,6 +30,30 @@ issuance problem outside these limits, still open; no second workload
 cluster was installed. Older installations keep their finite stored
 backing and must be reinstalled.
 
+## Capacity from Helm values (2026-11-14)
+
+Branch `clean/capacity`. The `capacity` values follow
+`specs/contracts/capacity.schema.json` (now in the chart schema). The
+hub-worker derives one pool and one policy per cluster from them and the
+release revision; audit lanes, footprints and the backup profile are
+internal. Namespaces take part unless they are system namespaces, the
+release namespace or labelled `asservat.io/evidence: disabled`.
+`capturesPerCluster` (default 8) and `workload.dump` (burst 1, 900 s) reach
+the hub-api. Removed: EvidenceStoragePool/EvidenceBudgetPolicy and
+CapacityReservation CRDs with their decoders, guards and gates; the
+lifetime `max_captures` counter (migration 00165); the 16-capture and
+active-policy caps; per-policy cooldown/burst ceilings. Migration 00166
+lets `bestEffort` storage enroll.
+
+Verified: unit tests of the changed packages, `make helm-check`, the CI gate
+set, `TestCapacityValuesSourceWithRealPostgres` (real PostgreSQL). Gaps: the
+default share divides by max(8, clusters + 1), not the eligible-workload
+count; the
+`capturesPerCluster` default ignores node count; `maxConcurrentExpensive`
+and `onFull` are not enforced; capacity is on only when a value is set; the
+SQL capacity subsystem (00054, object counts, five-second observation
+loops) is unchanged.
+
 ## ADR-330 contract divergence (2026-11-14)
 
 The canonical contracts in `specs/contracts/` and `docs/interfaces/` follow
@@ -37,7 +61,7 @@ ADR-330. The runtime still implements the earlier versions, which are kept
 byte-for-byte under `specs/contracts/implemented/` and `examples/implemented/`.
 Runtime consumers read through them: the embedded Go schema bundles
 (`scripts/manifest-schemas.py`, `scripts/investigation-schemas.py`), the
-generated CRDs (`scripts/policy-crd.py`, `scripts/capacity-crds.py`), the
+generated CRDs (`scripts/policy-crd.py`), the
 console contract generator (`web/scripts/contracts.mjs`) and the Go/console
 tests that load contracts or examples. Spec gates validate only the canonical
 files. Delete an `implemented/` file in the change that makes its runtime
@@ -56,17 +80,14 @@ implement the canonical contract.
 | `capture-assessment.schema.json` | No `validUntil` | `internal/application/planning/context_assessment.go`, `recorder_assessment.go` |
 | `packet-capture.schema.json` | No `peers.maxStaleness` (peers follow watch events) | `internal/application/planning/peers.go`, `recorder.go`, builtin profiles `internal/application/planning/profiles/*.json`, `internal/bootstrap/regional_peer_verifier.go`; DebugPolicy/CaptureProfile CRDs |
 | `browser-settings.schema.json` | No `revision`, `rootID`, `sessionEpoch`, `suspended` | `internal/adapters/kubernetes/browser_settings.go`, `internal/bootstrap/hub_api_inputs.go`, session-epoch SQL (`internal/adapters/postgres/custodydb`) |
-| `budget-policy.schema.json` | `spec.priority`; breaker `pressureTriggers` (PSI) + `recoverySeconds` replace `unhealthySamples`/`sampleIntervalSeconds`/`recoveryHealthySeconds` | Embedded copy `internal/adapters/kubernetes/capacity-schemas/`, chart CRD `evidencebudgetpolicies.yaml`, Helm values (`examples/helm/context-trial-profile.yaml`, `internal/bootstrap/testdata/`); no priority selection |
 | `internal-work.schema.json` | Stream message on the connector connection: no `issuerEpoch`, `deliveryFence`, `*Ref`, `nodeBootID`, `StaleFence`, JWS wrapper; analysis input by `inputArtifactId` | `internal/adapters/jose/work.go`, `internal/contracts/work.go`, `internal/domain/fleet/work.go` |
 | `local-key-service.schema.json`, `local-key-secret.schema.json` | wrap/unwrap only, no `validUntil`; purposes `artifact`, `browser-credentials` | `internal/contracts/key_service.go`, `internal/adapters/kms/local_signing.go`, `local_keys.go`, `protected_local_keys.go` |
 | (no JSON schema) node channel | Hello with version and capabilities; no enroll/poll, CSR, boot ID or epoch | `internal/contracts/node_channel.go`, `internal/bootstrap/node_channel.go` |
 
 Schemas kept because Go still embeds them with production code paths:
-`work-trust`, `submission-trust`, `installation-witness`, `retention-topology`
-(`internal/adapters/kubernetes/permission_decode.go` and their readers), and
-`local-start` with `scripts/start-crd.py` and
-`charts/asservat/crds/capacityreservations.yaml`
-(`internal/adapters/kubernetes/start_admission.go`). Remove each with its code.
+`work-trust`, `submission-trust`, `installation-witness` and `retention-topology`
+(`internal/adapters/kubernetes/permission_decode.go` and their readers). Remove
+each with its code.
 `local-key-configuration.schema.json` had no runtime consumer and is deleted.
 ## ADR-335 contract divergence (2026-11-14)
 
@@ -77,8 +98,8 @@ stays only with a written reason (resource cost, external constraint or
 maintainer decision; see "Bounds in the contracts" in `specs/apis.md`). The
 runtime still implements the earlier versions, kept under
 `specs/contracts/implemented/` and `examples/implemented/` as in the ADR-330
-pass. `scripts/permission-crds.py`, `profile-crd.py`, `retention-crd.py` and
-the `storage-pool` input of `capacity-crds.py` now also read through
+pass. `scripts/permission-crds.py`, `profile-crd.py` and `retention-crd.py` now
+also read through
 `scripts/implemented_contracts.py`; all Go and console tests that read
 examples go through `readImplementedExample` or the console equivalent.
 
@@ -96,8 +117,7 @@ examples go through `readImplementedExample` or the console equivalent.
 | `collection-scope.schema.json` | No `observation.mode` | `internal/application/capture/policy_compile.go`; console capture bundle |
 | `action.schema.json`, `capture-profile-go-cpu.yaml` | Profile `impact` may be `observe` (pprof GET) | `internal/application/planning/profile_plan.go` (refuses non-intrusive); `internal/application/planning/profiles/go-cpu-v1.json` |
 | `grant.schema.json` | Policy-grant `spec.renewal`, `status.renewalDue` | No renewal: `internal/application/authorization/grants.go`, `internal/adapters/postgres/policy_grant_attachment.go` |
-| `budget-policy`, `storage-pool` | Share percentages, all fields optional, `scope.clusters` by name, optional `protectedAllocations` | `internal/adapters/kubernetes/capacity_decode.go` (`workloadSlots`), `capacity-schemas/`, chart CRDs |
-| Capture/policy/trigger/recipe/packet/syscall schemas | No list-count caps; arbitrary maxima raised to 2^53−1; no packet-filter length cap (BPF limit checked at compile); `argv` items up to `MAX_ARG_STRLEN` | Embedded `policy-schemas/`, `capacity-schemas/`, `permission-schemas/approval-policy`, manifest `profile` schema; `internal/domain/planning/composition.go` (`MaxCompositionComponents` 8, `MaxComponentEdits` 32, `MaxCompositionBytes`); generated DebugPolicy/CaptureProfile/capacity CRDs |
+| Capture/policy/trigger/recipe/packet/syscall schemas | No list-count caps; arbitrary maxima raised to 2^53−1; no packet-filter length cap (BPF limit checked at compile); `argv` items up to `MAX_ARG_STRLEN` | Embedded `policy-schemas/`, `permission-schemas/approval-policy`, manifest `profile` schema; `internal/domain/planning/composition.go` (`MaxCompositionComponents` 8, `MaxComponentEdits` 32, `MaxCompositionBytes`); generated DebugPolicy/CaptureProfile CRDs |
 | `identity-settings.schema.json` | `groupsClaim`, `usernameClaim`, optional `requiredGroups`, `administrators`; no eligible lists, `groupMaxAgeSeconds`, `revision` or list caps | `internal/contracts/identity_settings.go`, `permission_runtime.go`, `installer_continuation.go`; `internal/domain/configuration/permissions.go`; `internal/bootstrap/permission_guards.go`; `internal/adapters/kubernetes/hub_worker_capacity_reads.go` |
 | `browser-settings.schema.json` | `maxLifetimeSeconds` (default 7 d) and `inactivityTimeoutSeconds` (default 24 h); no `maxLogins`/`maxSessions`/`maxLogoutEvents` or per-user session count | `internal/contracts/browser_settings.go`, `installer_continuation.go`; `internal/domain/identity/browser_settings.go` |
 | `fleet-settings.schema.json` (deleted) | Administrators replace fleet operators (D14) | `internal/adapters/kubernetes/fleet_settings.go`, `initial_preparer_inputs.go`, `initial_bootstrap_plan.go`, `hub_workload.go`, `configuration_runtime_*.go`; `internal/bootstrap/hub_api_inputs.go`; `internal/contracts/owner_deployment.go` |

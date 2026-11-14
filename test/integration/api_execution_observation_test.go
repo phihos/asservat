@@ -129,7 +129,7 @@ func qualifyAPIExecutionRetainedObservation(t *testing.T, ctx context.Context, a
 		}
 		done := make(chan result, 1)
 		go func() {
-			r, err := prepare.BindAPIStart(call, check, original, value.PreparedStart{ObjectUID: custodyID(), ResourceVersion: "1"})
+			r, err := prepare.RecordAPIStart(call, check, original)
 			done <- result{r, err}
 		}()
 		joined := false
@@ -159,7 +159,7 @@ func qualifyAPIExecutionRetainedObservation(t *testing.T, ctx context.Context, a
 			case got := <-done:
 				joined = true
 				timer.Stop()
-				t.Fatal("bind returned before the blocked permission check", got.err)
+				t.Fatal("start returned before the blocked permission check", got.err)
 			case <-call.Done():
 				timer.Stop()
 				t.Fatal("original observation expired before the lock interleaving", call.Err())
@@ -182,7 +182,7 @@ func qualifyAPIExecutionRetainedObservation(t *testing.T, ctx context.Context, a
 			t.Fatal(err)
 		}
 		if !unchanged || !suspended {
-			t.Fatal("revoked bind changed the immutable preparation", unchanged, suspended)
+			t.Fatal("revoked start changed the immutable preparation", unchanged, suspended)
 		}
 	})
 }

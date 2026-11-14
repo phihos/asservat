@@ -75,9 +75,6 @@ func (s consolePolicyStatus) ObservePolicy(context.Context, value.PolicySource) 
 func (s consolePolicyStatus) Delegation(context.Context, authorization.Target) (identity.Revision, error) {
 	return identity.Revision{}, value.ErrUnavailable
 }
-func (s consolePolicyStatus) ActiveClusterPolicies(context.Context, string, string) (int64, error) {
-	return 0, value.ErrUnavailable
-}
 func (s consolePolicyStatus) AcceptanceByNonce(context.Context, string) (value.PolicyAcceptance, bool, error) {
 	return value.PolicyAcceptance{}, false, value.ErrUnavailable
 }

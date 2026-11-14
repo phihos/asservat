@@ -53,7 +53,7 @@ func connectorTestOffer(t *testing.T, roots [][]byte) contracts.RegionalOffer {
 func connectorTestConfig() contracts.ConnectorConfig {
 	return contracts.ConnectorConfig{Format: contracts.ConnectorConfigFormat, Mode: contracts.ConnectorModeCluster, Namespace: "asservat-region",
 		Deployment: "asservat-connector", ServiceAccount: "asservat-connector", ClusterCredential: "asservat-cluster-credential", ImageDigest: strings.Repeat("a", 64),
-		Executor: &contracts.ConnectorExecutorConfig{CapacityAccount: "asservat-connector-capacity", CapacityAudience: "https://kubernetes.default.svc", Concurrency: 4}}
+		Executor: &contracts.ConnectorExecutorConfig{Concurrency: 4}}
 }
 
 // writeConnectorJoin writes the cluster-mode join Secret's files (cluster
@@ -100,18 +100,17 @@ func TestConnectorConfigIsClosed(t *testing.T) {
 		t.Fatal("combined mode", err)
 	}
 	for name, mutate := range map[string]func(*contracts.ConnectorConfig){
-		"format":                    func(c *contracts.ConnectorConfig) { c.Format = "asservat-regional-deployment/v1" },
-		"mode":                      func(c *contracts.ConnectorConfig) { c.Mode = "hub" },
-		"cluster with offer map":    func(c *contracts.ConnectorConfig) { c.OfferConfigMap = "asservat-regional-offer" },
-		"cluster with addresses":    func(c *contracts.ConnectorConfig) { c.Hub = combined.Hub },
-		"values cluster ID":         func(c *contracts.ConnectorConfig) { c.ClusterID = connectorTestID("02") },
-		"values peer ID":            func(c *contracts.ConnectorConfig) { c.PeerID = connectorTestID("05") },
-		"namespace":                 func(c *contracts.ConnectorConfig) { c.Namespace = "Region" },
-		"credential name":           func(c *contracts.ConnectorConfig) { c.ClusterCredential = "" },
-		"image digest":              func(c *contracts.ConnectorConfig) { c.ImageDigest = "latest" },
-		"capacity is the connector": func(c *contracts.ConnectorConfig) { c.Executor.CapacityAccount = c.ServiceAccount },
-		"no concurrency":            func(c *contracts.ConnectorConfig) { c.Executor.Concurrency = 0 },
-		"alertmanager credentials":  func(c *contracts.ConnectorConfig) { c.Executor.Alertmanager = "http://user:pass@alerts.invalid" },
+		"format":                   func(c *contracts.ConnectorConfig) { c.Format = "asservat-regional-deployment/v1" },
+		"mode":                     func(c *contracts.ConnectorConfig) { c.Mode = "hub" },
+		"cluster with offer map":   func(c *contracts.ConnectorConfig) { c.OfferConfigMap = "asservat-regional-offer" },
+		"cluster with addresses":   func(c *contracts.ConnectorConfig) { c.Hub = combined.Hub },
+		"values cluster ID":        func(c *contracts.ConnectorConfig) { c.ClusterID = connectorTestID("02") },
+		"values peer ID":           func(c *contracts.ConnectorConfig) { c.PeerID = connectorTestID("05") },
+		"namespace":                func(c *contracts.ConnectorConfig) { c.Namespace = "Region" },
+		"credential name":          func(c *contracts.ConnectorConfig) { c.ClusterCredential = "" },
+		"image digest":             func(c *contracts.ConnectorConfig) { c.ImageDigest = "latest" },
+		"no concurrency":           func(c *contracts.ConnectorConfig) { c.Executor.Concurrency = 0 },
+		"alertmanager credentials": func(c *contracts.ConnectorConfig) { c.Executor.Alertmanager = "http://user:pass@alerts.invalid" },
 		"collector in connector namespace": func(c *contracts.ConnectorConfig) {
 			c.Collector = &contracts.RegionalCollector{Namespace: c.Namespace, DaemonSet: "node", ServiceAccount: "node", ListenerSecret: "nodes", RootConfigMap: "nodes", ServerName: "nodes.svc"}
 		},
@@ -301,10 +300,10 @@ func TestRegionalContextComposesWithoutInstallerInputs(t *testing.T) {
 		t.Fatal("incomplete node-free output composition")
 	}
 	s := built.settings
-	if s.NamespaceUID != connectorTestID("06") || s.AccountUID != connectorTestID("12") || s.CapacityAccountUID != connectorTestID("11") || s.DeploymentUID != connectorTestID("07") || len(s.Inputs) != 0 || s.TemplateDigest != "" {
+	if s.NamespaceUID != connectorTestID("06") || s.AccountUID != connectorTestID("12") || s.DeploymentUID != connectorTestID("07") || len(s.Inputs) != 0 || s.TemplateDigest != "" {
 		t.Fatalf("settings %+v", s)
 	}
-	if got := calls.Load() - before; got != 4 {
+	if got := calls.Load() - before; got != 0 {
 		t.Fatal("constructor API calls", got)
 	}
 	if kube.ConnectorAPIStartupDigest(s) != kube.ConnectorAPIStartupDigest(withUIDs(s)) {
@@ -313,7 +312,7 @@ func TestRegionalContextComposesWithoutInstallerInputs(t *testing.T) {
 }
 
 func withUIDs(s contracts.ConnectorAPIContextSettings) contracts.ConnectorAPIContextSettings {
-	s.NamespaceUID, s.AccountUID, s.DeploymentUID, s.CapacityAccountUID = connectorTestID("96"), connectorTestID("97"), connectorTestID("98"), connectorTestID("99")
+	s.NamespaceUID, s.AccountUID, s.DeploymentUID = connectorTestID("96"), connectorTestID("97"), connectorTestID("98")
 	return s
 }
 

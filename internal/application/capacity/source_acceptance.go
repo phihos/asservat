@@ -236,7 +236,7 @@ func capacitySelectedSourceBytes(s CapacitySnapshot, poolName string) ([]byte, e
 			break
 		}
 	}
-	if pool == nil || pool.Budget == nil || pool.Resource.Deleting || pool.Resource.SpecDigest == (artifact.Digest{}) || pool.Assurance != "qualifiedReservedBackend" {
+	if pool == nil || pool.Budget == nil || pool.Resource.Deleting || pool.Resource.SpecDigest == (artifact.Digest{}) {
 		return nil, cfg.ErrUnavailable
 	}
 	versions := []CapacitySourceVersion{sourceVersion(pool.Resource, pool.Resource.SpecDigest)}

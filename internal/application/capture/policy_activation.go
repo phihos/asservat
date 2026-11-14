@@ -38,7 +38,6 @@ type PolicyPermissions interface {
 // PolicyActivationLedger holds the activation's read-only SQL facts.
 type PolicyActivationLedger interface {
 	Delegation(context.Context, authorization.Target) (identity.Revision, error)
-	ActiveClusterPolicies(ctx context.Context, cluster, except string) (int64, error)
 	AcceptanceByNonce(context.Context, string) (value.PolicyAcceptance, bool, error)
 	Status(context.Context, string) (value.PolicyStatus, error)
 }
@@ -229,11 +228,6 @@ func (s PolicyActivation) Activate(ctx context.Context, current identities.Curre
 	}
 	if ctx.Err() != nil || !s.Now().Before(compileUntil) {
 		return zero, value.ErrChanged
-	}
-	if active, err := s.Ledger.ActiveClusterPolicies(ctx, compiled.ClusterID, source.Revision.UID); err != nil {
-		return zero, s.refused("count", err)
-	} else if active >= value.MaxActivePoliciesPerCluster {
-		return zero, value.ErrCapacity
 	}
 	status, err := s.Ledger.Status(ctx, source.Revision.UID)
 	if err != nil {

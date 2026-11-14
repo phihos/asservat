@@ -49,19 +49,6 @@ func (f *regionalOperationsFixture) ResolveWorkload(_ context.Context, r targets
 	w := f.work.Target
 	return f.resolution(targets.Request{ClusterID: r.ClusterID, Namespace: configuration.NamespaceRef{Name: r.Namespace, UID: w.NamespaceUID}, Workload: configuration.WorkloadRef{Kind: r.Kind, Name: r.Name, UID: w.WorkloadUID}, PodName: r.Name + "-0", PodUID: w.PodUID}), nil
 }
-func (f *regionalOperationsFixture) PrepareStart(context.Context, execution.PreparationCheck) (execution.PreparedStart, error) {
-	return execution.PreparedStart{ObjectUID: ownerTestID, ResourceVersion: "1"}, nil
-}
-func (f *regionalOperationsFixture) ReadyStart(context.Context, execution.Request) (execution.Disposition, error) {
-	return execution.Disposition{ObjectUID: ownerTestID, ResourceVersion: "2", Phase: execution.Ready}, nil
-}
-func (f *regionalOperationsFixture) ConsumeStart(context.Context, execution.Request) (execution.Disposition, error) {
-	now := time.Now().UTC()
-	return execution.Disposition{ObjectUID: ownerTestID, ResourceVersion: "3", Phase: execution.StartCommitted, CommittedAt: now, MayStart: true, ValidUntil: now.Add(2 * time.Second)}, nil
-}
-func (f *regionalOperationsFixture) LookupStart(context.Context, execution.Request) (execution.Disposition, error) {
-	return execution.Disposition{}, execution.ErrUnavailable
-}
 func (f *regionalOperationsFixture) Capture(context.Context, artifact.PinnedPod) ([]byte, error) {
 	f.captures++
 	return []byte("synthetic regional context"), nil
@@ -103,7 +90,7 @@ func TestContextStartActualHTTP2HubRunOperations(t *testing.T) {
 		w.ExpectationDigest = evidence.ContextExpectationDigest(expectation)
 	})
 	regional := &regionalOperationsFixture{t: t, work: work, process: f.api}
-	local := contextstart.RegionalLocal{Process: regional, Targets: regional, Local: regional, Starts: regional, Output: regional, Collector: regional, Source: f.connector, Now: time.Now}
+	local := contextstart.RegionalLocal{Process: regional, Targets: regional, Output: regional, Collector: regional, Source: f.connector, Now: time.Now}
 	regionalDone := make(chan error, 1)
 	go func() {
 		defer stream.Close()
@@ -118,7 +105,6 @@ func TestContextStartActualHTTP2HubRunOperations(t *testing.T) {
 		t.Fatal(err)
 	}
 	target := targets.Request{ClusterID: work.Target.ClusterID, Namespace: configuration.NamespaceRef{Name: "app", UID: work.Target.NamespaceUID}, Workload: configuration.WorkloadRef{Kind: "Deployment", Name: "app", UID: work.Target.WorkloadUID}, PodName: "app-0", PodUID: work.Target.PodUID}
-	binding := execution.Binding{CaptureID: work.CaptureID, AttemptID: work.AttemptID, ClusterID: work.Target.ClusterID, PodUID: work.Target.PodUID, ScopeDigest: work.ScopeDigest, BudgetDigest: work.BudgetDigest}
 	state, err := attachment.Run(work, signed, func(ctx context.Context, ops *contextstart.HubOperations) (string, error) {
 		resolved, err := ops.ResolvePod(ctx, target)
 		if err != nil || resolved.Pin.UID != target.PodUID {
@@ -127,30 +113,18 @@ func TestContextStartActualHTTP2HubRunOperations(t *testing.T) {
 		if _, err = ops.ReadAPIProcess(ctx); err != nil {
 			return "", err
 		}
-		foreign := binding
-		foreign.CaptureID = "55000000-0000-4000-8000-0000000000ff"
-		if _, err = ops.PrepareStart(ctx, execution.PreparationCheck{Binding: foreign}); !errors.Is(err, execution.ErrDenied) {
-			return "", errors.New("foreign capture start accepted")
-		}
-		if _, err = ops.PrepareStart(ctx, execution.PreparationCheck{Binding: binding}); err != nil {
-			return "", err
-		}
 		prepared, err := ops.PrepareContext(ctx, expectation)
 		if err != nil {
 			return "", err
 		}
 		acquirer := prepared.(evidence.ContextAcquirer)
-		if _, _, err = acquirer.AcquireContext(ctx, resolved.Pin, time.Now(), time.Now().Add(time.Second)); !errors.Is(err, execution.ErrDenied) {
-			return "", errors.New("acquired before the start committed")
-		}
-		committed, err := ops.ConsumeStart(ctx, execution.Request{Binding: binding, ObjectUID: ownerTestID})
-		if err != nil || !committed.MayStart {
-			return "", errors.Join(errors.New("consume"), err)
+		if _, _, err = acquirer.AcquireContext(ctx, resolved.Pin, time.Now(), work.NotAfter.Add(time.Second)); !errors.Is(err, execution.ErrDenied) {
+			return "", errors.New("acquired past the work deadline")
 		}
 		if _, err = prepared.StoreContext(ctx, []byte("hub bytes"), time.Now(), time.Now()); err == nil {
 			return "", errors.New("hub stored native bytes")
 		}
-		acquired, copies, err := acquirer.AcquireContext(ctx, resolved.Pin, time.Now().UTC(), committed.ValidUntil)
+		acquired, copies, err := acquirer.AcquireContext(ctx, resolved.Pin, time.Now().UTC(), time.Now().Add(time.Second))
 		if err != nil || acquired.IsZero() || copies != regionalCopies {
 			return "", errors.Join(errors.New("acquire"), err)
 		}
@@ -237,7 +211,7 @@ func blockingOperationExchange(t *testing.T, mutate func(*value.APIContextWork))
 	}
 	work, signer, signed, _ := f.work(t, exchange.Receiver(), mutators...)
 	region := &blockingRegion{regionalOperationsFixture: &regionalOperationsFixture{t: t, work: work, process: f.api}, entered: make(chan struct{}), joined: make(chan struct{})}
-	local := contextstart.RegionalLocal{Process: region, Targets: region, Local: region, Starts: region, Output: region, Collector: region, Source: f.connector, Now: time.Now}
+	local := contextstart.RegionalLocal{Process: region, Targets: region, Output: region, Collector: region, Source: f.connector, Now: time.Now}
 	regionalDone := make(chan error, 1)
 	go func() {
 		defer stream.Close()
@@ -357,7 +331,7 @@ func TestContextStartActualHTTP2TargetQueriesKeepTheStandby(t *testing.T) {
 	// Queries have target facts but create no signed effect work.
 	target := authorization.Target{ClusterID: exchange.Receiver().Channel.Connector.Binding.ClusterID, NamespaceUID: ownerTestID, WorkloadUID: ownerTestID, PodUID: ownerTestID}
 	regional.work.Target = target
-	local := contextstart.RegionalLocal{Process: regional, Targets: regional, Local: regional, Starts: regional, Output: regional, Collector: regional, Source: f.connector, Now: time.Now}
+	local := contextstart.RegionalLocal{Process: regional, Targets: regional, Output: regional, Collector: regional, Source: f.connector, Now: time.Now}
 	regionalDone := make(chan error, 1)
 	go func() {
 		defer stream.Close()

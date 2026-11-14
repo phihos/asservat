@@ -380,7 +380,7 @@ func (f *apiPreparationFacts) ReadAPIProcess(ctx context.Context) (value.APIProc
 }
 
 func apiPreparationRunner(read, prepare *postgres.APIContextExecutions, facts *apiPreparationFacts, effects *apiPreparationNoEffects) executionapp.APIContextRunner {
-	return executionapp.APIContextRunner{Read: read, Prepare: prepare, Record: effects, Process: facts, Local: effects, Starts: effects, Targets: facts, Eligibility: facts, Capabilities: facts, Retention: facts, Recovery: facts, Output: effects, Collector: effects, Now: time.Now}
+	return executionapp.APIContextRunner{Read: read, Prepare: prepare, Record: effects, Process: facts, Targets: facts, Eligibility: facts, Capabilities: facts, Retention: facts, Recovery: facts, Output: effects, Collector: effects, Now: time.Now}
 }
 
 type apiPreparationNoEffects struct{ calls int }
@@ -389,23 +389,7 @@ func (f *apiPreparationNoEffects) PrepareContext(context.Context, artifact.Conte
 	f.calls++
 	return nil, value.ErrUnavailable
 }
-func (f *apiPreparationNoEffects) PrepareStart(context.Context, value.PreparationCheck) (value.PreparedStart, error) {
-	f.calls++
-	return value.PreparedStart{}, value.ErrUnavailable
-}
-func (f *apiPreparationNoEffects) ReadyStart(context.Context, value.Request) (value.Disposition, error) {
-	f.calls++
-	return value.Disposition{}, value.ErrUnavailable
-}
-func (f *apiPreparationNoEffects) ConsumeStart(context.Context, value.Request) (value.Disposition, error) {
-	f.calls++
-	return value.Disposition{}, value.ErrUnavailable
-}
-func (f *apiPreparationNoEffects) LookupStart(context.Context, value.Request) (value.Disposition, error) {
-	f.calls++
-	return value.Disposition{}, value.ErrUnavailable
-}
-func (f *apiPreparationNoEffects) RecordAPIStart(context.Context, executionapp.APIExecutionCheck, value.APIExecution, value.Disposition) (value.APIExecution, error) {
+func (f *apiPreparationNoEffects) RecordAPIStart(context.Context, executionapp.APIExecutionCheck, value.APIExecution) (value.APIExecution, error) {
 	f.calls++
 	return value.APIExecution{}, value.ErrUnavailable
 }

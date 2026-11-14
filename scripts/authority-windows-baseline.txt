@@ -182,7 +182,6 @@ internal/domain/catalog/context.go 2
 internal/domain/configuration/acceptance.go 1
 internal/domain/configuration/access_preview.go 1
 internal/domain/configuration/bootstrap.go 2
-internal/domain/execution/context.go 1
 internal/domain/execution/go_profile.go 1
 internal/domain/fleet/administration.go 2
 internal/domain/fleet/api_context_work.go 1

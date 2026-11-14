@@ -335,7 +335,7 @@ GRANT UPDATE(root_id) ON retention_source TO api_execution_prepare_runtime,api_e
 GRANT UPDATE(id) ON context_capture,custody_pool,custody_allocation,custody_attempt TO api_execution_prepare_runtime,api_execution_runtime;
 GRANT UPDATE(capture_id) ON context_execution TO api_execution_prepare_runtime,api_execution_runtime;
 GRANT INSERT(root_id,capture_id,attempt_id,binding_json,process_json,expectation_digest,not_before,not_after) ON context_execution TO api_execution_prepare_runtime;
-GRANT UPDATE(object_uid) ON context_execution TO api_execution_prepare_runtime;
+GRANT UPDATE(object_uid) ON context_execution TO api_execution_runtime;
 GRANT UPDATE(phase,started_at,acquired_at,completed_at,copies_json,copies_digest) ON context_execution TO api_execution_runtime;
 GRANT SELECT ON context_execution TO context_verify_runtime,context_verification_audit_runtime,context_publish_runtime,context_progress_read_runtime;
 

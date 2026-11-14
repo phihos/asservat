@@ -192,7 +192,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	c, p := in.config, in.config.Public
 	root, installation := c.PermissionRootID, c.InstallationID
 	if p == nil || c.Native == nil || pools == nil || observer == nil || shared.topologies == nil || shared.nativeRead == nil || !a.storageConfigured() || a.seal == nil || a.open == nil || a.keys == nil ||
-		!authorization.UUID(p.ClusterCatalog.Source.UID) || p.Standby < 1 || p.Standby > 64 || p.Captures < 1 || p.Captures > 16 || c.Native.Connections+p.Standby > 64 || p.PreviewSeconds < 1 || p.PreviewSeconds > 300 {
+		!authorization.UUID(p.ClusterCatalog.Source.UID) || p.Standby < 1 || p.Standby > 64 || p.Captures < 1 || c.Native.Connections+p.Standby > 64 || p.PreviewSeconds < 1 || p.PreviewSeconds > 300 {
 		return nil, mounts.ErrUnavailable
 	}
 	historyBounds, err := captureHistoryBounds(p.CaptureHistory)
@@ -339,7 +339,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 		standby, captures = standby+v.Standby, captures+v.Captures
 	}
 	limits.Standby, limits.Captures = max(limits.Standby, standby), max(limits.Captures, captures)
-	if limits.Standby > 64 || limits.Captures > 16 || c.Native.Connections+limits.Standby > 64 {
+	if limits.Standby > 64 || c.Native.Connections+limits.Standby > 64 {
 		return nil, mounts.ErrUnavailable
 	}
 	router, err := contextstart.NewRouter(limits)
@@ -371,6 +371,9 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	// evaluates a policy executor through its acceptance and team delegation.
 	if out.policies, err = postgres.NewPolicies(ctx, sql["policy-automation"], root, installation); err != nil {
 		return nil, mounts.ErrUnavailable
+	}
+	if r := p.WorkloadRate; r != nil {
+		postgres.SetWorkloadRate(r.Burst, r.MinimumIntervalSeconds)
 	}
 	if out.policyTriggers, err = postgres.NewPolicyTriggers(ctx, sql["policy-automation"], root, installation); err != nil {
 		return nil, mounts.ErrUnavailable

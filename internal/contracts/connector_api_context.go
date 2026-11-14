@@ -19,8 +19,6 @@ type ConnectorAPIContextSettings struct {
 	TemplateDigest           string                 `json:"templateDigest"`
 	ProjectionDigest         string                 `json:"projectionDigest"`
 	WorkloadProtectionDigest string                 `json:"workloadProtectionDigest"`
-	CapacityAccount          string                 `json:"capacityAccount"`
-	CapacityAccountUID       string                 `json:"capacityAccountUID"`
 	Inputs                   []ConnectorAPIInput    `json:"inputs"`
 	StartGuard               ConnectorAPIStartGuard `json:"startGuard"`
 }

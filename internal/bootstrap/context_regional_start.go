@@ -200,7 +200,7 @@ func (s RegionalAPIContextStart) startOnce(ctx context.Context, current identiti
 	state, e := attachment.Run(work, signed, func(ctx context.Context, ops *contextstart.HubOperations) (string, error) {
 		ops.Timing = func(method string, d time.Duration) { auditapp.MarkDuration(outer, "op-"+method, d) }
 		r := s.Runner
-		r.Process, r.Targets, r.Local, r.Starts, r.Output, r.Collector = ops, ops, ops, ops, ops, ops
+		r.Process, r.Targets, r.Output, r.Collector = ops, ops, ops, ops
 		r.Prepare = gatedPreparer{r.Prepare, gate}
 		result, err := r.ExecuteObserved(ctx, current, caller, accepted, capability, recovery)
 		gate.finish(err)

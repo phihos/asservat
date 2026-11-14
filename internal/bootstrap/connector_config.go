@@ -88,7 +88,7 @@ func validConnectorConfig(c contracts.ConnectorConfig) error {
 		return bad("image")
 	}
 	if x := c.Executor; x != nil {
-		if len(validation.IsDNS1123Subdomain(x.CapacityAccount)) != 0 || x.CapacityAccount == c.ServiceAccount || x.CapacityAudience != "" && !identity.Text(x.CapacityAudience, 512) || x.Concurrency < 1 || x.Concurrency > 16 ||
+		if x.Concurrency < 1 || x.Concurrency > 16 ||
 			x.Alertmanager != "" && !kube.AlertmanagerURL(x.Alertmanager) || !kube.IdentityMappingsValid(x.IdentityMappings) || !kube.ProfileEndpointsValid(x.ProfileEndpoints) {
 			return bad("executor")
 		}

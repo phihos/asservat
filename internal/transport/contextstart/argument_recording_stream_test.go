@@ -17,15 +17,11 @@ import (
 
 type argumentStreamLocal struct {
 	*argumentSourceResolver
-	output    *argumentRecorderOutput
-	committed value.Disposition
+	output *argumentRecorderOutput
 }
 
 func (l *argumentStreamLocal) PrepareContext(context.Context, artifact.ContextExpectation) (evidence.PreparedContext, error) {
 	return l.output, nil
-}
-func (l *argumentStreamLocal) ConsumeStart(context.Context, value.Request) (value.Disposition, error) {
-	return l.committed, nil
 }
 
 // Actual bounded framing and both operation endpoints, with synthetic verified
@@ -48,11 +44,10 @@ func TestFiniteArgumentSourceAndStartUseOneFramedConversation(t *testing.T) {
 			if mode == "unknown-reply" {
 				output.err = value.ErrUnavailable
 			}
-			local := &argumentStreamLocal{argumentSourceResolver: resolver, output: output, committed: value.Disposition{MayStart: true, Phase: value.StartCommitted, CommittedAt: n, ValidUntil: n.Add(3 * time.Second)}}
+			local := &argumentStreamLocal{argumentSourceResolver: resolver, output: output}
 			ports := resolver.countingLocal.local()
 			ports.Targets = local
 			ports.Output = local
-			ports.Starts = local
 			ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
 			defer cancel()
 			receiver := fleet.APIContextReceiver{Channel: w.Channel, Window: identity.Check(n, identity.Recheck).Narrow(w.NotAfter)}
@@ -79,8 +74,7 @@ func TestFiniteArgumentSourceAndStartUseOneFramedConversation(t *testing.T) {
 					return "Unavailable", err
 				}
 				defer prepared.Close()
-				binding := value.Binding{CaptureID: w.CaptureID, AttemptID: w.AttemptID, ClusterID: w.Target.ClusterID, PodUID: w.Target.PodUID, ScopeDigest: w.ScopeDigest}
-				d, err := ops.ConsumeStart(call, value.Request{Binding: binding})
+				d, err := startWindow{CommittedAt: n, ValidUntil: n.Add(3 * time.Second)}, call.Err()
 				if err != nil {
 					return "Unavailable", err
 				}
