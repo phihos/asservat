@@ -14,7 +14,7 @@ const (
 	RemoteBindingsChannel = "asservat_remote_bindings"
 	RemoteCapacityChannel = "asservat_remote_capacity"
 	// CaptureProgressChannel carries the capture ID of each committed
-	// progress revision (migration 00167).
+	// progress revision (migration 00168).
 	CaptureProgressChannel = "asservat_capture_progress"
 )
 
