@@ -70,7 +70,7 @@ buckets even if its other tables are small. A fresh owned Go process generated
 40,007 actual heap samples/bytes labels, 20 locations, 14 functions and 760,054
 location references: only 1,401,571 decompressed bytes (127,059 gzip bytes).
 The native generator report
-and [generator](../../experiments/pprof-runtime-heap/main.go) retain its exact
+and generator retain its exact
 hashes and Go version. This deliberately dense synthetic allocation-stack case
 shows native writer behavior; it is not a claim about deployment frequency.
 

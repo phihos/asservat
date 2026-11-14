@@ -9,9 +9,9 @@ This is test-only qualification work.
 The old production tree is canonical PR100 main
 `eed8594020645fe6d10f8c6565e69a6235c7507d`; the new tree is PR101
 `fa69b01948edf9d7baf1f00453e1482a224fd4ea`. Neither production tree is patched.
-The same finite [helper](../../test/fixtures/native-version-helper/main.go) is
+The same finite helper is
 compiled separately in each module/worktree by
-[the build script](../../scripts/build-native-version-helpers.py). It invokes
+the build script. It invokes
 that tree's actual NativeOwners, RunWorkerConversation, NativeFrameGate,
 HubOperation, RelayConversation and native h2/mTLS handler implementations.
 There is no copied old predicate, import alias, module replacement, compatibility

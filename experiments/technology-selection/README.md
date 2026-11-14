@@ -1,6 +1,6 @@
 # Isolated technology experiments
 
-Executed 2026-10-09 during planning. These small programs exercise dependencies against synthetic bytes and the real design contracts. They are not production services, capture mechanisms or a product skeleton. The [summary](results/summary.json) records actual exits, tool versions and input hashes; [technology research](../../docs/research/technology-selection.md) states what remains unproven.
+Executed 2026-10-09 during planning. These small programs exercise dependencies against synthetic bytes and the real design contracts. They are not production services, capture mechanisms or a product skeleton. The summary records actual exits, tool versions and input hashes; [technology research](../../docs/research/technology-selection.md) states what remains unproven.
 
 ## Actual results
 

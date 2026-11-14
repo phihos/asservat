@@ -2,9 +2,9 @@
 
 These commands belong **inside the new disposable VM**, unless explicitly described as host commands. Never run BPF probes or installation commands on the workstation. See the [lab boundary](../README.md).
 
-`lab.py up` downloads the pinned Ubuntu 24.04 image, validates its upstream HTTPS SHA-256, creates a 10 GiB sparse overlay and boots a two-vCPU/2 GiB VM with user-mode networking and a loopback-only SSH forward. The [image record](../results/vm-image.json) and [environment](../results/vm-environment.txt) give the exact tested inputs. No host folder, Docker socket or existing kubeconfig is shared with the guest.
+`lab.py up` downloads the pinned Ubuntu 24.04 image, validates its upstream HTTPS SHA-256, creates a 10 GiB sparse overlay and boots a two-vCPU/2 GiB VM with user-mode networking and a loopback-only SSH forward. The image record and environment give the exact tested inputs. No host folder, Docker socket or existing kubeconfig is shared with the guest.
 
-Inside the VM, install the distribution packages `clang llvm libbpf-dev libpcap-dev tcpdump tshark iproute2 python3 gcc make linux-tools-generic`. The standalone `bpftool` package name had no installation candidate in this image; `linux-tools-generic` supplies the relevant tools. Package installation logs are retained. Download the recorded [Gadget release](../results/gadget-cli.json) and [K3s release](../results/k3s-release.json), verify their SHA-256 lists, install only inside the VM, and launch:
+Inside the VM, install the distribution packages `clang llvm libbpf-dev libpcap-dev tcpdump tshark iproute2 python3 gcc make linux-tools-generic`. The standalone `bpftool` package name had no installation candidate in this image; `linux-tools-generic` supplies the relevant tools. Package installation logs are retained. Download the recorded Gadget release and K3s release, verify their SHA-256 lists, install only inside the VM, and launch:
 
 ```sh
 systemd-run --unit asservat-k3s /usr/local/bin/k3s server --disable traefik --disable servicelb --disable metrics-server --disable local-storage --write-kubeconfig-mode=600
@@ -13,7 +13,7 @@ k3s kubectl -n asservat-lab rollout status deployment/sender --timeout=90s
 k3s kubectl -n asservat-lab rollout status deployment/sink --timeout=90s
 ```
 
-Copy the checked-in [workload](workload.yaml) to that path using the lab SSH channel. Its tested Python image digest is recorded in the environment file; use that digest when reproducing rather than relying on the authored convenience tag. Only the VM's synthetic namespace is observed.
+Copy the checked-in workload to that path using the lab SSH channel. Its tested Python image digest is recorded in the environment file; use that digest when reproducing rather than relying on the authored convenience tag. Only the VM's synthetic namespace is observed.
 
 Pull/verify the Gadget tcpdump image once, record its digest, then disable pulling for the run. The recorded image is `ghcr.io/inspektor-gadget/gadget/tcpdump@sha256:2176a5bd659841ad7bdbed1633a52b744ccb4232f3fd567e2388361ddd8e047a`.
 
@@ -23,9 +23,9 @@ Pull/verify the Gadget tcpdump image once, record its digest, then disable pulli
 tshark -r /root/gadget-pods.pcapng
 ```
 
-[gadget-loopback.sh](gadget-loopback.sh) explicitly selects the VM's `lo` interface and generates its own bounded datagrams. The earlier [default-attachment experiment](gadget-packets.sh) is retained because it failed to capture that traffic. Explicit host-loopback success does not prove pod-loopback attachment/attribution.
+gadget-loopback.sh explicitly selects the VM's `lo` interface and generates its own bounded datagrams. The earlier default-attachment experiment is retained because it failed to capture that traffic. Explicit host-loopback success does not prove pod-loopback attachment/attribution.
 
-On the host, build only the portable VM executables from `experiments/feasibility/go` with `CGO_ENABLED=0 go build ./cmd/filterprobe` and `CGO_ENABLED=0 go build ./cmd/mapprobe` using a disk-backed `TMPDIR`. Transfer those executables, the generated `results/filter-programs.json`, and [peers.bpf.c](peers.bpf.c) into `/root` in the VM. Then:
+On the host, build only the portable VM executables from `experiments/feasibility/go` with `CGO_ENABLED=0 go build ./cmd/filterprobe` and `CGO_ENABLED=0 go build ./cmd/mapprobe` using a disk-backed `TMPDIR`. Transfer those executables, the generated `results/filter-programs.json`, and peers.bpf.c into `/root` in the VM. Then:
 
 ```sh
 touch /root/ASSERVAT_DISPOSABLE_VM
