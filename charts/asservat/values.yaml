@@ -312,7 +312,9 @@ hub:
         group: cert-manager.io
     # Acquisition unwraps for native downloads (ADR-204).
     downloads:
-      enabled: false
+      # Native downloads need the key service to unwrap for the hub-local
+      # download workers (hub.download-worker, enabled by default).
+      enabled: true
       # Retention topology ConfigMaps by target cluster; the cluster catalog
       # adds joined regions.
       retentionTopologies: []

@@ -85,7 +85,7 @@ def main():
     by = {(d["kind"], d["metadata"]["name"]): d for d in docs}
     for component, struct in COMPONENTS.items():
         config = json.loads(by[("ConfigMap", f"asservat-{component}-config")]["data"]["config.json"])
-        expected = go_fields(struct) - ({"downloads"} if component == "key-service" else set())
+        expected = go_fields(struct)
         assert set(config) == expected, (component, set(config) ^ expected)
         assert config["name"] == "asservat" and config["namespace"] == "hub" and set(config["postgres"]) == {"host", "port", "database"}
         pod = by[("Deployment", f"asservat-{component}")]["spec"]["template"]
@@ -124,7 +124,10 @@ def main():
     assert by[("Service", "asservat-federation")]["spec"]["ports"][0]["port"] == 9446
     assert by[("Service", "asservat-key-service")]["spec"]["ports"][0]["port"] == 9447
     assert ("Service", "asservat-publisher") not in by
-    assert ("Role", "asservat-key-service") not in by
+    # Downloads are on by default (the hub-local download workers).
+    assert ("Role", "asservat-key-service") in by
+    off = {(d["kind"], d["metadata"]["name"]): d for d in render(merge(BASE, {"hub": {"key-service": {"downloads": {"enabled": False}}}}))}
+    assert ("Role", "asservat-key-service") not in off and "downloads" not in json.loads(off[("ConfigMap", "asservat-key-service-config")]["data"]["config.json"])
     # Downloads add the acquisition login and the configured topology.
     docs = render(merge(BASE, {"hub": {"key-service": {"downloads": {"enabled": True, "retentionTopologies": [{"targetClusterID": "10000000-0000-4000-8000-000000000002", "name": "topology"}]}}}}))
     by = {(d["kind"], d["metadata"]["name"]): d for d in docs}
