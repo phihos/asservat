@@ -213,7 +213,7 @@ func readWorkerIdentity(ctx context.Context, l *Ledger, root, installation strin
 	}
 	// A served or otherwise ended parent is a positive observation for the
 	// exact latest unterminated worker, so it can stop cleanly.
-	if current.ID == r.ID && current.TerminationJson == nil && current.RetiredProofJson == nil && artifact.DownloadState(parent.State).Terminal() && identity.Fresh(start.Time, start.Time.Add(5*time.Second), now.Time, 5*time.Second) && ctx.Err() == nil {
+	if current.ID == r.ID && current.TerminationJson == nil && current.RetiredProofJson == nil && artifact.DownloadState(parent.State).Terminal() && identity.Check(start.Time, identity.SQLFenced).Valid(now.Time) && ctx.Err() == nil {
 		return out, &evidence.NativeParentFinished{Worker: w}
 	}
 	if current.ID != r.ID || current.TerminationJson != nil || current.RetiredProofJson != nil || !now.Time.Before(w.Intent.RunUntil) || !now.Time.Before(parent.Deadline.Time) || artifact.DownloadState(parent.State).Terminal() || !identity.Fresh(start.Time, start.Time.Add(5*time.Second), now.Time, 5*time.Second) {
