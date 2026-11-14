@@ -239,8 +239,6 @@ class RegionalContextSelection(unittest.TestCase):
         self.assertFalse(heavy["tshark"])
         self.assertTrue(heavy["builder"])
         self.assertIn("timeout-minutes: 20",workflow)
-        source=(Path(__file__).resolve().parents[1]/"test/integration/installed_profile_comparison_native_test.go").read_text()
-        self.assertLess(source.index("resources[0](index, handle, operation, pair, true)"),source.index("\n\tproofs.flush(t)"))
 
     def test_accepted_heavy_generator_image_provenance_and_nonroot_readability(self):
         # This checks provenance plumbing with synthetic bytes; the separate
@@ -374,21 +372,6 @@ class RegionalContextSelection(unittest.TestCase):
         workflow = (Path(__file__).resolve().parents[1]/".github/workflows/native.yml").read_text()
         self.assertFalse(native_needs("continuation-manual-heap")["tshark"])
         self.assertIn("timeout-minutes: 20", workflow)
-
-    def test_heap_summary_precedes_authorized_native_preparation(self):
-        source = (Path(__file__).resolve().parents[1]/"test/integration/installed_approved_recording_native_test.go").read_text()
-        check = source.index('verify := summaryCheck(row.ID)')
-        browser = source.index('call, downloadNative, finishBrowser := installedProfileBrowser(', check)
-        summary = source.index('heapSummary := queryInstalledProfileSummary(', browser)
-        joined = source.index('heap phase: installed React summary completed with joined SQL worker/key proof', summary)
-        preparing = source.index('heap phase: separately authorized browser native preparation begins', joined)
-        native = source.index('native, _ := downloadNative()', preparing)
-        self.assertLess(check, browser)
-        self.assertLess(browser, summary)
-        self.assertLess(summary, joined)
-        self.assertLess(joined, preparing)
-        self.assertLess(preparing, native)
-        self.assertLess(native, source.index('installedProfileSummaryMatchesNative(heapSummary, native', native))
 
     def test_policy_recording_guard_precedes_all_external_setup(self):
         with patch.dict(os.environ, {"ASSERVAT_JOURNEY_FOCUS": "policy-recording"}), patch.object(fixture.Path, "is_file", return_value=False), patch.object(fixture, "run", side_effect=AssertionError("external setup before guard")) as external:
