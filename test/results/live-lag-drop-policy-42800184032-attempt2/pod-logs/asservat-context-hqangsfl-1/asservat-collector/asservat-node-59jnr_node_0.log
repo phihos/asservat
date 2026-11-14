@@ -1,4 +1,0 @@
-2026-11-10T10:55:08.385034389Z node collector probe: kernel 7.0.0-1017-azure; btf supported; cgroup2 supported; bpf supported; tcx supported; tc supported; tracefs supported; hostpid supported; runtime containerd; engine linked=true initialized=true v0.57.0; packetCapture Available prerequisites=true hook="tc" []; syscallTrace Available prerequisites=true hook="" []; goProfile Available prerequisites=true hook="" []
-2026-11-10T10:55:08.385432196Z node collector ring medium: encrypted disk available=false removedEarlier=0
-2026-11-10T10:55:08.401362345Z node collector enrolled: node asservat-context-hqangsfl-1-control-plane, epoch 793e6b86-66dd-4058-b850-c5b262289f02, certificate until 2026-11-10T11:15:08Z
-2026-11-10T10:56:51.266646243Z node collector: source 69a7455d-dec7-4ded-9110-0a54d7f03701 stopped: observation lease expired

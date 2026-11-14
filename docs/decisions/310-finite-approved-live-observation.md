@@ -81,8 +81,8 @@ runs 42542873758 (policy) and 42542876337 (manual) at `beff40d2` pass packet,
 syscall and HTTP projections through real C-03/SQL/owner/node delivery to MCP
 and React, including separate HTTP Save/download and joined manual cancellation.
 Both artifacts record unchanged sources and complete cleanup
-([policy provenance](../../test/results/live-observation-policy-native-42542873758/README.md),
-[manual provenance](../../test/results/live-observation-manual-native-42542876337/README.md)).
+(policy provenance,
+manual provenance).
 These named fixtures do not qualify wider CNI, grouped/argument/peer or
 sustained-operation profiles.
 

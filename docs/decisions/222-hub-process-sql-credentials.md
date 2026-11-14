@@ -114,7 +114,7 @@ excluded process duties, retired role names, projection contents, aggregate role
 limits and the unchanged 32-connection budget. Run real scoped SQL operations,
 pool saturation/cancellation/cleanup regressions and existing transactional
 refusal cases. Qualify installer provisioning and the public investigation journey
-on frozen integrated sources, including ADR-219/221. The [component archive](../../test/results/resumed-c62e02ac-hub-credentials/README.md)
+on frozen integrated sources, including ADR-219/221. The component archive
 retains commands, exits, frozen-source hashes, preceding failures and independent
 review. Focused contract, bootstrap and PostgreSQL adapter tests, integration-package
 compilation and the spec, architecture and design gates pass. Kubernetes adapter

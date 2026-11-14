@@ -1,2 +1,0 @@
-2026-11-10T10:41:29.067789414Z 2026/11/10 10:41:29 http: TLS handshake error from 10.244.0.1:26507: tls: failed to verify certificate: x509: certificate signed by unknown authority
-2026-11-10T10:41:50.732718841Z service stopped: protected configuration, credentials or original deadline unavailable

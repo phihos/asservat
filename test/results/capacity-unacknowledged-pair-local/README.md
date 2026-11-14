@@ -1,7 +1,0 @@
-# Capacity setup repair service qualification
-
-The original failed installer retained one immutable unacknowledged setup claim and neither paired SQL row. The repair permits finishing this original pair under independently current protected roles, permission, protection and recovery, with both rows absent under existing locks. Original claim/incarnation/timestamps remain immutable; half-pairs and missing roots after acknowledgement deny. No schema, role, API request, timer, configuration, runtime state or refund is added.
-
-Actual service f49bc502 exits1 in20.137s: the new original-claim regression passes, then a stale case-route test expectation fails. The exact one-expression fixture correction adds the original Version and NativeType already returned by the unchanged adapter. Fresh 1eb93550 exits0 in83.524s, all106 selected names pass. Both4304-entry inventories independently match their Git heads, remain unchanged and clean up with cleanupFailures=[]. Root independently rechecks every Git blob and all5 compressed originals; hashes and separate campaign audits are retained.
-
-This qualifies actual PostgreSQL/S3/OpenBao activation, fixed-role setup/accounting and publication controls. Private Kubernetes root/guard observations are synthetic. It does not prove installed bootstrap timing or the complete logs workflow. The first retained postclaim failure remains unknown; no original retained setup or capture is retried.

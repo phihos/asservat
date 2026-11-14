@@ -1,6 +1,0 @@
-# asservat.local/asservat/test/integration [asservat.local/asservat/test/integration.test]
-test/integration/profile_admission_test.go:259:17: no new variables on left side of :=
-test/integration/profile_admission_test.go:259:20: cannot use execution.Disposition{…} (value of struct type "asservat.local/asservat/internal/domain/execution".Disposition) as "asservat.local/asservat/internal/domain/capture".ContextRequestDisposition value in assignment
-test/integration/profile_admission_test.go:260:63: cannot use disposition (variable of struct type "asservat.local/asservat/internal/domain/capture".ContextRequestDisposition) as "asservat.local/asservat/internal/domain/execution".Disposition value in argument to execSQL.RecordAPIStart
-FAIL	asservat.local/asservat/test/integration [build failed]
-FAIL

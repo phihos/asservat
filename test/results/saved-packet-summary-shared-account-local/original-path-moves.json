@@ -1,7 +1,0 @@
-{
-  "test/results/packet-summary-shared-principal-green-environment.json": "/home/phil/.cache/asservat-build/saved-packet-summary/shared-principal-originals/packet-summary-shared-principal-green-environment.json",
-  "test/results/packet-summary-shared-principal-green.log": "/home/phil/.cache/asservat-build/saved-packet-summary/shared-principal-originals/packet-summary-shared-principal-green.log",
-  "test/results/packet-summary-shared-principal-red-environment.json": "/home/phil/.cache/asservat-build/saved-packet-summary/shared-principal-originals/packet-summary-shared-principal-red-environment.json",
-  "test/results/packet-summary-shared-principal-red-postgres.log": "/home/phil/.cache/asservat-build/saved-packet-summary/shared-principal-originals/packet-summary-shared-principal-red-postgres.log",
-  "test/results/packet-summary-shared-principal-red.log": "/home/phil/.cache/asservat-build/saved-packet-summary/shared-principal-originals/packet-summary-shared-principal-red.log"
-}

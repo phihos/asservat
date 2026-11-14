@@ -70,7 +70,7 @@ explicit installed layout, and preserve omitted legacy bytes. Component recipe
 checks, actual provider qualification and deployed owner execution are distinct;
 none enables public serving or the Helm runtime on its own.
 
-The [owned native provider qualification](../../test/results/owner-provider-auth-native-check.log)
+The owned native provider qualification
 passes all six scenarios with the pinned provider and a real Kubernetes API.
 It covers the four generated login/renewal profiles, first effects and purpose
 separation, audience/policy rejection, original-Pod deletion, external reviewer
@@ -85,7 +85,7 @@ finite backoff, rotation with retained original effect leases and joined shutdow
 The result does not qualify the installed supervisor or select this provider
 profile; the receipt-bound loader and concrete effect composition remain pending.
 
-The [extended native provider test](../../test/results/owner-provider-leased-effects-native-check.log)
+The extended native provider test
 also passes the actual maintained Transit/PKI effects through the four leased
 clients, verifies both issued certificate purposes and observes denial of all
 four tokens after joined retirement. Its installation, recovery and permit facts
@@ -128,13 +128,13 @@ are both the existing 20-minute period plus one-minute early-renewal ceiling;
 the actual fixed UTC certificate periods are unchanged. Isolated actual signing
 accepts 20m30s and rejects 22m and explicit not-before. The complete native retry
 and installed producer/runtime qualification remain separate pending gates.
-See the [diagnostic archive](../../test/results/owner-provider-setup-diagnostics/archive.json)
-and [correction component result](../../test/results/owner-provider-setup-correction-integration.json).
+See the diagnostic archive
+and correction component result.
 The public-input observation digest retains exact int64 generation values;
 canonical floating-point rounding must never collapse distinct generations.
 
 
-The corrected [complete native retry](../../test/results/owner-provider-setup-native-retry-result.json)
+The corrected complete native retry
 now passes the read-only setup verifier and subsequent actual leased Transit and
 both PKI effects with the generated pool-scoped roles. All seven child scenarios
 pass, including configured reviewer rotation and original account identity.

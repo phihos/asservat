@@ -57,13 +57,13 @@ use cases. This decision adds no API, route, approval or public configuration.
 Helm renders both purposes, their grants and projection files with the rest of
 the role inventory. An upgrade adds them like any other rendered role.
 
-The [component gate](../../test/results/public-context-assembly-component-1/result.json)
+The component gate
 passes 300 top-level race tests, compilation, vet and canonical checks. It tests
 assembly bindings and original identity denial, not a positive complete journey.
 Actual generated-role SQL checks pass in the unchanged first-installation
 fixture: all 87 named tests pass with owned PostgreSQL/S3/OpenBao services.
 The wrapper omitted four existing test names and retains exit 1; the
-[independent verification](../../test/results/public-context-assembly-native-verification/result.json)
+independent verification
 checks the source-derived complete inventory, original limits and cleanup.
 Credentials and backing
 for every downstream download role, regional entrypoint, owned supervision and

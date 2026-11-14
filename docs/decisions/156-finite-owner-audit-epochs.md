@@ -116,8 +116,8 @@ current provider inventory credentials have independent authority and bounds.
 
 ## Component qualification
 
-The [integrated value foundation](../../test/results/owner-audit-epoch-integration.json)
-passes [component qualification](../../test/results/owner-audit-epoch-package/component-1/result.json):
+The integrated value foundation
+passes component qualification:
 35 fleet-domain, 25 audit-domain and 84 fleet-application top-level race tests
 (807 named passes), affected compilation and vet, and specification, architecture
 and design gates. An earlier unshipped draft reproduces two elapsed-dependency
@@ -130,7 +130,7 @@ the immutable values, finite arithmetic, conservative accounting and port
 contracts. They do not qualify SQL admission, reserve or
 checkpoint producers, automatic rollover, writer closure or physical retirement.
 
-The separate [codec integration](../../test/results/owner-epoch-codec-integration.json)
+The separate codec integration
 passes the full framed package race suite (42 top-level tests, 99 named passes),
 compilation, vet and canonical gates with 4,387 frozen dependencies. It uses the
 new purpose-bound encryption context, a 64 KiB plaintext and 128 KiB envelope

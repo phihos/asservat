@@ -151,8 +151,8 @@ An actual workspace/approval/projection HTTP-client unit journey passes through
 Pending→Approved before querying the same selected source; transport replies
 are synthetic. Component checks do not establish installed operation.
 
-The [SQL/upgrade evidence](../../test/results/saved-syscall-query-services-local/README.md)
-and [encrypted-reader resource evidence](../../test/results/saved-syscall-query-resource-local/README.md)
+The SQL/upgrade evidence
+and encrypted-reader resource evidence
 now pass their separate scopes. SQL paid loops use synthetic crypto/join proofs;
 the resource component runs the actual encrypted reader/parser. Neither proves
 the full installed composition. The new installed fixture retains all five fixed

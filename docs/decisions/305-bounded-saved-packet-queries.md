@@ -174,7 +174,7 @@ qualification.
 
 Candidate `360ba3f60d71c500dff6e5c6512ce38a71421f0d` implements the complete
 metadata/raw source, authority, grant-use, query, worker codec and React/MCP
-composition. [Local originals](../../test/results/saved-packet-query-local/README.md) retain meaningful failures and focused races. The built
+composition. Local originals retain meaningful failures and focused races. The built
 React/Go TLS gate at `bb936966` passed in 107.539 seconds, including limited
 nested output and zero/null/prefix checks. Its source reuse is explicit; later
 SQL/fixture corrections have separate proof. The canonical/runtime
@@ -183,7 +183,7 @@ outer hint, without raising 24 KiB or trimming rows. The parser reserves 4096 B
 for wrapping; a 20,424 B primitive page fits direct 21,254 B and nested 21,955
 B audited replies.
 
-[Managed services](../../test/results/saved-packet-query-services-local/README.md) passed separately for metadata 13.764 seconds (`5722a38e`) and raw
+Managed services passed separately for metadata 13.764 seconds (`5722a38e`) and raw
 15.639 seconds (`b2759438`), each with 4,194 exact source hashes and clean
 cleanup. The actual compiled-role path covers two batches/six key roles and raw
 per-batch 24 KiB/one-operation uses, current child/parent decisions, atomic
@@ -193,7 +193,7 @@ controlled component facts. Upgrade 139 at `360ba3f6` passed 401 tests, exact
 and source-specific 48 KiB control-binding CHECK are SQL implementation bounds,
 not new authorization or returned-data allowances.
 
-[Resource runs](../../test/results/saved-packet-query-resource-local/README.md) at `b2759438` cover two exact 8 MiB originals, 256 instructions, 16
+Resource runs at `b2759438` cover two exact 8 MiB originals, 256 instructions, 16
 currently distinct fields/64 B raw prefixes and 233,011 tiny records/cache
 overflow, plus cancel/error joins. All 1,812 dependency hashes matched and four
 consumers/probes/cleanup passed. Complete cgroup memory peaks 94,838,784

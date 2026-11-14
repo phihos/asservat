@@ -5,7 +5,7 @@
 > Superseded in part by ADR-328 (2026-11-13): the continuation generating the key material, the ConfigMap's UID and SHA-256 pins on the key Secret, the admission guard on the key configuration ConfigMap, and the continuation-built SQL projection (decisions 2, 3 and 5) no longer apply. The Helm `secrets` hook Job creates the root key Secret once if missing and never rotates it; Helm renders the configuration ConfigMap and the key-service RBAC. Still valid: a separate key-service Deployment that alone mounts the key (decision 1), permanent SQL logins, connectors resolved from SQL (decision 4), the operator serving Secret, worker-PKI key clients and no download unwrap.
 
 Date: 2026-10-17. Status: accepted; implemented and natively qualified
-([ADR-196 continuation run 8](../../test/results/adr196-continuation-native-8/environment.json)).
+(ADR-196 continuation run 8).
 Requirements: REQ-DEP-003/005, REQ-FED-002, artifact-downloads, S-02; TASK-03, TASK-11.
 Gap 5 of [ADR-196](196-regional-cluster-join.md). Installs the
 [ADR-176](176-artifact-keys-local-key-service.md) key service with the
@@ -178,8 +178,8 @@ OpenBao-wrapped roots stay future work.
 - **Unit tests.** Contracts, mtls, postgres, bootstrap and the affected
   Kubernetes tests pass.
 - **Native runs 1–3 failed and are retained.**
-  - Runs [1](../../test/results/adr198-continuation-native-1/environment.json)
-    and [2](../../test/results/adr198-continuation-native-2/environment.json)
+  - Runs 1
+    and 2
     installed the key service. In both, its configuration was accepted in
     SQL at revision 1, and each failed on a check in the test.
     - Run 1 queried the `bytea` snapshot as `jsonb`.
@@ -188,7 +188,7 @@ OpenBao-wrapped roots stay future work.
       the server's acceptable-CA list did not name its issuer.
     - The check now forces the certificate and accepts any remote TLS
       alert after the server is verified under the offer's roots.
-  - [Run 3](../../test/results/adr198-continuation-native-3/environment.json)
+  - Run 3
     stopped earlier, at the owner launch's
     `projection.final-native` (`finalize-commit`). The finalization
     transaction exceeded its narrowed freshness bound after 4.0 s. This is
@@ -196,7 +196,7 @@ OpenBao-wrapped roots stay future work.
     this change does not touch. It is recorded as an intermittent timing
     failure; validation was not weakened.
   - All three runs exited with no cleanup failures and unchanged sources.
-- **Natively qualified** in [ADR-196 continuation run 8](../../test/results/adr196-continuation-native-8/environment.json), which
+- **Natively qualified** in ADR-196 continuation run 8, which
   passed (exit 0, all four tests, no cleanup failures, source unchanged):
   - the continuation installs the key service, and SQL accepts its
     configuration at revision 1;

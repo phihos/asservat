@@ -64,7 +64,7 @@ tasks: many records describe successive parts of the same mechanisms, grouped be
 
 ### 1. The download fast path has a demonstrated budget contradiction
 
-The focused [policy request measurement](../../../test/results/resumed-c62e02ac-download-policy-budget/README.md)
+The focused policy request measurement
 finds 14 observer requests and three probe requests per complete policy read. A current
 download environment evaluates policy twice. The first new-worker preparation path has
 ten complete gates: **280 observer requests**. With the configured 20 QPS and a full
@@ -72,12 +72,12 @@ burst of 20, the observer requests alone have a **13-second rate-limit lower bou
 That excludes probes, SQL, object audit, scheduling and competing work. The authority
 window is five seconds.
 
-The separate [whole-phase reproduction](../../../test/results/resumed-c62e02ac-download-whole-phase-budget/README.md)
+The separate whole-phase reproduction
 fails after **4.951 seconds**, with **119 observer and 27 probe requests**, before worker
 creation. It uses the actual coordinator and Kubernetes policy reader with immediate
 synthetic downstream ports. This establishes a composition defect; it does not prove
 that every millisecond of the installed failure has the same cause. The installed
-[native50 result](../../../test/results/resumed-c62e02ac-native50/result.json) independently
+native50 result independently
 records an unavailable preparation after 4.433 seconds and no emitted native bytes.
 
 The measured repeated reads reconstruct the protected installation `DownloadPolicy`

@@ -1,7 +1,0 @@
-# Saved logs start diagnosis
-
-Signed candidate `ed7ebe0606a464db9a5785f086eeb9233c47c7df` passed [CI42112331527](https://github.com/phihos/asservat/actions/runs/42112331527). [Installed42112422885](https://github.com/phihos/asservat/actions/runs/42112422885) failed after 507.886s: preview and approval succeeded, the original accepted capture remained uncertain. All 4,364 Git inputs matched, source remained unchanged, provider collection exited zero, scratch was removed, and cleanupFailures was empty.
-
-The retained local campaign also failed (Go/harness 1, 492.278s). Read-only original-state inspection found the execution still prepared with no start object or start timestamp. The API-only constructor initialized the logs holder before assigning the complete output struct, discarding that pointer. No original capture was retried. The retained run originally reported cleanupComplete=false; subsequent explicit cleanup exited zero and independently found zero owned containers, networks or Kind clusters. Those reports remain separate.
-
-The subsequent signed constructor/default-client fix is `a03baf86e2332be440c636cf4a2aaef13f03d6af`. Its regression fails on the old constructor and passes after moving existing initialization. Fresh initial human-client defaults also explicitly include logs; existing administrator policies are unchanged. Affected bootstrap/privacy race tests pass (119.024s/1.016s). Corrected installed qualification is pending and must name its own commit.

@@ -52,10 +52,6 @@ jobs:
       - uses: actions/checkout@v7
         with:
           filter: "blob:none"
-          sparse-checkout-cone-mode: false
-          sparse-checkout: |
-            /*
-            !/test/results/
       # The image's /mnt scratch disk (when present) holds Docker's data, so
       # kind nodes and pinned images do not compete with Go caches on /.
       - name: Docker data on /mnt

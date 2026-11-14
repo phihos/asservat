@@ -98,7 +98,7 @@ No checkbox or component pass establishes an installed raw-summary workflow.
 
 PR167 merged as `897fd783` with the complete tree equal to reviewed `b6e2c084`.
 Eligible pull-request CI41960208068 passed all15 jobs. The
-[installed manual-raw reference](../../test/results/raw-packet-summary-native-41960249012/README.md)
+installed manual-raw reference
 passed Go/harness0 in773.697s: ordinary read-only MCP and actual React summaries
 matched the same authenticated9,400-byte original through native/tshark parity,
 54 saved records, two directional groups and0 unclassified records. Payload

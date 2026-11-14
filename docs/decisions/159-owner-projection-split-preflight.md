@@ -10,13 +10,13 @@ REQ-DEP-003; existing implementation work remains under TASK-02/TASK-11.
 
 ## Observed failure
 
-The [eighth installed-owner run](../../test/results/runtime-provider-owner-native-8/result.json)
+The eighth installed-owner run
 stops at the first projection's final native fleet-policy read. Its fixed codes
 identify `final-native / source.guards-final / source.guard-fleet /
 source.guard-policy-read`; the same SQL call records exactly one source-client
 limiter refusal while its context remains live. All six original standard
 20-QPS/burst-20 clients are retained. This is a failed installed run, not a
-qualification of the correction. The [log](../../test/results/runtime-provider-owner-native-8/context-storage.log)
+qualification of the correction. The log
 preserves the deciding codes and per-call counters.
 
 The ADR-158 projection completes a native preflight before the retained SQL

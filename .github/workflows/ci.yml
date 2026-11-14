@@ -9,14 +9,9 @@ concurrency:
   cancel-in-progress: true
 permissions:
   contents: read
-env:
-  # Recorded local results are evidence, not inputs; never fetch them.
-  CHECKOUT_SPARSE: |
-    /*
-    !/test/results/
 
 jobs:
-  # Documentation, recorded results and the design prototype cannot change
+  # Documentation and the design prototype cannot change
   # Go or console results; such pushes run only the checks job. The console
   # generates contracts from docs/interfaces, so that folder always counts.
   changes:
@@ -60,7 +55,7 @@ jobs:
           # omit code changes, so only shorter, successful lists can skip checks.
           # Both paths of renames count; extra names only make this conservative.
           if [[ -n $files ]] && (( $(wc -l <<< "$files") < limit )) &&
-             ! grep -qvE '^(docs/|test/results/|design/|[^/]+\.md$)' <<< "$files" && ! grep -q '^docs/interfaces/' <<< "$files"; then
+             ! grep -qvE '^(docs/|design/|[^/]+\.md$)' <<< "$files" && ! grep -q '^docs/interfaces/' <<< "$files"; then
             code=false
           fi
           echo "code=$code" | tee -a "$GITHUB_OUTPUT"
@@ -69,7 +64,6 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      # Full checkout: spec-check verifies documentation links into test/results.
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
         with: { helm: "true" }
@@ -92,7 +86,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
-        with: { filter: "blob:none", sparse-checkout: "${{ env.CHECKOUT_SPARSE }}", sparse-checkout-cone-mode: false }
+        with: { filter: "blob:none" }
       - uses: ./.github/actions/setup
         with: { sql-tools: "true" }
       - run: go vet ./...
@@ -145,7 +139,7 @@ jobs:
     name: test (${{ matrix.shard }}/${{ strategy.job-total }})
     steps:
       - uses: actions/checkout@v7
-        with: { filter: "blob:none", sparse-checkout: "${{ env.CHECKOUT_SPARSE }}", sparse-checkout-cone-mode: false }
+        with: { filter: "blob:none" }
       - uses: ./.github/actions/setup
       # Whole packages run under -race two at a time, as the local gate
       # (GOFLAGS=-p=2), not four, which starved timing-bound tests.
@@ -168,7 +162,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
-        with: { filter: "blob:none", sparse-checkout: "${{ env.CHECKOUT_SPARSE }}", sparse-checkout-cone-mode: false }
+        with: { filter: "blob:none" }
       - uses: ./.github/actions/setup
         with: { go: "false", console: "true" }
       - run: make console-check
@@ -180,7 +174,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
-        with: { filter: "blob:none", sparse-checkout: "${{ env.CHECKOUT_SPARSE }}", sparse-checkout-cone-mode: false }
+        with: { filter: "blob:none" }
       - uses: ./.github/actions/setup
         with: { console: "true" }
       - id: playwright
@@ -206,7 +200,7 @@ jobs:
     name: native-go-cache (${{ matrix.kind }})
     steps:
       - uses: actions/checkout@v7
-        with: { filter: "blob:none", sparse-checkout: "${{ env.CHECKOUT_SPARSE }}", sparse-checkout-cone-mode: false }
+        with: { filter: "blob:none" }
       - uses: ./.github/actions/setup
       - id: libpcap
         uses: actions/cache@v6

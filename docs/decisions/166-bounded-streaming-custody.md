@@ -94,7 +94,7 @@ Implemented:
 The plain `Register` path refuses attempts above one frame.
 
 Verification:
-[adr166-streaming-custody-6](../../test/results/adr166-streaming-custody-6/result.json)
+adr166-streaming-custody-6
 passes the whole `TestCustodyWithRealServices` on real PostgreSQL and SeaweedFS,
 including the streaming subtest. It covers 20 MiB in three parts, refusal of
 spent creates, the SQL constraint for journal-less large attempts, and create-only

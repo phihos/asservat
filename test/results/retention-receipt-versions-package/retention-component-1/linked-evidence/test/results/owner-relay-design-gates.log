@@ -1,3 +1,0 @@
-/tmp/asservat-openapi-validation/bin/python scripts/check-specs.py
-FAIL: list indices must be integers or slices, not str
-make: *** [Makefile:5: spec-check] Error 1

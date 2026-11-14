@@ -78,7 +78,7 @@ S-02 exit item 6 is satisfied for duplicate and reconnected starts (one effect,
 Indeterminate after their deadline. Unit tests cover the runner, the progress
 projection and the sweep.
 
-[Installed run 42630012490](../../test/results/lost-completion-native-42630012490/README.md)
+Installed run 42630012490
 qualifies the recovery state through the real storage, execution, replay,
 progress and deadline-observer path. A scoped trigger rejected only the hub's
 `started → stored` transition after all four regional ciphertext objects
@@ -89,7 +89,7 @@ deterministic completion-loss fixture, not a measurement of TCP packet-loss
 timing. The separate pre-start KMS failure also reached the same terminal state
 with zero executions.
 
-The [targeted real-PostgreSQL observer run](../../test/results/lost-completion-sql.log)
+The targeted real-PostgreSQL observer run
 also passed: both the original deadline role and the installed `context-cleanup`
 role produced one durable transition under concurrency, public progress changed
 to the expected indeterminate reason, and repeated/reverse mutations were denied

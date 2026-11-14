@@ -29,7 +29,7 @@ labels and one million inline lines. Actual TLS, object checks, crypto and
 streaming replace the earlier modeled 16 MiB buffers. Under a 256 MiB memory
 cgroup/no swap, GOMAXPROCS=2/GOGC=100, the read returned a valid summary with
 176.4 MiB peak process RSS and 156 MiB cgroup peak in 254.5 ms. See the
-[terminal report](../../test/results/pprof-streamed-summary-process.json).
+terminal report.
 The configured 500m CPU quota did not establish throttled execution on this
 host; elapsed time is not an installed 500m guarantee. No service remained.
 

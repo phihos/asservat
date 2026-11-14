@@ -62,9 +62,9 @@ delete marker. Independent administrator inventories must confirm their absence.
 Only the initial read-only credential subscription probe retries; none of these
 permission assertions or mutation probes does. Synthetic cleanup is bounded.
 
-The [focused native test](../../test/results/installed-evidence-delete-native-1/installed-evidence-delete.log)
+The focused native test
 passed on `2a5aea59a19a131c30a9c2df44a937a72903dd6c` on 2026-10-18.
-Its [environment report](../../test/results/installed-evidence-delete-native-1/installed-evidence-delete-environment.json)
+Its environment report
 records the exact required test, exit 0, unchanged sources and no cleanup failures.
 All 2,594 recorded source hashes match that commit's archive. The report SHA-256
 is `37b4565243f897f9f7e3ccb4f87f40db2a1e8977f3d441480b6018c425a654b8`.

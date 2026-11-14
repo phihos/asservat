@@ -46,7 +46,7 @@ The first combined Go/architecture invocation completed Go tests but exited 2 be
 
 `permission-kubernetes*-before-tidy.*` preserves the earlier passing real-server fixture. It was rerun after the YAML direct-dependency classification so the final integration input hashes match the final module. The vulnerability scan and fuzz run preceded that classification-only change; resolved versions and parser source were unchanged.
 
-Ordinary Go tests skip the real-server test without its owned fixture. A skip is not integration success. The [verification inventory](../../test/results/permission-verification.json) records final source/log hashes after checks; it complements the integration harness's independent before/after hashes rather than claiming every gate captured them during execution.
+Ordinary Go tests skip the real-server test without its owned fixture. A skip is not integration success. The verification inventory records final source/log hashes after checks; it complements the integration harness's independent before/after hashes rather than claiming every gate captured them during execution.
 
 ## Remaining work
 
