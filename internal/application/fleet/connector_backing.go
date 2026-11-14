@@ -55,13 +55,29 @@ func (b ConnectorIdentityBacking) Clone() ConnectorIdentityBacking {
 	return b
 }
 
+// ConnectorBackingStanding is the connector backing's ValidUntil: the backing
+// is a standing configuration, valid until replaced (ADR-332), not a window a
+// connector must restart or enroll within. The value is RFC 5280's
+// "no well-defined expiration" time; finite, as the SQL columns require.
+var ConnectorBackingStanding = audit.StandingAdmission
+
+// The standing backing's structural sizes (ADR-332). They size its accounting
+// only: SQL counts no connector profile, source transition, identity account
+// or record against them, so clusters join on demand without a reinstall.
+const (
+	ConnectorStandingAccounts          int64 = 256
+	ConnectorStandingProfiles          int64 = 256
+	ConnectorStandingSourceTransitions int64 = 4096
+	ConnectorStandingRecordsPerAccount int64 = 1000000
+)
+
 type ConnectorIdentityConfiguration struct {
 	Source  value.ConnectorIdentitySource
 	Backing ConnectorIdentityBacking
 }
 
 func (c ConnectorIdentityConfiguration) Valid(now time.Time) bool {
-	return c.Source.Valid(now) && c.Source.Observation.Backing.Revision == c.Backing.Policy.BackingRevision && c.Backing.Valid() && c.Backing.Policy.RootID == c.Source.Observation.Profile.RootID && c.Backing.Policy.InstallationID == c.Source.Observation.Profile.Binding.InstallationID && c.Backing.SupportsDeployment(c.Source.Observation.Profile.Deployment) && now.Before(c.Backing.Policy.ValidUntil)
+	return c.Source.Valid(now) && c.Source.Observation.Backing.Revision == c.Backing.Policy.BackingRevision && c.Backing.Valid() && c.Backing.Policy.RootID == c.Source.Observation.Profile.RootID && c.Backing.Policy.InstallationID == c.Source.Observation.Profile.Binding.InstallationID && c.Backing.SupportsDeployment(c.Source.Observation.Profile.Deployment)
 }
 func (c ConnectorIdentityConfiguration) Clone() ConnectorIdentityConfiguration {
 	c.Source.Observation.Profile = c.Source.Observation.Profile.Clone()

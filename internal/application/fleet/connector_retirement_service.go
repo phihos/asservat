@@ -59,7 +59,7 @@ func (r ConnectorRetirementRecord) Valid() bool {
 		}
 		switch r.Restriction.Cause {
 		case audit.ConnectorRetirementExpiry:
-			if r.Restriction.RetiringSource != nil || r.RestrictedAt.Before(t.AdmissionUntil) {
+			if r.Restriction.RetiringSource != nil || t.Standing() || r.RestrictedAt.Before(t.AdmissionUntil) {
 				return false
 			}
 		case audit.ConnectorRetirementExplicit:
@@ -170,6 +170,11 @@ func (s ConnectorRetirementService) retire(ctx context.Context, ticketID, cause 
 	}
 	if e != nil || !valid(record) {
 		return result, value.ErrUnavailable
+	}
+	// ADR-332: a standing cohort has no admission end to expire at; only an
+	// explicit retiring source retires it.
+	if cause == audit.ConnectorRetirementExpiry && record.Ticket.Standing() {
+		return result, value.ErrDenied
 	}
 	if record.Restriction == nil {
 		if cause == audit.ConnectorRetirementExplicit {

@@ -323,10 +323,6 @@ remote:
   owners: hub.example:9444                # -> <name>-hub-api-native:9444
   keyService: https://hub.example:9447    # -> <name>-key-service:9447
   objectStore: https://hub.example:8333   # -> the evidence object store
-federation:
-  connector:
-    profiles: 2   # every connector: the combined-mode one plus each cluster
-    accounts: 2
 ```
 
 Expose the federation (`hub.federation.service`), key service
@@ -335,8 +331,8 @@ Expose the federation (`hub.federation.service`), key service
 (`services.objectStore.seaweedfs.service`) as `LoadBalancer`, `NodePort` or a
 TLS-passthrough route. Connectors verify the in-cluster Service names, so the
 serving certificates need no external name, and no proxy may terminate TLS in
-front of them. `federation.connector` is fixed at the first install: size
-`profiles` for every cluster you will join.
+front of them. There is no connector count to size: each joined cluster's
+connector identity is created when it registers (ADR-332).
 
 After `helm upgrade` of the hub, the hub-api creates the join Secret
 `<name>-join-<cluster>` in the release namespace. It holds the cluster and

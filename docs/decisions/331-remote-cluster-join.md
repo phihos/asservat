@@ -88,8 +88,7 @@ remote:                 # how connectors reach the hub (TCP passthrough)
   `<name>-s3-regional-write-<cluster>` and `-regional-history-<cluster>`,
   scoped to the joined cluster's ID; with an external store the operator
   creates them.
-- `federation.connector.profiles` must cover every connector; the chart
-  refuses fewer. `fleet.maxClusters` and `fleet.maxActiveBootstraps` are
+- `fleet.maxClusters` and `fleet.maxActiveBootstraps` are
   raised to the hub-issued slots.
 
 ## Precedent
@@ -146,7 +145,9 @@ outbound-only connector.
 - A failed first enrollment after the claim consumes the slot (unchanged
   behaviour); re-joining needs a new `clusterID`.
 - The connector backing (`federation.connector`) is fixed at the first
-  install: a cluster beyond `profiles` needs a reinstall.
+  install: a cluster beyond `profiles` needs a reinstall. Superseded by
+  [ADR-332](332-standing-connector-identity.md): there is no connector count;
+  each cluster's profile is created when it registers.
 - ~~Remote captures need the joined cluster to run the hub's image digest.~~
   Removed by [ADR-333](333-connector-version-skew.md).
 - During a connector outage the hub keeps the last delivered capacity set:
