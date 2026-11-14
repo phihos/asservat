@@ -19,7 +19,7 @@ import (
 )
 
 func validCompletedAPI(r value.APIExecution, e artifact.ContextExpectation) bool {
-	return r.Valid() && r.Phase == "stored" && r.Binding.CaptureID == e.CaptureUID && r.Binding.AttemptID == e.Registration.Location.AttemptID && r.Binding.ClusterID == e.Registration.Location.ClusterID && r.Binding.PodUID == e.PodUID && r.Binding.ScopeDigest == e.PlanDigest && r.ExpectationDigest == evidence.ContextExpectationDigest(e) && r.Process.ImageDigest == e.CollectorImageDigest && r.Copies.Validate(e.Registration) == nil && r.CompletedAt.Before(e.Registration.WriteUntil)
+	return r.Valid() && r.Phase == "stored" && r.Binding.CaptureID == e.CaptureUID && r.Binding.AttemptID == e.Registration.Location.AttemptID && r.Binding.ClusterID == e.Registration.Location.ClusterID && r.Binding.PodUID == e.PodUID && r.Binding.ScopeDigest == e.PlanDigest && r.ExpectationDigest == evidence.ContextExpectationDigest(e) && r.Copies.Validate(e.Registration) == nil && r.CompletedAt.Before(e.Registration.WriteUntil)
 }
 
 // A completed execution retains the admitted digest; semantic verification

@@ -56,9 +56,11 @@ func TestHistoryRecorderRepeatRestoresFilterWindowAndFreshPod(t *testing.T) {
 	if err != nil || fresh.Recorder == nil || fresh.Preview.Intent.RequestedSeconds != 90 || fresh.Preview.Intent.Composition.Components[0].Edits[0].Text != "tcp port 8443" || fresh.Preview.Intent.Composition.MaxDuration != "15s" {
 		t.Fatal("edited repeat lost explicit edits", err)
 	}
+	// ADR-333: an upgraded hub (another collector image digest) still repeats
+	// the unchanged profile; the image is provenance, not a dependency gate.
 	f.cap.CollectorImageDigest = artifact.Digest{99}
-	if _, _, err = s.PreviewRepeat(t.Context(), f.source(t, t.Context()), fixtureID(41), nil); !errors.Is(err, value.ErrProfileChanged) {
-		t.Fatal("repeat silently upgraded collector image", err)
+	if _, _, err = s.PreviewRepeat(t.Context(), f.source(t, t.Context()), fixtureID(41), nil); err != nil {
+		t.Fatal("repeat refused after a hub image change", err)
 	}
 }
 func TestHistoryPolicyRequiresExplicitCurrentSelectionAndPodRepeatPinsUID(t *testing.T) {

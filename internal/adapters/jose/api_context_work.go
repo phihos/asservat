@@ -7,7 +7,6 @@ import (
 	"crypto/ed25519"
 	"encoding/hex"
 	"encoding/json"
-	"encoding/json/jsontext"
 	"strings"
 	"time"
 
@@ -184,11 +183,13 @@ func (s *APIContextWorkSignatures) VerifyAPIContextWork(ctx context.Context, enc
 	if !w.Matches(receiver, s.now()) {
 		return out, workStep{"receiver-" + w.MismatchStep(receiver, s.now()), value.ErrDenied}
 	}
+	// The known fields must be this release's canonical profile (fixed
+	// format, purpose, class, action and size; canonical digest/time
+	// spelling). Fields of a newer hub that this release does not know are
+	// ignored (ADR-333); the signature covers the received bytes.
 	canonical, e := wire.EncodeAPIContextWork(apiContextWire(w))
 	defer clear(canonical)
-	// This also rejects noncanonical digest/time spelling and omitted, aliased,
-	// unknown or mismatching fixed profile fields after the strict typed decode.
-	if e != nil || !jsontext.Value(payload).IsValid() || !bytes.Equal(canonical, payload) {
+	if e != nil || !wire.SameKnownFields(payload, canonical) {
 		return out, value.ErrInvalid
 	}
 	call, stop := context.WithDeadline(ctx, identity.Earlier(w.NotAfter, receiver.Window.Until()))

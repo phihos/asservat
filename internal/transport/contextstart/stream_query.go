@@ -199,7 +199,15 @@ func (s *frameStream) nextQuery() (int, error) {
 // API target metadata keeps its own original observation interval (ADR-260).
 // Any error other than errQueryAnswer leaves the stream unusable.
 func (s *frameStream) query(ctx context.Context, method string, in, out any) (time.Time, error) {
-	if s == nil || ctx == nil || s.sources == nil {
+	if s == nil || ctx == nil {
+		return time.Time{}, fleet.ErrInvalid
+	}
+	// ADR-333: an unannounced query is answered here, before any I/O, so the
+	// standby stays waiting for work.
+	if e := requireCapability(s, queryCapability(method), errQueryClass); e != nil {
+		return time.Time{}, errQueryAnswer{e}
+	}
+	if s.sources == nil {
 		return time.Time{}, fleet.ErrInvalid
 	}
 	call, cancel := context.WithTimeout(ctx, 5*time.Second)

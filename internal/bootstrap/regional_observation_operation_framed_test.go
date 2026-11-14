@@ -151,7 +151,7 @@ func (o *framedRegionalNative) Read(ctx context.Context, n int) (value.Connector
 	end, _ := ctx.Deadline()
 	o.end = identity.Earlier(o.end, end)
 	source.Observation.FreshUntil = o.end
-	workload := value.ConnectorObservationWorkload{Process: o.process, Pod: "connector-1", ReplicaSetUID: runtimeID, TemplateDigest: o.f.pin.TemplateDigest, ImageDigest: o.f.pin.ImageDigest, ProtectionDigest: o.f.pin.ProtectionDigest, WorkloadDigest: artifact.Digest{42}, ObservedAt: o.start, FreshUntil: o.end}
+	workload := value.ConnectorObservationWorkload{Process: o.process, Pod: "connector-1", ReplicaSetUID: runtimeID, TemplateDigest: o.f.pin.TemplateDigest, ProtectionDigest: o.f.pin.ProtectionDigest, WorkloadDigest: artifact.Digest{42}, ObservedAt: o.start, FreshUntil: o.end}
 	if o.f.mode == "regional-final" && n == 4 {
 		workload.WorkloadDigest = artifact.Digest{43}
 	}

@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"asservat.local/asservat/internal/adapters/mtls"
 	fleet "asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
 )
@@ -97,5 +98,20 @@ func TestRegionalContextOpeningTimingDoesNotExpandRateLimitKey(t *testing.T) {
 	s.reportFailure("open", timedOpeningDiagnostic{"tls", time.Second, 10 * time.Second})
 	if strings.Contains(out.String(), "private-") || !strings.Contains(out.String(), "open/setup-source-close") || !strings.Contains(out.String(), "open/setup-fresh") || strings.Contains(out.String(), "remaining=10s") {
 		t.Fatalf("diagnostic leaked unknown values: %s", out.String())
+	}
+}
+
+// ADR-333: a connector of another protocol major logs the hub's own refusal
+// and waits 30 seconds before the next attempt.
+func TestRegionalContextLogsHubProtocolRefusal(t *testing.T) {
+	var out bytes.Buffer
+	s := RegionalContextStartConnections{Report: eventLog(&out, "regional context standby refused")}
+	refusal := &mtls.HubProtocolRefusal{Message: "this hub speaks connector protocol 1; upgrade the connector"}
+	s.reportFailure("open", refusal)
+	if !strings.Contains(out.String(), "open/connector-protocol (denied): hub says: this hub speaks connector protocol 1; upgrade the connector") {
+		t.Fatalf("refusal not logged: %s", out.String())
+	}
+	if openingRetry(refusal) != 30*time.Second {
+		t.Fatal("protocol refusal retried immediately")
 	}
 }

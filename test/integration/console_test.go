@@ -57,7 +57,6 @@ func TestConsoleBrowserWithBuiltPackage(t *testing.T) {
 	}
 	sessions := &consoleSyntheticSessions{origin: origin, state: "revoked", expiresAt: time.Now().Add(2 * time.Minute)}
 	sessionHandler := browser.SessionHandler{Origin: origin, Issuer: "https://identity.invalid", Sessions: sessions}
-	fleetHandler, fleet := newConsoleFleet(t, sessionHandler)
 	// Test-only typed services model a single accepted request and an uncertain
 	// reply. Production HTTP, current-identity, CSRF and canonical projection are
 	// exercised without claiming SQL/admission/execution qualification.
@@ -98,10 +97,6 @@ func TestConsoleBrowserWithBuiltPackage(t *testing.T) {
 		t.Fatal(err)
 	}
 	server.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == browser.FleetBootstrapPath {
-			fleetHandler.ServeHTTP(w, r)
-			return
-		}
 		if r.URL.Path == "/test/capture" || r.URL.Path == "/test/capture-stats" {
 			captureService.control(w, r, origin)
 			return
@@ -156,8 +151,7 @@ func TestConsoleBrowserWithBuiltPackage(t *testing.T) {
 		}
 		t.Fatalf("console browser test failed: %v\n%s", err, output.String())
 	}
-	fleet.check(t)
-	t.Logf("Synthetic current identity, fleet issuance, capture and C16 case data; actual Go TLS/static/session/operations and built React console:\n%s", output.String())
+	t.Logf("Synthetic current identity, capture and C16 case data; actual Go TLS/static/session/operations and built React console:\n%s", output.String())
 }
 
 type consoleBoundedOutput struct{ bytes.Buffer }

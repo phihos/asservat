@@ -79,7 +79,6 @@ func sourceWorkValue(b []byte) (app.SourceWork, error) {
 			continue
 		}
 		dec := json.NewDecoder(bytes.NewReader(entry.raw))
-		dec.DisallowUnknownFields()
 		if dec.Decode(entry.value) != nil {
 			return app.SourceWork{}, value.ErrInvalid
 		}
@@ -99,7 +98,6 @@ func sourceWorkValue(b []byte) (app.SourceWork, error) {
 	if len(d.StopSnapshot) > 0 {
 		var x collector.SourceSnapshot
 		decoder := json.NewDecoder(bytes.NewReader(d.StopSnapshot))
-		decoder.DisallowUnknownFields()
 		if decoder.Decode(&x) != nil {
 			return app.SourceWork{}, value.ErrInvalid
 		}
@@ -108,7 +106,6 @@ func sourceWorkValue(b []byte) (app.SourceWork, error) {
 	if len(d.StopProfile) > 0 {
 		var x collector.ProfileStop
 		decoder := json.NewDecoder(bytes.NewReader(d.StopProfile))
-		decoder.DisallowUnknownFields()
 		if decoder.Decode(&x) != nil {
 			return app.SourceWork{}, value.ErrInvalid
 		}
@@ -117,14 +114,16 @@ func sourceWorkValue(b []byte) (app.SourceWork, error) {
 	if len(d.StopRecording) > 0 {
 		var x collector.RecordingStop
 		decoder := json.NewDecoder(bytes.NewReader(d.StopRecording))
-		decoder.DisallowUnknownFields()
 		if decoder.Decode(&x) != nil {
 			return app.SourceWork{}, value.ErrInvalid
 		}
 		w.StopRecording = &x
 	}
+	// The known fields must equal this release's canonical encoding (no alias,
+	// omission or noncanonical spelling); members of a newer hub that this
+	// release does not know are ignored (ADR-333).
 	canonical, e := sourceWorkBytes(w)
-	if e != nil || !bytes.Equal(canonical, b) {
+	if e != nil || !wire.SameKnownFields(b, canonical) {
 		return app.SourceWork{}, value.ErrInvalid
 	}
 	return w, nil

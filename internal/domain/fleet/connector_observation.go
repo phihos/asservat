@@ -17,11 +17,11 @@ type ConnectorObservationPin struct {
 	Roles   ConnectorIdentityRoles
 	// Profile.ProtectionDigest pins the connector configuration-source guard;
 	// ProtectionDigest here pins the distinct private workload namespace guard.
-	TemplateDigest, ImageDigest, ProtectionDigest artifact.Digest
+	TemplateDigest, ProtectionDigest artifact.Digest
 }
 
 func (p ConnectorObservationPin) Valid() bool {
-	return p.Profile.Valid() && !p.Profile.Suspended && !p.Profile.Retiring && p.Roles.Valid() && p.TemplateDigest != (artifact.Digest{}) && p.ImageDigest != (artifact.Digest{}) && p.ProtectionDigest != (artifact.Digest{})
+	return p.Profile.Valid() && !p.Profile.Suspended && !p.Profile.Retiring && p.Roles.Valid() && p.TemplateDigest != (artifact.Digest{}) && p.ProtectionDigest != (artifact.Digest{})
 }
 func (p ConnectorObservationPin) Clone() ConnectorObservationPin {
 	p.Profile = p.Profile.Clone()
@@ -47,14 +47,14 @@ func (p ConnectorObservationPin) Compatible(s ConnectorIdentitySource) bool {
 // the enrollment attester's general live-workload digest. It grants no capture
 // or effect authority and contains no token, token hash, CSR or private key.
 type ConnectorObservationWorkload struct {
-	Process                                                       ConnectorProcessIdentity
-	Pod, ReplicaSetUID                                            string
-	TemplateDigest, ImageDigest, ProtectionDigest, WorkloadDigest artifact.Digest
-	ObservedAt, FreshUntil                                        time.Time
+	Process                                          ConnectorProcessIdentity
+	Pod, ReplicaSetUID                               string
+	TemplateDigest, ProtectionDigest, WorkloadDigest artifact.Digest
+	ObservedAt, FreshUntil                           time.Time
 }
 
 func (w ConnectorObservationWorkload) Matches(p ConnectorObservationPin, now time.Time) bool {
-	return p.Valid() && w.Process.Valid() && w.Process.Binding == p.Profile.Binding && identity.Text(w.Pod, 253) && authorization.UUID(w.ReplicaSetUID) && w.TemplateDigest == p.TemplateDigest && w.ImageDigest == p.ImageDigest && w.ProtectionDigest == p.ProtectionDigest && w.WorkloadDigest != (artifact.Digest{}) && identity.Fresh(w.ObservedAt, w.FreshUntil, now, 5*time.Second)
+	return p.Valid() && w.Process.Valid() && w.Process.Binding == p.Profile.Binding && identity.Text(w.Pod, 253) && authorization.UUID(w.ReplicaSetUID) && w.TemplateDigest == p.TemplateDigest && w.ProtectionDigest == p.ProtectionDigest && w.WorkloadDigest != (artifact.Digest{}) && identity.Fresh(w.ObservedAt, w.FreshUntil, now, 5*time.Second)
 }
 
 // ConnectorObservation is fresh local evidence on one actual TLS conversation.

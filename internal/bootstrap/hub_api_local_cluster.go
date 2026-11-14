@@ -57,13 +57,13 @@ func localCatalogCluster(c contracts.OwnerDeployment, o *hubAPIRegionalOffer, st
 }
 
 // catalogCluster is one cluster's context-start entry derived from the
-// stored offer and Helm-known names: the connector identity document, the
-// executor pin (the startup digest over Helm-known values and the image) and
-// the hub's capability and work trust. A joined mode=cluster cluster is the
-// same entry with its own IDs and release namespace; its retention topology
-// is the in-process one of the hub retention source. image is the current
-// chart image (the hub's own): the stored offer keeps the first install's,
-// and every connector runs the release's current image.
+// stored offer and Helm-known names: the connector identity document and the
+// hub's capability and work trust. A joined mode=cluster cluster is the same
+// entry with its own IDs and release namespace; its retention topology is the
+// in-process one of the hub retention source. image is the hub's current
+// chart image: the capability names it as the collector release that plans
+// the capture (provenance). The connector may run another release within the
+// skew window (ADR-333); its own digests are recorded with each execution.
 func catalogCluster(stored contracts.RegionalOffer, image, cluster, peerID, namespace, release string, standby, captures int, step string) (contracts.OwnerPublicCluster, error) {
 	var zero contracts.OwnerPublicCluster
 	if executor, err := stored.RegionalExecutorOffered(); err != nil || !executor {
@@ -74,19 +74,15 @@ func catalogCluster(stored contracts.RegionalOffer, image, cluster, peerID, name
 		return zero, &fixedStepError{step + "-image", mounts.ErrUnavailable}
 	}
 	image = parts[1]
-	account, capacity := release+"-connector", release+"-connector-capacity"
+	account := release + "-connector"
 	deployment := contracts.ConnectorDeployment{Namespace: namespace, ServiceAccount: account, Deployment: account, ServingSlots: contracts.RegionalServingSlots, RetainedProcesses: contracts.RegionalRetainedProcesses}
 	peer, err := kube.ConnectorCatalogPeer(stored, cluster, peerID, deployment)
 	if err != nil {
 		return zero, &fixedStepError{step + "-peer", err}
 	}
 	projection := compiler.ProjectionDigest()
-	settings := contracts.ConnectorAPIContextSettings{RootID: stored.PermissionRootID, InstallationID: stored.InstallationID, ClusterID: cluster, IssuerEpoch: stored.IssuerEpoch,
-		Namespace: namespace, Account: account, Deployment: account, CapacityAccount: capacity, ImageDigest: image, ProjectionDigest: hex.EncodeToString(projection[:])}
-	startup := kube.ConnectorAPIStartupDigest(settings)
 	root, installation, epoch := stored.PermissionRootID, stored.InstallationID, stored.IssuerEpoch
 	return contracts.OwnerPublicCluster{ClusterID: cluster, Connector: peer, Standby: standby, Captures: captures,
-		Executor: contracts.OwnerPublicExecutor{StartupDigest: hex.EncodeToString(startup[:]), ImageDigest: image},
 		Settings: contracts.ContextCapabilitySettings{Format: contracts.ContextCapabilityFormat, RootID: root, InstallationID: installation, ClusterID: cluster, IssuerEpoch: epoch, Revision: 1, Enabled: true,
 			ExecutionClass: string(artifact.ContextAPIExecution), CollectorVersion: "sha256-" + image[:32], CollectorImageDigest: image, ProjectionDigest: hex.EncodeToString(projection[:])},
 		Trust: contracts.APIContextWorkTrustSettings{Format: contracts.APIContextTrustFormat, RootID: root, InstallationID: installation, ClusterID: cluster, IssuerEpoch: epoch, Revision: 1, Enabled: true, Keys: []contracts.APIContextWorkPublicKey{*stored.WorkKey}}}, nil

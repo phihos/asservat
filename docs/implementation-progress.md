@@ -1,5 +1,35 @@
 # Sustained implementation progress
 
+## Standing connector identity (ADR-332, 2026-11-14)
+
+Branch `fix/connector-backing-expiry`. Homelab defect: after the offer's
+connector backing `ValidUntil` (first hub-api start + `validSeconds`) no
+connector restarted (`startup connector: waiting at identity`). Reproduced
+on owned kind `asservat-bk` (repro build accepting `validSeconds: 120`): the
+Pod deleted after `ValidUntil` never enrolled. Fix: the backing is standing
+(9999-12-31T23:59:59Z), `federation.connector.{validSeconds,accounts,
+recordsPerAccount,profiles,sourceTransitions}` are removed, and migration
+00164 drops the ticket-admission/purge bound, the retained-process and
+serving-slot counts and the identity-lane record/account/profile/transition
+caps. hub-api retries a not-yet-current owner configuration in-process.
+Fresh kind install of the fix (`retainedSeconds: 2200`): ten connector Pod
+deletions in a row, three minutes after hub-api start, each enrolled in
+1.7–2.1 s (11 serving processes, identity `charged` 33);
+`TestHelmNativeKindJourney` passed (21.9 s) afterwards; a plain
+`helm upgrade` left hub-api at 0 restarts (`startup hub-api: ok after 5
+failed attempts` during the 15.5 s hub-worker Lease wait) and the next
+connector restart enrolled in 2.7 s. Real PostgreSQL:
+`scripts/test-custody.py --run
+'^TestContextAdmissionWithRealServices$/^connector-(trial-profile|identity-fast|retirement-prepaid-fast)$'`
+passed, including a restart beside eight earlier serving processes with a
+full record count and a later cluster staging its profile past the root's
+structural sizes. Not verified: a late `clusters:` join on the kind hub
+issued no join Secret (`remote cluster join eu: not-issued: credential/other`,
+then `reserve/other` after a hub-api restart) — an ADR-331 bootstrap
+issuance problem outside these limits, still open; no second workload
+cluster was installed. Older installations keep their finite stored
+backing and must be reinstalled.
+
 ## ADR-330 contract divergence (2026-11-14)
 
 The canonical contracts in `specs/contracts/` and `docs/interfaces/` follow

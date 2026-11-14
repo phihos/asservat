@@ -22,7 +22,11 @@ func historyDependenciesMatch(s value.CaptureSettings, collector, projection art
 	for _, pin := range pins {
 		switch pin.Role {
 		case "collector":
-			if pin.Digest != hex.EncodeToString(collector[:]) {
+			// A collector must still be available (an unsupported recorder has
+			// none), but its image digest is provenance only (ADR-333): an
+			// upgraded hub repeats a capture whose projection and profiles are
+			// unchanged.
+			if collector == (artifact.Digest{}) {
 				return false
 			}
 		case "projection":

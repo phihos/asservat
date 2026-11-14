@@ -8,6 +8,7 @@ import (
 	"time"
 
 	fleetapp "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/contracts"
 
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/identity"
@@ -345,6 +346,10 @@ func (t Targets) report(step, timing string) {
 // stream's first interruption, or the router (no idle standby or its wait).
 func queryStep(err error, d *StreamDiagnostics) string {
 	var answer errQueryAnswer
+	var old *contracts.ConnectorTooOldError
+	if errors.As(err, &old) {
+		return old.FixedStep()
+	}
 	if errors.As(err, &answer) {
 		return "answer/" + queryFailureLabel(err)
 	}

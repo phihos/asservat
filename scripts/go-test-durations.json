@@ -1692,7 +1692,6 @@
 "TestBrowserTransportFences": 0,
 "TestCaseBrowserUsesCurrentSessionCSRFAndNoUnavailableRoutes": 1.6,
 "TestDownloadContentConfigurationNamesItsCheck": 0,
-"TestFleetBootstrapRoute": 0.0,
 "TestInvestigationBrowserUsesCurrentSessionAndExactIdempotency": 4.7,
 "TestInvestigationFinalIdentityShorteningReachesSocket": 1.4,
 "TestLogoutBusyOnlyBeforeRevocation": 0,

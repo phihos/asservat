@@ -355,9 +355,6 @@ func (f *kcFixture) browserSessions(t *testing.T, ca []byte, mappers []any, user
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Run("fleet-bootstrap-issuance", func(t *testing.T) {
-		f.qualifyFleetBootstrapIssuance(t, ctx, admin, handler, server.URL, submissionCookie, csrf, clientID, group, seal, open)
-	})
 	t.Run("signed-policy-submission", func(t *testing.T) {
 		testProviderPolicySubmission(t, bridge.URL, bridge.Client(), verifiedHuman.Identity)
 	})
