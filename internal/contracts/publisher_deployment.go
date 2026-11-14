@@ -13,8 +13,8 @@ const (
 	// PublisherProviderTokenFile is the projected token with the publisher
 	// provider audience (ADR-203 decision 3).
 	PublisherProviderTokenFile = "provider-auth.token"
-	// PublisherEvidenceCredential and PublisherAuditCredential are the
-	// operator's storage principals (ADR-203 decision 5).
+	// PublisherEvidenceCredential is the operator's evidence-read storage
+	// principal (ADR-203 decision 5).
 	PublisherEvidenceCredential = "evidence-read.json"
 )
 
