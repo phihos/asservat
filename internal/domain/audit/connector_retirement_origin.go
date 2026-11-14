@@ -39,7 +39,7 @@ func (o ConnectorRetirementOrigin) ValidFor(in OperationIntent) bool {
 			return false
 		}
 	case ConnectorRetirementExpiry:
-		if o.RetiringSource != nil || in.CreatedAt.Before(t.AdmissionUntil) {
+		if o.RetiringSource != nil || t.Standing() || in.CreatedAt.Before(t.AdmissionUntil) {
 			return false
 		}
 	default:

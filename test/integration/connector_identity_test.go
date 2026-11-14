@@ -231,19 +231,22 @@ func newConnectorSQLFixtureWithOptions(t *testing.T, ctx context.Context, admin 
 		p := helmContextTrialProfile(t).Public
 		c, h := p.Federation.Connector, p.Capacity.Backup
 		b := &f.configuration.Backing
-		b.AccountLimit, b.RecordsPerAccount, b.RetainedSeconds = c.Accounts, c.RecordsPerAccount, c.RetainedSeconds
-		b.ProfileLimit, b.SourceTransitionLimit = c.Profiles, c.SourceTransitions
+		// ADR-332: standing sizes, not install-time connector counts.
+		accounts, records, profiles, transitions := app.ConnectorStandingAccounts, app.ConnectorStandingRecordsPerAccount, app.ConnectorStandingProfiles, app.ConnectorStandingSourceTransitions
+		b.AccountLimit, b.RecordsPerAccount, b.RetainedSeconds = accounts, records, c.RetainedSeconds
+		b.ProfileLimit, b.SourceTransitionLimit = profiles, transitions
 		q.MaximumRowFootprintBytes, q.MaximumTransitionWALBytes = c.Footprint.RowBytes, c.Footprint.TransitionWALBytes
 		q.BackupCopies, q.WALCopies = h.BackupCopies, h.WALCopies
-		policy.History, policy.MetadataSlots, policy.MaxPurgeLeases = &q, c.Accounts*c.RecordsPerAccount, c.PurgeLeases
+		policy.History, policy.MetadataSlots, policy.MaxPurgeLeases = &q, accounts*records, c.PurgeLeases
 		policy.BackupHorizonSeconds, policy.CleanupBudgetSeconds, policy.ProofWindowSeconds = h.HorizonSeconds, h.CleanupBudgetSeconds, h.ProofWindowSeconds
-		policy.ValidUntil = n.Add(time.Duration(c.ValidSeconds) * time.Second)
+		// ADR-332: the shipped backing is standing, valid until replaced.
+		policy.ValidUntil = app.ConnectorBackingStanding
 		backup, wal := q.SlotBacking(c.PurgeLeases)
 		policy.BackupReservedBytes, policy.WALReservedBytes = backup*policy.MetadataSlots, wal*policy.MetadataSlots
 		b.Policy = policy
-		rows := 1 + c.Profiles + c.Profiles*(c.SourceTransitions+1)
+		rows := 1 + profiles + profiles*(transitions+1)
 		b.SourceBackupReservedBytes = rows * 2 * q.MaximumRowFootprintBytes * q.BackupCopies
-		b.SourceWALReservedBytes = (2*c.SourceTransitions + app.ConnectorRetirementTicketTransitions*c.Profiles*(c.SourceTransitions+1)) * q.MaximumTransitionWALBytes * q.WALCopies
+		b.SourceWALReservedBytes = (2*transitions + app.ConnectorRetirementTicketTransitions*profiles*(transitions+1)) * q.MaximumTransitionWALBytes * q.WALCopies
 	}
 	if !f.configuration.Valid(n) {
 		t.Fatal("synthetic connector configuration invalid")
@@ -467,6 +470,7 @@ func qualifyConnectorIdentity(t *testing.T, ctx context.Context, admin *pgxpool.
 		if profiles != 1 || transitions != 1 || processes != 1 {
 			t.Fatalf("original profile/transition/process charges changed: %d/%d/%d", profiles, transitions, processes)
 		}
+		qualifyStandingConnectorIdentity(t, f)
 	})
 	t.Run("connector-identity-fast", func(t *testing.T) {
 		f := newConnectorSQLFixture(t, ctx, admin, poolFor, store, keys, create(t, 1), 10800)
@@ -538,10 +542,8 @@ func qualifyConnectorIdentity(t *testing.T, ctx context.Context, admin *pgxpool.
 				if _, e := bounded.enrollment.Enroll(ctx, custodyID(), bounded.request); e == nil {
 					t.Fatal("restoring old source revived exhausted authority")
 				}
-				var final int64
-				if e := admin.QueryRow(ctx, "SELECT source_transitions FROM connector_identity_root WHERE root_id=$1", bounded.scenario.a.RootID).Scan(&final); e != nil || final != used {
-					t.Fatal("resolution refilled/spent unreserved transition", final, used, e)
-				}
+				// ADR-332: source transitions are counted, not capped, so restaging
+				// may pass the structural limit; authority still is not revived.
 			})
 		}
 
@@ -637,5 +639,101 @@ func (f *connectorSQLFixture) qualifyPrivateViews(t *testing.T, poolFor func(str
 	_, e = f.pools["cleanup"].Exec(wait, "SELECT id FROM connector_operation_audit WHERE id=$1 FOR UPDATE", f.processID)
 	if e == nil || time.Since(began) > time.Second {
 		t.Fatal("private view ignored original lock deadline", e, time.Since(began))
+	}
+}
+
+// ADR-332: nothing in an installed system renews the backing, purges the
+// identity audit lane or detaches old processes. A connector must still admit
+// a new process (a restart) and serve it after as many earlier serving
+// processes as the deployment shape names (deleted Pods stay serving because
+// nothing retires them) and after its account has used the record count the
+// backing was sized for.
+func qualifyStandingConnectorIdentity(t *testing.T, f *connectorSQLFixture) {
+	t.Helper()
+	ctx := f.ctx
+	var rootUntil, admissionUntil time.Time
+	if err := f.admin.QueryRow(ctx, "SELECT r.valid_until,t.admission_until FROM connector_identity_root r JOIN connector_retirement_ticket t ON t.root_id=r.root_id WHERE r.root_id=$1", f.scenario.a.RootID).Scan(&rootUntil, &admissionUntil); err != nil || !rootUntil.Equal(app.ConnectorBackingStanding) || !admissionUntil.Equal(app.ConnectorBackingStanding) {
+		t.Fatal("standing backing or ticket admission not stored", rootUntil, admissionUntil, err)
+	}
+	// Synthetic history only: earlier processes of restarted Pods, inserted
+	// beside the guard, and an account charged up to its sized record count.
+	conn, err := f.admin.Acquire(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	limit := f.configuration.Source.Observation.Profile.Deployment.RetainedProcesses
+	_, err = conn.Exec(ctx, "SET session_replication_role=replica")
+	for i := 0; err == nil && i < limit; i++ {
+		_, err = conn.Exec(ctx, `INSERT INTO connector_identity_process(id,root_id,peer_id,pod_uid,process_epoch,client_key,server_key,process,source_uid,source_generation,source_digest,claimed_at,initial_not_after,run_until,accepted_at,serving,client_current_id,server_current_id)
+ SELECT gen_random_uuid(),root_id,peer_id,gen_random_uuid(),gen_random_uuid(),sha256(gen_random_uuid()::text::bytea),sha256(gen_random_uuid()::text::bytea),process,source_uid,source_generation,source_digest,
+  claimed_at-interval '10 minutes',date_trunc('second',claimed_at-interval '10 minutes'+interval '30 minutes'),date_trunc('second',claimed_at-interval '10 minutes'+interval '30 minutes'),claimed_at-interval '10 minutes',true,gen_random_uuid(),gen_random_uuid()
+ FROM connector_identity_process WHERE id=$1`, f.processID)
+	}
+	if err == nil {
+		_, err = conn.Exec(ctx, "UPDATE operation_audit_account a SET charged=p.records_per_account FROM operation_audit_pool p WHERE p.root_id=a.root_id AND p.lane=a.lane AND a.root_id=$1 AND a.lane='identity'", f.scenario.a.RootID)
+	}
+	if _, reset := conn.Exec(ctx, "RESET session_replication_role"); err == nil {
+		err = reset
+	}
+	conn.Release()
+	if err != nil {
+		t.Fatal("synthetic connector history", err)
+	}
+	restart := value.ConnectorProcessRequest{Process: value.ConnectorProcessIdentity{Binding: f.request.Process.Binding, PodUID: custodyID(), ProcessEpoch: custodyID()}, ClientCSRDER: connectorSQLCSR(t), ServerCSRDER: connectorSQLCSR(t)}
+	f.refresh(t)
+	if _, err = f.enrollment.Enroll(ctx, custodyID(), restart); err != nil {
+		t.Fatal("restarted connector process not admitted after earlier processes and a full record count", err)
+	}
+	for _, usage := range []string{"client", "server"} {
+		f.refresh(t)
+		if _, err = f.renewal.IssueProcess(ctx, custodyID(), usage, restart); err != nil {
+			t.Fatal("restarted connector process certificate", usage, err)
+		}
+	}
+	var serving int
+	if err = f.admin.QueryRow(ctx, "SELECT count(*) FROM connector_identity_process WHERE root_id=$1 AND pod_uid=$2 AND serving", f.scenario.a.RootID, restart.Process.PodUID).Scan(&serving); err != nil || serving != 1 {
+		t.Fatal("restarted connector process not serving beside earlier serving processes", serving, err)
+	}
+	// A cluster registered after the install stages its own profile on demand:
+	// the root's structural profile and transition sizes and the identity
+	// account size are not counts it must fit in.
+	conn, err = f.admin.Acquire(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = conn.Exec(ctx, "SET session_replication_role=replica")
+	if err == nil {
+		_, err = conn.Exec(ctx, "UPDATE connector_identity_root SET profiles=profile_limit,source_transitions=source_transition_limit WHERE root_id=$1", f.scenario.a.RootID)
+	}
+	if err == nil {
+		_, err = conn.Exec(ctx, "UPDATE operation_audit_pool SET accounts=account_limit WHERE root_id=$1 AND lane='identity'", f.scenario.a.RootID)
+	}
+	if _, reset := conn.Exec(ctx, "RESET session_replication_role"); err == nil {
+		err = reset
+	}
+	conn.Release()
+	if err != nil {
+		t.Fatal("synthetic root at its structural sizes", err)
+	}
+	second := f.configuration.Clone()
+	binding := second.Source.Observation.Profile.Binding
+	binding.ClusterID, binding.PeerID = custodyID(), custodyID()
+	second.Source.Observation.Profile.Binding = binding
+	second.Source.Observation.Profile.Revision.UID = custodyID()
+	q := second.Backing.Policy
+	pin := app.ConnectorQualificationPin{InstallationID: q.InstallationID, StoreID: q.StoreID, BackupProfileID: q.BackupProfileID, Qualification: *q.History}
+	sources, err := postgres.NewConnectorIdentitySources(ctx, f.pools["source"], f.scenario.a.RootID, binding, pin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.refresh(t)
+	n := time.Now().UTC().Truncate(time.Microsecond)
+	second.Source.Observation.ObservedAt, second.Source.Observation.FreshUntil = n, n.Add(5*time.Second)
+	if err = sources.StageConnectorIdentity(ctx, second); err != nil {
+		t.Fatal("a later cluster could not stage its connector profile", err)
+	}
+	var profiles, profileLimit int64
+	if err = f.admin.QueryRow(ctx, "SELECT profiles,profile_limit FROM connector_identity_root WHERE root_id=$1", f.scenario.a.RootID).Scan(&profiles, &profileLimit); err != nil || profiles != profileLimit+1 {
+		t.Fatal("later cluster profile not created on demand", profiles, profileLimit, err)
 	}
 }

@@ -32,6 +32,16 @@ type ConnectorRetirementTicket struct {
 	Policy                          OperationLifecyclePolicy
 }
 
+// StandingAdmission is the AdmissionUntil of a standing backing's ticket
+// (ADR-332): the cohort admits processes until the backing is replaced, so
+// it has no admission end and no expiry retirement. RFC 5280's "no
+// well-defined expiration" time; finite, as the SQL columns require.
+var StandingAdmission = time.Date(9999, 12, 31, 23, 59, 59, 0, time.UTC)
+
+// Standing reports a ticket with no admission end. Only an explicit retiring
+// source retires it; ConnectorRetirementExpiry never applies.
+func (t ConnectorRetirementTicket) Standing() bool { return t.AdmissionUntil.Equal(StandingAdmission) }
+
 func (t ConnectorRetirementTicket) OriginalPurgeAt() time.Time {
 	p := t.Policy
 	return t.RetainUntil.Add(-time.Duration(2*p.BackupHorizonSeconds+3*p.CleanupBudgetSeconds+p.ProofWindowSeconds) * time.Second)
@@ -51,7 +61,10 @@ func (t ConnectorRetirementTicket) Valid() bool {
 		return false
 	}
 	purge := t.OriginalPurgeAt()
-	return t.ReservedAt.Before(t.AdmissionUntil) && !t.AdmissionUntil.After(purge.Add(-time.Minute)) &&
+	// AdmissionUntil is the standing backing's ValidUntil (ADR-332): the
+	// cohort admits processes until the backing is replaced, independent of
+	// the accepting record's retention.
+	return t.ReservedAt.Before(t.AdmissionUntil) &&
 		t.ConsumeUntil.Equal(purge.Add(-30*time.Second)) && p.ValidUntil.Equal(t.ConsumeUntil) &&
 		!purge.After(t.OriginalAcceptancePurgeAt) && purge.After(t.ReservedAt.Add(time.Minute)) &&
 		t.RetainUntil.After(purge) && !t.RetainUntil.After(t.ReservedAt.Add(3660*24*time.Hour))
