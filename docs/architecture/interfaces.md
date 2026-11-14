@@ -4,7 +4,7 @@ Public browser/MCP operations and schemas are in the [interface package](../inte
 
 ## Common contract rules
 
-Internal control uses versioned strict JSON over mutual TLS. Enforce wire limits before decoding; reject duplicate keys, nonfinite numbers, malformed UTF-8, unknown fields and ambiguous normalization. Never put an arbitrary callback, object URL, shell command or evidence row in a control message. Protected references resolve only inside a configured pool and authorized region; they are not bearer capabilities.
+Internal control uses versioned strict JSON over authenticated TLS connections (ServiceAccount token on the connector connection, ADR-334; mutual TLS between hub replicas and inside a cluster). Enforce wire limits before decoding; reject duplicate keys, nonfinite numbers, malformed UTF-8, unknown fields and ambiguous normalization. Never put an arbitrary callback, object URL, shell command or evidence row in a control message. Protected references resolve only inside a configured pool and authorized region; they are not bearer capabilities.
 
 The [internal-work/v1 schema](../../specs/contracts/internal-work.schema.json) defines disjoint purposes and their receipts. `operationId` is the idempotency key of the parent operation; action `attemptId`, recording `snapshotId` and analysis `stageGeneration` identify effects independently of delivery. `scopeDigest` binds the accepted scope and `notAfter` caps a new start. The hub authorized the operation once at admission and recorded its charge and audit row in SQL under that ID; the receiver deduplicates by ID and never treats a reference's presence as authority. No generic "execute this payload" handler exists. Work messages are not signed: the mutually authenticated connection identifies the sender (D2).
 
@@ -24,7 +24,7 @@ Receipts bind work, operation and a monotonically increasing sequence. `Complete
 
 ### I-01 — Hub federation
 
-Each connector holds one outbound, multiplexed HTTP/2 connection to the hub with mutual TLS (D2). Commands, receipts, cluster-state pushes, live rows and download bytes are separate streams on it, with per-stream flow control so bulk bytes cannot starve control. The connector identity comes from a bootstrap token and is renewed by CSR before expiry (ADR-330 D3). The hub routes to the replica holding a connector's connection through one SQL row naming that replica. Routes under `/internal/v1/federation/` are internal protocol, not public OpenAPI.
+Each connector holds one outbound, multiplexed HTTP/2 connection to the hub's one HTTPS endpoint, through any Ingress or Gateway including one that terminates TLS (D2, ADR-334). Commands, receipts, cluster-state pushes, live rows and download bytes are separate streams on it, with per-stream flow control so bulk bytes cannot starve control. The connector authenticates with a projected ServiceAccount token of its cluster, verified against the issuer registered in the hub's `clusters` values ([connector identity](connector-credentials.md)). The hub routes to the replica holding a connector's connection through one SQL row naming that replica. Routes under `/internal/v1/federation/` are internal protocol, not public OpenAPI.
 
 Negotiation binds peer build identity, protocol major/minor, supported action/projection schema versions and maximum byte/item limits. Hub and connector support N/N-1 minors of one major; required capabilities fail explicitly and no downgrade omits a limit.
 
@@ -42,13 +42,13 @@ Work kinds include `armSource`, `stopSource`, `snapshot`, `peerGeneration` and `
 
 Node status is sent as a delta when a source, ring or accounting state changes. Live-viewing counters (active cohorts, buffered rows, scan and delivery totals, refused admissions, source-loss and dropped-row counts) are cumulative and included in those deltas; they carry no source, filter or payload labels. C-19 aggregates node totals per cluster for fleet status. A first report or nonmonotonic counter marks rates incomplete.
 
-A started source runs to its admitted hard end while the connector is disconnected; a pending stop is delivered on reconnect. While disconnected, natural cores (I-03) and policy-triggered starts spend only the connector's budget lease under unexpired local policy permits; other new intrusive starts need their hub `capture_start` row and wait for the connection. Multi-node admission may produce partial outcomes; it is not atomic across nodes.
+A started source runs to its admitted hard end while the connector is disconnected; a pending stop is delivered on reconnect. While disconnected, natural cores (I-03) and policy-triggered starts spend only the connector's local budget under unexpired local policy permits; other new intrusive starts need their hub `capture_start` row and wait for the connection. Multi-node admission may produce partial outcomes; it is not atomic across nodes.
 
 ### I-03 — Host core handoff
 
 Use an installation-owned Unix-domain stream socket with restricted ownership/mode and peer credentials. The helper verifies the collector peer; the collector verifies the helper and resolves the kernel-provided process identifiers itself. No caller-supplied executable path or argument becomes authority.
 
-A fixed-version header of at most 4 KiB (one page, a fixed allocation while the crashed process is held) carries numeric IDs, process start identity when available and a nonce. The node refuses promptly or returns an acceptance tied to one prepared envelope, a budget-lease allocation and a byte/time limit. Only then consume bytes, with bounded backpressure and a hard close deadline. No remote call occurs while the crashed process is held. The encrypted spool has its own budget. Exact Linux header/pidfd behavior is a required native-core spike; socket credentials alone do not solve PID reuse.
+A fixed-version header of at most 4 KiB (one page, a fixed allocation while the crashed process is held) carries numeric IDs, process start identity when available and a nonce. The node refuses promptly or returns an acceptance tied to one prepared envelope, a local-budget allocation and a byte/time limit. Only then consume bytes, with bounded backpressure and a hard close deadline. No remote call occurs while the crashed process is held. The encrypted spool has its own budget. Exact Linux header/pidfd behavior is a required native-core spike; socket credentials alone do not solve PID reuse.
 
 ### I-04 — Gadget observation
 

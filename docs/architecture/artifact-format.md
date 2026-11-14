@@ -21,8 +21,8 @@ UUIDs are canonical lowercase, nonzero identities; names, target paths, label va
 
 | Object | Representation and bound |
 | --- | --- |
-| data | Concatenated complete Tink streams, one per native frame. Frames are 8 MiB except the last (memory per in-flight frame in encoder and reader); an empty file has one authenticated empty frame. Native size is at most 5 TiB, the S3 maximum object size. The index supplies exact offsets. |
-| index | Concatenated Tink streams of JSON pages: at most 256 frame entries and 256 KiB decoded JSON per page, the memory a reader retains for one page. The page count follows from the native size (at most 2,560 pages at 5 TiB). No compression. The manifest contains the page directory. |
+| data | Concatenated complete Tink streams, one per native frame. Frames are 8 MiB except the last (memory per in-flight frame in encoder and reader); an empty file has one authenticated empty frame. The data object is at most 5 TiB, the [S3 maximum object size](https://docs.aws.amazon.com/AmazonS3/latest/userguide/upload-objects.html); with 64 KiB authentication overhead per 8 MiB frame that allows about 4.96 TiB of native bytes (650,279 full frames plus a final partial frame). The index supplies exact offsets. |
+| index | Concatenated Tink streams of JSON pages: at most 256 frame entries and 256 KiB decoded JSON per page, the memory a reader retains for one page. The page count follows from the native size (at most 2,541 pages at the S3 object maximum). No compression. The manifest contains the page directory. |
 | manifest | One Tink stream with the detailed `artifact/v1` manifest, including the layout and exact data/index object identities. Its size is derived: fixed fields plus one directory entry per index page. Evidence metadata, native hashes and wrapped data/index keys stay encrypted. |
 | commit | Plaintext JSON matching `artifact-commit/v1`: opaque IDs, format, the manifest's ciphertext digest/size, object identity and wrapped manifest key; its size follows from the schema's field maxima (about 4 KiB). A storage receipt, not a bearer capability. |
 

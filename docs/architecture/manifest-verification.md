@@ -33,7 +33,7 @@ Limits, each bounding reader memory per verification: the envelope is at most th
 
 ## Profiles
 
-- **Pod status** (`asservat-pod-status/v1`, manual `onTrigger`, within the 2 MiB API response cap). The [schema](../../specs/contracts/pod-status.schema.json) allows only namespace/Pod identity, resource version, observation time, finite phase/condition values and aggregate counts; no labels, annotations, environment, logs, addresses, container names or free text. The [Kubernetes API class](api-context-execution.md) sets `target.executionClass: kubernetesAPI` and has no node UID/boot.
+- **Pod status** (`asservat-pod-status/v1`, manual `onTrigger`; the closed schema bounds the document to at most 3,437 bytes, inside the recipe's 4096-byte reservation). The [schema](../../specs/contracts/pod-status.schema.json) allows only namespace/Pod identity, resource version, observation time, finite phase/condition values and aggregate counts; no labels, annotations, environment, logs, addresses, container names or free text. The [Kubernetes API class](api-context-execution.md) sets `target.executionClass: kubernetesAPI` and has no node UID/boot.
 - **Recorder types** (PCAPNG, syscall JSON Lines, HTTP header projection, [ADR-244](../decisions/244-native-artifact-types.md)) carry their own kind, evidence type, media type and format through the artifact-type registry and omit the pod-status projection digest.
 
 Unsupported optional manifest fields are rejected, not ignored. Classification defaults to `potentialPersonalData`. Verification does not attest that a compromised source reported the truth.

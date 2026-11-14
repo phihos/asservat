@@ -44,13 +44,13 @@ The slice may use a qualified node-produced approved context projection; it does
 | Boundary | Design decision fixed here | Runtime evidence still required |
 | --- | --- | --- |
 | Hub decomposition | API and worker roles share modular application code, separate scheduling/credentials | Replica races, queue fairness, connection budgets, connection failover |
-| Transport | One multiplexed connector connection; collectors connect to the connector with TokenReview then mTLS | Certificate rotation, superseded collector exclusion, lost-response lookup by operation ID |
+| Transport | One multiplexed connector connection authenticated by ServiceAccount token; collectors connect to the connector with TokenReview then mTLS | Token and JWKS rotation, superseded collector exclusion, lost-response lookup by operation ID |
 | Persistence | SQL hub authority and audit rows; Kubernetes configuration; object-store evidence | Real transaction/recovery tests, idempotent replay after lost commits |
 | Gadget | Pinned private adapter behind bounded lifecycle ports | Supported transport/ABI, runtime/kernel feature probing, loss/overhead and peer updates |
 | Analysis | Separate acquisition/offline/publish identities and encrypted PVCs | CSI encryption, stage ordering on Job completion, hostile output, deletion under failure |
 | Live | Rows routed from the replica holding the connector connection, one authorization per operation, SSE delivery | Regional routing, slow readers, no incident starvation |
 | Host crash | Local bounded helper with prepared envelopes | Kernel-global behavior in disposable VMs, process reaping delay |
-| Compatibility | Strict versioned DTOs over mTLS, N/N-1 minors | Malicious input, canonicalization and version-skew tests |
+| Compatibility | Strict versioned DTOs over authenticated TLS, N/N-1 minors | Malicious input, canonicalization and version-skew tests |
 
 Changes that require a new architecture decision include a new always-on service, broker, state backend, regional frontend topology, dynamically supplied executable plugin, weakened authority boundary, raw live evidence, or a new polling loop where an event source exists. Normal module splits within the allowed dependency graph and qualified adapter additions do not require repeated user permission.
 

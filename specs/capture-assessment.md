@@ -96,5 +96,5 @@ session end, and stops when a revocation event reaches its connector; while the
 connector is disconnected a session runs to its session end (REQ-LIF-004). Do not
 promise immediate packet cancellation. Show rate and ring ceilings (the bounds for
 recorders, ADR-335 D6), and for a finite manual sensitive session its
-observed-byte limit (the reviewed observation budget the maintainer requires), separately from actual
+rate × session length (the reviewed observation budget the maintainer requires), separately from actual
 measured input and retained output. A rate ceiling is not a throughput estimate.

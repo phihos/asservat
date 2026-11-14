@@ -81,11 +81,6 @@
           "maximum": 9007199254740991,
           "description": "Resolved bound; absent for recurring sharing without a capture count (it ends at notAfter)."
         },
-        "maxArtifactsPerCapture": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 9007199254740991
-        },
         "resolvedSelections": {
           "type": "array",
           "items": {
@@ -227,7 +222,6 @@
         "requestDigest",
         "acceptedAt",
         "notAfter",
-        "maxArtifactsPerCapture",
         "resolvedSelections",
         "management"
       ],

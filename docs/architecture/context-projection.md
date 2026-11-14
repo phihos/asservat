@@ -4,7 +4,7 @@
 
 ## Exact result
 
-The source is the published artifact for `asservat-pod-status/v1`, with the immutable `artifact.ContextProjectionDefinition` digest and no separate native byte ceiling: the projection is bounded by the connector's 2 MiB Kubernetes API response cap (the 1.5 MiB etcd object limit plus JSON overhead). Case, capture, target, attempt, store and ciphertext version come from the artifact row, not from the caller. The reader checks the envelope, manifest, native schema and expected format before projecting fields; another format or additional properties fail closed.
+The source is the published artifact for `asservat-pod-status/v1`, with the immutable `artifact.ContextProjectionDefinition` digest and no separate native byte ceiling: its closed schema bounds the document to at most 3,437 bytes of JSON (every string at its schema maximum with each code point escaped, the longest RFC 3339 timestamp), which the recipe's 4096-byte reservation covers. Case, capture, target, attempt, store and ciphertext version come from the artifact row, not from the caller. The reader checks the envelope, manifest, native schema and expected format before projecting fields; another format or additional properties fail closed.
 
 Display version `approved-pod-status-display/v1` returns `pod-status.txt` with one line per field in this order:
 

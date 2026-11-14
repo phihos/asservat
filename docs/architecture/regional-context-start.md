@@ -1,18 +1,20 @@
 # Connector connection and regional context start
 
 Each region's connector (A-CONN) holds one outbound, multiplexed HTTP/2
-connection to the hub with mutual TLS ([ADR-330](../decisions/330-event-driven-system-design.md)
-D2). Hub commands, cluster-state pushes, live rows and download bytes are
+connection to the hub's one HTTPS endpoint ([ADR-330](../decisions/330-event-driven-system-design.md)
+D2, [ADR-334](../decisions/334-connector-workload-identity.md)). Hub commands, cluster-state pushes, live rows and download bytes are
 separate streams on that connection. This document defines the connection and
 the regional half of a context start. Identities are defined in
 [peer identity](peer-identity.md).
 
 ## Connection
 
-- The connector dials the hub Service and authenticates with its cluster
-  client certificate. The hub verifies the chain against the installation CA
-  and reads the cluster ID from the certificate. Authentication happens once
-  per TLS handshake; streams on the connection need no further peer proof.
+- The connector dials the hub URL and authenticates with a projected
+  ServiceAccount token of its cluster (audience: the hub URL). The hub verifies
+  it against the cluster's registered issuer or JWKS and attributes the
+  connection to that cluster ([connector identity](connector-credentials.md)).
+  Streams on the connection need no further peer proof; the kubelet-rotated
+  token is presented again on its rotation.
 - The hub replica that accepts the connection records it in one SQL row
   (`cluster_connection`: cluster ID, replica, connection ID, connected-at).
   A replica that needs to reach a cluster reads that row and forwards the

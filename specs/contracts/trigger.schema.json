@@ -462,13 +462,13 @@
                 "pollInterval": {
                   "type": "string",
                   "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
-                  "maxLength": 16
+                  "maxLength": 16,
+                  "description": "Only for a path inotify cannot watch; the watch is used wherever it works. Omitted, an unwatchable path reports the detector unavailable instead of sampling."
                 }
               },
               "required": [
                 "path",
-                "condition",
-                "pollInterval"
+                "condition"
               ],
               "allOf": [
                 {

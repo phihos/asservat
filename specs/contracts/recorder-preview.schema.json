@@ -235,11 +235,6 @@
               "minimum": 1,
               "maximum": 9007199254740991
             },
-            "maxObservedBytes": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 9007199254740991
-            },
             "maxBytesPerSecond": {
               "type": "integer",
               "minimum": 1,
@@ -249,16 +244,10 @@
               "type": "integer",
               "minimum": 1,
               "maximum": 9007199254740991
-            },
-            "maxObservedEvents": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 9007199254740991
             }
           },
           "required": [
             "maxSessionSeconds",
-            "maxObservedBytes",
             "maxBytesPerSecond",
             "maxConcurrentSessions"
           ]

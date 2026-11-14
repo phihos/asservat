@@ -127,7 +127,6 @@ def sharing_origin_checks(share: dict, intent: dict, manifests: dict) -> None:
     require(spec["dataClasses"] == [selection["dataClass"]], "Share mixes selection classes")
     require(set(spec["operations"]) <= set(selection["operations"]), "Share exceeds selection operations")
     require(timestamp(spec["notAfter"]) <= timestamp(parent["notAfter"]), "Share outlives intent")
-    require(len(spec["artifacts"]) <= parent["maxArtifactsPerCapture"], "Share exceeds artifact budget")
     visited = set()
 
     def lineage(ref, stack, selected=False):
@@ -480,6 +479,8 @@ def pod_status_preview_checks(doc):
     assessment = data["capture_assessment"]
     require(all(a["retention"]["anchorRule"] == "submissionPreparation" for a in assessment["actions"]), "Pod-status retention must include waiting after submission")
     require(not data["capture_enabled"] or not data["blockers"], "Blocked pod-status preview enables collection")
+    combined = [q["upper"] for q in assessment["combinedQuantities"] if q["dimension"] == "outputBytes" and q["phase"] == "perIncident"]
+    require(combined == [data["max_bytes"]], "Pod-status preview bytes differ from its assessed recipe reservation")
     require(len(json.dumps(doc, separators=(",", ":")).encode()) <= 32768, "Pod-status preview exceeds hard structured-result bound")
 
 
@@ -582,18 +583,14 @@ def semantic_checks(doc: dict) -> None:
         identities = [(subject["issuer"], subject["id"]) for subject in subjects]
         require(len(identities) == len(set(identities)), "Duplicate managing team")
         require(all(subject["kind"] == "Group" and subject["id"] != "*" for subject in subjects), "Invalid managing team")
-        if kind in {"SharingIntent", "EvidenceShare"}:
-            assignment_ids = [a for team in teams for a in team["assignmentIDs"]]
-            require(len(assignment_ids) == len(set(assignment_ids)), "Manager assignment reused across teams")
     if kind == "SharingIntent":
         state = doc["status"]
         selections = {s["id"]: s for s in spec["resolvedSelections"]}
         approvals = {a["selectionID"]: a for a in state["selectionApprovals"]}
         require(len(selections) == len(spec["resolvedSelections"]), "Duplicate resolved selection")
         require(len(approvals) == len(state["selectionApprovals"]) and set(approvals) == set(selections), "Approval selection mismatch")
-        require(0 < (timestamp(spec["notAfter"]) - timestamp(spec["acceptedAt"])).total_seconds() <= 7 * 86400, "Invalid sharing lifetime")
+        require(timestamp(spec["acceptedAt"]) < timestamp(spec["notAfter"]), "Invalid sharing lifetime")
         require(state["registeredCaptures"] <= spec["maxCaptures"], "Sharing capture budget exceeded")
-        require(state["materializedArtifacts"] <= state["registeredCaptures"] * spec["maxArtifactsPerCapture"], "Sharing artifact budget exceeded")
         for key, approval in approvals.items():
             if approval["phase"] == "Approved":
                 require(timestamp(spec["acceptedAt"]) <= timestamp(approval["approvedAt"]) < timestamp(spec["notAfter"]), "Approval outside intent lifetime")
@@ -648,7 +645,6 @@ def semantic_checks(doc: dict) -> None:
                 if profile["kind"] == "httpHeaders":
                     require(peers["protocol"] == "tcp", "HTTP/1 requires TCP peers")
                     require(profile["maxHeaderBytes"] <= profile["maxReassemblyBytesPerFlow"] <= profile["maxReassemblyBytes"], "HTTP parser memory cannot contain header/flow")
-                    require(seconds(profile["idleTimeout"]) <= 30, "HTTP idle state exceeds bound")
                 if profile["kind"] == "rawPackets":
                     protocols = [rule["protocol"] for rule in profile.get("protocolSnaplen", [])]
                     require(len(protocols) == len(set(protocols)), "Ambiguous raw protocol snaplen rules")
@@ -699,15 +695,9 @@ def semantic_checks(doc: dict) -> None:
         require(spec["target"].get("workloadRef", {}).get("kind") != "Pod", "Direct Pod is ad hoc only")
         for detector in spec["detectors"]:
             options = detector["options"]
-            if "eventWindow" in detector:
-                require(duration_seconds(detector["eventWindow"]) <= 300, "Event window exceeds correlation bound")
             for key in ("sampleInterval", "pollInterval"):
                 if key in options:
                     require(duration_seconds(options[key]) >= 1, "Detector interval below minimum")
-            if "window" in options:
-                require(duration_seconds(options["window"]) <= 300, "Detector window exceeds bound")
-        if "evaluation" in spec:
-            require(duration_seconds(spec["evaluation"]["rearmFor"]) <= 300, "Rearm exceeds bound")
         ids = [d["id"] for d in spec["detectors"]]
         require(len(ids) == len(set(ids)), "Duplicate detector ID")
 
@@ -756,14 +746,6 @@ def semantic_checks(doc: dict) -> None:
             require(counters["artifactsRegistered"] <= result["maxArtifacts"], "Result artifact count exceeded")
             require(counters["bytesReserved"] + counters["bytesSpent"] <= result["maxBytes"], "Result byte pool exceeded")
             require(counters["operationsReserved"] + counters["operationsSpent"] <= result["maxOperations"], "Result operation pool exceeded")
-        if "observationLimits" in spec:
-            require(doc["status"].get("observedBytesReserved", 0) + doc["status"].get("observedBytesSpent", 0) <= spec["observationLimits"]["maxObservedBytes"], "Observation grant exceeded")
-        else:
-            require(not any(k in doc["status"] for k in ("observedBytesReserved", "observedBytesSpent")), "Observation counters without limits")
-        if "maxObservedEvents" in spec.get("observationLimits", {}):
-            require(doc["status"].get("observedEventsReserved", 0) + doc["status"].get("observedEventsSpent", 0) <= spec["observationLimits"]["maxObservedEvents"], "Observation event grant exceeded")
-        else:
-            require(not any(k in doc["status"] for k in ("observedEventsReserved", "observedEventsSpent")), "Event counters without observation limit")
         if doc.get("status", {}).get("phase") == "Approved":
             require("approver" in spec, "Approved grant lacks approver")
             approver, requester = spec["approver"], spec["requester"]
@@ -1438,7 +1420,7 @@ def main() -> None:
     rejects(capture, "capture", lambda d: d["spec"]["sharing"]["outputSelection"]["outputs"][1].pop("operations"))
     rejects(capture, "capture", lambda d: d["spec"]["sharing"]["outputSelection"]["outputs"][1].update({"operations": ["get_case"]}))
     rejects(intent, "sharing-intent", lambda d: d["spec"].update({"maxCaptures": 2}))
-    rejects(intent, "sharing-intent", lambda d: d["spec"].update({"notAfter": "2026-10-17T12:00:00Z"}), True)
+    rejects(intent, "sharing-intent", lambda d: d["spec"].update({"notAfter": "2026-10-09T11:00:00Z"}), True)
     rejects(intent, "sharing-intent", lambda d: d["status"].update({"registeredCaptures": 2}), True)
     rejects(intent, "sharing-intent", lambda d: d["status"]["selectionApprovals"][1].update({"phase": "Approved", "approvedBy": d["spec"]["createdBy"], "approvedAt": d["spec"]["acceptedAt"]}), True)
     rejects(examples["manifest-core.json"], "manifest", lambda d: d.pop("collectionProvenance"))
@@ -1449,8 +1431,8 @@ def main() -> None:
     rejects(intent, "sharing-intent", lambda d: d["spec"].update({"owner": d["spec"]["createdBy"]}))
     rejects(intent, "sharing-intent", lambda d: d["spec"]["management"]["teams"][0]["subject"].update({"kind": "User"}))
     rejects(intent, "sharing-intent", lambda d: d["spec"]["management"]["teams"][0]["subject"].update({"id": "*"}), True)
-    rejects(intent, "sharing-intent", lambda d: d["spec"]["management"]["teams"][0].pop("assignmentIDs"))
-    rejects(intent, "sharing-intent", lambda d: d["spec"]["management"]["teams"][1].update({"assignmentIDs": d["spec"]["management"]["teams"][0]["assignmentIDs"]}), True)
+    rejects(intent, "sharing-intent", lambda d: d["spec"]["management"]["teams"][0].update({"assignmentIDs": ["owner-assignment-1"]}))
+    rejects(intent, "sharing-intent", lambda d: d["spec"]["management"]["teams"][1].update(copy.deepcopy(d["spec"]["management"]["teams"][0])), True)
     rejects(capture, "capture", lambda d: d["spec"]["sharing"].update({"createdBy": intent["spec"]["createdBy"]}))
     rejects(capture, "capture", lambda d: d["spec"]["sharing"]["management"]["teams"][0].update({"assignmentIDs": ["forged"]}))
     rejects(examples["grant-policy.yaml"], "grant", lambda d: d.update({"metadata": {"name": "forged", "namespace": "payments"}}))
@@ -1497,7 +1479,7 @@ def main() -> None:
     rejects(examples["recipe-worker-pool.yaml"], "recipe", lambda d: d["spec"]["actions"][0]["parameters"].pop("batch"))
     rejects(examples["recipe-worker-pool.yaml"], "recipe", lambda d: d["spec"]["actions"][0]["parameters"]["batch"].update({"maxProcesses": 3}), True)
     rejects(examples["recipe-worker-pool.yaml"], "recipe", lambda d: d["spec"]["actions"][0]["parameters"]["processSelector"]["match"].update({"containerName": "app"}))
-    rejects(examples["grant-packet-observation.yaml"], "grant", lambda d: d["status"].update({"observedBytesSpent": 1073741824, "observedBytesReserved": 1}), True)
+    rejects(examples["grant-packet-observation.yaml"], "grant", lambda d: d["spec"]["observationLimits"].update({"maxObservedBytes": 1073741824}))
 
     rejects(examples["manifest-core.json"], "manifest", lambda d: d["target"].pop("hostPID"))
     rejects(examples["manifest-pod.json"], "manifest", lambda d: d["target"].update({"containerID": "invented"}))
@@ -1756,14 +1738,9 @@ def main() -> None:
     rejects(examples["share-extract.yaml"], "share", lambda d: d["spec"]["operations"].append("syscall_query"), True)
     rejects(examples["share-extract.yaml"], "share", lambda d: d["spec"]["operations"].append("get_logs"), True)
     rejects_guidance("preview_capture", "mcp-composition-preview-result.json", lambda d: d.update({"data_class": "metadata"}))
-    # Event grants and profile identity changes need independent evidence from output limits.
-    event_grant = copy.deepcopy(examples["grant-packet-observation.yaml"])
-    event_grant["spec"]["observationLimits"]["maxObservedEvents"] = 100
-    event_grant["status"].update({"observedEventsReserved": 50, "observedEventsSpent": 50})
-    validate(event_grant, schemas[BASE + "grant.schema.json"]); semantic_checks(event_grant)
-    rejects(event_grant, "grant", lambda d: d["status"].update({"observedEventsSpent": 51}), True)
-    rejects(event_grant, "grant", lambda d: d["status"].pop("observedEventsReserved"))
-    rejects(event_grant, "grant", lambda d: d["spec"]["observationLimits"].pop("maxObservedEvents"), True)
+    # ADR-335 D6: observation is bounded by rate x session length, not lifetime totals.
+    rejects(examples["grant-packet-observation.yaml"], "grant", lambda d: d["spec"]["observationLimits"].update({"maxObservedEvents": 100}))
+    # Profile identity changes need independent evidence from output limits.
     changed_profile = copy.deepcopy(profile_catalog[("builtin", "go-cpu", "v1")])
     prior_digest = capture_profile_definition_digest(changed_profile)
     changed_profile["spec"]["availability"] = {"enabled": False, "deprecated": True}
@@ -1858,6 +1835,25 @@ def main() -> None:
     scope = examples["resolved-capture-scope.json"]
     context_scope = examples["resolved-context-scope.json"]
     require(context_scope["collection"]["spec"]["recipeRef"]["digest"] == canonical_digest(examples["recipe-pod-status.json"]["spec"]), "Compiled context recipe digest mismatch")
+    # The pod-status reservation must hold the projection's worst-case JSON
+    # encoding under its schema maxima (every string code point escaped as a
+    # 12-byte surrogate pair, longest RFC 3339 timestamp); no other cap applies.
+    status_schema = schemas[BASE + "pod-status.schema.json"]
+    worst = 1 + len(status_schema["properties"])
+    for key, prop in status_schema["properties"].items():
+        worst += len(json.dumps(key)) + 1
+        if "const" in prop:
+            worst += len(json.dumps(prop["const"]))
+        elif "enum" in prop:
+            worst += max(len(json.dumps(e)) for e in prop["enum"])
+        elif prop.get("format") == "date-time":
+            worst += len('"2006-01-02T15:04:05.999999999+07:00"')
+        elif prop["type"] == "string":
+            worst += 2 + 12 * prop["maxLength"]
+        else:
+            worst += len(str(prop["maximum"]))
+    status_action = examples["recipe-pod-status.json"]["spec"]["actions"][0]
+    require(worst <= status_action["limits"]["maxBytes"] <= examples["recipe-pod-status.json"]["spec"]["maxTotalBytes"], "Pod-status reservation below the projection's derived worst case")
     api_scope = copy.deepcopy(context_scope)
     api_scope["podBindings"] = [{"podUID": context_scope["podBindings"][0]["podUID"], "executionClass": "kubernetesAPI"}]
     validate(api_scope, schemas[BASE + "collection-scope.schema.json"])
@@ -2004,7 +2000,7 @@ def main() -> None:
     # workload substitution, container selector or wider mechanism under one label.
     for field in ("selected_pods", "target_ref", "pod_selection"):
         rejects_guidance("preview_capture", "mcp-pod-status-preview-result.json", lambda d, f=field: d["data"].pop(f))
-    rejects_guidance("preview_capture", "mcp-pod-status-preview-result.json", lambda d: d["data"].update({"max_bytes": 8192}))
+    rejects_guidance("preview_capture", "mcp-pod-status-preview-result.json", lambda d: d["data"].update({"max_bytes": 8192}), True)
     rejects_guidance("preview_capture", "mcp-pod-status-preview-result.json", lambda d: d["data"]["selected_pods"].append(copy.deepcopy(d["data"]["selected_pods"][0])))
     rejects_guidance("preview_capture", "mcp-pod-status-preview-result.json", lambda d: d["data"]["selected_pods"][0].update({"container_name": "app"}))
     rejects_guidance("preview_capture", "mcp-pod-status-preview-result.json", lambda d: d["data"]["lifecycle_plan"]["actions"].append({"actionID": "logs", "kind": "logs", "executionMode": "onTrigger"}))

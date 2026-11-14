@@ -4082,24 +4082,13 @@
                             "type": "object",
                             "additionalProperties": false,
                             "properties": {
-                              "max_observed_bytes": {
-                                "type": "integer",
-                                "minimum": 1,
-                                "maximum": 9007199254740991
-                              },
                               "max_bytes_per_second": {
                                 "type": "integer",
                                 "minimum": 1,
                                 "maximum": 1073741824
-                              },
-                              "max_observed_events": {
-                                "type": "integer",
-                                "minimum": 0,
-                                "maximum": 9007199254740991
                               }
                             },
                             "required": [
-                              "max_observed_bytes",
                               "max_bytes_per_second"
                             ]
                           },
@@ -4847,32 +4836,10 @@
                                 "minimum": 1,
                                 "maximum": 9007199254740991
                               },
-                              "max_observed_bytes": {
-                                "type": "integer",
-                                "minimum": 0,
-                                "maximum": 9007199254740991
-                              },
                               "collected_bytes_used": {
                                 "type": "integer",
                                 "minimum": 0,
                                 "maximum": 9007199254740991
-                              },
-                              "observed_bytes_used": {
-                                "type": "integer",
-                                "minimum": 0,
-                                "maximum": 9007199254740991
-                              },
-                              "max_observed_events": {
-                                "type": "integer",
-                                "minimum": 0,
-                                "maximum": 9007199254740991,
-                                "description": "Cumulative eligible entry and exit probe ceiling; zero or absent grants no argument observation."
-                              },
-                              "observed_events_used": {
-                                "type": "integer",
-                                "minimum": 0,
-                                "maximum": 9007199254740991,
-                                "description": "Charged event units."
                               }
                             },
                             "required": [
@@ -4882,9 +4849,7 @@
                               "authority_not_after",
                               "executions_used",
                               "max_collected_bytes",
-                              "max_observed_bytes",
-                              "collected_bytes_used",
-                              "observed_bytes_used"
+                              "collected_bytes_used"
                             ]
                           }
                         },
@@ -5780,24 +5745,13 @@
                                   "type": "object",
                                   "additionalProperties": false,
                                   "properties": {
-                                    "max_observed_bytes": {
-                                      "type": "integer",
-                                      "minimum": 1,
-                                      "maximum": 9007199254740991
-                                    },
                                     "max_bytes_per_second": {
                                       "type": "integer",
                                       "minimum": 1,
                                       "maximum": 1073741824
-                                    },
-                                    "max_observed_events": {
-                                      "type": "integer",
-                                      "minimum": 0,
-                                      "maximum": 9007199254740991
                                     }
                                   },
                                   "required": [
-                                    "max_observed_bytes",
                                     "max_bytes_per_second"
                                   ]
                                 },
@@ -6029,32 +5983,10 @@
                                       "minimum": 1,
                                       "maximum": 9007199254740991
                                     },
-                                    "max_observed_bytes": {
-                                      "type": "integer",
-                                      "minimum": 0,
-                                      "maximum": 9007199254740991
-                                    },
                                     "collected_bytes_used": {
                                       "type": "integer",
                                       "minimum": 0,
                                       "maximum": 9007199254740991
-                                    },
-                                    "observed_bytes_used": {
-                                      "type": "integer",
-                                      "minimum": 0,
-                                      "maximum": 9007199254740991
-                                    },
-                                    "max_observed_events": {
-                                      "type": "integer",
-                                      "minimum": 0,
-                                      "maximum": 9007199254740991,
-                                      "description": "Cumulative eligible entry and exit probe ceiling; zero or absent grants no argument observation."
-                                    },
-                                    "observed_events_used": {
-                                      "type": "integer",
-                                      "minimum": 0,
-                                      "maximum": 9007199254740991,
-                                      "description": "Charged event units."
                                     }
                                   },
                                   "required": [
@@ -6064,9 +5996,7 @@
                                     "authority_not_after",
                                     "executions_used",
                                     "max_collected_bytes",
-                                    "max_observed_bytes",
-                                    "collected_bytes_used",
-                                    "observed_bytes_used"
+                                    "collected_bytes_used"
                                   ]
                                 }
                               },
@@ -11359,9 +11289,6 @@
                             "pod_count": {
                               "const": 1
                             },
-                            "max_bytes": {
-                              "const": 4096
-                            },
                             "max_process_starts": {
                               "const": 0
                             },
@@ -14655,18 +14582,6 @@
                         "maximum": 9007199254740991,
                         "description": "Original accepted cumulative native-output ceiling, shared across grant replacements and controls."
                       },
-                      "observed_bytes_spent": {
-                        "type": "integer",
-                        "minimum": 0,
-                        "maximum": 9007199254740991,
-                        "description": "Pre-filter observation charges shared by this acceptance. Not collected output."
-                      },
-                      "max_observed_bytes": {
-                        "type": "integer",
-                        "minimum": 0,
-                        "maximum": 9007199254740991,
-                        "description": "Original accepted cumulative pre-filter observation ceiling; zero permits no continuing acquisition."
-                      },
                       "collection_kind": {
                         "enum": [
                           "podStatus",
@@ -14681,18 +14596,6 @@
                         "type": "string",
                         "format": "uuid",
                         "description": "Grant named by the current attachment pointer; does not assert that its authority, budget or recorder readiness currently permits collection."
-                      },
-                      "max_observed_events": {
-                        "type": "integer",
-                        "minimum": 0,
-                        "maximum": 9007199254740991,
-                        "description": "Cumulative eligible entry and exit probe ceiling; zero or absent grants no argument observation."
-                      },
-                      "observed_events_spent": {
-                        "type": "integer",
-                        "minimum": 0,
-                        "maximum": 9007199254740991,
-                        "description": "Charged event units."
                       },
                       "renewal_due": {
                         "type": "boolean",
@@ -14878,7 +14781,6 @@
                           "ClientScopeMissing",
                           "ClusterNotObserved",
                           "IdentityUnavailable",
-                          "AudienceOverflow",
                           "ServiceUnavailable"
                         ]
                       },
@@ -15392,7 +15294,6 @@
                                 "NoMatchingAllow",
                                 "ExplicitDeny",
                                 "ClusterNotObserved",
-                                "AudienceOverflow",
                                 "ServiceUnavailable",
                                 "DecisionTimeSource"
                               ]
@@ -15402,7 +15303,6 @@
                                 "NoMatchingAllow",
                                 "ExplicitDeny",
                                 "ClusterNotObserved",
-                                "AudienceOverflow",
                                 "ServiceUnavailable",
                                 "DecisionTimeSource"
                               ]

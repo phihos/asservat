@@ -47,11 +47,6 @@
                 "version"
               ]
             },
-            "maxFlows": {
-              "type": "integer",
-              "minimum": 1,
-              "description": "Optional; the tracked-flow bound is maxReassemblyBytes \u00f7 maxReassemblyBytesPerFlow, and a given value must not exceed that quotient."
-            },
             "maxHeaderBytes": {
               "type": "integer",
               "minimum": 1,
@@ -69,10 +64,7 @@
               "type": "integer",
               "minimum": 1,
               "default": 16777216,
-              "description": "Per-target reassembly memory budget; the default 16 MiB is derived from the node collector memory limit together with the ring and frozen budgets."
-            },
-            "idleTimeout": {
-              "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/duration"
+              "description": "Per-target reassembly memory budget; tracked flows = maxReassemblyBytes \u00f7 maxReassemblyBytesPerFlow; the default 16 MiB is derived from the node collector memory limit together with the ring and frozen budgets."
             }
           },
           "required": [
@@ -81,8 +73,7 @@
             "projectionRef",
             "maxHeaderBytes",
             "maxReassemblyBytesPerFlow",
-            "maxReassemblyBytes",
-            "idleTimeout"
+            "maxReassemblyBytes"
           ]
         },
         {

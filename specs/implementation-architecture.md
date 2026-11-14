@@ -28,7 +28,7 @@ Given an older connector, an unexpected work purpose, a live projection disguise
 
 ## REQ-ARC-004 — Receiver deduplication and effect fencing
 
-Separate work identity (`workID`, `operationID`), individual start identity and evidence commit. The receiving executor MUST persist the authorized start disposition before an intrusive effect; hub retries resend that same identity and the receiver deduplicates against it. Unknown starts stay Indeterminate and charged until the collector reports their outcome or the node's boot ID changes (resolved by operation ID, ADR-330 D7; no time limit). No effect is executed inside a retried SQL callback. Natural cores spend from the connector's local budget lease without synchronous remote preparation.
+Separate work identity (`workID`, `operationID`), individual start identity and evidence commit. The receiving executor MUST persist the authorized start disposition before an intrusive effect; hub retries resend that same identity and the receiver deduplicates against it. Unknown starts stay Indeterminate and charged until the collector reports their outcome or the node's boot ID changes (resolved by operation ID, ADR-330 D7; no time limit). No effect is executed inside a retried SQL callback. Natural cores spend from the connector's local budget without synchronous remote preparation.
 
 ### SC-ARC-004
 
@@ -44,11 +44,11 @@ Given a new profiling or tracing adapter, when it is registered, then unsupporte
 
 ## REQ-ARC-006 — Failure, resource and privacy ownership
 
-Every critical runtime flow MUST assign the next transition, retry policy, residual charge/copy, current-rights check and deletion obligation to a component. Preserve separate installation/workload/node budgets, protected snapshot priority over live delivery, denial/cleanup during outages and bounded local budget leases (capture-storm protection). Expose recovery state and gaps. Database restore must not revive past approvals or watches; the relevant charge is released when the object store or volume confirms deletion.
+Every critical runtime flow MUST assign the next transition, retry policy, residual charge/copy, current-rights check and deletion obligation to a component. Preserve separate installation/workload/node budgets, protected snapshot priority over live delivery, denial/cleanup during outages and bounded connector local budgets (capture-storm protection). Expose recovery state and gaps. Database restore must not revive past approvals or watches; the relevant charge is released when the object store or volume confirms deletion.
 
 ### SC-ARC-006
 
-Given hub/database failure and saturated live readers during a triggered save, when the system degrades, then local work under the connector's budget lease and local deletion remain bounded, live delivery sheds before protected saving, expired reads are denied and reservations or copies with an unknown outcome remain tracked by operation ID until resolved. Recovery revalidates authority instead of trusting restored cache state.
+Given hub/database failure and saturated live readers during a triggered save, when the system degrades, then local work under the connector's local budget and local deletion remain bounded, live delivery sheds before protected saving, expired reads are denied and reservations or copies with an unknown outcome remain tracked by operation ID until resolved. Recovery revalidates authority instead of trusting restored cache state.
 
 ## REQ-ARC-007 — Traceable implementation slices
 

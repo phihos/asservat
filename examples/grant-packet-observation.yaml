@@ -26,7 +26,6 @@ spec:
   issuedAt: '2026-10-09T12:00:00Z'
   observationLimits:
     maxSessionSeconds: 30
-    maxObservedBytes: 1073741824
     maxBytesPerSecond: 33554432
     maxConcurrentSessions: 1
 status:
@@ -36,5 +35,3 @@ status:
   spentBytes: 0
   executionsSpent: 0
   executionsReserved: 0
-  observedBytesReserved: 0
-  observedBytesSpent: 0

@@ -17,27 +17,21 @@ that replica and its Service/headless DNS address.
 
 ## Connectors
 
-Each cluster has one connector identity. An administrator-issued, single-use
-bootstrap token obtains the first client certificate; the connector then
-rotates it with a certificate signing request before expiry (kubelet TLS
-bootstrapping, OCM cluster registration). Certificates last 90 days and are
-renewed at two thirds of their lifetime (kubelet/cert-manager practice);
-revocation does not depend on short validity because the SQL peer row and its
-change event revoke immediately.
+Each cluster has one standing connector identity: its name in the hub's
+`clusters` values ([ADR-334](../decisions/334-connector-workload-identity.md),
+[connector identity](connector-credentials.md)). The connector presents a
+projected ServiceAccount token of its own cluster (audience: the hub URL) on
+its one HTTPS connection; the hub verifies it against that cluster's issuer
+or static JWKS. Nothing is copied from the hub to the workload cluster, and
+the connection may pass a TLS-terminating Ingress or Gateway. A cluster
+removed from the values or marked `revoked: true` is refused at its next
+request and its open connection is closed by the change event.
 
-The URI SAN is `spiffe://asservat.<installation-uuid>/cluster/<cluster-uuid>/connector/<peer-uuid>`,
-with exact canonical spelling and no query, fragment, port or additional
-identity. The certificate uses digital-signature usage, the client-auth EKU,
-non-CA basic constraints and no common name, DNS, IP or email identity. TLS 1.3
-is required (RFC 8446; no version to tune). There is no forwarded-certificate or proxy-header fallback.
-
-`mtls.PeerVerifier` verifies the client chain against the installation roots
-during the handshake. The hub checks the SQL peer registration (enabled,
-expected cluster, certificate digest not revoked) at handshake and at
-certificate renewal; a revocation closes the peer's open connection. There is
-no per-request registry lookup on a reused connection. After renewal the
-connector opens new streams on a connection with the new certificate and the old
-connection drains gracefully; a connection never outlives its certificate.
+Where the hub is exposed by TLS passthrough, a connector may additionally use
+a client certificate the installation CA signs for a CSR authenticated by the
+same ServiceAccount token ([optional connector certificates](enrollment-activation.md)).
+That certificate adds transport binding, not authority: the token's cluster
+attribution and the cluster row still decide.
 
 ## In-cluster workloads
 
@@ -49,8 +43,7 @@ node boot ID, collector epoch or live owner-chain read is part of the identity.
 
 ## Messages
 
-Work and results travel unsigned over these mutually authenticated
-connections. A connection identifies the sender; it is not permission. Each
+Work and results travel unsigned over these authenticated connections. A connection identifies the sender; it is not permission. Each
 public operation is authorized once by its owning component (ADR-311), as in
 [download authority](download-authority.md).
 
@@ -58,4 +51,5 @@ References: [Go TLS connection state](https://pkg.go.dev/crypto/tls#ConnectionSt
 [X.509 verification](https://pkg.go.dev/crypto/x509#VerifyOptions),
 [SPIFFE concepts](https://spiffe.io/docs/latest/spiffe-about/spiffe-concepts/),
 [kubelet TLS bootstrapping](https://kubernetes.io/docs/reference/access-authn-authz/kubelet-tls-bootstrapping/),
+[ServiceAccount issuer discovery](https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#service-account-issuer-discovery),
 [cert-manager CA issuer](https://cert-manager.io/docs/configuration/ca/).

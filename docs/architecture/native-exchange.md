@@ -11,8 +11,8 @@ ADR-074–088, 116, 122 and 288.
 
 ## Connections and routing
 
-- Each connector holds one outbound, multiplexed HTTP/2 connection with mutual
-  TLS to the hub. Download commands and bytes are streams on it, alongside the
+- Each connector holds one outbound, multiplexed HTTP/2 connection to the
+  hub, authenticated by its ServiceAccount token (ADR-334). Download commands and bytes are streams on it, alongside the
   connector's other streams.
 - Reader replicas hold one long-lived HTTP/2 connection to the connector of
   their cluster (combined mode: an in-process call). The connector forwards

@@ -12,9 +12,10 @@ needs no Node, exec, Secret, log or container access.
    the per-workload storage charge and an audit row, in one SQL transaction
    (ADR-330 D6/D7). Concurrent requests with the same idempotency key receive
    the same row.
-2. The hub sends `runAction` as a stream on the connector's single mTLS
-   connection (ADR-330 D2). The connector is authenticated by its cluster
-   certificate; no per-start proof, guard read or start object is created.
+2. The hub sends `runAction` as a stream on the connector's single hub
+   connection (ADR-330 D2). The connector is authenticated by its
+   ServiceAccount token (ADR-334); no per-start proof, guard read or start
+   object is created.
 3. The connector reads the pinned Pod, rejects a substitute Pod, encrypts the
    projection with the wrap-only producer and writes the attempt objects under
    keys derived from the operation ID with conditional create. A retry of the

@@ -22,11 +22,9 @@ spec:
             projectionRef:
               name: http-response-headers
               version: v1
-            maxFlows: 1024
             maxHeaderBytes: 32768
-            maxReassemblyBytesPerFlow: 262144
+            maxReassemblyBytesPerFlow: 65536
             maxReassemblyBytes: 16777216
-            idleTimeout: 30s
           before: 30s
           after: 30s
           ring:
@@ -123,7 +121,7 @@ spec:
         catalog: builtin
         name: http-headers
         version: v1
-      definitionDigest: 6c498263cabcdba0e773251fec20c176644dab1f943ff78b976954aff73ef265
+      definitionDigest: d7b6a10dd58b74c306f92b1c096330eec6392918741bc3f90f4b297cc62aea75
     - componentID: calls
       profileRef:
         catalog: builtin

@@ -39,7 +39,7 @@ Case discovery also joins occurrences, artifact classes, expiry, retained audien
 | User-authored DebugCapture | Kubernetes request envelope and projected status; accepted immutable execution in PostgreSQL, keyed by cluster/request UID and generation; browser/MCP can submit through the existing authenticated capture path |
 | Hub capture executions, action outcomes, cases/occurrences, content-minimized artifact catalog, lineage/copy references and lifecycle work | PostgreSQL rows with indexed identities, versions, deadlines and idempotency keys |
 | Hub AccessGrant, EvidenceShare, SharingIntent, SharingRegistration, quota accounts/reservations and DeliveryWork | PostgreSQL records; controller-owned hub CRDs for these runtime records become unnecessary |
-| Cluster registration and connector certificate state | PostgreSQL runtime records; locality policy stays in Kubernetes configuration |
+| Cluster registration and connector connection state | PostgreSQL runtime records; locality policy stays in Kubernetes configuration |
 | Encrypted cores, packet captures, profiles, files/logs, derived evidence and full manifests | Existing regional object storage and KMS boundaries |
 | Content-minimized audit records | Append-only PostgreSQL rows written in the effect's transaction, exported in batches to the object store or a SIEM (ADR-330 D6) |
 | Logs, packets, samples, protocol reassembly, trigger counters and rings at observation frequency | Node-local bounded pipelines, not database writes for every observation |

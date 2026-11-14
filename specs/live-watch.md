@@ -48,7 +48,7 @@ Live viewing reserves separate query/fanout memory, CPU/scan work, slots and tra
 
 - **Watch slots per installation:** the hub-api memory share for live views divided by (replay + per-watch state), times the hub-api replicas.
 - **Delivery per watch:** 64 KiB/s by default, a human-readable row rate times the row size; it bounds hub egress per watch.
-- **Projection CPU per node:** a quarter of the node collector's CPU request by default; examined events/s and bytes/s derive from measured parser throughput at that CPU.
+- **Projection CPU per node:** the node collector's CPU request minus the CPU reserved for its armed sources and incident saves (the steady ring/parser/CPU reservation and the trigger-time save reservation of [capacity](capacity.md#admission-at-source-activation-and-at-trigger)), so live views use only the headroom recording does not need; examined events/s and bytes/s derive from measured parser throughput at that CPU.
 - **Subscriptions per node:** the node projection CPU budget divided by the measured per-subscription parser cost.
 
 Live views work with these defaults and no operator input. Projections are shared per source cohort (below), so further viewers of the same source cost only delivery; there is no per-principal or per-workload watch count and no cumulative hourly budget, because the per-second rates and node budgets already bound cost. Count every source subscription inside the node budgets and every transmitted retry against the delivery rate.
