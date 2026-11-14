@@ -55,6 +55,11 @@ func RunHubAPI(ctx context.Context, podUID string) (result error) {
 	}
 	defer d.Close()
 	phase = startupFullListener
+	stopReadiness, err := serveReadiness(ctx, d.Runtime.Ready)
+	if err != nil {
+		return errors.Join(mounts.ErrUnavailable, err)
+	}
+	defer stopReadiness()
 	listener, err := (&net.ListenConfig{KeepAlive: -1}).Listen(ctx, "tcp", net.JoinHostPort("", strconv.Itoa(d.Runtime.pool.Port)))
 	if err != nil {
 		return errors.Join(mounts.ErrUnavailable, err)

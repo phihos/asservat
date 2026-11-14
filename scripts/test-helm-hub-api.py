@@ -146,6 +146,11 @@ class HubAPI(unittest.TestCase):
                                                                  "--credential", "/run/asservat/hub/sql-owner-runtime.json", "--ca", "/run/asservat/hub/postgres-ca.crt"])
         c = spec["containers"][0]
         self.assertEqual(c["command"], ["/asservat", "hub-api"])
+        # Readiness: the hub-api's /readyz on its readiness port (the Go
+        # constant HubAPIReadinessPort), passing only after startup.
+        self.assertIn({"name": "readiness", "containerPort": 9449, "protocol": "TCP"}, c["ports"])
+        self.assertEqual(c["readinessProbe"]["httpGet"], {"path": "/readyz", "port": "readiness", "scheme": "HTTP"})
+        self.assertNotIn("livenessProbe", c)
         self.assertEqual({m["mountPath"] for m in c["volumeMounts"]}, {"/run/asservat/hub-api", "/run/asservat/ids", "/run/asservat/hub", "/run/asservat/owner-observation", "/run/asservat/public"})
         vols = {v["name"]: v for v in spec["volumes"]}
         self.assertEqual(vols["ids"]["secret"]["secretName"], "asservat-ids")

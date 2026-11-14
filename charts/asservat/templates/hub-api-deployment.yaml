@@ -51,6 +51,14 @@ spec:
             - {name: observation, containerPort: 9444, protocol: TCP}
             - {name: public, containerPort: 9445, protocol: TCP}
             - {name: operation, containerPort: 9448, protocol: TCP}
+            - {name: readiness, containerPort: 9449, protocol: TCP}
+          # Bound after the full composition started; 200 only while the
+          # owner runtime holds activated keys and a current enrollment proof.
+          readinessProbe:
+            httpGet: {path: /readyz, port: readiness, scheme: HTTP}
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 3
           securityContext: {{ include "asservat.securityContext" . | nindent 12 }}
           resources: {{ include "asservat.resources" (list . "hub-api") | nindent 12 }}
           volumeMounts:
