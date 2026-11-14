@@ -10,13 +10,7 @@ Helm is the officially supported installation method under [ADR-058](../docs/dec
 
 A read-only installation/capability report MUST identify each missing prerequisite, its effect, responsible role and exact remedy. Inspect API reachability, identity mapping, declared deletion/versioning policy, encryption, region, metadata protection and node capabilities independently. Distinguish configured/inspected from actively verified; a read-only check cannot prove a DELETE, failover or runtime capture works. Offer a separate synthetic qualification action with bounded cleanup. Never exercise a live dump/custom command to prove basic readiness. Active synthetic diagnostics require explicit selection. Report support per action/node pool; unavailable kernel cores must not disable logs or profiles. Core-handler takeover remains an explicit administrator decision once per qualified node-pool configuration.
 
-Regional context-executor installation MUST require the operator-managed local
-start API before creating installation resources. Missing or conflicting
-served `CapacityReservation` discovery must identify the chart CRD prerequisite,
-preserve original caller cancellation/deadlines, and create no namespace or
-runtime objects. Discovery establishes availability only; it does not replace
-schema qualification, RBAC, protected admission or current execution authority.
-The installer must not create or adopt the cluster-scoped CRD.
+Helm installs the CRDs from the chart's `crds/` directory with the CRD upgrade ordering of ADR-058. Installation fails with a message naming the missing CRD when a prerequisite CRD is absent.
 
 Source trust and retention-purpose setup belongs to administrators. Newly provisioned namespaces matching an approved source/ceiling inherit it automatically. No per-workload AccessBinding or consent checkbox is required in that path. Reusable budget profiles automatically allocate protected storage from the namespace envelope; show CapacityNotAllocated before arming if it cannot be backed, rather than requesting quota YAML from every maintainer. Application maintainers need no hub kubeconfig, node access, private registry credentials or separate per-cluster account to investigate already authorized evidence.
 
@@ -66,9 +60,9 @@ Given a case needing three bounded raw queries, when one suitable grant is appro
 
 ## REQ-UX-004 — Useful status and recovery
 
-The browser and CRD Conditions MUST distinguish saved, validating, awaiting selection/approval, arming, monitored, degraded, partial and expired. Report desired/observed generation, last fresh observation, actual history coverage and next eligible capture time. Each blocked/partial item gives a stable reason, practical remedy, responsible role, and retryability without exposing unauthorized inventory. Examples: missing endpoint → app maintainer; blocked collection ceiling → cluster admin; expired raw grant → requester/approver; expired evidence → unavailable, not retryable.
+The browser and CRD Conditions MUST distinguish saved, validating, awaiting selection/approval, arming, monitored, degraded, partial and expired. Report `generation`/`observedGeneration`, the last observed source change, actual history coverage and next eligible capture time. Each blocked/partial item gives a stable reason, practical remedy, responsible role, and retryability without exposing unauthorized inventory. Examples: missing endpoint → app maintainer; blocked collection ceiling → cluster admin; expired raw grant → requester/approver; expired evidence → unavailable, not retryable.
 
-Preserve drafts after validation errors. A failed optional action never hides successful evidence. A reconnect/refresh recovers the existing operation. Cancellation stops future work with its limitations; an ambiguous invasive action is never presented as a safe Retry button. Capability failures do not demand the user decode controller logs. Incident pages put available evidence and missing coverage before collector implementation details. Provide bounded support diagnostics with versions, capability/condition codes and opaque IDs; exclude evidence, tokens, argv values and user labels.
+Preserve drafts after validation errors. A failed optional action never hides successful evidence. A reconnect/refresh recovers the existing operation by its idempotency key. Cancellation stops future work with its limitations; an ambiguous invasive action is never presented as a safe Retry button. Capability failures do not demand the user decode controller logs. Incident pages put available evidence and missing coverage before collector implementation details. Provide bounded support diagnostics with versions, capability/condition codes and opaque IDs; exclude evidence, tokens, argv values and user labels.
 
 ### SC-UX-004
 
