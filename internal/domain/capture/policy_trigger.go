@@ -16,24 +16,15 @@ import (
 // StatefulSet fires the pod-status context diagnostic on the triggering Pod.
 // Every other detector, action or option is rejected with its field path.
 
-// WorkloadTriggerInterval and WorkloadTriggerBurst are the workload rate
-// limit (REQ-CAP-001 defaults): one token bucket with a burst of one and one
-// occurrence per 900 seconds, shared by every policy on the workload.
-// SetWorkloadRate replaces them with the capacity.workload.dump values;
-// the hub-api calls it once at startup.
-var (
-	WorkloadTriggerInterval = 900 * time.Second
-	WorkloadTriggerBurst    = 1
-)
-
-func SetWorkloadRate(burst int64, intervalSeconds int64) {
-	if burst > 0 {
-		WorkloadTriggerBurst = int(burst)
-	}
-	if intervalSeconds > 0 {
-		WorkloadTriggerInterval = time.Duration(intervalSeconds) * time.Second
-	}
+// WorkloadRate is the workload rate limit (REQ-CAP-001): one token bucket
+// per workload, shared by every policy, manual save and trigger source.
+type WorkloadRate struct {
+	Interval time.Duration
+	Burst    int
 }
+
+// DefaultWorkloadRate is the spec default: burst 1, one token per 900 s.
+func DefaultWorkloadRate() WorkloadRate { return WorkloadRate{Interval: 900 * time.Second, Burst: 1} }
 
 const (
 	// TriggerPollInterval is the restart poll period of one active policy.

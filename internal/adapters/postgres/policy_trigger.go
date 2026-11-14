@@ -134,7 +134,7 @@ func (s *PolicyTriggers) Tick(ctx context.Context, in value.PolicyTick) ([]value
 			} else if !errors.Is(err, pgx.ErrNoRows) {
 				return err
 			}
-			if !admits(shared, n, value.WorkloadTriggerInterval, value.WorkloadTriggerBurst) || !admits(own, n, in.Policy.Interval, in.Policy.Burst) {
+			if !admits(shared, n, currentWorkloadRate().Interval, currentWorkloadRate().Burst) || !admits(own, n, in.Policy.Interval, in.Policy.Burst) {
 				suppress["cooldown"]++
 				continue
 			}
@@ -163,7 +163,7 @@ func (s *PolicyTriggers) Tick(ctx context.Context, in value.PolicyTick) ([]value
 				policy   string
 				tat      time.Time
 				interval time.Duration
-			}{{"", shared, value.WorkloadTriggerInterval}, {a.PolicyUID, own, in.Policy.Interval}} {
+			}{{"", shared, currentWorkloadRate().Interval}, {a.PolicyUID, own, in.Policy.Interval}} {
 				if err = q.UpdatePolicyWindow(ctx, custodydb.UpdatePolicyWindowParams{RootID: id(s.root), ClusterID: id(a.ClusterID), WorkloadUid: a.WorkloadUID, PolicyUid: w.policy, Tat: ts(later(w.tat, n).Add(w.interval))}); err != nil {
 					return err
 				}

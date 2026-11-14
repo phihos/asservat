@@ -60,7 +60,7 @@ func validateHubWorkerCapacity(c *contracts.HubWorkerCapacity, ids contracts.Ins
 		return errHubWorkerCapacityConfig
 	}
 	if _, _, err = app.DeriveBudget(v, capacityClusters(c, ids)); err != nil {
-		return errHubWorkerCapacityConfig
+		return fmt.Errorf("%w: %w", errHubWorkerCapacityConfig, err)
 	}
 	// The processing source UID is a placeholder here; only the settings decide.
 	if _, err := buildHubWorkerQualification(c, ids, namespace, ids.ClusterID, time.Now()); err != nil {

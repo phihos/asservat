@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"math/bits"
 	"strconv"
 	"strings"
@@ -66,7 +67,7 @@ func amount(b, u int64) BudgetAmount {
 
 // DeriveBudget derives the pool and one policy per cluster (REQ-CAP-004).
 // The system reserve is 1/16 of the evidence storage; the default share is
-// the rest divided by eight; whatever is not protected is shared burst.
+// the rest divided by max(8, clusters + 1); whatever is not protected is shared burst.
 // Protected slots are split evenly over the clusters. evidenceStorage is
 // already usable capacity, so the SQL safety margin is one 4 KiB block.
 func DeriveBudget(v CapacityValues, clusters []string) (PoolBudgetInput, []PolicyBudgetInput, error) {
@@ -78,10 +79,11 @@ func DeriveBudget(v CapacityValues, clusters []string) (PoolBudgetInput, []Polic
 	available := u - system - safety
 	share := v.ShareBytes
 	if share <= 0 {
-		share = available / 8
+		// Each cluster keeps at least one protected slot and a positive burst.
+		share = available / max(8, int64(len(clusters))+1)
 	}
 	if share <= 0 || share > available {
-		return PoolBudgetInput{}, nil, ErrBudgetInvalid
+		return PoolBudgetInput{}, nil, fmt.Errorf("%w: workload share %d of %d available bytes", ErrBudgetInvalid, share, available)
 	}
 	slots := available / share
 	if slots*share == available {
@@ -89,7 +91,7 @@ func DeriveBudget(v CapacityValues, clusters []string) (PoolBudgetInput, []Polic
 	}
 	per := min(slots/int64(len(clusters)), sqlSlotLimit)
 	if per < 1 {
-		return PoolBudgetInput{}, nil, ErrBudgetInvalid
+		return PoolBudgetInput{}, nil, fmt.Errorf("%w: a workload share of %d bytes leaves no protected slot for each of %d clusters", ErrBudgetInvalid, share, len(clusters))
 	}
 	burst := available - per*int64(len(clusters))*share
 	hard := v.LimitBytes

@@ -46,3 +46,19 @@ func TestNameUUIDIsVersion5(t *testing.T) {
 		t.Fatal(got)
 	}
 }
+
+// Joining more clusters keeps the default share valid: each cluster gets a
+// protected slot and the pool keeps a positive burst.
+func TestDeriveBudgetDefaultShareCoversManyClusters(t *testing.T) {
+	clusters := make([]string, 20)
+	for i := range clusters {
+		clusters[i] = "c" + string(rune('a'+i))
+	}
+	pool, policies, err := DeriveBudget(CapacityValues{EvidenceBytes: 8 << 30}, clusters)
+	if err != nil || len(policies) != 20 || pool.Slots[0].Workloads < 1 || pool.Burst.Bytes <= 0 {
+		t.Fatal(err, pool)
+	}
+	if _, _, err = DeriveBudget(CapacityValues{EvidenceBytes: 8 << 30, ShareBytes: 1 << 30}, clusters); err == nil {
+		t.Fatal("an explicit share too large for every cluster was accepted")
+	}
+}

@@ -33,7 +33,6 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	audit "asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
-	capturevalue "asservat.local/asservat/internal/domain/capture"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	fleet "asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/planning"
@@ -374,7 +373,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 		return nil, mounts.ErrUnavailable
 	}
 	if r := p.WorkloadRate; r != nil {
-		capturevalue.SetWorkloadRate(r.Burst, r.MinimumIntervalSeconds)
+		postgres.SetWorkloadRate(r.Burst, r.MinimumIntervalSeconds)
 	}
 	if out.policyTriggers, err = postgres.NewPolicyTriggers(ctx, sql["policy-automation"], root, installation); err != nil {
 		return nil, mounts.ErrUnavailable
