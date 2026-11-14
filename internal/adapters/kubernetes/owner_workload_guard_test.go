@@ -119,9 +119,9 @@ func TestOwnerSchedulingLeasePlanRejectsAmbiguousScope(t *testing.T) {
 
 // ADR-193: one exact credential Secret UPDATE exception for one account.
 func TestOwnerCredentialSecretPlan(t *testing.T) {
-	plan := cfg.OwnerWorkloadAdministration{Name: "connector-workload", Deployment: "connector", DeploymentUID: ownerID(5), ControlNamespace: cfg.NamespaceRef{Name: "region", UID: ownerID(4)}, Administrators: []cfg.KubernetesActor{{Kind: "User", Name: "installer"}}, CredentialSecrets: []cfg.OwnerCredentialSecret{{Secret: "cluster-credential", ServiceAccount: "connector"}}}
+	plan := cfg.OwnerWorkloadAdministration{Name: "connector-workload", Deployment: "connector", DeploymentUID: ownerID(5), ControlNamespace: cfg.NamespaceRef{Name: "region", UID: ownerID(4)}, Administrators: []cfg.KubernetesActor{{Kind: "User", Name: "installer"}}, CredentialSecrets: []cfg.OwnerCredentialSecret{{Secret: "connector-delivery", ServiceAccount: "connector"}}}
 	policy, _, err := OwnerWorkloadAdmission(plan)
-	if err != nil || !strings.Contains(policy.Spec.Validations[0].Expression, `request.resource.resource == 'secrets' && variables.subResource == '' && request.name == "cluster-credential" && request.userInfo.username == "system:serviceaccount:region:connector"`) {
+	if err != nil || !strings.Contains(policy.Spec.Validations[0].Expression, `request.resource.resource == 'secrets' && variables.subResource == '' && request.name == "connector-delivery" && request.userInfo.username == "system:serviceaccount:region:connector"`) {
 		t.Fatal("credential Secret exception missing", err)
 	}
 	for _, mutate := range []func(*cfg.OwnerWorkloadAdministration){

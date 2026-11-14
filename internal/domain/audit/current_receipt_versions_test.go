@@ -57,8 +57,6 @@ func TestReachableAuditReceiptsRequireImmutableVersions(t *testing.T) {
 		{"worker-intent", audit.DownloadWorkerAuditKey(w.Intent), func(r audit.Receipt) bool { return r.ValidDownloadWorker(w.Intent) }},
 		{"worker-enrollment", audit.WorkerEnrollmentKey(en), func(r audit.Receipt) bool { return r.ValidWorkerEnrollment(en) }},
 		{"worker-certificate", audit.WorkerCertificateKey(cert), func(r audit.Receipt) bool { return r.ValidWorkerCertificate(cert) }},
-		{"connector-enrollment", audit.EnrollmentClaimKey(id, id), func(r audit.Receipt) bool { return r.ValidEnrollmentClaim(id, id) }},
-		{"connector-certificate", audit.EnrollmentCertificateKey(id, id), func(r audit.Receipt) bool { return r.ValidEnrollmentCertificate(id, id) }},
 		{"batch-intent", audit.DownloadAuditKey(id, id, id, "intent"), func(r audit.Receipt) bool { return r.ValidDownload(id, id, id, "intent") }},
 		{"batch-outcome", audit.DownloadAuditKey(id, id, id, "outcome"), func(r audit.Receipt) bool { return r.ValidDownload(id, id, id, "outcome") }},
 		{"window-intent", audit.DownloadWindowAuditKey(window.Window.Authority.Scope.RootID, window.Response.ID, window.Window.ID, "intent"), func(r audit.Receipt) bool { return r.ValidDownloadWindow(window, "intent") }},

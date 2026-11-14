@@ -10,6 +10,11 @@ import (
 	value "asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
 )
+// EnrollmentProofVerifier returns the key digest of a process CSR.
+type EnrollmentProofVerifier interface {
+	EnrollmentKey([]byte) (artifact.Digest, error)
+}
+
 
 // ConnectorLifecycleEnrollment explicitly selects ADR153's private native
 // operation. SQL/audit effects are the same runner used by legacy enrollment.

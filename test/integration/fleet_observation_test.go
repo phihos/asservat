@@ -259,7 +259,7 @@ func TestEnrollmentFleetObservationWithRealPostgres(t *testing.T) {
 		if err := o.ObserveAdministration(ctx, fleetBasisFixture(t, ctx, o), a); err != nil {
 			t.Fatal(err)
 		}
-		for _, sql := range []string{"UPDATE fleet_trust SET suspended=false WHERE installation_id=$1", "UPDATE fleet_trust SET issuer_epoch=gen_random_uuid() WHERE installation_id=$1", "UPDATE fleet_trust SET source_uid='replacement' WHERE installation_id=$1", "DELETE FROM fleet_trust WHERE installation_id=$1", "UPDATE fleet_peer SET enabled=true WHERE installation_id=$1", "UPDATE fleet_bootstrap SET revoked=false WHERE installation_id=$1"} {
+		for _, sql := range []string{"UPDATE fleet_trust SET suspended=false WHERE installation_id=$1", "UPDATE fleet_trust SET issuer_epoch=gen_random_uuid() WHERE installation_id=$1", "UPDATE fleet_trust SET source_uid='replacement' WHERE installation_id=$1", "DELETE FROM fleet_trust WHERE installation_id=$1", "UPDATE fleet_peer SET enabled=true WHERE installation_id=$1"} {
 			if _, err := pool.Exec(ctx, sql, a.InstallationID); err == nil {
 				t.Fatal("observer exceeded purpose")
 			}

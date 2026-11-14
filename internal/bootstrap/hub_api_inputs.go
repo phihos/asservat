@@ -263,7 +263,7 @@ func buildHubAPIPublic(ctx context.Context, files *os.Root, c contracts.OwnerDep
 		if err != nil {
 			return nil, err
 		}
-		out.Fleet = &contracts.OwnerFleetIssuance{Settings: settings, ChannelMount: contracts.SmallOpenBaoBootstrapMount, DeliveryProfile: f.DeliveryProfile}
+		out.Fleet = &contracts.OwnerFleetIssuance{Settings: settings}
 	}
 	// The work-signing key is read with the work-sign provider role; its role
 	// name does not depend on the key version.
@@ -280,11 +280,6 @@ func buildHubAPIPublic(ctx context.Context, files *os.Root, c contracts.OwnerDep
 	out.WorkSigning.KeyID = out.WorkSigning.Name + "-v" + strconv.Itoa(version)
 	if _, out.ProviderRecipeSHA256, err = providerconfig.OwnerPublicProviderRecipeFor(c, *c.ProviderAuthentication, now); err != nil {
 		return nil, hubAPIInputError("public-recipe")
-	}
-	if out.Fleet != nil {
-		if _, out.Fleet.ProviderRecipeSHA256, err = providerconfig.OwnerFleetProviderRecipeFor(c, *c.ProviderAuthentication, now); err != nil {
-			return nil, hubAPIInputError("fleet-recipe")
-		}
 	}
 	return out, nil
 }

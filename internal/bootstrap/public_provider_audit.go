@@ -16,7 +16,6 @@ import (
 // These existing audit purposes use the same finite material observation as
 // C08, retaining their own formats, pre-paid claims, key calls and completion
 // producers. They never borrow another purpose's SQL or disclosure authority.
-var _ auditapp.BootstrapIssueWriter = (*installedOperationAudit)(nil)
 var _ auditapp.DownloadWorkerWriter = (*installedOperationAudit)(nil)
 var _ auditapp.WorkerEnrollmentWriter = (*installedOperationAudit)(nil)
 var _ auditapp.DownloadWriter = (*installedOperationAudit)(nil)
@@ -24,14 +23,6 @@ var _ auditapp.DownloadWindowObjects = (*installedOperationAudit)(nil)
 var _ evidence.DownloadStopObjects = (*installedOperationAudit)(nil)
 var _ evidence.ClosedDownloadStopObjects = (*installedOperationAudit)(nil)
 
-func (s *installedOperationAudit) WriteBootstrapIssue(ctx context.Context, r audit.BootstrapIssue) (audit.Receipt, error) {
-	if !r.Valid() {
-		return audit.Receipt{}, mounts.ErrUnavailable
-	}
-	return withInstalledAudit(ctx, s, time.Now().Add(5*time.Second), func(call context.Context, store *objectstore.Store) (audit.Receipt, error) {
-		return (&objectstore.BootstrapIssueObjects{Store: store, Seal: s.seal, Open: s.open}).WriteBootstrapIssue(call, r)
-	})
-}
 func (s *installedOperationAudit) WriteDownloadWorkerIntent(ctx context.Context, r authorization.DownloadWorkerIntent) (audit.Receipt, error) {
 	if !r.Valid() {
 		return audit.Receipt{}, mounts.ErrUnavailable
@@ -146,12 +137,6 @@ func (s *installedOperationAudit) FindDownloadWindowOutcome(ctx context.Context,
 }
 
 func (a publicAuditStore) storageConfigured() bool { return a.store != nil || a.operation != nil }
-func (a publicAuditStore) bootstrapObjects() auditapp.BootstrapIssueWriter {
-	if a.operation != nil {
-		return a.operation
-	}
-	return &objectstore.BootstrapIssueObjects{Store: a.store, Seal: a.seal, Open: a.open}
-}
 func (a publicAuditStore) workerObjects() auditapp.DownloadWorkerWriter {
 	if a.operation != nil {
 		return a.operation

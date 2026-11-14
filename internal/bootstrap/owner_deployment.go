@@ -74,12 +74,8 @@ type OwnerDeployment struct {
 	// recordingCollect is the ADR-248 collect loop; RunPublic supervises it.
 	recordingCollect *RegionalRecordingCollect
 	history          *captureapp.HistoryParameterService
-	// localBootstrap issues the combined-mode connector's own bootstrap
-	// record; RunPublic supervises it.
-	localBootstrap *app.LocalClusterBootstrap
-	// remoteJoins issue the joined mode=cluster clusters' bootstraps into
-	// their join Secrets.
-	remoteJoins []app.RemoteClusterJoin
+	// remoteJoins keep the joined mode=cluster clusters' join Secrets.
+	remoteJoins []*remoteJoinSecret
 	shared      publicShared
 	// localControls are the control documents this process wrote (the
 	// hub-local download workers'); the trust catalog holds them beside the
@@ -336,12 +332,7 @@ func newOwnerDeployment(ctx context.Context, files *os.Root, podUID string, in *
 		if err != nil {
 			return nil, &fixedStepError{"public-context", err}
 		}
-		if !in.hubOnly() && d.publicContext.fleet != nil {
-			if d.localBootstrap, err = newLocalClusterBootstrap(startup, in, d.public, d.publicContext.fleet, d.providers.BootstrapChannel()); err != nil {
-				return nil, err
-			}
-		}
-		if d.remoteJoins, err = newRemoteClusterJoins(startup, in, d.public, d.publicContext.fleet, d.providers.BootstrapChannel()); err != nil {
+		if d.remoteJoins, err = newRemoteClusterJoins(in); err != nil {
 			return nil, err
 		}
 		nativeConfig.ContextStarts = d.publicContext.starts
@@ -601,18 +592,11 @@ func (d *OwnerDeployment) RunPublic(listener net.Listener) error {
 			_ = d.recordingCollect.Run(d.root)
 		}()
 	}
-	if d.localBootstrap != nil {
-		d.owners.Add(1)
-		go func() {
-			defer d.owners.Done()
-			_ = d.localBootstrap.Run(d.root, eventLog(os.Stderr, "local cluster bootstrap"))
-		}()
-	}
 	for _, join := range d.remoteJoins {
 		d.owners.Add(1)
 		go func() {
 			defer d.owners.Done()
-			_ = join.Run(d.root, eventLog(os.Stderr, "remote cluster join "+join.Bootstrap.DisplayName))
+			_ = join.Run(d.root, eventLog(os.Stderr, "remote cluster join "+join.display))
 		}()
 	}
 	if d.history != nil {

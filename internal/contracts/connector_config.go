@@ -22,10 +22,13 @@ const RegionalPodUIDEnvironment = "ASSERVAT_REGIONAL_POD_UID"
 // and Kubernetes API), the API roots, the optional bootstrap record and the
 // executor's object-store capabilities.
 const (
-	ConnectorPodTokenFile         = "connector-pod.token"
-	ConnectorKubeTokenFile        = "kube.token"
-	ConnectorKubeRootsFile        = "kube-ca.crt"
-	ConnectorBootstrapFile        = "bootstrap.json"
+	ConnectorPodTokenFile  = "connector-pod.token"
+	ConnectorKubeTokenFile = "kube.token"
+	// ConnectorHubTokenFile is the projected ServiceAccount token with the
+	// hub URL as audience that authenticates the connector (ADR-334).
+	ConnectorHubTokenFile  = "hub.token"
+	ConnectorKubeRootsFile = "kube-ca.crt"
+
 	ConnectorEvidenceFile         = "evidence-storage.json"
 	ConnectorModeCluster          = "cluster"
 	ConnectorModeCombined         = "combined"
@@ -51,19 +54,18 @@ func RemoteJoinSecretName(release, cluster string) string { return release + "-j
 // (InstallationIDsRoot). ClusterID and PeerID are never values: the startup
 // fills them. The bootstrap record itself is a Secret file, never a value.
 type ConnectorConfig struct {
-	Format            string                   `json:"format"`
-	Mode              string                   `json:"mode"`
-	ClusterID         string                   `json:"clusterID,omitempty"`
-	PeerID            string                   `json:"peerID,omitempty"`
-	Namespace         string                   `json:"namespace"`
-	Deployment        string                   `json:"deployment"`
-	ServiceAccount    string                   `json:"serviceAccount"`
-	ClusterCredential string                   `json:"clusterCredential"`
-	ImageDigest       string                   `json:"imageDigest"`
-	OfferConfigMap    string                   `json:"offerConfigMap,omitempty"`
-	Hub               *ConnectorHubAddresses   `json:"hub,omitempty"`
-	Executor          *ConnectorExecutorConfig `json:"executor,omitempty"`
-	Collector         *RegionalCollector       `json:"collector,omitempty"`
+	Format         string                   `json:"format"`
+	Mode           string                   `json:"mode"`
+	ClusterID      string                   `json:"clusterID,omitempty"`
+	PeerID         string                   `json:"peerID,omitempty"`
+	Namespace      string                   `json:"namespace"`
+	Deployment     string                   `json:"deployment"`
+	ServiceAccount string                   `json:"serviceAccount"`
+	ImageDigest    string                   `json:"imageDigest"`
+	OfferConfigMap string                   `json:"offerConfigMap,omitempty"`
+	Hub            *ConnectorHubAddresses   `json:"hub,omitempty"`
+	Executor       *ConnectorExecutorConfig `json:"executor,omitempty"`
+	Collector      *RegionalCollector       `json:"collector,omitempty"`
 }
 
 // ConnectorHubAddresses override the offer's externally exposed addresses

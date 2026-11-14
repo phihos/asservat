@@ -17,8 +17,6 @@ type ownerProviderLifetimes struct {
 	// public holds the ADR-182 public purposes in providerconfig order; all
 	// nil without a pinned public recipe.
 	public [4]*ownerProviderLifetime
-	// fleet is the ADR-193 bootstrap credential channel; nil without Fleet.
-	fleet  *ownerProviderLifetime
 	cancel context.CancelFunc
 }
 
@@ -29,9 +27,6 @@ func (s *ownerProviderLifetimes) all() []*ownerProviderLifetime {
 		if slot != nil {
 			out = append(out, slot)
 		}
-	}
-	if s.fleet != nil {
-		out = append(out, s.fleet)
 	}
 	return out
 }
@@ -55,12 +50,6 @@ func newOwnerProviderLifetimes(ctx context.Context, input contracts.OwnerDeploym
 				target  **ownerProviderLifetime
 			}{purpose, &out.public[i]})
 		}
-	}
-	if input.Public != nil && input.Public.Fleet != nil {
-		fixed = append(fixed, struct {
-			purpose string
-			target  **ownerProviderLifetime
-		}{providerconfig.OwnerFleetProviderPurpose, &out.fleet})
 	}
 	for _, fixed := range fixed {
 		control, err := newOwnerProviderControl(input, profile, fixed.purpose, client, now)

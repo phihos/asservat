@@ -15,7 +15,7 @@ import (
 
 func registrationSourceFixture(t *testing.T, r *RegionalLifecycle, request value.ConnectorProcessRequest, now time.Time) value.ConnectorIdentitySource {
 	t.Helper()
-	profile := value.ConnectorCredentialProfile{RootID: r.Credential.Profile.RootID, Binding: request.Process.Binding,
+	profile := value.ConnectorCredentialProfile{RootID: r.RootID, Binding: request.Process.Binding,
 		Revision: identity.Revision{UID: regionalPod, Generation: 1, Digest: artifact.Digest{1}}, ProtectionDigest: artifact.Digest{2}, ServerName: "connector.example",
 		Deployment:        value.ConnectorDeployment{Namespace: "control", ServiceAccount: "connector", Deployment: "connector", ServingSlots: 1, RetainedProcesses: 2},
 		ClientIssuerRoots: [][]byte{{1}}, ServerIssuerRoots: [][]byte{{2}}}
@@ -27,13 +27,13 @@ func registrationSourceFixture(t *testing.T, r *RegionalLifecycle, request value
 	return source
 }
 
-// Real TLS1.3/HTTP2/exporter-bound presentation with scripted registry/native
+// Real TLS1.3/HTTP2 token-authenticated conversation with scripted registry/native
 // authority. This qualifies the explicit source handoff, not native enforcement
 // or SQL49. The ordinary Local reader cannot supply a valid source in this fixture.
 func TestRegionalRegistrationAtOwnsOnlyOneOriginalSourceConversation(t *testing.T) {
 	for _, mode := range []string{"two-reads", "one-read", "three-reads", "configuration", "begin", "revoked", "cancelled", "expired", "foreign-source", "unknown-leaf", "missing-local"} {
 		t.Run(mode, func(t *testing.T) {
-			r, services, request, presenter, _ := regionalLifecycleSetup(t)
+			r, services, request, presenter := regionalLifecycleSetup(t)
 			now := time.Now().UTC()
 			var clock atomic.Int64
 			clock.Store(now.UnixNano())

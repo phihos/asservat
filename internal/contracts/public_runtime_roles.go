@@ -106,7 +106,7 @@ func PublicRuntimeHubRolePurposes() []string {
 // PublicRuntimeHubSharedDuties are typed adapter duties sharing one credential,
 // not additional role identities, projection files or pools (ADR-222).
 func PublicRuntimeHubSharedDuties() []string {
-	return []string{"identity-read", "browser-session", "hub-metadata-read", "download-source", "download-plan", "audit-normal-journal", "audit-normal-ack", "audit-resolution-journal", "audit-resolution-ack", "capture-preview", "capture-resolution", "api-execution", "download-session", "download-audit", "download-worker", "download-worker-audit", "download-worker-identity", "worker-enrollment", "worker-enrollment-audit", "worker-enrollment-activate", "native-owner", "download-key-bind", "native-key-bind", "download-stop", "download-stop-writer", "download-stop-ack", "fleet-bootstrap-reserve", "fleet-bootstrap-record", "fleet-bootstrap-audit", "fleet-bootstrap-activate", "regional-capacity", "processing-decision", "policy-automation", "evidence-share", "access-review", "capture-history", "live-watch"}
+	return []string{"identity-read", "browser-session", "hub-metadata-read", "download-source", "download-plan", "audit-normal-journal", "audit-normal-ack", "audit-resolution-journal", "audit-resolution-ack", "capture-preview", "capture-resolution", "api-execution", "download-session", "download-audit", "download-worker", "download-worker-audit", "download-worker-identity", "worker-enrollment", "worker-enrollment-audit", "worker-enrollment-activate", "native-owner", "download-key-bind", "native-key-bind", "download-stop", "download-stop-writer", "download-stop-ack", "regional-capacity", "processing-decision", "policy-automation", "evidence-share", "access-review", "capture-history", "live-watch"}
 }
 
 // Permanent role identities are not positions in a configurable or growing
@@ -142,7 +142,7 @@ func PublicRuntimeRoleOrdinal(purpose string) (int, bool) {
 		return 50, true
 	case "connector-read":
 		return 51, true
-	case "cluster-credential":
+	case "connector-delivery":
 		return 52, true
 	case "connector-cleanup":
 		return 53, true

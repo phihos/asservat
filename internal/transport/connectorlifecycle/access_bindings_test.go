@@ -2,14 +2,12 @@ package connectorlifecycle
 
 import (
 	"context"
-	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
 
 	"asservat.local/asservat/internal/contracts"
 	value "asservat.local/asservat/internal/domain/fleet"
@@ -31,7 +29,7 @@ func (s *deliveryServices) AccessBindings(ctx context.Context, region *Region) e
 	if _, _, err = region.ReadAccessBindings(ctx, s.stored); err == nil {
 		return ErrChannel // one delivery per conversation
 	}
-	s.cluster, s.items, s.unchanged = region.Presented().Profile.ClusterID, len(d.Items), unchanged
+	s.cluster, s.items, s.unchanged = region.Presented().ClusterID, len(d.Items), unchanged
 	return nil
 }
 
@@ -49,7 +47,7 @@ func (d deliveringReader) ReadAccessBindings(context.Context) (contracts.AccessB
 // presented cluster.
 func TestAccessBindingDeliveryOverRealHTTP2(t *testing.T) {
 	services := &deliveryServices{}
-	h, err := NewHandler(&acceptPresenter{}, digestKeys{}, services, 2)
+	h, err := NewHandler(&acceptTokens{}, services, 2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,17 +58,13 @@ func TestAccessBindingDeliveryOverRealHTTP2(t *testing.T) {
 	defer server.Close()
 	roots := x509.NewCertPool()
 	roots.AddCert(server.Certificate())
-	client, err := NewClient(server.URL, "example.com", roots)
+	client, err := NewClient(server.URL, "example.com", roots, syntheticToken)
 	if err != nil {
 		t.Fatal(err)
 	}
 	process := value.ConnectorProcessIdentity{Binding: localReader{}.binding(), PodUID: "10000000-0000-4000-8000-000000000005", ProcessEpoch: "10000000-0000-4000-8000-000000000006"}
 	request := value.ConnectorProcessRequest{Process: process, ClientCSRDER: make([]byte, 64), ServerCSRDER: append(make([]byte, 63), 1)}
-	clientKey, serverKey := sha256.Sum256(request.ClientCSRDER), sha256.Sum256(request.ServerCSRDER)
-	open := func(exporter []byte) (Opening, error) {
-		w := contracts.ClusterCredentialWire{Format: contracts.ClusterCredentialWireFormat, Operation: value.ClusterRenewal, RootID: "10000000-0000-4000-8000-000000000007", PeerID: process.Binding.PeerID, InstallationID: process.Binding.InstallationID, ClusterID: process.Binding.ClusterID, Generation: 1, PodUID: process.PodUID, ProcessEpoch: process.ProcessEpoch, ClientKey: clientKey[:], ServerKey: serverKey[:], RequestedAt: time.Now().UTC().Truncate(time.Microsecond), Signature: []byte{1, 2, 3}}
-		return Opening{Presentation: w, Purpose: PurposeAccessBindings, OperationID: "10000000-0000-4000-8000-000000000008", Request: request}, nil
-	}
+	open := Opening{Purpose: PurposeAccessBindings, OperationID: "10000000-0000-4000-8000-000000000008", Request: request}
 	// About 4 MiB: above an ordinary conversation's read bound.
 	spec, _ := json.Marshal(map[string]string{"pad": strings.Repeat("x", 4<<10)})
 	delivery := contracts.AccessBindingDelivery{ResourceVersion: "7"}
@@ -97,7 +91,7 @@ func TestAccessBindingDeliveryOverRealHTTP2(t *testing.T) {
 		t.Fatal("delivery without a local reader", err)
 	}
 	// A hub without the service refuses the purpose.
-	plain, err := NewHandler(&acceptPresenter{}, digestKeys{}, &scriptedServices{}, 2)
+	plain, err := NewHandler(&acceptTokens{}, &scriptedServices{}, 2)
 	if err != nil {
 		t.Fatal(err)
 	}

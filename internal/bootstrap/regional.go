@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"k8s.io/client-go/rest"
 	"net/http"
 	"os"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"k8s.io/client-go/rest"
 
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/mounts"
@@ -23,13 +24,11 @@ import (
 	"asservat.local/asservat/internal/transport/connectorlifecycle"
 )
 
-// Regional is the outbound regional connector process (ADR-168/169). It owns
-// its process keys and cluster credential and reaches the hub only through
-// the federation endpoint; it holds no hub SQL, signing or audit credential.
+// Regional is the outbound regional connector process (ADR-169). It owns
+// its process keys, authenticates to the hub with its ServiceAccount token
+// (ADR-334) and holds no hub SQL, signing or audit credential.
 type Regional struct {
 	credentials *mtls.ConnectorProcessCredentials
-	rotator     fleetapp.ClusterCredentialRotator
-	bootstrap   regionalBootstrap
 	context     *regionalContext // nil without the optional ADR-171 input
 	nodes       *regionalNodes   // nil without the optional ADR-246 input
 	// bindings delivers this cluster's AccessBindings to the hub (ADR-329);
@@ -89,11 +88,10 @@ func (t regionalCountingTransport) RoundTrip(r *http.Request) (*http.Response, e
 }
 
 // ponytail: fixed supervision cadences. Process leaves renew one minute early
-// within thirty-minute periods; rotation is due daily.
+// within thirty-minute periods.
 const (
 	regionalRetry     = 5 * time.Second
 	regionalReconcile = time.Minute
-	regionalRotation  = time.Minute
 )
 
 func RunRegional(ctx context.Context, podUID string) error {
@@ -262,25 +260,16 @@ func NewRegional(ctx context.Context, files *os.Root, podUID string) (r *Regiona
 	if err != nil {
 		return r, mounts.ErrUnavailable
 	}
-	secret, err := kube.NewClusterCredentialSecretForConfig(in.kubernetes(contracts.ConnectorKubeTokenFile), c.Namespace, c.ClusterCredential)
-	if err != nil {
-		return r, mounts.ErrUnavailable
-	}
 	roots, _, err := mtls.OwnerTrustRoots(c.hub.Roots, time.Now())
 	if err != nil {
 		return r, mounts.ErrUnavailable
 	}
-	channel, err := connectorlifecycle.NewClient(c.hub.Endpoint, c.hub.ServerName, roots)
+	hubToken := func() ([]byte, error) { return in.read(context.Background(), contracts.ConnectorHubTokenFile, 16<<10) }
+	channel, err := connectorlifecycle.NewClient(c.hub.Endpoint, c.hub.ServerName, roots, hubToken)
 	if err != nil {
 		return r, mounts.ErrUnavailable
 	}
-	rotation, err := mtls.NewClusterCredentialClient(c.hub.Endpoint, c.hub.ServerName, roots)
-	if err != nil {
-		return r, mounts.ErrUnavailable
-	}
-	r.rotator = fleetapp.ClusterCredentialRotator{Profile: value.ClusterCredentialProfile{RootID: c.rootID(), PeerID: c.PeerID, InstallationID: c.binding.InstallationID, ClusterID: c.ClusterID}, Policy: value.DefaultClusterCredentialPolicy(), Store: secret, Exchange: rotation, Now: time.Now}
-	lifecycle := &RegionalLifecycle{Client: channel, Local: regionalLocal{native, source}, Credential: r.rotator, Now: time.Now, Timing: r.lifecycleTiming()}
-	r.bootstrap = regionalBootstrap{store: secret, seed: secret, record: regionalBootstrapRecord{in}, channel: channel, local: regionalLocal{native, source}, binding: c.binding, root: c.rootID(), now: time.Now}
+	lifecycle := &RegionalLifecycle{Client: channel, Local: regionalLocal{native, source}, RootID: c.rootID(), Now: time.Now, Timing: r.lifecycleTiming()}
 	if raw.Mode == contracts.ConnectorModeCluster {
 		r.bindings, r.lifecycle, r.watchConfig = observer, lifecycle, in.kubernetes(contracts.ConnectorKubeTokenFile)
 		if c.executor && len(c.offer.CapacityKeys) != 0 {
@@ -332,18 +321,15 @@ func NewRegional(ctx context.Context, files *os.Root, podUID string) (r *Regiona
 	return r, nil
 }
 
-// Run supervises enrollment, renewal and cluster credential rotation until
-// ctx ends. A fenced credential is permanent and stops the process; every
-// other failure is retried as a new bounded conversation.
+// Run supervises enrollment and renewal until ctx ends; every failure is
+// retried as a new bounded conversation.
 func (r *Regional) Run(ctx context.Context) error {
 	if r == nil || r.credentials == nil || ctx == nil {
 		return mounts.ErrUnavailable
 	}
-	enrolled, bootstrapped, last := false, false, ""
+	enrolled, last := false, ""
 	wait := time.NewTimer(0)
 	defer wait.Stop()
-	rotate := time.NewTicker(regionalRotation)
-	defer rotate.Stop()
 	// Context start runs only while credentials are active; a stopped run is
 	// retried after the fixed delay, never resumed with old exchanges.
 	contextDone := make(chan error, 1)
@@ -415,22 +401,6 @@ func (r *Regional) Run(ctx context.Context) error {
 		case <-contextRetry:
 			contextRetry = nil
 		case <-wait.C:
-			// ADR-193: a generation-0 Secret enrolls generation 1 first.
-			if !bootstrapped {
-				err := r.bootstrap.Reconcile(ctx)
-				if errors.Is(err, value.ErrClusterCredentialFenced) {
-					return err
-				}
-				if err != nil {
-					if cause := regionalCause(err); cause != last {
-						fmt.Fprintln(os.Stderr, "connector bootstrap pending: "+cause)
-						last = cause
-					}
-					wait.Reset(regionalRetry)
-					continue
-				}
-				bootstrapped = true
-			}
 			err := r.credentials.Reconcile(ctx)
 			if err == nil && !enrolled {
 				enrolled = true
@@ -449,10 +419,6 @@ func (r *Regional) Run(ctx context.Context) error {
 			} else {
 				wait.Reset(regionalRetry)
 			}
-		case <-rotate.C:
-			if err := r.rotator.Reconcile(ctx); errors.Is(err, value.ErrClusterCredentialFenced) {
-				return err
-			}
 		}
 	}
 }
@@ -461,16 +427,6 @@ func regionalCause(err error) string {
 	switch {
 	case err == nil:
 		return ""
-	case errors.Is(err, value.ErrClusterCredentialFenced):
-		return "cluster-credential-fenced"
-	case errors.Is(err, errRegionalCredentialWrite):
-		return "cluster-credential-write"
-	case errors.Is(err, errRegionalBootstrapExpired):
-		return "cluster-bootstrap-expired"
-	case errors.Is(err, errRegionalBootstrapMissing):
-		return "cluster-bootstrap-record-missing"
-	case errors.Is(err, errRegionalCredential):
-		return "cluster-credential"
 	case errors.Is(err, errRegionalChannel):
 		return "hub-channel"
 	case errors.Is(err, errRegionalRefused):

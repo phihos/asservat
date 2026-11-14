@@ -62,7 +62,7 @@ func TestSmallOpenBaoSetupPoliciesArePerComponent(t *testing.T) {
 
 func TestSmallOpenBaoSetupMountsMatchBundledConsumers(t *testing.T) {
 	paths := smallOpenBaoPolicyPaths(t)
-	for _, mount := range []string{"asservat-audit", "public-transit", "owner-pki", "connector-pki", "worker-pki", "fleet-bootstrap"} {
+	for _, mount := range []string{"asservat-audit", "public-transit", "owner-pki", "connector-pki", "worker-pki"} {
 		if !slices.Equal(paths["sys/mounts/"+mount], []string{"create", "read", "update"}) {
 			t.Fatal("bundled consumer mount unavailable", mount)
 		}
@@ -73,8 +73,5 @@ func TestSmallOpenBaoSetupMountsMatchBundledConsumers(t *testing.T) {
 		if !slices.Equal(paths[mount+"/keys/*"], []string{"create", "read", "update"}) {
 			t.Fatal("transit keys must be create/read/update only", mount)
 		}
-	}
-	if _, ok := paths[contracts.SmallOpenBaoBootstrapMount+"/data/*"]; ok {
-		t.Fatal("setup reads bootstrap channel data")
 	}
 }

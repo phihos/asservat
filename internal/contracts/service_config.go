@@ -64,6 +64,24 @@ type FederationConfig struct {
 	Postgres    ServicePostgres    `json:"postgres"`
 	AuditStore  ServiceObjectStore `json:"auditStore"`
 	OpenBao     string             `json:"openBao"`
+	// Audiences are the hub URLs connectors dial; a connector's
+	// ServiceAccount token must name one of them (ADR-334).
+	Audiences []string `json:"audiences"`
+	// LocalConnector is the combined-mode connector's ServiceAccount
+	// "namespace/name" in this cluster; empty in mode=hub.
+	LocalConnector string `json:"localConnector,omitempty"`
+	// Clusters are the registered workload clusters (values clusters[]).
+	Clusters []FederationCluster `json:"clusters,omitempty"`
+}
+
+// FederationCluster is one registered workload cluster: public data only.
+// Without JWKS the hub discovers the issuer's keys.
+type FederationCluster struct {
+	Name      string `json:"name"`
+	ClusterID string `json:"clusterID"`
+	Issuer    string `json:"issuer"`
+	JWKS      string `json:"jwks,omitempty"`
+	Connector string `json:"connector"`
 }
 
 type KeyServiceConfig struct {

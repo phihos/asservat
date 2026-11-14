@@ -80,6 +80,36 @@ migration 00168); the console follows `GET /api/v1/events?capture_id=` and
 `get_capture` no longer returns poll advice. Remaining divergence is in the
 tables below.
 
+## Connector ServiceAccount tokens (ADR-334, 2026-11-14)
+
+Branch `clean/connector`. Connectors authenticate every lifecycle
+conversation with their projected ServiceAccount token (`hub.token`,
+audience: the federation URL they dial). The federation verifies it against
+the hub cluster's API server issuer (combined mode) or each registered
+cluster's `issuer`/`jwks` from the `clusters` values (go-oidc; discovered
+keys refresh on an unknown `kid`) and attributes the conversation to that
+cluster; `revoked: true` or removal refuses its tokens. A cluster's first
+conversation stages its connector source. Removed: one-use bootstrap
+records, their audited issuance, reservations and KV channel
+(`fleet-bootstrap` mount, provider role), `<name>-region-bootstrap`, the
+join Secret's record, the rotating cluster credential (lineage, rotation
+endpoint, `<name>-cluster-credential` Secret), enrollment claim/certificate
+tables (migration 00169) and the 15-cluster cap. Fresh all-bundled
+combined install on the owned kind cluster `asservat-cn` (since deleted):
+the connector enrolled with its token (no `region-bootstrap` or
+`cluster-credential` Secret exists) and `TestHelmNativeKindJourney` passed
+(19.7 s; 17.6 s again after rebasing on main). Not run: `TestHelmNativeKindClusterJoin` (mode=cluster).
+
+Remaining for this slice: process certificate enrollment/renewal/retirement
+and the mTLS context-start, key-service and owner relay transports still
+carry connector traffic (the next step is bearer-token auth on one HTTP/2
+connection and their deletion); the join Secret still carries the offer and
+copied object-store capabilities; cluster IDs still come from values, not
+names; `hub.url`/`hub.caBundle` are not implemented (mode=cluster sets
+`region.hub.federation` as the token audience); the native forwarded path
+still checks the never-filled `fleet_peer` registry; fleet settings, work
+JWS, local-key signing and the node channel rows below are unchanged.
+
 ## ADR-330 contract divergence (2026-11-14)
 
 The canonical contracts in `specs/contracts/` and `docs/interfaces/` follow

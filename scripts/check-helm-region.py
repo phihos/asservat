@@ -20,6 +20,7 @@ BUNDLED = {"keyService": {"provider": "openbao"}, "objectStore": {"provider": "s
            "postgres": {"provider": "bundled", "bundled": {"image": "registry.example/postgres@sha256:" + "b" * 64}},
            "identity": {"provider": "keycloak", "keycloak": {"hostname": "https://login.example.invalid", "tlsSecretName": "login-tls"}}}
 JOIN = "asservat-join-work"
+HUB = "https://hub.example.invalid:31446"
 CLUSTER, PEER = "50000000-0000-4000-8000-000000000001", "50000000-0000-4000-8000-000000000002"
 OFFER = {"format": "asservat-regional-offer/v1", "installationID": "10000000-0000-4000-8000-000000000001", "hubClusterID": "10000000-0000-4000-8000-000000000030",
          "permissionRootID": "10000000-0000-4000-8000-000000000003", "issuerEpoch": "10000000-0000-4000-8000-000000000004",
@@ -43,9 +44,10 @@ def render(values, namespace, ok=True):
 
 
 def base(mode, **region):
-    """mode=cluster reads IDs, offer and bootstrap record from the copied join
-    Secret (ADR-331); mode=combined takes them from the IDs Secret."""
-    ids = {"joinSecret": JOIN} if mode == "cluster" else {"bootstrapSecret": "operator-bootstrap"} if mode != "combined" else {}
+    """mode=cluster reads IDs and offer from the copied join Secret (ADR-331)
+    and names the hub's URL as its token audience (ADR-334); mode=combined
+    takes the IDs from the IDs Secret."""
+    ids = {"joinSecret": JOIN, "hub": {"federation": HUB}} if mode == "cluster" else {}
     v = {"mode": mode, "image": {"repository": "registry.example/asservat", "digest": DIGEST},
          "region": {"enabled": True, **ids, **region}, "collector": {"enabled": True}}
     if mode == "combined":
@@ -67,7 +69,7 @@ def rules(role):
     return {(g, r, v) for rule in role["rules"] for g in rule.get("apiGroups", []) for r in rule["resources"] for v in rule["verbs"]}
 
 
-def check_common(docs, ns, executor=True, bootstrap="operator-bootstrap"):
+def check_common(docs, ns, executor=True, audience="https://hub.example.invalid:31446"):
     d = find(docs, "Deployment", "asservat-connector")
     pod = d["spec"]["template"]["spec"]
     assert pod["automountServiceAccountToken"] is False and pod["securityContext"]["runAsNonRoot"] is True
@@ -76,9 +78,8 @@ def check_common(docs, ns, executor=True, bootstrap="operator-bootstrap"):
     assert c["securityContext"]["allowPrivilegeEscalation"] is False and c["securityContext"]["capabilities"]["drop"] == ["ALL"]
     sources = next(v for v in pod["volumes"] if v["name"] == "inputs")["projected"]["sources"]
     tokens = {s["serviceAccountToken"]["path"]: s["serviceAccountToken"].get("audience") for s in sources if "serviceAccountToken" in s}
-    assert tokens == {"kube.token": None, "connector-pod.token": "asservat-connector-process-enrollment"}, tokens
-    boot = [s["secret"] for s in sources if "secret" in s and s["secret"]["name"] == bootstrap]
-    assert boot and boot[0].get("optional", False) is (bootstrap != JOIN)
+    assert tokens == {"kube.token": None, "connector-pod.token": "asservat-connector-process-enrollment", "hub.token": audience}, tokens
+    assert not [s for s in sources if "secret" in s and any(i["key"] == "bootstrap.json" for i in s["secret"]["items"])]
     # No installer machinery: no admission policies, and no hook among these
     # templates except the download-worker namespace the secrets hook fills.
     mine = [x for x in docs if x["metadata"].get("labels", {}).get("app.kubernetes.io/component") in ("connector", "node", "download-worker")]
@@ -86,11 +87,10 @@ def check_common(docs, ns, executor=True, bootstrap="operator-bootstrap"):
     assert [x["metadata"]["name"] for x in docs if x["kind"].startswith("ValidatingAdmissionPolicy")] in ([], [ns + "-asservat-accessbindings"] * 2)
     hooks = [(x["kind"], x["metadata"]["name"]) for x in mine if "helm.sh/hook" in x["metadata"].get("annotations", {})]
     assert hooks in ([], [("Namespace", "asservat-downloads")]), hooks
-    cred = find(docs, "Secret", "asservat-cluster-credential")
-    assert "data" not in cred and cred["metadata"]["annotations"]["helm.sh/resource-policy"] == "keep"
+    assert not [d for d in docs if d["kind"] == "Secret" and d["metadata"]["name"] == "asservat-cluster-credential"]
     role = find(docs, "Role", "asservat-connector")
     secrets = [r for r in role["rules"] if r["resources"] == ["secrets"]][0]
-    assert secrets["verbs"] == ["get", "update"] and set(secrets["resourceNames"]) == {"asservat-cluster-credential", "asservat-connector-nodes"}
+    assert secrets["verbs"] == ["get", "update"] and secrets["resourceNames"] == ["asservat-connector-nodes"]
     assert ("", "serviceaccounts/token", "create") not in rules(role)
     cluster = rules(find(docs, "ClusterRole", ns + "-asservat-connector"))
     for need in [("authentication.k8s.io", "tokenreviews", "create"), ("", "nodes", "get")] + ([("", "pods", "list"), ("", "namespaces", "watch"), ("discovery.k8s.io", "endpointslices", "list")] if executor else []):
@@ -117,18 +117,18 @@ def main():
     configs = []
     # mode=cluster with an executor offer.
     docs = render(base("cluster", executor={"enabled": True, "evidenceSecret": "operator-evidence"}), "asservat-region")
-    c = check_common(docs, "asservat-region", bootstrap=JOIN)
+    c = check_common(docs, "asservat-region")
     assert c["mode"] == "cluster" and not {"offer", "offerConfigMap", "clusterID", "peerID", "hub"} & set(c) and c["executor"]["concurrency"] == 4
     assert not [d for d in docs if d["kind"] == "PriorityClass"], "download workers rendered in a regional release"
     configs.append(c)
     # A plain offer installs no executor objects.
     docs = render(base("cluster", executor={"enabled": False}), "asservat-region")
-    c = check_common(docs, "asservat-region", executor=False, bootstrap=JOIN)
+    c = check_common(docs, "asservat-region", executor=False)
     assert "executor" not in c
     configs.append(c)
     # mode=combined: in-cluster addresses, the hub's offer ConfigMap, generated S3 principals, download workers.
     docs = render(base("combined"), "asservat")
-    c = check_common(docs, "asservat", bootstrap="asservat-region-bootstrap")
+    c = check_common(docs, "asservat", audience="https://asservat-federation.asservat.svc:9446")
     assert "clusterID" not in c and "peerID" not in c
     pod = find(docs, "Deployment", "asservat-connector")["spec"]["template"]["spec"]
     assert {"name": "ids", "secret": {"secretName": "asservat-ids", "defaultMode": 0o440}} in pod["volumes"]
@@ -138,7 +138,7 @@ def main():
     role = find(docs, "Role", "asservat-connector")
     assert [r for r in role["rules"] if r["resources"] == ["configmaps"]][0] == {"apiGroups": [""], "resources": ["configmaps"], "resourceNames": ["asservat-regional-offer"], "verbs": ["get"]}
     sources = next(v for v in pod["volumes"] if v["name"] == "inputs")["projected"]["sources"]
-    assert {s["secret"]["name"] for s in sources if "secret" in s} == {"asservat-region-bootstrap", "asservat-s3-regional-write", "asservat-s3-regional-history"}
+    assert {s["secret"]["name"] for s in sources if "secret" in s} == {"asservat-s3-regional-write", "asservat-s3-regional-history"}
     pc = find(docs, "PriorityClass", "asservat-download-worker")
     assert pc["value"] == 0 and pc["preemptionPolicy"] == "Never"
     profile = json.loads(find(docs, "ConfigMap", "asservat-worker-profile")["data"]["worker-profile.json"])
@@ -154,6 +154,7 @@ def main():
     # Refusals.
     for bad, ns in [(base("hub"), "asservat"), ({**base("cluster"), "region": {"enabled": True}}, "asservat-region"),
                     ({**base("cluster"), "region": {**base("cluster")["region"], "bootstrapSecret": "operator-bootstrap"}}, "asservat-region"),
+                    ({**base("cluster"), "region": {"enabled": True, "joinSecret": JOIN}}, "asservat-region"),
                     ({**base("combined"), "region": {**base("combined")["region"], "joinSecret": JOIN}}, "asservat"),
                     ({**base("combined"), "region": {**base("combined")["region"], "offer": json.dumps(OFFER)}}, "asservat"),
                     ({**base("combined"), "region": {**base("combined")["region"], "executor": {"profileAuthorization": True}}}, "asservat"),

@@ -32,8 +32,6 @@ type ownerProviderEffects struct {
 	browserOpen *Opener
 	work        *SigningKey
 	worker      *WorkerCertificateIssuer
-	// channel is the ADR-193 bootstrap credential channel; nil without Fleet.
-	channel *BootstrapChannel
 }
 
 func newOwnerProviderEffects(ctx context.Context, input contracts.OwnerDeployment, profile contracts.OwnerProviderAuthentication, pool value.OwnerPool, issuerRoots *x509.CertPool, jwt TokenSource, proof ownerProviderCurrent, client *http.Client, concurrency int, now func() time.Time) (*ownerProviderEffects, error) {
@@ -87,15 +85,6 @@ func newOwnerProviderEffects(ctx context.Context, input contracts.OwnerDeploymen
 	if p := input.Public; p != nil && slots.public[0] != nil {
 		if err = out.public(p, pool); err != nil {
 			return nil, providerStep("public", err)
-		}
-	}
-	if f := input.Public; f != nil && f.Fleet != nil && slots.fleet != nil {
-		c, e := newOwnerProviderChannelClient(slots.fleet, f.Fleet.ChannelMount+"/data/"+contracts.OwnerFleetChannelPrefix+"/"+input.InstallationID+"/")
-		if e != nil {
-			return nil, providerStep("fleet-channel", e)
-		}
-		if out.channel, e = newBootstrapChannelWithClient(c, f.Fleet.ChannelMount, contracts.OwnerFleetChannelPrefix, f.Fleet.DeliveryProfile, input.InstallationID, now); e != nil {
-			return nil, providerStep("fleet-channel", e)
 		}
 	}
 	if ctx.Err() != nil {
@@ -179,13 +168,6 @@ const (
 	providerPathRecords
 	providerPathGET
 )
-
-// newOwnerProviderChannelClient confines a borrowed lifetime to GET and POST
-// of single records directly below prefix: one UUID segment, no listing,
-// metadata or deeper path (the ADR-193 bootstrap credential channel).
-func newOwnerProviderChannelClient(slot *ownerProviderLifetime, prefix string) (*bao.Client, error) {
-	return newOwnerProviderClient(slot, prefix, providerPathRecords)
-}
 
 func newOwnerProviderClient(slot *ownerProviderLifetime, path string, mode providerPathMode) (*bao.Client, error) {
 	if slot == nil || slot.control == nil || slot.control.http == nil {

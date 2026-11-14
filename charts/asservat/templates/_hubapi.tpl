@@ -104,9 +104,7 @@
 {{- with .Values.captureHistory }}{{ $_ := set $pub "captureHistory" . }}{{ end -}}
 {{- if eq .Values.exposure.tls.mode "proxy" }}{{ $_ := set $pub "proxyTLS" true }}{{ end -}}
 {{- if or .Values.fleet.issuer (include "asservat.hubApi.offer" .) -}}
-{{- $profiles := include "asservat.hubApi.deliveryProfiles" . | fromJsonArray -}}
-{{- if not $profiles }}{{ fail "fleet.deliveryProfiles needs at least one profile when fleet.issuer is set" }}{{ end -}}
-{{- $_ := set $pub "fleet" (dict "deliveryProfile" (first $profiles)) -}}
+{{- $_ := set $pub "fleet" (dict) -}}
 {{- end -}}
 {{- if include "asservat.hubApi.offer" . -}}
 {{- $fed := include "asservat.fullname" (list . "federation") -}}

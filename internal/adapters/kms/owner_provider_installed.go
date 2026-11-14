@@ -91,14 +91,6 @@ func NewInstalledOwnerProviderEffects(ctx context.Context, input contracts.Owner
 	return s, nil
 }
 
-// BootstrapChannel is the ADR-193 issuance credential channel; nil without
-// a pinned fleet recipe.
-func (s *InstalledOwnerProviderEffects) BootstrapChannel() *BootstrapChannel {
-	if s == nil || s.effects == nil {
-		return nil
-	}
-	return s.effects.channel
-}
 
 func (s *InstalledOwnerProviderEffects) Sealer() *Sealer {
 	if s == nil || s.effects == nil {

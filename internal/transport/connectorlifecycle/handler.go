@@ -1,19 +1,16 @@
 package connectorlifecycle
 
 import (
-	"bytes"
 	"context"
-	"crypto/ed25519"
-	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	app "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/fleet"
-	"asservat.local/asservat/internal/transport/clustercredential"
 )
 
 // Services runs the hub's unchanged duties for the presenting peer. The Region
@@ -29,15 +26,15 @@ type Services interface {
 	Recovery(context.Context, *Region) (value.RecoveryState, error)
 }
 
-// BootstrapService enrolls generation 1 (ADR-193). The handler has already
-// verified the CSR key, the secret and the exporter-bound signature.
-type BootstrapService interface {
-	Bootstrap(context.Context, *Region, value.ClusterBootstrapRequest, ed25519.PublicKey) (value.ClusterBootstrapResult, error)
+// TokenVerifier attributes a connector's projected ServiceAccount token to
+// its registered cluster (ADR-334).
+type TokenVerifier interface {
+	VerifyConnector(context.Context, string) (value.ConnectorCluster, error)
 }
 
 // AccessBindingsService records a connector's AccessBinding delivery for its
 // presented cluster (ADR-329). The Region reads the delivery; the service
-// must attribute it to region.Presented().Profile.ClusterID only.
+// must attribute it to region.Presented().ClusterID only.
 type AccessBindingsService interface {
 	AccessBindings(context.Context, *Region) error
 }
@@ -49,31 +46,40 @@ type CapacityService interface {
 }
 
 type Handler struct {
-	presenter clustercredential.Presenter
-	keys      app.EnrollmentProofVerifier
-	services  Services
-	slots     chan struct{}
+	tokens   TokenVerifier
+	services Services
+	slots    chan struct{}
 }
 
-func NewHandler(p clustercredential.Presenter, keys app.EnrollmentProofVerifier, services Services, concurrency int) (*Handler, error) {
-	if p == nil || keys == nil || services == nil || concurrency < 1 || concurrency > 16 {
+func NewHandler(tokens TokenVerifier, services Services, concurrency int) (*Handler, error) {
+	if tokens == nil || services == nil || concurrency < 1 {
 		return nil, ErrChannel
 	}
-	return &Handler{p, keys, services, make(chan struct{}, concurrency)}, nil
+	return &Handler{tokens, services, make(chan struct{}, concurrency)}, nil
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store, private")
 	fail := func(code int) { w.Header().Set("Connection", "close"); w.WriteHeader(code) }
-	if h == nil || r.ProtoMajor != 2 || r.Method != http.MethodPost || r.URL.Path != Path || r.URL.RawQuery != "" || r.Header.Get("Content-Type") != ContentType || len(r.Header.Values("Authorization")) != 0 || len(r.Header.Values("Cookie")) != 0 {
+	if h == nil || r.ProtoMajor != 2 || r.Method != http.MethodPost || r.URL.Path != Path || r.URL.RawQuery != "" || r.Header.Get("Content-Type") != ContentType || len(r.Header.Values("Authorization")) != 1 || len(r.Header.Values("Cookie")) != 0 {
 		fail(http.StatusBadRequest)
 		return
 	}
-	exporter, err := clustercredential.Exporter(r.TLS)
-	if err != nil {
-		fail(http.StatusForbidden)
+	token, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+	if !ok {
+		fail(http.StatusUnauthorized)
 		return
 	}
+	// The token is verified before any slot or opening read: an
+	// unauthenticated caller holds no concurrency slot and sends no frame.
+	verify, endVerify := context.WithTimeout(r.Context(), 5*time.Second)
+	presented, err := h.tokens.VerifyConnector(verify, token)
+	endVerify()
+	if err != nil {
+		fail(http.StatusUnauthorized)
+		return
+	}
+	verifiedAt := time.Now()
 	select {
 	case h.slots <- struct{}{}:
 		defer func() { <-h.slots }()
@@ -96,12 +102,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		fail(http.StatusBadRequest)
 		return
 	}
-	if opening.Purpose == PurposeBootstrap {
-		h.serveBootstrap(ctx, w, control, conn, opening, exporter)
-		return
-	}
-	presented, ok := h.admit(ctx, opening, exporter)
-	if !ok {
+	if !admit(opening, presented) {
 		fail(http.StatusForbidden)
 		return
 	}
@@ -110,7 +111,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if control.Flush() != nil {
 		return
 	}
-	region := &Region{conn: conn, presented: presented, process: opening.Request.Process}
+	region := &Region{conn: conn, presented: presented, verifiedAt: verifiedAt, process: opening.Request.Process}
 	defer region.closeChannel()
 	result := HubFrame{Kind: "result"}
 	switch opening.Purpose {
@@ -136,7 +137,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case PurposeRecovery:
 		var recovery value.RecoveryState
 		recovery, err = h.services.Recovery(ctx, region)
-		if err == nil && recovery.InstallationID != region.Presented().Profile.InstallationID {
+		if err == nil && recovery.InstallationID != region.Presented().InstallationID {
 			err = ErrChannel // only the presenting installation's own state
 		}
 		result.Recovery = &recovery
@@ -181,91 +182,31 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	_ = conn.Send(result)
 }
 
-// serveBootstrap checks the bootstrap opening before any reply: the CSR's
-// Ed25519 key matches the signed digest, the secret matches its digest and
-// the signature binds this connection. The conversation is then bound to the
-// claimed slot by the service.
-func (h *Handler) serveBootstrap(ctx context.Context, w http.ResponseWriter, control *http.ResponseController, conn *Conn, o Opening, exporter []byte) {
-	fail := func(code int) { w.Header().Set("Connection", "close"); w.WriteHeader(code) }
-	service, ok := h.services.(BootstrapService)
-	proof, proofs := h.keys.(app.ClusterBootstrapProof)
-	b := o.Bootstrap
-	empty, _ := json.Marshal(contracts.ClusterCredentialWire{})
-	presentation, _ := json.Marshal(o.Presentation)
-	if !ok || !proofs || b == nil || o.OperationID != "" || o.Certificate != nil || o.Owner != nil || !bytes.Equal(presentation, empty) || !b.Request.Valid() {
-		fail(http.StatusForbidden)
-		return
-	}
-	key, digest, err := proof.BootstrapKey(b.CSRDER)
-	secret, serr := proof.BootstrapSecretDigest(b.Request.InstallationID, b.Request.BootstrapID, b.Secret)
-	skew := time.Since(b.Request.RequestedAt)
-	if err != nil || serr != nil || digest != b.Request.KeyDigest || secret != b.Request.SecretDigest || skew > 30*time.Second || skew < -30*time.Second ||
-		!app.VerifyClusterBootstrapRequest(key, b.Request, b.Signature, exporter) {
-		fail(http.StatusForbidden)
-		return
-	}
-	w.Header().Set("Content-Type", ContentType)
-	w.WriteHeader(http.StatusOK)
-	if control.Flush() != nil {
-		return
-	}
-	region := &Region{conn: conn}
-	defer region.closeChannel()
-	result, err := service.Bootstrap(ctx, region, b.Request, key)
-	frame := HubFrame{Kind: "result", Bootstrap: &result}
-	if errors.Is(err, value.ErrClusterCredentialFenced) {
-		frame = HubFrame{Kind: "failure", Failure: "fenced"}
-	} else if err != nil {
-		frame = HubFrame{Kind: "failure", Failure: "unavailable"}
-	}
-	_ = conn.Send(frame)
-}
-
-// admit binds the exporter-bound ADR-168 presentation to this exact request:
-// the profile, the process and both CSR key digests.
-func (h *Handler) admit(ctx context.Context, o Opening, exporter []byte) (value.ClusterCredentialPresentation, bool) {
-	var zero value.ClusterCredentialPresentation
+// admit binds the opening to the token's registered cluster: the process
+// binding must name that cluster's peer.
+func admit(o Opening, p value.ConnectorCluster) bool {
 	if !authorization.UUID(o.OperationID) || !o.Request.Valid() {
-		return zero, false
+		return false
 	}
-	operation := value.ClusterRenewal
 	switch o.Purpose {
-	case value.ConnectorLifecycleEnroll:
-		operation = value.ClusterAdmission
-	case value.ConnectorLifecycleClient, value.ConnectorLifecycleServer:
+	case value.ConnectorLifecycleEnroll, value.ConnectorLifecycleClient, value.ConnectorLifecycleServer:
 	case PurposeRegistration:
 		if o.Certificate == nil || o.Certificate.Binding != o.Request.Process.Binding {
-			return zero, false
+			return false
 		}
 	case PurposeOwnerCandidates, PurposeRecovery, PurposeOwnerObservationCandidates, PurposeAccessBindings, PurposeCapacity:
 	case PurposeOwnerAuthentication, PurposeOwnerRegistration:
 		if o.Owner == nil || o.Owner.Usage != "server" || o.Owner.Binding.InstallationID != o.Request.Process.Binding.InstallationID {
-			return zero, false
+			return false
 		}
 	default:
-		return zero, false
+		return false
 	}
 	if o.Purpose != PurposeRegistration && o.Certificate != nil || o.Purpose != PurposeOwnerAuthentication && o.Purpose != PurposeOwnerRegistration && o.Owner != nil {
-		return zero, false
-	}
-	request, err := clustercredential.Request(o.Presentation)
-	if err != nil || request.Operation != operation {
-		return zero, false
+		return false
 	}
 	b := o.Request.Process.Binding
-	if request.Profile.InstallationID != b.InstallationID || request.Profile.ClusterID != b.ClusterID || request.Profile.PeerID != b.PeerID || request.PodUID != o.Request.Process.PodUID || request.ProcessEpoch != o.Request.Process.ProcessEpoch {
-		return zero, false
-	}
-	client, err := h.keys.EnrollmentKey(o.Request.ClientCSRDER)
-	if err != nil || client != request.ClientKey {
-		return zero, false
-	}
-	server, err := h.keys.EnrollmentKey(o.Request.ServerCSRDER)
-	if err != nil || server != request.ServerKey {
-		return zero, false
-	}
-	p, err := h.presenter.Present(ctx, request, o.Presentation.Signature, exporter)
-	return p, err == nil
+	return p.InstallationID == b.InstallationID && p.ClusterID == b.ClusterID && p.PeerID == b.PeerID
 }
 
 // Region is one conversation's delegated regional reader: ADR-153 native
@@ -274,35 +215,27 @@ func (h *Handler) admit(ctx context.Context, o Opening, exporter []byte) (value.
 // the hub duties still apply all of their own domain and SQL checks.
 type Region struct {
 	conn      *Conn
-	presented value.ClusterCredentialPresentation
-	process   value.ConnectorProcessIdentity
+	presented  value.ConnectorCluster
+	verifiedAt time.Time
+	process    value.ConnectorProcessIdentity
 	begun     *app.ConnectorLifecycleRequest
 	closed    bool
-	// slot is the claimed bootstrap slot of a bootstrap conversation; every
-	// source value is checked against it instead of a presentation.
-	slot *value.PeerBinding
 	// delivered marks the conversation's one AccessBinding or capacity
 	// request.
 	delivered bool
 }
 
-// BindBootstrap binds a bootstrap conversation to its claimed slot, once.
-func (r *Region) BindBootstrap(b value.PeerBinding) error {
-	if r == nil || r.slot != nil || r.presented.Profile != (value.ClusterCredentialProfile{}) || !b.Valid() || b.Role != value.ConnectorPeer {
-		return ErrChannel
-	}
-	r.slot = &b
-	return nil
-}
+// Presented is the cluster the conversation's token was attributed to.
+func (r *Region) Presented() value.ConnectorCluster { return r.presented }
 
-// Presented is the verified ADR-168 presentation that opened the conversation.
-func (r *Region) Presented() value.ClusterCredentialPresentation { return r.presented }
+// VerifiedAt is when the token was verified; deliveries are observed no later.
+func (r *Region) VerifiedAt() time.Time { return r.verifiedAt }
+
+// Binding is the presenting process's peer binding, checked against the cluster.
+func (r *Region) Binding() value.PeerBinding { return r.process.Binding }
 
 func (r *Region) peer(b value.PeerBinding) bool {
-	if r.slot != nil {
-		return b == *r.slot
-	}
-	p := r.presented.Profile
+	p := r.presented
 	return b == r.process.Binding && b.InstallationID == p.InstallationID && b.ClusterID == p.ClusterID && b.PeerID == p.PeerID
 }
 
@@ -367,7 +300,7 @@ func (r *Region) ReadConnectorIdentityConfiguration(ctx context.Context) (app.Co
 func (r *Region) ReadAccessBindings(ctx context.Context, stored string) (_ contracts.AccessBindingDelivery, unchanged bool, _ error) {
 	r.conn.mu.Lock()
 	defer r.conn.mu.Unlock()
-	if r.slot != nil || r.delivered {
+	if r.delivered {
 		return contracts.AccessBindingDelivery{}, false, ErrChannel
 	}
 	r.delivered = true
@@ -392,7 +325,7 @@ func (r *Region) ReadAccessBindings(ctx context.Context, stored string) (_ contr
 func (r *Region) ReadCapacity(ctx context.Context, stored string) (_ contracts.CapacityDelivery, unchanged bool, _ error) {
 	r.conn.mu.Lock()
 	defer r.conn.mu.Unlock()
-	if r.slot != nil || r.delivered {
+	if r.delivered {
 		return contracts.CapacityDelivery{}, false, ErrChannel
 	}
 	r.delivered = true
@@ -520,12 +453,12 @@ type PeerDuties struct {
 
 // Runners selects the duties of exactly the presented peer. An unknown or
 // unconfigured peer is an error; it never falls back to another profile.
-type Runners func(context.Context, value.ClusterCredentialProfile) (PeerDuties, error)
+type Runners func(context.Context, *Region) (PeerDuties, error)
 
 // Enroll stages the delegated source first: staging only creates a candidate
 // or a fence, and admission still requires the separately accepted source.
 func (s Runners) Enroll(ctx context.Context, region *Region, id string, r value.ConnectorProcessRequest) (value.ConnectorCredentialProcess, error) {
-	d, err := s(ctx, region.Presented().Profile)
+	d, err := s(ctx, region)
 	if err != nil {
 		return value.ConnectorCredentialProcess{}, enrollmentError{"resolve", err}
 	}
@@ -540,7 +473,7 @@ func (s Runners) Enroll(ctx context.Context, region *Region, id string, r value.
 }
 
 func (s Runners) Issue(ctx context.Context, region *Region, id, usage string, r value.ConnectorProcessRequest) (value.IssuedConnectorCredential, error) {
-	d, err := s(ctx, region.Presented().Profile)
+	d, err := s(ctx, region)
 	if err != nil {
 		return value.IssuedConnectorCredential{}, err
 	}
@@ -550,7 +483,7 @@ func (s Runners) Issue(ctx context.Context, region *Region, id, usage string, r 
 }
 
 func (s Runners) Registration(ctx context.Context, region *Region, c value.ConnectorCredentialCertificate) (app.ConnectorLeafRegistration, error) {
-	d, err := s(ctx, region.Presented().Profile)
+	d, err := s(ctx, region)
 	if err != nil || d.Registry == nil {
 		return app.ConnectorLeafRegistration{}, ErrChannel
 	}
@@ -562,7 +495,7 @@ func (s Runners) Registration(ctx context.Context, region *Region, c value.Conne
 }
 
 func (s Runners) OwnerCandidates(ctx context.Context, region *Region) (value.APIContextOwnerCandidates, error) {
-	d, err := s(ctx, region.Presented().Profile)
+	d, err := s(ctx, region)
 	if err != nil || d.Owners.Candidates == nil {
 		return value.APIContextOwnerCandidates{}, ErrChannel
 	}
@@ -570,7 +503,7 @@ func (s Runners) OwnerCandidates(ctx context.Context, region *Region) (value.API
 }
 
 func (s Runners) OwnerObservationCandidates(ctx context.Context, region *Region) (value.APIContextOwnerCandidates, error) {
-	d, err := s(ctx, region.Presented().Profile)
+	d, err := s(ctx, region)
 	if err != nil || d.Owners.ObservationCandidates == nil {
 		return value.APIContextOwnerCandidates{}, ErrChannel
 	}
@@ -578,7 +511,7 @@ func (s Runners) OwnerObservationCandidates(ctx context.Context, region *Region)
 }
 
 func (s Runners) OwnerRegistration(ctx context.Context, region *Region, c value.OwnerCertificate) (value.OwnerRegistrationObservation, error) {
-	d, err := s(ctx, region.Presented().Profile)
+	d, err := s(ctx, region)
 	if err != nil || d.Owners.Registry == nil {
 		return value.OwnerRegistrationObservation{}, ErrChannel
 	}
@@ -586,7 +519,7 @@ func (s Runners) OwnerRegistration(ctx context.Context, region *Region, c value.
 }
 
 func (s Runners) AuthenticateOwner(ctx context.Context, region *Region, c value.OwnerCertificate) (OwnerAuthentication, error) {
-	d, err := s(ctx, region.Presented().Profile)
+	d, err := s(ctx, region)
 	if err != nil || d.Owners.Authenticator == nil {
 		return OwnerAuthentication{}, ErrChannel
 	}
@@ -599,7 +532,7 @@ func (s Runners) AuthenticateOwner(ctx context.Context, region *Region, c value.
 }
 
 func (s Runners) Recovery(ctx context.Context, region *Region) (value.RecoveryState, error) {
-	d, err := s(ctx, region.Presented().Profile)
+	d, err := s(ctx, region)
 	if err != nil || d.Recovery == nil {
 		return value.RecoveryState{}, ErrChannel
 	}

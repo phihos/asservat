@@ -27,14 +27,6 @@ func publicRuntimeConnectorGrants(purpose string) ([]publicRuntimeGrant, bool) {
 			out = append(out, publicRuntimeGrant{"table", "connector_operation_lifecycle", column, "UPDATE"})
 		}
 	}
-	// ADR-193: the bootstrap claim and its acknowledgement lock the current
-	// trust row and one fleet_bootstrap slot, as the enrollment adapters do.
-	claim := func(columns ...string) {
-		out = append(out, publicRuntimeGrant{"table", "fleet_current_trust", "", "SELECT"}, publicRuntimeGrant{"table", "fleet_current_trust", "installation_id", "UPDATE"}, publicRuntimeGrant{"table", "fleet_bootstrap", "", "SELECT"})
-		for _, column := range columns {
-			out = append(out, publicRuntimeGrant{"table", "fleet_bootstrap", column, "UPDATE"})
-		}
-	}
 	switch purpose {
 	case "connector-source":
 		functions("stage_connector_identity(uuid,jsonb,jsonb)", "fence_connector_identity(uuid,uuid,timestamptz)", "promote_connector_backing(uuid,uuid,jsonb)")
@@ -48,7 +40,6 @@ func publicRuntimeConnectorGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		)
 	case "connector-ack":
 		functions("connector_audit_acknowledge(uuid,jsonb,text,jsonb,jsonb)")
-		claim("id", "claim_acknowledged_at", "claim_audit_digest", "claim_object_key", "claim_object_version", "claim_object_etag", "claim_object_bytes", "claim_object_sha256")
 	case "connector-read":
 		// The activated-leaf registry plus the recovery state the duties read.
 		functions("read_connector_activated_leaf(uuid,uuid,text,bytea,jsonb)")
@@ -61,27 +52,14 @@ func publicRuntimeConnectorGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		for _, column := range []string{"root_id", "backing"} {
 			out = append(out, publicRuntimeGrant{"table", "connector_identity_root", column, "SELECT"})
 		}
-	case "cluster-credential":
-		for _, column := range []string{"root_id", "peer_id", "installation_id", "cluster_id"} {
-			out = append(out, publicRuntimeGrant{"table", "connector_identity_profile", column, "SELECT"})
-		}
-		// ADR-193: a lineage arises only through the bootstrap functions, so
-		// this login inserts credentials (rotation) but never a lineage.
-		for _, table := range []string{"cluster_enrollment_lineage", "cluster_enrollment_credential"} {
-			for _, privilege := range []string{"SELECT", "UPDATE"} {
-				out = append(out, publicRuntimeGrant{"table", table, "", privilege})
-			}
-		}
-		out = append(out, publicRuntimeGrant{"table", "cluster_enrollment_credential", "", "INSERT"})
-		claim("claimed_at", "public_key_sha256")
+	case "connector-delivery":
 		// ADR-329: the presenting connector's AccessBinding delivery, stored
-		// under the cluster its credential lineage names.
+		// under the cluster its ServiceAccount token was attributed to.
 		for _, privilege := range []string{"SELECT", "INSERT", "UPDATE"} {
 			out = append(out, publicRuntimeGrant{"table", "remote_access_binding_delivery", "", privilege})
 			// ADR-331: likewise its capacity observation.
 			out = append(out, publicRuntimeGrant{"table", "remote_capacity_delivery", "", privilege})
 		}
-		functions("reserve_cluster_bootstrap(uuid,uuid,uuid,bytea,uuid,bigint,bytea,bigint,bigint)", "acknowledge_cluster_bootstrap(uuid,uuid,text,text,text,bigint,bytea)", "activate_cluster_bootstrap(uuid,uuid,bytea,bytea)")
 	case "connector-owner-read":
 		// ADR-172: the hub-api owner registry reads, for owner discovery and
 		// authentication on behalf of regions. No owner write is granted.

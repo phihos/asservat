@@ -52,7 +52,7 @@ func connectorTestOffer(t *testing.T, roots [][]byte) contracts.RegionalOffer {
 
 func connectorTestConfig() contracts.ConnectorConfig {
 	return contracts.ConnectorConfig{Format: contracts.ConnectorConfigFormat, Mode: contracts.ConnectorModeCluster, Namespace: "asservat-region",
-		Deployment: "asservat-connector", ServiceAccount: "asservat-connector", ClusterCredential: "asservat-cluster-credential", ImageDigest: strings.Repeat("a", 64),
+		Deployment: "asservat-connector", ServiceAccount: "asservat-connector", ImageDigest: strings.Repeat("a", 64),
 		Executor: &contracts.ConnectorExecutorConfig{Concurrency: 4}}
 }
 
@@ -107,7 +107,6 @@ func TestConnectorConfigIsClosed(t *testing.T) {
 		"values cluster ID":        func(c *contracts.ConnectorConfig) { c.ClusterID = connectorTestID("02") },
 		"values peer ID":           func(c *contracts.ConnectorConfig) { c.PeerID = connectorTestID("05") },
 		"namespace":                func(c *contracts.ConnectorConfig) { c.Namespace = "Region" },
-		"credential name":          func(c *contracts.ConnectorConfig) { c.ClusterCredential = "" },
 		"image digest":             func(c *contracts.ConnectorConfig) { c.ImageDigest = "latest" },
 		"no concurrency":           func(c *contracts.ConnectorConfig) { c.Executor.Concurrency = 0 },
 		"alertmanager credentials": func(c *contracts.ConnectorConfig) { c.Executor.Alertmanager = "http://user:pass@alerts.invalid" },

@@ -79,7 +79,7 @@ func validConnectorConfig(c contracts.ConnectorConfig) error {
 	if c.ClusterID != "" || c.PeerID != "" || len(validation.IsDNS1123Label(c.Namespace)) != 0 {
 		return bad("binding")
 	}
-	for _, name := range []string{c.Deployment, c.ServiceAccount, c.ClusterCredential} {
+	for _, name := range []string{c.Deployment, c.ServiceAccount} {
 		if len(validation.IsDNS1123Subdomain(name)) != 0 {
 			return bad("names")
 		}

@@ -118,11 +118,11 @@ type openBaoRole struct {
 }
 
 type openBaoSetupPlan struct {
-	transit, pki, kv, auth []string
-	roots                  []string // PKI mounts
-	keys                   []openBaoKey
-	pkiRoles               []openBaoPKIRole
-	roles                  []openBaoRole
+	transit, pki, auth []string
+	roots              []string // PKI mounts
+	keys               []openBaoKey
+	pkiRoles           []openBaoPKIRole
+	roles              []openBaoRole
 }
 type openBaoKey struct{ mount, name, kind string }
 type openBaoPKIRole struct {
@@ -152,7 +152,6 @@ func openBaoSetupPlanFor(in OpenBaoSetupInput) (openBaoSetupPlan, error) {
 	ownerPKI, connectorPKI, workerPKI := contracts.SmallOpenBaoOwnerPKIMount, contracts.SmallOpenBaoConnectorPKIMount, contracts.SmallOpenBaoWorkerPKIMount
 	p.transit = []string{audit, transit}
 	p.pki = []string{ownerPKI, connectorPKI, workerPKI}
-	p.kv = []string{contracts.SmallOpenBaoBootstrapMount}
 	p.auth = []string{contracts.SmallOpenBaoConfigurationAuthMount, contracts.SmallOpenBaoOwnerAuthMount}
 	p.keys = []openBaoKey{{audit, n.AuditKey, "aes256-gcm96"}, {audit, n.WorkerConfigurationAuditKey, "aes256-gcm96"}, {audit, n.DeletionSigningKey, "ed25519"},
 		{audit, n.FederationAuditKey, "aes256-gcm96"}, {audit, n.PublisherAuditKey, "aes256-gcm96"},
@@ -183,7 +182,6 @@ func openBaoSetupPlanFor(in OpenBaoSetupInput) (openBaoSetupPlan, error) {
 	hub := contracts.OwnerProviderAudience(in.InstallationID, in.ClusterID)
 	federation := contracts.FederationProviderAudience(in.InstallationID, in.ClusterID)
 	publisher := contracts.PublisherProviderAudience(in.InstallationID, in.ClusterID)
-	channel := map[string][]string{contracts.SmallOpenBaoBootstrapMount + "/data/" + contracts.OwnerFleetChannelPrefix + "/" + in.InstallationID + "/*": {"create", "read"}}
 	p.roles = []openBaoRole{
 		worker("audit-wrap", read(use(encrypt, key(audit, n.WorkerConfigurationAuditKey, "encrypt"), sign), audit+"/keys/"+n.DeletionSigningKey)),
 		worker("audit-unwrap", use(decrypt, key(audit, n.WorkerConfigurationAuditKey, "decrypt"))),
@@ -192,7 +190,6 @@ func openBaoSetupPlanFor(in OpenBaoSetupInput) (openBaoSetupPlan, error) {
 		owner("hub-api", hub, "server-sign", use(ownerPKI+"/sign/"+n.OwnerServerRole)), owner("hub-api", hub, "client-sign", use(ownerPKI+"/sign/"+n.OwnerClientRole)),
 		owner("hub-api", hub, "browser-seal", use(key(transit, n.BrowserSessionKey, "encrypt"))), owner("hub-api", hub, "browser-open", use(key(transit, n.BrowserSessionKey, "decrypt"))),
 		owner("hub-api", hub, "work-sign", read(use(key(transit, n.WorkSigningKey, "sign")), transit+"/keys/"+n.WorkSigningKey)), owner("hub-api", hub, "worker-issue", use(workerPKI+"/sign/"+n.DownloadWorkerRole)),
-		owner("hub-api", hub, OwnerFleetProviderPurpose, channel),
 		owner("federation", federation, "audit-wrap", use(key(audit, n.FederationAuditKey, "encrypt"))), owner("federation", federation, "audit-unwrap", use(key(audit, n.FederationAuditKey, "decrypt"))),
 		owner("federation", federation, "client-sign", use(connectorPKI+"/sign/"+n.ConnectorClientRole)), owner("federation", federation, "server-sign", use(connectorPKI+"/sign/"+n.ConnectorServerRole)),
 		owner("publisher", publisher, "audit-wrap", use(key(audit, n.PublisherAuditKey, "encrypt"))), owner("publisher", publisher, "audit-unwrap", use(key(audit, n.PublisherAuditKey, "decrypt"))),
@@ -335,11 +332,6 @@ func EnsureOpenBaoSetup(ctx context.Context, client *bao.Client, in OpenBaoSetup
 	}
 	for _, m := range plan.transit {
 		if err = mount(engines, "sys/mounts/", m, map[string]any{"type": "transit"}); err != nil {
-			return err
-		}
-	}
-	for _, m := range plan.kv {
-		if err = mount(engines, "sys/mounts/", m, map[string]any{"type": "kv", "options": map[string]any{"version": "2"}}); err != nil {
 			return err
 		}
 	}
