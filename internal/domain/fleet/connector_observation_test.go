@@ -13,9 +13,9 @@ func connectorObservationFixture() (ConnectorObservationPin, ConnectorObservatio
 	id := "00000000-0000-4000-8000-000000000001"
 	b := PeerBinding{InstallationID: id, ClusterID: id, IssuerEpoch: id, PeerID: id, Role: ConnectorPeer}
 	d := ConnectorDeployment{Namespace: "connector", ServiceAccount: "connector", Deployment: "connector", ServingSlots: 2, RetainedProcesses: 8}
-	p := ConnectorObservationPin{Profile: ConnectorCredentialProfile{RootID: id, Binding: b, Revision: identity.Revision{UID: id, Generation: 1, Digest: artifact.Digest{1}}, ProtectionDigest: artifact.Digest{2}, ServerName: "connector.invalid", Deployment: d, ClientIssuerRoots: [][]byte{{1}}, ServerIssuerRoots: [][]byte{{2}}}, Roles: ConnectorIdentityRoles{Source: "src", Journal: "journal", Acknowledgement: "ack", Cleanup: "clean", Verifier: "verify", Finalizer: "final"}, TemplateDigest: artifact.Digest{3}, ImageDigest: artifact.Digest{4}, ProtectionDigest: artifact.Digest{17}}
+	p := ConnectorObservationPin{Profile: ConnectorCredentialProfile{RootID: id, Binding: b, Revision: identity.Revision{UID: id, Generation: 1, Digest: artifact.Digest{1}}, ProtectionDigest: artifact.Digest{2}, ServerName: "connector.invalid", Deployment: d, ClientIssuerRoots: [][]byte{{1}}, ServerIssuerRoots: [][]byte{{2}}}, Roles: ConnectorIdentityRoles{Source: "src", Journal: "journal", Acknowledgement: "ack", Cleanup: "clean", Verifier: "verify", Finalizer: "final"}, TemplateDigest: artifact.Digest{3}, ProtectionDigest: artifact.Digest{17}}
 	s := ConnectorIdentitySource{Roles: p.Roles, Observation: ConnectorCredentialObservation{Profile: p.Profile.Clone(), Backing: ConnectorBackingObservation{Revision: 1, Digest: artifact.Digest{5}, SourceDigest: artifact.Digest{6}}, ObservedAt: now, FreshUntil: now.Add(4 * time.Second)}}
-	w := ConnectorObservationWorkload{Process: ConnectorProcessIdentity{Binding: b, PodUID: id, ProcessEpoch: id}, Pod: "connector-1", ReplicaSetUID: id, TemplateDigest: p.TemplateDigest, ImageDigest: p.ImageDigest, ProtectionDigest: p.ProtectionDigest, WorkloadDigest: artifact.Digest{7}, ObservedAt: now, FreshUntil: now.Add(3 * time.Second)}
+	w := ConnectorObservationWorkload{Process: ConnectorProcessIdentity{Binding: b, PodUID: id, ProcessEpoch: id}, Pod: "connector-1", ReplicaSetUID: id, TemplateDigest: p.TemplateDigest, ProtectionDigest: p.ProtectionDigest, WorkloadDigest: artifact.Digest{7}, ObservedAt: now, FreshUntil: now.Add(3 * time.Second)}
 	o := ConnectorObservation{Request: OwnerObservationRequest{RootID: id, ID: id, Challenge: id, RequestedAt: now, NotAfter: now.Add(5 * time.Second)}, Ordinal: 1, ConnectionBinding: artifact.Digest{8}, Certificate: ConnectorCredentialCertificate{Binding: b, Usage: "client", Digest: artifact.Digest{9}, PublicKeyDigest: artifact.Digest{10}, NotBefore: now.Add(-time.Second), NotAfter: now.Add(20 * time.Minute)}, Source: s, Workload: w, ObservedAt: now, FreshUntil: now.Add(3 * time.Second)}
 	return p, o, now
 }
@@ -32,7 +32,6 @@ func TestConnectorObservationKeepsOriginalChildBoundsAndPins(t *testing.T) {
 		"no-channel":       func(v *ConnectorObservation) { v.ConnectionBinding = artifact.Digest{} },
 		"first-ordinal":    func(v *ConnectorObservation) { v.Ordinal = 0 },
 		"ordinal-ceiling":  func(v *ConnectorObservation) { v.Ordinal = 5 },
-		"changed-image":    func(v *ConnectorObservation) { v.Workload.ImageDigest[0]++ },
 		"changed-template": func(v *ConnectorObservation) { v.Workload.TemplateDigest[0]++ },
 		"changed-guard":    func(v *ConnectorObservation) { v.Workload.ProtectionDigest[0]++ },
 		"changed-roles":    func(v *ConnectorObservation) { v.Source.Roles.Source = "different" },

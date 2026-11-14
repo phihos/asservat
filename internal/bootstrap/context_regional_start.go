@@ -529,7 +529,8 @@ func (s RegionalContextStartConnections) Run(ctx context.Context) error {
 // owner set, every check and the next opening's bounds are unchanged.
 func openingRetry(err error) time.Duration {
 	var fixed interface{ FixedStep() string }
-	if err != nil && errors.As(err, &fixed) && fixed.FixedStep() == "tls" {
+	var refusal *mtls.HubProtocolRefusal
+	if err != nil && (errors.As(err, &fixed) && fixed.FixedStep() == "tls" || errors.As(err, &refusal)) {
 		return 30 * time.Second
 	}
 	return time.Second

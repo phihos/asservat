@@ -40,7 +40,7 @@ func (f *SourceFeed) accept(payload []byte, sequence int) error {
 	}
 	var s fleet.ConnectorIdentitySource
 	d := json.NewDecoder(bytes.NewReader(m.Source))
-	d.DisallowUnknownFields()
+	// Unknown fields of a newer peer are ignored (ADR-333).
 	if d.Decode(&s) != nil || d.More() {
 		return contracts.ErrAPIContextProtocol
 	}

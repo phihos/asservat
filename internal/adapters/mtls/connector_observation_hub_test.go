@@ -53,7 +53,7 @@ func newHubObservationFixture(t *testing.T, mode string) *hubObservationFixture 
 	}
 	pool := ownerBootstrapPool()
 	owner := value.OwnerObservationPin{RootID: f.profile.RootID, SourceUID: ownerTestID, Pool: pool, TemplateDigest: artifact.Digest{13}, ImageDigest: artifact.Digest{14}, ProtectionDigest: artifact.Digest{15}}
-	pin := value.ConnectorObservationPin{Profile: f.profile.Clone(), Roles: f.roles, TemplateDigest: artifact.Digest{11}, ImageDigest: artifact.Digest{12}, ProtectionDigest: artifact.Digest{17}}
+	pin := value.ConnectorObservationPin{Profile: f.profile.Clone(), Roles: f.roles, TemplateDigest: artifact.Digest{11}, ProtectionDigest: artifact.Digest{17}}
 	base := &ownerCredentialFixture{t: t, ca: newOwnerTestCA(t, f.clock())}
 	base.clock.Store(f.clock().UnixNano())
 	common, _ := OwnerBootstrapServerName(pool)
@@ -167,7 +167,7 @@ func (x *hubObservationFixture) ExchangeConnectorObservation(ctx context.Context
 		source.Observation.Profile.Revision.Generation++
 		source.Observation.Profile.Revision.Digest[0]++
 	}
-	w := value.ConnectorObservationWorkload{Process: x.local.Request.Process, Pod: "connector-1", ReplicaSetUID: ownerTestID, TemplateDigest: x.pin.TemplateDigest, ImageDigest: x.pin.ImageDigest, ProtectionDigest: x.pin.ProtectionDigest, WorkloadDigest: artifact.Digest{16}, ObservedAt: x.f.clock(), FreshUntil: end}
+	w := value.ConnectorObservationWorkload{Process: x.local.Request.Process, Pod: "connector-1", ReplicaSetUID: ownerTestID, TemplateDigest: x.pin.TemplateDigest, ProtectionDigest: x.pin.ProtectionDigest, WorkloadDigest: artifact.Digest{16}, ObservedAt: x.f.clock(), FreshUntil: end}
 	return connectorObservationReplyWire(value.ConnectorObservation{Request: r, Ordinal: p.Ordinal, ConnectionBinding: channel, Certificate: x.local.Registration.Certificate, Source: source, Workload: w, ObservedAt: x.f.clock(), FreshUntil: end}, x.pin)
 }
 

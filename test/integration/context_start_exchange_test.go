@@ -282,7 +282,7 @@ func newRegionalAPIStartFixture(t *testing.T, ctx context.Context, f fixture, n 
 		t.Fatal(e)
 	}
 	t.Cleanup(router.Close)
-	ingress, e := mtls.NewContextStartIngress(s.a.RootID, serving, owners, []mtls.ContextStartConnectorAdmission{{Profile: profile, Executor: mtls.ContextStartExecutorPin{StartupDigest: b.StartupDigest, ImageDigest: b.ImageDigest}, Registry: contextStartObservationRegistryFixture{source}}}, time.Now)
+	ingress, e := mtls.NewContextStartIngress(s.a.RootID, serving, owners, []mtls.ContextStartConnectorAdmission{{Profile: profile, Registry: contextStartObservationRegistryFixture{source}}}, time.Now)
 	if e != nil {
 		t.Fatal(e)
 	}

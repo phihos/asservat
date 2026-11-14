@@ -134,6 +134,11 @@ type APIContextHello struct {
 	Channel APIContextChannel `json:"channel"`
 	// Original connector conversation end; availability only, never authority.
 	StandbyUntil time.Time `json:"standbyUntil"`
+	// Protocol is the connector's ConnectorProtocolMajor and Capabilities the
+	// operations and queries it answers (ADR-333). The hub sends only announced
+	// ones; they are availability facts, never authority.
+	Protocol     int      `json:"protocol,omitempty"`
+	Capabilities []string `json:"capabilities,omitempty"`
 }
 
 // Result is a bounded disposition, not evidence or a catalog publication.
@@ -175,7 +180,7 @@ func EncodeAPIContextOperation(v APIContextOperation) ([]byte, error) {
 	return canonicalAPIContext(v, APIContextOperationBytes)
 }
 func DecodeAPIContextOperation(b []byte) (APIContextOperation, error) {
-	v, e := decodeClosedRPC[APIContextOperation](bytes.NewReader(b), APIContextOperationBytes)
+	v, e := decodeOpenRPC[APIContextOperation](bytes.NewReader(b), APIContextOperationBytes)
 	if e != nil || v.Format != APIContextExchangeFormat || v.Sequence < 1 || v.Sequence > APIContextMaximumOperations || v.Method == "" || len(v.Method) > 32 {
 		return APIContextOperation{}, ErrAPIContextProtocol
 	}
@@ -185,7 +190,7 @@ func EncodeAPIContextOperationReply(v APIContextOperationReply) ([]byte, error) 
 	return canonicalAPIContext(v, APIContextOperationBytes)
 }
 func DecodeAPIContextOperationReply(b []byte) (APIContextOperationReply, error) {
-	v, e := decodeClosedRPC[APIContextOperationReply](bytes.NewReader(b), APIContextOperationBytes)
+	v, e := decodeOpenRPC[APIContextOperationReply](bytes.NewReader(b), APIContextOperationBytes)
 	if e != nil || v.Format != APIContextExchangeFormat || v.Sequence < 1 || v.Sequence > APIContextMaximumOperations || v.Method == "" || len(v.Failure) > 32 {
 		return APIContextOperationReply{}, ErrAPIContextProtocol
 	}
@@ -199,7 +204,7 @@ func EncodeAPIContextHello(v APIContextHello) ([]byte, error) {
 	return canonicalAPIContext(v, APIContextWorkBytes)
 }
 func DecodeAPIContextHello(b []byte) (APIContextHello, error) {
-	v, e := decodeClosedRPC[APIContextHello](bytes.NewReader(b), APIContextWorkBytes)
+	v, e := decodeOpenRPC[APIContextHello](bytes.NewReader(b), APIContextWorkBytes)
 	if e != nil || v.StandbyUntil.IsZero() {
 		return APIContextHello{}, ErrAPIContextProtocol
 	}
@@ -207,7 +212,7 @@ func DecodeAPIContextHello(b []byte) (APIContextHello, error) {
 }
 func EncodeAPIContextResult(v APIContextResult) ([]byte, error) { return canonicalAPIContext(v, 1024) }
 func DecodeAPIContextResult(b []byte) (APIContextResult, error) {
-	v, e := decodeClosedRPC[APIContextResult](bytes.NewReader(b), 1024)
+	v, e := decodeOpenRPC[APIContextResult](bytes.NewReader(b), 1024)
 	if e != nil {
 		return APIContextResult{}, ErrAPIContextProtocol
 	}
@@ -217,7 +222,7 @@ func EncodeAPIContextReceipt(v APIContextReceipt) ([]byte, error) {
 	return canonicalAPIContext(v, 1024)
 }
 func DecodeAPIContextReceipt(b []byte) (APIContextReceipt, error) {
-	v, e := decodeClosedRPC[APIContextReceipt](bytes.NewReader(b), 1024)
+	v, e := decodeOpenRPC[APIContextReceipt](bytes.NewReader(b), 1024)
 	if e != nil {
 		return APIContextReceipt{}, ErrAPIContextProtocol
 	}
@@ -245,7 +250,7 @@ func EncodeAPIContextSourceRequest(v APIContextSourceRequest) ([]byte, error) {
 	return canonicalAPIContext(v, 1024)
 }
 func DecodeAPIContextSourceRequest(b []byte) (APIContextSourceRequest, error) {
-	v, e := decodeClosedRPC[APIContextSourceRequest](bytes.NewReader(b), 1024)
+	v, e := decodeOpenRPC[APIContextSourceRequest](bytes.NewReader(b), 1024)
 	if e != nil || v.Format != APIContextExchangeFormat || v.Sequence < 1 || v.Sequence >= APIContextMaximumSourceFrames {
 		return APIContextSourceRequest{}, ErrAPIContextProtocol
 	}
@@ -255,7 +260,7 @@ func EncodeAPIContextSource(v APIContextSource) ([]byte, error) {
 	return canonicalAPIContext(v, APIContextSourceBytes)
 }
 func DecodeAPIContextSource(b []byte) (APIContextSource, error) {
-	v, e := decodeClosedRPC[APIContextSource](bytes.NewReader(b), APIContextSourceBytes)
+	v, e := decodeOpenRPC[APIContextSource](bytes.NewReader(b), APIContextSourceBytes)
 	if e != nil || v.Format != APIContextExchangeFormat || v.Sequence < 0 || v.Sequence >= APIContextMaximumSourceFrames || len(v.Source) == 0 {
 		return APIContextSource{}, ErrAPIContextProtocol
 	}

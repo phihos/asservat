@@ -267,16 +267,11 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 		if err != nil {
 			return err
 		}
-		startup, okStartup := publicDigest(v.Executor.StartupDigest)
-		image, okImage := publicDigest(v.Executor.ImageDigest)
-		if !okStartup || !okImage {
-			return mounts.ErrUnavailable
-		}
 		registry, err := postgres.NewConnectorObservationRegistry(ctx, shared.nativeRead, profile)
 		if err != nil {
 			return mounts.ErrUnavailable
 		}
-		admissions = append(admissions, mtls.ContextStartConnectorAdmission{Profile: profile, Executor: mtls.ContextStartExecutorPin{StartupDigest: startup, ImageDigest: image}, Registry: registry})
+		admissions = append(admissions, mtls.ContextStartConnectorAdmission{Profile: profile, Registry: registry})
 		capabilities[v.ClusterID] = capability
 		if signers[v.ClusterID], err = jose.NewAPIContextWorkSignatures(trust, s.KeyID, key.ForContext, time.Now); err != nil {
 			return mounts.ErrUnavailable

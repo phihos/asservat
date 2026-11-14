@@ -32,7 +32,7 @@ func (h *ConnectorRecordings) manualHolderLocked(t targets.ManualLiveTarget) (*h
 	} else if e.Recording.Profile == "httpHeaders" {
 		projection = "httpHeaders"
 	}
-	if t.Projection != projection || t.Executor.ImageDigest != e.CollectorImageDigest {
+	if t.Projection != projection {
 		return nil, false
 	}
 	expectedKind := ""

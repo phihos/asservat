@@ -567,7 +567,7 @@ func (c *ContextStartClient) open(ctx context.Context, owner value.OwnerBinding,
 	}
 	request.Header.Set("Content-Type", contracts.APIContextStartMedia)
 	request.Header.Set("Accept", contracts.APIContextStartMedia)
-	hello, e := contracts.EncodeAPIContextHello(contracts.APIContextHello{Format: contracts.APIContextExchangeFormat, Channel: contextStartChannelWire(channel), StandbyUntil: until.UTC().Truncate(time.Microsecond)})
+	hello, e := contracts.EncodeAPIContextHello(contracts.APIContextHello{Format: contracts.APIContextExchangeFormat, Channel: contextStartChannelWire(channel), StandbyUntil: until.UTC().Truncate(time.Microsecond), Protocol: contracts.ConnectorProtocolMajor, Capabilities: contracts.APIContextCapabilities()})
 	if e != nil {
 		return nil, e
 	}
@@ -623,6 +623,14 @@ func (c *ContextStartClient) open(ctx context.Context, owner value.OwnerBinding,
 		response.Body.Close()
 		<-wrote
 		return nil, value.ErrUnavailable
+	}
+	if response.StatusCode == http.StatusUpgradeRequired && response.ProtoMajor == 2 {
+		// ADR-333: the authenticated hub refuses this connector's protocol;
+		// keep its bounded, printable message for the operator's log.
+		message := hubRefusalText(response.Body)
+		exchange.interrupt()
+		<-wrote
+		return nil, &HubProtocolRefusal{Message: message}
 	}
 	header := response.Header.Values("Content-Type")
 	if response.ProtoMajor != 2 || response.StatusCode != http.StatusOK || response.ContentLength != -1 || len(response.TransferEncoding) != 0 || response.TLS == nil || !response.TLS.HandshakeComplete || response.TLS.NegotiatedProtocol != "h2" || len(header) != 1 || header[0] != contracts.APIContextStartMedia || len(response.Header.Values("Content-Encoding")) != 0 || len(response.Header.Values("Location")) != 0 {
@@ -702,3 +710,23 @@ type receiverCheckStep struct {
 func (e receiverCheckStep) Error() string             { return e.err.Error() }
 func (e receiverCheckStep) Unwrap() error             { return e.err }
 func (e receiverCheckStep) ReceiverCheckStep() string { return e.step }
+
+// HubProtocolRefusal is the hub's refusal of this connector's protocol major
+// (HTTP 426, ADR-333). Message is the hub's bounded printable text.
+type HubProtocolRefusal struct{ Message string }
+
+func (e *HubProtocolRefusal) Error() string     { return "hub refused connector protocol: " + e.Message }
+func (e *HubProtocolRefusal) Unwrap() error     { return value.ErrDenied }
+func (e *HubProtocolRefusal) FixedStep() string { return "connector-protocol" }
+
+// hubRefusalText reads at most 512 bytes and keeps printable ASCII only.
+func hubRefusalText(r io.Reader) string {
+	b, _ := io.ReadAll(io.LimitReader(r, 512))
+	out := make([]byte, 0, len(b))
+	for _, c := range b {
+		if c >= 0x20 && c < 0x7f {
+			out = append(out, c)
+		}
+	}
+	return string(out)
+}

@@ -66,10 +66,9 @@ remote:                 # how connectors reach the hub (TCP passthrough)
   offer and values (the combined-mode local entry, generalized). Key service,
   publisher and hub-api serve its retention topology in process from the hub
   retention source (ADR-195).
-- The executor pin keeps the startup and image digests over Helm-known
-  values. Namespace and account UIDs are not pinned (ADR-328: writers of the
-  Asservat namespaces are trusted); the image digest is the release's current
-  image.
+- ~~The executor pin keeps the startup and image digests over Helm-known
+  values.~~ Superseded by [ADR-333](333-connector-version-skew.md): no digest
+  is pinned; hub and connector negotiate a protocol major and capabilities.
 - Capacity: each joined connector watches its cluster's namespaces,
   Deployments, StatefulSets and Pods (metadata informers) and delivers on
   change over the lifecycle channel (purpose `capacity`, as ADR-329
@@ -149,7 +148,8 @@ outbound-only connector.
   install: a cluster beyond `profiles` needs a reinstall. Superseded by
   [ADR-332](332-standing-connector-identity.md): there is no connector count;
   each cluster's profile is created when it registers.
-- Remote captures need the joined cluster to run the hub's image digest.
+- ~~Remote captures need the joined cluster to run the hub's image digest.~~
+  Removed by [ADR-333](333-connector-version-skew.md).
 - During a connector outage the hub keeps the last delivered capacity set:
   a workload deleted meanwhile keeps its binding until the next delivery
   (new captures there need the connector anyway).

@@ -18,29 +18,14 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 )
 
-// ContextStartExecutorPin is the hub-derived startup and image digest of a
-// cluster's regional executor (over Helm-known values, ADR-196). Hello
-// supplies neither. The executor's namespace and account UIDs are not pinned
-// (ADR-328: writers of the Asservat namespace are trusted); the dynamic
-// Pod/API epoch is checked by the regional producer.
-type ContextStartExecutorPin struct {
-	StartupDigest, ImageDigest artifact.Digest
-}
-
-func (p ContextStartExecutorPin) valid() bool {
-	return p.StartupDigest != (artifact.Digest{}) && p.ImageDigest != (artifact.Digest{})
-}
-func (p ContextStartExecutorPin) matches(e value.APIContextExecutor) bool {
-	return p.valid() && e.Valid() && p.StartupDigest == e.StartupDigest && p.ImageDigest == e.ImageDigest
-}
-
 // ContextStartConnectorAdmission is constructor-owned protected input, not
 // registry discovery or Hello-derived policy. One exact connector per cluster.
 // The profile is the installer-pinned expected profile; each exchange binds
 // the registry to its own ADR-178 feed of regional source observations.
+// The executor's startup and image digests in Hello are provenance only: a
+// connector of another release is admitted (ADR-333 version skew).
 type ContextStartConnectorAdmission struct {
 	Profile  value.ConnectorCredentialProfile
-	Executor ContextStartExecutorPin
 	Registry app.ConnectorObservationRegistry
 }
 type contextStartConnectorAdmission struct {
@@ -93,7 +78,7 @@ func NewContextStartIngress(rootID string, local *OwnerCredentials, owners *app.
 	c := &ContextStartIngress{rootID: rootID, local: local, owners: owners, clusters: make(map[string]contextStartConnectorAdmission, len(inputs)), now: now}
 	for _, input := range inputs {
 		p := input.Profile
-		if !p.Valid() || p.Suspended || p.RootID != rootID || !input.Executor.valid() || input.Registry == nil {
+		if !p.Valid() || p.Suspended || p.RootID != rootID || input.Registry == nil {
 			return nil, value.ErrInvalid
 		}
 		if _, exists := c.clusters[p.Binding.ClusterID]; exists {
@@ -180,7 +165,7 @@ func (s *ContextStartIngress) AuthenticateContextStart(ctx context.Context, stat
 	}
 	channel := contextStartChannel(hello.Channel)
 	admission, exists := s.clusters[channel.Connector.Binding.ClusterID]
-	if !exists || !channel.Valid() || channel.RootID != s.rootID || channel.Connector.Binding != admission.Profile.Binding || !admission.Executor.matches(channel.Executor) {
+	if !exists || !channel.Valid() || channel.RootID != s.rootID || channel.Connector.Binding != admission.Profile.Binding {
 		s.refuse("admission")
 		return zero, nil, value.ErrDenied
 	}

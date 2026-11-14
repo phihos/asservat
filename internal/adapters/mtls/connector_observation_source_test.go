@@ -37,7 +37,7 @@ func connectorObservationTestTLS(t *testing.T) (*connectorPairFixture, *Connecto
 	if e != nil {
 		t.Fatal(e)
 	}
-	pin := value.ConnectorObservationPin{Profile: f.profile.Clone(), Roles: f.roles, TemplateDigest: artifact.Digest{11}, ImageDigest: artifact.Digest{12}, ProtectionDigest: artifact.Digest{17}}
+	pin := value.ConnectorObservationPin{Profile: f.profile.Clone(), Roles: f.roles, TemplateDigest: artifact.Digest{11}, ProtectionDigest: artifact.Digest{17}}
 	owner := value.OwnerObservationPin{RootID: f.profile.RootID, SourceUID: ownerTestID, Pool: ownerBootstrapPool(), TemplateDigest: artifact.Digest{13}, ImageDigest: artifact.Digest{14}, ProtectionDigest: artifact.Digest{15}}
 	common, _ := OwnerBootstrapServerName(owner.Pool)
 	ca := newOwnerTestCA(t, f.clock())
@@ -104,7 +104,7 @@ func TestRemoteConnectorSourceReadsFreshEveryTimeAndPreservesFirstDeadline(t *te
 		if n > 1 {
 			until = request.RequestedAt.Add(4 * time.Second)
 		}
-		w := value.ConnectorObservationWorkload{Process: local.Request.Process, Pod: "connector-1", ReplicaSetUID: ownerTestID, TemplateDigest: p.TemplateDigest, ImageDigest: p.ImageDigest, ProtectionDigest: p.ProtectionDigest, WorkloadDigest: artifact.Digest{16}, ObservedAt: f.clock(), FreshUntil: until}
+		w := value.ConnectorObservationWorkload{Process: local.Request.Process, Pod: "connector-1", ReplicaSetUID: ownerTestID, TemplateDigest: p.TemplateDigest, ProtectionDigest: p.ProtectionDigest, WorkloadDigest: artifact.Digest{16}, ObservedAt: f.clock(), FreshUntil: until}
 		return connectorObservationReplyWire(value.ConnectorObservation{Request: request, Ordinal: n, ConnectionBinding: channel, Certificate: local.Registration.Certificate, Source: source, Workload: w, ObservedAt: f.clock(), FreshUntil: until}, p)
 	})
 	s, e := NewRemoteConnectorObservationSource(ctx, p, owner, request, state, exchange, f.clock)
@@ -156,7 +156,7 @@ func TestRemoteConnectorSourceUnknownAndChangedProofRemainUnavailable(t *testing
 					return contracts.ConnectorObservationReply{}, value.ErrUnavailable
 				}
 				source, _ := f.ReadConnectorIdentitySource(call)
-				w := value.ConnectorObservationWorkload{Process: local.Request.Process, Pod: "connector-1", ReplicaSetUID: ownerTestID, TemplateDigest: p.TemplateDigest, ImageDigest: p.ImageDigest, ProtectionDigest: p.ProtectionDigest, WorkloadDigest: artifact.Digest{16}, ObservedAt: f.clock(), FreshUntil: r.NotAfter}
+				w := value.ConnectorObservationWorkload{Process: local.Request.Process, Pod: "connector-1", ReplicaSetUID: ownerTestID, TemplateDigest: p.TemplateDigest, ProtectionDigest: p.ProtectionDigest, WorkloadDigest: artifact.Digest{16}, ObservedAt: f.clock(), FreshUntil: r.NotAfter}
 				out, e := connectorObservationReplyWire(value.ConnectorObservation{Request: r, Ordinal: n, ConnectionBinding: channel, Certificate: local.Registration.Certificate, Source: source, Workload: w, ObservedAt: f.clock(), FreshUntil: r.NotAfter}, p)
 				if n == 2 {
 					switch mode {

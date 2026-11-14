@@ -352,15 +352,33 @@ kubectl --context hub -n asservat-system get secret asservat-join-eu -o json \
 kubectl --context eu apply --server-side --field-manager=asservat-crd-upgrade -f ./charts/asservat/crds
 helm --kube-context eu upgrade --install asservat ./charts/asservat -n asservat-system \
   --set mode=cluster --set region.enabled=true --set region.joinSecret=asservat-join-eu \
-  --set image.repository=<hub image> --set image.digest=<hub digest>
+  --set image.repository=<image> --set image.digest=<this chart version's digest>
 ```
 
-The workload cluster runs the hub's image digest; captures there are refused
-while the two differ. The connector seeds `<name>-cluster-credential` from the
+The workload cluster's release uses its own chart version's image; it does
+not need the hub's digest (see [version skew](#version-skew)). The connector seeds `<name>-cluster-credential` from the
 record once and rotates it itself; keep the join Secret, which also carries
 the offer. When the hub's offer changes, the hub-api updates its copy: copy
 it again and restart the connector. A budget policy for the joined cluster
 names its `clusterID` in `scope.clusterID`.
+
+### Version skew
+
+[ADR-333](../decisions/333-connector-version-skew.md). A workload cluster's
+connector and node collectors may run one minor release older or newer than
+the hub, as long as both speak the same connector protocol major (during 0.x
+development, the protocol major is the boundary). Upgrade the hub first,
+then each workload cluster at its own pace. Image digests are recorded as
+provenance and are never compared.
+
+The connector announces its protocol and capabilities when it connects. The
+hub refuses a connector of another protocol major with HTTP 426 and a
+message naming its protocol (hub-api log `context start refused
+connector-protocol`; connector log `open/connector-protocol (denied): hub
+says: … upgrade the connector …`) and refuses only the requests an older connector
+lacks, with `connector too old for <capability>` (diagnostic step
+`connector-too-old/<capability>`); everything else keeps working. Upgrade
+that cluster's release to use the feature.
 
 ### Regional connector options
 
