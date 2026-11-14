@@ -1,6 +1,6 @@
 # Applications and deployment
 
-These are scheduling and authority boundaries. Component names and package names do not imply additional Deployments. Production roles are separate even when they use the same Go executable.
+These are scheduling and authority boundaries. Component and package names do not imply additional Deployments. Roles are separate even when they share the Go executable. Mechanisms follow [ADR-330](../decisions/330-event-driven-system-design.md); the threat model is [ADR-328](../decisions/328-administrator-only-namespaces.md).
 
 ## Context and application views
 
@@ -9,31 +9,34 @@ flowchart LR
   Dev[Maintainer / reviewer / recipient] -->|Organization sign-in| Console[Asservat console]
   Agent[Developer's MCP client] -->|OAuth, bounded tools| Hub[Asservat installation]
   Console --> Hub
-  Admin[Cluster administrator / GitOps] -->|Declarative CRDs| Kube[Kubernetes APIs]
+  Admin[Cluster administrator / GitOps] -->|Helm values, CRDs| Kube[Kubernetes APIs]
   Hub -->|OIDC / OAuth verification| IdP[Organization IdP]
   Hub -->|Controlled observation| Workloads[Opted-in workloads]
   Hub -->|Encrypted regional evidence| Storage[Operator storage and keys]
-  Kube -->|Configuration and local ceilings| Hub
+  Kube -->|Watched configuration| Hub
 ```
 
 ```mermaid
 flowchart TB
-  User[Browser / MCP client] -->|HTTPS| API[A-HAPI: hub API]
+  User[Browser / MCP client] -->|HTTPS, SSE| API[A-HAPI: hub API]
   API --> SQL[(PostgreSQL)]
   Worker[A-HWORK: hub workers] --> SQL
-  API -->|Same-cluster mTLS: bounded owner relay| Worker
-  API --> Config[Management Kubernetes configuration]
+  SQL -.->|LISTEN/NOTIFY| API
+  SQL -.->|LISTEN/NOTIFY| Worker
+  API --> Config[Management Kubernetes informers]
   Worker --> Config
-  Worker --> Audit[(Protected audit / control objects)]
   subgraph Region[One authorized collection region]
-    Conn[A-CONN: connector / controllers] -->|Outbound mTLS long poll and receipts| API
-    Node[A-NODE: node collector] -->|Outbound mTLS local work poll and results| Conn
+    Conn[A-CONN: connector] -->|One outbound multiplexed mTLS connection| API
+    Node[A-NODE: node collector] -->|Outbound stream| Conn
+    Reader[A-READ: regional reader] -->|Outbound stream| Conn
     Helper[A-CORE: Rust host helper] -->|Bounded Unix socket stream| Node
     Gadget[A-GADGET: embedded Gadget runtime] -->|In-process observation| Node
     Node -->|Encrypt before upload| Obj[(Regional S3)]
     Node -->|Wrap-only key role| KMS[Regional KMS]
-    Conn --> Kube[Workload Kubernetes API]
-    Conn -->|Create bounded Jobs| Acquire[A-ACQUIRE: acquisition]
+    Reader --> Obj
+    Reader --> KMS
+    Conn -->|Informers| Kube[Workload Kubernetes API]
+    Conn -->|Create analysis Jobs| Acquire[A-ACQUIRE: acquisition]
     Acquire --> Obj
     Acquire --> KMS
     Acquire --> In[(Encrypted input PVC)]
@@ -42,54 +45,49 @@ flowchart TB
     Out --> Publish[A-PUBLISH: publication]
     Publish --> Obj
     Publish --> KMS
-    Conn --> Index[Bounded regional memory index]
   end
-  Conn -->|Bounded approved results, if residency permits| Worker
 ```
 
-Arrows describe initiated requests or data movement, not authority inheritance. No hub process dials a node. The local connector has a private ClusterIP endpoint for collectors; no NodePort, host-network listener or workload-facing debug service. Gadget uses its qualified local interface, never a general remotely callable BPF service. Analysis data moves through fenced PVC handoff, not pipes between concurrently privileged Jobs.
+Arrows describe initiated connections or data movement, not authority inheritance. No hub process dials a node or a workload cluster. The connector has a private ClusterIP endpoint for collectors and readers; no NodePort, host-network listener or workload-facing debug service. Gadget uses its qualified local interface. Analysis data moves through PVC handoff, not pipes between concurrently running Jobs.
 
 ## Role inventory
 
-| ID / role | Entry point / image family | Deployment, authority and scaling |
+| ID / role | Entry point | Deployment, authority and scaling |
 | --- | --- | --- |
-| A-INSTALL — initial activation | `asservat initial-install`; control image | Finite Restricted Pod, initially scheduling-gated, with exact Pod/account/guard pins and separate temporary SQL/audit credentials. No automatic restart, schema DDL, public endpoint, raw-evidence unwrap or restore authority. [Execution contract](initial-installer.md). |
-| A-HAPI — hub API | `asservat hub-api`; control image | Unprivileged Deployment. Compiled React/TypeScript assets and app shell, browser/MCP, OAuth, enrollment/federation ingress and typed command/query services. DB runtime credentials and read-only management configuration access. At least two replicas in the HA profile; no per-view client stickiness. Does not hold workload kubeconfigs, CRI access or raw-artifact unwrap rights. |
-| A-HWORK — hub workers | `asservat hub-worker`; control image | Unprivileged Deployment with separately scoped identity. Audit/outbox, sharing materialization, hub lifecycle and reconciliation, webhook delivery and leased live-owner routing. Parallel SQL work leases; only singleton config reconciliation uses a leader lease. Fair workload scheduling precedes claims. Scale with queue age within global DB/resource allocations. |
-| A-CONN — cluster connector/controller | `asservat controller`; control image | Per-cluster unprivileged Deployment. Local CRD writes, informer/SAR reads, node credential admission, local capacity/permit CAS, Job scheduling and expiry enforcement. Outbound hub sessions; private authenticated node endpoint. HA replicas serve node ingress concurrently; per-resource CAS/fences and leader election bound reconciliation. A short-lived request may reach any replica. |
-| A-NODE — collector | `asservat node`; collector image | Privileged DaemonSet only in the collector namespace. One active collector generation per node boot, with CRI/namespace/cgroup/BPF access limited to qualified adapters. Owns local sensors, trigger state, rings, execution, encryption and upload. No hub SQL credentials or general Kubernetes writer credential. Node-initiated connector requests carry current node/boot/process epoch identity. Restart cannot revive old starts or rings. |
-| A-CORE — crash helper | `asservat-core-helper`; static Rust artifact | Host-installed executable invoked by the kernel. Authenticated local socket handoff only. No SDK, DNS, Kubernetes, KMS or network call. Installation, core_pattern ownership and uninstall belong to the explicitly enabled node mechanism. |
-| A-GADGET — observation engine | Pinned Inspektor Gadget runtime linked into the collector image (build tag `gadget`, ADR-246/S1) and approved preloaded gadget digests | Runs inside the A-NODE process, not as a separate privileged Pod or image (S-04 plan S1: a second privileged process on the same node adds no isolation). Adapter exposes only allowlisted packet/syscall mechanisms and bounded node-local output. Cannot independently authorize collection. |
-| A-ACQUIRE — acquisition | `asservat acquire`; staging image | Short-lived unprivileged Job. Exact approved inputs/private symbols, limited object reads and KMS unwrap; stage only on qualified encrypted input/output PVCs. Restricted egress destinations and deadline. Does not run target code or untrusted parsing tools. |
-| A-ANALYZE — analysis | `asservat analyze`; mechanism-specific analyzer image | Short-lived unprivileged no-network Job, no service-account token or cloud credential. Read-only verified inputs, bounded writable output, constrained tools. Parser crash is contained here. No raw export or arbitrary debugger scripts. |
-| A-PUBLISH — publication | `asservat publish`; staging image | New short-lived Job after the analyzer is terminated and unmounted. Validate a hostile output tree and trusted provenance; encrypt/upload under write-only object and wrap-only key scopes. No acquisition unwrap credential. Parent deadlines bound all results. |
-| A-MIGRATE — database migration | `asservat migrate`; control image | Bounded release-maintenance Job with an exclusive migration lock and dedicated database-scoped DDL identity. No superuser, artifact keys, workload credentials or runtime service endpoint. Expand/backfill/validate/contract follows the supported version window; runtime pods never inherit this credential. |
-| A-KEY — optional local key service | Planned `asservat key-service`; control image | Unprivileged Deployment in the configured key region. Holds only protected purpose-scoped wrapping/signing keys and current-authority reader credentials. Private mTLS I-14; collector/publisher wrap-only and acquisition unwrap remain separate. No artifact payloads or public user endpoint. Handler/clients/crypto exist; production authorizers, issuer/Secret lifecycle and runnable bootstrap remain pending. |
+| A-SETUP — Helm hook Jobs | `asservat secrets`, `asservat setup` | Idempotent Helm hook Jobs that do only work needing live external state: generated Secrets, SQL roles, key and object-store setup. Helm renders every Kubernetes object. |
+| A-MIGRATE — database migration | `asservat setup` (migration step) | Helm hook Job with an exclusive migration lock and a dedicated DDL login. No superuser, artifact keys or workload credentials; runtime Pods never receive this login. |
+| A-HAPI — hub API | `asservat hub-api` | Unprivileged Deployment. React/TypeScript console assets, browser/MCP, OAuth, connector connections and typed command/query services. One SQL login. Two or more replicas in the HA profile; no client stickiness. No workload kubeconfigs, CRI access or evidence unwrap. |
+| A-HWORK — hub workers | `asservat hub-worker` | Unprivileged Deployment. Outbox and audit export, sharing, lifecycle and retention deadlines, webhook delivery. Work rows are claimed with `FOR UPDATE SKIP LOCKED` and woken by `LISTEN/NOTIFY`; no fixed-interval sweeps. Only singletons use a leader Lease. One SQL login. |
+| A-CONN — connector | `asservat connector` | Per-cluster unprivileged Deployment. Shared informers on namespaces, workloads, Pods, EndpointSlices and AccessBindings, pushed to the hub on change ([cluster observations](cluster-observations.md)); local CRD writes, SubjectAccessReview, capacity counters, analysis Jobs. Holds the cluster's one hub connection ([connector identity](connector-credentials.md)). Replicas use leader election for the connection. |
+| A-NODE — collector | `asservat node` | Privileged DaemonSet in the collector namespace. CRI/namespace/cgroup/BPF access limited to qualified adapters. Owns local sensors, triggers, rings, execution, encryption and upload. Authenticates to the connector with an audience-bound projected token (TokenReview once per connection). No hub SQL or general Kubernetes write credential. |
+| A-CORE — crash helper | `asservat-core-helper` (static Rust) | Host executable invoked by the kernel. Local socket handoff only; no SDK, DNS, Kubernetes, KMS or network call. Installed only by the explicitly enabled node mechanism. |
+| A-GADGET — observation engine | Inspektor Gadget linked into the collector (build tag `gadget`) | Runs inside A-NODE. Exposes only allowlisted packet/syscall mechanisms with bounded node-local output. Cannot authorize collection. |
+| A-READ — regional reader | `asservat download-worker` | Long-running unprivileged Deployment in each region, scaled by replicas. Serves native downloads (range reads) and bounded stored-evidence queries over its connector stream; holds the region's evidence read and unwrap credential. Reads do not depend on live source-workload capacity. |
+| A-ACQUIRE — analysis acquisition | `asservat acquire` | Short-lived unprivileged Job for offline analysis only. Exact approved inputs and private symbols, object read and unwrap; stages to encrypted input PVCs. Runs no target code or parser. |
+| A-ANALYZE — analysis | `asservat analyze` | Short-lived no-network Job without service-account token or cloud credential. Read-only inputs, bounded output, constrained tools; parser crashes stay here. |
+| A-PUBLISH — publication | `asservat publish` | Job started after the analyzer has terminated. Validates the output tree, encrypts and uploads under write-only object and wrap-only key scopes. |
+| A-KEY — local key service | `asservat key-service` | Optional unprivileged Deployment in the key region. Holds purpose-scoped wrapping/signing keys. Private mTLS [I-14](local-key-service.md); never receives artifact payloads. |
 
-Image sharing never means service-account or credential sharing. Runtime packs add qualified tools only to relevant analyzer images; the control image does not become a debugger toolbox. The controller hosts regional index/query-cache management initially, as a bounded component with separate queue/memory allocation. Scaling it into a regional worker Deployment is an explicit future operational decision, not a first-release mandatory service. Hub placement is allowed only when that hub is inside the same permitted region and policy allows the cache.
+Image sharing never means service-account or credential sharing. Each deployed process has one SQL login with the grants it needs ([persistence](../../specs/persistence.md)). Runtime packs add qualified tools only to analyzer images.
 
 ## Infrastructure and packaging
 
-Reuse qualified operator-provided services or explicitly select planned internal/bundled identity, key, PostgreSQL and S3 alternatives under [ADR-063](../decisions/063-small-deployment-alternatives.md). The [small-deployment research](../research/small-deployments.md) selects local identity, an isolated purpose-scoped key-service role, PostgreSQL/pgBackRest and SeaweedFS. [I-14](local-key-service.md) now fixes the private key-service boundary; runtime/provider lifecycle qualification remains pending. Existing diagrams show service capabilities, not mandatory external products. Charts validate readiness and do not silently install platforms. Management-cluster install enables hub roles and selected hub dependencies; workload-cluster install enables connector/node roles and optional qualified Gadget/core/analysis profiles. It does not deploy another identity service or database. One chart family may expose both profiles; same-cluster operation retains role and credential boundaries. The core mechanism is opt-in and never changes this developer workstation.
+Reuse operator-provided services or select the internal/bundled identity, key, PostgreSQL and S3 alternatives of [ADR-063](../decisions/063-small-deployment-alternatives.md) ([small-deployment research](../research/small-deployments.md)). Installation is Helm-native ([Helm guide](../installation/helm.md)): the chart renders RBAC, Secrets, ConfigMaps and workloads; hook Jobs create SQL roles and key/object-store state idempotently. Components read mounted configuration or watch it and trust RBAC and TokenReview. Management-cluster install enables hub roles; workload-cluster install enables connector, node, reader and optional analysis/core profiles. The core mechanism is opt-in and never changes this developer workstation.
 
-Control pods use read-only filesystems, non-root identities and restricted security settings. Node privileges and host mounts are explicitly documented exceptions in the collector namespace; observed namespaces retain Pod Security restricted. Object access uses named configured pools and role credentials, never arbitrary URLs from a request. Migration/backup identities remain separate from running hub identities. Analyzer manifests are generated from reviewed templates, not supplied by a user.
+Control Pods use read-only filesystems, non-root identities and Restricted security settings. Node privileges and host mounts are documented exceptions in the collector namespace; observed namespaces retain Pod Security restricted. Object access uses configured pools and role credentials, never request-supplied URLs. Analyzer manifests come from reviewed templates.
 
 ## Lifecycle, availability and readiness
 
-- Startup loads only that role's dependency set. Optional mechanism failures affect that capability, not all evidence reads. Database recovery starts RecoveryBlocked; health cannot bypass that gate.
-- Hub API readiness requires its authoritative control/query dependencies and safe recovery state. Hub worker readiness describes its work classes separately; an unavailable webhook receiver does not take down collection admission.
-- Connector readiness distinguishes hub connection, current configuration, local admission, analysis and node coverage. Local cleanup and prepaid execution do not wait for hub readiness.
-- Node reports detector readiness, each recorder's warming/coverage, prewrapped natural-core capacity and adapter qualification independently. A ready pod does not prove complete history.
-- Shutdown stops new leases/starts, drains bounded work until its existing deadline, and records uncertainty. It does not extend permits or reset deadlines. A node source cannot migrate to another node; replacement reports a gap/new identity.
-- Old workers cannot publish after a newer fence is accepted. A Kubernetes leader lease does not itself fence a process, SQL write, artifact commit or BPF source. Each effect boundary checks the applicable epoch/revision/attempt identity.
-- N/N-1 hub–connector protocol compatibility is the existing rule. Rolling node upgrades drain or expire source sessions; no promise of lossless ring migration. Schema migrations expand/contract across the supported window; undoing a binary rollout is not a database rollback strategy.
+- Startup loads only that role's dependency set. An optional mechanism failure affects that capability, not evidence reads.
+- Readiness probes report the role's own dependencies: hub API (SQL, identity provider settings), hub worker (per work class), connector (hub connection, informer sync, node coverage), node (detector and recorder readiness, adapter qualification). A ready Pod does not prove complete history.
+- Configuration comes from informers or mounted files and stays valid until replaced; a watch failure marks only the affected source unavailable until relist.
+- Shutdown stops new work and drains in-flight work within its existing deadline. A node source cannot migrate to another node; a replacement reports a gap.
+- Each effect carries its idempotency key and attempt identity; a leader Lease does not by itself fence an effect.
+- Database restore follows a runbook: scale hub and connectors to zero, restore, run the setup Job (which advances the installation epoch), start again. Components read the epoch at startup and on reconnect.
+- N/N−1 hub–connector protocol compatibility is the rule. Rolling node upgrades drain or expire source sessions; rings are not migrated. Schema migrations expand/contract across the supported window.
 
 ## Isolation and capacity
 
-Separate queue budgets for denial/expiry control, protected saves/uploads, normal collection/analysis, and live delivery. Apply weighted workload fairness within each class. Live viewers shed first; control channels must remain able to deliver cancellation and denial under traffic pressure. Reserve each hub process's share of installation DB connections; scaling replicas cannot multiply the global pool silently. Controller cache/index memory and node buffers have hard limits. Read replicas are never used to approve rights, spend, or revocation-sensitive delivery.
+Separate queue budgets for denial/Stop delivery, protected saves/uploads, normal collection/analysis and live delivery, with weighted workload fairness within each class. Live viewers shed first; Stop and denial must get through under load. Each hub process has a fixed share of installation DB connections. Connector caches and node buffers have hard limits. Read replicas never approve rights, spend or revocation-sensitive delivery.
 
-Production replica counts, requests/limits and throughput ceilings beyond existing defaults require the qualification measurements in [implementation slices](implementation-slices.md). The architecture selects where scaling occurs, not invented performance numbers.
-
-The acquisition role additionally has an independently templated download-only Job mode under [REQ-DLD-003](../../specs/artifact-downloads.md): exact artifact read/unwrap, bounded verified streaming and no plaintext scratch, analyzer or target execution. It is not the acquire/analyze/publish pipeline and does not require analysis storage. Connector and hub relay authenticated bounded bytes transiently only where residency permits; control-plane roles receive no unwrap credentials. No new always-on service is required.
-
-The initial `asservat download-worker` command implements only the A-ACQUIRE credential phase under [ADR-073](worker-startup.md). It consumes the exact protected Job startup inputs and renews its process key credential within original deadlines. It does not yet run the native transfer or the separate analysis-acquisition pipeline. The chart does not deploy this partial runtime.
+Replica counts, requests/limits and throughput ceilings come from the measurements in [implementation slices](implementation-slices.md).

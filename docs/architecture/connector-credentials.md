@@ -1,15 +1,43 @@
-# Process-owned initial connector credentials
+# Connector identity
 
-C-04/C-21 under REQ-FED-001. This component supplies the connector process key owner for the existing audited bootstrap enrollment; it does not yet implement renewal, a worker-facing server identity, protected startup provisioning or a connector executable.
+C-04/C-21 under REQ-FED-001 and ADR-330 D2/D3.
 
-`ConnectorCredentials` generates one P-256 key and identity-free CSR. Protected runtime startup must suppress core dumps before constructing it. The private bootstrap reference pins the original installation/cluster/issuer/peer, bootstrap ID, secret digest and original five-minute interval. A constructor creates no issuance authority. Existing SQL/audit/provider enrollment independently checks the claim and remains the only activation producer.
+Each workload cluster has one connector identity. Connector process restarts
+and replicas reuse it; there is no per-process identity.
 
-Unknown enrollment replies retain the same key, CSR, bootstrap and expiry; the client allows one active attempt and at least one second between attempts. It joins original owning-context cancellation even if an internal caller supplies Background. Close joins the active attempt and disables previously returned signers. Public certificate/chain/key snapshots are copied; physical Go heap erasure is not claimed.
+## Registration and first certificate
 
-Before installing the leaf, the client independently reads the original historical claim/key/expiry, requires the exact claim-derived thirty-minute certificate end, validates the actual chain/peer/key/clientAuth-only profile, and checks current peer registration. Historical claim metadata does not grant authority. After installation, Enroll performs a current registration check without asking the issuer to sign again, and discards the retained bootstrap digest. Ordinary TLS uses still require current NativeConnectorIdentity/PeerAuthenticator checks; a local certificate snapshot is not a permit.
+1. An administrator registers the cluster. The hub creates a `cluster`
+   row and a one-time bootstrap token, shows the token once and stores only
+   its hash and expiry.
+2. The connector Helm release receives the token in a Secret.
+3. The connector generates a P-256 key, sends a certificate signing request
+   with the token over TLS to the hub, and receives a client certificate for
+   the cluster identity from the installation CA. The hub consumes the token
+   in the same transaction that records the certificate serial and writes the
+   audit row (D6). A retry with the same token and public key returns the
+   same certificate.
+4. The connector stores key and certificate in its own Secret.
 
-`NativeConnectorIdentity` now supplies supported TLS1.3 signature schemes when asking a process-owned callback for its preflight certificate snapshot. The prior version supplied an empty scheme list, which real TLS certificate callbacks correctly rejected despite static fixture callbacks succeeding. This selection is not a manufactured TLS handshake; the actual connection still negotiates its own signature scheme and validates TLS plus current registry before forwarding.
+## Rotation and revocation
 
-The typed initial enrollment/claim ports are internal composition. A future network enrollment adapter must use the actual protected bootstrap credential and server-side digest verification; it must not serialize the stored digest as a bearer substitute. Root/provider keys never enter this key owner.
+The connector sends a new CSR over its authenticated connection at about
+two thirds of the certificate lifetime and switches to the new certificate
+on success. Revoking a cluster disables its `cluster` row; the hub checks
+the row when a connection is established and closes open connections of a
+disabled cluster when the change event arrives (D1).
 
-Qualification: focused tests reproduce the prior native-callback failure, then pass with the supported-scheme fix. Full mTLS/fleet race suites and affected vet pass. A real loopback TLS connection uses the process-owned callback and rejects the same client after current registry revocation. Tests use synthetic bootstrap/issuer/registration services; no real SQL/OpenBao/bootstrap delivery, deployed connector Pod, certificate renewal or server producer is qualified by this component. Those remain the next production composition tasks under the reserved ADR126/migration49 work. The new audit lane must preserve old bytes, finite history/backing, independent current activation and first-installation complete-history reads.
+## Connection
+
+The connector holds one outbound, multiplexed mTLS connection to the hub
+(D2). Commands, cluster-state pushes ([cluster observations](cluster-observations.md)),
+live rows and download bytes are streams on it. The hub records which
+replica holds the connection in SQL and routes work for that cluster
+there.
+
+In-cluster Asservat workloads (node collectors, regional readers)
+authenticate to the connector with an audience-bound projected
+ServiceAccount token checked once per connection by TokenReview.
+
+Precedent: kubelet TLS bootstrapping and client certificate rotation;
+Open Cluster Management klusterlet registration; Kubernetes konnectivity.
