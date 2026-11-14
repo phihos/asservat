@@ -13,6 +13,9 @@ import (
 const (
 	RemoteBindingsChannel = "asservat_remote_bindings"
 	RemoteCapacityChannel = "asservat_remote_capacity"
+	// CaptureProgressChannel carries the capture ID of each committed
+	// progress revision (migration 00165).
+	CaptureProgressChannel = "asservat_capture_progress"
 )
 
 // listenReconnect spaces reconnects of a failed notification connection.
@@ -32,7 +35,7 @@ func Listen(ctx context.Context, pool *pgxpool.Pool, channel string) <-chan stru
 	}
 	go func() {
 		for ctx.Err() == nil {
-			listen(ctx, pool, channel, signal)
+			listen(ctx, pool, channel, func(string) { signal() })
 			t := time.NewTimer(listenReconnect)
 			select {
 			case <-ctx.Done():
@@ -44,7 +47,7 @@ func Listen(ctx context.Context, pool *pgxpool.Pool, channel string) <-chan stru
 	return out
 }
 
-func listen(ctx context.Context, pool *pgxpool.Pool, channel string, signal func()) {
+func listen(ctx context.Context, pool *pgxpool.Pool, channel string, signal func(string)) {
 	conn, err := pgx.ConnectConfig(ctx, pool.Config().ConnConfig.Copy())
 	if err != nil {
 		return
@@ -57,11 +60,28 @@ func listen(ctx context.Context, pool *pgxpool.Pool, channel string, signal func
 	if _, err = conn.Exec(ctx, "LISTEN "+pgx.Identifier{channel}.Sanitize()); err != nil {
 		return
 	}
-	signal()
+	signal("")
 	for {
-		if _, err = conn.WaitForNotification(ctx); err != nil {
+		n, err := conn.WaitForNotification(ctx)
+		if err != nil {
 			return
 		}
-		signal()
+		signal(n.Payload)
 	}
+}
+
+// ListenPayloads calls publish with each notification payload on channel,
+// and with "" whenever its connection is (re)established. It ends with ctx.
+func ListenPayloads(ctx context.Context, pool *pgxpool.Pool, channel string, publish func(string)) {
+	go func() {
+		for ctx.Err() == nil {
+			listen(ctx, pool, channel, publish)
+			t := time.NewTimer(listenReconnect)
+			select {
+			case <-ctx.Done():
+				t.Stop()
+			case <-t.C:
+			}
+		}
+	}()
 }

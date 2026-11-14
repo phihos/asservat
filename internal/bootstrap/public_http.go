@@ -14,6 +14,7 @@ import (
 	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/audit"
+	"asservat.local/asservat/internal/transport/browser"
 	"asservat.local/asservat/internal/transport/presentation"
 )
 
@@ -218,6 +219,13 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 		}
 		services.Processing = publicProcessingChanges{root: root, installation: installation, profiles: profiles, policies: pc.processingPolicy, recovery: pc.recovery, decisions: decisions, artifactScopes: inventory, audit: normal, releaseAudit: release, mac: pc.mac, refused: eventLog(os.Stderr, "processing change refused")}
 	}
+	// One LISTEN connection feeds every console status stream (REQ-INT-003).
+	progressPool, err := d.public.open(ctx, "hub-metadata-read")
+	if err != nil {
+		return nil, &fixedStepError{"capture-progress-pool", mounts.ErrUnavailable}
+	}
+	services.CaptureChanges = browser.NewChanges()
+	postgres.ListenPayloads(ctx, progressPool, postgres.CaptureProgressChannel, services.CaptureChanges.Publish)
 	h, err := NewPublicContextHandler(PublicContextConfig{PublicOrigin: p.Origin, Issuer: id.settings.Issuer, Version: p.Version,
 		OperationConcurrency: p.OperationConcurrency, MCPPerIdentity: p.MCPPerIdentity, DownloadConcurrency: p.DownloadConcurrency, DownloadsPerIdentity: p.DownloadsPerIdentity, DownloadMaxDuration: time.Duration(p.DownloadMaxSeconds) * time.Second,
 		Audit: presentation.AuditedOperationsConfig{RootID: root, Retention: time.Duration(o.RetentionSeconds) * time.Second, NormalConcurrency: o.NormalConcurrency, ResolutionConcurrency: o.ResolutionConcurrency, PerPrincipalConcurrency: o.PerPrincipalConcurrency, NormalPerSecond: o.NormalPerSecond, ResolutionPerSecond: o.ResolutionPerSecond, Now: time.Now, NewID: ownerRandomID}},

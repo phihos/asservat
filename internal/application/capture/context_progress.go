@@ -94,9 +94,6 @@ func (s ContextProgressService) Get(ctx context.Context, source identities.Curre
 			}
 		}
 	}
-	if p.Phase == "Pending" || p.Phase == "Running" || p.Phase == "Finalizing" {
-		out.RetryAfterSeconds = 2
-	}
 	if out.Sharing, err = sharingStatus(ctx, s.Shares, p); err != nil {
 		return zero, err
 	}
