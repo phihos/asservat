@@ -13,10 +13,11 @@ composition and expanded submissions are rejected, never silently dropped.
 
 `scripts/investigation-schemas.py` derives this subset from the canonical
 contracts; `make investigation-schema-check` rejects drift. The shared wire
-validator rejects duplicate or case-aliased keys, excessive nesting, trailing
-documents and invalid values before a service call. The same JSON result goes
-to both transports. Metadata is bounded to 24 KiB so MCP can carry structured
-and text copies within 64 KiB.
+validator rejects duplicate or case-aliased keys, nesting deeper than the
+deepest canonical schema plus a margin (parser safety), trailing documents and
+invalid values before a service call. The same JSON result goes to both
+transports. List-shaped results are paginated with a cursor; MCP results follow
+the 96 KiB tool-result bound ([MCP runtime](mcp-runtime.md)).
 
 ## Review and acceptance
 
@@ -49,7 +50,9 @@ CSRF on every POST. MCP uses its bearer resource. Each request authorizes once
 ([ADR-311](../decisions/311-operation-authority-recheck.md)); ordinary HTTP
 timeouts bound I/O, and no validity deadline is carried into encoders or
 socket writes. Neither transport reads SQL or decides permissions. The
-browser bounds global and per-principal concurrent requests.
+browser API bounds global concurrent requests by hub memory divided by the
+per-request buffer, and each principal by a token-bucket rate limit (ADR-335
+D8); SSE streams do not count against either.
 
 `NewContextHandler` registers only these tools with the official MCP SDK,
 validated by the shared validator. Tool annotations do not authorize

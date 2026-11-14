@@ -36,10 +36,12 @@ The connector reads the pinned Pod through its namespace/Pod read permission
 and checks namespace, Pod and owner identity. `scheduled` is an observed
 condition; the projection exposes no node name, workload configuration,
 labels, annotations, addresses, environment or free-text messages. Responses
-are capped at 2 MiB; the projected output is at most 4096 bytes.
+are capped at 2 MiB, which covers the 1.5 MiB etcd object limit plus JSON
+overhead; the projection is a subset of that response and needs no separate
+ceiling.
 
-The accepted expectation requires metadata, `pod-status` and the 4096-byte
-ceiling. The encrypted manifest includes `target.executionClass:
+The accepted expectation requires metadata, `pod-status` and the 2 MiB
+response bound. The encrypted manifest includes `target.executionClass:
 kubernetesAPI`; the canonical schema forbids node/boot claims and restricts
 kind, format, action and size. Removing the class cannot produce a valid node
 manifest, and adding node facts cannot turn an API artifact into node evidence.

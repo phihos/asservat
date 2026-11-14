@@ -11,8 +11,8 @@
     "namespace_uid": "namespace-payments-uid",
     "accepted_at": "2026-10-09T12:00:05Z",
     "expires_at": "2026-10-10T11:55:00Z",
-    "settings_digest": "6ec51853f772fec6cb8a7f1233f6cf9c8d9d764f343f6d82ea843b6b4504a0cc",
-    "original_execution_digest": "cc1d2458717eb5676b053b17cbae10f49d0635ef882c99efb1c6a01cd35ef880",
+    "settings_digest": "c7f9010a2ef7455a1482a0457e26d9759f23b2f58e076faac26ab49b3aa35777",
+    "original_execution_digest": "b514e8e20fa380a9af045442ed2e34c4c7ee7aecce680acb8dab14591339517c",
     "settings": {
       "target": {
         "namespace": "payments",
@@ -30,7 +30,7 @@
         "clusterID": "00000000-0000-4000-8000-000000000001",
         "namespaceUID": "namespace-payments-uid",
         "policyUID": "policy-trigger-lifecycles-uid",
-        "executionDigest": "69934be76c88bd1397d16867f9033de5aac4e4915276a01f9e8c8e697c52f4cf"
+        "executionDigest": "e04b02717320c8c56bf762d6faa45edcaa7996b6af23690130fdcf3c0cbd7f25"
       },
       "action_windows": [
         {

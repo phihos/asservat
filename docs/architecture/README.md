@@ -23,7 +23,7 @@ The vocabulary has four levels. An **application role** is a separately schedule
 
 ## Selected shape
 
-A modular Go hub with separately runnable API and worker roles. Each workload cluster runs a connector with one outbound multiplexed mTLS connection to the hub, privileged node collectors and a long-running regional reader Deployment that serves native downloads and stored-evidence queries. A minimal Rust helper handles the host crash path. Offline analysis uses separate acquisition, analysis and publication Jobs. One reviewed Go codebase and role-selecting binary; images, credentials and network policy separate execution authority. Inspektor Gadget is a pinned external dependency. No component becomes a microservice solely because it appears in a diagram. The React/TypeScript console is a static build served by the Go API role.
+A modular Go hub with separately runnable API and worker roles. Each workload cluster runs a connector with one outbound multiplexed HTTPS connection to the hub, authenticated by its ServiceAccount token, privileged node collectors and a long-running regional reader Deployment that serves native downloads and stored-evidence queries. A minimal Rust helper handles the host crash path. Offline analysis uses separate acquisition, analysis and publication Jobs. One reviewed Go codebase and role-selecting binary; images, credentials and network policy separate execution authority. Inspektor Gadget is a pinned external dependency. No component becomes a microservice solely because it appears in a diagram. The React/TypeScript console is a static build served by the Go API role.
 
 PostgreSQL owns hub transactions, audit rows and small metadata; Kubernetes owns configuration (watched by informers) and local execution; regional object storage owns envelope-encrypted evidence. Hub processes signal each other with `LISTEN/NOTIFY`; browsers receive status over Server-Sent Events. Browser and MCP are adapters over the same application services. External effects leave the hub transaction before execution and carry an idempotency key, so a retry returns the recorded outcome.
 
@@ -69,7 +69,7 @@ An implementation task should read its requirement, catalog owner, relevant comp
 - [Bounded native response accounting](download-responses.md)
 - [Native download sessions and accounting](download-sessions.md)
 - [Download worker dispatch and cleanup](download-worker-dispatch.md)
-- [Connector activation](enrollment-activation.md)
+- [Optional connector certificates](enrollment-activation.md)
 - [Fleet administration](fleet-administration.md)
 - [Initial identity and ordinary eligibility boundary](identity-eligibility.md)
 - [Keycloak reference identity profile](keycloak-profile.md)

@@ -40,8 +40,7 @@
             },
             "databaseStart": {
               "type": "string",
-              "format": "date-time",
-              "maxLength": 32
+              "format": "date-time"
             },
             "databaseOID": {
               "type": "integer",
@@ -51,17 +50,16 @@
             "databaseSchemaVersion": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 1000000
+              "maximum": 9007199254740991
             },
             "sourceUID": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 64
+              "minLength": 1
             },
             "sourceGeneration": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 2147483647
+              "maximum": 9007199254740991
             },
             "sourceDigest": {
               "type": "string",
@@ -75,13 +73,11 @@
             },
             "notBefore": {
               "type": "string",
-              "format": "date-time",
-              "maxLength": 32
+              "format": "date-time"
             },
             "notAfter": {
               "type": "string",
-              "format": "date-time",
-              "maxLength": 32
+              "format": "date-time"
             }
           },
           "required": [

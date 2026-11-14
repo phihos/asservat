@@ -36,14 +36,10 @@ spec:
         kind: Group
         issuer: https://identity.example.invalid/realms/company
         id: group-payments-123
-      assignmentIDs:
-      - owner-assignment-1
     - subject:
         kind: Group
         issuer: https://identity.example.invalid/realms/company
         id: group-payments-sre-456
-      assignmentIDs:
-      - owner-assignment-2
 status:
   phase: Active
   revision: 1

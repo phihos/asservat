@@ -51,11 +51,6 @@
         "role": {
           "$ref": "https://asservat.io/spec/v1/permission-common.schema.json#/$defs/role"
         },
-        "maxNamespaces": {
-          "type": "integer",
-          "minimum": 1,
-          "description": "Optional administrator bound on granted namespaces; omitted means unbounded."
-        },
         "protection": {
           "$ref": "https://asservat.io/spec/v1/permission-common.schema.json#/$defs/protection"
         },

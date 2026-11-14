@@ -22,8 +22,7 @@
     },
     "subject": {
       "type": "string",
-      "minLength": 1,
-      "maxLength": 128
+      "minLength": 1
     },
     "time": {
       "type": "string",
@@ -62,7 +61,6 @@
             "type": "string",
             "format": "uuid"
           },
-          "maxItems": 64,
           "minItems": 0,
           "uniqueItems": true
         },
@@ -77,7 +75,7 @@
         "occurrenceCount": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 1099511627776
+          "maximum": 9007199254740991
         },
         "dataClasses": {
           "type": "array",
@@ -89,7 +87,6 @@
               "raw"
             ]
           },
-          "maxItems": 3,
           "minItems": 0,
           "uniqueItems": true
         }

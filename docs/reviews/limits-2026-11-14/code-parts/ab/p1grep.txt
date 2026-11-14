@@ -1,0 +1,750 @@
+internal/adapters/postgres/access_grant.go:42:	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+internal/adapters/postgres/access_grant.go:59:	MaxArtifacts  int      `json:"maxArtifacts"`
+internal/adapters/postgres/access_grant.go:60:	MaxBytes      int64    `json:"maxBytes"`
+internal/adapters/postgres/access_grant.go:61:	MaxOperations int64    `json:"maxOperations"`
+internal/adapters/postgres/access_grant.go:74:	if json.Unmarshal(r.Reasons, &reasons) != nil || len(r.ExecutionDigest) != 32 || len(r.ReviewDigest) != 32 {
+internal/adapters/postgres/access_grant.go:81:		RequestedAt: r.RequestedAt.Time, ReviewUntil: r.ReviewUntil.Time, Lifetime: time.Duration(r.LifetimeSeconds) * time.Second,
+internal/adapters/postgres/access_grant.go:82:		ExpiresAt: optionalTime(r.ExpiresAt), RevokedAt: optionalTime(r.RevokedAt), Revision: int64(r.Revision),
+internal/adapters/postgres/access_grant.go:91:			r.RequestOperation != "requestPolicyGrant" || !r.PolicyMaxExecutions.Valid || r.PolicyMaxExecutions.Int64 != scope.Limits.MaxExecutions ||
+internal/adapters/postgres/access_grant.go:92:			!r.PolicyMaxBytes.Valid || r.PolicyMaxBytes.Int64 != scope.Limits.MaxBytes || !r.PolicyMaxObservedBytes.Valid || r.PolicyMaxObservedBytes.Int64 != scope.Limits.MaxObservedBytes {
+internal/adapters/postgres/access_grant.go:104:		if strictJSON(string(r.RawQuery), &raw) != nil || r.PreviewID.Valid || r.CaptureID.Valid || r.ClusterID.Valid || r.NamespaceUid.Valid || r.WorkloadUid.Valid || r.PodUid.Valid || r.RequesterKind != string(identity.Human) || r.RequestOperation != "requestRawAccess" || !bytes.Equal(r.RequesterKey, policyGrantActorKey(g.Requester)) || len(r.ResultAccess) != 0 || len(r.ResultAccessDigest) != 0 || !r.NotAfter.Valid || !r.NotAfter.Time.Equal(raw.NotAfter) || int(r.MaxArtifacts) != len(raw.Artifacts) || r.MaxBytes != raw.MaxBytes || r.MaxOperations != raw.MaxOperations {
+internal/adapters/postgres/access_grant.go:118:	if len(r.ResultAccess) > 0 {
+internal/adapters/postgres/access_grant.go:124:		if err != nil || len(r.ResultAccessDigest) != 32 || int64(w.MaxArtifacts) != int64(r.MaxArtifacts) || w.MaxBytes != r.MaxBytes || w.MaxOperations != r.MaxOperations || !r.NotAfter.Valid || !r.NotAfter.Time.Equal(notAfter) {
+internal/adapters/postgres/access_grant.go:127:		g.ResultAccess = &authorization.ResultAccess{ActionIDs: w.ActionIDs, Operations: w.Operations, ClientIDs: w.ClientIDs, MaxArtifacts: w.MaxArtifacts, MaxBytes: w.MaxBytes, MaxOperations: w.MaxOperations, NotAfter: r.NotAfter.Time}
+internal/adapters/postgres/access_grant.go:158:		authorization.ErrGrantPoolExhausted, authorization.ErrGrantScope, authorization.ErrGrantRevoked, authorization.ErrGrantExpired, authorization.ErrGrantDenied} {
+internal/adapters/postgres/access_grant.go:169:	if s == nil || ctx == nil || ctx.Err() != nil || g.RootID != s.root || g.Decision != nil || !g.RevokedAt.IsZero() || !identity.Text(r.IdempotencyKey, 128) || r.RequestDigest == (artifact.Digest{}) {
+internal/adapters/postgres/access_grant.go:189:		LifetimeSeconds: int32(g.Lifetime / time.Second), IdempotencyKey: r.IdempotencyKey, RequestDigest: r.RequestDigest[:]}
+internal/adapters/postgres/access_grant.go:195:		if params.ResultAccess, err = json.Marshal(grantResultAccessWire{a.ActionIDs, a.Operations, a.ClientIDs, a.MaxArtifacts, a.MaxBytes, a.MaxOperations, notAfter.Format(time.RFC3339Nano)}); err != nil {
+internal/adapters/postgres/access_grant.go:200:		params.MaxArtifacts, params.MaxBytes, params.MaxOperations = int32(a.MaxArtifacts), a.MaxBytes, a.MaxOperations
+internal/adapters/postgres/access_grant.go:311:func (s *AccessGrants) PendingGrants(ctx context.Context, limit int) ([]authorization.Grant, error) {
+internal/adapters/postgres/access_grant.go:312:	if limit < 1 || limit > 100 {
+internal/adapters/postgres/access_grant.go:316:		return q.ListPendingGrants(ctx, custodydb.ListPendingGrantsParams{RootID: id(s.root), RowLimit: int32(limit)})
+internal/adapters/postgres/access_grant.go:320:func (s *AccessGrants) RequestedGrants(ctx context.Context, requester identity.Principal, limit int) ([]authorization.Grant, error) {
+internal/adapters/postgres/access_grant.go:321:	if limit < 1 || limit > 100 || !requester.Valid() {
+internal/adapters/postgres/access_grant.go:325:		return q.ListRequestedGrants(ctx, custodydb.ListRequestedGrantsParams{RootID: id(s.root), RequesterIssuer: requester.Issuer, RequesterSubject: requester.Subject, RequesterKind: string(requester.Kind), RequesterClient: requester.ClientID, RowLimit: int32(limit)})
+internal/adapters/postgres/access_grant.go:337:	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(in.GrantID) || !in.Approver.Valid() || in.Approver.Kind != identity.Human || !identity.Text(in.Reason, 512) || !identity.Text(in.IdempotencyKey, 128) {
+internal/adapters/postgres/access_grant.go:349:	stepped := identity.Text(in.ACR, 128) && !in.AuthTime.IsZero()
+internal/adapters/postgres/access_grant.go:410:	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(in.GrantID) || !in.Revoker.Valid() || in.ExpectedRevision < 1 || in.ExpectedRevision > authorization.GrantMaxRevision || !identity.Text(in.IdempotencyKey, 128) {
+internal/adapters/postgres/access_grant.go:470:	if len(r.ArtifactDigest) != 32 {
+internal/adapters/postgres/access_grant.go:485:		} else if len(raw) == 0 || queryDecode(raw, 4096, &group) != nil {
+internal/adapters/postgres/access_grant.go:488:		if len(source) != 32 {
+internal/adapters/postgres/access_grant.go:511:	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(in.ChildID) || !authorization.UUID(in.ParentID) || !in.Output.Valid() || !identity.Text(in.ClientID, 256) {
+internal/adapters/postgres/access_grant.go:615:	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(parentID) || !authorization.UUID(artifactID) || !identity.Text(clientID, 256) {
+internal/adapters/postgres/access_grant.go:764:			case authorization.GrantExpired:
+internal/adapters/postgres/access_grant.go:765:				return out, false, authorization.ErrGrantExpired
+internal/adapters/postgres/adhoc_observation.go:71:	hard = identity.Earlier(hard, e.Registration.ExpiresAt)
+internal/adapters/postgres/adhoc_observation.go:72:	finite, err := authorization.PlanFiniteAdHocObservation(g, adHocObservationLimits(g.Scope), time.Duration(e.Recording.DurationMillis)*time.Millisecond, active, checkedAt.Add(collector.PacketCaptureStartWithin), hard, checkedAt)
+internal/adapters/postgres/adhoc_observation.go:87:		Sequence: 1, Credit: finite.Credit, MaxBytesPerSecond: finite.BytesPerSecond,
+internal/adapters/postgres/adhoc_observation.go:95:		return collector.ErrObservationBudgetExhausted
+internal/adapters/postgres/adhoc_observation.go:100:		StartedAt: session.StartedAt, SessionUntil: session.SessionUntil, StartBy: session.StartBy, DurationMillis: session.DurationMillis, Credit: session.Credit, MaxBytesPerSecond: session.MaxBytesPerSecond,
+internal/adapters/postgres/adhoc_observation.go:111:func adHocObservationLimits(scope []byte) authorization.ObservationLimits {
+internal/adapters/postgres/adhoc_observation.go:114:			ObservationLimits authorization.ObservationLimits `json:"observationLimits"`
+internal/adapters/postgres/adhoc_observation.go:118:		return authorization.ObservationLimits{}
+internal/adapters/postgres/adhoc_observation.go:120:	return s.Approval.ObservationLimits
+internal/adapters/postgres/admitted_worker_identity.go:47:	call, cancel := context.WithDeadline(ctx, started.Add(5*time.Second))
+internal/adapters/postgres/admitted_worker_identity.go:72:			return artifact.ErrDownloadExpired
+internal/adapters/postgres/admitted_worker_identity.go:82:			return artifact.ErrDownloadExpired
+internal/adapters/postgres/admitted_worker_identity.go:97:		return artifact.ErrDownloadExpired
+internal/adapters/postgres/admitted_worker_identity.go:104:			return artifact.ErrDownloadExpired
+internal/adapters/postgres/admitted_worker_identity.go:111:			return artifact.ErrDownloadExpired
+internal/adapters/postgres/admitted_worker_identity.go:116:			return artifact.ErrDownloadExpired
+internal/adapters/postgres/admitted_worker_identity.go:121:		return artifact.ErrDownloadExpired
+internal/adapters/postgres/admitted_worker_identity.go:123:	checked.freshUntil = identity.Earlier(started.Add(5*time.Second), identity.Earlier(parentUntil, checked.worker.Intent.RunUntil))
+internal/adapters/postgres/admitted_worker_identity.go:133:		if ctx.Err() != nil || !identity.Fresh(started, checked.freshUntil, n.Time, 5*time.Second) || uid(trust.InstallationID) != s.profile.InstallationID {
+internal/adapters/postgres/admitted_worker_identity.go:134:			return n.Time, artifact.ErrDownloadExpired
+internal/adapters/postgres/api_context_execution.go:103:	if json.Unmarshal(row.BindingJson, &r.Binding) != nil || json.Unmarshal(row.ProcessJson, &r.Process) != nil || len(row.ExpectationDigest) != 32 {
+internal/adapters/postgres/api_context_execution.go:123:	if len(row.CopiesJson) > 0 {
+internal/adapters/postgres/api_context_execution.go:282:		if err = current(ctx, q, pool, allocation, e.Registration, attempt.EffectiveExpiresAt.Time); err != nil {
+internal/adapters/postgres/api_context_execution.go:290:			return sqlStep{"expired", value.ErrExpired}
+internal/adapters/postgres/api_context_execution.go:341:				b := value.Binding{ExecutionClass: artifact.ContextAPIExecution, ExecutorPodUID: p.PodUID, ExecutorAccountUID: p.AccountUID, OperationID: e.CaptureUID, CaptureID: e.CaptureUID, ActionID: e.ActionID, AttemptID: e.Registration.Location.AttemptID, ClusterID: p.ClusterID, IssuerEpoch: p.IssuerEpoch, PodUID: e.PodUID, CollectorEpoch: p.ProcessEpoch, ScopeDigest: e.PlanDigest, AuditDigest: c.Work.IntentDigest, NativeBytes: e.Registration.NativeLimit, NotBefore: c.CheckedAt.UTC(), NotAfter: c.ValidUntil.UTC()}
+internal/adapters/postgres/api_context_execution.go:345:				copy(b.BudgetDigest[:], digest(normalized(e.Registration)))
+internal/adapters/postgres/api_context_execution.go:369:				if until.Sub(now.Time) < time.Second {
+internal/adapters/postgres/api_context_execution.go:395:				return sqlStep{"expired", value.ErrExpired}
+internal/adapters/postgres/api_context_execution.go:455:		if !authorization.UUID(p.ObjectUID) || !identity.Text(p.ResourceVersion, 128) {
+internal/adapters/postgres/api_context_execution.go:509:				return value.ErrExpired
+internal/adapters/postgres/api_context_execution.go:612:				return value.ErrExpired
+internal/adapters/postgres/api_context_execution.go:631:			if projectErr != nil || len(snapshotRaw) > 8192 {
+internal/adapters/postgres/api_context_execution.go:650:			return value.ErrExpired
+internal/adapters/postgres/api_context_execution.go:674:			return value.ErrExpired
+internal/adapters/postgres/api_context_execution.go:704:				return value.ErrExpired
+internal/adapters/postgres/api_context_publication.go:33:	return err == nil && (e.Snapshot == nil || len(c.SnapshotCoverage) > 0) && evidence.ContextExpectationDigest(projected) == evidence.ContextExpectationDigest(e)
+internal/adapters/postgres/api_context_publication.go:79:	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+internal/adapters/postgres/api_context_publication.go:82:	d := privacyvalue.Deadlines{AnchorAt: e.Registration.AnchorAt, ExpiresAt: e.Registration.ExpiresAt, DeleteBy: e.Registration.DeleteBy}
+internal/adapters/postgres/api_context_publication.go:122:		until := identity.Earlier(now.Time.Add(5*time.Second), retained.ValidUntil)
+internal/adapters/postgres/api_context_publication.go:123:		for _, end := range []time.Time{recovery.FreshUntil, stream.FreshUntil.Time, stream.LeaseUntil.Time, e.Registration.WriteUntil, retained.ExpiresAt} {
+internal/adapters/postgres/api_context_recording.go:24:func (s *APIContextExecutions) StartedRecordings(ctx context.Context, startedBefore time.Time, limit int) ([]string, error) {
+internal/adapters/postgres/api_context_recording.go:25:	if limit < 1 || limit > 64 || startedBefore.IsZero() {
+internal/adapters/postgres/api_context_recording.go:30:		rows, err := q.ListStartedRecordings(ctx, custodydb.ListStartedRecordingsParams{RootID: id(s.root), StartedAt: ts(startedBefore), Limit: int32(limit)})
+internal/adapters/postgres/argument_observation.go:86:	hard := identity.Earlier(c.Work.Accepted.Deadline, identity.Earlier(e.Registration.WriteUntil, e.Registration.ExpiresAt))
+internal/adapters/postgres/argument_observation.go:100:		finite, err = authorization.PlanFinitePolicyArgumentObservation(g, g.Policy.Authority, c.Eligibility.Target, e.Recording, g.Policy.Authority.Limits.MaxObservedBytes-a.ObservedBytesSpent, g.Policy.Authority.Limits.MaxObservedEvents-a.ObservedEventsSpent, active, checkedAt.Add(collector.PacketCaptureStartWithin), hard, checkedAt)
+internal/adapters/postgres/argument_observation.go:109:		finite, err = authorization.PlanFiniteAdHocArgumentObservation(g, adHocObservationLimits(g.Scope), e.Recording, active, checkedAt.Add(collector.PacketCaptureStartWithin), hard, checkedAt)
+internal/adapters/postgres/argument_observation.go:122:		Credit: finite.ByteCredit, EventCredit: finite.EventCredit, MaxBytesPerSecond: finite.BytesPerSecond, MaxEventsPerSecond: finite.EventsPerSecond,
+internal/adapters/postgres/argument_observation.go:123:		MaxProbeBytes: args.MaxProbeBytes, MaxBytesPerEvent: args.MaxBytesPerEvent, MaxTrackedThreads: r.Syscalls.MaxTrackedThreads, CaptureBuffers: args.CaptureBuffers,
+internal/adapters/postgres/argument_observation.go:132:			return collector.ErrObservationBudgetExhausted
+internal/adapters/postgres/argument_observation.go:139:			return collector.ErrObservationBudgetExhausted
+internal/adapters/postgres/argument_observation.go:147:			return collector.ErrObservationBudgetExhausted
+internal/adapters/postgres/argument_observation.go:153:		StartedAt: row.StartedAt, SessionUntil: row.SessionUntil, StartBy: row.StartBy, DurationMillis: row.DurationMillis, Credit: row.Credit, MaxBytesPerSecond: row.MaxBytesPerSecond,
+internal/adapters/postgres/argument_observation.go:154:		ArgumentDefinitionDigest: row.ArgumentDefinitionDigest, EventCredit: row.EventCredit, MaxEventsPerSecond: row.MaxEventsPerSecond, MaxProbeBytes: row.MaxProbeBytes, MaxBytesPerEvent: row.MaxBytesPerEvent, MaxTrackedThreads: row.MaxTrackedThreads, CaptureBuffers: row.CaptureBuffers,
+internal/adapters/postgres/argument_observation.go:179:	if len(row.BindingScope) != 32 || len(row.ProgramDigest) != 32 || len(row.ArgumentDefinitionDigest) != 32 || len(row.ExpectationDigest) != 32 || !bytes.Equal(row.BindingScope, argumentObservationScope(row)) || !bytes.Equal(row.AccountingRule, argumentRuleBytes()) || row.Sequence != 1 || row.EndedAt.Valid {
+internal/adapters/postgres/argument_observation.go:187:	p := collector.ArgumentObservationPermit{Binding: b, StartedAt: row.StartedAt.Time, SessionUntil: row.SessionUntil.Time, LeaseUntil: row.LeaseUntil.Time, StartBy: row.StartBy.Time, Duration: time.Duration(row.DurationMillis) * time.Millisecond, Sequence: 1, EventCredit: row.EventCredit, ByteCredit: row.Credit, EventsPerSecond: row.MaxEventsPerSecond, BytesPerSecond: row.MaxBytesPerSecond, MaxProbeBytes: row.MaxProbeBytes, MaxBytesPerEvent: row.MaxBytesPerEvent, MaxTrackedThreads: row.MaxTrackedThreads, CaptureBuffers: row.CaptureBuffers}
+internal/adapters/postgres/argument_observation.go:200:	return uid(row.CaptureID) == e.CaptureUID && uid(row.AttemptID) == e.Registration.Location.AttemptID && row.ActionID == e.ActionID && row.PodUid == e.PodUID && bytes.Equal(row.ExpectationDigest, ed[:]) && bytes.Equal(row.ProgramDigest, a.ProgramDigest[:]) && bytes.Equal(row.ArgumentDefinitionDigest, a.DefinitionDigest[:]) && bytes.Equal(row.AccountingRule, a.AccountingRule[:]) && row.MaxProbeBytes == a.MaxProbeBytes && row.MaxBytesPerEvent == a.MaxBytesPerEvent && row.MaxBytesPerSecond == a.MaxBytesPerSecond && row.MaxEventsPerSecond == r.Syscalls.MaxEventsPerSecond && row.MaxTrackedThreads == r.Syscalls.MaxTrackedThreads && row.CaptureBuffers == a.CaptureBuffers && row.DurationMillis == r.DurationMillis
+internal/adapters/postgres/authority_audit.go:16:	if len(row.Record) > 8<<20 {
+internal/adapters/postgres/authority_audit.go:17:		return r, cfg.ErrLimit
+internal/adapters/postgres/authority_current_receipt.go:21:	if !acknowledged || !key.Valid || !version.Valid || !etag.Valid || !size.Valid || len(digest) != 32 {
+internal/adapters/postgres/automation.go:134:	if b.SeenSequence != s.Sequence || b.Generation != basis.Generation || !bytes.Equal(b.SpecDigest, basis.Digest[:]) || !b.AcknowledgedAt.Valid || len(b.AutomationJson) == 0 || len(b.AutomationJson) > 4096 {
+internal/adapters/postgres/automation.go:172:	return a.MaxLifetimeSeconds == b.MaxLifetimeSeconds && a.MaxExecutions == b.MaxExecutions && a.MaxBytes == b.MaxBytes && a.MaxObservedBytes == b.MaxObservedBytes && a.MaxObservedEvents == b.MaxObservedEvents && slices.Equal(a.AllowedActions, b.AllowedActions)
+internal/adapters/postgres/bootstrap_audit_receipts.go:15:	if !row.AuditAcknowledgedAt.Valid || !row.AuditObjectKey.Valid || !row.AuditObjectVersion.Valid || !row.AuditObjectEtag.Valid || !row.AuditObjectBytes.Valid || len(row.AuditObjectSha256) != 32 {
+internal/adapters/postgres/bootstrap_audit_receipts.go:29:		identity.Text(row.IssueAuditVersion, 1024) && row.IssueAuditVersion != "null" &&
+internal/adapters/postgres/bootstrap_audit_receipts.go:30:		len(row.IssueAuthorityDigest) == 32 && !bytes.Equal(row.IssueAuthorityDigest, make([]byte, 32)) &&
+internal/adapters/postgres/bootstrap_audit_receipts.go:31:		len(row.IssueAuditSha256) == 32 && !bytes.Equal(row.IssueAuditSha256, make([]byte, 32))
+internal/adapters/postgres/bootstrap_reservation.go:95:	if !a.Valid(now) || root.InstallationID != id(a.InstallationID) || root.IssuerEpoch != id(a.IssuerEpoch) || root.Suspended || root.RecoveryBlocked || trustRevision(root) != a.AdministrationRevision || !identity.Fresh(root.ObservedAt.Time, root.FreshUntil.Time, now, 30*time.Second) {
+internal/adapters/postgres/bootstrap_reservation.go:174:			if count.ActiveCount >= int64(a.MaxActiveBootstraps) || count.HistoryCount >= int64(a.MaxBootstrapHistory) || clusters >= int64(a.MaxClusters) {
+internal/adapters/postgres/bootstrap_reservation.go:197:			row, err = q.InsertBootstrapIntent(ctx, custodydb.InsertBootstrapIntentParams{InstallationID: root.InstallationID, ID: id(slotID), ActorDigest: digest(a.Actor), KeyDigest: request.KeyDigest[:], RequestDigest: bootstrapRequestDigest(request), ActorJson: actor, IdentityUid: a.IdentityRevision.UID, IdentityGeneration: a.IdentityRevision.Generation, IdentityDigest: a.IdentityRevision.Digest[:], TrustUid: a.AdministrationRevision.UID, TrustGeneration: a.AdministrationRevision.Generation, TrustDigest: a.AdministrationRevision.Digest[:], ClusterID: id(clusterID), PeerID: id(peerID), IssuerEpoch: root.IssuerEpoch, DeliveryProfile: a.DeliveryProfile, DisplayName: request.DisplayName, Region: request.Region, NotBefore: now, NotAfter: ts(now.Time.Add(5 * time.Minute))})
+internal/adapters/postgres/browser.go:119:		if n >= int64(r.MaxLogins) {
+internal/adapters/postgres/browser.go:129:		return q.InsertBrowserLogin(ctx, custodydb.InsertBrowserLoginParams{RootID: id(s.root), Epoch: id(s.epoch), ID: l.ID[:], Browser: l.Browser[:], Ciphertext: l.Ciphertext, CreatedAt: ts(l.CreatedAt), ExpiresAt: ts(l.ExpiresAt)})
+internal/adapters/postgres/browser.go:132:func (s *BrowserSessions) TakeLogin(ctx context.Context, key, browser [32]byte) (value.BrowserLogin, error) {
+internal/adapters/postgres/browser.go:142:		out = value.BrowserLogin{ID: key, Browser: browser, Ciphertext: r.Ciphertext, CreatedAt: r.CreatedAt.Time.UTC(), ExpiresAt: r.ExpiresAt.Time.UTC()}
+internal/adapters/postgres/browser.go:152:	out := value.BrowserSession{Principal: value.Principal{Issuer: r.Issuer, Subject: r.Subject, ClientID: r.ClientID, Kind: value.Human}, ProviderSession: r.ProviderSession, Ciphertext: r.Ciphertext, CreatedAt: r.CreatedAt.Time.UTC(), AuthenticatedAt: r.AuthenticatedAt.Time.UTC(), ExpiresAt: r.ExpiresAt.Time.UTC(), RefreshAt: r.RefreshAt.Time.UTC(), Version: r.Version}
+internal/adapters/postgres/browser.go:166:		r.ExpiresAt = value.Earlier(r.ExpiresAt, r.CreatedAt.Add(time.Duration(root.MaxLifetimeSeconds.Int32)*time.Second))
+internal/adapters/postgres/browser.go:167:		r.RefreshAt = value.Earlier(r.RefreshAt, r.ExpiresAt)
+internal/adapters/postgres/browser.go:175:		if n >= int64(root.MaxSessions) {
+internal/adapters/postgres/browser.go:182:		if n >= 10 {
+internal/adapters/postgres/browser.go:201:		r.Observation = sessionObservation(root, r.ExpiresAt)
+internal/adapters/postgres/browser.go:202:		return q.InsertBrowserSession(ctx, custodydb.InsertBrowserSessionParams{RootID: id(s.root), Epoch: id(s.epoch), ID: r.ID[:], Issuer: r.Principal.Issuer, ClientID: r.Principal.ClientID, Subject: r.Principal.Subject, ProviderSession: r.ProviderSession, Ciphertext: r.Ciphertext, CreatedAt: ts(r.CreatedAt), AuthenticatedAt: ts(r.AuthenticatedAt), ExpiresAt: ts(r.ExpiresAt), RefreshAt: ts(r.RefreshAt)})
+internal/adapters/postgres/browser.go:209:func (s *BrowserSessions) ReadSession(ctx context.Context, key [32]byte) (value.BrowserSession, error) {
+internal/adapters/postgres/browser.go:212:func (s *BrowserSessions) ReadSessionForCSRF(ctx context.Context, key [32]byte) (value.BrowserSession, error) {
+internal/adapters/postgres/browser.go:215:func (s *BrowserSessions) readSession(ctx context.Context, key [32]byte, current bool) (value.BrowserSession, error) {
+internal/adapters/postgres/browser.go:233:		if current && len(r.RefreshClaim) > 0 {
+internal/adapters/postgres/browser.go:240:			out.Observation = sessionObservation(root, out.ExpiresAt)
+internal/adapters/postgres/browser.go:249:func (s *BrowserSessions) ClaimRefresh(ctx context.Context, key [32]byte, version int64, claim [32]byte) error {
+internal/adapters/postgres/browser.go:250:	if claim == ([32]byte{}) {
+internal/adapters/postgres/browser.go:268:		if len(r.RefreshClaim) > 0 {
+internal/adapters/postgres/browser.go:277:		return q.ClaimBrowserRefresh(ctx, custodydb.ClaimBrowserRefreshParams{RootID: id(s.root), Epoch: id(s.epoch), ID: key[:], RefreshClaim: claim[:], ClaimUntil: ts(value.Earlier(r.ExpiresAt.Time, now.Time.Add(10*time.Second)))})
+internal/adapters/postgres/browser.go:280:func (s *BrowserSessions) FinishRefresh(ctx context.Context, key [32]byte, version int64, claim [32]byte, blob []byte, refreshAt time.Time) error {
+internal/adapters/postgres/browser.go:293:		if !r.ClaimUntil.Valid || !browserRefreshDatesCurrent(browserRecord(r), r.ClaimUntil.Time, refreshAt, now.Time) || !bytes.Equal(r.RefreshClaim, claim[:]) || r.Version != version || len(blob) == 0 || len(blob) > value.MaxSessionCiphertext {
+internal/adapters/postgres/browser.go:299:func (s *BrowserSessions) RevokeSession(ctx context.Context, key [32]byte) error {
+internal/adapters/postgres/browser.go:305:	if !value.Text(event.Issuer, 2048) || !value.Text(event.ClientID, 256) || !value.Text(event.ID, 256) || event.Subject == "" && event.SessionID == "" || event.Subject != "" && !value.Text(event.Subject, 256) || event.SessionID != "" && !value.Text(event.SessionID, 256) {
+internal/adapters/postgres/browser.go:318:		if !value.Fresh(event.IssuedAt, event.IssuedAt.Add(5*time.Minute), now.Time, 5*time.Minute) {
+internal/adapters/postgres/browser.go:338:		if n >= int64(r.MaxLogoutEvents) {
+internal/adapters/postgres/browser.go:345:		if !value.Fresh(event.IssuedAt, event.IssuedAt.Add(5*time.Minute), now.Time, 5*time.Minute) {
+internal/adapters/postgres/browser.go:348:		if e = q.InsertBrowserLogout(ctx, custodydb.InsertBrowserLogoutParams{RootID: id(s.root), Epoch: id(s.epoch), ID: key[:], Issuer: event.Issuer, ClientID: event.ClientID, Subject: event.Subject, ProviderSession: event.SessionID, IssuedAt: ts(event.IssuedAt), ExpiresAt: ts(event.IssuedAt.Add(25 * time.Hour))}); e != nil {
+internal/adapters/postgres/browser.go:358:	return r.Valid(now) && now.Before(claimUntil) && refreshAt.After(r.CreatedAt) && !refreshAt.After(r.ExpiresAt)
+internal/adapters/postgres/browser_settings.go:40:		if e := q.InsertBlockedBrowserRoot(ctx, custodydb.InsertBlockedBrowserRootParams{ID: id(s.root), Epoch: id(a.Epoch), MaxLogins: int32(a.MaxLogins), MaxSessions: int32(a.MaxSessions), MaxLogoutEvents: int32(a.MaxLogoutEvents)}); e != nil {
+internal/adapters/postgres/browser_settings.go:87:		if e = q.ObserveBrowserSettings(ctx, custodydb.ObserveBrowserSettingsParams{ID: id(s.root), Epoch: id(a.Epoch), Enabled: !a.Suspended, MaxLogins: int32(a.MaxLogins), MaxSessions: int32(a.MaxSessions), MaxLogoutEvents: int32(a.MaxLogoutEvents), SourceUid: text(a.Revision.UID), SourceGeneration: pgtype.Int8{Int64: a.Revision.Generation, Valid: true}, SourceDigest: a.Revision.Digest[:], ObservedAt: ts(a.ObservedAt), FreshUntil: ts(a.FreshUntil), Issuer: text(a.Issuer), ClientID: text(a.ClientID), Origin: text(a.Origin), MaxLifetimeSeconds: pgtype.Int4{Int32: int32(a.MaxLifetimeSeconds), Valid: true}}); e != nil {
+internal/adapters/postgres/browser_settings.go:90:		if e = q.ClampBrowserSessionLifetimes(ctx, custodydb.ClampBrowserSessionLifetimesParams{RootID: id(s.root), MaxLifetimeSeconds: int32(a.MaxLifetimeSeconds)}); e != nil {
+internal/adapters/postgres/browser_settings.go:130:	return r.Enabled && r.SourceUid.Valid && r.SourceGeneration.Valid && len(r.SourceDigest) == 32 && r.Issuer.Valid && r.ClientID.Valid && r.Origin.Valid && r.MaxLifetimeSeconds.Valid && value.Fresh(r.ObservedAt.Time, r.FreshUntil.Time, now, 5*time.Second)
+internal/adapters/postgres/capacity_audit_profiles.go:32:	if !authorization.UUID(root) || !authorization.UUID(installation) || !authorization.UUID(qualification) || digest == (artifact.Digest{}) || !identity.Text(accountVersion, 64) {
+internal/adapters/postgres/capacity_audit_profiles.go:44:	if len(raw) < 2 || len(raw) > 16<<10 {
+internal/adapters/postgres/capacity_audit_profiles.go:75:	until := start.Add(5 * time.Second)
+internal/adapters/postgres/capacity_cluster_qualification.go:48:	call, end := context.WithTimeout(ctx, 5*time.Second)
+internal/adapters/postgres/capacity_cluster_qualification.go:63:	call, end := context.WithTimeout(ctx, 5*time.Second)
+internal/adapters/postgres/capacity_cluster_qualification.go:74:	if len(raw) > 1<<20 {
+internal/adapters/postgres/capacity_cluster_qualification.go:82:	if strictJSON(string(raw), &rows) != nil || len(rows) > 15 {
+internal/adapters/postgres/capacity_cluster_qualification.go:97:	if len(keys) < 1 || len(keys) > 256 || !slices.IsSorted(keys) {
+internal/adapters/postgres/capacity_cluster_qualification.go:101:		if !identity.Text(k, 253) || i > 0 && keys[i-1] == k {
+internal/adapters/postgres/capacity_enrollment_decode.go:24:	if len(raw) < 2 || len(raw) > 8192 {
+internal/adapters/postgres/capacity_enrollment_decode.go:41:	if e != nil || !capacitySameJSONFields(raw, encoded) || out.FreshUntil.IsZero() || out.FreshUntil.Nanosecond()%1000 != 0 || out.Enrollment != nil && !out.Enrollment.Valid() {
+internal/adapters/postgres/capacity_enrollment_effect.go:91:	if e != nil || len(observation) > 128<<10 {
+internal/adapters/postgres/capacity_enrollment_effect.go:97:		if e != nil || len(receipt) > 8<<10 {
+internal/adapters/postgres/capacity_enrollment.go:44:	if !authorization.UUID(root) || !authorization.UUID(installation) || accounts == nil || !identity.Text(accounts.AccountVersion(), 64) {
+internal/adapters/postgres/capacity_enrollment.go:78:	if e != nil || len(observation) > 128<<10 {
+internal/adapters/postgres/capacity.go:19:	if (artifact.Location{ClusterID: a.ID, ArtifactID: a.PoolID, AttemptID: a.ScopeID}).Validate() != nil || a.PoolRevision < 1 || a.Revision < 1 || a.Bytes < 0 || a.Objects < 0 || a.ValidUntil.IsZero() || a.ValidUntil.Nanosecond()%1000 != 0 || (a.ServiceClass != "context" && a.ServiceClass != "evidence") {
+internal/adapters/postgres/capacity.go:29:			if old.PoolID != p.ID || old.ScopeID != id(a.ScopeID) || old.ServiceClass != a.ServiceClass || old.Revision != a.Revision || old.ByteLimit != a.Bytes || old.ObjectLimit != a.Objects || !old.ValidUntil.Time.Equal(a.ValidUntil) {
+internal/adapters/postgres/capacity.go:45:			return privacy.ErrExpired
+internal/adapters/postgres/capacity.go:54:		if err = q.InsertAllocation(ctx, custodydb.InsertAllocationParams{ID: id(a.ID), PoolID: p.ID, ScopeID: id(a.ScopeID), ServiceClass: a.ServiceClass, Revision: a.Revision, ValidUntil: ts(a.ValidUntil), ByteLimit: a.Bytes, ObjectLimit: a.Objects}); err != nil {
+internal/adapters/postgres/capacity.go:62:			return privacy.ErrExpired
+internal/adapters/postgres/capacity_initialization.go:49:	if ctx == nil || ctx.Err() != nil || pool == nil || !authorization.UUID(in.ClusterID) || !identity.Text(in.NamespaceUID, 64) || in.SourceDigest == (artifact.Digest{}) ||
+internal/adapters/postgres/capacity_initialization.go:50:		!identity.Text(in.AccountVersion, 64) || !q.Valid() || !app.ValidateRootBackingInput(q.RootBacking) || q.RootBacking.AccountVersion != in.AccountVersion {
+internal/adapters/postgres/capacity_initialization.go:54:	if err != nil || len(raw) > 128<<10 {
+internal/adapters/postgres/capacity_initialization.go:57:	call, end := context.WithTimeout(ctx, 5*time.Second)
+internal/adapters/postgres/capacity_initialization.go:64:		if errors.As(err, &pg) && pg.Code == "55000" {
+internal/adapters/postgres/capacity_initialization.go:87:	call, end := context.WithTimeout(ctx, 5*time.Second)
+internal/adapters/postgres/capacity_permissions.go:42:	if len(raw) < 2 || len(raw) > 1<<20 {
+internal/adapters/postgres/capacity_qualification_pin.go:38:	call, end := context.WithTimeout(ctx, 5*time.Second)
+internal/adapters/postgres/capacity_qualification_pin.go:44:	if json.Unmarshal(raw, &out) != nil || out.QualificationID == "" || len(out.QualificationDigest) != 64 || out.AccountVersion == "" || len(out.CapturePolicy) < 2 || out.OperationRetentionSeconds < 60 {
+internal/adapters/postgres/capacity_recovery.go:21:	if len(raw) < 2 || len(raw) > 4096 {
+internal/adapters/postgres/capacity_refresh_demand.go:42:	call, end := context.WithTimeout(ctx, 2*time.Second)
+internal/adapters/postgres/capacity_refresh_demand.go:55:	call, end := context.WithTimeout(ctx, 5*time.Second)
+internal/adapters/postgres/capacity_refresh_demand.go:58:	if err != nil || len(raw) > 1<<16 {
+internal/adapters/postgres/capacity_refresh_demand.go:65:	if strictJSON(string(raw), &rows) != nil || len(rows) > 16 {
+internal/adapters/postgres/capacity_root.go:66:	if len(raw) < 2 || len(raw) > 16<<10 {
+internal/adapters/postgres/capacity_root.go:83:	if e != nil || !capacitySameJSONFields(raw, encoded) || out.FreshUntil.IsZero() || out.FreshUntil.Nanosecond()%1000 != 0 || out.Configuration != nil && !out.Configuration.Valid() {
+internal/adapters/postgres/capacity_root.go:148:	if e != nil || len(observation) > 16<<10 {
+internal/adapters/postgres/capacity_root.go:155:		if e != nil || len(prior) > 8192 {
+internal/adapters/postgres/capacity_session_decode.go:24:	if !managed || len(raw) == 0 || len(raw) > value.CapacitySessionBackingBytes || len(hash) != sha256.Size {
+internal/adapters/postgres/capacity_session_reads.go:42:		b.RowsLimit, b.KeysLimit, b.TransitionsPerRow = p.Rows, p.Keys, p.TransitionsPerRow
+internal/adapters/postgres/capacity_setup.go:33:			err = &ProvisionStop{Step: "capacity/" + at + " after " + time.Since(started).Round(time.Millisecond).String(), Err: err}
+internal/adapters/postgres/capacity_setup.go:51:		_, connections := contracts.PublicRuntimeRoleConnectionLimit(purpose)
+internal/adapters/postgres/capacity_setup.go:62:	live, cancel := context.WithTimeout(ctx, 5*time.Second)
+internal/adapters/postgres/capacity_setup.go:147:		c, e := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
+internal/adapters/postgres/capacity_setup.go:158:	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(1095979854,hashtext($1))`, in.value.InstallationID); err != nil {
+internal/adapters/postgres/capacity_setup.go:241: AND p.fresh_until<=p.observed_at+interval '30 seconds'
+internal/adapters/postgres/capacity_setup.go:258:	out := make([]capacitySetupRole, 0, 10)
+internal/adapters/postgres/capacity_setup.go:278:		connections, bounded := contracts.PublicRuntimeRoleConnectionLimit(purpose)
+internal/adapters/postgres/capacity_setup_input.go:34:	if v.Format != contracts.CapacityRootSetupFormat || v.InstallationID != original.InstallationID || v.InitialClaimID != original.InitialClaimID || !authorization.UUID(v.PermissionRootID) || !authorization.UUID(v.RoleRootUID) || !authorization.UUID(v.RoleSetupID) || !authorization.UUID(v.ControlClusterID) || !identity.Text(v.ControlNamespaceUID, 64) || !identity.Text(v.AccountVersion, 64) || len(v.Qualification) < 2 || len(v.Qualification) > 128<<10 {
+internal/adapters/postgres/capacity_setup_input.go:38:	if err != nil || len(guard) != 32 || hex.EncodeToString(guard) != v.SourceGuardDigest {
+internal/adapters/postgres/capacity_setup_input.go:71:	if err != nil || len(out.bytes) > contracts.CapacityRootSetupMaxBytes {
+internal/adapters/postgres/capacity_setup_input.go:96: AND octet_length(($3::jsonb)::text)<=16384`, in.value.Qualification, in.bytes, raw).Scan(&valid)
+internal/adapters/postgres/capacity_setup_pair.go:22:	if err != nil || len(roleBytes) > 16<<10 {
+internal/adapters/postgres/capacity_setup_pair.go:54: VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,1,false,$11)`, in.value.PermissionRootID, in.value.InstallationID, roleIDs["capacity-capture"], roleIDs["capture-admit"], roleIDs["capture-journal"], roleIDs["capture-ack"], roleIDs["capture-cleanup"], roleIDs["capture-verifier"], roleIDs["capture-finalizer"], roleIDs["capture-intent-read"], q.RootBacking.Capture.Policy.ValidUntil); err != nil {
+internal/adapters/postgres/capacity_setup_pair.go:57:		if _, err = tx.Exec(ctx, `INSERT INTO public.capacity_source(root_id,installation_id,control_cluster_id,control_namespace_uid,source_guard_digest,writer_role,capture_role,audit_reader_role,audit_reader_provenance,account_version,process_limit,qualification,qualification_digest,setup_receipt,setup_input,setup_roles)
+internal/adapters/postgres/capacity_setup_pair.go:58: VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,2,$11,$12,$13,$14,$15)`, in.value.PermissionRootID, in.value.InstallationID, in.value.ControlClusterID, in.value.ControlNamespaceUID, in.guard[:], roleIDs["capacity"], roleIDs["capacity-capture"], roleIDs["capacity-profile-read"], readerProvenance, in.value.AccountVersion, in.value.Qualification, q.Digest[:], receiptBytes, in.bytes, roleBytes); err != nil {
+internal/adapters/postgres/capacity_source.go:50:	if len(raw) < 2 || len(raw) > 1024 {
+internal/adapters/postgres/capacity_source.go:88:	if e != nil || live.Err() != nil || !recovery.Valid(time.Now()) || revision < 0 || revision >= 1<<60 {
+internal/adapters/postgres/capacity_source.go:113:	if e != nil || len(observation) > app.CapacitySourceBytes {
+internal/adapters/postgres/capacity_source.go:144:		if err != nil || ack.Revision < 1 || ack.Revision >= 1<<60 || ack.Revision < in.ExpectedRevision || ack.Revision > in.ExpectedRevision+1 || !ack.Accepted && ack.Revision != in.ExpectedRevision+1 || !identity.Fresh(ack.ObservedAt, ack.FreshUntil, time.Now(), app.CapacitySourceInterval) || ack.FreshUntil.After(until) {
+internal/adapters/postgres/capacity_source.go:180:	if s == nil || ctx == nil || ctx.Err() != nil || root != s.root || expected < 0 || expected >= 1<<60 || recovery.InstallationID != s.installation || !recovery.Valid(time.Now()) || !identity.Fresh(observed, until, time.Now(), app.CapacitySourceInterval) {
+internal/adapters/postgres/capture_audit_backing.go:28:	if l == nil || ctx == nil || ctx.Err() != nil || mac == nil || !a.Valid() || p.RootID != a.RootID || p.Lane != "capture" || p.AccountVersion != a.AccountVersion || mac.AccountVersion() != a.AccountVersion || in.ExpectedRevision < 0 || in.ExpectedRevision >= 1<<60 || a.Revision != in.ExpectedRevision+1 || p.ExpectedRevision < 0 || p.ExpectedRevision >= 1<<60 || a.Policy.BackingRevision != p.ExpectedRevision+1 || p.Accounts < 1 || p.Accounts > 1000000 || p.RecordsPerAccount < a.Records || p.RecordsPerAccount > 1000000 || a.Policy.MetadataSlots < p.Accounts*p.RecordsPerAccount || p.RetainedSeconds != a.RetainedSeconds || !identity.Fresh(p.ObservedAt, p.FreshUntil, p.ObservedAt, 5*time.Second) || !p.ValidUntil.After(p.ObservedAt) || !in.ValidUntil.After(p.ObservedAt) {
+internal/adapters/postgres/capture_audit.go:71:	if len(b) > 64<<10 || json.Unmarshal(b, &out) != nil || out.ValidUntil.IsZero() || out.ValidUntil.After(in.WriteUntil) || !time.Now().Before(out.ValidUntil) || !sameAuditJSON(out.Snapshot.Intent, in) {
+internal/adapters/postgres/capture_audit.go:97:	live, end := context.WithDeadline(ctx, minCaptureAuditTime(until, time.Now().Add(5*time.Second)))
+internal/adapters/postgres/capture_audit.go:139:	live, end := context.WithDeadline(ctx, minCaptureAuditTime(in.WriteUntil, time.Now().Add(5*time.Second)))
+internal/adapters/postgres/capture_audit.go:239:	live, end := context.WithTimeout(ctx, 5*time.Second)
+internal/adapters/postgres/capture_audit.go:247:		if len(b) > 64<<10 || json.Unmarshal(b, &observed) != nil || !captureAuditIntent(s.policy, observed.Snapshot.Intent) || observed.Snapshot.Intent.ID != operation {
+internal/adapters/postgres/capture_audit.go:267:	until := minCaptureAuditTime(in.WriteUntil, time.Now().Add(5*time.Second))
+internal/adapters/postgres/capture_audit.go:277:		if len(v) > 256 || json.Unmarshal(v, &granted) != nil || !granted.Valid() || granted.Until.After(in.WriteUntil) {
+internal/adapters/postgres/capture_audit.go:291:	live, end := context.WithDeadline(ctx, minCaptureAuditTime(in.WriteUntil, time.Now().Add(5*time.Second)))
+internal/adapters/postgres/capture_audit_read.go:40:	until := time.Now().Add(5 * time.Second)
+internal/adapters/postgres/capture_audit_read.go:79:	if row.State != capture.IntentAudited || row.IntentAcknowledgedAt.Time.Before(intent.CreatedAt) || !row.IntentAcknowledgedAt.Time.Before(minCaptureAuditTime(intent.Deadline, intent.CreatedAt.Add(30*time.Second))) || !bytes.Equal(row.IntentDigest, digest(intent)) || !row.IntentObjectKey.Valid || !row.IntentObjectVersion.Valid || !row.IntentObjectEtag.Valid || !row.IntentObjectBytes.Valid || len(row.IntentObjectSha256) != 32 || !receipt.ValidOperation(intent.RootID, intent.CaptureID, "intent") || receipt.Version == "" || receipt.Version == "null" {
+internal/adapters/postgres/capture_audit_read.go:90:	if row.GroupID.Valid && (row.GroupOrdinal < 0 || row.GroupOrdinal > 15) || !row.GroupID.Valid && row.GroupOrdinal != -1 {
+internal/adapters/postgres/capture_audit_read.go:130:		RepeatedFromExpiresAt:     row.RepeatedFromExpiresAt,
+internal/adapters/postgres/capture_cleanup_due.go:40:		after = "00000000-0000-0000-0000-000000000000"
+internal/adapters/postgres/capture_cleanup_due.go:42:	call, cancel := context.WithTimeout(ctx, 5*time.Second)
+internal/adapters/postgres/capture_cleanup_due.go:57:		if err != nil || len(rows) > 16 {
+internal/adapters/postgres/capture_cleanup_due.go:69:		return auditCurrent(call, q, trust, started, identity.Earlier(started.Add(5*time.Second), trust.FreshUntil.Time))
+internal/adapters/postgres/capture_cleanup_store.go:27:	call, end := context.WithTimeout(ctx, 5*time.Second)
+internal/adapters/postgres/capture.go:52:	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+internal/adapters/postgres/capture.go:83:	for _, e := range []error{value.ErrStorageBindingExpired, value.ErrInvalid, value.ErrSharingDenied, value.ErrDenied, value.ErrChanged, value.ErrUnavailable, value.ErrCapacity, value.ErrProcessingCoverage, value.ErrConflict} {
+internal/adapters/postgres/capture.go:94:	if errors.Is(err, privacyapp.ErrExpired) || errors.Is(err, privacyapp.ErrFence) {
+internal/adapters/postgres/capture.go:105:	if b.RootID != s.root || b.ObservedAt.Nanosecond()%1000 != 0 || b.FreshUntil.Nanosecond()%1000 != 0 || !b.Valid(b.ObservedAt) {
+internal/adapters/postgres/capture.go:145:	return manualAdmissionShape(a) && authorization.UUID(a.RootID) && identity.Text(a.IdempotencyKey, 128) && a.SubmissionDigest != (artifact.Digest{}) && planning.VerifyFrozenContextPlan(a.Plan) && a.Storage.RootID == a.RootID && a.Storage.Matches(t) && a.Storage.AllocationID == r.AllocationID && a.Storage.Valid(a.Storage.ObservedAt) && r.Validate() == nil && r.Location.ClusterID == t.ClusterID && admissionNativeLimit(a) && r.AnchorAt.Equal(p.Retention.AnchorAt) && r.ExpiresAt.Equal(p.Retention.ExpiresAt) && r.DeleteBy.Equal(p.Retention.DeleteBy) && !r.WriteUntil.After(p.Deadline) && authorization.UUID(a.CaseID) && authorization.UUID(a.OccurrenceID) && (p.CaseID == "" || p.CaseID == a.CaseID) && e.Eligible && e.Target == t && e.Principal == p.Executor && e.VerifiedIdentity.Principal == p.Executor && e.IdentityRevision == e.VerifiedIdentity.Policy && e.PermissionRevision.Valid()
+internal/adapters/postgres/capture.go:148:func admissionNativeLimit(a value.Admission) bool {
+internal/adapters/postgres/capture.go:152:		return err == nil && p.Recorder == nil && p.Profile == nil && p.Snapshot == nil && r.NativeLimit == logs.MaxNativeBytes
+internal/adapters/postgres/capture.go:156:		return err == nil && p.Recorder == nil && p.Snapshot == nil && r.NativeLimit == profile.MaxBytes
+internal/adapters/postgres/capture.go:158:	return p.Recorder == nil && p.Snapshot == nil && r.NativeLimit == artifact.MaxContextBytes || p.Recorder != nil && p.Snapshot == nil && r.NativeLimit == artifact.RecordingNativeLimit || p.Recorder == nil && p.Snapshot != nil && r.NativeLimit == p.Snapshot.Request.MaxBytes
+internal/adapters/postgres/capture.go:177:	if json.Unmarshal(row.ExpectationJson, &e) != nil || json.Unmarshal(row.PodPinJson, &pin) != nil || e.Validate() != nil || e.CaptureUID != uid(row.ID) || e.Registration.Location.AttemptID != uid(row.AttemptID) || len(row.ScopeDigest) != 32 || len(row.SubmissionDigest) != 32 {
+internal/adapters/postgres/capture.go:182:		out.RepeatedFrom = &value.HistoryLineage{CaptureID: uid(row.RepeatedFromCaptureID), ExpiresAt: row.RepeatedFromExpiresAt.Time}
+internal/adapters/postgres/capture.go:462:				processingUntil = identity.Earlier(processingUntil, a.RepeatedFrom.ExpiresAt)
+internal/adapters/postgres/capture.go:469:			if err != nil || a.Plan.Input.Deadline.After(policyReservation.processingLimit) {
+internal/adapters/postgres/capture.go:493:			if len(raw) > 8<<10 || json.Unmarshal(raw, &observed) != nil || !observed.CaptureAuditAccount.Valid() || observed.RootID != s.root || observed.AllocationID != r.AllocationID || observed.AccountVersion != s.auditMAC.AccountVersion() {
+internal/adapters/postgres/capture.go:538:			until := contextMetadataDeadline(ctx, n.Time.Add(5*time.Second), capacityUntil.Time, a.Recovery.FreshUntil, a.Eligibility.ValidUntil, a.Eligibility.VerifiedIdentity.ValidUntil, a.Storage.FreshUntil)
+internal/adapters/postgres/capture.go:589:			if !planning.VerifyContextPlan(a.Plan, n.Time) || a.Plan.CompiledAt.After(n.Time) || !a.Storage.Valid(n.Time) || !identity.Fresh(binding.ObservedAt.Time, binding.FreshUntil.Time, n.Time, 30*time.Second) {
+internal/adapters/postgres/capture.go:592:			if err := current(ctx, q, p, allocation, r, r.ExpiresAt); err != nil {
+internal/adapters/postgres/capture.go:659:		expected := artifact.ContextExpectation{ExecutionClass: target.ExecutionClass, Registration: r, CaseID: a.CaseID, OccurrenceID: a.OccurrenceID, NodeUID: target.NodeUID, NodeBootID: target.NodeBootID, PodUID: target.Request.PodUID, Namespace: target.Request.Namespace.Name, NamespaceUID: target.Request.Namespace.UID, WorkloadUID: target.Request.Workload.UID, CollectorVersion: in.Capability.CollectorVersion, CollectorImageDigest: in.Capability.CollectorImageDigest, RecipeDigest: a.Plan.RecipeDigest, PlanDigest: a.Plan.ScopeDigest, CaptureUID: in.CaptureID, ActionID: "pod-status", DataClass: "metadata", PurposeRef: retention.PurposeRef, Audience: fresh.DefaultAudience, RequestedAgeSeconds: retention.RequestedSeconds, MaximumAgeSeconds: retention.MaximumSeconds, DeletionBudgetSeconds: retention.DeletionBudgetSeconds, RetentionRules: retention.Policies, TriggeredAt: r.AnchorAt}
+internal/adapters/postgres/capture.go:719:		if err != nil || len(expectationJSON) > 65536 {
+internal/adapters/postgres/capture.go:723:		if err != nil || len(pinJSON) > 4096 {
+internal/adapters/postgres/capture.go:755:				if e != nil || !source.Visible || source.State != "available" || source.SummaryExpiresAt.Time.Before(a.RepeatedFrom.ExpiresAt) {
+internal/adapters/postgres/capture.go:759:				if e != nil || sourceStorage.Effective.ExpiresAt.Before(a.RepeatedFrom.ExpiresAt) {
+internal/adapters/postgres/capture.go:762:			} else if sourceCapture.CreatedAt.Time.Add(value.HistoryLifetime).Before(a.RepeatedFrom.ExpiresAt) {
+internal/adapters/postgres/capture.go:765:			repeatedID, repeatedUntil = id(a.RepeatedFrom.CaptureID), ts(a.RepeatedFrom.ExpiresAt)
+internal/adapters/postgres/capture.go:781:		row, err := q.InsertContextCapture(ctx, custodydb.InsertContextCaptureParams{ReasonRef: reasonRef, GroupID: groupID, GroupOrdinal: ordinal, ID: id(in.CaptureID), RootID: id(s.root), PreviewID: id(childPreviewID), RequestKey: childRequestKey, SubmissionDigest: a.SubmissionDigest[:], ScopeDigest: a.Plan.ScopeDigest[:], ScopeJson: a.Plan.CanonicalScope, ExpectationJson: expectationJSON, PodPinJson: pinJSON, AttemptID: id(r.Location.AttemptID), PermissionEpoch: stream.Epoch, PermissionSequence: stream.Sequence, IdentityPolicyUid: fresh.IdentityRevision.UID, IdentityPolicyGeneration: fresh.IdentityRevision.Generation, IdentityPolicyDigest: fresh.IdentityRevision.Digest[:], Deadline: ts(in.Deadline), IntentOperationID: id(operationID), ShareInstruction: instruction, RepeatedFromCaptureID: repeatedID, RepeatedFromExpiresAt: repeatedUntil, AcceptedAt: acceptedAt})
+internal/adapters/postgres/capture_history.go:81:		until := identity.Earlier(first.Time.Add(5*time.Second), identity.Earlier(scope.ValidUntil, q.Recovery.FreshUntil))
+internal/adapters/postgres/capture_history.go:82:		params := custodydb.ListCaptureHistoryCandidatesParams{SelectorKey: q.SelectorKey[:], SnapshotBefore: ts(q.SnapshotBefore), RootID: id(s.root), ClusterID: id(q.Target.ClusterID), NamespaceUid: q.Target.NamespaceUID, WorkloadUid: q.Target.WorkloadUID, Origins: origins, NotBefore: ts(first.Time.Add(-value.HistoryLifetime)), PageLimit: value.HistoryScan}
+internal/adapters/postgres/capture_history.go:176:		entry := value.HistoryEntry{Requester: actors[c.ID], CaptureID: uid(c.ID), Origin: value.HistoryOrigin(c.HistoryOrigin.String), AcceptedAt: accepted.CreatedAt, ExpiresAt: accepted.CreatedAt.Add(value.HistoryLifetime), Phase: p.Phase, EvidenceState: value.HistoryEvidenceState(p.Phase, f.EffectiveExpiresAt.Time, now), ActionKinds: []string{accepted.Expectation.Type().EvidenceType}, RepeatState: "available", SettingsExpiresAt: accepted.CreatedAt.Add(value.HistoryLifetime)}
+internal/adapters/postgres/capture_history.go:184:			if !f.HistoryVisible.Bool || !now.Before(f.HistorySummaryExpires.Time) {
+internal/adapters/postgres/capture_history.go:187:			entry.ExpiresAt = f.HistorySummaryExpires.Time
+internal/adapters/postgres/capture_history.go:188:			entry.SettingsExpiresAt = identity.Earlier(entry.ExpiresAt, f.HistorySettingsExpires.Time)
+internal/adapters/postgres/capture_history.go:189:			if !now.Before(entry.SettingsExpiresAt) {
+internal/adapters/postgres/capture_history.go:190:				entry.RepeatState = "parametersExpired"
+internal/adapters/postgres/capture_history.go:197:		if c.RepeatedFromCaptureID.Valid && now.Before(c.RepeatedFromExpiresAt.Time) {
+internal/adapters/postgres/capture_history.go:267:		expires := accepted.CreatedAt.UTC().Add(value.HistoryLifetime)
+internal/adapters/postgres/capture_history.go:294:			AcceptedAt: accepted.CreatedAt.UTC(), ExpiresAt: expires, TargetJSON: bytes.Clone(scope.Collection.Spec.Target), DependencyJSON: bytes.Clone(scope.Dependencies),
+internal/adapters/postgres/capture_history.go:296:			ObservedAt: first.Time, ValidUntil: identity.Earlier(first.Time.Add(5*time.Second), identity.Earlier(identity.Earlier(e.ValidUntil, q.Recovery.FreshUntil), expires))}
+internal/adapters/postgres/capture_intent.go:69:	if row.State != capture.IntentAudited || !bytes.Equal(row.IntentDigest, digest(r)) || !row.IntentObjectKey.Valid || !row.IntentObjectVersion.Valid || !row.IntentObjectEtag.Valid || !row.IntentObjectBytes.Valid || len(row.IntentObjectSha256) != 32 || !receipt.ValidCaptureIntent(r.RootID, r.CaptureID) {
+internal/adapters/postgres/capture_intent.go:84:	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+internal/adapters/postgres/capture_intent.go:114:	out = audit.CaptureIntent{RootID: uid(row.RootID), CaptureID: accepted.CaptureID, CaseID: e.CaseID, OccurrenceID: e.OccurrenceID, ArtifactID: e.Registration.Location.ArtifactID, AttemptID: e.Registration.Location.AttemptID, Actor: identity.Principal{Issuer: scope.Executor.Issuer, Subject: scope.Executor.Subject, ClientID: scope.Executor.ClientID, Kind: scope.Executor.Kind}, Target: authorization.Target{ClusterID: e.Registration.Location.ClusterID, NamespaceUID: e.NamespaceUID, WorkloadUID: e.WorkloadUID, PodUID: e.PodUID}, ScopeDigest: accepted.ScopeDigest, SubmissionDigest: accepted.SubmissionDigest, PermissionEpoch: uid(row.PermissionEpoch), PermissionSequence: row.PermissionSequence, IdentityRevision: identity.Revision{UID: row.IdentityPolicyUid, Generation: row.IdentityPolicyGeneration}, CreatedAt: accepted.CreatedAt, Deadline: accepted.Deadline, ExpiresAt: e.Registration.ExpiresAt, DeleteBy: e.Registration.DeleteBy, ReservedBytes: e.Registration.ReservedBytes()}
+internal/adapters/postgres/capture_intent.go:123:			if !row.GroupOrdinal.Valid || uid(row.GroupID) != parsed.CaptureID || len(parsed.Targets) < 2 || int(row.GroupOrdinal.Int16) >= len(parsed.Targets) || row.GroupOrdinal.Int16 < 0 || parsed.Targets[row.GroupOrdinal.Int16] != out.Target {
+internal/adapters/postgres/capture_intent.go:127:		} else if len(parsed.Targets) > 1 {
+internal/adapters/postgres/capture_reason_read.go:26:	call, end := context.WithTimeout(ctx, 5*time.Second)
+internal/adapters/postgres/capture_reason_read.go:34:		if len(raw) == 0 || len(raw) > 64<<10 {
+internal/adapters/postgres/capture_share.go:76:	if !s.NotAfter.IsZero() && (!s.NotAfter.After(n.Time) || s.NotAfter.After(n.Time.Add(authorization.ShareMaxLifetime))) {
+internal/adapters/postgres/capture_share.go:80:	retained := authorization.Retained{ArtifactID: r.Location.ArtifactID, Target: target, DataClass: "metadata", ExpiresAt: r.ExpiresAt, Audience: audience}
+internal/adapters/postgres/capture_share.go:102:		if err != nil || len(out) > 65536 {
+internal/adapters/postgres/cluster_bootstrap.go:36:	if s == nil || ctx == nil || !authorization.UUID(bootstrap) || !authorization.UUID(root) || len(key) != 32 || !source.Valid() || !policy.Valid() {
+internal/adapters/postgres/cluster_bootstrap.go:39:	call, end := context.WithTimeout(ctx, 5*time.Second)
+internal/adapters/postgres/cluster_bootstrap.go:43:		source.ProtectionDigest[:], int64(policy.Validity/time.Second), int64(policy.Rotation/time.Second)).Scan(&lineage)
+internal/adapters/postgres/cluster_bootstrap.go:55:	call, end := context.WithTimeout(ctx, 5*time.Second)
+internal/adapters/postgres/cluster_bootstrap.go:68:	if s == nil || ctx == nil || !authorization.UUID(bootstrap) || secretDigest == (artifact.Digest{}) || len(key) != 32 {
+internal/adapters/postgres/cluster_bootstrap.go:71:	call, end := context.WithTimeout(ctx, 5*time.Second)
+internal/adapters/postgres/cluster_bootstrap.go:93:func clusterBootstrapSPKIDigest(key []byte) [32]byte {
+internal/adapters/postgres/cluster_credentials.go:57:		lineage := fleet.ClusterCredentialLineage{Profile: fleet.ClusterCredentialProfile{RootID: uid(row.RootID), PeerID: uid(row.PeerID), InstallationID: uid(row.InstallationID), ClusterID: uid(row.ClusterID)}, ID: uid(row.LineageID), Policy: fleet.ClusterCredentialPolicy{Validity: time.Duration(row.ValiditySeconds) * time.Second, Rotation: time.Duration(row.RotationSeconds) * time.Second}, Current: row.CurrentGeneration, Fenced: row.Fenced.String}
+internal/adapters/postgres/cluster_credentials.go:104:		out = fleet.ClusterCredentialPresentation{Profile: lineage.Profile, LineageID: lineage.ID, Operation: r.Operation, Generation: generation, CheckedAt: now.Time, ValidUntil: identity.Earlier(now.Time.Add(5*time.Second), current.ValidUntil)}
+internal/adapters/postgres/connection_governor.go:28:	limit, hot int
+internal/adapters/postgres/connection_governor.go:36:func NewSQLConnectionGovernor(limit, hot int) (*SQLConnectionGovernor, error) {
+internal/adapters/postgres/connection_governor.go:37:	if limit < 1 || limit > 64 || hot < 0 || hot > limit {
+internal/adapters/postgres/connection_governor.go:40:	return &SQLConnectionGovernor{limit: limit, hot: hot, shared: make(chan struct{}, limit-hot)}, nil
+internal/adapters/postgres/connection_governor.go:46:	if g == nil || c == nil || c.ConnConfig == nil || c.MaxConns < 1 || c.MinConns != 0 {
+internal/adapters/postgres/connection_governor.go:49:	slots := g.shared
+internal/adapters/postgres/connection_governor.go:51:		n := int(c.MaxConns)
+internal/adapters/postgres/connection_governor.go:59:		slots = make(chan struct{}, n)
+internal/adapters/postgres/connection_governor.go:65:		dial = (&net.Dialer{Timeout: 5 * time.Second, KeepAlive: 5 * time.Minute}).DialContext
+internal/adapters/postgres/connection_governor.go:69:		case slots <- struct{}{}:
+internal/adapters/postgres/connection_governor.go:75:			<-slots
+internal/adapters/postgres/connection_governor.go:78:		return &governedConn{Conn: conn, release: sync.OnceFunc(func() { <-slots })}, nil
+internal/adapters/postgres/connector_audit.go:69:	if len(b) > 48<<10 || json.Unmarshal(b, &out) != nil || !sameAuditJSON(out.Snapshot.Intent, in) {
+internal/adapters/postgres/connector_backing.go:46:	if len(b) == 0 || len(b) > 256<<10 || json.Unmarshal(b, &a) != nil || !a.Intent.Valid() || a.Intent.Name != "connector_backing_acceptance" || a.Intent.Lifecycle == nil || !a.Proposed.Backing.CanRenew(a.Before) || !sameAuditJSON(a.Intent.Lifecycle.Policy, a.Before.Policy) || a.Proposed.Backing.Policy.ValidUntil.Add(time.Minute).After(a.Intent.Lifecycle.OriginalPurgeAt) || a.Intent.RetainUntil.After(a.Intent.CreatedAt.Add(time.Duration(a.Before.RetainedSeconds)*time.Second)) {
+internal/adapters/postgres/connector_backing.go:80:		if len(b) > 32<<10 || json.Unmarshal(b, &result) != nil || !authorization.UUID(result.ID) || !c.Configuration.Backing.CanRenew(result.Before) {
+internal/adapters/postgres/connector_backing.go:100:	if e != nil || len(current) > 384<<10 {
+internal/adapters/postgres/connector_backing.go:108:		if len(stored) > 0 {
+internal/adapters/postgres/connector_backing.go:120:		if len(b) > 32<<10 || json.Unmarshal(b, &candidate) != nil || candidate.ID != operation || !c.Configuration.Backing.CanRenew(candidate.Before) {
+internal/adapters/postgres/connector_backing.go:142:		in := audit.OperationIntent{ID: operation, RootID: s.root, TraceID: operation, Name: "connector_backing_acceptance", InputFormat: "connector-backing/v1", MACVersion: s.mac.Version(), AccountVersion: s.mac.AccountVersion(), Process: &actor, PrincipalDigest: account, InputDigest: input, CreatedAt: start, RequestUntil: identity.Earlier(c.Until, candidate.Before.Policy.ValidUntil).UTC().Truncate(time.Microsecond), WriteUntil: start.Add(30 * time.Second), RetainUntil: start.Add(time.Duration(candidate.Before.RetainedSeconds) * time.Second)}
+internal/adapters/postgres/connector_backing.go:153:			if len(cohortBytes) > 8<<20 || json.Unmarshal(cohortBytes, &cohorts) != nil || len(cohorts) == 0 || len(cohorts) > app.ConnectorRetirementSetLimit || int64(len(cohorts)) > candidate.Before.ProfileLimit {
+internal/adapters/postgres/connector_backing.go:188:		if c.Configuration.Backing.Policy.ValidUntil.Add(time.Minute).After(in.Lifecycle.OriginalPurgeAt) {
+internal/adapters/postgres/connector_backing.go:192:		if err != nil || len(intent) > 8192 {
+internal/adapters/postgres/connector_backing.go:245:		if len(b) > 32<<10 || json.Unmarshal(b, &out) != nil || !sameAuditJSON(out, a.Proposed.Backing) {
+internal/adapters/postgres/connector_credentials.go:35:	if len(b) == 0 || len(b) > 320<<10 || json.Unmarshal(b, &a) != nil || !a.Permit.WellFormed() || !a.Intent.Valid() || a.Intent.Lifecycle == nil || a.Permit.ID != a.Intent.ID || a.Permit.IntentDigest != auditapp.OperationLifecycleDigest(a.Intent) || a.Permit.CertificateNotAfter.After(a.Intent.Lifecycle.OriginalPurgeAt.Add(-time.Minute)) {
+internal/adapters/postgres/connector_credentials.go:56:	if e != nil || len(current) > 256<<10 {
+internal/adapters/postgres/connector_credentials.go:66:		if len(stored) > 0 {
+internal/adapters/postgres/connector_credentials.go:79:		if len(b) > 40<<10 || json.Unmarshal(b, &state) != nil || !state.Backing.SameResources(p.backing) || !state.Process.Valid() || state.Process.Attested == nil || *state.Process.Attested != *c.Attested {
+internal/adapters/postgres/connector_credentials.go:123:		in := audit.OperationIntent{ID: c.ID, RootID: p.root, TraceID: c.ID, Name: "connector_" + c.Usage + "_certificate", InputFormat: "connector-credential/v1", MACVersion: p.mac.Version(), AccountVersion: p.mac.AccountVersion(), Peer: actor, Process: processActor, PrincipalDigest: account, InputDigest: input, CreatedAt: start, RequestUntil: c.Current.Until.UTC().Truncate(time.Microsecond), WriteUntil: start.Add(30 * time.Second), RetainUntil: start.Add(time.Duration(state.Backing.RetainedSeconds) * time.Second)}
+internal/adapters/postgres/connector_credentials.go:129:		if !permit.Valid(time.Now()) || leafEnd.After(in.Lifecycle.OriginalPurgeAt.Add(-time.Minute)) {
+internal/adapters/postgres/connector_credentials.go:133:		if err != nil || len(intent) > 8192 {
+internal/adapters/postgres/connector_credentials.go:137:		if err != nil || len(body) > 256<<10 {
+internal/adapters/postgres/connector_credentials.go:228:		if len(b) > 64<<10 || json.Unmarshal(b, &out) != nil || !a.Permit.Matches(out) || a.Certificate == nil || !sameAuditJSON(out, *a.Certificate) {
+internal/adapters/postgres/connector_process.go:48:	if len(b) == 0 || len(b) > 40<<10 || json.Unmarshal(b, &a) != nil || !a.Process.Valid() || !a.Intent.Valid() || a.Intent.Lifecycle == nil || a.Intent.Name != "connector_process_enrollment" || a.Intent.Process == nil || a.Process.Attested == nil || *a.Process.Attested != a.Intent.Process.Process || a.Process.ClientKeyDigest != a.Intent.Process.ClientKeyDigest || a.Process.ServerKeyDigest != a.Intent.Process.ServerKeyDigest || !a.Process.ClaimedAt.Equal(a.Intent.CreatedAt) || a.Process.RunUntil.After(a.Intent.Lifecycle.OriginalPurgeAt.Add(-time.Minute)) {
+internal/adapters/postgres/connector_process.go:69:	if e != nil || len(current) > 192<<10 {
+internal/adapters/postgres/connector_process.go:77:		if len(stored) > 0 {
+internal/adapters/postgres/connector_process.go:86:		if len(activeBytes) > 32<<10 || json.Unmarshal(activeBytes, &backing) != nil || !backing.SameResources(s.backing) || !backing.SupportsDeployment(c.Proof.Configuration.Profile.Deployment) {
+internal/adapters/postgres/connector_process.go:109:		in := audit.OperationIntent{ID: operation, RootID: s.root, TraceID: operation, Name: "connector_process_enrollment", InputFormat: "connector-process/v1", MACVersion: s.mac.Version(), AccountVersion: s.mac.AccountVersion(), Process: &actor, PrincipalDigest: account, InputDigest: input, CreatedAt: start, RequestUntil: c.Until.UTC().Truncate(time.Microsecond), WriteUntil: start.Add(30 * time.Second), RetainUntil: start.Add(time.Duration(backing.RetainedSeconds) * time.Second)}
+internal/adapters/postgres/connector_process.go:121:			if len(planBytes) > 4096 || json.Unmarshal(planBytes, &plan) != nil || !plan.Cohort.Valid() || plan.Cohort.RootID != s.root || plan.Cohort.Binding != s.binding || plan.Cohort.Behavior != cfg.Revision || plan.Cohort.ServingSlots != cfg.Deployment.ServingSlots || plan.Cohort.RetainedProcesses != cfg.Deployment.RetainedProcesses || plan.Cohort.BackingRevision != backing.Policy.BackingRevision {
+internal/adapters/postgres/connector_process.go:152:		process := value.ConnectorCredentialProcess{Attested: &admitted, Binding: s.binding, ClientKeyDigest: c.Proof.ClientKeyDigest, ServerKeyDigest: c.Proof.ServerKeyDigest, ClaimedAt: start, InitialCertificateNotAfter: start.Add(value.ConnectorCertificatePeriod).Truncate(time.Second), RunUntil: in.Lifecycle.OriginalPurgeAt.Add(-time.Minute)}
+internal/adapters/postgres/connector_process.go:157:		if err != nil || len(intent) > 8192 {
+internal/adapters/postgres/connector_process.go:161:		if err != nil || len(body) > 4096 {
+internal/adapters/postgres/connector_process.go:215:		if len(b) > 4096 || json.Unmarshal(b, &out) != nil || !out.Valid() || !sameAuditJSON(out, a.Process) {
+internal/adapters/postgres/connector_profile_read.go:39:	call, end := context.WithTimeout(ctx, 5*time.Second)
+internal/adapters/postgres/connector_profile_read.go:65:	call, end := context.WithTimeout(ctx, 5*time.Second)
+internal/adapters/postgres/connector_profile_read.go:88:	call, end := context.WithTimeout(ctx, 5*time.Second)
+internal/adapters/postgres/connector_registry.go:39:	live, end := context.WithDeadline(ctx, started.Add(5*time.Second))
+internal/adapters/postgres/connector_registry.go:45:	until := identity.Earlier(started.Add(5*time.Second), source.Observation.FreshUntil)
+internal/adapters/postgres/connector_registry.go:106:	if e != nil || len(row) > 8192 || json.Unmarshal(row, &out) != nil || !out.Valid(time.Now()) || out.Certificate.Binding != binding || out.Certificate.Usage != usage || out.Certificate.Digest != digest || out.Revision != source.Observation.Profile.Revision || ctx.Err() != nil || !time.Now().Before(until) {
+internal/adapters/postgres/connector_retirement.go:44:	if len(raw) == 0 || len(raw) > 48<<10 || json.Unmarshal(raw, &r) != nil || !r.Valid() || r.Ticket.RootID != s.root || r.Ticket.Binding.InstallationID != c.Recovery.InstallationID || r.Ticket.Binding.IssuerEpoch != c.Recovery.IssuerEpoch || r.Ticket.AccountVersion != s.mac.AccountVersion() || !audit.CompatibleConnectorPolicy(r.Ticket.Policy, s.backing.Policy) {
+internal/adapters/postgres/connector_retirement.go:75:	if ctx == nil || ctx.Err() != nil || !authorization.UUID(ticketID) || !s.current(c) || cause != audit.ConnectorRetirementExpiry && cause != audit.ConnectorRetirementExplicit || (cause == audit.ConnectorRetirementExplicit) != (c.Proof != nil) {
+internal/adapters/postgres/connector_retirement.go:82:	if e != nil || len(body) > 384<<10 {
+internal/adapters/postgres/connector_retirement.go:131:		if e != nil || len(body) > 8192 {
+internal/adapters/postgres/connector_retirement.go:161:	if e != nil || len(body) > 24<<10 {
+internal/adapters/postgres/connector_source.go:45:	if e != nil || len(b) > 192<<10 {
+internal/adapters/postgres/context_acquisition.go:30:	return w != nil && e.Profile != nil && w.Valid() && w.StartedAt.Nanosecond()%1000 == 0 && w.CompletedAt.Nanosecond()%1000 == 0 &&
+internal/adapters/postgres/context_audit_receipts.go:35:	if !v.AuditAcknowledgedAt.Valid || !v.VerifiedAt.Valid || v.AuditAcknowledgedAt.Time.Before(v.VerifiedAt.Time) || !v.AuditObjectKey.Valid || !v.AuditObjectVersion.Valid || !v.AuditObjectEtag.Valid || !v.AuditObjectBytes.Valid || len(v.AuditObjectSha256) != 32 || len(v.AuditDigest) != 32 || bytes.Equal(v.AuditDigest, make([]byte, 32)) {
+internal/adapters/postgres/context_audit_receipts.go:55:	if v.NativeBytes.Valid && (v.NativeBytes.Int64 < 0 || v.NativeBytes.Int64 > e.Registration.NativeLimit) || !currentVerificationReceipt(v) || v.RootID != c.RootID || v.CaptureID != c.ID || !bytes.Equal(v.ExpectationDigest, digest(e)) || !bytes.Equal(v.IntentDigest, c.IntentDigest) || len(v.CopiesDigest) != 32 || bytes.Equal(v.CopiesDigest, make([]byte, 32)) || !row.PublishedAt.Valid || row.PublishedAt.Time.Before(v.AuditAcknowledgedAt.Time) || !row.PublishedAt.Time.Before(e.Registration.WriteUntil) {
+internal/adapters/postgres/context_case.go:46:	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+internal/adapters/postgres/context_case.go:65:		if len(rows) < 1 || len(rows) > value.MaxContextCaseArtifacts {
+internal/adapters/postgres/context_case.go:68:		out = value.ContextCaseRoutes{CaseID: request.CaseID, ObservedAt: first.Time, ValidUntil: identity.Earlier(first.Time.Add(5*time.Second), identity.Earlier(request.Identity.ValidUntil, request.Recovery.FreshUntil))}
+internal/adapters/postgres/context_case.go:76:			if len(row.Version) != 32 {
+internal/adapters/postgres/context_control.go:22:	return authorization.UUID(root) && expected >= 0 && expected < math.MaxInt64 && revision == expected+1 && full >= 0 && replay >= 0 && !until.IsZero() && until.Nanosecond()%1000 == 0 && observed.Nanosecond()%1000 == 0 && fresh.Nanosecond()%1000 == 0 && identity.Fresh(observed, fresh, observed, 5*time.Second)
+internal/adapters/postgres/context_control.go:25:	return now.Before(until) && identity.Fresh(observed, fresh, now, 5*time.Second)
+internal/adapters/postgres/context_control.go:42:			if old.Paused != in.Paused || old.FullLimit != in.FullRecords || old.ReplayLimit != in.ReplayRecords || !old.ValidUntil.Time.Equal(in.ValidUntil) {
+internal/adapters/postgres/context_control.go:62:				return privacy.ErrExpired
+internal/adapters/postgres/context_control.go:70:			_, err = q.InsertContextControlPool(ctx, custodydb.InsertContextControlPoolParams{RootID: id(in.RootID), Revision: in.Revision, ValidUntil: ts(in.ValidUntil), FullLimit: in.FullRecords, ReplayLimit: in.ReplayRecords, Paused: in.Paused})
+internal/adapters/postgres/context_control.go:72:			_, err = q.ConfigureContextControlPool(ctx, custodydb.ConfigureContextControlPoolParams{RootID: id(in.RootID), ExpectedRevision: in.ExpectedRevision, Revision: in.Revision, ValidUntil: ts(in.ValidUntil), FullLimit: in.FullRecords, ReplayLimit: in.ReplayRecords, Paused: in.Paused})
+internal/adapters/postgres/context_control.go:103:			if pool.Revision != in.PoolRevision || old.Paused != in.Paused || old.FullLimit != in.FullRecords || old.ReplayLimit != in.ReplayRecords || !old.ValidUntil.Time.Equal(in.ValidUntil) {
+internal/adapters/postgres/context_control.go:119:			oldFull, oldReplay = old.FullLimit, old.ReplayLimit
+internal/adapters/postgres/context_control.go:124:		if pool.BackedFull < oldFull || pool.BackedReplay < oldReplay || in.FullRecords > pool.FullLimit-(pool.BackedFull-oldFull) || in.ReplayRecords > pool.ReplayLimit-(pool.BackedReplay-oldReplay) {
+internal/adapters/postgres/context_control.go:132:			if !controlConfigurationCurrent(now.Time, in.ValidUntil, in.ObservedAt, in.FreshUntil) || !now.Time.Before(pool.ValidUntil.Time) || storagePool.Paused || allocation.Paused || !now.Time.Before(storagePool.ValidUntil.Time) || !now.Time.Before(allocation.ValidUntil.Time) || !identity.Fresh(binding.ObservedAt.Time, binding.FreshUntil.Time, now.Time, 30*time.Second) {
+internal/adapters/postgres/context_control.go:133:				return privacy.ErrExpired
+internal/adapters/postgres/context_control.go:141:			_, err = q.InsertContextControlAccount(ctx, custodydb.InsertContextControlAccountParams{RootID: id(in.RootID), AllocationID: id(in.AllocationID), Revision: in.Revision, ValidUntil: ts(in.ValidUntil), FullLimit: in.FullRecords, ReplayLimit: in.ReplayRecords, Paused: in.Paused})
+internal/adapters/postgres/context_control.go:143:			_, err = q.ConfigureContextControlAccount(ctx, custodydb.ConfigureContextControlAccountParams{RootID: id(in.RootID), AllocationID: id(in.AllocationID), ExpectedRevision: in.ExpectedRevision, Revision: in.Revision, ValidUntil: ts(in.ValidUntil), FullLimit: in.FullRecords, ReplayLimit: in.ReplayRecords, Paused: in.Paused})
+internal/adapters/postgres/context_control.go:156:	if pool.BackedFull > pool.FullLimit || pool.BackedReplay > pool.ReplayLimit || account.FullLimit > pool.BackedFull || account.ReplayLimit > pool.BackedReplay || account.ChargedFull < 0 || account.ChargedReplay < 0 || account.ChargedFull >= account.FullLimit || account.ChargedReplay >= account.ReplayLimit {
+internal/adapters/postgres/context_deletion.go:65:				return app.ErrExpired
+internal/adapters/postgres/context_deletion.go:96:	if len(row.RecordJson) > 8192 || json.Unmarshal(row.RecordJson, &r) != nil || !r.Valid() {
+internal/adapters/postgres/context_deletion.go:157:	Through, AfterExpiresAt time.Time
+internal/adapters/postgres/context_deletion.go:171:		return c.AfterExpiresAt.IsZero() && c.AfterAttemptID == ""
+internal/adapters/postgres/context_deletion.go:174:		!c.AfterExpiresAt.IsZero() && c.AfterExpiresAt.Equal(c.AfterExpiresAt.UTC().Truncate(time.Microsecond)) &&
+internal/adapters/postgres/context_deletion.go:175:		!c.AfterExpiresAt.After(c.Through) && authorization.UUID(c.AfterAttemptID)
+internal/adapters/postgres/context_deletion.go:210:			args.AfterExpiresAt, args.AfterAttemptID = ts(cursor.AfterExpiresAt), id(cursor.AfterAttemptID)
+internal/adapters/postgres/context_deletion.go:228:	if len(rows) > 16 {
+internal/adapters/postgres/context_deletion.go:236:		expires := r.EffectiveExpiresAt
+internal/adapters/postgres/context_deletion.go:238:			expires.Time.After(cursor.Through) || last.AfterAttemptID != "" && (expires.Time.Before(last.AfterExpiresAt) || expires.Time.Equal(last.AfterExpiresAt) && loc.AttemptID <= last.AfterAttemptID) {
+internal/adapters/postgres/context_deletion.go:243:		last.AfterExpiresAt, last.AfterAttemptID = expires.Time.UTC().Truncate(time.Microsecond), loc.AttemptID
+internal/adapters/postgres/context_deletion.go:245:	if len(rows) == 16 {
+internal/adapters/postgres/context_deletion.go:283:		if row.State == artifact.Deleted || n.Time.Before(row.EffectiveExpiresAt.Time) {
+internal/adapters/postgres/context_deletion.go:302:		until := n.Time.Add(30 * time.Second)
+internal/adapters/postgres/context_deletion.go:350:		if row.State != artifact.Deleting || row.DeletionFence != r.PurgeFence || !row.LeaseUntil.Valid || !row.LeaseUntil.Time.Equal(work.Deletion.LeaseUntil) || !n.Time.Before(row.LeaseUntil.Time) || r.PurgedAt.After(n.Time) || r.PurgedAt.Before(row.EffectiveExpiresAt.Time) || r.StoreID != uid(pool.StoreID) || !bytes.Equal(row.RequestDigest, r.RegistrationDigest[:]) {
+internal/adapters/postgres/context_deletion.go:363:			return app.ErrExpired
+internal/adapters/postgres/context_download_attachment.go:32:		if err != nil || len(workers) > 1 {
+internal/adapters/postgres/context_download_attachment.go:36:		if err != nil || len(batches) > 1 {
+internal/adapters/postgres/context_download_attachment.go:82:					if e != nil || len(certificates) > 4 {
+internal/adapters/postgres/context_download_plan.go:21:type ContextDownloadPlanLimits struct {
+internal/adapters/postgres/context_download_plan.go:22:	OutputLimit, ReadLimit, RequestLimit int64
+internal/adapters/postgres/context_download_plan.go:26:func (l ContextDownloadPlanLimits) valid() bool {
+internal/adapters/postgres/context_download_plan.go:27:	return l.OutputLimit >= artifact.MaxContextBytes && l.OutputLimit <= artifact.MaxDownloadOutput && l.ReadLimit >= 2*evidence.ContextDownloadReadWork && l.ReadLimit <= artifact.MaxDownloadReadWork && l.RequestLimit >= 2 && l.RequestLimit <= artifact.MaxDownloadRequests && l.Duration > 0 && l.Duration <= 8*time.Hour
+internal/adapters/postgres/context_download_plan.go:35:	limits             ContextDownloadPlanLimits
+internal/adapters/postgres/context_download_plan.go:38:func NewContextDownloadPlans(ctx context.Context, pool *pgxpool.Pool, root, installation string, profile authorization.DownloadWorkerProfile, configuration *WorkerConfigurations, limits ContextDownloadPlanLimits) (*ContextDownloadPlans, error) {
+internal/adapters/postgres/context_download_plan.go:39:	if !authorization.UUID(root) || !authorization.UUID(installation) || !profile.Valid() || profile.StoreCredentialSecret == "" || profile.InstallationID != installation || configuration == nil || !limits.valid() {
+internal/adapters/postgres/context_download_plan.go:46:	return &ContextDownloadPlans{ledger: ledger, root: root, installation: installation, profile: profile, configuration: configuration, limits: limits}, nil
+internal/adapters/postgres/context_download_plan.go:54:	limits, e := boundedNativeDownloadPlan(s.limits, source.Expectation.Type(), source.Expectation.Registration.NativeLimit)
+internal/adapters/postgres/context_download_plan.go:82:		if !allocation.Valid() || !allocation.Covers(scope) || rows[0].ReservedSessions >= allocation.SessionLimit || limits.OutputLimit > allocation.OutputLimit-rows[0].ReservedOutput || limits.ReadLimit > allocation.ReadLimit-rows[0].ReservedRead {
+internal/adapters/postgres/context_download_plan.go:117:		if !contextPlanBacking(limits, source.Expectation.Type(), allocation, control, native, stop, pool, s.installation, now.Time) {
+internal/adapters/postgres/context_download_plan.go:123:		out = evidence.ContextDownloadPlan{HardUntil: hard, Allocation: allocation, OutputLimit: limits.OutputLimit, ReadLimit: limits.ReadLimit, RequestLimit: limits.RequestLimit, Duration: limits.Duration, ObservedAt: start.Time, ValidUntil: downloadObservationDeadline(call, start.Time, original, until, current.FreshUntil, hard)}
+internal/adapters/postgres/context_download_plan.go:134:func contextPlanBacking(l ContextDownloadPlanLimits, typ artifact.NativeType, a artifact.DownloadAllocation, c custodydb.DownloadControlAllocation, n custodydb.DownloadNativeBacking, b custodydb.DownloadStopBacking, p custodydb.DownloadStopPool, installation string, now time.Time) bool {
+internal/adapters/postgres/context_download_plan.go:138:	windows := max(int64(1), (min(l.OutputLimit, artifact.MaxGoTraceBytes)+artifact.DownloadWindowBytes-1)/artifact.DownloadWindowBytes)
+internal/adapters/postgres/context_download_plan.go:139:	transitions := max(int64(8), firstContextObserveTransitions+firstContextObserveTransitions+windows*firstContextContentTransitions+firstContextRetirementTransitions)
+internal/adapters/postgres/context_download_plan.go:151:	if uid(c.ID) != a.ID || uid(c.RootID) != a.RootID || uid(n.AllocationID) != a.ID || uid(n.RootID) != a.RootID || native.AllocationID != a.ID || native.RootID != a.RootID || native.Rows != n.RowsLimit || native.Keys != n.KeysLimit || native.TransitionsPerRow != n.TransitionsPerRow || native.BackupHorizonSeconds != n.BackupHorizonSeconds || native.CleanupSeconds != n.CleanupSeconds || !native.ValidUntil.Equal(n.ValidUntil.Time) || !native.RetireBy.Equal(n.RetireBy.Time) || n.Overdue || native.TransitionsPerRow < transitions {
+internal/adapters/postgres/context_download_plan.go:159:	if l.OutputLimit > a.OutputLimit || l.ReadLimit > a.ReadLimit || c.ReservedResponses >= c.ResponseLimit || c.WindowLimit-c.ReservedWindows < windows || c.AuditByteLimit-c.ReservedAuditBytes < 2*windows*artifact.DownloadWindowAuditBytes || n.ChargedRows >= n.RowsLimit || n.KeysLimit-n.ChargedKeys < windows || b.Charged >= b.Slots || b.Slots > p.Slots || p.Allocated > p.Slots || p.RetainedSeconds < 60 || p.RetainedSeconds > 316224000 || p.BackupHorizonSeconds != stop.BackupHorizonSeconds || p.RetainedSeconds <= 2*stop.BackupHorizonSeconds+3*stop.CleanupBudgetSeconds+stop.ProofWindowSeconds+30 {
+internal/adapters/postgres/context_download_plan.go:163:	if p.Slots < 1 || p.CipherBytes/p.Slots < cipher || p.KeyAttempts/p.Slots < keys || p.BackupBytes/p.Slots < backup || p.WalBytes/p.Slots < wal {
+internal/adapters/postgres/context_download_plan.go:178:func boundedNativeDownloadPlan(l ContextDownloadPlanLimits, t artifact.NativeType, nativeLimit int64) (ContextDownloadPlanLimits, error) {
+internal/adapters/postgres/context_download_plan.go:179:	if !l.valid() || nativeLimit < 1 || nativeLimit > t.MaxBytes {
+internal/adapters/postgres/context_download_plan.go:182:	if t.DownloadLimit() <= artifact.FrameBytes {
+internal/adapters/postgres/context_download_plan.go:183:		l.OutputLimit = min(l.OutputLimit, int64(16<<20))
+internal/adapters/postgres/context_download_plan.go:184:		l.ReadLimit = min(l.ReadLimit, int64(24<<20))
+internal/adapters/postgres/context_download_plan.go:187:	windows := (nativeLimit-1)/artifact.DownloadWindowBytes + 1
+internal/adapters/postgres/context_download_plan.go:188:	output := 2 * nativeLimit
+internal/adapters/postgres/context_download_plan.go:190:	if l.OutputLimit < output || l.ReadLimit < reads {
+internal/adapters/postgres/context_download_plan.go:193:	l.OutputLimit, l.ReadLimit = max(artifact.MaxContextBytes, output), reads
+internal/adapters/postgres/context_key_unwraps.go:61:	if s == nil || ctx == nil || ctx.Err() != nil || r.Scope != s.scope || r.Operation != "unwrap" || !authorization.UUID(r.AuthorityID) || r.RequestDigest == (artifact.Digest{}) || len(r.Binding) < 1 || len(r.Binding) > 2048 || peer.Role != "verifier" || !peer.CanRequest(s.scope, "unwrap") {
+internal/adapters/postgres/context_key_unwraps.go:64:	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+internal/adapters/postgres/context_key_unwraps.go:81:		if err != nil || exec.Phase != "stored" || exec.Published || len(exec.ExpectationDigest) != 32 {
+internal/adapters/postgres/context_key_unwraps.go:126:		end := identity.Earlier(peer.NotAfter, identity.Earlier(start.Add(5*time.Second), proof.FreshUntil))
+internal/adapters/postgres/context_key_unwraps.go:127:		out = authorization.KeyOperationPermit{AuthorityID: r.AuthorityID, RecoveryEpoch: s.epoch, Revision: uint64(max(proof.Revision.Generation, 1)), Certificate: peer.Certificate, RequestDigest: r.RequestDigest, ObservedAt: now.Time, ValidUntil: end}
+internal/adapters/postgres/context_key_unwraps.go:178:func (s *ContextPublicationQueue) PendingContextPublications(ctx context.Context, limit int) ([]PendingContextPublication, error) {
+internal/adapters/postgres/context_key_unwraps.go:179:	if s == nil || ctx == nil || ctx.Err() != nil || limit < 1 || limit > 64 {
+internal/adapters/postgres/context_key_unwraps.go:182:	rows, err := custodydb.New(s.ledger.pool).ListContextPublicationQueue(ctx, custodydb.ListContextPublicationQueueParams{RootID: id(s.root), Limit: int32(limit)})
+internal/adapters/postgres/context_key_wraps.go:62:	if s == nil || ctx == nil || ctx.Err() != nil || r.Scope != s.scope || r.Operation != "wrap" || !authorization.UUID(r.AuthorityID) || r.RequestDigest == (artifact.Digest{}) || len(r.Binding) < 1 || len(r.Binding) > 2048 || peer.Role != "collector" || !peer.CanRequest(s.scope, "wrap") {
+internal/adapters/postgres/context_key_wraps.go:65:	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+internal/adapters/postgres/context_key_wraps.go:87:		if exec.Phase != "prepared" || exec.ObjectUid.Valid || !now.Time.Before(exec.NotAfter.Time) || len(exec.ExpectationDigest) != 32 {
+internal/adapters/postgres/context_key_wraps.go:136:		end = identity.Earlier(end, identity.Earlier(start.Add(5*time.Second), proof.FreshUntil))
+internal/adapters/postgres/context_key_wraps.go:137:		out = authorization.KeyOperationPermit{AuthorityID: r.AuthorityID, RecoveryEpoch: s.epoch, Revision: uint64(max(proof.Revision.Generation, 1)), Certificate: peer.Certificate, RequestDigest: r.RequestDigest, ObservedAt: now.Time, ValidUntil: end}
+internal/adapters/postgres/context_native_control.go:36:	windows := max(int64(1), (min(outputRemaining, artifact.MaxGoTraceBytes)+artifact.DownloadWindowBytes-1)/artifact.DownloadWindowBytes)
+internal/adapters/postgres/context_native_control.go:41:	return plan.Valid() && plan.Selection.Length <= artifact.MaxGoTraceBytes && plan.Selection.Offset <= artifact.MaxGoTraceBytes-plan.Selection.Length && !c.uncertain && !c.nativeBusy && !c.responseBusy && c.remaining >= plan.Windows()*firstContextContentTransitions+firstContextRetirementTransitions
+internal/adapters/postgres/context_native_control.go:50:	if !r.Valid() || !r.Closed || r.Plan.Selection.Length > artifact.MaxGoTraceBytes || r.Plan.Selection.Offset > artifact.MaxGoTraceBytes-r.Plan.Selection.Length || count < 1 || count > 2 || r.WindowCount != count || r.CompletedWindows != count || r.ActiveWindowID != "" || r.EmittedBytes != r.Plan.Selection.Length || int64(len(windows)) != count {
+internal/adapters/postgres/context_native_control.go:82:	if json.Unmarshal(backing.PolicyJson, &policy) != nil || !policy.Valid() || policy.AllocationID != s.AllocationID || policy.RootID != s.Scope.RootID || policy.Rows != backing.RowsLimit || policy.Keys != backing.KeysLimit || policy.TransitionsPerRow != backing.TransitionsPerRow || policy.BackupHorizonSeconds != backing.BackupHorizonSeconds || policy.CleanupSeconds != backing.CleanupSeconds || !policy.ValidUntil.Equal(backing.ValidUntil.Time) || !policy.RetireBy.Equal(backing.RetireBy.Time) || backing.Overdue || !time.Now().Before(policy.ValidUntil) {
+internal/adapters/postgres/context_preview.go:49:	if len(row.BlueprintJson)+len(row.ReasonEnvelope) > value.MaxContextPreviewBytes || len(row.BlueprintJson) == 0 || len(row.BlueprintJson) > value.MaxContextPreviewBytes || len(row.BlueprintSha256) != sha256.Size {
+internal/adapters/postgres/context_preview.go:124:		if _, err = q.DeleteExpiredContextPreviews(ctx, id(s.root)); err != nil {
+internal/adapters/postgres/context_preview.go:127:		if _, err := q.DeleteExpiredContextPreviewFences(ctx, id(s.root)); err != nil {
+internal/adapters/postgres/context_preview.go:130:		if _, err := q.DeleteExpiredRecordingSelections(ctx, id(s.root)); err != nil {
+internal/adapters/postgres/context_preview.go:137:		if count >= value.MaxPreviewsPerRoot {
+internal/adapters/postgres/context_preview.go:144:		if count >= value.MaxPreviewsPerPrincipal {
+internal/adapters/postgres/context_preview.go:193:			return value.ErrPreviewExpired
+internal/adapters/postgres/context_preview.go:216:func (s *ContextPreviewCleanup) DeleteExpiredContextPreviews(ctx context.Context) (int64, error) {
+internal/adapters/postgres/context_preview.go:226:		count, err = q.DeleteExpiredContextPreviews(ctx, id(s.previews.root))
+internal/adapters/postgres/context_preview.go:230:		n, err := q.DeleteExpiredContextPreviewFences(ctx, id(s.previews.root))
+internal/adapters/postgres/context_progress.go:58:	if c.ProgressRevision < 1 || c.ProgressRevision > value.MaxProgressRevision || !bytes.Equal(f.RequestDigest, digest(normalized(accepted.Expectation.Registration))) {
+internal/adapters/postgres/context_progress.go:67:		out.ReasonMetadata = &value.CaptureReasonMetadata{RootID: intent.RootID, CaptureID: parent, AuditCaptureID: intent.CaptureID, Reference: value.ProtectedReasonRef{ID: intent.ReasonRef.ID, CiphertextDigest: intent.ReasonRef.CiphertextDigest, ExpiresAt: intent.ReasonRef.ExpiresAt}, Requester: intent.Requester(), ScopeDigest: intent.ScopeDigest}
+internal/adapters/postgres/context_progress.go:86:		if accepted.Expectation.Profile != nil && len(c.SnapshotCancelProof) > 0 {
+internal/adapters/postgres/context_progress.go:118:	if len(executions) > 0 {
+internal/adapters/postgres/context_progress.go:186:		if !audited || len(f.CopiesDigest) != 32 {
+internal/adapters/postgres/context_progress.go:272:func (s *ContextDeadlines) ObserveOverdueContextCaptures(ctx context.Context, limit int) (int64, error) {
+internal/adapters/postgres/context_progress.go:276:	if limit < 1 || limit > 16 {
+internal/adapters/postgres/context_progress.go:286:		count, err = q.ObserveOverdueContextCaptures(ctx, custodydb.ObserveOverdueContextCapturesParams{RootID: id(s.root), PageLimit: int32(limit)})
+internal/adapters/postgres/context_progress.go:340:		if c.RepeatedFromCaptureID.Valid && n.Time.Before(c.RepeatedFromExpiresAt.Time) {
+internal/adapters/postgres/context_progress.go:347:				out.RepeatedFrom = &value.HistoryLineage{CaptureID: uid(c.RepeatedFromCaptureID), ExpiresAt: c.RepeatedFromExpiresAt.Time}
+internal/adapters/postgres/context_progress.go:352:			if f.HistoryParametersState.String == "available" && f.HistoryCustodyState.String == artifact.StoredUnpublished && f.HistoryVisible.Bool && n.Time.Before(f.HistorySummaryExpires.Time) && n.Time.Before(f.HistorySettingsExpires.Time) {
+internal/adapters/postgres/context_progress.go:357:		out.ValidUntil = identity.Earlier(observedAt.Add(5*time.Second), identity.Earlier(eligible.ValidUntil, request.Recovery.FreshUntil))
+internal/adapters/postgres/context_projection_cleanup.go:26:func (s *ProjectionWorkers) ExpiredProjectionWorkers(ctx context.Context) ([]evidence.ProjectionCleanupCandidate, error) {
+internal/adapters/postgres/context_projection_cleanup.go:30:	call, stop := context.WithTimeout(ctx, 5*time.Second)
+internal/adapters/postgres/context_projection_cleanup.go:32:	rows, err := custodydb.New(s.queries.ledger.pool).ExpiredQueryAcquisitionWorkers(call, custodydb.ExpiredQueryAcquisitionWorkersParams{RootID: id(s.queries.root), InstallationID: id(s.profile.InstallationID)})
+internal/adapters/postgres/context_projection_cleanup.go:33:	if err != nil || len(rows) > 16 {
+internal/adapters/postgres/context_projection_cleanup.go:44:			if queryDecode(row.TerminationJson, 32768, &c.Termination) != nil || !c.Termination.Valid(c.Termination.ObservedAt) || c.Termination.Worker != state.Worker {
+internal/adapters/postgres/context_projection_cleanup.go:99:			if queryDecode(row.TerminationJson, 32768, &out) != nil || !out.Valid(out.ObservedAt) || out.Worker != p.Worker {
+internal/adapters/postgres/context_projection_comparison_keys.go:38:		if e != nil || len(raw) > comparisonKeyChildBytes {
+internal/adapters/postgres/context_projection_comparison_keys.go:110:		out = value.KeyOperationPermit{AuthorityID: child.ID, RecoveryEpoch: actual.Environment.Recovery.IssuerEpoch, Revision: uint64(b.Generation), Certificate: peer.Certificate, RequestDigest: r.RequestDigest, ObservedAt: now.Time, ValidUntil: identity.Earlier(now.Time.Add(5*time.Second), identity.Earlier(child.Until, peer.NotAfter))}
+internal/adapters/postgres/context_projection_enrollment.go:174:		if len(rows) > 2 {
+internal/adapters/postgres/context_projection_enrollment.go:177:		if len(rows) > 0 {
+internal/adapters/postgres/context_projection_enrollment.go:202:		end := identity.Earlier(p.FreshUntil, identity.Earlier(checked.freshUntil, identity.Earlier(now.Add(5*time.Second), until)))
+internal/adapters/postgres/context_projection_enrollment.go:205:			return artifact.ErrDownloadExpired
+internal/adapters/postgres/context_projection_enrollment.go:208:		if e != nil || len(b) > 65536 {
+internal/adapters/postgres/context_projection_enrollment.go:220:			return artifact.ErrDownloadExpired
+internal/adapters/postgres/context_projection_enrollment.go:234:	if e != nil || len(b) > 48<<10 {
+internal/adapters/postgres/context_projection_enrollment.go:239:			return artifact.ErrDownloadExpired
+internal/adapters/postgres/context_projection_enrollment.go:242:			return artifact.ErrDownloadExpired
+internal/adapters/postgres/context_projection_enrollment.go:270:			return artifact.ErrDownloadExpired
+internal/adapters/postgres/context_projection_enrollment.go:282:			return artifact.ErrDownloadExpired
+internal/adapters/postgres/context_projection_enrollment.go:303:			return artifact.ErrDownloadExpired
+internal/adapters/postgres/context_projection_enrollment.go:320:			return artifact.ErrDownloadExpired
+internal/adapters/postgres/context_projection_enrollment.go:336:	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+internal/adapters/postgres/context_projection_evidence.go:33:	call, stop := context.WithTimeout(ctx, 5*time.Second)
+internal/adapters/postgres/context_projection_evidence.go:52:		if e.Registration.Location.ArtifactID != artifactID || !known || !src.Matches(e.NativeType, e.Type().Format, e.DataClass, e.Type().EvidenceType, e.Registration.NativeLimit, src.ProjectionDigest) {
+internal/adapters/postgres/context_projection_evidence.go:72:		until := identity.Earlier(started.Time.Add(identity.EvidenceReadRequestWindow), retained.Effective.ExpiresAt)
+internal/adapters/postgres/context_projection_evidence.go:77:			return privacy.ErrExpired
+internal/adapters/postgres/context_projection_identity.go:58:	if e != nil || len(rows) > 2 {
+internal/adapters/postgres/context_projection_identity.go:132:			if queryDecode(old.Binding, 16384, &prior) != nil || queryDecode(old.Proof, 65536, &priorProof) != nil || prior != out || priorProof != stored {
+internal/adapters/postgres/context_projection_keys.go:34:const syscallProjectionKeyBindingBytes = 48 << 10
+internal/adapters/postgres/context_projection_keys.go:46:	return 16 << 10
+internal/adapters/postgres/context_projection_keys.go:82:		if e != nil || len(raw) > projectionKeyBindingBytes(binding) {
+internal/adapters/postgres/context_projection_keys.go:102:	if s == nil || ctx == nil || ctx.Err() != nil || r.Scope != s.scope || r.Operation != "unwrap" || r.Version != 0 || !value.UUID(r.AuthorityID) || r.RequestDigest == (artifact.Digest{}) || len(r.Binding) < 1 || len(r.Binding) > 2048 || peer.Role != "acquisition" || !peer.CanRequest(s.scope, "unwrap") || !strings.HasPrefix(r.Reference, "asservat-local-keyset/v1/"+s.scope.InstallationID+"/artifact/"+s.scope.KeyID+"/") {
+internal/adapters/postgres/context_projection_keys.go:105:	call, stop := context.WithTimeout(ctx, 5*time.Second)
+internal/adapters/postgres/context_projection_keys.go:115:	if queryDecode(row.Binding, syscallProjectionKeyBindingBytes, &binding) != nil || len(row.Binding) > projectionKeyBindingBytes(binding) || binding.Scope != s.scope || binding.ClaimID != r.AuthorityID || binding.Authority.Scope.RootID != s.queries.root || binding.Worker.Peer != peer {
+internal/adapters/postgres/context_projection_keys.go:161:		out = value.KeyOperationPermit{AuthorityID: r.AuthorityID, RecoveryEpoch: a.Environment.Recovery.IssuerEpoch, Revision: uint64(binding.Batch.Generation), Certificate: peer.Certificate, RequestDigest: r.RequestDigest, ObservedAt: now.Time, ValidUntil: identity.Earlier(now.Time.Add(5*time.Second), identity.Earlier(binding.Until, peer.NotAfter))}
+internal/adapters/postgres/context_projection_native.go:55:	if len(leaf) < 1 || len(leaf) > 16<<10 {
+internal/adapters/postgres/context_projection_native.go:87:	if e != nil || queryDecode(row.NativeOperation, 16384, &o) != nil || queryDecode(row.NativeAuthority, comparisonAuthorityBytes, &a) != nil || len(row.NativeAuthority) > projectionAuthorityBytes(a) || a.Scope != q.Scope || a.Grant != q.Grant || !projectionNativeBaselineMatches(o, a) || !o.Valid() || o.Kind != value.NativeProjection || o.Reference.Parent() != (value.AcquisitionParent{Purpose: value.AcquisitionProjection, ID: q.ID}) || o.Reference.InstallationID != q.Plan.InstallationID || o.Reference.WorkerID != q.WorkerID || o.Reference.OperationID != b.ID || o.Reference.Fence != b.Generation || o.ParentID != b.ID || o.Generation != b.Generation || o.SourceVersion != q.Scope.Version || o.Path != a.Environment.Path.AcquisitionPath() || !o.Processing.Equal(a.Environment.Processing) || o.Until.After(b.Until) || o.Until.After(a.ValidUntil) || o.HubProcessEpoch != b.Request.HubProcessEpoch {
+internal/adapters/postgres/context_projection_native.go:222:		if e != nil || len(encoded) > 16384 {
+internal/adapters/postgres/context_projection_native.go:226:		if e != nil || len(authority) > projectionAuthorityBytes(a) {
+internal/adapters/postgres/context_projection_worker.go:44:		if e != nil || queryDecode(call.Request, 8192, &original) != nil || !sameAuditJSON(original, r) {
+internal/adapters/postgres/context_projection_worker.go:61:	if queryDecode(row.IntentJson, comparisonQueryBytes, &out.Intent) != nil || !out.Intent.Valid() || len(row.IntentJson) > projectionQueryBytes(q) || !out.Intent.Query.Equal(q) ||
+internal/adapters/postgres/context_projection_worker.go:69:		if queryDecode(row.AuditReceiptJson, 8192, &out.Receipt) != nil || !out.Receipt.ValidProjectionWorker(out.Intent) {
+internal/adapters/postgres/context_projection_worker.go:75:		if !out.Claimed || queryDecode(row.JobJson, 8192, &out.Job) != nil || !out.Job.ValidAcquisition(out.Intent.Worker) {
+internal/adapters/postgres/context_projection_worker.go:81:		if queryDecode(row.BindingJson, 16384, &out.Worker.Binding) != nil || !out.Worker.Valid() {
+internal/adapters/postgres/context_projection_worker.go:112:		if e != nil || len(raw) > projectionQueryBytes(q) {
+internal/adapters/postgres/context_projection_worker.go:130:	return c.Total < 16 && c.Workload < 2 && c.Principal < 2
+internal/adapters/postgres/context_projection_worker.go:191:			if out.Until.Sub(now.Time) < time.Second {
+internal/adapters/postgres/context_publication.go:47:	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+internal/adapters/postgres/context_publication.go:154:		err = current(ctx, q, pool, allocation, e.Registration, attempt.EffectiveExpiresAt.Time)
+internal/adapters/postgres/context_publication.go:166:	r := audit.ContextVerification{RootID: uid(c.RootID), CaptureID: uid(c.ID), ArtifactID: e.Registration.Location.ArtifactID, AttemptID: e.Registration.Location.AttemptID, PermissionEpoch: uid(v.PermissionEpoch), PermissionSequence: v.PermissionSequence, ScopeDigest: e.PlanDigest, VerifiedAt: v.VerifiedAt.Time, WriteUntil: e.Registration.WriteUntil, ExpiresAt: e.Registration.ExpiresAt, DeleteBy: e.Registration.DeleteBy}
+internal/adapters/postgres/context_publication.go:172:		if v.NativeBytes.Int64 < 0 || v.NativeBytes.Int64 > e.Registration.NativeLimit {
+internal/adapters/postgres/context_publication.go:182:		if len(pair.src) != 32 {
+internal/adapters/postgres/context_publication.go:195:	} else if len(executions) > 0 {
+internal/adapters/postgres/context_publication.go:206:	if e.Validate() != nil || c.Validate(e.Registration) != nil || a.RootID != s.root || nativeBytes < 0 || nativeBytes > e.Registration.NativeLimit || verified.Acquisition != nil && !acquisitionMatchesExpectation(e, verified.Acquisition) {
+internal/adapters/postgres/context_publication.go:271:		if err = current(ctx, q, pool, allocation, e.Registration, attempt.EffectiveExpiresAt.Time); err != nil {
+internal/adapters/postgres/context_publication.go:365:		if err = current(ctx, q, pool, allocation, e.Registration, attempt.EffectiveExpiresAt.Time); err != nil {
+internal/adapters/postgres/context_publication.go:380:	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+internal/adapters/postgres/context_publication.go:392:	out = authorization.Retained{ArtifactID: artifactID, Target: authorization.Target{ClusterID: e.Registration.Location.ClusterID, NamespaceUID: e.NamespaceUID, WorkloadUID: e.WorkloadUID, PodUID: e.PodUID}, DataClass: e.DataClass, ExpiresAt: row.EffectiveExpiresAt.Time, Audience: e.Audience}
+internal/adapters/postgres/context_publication.go:435:		until := identity.Earlier(started.Time.Add(5*time.Second), retained.Effective.ExpiresAt)
+internal/adapters/postgres/context_publication.go:436:		if !identity.Fresh(started.Time, until, now.Time, 5*time.Second) {
+internal/adapters/postgres/context_publication.go:437:			return privacy.ErrExpired
+internal/adapters/postgres/context_query_audit.go:19:	if queryDecode(a.Intent, 8192, &in) != nil || !in.Valid() || in.Lifecycle == nil || !in.Lifecycle.Policy.CertificateVerificationBacked() ||
+internal/adapters/postgres/context_query_audit.go:30:	if queryDecode(l.Binding, 4096, &binding) != nil || !sameAuditJSON(binding, *in.Lifecycle) || queryDecode(l.IntentCompletion, 8192, &completion) != nil ||
+internal/adapters/postgres/context_query_audit.go:72:	if queryDecode(row.OperationAuditLifecycle.OutcomeCompletion, 8192, &completion) != nil || !completion.Valid(in.RootID, in.ID, in.Lifecycle.Policy.StoreID, "outcome", in.CreatedAt, in.WriteUntil) || completion.RecordDigest != auditapp.OperationLifecycleDigest(*snapshot.Outcome) || completion.Receipt != *snapshot.OutcomeReceipt {
+internal/adapters/postgres/context_query_batch.go:33:	if e != nil || queryDecode(row.Binding, 16384, &stored) != nil || stored != w || !stored.Matches(q) || len(row.Proof) == 0 || uid(row.WorkerID) != q.WorkerID {
+internal/adapters/postgres/context_query_batch.go:42:	if queryDecode(row.Batch, 32<<10, &b) != nil || (q.Scope.Comparison == (value.ProfileComparisonWindow{}) && len(row.Batch) > 16384) || !b.Matches(q) || b.ID != uid(row.ID) || b.QueryID != uid(row.QueryID) || b.OperationID != uid(row.OperationID) || b.Generation != int64(row.Generation) {
+internal/adapters/postgres/context_query_batch.go:81:			if e != nil || (!call.IsPoll && r.Call.ID != q.OperationID) || queryDecode(call.Request, 8192, &request) != nil || !sameAuditJSON(request, r) {
+internal/adapters/postgres/context_query_batch.go:198:	ctx, stop := context.WithDeadline(ctx, identity.Earlier(time.Now().Add(5*time.Second), originalUntil))
+internal/adapters/postgres/context_query_batch.go:204:	ctx, cancel := context.WithDeadline(ctx, identity.Earlier(time.Now().Add(5*time.Second), q.CleanupUntil))
+internal/adapters/postgres/context_query_capacity.go:45:		p.Worker.CPUMilli == s.profile.CPUMillis && p.Worker.MemoryBytes == s.profile.MemoryBytes && p.Worker.EphemeralStorageBytes == 4<<20 && p.Worker.Runtime <= s.profile.MaxRuntime
+internal/adapters/postgres/context_query_capacity.go:53:	until := identity.Earlier(time.Now().Add(5*time.Second), a.ValidUntil)
+internal/adapters/postgres/context_query_capacity.go:73:		return queryDecode(raw, 65536, &out)
+internal/adapters/postgres/context_query_capacity.go:98:	until := identity.Earlier(time.Now().Add(5*time.Second), identity.Earlier(a.ValidUntil, a.Baseline.ValidUntil))
+internal/adapters/postgres/context_query_capacity.go:145:		if err != nil || queryDecode(raw, 65536, &out[i]) != nil || ctx.Err() != nil ||
+internal/adapters/postgres/context_query_comparison.go:11:const comparisonQueryBytes = 96 << 10
+internal/adapters/postgres/context_query_comparison.go:12:const comparisonAuthorityBytes = 128 << 10
+internal/adapters/postgres/context_query_comparison.go:18:	return 64 << 10
+internal/adapters/postgres/context_query_comparison.go:24:	return 64 << 10
+internal/adapters/postgres/context_query.go:66:func queryDecode(raw []byte, limit int, out any) error {
+internal/adapters/postgres/context_query.go:67:	if len(raw) == 0 || len(raw) > limit {
+internal/adapters/postgres/context_query.go:82:	if queryDecode(r.Query, comparisonQueryBytes, &q) != nil || len(r.Query) > projectionQueryBytes(q) || !q.Valid() || q.ID != uid(r.ID) || q.Scope.RootID != uid(r.RootID) || q.OperationID != uid(r.OperationID) || q.WorkerID != uid(r.WorkerID) || q.Plan.AllocationID != uid(r.AllocationID) || q.Plan.AccountID != uid(r.AccountID) || q.BaselinePlan.AllocationID != uid(r.BaselineAllocationID) || q.RecoveryIssuerEpoch != uid(r.IssuerEpoch) || !q.CreatedAt.Equal(r.CreatedAt.Time) || !q.Deadline.Equal(r.Deadline.Time) || !q.CleanupUntil.Equal(r.CleanupUntil.Time) || !q.Plan.RetireBy.Equal(r.RetireBy.Time) || !bytes.Equal(principalKey(q.Scope.Principal), r.PrincipalKey) {
+internal/adapters/postgres/context_query.go:93:	if queryDecode(r.Actor, 4096, &actor) != nil || actor != q.Scope.Principal {
+internal/adapters/postgres/context_query.go:206:	if queryDecode(b.Profile, 32768, &profile) != nil || profile != q.Plan.Profile.SharedBudget() || queryDecode(b.Qualification, 32768, &qualification) != nil || qualification != profile.Qualification ||
+internal/adapters/postgres/context_query.go:207:		!b.HardUntil.Time.Equal(q.Plan.HardUntil) || !b.EffectsUntil.Time.Equal(q.Plan.EffectsUntil) || !b.CleanupUntil.Time.Equal(q.Plan.CleanupUntil) || !b.RetireBy.Time.Equal(q.Plan.RetireBy) || queryDecode(allocation.PoolSource, 4096, &pool) != nil || queryDecode(allocation.PolicySource, 4096, &policy) != nil || pool != q.Plan.PoolSource || policy != q.Plan.PolicySource || allocation.Revision != q.Plan.AllocationRevision || uid(allocation.ClusterID) != q.Scope.ClusterID || allocation.NamespaceUid != q.Scope.NamespaceUID || allocation.WorkloadUid != q.Scope.WorkloadUID {
+internal/adapters/postgres/context_query.go:233:	if e != nil || original.CaseID != q.Scope.CaseID || original.CaptureUID != q.Scope.CaptureID || original.NamespaceUID != q.Scope.NamespaceUID || original.WorkloadUID != q.Scope.WorkloadUID || original.PodUID != q.Scope.PodUID || original.Registration.Location != a.Environment.Location || original.Registration.StoreID != a.Environment.StoreID || !scopeSource(q.Scope, original) || !bytes.Equal(published.ContextVerification.CopiesDigest, q.Scope.Version[:]) || a.AccessUntil.After(published.EffectiveExpiresAt.Time) || a.DeleteBy.After(published.EffectiveDeleteBy.Time) {
+internal/adapters/postgres/context_query.go:262:	if e != nil || ctx.Err() != nil || !q.Current(a, now.Time) || !r.Valid(now.Time) || !now.Time.Before(published.EffectiveExpiresAt.Time) || !now.Time.Before(topology.FreshUntil) || !now.Time.Before(p.FreshUntil.Time) || !now.Time.Before(p.LeaseUntil.Time) {
+internal/adapters/postgres/context_query.go:352:		if queryDecode(row.Request, 8192, &old) != nil || !sameAuditJSON(old, r) || row.IsPoll != poll {
+internal/adapters/postgres/context_query.go:370:	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+internal/adapters/postgres/context_query.go:419:		if e != nil || row.Uncertain || queryDecode(row.InitialRequest, 8192, &original) != nil || r.Call.InputFormat != original.Call.InputFormat || r.Call.MACVersion != original.Call.MACVersion || r.Call.InputDigest != original.Call.InputDigest {
+internal/adapters/postgres/context_query.go:444:		if e != nil || queryDecode(call.Request, 8192, &old) != nil || !sameAuditJSON(old, r) {
+internal/adapters/postgres/context_query.go:477:	return ok && src.Matches(e.NativeType, e.Type().Format, e.DataClass, src.EvidenceType, e.Registration.NativeLimit, src.ProjectionDigest)
+internal/adapters/postgres/context_query.go:489:	if s == nil || ctx == nil || ctx.Err() != nil || !p.Valid() || !identity.Text(key, 128) || digest == (artifact.Digest{}) {
+internal/adapters/postgres/context_query.go:492:	call, stop := context.WithTimeout(ctx, 5*time.Second)
+internal/adapters/postgres/context_query_processing.go:23:	until := identity.Earlier(r.ValidUntil, identity.Earlier(recovery.FreshUntil, r.Retained.Effective.ExpiresAt))
+internal/adapters/postgres/context_query_processing.go:74:	return ok && src.Matches(r.NativeType, r.SourceFormat, r.DataClass, r.Retained.Input.EvidenceType, r.Retained.Registration.NativeLimit, r.SourceProjectionDigest)
+internal/adapters/postgres/context_resolution.go:119:	if len(rows) > 1 {
+internal/adapters/postgres/context_resolution.go:321:	if _, err = q.DeleteExpiredContextPreviews(ctx, id(in.RootID)); err != nil {
+internal/adapters/postgres/context_resolution.go:324:	if _, err = q.DeleteExpiredContextPreviewFences(ctx, id(in.RootID)); err != nil {
+internal/adapters/postgres/context_resolution.go:331:	if count >= value.MaxPreviewsPerRoot {
+internal/adapters/postgres/context_resolution.go:338:	if count >= value.MaxPreviewsPerPrincipal {
+internal/adapters/postgres/context_resolution.go:350:	return in.RootID == root && authorization.UUID(root) && authorization.UUID(in.PreviewID) && identity.Text(in.IdempotencyKey, 128) && in.SubmissionDigest == app.ContextRequestDigest(in.PreviewID) && in.Identity.Valid(in.Identity.VerifiedAt) && in.Recovery.Valid(in.Recovery.ObservedAt)
+internal/adapters/postgres/context_reviewed.go:23:	return app.ValidContextPreview(p) && p.RootID == a.RootID && p.InstallationID == a.Recovery.InstallationID && p.IssuerEpoch == a.Recovery.IssuerEpoch && p.Actor == a.Requester() && p.Executor() == in.Executor && p.ExecutionClass == in.Target.ExecutionClass && p.CaptureID == in.CaptureID && p.CaseID == a.CaseID && p.OccurrenceID == a.OccurrenceID && p.ArtifactID == r.Location.ArtifactID && p.AttemptID == r.Location.AttemptID && p.Target == in.Target.Request && p.Pin == in.Target.Pin && p.ScopeDigest == a.Plan.ScopeDigest && bytes.Equal(p.CanonicalScope, a.Plan.CanonicalScope) && (p.Deadline.Equal(in.Deadline) || approvedContextPlan(a) || a.RecordingSave != nil) && (in.Recorder == nil && in.Profile == nil && in.Logs == nil && in.Snapshot == nil && p.Intent.Snapshot == nil && p.Intent.Composition == nil && p.AssessmentRulesDigest == planning.ContextAssessmentRulesDigestForClass(p.ExecutionClass) || (in.Recorder != nil || in.Profile != nil || in.Logs != nil) && p.Intent.Composition != nil && reviewedRecorderAssessment(p) || in.Snapshot != nil && p.Intent.Snapshot != nil && p.AssessmentRulesDigest == planning.SourceSnapshotAssessmentRulesDigest()) && p.Storage == (value.ContextStorageSelection{StoreID: r.StoreID, AllocationID: r.AllocationID, PoolRevision: r.PoolRevision, AllocationRevision: r.AllocationRevision, BindingRevision: a.Storage.Revision}) && p.Retention.PurposeRef == in.Retention.PurposeRef && p.Retention.RequestedSeconds == in.Retention.RequestedSeconds && p.Retention.MaximumSeconds == in.Retention.MaximumSeconds && p.Retention.DeletionBudgetSeconds == in.Retention.DeletionBudgetSeconds && slices.Equal(p.Retention.Policies, in.Retention.Policies) && slices.Equal(p.Audience, a.Eligibility.DefaultAudience)
+internal/adapters/postgres/context_reviewed.go:80:	if !until.Valid || !now.Time.Before(until.Time) || !now.Time.Before(deadline) || deadline.After(until.Time) || deadline.After(now.Time.Add(5*time.Minute)) || a.Plan.CompiledAt.Before(p.CreatedAt) {
+internal/adapters/postgres/context_reviewed.go:104:	if !until.Valid || !now.Time.Before(until.Time) || !now.Time.Before(deadline) || deadline.After(until.Time) || deadline.After(now.Time.Add(5*time.Minute)) || a.Plan.CompiledAt.Before(parent.CreatedAt) {
+internal/adapters/postgres/context_start_owners.go:22:	call, stop := context.WithDeadline(ctx, start.Add(5*time.Second))
+internal/adapters/postgres/context_start_owners.go:36:		if len(rows) > 16 {
+internal/adapters/postgres/context_storage_read.go:46:	if !authorization.UUID(root) || !target.Valid() || row.ServiceClass != "context" || len(row.SourceDigest) != 32 || !row.ObservedAt.Valid || !row.FreshUntil.Valid || !row.CapacityUntil.Valid || !row.PoolValidUntil.Valid || !row.AllocationValidUntil.Valid {
+internal/adapters/postgres/context_storage_read.go:70:		return app.ContextStorageObservation{Binding: b, Selection: selection}, contextStorageObservationFailure{predicate: "source-expired", cause: value.ErrStorageBindingExpired}
+internal/adapters/postgres/context_storage_read.go:75:	controlPool := custodydb.ContextControlPool{RootID: row.RootID, Configured: row.ControlPoolConfigured, Paused: row.ControlPoolPaused, Revision: row.ControlPoolRevision, ValidUntil: row.ControlPoolUntil, FullLimit: row.ControlPoolFull, ReplayLimit: row.ControlPoolReplay, BackedFull: row.BackedFull, BackedReplay: row.BackedReplay}
+internal/adapters/postgres/context_storage_read.go:76:	controlAccount := custodydb.ContextControlAccount{RootID: row.RootID, AllocationID: row.AllocationID, Configured: row.ControlAccountConfigured, Paused: row.ControlAccountPaused, Revision: row.ControlAccountRevision, ValidUntil: row.ControlAccountUntil, FullLimit: row.ControlAccountFull, ReplayLimit: row.ControlAccountReplay, ChargedFull: row.ChargedFull, ChargedReplay: row.ChargedReplay}
+internal/adapters/postgres/context_storage_read.go:120:			if errors.As(err, &sql) && (sql.Code == "40001" || sql.Code == "40P01") {
+internal/adapters/postgres/context_storage_read.go:144:		if errors.Is(err, value.ErrStorageBindingExpired) {
+internal/adapters/postgres/current_owner_configuration_audit.go:38:	live, end := context.WithTimeout(ctx, 5*time.Second)
+internal/adapters/postgres/current_owner_configuration_audit.go:74:			if e != nil || recovery.IssuerEpoch != c.Pool.IssuerEpoch || uid(h.SourceUid) != base.source || h.Generation != c.Revision.Generation || !identity.Fresh(h.ObservedAt.Time, h.FreshUntil.Time, n.Time, 5*time.Second) || bound.Err() != nil {
+internal/adapters/postgres/custody.go:65:const schemaStateQuery = `SELECT version_id,is_applied,pg_catalog.obj_description('public.goose_db_version'::regclass,'pg_class') FROM goose_db_version ORDER BY id DESC LIMIT 1`
+internal/adapters/postgres/custody.go:77:		n, e := strconv.ParseInt(strings.TrimPrefix(*comment, schemaFloorComment), 10, 64)
+internal/adapters/postgres/custody.go:98:	if c.MaxConns > 32 || t == nil || t.InsecureSkipVerify || t.ServerName == "" || t.MinVersion < tls.VersionTLS12 || len(c.ConnConfig.Fallbacks) != 0 || c.ConnConfig.Tracer != nil {
+internal/adapters/postgres/custody.go:101:	check, cancel := context.WithTimeout(ctx, 5*time.Second)
+internal/adapters/postgres/custody.go:126:	r.ExpiresAt = r.ExpiresAt.UTC()
+internal/adapters/postgres/custody.go:136:	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+internal/adapters/postgres/custody.go:154:		rollbackCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
+internal/adapters/postgres/custody.go:163:			authvalue.ErrGrantPoolExhausted, authvalue.ErrGrantScope, authvalue.ErrGrantRevoked, authvalue.ErrGrantExpired, authvalue.ErrGrantDenied, authvalue.ErrStepUpRequired} {
+internal/adapters/postgres/custody.go:174:			if (pe.Code == "40001" || pe.Code == "40P01") && attempt < 2 {
+internal/adapters/postgres/custody.go:175:				delay := time.Duration(10+time.Now().UnixNano()%20) * time.Millisecond
+internal/adapters/postgres/custody.go:183:			if pe.Code == "23505" {
+internal/adapters/postgres/custody.go:187:		for _, sentinel := range []error{sharing.ErrRetentionCapacity, fleetvalue.ErrCapacity, fleetvalue.ErrConflict, fleetvalue.ErrPending, fleetvalue.ErrLocalBootstrapConsumed, fleetvalue.ErrInvalid, fleetvalue.ErrDenied, fleetvalue.ErrUnavailable, capturevalue.ErrSettingsUnavailable, capturevalue.ErrSettingsTooLarge, capturevalue.ErrHistoryUnavailable, capturevalue.ErrStorageBindingExpired, capturevalue.ErrInvalid, capturevalue.ErrSharingDenied, capturevalue.ErrDenied, capturevalue.ErrChanged, capturevalue.ErrUnavailable, capturevalue.ErrCapacity, capturevalue.ErrProcessingCoverage, capturevalue.ErrConflict, artifact.ErrInvalid, artifact.ErrIntegrity, artifact.ErrLimit, artifact.ErrDownloadConflict, artifact.ErrDownloadUnavailable, artifact.ErrDownloadCapacity, artifact.ErrDownloadExpired, privacy.ErrConflict, privacy.ErrCapacity, privacy.ErrExpired, privacy.ErrFence, privacy.ErrNotDue, configuration.ErrInvalid, configuration.ErrChanged, configuration.ErrLimit, configuration.ErrDenied, configuration.ErrUnavailable, configuration.ErrRetentionHistoryBehind, configuration.ErrRetentionObservationObsolete, fleetvalue.ErrClusterCredentialDenied, fleetvalue.ErrClusterCredentialFenced} {
+internal/adapters/postgres/custody.go:272:	if p.Paused || a.Paused || !n.Time.Before(p.ValidUntil.Time) || !n.Time.Before(a.ValidUntil.Time) || n.Time.Before(r.AnchorAt) || !n.Time.Before(r.WriteUntil) || !n.Time.Before(r.ExpiresAt) || !n.Time.Before(effective) {
+internal/adapters/postgres/custody.go:273:		return privacy.ErrExpired
+internal/adapters/postgres/custody.go:279:	r := privacy.Record{State: row.State, Effective: privacyvalue.Deadlines{AnchorAt: row.AnchorAt.Time, ExpiresAt: row.EffectiveExpiresAt.Time, DeleteBy: row.EffectiveDeleteBy.Time}, Registration: artifact.Registration{Location: artifact.Location{ClusterID: uid(row.ClusterID), ArtifactID: uid(row.ArtifactID), AttemptID: uid(row.ID)}, StoreID: store, AllocationID: uid(row.AllocationID), PoolRevision: row.PoolRevision, AllocationRevision: row.AllocationRevision, NativeLimit: row.NativeLimit, AnchorAt: row.AnchorAt.Time, WriteUntil: row.WriteUntil.Time, ExpiresAt: row.ExpiresAt.Time, DeleteBy: row.DeleteBy.Time}}
+internal/adapters/postgres/custody.go:301:	if r.Validate() != nil || r.NativeLimit > artifact.FrameBytes {
+internal/adapters/postgres/custody.go:362:			return privacy.ErrExpired
+internal/adapters/postgres/custody.go:364:		return current(ctx, q, p, a, r, row.EffectiveExpiresAt.Time)
+internal/adapters/postgres/custody.go:385:		if err = current(ctx, q, p, a, r, row.EffectiveExpiresAt.Time); err != nil {
+internal/adapters/postgres/custody.go:395:			return privacy.ErrExpired
+internal/adapters/postgres/custody.go:409:		return current(ctx, q, p, a, r, row.EffectiveExpiresAt.Time)
+internal/adapters/postgres/custody.go:438:		if row.State == artifact.Deleted || n.Time.Before(row.EffectiveExpiresAt.Time) {
+internal/adapters/postgres/custody.go:448:		until := n.Time.Add(30 * time.Second)
+internal/adapters/postgres/custody.go:500:		if row.NativeLimit > artifact.FrameBytes {
+internal/adapters/postgres/custody.go:532:	if err = current(ctx, q, p, a, r, r.ExpiresAt); err != nil {
+internal/adapters/postgres/custody.go:553:	err = q.InsertAttempt(ctx, custodydb.InsertAttemptParams{ID: id(r.Location.AttemptID), ClusterID: id(r.Location.ClusterID), ArtifactID: id(r.Location.ArtifactID), AllocationID: a.ID, RequestDigest: digest(r), PoolRevision: r.PoolRevision, AllocationRevision: r.AllocationRevision, NativeLimit: r.NativeLimit, ReservedBytes: r.ReservedBytes(), AnchorAt: ts(r.AnchorAt), WriteUntil: ts(r.WriteUntil), ExpiresAt: ts(r.ExpiresAt), DeleteBy: ts(r.DeleteBy)})
+internal/adapters/postgres/custody.go:557:	for i, n := range r.Limits() {
+internal/adapters/postgres/custody.go:558:		if err = q.InsertCopy(ctx, custodydb.InsertCopyParams{AttemptID: id(r.Location.AttemptID), Role: int16(i), ByteLimit: n}); err != nil {
+internal/adapters/postgres/custody.go:563:	if err = current(ctx, q, p, a, r, r.ExpiresAt); err != nil {
+internal/adapters/postgres/custody.go:569:	return privacy.Record{Registration: r, Effective: privacyvalue.Deadlines{AnchorAt: r.AnchorAt, ExpiresAt: r.ExpiresAt, DeleteBy: r.DeleteBy}, State: artifact.Reserved}, nil
+internal/adapters/postgres/download_control.go:58:		if err != nil || len(row.CopiesDigest) != 32 {
+internal/adapters/postgres/download_control.go:212:		return artifact.DownloadObservation{}, artifact.ErrDownloadExpired
+internal/adapters/postgres/download_control.go:283:			return artifact.ErrDownloadExpired
+internal/adapters/postgres/download.go:46:	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+internal/adapters/postgres/download.go:59:	return artifact.DownloadAllocation{ID: uid(r.ID), RootID: uid(r.RootID), ClusterID: uid(r.ClusterID), NamespaceUID: r.NamespaceUid, WorkloadUID: r.WorkloadUid, OutputLimit: r.OutputLimit, ReadLimit: r.ReadLimit, SessionLimit: r.SessionLimit, ValidUntil: r.ValidUntil.Time.UTC()}
+internal/adapters/postgres/download.go:84:		if !n.Time.Before(a.ValidUntil) || a.ValidUntil.After(n.Time.Add(8*time.Hour)) {
+internal/adapters/postgres/download.go:87:		_, err = q.InsertDownloadAllocation(ctx, custodydb.InsertDownloadAllocationParams{ID: id(a.ID), RootID: id(a.RootID), ClusterID: id(a.ClusterID), NamespaceUid: a.NamespaceUID, WorkloadUid: a.WorkloadUID, OutputLimit: a.OutputLimit, ReadLimit: a.ReadLimit, SessionLimit: a.SessionLimit, ValidUntil: ts(a.ValidUntil)})
+internal/adapters/postgres/download.go:94:	if json.Unmarshal(r.ScopeJson, &scope) != nil || len(r.RequestDigest) != 32 || !scope.Valid() || scope.RootID != uid(r.RootID) || scope.ArtifactID != uid(r.ArtifactID) || !bytes.Equal(r.ActorKey, digest(scope.Principal)) || !bytes.Equal(r.PrincipalKey, principalKey(scope.Principal)) {
+internal/adapters/postgres/download.go:97:	s := artifact.DownloadSession{StopProtocol: r.StopProtocol.String, ID: uid(r.ID), AllocationID: uid(r.AllocationID), Scope: scope, RequestDigest: artifact.Digest(r.RequestDigest), State: artifact.DownloadState(r.State), CreatedAt: r.CreatedAt.Time, Deadline: r.Deadline.Time, OutputLimit: r.OutputLimit, ReadLimit: r.ReadLimit, RequestLimit: r.RequestLimit, ChargedOutput: r.ChargedOutput, ChargedRead: r.ChargedRead, Requests: r.Requests, EmittedBytes: r.EmittedBytes, Generation: r.Generation}
+internal/adapters/postgres/download.go:149:	if i.Batch.Authority.Scope != s.Scope || i.Batch.Generation != s.Generation || len(b.OutcomeJson) > 0 {
+internal/adapters/postgres/download.go:172:	if i.Batch.Authority.Scope != s.Scope || i.Batch.Generation != s.Generation || len(b.OutcomeJson) > 0 {
+internal/adapters/postgres/download.go:225:			return artifact.ErrDownloadExpired
+internal/adapters/postgres/download.go:268:	if err != nil || a.Environment.Location != e.Registration.Location || a.Environment.StoreID != e.Registration.StoreID || e.CaptureUID != a.Scope.CaptureID || e.Registration.Location.ArtifactID != a.Scope.ArtifactID || e.Registration.Location.ClusterID != a.Scope.ClusterID || e.NamespaceUID != a.Scope.NamespaceUID || e.WorkloadUID != a.Scope.WorkloadUID || e.PodUID != a.Scope.PodUID || !bytes.Equal(r.ContextVerification.CopiesDigest, a.Scope.Version[:]) || a.AccessUntil.After(r.EffectiveExpiresAt.Time) || a.DeleteBy.After(r.EffectiveDeleteBy.Time) {
+internal/adapters/postgres/download.go:275:	if !a.Valid(n.Time) || !n.Time.Before(r.EffectiveExpiresAt.Time) {
+internal/adapters/postgres/download.go:276:		return artifact.ErrDownloadExpired
+internal/adapters/postgres/download.go:286:		return out, artifact.ErrDownloadExpired
+internal/adapters/postgres/download.go:328:		budget := downloadAllocation(allocation)
+internal/adapters/postgres/download.go:329:		if !budget.Valid() || !budget.Covers(request.Scope) || request.Deadline.After(budget.ValidUntil) || request.Deadline.After(a.AccessUntil) {
+internal/adapters/postgres/download.go:332:		if request.OutputLimit > budget.OutputLimit-allocation.ReservedOutput || request.ReadLimit > budget.ReadLimit-allocation.ReservedRead || allocation.ReservedSessions >= budget.SessionLimit {
+internal/adapters/postgres/download.go:339:		if !now.Time.Before(request.Deadline) || request.Deadline.After(now.Time.Add(8*time.Hour)) {
+internal/adapters/postgres/download.go:340:			return artifact.ErrDownloadExpired
+internal/adapters/postgres/download.go:346:		row, err := q.InsertDownloadSession(ctx, custodydb.InsertDownloadSessionParams{ID: id(request.ID), RootID: id(s.root), AllocationID: id(request.AllocationID), ArtifactID: id(request.Scope.ArtifactID), PrincipalKey: principalKey(request.Scope.Principal), ActorKey: digest(request.Scope.Principal), IdempotencyDigest: r.IdempotencyDigest[:], RequestDigest: request.RequestDigest[:], ScopeJson: encoded, Deadline: ts(request.Deadline), OutputLimit: request.OutputLimit, ReadLimit: request.ReadLimit, RequestLimit: request.RequestLimit, StopProtocol: pgtype.Text{String: request.StopProtocol, Valid: request.StopProtocol != ""}})
+internal/adapters/postgres/download.go:350:		if _, err = q.ChargeDownloadAllocation(ctx, custodydb.ChargeDownloadAllocationParams{ID: allocation.ID, RootID: allocation.RootID, ReservedOutput: request.OutputLimit, ReservedRead: request.ReadLimit}); err != nil {
+internal/adapters/postgres/download.go:399:		return audit.DownloadIntent{}, artifact.ErrDownloadExpired
+internal/adapters/postgres/download.go:438:		if streams.Total >= 16 || streams.Principal >= 2 {
+internal/adapters/postgres/download.go:484:		return artifact.ErrDownloadExpired
+internal/adapters/postgres/download.go:546:		if len(b.OutcomeJson) > 0 {
+internal/adapters/postgres/download.go:591:		return artifact.ErrDownloadExpired
+internal/adapters/postgres/download.go:641:			return artifact.ErrDownloadExpired
+internal/adapters/postgres/download.go:739:					next = artifact.DownloadExpired
+internal/adapters/postgres/download_keys.go:49:		return artifact.ErrDownloadExpired
+internal/adapters/postgres/download_keys.go:101:	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+internal/adapters/postgres/download_keys.go:104:	if err != nil || len(encoded) > 65536 {
+internal/adapters/postgres/download_keys.go:108:	if err != nil || len(worker) > 16384 {
+internal/adapters/postgres/download_keys.go:154:	if s == nil || s.downloads == nil || ctx == nil || ctx.Err() != nil || r.Scope != s.scope || r.Operation != "unwrap" || r.Version != 0 || !authorization.UUID(r.AuthorityID) || r.RequestDigest == (artifact.Digest{}) || len(r.Binding) < 1 || len(r.Binding) > 2048 || peer.Role != "acquisition" || !peer.CanRequest(s.scope, "unwrap") || !strings.HasPrefix(r.Reference, "asservat-local-keyset/v1/"+s.scope.InstallationID+"/artifact/"+s.scope.KeyID+"/") {
+internal/adapters/postgres/download_keys.go:157:	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+internal/adapters/postgres/download_keys.go:230:	if len(b) == 0 || len(b) > 16384 || json.Unmarshal(b, &p) != nil || !p.Valid(now) || p.Peer != peer || p.Binding.DownloadID != session {
+internal/adapters/postgres/download_response_audit.go:66:		if len(old) > 0 {
+internal/adapters/postgres/download_response_audit.go:84:			return artifact.ErrDownloadExpired
+internal/adapters/postgres/download_response.go:21:	return artifact.DownloadControlAllocation{ID: uid(r.ID), RootID: uid(r.RootID), AuditStoreID: uid(r.AuditStoreID), ResponseLimit: r.ResponseLimit, WindowLimit: r.WindowLimit, AuditByteLimit: r.AuditByteLimit, ValidUntil: r.ValidUntil.Time, AuditWriteUntil: r.AuditWriteUntil.Time}
+internal/adapters/postgres/download_response.go:43:			if v.ID != a.ID || v.RootID != a.RootID || v.AuditStoreID != a.AuditStoreID || v.ResponseLimit != a.ResponseLimit || v.WindowLimit != a.WindowLimit || v.AuditByteLimit != a.AuditByteLimit || !v.ValidUntil.Equal(a.ValidUntil) || !v.AuditWriteUntil.Equal(a.AuditWriteUntil) {
+internal/adapters/postgres/download_response.go:55:		if !n.Time.Before(a.ValidUntil) || a.ValidUntil.After(parent.ValidUntil.Time) || a.WindowLimit > (parent.OutputLimit-1)/artifact.DownloadWindowBytes+1+a.ResponseLimit {
+internal/adapters/postgres/download_response.go:58:		_, e = q.InsertDownloadControlAllocation(ctx, custodydb.InsertDownloadControlAllocationParams{ID: id(a.ID), RootID: id(s.root), AuditStoreID: id(a.AuditStoreID), ResponseLimit: a.ResponseLimit, WindowLimit: a.WindowLimit, AuditByteLimit: a.AuditByteLimit, ValidUntil: ts(a.ValidUntil), AuditWriteUntil: ts(a.AuditWriteUntil)})
+internal/adapters/postgres/download_response.go:172:		if streams.Total >= 16 || streams.Principal >= 2 {
+internal/adapters/postgres/download_response_window.go:42:	if len(row.IntentReceipt) > 0 {
+internal/adapters/postgres/download_response_window.go:49:	if len(row.OutcomeJson) > 0 {
+internal/adapters/postgres/download_response_window.go:56:	if len(row.OutcomeReceipt) > 0 {
+internal/adapters/postgres/download_response_window.go:251:	if streams.Total >= 16 || streams.Principal >= 2 {
+internal/adapters/postgres/download_stop.go:29:	if !authorization.UUID(root) || len(guards) > 1 || len(guards) == 1 && (guards[0] == nil || guards[0].root != root) {
+internal/adapters/postgres/download_stop.go:50:	if len(row.Receipt) > 0 {
+internal/adapters/postgres/download_stop.go:60:	return r.Key == artifact.DownloadStopKey(d.RootID, d.DownloadID) && r.Bytes > 0 && r.Bytes <= artifact.DownloadStopCipherLimit && r.SHA256 != (artifact.Digest{}) && identity.Text(r.ETag, 256) && (r.Version == "" || identity.Text(r.Version, 1024))
+internal/adapters/postgres/download_stop.go:93:		if len(stop.Decision) > 0 {
+internal/adapters/postgres/download_stop.go:103:				session.State = artifact.DownloadExpired
+internal/adapters/postgres/download_stop.go:110:			writeUntil := identity.Earlier(n.Time.Add(30*time.Second), stop.RetainUntil.Time.Add(-time.Microsecond))
+internal/adapters/postgres/download_stop.go:177:		snap, e := stopSnapshot(row, time.Now(), time.Now().Add(time.Second))
+internal/adapters/postgres/download_stop.go:181:		if len(row.Receipt) > 0 {
+internal/adapters/postgres/download_stop.go:197:		return auditCurrent(ctx, q, trust, start, identity.Earlier(start.Add(5*time.Second), d.RetainUntil))
+internal/adapters/postgres/download_stop.go:220:		snap, e := stopSnapshot(row, time.Now(), time.Now().Add(time.Second))
+internal/adapters/postgres/download_stop.go:228:			return auditCurrent(ctx, q, trust, start, identity.Earlier(start.Add(5*time.Second), d.RetainUntil))
+internal/adapters/postgres/download_stop.go:245:		return auditCurrent(ctx, q, trust, start, identity.Earlier(start.Add(5*time.Second), d.RetainUntil))
+internal/adapters/postgres/download_stop.go:264:			e = q.InsertDownloadStopPool(ctx, custodydb.InsertDownloadStopPoolParams{RootID: id(s.root), InstallationID: id(b.InstallationID), StoreID: id(b.StoreID), PolicyID: id(b.PolicyID), BackupProfileID: id(b.BackupProfileID), PolicyDigest: b.PolicyDigest[:], BackupProfileDigest: b.BackupProfileDigest[:], Slots: b.Slots, CipherBytes: b.CipherBytes, KeyAttempts: b.KeyAttempts, BackupBytes: b.BackupBytes, WalBytes: b.WALBytes, RetainedSeconds: b.RetainedSeconds, BackupHorizonSeconds: b.BackupHorizonSeconds, ValidUntil: ts(b.ValidUntil)})
+internal/adapters/postgres/download_stop.go:266:			if uid(pool.InstallationID) != b.InstallationID || uid(pool.StoreID) != b.StoreID || uid(pool.PolicyID) != b.PolicyID || uid(pool.BackupProfileID) != b.BackupProfileID || !bytes.Equal(pool.PolicyDigest, b.PolicyDigest[:]) || !bytes.Equal(pool.BackupProfileDigest, b.BackupProfileDigest[:]) || pool.Slots != b.Slots || pool.CipherBytes != b.CipherBytes || pool.KeyAttempts != b.KeyAttempts || pool.BackupBytes != b.BackupBytes || pool.WalBytes != b.WALBytes || pool.RetainedSeconds != b.RetainedSeconds || pool.BackupHorizonSeconds != b.BackupHorizonSeconds {
+internal/adapters/postgres/download_stop.go:285:			if old.Slots != b.AllocationSlots {
+internal/adapters/postgres/download_stop.go:289:			e = q.InsertDownloadStopBacking(ctx, custodydb.InsertDownloadStopBackingParams{AllocationID: id(b.AllocationID), RootID: id(s.root), Slots: b.AllocationSlots})
+internal/adapters/postgres/download_stop.go:298:		if !identity.Fresh(b.ObservedAt, b.ObservedAt.Add(5*time.Second), n.Time, 5*time.Second) || !n.Time.Before(b.ValidUntil) {
+internal/adapters/postgres/download_stop_lifecycle.go:82:	if !out.OverdueSelectedAt.IsZero() && (out.ClosedAt.IsZero() || out.CertificateStarted || out.CertificateWriter != nil || out.CertificateReceipt != nil || out.OverdueSelectedAt.Before(b.CertificatePurgeAt.Add(-time.Duration(b.Policy.ProofWindowSeconds)*time.Second))) {
+internal/adapters/postgres/download_stop_lifecycle.go:88:		if !r.Valid() || r.RootID != b.RootID || r.DownloadID != b.DownloadID || r.InstallationID != b.Policy.InstallationID || r.IssuerEpoch != b.IssuerEpoch || r.StoreID != b.Policy.StoreID || r.BindingDigest != auditapp.OperationLifecycleDigest(b) || r.Mode != out.Mode || r.ObjectsDigest != objects || r.WritersDigest != writers || !r.CertificatePurgeAt.Equal(b.CertificatePurgeAt) || !r.LiveRetireBy.Equal(b.LiveRetireBy) || r.CertificateWriteUntil.After(b.CertificatePurgeAt.Add(-time.Duration(b.Policy.ProofWindowSeconds)*time.Second)) {
+internal/adapters/postgres/download_stop_lifecycle.go:141:	until := started.Add(5 * time.Second)
+internal/adapters/postgres/download_stop_lifecycle.go:263:		proofEnd := b.CertificatePurgeAt.Add(-time.Duration(b.Policy.ProofWindowSeconds) * time.Second)
+internal/adapters/postgres/download_stop_lifecycle.go:289:		if l.LeaseFence >= b.Policy.MaxPurgeLeases {
+internal/adapters/postgres/download_stop_lifecycle.go:293:		until := now.Add(5 * time.Second)
+internal/adapters/postgres/download_stop_lifecycle.go:331:		until := identity.Earlier(now.Add(30*time.Second), b.CertificatePurgeAt.Add(-time.Duration(b.Policy.ProofWindowSeconds)*time.Second))
+internal/adapters/postgres/download_stop_lifecycle.go:490:	until := time.Now().Add(5 * time.Second)
+internal/adapters/postgres/download_stop_lifecycle.go:509:	until := time.Now().Add(5 * time.Second)
+internal/adapters/postgres/download_stop_lifecycle.go:519:		if e != nil || len(rows) > 16 {
+internal/adapters/postgres/download_stop_lifecycle.go:524:			if len(r.PolicyDigest) != 32 || r.InstallationID != trust.InstallationID || r.IssuerEpoch != trust.IssuerEpoch {
+internal/adapters/postgres/download_stop_lifecycle.go:545:	until := time.Now().Add(5 * time.Second)
+internal/adapters/postgres/download_stop_lifecycle.go:572:	until := identity.Earlier(observed.Add(5*time.Second), validUntil)
+internal/adapters/postgres/download_stop_lifecycle.go:584:		if len(pool.LifecyclePolicy) > 0 {
+internal/adapters/postgres/download_workers.go:104:				return n.Time, sqlStep{"native-session-expiry", artifact.ErrDownloadExpired}
+internal/adapters/postgres/download_workers.go:134:					return artifact.ErrDownloadExpired
+internal/adapters/postgres/download_workers.go:146:		if generation > parent.RequestLimit {
+internal/adapters/postgres/download_workers.go:153:		if counts.Total >= 16 || counts.Workload >= 2 || counts.Principal >= 2 {
+internal/adapters/postgres/download_workers.go:156:		until := identity.Earlier(parent.Deadline, identity.Earlier(a.AccessUntil, now.Add(p.MaxRuntime))).UTC().Truncate(time.Microsecond)
+internal/adapters/postgres/download_workers.go:157:		if until.Sub(now) < time.Second {
+internal/adapters/postgres/download_workers.go:158:			return artifact.ErrDownloadExpired
+internal/adapters/postgres/download_workers.go:165:		if e != nil || len(b) > 65536 {
+internal/adapters/postgres/download_workers.go:189:	ctx, end := context.WithTimeout(ctx, 5*time.Second)
+internal/adapters/postgres/download_workers.go:254:			return artifact.ErrDownloadExpired
+internal/adapters/postgres/download_workers.go:334:			return artifact.ErrDownloadExpired
+internal/adapters/postgres/download_workers.go:381:		return value.DownloadWorkerIdentity{}, artifact.ErrDownloadExpired
+internal/adapters/postgres/download_workers.go:403:			return artifact.ErrDownloadExpired
+internal/adapters/postgres/download_workers.go:419:			return artifact.ErrDownloadExpired
+internal/adapters/postgres/download_workers.go:430:	ctx, end := context.WithTimeout(ctx, 5*time.Second)
+internal/adapters/postgres/download_workers.go:471:			return artifact.ErrDownloadExpired
+internal/adapters/postgres/download_workers.go:480:			return artifact.ErrDownloadExpired
+internal/adapters/postgres/download_workers.go:497:	call, stop := context.WithTimeout(ctx, 5*time.Second)
+internal/adapters/postgres/download_workers.go:500:	if e != nil || len(rows) > 16 {
+internal/adapters/postgres/enrollment_activation.go:46:		if len(rows) == 0 || len(rows) > 2 {
+internal/adapters/postgres/enrollment_activation.go:50:		if uid(row.ID) != issueID || !row.AuditAcknowledgedAt.Valid || !row.AuditObjectVersion.Valid || row.AuditObjectVersion.String == "null" || !identity.Text(row.AuditObjectVersion.String, 1024) {
+internal/adapters/postgres/enrollment.go:31:	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+internal/adapters/postgres/enrollment.go:60:		if !currentIssuedBootstrapAudit(slot) || root.Suspended || root.RecoveryBlocked || !revision.Valid() || !identity.Fresh(root.ObservedAt.Time, root.FreshUntil.Time, now.Time, 30*time.Second) || slot.IssuerEpoch != root.IssuerEpoch || slot.Revoked || now.Time.Before(slot.NotBefore.Time) || !now.Time.Before(slot.NotAfter.Time) || subtle.ConstantTimeCompare(slot.SecretSha256, c.SecretDigest[:]) != 1 {
+internal/adapters/postgres/enrollment_signing.go:44:	if !currentIssuedBootstrapAudit(slot) || !c.Valid() || slot.InstallationID != id(c.InstallationID) || slot.ID != id(c.BootstrapID) || root.InstallationID != slot.InstallationID || root.Suspended || root.RecoveryBlocked || !trustRevision(root).Valid() || !identity.Fresh(root.ObservedAt.Time, root.FreshUntil.Time, now, 30*time.Second) || slot.IssuerEpoch != root.IssuerEpoch || slot.Revoked || !slot.ClaimedAt.Valid || now.Before(slot.ClaimedAt.Time) || !now.Before(slot.NotAfter.Time) || subtle.ConstantTimeCompare(slot.SecretSha256, c.SecretDigest[:]) != 1 || subtle.ConstantTimeCompare(slot.PublicKeySha256, c.PublicKeyDigest[:]) != 1 {
+internal/adapters/postgres/enrollment_signing.go:48:	if err != nil || !slot.ClaimAcknowledgedAt.Valid || !slot.ClaimObjectVersion.Valid || slot.ClaimObjectVersion.String == "null" || !identity.Text(slot.ClaimObjectVersion.String, 1024) || !bytes.Equal(slot.ClaimAuditDigest, digest(frozen)) {
+internal/adapters/postgres/enrollment_signing.go:69:	if !row.SignedAt.Valid || len(row.CertificateJson) == 0 || len(row.CertificateJson) > 48<<10 || json.Unmarshal(row.CertificateJson, &c) != nil || !a.MatchesIssued(c) || artifact.Digest(sha256.Sum256(c.DER)) != c.Certificate.Digest || !bytes.Equal(c.Certificate.Digest[:], row.CertificateSha256) || !c.Certificate.NotBefore.Equal(row.CertificateNotBefore.Time) || !c.Certificate.NotAfter.Equal(row.CertificateNotAfter.Time) {
+internal/adapters/postgres/enrollment_signing.go:100:		if len(rows) > 2 {
+internal/adapters/postgres/enrollment_signing.go:103:		if len(rows) > 0 {
+internal/adapters/postgres/enrollment_signing.go:128:		until := now.Time.Add(5 * time.Second)
+internal/adapters/postgres/enrollment_signing.go:167:	if err != nil || len(encoded) > 48<<10 {
+internal/adapters/postgres/enrollment_signing.go:184:		if len(rows) == 0 || len(rows) > 2 {
+internal/adapters/postgres/evidence_share.go:42:	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+internal/adapters/postgres/evidence_share.go:61:	until := now.Time.Add(5 * time.Second)
+internal/adapters/postgres/evidence_share.go:83:	if json.Unmarshal(r.Management, &management) != nil || json.Unmarshal(r.Recipients, &recipients) != nil || len(r.Version) != 32 {
+internal/adapters/postgres/evidence_share.go:89:		Revision: r.Revision, Management: management, CreatedAt: r.CreatedAt.Time, ExpiresAt: r.ExpiresAt.Time}
+internal/adapters/postgres/evidence_share.go:103:	if !v.Valid() || !slices.Equal(stored, keys) || !r.CreatingOperationID.Valid || !r.LastOperationID.Valid || !r.RetireBy.Valid || !v.ExpiresAt.Before(r.RetireBy.Time) {
+internal/adapters/postgres/evidence_share.go:126:	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(artifactID) || len(keys) == 0 || len(keys) > 257 {
+internal/adapters/postgres/evidence_share.go:152:func (s *EvidenceShares) OwnedShares(ctx context.Context, caller identity.Identity, limit int) ([]authorization.Share, error) {
+internal/adapters/postgres/evidence_share.go:153:	if s == nil || ctx == nil || ctx.Err() != nil || !caller.Principal.Valid() || len(caller.Groups) > 256 || limit < 1 || limit > 100 {
+internal/adapters/postgres/evidence_share.go:174:		rows, err := q.ListOwnedShares(ctx, custodydb.ListOwnedSharesParams{RootID: id(s.root), CreatorIssuer: caller.Principal.Issuer, CreatorSubject: caller.Principal.Subject, Managers: managers, RowLimit: int32(limit)})
+internal/adapters/postgres/evidence_share.go:189:func (s *EvidenceShares) AdministeredShares(ctx context.Context, after sharing.ShareCursor, limit int) ([]authorization.Share, error) {
+internal/adapters/postgres/evidence_share.go:191:	if s == nil || ctx == nil || ctx.Err() != nil || limit < 1 || limit > 101 || paged && (!authorization.UUID(after.ID) || after.CreatedAt.IsZero()) {
+internal/adapters/postgres/evidence_share.go:194:	params := custodydb.ListAdministeredSharesParams{RootID: id(s.root), Paged: paged, RowLimit: int32(limit)}
+internal/adapters/postgres/evidence_share.go:238:func (s *EvidenceShares) ReceivedShares(ctx context.Context, caller identity.Identity, limit int) ([]authorization.Share, error) {
+internal/adapters/postgres/evidence_share.go:240:	if s == nil || ctx == nil || ctx.Err() != nil || len(keys) == 0 || len(keys) > 257 || limit < 1 || limit > 100 {
+internal/adapters/postgres/evidence_share.go:245:		rows, err := q.ListReceivedShares(ctx, custodydb.ListReceivedSharesParams{RootID: id(s.root), Keys: keys, RowLimit: int32(limit)})
+internal/adapters/postgres/evidence_share.go:266:	if s == nil || ctx == nil || ctx.Err() != nil || v.RootID != s.root || !authorization.UUID(v.ID) || !authorization.UUID(r.OperationID) || !identity.Text(r.IdempotencyKey, 128) || r.RequestDigest == (artifact.Digest{}) {
+internal/adapters/postgres/evidence_share.go:271:	probe.CreatedAt, probe.Revision = v.ExpiresAt.Add(-time.Second), 1
+internal/adapters/postgres/evidence_share.go:315:			if !effect.EffectUntil.Valid || v.ExpiresAt.After(effect.EffectUntil.Time) {
+internal/adapters/postgres/evidence_share.go:322:			if active >= authorization.ShareMaxActivePerArtifact {
+internal/adapters/postgres/evidence_share.go:328:				Management: management, Recipients: recipients, RecipientKeys: keys, IdempotencyKey: r.IdempotencyKey, RequestDigest: r.RequestDigest[:], ExpiresAt: ts(v.ExpiresAt), OperationID: id(r.OperationID)})
+internal/adapters/postgres/evidence_share.go:364:	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(r.ShareID) || !authorization.UUID(r.OperationID) || !r.Actor.Valid() || len(r.Managers) > authorization.ShareMaxManagers || !identity.Text(r.IdempotencyKey, 128) || r.ExpectedRevision < 1 {
+internal/adapters/postgres/evidence_share.go:426:	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(r.ShareID) || !authorization.UUID(r.OperationID) || !r.Actor.Valid() || len(r.Managers) < 1 && !r.Administrator || len(r.Managers) > authorization.ShareMaxManagers ||
+internal/adapters/postgres/evidence_share.go:427:		len(r.Management) < 1 || len(r.Management) > authorization.ShareMaxManagers || !identity.Text(r.IdempotencyKey, 128) || r.RequestDigest == (artifact.Digest{}) || r.ExpectedRevision < 1 {
+internal/adapters/postgres/fleet_observation_basis.go:19:	call, cancel := context.WithDeadline(ctx, started.Add(5*time.Second))
+internal/adapters/postgres/fleet_observation_contention.go:35:	return errors.As(err, &pe) && pe.Code == "55P03"
+internal/adapters/postgres/fleet_observation_contention.go:44:	if !row.ObservedAt.Valid || !row.FreshUntil.Valid || row.ObservedAt.InfinityModifier != 0 || row.FreshUntil.InfinityModifier != 0 || row.ObservedAt.Time.After(now) || !now.Before(row.FreshUntil.Time) || !row.ObservedAt.Time.Before(row.FreshUntil.Time) || row.FreshUntil.Time.Sub(row.ObservedAt.Time) > 30*time.Second {
+internal/adapters/postgres/fleet_observation.go:34:	until := time.Now().Add(5 * time.Second)
+internal/adapters/postgres/fleet_observation.go:105:	if s == nil || s.claims == nil || ctx == nil || !basis.Valid() || basis.Database.SchemaVersion != currentSchemaVersion || basis.InstallationID != s.claims.installation || started.Year() < 2020 || started.Year() > 9999 {
+internal/adapters/postgres/grant_output_group.go:41:	if len(row.ExecutionDigest) != 32 || queryDecode(row.GroupAssociation, 4096, &group) != nil || !group.Valid() {
+internal/adapters/postgres/history_capture_projection.go:25:	RepeatedFromExpiresAt     pgtype.Timestamptz
+internal/adapters/postgres/history_capture_projection.go:57:		return historyCaptureProjection{ID: c.ID, RootID: c.RootID, CreatedAt: c.CreatedAt, HistoryOrigin: c.HistoryOrigin, HistoryParametersRequired: c.HistoryParametersRequired, RepeatedFromCaptureID: c.RepeatedFromCaptureID, RepeatedFromExpiresAt: c.RepeatedFromExpiresAt, ScopeDigest: accepted.ScopeDigest, Target: intent.Target, Backing: historyCaptureBackingFor(accepted.Expectation.Registration)}, until, nil
+internal/adapters/postgres/history_capture_projection.go:95:			out.RepeatedFromExpiresAt = child.RepeatedFromExpiresAt
+internal/adapters/postgres/history_capture_projection.go:96:		} else if intent.Target.ClusterID != out.Target.ClusterID || intent.Target.NamespaceUID != out.Target.NamespaceUID || intent.Target.WorkloadUID != out.Target.WorkloadUID || registration.StoreID != out.Backing.StoreID || registration.AllocationID != out.Backing.AllocationID || registration.PoolRevision != out.Backing.PoolRevision || registration.AllocationRevision != out.Backing.AllocationRevision || child.RepeatedFromCaptureID != out.RepeatedFromCaptureID || !child.RepeatedFromExpiresAt.Time.Equal(out.RepeatedFromExpiresAt.Time) {
+internal/adapters/postgres/history_parameters.go:46:	if len(h.ExpectationJson) > 8192 || json.Unmarshal(h.ExpectationJson, &e) != nil || !e.Valid() || id(e.RootID) != h.RootID || id(e.CaptureID) != h.CaptureID || id(e.Registration.Location.AttemptID) != h.AttemptID || !bytes.Equal(e.SelectorKey[:], h.SelectorKey) || !bytes.Equal(e.SettingsKey[:], h.SettingsKey) || e.MACVersion != h.MacVersion {
+internal/adapters/postgres/history_parameters.go:74:	out = value.HistoryStorage{Expectation: e, Copies: r.Copies, State: h.State, SummaryExpiresAt: h.SummaryExpiresAt.Time, Target: retention.Input.Target, Retention: retention, Effective: r.Effective}
+internal/adapters/postgres/history_parameters.go:100:	if s == nil || !e.Valid() || e.RootID != s.root || !in.Limits.Valid() || !in.Retention.Target.Valid() || !in.Retention.Proof.Valid(in.Retention.Proof.ObservedAt) {
+internal/adapters/postgres/history_parameters.go:113:		if e.OriginalExecutionDigest != c.ScopeDigest || e.Registration.Location.ClusterID != original.ClusterID || e.Registration.AllocationID != original.AllocationID || !e.Registration.AnchorAt.Equal(c.CreatedAt.Time) || in.SummaryExpiresAt.After(in.Retention.ExpiresAt) || e.Registration.ExpiresAt.After(in.SummaryExpiresAt) || !e.Registration.WriteUntil.After(c.CreatedAt.Time) {
+internal/adapters/postgres/history_parameters.go:134:		if c.RepeatedFromCaptureID.Valid && (in.Source == nil || in.Source.CaptureID != uid(c.RepeatedFromCaptureID) || in.Source.ExpiresAt.After(c.RepeatedFromExpiresAt.Time)) {
+internal/adapters/postgres/history_parameters.go:139:			if !in.Source.Valid(in.Identity.VerifiedAt) || !c.RepeatedFromCaptureID.Valid || uid(c.RepeatedFromCaptureID) != in.Source.CaptureID || e.Registration.ExpiresAt.After(in.Source.ExpiresAt) {
+internal/adapters/postgres/history_parameters.go:155:				if in.Source.ExpiresAt.After(sourceStorage.Effective.ExpiresAt) || in.Source.ExpiresAt.After(h.SummaryExpiresAt.Time) {
+internal/adapters/postgres/history_parameters.go:162:			} else if in.Source.ExpiresAt.After(source.CreatedAt.Time.Add(value.HistoryLifetime)) {
+internal/adapters/postgres/history_parameters.go:165:			retention.SourceCutoff = in.Source.ExpiresAt
+internal/adapters/postgres/history_parameters.go:166:			until = identity.Earlier(until, in.Source.ExpiresAt)
+internal/adapters/postgres/history_parameters.go:183:		zero := make([]byte, 32)
+internal/adapters/postgres/history_parameters.go:197:		if int(rootCount) >= in.Limits.PerInstallation || int(selectorCount) >= in.Limits.PerSelector {
+internal/adapters/postgres/history_parameters.go:199:			if int(selectorCount) >= in.Limits.PerSelector {
+internal/adapters/postgres/history_parameters.go:214:				changed, err = q.ChangeHistoryQuota(ctx, custodydb.ChangeHistoryQuotaParams{RootID: id(s.root), SelectorKey: zero, Amount: -1, Maximum: value.MaxHistoryPerInstallation})
+internal/adapters/postgres/history_parameters.go:221:				changed, err = q.ChangeHistoryQuota(ctx, custodydb.ChangeHistoryQuotaParams{RootID: id(s.root), SelectorKey: old.SelectorKey, Amount: -1, Maximum: value.MaxHistoryPerSelector})
+internal/adapters/postgres/history_parameters.go:232:				if int(rootCount) < in.Limits.PerInstallation && int(selectorCount) < in.Limits.PerSelector {
+internal/adapters/postgres/history_parameters.go:237:		if int(rootCount) >= in.Limits.PerInstallation || int(selectorCount) >= in.Limits.PerSelector {
+internal/adapters/postgres/history_parameters.go:242:			max int
+internal/adapters/postgres/history_parameters.go:243:		}{{zero, in.Limits.PerInstallation}, {e.SelectorKey[:], in.Limits.PerSelector}} {
+internal/adapters/postgres/history_parameters.go:244:			n, err := q.ChangeHistoryQuota(ctx, custodydb.ChangeHistoryQuotaParams{RootID: id(s.root), SelectorKey: entry.key, Amount: 1, Maximum: int32(entry.max)})
+internal/adapters/postgres/history_parameters.go:255:		if err = q.InsertHistoryParameter(ctx, custodydb.InsertHistoryParameterParams{RootID: id(s.root), CaptureID: id(e.CaptureID), AttemptID: id(e.Registration.Location.AttemptID), SelectorKey: e.SelectorKey[:], SettingsKey: e.SettingsKey[:], MacVersion: e.MACVersion, ExpectationJson: encoded, RetentionJson: retained, SummaryExpiresAt: ts(in.SummaryExpiresAt), CreatedAt: c.CreatedAt}); err != nil {
+internal/adapters/postgres/history_parameters.go:268:		out = value.HistoryStorage{Expectation: e, State: "reserved", SummaryExpiresAt: in.SummaryExpiresAt, ObservedAt: now.Time, ValidUntil: identity.Earlier(until, in.Recovery.FreshUntil), Target: c.Target, Retention: retention, Effective: privacy.Deadlines{AnchorAt: e.Registration.AnchorAt, ExpiresAt: e.Registration.ExpiresAt, DeleteBy: e.Registration.DeleteBy}}
+internal/adapters/postgres/history_parameters.go:415:		until = identity.Earlier(until, identity.Earlier(in.Retention.ExpiresAt, in.Retention.ValidUntil))
+internal/adapters/postgres/history_parameters.go:416:		until = identity.Earlier(until, identity.Earlier(h.SummaryExpiresAt.Time, identity.Earlier(storage.Effective.ExpiresAt, in.Query.Recovery.FreshUntil)))
+internal/adapters/postgres/history_parameters.go:463:		if h.State == "deleted" || h.State == "write_claimed" || (h.Visible && now.Time.Before(storage.Effective.ExpiresAt) && !(h.State == "reserved" && !now.Time.Before(row.WriteUntil.Time))) {
+internal/adapters/postgres/history_parameters.go:476:		until := identity.Earlier(now.Time.Add(30*time.Second), in.Recovery.FreshUntil)
+internal/adapters/postgres/history_parameters.go:618:		out.ValidUntil = identity.Earlier(until, identity.Earlier(h.SummaryExpiresAt.Time, out.Effective.ExpiresAt))
+internal/adapters/postgres/history_parameters.go:652:	call, cancel := context.WithTimeout(ctx, 5*time.Second)
+internal/adapters/postgres/history_parameters.go:664:func (s *HistoryParametersLedger) ExpireHistorySummaries(ctx context.Context, recovery artifact.RecoveryProof) error {
+internal/adapters/postgres/history_parameters.go:670:		rows, err := q.ListExpiredHistorySummaries(ctx, custodydb.ListExpiredHistorySummariesParams{RootID: id(s.root), Through: now})
+internal/adapters/postgres/history_parameters.go:674:		zero := make([]byte, 32)
+internal/adapters/postgres/history_parameters.go:681:				changed, err := q.ChangeHistoryQuota(ctx, custodydb.ChangeHistoryQuotaParams{RootID: h.RootID, SelectorKey: key, Amount: -1, Maximum: value.MaxHistoryPerInstallation})
+internal/adapters/postgres/history_retention.go:36:	r := value.RetainedArtifact{RootID: root, Registration: e.Registration, OriginPolicies: retention.Origins, Input: retention.Input, Effective: value.Deadlines{AnchorAt: e.Registration.AnchorAt, ExpiresAt: a.EffectiveExpiresAt.Time, DeleteBy: a.EffectiveDeleteBy.Time}, Sequence: a.RetentionSequence}

@@ -72,8 +72,7 @@
             },
             "value": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 1024
+              "minLength": 1
             }
           },
           "required": [
@@ -161,8 +160,7 @@
         },
         "reason": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 512
+          "minLength": 1
         },
         "retention": {
           "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/duration"

@@ -13,7 +13,7 @@ paths:
       parameters:
       - in: query
         name: return_to
-        schema: {type: string, maxLength: 2048, default: /}
+        schema: {type: string, default: /}
       responses:
         '303':
           description: Pinned provider redirect and Secure HttpOnly SameSite=Lax browser-binding cookie.
@@ -24,11 +24,11 @@ paths:
     get:
       operationId: begin_browser_step_up
       summary: Sign in again with the configured approval assurance
-      description: Uses current protected identity settings for acr_values and requests max_age=0. Reuses the normal bounded state, nonce, PKCE and browser-binding challenge. Does not decide a review or confer assurance; approval still requires current signed acr/auth_time and target permissions. Unavailable settings return an administrator-directed sanitized problem.
+      description: Step-up is optional and off by default (ADR-335 D5); when an administrator enables it, this uses current protected identity settings for acr_values and requests max_age=0 (OIDC Core forced re-authentication). Reuses the normal bounded state, nonce, PKCE and browser-binding challenge. Does not decide a review or confer assurance; approval still requires current signed acr/auth_time and target permissions. Unavailable settings return an administrator-directed sanitized problem.
       parameters:
       - in: query
         name: return_to
-        schema: {type: string, maxLength: 2048, default: /}
+        schema: {type: string, default: /}
       responses:
         '303':
           description: Pinned provider redirect and Secure HttpOnly SameSite=Lax browser-binding cookie. Provider parameters cannot be selected by the caller.
@@ -41,14 +41,14 @@ paths:
       summary: Consume state and exchange the one-use authorization code
       parameters:
       - {in: query, name: state, required: true, schema: {type: string, minLength: 43, maxLength: 43}}
-      - {in: query, name: code, required: true, schema: {type: string, minLength: 1, maxLength: 4096}}
-      - {in: query, name: iss, required: true, schema: {type: string, format: uri, maxLength: 2048}}
-      - {in: query, name: session_state, schema: {type: string, maxLength: 256}}
+      - {in: query, name: code, required: true, schema: {type: string, minLength: 1}}
+      - {in: query, name: iss, required: true, schema: {type: string, format: uri}}
+      - {in: query, name: session_state, schema: {type: string}}
       responses:
         '303':
           description: Local return path and fresh opaque Secure HttpOnly SameSite=Strict session cookie. No provider credential in the response.
           headers:
-            Location: {schema: {type: string, maxLength: 2048}}
+            Location: {schema: {type: string}}
         default: {$ref: '#/components/responses/Problem'}
   /auth/csrf:
     get:
@@ -105,10 +105,9 @@ paths:
             schema:
               type: object
               additionalProperties: true
-              maxProperties: 128
               required: [logout_token]
               properties:
-                logout_token: {type: string, minLength: 1, maxLength: 32768}
+                logout_token: {type: string, minLength: 1}
       responses:
         '200': {description: Current matching sessions revoked or exact event retry acknowledged.}
         default: {$ref: '#/components/responses/Problem'}
@@ -116,11 +115,11 @@ components:
   securitySchemes:
     BrowserSession: {type: apiKey, in: cookie, name: __Host-asservat-session}
   parameters:
-    Origin: {in: header, name: Origin, required: true, schema: {type: string, format: uri, maxLength: 2048}, description: Must exactly equal the protected HTTPS console origin.}
+    Origin: {in: header, name: Origin, required: true, schema: {type: string, format: uri}, description: Must exactly equal the protected HTTPS console origin.}
     CSRF: {in: header, name: X-CSRF-Token, required: true, schema: {type: string, minLength: 43, maxLength: 43}}
   responses:
     Problem:
-      description: "Sanitized failure. 400 malformed; 401 sign-in required; 403 CSRF/origin denied; 429 capacity; 409 same-session credential rotation in progress (Retry-After: 1), including CSRF lookup; 503 unavailable. Retain the cookie and current page during bounded Busy retry. CSRF and the following POST share the original attempt budget. For logout, 409 guarantees rejection before revocation starts; uncertain revocation returns 503 and must not be automatically retried. No stale CSRF token, identity or evidence is returned. No upstream credential details."
+      description: "Sanitized failure. 400 malformed; 401 sign-in required; 403 CSRF/origin denied; 429 capacity; 409 same-session credential rotation in progress (Retry-After: 1), including CSRF lookup; 503 unavailable. Retain the cookie and current page during bounded Busy retry. For logout, 409 guarantees rejection before revocation starts; uncertain revocation returns 503 and must not be automatically retried. No stale CSRF token, identity or evidence is returned. No upstream credential details."
       content:
         application/problem+json:
           schema:
@@ -129,5 +128,5 @@ components:
             additionalProperties: false
             properties:
               type: {type: string, const: 'about:blank'}
-              title: {type: string, maxLength: 80}
+              title: {type: string}
               status: {type: integer, minimum: 400, maximum: 599}

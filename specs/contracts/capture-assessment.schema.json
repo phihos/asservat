@@ -39,8 +39,7 @@
         },
         "explanation": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 256
+          "minLength": 1
         }
       },
       "required": [
@@ -84,8 +83,7 @@
         },
         "assessmentRef": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 128
+          "minLength": 1
         },
         "retainedPossible": {
           "type": "array",
@@ -288,8 +286,7 @@
         },
         "sourceRef": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 128
+          "minLength": 1
         },
         "measuredAt": {
           "type": "string",
@@ -300,8 +297,7 @@
         },
         "coverage": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 256
+          "minLength": 1
         }
       },
       "required": [
@@ -456,8 +452,7 @@
             "properties": {
               "actionID": {
                 "type": "string",
-                "minLength": 1,
-                "maxLength": 63
+                "minLength": 1
               },
               "executionMode": {
                 "enum": [
@@ -484,7 +479,6 @@
               "recording_handle": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 128,
                 "description": "For an existing-source save, identifies the selected source row whose incremental snapshot assessment this is. It conveys no acquisition authority."
               }
             },
@@ -516,8 +510,7 @@
                 "type": "array",
                 "items": {
                   "type": "string",
-                  "minLength": 1,
-                  "maxLength": 63
+                  "minLength": 1
                 },
                 "minItems": 1,
                 "uniqueItems": true
@@ -532,8 +525,7 @@
               },
               "message": {
                 "type": "string",
-                "minLength": 1,
-                "maxLength": 256
+                "minLength": 1
               },
               "blocking": {
                 "type": "boolean"
@@ -558,8 +550,7 @@
                 "type": "array",
                 "items": {
                   "type": "string",
-                  "minLength": 1,
-                  "maxLength": 63
+                  "minLength": 1
                 },
                 "minItems": 1,
                 "uniqueItems": true
@@ -578,13 +569,11 @@
               },
               "benefit": {
                 "type": "string",
-                "minLength": 1,
-                "maxLength": 192
+                "minLength": 1
               },
               "coverageLoss": {
                 "type": "string",
-                "minLength": 1,
-                "maxLength": 192
+                "minLength": 1
               }
             },
             "required": [
@@ -613,8 +602,7 @@
         },
         "handlingPolicyRef": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 128
+          "minLength": 1
         }
       },
       "required": [
@@ -706,8 +694,7 @@
         },
         "handlingPolicyRef": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 128
+          "minLength": 1
         }
       },
       "required": [

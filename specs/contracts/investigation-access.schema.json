@@ -12,11 +12,9 @@
           "type": "array",
           "items": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 128
+            "minLength": 1
           },
           "minItems": 1,
-          "maxItems": 64,
           "uniqueItems": true
         },
         "operations": {
@@ -32,23 +30,22 @@
             ]
           },
           "minItems": 1,
-          "maxItems": 5,
           "uniqueItems": true
         },
         "maxArtifacts": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 64
+          "maximum": 9007199254740991
         },
         "maxBytes": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 1099511627776
+          "maximum": 9007199254740991
         },
         "maxOperations": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 10000
+          "maximum": 9007199254740991
         },
         "notAfter": {
           "type": "string",
@@ -73,11 +70,9 @@
           "type": "array",
           "items": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 128
+            "minLength": 1
           },
           "minItems": 1,
-          "maxItems": 64,
           "uniqueItems": true
         },
         "operations": {
@@ -93,23 +88,22 @@
             ]
           },
           "minItems": 1,
-          "maxItems": 5,
           "uniqueItems": true
         },
         "maxArtifacts": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 64
+          "maximum": 9007199254740991
         },
         "maxBytes": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 1099511627776
+          "maximum": 9007199254740991
         },
         "maxOperations": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 10000
+          "maximum": 9007199254740991
         },
         "notAfter": {
           "type": "string",
@@ -152,8 +146,7 @@
         },
         "actionID": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 128
+          "minLength": 1
         }
       },
       "required": [
@@ -190,12 +183,10 @@
             "type": "string",
             "format": "uuid"
           },
-          "uniqueItems": true,
-          "maxItems": 64
+          "uniqueItems": true
         },
         "reason": {
-          "type": "string",
-          "maxLength": 512
+          "type": "string"
         }
       },
       "required": [
@@ -209,27 +200,27 @@
         "artifactsRegistered": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 64
+          "maximum": 9007199254740991
         },
         "bytesReserved": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 1099511627776
+          "maximum": 9007199254740991
         },
         "bytesSpent": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 1099511627776
+          "maximum": 9007199254740991
         },
         "operationsReserved": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 10000
+          "maximum": 9007199254740991
         },
         "operationsSpent": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 10000
+          "maximum": 9007199254740991
         }
       },
       "required": [

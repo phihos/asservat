@@ -44,7 +44,7 @@ Every operation:
 
 - authorizes once against the caller's current identity and permissions and
   reuses that decision for at most `identity.AuthorityRecheckInterval` (30 s;
-  60 s for the shared policy observation), never past the original deadline
+  60 s for the shared policy observation; maintainer decision), never past the original deadline
   ([ADR-311](../decisions/311-operation-authority-recheck.md));
 - carries an idempotency key; a retry with the same key returns the stored
   outcome;
@@ -58,7 +58,8 @@ submission with the digest accepts that plan or reports what changed
 Progress and status changes are published with PostgreSQL `LISTEN/NOTIFY` in
 the writing transaction. The console receives them over one Server-Sent
 Events stream per page, served by the browser operations handler. MCP status
-tools wait server-side for at most 30 s and return on the first change.
+tools wait server-side for at most 30 s (ADR-330 D1) and return on the first
+change.
 
 ## SQL
 

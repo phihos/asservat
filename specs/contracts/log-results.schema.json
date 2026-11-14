@@ -15,7 +15,7 @@
             "origin_id": {
               "type": "integer",
               "minimum": 0,
-              "maximum": 127
+              "maximum": 9007199254740991
             },
             "container_kind": {
               "enum": [
@@ -43,8 +43,7 @@
                 "string",
                 "null"
               ],
-              "minLength": 1,
-              "maxLength": 256
+              "minLength": 1
             },
             "restart_count": {
               "type": [
@@ -52,7 +51,7 @@
                 "null"
               ],
               "minimum": 0,
-              "maximum": 4294967295
+              "maximum": 9007199254740991
             }
           },
           "required": [
@@ -68,22 +67,22 @@
         "fragment": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 67108864
+          "maximum": 9007199254740991
         },
         "line": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 67108864
+          "maximum": 9007199254740991
         },
         "offset": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 67108864
+          "maximum": 9007199254740991
         },
         "line_offset": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 67108864
+          "maximum": 9007199254740991
         },
         "continuation": {
           "type": "boolean"
@@ -103,8 +102,7 @@
             "string",
             "null"
           ],
-          "minLength": 1,
-          "maxLength": 1024
+          "minLength": 1
         },
         "bytes_base64": {
           "type": [
@@ -112,7 +110,6 @@
             "null"
           ],
           "minLength": 4,
-          "maxLength": 1368,
           "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
         }
       },
@@ -160,8 +157,7 @@
         },
         "pod_uid": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 128
+          "minLength": 1
         },
         "window_start": {
           "type": "string",
@@ -173,7 +169,6 @@
         },
         "entries": {
           "type": "array",
-          "maxItems": 100,
           "items": {
             "$ref": "https://asservat.io/spec/v1/log-results.schema.json#/$defs/entry"
           }
@@ -185,42 +180,42 @@
             "origins": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 128
+              "maximum": 9007199254740991
             },
             "complete_origins": {
               "type": "integer",
               "minimum": 0,
-              "maximum": 128
+              "maximum": 9007199254740991
             },
             "partial_origins": {
               "type": "integer",
               "minimum": 0,
-              "maximum": 128
+              "maximum": 9007199254740991
             },
             "unavailable_origins": {
               "type": "integer",
               "minimum": 0,
-              "maximum": 128
+              "maximum": 9007199254740991
             },
             "unknown_timestamp_origins": {
               "type": "integer",
               "minimum": 0,
-              "maximum": 128
+              "maximum": 9007199254740991
             },
             "gapped_origins": {
               "type": "integer",
               "minimum": 0,
-              "maximum": 128
+              "maximum": 9007199254740991
             },
             "source_bytes": {
               "type": "integer",
               "minimum": 0,
-              "maximum": 67108864
+              "maximum": 9007199254740991
             },
             "total_fragments": {
               "type": "integer",
               "minimum": 0,
-              "maximum": 67108864
+              "maximum": 9007199254740991
             }
           },
           "required": [

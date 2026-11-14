@@ -2,7 +2,7 @@
 
 C-07/C-11/C-20/C-21/C-24 under I-02, TASK-03/05 and S-01/S-02; part of REQ-FED-002, REQ-CAP-002/005 and REQ-ARC-003/004. Design follows [ADR-330](../decisions/330-event-driven-system-design.md) D7/D8.
 
-An intrusive `onTrigger` effect starts at most once. The start right is one hub SQL row, `capture_start`, keyed by the attempt ID (the effect's idempotency key). It records operation/capture/action/attempt, target Pod (and node for node execution, executor Pod for the [regional API profile](api-context-runner.md)), scope and budget digests, native-byte limit and the original start interval (at most 60 seconds). No evidence, reason, command, token or key enters the row. There is no Kubernetes object per attempt.
+An intrusive `onTrigger` effect starts at most once. The start right is one hub SQL row, `capture_start`, keyed by the attempt ID (the effect's idempotency key). It records operation/capture/action/attempt, target Pod (and node for node execution, executor Pod for the [regional API profile](api-context-runner.md)), scope and budget digests, native-byte limit and `start_not_after`, the capture's own deadline (its approved window, ADR-335 D5). At-most-once comes from the conditional update below (ADR-330 D7), not from a short expiry. No evidence, reason, command, token or key enters the row. There is no Kubernetes object per attempt.
 
 ## States
 
@@ -29,4 +29,4 @@ Rows follow the capture's audit-retention partitioning; no separate cleanup is n
 | Profile | Executor | Native types |
 | --- | --- | --- |
 | `onTriggerStart/v1` | Node collector; binds node and target Pod | Action-specific |
-| `apiContextStart/v1` | Regional API executor; no node fields | `pod-status`; `logs` up to 64 MiB |
+| `apiContextStart/v1` | Regional API executor; no node fields | `pod-status`; `logs` up to the per-capture byte budget (workload storage share, ADR-335 D2) over the configured capture duration |

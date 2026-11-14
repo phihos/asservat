@@ -1,0 +1,581 @@
+live_manual.go:50:	if len(ids) == 0 || len(ids) > 16 {
+live_manual.go:76:		r.Binding.AuditDigest == w.IntentDigest && r.ExpectationDigest == evidence.ContextExpectationDigest(e) && r.Binding.NativeBytes == e.Registration.Nati
+live_manual.go:85:	call, stop := context.WithDeadline(ctx, identity.Earlier(time.Now().Add(5*time.Second), recovery.FreshUntil))
+live_manual.go:92:		until := identity.Earlier(first.Time.Add(5*time.Second), recovery.FreshUntil)
+live_manual.go:223:func (s *APIContextExecutions) ListLiveManualWork(ctx context.Context, target authorization.WorkloadTarget, after string, limit int, recovery artifact.
+live_manual.go:224:	if !target.Valid() || after != "" && !authorization.UUID(after) || limit < 1 || limit > 100 {
+live_manual.go:230:		rows, err := q.ListLiveManualWorks(call, custodydb.ListLiveManualWorksParams{RootID: id(s.root), AfterCaptureID: id(after), ClusterID: target.Cluster
+live_manual.go:234:		if len(rows) > limit {
+live_manual.go:235:			next = uid(rows[limit-1].ContextCapture.ID)
+live_manual.go:236:			rows = rows[:limit]
+live_source_observation.go:47:	if queryDecode(row.BindingJson, 8192, &binding) != nil || !binding.Valid() || binding.RootID != root || binding.SourceID != sourceID || bin
+live_source_observation.go:58:	if a.PolicyUID != binding.PolicyUID || a.ClusterID != uid(row.SourceClusterID) || a.NamespaceUID != row.SourceNamespaceUid || a.WorkloadUID
+live_source_observation.go:61:	until := identity.Earlier(row.HardUntil.Time, identity.Earlier(row.PolicyFreshUntil.Time, identity.Earlier(g.ExpiresAt, g.PolicyNotAfter)))
+live_source_observation.go:63:		return time.Time{}, authorization.ErrGrantExpired
+live_viewer_capacity.go:49:		fresh = now.Time.Add(5 * time.Second)
+live_viewer_capacity.go:52:	if err != nil || count < 0 || count > 65536 || fresh.IsZero() {
+live_watch.go:29:	limits       LiveWatchLimits
+live_watch.go:30:	limitsDigest [32]byte
+live_watch.go:31:	limitsJSON   []byte
+live_watch.go:36:func NewLiveWatches(ctx context.Context, pool *pgxpool.Pool, root, owner string, registry *OwnerEnrollments, certificate func(context.Context) (fleet.Own
+live_watch.go:37:	if ctx == nil || !authorization.UUID(root) || !authorization.UUID(owner) || registry == nil || registry.configuration == nil || certificate == nil || !l
+live_watch.go:44:	encoded, err := json.Marshal(limits)
+live_watch.go:48:	return &LiveWatches{ledger: ledger, root: root, owner: owner, registry: registry, certificate: certificate, limits: limits, limitsDigest: sha256.Sum256(
+live_watch.go:72:		return privacy.ErrExpired
+live_watch.go:80:		case "23505":
+live_watch.go:82:		case "54000":
+live_watch.go:102:	c.ExpiresAt = ownerTime(c.ExpiresAt)
+live_watch.go:106:func liveClusterKey(cluster string) ([32]byte, bool) {
+live_watch.go:108:		return [32]byte{}, false
+live_watch.go:114:	if queryDecode(raw, 4096, &c) != nil || !liveControlValid(c) {
+live_watch.go:124:	if s == nil || c.OwnerID != s.owner || !liveControlValid(c) || c.State != "Active" || c.Revision != 1 || c.Spent != 0 || !clusterOK || err != nil || le
+live_watch.go:142:		ok, err := q.ConfigureLiveWatch(call, custodydb.ConfigureLiveWatchParams{RootID: id(s.root), InstallationID: id(proof.Certificate.Binding.Installation
+live_watch.go:153:		raw, err := q.CreateLiveWatch(call, custodydb.CreateLiveWatchParams{RootID: id(s.root), OwnerID: id(s.owner), LimitsDigest: s.limitsDigest[:], Control
+live_watch.go:157:		if queryDecode(raw, 8192, &out) != nil {
+live_watch.go:180:	if s == nil || !liveControlValid(c) || c.OwnerID != s.owner || revision < 1 || cost < 0 || cost > 24<<10 || ctx == nil || ctx.Err() != nil {
+live_watch.go:185:	until := time.Now().Add(5 * time.Second)
+live_watch.go:199:		raw, e = q.ChangeLiveWatch(call, custodydb.ChangeLiveWatchParams{RootID: id(s.root), OwnerID: id(s.owner), LimitsDigest: s.limitsDigest[:], Control: b
+live_watch.go:229:		ok, e := q.CurrentLiveWatch(call, custodydb.CurrentLiveWatchParams{RootID: id(s.root), OwnerID: id(s.owner), LimitsDigest: s.limitsDigest[:], Control:
+live_watch.go:252:func (s *LiveWatches) PruneExpired(ctx context.Context) (int64, int64, error) {
+live_watch.go:265:		if queryDecode(raw, 1024, &out) != nil || out.Controls < 0 || out.Controls > 64 || out.Accounts < 0 || out.Accounts > 64 {
+live_watch_limits.go:13:type LiveWatchLimits struct {
+live_watch_limits.go:14:	InstallationSlots, PrincipalSlots, WorkloadSlots   int64
+live_watch_limits.go:19:	WatchBurst, MaxOutputBytes, MaxRate                int64
+live_watch_limits.go:20:	MaxDurationSeconds, MaxAccounts, MaxControlRecords int64
+live_watch_limits.go:23:func (p LiveWatchLimits) Valid() bool {
+live_watch_limits.go:24:	if p.InstallationSlots < 1 || p.InstallationSlots > 4096 || p.PrincipalSlots < 1 || p.PrincipalSlots > p.InstallationSlots || p.WorkloadSlots < 1
+live_watch_limits.go:28:		if b[0] < 1 || b[0] > 256<<20 || b[1] < 24<<10 || b[1] > 1<<30 {
+live_watch_limits.go:35:	return authorization.UUID(c.ID) && authorization.UUID(c.OwnerID) && authorization.UUID(c.Fence) && c.PrincipalKey != [32]byte{} && c.WorkloadKey 
+live_watch_owner.go:21:func (s *LiveWatches) LookupLiveWatchOwner(ctx context.Context, principalKey [32]byte, watchID, keyHex string) (fleet.OwnerBinding, bool, error) {
+live_watch_owner.go:23:	if s == nil || s.ledger == nil || ctx == nil || ctx.Err() != nil || principalKey == ([32]byte{}) || (watchID == "") == (keyHex == "") {
+live_watch_owner.go:34:		if err != nil || len(key) != 32 || hex.EncodeToString(key) != keyHex {
+live_watch_recovery.go:15:func (s *LiveWatches) ReadLiveControl(ctx context.Context, principal [32]byte, watch string) (liveapp.Control, error) {
+live_watch_recovery.go:17:	if s == nil || s.ledger == nil || ctx == nil || ctx.Err() != nil || principal == ([32]byte{}) || !authorization.UUID(watch) {
+live_watch_recovery.go:38:	if s == nil || s.ledger == nil || ctx == nil || ctx.Err() != nil || control.PrincipalKey == ([32]byte{}) || !authorization.UUID(control.ID) || 
+local_keys.go:27:	if !scope.Valid() || !value.UUID(cluster) || !identity.Text(namespace, 64) || !identity.Text(source, 64) {
+local_keys.go:43:	if e != nil || len(b) > 16384 {
+logs_cancellation.go:59:		if err != nil || len(raw) > 8192 {
+native_completion.go:44:			return artifact.ErrDownloadExpired
+native_completion.go:52:		return artifact.ErrDownloadExpired
+native_exchange.go:145:			if !control.canObserve(p.OutputLimit - p.ChargedOutput) {
+native_exchange.go:158:			return artifact.ErrDownloadExpired
+native_exchange.go:181:		if e != nil || len(encoded) > 8192 {
+native_exchange.go:185:		if e != nil || len(authority) > 16384 {
+native_exchange.go:258:			return sqlStep{"native-observe-expired", artifact.ErrDownloadExpired}
+native_exchange.go:330:			return sqlStep{"native-renew-expired", artifact.ErrDownloadExpired}
+native_exchange.go:333:		if err != nil || len(encoded) > 16384 {
+native_exchange.go:342:			return artifact.ErrDownloadExpired
+native_exchange.go:410:	if !row.Closed || row.RetiredAt.Valid || row.Fence >= 1<<60 || ctx.Err() != nil {
+native_exchange.go:421:	if s == nil || ctx == nil || len(leaf) < 1 || len(leaf) > 16<<10 {
+native_history.go:36:	if e != nil || len(encoded) > 4096 {
+native_history.go:39:	return custodydb.New(s.ledger.pool).InsertNativeBacking(ctx, custodydb.InsertNativeBackingParams{AllocationID: id(b.AllocationID), RootID: id(b.Root
+native_keys.go:92:	if e != nil || len(encoded) > 16384 {
+native_keys.go:96:	if e != nil || len(pb) > 16384 {
+native_keys.go:153:	if s == nil || ctx == nil || ctx.Err() != nil || r.Scope != s.scope || r.Operation != "unwrap" || r.Version != 0 || !value.UUID(r.AuthorityID) || r.Re
+native_readers.go:42:	call, stop := context.WithTimeout(ctx, 5*time.Second)
+native_readers.go:57:		return sqlStep{"native-worker-current", artifact.ErrDownloadExpired}
+native_readers.go:115:	if !value.UUID(worker) || len(leaf) < 1 || len(leaf) > 16<<10 {
+notifications.go:19:const listenReconnect = 5 * time.Second
+notifications.go:53:		closing, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
+operation_audit.go:79:	if len(row.IntentReceipt) > 0 {
+operation_audit.go:86:	if len(row.Outcome) > 0 {
+operation_audit.go:93:	if len(row.OutcomeReceipt) > 0 {
+operation_audit.go:130:	if e != nil || len(b) > 8<<10 {
+operation_audit.go:155:				if policy.InstallationID != s.recovery.installation || policy.BackingRevision != pool.Revision || policy.MetadataSlots < pool.AccountLimit*pool
+operation_audit.go:159:			if pool.Paused || pool.AccountVersion != in.AccountVersion || !in.CreatedAt.Before(pool.ValidUntil.Time) || in.RetainUntil.After(in.CreatedAt.Ad
+operation_audit.go:240:	if e != nil || len(b) > 16<<10 {
+operation_audit.go:286:	if e != nil || len(b) > 4096 {
+operation_audit.go:344:	if l == nil || ctx == nil || !authorization.UUID(in.RootID) || (in.Lane != "normal" && in.Lane != "resolution" && in.Lane != "processing") || !ide
+operation_audit.go:357:			if old.AccountVersion != in.AccountVersion || old.AccountLimit != in.Accounts || old.RecordsPerAccount != in.RecordsPerAccount || old.RetainedSe
+operation_audit.go:361:			if e != nil || !identity.Fresh(in.ObservedAt, in.FreshUntil, now.Time, 5*time.Second) || !now.Time.Before(in.ValidUntil) {
+operation_audit.go:374:			if !identity.Fresh(in.ObservedAt, in.FreshUntil, now.Time, 5*time.Second) || !now.Time.Before(in.ValidUntil) {
+operation_audit.go:383:			e = q.InsertOperationAuditPool(ctx, custodydb.InsertOperationAuditPoolParams{RootID: id(in.RootID), Lane: in.Lane, AccountVersion: in.AccountVer
+operation_audit.go:386:			n, e = q.ConfigureOperationAuditPool(ctx, custodydb.ConfigureOperationAuditPoolParams{RootID: id(in.RootID), Lane: in.Lane, ExpectedRevision: in
+operation_lifecycle.go:131:		if b.Policy.OverdueTerminal != value.OperationOverdueTerminal || s.CertificateStarted || s.CertificateWriter != nil || s.CertificateReceipt !
+operation_lifecycle.go:198:		until := identity.Earlier(start.Add(5*time.Second), trust.FreshUntil.Time)
+operation_lifecycle.go:311:		if phase == "original" && (!state.OverdueSelectedAt.IsZero() || state.Retirement != nil || now.Before(b.OriginalPurgeAt) || !now.Before(b.Cer
+operation_lifecycle.go:315:			until = identity.Earlier(until, b.CertificatePurgeAt.Add(-time.Duration(b.Policy.ProofWindowSeconds)*time.Second))
+operation_lifecycle.go:360:		out = value.OperationRetirement{RootID: l.RootID, OperationID: l.OperationID, StoreID: l.StoreID, InstallationID: l.InstallationID, IssuerEpo
+operation_lifecycle.go:431:	until := identity.Earlier(time.Now().UTC().Truncate(time.Microsecond).Add(5*time.Second), r.CertificateWriteUntil)
+operation_lifecycle.go:571:		return auditCurrent(ctx, q, trust, start, identity.Earlier(start.Add(5*time.Second), trust.FreshUntil.Time))
+operation_lifecycle.go:599:		return auditCurrent(ctx, q, trust, start, identity.Earlier(start.Add(5*time.Second), trust.FreshUntil.Time))
+owner_configuration.go:62:	if err != nil || len(b) > 64<<10 {
+owner_configuration.go:133:			if n >= 1024 {
+owner_configuration_read_diagnostic.go:78:	ownerReadExpiredInterval
+owner_configuration_read_diagnostic.go:120:		case "sql-55P03":
+owner_configuration_read_diagnostic.go:122:		case "sql-57014":
+owner_configuration_read_diagnostic.go:124:		case "sql-42501":
+owner_configuration_read_diagnostic.go:126:		case "sql-53300":
+owner_configuration_read_diagnostic.go:127:			reason = "connection-limit"
+owner_configuration_read_diagnostic.go:128:		case "sql-40001":
+owner_configuration_read_diagnostic.go:130:		case "sql-40P01":
+owner_configuration_read_diagnostic.go:156:	if errors.As(err, &p) && (p.Code == "40001" || p.Code == "40P01") {
+owner_configuration_read_diagnostic.go:172:		case "55P03":
+owner_configuration_read_diagnostic.go:174:		case "57014":
+owner_configuration_read_diagnostic.go:176:		case "42501":
+owner_configuration_read_diagnostic.go:193:	if !identity.Fresh(row.ObservedAt.Time, row.FreshUntil.Time, now, 30*time.Second) {
+owner_configuration_read_diagnostic.go:194:		return ownerConfigurationReadDiagnostic{ownerReadRecoveryFleetInterval, ownerReadIntervalFailure(row.ObservedAt.Time, row.Fre
+owner_configuration_read_diagnostic.go:199:	until := identity.Earlier(started.Add(5*time.Second), row.FreshUntil.Time)
+owner_configuration_read_diagnostic.go:200:	if !identity.Fresh(started, until, now, 5*time.Second) {
+owner_configuration_read_diagnostic.go:201:		return ownerConfigurationReadDiagnostic{ownerReadRecoveryProofInterval, ownerReadIntervalFailure(started, until, now, 5*time.
+owner_configuration_read_diagnostic.go:210:	return ownerConfigurationReadDiagnostic{ownerReadObservationInterval, ownerReadIntervalFailure(out.ObservedAt, out.FreshUntil,
+owner_configuration_read_diagnostic.go:215:func ownerReadIntervalFailure(started, until, now time.Time, maximum time.Duration) OwnerConfigurationReadReason {
+owner_configuration_read_diagnostic.go:223:	case until.After(started.Add(maximum)):
+owner_configuration_read_diagnostic.go:226:		return ownerReadExpiredInterval
+owner_enrollment.go:262:		if len(rows) > 2 {
+owner_enrollment.go:265:		if len(rows) > 0 {
+owner_enrollment.go:290:		permit := value.OwnerCertificatePermit{ID: s.newID(), Binding: p.Binding, Usage: p.Usage, PublicKeyDigest: p.PublicKeyDigest, EnrollmentAudit: r
+owner_enrollment.go:296:		if e != nil || len(b) > 64<<10 {
+owner_enrollment.go:315:	if e != nil || len(b) > 64<<10 {
+owner_observation_candidates.go:24:	call, stop := context.WithDeadline(ctx, start.Add(5*time.Second))
+owner_observation_candidates.go:28:		if c.Configuration.Pool.NativeCandidateLimit == 0 {
+owner_observation_candidates.go:31:		rows, e := q.ListOwnerObservationCandidates(call, custodydb.ListOwnerObservationCandidatesParams{InstallationID: id(c.Configuration.P
+owner_observation_candidates.go:35:		if len(rows) > c.Configuration.Pool.NativeCandidateLimit {
+owner_projection_diagnostic.go:11:	ownerProjectionSQLLifetime
+peer.go:34:	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+peer.go:47:	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+peer.go:73:	if len(rows) < 1 || len(rows) > 2 || now.Time.Before(start.Time) || !now.Time.Before(start.Time.Add(5*time.Second)) {
+peer.go:79:	if len(r.SourceDigest) != 32 || !rootRevision.Valid() {
+peer.go:82:	if r.Suspended || r.RecoveryBlocked || !r.Enabled || !r.AuditID.Valid || !r.AuditObjectKey.Valid || !r.AuditObjectVersion.Valid || r.AuditObjectVersion.String
+peer.go:91:	out = value.PeerRegistration{Binding: b, Revision: identity.Revision{UID: b.PeerID, Generation: r.Revision, Digest: sha256.Sum256(raw)}, Enabled: true, Observ
+peer.go:93:		if len(row.CertificateSha256) != 32 {
+permission_preview.go:39:		if len(bases) > 1024 {
+permission_preview.go:40:			return cfg.ErrLimit
+permission_preview.go:63:			if len(reviewRows)+len(rows) > cfg.MaxPreviewTargets {
+permission_preview.go:64:				return cfg.ErrLimit
+permission_preview.go:103:		if len(r.Sources) > 0 {
+permission_preview.go:162:		if cells > cfg.MaxPreviewTargets {
+permission_preview.go:163:			return cfg.ErrLimit
+permission_preview.go:179:				case errors.Is(err, cfg.ErrLimit):
+permission_reviews.go:25:const maxReviewAssignments = 4096
+permission_reviews.go:38:	if len(rows) > 64 {
+permission_reviews.go:39:		return cfg.ErrLimit
+permission_reviews.go:142:	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+permission_reviews.go:180:		if len(rows) > cfg.MaxReviewSourcesPerCluster {
+permission_reviews.go:181:			return cfg.ErrLimit
+permission_reviews.go:258:	if r == nil || p.Kind != identity.Human || !identity.Text(p.Issuer, 2048) || !identity.Text(p.Subject, 256) || !t.Valid() || !src.Valid() || sr
+permission_reviews.go:281:		if n.Time.Sub(decided) > 5*time.Second {
+permission_reviews.go:321:			if count >= maxReviewAssignments {
+permission_reviews.go:322:				return cfg.ErrLimit
+permission_reviews.go:369:	if identity.Text(d.Outcome, 32) {
+permission_reviews.go:389:	if err != nil || len(data) > 8<<20 {
+permission_reviews.go:390:		return cfg.ErrLimit
+permissions.go:45:	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+permissions.go:56:	for _, e := range []error{cfg.ErrInvalid, cfg.ErrChanged, cfg.ErrLimit, cfg.ErrDenied, cfg.ErrRetentionHistoryBehind, cfg.ErrRetentionObservationObsole
+permissions.go:115:	if len(bases) > 1024 || len(rows) > 4096 {
+permissions.go:116:		return nil, nil, cfg.ErrLimit
+permissions.go:129:	if err != nil || len(data) > 8<<20 {
+permissions.go:130:		return cfg.ErrLimit
+permissions.go:304:	if b.ExpectedSequence >= 2147483647 {
+permissions.go:305:		return cfg.ErrLimit
+permissions.go:415:				record.Bootstrap.ExpiresAt = r.ExpiresAt
+permissions.go:604:	if !s.InitialAuditID.Valid || s.Suspended || !n.Time.Before(s.LeaseUntil.Time) || !identity.Fresh(s.ObservedAt.Time, s.FreshUntil.Time, n.Time, author
+permissions.go:619:	if len(rows) > 256 {
+permissions.go:620:		return authorization.Projection{}, cfg.ErrLimit
+permissions.go:662:			if len(out.Allows)+len(out.Denies) >= 256 {
+policy_capture_reservation.go:24:	processingLimit time.Time
+policy_capture_reservation.go:111:	output := int64(artifact.MaxContextBytes)
+policy_capture_reservation.go:114:		output, required = recording.MaxBytes, policyRecordingNeedsGrant(recording)
+policy_capture_reservation.go:123:		output, required = l.MaxNativeBytes, planning.RecorderApprovedAcceptance(a.Plan.CanonicalScope)
+policy_capture_reservation.go:132:		output, required = profile.MaxBytes, true
+policy_capture_reservation.go:138:		output, required = saved.Request.MaxBytes, saved.Request.RequireApproval
+policy_capture_reservation.go:144:	r := &policyCaptureReservation{childAction: childAction, occurrence: occurrence, manual: manual, processingLimit: record.Authority.NotA
+policy_capture_reservation.go:167:			if errors.Is(err, authorization.ErrPolicyGrantBudgetExhausted) {
+policy_capture_reservation.go:172:		if raw && (grant.Policy.Observation == nil || grant.Policy.Limits.MaxObservedBytes < 1 || arguments && grant.Policy.Limits.MaxObserved
+policy_capture_reservation.go:185:		r.processingLimit = identity.Earlier(r.processingLimit, grant.PolicyNotAfter)
+policy_capture_reservation.go:267:		if err != nil || manual.ReservedBytes != accepted.Expectation.Registration.NativeLimit || !manual.AcceptedAt.Time.Equal(accepted.Creat
+policy.go:57:	if in.InstallationID != s.installation || !in.Valid(in.ObservedAt) || in.ObservedAt.Nanosecond()%1000 != 0 || in.FreshUntil.Nanosecond()%1000 != 0 {
+policy.go:113:	if len(row.Record) == 0 || len(row.Record) > 64<<10 {
+policy.go:232:		if err != nil || len(encoded) > 64<<10 {
+policy.go:281:	if !identity.Text(policy, 64) {
+policy_grant_attachment.go:22:	if !a.Valid() || len(r.AuthorityDigest) != 32 || !bytes.Equal(r.ActorKey, policyGrantActorKey(a.Actor)) {
+policy_grant_attachment.go:34:		!identity.Text(in.PolicyUID, 64) || !identity.Text(in.IdempotencyKey, 128) || !in.Actor.Principal.Valid() || in.Actor.Principal.Kind != id
+policy_grant.go:46:	if s == nil || ctx == nil || ctx.Err() != nil || !in.Requester.Valid() || !identity.Text(in.PolicyUID, 64) || !identity.Text(in.IdempotencyKey, 128) |
+policy_grant.go:112:				RequesterSubject: g.Requester.Subject, RequesterClient: g.Requester.ClientID, RequesterKind: string(g.Requester.Kind), LifetimeSeconds: int32(g.Li
+policy_grant_settings.go:23:		Values: identity.PolicyGrantApproval{DefaultAge: time.Duration(row.DefaultAgeSeconds) * time.Second,
+policy_grant_settings.go:24:			MaxAge: time.Duration(row.MaxAgeSeconds) * time.Second, RenewalNotice: time.Duration(row.RenewalNoticeSeconds) * time.Second}}
+policy_grant_settings.go:67:			DefaultAgeSeconds: int32(in.Values.DefaultAge / time.Second), MaxAgeSeconds: int32(in.Values.MaxAge / time.Second), RenewalNoticeSeconds: i
+policy_grant_settings.go:72:		if first || old.RootID.Valid && int64(in.Values.MaxAge/time.Second) < int64(old.MaxAgeSeconds) {
+policy_grant_settings.go:73:			if err = q.ClampPolicyGrantDeadlines(ctx, custodydb.ClampPolicyGrantDeadlinesParams{RootID: id(s.root), MaxAgeSeconds: int32(in.Values.MaxA
+policy_logs_reservation.go:28:	return be == nil && ae == nil && te == nil && l.TimeoutMillis == timeout.Milliseconds() && l.ActionID == parent.Action.ID && l.BeforeMillis
+policy_observation.go:85:	remaining := g.Policy.Authority.Limits.MaxObservedBytes - a.ObservedBytesSpent
+policy_observation.go:87:	hard = identity.Earlier(hard, e.Registration.ExpiresAt)
+policy_observation.go:88:	finite, err := authorization.PlanFinitePolicyObservation(g, g.Policy.Authority, c.Eligibility.Target, time.Duration(e.Recording.DurationMillis)*
+policy_observation.go:98:		Sequence: 1, Credit: finite.Credit, MaxBytesPerSecond: finite.BytesPerSecond,
+policy_observation.go:118:		StartedAt: row.StartedAt, SessionUntil: row.SessionUntil, StartBy: row.StartBy, DurationMillis: row.DurationMillis, Credit: row.Credit, MaxByt
+policy_observation.go:180:		MaxBytesPerSecond int64
+policy_observation.go:214:		MaxBytesPerSecond: row.MaxBytesPerSecond,
+policy_observation.go:221:	if !legacyObservationTuple(row) || len(row.BindingScope) != 32 || len(row.ProgramDigest) != 32 || len(row.ExpectationDigest) != 32 || !bytes.Eq
+policy_observation.go:228:	permit := collector.ObservationPermit{Binding: b, StartedAt: row.StartedAt.Time, SessionUntil: row.SessionUntil.Time, LeaseUntil: row.LeaseUnti
+policy_observation.go:248:	return r.ArgumentDefinitionDigest == nil && r.EventCredit == 0 && r.MaxEventsPerSecond == 0 && r.MaxProbeBytes == 0 && r.MaxBytesPerEvent == 0 
+policy_profile_reservation.go:40:	return err == nil && acquisition.SourceRef == parent.ProfileEndpoint.SourceRef && acquisition.Type == a.ProfileType && acquisition.Mode 
+policy_share.go:100:		if len(ids) > 100 {
+policy_share.go:141:	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(r.AcceptanceID) || !authorization.UUID(r.OperationID) || !r.Actor.Valid() || len
+policy_sources.go:56:	age, ageErr := time.ParseDuration(p.Action.RingMaxAge)
+policy_sources.go:57:	if ageErr != nil || age <= 0 || age > in.Retention.ExpiresAt.Sub(in.Retention.AnchorAt) {
+policy_sources.go:69:		identity.Fresh(in.ObservedAt, in.ValidUntil, now, 5*time.Second) && now.Before(in.Retention.ValidUntil) && in.Retention.Target == in.Target.Target(
+policy_sources.go:70:		authorization.UUID(in.SourceID) && authorization.UUID(in.Fence) && in.BytesPerSecond > 0 && in.BytesPerSecond <= collector.MaxInputRate && in.Sourc
+policy_sources.go:71:		in.InitialCredit >= 0 && in.ExpectedCredit >= 0 && in.AdditionalCredit >= 0 && in.ExpectedCredit <= math.MaxInt64-in.AdditionalCredit &&
+policy_sources.go:132:		if !reflect.DeepEqual(a, in.Authority) || in.Settings.Issuer != a.Creator.Issuer || app.RecorderPolicyScopeDigest(a.PolicyUID, record.IntentVersio
+policy_sources.go:200:			hard = identity.Earlier(hard, identity.Earlier(g.PolicyNotAfter, g.ExpiresAt))
+policy_sources.go:203:				hard = identity.Earlier(hard, now.Time.Add(time.Duration(g.Policy.Observation.MaxSessionSeconds)*time.Second))
+policy_sources.go:232:		limits, resourceDigest, err := sourceResources(resource, a.ClusterID, now.Time)
+policy_sources.go:236:		out.Resources = limits
+policy_sources.go:240:			rate = min(rate, observationGrant.Policy.Observation.MaxBytesPerSecond)
+policy_sources.go:242:		slots := in.SourceSlots
+policy_sources.go:243:		if limits.Node.MaxActiveSources > 0 {
+policy_sources.go:244:			slots = min(slots, limits.Node.MaxActiveSources)
+policy_sources.go:251:		lower(limits.Node.InputBytesPerSecond, slots)
+policy_sources.go:252:		lower(limits.Node.InputBurstBytes, slots)
+policy_sources.go:253:		workloadSlots := int64(in.Policy.ObservedPods * len(in.Policy.Recorders()))
+policy_sources.go:254:		if limits.Workload.MaxActiveSources > 0 {
+policy_sources.go:255:			workloadSlots = min(workloadSlots, limits.Workload.MaxActiveSources)
+policy_sources.go:257:		lower(limits.Workload.InputBytesPerSecond, workloadSlots)
+policy_sources.go:258:		lower(limits.Workload.InputBurstBytes, workloadSlots)
+policy_sources.go:277:			if call.Err() != nil || !sourceCheckCurrent(in, n.Time) || !n.Time.Before(until) || !n.Time.Before(hard) || !sourceResourceCurrent(resource, n.Ti
+policy_sources.go:278:				binding.ClusterID != id(a.ClusterID) || binding.NamespaceUid != a.NamespaceUID || binding.WorkloadUid != a.WorkloadUID || binding.AllocationID !
+policy_sources.go:311:			if limits.Workload.MaxActiveSources > 0 && count.SourceCount >= limits.Workload.MaxActiveSources || limits.Workload.InputBytesPerSecond > 0 && ra
+policy_sources.go:314:			budget, err := q.ReadPolicyAcceptance(call, custodydb.ReadPolicyAcceptanceParams{RootID: id(s.root), ID: policy.ActiveID})
+policy_sources.go:321:			initialCredit := min(in.InitialCredit, a.Limits.MaxObservedBytes-budget.ObservedBytesSpent)
+policy_sources.go:323:				initialCredit = min(initialCredit, observationGrant.Policy.Limits.MaxObservedBytes-observationGrant.PolicySpend.ObservedBytes)
+policy_sources.go:355:			b := collector.SourceBinding{RootID: s.root, PolicyUID: a.PolicyUID, AcceptanceID: record.ID, SourceID: in.SourceID, Fence: in.Fence, ActionID: i
+policy_sources.go:360:				b.ProgramDigest = [32]byte(compiler.FilterProgramDigest(in.Recorder().Filter.Program))
+policy_sources.go:379:			row, err = q.InsertPolicyRecordingSource(call, custodydb.InsertPolicyRecordingSourceParams{RootID: id(s.root), ID: id(in.SourceID), Fence: id(in.
+policy_sources.go:392:			if prior.Binding.ObservationGrantID != expectedGrant || observationGrant != nil && (prior.HardUntil.After(prior.StartedAt.Add(time.Duration(obser
+policy_sources.go:409:					budget, err := q.ReadPolicyAcceptance(call, custodydb.ReadPolicyAcceptanceParams{RootID: id(s.root), ID: policy.ActiveID})
+policy_sources.go:413:					delta := min(in.AdditionalCredit, a.Limits.MaxObservedBytes-budget.ObservedBytesSpent)
+policy_sources.go:415:						delta = min(delta, observationGrant.Policy.Limits.MaxObservedBytes-observationGrant.PolicySpend.ObservedBytes)
+policy_sources.go:450:		if b.PolicyUID != a.PolicyUID || b.ActionID != in.Recorder().Action.ID || b.Scope != [32]byte(a.ScopeDigest) || b.ExpectationDigest != [32]byte(in
+policy_sources.go:461:		p := collector.SourcePermit{Binding: b, StartedAt: state.StartedAt, HardUntil: state.HardUntil, StartBy: state.StartBy, IssuedAt: issued, Dispatch
+policy_sources.go:482:			step += "-late-" + bound + "-" + sourceBudgetBucket(until.Sub(entered))
+policy_sources.go:496:	return !row.Suspended && identity.Fresh(row.ObservedAt.Time, row.FreshUntil.Time, now, 30*time.Second)
+policy_sources.go:499:func sourceResources(row custodydb.ReadPolicySourceResourceSelectionRow, cluster string, now time.Time) (collector.SourceResources, [32]byte, error)
+policy_sources.go:502:	if !sourceResourceCurrent(row, now) || row.AcceptedRevision < 1 || len(row.AcceptedDigest) != 32 || json.Unmarshal(row.AcceptedSnapshot, &observati
+policy_sources.go:503:		return zero, [32]byte{}, value.ErrChanged
+policy_sources.go:509:		if policy.Resource.Deleting || policy.Scope == nil || policy.Scope.ClusterID != cluster || policy.Budget == nil {
+policy_sources.go:510:			return zero, [32]byte{}, value.ErrChanged
+policy_sources.go:512:		limits := collector.SourceResources{PolicyUID: policy.Resource.UID}
+policy_sources.go:514:			limits.Node = policy.SourceResources.Node
+policy_sources.go:515:			limits.Workload = policy.SourceResources.Workload
+policy_sources.go:517:		return limits, deliveryapp.SourceResourcesDigest(limits), nil
+policy_sources.go:519:	return zero, [32]byte{}, value.ErrChanged
+policy_sources.go:524:	if len(row.BindingJson) > 8192 || json.Unmarshal(row.BindingJson, &b) != nil || !b.Valid() || b.RootID != uid(row.RootID) || b.SourceID != uid(row.
+policy_sources.go:535:	if s == nil || !identity.Text(policy, 128) {
+policy_sources.go:545:		if len(rows) > 1024 {
+policy_sources.go:570:		_, err := q.ReleaseEndedPolicySourceSlots(ctx, id(s.root))
+policy_sources.go:599:		_, err = q.ReleaseEndedPolicySourceSlots(ctx, id(s.root))
+policy_sources.go:606:func sourceBudgetBucket(d time.Duration) string {
+policy_sources.go:610:	case d < time.Second:
+policy_sources.go:612:	case d < 3*time.Second:
+policy_trigger.go:35:	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+policy_trigger.go:49:	if s == nil || !in.Policy.Valid() || a.InstallationID != s.installation || o.ClusterID != a.ClusterID || o.Namespace.UID != a.NamespaceUID || o.Work
+policy_trigger.go:105:		if len(pods) > 0 {
+policy_trigger.go:146:				suppress["budget"]++
+policy_trigger.go:173:		for _, reason := range []string{"budget", "coalesced", "cooldown", "overlong"} {
+policy_trigger.go:212:	return q.CountPolicySuppression(ctx, custodydb.CountPolicySuppressionParams{RootID: id(s.root), PolicyUid: policy, Reason: reason, FirstAt: ts(at),
+policy_trigger.go:216:const policyWatermarkRetention = 10 * time.Minute
+policy_trigger.go:252:	if s == nil || !authorization.UUID(o.ID) || !identity.Text(o.PolicyUID, 64) || (captureID == "") == (refusal == "") || captureID != "" && !authoriz
+policy_trigger.go:290:		if len(rows) > 64 {
+policy_trigger.go:307:	if s == nil || !identity.Text(policy, 64) {
+policy_trigger.go:320:		if len(row.CreatorJson) > 0 {
+policy_trigger.go:352:		out.Authority, out.ExecutionsSpent, out.MaxExecutions, out.NotAfter, out.AcceptedIntentVersion, out.AcceptedGeneration = a, accepted.ExecutionsSpe
+policy_trigger.go:353:		out.CollectedBytesSpent, out.MaxCollectedBytes = accepted.CollectedBytesSpent, a.Limits.MaxBytes
+policy_trigger.go:354:		out.ObservedBytesSpent, out.MaxObservedBytes = accepted.ObservedBytesSpent, a.Limits.MaxObservedBytes
+policy_trigger.go:355:		out.ObservedEventsSpent, out.MaxObservedEvents = accepted.ObservedEventsSpent, a.Limits.MaxObservedEvents
+policy_trigger.go:418:	if s == nil || !identity.Text(policy, 64) || !authorization.UUID(acceptance) {
+policy_trigger.go:488:		if len(rows) != 1 || len(rows[0].SpecDigest) != 32 {
+processing_audit.go:44:	if in.Accounts < 1 || in.Accounts > 1000000 || in.RecordsPerAccount < 16 || in.RecordsPerAccount > 1000000 || !policy.CertificateVerificationBacke
+processing_capture.go:24:		!authorization.UUID(uid(p.InitializationID)) || !authorization.UUID(uid(p.Epoch)) || !authorization.UUID(uid(p.SourceUid)) || p.Sequence < 1 ||
+processing_capture.go:25:		len(p.ProtectionDigest) != 32 || bytes.Equal(p.ProtectionDigest, make([]byte, 32)) || p.Captures < 0 || p.Captures > p.MaxCaptures || p.Rules <
+processing_capture.go:26:		p.RootTransitions < 1 || p.RootTransitions > p.MaxRootTransitions || p.InitializedAt.Time.After(now) || len(rows) > privacy.MaxProcessingRules 
+processing_capture.go:33:		if uid(row.RootID) != in.RootID || seen[r.ID] || len(row.Scope) > 2048 || !row.ValidUntil.Valid || !row.RetireBy.Valid ||
+processing_capture.go:51:	if p.Captures == p.MaxCaptures {
+processing_capture.go:72:	if err != nil || ctx.Err() != nil || !recovery.Valid(n.Time) || !identity.Fresh(started, until, n.Time, 5*time.Second) {
+processing_capture.go:79:	if err != nil || ctx.Err() != nil || !recovery.Valid(n.Time) || !identity.Fresh(started, until, n.Time, 5*time.Second) {
+processing_capture.go:104:	until := identity.Earlier(started.Add(5*time.Second), recovery.FreshUntil)
+processing_configuration.go:33:	if !accepted.Valid() || !release.CertificateVerificationBacked() || release.Lane != "processing" || release.History.Layout != audit.Proces
+processing_configuration.go:77:			e = q.InsertProcessingRoot(call, custodydb.InsertProcessingRootParams{RootID: id(s.accepted.RootID), InstallationID: id(s.accepted.Insta
+processing_configuration.go:94:				changed, e := q.UpdateProcessingBacking(call, custodydb.UpdateProcessingBackingParams{RootID: id(s.accepted.RootID), BackingRevision: e
+processing_decisions.go:75:	if json.Unmarshal(row.Scope, &d.Change.Scope) != nil || json.Unmarshal(row.IntentSeed, &d.Intent) != nil || json.Unmarshal(row.OutcomeJson, &d
+processing_decisions.go:193:			if p.RootTransitions+2 >= p.MaxRootTransitions {
+processing_decisions.go:204:				if p.Rules >= p.MaxRules {
+processing_decisions.go:213:				if r.Decisions >= 16 || draft.Change.Action == "restrict_processing" && r.Decisions >= 15 {
+processing_discovery.go:29:			afterID, afterAt = "00000000-0000-0000-0000-000000000000", query.AcquiredFrom
+processing_discovery.go:33:			AfterArtifactID: id(afterID), AfterAnchorAt: ts(afterAt), AcquiredUntil: ts(query.AcquiredUntil), ObservedAt: ts(now), ScanLimit: int32(quer
+processing_discovery.go:35:		if err != nil || len(rows) > query.Limit+1 {
+processing_discovery.go:40:		if len(rows) > query.Limit {
+processing_discovery.go:41:			rows = rows[:query.Limit]
+processing_discovery.go:93:		Origin: node.Origin, AnchorAt: node.AnchorAt, ExpiresAt: r.EffectiveExpiresAt.Time.UTC(), DeleteBy: r.EffectiveDeleteBy.Time.UTC(), CustodySt
+processing_erasure.go:31:	previous := value.Deadlines{AnchorAt: r.Effective.AnchorAt.UTC(), ExpiresAt: r.Effective.ExpiresAt.UTC(), DeleteBy: r.Effective.DeleteBy.UTC()}
+processing_erasure.go:33:	effective.ExpiresAt = previous.AnchorAt
+processing_erasure.go:64:		a.RetentionSequence < d.Sequence || !a.EffectiveExpiresAt.Time.Equal(d.Effective.ExpiresAt) || a.EffectiveDeleteBy.Time.After(d.Effective.Delet
+processing.go:40:	return uid(p.InstallationID) == installation && p.InitializedAt.Valid && p.InitializationID.Valid && now.Before(p.ValidUntil.Time) && json.Unmarshal(p.B
+processing.go:55:	for len(queue) > 0 {
+processing.go:62:		if len(seen) > value.MaxProcessingAncestors {
+processing.go:78:		if len(queue) > value.MaxProcessingAncestors*value.MaxProcessingParents {
+processing.go:83:	if e != nil || len(rules) > value.MaxProcessingRules {
+processing.go:122:	call, stop := context.WithTimeout(ctx, 5*time.Second)
+processing.go:129:		if !identity.Fresh(r.ObservedAt, r.ValidUntil, started.Time, 5*time.Second) || !recovery.Valid(started.Time) {
+processing.go:136:		until := identity.Earlier(started.Time.Add(5*time.Second), identity.Earlier(r.ValidUntil, identity.Earlier(recovery.FreshUntil, r.Retained.Effective.E
+processing_inventory.go:41:		rows, err := q.ListProcessingInventoryRules(call, custodydb.ListProcessingInventoryRulesParams{RootID: p.RootID, AfterID: after, PageLimit: i
+processing_inventory.go:42:		if err != nil || len(rows) > query.Limit+1 {
+processing_inventory.go:46:		more := len(rows) > query.Limit
+processing_inventory.go:48:			rows = rows[:query.Limit]
+processing_report.go:50:		if err != nil || len(records) > query.Limit+1 {
+processing_report.go:53:		more := len(records) > query.Limit
+processing_report.go:55:			records = records[:query.Limit]
+processing_report.go:88:		after.ID = "00000000-0000-0000-0000-000000000000"
+processing_report.go:90:	limit := int32(query.Limit + 1)
+processing_report.go:99:			AfterClusterID: id(after.ClusterID), AfterID: id(after.ID), AfterAttemptID: id(after.AttemptID), PageLimit: limit,
+processing_report.go:117:			AfterID: id(after.ID), AfterOrdinal: after.Ordinal, PageLimit: limit,
+processing_report.go:129:				RecipientID: recipient.ID, Ordinal: row.Ordinal, CreatedAt: row.CreatedAt.Time.UTC(), ExpiresAt: row.ExpiresAt.Time.UTC(), State: "recorded",
+processing_report.go:131:			if !now.Before(v.ExpiresAt) {
+processing_report.go:142:			RootID: id(a.Policy.RootID), AfterID: id(after.ID), CreatedBefore: ts(query.CreatedBefore), ObservedAt: ts(now), PageLimit: limit,
+processing_report.go:160:			RootID: id(a.Policy.RootID), CreatedBefore: ts(query.CreatedBefore), ObservedAt: ts(now), AfterID: id(after.ID), AfterOrdinal: after.Ordinal, 
+processing_report.go:183:			RootID: id(a.Policy.RootID), AfterID: id(after.ID), ObservedAt: ts(now), CreatedBefore: ts(query.CreatedBefore), PageLimit: limit,
+processing_report.go:212:			if len(records) == int(limit) {
+processing_report.go:226:			if len(records) == int(limit) {
+processing_report.go:259:		PrivacyClass: "potentialPersonalData", Origin: row.Origin, Parents: []string{}, AnchorAt: row.AnchorAt.Time.UTC(), OriginalExpiresAt: row.Origi
+processing_report.go:260:		OriginalDeleteBy: row.OriginalDeleteBy.Time.UTC(), ExpiresAt: row.EffectiveExpiresAt.Time.UTC(), DeleteBy: row.EffectiveDeleteBy.Time.UTC(),
+processing_report.go:269:	if !now.Before(v.ExpiresAt) {
+profile_cancellation.go:59:		if err != nil || len(raw) > 8192 {
+profile_streaming.go:19:	if r.NativeLimit <= artifact.FrameBytes {
+profile_streaming.go:22:	if r.NativeLimit > artifact.MaxGoTraceBytes {
+profile_streaming.go:28:		if old.TemporaryBytes != plan.TemporaryBytes() || old.TemporaryObjects != int64(1+plan.PartLimit()) {
+profile_streaming.go:36:	changed, err := q.ChargeStreaming(ctx, custodydb.ChargeStreamingParams{ID: id(r.AllocationID), ChargedBytes: plan.TemporaryBytes(), ChargedObject
+profile_streaming.go:47:	return q.InsertPendingStream(ctx, custodydb.InsertPendingStreamParams{AttemptID: id(r.Location.AttemptID), TemporaryBytes: plan.TemporaryBytes(),
+profile_streaming.go:54:	if e.Profile == nil && e.Logs == nil || e.Registration.NativeLimit <= artifact.FrameBytes {
+profile_streaming.go:68:	if old.TemporaryBytes != plan.TemporaryBytes() || old.TemporaryObjects != int64(1+plan.PartLimit()) || old.ReleasedAt.Valid {
+profile_streaming.go:71:	if old.WriterEpoch.Valid || len(old.PlanDigest) > 0 {
+public_runtime_hub_extension_grants.go:129:		{"table", "context_catalog", "capture_id", "SELECT"}, // ADR-181 publication queue
+public_runtime_hub_extension_grants.go:230:		{"table", "artifact_download", "output_limit", "INSERT"},
+public_runtime_hub_extension_grants.go:232:		{"table", "artifact_download", "read_limit", "INSERT"},
+public_runtime_hub_extension_grants.go:234:		{"table", "artifact_download", "request_limit", "INSERT"},
+public_runtime_role_plan.go:29:	return "as_" + strings.ReplaceAll(installation, "-", "") + "_pub_" + string([]byte{'0' + byte(index/10), '0' + byte(index%10)}), true
+public_runtime_role_plan.go:203:		add("policy_occurrence_capture", "INSERT") // ADR-275 further recorder captures
+public_runtime_role_plan.go:339:		add("policy_grant_settings", "UPDATE", "issuer", "source_uid", "source_generation", "source_digest", "observed_at", "fresh_until", "defa
+public_runtime_role_plan.go:578:		connections, _ := contracts.PublicRuntimeRoleConnectionLimit(purpose)
+public_runtime_roles.go:47:	if ctx == nil || ctx.Err() != nil || c == nil || root == nil || input.Format != contracts.PublicRuntimeRolesFormat || !authorization.UUID(inpu
+public_runtime_roles.go:60:	c.RuntimeParams = map[string]string{"application_name": "asservat-public-role-provisioner", "search_path": "pg_catalog,public", "timezone": "U
+public_runtime_roles.go:61:	c.ConnectTimeout = 5 * time.Second
+public_runtime_roles.go:67:	config.MaxConns = 1
+public_runtime_roles.go:76:	current, end := context.WithTimeout(life, 5*time.Second)
+public_runtime_roles.go:143: AND NOT t.suspended AND NOT t.recovery_blocked AND t.observed_at<=clock_timestamp() AND clock_timestamp()<t.fresh_until AND t.fresh_until-t.o
+public_runtime_roles.go:177:	check, cancel := context.WithTimeout(ctx, 5*time.Second)
+public_runtime_roles.go:251:const publicRoleBracketReserve = 2 * time.Second
+public_runtime_roles.go:255:	observation, finish := context.WithTimeout(ctx, 5*time.Second)
+public_runtime_roles.go:299:	life, cancel := context.WithTimeout(ctx, 5*time.Second)
+public_runtime_roles.go:316:		c, e := context.WithTimeout(context.WithoutCancel(bounded), time.Second)
+public_runtime_roles.go:324:	if _, err = tx.Exec(bounded, `SELECT pg_advisory_xact_lock(1095979854,hashtext($1))`, s.input.InstallationID); err != nil {
+public_runtime_roles.go:363:		rollback, end := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
+public_runtime_roles.go:373:	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(1095979854,hashtext($1))`, s.input.InstallationID); err != nil {
+public_runtime_roles.go:396:	connections, bounded := contracts.PublicRuntimeRoleConnectionLimit(material.Purpose)
+public_runtime_roles.go:459:	c.RequireAuth = "scram-sha-256"
+public_runtime_roles.go:467:		closeCtx, end := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
+public_runtime_roles.go:482:	connections, bounded := contracts.PublicRuntimeRoleConnectionLimit(material.Purpose)
+public_runtime_roles.go:498:	err := q.QueryRow(ctx, `SELECT oid,rolcanlogin AND NOT rolsuper AND NOT rolinherit AND NOT rolcreatedb AND NOT rolcreaterole AND NOT rolrepli
+public_runtime_roles.go:542:		resolved, err := strconv.ParseUint(object, 10, 32)
+public_runtime_roles.go:543:		if err != nil || resolved == 0 || strconv.FormatUint(resolved, 10) != object {
+raw_query_grant.go:29:	if s == nil || !p.Valid() || p.Kind != identity.Human || !identity.Text(key, 128) {
+raw_query_grant.go:37:		if len(row.RequestDigest) != 32 || row.RequesterIssuer != p.Issuer || row.RequesterSubject != p.Subject || row.RequesterClient != p.ClientID {
+raw_query_grant.go:86:			row, err = q.InsertRawQueryGrant(ctx, custodydb.InsertRawQueryGrantParams{ID: id(g.ID), RootID: id(s.root), ExecutionDigest: g.ExecutionDigest[:]
+raw_query_grant.go:188:	if s == nil || ctx == nil || ctx.Err() != nil || !value.UUID(parent) || len(artifacts) < 1 || len(artifacts) > value.GrantMaxResultArtifacts {
+recording_cancellation.go:62:		if err != nil || len(raw) > 8192 {
+recording_save_group_bounds.go:16:	if a.RecordingSave == nil || s == nil || s.Group == nil || intent.Group == nil || !bounds.Valid(intent.CreatedAt) || bounds.Requester !
+recording_save_group_cancel.go:17:		return zero, value.ErrDenied // ADR-276: finite children run to their deadline
+recording_save_group_history.go:48:	if len(singles) > 0 {
+recording_save_group_history.go:54:	if len(groups) > 0 {
+recording_save_group_history.go:135:		if visible == query.Limit {
+recording_save_group_history.go:208:		if !ok || !parameter.Visible || !now.Before(parameter.SummaryExpiresAt.Time) {
+recording_save_group_history.go:213:		evidenceAvailable, evidenceExpired, active := false, false, false
+recording_save_group_history.go:233:			switch value.HistoryEvidenceState(p.Phase, f.EffectiveExpiresAt.Time, now) {
+recording_save_group_history.go:237:				evidenceExpired = true
+recording_save_group_history.go:250:		} else if evidenceExpired {
+recording_save_group_history.go:253:		entry := value.HistoryEntry{Operation: "recordingSave", Requester: actors[g.ID], CaptureID: uid(g.ID), Origin: value.HistoryManual, 
+recording_save_group_history.go:254:		if !now.Before(entry.SettingsExpiresAt) {
+recording_save_group_history.go:255:			entry.RepeatState = "parametersExpired"
+recording_save_group_history.go:260:		if len(rows) > 0 && rows[0].RepeatedFromCaptureID.Valid && now.Before(rows[0].RepeatedFromExpiresAt.Time) {
+recording_save_group_history.go:275:		if candidate.Grouped && (members < 2 || members > value.MaxRecordingSaveGroupChildren) || !candidate.Grouped && members != 1 {
+recording_save_group_permissions.go:49:	if len(p.byTarget) >= value.MaxRecordingSaveGroupChildren {
+recording_save_group_progress.go:34:	if len(actions) > 0 && counts["Succeeded"] == len(actions) {
+recording_save_group_progress.go:43:	if len(actions) > 0 && counts["Cancelled"] == len(actions) {
+recording_save_group_progress.go:61:		operation = "collect" // ADR-276: one Pod, several recorders
+recording_save_group_progress.go:63:	out := value.ContextProgressObservation{CaptureID: uid(header.ID), CandidateCaseID: accepted.Group.CaseID, Operation: operation, Revi
+recording_save_group_progress.go:84:		if row.RepeatedFromCaptureID.Valid && observedAt.Before(row.RepeatedFromExpiresAt.Time) {
+recording_save_group_progress.go:97:		if history.Visible && history.State == "available" && history.CustodyState == artifact.StoredUnpublished && observedAt.Before(histor
+recording_save_groups.go:25:	if len(row.ChildIds) < 2 || len(row.ChildIds) > 16 {
+recording_save_groups.go:46:	if err != nil || parsed.CaptureID != uid(row.ID) || parsed.Requester == nil || len(rows) != len(row.ChildIds) || len(parsed.Targets) != len(r
+recording_save_groups.go:133:	if err != nil || scope.Requester == nil || len(scope.Targets) < 2 {
+recording_save_groups.go:168:	if s == nil || s.ledger == nil || ctx == nil || in.RootID != s.root || p.RootID != s.root || p.Group == nil || !app.ValidContextPreview(p) |
+recording_save_groups.go:258:				until = identity.Earlier(until, children[n].RepeatedFrom.ExpiresAt)
+recording_save_groups.go:265:			if err != nil || children[n].Plan.Input.Deadline.After(r.processingLimit) {
+recording_save_groups.go:331:	if accepted.Group == nil || len(accepted.Group.Children) < 2 {
+recording_save_groups.go:378:	if s == nil || s.ledger == nil || ctx == nil || in.RootID != s.root || p.RootID != s.root || p.CompositionGroup == nil || in.RequestBounds !
+recording_save_reservation.go:53:	if app.RecorderPolicyScopeDigest(source.PolicyUid, record.IntentVersion, policySource(source).CollectionDigest, p, authority.NamespaceUI
+recording_save_reservation.go:57:	if in.Authority.Executor != authority.Executor || in.Authority.ScopeDigest != authority.ScopeDigest || saved.ExecutionDigest != authorit
+recording_save_reservation.go:138:	recipe, recipeErr := time.ParseDuration(rec.Composition.MaxDuration)
+recording_selections.go:44:	if err != nil || len(raw) > 65536 {
+recording_selections.go:50:	if len(raw) < 2 || len(raw) > 65536 {
+recording_selections.go:56:	if d.Decode(&records) != nil || len(records) > value.MaxRecordingSelections {
+recording_selections.go:61:		if len(r.Binding) != 32 || len(r.Execution) != 32 {
+recording_selections.go:93:		if now.Time.Before(set.CreatedAt) || !now.Time.Before(set.ExpiresAt) {
+recording_selections.go:98:			if !bytes.Equal(old.ReferencesJson, raw) || !old.CreatedAt.Time.Equal(set.CreatedAt) || !old.ExpiresAt.Time.Equal(set.ExpiresAt) || old.Poli
+recording_selections.go:106:		if _, err = q.DeleteExpiredRecordingSelections(ctx, id(s.root)); err != nil {
+recording_selections.go:113:		if count >= value.MaxPreviewsPerRoot {
+recording_selections.go:120:		if count >= value.MaxPreviewsPerPrincipal {
+recording_selections.go:123:		if err = q.InsertRecordingSelection(ctx, custodydb.InsertRecordingSelectionParams{ID: id(set.ID), RootID: id(s.root), ActorKey: previewActor
+recording_selections.go:130:		if !now.Time.Before(set.ExpiresAt) {
+recording_selections.go:151:		out = value.RecordingSelectionSet{ID: uid(row.ID), RootID: uid(row.RootID), Actor: actor, Target: authorization.WorkloadTarget{ClusterID: ui
+recording_selections.go:156:		if !out.Valid() || !bytes.Equal(row.PrincipalKey, principalKey(actor)) || now.Time.Before(out.CreatedAt) || !now.Time.Before(out.ExpiresAt) 
+recording_selections.go:166:	if s == nil || s.ledger == nil || !target.Valid() || query.PolicyUID != "" && !identity.Text(query.PolicyUID, 64) || query.AfterSourceID != "
+recording_selections.go:174:		out.More = len(rows) > value.MaxRecordingSelections
+recording_selections.go:176:			rows = rows[:value.MaxRecordingSelections]
+recording_selections.go:191:	if s == nil || s.ledger == nil || !target.Valid() || len(ids) < 1 || len(ids) > value.MaxRecordingSelections {
+recovery.go:50:	return recoveryStateWithin(row, started, now, 5*time.Second)
+recovery.go:54:		window = 5 * time.Second
+recovery.go:56:	if row.Suspended || row.RecoveryBlocked || !identity.Fresh(row.ObservedAt.Time, row.FreshUntil.Time, now, 30*time.Second) {
+remote_capacity.go:52:	call, end := context.WithTimeout(ctx, 5*time.Second)
+remote_capacity.go:70:	call, end := context.WithTimeout(ctx, 5*time.Second)
+remote_capacity.go:101:	call, end := context.WithTimeout(ctx, 5*time.Second)
+remote_capacity.go:103:	rows, err := s.pool.Query(call, `SELECT cluster_id,observed_at,namespaces FROM public.remote_capacity_delivery WHERE root_id=$1 ORDER BY cluster_i
+retention_catchup.go:23:func (s *Retention) ReconcileRetentionPage(ctx context.Context, source value.PolicySourceRef, limit int) (value.RetentionCatchupPage, error) {
+retention_catchup.go:25:	if !config.ValidRetentionSource(source) || limit < 1 || limit > 16 {
+retention_catchup.go:60:		rows, err := q.ListRetentionCatchupContexts(ctx, custodydb.ListRetentionCatchupContextsParams{RootID: id(s.root), CreatedAt: row.CreatedAt, Afte
+retention_catchup.go:66:		out.Complete = len(rows) <= limit
+retention_catchup.go:67:		if len(rows) > limit {
+retention_catchup.go:68:			rows = rows[:limit]
+retention_catchup.go:100:			if !deadlines.ExpiresAt.Equal(r.Effective.ExpiresAt) || !deadlines.DeleteBy.Equal(r.Effective.DeleteBy) {
+retention_catchup.go:113:				d := value.LifecycleDecision{ID: uid(decisionID), RootID: s.root, Location: r.Registration.Location, Target: r.Input.Target, Sequence: r.Sequ
+retention_fence.go:36:	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+retention_fence.go:85:		return privacyapp.ErrExpired
+retention.go:52:	out = value.RetainedArtifact{RootID: root, Registration: r, OriginPolicies: slices.Clone(e.RetentionRules), Input: value.Input{Target: authorization.Targ
+retention.go:88:	if json.Unmarshal(r.DecisionJson, &d) != nil || !d.Valid() || id(d.ID) != r.ID || id(d.RootID) != r.RootID || id(d.Location.AttemptID) != r.AttemptID || 
+retention.go:101:	for _, at := range []time.Time{d.ObservedAt, d.ValidUntil, d.Previous.AnchorAt, d.Previous.ExpiresAt, d.Previous.DeleteBy, d.Effective.AnchorAt, d.Effec
+retention.go:102:		if at.Nanosecond()%1000 != 0 {
+retention.go:137:	if r.Registration.Location != d.Location || r.Input.Target != d.Target || r.Sequence+1 != d.Sequence || app.RegistrationDigest(r.Registration) != d.Regi
+retention.go:149:		if !identity.Fresh(d.ObservedAt, d.ValidUntil, now.Time, 60*time.Second) {
+retention.go:158:	if err != nil || len(encoded) > 32<<10 {
+retention.go:161:	if err = q.InsertRetentionDecision(ctx, custodydb.InsertRetentionDecisionParams{ID: id(d.ID), RootID: id(s.root), AttemptID: a.ID, Sequence: d.Sequence,
+retention.go:164:	n, err := q.TightenAttempt(ctx, custodydb.TightenAttemptParams{ID: a.ID, RetentionSequence: d.Sequence, EffectiveExpiresAt: ts(d.Effective.ExpiresAt), E
+retention.go:174:	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+retention.go:192:	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+retention_observation.go:46:		if !identity.Fresh(p.ObservedAt, p.FreshUntil, now, 5*time.Second) {
+retention_observation.go:109:		if !identity.Fresh(observed, input, now, 5*time.Second) {
+retention_preview.go:26:func (s *RetentionSources) RetentionPreviewCatalog(ctx context.Context, limit int) (privacy.PreviewCatalog, error) {
+retention_preview.go:28:	if limit < 1 || limit > privacy.MaxRetentionPreviewArtifacts {
+retention_preview.go:33:		rows, err := q.ListRetentionPreviewSources(ctx, custodydb.ListRetentionPreviewSourcesParams{RootID: id(s.root), RowLimit: privacy.MaxRetentionPr
+retention_preview.go:37:		if len(rows) > privacy.MaxRetentionPreviewSources {
+retention_preview.go:38:			return value.ErrLimit
+retention_preview.go:73:			page := min(retentionPreviewPage, limit-scanned) + 1
+retention_preview.go:74:			rows, err := q.ListRetentionPreviewContexts(ctx, custodydb.ListRetentionPreviewContextsParams{RootID: id(s.root), AfterAttempt: after, PageLimi
+retention_preview.go:89:			if scanned >= limit {
+retention_preview.go:117:		a := custodydb.CustodyAttempt{ID: row.AttemptID, ClusterID: row.ClusterID, RequestDigest: row.RequestDigest, EffectiveExpiresAt: row.EffectiveE
+retention_preview.go:129:	if len(ids) > 0 {
+retention_sources.go:143:	if err != nil || len(encoded) > 8<<20 {
+retention_sources.go:144:		return out, value.ErrLimit
+retention_sources.go:179:		if err != nil || len(record) > 256<<10 {
+retention_sources.go:180:			return value.ErrLimit
+retention_sources.go:229:	if !f.Valid() || f.RootID != s.root || f.Sequence < 1 || !identity.Text(cursor, 128) || cursor == "0" {
+retention_sources.go:255:func (s *RetentionSources) PendingRetentionAcceptances(ctx context.Context, limit int) ([]audit.RetentionAcceptance, error) {
+retention_sources.go:256:	if limit < 1 || limit > 64 {
+retention_sources.go:261:		rows, err := q.PendingRetentionCheckpoints(ctx, custodydb.PendingRetentionCheckpointsParams{RootID: id(s.root), Limit: int32(limit)})
+runtime_roles.go:33:	add := func(name string, named bool, connections int, limited bool, grants []publicRuntimeGrant, planned bool) error {
+runtime_roles.go:34:		if !named || !limited || !planned || connections < 1 {
+runtime_roles.go:42:		limit, limited := contracts.PublicRuntimeRoleConnectionLimit(purpose)
+runtime_roles.go:44:		if err := add(name, named, limit, limited, grants, planned); err != nil {
+runtime_roles.go:89:	c.RuntimeParams = map[string]string{"application_name": "asservat-setup-roles", "search_path": "pg_catalog,public", "timezone": "UTC", "lock_timeout"
+runtime_roles.go:90:	c.ConnectTimeout = 5 * time.Second
+runtime_roles.go:96:		end, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
+runtime_roles.go:152:		end, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
+session_role.go:21:	call, cancel := context.WithTimeout(ctx, 5*time.Second)
+setup_seed.go:24:	c.RuntimeParams = map[string]string{"application_name": "asservat-setup-seed", "search_path": "pg_catalog,public", "timezone": "UTC", "lock_timeout": "5
+setup_seed.go:25:	c.ConnectTimeout = 5 * time.Second
+setup_seed.go:33:		end, stop := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
+setup_seed.go:42:		end, stop := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
+small_keycloak_database.go:23:var smallKeycloakDatabaseHost = regexp.MustCompile(`^[a-zA-Z0-9](?:[a-zA-Z0-9.-]{0,251}[a-zA-Z0-9])?$`)
+small_keycloak_database.go:30:	if (net.ParseIP(p.Host) == nil && !smallKeycloakDatabaseHost.MatchString(p.Host)) || p.Port < 1 || p.Port > 65535 || !identity.Text(p.Datab
+small_keycloak_database.go:52:	c.ConnectTimeout = 5 * time.Second
+small_keycloak_database.go:54:	c.RuntimeParams = map[string]string{"application_name": "asservat-keycloak-empty-check", "search_path": "pg_catalog", "timezone": "UTC", "d
+small_keycloak_database.go:81:	ctx, end := context.WithTimeout(ctx, 5*time.Second)
+snapshot_cancellation.go:99:		if err != nil || len(raw) > 8192 {
+snapshot_cancellation.go:227:				out.Snapshot = &collector.SourceSnapshot{Binding: *w.SourceBinding, CaptureID: accepted.CaptureID, AttemptID: accepted.Expectation.Regist
+snapshot_cancellation.go:248:		out.Decision = value.Cancellation{CaptureID: accepted.CaptureID, Phase: phase, Revision: row.ProgressRevision, Requested: row.SnapshotCance
+source_provenance.go:21:		if source.Binding.AudienceDigest != ([32]byte{}) {
+source_provenance.go:26:	if len(row.SourceAudienceJson) == 0 || len(row.SourceAudienceDigest) != 32 || len(row.SourceTargetJson) == 0 {
+source_provenance.go:47:	if err != nil || !b.Valid() || b.AudienceDigest == ([32]byte{}) || digest != artifact.Digest(b.AudienceDigest) || t == nil || !t.Valid() {
+source_snapshot_completion.go:22:	if e.Snapshot == nil || !evidence.ValidSourceSnapshotManifest(e) || len(raw) > 8192 || len(coverageDigest) != 32 || len(finalDigest) != 
+source_snapshot_execution.go:36:	if source.Target == nil || !source.Target.Valid() || source.Target.SourceID != b.SourceID || source.Target.Fence != b.Fence || source.Tar
+sql_login.go:19:	if len(l.Password) < 32 || len(l.Password) > 1024 || strings.IndexFunc(l.Password, func(r rune) bool { return r < 0x21 || r > 0x7e }) >= 0 {
+sql_login.go:26:	salt := make([]byte, 16)
+sql_login.go:31:	stored, err := c.GetStoredCredentialsWithError(scram.KeyFactors{Salt: string(salt), Iters: 4096})
+sql_login.go:38:	return "SCRAM-SHA-256$4096:" + b64(salt) + "$" + b64(stored.StoredKey) + ":" + b64(stored.ServerKey), nil
+streaming.go:48:		if err = current(ctx, q, p, a, r, r.ExpiresAt); err != nil {
+streaming.go:62:		temporaryObjects := int64(1 + plan.PartLimit())
+streaming.go:70:		if err = q.InsertAttempt(ctx, custodydb.InsertAttemptParams{ID: id(r.Location.AttemptID), ClusterID: id(r.Location.ClusterID), ArtifactID: id(r.Location
+streaming.go:73:		for i, limit := range r.Limits() {
+streaming.go:74:			if err = q.InsertCopy(ctx, custodydb.InsertCopyParams{AttemptID: id(r.Location.AttemptID), Role: int16(i), ByteLimit: limit}); err != nil {
+streaming.go:85:		if err = current(ctx, q, p, a, r, r.ExpiresAt); err != nil {
+streaming.go:91:		result = privacy.Record{Registration: r, Effective: privacyvalue.Deadlines{AnchorAt: r.AnchorAt, ExpiresAt: r.ExpiresAt, DeleteBy: r.DeleteBy}, State: a
+streaming.go:134:		if claim && (row.State != artifact.Reserved || current(ctx, q, p, a, r, row.EffectiveExpiresAt.Time) != nil) {
+streaming.go:135:			return privacy.ErrExpired
+streaming.go:166:		if claim && current(ctx, q, p, a, r, row.EffectiveExpiresAt.Time) != nil {
+streaming.go:167:			return privacy.ErrExpired
+upgrade_schema.go:30:const schemaLockWait = 2 * time.Minute
+upgrade_schema.go:56:		if entry.IsDir() || len(name) < 11 || len(name) > 128 || name[5] != '_' || !strings.HasSuffix(name, ".sql") {
+upgrade_schema.go:59:		n, e := strconv.ParseInt(name[:5], 10, 64)
+upgrade_schema.go:64:		if e != nil || len(b) == 0 || len(b) > 512<<10 {
+upgrade_schema.go:131:	copy.RuntimeParams = map[string]string{"application_name": "asservat-setup-schema", "search_path": "public,pg_catalog", "timezone": "UTC", "lock_ti
+upgrade_schema.go:132:	copy.ConnectTimeout = 5 * time.Second
+upgrade_schema.go:134:	db.SetMaxOpenConns(1)
+upgrade_schema.go:135:	db.SetMaxIdleConns(0)
+upgrade_schema.go:136:	db.SetConnMaxLifetime(30 * time.Minute)
+upgrade_schema.go:241:func schemaHistory(ctx context.Context, q schemaQuery, maximum int64, owner uint32) (int64, bool, error) {
+upgrade_schema.go:242:	if maximum < 1 || maximum > currentSchemaVersion {
+upgrade_schema.go:260:	rows, e := q.QueryContext(ctx, "SELECT id,version_id,is_applied FROM public.goose_db_version ORDER BY id LIMIT $1", maximum+2)
+upgrade_schema.go:276:	head, e := schemaPrefix(entries, maximum)
+upgrade_schema.go:286:func schemaPrefix(entries []schemaVersion, maximum int64) (int64, error) {
+upgrade_schema.go:287:	if maximum < 1 || len(entries) == 0 || int64(len(entries)) > maximum+1 {
+upgrade_schema.go:343:		floor = max(floor, n)
+upgrade_schema.go:353:	matches, err := fs.Glob(migrations.Files(), fmt.Sprintf("%05d_*.sql", version))
+upgrade_schema.go:363:		n, e := strconv.ParseInt(string(m[1]), 10, 64)
+upgrade_schema.go:367:		floor = max(floor, n)
+worker_configuration.go:30:	if !value.UUID(installation) || !value.UUID(cluster) || !value.UUID(source) || !identity.Text(namespace, 64) {
+worker_configuration.go:53:	if e != nil || len(b) > 16384 {
+worker_configuration.go:68:				return artifact.ErrDownloadExpired
+worker_configuration.go:104:			if count >= 1024 {
+worker_configuration.go:198:	if !identity.Fresh(head.ObservedAt.Time, head.FreshUntil.Time, n.Time, 5*time.Second) {
+worker_configuration.go:199:		return zero, artifact.ErrDownloadExpired
+worker_configuration.go:208:	ctx, end := context.WithTimeout(ctx, 5*time.Second)
+worker_configuration.go:229:			return artifact.ErrDownloadExpired
+worker_enrollment.go:48:			return artifact.ErrDownloadExpired
+worker_enrollment.go:58:			return artifact.ErrDownloadExpired
+worker_enrollment.go:160:		if len(rows) > 2 {
+worker_enrollment.go:163:		if len(rows) > 0 {
+worker_enrollment.go:188:		end := identity.Earlier(p.FreshUntil, identity.Earlier(checked.freshUntil, identity.Earlier(now.Add(5*time.Second), until)))
+worker_enrollment.go:191:			return artifact.ErrDownloadExpired
+worker_enrollment.go:194:		if e != nil || len(b) > 65536 {
+worker_enrollment.go:206:			return artifact.ErrDownloadExpired
+worker_enrollment.go:220:	if e != nil || len(b) > 48<<10 {
+worker_enrollment.go:225:			return artifact.ErrDownloadExpired
+worker_enrollment.go:253:			return artifact.ErrDownloadExpired
+worker_enrollment.go:283:			return artifact.ErrDownloadExpired
+worker_enrollment.go:300:			return artifact.ErrDownloadExpired
+worker_enrollment.go:316:	ctx, end := context.WithTimeout(ctx, 5*time.Second)
+worker_lifecycle.go:45:	if err != nil || len(rows) > 16 {
+worker_owners.go:29:	return value.WorkerOwnerLease{Request: value.WorkerOwnerRequest{ID: uid(r.RequestID), InstallationID: installation, SessionID: session, WorkerID: uid
+worker_owners.go:38:	ctx, end := context.WithTimeout(ctx, 5*time.Second)
+worker_owners.go:61:			return artifact.ErrDownloadExpired
+worker_owners.go:80:			count, err := q.ReplaceWorkerOwner(ctx, custodydb.ReplaceWorkerOwnerParams{WorkerID: id(request.WorkerID), RequestID: id(request.ID), PodUid: id(re
+worker_owners.go:89:		return q.InsertWorkerOwner(ctx, custodydb.InsertWorkerOwnerParams{WorkerID: id(request.WorkerID), RequestID: id(request.ID), PodUid: id(request.PodU
+worker_owners.go:95:		return value.WorkerOwnerLease{}, artifact.ErrDownloadExpired
+worker_owners.go:112:	ctx, end := context.WithTimeout(ctx, 5*time.Second)
+worker_owners.go:115:	_, err := custodydb.New(s.workers.downloads.ledger.pool).ReleaseWorkerOwner(ctx, custodydb.ReleaseWorkerOwnerParams{RootID: id(s.workers.downloads.r
+worker_routing.go:70:	ctx, cancel := context.WithDeadline(ctx, started.Add(5*time.Second))
+worker_routing.go:131:		return value.AcquisitionWorkerIdentity{}, artifact.ErrDownloadExpired
+worker_routing.go:148:	ctx, end := context.WithTimeout(ctx, 5*time.Second)
+worker_routing.go:160:		return value.WorkerOwnerLease{}, artifact.ErrDownloadExpired
+worker_routing.go:172:	ctx, end := context.WithTimeout(ctx, 5*time.Second)
+worker_routing.go:219:	if current.ID != r.ID || current.TerminationJson != nil || current.RetiredProofJson != nil || !now.Time.Before(w.Intent.RunUntil) || !now.Time.Befo
+worker_routing.go:220:		return out, artifact.ErrDownloadExpired
+worker_routing.go:223:	until = identity.Earlier(until, identity.Earlier(start.Time.Add(5*time.Second), w.Intent.RunUntil))
+worker_routing.go:227:		return value.DownloadWorkerIdentity{}, artifact.ErrDownloadExpired

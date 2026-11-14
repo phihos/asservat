@@ -23,17 +23,23 @@ expose the complete group. Evidence bytes, unwrap keys and tokens never enter SQ
 
 ## Quotas
 
-Downloads draw on a per-workload transfer allocation configured by the
-administrator. Admission is one conditional update on the affected workload
-allocation row (`used + n <= limit`); no installation-wide lock or row is
-taken. Concurrency limits per principal and per workload are administrator
-settings, not fixed constants, and incident uploads have priority over
-downloads in reader scheduling.
+Ordinary downloads read existing evidence, use no storage and have no transfer
+byte budget or request-count cap ([ADR-335](../decisions/335-usable-by-default.md) D9).
+A raw evidence download charges its raw grant's finite parent disclosure pool
+(maintainer decision) with one conditional update on that pool row; no
+installation-wide lock or row is taken.
 
-A response reserves its selected range at start and records the actual emitted
-bytes when it ends; the unused remainder is released then. If the end is not
-known (process crash), the reservation is released when the response's hard
-deadline has passed, because no writer can emit after it. Bytes already emitted
+Reader capacity is the real cost. Download concurrency defaults to reader
+replicas × streams per replica ([download reader deployment](download-worker-dispatch.md)),
+and one workload may use at most half of it (fair share on the shared reader);
+both are administrator-configurable with these derived defaults. Incident
+uploads have priority over downloads in reader scheduling.
+
+A raw download reserves its selected range on the pool at start and records the
+actual emitted bytes when it ends; the unused remainder is released then. If
+the end is not known (process crash), the reservation is released when the
+response's hard deadline has passed, because no writer can emit after it
+(ADR-312 original bound). Bytes already emitted
 stay counted. Emitted-byte counters are server facts, not proof that a client
 stored the bytes.
 

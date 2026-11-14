@@ -53,18 +53,25 @@ is woken by the same change events that drive the console stream.
 
 Bounds:
 
-- A request lives at most until its identity handle ends (≤30 s) and its
-  operation deadline; socket read/write timeouts follow that deadline.
-- Input: at most 32 KiB, one JSON object, depth 32. Duplicate members, aliased
+- A request runs to its operation deadline. Its authorization is reused for at
+  most `identity.AuthorityRecheckInterval` (ADR-311); a longer tool call
+  authorizes again. Socket read/write timeouts follow the operation deadline.
+- Input: one JSON object of at most 1.5 MiB (the largest tool input is a
+  policy/profile document, bounded by the Kubernetes object size) and no deeper
+  than the deepest canonical tool schema plus a margin (parser safety). Duplicate members, aliased
   envelope or routing members, batches, encoded bodies and conflicting routing
   headers are rejected, including contradictory method/name hints from older
   clients.
-- Concurrency: 1–64 requests per process and 1–4 per principal/client (the
-  latter ≤ the former). Capacity stays charged until the handler returns.
-  These are local transport limits, not collection or disclosure budgets.
-- Output: buffered to a hard 64 KiB. `preview_capture` of a recording save uses a 256 KiB
-  frame for its 128 KiB metadata result. Evidence tools enforce their 24 KiB
-  default/32 KiB hard structured envelope before this ceiling. Responses are
+- Concurrency: requests per process default to hub memory divided by the
+  per-request output buffer (memory cost); each principal/client has a
+  token-bucket rate limit (storm protection, ADR-335 D8) instead of a
+  concurrency count, and status waits hold no slot. Capacity stays charged
+  until the handler returns. These are local transport limits, not collection
+  or disclosure budgets.
+- Output: a tool result is at most 96 KiB, derived from the common MCP client
+  default tool-output limit (Claude Code `MAX_MCP_OUTPUT_TOKENS`, 25,000 tokens
+  ≈ 100 KB); results aim at 24 KiB by default to leave room in the model
+  context. List-shaped results are paginated with a cursor. Responses are
   `no-store, private`. Native evidence is never returned inline.
 
 ## Dependencies

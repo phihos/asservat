@@ -16,11 +16,9 @@ spec:
         projectionRef:
           name: http-response-headers
           version: v1
-        maxFlows: 1024
         maxHeaderBytes: 32768
-        maxReassemblyBytesPerFlow: 262144
+        maxReassemblyBytesPerFlow: 65536
         maxReassemblyBytes: 16777216
-        idleTimeout: 30s
       before: 30s
       after: 30s
       ring:

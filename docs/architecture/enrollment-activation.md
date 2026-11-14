@@ -1,69 +1,57 @@
-# Connector enrollment
+# Optional connector certificates
 
-C-04 with C-21 SQL/PKI adapters under TASK-03, S-01 and REQ-FED-001/002. A
-connector obtains its cluster identity from a one-use bootstrap token and a
-certificate signing request, following kubelet TLS bootstrapping and Open
-Cluster Management registration (ADR-330 D3). The hub creates the token
-([connector identity](connector-credentials.md)), the installation CA signs and
-[peer identity](peer-identity.md) checks the certificate at each handshake.
+C-04 with the C-21 PKI adapter under TASK-03, S-01 and REQ-FED-001
+([ADR-334](../decisions/334-connector-workload-identity.md) item 6). The
+connector's credential is its projected ServiceAccount token
+([connector identity](connector-credentials.md)). Where the hub is exposed by
+TLS passthrough, a cluster's values may additionally enable a client
+certificate. Nothing is copied from the hub: the certificate request is
+authenticated by the same token, following kubelet TLS bootstrapping. Behind a
+TLS-terminating Ingress or Gateway this path is unavailable and not needed.
 
-## Bootstrap token
+## Certificate request
 
-- A random 256-bit secret in canonical unpadded base64url, generated with a
-  CSPRNG. SQL `fleet_bootstrap` stores only a purpose-, installation- and
-  bootstrap-bound SHA-256 digest, the preassigned peer, cluster and issuer
-  epoch, and the token's expiry.
-- The operator supplies the token to the connector through its Helm values or
-  Secret. It travels in the request body or header, never in a URL, log, CRD
-  status or error.
-- Possessing the token never lets the caller choose installation, cluster, peer
-  or epoch; the bootstrap row fixes them.
+The connector generates its private key in process memory at start and POSTs
+a DER PKCS#10 CSR on its hub connection, authenticated by its ServiceAccount
+token. The token's verified cluster attribution fixes the identity; the request
+cannot choose installation or cluster.
 
-## Enrollment request
-
-The connector generates its private key, keeps it in its own Secret and POSTs
-the token with a DER PKCS#10 CSR (at most 8192 bytes).
-
+- The CSR body is at most 8192 bytes: the largest accepted key, RSA-4096,
+  without subject, SANs or extensions yields a CSR under 2 KiB.
 - Standard-library X.509 verifies proof of possession. Accepted keys: Ed25519,
   ECDSA P-256/P-384/P-521, RSA 2048–4096 with exponent 65537 and SHA-2/PSS
-  signatures.
-- Requested subjects, SANs, extensions and all attributes are rejected; the
-  identity comes from the bootstrap row. The signed attribute set is checked
-  explicitly because the parsed `Attributes` field drops some shapes.
-- The canonical public-key digest is the idempotency key. The first valid
-  request binds that key to the bootstrap row; a retry with the same key (and a
-  fresh CSR signature) returns the same enrollment and certificate. A different
-  key cannot claim a bound token.
+  signatures (NIST SP 800-57 minimum and the Go standard-library verifier).
+- Requested subjects, SANs, extensions and attributes are rejected; the
+  signed attribute set is checked explicitly because the parsed `Attributes`
+  field drops some shapes.
+- The installation CA signs outside any SQL transaction. A retry with the same
+  key returns the stored certificate or signs again; there is no attempt
+  count, since each request is authenticated by a current token.
 
-Signing goes through the installation CA (OpenBao PKI or the Helm-generated CA)
-outside any SQL transaction. The connector may retry the same request any
-number of times until the token expires; an unknown outcome is resolved by the
-retry, which looks the enrollment up by key digest and, if no certificate was
-stored, signs again. The certificate profile (one URI SAN, client-auth EKU, at
-most one hour validity) is in [peer identity](peer-identity.md).
+SQL stores the public certificate and its digest on the cluster row; it never
+holds a private key. A process restart generates a new key and requests a new
+certificate.
 
-One transaction stores the public certificate and chain (at most 48 KiB), its
-digest and validity, enables the peer, marks the token consumed and writes one
-append-only audit row. If the audit row cannot be written, nothing is
-committed. A trigger keeps the binding, certificate and audit rows immutable.
-SQL never holds a private key.
+## Profile
 
-Expired or revoked tokens and suspended or recovering installations are
-rejected. A revoked peer is never re-enabled by a replay.
+The URI SAN is `spiffe://asservat.<installation-uuid>/cluster/<cluster-uuid>/connector`,
+with exact canonical spelling and no query, fragment, port or additional
+identity. The certificate uses digital-signature usage, the client-auth EKU,
+non-CA basic constraints and no common name, DNS, IP or email identity. TLS 1.3
+is required (RFC 8446). There is no forwarded-certificate or proxy-header
+fallback.
 
-## Rotation and revocation
+Validity ends with the issuing installation CA's validity: RFC 5280 path
+validation rejects a certificate beyond its issuer anyway, and a shorter
+lifetime would add renewals without a benefit, because revocation does not
+depend on expiry. The connector requests a new certificate when the CA is
+rotated (a changed `hub.caBundle` or CA Secret) and at each process start.
 
-The connector requests its next certificate with a new CSR over its existing
-mTLS connection before the current one expires. The request is idempotent by
-public-key digest; two certificate slots allow overlap, and retiring a slot
-blocks its certificate even while the CA signature is valid. Revoking the peer
-closes its connection and rejects later handshakes.
+## Verification and revocation
 
-## Persistence
-
-`fleet_bootstrap`, `fleet_peer`, `fleet_certificate_issue` and the audit table
-are written by the hub process's single SQL role (ADR-222); immutability is
-enforced by triggers, not by per-column role splits. The ceilings in
-[fleet administration](fleet-administration.md) bound active tokens, retained
-bootstrap records and registered clusters. `ClaimConnector` has no public
-endpoint that accepts caller-created domain values.
+`mtls.PeerVerifier` verifies the chain against the installation roots during
+the handshake. The hub checks the cluster row (registered, not revoked,
+certificate digest current) at handshake. Removing the cluster from the
+values or setting `revoked: true` closes its open connection when the change
+event arrives (ADR-330 D1) and rejects later handshakes; there is no
+per-request registry lookup on a reused connection.

@@ -35,21 +35,9 @@
           "type": "integer",
           "minimum": 1
         },
-        "maxExecutions": {
-          "type": "integer",
-          "minimum": 1
-        },
         "maxBytes": {
           "type": "integer",
           "minimum": 1
-        },
-        "maxObservedBytes": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "maxObservedEvents": {
-          "type": "integer",
-          "minimum": 0
         }
       },
       "required": [
@@ -159,21 +147,9 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "maxExecutions": {
-              "type": "integer",
-              "minimum": 1
-            },
             "maxBytes": {
               "type": "integer",
               "minimum": 1
-            },
-            "maxObservedBytes": {
-              "type": "integer",
-              "minimum": 0
-            },
-            "maxObservedEvents": {
-              "type": "integer",
-              "minimum": 0
             }
           }
         }
@@ -208,21 +184,9 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "maxExecutions": {
-              "type": "integer",
-              "minimum": 1
-            },
             "maxBytes": {
               "type": "integer",
               "minimum": 1
-            },
-            "maxObservedBytes": {
-              "type": "integer",
-              "minimum": 0
-            },
-            "maxObservedEvents": {
-              "type": "integer",
-              "minimum": 0
             }
           }
         },

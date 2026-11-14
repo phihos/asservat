@@ -20,8 +20,7 @@
       "properties": {
         "storageProfileRef": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 63
+          "minLength": 1
         },
         "capacity": {
           "type": "object",
@@ -186,8 +185,7 @@
             "properties": {
               "budgetPolicyRef": {
                 "type": "string",
-                "minLength": 1,
-                "maxLength": 63
+                "minLength": 1
               },
               "workloadSlots": {
                 "type": "integer",
@@ -230,20 +228,15 @@
             "bytesPerSecond": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 1125899906842624
+              "maximum": 9007199254740991
             },
             "burstBytes": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 1125899906842624
+              "maximum": 9007199254740991
             }
           },
           "required": []
-        },
-        "maxUploadRequestsPerSecond": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 100000
         },
         "capacityAssurance": {
           "enum": [

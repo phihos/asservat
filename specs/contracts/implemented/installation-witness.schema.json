@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/installation-witness.schema.json",
+  "title": "Private one-use installation witness v1",
+  "description": "Protected ConfigMap data, pinned outside SQL. Fresh claim is null. Consumed data must be Kubernetes-immutable. This records consumption only and cannot authorize activation or recovery.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": "installation-witness/v1"
+    },
+    "installationID": {
+      "type": "string",
+      "format": "uuid",
+      "maxLength": 36
+    },
+    "issuerEpoch": {
+      "type": "string",
+      "format": "uuid",
+      "maxLength": 36
+    },
+    "writerAccountUID": {
+      "type": "string",
+      "format": "uuid",
+      "maxLength": 36
+    },
+    "claim": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid",
+              "maxLength": 36
+            },
+            "databaseStart": {
+              "type": "string",
+              "format": "date-time",
+              "maxLength": 32
+            },
+            "databaseOID": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4294967295
+            },
+            "databaseSchemaVersion": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000
+            },
+            "sourceUID": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "sourceGeneration": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            },
+            "sourceDigest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$",
+              "maxLength": 64
+            },
+            "planDigest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$",
+              "maxLength": 64
+            },
+            "notBefore": {
+              "type": "string",
+              "format": "date-time",
+              "maxLength": 32
+            },
+            "notAfter": {
+              "type": "string",
+              "format": "date-time",
+              "maxLength": 32
+            }
+          },
+          "required": [
+            "id",
+            "databaseStart",
+            "databaseOID",
+            "databaseSchemaVersion",
+            "sourceUID",
+            "sourceGeneration",
+            "sourceDigest",
+            "planDigest",
+            "notBefore",
+            "notAfter"
+          ]
+        }
+      ]
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "installationID",
+    "issuerEpoch",
+    "writerAccountUID",
+    "claim"
+  ]
+}

@@ -132,7 +132,7 @@
         "lookbackMillis": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 3600000
+          "maximum": 9007199254740991
         },
         "policyExecutionDigest": {
           "type": "string",
@@ -300,7 +300,6 @@
         },
         "requiredCapabilities": {
           "type": "array",
-          "maxItems": 32,
           "uniqueItems": true,
           "items": {
             "type": "string",

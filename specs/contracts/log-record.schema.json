@@ -24,8 +24,7 @@
         },
         "pod_uid": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 128
+          "minLength": 1
         },
         "window_start": {
           "type": "string",
@@ -38,7 +37,7 @@
         "origins": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 128
+          "maximum": 9007199254740991
         }
       }
     },
@@ -62,7 +61,7 @@
         "origin_id": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 127
+          "maximum": 9007199254740991
         },
         "container_kind": {
           "enum": [
@@ -91,8 +90,7 @@
             "string",
             "null"
           ],
-          "minLength": 1,
-          "maxLength": 256
+          "minLength": 1
         },
         "restart_count": {
           "type": [
@@ -100,7 +98,7 @@
             "null"
           ],
           "minimum": 0,
-          "maximum": 4294967295
+          "maximum": 9007199254740991
         }
       }
     },
@@ -125,22 +123,22 @@
         "origin_id": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 127
+          "maximum": 9007199254740991
         },
         "line": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 67108864
+          "maximum": 9007199254740991
         },
         "offset": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 67108864
+          "maximum": 9007199254740991
         },
         "line_offset": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 67108864
+          "maximum": 9007199254740991
         },
         "continuation": {
           "type": "boolean"
@@ -153,8 +151,7 @@
             "string",
             "null"
           ],
-          "format": "date-time",
-          "maxLength": 64
+          "format": "date-time"
         },
         "data": {
           "type": "string",
@@ -185,7 +182,7 @@
         "origin_id": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 127
+          "maximum": 9007199254740991
         },
         "fetch_outcome": {
           "enum": [
@@ -211,21 +208,20 @@
         "source_bytes": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 67108864
+          "maximum": 9007199254740991
         },
         "fragments": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 67108864
+          "maximum": 9007199254740991
         },
         "lines": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 67108864
+          "maximum": 9007199254740991
         },
         "gaps": {
           "type": "array",
-          "maxItems": 7,
           "uniqueItems": true,
           "items": {
             "enum": [
@@ -258,22 +254,22 @@
         "origins": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 128
+          "maximum": 9007199254740991
         },
         "source_bytes": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 67108864
+          "maximum": 9007199254740991
         },
         "fragments": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 67108864
+          "maximum": 9007199254740991
         },
         "lines": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 67108864
+          "maximum": 9007199254740991
         }
       }
     }

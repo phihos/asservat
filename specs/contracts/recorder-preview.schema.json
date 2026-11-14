@@ -55,8 +55,7 @@
             },
             "uid": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 64
+              "minLength": 1
             }
           },
           "required": [
@@ -68,8 +67,7 @@
         },
         "podUID": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 64
+          "minLength": 1
         }
       },
       "required": [
@@ -113,8 +111,7 @@
         "properties": {
           "actionID": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 63
+            "minLength": 1
           },
           "expression": {
             "type": "string",
@@ -132,7 +129,7 @@
           "program": {
             "type": "array",
             "minItems": 1,
-            "maxItems": 256,
+            "maxItems": 4096,
             "items": {
               "type": "array",
               "prefixItems": [
@@ -160,7 +157,7 @@
               "minItems": 4,
               "maxItems": 4
             },
-            "description": "Classic BPF instructions (code, jt, jf, k) as emitted by libpcap pcap_compile."
+            "description": "Classic BPF instructions emitted by libpcap; the kernel limit BPF_MAXINSNS is 4096."
           },
           "programDigest": {
             "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/hash",
@@ -206,8 +203,7 @@
             "properties": {
               "actionID": {
                 "type": "string",
-                "minLength": 1,
-                "maxLength": 64
+                "minLength": 1
               },
               "code": {
                 "enum": [
@@ -235,11 +231,6 @@
               "minimum": 1,
               "maximum": 9007199254740991
             },
-            "maxObservedBytes": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 9007199254740991
-            },
             "maxBytesPerSecond": {
               "type": "integer",
               "minimum": 1,
@@ -249,16 +240,10 @@
               "type": "integer",
               "minimum": 1,
               "maximum": 9007199254740991
-            },
-            "maxObservedEvents": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 9007199254740991
             }
           },
           "required": [
             "maxSessionSeconds",
-            "maxObservedBytes",
             "maxBytesPerSecond",
             "maxConcurrentSessions"
           ]
@@ -278,18 +263,15 @@
         "properties": {
           "actionID": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 63
+            "minLength": 1
           },
           "sourceRef": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 63
+            "minLength": 1
           },
           "sourceName": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 63
+            "minLength": 1
           },
           "sourceKind": {
             "enum": [
@@ -354,15 +336,13 @@
     "argumentPrograms": {
       "type": "array",
       "minItems": 1,
-      "maxItems": 1,
       "items": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
           "actionID": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 63
+            "minLength": 1
           },
           "names": {
             "type": "array",

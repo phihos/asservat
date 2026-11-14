@@ -38,8 +38,7 @@
       "anyOf": [
         {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 4096
+          "minLength": 1
         },
         {
           "type": "null"
@@ -50,8 +49,7 @@
       "anyOf": [
         {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
+          "minLength": 1
         },
         {
           "type": "null"
@@ -62,10 +60,8 @@
       "type": "array",
       "items": {
         "type": "string",
-        "minLength": 1,
-        "maxLength": 1024
+        "minLength": 1
       },
-      "maxItems": 32,
       "minItems": 0,
       "uniqueItems": true
     },
@@ -74,7 +70,6 @@
       "items": {
         "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/artifactRef"
       },
-      "maxItems": 64,
       "minItems": 0,
       "uniqueItems": true
     }
@@ -107,8 +102,7 @@
         "properties": {
           "narrowing_hint": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 1024
+            "minLength": 1
           }
         }
       }

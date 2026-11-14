@@ -179,16 +179,9 @@
         "notAfter": {
           "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/timestamp"
         },
-        "maxArtifactsPerCapture": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 9007199254740991,
-          "default": 64
-        },
         "reason": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 512
+          "minLength": 1
         },
         "management": {
           "$ref": "https://asservat.io/spec/v1/management.schema.json#/$defs/request"
@@ -375,16 +368,9 @@
           "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/timestamp",
           "description": "Optional end of recurring sharing; defaults to the policy grant end (non-intrusive policies: 90 days, at most 365). No weekly renewal."
         },
-        "maxArtifactsPerCapture": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 9007199254740991,
-          "default": 64
-        },
         "reason": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 512
+          "minLength": 1
         },
         "futureCaptures": {
           "type": "object",

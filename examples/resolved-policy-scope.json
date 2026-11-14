@@ -56,7 +56,6 @@
       "budgets": {
         "cooldown": "30m",
         "burst": 1,
-        "maxOccurrencesPerHour": 2,
         "maxConcurrentActions": 1
       },
       "retention": "72h",
@@ -106,9 +105,7 @@
     "issuedAt": "2026-10-09T12:00:00Z",
     "notAfter": "2026-11-08T12:00:00Z",
     "limits": {
-      "maxExecutions": 100,
-      "maxBytes": 1099511627776,
-      "maxObservedBytes": 1099511627776
+      "maxBytes": 1099511627776
     }
   }
 }

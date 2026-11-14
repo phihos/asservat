@@ -49,7 +49,9 @@ without blocking publication (`get_capture` reports `SharingUnavailable`). See
 A policy executor's capture receives its instruction at admission: the
 `claim_policy_capture_share` BEFORE INSERT trigger on `context_capture`
 consumes one slot of the policy acceptance's `shares_spent` counter while under
-`maxCaptures`, before `notAfter`, unrevoked and at the accepted DebugPolicy
+`maxCaptures`, before `notAfter` (maintainer requirement of explicitly bounded
+recurring-policy sharing; `notAfter` defaults to the evidence retention end
+with no weekly renewal, ADR-335 D7), unrevoked and at the accepted DebugPolicy
 generation, and copies an ADR-235 instruction naming the acceptance.
 `materialize_capture_share` records `evidence_share.policy_acceptance_id` and
 materializes nothing for a revoked acceptance (it takes a KEY SHARE lock on the

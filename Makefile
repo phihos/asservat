@@ -3,6 +3,7 @@ PYTHON ?= python3
 .PHONY: spec-check
 spec-check:
 	$(PYTHON) scripts/check-specs.py
+	$(PYTHON) scripts/check-limits.py
 
 .PHONY: design-check ui-check
 design-check:

@@ -20,8 +20,7 @@
       "properties": {
         "description": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
+          "minLength": 1
         },
         "actions": {
           "type": "array",
@@ -38,8 +37,7 @@
         },
         "maxDuration": {
           "type": "string",
-          "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
-          "maxLength": 16
+          "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$"
         },
         "endpointBindings": {
           "type": "array",
@@ -51,13 +49,11 @@
             "properties": {
               "name": {
                 "type": "string",
-                "minLength": 1,
-                "maxLength": 63
+                "minLength": 1
               },
               "templateRef": {
                 "type": "string",
-                "minLength": 1,
-                "maxLength": 63
+                "minLength": 1
               },
               "addressMode": {
                 "type": "string",

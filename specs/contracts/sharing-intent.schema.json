@@ -36,18 +36,16 @@
             },
             "namespaceUID": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 128
+              "minLength": 1
             },
             "resourceUID": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 128
+              "minLength": 1
             },
             "generation": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 1000000000
+              "maximum": 9007199254740991
             },
             "planDigest": {
               "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/hash"
@@ -78,13 +76,8 @@
         "maxCaptures": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 1000000,
+          "maximum": 9007199254740991,
           "description": "Resolved bound; absent for recurring sharing without a capture count (it ends at notAfter)."
-        },
-        "maxArtifactsPerCapture": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 64
         },
         "resolvedSelections": {
           "type": "array",
@@ -137,7 +130,6 @@
                   ]
                 },
                 "minItems": 1,
-                "maxItems": 32,
                 "uniqueItems": true
               },
               "projectionDigest": {
@@ -211,7 +203,6 @@
             ]
           },
           "minItems": 1,
-          "maxItems": 32,
           "uniqueItems": true
         },
         "createdBy": {
@@ -228,7 +219,6 @@
         "requestDigest",
         "acceptedAt",
         "notAfter",
-        "maxArtifactsPerCapture",
         "resolvedSelections",
         "management"
       ],
@@ -277,17 +267,17 @@
         "revision": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 1000000000
+          "maximum": 9007199254740991
         },
         "registeredCaptures": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 100
+          "maximum": 9007199254740991
         },
         "materializedArtifacts": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 6400
+          "maximum": 9007199254740991
         },
         "selectionApprovals": {
           "type": "array",
@@ -337,7 +327,6 @@
             ]
           },
           "minItems": 1,
-          "maxItems": 32,
           "uniqueItems": true
         }
       },

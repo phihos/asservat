@@ -18,7 +18,7 @@ Stop.
 - Session state changes are published with `LISTEN/NOTIFY` in the writing
   transaction. The console follows them on its page's Server-Sent Events
   stream instead of repeating prepare; MCP `get` waits server-side for at
-  most 30 s and returns on the first change.
+  most 30 s (ADR-330 D1) and returns on the first change.
 - The content route is `/api/v1/downloads/{download_id}/content`. Returning
   that path is not a byte permit: each content GET authenticates the session's
   principal and client and completes authorization before the response
@@ -38,8 +38,8 @@ in one SQL transaction:
 
 Stop needs no evidence scope, catalog read, retention check or current Pod.
 Active byte streams end when the notification reaches the hub and the reader.
-Source artifacts are untouched. Byte and transfer charges are released when
-the terminal state is committed.
+Source artifacts are untouched. An unused raw-pool reservation is released
+when the terminal state is committed.
 
 The first Stop for a session stores its idempotency key, request digest,
 actor and database timestamp. A retry with the same key returns that outcome;
@@ -52,6 +52,10 @@ Stop is not delayed by audit export or any object-store operation.
 
 ## Admission
 
-Normal and Stop requests have separate process-local concurrency slots and
-per-principal limits in both transports, so a saturated normal lane cannot
-block Stop. Only schema-valid cancellation enters the Stop lane.
+Normal and Stop requests have separate process-local concurrency slots in both
+transports, so a saturated normal lane cannot block Stop. The normal slot count
+defaults to the hub pod memory limit ÷ the per-response buffer (one 1 MiB data
+frame, [native exchange](native-exchange.md)), because hub memory grows with
+concurrent responses. There is no per-principal download request cap
+([ADR-335](../decisions/335-usable-by-default.md) D9); process slots and the
+reader's busy status protect capacity. Only schema-valid cancellation enters the Stop lane.

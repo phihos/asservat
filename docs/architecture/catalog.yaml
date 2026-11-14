@@ -247,10 +247,10 @@ components:
   - C-02
   - C-08
   - C-24
-  responsibility: Per-cluster registration, connector certificate rotation, connection routing, compatibility and reported capabilities.
+  responsibility: Per-cluster registration from Helm values, connector ServiceAccount-token authentication, connection routing, compatibility and reported capabilities.
   provided_ports:
   - ConnectionRegistry
-  - EnrollmentService
+  - ConnectorAuthenticator
   - PeerVerifier
   - CapabilityReader
   - PeerRegistry
@@ -660,7 +660,7 @@ interfaces:
   name: Hub federation
   caller: A-CONN
   provider: A-HAPI
-  transport: outbound-mtls-multiplexed-streams
+  transport: outbound-https-multiplexed-streams-serviceaccount-token
   spec: docs/architecture/interfaces.md
   schema: specs/contracts/internal-work.schema.json
 - id: I-02

@@ -37,7 +37,7 @@ A lost submit response is resolved with the original idempotency key. A submit w
 
 C-01 accepts policy/profile generations and executor provenance. C-06 compiles detector and source activation separately from the incident graph. C-10 resolves all authorized replicas under the administrator ceiling; C-07 independently reserves observation resources and smaller incident resources. C-12 arms each admitted source once and reports Warming/Ready/Degraded with actual coverage. Optional source failure cannot suppress independent useful context.
 
-C-10 consumes bounded log/resource/probe/exit/alert signals, applies event/level/rearm/correlation rules, and coalesces repeated matches. An admitted occurrence selects contributing pods and allocates stable incident/action/snapshot identities. C-11 checks the policy's local permit and quota counters, pins the existing source window around original t0 and dispatches eligible onTrigger work. During a hub disconnection this local admission spends only the connector's budget lease under unexpired permits; subsequent hub import uses the cluster occurrence identity and never repeats the effects.
+C-10 consumes bounded log/resource/probe/exit/alert signals, applies event/level/rearm/correlation rules, and coalesces repeated matches. An admitted occurrence selects contributing pods and allocates stable incident/action/snapshot identities. C-11 checks the policy's local permit and quota counters, pins the existing source window around original t0 and dispatches eligible onTrigger work. During a hub disconnection this local admission spends only the connector's local budget under unexpired permits; subsequent hub import uses the cluster occurrence identity and never repeats the effects.
 
 If 1,000 matches arrive during cooldown, the suppression counter changes; there are not 1,000 core jobs or ring allocations. C-07 protects other workloads' allocations and prioritizes admitted snapshots over live readers. C-12 continues recording under its admitted source session while each admitted snapshot has a separately charged frozen/upload budget. Missing history is reported; post-window time is not shifted to when upload becomes available. See [triggers](../../specs/triggers.md), [capacity](../../specs/capacity.md) and [action lifecycles](../../specs/action-lifecycle.md).
 
@@ -69,7 +69,7 @@ C-12 freezes the available intersection of requested lookback and source coverag
 
 ## R-05 — Natural crash while remote services fail
 
-Before readiness, C-11/C-14 prepare a finite pool of unique prewrapped encryption envelopes backed by unexpired policy permits and the connector's budget lease. C-22 receives a kernel crash invocation, verifies the local socket peer and passes numeric identity to C-11. Local checks either consume a prepared single-use slot or refuse promptly. Accepted bytes are bounded and immediately encrypted into the admitted spool; remote upload can occur after process handoff ends.
+Before readiness, C-11/C-14 prepare a finite pool of unique prewrapped encryption envelopes backed by unexpired policy permits and the connector's local budget. C-22 receives a kernel crash invocation, verifies the local socket peer and passes numeric identity to C-11. Local checks either consume a prepared single-use slot or refuse promptly. Accepted bytes are bounded and immediately encrypted into the admitted spool; remote upload can occur after process handoff ends.
 
 A pool entry is single-use and cannot be restored after collector-state loss; a restarted collector prepares a new pool. If KMS, hub, DNS, S3 and Kubernetes are all down, no synchronous refill occurs on the crash path. Pool exhaustion rejects the stream; subsequent loss reporting is content-minimized and bounded. A crashArtifact signal references this already acquired core rather than acquiring it again. OOM/SIGKILL is not evidence of a core. See [natural-core architecture](../architecture.md#natural-core-readiness-without-remote-crash-path-waits).
 
@@ -140,7 +140,7 @@ A changed namespace UID or source definition cannot inherit its namesake's autho
 | Analyzer or volume handoff uncertainty | C-18 / C-15 | Fence stage, retain tracked volumes until safe cleanup |
 | Slow/expired live client | C-13 | Bounded gaps/close; rows end at min(privacy deadline, watch deadline); no durable rows |
 | Watch lost for identity / config source | C-03 / C-01 | Deny dependent starts/reads until the relist completes |
-| SQL outage / restore | C-21 / C-04 | New effects disabled until reconciled; only the connector's budget lease, unexpired local permits and cleanup |
+| SQL outage / restore | C-21 / C-04 | New effects disabled until reconciled; only the connector's local budget, unexpired local permits and cleanup |
 | Deletion not verified | C-15 / C-07 | Denied reads, retained charge and explicit overdue remediation |
 
 Runtime tests must exercise these boundaries with actual processes, storage and network failures. The architecture gate only checks documented contracts and synthetic state transitions.

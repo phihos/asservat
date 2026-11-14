@@ -18,16 +18,18 @@ profile; it has no pre-trigger history.
 
 Before acquisition the execution service has authorized the operation once (ADR-311), recorded
 the start with its operation ID, reserved impact/output quota and the conflicting-runtime slot,
-and prepared wrap-only encryption keys. Profile admission defines its own action interval, so a
-60-second CPU profile plus setup and finish margin fits; it does not reuse the context-start
-binding. A started acquisition runs to its original deadline. Stop or cancel for the operation
+and prepared wrap-only encryption keys. Profile admission defines its own action interval: the recipe's configured recording duration
+plus setup and finish margin, with no separate duration ceiling (the remote cost is the
+application's own profiler, bounded by admission concurrency and rate limits, ADR-335 D8); it
+does not reuse the context-start binding. A started acquisition runs to its original deadline. Stop or cancel for the operation
 arrives as a pushed command on the node stream and closes the socket; there is no periodic
 authority recheck during the profile. Caller cancellation stays connected through acquisition
 and encryption.
 
-The mechanism requires an explicitly admitted setup/finish margin of 2–10 seconds and
-synthesizes no defaults. Planning keeps the product defaults: ten-second CPU, five-second trace
-and five-second snapshot. If the remaining interval (earliest of caller, action and channel
+The setup/finish margin is the connect plus finish I/O timeout (2 × 5 s, ADR-330 D5) and is
+the default; an admitted plan records it. Default recording durations follow Go's
+`net/http/pprof` defaults (CPU `seconds=30`, trace `seconds=1`); the recipe may configure
+another duration. If the remaining interval (earliest of caller, action and channel
 cutoff) cannot fit the recording plus margin, the application is not contacted. Recording
 duration sets the server-side `seconds` parameter. Cancellation or HTTP EOF does not prove the
 remote profiler stopped. A retry with the same operation ID returns the recorded outcome; there
@@ -65,7 +67,9 @@ it after joining its source work. The framed format keeps native length/checksum
 download. The result is an encrypted layout plus acquisition facts, not a catalog artifact.
 
 Headers are bounded; non-success bodies are classified by a small fixed classifier and never
-logged. Accepted bodies have a hard native cap with at most one overflow byte. Empty, truncated,
+logged. Accepted bodies have a hard native cap with at most one overflow byte. The cap is the
+verification bound, so every collectable profile is verifiable: the regional reader's memory
+request divided by its concurrent verifications, default 16 MiB. Empty, truncated,
 over-limit or partially consumed responses never report complete acquisition. Host,
 authorization and upstream error strings never appear in errors or provenance.
 
@@ -83,8 +87,8 @@ them, no redaction is claimed and managed deletion cannot erase downloaded copie
 facts from the connector's informer cache. Administrator profiles with fixed numeric ports need
 no declared port.
 
-The catalog holds at most 128 template/profile entries; a recipe has at most 16 bindings. An
-entry's definition scope names one application namespace or every authorized namespace in its
+The catalog and recipes have no entry or binding counts; Kubernetes object limits bound them.
+An entry's definition scope names one application namespace or every authorized namespace in its
 cluster; entries stored in an administrator namespace may serve application namespaces. Entries
 for other namespaces or clusters are ignored before name resolution, and selecting one yields
 `ProfileUnavailable`, like an absent name. Duplicate applicable names, duplicate bindings and
@@ -113,8 +117,8 @@ The resolver canonicalizes the selected definition and computes a definition dig
 endpoint digest over source identity/public digest, policy, TLS/credential references, exact
 target/root/Pod/node, route IP, address mode, port/binding, profile parameters and native limit.
 `MatchesAcquisition` compares the plan with `GoProfileRequest`; it is not an authorization.
-`PodTargets.ObserveProfileNetwork` reads at most 256 declared ports and two Pod IPs from the
-informer cache, with no environment or free-form workload data; the node verifies the Pod UID
+`PodTargets.ObserveProfileNetwork` reads the declared ports and the Pod IPs (at most two:
+Kubernetes assigns one per family) from the informer cache, with no environment or free-form workload data; the node verifies the Pod UID
 when it dials.
 
 ## Endpoint TLS (ADR-299)
@@ -123,8 +127,8 @@ Endpoint entries may carry `tls: {serverName, rootsPEM}`. The adapter parses all
 blocks, canonicalizes the bundle and records its SHA-256 in the definition, which enters manual
 and recurring definitions. `GoEndpointPlan.TLSMaterial` carries the bundle beside the plan,
 outside approval scope; the node checks its digest/name against the admitted definition and uses
-`tls.Client` with explicit roots, HTTP/1.1 and the original deadline. Bundles are at most 8 KiB,
-64 KiB in aggregate. The collector announces `profileTLS` in its Hello capabilities; a start
+`tls.Client` with explicit roots, HTTP/1.1 and the original deadline. A bundle is bounded only by
+its containing ConfigMap (1 MiB); without one the system trust store applies (ADR-335 D12). The collector announces `profileTLS` in its Hello capabilities; a start
 requiring TLS is refused for a collector without it.
 [ADR-299](../decisions/299-named-go-endpoint-tls.md).
 

@@ -18,7 +18,7 @@ Checked 2026-10-09. These are primary references for architecture organization a
 
 The accepted approach is a modular hub with independently scheduled API/background roles and separate privileged/local/offline roles. A shared Go binary does not make these one security identity. Feature modules remain code modules unless a demonstrated privilege/locality/lifetime/scaling boundary warrants a service. PostgreSQL, Kubernetes and regional objects retain their already accepted authority split.
 
-Internal work and results travel unsigned over mutually authenticated TLS connections ([peer identity](peer-identity.md)); each operation is authorized once by its owning component (ADR-311). Evidence keeps streaming envelope encryption.
+Internal work and results travel unsigned over authenticated connections ([peer identity](peer-identity.md)); each operation is authorized once by its owning component (ADR-311). Evidence keeps streaming envelope encryption.
 
 ## Reconciled gaps
 

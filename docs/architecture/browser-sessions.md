@@ -12,9 +12,11 @@ disclosure, policy execution or approval authority.
 ## Login
 
 1. GET `/auth/login?return_to=/investigations` validates a local return path,
-   stores a five-minute login row (hashes of state and a browser-binding
-   cookie, nonce, PKCE S256 verifier) and redirects to the configured
-   authorization endpoint.
+   stores a login row (hashes of state and a browser-binding cookie, nonce,
+   PKCE S256 verifier) that lives 30 minutes, matching the identity
+   provider's login timeout (Keycloak default) so password/MFA entry does not
+   outlive it; rows are tiny and login creation is bounded by the ingress rate
+   limit. It then redirects to the configured authorization endpoint.
 2. Only when an administrator configures `approvals.stepUp`, GET
    `/auth/step-up?return_to=/approvals/<id>` starts the same login with the
    configured `acr_values` and `max_age=0`. A successful login does not
@@ -35,10 +37,15 @@ disclosure, policy execution or approval authority.
    session key (AES-GCM, session ID as associated data). The session key comes
    from a mounted Secret; a key ID per row allows rotation, and no KMS call is
    on the request path. A session ends at the earlier of its maximum
-   lifetime (default 7 days, configurable up to 30 days) from creation and
-   its inactivity timeout (default 24 hours) after the last authenticated
-   request; use slides the inactivity deadline (written at most once per
-   minute; it rotates no credential), never the maximum.
+   lifetime from creation and its inactivity timeout after the last
+   authenticated request. Both default to the provider's own session limits
+   (refresh-token maximum lifetime and idle timeout, e.g. Keycloak SSO Session
+   Max/Idle), because a session cannot outlive its refresh token anyway; an
+   administrator may set either explicitly, and internal users (ADR-063) use
+   configurable defaults of 7 days and 24 hours. Use slides the inactivity
+   deadline, never the maximum; the slide is written at most once per minute
+   because a write per request costs SQL load for no useful precision against
+   an hours-scale timeout, and it rotates no credential.
 5. There is no installation-wide or per-user session cap; rows are small,
    login is bounded by the ingress rate limit and idle sessions end at their
    inactivity timeout. Login and logout write an audit row in the same
@@ -66,7 +73,8 @@ access-token expiry. Group membership comes entirely from the current access
 token.
 
 The server refreshes the provider tokens only when the access token expires
-within 60 seconds at the time of use, so group membership follows the
+within 60 seconds at the time of use (the 30-second ADR-311 reuse interval
+plus 30 seconds of clock skew), so group membership follows the
 provider while the user works. Rotation is optimistic: the update
 succeeds only if the row's credential version is unchanged; a concurrent
 request that loses the race re-reads the row and uses the new tokens. The
@@ -86,8 +94,10 @@ provider.
 
 OIDC back-channel logout tokens are validated for issuer, audience, signature,
 expiry, recent issue time, event ID, logout event and subject/session binding,
-with `nonce` forbidden. The handler deletes the matching sessions and stores
-the event ID for 25 hours so a delayed duplicate cannot be replayed.
+with `nonce` forbidden; "recent" means an `iat` at most 10 minutes old plus
+1 minute of clock skew. The handler deletes the matching sessions and stores
+the event ID for that same 11 minutes, the only period in which a delayed
+duplicate could still pass validation and be replayed.
 
 ## Settings
 
@@ -107,13 +117,17 @@ new settings load; raising it affects only new sessions.
 ## Persistence
 
 Migration 00020 provides `browser_login`, `browser_session` and
-`browser_logout`. Rows are bounded (256 KiB ciphertext per session).
+`browser_logout`. A session row's ciphertext is bounded by three tokens at
+the 32 KiB compact-token cap ([identity eligibility](identity-eligibility.md))
+plus 4 KiB of fixed fields.
 Concurrent operations lock only the affected session row; there is no shared
 root row. The browser role has no evidence or capture privileges.
 
 Expired login, session and logout rows have no event source, so the hub worker
-deletes them in batches of at most 256 rows on a timer set to the earliest
-expiry from an index, at most once per minute.
+deletes them on a timer set to the earliest expiry from an index (at most once
+per minute, the inactivity-slide precision). It deletes in batches of 1,000
+rows, an internal tuning value that bounds one transaction's lock time, and
+repeats until no expired row remains.
 
 ## Verification
 

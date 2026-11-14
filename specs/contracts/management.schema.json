@@ -39,8 +39,7 @@
                   },
                   "id": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 256
+                    "minLength": 1
                   }
                 },
                 "required": [
@@ -50,7 +49,6 @@
                 ]
               },
               "minItems": 1,
-              "maxItems": 8,
               "uniqueItems": true
             }
           },
@@ -101,8 +99,7 @@
                       },
                       "id": {
                         "type": "string",
-                        "minLength": 1,
-                        "maxLength": 256
+                        "minLength": 1
                       }
                     },
                     "required": [
@@ -110,26 +107,13 @@
                       "issuer",
                       "id"
                     ]
-                  },
-                  "assignmentIDs": {
-                    "type": "array",
-                    "items": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 128
-                    },
-                    "minItems": 1,
-                    "maxItems": 32,
-                    "uniqueItems": true
                   }
                 },
                 "required": [
-                  "subject",
-                  "assignmentIDs"
+                  "subject"
                 ]
               },
               "minItems": 1,
-              "maxItems": 8,
               "uniqueItems": true
             }
           },

@@ -63,8 +63,7 @@
                 },
                 "workloadUID": {
                   "type": "string",
-                  "minLength": 1,
-                  "maxLength": 64
+                  "minLength": 1
                 },
                 "executionDigest": {
                   "type": "string",
@@ -76,8 +75,7 @@
                 },
                 "policyUID": {
                   "type": "string",
-                  "minLength": 1,
-                  "maxLength": 64
+                  "minLength": 1
                 }
               },
               "required": [
@@ -101,8 +99,7 @@
                 },
                 "workloadUID": {
                   "type": "string",
-                  "minLength": 1,
-                  "maxLength": 64
+                  "minLength": 1
                 },
                 "executionDigest": {
                   "type": "string",
@@ -131,16 +128,14 @@
           "type": "array",
           "items": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 64
+            "minLength": 1
           },
           "minItems": 1,
           "uniqueItems": true
         },
         "reason": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 512
+          "minLength": 1
         },
         "notAfter": {
           "type": "string",
@@ -158,17 +153,16 @@
             "maxExecutions": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 9007199254740991
+              "maximum": 9007199254740991,
+              "description": "Query count of a raw-query grant (required there). Policy grants have no run count (ADR-335 D6): they are bounded by expiry and rate limits."
             },
             "maxDuration": {
               "type": "string",
-              "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
-              "maxLength": 16
+              "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$"
             }
           },
           "required": [
             "maxBytes",
-            "maxExecutions",
             "maxDuration"
           ]
         },
@@ -185,8 +179,7 @@
           "properties": {
             "name": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 63
+              "minLength": 1
             },
             "digest": {
               "type": "string",
@@ -213,11 +206,6 @@
               "minimum": 1,
               "maximum": 9007199254740991
             },
-            "maxObservedBytes": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 9007199254740991
-            },
             "maxBytesPerSecond": {
               "type": "integer",
               "minimum": 1,
@@ -227,16 +215,10 @@
               "type": "integer",
               "minimum": 1,
               "maximum": 9007199254740991
-            },
-            "maxObservedEvents": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 9007199254740991
             }
           },
           "required": [
             "maxSessionSeconds",
-            "maxObservedBytes",
             "maxBytesPerSecond",
             "maxConcurrentSessions"
           ]
@@ -501,6 +483,42 @@
               ]
             }
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "grantType": {
+                "const": "rawQuery"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "limits": {
+                "required": [
+                  "maxExecutions"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "grantType": {
+                "const": "policy"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "limits": {
+                "properties": {
+                  "maxExecutions": false
+                }
+              }
+            }
+          }
         }
       ]
     },
@@ -544,26 +562,6 @@
           "minimum": 0,
           "maximum": 9007199254740991
         },
-        "observedBytesReserved": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 9007199254740991
-        },
-        "observedBytesSpent": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 9007199254740991
-        },
-        "observedEventsReserved": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 9007199254740991
-        },
-        "observedEventsSpent": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 9007199254740991
-        },
         "resultAccessCounters": {
           "$ref": "https://asservat.io/spec/v1/investigation-access.schema.json#/$defs/counters"
         },
@@ -579,39 +577,7 @@
         "spentBytes",
         "executionsSpent",
         "executionsReserved"
-      ],
-      "allOf": [
-        {
-          "if": {
-            "anyOf": [
-              {
-                "required": [
-                  "observedBytesReserved"
-                ]
-              },
-              {
-                "required": [
-                  "observedBytesSpent"
-                ]
-              }
-            ]
-          },
-          "then": {
-            "required": [
-              "observedBytesReserved",
-              "observedBytesSpent"
-            ]
-          }
-        }
-      ],
-      "dependentRequired": {
-        "observedEventsReserved": [
-          "observedEventsSpent"
-        ],
-        "observedEventsSpent": [
-          "observedEventsReserved"
-        ]
-      }
+      ]
     },
     "schemaVersion": {
       "const": "grant/v1"

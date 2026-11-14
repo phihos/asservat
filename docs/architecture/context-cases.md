@@ -9,12 +9,12 @@ fallback for them.
 `catalog.ContextCaseService.GetContextCase(ctx, CurrentIdentity, caseID)`
 accepts the request-owned identity from the browser or bearer ingress. The
 caller supplies no namespace, target, audience or storage reference. Unknown,
-unreadable, oversized and unavailable cases return the same `case unavailable`
+unreadable and unavailable cases return the same `case unavailable`
 error.
 
 One authorization per operation ([ADR-311](../decisions/311-operation-authority-recheck.md)):
-the service reads at most 100 published-artifact locators for the case, then
-evaluates `ReadApproved` eligibility in one batched query over the case's
+the service reads one cursor page of published-artifact locators for the case,
+then evaluates `ReadApproved` eligibility in one batched query over the case's
 distinct whole-pod targets, together with complete denies, the original
 retained audience (stable group IDs and subjects) and the stored retention
 deadlines. Being the requester, publication or later workload ownership is not
@@ -41,8 +41,8 @@ Every case read writes its audit row (D6), including denials.
 
 `context_case_locator` has one immutable row per published artifact with
 root/case/cluster UUIDs and namespace, workload and Pod UIDs. An index on
-`(root_id,case_id,artifact_id)` serves exact lookup; the query fetches at most
-101 rows and rejects overflow instead of truncating. Deleted or expired
+`(root_id,case_id,artifact_id)` serves exact lookup and is the pagination
+cursor; a case with many artifacts is read page by page. Deleted or expired
 artifacts are excluded.
 
 A catalog `AFTER INSERT` trigger derives the locator in the publication
@@ -50,8 +50,8 @@ transaction from the accepted expectation, so runtime code cannot insert
 arbitrary locators. Unpublished uploads never become cases. The table rejects
 UPDATE; rows go away with their artifact's metadata when retention deletes it.
 
-Case grouping, aliases, editable titles, pagination/search and sharing are
-separate work. An artifact never stays readable merely to keep a case visible.
+Case grouping, aliases, editable titles, search and sharing are separate
+work. An artifact never stays readable merely to keep a case visible.
 
 ## Capture navigation
 

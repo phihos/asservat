@@ -47,7 +47,7 @@ transient unavailable read.
 
 [ADR-318](../decisions/318-processing-operator-rule-inventory-and-release.md)
 adds same-origin console controls for processing operators. Inventory uses
-bounded queries under the processing duty and grants no ordinary evidence
+cursor-paginated queries under the processing duty and grants no ordinary evidence
 inspection. Artifact selection resolves one immutable location; release
 names the persisted scope and exact revision and writes its audit row in the
 release transaction.

@@ -21,7 +21,6 @@
           "items": {
             "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/artifactRef"
           },
-          "maxItems": 64,
           "minItems": 1,
           "uniqueItems": true
         },
@@ -44,7 +43,6 @@
               "raw"
             ]
           },
-          "maxItems": 3,
           "minItems": 1,
           "uniqueItems": true
         },
@@ -52,17 +50,14 @@
           "type": "array",
           "items": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 64
+            "minLength": 1
           },
-          "maxItems": 32,
           "minItems": 1,
           "uniqueItems": true
         },
         "reason": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 512
+          "minLength": 1
         },
         "notAfter": {
           "type": "string",
@@ -83,8 +78,7 @@
             },
             "captureUID": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 128
+              "minLength": 1
             },
             "selectionID": {
               "type": "string",
@@ -158,7 +152,7 @@
         "revision": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 1000000
+          "maximum": 9007199254740991
         },
         "approvedBy": {
           "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/principal"

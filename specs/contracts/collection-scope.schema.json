@@ -18,13 +18,11 @@
         },
         "namespaceUID": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 64
+          "minLength": 1
         },
         "resourceUID": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 64
+          "minLength": 1
         }
       },
       "required": [
@@ -69,8 +67,7 @@
                   "properties": {
                     "name": {
                       "type": "string",
-                      "minLength": 1,
-                      "maxLength": 63
+                      "minLength": 1
                     },
                     "digest": {
                       "type": "string",
@@ -88,37 +85,29 @@
                   "properties": {
                     "cooldown": {
                       "type": "string",
-                      "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
-                      "maxLength": 16
+                      "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$"
                     },
                     "burst": {
                       "type": "integer",
                       "minimum": 1,
-                      "maximum": 10
-                    },
-                    "maxOccurrencesPerHour": {
-                      "type": "integer",
-                      "minimum": 1,
-                      "maximum": 1000
+                      "maximum": 9007199254740991
                     },
                     "maxConcurrentActions": {
                       "type": "integer",
                       "minimum": 1,
-                      "maximum": 10
+                      "maximum": 9007199254740991
                     }
                   },
                   "required": [
                     "cooldown",
                     "burst",
-                    "maxOccurrencesPerHour",
                     "maxConcurrentActions"
                   ],
                   "description": "Storm protection (maintainer decision, ADR-335 D8); administrator budget policies may only tighten it."
                 },
                 "retention": {
                   "type": "string",
-                  "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
-                  "maxLength": 16
+                  "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$"
                 },
                 "observation": {
                   "type": "object",
@@ -196,8 +185,7 @@
                   "properties": {
                     "name": {
                       "type": "string",
-                      "minLength": 1,
-                      "maxLength": 63
+                      "minLength": 1
                     },
                     "digest": {
                       "type": "string",
@@ -284,13 +272,11 @@
         "properties": {
           "podUID": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 64
+            "minLength": 1
           },
           "nodeUID": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 64
+            "minLength": 1
           },
           "nodeBootID": {
             "type": "string",
@@ -352,13 +338,11 @@
         "properties": {
           "actionID": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 63
+            "minLength": 1
           },
           "purposeRef": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 128
+            "minLength": 1
           },
           "privacyClass": {
             "enum": [
@@ -408,13 +392,12 @@
               "properties": {
                 "uid": {
                   "type": "string",
-                  "minLength": 1,
-                  "maxLength": 64
+                  "minLength": 1
                 },
                 "generation": {
                   "type": "integer",
                   "minimum": 1,
-                  "maximum": 2147483647
+                  "maximum": 9007199254740991
                 },
                 "digest": {
                   "type": "string",

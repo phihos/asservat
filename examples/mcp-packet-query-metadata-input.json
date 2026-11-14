@@ -8,6 +8,5 @@
     "source_port"
   ],
   "packet_filter": "tcp port 80",
-  "max_packets": 100,
-  "max_scan_bytes": 8388608
+  "max_packets": 100
 }

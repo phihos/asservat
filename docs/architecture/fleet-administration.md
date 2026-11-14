@@ -17,25 +17,21 @@ earlier `fleet.json`, described below
 [example](../../examples/implemented/fleet-settings.json)). The Helm chart renders it into a
 ConfigMap in the Asservat namespace. It declares:
 
-- the installation and issuer epoch, and a monotonic revision;
+- the installation;
 - administrative suspension;
 - one organization issuer (HTTPS, no user info, query or fragment) and the
   allowed clients;
-- explicit human/workload operator subjects or stable operator group IDs
-  (empty lists grant fleet administration to nobody);
 - approved credential-delivery profile names; no field selects a URL or
-  carries a secret;
-- enrollment ceilings: 1–128 active bootstrap slots, 1–65,536 retained bootstrap
-  records (≥ the active ceiling) and 1–1,024 registered clusters. These are
-  rejection bounds, not supported-scale claims; there are no silent defaults.
+  carries a secret.
+
+There are no enrollment ceilings: the registered cluster rows (one per Helm
+release on a workload cluster) bound the cluster count.
 
 hub-worker reads the file through a shared informer (or the mounted file) and
 rejects unknown fields and case aliases. A valid change is written to SQL
-`fleet_trust` as a new revision, in one transaction with a `NOTIFY` so other
-hub processes reload. The revision may advance but not regress, and the same
-revision cannot carry different content. Unchanged content writes nothing. The
-stored revision stays valid until a later change replaces it; it does not
-expire. A watch or parse failure keeps the last valid revision and reports the
+`fleet_trust`, in one transaction with a `NOTIFY` so other hub processes
+reload. Unchanged content writes nothing. The stored content stays valid until
+a later change replaces it; it does not expire. A watch or parse failure keeps the last valid revision and reports the
 error; it does not suspend the installation.
 
 ## Recovery fence
@@ -47,4 +43,4 @@ restore procedure records the new incarnation before service resumes. Effects
 read the stored incarnation and suspension with plain MVCC in their own
 transaction and include the expected incarnation in their conditional write;
 they do not lock the trust row. A configuration change by itself never clears
-recovery or changes the issuer epoch.
+recovery.

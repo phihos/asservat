@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/pod-status.schema.json",
+  "title": "Bounded pod status projection v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "format": {
+      "const": "asservat-pod-status/v1"
+    },
+    "namespaceUID": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "podUID": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "resourceVersion": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "observedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "phase": {
+      "enum": [
+        "Pending",
+        "Running",
+        "Succeeded",
+        "Failed",
+        "Unknown"
+      ]
+    },
+    "ready": {
+      "enum": [
+        "True",
+        "False",
+        "Unknown"
+      ]
+    },
+    "initialized": {
+      "enum": [
+        "True",
+        "False",
+        "Unknown"
+      ]
+    },
+    "scheduled": {
+      "enum": [
+        "True",
+        "False",
+        "Unknown"
+      ]
+    },
+    "runtimeInstances": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 64
+    },
+    "running": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 64
+    },
+    "waiting": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 64
+    },
+    "terminated": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 64
+    },
+    "restarts": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 137438953408
+    }
+  },
+  "required": [
+    "format",
+    "namespaceUID",
+    "podUID",
+    "resourceVersion",
+    "observedAt",
+    "phase",
+    "ready",
+    "initialized",
+    "scheduled",
+    "runtimeInstances",
+    "running",
+    "waiting",
+    "terminated",
+    "restarts"
+  ]
+}

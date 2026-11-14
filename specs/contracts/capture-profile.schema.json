@@ -9,13 +9,11 @@
       "properties": {
         "displayName": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 128
+          "minLength": 1
         },
         "description": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
+          "minLength": 1
         },
         "recipe": {
           "$ref": "https://asservat.io/spec/v1/recipe.schema.json#/properties/spec"
@@ -28,8 +26,7 @@
             "properties": {
               "actionID": {
                 "type": "string",
-                "minLength": 1,
-                "maxLength": 63
+                "minLength": 1
               },
               "field": {
                 "enum": [
@@ -61,13 +58,11 @@
               },
               "label": {
                 "type": "string",
-                "minLength": 1,
-                "maxLength": 128
+                "minLength": 1
               },
               "description": {
                 "type": "string",
-                "minLength": 1,
-                "maxLength": 512
+                "minLength": 1
               }
             },
             "required": [
@@ -116,8 +111,7 @@
         },
         "version": {
           "type": "string",
-          "pattern": "^v[1-9][0-9]*$",
-          "maxLength": 32
+          "pattern": "^v[1-9][0-9]*$"
         },
         "definition": {
           "$ref": "https://asservat.io/spec/v1/capture-profile.schema.json#/$defs/definition"

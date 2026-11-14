@@ -22,8 +22,8 @@ and rejects duplicate advertised names. Case-only configuration exposes only
 `get_case`. No download operation is registered merely because its schema or
 UI exists.
 
-Metadata keeps the 24 KiB ceiling so MCP can carry structured and text copies
-within 64 KiB; an oversized projection is unavailable, never truncated.
+The case's artifact list is paginated with a cursor, never truncated; an MCP
+page stays within the 96 KiB tool-result bound ([MCP runtime](mcp-runtime.md)).
 Browser reads use exact-origin TLS, session-bound CSRF and POST. MCP uses its
 bearer identity. Authorization happens once per operation
 ([ADR-311](../decisions/311-operation-authority-recheck.md)); ordinary HTTP

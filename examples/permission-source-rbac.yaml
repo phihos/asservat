@@ -14,7 +14,6 @@ spec:
   - kube-system
   - asservat-system
   role: workload-maintainer
-  maxNamespaces: 200
   identityMappingRef: company-oidc-to-cluster
   admissionParity:
     mode: qualifiedAdapter

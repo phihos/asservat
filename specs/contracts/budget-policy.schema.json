@@ -27,8 +27,7 @@
         },
         "poolRef": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 63
+          "minLength": 1
         },
         "scope": {
           "type": "object",
@@ -41,9 +40,7 @@
                 "matchLabels": {
                   "type": "object",
                   "minProperties": 1,
-                  "propertyNames": {
-                    "maxLength": 253
-                  },
+                  "propertyNames": {},
                   "additionalProperties": {
                     "type": "string",
                     "minLength": 1,
@@ -74,11 +71,6 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "maxWorkloadAccounts": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 9007199254740991
-            },
             "maxStoredBytes": {
               "type": "integer",
               "minimum": 1,
@@ -218,17 +210,12 @@
                 "maxStartsPerRollingHour": {
                   "type": "integer",
                   "minimum": 1,
-                  "maximum": 1000
-                },
-                "maxInputBytesPerRollingHour": {
-                  "type": "integer",
-                  "minimum": 1,
                   "maximum": 9007199254740991
                 },
                 "maxProcessesPerEpisode": {
                   "type": "integer",
                   "minimum": 1,
-                  "maximum": 64,
+                  "maximum": 9007199254740991,
                   "default": 1
                 }
               },
@@ -237,17 +224,12 @@
             "maxConcurrentExpensive": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 100
+              "maximum": 9007199254740991
             },
             "maxQueuedExpensive": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 100
-            },
-            "maxQueueAgeSeconds": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 300
+              "maximum": 9007199254740991
             },
             "upload": {
               "type": "object",
@@ -256,20 +238,15 @@
                 "bytesPerSecond": {
                   "type": "integer",
                   "minimum": 1,
-                  "maximum": 1125899906842624
+                  "maximum": 9007199254740991
                 },
                 "burstBytes": {
                   "type": "integer",
                   "minimum": 1,
-                  "maximum": 1125899906842624
+                  "maximum": 9007199254740991
                 }
               },
               "required": []
-            },
-            "maxUploadRequestsPerSecond": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 100000
             },
             "maxSpoolBytes": {
               "type": "integer",
@@ -285,17 +262,17 @@
             "maxActiveSources": {
               "type": "integer",
               "minimum": 0,
-              "maximum": 1024
+              "maximum": 9007199254740991
             },
             "inputBytesPerSecond": {
               "type": "integer",
               "minimum": 0,
-              "maximum": 10737418240
+              "maximum": 9007199254740991
             },
             "inputBurstBytes": {
               "type": "integer",
               "minimum": 0,
-              "maximum": 10737418240
+              "maximum": 9007199254740991
             }
           },
           "required": []
@@ -307,12 +284,12 @@
             "maxConcurrentExpensive": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 100
+              "maximum": 9007199254740991
             },
             "maxQueuedExpensive": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 1000
+              "maximum": 9007199254740991
             },
             "upload": {
               "type": "object",
@@ -321,12 +298,12 @@
                 "bytesPerSecond": {
                   "type": "integer",
                   "minimum": 1,
-                  "maximum": 1125899906842624
+                  "maximum": 9007199254740991
                 },
                 "burstBytes": {
                   "type": "integer",
                   "minimum": 1,
-                  "maximum": 1125899906842624
+                  "maximum": 9007199254740991
                 }
               },
               "required": []
@@ -339,17 +316,17 @@
             "maxRingBytes": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 4294967296
+              "maximum": 9007199254740991,
+              "description": "Derived from the node collector memory/scratch allocation; ring and frozen budgets share it."
             },
             "maxFrozenBytes": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 4294967296
+              "maximum": 9007199254740991
             },
             "impactProfileRef": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 63
+              "minLength": 1
             },
             "pressureTriggers": {
               "description": "Linux PSI triggers (/proc/pressure/<resource>, 'some|full <stall> <window>'). A delivered trigger event trips the breaker for new expensive work.",
@@ -396,24 +373,24 @@
             "recoverySeconds": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 3600,
+              "maximum": 9007199254740991,
               "default": 60,
               "description": "The breaker closes after this long without a new trip event."
             },
             "maxActiveSources": {
               "type": "integer",
               "minimum": 0,
-              "maximum": 1024
+              "maximum": 9007199254740991
             },
             "inputBytesPerSecond": {
               "type": "integer",
               "minimum": 0,
-              "maximum": 10737418240
+              "maximum": 9007199254740991
             },
             "inputBurstBytes": {
               "type": "integer",
               "minimum": 0,
-              "maximum": 10737418240
+              "maximum": 9007199254740991
             }
           },
           "required": []

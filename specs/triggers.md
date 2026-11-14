@@ -22,9 +22,9 @@ Initial implementation order: log/resource/probe/exit/external/manual, then cras
 
 ## REQ-TRG-001 — Bounded expression language
 
-Policies MUST define named typed detectors and a `when` expression combining detector states through `all`, `any`, `not`, `for`, count/window, or ordered sequence. Implement a constrained typed AST with CEL for leaf predicates, not arbitrary scripts. No network, file, process or unbounded iteration functions exist in expressions. Admission MUST reject unknown fields, impossible units, invalid regular expressions, excessive depth and expressions over the evaluation budget.
+Policies MUST define named typed detectors and a `when` expression combining detector states through `all`, `any`, `not`, `for`, count/window, or ordered sequence. Implement a constrained typed AST with CEL for leaf predicates, not arbitrary scripts. No network, file, process or unbounded iteration functions exist in expressions. Admission MUST reject unknown fields, impossible units, invalid regular expressions, expressions deeper than the CEL parser recursion limit (cel-go default 250) and expressions over the per-expression cost limit (1,000,000, as Kubernetes CEL validation's `PerCallLimit`).
 
-Default ceilings: nesting depth 8 (evaluator recursion), 64 KiB per assembled log record and 1 MiB buffered log data per pod (connector memory), fairly split across its sources, 5-minute maximum correlation window. Node-local cgroup samples default to a 5-second interval; the metrics-API resource source samples at its own 15-second resolution (see [Resource](#resource)). Overlong records are dropped and counted by default. Explicit matchPrefix mode may match a truncated literal/regexp prefix, tagged incomplete; structured JSON predicates never evaluate incomplete JSON. Regular expressions use Go's linear-time engine; no backreferences or look-around.
+The number of detectors and the policy text are bounded by the Kubernetes object size (≈1.5 MiB etcd request limit). Log buffers cost connector memory: buffered log data per Pod defaults to `connectorMemoryLimit × logShare / followedPods`, at least 1 MiB, fairly split across its sources; an assembled record defaults to 64 KiB (containerd splits lines at 16 KiB and kubelet rejoins partials) and may not exceed the per-Pod buffer divided by its followed containers. Temporal windows have no fixed maximum: per-Pod state is a count plus at most `minimumFailures` timestamps or the newest match instant, so memory does not grow with window length. Node-local cgroup samples default to a 5-second interval; their minimum is derived from the collector CPU budget (CPU per sample × observed Pods) and is at least one second. The metrics-API resource source samples at the API's reported resolution (see [Resource](#resource)). Overlong records are dropped and counted by default. Explicit matchPrefix mode may match a truncated literal/regexp prefix, tagged incomplete; structured JSON predicates never evaluate incomplete JSON. Regular expressions use Go's linear-time engine; no backreferences or look-around.
 
 ### SC-TRG-001
 
@@ -34,7 +34,7 @@ Given an invalid nested expression or a regexp requiring unsupported syntax, whe
 
 Evaluation MUST use monotonic time locally and preserve source and observed wall timestamps. Missing/stale detector data has state `Unknown`, not false or zero. `not Unknown` remains Unknown. Sustained conditions reset on missing samples by default; an explicit gap tolerance may be configured and is bounded by the sample period budget.
 
-A trigger fires once on a qualified false/Unknown→true activation after its hold condition, not every sample. Initial true may fire by default; evaluation.fireOnActivation=false instead waits for a proven false state before arming. Re-arm requires a continuous false interval (evaluation.rearmFor, default 10 seconds); Unknown never constitutes recovery. Record policy generation, detector values/units, source freshness, threshold and observation gaps. Never place raw matched log text in Events, CRD status or webhook data.
+A trigger fires once on a qualified false/Unknown→true activation after its hold condition, not every sample. Initial true may fire by default; evaluation.fireOnActivation=false instead waits for a proven false state before arming. Re-arm requires a continuous false interval (evaluation.rearmFor, default one `eventWindow`/`window` of the detector, or two sample intervals for a sampled level); Unknown never constitutes recovery. Record policy generation, detector values/units, source freshness, threshold and observation gaps. Never place raw matched log text in Events, CRD status or webhook data.
 
 ### SC-TRG-002
 
@@ -52,9 +52,9 @@ Given a matching CRI record split across partial entries and followed by rotatio
 
 ## REQ-TRG-004 — Deduplication and budgets
 
-Each trigger occurrence MUST have an idempotency key derived from cluster, policy UID/generation, pod/correlation identity, contributing source IDs, detector transition ID and source epoch. Enforce per-policy, per-workload, per-node and installation-wide budgets. Defaults: occurrences that start an expensive action (dump, command, intrusive profile, recording save) are limited to one per workload per 5 minutes, burst 2; occurrences with only context, log, non-intrusive profile or recorder-window actions are limited by each policy's own `cooldown` (default 1 minute) and `maxOccurrencesPerHour` (default 60); one intrusive action per pod at once. Per-node concurrency (artifact streams, active actions) defaults from the node collector's resource limits, at least 4 artifact streams and 16 active actions per node; these are tuning values in Helm, not fixed caps. There is no limit on the number of policies; their cost is the watched workloads, bounded by the connector's shared informers. Budget changes cannot retroactively authorize a previously denied action. The [capacity rules](capacity.md) add stricter workload-wide dump limits, staged admission, bounded suppression summaries and shared counters across every replica/policy/generation. Context burst capacity never authorizes a dump burst.
+Each trigger occurrence MUST have an idempotency key derived from cluster, policy UID/generation, pod/correlation identity, contributing source IDs, detector transition ID and source epoch. Enforce per-policy, per-workload, per-node and installation-wide budgets. Defaults: occurrences that start an expensive action (dump, command, intrusive profile, recording save) are limited to one per workload per 5 minutes, burst 2 (storm protection, ADR-335 D8; the interval matches kubelet's maximum CrashLoopBackOff back-off); occurrences with only context, log, non-intrusive profile or recorder-window actions are limited by each policy's own `cooldown` (default 1 minute, storm protection); one intrusive action per pod at once (D8 concurrency limit). Per-node concurrency (artifact streams, active actions) defaults from the node collector's resource limits, at least 4 artifact streams and 16 active actions per node; these are tuning values in Helm, not fixed caps. There is no limit on the number of policies; their cost is the watched workloads, bounded by the connector's shared informers. Budget changes cannot retroactively authorize a previously denied action. The [capacity rules](capacity.md) add stricter workload-wide dump limits, staged admission, bounded suppression summaries and shared counters across every replica/policy/generation. Context burst capacity never authorizes a dump burst.
 
-Related crash-agent, exit, probe and alert signals within a 30-second correlation window MAY append to one occurrence. Preserve each signal's provenance. A signature used before analysis MUST be marked provisional. Rate-limited occurrences keep content-free counts and gap reasons instead of pretending evidence was collected. Aggregate suppressed signals in bounded windows rather than creating a control object or durable event per raw match.
+Related crash-agent, exit, probe and alert signals MAY append to one occurrence when they share its identity (Pod UID plus container restart count or process identity); there is no time window. Preserve each signal's provenance. A signature used before analysis MUST be marked provisional. Rate-limited occurrences keep content-free counts and gap reasons instead of pretending evidence was collected. Aggregate suppressed signals in bounded windows rather than creating a control object or durable event per raw match.
 
 ### SC-TRG-004
 
@@ -80,11 +80,11 @@ Given an Event series with count increasing from 4 to 9, when it is observed twi
 
 The default evaluation key is pod UID, with internal source/restart identities retained. No log from replica A can combine with a resource condition on B unless evaluation.scope explicitly selects workload and the larger contributor set is approved. Pod scope deliberately includes sidecars: do not claim that two signals necessarily came from the same process. Record contributors for collection selection and explanation.
 
-A detector is either a fresh level (resource/network/Kubernetes condition) or an event source (log/exit/alert/crashArtifact/schedule/file). Event leaves are true while at least one deduplicated event remains in eventWindow (default 30 seconds, maximum five minutes), false only while the source is fresh and its window is empty, Unknown on coverage loss. Probe threshold is a level over deduplicated failure events. count counts distinct source occurrences or qualified rising transitions for level detectors, never every true sample. sequence consumes distinct ordered occurrences, compares local observed time with stable source-ID tie breaks, does not reuse one event for multiple sequence positions, and expires incomplete prefixes at within. Each completed sequence is a one-evaluation pulse. for requires continuous known true; not uses three-valued logic (not Unknown is Unknown), all is false if any operand is false and otherwise Unknown if any is unknown; any is the dual. Temporal windows use (now-window, now]. Replays do not advance event counts. Reset correlation state on source epoch changes with an explicit gap, without resetting workload budgets.
+A detector is either a fresh level (resource/network/Kubernetes condition) or an event source (log/exit/alert/crashArtifact/schedule/file). Event leaves are true while at least one deduplicated event remains in eventWindow (default 30 seconds, no maximum), false only while the source is fresh and its window is empty, Unknown on coverage loss. Probe threshold is a level over deduplicated failure events. count counts distinct source occurrences or qualified rising transitions for level detectors, never every true sample. sequence consumes distinct ordered occurrences, compares local observed time with stable source-ID tie breaks, does not reuse one event for multiple sequence positions, and expires incomplete prefixes at within. Each completed sequence is a one-evaluation pulse. for requires continuous known true; not uses three-valued logic (not Unknown is Unknown), all is false if any operand is false and otherwise Unknown if any is unknown; any is the dual. Temporal windows use (now-window, now]. Replays do not advance event counts. Reset correlation state on source epoch changes with an explicit gap, without resetting workload budgets.
 
-Absolute pod CPU/memory values use qualified aggregate accounting without double-counting parent/child cgroups. Limit/quota ratios and PSI are evaluated on each available runtime component and combined with any under the same pod; no user container selector exists. A component without a finite limit is Unknown for that ratio, not zero; preserve each contributor/unit and partial coverage. CPU requests are never a denominator. Admission rejects unsupported metric/runtime combinations. Node-local sample intervals are at least one second (default five); the metrics-API source is described under [Resource](#resource). Correlation/hold/probe windows are at most five minutes. Invalid Go regex and CEL types require the actual Go compiler in production; the Python checker is not a substitute.
+Absolute pod CPU/memory values use qualified aggregate accounting without double-counting parent/child cgroups. Limit/quota ratios and PSI are evaluated on each available runtime component and combined with any under the same pod; no user container selector exists. A component without a finite limit is Unknown for that ratio, not zero; preserve each contributor/unit and partial coverage. CPU requests are never a denominator. Admission rejects unsupported metric/runtime combinations. Node-local sample intervals default to five seconds with a minimum derived from the collector CPU budget (REQ-TRG-001); the metrics-API source is described under [Resource](#resource). Correlation and hold windows have no fixed maximum; a probe window is bounded by the Event TTL ([Probe failure](#probe-failure)). Invalid Go regex and CEL types require the actual Go compiler in production; the Python checker is not a substitute.
 
-Schedules use five-field minute cron and explicit IANA timeZone (preset default Etc/UTC), no embedded TZ macros or second field. Persist the last admitted nominal UTC slot; deterministic jitter is less than the minimum interval and charged to the original slot. No replay/catch-up after downtime, suspension or expiry; report missed slots. Nonexistent DST local times are skipped; repeated local minute runs once per policy/local date-minute, identified with the first UTC occurrence. Distinct policies still share workload budgets. A file sizeAbove detector requires sizeBytes; a stable-size observation never proves an application finished writing a dump.
+Schedules use standard five-field minute cron (hence minute granularity) and explicit IANA timeZone (preset default Etc/UTC), no embedded TZ macros or second field. Persist the last admitted nominal UTC slot; deterministic jitter is less than the minimum interval and charged to the original slot. No replay/catch-up after downtime, suspension or expiry; report missed slots. Nonexistent DST local times are skipped; repeated local minute runs once per policy/local date-minute, identified with the first UTC occurrence. Distinct policies still share workload budgets. A file sizeAbove detector requires sizeBytes; a stable-size observation never proves an application finished writing a dump.
 
 ### SC-TRG-007
 
@@ -125,12 +125,12 @@ Shared refinements of REQ-TRG-002/004/007 for these detectors:
   first observation of a Pod is its baseline and is armed only when its condition is false; a Pod
   already failing when the policy is applied waits for a proven recovery. A source time later than
   the connector's clock counts as now.
-- Workload budgets (REQ-TRG-004) hold for every policy on the workload; a policy's own cooldown and
-  hourly bound only tighten them. An execution is charged at admission by the occurrence
+- Workload budgets (REQ-TRG-004) hold for every policy on the workload; a policy's own cooldown only
+  tightens them. An execution is charged at admission by the occurrence
   idempotency key and released on a definite refusal before start. Suppression is a saturating
   count per policy and reason, never a durable record per signal; capacity shortfalls are
   suppressions, never queued.
-- The 30-second correlation append (REQ-TRG-004 MAY) is not applied to connector detectors.
+- The identity-based correlation append (REQ-TRG-004 MAY) is not applied to connector detectors.
   Options that need node-local data (`kubeletMetrics`, cgroup-only metrics, PSI, file and network
   conditions) are evaluated by the node collector where it runs; without it the policy reports
   `DetectorUnavailable` with the field path.
@@ -176,8 +176,9 @@ them.
 message prefix `<probeType> probe failed` or `<probeType> probe errored` for Pods of the workload.
 These semantics refine REQ-TRG-002/006/007 for this source:
 
-- `window` is 30 s to 5 min in whole seconds; `minimumFailures` 1–1000; `evaluation.rearmFor` must
-  not exceed `window`.
+- `window` is whole seconds, default 30 s, at most the cluster's Event TTL (kube-apiserver
+  `--event-ttl`, default 1 h), because expired Events are no longer recorded; `minimumFailures` is a
+  positive integer; `evaluation.rearmFor` must not exceed `window`.
 - Failures within the window are a lower bound from Kubernetes Event series: each `count` or
   `series.count` increase observed on an Event update adds that many failures at the update's time;
   a series first seen with an earlier start counts only its latest failure. A burst inside a
@@ -217,7 +218,7 @@ with the connector audience, checked by TokenReview as for connectors
 REQ-TRG-002/004/006/007 for this source:
 
 - Options: `receiverRef: alertmanager` (the cluster's configured receiver; any other value is
-  rejected), `status: firing`, optional `matchLabels` (at most 16 exact label values; `namespace`,
+  rejected), `status: firing`, optional `matchLabels` (exact label values; `namespace`,
   `pod` and the workload labels below are rejected because the mapping sets them). `eventWindow` is rejected: the
   alert is a level. A longer hold belongs to the rule's `for` and `keep_firing_for`.
 - Mapping: an alert counts when its `namespace` label is the policy's namespace, every
@@ -236,7 +237,10 @@ REQ-TRG-002/004/006/007 for this source:
   matching alert resolves; a later `startsAt` after the re-arm fires again, subject to budgets.
 - Unknown (fires nothing, never re-arms): after a connector restart until the next notification
   for the group (Alertmanager resends at `group_interval`/`repeat_interval`). A request without the
-  credential, over 1 MiB or more than 1024 alerts, or malformed is rejected. A region without a
+  credential, with a body over the receiver limit, or malformed is rejected. The body limit costs
+  connector memory and is derived as the receiver's memory share divided by its concurrent requests,
+  default 1 MiB. A batch is never rejected for its alert count; Alertmanager's own `max_alerts`
+  truncates and reports `truncatedAlerts`. A region without a
   configured receiver reports `DetectorUnavailable`.
 
 ### SC-TRG-011
@@ -262,14 +266,18 @@ digest. These semantics refine REQ-TRG-001/002/003/004/007 for this source:
   which records the stream, because the log API's stream filter is a feature-gated parameter that
   is silently ignored where the gate is off; without a node collector they report
   `DetectorUnavailable` with the field path); `match` literal
-  (substring) or regexp (Go's RE2 engine, Perl syntax, no backreferences or look-around, at most
-  4096 compiled instructions); `pattern` 1–1024 bytes; optional `jsonField`, a dotted path of at
-  most 8 object keys whose value (a string's text, a number's or boolean's literal) is matched
-  instead of the record; `maxRecordBytes` 1–65536 (default 65536); `overlong` drop (default) or
+  (substring) or regexp (Go's RE2 engine, Perl syntax, no backreferences or look-around; matching costs record bytes ×
+  program size, so the compiled program is bounded by RE2's default program memory budget of 8 MiB,
+  and Go's parser already rejects repeat counts above 1000); `pattern` nonempty, its length bounded
+  by the compiled program and the object size; optional `jsonField`, a dotted path of object keys whose value (a string's text, a number's or boolean's literal) is matched
+  instead of the record; `maxRecordBytes` positive (default 65536, at most the per-Pod buffer divided by its followed
+  containers, REQ-TRG-001); `overlong` drop (default) or
   matchPrefix, which is rejected with `jsonField` (incomplete JSON is never evaluated);
-  `eventWindow` 30 s–5 min (default 30 s). `evaluation.rearmFor` must not exceed `eventWindow`.
-- Bounds: at most 32 followed containers per Pod (more makes the Pod Unknown); buffered log data
-  is bounded per Pod by REQ-TRG-001.
+  `eventWindow` in whole seconds, at least 1 s (default 30 s, no maximum). `evaluation.rearmFor` must not exceed `eventWindow`.
+- Bounds: each followed stream costs an API server connection and a buffer, so a connector follows
+  at most `connectorMemoryLimit × logShare / perStreamBuffer` streams in total, reported in status;
+  streams beyond that budget are a reported capability gap, never a reason to make a Pod with many
+  containers Unknown. Buffered log data is bounded per Pod by REQ-TRG-001.
 - Level: a Pod is failing while at least one record within (now − eventWindow, now] matches. The
   occurrence instant is the newest matching record second. After an occurrence the Pod re-arms
   when `eventWindow` passes without a match.
@@ -294,19 +302,20 @@ a match neither fires nor re-arms.
 
 The `resource` detector reads the Kubernetes resource metrics API (`metrics.k8s.io`, served by
 metrics-server). That API has no watch, so it is the one sampled source: the connector lists
-`/apis/metrics.k8s.io/v1beta1/namespaces/<ns>/pods` once per 15 seconds (metrics-server's default
-resolution) for all resource policies of the namespace together (`list` on `pods.metrics.k8s.io`;
-at most 1024 items). These semantics refine REQ-TRG-002/006/007 and the resource units below for
+`/apis/metrics.k8s.io/v1beta1/namespaces/<ns>/pods` once per the API's reported `window`
+(metrics-server's default resolution is 15 seconds) for all resource policies of the namespace
+together (`list` on `pods.metrics.k8s.io` with the policies' label selectors; no item cap, the
+namespace's Pods bound it). These semantics refine REQ-TRG-002/006/007 and the resource units below for
 this source:
 
 - Options: `metric` cpuCores, cpuQuotaRatio, memoryBytes or memoryLimitRatio; `operator`
-  gt/gte/lt/lte; `threshold` ≥ 0 (ratios may exceed one); `sampleInterval` (default 30 s, at most
-  5 min), the oldest sample still evaluated. A `sampleInterval` below 30 s is valid for the
-  node-local cgroup reader (minimum one second); on the metrics API it is evaluated as 30 s and
-  status reports the effective interval. cpuThrottledRatio, memoryGrowthBytesPerSecond and the PSI
+  gt/gte/lt/lte; `threshold` ≥ 0 (ratios may exceed one); `sampleInterval` (no
+  maximum), the oldest sample still evaluated. On the metrics API the default and effective minimum
+  are twice the API's reported `window` (30 s with metrics-server's 15 s), so two scrapes back each
+  sample; a shorter value is evaluated at that minimum and status reports the effective interval.
+  The node-local cgroup reader accepts the minimum of REQ-TRG-001. cpuThrottledRatio, memoryGrowthBytesPerSecond and the PSI
   metrics need the node-local cgroup reader; without it they report `DetectorUnavailable` with
-  their path. `evaluation.rearmFor` may be at
-  most 15 s.
+  their path.
 - Value: the Pod's sum over its containers of CPU usage in cores or memory working set in bytes; a
   ratio divides it by the Pod's finite effective limit (the Pod-level limit if set, otherwise the
   sum of the limits of every container and sidecar init container). A Pod without a finite limit

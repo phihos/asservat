@@ -23,7 +23,6 @@ spec:
   budgets:
     cooldown: 5m
     burst: 2
-    maxOccurrencesPerHour: 12
     maxConcurrentActions: 1
   retention: 72h
   evaluation:

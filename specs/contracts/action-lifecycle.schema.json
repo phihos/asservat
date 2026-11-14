@@ -26,8 +26,7 @@
                 "properties": {
                   "actionID": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 63
+                    "minLength": 1
                   },
                   "kind": {
                     "enum": [
@@ -54,8 +53,7 @@
                   },
                   "after": {
                     "type": "string",
-                    "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
-                    "maxLength": 16
+                    "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$"
                   }
                 },
                 "required": [
@@ -106,8 +104,7 @@
                 "properties": {
                   "actionID": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 63
+                    "minLength": 1
                   },
                   "kind": {
                     "enum": [
@@ -126,13 +123,11 @@
                   },
                   "requestedBefore": {
                     "type": "string",
-                    "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
-                    "maxLength": 16
+                    "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$"
                   },
                   "after": {
                     "type": "string",
-                    "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
-                    "maxLength": 16
+                    "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$"
                   }
                 },
                 "required": [
@@ -150,8 +145,7 @@
                 "properties": {
                   "actionID": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 63
+                    "minLength": 1
                   },
                   "kind": {
                     "const": "logs"
@@ -161,13 +155,11 @@
                   },
                   "requestedBefore": {
                     "type": "string",
-                    "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
-                    "maxLength": 16
+                    "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$"
                   },
                   "after": {
                     "type": "string",
-                    "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
-                    "maxLength": 16
+                    "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$"
                   }
                 },
                 "required": [
@@ -301,13 +293,11 @@
         },
         "requestedBefore": {
           "type": "string",
-          "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
-          "maxLength": 16
+          "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$"
         },
         "after": {
           "type": "string",
-          "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
-          "maxLength": 16
+          "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$"
         },
         "historyCoverage": {
           "enum": [
@@ -355,8 +345,7 @@
           "properties": {
             "policyUID": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 64
+              "minLength": 1
             },
             "policyExecutionDigest": {
               "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/hash"

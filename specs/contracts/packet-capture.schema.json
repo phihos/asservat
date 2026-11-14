@@ -47,39 +47,33 @@
                 "version"
               ]
             },
-            "maxFlows": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 1024
-            },
             "maxHeaderBytes": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 32768
+              "maximum": 32768,
+              "default": 32768,
+              "description": "Common HTTP server header limits (nginx large_client_header_buffers 4 \u00d7 8 KiB) bound one request header block."
             },
             "maxReassemblyBytesPerFlow": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 262144
+              "default": 65536,
+              "description": "Default 2 \u00d7 maxHeaderBytes, so one complete header block plus its segment overlap fits."
             },
             "maxReassemblyBytes": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 16777216
-            },
-            "idleTimeout": {
-              "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/duration"
+              "default": 16777216,
+              "description": "Per-target reassembly memory budget; tracked flows = maxReassemblyBytes \u00f7 maxReassemblyBytesPerFlow; the default 16 MiB is derived from the node collector memory limit together with the ring and frozen budgets."
             }
           },
           "required": [
             "kind",
             "protocol",
             "projectionRef",
-            "maxFlows",
             "maxHeaderBytes",
             "maxReassemblyBytesPerFlow",
-            "maxReassemblyBytes",
-            "idleTimeout"
+            "maxReassemblyBytes"
           ]
         },
         {
@@ -131,19 +125,17 @@
     },
     "before": {
       "type": "string",
-      "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
-      "maxLength": 16
+      "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$"
     },
     "after": {
       "type": "string",
-      "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
-      "maxLength": 16
+      "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$"
     },
     "filter": {
       "type": "string",
       "minLength": 1,
       "pattern": "\\S",
-      "description": "No length cap: the compiled program must fit the kernel classic BPF limit (BPF_MAXINSNS, 4096 instructions), checked at compile."
+      "description": "No length cap on the text; the bound is the compiled classic BPF program, which must fit the kernel limit BPF_MAXINSNS (4096 instructions), checked at compile, and the enclosing Kubernetes object size."
     },
     "ring": {
       "type": "object",
@@ -160,12 +152,13 @@
         "segmentBytes": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 67108864
+          "maximum": 9007199254740991
         },
         "maxSegments": {
           "type": "integer",
           "minimum": 2,
-          "maximum": 64
+          "maximum": 9007199254740991,
+          "description": "Derived bound: ring maxBytes \u00f7 segmentBytes; at least 2 so the ring can rotate."
         },
         "medium": {
           "enum": [
@@ -175,8 +168,7 @@
         },
         "storageProfileRef": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 63
+          "minLength": 1
         }
       },
       "required": [
@@ -203,8 +195,7 @@
                     "type": "array",
                     "items": {
                       "type": "string",
-                      "minLength": 1,
-                      "maxLength": 64
+                      "minLength": 1
                     },
                     "minItems": 1,
                     "uniqueItems": true
@@ -373,12 +364,14 @@
     "maxFrozenBytes": {
       "type": "integer",
       "minimum": 1,
-      "maximum": 268435456
+      "maximum": 9007199254740991,
+      "description": "At most the ring maxBytes; derived from the node collector memory/scratch allocation (budget node maxFrozenBytes), not a fixed constant."
     },
     "maxConcurrentSnapshots": {
       "type": "integer",
       "minimum": 1,
-      "maximum": 4
+      "maximum": 9007199254740991,
+      "description": "Bounded by the node frozen byte budget (node maxFrozenBytes \u00f7 ring maxBytes) and the trigger rate limits."
     }
   },
   "required": [

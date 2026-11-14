@@ -92,7 +92,7 @@
   "collectionProvenance": {
     "captureUID": "00000000-0000-4000-8000-000000000190",
     "actionID": "traffic",
-    "planDigest": "cc1d2458717eb5676b053b17cbae10f49d0635ef882c99efb1c6a01cd35ef880"
+    "planDigest": "b514e8e20fa380a9af045442ed2e34c4c7ee7aecce680acb8dab14591339517c"
   },
   "actionLifecycle": {
     "executionMode": "ongoing",
@@ -108,7 +108,7 @@
     "windowCoverage": "full",
     "recordingSaveOrigin": {
       "policyUID": "policy-trigger-lifecycles-uid",
-      "policyExecutionDigest": "69934be76c88bd1397d16867f9033de5aac4e4915276a01f9e8c8e697c52f4cf"
+      "policyExecutionDigest": "e04b02717320c8c56bf762d6faa45edcaa7996b6af23690130fdcf3c0cbd7f25"
     }
   }
 }

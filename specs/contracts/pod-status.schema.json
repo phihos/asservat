@@ -60,27 +60,27 @@
     "runtimeInstances": {
       "type": "integer",
       "minimum": 0,
-      "maximum": 64
+      "maximum": 9007199254740991
     },
     "running": {
       "type": "integer",
       "minimum": 0,
-      "maximum": 64
+      "maximum": 9007199254740991
     },
     "waiting": {
       "type": "integer",
       "minimum": 0,
-      "maximum": 64
+      "maximum": 9007199254740991
     },
     "terminated": {
       "type": "integer",
       "minimum": 0,
-      "maximum": 64
+      "maximum": 9007199254740991
     },
     "restarts": {
       "type": "integer",
       "minimum": 0,
-      "maximum": 137438953408
+      "maximum": 9007199254740991
     }
   },
   "required": [

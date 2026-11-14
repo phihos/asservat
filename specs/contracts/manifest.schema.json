@@ -30,8 +30,7 @@
         },
         "nodeUID": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 64
+          "minLength": 1
         },
         "nodeBootID": {
           "type": "string",
@@ -39,8 +38,7 @@
         },
         "podUID": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 64
+          "minLength": 1
         },
         "namespace": {
           "type": "string",
@@ -49,18 +47,16 @@
         },
         "workloadUID": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 64
+          "minLength": 1
         },
         "containerID": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 256
+          "minLength": 1
         },
         "restartCount": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 100000
+          "maximum": 2147483647
         },
         "hostPID": {
           "type": "integer",
@@ -221,13 +217,11 @@
     },
     "mediaType": {
       "type": "string",
-      "minLength": 1,
-      "maxLength": 128
+      "minLength": 1
     },
     "format": {
       "type": "string",
-      "minLength": 1,
-      "maxLength": 64
+      "minLength": 1
     },
     "dataClass": {
       "type": "string",
@@ -243,8 +237,7 @@
       "properties": {
         "requested": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 512
+          "minLength": 1
         },
         "resolvedDigest": {
           "anyOf": [
@@ -269,8 +262,7 @@
           "anyOf": [
             {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 256
+              "minLength": 1
             },
             {
               "type": "null"
@@ -291,8 +283,7 @@
       "properties": {
         "version": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 64
+          "minLength": 1
         },
         "imageDigest": {
           "type": "string",
@@ -356,10 +347,8 @@
           "type": "array",
           "items": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 256
+            "minLength": 1
           },
-          "maxItems": 32,
           "minItems": 0,
           "uniqueItems": true
         }
@@ -378,12 +367,12 @@
         "plaintextBytes": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 1099511627776
+          "maximum": 9007199254740991
         },
         "ciphertextBytes": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 1108101562368
+          "maximum": 9007199254740991
         }
       },
       "required": [
@@ -420,13 +409,11 @@
             },
             "keyRef": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 256
+              "minLength": 1
             },
             "wrappedKeyset": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 16384
+              "minLength": 1
             },
             "aadSHA256": {
               "type": "string",
@@ -454,14 +441,12 @@
           "items": {
             "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/artifactRef"
           },
-          "maxItems": 16,
           "minItems": 0,
           "uniqueItems": true
         },
         "transform": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 128
+          "minLength": 1
         },
         "toolDigests": {
           "type": "array",
@@ -469,7 +454,6 @@
             "type": "string",
             "pattern": "^[a-f0-9]{64}$"
           },
-          "maxItems": 32,
           "minItems": 0,
           "uniqueItems": true
         },
@@ -477,10 +461,8 @@
           "type": "array",
           "items": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 128
+            "minLength": 1
           },
-          "maxItems": 128,
           "minItems": 0,
           "uniqueItems": true
         },
@@ -512,8 +494,7 @@
       "properties": {
         "captureUID": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 128
+          "minLength": 1
         },
         "actionID": {
           "type": "string",
@@ -557,12 +538,10 @@
       ],
       "properties": {
         "canonicalScope": {
-          "type": "object",
-          "maxProperties": 64
+          "type": "object"
         },
         "binding": {
-          "type": "object",
-          "maxProperties": 32
+          "type": "object"
         }
       }
     }
@@ -775,9 +754,7 @@
               },
               "sizes": {
                 "properties": {
-                  "plaintextBytes": {
-                    "maximum": 4096
-                  }
+                  "plaintextBytes": {}
                 }
               }
             }
@@ -813,7 +790,7 @@
               "sizes": {
                 "properties": {
                   "plaintextBytes": {
-                    "maximum": 8388608
+                    "maximum": 9007199254740991
                   }
                 }
               }
@@ -850,7 +827,7 @@
               "sizes": {
                 "properties": {
                   "plaintextBytes": {
-                    "maximum": 8388608
+                    "maximum": 9007199254740991
                   }
                 }
               }
@@ -887,7 +864,7 @@
               "sizes": {
                 "properties": {
                   "plaintextBytes": {
-                    "maximum": 8388608
+                    "maximum": 9007199254740991
                   }
                 }
               }
@@ -924,7 +901,7 @@
               "sizes": {
                 "properties": {
                   "plaintextBytes": {
-                    "maximum": 8388608
+                    "maximum": 9007199254740991
                   }
                 }
               }
@@ -973,7 +950,7 @@
               "sizes": {
                 "properties": {
                   "plaintextBytes": {
-                    "maximum": 67108864
+                    "maximum": 9007199254740991
                   }
                 }
               }
@@ -1020,7 +997,7 @@
               "sizes": {
                 "properties": {
                   "plaintextBytes": {
-                    "maximum": 134217728
+                    "maximum": 9007199254740991
                   }
                 }
               }
@@ -1057,7 +1034,7 @@
               "sizes": {
                 "properties": {
                   "plaintextBytes": {
-                    "maximum": 8388608
+                    "maximum": 9007199254740991
                   }
                 }
               }
@@ -1094,7 +1071,7 @@
               "sizes": {
                 "properties": {
                   "plaintextBytes": {
-                    "maximum": 67108864
+                    "maximum": 9007199254740991
                   }
                 }
               }

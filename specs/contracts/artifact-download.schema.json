@@ -21,8 +21,7 @@
         },
         "idempotency_key": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 128
+          "minLength": 1
         },
         "representation": {
           "enum": [
@@ -61,8 +60,7 @@
         },
         "idempotency_key": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 128
+          "minLength": 1
         }
       },
       "required": [
@@ -94,19 +92,18 @@
         },
         "filename": {
           "type": "string",
-          "maxLength": 200,
+          "maxLength": 255,
           "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$",
           "description": "<workload>-<pod>-<time>.<ext> from recorded provenance (core bundle: .core.tar)."
         },
         "native_format": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 96
+          "minLength": 1
         },
         "size_bytes": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 1099511627776,
+          "maximum": 9007199254740991,
           "description": "Verified size from the catalog; present in every status while the caller may read the artifact's metadata."
         },
         "sha256": {
@@ -121,19 +118,17 @@
         "emitted_bytes": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 1099511627776
+          "maximum": 9007199254740991
         },
         "local_copy_managed": {
           "const": false
         },
         "handling_notice": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
+          "minLength": 1
         },
         "coverage_notice": {
-          "type": "string",
-          "maxLength": 1024
+          "type": "string"
         },
         "etag": {
           "type": "string",

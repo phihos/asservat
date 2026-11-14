@@ -6,7 +6,7 @@
   "data": {
     "kind": "recordingSavePreview",
     "operation": "recordingSave",
-    "plan_digest": "cc1d2458717eb5676b053b17cbae10f49d0635ef882c99efb1c6a01cd35ef880",
+    "plan_digest": "b514e8e20fa380a9af045442ed2e34c4c7ee7aecce680acb8dab14591339517c",
     "selected_recordings": [
       {
         "recording_handle": "recording-synthetic-traffic",
@@ -38,9 +38,7 @@
           "continuesAfterCreatorLeaves": true,
           "notAfter": "2026-11-08T12:00:00Z",
           "limits": {
-            "maxExecutions": 100,
-            "maxBytes": 1099511627776,
-            "maxObservedBytes": 1099511627776
+            "maxBytes": 1099511627776
           },
           "state": "Ready",
           "reasonCodes": [],
@@ -84,9 +82,7 @@
           "continuesAfterCreatorLeaves": true,
           "notAfter": "2026-11-08T12:00:00Z",
           "limits": {
-            "maxExecutions": 100,
-            "maxBytes": 1099511627776,
-            "maxObservedBytes": 1099511627776
+            "maxBytes": 1099511627776
           },
           "state": "Ready",
           "reasonCodes": [],
@@ -116,7 +112,7 @@
     "capture_assessment": {
       "schemaVersion": "capture-assessment/v1",
       "assessmentID": "00000000-0000-4000-8000-000000000193",
-      "planDigest": "cc1d2458717eb5676b053b17cbae10f49d0635ef882c99efb1c6a01cd35ef880",
+      "planDigest": "b514e8e20fa380a9af045442ed2e34c4c7ee7aecce680acb8dab14591339517c",
       "generatedAt": "2026-10-09T12:00:00Z",
       "basis": {
         "rulesDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",

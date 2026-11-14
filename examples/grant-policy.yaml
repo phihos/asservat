@@ -14,7 +14,7 @@ spec:
     workloadUID: workload-ledger-uid
     recipeDigest: 5a5eff2029e270d2ec764af201abcb29dfaa0305071797ffca2ef784a788af43
     policyUID: policy-ledger-memory-uid
-    executionDigest: dfe4ed17b7bce98b4e593b02a4db350201bfe85aba16f3c03d3595bcbf614989
+    executionDigest: ea41cdb6aa97aa7c5aae6c7fcf53dddd6fca988cd184a4ded6dea4407b33045a
   operations:
   - runtimeDiagnostic
   - command
@@ -23,7 +23,6 @@ spec:
   notAfter: '2026-11-08T12:00:00Z'
   limits:
     maxBytes: 8623489024
-    maxExecutions: 12
     maxDuration: 60s
   approver:
     issuer: https://identity.example.invalid/realms/company
@@ -55,9 +54,7 @@ spec:
     issuedAt: '2026-10-09T12:00:00Z'
     notAfter: '2026-11-08T12:00:00Z'
     limits:
-      maxExecutions: 100
       maxBytes: 1099511627776
-      maxObservedBytes: 1099511627776
   policyExecutor:
     issuer: urn:asservat:installation:00000000-0000-4000-8000-000000000098
     subject: policy:policy-ledger-memory-uid

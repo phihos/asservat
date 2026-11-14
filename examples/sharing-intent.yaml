@@ -18,7 +18,6 @@ spec:
   acceptedAt: '2026-10-09T12:00:00Z'
   notAfter: '2026-10-09T18:00:00Z'
   maxCaptures: 1
-  maxArtifactsPerCapture: 64
   resolvedSelections:
   - id: stack
     actionID: core
@@ -47,14 +46,10 @@ spec:
         kind: Group
         issuer: https://identity.example.invalid/realms/company
         id: group-payments-123
-      assignmentIDs:
-      - owner-assignment-1
     - subject:
         kind: Group
         issuer: https://identity.example.invalid/realms/company
         id: group-payments-sre-456
-      assignmentIDs:
-      - owner-assignment-2
 status:
   phase: Active
   revision: 1

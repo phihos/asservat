@@ -1,0 +1,299 @@
+access_grant.go:81:		RequestedAt: r.RequestedAt.Time, ReviewUntil: r.ReviewUntil.Time, Lifetime: time.Duration(r.LifetimeSeconds) * time.Second,
+access_grant.go:169:	if s == nil || ctx == nil || ctx.Err() != nil || g.RootID != s.root || g.Decision != nil || !g.RevokedAt.IsZero() || !identity.Text(r.IdempotencyKey, 128) || r.RequestDigest == (artifact.Digest{}) {
+access_grant.go:178:	reasons := make([]grantReasonWire, 0, len(g.Reasons))
+access_grant.go:189:		LifetimeSeconds: int32(g.Lifetime / time.Second), IdempotencyKey: r.IdempotencyKey, RequestDigest: r.RequestDigest[:]}
+access_grant.go:295:		out = make([]authorization.Grant, 0, len(rows))
+access_grant.go:312:	if limit < 1 || limit > 100 {
+access_grant.go:321:	if limit < 1 || limit > 100 || !requester.Valid() {
+access_grant.go:337:	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(in.GrantID) || !in.Approver.Valid() || in.Approver.Kind != identity.Human || !identity.Text(in.Reason, 512) || !identity.Text(in.Idempotency
+access_grant.go:349:	stepped := identity.Text(in.ACR, 128) && !in.AuthTime.IsZero()
+access_grant.go:410:	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(in.GrantID) || !in.Revoker.Valid() || in.ExpectedRevision < 1 || in.ExpectedRevision > authorization.GrantMaxRevision || !identity.Text(in.I
+access_grant.go:511:	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(in.ChildID) || !authorization.UUID(in.ParentID) || !in.Output.Valid() || !identity.Text(in.ClientID, 256) {
+access_grant.go:615:	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(parentID) || !authorization.UUID(artifactID) || !identity.Text(clientID, 256) {
+adhoc_observation.go:72:	finite, err := authorization.PlanFiniteAdHocObservation(g, adHocObservationLimits(g.Scope), time.Duration(e.Recording.DurationMillis)*time.Millisecond, active, checkedAt.Add(collector.PacketCaptureStartWit
+admitted_worker_identity.go:47:	call, cancel := context.WithDeadline(ctx, started.Add(5*time.Second))
+admitted_worker_identity.go:123:	checked.freshUntil = identity.Earlier(started.Add(5*time.Second), identity.Earlier(parentUntil, checked.worker.Intent.RunUntil))
+admitted_worker_identity.go:133:		if ctx.Err() != nil || !identity.Fresh(started, checked.freshUntil, n.Time, 5*time.Second) || uid(trust.InstallationID) != s.profile.InstallationID {
+api_context_execution.go:369:				if until.Sub(now.Time) < time.Second {
+api_context_execution.go:455:		if !authorization.UUID(p.ObjectUID) || !identity.Text(p.ResourceVersion, 128) {
+api_context_execution.go:631:			if projectErr != nil || len(snapshotRaw) > 8192 {
+api_context_publication.go:122:		until := identity.Earlier(now.Time.Add(5*time.Second), retained.ValidUntil)
+api_context_recording.go:25:	if limit < 1 || limit > 64 || startedBefore.IsZero() {
+argument_observation.go:187:	p := collector.ArgumentObservationPermit{Binding: b, StartedAt: row.StartedAt.Time, SessionUntil: row.SessionUntil.Time, LeaseUntil: row.LeaseUntil.Time, StartBy: row.StartBy.Time, Duration: time.Durat
+authority_audit.go:16:	if len(row.Record) > 8<<20 {
+bootstrap_audit_receipts.go:29:		identity.Text(row.IssueAuditVersion, 1024) && row.IssueAuditVersion != "null" &&
+bootstrap_reservation.go:95:	if !a.Valid(now) || root.InstallationID != id(a.InstallationID) || root.IssuerEpoch != id(a.IssuerEpoch) || root.Suspended || root.RecoveryBlocked || trustRevision(root) != a.AdministrationRevision || 
+bootstrap_reservation.go:197:			row, err = q.InsertBootstrapIntent(ctx, custodydb.InsertBootstrapIntentParams{InstallationID: root.InstallationID, ID: id(slotID), ActorDigest: digest(a.Actor), KeyDigest: request.KeyDigest[:], Requ
+browser.go:166:		r.ExpiresAt = value.Earlier(r.ExpiresAt, r.CreatedAt.Add(time.Duration(root.MaxLifetimeSeconds.Int32)*time.Second))
+browser.go:182:		if n >= 10 {
+browser.go:277:		return q.ClaimBrowserRefresh(ctx, custodydb.ClaimBrowserRefreshParams{RootID: id(s.root), Epoch: id(s.epoch), ID: key[:], RefreshClaim: claim[:], ClaimUntil: ts(value.Earlier(r.ExpiresAt.Time, now.Time.Add(10*time
+browser.go:305:	if !value.Text(event.Issuer, 2048) || !value.Text(event.ClientID, 256) || !value.Text(event.ID, 256) || event.Subject == "" && event.SessionID == "" || event.Subject != "" && !value.Text(event.Subject, 256) || even
+browser.go:318:		if !value.Fresh(event.IssuedAt, event.IssuedAt.Add(5*time.Minute), now.Time, 5*time.Minute) {
+browser.go:345:		if !value.Fresh(event.IssuedAt, event.IssuedAt.Add(5*time.Minute), now.Time, 5*time.Minute) {
+browser.go:348:		if e = q.InsertBrowserLogout(ctx, custodydb.InsertBrowserLogoutParams{RootID: id(s.root), Epoch: id(s.epoch), ID: key[:], Issuer: event.Issuer, ClientID: event.ClientID, Subject: event.Subject, ProviderSession: ev
+capacity_audit_profiles.go:32:	if !authorization.UUID(root) || !authorization.UUID(installation) || !authorization.UUID(qualification) || digest == (artifact.Digest{}) || !identity.Text(accountVersion, 64) {
+capacity_audit_profiles.go:44:	if len(raw) < 2 || len(raw) > 16<<10 {
+capacity_audit_profiles.go:75:	until := start.Add(5 * time.Second)
+capacity_cluster_qualification.go:74:	if len(raw) > 1<<20 {
+capacity_cluster_qualification.go:82:	if strictJSON(string(raw), &rows) != nil || len(rows) > 15 {
+capacity_cluster_qualification.go:85:	out := make([]capacity.CapacityNamespaceQualification, 0, len(rows))
+capacity_cluster_qualification.go:97:	if len(keys) < 1 || len(keys) > 256 || !slices.IsSorted(keys) {
+capacity_enrollment_decode.go:24:	if len(raw) < 2 || len(raw) > 8192 {
+capacity_enrollment_effect.go:91:	if e != nil || len(observation) > 128<<10 {
+capacity_enrollment_effect.go:97:		if e != nil || len(receipt) > 8<<10 {
+capacity_enrollment.go:44:	if !authorization.UUID(root) || !authorization.UUID(installation) || accounts == nil || !identity.Text(accounts.AccountVersion(), 64) {
+capacity_enrollment.go:78:	if e != nil || len(observation) > 128<<10 {
+capacity_initialization.go:49:	if ctx == nil || ctx.Err() != nil || pool == nil || !authorization.UUID(in.ClusterID) || !identity.Text(in.NamespaceUID, 64) || in.SourceDigest == (artifact.Digest{}) ||
+capacity_initialization.go:50:		!identity.Text(in.AccountVersion, 64) || !q.Valid() || !app.ValidateRootBackingInput(q.RootBacking) || q.RootBacking.AccountVersion != in.AccountVersion {
+capacity_initialization.go:54:	if err != nil || len(raw) > 128<<10 {
+capacity_permissions.go:42:	if len(raw) < 2 || len(raw) > 1<<20 {
+capacity_recovery.go:21:	if len(raw) < 2 || len(raw) > 4096 {
+capacity_refresh_demand.go:42:	call, end := context.WithTimeout(ctx, 2*time.Second)
+capacity_refresh_demand.go:58:	if err != nil || len(raw) > 1<<16 {
+capacity_refresh_demand.go:65:	if strictJSON(string(raw), &rows) != nil || len(rows) > 16 {
+capacity_refresh_demand.go:69:	out := make([]capacity.CapacityRefreshDemand, 0, len(rows))
+capacity_root.go:66:	if len(raw) < 2 || len(raw) > 16<<10 {
+capacity_root.go:148:	if e != nil || len(observation) > 16<<10 {
+capacity_root.go:155:		if e != nil || len(prior) > 8192 {
+capacity_setup.go:33:			err = &ProvisionStop{Step: "capacity/" + at + " after " + time.Since(started).Round(time.Millisecond).String(), Err: err}
+capacity_setup.go:147:		c, e := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
+capacity_setup.go:258:	out := make([]capacitySetupRole, 0, 10)
+capacity_setup_input.go:34:	if v.Format != contracts.CapacityRootSetupFormat || v.InstallationID != original.InstallationID || v.InitialClaimID != original.InitialClaimID || !authorization.UUID(v.PermissionRootID) || !authorizatio
+capacity_setup_pair.go:22:	if err != nil || len(roleBytes) > 16<<10 {
+capacity_source.go:50:	if len(raw) < 2 || len(raw) > 1024 {
+capture_audit.go:71:	if len(b) > 64<<10 || json.Unmarshal(b, &out) != nil || out.ValidUntil.IsZero() || out.ValidUntil.After(in.WriteUntil) || !time.Now().Before(out.ValidUntil) || !sameAuditJSON(out.Snapshot.Intent, in) {
+capture_audit.go:97:	live, end := context.WithDeadline(ctx, minCaptureAuditTime(until, time.Now().Add(5*time.Second)))
+capture_audit.go:139:	live, end := context.WithDeadline(ctx, minCaptureAuditTime(in.WriteUntil, time.Now().Add(5*time.Second)))
+capture_audit.go:247:		if len(b) > 64<<10 || json.Unmarshal(b, &observed) != nil || !captureAuditIntent(s.policy, observed.Snapshot.Intent) || observed.Snapshot.Intent.ID != operation {
+capture_audit.go:267:	until := minCaptureAuditTime(in.WriteUntil, time.Now().Add(5*time.Second))
+capture_audit.go:277:		if len(v) > 256 || json.Unmarshal(v, &granted) != nil || !granted.Valid() || granted.Until.After(in.WriteUntil) {
+capture_audit.go:291:	live, end := context.WithDeadline(ctx, minCaptureAuditTime(in.WriteUntil, time.Now().Add(5*time.Second)))
+capture_audit_read.go:40:	until := time.Now().Add(5 * time.Second)
+capture_cleanup_due.go:57:		if err != nil || len(rows) > 16 {
+capture_cleanup_due.go:69:		return auditCurrent(call, q, trust, started, identity.Earlier(started.Add(5*time.Second), trust.FreshUntil.Time))
+capture.go:145:	return manualAdmissionShape(a) && authorization.UUID(a.RootID) && identity.Text(a.IdempotencyKey, 128) && a.SubmissionDigest != (artifact.Digest{}) && planning.VerifyFrozenContextPlan(a.Plan) && a.Storage.RootID ==
+capture.go:493:			if len(raw) > 8<<10 || json.Unmarshal(raw, &observed) != nil || !observed.CaptureAuditAccount.Valid() || observed.RootID != s.root || observed.AllocationID != r.AllocationID || observed.AccountVersion != s.auditM
+capture.go:538:			until := contextMetadataDeadline(ctx, n.Time.Add(5*time.Second), capacityUntil.Time, a.Recovery.FreshUntil, a.Eligibility.ValidUntil, a.Eligibility.VerifiedIdentity.ValidUntil, a.Storage.FreshUntil)
+capture.go:589:			if !planning.VerifyContextPlan(a.Plan, n.Time) || a.Plan.CompiledAt.After(n.Time) || !a.Storage.Valid(n.Time) || !identity.Fresh(binding.ObservedAt.Time, binding.FreshUntil.Time, n.Time, 30*time.Second) {
+capture.go:719:		if err != nil || len(expectationJSON) > 65536 {
+capture.go:723:		if err != nil || len(pinJSON) > 4096 {
+capture_history.go:81:		until := identity.Earlier(first.Time.Add(5*time.Second), identity.Earlier(scope.ValidUntil, q.Recovery.FreshUntil))
+capture_history.go:130:	out := make([]value.HistoryEntry, 0, len(visible))
+capture_history.go:296:			ObservedAt: first.Time, ValidUntil: identity.Earlier(first.Time.Add(5*time.Second), identity.Earlier(identity.Earlier(e.ValidUntil, q.Recovery.FreshUntil), expires))}
+capture_intent.go:127:		} else if len(parsed.Targets) > 1 {
+capture_share.go:102:		if err != nil || len(out) > 65536 {
+cluster_bootstrap.go:43:		source.ProtectionDigest[:], int64(policy.Validity/time.Second), int64(policy.Rotation/time.Second)).Scan(&lineage)
+cluster_bootstrap.go:94:	return sha256.Sum256(append([]byte{0x30, 0x2a, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x03, 0x21, 0x00}, key...))
+cluster_credentials.go:57:		lineage := fleet.ClusterCredentialLineage{Profile: fleet.ClusterCredentialProfile{RootID: uid(row.RootID), PeerID: uid(row.PeerID), InstallationID: uid(row.InstallationID), ClusterID: uid(row.ClusterID)
+cluster_credentials.go:104:		out = fleet.ClusterCredentialPresentation{Profile: lineage.Profile, LineageID: lineage.ID, Operation: r.Operation, Generation: generation, CheckedAt: now.Time, ValidUntil: identity.Earlier(now.Time.Add
+connection_governor.go:65:		dial = (&net.Dialer{Timeout: 5 * time.Second, KeepAlive: 5 * time.Minute}).DialContext
+connector_audit.go:69:	if len(b) > 48<<10 || json.Unmarshal(b, &out) != nil || !sameAuditJSON(out.Snapshot.Intent, in) {
+connector_backing.go:80:		if len(b) > 32<<10 || json.Unmarshal(b, &result) != nil || !authorization.UUID(result.ID) || !c.Configuration.Backing.CanRenew(result.Before) {
+connector_backing.go:100:	if e != nil || len(current) > 384<<10 {
+connector_backing.go:120:		if len(b) > 32<<10 || json.Unmarshal(b, &candidate) != nil || candidate.ID != operation || !c.Configuration.Backing.CanRenew(candidate.Before) {
+connector_backing.go:142:		in := audit.OperationIntent{ID: operation, RootID: s.root, TraceID: operation, Name: "connector_backing_acceptance", InputFormat: "connector-backing/v1", MACVersion: s.mac.Version(), AccountVersion: s.ma
+connector_backing.go:156:			tickets := make([]audit.ConnectorRetirementTicket, 0, len(cohorts))
+connector_backing.go:157:			ticketImages = make([][]byte, 0, len(cohorts))
+connector_backing.go:188:		if c.Configuration.Backing.Policy.ValidUntil.Add(time.Minute).After(in.Lifecycle.OriginalPurgeAt) {
+connector_backing.go:192:		if err != nil || len(intent) > 8192 {
+connector_backing.go:245:		if len(b) > 32<<10 || json.Unmarshal(b, &out) != nil || !sameAuditJSON(out, a.Proposed.Backing) {
+connector_credentials.go:56:	if e != nil || len(current) > 256<<10 {
+connector_credentials.go:79:		if len(b) > 40<<10 || json.Unmarshal(b, &state) != nil || !state.Backing.SameResources(p.backing) || !state.Process.Valid() || state.Process.Attested == nil || *state.Process.Attested != *c.Attested {
+connector_credentials.go:90:		ordinal := 1
+connector_credentials.go:94:		if epoch < prior || ordinal > 2 {
+connector_credentials.go:123:		in := audit.OperationIntent{ID: c.ID, RootID: p.root, TraceID: c.ID, Name: "connector_" + c.Usage + "_certificate", InputFormat: "connector-credential/v1", MACVersion: p.mac.Version(), AccountVersion
+connector_credentials.go:129:		if !permit.Valid(time.Now()) || leafEnd.After(in.Lifecycle.OriginalPurgeAt.Add(-time.Minute)) {
+connector_credentials.go:133:		if err != nil || len(intent) > 8192 {
+connector_credentials.go:137:		if err != nil || len(body) > 256<<10 {
+connector_credentials.go:228:		if len(b) > 64<<10 || json.Unmarshal(b, &out) != nil || !a.Permit.Matches(out) || a.Certificate == nil || !sameAuditJSON(out, *a.Certificate) {
+connector_process.go:69:	if e != nil || len(current) > 192<<10 {
+connector_process.go:86:		if len(activeBytes) > 32<<10 || json.Unmarshal(activeBytes, &backing) != nil || !backing.SameResources(s.backing) || !backing.SupportsDeployment(c.Proof.Configuration.Profile.Deployment) {
+connector_process.go:109:		in := audit.OperationIntent{ID: operation, RootID: s.root, TraceID: operation, Name: "connector_process_enrollment", InputFormat: "connector-process/v1", MACVersion: s.mac.Version(), AccountVersion: s.ma
+connector_process.go:121:			if len(planBytes) > 4096 || json.Unmarshal(planBytes, &plan) != nil || !plan.Cohort.Valid() || plan.Cohort.RootID != s.root || plan.Cohort.Binding != s.binding || plan.Cohort.Behavior != cfg.Revision ||
+connector_process.go:152:		process := value.ConnectorCredentialProcess{Attested: &admitted, Binding: s.binding, ClientKeyDigest: c.Proof.ClientKeyDigest, ServerKeyDigest: c.Proof.ServerKeyDigest, ClaimedAt: start, InitialCertifica
+connector_process.go:157:		if err != nil || len(intent) > 8192 {
+connector_process.go:161:		if err != nil || len(body) > 4096 {
+connector_process.go:215:		if len(b) > 4096 || json.Unmarshal(b, &out) != nil || !out.Valid() || !sameAuditJSON(out, a.Process) {
+connector_registry.go:39:	live, end := context.WithDeadline(ctx, started.Add(5*time.Second))
+connector_registry.go:45:	until := identity.Earlier(started.Add(5*time.Second), source.Observation.FreshUntil)
+connector_registry.go:106:	if e != nil || len(row) > 8192 || json.Unmarshal(row, &out) != nil || !out.Valid(time.Now()) || out.Certificate.Binding != binding || out.Certificate.Usage != usage || out.Certificate.Digest != digest ||
+connector_retirement.go:82:	if e != nil || len(body) > 384<<10 {
+connector_retirement.go:131:		if e != nil || len(body) > 8192 {
+connector_retirement.go:161:	if e != nil || len(body) > 24<<10 {
+connector_source.go:45:	if e != nil || len(b) > 192<<10 {
+context_case.go:65:		if len(rows) < 1 || len(rows) > value.MaxContextCaseArtifacts {
+context_case.go:68:		out = value.ContextCaseRoutes{CaseID: request.CaseID, ObservedAt: first.Time, ValidUntil: identity.Earlier(first.Time.Add(5*time.Second), identity.Earlier(request.Identity.ValidUntil, request.Recovery.FreshUnt
+context_control.go:25:	return now.Before(until) && identity.Fresh(observed, fresh, now, 5*time.Second)
+context_control.go:82:	if l == nil || !validControlBounds(in.RootID, in.ExpectedRevision, in.Revision, in.FullRecords, in.ReplayRecords, in.ValidUntil, in.ObservedAt, in.FreshUntil) || !authorization.UUID(in.AllocationID) || in.Po
+context_control.go:132:			if !controlConfigurationCurrent(now.Time, in.ValidUntil, in.ObservedAt, in.FreshUntil) || !now.Time.Before(pool.ValidUntil.Time) || storagePool.Paused || allocation.Paused || !now.Time.Before(storagePool.
+context_control.go:153:	if !pool.Configured || !account.Configured || pool.Paused || account.Paused || pool.RootID != id(root) || account.RootID != pool.RootID || account.AllocationID != id(allocation) || pool.Revision < 1 || acco
+context_deletion.go:96:	if len(row.RecordJson) > 8192 || json.Unmarshal(row.RecordJson, &r) != nil || !r.Valid() {
+context_deletion.go:228:	if len(rows) > 16 {
+context_deletion.go:231:	out := ContextDeletionPage{Locations: make([]artifact.Location, 0, len(rows))}
+context_deletion.go:302:		until := n.Time.Add(30 * time.Second)
+context_deletion.go:472:		if retired > 1 {
+context_download_attachment.go:32:		if err != nil || len(workers) > 1 {
+context_download_attachment.go:36:		if err != nil || len(batches) > 1 {
+context_download_attachment.go:82:					if e != nil || len(certificates) > 4 {
+context_download_attachment.go:150:	if json.Unmarshal(k.WorkerProofJson, &proof) != nil || !k.CreatedAt.Valid || !proof.Valid(k.CreatedAt.Time) || proof.Binding != en.Worker.Binding || proof.Peer.Role != "acquisition" || k.BatchID
+context_download_plan.go:139:	transitions := max(int64(8), firstContextObserveTransitions+firstContextObserveTransitions+windows*firstContextContentTransitions+firstContextRetirementTransitions)
+context_download_plan.go:159:	if l.OutputLimit > a.OutputLimit || l.ReadLimit > a.ReadLimit || c.ReservedResponses >= c.ResponseLimit || c.WindowLimit-c.ReservedWindows < windows || c.AuditByteLimit-c.ReservedAuditBytes < 2*window
+context_download_plan.go:163:	if p.Slots < 1 || p.CipherBytes/p.Slots < cipher || p.KeyAttempts/p.Slots < keys || p.BackupBytes/p.Slots < backup || p.WalBytes/p.Slots < wal {
+context_download_plan.go:179:	if !l.valid() || nativeLimit < 1 || nativeLimit > t.MaxBytes {
+context_download_plan.go:183:		l.OutputLimit = min(l.OutputLimit, int64(16<<20))
+context_download_plan.go:184:		l.ReadLimit = min(l.ReadLimit, int64(24<<20))
+context_download_plan.go:188:	output := 2 * nativeLimit
+context_key_unwraps.go:23:const ContextKeyUnwrapAllowance = 12
+context_key_unwraps.go:61:	if s == nil || ctx == nil || ctx.Err() != nil || r.Scope != s.scope || r.Operation != "unwrap" || !authorization.UUID(r.AuthorityID) || r.RequestDigest == (artifact.Digest{}) || len(r.Binding) < 1 || len
+context_key_unwraps.go:126:		end := identity.Earlier(peer.NotAfter, identity.Earlier(start.Add(5*time.Second), proof.FreshUntil))
+context_key_unwraps.go:127:		out = authorization.KeyOperationPermit{AuthorityID: r.AuthorityID, RecoveryEpoch: s.epoch, Revision: uint64(max(proof.Revision.Generation, 1)), Certificate: peer.Certificate, RequestDigest: r.RequestDi
+context_key_unwraps.go:179:	if s == nil || ctx == nil || ctx.Err() != nil || limit < 1 || limit > 64 {
+context_key_unwraps.go:186:	out := make([]PendingContextPublication, 0, len(rows))
+context_key_wraps.go:62:	if s == nil || ctx == nil || ctx.Err() != nil || r.Scope != s.scope || r.Operation != "wrap" || !authorization.UUID(r.AuthorityID) || r.RequestDigest == (artifact.Digest{}) || len(r.Binding) < 1 || len(r.B
+context_key_wraps.go:110:				mask = int16(1 << i)
+context_key_wraps.go:136:		end = identity.Earlier(end, identity.Earlier(start.Add(5*time.Second), proof.FreshUntil))
+context_key_wraps.go:137:		out = authorization.KeyOperationPermit{AuthorityID: r.AuthorityID, RecoveryEpoch: s.epoch, Revision: uint64(max(proof.Revision.Generation, 1)), Certificate: peer.Certificate, RequestDigest: r.RequestDige
+context_native_control.go:20:	firstContextObserveTransitions    int64 = 2
+context_native_control.go:21:	firstContextContentTransitions    int64 = 2
+context_native_control.go:22:	firstContextRetirementTransitions int64 = 1
+context_native_control.go:50:	if !r.Valid() || !r.Closed || r.Plan.Selection.Length > artifact.MaxGoTraceBytes || r.Plan.Selection.Offset > artifact.MaxGoTraceBytes-r.Plan.Selection.Length || count < 1 || count > 2 || r.WindowCoun
+context_native_control.go:89:		if e != nil || operation.Reference.SessionID != s.ID || operation.Reference.WorkerID != worker || authority.Scope != s.Scope || native.AllocationID != id(s.AllocationID) || native.Updates < 1 || nati
+context_native_control.go:111:			windows := make([]artifact.DownloadWindow, 0, len(rows))
+context_progress.go:58:	if c.ProgressRevision < 1 || c.ProgressRevision > value.MaxProgressRevision || !bytes.Equal(f.RequestDigest, digest(normalized(accepted.Expectation.Registration))) {
+context_progress.go:276:	if limit < 1 || limit > 16 {
+context_progress.go:357:		out.ValidUntil = identity.Earlier(observedAt.Add(5*time.Second), identity.Earlier(eligible.ValidUntil, request.Recovery.FreshUntil))
+context_projection_cleanup.go:33:	if err != nil || len(rows) > 16 {
+context_projection_cleanup.go:36:	out := make([]evidence.ProjectionCleanupCandidate, 0, len(rows))
+context_projection_cleanup.go:44:			if queryDecode(row.TerminationJson, 32768, &c.Termination) != nil || !c.Termination.Valid(c.Termination.ObservedAt) || c.Termination.Worker != state.Worker {
+context_projection_cleanup.go:99:			if queryDecode(row.TerminationJson, 32768, &out) != nil || !out.Valid(out.ObservedAt) || out.Worker != p.Worker {
+context_projection_comparison_keys.go:17:const comparisonKeyChildBytes = 4096
+context_projection_comparison_keys.go:88:		if e != nil || len(children) != 2 {
+context_projection_comparison_keys.go:110:		out = value.KeyOperationPermit{AuthorityID: child.ID, RecoveryEpoch: actual.Environment.Recovery.IssuerEpoch, Revision: uint64(b.Generation), Certificate: peer.Certificate, RequestDigest
+context_projection_enrollment.go:174:		if len(rows) > 2 {
+context_projection_enrollment.go:198:			if len(rows) == 2 {
+context_projection_enrollment.go:202:		end := identity.Earlier(p.FreshUntil, identity.Earlier(checked.freshUntil, identity.Earlier(now.Add(5*time.Second), until)))
+context_projection_enrollment.go:208:		if e != nil || len(b) > 65536 {
+context_projection_enrollment.go:234:	if e != nil || len(b) > 48<<10 {
+context_projection_identity.go:58:	if e != nil || len(rows) > 2 {
+context_projection_identity.go:132:			if queryDecode(old.Binding, 16384, &prior) != nil || queryDecode(old.Proof, 65536, &priorProof) != nil || prior != out || priorProof != stored {
+context_projection_keys.go:34:const syscallProjectionKeyBindingBytes = 48 << 10
+context_projection_keys.go:46:	return 16 << 10
+context_projection_keys.go:161:		out = value.KeyOperationPermit{AuthorityID: r.AuthorityID, RecoveryEpoch: a.Environment.Recovery.IssuerEpoch, Revision: uint64(binding.Batch.Generation), Certificate: peer.Certificate, RequestDiges
+context_projection_native.go:55:	if len(leaf) < 1 || len(leaf) > 16<<10 {
+context_projection_native.go:87:	if e != nil || queryDecode(row.NativeOperation, 16384, &o) != nil || queryDecode(row.NativeAuthority, comparisonAuthorityBytes, &a) != nil || len(row.NativeAuthority) > projectionAuthorityBytes(a) 
+context_projection_native.go:222:		if e != nil || len(encoded) > 16384 {
+context_projection_worker.go:44:		if e != nil || queryDecode(call.Request, 8192, &original) != nil || !sameAuditJSON(original, r) {
+context_projection_worker.go:69:		if queryDecode(row.AuditReceiptJson, 8192, &out.Receipt) != nil || !out.Receipt.ValidProjectionWorker(out.Intent) {
+context_projection_worker.go:75:		if !out.Claimed || queryDecode(row.JobJson, 8192, &out.Job) != nil || !out.Job.ValidAcquisition(out.Intent.Worker) {
+context_projection_worker.go:81:		if queryDecode(row.BindingJson, 16384, &out.Worker.Binding) != nil || !out.Worker.Valid() {
+context_projection_worker.go:130:	return c.Total < 16 && c.Workload < 2 && c.Principal < 2
+context_projection_worker.go:191:			if out.Until.Sub(now.Time) < time.Second {
+context_publication.go:435:		until := identity.Earlier(started.Time.Add(5*time.Second), retained.Effective.ExpiresAt)
+context_publication.go:436:		if !identity.Fresh(started.Time, until, now.Time, 5*time.Second) {
+context_query_audit.go:19:	if queryDecode(a.Intent, 8192, &in) != nil || !in.Valid() || in.Lifecycle == nil || !in.Lifecycle.Policy.CertificateVerificationBacked() ||
+context_query_audit.go:30:	if queryDecode(l.Binding, 4096, &binding) != nil || !sameAuditJSON(binding, *in.Lifecycle) || queryDecode(l.IntentCompletion, 8192, &completion) != nil ||
+context_query_audit.go:72:	if queryDecode(row.OperationAuditLifecycle.OutcomeCompletion, 8192, &completion) != nil || !completion.Valid(in.RootID, in.ID, in.Lifecycle.Policy.StoreID, "outcome", in.CreatedAt, in.WriteUntil) || comp
+context_query_batch.go:42:	if queryDecode(row.Batch, 32<<10, &b) != nil || (q.Scope.Comparison == (value.ProfileComparisonWindow{}) && len(row.Batch) > 16384) || !b.Matches(q) || b.ID != uid(row.ID) || b.QueryID != uid(row.QueryID
+context_query_batch.go:81:			if e != nil || (!call.IsPoll && r.Call.ID != q.OperationID) || queryDecode(call.Request, 8192, &request) != nil || !sameAuditJSON(request, r) {
+context_query_batch.go:198:	ctx, stop := context.WithDeadline(ctx, identity.Earlier(time.Now().Add(5*time.Second), originalUntil))
+context_query_batch.go:204:	ctx, cancel := context.WithDeadline(ctx, identity.Earlier(time.Now().Add(5*time.Second), q.CleanupUntil))
+context_query_capacity.go:45:		p.Worker.CPUMilli == s.profile.CPUMillis && p.Worker.MemoryBytes == s.profile.MemoryBytes && p.Worker.EphemeralStorageBytes == 4<<20 && p.Worker.Runtime <= s.profile.MaxRuntime
+context_query_capacity.go:53:	until := identity.Earlier(time.Now().Add(5*time.Second), a.ValidUntil)
+context_query_capacity.go:73:		return queryDecode(raw, 65536, &out)
+context_query_capacity.go:98:	until := identity.Earlier(time.Now().Add(5*time.Second), identity.Earlier(a.ValidUntil, a.Baseline.ValidUntil))
+context_query_capacity.go:145:		if err != nil || queryDecode(raw, 65536, &out[i]) != nil || ctx.Err() != nil ||
+context_query_comparison.go:11:const comparisonQueryBytes = 96 << 10
+context_query_comparison.go:12:const comparisonAuthorityBytes = 128 << 10
+context_query_comparison.go:18:	return 64 << 10
+context_query_comparison.go:24:	return 64 << 10
+context_query.go:93:	if queryDecode(r.Actor, 4096, &actor) != nil || actor != q.Scope.Principal {
+context_query.go:206:	if queryDecode(b.Profile, 32768, &profile) != nil || profile != q.Plan.Profile.SharedBudget() || queryDecode(b.Qualification, 32768, &qualification) != nil || qualification != profile.Qualification ||
+context_query.go:207:		!b.HardUntil.Time.Equal(q.Plan.HardUntil) || !b.EffectsUntil.Time.Equal(q.Plan.EffectsUntil) || !b.CleanupUntil.Time.Equal(q.Plan.CleanupUntil) || !b.RetireBy.Time.Equal(q.Plan.RetireBy) || queryDecode(alloc
+context_query.go:352:		if queryDecode(row.Request, 8192, &old) != nil || !sameAuditJSON(old, r) || row.IsPoll != poll {
+context_query.go:419:		if e != nil || row.Uncertain || queryDecode(row.InitialRequest, 8192, &original) != nil || r.Call.InputFormat != original.Call.InputFormat || r.Call.MACVersion != original.Call.MACVersion || r.Call.InputDige
+context_query.go:444:		if e != nil || queryDecode(call.Request, 8192, &old) != nil || !sameAuditJSON(old, r) {
+context_query.go:489:	if s == nil || ctx == nil || ctx.Err() != nil || !p.Valid() || !identity.Text(key, 128) || digest == (artifact.Digest{}) {
+context_resolution.go:119:	if len(rows) > 1 {
+context_resolution.go:350:	return in.RootID == root && authorization.UUID(root) && authorization.UUID(in.PreviewID) && identity.Text(in.IdempotencyKey, 128) && in.SubmissionDigest == app.ContextRequestDigest(in.PreviewID) && in.Id
+context_reviewed.go:80:	if !until.Valid || !now.Time.Before(until.Time) || !now.Time.Before(deadline) || deadline.After(until.Time) || deadline.After(now.Time.Add(5*time.Minute)) || a.Plan.CompiledAt.Before(p.CreatedAt) {
+context_reviewed.go:104:	if !until.Valid || !now.Time.Before(until.Time) || !now.Time.Before(deadline) || deadline.After(until.Time) || deadline.After(now.Time.Add(5*time.Minute)) || a.Plan.CompiledAt.Before(parent.CreatedAt) {
+context_start_owners.go:22:	call, stop := context.WithDeadline(ctx, start.Add(5*time.Second))
+context_start_owners.go:36:		if len(rows) > 16 {
+current_owner_configuration_audit.go:74:			if e != nil || recovery.IssuerEpoch != c.Pool.IssuerEpoch || uid(h.SourceUid) != base.source || h.Generation != c.Revision.Generation || !identity.Fresh(h.ObservedAt.Time, h.FreshUntil.Ti
+custody.go:34:const currentSchemaVersion = 163
+custody.go:65:const schemaStateQuery = `SELECT version_id,is_applied,pg_catalog.obj_description('public.goose_db_version'::regclass,'pg_class') FROM goose_db_version ORDER BY id DESC LIMIT 1`
+custody.go:72:	if err = row.Scan(&head, &applied, &comment); err != nil || !applied || head < 1 {
+custody.go:73:		return 0, 0, configuration.ErrUnavailable
+custody.go:77:		n, e := strconv.ParseInt(strings.TrimPrefix(*comment, schemaFloorComment), 10, 64)
+custody.go:78:		if e != nil || n < 1 || n > head {
+custody.go:79:			return 0, 0, configuration.ErrChanged
+custody.go:138:	for attempt := 0; attempt < 3; attempt++ {
+custody.go:154:		rollbackCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
+custody.go:174:			if (pe.Code == "40001" || pe.Code == "40P01") && attempt < 2 {
+custody.go:175:				delay := time.Duration(10+time.Now().UnixNano()%20) * time.Millisecond
+custody.go:199:		case errors.As(err, &pe) && len(pe.Code) == 5:
+custody.go:284:	if len(copies) != 4 {
+custody.go:448:		until := n.Time.Add(30 * time.Second)
+custody.go:461:	if r.Validate() != nil || d.Fence < 1 {
+download.go:84:		if !n.Time.Before(a.ValidUntil) || a.ValidUntil.After(n.Time.Add(8*time.Hour)) {
+download.go:339:		if !now.Time.Before(request.Deadline) || request.Deadline.After(now.Time.Add(8*time.Hour)) {
+download.go:438:		if streams.Total >= 16 || streams.Principal >= 2 {
+download_keys.go:51:	if s == nil || s.retention == nil || s.recovery == nil || !authorization.UUID(session) || !authorization.UUID(batch) || generation < 1 || a.Scope.RootID != s.root {
+download_keys.go:104:	if err != nil || len(encoded) > 65536 {
+download_keys.go:108:	if err != nil || len(worker) > 16384 {
+download_keys.go:202:				mask = int16(1 << i)
+download_response.go:172:		if streams.Total >= 16 || streams.Principal >= 2 {
+download_response_window.go:251:	if streams.Total >= 16 || streams.Principal >= 2 {
+download_stop.go:110:			writeUntil := identity.Earlier(n.Time.Add(30*time.Second), stop.RetainUntil.Time.Add(-time.Microsecond))
+download_stop.go:177:		snap, e := stopSnapshot(row, time.Now(), time.Now().Add(time.Second))
+download_stop.go:197:		return auditCurrent(ctx, q, trust, start, identity.Earlier(start.Add(5*time.Second), d.RetainUntil))
+download_stop.go:220:		snap, e := stopSnapshot(row, time.Now(), time.Now().Add(time.Second))
+download_stop.go:228:			return auditCurrent(ctx, q, trust, start, identity.Earlier(start.Add(5*time.Second), d.RetainUntil))
+download_stop.go:245:		return auditCurrent(ctx, q, trust, start, identity.Earlier(start.Add(5*time.Second), d.RetainUntil))
+download_stop.go:298:		if !identity.Fresh(b.ObservedAt, b.ObservedAt.Add(5*time.Second), n.Time, 5*time.Second) || !n.Time.Before(b.ValidUntil) {
+download_stop.go:329:	out := make([]evidence.DownloadStopSnapshot, 0, len(rows))
+download_stop_lifecycle.go:82:	if !out.OverdueSelectedAt.IsZero() && (out.ClosedAt.IsZero() || out.CertificateStarted || out.CertificateWriter != nil || out.CertificateReceipt != nil || out.OverdueSelectedAt.Before(b.CertificatePu
+download_stop_lifecycle.go:88:		if !r.Valid() || r.RootID != b.RootID || r.DownloadID != b.DownloadID || r.InstallationID != b.Policy.InstallationID || r.IssuerEpoch != b.IssuerEpoch || r.StoreID != b.Policy.StoreID || r.BindingDi
+download_stop_lifecycle.go:141:	until := started.Add(5 * time.Second)
+download_stop_lifecycle.go:263:		proofEnd := b.CertificatePurgeAt.Add(-time.Duration(b.Policy.ProofWindowSeconds) * time.Second)
+download_stop_lifecycle.go:293:		until := now.Add(5 * time.Second)
+download_stop_lifecycle.go:331:		until := identity.Earlier(now.Add(30*time.Second), b.CertificatePurgeAt.Add(-time.Duration(b.Policy.ProofWindowSeconds)*time.Second))
+download_stop_lifecycle.go:401:		if v.Retirement == nil || !sameAuditJSON(*v.Retirement, r) || v.CertificateWriter == nil || v.CertificateReceipt != nil || v.CertificateVerifyAttempts >= 2 || !now.Before(r.CertificateWriteUntil) {
+download_stop_lifecycle.go:422:		if v.Retirement == nil || !sameAuditJSON(*v.Retirement, r) || v.CertificateWriter == nil || v.CertificateWriter.Receipt != receipt || v.CertificateVerifyAttempts < 1 {
+download_stop_lifecycle.go:490:	until := time.Now().Add(5 * time.Second)
+download_stop_lifecycle.go:509:	until := time.Now().Add(5 * time.Second)
+download_stop_lifecycle.go:519:		if e != nil || len(rows) > 16 {
+download_stop_lifecycle.go:545:	until := time.Now().Add(5 * time.Second)
+download_stop_lifecycle.go:572:	until := identity.Earlier(observed.Add(5*time.Second), validUntil)
+download_workers.go:125:		generation := int64(1)
+download_workers.go:153:		if counts.Total >= 16 || counts.Workload >= 2 || counts.Principal >= 2 {
+download_workers.go:157:		if until.Sub(now) < time.Second {
+download_workers.go:165:		if e != nil || len(b) > 65536 {
+download_workers.go:500:	if e != nil || len(rows) > 16 {
+download_workers.go:503:	out := make([]evidence.DownloadCleanupCandidate, 0, len(rows))
+enrollment_activation.go:50:		if uid(row.ID) != issueID || !row.AuditAcknowledgedAt.Valid || !row.AuditObjectVersion.Valid || row.AuditObjectVersion.String == "null" || !identity.Text(row.AuditObjectVersion.String, 1024) {
+enrollment_signing.go:48:	if err != nil || !slot.ClaimAcknowledgedAt.Valid || !slot.ClaimObjectVersion.Valid || slot.ClaimObjectVersion.String == "null" || !identity.Text(slot.ClaimObjectVersion.String, 1024) || !bytes.Equal(slot.
+enrollment_signing.go:100:		if len(rows) > 2 {
+enrollment_signing.go:124:			if len(rows) == 2 {
+enrollment_signing.go:128:		until := now.Time.Add(5 * time.Second)
+enrollment_signing.go:167:	if err != nil || len(encoded) > 48<<10 {
+evidence_share.go:61:	until := now.Time.Add(5 * time.Second)
+evidence_share.go:65:	out := make([]authorization.Share, 0, len(rows))
+evidence_share.go:94:	keys := make([]string, 0, len(recipients))
+evidence_share.go:153:	if s == nil || ctx == nil || ctx.Err() != nil || !caller.Principal.Valid() || len(caller.Groups) > 256 || limit < 1 || limit > 100 {
+evidence_share.go:191:	if s == nil || ctx == nil || ctx.Err() != nil || limit < 1 || limit > 101 || paged && (!authorization.UUID(after.ID) || after.CreatedAt.IsZero()) {
+evidence_share.go:266:	if s == nil || ctx == nil || ctx.Err() != nil || v.RootID != s.root || !authorization.UUID(v.ID) || !authorization.UUID(r.OperationID) || !identity.Text(r.IdempotencyKey, 128) || r.RequestDigest == (artifact
+evidence_share.go:271:	probe.CreatedAt, probe.Revision = v.ExpiresAt.Add(-time.Second), 1
+evidence_share.go:279:	wires := make([]shareRecipientWire, 0, len(v.Recipients))
+evidence_share.go:280:	keys := make([]string, 0, len(v.Recipients))
+evidence_share.go:364:	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(r.ShareID) || !authorization.UUID(r.OperationID) || !r.Actor.Valid() || len(r.Managers) > authorization.ShareMaxManagers || !identity.Text
+evidence_share.go:426:	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(r.ShareID) || !authorization.UUID(r.OperationID) || !r.Actor.Valid() || len(r.Managers) < 1 && !r.Administrator || len(r.Managers) > autho
+evidence_share.go:427:		len(r.Management) < 1 || len(r.Management) > authorization.ShareMaxManagers || !identity.Text(r.IdempotencyKey, 128) || r.RequestDigest == (artifact.Digest{}) || r.ExpectedRevision < 1 {
+fleet_observation_basis.go:19:	call, cancel := context.WithDeadline(ctx, started.Add(5*time.Second))
+fleet_observation.go:34:	until := time.Now().Add(5 * time.Second)
+fleet_observation.go:105:	if s == nil || s.claims == nil || ctx == nil || !basis.Valid() || basis.Database.SchemaVersion != currentSchemaVersion || basis.InstallationID != s.claims.installation || started.Year() < 2020 || started.
+history_parameters.go:46:	if len(h.ExpectationJson) > 8192 || json.Unmarshal(h.ExpectationJson, &e) != nil || !e.Valid() || id(e.RootID) != h.RootID || id(e.CaptureID) != h.CaptureID || id(e.Registration.Location.AttemptID) != h.A
+history_parameters.go:183:		zero := make([]byte, 32)
+history_parameters.go:476:		until := identity.Earlier(now.Time.Add(30*time.Second), in.Recovery.FreshUntil)
+history_parameters.go:658:	out := make([]value.HistoryRetirementCandidate, 0, len(rows))
+history_parameters.go:674:		zero := make([]byte, 32)

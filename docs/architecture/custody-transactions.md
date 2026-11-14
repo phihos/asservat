@@ -23,7 +23,7 @@ UPDATE custody_allocation SET used = used + $n
  WHERE id = $allocation AND used + $n <= limit RETURNING used;
 ```
 
-No row returned means `CapacityUnavailable`. The charge covers ADR-048's worst-case data/index ceilings, the 1088 KiB manifest, the 32 KiB envelope and four object slots. Allocations do not borrow each other's space. Allocation limits come from the Helm-rendered configuration; capture clients never choose the allocation ID.
+No row returned means `CapacityUnavailable`. The charge covers ADR-048's worst-case data/index ceilings, the manifest and envelope maxima ([manifest verification](manifest-verification.md)) and four object slots; it is settled to the actual size at publication. Allocations do not borrow each other's space. Allocation limits come from the Helm-rendered configuration (cross-workload storage-exhaustion protection, REQ-CAP-006); capture clients never choose the allocation ID.
 
 ## Integrity and visibility
 
@@ -37,11 +37,11 @@ SQL holds opaque identities and ciphertext checksums, never evidence bytes, nati
 
 ## Transactions
 
-Queries use pgx v5 with checked-in sqlc bindings and goose migrations. Each hub process uses one SQL login (ADR-222); the database role's grants, not runtime self-checks, limit what it can do. The pool rejects plaintext TLS and more than 32 connections and checks the migration version.
+Queries use pgx v5 with checked-in sqlc bindings and goose migrations. Each hub process uses one SQL login (ADR-222); the database role's grants, not runtime self-checks, limit what it can do. The pool rejects plaintext TLS and checks the migration version; its size is the chart's per-process pool value (ADR-335 D11, default total ≤ 30 across processes), bounded by PostgreSQL `max_connections`.
 
-Lock order within a registration is allocation, then attempt. Use `clock_timestamp()` after blocking locks. Statement and lock timeouts are I/O bounds (five-second statements, one-second lock waits); the operation's original deadline is the authority bound. No storage, identity or Kubernetes call runs while a transaction holds a lock.
+Lock order within a registration is allocation, then attempt. Use `clock_timestamp()` after blocking locks. Statement and lock timeouts are I/O bounds (five seconds for statements and lock waits, ADR-330 D5); the operation's original deadline is the authority bound. No storage, identity or Kubernetes call runs while a transaction holds a lock.
 
-Serialization and deadlock aborts are retried up to three times. An unknown COMMIT outcome is resolved by looking up the attempt ID; the charge stays until the lookup shows the outcome, then follows it.
+Serialization and deadlock aborts are retried up to three times (each retry costs a transaction; PostgreSQL recommends retrying serialization failures). An unknown COMMIT outcome is resolved by looking up the attempt ID; the charge stays until the lookup shows the outcome, then follows it.
 
 ## Deletion
 
@@ -49,7 +49,7 @@ Each attempt stores its effective deletion deadline (`delete_due_at`, see [reten
 
 Writers are fenced by their deadline: an upload credential and the attempt's write deadline end before `delete_due_at`, `StoreCopies` refuses after the write deadline, and the bucket's `AbortIncompleteMultipartUpload` lifecycle rule removes abandoned multipart uploads. A claimed deletion row carries a fence number; only the current fence may complete it.
 
-The S3 cleanup adapter lists versions, delete markers, multipart uploads and current objects under the attempt's UUID-derived prefix, aborts uploads, deletes explicit versions (including null versions) and lists again. Each LIST response must carry an explicit `IsTruncated`; a missing value is incomplete, never empty. Missing permissions, malformed responses or remaining entries leave the charge in place and the row due. One pass handles at most 128 entries per inventory API.
+The S3 cleanup adapter lists versions, delete markers, multipart uploads and current objects under the attempt's UUID-derived prefix, aborts uploads, deletes explicit versions (including null versions) and lists again. Each LIST response must carry an explicit `IsTruncated`; a missing value is incomplete, never empty. Missing permissions, malformed responses or remaining entries leave the charge in place and the row due. One pass handles up to 1,000 entries per inventory API, the S3 ListObjectsV2/ListObjectVersions page and DeleteObjects maximum.
 
 Completion releases the charge once (`used = used - $n`), clears receipts and keeps the minimized deleted record for restore suppression. Duplicate completion of the same fence is idempotent; an old fence cannot release. Failures stay due and are retried at the next wake.
 

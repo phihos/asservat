@@ -19,21 +19,21 @@ Publication never rereads or redecrypts data frames.
 
 ## Reader checks
 
-The hub assigns verification of a stored outcome to the regional reader over its connection. `evidence.ContextCustodian` checks the registration and write deadline; the reader runs `ContextVerifier` outside transaction locks with a 30-second I/O bound:
+The hub assigns verification of a stored outcome to the regional reader over its connection. `evidence.ContextCustodian` checks the registration and write deadline; the reader runs `ContextVerifier` outside transaction locks; each object read has the five-second I/O timeout (ADR-330 D5):
 
 1. Read the envelope object/version, compare its recorded checksum and length, validate `artifact-commit/v1` and bind its IDs and manifest checksum to the registration.
 2. Decrypt the manifest with the fixed manifest AAD and validate it against the canonical schema.
 3. Compare every control field with the expectation: target, audience, origin, classification, retention arithmetic, source times, projection provenance, type, and data/index identities, sizes and checksums. Reject unsupported fields, substituted targets or audiences, later expiry and false completeness.
 4. Decrypt the index and check that its frame count, sizes and data checksum agree with the manifest.
-5. For the 4096-byte pod-status profile only, the whole data object is one frame: decrypt it and check identity, observation time and counts against the expectation.
+5. For the pod-status profile only, the whole data object is one frame: decrypt it and check identity, observation time and counts against the expectation.
 
 A failure publishes nothing; the stored objects stay charged until deletion removes them.
 
-Limits: envelope ≤ 32 KiB, decoded manifest ≤ 1 MiB, manifest ciphertext ≤ 1088 KiB, pod-status document ≤ 4096 bytes. Strict JSON parsing rejects duplicate keys, invalid Unicode, trailing documents, depth over 32, more than 32768 tokens and non-integer numbers. Errors carry allowlisted codes, never content.
+Limits, each bounding reader memory per verification: the envelope is at most the size implied by the fixed-shape `artifact-commit/v1` schema maxima; the decoded manifest is at most the reader memory limit divided by its concurrent verifications (chart default 1 MiB), and its ciphertext adds the 64 KiB framing overhead; the pod-status document is within the 2 MiB Kubernetes API response cap. Strict JSON parsing rejects duplicate keys, invalid Unicode, trailing documents, nesting deeper than the deepest canonical schema plus a margin, and non-integer numbers; the byte bound also bounds the token count. Errors carry allowlisted codes, never content.
 
 ## Profiles
 
-- **Pod status** (`asservat-pod-status/v1`, manual `onTrigger`, ≤ 4096 bytes). The [schema](../../specs/contracts/pod-status.schema.json) allows only namespace/Pod identity, resource version, observation time, finite phase/condition values and aggregate counts; no labels, annotations, environment, logs, addresses, container names or free text. The [Kubernetes API class](api-context-execution.md) sets `target.executionClass: kubernetesAPI` and has no node UID/boot.
+- **Pod status** (`asservat-pod-status/v1`, manual `onTrigger`; the closed schema bounds the document to at most 3,437 bytes, inside the recipe's 4096-byte reservation). The [schema](../../specs/contracts/pod-status.schema.json) allows only namespace/Pod identity, resource version, observation time, finite phase/condition values and aggregate counts; no labels, annotations, environment, logs, addresses, container names or free text. The [Kubernetes API class](api-context-execution.md) sets `target.executionClass: kubernetesAPI` and has no node UID/boot.
 - **Recorder types** (PCAPNG, syscall JSON Lines, HTTP header projection, [ADR-244](../decisions/244-native-artifact-types.md)) carry their own kind, evidence type, media type and format through the artifact-type registry and omit the pod-status projection digest.
 
 Unsupported optional manifest fields are rejected, not ignored. Classification defaults to `potentialPersonalData`. Verification does not attest that a compromised source reported the truth.

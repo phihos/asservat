@@ -14,7 +14,6 @@ spec:
   - kube-system
   - asservat-system
   role: workload-maintainer
-  maxNamespaces: 200
   protection:
     mode: administratorManaged
   metadataMapping:

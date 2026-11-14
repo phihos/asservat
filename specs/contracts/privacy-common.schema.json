@@ -34,8 +34,7 @@
         },
         "purposeRef": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 128
+          "minLength": 1
         },
         "classificationSource": {
           "type": "string",
@@ -48,8 +47,7 @@
         },
         "assessmentRef": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 128
+          "minLength": 1
         }
       },
       "required": [
@@ -102,17 +100,17 @@
         "requestedAgeSeconds": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 315360000
+          "maximum": 9007199254740991
         },
         "resolvedMaxAgeSeconds": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 315360000
+          "maximum": 9007199254740991
         },
         "deletionBudgetSeconds": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 86400
+          "maximum": 9007199254740991
         },
         "deleteBy": {
           "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/timestamp"
@@ -125,13 +123,12 @@
             "properties": {
               "uid": {
                 "type": "string",
-                "minLength": 1,
-                "maxLength": 64
+                "minLength": 1
               },
               "generation": {
                 "type": "integer",
                 "minimum": 1,
-                "maximum": 2147483647
+                "maximum": 9007199254740991
               },
               "digest": {
                 "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/hash"
@@ -144,7 +141,6 @@
             ]
           },
           "minItems": 1,
-          "maxItems": 64,
           "uniqueItems": true
         },
         "parentExpiresAt": {

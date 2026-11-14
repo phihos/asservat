@@ -17,8 +17,7 @@
         },
         "reason": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 512
+          "minLength": 1
         }
       },
       "required": [
@@ -50,8 +49,7 @@
         },
         "uid": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 64
+          "minLength": 1
         }
       },
       "required": [
@@ -67,13 +65,11 @@
       "properties": {
         "process_ref": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 128
+          "minLength": 1
         },
         "pod_uid": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 64
+          "minLength": 1
         },
         "display_pid": {
           "type": "integer",
@@ -106,13 +102,12 @@
         },
         "parent_ref": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 128
+          "minLength": 1
         },
         "rss_bytes": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 109951162777600
+          "maximum": 9007199254740991
         },
         "selector_candidate": {
           "$ref": "https://asservat.io/spec/v1/action.schema.json#/$defs/processSelector"
@@ -121,10 +116,8 @@
           "type": "array",
           "items": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 128
+            "minLength": 1
           },
-          "maxItems": 16,
           "uniqueItems": true
         },
         "observed_at": {
@@ -147,13 +140,11 @@
       "properties": {
         "flow_ref": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 128
+          "minLength": 1
         },
         "pod_uid": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 64
+          "minLength": 1
         },
         "transport": {
           "enum": [
@@ -165,8 +156,7 @@
         },
         "peer_address": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 64
+          "minLength": 1
         },
         "peer_port": {
           "type": "integer",
@@ -197,8 +187,7 @@
           "items": {
             "$ref": "https://asservat.io/spec/v1/guidance.schema.json#/$defs/peer"
           },
-          "minItems": 0,
-          "maxItems": 16
+          "minItems": 0
         },
         "peer_basis": {
           "$ref": "https://asservat.io/spec/v1/guidance.schema.json#/$defs/basis"
@@ -207,19 +196,16 @@
           "type": "array",
           "items": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 128
+            "minLength": 1
           },
-          "minItems": 0,
-          "maxItems": 16
+          "minItems": 0
         },
         "process_basis": {
           "$ref": "https://asservat.io/spec/v1/guidance.schema.json#/$defs/basis"
         },
         "observation_point": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 128
+          "minLength": 1
         }
       },
       "required": [
@@ -244,12 +230,12 @@
         "requested_pods": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 100
+          "maximum": 9007199254740991
         },
         "covered_pods": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 100
+          "maximum": 9007199254740991
         },
         "process_inventory_complete": {
           "type": "boolean"
@@ -299,12 +285,12 @@
         "observed_wire_bytes": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 1099511627776
+          "maximum": 9007199254740991
         },
         "retained_bytes": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 1099511627776
+          "maximum": 9007199254740991
         },
         "coverage": {
           "$ref": "https://asservat.io/spec/v1/guidance.schema.json#/$defs/coverage"
@@ -347,8 +333,7 @@
             "type": "string",
             "format": "uuid"
           },
-          "minItems": 1,
-          "maxItems": 16
+          "minItems": 1
         },
         "expires_at": {
           "type": "string",
@@ -369,26 +354,22 @@
           "items": {
             "$ref": "https://asservat.io/spec/v1/guidance.schema.json#/$defs/process"
           },
-          "minItems": 0,
-          "maxItems": 100
+          "minItems": 0
         },
         "flows": {
           "type": "array",
           "items": {
             "$ref": "https://asservat.io/spec/v1/guidance.schema.json#/$defs/flow"
           },
-          "minItems": 0,
-          "maxItems": 100
+          "minItems": 0
         },
         "gaps": {
           "type": "array",
           "items": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 256
+            "minLength": 1
           },
-          "minItems": 0,
-          "maxItems": 32
+          "minItems": 0
         }
       },
       "required": [
@@ -458,42 +439,39 @@
         "retained_bytes_per_second": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 1073741824
+          "maximum": 9007199254740991
         },
         "history_seconds": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 3600
+          "maximum": 9007199254740991
         },
         "burst_factor": {
           "type": "integer",
-          "minimum": 1,
-          "maximum": 8
+          "minimum": 1
         },
         "segment_bytes": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 67108864
+          "maximum": 9007199254740991
         },
         "segments": {
           "type": "integer",
           "minimum": 2,
-          "maximum": 64
+          "maximum": 9007199254740991
         },
         "ring_bytes": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 268435456
+          "maximum": 9007199254740991
         },
         "limitations": {
           "type": "array",
           "items": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 256
+            "minLength": 1
           },
-          "minItems": 1,
-          "maxItems": 16
+          "minItems": 1
         }
       },
       "required": [
@@ -513,13 +491,11 @@
       "properties": {
         "code": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 64
+          "minLength": 1
         },
         "message": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 256
+          "minLength": 1
         },
         "responsible_role": {
           "enum": [
@@ -546,38 +522,31 @@
       "properties": {
         "diagnostic_handle": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 128
+          "minLength": 1
         },
         "title": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 128
+          "minLength": 1
         },
         "explanation": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
+          "minLength": 1
         },
         "answers": {
           "type": "array",
           "items": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 256
+            "minLength": 1
           },
-          "minItems": 1,
-          "maxItems": 8
+          "minItems": 1
         },
         "limitations": {
           "type": "array",
           "items": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 256
+            "minLength": 1
           },
-          "minItems": 1,
-          "maxItems": 16
+          "minItems": 1
         },
         "basis": {
           "$ref": "https://asservat.io/spec/v1/guidance.schema.json#/$defs/basis"
@@ -586,11 +555,9 @@
           "type": "array",
           "items": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 64
+            "minLength": 1
           },
-          "minItems": 1,
-          "maxItems": 16
+          "minItems": 1
         },
         "impact": {
           "enum": [
@@ -602,17 +569,17 @@
         "max_bytes": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 109951162777600
+          "maximum": 9007199254740991
         },
         "max_process_starts": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 10000
+          "maximum": 9007199254740991
         },
         "retention_seconds": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 31536000
+          "maximum": 9007199254740991
         },
         "approval_required": {
           "type": "boolean"
@@ -622,8 +589,7 @@
           "items": {
             "$ref": "https://asservat.io/spec/v1/guidance.schema.json#/$defs/blocker"
           },
-          "minItems": 0,
-          "maxItems": 16
+          "minItems": 0
         },
         "process_selector": {
           "$ref": "https://asservat.io/spec/v1/action.schema.json#/$defs/processSelector"
@@ -640,7 +606,7 @@
         "process_match_count": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 256
+          "maximum": 9007199254740991
         },
         "process_inventory_complete": {
           "type": "boolean"
@@ -684,8 +650,7 @@
         },
         "target_handle": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 128
+          "minLength": 1
         },
         "goal": {
           "enum": [
@@ -714,26 +679,22 @@
             "type": "string",
             "format": "uuid"
           },
-          "minItems": 0,
-          "maxItems": 4
+          "minItems": 0
         },
         "recommendations": {
           "type": "array",
           "items": {
             "$ref": "https://asservat.io/spec/v1/guidance.schema.json#/$defs/recommendation"
           },
-          "minItems": 1,
-          "maxItems": 8
+          "minItems": 1
         },
         "missing_observations": {
           "type": "array",
           "items": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 256
+            "minLength": 1
           },
-          "minItems": 0,
-          "maxItems": 16
+          "minItems": 0
         }
       },
       "required": [
