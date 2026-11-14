@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	value "asservat.local/asservat/internal/domain/fleet"
@@ -228,11 +227,6 @@ func (s *OwnerObservationOperationReader) boundaryLocal(ctx context.Context, r v
 	if err != nil {
 		return zero, noDigest, err
 	}
-	// ADR-227: read inside the namespace bracket, like the Deployment.
-	release, err := s.client.releaseRecord(ctx, p.Namespace, p.InstallationID)
-	if err != nil {
-		return zero, noDigest, err
-	}
 	route := &OwnerEndpoints{client: s.client, pool: p}
 	service, err := route.service(ctx)
 	if err != nil {
@@ -265,7 +259,7 @@ func (s *OwnerObservationOperationReader) boundaryLocal(ctx context.Context, r v
 			if e != nil {
 				return zero, noDigest, e
 			}
-			digest, e := s.validateObjects(service, deployment, rs, pod, b, location, release)
+			digest, e := s.validateObjects(service, deployment, rs, pod, b, location)
 			if e != nil {
 				return zero, noDigest, e
 			}
@@ -275,7 +269,7 @@ func (s *OwnerObservationOperationReader) boundaryLocal(ctx context.Context, r v
 			}
 			// Status/resourceVersion updates are not workload identity. Recheck
 			// the last Pod's live behavior and the same protected spec projection.
-			lastDigest, e := s.validateObjects(service, deployment, rs, last, b, location, release)
+			lastDigest, e := s.validateObjects(service, deployment, rs, last, b, location)
 			if e != nil || lastDigest != digest {
 				return zero, noDigest, cfg.ErrChanged
 			}
@@ -324,7 +318,7 @@ func readPinnedDeployment(ctx context.Context, c *PermissionClient, namespace, n
 	return d, nil
 }
 
-func (s *OwnerObservationOperationReader) validateObjects(service core.Service, d apps.Deployment, rs apps.ReplicaSet, pod core.Pod, binding value.OwnerBinding, route ownerOperationRoute, release *contracts.ReleaseRecord) (artifact.Digest, error) {
+func (s *OwnerObservationOperationReader) validateObjects(service core.Service, d apps.Deployment, rs apps.ReplicaSet, pod core.Pod, binding value.OwnerBinding, route ownerOperationRoute) (artifact.Digest, error) {
 	var zero artifact.Digest
 	p := s.pin.Pool
 	if !ownerMetadata(d.ObjectMeta, p.Namespace, p.Deployment, p.DeploymentUID) || d.Spec.Replicas == nil || *d.Spec.Replicas < 1 || d.Spec.Template.Spec.ServiceAccountName != p.ServiceAccount || !ownerMetadata(pod.ObjectMeta, p.Namespace, route.pod, binding.PodUID) || pod.Spec.ServiceAccountName != p.ServiceAccount || pod.Spec.HostNetwork || pod.Spec.HostPID || pod.Spec.HostIPC || pod.Spec.NodeName == "" || pod.Spec.NodeName != route.node || pod.Status.Phase != core.PodRunning || len(pod.Status.PodIPs) < 1 || len(pod.Status.PodIPs) > 2 {
@@ -351,7 +345,7 @@ func (s *OwnerObservationOperationReader) validateObjects(service core.Service, 
 		return zero, cfg.ErrChanged
 	}
 	owner, ok := ownerController(rs.OwnerReferences, "Deployment", "apps/v1")
-	if !ok || owner.Name != p.Deployment || string(owner.UID) != p.DeploymentUID || connectorAPITemplateMatch(&d, &rs, &pod, s.pin.TemplateDigest, s.pin.ImageDigest, release, releaseHubAPI) != nil {
+	if !ok || owner.Name != p.Deployment || string(owner.UID) != p.DeploymentUID {
 		return zero, cfg.ErrChanged
 	}
 	// Same canonical native facts on both boundaries; no certificate, token,
@@ -363,7 +357,8 @@ func (s *OwnerObservationOperationReader) validateObjects(service core.Service, 
 		Deployment               apps.DeploymentSpec
 		Labels, Annotations      map[string]string
 		PodOwners, ReplicaOwners []meta.OwnerReference
-	}{s.pin, pod.Spec, rs.Spec, d.Spec, pod.Labels, pod.Annotations, pod.OwnerReferences, rs.OwnerReferences})
+		Finalizers               []string
+	}{s.pin, pod.Spec, rs.Spec, d.Spec, pod.Labels, pod.Annotations, pod.OwnerReferences, rs.OwnerReferences, pod.Finalizers})
 	if err != nil || len(raw) > 128<<10 {
 		return zero, value.ErrUnavailable
 	}

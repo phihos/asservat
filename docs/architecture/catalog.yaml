@@ -192,7 +192,6 @@ components:
   - RetentionListReader
   - RetentionWatcher
   - RetentionWatch
-  - RetentionBootstrapReviewReader
   - RetentionCheckpointStore
   - RetentionAcceptanceJournal
   - RetentionAcceptanceWriter

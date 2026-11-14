@@ -1,7 +1,6 @@
 package bootstrap
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -20,7 +19,6 @@ import (
 	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	value "asservat.local/asservat/internal/domain/fleet"
-	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/transport/connectorlifecycle"
 )
 
@@ -31,13 +29,12 @@ type Regional struct {
 	credentials *mtls.ConnectorProcessCredentials
 	rotator     fleetapp.ClusterCredentialRotator
 	bootstrap   regionalBootstrap
-	context     *regionalContext  // nil without the optional ADR-171 input
-	capacity    *regionalCapacity // nil without the optional ADR-197 input
-	nodes       *regionalNodes    // nil without the optional ADR-246 input
+	context     *regionalContext // nil without the optional ADR-171 input
+	nodes       *regionalNodes   // nil without the optional ADR-246 input
 	closers     []func()
-	// API round trips of the shared observer and probe clients, for the
-	// executor's stop line (ADR-196): counts and transport time only.
-	observerStats, probeStats regionalAPIStats
+	// API round trips of the shared observer client, for the executor's stop
+	// line (ADR-196): counts and transport time only.
+	observerStats regionalAPIStats
 }
 
 // lifecycleTiming reports the first completed hub conversation of each
@@ -92,7 +89,7 @@ const (
 func RunRegional(ctx context.Context, podUID string) error {
 	// The test diagnostics keep connector lines prefixed "regional".
 	logOpeningStats(ctx, "regional kube opening")
-	files, err := os.OpenRoot(contracts.RegionalDeploymentRoot)
+	files, err := os.OpenRoot(contracts.ConnectorConfigRoot)
 	if err != nil {
 		return errors.Join(mounts.ErrUnavailable, err)
 	}
@@ -105,56 +102,10 @@ func RunRegional(ctx context.Context, podUID string) error {
 	return r.Run(ctx)
 }
 
-func readRegionalDeployment(ctx context.Context, files *os.Root) (contracts.RegionalDeployment, error) {
-	b, err := mounts.Read(ctx, files, "regional.json", contracts.RegionalDeploymentMaxBytes)
-	if err != nil {
-		return contracts.RegionalDeployment{}, mounts.ErrUnavailable
-	}
-	defer clear(b)
-	c, err := contracts.DecodeRegionalDeployment(bytes.NewReader(b))
-	if err != nil || c.Format != contracts.RegionalDeploymentFormat {
-		return contracts.RegionalDeployment{}, mounts.ErrUnavailable
-	}
-	for _, id := range []string{c.InstallationID, c.ClusterID, c.PermissionRootID, c.IssuerEpoch, c.PeerID, c.Namespace.UID, c.Deployment.UID, c.Source.UID, c.ClusterCredential.UID} {
-		if !authorization.UUID(id) {
-			return contracts.RegionalDeployment{}, mounts.ErrUnavailable
-		}
-	}
-	for _, name := range []string{c.Namespace.Name, c.Deployment.Name, c.Source.Name, c.ClusterCredential.Name, c.ClusterCredentialAccount, c.Hub.ServerName} {
-		if !identity.Text(name, 253) {
-			return contracts.RegionalDeployment{}, mounts.ErrUnavailable
-		}
-	}
-	if !ownerEndpoint(c.Kubernetes.Endpoint) || !ownerEndpoint(c.Hub.Endpoint) || len(c.ConfigurationProbes) > 8 {
-		return contracts.RegionalDeployment{}, mounts.ErrUnavailable
-	}
-	for _, g := range []contracts.OwnerDeploymentGuard{c.WorkloadGuard, c.SourceGuard} {
-		if !identity.Text(g.Name, 253) || !authorization.UUID(g.PolicyUID) || !authorization.UUID(g.BindingUID) || !identity.Text(g.BindingResourceVersion, 128) || g.PolicyGeneration < 1 || len(g.Administrators) < 1 || len(g.Administrators) > 32 {
-			return contracts.RegionalDeployment{}, mounts.ErrUnavailable
-		}
-	}
-	if !validRegionalAPIContext(c) || !validRegionalCapacity(c) || !validRegionalCollector(c) {
-		return contracts.RegionalDeployment{}, mounts.ErrUnavailable
-	}
-	return c, nil
-}
-
-func regionalActors(in []contracts.OwnerDeploymentActor) []cfg.KubernetesActor {
-	out := make([]cfg.KubernetesActor, len(in))
-	for i, a := range in {
-		out[i] = cfg.KubernetesActor{Kind: a.Kind, Name: a.Name}
-	}
-	return out
-}
-
-func regionalPin(g contracts.OwnerDeploymentGuard) kube.GuardPin {
-	return kube.GuardPin{PolicyUID: g.PolicyUID, PolicyGeneration: g.PolicyGeneration, BindingUID: g.BindingUID, BindingResourceVersion: g.BindingResourceVersion}
-}
-
 type regionalPodToken struct{ inputs *providerInputs }
 
 func (s regionalPodToken) ReadConnectorPodToken(ctx context.Context) ([]byte, error) {
-	b, err := s.inputs.token("connector-pod.token")(ctx)
+	b, err := s.inputs.token(contracts.ConnectorPodTokenFile)(ctx)
 	if err != nil || !contracts.ValidWorkerToken(b) {
 		clear(b)
 		return nil, mounts.ErrUnavailable
@@ -231,10 +182,6 @@ func NewRegional(ctx context.Context, files *os.Root, podUID string) (r *Regiona
 	if ctx == nil || ctx.Err() != nil || files == nil || !authorization.UUID(podUID) || disableWorkerCoreDumps() != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	c, err := readRegionalDeployment(ctx, files)
-	if err != nil {
-		return nil, err
-	}
 	r = &Regional{}
 	defer func() {
 		if err != nil {
@@ -244,100 +191,97 @@ func NewRegional(ctx context.Context, files *os.Root, podUID string) (r *Regiona
 	}()
 	startup, end := context.WithTimeout(ctx, 30*time.Second)
 	defer end()
-	in := &providerInputs{files: files, kubernetesEndpoint: c.Kubernetes}
+	in := &providerInputs{files: files}
 	r.closers = append(r.closers, in.closeHTTP)
-	control := cfg.NamespaceRef{Name: c.Namespace.Name, UID: c.Namespace.UID}
-	observerConfig := kube.WithOpeningBurst(in.kubernetes("kube-observer.token"))
+	raw, err := readConnectorConfig(startup, in)
+	if err != nil {
+		return r, err
+	}
+	apiRoots, err := kubernetesRoots(startup, in)
+	if err != nil {
+		return r, err
+	}
+	in.kubernetesEndpoint = contracts.OwnerProviderEndpoint{Endpoint: "https://kubernetes.default.svc", Roots: apiRoots}
+	// Combined mode: the hub's own cluster and local connector peer come
+	// from the IDs Secret (field map class S), not from values.
+	var ids contracts.InstallationIDs
+	if raw.Mode == contracts.ConnectorModeCombined {
+		if ids, err = readCombinedIDs(); err != nil {
+			return r, err
+		}
+		raw.ClusterID, raw.PeerID = ids.ClusterID, ids.PeerID
+	}
+	c, err := resolveRegionalConfig(startup, in, raw)
+	if err != nil {
+		return r, err
+	}
+	if raw.Mode == contracts.ConnectorModeCombined && !combinedOfferMatches(c.offer, ids) {
+		return r, &fixedStepError{"offer-ids", mounts.ErrUnavailable}
+	}
+	// N values: the connector's own namespace, account and Deployment UIDs,
+	// read by name once.
+	workload, err := kube.ReadConnectorWorkload(startup, in.kubernetes(contracts.ConnectorKubeTokenFile), c.ClusterID, c.Namespace, c.ServiceAccount, c.Deployment)
+	if err != nil {
+		return r, &fixedStepError{"workload", err}
+	}
+	control := cfg.NamespaceRef{Name: c.Namespace, UID: workload.NamespaceUID}
+	observerConfig := kube.WithOpeningBurst(in.kubernetes(contracts.ConnectorKubeTokenFile))
 	observerConfig.Wrap(r.observerStats.wrap)
 	observer, err := kube.NewPermissionClient(observerConfig, c.ClusterID, control, time.Now)
 	if err != nil {
 		return r, mounts.ErrUnavailable
 	}
-	probeConfig := kube.WithOpeningBurst(in.kubernetes("kube-probe.token"))
-	probeConfig.Wrap(r.probeStats.wrap)
-	probe, err := kube.NewPermissionClient(probeConfig, c.ClusterID, control, time.Now)
+	document, err := kube.ConnectorIdentityDocument(c.offer, c.ClusterID, c.PeerID, c.connectorDeployment())
 	if err != nil {
-		return r, mounts.ErrUnavailable
+		return r, &fixedStepError{"identity", err}
 	}
-	probes := make([]cfg.OwnerConfigurationProbe, len(c.ConfigurationProbes))
-	for i, p := range c.ConfigurationProbes {
-		probes[i] = cfg.OwnerConfigurationProbe{ConfigMap: p.ConfigMap, ServiceAccount: p.ServiceAccount}
-	}
-	plan := cfg.OwnerWorkloadAdministration{Name: c.WorkloadGuard.Name, Deployment: c.Deployment.Name, DeploymentUID: c.Deployment.UID, ControlNamespace: control, Administrators: regionalActors(c.WorkloadGuard.Administrators), ConfigurationProbes: probes,
-		CredentialSecrets: []cfg.OwnerCredentialSecret{{Secret: c.ClusterCredential.Name, ServiceAccount: c.ClusterCredentialAccount}}}
-	if c.APIContext != nil {
-		// The installed guard admits only the exact capacity/execution start writes.
-		if plan.APIContextStarts, err = ownerDeploymentStarts(&c.APIContext.Starts); err != nil {
-			return r, mounts.ErrUnavailable
-		}
-	}
-	guard, err := kube.NewOwnerWorkloadProtection(observer, probe, plan, regionalPin(c.WorkloadGuard))
+	source, err := kube.NewConnectorIdentitySource(observer, document, c.rootID(), c.binding)
 	if err != nil {
-		return r, mounts.ErrUnavailable
+		return r, &fixedStepError{"identity", err}
 	}
-	sourcePlan := cfg.ConfigMapAdministration{Name: c.SourceGuard.Name, SourceName: c.Source.Name, ControlNamespace: control, Administrators: regionalActors(c.SourceGuard.Administrators)}
-	protection, err := kube.NewConnectorIdentityProtection(observer, probe, sourcePlan, regionalPin(c.SourceGuard))
-	if err != nil {
-		return r, mounts.ErrUnavailable
-	}
-	binding := value.PeerBinding{InstallationID: c.InstallationID, ClusterID: c.ClusterID, IssuerEpoch: c.IssuerEpoch, PeerID: c.PeerID, Role: value.ConnectorPeer}
-	source, err := kube.NewConnectorIdentitySource(observer, protection, c.Source.Name, c.Source.UID, c.PermissionRootID, binding)
-	if err != nil {
-		return r, mounts.ErrUnavailable
-	}
-	// The process profile is this cluster's current protected source, including
-	// the current guard's protection digest; the hub pins the same document.
 	current, err := source.ReadConnectorIdentityConfiguration(startup)
 	if err != nil {
-		return r, mounts.ErrUnavailable
+		return r, &fixedStepError{"identity", err}
 	}
-	native, err := kube.NewConnectorLifecycleReader(observer, source, guard, regionalPodToken{in})
+	native, err := kube.NewConnectorLifecycleReader(observer, source, workload, regionalPodToken{in})
 	if err != nil {
 		return r, mounts.ErrUnavailable
 	}
-	secret, err := kube.NewClusterCredentialSecretForConfig(in.kubernetes("kube-observer.token"), c.Namespace.Name, c.ClusterCredential.Name, c.ClusterCredential.UID)
+	secret, err := kube.NewClusterCredentialSecretForConfig(in.kubernetes(contracts.ConnectorKubeTokenFile), c.Namespace, c.ClusterCredential)
 	if err != nil {
 		return r, mounts.ErrUnavailable
 	}
-	roots, _, err := mtls.OwnerTrustRoots(c.Hub.Roots, time.Now())
+	roots, _, err := mtls.OwnerTrustRoots(c.hub.Roots, time.Now())
 	if err != nil {
 		return r, mounts.ErrUnavailable
 	}
-	channel, err := connectorlifecycle.NewClient(c.Hub.Endpoint, c.Hub.ServerName, roots)
+	channel, err := connectorlifecycle.NewClient(c.hub.Endpoint, c.hub.ServerName, roots)
 	if err != nil {
 		return r, mounts.ErrUnavailable
 	}
-	rotation, err := mtls.NewClusterCredentialClient(c.Hub.Endpoint, c.Hub.ServerName, roots)
+	rotation, err := mtls.NewClusterCredentialClient(c.hub.Endpoint, c.hub.ServerName, roots)
 	if err != nil {
 		return r, mounts.ErrUnavailable
 	}
-	r.rotator = fleetapp.ClusterCredentialRotator{Profile: value.ClusterCredentialProfile{RootID: c.PermissionRootID, PeerID: c.PeerID, InstallationID: c.InstallationID, ClusterID: c.ClusterID}, Policy: value.DefaultClusterCredentialPolicy(), Store: secret, Exchange: rotation, Now: time.Now}
+	r.rotator = fleetapp.ClusterCredentialRotator{Profile: value.ClusterCredentialProfile{RootID: c.rootID(), PeerID: c.PeerID, InstallationID: c.binding.InstallationID, ClusterID: c.ClusterID}, Policy: value.DefaultClusterCredentialPolicy(), Store: secret, Exchange: rotation, Now: time.Now}
 	lifecycle := &RegionalLifecycle{Client: channel, Local: regionalLocal{native, source}, Credential: r.rotator, Now: time.Now, Timing: r.lifecycleTiming()}
-	r.bootstrap = regionalBootstrap{store: secret, channel: channel, local: regionalLocal{native, source}, binding: binding, root: c.PermissionRootID, now: time.Now}
+	r.bootstrap = regionalBootstrap{store: secret, seed: secret, record: regionalBootstrapRecord{in}, channel: channel, local: regionalLocal{native, source}, binding: c.binding, root: c.rootID(), now: time.Now}
 	r.credentials, err = mtls.NewConnectorProcessCredentials(ctx, current.Source.Observation.Profile, podUID, lifecycle, lifecycle, source, lifecycle, time.Now)
 	if err != nil {
 		return r, mounts.ErrUnavailable
 	}
 	r.closers = append(r.closers, r.credentials.Close)
-	if c.APIContext != nil {
+	if c.executor {
 		var closers []func()
-		r.context, closers, err = newRegionalContext(startup, c, in, podUID, plan, sourcePlan, binding, lifecycle, r.credentials)
+		r.context, closers, err = newRegionalContext(startup, c, in, podUID, workload, source, lifecycle, r.credentials)
 		r.closers = append(r.closers, closers...)
 		if err != nil {
-			return r, mounts.ErrUnavailable
-		}
-	}
-	if c.Capacity != nil {
-		var closers []func()
-		r.capacity, closers, err = newRegionalCapacity(startup, c, in, podUID, plan, sourcePlan, binding, lifecycle)
-		r.closers = append(r.closers, closers...)
-		if err != nil {
-			return r, mounts.ErrUnavailable
+			return r, err
 		}
 	}
 	if c.Collector != nil {
 		if r.nodes, err = newRegionalNodes(startup, c, in); err != nil {
-			return r, mounts.ErrUnavailable
+			return r, err
 		}
 		r.closers = append(r.closers, r.nodes.close)
 		// ADR-248: manual packet recordings need both the node channel and
@@ -385,18 +329,10 @@ func (r *Regional) Run(ctx context.Context) error {
 	contextRunning, contextLast := false, ""
 	var contextRetry <-chan time.Time
 	contextCtx, stopContext := context.WithCancel(ctx)
-	// ADR-197: the capacity standby runs beside context start, with its own
-	// fixed retry, while credentials are active.
-	capacityDone := make(chan error, 1)
-	capacityRunning, capacityLast := false, ""
-	var capacityRetry <-chan time.Time
 	defer func() {
 		stopContext()
 		if contextRunning {
 			<-contextDone
-		}
-		if capacityRunning {
-			<-capacityDone
 		}
 	}()
 	// ADR-246: the node listener runs for the process lifetime; its failure
@@ -413,28 +349,19 @@ func (r *Regional) Run(ctx context.Context) error {
 		}
 	}()
 	var attemptAt time.Time
-	var observerAt, probeAt int64
-	var observerTime, probeTime time.Duration
+	var observerAt int64
+	var observerTime time.Duration
 	startContext := func() {
 		if r.context == nil || contextRunning || !enrolled || contextRetry != nil {
 			return
 		}
 		attemptAt = time.Now()
 		observerAt, observerTime = r.observerStats.load()
-		probeAt, probeTime = r.probeStats.load()
 		contextRunning = true
 		go func() { contextDone <- r.context.run(contextCtx, r.credentials) }()
 	}
-	startCapacity := func() {
-		if r.capacity == nil || r.context == nil || capacityRunning || !enrolled || capacityRetry != nil {
-			return
-		}
-		capacityRunning = true
-		go func() { capacityDone <- r.capacity.run(contextCtx, r.credentials, r.context.settings) }()
-	}
 	for {
 		startContext()
-		startCapacity()
 		select {
 		case <-ctx.Done():
 			return nil
@@ -442,20 +369,6 @@ func (r *Regional) Run(ctx context.Context) error {
 			r.nodes = nil
 			fmt.Fprintln(os.Stderr, "connector node listener stopped: "+regionalCause(err))
 			return mounts.ErrUnavailable
-		case err := <-capacityDone:
-			capacityRunning = false
-			cause := regionalCause(err)
-			var step interface{ FixedStep() string }
-			if errors.As(err, &step) {
-				cause = step.FixedStep() + " (" + cause + ")"
-			}
-			if err != nil && cause != capacityLast {
-				fmt.Fprintln(os.Stderr, "regional capacity stopped: "+cause)
-				capacityLast = cause
-			}
-			capacityRetry = time.After(regionalRetry)
-		case <-capacityRetry:
-			capacityRetry = nil
 		case err := <-contextDone:
 			contextRunning = false
 			cause := regionalCause(err)
@@ -465,9 +378,8 @@ func (r *Regional) Run(ctx context.Context) error {
 			}
 			if cause != contextLast {
 				oc, ot := r.observerStats.load()
-				pc, pt := r.probeStats.load()
-				fmt.Fprintf(os.Stderr, "regional context start stopped: %s; attempt %s, observer %d calls %s, probe %d calls %s\n", cause,
-					time.Since(attemptAt).Round(10*time.Millisecond), oc-observerAt, (ot - observerTime).Round(10*time.Millisecond), pc-probeAt, (pt - probeTime).Round(10*time.Millisecond))
+				fmt.Fprintf(os.Stderr, "regional context start stopped: %s; attempt %s, observer %d calls %s\n", cause,
+					time.Since(attemptAt).Round(10*time.Millisecond), oc-observerAt, (ot - observerTime).Round(10*time.Millisecond))
 				contextLast = cause
 			}
 			contextRetry = time.After(regionalRetry)
@@ -525,6 +437,8 @@ func regionalCause(err error) string {
 		return "cluster-credential-write"
 	case errors.Is(err, errRegionalBootstrapExpired):
 		return "cluster-bootstrap-expired"
+	case errors.Is(err, errRegionalBootstrapMissing):
+		return "cluster-bootstrap-record-missing"
 	case errors.Is(err, errRegionalCredential):
 		return "cluster-credential"
 	case errors.Is(err, errRegionalChannel):

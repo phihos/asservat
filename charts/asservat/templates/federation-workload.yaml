@@ -1,0 +1,37 @@
+{{- if include "asservat.hub" . }}
+{{- $v := .Values.hub.federation }}
+{{- $n := include "asservat.name" . }}
+{{- $p := include "asservat.providers" . | fromJson }}
+{{- $dir := "/run/asservat/federation" }}
+{{- $purposes := list "connector-source" "connector-journal" "connector-ack" "connector-read" "cluster-credential" "connector-owner-read" }}
+{{- $config := toJson (dict
+  "name" $n
+  "namespace" .Release.Namespace
+  "port" 9446
+  "concurrency" (int (default 4 $v.concurrency))
+  "postgres" $p.postgres
+  "auditStore" (dict "endpoint" $p.objectStore.endpoint "region" $p.objectStore.region "bucket" $p.objectStore.auditBucket)
+  "openBao" $p.openBao.endpoint) }}
+{{- $rules := list
+  (dict "apiGroups" (list "") "resources" (list "configmaps") "resourceNames" (list (printf "%s-owner-source" $n) (printf "%s-regional-offer" $n)) "verbs" (list "get"))
+  (dict "apiGroups" (list "") "resources" (list "pods" "services") "verbs" (list "get"))
+  (dict "apiGroups" (list "") "resources" (list "serviceaccounts") "resourceNames" (list (printf "%s-hub-api" $n)) "verbs" (list "get"))
+  (dict "apiGroups" (list "apps") "resources" (list "replicasets" "deployments") "verbs" (list "get"))
+  (dict "apiGroups" (list "discovery.k8s.io") "resources" (list "endpointslices") "verbs" (list "list")) }}
+{{- $tls := include "asservat.svc.tlsSecret" (list . "federation") }}
+{{- $sources := list }}
+{{- $sources = append $sources (include "asservat.svc.sql" (list . "federation" $purposes)) }}
+{{- $sources = append $sources (include "asservat.svc.auditMAC" .) }}
+{{- $sources = append $sources (include "asservat.svc.s3" (list . "federation-audit" "audit-storage.json")) }}
+{{- $sources = append $sources (printf "- secret:\n    name: %s\n    items: [{key: tls.crt, path: tls.crt}, {key: tls.key, path: tls.key}]" ($tls | quote)) }}
+{{- $sources = append $sources (include "asservat.providerRoots" (dict "root" . "provider" "postgres" "path" "postgres-ca.crt") | trim) }}
+{{- $sources = append $sources (include "asservat.providerRoots" (dict "root" . "provider" "objectStore" "path" "objectstore-ca.crt") | trim) }}
+{{- $sources = append $sources (include "asservat.providerRoots" (dict "root" . "provider" "openBao" "path" "openbao-ca.crt") | trim) }}
+{{- $sources = append $sources (printf "- serviceAccountToken:\n    audience: %s\n    expirationSeconds: 600\n    path: provider-auth.token" (include "asservat.openBao" . | fromJson).federationAudience) }}
+{{ include "asservat.svc.account" (list . "federation" $rules) }}
+---
+{{ include "asservat.svc.service" (list . "federation" 9446) }}
+{{- include "asservat.svc.tlsObjects" (list . "federation") }}
+---
+{{ include "asservat.svc.deployment" (dict "root" . "component" "federation" "command" "hub-federation" "dir" $dir "port" 9446 "grace" 40 "config" $config "sqlFile" "sql-connector-read.json" "sources" (join "\n" $sources)) }}
+{{- end }}

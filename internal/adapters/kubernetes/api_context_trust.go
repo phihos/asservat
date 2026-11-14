@@ -111,7 +111,30 @@ func NewAPIContextWorkTrustSource(c *PermissionClient, p *APIContextWorkTrustPro
 	installed.Keys = slices.Clone(installed.Keys)
 	return &APIContextWorkTrustSource{client: c, protection: p, recovery: recovery, name: name, uid: uid, installed: installed, canonical: canonical}, nil
 }
+
+// NewLocalAPIContextWorkTrustSource serves the hub's own work trust for its
+// combined-mode local cluster (no ConfigMap); uid names its revision.
+// Recovery is checked on every read as for a guarded source.
+func NewLocalAPIContextWorkTrustSource(c *PermissionClient, recovery app.RecoveryReader, uid string, installed contracts.APIContextWorkTrustSettings) (*APIContextWorkTrustSource, error) {
+	if c == nil || recovery == nil || !authorization.UUID(uid) {
+		return nil, cfg.ErrInvalid
+	}
+	n := c.now()
+	if _, e := apiWorkTrustValue(installed, uid, n, n.Add(5*time.Second)); e != nil {
+		return nil, e
+	}
+	canonical, e := contracts.EncodeAPIContextTrust(installed)
+	if e != nil {
+		return nil, e
+	}
+	installed.Keys = slices.Clone(installed.Keys)
+	return &APIContextWorkTrustSource{client: c, recovery: recovery, uid: uid, installed: installed, canonical: canonical}, nil
+}
+
 func (s *APIContextWorkTrustSource) snapshot(ctx context.Context) error {
+	if s.name == "" {
+		return nil // the local source is its installed settings
+	}
 	data, ref, e := s.client.installationConfigMode(ctx, s.name, s.uid, true)
 	if e != nil || len(data) != 1 || ref.UID != s.uid {
 		return cfg.ErrUnavailable

@@ -57,7 +57,7 @@ type SmallOpenBaoPlan struct {
 
 func (p SmallOpenBaoPlan) Valid() bool {
 	u, err := url.Parse(p.Kubernetes.Endpoint)
-	if p.Format != SmallOpenBaoFormat || len(p.Name) < 1 || len(p.Name) > 30 || len(validation.IsDNS1123Label(p.Name)) != 0 || len(validation.IsDNS1123Label(p.Namespace)) != 0 || len(p.Image) > 512 || !smallOpenBaoImage.MatchString(p.Image) || p.SetupAccount != p.Name+"-bootstrap-runner" || err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.Opaque != "" || u.Path != "" || u.RawPath != "" || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" || len(p.Kubernetes.Endpoint) > 2048 || len(p.Kubernetes.Roots) < 1 || len(p.Kubernetes.Roots) > 4 {
+	if p.Format != SmallOpenBaoFormat || len(p.Name) < 1 || len(p.Name) > 30 || len(validation.IsDNS1123Label(p.Name)) != 0 || len(validation.IsDNS1123Label(p.Namespace)) != 0 || len(p.Image) > 512 || !smallOpenBaoImage.MatchString(p.Image) || p.SetupAccount != p.Name+"-setup" || err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.Opaque != "" || u.Path != "" || u.RawPath != "" || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" || len(p.Kubernetes.Endpoint) > 2048 || len(p.Kubernetes.Roots) < 1 || len(p.Kubernetes.Roots) > 4 {
 		return false
 	}
 	for i, der := range p.Kubernetes.Roots {

@@ -11,6 +11,9 @@ import (
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/configuration"
 	coordination "k8s.io/api/coordination/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 )
@@ -24,18 +27,20 @@ type ReconciliationLeader struct {
 }
 
 type reconciliationLock struct {
-	client              *PermissionClient
-	name, uid, identity string
-	lease               *coordination.Lease
+	client         *PermissionClient
+	name, identity string
+	lease          *coordination.Lease
 }
 
 var _ resourcelock.Interface = (*reconciliationLock)(nil)
 
-func NewReconciliationLeader(c *PermissionClient, name, uid, process string) (*ReconciliationLeader, error) {
-	if c == nil || !installationRefValid(name, uid) || !authorization.UUID(uid) || !authorization.UUID(process) {
+// NewReconciliationLeader schedules on the named Lease, which it creates when
+// missing (Helm-native installation: the Lease is matched by name).
+func NewReconciliationLeader(c *PermissionClient, name, process string) (*ReconciliationLeader, error) {
+	if c == nil || len(validation.IsDNS1123Subdomain(name)) != 0 || !authorization.UUID(process) {
 		return nil, value.ErrInvalid
 	}
-	return &ReconciliationLeader{lock: &reconciliationLock{client: c, name: name, uid: uid, identity: process}}, nil
+	return &ReconciliationLeader{lock: &reconciliationLock{client: c, name: name, identity: process}}, nil
 }
 
 func (l *reconciliationLock) path() string {
@@ -49,7 +54,7 @@ func (l *reconciliationLock) namespace(ctx context.Context) error {
 	return nil
 }
 func (l *reconciliationLock) valid(v *coordination.Lease) bool {
-	if v == nil || v.Name != l.name || string(v.UID) != l.uid || v.Namespace != l.client.control.Name || v.ResourceVersion == "" || v.DeletionTimestamp != nil || v.APIVersion != "coordination.k8s.io/v1" || v.Kind != "Lease" {
+	if v == nil || v.Name != l.name || v.UID == "" || v.Namespace != l.client.control.Name || v.ResourceVersion == "" || v.DeletionTimestamp != nil || v.APIVersion != "coordination.k8s.io/v1" || v.Kind != "Lease" {
 		return false
 	}
 	r := resourcelock.LeaseSpecToLeaderElectionRecord(&v.Spec)
@@ -59,7 +64,11 @@ func (l *reconciliationLock) Get(ctx context.Context) (*resourcelock.LeaderElect
 	if err := l.namespace(ctx); err != nil {
 		return nil, nil, err
 	}
-	b, err := l.client.raw(ctx, l.path(), nil)
+	b, err := l.client.api.Get().AbsPath(l.path()).MaxRetries(0).DoRaw(ctx)
+	if apierrors.IsNotFound(err) {
+		// client-go creates the Lease only after a NotFound status.
+		return nil, nil, apierrors.NewNotFound(coordination.Resource("leases"), l.name)
+	}
 	var v coordination.Lease
 	if err != nil || len(b) > 64<<10 || json.Unmarshal(b, &v) != nil || !l.valid(&v) {
 		return nil, nil, value.ErrUnavailable
@@ -69,9 +78,21 @@ func (l *reconciliationLock) Get(ctx context.Context) (*resourcelock.LeaderElect
 	b, err = json.Marshal(r)
 	return r, b, err
 }
-func (l *reconciliationLock) Create(context.Context, resourcelock.LeaderElectionRecord) error {
-	// Installation creates the exact pinned Lease. Runtime has no create/delete.
-	return value.ErrUnavailable
+func (l *reconciliationLock) Create(ctx context.Context, r resourcelock.LeaderElectionRecord) error {
+	if r.HolderIdentity != l.identity || r.LeaseDurationSeconds != 15 || r.LeaderTransitions < 0 {
+		return value.ErrInvalid
+	}
+	if err := l.namespace(ctx); err != nil {
+		return err
+	}
+	v := &coordination.Lease{TypeMeta: meta.TypeMeta{APIVersion: "coordination.k8s.io/v1", Kind: "Lease"}, ObjectMeta: meta.ObjectMeta{Name: l.name, Namespace: l.client.control.Name}, Spec: resourcelock.LeaderElectionRecordToLeaseSpec(&r)}
+	b, err := l.client.api.Post().AbsPath("/apis/coordination.k8s.io/v1/namespaces/"+l.client.control.Name+"/leases").Param("fieldValidation", "Strict").Body(v).MaxRetries(0).Do(ctx).Raw()
+	var created coordination.Lease
+	if err != nil || len(b) > 64<<10 || json.Unmarshal(b, &created) != nil || !l.valid(&created) {
+		return value.ErrUnavailable
+	}
+	l.lease = &created
+	return nil
 }
 func (l *reconciliationLock) Update(ctx context.Context, r resourcelock.LeaderElectionRecord) error {
 	if !l.valid(l.lease) || r.HolderIdentity != l.identity || r.LeaseDurationSeconds != 15 || r.LeaderTransitions < 0 {

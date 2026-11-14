@@ -9,10 +9,10 @@ const ConfigurationProviderAuditCredentialFile = "configuration-audit-storage.js
 const ConfigurationProviderTokenTTLSeconds = 300
 const ConfigurationProviderTokenMaxTTLSeconds = 900
 
-// The dedicated projected audience cannot select another provider purpose.
-func ConfigurationProviderAudience(installationID, clusterID string) string {
-	return "https://asservat." + installationID + "/configuration-provider/" + clusterID
-}
+// ConfigurationProviderAudience is the hub-worker's projected provider token
+// audience. Helm renders it before the installation ID exists, so it is a
+// chart constant; the OpenBao role also binds the account and namespace.
+func ConfigurationProviderAudience(string, string) string { return "asservat-configuration-provider" }
 
 // ConfigurationProviderAuthentication is public original input. The actual
 // protected producer, native workload, SQL recovery and finite provider leases

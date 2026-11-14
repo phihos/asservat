@@ -2,12 +2,12 @@ package kubernetes
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"strings"
 	"time"
 
+	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
@@ -176,9 +176,9 @@ func OwnerWorkloadAdmission(p cfg.OwnerWorkloadAdministration) (*admission.Valid
 // TokenReview of the Pod-bound token, the live Pod → ReplicaSet → Deployment
 // chain, SQL registration and exact TLS peers.
 //
-// The digest is computed exactly as before from the plan, pin and cluster so
-// persisted protection_digest values keep matching. policy and binding remain
-// only for callers outside this slice that still read them.
+// The digest names only the cluster, namespace and Deployment
+// (contracts.WorkloadSourceDigest). policy and binding remain only for callers
+// outside the hub-api that still read them.
 type OwnerWorkloadProtection struct {
 	observer, probe *PermissionClient
 	plan            cfg.OwnerWorkloadAdministration
@@ -197,7 +197,9 @@ const OwnerProtectionReuse = 30 * time.Second
 const ownerProtectionRefresh = 5 * time.Second
 
 func NewOwnerWorkloadProtection(observer, probe *PermissionClient, plan cfg.OwnerWorkloadAdministration, pin GuardPin) (*OwnerWorkloadProtection, error) {
-	if observer == nil || probe == nil || observer == probe || observer.clusterID != probe.clusterID || observer.control != plan.ControlNamespace || probe.control != plan.ControlNamespace || !identity.Text(pin.PolicyUID, 64) || !identity.Text(pin.BindingUID, 64) || !identity.Text(pin.BindingResourceVersion, 128) || pin.PolicyGeneration < 1 {
+	// ADR-328: probe and pin are optional; only remaining non-hub-api
+	// proofs still use them.
+	if observer == nil || observer == probe || probe != nil && (observer.clusterID != probe.clusterID || probe.control != plan.ControlNamespace) || observer.control != plan.ControlNamespace {
 		return nil, cfg.ErrInvalid
 	}
 	if plan.CapacityProbe != nil {
@@ -216,17 +218,20 @@ func NewOwnerWorkloadProtection(observer, probe *PermissionClient, plan cfg.Owne
 	plan.ConfigurationProbes = append([]cfg.OwnerConfigurationProbe(nil), plan.ConfigurationProbes...)
 	plan.SchedulingLeases = append([]cfg.OwnerSchedulingLease(nil), plan.SchedulingLeases...)
 	plan.CredentialSecrets = append([]cfg.OwnerCredentialSecret(nil), plan.CredentialSecrets...)
+	out := &OwnerWorkloadProtection{observer: observer, probe: probe, plan: plan, pin: pin, digest: artifact.Digest(contracts.WorkloadSourceDigest(observer.clusterID, plan.ControlNamespace.Name, plan.Deployment))}
+	if probe == nil {
+		if len(validation.IsDNS1123Subdomain(plan.Deployment)) != 0 || len(validation.IsDNS1123Label(plan.ControlNamespace.Name)) != 0 {
+			return nil, cfg.ErrInvalid
+		}
+		return out, nil
+	}
 	p, b, err := OwnerWorkloadAdmission(plan)
 	if err != nil {
 		return nil, err
 	}
 	normalizePermissionPolicy(&p.Spec)
-	raw, _ := json.Marshal(struct {
-		Format, Cluster string
-		Plan            cfg.OwnerWorkloadAdministration
-		Pin             GuardPin
-	}{"asservat-owner-workload-protection/v1", observer.clusterID, plan, pin})
-	return &OwnerWorkloadProtection{observer, probe, plan, pin, p.Spec, b.Spec, artifact.Digest(sha256.Sum256(raw))}, nil
+	out.policy, out.binding = p.Spec, b.Spec
+	return out, nil
 }
 
 // proveObjectIdentity and prove keep the former denied dry-run probe only for
@@ -238,6 +243,9 @@ func NewOwnerWorkloadProtection(observer, probe *PermissionClient, plan cfg.Owne
 // account/client pins and a live account object; it creates no new authority.
 func (g *OwnerWorkloadProtection) proveObjectIdentity(ctx context.Context, start time.Time) (apps.Deployment, authentication.UserInfo, error) {
 	var zero apps.Deployment
+	if g.probe == nil {
+		return zero, authentication.UserInfo{}, cfg.ErrUnavailable
+	}
 	raw, err := g.probe.proofPost(ctx, "/apis/authentication.k8s.io/v1/selfsubjectreviews", authentication.SelfSubjectReview{TypeMeta: meta.TypeMeta{APIVersion: "authentication.k8s.io/v1", Kind: "SelfSubjectReview"}}, nil)
 	if err != nil {
 		return zero, authentication.UserInfo{}, configurationSourceError(configurationSourceProbeIdentityRead, cfg.ErrUnavailable)

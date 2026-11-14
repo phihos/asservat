@@ -18,7 +18,7 @@ func bundledInitialFixture(t *testing.T) (*initialProviderFixture, contracts.Bun
 	selected := contracts.BundledInitialProviderIdentity{
 		Format: contracts.BundledInitialProviderIdentityFormat, BackendName: "trial",
 		Namespace:    contracts.WorkerObjectReference{Name: "bootstrap", UID: "20000000-0000-4000-8000-000000000010"},
-		SetupAccount: contracts.WorkerObjectReference{Name: "trial-bootstrap-runner", UID: "20000000-0000-4000-8000-000000000011"},
+		SetupAccount: contracts.WorkerObjectReference{Name: "trial-setup", UID: "20000000-0000-4000-8000-000000000011"},
 		EntityID:     "20000000-0000-4000-8000-000000000012",
 		SetupParent:  contracts.InitialProviderParent{Accessor: "original-setup-parent", IssuedAt: now.Add(-time.Second), ExpiresAt: now.Add(299 * time.Second)},
 	}

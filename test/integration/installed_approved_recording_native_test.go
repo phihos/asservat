@@ -24,7 +24,6 @@ import (
 	"testing"
 	"time"
 
-	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/contracts"
 	analysis "asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -195,70 +194,6 @@ func approvedRecordingArguments(cluster, namespace, workload string) map[string]
 // has prepared its namespace and published the node endpoint.
 func approvedRecordingCollectorRenderArgs(connectorNamespace, valuesPath string) []string {
 	return []string{"template", "asservat", "../../charts/asservat", "--namespace", connectorNamespace, "--show-only", "templates/collector.yaml", "--kube-version", "1.37.0", "-f", valuesPath}
-}
-
-// This focus uses the ordinary product installer and official chart. Its only
-// privileged component runs on a guarded disposable runner, never a workstation.
-func installApprovedRecordingCollector(t *testing.T, ctx context.Context, api kubernetes.Interface, config, image, installation, cluster, connectorNamespace string) {
-	t.Helper()
-	if _, err := os.Stat("/etc/asservat-disposable-host"); err != nil {
-		t.Fatal("approved collector requires disposable host", err)
-	}
-	if image == "" {
-		t.Fatal("approved collector lacks built image")
-	}
-	qualifyApprovedRecordingInputPermissions(t, ctx, api, config, connectorNamespace)
-	source, err := api.CoreV1().ConfigMaps(connectorNamespace).Get(ctx, kube.RegionalNodes, meta.GetOptions{})
-	if err != nil {
-		t.Fatal("installed collector endpoint", err)
-	}
-	collector := map[string]any{"enabled": true, "image": image, "installationID": installation, "clusterID": cluster, "connector": source.Data}
-	if installedAnyFocus("ongoing-save-disk") {
-		// ADR-278: the administrator's opt-in encrypted-disk ring volume.
-		collector["ringDisk"] = map[string]any{"enabled": true, "bytes": ongoingSaveDiskBytes}
-	}
-	if installedAnyFocus("live-observation") || installedAnyFocus("ongoing-incident") {
-		// The administrator's node-side live processing opt-in; hub
-		// delivery.liveRead separately authorizes viewers. The incident fixture
-		// leaves one node slot so a second hub-eligible view must be shed.
-		subscriptions := 4
-		if installedAnyFocus("ongoing-incident") {
-			subscriptions = 1
-		}
-		collector["live"] = map[string]any{"subscriptions": subscriptions, "memoryBytes": 4 << 20, "eventsPerSecond": 2000, "bytesPerSecond": 1 << 20, "processingNanosPerSecond": 50_000_000}
-	}
-	values := map[string]any{"mode": "cluster", "collector": collector}
-	raw, _ := json.Marshal(values)
-	path := filepath.Join(t.TempDir(), "collector-values.json")
-	if err := os.WriteFile(path, raw, 0600); err != nil {
-		t.Fatal(err)
-	}
-	// Hang bounds only: a local render, an apply and a 90 s rollout wait.
-	render, rendered := installedBoundedCommand(ctx, 2*time.Minute, "helm", approvedRecordingCollectorRenderArgs(connectorNamespace, path)...)
-	manifest, err := render.Output()
-	rendered()
-	if err != nil {
-		t.Fatal("official collector chart", err)
-	}
-	apply, applied := installedBoundedCommand(ctx, 2*time.Minute, "kubectl", "--kubeconfig", config, "apply", "-f", "-")
-	defer applied()
-	apply.Stdin = bytes.NewReader(manifest)
-	if out, err := apply.CombinedOutput(); err != nil {
-		t.Fatalf("collector apply: %v %s", err, out)
-	}
-	roll, rolled := installedBoundedCommand(ctx, 3*time.Minute, "kubectl", "--kubeconfig", config, "-n", "asservat-collector", "rollout", "status", "daemonset/asservat-node", "--timeout=90s")
-	defer rolled()
-	if out, err := roll.CombinedOutput(); err != nil {
-		t.Fatalf("collector readiness: %v %s", err, out)
-	}
-	t.Cleanup(func() {
-		if t.Failed() {
-			logs, end := installedBoundedCommand(context.Background(), 10*time.Second, "kubectl", "--kubeconfig", config, "-n", "asservat-collector", "logs", "-l", "app.kubernetes.io/name=asservat-node", "--tail=100", "--prefix")
-			defer end()
-			out, _ := logs.CombinedOutput()
-			t.Logf("collector diagnostics: %s", out)
-		}
-	})
 }
 
 // stepUp exercises the same fresh-form route as the console, with the same

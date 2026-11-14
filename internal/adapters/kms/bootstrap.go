@@ -222,6 +222,17 @@ func DecodeBootstrapRecord(raw []byte) (value.BootstrapEnvelope, error) {
 	return out, nil
 }
 
+// EncodeBootstrapRecord is DecodeBootstrapRecord's inverse: the channel's
+// data object for one envelope, as the connector reads it from bootstrap.json.
+func EncodeBootstrapRecord(e value.BootstrapEnvelope) ([]byte, error) {
+	if !e.Valid() {
+		return nil, value.ErrInvalid
+	}
+	b := e.Binding
+	return json.Marshal(bootstrapSecret{Binding: bootstrapBinding{Format: "asservat-bootstrap-secret/v1", InstallationID: b.InstallationID, BootstrapID: e.BootstrapID, ClusterID: b.ClusterID, PeerID: b.PeerID, IssuerEpoch: b.IssuerEpoch,
+		DeliveryProfile: e.DeliveryProfile, RequestDigest: hex.EncodeToString(e.RequestDigest[:]), NotBefore: e.NotBefore.UTC().Format(time.RFC3339Nano), NotAfter: e.NotAfter.UTC().Format(time.RFC3339Nano)}, Secret: e.Secret})
+}
+
 // ReadBootstrapEnvelope delivers only the original version-one credential from
 // an administrator-selected existing channel. It creates no slot or credential;
 // the connector still has to claim the exact current SQL bootstrap before use.

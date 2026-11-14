@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
-	"encoding/json"
 	"sync"
 	"time"
 
@@ -19,43 +18,19 @@ import (
 // ConnectorLifecycleReader owns only ADR153's explicit enrollment/signing
 // native composition. General attestation, retirement and ADR150 stay separate.
 type ConnectorLifecycleReader struct {
-	client *PermissionClient
-	source *ConnectorIdentitySource
-	guard  *OwnerWorkloadProtection
-	tokens app.ConnectorPodToken
+	client   *PermissionClient
+	source   *ConnectorIdentitySource
+	workload ConnectorWorkload
+	tokens   app.ConnectorPodToken
 }
 
 var _ app.ConnectorLifecycleOperationReader = (*ConnectorLifecycleReader)(nil)
 
-func NewConnectorLifecycleReader(c *PermissionClient, source *ConnectorIdentitySource, guard *OwnerWorkloadProtection, tokens app.ConnectorPodToken) (*ConnectorLifecycleReader, error) {
-	if c == nil || source == nil || source.protection == nil || source.protection.configMapProtection == nil || guard == nil || tokens == nil ||
-		source.client != c || source.protection.observer != c || guard.observer != c || source.binding.ClusterID != c.clusterID ||
-		source.protection.plan.ControlNamespace != c.control || guard.plan.ControlNamespace != c.control {
+func NewConnectorLifecycleReader(c *PermissionClient, source *ConnectorIdentitySource, workload ConnectorWorkload, tokens app.ConnectorPodToken) (*ConnectorLifecycleReader, error) {
+	if c == nil || source == nil || tokens == nil || source.client != c || source.binding.ClusterID != c.clusterID || !workload.matches(c, workload.Namespace, workload.Account, workload.Deployment) {
 		return nil, cfg.ErrInvalid
 	}
-	var workPlan cfg.OwnerWorkloadAdministration
-	raw, err := json.Marshal(guard.plan)
-	if err != nil || json.Unmarshal(raw, &workPlan) != nil {
-		return nil, cfg.ErrInvalid
-	}
-	work, err := NewOwnerWorkloadProtection(c, guard.probe, workPlan, guard.pin)
-	if err != nil || work.digest != guard.digest {
-		return nil, cfg.ErrInvalid
-	}
-	var sourcePlan cfg.ConfigMapAdministration
-	raw, err = json.Marshal(source.protection.plan)
-	if err != nil || json.Unmarshal(raw, &sourcePlan) != nil {
-		return nil, cfg.ErrInvalid
-	}
-	protection, err := NewConnectorIdentityProtection(c, source.protection.probe, sourcePlan, source.protection.pin)
-	if err != nil || protection.digest != source.protection.digest {
-		return nil, cfg.ErrInvalid
-	}
-	owned, err := NewConnectorIdentitySource(c, protection, source.name, source.uid, source.root, source.binding)
-	if err != nil {
-		return nil, err
-	}
-	return &ConnectorLifecycleReader{c, owned, work, tokens}, nil
+	return &ConnectorLifecycleReader{c, source, workload, tokens}, nil
 }
 
 type connectorLifecycleOperation struct {
@@ -200,7 +175,7 @@ func sameLifecycleProofFacts(a, b value.ConnectorProcessProof) bool {
 }
 
 func (o *connectorLifecycleOperation) proof(w ownerEnrollmentWorkload, source value.ConnectorIdentitySource, start, until time.Time) value.ConnectorProcessProof {
-	return value.ConnectorProcessProof{Process: o.request.Binding.Process, Configuration: source.Observation, Pod: w.Pod, ReplicaSet: w.ReplicaSet, ReplicaSetUID: w.ReplicaSetUID, ClientKeyDigest: o.clientKey, ServerKeyDigest: o.serverKey, TokenDigest: artifact.Digest(sha256.Sum256(o.token)), WorkloadDigest: w.Digest, ProtectionDigest: o.reader.guard.digest, ObservedAt: start, FreshUntil: until}
+	return value.ConnectorProcessProof{Process: o.request.Binding.Process, Configuration: source.Observation, Pod: w.Pod, ReplicaSet: w.ReplicaSet, ReplicaSetUID: w.ReplicaSetUID, ClientKeyDigest: o.clientKey, ServerKeyDigest: o.serverKey, TokenDigest: artifact.Digest(sha256.Sum256(o.token)), WorkloadDigest: w.Digest, ProtectionDigest: o.reader.workload.Digest, ObservedAt: start, FreshUntil: until}
 }
 
 func (o *connectorLifecycleOperation) Close() {

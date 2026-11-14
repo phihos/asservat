@@ -3,13 +3,11 @@ package kubernetes
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"strings"
 	"testing"
 	"time"
 
 	"asservat.local/asservat/internal/contracts"
-	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/authorization"
 	batch "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
@@ -40,7 +38,7 @@ func originalDownloadJob219(i value.DownloadWorkerIntent) *batch.Job {
 			{Name: "control", VolumeSource: core.VolumeSource{ConfigMap: &core.ConfigMapVolumeSource{LocalObjectReference: core.LocalObjectReference{Name: p.ControlConfig}, DefaultMode: &mode}}},
 		},
 		Containers: []core.Container{{Name: "acquisition", Image: p.Image, ImagePullPolicy: core.PullIfNotPresent,
-			Command: []string{"/asservat"}, Args: []string{"download-worker", "--installation", p.InstallationID, "--cluster", p.ClusterID, "--dispatch", i.ID, "--session", i.SessionID, "--created-at", i.CreatedAt.UTC().Format(time.RFC3339Nano), "--until", i.RunUntil.UTC().Format(time.RFC3339Nano), "--control-sha256", fmt.Sprintf("%x", p.ControlDigest), "--control", contracts.WorkerControlPath, "--token", DownloadWorkerTokenPath},
+			Command: []string{"/asservat"}, Args: []string{"download-worker", "--installation", p.InstallationID, "--cluster", p.ClusterID, "--dispatch", i.ID, "--session", i.SessionID, "--created-at", i.CreatedAt.UTC().Format(time.RFC3339Nano), "--until", i.RunUntil.UTC().Format(time.RFC3339Nano), "--control", contracts.WorkerControlPath, "--token", DownloadWorkerTokenPath},
 			Env:                    []core.EnvVar{{Name: contracts.WorkerPodUIDEnvironment, ValueFrom: &core.EnvVarSource{FieldRef: &core.ObjectFieldSelector{APIVersion: "v1", FieldPath: "metadata.uid"}}}},
 			TerminationMessagePath: core.TerminationMessagePathDefault, TerminationMessagePolicy: core.TerminationMessageReadFile,
 			Resources:       core.ResourceRequirements{Requests: resources, Limits: resources},
@@ -63,7 +61,7 @@ func originalDownloadJob219(i value.DownloadWorkerIntent) *batch.Job {
 func TestSharedAcquisitionPreservesOriginalDownloadJobBytes(t *testing.T) {
 	now := time.Date(2026, 10, 23, 10, 0, 0, 123456000, time.UTC)
 	id := "10000000-0000-4000-8000-000000000001"
-	p := value.DownloadWorkerProfile{InstallationID: id, ClusterID: id, Namespace: "workers", ServiceAccount: "acquisition", Image: "synthetic.invalid/worker@sha256:" + strings.Repeat("1", 64), ControlConfig: "control", ControlDigest: artifact.Digest{3}, PriorityClass: "workers", CPUMillis: 100, MemoryBytes: 64 << 20}
+	p := value.DownloadWorkerProfile{InstallationID: id, ClusterID: id, Namespace: "workers", ServiceAccount: "acquisition", Image: "synthetic.invalid/worker@sha256:" + strings.Repeat("1", 64), ControlConfig: "control", PriorityClass: "workers", CPUMillis: 100, MemoryBytes: 64 << 20}
 	for _, native := range []bool{false, true} {
 		if native {
 			p.StoreCredentialSecret = "native-store"

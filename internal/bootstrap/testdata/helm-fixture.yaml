@@ -1,0 +1,173 @@
+# Base values for Go tests that render the whole chart: the fields every
+# public/combined render requires. Test values files override them.
+exposure:
+  tlsSecret: console-tls
+identity:
+  processingOperators:
+  - {clientID: asservat-console, issuer: "https://login.example.org/realms/asservat", kind: User, id: 0f03f92a-6920-47cd-85d5-26080d3571d5}
+  eligibleSubjects:
+  - id: 00000000-0000-4000-8000-0000000000aa
+    kind: human
+  providerRootsPEM: PUBLIC-CA
+  clientSecret:
+    existingSecret: operator-oidc
+federation:
+  connector:
+    accounts: 1
+    recordsPerAccount: 96
+    retainedSeconds: 4000
+    profiles: 1
+    sourceTransitions: 8
+    purgeLeases: 2
+    validSeconds: 3600
+    footprint:
+      rowBytes: 1048576
+      transitionWALBytes: 1048576
+capacity:
+  pool: trial
+  policy: trial-apps
+  namespaceKeys:
+  - asservat-trial
+  accounts: 2
+  recordsPerAccount: 8
+  admissionSeconds: 86400
+  lanes:
+    captureRetainedSeconds: 10000
+    normal:
+      accounts: 4
+      recordsPerAccount: 128
+      retainedSeconds: 10000
+    resolution:
+      accounts: 4
+      recordsPerAccount: 8
+      retainedSeconds: 10000
+    processing:
+      accounts: 2
+      recordsPerAccount: 16
+      retainedSeconds: 10000
+  stopRetainedSeconds: 10000
+  backup:
+    horizonSeconds: 1
+    cleanupBudgetSeconds: 60
+    proofWindowSeconds: 60
+    backupCopies: 1
+    walCopies: 1
+  footprints:
+    capture:
+      rowBytes: 131072
+      transitionWALBytes: 262144
+    operation:
+      rowBytes: 131072
+      transitionWALBytes: 262144
+    processing:
+      rowBytes: 131072
+      transitionWALBytes: 262144
+    native:
+      rowBytes: 65536
+      transitionWALBytes: 131072
+    stop:
+      rowBytes: 131072
+      transitionWALBytes: 262144
+    processingState:
+      rowBytes: 16384
+      transitionWALBytes: 65536
+  purgeLeases: 4
+  processing:
+    maxRules: 2
+    maxRootTransitions: 512
+  metadata:
+    fixedRowBytes: 1048576
+    accountRowBytes: 262144
+    recordRowBytes: 131072
+    recordWALBytes: 8388608
+    recordKeyAttempts: 16
+    transitionWALBytes: 1048576
+    configurationTransitions: 4096
+  envelope:
+    systemObjects:
+      bytes: 1073741824
+      objects: 4096
+    sqlBytes: 536870912
+    backupBytes: 1073741824
+    walBytes: 34359738368
+    keyAttempts: 16384
+  backends:
+  - storageProfile: trial-dedicated
+    usable:
+      bytes: 8589934592
+      objects: 16000
+  poolSpec:
+    storageProfileRef: trial-dedicated
+    capacity:
+      bytes: 8589934592
+      objects: 16000
+    safetyHeadroom:
+      bytes: 1073741824
+      objects: 2000
+    systemReserve:
+      bytes: 2147483648
+      objects: 6000
+    sharedBurst:
+      bytes: 1073741824
+      objects: 2000
+    protectedAllocations:
+    - budgetPolicyRef: trial-apps
+      workloadSlots: 2
+      protectedPerWorkload:
+        bytes: 1073741824
+        objects: 2000
+    upload:
+      bytesPerSecond: 16777216
+      burstBytes: 16777216
+    maxUploadRequestsPerSecond: 20
+    capacityAssurance: qualifiedReservedBackend
+  policySpec:
+    poolRef: trial
+    scope:
+      clusterID: ''
+      namespaceSelector:
+        matchLabels:
+          asservat-trial: 'true'
+    namespaceEnvelope:
+      maxWorkloadAccounts: 2
+      maxStoredBytes: 3221225472
+      maxObjects: 6000
+    workload:
+      protected:
+        bytes: 1073741824
+        objects: 2000
+      hardLimit:
+        bytes: 1610612736
+        objects: 3000
+      contextReserve:
+        bytes: 12353536
+        objects: 32
+      dump:
+        burst: 1
+        minimumIntervalSeconds: 900
+        maxStartsPerRollingHour: 1
+        maxInputBytesPerRollingHour: 1048576
+      maxConcurrentExpensive: 1
+      maxQueuedExpensive: 1
+      maxQueueAgeSeconds: 30
+      upload:
+        bytesPerSecond: 8388608
+        burstBytes: 8388608
+      maxUploadRequestsPerSecond: 10
+      maxSpoolBytes: 16777216
+      onFull: RejectNewExpensive
+    node:
+      maxConcurrentExpensive: 1
+      maxQueuedExpensive: 1
+      upload:
+        bytesPerSecond: 8388608
+        burstBytes: 8388608
+      maxSpoolBytes: 16777216
+      impactProfileRef: standard-node
+      unhealthySamples: 3
+      sampleIntervalSeconds: 5
+      recoveryHealthySeconds: 60
+# The fake API of the hook tests serves only the release namespace.
+hub:
+  download-worker:
+    enabled: false

@@ -1,0 +1,82 @@
+{{- if and (include "asservat.hub" .) .Values.origin }}
+{{- /* Source ConfigMaps the hub-api (and the hub-worker) read by name. Only
+  Helm-known values; generated IDs come from <name>-ids in the readers. */}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "asservat.fullname" (list . "browser-settings") }}
+  namespace: {{ .Release.Namespace }}
+  labels: {{ include "asservat.labels" (list . "hub-api") | nindent 4 }}
+data:
+  browser.json: {{ include "asservat.hubApi.browserSettings" . | quote }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "asservat.fullname" (list . "identity-settings") }}
+  namespace: {{ .Release.Namespace }}
+  labels: {{ include "asservat.labels" (list . "hub-api") | nindent 4 }}
+data:
+  identity.json: {{ include "asservat.hubApi.identitySettings" . | quote }}
+---
+# Joined regional clusters (contracts.OwnerClusterCatalog); none at install.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "asservat.fullname" (list . "cluster-catalog") }}
+  namespace: {{ .Release.Namespace }}
+  labels: {{ include "asservat.labels" (list . "hub-api") | nindent 4 }}
+data:
+  cluster-catalog.json: {{ toJson (dict "format" "asservat-owner-cluster-catalog/v1" "clusters" list) | quote }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "asservat.fullname" (list . "download-environment") }}
+  namespace: {{ .Release.Namespace }}
+  labels: {{ include "asservat.labels" (list . "hub-api") | nindent 4 }}
+data:
+  download-environment.json: {{ include "asservat.hubApi.downloadEnvironment" . | quote }}
+{{- end }}
+{{- if and (include "asservat.hub" .) (or .Values.capacity (and .Values.origin (index .Values.hub "hub-api").public.processing)) }}
+---
+# The capacity processing source (ADR-192, ADR-210): the same settings.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "asservat.fullname" (list . "processing-source") }}
+  namespace: {{ .Release.Namespace }}
+  labels: {{ include "asservat.labels" (list . "hub-api") | nindent 4 }}
+data:
+  download-environment.json: {{ include "asservat.hubApi.downloadEnvironment" . | quote }}
+{{- end }}
+{{- if and (include "asservat.hubApi.combined" .) .Values.origin }}
+---
+# The hub's regional offer (contracts.RegionalOffer) for the combined-mode
+# connector. hub-api writes regional-offer.json once its provider values
+# exist; Helm only creates the object and keeps it.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "asservat.fullname" (list . "regional-offer") }}
+  namespace: {{ .Release.Namespace }}
+  labels: {{ include "asservat.labels" (list . "hub-api") | nindent 4 }}
+  annotations:
+    helm.sh/resource-policy: keep
+{{- if .Values.region.enabled }}
+---
+# The combined-mode connector's bootstrap record: hub-api writes
+# bootstrap.json for the generated local cluster and peer (the installation's
+# own audited fleet bootstrap) and replaces it when it expires unclaimed.
+# Helm only creates the object and keeps it.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "asservat.fullname" (list . "region-bootstrap") }}
+  namespace: {{ .Release.Namespace }}
+  labels: {{ include "asservat.labels" (list . "hub-api") | nindent 4 }}
+  annotations:
+    helm.sh/resource-policy: keep
+type: Opaque
+{{- end }}
+{{- end }}

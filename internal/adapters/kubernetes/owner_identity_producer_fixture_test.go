@@ -141,7 +141,7 @@ func newOwnerIdentityProducerFixture(t *testing.T) *ownerIdentityProducerFixture
 	if e != nil {
 		t.Fatal(e)
 	}
-	fleetSource, e := NewProtectedFleetSettings(observer, fleetGuard, inventory.FleetSource.Name, inventory.FleetSource.UID, resources.initial.InstallationID)
+	fleetSource, e := NewProtectedFleetSettings(observer, fleetGuard, inventory.FleetSource.Name, inventory.FleetSource.UID, resources.initial.InstallationID, resources.initial.IssuerEpoch)
 	if e != nil {
 		t.Fatal(e)
 	}

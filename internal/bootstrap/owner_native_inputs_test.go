@@ -69,13 +69,13 @@ func TestOwnerNativeInputsAreClosedPinnedAndOptional(t *testing.T) {
 			} else {
 				writeOwnerJSON(t, dir, "deployment.json", c)
 			}
-			got, e := readOwnerInputs(context.Background(), in.files)
+			got, e := readOwnerDeploymentFixture(context.Background(), in.files)
 			if mode == "valid" || mode == "absent" {
 				if e != nil || got == nil {
 					t.Fatal("supported protected projection", e)
 				}
-				if mode == "valid" && nativeKubernetesTokenName(got.config.Native.WorkerAPIs[0]) != "native-kube-"+runtimeID+"-workers.token" {
-					t.Fatal("token path is not fixed from pinned identities")
+				if mode == "valid" && nativeKubernetesTokenName(got.config.Native.WorkerAPIs[0]) != "native-kube-workers.token" {
+					t.Fatal("token path is not fixed from the namespace name")
 				}
 			} else if e == nil {
 				t.Fatal("unsafe native projection accepted", mode)

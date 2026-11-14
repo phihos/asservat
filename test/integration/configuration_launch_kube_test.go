@@ -149,7 +149,7 @@ func qualifyConfigurationNativeLaunch(t *testing.T, ctx context.Context, config 
 	administrators := []cfg.KubernetesActor{{Kind: "User", Name: who.Status.UserInfo.Username}}
 	workloadProtection := cfg.OwnerWorkloadAdministration{Name: name + "-workload", Deployment: owner.Name, DeploymentUID: string(owner.UID), ControlNamespace: control, Administrators: administrators, ConfigurationProbes: []cfg.OwnerConfigurationProbe{{ConfigMap: "fleet", ServiceAccount: "probe"}, {ConfigMap: "owner", ServiceAccount: "probe"}}}
 	rootCA, _ := connectorSQLCA(t)
-	fleet := contracts.FleetSettings{SchemaVersion: "fleet-settings/v1", Revision: 1, InstallationID: installation, IssuerEpoch: epoch, Issuer: "https://identity.synthetic.invalid", Clients: []string{"console"}, Subjects: []contracts.IdentitySubject{}, Groups: []string{}, DeliveryProfiles: []string{"operators"}, MaxActiveBootstraps: 2, MaxBootstrapHistory: 4, MaxClusters: 2}
+	fleet := contracts.FleetSettings{SchemaVersion: "fleet-settings/v1", Revision: 1, Issuer: "https://identity.synthetic.invalid", Clients: []string{"console"}, Subjects: []contracts.IdentitySubject{}, Groups: []string{}, DeliveryProfiles: []string{"operators"}, MaxActiveBootstraps: 2, MaxBootstrapHistory: 4, MaxClusters: 2}
 	ownerWire := contracts.OwnerConfiguration{Format: contracts.OwnerConfigurationFormat, InstallationID: installation, ClusterID: cluster, IssuerEpoch: epoch, Revision: 1, Namespace: ref(name, string(ns.UID)), Service: ref("owner", custodyID()), Deployment: ref(owner.Name, string(owner.UID)), ServiceAccount: ref("owner", string(accounts["owner"].UID)), Port: 9443, IssuerRoots: [][]byte{rootCA.Raw}}
 	createConfig := func(n, key string, v any, immutable bool) *core.ConfigMap {
 		t.Helper()
@@ -266,7 +266,7 @@ func qualifyConfigurationNativeLaunch(t *testing.T, ctx context.Context, config 
 	if err != nil {
 		t.Fatal(err)
 	}
-	fleetSource, err := kube.NewProtectedFleetSettings(observer, fleetGuard, in.FleetSource.Name, in.FleetSource.UID, installation)
+	fleetSource, err := kube.NewProtectedFleetSettings(observer, fleetGuard, in.FleetSource.Name, in.FleetSource.UID, installation, epoch)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -6,8 +6,6 @@ import (
 	"testing"
 	"time"
 
-	kube "asservat.local/asservat/internal/adapters/kubernetes"
-	"asservat.local/asservat/internal/domain/authorization"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -58,31 +56,6 @@ func TestInstallerContextTopologySelectsOriginalAPI(t *testing.T) {
 			}
 		})
 	}
-}
-
-// The independent original hub observer must see the same concrete identities
-// used by the regional journey; API selection cannot pass by mixing clusters.
-func assertSameAPIRegionalTarget(t *testing.T, ctx context.Context, hub kubernetes.Interface, installed kube.RegionalInstallation, w regionalWorkload, podName string, target authorization.Target) {
-	t.Helper()
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-	connector, err := hub.CoreV1().Namespaces().Get(ctx, installed.Namespace.Name, meta.GetOptions{})
-	if err != nil || string(connector.UID) != installed.Namespace.UID {
-		t.Fatal("same-api original hub does not hold the installed connector namespace", err)
-	}
-	namespace, err := hub.CoreV1().Namespaces().Get(ctx, w.ns.Name, meta.GetOptions{})
-	if err != nil || string(namespace.UID) != target.NamespaceUID {
-		t.Fatal("same-api original target namespace differs on hub API", err)
-	}
-	workload, err := hub.AppsV1().Deployments(w.ns.Name).Get(ctx, w.app.Name, meta.GetOptions{})
-	if err != nil || string(workload.UID) != target.WorkloadUID {
-		t.Fatal("same-api original target workload differs on hub API", err)
-	}
-	pod, err := hub.CoreV1().Pods(w.ns.Name).Get(ctx, podName, meta.GetOptions{})
-	if err != nil || string(pod.UID) != target.PodUID {
-		t.Fatal("same-api original selected Pod differs on hub API", err)
-	}
-	t.Log("same-api original hub independently observed the exact connector, namespace, workload and selected Pod UIDs")
 }
 
 func assertUnusedRegionalAPI(t *testing.T, ctx context.Context, f fixture, connectorNamespace, workloadNamespace string) {

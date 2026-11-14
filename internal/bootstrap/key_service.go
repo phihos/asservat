@@ -1,15 +1,14 @@
 package bootstrap
 
 import (
-	"bytes"
 	"context"
+	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"net"
 	"net/http"
-	"net/netip"
 	"os"
 	"slices"
 	"strconv"
@@ -22,11 +21,14 @@ import (
 	"asservat.local/asservat/internal/adapters/postgres"
 	authapp "asservat.local/asservat/internal/application/authorization"
 	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/transport/keyservice"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/client-go/rest"
 )
 
 // KeyService is the ADR-176 local key service process for the artifact
@@ -36,21 +38,33 @@ type KeyService struct {
 	handler *keyservice.Handler
 	tls     *tls.Config
 	port    int
-	// catalog is the guarded cluster catalog as read at start, only with
-	// downloads; a changed digest restarts the process (ADR-204, as the
-	// publisher does under ADR-203 decision 6).
+	// catalog is the cluster catalog as read at start, only with downloads;
+	// a changed digest restarts the process (ADR-204, as the publisher does
+	// under ADR-203 decision 6).
 	catalog publicCatalog
 	closers []func()
 }
 
-// RunKeyService serves until ctx ends from the fixed installation projection.
+// keyServiceInputs are the Helm-rendered configuration plus the generated
+// installation IDs; the recovery epoch is the issuer epoch.
+type keyServiceInputs struct {
+	contracts.KeyServiceConfig
+	contracts.ServiceIDs
+}
+
+// RunKeyService serves until ctx ends from the fixed mounted inputs.
 func RunKeyService(ctx context.Context) error {
 	files, err := os.OpenRoot(contracts.KeyServiceDeploymentRoot)
 	if err != nil {
 		return errors.Join(mounts.ErrUnavailable, err)
 	}
 	defer files.Close()
-	k, err := NewKeyService(ctx, files)
+	ids, err := os.OpenRoot(contracts.IDsRoot)
+	if err != nil {
+		return errors.Join(mounts.ErrUnavailable, err)
+	}
+	defer ids.Close()
+	k, err := NewKeyService(ctx, files, ids)
 	if err != nil {
 		return err
 	}
@@ -62,86 +76,78 @@ func RunKeyService(ctx context.Context) error {
 	return k.Serve(ctx, listener)
 }
 
-func readKeyServiceDeployment(ctx context.Context, files *os.Root) (contracts.KeyServiceDeployment, error) {
-	b, err := mounts.Read(ctx, files, "key-service.json", contracts.KeyServiceDeploymentMaxBytes)
+func readKeyServiceInputs(ctx context.Context, files, ids *os.Root) (keyServiceInputs, error) {
+	c, err := readServiceConfig(ctx, files, contracts.DecodeKeyServiceConfig)
 	if err != nil {
-		return contracts.KeyServiceDeployment{}, mounts.ErrUnavailable
+		return keyServiceInputs{}, err
 	}
-	defer clear(b)
-	c, err := contracts.DecodeKeyServiceDeployment(bytes.NewReader(b))
-	p := c.Postgres
-	scope := authorization.KeyScope{InstallationID: c.InstallationID, Purpose: "artifact", KeyID: c.KeyID}
-	if err != nil || c.Format != contracts.KeyServiceDeploymentFormat || !authorization.UUID(c.InstallationID) || !authorization.UUID(c.ClusterID) || !authorization.UUID(c.PermissionRootID) || !authorization.UUID(c.RecoveryEpoch) || !scope.Valid() || c.Port < 1 || c.Port > 65535 || c.Concurrency < 1 || c.Concurrency > 64 || !authorization.UUID(c.Namespace.UID) || !identity.Text(c.Namespace.Name, 63) || !identity.Text(c.KeySource.Name, 253) || !authorization.UUID(c.KeySource.UID) || !ownerEndpoint(c.Kubernetes.Endpoint) {
-		return contracts.KeyServiceDeployment{}, mounts.ErrUnavailable
+	v, err := readServiceIDs(ctx, ids)
+	if err != nil {
+		return keyServiceInputs{}, err
 	}
-	if _, err = netip.ParseAddr(p.Host); err != nil && !ownerDNSName.MatchString(p.Host) || !identity.Text(p.Database, 63) || p.Port < 1 || p.Port > 65535 || p.MaxConnections != 1 {
-		return contracts.KeyServiceDeployment{}, mounts.ErrUnavailable
-	}
-	if _, _, err = mtls.OwnerTrustRoots(c.KeyClientRoots, time.Now()); err != nil {
-		return contracts.KeyServiceDeployment{}, mounts.ErrUnavailable
-	}
-	if _, _, err = mtls.OwnerTrustRoots(c.ConnectorClientRoots, time.Now()); err != nil {
-		return contracts.KeyServiceDeployment{}, mounts.ErrUnavailable
+	_, pg := servicePostgres(c.Postgres, nil)
+	if !validServiceScope(c.Name, c.Namespace) || !artifactScope(v.InstallationID).Valid() || c.Port < 1 || c.Port > 65535 || c.Concurrency < 1 || c.Concurrency > 64 || !pg || !ownerEndpoint(c.OpenBao) {
+		return keyServiceInputs{}, &fixedStepError{"config", mounts.ErrUnavailable}
 	}
 	if d := c.Downloads; d != nil {
-		if _, err = keyServiceWorkerProfile(c); err != nil || !capacityRuntimeReference(d.ClusterCatalog.Source) || !capacityRuntimeGuard(d.ClusterCatalog.Guard) || d.RetentionTopologies == nil {
-			return contracts.KeyServiceDeployment{}, mounts.ErrUnavailable
-		}
-		if _, err = keyServiceTopologyPins(c, nil); err != nil {
-			return contracts.KeyServiceDeployment{}, mounts.ErrUnavailable
+		if _, err = serviceTopologyPins(d.RetentionTopologies, nil); err != nil {
+			return keyServiceInputs{}, &fixedStepError{"config", err}
 		}
 	}
-	return c, nil
+	return keyServiceInputs{c, v}, nil
 }
 
-// keyServiceWorkerProfile derives the profile of the pinned worker document
-// with the guarded source reader's own parse. The pin only selects the
-// profile: the native key authority spends a slot only while SQL's current
-// audited revision equals it (ADR-070), so a stale pin denies. The workers'
-// namespace is never the key service's (ADR-204 decision 1).
-func keyServiceWorkerProfile(c contracts.KeyServiceDeployment) (authorization.DownloadWorkerProfile, error) {
-	d := c.Downloads
-	if d == nil || !capacityRuntimeReference(d.WorkerSource) {
-		return authorization.DownloadWorkerProfile{}, mounts.ErrUnavailable
-	}
-	w, err := kube.PinnedWorkerConfiguration(d.WorkerProfile, d.WorkerSource.UID, c.InstallationID, c.ClusterID)
-	if err != nil || w.Profile.NamespaceUID == c.Namespace.UID || w.Profile.Namespace == c.Namespace.Name {
-		return authorization.DownloadWorkerProfile{}, mounts.ErrUnavailable
-	}
-	return w.Profile, nil
+// artifactScope is the artifact key scope; its key ID is the one the secrets
+// Job writes into `<name>-artifact-key` (artifactKeyID).
+func artifactScope(installation string) authorization.KeyScope {
+	return authorization.KeyScope{InstallationID: installation, Purpose: "artifact", KeyID: artifactKeyID(installation)}
 }
 
-// keyServiceTopologyPins unions the fixed pins with each joined catalog
-// slot's pin as the hub-api and the publisher do (ADR-196 decision 7): a
-// slot's pin must name its own cluster and fixed slot topology, and a cluster
-// or topology named twice is refused. Both sets may be empty.
-func keyServiceTopologyPins(c contracts.KeyServiceDeployment, catalog []contracts.OwnerPublicCluster) ([]kube.RetentionTopologyPin, error) {
-	if c.Downloads == nil {
-		return nil, mounts.ErrUnavailable
+// serviceTopologyPins unions the configured topologies with each joined
+// catalog slot's topology, as the hub-api does (ADR-196 decision 7). A
+// cluster or topology named twice is refused; both sets may be empty.
+func serviceTopologyPins(configured []contracts.ServiceTopology, catalog []contracts.OwnerPublicCluster) ([]kube.RetentionTopologyPin, error) {
+	pins := make([]kube.RetentionTopologyPin, 0, len(configured)+len(catalog))
+	for _, t := range configured {
+		pins = append(pins, kube.RetentionTopologyPin{TargetClusterID: t.TargetClusterID, Name: t.Name})
 	}
-	all := slices.Clone(c.Downloads.RetentionTopologies)
-	for i, v := range catalog {
-		t := v.Topology
-		if t.TargetClusterID != v.ClusterID || t.Name != contracts.OwnerClusterSourceName(c.InstallationID, i+1, "topology") {
+	for _, v := range catalog {
+		if v.Topology.TargetClusterID != v.ClusterID {
 			return nil, mounts.ErrUnavailable
 		}
-		all = append(all, t)
+		pins = append(pins, kube.RetentionTopologyPin{TargetClusterID: v.ClusterID, Name: v.Topology.Name})
 	}
-	if len(all) > 1024 {
+	if len(pins) > 1024 {
 		return nil, mounts.ErrUnavailable
 	}
-	pins := make([]kube.RetentionTopologyPin, len(all))
 	clusters, names := map[string]bool{}, map[string]bool{}
-	for i, p := range all {
-		b, err := hex.DecodeString(p.SHA256)
-		if !validOwnerNativeTopology(p) || err != nil || clusters[p.TargetClusterID] || names[p.Name] {
+	for _, p := range pins {
+		if !authorization.UUID(p.TargetClusterID) || len(validation.IsDNS1123Subdomain(p.Name)) != 0 || clusters[p.TargetClusterID] || names[p.Name] {
 			return nil, mounts.ErrUnavailable
 		}
 		clusters[p.TargetClusterID], names[p.Name] = true, true
-		pins[i] = kube.RetentionTopologyPin{TargetClusterID: p.TargetClusterID, Name: p.Name, UID: p.UID}
-		copy(pins[i].ContentDigest[:], b)
 	}
 	return pins, nil
+}
+
+// readServiceCatalog reads the cluster catalog once at process start; its
+// joined slots add topology pins and a changed digest restarts the process.
+func readServiceCatalog(ctx context.Context, observer *kube.PermissionClient, api *rest.Config, namespace, name string) (publicCatalog, error) {
+	var out publicCatalog
+	uid, err := kube.ConfigMapUID(ctx, api, namespace, name)
+	if err != nil {
+		return out, &fixedStepError{"catalog", mounts.ErrUnavailable}
+	}
+	if out.source, err = kube.NewNamedClusterCatalogSource(observer, name, uid); err != nil {
+		return out, mounts.ErrUnavailable
+	}
+	if out.catalog, err = out.source.ReadClusterCatalog(ctx); err != nil {
+		return out, &fixedStepError{"catalog", mounts.ErrUnavailable}
+	}
+	if out.digest, err = clusterCatalogDigest(out.catalog); err != nil {
+		return out, mounts.ErrUnavailable
+	}
+	return out, nil
 }
 
 // keyServiceAuthorities is the artifact scope's authority map: wraps,
@@ -157,30 +163,47 @@ func keyServiceAuthorities(wraps, verifier authapp.KeyOperationAuthorizer, acqui
 }
 
 // keyServiceAcquisition composes the native download key authority from the
-// key-acquisition login, the pinned worker profile and the retention and
-// recovery transaction guards it needs. Topology pins come from the guarded
-// cluster catalog, proved with the probe account like the hub-api's reads.
-func keyServiceAcquisition(ctx context.Context, c contracts.KeyServiceDeployment, in *providerInputs, observer *kube.PermissionClient, pool *pgxpool.Pool, scope authorization.KeyScope) (*postgres.NativeKeyAuthority, publicCatalog, error) {
+// key-acquisition login, the worker configuration's profile and the retention
+// and recovery transaction guards it needs. Topology pins come from the
+// configuration and the cluster catalog.
+func keyServiceAcquisition(ctx context.Context, c keyServiceInputs, api *rest.Config, observer *kube.PermissionClient, pool *pgxpool.Pool, scope authorization.KeyScope) (*postgres.NativeKeyAuthority, publicCatalog, error) {
 	var none publicCatalog
-	profile, err := keyServiceWorkerProfile(c)
-	if err != nil || pool == nil {
+	d := c.Downloads
+	if d == nil || pool == nil {
 		return nil, none, mounts.ErrUnavailable
 	}
-	probe, err := kube.NewPermissionClient(in.kubernetes("kube-probe.token"), c.ClusterID, cfg.NamespaceRef{Name: c.Namespace.Name, UID: c.Namespace.UID}, time.Now)
+	// The worker profile lives in the download-worker namespace, never the
+	// key service's (ADR-204 decision 1).
+	workers := c.Name + "-downloads"
+	workersUID, err := kube.NamespaceUID(ctx, api, workers)
+	if err != nil {
+		return nil, none, &fixedStepError{"key-service/worker-namespace", mounts.ErrUnavailable}
+	}
+	workerClient, err := kube.NewPermissionClient(api, c.ClusterID, cfg.NamespaceRef{Name: workers, UID: workersUID}, time.Now)
 	if err != nil {
 		return nil, none, mounts.ErrUnavailable
 	}
-	catalog, err := readPublicClusterCatalog(ctx, contracts.OwnerDeployment{Namespace: c.Namespace, Public: &contracts.OwnerPublicDeployment{ClusterCatalog: c.Downloads.ClusterCatalog}}, observer, probe)
+	profile, err := kube.ReadWorkerProfile(ctx, workerClient, c.Name+"-worker-profile", c.InstallationID, c.IssuerEpoch)
+	if err != nil || profile.Namespace == c.Namespace {
+		return nil, none, &fixedStepError{"key-service/worker-configuration", mounts.ErrUnavailable}
+	}
+	catalog, err := readServiceCatalog(ctx, observer, api, c.Namespace, c.Name+"-cluster-catalog")
 	if err != nil {
 		return nil, none, &fixedStepError{"key-service/catalog", err}
 	}
-	pins, err := keyServiceTopologyPins(c, catalog.catalog.Clusters)
+	pins, err := serviceTopologyPins(d.RetentionTopologies, catalog.catalog.Clusters)
 	if err != nil {
 		return nil, none, &fixedStepError{"key-service/topology", err}
 	}
 	topologies, err := kube.NewRetentionTopologies(observer, c.PermissionRootID, pins)
 	if err != nil {
 		return nil, none, mounts.ErrUnavailable
+	}
+	// Hub-cluster captures (mode=combined): the in-process hub topology.
+	if !slices.ContainsFunc(pins, func(p kube.RetentionTopologyPin) bool { return p.TargetClusterID == c.ClusterID }) {
+		if err = topologies.AddHubTopology(observer, c.PermissionRootID); err != nil {
+			return nil, none, &fixedStepError{"key-service/hub-topology", err}
+		}
 	}
 	retention, err := postgres.NewRetentionTransactionGuard(c.PermissionRootID, topologies)
 	if err != nil {
@@ -212,11 +235,11 @@ func keyServiceAcquisition(ctx context.Context, c contracts.KeyServiceDeployment
 	return native, catalog, nil
 }
 
-func NewKeyService(ctx context.Context, files *os.Root) (k *KeyService, err error) {
-	if ctx == nil || ctx.Err() != nil || files == nil || disableWorkerCoreDumps() != nil {
+func NewKeyService(ctx context.Context, files, ids *os.Root) (k *KeyService, err error) {
+	if ctx == nil || ctx.Err() != nil || files == nil || ids == nil || disableWorkerCoreDumps() != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	c, err := readKeyServiceDeployment(ctx, files)
+	c, err := readKeyServiceInputs(ctx, files, ids)
 	if err != nil {
 		return nil, err
 	}
@@ -229,8 +252,16 @@ func NewKeyService(ctx context.Context, files *os.Root) (k *KeyService, err erro
 	}()
 	startup, end := context.WithTimeout(ctx, 30*time.Second)
 	defer end()
-	in := &providerInputs{files: files, postgresEndpoint: c.Postgres, kubernetesEndpoint: c.Kubernetes}
-	k.closers = append(k.closers, in.closeHTTP)
+	pgRoots, err := readServiceRoots(startup, files, contracts.PostgresRootsFile)
+	if err != nil {
+		return k, err
+	}
+	baoRoots, err := readServiceRoots(startup, files, contracts.OpenBaoRootsFile)
+	if err != nil {
+		return k, err
+	}
+	endpoint, _ := servicePostgres(c.Postgres, pgRoots)
+	in := &providerInputs{files: files, postgresEndpoint: endpoint}
 	pools := map[string]*pgxpool.Pool{}
 	users := map[string]bool{}
 	purposes := []string{"key-configuration", "key-wrap", "key-verify"}
@@ -241,7 +272,7 @@ func NewKeyService(ctx context.Context, files *os.Root) (k *KeyService, err erro
 	for _, purpose := range purposes {
 		config, err := in.sqlConfig(startup, "sql-"+purpose+".json")
 		if err != nil || users[config.ConnConfig.User] {
-			return k, mounts.ErrUnavailable
+			return k, &fixedStepError{"sql/" + purpose, mounts.ErrUnavailable}
 		}
 		users[config.ConnConfig.User] = true
 		config.ConnConfig.RuntimeParams["application_name"] = "asservat-key-service"
@@ -252,25 +283,27 @@ func NewKeyService(ctx context.Context, files *os.Root) (k *KeyService, err erro
 		pools[purpose] = pool
 		k.closers = append(k.closers, pool.Close)
 	}
-	scope := authorization.KeyScope{InstallationID: c.InstallationID, Purpose: "artifact", KeyID: c.KeyID}
-	control := cfg.NamespaceRef{Name: c.Namespace.Name, UID: c.Namespace.UID}
-	observer, err := kube.NewPermissionClient(in.kubernetes("kube-observer.token"), c.ClusterID, control, time.Now)
+	scope := artifactScope(c.InstallationID)
+	api, err := serviceKubernetes()
 	if err != nil {
-		return k, mounts.ErrUnavailable
+		return k, &fixedStepError{"kubernetes", mounts.ErrUnavailable}
 	}
-	source, err := kube.NewLocalKeySource(observer, c.KeySource.Name, c.KeySource.UID, scope)
+	namespaceUID, err := kube.NamespaceUID(startup, api, c.Namespace)
 	if err != nil {
-		return k, mounts.ErrUnavailable
+		return k, &fixedStepError{"kubernetes/namespace", mounts.ErrUnavailable}
 	}
-	ledger, err := postgres.NewLocalKeyConfigurations(startup, pools["key-configuration"], scope, c.ClusterID, c.Namespace.UID, c.KeySource.UID)
+	// The root key is the mounted <name>-artifact-key Secret, mounted only
+	// into this Pod; SQL keeps the version fingerprints append-only.
+	source := &mountedKeySource{files: files, scope: scope, cluster: c.ClusterID, namespace: namespaceUID, epoch: c.IssuerEpoch, now: time.Now}
+	ledger, err := postgres.NewLocalKeyConfigurations(startup, pools["key-configuration"], scope, c.ClusterID, namespaceUID, mountedKeySourceID)
 	if err != nil {
 		return k, mounts.ErrUnavailable
 	}
 	backend, err := kms.LoadProtectedLocalOperations(startup, scope, source, ledger, time.Now)
 	if err != nil {
-		return k, mounts.ErrUnavailable
+		return k, &fixedStepError{"artifact-key", mounts.ErrUnavailable}
 	}
-	wraps, err := postgres.NewContextKeyWraps(startup, pools["key-wrap"], c.PermissionRootID, c.RecoveryEpoch, scope)
+	wraps, err := postgres.NewContextKeyWraps(startup, pools["key-wrap"], c.PermissionRootID, c.IssuerEpoch, scope)
 	if err != nil {
 		return k, mounts.ErrUnavailable
 	}
@@ -279,7 +312,16 @@ func NewKeyService(ctx context.Context, files *os.Root) (k *KeyService, err erro
 	if err != nil {
 		return k, mounts.ErrUnavailable
 	}
-	keyRoots, _, err := mtls.OwnerTrustRoots(c.KeyClientRoots, time.Now())
+	// Client CAs are the worker and connector PKI issuers (field class J).
+	keyClientRoots, err := readPKIRoots(startup, c.OpenBao, baoRoots, contracts.SmallOpenBaoWorkerPKIMount)
+	if err != nil {
+		return k, err
+	}
+	connectorClientRoots, err := readPKIRoots(startup, c.OpenBao, baoRoots, contracts.SmallOpenBaoConnectorPKIMount)
+	if err != nil {
+		return k, err
+	}
+	keyRoots, _, err := mtls.OwnerTrustRoots(keyClientRoots, time.Now())
 	if err != nil {
 		return k, mounts.ErrUnavailable
 	}
@@ -291,7 +333,7 @@ func NewKeyService(ctx context.Context, files *os.Root) (k *KeyService, err erro
 	if err != nil {
 		return k, mounts.ErrUnavailable
 	}
-	unwraps, err := postgres.NewContextKeyUnwraps(startup, pools["key-verify"], c.PermissionRootID, c.RecoveryEpoch, scope)
+	unwraps, err := postgres.NewContextKeyUnwraps(startup, pools["key-verify"], c.PermissionRootID, c.IssuerEpoch, scope)
 	if err != nil {
 		return k, mounts.ErrUnavailable
 	}
@@ -300,7 +342,11 @@ func NewKeyService(ctx context.Context, files *os.Root) (k *KeyService, err erro
 	// only with a Downloads section.
 	var acquisition *postgres.NativeKeyAuthority
 	if c.Downloads != nil {
-		if acquisition, k.catalog, err = keyServiceAcquisition(startup, c, in, observer, pools["key-acquisition"], scope); err != nil {
+		observer, err := kube.NewPermissionClient(api, c.ClusterID, cfg.NamespaceRef{Name: c.Namespace, UID: namespaceUID}, time.Now)
+		if err != nil {
+			return k, mounts.ErrUnavailable
+		}
+		if acquisition, k.catalog, err = keyServiceAcquisition(startup, c, api, observer, pools["key-acquisition"], scope); err != nil {
 			return k, err
 		}
 	}
@@ -312,28 +358,67 @@ func NewKeyService(ctx context.Context, files *os.Root) (k *KeyService, err erro
 	// The TLS layer accepts key-client and connector client chains; the
 	// handler's peer union then selects exactly one verifier per leaf.
 	clients := keyRoots.Clone()
-	for _, der := range c.ConnectorClientRoots {
+	for _, der := range connectorClientRoots {
 		cert, err := x509.ParseCertificate(der)
 		if err != nil {
 			return k, mounts.ErrUnavailable
 		}
 		clients.AddCert(cert)
 	}
-	certificate, err := mounts.Read(startup, files, "tls.crt", 64<<10)
+	pair, err := readServingPair(startup, files)
 	if err != nil {
-		return k, mounts.ErrUnavailable
-	}
-	key, err := mounts.Read(startup, files, "tls.key", 16<<10)
-	if err != nil {
-		return k, mounts.ErrUnavailable
-	}
-	pair, err := tls.X509KeyPair(certificate, key)
-	clear(key)
-	if err != nil {
-		return k, mounts.ErrUnavailable
+		return k, err
 	}
 	k.tls = &tls.Config{MinVersion: tls.VersionTLS13, Certificates: []tls.Certificate{pair}, ClientAuth: tls.RequireAndVerifyClientCert, ClientCAs: clients}
 	return k, nil
+}
+
+// mountedKeySourceID names the mounted key source in the SQL key ledger and
+// as its Secret identity: the mount carries no Kubernetes UID.
+const mountedKeySourceID = "artifact-key"
+
+// mountedKeySource reads the artifact root key from the mounted
+// <name>-artifact-key Secret. The revision generation is the highest key
+// version, so an additive rotation advances it; SQL still refuses a changed
+// fingerprint for an existing version.
+type mountedKeySource struct {
+	files                     *os.Root
+	scope                     authorization.KeyScope
+	cluster, namespace, epoch string
+	now                       func() time.Time
+}
+
+func (s *mountedKeySource) ReadKeyMaterial(ctx context.Context) (authapp.KeyMaterial, error) {
+	var zero authapp.KeyMaterial
+	if s == nil || ctx == nil {
+		return zero, authapp.ErrKeyUnavailable
+	}
+	started := s.now()
+	payload, err := mounts.Read(ctx, s.files, contracts.ArtifactKeyFile, 16<<10)
+	if err != nil || len(payload) == 0 {
+		clear(payload)
+		return zero, authapp.ErrKeyUnavailable
+	}
+	var versions struct {
+		Keys []struct {
+			Version int `json:"version"`
+		} `json:"keys"`
+	}
+	generation := 0
+	if json.Unmarshal(payload, &versions) == nil {
+		for _, v := range versions.Keys {
+			generation = max(generation, v.Version)
+		}
+	}
+	if generation < 1 || generation > 2147483647 {
+		clear(payload)
+		return zero, authapp.ErrKeyUnavailable
+	}
+	digest := artifact.Digest(sha256.Sum256(payload))
+	c := authorization.LocalKeyConfiguration{Scope: s.scope, ClusterID: s.cluster, NamespaceUID: s.namespace, RecoveryEpoch: s.epoch,
+		Revision: identity.Revision{UID: mountedKeySourceID, Generation: int64(generation), Digest: digest}, SecretUID: mountedKeySourceID, SecretDigest: digest,
+		ObservedAt: started, FreshUntil: identity.Check(started, identity.SQLFenced).Until()}
+	return authapp.KeyMaterial{Configuration: c, Payload: payload}, nil
 }
 
 // Serve accepts only TLS 1.3 with a verified client certificate; the handler

@@ -1,10 +1,11 @@
 package contracts
 
+// FleetSettings is the Helm-rendered fleet.json of the fleet ConfigMap. It
+// holds only chart values: the reader takes the installation ID and issuer
+// epoch from the generated IDs (InstallationIDs).
 type FleetSettings struct {
 	SchemaVersion       string            `json:"schemaVersion"`
 	Revision            int64             `json:"revision"`
-	InstallationID      string            `json:"installationID"`
-	IssuerEpoch         string            `json:"issuerEpoch"`
 	Issuer              string            `json:"issuer"`
 	Suspended           bool              `json:"suspended"`
 	Clients             []string          `json:"clients"`

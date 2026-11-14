@@ -1,0 +1,17 @@
+{{- if and (include "asservat.hub" .) .Values.retention }}
+{{- $r := .Values.retention }}
+apiVersion: asservat.io/v1alpha1
+kind: EvidenceRetentionPolicy
+metadata:
+  name: {{ printf "%s-baseline" (include "asservat.name" .) }}
+  namespace: {{ .Release.Namespace }}
+  labels: {{ include "asservat.labels" (list . "retention") | nindent 4 }}
+spec:
+  purposeRef: {{ $r.purposeRef | quote }}
+  defaults: {{ toJson $r.defaults }}
+  maxima: {{ toJson $r.maxima }}
+  deletionBudgetSeconds: {{ int64 $r.deletionBudgetSeconds }}
+  legalExceptions: disabled
+  rules: []
+  scope: {}
+{{- end }}

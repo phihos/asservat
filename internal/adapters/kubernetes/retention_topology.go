@@ -2,6 +2,7 @@ package kubernetes
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"slices"
@@ -15,16 +16,15 @@ import (
 	value "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/privacy"
+	"k8s.io/apimachinery/pkg/util/validation"
 )
 
-// RetentionTopologyClient reads an independently accepted immutable topology.
-// Installation bootstrap supplies the exact namespace/object/content pins from
-// its protected enrollment configuration. Neither a request nor this reader can
-// discover or accept replacement pins, enroll a target or clear recovery.
+// RetentionTopologyClient reads the named immutable topology ConfigMap of one
+// target under ordinary RBAC (Helm-native: no UID or content pins). Neither a
+// request nor this reader can enroll a target or clear recovery.
 type RetentionTopologyClient struct {
-	client                  *PermissionClient
-	name, uid, root, target string
-	digest                  artifact.Digest
+	client             *PermissionClient
+	name, root, target string
 	// ponytail: one process-wide reuse of the last successful pinned read;
 	// failures are never kept. Per-target lock serializes cold reads.
 	mu   sync.Mutex
@@ -33,14 +33,13 @@ type RetentionTopologyClient struct {
 
 var _ port.RetentionTopologyReader = (*RetentionTopologyClient)(nil)
 
-// RetentionTopologyPin is supplied only by protected installation/enrollment
-// composition. Copies of request parameters must never populate this table.
+// RetentionTopologyPin names one target's topology ConfigMap, from the
+// installation configuration or the cluster catalog, never from a request.
 type RetentionTopologyPin struct {
-	TargetClusterID, Name, UID string
-	ContentDigest              artifact.Digest
+	TargetClusterID, Name string
 }
 type RetentionTopologies struct {
-	readers map[string]*RetentionTopologyClient
+	readers map[string]port.RetentionTopologyReader
 }
 
 var _ port.RetentionTopologyReader = (*RetentionTopologies)(nil)
@@ -50,13 +49,13 @@ func NewRetentionTopologies(client *PermissionClient, root string, pins []Retent
 	if pins == nil || len(pins) > 1024 {
 		return nil, value.ErrInvalid
 	}
-	out := &RetentionTopologies{readers: make(map[string]*RetentionTopologyClient, len(pins))}
+	out := &RetentionTopologies{readers: make(map[string]port.RetentionTopologyReader, len(pins))}
 	names := map[string]bool{}
 	for _, p := range pins {
 		if out.readers[p.TargetClusterID] != nil || names[p.Name] {
 			return nil, value.ErrInvalid
 		}
-		r, err := NewRetentionTopologyClient(client, p.Name, p.UID, root, p.TargetClusterID, p.ContentDigest)
+		r, err := NewRetentionTopologyClient(client, p.Name, root, p.TargetClusterID)
 		if err != nil {
 			return nil, err
 		}
@@ -73,11 +72,46 @@ func (r *RetentionTopologies) RetentionTopology(ctx context.Context, target stri
 	return reader.RetentionTopology(ctx, target)
 }
 
-func NewRetentionTopologyClient(client *PermissionClient, name, uid, root, target string, digest artifact.Digest) (*RetentionTopologyClient, error) {
-	if client == nil || !installationRefValid(name, uid) || !authorization.UUID(root) || !authorization.UUID(target) || digest == (artifact.Digest{}) {
+// AddHubTopology serves the hub cluster's own topology in process
+// (mode=combined): its only source is the hub retention source the hub-worker
+// observes in the release namespace (contracts.RetentionSourceDigest). A
+// ConfigMap pin for the same target is refused.
+func (r *RetentionTopologies) AddHubTopology(client *PermissionClient, root string) error {
+	if r == nil || client == nil || !authorization.UUID(root) || r.readers[client.clusterID] != nil {
+		return value.ErrInvalid
+	}
+	hub := privacy.PolicySourceRef{ClusterID: client.clusterID, ControlNamespaceUID: client.control.UID, Hub: true, ProtectionDigest: artifact.Digest(contracts.RetentionSourceDigest(client.clusterID, client.control.Name))}
+	if !port.ValidRetentionSource(hub) {
+		return value.ErrInvalid
+	}
+	r.readers[client.clusterID] = hubTopology{client: client, root: root, hub: hub}
+	return nil
+}
+
+type hubTopology struct {
+	client *PermissionClient
+	root   string
+	hub    privacy.PolicySourceRef
+}
+
+func (h hubTopology) RetentionTopology(ctx context.Context, target string) (privacy.PolicyTopology, error) {
+	if ctx == nil || ctx.Err() != nil || target != h.client.clusterID {
+		return privacy.PolicyTopology{}, value.ErrDenied
+	}
+	start := h.client.now()
+	digest := sha256.Sum256([]byte("asservat-hub-topology/v1\x00" + h.root + "\x00" + h.client.clusterID + "\x00" + h.client.control.UID))
+	out := privacy.PolicyTopology{RootID: h.root, TargetClusterID: target, Revision: identity.Revision{UID: h.client.control.UID, Generation: 1, Digest: digest}, Sources: []privacy.PolicySourceRef{h.hub}, ObservedAt: start, FreshUntil: start.Add(privacy.PolicyTopologyInterval)}
+	if !out.Valid(h.client.now()) {
+		return privacy.PolicyTopology{}, value.ErrUnavailable
+	}
+	return out, nil
+}
+
+func NewRetentionTopologyClient(client *PermissionClient, name, root, target string) (*RetentionTopologyClient, error) {
+	if client == nil || len(validation.IsDNS1123Subdomain(name)) != 0 || !authorization.UUID(root) || !authorization.UUID(target) {
 		return nil, value.ErrInvalid
 	}
-	return &RetentionTopologyClient{client: client, name: name, uid: uid, root: root, target: target, digest: digest}, nil
+	return &RetentionTopologyClient{client: client, name: name, root: root, target: target}, nil
 }
 func (c *RetentionTopologyClient) RetentionTopology(ctx context.Context, target string) (privacy.PolicyTopology, error) {
 	var out privacy.PolicyTopology
@@ -112,7 +146,11 @@ func (c *RetentionTopologyClient) readTopology(ctx context.Context) (privacy.Pol
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	start := c.client.now()
-	data, ref, err := c.client.installationConfigMode(ctx, c.name, c.uid, true)
+	uid, err := ObjectUIDFrom(ctx, c.client, "/api/v1/namespaces/"+c.client.control.Name+"/configmaps/"+c.name)
+	if err != nil {
+		return out, err
+	}
+	data, ref, err := c.client.installationConfigMode(ctx, c.name, uid, true)
 	if err != nil {
 		return out, err
 	}
@@ -121,7 +159,7 @@ func (c *RetentionTopologyClient) readTopology(ctx context.Context) (privacy.Pol
 	}
 	var wire contracts.RetentionTopologySettings
 	digest, err := decodePermissionSpec([]byte(data["topology.json"]), c.client.validator.retentionTopologySchema, &wire)
-	if err != nil || digest != c.digest || wire.RootID != c.root || wire.TargetClusterID != c.target {
+	if err != nil || wire.RootID != c.root || wire.TargetClusterID != c.target {
 		return out, value.ErrChanged
 	}
 	source := func(w contracts.RetentionPolicySource, hub bool) (privacy.PolicySourceRef, error) {

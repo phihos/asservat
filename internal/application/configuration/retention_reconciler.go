@@ -24,7 +24,6 @@ type RetentionReconciler struct {
 	Reader     RetentionListReader
 	Watcher    RetentionWatcher
 	Protection RetentionProtectionReader
-	Review     RetentionBootstrapReviewReader
 	Store      RetentionCheckpointStore
 	Now        func() time.Time
 	NewID      func() string
@@ -50,7 +49,7 @@ func (s *retentionRun) protection(ctx context.Context) (privacy.SourceProtection
 	}
 	return p, nil
 }
-func (s *retentionRun) persist(ctx context.Context, event *PolicyEvent, review *value.RetentionBootstrapReview, until time.Time) error {
+func (s *retentionRun) persist(ctx context.Context, event *PolicyEvent, until time.Time) error {
 	if !s.r.Now().Before(until) {
 		return value.ErrUnavailable
 	}
@@ -60,7 +59,7 @@ func (s *retentionRun) persist(ctx context.Context, event *PolicyEvent, review *
 	}
 	f := s.fence
 	f.LeaseUntil = identity.Earlier(f.LeaseUntil, until)
-	t := RetentionTransition{ID: s.r.NewID(), Fence: f, List: list, Event: event, Review: review}
+	t := RetentionTransition{ID: s.r.NewID(), Fence: f, List: list, Event: event}
 	accepted, err := s.r.Store.AcceptRetention(ctx, t)
 	if err != nil {
 		return err
@@ -77,76 +76,67 @@ func (s *retentionRun) persist(ctx context.Context, event *PolicyEvent, review *
 func (s *retentionRun) start(ctx context.Context) error {
 	first, err := s.protection(ctx)
 	if err != nil {
-		return err
+		return reconcileStep("protection", err)
 	}
 	start, err := s.r.Store.BeginRetention(ctx, s.r.RootID, s.r.Source, s.r.NewID())
 	if err != nil {
-		return err
+		return reconcileStep("begin", err)
 	}
 	s.fence = start.Fence
 	if !s.fence.Valid() || s.fence.RootID != s.r.RootID || s.fence.Source != s.r.Source || !s.r.Now().Before(s.fence.LeaseUntil) {
-		return value.ErrChanged
+		return reconcileStep("begin/fence", value.ErrChanged)
 	}
 	if c := start.Checkpoint; c != nil {
 		if !c.Record.Valid() || c.Record.RootID != s.r.RootID || c.Record.Sequence != s.fence.Sequence || c.Transition.Fence.Source != s.r.Source || RetentionTransitionDigest(c.Transition) != c.Record.CheckpointDigest {
-			return value.ErrChanged
+			return reconcileStep("resume/checkpoint", value.ErrChanged)
 		}
 		// Never relist to initialize a resumed epoch: the next watch begins at
 		// the durable cursor, even when its original observation has expired.
 		s.journal, err = ResumeRetentionJournal(c.Transition.List)
 		if err != nil {
-			return err
+			return reconcileStep("resume/journal", err)
 		}
 		if !identity.Text(start.ResumeCursor, 128) || start.ResumeCursor == "0" {
-			return value.ErrChanged
+			return reconcileStep("resume/cursor", value.ErrChanged)
 		}
 		if err = s.journal.Apply(PolicyEvent{Type: "BOOKMARK", ResourceVersion: start.ResumeCursor}); err != nil {
-			return err
+			return reconcileStep("resume/cursor", err)
 		}
-		_, err = s.protection(ctx)
-		return err
+		if _, err = s.protection(ctx); err != nil {
+			return reconcileStep("resume/protection", err)
+		}
+		return nil
 	}
 	if s.fence.Sequence != 0 {
-		return value.ErrChanged
+		return reconcileStep("begin/sequence", value.ErrChanged)
 	}
 	list, err := s.r.Reader.RetentionPolicyList(ctx)
 	if err != nil {
-		return err
+		return reconcileStep("list", err)
 	}
 	if list.Snapshot.SourceClusterID != s.r.Source.ClusterID || list.Snapshot.ControlNamespaceUID != s.r.Source.ControlNamespaceUID || list.Snapshot.Hub != s.r.Source.Hub {
-		return value.ErrChanged
-	}
-	var review *value.RetentionBootstrapReview
-	if len(list.Snapshot.Policies) > 0 {
-		if s.r.Review == nil {
-			return value.ErrDenied
-		}
-		r, err := s.r.Review.InitialRetentionReview(ctx)
-		if err != nil {
-			return err
-		}
-		review = &r
+		return reconcileStep("list/source", value.ErrChanged)
 	}
 	last, err := s.protection(ctx)
 	if err != nil {
-		return err
+		return reconcileStep("protection", err)
 	}
 	until := identity.Earlier(first.FreshUntil, last.FreshUntil)
 	if !s.r.Now().Before(until) {
-		return value.ErrUnavailable
+		return reconcileStep("protection/expired", value.ErrUnavailable)
 	}
 	list.Snapshot.FreshUntil = identity.Earlier(list.Snapshot.FreshUntil, until)
-	if review != nil {
-		list.Snapshot.FreshUntil = identity.Earlier(list.Snapshot.FreshUntil, review.FreshUntil)
-	}
-	if err = CheckInitialRetention(list.Snapshot, s.r.Source.ProtectionDigest, review, s.r.Now()); err != nil {
-		return err
+	if err = CheckInitialRetention(list.Snapshot, s.r.Source.ProtectionDigest, s.r.Now()); err != nil {
+		return reconcileStep("initial", err)
 	}
 	s.journal, err = NewRetentionJournal(list, s.r.Now())
 	if err != nil {
-		return err
+		return reconcileStep("journal", err)
 	}
-	return s.persist(ctx, nil, review, until)
+	if err = s.persist(ctx, nil, until); err != nil {
+		return reconcileStep("accept", err)
+	}
+	return nil
 }
 func (s *retentionRun) maintain(ctx context.Context) error {
 	if !s.lastObservation.IsZero() && s.r.Now().Before(s.lastObservation) {
@@ -154,12 +144,12 @@ func (s *retentionRun) maintain(ctx context.Context) error {
 	}
 	first, err := s.protection(ctx)
 	if err != nil {
-		return err
+		return reconcileStep("protection", err)
 	}
 	if s.fence.LeaseUntil.Sub(s.r.Now()) < 10*time.Second {
 		f, err := s.r.Store.RenewRetention(ctx, s.fence)
 		if err != nil {
-			return err
+			return reconcileStep("renew", err)
 		}
 		if !f.Valid() || f.RootID != s.fence.RootID || f.Epoch != s.fence.Epoch || f.Source != s.fence.Source || f.Sequence != s.fence.Sequence || !s.r.Now().Before(f.LeaseUntil) || f.LeaseUntil.Sub(s.r.Now()) > 30*time.Second {
 			return value.ErrChanged
@@ -170,11 +160,11 @@ func (s *retentionRun) maintain(ctx context.Context) error {
 		s.lastObservation = s.r.Now()
 		list, err := s.r.Reader.RetentionPolicyList(ctx)
 		if err != nil {
-			return err
+			return reconcileStep("list", err)
 		}
 		last, err := s.protection(ctx)
 		if err != nil {
-			return err
+			return reconcileStep("protection", err)
 		}
 		proof := first
 		proof.FreshUntil = identity.Earlier(first.FreshUntil, last.FreshUntil)
@@ -207,7 +197,7 @@ func (s *retentionRun) observe(ctx context.Context) error {
 			s.discardObservations(i + 1)
 			return nil
 		}
-		return err
+		return reconcileStep("observe", err)
 	}
 	return nil
 }
@@ -245,19 +235,19 @@ func (r RetentionReconciler) Run(ctx context.Context) (result error) {
 		}
 	}()
 	if err := s.start(ctx); err != nil {
-		return err
+		return reconcileStep("start", err)
 	}
 	for {
 		if err := s.maintain(ctx); err != nil {
-			return err
+			return reconcileStep("maintain", err)
 		}
 		watch, err := r.Watcher.WatchRetentionPolicies(ctx, s.journal.Cursor())
 		if err != nil {
-			return err
+			return reconcileStep("watch", err)
 		}
 		err = s.consume(ctx, watch)
 		if !errors.Is(err, io.EOF) {
-			return err
+			return reconcileStep("consume", err)
 		}
 	}
 }
@@ -295,36 +285,39 @@ func (s *retentionRun) consume(ctx context.Context, watch RetentionWatch) error 
 			return ctx.Err()
 		case <-timer.C:
 			if err := s.maintain(ctx); err != nil {
-				return err
+				return reconcileStep("maintain", err)
 			}
 			timer.Reset(s.observationDelay())
 		case got := <-queue:
 			if got.err != nil {
-				return got.err
+				if errors.Is(got.err, io.EOF) {
+					return got.err
+				}
+				return reconcileStep("next", got.err)
 			}
 			proof, err := s.protection(ctx)
 			if err != nil {
-				return err
+				return reconcileStep("protection", err)
 			}
 			if err = s.journal.Apply(got.event); err != nil {
-				return err
+				return reconcileStep("event", err)
 			}
 			if got.event.Type == "BOOKMARK" {
 				f := s.fence
 				f.LeaseUntil = identity.Earlier(f.LeaseUntil, proof.FreshUntil)
 				if err = s.r.Store.AdvanceRetentionCursor(ctx, f, got.event.ResourceVersion); err != nil {
-					return err
+					return reconcileStep("cursor", err)
 				}
 				if err = s.observe(ctx); err != nil {
-					return err
+					return reconcileStep("observe", err)
 				}
 				continue
 			}
-			if err = s.persist(ctx, &got.event, nil, proof.FreshUntil); err != nil {
-				return err
+			if err = s.persist(ctx, &got.event, proof.FreshUntil); err != nil {
+				return reconcileStep("accept", err)
 			}
 			if err = s.observe(ctx); err != nil {
-				return err
+				return reconcileStep("observe", err)
 			}
 		}
 	}

@@ -2,6 +2,8 @@ package kubernetes
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"time"
 
 	port "asservat.local/asservat/internal/application/capacity"
@@ -42,18 +44,22 @@ func (s *CapacitySource) ReadCapacitySource(ctx context.Context) (port.CapacityS
 	}
 	call, cancel := context.WithDeadline(ctx, until)
 	defer cancel()
+	// Fixed steps name the refusing check; every failure stays unavailable.
+	step := func(name string, e error) error {
+		return &observationStep{name, errors.Join(cfg.ErrUnavailable, e)}
+	}
 	ns, e := s.client.namespace(call, s.client.control)
 	if e != nil || ns.Deleting {
-		return zero, cfg.ErrUnavailable
+		return zero, step("namespace", e)
 	}
 	budget := 8 << 20
 	pRV, pools, pRefs, e := s.client.list(call, "EvidenceStoragePool", "evidencestoragepools", start, &budget)
 	if e != nil || len(pools) > port.CapacityPoolLimit {
-		return zero, cfg.ErrUnavailable
+		return zero, step("pools", e)
 	}
 	bRV, policies, bRefs, e := s.client.list(call, "EvidenceBudgetPolicy", "evidencebudgetpolicies", start, &budget)
 	if e != nil || len(policies) > port.CapacityPolicyLimit {
-		return zero, cfg.ErrUnavailable
+		return zero, step("policies", e)
 	}
 	out := port.CapacitySourceObservation{Snapshot: port.CapacitySnapshot{ClusterID: s.client.clusterID, ControlNamespace: s.client.control, PoolResourceVersion: pRV, PolicyResourceVersion: bRV, ObservedAt: start, FreshUntil: until, Pools: make([]port.PoolObservation, 0, len(pools)), Policies: make([]port.BudgetPolicyObservation, 0, len(policies))}}
 	versions := make([]port.CapacitySourceVersion, 0, len(pools)+len(policies))
@@ -67,13 +73,16 @@ func (s *CapacitySource) ReadCapacitySource(ctx context.Context) (port.CapacityS
 	}
 	for i, p := range pools {
 		if e = appendVersion(p, pRefs[i]); e != nil {
-			return zero, e
+			return zero, step("pool-spec", e)
 		}
 		out.Snapshot.Pools = append(out.Snapshot.Pools, s.validator.poolObservation(p, pRefs[i]))
 	}
 	for i, p := range policies {
+		// The version digest and the observation both use the hub-scoped
+		// spec, so a Helm-rendered policy without scope.clusterID matches.
+		p = hubScopedPolicy(p, s.client.clusterID)
 		if e = appendVersion(p, bRefs[i]); e != nil {
-			return zero, e
+			return zero, step("policy-spec", e)
 		}
 		out.Snapshot.Policies = append(out.Snapshot.Policies, s.validator.policyObservation(p, bRefs[i]))
 	}
@@ -82,11 +91,49 @@ func (s *CapacitySource) ReadCapacitySource(ctx context.Context) (port.CapacityS
 	out.Versions = versions
 	out.Digest, e = port.CapacitySourceDigest(out.Snapshot, versions)
 	if e != nil {
-		return zero, cfg.ErrUnavailable
+		return zero, step("digest", e)
 	}
 	ns, e = s.client.namespace(call, s.client.control)
-	if e != nil || ns.Deleting || s.client.current(call, start, 5*time.Second) != nil || !out.Snapshot.Valid(s.client.now()) {
-		return zero, cfg.ErrUnavailable
+	if e != nil || ns.Deleting {
+		return zero, step("namespace", e)
+	}
+	if e = s.client.current(call, start, 5*time.Second); e != nil {
+		return zero, step("current", e)
+	}
+	if !out.Snapshot.Valid(s.client.now()) {
+		return zero, step("snapshot", nil)
 	}
 	return out, nil
+}
+
+// hubScopedPolicy reads an EvidenceBudgetPolicy whose scope.clusterID is
+// empty or absent as scoped to this (hub) cluster: Helm renders the policy
+// before the generated cluster ID exists. Malformed or duplicate-key specs
+// are left unchanged for the validator to reject.
+func hubScopedPolicy(o permissionObject, cluster string) permissionObject {
+	if permissionJSON(o.Spec, 64<<10, 16384) != nil {
+		return o
+	}
+	var spec map[string]json.RawMessage
+	if json.Unmarshal(o.Spec, &spec) != nil {
+		return o
+	}
+	var scope map[string]json.RawMessage
+	if json.Unmarshal(spec["scope"], &scope) != nil || scope == nil {
+		return o
+	}
+	if v, ok := scope["clusterID"]; ok && string(v) != `""` {
+		return o
+	}
+	scope["clusterID"], _ = json.Marshal(cluster)
+	var e error
+	if spec["scope"], e = json.Marshal(scope); e != nil {
+		return o
+	}
+	b, e := json.Marshal(spec)
+	if e != nil {
+		return o
+	}
+	o.Spec = b
+	return o
 }

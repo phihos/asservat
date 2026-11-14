@@ -22,9 +22,9 @@ Make these endpoints reachable from both your browser and cluster Pods:
 | Native owner, `owner.lab.example.invalid` | 31447 and 31449 |
 | Artifact key service, `keys.lab.example.invalid` | 31448 |
 
-Replace these example DNS names with your own. Route peer/native ports without terminating their mTLS at an HTTP ingress. The Kubernetes API address must also be reachable from the installer and runtime Pods, with a certificate covering that exact address. Do not use `insecure-skip-tls-verify`.
+Replace these example DNS names with your own. Route peer/native ports without terminating their mTLS at an HTTP ingress.  Do not use `insecure-skip-tls-verify`.
 
-Every participating node needs access to the exact product and PostgreSQL image digests. Use anonymous or node-configured registry reads, or a genuinely preloaded-image setup accepted by your kubelet policy. `bootstrap.registrySecret` authenticates only the bootstrap runner: it does not propagate to runtime Pods. On current Kubernetes, a cached private image pulled by another Pod can still require pull credentials. Merely seeing the image in `crictl images` is insufficient.
+Every participating node needs access to the exact product and PostgreSQL image digests. Use anonymous or node-configured registry reads, `image.pullSecrets`, or a genuinely preloaded-image setup accepted by your kubelet policy. On current Kubernetes, a cached private image pulled by another Pod can still require pull credentials. Merely seeing the image in `crictl images` is insufficient.
 
 ## Build your images and chart
 
@@ -40,7 +40,7 @@ TRIAL=$(mktemp -d "$STATE_DIR/small-trial.XXXXXX")
 install -d -m 0700 "$TRIAL/private" "$TRIAL/bin" "$TRIAL/package" "$TRIAL/public"
 REV=$(git -C "$SOURCE" rev-parse --short=12 HEAD)
 HUB_CONTEXT=REPLACE_CONTEXT
-HUB_NAMESPACE=asservat-bootstrap
+HUB_NAMESPACE=asservat-system
 REGISTRY=registry.example.invalid
 PRODUCT_REPO="$REGISTRY/asservat"
 PG_REPO="$REGISTRY/asservat-postgres"
@@ -60,7 +60,7 @@ ASSERVAT="$TRIAL/bin/asservat"
 CHART_ARCHIVE="$TRIAL/package/asservat-0.1.0-dev.1.tgz"
 ```
 
-The PostgreSQL Dockerfile builds the pinned pgBackRest source during image construction; the installed server downloads nothing at startup. Its server limit is 122 connections when Keycloak shares the bundled database, versus 117 without it. The initial installer client pool remains two connections. Do not lower these limits to make the deployment appear smaller.
+The PostgreSQL Dockerfile builds the pinned pgBackRest source during image construction; the installed server downloads nothing at startup. Its server limit is 122 connections when Keycloak shares the bundled database, versus 117 without it. Do not lower these limits to make the deployment appear smaller.
 
 The following commands publish into **your** registry when you run them. They are not an Asservat release:
 
@@ -78,7 +78,7 @@ PG_IMAGE="$PG_REPO@${PG_DIGEST:?missing registry manifest digest}"
 
 Use these registry manifest digests in values. A local Docker image ID can identify a config or OCI index; it is not interchangeable with a repository manifest reference. Configure node access to this registry before installation. For your own Kind cluster, `kind load docker-image "asservat:$REV" "asservat-postgres:$REV" --name YOUR_OWNED_CLUSTER` loads local images, but the chart still needs a digest reference that the node's CRI resolves to those exact images; importing a tag does not establish that reference or bypass credential verification. The registry path above avoids that extra alias step. Do not change kubelet verification policy just to make a cached private image start.
 
-## Prepare site values, public trust and serving inputs
+## Prepare site values and serving inputs
 
 Copy the [site values example](../../examples/helm/small-profile-values.yaml) to your private working directory:
 
@@ -86,28 +86,11 @@ Copy the [site values example](../../examples/helm/small-profile-values.yaml) to
 cp "$SOURCE/examples/helm/small-profile-values.yaml" "$TRIAL/site-values.yaml"
 ```
 
-Replace all site placeholders. Set the built image digests to `$PRODUCT_IMAGE` and `$PG_IMAGE`; use your StorageClass and exact Kubernetes authenticated administrator username, obtainable with:
+Replace all site placeholders. Set `image.repository`/`image.digest` to `$PRODUCT_IMAGE` and the PostgreSQL image to `$PG_IMAGE`, and use your StorageClass.
 
-```bash
-kubectl --context "$HUB_CONTEXT" auth whoami -o json
-```
+Obtain serving certificate/key pairs through your TLS process (for example cert-manager) for Keycloak, the console origin, federation and the key service. Each SAN must cover its exact configured hostname. Browser and cluster trust must accept these genuine roots; do not disable verification.
 
-This Kubernetes administrator is separate from a browser user. Its existing protected configuration rights do not grant evidence access or make a Keycloak user an operator. The product adds its own original bootstrap-runner account independently.
-
-Export your current Kubernetes public CA to `$TRIAL/public/api-ca.pem` using your cluster's trusted configuration. For a kubeconfig containing embedded CA data:
-
-```bash
-kubectl --context "$HUB_CONTEXT" config view --raw --minify \
-  -o jsonpath='{.clusters[0].cluster.certificate-authority-data}' |
-  base64 --decode > "$TRIAL/public/api-ca.pem"
-test -s "$TRIAL/public/api-ca.pem"
-```
-
-If that kubeconfig instead references a CA file, copy that public file. Do not copy a kubeconfig, client key or service-account token into Helm values.
-
-Obtain four serving certificate/key pairs through your TLS process: Keycloak, public API, federation and key service. Each SAN must cover its exact configured hostname. Place them in `$TRIAL/private` as `keycloak.crt/keycloak.key`, `public.crt/public.key`, `federation.crt/federation.key` and `key-service.crt/key-service.key`. Place the public issuing roots in `$TRIAL/public/keycloak-ca.pem`, `federation-ca.pem` and `key-service-ca.pem`. Browser and cluster trust must accept these genuine roots; do not disable verification. With a private homelab CA, import its public root into your browser's trust store before login. The chart generates PostgreSQL, object-store and OpenBao TLS independently.
-
-Create a fresh trusted Restricted bootstrap namespace. Existing namespace presence alone does not establish trust. Leave `asservat-system` creation to the installer:
+Create the release namespace with Pod Security `restricted`, apply the CRDs and create the TLS Secrets named in your values:
 
 ```bash
 kubectl --context "$HUB_CONTEXT" create namespace "$HUB_NAMESPACE"
@@ -119,52 +102,29 @@ kubectl --context "$HUB_CONTEXT" apply --server-side \
   --field-manager=asservat-crd-upgrade -f "$SOURCE/charts/asservat/crds"
 kubectl --context "$HUB_CONTEXT" -n "$HUB_NAMESPACE" create secret tls operator-keycloak-tls \
   --cert="$TRIAL/private/keycloak.crt" --key="$TRIAL/private/keycloak.key"
-kubectl --context "$HUB_CONTEXT" -n "$HUB_NAMESPACE" create secret generic operator-serving-material \
-  --from-file=public-tls.crt="$TRIAL/private/public.crt" \
-  --from-file=public-tls.key="$TRIAL/private/public.key" \
-  --from-file=federation-tls.crt="$TRIAL/private/federation.crt" \
-  --from-file=federation-tls.key="$TRIAL/private/federation.key" \
-  --from-file=federation-ca.crt="$TRIAL/public/federation-ca.pem" \
-  --from-file=key-service-tls.crt="$TRIAL/private/key-service.crt" \
-  --from-file=key-service-tls.key="$TRIAL/private/key-service.key" \
-  --from-file=key-service-ca.crt="$TRIAL/public/key-service-ca.pem"
+kubectl --context "$HUB_CONTEXT" -n "$HUB_NAMESPACE" create secret tls operator-console-tls \
+  --cert="$TRIAL/private/public.crt" --key="$TRIAL/private/public.key"
 ```
 
-This is the single phase-3 private serving-material Secret. Do not supply PostgreSQL administrators, an initial OpenBao token, an S3 administrator or an OIDC client secret. Selected preparation generates and retains them in their original protected state; the continuation reads the actual generated client secret. Do not copy synthetic fixture grants or fabricate installation IDs.
+Do not supply PostgreSQL administrators, an OpenBao token, an S3 administrator or an OIDC client secret. The `secrets` hook generates them once and keeps them in Secrets of the release namespace.
 
 ## Install the hub and check completion
 
-The reference profile supplies finite capacity and retention declarations; the site overlay selects all four services. Keep the same original image pins, endpoints, namespace and release name on retries:
+The reference profile supplies finite capacity and retention declarations; the site overlay selects all four services:
 
 ```bash
 helm upgrade --install asservat "$CHART_ARCHIVE" \
   --kube-context "$HUB_CONTEXT" --namespace "$HUB_NAMESPACE" --skip-crds \
   -f "$SOURCE/examples/helm/context-trial-profile.yaml" -f "$TRIAL/site-values.yaml" \
-  --set-string bootstrap.image="$PRODUCT_IMAGE" \
-  --set-string services.postgres.bundled.image="$PG_IMAGE" \
-  --set-file bootstrap.kubernetes.rootsPEM="$TRIAL/public/api-ca.pem" \
-  --set-file bootstrap.continuation.public.promotion.providerRootsPEM="$TRIAL/public/keycloak-ca.pem" \
-  --wait --timeout 20m
-```
-
-The finite preparation hook creates retained service material before their PVC-backed workloads start. PostgreSQL's backup container must become Ready after its first encrypted full backup. The subsequent original Pod runs `produce`, `schema`, `prepare`, `retire`, then `installer-continue`; automatic provider/S3 setup uses the original selected backend. There is no manual provider outbox loop for this all-bundled path. The continuation retains its original 300-second stage budget; a longer Helm timeout does not extend it or the original setup credentials.
-
-Require Helm exit 0, its `asservat-bootstrap` hook success and successful hook removal, then inspect workloads:
-
-```bash
-helm status asservat --kube-context "$HUB_CONTEXT" --namespace "$HUB_NAMESPACE"
+  --set-file identity.providerRootsPEM="$TRIAL/public/keycloak-ca.pem"
+kubectl --context "$HUB_CONTEXT" -n "$HUB_NAMESPACE" \
+  wait --for=condition=Complete --timeout=20m job -l app.kubernetes.io/component=setup
 kubectl --context "$HUB_CONTEXT" -n "$HUB_NAMESPACE" get pods,pvc
-kubectl --context "$HUB_CONTEXT" -n asservat-system get pods
 ```
 
-The default bootstrap name is `asservat`, so the hook is `asservat-bootstrap`. A ready login page alone does not prove completed installation. On failure, inspect the retained original hook and its failing command. If the exact terminal hook blocks a corrected retry, use the existing bounded resume command, then repeat the same Helm command:
+The `secrets` hook creates the bundled provider state and the generated Secrets before the provider workloads start. The `setup` Job then waits for PostgreSQL, OpenBao and SeaweedFS, applies the schema and configures them; hub workloads start once the schema is current. A ready login page alone does not prove a completed installation; check that the setup Job completed.
 
-```bash
-"$ASSERVAT" installer-resume --context "$HUB_CONTEXT" \
-  --namespace "$HUB_NAMESPACE" --name asservat
-```
-
-Never force-delete a live hook, reset journals, rotate generated keys or delete retained PVCs to hide an error. Keep all generated state/PVCs together on upgrades. Uninstall is not reset or restore; it leaves retained data and obligations.
+On failure, read the logs of `job/asservat-secrets` or the `asservat-setup-*` Job; both name the failing stage. Fix the values and run the same `helm upgrade` again. Never delete generated Secrets or retained PVCs to hide an error. Uninstall keeps both.
 
 ## Create the first human and initialize processing
 
@@ -186,25 +146,7 @@ Sign in through `https://asservat.YOUR_DOMAIN:31450`, open `/processing`, choose
 
 ## Enroll the same Kubernetes API as a workload region
 
-Prepare this step before issuing the bootstrap, which expires in at most five minutes. The second release uses the **same original bootstrap namespace** and existing trusted `asservat-bootstrap-runner`, with its own connector namespace. It neither reinstalls the hub nor creates another user/provider service.
-
-Open `/fleet`, enter the display name and region, keep delivery profile `regional-installer`, and choose **Issue bootstrap slot**. Copy the returned original `bootstrapID` and `clusterID`. Do not invent IDs or edit the deadline.
-
-```bash
-BOOTSTRAP_ID=REPLACE_WITH_ISSUED_BOOTSTRAP_ID
-CLUSTER=REPLACE_WITH_ISSUED_CLUSTER_ID
-jq -n --arg image "$PRODUCT_IMAGE" --arg id "$BOOTSTRAP_ID" \
-  '{mode:"cluster",bootstrap:{enabled:false},collector:{enabled:false},cluster:{enabled:true,namespace:"asservat-connector",image:$image,bundledHub:"asservat",bootstrapID:$id}}' \
-  > "$TRIAL/region-values.json"
-helm upgrade --install asservat-region "$CHART_ARCHIVE" \
-  --kube-context "$HUB_CONTEXT" --namespace "$HUB_NAMESPACE" --skip-crds \
-  -f "$TRIAL/region-values.json" --wait --timeout 6m
-kubectl --context "$HUB_CONTEXT" -n "$HUB_NAMESPACE" \
-  logs job/asservat-region-cluster-installer -c installer > "$TRIAL/regional-installed.json"
-jq -e --arg cluster "$CLUSTER" '.Join.clusterID == $cluster' "$TRIAL/regional-installed.json"
-```
-
-The hook reads version1 of that existing original bootstrap from the selected OpenBao channel, retains separate regional evidence/history keys before IAM changes, installs the connector, then joins its actual guarded sources to the hub. It does not issue a new bootstrap. Manual offer, bootstrap Secret and evidence Secret values must remain empty for this selected path. Regional private profile-authorization inputs are not supported by this chart branch.
+Set `mode: combined` to run the workload region in the hub cluster with in-cluster addresses; no second release, bootstrap record or NodePort is needed. Separate workload clusters use their own `mode: cluster` release (see [add a regional cluster](helm.md#add-a-regional-cluster-modecluster)).
 
 ## Grant one workload and capture pod status
 
@@ -257,58 +199,39 @@ The pinned Keycloak image is qualified for fresh login after the tested PostgreS
 
 ## Replace one bundled service
 
-The four `services.*.provider` choices are independent and default to `external`. Make these choices before a fresh installation. Changing a completed installation's provider is not a supported migration or restore procedure. Keep the other selected services and their original inputs; do not copy the entire external-services example over this overlay.
+Each provider is selected independently. Set `services.<provider>.provider: external` and its `external` coordinates; keep the others bundled.
 
-| Replace | Select and supply | Existing input reference |
+| Service | Values | Credentials |
 | --- | --- | --- |
-| PostgreSQL | `services.postgres.provider: external`; set `bootstrap.postgres.host`, `port`, `database`, public `rootsPEM`, and the existing producer/schema/retirement Secret references. The initial client `maxConnections` remains 2; size the external server for the actual aggregate connection plan. If bundled Keycloak remains selected, configure its separate `services.identity.keycloak.database` host/name/user and password/CA Secret references as well. | [SQL credentials and Secret keys](helm.md#optional-initial-bootstrap-checkpoint), [external database prerequisites](context-trial.md#prepare-the-external-services-and-files), [Keycloak database selection](../../charts/asservat/README.md#small-service-candidate) |
-| Object store | `services.objectStore.provider: external`; set `bootstrap.auditStore` endpoint/region/bucket/public roots and `bootstrap.continuation.public.federation.evidenceStore` to the actual qualified store. Supply the original initial storage credential through `bootstrap.secrets.producer` and the scoped continuation credentials described below. | [Initial private material](context-trial.md#prepare-the-external-services-and-files), [versioned storage and per-role recipe capabilities](context-trial.md#install-the-hub) |
-| OpenBao | `services.keyService.provider: external`; set `bootstrap.keyService` endpoint/audit mount/key/public roots, continuation worker/owner auth mounts and their actual accessors, `ownerPKIMount`/`ownerIssuerRootsPEM`, and federation connector PKI mount/roots. Supply the finite initial issuer through the producer input. Existing external OpenBao mount, reviewer, PKI and KV prerequisites still apply. | [Initial provider prerequisites](context-trial.md#prepare-the-external-services-and-files), [continuation roles and inspection](helm.md#runtime-continuation-development) |
-| Keycloak | `services.identity.provider: external`; supply the exact issuer, qualified client declarations, stable eligible/fleet/operator IDs, public identity-provider roots and private console client secret. No Keycloak Deployment, realm or users are created. | [External Keycloak configuration below](#use-your-existing-keycloak), [client/scopes and stable-ID mapper](../architecture/keycloak-profile.md), [site input example](../../examples/helm/context-trial-site.example.yaml) |
-
-A mixed/external key-provider or store selection still uses the existing private `provider-material.json` in `bootstrap.secrets.producer`. It declares the format and original finite `storageUseUntil`; include `issuerToken` only for external OpenBao and `storage` only for an external object store. Omit the bundled provider's credential field rather than supplying a placeholder or another backend's credential. Keep separate PostgreSQL administrator inputs when PostgreSQL is external. The [external input procedure](context-trial.md#prepare-the-external-services-and-files) defines the credential bodies; no secret belongs in values.
-
-With **bundled OpenBao and external S3**, keep `bootstrap.continuation.materialSecretName` pointing at your existing private material Secret. Add `configuration-audit-storage.json` for the phase-1 worker. Phase 3 uses `audit-storage.json` for the owner and, only when selected by the actual recipe, `federation-audit-storage.json`, `publisher-audit-storage.json`, `evidence-read.json`, `download-evidence-read.json`, `evidence-delete.json`, `cleanup-audit.json` and `cleanup-verify.json`. These are distinct narrowly scoped S3 credentials, using the closed `accessKeyID`/`secretAccessKey`/`sessionToken` JSON body. Retain the serving TLS files above and add `oidc-client-secret` if identity is external. The source must already contain the actual phase's inputs when read; the generated-prefix recipes are published in the existing outbox. After a named missing-input refusal, supply the exact source keys, observe terminal failure and follow the [existing resume procedure](helm.md#interrupted-or-failed-hook) with the same original values. The installer verifies retained progress; retry does not replace IDs or extend the original stage, credential or journal bounds, and expired bounds can still refuse. Do not substitute broad S3 administration or an OpenBao token. This path applies bundled OpenBao setup itself; it has no operator `installer-provider-apply` fallback.
-
-With **bundled SeaweedFS and external OpenBao**, the continuation retains its generated original storage keys and private serving/identity inputs in its existing inbox. Answer each published worker/owner recipe with the existing local command:
-
-```bash
-"$ASSERVAT" installer-provider-apply --context "$HUB_CONTEXT" \
-  --namespace "$HUB_NAMESPACE" --installation "$INSTALLATION"
-```
-
-Set `INSTALLATION` from the actual target namespace annotation as in the [outbox procedure](context-trial.md#install-the-hub). The OpenBao SDK uses your existing `BAO_ADDR`, `BAO_CACERT` and `BAO_TOKEN` environment for that actual external provider. Pass no credential or TLS file flags in this selected mixed path: the command consumes the retained original inbox. It never exports a bundled OpenBao administrator token. Mixed-provider installation qualification remains pending.
-
-The automatic second-release regional procedure above selects the original bundled OpenBao and SeaweedFS sources. For an external key provider or store, use the [external regional enrollment procedure](context-trial.md#install-and-join-the-workload-cluster) and its actual issued credentials instead; the same-API helper does not discover an external provider.
+| PostgreSQL | `services.postgres.external`: `host`, `port`, `database`, public `rootsPEM`, `adminSecret` | `adminSecret` holds an administrator `credentials.json` used only by the setup Job. Runtime role passwords stay generated. With bundled Keycloak also set `services.identity.keycloak.database`. |
+| Object store | `services.objectStore.external`: `endpoint`, `region`, `bucket`, `rootsPEM`; `federation.evidenceStore` | Create one `<name>-s3-<principal>` Secret (`credentials.json`) per principal listed in the [chart README](../../charts/asservat/README.md#generated-secrets). |
+| OpenBao | `services.keyService.external`: `endpoint`, `rootsPEM` | Configure mounts, policies and Kubernetes auth as the setup recipe documents. |
 
 ### Use your existing Keycloak
 
-Keep PostgreSQL, OpenBao and SeaweedFS bundled. In a final overlay after `small-profile-values.yaml`, select external identity and replace the following public placeholders with the existing realm's values:
+Keep PostgreSQL, OpenBao and SeaweedFS bundled. In a final overlay after `small-profile-values.yaml`, select external identity:
 
 ```yaml
 services:
   identity:
     provider: external
-bootstrap:
-  fleet:
-    issuer: https://id.example.invalid/realms/company
-    clients: [asservat-console, asservat-mcp]
-    groups: [REPLACE_WITH_STABLE_FLEET_OPERATOR_GROUP_ID]
-  continuation:
-    public:
+identity:
+  issuer: https://id.example.invalid/realms/company
+  clientID: asservat-console
+  browserAudience: asservat-api
+  clients:
+    - {id: asservat-console, kind: human}
+    - {id: asservat-mcp, kind: human}
+  eligibleGroups: [REPLACE_WITH_STABLE_USERS_GROUP_ID]
+  processingOperators:
+    - clientID: asservat-console
       issuer: https://id.example.invalid/realms/company
-      clientID: asservat-console
-      clients:
-        - {id: asservat-console, kind: human}
-        - {id: asservat-mcp, kind: human}
-      eligibleGroups: [REPLACE_WITH_STABLE_USERS_GROUP_ID]
-      processingOperators:
-        - clientID: asservat-console
-          issuer: https://id.example.invalid/realms/company
-          kind: Group
-          id: REPLACE_WITH_STABLE_PROCESSING_OPERATOR_GROUP_ID
+      kind: Group
+      id: REPLACE_WITH_STABLE_PROCESSING_OPERATOR_GROUP_ID
+fleet:
+  issuer: https://id.example.invalid/realms/company
+  clients: [asservat-console, asservat-mcp]
+  groups: [REPLACE_WITH_STABLE_FLEET_OPERATOR_GROUP_ID]
 ```
 
-Client IDs must match your actual qualified clients; omit the MCP declaration and fleet client if you are configuring only the console. Keep `bootstrap.continuation.public.origin` at your Asservat browser address. Set `promotion.browserAudience` to the configured API audience and use the external Keycloak's genuine public roots for the existing `--set-file bootstrap.continuation.public.promotion.providerRootsPEM=...` argument. Add the raw confidential console client secret as key `oidc-client-secret` to the **same** `operator-serving-material` Secret; there is no second phase-3 Secret. Append `--from-file=oidc-client-secret="$TRIAL/private/oidc-client-secret"` to the earlier `kubectl create secret generic operator-serving-material` command. Create/review that source before starting installation; this passes a file path, never the private value, in arguments.
-
-Configure authorization code with S256 PKCE, exact redirect `<public.origin>/auth/callback`, the API audience, the built-in `basic` subject scope and the [required operation scopes and protected stable-ID mapper](context-trial.md#prepare-the-external-services-and-files). For sharing, include the profile's `evidence:share` scope. Public eligibility, fleet issuance and processing operation are separate explicit assignments. Create your human and memberships in your existing realm; skip this guide's generated Keycloak administrator retrieval and generated-group steps. Use the actual issuer and users-group ID in the regional `AccessBinding`. No generated Keycloak group UUID is added to external identity settings.
+Pass the issuer's public roots with `--set-file identity.providerRootsPEM=...`. Configure authorization code with S256 PKCE, exact redirect `<origin>/auth/callback`, the API audience, the built-in `basic` subject scope and the [required operation scopes and protected stable-ID mapper](context-trial.md#prepare-the-external-services-and-files). Create your human and memberships in your existing realm.

@@ -3,8 +3,6 @@ package providerconfig
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -34,52 +32,6 @@ func configurationPolicyPaths(t *testing.T, r ConfigurationProviderRoleRecipe) [
 	}
 	slices.Sort(out)
 	return out
-}
-
-// Without the key, the recipe preimage is byte-for-byte the one before
-// ADR-204: the profile it hashes has exactly the original fields.
-func TestConfigurationProviderRecipeDigestUnchangedWithoutWorkerAudit(t *testing.T) {
-	in, selection, account, now := configurationProviderRecipeFixture(t)
-	r, err := ConfigurationProviderRecipeFor(in, selection, account, now)
-	if err != nil {
-		t.Fatal(err)
-	}
-	legacy, err := ownerProviderCanonical(struct {
-		Format         string                            `json:"format"`
-		InstallationID string                            `json:"installationID"`
-		ClusterID      string                            `json:"clusterID"`
-		Namespace      contracts.WorkerObjectReference   `json:"namespace"`
-		FleetSource    contracts.WorkerObjectReference   `json:"fleetSource"`
-		OwnerSource    contracts.WorkerObjectReference   `json:"ownerSource"`
-		Kubernetes     contracts.OwnerProviderEndpoint   `json:"kubernetes"`
-		KeyService     contracts.ConfigurationKeyService `json:"keyService"`
-		AuditStore     contracts.OwnerAuditStore         `json:"auditStore"`
-		Profile        map[string]any                    `json:"profile"`
-		Roles          []ConfigurationProviderRoleRecipe `json:"roles"`
-	}{"asservat-configuration-provider-recipe/v1", in.InstallationID, in.ClusterID, in.Namespace, in.FleetSource, in.OwnerSource, in.Kubernetes, in.KeyService, in.AuditStore,
-		map[string]any{"format": r.Profile.Format, "authMount": r.Profile.AuthMount, "authMountAccessor": r.Profile.AuthMountAccessor, "serviceAccount": r.Profile.ServiceAccount, "auditCredentials": r.Profile.AuditCredentials, "recipeSHA256": ""}, r.Roles})
-	if err != nil {
-		t.Fatal(err)
-	}
-	d := sha256.Sum256(legacy)
-	if r.Profile.RecipeSHA256 != hex.EncodeToString(d[:]) {
-		t.Fatal("recipe digest changed for a hub-worker without a worker configuration audit key")
-	}
-	for _, role := range r.Roles {
-		if len(configurationPolicyPaths(t, role)) != 4 {
-			t.Fatal("base policy widened")
-		}
-	}
-	raw, err := json.Marshal(r.Profile)
-	if err != nil || bytes.Contains(raw, []byte("workerConfigurationAudit")) {
-		t.Fatal("zero worker configuration audit serialized")
-	}
-	for _, versioned := range []bool{false, true} {
-		b, err := configurationProviderSetupArtifact(in, selection, account, now, versioned)
-		if err != nil || bytes.Contains(b, []byte("workerConfigurationAudit")) || bytes.Contains(b, []byte("download-worker-configuration")) || bytes.Contains(b, []byte(workerAuditFixture.Key)) {
-			t.Fatal("artifact changed without a worker configuration audit key", err)
-		}
-	}
 }
 
 func TestConfigurationProviderRecipeExtendsBothAuditPurposesToWorkerAuditKey(t *testing.T) {
@@ -153,90 +105,6 @@ func TestConfigurationProviderRecipeExtendsBothAuditPurposesToWorkerAuditKey(t *
 		if _, err := ConfigurationProviderRecipeFor(in, s, account, now); err == nil {
 			t.Fatal("invalid worker configuration audit key accepted", name)
 		}
-	}
-}
-
-func TestConfigurationPairArtifactCreatesWorkerAuditKeyAndPrefix(t *testing.T) {
-	in, selection, account, now := configurationProviderRecipeFixture(t)
-	for _, worker := range []contracts.OwnerPublicTransit{workerAuditFixture, {Mount: "worker-audit", Key: "worker-configuration"}} {
-		t.Run(worker.Mount, func(t *testing.T) {
-			s := selection
-			s.WorkerConfigurationAudit = worker
-			r, err := ConfigurationProviderRecipeFor(in, s, account, now)
-			if err != nil {
-				t.Fatal(err)
-			}
-			b, err := ConfigurationProviderPairSetupArtifact(in, s, account, contracts.HubWorkerProviderInstalledLayout, now)
-			if err != nil {
-				t.Fatal(err)
-			}
-			var v struct {
-				Format       string                              `json:"format"`
-				Apply        []configurationProviderSetupRequest `json:"apply"`
-				Inspect      []string                            `json:"inspect"`
-				AuditStorage struct {
-					Prefixes   []string `json:"prefixes"`
-					Operations []string `json:"operations"`
-				} `json:"auditStorage"`
-			}
-			if json.Unmarshal(b, &v) != nil || v.Format != "asservat-configuration-provider-installed-setup/v3" || len(v.Apply) != 5 {
-				t.Fatal("artifact shape changed", len(v.Apply))
-			}
-			for i, role := range r.Roles {
-				var policy struct {
-					Policy string `json:"policy"`
-				}
-				if v.Apply[2*i].Path != "sys/policies/acl/"+role.Name || json.Unmarshal(v.Apply[2*i].Body, &policy) != nil || policy.Policy != string(role.Policy) || !bytes.Equal(v.Apply[2*i+1].Body, role.Role) {
-					t.Fatal("artifact policy is not the extended recipe policy")
-				}
-			}
-			// The canonical artifact carries the key body in canonical form.
-			key := v.Apply[4]
-			body, err := ownerProviderCanonical(configurationTransitKey)
-			if err != nil || key.Method != "POST" || key.Path != worker.Mount+"/keys/"+worker.Key || !bytes.Equal(key.Body, body) {
-				t.Fatal("worker configuration audit key is not created exactly", key.Path)
-			}
-			wantInspect := []string{worker.Mount + "/keys/" + worker.Key}
-			if worker.Mount != in.KeyService.AuditMount {
-				wantInspect = []string{"sys/mounts/" + worker.Mount, worker.Mount + "/keys/" + worker.Key}
-			}
-			if len(v.Inspect) != 8+len(wantInspect) || !slices.Equal(v.Inspect[8:], wantInspect) {
-				t.Fatal("inspection does not name the worker configuration audit key", v.Inspect)
-			}
-			if !slices.Equal(v.AuditStorage.Prefixes, []string{"hub-owner-configuration/v1/" + in.InstallationID + "/" + in.ClusterID + "/" + in.OwnerSource.UID + "/", "authority/v1/", "retention-acceptance/v1/", "lifecycle/v1/", "download-worker-configuration/v1/" + in.InstallationID + "/"}) ||
-				!slices.Equal(v.AuditStorage.Operations, []string{"PutObject", "GetObject", "GetObjectVersion"}) {
-				t.Fatal("audit storage lacks the worker configuration prefix", v.AuditStorage.Prefixes)
-			}
-			// The operator's applier accepts exactly these writes and reads.
-			for _, request := range v.Apply {
-				if !setupApplyPath(request.Path) {
-					t.Fatal("applier refuses", request.Path)
-				}
-			}
-			if _, err := setupInspectionPolicy(v.Inspect); err != nil {
-				t.Fatal("inspection policy", err)
-			}
-		})
-	}
-	// The legacy unversioned profile has no versioned audit store.
-	s := selection
-	s.WorkerConfigurationAudit = workerAuditFixture
-	if _, err := ConfigurationProviderSetupArtifact(in, s, account, now); err == nil {
-		t.Fatal("legacy artifact accepted a worker configuration audit key")
-	}
-	// The installed artifact's selection must be the profile's.
-	r, err := ConfigurationProviderRecipeFor(in, s, account, now)
-	if err != nil {
-		t.Fatal(err)
-	}
-	in.ProviderAuthentication = &r.Profile
-	in.ProviderInputs = &contracts.ConfigurationWorkerInputProvenance{OperationID: "70000000-0000-4000-8000-000000000001"}
-	in.Activation = &contracts.HubWorkerRuntimeActivation{WorkerLayout: contracts.HubWorkerProviderInstalledLayout}
-	if _, err := ConfigurationProviderInstalledSetupArtifact(in, s, account, now); err != nil {
-		t.Fatal("installed artifact", err)
-	}
-	if _, err := ConfigurationProviderInstalledSetupArtifact(in, selection, account, now); err == nil {
-		t.Fatal("installed artifact dropped the profile's worker configuration audit key")
 	}
 }
 

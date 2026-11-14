@@ -11,6 +11,7 @@ import (
 	"asservat.local/asservat/internal/adapters/mtls"
 	app "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	value "asservat.local/asservat/internal/domain/fleet"
@@ -37,6 +38,7 @@ func NewOwnerConfigurationProtection(observer, probe *PermissionClient, plan cfg
 type OwnerConfigurationSource struct {
 	client                  *PermissionClient
 	protection              *OwnerConfigurationProtection
+	digest                  artifact.Digest
 	name, uid, installation string
 }
 
@@ -46,8 +48,9 @@ func NewOwnerConfigurationSource(c *PermissionClient, p *OwnerConfigurationProte
 	if c == nil || p == nil || p.configMapProtection == nil || p.observer != c || p.plan.SourceName != name || !installationRefValid(name, uid) || !authorization.UUID(uid) || !authorization.UUID(installation) {
 		return nil, value.ErrInvalid
 	}
-	return &OwnerConfigurationSource{c, p, name, uid, installation}, nil
+	return &OwnerConfigurationSource{c, p, p.digest, name, uid, installation}, nil
 }
+
 func (s *OwnerConfigurationSource) snapshot(ctx context.Context) (value.OwnerConfiguration, time.Time, error) {
 	data, _, err := s.client.installationConfig(ctx, s.name, s.uid)
 	if err != nil {
@@ -97,7 +100,7 @@ func (s *OwnerConfigurationSource) ReadOwnerConfiguration(ctx context.Context) (
 	if err != nil {
 		return out, err
 	}
-	c.ProtectionDigest = s.protection.digest
+	c.ProtectionDigest = s.digest
 	out = value.OwnerConfigurationObservation{Configuration: c, ObservedAt: start, FreshUntil: identity.Earlier(start.Add(5*time.Second), rootsUntil)}
 	if !out.Valid(s.client.now()) || ctx.Err() != nil {
 		return value.OwnerConfigurationObservation{}, value.ErrUnavailable

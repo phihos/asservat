@@ -35,7 +35,7 @@ func TestProviderConfigurationAuditStorageRequiresImmutableVersion(t *testing.T)
 				}
 			}))
 			defer server.Close()
-			writer := &installedConfigurationAudit{input: contracts.HubWorkerDeployment{AuditStore: contracts.OwnerAuditStore{Endpoint: server.URL, Region: "test", Bucket: "audit"}}, http: server.Client()}
+			writer := &installedConfigurationAudit{scope: hubWorkerAuditScope{store: contracts.OwnerAuditStore{Endpoint: server.URL, Region: "test", Bucket: "audit"}}, http: server.Client()}
 			defer writer.Close()
 			store, err := writer.storage(contracts.OwnerStorageCredential{AccessKeyID: "synthetic", SecretAccessKey: "synthetic"})
 			if err != nil {

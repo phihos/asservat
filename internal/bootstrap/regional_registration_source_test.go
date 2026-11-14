@@ -17,7 +17,7 @@ func registrationSourceFixture(t *testing.T, r *RegionalLifecycle, request value
 	t.Helper()
 	profile := value.ConnectorCredentialProfile{RootID: r.Credential.Profile.RootID, Binding: request.Process.Binding,
 		Revision: identity.Revision{UID: regionalPod, Generation: 1, Digest: artifact.Digest{1}}, ProtectionDigest: artifact.Digest{2}, ServerName: "connector.example",
-		Deployment:        value.ConnectorDeployment{Namespace: "control", NamespaceUID: regionalPod, ServiceAccount: "connector", AccountUID: regionalPod, Deployment: "connector", DeploymentUID: regionalPod, ServingSlots: 1, RetainedProcesses: 2},
+		Deployment:        value.ConnectorDeployment{Namespace: "control", ServiceAccount: "connector", Deployment: "connector", ServingSlots: 1, RetainedProcesses: 2},
 		ClientIssuerRoots: [][]byte{{1}}, ServerIssuerRoots: [][]byte{{2}}}
 	source := value.ConnectorIdentitySource{Observation: value.ConnectorCredentialObservation{Profile: profile, Backing: value.ConnectorBackingObservation{Revision: 1, Digest: artifact.Digest{3}, SourceDigest: artifact.Digest{4}}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)},
 		Roles: value.ConnectorIdentityRoles{Source: "source", Journal: "journal", Acknowledgement: "ack", Cleanup: "cleanup", Verifier: "verifier", Finalizer: "finalizer"}}

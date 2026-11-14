@@ -1,0 +1,31 @@
+{{- if include "asservat.hub" . }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ printf "%s-config" (include "asservat.fullname" (list . "hub-worker")) }}
+  namespace: {{ .Release.Namespace }}
+  labels: {{ include "asservat.labels" (list . "hub-worker") | nindent 4 }}
+data:
+  config.json: {{ include "asservat.hubWorker.config" . | quote }}
+---
+# Fleet enrollment settings (contracts.FleetSettings), read by setup and the
+# hub-worker's fleet observer.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "asservat.fullname" (list . "fleet") }}
+  namespace: {{ .Release.Namespace }}
+  labels: {{ include "asservat.labels" (list . "hub-worker") | nindent 4 }}
+data:
+  fleet.json: {{ include "asservat.hubWorker.fleet" . | quote }}
+---
+# The hub-api owner pool (contracts.OwnerSource), accepted by the hub-worker.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "asservat.fullname" (list . "owner-source") }}
+  namespace: {{ .Release.Namespace }}
+  labels: {{ include "asservat.labels" (list . "hub-worker") | nindent 4 }}
+data:
+  owner-pool.json: {{ include "asservat.hubWorker.ownerSource" . | quote }}
+{{- end }}

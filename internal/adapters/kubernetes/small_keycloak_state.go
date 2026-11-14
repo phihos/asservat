@@ -15,20 +15,21 @@ import (
 // SmallKeycloakStateStore is the finite preparation job's exact named-Secret
 // port. It has no update/delete, broad list, or runtime authorization behavior.
 type SmallKeycloakStateStore struct {
-	api                                                rest.Interface
-	namespace, name, databaseStateName, deploymentName string
-	externalPresence                                   func(context.Context) (bool, error)
+	api                                rest.Interface
+	namespace, name, databaseStateName string
 }
 
-func NewSmallKeycloakStateStore(config *rest.Config, s contracts.SmallKeycloakSettings, databaseStateName, deploymentName string, externalPresence func(context.Context) (bool, error)) (*SmallKeycloakStateStore, error) {
-	if len(validation.IsDNS1123Label(s.Namespace)) != 0 || len(validation.IsDNS1123Subdomain(s.SecretName)) != 0 || databaseStateName != "" && len(validation.IsDNS1123Subdomain(databaseStateName)) != 0 || databaseStateName == s.SecretName || len(validation.IsDNS1123Subdomain(deploymentName)) != 0 || databaseStateName != "" && externalPresence != nil {
+// An empty databaseStateName selects an external database, whose retained
+// state the store cannot observe.
+func NewSmallKeycloakStateStore(config *rest.Config, s contracts.SmallKeycloakSettings, databaseStateName string) (*SmallKeycloakStateStore, error) {
+	if len(validation.IsDNS1123Label(s.Namespace)) != 0 || len(validation.IsDNS1123Subdomain(s.SecretName)) != 0 || databaseStateName != "" && len(validation.IsDNS1123Subdomain(databaseStateName)) != 0 || databaseStateName == s.SecretName {
 		return nil, cfg.ErrInvalid
 	}
 	api, err := newBoundedAPI(config)
 	if err != nil {
 		return nil, cfg.ErrUnavailable
 	}
-	return &SmallKeycloakStateStore{api: api, namespace: s.Namespace, name: s.SecretName, databaseStateName: databaseStateName, deploymentName: deploymentName, externalPresence: externalPresence}, nil
+	return &SmallKeycloakStateStore{api: api, namespace: s.Namespace, name: s.SecretName, databaseStateName: databaseStateName}, nil
 }
 
 func (s *SmallKeycloakStateStore) path(name string) string {
@@ -69,26 +70,13 @@ func (s *SmallKeycloakStateStore) Create(ctx context.Context, v *core.Secret) (*
 	return s.decode(raw)
 }
 
+// DatabaseStateExists reports whether the bundled PostgreSQL state already
+// exists: new Keycloak identity must not meet an initialized database.
 func (s *SmallKeycloakStateStore) DatabaseStateExists(ctx context.Context) (bool, error) {
-	// A retained provider workload with missing original state is recovery.
-	// Never fall through to database inspection or generate a replacement.
-	raw, err := s.api.Get().AbsPath("/apis/apps/v1/namespaces/" + s.namespace + "/deployments/" + s.deploymentName).MaxRetries(0).DoRaw(ctx)
-	clear(raw)
-	if err == nil {
-		return true, nil
-	}
-	if !apierrors.IsNotFound(err) || ctx.Err() != nil {
-		return false, cfg.ErrUnavailable
-	}
 	if s.databaseStateName == "" {
-		// An external database needs its own current positive empty-state
-		// observation; Kubernetes absence does not supply one.
-		if s.externalPresence == nil {
-			return false, cfg.ErrUnavailable
-		}
-		return s.externalPresence(ctx)
+		return false, nil
 	}
-	raw, err = s.api.Get().AbsPath(s.path(s.databaseStateName)).MaxRetries(0).DoRaw(ctx)
+	raw, err := s.api.Get().AbsPath(s.path(s.databaseStateName)).MaxRetries(0).DoRaw(ctx)
 	clear(raw)
 	if apierrors.IsNotFound(err) {
 		return false, nil

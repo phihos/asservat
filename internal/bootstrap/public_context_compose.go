@@ -148,7 +148,8 @@ func decodeAuditPolicy(raw json.RawMessage, lane, root, installation string) (au
 		return audit.OperationLifecyclePolicy{}, mounts.ErrUnavailable
 	}
 	b, e := json.Marshal(p)
-	a, z := jsontext.Value(raw), jsontext.Value(b)
+	// Canonicalize rewrites in place: never the caller's bytes.
+	a, z := jsontext.Value(bytes.Clone(raw)), jsontext.Value(b)
 	if e != nil || a.Canonicalize() != nil || z.Canonicalize() != nil || !bytes.Equal(a, z) {
 		return audit.OperationLifecyclePolicy{}, mounts.ErrUnavailable
 	}
@@ -192,7 +193,7 @@ type publicShared struct {
 func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInputs, providers *kms.InstalledOwnerProviderEffects, pools *publicPools, observer, probe *kube.PermissionClient, shared publicShared, catalog publicCatalog, a publicAuditStore, closers *[]func()) (*publicContext, error) {
 	c, p := in.config, in.config.Public
 	root, installation := c.PermissionRootID, c.InstallationID
-	if p == nil || c.Native == nil || pools == nil || observer == nil || probe == nil || shared.topologies == nil || shared.nativeRead == nil || !a.storageConfigured() || a.seal == nil || a.open == nil || a.keys == nil ||
+	if p == nil || c.Native == nil || pools == nil || observer == nil || shared.topologies == nil || shared.nativeRead == nil || !a.storageConfigured() || a.seal == nil || a.open == nil || a.keys == nil ||
 		!authorization.UUID(p.ClusterCatalog.Source.UID) || p.Standby < 1 || p.Standby > 64 || p.Captures < 1 || p.Captures > 16 || c.Native.Connections+p.Standby > 64 || p.PreviewSeconds < 1 || p.PreviewSeconds > 300 {
 		return nil, mounts.ErrUnavailable
 	}
@@ -220,7 +221,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	if out.recovery, err = postgres.NewRecoveryReader(ctx, sql["identity-read"], installation); err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	if out.mac, err = newPublicOperationMAC(ctx, files, in.config.InstallationID, pools.manifest); err != nil {
+	if out.mac, err = newPublicOperationMAC(ctx, files, in.config.InstallationID); err != nil {
 		return nil, mounts.ErrUnavailable
 	}
 	capture, err := decodeAuditPolicy(p.CaptureAuditPolicy, "capture", root, installation)
@@ -259,30 +260,40 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	out.clusters, out.clustersDigest = catalog.source, catalog.digest
 	out.clusterIDs = append([]string{c.ClusterID}, catalogTargets(catalog.catalog)...)
 	out.previewDelegations = p.PermissionDelegations
-	for _, v := range catalog.catalog.Clusters {
-		if _, dup := capabilities[v.ClusterID]; dup || !authorization.UUID(v.ClusterID) || v.Settings.ClusterID != v.ClusterID || v.Trust.ClusterID != v.ClusterID || v.Settings.RootID != root || v.Trust.RootID != root || v.Settings.InstallationID != installation || v.Trust.InstallationID != installation {
-			return nil, mounts.ErrUnavailable
-		}
+	// admit adds one cluster's connector admission, capability, work-trust
+	// signer and limits.
+	admit := func(v contracts.OwnerPublicCluster, capability *kube.ContextCapabilitySource, trust *kube.APIContextWorkTrustSource) error {
 		profile, err := publicConnectorProfile(v, root, installation)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		startup, okStartup := publicDigest(v.Executor.StartupDigest)
 		image, okImage := publicDigest(v.Executor.ImageDigest)
 		if !okStartup || !okImage {
-			return nil, mounts.ErrUnavailable
+			return mounts.ErrUnavailable
 		}
 		registry, err := postgres.NewConnectorObservationRegistry(ctx, shared.nativeRead, profile)
 		if err != nil {
-			return nil, mounts.ErrUnavailable
+			return mounts.ErrUnavailable
 		}
 		admissions = append(admissions, mtls.ContextStartConnectorAdmission{Profile: profile, Executor: mtls.ContextStartExecutorPin{NamespaceUID: v.Executor.NamespaceUID, AccountUID: v.Executor.AccountUID, StartupDigest: startup, ImageDigest: image}, Registry: registry})
+		capabilities[v.ClusterID] = capability
+		if signers[v.ClusterID], err = jose.NewAPIContextWorkSignatures(trust, s.KeyID, key.ForContext, time.Now); err != nil {
+			return mounts.ErrUnavailable
+		}
+		limits.Clusters = append(limits.Clusters, contextstart.ClusterLimit{ClusterID: v.ClusterID, Standby: v.Standby, Captures: v.Captures})
+		return nil
+	}
+	for _, v := range catalog.catalog.Clusters {
+		if _, dup := capabilities[v.ClusterID]; dup || v.ClusterID == c.ClusterID || !authorization.UUID(v.ClusterID) || v.Settings.ClusterID != v.ClusterID || v.Trust.ClusterID != v.ClusterID || v.Settings.RootID != root || v.Trust.RootID != root || v.Settings.InstallationID != installation || v.Trust.InstallationID != installation {
+			return nil, mounts.ErrUnavailable
+		}
 		ca, cp := capacityWorkerGuard(v.Capability.Guard)
 		capGuard, err := kube.NewContextCapabilityProtection(observer, probe, cfg.ConfigMapAdministration{Name: v.Capability.Guard.Name, SourceName: v.Capability.Source.Name, ControlNamespace: control, Administrators: ca}, cp)
 		if err != nil {
 			return nil, mounts.ErrUnavailable
 		}
-		capabilities[v.ClusterID], err = kube.NewContextCapabilitySource(observer, capGuard, out.recovery, v.Capability.Source.Name, v.Capability.Source.UID, v.Settings)
+		capability, err := kube.NewContextCapabilitySource(observer, capGuard, out.recovery, v.Capability.Source.Name, v.Capability.Source.UID, v.Settings)
 		if err != nil {
 			return nil, mounts.ErrUnavailable
 		}
@@ -295,10 +306,25 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 		if err != nil {
 			return nil, mounts.ErrUnavailable
 		}
-		if signers[v.ClusterID], err = jose.NewAPIContextWorkSignatures(trust, s.KeyID, key.ForContext, time.Now); err != nil {
-			return nil, mounts.ErrUnavailable
+		if err = admit(v, capability, trust); err != nil {
+			return nil, err
 		}
-		limits.Clusters = append(limits.Clusters, contextstart.ClusterLimit{ClusterID: v.ClusterID, Standby: v.Standby, Captures: v.Captures})
+	}
+	// mode=combined: the hub admits its own cluster's connector itself; its
+	// capability and work trust are the hub's own settings (no catalog entry).
+	if in.local != nil {
+		v := *in.local
+		capability, err := kube.NewLocalContextCapabilitySource(observer, out.recovery, v.Connector.SourceUID, v.Settings)
+		if err != nil {
+			return nil, &fixedStepError{"local-cluster-capability", mounts.ErrUnavailable}
+		}
+		trust, err := kube.NewLocalAPIContextWorkTrustSource(observer, out.recovery, v.Connector.SourceUID, v.Trust)
+		if err != nil {
+			return nil, &fixedStepError{"local-cluster-trust", mounts.ErrUnavailable}
+		}
+		if err = admit(v, capability, trust); err != nil {
+			return nil, &fixedStepError{"local-cluster", err}
+		}
 	}
 	// The installation-wide ceilings cover every joined cluster's own
 	// reservation; each cluster stays bounded by its catalog entry.
@@ -489,18 +515,13 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	// ADR-210: the processing source has no download paths; it is read only
 	// as the policy that names the processing operators.
 	if e := p.Processing; e != nil {
-		pa, pp := capacityWorkerGuard(e.Guard)
-		guard, err := kube.NewDownloadEnvironmentProtection(observer, probe, cfg.ConfigMapAdministration{Name: e.Guard.Name, SourceName: e.Source.Name, ControlNamespace: control, Administrators: pa}, pp)
-		if err != nil {
-			return nil, mounts.ErrUnavailable
-		}
 		// The join adds each cluster's derived path to both sources (ADR-192,
 		// ADR-204), so the reader pins the same derived paths.
-		paths, err := downloadEnvironmentPaths(installation, c.ClusterID, p.DownloadEnvironment.Paths, p.DownloadEnvironment.PathTemplate, catalogTargets(catalog.catalog))
+		paths, err := downloadEnvironmentPaths(installation, c.ClusterID, p.DownloadEnvironment.Paths, p.DownloadEnvironment.PathTemplate, in.pathTargets(catalog))
 		if err != nil {
 			return nil, err
 		}
-		if out.processingPolicy, err = kube.NewDownloadEnvironmentSource(observer, guard, e.Source.Name, e.Source.UID, root, installation, paths); err != nil {
+		if out.processingPolicy, err = kube.NewPlainDownloadEnvironmentReader(observer, e.Source.Name, e.Source.UID, root, installation, p.WorkerPKI.IssuerEpoch, paths); err != nil {
 			return nil, mounts.ErrUnavailable
 		}
 	}

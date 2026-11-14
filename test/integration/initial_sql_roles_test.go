@@ -3,15 +3,12 @@ package integration
 import (
 	"context"
 	"crypto/tls"
-	"errors"
 	"strings"
 	"testing"
 	"time"
 
-	"asservat.local/asservat/internal/adapters/postgres"
 	"asservat.local/asservat/migrations"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
@@ -91,104 +88,4 @@ func initialSQLMaintenance(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 	}
 	t.Cleanup(op.Close)
 	return op
-}
-
-func qualifyInitialSQLRoles(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config) {
-	t.Helper()
-	op := initialSQLMaintenance(t, ctx, admin, address, tlsConfig)
-	c := op.Config()
-	plan, err := postgres.NewInitialSQLCredentials(custodyID(), time.Now())
-	if err != nil {
-		t.Fatal(err)
-	}
-	manager, err := postgres.NewInitialSQLRoles(ctx, op, plan.InstallationID)
-	if err != nil {
-		t.Fatal("maintenance role", err)
-	}
-	if err = manager.Provision(ctx, plan); err != nil {
-		t.Fatal("initial role provisioning", err)
-	}
-	var verifier string
-	var originalExpiry time.Time
-	if err = admin.QueryRow(ctx, "SELECT rolpassword,rolvaliduntil FROM pg_authid WHERE rolname=$1", plan.Preparation.Username).Scan(&verifier, &originalExpiry); err != nil || !strings.HasPrefix(verifier, "SCRAM-SHA-256$") {
-		t.Fatal("SCRAM verifier not stored")
-	}
-	if err = manager.Provision(ctx, plan); err != nil {
-		t.Fatal("exact role replay", err)
-	}
-	var unchanged bool
-	if err = admin.QueryRow(ctx, "SELECT rolpassword=$2 AND rolvaliduntil=$3 FROM pg_authid WHERE rolname=$1", plan.Preparation.Username, verifier, originalExpiry).Scan(&unchanged); err != nil || !unchanged {
-		t.Fatal("replay changed credential/expiry")
-	}
-	other, err := postgres.NewInitialSQLCredentials(plan.InstallationID, time.Now())
-	if err != nil {
-		t.Fatal(err)
-	}
-	wrong := plan
-	wrong.Preparation.Password = other.Preparation.Password
-	if err = manager.Provision(ctx, wrong); err == nil {
-		t.Fatal("adopted role without matching secret")
-	}
-	// This administrator mutation is a fault injection. Product replay must
-	// reject unexpected privileges rather than silently adopting/removing them.
-	if _, err = admin.Exec(ctx, "GRANT UPDATE ON public.custody_pool TO "+pgx.Identifier{plan.Preparation.Username}.Sanitize()); err != nil {
-		t.Fatal(err)
-	}
-	if err = manager.Provision(ctx, plan); err == nil {
-		t.Fatal("overprivileged role accepted")
-	}
-	if _, err = admin.Exec(ctx, "REVOKE UPDATE ON public.custody_pool FROM "+pgx.Identifier{plan.Preparation.Username}.Sanitize()); err != nil {
-		t.Fatal(err)
-	}
-	if err = manager.Provision(ctx, plan); err != nil {
-		t.Fatal("exact privileges not restored", err)
-	}
-	// PUBLIC grants do not appear in this role's direct ACL. They must not
-	// silently bypass the purpose-specific permission boundary.
-	for _, injection := range []struct{ grant, undo string }{
-		{"GRANT UPDATE ON public.custody_pool TO PUBLIC", "REVOKE UPDATE ON public.custody_pool FROM PUBLIC"},
-		{"GRANT UPDATE(recovery_blocked) ON public.fleet_trust TO PUBLIC", "REVOKE UPDATE(recovery_blocked) ON public.fleet_trust FROM PUBLIC"},
-		{"GRANT CREATE ON SCHEMA public TO PUBLIC", "REVOKE CREATE ON SCHEMA public FROM PUBLIC"},
-		{"CREATE FUNCTION public.unsafe_initial_test() RETURNS void LANGUAGE sql SECURITY DEFINER AS 'UPDATE public.fleet_trust SET recovery_blocked=false'", "DROP FUNCTION public.unsafe_initial_test()"},
-	} {
-		if _, err = admin.Exec(ctx, injection.grant); err != nil {
-			t.Fatal(err)
-		}
-		denied := manager.Provision(ctx, plan)
-		if _, err = admin.Exec(ctx, injection.undo); err != nil {
-			t.Fatal(err)
-		}
-		if denied == nil {
-			t.Fatalf("accepted ambient privilege: %s", injection.grant)
-		}
-	}
-	runtime := c.ConnConfig.Copy()
-	runtime.User, runtime.Password, runtime.RequireAuth = plan.Activation.Username, plan.Activation.Password, "scram-sha-256"
-	conn, err := pgx.ConnectConfig(ctx, runtime)
-	if err != nil {
-		t.Fatal("scoped runtime authentication failed")
-	}
-	defer conn.Close(context.Background())
-	if err = manager.Retire(ctx, plan); err != nil {
-		t.Fatal("credential retirement", err)
-	}
-	if err = manager.Retire(ctx, plan); err != nil {
-		t.Fatal("retirement replay", err)
-	}
-	if err = manager.Provision(ctx, plan); err == nil {
-		t.Fatal("retired credentials resurrected")
-	}
-	_, err = conn.Exec(ctx, "SELECT * FROM fleet_trust")
-	var denied *pgconn.PgError
-	if !errors.As(err, &denied) || denied.Code != "42501" {
-		t.Fatal("existing connection kept table privileges", err)
-	}
-	if later, err := pgx.ConnectConfig(ctx, runtime); err == nil {
-		later.Close(ctx)
-		t.Fatal("retired login accepted")
-	}
-	if err = admin.QueryRow(ctx, "SELECT NOT rolcanlogin AND rolpassword IS NULL AND rolvaliduntil=$2 FROM pg_authid WHERE rolname=$1", plan.Activation.Username, originalExpiry).Scan(&unchanged); err != nil || !unchanged {
-		t.Fatal("retirement incomplete")
-	}
-	t.Log("non-superuser maintenance provisioned exact purpose roles with client-derived SCRAM; exact replay preserves password/expiry, wrong secrets and excess grants deny, retirement revokes existing/new sessions' authority")
 }

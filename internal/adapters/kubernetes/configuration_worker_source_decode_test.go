@@ -77,8 +77,8 @@ func TestConfigurationWorkerFleetDecoderCannotRenewOriginalInterval(t *testing.T
 		t.Fatal(err)
 	}
 	client := &PermissionClient{validator: validator, clusterID: ownerID(1), control: cfg.NamespaceRef{Name: "owners", UID: ownerID(2)}, now: func() time.Time { return start.Add(6 * time.Second) }}
-	source := &FleetSettingsClient{client: client, name: "fleet", uid: ownerID(3), installation: ownerID(4)}
-	wire := contracts.FleetSettings{SchemaVersion: "fleet-settings/v1", InstallationID: source.installation, IssuerEpoch: ownerID(5), Revision: 1,
+	source := &FleetSettingsClient{client: client, name: "fleet", uid: ownerID(3), installation: ownerID(4), epoch: ownerID(5)}
+	wire := contracts.FleetSettings{SchemaVersion: "fleet-settings/v1", Revision: 1,
 		Issuer: "https://identity.example.test", Clients: []string{"console"}, Subjects: []contracts.IdentitySubject{}, Groups: []string{"operators"}, DeliveryProfiles: []string{"ops"}, MaxActiveBootstraps: 8, MaxBootstrapHistory: 16, MaxClusters: 16}
 	raw, err := json.Marshal(wire)
 	if err != nil {

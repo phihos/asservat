@@ -11,10 +11,10 @@ import (
 	"asservat.local/asservat/internal/contracts"
 )
 
-// RunHubAPI starts the private owner subsystem and, only with the installer's
-// optional Public section (ADR-180), the public browser/MCP/download layer.
-// The installer owns the fixed protected projection; no flag or user request
-// can replace a provider endpoint, credential path or startup trust source.
+// RunHubAPI starts the private owner subsystem and, with the optional public
+// section of its Helm-rendered config (ADR-180), the public browser/MCP/
+// download layer. Inputs come from fixed mounts only; no flag or request can
+// replace a provider endpoint, credential path or trust source.
 func RunHubAPI(ctx context.Context, podUID string) (result error) {
 	phase, purpose := startupFiles, "none"
 	defer ownerStartupAnnotate(&phase, &purpose, &result)
@@ -24,9 +24,6 @@ func RunHubAPI(ctx context.Context, podUID string) (result error) {
 		return errors.Join(mounts.ErrUnavailable, err)
 	}
 	defer files.Close()
-	// Select only the explicit original public mode before unrelated credentials
-	// or worker/native constructors. The concrete loader independently verifies
-	// actual installation receipts and current identity before any SQL authority.
 	phase = startupInputs
 	mode, err := readOwnerInputs(ctx, files)
 	if err != nil {
@@ -36,7 +33,7 @@ func RunHubAPI(ctx context.Context, podUID string) (result error) {
 	// a promoted installed owner (with Native) runs the full composition.
 	if mode.config.Observation != nil && mode.config.Native == nil {
 		phase = startupObservationRuntime
-		d, err := NewOwnerObservationDeployment(ctx, files, podUID)
+		d, err := newOwnerObservationDeployment(ctx, files, podUID, mode)
 		if err != nil {
 			return errors.Join(mounts.ErrUnavailable, err)
 		}
@@ -52,12 +49,17 @@ func RunHubAPI(ctx context.Context, podUID string) (result error) {
 	}
 
 	phase = startupFullDeployment
-	d, err := NewOwnerDeployment(ctx, files, podUID)
+	d, err := newOwnerDeployment(ctx, files, podUID, mode)
 	if err != nil {
 		return errors.Join(mounts.ErrUnavailable, err)
 	}
 	defer d.Close()
 	phase = startupFullListener
+	stopReadiness, err := serveReadiness(ctx, d.Runtime.Ready)
+	if err != nil {
+		return errors.Join(mounts.ErrUnavailable, err)
+	}
+	defer stopReadiness()
 	listener, err := (&net.ListenConfig{KeepAlive: -1}).Listen(ctx, "tcp", net.JoinHostPort("", strconv.Itoa(d.Runtime.pool.Port)))
 	if err != nil {
 		return errors.Join(mounts.ErrUnavailable, err)

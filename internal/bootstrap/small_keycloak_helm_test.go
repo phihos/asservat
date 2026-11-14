@@ -26,7 +26,7 @@ func TestSmallKeycloakHelmUsesPreparedMaterialAndIndependentDatabase(t *testing.
 		t.Skip("Helm is required")
 	}
 	kc := map[string]any{"image": contracts.SmallKeycloakImage, "hostname": "https://identity.example:30443", "realm": "asservat", "tlsSecretName": "operator-identity-tls", "mcpRedirectURIs": []string{"http://127.0.0.1:42000/callback"}, "database": map[string]any{"host": "", "port": 5432, "name": "keycloak", "user": "keycloak", "credentialsSecretName": "", "rootsSecretName": "", "maxConnections": 5}, "service": map[string]any{"type": "NodePort", "nodePort": 30443}, "resources": map[string]any{"requests": map[string]string{"cpu": "100m", "memory": "512Mi"}, "limits": map[string]string{"cpu": "1", "memory": "1Gi"}}}
-	values := map[string]any{"services": map[string]any{"identity": map[string]any{"provider": "keycloak", "keycloak": kc}, "postgres": map[string]any{"provider": "bundled", "bundled": map[string]any{"image": "registry.example/postgres@sha256:" + strings.Repeat("b", 64)}}}, "bootstrap": smallServicesHelmBootstrap()}
+	values := smallServicesHelmValues(map[string]any{"identity": map[string]any{"provider": "keycloak", "keycloak": kc}, "postgres": map[string]any{"provider": "bundled", "bundled": map[string]any{"image": "registry.example/postgres@sha256:" + strings.Repeat("b", 64)}}})
 	render := func() ([]byte, error) {
 		t.Helper()
 		body, err := json.Marshal(values)
@@ -39,7 +39,7 @@ func TestSmallKeycloakHelmUsesPreparedMaterialAndIndependentDatabase(t *testing.
 		}
 		ctx, end := context.WithTimeout(t.Context(), 15*time.Second)
 		defer end()
-		return exec.CommandContext(ctx, helm, "template", "trial", "../../charts/asservat", "--namespace", "installation", "--kube-version", "1.35.0", "-f", path).CombinedOutput()
+		return exec.CommandContext(ctx, helm, "template", "trial", "../../charts/asservat", "--namespace", "installation", "--kube-version", "1.35.0", "-f", "testdata/helm-fixture.yaml", "-f", path).CombinedOutput()
 	}
 	read := func(raw []byte) (*apps.Deployment, *core.Service) {
 		t.Helper()

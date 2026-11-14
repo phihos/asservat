@@ -24,46 +24,46 @@ var _ liveapp.Sources = authapp.LiveSourceAuthority{}
 func (d *OwnerDeployment) newPublicLive(ctx context.Context) (presentation.LiveService, error) {
 	pc, dl := d.publicContext, d.publicDownloads
 	if pc == nil || dl == nil || dl.environment == nil || d.Runtime == nil {
-		return nil, mounts.ErrUnavailable
+		return nil, &fixedStepError{"live/pc", mounts.ErrUnavailable}
 	}
 	policy, e := dl.environment.DownloadPolicy(ctx)
 	if e != nil || !policy.Valid(time.Now()) {
-		return nil, mounts.ErrUnavailable
+		return nil, &fixedStepError{"live/policy", mounts.ErrUnavailable}
 	}
 	if policy.LiveRead == nil || len(policy.LiveRead.Projections) == 0 || len(policy.LiveRead.Clients) == 0 || len(policy.LiveRead.Ceilings) == 0 {
 		return nil, nil
 	}
 	candidates, ok := pc.investigation.RecordingSources.(liveCandidateReader)
 	if !ok {
-		return nil, mounts.ErrUnavailable
+		return nil, &fixedStepError{"live/candidates", mounts.ErrUnavailable}
 	}
 	policies, ok := pc.recordings.Inventory.Policies.(livePolicyReader)
 	if !ok {
-		return nil, mounts.ErrUnavailable
+		return nil, &fixedStepError{"live/policies", mounts.ErrUnavailable}
 	}
 	status, ok := pc.investigation.Targets.(liveSourceStatusReader)
 	if !ok {
-		return nil, mounts.ErrUnavailable
+		return nil, &fixedStepError{"live/status", mounts.ErrUnavailable}
 	}
 	remote, ok := pc.investigation.Targets.(liveRegionalReader)
 	if !ok {
-		return nil, mounts.ErrUnavailable
+		return nil, &fixedStepError{"live/remote", mounts.ErrUnavailable}
 	}
 	targets, ok := pc.investigation.Targets.(authapp.LiveWorkloads)
 	if !ok {
-		return nil, mounts.ErrUnavailable
+		return nil, &fixedStepError{"live/targets", mounts.ErrUnavailable}
 	}
 	grants, ok := pc.grants.Store.(authapp.LiveObservationGrants)
 	if !ok {
-		return nil, mounts.ErrUnavailable
+		return nil, &fixedStepError{"live/grants", mounts.ErrUnavailable}
 	}
 	registry, ok := d.Runtime.readiness.Registry.(*postgres.OwnerEnrollments)
 	if !ok {
-		return nil, mounts.ErrUnavailable
+		return nil, &fixedStepError{"live/registry", mounts.ErrUnavailable}
 	}
 	pool, e := d.public.open(ctx, "live-watch")
 	if e != nil {
-		return nil, e
+		return nil, &fixedStepError{"live/pool", e}
 	}
 	numeric, limits := publicLiveLimits(*policy.LiveRead)
 	ledger, e := postgres.NewLiveWatches(ctx, pool, policy.RootID, d.Runtime.binding.ProcessEpoch, registry, func(call context.Context) (fleet.OwnerCertificate, error) {
@@ -73,26 +73,26 @@ func (d *OwnerDeployment) newPublicLive(ctx context.Context) (presentation.LiveS
 		return d.Runtime.server.ServingCertificate()
 	}, numeric)
 	if e != nil {
-		return nil, e
+		return nil, &fixedStepError{"live/ledger", e}
 	}
 	manualWorks, ok := pc.collect.Recordings.(executionapp.LiveManualWorks)
 	if !ok {
-		return nil, mounts.ErrUnavailable
+		return nil, &fixedStepError{"live/manualWorks", mounts.ErrUnavailable}
 	}
 	manualHolders, ok := pc.investigation.Targets.(liveManualHolders)
 	if !ok {
-		return nil, mounts.ErrUnavailable
+		return nil, &fixedStepError{"live/manualHolders", mounts.ErrUnavailable}
 	}
 	catalog := liveCatalog{ongoing: liveSourceCatalog{root: policy.RootID, candidates: candidates, policies: policies, status: status, now: time.Now}, manual: liveManualCatalog{root: policy.RootID, works: manualWorks, recovery: pc.recovery, holders: manualHolders, now: time.Now}}
 	authority := authapp.LiveSourceAuthority{Diagnose: eventLog(os.Stderr, "live inventory refused"), RootID: policy.RootID, Targets: targets, Workloads: pc.permissions, Permissions: pc.permissions, Catalog: catalog, Accepted: pc.policies, Automation: pc.automation, ObservationGrants: grants, Environment: authapp.CurrentLiveEnvironment{RootID: policy.RootID, InstallationID: policy.InstallationID, AcceptedRoot: policy.LiveRead.Root, Policies: livePolicies(dl), Recovery: pc.recovery, Now: time.Now}, Now: time.Now}
 	service, e := liveapp.New(liveapp.Config{RootID: policy.RootID, OwnerID: d.Runtime.binding.ProcessEpoch, Keys: pc.mac, Now: time.Now, NewID: ownerRandomID, Limits: limits, MaxWatches: int(numeric.InstallationSlots), MaxControls: int(numeric.MaxControlRecords)}, authority, liveProjectionReader{remote: remote, now: time.Now}, ledger)
 	if e != nil {
-		return nil, e
+		return nil, &fixedStepError{"live/service", e}
 	}
 	d.closers = append(d.closers, service.Close)
 	routed, e := d.newLiveOwner(ctx, service, ledger, policy.RootID)
 	if e != nil {
-		return nil, e
+		return nil, &fixedStepError{"live/routed", e}
 	}
 	return routed, nil
 }

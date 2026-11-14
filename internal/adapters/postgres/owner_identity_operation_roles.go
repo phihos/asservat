@@ -130,7 +130,7 @@ func (s *OwnerIdentityOperationSQL) advanceOwnerIdentityRoleOperation(ctx contex
 		if !fresh {
 			return zero, cfg.ErrUnavailable
 		}
-		verifier, err := initialPasswordVerifier(InitialSQLLogin{Username: name, Password: material.Password})
+		verifier, err := sqlPasswordVerifier(SQLLogin{Username: name, Password: material.Password})
 		if err != nil {
 			return zero, err
 		}

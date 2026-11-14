@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/json"
 	"net/http"
 	"net/url"
 	"os"
@@ -16,7 +15,41 @@ import (
 	"asservat.local/asservat/internal/contracts"
 	value "asservat.local/asservat/internal/domain/fleet"
 	bao "github.com/openbao/openbao/api/v2"
+	"k8s.io/apimachinery/pkg/util/validation"
 )
+
+// ProviderLogin selects one component's OpenBao Kubernetes-auth roles by name
+// (Helm-native: chart constants shared with setup). The account binds by name;
+// the projected token file carries the role's audience.
+type ProviderLogin struct {
+	Provider       contracts.OwnerProviderEndpoint
+	AuthMount      string
+	Namespace      string
+	ServiceAccount string
+	// Roles maps each fixed purpose to its role (and policy) name.
+	Roles map[string]string
+}
+
+func (l ProviderLogin) valid(purposes ...string) bool {
+	if !keyName.MatchString(l.AuthMount) || l.AuthMount == "token" || len(validation.IsDNS1123Label(l.Namespace)) != 0 || len(validation.IsDNS1123Subdomain(l.ServiceAccount)) != 0 || len(l.Roles) != len(purposes) {
+		return false
+	}
+	seen := map[string]bool{}
+	for _, p := range purposes {
+		name := l.Roles[p]
+		if !keyName.MatchString(name) || seen[name] {
+			return false
+		}
+		seen[name] = true
+	}
+	return true
+}
+
+// FederationProviderKeys are the federation's audit Transit key and connector
+// PKI roles on the login's provider.
+type FederationProviderKeys struct {
+	AuditMount, AuditKey, PKIMount, ClientRole, ServerRole string
+}
 
 // InstalledFederationProviderEffects owns the federation's four provider
 // lifetimes (ADR-193): Kubernetes-auth logins with the projected federation
@@ -24,7 +57,7 @@ import (
 // and renewal runs only under the composition's current proof; crypto effects
 // borrow a token and never trigger a login.
 type InstalledFederationProviderEffects struct {
-	input                        contracts.FederationDeployment
+	keys                         FederationProviderKeys
 	files                        *os.Root
 	wrap, unwrap, client, server *ownerProviderLifetime
 	seal                         *Sealer
@@ -40,20 +73,15 @@ type InstalledFederationProviderEffects struct {
 }
 
 // NewInstalledFederationProviderEffects composes the four lifetimes. proof is
-// the federation's current native proof (hub workload guard and recovery);
-// its returned time bounds every login, renewal and borrowed effect.
-func NewInstalledFederationProviderEffects(ctx context.Context, input contracts.FederationDeployment, files *os.Root, proof func(context.Context) (time.Time, error)) (*InstalledFederationProviderEffects, error) {
-	if ctx == nil || ctx.Err() != nil || files == nil || proof == nil || input.ProviderAuthentication == nil ||
-		providerconfig.ValidateFederationProviderAuthentication(input, *input.ProviderAuthentication, time.Now()) != nil {
-		return nil, ErrKeyService
-	}
-	raw, err := json.Marshal(input)
-	var cloned contracts.FederationDeployment
-	if err != nil || json.Unmarshal(raw, &cloned) != nil {
+// the federation's current recovery observation; its returned time bounds
+// every login, renewal and borrowed effect.
+func NewInstalledFederationProviderEffects(ctx context.Context, login ProviderLogin, k FederationProviderKeys, concurrency int, files *os.Root, proof func(context.Context) (time.Time, error)) (*InstalledFederationProviderEffects, error) {
+	if ctx == nil || ctx.Err() != nil || files == nil || proof == nil || !login.valid(providerconfig.FederationProviderPurposes[:]...) || concurrency < 1 ||
+		!keyName.MatchString(k.AuditMount) || !keyName.MatchString(k.AuditKey) || !keyName.MatchString(k.PKIMount) || !keyName.MatchString(k.ClientRole) || !keyName.MatchString(k.ServerRole) || k.ClientRole == k.ServerRole {
 		return nil, ErrKeyService
 	}
 	root, cancel := context.WithCancel(ctx)
-	s := &InstalledFederationProviderEffects{input: cloned, files: files, root: root, cancel: cancel, closeDone: make(chan struct{})}
+	s := &InstalledFederationProviderEffects{keys: k, files: files, root: root, cancel: cancel, closeDone: make(chan struct{})}
 	complete := false
 	defer func() {
 		if !complete {
@@ -61,16 +89,15 @@ func NewInstalledFederationProviderEffects(ctx context.Context, input contracts.
 		}
 	}()
 	base := &http.Client{Transport: &http.Transport{}, Timeout: 5 * time.Second}
-	k := cloned.KeyService
 	for _, fixed := range []struct {
 		purpose string
 		target  **ownerProviderLifetime
 	}{{"audit-wrap", &s.wrap}, {"audit-unwrap", &s.unwrap}, {"client-sign", &s.client}, {"server-sign", &s.server}} {
-		control, err := newFederationProviderControl(cloned, *cloned.ProviderAuthentication, fixed.purpose, base, time.Now)
+		control, err := newKubernetesProviderControl(login.Provider, login.AuthMount, login.Roles[fixed.purpose], login.Namespace, login.ServiceAccount, base, time.Now)
 		if err != nil {
 			return nil, err
 		}
-		slot, err := newOwnerProviderLifetime(root, control, s.projectedJWT, ownerProviderCurrent(proof), cloned.Concurrency)
+		slot, err := newOwnerProviderLifetime(root, control, s.projectedJWT, ownerProviderCurrent(proof), concurrency)
 		if err != nil {
 			control.close()
 			return nil, err
@@ -103,14 +130,14 @@ func (s *InstalledFederationProviderEffects) Opener() *Opener { return s.open }
 // ConnectorIssuer returns one peer's connector leaf issuer over the shared
 // borrowed signing effect of its usage.
 func (s *InstalledFederationProviderEffects) ConnectorIssuer(usage string, profile value.ConnectorCredentialProfile) (*ConnectorCredentialIssuer, error) {
-	client, role := s.clientPKI, s.input.KeyService.ClientRole
+	client, role := s.clientPKI, s.keys.ClientRole
 	if usage == "server" {
-		client, role = s.serverPKI, s.input.KeyService.ServerRole
+		client, role = s.serverPKI, s.keys.ServerRole
 	}
 	if s == nil || client == nil || (usage != "client" && usage != "server") || !profile.Valid() || profile.Suspended {
 		return nil, value.ErrInvalid
 	}
-	return newConnectorCredentialIssuerWithClient(client, s.input.KeyService.PKIMount, role, usage, profile, time.Now)
+	return newConnectorCredentialIssuerWithClient(client, s.keys.PKIMount, role, usage, profile, time.Now)
 }
 
 func (s *InstalledFederationProviderEffects) projectedJWT(ctx context.Context) ([]byte, error) {
@@ -232,31 +259,12 @@ func (s *InstalledFederationProviderEffects) CloseAndJoin(ctx context.Context) e
 	return result
 }
 
-// newFederationProviderControl reuses the fixed login/self-control wire with
-// a role name derived only from the federation recipe.
-func newFederationProviderControl(in contracts.FederationDeployment, profile contracts.FederationProviderAuthentication, purpose string, client *http.Client, now func() time.Time) (*ownerProviderControl, error) {
-	if now == nil || client == nil || client.Jar != nil {
-		return nil, ErrKeyService
-	}
-	recipe, err := providerconfig.FederationProviderRecipeFor(in, profile)
-	if err != nil || recipe.Profile != profile {
-		return nil, ErrKeyService
-	}
-	var name string
-	for _, role := range recipe.Roles {
-		if role.Purpose == purpose {
-			name = role.Name
-		}
-	}
-	return newKubernetesProviderControl(contracts.OwnerProviderEndpoint{Endpoint: in.KeyService.Endpoint, Roots: in.KeyService.Roots}, profile.AuthMount, name, profile.Namespace.Name, profile.ServiceAccount, client, now)
-}
-
 // newKubernetesProviderControl is the fixed login/self-control transport for
-// one recipe-derived role: pinned provider roots only, no proxy, custom TLS
-// hook, cookie jar or redirect.
+// one named role: pinned provider roots only, no proxy, custom TLS hook,
+// cookie jar or redirect. The account binds by name.
 // ponytail: the owner and configuration controls keep their own copies of
 // this transport tail; fold them in here when one of them changes.
-func newKubernetesProviderControl(provider contracts.OwnerProviderEndpoint, mount, name, namespace string, account contracts.WorkerObjectReference, client *http.Client, now func() time.Time) (*ownerProviderControl, error) {
+func newKubernetesProviderControl(provider contracts.OwnerProviderEndpoint, mount, name, namespace, account string, client *http.Client, now func() time.Time) (*ownerProviderControl, error) {
 	if now == nil || client == nil || client.Jar != nil {
 		return nil, ErrKeyService
 	}
@@ -291,5 +299,5 @@ func newKubernetesProviderControl(provider contracts.OwnerProviderEndpoint, moun
 	h.Transport = transport
 	h.Timeout = 5 * time.Second
 	h.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-	return &ownerProviderControl{http: &h, endpoint: u.String(), mount: mount, role: name, namespace: namespace, account: account.Name, accountUID: account.UID, now: now}, nil
+	return &ownerProviderControl{http: &h, endpoint: u.String(), mount: mount, role: name, namespace: namespace, account: account, now: now}, nil
 }

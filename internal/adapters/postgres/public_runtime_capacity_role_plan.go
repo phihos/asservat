@@ -32,6 +32,9 @@ func publicRuntimeCapacityGrants(purpose string) ([]publicRuntimeGrant, bool) {
 			// ADR-219: shared query backing follows these existing publications.
 			"ensure_shared_context_query_capacity(uuid)",
 			"ensure_shared_context_query_allocation(uuid,uuid,text,text)",
+			// Helm-native decision 6: the hub-worker initializes the root.
+			"initialize_capacity_source(uuid,uuid,text,bytea,text,jsonb)",
+			"read_capacity_qualification(uuid)",
 		}
 	case "capacity-capture":
 		signatures = []string{

@@ -12,10 +12,11 @@ import (
 
 const workerNamespaceID = "33333333-3333-4333-8333-333333333333"
 
-// ADR-204 decision 2: with one pinned worker API in its own namespace, the
-// guarded worker profile source is read there, with that API's client and a
-// separate probe token; otherwise the hub namespace clients read it as before.
-func TestWorkerSourceClientsFollowTheWorkerNamespace(t *testing.T) {
+// ADR-204 decision 2: with one worker API in its own namespace, the worker
+// profile is read there with that API's client; a worker API pinned to the
+// hub namespace reads it with the hub client. No or several worker APIs name
+// no source.
+func TestWorkerSourceClientFollowsTheWorkerNamespace(t *testing.T) {
 	root, err := os.OpenRoot(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -30,13 +31,13 @@ func TestWorkerSourceClientsFollowTheWorkerNamespace(t *testing.T) {
 		}
 		return c
 	}
-	observer, probe := newClient(hub), newClient(hub)
+	observer := newClient(hub)
 	api := func(name, uid string) contracts.OwnerNativeWorkerAPI {
 		return contracts.OwnerNativeWorkerAPI{ClusterID: runtimeID, Namespace: contracts.WorkerObjectReference{Name: name, UID: uid}, Kubernetes: contracts.OwnerProviderEndpoint{Endpoint: "https://api.synthetic.invalid"}}
 	}
 	workers := api("asservat-downloads", workerNamespaceID)
-	if got := nativeKubernetesProbeTokenName(workers); got != "native-kube-probe-"+runtimeID+"-asservat-downloads.token" || got == nativeKubernetesTokenName(workers) {
-		t.Fatal("probe token name", got)
+	if got := nativeKubernetesTokenName(workers); got != "native-kube-asservat-downloads.token" {
+		t.Fatal("token name", got)
 	}
 	workerClient := newClient(cfg.NamespaceRef{Name: workers.Namespace.Name, UID: workers.Namespace.UID})
 	for _, mode := range []string{"unconfigured", "no-native", "worker-namespace", "hub-namespace", "two-apis", "missing-client"} {
@@ -57,23 +58,19 @@ func TestWorkerSourceClientsFollowTheWorkerNamespace(t *testing.T) {
 				clients = map[ownerNativeAPIKey]*kube.PermissionClient{}
 			}
 			d := &OwnerDeployment{inputs: &ownerInputs{providerInputs: &providerInputs{files: root}, config: contracts.OwnerDeployment{Native: n}}, shared: publicShared{workers: clients}}
-			var closers []func()
-			o, p, control, err := d.workerSourceClients(observer, probe, hub, &closers)
-			for _, c := range closers {
-				c()
-			}
+			o, err := d.workerSourceClient(observer, hub)
 			switch mode {
-			case "unconfigured", "no-native", "hub-namespace":
-				if err != nil || o != observer || p != probe || control != hub || len(closers) != 0 {
-					t.Fatal("hub namespace source clients changed", err)
+			case "hub-namespace":
+				if err != nil || o != observer {
+					t.Fatal("hub namespace source client changed", err)
 				}
 			case "worker-namespace":
-				if err != nil || o != workerClient || p == nil || p == observer || p == probe || p == workerClient || control != (cfg.NamespaceRef{Name: "asservat-downloads", UID: workerNamespaceID}) || len(closers) != 1 {
-					t.Fatal("worker namespace source not read with its own pinned clients", err)
+				if err != nil || o != workerClient {
+					t.Fatal("worker namespace source not read with its own client", err)
 				}
 			default:
-				if err == nil || o != nil || p != nil {
-					t.Fatal("ambiguous or unpinned worker namespace accepted", mode)
+				if err == nil || o != nil {
+					t.Fatal("missing, ambiguous or unknown worker namespace accepted", mode)
 				}
 			}
 		})

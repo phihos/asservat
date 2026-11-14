@@ -13,14 +13,13 @@ func TestBundledServicesRejectInvalidSelectedInputsBeforeHook(t *testing.T) {
 	if _, err := exec.LookPath("helm"); err != nil {
 		t.Skip("Helm is required")
 	}
-	for _, mode := range []string{"postgres-image", "identity-image", "store-image", "jdbc-option", "bundled-database-secret", "bootstrap-disabled", "workload-cluster"} {
+	for _, mode := range []string{"postgres-image", "identity-image", "store-image", "jdbc-option", "bundled-database-secret", "workload-cluster"} {
 		t.Run(mode, func(t *testing.T) {
 			pg := map[string]any{"image": "registry.example/postgres@sha256:" + strings.Repeat("a", 64)}
 			db := map[string]any{}
 			kc := map[string]any{"hostname": "https://identity.example", "tlsSecretName": "identity-tls", "database": db}
 			store := map[string]any{}
-			b := smallServicesHelmBootstrap()
-			values := map[string]any{"bootstrap": b, "services": map[string]any{"postgres": map[string]any{"provider": "bundled", "bundled": pg}, "identity": map[string]any{"provider": "keycloak", "keycloak": kc}, "objectStore": map[string]any{"provider": "seaweedfs", "seaweedfs": store}}}
+			values := smallServicesHelmValues(map[string]any{"postgres": map[string]any{"provider": "bundled", "bundled": pg}, "identity": map[string]any{"provider": "keycloak", "keycloak": kc}, "objectStore": map[string]any{"provider": "seaweedfs", "seaweedfs": store}, "keyService": map[string]any{"provider": "openbao"}})
 			switch mode {
 			case "postgres-image":
 				pg["image"] = ""
@@ -32,8 +31,6 @@ func TestBundledServicesRejectInvalidSelectedInputsBeforeHook(t *testing.T) {
 				db["name"] = "keycloak?sslmode=disable"
 			case "bundled-database-secret":
 				db["credentialsSecretName"] = "another-database-password"
-			case "bootstrap-disabled":
-				b["enabled"] = false
 			case "workload-cluster":
 				values["mode"] = "cluster"
 			}

@@ -56,7 +56,7 @@ func TestCapacitySchedulingLeaseRetainsBlockedChildPastFormerShutdownTimer(t *te
 	if err != nil {
 		t.Fatal(err)
 	}
-	leader, err := NewReconciliationLeader(client, "reconcile", ownerID(1), ownerID(3))
+	leader, err := NewReconciliationLeader(client, "reconcile", ownerID(3))
 	if err != nil {
 		t.Fatal(err)
 	}

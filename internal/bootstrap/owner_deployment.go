@@ -15,6 +15,7 @@ import (
 
 	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/transport/edge"
 
 	"asservat.local/asservat/internal/adapters/kms"
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
@@ -28,6 +29,7 @@ import (
 	configuration "asservat.local/asservat/internal/domain/configuration"
 	value "asservat.local/asservat/internal/domain/fleet"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"k8s.io/client-go/kubernetes"
 )
 
 // OwnerDeployment composes only the private owner subsystem. Installation and
@@ -64,12 +66,21 @@ type OwnerDeployment struct {
 	publicContext   *publicContext
 	publicDownloads *publicDownloads
 	publicHandler   http.Handler
+	// publicProxyTLS: the operator's proxy terminates public TLS (ADR-327).
+	publicProxyTLS bool
 	// policyTrigger is the ADR-228 restart trigger; RunPublic supervises it.
 	policyTrigger *captureapp.PolicyTrigger
 	// recordingCollect is the ADR-248 collect loop; RunPublic supervises it.
 	recordingCollect *RegionalRecordingCollect
 	history          *captureapp.HistoryParameterService
-	shared           publicShared
+	// localBootstrap issues the combined-mode connector's own bootstrap
+	// record; RunPublic supervises it.
+	localBootstrap *app.LocalClusterBootstrap
+	shared         publicShared
+	// localControls are the control documents this process wrote (the
+	// hub-local download workers'); the trust catalog holds them beside the
+	// mounted worker-controls.json.
+	localControls [][]byte
 	// ADR-182: backend and public input roots (the owner root in the legacy
 	// layout) and, in the installed layout, the provider effects.
 	backend, publicFiles *providerInputs
@@ -88,17 +99,24 @@ func ownerRandomID() string {
 
 // NewOwnerDeployment borrows an installation-owned mount root. The caller
 // retains it until Run/Close has stopped all use. No path comes from a request.
-func NewOwnerDeployment(ctx context.Context, files *os.Root, podUID string) (result *OwnerDeployment, err error) {
+func NewOwnerDeployment(ctx context.Context, files *os.Root, podUID string) (*OwnerDeployment, error) {
+	if ctx == nil || files == nil {
+		return nil, mounts.ErrUnavailable
+	}
+	in, err := readOwnerInputs(ctx, files)
+	if err != nil {
+		return nil, ownerStartupError(startupInputs, "none", err)
+	}
+	return newOwnerDeployment(ctx, files, podUID, in)
+}
+
+// newOwnerDeployment composes the deployment from already loaded inputs.
+func newOwnerDeployment(ctx context.Context, files *os.Root, podUID string, in *ownerInputs) (result *OwnerDeployment, err error) {
 	// The innermost phase names a startup failure (ADR-194 qualification).
 	phase, purpose := startupProcessPreconditions, "none"
 	defer ownerStartupAnnotate(&phase, &purpose, &err)
-	if ctx == nil || ctx.Err() != nil || files == nil || !authorization.UUID(podUID) || disableWorkerCoreDumps() != nil {
+	if ctx == nil || ctx.Err() != nil || files == nil || in == nil || !authorization.UUID(podUID) || disableWorkerCoreDumps() != nil {
 		return nil, mounts.ErrUnavailable
-	}
-	phase = startupInputs
-	in, err := readOwnerInputs(ctx, files)
-	if err != nil {
-		return nil, err
 	}
 	// ADR-182: an identity-only installed owner is the observation deployment;
 	// only a promoted installed input (with Native) reaches this composition.
@@ -151,11 +169,7 @@ func NewOwnerDeployment(ctx context.Context, files *os.Root, podUID string) (res
 	}
 	if in.config.Public != nil {
 		phase = startupPublicPools
-		manifest, err := readPublicRuntimeManifest(startup, in, d.publicFiles)
-		if err != nil {
-			return nil, err
-		}
-		d.public = &publicPools{in: d.publicFiles, manifest: manifest, governor: governor}
+		d.public = &publicPools{in: d.publicFiles, installation: in.config.InstallationID, governor: governor}
 		d.closers = append(d.closers, d.public.Close)
 	}
 	var parts *ownerIdentityParts
@@ -199,6 +213,36 @@ func NewOwnerDeployment(ctx context.Context, files *os.Root, podUID string) (res
 	reader, err := postgres.NewWorkerRouting(startup, pools["routing"], c.PermissionRootID, c.InstallationID)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
+	}
+	if in.offer != nil && in.offer.ownersAddress != "" {
+		// The combined-mode regional executor dials the accepted owner pool.
+		if err = in.offer.setOwners(parts.pool, parts.revision, parts.issuerRoots); err != nil {
+			return nil, &fixedStepError{"regional-offer-owners", err}
+		}
+		api, e := kubernetes.NewForConfig(in.kubernetes(contracts.HubAPIKubernetesTokenFile))
+		if e != nil {
+			return nil, mounts.ErrUnavailable
+		}
+		stored, e := in.offer.ensure(startup, api)
+		if e != nil {
+			return nil, e
+		}
+		local, e := localCatalogCluster(startup, api, c, in.offer, stored)
+		if e != nil {
+			return nil, e
+		}
+		in.local = &local
+	}
+	if in.downloadControl != nil && c.Public != nil {
+		api, e := kubernetes.NewForConfig(in.kubernetes(contracts.HubAPIKubernetesTokenFile))
+		if e != nil {
+			return nil, mounts.ErrUnavailable
+		}
+		raw, e := in.downloadControl.publish(startup, api, c.InstallationID, c.ClusterID, parts.pool, parts.issuerRoots, c.Public.WorkerPKI.Roots)
+		if e != nil {
+			return nil, e
+		}
+		d.localControls = [][]byte{raw}
 	}
 	d.trust, err = mtls.NewWorkerTrustCatalog(c.InstallationID, nil)
 	if err != nil {
@@ -247,6 +291,11 @@ func NewOwnerDeployment(ctx context.Context, files *os.Root, podUID string) (res
 		}
 		closers = nil
 		phase = startupPublicContext
+		if in.downloadControl != nil {
+			if err = d.hubLocalPathTemplate(startup, observer, parts.ownerRevision); err != nil {
+				return nil, err
+			}
+		}
 		// ADR-208: preview capability and catalog reads get their own clients
 		// with the opening limiter; on the owner's shared clients the capability
 		// read alone took 1-2 s of a preview's five seconds (local run 3).
@@ -255,14 +304,15 @@ func NewOwnerDeployment(ctx context.Context, files *os.Root, podUID string) (res
 		if e != nil {
 			return nil, mounts.ErrUnavailable
 		}
-		publicProbe, e := kube.NewPermissionClient(kube.WithOpeningBurst(in.kubernetes("kube-probe.token")), c.ClusterID, control, time.Now)
-		if e != nil {
-			return nil, mounts.ErrUnavailable
-		}
-		d.publicContext, err = newPublicContext(startup, in, d.publicFiles, d.providers, d.public, publicObserver, publicProbe, d.shared, catalog, parts.audit, &closers)
+		d.publicContext, err = newPublicContext(startup, in, d.publicFiles, d.providers, d.public, publicObserver, nil, d.shared, catalog, parts.audit, &closers)
 		d.closers = append(d.closers, closers...)
 		if err != nil {
 			return nil, &fixedStepError{"public-context", err}
+		}
+		if in.offer != nil && d.publicContext.fleet != nil {
+			if d.localBootstrap, err = newLocalClusterBootstrap(startup, in, d.public, d.publicContext.fleet, d.providers.BootstrapChannel()); err != nil {
+				return nil, err
+			}
 		}
 		nativeConfig.ContextStarts = d.publicContext.starts
 		if nativeConfig.ContextStarts.Authenticator, err = contextStartOwnerAuthenticator(in, c, guard, pool, configs, ledgers["registry"], &d.contextStartStats); err != nil {
@@ -310,6 +360,7 @@ func NewOwnerDeployment(ctx context.Context, files *os.Root, podUID string) (res
 		if err == nil {
 			phase = startupPublicHandler
 			d.publicHandler, err = newPublicHandler(startup, d, a)
+			d.publicProxyTLS = c.Public.ProxyTLS
 		}
 		d.closers = append(d.closers, closers...)
 		if err != nil {
@@ -340,7 +391,7 @@ func (d *OwnerDeployment) refreshWorkerTrust(ctx context.Context) ([32]byte, err
 	if err != nil || wire.Format != contracts.OwnerWorkerTrustFormat || wire.Controls == nil || len(wire.Controls) > 256 {
 		return zero, mounts.ErrUnavailable
 	}
-	if err = d.trust.Replace(wire.Controls); err != nil {
+	if err = d.trust.Replace(append(wire.Controls, d.localControls...)); err != nil {
 		return zero, mounts.ErrUnavailable
 	}
 	d.catalogDigest = digest
@@ -486,7 +537,16 @@ func (d *OwnerDeployment) RunPublic(listener net.Listener) error {
 	d.owners.Add(1)
 	d.mu.Unlock()
 	defer d.owners.Done()
-	server := &http.Server{Handler: d.publicHandler, TLSConfig: publicTLS(d.publicFiles), ReadHeaderTimeout: 5 * time.Second, IdleTimeout: time.Minute, MaxHeaderBytes: 32 << 10, BaseContext: func(net.Listener) context.Context { return d.root }}
+	base := d.root
+	server := &http.Server{Handler: d.publicHandler, ReadHeaderTimeout: 5 * time.Second, IdleTimeout: time.Minute, MaxHeaderBytes: 32 << 10}
+	if d.publicProxyTLS {
+		// ADR-327: TLS ended at the operator's Ingress/Gateway; requests
+		// on this listener count as secure, forwarded headers still do not.
+		base = edge.WithTLSProxy(d.root)
+	} else {
+		server.TLSConfig = publicTLS(d.publicFiles)
+	}
+	server.BaseContext = func(net.Listener) context.Context { return base }
 	shutdown := func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		_ = server.Shutdown(ctx)
@@ -511,6 +571,13 @@ func (d *OwnerDeployment) RunPublic(listener net.Listener) error {
 			_ = d.recordingCollect.Run(d.root)
 		}()
 	}
+	if d.localBootstrap != nil {
+		d.owners.Add(1)
+		go func() {
+			defer d.owners.Done()
+			_ = d.localBootstrap.Run(d.root, eventLog(os.Stderr, "local cluster bootstrap"))
+		}()
+	}
 	if d.history != nil {
 		d.owners.Add(1)
 		go func() {
@@ -518,7 +585,12 @@ func (d *OwnerDeployment) RunPublic(listener net.Listener) error {
 			_ = d.history.Run(d.root, eventLog(os.Stderr, "history retirement refused"))
 		}()
 	}
-	err := server.ServeTLS(listener, "", "")
+	var err error
+	if d.publicProxyTLS {
+		err = server.Serve(listener)
+	} else {
+		err = server.ServeTLS(listener, "", "")
+	}
 	if stop() {
 		d.cancel()
 		shutdown()

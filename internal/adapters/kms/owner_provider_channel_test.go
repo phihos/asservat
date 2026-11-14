@@ -17,7 +17,7 @@ func TestOwnerProviderChannelTransportAdmitsOnlySingleRecords(t *testing.T) {
 		return ownerProviderLease{}, ErrKeyService
 	}}
 	endpoint, _ := url.Parse("https://keys.invalid")
-	transport := &ownerProviderEffectTransport{next: lease, endpoint: *endpoint, path: "/v1/fleet-kv/data/connector/10000000-0000-4000-8000-000000000001/", records: true}
+	transport := &ownerProviderEffectTransport{next: lease, endpoint: *endpoint, path: "/v1/fleet-kv/data/connector/10000000-0000-4000-8000-000000000001/", mode: providerPathRecords}
 	try := func(method, path string) {
 		r, _ := http.NewRequest(method, "https://keys.invalid"+path, nil)
 		_, _ = transport.RoundTrip(r)
@@ -30,6 +30,8 @@ func TestOwnerProviderChannelTransportAdmitsOnlySingleRecords(t *testing.T) {
 		{"LIST", base},
 		{http.MethodGet, "/v1/fleet-kv/metadata/connector/10000000-0000-4000-8000-000000000001/10000000-0000-4000-8000-000000000002"},
 		{http.MethodGet, "/v1/fleet-kv/data/connector/10000000-0000-4000-8000-000000000009/10000000-0000-4000-8000-000000000002"},
+		{http.MethodGet, base + "10000000-0000-4000-8000-000000000002?version=2"},
+		{http.MethodPost, base + "10000000-0000-4000-8000-000000000002?version=1"},
 	} {
 		try(refused.method, refused.path)
 	}
@@ -38,7 +40,9 @@ func TestOwnerProviderChannelTransportAdmitsOnlySingleRecords(t *testing.T) {
 	}
 	try(http.MethodGet, base+"10000000-0000-4000-8000-000000000002")
 	try(http.MethodPost, base+"10000000-0000-4000-8000-000000000002")
-	if reached != 2 {
+	// The local bootstrap reads the record's original version back.
+	try(http.MethodGet, base+"10000000-0000-4000-8000-000000000002?version=1")
+	if reached != 3 {
 		t.Fatal("single-record GET and POST did not reach the lease", reached)
 	}
 }

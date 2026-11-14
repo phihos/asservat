@@ -3,6 +3,7 @@ package kubernetes
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 	"testing"
@@ -203,5 +204,54 @@ func TestCapacitySourceRetainsOngoingLimitsInProtectedDesiredDigest(t *testing.T
 	}
 	if c.Snapshot.Policies[0].Budget != nil {
 		t.Fatal("invalid cap supplied typed budget")
+	}
+}
+
+// The pool and budget policy exactly as charts/asservat/templates/hub-capacity.yaml
+// renders them from examples/helm/context-trial-profile.yaml (an absent
+// scope.clusterID means the hub), with the metadata a real API server adds.
+func TestCapacitySourceReadsHelmRenderedObjects(t *testing.T) {
+	const poolSpec = `{"capacity":{"bytes":8589934592,"objects":16000},"capacityAssurance":"qualifiedReservedBackend","maxUploadRequestsPerSecond":20,"protectedAllocations":[{"budgetPolicyRef":"trial-apps","protectedPerWorkload":{"bytes":1073741824,"objects":2000},"workloadSlots":2}],"safetyHeadroom":{"bytes":1073741824,"objects":2000},"sharedBurst":{"bytes":1073741824,"objects":2000},"storageProfileRef":"trial-dedicated","systemReserve":{"bytes":2147483648,"objects":6000},"upload":{"burstBytes":16777216,"bytesPerSecond":16777216}}`
+	const policySpec = `{"namespaceEnvelope":{"maxObjects":6000,"maxStoredBytes":3221225472,"maxWorkloadAccounts":2},"node":{"impactProfileRef":"standard-node","maxConcurrentExpensive":1,"maxQueuedExpensive":1,"maxSpoolBytes":16777216,"recoveryHealthySeconds":60,"sampleIntervalSeconds":5,"unhealthySamples":3,"upload":{"burstBytes":8388608,"bytesPerSecond":8388608}},"poolRef":"trial","scope":{"namespaceSelector":{"matchLabels":{"asservat-trial":"true"}}},"workload":{"contextReserve":{"bytes":12353536,"objects":32},"dump":{"burst":1,"maxInputBytesPerRollingHour":1048576,"maxStartsPerRollingHour":1,"minimumIntervalSeconds":900},"hardLimit":{"bytes":1610612736,"objects":3000},"maxConcurrentExpensive":1,"maxQueueAgeSeconds":30,"maxQueuedExpensive":1,"maxSpoolBytes":16777216,"maxUploadRequestsPerSecond":10,"onFull":"RejectNewExpensive","protected":{"bytes":1073741824,"objects":2000},"upload":{"burstBytes":8388608,"bytesPerSecond":8388608}}}`
+	object := func(kind, name, uid, spec string) map[string]any {
+		var m map[string]any
+		if json.Unmarshal([]byte(spec), &m) != nil {
+			t.Fatal("fixture JSON")
+		}
+		meta := map[string]any{"name": name, "namespace": permissionControl.Name, "uid": uid, "generation": 1, "resourceVersion": "1234",
+			"creationTimestamp": "2026-11-13T10:00:00Z",
+			"labels":            map[string]string{"app.kubernetes.io/name": "asservat", "app.kubernetes.io/component": "capacity", "app.kubernetes.io/managed-by": "Helm", "helm.sh/chart": "asservat-0.1.0-dev.1"},
+			"annotations":       map[string]string{"meta.helm.sh/release-name": "asservat", "meta.helm.sh/release-namespace": permissionControl.Name},
+			"managedFields":     []any{map[string]any{"manager": "helm", "operation": "Update", "apiVersion": "asservat.io/v1alpha1", "fieldsType": "FieldsV1", "fieldsV1": map[string]any{"f:spec": map[string]any{}}}}}
+		return map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": kind, "metadata": meta, "spec": m}
+	}
+	pool, policy := object("EvidenceStoragePool", "trial", "pool-uid", poolSpec), object("EvidenceBudgetPolicy", "trial-apps", "policy-uid", policySpec)
+	f := newPermissionFixture(t, func(w http.ResponseWriter, r *http.Request) bool {
+		if strings.HasSuffix(r.URL.Path, "/evidencestoragepools") {
+			permissionReply(w, permissionList("EvidenceStoragePool", "1300", "", pool))
+			return true
+		}
+		if strings.HasSuffix(r.URL.Path, "/evidencebudgetpolicies") {
+			permissionReply(w, permissionList("EvidenceBudgetPolicy", "1300", "", policy))
+			return true
+		}
+		return false
+	})
+	f.clock.Store(time.Now().UTC().UnixNano())
+	s, e := NewCapacitySource(f.client)
+	if e != nil {
+		t.Fatal(e)
+	}
+	got, e := s.ReadCapacitySource(context.Background())
+	if e != nil {
+		var fixed interface{ FixedStep() string }
+		step := ""
+		if errors.As(e, &fixed) {
+			step = fixed.FixedStep()
+		}
+		t.Fatalf("Helm-rendered capacity source refused at %q: %v", step, e)
+	}
+	if !got.Valid(f.client.now()) || len(got.Snapshot.Pools) != 1 || len(got.Snapshot.Policies) != 1 {
+		t.Fatal("Helm-rendered capacity source observation is invalid")
 	}
 }

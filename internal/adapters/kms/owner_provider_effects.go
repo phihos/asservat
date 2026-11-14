@@ -37,16 +37,16 @@ type ownerProviderEffects struct {
 }
 
 func newOwnerProviderEffects(ctx context.Context, input contracts.OwnerDeployment, profile contracts.OwnerProviderAuthentication, pool value.OwnerPool, issuerRoots *x509.CertPool, jwt TokenSource, proof ownerProviderCurrent, client *http.Client, concurrency int, now func() time.Time) (*ownerProviderEffects, error) {
-	if now == nil || !pool.Valid() || pool.InstallationID != input.InstallationID || pool.ClusterID != input.ClusterID || pool.Namespace != input.Namespace.Name || pool.NamespaceUID != input.Namespace.UID || pool.ServiceAccount != profile.ServiceAccount.Name || pool.AccountUID != profile.ServiceAccount.UID {
-		return nil, ErrKeyService
+	if now == nil || !pool.Valid() || pool.InstallationID != input.InstallationID || pool.ClusterID != input.ClusterID || pool.Namespace != input.Namespace.Name || pool.NamespaceUID != input.Namespace.UID || pool.ServiceAccount != profile.ServiceAccount.Name {
+		return nil, providerStep("pool", ErrKeyService)
 	}
 	verifier, err := mtls.NewOwnerPeerVerifierForPool(issuerRoots, pool, now)
 	if err != nil {
-		return nil, err
+		return nil, providerStep("peer-verifier", err)
 	}
 	slots, err := newOwnerProviderLifetimes(ctx, input, profile, jwt, proof, client, concurrency, now)
 	if err != nil {
-		return nil, err
+		return nil, providerStep("lifetimes", err)
 	}
 	out := &ownerProviderEffects{lifetimes: slots}
 	complete := false
@@ -57,12 +57,12 @@ func newOwnerProviderEffects(ctx context.Context, input contracts.OwnerDeploymen
 	}()
 	wrap, err := newOwnerProviderEffectClient(slots.auditWrap, input.KeyService.AuditMount+"/encrypt/"+input.KeyService.AuditKey)
 	if err != nil {
-		return nil, err
+		return nil, providerStep("audit-wrap", err)
 	}
 	out.seal = &Sealer{client: wrap, mount: input.KeyService.AuditMount, key: input.KeyService.AuditKey, reference: input.KeyService.AuditMount + "/" + input.KeyService.AuditKey}
 	unwrap, err := newOwnerProviderEffectClient(slots.auditUnwrap, input.KeyService.AuditMount+"/decrypt/"+input.KeyService.AuditKey)
 	if err != nil {
-		return nil, err
+		return nil, providerStep("audit-unwrap", err)
 	}
 	out.open = &Opener{client: unwrap, mount: input.KeyService.AuditMount, key: input.KeyService.AuditKey, reference: input.KeyService.AuditMount + "/" + input.KeyService.AuditKey}
 	for _, fixed := range []struct {
@@ -76,7 +76,7 @@ func newOwnerProviderEffects(ctx context.Context, input contracts.OwnerDeploymen
 		path := input.KeyService.PKIMount + "/sign/" + fixed.role
 		c, e := newOwnerProviderEffectClient(fixed.slot, path)
 		if e != nil {
-			return nil, e
+			return nil, providerStep(fixed.usage+"-sign", e)
 		}
 		issuer := &OwnerCertificateIssuer{client: c, path: path, installation: pool.InstallationID, cluster: pool.ClusterID, epoch: pool.IssuerEpoch, usage: fixed.usage, verify: verifier, now: now}
 		if pool.NativeBootstrap != "" {
@@ -86,20 +86,20 @@ func newOwnerProviderEffects(ctx context.Context, input contracts.OwnerDeploymen
 	}
 	if p := input.Public; p != nil && slots.public[0] != nil {
 		if err = out.public(p, pool); err != nil {
-			return nil, err
+			return nil, providerStep("public", err)
 		}
 	}
 	if f := input.Public; f != nil && f.Fleet != nil && slots.fleet != nil {
 		c, e := newOwnerProviderChannelClient(slots.fleet, f.Fleet.ChannelMount+"/data/"+contracts.OwnerFleetChannelPrefix+"/"+input.InstallationID+"/")
 		if e != nil {
-			return nil, e
+			return nil, providerStep("fleet-channel", e)
 		}
 		if out.channel, e = newBootstrapChannelWithClient(c, f.Fleet.ChannelMount, contracts.OwnerFleetChannelPrefix, f.Fleet.DeliveryProfile, input.InstallationID, now); e != nil {
-			return nil, e
+			return nil, providerStep("fleet-channel", e)
 		}
 	}
 	if ctx.Err() != nil {
-		return nil, ErrKeyService
+		return nil, providerStep("canceled", ErrKeyService)
 	}
 	complete = true
 	return out, nil
@@ -162,17 +162,32 @@ func (s *ownerProviderEffects) close(ctx context.Context) error {
 }
 
 func newOwnerProviderEffectClient(slot *ownerProviderLifetime, path string) (*bao.Client, error) {
-	return newOwnerProviderClient(slot, path, false)
+	return newOwnerProviderClient(slot, path, providerPathPOST)
 }
+
+// newOwnerProviderReadClient confines a borrowed lifetime to GET of exactly
+// path (a public key read).
+func newOwnerProviderReadClient(slot *ownerProviderLifetime, path string) (*bao.Client, error) {
+	return newOwnerProviderClient(slot, path, providerPathGET)
+}
+
+// providerPathMode is the one request shape a confined client may send.
+type providerPathMode uint8
+
+const (
+	providerPathPOST providerPathMode = iota
+	providerPathRecords
+	providerPathGET
+)
 
 // newOwnerProviderChannelClient confines a borrowed lifetime to GET and POST
 // of single records directly below prefix: one UUID segment, no listing,
 // metadata or deeper path (the ADR-193 bootstrap credential channel).
 func newOwnerProviderChannelClient(slot *ownerProviderLifetime, prefix string) (*bao.Client, error) {
-	return newOwnerProviderClient(slot, prefix, true)
+	return newOwnerProviderClient(slot, prefix, providerPathRecords)
 }
 
-func newOwnerProviderClient(slot *ownerProviderLifetime, path string, records bool) (*bao.Client, error) {
+func newOwnerProviderClient(slot *ownerProviderLifetime, path string, mode providerPathMode) (*bao.Client, error) {
 	if slot == nil || slot.control == nil || slot.control.http == nil {
 		return nil, ErrKeyService
 	}
@@ -190,7 +205,7 @@ func newOwnerProviderClient(slot *ownerProviderLifetime, path string, records bo
 	// transport, never the unvalidated caller's client or another purpose's token.
 	transport := base.Clone()
 	leased := &ownerProviderLeaseTransport{base: transport, source: slot.borrow, now: control.now}
-	httpClient := &http.Client{Timeout: 10 * time.Second, Transport: &ownerProviderEffectTransport{next: leased, endpoint: *endpoint, path: "/v1/" + path, records: records}, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	httpClient := &http.Client{Timeout: 10 * time.Second, Transport: &ownerProviderEffectTransport{next: leased, endpoint: *endpoint, path: "/v1/" + path, mode: mode}, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	config := bao.NewConfig()
 	config.Address, config.Timeout, config.MaxRetries = control.endpoint, 10*time.Second, 0
 	config.HttpClient = httpClient
@@ -210,8 +225,9 @@ type ownerProviderEffectTransport struct {
 	next     *ownerProviderLeaseTransport
 	endpoint url.URL
 	path     string
-	// records admits GET or POST of path + one UUID instead of POST to path.
-	records bool
+	// mode admits POST to path, GET or POST of path + one UUID
+	// (providerPathRecords) or GET of path (providerPathGET).
+	mode providerPathMode
 }
 
 func (t *ownerProviderEffectTransport) CloseIdleConnections() {
@@ -220,16 +236,28 @@ func (t *ownerProviderEffectTransport) CloseIdleConnections() {
 	}
 }
 func (t *ownerProviderEffectTransport) RoundTrip(r *http.Request) (*http.Response, error) {
-	if t == nil || t.next == nil || r == nil || r.URL == nil || r.URL.Scheme != t.endpoint.Scheme || r.URL.Host != t.endpoint.Host || r.URL.User != nil || r.URL.RawQuery != "" || r.URL.ForceQuery || r.URL.Fragment != "" || r.Host != "" && r.Host != t.endpoint.Host {
+	if t == nil || t.next == nil || r == nil || r.URL == nil || r.URL.Scheme != t.endpoint.Scheme || r.URL.Host != t.endpoint.Host || r.URL.User != nil || r.URL.ForceQuery || r.URL.Fragment != "" || r.Host != "" && r.Host != t.endpoint.Host {
 		return nil, ErrKeyService
 	}
-	if t.records {
+	// Only a channel record read names its original version (KV v2
+	// ?version=1); every other request carries no query.
+	if r.URL.RawQuery != "" && (t.mode != providerPathRecords || r.Method != http.MethodGet || r.URL.RawQuery != "version=1") {
+		return nil, ErrKeyService
+	}
+	switch t.mode {
+	case providerPathRecords:
 		record, ok := strings.CutPrefix(r.URL.EscapedPath(), t.path)
 		if !ok || !authorization.UUID(record) || r.Method != http.MethodGet && r.Method != http.MethodPost {
 			return nil, ErrKeyService
 		}
-	} else if r.Method != http.MethodPost || r.URL.EscapedPath() != t.path {
-		return nil, ErrKeyService
+	case providerPathGET:
+		if r.Method != http.MethodGet || r.URL.EscapedPath() != t.path {
+			return nil, ErrKeyService
+		}
+	default:
+		if r.Method != http.MethodPost || r.URL.EscapedPath() != t.path {
+			return nil, ErrKeyService
+		}
 	}
 	return t.next.RoundTrip(r)
 }
@@ -243,4 +271,22 @@ func (s *ownerProviderEffects) joinClosed() {
 	s.open.Close()
 	s.server.Close()
 	s.client.Close()
+}
+
+// providerStepError names the failed provider composition step; it keeps
+// a nested step, so diagnostics show where startup stopped.
+type providerStepError struct {
+	step string
+	err  error
+}
+
+func providerStep(step string, err error) error { return &providerStepError{step, err} }
+func (e *providerStepError) Error() string      { return "provider " + e.step }
+func (e *providerStepError) Unwrap() error      { return e.err }
+func (e *providerStepError) FixedStep() string {
+	var nested interface{ FixedStep() string }
+	if errors.As(e.err, &nested) {
+		return e.step + "/" + nested.FixedStep()
+	}
+	return e.step
 }

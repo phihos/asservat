@@ -35,11 +35,11 @@ type NodeAttester struct {
 
 var _ delivery.NodeAttester = (*NodeAttester)(nil)
 
-func NewNodeAttester(c *PermissionClient, installationID, daemonSet, serviceAccount string) (*NodeAttester, error) {
-	if c == nil || installationID == "" || len(validation.IsDNS1123Subdomain(daemonSet)) != 0 || len(validation.IsDNS1123Subdomain(serviceAccount)) != 0 {
+func NewNodeAttester(c *PermissionClient, daemonSet, serviceAccount string) (*NodeAttester, error) {
+	if c == nil || c.clusterID == "" || len(validation.IsDNS1123Subdomain(daemonSet)) != 0 || len(validation.IsDNS1123Subdomain(serviceAccount)) != 0 {
 		return nil, delivery.ErrNodeInvalid
 	}
-	return &NodeAttester{client: c, audience: contracts.NodeTokenAudience(installationID), namespace: c.control.Name, daemonSet: daemonSet, serviceAccount: serviceAccount}, nil
+	return &NodeAttester{client: c, audience: contracts.NodeTokenAudience, namespace: c.control.Name, daemonSet: daemonSet, serviceAccount: serviceAccount}, nil
 }
 
 type nodeTokenUser struct {

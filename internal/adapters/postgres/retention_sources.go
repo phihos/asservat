@@ -191,7 +191,7 @@ func (s *RetentionSources) AcceptRetention(ctx context.Context, t app.RetentionT
 			return err
 		}
 		if t.Fence.Sequence == 0 {
-			if err = app.CheckInitialRetention(t.List.Snapshot, t.Fence.Source.ProtectionDigest, t.Review, after); err != nil {
+			if err = app.CheckInitialRetention(t.List.Snapshot, t.Fence.Source.ProtectionDigest, after); err != nil {
 				return err
 			}
 		}

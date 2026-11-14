@@ -3,92 +3,78 @@ package kubernetes
 import (
 	"encoding/json"
 	"slices"
+	"strings"
 	"testing"
 
 	"asservat.local/asservat/internal/contracts"
 )
 
-func TestSmallOpenBaoSetupSudoOnlyTwoExactAuthMounts(t *testing.T) {
+func smallOpenBaoPolicyPaths(t *testing.T) map[string][]string {
+	t.Helper()
 	var policy struct {
 		Path map[string]struct {
 			Capabilities []string `json:"capabilities"`
 		} `json:"path"`
 	}
-	if json.Unmarshal([]byte(smallOpenBaoSetupPolicy()), &policy) != nil {
+	if json.Unmarshal([]byte(SmallOpenBaoSetupPolicy("trial")), &policy) != nil {
 		t.Fatal("invalid policy")
 	}
-	exact := map[string]bool{"sys/auth/" + contracts.SmallOpenBaoConfigurationAuthMount: false, "sys/auth/" + contracts.SmallOpenBaoOwnerAuthMount: false}
+	out := map[string][]string{}
 	for path, rule := range policy.Path {
-		if slices.Contains(rule.Capabilities, "delete") {
-			t.Fatal("setup gained delete")
+		out[path] = rule.Capabilities
+	}
+	return out
+}
+
+func TestSmallOpenBaoSetupSudoOnlyTwoExactAuthMounts(t *testing.T) {
+	paths := smallOpenBaoPolicyPaths(t)
+	sudo := 0
+	for path, capabilities := range paths {
+		if slices.Contains(capabilities, "delete") {
+			t.Fatal("setup gained delete", path)
 		}
-		if slices.Contains(rule.Capabilities, "sudo") {
-			if _, ok := exact[path]; !ok {
-				t.Fatal("sudo outside exact two auth mounts")
+		if slices.Contains(capabilities, "sudo") {
+			if path != "sys/auth/"+contracts.SmallOpenBaoConfigurationAuthMount && path != "sys/auth/"+contracts.SmallOpenBaoOwnerAuthMount {
+				t.Fatal("sudo outside the two component auth mounts", path)
 			}
-			if !slices.Equal(rule.Capabilities, []string{"create", "read", "update", "sudo"}) {
-				t.Fatal("auth mount capability changed")
-			}
-			exact[path] = true
+			sudo++
 		}
 	}
-	for _, found := range exact {
-		if !found {
-			t.Fatal("missing exact auth administration")
+	if sudo != 2 {
+		t.Fatal("missing auth mount administration")
+	}
+	for _, path := range []string{"sys/auth/*", "sys/auth/" + contracts.SmallOpenBaoSetupMount, "sys/raw/*", "auth/token/create", "auth/token/create/*", "sys/policies/acl/*", "sys/policies/acl/trial-*", "sys/policies/acl/" + contracts.SmallOpenBaoSetupPolicy, contracts.SmallOpenBaoBackendPolicyPath} {
+		if _, ok := paths[path]; ok {
+			t.Fatal("broader administration path", path)
 		}
 	}
-	for _, path := range []string{"sys/auth/*", "sys/auth/asservat-*", "sys/auth/asservat-configuration/tune", "sys/auth/asservat-owner/tune", "sys/auth/asservat-setup", "sys/raw/*", "auth/token/create"} {
-		if _, ok := policy.Path[path]; ok {
-			t.Fatal("broader administration path")
+}
+
+// The setup login cannot rewrite its own policy or the backend marker: the
+// policy globs are per component.
+func TestSmallOpenBaoSetupPoliciesArePerComponent(t *testing.T) {
+	for path := range smallOpenBaoPolicyPaths(t) {
+		if strings.HasPrefix(path, "sys/policies/acl/") && !slices.ContainsFunc([]string{"hub-api", "hub-worker", "federation", "publisher"}, func(c string) bool { return path == "sys/policies/acl/trial-"+c+"-*" }) {
+			t.Fatal("policy path outside the component prefixes", path)
 		}
 	}
 }
 
 func TestSmallOpenBaoSetupMountsMatchBundledConsumers(t *testing.T) {
-	var policy struct {
-		Path map[string]struct {
-			Capabilities []string `json:"capabilities"`
-		} `json:"path"`
-	}
-	if err := json.Unmarshal([]byte(smallOpenBaoSetupPolicy()), &policy); err != nil {
-		t.Fatal(err)
-	}
+	paths := smallOpenBaoPolicyPaths(t)
 	for _, mount := range []string{"asservat-audit", "public-transit", "owner-pki", "connector-pki", "worker-pki", "fleet-bootstrap"} {
-		if !slices.Equal(policy.Path["sys/mounts/"+mount].Capabilities, []string{"create", "read", "update"}) {
+		if !slices.Equal(paths["sys/mounts/"+mount], []string{"create", "read", "update"}) {
 			t.Fatal("bundled consumer mount unavailable", mount)
 		}
 	}
 	for _, mount := range []string{"asservat-audit", "public-transit"} {
-		if !slices.Equal(policy.Path[mount+"/keys/*"].Capabilities, []string{"create", "read", "update"}) {
-			t.Fatal("distinct audit/public key preparation unavailable")
+		// Transit key creation is an update (no existence check); there is
+		// still no delete, export or backup capability.
+		if !slices.Equal(paths[mount+"/keys/*"], []string{"create", "read", "update"}) {
+			t.Fatal("transit keys must be create/read/update only", mount)
 		}
 	}
-	for _, old := range []string{"transit", "pki-owner", "pki-connector", "pki-worker", "bootstrap"} {
-		if _, ok := policy.Path["sys/mounts/"+old]; ok {
-			t.Fatal("unconsumed draft mount remains")
-		}
-	}
-	if contracts.SmallOpenBaoAuditMount == contracts.SmallOpenBaoTransitMount {
-		t.Fatal("audit and session/work mounts must remain distinct")
-	}
-}
-
-func TestSmallOpenBaoSetupReadsOnlyExistingConnectorBootstrapData(t *testing.T) {
-	var policy struct {
-		Path map[string]struct {
-			Capabilities []string `json:"capabilities"`
-		} `json:"path"`
-	}
-	if err := json.Unmarshal([]byte(smallOpenBaoSetupPolicy()), &policy); err != nil {
-		t.Fatal(err)
-	}
-	path := contracts.SmallOpenBaoBootstrapMount + "/data/connector/*"
-	if !slices.Equal(policy.Path[path].Capabilities, []string{"read"}) {
-		t.Fatal("missing read-only existing bootstrap delivery")
-	}
-	for _, p := range []string{contracts.SmallOpenBaoBootstrapMount + "/*", contracts.SmallOpenBaoBootstrapMount + "/data/*", contracts.SmallOpenBaoBootstrapMount + "/metadata/*"} {
-		if _, ok := policy.Path[p]; ok {
-			t.Fatal("broadened bootstrap data administration")
-		}
+	if _, ok := paths[contracts.SmallOpenBaoBootstrapMount+"/data/*"]; ok {
+		t.Fatal("setup reads bootstrap channel data")
 	}
 }

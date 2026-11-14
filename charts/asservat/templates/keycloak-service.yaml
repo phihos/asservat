@@ -8,7 +8,7 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ printf "%s-keycloak" .Values.bootstrap.name }}
+  name: {{ printf "%s-keycloak" (include "asservat.name" .) }}
   namespace: {{ .Release.Namespace }}
 spec:
   type: {{ $kc.service.type }}

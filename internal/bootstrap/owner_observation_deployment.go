@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	"asservat.local/asservat/internal/domain/identity"
 	"context"
 	"crypto/x509"
 	"errors"
@@ -13,9 +14,7 @@ import (
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/mounts"
 	"asservat.local/asservat/internal/adapters/mtls"
-	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
-	auditapp "asservat.local/asservat/internal/application/audit"
 	app "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/authorization"
@@ -40,16 +39,22 @@ type OwnerObservationDeployment struct {
 	closeErr  error
 }
 
-func NewOwnerObservationDeployment(ctx context.Context, files *os.Root, podUID string) (result *OwnerObservationDeployment, err error) {
-	phase, purpose := startupProcessPreconditions, "none"
-	defer ownerStartupAnnotate(&phase, &purpose, &err)
-	if ctx == nil || ctx.Err() != nil || files == nil || !authorization.UUID(podUID) || disableWorkerCoreDumps() != nil {
-		return nil, errors.Join(mounts.ErrUnavailable, err)
+func NewOwnerObservationDeployment(ctx context.Context, files *os.Root, podUID string) (*OwnerObservationDeployment, error) {
+	if ctx == nil || files == nil {
+		return nil, mounts.ErrUnavailable
 	}
-	phase = startupInputs
 	in, err := readOwnerInputs(ctx, files)
 	if err != nil {
-		return nil, err
+		return nil, ownerStartupError(startupInputs, "none", err)
+	}
+	return newOwnerObservationDeployment(ctx, files, podUID, in)
+}
+
+func newOwnerObservationDeployment(ctx context.Context, files *os.Root, podUID string, in *ownerInputs) (result *OwnerObservationDeployment, err error) {
+	phase, purpose := startupProcessPreconditions, "none"
+	defer ownerStartupAnnotate(&phase, &purpose, &err)
+	if ctx == nil || ctx.Err() != nil || files == nil || in == nil || !authorization.UUID(podUID) || disableWorkerCoreDumps() != nil {
+		return nil, errors.Join(mounts.ErrUnavailable, err)
 	}
 	phase = startupDeploymentMode
 	if in.config.Observation == nil || in.config.Native != nil {
@@ -208,11 +213,20 @@ type ownerIdentityParts struct {
 	providers       *kms.InstalledOwnerProviderEffects
 	// audit is the legacy static audit store and keys; empty with providers.
 	audit publicAuditStore
+	// issuerRoots are roots' accepted DER certificates and revision the
+	// accepted owner configuration's source generation.
+	issuerRoots [][]byte
+	revision    int64
+	// ownerRevision is the accepted owner configuration's full revision.
+	ownerRevision identity.Revision
 }
 
-// composeOwnerIdentity runs the installed identity startup unchanged: native
-// identity proof before any SQL credential, verified identity pools, accepted
-// configuration and the enrollment services. d owns every closer.
+// composeOwnerIdentity opens the owner's SQL credential, reads the accepted
+// owner configuration and builds the enrollment services and provider
+// effects. Helm-native installation (ADR-328): the mounted inputs are
+// trusted as Kubernetes delivers them; no installation journal, launch
+// receipt, projection identity or admission guard is verified. d owns every
+// closer.
 func composeOwnerIdentity(root, startup context.Context, files *os.Root, podUID string, d *OwnerDeployment, in *ownerInputs, governor *postgres.SQLConnectionGovernor, backend []string, phase *ownerStartupPhase, purpose *string) (parts *ownerIdentityParts, err error) {
 	parts = &ownerIdentityParts{}
 	defer func() {
@@ -221,135 +235,50 @@ func composeOwnerIdentity(root, startup context.Context, files *os.Root, podUID 
 		}
 	}()
 	c := in.config
-	activation := *c.Observation.Activation
+	if c.ProviderAuthentication == nil || !authorization.UUID(podUID) {
+		return parts, mounts.ErrUnavailable
+	}
 	control := configuration.NamespaceRef{Name: c.Namespace.Name, UID: c.Namespace.UID}
 	*phase = startupObserverClient
 	// ADR-197 diagnostics: the shared observer's call count and transport
 	// time, reported periodically by the owner deployment's Run.
-	observerConfig := in.kubernetes("kube-observer.token")
+	observerConfig := in.kubernetes(contracts.HubAPIKubernetesTokenFile)
 	observerConfig.Wrap(d.observerStats.wrap)
 	observer, err := kube.NewPermissionClient(observerConfig, c.ClusterID, control, time.Now)
 	if err != nil {
 		return parts, errors.Join(mounts.ErrUnavailable, err)
 	}
-	*phase = startupProbeClient
-	probe, err := kube.NewPermissionClient(in.kubernetes("kube-probe.token"), c.ClusterID, control, time.Now)
-	if err != nil {
-		return parts, errors.Join(mounts.ErrUnavailable, err)
-	}
-	actors := make([]configuration.KubernetesActor, len(c.WorkloadGuard.Administrators))
-	for i, a := range c.WorkloadGuard.Administrators {
-		actors[i] = configuration.KubernetesActor{Kind: a.Kind, Name: a.Name}
-	}
-	g := c.WorkloadGuard
-	schedulingLeases := make([]configuration.OwnerSchedulingLease, len(c.SchedulingLeases))
-	for i, l := range c.SchedulingLeases {
-		schedulingLeases[i] = configuration.OwnerSchedulingLease{Lease: l.Lease, ServiceAccount: l.ServiceAccount}
-	}
-	configurationProbes := make([]configuration.OwnerConfigurationProbe, len(c.ConfigurationProbes))
-	for i, p := range c.ConfigurationProbes {
-		configurationProbes[i] = configuration.OwnerConfigurationProbe{ConfigMap: p.ConfigMap, ServiceAccount: p.ServiceAccount}
-	}
-	var initialHistory *configuration.OwnerInitialHistoryProbe
-	if p := c.InitialHistoryProbe; p != nil {
-		initialHistory = &configuration.OwnerInitialHistoryProbe{Namespace: configuration.NamespaceRef{Name: p.Namespace.Name, UID: p.Namespace.UID}, ServiceAccount: p.ServiceAccount.Name, ServiceAccountUID: p.ServiceAccount.UID, Configuration: p.Configuration}
-	}
-	*phase = startupStartInputs
-	starts, err := ownerDeploymentStarts(c.APIContextStarts)
-	if err != nil {
-		return parts, errors.Join(mounts.ErrUnavailable, err)
-	}
-	*phase = startupCapacityInputs
-	capacityProbe, err := ownerDeploymentCapacityProbe(c.CapacityProbe)
-	if err != nil {
-		return parts, errors.Join(mounts.ErrUnavailable, err)
-	}
-	*phase = startupWorkloadGuard
-	administration := configuration.OwnerWorkloadAdministration{Name: g.Name, Deployment: activation.Input.Deployment.Name, DeploymentUID: activation.Input.Deployment.UID, ControlNamespace: control, Administrators: actors, ConfigurationProbes: configurationProbes, SchedulingLeases: schedulingLeases, InitialHistoryProbe: initialHistory, APIContextStarts: starts, CapacityProbe: capacityProbe}
-	pin := kube.GuardPin{PolicyUID: g.PolicyUID, PolicyGeneration: g.PolicyGeneration, BindingUID: g.BindingUID, BindingResourceVersion: g.BindingResourceVersion}
-	guard, err := kube.NewOwnerWorkloadProtection(observer, probe, administration, pin)
-	if err != nil {
-		return parts, errors.Join(mounts.ErrUnavailable, err)
-	}
-
-	*phase = startupMountedIdentity
-	mounted, manifest, err := readSelectedOwnerIdentityProviders(startup, files, c)
-	if err != nil {
-		return parts, errors.Join(mounts.ErrUnavailable, err)
-	}
-	defer func() {
-		for _, b := range mounted {
-			clear(b)
-		}
-	}()
-	*phase = startupIdentityReader
-	identityReader, err := kube.NewInstalledOwnerIdentityReader(observer, guard, c, activation, mountedOwnerPodToken{in}, podUID)
-	if err != nil {
-		return parts, errors.Join(mounts.ErrUnavailable, err)
-	}
-	*phase = startupNativeIdentity
-	// The installer may still be recording this launch in the resource
-	// journal, so a journal that changed between the proof's reads is proved
-	// again, in full, within the same startup deadline (journey run 33).
-	identityUntil, err := retryChanged(startup, func() (time.Time, error) { return identityReader.VerifyStartup(startup, manifest, mounted) })
-	if err != nil || !time.Now().Before(identityUntil) {
-		return parts, errors.Join(mounts.ErrUnavailable, err)
-	}
-	if c.Public != nil && c.ProviderAuthentication != nil {
-		// ADR-194: the installed public root must be the referenced immutable
-		// product projection before any public credential is opened.
-		*phase = startupPublicProjection
-		check, end := context.WithDeadline(startup, identityUntil)
-		public, e := readPublicProjectionFiles(check, d.publicFiles.files)
-		if e == nil {
-			e = identityReader.VerifyPublicProjection(check, c.Public.RuntimeProjection, public)
-		}
-		for _, b := range public {
-			clear(b)
-		}
-		end()
-		if e != nil {
-			return parts, errors.Join(mounts.ErrUnavailable, e)
-		}
-	}
-	// SQL credentials are not used until the exact current original projection,
-	// live Pod/token and native guard have been independently established. Every
-	// role check retains that proof's original deadline, never a new interval.
-	verified, stopVerified := context.WithDeadline(startup, identityUntil)
+	verified, stopVerified := context.WithCancel(startup)
 	parts.verified, parts.stop = verified, stopVerified
 	pools := map[string]*pgxpool.Pool{}
-	users := map[string]bool{}
 	// ADR-184: a promoted hub-api also opens its backend pools here, under the
-	// same name, SCRAM, governor and manifest checks as the identity pools.
-	roles := contracts.OwnerIdentityRolePurposes()
-	for _, role := range roles {
+	// same name, SCRAM and governor checks as the identity pools.
+	for _, role := range contracts.OwnerIdentityRolePurposes() {
 		*purpose = role
 		*phase = startupSqlCredential
-		c, err := in.sqlConfig(verified, "sql-"+role+".json")
-		if err != nil || c == nil || users[c.ConnConfig.User] {
+		config, err := in.sqlConfig(verified, "sql-"+role+".json")
+		if err != nil || config == nil {
 			return parts, errors.Join(mounts.ErrUnavailable, err)
 		}
 		*phase = startupSqlRoleName
-		expected, known := postgres.OwnerIdentityRoleName(in.config.InstallationID, role)
-		if !known || c.ConnConfig.User != expected {
-			return parts, errors.Join(mounts.ErrUnavailable, err)
+		expected, known := postgres.OwnerIdentityRoleName(c.InstallationID, role)
+		if !known || config.ConnConfig.User != expected {
+			return parts, mounts.ErrUnavailable
 		}
-		c.MaxConns, c.MinConns = contracts.OwnerIdentityPoolConnections, 0
-		c.ConnConfig.RequireAuth = "scram-sha-256"
-		users[c.ConnConfig.User] = true
-		// A promoted installed owner governs its identity pools too (ADR-177).
-		if governor != nil && governor.Govern(c, true) != nil {
+		config.MaxConns, config.MinConns = contracts.OwnerIdentityPoolConnections, 0
+		config.ConnConfig.RequireAuth = "scram-sha-256"
+		if governor != nil && governor.Govern(config, true) != nil {
 			return parts, mounts.ErrUnavailable
 		}
 		*phase = startupSqlPool
-		pool, err := pgxpool.NewWithConfig(verified, c)
+		pool, err := pgxpool.NewWithConfig(verified, config)
 		if err != nil {
 			return parts, errors.Join(mounts.ErrUnavailable, err)
 		}
 		pools[role] = pool
 		d.closers = append(d.closers, pool.Close)
 		*phase = startupSqlRoleProof
-		if err = postgres.VerifyOwnerIdentityCredential(verified, pool, manifest, role); err != nil {
+		if err = postgres.VerifySessionRole(verified, pool, expected); err != nil {
 			return parts, errors.Join(mounts.ErrUnavailable, err)
 		}
 	}
@@ -369,9 +298,11 @@ func composeOwnerIdentity(root, startup context.Context, files *os.Root, podUID 
 	if err != nil || !current.Valid(time.Now()) || current.Configuration.Suspended || current.Configuration.Pool.Namespace != c.Namespace.Name {
 		return parts, errors.Join(mounts.ErrUnavailable, err)
 	}
-	*phase = startupOriginalPool
 	pool := current.Configuration.Pool
-	if pool.Deployment != activation.Input.Deployment.Name || pool.DeploymentUID != activation.Input.Deployment.UID || pool.ServiceAccount != activation.Input.ServiceAccount.Name || pool.AccountUID != activation.Input.ServiceAccount.UID || verified.Err() != nil {
+	*phase = startupWorkloadGuard
+	administration := configuration.OwnerWorkloadAdministration{Deployment: pool.Deployment, DeploymentUID: pool.DeploymentUID, ControlNamespace: control}
+	guard, err := kube.NewOwnerWorkloadProtection(observer, nil, administration, kube.GuardPin{})
+	if err != nil {
 		return parts, errors.Join(mounts.ErrUnavailable, err)
 	}
 	*phase = startupIssuerRoots
@@ -395,12 +326,9 @@ func composeOwnerIdentity(root, startup context.Context, files *os.Root, podUID 
 	if err != nil {
 		return parts, errors.Join(mounts.ErrUnavailable, err)
 	}
-	// ADR-173: the readiness loop proves enrollment back to back (about 52
-	// observer and 12 probe calls a check) and alone held the shared observer
-	// at its 20 QPS limit, so request paths queued behind it and overran their
-	// five seconds. It gets its own clients, guard and attester; the proofs
-	// are unchanged.
-	if parts.readinessProofs, err = ownerReadinessProofs(in, c.ClusterID, control, administration, pin, configs, &d.readinessStats); err != nil {
+	// ADR-173: the readiness loop gets its own client and attester so its
+	// proofs never queue request paths behind it.
+	if parts.readinessProofs, err = ownerReadinessProofs(in, c.ClusterID, control, administration, configs, &d.readinessStats); err != nil {
 		return parts, errors.Join(mounts.ErrUnavailable, err)
 	}
 	*phase = startupEndpoints
@@ -409,85 +337,18 @@ func composeOwnerIdentity(root, startup context.Context, files *os.Root, podUID 
 		return parts, errors.Join(mounts.ErrUnavailable, err)
 	}
 	routes := &app.OwnerRoutes{Configurations: configs, Endpoints: endpoints, Now: time.Now}
-	var audits auditapp.OwnerEnrollmentWriter
-	issuers := map[string]*kms.OwnerCertificateIssuer{}
-	if c.ProviderAuthentication != nil {
-		*phase = startupProviderEffects
-		// ADR-173: provider login and renewal use their own clients, guard copy
-		// and reader. The native self-proof is reused for
-		// kube.OwnerProtectionReuse (2026-10-23 revision), so a login rarely
-		// repeats it.
-		providerReader, err := ownerProviderProofReader(in, c, control, guard, activation, podUID, &d.providerStats)
-		if err != nil {
-			return parts, errors.Join(mounts.ErrUnavailable, err)
-		}
-		// Each audit object write reads its storage credential under the same
-		// reused native proof, on its own clients so it never queues behind a
-		// provider refresh. Within the reuse window a read is one Secret GET.
-		credentialReader, err := ownerProviderProofReader(in, c, control, guard, activation, podUID, &d.credentialStats)
-		if err != nil {
-			return parts, errors.Join(mounts.ErrUnavailable, err)
-		}
-		parts.providers, err = kms.NewInstalledOwnerProviderEffects(root, c, files, providerReader, credentialReader, configs, current.Configuration)
-		if err != nil {
-			return parts, errors.Join(mounts.ErrUnavailable, err)
-		}
-		*phase = startupProviderAudit
-		auditObjects, e := newInstalledOwnerEnrollmentAudit(c, parts.providers)
-		if e != nil {
-			return parts, errors.Join(mounts.ErrUnavailable, e)
-		}
-		audits = auditObjects
-		d.closers = append(d.closers, auditObjects.Close)
-		issuers["server"], issuers["client"] = parts.providers.ServerIssuer(), parts.providers.ClientIssuer()
-	} else {
-		*phase = startupAuditHttp
-		h, err := ownerHTTP(c.KeyService.Endpoint, c.KeyService.Roots)
-		if err != nil {
-			return parts, err
-		}
-		d.closers = append(d.closers, h.CloseIdleConnections)
-		*phase = startupAuditSealer
-		seal, err := kms.NewSealerWithTokenSource(c.KeyService.Endpoint, c.KeyService.AuditMount, c.KeyService.AuditKey, in.token("audit-wrap.token"), h)
-		if err != nil {
-			return parts, errors.Join(mounts.ErrUnavailable, err)
-		}
-		d.closers = append(d.closers, seal.Close)
-		*phase = startupAuditOpener
-		open, err := kms.NewOpenerWithTokenSource(c.KeyService.Endpoint, c.KeyService.AuditMount, c.KeyService.AuditKey, in.token("audit-unwrap.token"), h)
-		if err != nil {
-			return parts, errors.Join(mounts.ErrUnavailable, err)
-		}
-		d.closers = append(d.closers, open.Close)
-		*phase = startupAuditStoreHttp
-		storageHTTP, err := ownerHTTP(c.AuditStore.Endpoint, c.AuditStore.Roots)
-		if err != nil {
-			return parts, err
-		}
-		d.closers = append(d.closers, storageHTTP.CloseIdleConnections)
-		*phase = startupAuditStore
-		store, err := objectstore.NewVersionedAudit(c.AuditStore.Endpoint, c.AuditStore.Region, c.AuditStore.Bucket, mountedStorage{in.providerInputs}, storageHTTP)
-		if err != nil {
-			return parts, errors.Join(mounts.ErrUnavailable, err)
-		}
-		d.closers = append(d.closers, store.Close)
-		audits = &objectstore.OwnerEnrollmentAuditObjects{Store: store, Seal: seal, Open: open}
-		parts.audit = publicAuditStore{store: store, seal: seal, open: open, keys: h}
-		for _, usage := range []string{"server", "client"} {
-			role := c.KeyService.ServerRole
-			if usage == "client" {
-				role = c.KeyService.ClientRole
-			}
-			*phase, *purpose = startupCertificateIssuer, usage
-			issuer, e := kms.NewOwnerCertificateIssuerForPoolWithTokenSource(c.KeyService.Endpoint, c.KeyService.PKIMount, role, pool, usage, roots, in.token("owner-"+usage+"-sign.token"), h, time.Now)
-			if e != nil {
-				return parts, errors.Join(mounts.ErrUnavailable, e)
-			}
-			d.closers = append(d.closers, issuer.Close)
-			issuers[usage] = issuer
-		}
+	*phase = startupProviderEffects
+	parts.providers, err = kms.NewInstalledOwnerProviderEffects(root, c, files, configs, current.Configuration)
+	if err != nil {
+		return parts, errors.Join(mounts.ErrUnavailable, err)
 	}
-	*purpose = "none"
+	*phase = startupProviderAudit
+	audits, err := newInstalledOwnerEnrollmentAudit(c, parts.providers)
+	if err != nil {
+		return parts, errors.Join(mounts.ErrUnavailable, err)
+	}
+	d.closers = append(d.closers, audits.Close)
+	issuers := map[string]*kms.OwnerCertificateIssuer{"server": parts.providers.ServerIssuer(), "client": parts.providers.ClientIssuer()}
 	*phase = startupPeerVerifier
 	verifier, err := mtls.NewOwnerPeerVerifierForPool(roots, pool, time.Now)
 	if err != nil {
@@ -495,85 +356,26 @@ func composeOwnerIdentity(root, startup context.Context, files *os.Root, podUID 
 	}
 	services := map[string]*app.OwnerEnrollmentCoordinator{}
 	for _, usage := range []string{"server", "client"} {
-		issuer := issuers[usage]
-		services[usage] = &app.OwnerEnrollmentCoordinator{Verifier: verifier, Proofs: proofs, Ledger: ledgers["enrollment"], Activation: ledgers["activation"], Audit: audits, Acknowledgements: ledgers["audit"], Issuer: issuer, Now: time.Now}
+		services[usage] = &app.OwnerEnrollmentCoordinator{Verifier: verifier, Proofs: proofs, Ledger: ledgers["enrollment"], Activation: ledgers["activation"], Audit: audits, Acknowledgements: ledgers["audit"], Issuer: issuers[usage], Now: time.Now}
 	}
-	parts.observer, parts.probe, parts.guard, parts.pools, parts.configs, parts.pool, parts.roots = observer, probe, guard, pools, configs, pool, roots
+	parts.observer, parts.guard, parts.pools, parts.configs, parts.pool, parts.roots = observer, guard, pools, configs, pool, roots
+	parts.issuerRoots, parts.revision, parts.ownerRevision = current.Configuration.IssuerRoots, current.Configuration.Revision.Generation, current.Configuration.Revision
 	parts.ledgers, parts.proofs, parts.endpoints, parts.routes, parts.services = ledgers, proofs, endpoints, routes, services
 	return parts, nil
 }
 
-// readPublicProjectionFiles reads the product projection's fixed keys from the
-// mounted public root: one login per hub purpose, the manifest and the audit
-// keys. The operator Secret's keys in the same root are not read here.
-func readPublicProjectionFiles(ctx context.Context, root *os.Root) (map[string][]byte, error) {
-	names := []string{contracts.PublicRuntimeCredentialManifestFile, contracts.PublicAuditKeysFile}
-	for _, purpose := range contracts.PublicRuntimeHubRolePurposes() {
-		names = append(names, "sql-public-"+purpose+".json")
-	}
-	out := make(map[string][]byte, len(names))
-	for _, name := range names {
-		b, err := mounts.Read(ctx, root, name, contracts.PublicRuntimeRoleMaxBytes)
-		if err != nil {
-			for _, v := range out {
-				clear(v)
-			}
-			return nil, mounts.ErrUnavailable
-		}
-		out[name] = b
-	}
-	return out, nil
-}
-
 // ownerReadinessProofs builds the readiness loop's enrollment attester on its
-// own observer and probe clients, with the same guard administration and pin.
-func ownerReadinessProofs(in *ownerInputs, cluster string, control configuration.NamespaceRef, administration configuration.OwnerWorkloadAdministration, pin kube.GuardPin, configs *postgres.OwnerConfigurations, stats *regionalAPIStats) (*kube.OwnerEnrollmentAttester, error) {
-	observerConfig, probeConfig := in.kubernetes("kube-observer.token"), in.kubernetes("kube-probe.token")
+// own observer client, with the same workload administration.
+func ownerReadinessProofs(in *ownerInputs, cluster string, control configuration.NamespaceRef, administration configuration.OwnerWorkloadAdministration, configs *postgres.OwnerConfigurations, stats *regionalAPIStats) (*kube.OwnerEnrollmentAttester, error) {
+	observerConfig := in.kubernetes(contracts.HubAPIKubernetesTokenFile)
 	observerConfig.Wrap(stats.wrap)
-	probeConfig.Wrap(stats.wrap)
 	observer, err := kube.NewPermissionClient(observerConfig, cluster, control, time.Now)
 	if err != nil {
 		return nil, err
 	}
-	probe, err := kube.NewPermissionClient(probeConfig, cluster, control, time.Now)
-	if err != nil {
-		return nil, err
-	}
-	guard, err := kube.NewOwnerWorkloadProtection(observer, probe, administration, pin)
+	guard, err := kube.NewOwnerWorkloadProtection(observer, nil, administration, kube.GuardPin{})
 	if err != nil {
 		return nil, err
 	}
 	return kube.NewOwnerEnrollmentAttester(observer, configs, guard, mountedOwnerPodToken{in})
-}
-
-// ownerProviderProofReader is the provider effects' own identity reader, on
-// separate observer and probe clients with the same guard plan and pins.
-func ownerProviderProofReader(in *ownerInputs, c contracts.OwnerDeployment, control configuration.NamespaceRef, guard *kube.OwnerWorkloadProtection, activation contracts.OwnerIdentityActivation, podUID string, stats *regionalAPIStats) (*kube.InstalledOwnerIdentityReader, error) {
-	observerConfig, probeConfig := in.kubernetes("kube-observer.token"), in.kubernetes("kube-probe.token")
-	observerConfig.Wrap(stats.wrap)
-	probeConfig.Wrap(stats.wrap)
-	observer, err := kube.NewPermissionClient(observerConfig, c.ClusterID, control, time.Now)
-	if err != nil {
-		return nil, err
-	}
-	probe, err := kube.NewPermissionClient(probeConfig, c.ClusterID, control, time.Now)
-	if err != nil {
-		return nil, err
-	}
-	own, err := guard.WithClients(observer, probe)
-	if err != nil {
-		return nil, err
-	}
-	return kube.NewInstalledOwnerIdentityReader(observer, own, c, activation, mountedOwnerPodToken{in}, podUID)
-}
-
-// retryChanged runs proof up to three times, a second apart, while it fails
-// with configuration.ErrChanged and ctx lasts. Each attempt is a complete proof; no
-// earlier attempt's result is kept.
-func retryChanged(ctx context.Context, proof func() (time.Time, error)) (time.Time, error) {
-	until, err := proof()
-	for attempt := 1; attempt < 3 && errors.Is(err, configuration.ErrChanged) && sleepContext(ctx, time.Second); attempt++ {
-		until, err = proof()
-	}
-	return until, err
 }

@@ -26,7 +26,7 @@ func TestSharedPublicPoolKeepsResolutionReservationsAndRefusesRetiredFacets(t *t
 	if err != nil {
 		t.Fatal(err)
 	}
-	pools := &publicPools{in: in.providerInputs, manifest: publicManifestFixture(c), governor: governor}
+	pools := &publicPools{in: in.providerInputs, installation: c.InstallationID, governor: governor}
 	defer pools.Close()
 	name, _ := postgres.PublicRuntimeRoleName(c.InstallationID, "hub-runtime")
 	for _, old := range []string{"api-execution-read", "api-execution-prepare", "api-execution-record"} {

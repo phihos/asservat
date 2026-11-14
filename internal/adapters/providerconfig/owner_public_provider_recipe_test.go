@@ -40,7 +40,7 @@ func TestOwnerPublicProviderRecipeIsBoundAndSeparate(t *testing.T) {
 		t.Fatal("public recipe", err)
 	}
 	for i, r := range roles {
-		if r.Purpose != OwnerPublicProviderPurposes[i] || !strings.HasPrefix(r.Name, "asservat-owner-public-") || len(r.Name) > 128 {
+		if r.Purpose != OwnerPublicProviderPurposes[i] || r.Name != "owner-"+r.Purpose || len(r.Name) > 128 {
 			t.Fatal("public role", r.Purpose, r.Name)
 		}
 		for _, owned := range identity.Roles {

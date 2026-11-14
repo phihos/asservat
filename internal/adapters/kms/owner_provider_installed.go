@@ -1,7 +1,6 @@
 package kms
 
 import (
-	auditapp "asservat.local/asservat/internal/application/audit"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -11,7 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"asservat.local/asservat/internal/adapters/kubernetes"
+	auditapp "asservat.local/asservat/internal/application/audit"
+
 	"asservat.local/asservat/internal/adapters/mounts"
 	"asservat.local/asservat/internal/adapters/mtls"
 	"asservat.local/asservat/internal/adapters/postgres"
@@ -31,8 +31,6 @@ type InstalledOwnerProviderEffects struct {
 	Report          func(string)
 	input           contracts.OwnerDeployment
 	files           *os.Root
-	reader          *kubernetes.InstalledOwnerIdentityReader
-	credentials     *kubernetes.InstalledOwnerIdentityReader
 	configuration   *postgres.OwnerConfigurations
 	original        fleet.OwnerConfiguration
 	effects         *ownerProviderEffects
@@ -45,25 +43,43 @@ type InstalledOwnerProviderEffects struct {
 	closeDone       chan struct{}
 }
 
-// reader proves the identity around provider logins and renewals; credentials
-// proves it for audit credential reads. Separate readers on separate clients
-// keep a refresh's proofs from starving an audit write's (ADR-173).
-func NewInstalledOwnerProviderEffects(ctx context.Context, input contracts.OwnerDeployment, files *os.Root, reader, credentials *kubernetes.InstalledOwnerIdentityReader, configuration *postgres.OwnerConfigurations, accepted fleet.OwnerConfiguration) (*InstalledOwnerProviderEffects, error) {
-	if ctx == nil || ctx.Err() != nil || files == nil || reader == nil || credentials == nil || !credentials.MatchesProviderInput(input) || configuration == nil || input.Observation == nil || input.Observation.Activation == nil || input.Observation.Activation.Input.OwnerLayout != contracts.OwnerProviderInstalledLayout || input.ProviderAuthentication == nil || !reader.MatchesProviderInput(input) || !accepted.Valid() || accepted.Suspended || accepted.Revision.UID != input.ConfigurationUID || accepted.Pool.NativeCandidateLimit != fleet.OwnerRegistrationsPerPool || ValidateOwnerProviderAuthentication(input, *input.ProviderAuthentication, time.Now()) != nil {
-		return nil, ErrKeyService
+// Helm-native installation (ADR-328): the mounted projection is trusted
+// as Kubernetes delivers it; only the accepted owner configuration is
+// checked around provider logins and audit credential reads.
+func NewInstalledOwnerProviderEffects(ctx context.Context, input contracts.OwnerDeployment, files *os.Root, configuration *postgres.OwnerConfigurations, accepted fleet.OwnerConfiguration) (*InstalledOwnerProviderEffects, error) {
+	if ctx == nil || ctx.Err() != nil || files == nil || configuration == nil || input.ProviderAuthentication == nil || !accepted.Valid() || accepted.Suspended || accepted.Revision.UID != input.ConfigurationUID || accepted.Pool.NativeCandidateLimit != fleet.OwnerRegistrationsPerPool {
+		return nil, providerStep("accepted-configuration", ErrKeyService)
+	}
+	if err := ValidateOwnerProviderAuthentication(input, *input.ProviderAuthentication, time.Now()); err != nil {
+		return nil, providerStep("authentication", err)
 	}
 	raw, err := json.Marshal(input)
 	var cloned contracts.OwnerDeployment
-	if err != nil || json.Unmarshal(raw, &cloned) != nil {
-		return nil, ErrKeyService
+	if err != nil {
+		step := "clone-encode"
+		var m *json.MarshalerError
+		var u *json.UnsupportedValueError
+		var t *json.UnsupportedTypeError
+		switch {
+		case errors.As(err, &m):
+			step += ":" + m.Type.String()
+		case errors.As(err, &u):
+			step += ":unsupported-value"
+		case errors.As(err, &t):
+			step += ":" + t.Type.String()
+		}
+		return nil, providerStep(step, ErrKeyService)
+	}
+	if err = json.Unmarshal(raw, &cloned); err != nil {
+		return nil, providerStep("clone-decode", errors.Join(ErrKeyService, err))
 	}
 	input = cloned
 	roots, _, err := mtls.OwnerTrustRoots(accepted.IssuerRoots, time.Now())
 	if err != nil {
-		return nil, ErrKeyService
+		return nil, providerStep("issuer-roots", ErrKeyService)
 	}
 	root, cancel := context.WithCancel(ctx)
-	s := &InstalledOwnerProviderEffects{input: input, files: files, reader: reader, credentials: credentials, configuration: configuration, original: accepted.Clone(), root: root, cancel: cancel, closeDone: make(chan struct{})}
+	s := &InstalledOwnerProviderEffects{input: input, files: files, configuration: configuration, original: accepted.Clone(), root: root, cancel: cancel, closeDone: make(chan struct{})}
 	// The private control constructor discards ambient/custom transport hooks
 	// and pins this endpoint's roots. No installed caller supplies a client.
 	base := &http.Client{Transport: (&http.Transport{}), Timeout: 5 * time.Second}
@@ -169,45 +185,8 @@ func (s *InstalledOwnerProviderEffects) projectedJWT(ctx context.Context) ([]byt
 	return b, nil
 }
 
-func (s *InstalledOwnerProviderEffects) mounted(ctx context.Context) (contracts.OwnerIdentityCredentialManifest, map[string][]byte, error) {
-	var zero contracts.OwnerIdentityCredentialManifest
-	raw, err := mounts.Read(ctx, s.files, "deployment.json", contracts.OwnerDeploymentMaxBytes)
-	if err != nil {
-		return zero, nil, ErrKeyService
-	}
-	defer clear(raw)
-	in, err := contracts.DecodeOwnerDeployment(bytes.NewReader(raw))
-	if err != nil || !s.reader.MatchesProviderInput(in) {
-		return zero, nil, ErrKeyService
-	}
-	out := map[string][]byte{}
-	ok := false
-	defer func() {
-		if !ok {
-			for _, b := range out {
-				clear(b)
-			}
-		}
-	}()
-	for _, name := range contracts.OwnerIdentityProjectionFiles() {
-		b, e := mounts.Read(ctx, s.files, name, contracts.OwnerIdentityRoleMaxBytes)
-		if e != nil || len(b) == 0 {
-			clear(b)
-			return zero, nil, ErrKeyService
-		}
-		out[name] = b
-	}
-	m, err := contracts.DecodeOwnerIdentityCredentialManifest(bytes.NewReader(out[contracts.OwnerIdentityRoleManifestFile]))
-	if err != nil || ctx.Err() != nil {
-		return zero, nil, ErrKeyService
-	}
-	ok = true
-	return m, out, nil
-}
-
 // Every control operation reads the current accepted configuration once and
-// uses the reused native self-proof, retaining the first interval through all
-// blocking work. Revision changes do not adopt replacement roots or pools.
+// retains its interval. Revision changes do not adopt replacement roots or pools.
 func (s *InstalledOwnerProviderEffects) current(ctx context.Context) (time.Time, error) {
 	if s == nil || ctx == nil || ctx.Err() != nil || s.root.Err() != nil {
 		return time.Time{}, ErrKeyService
@@ -216,27 +195,10 @@ func (s *InstalledOwnerProviderEffects) current(ctx context.Context) (time.Time,
 	if err != nil || !s.currentConfiguration(first) {
 		return time.Time{}, ownerProviderConfigurationFailure("configuration", err)
 	}
-	call, end := context.WithDeadline(ctx, first.FreshUntil)
-	defer end()
-	manifest, mounted, err := s.mounted(call)
-	if err != nil {
-		return time.Time{}, err
+	if ctx.Err() != nil || !time.Now().Before(first.FreshUntil) {
+		return time.Time{}, ownerProviderConfigurationFailure("configuration-final", ctx.Err())
 	}
-	defer func() {
-		for _, b := range mounted {
-			clear(b)
-		}
-	}()
-	until, err := s.reader.Verify(call, manifest, mounted)
-	until = identity.Earlier(first.FreshUntil, until)
-	if err != nil {
-		// Keep the reader's fixed check for the startup diagnostic.
-		return time.Time{}, errors.Join(ErrKeyService, err)
-	}
-	if call.Err() != nil || !time.Now().Before(until) {
-		return time.Time{}, ownerProviderConfigurationFailure("configuration-final", call.Err())
-	}
-	return until, nil
+	return first.FreshUntil, nil
 }
 func (s *InstalledOwnerProviderEffects) currentConfiguration(v fleet.OwnerConfigurationObservation) bool {
 	if !v.Valid(time.Now()) || v.Configuration.Suspended || v.Configuration.Pool != s.original.Pool || v.Configuration.Revision.UID != s.original.Revision.UID || v.Configuration.ProtectionDigest != s.original.ProtectionDigest || len(v.Configuration.IssuerRoots) != len(s.original.IssuerRoots) {
@@ -414,33 +376,19 @@ func (s *InstalledOwnerProviderEffects) ReadAuditCredentials(ctx context.Context
 	}
 	call, end := context.WithDeadline(ctx, first.FreshUntil)
 	defer end()
-	mark = time.Now()
-	manifest, mounted, err := s.mounted(call)
-	auditapp.MarkStep(ctx, "credentials-mounted", mark)
-	if err != nil {
-		return zero, time.Time{}, auditCredentialStep("mounted", err)
-	}
-	defer func() {
-		for _, b := range mounted {
-			clear(b)
-		}
-	}()
 	raw, err := mounts.Read(call, s.files, contracts.OwnerProviderAuditCredentialFile, 32<<10)
 	defer clear(raw)
 	if err != nil {
 		return zero, time.Time{}, auditCredentialStep("file", ErrKeyService)
 	}
-	mark = time.Now()
-	credential, until, err := s.credentials.ReadProviderAuditCredential(call, manifest, mounted, raw)
-	auditapp.MarkStep(ctx, "credentials-verify", mark)
-	until = identity.Earlier(until, first.FreshUntil)
-	if err != nil {
-		return zero, time.Time{}, auditCredentialStepFrom("verify", err)
+	credential, err := contracts.DecodeOwnerStorageCredential(bytes.NewReader(raw))
+	if err != nil || !identity.Text(credential.AccessKeyID, 256) || !identity.Text(credential.SecretAccessKey, 4096) || credential.SessionToken != "" && !identity.Text(credential.SessionToken, 16384) {
+		return zero, time.Time{}, auditCredentialStep("decode", ErrKeyService)
 	}
-	if call.Err() != nil || !time.Now().Before(until) {
+	if call.Err() != nil || !time.Now().Before(first.FreshUntil) {
 		return zero, time.Time{}, auditCredentialStepFrom("final", call.Err())
 	}
-	return credential, until, nil
+	return credential, first.FreshUntil, nil
 }
 
 // auditCredentialStepError keeps the returned error and names the closed step

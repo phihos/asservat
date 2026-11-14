@@ -60,9 +60,6 @@ func workerJSONEqual(a, b any) bool {
 	y, e := json.Marshal(b)
 	return e == nil && bytes.Equal(x, y)
 }
-func WorkerControlDigest(data map[string]string) (artifact.Digest, error) {
-	return mtls.WorkerControlDigest(data)
-}
 func (s *DownloadWorkerJobs) sources(ctx context.Context) error {
 	p := s.profile
 	ns, e := s.client.namespace(ctx, s.client.control)
@@ -84,11 +81,7 @@ func (s *DownloadWorkerJobs) sources(ctx context.Context) error {
 	}
 	defer clear(b)
 	var cm core.ConfigMap
-	if json.Unmarshal(b, &cm) != nil || cm.APIVersion != "v1" || cm.Kind != "ConfigMap" || cm.Name != p.ControlConfig || cm.Namespace != p.Namespace || string(cm.UID) != p.ControlConfigUID || cm.DeletionTimestamp != nil || cm.Immutable == nil || !*cm.Immutable || len(cm.BinaryData) > 0 {
-		return artifact.ErrInvalid
-	}
-	d, e := WorkerControlDigest(cm.Data)
-	if e != nil || d != p.ControlDigest {
+	if json.Unmarshal(b, &cm) != nil || cm.APIVersion != "v1" || cm.Kind != "ConfigMap" || cm.Name != p.ControlConfig || cm.Namespace != p.Namespace || string(cm.UID) != p.ControlConfigUID || cm.DeletionTimestamp != nil || len(cm.BinaryData) > 0 || len(cm.Data) != 1 {
 		return artifact.ErrInvalid
 	}
 	control, e := mtls.ParseWorkerControl([]byte(cm.Data["worker.json"]))
@@ -156,7 +149,7 @@ func acquisitionJob(i value.AcquisitionWorkerIntent) *batch.Job {
 			{Name: "control", VolumeSource: core.VolumeSource{ConfigMap: &core.ConfigMapVolumeSource{LocalObjectReference: core.LocalObjectReference{Name: p.ControlConfig}, DefaultMode: &mode}}},
 		},
 		Containers: []core.Container{{Name: "acquisition", Image: p.Image, ImagePullPolicy: core.PullIfNotPresent,
-			Command: []string{"/asservat"}, Args: []string{"download-worker", "--installation", p.InstallationID, "--cluster", p.ClusterID, "--dispatch", i.ID, parentFlag, i.Parent.ID, "--created-at", i.CreatedAt.UTC().Format(time.RFC3339Nano), "--until", i.RunUntil.UTC().Format(time.RFC3339Nano), "--control-sha256", fmt.Sprintf("%x", p.ControlDigest), "--control", contracts.WorkerControlPath, "--token", DownloadWorkerTokenPath},
+			Command: []string{"/asservat"}, Args: []string{"download-worker", "--installation", p.InstallationID, "--cluster", p.ClusterID, "--dispatch", i.ID, parentFlag, i.Parent.ID, "--created-at", i.CreatedAt.UTC().Format(time.RFC3339Nano), "--until", i.RunUntil.UTC().Format(time.RFC3339Nano), "--control", contracts.WorkerControlPath, "--token", DownloadWorkerTokenPath},
 			Env:                    []core.EnvVar{{Name: contracts.WorkerPodUIDEnvironment, ValueFrom: &core.EnvVarSource{FieldRef: &core.ObjectFieldSelector{APIVersion: "v1", FieldPath: "metadata.uid"}}}},
 			TerminationMessagePath: core.TerminationMessagePathDefault, TerminationMessagePolicy: core.TerminationMessageReadFile,
 			Resources:       core.ResourceRequirements{Requests: resources, Limits: resources},

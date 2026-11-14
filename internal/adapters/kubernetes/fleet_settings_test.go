@@ -11,7 +11,7 @@ import (
 )
 
 func TestFleetAdministrationProtectedConfig(t *testing.T) {
-	for _, mode := range []string{"valid", "no-operators", "suspended", "installation", "bad-epoch", "untrusted-issuer", "duplicate-subject", "unbounded", "history", "unknown", "case-alias", "replacement", "extra-data", "expired-read"} {
+	for _, mode := range []string{"valid", "no-operators", "suspended", "generated-ids", "untrusted-issuer", "duplicate-subject", "unbounded", "history", "unknown", "case-alias", "replacement", "extra-data", "expired-read"} {
 		t.Run(mode, func(t *testing.T) {
 			b, err := os.ReadFile("../../../examples/fleet-settings.json")
 			if err != nil {
@@ -26,10 +26,10 @@ func TestFleetAdministrationProtectedConfig(t *testing.T) {
 				config["groups"] = []any{}
 			case "suspended":
 				config["suspended"] = true
-			case "installation":
+			case "generated-ids":
+				// The reader supplies the generated IDs; fleet.json must not.
 				config["installationID"] = "33333333-3333-4333-8333-333333333333"
-			case "bad-epoch":
-				config["issuerEpoch"] = "00000000-0000-0000-0000-000000000000"
+				config["issuerEpoch"] = "22222222-2222-4222-8222-222222222222"
 			case "untrusted-issuer":
 				config["issuer"] = "http://identity.example.test"
 			case "duplicate-subject":
@@ -65,13 +65,13 @@ func TestFleetAdministrationProtectedConfig(t *testing.T) {
 				return true
 			})
 			clock = f.clock
-			reader, err := NewFleetSettingsClient(f.client, "fleet", "fleet-uid", permissionCluster)
+			reader, err := NewFleetSettingsClient(f.client, "fleet", "fleet-uid", permissionCluster, "22222222-2222-4222-8222-222222222222")
 			if err != nil {
 				t.Fatal(err)
 			}
 			a, err := reader.FleetAdministration(context.Background())
 			if mode == "valid" || mode == "no-operators" || mode == "suspended" {
-				if err != nil || !a.Valid(time.Unix(0, clock.Load())) || a.Revision.UID != uid || a.FreshUntil.Sub(a.ObservedAt) != 5*time.Second {
+				if err != nil || !a.Valid(time.Unix(0, clock.Load())) || a.Revision.UID != uid || a.FreshUntil.Sub(a.ObservedAt) != 5*time.Second || a.InstallationID != permissionCluster || a.IssuerEpoch != "22222222-2222-4222-8222-222222222222" {
 					t.Fatal(a, err)
 				}
 			} else if err == nil {

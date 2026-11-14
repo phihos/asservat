@@ -1,0 +1,41 @@
+{{- if include "asservat.hub" . }}
+{{- $v := index .Values.hub "key-service" }}
+{{- $n := include "asservat.name" . }}
+{{- $p := include "asservat.providers" . | fromJson }}
+{{- $dir := "/run/asservat/key-service" }}
+{{- $d := default dict $v.downloads }}
+{{- $config := dict
+  "name" $n
+  "namespace" .Release.Namespace
+  "port" 9447
+  "concurrency" (int (default 8 $v.concurrency))
+  "postgres" $p.postgres
+  "openBao" $p.openBao.endpoint }}
+{{- $purposes := list "key-configuration" "key-wrap" "key-verify" }}
+{{- $rules := list }}
+{{- if $d.enabled }}
+{{- $topologies := list }}
+{{- range (default list $d.retentionTopologies) }}
+{{- $topologies = append $topologies (dict "targetClusterID" .targetClusterID "name" .name) }}
+{{- end }}
+{{- $_ := set $config "downloads" (dict "retentionTopologies" $topologies) }}
+{{- $purposes = append $purposes "key-acquisition" }}
+{{- /* Worker configuration, cluster catalog and topologies; catalog slot
+  topologies are named by the catalog. No Secret is read through the API. */}}
+{{- $rules = list (dict "apiGroups" (list "") "resources" (list "configmaps") "verbs" (list "get")) }}
+{{- end }}
+{{- $tls := include "asservat.svc.tlsSecret" (list . "key-service") }}
+{{- $sources := list }}
+{{- $sources = append $sources (include "asservat.svc.sql" (list . "key-service" $purposes)) }}
+{{- /* The artifact root key: mounted into this Pod only. */}}
+{{- $sources = append $sources (printf "- secret:\n    name: %s\n    items: [{key: keys.json, path: artifact-key.json}]" (include "asservat.secretName" (list . "artifact-key") | quote)) }}
+{{- $sources = append $sources (printf "- secret:\n    name: %s\n    items: [{key: tls.crt, path: tls.crt}, {key: tls.key, path: tls.key}]" ($tls | quote)) }}
+{{- $sources = append $sources (include "asservat.providerRoots" (dict "root" . "provider" "postgres" "path" "postgres-ca.crt") | trim) }}
+{{- $sources = append $sources (include "asservat.providerRoots" (dict "root" . "provider" "openBao" "path" "openbao-ca.crt") | trim) }}
+{{ include "asservat.svc.account" (list . "key-service" $rules) }}
+---
+{{ include "asservat.svc.service" (list . "key-service" 9447) }}
+{{- include "asservat.svc.tlsObjects" (list . "key-service") }}
+---
+{{ include "asservat.svc.deployment" (dict "root" . "component" "key-service" "command" "key-service" "dir" $dir "port" 9447 "grace" 15 "config" (toJson $config) "sqlFile" "sql-key-configuration.json" "sources" (join "\n" $sources)) }}
+{{- end }}

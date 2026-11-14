@@ -58,11 +58,9 @@ const FederationProviderAuthenticationFormat = "asservat-federation-kubernetes-a
 const FederationProviderTokenFile = "provider-auth.token"
 const FederationProviderAuditCredentialFile = "provider-audit-storage.json"
 
-// FederationProviderAudience derives the fixed audience of the federation's
-// projected provider token; it grants no authority.
-func FederationProviderAudience(installationID, clusterID string) string {
-	return "https://asservat." + installationID + "/federation-provider/" + clusterID
-}
+// FederationProviderAudience is the fixed (chart constant) audience of the
+// federation's projected provider token; it grants no authority.
+func FederationProviderAudience(string, string) string { return "asservat-federation-provider" }
 
 // FederationProviderAuthentication is the public, installation-owned
 // selection of the federation's Kubernetes auth roles. It holds no JWT,

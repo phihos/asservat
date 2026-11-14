@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"asservat.local/asservat/internal/transport/browser"
+	"asservat.local/asservat/internal/transport/edge"
 )
 
 // publicContextRoutes is a composition detail. Its handlers are constructed by
@@ -40,7 +41,7 @@ func publicContextProblem(w http.ResponseWriter, status int) {
 // values may be escaped; the fixed product paths themselves are literal ASCII.
 // Neither TLS identity nor the public host is inferred from forwarding headers.
 func originalPublicTarget(r *http.Request, host string) bool {
-	if r == nil || r.URL == nil || r.TLS == nil || host == "" || r.Host != host || len(r.RequestURI) > 8192 {
+	if r == nil || r.URL == nil || !edge.Secure(r) || host == "" || r.Host != host || len(r.RequestURI) > 8192 {
 		return false
 	}
 	u := r.URL

@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"asservat.local/asservat/internal/transport/edge"
 )
 
 // HTTPDownloadResponse owns one whole selected response, with bounded writes
@@ -31,7 +33,7 @@ type HTTPDownloadResponse struct {
 func NewHTTPDownloadResponse(w http.ResponseWriter, r *http.Request, m artifact.NativeDownloadMetadata, response artifact.DownloadResponse) (*HTTPDownloadResponse, error) {
 	now := time.Now()
 	selection, until := response.Plan.Selection, response.Until
-	if !response.Valid() || w == nil || r == nil || r.Method != http.MethodGet || r.TLS == nil || r.Context().Err() != nil || !until.After(now) || until.After(now.Add(8*time.Hour)) || m.Size < 0 || m.Size > artifact.MaxNativeBytes || !strongETag(m.ETag) || !safeDownloadFilename(m.Filename) || selection.Offset < 0 || selection.Length < 0 || selection.Offset > m.Size || selection.Length > m.Size-selection.Offset || selection.Partial && selection.Length == 0 || !selection.Partial && (selection.Offset != 0 || selection.Length != m.Size) || w.Header().Get("Content-Encoding") != "" {
+	if !response.Valid() || w == nil || r == nil || r.Method != http.MethodGet || !edge.Secure(r) || r.Context().Err() != nil || !until.After(now) || until.After(now.Add(8*time.Hour)) || m.Size < 0 || m.Size > artifact.MaxNativeBytes || !strongETag(m.ETag) || !safeDownloadFilename(m.Filename) || selection.Offset < 0 || selection.Length < 0 || selection.Offset > m.Size || selection.Length > m.Size-selection.Offset || selection.Partial && selection.Length == 0 || !selection.Partial && (selection.Offset != 0 || selection.Length != m.Size) || w.Header().Get("Content-Encoding") != "" {
 		return nil, artifact.ErrInvalid
 	}
 	owner, cancel := context.WithDeadline(r.Context(), until)

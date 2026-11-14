@@ -1,0 +1,37 @@
+{{- if include "asservat.hub" . }}
+{{- $v := .Values.hub.publisher }}
+{{- $n := include "asservat.name" . }}
+{{- $p := include "asservat.providers" . | fromJson }}
+{{- $dir := "/run/asservat/publisher" }}
+{{- $topologies := list }}
+{{- range (default list $v.retentionTopologies) }}
+{{- $topologies = append $topologies (dict "targetClusterID" .targetClusterID "name" .name) }}
+{{- end }}
+{{- $store := $p.objectStore }}
+{{- $config := toJson (dict
+  "name" $n
+  "namespace" .Release.Namespace
+  "pollSeconds" (int (default 2 $v.pollSeconds))
+  "batch" (int (default 8 $v.batch))
+  "postgres" $p.postgres
+  "auditStore" (dict "endpoint" $store.endpoint "region" $store.region "bucket" $store.auditBucket)
+  "evidence" (dict "endpoint" $store.endpoint "region" $store.region "bucket" $store.evidenceBucket)
+  "openBao" $p.openBao.endpoint
+  "retentionTopologies" $topologies) }}
+{{- /* Cluster catalog and retention topology reads; slot topologies are
+  named by the catalog, so ConfigMap reads are not name-restricted. */}}
+{{- $rules := list (dict "apiGroups" (list "") "resources" (list "configmaps") "verbs" (list "get")) }}
+{{- $sources := list }}
+{{- $sources = append $sources (include "asservat.svc.sql" (list . "publisher" (list "publication-gate" "context-verify" "context-verification-audit" "context-publish" "publisher-identity-read" "publisher-retention-read"))) }}
+{{- $sources = append $sources (include "asservat.svc.s3" (list . "publisher-audit" "audit-storage.json")) }}
+{{- $sources = append $sources (include "asservat.svc.s3" (list . "publisher-read" "evidence-read.json")) }}
+{{- /* Only the key service's CA, never its key. */}}
+{{- $sources = append $sources (printf "- secret:\n    name: %s\n    items: [{key: ca.crt, path: key-service-ca.crt}]" (include "asservat.svc.tlsSecret" (list . "key-service") | quote)) }}
+{{- $sources = append $sources (include "asservat.providerRoots" (dict "root" . "provider" "postgres" "path" "postgres-ca.crt") | trim) }}
+{{- $sources = append $sources (include "asservat.providerRoots" (dict "root" . "provider" "objectStore" "path" "objectstore-ca.crt") | trim) }}
+{{- $sources = append $sources (include "asservat.providerRoots" (dict "root" . "provider" "openBao" "path" "openbao-ca.crt") | trim) }}
+{{- $sources = append $sources (printf "- serviceAccountToken:\n    audience: %s\n    expirationSeconds: 600\n    path: provider-auth.token" (include "asservat.openBao" . | fromJson).publisherAudience) }}
+{{ include "asservat.svc.account" (list . "publisher" $rules) }}
+---
+{{ include "asservat.svc.deployment" (dict "root" . "component" "publisher" "command" "publisher" "dir" $dir "port" 0 "grace" 40 "config" $config "sqlFile" "sql-publisher-identity-read.json" "sources" (join "\n" $sources)) }}
+{{- end }}

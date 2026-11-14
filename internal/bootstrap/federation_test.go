@@ -4,96 +4,74 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
-	"asservat.local/asservat/internal/adapters/providerconfig"
 	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/fleet"
 )
 
-func federationTestDeployment() contracts.FederationDeployment {
-	return contracts.FederationDeployment{
-		Format: contracts.FederationDeploymentFormat, InstallationID: "10000000-0000-4000-8000-000000000001", ClusterID: "10000000-0000-4000-8000-000000000002", PermissionRootID: "10000000-0000-4000-8000-000000000003",
-		Port: 9446, Concurrency: 2,
-		Postgres:   contracts.OwnerPostgresEndpoint{Host: "postgres.asservat.svc", Port: 5432, Database: "asservat", MaxConnections: 1},
-		AuditStore: contracts.OwnerAuditStore{Endpoint: "https://s3.example", Region: "us-east-1", Bucket: "audit"},
-		KeyService: contracts.FederationKeyService{Endpoint: "https://bao.example", AuditMount: "transit", AuditKey: "audit", PKIMount: "pki", ClientRole: "connector-client", ServerRole: "connector-server"},
-	}
+func federationTestConfig() contracts.FederationConfig {
+	return contracts.FederationConfig{Name: "asservat", Namespace: "asservat", Port: 9446, Concurrency: 2,
+		Postgres:   contracts.ServicePostgres{Host: "postgres.asservat.svc", Port: 5432, Database: "asservat"},
+		AuditStore: contracts.ServiceObjectStore{Endpoint: "https://s3.example", Region: "us-east-1", Bucket: "audit"},
+		OpenBao:    "https://bao.example"}
 }
 
-func TestFederationDeploymentInputsAreClosed(t *testing.T) {
-	read := func(c contracts.FederationDeployment) error {
-		dir := t.TempDir()
-		raw, _ := json.Marshal(c)
-		if err := os.WriteFile(filepath.Join(dir, "federation.json"), raw, 0o400); err != nil {
-			t.Fatal(err)
-		}
-		root, err := os.OpenRoot(dir)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer root.Close()
-		_, err = readFederationDeployment(context.Background(), root)
+// The federation's Helm inputs are closed: unknown fields and unbounded
+// limits stop it before any connection. Provider names are derived, never
+// configured.
+func TestFederationInputsAreClosed(t *testing.T) {
+	read := func(v any) error {
+		_, err := readFederationInputs(context.Background(), serviceTestConfigRoot(t, v), serviceTestIDsRoot(t, serviceTestIDs))
 		return err
 	}
-	if err := read(federationTestDeployment()); err != nil {
+	if c, err := readFederationInputs(context.Background(), serviceTestConfigRoot(t, federationTestConfig()), serviceTestIDsRoot(t, serviceTestIDs)); err != nil || c.PermissionRootID != serviceTestIDs.PermissionRootID {
 		t.Fatal("valid federation input", err)
 	}
-	for name, mutate := range map[string]func(*contracts.FederationDeployment){
-		"pool above one connection": func(c *contracts.FederationDeployment) { c.Postgres.MaxConnections = 2 },
-		"same PKI role for both":    func(c *contracts.FederationDeployment) { c.KeyService.ServerRole = c.KeyService.ClientRole },
-		"plain HTTP key service":    func(c *contracts.FederationDeployment) { c.KeyService.Endpoint = "http://bao.example" },
-		"root not a UUID":           func(c *contracts.FederationDeployment) { c.PermissionRootID = "root" },
-		"unbounded concurrency":     func(c *contracts.FederationDeployment) { c.Concurrency = 17 },
-		"other format":              func(c *contracts.FederationDeployment) { c.Format = "asservat-federation-deployment/v0" },
+	for name, mutate := range map[string]func(*contracts.FederationConfig){
+		"plain HTTP provider":     func(c *contracts.FederationConfig) { c.OpenBao = "http://bao.example" },
+		"unbounded concurrency":   func(c *contracts.FederationConfig) { c.Concurrency = 17 },
+		"no name":                 func(c *contracts.FederationConfig) { c.Name = "" },
+		"name over 30":            func(c *contracts.FederationConfig) { c.Name = strings.Repeat("a", 31) },
+		"invalid namespace":       func(c *contracts.FederationConfig) { c.Namespace = "Hub_NS" },
+		"plain HTTP audit store":  func(c *contracts.FederationConfig) { c.AuditStore.Endpoint = "http://s3.example" },
+		"postgres port out of 16": func(c *contracts.FederationConfig) { c.Postgres.Port = 70000 },
 	} {
-		c := federationTestDeployment()
+		c := federationTestConfig()
 		mutate(&c)
 		if read(c) == nil {
 			t.Fatal("accepted:", name)
 		}
 	}
+	for _, field := range []string{"peers", "auditKey", "provider"} {
+		raw, _ := json.Marshal(federationTestConfig())
+		var doc map[string]any
+		_ = json.Unmarshal(raw, &doc)
+		doc[field] = "x"
+		if read(doc) == nil {
+			t.Fatal("accepted field", field)
+		}
+	}
+	if _, err := readFederationInputs(context.Background(), serviceTestConfigRoot(t, federationTestConfig()), serviceTestConfigRoot(t, map[string]string{})); err == nil {
+		t.Fatal("started without generated IDs")
+	}
 }
 
-// ADR-172: the owner section is the hub-api's own guard plan, validated by the
-// same shared check.
-func TestFederationOwnerReadsTakeTheHubAPIGuardPlan(t *testing.T) {
-	_, _, owner := ownerInputFixture(t)
-	read := func(g *contracts.OwnerGuardInputs) error {
-		c := federationTestDeployment()
-		c.Owner = g
-		dir := t.TempDir()
-		writeOwnerJSON(t, dir, "federation.json", c)
-		root, err := os.OpenRoot(dir)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer root.Close()
-		_, err = readFederationDeployment(context.Background(), root)
-		return err
+// The owner protection is the deterministic platform digest of the pool's
+// own Deployment, bounded to five seconds.
+func TestFederationOwnerProtectionIsThePlatformDigest(t *testing.T) {
+	now := time.Now()
+	u := serviceTestIDs.IssuerEpoch
+	pool := value.OwnerPool{InstallationID: serviceTestIDs.InstallationID, ClusterID: serviceTestIDs.ClusterID, IssuerEpoch: u, Namespace: "asservat", NamespaceUID: u, Service: "asservat-hub-api", ServiceUID: u, Deployment: "asservat-hub-api", DeploymentUID: u, ServiceAccount: "asservat-hub-api", AccountUID: u, Port: 8443}
+	got, err := platformOwnerProtection{func() time.Time { return now }}.ReadOwnerProtection(context.Background(), pool)
+	if err != nil || got.Pool != pool || got.Digest != artifact.Digest(contracts.WorkloadSourceDigest(pool.ClusterID, pool.Namespace, pool.Deployment)) || got.FreshUntil.Sub(got.ObservedAt) != 5*time.Second {
+		t.Fatal("owner protection", got, err)
 	}
-	g := owner.Guard()
-	if err := read(&g); err != nil {
-		t.Fatal("hub-api guard plan refused", err)
-	}
-	for name, mutate := range map[string]func(*contracts.OwnerGuardInputs){
-		"plain HTTP Kubernetes": func(g *contracts.OwnerGuardInputs) { g.Kubernetes.Endpoint = "http://api.synthetic.invalid" },
-		"no Kubernetes roots":   func(g *contracts.OwnerGuardInputs) { g.Kubernetes.Roots = nil },
-		"namespace not a UUID":  func(g *contracts.OwnerGuardInputs) { g.Namespace.UID = "hub" },
-		"no administrators":     func(g *contracts.OwnerGuardInputs) { g.WorkloadGuard.Administrators = nil },
-		"duplicate probe": func(g *contracts.OwnerGuardInputs) {
-			g.ConfigurationProbes = append(g.ConfigurationProbes, g.ConfigurationProbes...)
-		},
-		"absent probe list": func(g *contracts.OwnerGuardInputs) { g.ConfigurationProbes = nil },
-	} {
-		g := owner.Guard()
-		mutate(&g)
-		if read(&g) == nil {
-			t.Fatal("accepted:", name)
-		}
+	if _, err = (platformOwnerProtection{time.Now}).ReadOwnerProtection(context.Background(), value.OwnerPool{}); err == nil {
+		t.Fatal("invalid pool protected")
 	}
 }
 
@@ -103,28 +81,11 @@ func TestFederationIssuerDispatchesByUsage(t *testing.T) {
 	}
 }
 
-// ADR-193: the federation starts without a peer list and refuses a pinned one;
-// a presented peer of another root or installation is refused before any SQL.
+// ADR-193: a presented peer of another root or installation is refused
+// before any SQL.
 func TestFederationPeersComeFromStagedSQLOnly(t *testing.T) {
-	dir := t.TempDir()
-	raw, _ := json.Marshal(federationTestDeployment())
-	var doc map[string]any
-	_ = json.Unmarshal(raw, &doc)
-	doc["peers"] = []any{}
-	raw, _ = json.Marshal(doc)
-	if err := os.WriteFile(filepath.Join(dir, "federation.json"), raw, 0o400); err != nil {
-		t.Fatal(err)
-	}
-	root, err := os.OpenRoot(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer root.Close()
-	if _, err = readFederationDeployment(context.Background(), root); err == nil {
-		t.Fatal("accepted a pinned peer list")
-	}
-	c := federationTestDeployment()
-	peers := &federationPeers{c: c}
+	c := serviceTestIDs
+	peers := &federationPeers{ids: c}
 	for _, p := range []value.ClusterCredentialProfile{
 		{RootID: "10000000-0000-4000-8000-000000000009", PeerID: c.ClusterID, InstallationID: c.InstallationID, ClusterID: c.ClusterID},
 		{RootID: c.PermissionRootID, PeerID: c.ClusterID, InstallationID: "10000000-0000-4000-8000-000000000009", ClusterID: c.ClusterID},
@@ -135,53 +96,11 @@ func TestFederationPeersComeFromStagedSQLOnly(t *testing.T) {
 	}
 }
 
-// ADR-193: Kubernetes-auth provider credentials need the owner guard (their
-// refresh proof) and the exact recipe profile.
-func TestFederationProviderAuthenticationNeedsOwnerGuardAndExactRecipe(t *testing.T) {
-	_, _, owner := ownerInputFixture(t)
-	g := owner.Guard()
-	c := federationTestDeployment()
-	recipe, err := providerconfig.FederationProviderRecipeFor(c, contracts.FederationProviderAuthentication{AuthMount: "kubernetes", AuthMountAccessor: "auth_kubernetes_1",
-		Namespace:        g.Namespace,
-		ServiceAccount:   contracts.WorkerObjectReference{Name: contracts.FederationServiceAccountName(c.InstallationID), UID: "10000000-0000-4000-8000-000000000012"},
-		AuditCredentials: contracts.WorkerObjectReference{Name: "federation-audit", UID: "10000000-0000-4000-8000-000000000013"}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	read := func(c contracts.FederationDeployment) error {
-		dir := t.TempDir()
-		writeOwnerJSON(t, dir, "federation.json", c)
-		root, err := os.OpenRoot(dir)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer root.Close()
-		_, err = readFederationDeployment(context.Background(), root)
-		return err
-	}
-	c.Owner, c.ProviderAuthentication = &g, &recipe.Profile
-	if err = read(c); err != nil {
-		t.Fatal("valid provider selection refused", err)
-	}
-	withoutOwner := c
-	withoutOwner.Owner = nil
-	if read(withoutOwner) == nil {
-		t.Fatal("provider credentials without the owner guard proof")
-	}
-	changed := c
-	profile := recipe.Profile
-	profile.RecipeSHA256 = strings.Repeat("0", 64)
-	changed.ProviderAuthentication = &profile
-	if read(changed) == nil {
-		t.Fatal("profile that does not match its recipe")
-	}
-}
-
 // The log consumes fixed local stages and closed classes, never provider text.
 func TestFederationEnrollmentDiagnosticNamesCompositionBoundary(t *testing.T) {
 	private := errors.New("synthetic private provider error")
 	err := federationEnrollmentError{"audit-journal", private}
-	if federationEnrollmentStep(err) != "resolve/audit-journal" || federationCause(err) != "unavailable" || !errors.Is(err, private) {
+	if federationEnrollmentStep(err) != "resolve/audit-journal" || federationClass(err) != "unavailable" || !errors.Is(err, private) {
 		t.Fatal("composition boundary or error class lost")
 	}
 	if strings.Contains(err.Error(), "synthetic") {

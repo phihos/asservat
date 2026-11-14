@@ -37,7 +37,7 @@ func TestOwnerFleetProviderRecipeIsNarrowAndPinned(t *testing.T) {
 	}
 	in.Public.Fleet = &contracts.OwnerFleetIssuance{ChannelMount: "fleet-kv", DeliveryProfile: "regional-installer"}
 	role, digest, err := OwnerFleetProviderRecipeFor(in, identity.Profile, now)
-	if err != nil || len(digest) != 64 || role.Purpose != OwnerFleetProviderPurpose || !strings.HasPrefix(role.Name, "asservat-owner-fleet-") {
+	if err != nil || len(digest) != 64 || role.Purpose != OwnerFleetProviderPurpose || role.Name != "owner-"+OwnerFleetProviderPurpose {
 		t.Fatal("fleet recipe", err)
 	}
 	var acl ownerProviderACL

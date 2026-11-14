@@ -19,7 +19,7 @@ func smallOpenBaoFixturePlan(t *testing.T, now time.Time) contracts.SmallOpenBao
 	cert, _, ca := installerServingTLSFixture(t, "api.invalid", now)
 	_ = cert
 	block, _ := pem.Decode(ca)
-	return contracts.SmallOpenBaoPlan{Format: contracts.SmallOpenBaoFormat, Namespace: "bootstrap", Name: "trial", Image: contracts.SmallOpenBaoImage, Kubernetes: contracts.OwnerProviderEndpoint{Endpoint: "https://api.invalid", Roots: [][]byte{block.Bytes}}, SetupAccount: "trial-bootstrap-runner"}
+	return contracts.SmallOpenBaoPlan{Format: contracts.SmallOpenBaoFormat, Namespace: "bootstrap", Name: "trial", Image: contracts.SmallOpenBaoImage, Kubernetes: contracts.OwnerProviderEndpoint{Endpoint: "https://api.invalid", Roots: [][]byte{block.Bytes}}, SetupAccount: "trial-setup"}
 }
 
 func cloneSmallOpenBaoMaterial(m map[string][]byte) map[string][]byte {
@@ -132,8 +132,8 @@ func TestSmallOpenBaoPlanAndConfigurationAreClosed(t *testing.T) {
 	if _, err := SmallOpenBaoBackendPolicy("replacement"); err == nil {
 		t.Fatal("invalid backend marker accepted")
 	}
-	if !bytes.Contains(data, []byte("auth/token/roles/asservat-inspection")) || !bytes.Contains(data, []byte(`"allowed_policies_glob" = ["asservat-*-inspection"]`)) || !bytes.Contains(data, []byte(`"token_explicit_max_ttl" = 600`)) || !bytes.Contains(data, []byte(`"disallowed_policies" = ["root","default"]`)) || bytes.Index(data, []byte(`request "inspection-role"`)) > bytes.Index(data, []byte(`request "backend-identity"`)) {
-		t.Fatal("inspection role must be bounded and initialized before completion marker")
+	if bytes.Contains(data, []byte("auth/token/roles/")) {
+		t.Fatal("self-initialization creates a token role")
 	}
 }
 

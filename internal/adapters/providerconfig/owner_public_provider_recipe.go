@@ -27,18 +27,9 @@ func OwnerPublicProviderRecipeFor(in contracts.OwnerDeployment, profile contract
 	if err != nil || identity.Profile.RecipeSHA256 != profile.RecipeSHA256 {
 		return roles, "", cfg.ErrInvalid
 	}
-	scope, err := ownerProviderCanonical(struct {
-		Format         string                          `json:"format"`
-		InstallationID string                          `json:"installationID"`
-		ClusterID      string                          `json:"clusterID"`
-		Namespace      contracts.WorkerObjectReference `json:"namespace"`
-		ServiceAccount contracts.WorkerObjectReference `json:"serviceAccount"`
-	}{"asservat-owner-public-provider-name/v1", in.InstallationID, in.ClusterID, in.Namespace, profile.ServiceAccount})
-	if err != nil {
-		return roles, "", err
-	}
-	nameDigest := sha256.Sum256(scope)
-	prefix := "asservat-owner-public-" + hex.EncodeToString(nameDigest[:8]) + "-"
+	// Role and policy: "<name>-hub-api-<purpose>" (OpenBaoRoleName), the
+	// ServiceAccount name plus the purpose; setup creates the same names.
+	prefix := profile.ServiceAccount.Name + "-"
 	audience := contracts.OwnerProviderAudience(in.InstallationID, in.ClusterID)
 	paths := [4]string{p.SessionTransit.Mount + "/encrypt/" + p.SessionTransit.Key, p.SessionTransit.Mount + "/decrypt/" + p.SessionTransit.Key, p.WorkSigning.Mount + "/sign/" + p.WorkSigning.Name, p.WorkerPKI.Mount + "/sign/" + p.WorkerPKI.Role}
 	for i, purpose := range OwnerPublicProviderPurposes {
@@ -50,6 +41,11 @@ func OwnerPublicProviderRecipeFor(in contracts.OwnerDeployment, profile contract
 			"auth/token/revoke-self": {Capabilities: []string{"update"}},
 			paths[i]:                 {Capabilities: []string{"update"}},
 		}}
+		if purpose == "work-sign" {
+			// The hub-api reads its signing key's version and public key at
+			// startup (Helm-native installation).
+			acl.Path[p.WorkSigning.Mount+"/keys/"+p.WorkSigning.Name] = ownerProviderACLRule{Capabilities: []string{"read"}}
+		}
 		r, e := ownerProviderCanonical(role)
 		if e != nil {
 			return roles, "", e

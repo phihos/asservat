@@ -135,7 +135,7 @@ func seaweedGrant(g contracts.SeaweedGrant) ([]string, []map[string]any, error) 
 	if ValidateSeaweedCredential(g.Credential) != nil || g.Credential.Principal.Purpose == "admin" || !authorization.UUID(g.InstallationID) || !seaweedBucket.MatchString(g.Bucket) || strings.Contains(g.Bucket, "..") || len(g.Prefixes) > 32 {
 		return nil, nil, ErrSeaweedStorage
 	}
-	for _, id := range []string{g.ClusterID, g.RootID, g.SourceUID} {
+	for _, id := range []string{g.ClusterID, g.RootID} {
 		if id != "" && !authorization.UUID(id) {
 			return nil, nil, ErrSeaweedStorage
 		}
@@ -269,12 +269,14 @@ func seaweedScope(g contracts.SeaweedGrant) (prefixes []string, read, write, lis
 	return prefixes, read, write, list, nil
 }
 func seaweedAuditPrefixes(g contracts.SeaweedGrant) []string {
-	i, c, r, s := g.InstallationID, g.ClusterID, g.RootID, g.SourceUID
+	i, c, r := g.InstallationID, g.ClusterID, g.RootID
 	switch g.Credential.Principal.Purpose {
 	case "configuration-audit":
 		p := []string{"authority/v1/", "retention-acceptance/v1/", "lifecycle/v1/", "context-deletion/v1/", "download-worker-configuration/v1/" + i + "/"}
-		if c != "" && s != "" {
-			p = append(p, "hub-owner-configuration/v1/"+i+"/"+c+"/"+s+"/")
+		// The hub cluster's owner configuration audit, whatever ConfigMap
+		// identifies the revision: IAM is compiled before the ConfigMap exists.
+		if c != "" {
+			p = append(p, "hub-owner-configuration/v1/"+i+"/"+c+"/")
 		}
 		return p
 	case "owner-audit":
@@ -357,29 +359,6 @@ func decodeSeaweedIdentities(raw []byte) (map[string]seaweedIdentity, error) {
 	return out, nil
 }
 
-// ReadSeaweedInitialAuditCredential reads only the exact original installation's
-// initial-audit entry from private retained IAM. The caller must independently
-// pin that IAM source and installation; these bytes grant no principal authority.
-func ReadSeaweedInitialAuditCredential(raw []byte, installationID string) (contracts.SeaweedCredential, error) {
-	var zero contracts.SeaweedCredential
-	principal := contracts.SeaweedPrincipalKey{Purpose: "initial-audit", ScopeID: installationID}
-	name, err := SeaweedPrincipalName(principal)
-	if err != nil {
-		return zero, ErrSeaweedStorage
-	}
-	identities, err := decodeSeaweedIdentities(raw)
-	if err != nil {
-		return zero, ErrSeaweedStorage
-	}
-	defer clear(identities)
-	identity, ok := identities[name]
-	if !ok {
-		return zero, ErrSeaweedStorage
-	}
-	key := identity.Credentials[0]
-	return contracts.SeaweedCredential{Principal: principal, AccessKeyID: key.Access, SecretAccessKey: key.Secret}, nil
-}
-
 // ValidateSeaweedConfigTransition prevents later installer phases from replacing
 // or dropping a retained principal/key/capability. Inputs remain private. It is
 // not a replacement for CompileSeaweedStorage's purpose/recipe checks.
@@ -410,6 +389,10 @@ func ValidateSeaweedConfigTransition(before, after []byte) error {
 // The Helm render regression compares the actual chart command to this value.
 func SeaweedServerArgs() []string {
 	return []string{
-		"server", "-dir=/data", "-ip=127.0.0.1", "-ip.bind=127.0.0.1", "-master=true", "-volume=true", "-filer=true", "-s3=true", "-master.telemetry=false", "-s3.ip.bind=0.0.0.0", "-s3.port=8333", "-s3.port.https=0", "-s3.cert.file=/run/asservat/objectstore-tls/tls.crt", "-s3.key.file=/run/asservat/objectstore-tls/tls.key", "-s3.config=/run/asservat/objectstore-iam/s3.json", "-s3.iam=false", "-s3.autoCreateBucket=false", "-s3.port.iceberg=0", "-s3.port.lance=0", "-iam=false", "-webdav=false", "-sftp=false", "-mq.broker=false", "-mq.agent=false", "-metricsPort=0", "-debug=false",
+		"server", "-dir=/data", "-ip=127.0.0.1", "-ip.bind=127.0.0.1", "-master=true", "-volume=true", "-master.volumeSizeLimitMB=1024", "-volume.max=64", "-filer=true", "-s3=true", "-master.telemetry=false", "-s3.ip.bind=0.0.0.0", "-s3.port=8333", "-s3.port.https=0", "-s3.cert.file=/run/asservat/objectstore-tls/tls.crt", "-s3.key.file=/run/asservat/objectstore-tls/tls.key", "-s3.config=/run/asservat/objectstore-iam/s3.json", "-s3.iam=false", "-s3.autoCreateBucket=false", "-s3.port.iceberg=0", "-s3.port.lance=0", "-iam=false", "-webdav=false", "-sftp=false", "-mq.broker=false", "-mq.agent=false", "-metricsPort=0", "-debug=false",
 	}
 }
+
+// SeaweedAuditPrefixes are the complete audit prefix families of an audit
+// purpose's grant (for the grant's installation, cluster, root and source).
+func SeaweedAuditPrefixes(g contracts.SeaweedGrant) []string { return seaweedAuditPrefixes(g) }

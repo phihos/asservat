@@ -32,11 +32,10 @@ func ValidRetentionSource(s privacy.PolicySourceRef) bool {
 // Exactly one transition is persisted before its successor. An expired
 // checkpoint can be replayed as an obligation; it cannot authorize access.
 type RetentionTransition struct {
-	ID     string
-	Fence  RetentionFence
-	List   PolicyList
-	Event  *PolicyEvent
-	Review *value.RetentionBootstrapReview
+	ID    string
+	Fence RetentionFence
+	List  PolicyList
+	Event *PolicyEvent
 }
 type RetentionCheckpoint struct {
 	Transition RetentionTransition
@@ -76,23 +75,12 @@ func ValidateRetentionTransition(t RetentionTransition, previous *RetentionCheck
 		if previous != nil || t.Event != nil || len(t.List.Deleting) != 0 {
 			return audit.RetentionAcceptance{}, value.ErrInvalid
 		}
-		if err := CheckInitialRetention(s, f.Source.ProtectionDigest, t.Review, now); err != nil {
+		if err := CheckInitialRetention(s, f.Source.ProtectionDigest, now); err != nil {
 			return audit.RetentionAcceptance{}, err
 		}
 		out.Bootstrap = &audit.RetentionBootstrap{PoliciesDigest: RetentionSnapshotDigest(s), PolicyCount: len(s.Policies)}
-		if len(s.Policies) > 0 {
-			r := t.Review
-			out.Bootstrap.ReviewUID = r.Resource.UID
-			out.Bootstrap.ReviewVersion = r.Resource.ResourceVersion
-			out.Bootstrap.Reviewer = r.Reviewer
-			out.Bootstrap.ReviewDigest = r.Resource.SpecDigest
-			out.Bootstrap.ReviewedAt = r.ReviewedAt
-			out.Bootstrap.ExpiresAt = r.ExpiresAt
-		} else if t.Review != nil {
-			return audit.RetentionAcceptance{}, value.ErrInvalid
-		}
 	} else {
-		if previous == nil || !previous.Record.Valid() || previous.Record.Sequence != f.Sequence || previous.Transition.Fence.RootID != f.RootID || previous.Transition.Fence.Source != f.Source || t.Event == nil || t.Event.Type == "BOOKMARK" || t.Review != nil {
+		if previous == nil || !previous.Record.Valid() || previous.Record.Sequence != f.Sequence || previous.Transition.Fence.RootID != f.RootID || previous.Transition.Fence.Source != f.Source || t.Event == nil || t.Event.Type == "BOOKMARK" {
 			return audit.RetentionAcceptance{}, value.ErrChanged
 		}
 		out.PreviousDigest = RetentionTransitionDigest(previous.Transition)

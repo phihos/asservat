@@ -56,7 +56,7 @@ func newPublicIdentity(ctx context.Context, in *ownerInputs, files *providerInpu
 	if ctx == nil || ctx.Err() != nil || p == nil || observer == nil || pools == nil {
 		return fail(mounts.ErrUnavailable)
 	}
-	reader, e := kube.NewBrowserSettingsClient(observer, p.BrowserSettings.Name, p.BrowserSettings.UID, p.BrowserRootID)
+	reader, e := kube.NewBrowserSettingsReader(observer, p.BrowserSettings.Name, p.BrowserSettings.UID, p.BrowserRootID, p.BrowserSessionEpoch)
 	if e != nil {
 		return fail(mounts.ErrUnavailable)
 	}

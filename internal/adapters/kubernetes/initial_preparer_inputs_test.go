@@ -25,8 +25,7 @@ func finalInputFixture(t *testing.T, mode string) (*preparerFixture, *InitialPre
 	if e != nil || json.Unmarshal(raw, &fleet) != nil {
 		t.Fatal("synthetic fleet", e)
 	}
-	fleet.InstallationID = f.plan.InstallationID
-	services := contracts.InitialPreparationServices{Format: contracts.InitialPreparationServicesFormat, Fleet: fleet, Kubernetes: contracts.OwnerProviderEndpoint{Endpoint: f.server.URL, Roots: [][]byte{f.server.Certificate().Raw}}, Postgres: contracts.OwnerPostgresEndpoint{Host: "sql.example.test", Port: 5432, Database: "asservat", Roots: [][]byte{f.server.Certificate().Raw}, MaxConnections: 2}, AuditStore: contracts.OwnerAuditStore{Endpoint: "https://audit.example.test", Roots: [][]byte{f.server.Certificate().Raw}, Region: "test", Bucket: "audit"}, KeyService: contracts.ConfigurationKeyService{Endpoint: "https://keys.example.test", Roots: [][]byte{f.server.Certificate().Raw}, AuditMount: "transit", AuditKey: "audit"}}
+	services := contracts.InitialPreparationServices{Format: contracts.InitialPreparationServicesFormat, Fleet: fleet, IssuerEpoch: "22222222-2222-4222-8222-222222222222", Kubernetes: contracts.OwnerProviderEndpoint{Endpoint: f.server.URL, Roots: [][]byte{f.server.Certificate().Raw}}, Postgres: contracts.OwnerPostgresEndpoint{Host: "sql.example.test", Port: 5432, Database: "asservat", Roots: [][]byte{f.server.Certificate().Raw}, MaxConnections: 2}, AuditStore: contracts.OwnerAuditStore{Endpoint: "https://audit.example.test", Roots: [][]byte{f.server.Certificate().Raw}, Region: "test", Bucket: "audit"}, KeyService: contracts.ConfigurationKeyService{Endpoint: "https://keys.example.test", Roots: [][]byte{f.server.Certificate().Raw}, AuditMount: "transit", AuditKey: "audit"}}
 	fleetRaw, _ := json.Marshal(services.Fleet)
 	var parsed contracts.FleetSettings
 	if _, e := decodePermissionSpec(fleetRaw, p.protection.observer.validator.fleetSchema, &parsed); e != nil {
@@ -146,7 +145,7 @@ func TestInitialPreparationPublicInputChangedServiceIntentDenied(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	f.config.Services.Fleet.IssuerEpoch = ownerID(901)
+	f.config.Services.IssuerEpoch = ownerID(901)
 	if _, e = f.preparer(t).PrepareFinalInputs(context.Background()); e == nil {
 		t.Fatal("accepted replacement service intent")
 	}

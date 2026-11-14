@@ -2,16 +2,13 @@ package integration
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"encoding/json/jsontext"
 	"testing"
 	"time"
 
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/contracts"
-	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/privacy"
 	core "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
@@ -36,11 +33,6 @@ func qualifyRetentionTopology(t *testing.T, ctx context.Context, native kubernet
 		if err != nil {
 			t.Fatal(err)
 		}
-		canonical := jsontext.Value(b)
-		if err = canonical.Canonicalize(); err != nil {
-			t.Fatal(err)
-		}
-		pin := artifact.Digest(sha256.Sum256(canonical))
 		immutable := true
 		cm, err := native.CoreV1().ConfigMaps(namespace).Create(ctx, &core.ConfigMap{ObjectMeta: meta.ObjectMeta{Name: name}, Immutable: &immutable, Data: map[string]string{"topology.json": string(b)}}, meta.CreateOptions{})
 		if err != nil {
@@ -54,7 +46,7 @@ func qualifyRetentionTopology(t *testing.T, ctx context.Context, native kubernet
 		if _, err = native.RbacV1().Roles(namespace).Update(ctx, role, meta.UpdateOptions{}); err != nil {
 			t.Fatal(err)
 		}
-		reader, err := kube.NewRetentionTopologyClient(client, name, string(cm.UID), root, hub.ClusterID, pin)
+		reader, err := kube.NewRetentionTopologyClient(client, name, root, hub.ClusterID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -83,7 +75,7 @@ func qualifyRetentionTopology(t *testing.T, ctx context.Context, native kubernet
 		// check below uses a reader without a cached observation: it must
 		// re-read the pinned object, not merely reuse an earlier result.
 		reread := func() (privacy.PolicyTopology, error) {
-			r, err := kube.NewRetentionTopologyClient(client, name, string(cm.UID), root, hub.ClusterID, pin)
+			r, err := kube.NewRetentionTopologyClient(client, name, root, hub.ClusterID)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -103,8 +95,10 @@ func qualifyRetentionTopology(t *testing.T, ctx context.Context, native kubernet
 		if _, err = native.CoreV1().ConfigMaps(namespace).Create(ctx, replacement, meta.CreateOptions{}); err != nil {
 			t.Fatal(err)
 		}
-		if _, err = reread(); err == nil {
-			t.Fatal("same-name replacement accepted without requalification")
+		// Helm-native: the topology is read by name; a replacement is a new
+		// revision of the same named source, never the old one.
+		if replaced, err := reread(); err != nil || replaced.Revision.UID == out.Revision.UID {
+			t.Fatal("same-name replacement not read as a new revision", err)
 		}
 	}
 }

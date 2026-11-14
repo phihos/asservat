@@ -72,8 +72,7 @@ func handoverConflictProviderFixture(t *testing.T, keyService *contracts.Configu
 	if e != nil || json.Unmarshal(raw, &fleet) != nil {
 		t.Fatal("synthetic fleet unavailable")
 	}
-	fleet.InstallationID = plan.InstallationID
-	f.config.Services = &contracts.InitialPreparationServices{Format: contracts.InitialPreparationServicesFormat, Fleet: fleet, Kubernetes: contracts.OwnerProviderEndpoint{Endpoint: f.server.URL, Roots: [][]byte{f.server.Certificate().Raw}}, Postgres: contracts.OwnerPostgresEndpoint{Host: "sql.example.test", Port: 5432, Database: "asservat", Roots: [][]byte{f.server.Certificate().Raw}, MaxConnections: 2}, AuditStore: contracts.OwnerAuditStore{Endpoint: "https://audit.example.test", Roots: [][]byte{f.server.Certificate().Raw}, Region: "test", Bucket: "audit"}, KeyService: contracts.ConfigurationKeyService{Endpoint: "https://keys.example.test", Roots: [][]byte{f.server.Certificate().Raw}, AuditMount: "transit", AuditKey: "audit"}}
+	f.config.Services = &contracts.InitialPreparationServices{Format: contracts.InitialPreparationServicesFormat, Fleet: fleet, IssuerEpoch: "22222222-2222-4222-8222-222222222222", Kubernetes: contracts.OwnerProviderEndpoint{Endpoint: f.server.URL, Roots: [][]byte{f.server.Certificate().Raw}}, Postgres: contracts.OwnerPostgresEndpoint{Host: "sql.example.test", Port: 5432, Database: "asservat", Roots: [][]byte{f.server.Certificate().Raw}, MaxConnections: 2}, AuditStore: contracts.OwnerAuditStore{Endpoint: "https://audit.example.test", Roots: [][]byte{f.server.Certificate().Raw}, Region: "test", Bucket: "audit"}, KeyService: contracts.ConfigurationKeyService{Endpoint: "https://keys.example.test", Roots: [][]byte{f.server.Certificate().Raw}, AuditMount: "transit", AuditKey: "audit"}}
 	if keyService != nil {
 		selected := *keyService
 		selected.Roots = make([][]byte, len(keyService.Roots))

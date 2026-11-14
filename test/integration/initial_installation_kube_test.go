@@ -43,7 +43,6 @@ func nativeInitialInstallationInputs(t *testing.T, ctx context.Context, f fixtur
 	if json.Unmarshal(b, &doc) != nil {
 		t.Fatal("invalid fixture")
 	}
-	doc["installationID"], doc["issuerEpoch"] = w.scope.InstallationID, w.scope.IssuerEpoch
 	b, err = json.Marshal(doc)
 	if err != nil {
 		t.Fatal(err)
@@ -89,7 +88,7 @@ func nativeInitialInstallationInputs(t *testing.T, ctx context.Context, f fixtur
 	if err != nil {
 		t.Fatal(err)
 	}
-	source, err := kube.NewProtectedFleetSettings(w.clients["reader"], guard, cm.Name, string(cm.UID), w.scope.InstallationID)
+	source, err := kube.NewProtectedFleetSettings(w.clients["reader"], guard, cm.Name, string(cm.UID), w.scope.InstallationID, w.scope.IssuerEpoch)
 	if err != nil {
 		t.Fatal(err)
 	}

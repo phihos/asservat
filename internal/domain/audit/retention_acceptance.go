@@ -20,11 +20,8 @@ type RetentionAcceptance struct {
 	Bootstrap                                               *RetentionBootstrap
 }
 type RetentionBootstrap struct {
-	PoliciesDigest                     artifact.Digest
-	PolicyCount                        int
-	ReviewUID, ReviewVersion, Reviewer string
-	ReviewDigest                       artifact.Digest
-	ReviewedAt, ExpiresAt              time.Time
+	PoliciesDigest artifact.Digest
+	PolicyCount    int
 }
 
 func (r RetentionAcceptance) Valid() bool {
@@ -43,12 +40,6 @@ func (r RetentionAcceptance) Valid() bool {
 	}
 	if b := r.Bootstrap; b != nil {
 		if b.PoliciesDigest == (artifact.Digest{}) || b.PolicyCount != len(r.Policies) {
-			return false
-		}
-		if b.PolicyCount == 0 {
-			return b.ReviewUID == "" && b.ReviewVersion == "" && b.Reviewer == "" && b.ReviewDigest == (artifact.Digest{}) && b.ReviewedAt.IsZero() && b.ExpiresAt.IsZero()
-		}
-		if !identity.Text(b.ReviewUID, 64) || !identity.Text(b.ReviewVersion, 128) || !identity.Text(b.Reviewer, 256) || b.ReviewDigest == (artifact.Digest{}) || !identity.Fresh(b.ReviewedAt, b.ExpiresAt, r.CreatedAt, time.Hour) {
 			return false
 		}
 	}

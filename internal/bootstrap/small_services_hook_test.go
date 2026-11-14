@@ -6,11 +6,9 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
-	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
@@ -28,13 +26,14 @@ import (
 	"testing"
 	"time"
 
-	kube "asservat.local/asservat/internal/adapters/kubernetes"
+	"asservat.local/asservat/internal/adapters/providerconfig"
 	"asservat.local/asservat/internal/contracts"
-	"github.com/google/go-cmp/cmp"
+	batch "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/client-go/rest"
 )
 
 func smallServicesHookTLS(t *testing.T) (tls.Certificate, string) {
@@ -44,7 +43,7 @@ func smallServicesHookTLS(t *testing.T) (tls.Certificate, string) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	ca := &x509.Certificate{SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "owned preparation API root"}, IsCA: true, BasicConstraintsValid: true, KeyUsage: x509.KeyUsageCertSign, NotBefore: now.Add(-time.Minute), NotAfter: now.Add(time.Hour)}
+	ca := &x509.Certificate{SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "owned secrets API root"}, IsCA: true, BasicConstraintsValid: true, KeyUsage: x509.KeyUsageCertSign, NotBefore: now.Add(-time.Minute), NotAfter: now.Add(time.Hour)}
 	caDER, e := x509.CreateCertificate(rand.Reader, ca, ca, &caKey.PublicKey, caKey)
 	if e != nil {
 		t.Fatal(e)
@@ -61,88 +60,51 @@ func smallServicesHookTLS(t *testing.T) (tls.Certificate, string) {
 	return tls.Certificate{Certificate: [][]byte{der}, PrivateKey: key}, string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: caDER}))
 }
 
-// This fake API enforces the actual rendered namespace Role. It does not use
-// cluster-admin, grant missing rules, execute SQL or start provider services.
-func TestSmallServicesHookUsesRenderedPlanAndExactRole(t *testing.T) {
-	for _, bundledKeys := range []bool{false, true} {
-		t.Run(fmt.Sprintf("bundled-keys-%t", bundledKeys), func(t *testing.T) {
-			smallServicesRenderedHook(t, bundledKeys)
-		})
+func pemDER(t *testing.T, s string) []byte {
+	t.Helper()
+	block, _ := pem.Decode([]byte(s))
+	if block == nil {
+		t.Fatal("PEM")
 	}
+	return block.Bytes
 }
 
-func smallServicesRenderedHook(t *testing.T, bundledKeys bool) {
+// renderSecretsHook renders the chart and returns the hook's plan and Role.
+func renderSecretsHook(t *testing.T, values map[string]any) (contracts.SecretsPlan, *rbac.Role, *batch.Job) {
 	t.Helper()
 	helm, e := exec.LookPath("helm")
 	if e != nil {
 		t.Skip("Helm is required")
 	}
-	values := map[string]any{"bootstrap": smallServicesHelmBootstrap(), "services": map[string]any{
-		"postgres":    map[string]any{"provider": "bundled", "bundled": map[string]any{"image": "registry.example/postgres@sha256:" + strings.Repeat("b", 64)}},
-		"identity":    map[string]any{"provider": "keycloak", "keycloak": map[string]any{"hostname": "https://identity.example", "tlsSecretName": "operator-identity-tls", "mcpRedirectURIs": []string{"http://127.0.0.1:42000/callback"}}},
-		"objectStore": map[string]any{"provider": "seaweedfs"},
-	}}
-	if bundledKeys {
-		values["services"].(map[string]any)["keyService"] = map[string]any{"provider": "openbao"}
-	}
-	input, e := json.Marshal(values)
-	if e != nil {
+	input, _ := json.Marshal(values)
+	path := filepath.Join(t.TempDir(), "values.json")
+	if e = os.WriteFile(path, input, 0600); e != nil {
 		t.Fatal(e)
 	}
-	valuesPath := filepath.Join(t.TempDir(), "values.json")
-	if e = os.WriteFile(valuesPath, input, 0600); e != nil {
-		t.Fatal(e)
-	}
-	renderCtx, stop := context.WithTimeout(t.Context(), 15*time.Second)
+	ctx, stop := context.WithTimeout(t.Context(), 15*time.Second)
 	defer stop()
-	rendered, e := exec.CommandContext(renderCtx, helm, "template", "trial", "../../charts/asservat", "--namespace", "installation", "--kube-version", "1.35.0", "-f", valuesPath).CombinedOutput()
+	rendered, e := exec.CommandContext(ctx, helm, "template", "trial", "../../charts/asservat", "--namespace", "installation", "--kube-version", "1.35.0", "-f", "testdata/helm-fixture.yaml", "-f", path).CombinedOutput()
 	if e != nil {
 		t.Fatalf("actual Helm producer: %v\n%s", e, rendered)
 	}
-	const name = "trial-services-prepare"
-	var plan contracts.SmallServicesPreparation
+	var plan contracts.SecretsPlan
 	var role *rbac.Role
 	var binding *rbac.RoleBinding
-	var pod *core.Pod
-	var public *core.ConfigMap
-	var bootstrapPublic *core.ConfigMap
-	var bootstrapPod *core.Pod
+	var job *batch.Job
 	decoder := yaml.NewYAMLOrJSONDecoder(bytes.NewReader(rendered), 4096)
 	for {
 		var doc json.RawMessage
-		e = decoder.Decode(&doc)
-		if e == io.EOF {
+		if e = decoder.Decode(&doc); e == io.EOF {
 			break
-		}
-		if e != nil {
+		} else if e != nil {
 			t.Fatal(e)
 		}
 		var head struct {
 			Kind     string
-			Metadata struct{ Name string }
+			Metadata struct{ Name, Namespace string }
 		}
-		if json.Unmarshal(doc, &head) != nil {
-			t.Fatal("chart JSON")
-		}
-		if head.Metadata.Name != name {
-			if head.Kind == "ConfigMap" {
-				var cm core.ConfigMap
-				if json.Unmarshal(doc, &cm) != nil {
-					t.Fatal("bootstrap public ConfigMap decode")
-				}
-				if cm.Data["bootstrap.json"] != "" {
-					if bootstrapPublic != nil {
-						t.Fatal("duplicate bootstrap input producer")
-					}
-					bootstrapPublic = &cm
-				}
-			}
-			if head.Kind == "Pod" && head.Metadata.Name == "trial-bootstrap" {
-				bootstrapPod = &core.Pod{}
-				if json.Unmarshal(doc, bootstrapPod) != nil {
-					t.Fatal("bootstrap runner Pod decode")
-				}
-			}
+		// The fake API serves the release namespace only.
+		if json.Unmarshal(doc, &head) != nil || head.Metadata.Name != "trial-secrets" || head.Metadata.Namespace != "" && head.Metadata.Namespace != "installation" {
 			continue
 		}
 		switch head.Kind {
@@ -152,257 +114,269 @@ func smallServicesRenderedHook(t *testing.T, bundledKeys bool) {
 		case "RoleBinding":
 			binding = &rbac.RoleBinding{}
 			e = json.Unmarshal(doc, binding)
-		case "Pod":
-			pod = &core.Pod{}
-			e = json.Unmarshal(doc, pod)
+		case "Job":
+			job = &batch.Job{}
+			e = json.Unmarshal(doc, job)
 		case "ConfigMap":
-			public = &core.ConfigMap{}
-			e = json.Unmarshal(doc, public)
+			var cm core.ConfigMap
+			if e = json.Unmarshal(doc, &cm); e == nil {
+				plan, e = contracts.DecodeSecretsPlan(strings.NewReader(cm.Data["secrets.json"]))
+			}
 		}
 		if e != nil {
-			t.Fatal(e)
+			t.Fatal("rendered hook object rejected", head.Kind, e)
 		}
 	}
-	if role == nil || binding == nil || pod == nil || public == nil || binding.RoleRef.Kind != "Role" || binding.RoleRef.Name != role.Name || binding.Namespace != role.Namespace || len(binding.Subjects) != 1 || binding.Subjects[0].Kind != "ServiceAccount" || binding.Subjects[0].Name != pod.Spec.ServiceAccountName || binding.Subjects[0].Namespace != pod.Namespace {
-		t.Fatal("preparation consumer is not bound to rendered Role")
+	if role == nil || binding == nil || job == nil || binding.RoleRef.Name != role.Name || len(binding.Subjects) != 1 || binding.Subjects[0].Name != job.Spec.Template.Spec.ServiceAccountName {
+		t.Fatal("secrets Job is not bound to the rendered Role")
 	}
-	plan, e = contracts.DecodeSmallServicesPreparation(strings.NewReader(public.Data["preparation.json"]))
-	if e != nil {
-		t.Fatal("actual chart preparation.json rejected by closed production decoder", e)
-	}
-	if !plan.Postgres || plan.Keycloak == nil || plan.ObjectStore == nil || (plan.OpenBao != nil) != bundledKeys {
-		t.Fatal("chart did not select the requested real preparation adapters")
-	}
-	// Compare the complete actual runner before changing any transport input.
-	if bootstrapPublic == nil || bootstrapPod == nil {
-		t.Fatal("missing public bootstrap input/runner")
-	}
-	initial, e := contracts.DecodeInitialBootstrapInput(strings.NewReader(bootstrapPublic.Data["bootstrap.json"]))
-	if e != nil {
-		t.Fatal("actual initial bootstrap wire", e)
-	}
-	refs, e := contracts.DecodeInitialBootstrapRunnerInput(strings.NewReader(bootstrapPublic.Data["runner.json"]))
-	if e != nil {
-		t.Fatal("actual bootstrap runner wire", e)
-	}
-	if refs.KeycloakSecret != "trial-keycloak-state" || refs.PostgresSecret != "trial-postgres-state" || initial.IdentitySource != "bundledKeycloak" {
-		t.Fatal("runner omitted selected private-state references/public identity source")
-	}
-	digest := sha256.Sum256([]byte(bootstrapPublic.Data["bootstrap.json"] + "\n" + bootstrapPublic.Data["runner.json"]))
-	expectedRunner, e := kube.BuildInitialBootstrapRunner(kube.InitialBootstrapRunnerPlan{Namespace: initial.BootstrapNamespace, Name: initial.Name, Image: initial.Image, InputDigest: hex.EncodeToString(digest[:]), ProducerSecret: refs.ProducerSecret, SchemaSecret: refs.SchemaSecret, RetirementSecret: refs.RetirementSecret, RegistrySecret: refs.RegistrySecret, ProbeAudience: initial.ProbeAudience, ContinuationDigest: refs.ContinuationDigest, PostgresSecret: refs.PostgresSecret, KeycloakSecret: refs.KeycloakSecret, ObjectStoreSecret: refs.ObjectStoreSecret, KeyServiceSecret: refs.KeyServiceSecret})
-	if e != nil {
-		t.Fatal("actual native runner builder", e)
-	}
-	a, _ := json.Marshal(bootstrapPod)
-	b, _ := json.Marshal(expectedRunner)
-	if !bytes.Equal(a, b) {
-		t.Fatalf("actual Helm/native runner mismatch: %s", cmp.Diff(expectedRunner, bootstrapPod))
-	}
-	var mu sync.Mutex
-	secrets := map[string]*core.Secret{}
-	var creates, requests, denials []string
-	t.Cleanup(func() {
-		mu.Lock()
-		defer mu.Unlock()
-		for _, s := range secrets {
-			for _, b := range s.Data {
-				clear(b)
-			}
+	return plan, role, job
+}
+
+// secretsAPI is a fake Kubernetes API that enforces the rendered Role.
+type secretsAPI struct {
+	mu       sync.Mutex
+	t        *testing.T
+	role     *rbac.Role
+	secrets  map[string]*core.Secret
+	creates  []string
+	patches  []string
+	denials  []string
+	unknown  string
+	external map[string]bool
+}
+
+func (a *secretsAPI) allowed(verb, name string) bool {
+	for _, rule := range a.role.Rules {
+		if slices.Contains(rule.APIGroups, "") && slices.Contains(rule.Resources, "secrets") && slices.Contains(rule.Verbs, verb) && (len(rule.ResourceNames) == 0 || slices.Contains(rule.ResourceNames, name)) {
+			return true
 		}
-	})
-	allowed := func(group, resource, verb, object string) bool {
-		for _, rule := range role.Rules {
-			if !slices.Contains(rule.APIGroups, group) || !slices.Contains(rule.Resources, resource) || !slices.Contains(rule.Verbs, verb) {
-				continue
-			}
-			if len(rule.ResourceNames) == 0 || slices.Contains(rule.ResourceNames, object) {
-				return true
-			}
-		}
-		return false
 	}
-	cert, ca := smallServicesHookTLS(t)
-	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		mu.Lock()
-		defer mu.Unlock()
-		w.Header().Set("Content-Type", "application/json")
-		status := func(code int, reason string) {
-			w.WriteHeader(code)
-			_ = json.NewEncoder(w).Encode(map[string]any{"apiVersion": "v1", "kind": "Status", "code": code, "reason": reason})
-		}
-		if r.Header.Get("Authorization") != "Bearer synthetic-preparation-token" {
-			t.Error("preparation lost its actual mounted token transport")
-			status(401, "Unauthorized")
+	return false
+}
+
+func (a *secretsAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	w.Header().Set("Content-Type", "application/json")
+	status := func(code int, reason string) {
+		w.WriteHeader(code)
+		_ = json.NewEncoder(w).Encode(map[string]any{"apiVersion": "v1", "kind": "Status", "code": code, "reason": reason})
+	}
+	path := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	if len(path) < 5 || path[0] != "api" || path[1] != "v1" || path[2] != "namespaces" || path[3] != a.role.Namespace || path[4] != "secrets" || len(path) > 6 {
+		a.t.Errorf("unexpected API request %s %s", r.Method, r.URL.Path)
+		status(403, "Forbidden")
+		return
+	}
+	name := ""
+	if len(path) == 6 {
+		name = path[5]
+	}
+	verb := map[string]string{http.MethodGet: "get", http.MethodPost: "create", http.MethodPatch: "patch"}[r.Method]
+	if verb == "" || !a.allowed(verb, name) {
+		a.denials = append(a.denials, verb+" "+name)
+		status(403, "Forbidden")
+		return
+	}
+	switch verb {
+	case "get":
+		if s := a.secrets[name]; s != nil {
+			_ = json.NewEncoder(w).Encode(s)
 			return
 		}
-		path := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
-		group, offset := "", 0
-		switch {
-		case len(path) >= 5 && path[0] == "api" && path[1] == "v1" && path[2] == "namespaces":
-			offset = 3
-		case len(path) >= 6 && path[0] == "apis" && path[1] == "apps" && path[2] == "v1" && path[3] == "namespaces":
-			group, offset = "apps", 4
-		default:
-			t.Error("unexpected preparation API path")
-			status(403, "Forbidden")
-			return
-		}
-		if path[offset] != role.Namespace || len(path) < offset+2 || len(path) > offset+3 {
-			t.Error("preparation crossed namespace or subresource")
-			status(403, "Forbidden")
-			return
-		}
-		resource, object := path[offset+1], ""
-		if len(path) == offset+3 {
-			object = path[offset+2]
-		}
-		verb := ""
-		if r.Method == http.MethodGet {
-			verb = "get"
-		}
-		if r.Method == http.MethodPost {
-			verb = "create"
-		}
-		step := verb + " " + resource + "/" + object
-		requests = append(requests, step)
-		if verb == "" || !allowed(group, resource, verb, object) {
-			denials = append(denials, step)
-			status(403, "Forbidden")
-			return
-		}
-		if verb == "get" {
-			if resource == "secrets" {
-				if secret := secrets[object]; secret != nil {
-					_ = json.NewEncoder(w).Encode(secret)
-					return
-				}
-			}
-			status(404, "NotFound")
-			return
-		}
-		if resource != "secrets" || object != "" {
-			t.Error("unexpected preparation mutation")
-			status(403, "Forbidden")
-			return
-		}
-		var secret core.Secret
-		if json.NewDecoder(io.LimitReader(r.Body, 2<<20)).Decode(&secret) != nil || secret.Namespace != role.Namespace || secret.Name == "" {
-			t.Error("invalid private Secret request")
+		status(404, "NotFound")
+	case "create":
+		var s core.Secret
+		if json.NewDecoder(io.LimitReader(r.Body, 2<<20)).Decode(&s) != nil || s.Name == "" || s.Namespace != a.role.Namespace {
 			status(400, "BadRequest")
 			return
 		}
-		if secrets[secret.Name] != nil {
+		if a.secrets[s.Name] != nil {
 			status(409, "AlreadyExists")
 			return
 		}
-		if secret.Name == "trial-postgres-state" && secrets["trial-keycloak-state"] == nil {
-			t.Error("database material created before original realm/client identity")
+		if a.external[s.Name] {
+			a.t.Errorf("created overridden Secret %s", s.Name)
+		}
+		if s.Name == "trial-postgres-state" && a.secrets["trial-keycloak-state"] == nil {
+			a.t.Error("database material created before original realm/client identity")
+		}
+		s.UID = types.UID(fmt.Sprintf("99000000-0000-4000-8000-%012d", len(a.secrets)+1))
+		s.ResourceVersion = "1"
+		a.secrets[s.Name] = &s
+		a.creates = append(a.creates, s.Name)
+		if a.unknown == s.Name {
+			a.unknown = ""
+			status(500, "InternalError")
+			return
+		}
+		w.WriteHeader(201)
+		_ = json.NewEncoder(w).Encode(s)
+	case "patch":
+		s := a.secrets[name]
+		var p struct {
+			Data map[string][]byte `json:"data"`
+		}
+		d := json.NewDecoder(r.Body)
+		d.DisallowUnknownFields()
+		if s == nil || r.Header.Get("Content-Type") != "application/merge-patch+json" || d.Decode(&p) != nil || len(p.Data) == 0 {
 			status(400, "BadRequest")
 			return
 		}
-		secret.UID = types.UID(fmt.Sprintf("99000000-0000-4000-8000-%012d", len(secrets)+1))
-		secret.ResourceVersion = "1"
-		secrets[secret.Name] = &secret
-		creates = append(creates, secret.Name)
-		w.WriteHeader(201)
-		_ = json.NewEncoder(w).Encode(secret)
-	}))
+		for k, v := range p.Data {
+			s.Data[k] = v
+		}
+		a.patches = append(a.patches, name)
+		_ = json.NewEncoder(w).Encode(s)
+	}
+}
+
+func (a *secretsAPI) snapshot() map[string]map[string]string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	out := map[string]map[string]string{}
+	for name, s := range a.secrets {
+		out[name] = map[string]string{}
+		for k, v := range s.Data {
+			out[name][k] = string(v)
+		}
+	}
+	return out
+}
+
+func secretsHelmValues(mode string) map[string]any {
+	values := smallServicesHelmValues(map[string]any{
+		"postgres":    map[string]any{"provider": "bundled", "bundled": map[string]any{"image": "registry.example/postgres@sha256:" + strings.Repeat("b", 64)}},
+		"identity":    map[string]any{"provider": "keycloak", "keycloak": map[string]any{"hostname": "https://identity.example", "tlsSecretName": "operator-identity-tls", "mcpRedirectURIs": []string{"http://127.0.0.1:42000/callback"}}},
+		"objectStore": map[string]any{"provider": "seaweedfs"},
+		"keyService":  map[string]any{"provider": "openbao"},
+	})
+	values["mode"] = mode
+	return values
+}
+
+// The rendered plan and Role drive the actual command against a fake API.
+func TestSecretsHookUsesRenderedPlanAndExactRole(t *testing.T) {
+	for _, mode := range []string{"hub", "combined"} {
+		t.Run(mode, func(t *testing.T) {
+			plan, role, job := renderSecretsHook(t, secretsHelmValues(mode))
+			if job.Spec.BackoffLimit == nil || job.Spec.TTLSecondsAfterFinished == nil || job.Annotations["helm.sh/hook"] != "pre-install,pre-upgrade" || job.Annotations["helm.sh/hook-delete-policy"] != "before-hook-creation,hook-succeeded" {
+				t.Fatal("secrets hook is not a bounded pre-install/pre-upgrade Job")
+			}
+			if c := job.Spec.Template.Spec.Containers; len(c) != 1 || !slices.Equal(c[0].Command, []string{"/asservat", "secrets"}) {
+				t.Fatal("secrets Job does not run `asservat secrets`")
+			}
+			api := &secretsAPI{t: t, role: role, secrets: map[string]*core.Secret{}, unknown: "trial-sql-hub-api"}
+			cert, ca := smallServicesHookTLS(t)
+			server := httptest.NewUnstartedServer(api)
+			server.TLS = &tls.Config{Certificates: []tls.Certificate{cert}, MinVersion: tls.VersionTLS12}
+			server.StartTLS()
+			defer server.Close()
+			config := &rest.Config{Host: server.URL, BearerToken: "synthetic", TLSClientConfig: rest.TLSClientConfig{CAData: []byte(ca)}}
+			kubeAPI := contracts.OwnerProviderEndpoint{Endpoint: "https://kubernetes.default.svc", Roots: [][]byte{pemDER(t, ca)}}
+			if e := runSecrets(t.Context(), plan, config, kubeAPI); e != nil {
+				t.Fatalf("fresh run: %v; denied=%v", e, api.denials)
+			}
+			want := []string{"trial-keycloak-state", "trial-postgres-state", "trial-objectstore-state", "trial-openbao-state", "trial-ids",
+				"trial-sql-hub-api", "trial-sql-hub-worker", "trial-sql-federation", "trial-sql-publisher", "trial-sql-key-service", "trial-audit-mac", "trial-artifact-key"}
+			for _, p := range contracts.ObjectStorePrincipals(mode) {
+				want = append(want, "trial-s3-"+p)
+			}
+			// The peer listeners' serving TLS (no existing Secret or issuer).
+			want = append(want, "trial-objectstore-iam", "trial-federation-tls", "trial-key-service-tls")
+			if !slices.Equal(api.creates, want) || len(api.patches) != 0 {
+				t.Fatalf("creates=%v patches=%v", api.creates, api.patches)
+			}
+			first := api.snapshot()
+			ids := first["trial-ids"]
+			if len(ids) != len(contracts.InstallationIDKeys()) {
+				t.Fatal("IDs Secret keys", ids)
+			}
+			for _, component := range contracts.SQLComponents() {
+				purposes, _ := contracts.SQLComponentPurposes(component)
+				data := first["trial-sql-"+component]
+				if len(data) != len(purposes) {
+					t.Fatalf("%s keys=%d want %d", component, len(data), len(purposes))
+				}
+				for _, purpose := range purposes {
+					c, e := contracts.DecodeOwnerSQLCredential(strings.NewReader(data["sql-"+purpose+".json"]))
+					name, _ := sqlRoleName(ids["installationID"], purpose)
+					if e != nil || c.Username != name || len(c.Password) < 40 {
+						t.Fatal("invalid SQL credential", component, purpose)
+					}
+				}
+			}
+			mac := first["trial-audit-mac"]
+			if len(mac[contracts.AuditMACInputKey]) != 32 || mac[contracts.AuditMACAccountVersion] != ids["roleSetupID"]+"-account/v1" || mac[contracts.AuditMACInputVersion] != ids["roleSetupID"]+"-input/v1" || !strings.Contains(first["trial-artifact-key"][contracts.ArtifactKeySecretKey], `"purpose":"artifact"`) {
+				t.Fatal("audit MAC or artifact key material")
+			}
+			// hub-api's projection carries the same stored keys and setup ID.
+			projection, e := contracts.DecodePublicAuditKeys(strings.NewReader(mac[contracts.PublicAuditKeysFile]))
+			if e != nil || projection.Format != contracts.PublicAuditKeysFormat || projection.InstallationID != ids["installationID"] || projection.SetupID != ids["roleSetupID"] ||
+				string(projection.Material.AccountKey) != mac[contracts.AuditMACAccountKey] || string(projection.Material.InputKey) != mac[contracts.AuditMACInputKey] || projection.Material.AccountVersion != mac[contracts.AuditMACAccountVersion] {
+				t.Fatal("public audit keys projection", e)
+			}
+			var policies map[string]json.RawMessage
+			if json.Unmarshal([]byte(first["trial-objectstore-iam"][SeaweedBucketPoliciesKey]), &policies) != nil || len(policies) != 2 || policies["trial-audit"] == nil || policies["trial-evidence"] == nil {
+				t.Fatal("bucket policies", first["trial-objectstore-iam"][SeaweedBucketPoliciesKey])
+			}
+			iam := first["trial-objectstore-iam"][providerconfig.SeaweedConfigKey]
+			for _, p := range contracts.ObjectStorePrincipals(mode) {
+				var c contracts.OwnerStorageCredential
+				if json.Unmarshal([]byte(first["trial-s3-"+p][contracts.ObjectStoreCredentialFile]), &c) != nil || !strings.Contains(iam, c.AccessKeyID) {
+					t.Fatal("IAM lacks principal", p)
+				}
+			}
+			// A rerun (helm upgrade) changes nothing.
+			if e := runSecrets(t.Context(), plan, config, kubeAPI); e != nil {
+				t.Fatalf("rerun: %v; denied=%v", e, api.denials)
+			}
+			if len(api.creates) != len(want) || len(api.patches) != 0 || fmt.Sprint(api.snapshot()) != fmt.Sprint(first) {
+				t.Fatal("rerun rotated or rewrote a Secret")
+			}
+			// A missing key (a new purpose after upgrade) is added; others stay.
+			api.mu.Lock()
+			delete(api.secrets["trial-sql-publisher"].Data, "sql-context-publish.json")
+			api.mu.Unlock()
+			if e := runSecrets(t.Context(), plan, config, kubeAPI); e != nil {
+				t.Fatal(e)
+			}
+			after := api.snapshot()
+			if !slices.Equal(api.patches, []string{"trial-sql-publisher"}) || after["trial-sql-publisher"]["sql-publication-gate.json"] != first["trial-sql-publisher"]["sql-publication-gate.json"] || after["trial-sql-publisher"]["sql-context-publish.json"] == "" {
+				t.Fatal("missing key not added in place", api.patches)
+			}
+			if len(api.denials) != 0 {
+				t.Fatal("rendered Role denied a request", api.denials)
+			}
+		})
+	}
+}
+
+// existingSecret overrides are neither created nor patched; the IDs override
+// is only read.
+func TestSecretsHookHonoursExistingSecretOverrides(t *testing.T) {
+	values := secretsHelmValues("hub")
+	values["secrets"] = map[string]any{"ids": map[string]any{"existingSecret": "operator-ids"}, "sql-hub-api": map[string]any{"existingSecret": "operator-hub-sql"}, "artifact-key": map[string]any{"existingSecret": "operator-artifact"}}
+	plan, role, _ := renderSecretsHook(t, values)
+	if plan.IDs.Secret != "operator-ids" || plan.IDs.Generate || plan.ArtifactKey != "" || slices.ContainsFunc(plan.SQL, func(s contracts.SecretsSQL) bool { return s.Component == "hub-api" }) {
+		t.Fatal("overrides not reflected in plan", plan)
+	}
+	ids := map[string][]byte{}
+	for i, key := range contracts.InstallationIDKeys() {
+		ids[key] = fmt.Appendf(nil, "10000000-0000-4000-8000-%012d", i+1)
+	}
+	api := &secretsAPI{t: t, role: role, secrets: map[string]*core.Secret{"operator-ids": {Data: ids}}, external: map[string]bool{"operator-hub-sql": true, "operator-artifact": true}}
+	cert, ca := smallServicesHookTLS(t)
+	server := httptest.NewUnstartedServer(api)
 	server.TLS = &tls.Config{Certificates: []tls.Certificate{cert}, MinVersion: tls.VersionTLS12}
 	server.StartTLS()
 	defer server.Close()
-	// Only the transport endpoint and its real current CA replace chart data.
-	plan.Kubernetes.Endpoint = server.URL
-	plan.Kubernetes.RootsPEM = ca
-	directory := t.TempDir()
-	writePlan := func() {
-		t.Helper()
-		raw, e := json.Marshal(plan)
-		if e != nil {
-			t.Fatal(e)
-		}
-		if e = os.WriteFile(filepath.Join(directory, "preparation.json"), raw, 0600); e != nil {
-			t.Fatal(e)
-		}
+	config := &rest.Config{Host: server.URL, BearerToken: "synthetic", TLSClientConfig: rest.TLSClientConfig{CAData: []byte(ca)}}
+	if e := runSecrets(t.Context(), plan, config, contracts.OwnerProviderEndpoint{Endpoint: "https://kubernetes.default.svc", Roots: [][]byte{pemDER(t, ca)}}); e != nil {
+		t.Fatalf("%v; denied=%v", e, api.denials)
 	}
-	writePlan()
-	if e = os.WriteFile(filepath.Join(directory, "administrator-token"), []byte("synthetic-preparation-token"), 0600); e != nil {
-		t.Fatal(e)
-	}
-	files, e := os.OpenRoot(directory)
-	if e != nil {
-		t.Fatal(e)
-	}
-	defer files.Close()
-	if e = runSmallServicesPreparation(t.Context(), files); e != nil {
-		mu.Lock()
-		d := slices.Clone(denials)
-		mu.Unlock()
-		t.Fatalf("fresh rendered hook: %v; denied=%v", e, d)
-	}
-	mu.Lock()
-	order := slices.Clone(creates)
-	original := map[string]*core.Secret{}
-	for name, v := range secrets {
-		original[name] = v.DeepCopy()
-	}
-	mu.Unlock()
-	defer func() {
-		for _, v := range original {
-			for _, b := range v.Data {
-				clear(b)
-			}
-		}
-	}()
-	expectedOrder := []string{"trial-keycloak-state", "trial-postgres-state", "trial-objectstore-state", "trial-objectstore-iam"}
-	if bundledKeys {
-		expectedOrder = append(expectedOrder, "trial-openbao-state")
-	}
-	if !slices.Equal(order, expectedOrder) {
-		t.Fatalf("actual preparation order=%v", order)
-	}
-	if e = runSmallServicesPreparation(t.Context(), files); e != nil {
-		mu.Lock()
-		d := slices.Clone(denials)
-		mu.Unlock()
-		t.Fatalf("retained rendered hook: %v; denied=%v", e, d)
-	}
-	assertUnchanged := func() {
-		t.Helper()
-		mu.Lock()
-		defer mu.Unlock()
-		if len(creates) != len(expectedOrder) || len(secrets) != len(original) {
-			t.Fatal("repeat/changed target created new private state")
-		}
-		for name, before := range original {
-			now := secrets[name]
-			if now == nil || now.UID != before.UID || now.ResourceVersion != before.ResourceVersion || len(now.Data) != len(before.Data) {
-				t.Fatal("retained private identity changed")
-			}
-			for key, raw := range before.Data {
-				if !bytes.Equal(raw, now.Data[key]) {
-					t.Fatal("retained private bytes changed")
-				}
-			}
-		}
-	}
-	assertUnchanged()
-	// A legitimate external DB selection is structurally valid, but cannot
-	// replace the target already bound into retained Keycloak material. No SQL
-	// credential/CA files are present, and only the exact KC state GET may occur.
-	plan.Keycloak.Database.Host = "changed-postgres.example"
-	plan.KeycloakExternalDatabase = true
-	writePlan()
-	mu.Lock()
-	requestCount := len(requests)
-	mu.Unlock()
-	if e = runSmallServicesPreparation(t.Context(), files); e == nil {
-		t.Fatal("changed retained Keycloak DB target accepted")
-	}
-	assertUnchanged()
-	mu.Lock()
-	after := slices.Clone(requests[requestCount:])
-	mu.Unlock()
-	if !slices.Equal(after, []string{"get secrets/trial-keycloak-state"}) {
-		t.Fatalf("changed target reached later preparation or SQL prerequisites: %v", after)
+	if slices.Contains(api.creates, "trial-ids") || len(api.patches) != 0 || !strings.Contains(string(api.secrets["trial-sql-hub-worker"].Data["sql-permission-accept.json"]), "as_10000000000040008000000000000001_pub_") {
+		t.Fatal("override IDs not used", api.creates)
 	}
 }

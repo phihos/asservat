@@ -29,7 +29,7 @@ func (s *InitialPreparer) FinalInputsEnabled() bool { return s != nil && s.servi
 func (s *InitialPreparer) checkedServices(v contracts.InitialPreparationServices) (contracts.InitialPreparationServices, error) {
 	var zero contracts.InitialPreparationServices
 	raw, e := json.Marshal(v)
-	if !s.ActivationPreparationEnabled() || e != nil || len(raw) > 24<<10 || contracts.InitialInstallerFormatForServices(v.Format) == "" || v.Fleet.InstallationID != s.plan.InstallationID || !authorization.UUID(v.Fleet.IssuerEpoch) {
+	if !s.ActivationPreparationEnabled() || e != nil || len(raw) > 24<<10 || contracts.InitialInstallerFormatForServices(v.Format) == "" || !authorization.UUID(v.IssuerEpoch) {
 		return zero, cfg.ErrInvalid
 	}
 	fleet, _ := json.Marshal(v.Fleet)
@@ -95,7 +95,7 @@ func (s *InitialPreparer) inputConfiguration(w contracts.InitialPreparationRoot)
 	}
 	p := s.plan.Workload
 	var e error
-	c = contracts.InitialInstaller{Format: contracts.InitialInstallerFormatForServices(s.services.Format), InstallationID: s.plan.InstallationID, ClusterID: s.plan.ClusterID, IssuerEpoch: s.services.Fleet.IssuerEpoch, Pod: contracts.WorkerObjectReference{Name: p.Name, UID: w.Activation.Pod.Receipt.UID}, PodSpecDigest: w.Activation.Pod.SpecDigest, Configuration: p.Configuration, Kubernetes: s.services.Kubernetes, Postgres: s.services.Postgres, AuditStore: s.services.AuditStore, KeyService: s.services.KeyService}
+	c = contracts.InitialInstaller{Format: contracts.InitialInstallerFormatForServices(s.services.Format), InstallationID: s.plan.InstallationID, ClusterID: s.plan.ClusterID, IssuerEpoch: s.services.IssuerEpoch, Pod: contracts.WorkerObjectReference{Name: p.Name, UID: w.Activation.Pod.Receipt.UID}, PodSpecDigest: w.Activation.Pod.SpecDigest, Configuration: p.Configuration, Kubernetes: s.services.Kubernetes, Postgres: s.services.Postgres, AuditStore: s.services.AuditStore, KeyService: s.services.KeyService}
 	if s.plan.SchemaInitialization != "" {
 		if s.plan.SchemaInitialization != contracts.InitialSchemaProtocol || w.Schema == nil || w.Schema.CompletedAt == nil || !s.validSchema(w) {
 			return c, cfg.ErrChanged

@@ -222,7 +222,7 @@ func newPreparationPhaseBudget(t *testing.T) (*preparationPhaseBudget, evidence.
 		t.Fatal("download policy observations", err)
 	}
 	f.environment = authapp.CurrentDownloadEnvironment{RootID: root, InstallationID: installation, Policies: observations, Recovery: f, Processing: f, Now: time.Now}
-	f.profile = value.DownloadWorkerProfile{Configuration: rev, InstallationID: installation, ClusterID: path.AcquisitionClusterID, Namespace: "workers", NamespaceUID: "workers-uid", ServiceAccount: "worker", ServiceAccountUID: "worker-uid", Image: "synthetic.invalid/worker@sha256:" + strings.Repeat("1", 64), ControlConfig: "control", ControlConfigUID: "control-uid", PriorityClass: "worker", PriorityClassUID: "priority-uid", ControlDigest: artifact.Digest{1}, CPUMillis: 100, MemoryBytes: 64 << 20, MaxRuntime: time.Minute, StoreCredentialSecret: "reader", StoreCredentialSecretUID: ownerID(19103)}
+	f.profile = value.DownloadWorkerProfile{Configuration: rev, InstallationID: installation, ClusterID: path.AcquisitionClusterID, Namespace: "workers", NamespaceUID: "workers-uid", ServiceAccount: "worker", ServiceAccountUID: "worker-uid", Image: "synthetic.invalid/worker@sha256:" + strings.Repeat("1", 64), ControlConfig: "control", ControlConfigUID: "control-uid", PriorityClass: "worker", PriorityClassUID: "priority-uid", CPUMillis: 100, MemoryBytes: 64 << 20, MaxRuntime: time.Minute, StoreCredentialSecret: "reader", StoreCredentialSecretUID: ownerID(19103)}
 	if !f.a.Valid(now) || !f.source.Valid(now) || !f.record.Retained.Valid() || !f.processing.Valid(now) || !f.recovery.Valid(now) || !f.profile.Valid() {
 		t.Fatal("invalid synthetic preparation facts")
 	}

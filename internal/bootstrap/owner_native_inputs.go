@@ -31,13 +31,6 @@ func nativeKubernetesTokenName(c contracts.OwnerNativeWorkerAPI) string {
 	return contracts.NativeKubernetesTokenFile(c.ClusterID, c.Namespace.Name)
 }
 
-// nativeKubernetesProbeTokenName is the worker namespace's separate probe
-// credential (ADR-204 decision 2): it proves the worker profile source's guard
-// by a denied dry-run update, as kube-probe.token does in the hub namespace.
-func nativeKubernetesProbeTokenName(c contracts.OwnerNativeWorkerAPI) string {
-	return contracts.NativeKubernetesProbeTokenFile(c.ClusterID, c.Namespace.Name)
-}
-
 // workerAPIClient is one pinned worker API's client for one fixed token file
 // of the backend projection; the returned func closes its HTTP transport.
 func (d *OwnerDeployment) workerAPIClient(a contracts.OwnerNativeWorkerAPI, token string) (*kube.PermissionClient, func(), error) {
@@ -158,13 +151,18 @@ func (d *OwnerDeployment) nativeConfiguration(ctx context.Context, pool *pgxpool
 	}
 	pins := make([]kube.RetentionTopologyPin, len(all))
 	for i, p := range all {
-		b, _ := hex.DecodeString(p.SHA256)
-		pins[i] = kube.RetentionTopologyPin{TargetClusterID: p.TargetClusterID, Name: p.Name, UID: p.UID}
-		copy(pins[i].ContentDigest[:], b)
+		pins[i] = kube.RetentionTopologyPin{TargetClusterID: p.TargetClusterID, Name: p.Name}
 	}
 	topologies, err := kube.NewRetentionTopologies(observer, c.PermissionRootID, pins)
 	if err != nil {
 		return nil, err
+	}
+	// mode=combined: the hub cluster is also a capture target; its topology
+	// names the hub retention source only and is served in process.
+	if d.inputs.offer != nil {
+		if err = topologies.AddHubTopology(observer, c.PermissionRootID); err != nil {
+			return nil, &fixedStepError{"local-cluster-topology", err}
+		}
 	}
 	retention, err := postgres.NewRetentionTransactionGuard(c.PermissionRootID, topologies)
 	if err != nil {

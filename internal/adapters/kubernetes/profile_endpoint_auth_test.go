@@ -35,44 +35,6 @@ func TestProfileEndpointAuthorizationTLSAndExactAudiences(t *testing.T) {
 	}
 }
 
-func TestRegionalProfileAuthorizationUsesExistingInputOnly(t *testing.T) {
-	offer := contracts.RegionalOffer{}
-	baseline := RegionalWorkload(offer, true, true)
-	authorized := RegionalWorkload(offer, true, true, true)
-	before, err := connectorAPIInputNames(baseline.Spec.Template.Spec)
-	if err != nil {
-		t.Fatal(err)
-	}
-	after, err := connectorAPIInputNames(authorized.Spec.Template.Spec)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(before) != len(after) {
-		t.Fatal("authorization added input object")
-	}
-	for k := range after {
-		if !before[k] {
-			t.Fatal("new input/API scope", k)
-		}
-	}
-	count := 0
-	for _, s := range authorized.Spec.Template.Spec.Volumes[0].Projected.Sources {
-		if s.Secret != nil {
-			for _, item := range s.Secret.Items {
-				if item.Key == contracts.RegionalProfileAuthorizationFile {
-					if s.Secret.Name != RegionalEvidence {
-						t.Fatal("authorization outside existing bundle")
-					}
-					count++
-				}
-			}
-		}
-	}
-	if count != 1 {
-		t.Fatal("fixed private projection missing")
-	}
-}
-
 func TestProfileAuthorizationMapRequiresExactConfiguredNames(t *testing.T) {
 	endpoints := []contracts.RegionalProfileEndpoint{{Name: "pprof", Credential: &contracts.RegionalProfileEndpointCredential{}}}
 	good := contracts.RegionalProfileAuthorization{Format: contracts.RegionalProfileAuthorizationFormat, Entries: []contracts.RegionalProfileAuthorizationEntry{{Name: "pprof", Authorization: []byte("Bearer synthetic-private")}}}

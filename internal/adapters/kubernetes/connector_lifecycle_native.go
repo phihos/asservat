@@ -12,16 +12,15 @@ import (
 	core "k8s.io/api/core/v1"
 )
 
-func (o *connectorLifecycleOperation) configuration(data map[string]string, observed, until time.Time) (app.ConnectorIdentityConfiguration, time.Time, error) {
+func (o *connectorLifecycleOperation) configuration(observed, until time.Time) (app.ConnectorIdentityConfiguration, time.Time, error) {
 	s := o.reader
-	c, rootsUntil, err := s.source.decodeConfiguration(data)
+	c, rootsUntil, err := s.source.decode()
 	until = identity.Earlier(until, identity.Earlier(rootsUntil, c.Backing.Policy.ValidUntil))
-	c.Source.Observation.Profile.ProtectionDigest = s.source.protection.digest
+	c.Source.Observation.Profile.ProtectionDigest = s.source.protection
 	c.Source.Observation.ObservedAt, c.Source.Observation.FreshUntil = observed, until
 	p := c.Source.Observation.Profile
 	if err != nil || !c.Valid(s.client.now()) || p.Suspended || p.Retiring || p.Binding != o.request.Binding.Process.Binding ||
-		p.Deployment.Namespace != s.client.control.Name || p.Deployment.NamespaceUID != s.client.control.UID ||
-		p.Deployment.Deployment != s.guard.plan.Deployment || p.Deployment.DeploymentUID != s.guard.plan.DeploymentUID {
+		!s.workload.matches(s.client, p.Deployment.Namespace, p.Deployment.ServiceAccount, p.Deployment.Deployment) {
 		return app.ConnectorIdentityConfiguration{}, until, value.ErrUnavailable
 	}
 	if o.first != nil && (o.first.Source.Roles != c.Source.Roles || !o.first.Source.Observation.SameSource(c.Source.Observation) || !connectorBackingEqual(*o.backing, c.Backing)) {
@@ -30,19 +29,13 @@ func (o *connectorLifecycleOperation) configuration(data map[string]string, obse
 	return c, until, nil
 }
 
-// sourceBoundary reads the exact source ConfigMap under ordinary RBAC,
-// bracketed by namespace reads. A full value read still follows the boundary.
+// sourceBoundary opens the operation with one observation of the fixed
+// identity document.
 func (o *connectorLifecycleOperation) sourceBoundary(ctx context.Context, start, until time.Time) (app.ConnectorIdentityConfiguration, time.Time, error) {
-	s := o.reader
-	var zero app.ConnectorIdentityConfiguration
-	data, _, err := s.client.installationConfig(ctx, s.source.name, s.source.uid)
-	if err != nil {
-		return zero, until, err
+	if o.reader.client.current(ctx, start, 5*time.Second) != nil {
+		return app.ConnectorIdentityConfiguration{}, until, cfg.ErrChanged
 	}
-	if s.client.current(ctx, start, 5*time.Second) != nil {
-		return zero, until, cfg.ErrChanged
-	}
-	return o.configuration(data, start, until)
+	return o.configuration(start, until)
 }
 
 func (o *connectorLifecycleOperation) boundary(ctx context.Context, start, until time.Time) (value.ConnectorProcessProof, app.ConnectorIdentityConfiguration, time.Time, error) {
@@ -55,12 +48,12 @@ func (o *connectorLifecycleOperation) boundary(ctx context.Context, start, until
 	}
 	call, cancel := context.WithDeadline(ctx, until)
 	defer cancel()
-	g, p := s.guard, first.Source.Observation.Profile.Deployment
+	w, p := s.workload, first.Source.Observation.Profile.Deployment
 	ns, err := s.client.namespace(call, s.client.control)
 	if err != nil || ns.Deleting {
 		return proof, zero, until, cfg.ErrChanged
 	}
-	deployment, err := readPinnedDeployment(call, s.client, g.plan.ControlNamespace.Name, g.plan.Deployment, g.plan.DeploymentUID)
+	deployment, err := readPinnedDeployment(call, s.client, w.Namespace, w.Deployment, w.DeploymentUID)
 	if err != nil {
 		return proof, zero, until, err
 	}
@@ -87,7 +80,7 @@ func (o *connectorLifecycleOperation) boundary(ctx context.Context, start, until
 	if err != nil {
 		return proof, zero, until, err
 	}
-	lastWork, err := lifecycleWorkloadObjects(p, o.request.Binding.Process, name, deployment, replica, last)
+	lastWork, err := lifecycleWorkloadObjects(p, w.DeploymentUID, o.request.Binding.Process, name, deployment, replica, last)
 	if err != nil || lastWork != work {
 		return proof, zero, until, cfg.ErrChanged
 	}
@@ -96,12 +89,7 @@ func (o *connectorLifecycleOperation) boundary(ctx context.Context, start, until
 		return proof, zero, until, cfg.ErrChanged
 	}
 	// The final value read follows the complete workload boundary.
-	observed := s.client.now()
-	data, _, err := s.client.installationConfig(lastCall, s.source.name, s.source.uid)
-	if err != nil {
-		return proof, zero, until, err
-	}
-	configuration, until, err := o.configuration(data, observed, until)
+	configuration, until, err := o.configuration(s.client.now(), until)
 	if err != nil || first.Source.Roles != configuration.Source.Roles || !first.Source.Observation.SameSource(configuration.Source.Observation) || !connectorBackingEqual(first.Backing, configuration.Backing) || lastCall.Err() != nil {
 		return proof, zero, until, cfg.ErrChanged
 	}
@@ -122,16 +110,7 @@ func (o *connectorLifecycleOperation) currentValues(ctx context.Context, start, 
 	if err != nil || ns.Deleting {
 		return proof, zero, until, cfg.ErrChanged
 	}
-	observed := s.client.now()
-	raw, err := s.client.raw(ctx, "/api/v1/namespaces/"+s.client.control.Name+"/configmaps/"+s.source.name, nil)
-	if err != nil {
-		return proof, zero, until, err
-	}
-	data, _, err := s.client.decodeInstallationConfig(raw, s.source.name, s.source.uid, false)
-	if err != nil {
-		return proof, zero, until, err
-	}
-	configuration, until, err := o.configuration(data, observed, until)
+	configuration, until, err := o.configuration(s.client.now(), until)
 	if err != nil {
 		return proof, zero, until, err
 	}
@@ -163,7 +142,7 @@ func (o *connectorLifecycleOperation) currentValues(ctx context.Context, start, 
 
 func (o *connectorLifecycleOperation) review(ctx context.Context, p value.ConnectorDeployment) (string, time.Time, error) {
 	process, s := o.request.Binding.Process, o.reader
-	name, err := reviewBoundPodToken(ctx, s.client, o.token, ConnectorEnrollmentAudience(process.Binding.InstallationID), p.Namespace, p.ServiceAccount, p.AccountUID, process.PodUID)
+	name, err := reviewBoundPodToken(ctx, s.client, o.token, ConnectorEnrollmentAudience, p.Namespace, p.ServiceAccount, s.workload.AccountUID, process.PodUID)
 	if err != nil {
 		return "", time.Time{}, value.ErrDenied
 	}
@@ -180,7 +159,7 @@ func (o *connectorLifecycleOperation) workload(ctx context.Context, p value.Conn
 	var replica apps.ReplicaSet
 	reader := &OwnerEndpoints{client: o.reader.client}
 	account, err := ownerResource[core.ServiceAccount](reader, ctx, "/api/v1/namespaces/"+p.Namespace+"/serviceaccounts/"+p.ServiceAccount, "v1", "ServiceAccount")
-	if err != nil || !ownerMetadata(account.ObjectMeta, p.Namespace, p.ServiceAccount, p.AccountUID) {
+	if err != nil || !ownerMetadata(account.ObjectMeta, p.Namespace, p.ServiceAccount, o.reader.workload.AccountUID) {
 		return zero, pod, replica, value.ErrUnavailable
 	}
 	var deployment apps.Deployment
@@ -204,12 +183,12 @@ func (o *connectorLifecycleOperation) workload(ctx context.Context, p value.Conn
 	if err != nil {
 		return zero, pod, replica, err
 	}
-	w, err := lifecycleWorkloadObjects(p, o.request.Binding.Process, name, deployment, replica, pod)
+	w, err := lifecycleWorkloadObjects(p, o.reader.workload.DeploymentUID, o.request.Binding.Process, name, deployment, replica, pod)
 	return w, pod, replica, err
 }
 
-func lifecycleWorkloadObjects(p value.ConnectorDeployment, process value.ConnectorProcessIdentity, name string, deployment apps.Deployment, replica apps.ReplicaSet, pod core.Pod) (ownerEnrollmentWorkload, error) {
-	if !ownerMetadata(deployment.ObjectMeta, p.Namespace, p.Deployment, p.DeploymentUID) || deployment.Spec.Template.Spec.ServiceAccountName != p.ServiceAccount || deployment.Spec.Replicas == nil || *deployment.Spec.Replicas < 1 ||
+func lifecycleWorkloadObjects(p value.ConnectorDeployment, deploymentUID string, process value.ConnectorProcessIdentity, name string, deployment apps.Deployment, replica apps.ReplicaSet, pod core.Pod) (ownerEnrollmentWorkload, error) {
+	if !ownerMetadata(deployment.ObjectMeta, p.Namespace, p.Deployment, deploymentUID) || deployment.Spec.Template.Spec.ServiceAccountName != p.ServiceAccount || deployment.Spec.Replicas == nil || *deployment.Spec.Replicas < 1 ||
 		!ownerMetadata(pod.ObjectMeta, p.Namespace, name, process.PodUID) || pod.Spec.ServiceAccountName != p.ServiceAccount || pod.Spec.NodeName == "" || pod.Spec.HostNetwork || pod.Spec.HostPID || pod.Spec.HostIPC || len(pod.Spec.EphemeralContainers) != 0 ||
 		pod.Status.Phase != core.PodPending && pod.Status.Phase != core.PodRunning || !ownerEnrollmentSelector(deployment.Spec.Selector, pod.Labels) {
 		return ownerEnrollmentWorkload{}, cfg.ErrChanged
@@ -219,7 +198,7 @@ func lifecycleWorkloadObjects(p value.ConnectorDeployment, process value.Connect
 		return ownerEnrollmentWorkload{}, cfg.ErrChanged
 	}
 	parent, ok := ownerController(replica.OwnerReferences, "Deployment", "apps/v1")
-	if !ok || parent.Name != p.Deployment || string(parent.UID) != p.DeploymentUID {
+	if !ok || parent.Name != p.Deployment || string(parent.UID) != deploymentUID {
 		return ownerEnrollmentWorkload{}, cfg.ErrChanged
 	}
 	return connectorProcessWorkload(p, process, name, deployment, replica, pod)

@@ -10,9 +10,9 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"net/netip"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -26,54 +26,65 @@ import (
 	auditapp "asservat.local/asservat/internal/application/audit"
 	fleetapp "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/contracts"
-	"asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/configuration"
 	value "asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/transport/clustercredential"
 	"asservat.local/asservat/internal/transport/connectorlifecycle"
 	"github.com/jackc/pgx/v5/pgxpool"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 )
 
 // Federation is the ADR-170 hub process for connector-facing duties. It serves
-// the ADR-169 lifecycle channel for installer-pinned peers with the real SQL
-// duties, encrypted audit and connector PKI issuer. It holds no browser, MCP,
-// evidence, owner-signing or recovery-activation authority; with the optional
-// owner input it answers ADR-172 owner discovery and authentication reads.
+// the ADR-169 lifecycle channel for staged peers with the real SQL duties,
+// encrypted audit and connector PKI issuer, and answers ADR-172 owner
+// discovery and authentication reads. It holds no browser, MCP, evidence,
+// owner-signing or recovery-activation authority.
 type Federation struct {
 	handler  *connectorlifecycle.Handler
 	rotation *clustercredential.Handler
 	tls      *tls.Config
 	port     int
 	closers  []func()
-	// providers is set with ProviderAuthentication (ADR-193): Kubernetes-auth
-	// provider lifetimes, primed before serving and refreshed while serving.
+	// providers are the Kubernetes-auth provider lifetimes (ADR-193), primed
+	// before serving and refreshed while serving.
 	providers *kms.InstalledFederationProviderEffects
 }
 
-// RunFederation serves until ctx ends. All inputs come from the fixed
-// installation-owned projection; no flag or request can replace them.
+// federationInputs are the Helm-rendered configuration plus the generated
+// installation IDs; the federation's own values never come from a request.
+type federationInputs struct {
+	contracts.FederationConfig
+	contracts.ServiceIDs
+}
+
+// RunFederation serves until ctx ends from the fixed mounted inputs.
 func RunFederation(ctx context.Context) error {
 	files, err := os.OpenRoot(contracts.FederationDeploymentRoot)
 	if err != nil {
 		return errors.Join(mounts.ErrUnavailable, err)
 	}
 	defer files.Close()
-	f, err := NewFederation(ctx, files)
+	ids, err := os.OpenRoot(contracts.IDsRoot)
+	if err != nil {
+		return errors.Join(mounts.ErrUnavailable, err)
+	}
+	defer ids.Close()
+	f, err := NewFederation(ctx, files, ids)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
 	serve, stop := context.WithCancel(ctx)
 	defer stop()
-	if f.providers != nil {
-		if err = f.providers.Prime(ctx); err != nil {
-			return errors.Join(mounts.ErrUnavailable, err)
-		}
-		// A stopped provider supervisor stops serving: issuance and audit
-		// would otherwise fail later without a visible process stop.
-		go func() { _ = f.providers.Run(serve); stop() }()
+	if err = f.providers.Prime(ctx); err != nil {
+		return errors.Join(mounts.ErrUnavailable, err)
 	}
+	// A stopped provider supervisor stops serving: issuance and audit would
+	// otherwise fail later without a visible process stop.
+	go func() { _ = f.providers.Run(serve); stop() }()
 	listener, err := (&net.ListenConfig{KeepAlive: -1}).Listen(ctx, "tcp", net.JoinHostPort("", strconv.Itoa(f.port)))
 	if err != nil {
 		return errors.Join(mounts.ErrUnavailable, err)
@@ -84,40 +95,31 @@ func RunFederation(ctx context.Context) error {
 	return err
 }
 
-func readFederationDeployment(ctx context.Context, files *os.Root) (contracts.FederationDeployment, error) {
-	b, err := mounts.Read(ctx, files, "federation.json", contracts.FederationDeploymentMaxBytes)
+func readFederationInputs(ctx context.Context, files, ids *os.Root) (federationInputs, error) {
+	c, err := readServiceConfig(ctx, files, contracts.DecodeFederationConfig)
 	if err != nil {
-		return contracts.FederationDeployment{}, mounts.ErrUnavailable
+		return federationInputs{}, err
 	}
-	defer clear(b)
-	c, err := contracts.DecodeFederationDeployment(bytes.NewReader(b))
-	k, p := c.KeyService, c.Postgres
-	if err != nil || c.Format != contracts.FederationDeploymentFormat || !authorization.UUID(c.InstallationID) || !authorization.UUID(c.ClusterID) || !authorization.UUID(c.PermissionRootID) || c.Port < 1 || c.Port > 65535 || c.Concurrency < 1 || c.Concurrency > 16 {
-		return contracts.FederationDeployment{}, mounts.ErrUnavailable
+	if !validFederationConfig(c) {
+		return federationInputs{}, &fixedStepError{"config", mounts.ErrUnavailable}
 	}
-	if !ownerProviderName.MatchString(k.AuditMount) || !ownerProviderName.MatchString(k.AuditKey) || !ownerProviderName.MatchString(k.PKIMount) || !ownerProviderName.MatchString(k.ClientRole) || !ownerProviderName.MatchString(k.ServerRole) || k.ClientRole == k.ServerRole || k.AuditMount == k.PKIMount || !identity.Text(c.AuditStore.Region, 128) || !identity.Text(c.AuditStore.Bucket, 63) || !ownerEndpoint(k.Endpoint) || !ownerEndpoint(c.AuditStore.Endpoint) {
-		return contracts.FederationDeployment{}, mounts.ErrUnavailable
+	v, err := readServiceIDs(ctx, ids)
+	if err != nil {
+		return federationInputs{}, err
 	}
-	// One MaxConns=1 pool per federation role (ADR-170 connection limit three).
-	if _, err = netip.ParseAddr(p.Host); err != nil && !ownerDNSName.MatchString(p.Host) || !identity.Text(p.Database, 63) || p.Port < 1 || p.Port > 65535 || p.MaxConnections != 1 {
-		return contracts.FederationDeployment{}, mounts.ErrUnavailable
-	}
-	if c.Owner != nil && !validOwnerGuard(*c.Owner) {
-		return contracts.FederationDeployment{}, mounts.ErrUnavailable
-	}
-	// Kubernetes-auth credentials refresh only under the hub workload guard's
-	// current proof, so they need the owner guard inputs.
-	if a := c.ProviderAuthentication; a != nil && (c.Owner == nil || a.Namespace != c.Owner.Namespace || providerconfig.ValidateFederationProviderAuthentication(c, *a, time.Now()) != nil) {
-		return contracts.FederationDeployment{}, mounts.ErrUnavailable
-	}
-	return c, nil
+	return federationInputs{c, v}, nil
 }
 
-func NewFederation(ctx context.Context, files *os.Root) (f *Federation, err error) {
-	if ctx == nil || ctx.Err() != nil || files == nil {
+func validFederationConfig(c contracts.FederationConfig) bool {
+	_, pg := servicePostgres(c.Postgres, nil)
+	return validServiceScope(c.Name, c.Namespace) && c.Port >= 1 && c.Port <= 65535 && c.Concurrency >= 1 && c.Concurrency <= 16 && pg && validServiceStore(c.AuditStore) && ownerEndpoint(c.OpenBao)
+}
+
+func NewFederation(ctx context.Context, files, ids *os.Root) (f *Federation, err error) {
+	if ctx == nil || ctx.Err() != nil || files == nil || ids == nil {
 		return nil, mounts.ErrUnavailable
 	}
-	c, err := readFederationDeployment(ctx, files)
+	c, err := readFederationInputs(ctx, files, ids)
 	if err != nil {
 		return nil, err
 	}
@@ -130,19 +132,20 @@ func NewFederation(ctx context.Context, files *os.Root) (f *Federation, err erro
 	}()
 	startup, end := context.WithTimeout(ctx, 30*time.Second)
 	defer end()
-	in := &providerInputs{files: files, postgresEndpoint: c.Postgres}
-	if c.Owner != nil {
-		in.kubernetesEndpoint = c.Owner.Kubernetes
+	roots := map[string][][]byte{}
+	for _, name := range []string{contracts.PostgresRootsFile, contracts.ObjectStoreRootsFile, contracts.OpenBaoRootsFile} {
+		if roots[name], err = readServiceRoots(startup, files, name); err != nil {
+			return f, err
+		}
 	}
+	endpoint, _ := servicePostgres(c.Postgres, roots[contracts.PostgresRootsFile])
+	in := &providerInputs{files: files, postgresEndpoint: endpoint}
 	pools := map[string]*pgxpool.Pool{}
 	users := map[string]bool{}
 	for _, purpose := range contracts.PublicRuntimeFederationPurposes() {
-		if purpose == "connector-owner-read" && c.Owner == nil {
-			continue // the ADR-172 owner purposes stay refused
-		}
-		config, err := in.sqlConfig(startup, "sql-federation-"+purpose+".json")
+		config, err := in.sqlConfig(startup, "sql-"+purpose+".json")
 		if err != nil || users[config.ConnConfig.User] {
-			return f, mounts.ErrUnavailable
+			return f, &fixedStepError{"sql/" + purpose, mounts.ErrUnavailable}
 		}
 		users[config.ConnConfig.User] = true
 		config.ConnConfig.RuntimeParams["application_name"] = "asservat-federation"
@@ -153,31 +156,12 @@ func NewFederation(ctx context.Context, files *os.Root) (f *Federation, err erro
 		pools[purpose] = pool
 		f.closers = append(f.closers, pool.Close)
 	}
-	mac, accountVersion, err := readFederationMAC(startup, files, c)
+	mac, accountVersion, err := readAuditMAC(startup, files)
 	if err != nil {
 		return f, err
 	}
 	f.closers = append(f.closers, mac.Close)
-	keys, err := ownerHTTP(c.KeyService.Endpoint, c.KeyService.Roots)
-	if err != nil {
-		return f, mounts.ErrUnavailable
-	}
-	f.closers = append(f.closers, keys.CloseIdleConnections)
-	var seal *kms.Sealer
-	var open *kms.Opener
-	if c.ProviderAuthentication == nil {
-		// Legacy static token files; the installed layout uses the provider
-		// lifetimes composed after the owner guard below.
-		if seal, err = kms.NewSealerWithTokenSource(c.KeyService.Endpoint, c.KeyService.AuditMount, c.KeyService.AuditKey, in.token("audit-wrap.token"), keys); err != nil {
-			return f, mounts.ErrUnavailable
-		}
-		f.closers = append(f.closers, seal.Close)
-		if open, err = kms.NewOpenerWithTokenSource(c.KeyService.Endpoint, c.KeyService.AuditMount, c.KeyService.AuditKey, in.token("audit-unwrap.token"), keys); err != nil {
-			return f, mounts.ErrUnavailable
-		}
-		f.closers = append(f.closers, open.Close)
-	}
-	storage, err := ownerHTTP(c.AuditStore.Endpoint, c.AuditStore.Roots)
+	storage, err := ownerHTTP(c.AuditStore.Endpoint, roots[contracts.ObjectStoreRootsFile])
 	if err != nil {
 		return f, mounts.ErrUnavailable
 	}
@@ -191,50 +175,29 @@ func NewFederation(ctx context.Context, files *os.Root) (f *Federation, err erro
 	if err != nil {
 		return f, mounts.ErrUnavailable
 	}
-	var owners connectorlifecycle.OwnerReads
-	var guard *kube.OwnerWorkloadProtection
-	if c.Owner != nil {
-		if owners, guard, err = federationOwnerReads(startup, c, pools["connector-owner-read"], in); err != nil {
-			return f, err
-		}
+	owners, err := federationOwnerReads(startup, c, pools["connector-owner-read"])
+	if err != nil {
+		return f, err
 	}
-	if c.ProviderAuthentication != nil {
-		if guard == nil {
-			return f, mounts.ErrUnavailable
-		}
-		// Every provider login and renewal needs the hub workload guard's
-		// current proof and a current recovery observation (ADR-193).
-		proof := func(ctx context.Context) (time.Time, error) {
-			_, until, err := guard.Current(ctx)
-			if err != nil {
-				return time.Time{}, err
-			}
-			r, err := recovery.RecoveryState(ctx)
-			if err != nil || !r.Valid(time.Now()) {
-				return time.Time{}, mounts.ErrUnavailable
-			}
-			return identity.Earlier(until, r.FreshUntil), nil
-		}
-		if f.providers, err = kms.NewInstalledFederationProviderEffects(ctx, c, files, proof); err != nil {
-			return f, mounts.ErrUnavailable
-		}
-		providers := f.providers
-		f.closers = append(f.closers, func() { _ = providers.CloseAndJoin(context.Background()) })
-		seal, open = providers.Sealer(), providers.Opener()
+	login := serviceLogin(c.Name, c.Namespace, "federation", contracts.OwnerProviderEndpoint{Endpoint: c.OpenBao, Roots: roots[contracts.OpenBaoRootsFile]}, "audit-wrap", "audit-unwrap", "client-sign", "server-sign")
+	names := providerconfig.OpenBaoNamesFor(c.InstallationID)
+	keys := kms.FederationProviderKeys{AuditMount: contracts.SmallOpenBaoAuditMount, AuditKey: names.FederationAuditKey, PKIMount: contracts.SmallOpenBaoConnectorPKIMount, ClientRole: names.ConnectorClientRole, ServerRole: names.ConnectorServerRole}
+	if f.providers, err = kms.NewInstalledFederationProviderEffects(ctx, login, keys, c.Concurrency, files, recoveryProof(recovery)); err != nil {
+		return f, &fixedStepError{"providers", mounts.ErrUnavailable}
 	}
+	providers := f.providers
+	f.closers = append(f.closers, func() { _ = providers.CloseAndJoin(context.Background()) })
 	profiles, err := postgres.NewConnectorIdentityProfiles(startup, pools["connector-read"])
 	if err != nil {
 		return f, mounts.ErrUnavailable
 	}
-	peers := &federationPeers{providers: f.providers, c: c, pools: pools, mac: mac, accountVersion: accountVersion, recovery: recovery, store: store, seal: seal, open: open, keys: keys, in: in, owners: owners, profiles: profiles, duties: map[value.ClusterCredentialProfile]federationPeerEntry{}}
+	peers := &federationPeers{providers: providers, ids: c.ServiceIDs, pools: pools, mac: mac, accountVersion: accountVersion, recovery: recovery, store: store, seal: providers.Sealer(), open: providers.Opener(), owners: owners, profiles: profiles, offerBacking: federationOfferBacking(c), duties: map[value.ClusterCredentialProfile]federationPeerEntry{}}
 	credentials, err := postgres.NewClusterCredentials(startup, pools["cluster-credential"], c.PermissionRootID)
 	if err != nil {
 		return f, mounts.ErrUnavailable
 	}
-	if c.Connector != nil {
-		if err = federationBootstrap(startup, c, pools, store, seal, open, peers); err != nil {
-			return f, err
-		}
+	if err = federationBootstrap(startup, c.InstallationID, pools, store, peers); err != nil {
+		return f, err
 	}
 	presenter := federationPresenter{fleetapp.ClusterCredentialVerifier{Store: credentials}}
 	if f.rotation, err = clustercredential.NewHandler(presenter, c.Concurrency); err != nil {
@@ -246,68 +209,54 @@ func NewFederation(ctx context.Context, files *os.Root) (f *Federation, err erro
 	}
 	// The serving identity is deployment-provided server authentication only;
 	// every presentation is bound to this TLS session's own exporter.
-	certificate, err := mounts.Read(startup, files, "tls.crt", 64<<10)
+	pair, err := readServingPair(startup, files)
 	if err != nil {
-		return f, mounts.ErrUnavailable
-	}
-	key, err := mounts.Read(startup, files, "tls.key", 16<<10)
-	if err != nil {
-		return f, mounts.ErrUnavailable
-	}
-	pair, err := tls.X509KeyPair(certificate, key)
-	clear(key)
-	if err != nil {
-		return f, mounts.ErrUnavailable
+		return f, err
 	}
 	f.tls = &tls.Config{MinVersion: tls.VersionTLS13, NextProtos: []string{"h2"}, Certificates: []tls.Certificate{pair}}
 	return f, nil
 }
 
+// readServingPair reads the mounted serving certificate: a cert-manager,
+// existing or chart-generated kubernetes.io/tls Secret.
+func readServingPair(ctx context.Context, files *os.Root) (tls.Certificate, error) {
+	certificate, err := mounts.Read(ctx, files, "tls.crt", 64<<10)
+	if err != nil {
+		return tls.Certificate{}, &fixedStepError{"tls", mounts.ErrUnavailable}
+	}
+	key, err := mounts.Read(ctx, files, "tls.key", 16<<10)
+	if err != nil {
+		return tls.Certificate{}, &fixedStepError{"tls", mounts.ErrUnavailable}
+	}
+	pair, err := tls.X509KeyPair(certificate, key)
+	clear(key)
+	if err != nil {
+		return tls.Certificate{}, &fixedStepError{"tls", mounts.ErrUnavailable}
+	}
+	return pair, nil
+}
+
 // federationBootstrap composes the ADR-193 generation-1 activation: the
 // claim on the cluster-credential login, its acknowledgement on the separate
-// connector-ack login, both encrypted audit records and the 00064 ledger.
-func federationBootstrap(ctx context.Context, c contracts.FederationDeployment, pools map[string]*pgxpool.Pool, store *objectstore.Store, seal *kms.Sealer, open *kms.Opener, peers *federationPeers) error {
-	var backing fleetapp.ConnectorIdentityBacking
-	d := json.NewDecoder(bytes.NewReader(c.Connector.Backing))
-	d.DisallowUnknownFields()
-	if d.Decode(&backing) != nil || !backing.Valid() || backing.Policy.RootID != c.PermissionRootID || backing.Policy.InstallationID != c.InstallationID || backing.AccountVersion != peers.accountVersion {
-		return mounts.ErrUnavailable
-	}
-	claims, err := postgres.NewEnrollmentClaims(ctx, pools["cluster-credential"], c.InstallationID)
+// connector-ack login, both encrypted audit records and the 00064 ledger. The
+// root backing each staging needs is read from SQL (connector_identity_root).
+func federationBootstrap(ctx context.Context, installation string, pools map[string]*pgxpool.Pool, store *objectstore.Store, peers *federationPeers) error {
+	claims, err := postgres.NewEnrollmentClaims(ctx, pools["cluster-credential"], installation)
 	if err != nil {
 		return mounts.ErrUnavailable
 	}
-	audits, err := postgres.NewEnrollmentClaimAudits(ctx, pools["connector-ack"], c.InstallationID)
+	audits, err := postgres.NewEnrollmentClaimAudits(ctx, pools["connector-ack"], installation)
 	if err != nil {
 		return mounts.ErrUnavailable
 	}
-	ledger, err := postgres.NewClusterBootstraps(ctx, pools["cluster-credential"], c.InstallationID)
+	ledger, err := postgres.NewClusterBootstraps(ctx, pools["cluster-credential"], installation)
 	if err != nil {
 		return mounts.ErrUnavailable
 	}
-	peers.connector = &backing
+	seal, open := peers.seal, peers.open
 	peers.bootstrap = &fleetapp.ClusterBootstrapActivation{Claims: claims, ClaimAudits: audits, ClaimObjects: &objectstore.EnrollmentClaimObjects{Store: store, Seal: seal, Open: open},
 		Bootstraps: ledger, Audit: &objectstore.ClusterBootstrapAuditObjects{Store: store, Seal: seal, Open: open}, Policy: value.DefaultClusterCredentialPolicy(), Now: time.Now}
 	return nil
-}
-
-func readFederationMAC(ctx context.Context, files *os.Root, c contracts.FederationDeployment) (*auditapp.OperationMAC, string, error) {
-	b, err := mounts.Read(ctx, files, "federation-audit-keys.json", 16<<10)
-	if err != nil {
-		return nil, "", mounts.ErrUnavailable
-	}
-	defer clear(b)
-	v, err := contracts.DecodeFederationAuditKeys(bytes.NewReader(b))
-	defer clear(v.InputKey)
-	defer clear(v.AccountKey)
-	if err != nil || v.Format != contracts.FederationAuditKeysFormat || v.InstallationID != c.InstallationID || v.RootID != c.PermissionRootID {
-		return nil, "", mounts.ErrUnavailable
-	}
-	mac, err := auditapp.NewOperationMAC(v.InputVersion, v.InputKey, v.AccountVersion, v.AccountKey)
-	if err != nil {
-		return nil, "", mounts.ErrUnavailable
-	}
-	return mac, v.AccountVersion, nil
 }
 
 // federationPeers resolves each presented peer from its staged SQL profile
@@ -316,7 +265,7 @@ func readFederationMAC(ctx context.Context, files *os.Root, c contracts.Federati
 // ponytail: one mutex around composition; per-peer locks if peers contend.
 type federationPeers struct {
 	providers      *kms.InstalledFederationProviderEffects
-	c              contracts.FederationDeployment
+	ids            contracts.ServiceIDs
 	pools          map[string]*pgxpool.Pool
 	mac            *auditapp.OperationMAC
 	accountVersion string
@@ -324,14 +273,12 @@ type federationPeers struct {
 	store          *objectstore.Store
 	seal           *kms.Sealer
 	open           *kms.Opener
-	keys           *http.Client
-	in             *providerInputs
 	owners         connectorlifecycle.OwnerReads
 	profiles       *postgres.ConnectorIdentityProfiles
-	// connector is the deployment's hub-decided initial root backing and
-	// bootstrap the generation-1 activation (ADR-193); both are nil without
-	// the connector block, which refuses the bootstrap purpose.
-	connector *fleetapp.ConnectorIdentityBacking
+	// offerBacking reads the hub's published regional offer backing; the
+	// first bootstrap stages the identity root from it (no root row yet).
+	offerBacking func(context.Context) (fleetapp.ConnectorIdentityBacking, error)
+	// bootstrap is the generation-1 activation (ADR-193).
 	bootstrap *fleetapp.ClusterBootstrapActivation
 
 	mu     sync.Mutex
@@ -348,7 +295,7 @@ const federationPeerLimit = 64
 
 func (s *federationPeers) resolve(ctx context.Context, p value.ClusterCredentialProfile) (connectorlifecycle.PeerDuties, error) {
 	var zero connectorlifecycle.PeerDuties
-	if p.RootID != s.c.PermissionRootID || p.InstallationID != s.c.InstallationID {
+	if p.RootID != s.ids.PermissionRootID || p.InstallationID != s.ids.InstallationID {
 		return zero, value.ErrDenied
 	}
 	profile, backing, err := s.profiles.ReadStagedConnector(ctx, p)
@@ -369,7 +316,7 @@ func (s *federationPeers) resolve(ctx context.Context, p value.ClusterCredential
 	} else if !ok && len(s.duties) >= federationPeerLimit {
 		return zero, mounts.ErrUnavailable
 	}
-	d, err := federationPeer(ctx, s.c, profile, backing, s.pools, s.mac, s.accountVersion, s.recovery, s.store, s.seal, s.open, s.keys, s.in, s.providers)
+	d, err := federationPeer(ctx, s.ids, profile, backing, s.pools, s.mac, s.accountVersion, s.recovery, s.store, s.seal, s.open, s.providers)
 	if err != nil {
 		return zero, err
 	}
@@ -379,7 +326,7 @@ func (s *federationPeers) resolve(ctx context.Context, p value.ClusterCredential
 }
 
 // federationPeer composes one staged peer's unchanged ADR-153 duties.
-func federationPeer(ctx context.Context, c contracts.FederationDeployment, profile value.ConnectorCredentialProfile, backing fleetapp.ConnectorIdentityBacking, pools map[string]*pgxpool.Pool, mac *auditapp.OperationMAC, accountVersion string, recovery *postgres.RecoveryReader, store *objectstore.Store, seal *kms.Sealer, open *kms.Opener, keys *http.Client, in *providerInputs, providers *kms.InstalledFederationProviderEffects) (_ connectorlifecycle.PeerDuties, err error) {
+func federationPeer(ctx context.Context, c contracts.ServiceIDs, profile value.ConnectorCredentialProfile, backing fleetapp.ConnectorIdentityBacking, pools map[string]*pgxpool.Pool, mac *auditapp.OperationMAC, accountVersion string, recovery *postgres.RecoveryReader, store *objectstore.Store, seal *kms.Sealer, open *kms.Opener, providers *kms.InstalledFederationProviderEffects) (_ connectorlifecycle.PeerDuties, err error) {
 	step := "inputs"
 	defer func() {
 		if err != nil {
@@ -430,17 +377,7 @@ func federationPeer(ctx context.Context, c contracts.FederationDeployment, profi
 	step = "credential-issuer"
 	var issuers federationIssuer
 	for _, usage := range []string{"client", "server"} {
-		role := c.KeyService.ClientRole
-		if usage == "server" {
-			role = c.KeyService.ServerRole
-		}
-		var issuer *kms.ConnectorCredentialIssuer
-		var err error
-		if providers != nil {
-			issuer, err = providers.ConnectorIssuer(usage, profile)
-		} else {
-			issuer, err = kms.NewConnectorCredentialIssuerWithTokenSource(c.KeyService.Endpoint, in.token("connector-"+usage+"-sign.token"), c.KeyService.PKIMount, role, usage, profile, keys, time.Now)
-		}
+		issuer, err := providers.ConnectorIssuer(usage, profile)
 		if err != nil {
 			return zero, mounts.ErrUnavailable
 		}
@@ -470,6 +407,14 @@ func federationPeer(ctx context.Context, c contracts.FederationDeployment, profi
 // Operator diagnostics: one fixed line per refused presentation or failed
 // conversation, with a closed cause. Never inputs, identities or remote text.
 func federationCause(err error) string {
+	var step interface{ FixedStep() string }
+	if errors.As(err, &step) {
+		return step.FixedStep() + "/" + federationClass(err)
+	}
+	return federationClass(err)
+}
+
+func federationClass(err error) string {
 	switch {
 	case errors.Is(err, value.ErrClusterCredentialFenced):
 		return "cluster-credential-fenced"
@@ -507,7 +452,7 @@ type federationServices struct {
 // Bootstrap enrolls generation 1 for one claimed slot (ADR-193 step 3).
 func (s federationServices) Bootstrap(ctx context.Context, region *connectorlifecycle.Region, r value.ClusterBootstrapRequest, key ed25519.PublicKey) (value.ClusterBootstrapResult, error) {
 	p := s.peers
-	if p == nil || p.bootstrap == nil || r.InstallationID != p.c.InstallationID || r.RootID != p.c.PermissionRootID {
+	if p == nil || p.bootstrap == nil || r.InstallationID != p.ids.InstallationID || r.RootID != p.ids.PermissionRootID {
 		return value.ClusterBootstrapResult{}, value.ErrDenied
 	}
 	out, err := p.bootstrap.Activate(ctx, r, key, func(ctx context.Context, e value.Enrollment) (value.ClusterBootstrapSource, error) {
@@ -520,32 +465,42 @@ func (s federationServices) Bootstrap(ctx context.Context, region *connectorlife
 }
 
 // stage binds the conversation to the claimed slot and stages the regional
-// source under the hub-decided backing: the root's stored backing, or the
-// deployment's initial backing before the first staging.
+// source under the hub-decided root backing stored in SQL; without one the
+// bootstrap is refused.
 func (s *federationPeers) stage(ctx context.Context, region *connectorlifecycle.Region, e value.Enrollment) (value.ClusterBootstrapSource, error) {
 	var zero value.ClusterBootstrapSource
 	if err := region.BindBootstrap(e.Binding); err != nil {
-		return zero, value.ErrDenied
+		return zero, &fixedStepError{"stage/bind", value.ErrDenied}
 	}
-	backing, found, err := s.profiles.ReadRootBacking(ctx, s.c.PermissionRootID)
+	backing, found, err := s.profiles.ReadRootBacking(ctx, s.ids.PermissionRootID)
 	if err != nil {
-		return zero, err
+		return zero, &fixedStepError{"stage/backing-read", err}
 	}
-	if !found {
-		backing = s.connector.Clone()
+	if !found && s.offerBacking != nil {
+		// No identity root yet: the first stage creates it from the backing
+		// the hub-api published in its regional offer (the same document
+		// every connector observes).
+		if backing, err = s.offerBacking(ctx); err != nil {
+			return zero, &fixedStepError{"stage/offer-backing", err}
+		}
+		found = true
 	}
 	q := backing.Policy
-	if q.History == nil || backing.AccountVersion != s.accountVersion || q.RootID != s.c.PermissionRootID || q.InstallationID != s.c.InstallationID {
-		return zero, mounts.ErrUnavailable
+	if !found || !backing.Valid() || q.History == nil || backing.AccountVersion != s.accountVersion || q.RootID != s.ids.PermissionRootID || q.InstallationID != s.ids.InstallationID {
+		step := "stage/backing"
+		if !found {
+			step += "-missing"
+		}
+		return zero, &fixedStepError{step, mounts.ErrUnavailable}
 	}
 	pin := fleetapp.ConnectorQualificationPin{InstallationID: q.InstallationID, StoreID: q.StoreID, BackupProfileID: q.BackupProfileID, Qualification: *q.History}
-	sources, err := postgres.NewConnectorIdentitySources(ctx, s.pools["connector-source"], s.c.PermissionRootID, e.Binding, pin)
+	sources, err := postgres.NewConnectorIdentitySources(ctx, s.pools["connector-source"], s.ids.PermissionRootID, e.Binding, pin)
 	if err != nil {
-		return zero, mounts.ErrUnavailable
+		return zero, &fixedStepError{"stage/sources", mounts.ErrUnavailable}
 	}
 	c, err := fleetapp.ConnectorIdentityObserver{Reader: region, Journal: sources, Qualification: pin, Binding: e.Binding, Now: time.Now, Backing: &backing}.ObserveConfiguration(ctx)
 	if err != nil {
-		return zero, err
+		return zero, &fixedStepError{"stage/observe", err}
 	}
 	profile := c.Source.Observation.Profile
 	return value.ClusterBootstrapSource{UID: profile.Revision.UID, Generation: profile.Revision.Generation, ProtectionDigest: profile.ProtectionDigest}, nil
@@ -554,7 +509,7 @@ func (s *federationPeers) stage(ctx context.Context, region *connectorlifecycle.
 func (s federationServices) Enroll(ctx context.Context, region *connectorlifecycle.Region, id string, r value.ConnectorProcessRequest) (value.ConnectorCredentialProcess, error) {
 	out, err := s.Runners.Enroll(ctx, region, id, r)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "federation enroll failed: "+federationEnrollmentStep(err)+" "+federationCause(err))
+		fmt.Fprintln(os.Stderr, "federation enroll failed: "+federationEnrollmentStep(err)+" "+federationClass(err))
 	}
 	return out, err
 }
@@ -563,6 +518,17 @@ func (s federationServices) Issue(ctx context.Context, region *connectorlifecycl
 	out, err := s.Runners.Issue(ctx, region, id, usage, r)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "federation "+usage+" issue failed: "+federationCause(err))
+	}
+	return out, err
+}
+
+// AuthenticateOwner logs the fixed refusal step of a failed owner
+// authentication (fleet.WithRefusalSteps); the result is unchanged.
+func (s federationServices) AuthenticateOwner(ctx context.Context, region *connectorlifecycle.Region, c value.OwnerCertificate) (connectorlifecycle.OwnerAuthentication, error) {
+	var steps []string
+	out, err := s.Runners.AuthenticateOwner(fleetapp.WithRefusalSteps(ctx, func(step string) { steps = append(steps, step) }), region, c)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "federation owner authentication refused: "+strings.Join(steps, ",")+" "+federationCause(err))
 	}
 	return out, err
 }
@@ -623,45 +589,49 @@ func (f *Federation) Close() {
 	f.closers = nil
 }
 
-// federationOwnerReads composes the hub-api's unchanged owner registry, route
-// and protection reads (ADR-172). The guard plan is the identical installed
-// one, so a region is answered from the same protection digest; nothing here
-// can sign, audit or activate an owner.
-func federationOwnerReads(ctx context.Context, c contracts.FederationDeployment, pool *pgxpool.Pool, in *providerInputs) (connectorlifecycle.OwnerReads, *kube.OwnerWorkloadProtection, error) {
+// federationOwnerReads composes the hub-api's unchanged owner registry and
+// route reads (ADR-172). The owner configuration and namespace UIDs key the
+// SQL rows and are read by name; the owner protection is the platform's
+// deterministic workload digest. Nothing here can sign, audit or activate an
+// owner.
+func federationOwnerReads(ctx context.Context, c federationInputs, pool *pgxpool.Pool) (connectorlifecycle.OwnerReads, error) {
 	var zero connectorlifecycle.OwnerReads
-	o := *c.Owner
-	configurations, err := postgres.NewOwnerConfigurations(ctx, pool, c.InstallationID, c.ClusterID, o.Namespace.UID, o.ConfigurationUID)
+	api, err := serviceKubernetes()
 	if err != nil {
-		return zero, nil, mounts.ErrUnavailable
+		return zero, &fixedStepError{"kubernetes", mounts.ErrUnavailable}
 	}
+	namespaceUID, err := kube.NamespaceUID(ctx, api, c.Namespace)
+	if err != nil {
+		return zero, &fixedStepError{"kubernetes/namespace", mounts.ErrUnavailable}
+	}
+	configurationUID, err := kube.ConfigMapUID(ctx, api, c.Namespace, c.Name+"-owner-source")
+	if err != nil {
+		return zero, &fixedStepError{"kubernetes/owner-configuration", mounts.ErrUnavailable}
+	}
+	configurations, err := postgres.NewOwnerConfigurations(ctx, pool, c.InstallationID, c.ClusterID, namespaceUID, configurationUID)
+	if err != nil {
+		return zero, mounts.ErrUnavailable
+	}
+	registry, err := postgres.NewOwnerEnrollments(ctx, pool, c.InstallationID, c.ClusterID, namespaceUID, configurationUID, ownerRandomID)
+	if err != nil {
+		return zero, mounts.ErrUnavailable
+	}
+	observer, err := kube.NewPermissionClient(api, c.ClusterID, configuration.NamespaceRef{Name: c.Namespace, UID: namespaceUID}, time.Now)
+	if err != nil {
+		return zero, mounts.ErrUnavailable
+	}
+	// The hub-api accepts its owner configuration; until then the federation
+	// restarts rather than serving owner reads without a pool.
 	current, err := configurations.ReadOwnerConfiguration(ctx)
-	if err != nil || !current.Valid(time.Now()) || current.Configuration.Pool.Namespace != o.Namespace.Name {
-		return zero, nil, mounts.ErrUnavailable
+	if err != nil || !current.Valid(time.Now()) || current.Configuration.Pool.Namespace != c.Namespace {
+		return zero, &fixedStepError{"owner-configuration", mounts.ErrUnavailable}
 	}
-	registry, err := postgres.NewOwnerEnrollments(ctx, pool, c.InstallationID, c.ClusterID, o.Namespace.UID, o.ConfigurationUID, ownerRandomID)
+	endpoints, err := kube.NewOwnerEndpoints(observer, current.Configuration.Pool)
 	if err != nil {
-		return zero, nil, mounts.ErrUnavailable
-	}
-	control := configuration.NamespaceRef{Name: o.Namespace.Name, UID: o.Namespace.UID}
-	observer, err := kube.NewPermissionClient(in.kubernetes("kube-observer.token"), c.ClusterID, control, time.Now)
-	if err != nil {
-		return zero, nil, mounts.ErrUnavailable
-	}
-	probe, err := kube.NewPermissionClient(in.kubernetes("kube-probe.token"), c.ClusterID, control, time.Now)
-	if err != nil {
-		return zero, nil, mounts.ErrUnavailable
-	}
-	owners := current.Configuration.Pool
-	guard, err := ownerWorkloadGuard(observer, probe, owners, o)
-	if err != nil {
-		return zero, nil, mounts.ErrUnavailable
-	}
-	endpoints, err := kube.NewOwnerEndpoints(observer, owners)
-	if err != nil {
-		return zero, nil, mounts.ErrUnavailable
+		return zero, mounts.ErrUnavailable
 	}
 	routes := &fleetapp.OwnerRoutes{Configurations: configurations, Endpoints: endpoints, Now: time.Now}
-	return connectorlifecycle.OwnerReads{Candidates: registry, ObservationCandidates: registry, Registry: registry, Authenticator: &fleetapp.OwnerAuthenticator{Registry: registry, Routes: routes, Protection: guard, Now: time.Now}}, guard, nil
+	return connectorlifecycle.OwnerReads{Candidates: registry, ObservationCandidates: registry, Registry: registry, Authenticator: &fleetapp.OwnerAuthenticator{Registry: registry, Routes: routes, Protection: platformOwnerProtection{time.Now}, Now: time.Now}}, nil
 }
 
 // Each stage is a local literal. Do not format SQL/provider errors, request
@@ -680,4 +650,51 @@ func federationEnrollmentStep(err error) string {
 		return "resolve/" + failure.step
 	}
 	return connectorlifecycle.EnrollmentStep(err)
+}
+
+// platformOwnerProtection replaces the removed owner workload guard proof:
+// the hub namespace is protected by Kubernetes RBAC, so the protection digest
+// is the deterministic digest of the owner Deployment's cluster, namespace and
+// name (field map coupling 2). It performs no I/O and confers no authority.
+type platformOwnerProtection struct{ now func() time.Time }
+
+func (p platformOwnerProtection) ReadOwnerProtection(ctx context.Context, pool value.OwnerPool) (value.OwnerProtection, error) {
+	if ctx == nil || ctx.Err() != nil || !pool.Valid() {
+		return value.OwnerProtection{}, value.ErrUnavailable
+	}
+	start := p.now()
+	return value.OwnerProtection{Pool: pool, Digest: artifact.Digest(contracts.WorkloadSourceDigest(pool.ClusterID, pool.Namespace, pool.Deployment)), ObservedAt: start, FreshUntil: identity.Check(start, identity.SQLFenced).Until()}, nil
+}
+
+// federationOfferBacking reads connectorBacking of `<name>-regional-offer`
+// (get on that one name) for the first bootstrap of an installation.
+func federationOfferBacking(c federationInputs) func(context.Context) (fleetapp.ConnectorIdentityBacking, error) {
+	return func(ctx context.Context) (fleetapp.ConnectorIdentityBacking, error) {
+		var zero fleetapp.ConnectorIdentityBacking
+		config, err := serviceKubernetes()
+		if err != nil {
+			return zero, mounts.ErrUnavailable
+		}
+		api, err := kubernetes.NewForConfig(config)
+		if err != nil {
+			return zero, mounts.ErrUnavailable
+		}
+		call, end := context.WithTimeout(ctx, 5*time.Second)
+		defer end()
+		object, err := api.CoreV1().ConfigMaps(c.Namespace).Get(call, c.Name+"-regional-offer", meta.GetOptions{})
+		if err != nil {
+			return zero, mounts.ErrUnavailable
+		}
+		var offer contracts.RegionalOffer
+		if json.Unmarshal([]byte(object.Data[contracts.RegionalOfferFile]), &offer) != nil || offer.InstallationID != c.InstallationID || offer.PermissionRootID != c.PermissionRootID {
+			return zero, mounts.ErrUnavailable
+		}
+		var backing fleetapp.ConnectorIdentityBacking
+		d := json.NewDecoder(bytes.NewReader(offer.ConnectorBacking))
+		d.DisallowUnknownFields()
+		if d.Decode(&backing) != nil || !backing.Valid() {
+			return zero, value.ErrInvalid
+		}
+		return backing, nil
+	}
 }

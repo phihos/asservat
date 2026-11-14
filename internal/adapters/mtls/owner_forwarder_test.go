@@ -81,7 +81,7 @@ func forwardTestWorker(t *testing.T) value.DownloadWorker {
 	id := ownerTestID
 	now := time.Now().UTC().Truncate(time.Second)
 	rev := identity.Revision{UID: id, Generation: 1, Digest: artifact.Digest{1}}
-	profile := value.DownloadWorkerProfile{Configuration: rev, InstallationID: id, ClusterID: id, Namespace: "workers", NamespaceUID: "namespace", ServiceAccount: "acquisition", ServiceAccountUID: "account", Image: "synthetic.invalid/worker@sha256:" + strings.Repeat("1", 64), ControlConfig: "control", ControlConfigUID: "config", ControlDigest: artifact.Digest{1}, PriorityClass: "workers", PriorityClassUID: "priority", CPUMillis: 100, MemoryBytes: 64 << 20, MaxRuntime: time.Minute}
+	profile := value.DownloadWorkerProfile{Configuration: rev, InstallationID: id, ClusterID: id, Namespace: "workers", NamespaceUID: "namespace", ServiceAccount: "acquisition", ServiceAccountUID: "account", Image: "synthetic.invalid/worker@sha256:" + strings.Repeat("1", 64), ControlConfig: "control", ControlConfigUID: "config", PriorityClass: "workers", PriorityClassUID: "priority", CPUMillis: 100, MemoryBytes: 64 << 20, MaxRuntime: time.Minute}
 	scope := artifact.DownloadScope{RootID: id, ArtifactID: id, CaptureID: id, ClusterID: id, NamespaceUID: "namespace", WorkloadUID: "workload", PodUID: "pod", Version: artifact.Digest{2}, Principal: identity.Principal{Issuer: "https://synthetic.invalid", Subject: "dev", ClientID: "console", Kind: identity.Human}}
 	a := artifact.DownloadAuthority{Scope: scope, PermissionEpoch: id, PermissionSequence: 1, ProjectionDigest: artifact.Digest{3}, DecisionDigest: artifact.Digest{4}, IdentityRevision: rev, CheckedAt: now, ValidUntil: now.Add(5 * time.Second), AccessUntil: now.Add(time.Hour), DeleteBy: now.Add(2 * time.Hour)}
 	a.Environment = artifact.DownloadEnvironment{RootID: id, InstallationID: id, Region: "test", StoreID: id, RecoveryEpoch: id, Location: artifact.Location{ClusterID: id, ArtifactID: id, AttemptID: id}, Principal: scope.Principal, Revision: rev, RecoveryRevision: rev, ObservedAt: now, ValidUntil: a.ValidUntil}
@@ -317,7 +317,6 @@ func newForwardLab(t *testing.T, mode string) *forwardLab {
 		return out, nil
 	})
 	control := workerTrustDocument(t, f.worker.Intent.Profile.ClusterID, f.workerCA)
-	f.worker.Intent.Profile.ControlDigest, _ = WorkerControlDigest(map[string]string{"worker.json": string(control)})
 	trust, err := NewWorkerTrustCatalog(ownerTestID, [][]byte{control})
 	if err != nil {
 		t.Fatal(err)

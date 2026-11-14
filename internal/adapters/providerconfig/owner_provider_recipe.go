@@ -54,22 +54,16 @@ type OwnerKubernetesAuthRole struct {
 // and derives immutable public bytes. Tokens and secret data are never inputs.
 func OwnerProviderRecipeFor(in contracts.OwnerDeployment, mount, accessor string, account, auditCredentials contracts.WorkerObjectReference, now time.Time) (OwnerProviderRecipe, error) {
 	var out OwnerProviderRecipe
-	if in.Format != contracts.OwnerDeploymentFormat || !authorization.UUID(in.InstallationID) || !authorization.UUID(in.ClusterID) || !authorization.UUID(in.Namespace.UID) || len(validation.IsDNS1123Label(in.Namespace.Name)) != 0 || !authorization.UUID(account.UID) || len(validation.IsDNS1123Subdomain(account.Name)) != 0 || !authorization.UUID(auditCredentials.UID) || len(validation.IsDNS1123Subdomain(auditCredentials.Name)) != 0 || account.UID == auditCredentials.UID || !providerName.MatchString(mount) || mount == "token" || !providerName.MatchString(accessor) || ValidateOwner(in.Kubernetes, in.Postgres, in.AuditStore, in.KeyService, now) != nil {
+	// Helm-native installation: role names derive from names only, so the
+	// setup Job and the hub-api compute them without object UIDs; the
+	// accessor is optional (ADR-328, no runtime recipe verification).
+	if in.Format != contracts.OwnerDeploymentFormat || !authorization.UUID(in.InstallationID) || !authorization.UUID(in.ClusterID) || len(validation.IsDNS1123Label(in.Namespace.Name)) != 0 || len(validation.IsDNS1123Subdomain(account.Name)) != 0 || len(validation.IsDNS1123Subdomain(auditCredentials.Name)) != 0 || !providerName.MatchString(mount) || mount == "token" || accessor != "" && !providerName.MatchString(accessor) || ValidateOwner(in.Kubernetes, in.Postgres, in.AuditStore, in.KeyService, now) != nil {
 		return out, cfg.ErrInvalid
 	}
 	out.Profile = contracts.OwnerProviderAuthentication{Format: contracts.OwnerProviderAuthenticationFormat, AuthMount: mount, AuthMountAccessor: accessor, ServiceAccount: account, AuditCredentials: auditCredentials}
-	scope, e := ownerProviderCanonical(struct {
-		Format         string                          `json:"format"`
-		InstallationID string                          `json:"installationID"`
-		ClusterID      string                          `json:"clusterID"`
-		Namespace      contracts.WorkerObjectReference `json:"namespace"`
-		ServiceAccount contracts.WorkerObjectReference `json:"serviceAccount"`
-	}{"asservat-owner-provider-name/v1", in.InstallationID, in.ClusterID, in.Namespace, account})
-	if e != nil {
-		return OwnerProviderRecipe{}, e
-	}
-	nameDigest := sha256.Sum256(scope)
-	prefix := "asservat-owner-" + hex.EncodeToString(nameDigest[:]) + "-"
+	// Role and policy: "<name>-hub-api-<purpose>" (OpenBaoRoleName), the
+	// ServiceAccount name plus the purpose; setup creates the same names.
+	prefix := account.Name + "-"
 	audience := contracts.OwnerProviderAudience(in.InstallationID, in.ClusterID)
 	purposes := [4]string{"audit-wrap", "audit-unwrap", "server-sign", "client-sign"}
 	paths := [4]string{in.KeyService.AuditMount + "/encrypt/" + in.KeyService.AuditKey, in.KeyService.AuditMount + "/decrypt/" + in.KeyService.AuditKey, in.KeyService.PKIMount + "/sign/" + in.KeyService.ServerRole, in.KeyService.PKIMount + "/sign/" + in.KeyService.ClientRole}

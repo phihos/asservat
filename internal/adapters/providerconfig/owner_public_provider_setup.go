@@ -82,3 +82,11 @@ func ownerWorkerPKIRole(installation string) (json.RawMessage, error) {
 		"signature_bits": 0, "use_pss": false, "cn_validations": []string{"email", "hostname"},
 	})
 }
+
+// ownerProviderSetupRequest is one provider write the runtime readback
+// verifiers recompute; setup applies its own plan (setup_openbao.go).
+type ownerProviderSetupRequest struct {
+	Method string          `json:"method"`
+	Path   string          `json:"path"`
+	Body   json.RawMessage `json:"body"`
+}

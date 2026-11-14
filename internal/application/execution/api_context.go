@@ -700,18 +700,18 @@ func (s APIContextRunner) execute(ctx context.Context, current identities.Curren
 func (s APIContextRunner) finishAcquisition(ctx context.Context, w APIContextWork, prepared evidence.PreparedContext, closer evidence.StoredContextCloser, completionRecorder APIStoredCompletionRecorder, result value.APIExecution, err error) (ContextResult, error) {
 	process, proofErr := s.Process.ReadAPIProcess(ctx)
 	if proofErr != nil {
-		return ContextResult{State: "Indeterminate"}, proofErr
+		return ContextResult{State: "Indeterminate"}, executeStep{"finish/process", proofErr}
 	}
 	var recordErr error
 	if result.Phase == "stored" {
 		completion, closeErr := closer.CompleteStored()
 		if closeErr != nil || completion.Copies != result.Copies || !completion.Valid(w.Accepted.Expectation.Registration) {
-			return ContextResult{State: "Indeterminate"}, value.ErrUnavailable
+			return ContextResult{State: "Indeterminate"}, executeStep{"finish/complete-stored", value.ErrUnavailable}
 		}
 		result.CompletedAt = completion.StoredAt
 		currentRecovery, recoveryErr := s.Recovery.RecoveryState(ctx)
 		if recoveryErr != nil {
-			return ContextResult{State: "Indeterminate"}, recoveryErr
+			return ContextResult{State: "Indeterminate"}, executeStep{"finish/recovery", recoveryErr}
 		}
 		_, recordErr = completionRecorder.RecordAPIStoredCompletion(ctx, result, completion, process, currentRecovery)
 	} else {
@@ -719,10 +719,10 @@ func (s APIContextRunner) finishAcquisition(ctx context.Context, w APIContextWor
 		_, recordErr = s.Record.RecordAPIOutcome(ctx, result, process)
 	}
 	if recordErr != nil {
-		return ContextResult{State: "Indeterminate"}, recordErr
+		return ContextResult{State: "Indeterminate"}, executeStep{"finish/record-" + result.Phase, recordErr}
 	}
 	if err != nil {
-		return ContextResult{State: "Indeterminate"}, err
+		return ContextResult{State: "Indeterminate"}, executeStep{"acquire/" + result.Phase, err}
 	}
 	return ContextResult{State: "StoredPendingVerification", Copies: result.Copies}, nil
 }

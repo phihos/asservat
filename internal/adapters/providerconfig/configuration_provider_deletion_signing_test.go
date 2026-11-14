@@ -70,9 +70,9 @@ func TestConfigurationProviderBytesUnchangedWithoutDeletionSigning(t *testing.T)
 		recipe, wrap, unwrap, v3 string
 		legacy                   string
 	}{
-		{contracts.OwnerPublicTransit{}, "250e2db6ad380be5398c3e12ef7ad6d5d834df96b967d916912cf50ba16033a0", "d1401d769753873e1f8f38e1f9eb7c2c57b0c6c9eda019c6611ad130de8c2e53",
+		{contracts.OwnerPublicTransit{}, "1abf528a464dbe78eba2cfa99947178aa89a09f9161c39b3ed9fbe8083b743ba", "d1401d769753873e1f8f38e1f9eb7c2c57b0c6c9eda019c6611ad130de8c2e53",
 			"a59d7b4e1b685f7feda1a6519ef5d69429408d5fa7d8ffcba87e78261dcab321", "6daa32e89be933cf4b688d462ef47bd696289c84054af28d86f8f8be30af68fd", "cb27e075e4e18c0fbe5e659f087c94d2d45e4abacc112c95947634a29c60e48b"},
-		{contracts.OwnerPublicTransit{Mount: "audit", Key: contracts.WorkerConfigurationAuditKeyName(in.InstallationID)}, "ebe401670c853087478ded250b2a05d0518ab927a78068e9c34a589bc2989b19", "3ad93dc2d52ed0ff2370514826bf5e5ef6054a75c7befc667354928525937123",
+		{contracts.OwnerPublicTransit{Mount: "audit", Key: contracts.WorkerConfigurationAuditKeyName(in.InstallationID)}, "b409af1f2640cf9dac267610ea477f53605c675dbf9b87c654d9ded9645a706a", "3ad93dc2d52ed0ff2370514826bf5e5ef6054a75c7befc667354928525937123",
 			"8396b514558c1c2f12dc8956a84cb599f1a29034e5b57a7fda946430d6651d5b", "45927f7dece3408f284d2364f35c3ab32f503c2c215a17cafd6df88fb4d7d5c0", ""},
 	} {
 		s := selection
@@ -87,14 +87,6 @@ func TestConfigurationProviderBytesUnchangedWithoutDeletionSigning(t *testing.T)
 		raw, err := json.Marshal(r.Profile)
 		if err != nil || bytes.Contains(raw, []byte("contextDeletionSigning")) {
 			t.Fatal("zero deletion signing key serialized")
-		}
-		b, err := ConfigurationProviderPairSetupArtifact(in, s, account, contracts.HubWorkerProviderInstalledLayout, now)
-		if err != nil || hexSHA256(b) != c.v3 || bytes.Contains(b, []byte("context-deletion")) || bytes.Contains(b, []byte("/sign/")) {
-			t.Fatal("installed artifact changed without a deletion signing key", err)
-		}
-		b, err = ConfigurationProviderSetupArtifact(in, s, account, now)
-		if c.legacy != "" && (err != nil || hexSHA256(b) != c.legacy) || c.legacy == "" && err == nil {
-			t.Fatal("legacy artifact changed without a deletion signing key", err)
 		}
 	}
 }
@@ -162,83 +154,6 @@ func TestConfigurationProviderRecipeLetsOnlyAuditWrapSignDeletions(t *testing.T)
 		if _, err := ConfigurationProviderRecipeFor(in, s, account, now); err == nil {
 			t.Fatal("invalid deletion signing key accepted", name)
 		}
-	}
-}
-
-func TestConfigurationPairArtifactCreatesDeletionSigningKeyAndPrefix(t *testing.T) {
-	in, selection, account, now := configurationProviderRecipeFixture(t)
-	signing := deletionSigningFixture(in.InstallationID)
-	for _, worker := range []contracts.OwnerPublicTransit{{}, workerAuditFixture} {
-		s := selection
-		s.WorkerConfigurationAudit = worker
-		before, err := ConfigurationProviderPairSetupArtifact(in, s, account, contracts.HubWorkerProviderInstalledLayout, now)
-		if err != nil {
-			t.Fatal(err)
-		}
-		s.ContextDeletionSigning = signing
-		r, err := ConfigurationProviderRecipeFor(in, s, account, now)
-		if err != nil {
-			t.Fatal(err)
-		}
-		b, err := ConfigurationProviderPairSetupArtifact(in, s, account, contracts.HubWorkerProviderInstalledLayout, now)
-		if err != nil {
-			t.Fatal(err)
-		}
-		type artifact struct {
-			Apply        []configurationProviderSetupRequest `json:"apply"`
-			Inspect      []string                            `json:"inspect"`
-			AuditStorage struct {
-				Prefixes   []string `json:"prefixes"`
-				Operations []string `json:"operations"`
-			} `json:"auditStorage"`
-		}
-		var v, old artifact
-		if json.Unmarshal(b, &v) != nil || json.Unmarshal(before, &old) != nil || len(v.Apply) != len(old.Apply)+1 {
-			t.Fatal("artifact shape", len(v.Apply), len(old.Apply))
-		}
-		var policy struct {
-			Policy string `json:"policy"`
-		}
-		if json.Unmarshal(v.Apply[0].Body, &policy) != nil || policy.Policy != string(r.Roles[0].Policy) || !bytes.Equal(v.Apply[2].Body, old.Apply[2].Body) {
-			t.Fatal("artifact policies are not the extended recipe")
-		}
-		key := v.Apply[len(v.Apply)-1]
-		body, err := ownerProviderCanonical(configurationSigningKey)
-		if err != nil || key.Method != "POST" || key.Path != "audit/keys/"+signing.Key || !bytes.Equal(key.Body, body) || !strings.Contains(string(body), `"type":"ed25519"`) || !strings.Contains(string(body), `"exportable":false`) || !strings.Contains(string(body), `"allow_plaintext_backup":false`) {
-			t.Fatal("deletion signing key is not created exactly", key.Path, string(key.Body))
-		}
-		if !slices.Equal(v.Inspect, append(old.Inspect, "audit/keys/"+signing.Key)) {
-			t.Fatal("inspection does not name the deletion signing key", v.Inspect)
-		}
-		if !slices.Equal(v.AuditStorage.Prefixes, append(old.AuditStorage.Prefixes, "context-deletion/v1/")) || !slices.Equal(v.AuditStorage.Operations, old.AuditStorage.Operations) {
-			t.Fatal("audit storage lacks the context deletion prefix", v.AuditStorage.Prefixes)
-		}
-		for _, request := range v.Apply {
-			if !setupApplyPath(request.Path) {
-				t.Fatal("applier refuses", request.Path)
-			}
-		}
-		if _, err := setupInspectionPolicy(v.Inspect); err != nil {
-			t.Fatal("inspection policy", err)
-		}
-	}
-	s := selection
-	s.ContextDeletionSigning = signing
-	if _, err := ConfigurationProviderSetupArtifact(in, s, account, now); err == nil {
-		t.Fatal("legacy artifact accepted a deletion signing key")
-	}
-	r, err := ConfigurationProviderRecipeFor(in, s, account, now)
-	if err != nil {
-		t.Fatal(err)
-	}
-	in.ProviderAuthentication = &r.Profile
-	in.ProviderInputs = &contracts.ConfigurationWorkerInputProvenance{OperationID: "70000000-0000-4000-8000-000000000001"}
-	in.Activation = &contracts.HubWorkerRuntimeActivation{WorkerLayout: contracts.HubWorkerProviderInstalledLayout}
-	if _, err := ConfigurationProviderInstalledSetupArtifact(in, s, account, now); err != nil {
-		t.Fatal("installed artifact", err)
-	}
-	if _, err := ConfigurationProviderInstalledSetupArtifact(in, selection, account, now); err == nil {
-		t.Fatal("installed artifact dropped the profile's deletion signing key")
 	}
 }
 

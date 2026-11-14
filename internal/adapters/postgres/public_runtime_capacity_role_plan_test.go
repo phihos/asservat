@@ -37,7 +37,9 @@ func TestCapacityRolePlansKeepClosedRPCsAndPurposeFixedPeerReads(t *testing.T) {
 				t.Fatal("unrecognized privilege", g.key())
 			}
 		}
-		want := 19 // ADR-219 shares root/allocation publication with query backing.
+		// ADR-219 shares root/allocation publication with query backing; the
+		// Helm-native hub-worker initializes the root and reads its qualification.
+		want := 21
 		if purpose == "capacity-capture" {
 			want = 5
 		}

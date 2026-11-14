@@ -109,7 +109,7 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 	}
 	liveService, err := d.newPublicLive(ctx)
 	if err != nil {
-		return nil, &fixedStepError{"live", mounts.ErrUnavailable}
+		return nil, &fixedStepError{"live", err}
 	}
 	if liveService != nil {
 		liveOperations, e := presentation.NewLiveOperations(p.Origin, liveService, time.Now)

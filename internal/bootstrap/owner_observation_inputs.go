@@ -24,12 +24,11 @@ func ownerObservationDigest(s string) artifact.Digest {
 	return out
 }
 
-// projected requires the activation the owner projection attaches.
-func validateOwnerObservationInputs(c *contracts.OwnerObservationBootstrap, projected bool) error {
+func validateOwnerObservationInputs(c *contracts.OwnerObservationBootstrap) error {
 	if c == nil {
 		return nil
 	}
-	if projected && c.Activation == nil || c.Format != contracts.OwnerObservationFormat || ownerObservationDigest(c.TemplateDigest) == (artifact.Digest{}) || ownerObservationDigest(c.ImageDigest) == (artifact.Digest{}) || ownerObservationDigest(c.ProtectionDigest) == (artifact.Digest{}) || len(c.Peers) < 1 || len(c.Peers) > 16 {
+	if c.Format != contracts.OwnerObservationFormat || ownerObservationDigest(c.TemplateDigest) == (artifact.Digest{}) || ownerObservationDigest(c.ImageDigest) == (artifact.Digest{}) || ownerObservationDigest(c.ProtectionDigest) == (artifact.Digest{}) || len(c.Peers) < 1 || len(c.Peers) > 16 {
 		return mounts.ErrUnavailable
 	}
 	seen := make(map[value.PeerBinding]bool, len(c.Peers))
@@ -44,20 +43,16 @@ func validateOwnerObservationInputs(c *contracts.OwnerObservationBootstrap, proj
 		seen[b] = true
 	}
 	if l := c.LocalCapacity; l != nil {
-		g := l.Guard
-		if !authorization.UUID(g.PolicyUID) || !authorization.UUID(g.BindingUID) || g.PolicyGeneration < 1 || g.BindingResourceVersion == "" || len(g.Administrators) == 0 ||
-			len(l.Keys) == 0 || len(l.Keys) > 256 || !slices.IsSorted(l.Keys) || len(slices.Compact(slices.Clone(l.Keys))) != len(l.Keys) ||
-			!authorization.UUID(l.ProbeNamespace.UID) || l.ProbeNamespace.Name == "" || !authorization.UUID(l.ProbeAccount.UID) || l.ProbeAccount.Name == "" || l.ProbeAudience == "" ||
+		// ADR-328: no guard pin or probe account; the hub-worker caller is
+		// named and its UIDs are read by name at startup.
+		if len(l.Keys) == 0 || len(l.Keys) > 256 || !slices.IsSorted(l.Keys) || len(slices.Compact(slices.Clone(l.Keys))) != len(l.Keys) ||
+			!authorization.UUID(l.ProbeNamespace.UID) || l.ProbeNamespace.Name == "" ||
 			!authorization.UUID(l.Caller.AccountUID) || !authorization.UUID(l.Caller.DeploymentUID) || l.Caller.Account == "" || l.Caller.Deployment == "" ||
 			ownerObservationDigest(l.Caller.TemplateDigest) == (artifact.Digest{}) || ownerObservationDigest(l.Caller.ImageDigest) == (artifact.Digest{}) || ownerObservationDigest(l.Caller.ProtectionDigest) == (artifact.Digest{}) {
 			return mounts.ErrUnavailable
 		}
-		if w := l.WorkloadGuard; w != nil {
-			g := w.Guard
-			if !authorization.UUID(g.PolicyUID) || !authorization.UUID(g.BindingUID) || g.PolicyGeneration < 1 || g.BindingResourceVersion == "" || len(g.Administrators) == 0 || g.Name == "" ||
-				!(cfg.WorkloadAdministration{Name: g.Name, Administrators: []cfg.KubernetesActor{{Kind: "Group", Name: "-"}}, LabelKeys: w.LabelKeys, AnnotationKeys: w.AnnotationKeys, ProbeNamespace: cfg.NamespaceRef{Name: l.ProbeNamespace.Name, UID: l.ProbeNamespace.UID}, ProbeAccount: cfg.NamespaceRef{Name: l.ProbeAccount.Name, UID: l.ProbeAccount.UID}}).Valid() {
-				return mounts.ErrUnavailable
-			}
+		if w := l.WorkloadGuard; w != nil && !(cfg.NamespaceKeys{Labels: w.LabelKeys, Annotations: w.AnnotationKeys}).Valid() {
+			return mounts.ErrUnavailable
 		}
 	}
 	return nil
@@ -67,7 +62,7 @@ func ownerObservationConfig(c contracts.OwnerDeployment, p value.OwnerPool) (val
 	var zero value.OwnerObservationPin
 	o := c.Observation
 	// ADR-190 decision 4: a promoted installed owner also serves observation.
-	if o == nil || c.Native != nil && (c.ProviderAuthentication == nil || c.Public == nil) || validateOwnerObservationInputs(o, true) != nil || p.NativeBootstrap != value.OwnerBootstrapProfile || p.InstallationID != c.InstallationID || p.ClusterID != c.ClusterID || p.NamespaceUID != c.Namespace.UID || p.Namespace != c.Namespace.Name {
+	if o == nil || c.Native != nil && (c.ProviderAuthentication == nil || c.Public == nil) || validateOwnerObservationInputs(o) != nil || p.NativeBootstrap != value.OwnerBootstrapProfile || p.InstallationID != c.InstallationID || p.ClusterID != c.ClusterID || p.NamespaceUID != c.Namespace.UID || p.Namespace != c.Namespace.Name {
 		return zero, nil, mounts.ErrUnavailable
 	}
 	pin := value.OwnerObservationPin{RootID: c.PermissionRootID, SourceUID: c.ConfigurationUID, Pool: p, TemplateDigest: ownerObservationDigest(o.TemplateDigest), ImageDigest: ownerObservationDigest(o.ImageDigest), ProtectionDigest: ownerObservationDigest(o.ProtectionDigest)}

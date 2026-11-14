@@ -16,7 +16,6 @@ import (
 type retentionReconcileFixture struct {
 	now                               time.Time
 	list                              PolicyList
-	review                            *value.RetentionBootstrapReview
 	source                            privacy.PolicySourceRef
 	fence                             RetentionFence
 	previous                          *RetentionCheckpoint
@@ -48,12 +47,6 @@ func (f *retentionReconcileFixture) RetentionProtection(context.Context) (privac
 		p.Digest[0]++
 	}
 	return p, nil
-}
-func (f *retentionReconcileFixture) InitialRetentionReview(context.Context) (value.RetentionBootstrapReview, error) {
-	if f.review == nil {
-		return value.RetentionBootstrapReview{}, value.ErrDenied
-	}
-	return *f.review, nil
 }
 func (f *retentionReconcileFixture) BeginRetention(_ context.Context, root string, source privacy.PolicySourceRef, epoch string) (RetentionStart, error) {
 	f.fence = RetentionFence{RootID: root, Source: source, Epoch: epoch, LeaseUntil: f.now.Add(30 * time.Second)}
@@ -155,24 +148,28 @@ func (w *retentionFixtureWatch) Next(ctx context.Context) (PolicyEvent, error) {
 func retentionReconciliation(t *testing.T) (*retentionReconcileFixture, RetentionReconciler) {
 	t.Helper()
 	x, _ := retentionTransitionFixture(t)
-	f := &retentionReconcileFixture{now: x.List.Snapshot.ObservedAt, list: x.List, review: x.Review, source: x.Fence.Source, done: make(chan struct{})}
-	r := RetentionReconciler{RootID: x.Fence.RootID, Source: f.source, Reader: f, Watcher: f, Protection: f, Review: f, Store: f, Now: func() time.Time { return f.now }, NewID: f.newID}
+	f := &retentionReconcileFixture{now: x.List.Snapshot.ObservedAt, list: x.List, source: x.Fence.Source, done: make(chan struct{})}
+	r := RetentionReconciler{RootID: x.Fence.RootID, Source: f.source, Reader: f, Watcher: f, Protection: f, Store: f, Now: func() time.Time { return f.now }, NewID: f.newID}
 	return f, r
 }
 func TestRetentionReconcilerRequiresInitialValuesAndStableGuard(t *testing.T) {
-	for _, mode := range []string{"review", "guard", "source"} {
+	steps := map[string]string{"guard": "start/protection", "source": "start/list/source"}
+	for _, mode := range []string{"guard", "source"} {
 		t.Run(mode, func(t *testing.T) {
 			f, r := retentionReconciliation(t)
 			switch mode {
-			case "review":
-				r.Review = nil
 			case "guard":
 				f.failGuard = 2
 			case "source":
 				f.list.Snapshot.Hub = false
 			}
-			if err := r.Run(context.Background()); err == nil {
+			err := r.Run(context.Background())
+			if err == nil {
 				t.Fatal("invalid source accepted")
+			}
+			var fixed interface{ FixedStep() string }
+			if !errors.As(err, &fixed) || fixed.FixedStep() != steps[mode] {
+				t.Fatal("failure names the wrong reconciler step", err)
 			}
 			if !f.suspended || len(f.accepted) != 0 {
 				t.Fatal("failed bootstrap left a live source")

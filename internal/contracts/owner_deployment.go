@@ -71,11 +71,14 @@ type OwnerPublicDeployment struct {
 	// issuer, client and session epoch; the Keycloak profile derives the
 	// provider endpoints from that issuer. BrowserAudience is the one access
 	// audience of browser login; MCP and download audiences derive from Origin.
-	BrowserRootID    string                `json:"browserRootID"`
-	BrowserSettings  WorkerObjectReference `json:"browserSettings"`
-	IdentitySettings WorkerObjectReference `json:"identitySettings"`
-	BrowserAudience  string                `json:"browserAudience"`
-	ProviderRoots    [][]byte              `json:"providerRoots"`
+	BrowserRootID string `json:"browserRootID"`
+	// BrowserSessionEpoch fills the Helm-rendered browser settings' omitted
+	// sessionEpoch (the <name>-ids Secret).
+	BrowserSessionEpoch string                `json:"browserSessionEpoch,omitempty"`
+	BrowserSettings     WorkerObjectReference `json:"browserSettings"`
+	IdentitySettings    WorkerObjectReference `json:"identitySettings"`
+	BrowserAudience     string                `json:"browserAudience"`
+	ProviderRoots       [][]byte              `json:"providerRoots"`
 	// SessionTransit is the OpenBao Transit key on KeyService for browser
 	// session ciphertext; its encrypt and decrypt tokens are separate files.
 	SessionTransit OwnerPublicTransit `json:"sessionTransit"`
@@ -118,7 +121,10 @@ type OwnerPublicDeployment struct {
 	DownloadPlan OwnerPublicDownloadPlan `json:"downloadPlan"`
 	// HTTPS (ADR-180 P5). hub-api terminates TLS itself with the fixed files
 	// OwnerPublicTLSCertificate/OwnerPublicTLSKey; forwarded headers confer no
-	// transport trust. The console package is image-owned.
+	// transport trust. The console package is image-owned. ProxyTLS (ADR-327):
+	// the operator's Ingress/Gateway terminates TLS for the https origin and
+	// the hub-api serves plain HTTP on Port inside the cluster.
+	ProxyTLS             bool                      `json:"proxyTLS,omitempty"`
 	Port                 int                       `json:"port"`
 	Version              string                    `json:"version"`
 	OperationConcurrency int                       `json:"operationConcurrency"`

@@ -23,7 +23,7 @@ func newPublicFleet(ctx context.Context, c contracts.OwnerDeployment, providers 
 		return nil, nil
 	}
 	f := c.Public.Fleet
-	if providers == nil || providers.BootstrapChannel() == nil || pools == nil || observer == nil || probe == nil || !a.storageConfigured() || a.seal == nil || a.open == nil {
+	if providers == nil || providers.BootstrapChannel() == nil || pools == nil || observer == nil || !a.storageConfigured() || a.seal == nil || a.open == nil {
 		return nil, &fixedStepError{"fleet-inputs", mounts.ErrUnavailable}
 	}
 	admins, pin := capacityWorkerGuard(f.SettingsGuard)
@@ -31,7 +31,7 @@ func newPublicFleet(ctx context.Context, c contracts.OwnerDeployment, providers 
 	if err != nil {
 		return nil, &fixedStepError{"fleet-protection", mounts.ErrUnavailable}
 	}
-	settings, err := kube.NewProtectedFleetSettings(observer, protection, f.Settings.Name, f.Settings.UID, c.InstallationID)
+	settings, err := kube.NewProtectedFleetSettings(observer, protection, f.Settings.Name, f.Settings.UID, c.InstallationID, c.Public.WorkerPKI.IssuerEpoch)
 	if err != nil {
 		return nil, &fixedStepError{"fleet-settings", mounts.ErrUnavailable}
 	}

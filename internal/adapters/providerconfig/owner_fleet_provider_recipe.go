@@ -25,18 +25,7 @@ func OwnerFleetProviderRecipeFor(in contracts.OwnerDeployment, profile contracts
 	if err != nil || identity.Profile.RecipeSHA256 != profile.RecipeSHA256 {
 		return role, "", cfg.ErrInvalid
 	}
-	scope, err := ownerProviderCanonical(struct {
-		Format         string                          `json:"format"`
-		InstallationID string                          `json:"installationID"`
-		ClusterID      string                          `json:"clusterID"`
-		Namespace      contracts.WorkerObjectReference `json:"namespace"`
-		ServiceAccount contracts.WorkerObjectReference `json:"serviceAccount"`
-	}{"asservat-owner-fleet-provider-name/v1", in.InstallationID, in.ClusterID, in.Namespace, profile.ServiceAccount})
-	if err != nil {
-		return role, "", err
-	}
-	nameDigest := sha256.Sum256(scope)
-	name := "asservat-owner-fleet-" + hex.EncodeToString(nameDigest[:8]) + "-" + OwnerFleetProviderPurpose
+	name := profile.ServiceAccount.Name + "-" + OwnerFleetProviderPurpose
 	auth := OwnerKubernetesAuthRole{Accounts: []string{profile.ServiceAccount.Name}, Namespaces: []string{in.Namespace.Name}, Audience: contracts.OwnerProviderAudience(in.InstallationID, in.ClusterID), AliasSource: "serviceaccount_uid", TTL: contracts.OwnerProviderTokenTTLSeconds, MaxTTL: contracts.OwnerProviderTokenMaxTTLSeconds, ExplicitMaxTTL: contracts.OwnerProviderTokenMaxTTLSeconds, Policies: []string{name}, NoDefault: true, Type: "service", BoundCIDRs: []string{}}
 	acl := ownerProviderACL{Path: map[string]ownerProviderACLRule{
 		"auth/token/lookup-self": {Capabilities: []string{"read"}},

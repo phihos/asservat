@@ -32,13 +32,32 @@ type BootstrapIssuer struct {
 	Now          func() time.Time
 }
 
-func (s BootstrapIssuer) Issue(ctx context.Context, token string, in BootstrapInput) (value.BootstrapIntent, error) {
+// BootstrapIssueStage names the issuance stage that refused (a fixed word);
+// errors.Is still sees the wrapped cause.
+type BootstrapIssueStage struct {
+	Stage string
+	Err   error
+}
+
+func (e *BootstrapIssueStage) Error() string {
+	return "bootstrap issuance " + e.Stage + ": " + e.Err.Error()
+}
+func (e *BootstrapIssueStage) Unwrap() error { return e.Err }
+
+func (s BootstrapIssuer) Issue(ctx context.Context, token string, in BootstrapInput) (_ value.BootstrapIntent, err error) {
 	var empty value.BootstrapIntent
+	stage := "inputs"
+	defer func() {
+		if err != nil {
+			err = &BootstrapIssueStage{stage, err}
+		}
+	}()
 	if s.Authority == nil || s.Reservations == nil || s.Credentials == nil || s.Records == nil || s.Audits == nil || s.Objects == nil || s.Activation == nil || s.Now == nil {
 		return empty, value.ErrUnavailable
 	}
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
+	stage = "authorize"
 	a, err := s.Authority.AuthorizeEnrollment(ctx, token, in.DeliveryProfile)
 	if err != nil {
 		return empty, err
@@ -47,6 +66,7 @@ func (s BootstrapIssuer) Issue(ctx context.Context, token string, in BootstrapIn
 	if !request.Valid(s.Now()) || a.DeliveryProfile != in.DeliveryProfile {
 		return empty, value.ErrDenied
 	}
+	stage = "reserve"
 	intent, err := s.Reservations.ReserveBootstrap(ctx, request)
 	if err != nil {
 		return empty, err
@@ -54,6 +74,7 @@ func (s BootstrapIssuer) Issue(ctx context.Context, token string, in BootstrapIn
 	if !intent.Slot.Valid(s.Now()) || intent.Actor != a.Actor || intent.AdministrationRevision != a.AdministrationRevision || intent.Slot.Binding.InstallationID != a.InstallationID || intent.Slot.Binding.IssuerEpoch != a.IssuerEpoch || intent.Slot.DeliveryProfile != in.DeliveryProfile || intent.DisplayName != in.DisplayName || intent.Region != in.Region {
 		return empty, value.ErrDenied
 	}
+	stage = "credential"
 	if intent.Credential == nil {
 		c, err := s.Credentials.EnsureBootstrapCredential(ctx, intent.Slot)
 		if err != nil {
@@ -67,6 +88,7 @@ func (s BootstrapIssuer) Issue(ctx context.Context, token string, in BootstrapIn
 	if !intent.Credential.Matches(intent.Slot) {
 		return empty, value.ErrDenied
 	}
+	stage = "record"
 	r, err := s.Records.RecordBootstrapCredential(ctx, intent.Slot, *intent.Credential)
 	if err != nil {
 		return empty, err
@@ -75,6 +97,7 @@ func (s BootstrapIssuer) Issue(ctx context.Context, token string, in BootstrapIn
 	if !r.Valid() || r != want {
 		return empty, value.ErrDenied
 	}
+	stage = "audit-write"
 	receipt, err := s.Objects.WriteBootstrapIssue(ctx, r)
 	if err != nil {
 		return empty, err
@@ -82,12 +105,14 @@ func (s BootstrapIssuer) Issue(ctx context.Context, token string, in BootstrapIn
 	if !receipt.ValidBootstrapIssue(a.InstallationID, intent.Slot.ID) {
 		return empty, value.ErrDenied
 	}
+	stage = "audit-ack"
 	if err = s.Audits.AcknowledgeBootstrapIssue(ctx, r, receipt); err != nil {
 		return empty, err
 	}
 	// Provider and audit I/O can outlast the original five-second authority.
 	// Revalidate the authenticated actor and protected policy without renewing
 	// the reserved IDs, original request, credential or five-minute deadline.
+	stage = "reauthorize"
 	current, err := s.Authority.AuthorizeEnrollment(ctx, token, in.DeliveryProfile)
 	if err != nil {
 		return empty, err
@@ -96,6 +121,7 @@ func (s BootstrapIssuer) Issue(ctx context.Context, token string, in BootstrapIn
 		return empty, value.ErrDenied
 	}
 	request.Authority = current
+	stage = "activate"
 	out, err := s.Activation.ActivateBootstrap(ctx, request, intent.Slot.ID)
 	if err != nil {
 		return empty, err

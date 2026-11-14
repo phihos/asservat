@@ -38,8 +38,7 @@ func TestInitialPreparationPublicInputsWithRealKubernetes(t *testing.T) {
 		if e != nil || json.Unmarshal(raw, &fleet) != nil {
 			t.Fatal("synthetic fleet unavailable", e)
 		}
-		fleet.InstallationID = c.Plan.InstallationID
-		c.Services = &contracts.InitialPreparationServices{Format: contracts.InitialPreparationServicesFormat, Fleet: fleet, Kubernetes: contracts.OwnerProviderEndpoint{Endpoint: native.Host, Roots: roots}, Postgres: contracts.OwnerPostgresEndpoint{Host: "sql.example.test", Port: 5432, Database: "asservat", Roots: roots, MaxConnections: 2}, AuditStore: contracts.OwnerAuditStore{Endpoint: "https://audit.example.test", Roots: roots, Region: "test", Bucket: "audit"}, KeyService: contracts.ConfigurationKeyService{Endpoint: "https://keys.example.test", Roots: roots, AuditMount: "transit", AuditKey: "audit"}}
+		c.Services = &contracts.InitialPreparationServices{Format: contracts.InitialPreparationServicesFormat, Fleet: fleet, IssuerEpoch: "22222222-2222-4222-8222-222222222222", Kubernetes: contracts.OwnerProviderEndpoint{Endpoint: native.Host, Roots: roots}, Postgres: contracts.OwnerPostgresEndpoint{Host: "sql.example.test", Port: 5432, Database: "asservat", Roots: roots, MaxConnections: 2}, AuditStore: contracts.OwnerAuditStore{Endpoint: "https://audit.example.test", Roots: roots, Region: "test", Bucket: "audit"}, KeyService: contracts.ConfigurationKeyService{Endpoint: "https://keys.example.test", Roots: roots, AuditMount: "transit", AuditKey: "audit"}}
 		// Register before any producer effect. Remove only this fixture's exact owned
 		// policies. Trusted fixture teardown does not stand in for product handover.
 		t.Cleanup(func() {

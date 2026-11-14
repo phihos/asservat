@@ -1,0 +1,88 @@
+{{- if include "asservat.hub" . }}
+{{- $n := include "asservat.name" . }}
+{{- $name := include "asservat.fullname" (list . "hub-worker") }}
+{{- $api := include "asservat.fullname" (list . "hub-api") }}
+{{- $cluster := printf "%s-%s" .Release.Namespace $name }}
+{{- $capacity := not (empty .Values.capacity) }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels: {{ include "asservat.labels" (list . "hub-worker") | nindent 4 }}
+rules:
+  # Fleet, owner, processing, browser/identity settings and cluster catalog
+  # source observers (read by name; UIDs key SQL rows).
+  - apiGroups: [""]
+    resources: [configmaps]
+    verbs: [get, list, watch]
+  # The owner pool's object UIDs, read by name (owner source).
+  - apiGroups: [""]
+    resources: [services, serviceaccounts]
+    resourceNames: [{{ printf "%s-owner" $api | quote }}, {{ $api | quote }}]
+    verbs: [get]
+  - apiGroups: [apps]
+    resources: [deployments]
+    resourceNames: [{{ $api | quote }}]
+    verbs: [get]
+  # Leader election creates its Lease; create cannot be restricted by name.
+  - apiGroups: [coordination.k8s.io]
+    resources: [leases]
+    verbs: [create]
+  - apiGroups: [coordination.k8s.io]
+    resources: [leases]
+    resourceNames: [{{ printf "%s-hub-worker-leader" $n | quote }}]
+    verbs: [get, update]
+  # Permission reconciler: AccessBindings and PermissionSources.
+  - apiGroups: [asservat.io]
+    resources: [accessbindings, permissionsources]
+    verbs: [get, list, watch]
+  # Hub retention source (ADR-195).
+  - apiGroups: [asservat.io]
+    resources: [evidenceretentionpolicies]
+    verbs: [get, list, watch]
+  {{- if $capacity }}
+  # Capacity source reader (ADR-189): storage pools and budget policies.
+  - apiGroups: [asservat.io]
+    resources: [evidencestoragepools, evidencebudgetpolicies]
+    verbs: [get, list]
+  {{- end }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels: {{ include "asservat.labels" (list . "hub-worker") | nindent 4 }}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: {{ $name }}}
+subjects: [{kind: ServiceAccount, namespace: {{ .Release.Namespace }}, name: {{ $name }}}]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ $cluster }}
+  labels: {{ include "asservat.labels" (list . "hub-worker") | nindent 4 }}
+rules:
+  # Namespace UIDs by name (SQL keys) and namespace inheritance (ADR-242),
+  # which lists and watches the hub cluster's namespaces.
+  - apiGroups: [""]
+    resources: [namespaces]
+    verbs: [get, list, watch]
+  {{- if $capacity }}
+  # Capacity local workload observation: Pods and their owning workloads.
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [get, list, watch]
+  - apiGroups: [apps]
+    resources: [deployments, statefulsets, replicasets]
+    verbs: [get, list, watch]
+  {{- end }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ $cluster }}
+  labels: {{ include "asservat.labels" (list . "hub-worker") | nindent 4 }}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: {{ $cluster }}}
+subjects: [{kind: ServiceAccount, namespace: {{ .Release.Namespace }}, name: {{ $name }}}]
+{{- end }}

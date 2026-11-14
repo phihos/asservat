@@ -4,15 +4,16 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"net"
 	"net/url"
 	"os"
+	"strconv"
 	"testing"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/kms"
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
-	app "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
@@ -24,7 +25,7 @@ import (
 )
 
 // The ordinary harness does not select this test. It requires its own fresh
-// owned fleet database and uses actual initial SQL/S3/OpenBao activation before
+// owned fleet database and seeds the trust root as setup does before
 // actual capacity setup. Kubernetes witness/guard/metadata and physical-history
 // qualifications remain explicitly synthetic. No history coverage is returned.
 func TestCapacityProducerWithRealPostgres(t *testing.T) {
@@ -57,43 +58,11 @@ func withCapacityProducerFixture(t *testing.T, qualify capacityProducerCheck) {
 	if e = admin.QueryRow(ctx, "SELECT (SELECT count(*) FROM fleet_trust)+(SELECT count(*) FROM fleet_initial_activation)").Scan(&count); e != nil || count != 0 {
 		t.Fatal("fixture not pristine", e)
 	}
-	_, e = admin.Exec(ctx, `CREATE ROLE initial_prepare LOGIN PASSWORD 'synthetic-initial';
- CREATE ROLE initial_audit LOGIN PASSWORD 'synthetic-initial';
- CREATE ROLE initial_activate LOGIN PASSWORD 'synthetic-initial';
- GRANT USAGE ON SCHEMA public TO initial_prepare,initial_audit,initial_activate;
- GRANT SELECT,MAINTAIN ON ALL TABLES IN SCHEMA public TO initial_prepare,initial_activate;
- GRANT INSERT ON fleet_initial_activation TO initial_prepare;
- GRANT UPDATE(singleton) ON fleet_initial_activation TO initial_prepare;
- GRANT INSERT(installation_id,issuer_epoch,source_uid,source_generation,source_digest,observed_at,fresh_until) ON fleet_trust TO initial_prepare;
- GRANT SELECT ON goose_db_version,fleet_initial_activation TO initial_audit;
- GRANT UPDATE(audit_receipt_json) ON fleet_initial_activation TO initial_audit;
- GRANT UPDATE(activated_at) ON fleet_initial_activation TO initial_activate;
- GRANT UPDATE(suspended,recovery_blocked,activated_postmaster_at,activated_database_oid,observed_at,fresh_until) ON fleet_trust TO initial_activate;
- GRANT INSERT(installation_id,semantic_version,issuer_epoch,source_uid,source_generation,source_digest,activated_postmaster_at,activated_database_oid,observed_at,fresh_until) ON fleet_observation TO initial_activate;`)
-	if e != nil {
-		t.Fatal(e)
-	}
 	u, e := url.Parse(f.Postgres)
 	if e != nil {
 		t.Fatal(e)
 	}
 	address, tlsConfig := pgTLSBridge(t, u.Host)
-	pools := map[string]*pgxpool.Pool{}
-	for _, name := range []string{"prepare", "audit", "activate"} {
-		cfg, e := pgxpool.ParseConfig("postgres://initial_" + name + ":synthetic-initial@" + address + "/custody_test?sslmode=disable")
-		if e != nil {
-			t.Fatal(e)
-		}
-		cfg.ConnConfig.TLSConfig = tlsConfig
-		cfg.ConnConfig.Fallbacks = nil
-		cfg.MaxConns = 4
-		p, e := pgxpool.NewWithConfig(ctx, cfg)
-		if e != nil {
-			t.Fatal(e)
-		}
-		t.Cleanup(p.Close)
-		pools[name] = p
-	}
 	request(t, f.KMS, "synthetic-root", "sys/mounts/initial-transit", map[string]any{"type": "transit"}, 204)
 	request(t, f.KMS, "synthetic-root", "initial-transit/keys/audit", map[string]any{"type": "aes256-gcm96"}, 200)
 	tokens := map[string]string{}
@@ -127,41 +96,22 @@ func withCapacityProducerFixture(t *testing.T, qualify capacityProducerCheck) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	objects := &objectstore.InitialInstallationObjects{Store: store, Seal: seal, Open: open}
-	type lab struct {
-		scope          value.InstallationWitnessScope
-		w              *initialWitnessFixture
-		a              *initialAdminFixture
-		prep, ack, act *postgres.InitialInstallations
-		service        app.InitialInstaller
+	// The trust root is seeded as `asservat setup` seeds it.
+	scope := value.InstallationWitnessScope{InstallationID: custodyID(), IssuerEpoch: custodyID(), ClusterID: custodyID(), Namespace: "control", NamespaceUID: custodyID(), Name: "witness", UID: custodyID(), WriterAccount: "installer", WriterAccountUID: custodyID()}
+	seed := admin.Config().ConnConfig.Copy()
+	host, port, e := net.SplitHostPort(address)
+	if e != nil {
+		t.Fatal(e)
 	}
-	setup := func(t *testing.T) *lab {
-		t.Helper()
-		s := &lab{scope: value.InstallationWitnessScope{InstallationID: custodyID(), IssuerEpoch: custodyID(), ClusterID: custodyID(), Namespace: "control", NamespaceUID: custodyID(), Name: "witness", UID: custodyID(), WriterAccount: "installer", WriterAccountUID: custodyID()}}
-		s.w = &initialWitnessFixture{scope: s.scope}
-		s.a = &initialAdminFixture{a: value.Administration{InstallationID: s.scope.InstallationID, IssuerEpoch: s.scope.IssuerEpoch, Issuer: "https://id.example.test", Revision: identity.Revision{UID: "initial-fleet", Generation: 1, Digest: artifact.Digest{1}}, Clients: []string{"console"}, Groups: []string{"operators"}, DeliveryProfiles: []string{"ops"}, MaxActiveBootstraps: 8, MaxBootstrapHistory: 16, MaxClusters: 16}}
-		for name, dst := range map[string]**postgres.InitialInstallations{"prepare": &s.prep, "audit": &s.ack, "activate": &s.act} {
-			var e error
-			*dst, e = postgres.NewInitialInstallations(ctx, pools[name], s.scope, artifact.Digest{2})
-			if e != nil {
-				t.Fatal(e)
-			}
-		}
-		s.service = app.InitialInstaller{Witness: s.w, Consume: s.w, Administration: s.a, Preparation: s.prep, Objects: objects, Acknowledgements: s.ack, Activation: s.act, Now: time.Now}
-
-		return s
+	n, _ := strconv.Atoi(port)
+	seed.Host, seed.Port, seed.Fallbacks = host, uint16(n), nil
+	seed.TLSConfig = tlsConfig.Clone()
+	seed.TLSConfig.MinVersion = tls.VersionTLS13
+	now := time.Now()
+	current := value.Administration{InstallationID: scope.InstallationID, IssuerEpoch: scope.IssuerEpoch, Issuer: "https://id.example.test", Revision: identity.Revision{UID: custodyID(), Generation: 1, Digest: artifact.Digest{1}}, Clients: []string{"console"}, Groups: []string{"operators"}, DeliveryProfiles: []string{"ops"}, MaxActiveBootstraps: 8, MaxBootstrapHistory: 16, MaxClusters: 16, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
+	if e = postgres.SeedInstallation(ctx, seed, current); e != nil {
+		t.Fatal("capacity prerequisite trust seed unavailable", e)
 	}
-
-	s := setup(t)
-	s.a.a.Revision.UID = custodyID()
-	record, err := s.service.Activate(ctx)
-	if err != nil {
-		t.Fatal("capacity prerequisite audited activation unavailable", err)
-	}
-	current, err := s.a.FleetAdministration(ctx)
-	if err != nil {
-		t.Fatal("synthetic original administration unavailable")
-	}
-	qualify(t, ctx, admin, address, tlsConfig, s.scope, record.Claim.ID, current, &objectstore.AuthorityObjects{Store: store, Seal: seal, Open: open})
-	t.Log("actual initial activation and SQL54 purpose facets; source/probe/history inputs synthetic, no window reuse or installed remote observer")
+	qualify(t, ctx, admin, address, tlsConfig, scope, custodyID(), current, &objectstore.AuthorityObjects{Store: store, Seal: seal, Open: open})
+	t.Log("setup trust seed and SQL54 purpose facets; source/probe/history inputs synthetic, no window reuse or installed remote observer")
 }

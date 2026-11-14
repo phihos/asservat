@@ -23,11 +23,11 @@ type regionalProfileAuthorizationReader struct {
 	policies map[string]planning.GoEndpointSource
 }
 
-func newRegionalProfileAuthorizationReader(ctx context.Context, in *providerInputs, c contracts.RegionalDeployment) (*regionalProfileAuthorizationReader, error) {
-	if ctx == nil || ctx.Err() != nil || in == nil || c.APIContext == nil {
+func newRegionalProfileAuthorizationReader(ctx context.Context, in *providerInputs, c regionalConfig) (*regionalProfileAuthorizationReader, error) {
+	if ctx == nil || ctx.Err() != nil || in == nil || c.Executor == nil {
 		return nil, mounts.ErrUnavailable
 	}
-	entries, err := kube.ProfileEndpointEntries(c.ClusterID, c.APIContext.ProfileEndpoints)
+	entries, err := kube.ProfileEndpointEntries(c.ClusterID, c.Executor.ProfileEndpoints)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}

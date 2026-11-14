@@ -6,12 +6,10 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	"asservat.local/asservat/internal/adapters/providerconfig"
 	"asservat.local/asservat/internal/contracts"
 	value "asservat.local/asservat/internal/domain/fleet"
 )
@@ -21,22 +19,13 @@ import (
 // and seal/open audit keys with borrowed tokens.
 func TestFederationProviderEffectsAreProofBoundAndPurposeSeparated(t *testing.T) {
 	tlsFixture := newOwnerProviderControlFixture(t)
-	installation := "10000000-0000-4000-8000-000000000001"
-	in := contracts.FederationDeployment{Format: contracts.FederationDeploymentFormat, InstallationID: installation, ClusterID: "10000000-0000-4000-8000-000000000002", Concurrency: 2,
-		KeyService: contracts.FederationKeyService{Endpoint: tlsFixture.server.URL, Roots: [][]byte{tlsFixture.server.Certificate().Raw}, AuditMount: "audit", AuditKey: "federation", PKIMount: "connector-pki", ClientRole: "connector-client", ServerRole: "connector-server"}}
-	selection := contracts.FederationProviderAuthentication{AuthMount: "federation-auth", AuthMountAccessor: "auth_kubernetes_1",
-		Namespace:        contracts.WorkerObjectReference{Name: "asservat", UID: "10000000-0000-4000-8000-000000000003"},
-		ServiceAccount:   contracts.WorkerObjectReference{Name: contracts.FederationServiceAccountName(installation), UID: "10000000-0000-4000-8000-000000000004"},
-		AuditCredentials: contracts.WorkerObjectReference{Name: "federation-audit", UID: "10000000-0000-4000-8000-000000000005"}}
-	recipe, err := providerconfig.FederationProviderRecipeFor(in, selection)
-	if err != nil {
-		t.Fatal(err)
-	}
-	in.ProviderAuthentication = &recipe.Profile
+	login := ProviderLogin{Provider: contracts.OwnerProviderEndpoint{Endpoint: tlsFixture.server.URL, Roots: [][]byte{tlsFixture.server.Certificate().Raw}}, AuthMount: "federation-auth", Namespace: "asservat", ServiceAccount: "asservat-federation",
+		Roles: map[string]string{"audit-wrap": "fed-audit-wrap", "audit-unwrap": "fed-audit-unwrap", "client-sign": "fed-client-sign", "server-sign": "fed-server-sign"}}
+	keys := FederationProviderKeys{AuditMount: "audit", AuditKey: "federation", PKIMount: "connector-pki", ClientRole: "connector-client", ServerRole: "connector-server"}
 	jwt := ownerProviderTestJWT(time.Now().Add(600 * time.Second))
 	purpose := map[string]string{}
-	for _, role := range recipe.Roles {
-		purpose[role.Name] = role.Purpose
+	for p, name := range login.Roles {
+		purpose[name] = p
 	}
 	var mu sync.Mutex
 	var logins int
@@ -44,7 +33,7 @@ func TestFederationProviderEffectsAreProofBoundAndPurposeSeparated(t *testing.T)
 	issue := map[string]time.Time{}
 	const entity = "10000000-0000-4000-8000-000000000008"
 	meta := func(role string) map[string]string {
-		return map[string]string{"role": role, "service_account_name": selection.ServiceAccount.Name, "service_account_uid": selection.ServiceAccount.UID, "service_account_namespace": selection.Namespace.Name, "service_account_secret_name": ""}
+		return map[string]string{"role": role, "service_account_name": login.ServiceAccount, "service_account_uid": "10000000-0000-4000-8000-000000000004", "service_account_namespace": login.Namespace, "service_account_secret_name": ""}
 	}
 	tlsFixture.server.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()
@@ -90,7 +79,7 @@ func TestFederationProviderEffectsAreProofBoundAndPurposeSeparated(t *testing.T)
 		}
 	})
 	dir := t.TempDir()
-	if err = os.WriteFile(filepath.Join(dir, contracts.FederationProviderTokenFile), jwt, 0o400); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, contracts.FederationProviderTokenFile), jwt, 0o400); err != nil {
 		t.Fatal(err)
 	}
 	files, err := os.OpenRoot(dir)
@@ -108,7 +97,12 @@ func TestFederationProviderEffectsAreProofBoundAndPurposeSeparated(t *testing.T)
 		}
 		return time.Now().Add(5 * time.Second), nil
 	}
-	s, err := NewInstalledFederationProviderEffects(context.Background(), in, files, proof)
+	bad := login
+	bad.Roles = map[string]string{"audit-wrap": "same", "audit-unwrap": "same", "client-sign": "c", "server-sign": "s"}
+	if _, err := NewInstalledFederationProviderEffects(context.Background(), bad, keys, 2, files, proof); err == nil {
+		t.Fatal("effects composed with a shared role name")
+	}
+	s, err := NewInstalledFederationProviderEffects(context.Background(), login, keys, 2, files, proof)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,8 +127,5 @@ func TestFederationProviderEffectsAreProofBoundAndPurposeSeparated(t *testing.T)
 	}
 	if _, err = s.ConnectorIssuer("owner", value.ConnectorCredentialProfile{}); err == nil {
 		t.Fatal("unknown issuer usage accepted")
-	}
-	if !strings.HasPrefix(recipe.Roles[2].Name, "asservat-federation-") {
-		t.Fatal("unexpected role naming")
 	}
 }

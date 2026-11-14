@@ -2,9 +2,6 @@ package bootstrap
 
 import (
 	"context"
-	"encoding/json"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -30,18 +27,12 @@ func ownerProviderInputFixture(t *testing.T) (*ownerInputs, string, contracts.Ow
 }
 
 func TestProviderOwnerInputRequiresCompleteSelectedBranch(t *testing.T) {
-	for _, mode := range []string{"valid", "missing-profile", "missing-observation", "missing-activation", "legacy-layout", "native-mixed", "changed-scope", "changed-recipe", "changed-secret-name"} {
+	for _, mode := range []string{"valid", "missing-observation", "native-mixed", "changed-scope", "changed-recipe", "changed-secret-name"} {
 		t.Run(mode, func(t *testing.T) {
 			in, dir, c := ownerProviderInputFixture(t)
 			switch mode {
-			case "missing-profile":
-				c.ProviderAuthentication = nil
 			case "missing-observation":
 				c.Observation = nil
-			case "missing-activation":
-				c.Observation.Activation = nil
-			case "legacy-layout":
-				c.Observation.Activation.Input.OwnerLayout = contracts.OwnerInstalledLayout
 			case "native-mixed":
 				c.Native = &contracts.OwnerNativeDeployment{}
 			case "changed-scope":
@@ -52,7 +43,7 @@ func TestProviderOwnerInputRequiresCompleteSelectedBranch(t *testing.T) {
 				c.ProviderAuthentication.AuditCredentials.Name += "-other"
 			}
 			writeOwnerJSON(t, dir, "deployment.json", c)
-			got, err := readOwnerInputs(context.Background(), in.files)
+			got, err := readOwnerDeploymentFixture(context.Background(), in.files)
 			if mode == "valid" {
 				if err != nil || got.config.ProviderAuthentication == nil || got.config.Observation.Activation.Input.OwnerLayout != contracts.OwnerProviderInstalledLayout {
 					t.Fatal("explicit provider branch rejected", err)
@@ -66,56 +57,11 @@ func TestProviderOwnerInputRequiresCompleteSelectedBranch(t *testing.T) {
 	}
 }
 
-func TestProviderOwnerProjectionReadsOnlyFixedSQLFilesAndRejectsLegacyMaterial(t *testing.T) {
-	in, dir, c := ownerProviderInputFixture(t)
-	a := c.Observation.Activation
-	m := contracts.OwnerIdentityCredentialManifest{Format: contracts.OwnerIdentityCredentialManifestFormat, Input: a.Input, RootUID: a.RoleRoot.UID, SetupID: a.RoleSetupID}
-	writeOwnerJSON(t, dir, contracts.OwnerIdentityRoleManifestFile, m)
-	for _, purpose := range contracts.OwnerIdentityRolePurposes() {
-		writeOwnerJSON(t, dir, "sql-"+purpose+".json", contracts.OwnerSQLCredential{Username: purpose, Password: "synthetic-component-credential"})
-	}
-	// A provider token file or audit payload is not needed to inspect the fixed
-	// SQL projection. The independent native/provider checks follow this read.
-	values, manifest, err := readSelectedOwnerIdentityProviders(context.Background(), in.files, c)
-	if err != nil || len(values) != 1+len(contracts.OwnerIdentityRolePurposes()) || manifest.RootUID != m.RootUID {
-		t.Fatal("fixed SQL-only projection unavailable", err)
-	}
-	for _, b := range values {
-		clear(b)
-	}
-	for _, name := range []string{"audit-storage.json", "audit-wrap.token", "audit-unwrap.token", "owner-server-sign.token", "owner-client-sign.token"} {
-		path := filepath.Join(dir, name)
-		if err = os.WriteFile(path, []byte("synthetic-legacy-material"), 0600); err != nil {
-			t.Fatal(err)
-		}
-		if values, _, err = readSelectedOwnerIdentityProviders(context.Background(), in.files, c); err == nil {
-			for _, b := range values {
-				clear(b)
-			}
-			t.Fatal("selected branch silently accepted legacy credential", name)
-		}
-		if err = os.Remove(path); err != nil {
-			t.Fatal(err)
-		}
-	}
-	// A dangling old credential link is still a mixed projection, not absence.
-	if err = os.Symlink("not-present", filepath.Join(dir, "audit-wrap.token")); err != nil {
-		t.Fatal(err)
-	}
-	if _, _, err = readSelectedOwnerIdentityProviders(context.Background(), in.files, c); err == nil {
-		t.Fatal("dangling legacy projection was treated as an omitted field")
-	}
-	encoded, err := json.Marshal(c)
-	if err != nil || strings.Contains(string(encoded), "synthetic-component-credential") {
-		t.Fatal("public provider input contains SQL credential")
-	}
-}
-
 // ADR-182: an installed owner may be promoted with Native and Public. The
 // public layer then has the fixed installed port and a pinned public provider
 // recipe; the legacy layout never carries one.
 func TestInstalledOwnerPromotionInputs(t *testing.T) {
-	for _, mode := range []string{"backend", "public", "public-port", "public-no-recipe", "public-changed-pki", "public-no-projection", "public-other-projection", "public-empty-lists", "legacy-recipe"} {
+	for _, mode := range []string{"backend", "public", "public-port", "public-no-recipe", "public-changed-pki", "public-empty-lists", "legacy-recipe"} {
 		t.Run(mode, func(t *testing.T) {
 			in, dir, c := ownerProviderInputFixture(t)
 			c.Native = &contracts.OwnerNativeDeployment{ConnectorRoots: c.Kubernetes.Roots, Connections: 2, Concurrency: 1,
@@ -151,7 +97,7 @@ func TestInstalledOwnerPromotionInputs(t *testing.T) {
 				c.ProviderAuthentication, c.Observation = nil, nil
 			}
 			writeOwnerJSON(t, dir, "deployment.json", c)
-			got, err := readOwnerInputs(context.Background(), in.files)
+			got, err := readOwnerDeploymentFixture(context.Background(), in.files)
 			if (mode == "backend" || mode == "public" || mode == "public-empty-lists") != (err == nil) {
 				t.Fatal("promotion input decision", mode, err)
 			}

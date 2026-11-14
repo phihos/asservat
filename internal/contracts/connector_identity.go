@@ -36,11 +36,8 @@ type ConnectorIdentityRoles struct {
 
 type ConnectorDeployment struct {
 	Namespace         string `json:"namespace"`
-	NamespaceUID      string `json:"namespaceUID"`
 	ServiceAccount    string `json:"serviceAccount"`
-	AccountUID        string `json:"accountUID"`
 	Deployment        string `json:"deployment"`
-	DeploymentUID     string `json:"deploymentUID"`
 	ServingSlots      int    `json:"servingSlots"`
 	RetainedProcesses int    `json:"retainedProcesses"`
 }

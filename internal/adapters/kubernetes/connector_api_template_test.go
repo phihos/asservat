@@ -2,16 +2,14 @@ package kubernetes
 
 import (
 	"bytes"
-	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"strings"
 	"testing"
 
-	compiler "asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	cfg "asservat.local/asservat/internal/domain/configuration"
+	value "asservat.local/asservat/internal/domain/fleet"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -160,52 +158,34 @@ func TestOwnerAPIContextAllowancePreservesOmissionAndExactStatusBranch(t *testin
 	}
 }
 
-func TestConnectorAPISettingsMaximumLegalInputsFit(t *testing.T) {
+// The executor settings carry only Helm-derivable names, the UIDs read by
+// name and the image; installer template, input and guard pins are refused.
+func TestConnectorAPISettingsRejectInstallerPins(t *testing.T) {
 	id := ownerID(1)
-	digest := strings.Repeat("a", 64)
-	projection := compiler.ProjectionDigest()
-	name := strings.Repeat("a", 253)
-	p := contracts.ConnectorAPIContextSettings{Format: contracts.ConnectorAPIContextFormat, RootID: id, InstallationID: id, ClusterID: id, IssuerEpoch: id, ConnectorRevision: contracts.APIContextRevision{UID: id, Generation: 2147483647, Digest: digest}, Namespace: strings.Repeat("n", 63), NamespaceUID: id, Account: name, AccountUID: id, Deployment: name, DeploymentUID: id, ImageDigest: digest, TemplateDigest: digest, ProjectionDigest: hex.EncodeToString(projection[:]), WorkloadProtectionDigest: digest, CapacityAccount: strings.Repeat("b", 253), CapacityAccountUID: ownerID(2), StartGuard: contracts.ConnectorAPIStartGuard{Name: name, PolicyUID: id, PolicyGeneration: 2147483647, BindingUID: id, BindingResourceVersion: strings.Repeat(`"`, 128)}}
-	for n := 0; n < 16; n++ {
-		p.Inputs = append(p.Inputs, contracts.ConnectorAPIInput{Kind: "ConfigMap", Name: fmt.Sprintf("%02d", n) + strings.Repeat("a", 251), UID: id, ResourceVersion: strings.Repeat(`"`, 128)})
-	}
-	if !connectorAPISettingsValid(p) {
-		t.Fatal("maximum legal fixture rejected")
+	binding := value.PeerBinding{InstallationID: id, ClusterID: ownerID(3), IssuerEpoch: id, PeerID: ownerID(4), Role: value.ConnectorPeer}
+	w := ConnectorWorkload{Namespace: strings.Repeat("n", 63), NamespaceUID: ownerID(5), Account: strings.Repeat("a", 253), AccountUID: ownerID(6), Deployment: strings.Repeat("d", 253), DeploymentUID: ownerID(7), Digest: ConnectorWorkloadDigest(ownerID(3), strings.Repeat("n", 63), strings.Repeat("d", 253))}
+	p, err := ConnectorAPISettings(id, binding, w, strings.Repeat("b", 253), ownerID(2), strings.Repeat("a", 64))
+	if err != nil {
+		t.Fatal("maximum legal settings rejected", err)
 	}
 	encoded, e := contracts.EncodeConnectorAPIContextSettings(p)
-	if e != nil {
-		t.Fatal("maximum accepted settings do not fit bounded encoding", e)
+	if e != nil || len(encoded) > contracts.ConnectorAPIContextSettingsBytes {
+		t.Fatal("settings exceed the bounded encoding", e)
 	}
-	if len(encoded) > contracts.ConnectorAPIContextSettingsBytes {
-		t.Fatal("settings exceeded declared bound")
-	}
-	t.Logf("maximum first-profile settings: %d bytes", len(encoded))
-	decoded, e := contracts.DecodeConnectorAPIContextSettings(encoded)
-	if e != nil || !connectorAPISettingsValid(decoded) {
-		t.Fatal("max settings cannot be read", e)
-	}
-	// A whole-object grant is a protected installer decision, not inferred
-	// from a mount, key selection, object name or metadata response.
-	p.Inputs[0].Kind = "Secret"
-	if connectorAPISettingsValid(p) {
-		t.Fatal("shared/unapproved Secret accepted")
-	}
-	p.Inputs[0].DedicatedToAPI = true
-	if !connectorAPISettingsValid(p) {
-		t.Fatal("dedicated role-owned Secret rejected")
-	}
-	p.Inputs[0].Kind = "ConfigMap"
-	if connectorAPISettingsValid(p) {
-		t.Fatal("Secret authority marker accepted on ConfigMap")
-	}
-	p.Inputs[0].DedicatedToAPI = false
-	// The constructor still rejects unbounded input inventory before any API read.
-	p.Inputs = append(p.Inputs, contracts.ConnectorAPIInput{Kind: "Secret", Name: "extra", UID: id, ResourceVersion: "1"})
-	if connectorAPISettingsValid(p) {
-		t.Fatal("seventeenth input accepted")
-	}
-	p.Inputs[0].Name = strings.Repeat("x", contracts.ConnectorAPIContextSettingsBytes)
-	if _, e = contracts.EncodeConnectorAPIContextSettings(p); e == nil {
-		t.Fatal("oversize settings encoded")
+	for name, mutate := range map[string]func(*contracts.ConnectorAPIContextSettings){
+		"template": func(s *contracts.ConnectorAPIContextSettings) { s.TemplateDigest = strings.Repeat("a", 64) },
+		"inputs": func(s *contracts.ConnectorAPIContextSettings) {
+			s.Inputs = []contracts.ConnectorAPIInput{{Kind: "ConfigMap", Name: "x", UID: id, ResourceVersion: "1"}}
+		},
+		"start guard": func(s *contracts.ConnectorAPIContextSettings) { s.StartGuard.Name = "start" },
+		"same account": func(s *contracts.ConnectorAPIContextSettings) {
+			s.CapacityAccount, s.CapacityAccountUID = s.Account, s.AccountUID
+		},
+	} {
+		q := p
+		mutate(&q)
+		if connectorAPISettingsValid(q) {
+			t.Errorf("%s accepted", name)
+		}
 	}
 }

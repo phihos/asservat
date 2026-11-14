@@ -11,6 +11,7 @@ type HubWorkerDeployment struct {
 	Format                 string                               `json:"format"`
 	InstallationID         string                               `json:"installationID"`
 	ClusterID              string                               `json:"clusterID"`
+	IssuerEpoch            string                               `json:"issuerEpoch"`
 	Namespace              WorkerObjectReference                `json:"namespace"`
 	FleetSource            WorkerObjectReference                `json:"fleetSource"`
 	OwnerSource            WorkerObjectReference                `json:"ownerSource"`

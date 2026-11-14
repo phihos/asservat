@@ -19,6 +19,9 @@ import (
 type BootstrapReservations struct {
 	claims *EnrollmentClaims
 	newID  func() string
+	// local is the combined-mode connector's fixed generated cluster and
+	// peer (NewLocalBootstrapReservations); nil reserves fresh random IDs.
+	local *[2]string
 }
 
 var _ port.BootstrapReservations = (*BootstrapReservations)(nil)
@@ -31,7 +34,48 @@ func NewBootstrapReservations(ctx context.Context, pool *pgxpool.Pool, installat
 	if err != nil {
 		return nil, err
 	}
-	return &BootstrapReservations{c, newID}, nil
+	return &BootstrapReservations{claims: c, newID: newID}, nil
+}
+
+// NewLocalBootstrapReservations reserves slots only for the installation's
+// own connector: the generated cluster and peer IDs. A new slot is reserved
+// only after the peer's latest slot expired unclaimed; a live slot of the
+// same request resumes, any other live slot returns value.ErrPending and a
+// claimed slot returns value.ErrLocalBootstrapConsumed.
+func NewLocalBootstrapReservations(ctx context.Context, pool *pgxpool.Pool, installation, clusterID, peerID string, newID func() string) (*BootstrapReservations, error) {
+	if !authorization.UUID(clusterID) || !authorization.UUID(peerID) || clusterID == peerID {
+		return nil, value.ErrInvalid
+	}
+	r, err := NewBootstrapReservations(ctx, pool, installation, newID)
+	if err != nil {
+		return nil, err
+	}
+	r.local = &[2]string{clusterID, peerID}
+	return r, nil
+}
+
+// localIntent returns the peer's live slot to resume, or nil when a new slot
+// may be reserved.
+func (r *BootstrapReservations) localIntent(ctx context.Context, q *custodydb.Queries, request value.BootstrapRequest, now time.Time) (*custodydb.FleetBootstrapIntent, error) {
+	latest, err := q.LatestPeerBootstrapIntent(ctx, custodydb.LatestPeerBootstrapIntentParams{InstallationID: id(request.Authority.InstallationID), PeerID: id(r.local[1])})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	row := latest.FleetBootstrapIntent
+	switch {
+	case latest.Claimed:
+		return nil, value.ErrLocalBootstrapConsumed
+	case !now.Before(row.NotAfter.Time):
+		return nil, nil
+	case uid(row.ClusterID) != r.local[0] || !bytes.Equal(row.ActorDigest, digest(request.Authority.Actor)) || !bytes.Equal(row.KeyDigest, request.KeyDigest[:]):
+		return nil, value.ErrPending
+	case !bytes.Equal(row.RequestDigest, bootstrapRequestDigest(request)):
+		return nil, value.ErrConflict
+	}
+	return &row, nil
 }
 func bootstrapRequestDigest(r value.BootstrapRequest) []byte {
 	return digest(struct {
@@ -90,7 +134,20 @@ func (r *BootstrapReservations) ReserveBootstrap(ctx context.Context, request va
 		if err = checkEnrollmentAuthority(root, a, now.Time); err != nil {
 			return err
 		}
-		row, err := q.FindBootstrapIntent(ctx, custodydb.FindBootstrapIntentParams{InstallationID: root.InstallationID, ActorDigest: digest(a.Actor), KeyDigest: request.KeyDigest[:]})
+		var row custodydb.FleetBootstrapIntent
+		if r.local != nil {
+			live, lerr := r.localIntent(ctx, q, request, now.Time)
+			if lerr != nil {
+				return lerr
+			}
+			if live != nil {
+				row = *live
+			} else {
+				err = pgx.ErrNoRows
+			}
+		} else {
+			row, err = q.FindBootstrapIntent(ctx, custodydb.FindBootstrapIntentParams{InstallationID: root.InstallationID, ActorDigest: digest(a.Actor), KeyDigest: request.KeyDigest[:]})
+		}
 		if err == nil {
 			if !bytes.Equal(row.RequestDigest, bootstrapRequestDigest(request)) {
 				return value.ErrConflict
@@ -120,6 +177,9 @@ func (r *BootstrapReservations) ReserveBootstrap(ctx context.Context, request va
 				return err
 			}
 			slotID, clusterID, peerID := r.newID(), r.newID(), r.newID()
+			if r.local != nil {
+				clusterID, peerID = r.local[0], r.local[1]
+			}
 			if !authorization.UUID(slotID) || !authorization.UUID(clusterID) || !authorization.UUID(peerID) {
 				return value.ErrUnavailable
 			}
