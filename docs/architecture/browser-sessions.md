@@ -2,7 +2,8 @@
 
 Scope: C-02 owns session coordination, C-20 the HTTP ingress and C-21 the
 OIDC/SQL adapters. This implements REQ-AUT-001, TASK-07 and S-01/S-02 under
-[ADR-060](../decisions/060-bounded-browser-sessions.md) and ADR-330. The design
+[ADR-060](../decisions/060-bounded-browser-sessions.md), ADR-330 and
+[ADR-335](../decisions/335-usable-by-default.md) D5. The design
 is the standard backend-for-frontend pattern (IETF *OAuth 2.0 for Browser-Based
 Applications*, BFF; oauth2-proxy; Grafana server-side sessions). A session
 identifies a current human; it never grants target permissions, evidence
@@ -14,31 +15,38 @@ disclosure, policy execution or approval authority.
    stores a five-minute login row (hashes of state and a browser-binding
    cookie, nonce, PKCE S256 verifier) and redirects to the configured
    authorization endpoint.
-2. GET `/auth/step-up?return_to=/approvals/<id>` starts the same login with
-   `acr_values` from the identity policy and `max_age=0`. A successful login
-   does not establish approval assurance: each approval checks the returned
-   signed `acr`/`auth_time`, current policy and current target permissions.
-   Missing step-up settings yield a sanitized failure. See
-   [ADR-253](../decisions/253-approval-stepup-login.md).
+2. Only when an administrator configures `approvals.stepUp`, GET
+   `/auth/step-up?return_to=/approvals/<id>` starts the same login with the
+   configured `acr_values` and `max_age=0`. A successful login does not
+   establish approval assurance: each approval checks the returned signed
+   `acr`/`auth_time`, current policy and current target permissions. Without
+   step-up settings, approvals use the ordinary session and the route is not
+   offered. See [ADR-253](../decisions/253-approval-stepup-login.md).
 3. The callback requires the configured issuer, exact state and browser
    cookie, deletes the login row in the same transaction that claims it (a
    repeated or concurrent callback cannot exchange again), verifies the ID
-   and access tokens and resolves the human through the current organization
-   policy.
+   and access tokens, resolves the human through the current identity
+   configuration and updates the human's known-principals row (username,
+   display name, groups seen; REQ-AUT-001).
 4. It creates a session row and sets an opaque random HttpOnly, Secure,
    SameSite=Lax cookie. SQL stores the cookie hash, subject, issuer, client,
-   provider session ID, authentication time, the fixed session deadline, a
+   provider session ID, authentication time, the maximum and inactivity deadlines, a
    CSRF token and the refresh/access tokens encrypted with the application
    session key (AES-GCM, session ID as associated data). The session key comes
    from a mounted Secret; a key ID per row allows rotation, and no KMS call is
-   on the request path. The fixed deadline is the shorter of the configured
-   maximum and 24 hours; there is no sliding renewal.
-5. At most ten active sessions per subject are accepted; a further login is
-   refused without evicting another session. Login, logout and refusal write
-   an audit row in the same transaction (ADR-330 D6).
+   on the request path. A session ends at the earlier of its maximum
+   lifetime (default 7 days, configurable up to 30 days) from creation and
+   its inactivity timeout (default 24 hours) after the last authenticated
+   request; use slides the inactivity deadline (written at most once per
+   minute; it rotates no credential), never the maximum.
+5. There is no installation-wide login or session cap; rows are small and
+   login is bounded by the ingress rate limit. A subject keeps at most 32
+   active sessions; a further login evicts that subject's least recently used
+   session. Login, logout and eviction write an audit row in the same
+   transaction (ADR-330 D6).
 
-`GET /api/v1/session` returns the subject, CSRF token, fixed expiry and
-`step_up` state. A returning tab calls `GET /auth/csrf` and then
+`GET /api/v1/session` returns the subject, username, CSRF token, expiry
+and, when configured, the `step_up` state. A returning tab calls `GET /auth/csrf` and then
 `POST /auth/refresh` with that token and an exact `Origin`. State-changing
 requests require the CSRF token and exact `Origin`.
 
@@ -59,13 +67,15 @@ access-token expiry. Group membership comes entirely from the current access
 token.
 
 The server refreshes the provider tokens only when the access token expires
-within 60 seconds at the time of use. Rotation is optimistic: the update
+within 60 seconds at the time of use, so group membership follows the
+provider while the user works. Rotation is optimistic: the update
 succeeds only if the row's credential version is unchanged; a concurrent
 request that loses the race re-reads the row and uses the new tokens. The
 provider's refresh-token reuse detection covers replay. If the provider call
 fails or its reply is lost, the request fails; the next request retries with
-the stored token, and a provider-revoked token requires a new login. A refresh
-never extends the fixed session deadline. The new tokens must keep the
+the stored token, and a provider-revoked token or an expired provider
+refresh token requires a new login. A refresh never extends the maximum
+lifetime. The new tokens must keep the
 subject, client, provider session and original authentication time.
 
 ## Logout
@@ -87,8 +97,8 @@ Under [ADR-061](../decisions/061-current-browser-configuration.md) the hub reads
 [example](../../examples/browser-settings.json) and
 [schema](../../specs/contracts/browser-settings.schema.json) contain issuer,
 client, exact HTTPS origin (no path, userinfo, query or fragment; lowercase
-host; default port omitted), session ceilings and the maximum lifetime, never
-credentials. The process validates the file at startup and on change and keeps
+host; default port omitted), the maximum lifetime and the inactivity timeout,
+never credentials. The process validates the file at startup and on change and keeps
 the last valid settings until a new valid file replaces them; an invalid file
 is logged and ignored. Sessions whose issuer or client differs from the
 current settings are rejected. Lowering the maximum lifetime clamps existing
