@@ -8,6 +8,8 @@ import argparse
 import importlib.util
 import json
 from pathlib import Path
+
+import implemented_contracts
 ROOT=Path(__file__).resolve().parents[1]
 spec=importlib.util.spec_from_file_location('permission_crds',ROOT/'scripts/permission-crds.py')
 base=importlib.util.module_from_spec(spec);spec.loader.exec_module(base)
@@ -39,7 +41,7 @@ def pool():
     return body
 
 def policy():
-    raw=single(json.loads((ROOT/'specs/contracts/budget-policy.schema.json').read_text())['properties']['spec'])
+    raw=single(json.loads(implemented_contracts.path('budget-policy.schema.json').read_text())['properties']['spec'])
     labels=raw['properties']['scope']['properties']['namespaceSelector']['properties']['matchLabels']
     assert labels.pop('propertyNames')=={'maxLength':253}
     body=base.structural(raw)

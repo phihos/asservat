@@ -11,7 +11,6 @@ import (
 	"context"
 	"encoding/json"
 	jsonschema "github.com/santhosh-tekuri/jsonschema/v6"
-	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -356,7 +355,7 @@ func validatePacketQueryCanonicalOutput(t *testing.T, name string, body []byte) 
 	c.UseLoader(offlineLoader{})
 	c.AssertFormat()
 	for _, file := range []string{"common.schema.json", "mcp-result.schema.json"} {
-		b, e := os.ReadFile("../../../specs/contracts/" + file)
+		b, e := readImplementedContract(file)
 		if e != nil {
 			t.Fatal(e)
 		}
@@ -365,7 +364,7 @@ func validatePacketQueryCanonicalOutput(t *testing.T, name string, body []byte) 
 			t.Fatal("canonical base schema")
 		}
 	}
-	b, e := os.ReadFile("../../../specs/contracts/mcp-tools.json")
+	b, e := readImplementedContract("mcp-tools.json")
 	if e != nil {
 		t.Fatal(e)
 	}

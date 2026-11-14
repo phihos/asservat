@@ -7,7 +7,6 @@
     "sources": [
       {
         "source_handle": "opaque-source-handle",
-        "handle_expires_at": "2026-10-09T12:06:00Z",
         "source_session_id": "00000000-0000-4000-8000-000000000702",
         "workload_uid": "deployment-checkout-uid",
         "pod_uid": "pod-checkout-8k2p",

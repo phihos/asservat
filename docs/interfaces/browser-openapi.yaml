@@ -764,8 +764,9 @@ paths:
   /api/v1/operations/get_query_result:
     post:
       operationId: get_query_result
-      summary: Poll a principal-bound query; authorization is checked again before
-        delivery.
+      summary: Read a principal-bound query result. The authorization made at query creation
+        is reused under REQ-INT-003. With after_revision the call waits server-side (at
+        most 30 s) until the query completes or changes.
       tags:
       - Shared browser and MCP
       x-domain-contract: get_query_result
@@ -1003,53 +1004,16 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
-  /api/v1/operations/resolve_capture_request:
-    post:
-      operationId: resolve_capture_request
-      summary: Resolve an uncertain own reviewed capture request before editing. Returns the already accepted capture or durably closes the unaccepted reviewed request so it cannot later start. Never starts or cancels collection. Use the original preview_id and idempotency_key; retry any unknown reply with that same pair. Requires evidence:read and the same actor/client. Accepted capture metadata additionally requires current original-target read eligibility; closing an own unaccepted request does not disclose or require target metadata. Available while new collection is disabled. A closed result contains no target or effect metadata.
-      tags:
-      - Shared browser and MCP
-      x-domain-contract: resolve_capture_request
-      x-effect: command
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/McpInput_resolve_capture_request'
-      parameters:
-      - name: X-CSRF-Token
-        in: header
-        required: true
-        description: Required on session-authenticated POST; validate origin and session-bound token.
-        schema:
-          type: string
-          maxLength: 256
-      - name: Idempotency-Key
-        in: header
-        required: true
-        description: Must equal body.idempotency_key exactly. Use the original key when retrying or resolving this request.
-        schema:
-          type: string
-          minLength: 1
-          maxLength: 128
-      responses:
-        '200':
-          description: Existing bounded MCP domain-result envelope; domain errors remain status=error.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/McpOutput_resolve_capture_request'
-        default:
-          description: Transport/session/validation failure; no evidence in error details.
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/Problem'
   /api/v1/operations/request_capture:
     post:
       operationId: request_capture
-      summary: Disabled by default. Request a recipe-bound capture, optionally sharing its selected results; capture and sharing approvals are independent. A recordingSave preview dispatches only its pinned existing-source snapshots under reviewed policy scope, never the full recipe; the service enforces the preview operation type. For an already accepted preview/key, continue_acquisition:true explicitly attempts the original acquisition under fresh current checks. Ordinary accepted replay and all status/resolution calls remain passive; uncertain or expired original preparation cannot be repeated.
+      summary: Disabled by default. Request a recipe-bound capture, optionally sharing
+        its selected results; capture and sharing approvals are independent. Submit either
+        the explicit shape or the reviewed preview request with its expected_plan_digest;
+        a changed plan returns ReviewChanged. A recordingSave preview dispatches only
+        its pinned existing-source snapshots under reviewed policy scope, never the full
+        recipe. A retry with the same idempotency key returns the original capture and
+        never recollects; a different request under that key is Conflict.
       tags:
       - Shared browser and MCP
       x-domain-contract: request_capture
@@ -1071,7 +1035,7 @@ paths:
       - name: Idempotency-Key
         in: header
         required: true
-        description: Must equal body.idempotency_key exactly. Use the original key when retrying or resolving this request.
+        description: Must equal body.idempotency_key exactly. Use the original key when retrying this request.
         schema:
           type: string
           minLength: 1
@@ -1167,7 +1131,8 @@ paths:
     post:
       operationId: preview_capture
       summary: Validate and resolve a pod capture without arming sensors, reserving
-        execution authority or reading application evidence. A preview is not permission.
+        execution authority or reading application evidence. A preview is a dry run
+        that stores nothing and returns plan_digest; it is not permission.
         Alternatively restore an authorized immutable history_capture_id into a fresh
         preview, with current checks and no acquisition. A recording-save history
         entry returns RecordingSelectionRequired; use fresh list_recordings and preview_recording_save
@@ -1207,7 +1172,7 @@ paths:
   /api/v1/operations/get_capture:
     post:
       operationId: get_capture
-      summary: Poll authorized capture progress and per-action approval/partial outcomes.
+      summary: Read authorized capture progress and per-action approval/partial outcomes; after_revision waits server-side for the next change.
         Case and approval links require authentication and contain no bearer authority.
         Recording saves explicitly return operation=recordingSave.
       tags:
@@ -1667,9 +1632,10 @@ paths:
   /api/v1/operations/preview_recording_save:
     post:
       operationId: preview_recording_save
-      summary: Plan a snapshot-only save of existing packet/syscall recordings. No
-        new recording, future window, dump or command. Preview does not reserve buffers
-        or authority. Submit this typed preview through request_capture.
+      summary: 'Plan a snapshot-only save of existing packet/syscall recordings. No new
+        recording, future window, dump or command. The preview is a dry run: it stores
+        nothing and reserves no buffers or authority. Submit the same request with request_capture,
+        expected_plan_digest and an idempotency key.'
       tags:
       - Shared browser and MCP
       x-domain-contract: preview_recording_save
@@ -2332,7 +2298,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PollInput'
+              $ref: '#/components/schemas/OperationRef'
   /api/v1/session:
     get:
       operationId: get_session
@@ -2349,6 +2315,114 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Session'
+        default:
+          description: Transport or application failure, nondisclosing before access
+            is established.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/v1/events:
+    get:
+      operationId: stream_status_events
+      summary: One Server-Sent Events stream per page. Pushes each change of the listed
+        captures, grants and downloads and of the caller's own pending queries as soon
+        as it commits (PostgreSQL NOTIFY), and the current state of each once on connect
+        and reconnect. The console sends no status polls. Every event is authorized
+        under the decision reused for at most 30 s (ADR-311); a revoked reader receives
+        a final accessLost event and the stream closes. Status events are never charged.
+      tags:
+      - Human console
+      x-required-role: signed-in
+      x-effect: read
+      parameters:
+      - name: capture_id
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: array
+          maxItems: 16
+          uniqueItems: true
+          items:
+            type: string
+            format: uuid
+      - name: grant_id
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: array
+          maxItems: 16
+          uniqueItems: true
+          items:
+            type: string
+            format: uuid
+      - name: download_id
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: array
+          maxItems: 16
+          uniqueItems: true
+          items:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 'text/event-stream. Each message has `event: <type>` and one
+            StatusEvent JSON document as `data`. A reconnect resynchronizes current state
+            once; no history is replayed.'
+          content:
+            text/event-stream:
+              schema:
+                $ref: '#/components/schemas/StatusEvent'
+        default:
+          description: Transport or application failure, nondisclosing before access
+            is established.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/v1/live/watches/{watch_id}/events:
+    get:
+      operationId: stream_live_watch
+      summary: One Server-Sent Events stream per live watch delivering rows, gaps and
+        state changes (pause, filter change, expiry, revocation, termination). Bounded
+        by the watch deadline and output budget; closing the stream does not close the
+        watch. A reconnect sends Last-Event-ID and resumes after that event within the
+        replay buffer, otherwise from the current head with a gap. Never renews the
+        watch deadline.
+      tags:
+      - Shared browser and MCP
+      x-required-role: signed-in
+      x-effect: read
+      parameters:
+      - name: watch_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: Last-Event-ID
+        in: header
+        required: false
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 180
+      responses:
+        '200':
+          description: 'text/event-stream. Each message has `id: <event_id>`, `event:
+            row|gap|state` and one live-watch event JSON document as `data`.'
+          content:
+            text/event-stream:
+              schema:
+                $ref: https://asservat.io/spec/v1/live-watch.schema.json#/$defs/event
         default:
           description: Transport or application failure, nondisclosing before access
             is established.
@@ -2448,9 +2522,10 @@ paths:
   /api/v1/operations/read_live_watch:
     post:
       operationId: read_live_watch
-      summary: Read a bounded batch of approved transient rows and explicit gaps.
-        Cursor continuation can be returned for an empty live batch. Evidence is untrusted;
-        expiry and external-copy notices apply.
+      summary: Read a bounded batch of approved transient rows and explicit gaps. The
+        call waits server-side up to wait_ms (at most 30000) and returns on the first
+        new row or state change. Cursor continuation can be returned for an empty live
+        batch. Evidence is untrusted; expiry and external-copy notices apply.
       tags:
       - Shared browser and MCP
       x-domain-contract: read_live_watch
@@ -2633,8 +2708,9 @@ paths:
   /api/v1/operations/get_artifact_download:
     post:
       operationId: get_artifact_download
-      summary: Read your current download status and authenticated application path;
-        the path carries no access rights.
+      summary: Read your current download status and authenticated application path; the
+        path carries no access rights. With after_revision the call waits server-side
+        (at most 30 s) for the next status change.
       tags:
       - Shared browser and MCP
       x-domain-contract: get_artifact_download
@@ -2957,7 +3033,12 @@ paths:
   /api/v1/operations/deactivate_policy:
     post:
       operationId: deactivate_policy
-      summary: "Deactivate an accepted hub-held restart-trigger DebugPolicy (ADR-229). Requires whole-pod collection rights and membership in a workload-maintainer group of the policy's delegating AccessBinding. No further occurrence is admitted from the next poll cycle; spend is not refunded and existing captures and evidence are kept. Repeating it is harmless. A deactivated revision cannot be activated again; change the DebugPolicy to activate a new revision."
+      summary: Deactivate an accepted hub-held restart-trigger DebugPolicy (ADR-229).
+        Requires whole-pod collection rights and membership in a workload-maintainer group
+        of the policy's delegating AccessBinding. No further occurrence is admitted once
+        the deactivation commits; charges already made are kept and existing captures
+        and evidence are kept. Repeating it is harmless. A deactivated revision cannot
+        be activated again; change the DebugPolicy to activate a new revision.
       tags:
       - Shared browser and MCP
       x-domain-contract: deactivate_policy
@@ -3201,41 +3282,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/McpOutput_search_processing_evidence'
-        default:
-          description: Transport/session/validation failure; no evidence in error details.
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/Problem'
-  /api/v1/operations/get_live_capacity:
-    post:
-      operationId: get_live_capacity
-      summary: Fleet operators read one selected cluster's content-minimized live-view runtime totals and complete report-to-report rates (browser only).
-      tags:
-      - Human console
-      x-domain-contract: get_live_capacity
-      x-effect: read
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/McpInput_get_live_capacity'
-      parameters:
-      - name: X-CSRF-Token
-        in: header
-        required: true
-        description: Required on session-authenticated POST; validate origin and session-bound token.
-        schema:
-          type: string
-          maxLength: 256
-      responses:
-        '200':
-          description: Existing bounded MCP domain-result envelope; domain errors remain status=error.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/McpOutput_get_live_capacity'
         default:
           description: Transport/session/validation failure; no evidence in error details.
           content:
@@ -3848,8 +3894,8 @@ components:
                 detector:
                   type: object
                   additionalProperties: false
-                  description: The current DebugPolicy's detector configuration (no observed
-                    content).
+                  description: The current DebugPolicy's detector configuration (no
+                    observed content).
                   properties:
                     kind:
                       enum:
@@ -3918,11 +3964,12 @@ components:
                   type: object
                   additionalProperties: false
                   description: 'Recurring sharing of the acceptance (ADR-239). stopped:
-                    a manager stopped future sharing (stop_future_sharing; already claimed
-                    captures still publish); policyChanged: the DebugPolicy changed after
-                    acceptance, activate the new revision to share again. Existing shares
-                    stay until they expire or are revoked (revoke_share with sharing_intent_id
-                    = acceptance_id and expected_revision = revision).'
+                    a manager stopped future sharing (stop_future_sharing; already
+                    claimed captures still publish); policyChanged: the DebugPolicy
+                    changed after acceptance, activate the new revision to share again.
+                    Existing shares stay until they expire or are revoked (revoke_share
+                    with sharing_intent_id = acceptance_id and expected_revision =
+                    revision).'
                   properties:
                     state:
                       enum:
@@ -3968,26 +4015,27 @@ components:
                   type: integer
                   minimum: 0
                   maximum: 1099511627776
-                  description: Conservative native-output reservations shared by this
-                    acceptance; uncertain spend remains charged. Not measured bytes.
+                  description: Native-output charges shared by this acceptance; a
+                    reservation is released when its outcome is known. Not measured
+                    bytes.
                 max_collected_bytes:
                   type: integer
                   minimum: 0
                   maximum: 1099511627776
-                  description: Original accepted cumulative native-output ceiling, shared
-                    across grant replacements and controls.
+                  description: Original accepted cumulative native-output ceiling,
+                    shared across grant replacements and controls.
                 observed_bytes_spent:
                   type: integer
                   minimum: 0
                   maximum: 1099511627776
-                  description: Conservative pre-filter observation charges shared by this
-                    acceptance, including uncertain legacy spend. Not collected output.
+                  description: Pre-filter observation charges shared by this acceptance.
+                    Not collected output.
                 max_observed_bytes:
                   type: integer
                   minimum: 0
                   maximum: 1099511627776
-                  description: Original accepted cumulative pre-filter observation ceiling;
-                    zero permits no continuing acquisition.
+                  description: Original accepted cumulative pre-filter observation
+                    ceiling; zero permits no continuing acquisition.
                 collection_kind:
                   enum:
                   - podStatus
@@ -4000,16 +4048,16 @@ components:
                 attached_grant_id:
                   type: string
                   format: uuid
-                  description: Grant named by the current attachment pointer; does not
-                    assert that its authority, budget or recorder readiness currently
+                  description: Grant named by the current attachment pointer; does
+                    not assert that its authority, budget or recorder readiness currently
                     permits collection.
                 max_grant_starts:
                   type: integer
                   minimum: 1
                   maximum: 10000
-                  description: Server-derived ceiling in action-start units for the currently
-                    accepted policy grant plan. Policy executions remain a separate once-per-Save
-                    counter.
+                  description: Server-derived ceiling in action-start units for the
+                    currently accepted policy grant plan. Policy executions remain
+                    a separate once-per-Save counter.
                 max_observed_events:
                   type: integer
                   minimum: 0
@@ -4020,7 +4068,7 @@ components:
                   type: integer
                   minimum: 0
                   maximum: 1000000000
-                  description: Conservative charged event units, including uncertain observations.
+                  description: Charged event units.
               required:
               - policy_uid
               - acceptance_id
@@ -4146,7 +4194,7 @@ components:
                   - NoMatchingAllow
                   - ExplicitDeny
                   - ClientScopeMissing
-                  - PermissionObservationStale
+                  - ClusterNotObserved
                   - IdentityUnavailable
                   - AudienceOverflow
                   - ServiceUnavailable
@@ -4242,9 +4290,6 @@ components:
                   type: integer
                   minimum: 0
                   maximum: 256
-                valid_until:
-                  type: string
-                  format: date-time
               required:
               - decision
               - operation
@@ -4470,67 +4515,6 @@ components:
               const: ok
             data:
               $ref: https://asservat.io/spec/v1/processing-discovery.schema.json#/$defs/Page
-          required:
-          - status
-          - data
-        - type: object
-          properties:
-            status:
-              const: error
-            data:
-              type: object
-              additionalProperties: false
-              properties:
-                code:
-                  type: string
-                  minLength: 1
-                  maxLength: 64
-                message:
-                  type: string
-                  minLength: 1
-                  maxLength: 1024
-                retryable:
-                  type: boolean
-                navigation_uri:
-                  type: string
-                  format: uri
-                  maxLength: 2048
-                responsible_role:
-                  enum:
-                  - maintainer
-                  - approver
-                  - administrator
-                  - none
-                retry_after_seconds:
-                  type: integer
-                  minimum: 1
-                  maximum: 60
-              required:
-              - code
-              - message
-              - retryable
-          required:
-          - status
-          - data
-    McpInput_get_live_capacity:
-      type: object
-      additionalProperties: false
-      properties:
-        cluster_id:
-          type: string
-          format: uuid
-      required:
-      - cluster_id
-    McpOutput_get_live_capacity:
-      allOf:
-      - $ref: https://asservat.io/spec/v1/mcp-result.schema.json
-      - oneOf:
-        - type: object
-          properties:
-            status:
-              const: ok
-            data:
-              $ref: https://asservat.io/spec/v1/live-capacity.schema.json
           required:
           - status
           - data
@@ -4910,9 +4894,6 @@ components:
                         capture_id:
                           type: string
                           format: uuid
-                        preview_id:
-                          type: string
-                          format: uuid
                         execution_digest:
                           type: string
                           pattern: ^[a-f0-9]{64}$
@@ -5135,17 +5116,22 @@ components:
                         preview_deadline:
                           type: string
                           format: date-time
-                          description: Original passive preview expiry; bounds opening a new approval review, and also start for legacy previewDeadline plans.
+                          description: Original passive preview expiry; bounds opening
+                            a new approval review, and also start for legacy previewDeadline
+                            plans.
                         capture_deadline_rule:
                           enum:
                           - previewDeadline
                           - acceptanceWithinGrant
                           - policyAuthority
-                          description: Manual preview/acceptance window, or the separately accepted team-policy authority bound by original request-anchored grant expiry.
+                          description: Manual preview/acceptance window, or the separately
+                            accepted team-policy authority bound by original request-anchored
+                            grant expiry.
                         capture_window_seconds:
                           type: integer
                           const: 300
-                          description: Maximum window fixed once at acceptance, never beyond original approval expiry.
+                          description: Maximum window fixed once at acceptance, never
+                            beyond original approval expiry.
                         policy:
                           type: object
                           additionalProperties: false
@@ -5208,12 +5194,13 @@ components:
                               type: integer
                               minimum: 0
                               maximum: 1000000000
-                              description: Cumulative eligible entry and exit probe ceiling; zero or absent grants no argument observation.
+                              description: Cumulative eligible entry and exit probe
+                                ceiling; zero or absent grants no argument observation.
                             observed_events_used:
                               type: integer
                               minimum: 0
                               maximum: 1000000000
-                              description: Conservative charged event units, including uncertain observations.
+                              description: Charged event units.
                           required:
                           - uid
                           - executor
@@ -5262,7 +5249,6 @@ components:
                         then:
                           required:
                           - capture_id
-                          - preview_id
                           - preview_deadline
                           properties:
                             lifetime_seconds:
@@ -5306,16 +5292,10 @@ components:
                               const: policyAuthority
                             can_resume:
                               const: false
-                            can_resolve:
-                              const: false
-                            resume_requires_original_client:
-                              const: false
                           not:
                             anyOf:
                             - required:
                               - capture_id
-                            - required:
-                              - preview_id
                             - required:
                               - preview_deadline
                             - required:
@@ -5558,13 +5538,13 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
           required:
           - status
           - data
@@ -5677,13 +5657,13 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
           required:
           - status
           - data
@@ -5785,13 +5765,13 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
           required:
           - status
           - data
@@ -5990,7 +5970,7 @@ components:
                         const: Indeterminate
                       unmet:
                         enum:
-                        - PermissionObservationStale
+                        - ClusterNotObserved
                         - ServiceUnavailable
                         - ClusterUnavailable
                     required:
@@ -6041,7 +6021,7 @@ components:
                         enum:
                         - NoMatchingAllow
                         - ExplicitDeny
-                        - PermissionObservationStale
+                        - ClusterNotObserved
                         - AudienceOverflow
                         - ServiceUnavailable
                         - DecisionTimeSource
@@ -6049,7 +6029,7 @@ components:
                         enum:
                         - NoMatchingAllow
                         - ExplicitDeny
-                        - PermissionObservationStale
+                        - ClusterNotObserved
                         - AudienceOverflow
                         - ServiceUnavailable
                         - DecisionTimeSource
@@ -6497,29 +6477,22 @@ components:
           - completed
           - conflict
           - indeterminate
-        poll_operation:
-          type: string
-          maxLength: 80
-        poll_handle:
-          type: string
-          maxLength: 4096
       required:
       - operation_id
       - revision
       - state
-      - poll_operation
-      - poll_handle
     ConfigurationPreview:
       type: object
       additionalProperties: false
       properties:
-        preview_id: *id003
+        plan_digest:
+          type: string
+          pattern: ^[a-f0-9]{64}$
         source:
           $ref: '#/components/schemas/DraftTarget'
         base_resource_version:
           type: string
           maxLength: 256
-        expires_at: *id006
         field_manager:
           type: string
           maxLength: 128
@@ -6590,10 +6563,9 @@ components:
         execution_authority:
           $ref: https://asservat.io/spec/v1/policy-authority.schema.json#/$defs/summary
       required:
-      - preview_id
+      - plan_digest
       - source
       - base_resource_version
-      - expires_at
       - field_manager
       - protected_diff_ref
       - impact_codes
@@ -6882,7 +6854,71 @@ components:
       - configured_release
       - candidate_release
       - checked_at
-    PollInput:
+    StatusEvent:
+      type: object
+      additionalProperties: false
+      description: Data of one status Server-Sent Event. result is the unchanged result
+        envelope of the matching status operation.
+      properties:
+        type:
+          enum:
+          - capture
+          - grant
+          - download
+          - query
+          - accessLost
+        id:
+          type: string
+          minLength: 1
+          maxLength: 4096
+        revision:
+          type: integer
+          minimum: 1
+          maximum: 1000000000
+        result: {}
+      required:
+      - type
+      - id
+      oneOf:
+      - properties:
+          type:
+            const: capture
+          result:
+            $ref: '#/components/schemas/McpOutput_get_capture'
+        required:
+        - revision
+        - result
+      - properties:
+          type:
+            const: grant
+          result:
+            $ref: '#/components/schemas/McpOutput_get_grant'
+        required:
+        - revision
+        - result
+      - properties:
+          type:
+            const: download
+          result:
+            $ref: '#/components/schemas/McpOutput_get_artifact_download'
+        required:
+        - revision
+        - result
+      - properties:
+          type:
+            const: query
+          result:
+            $ref: '#/components/schemas/McpOutput_get_query_result'
+        required:
+        - revision
+        - result
+      - properties:
+          type:
+            const: accessLost
+        not:
+          required:
+          - result
+    OperationRef:
       type: object
       additionalProperties: false
       properties:
@@ -6997,7 +7033,14 @@ components:
       type: object
       additionalProperties: false
       properties:
-        preview_id: *id003
+        source:
+          $ref: '#/components/schemas/DraftTarget'
+        protected_draft_handle:
+          type: string
+          maxLength: 4096
+        expected_plan_digest:
+          type: string
+          pattern: ^[a-f0-9]{64}$
         expected_resource_version:
           type: string
           maxLength: 256
@@ -7007,7 +7050,9 @@ components:
           - EvidenceRecipe
           - CaptureProfile
       required:
-      - preview_id
+      - source
+      - protected_draft_handle
+      - expected_plan_digest
       - expected_resource_version
       - kind
     EnrollmentInput:
@@ -7190,13 +7235,13 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
           required:
           - status
           - data
@@ -7302,7 +7347,11 @@ components:
                       digest:
                         type: string
                         pattern: ^[a-f0-9]{64}$
-                        description: Immutable verified artifact version. For the current pod-status artifact this is SHA-256 of the existing serialized verified ciphertext copy receipts, not the native file checksum. The prepared download supplies the native SHA-256 separately.
+                        description: Immutable verified artifact version. For the
+                          current pod-status artifact this is SHA-256 of the existing
+                          serialized verified ciphertext copy receipts, not the native
+                          file checksum. The prepared download supplies the native
+                          SHA-256 separately.
                       kind:
                         type: string
                         minLength: 1
@@ -7326,7 +7375,9 @@ components:
                         type: string
                         minLength: 1
                         maxLength: 64
-                        description: Verified native format, when supplied; used to choose a compatible saved-evidence view. It grants no download or analysis authority.
+                        description: Verified native format, when supplied; used to
+                          choose a compatible saved-evidence view. It grants no download
+                          or analysis authority.
                       verified_native_bytes:
                         type: integer
                         minimum: 0
@@ -7377,7 +7428,10 @@ components:
                       profile_acquisition:
                         type: object
                         additionalProperties: false
-                        description: Accepted request parameters and authenticated HTTP acquisition timing, not the sample interval or cumulative history. Legacy timing, clock uncertainty and serving-process attribution may be unknown.
+                        description: Accepted request parameters and authenticated
+                          HTTP acquisition timing, not the sample interval or cumulative
+                          history. Legacy timing, clock uncertainty and serving-process
+                          attribution may be unknown.
                         properties:
                           requested_type:
                             type: string
@@ -7408,14 +7462,19 @@ components:
                             type: boolean
                           execution_mode:
                             const: onTrigger
-                          started_at: &profile_acq_timestamp
+                          started_at:
                             type:
                             - string
                             - 'null'
                             format: date-time
                             pattern: ^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,6})?Z$
-                          completed_at: *profile_acq_timestamp
-                          clock_uncertainty_ms: &profile_acq_null
+                          completed_at:
+                            type:
+                            - string
+                            - 'null'
+                            format: date-time
+                            pattern: ^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,6})?Z$
+                          clock_uncertainty_ms:
                             type: 'null'
                           process_attribution:
                             const: unknown
@@ -7443,7 +7502,7 @@ components:
                                 - cpu
                               mode:
                                 const: interval
-                              requested_duration_ms: &profile_acq_duration
+                              requested_duration_ms:
                                 type: integer
                                 minimum: 1000
                                 maximum: 60000
@@ -7469,14 +7528,16 @@ components:
                                 - heap
                               mode:
                                 const: snapshot
-                              requested_duration_ms: *profile_acq_null
+                              requested_duration_ms:
+                                type: 'null'
                           - properties:
                               requested_type:
                                 enum:
                                 - goroutine
                               mode:
                                 const: snapshot
-                              requested_duration_ms: *profile_acq_null
+                              requested_duration_ms:
+                                type: 'null'
                               force_gc:
                                 const: false
                           - properties:
@@ -7488,7 +7549,8 @@ components:
                                 - threadcreate
                               mode:
                                 const: cumulative
-                              requested_duration_ms: *profile_acq_null
+                              requested_duration_ms:
+                                type: 'null'
                               force_gc:
                                 const: false
                           - properties:
@@ -7502,13 +7564,19 @@ components:
                                 - threadcreate
                               mode:
                                 const: delta
-                              requested_duration_ms: *profile_acq_duration
+                              requested_duration_ms:
+                                type: integer
+                                minimum: 1000
+                                maximum: 60000
+                                multipleOf: 1000
                               force_gc:
                                 const: false
                         - oneOf:
                           - properties:
-                              started_at: *profile_acq_null
-                              completed_at: *profile_acq_null
+                              started_at:
+                                type: 'null'
+                              completed_at:
+                                type: 'null'
                           - properties:
                               started_at:
                                 type: string
@@ -7584,13 +7652,13 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
           required:
           - status
           - data
@@ -7717,13 +7785,13 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
           required:
           - status
           - data
@@ -7807,7 +7875,11 @@ components:
                       digest:
                         type: string
                         pattern: ^[a-f0-9]{64}$
-                        description: Immutable verified artifact version. For the current pod-status artifact this is SHA-256 of the existing serialized verified ciphertext copy receipts, not the native file checksum. The prepared download supplies the native SHA-256 separately.
+                        description: Immutable verified artifact version. For the
+                          current pod-status artifact this is SHA-256 of the existing
+                          serialized verified ciphertext copy receipts, not the native
+                          file checksum. The prepared download supplies the native
+                          SHA-256 separately.
                       kind:
                         type: string
                         minLength: 1
@@ -7853,13 +7925,13 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
           required:
           - status
           - data
@@ -7974,13 +8046,13 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
           required:
           - status
           - data
@@ -8134,13 +8206,13 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
           required:
           - status
           - data
@@ -8258,13 +8330,13 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
           required:
           - status
           - data
@@ -8373,7 +8445,9 @@ components:
                       cumulative:
                         type: number
                       fraction:
-                        description: Flat divided by total for nonnegative samples with positive total; null for signed delta samples or a zero total.
+                        description: Flat divided by total for nonnegative samples
+                          with positive total; null for signed delta samples or a
+                          zero total.
                         anyOf:
                         - type: number
                           minimum: 0
@@ -8394,11 +8468,18 @@ components:
                 query_observed_at:
                   type: string
                   format: date-time
-                  description: Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock.
+                  description: Server time of this prepared query snapshot. This observation
+                    does not renew query or request authority. Together with query_expires_at
+                    it bounds managed-view lifetime independently of the client wall
+                    clock.
                 query_expires_at:
                   type: string
                   format: date-time
-                  description: Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline.
+                  description: Original total query cutoff, irreversibly shortened
+                    by effective evidence access. A status read never extends it.
+                    Managed views clear by this cutoff or earlier on scope loss or
+                    closure; this cannot recall external copies. Distinct from the
+                    current request disclosure deadline.
               required:
               - sample_type
               - unit
@@ -8423,21 +8504,28 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
                 query_observed_at:
                   type: string
                   format: date-time
-                  description: Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock.
+                  description: Server time of this prepared query snapshot. This observation
+                    does not renew query or request authority. Together with query_expires_at
+                    it bounds managed-view lifetime independently of the client wall
+                    clock.
                 query_expires_at:
                   type: string
                   format: date-time
-                  description: Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline.
+                  description: Original total query cutoff, irreversibly shortened
+                    by effective evidence access. A status read never extends it.
+                    Managed views clear by this cutoff or earlier on scope loss or
+                    closure; this cannot recall external copies. Distinct from the
+                    current request disclosure deadline.
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
               - query_observed_at
               - query_expires_at
           required:
@@ -8845,11 +8933,18 @@ components:
                 query_observed_at:
                   type: string
                   format: date-time
-                  description: Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock.
+                  description: Server time of this prepared query snapshot. This observation
+                    does not renew query or request authority. Together with query_expires_at
+                    it bounds managed-view lifetime independently of the client wall
+                    clock.
                 query_expires_at:
                   type: string
                   format: date-time
-                  description: Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline.
+                  description: Original total query cutoff, irreversibly shortened
+                    by effective evidence access. A status read never extends it.
+                    Managed views clear by this cutoff or earlier on scope loss or
+                    closure; this cannot recall external copies. Distinct from the
+                    current request disclosure deadline.
               required:
               - sample_type
               - unit
@@ -8919,21 +9014,28 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
                 query_observed_at:
                   type: string
                   format: date-time
-                  description: Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock.
+                  description: Server time of this prepared query snapshot. This observation
+                    does not renew query or request authority. Together with query_expires_at
+                    it bounds managed-view lifetime independently of the client wall
+                    clock.
                 query_expires_at:
                   type: string
                   format: date-time
-                  description: Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline.
+                  description: Original total query cutoff, irreversibly shortened
+                    by effective evidence access. A status read never extends it.
+                    Managed views clear by this cutoff or earlier on scope loss or
+                    closure; this cannot recall external copies. Distinct from the
+                    current request disclosure deadline.
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
               - query_observed_at
               - query_expires_at
             data_class:
@@ -9016,14 +9118,17 @@ components:
                   type: integer
                   minimum: 0
                   maximum: 1000000000000
-                  description: Retained packet records in the authenticated saved file; this is not a count of unique network datagrams.
+                  description: Retained packet records in the authenticated saved
+                    file; this is not a count of unique network datagrams.
                 drops:
                   type:
                   - integer
                   - 'null'
                   minimum: 0
                   maximum: 1000000000000
-                  description: Producer-reported exclusions with the exact meaning given by drop_reporting; null means unavailable. This is not measured network loss.
+                  description: Producer-reported exclusions with the exact meaning
+                    given by drop_reporting; null means unavailable. This is not measured
+                    network loss.
                 conversations:
                   type: array
                   items:
@@ -9054,7 +9159,9 @@ components:
                     - protocol
                     - packets
                   maxItems: 100
-                  description: Top100 directional numeric endpoint/protocol aggregates, ordered by record count descending then protocol/source/destination; never DNS, comments or payload.
+                  description: Top100 directional numeric endpoint/protocol aggregates,
+                    ordered by record count descending then protocol/source/destination;
+                    never DNS, comments or payload.
                 drop_reporting:
                   enum:
                   - captureExclusions
@@ -9069,16 +9176,26 @@ components:
                 query_observed_at:
                   type: string
                   format: date-time
-                  description: Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock.
+                  description: Server time of this prepared query snapshot. This observation
+                    does not renew query or request authority. Together with query_expires_at
+                    it bounds managed-view lifetime independently of the client wall
+                    clock.
                 query_expires_at:
                   type: string
                   format: date-time
-                  description: Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline.
+                  description: Original total query cutoff, irreversibly shortened
+                    by effective evidence access. A status read never extends it.
+                    Managed views clear by this cutoff or earlier on scope loss or
+                    closure; this cannot recall external copies. Distinct from the
+                    current request disclosure deadline.
                 unclassified_packets:
                   type: integer
                   minimum: 0
                   maximum: 1000000000000
-                  description: Saved raw packet records without usable complete headers. These records remain in packets but not conversations; this is not a drop or network-loss count. Required for rawPackets and omitted for networkHeaders.
+                  description: Saved raw packet records without usable complete headers.
+                    These records remain in packets but not conversations; this is
+                    not a drop or network-loss count. Required for rawPackets and
+                    omitted for networkHeaders.
               required:
               - capture_mode
               - packets
@@ -9118,21 +9235,28 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
                 query_observed_at:
                   type: string
                   format: date-time
-                  description: Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock.
+                  description: Server time of this prepared query snapshot. This observation
+                    does not renew query or request authority. Together with query_expires_at
+                    it bounds managed-view lifetime independently of the client wall
+                    clock.
                 query_expires_at:
                   type: string
                   format: date-time
-                  description: Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline.
+                  description: Original total query cutoff, irreversibly shortened
+                    by effective evidence access. A status read never extends it.
+                    Managed views clear by this cutoff or earlier on scope loss or
+                    closure; this cannot recall external copies. Distinct from the
+                    current request disclosure deadline.
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
               - query_observed_at
               - query_expires_at
           required:
@@ -9309,13 +9433,13 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
           required:
           - status
           - data
@@ -9445,13 +9569,13 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
           required:
           - status
           - data
@@ -9547,14 +9671,16 @@ components:
                   format: date-time
                   description: Server time of this prepared query snapshot. This observation
                     does not renew query or request authority. Together with query_expires_at
-                    it bounds managed-view lifetime independently of the client wall clock.
+                    it bounds managed-view lifetime independently of the client wall
+                    clock.
                 query_expires_at:
                   type: string
                   format: date-time
-                  description: Original total query cutoff, irreversibly shortened by effective
-                    evidence access. A poll never extends it. Managed views clear by this
-                    cutoff or earlier on scope loss or closure; this cannot recall external
-                    copies. Distinct from the current request disclosure deadline.
+                  description: Original total query cutoff, irreversibly shortened
+                    by effective evidence access. A status read never extends it.
+                    Managed views clear by this cutoff or earlier on scope loss or
+                    closure; this cannot recall external copies. Distinct from the
+                    current request disclosure deadline.
               required:
               - logical_path
               - line_start
@@ -9576,26 +9702,28 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
                 query_observed_at:
                   type: string
                   format: date-time
                   description: Server time of this prepared query snapshot. This observation
                     does not renew query or request authority. Together with query_expires_at
-                    it bounds managed-view lifetime independently of the client wall clock.
+                    it bounds managed-view lifetime independently of the client wall
+                    clock.
                 query_expires_at:
                   type: string
                   format: date-time
-                  description: Original total query cutoff, irreversibly shortened by effective
-                    evidence access. A poll never extends it. Managed views clear by this
-                    cutoff or earlier on scope loss or closure; this cannot recall external
-                    copies. Distinct from the current request disclosure deadline.
+                  description: Original total query cutoff, irreversibly shortened
+                    by effective evidence access. A status read never extends it.
+                    Managed views clear by this cutoff or earlier on scope loss or
+                    closure; this cannot recall external copies. Distinct from the
+                    current request disclosure deadline.
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
               - query_observed_at
               - query_expires_at
           required:
@@ -9682,133 +9810,98 @@ components:
         ]
       }
     McpOutput_get_logs:
-      {
-        "allOf": [
-          {
-            "$ref": "https://asservat.io/spec/v1/mcp-result.schema.json"
-          },
-          {
-            "oneOf": [
-              {
-                "type": "object",
-                "properties": {
-                  "status": {
-                    "const": "ok"
-                  },
-                  "data": {
-                    "$ref": "https://asservat.io/spec/v1/log-results.schema.json#/$defs/page"
-                  },
-                  "data_class": {
-                    "const": "raw"
-                  }
-                },
-                "required": [
-                  "status",
-                  "data"
-                ]
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "status": {
-                    "const": "pending"
-                  },
-                  "data": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "properties": {
-                      "query_handle": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 4096
-                      },
-                      "retry_after_seconds": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 60
-                      },
-                      "query_observed_at": {
-                        "type": "string",
-                        "format": "date-time",
-                        "description": "Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock."
-                      },
-                      "query_expires_at": {
-                        "type": "string",
-                        "format": "date-time",
-                        "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
-                      }
-                    },
-                    "required": [
-                      "query_handle",
-                      "retry_after_seconds",
-                      "query_observed_at",
-                      "query_expires_at"
-                    ]
-                  }
-                },
-                "required": [
-                  "status",
-                  "data"
-                ]
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "status": {
-                    "const": "error"
-                  },
-                  "data": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "properties": {
-                      "code": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 64
-                      },
-                      "message": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 1024
-                      },
-                      "retryable": {
-                        "type": "boolean"
-                      },
-                      "navigation_uri": {
-                        "type": "string",
-                        "format": "uri",
-                        "maxLength": 2048
-                      },
-                      "responsible_role": {
-                        "enum": [
-                          "maintainer",
-                          "approver",
-                          "administrator",
-                          "none"
-                        ]
-                      },
-                      "retry_after_seconds": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 60
-                      }
-                    },
-                    "required": [
-                      "code",
-                      "message",
-                      "retryable"
-                    ]
-                  }
-                },
-                "required": [
-                  "status",
-                  "data"
-                ]
-              }
-            ]
-          }
-        ]
-      }
+      allOf:
+      - $ref: https://asservat.io/spec/v1/mcp-result.schema.json
+      - oneOf:
+        - type: object
+          properties:
+            status:
+              const: ok
+            data:
+              $ref: https://asservat.io/spec/v1/log-results.schema.json#/$defs/page
+            data_class:
+              const: raw
+          required:
+          - status
+          - data
+        - type: object
+          properties:
+            status:
+              const: pending
+            data:
+              type: object
+              additionalProperties: false
+              properties:
+                query_handle:
+                  type: string
+                  minLength: 1
+                  maxLength: 4096
+                revision:
+                  type: integer
+                  minimum: 1
+                  maximum: 1000000000
+                query_observed_at:
+                  type: string
+                  format: date-time
+                  description: Server time of this prepared query snapshot. This observation
+                    does not renew query or request authority. Together with query_expires_at
+                    it bounds managed-view lifetime independently of the client wall
+                    clock.
+                query_expires_at:
+                  type: string
+                  format: date-time
+                  description: Original total query cutoff, irreversibly shortened
+                    by effective evidence access. A status read never extends it.
+                    Managed views clear by this cutoff or earlier on scope loss or
+                    closure; this cannot recall external copies. Distinct from the
+                    current request disclosure deadline.
+              required:
+              - query_handle
+              - revision
+              - query_observed_at
+              - query_expires_at
+          required:
+          - status
+          - data
+        - type: object
+          properties:
+            status:
+              const: error
+            data:
+              type: object
+              additionalProperties: false
+              properties:
+                code:
+                  type: string
+                  minLength: 1
+                  maxLength: 64
+                message:
+                  type: string
+                  minLength: 1
+                  maxLength: 1024
+                retryable:
+                  type: boolean
+                navigation_uri:
+                  type: string
+                  format: uri
+                  maxLength: 2048
+                responsible_role:
+                  enum:
+                  - maintainer
+                  - approver
+                  - administrator
+                  - none
+                retry_after_seconds:
+                  type: integer
+                  minimum: 1
+                  maximum: 60
+              required:
+              - code
+              - message
+              - retryable
+          required:
+          - status
+          - data
     McpInput_request_raw_access:
       type: object
       additionalProperties: false
@@ -9926,13 +10019,13 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
           required:
           - status
           - data
@@ -9982,6 +10075,13 @@ components:
         grant_id:
           type: string
           format: uuid
+        after_revision:
+          type: integer
+          minimum: 1
+          maximum: 1000000000
+          description: Wait server-side until the state revision differs from this
+            value or 30 seconds pass, then return the current state. Omit for an immediate
+            read. Status reads are never charged.
       required:
       - grant_id
     McpOutput_get_grant:
@@ -10017,9 +10117,6 @@ components:
                     - adHocCapture
                     - policy
                   capture_id:
-                    type: string
-                    format: uuid
-                  preview_id:
                     type: string
                     format: uuid
                   execution_digest:
@@ -10589,26 +10686,27 @@ components:
                   preview_deadline:
                     type: string
                     format: date-time
-                    description: Original passive preview expiry; bounds opening a new approval review, and also start for legacy previewDeadline plans.
+                    description: Original passive preview expiry; bounds opening a
+                      new approval review, and also start for legacy previewDeadline
+                      plans.
                   capture_deadline_rule:
                     enum:
                     - previewDeadline
                     - acceptanceWithinGrant
                     - policyAuthority
-                    description: Manual preview/acceptance window, or the separately accepted team-policy authority bound by original request-anchored grant expiry.
+                    description: Manual preview/acceptance window, or the separately
+                      accepted team-policy authority bound by original request-anchored
+                      grant expiry.
                   capture_window_seconds:
                     type: integer
                     const: 300
-                    description: Maximum window fixed once at acceptance, never beyond original approval expiry.
+                    description: Maximum window fixed once at acceptance, never beyond
+                      original approval expiry.
                   can_resume:
                     type: boolean
-                    description: Advisory current original requester/client collection eligibility under this exact approved grant. Submission rechecks all authority.
-                  can_resolve:
-                    type: boolean
-                    description: Advisory original requester/client may recover a possibly accepted request after an approved decision. Never offered for pending or denied review; a missing acceptance closes the original intent.
-                  resume_requires_original_client:
-                    type: boolean
-                    description: Guidance only for the same requesting human on another OAuth client while this marked plan is Approved. It confers no authority or grant transfer.
+                    description: Advisory current original requester/client collection
+                      eligibility under this exact approved grant. Submission rechecks
+                      all authority.
                   policy:
                     type: object
                     additionalProperties: false
@@ -10671,12 +10769,13 @@ components:
                         type: integer
                         minimum: 0
                         maximum: 1000000000
-                        description: Cumulative eligible entry and exit probe ceiling; zero or absent grants no argument observation.
+                        description: Cumulative eligible entry and exit probe ceiling;
+                          zero or absent grants no argument observation.
                       observed_events_used:
                         type: integer
                         minimum: 0
                         maximum: 1000000000
-                        description: Conservative charged event units, including uncertain observations.
+                        description: Charged event units.
                     required:
                     - uid
                     - executor
@@ -10708,8 +10807,6 @@ components:
                 - actions
                 - capture_deadline_rule
                 - can_resume
-                - can_resolve
-                - resume_requires_original_client
                 allOf:
                 - if:
                     properties:
@@ -10729,7 +10826,6 @@ components:
                   then:
                     required:
                     - capture_id
-                    - preview_id
                     - preview_deadline
                     properties:
                       lifetime_seconds:
@@ -10773,16 +10869,10 @@ components:
                         const: policyAuthority
                       can_resume:
                         const: false
-                      can_resolve:
-                        const: false
-                      resume_requires_original_client:
-                        const: false
                     not:
                       anyOf:
                       - required:
                         - capture_id
-                      - required:
-                        - preview_id
                       - required:
                         - preview_deadline
                       - required:
@@ -10962,10 +11052,6 @@ components:
                     maxLength: 2048
                   can_resume:
                     const: false
-                  can_resolve:
-                    const: false
-                  resume_requires_original_client:
-                    const: false
                   raw_access:
                     type: object
                     additionalProperties: false
@@ -11140,13 +11226,13 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
           required:
           - status
           - data
@@ -11266,13 +11352,13 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
           required:
           - status
           - data
@@ -11413,13 +11499,13 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
           required:
           - status
           - data
@@ -11636,7 +11722,9 @@ components:
                       maxLength: 128
                       minimum: 0
                       maximum: 4294967295
-                  description: Exactly one cell per selected field. Fixed field types, canonical values and null availability are independently validated; zero is not null.
+                  description: Exactly one cell per selected field. Fixed field types,
+                    canonical values and null availability are independently validated;
+                    zero is not null.
                 scanned_bytes:
                   type: integer
                   minimum: 0
@@ -11654,11 +11742,18 @@ components:
                 query_observed_at:
                   type: string
                   format: date-time
-                  description: Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock.
+                  description: Server time of this prepared query snapshot. This observation
+                    does not renew query or request authority. Together with query_expires_at
+                    it bounds managed-view lifetime independently of the client wall
+                    clock.
                 query_expires_at:
                   type: string
                   format: date-time
-                  description: Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline.
+                  description: Original total query cutoff, irreversibly shortened
+                    by effective evidence access. A status read never extends it.
+                    Managed views clear by this cutoff or earlier on scope loss or
+                    closure; this cannot recall external copies. Distinct from the
+                    current request disclosure deadline.
               required:
               - capture_mode
               - fields
@@ -11753,21 +11848,28 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
                 query_observed_at:
                   type: string
                   format: date-time
-                  description: Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock.
+                  description: Server time of this prepared query snapshot. This observation
+                    does not renew query or request authority. Together with query_expires_at
+                    it bounds managed-view lifetime independently of the client wall
+                    clock.
                 query_expires_at:
                   type: string
                   format: date-time
-                  description: Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline.
+                  description: Original total query cutoff, irreversibly shortened
+                    by effective evidence access. A status read never extends it.
+                    Managed views clear by this cutoff or earlier on scope loss or
+                    closure; this cannot recall external copies. Distinct from the
+                    current request disclosure deadline.
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
               - query_observed_at
               - query_expires_at
           required:
@@ -11820,6 +11922,13 @@ components:
           type: string
           minLength: 1
           maxLength: 4096
+        after_revision:
+          type: integer
+          minimum: 1
+          maximum: 1000000000
+          description: Wait server-side until the state revision differs from this
+            value or 30 seconds pass, then return the current state. Omit for an immediate
+            read. Status reads are never charged.
       required:
       - query_handle
     McpOutput_get_query_result:
@@ -11849,14 +11958,16 @@ components:
                   format: date-time
                   description: Server time of this prepared query snapshot. This observation
                     does not renew query or request authority. Together with query_expires_at
-                    it bounds managed-view lifetime independently of the client wall clock.
+                    it bounds managed-view lifetime independently of the client wall
+                    clock.
                 query_expires_at:
                   type: string
                   format: date-time
-                  description: Original total query cutoff, irreversibly shortened by effective
-                    evidence access. A poll never extends it. Managed views clear by this
-                    cutoff or earlier on scope loss or closure; this cannot recall external
-                    copies. Distinct from the current request disclosure deadline.
+                  description: Original total query cutoff, irreversibly shortened
+                    by effective evidence access. A status read never extends it.
+                    Managed views clear by this cutoff or earlier on scope loss or
+                    closure; this cannot recall external copies. Distinct from the
+                    current request disclosure deadline.
               required:
               - query_handle
               - tool_name
@@ -11878,26 +11989,28 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
                 query_observed_at:
                   type: string
                   format: date-time
                   description: Server time of this prepared query snapshot. This observation
                     does not renew query or request authority. Together with query_expires_at
-                    it bounds managed-view lifetime independently of the client wall clock.
+                    it bounds managed-view lifetime independently of the client wall
+                    clock.
                 query_expires_at:
                   type: string
                   format: date-time
-                  description: Original total query cutoff, irreversibly shortened by effective
-                    evidence access. A poll never extends it. Managed views clear by this
-                    cutoff or earlier on scope loss or closure; this cannot recall external
-                    copies. Distinct from the current request disclosure deadline.
+                  description: Original total query cutoff, irreversibly shortened
+                    by effective evidence access. A status read never extends it.
+                    Managed views clear by this cutoff or earlier on scope loss or
+                    closure; this cannot recall external copies. Distinct from the
+                    current request disclosure deadline.
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
               - query_observed_at
               - query_expires_at
           required:
@@ -12104,13 +12217,13 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
           required:
           - status
           - data
@@ -12253,13 +12366,13 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
           required:
           - status
           - data
@@ -12373,13 +12486,13 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
           required:
           - status
           - data
@@ -12525,13 +12638,13 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
           required:
           - status
           - data
@@ -12640,117 +12753,6 @@ components:
           required:
           - status
           - data
-    McpInput_resolve_capture_request:
-      type: object
-      additionalProperties: false
-      properties:
-        preview_id:
-          type: string
-          format: uuid
-        idempotency_key:
-          type: string
-          minLength: 1
-          maxLength: 128
-      required:
-      - preview_id
-      - idempotency_key
-    McpOutput_resolve_capture_request:
-      allOf:
-      - $ref: https://asservat.io/spec/v1/mcp-result.schema.json
-      - oneOf:
-        - type: object
-          properties:
-            status:
-              const: ok
-            data:
-              oneOf:
-              - type: object
-                additionalProperties: false
-                properties:
-                  capture_id:
-                    type: string
-                    format: uuid
-                  phase:
-                    const: Accepted
-                  navigation_uri:
-                    type: string
-                    format: uri
-                    maxLength: 2048
-                  operation:
-                    enum:
-                    - collect
-                    - recordingSave
-                  state:
-                    const: accepted
-                required:
-                - state
-                - capture_id
-                - phase
-                - navigation_uri
-                - operation
-              - type: object
-                additionalProperties: false
-                properties:
-                  state:
-                    const: closed
-                required:
-                - state
-            data_class:
-              const: metadata
-            truncated:
-              const: false
-            next_cursor:
-              type: 'null'
-            narrowing_hint:
-              type: 'null'
-            warnings:
-              type: array
-              maxItems: 0
-            provenance:
-              type: array
-              maxItems: 0
-          required:
-          - status
-          - data
-        - type: object
-          properties:
-            status:
-              const: error
-            data:
-              type: object
-              additionalProperties: false
-              properties:
-                code:
-                  type: string
-                  minLength: 1
-                  maxLength: 64
-                message:
-                  type: string
-                  minLength: 1
-                  maxLength: 1024
-                retryable:
-                  type: boolean
-                navigation_uri:
-                  type: string
-                  format: uri
-                  maxLength: 2048
-                responsible_role:
-                  enum:
-                  - maintainer
-                  - approver
-                  - administrator
-                  - none
-                retry_after_seconds:
-                  type: integer
-                  minimum: 1
-                  maximum: 60
-              required:
-              - code
-              - message
-              - retryable
-          required:
-          - status
-          - data
     McpInput_request_capture:
       type: object
       additionalProperties: false
@@ -12773,18 +12775,195 @@ components:
           maxLength: 128
         sharing:
           $ref: https://asservat.io/spec/v1/sharing-request.schema.json#/$defs/capture
-        preview_id:
-          type: string
-          format: uuid
         result_access:
           $ref: https://asservat.io/spec/v1/investigation-access.schema.json#/$defs/request
-        continue_acquisition:
-          type: boolean
-          const: true
-          description: Explicitly continue acquisition for an already accepted original preview
-            and request key using current permissions. Omission preserves passive accepted replay.
-            This cannot admit a missing request, create another attempt, renew a start interval,
-            or retry uncertain key preparation.
+        preview:
+          description: The preview_capture or preview_recording_save request that
+            was reviewed. Submission recomputes its plan.
+          oneOf:
+          - type: object
+            additionalProperties: false
+            properties:
+              target_handle:
+                type: string
+                minLength: 1
+                maxLength: 128
+              target_ref:
+                type: object
+                additionalProperties: false
+                properties:
+                  cluster_id:
+                    type: string
+                    format: uuid
+                  namespace:
+                    type: string
+                    minLength: 1
+                    maxLength: 63
+                  kind:
+                    enum:
+                    - Deployment
+                    - StatefulSet
+                    - Pod
+                  name:
+                    type: string
+                    minLength: 1
+                    maxLength: 253
+                required:
+                - cluster_id
+                - namespace
+                - kind
+                - name
+              diagnostic_handle:
+                type: string
+                minLength: 1
+                maxLength: 128
+              preset_ref:
+                type: object
+                additionalProperties: false
+                properties:
+                  name:
+                    enum:
+                    - incident-context
+                    - pod-status
+                  version:
+                    const: v1
+                required:
+                - name
+                - version
+              reason:
+                type: string
+                minLength: 1
+                maxLength: 512
+              sharing:
+                $ref: https://asservat.io/spec/v1/sharing-request.schema.json#/$defs/capture
+              history_capture_id:
+                type: string
+                format: uuid
+              repeated_from_capture_id:
+                type: string
+                format: uuid
+              profile_composition:
+                $ref: https://asservat.io/spec/v1/capture-composition.schema.json
+              result_access:
+                $ref: https://asservat.io/spec/v1/investigation-access.schema.json#/$defs/request
+              requested_retention_seconds:
+                type: integer
+                minimum: 1
+                maximum: 315360000
+                description: Requested evidence-access lifetime in seconds. Omission
+                  uses the administrator default; effective access and managed deletion
+                  remain bounded by current retention policy and its deletion budget.
+                  History restoration preserves its original request; use a normal
+                  edited preview to change it.
+              history_selection:
+                enum:
+                - currentEligiblePod
+                description: Explicit manual selection when repeating a policy triggeringPod
+                  occurrence; the preview selects a current eligible Pod under the
+                  original workload identity.
+            required: []
+            oneOf:
+            - allOf:
+              - oneOf:
+                - required:
+                  - target_handle
+                  not:
+                    required:
+                    - target_ref
+                - required:
+                  - target_ref
+                  not:
+                    required:
+                    - target_handle
+              - oneOf:
+                - required:
+                  - diagnostic_handle
+                  not:
+                    anyOf:
+                    - required:
+                      - preset_ref
+                    - required:
+                      - profile_composition
+                - required:
+                  - preset_ref
+                  not:
+                    anyOf:
+                    - required:
+                      - diagnostic_handle
+                    - required:
+                      - profile_composition
+                - required:
+                  - profile_composition
+                  not:
+                    anyOf:
+                    - required:
+                      - diagnostic_handle
+                    - required:
+                      - preset_ref
+              not:
+                required:
+                - history_capture_id
+            - required:
+              - history_capture_id
+              not:
+                anyOf:
+                - required:
+                  - target_handle
+                - required:
+                  - target_ref
+                - required:
+                  - diagnostic_handle
+                - required:
+                  - preset_ref
+                - required:
+                  - repeated_from_capture_id
+                - required:
+                  - profile_composition
+                - required:
+                  - requested_retention_seconds
+            allOf:
+            - if:
+                required:
+                - history_selection
+              then:
+                anyOf:
+                - required:
+                  - history_capture_id
+                - required:
+                  - repeated_from_capture_id
+          - type: object
+            additionalProperties: false
+            properties:
+              recording_handles:
+                type: array
+                items:
+                  type: string
+                  minLength: 1
+                  maxLength: 128
+                minItems: 1
+                maxItems: 16
+                uniqueItems: true
+              before:
+                $ref: https://asservat.io/spec/v1/common.schema.json#/$defs/duration
+              reason:
+                type: string
+                minLength: 1
+                maxLength: 512
+                description: Optional 1–512 Unicode scalars, preserved verbatim. Omit
+                  when absent; an explicit empty string is invalid. Descriptive metadata
+                  is not restored on repeat.
+              sharing:
+                $ref: https://asservat.io/spec/v1/sharing-request.schema.json#/$defs/capture
+              repeated_from_capture_id:
+                type: string
+                format: uuid
+            required:
+            - recording_handles
+        expected_plan_digest:
+          type: string
+          pattern: ^[a-f0-9]{64}$
+          description: plan_digest of the reviewed preview. A different recomputed
+            plan returns ReviewChanged with the differences; nothing is accepted.
       required:
       - idempotency_key
       oneOf:
@@ -12797,11 +12976,13 @@ components:
         not:
           anyOf:
           - required:
-            - preview_id
+            - preview
           - required:
-            - continue_acquisition
+            - expected_plan_digest
       - required:
-        - preview_id
+        - preview
+        - expected_plan_digest
+        - idempotency_key
         not:
           anyOf:
           - required:
@@ -12814,6 +12995,8 @@ components:
             - reason
           - required:
             - sharing
+          - required:
+            - result_access
     McpOutput_request_capture:
       allOf:
       - $ref: https://asservat.io/spec/v1/mcp-result.schema.json
@@ -12878,13 +13061,13 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
           required:
           - status
           - data
@@ -13022,13 +13205,13 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
           required:
           - status
           - data
@@ -13249,13 +13432,13 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
           required:
           - status
           - data
@@ -13459,12 +13642,12 @@ components:
               type: object
               additionalProperties: false
               properties:
-                preview_id:
+                plan_digest:
                   type: string
-                  format: uuid
-                expires_at:
-                  type: string
-                  format: date-time
+                  pattern: ^[a-f0-9]{64}$
+                  description: 'Digest of the resolved plan: immutable target UIDs,
+                    dependencies and the normalized request. Submit it as request_capture
+                    expected_plan_digest.'
                 execution_digest:
                   type: string
                   pattern: ^[a-f0-9]{64}$
@@ -13638,11 +13821,15 @@ components:
                   enum:
                   - explicitPod
                   - lexicalEligiblePod
-                  description: Selection for the fixed pod-status/v1 preset. This describes the reviewed pod, never ongoing monitoring coverage or authority to select a replacement.
+                  description: Selection for the fixed pod-status/v1 preset. This
+                    describes the reviewed pod, never ongoing monitoring coverage
+                    or authority to select a replacement.
                 result_access_actions:
                   type: array
                   maxItems: 16
-                  description: Advisory follow-up access choices for this exact reviewed raw plan. Current authority, retained source and selected operations are checked again on submission. Absence grants no access.
+                  description: Advisory follow-up access choices for this exact reviewed
+                    raw plan. Current authority, retained source and selected operations
+                    are checked again on submission. Absence grants no access.
                   items:
                     type: object
                     additionalProperties: false
@@ -13666,8 +13853,7 @@ components:
                     - action_id
                     - operations
               required:
-              - preview_id
-              - expires_at
+              - plan_digest
               - execution_digest
               - pod_count
               - max_bytes
@@ -13738,13 +13924,13 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
           required:
           - status
           - data
@@ -13808,6 +13994,13 @@ components:
         capture_id:
           type: string
           format: uuid
+        after_revision:
+          type: integer
+          minimum: 1
+          maximum: 1000000000
+          description: Wait server-side until the state revision differs from this
+            value or 30 seconds pass, then return the current state. Omit for an immediate
+            read. Status reads are never charged.
       required:
       - capture_id
     McpOutput_get_capture:
@@ -13874,12 +14067,17 @@ components:
                         type: string
                         minLength: 1
                         maxLength: 64
-                        description: "Bounded stable action reason. Failed Go profile acquisition reports ProfileUnavailable when the endpoint is unavailable or disabled, or ProfilerBusy for an existing conflicting profiling session that Asservat did not stop. Other existing reason strings retain their current meaning; a reason never authorizes retry or replacement."
+                        description: Bounded stable action reason. Failed Go profile
+                          acquisition reports ProfileUnavailable when the endpoint
+                          is unavailable or disabled, or ProfilerBusy for an existing
+                          conflicting profiling session that Asservat did not stop.
+                          Other existing reason strings retain their current meaning;
+                          a reason never authorizes retry or replacement.
                       action_instance_id:
                         type: string
                         format: uuid
-                        description: Exact child identity within this parent save. It
-                          is not a separate navigation or retry target.
+                        description: Exact child identity within this parent save.
+                          It is not a separate navigation or retry target.
                       pod_uid:
                         type: string
                         minLength: 1
@@ -13917,10 +14115,6 @@ components:
                 grant_id:
                   type: string
                   format: uuid
-                retry_after_seconds:
-                  type: integer
-                  minimum: 1
-                  maximum: 60
                 can_cancel:
                   type: boolean
                 blockers:
@@ -13964,10 +14158,10 @@ components:
                 sharing:
                   type: object
                   additionalProperties: false
-                  description: Capture-time sharing status, reported separately from collection
-                    progress. Present only when the request included sharing. Shared names
-                    the concrete share; SharingUnavailable means the result was not shared
-                    (collection outcome is unaffected).
+                  description: Capture-time sharing status, reported separately from
+                    collection progress. Present only when the request included sharing.
+                    Shared names the concrete share; SharingUnavailable means the
+                    result was not shared (collection outcome is unaffected).
                   properties:
                     state:
                       enum:
@@ -13989,8 +14183,8 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 512
-                  description: Authorized parent Save reason, preserved verbatim; never
-                    restored on repeat.
+                  description: Authorized parent Save reason, preserved verbatim;
+                    never restored on repeat.
                 reason_state:
                   enum:
                   - available
@@ -14043,13 +14237,13 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
           required:
           - status
           - data
@@ -14171,13 +14365,13 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
           required:
           - status
           - data
@@ -14270,13 +14464,13 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
           required:
           - status
           - data
@@ -14424,13 +14618,13 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
           required:
           - status
           - data
@@ -14583,13 +14777,13 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
           required:
           - status
           - data
@@ -14670,13 +14864,13 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
           required:
           - status
           - data
@@ -14856,13 +15050,13 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
           required:
           - status
           - data
@@ -14993,13 +15187,13 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
           required:
           - status
           - data
@@ -15090,21 +15284,28 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
                 query_observed_at:
                   type: string
                   format: date-time
-                  description: Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock.
+                  description: Server time of this prepared query snapshot. This observation
+                    does not renew query or request authority. Together with query_expires_at
+                    it bounds managed-view lifetime independently of the client wall
+                    clock.
                 query_expires_at:
                   type: string
                   format: date-time
-                  description: Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline.
+                  description: Original total query cutoff, irreversibly shortened
+                    by effective evidence access. A status read never extends it.
+                    Managed views clear by this cutoff or earlier on scope loss or
+                    closure; this cannot recall external copies. Distinct from the
+                    current request disclosure deadline.
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
           required:
           - status
           - data
@@ -15206,21 +15407,28 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
                 query_observed_at:
                   type: string
                   format: date-time
-                  description: Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock.
+                  description: Server time of this prepared query snapshot. This observation
+                    does not renew query or request authority. Together with query_expires_at
+                    it bounds managed-view lifetime independently of the client wall
+                    clock.
                 query_expires_at:
                   type: string
                   format: date-time
-                  description: Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline.
+                  description: Original total query cutoff, irreversibly shortened
+                    by effective evidence access. A status read never extends it.
+                    Managed views clear by this cutoff or earlier on scope loss or
+                    closure; this cannot recall external copies. Distinct from the
+                    current request disclosure deadline.
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
           required:
           - status
           - data
@@ -15331,21 +15539,28 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
                 query_observed_at:
                   type: string
                   format: date-time
-                  description: Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock.
+                  description: Server time of this prepared query snapshot. This observation
+                    does not renew query or request authority. Together with query_expires_at
+                    it bounds managed-view lifetime independently of the client wall
+                    clock.
                 query_expires_at:
                   type: string
                   format: date-time
-                  description: Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline.
+                  description: Original total query cutoff, irreversibly shortened
+                    by effective evidence access. A status read never extends it.
+                    Managed views clear by this cutoff or earlier on scope loss or
+                    closure; this cannot recall external copies. Distinct from the
+                    current request disclosure deadline.
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
               - query_observed_at
               - query_expires_at
           required:
@@ -15460,13 +15675,13 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
           required:
           - status
           - data
@@ -15563,13 +15778,13 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
           required:
           - status
           - data
@@ -15853,7 +16068,7 @@ components:
       type: object
       additionalProperties: false
       properties:
-        watch_id: &id011
+        watch_id:
           type: string
           format: uuid
         cursor:
@@ -15867,7 +16082,7 @@ components:
         wait_ms:
           type: integer
           minimum: 0
-          maximum: 5000
+          maximum: 30000
       required:
       - watch_id
       - cursor
@@ -15929,12 +16144,14 @@ components:
       type: object
       additionalProperties: false
       properties:
-        watch_id: *id011
-        expected_revision: &id012
+        watch_id:
+          type: string
+          format: uuid
+        expected_revision:
           type: integer
           minimum: 1
           maximum: 1000000000
-        idempotency_key: &id013
+        idempotency_key:
           type: string
           minLength: 1
           maxLength: 128
@@ -16011,9 +16228,17 @@ components:
       type: object
       additionalProperties: false
       properties:
-        watch_id: *id011
-        expected_revision: *id012
-        idempotency_key: *id013
+        watch_id:
+          type: string
+          format: uuid
+        expected_revision:
+          type: integer
+          minimum: 1
+          maximum: 1000000000
+        idempotency_key:
+          type: string
+          minLength: 1
+          maxLength: 128
       required:
       - watch_id
       - expected_revision
@@ -16076,10 +16301,12 @@ components:
       type: object
       additionalProperties: false
       properties:
-        artifact_id: &id014
+        artifact_id:
           type: string
           format: uuid
-        grant_id: *id014
+        grant_id:
+          type: string
+          format: uuid
         idempotency_key:
           type: string
           minLength: 1
@@ -16112,13 +16339,13 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
           required:
           - status
           - data
@@ -16134,7 +16361,9 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 64
-                  description: RawApprovalRequired is returned only for a fresh preparation whose ordinary access checks passed but no current whole-file grant covers it. Other failures must not open approval.
+                  description: RawApprovalRequired is returned only for a fresh preparation
+                    whose ordinary access checks passed but no current whole-file
+                    grant covers it. Other failures must not open approval.
                 message:
                   type: string
                   minLength: 1
@@ -16169,6 +16398,13 @@ components:
         download_id:
           type: string
           format: uuid
+        after_revision:
+          type: integer
+          minimum: 1
+          maximum: 1000000000
+          description: Wait server-side until the state revision differs from this
+            value or 30 seconds pass, then return the current state. Omit for an immediate
+            read. Status reads are never charged.
       required:
       - download_id
     McpOutput_get_artifact_download:
@@ -16183,7 +16419,8 @@ components:
               allOf:
               - $ref: https://asservat.io/spec/v1/artifact-download.schema.json#/$defs/status
               - not:
-                  required: [continue_preparation]
+                  required:
+                  - continue_preparation
           required:
           - status
           - data
@@ -16199,13 +16436,13 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
           required:
           - status
           - data
@@ -16293,13 +16530,13 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
           required:
           - status
           - data
@@ -16453,9 +16690,6 @@ components:
                 kind:
                   const: policy
                 capture_id:
-                  type: string
-                  format: uuid
-                preview_id:
                   type: string
                   format: uuid
                 execution_digest:
@@ -16998,26 +17232,26 @@ components:
                 preview_deadline:
                   type: string
                   format: date-time
-                  description: Original passive preview expiry; bounds opening a new approval review, and also start for legacy previewDeadline plans.
+                  description: Original passive preview expiry; bounds opening a new
+                    approval review, and also start for legacy previewDeadline plans.
                 capture_deadline_rule:
                   enum:
                   - previewDeadline
                   - acceptanceWithinGrant
                   - policyAuthority
-                  description: Manual preview/acceptance window, or the separately accepted team-policy authority bound by original request-anchored grant expiry.
+                  description: Manual preview/acceptance window, or the separately
+                    accepted team-policy authority bound by original request-anchored
+                    grant expiry.
                 capture_window_seconds:
                   type: integer
                   const: 300
-                  description: Maximum window fixed once at acceptance, never beyond original approval expiry.
+                  description: Maximum window fixed once at acceptance, never beyond
+                    original approval expiry.
                 can_resume:
                   type: boolean
-                  description: Advisory current original requester/client collection eligibility under this exact approved grant. Submission rechecks all authority.
-                can_resolve:
-                  type: boolean
-                  description: Advisory original requester/client may recover a possibly accepted request after an approved decision. Never offered for pending or denied review; a missing acceptance closes the original intent.
-                resume_requires_original_client:
-                  type: boolean
-                  description: Guidance only for the same requesting human on another OAuth client while this marked plan is Approved. It confers no authority or grant transfer.
+                  description: Advisory current original requester/client collection
+                    eligibility under this exact approved grant. Submission rechecks
+                    all authority.
                 policy:
                   type: object
                   additionalProperties: false
@@ -17080,12 +17314,13 @@ components:
                       type: integer
                       minimum: 0
                       maximum: 1000000000
-                      description: Cumulative eligible entry and exit probe ceiling; zero or absent grants no argument observation.
+                      description: Cumulative eligible entry and exit probe ceiling;
+                        zero or absent grants no argument observation.
                     observed_events_used:
                       type: integer
                       minimum: 0
                       maximum: 1000000000
-                      description: Conservative charged event units, including uncertain observations.
+                      description: Charged event units.
                   required:
                   - uid
                   - executor
@@ -17117,8 +17352,6 @@ components:
               - actions
               - capture_deadline_rule
               - can_resume
-              - can_resolve
-              - resume_requires_original_client
               allOf:
               - if:
                   properties:
@@ -17138,7 +17371,6 @@ components:
                 then:
                   required:
                   - capture_id
-                  - preview_id
                   - preview_deadline
                   properties:
                     lifetime_seconds:
@@ -17182,16 +17414,10 @@ components:
                       const: policyAuthority
                     can_resume:
                       const: false
-                    can_resolve:
-                      const: false
-                    resume_requires_original_client:
-                      const: false
                   not:
                     anyOf:
                     - required:
                       - capture_id
-                    - required:
-                      - preview_id
                     - required:
                       - preview_deadline
                     - required:
@@ -17235,13 +17461,13 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 4096
-                retry_after_seconds:
+                revision:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 1000000000
               required:
               - query_handle
-              - retry_after_seconds
+              - revision
           required:
           - status
           - data

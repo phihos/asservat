@@ -113,7 +113,7 @@
     "resolvedProfiles": [
       {
         "componentID": "net",
-        "definitionDigest": "ad67f4f61778a3595166fd91cbfdb45e0642a27a35b9eb329d40092fb0c78c17",
+        "definitionDigest": "7c8bf05f4f6c650499e61c033d33043377cb246bfbce3e12d3188220497cf882",
         "profileRef": {
           "catalog": "builtin",
           "name": "network-connections",
@@ -149,7 +149,6 @@
               }
             ],
             "maxEndpoints": 1,
-            "maxStaleness": "5s",
             "protocol": "any",
             "resolution": "frozen"
           },
@@ -172,8 +171,8 @@
     "maxTotalBytes": 16777216
   },
   "recipeRef": {
-    "digest": "1b1cda1a1600107d0fc4bd36ccff06af6188fbd9940529222e8ff2515af6cc85",
-    "name": "composition-1b1cda1a1600107d0fc4bd36"
+    "digest": "c0555c7b6a2c9cc5f0908d8eb3f48e1ab32bb76725f812004e24680749c19458",
+    "name": "composition-c0555c7b6a2c9cc5f0908d8e"
   },
   "schemaVersion": "recorder-preview/v1",
   "source": {

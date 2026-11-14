@@ -4,9 +4,8 @@
   "data_class": "extract",
   "status": "ok",
   "data": {
-    "preview_id": "00000000-0000-4000-8000-000000000080",
-    "expires_at": "2026-10-09T12:05:00Z",
-    "execution_digest": "aa80b097302f82697f33bbdb9f3a0a894bbfa775c1d1d4509d1c6fcba2309d97",
+    "plan_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "execution_digest": "81ec8e7f3085121334bec8ce027aade7c9ffdfacbd6e748621dd29c4a9579ca8",
     "pod_count": 1,
     "max_bytes": 100663296,
     "max_process_starts": 0,
@@ -61,7 +60,7 @@
             "name": "http-headers",
             "version": "v1"
           },
-          "definitionDigest": "7a296e8c2a6acb8061a98db21e1f02c9d1aaac4bb31a352347fba1b7674d1d26"
+          "definitionDigest": "6c498263cabcdba0e773251fec20c176644dab1f943ff78b976954aff73ef265"
         },
         {
           "componentID": "calls",
@@ -145,9 +144,8 @@
     "capture_assessment": {
       "schemaVersion": "capture-assessment/v1",
       "assessmentID": "00000000-0000-4000-8000-000000000161",
-      "planDigest": "aa80b097302f82697f33bbdb9f3a0a894bbfa775c1d1d4509d1c6fcba2309d97",
+      "planDigest": "81ec8e7f3085121334bec8ce027aade7c9ffdfacbd6e748621dd29c4a9579ca8",
       "generatedAt": "2026-10-09T12:00:00Z",
-      "validUntil": "2026-10-09T12:05:00Z",
       "basis": {
         "rulesDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
         "capabilityDigest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",

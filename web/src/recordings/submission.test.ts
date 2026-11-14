@@ -44,9 +44,9 @@ it('an expired save preview never creates a receipt or sends a capture request',
   expect(client.calls).toHaveLength(0); expect(controller.snapshot().stage).toBe('recordings');
 });
 it('history repeat restores only preferences and requires fresh source selection', async () => {
-  const { readFileSync } = await import('node:fs');
+  const { readFileSync, existsSync } = await import('node:fs');
   const name = 'mcp-recording-save-settings-result.json';
-  const saved = JSON.parse(readFileSync(new URL('../../../examples/' + name, import.meta.url), 'utf8'));
+  const saved = JSON.parse(readFileSync(existsSync(new URL('../../../examples/implemented/' + name, import.meta.url)) ? new URL('../../../examples/implemented/' + name, import.meta.url) : new URL('../../../examples/' + name, import.meta.url), 'utf8'));
   saved.data.expires_at = new Date(Date.now() + 60_000).toISOString();
   const client = new SyntheticOperations(); const base = client.responder;
   client.responder = name => name === 'get_capture_settings' ? saved : base(name);

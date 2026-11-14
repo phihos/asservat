@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "browser-settings/v1",
+  "revision": 1,
+  "rootID": "74000000-0000-4000-8000-000000000001",
+  "sessionEpoch": "74000000-0000-4000-8000-000000000002",
+  "issuer": "https://id.example.invalid/realms/engineering",
+  "clientID": "asservat-console",
+  "origin": "https://asservat.example.invalid",
+  "suspended": false,
+  "maxLifetimeSeconds": 28800,
+  "maxLogins": 256,
+  "maxSessions": 2000,
+  "maxLogoutEvents": 4000
+}

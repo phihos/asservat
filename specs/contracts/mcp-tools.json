@@ -136,15 +136,15 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds"
+                      "revision"
                     ]
                   }
                 },
@@ -737,15 +737,15 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds"
+                      "revision"
                     ]
                   }
                 },
@@ -938,15 +938,15 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds"
+                      "revision"
                     ]
                   }
                 },
@@ -1142,15 +1142,15 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds"
+                      "revision"
                     ]
                   }
                 },
@@ -1327,15 +1327,15 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds"
+                      "revision"
                     ]
                   }
                 },
@@ -1576,15 +1576,15 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds"
+                      "revision"
                     ]
                   }
                 },
@@ -1765,15 +1765,15 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds"
+                      "revision"
                     ]
                   }
                 },
@@ -1983,7 +1983,7 @@
                       "query_expires_at": {
                         "type": "string",
                         "format": "date-time",
-                        "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
+                        "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A status read never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
                       }
                     },
                     "required": [
@@ -2018,10 +2018,10 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       },
                       "query_observed_at": {
                         "type": "string",
@@ -2031,12 +2031,12 @@
                       "query_expires_at": {
                         "type": "string",
                         "format": "date-time",
-                        "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
+                        "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A status read never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds",
+                      "revision",
                       "query_observed_at",
                       "query_expires_at"
                     ]
@@ -2668,7 +2668,7 @@
                       "query_expires_at": {
                         "type": "string",
                         "format": "date-time",
-                        "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
+                        "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A status read never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
                       }
                     },
                     "required": [
@@ -2768,10 +2768,10 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       },
                       "query_observed_at": {
                         "type": "string",
@@ -2781,12 +2781,12 @@
                       "query_expires_at": {
                         "type": "string",
                         "format": "date-time",
-                        "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
+                        "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A status read never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds",
+                      "revision",
                       "query_observed_at",
                       "query_expires_at"
                     ]
@@ -2991,7 +2991,7 @@
                       "query_expires_at": {
                         "type": "string",
                         "format": "date-time",
-                        "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
+                        "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A status read never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
                       },
                       "unclassified_packets": {
                         "type": "integer",
@@ -3059,10 +3059,10 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       },
                       "query_observed_at": {
                         "type": "string",
@@ -3072,12 +3072,12 @@
                       "query_expires_at": {
                         "type": "string",
                         "format": "date-time",
-                        "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
+                        "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A status read never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds",
+                      "revision",
                       "query_observed_at",
                       "query_expires_at"
                     ]
@@ -3333,15 +3333,15 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds"
+                      "revision"
                     ]
                   }
                 },
@@ -3536,15 +3536,15 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds"
+                      "revision"
                     ]
                   }
                 },
@@ -3693,7 +3693,7 @@
                       "query_expires_at": {
                         "type": "string",
                         "format": "date-time",
-                        "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
+                        "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A status read never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
                       }
                     },
                     "required": [
@@ -3725,10 +3725,10 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       },
                       "query_observed_at": {
                         "type": "string",
@@ -3738,12 +3738,12 @@
                       "query_expires_at": {
                         "type": "string",
                         "format": "date-time",
-                        "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
+                        "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A status read never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds",
+                      "revision",
                       "query_observed_at",
                       "query_expires_at"
                     ]
@@ -3902,10 +3902,10 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       },
                       "query_observed_at": {
                         "type": "string",
@@ -3915,12 +3915,12 @@
                       "query_expires_at": {
                         "type": "string",
                         "format": "date-time",
-                        "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
+                        "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A status read never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds",
+                      "revision",
                       "query_observed_at",
                       "query_expires_at"
                     ]
@@ -3992,7 +3992,7 @@
     },
     {
       "name": "request_raw_access",
-      "description": "Request independent approval for whole-file downloads, bounded saved-packet queries, or both over selected existing raw artifacts. This creates no collection or disclosure. Current runtime operations are download_artifact and pcap_query. Exact verified sizes, targets, requester/client and the fixed 10000-operation ceiling are reviewed. Query-only output budgets need not cover the whole native file; each paid query page reserves 24 KiB and one operation. Retry an uncertain reply with the same selection and idempotency key; original expiry and spend do not reset.",
+      "description": "Request independent approval for whole-file downloads, bounded saved-packet queries, or both over selected existing raw artifacts. This creates no collection or disclosure. Current runtime operations are download_artifact and pcap_query. Exact verified sizes, targets, requester/client and the fixed 10000-operation ceiling are reviewed. Query-only output budgets need not cover the whole native file; each returned query page is charged at most 24 KiB and one operation. Retry an uncertain reply with the same selection and idempotency key; original expiry and spend do not reset.",
       "enabledByDefault": true,
       "annotations": {
         "readOnlyHint": false,
@@ -4154,15 +4154,15 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds"
+                      "revision"
                     ]
                   }
                 },
@@ -4232,7 +4232,7 @@
     },
     {
       "name": "get_grant",
-      "description": "Read one approval request or grant: exact reviewed configuration, requester/reviewer, original effective expiry and reservations. Ad hoc grants retain personal capture/result-access scope. Team policy grants show their real workload, policy/executor, finite ceilings and spent grant reservations; no personal capture or evidence access is created. Direct policy lookup permits an eligible requester, current reviewer or exact current pinned team manager; other callers receive not available. Shared policy and admission limits remain independently binding. Existing-artifact rawQuery approvals show exact selected files, verified sizes, targets, requesting client and finite download budgets; they authorize no collection.",
+      "description": "Read one approval request or grant: exact reviewed configuration, requester/reviewer, original effective expiry and reservations. Ad hoc grants retain personal capture/result-access scope. Team policy grants show their real workload, policy/executor, finite ceilings and spent grant reservations; no personal capture or evidence access is created. Direct policy lookup permits an eligible requester, current reviewer or exact current pinned team manager; other callers receive not available. Shared policy and admission limits remain independently binding. Existing-artifact rawQuery approvals show exact selected files, verified sizes, targets, requesting client and finite download budgets; they authorize no collection. With after_revision the call waits server-side (at most 30 s) for the next decision or state change.",
       "enabledByDefault": true,
       "annotations": {
         "readOnlyHint": true,
@@ -4246,6 +4246,12 @@
           "grant_id": {
             "type": "string",
             "format": "uuid"
+          },
+          "after_revision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000000,
+            "description": "Wait server-side until the state revision differs from this value or 30 seconds pass, then return the current state. Omit for an immediate read. Status reads are never charged."
           }
         },
         "required": [
@@ -4297,10 +4303,6 @@
                             ]
                           },
                           "capture_id": {
-                            "type": "string",
-                            "format": "uuid"
-                          },
-                          "preview_id": {
                             "type": "string",
                             "format": "uuid"
                           },
@@ -5143,14 +5145,6 @@
                             "type": "boolean",
                             "description": "Advisory current original requester/client collection eligibility under this exact approved grant. Submission rechecks all authority."
                           },
-                          "can_resolve": {
-                            "type": "boolean",
-                            "description": "Advisory original requester/client may recover a possibly accepted request after an approved decision. Never offered for pending or denied review; a missing acceptance closes the original intent."
-                          },
-                          "resume_requires_original_client": {
-                            "type": "boolean",
-                            "description": "Guidance only for the same requesting human on another OAuth client while this marked plan is Approved. It confers no authority or grant transfer."
-                          },
                           "policy": {
                             "type": "object",
                             "additionalProperties": false,
@@ -5234,7 +5228,7 @@
                                 "type": "integer",
                                 "minimum": 0,
                                 "maximum": 1000000000,
-                                "description": "Conservative charged event units, including uncertain observations."
+                                "description": "Charged event units."
                               }
                             },
                             "required": [
@@ -5270,9 +5264,7 @@
                           "approval_navigation_uri",
                           "actions",
                           "capture_deadline_rule",
-                          "can_resume",
-                          "can_resolve",
-                          "resume_requires_original_client"
+                          "can_resume"
                         ],
                         "allOf": [
                           {
@@ -5307,7 +5299,6 @@
                             "then": {
                               "required": [
                                 "capture_id",
-                                "preview_id",
                                 "preview_deadline"
                               ],
                               "properties": {
@@ -5386,12 +5377,6 @@
                                 },
                                 "can_resume": {
                                   "const": false
-                                },
-                                "can_resolve": {
-                                  "const": false
-                                },
-                                "resume_requires_original_client": {
-                                  "const": false
                                 }
                               },
                               "not": {
@@ -5399,11 +5384,6 @@
                                   {
                                     "required": [
                                       "capture_id"
-                                    ]
-                                  },
-                                  {
-                                    "required": [
-                                      "preview_id"
                                     ]
                                   },
                                   {
@@ -5669,12 +5649,6 @@
                           "can_resume": {
                             "const": false
                           },
-                          "can_resolve": {
-                            "const": false
-                          },
-                          "resume_requires_original_client": {
-                            "const": false
-                          },
                           "raw_access": {
                             "type": "object",
                             "additionalProperties": false,
@@ -5898,15 +5872,15 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds"
+                      "revision"
                     ]
                   }
                 },
@@ -6058,10 +6032,6 @@
                                   ]
                                 },
                                 "capture_id": {
-                                  "type": "string",
-                                  "format": "uuid"
-                                },
-                                "preview_id": {
                                   "type": "string",
                                   "format": "uuid"
                                 },
@@ -6453,7 +6423,7 @@
                                       "type": "integer",
                                       "minimum": 0,
                                       "maximum": 1000000000,
-                                      "description": "Conservative charged event units, including uncertain observations."
+                                      "description": "Charged event units."
                                     }
                                   },
                                   "required": [
@@ -6522,7 +6492,6 @@
                                   "then": {
                                     "required": [
                                       "capture_id",
-                                      "preview_id",
                                       "preview_deadline"
                                     ],
                                     "properties": {
@@ -6601,12 +6570,6 @@
                                       },
                                       "can_resume": {
                                         "const": false
-                                      },
-                                      "can_resolve": {
-                                        "const": false
-                                      },
-                                      "resume_requires_original_client": {
-                                        "const": false
                                       }
                                     },
                                     "not": {
@@ -6614,11 +6577,6 @@
                                         {
                                           "required": [
                                             "capture_id"
-                                          ]
-                                        },
-                                        {
-                                          "required": [
-                                            "preview_id"
                                           ]
                                         },
                                         {
@@ -6955,15 +6913,15 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds"
+                      "revision"
                     ]
                   }
                 },
@@ -7140,15 +7098,15 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds"
+                      "revision"
                     ]
                   }
                 },
@@ -7310,15 +7268,15 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds"
+                      "revision"
                     ]
                   }
                 },
@@ -7499,15 +7457,15 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds"
+                      "revision"
                     ]
                   }
                 },
@@ -7715,15 +7673,15 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds"
+                      "revision"
                     ]
                   }
                 },
@@ -8053,7 +8011,7 @@
                       "query_expires_at": {
                         "type": "string",
                         "format": "date-time",
-                        "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
+                        "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A status read never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
                       }
                     },
                     "required": [
@@ -8216,10 +8174,10 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       },
                       "query_observed_at": {
                         "type": "string",
@@ -8229,12 +8187,12 @@
                       "query_expires_at": {
                         "type": "string",
                         "format": "date-time",
-                        "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
+                        "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A status read never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds",
+                      "revision",
                       "query_observed_at",
                       "query_expires_at"
                     ]
@@ -8306,7 +8264,7 @@
     },
     {
       "name": "get_query_result",
-      "description": "Poll a principal-bound query; authorization is checked again before delivery.",
+      "description": "Read a principal-bound query result. The authorization made at query creation is reused under REQ-INT-003. With after_revision the call waits server-side (at most 30 s) until the query completes or changes.",
       "enabledByDefault": true,
       "annotations": {
         "readOnlyHint": true,
@@ -8321,6 +8279,12 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 4096
+          },
+          "after_revision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000000,
+            "description": "Wait server-side until the state revision differs from this value or 30 seconds pass, then return the current state. Omit for an immediate read. Status reads are never charged."
           }
         },
         "required": [
@@ -8365,7 +8329,7 @@
                       "query_expires_at": {
                         "type": "string",
                         "format": "date-time",
-                        "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
+                        "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A status read never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
                       }
                     },
                     "required": [
@@ -8397,10 +8361,10 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       },
                       "query_observed_at": {
                         "type": "string",
@@ -8410,12 +8374,12 @@
                       "query_expires_at": {
                         "type": "string",
                         "format": "date-time",
-                        "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
+                        "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A status read never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds",
+                      "revision",
                       "query_observed_at",
                       "query_expires_at"
                     ]
@@ -8719,15 +8683,15 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds"
+                      "revision"
                     ]
                   }
                 },
@@ -8939,15 +8903,15 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds"
+                      "revision"
                     ]
                   }
                 },
@@ -9134,15 +9098,15 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds"
+                      "revision"
                     ]
                   }
                 },
@@ -9480,15 +9444,15 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds"
+                      "revision"
                     ]
                   }
                 },
@@ -9558,7 +9522,7 @@
     },
     {
       "name": "request_capture",
-      "description": "Disabled by default. Request a recipe-bound capture, optionally sharing its selected results; capture and sharing approvals are independent. A recordingSave preview dispatches only its pinned existing-source snapshots under reviewed policy scope, never the full recipe; the service enforces the preview operation type. For an already accepted preview/key, continue_acquisition:true explicitly attempts the original acquisition under fresh current checks. Ordinary accepted replay and all status/resolution calls remain passive; uncertain or expired original preparation cannot be repeated.",
+      "description": "Disabled by default. Request a recipe-bound capture, optionally sharing its selected results; capture and sharing approvals are independent. Submit either the explicit shape or the reviewed preview request with its expected_plan_digest; a changed plan returns ReviewChanged. A recordingSave preview dispatches only its pinned existing-source snapshots under reviewed policy scope, never the full recipe. A retry with the same idempotency key returns the original capture and never recollects; a different request under that key is Conflict.",
       "enabledByDefault": false,
       "annotations": {
         "readOnlyHint": false,
@@ -9593,17 +9557,320 @@
           "sharing": {
             "$ref": "https://asservat.io/spec/v1/sharing-request.schema.json#/$defs/capture"
           },
-          "preview_id": {
-            "type": "string",
-            "format": "uuid"
-          },
           "result_access": {
             "$ref": "https://asservat.io/spec/v1/investigation-access.schema.json#/$defs/request"
           },
-          "continue_acquisition": {
-            "type": "boolean",
-            "const": true,
-            "description": "Explicitly continue acquisition for an already accepted original preview and request key using current permissions. Omission preserves passive accepted replay. This cannot admit a missing request, create another attempt, renew a start interval, or retry uncertain key preparation."
+          "preview": {
+            "description": "The preview_capture or preview_recording_save request that was reviewed. Submission recomputes its plan.",
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "target_handle": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "target_ref": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "cluster_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "namespace": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 63
+                      },
+                      "kind": {
+                        "enum": [
+                          "Deployment",
+                          "StatefulSet",
+                          "Pod"
+                        ]
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 253
+                      }
+                    },
+                    "required": [
+                      "cluster_id",
+                      "namespace",
+                      "kind",
+                      "name"
+                    ]
+                  },
+                  "diagnostic_handle": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "preset_ref": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "name": {
+                        "enum": [
+                          "incident-context",
+                          "pod-status"
+                        ]
+                      },
+                      "version": {
+                        "const": "v1"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "version"
+                    ]
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  },
+                  "sharing": {
+                    "$ref": "https://asservat.io/spec/v1/sharing-request.schema.json#/$defs/capture"
+                  },
+                  "history_capture_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "repeated_from_capture_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "profile_composition": {
+                    "$ref": "https://asservat.io/spec/v1/capture-composition.schema.json"
+                  },
+                  "result_access": {
+                    "$ref": "https://asservat.io/spec/v1/investigation-access.schema.json#/$defs/request"
+                  },
+                  "requested_retention_seconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 315360000,
+                    "description": "Requested evidence-access lifetime in seconds. Omission uses the administrator default; effective access and managed deletion remain bounded by current retention policy and its deletion budget. History restoration preserves its original request; use a normal edited preview to change it."
+                  },
+                  "history_selection": {
+                    "enum": [
+                      "currentEligiblePod"
+                    ],
+                    "description": "Explicit manual selection when repeating a policy triggeringPod occurrence; the preview selects a current eligible Pod under the original workload identity."
+                  }
+                },
+                "required": [],
+                "oneOf": [
+                  {
+                    "allOf": [
+                      {
+                        "oneOf": [
+                          {
+                            "required": [
+                              "target_handle"
+                            ],
+                            "not": {
+                              "required": [
+                                "target_ref"
+                              ]
+                            }
+                          },
+                          {
+                            "required": [
+                              "target_ref"
+                            ],
+                            "not": {
+                              "required": [
+                                "target_handle"
+                              ]
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "oneOf": [
+                          {
+                            "required": [
+                              "diagnostic_handle"
+                            ],
+                            "not": {
+                              "anyOf": [
+                                {
+                                  "required": [
+                                    "preset_ref"
+                                  ]
+                                },
+                                {
+                                  "required": [
+                                    "profile_composition"
+                                  ]
+                                }
+                              ]
+                            }
+                          },
+                          {
+                            "required": [
+                              "preset_ref"
+                            ],
+                            "not": {
+                              "anyOf": [
+                                {
+                                  "required": [
+                                    "diagnostic_handle"
+                                  ]
+                                },
+                                {
+                                  "required": [
+                                    "profile_composition"
+                                  ]
+                                }
+                              ]
+                            }
+                          },
+                          {
+                            "required": [
+                              "profile_composition"
+                            ],
+                            "not": {
+                              "anyOf": [
+                                {
+                                  "required": [
+                                    "diagnostic_handle"
+                                  ]
+                                },
+                                {
+                                  "required": [
+                                    "preset_ref"
+                                  ]
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    ],
+                    "not": {
+                      "required": [
+                        "history_capture_id"
+                      ]
+                    }
+                  },
+                  {
+                    "required": [
+                      "history_capture_id"
+                    ],
+                    "not": {
+                      "anyOf": [
+                        {
+                          "required": [
+                            "target_handle"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "target_ref"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "diagnostic_handle"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "preset_ref"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "repeated_from_capture_id"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "profile_composition"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "requested_retention_seconds"
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "allOf": [
+                  {
+                    "if": {
+                      "required": [
+                        "history_selection"
+                      ]
+                    },
+                    "then": {
+                      "anyOf": [
+                        {
+                          "required": [
+                            "history_capture_id"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "repeated_from_capture_id"
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "recording_handles": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    },
+                    "minItems": 1,
+                    "maxItems": 16,
+                    "uniqueItems": true
+                  },
+                  "before": {
+                    "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/duration"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512,
+                    "description": "Optional 1\u2013512 Unicode scalars, preserved verbatim. Omit when absent; an explicit empty string is invalid. Descriptive metadata is not restored on repeat."
+                  },
+                  "sharing": {
+                    "$ref": "https://asservat.io/spec/v1/sharing-request.schema.json#/$defs/capture"
+                  },
+                  "repeated_from_capture_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "recording_handles"
+                ]
+              }
+            ]
+          },
+          "expected_plan_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "plan_digest of the reviewed preview. A different recomputed plan returns ReviewChanged with the differences; nothing is accepted."
           }
         },
         "required": [
@@ -9622,12 +9889,12 @@
               "anyOf": [
                 {
                   "required": [
-                    "preview_id"
+                    "preview"
                   ]
                 },
                 {
                   "required": [
-                    "continue_acquisition"
+                    "expected_plan_digest"
                   ]
                 }
               ]
@@ -9635,7 +9902,9 @@
           },
           {
             "required": [
-              "preview_id"
+              "preview",
+              "expected_plan_digest",
+              "idempotency_key"
             ],
             "not": {
               "anyOf": [
@@ -9662,6 +9931,11 @@
                 {
                   "required": [
                     "sharing"
+                  ]
+                },
+                {
+                  "required": [
+                    "result_access"
                   ]
                 }
               ]
@@ -9760,193 +10034,16 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds"
+                      "revision"
                     ]
-                  }
-                },
-                "required": [
-                  "status",
-                  "data"
-                ]
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "status": {
-                    "const": "error"
-                  },
-                  "data": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "properties": {
-                      "code": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 64
-                      },
-                      "message": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 1024
-                      },
-                      "retryable": {
-                        "type": "boolean"
-                      },
-                      "navigation_uri": {
-                        "type": "string",
-                        "format": "uri",
-                        "maxLength": 2048
-                      },
-                      "responsible_role": {
-                        "enum": [
-                          "maintainer",
-                          "approver",
-                          "administrator",
-                          "none"
-                        ]
-                      },
-                      "retry_after_seconds": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 60
-                      }
-                    },
-                    "required": [
-                      "code",
-                      "message",
-                      "retryable"
-                    ]
-                  }
-                },
-                "required": [
-                  "status",
-                  "data"
-                ]
-              }
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "name": "resolve_capture_request",
-      "description": "Resolve an uncertain own reviewed capture request before editing. Returns the already accepted capture or durably closes the unaccepted reviewed request so it cannot later start. Never starts or cancels collection. Use the original preview_id and idempotency_key; retry any unknown reply with that same pair. Requires evidence:read and the same actor/client. Accepted capture metadata additionally requires current original-target read eligibility; closing an own unaccepted request does not disclose or require target metadata. Available while new collection is disabled. A closed result contains no target or effect metadata.",
-      "enabledByDefault": true,
-      "annotations": {
-        "readOnlyHint": false,
-        "destructiveHint": true,
-        "idempotentHint": true,
-        "openWorldHint": false
-      },
-      "inputSchema": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "preview_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "idempotency_key": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 128
-          }
-        },
-        "required": [
-          "preview_id",
-          "idempotency_key"
-        ]
-      },
-      "outputSchema": {
-        "allOf": [
-          {
-            "$ref": "https://asservat.io/spec/v1/mcp-result.schema.json"
-          },
-          {
-            "oneOf": [
-              {
-                "type": "object",
-                "properties": {
-                  "status": {
-                    "const": "ok"
-                  },
-                  "data": {
-                    "oneOf": [
-                      {
-                        "type": "object",
-                        "additionalProperties": false,
-                        "properties": {
-                          "capture_id": {
-                            "type": "string",
-                            "format": "uuid"
-                          },
-                          "phase": {
-                            "const": "Accepted"
-                          },
-                          "navigation_uri": {
-                            "type": "string",
-                            "format": "uri",
-                            "maxLength": 2048
-                          },
-                          "operation": {
-                            "enum": [
-                              "collect",
-                              "recordingSave"
-                            ]
-                          },
-                          "state": {
-                            "const": "accepted"
-                          }
-                        },
-                        "required": [
-                          "state",
-                          "capture_id",
-                          "phase",
-                          "navigation_uri",
-                          "operation"
-                        ]
-                      },
-                      {
-                        "type": "object",
-                        "additionalProperties": false,
-                        "properties": {
-                          "state": {
-                            "const": "closed"
-                          }
-                        },
-                        "required": [
-                          "state"
-                        ]
-                      }
-                    ]
-                  },
-                  "data_class": {
-                    "const": "metadata"
-                  },
-                  "truncated": {
-                    "const": false
-                  },
-                  "next_cursor": {
-                    "type": "null"
-                  },
-                  "narrowing_hint": {
-                    "type": "null"
-                  },
-                  "warnings": {
-                    "type": "array",
-                    "maxItems": 0
-                  },
-                  "provenance": {
-                    "type": "array",
-                    "maxItems": 0
                   }
                 },
                 "required": [
@@ -10150,15 +10247,15 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds"
+                      "revision"
                     ]
                   }
                 },
@@ -10495,15 +10592,15 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds"
+                      "revision"
                     ]
                   }
                 },
@@ -10573,7 +10670,7 @@
     },
     {
       "name": "preview_capture",
-      "description": "Validate and resolve a pod capture without arming sensors, reserving execution authority or reading application evidence. A preview is not permission. Alternatively restore an authorized immutable history_capture_id into a fresh preview, with current checks and no acquisition. A recording-save history entry returns RecordingSelectionRequired; use fresh list_recordings and preview_recording_save instead of compiling a recipe. Optional result_access requests one bounded review of collection and the same human\u2019s selected result inspection/download; never an issued grant.",
+      "description": "Validate and resolve a pod capture without arming sensors, reserving execution authority or reading application evidence. A preview is a dry run: nothing is stored and it is not permission. Submit the same request with request_capture, expected_plan_digest and an idempotency key. Alternatively restore an authorized immutable history_capture_id into a fresh preview, with current checks and no acquisition. A recording-save history entry returns RecordingSelectionRequired; use fresh list_recordings and preview_recording_save instead of compiling a recipe. Optional result_access requests one bounded review of collection and the same human\u2019s selected result inspection/download; never an issued grant.",
       "enabledByDefault": true,
       "annotations": {
         "readOnlyHint": true,
@@ -10863,13 +10960,10 @@
                     "type": "object",
                     "additionalProperties": false,
                     "properties": {
-                      "preview_id": {
+                      "plan_digest": {
                         "type": "string",
-                        "format": "uuid"
-                      },
-                      "expires_at": {
-                        "type": "string",
-                        "format": "date-time"
+                        "pattern": "^[a-f0-9]{64}$",
+                        "description": "Digest of the resolved plan: immutable target UIDs, dependencies and the normalized request. Submit it as request_capture expected_plan_digest."
                       },
                       "execution_digest": {
                         "type": "string",
@@ -11147,8 +11241,7 @@
                       }
                     },
                     "required": [
-                      "preview_id",
-                      "expires_at",
+                      "plan_digest",
                       "execution_digest",
                       "pod_count",
                       "max_bytes",
@@ -11257,15 +11350,15 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds"
+                      "revision"
                     ]
                   }
                 },
@@ -11360,7 +11453,7 @@
     },
     {
       "name": "get_capture",
-      "description": "Poll authorized capture progress and per-action approval/partial outcomes. Case and approval links require authentication and contain no bearer authority. Recording saves explicitly return operation=recordingSave. Result-access status distinguishes saved evidence awaiting grant publication from collection failure.",
+      "description": "Read authorized capture progress and per-action approval/partial outcomes. Case and approval links require authentication and contain no bearer authority. Recording saves explicitly return operation=recordingSave. Result-access status distinguishes saved evidence awaiting grant publication from collection failure. With after_revision the call waits server-side (at most 30 s) for the next change.",
       "enabledByDefault": true,
       "annotations": {
         "readOnlyHint": true,
@@ -11374,6 +11467,12 @@
           "capture_id": {
             "type": "string",
             "format": "uuid"
+          },
+          "after_revision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000000,
+            "description": "Wait server-side until the state revision differs from this value or 30 seconds pass, then return the current state. Omit for an immediate read. Status reads are never charged."
           }
         },
         "required": [
@@ -11513,11 +11612,6 @@
                       "grant_id": {
                         "type": "string",
                         "format": "uuid"
-                      },
-                      "retry_after_seconds": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 60
                       },
                       "can_cancel": {
                         "type": "boolean"
@@ -11691,15 +11785,15 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds"
+                      "revision"
                     ]
                   }
                 },
@@ -11881,15 +11975,15 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds"
+                      "revision"
                     ]
                   }
                 },
@@ -12037,15 +12131,15 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds"
+                      "revision"
                     ]
                   }
                 },
@@ -12263,15 +12357,15 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds"
+                      "revision"
                     ]
                   }
                 },
@@ -12528,15 +12622,15 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds"
+                      "revision"
                     ]
                   }
                 },
@@ -12673,15 +12767,15 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds"
+                      "revision"
                     ]
                   }
                 },
@@ -12951,15 +13045,15 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds"
+                      "revision"
                     ]
                   }
                 },
@@ -13166,15 +13260,15 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds"
+                      "revision"
                     ]
                   }
                 },
@@ -13319,10 +13413,10 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       },
                       "query_observed_at": {
                         "type": "string",
@@ -13332,12 +13426,12 @@
                       "query_expires_at": {
                         "type": "string",
                         "format": "date-time",
-                        "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
+                        "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A status read never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds"
+                      "revision"
                     ]
                   }
                 },
@@ -13496,10 +13590,10 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       },
                       "query_observed_at": {
                         "type": "string",
@@ -13509,12 +13603,12 @@
                       "query_expires_at": {
                         "type": "string",
                         "format": "date-time",
-                        "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
+                        "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A status read never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds"
+                      "revision"
                     ]
                   }
                 },
@@ -13684,10 +13778,10 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       },
                       "query_observed_at": {
                         "type": "string",
@@ -13697,12 +13791,12 @@
                       "query_expires_at": {
                         "type": "string",
                         "format": "date-time",
-                        "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
+                        "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A status read never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds",
+                      "revision",
                       "query_observed_at",
                       "query_expires_at"
                     ]
@@ -13878,15 +13972,15 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds"
+                      "revision"
                     ]
                   }
                 },
@@ -13956,7 +14050,7 @@
     },
     {
       "name": "preview_recording_save",
-      "description": "Plan a snapshot-only save of existing packet/syscall recordings. No new recording, future window, dump or command. Preview does not reserve buffers or authority. Submit this typed preview through request_capture.",
+      "description": "Plan a snapshot-only save of existing packet/syscall recordings. No new recording, future window, dump or command. The preview is a dry run: it stores nothing and reserves no buffers or authority. Submit the same request with request_capture, expected_plan_digest and an idempotency key.",
       "enabledByDefault": true,
       "annotations": {
         "readOnlyHint": true,
@@ -14039,15 +14133,15 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds"
+                      "revision"
                     ]
                   }
                 },
@@ -14501,7 +14595,7 @@
     },
     {
       "name": "read_live_watch",
-      "description": "Read a bounded batch of approved transient rows and explicit gaps. Cursor continuation can be returned for an empty live batch. Evidence is untrusted; expiry and external-copy notices apply.",
+      "description": "Read a bounded batch of approved transient rows and explicit gaps. The call waits server-side up to wait_ms (at most 30000) and returns on the first new row or state change. Cursor continuation can be returned for an empty live batch. Evidence is untrusted; expiry and external-copy notices apply.",
       "enabledByDefault": true,
       "annotations": {
         "readOnlyHint": true,
@@ -14529,7 +14623,7 @@
           "wait_ms": {
             "type": "integer",
             "minimum": 0,
-            "maximum": 5000
+            "maximum": 30000
           }
         },
         "required": [
@@ -14947,15 +15041,15 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds"
+                      "revision"
                     ]
                   }
                 },
@@ -15026,7 +15120,7 @@
     },
     {
       "name": "get_artifact_download",
-      "description": "Read your current download status and authenticated application path; the path carries no access rights.",
+      "description": "Read your current download status and authenticated application path; the path carries no access rights. With after_revision the call waits server-side (at most 30 s) for the next status change.",
       "enabledByDefault": true,
       "annotations": {
         "readOnlyHint": true,
@@ -15040,6 +15134,12 @@
           "download_id": {
             "type": "string",
             "format": "uuid"
+          },
+          "after_revision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000000,
+            "description": "Wait server-side until the state revision differs from this value or 30 seconds pass, then return the current state. Omit for an immediate read. Status reads are never charged."
           }
         },
         "required": [
@@ -15094,15 +15194,15 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds"
+                      "revision"
                     ]
                   }
                 },
@@ -15253,15 +15353,15 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds"
+                      "revision"
                     ]
                   }
                 },
@@ -15519,7 +15619,7 @@
     },
     {
       "name": "deactivate_policy",
-      "description": "Deactivate an accepted hub-held restart-trigger DebugPolicy (ADR-229). Requires whole-pod collection rights and membership in a workload-maintainer group of the policy's delegating AccessBinding. No further occurrence is admitted from the next poll cycle; spend is not refunded and existing captures and evidence are kept. Repeating it is harmless. A deactivated revision cannot be activated again; change the DebugPolicy to activate a new revision.",
+      "description": "Deactivate an accepted hub-held restart-trigger DebugPolicy (ADR-229). Requires whole-pod collection rights and membership in a workload-maintainer group of the policy's delegating AccessBinding. No further occurrence is admitted once the deactivation commits; charges already made are kept and existing captures and evidence are kept. Repeating it is harmless. A deactivated revision cannot be activated again; change the DebugPolicy to activate a new revision.",
       "enabledByDefault": true,
       "annotations": {
         "readOnlyHint": false,
@@ -16042,7 +16142,7 @@
                         "type": "integer",
                         "minimum": 0,
                         "maximum": 1099511627776,
-                        "description": "Conservative native-output reservations shared by this acceptance; uncertain spend remains charged. Not measured bytes."
+                        "description": "Native-output charges shared by this acceptance; a reservation is released when its outcome is known. Not measured bytes."
                       },
                       "max_collected_bytes": {
                         "type": "integer",
@@ -16054,7 +16154,7 @@
                         "type": "integer",
                         "minimum": 0,
                         "maximum": 1099511627776,
-                        "description": "Conservative pre-filter observation charges shared by this acceptance, including uncertain legacy spend. Not collected output."
+                        "description": "Pre-filter observation charges shared by this acceptance. Not collected output."
                       },
                       "max_observed_bytes": {
                         "type": "integer",
@@ -16093,7 +16193,7 @@
                         "type": "integer",
                         "minimum": 0,
                         "maximum": 1000000000,
-                        "description": "Conservative charged event units, including uncertain observations."
+                        "description": "Charged event units."
                       }
                     },
                     "required": [
@@ -16277,7 +16377,7 @@
                           "NoMatchingAllow",
                           "ExplicitDeny",
                           "ClientScopeMissing",
-                          "PermissionObservationStale",
+                          "ClusterNotObserved",
                           "IdentityUnavailable",
                           "AudienceOverflow",
                           "ServiceUnavailable"
@@ -16403,10 +16503,6 @@
                         "type": "integer",
                         "minimum": 0,
                         "maximum": 256
-                      },
-                      "valid_until": {
-                        "type": "string",
-                        "format": "date-time"
                       }
                     },
                     "required": [
@@ -16714,7 +16810,7 @@
                             },
                             "unmet": {
                               "enum": [
-                                "PermissionObservationStale",
+                                "ClusterNotObserved",
                                 "ServiceUnavailable",
                                 "ClusterUnavailable"
                               ]
@@ -16782,7 +16878,7 @@
                               "enum": [
                                 "NoMatchingAllow",
                                 "ExplicitDeny",
-                                "PermissionObservationStale",
+                                "ClusterNotObserved",
                                 "AudienceOverflow",
                                 "ServiceUnavailable",
                                 "DecisionTimeSource"
@@ -16792,7 +16888,7 @@
                               "enum": [
                                 "NoMatchingAllow",
                                 "ExplicitDeny",
-                                "PermissionObservationStale",
+                                "ClusterNotObserved",
                                 "AudienceOverflow",
                                 "ServiceUnavailable",
                                 "DecisionTimeSource"
@@ -17438,112 +17534,6 @@
       }
     },
     {
-      "name": "get_live_capacity",
-      "description": "Read one selected cluster's content-minimized live-view runtime capacity: current active cohorts and cumulative scan/delivery/refused-admission counters, plus report-to-report rates when every current live-enabled node has a valid predecessor. Incomplete rates are explicitly unavailable rather than partial. For fleet operators; no workload, principal, source, filter, row or payload labels are returned and no acquisition occurs.",
-      "enabledByDefault": true,
-      "transports": [
-        "browser"
-      ],
-      "annotations": {
-        "readOnlyHint": true,
-        "destructiveHint": false,
-        "openWorldHint": false
-      },
-      "inputSchema": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "cluster_id": {
-            "type": "string",
-            "format": "uuid"
-          }
-        },
-        "required": [
-          "cluster_id"
-        ]
-      },
-      "outputSchema": {
-        "allOf": [
-          {
-            "$ref": "https://asservat.io/spec/v1/mcp-result.schema.json"
-          },
-          {
-            "oneOf": [
-              {
-                "type": "object",
-                "properties": {
-                  "status": {
-                    "const": "ok"
-                  },
-                  "data": {
-                    "$ref": "https://asservat.io/spec/v1/live-capacity.schema.json"
-                  }
-                },
-                "required": [
-                  "status",
-                  "data"
-                ]
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "status": {
-                    "const": "error"
-                  },
-                  "data": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "properties": {
-                      "code": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 64
-                      },
-                      "message": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 1024
-                      },
-                      "retryable": {
-                        "type": "boolean"
-                      },
-                      "navigation_uri": {
-                        "type": "string",
-                        "format": "uri",
-                        "maxLength": 2048
-                      },
-                      "responsible_role": {
-                        "enum": [
-                          "maintainer",
-                          "approver",
-                          "administrator",
-                          "none"
-                        ]
-                      },
-                      "retry_after_seconds": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 60
-                      }
-                    },
-                    "required": [
-                      "code",
-                      "message",
-                      "retryable"
-                    ]
-                  }
-                },
-                "required": [
-                  "status",
-                  "data"
-                ]
-              }
-            ]
-          }
-        ]
-      }
-    },
-    {
       "name": "preview_retention_change",
       "description": "Preview how proposed EvidenceRetentionPolicy changes would shorten the retention of evidence already stored, before applying them through Kubernetes (ADR-240). Applies the proposal to the latest accepted policies of the hub (no source_cluster_id) or of one cluster's local source exactly as reconciliation will after acceptance, over at most 10,000 retained artifacts whose deletion is not yet due: affected artifacts per cluster and class, how many would become unreadable or due for deletion at once, and the earliest new access end and deletion dates. A longer limit never moves an already bound date. Artifacts for which a newly selected label selector would need historical labels are Unknown, never assumed; clusters whose policy source is not current are listed as incomplete. For fleet operators; it changes nothing: apply the change with kubectl or GitOps.",
       "enabledByDefault": true,
@@ -18094,10 +18084,6 @@
                         "const": "policy"
                       },
                       "capture_id": {
-                        "type": "string",
-                        "format": "uuid"
-                      },
-                      "preview_id": {
                         "type": "string",
                         "format": "uuid"
                       },
@@ -18886,14 +18872,6 @@
                         "type": "boolean",
                         "description": "Advisory current original requester/client collection eligibility under this exact approved grant. Submission rechecks all authority."
                       },
-                      "can_resolve": {
-                        "type": "boolean",
-                        "description": "Advisory original requester/client may recover a possibly accepted request after an approved decision. Never offered for pending or denied review; a missing acceptance closes the original intent."
-                      },
-                      "resume_requires_original_client": {
-                        "type": "boolean",
-                        "description": "Guidance only for the same requesting human on another OAuth client while this marked plan is Approved. It confers no authority or grant transfer."
-                      },
                       "policy": {
                         "type": "object",
                         "additionalProperties": false,
@@ -18977,7 +18955,7 @@
                             "type": "integer",
                             "minimum": 0,
                             "maximum": 1000000000,
-                            "description": "Conservative charged event units, including uncertain observations."
+                            "description": "Charged event units."
                           }
                         },
                         "required": [
@@ -19013,9 +18991,7 @@
                       "approval_navigation_uri",
                       "actions",
                       "capture_deadline_rule",
-                      "can_resume",
-                      "can_resolve",
-                      "resume_requires_original_client"
+                      "can_resume"
                     ],
                     "allOf": [
                       {
@@ -19050,7 +19026,6 @@
                         "then": {
                           "required": [
                             "capture_id",
-                            "preview_id",
                             "preview_deadline"
                           ],
                           "properties": {
@@ -19129,12 +19104,6 @@
                             },
                             "can_resume": {
                               "const": false
-                            },
-                            "can_resolve": {
-                              "const": false
-                            },
-                            "resume_requires_original_client": {
-                              "const": false
                             }
                           },
                           "not": {
@@ -19142,11 +19111,6 @@
                               {
                                 "required": [
                                   "capture_id"
-                                ]
-                              },
-                              {
-                                "required": [
-                                  "preview_id"
                                 ]
                               },
                               {
@@ -19233,15 +19197,15 @@
                         "minLength": 1,
                         "maxLength": 4096
                       },
-                      "retry_after_seconds": {
+                      "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 1000000000
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds"
+                      "revision"
                     ]
                   }
                 },

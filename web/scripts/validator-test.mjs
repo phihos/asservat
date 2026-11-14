@@ -1,12 +1,19 @@
 // Run in native ESM, independently of Vitest's module transformation. A helper
 // that works only in the test runner must fail qualification before packaging.
 import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { validCSRF, validSession } from '../src/generated/validate-auth.js';
 import * as capture from '../src/generated/validate-capture.js';
 import * as projection from '../src/generated/validate-projection.js';
 import * as policy from '../src/generated/validate-policy.js';
 import * as sharing from '../src/generated/validate-sharing.js';
+
+// Examples of the contracts this console implements (scripts/implemented_contracts.py).
+const exampleURL = name => {
+  const implemented = new URL('../../examples/implemented/' + name, import.meta.url);
+  return existsSync(implemented) ? implemented : new URL('../../examples/' + name, import.meta.url);
+};
 
 assert.equal(validCSRF({ csrf_token: 'C'.repeat(43) }), true);
 assert.equal(validCSRF({ csrf_token: '😀'.repeat(257) }), false);
@@ -26,18 +33,18 @@ for (const [file, validator] of [
   ['mcp-resolve-capture-accepted', 'validOutput_resolve_capture_request'],
   ['mcp-resolve-capture-closed', 'validOutput_resolve_capture_request'],
 ]) {
-  const value = JSON.parse(await readFile(new URL('../../examples/' + file + '.json', import.meta.url), 'utf8'));
+  const value = JSON.parse(await readFile(exampleURL(file + '.json'), 'utf8'));
   assert.equal(capture[validator](value), true, file);
   assert.equal(capture[validator]({ ...value, extra: 'unexpected' }), false, file + ' rejects extra field');
 }
 const id = '00000000-0000-4000-8000-000000000008';
-const podStatus = JSON.parse(await readFile(new URL('../../examples/mcp-pod-status-preview-result.json', import.meta.url), 'utf8'));
+const podStatus = JSON.parse(await readFile(exampleURL('mcp-pod-status-preview-result.json'), 'utf8'));
 for (const anchorRule of ['firstAcquisitionOrEarlierSource', 'uploadCompletion', 'previewCreation']) {
   const wrong = structuredClone(podStatus);
   wrong.data.capture_assessment.actions[0].retention.anchorRule = anchorRule;
   assert.equal(capture.validOutput_preview_capture(wrong), false, 'pod-status rejects ' + anchorRule);
 }
-const otherMechanism = JSON.parse(await readFile(new URL('../../examples/mcp-preview-result.json', import.meta.url), 'utf8'));
+const otherMechanism = JSON.parse(await readFile(exampleURL('mcp-preview-result.json'), 'utf8'));
 assert.equal(capture.validOutput_preview_capture(otherMechanism), true, 'manual previews retain their submission-preparation anchor');
 const wrongRecorder = structuredClone(otherMechanism);
 wrongRecorder.data.capture_assessment.actions[0].retention.anchorRule = 'firstAcquisitionOrEarlierSource';
@@ -62,7 +69,7 @@ for (const [file, validator] of [
   ['download-ready', 'validOutput_get_artifact_download'],
   ['download-cancelled', 'validOutput_cancel_artifact_download'],
 ]) {
-  const value = JSON.parse(await readFile(new URL('../../examples/' + file + '.json', import.meta.url), 'utf8'));
+  const value = JSON.parse(await readFile(exampleURL(file + '.json'), 'utf8'));
   assert.equal(evidence[validator](value), true, file);
   assert.equal(evidence[validator]({ ...value, extra: 'unexpected' }), false, file + ' rejects extra field');
 }
@@ -75,24 +82,24 @@ assert.equal(capture.validInput_preview_capture(profilePreview), true, 'profile 
 const arbitraryProfileEdit = structuredClone(profilePreview);
 arbitraryProfileEdit.profile_composition.components[0].overrides[0].field = 'profileURL';
 assert.equal(capture.validInput_preview_capture(arbitraryProfileEdit), false, 'profile duration never opens arbitrary endpoint editing');
-const profileCase = JSON.parse(await readFile(new URL('../../examples/mcp-shared-case-notice-result.json', import.meta.url), 'utf8'));
+const profileCase = JSON.parse(await readFile(exampleURL('mcp-shared-case-notice-result.json'), 'utf8'));
 profileCase.data.artifacts[0].kind = 'profile';
 profileCase.data.artifacts[0].data_class = 'raw';
 assert.equal(evidence.validOutput_get_case(profileCase), true, 'profile case preserves native kind and raw class');
 profileCase.data.artifacts[0].endpoint = 'http://unreviewed.invalid';
 assert.equal(evidence.validOutput_get_case(profileCase), false, 'case metadata does not expose arbitrary endpoint fields');
-const ready = JSON.parse(await readFile(new URL('../../examples/download-ready.json', import.meta.url), 'utf8'));
+const ready = JSON.parse(await readFile(exampleURL('download-ready.json'), 'utf8'));
 delete ready.data.sha256;
 assert.equal(evidence.validOutput_get_artifact_download(ready), false, 'native metadata is an indivisible group');
 console.log('Native ESM case and download validators passed positive and negative checks.');
 
 const nativeFields = ['filename', 'native_format', 'size_bytes', 'sha256', 'etag', 'coverage_notice'];
-const completed = JSON.parse(await readFile(new URL('../../examples/download-ready.json', import.meta.url), 'utf8'));
+const completed = JSON.parse(await readFile(exampleURL('download-ready.json'), 'utf8'));
 completed.data.state = 'Completed'; completed.data.resume_available = false;
 completed.data.expires_at = '2000-01-01T00:00:00Z';
 delete completed.data.content_path;
 for (const field of nativeFields) delete completed.data[field];
-const full = JSON.parse(await readFile(new URL('../../examples/download-ready.json', import.meta.url), 'utf8'));
+const full = JSON.parse(await readFile(exampleURL('download-ready.json'), 'utf8'));
 for (const name of ['prepare_artifact_download', 'get_artifact_download', 'cancel_artifact_download']) {
   const validate = evidence['validOutput_' + name];
   assert.equal(validate(completed), true, name + ' accepts terminal-only Completed after transfer expiry');
@@ -125,7 +132,7 @@ for (const [file, validator] of [
   ['mcp-context-query-pending', 'validOutput_get_query_result'],
   ['mcp-context-query-result', 'validOutput_get_query_result'],
 ]) {
-  const example = JSON.parse(await readFile(new URL('../../examples/' + file + '.json', import.meta.url), 'utf8'));
+  const example = JSON.parse(await readFile(exampleURL(file + '.json'), 'utf8'));
   assert.equal(projection[validator](example), true, file);
   example.data.query_expires_at = 'not-a-date';
   assert.equal(projection[validator](example), false, file + ' invalid query expiry');
@@ -155,7 +162,7 @@ const recordings = await import('../src/generated/validate-recordings.js');
 assert.equal(recordings.validInput_list_recordings({ target_ref: { cluster_id: id, namespace: 'payments', kind: 'Deployment', name: 'api' }, limit: 20 }), true);
 assert.equal(recordings.validInput_preview_recording_save({ recording_handles: ['opaque-source'], before: '10s' }), true);
 for (const extra of [{ after: '5s' }, { t0: '2026-10-30T12:00:00Z' }, { executor: {} }, { recipe: 'core' }]) assert.equal(recordings.validInput_preview_recording_save({ recording_handles: ['opaque-source'], ...extra }), false);
-const saveExample = JSON.parse(await readFile(new URL('../../examples/mcp-recording-save-preview-result.json', import.meta.url), 'utf8'));
+const saveExample = JSON.parse(await readFile(exampleURL('mcp-recording-save-preview-result.json'), 'utf8'));
 assert.equal(recordings.validOutput_preview_recording_save(saveExample), true, 'typed recording-save preview');
 const badSource = structuredClone(saveExample); badSource.data.selected_recordings[0].packet_contents = 'not metadata';
 assert.equal(recordings.validOutput_preview_recording_save(badSource), false, 'recording metadata rejects evidence fields');

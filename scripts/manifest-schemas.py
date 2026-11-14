@@ -4,6 +4,8 @@ import argparse
 import json
 from pathlib import Path
 
+import implemented_contracts
+
 ROOT=Path(__file__).resolve().parents[1]
 SOURCE=ROOT/"specs/contracts"
 PREFIX="https://asservat.io/spec/v1/"
@@ -29,7 +31,7 @@ def main():
                     if x.startswith("#"): continue
                     if not x.startswith(PREFIX): raise ValueError("Nonlocal schema reference")
                     name=x[len(PREFIX):].split("#",1)[0]
-                    if "/" in name or name not in {p.name for p in SOURCE.glob("*.schema.json")}: raise ValueError("Unknown schema")
+                    if "/" in name or name not in implemented_contracts.schema_names(): raise ValueError("Unknown schema")
                     pending.append(name)
                 else: visit(x)
         elif isinstance(v,list):
@@ -37,7 +39,7 @@ def main():
     while pending:
         name=pending.pop()
         if name in graph: continue
-        b=(SOURCE/name).read_bytes();graph[name]=b;visit(json.loads(b))
+        b=implemented_contracts.path(name).read_bytes();graph[name]=b;visit(json.loads(b))
     if args.write:
         dest.mkdir(parents=True,exist_ok=True)
         for name,b in graph.items(): (dest/name).write_bytes(b)

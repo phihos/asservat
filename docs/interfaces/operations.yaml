@@ -421,6 +421,19 @@ operations:
   effect: read
   role: operation-authorized-reader
   contract: docs/interfaces/browser-openapi.yaml
+- operation: stream_status_events
+  path: /api/v1/events
+  transport:
+  - browser
+  effect: read
+  role: signed-in
+  contract: docs/interfaces/browser-openapi.yaml
+- operation: stream_live_watch
+  path: /api/v1/live/watches/{watch_id}/events
+  transport:
+  - browser
+  effect: read
+  contract: specs/contracts/live-watch.schema.json
 - operation: list_live_sources
   path: /api/v1/operations/list_live_sources
   transport:
@@ -484,13 +497,6 @@ operations:
   - http-client
   effect: read
   contract: specs/artifact-downloads.md
-- operation: resolve_capture_request
-  path: /api/v1/operations/resolve_capture_request
-  transport:
-  - browser
-  - mcp
-  effect: command
-  contract: specs/contracts/mcp-tools.json
 - operation: activate_policy
   path: /api/v1/operations/activate_policy
   transport:
@@ -545,13 +551,6 @@ operations:
   - browser
   effect: read
   role: privacy-operator
-  contract: specs/contracts/mcp-tools.json
-- operation: get_live_capacity
-  path: /api/v1/operations/get_live_capacity
-  transport:
-  - browser
-  effect: read
-  role: fleet-operator
   contract: specs/contracts/mcp-tools.json
 - operation: preview_retention_change
   path: /api/v1/operations/preview_retention_change

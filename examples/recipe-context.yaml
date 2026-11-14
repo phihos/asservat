@@ -79,7 +79,6 @@ spec:
         - 5432
         resolution: frozen
         maxEndpoints: 256
-        maxStaleness: 5s
       maxFrozenBytes: 67108864
       maxConcurrentSnapshots: 1
     required: false

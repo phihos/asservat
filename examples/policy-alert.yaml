@@ -16,12 +16,10 @@ spec:
     selection: triggeringPod
     adoption: pinUID
   detectors:
-  # ADR-231: active alerts of the target cluster's configured Alertmanager
-  # (Helm value cluster.alertmanager). An alert counts for a Pod when its
-  # namespace and pod labels name a Pod of the workload and its other labels
-  # match matchLabels. Fires once when such an alert starts; re-arms when
-  # Alertmanager no longer reports a matching alert for the Pod (rearmFor at
-  # most 15s, one poll).
+  # Alertmanager delivers webhooks (send_resolved: true) to the connector's
+  # receiver. An alert counts for a Pod when its namespace and pod labels name
+  # a Pod of the workload and its other labels match matchLabels. Fires once
+  # when such an alert starts; re-arms when Alertmanager reports it resolved.
   - id: errors
     kind: alert
     options:

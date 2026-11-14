@@ -155,7 +155,7 @@ func TestInstructionBoundThroughPlanner(t *testing.T) {
 // program in examples/resolved-recorder-preview.json, so that fixture's
 // execution digest is the one a real hub computes.
 func TestRecorderFixtureProgramPinned(t *testing.T) {
-	b, err := os.ReadFile("../../../examples/resolved-recorder-preview.json")
+	b, err := readImplementedExample("../../../examples/", "resolved-recorder-preview.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -265,4 +265,14 @@ func TestCIDRPeersThroughPlanner(t *testing.T) {
 			t.Errorf("%s: matched %v", name, got)
 		}
 	}
+}
+
+// readImplementedExample reads the example this runtime implements:
+// examples/implemented/ (pre-ADR-330 contracts) when present, otherwise the
+// canonical example.
+func readImplementedExample(dir, name string) ([]byte, error) {
+	if b, err := os.ReadFile(dir + "implemented/" + name); err == nil {
+		return b, nil
+	}
+	return os.ReadFile(dir + name)
 }
