@@ -1,9 +1,9 @@
 // Synthetic metadata only; these helpers are never imported by product code.
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import type { Input, Output, Operations, Operation, Download } from './http';
 export { session } from '../capture/test-fixtures';
 export const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
-const example = (name: string) => JSON.parse(readFileSync(new URL('../../../examples/' + name, import.meta.url), 'utf8'));
+const example = (name: string) => JSON.parse(readFileSync(existsSync(new URL('../../../examples/implemented/' + name, import.meta.url)) ? new URL('../../../examples/implemented/' + name, import.meta.url) : new URL('../../../examples/' + name, import.meta.url), 'utf8'));
 export function caseResult(): Output<'get_case'> {
   const value = example('mcp-shared-case-notice-result.json');
   value.data.case.access = 'ordinary';

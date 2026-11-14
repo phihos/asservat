@@ -1,5 +1,7 @@
 # ADR-239 — Bounded recurring-policy sharing (S-06 increment 8)
 
+> Superseded in part by [ADR-335](335-usable-by-default.md): recurring sharing lasts until its `notAfter` (default 90 days) without weekly renewal, upper limit, required capture count or recipient cap; policies are accepted on apply, not by `activate_policy`.
+
 Date: 2026-10-27. Status: accepted; implemented; qualification below.
 Requirements: REQ-SHR-005 and REQ-SHR-007 (narrowed below), S-06 (TASK-07). Plan:
 `docs/reviews/s06-plan-2026-10-26.md`, §2.3 row "Recurring sharing via SharingIntent registration

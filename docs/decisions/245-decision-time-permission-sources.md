@@ -1,5 +1,7 @@
 # ADR-245 — Decision-time permission sources (pod exec and access review)
 
+> Superseded in part by [ADR-335](335-usable-by-default.md): permission sources name groups by name (`groupName` mode) rather than by stable group ID.
+
 > Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
 
 Date: 2026-10-27. Status: accepted; implemented; qualification below.

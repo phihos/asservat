@@ -1,5 +1,7 @@
 # ADR-236 — Recent captures and Collect again (S-06 increment 6)
 
+> Superseded in part by [ADR-335](335-usable-by-default.md): history keeps the case-metadata period and groups by workload name; Repeat preselects the same policy and actions.
+
 > Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
 
 Date: 2026-10-26. Status: accepted; implemented; qualification below.

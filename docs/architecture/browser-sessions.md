@@ -39,10 +39,9 @@ disclosure, policy execution or approval authority.
    its inactivity timeout (default 24 hours) after the last authenticated
    request; use slides the inactivity deadline (written at most once per
    minute; it rotates no credential), never the maximum.
-5. There is no installation-wide login or session cap; rows are small and
-   login is bounded by the ingress rate limit. A subject keeps at most 32
-   active sessions; a further login evicts that subject's least recently used
-   session. Login, logout and eviction write an audit row in the same
+5. There is no installation-wide or per-user session cap; rows are small,
+   login is bounded by the ingress rate limit and idle sessions end at their
+   inactivity timeout. Login and logout write an audit row in the same
    transaction (ADR-330 D6).
 
 `GET /api/v1/session` returns the subject, username, CSRF token, expiry

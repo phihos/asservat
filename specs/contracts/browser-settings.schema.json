@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://asservat.io/spec/v1/browser-settings.schema.json",
   "title": "Protected browser session settings v1",
-  "description": "Content of browser.json in the Helm-rendered settings ConfigMap. No credentials or public configuration API. The hub watches the ConfigMap; a change applies to new sessions and shortens existing ones to the new maxLifetimeSeconds. Current user permissions remain independently required.",
+  "description": "Content of browser.json in the Helm-rendered settings ConfigMap. No credentials or public configuration API. The hub watches the ConfigMap; a change applies to new sessions and shortens existing ones to the new maxLifetimeSeconds. A session ends at the earlier of creation plus maxLifetimeSeconds and the last authenticated request plus inactivityTimeoutSeconds. There is no login or session cap (ADR-335 D8); expired rows are deleted and login is bounded by the ingress rate limit. Current user permissions remain independently required.",
   "type": "object",
   "additionalProperties": false,
   "properties": {
@@ -12,50 +12,35 @@
     "issuer": {
       "type": "string",
       "format": "uri",
-      "pattern": "^https://",
-      "maxLength": 2048
+      "pattern": "^https://"
     },
     "clientID": {
       "type": "string",
       "minLength": 1,
-      "maxLength": 256,
       "pattern": "^[^\\x00-\\x1f\\x7f]+$"
     },
     "origin": {
       "type": "string",
       "format": "uri",
-      "pattern": "^https://",
-      "maxLength": 2048
+      "pattern": "^https://"
     },
     "maxLifetimeSeconds": {
       "type": "integer",
-      "minimum": 60,
-      "maximum": 86400
+      "minimum": 1,
+      "default": 604800,
+      "description": "Maximum session lifetime from creation; default 7 days. Not capped: the provider's refresh-token lifetime ends a session independently."
     },
-    "maxLogins": {
+    "inactivityTimeoutSeconds": {
       "type": "integer",
       "minimum": 1,
-      "maximum": 10000
-    },
-    "maxSessions": {
-      "type": "integer",
-      "minimum": 1,
-      "maximum": 100000
-    },
-    "maxLogoutEvents": {
-      "type": "integer",
-      "minimum": 1,
-      "maximum": 100000
+      "default": 86400,
+      "description": "Session ends this long after the last authenticated request; default 24 hours. Use slides it, never the maximum."
     }
   },
   "required": [
     "schemaVersion",
     "issuer",
     "clientID",
-    "origin",
-    "maxLifetimeSeconds",
-    "maxLogins",
-    "maxSessions",
-    "maxLogoutEvents"
+    "origin"
   ]
 }

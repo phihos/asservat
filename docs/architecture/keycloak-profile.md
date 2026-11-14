@@ -57,7 +57,7 @@ access at runtime.
 ## Bundled realm
 
 The bundled realm creates the console client, the MCP client and the group
-`/asservat-admins`, which is the default of `identity.administrators`. The
+`/asservat-admins`, which is the default of the Helm value `administrators.groups`. The
 chart creates an initial administrator user named in values, with its password
 read from an existing Secret or generated into one; that user belongs to
 `/asservat-admins`. Administrators create further users in the Keycloak admin

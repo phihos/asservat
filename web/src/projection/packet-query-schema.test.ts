@@ -1,8 +1,8 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
 import { validInput_pcap_query, validOutput_pcap_query } from '../generated/validate-projection';
 
-const example = (name: string) => JSON.parse(readFileSync(new URL('../../../examples/' + name, import.meta.url), 'utf8'));
+const example = (name: string) => JSON.parse(readFileSync(existsSync(new URL('../../../examples/implemented/' + name, import.meta.url)) ? new URL('../../../examples/implemented/' + name, import.meta.url) : new URL('../../../examples/' + name, import.meta.url), 'utf8'));
 
 it.each(['metadata', 'raw'])('accepts the same canonical %s query and primitive page as Go', kind => {
   expect(validInput_pcap_query(example(`mcp-packet-query-${kind}-input.json`))).toBe(true);

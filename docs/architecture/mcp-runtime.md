@@ -62,7 +62,7 @@ Bounds:
 - Concurrency: 1–64 requests per process and 1–4 per principal/client (the
   latter ≤ the former). Capacity stays charged until the handler returns.
   These are local transport limits, not collection or disclosure budgets.
-- Output: buffered to a hard 64 KiB. `preview_recording_save` uses a 256 KiB
+- Output: buffered to a hard 64 KiB. `preview_capture` of a recording save uses a 256 KiB
   frame for its 128 KiB metadata result. Evidence tools enforce their 24 KiB
   default/32 KiB hard structured envelope before this ceiling. Responses are
   `no-store, private`. Native evidence is never returned inline.

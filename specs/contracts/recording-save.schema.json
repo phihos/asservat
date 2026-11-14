@@ -8,12 +8,12 @@
       "additionalProperties": false,
       "properties": {
         "enabled": {
-          "type": "boolean"
+          "type": "boolean",
+          "default": true
         }
       },
-      "required": [
-        "enabled"
-      ]
+      "required": [],
+      "description": "Defaults to true for a policy with ongoing actions (invalid without one). Shown on the policy grant review; not part of the collection execution digest (REQ-SAV-001)."
     },
     "policyRef": {
       "type": "object",
@@ -51,22 +51,24 @@
         "recording_handle": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 128
+          "maxLength": 128,
+          "description": "Opaque, principal-bound handle for preview_capture(recording_handles) and watch_live(action=open, source_handles)."
         },
-        "policy_uid": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 64
+        "owner_kind": {
+          "enum": [
+            "policy",
+            "manualSession"
+          ]
         },
         "policy_name": {
           "type": "string",
           "minLength": 1,
           "maxLength": 253
         },
-        "pod_uid": {
+        "capture_id": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 128
+          "format": "uuid",
+          "description": "Manual-session source: the capture that owns it."
         },
         "pod_name": {
           "type": "string",
@@ -117,6 +119,23 @@
         "save_eligible": {
           "type": "boolean"
         },
+        "save_via": {
+          "enum": [
+            "recordingSave",
+            "captureOutcome",
+            "unavailable"
+          ]
+        },
+        "live_projections": {
+          "type": "array",
+          "items": {
+            "$ref": "https://asservat.io/spec/v1/live-watch.schema.json#/$defs/projection"
+          },
+          "minItems": 0,
+          "maxItems": 3,
+          "uniqueItems": true,
+          "description": "Live projections watch_live can open on this source; empty when live viewing is unavailable."
+        },
         "blockers": {
           "type": "array",
           "items": {
@@ -125,7 +144,8 @@
             "maxLength": 64
           },
           "maxItems": 16,
-          "uniqueItems": true
+          "uniqueItems": true,
+          "description": "Actionable blocker codes, for example NotSaveEnabled, LiveViewDisabled or SourceStopped."
         },
         "incident_pod_cap": {
           "type": "integer",
@@ -141,13 +161,30 @@
           "type": "string",
           "format": "date-time"
         },
+        "hard_end": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Source hard end; watches and saves end by then."
+        },
         "execution_authority": {
           "$ref": "https://asservat.io/spec/v1/policy-authority.schema.json#/$defs/summary"
+        },
+        "policy_uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "description": "Provenance only."
+        },
+        "pod_uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Provenance only."
         }
       },
       "required": [
-        "policy_uid",
-        "pod_uid",
+        "recording_handle",
+        "owner_kind",
         "pod_name",
         "action_id",
         "kind",
@@ -155,10 +192,39 @@
         "history",
         "maximum_before",
         "save_eligible",
+        "save_via",
+        "live_projections",
         "blockers",
         "incident_pod_cap"
       ],
       "allOf": [
+        {
+          "if": {
+            "properties": {
+              "owner_kind": {
+                "const": "policy"
+              }
+            },
+            "required": [
+              "owner_kind"
+            ]
+          },
+          "then": {
+            "required": [
+              "policy_name"
+            ]
+          },
+          "else": {
+            "required": [
+              "capture_id"
+            ],
+            "properties": {
+              "save_eligible": {
+                "const": false
+              }
+            }
+          }
+        },
         {
           "if": {
             "properties": {
@@ -171,9 +237,11 @@
             ]
           },
           "then": {
-            "required": [
-              "recording_handle"
-            ]
+            "properties": {
+              "save_via": {
+                "const": "recordingSave"
+              }
+            }
           }
         }
       ]
@@ -510,7 +578,8 @@
           },
           "minItems": 0,
           "maxItems": 16,
-          "uniqueItems": true
+          "uniqueItems": true,
+          "description": "Blocker codes; NoCurrentSource when a repeated save finds no matching running source (follow navigation_uri to list_recordings)."
         },
         "navigation_uri": {
           "type": "string",

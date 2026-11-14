@@ -1,0 +1,22 @@
+apiVersion: asservat.io/v1alpha1
+kind: PermissionSource
+metadata:
+  name: inherit-pod-exec
+  namespace: asservat-system
+spec:
+  enabled: true
+  clusterID: 00000000-0000-4000-8000-000000000001
+  type: kubernetesExec
+  namespaceSelector:
+    matchLabels:
+      platform.example.invalid/managed: 'true'
+  excludedNamespaces:
+  - kube-system
+  - asservat-system
+  role: workload-maintainer
+  maxDecisionAgeSeconds: 30
+  maxNamespaces: 200
+  identityMappingRef: company-oidc-to-cluster
+  admissionParity:
+    mode: noAdditionalRestrictions
+    reviewRef: platform-review/exec-controls-2026-10

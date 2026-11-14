@@ -1,5 +1,7 @@
 # ADR-253 — Approval step-up sign-in
 
+> Superseded in part by [ADR-335](335-usable-by-default.md): step-up sign-in is optional and off by default (`approvals.stepUp`).
+
 Date: 2026-10-27. Status: implemented; component verification below, real-provider qualification pending.
 Requirements: REQ-AUT-003, REQ-INV-001; TASK-07/08; S-04 increment 12b subset.
 

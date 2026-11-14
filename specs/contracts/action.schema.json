@@ -31,7 +31,6 @@
                   "rollout"
                 ]
               },
-              "maxItems": 5,
               "minItems": 1,
               "uniqueItems": true
             }
@@ -47,7 +46,6 @@
             "minLength": 1,
             "maxLength": 63
           },
-          "maxItems": 16,
           "minItems": 0,
           "uniqueItems": true
         },
@@ -127,7 +125,6 @@
             "minLength": 1,
             "maxLength": 63
           },
-          "maxItems": 16,
           "minItems": 0,
           "uniqueItems": true
         },
@@ -190,7 +187,6 @@
                   "identity"
                 ]
               },
-              "maxItems": 8,
               "minItems": 1,
               "uniqueItems": true
             }
@@ -206,7 +202,6 @@
             "minLength": 1,
             "maxLength": 63
           },
-          "maxItems": 16,
           "minItems": 0,
           "uniqueItems": true
         },
@@ -288,7 +283,6 @@
             "minLength": 1,
             "maxLength": 63
           },
-          "maxItems": 16,
           "minItems": 0,
           "uniqueItems": true
         },
@@ -342,7 +336,6 @@
             "minLength": 1,
             "maxLength": 63
           },
-          "maxItems": 16,
           "minItems": 0,
           "uniqueItems": true
         },
@@ -446,7 +439,6 @@
                   "socketOwners"
                 ]
               },
-              "maxItems": 5,
               "minItems": 1,
               "uniqueItems": true
             }
@@ -462,7 +454,6 @@
             "minLength": 1,
             "maxLength": 63
           },
-          "maxItems": 16,
           "minItems": 0,
           "uniqueItems": true
         },
@@ -551,7 +542,6 @@
             "minLength": 1,
             "maxLength": 63
           },
-          "maxItems": 16,
           "minItems": 0,
           "uniqueItems": true
         },
@@ -611,7 +601,6 @@
             "minLength": 1,
             "maxLength": 63
           },
-          "maxItems": 16,
           "minItems": 0,
           "uniqueItems": true
         },
@@ -766,7 +755,6 @@
             "minLength": 1,
             "maxLength": 63
           },
-          "maxItems": 16,
           "minItems": 0,
           "uniqueItems": true
         },
@@ -814,15 +802,16 @@
               "items": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 4096
+                "maxLength": 131072,
+                "description": "Linux MAX_ARG_STRLEN (131072 bytes) per argument."
               },
-              "maxItems": 64,
               "minItems": 1
             },
             "workingDirectory": {
               "type": "string",
               "minLength": 1,
-              "maxLength": 4096
+              "maxLength": 4096,
+              "description": "Linux PATH_MAX (4096 bytes)."
             },
             "environmentNames": {
               "type": "array",
@@ -831,7 +820,6 @@
                 "minLength": 1,
                 "maxLength": 128
               },
-              "maxItems": 16,
               "minItems": 0,
               "uniqueItems": true
             },
@@ -856,7 +844,6 @@
             "minLength": 1,
             "maxLength": 63
           },
-          "maxItems": 16,
           "minItems": 0,
           "uniqueItems": true
         },
@@ -927,7 +914,6 @@
             "minLength": 1,
             "maxLength": 63
           },
-          "maxItems": 16,
           "minItems": 0,
           "uniqueItems": true
         },
@@ -1010,7 +996,6 @@
             "minLength": 1,
             "maxLength": 63
           },
-          "maxItems": 16,
           "minItems": 0,
           "uniqueItems": true
         },
@@ -1141,7 +1126,7 @@
             "frequencyHz": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 999
+              "maximum": 9007199254740991
             },
             "forceGC": {
               "type": "boolean"
@@ -1306,7 +1291,6 @@
             "minLength": 1,
             "maxLength": 63
           },
-          "maxItems": 16,
           "minItems": 0,
           "uniqueItems": true
         },
@@ -1314,7 +1298,12 @@
           "type": "boolean"
         },
         "impact": {
-          "const": "intrusive"
+          "type": "string",
+          "enum": [
+            "observe",
+            "intrusive"
+          ],
+          "description": "observe for pprof GETs and the eBPF sampler; intrusive for forced GC, sampling changes, traces and attached profilers (ADR-335 D5)."
         },
         "limits": {
           "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/limits"
@@ -1355,7 +1344,6 @@
             "minLength": 1,
             "maxLength": 63
           },
-          "maxItems": 16,
           "minItems": 0,
           "uniqueItems": true
         },
@@ -1471,7 +1459,6 @@
                 "maxLength": 128
               },
               "minItems": 1,
-              "maxItems": 16,
               "uniqueItems": true
             }
           },
@@ -1484,7 +1471,7 @@
         "maxDepth": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 32
+          "maximum": 9007199254740991
         },
         "resolve": {
           "const": "atDispatch"
@@ -1504,12 +1491,12 @@
         "maxProcesses": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 64
+          "maximum": 9007199254740991
         },
         "maxBytesPerProcess": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 8589934592
+          "maximum": 9007199254740991
         },
         "maxStopPerProcess": {
           "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/duration"

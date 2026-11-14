@@ -1,8 +1,9 @@
 // Pure checks of real-driver observation acceptance; no authority or HTTP replay.
 import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { checkInstalledProfileCaseRefreshes as check } from './installed-profile-case-proof.mjs';
-const original = JSON.parse(await readFile(new URL('../../examples/mcp-shared-case-notice-result.json', import.meta.url)));
+const original = JSON.parse(await readFile(new URL(existsSync(new URL('../../examples/implemented/mcp-shared-case-notice-result.json', import.meta.url)) ? '../../examples/implemented/mcp-shared-case-notice-result.json' : '../../examples/mcp-shared-case-notice-result.json', import.meta.url)));
 original.data.case.access = 'ordinary';
 const artifact = original.data.artifacts[0];
 Object.assign(artifact, { kind: 'profile', native_format: 'pprof', data_class: 'raw', profile_acquisition: { requested_type: 'heap', mode: 'snapshot', requested_duration_ms: null, force_gc: false, execution_mode: 'onTrigger', started_at: '2026-10-09T17:50:00.123456Z', completed_at: '2026-10-09T17:50:01.123456Z', clock_uncertainty_ms: null, process_attribution: 'unknown', window_kind: 'httpAcquisition', timestamp_precision: 'microsecond' } });

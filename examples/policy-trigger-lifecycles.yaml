@@ -5,15 +5,9 @@ metadata:
   namespace: payments
 spec:
   target:
-    namespace: payments
     workloadRef:
-      apiVersion: apps/v1
       kind: Deployment
       name: api
-      uid: workload-api-uid
-    maxPods: 1
-    selection: triggeringPod
-    adoption: pinUID
   detectors:
   - id: panic-log
     kind: log
@@ -46,16 +40,12 @@ spec:
     - detector: probe-failed
   recipeRef:
     name: trigger-lifecycles
-    digest: 04448c6faf2374ef3097ace4526fded6dcd152a15f62f74f35656551acf2f4a7
   budgets:
     cooldown: 5m
     burst: 2
     maxOccurrencesPerHour: 12
     maxConcurrentActions: 3
   retention: 72h
-  suspended: false
-  observation:
-    mode: allAuthorized
   evaluation:
     scope: pod
     fireOnActivation: true

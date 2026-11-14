@@ -1,5 +1,7 @@
 # ADR-232 — Concrete evidence share of one stored artifact (S-06 increment 1)
 
+> Superseded in part by [ADR-335](335-usable-by-default.md): recipients and groups are picked by name from the `groups` claim, valid for the token's lifetime; shares last until the evidence's access end with no 7-day cap and no recipient cap.
+
 > Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
 
 Date: 2026-10-26. Status: accepted; implemented; qualification below. Amended the same day by

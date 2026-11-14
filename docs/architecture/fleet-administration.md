@@ -7,8 +7,12 @@ is no public permission CRUD API.
 
 ## Fleet settings
 
-`fleet.json` follows [fleet-settings/v1](../../specs/contracts/fleet-settings.schema.json)
-([example](../../examples/fleet-settings.json)). The Helm chart renders it into a
+[ADR-335](../decisions/335-usable-by-default.md) D14 removes the separate fleet
+operator list: administrators (`identity.administrators`) enroll clusters, and
+the canonical fleet-settings contract is deleted. The runtime still reads the
+earlier `fleet.json`, described below
+([implemented schema](../../specs/contracts/implemented/fleet-settings.schema.json),
+[example](../../examples/implemented/fleet-settings.json)). The Helm chart renders it into a
 ConfigMap in the Asservat namespace. It declares:
 
 - the installation and issuer epoch, and a monotonic revision;

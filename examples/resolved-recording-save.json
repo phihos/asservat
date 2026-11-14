@@ -18,7 +18,7 @@
     "clusterID": "00000000-0000-4000-8000-000000000001",
     "namespaceUID": "namespace-payments-uid",
     "policyUID": "policy-trigger-lifecycles-uid",
-    "executionDigest": "fa9e4f0a03e4f48858dac605353f44623f3bafa509f31986cd8179fb892774db"
+    "executionDigest": "69934be76c88bd1397d16867f9033de5aac4e4915276a01f9e8c8e697c52f4cf"
   },
   "workloadUID": "workload-api-uid",
   "sources": [

@@ -33,20 +33,20 @@ These files illustrate the proposed API. CRD examples cannot be installed until 
 | [Intrusive recipe](recipe-intrusive.yaml) | Typed runtime diagnostic, argv-based custom command and a dependent live core |
 | [Pprof recipe](recipe-pprof.yaml) | Go CPU, heap and mutex profiles from a named container-local endpoint, without forced GC |
 | [Pprof template binding](recipe-pprof-template.yaml) | Reuse an administrator endpoint template with an app-declared named port |
-| [Pprof policy](policy-pprof.yaml) | Sustained CPU quota use triggers profiling; its separate policy grant must be approved before execution |
+| [Pprof policy](policy-pprof.yaml) | Sustained CPU quota use triggers pprof reads; they are `observe`, so the policy runs on apply without a grant (ADR-335 D5) |
 | [Profile metadata](profile-metadata.json) | Original format, sample types/units, duration, period and symbol coverage |
 | [MCP HTTP headers](mcp-http-headers-result.json) | Bounded allowlisted HTTP response fields, no body, incomplete-flow coverage |
 | [MCP profile result](mcp-profile-result.json) | Bounded CPU hotspots with explicit units and incomplete-symbol warnings |
-| [StatefulSet policy](policy-statefulset.yaml) | Ordinal-scoped sustained-memory trigger with a policy grant |
-| [Approved policy grant](grant-policy.yaml) | Second-person approval bound to resolved collection/recipe digests and an aggregate budget |
-| [Manual capture](capture-manual.yaml) | Separate ad hoc request referencing a required individual grant; its supplied pending grant cannot authorize execution |
+| [StatefulSet policy](policy-statefulset.yaml) | Ordinal-scoped sustained-memory trigger; its intrusive actions open a policy review on apply. The optional `uid` with `adoption: pinUID` shows opting out of following the name |
+| [Approved policy grant](grant-policy.yaml) | Approval the hub attached to the policy, bound to the resolved collection/recipe digests, renewable in place |
+| [Manual capture](capture-manual.yaml) | Ad hoc request naming its workload and recipe; no UID, digest, grant, idempotency key or deadline. Its approval, when required, submits it |
 | [Extract share](share-extract.yaml) | Otherwise ineligible group within the organization gets a snapshot of existing extracts; no future artifacts or re-sharing |
 | [Pending raw grant](grant-raw-pending.yaml) | A raw request does not grant access; the extract share above does not cover its separate core artifact |
 | [Manifest](manifest.json) | Detailed encrypted-manifest plaintext shape, access/privacy provenance, inherited expiry/deletion deadlines and explicit completeness |
 | [MCP result](mcp-backtrace-result.json) | Structured bounded backtrace result with provenance |
 | [CloudEvent](case-event.json) | Identifier-only notification with authenticated evidence URI |
 
-The validator recomputes recipe digests and explicit resolved collection-scope digests from compact JSON with sorted keys and UTF-8 encoding. Submission, collection and sharing identities are distinct under [execution identity](../specs/execution.md). Production canonicalization must additionally normalize defaults and Kubernetes quantities before hashing; quantities in these portable examples are already explicit integer bytes/duration strings.
+Authored examples name workloads and recipes (ADR-335 D4); the validator resolves them like the hub (defaults, recipe digest by name) and compares the result with the resolved collection-scope fixtures, whose digests it recomputes from compact JSON with sorted keys and UTF-8 encoding. Submission, collection and sharing identities are distinct under [execution identity](../specs/execution.md). Production canonicalization must additionally normalize defaults and Kubernetes quantities before hashing; quantities in these portable examples are already explicit integer bytes/duration strings.
 
 Permission-source review, guard and identity-mapping references are synthetic placeholders; setting `enabled: true` does not make them qualified. The Namespace example validates only a bounded metadata shape, not the full Kubernetes API. Generated CRDs/admission/status and preset resolution remain implementation deliverables. Permission configuration has no separate HTTP CRUD API. Preset examples pin catalog versions; they need no manually calculated recipe digest.
 

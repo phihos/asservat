@@ -6,7 +6,7 @@ the same path; the mechanism supplies its native format.
 
 ## Prepare
 
-`prepare_artifact_download` carries an idempotency key bound to the exact
+`download_artifact(action=prepare)` carries an idempotency key bound to the exact
 artifact. One authorization per operation ([ADR-311](../decisions/311-operation-authority-recheck.md))
 covers identity, whole-pod download rights, retained audience, stored
 retention deadlines and environment restrictions. The artifact locator gives
@@ -29,7 +29,7 @@ filename. No Job, certificate or key slot is created per download.
 Session state changes (Preparing, Ready, Streaming, Interrupted, Completed,
 Cancelled, Failed, Denied, Expired) are written to SQL and signalled with
 `NOTIFY`. The console receives them over its SSE stream; MCP
-`get_artifact_download` waits server-side up to 30 s and returns on the first
+`download_artifact(action=status)` waits server-side up to 30 s and returns on the first
 change. Clients do not repeat prepare requests to make progress.
 
 Status reads are MVCC selects under the operation's authorization. The reader

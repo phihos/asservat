@@ -6,10 +6,6 @@
     "read_memory",
     "download_artifact"
   ],
-  "clientIDs": [
-    "asservat-browser",
-    "developer-agent"
-  ],
   "maxArtifacts": 2,
   "maxBytes": 6442450944,
   "maxOperations": 20,

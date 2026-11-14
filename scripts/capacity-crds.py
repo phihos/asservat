@@ -33,7 +33,7 @@ def single(value):
     return value
 
 def pool():
-    raw=single(json.loads((ROOT/'specs/contracts/storage-pool.schema.json').read_text())['properties']['spec'])
+    raw=single(json.loads(implemented_contracts.path('storage-pool.schema.json').read_text())['properties']['spec'])
     assert raw['properties']['protectedAllocations'].pop('uniqueItems') is True
     body=base.structural(raw)
     body['properties']['protectedAllocations']['x-kubernetes-list-type']='map'

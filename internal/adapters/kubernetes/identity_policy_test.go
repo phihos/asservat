@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"os"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -16,7 +15,7 @@ import (
 
 func identitySettingsFixture(t *testing.T) map[string]any {
 	t.Helper()
-	b, err := os.ReadFile("../../../examples/identity-settings.json")
+	b, err := readImplementedExample("../../../examples/", "identity-settings.json")
 	if err != nil {
 		t.Fatal(err)
 	}

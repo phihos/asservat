@@ -122,12 +122,12 @@ access.
 the default audience for a new capture. `Evaluator.ContextEligibility` returns
 caller eligibility and, separately, the complete default audience from the same
 projection: all current reader, maintainer and owner assignments for the
-target, excluding approver-only assignments and denied subjects, with at most
-256 entries and no truncation. It performs no artifact lookup or acquisition.
+target, excluding approver-only assignments and denied subjects, complete and
+without truncation. It performs no artifact lookup or acquisition.
 
 Read checks may evaluate a larger current projection before intersecting it with
 the artifact's audience, so assignments added later never block an existing
-reader. A stored artifact keeps at most 256 audience entries.
+reader. A stored artifact keeps its complete audience.
 
 Raw operations, shares, approvals, optional step-up authentication, collection
 ceilings, capacity, execution, audit and disclosure are composed by their own

@@ -1,0 +1,25 @@
+apiVersion: asservat.io/v1alpha1
+kind: PermissionSource
+metadata:
+  name: inherit-workload-management
+  namespace: asservat-system
+spec:
+  enabled: false
+  clusterID: 00000000-0000-4000-8000-000000000001
+  type: kubernetesAccessReview
+  namespaceSelector:
+    matchLabels:
+      platform.example.invalid/managed: 'true'
+  excludedNamespaces:
+  - kube-system
+  - asservat-system
+  role: workload-maintainer
+  maxDecisionAgeSeconds: 30
+  maxNamespaces: 200
+  identityMappingRef: company-oidc-to-cluster
+  admissionParity:
+    mode: qualifiedAdapter
+    reviewRef: platform-review/workload-management-2026-10
+    adapterRef: workload-change-guard
+  accessReview:
+    check: workloadPatch

@@ -3,7 +3,6 @@ package planning
 import (
 	"bytes"
 	"encoding/json"
-	"os"
 	"testing"
 	"time"
 
@@ -33,7 +32,7 @@ func TestContextScopeCrossLanguageFixture(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, err := os.ReadFile("../../../examples/resolved-context-scope.json")
+	b, err := readImplementedExample("../../../examples/", "resolved-context-scope.json")
 	if err != nil {
 		t.Fatal(err)
 	}

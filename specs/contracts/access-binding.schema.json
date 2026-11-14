@@ -28,10 +28,9 @@
         "subjects": {
           "type": "array",
           "items": {
-            "$ref": "https://asservat.io/spec/v1/permission-common.schema.json#/$defs/subject"
+            "$ref": "https://asservat.io/spec/v1/permission-common.schema.json#/$defs/bindingSubject"
           },
           "minItems": 1,
-          "maxItems": 32,
           "uniqueItems": true
         },
         "roles": {
@@ -40,7 +39,6 @@
             "$ref": "https://asservat.io/spec/v1/permission-common.schema.json#/$defs/role"
           },
           "minItems": 1,
-          "maxItems": 4,
           "uniqueItems": true
         },
         "workloads": {
@@ -49,7 +47,6 @@
             "$ref": "https://asservat.io/spec/v1/permission-common.schema.json#/$defs/workloadRef"
           },
           "minItems": 1,
-          "maxItems": 64,
           "uniqueItems": true
         },
         "notAfter": {
@@ -59,7 +56,7 @@
         "reason": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 512
+          "description": "Optional."
         },
         "automation": {
           "$ref": "https://asservat.io/spec/v1/policy-authority.schema.json#/$defs/envelope"
@@ -68,8 +65,7 @@
       "required": [
         "effect",
         "subjects",
-        "roles",
-        "reason"
+        "roles"
       ],
       "allOf": [
         {
@@ -100,7 +96,8 @@
             }
           }
         }
-      ]
+      ],
+      "description": "Lists are not capped: the Kubernetes object size limit (about 1.5 MiB) bounds them; roles are bounded by their enum and uniqueItems."
     },
     "status": {
       "$ref": "https://asservat.io/spec/v1/permission-common.schema.json#/$defs/status"

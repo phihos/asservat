@@ -14,7 +14,7 @@ spec:
     workloadUID: workload-ledger-uid
     recipeDigest: 5a5eff2029e270d2ec764af201abcb29dfaa0305071797ffca2ef784a788af43
     policyUID: policy-ledger-memory-uid
-    executionDigest: 127313099fe43d953ffa3fe105c810c1de91122cdc8b80705fd91ac667e830b3
+    executionDigest: dfe4ed17b7bce98b4e593b02a4db350201bfe85aba16f3c03d3595bcbf614989
   operations:
   - runtimeDiagnostic
   - command
@@ -70,3 +70,4 @@ status:
   spentBytes: 0
   executionsSpent: 0
   executionsReserved: 0
+  renewalDue: false

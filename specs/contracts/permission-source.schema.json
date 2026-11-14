@@ -21,9 +21,10 @@
         "enabled": {
           "type": "boolean"
         },
-        "clusterID": {
+        "cluster": {
+          "description": "Name of the cluster the source derives access in (ADR-335 D4).",
           "type": "string",
-          "format": "uuid"
+          "pattern": "^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?$"
         },
         "type": {
           "type": "string",
@@ -44,21 +45,16 @@
             "minLength": 1,
             "maxLength": 63
           },
-          "maxItems": 64,
-          "uniqueItems": true
+          "uniqueItems": true,
+          "description": "Namespace names (DNS label, 63 characters). Not capped: the Kubernetes object size limit (about 1.5 MiB in etcd) bounds this list."
         },
         "role": {
           "$ref": "https://asservat.io/spec/v1/permission-common.schema.json#/$defs/role"
         },
-        "maxDecisionAgeSeconds": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 60
-        },
         "maxNamespaces": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 1000
+          "description": "Optional administrator bound on granted namespaces; omitted means unbounded."
         },
         "protection": {
           "$ref": "https://asservat.io/spec/v1/permission-common.schema.json#/$defs/protection"
@@ -71,8 +67,7 @@
         },
         "identityMappingRef": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 63
+          "minLength": 1
         },
         "admissionParity": {
           "type": "object",
@@ -87,18 +82,15 @@
             },
             "reviewRef": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 256
+              "minLength": 1
             },
             "adapterRef": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 63
+              "minLength": 1
             }
           },
           "required": [
-            "mode",
-            "reviewRef"
+            "mode"
           ],
           "allOf": [
             {
@@ -145,13 +137,9 @@
       },
       "required": [
         "enabled",
-        "clusterID",
+        "cluster",
         "type",
-        "namespaceSelector",
-        "excludedNamespaces",
-        "role",
-        "maxDecisionAgeSeconds",
-        "maxNamespaces"
+        "role"
       ],
       "allOf": [
         {
@@ -195,15 +183,6 @@
               "identityMappingRef",
               "admissionParity"
             ],
-            "properties": {
-              "role": {
-                "type": "string",
-                "enum": [
-                  "evidence-reader",
-                  "workload-maintainer"
-                ]
-              }
-            },
             "not": {
               "anyOf": [
                 {

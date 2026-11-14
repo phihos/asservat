@@ -5,14 +5,9 @@ metadata:
   namespace: payments
 spec:
   target:
-    namespace: payments
     workloadRef:
-      apiVersion: apps/v1
       kind: Deployment
       name: api
-    maxPods: 1
-    selection: triggeringPod
-    adoption: pinUID
   detectors:
   - id: panic-log
     kind: log
@@ -49,9 +44,6 @@ spec:
     maxOccurrencesPerHour: 12
     maxConcurrentActions: 3
   retention: 72h
-  suspended: false
-  observation:
-    mode: allAuthorized
   evaluation:
     scope: pod
     fireOnActivation: true

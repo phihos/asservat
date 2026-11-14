@@ -29,14 +29,14 @@ Sensitivity and impact are independent. A read-only file can contain a credentia
 
 [Capture profiles](capture-profiles.md) compile versioned reusable building blocks into this same recipe model; there is no separate executor or approval path.
 
-A recipe resolves into source arming plus an incident graph. Ongoing sources have no dependsOn edges; incoming dependencies from onTrigger actions wait for their incident snapshots. A recipe MUST be an acyclic graph of at most 16 typed actions with explicit IDs, dependencies and required/optional flags. Byte limits and timeouts default from the tables below. Impact is derived from the action kind and its parameters; an authored `impact` may only raise it, never lower it. Defaults run independent snapshots in parallel, then costly diagnostics; two actions that pause the same process MUST serialize. Never delay all light evidence waiting for a heap dump. Before expensive acquisition, reserve the resources and storage defined in [capacity](capacity.md); grants alone cannot authorize work that lacks safe capacity.
+A recipe resolves into source arming plus an incident graph. Ongoing sources have no dependsOn edges; incoming dependencies from onTrigger actions wait for their incident snapshots. A recipe MUST be an acyclic graph of typed actions (no count cap; capacity admission bounds their cost) with explicit IDs, dependencies and required/optional flags. Byte limits and timeouts default from the tables below. Impact is derived from the action kind and its parameters; an authored `impact` may only raise it, never lower it. Defaults run independent snapshots in parallel, then costly diagnostics; two actions that pause the same process MUST serialize. Never delay all light evidence waiting for a heap dump. Before expensive acquisition, reserve the resources and storage defined in [capacity](capacity.md); grants alone cannot authorize work that lacks safe capacity.
 
 Every action MUST end in `Succeeded`, `Partial`, `Skipped`, `Denied`, `TimedOut`, `Failed`, `TargetGone`, `Unsupported` or `Indeterminate`, with reason and timing. Failed optional actions do not discard successful artifacts. A capture MUST distinguish a partial action set from fully successful collection. An intrusive action with unknown execution outcome MUST NOT be retried automatically.
 
 ### Finite logs implementation contract (ADR-308)
 
 [ADR-308](../docs/decisions/308-finite-whole-pod-logs.md) defines finite whole-pod
-API logs, raw saved `get_logs` pages and native JSONL. Current/available previous
+API logs, raw saved `get_extract(view=logs)` pages and native JSONL. Current/available previous
 regular/init/ephemeral sources share aggregate action limits. Portable stream
 provenance is combined; exact stdout/stderr selection is Unsupported without
 qualified split capability. Preserve original bytes, nullable source timestamps,

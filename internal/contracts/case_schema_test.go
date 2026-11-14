@@ -2,7 +2,6 @@ package contracts
 
 import (
 	"encoding/json"
-	"os"
 	"strings"
 	"testing"
 )
@@ -21,7 +20,7 @@ func TestCaseSchemaIsOnlyTheQualifiedOrdinaryPodStatusProjection(t *testing.T) {
 			t.Fatal("invalid input admitted", bad)
 		}
 	}
-	sample, err := os.ReadFile("../../examples/mcp-shared-case-notice-result.json")
+	sample, err := readImplementedExample("../../examples/", "mcp-shared-case-notice-result.json")
 	if err != nil {
 		t.Fatal(err)
 	}

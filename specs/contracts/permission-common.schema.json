@@ -30,8 +30,7 @@
         },
         "id": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 256
+          "minLength": 1
         }
       },
       "required": [
@@ -47,12 +46,14 @@
         "name": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 63
+          "maxLength": 63,
+          "description": "Kubernetes namespace name (DNS label)."
         },
         "uid": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 64
+          "maxLength": 64,
+          "description": "Kubernetes UID (a UUID; 64 characters leaves room for its textual forms)."
         }
       },
       "required": [
@@ -74,19 +75,21 @@
         "name": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 253
+          "maxLength": 253,
+          "description": "Kubernetes object name (DNS subdomain)."
         },
         "uid": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 64
+          "maxLength": 64,
+          "description": "Kubernetes UID (a UUID; 64 characters leaves room for its textual forms)."
         }
       },
       "required": [
         "kind",
-        "name",
-        "uid"
-      ]
+        "name"
+      ],
+      "description": "Workload by kind and name; a recreated workload of the same name keeps its access. Optional uid pins one instance."
     },
     "selector": {
       "type": "object",
@@ -99,7 +102,7 @@
             "minLength": 1,
             "maxLength": 63
           },
-          "maxProperties": 16
+          "description": "Label values are at most 63 characters (Kubernetes label syntax). Not capped: the Kubernetes object size limit (about 1.5 MiB in etcd) bounds this list."
         }
       },
       "required": [
@@ -119,35 +122,17 @@
         },
         "reviewRef": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 256
+          "minLength": 1
         },
         "guardRef": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 256
+          "minLength": 1
         }
       },
       "required": [
-        "mode",
-        "reviewRef"
+        "mode"
       ],
-      "allOf": [
-        {
-          "if": {
-            "properties": {
-              "mode": {
-                "const": "admissionEnforced"
-              }
-            }
-          },
-          "then": {
-            "required": [
-              "guardRef"
-            ]
-          }
-        }
-      ]
+      "description": "administratorManaged: the source itself is the administrator's statement. admissionEnforced: the Helm-rendered label ValidatingAdmissionPolicy protects the keys. reviewRef and guardRef are optional notes."
     },
     "metadataMapping": {
       "type": "object",
@@ -163,40 +148,43 @@
         "key": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 253
+          "maxLength": 253,
+          "description": "Kubernetes label or annotation key (at most 253 characters)."
         },
         "mode": {
           "type": "string",
           "enum": [
-            "groupID",
+            "groupName",
             "valueMap"
           ]
         },
         "issuer": {
           "type": "string",
-          "format": "uri"
+          "format": "uri",
+          "description": "Defaults to the installation's issuer."
         },
         "values": {
           "type": "object",
-          "maxProperties": 128,
           "additionalProperties": {
             "type": "array",
             "items": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 256
+              "minLength": 1
             },
             "minItems": 1,
-            "maxItems": 16,
             "uniqueItems": true
           }
+        },
+        "prefix": {
+          "description": "groupName mode: prepended to the value (label values cannot contain /).",
+          "type": "string",
+          "minLength": 1
         }
       },
       "required": [
         "field",
         "key",
-        "mode",
-        "issuer"
+        "mode"
       ],
       "allOf": [
         {
@@ -215,6 +203,11 @@
               "values": {
                 "minProperties": 1
               }
+            },
+            "not": {
+              "required": [
+                "prefix"
+              ]
             }
           },
           "else": {
@@ -254,10 +247,8 @@
           "type": "array",
           "items": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 256
-          },
-          "maxItems": 16
+            "minLength": 1
+          }
         }
       },
       "required": [
@@ -272,12 +263,12 @@
         "namespaceUID": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 64
+          "maxLength": 64,
+          "description": "Kubernetes namespace UID."
         },
         "assignments": {
           "type": "array",
           "minItems": 1,
-          "maxItems": 32,
           "uniqueItems": true,
           "items": {
             "type": "object",
@@ -293,13 +284,15 @@
                 "type": "string",
                 "enum": [
                   "AccessBinding",
+                  "ClusterAccessBinding",
                   "PermissionSource"
                 ]
               },
               "basisUID": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 64
+                "maxLength": 64,
+                "description": "Kubernetes UID of the basis object."
               },
               "basisDigest": {
                 "type": "string",
@@ -324,6 +317,44 @@
       "required": [
         "namespaceUID",
         "assignments"
+      ]
+    },
+    "clusterRole": {
+      "description": "Roles a ClusterAccessBinding may grant; privacy-operator only in the hub cluster.",
+      "type": "string",
+      "enum": [
+        "evidence-reader",
+        "workload-maintainer",
+        "evidence-owner",
+        "action-approver",
+        "privacy-operator"
+      ]
+    },
+    "bindingSubject": {
+      "description": "Authored subject (ADR-335 D4): a user by username, a group by the name the provider emits (for example /payments) or a workload identity. issuer defaults to the installation's issuer.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "User",
+            "Group",
+            "Workload"
+          ]
+        },
+        "issuer": {
+          "type": "string",
+          "format": "uri"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "kind",
+        "id"
       ]
     }
   }

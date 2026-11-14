@@ -35,7 +35,6 @@
             ]
           },
           "minItems": 0,
-          "maxItems": 10,
           "uniqueItems": true
         },
         "explanation": {
@@ -102,7 +101,6 @@
             ]
           },
           "minItems": 0,
-          "maxItems": 7,
           "uniqueItems": true
         },
         "transientOnly": {
@@ -119,7 +117,6 @@
             ]
           },
           "minItems": 0,
-          "maxItems": 7,
           "uniqueItems": true
         },
         "unknownContent": {
@@ -191,17 +188,17 @@
         "accessAgeSeconds": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 315360000
+          "maximum": 9007199254740991
         },
         "maximumAgeSeconds": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 315360000
+          "maximum": 9007199254740991
         },
         "deletionBudgetSeconds": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 86400
+          "maximum": 9007199254740991
         },
         "policyDigests": {
           "type": "array",
@@ -209,7 +206,6 @@
             "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/hash"
           },
           "minItems": 1,
-          "maxItems": 64,
           "uniqueItems": true
         },
         "automaticDeletion": {
@@ -228,7 +224,7 @@
         "deleteAgeSeconds": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 315360000
+          "maximum": 9007199254740991
         }
       },
       "required": [
@@ -436,12 +432,12 @@
             "observationPods": {
               "type": "integer",
               "minimum": 0,
-              "maximum": 1000
+              "maximum": 9007199254740991
             },
             "incidentPods": {
               "type": "integer",
               "minimum": 0,
-              "maximum": 100
+              "maximum": 9007199254740991
             }
           },
           "required": [
@@ -483,8 +479,7 @@
                 "items": {
                   "$ref": "https://asservat.io/spec/v1/capture-assessment.schema.json#/$defs/quantity"
                 },
-                "minItems": 0,
-                "maxItems": 4
+                "minItems": 0
               },
               "recording_handle": {
                 "type": "string",
@@ -502,16 +497,14 @@
               "quantities"
             ]
           },
-          "minItems": 1,
-          "maxItems": 16
+          "minItems": 1
         },
         "combinedQuantities": {
           "type": "array",
           "items": {
             "$ref": "https://asservat.io/spec/v1/capture-assessment.schema.json#/$defs/quantity"
           },
-          "minItems": 0,
-          "maxItems": 16
+          "minItems": 0
         },
         "interactions": {
           "type": "array",
@@ -527,7 +520,6 @@
                   "maxLength": 63
                 },
                 "minItems": 1,
-                "maxItems": 16,
                 "uniqueItems": true
               },
               "kind": {
@@ -554,8 +546,7 @@
               "blocking"
             ]
           },
-          "minItems": 0,
-          "maxItems": 16
+          "minItems": 0
         },
         "alternatives": {
           "type": "array",
@@ -571,7 +562,6 @@
                   "maxLength": 63
                 },
                 "minItems": 1,
-                "maxItems": 16,
                 "uniqueItems": true
               },
               "change": {
@@ -604,8 +594,7 @@
               "coverageLoss"
             ]
           },
-          "minItems": 0,
-          "maxItems": 8
+          "minItems": 0
         },
         "handlingCodes": {
           "type": "array",
@@ -620,7 +609,6 @@
             ]
           },
           "minItems": 6,
-          "maxItems": 6,
           "uniqueItems": true
         },
         "handlingPolicyRef": {
@@ -665,7 +653,6 @@
             ]
           },
           "minItems": 0,
-          "maxItems": 7,
           "uniqueItems": true
         },
         "expiresAt": {
@@ -708,7 +695,6 @@
             ]
           },
           "minItems": 6,
-          "maxItems": 6,
           "uniqueItems": true
         },
         "preservationException": {

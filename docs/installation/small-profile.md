@@ -57,9 +57,9 @@ services:
     provider: keycloak
     keycloak:
       initialUsers:
-        - {username: alice, groups: [asservat-users, asservat-admins]}
+        - {username: alice, groups: [/asservat-users, /asservat-admins]}
 administrators:
-  groups: [asservat-admins]
+  groups: [/asservat-admins]
 ```
 
 Install and wait:
@@ -100,7 +100,7 @@ kind: AccessBinding
 metadata: {name: trial-maintainers, namespace: my-app}
 spec:
   effect: Allow
-  subjects: [{kind: Group, name: asservat-users}]
+  subjects: [{kind: Group, name: /asservat-users}]
   roles: [workload-maintainer]
   workloads: [{kind: Deployment, name: my-app}]
 EOF

@@ -2,7 +2,6 @@ package contracts
 
 import (
 	"encoding/json"
-	"os"
 	"testing"
 )
 
@@ -11,7 +10,7 @@ func TestRawLogQueryStableInvocationAndPrimitiveOutput(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	input, err := os.ReadFile("../../examples/mcp-logs-input.json")
+	input, err := readImplementedExample("../../examples/", "mcp-logs-input.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -30,7 +29,7 @@ func TestRawLogQueryStableInvocationAndPrimitiveOutput(t *testing.T) {
 	if wire.ValidateInput("get_logs", b) == nil {
 		t.Fatal("missing stable key accepted")
 	}
-	body, err := os.ReadFile("../../examples/mcp-logs-result.json")
+	body, err := readImplementedExample("../../examples/", "mcp-logs-result.json")
 	if err != nil {
 		t.Fatal(err)
 	}

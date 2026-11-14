@@ -1,5 +1,5 @@
 {
-  "cluster_id": "00000000-0000-4000-8000-000000000001",
+  "cluster": "prod",
   "target": {
     "namespace": "payments",
     "workloadRef": {
@@ -15,7 +15,7 @@
       0
     ]
   },
-  "recipe_digest": "5a5eff2029e270d2ec764af201abcb29dfaa0305071797ffca2ef784a788af43",
+  "recipe": "bounded-live-diagnostics",
   "reason": "Investigate a synthetic ledger stall.",
   "idempotency_key": "mcp-ledger-shared-001",
   "sharing": {

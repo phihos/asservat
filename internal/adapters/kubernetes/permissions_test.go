@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -472,7 +471,7 @@ func TestPermissionSchemaMatchesReviewedExamples(t *testing.T) {
 	}
 	for _, name := range []string{"access-binding", "access-binding-owners", "permission-source-namespace", "permission-source-workload", "permission-source-rbac", "permission-source-exec"} {
 		t.Run(name, func(t *testing.T) {
-			b, err := os.ReadFile("../../../examples/" + name + ".yaml")
+			b, err := readImplementedExample("../../../examples/", name+".yaml")
 			if err != nil {
 				t.Fatal(err)
 			}

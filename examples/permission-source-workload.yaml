@@ -5,7 +5,7 @@ metadata:
   namespace: asservat-system
 spec:
   enabled: true
-  clusterID: 00000000-0000-4000-8000-000000000001
+  cluster: prod
   type: workloadMetadata
   namespaceSelector:
     matchLabels:
@@ -17,17 +17,14 @@ spec:
     matchLabels:
       platform.example.invalid/ownership-managed: 'true'
   role: workload-maintainer
-  maxDecisionAgeSeconds: 30
   maxNamespaces: 50
   protection:
     mode: admissionEnforced
-    reviewRef: platform-review/workload-ownership-2026-10
     guardRef: workload-owner-guard-v1
   metadataMapping:
     field: annotation
     key: platform.example.invalid/owner-team
     mode: valueMap
-    issuer: https://identity.example.invalid/realms/company
     values:
       payments:
       - group-payments-123

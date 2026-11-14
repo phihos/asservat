@@ -1,6 +1,6 @@
 {
   "target_ref": {
-    "cluster_id": "00000000-0000-4000-8000-000000000001",
+    "cluster": "prod",
     "namespace": "payments",
     "kind": "StatefulSet",
     "name": "ledger"
@@ -12,10 +12,6 @@
     "operations": [
       "read_memory",
       "download_artifact"
-    ],
-    "clientIDs": [
-      "asservat-browser",
-      "developer-agent"
     ],
     "maxArtifacts": 2,
     "maxBytes": 6442450944,

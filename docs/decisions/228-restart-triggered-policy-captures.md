@@ -1,5 +1,7 @@
 # ADR-228 — Restart-triggered policy captures (first S-03 increment)
 
+> Superseded in part by [ADR-335](335-usable-by-default.md): policies live in the workload's own namespace, delivered by its cluster's connector, and take effect on apply; no hub-held policies, `target.cluster` or `activate_policy`.
+
 > Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
 
 Date: 2026-10-25. Status: accepted; implemented; qualification results below.

@@ -29,42 +29,33 @@
             "type": "string"
           },
           "minItems": 1,
-          "maxItems": 14,
           "uniqueItems": true
         },
         "maxLifetimeSeconds": {
           "type": "integer",
-          "minimum": 1,
-          "maximum": 31536000
+          "minimum": 1
         },
         "maxExecutions": {
           "type": "integer",
-          "minimum": 1,
-          "maximum": 10000
+          "minimum": 1
         },
         "maxBytes": {
           "type": "integer",
-          "minimum": 1,
-          "maximum": 1099511627776
+          "minimum": 1
         },
         "maxObservedBytes": {
           "type": "integer",
-          "minimum": 0,
-          "maximum": 1099511627776
+          "minimum": 0
         },
         "maxObservedEvents": {
           "type": "integer",
-          "minimum": 0,
-          "maximum": 1000000000
+          "minimum": 0
         }
       },
       "required": [
-        "allowedActions",
-        "maxLifetimeSeconds",
-        "maxExecutions",
-        "maxBytes",
-        "maxObservedBytes"
-      ]
+        "allowedActions"
+      ],
+      "description": "Automation envelope on an AccessBinding (ADR-335 D6). Only allowedActions is required; omitted ceilings are unbounded within the installation's capacity and rate limits. Intrusive actions still need an expiring policy grant. Ceilings are not capped: each is an administrator's own bound, and enum plus uniqueItems bound allowedActions."
     },
     "accepted": {
       "type": "object",
@@ -82,13 +73,11 @@
           "properties": {
             "uid": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 64
+              "minLength": 1
             },
             "generation": {
               "type": "integer",
-              "minimum": 1,
-              "maximum": 2147483647
+              "minimum": 1
             },
             "digest": {
               "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/hash"
@@ -119,8 +108,7 @@
                   },
                   "id": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 256
+                    "minLength": 1
                   }
                 },
                 "required": [
@@ -137,8 +125,7 @@
               },
               "basisUID": {
                 "type": "string",
-                "minLength": 1,
-                "maxLength": 64
+                "minLength": 1
               },
               "basisDigest": {
                 "type": "string",
@@ -159,14 +146,14 @@
             ]
           },
           "minItems": 1,
-          "maxItems": 8,
           "uniqueItems": true
         },
         "issuedAt": {
           "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/timestamp"
         },
         "notAfter": {
-          "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/timestamp"
+          "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/timestamp",
+          "description": "Absent for an envelope without a lifetime ceiling (ADR-335 D6)."
         },
         "limits": {
           "type": "object",
@@ -174,30 +161,21 @@
           "properties": {
             "maxExecutions": {
               "type": "integer",
-              "minimum": 1,
-              "maximum": 10000
+              "minimum": 1
             },
             "maxBytes": {
               "type": "integer",
-              "minimum": 1,
-              "maximum": 1099511627776
+              "minimum": 1
             },
             "maxObservedBytes": {
               "type": "integer",
-              "minimum": 0,
-              "maximum": 1099511627776
+              "minimum": 0
             },
             "maxObservedEvents": {
               "type": "integer",
-              "minimum": 0,
-              "maximum": 1000000000
+              "minimum": 0
             }
-          },
-          "required": [
-            "maxExecutions",
-            "maxBytes",
-            "maxObservedBytes"
-          ]
+          }
         }
       },
       "required": [
@@ -206,7 +184,6 @@
         "delegation",
         "ownerAssignments",
         "issuedAt",
-        "notAfter",
         "limits"
       ]
     },
@@ -224,7 +201,8 @@
           "const": true
         },
         "notAfter": {
-          "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/timestamp"
+          "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/timestamp",
+          "description": "Absent for an envelope without a lifetime ceiling (ADR-335 D6)."
         },
         "limits": {
           "type": "object",
@@ -232,30 +210,21 @@
           "properties": {
             "maxExecutions": {
               "type": "integer",
-              "minimum": 1,
-              "maximum": 10000
+              "minimum": 1
             },
             "maxBytes": {
               "type": "integer",
-              "minimum": 1,
-              "maximum": 1099511627776
+              "minimum": 1
             },
             "maxObservedBytes": {
               "type": "integer",
-              "minimum": 0,
-              "maximum": 1099511627776
+              "minimum": 0
             },
             "maxObservedEvents": {
               "type": "integer",
-              "minimum": 0,
-              "maximum": 1000000000
+              "minimum": 0
             }
-          },
-          "required": [
-            "maxExecutions",
-            "maxBytes",
-            "maxObservedBytes"
-          ]
+          }
         },
         "state": {
           "enum": [
@@ -272,17 +241,14 @@
           "type": "array",
           "items": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 80
+            "minLength": 1
           },
           "minItems": 0,
-          "maxItems": 16,
           "uniqueItems": true
         },
         "ownerTeams": {
           "type": "array",
           "minItems": 1,
-          "maxItems": 8,
           "uniqueItems": true,
           "items": {
             "type": "object",
@@ -297,8 +263,7 @@
               },
               "id": {
                 "type": "string",
-                "minLength": 1,
-                "maxLength": 256
+                "minLength": 1
               }
             },
             "required": [
@@ -313,7 +278,6 @@
         "mode",
         "executor",
         "continuesAfterCreatorLeaves",
-        "notAfter",
         "limits",
         "state",
         "reasonCodes",
