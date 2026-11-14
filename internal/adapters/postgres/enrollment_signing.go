@@ -41,7 +41,7 @@ func trustRevision(root custodydb.FleetCurrentTrust) identity.Revision {
 	return r
 }
 func checkClaimedEnrollment(root custodydb.FleetCurrentTrust, slot custodydb.FleetBootstrap, c value.EnrollmentClaim, now time.Time) error {
-	if !currentIssuedBootstrapAudit(slot) || !c.Valid() || slot.InstallationID != id(c.InstallationID) || slot.ID != id(c.BootstrapID) || root.InstallationID != slot.InstallationID || root.Suspended || root.RecoveryBlocked || !trustRevision(root).Valid() || !identity.Fresh(root.ObservedAt.Time, root.FreshUntil.Time, now, 30*time.Second) || slot.IssuerEpoch != root.IssuerEpoch || slot.Revoked || !slot.ClaimedAt.Valid || now.Before(slot.ClaimedAt.Time) || !now.Before(slot.NotAfter.Time) || subtle.ConstantTimeCompare(slot.SecretSha256, c.SecretDigest[:]) != 1 || subtle.ConstantTimeCompare(slot.PublicKeySha256, c.PublicKeyDigest[:]) != 1 {
+	if !currentIssuedBootstrapAudit(slot) || !c.Valid() || slot.InstallationID != id(c.InstallationID) || slot.ID != id(c.BootstrapID) || root.InstallationID != slot.InstallationID || root.Suspended || !trustRevision(root).Valid() || !identity.Fresh(root.ObservedAt.Time, root.FreshUntil.Time, now, 30*time.Second) || slot.IssuerEpoch != root.IssuerEpoch || slot.Revoked || !slot.ClaimedAt.Valid || now.Before(slot.ClaimedAt.Time) || !now.Before(slot.NotAfter.Time) || subtle.ConstantTimeCompare(slot.SecretSha256, c.SecretDigest[:]) != 1 || subtle.ConstantTimeCompare(slot.PublicKeySha256, c.PublicKeyDigest[:]) != 1 {
 		return value.ErrDenied
 	}
 	frozen, err := enrollmentClaimAudit(slot)

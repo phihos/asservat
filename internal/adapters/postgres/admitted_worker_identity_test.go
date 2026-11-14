@@ -161,7 +161,7 @@ func TestAdmittedWorkerIdentityUsesAdmissionWithoutRenewingHumanAuthority(t *tes
 }
 
 func TestAdmittedWorkerIdentityRefusesCurrentFencesAfterBlockingWork(t *testing.T) {
-	for _, mode := range []string{"stopped-parent", "expired-parent", "recovery-blocked", "recovery-expired-after-worker-lock", "configuration-suspended", "configuration-replaced", "configuration-expired-after-worker-lock", "wrong-issuer-epoch", "terminated-worker", "retired-worker", "replacement-worker", "missing-worker-audit", "caller-cancelled-after-worker-lock", "original-operation-expired-after-worker-lock", "cutoff-after-effect"} {
+	for _, mode := range []string{"stopped-parent", "expired-parent", "recovery-expired-after-worker-lock", "configuration-suspended", "configuration-replaced", "configuration-expired-after-worker-lock", "wrong-issuer-epoch", "terminated-worker", "retired-worker", "replacement-worker", "missing-worker-audit", "caller-cancelled-after-worker-lock", "original-operation-expired-after-worker-lock", "cutoff-after-effect"} {
 		t.Run(mode, func(t *testing.T) {
 			s, rows, w, started := admittedIdentityFixture(t)
 			ctx, cancel := context.WithCancel(context.Background())
@@ -171,8 +171,6 @@ func TestAdmittedWorkerIdentityRefusesCurrentFencesAfterBlockingWork(t *testing.
 				rows.parent.State = string(artifact.DownloadCancelled)
 			case "expired-parent":
 				rows.parent.Deadline = ts(started)
-			case "recovery-blocked":
-				rows.trust.RecoveryBlocked = true
 			case "recovery-expired-after-worker-lock":
 				rows.head.FreshUntil = ts(started.Add(5 * time.Second))
 			case "wrong-issuer-epoch":

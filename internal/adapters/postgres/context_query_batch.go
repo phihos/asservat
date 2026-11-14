@@ -210,7 +210,7 @@ func (s *ContextQueries) CompleteReadBatch(ctx context.Context, b value.ContextR
 			// Historical closure records no new access/effect. Original incarnation
 			// still binds all writes; restored state needs independent reconciliation.
 			trust, e := tx.ShareFleetTrust(joined, id(q.Plan.InstallationID))
-			if e != nil || trust.RecoveryBlocked || uid(trust.IssuerEpoch) != q.RecoveryIssuerEpoch {
+			if e != nil || uid(trust.IssuerEpoch) != q.RecoveryIssuerEpoch {
 				return value.ErrUnavailable
 			}
 			if _, e = tx.LockPermissionStream(joined, id(s.root)); e != nil {

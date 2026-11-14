@@ -168,14 +168,6 @@ audit-storage-integration:
 	$(PYTHON) scripts/test-custody.py --scoped-audit
 
 
-.PHONY: database-recovery-integration
-database-recovery-integration:
-	$(PYTHON) scripts/test-custody.py --database-recovery
-
-.PHONY: initial-installation-integration
-initial-installation-integration:
-	$(PYTHON) scripts/test-custody.py --initial-installation
-
 .PHONY: manifest-schema-check
 .PHONY: investigation-schema-check
 investigation-schema-check:

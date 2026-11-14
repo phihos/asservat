@@ -160,5 +160,5 @@ func (p *recordingGroupFacts) automation(ctx context.Context, q *custodydb.Queri
 }
 
 func sameGroupTrust(a, b custodydb.FleetCurrentTrust) bool {
-	return a.InstallationID == b.InstallationID && a.IssuerEpoch == b.IssuerEpoch && a.SourceUid == b.SourceUid && a.SourceGeneration == b.SourceGeneration && bytes.Equal(a.SourceDigest, b.SourceDigest) && a.Suspended == b.Suspended && a.RecoveryBlocked == b.RecoveryBlocked && a.ObservedAt == b.ObservedAt && a.FreshUntil == b.FreshUntil
+	return a.InstallationID == b.InstallationID && a.IssuerEpoch == b.IssuerEpoch && a.SourceUid == b.SourceUid && a.SourceGeneration == b.SourceGeneration && bytes.Equal(a.SourceDigest, b.SourceDigest) && a.Suspended == b.Suspended && a.ObservedAt == b.ObservedAt && a.FreshUntil == b.FreshUntil
 }

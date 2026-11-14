@@ -212,7 +212,7 @@ func qualifyOperationAudits(t *testing.T, ctx context.Context, admin *pgxpool.Po
 			t.Fatal("renewal did not preserve usable principal allowance", e)
 		}
 		// Exact recovery fencing remains required; audit is not an activation path.
-		if _, e = admin.Exec(ctx, "UPDATE fleet_trust SET recovery_blocked=true WHERE installation_id=$1", s.recovery.installation); e != nil {
+		if _, e = admin.Exec(ctx, "UPDATE fleet_trust SET suspended=true WHERE installation_id=$1", s.recovery.installation); e != nil {
 			t.Fatal(e)
 		}
 		if e = gates["resolution"].Begin(ctx, in(1, "resolve_capture_request")); !errors.Is(e, app.ErrUnavailable) {

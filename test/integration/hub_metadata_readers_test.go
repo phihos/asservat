@@ -182,7 +182,7 @@ func (f *capacitySQLFixture) qualifySharedMetadataReaders(t *testing.T, s captur
 			`UPDATE context_catalog SET published_at=published_at WHERE false`,
 			`INSERT INTO context_capture SELECT * FROM context_capture WHERE false`,
 			`DELETE FROM authority_audit WHERE false`,
-			`UPDATE fleet_trust SET recovery_blocked=false WHERE false`,
+			`UPDATE fleet_trust SET suspended=false WHERE false`,
 			`SELECT advance_context_progress()`,
 		} {
 			if _, err = pool.Exec(call, statement); capacitySQLState(err) != "42501" {

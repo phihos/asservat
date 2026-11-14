@@ -121,7 +121,7 @@ func qualifyConnectorObservationOperation(t *testing.T, ctx context.Context, adm
 						t.Fatal("actual scoped source fence", err)
 					}
 				case "recovery-between-pairs":
-					if _, err = admin.Exec(ctx, "UPDATE fleet_trust SET recovery_blocked=true WHERE installation_id=$1", f.scenario.recovery.installation); err != nil {
+					if _, err = admin.Exec(ctx, "UPDATE fleet_trust SET suspended=true WHERE installation_id=$1", f.scenario.recovery.installation); err != nil {
 						t.Fatal("fixture recovery transition", err)
 					}
 				case "database-incarnation-between-pairs":
@@ -153,7 +153,7 @@ func qualifyConnectorObservationOperation(t *testing.T, ctx context.Context, adm
 				}
 				// The original EXECUTE-only role does not acquire ambient row
 				// reads or source/recovery writes through the new adapter.
-				for _, query := range []string{"SELECT * FROM connector_identity_process LIMIT 1", "SELECT * FROM connector_identity_profile LIMIT 1", "UPDATE fleet_trust SET recovery_blocked=false", "SELECT fence_connector_identity(NULL,NULL,clock_timestamp())"} {
+				for _, query := range []string{"SELECT * FROM connector_identity_process LIMIT 1", "SELECT * FROM connector_identity_profile LIMIT 1", "UPDATE fleet_trust SET suspended=false", "SELECT fence_connector_identity(NULL,NULL,clock_timestamp())"} {
 					if _, err = f.pools["read"].Exec(ctx, query); err == nil {
 						t.Fatal("read role acquired unrelated authority", query)
 					}

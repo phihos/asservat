@@ -10,10 +10,9 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// SeedInstallation creates the installation's trust root, activates it for
-// the current database incarnation and seeds its first fleet observation,
+// SeedInstallation creates the installation's trust root, activates it and seeds its first fleet observation,
 // from one current read of the fleet ConfigMap. It is idempotent: an existing
-// trust row is never re-keyed, re-activated or unsuspended, and an existing
+// trust row is never re-keyed or unsuspended, and an existing
 // observation is left to the hub-worker's observer. A database that holds
 // another installation's trust row is refused.
 func SeedInstallation(ctx context.Context, ddl *pgx.ConnConfig, a value.Administration) error {
@@ -65,9 +64,9 @@ func SeedInstallation(ctx context.Context, ddl *pgx.ConnConfig, a value.Administ
 	if epoch != a.IssuerEpoch {
 		return cfg.ErrChanged
 	}
-	// First activation only: a later suspension, recovery block or restore
-	// stays for the hub-worker's observer and the restore protocol.
-	if _, err = tx.Exec(ctx, `UPDATE public.fleet_trust SET suspended=false,recovery_blocked=false,
+	// First activation only: a later suspension stays for the hub-worker's
+	// observer.
+	if _, err = tx.Exec(ctx, `UPDATE public.fleet_trust SET suspended=false,
  activated_postmaster_at=pg_catalog.pg_postmaster_start_time(),
  activated_database_oid=(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()),
  observed_at=$2,fresh_until=$3

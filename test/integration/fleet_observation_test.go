@@ -64,23 +64,25 @@ func TestEnrollmentFleetObservationWithRealPostgres(t *testing.T) {
 		a.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
 		a.FreshUntil = a.ObservedAt.Add(5 * time.Second)
 	}
-	check := func(a value.Administration, wantSuspended, wantRecovery bool) {
+	// unseeded: setup has not seeded an observation, so the root stays
+	// suspended and the trust row keeps the caller's own interval.
+	check := func(a value.Administration, wantSuspended, unseeded bool) {
 		t.Helper()
-		var suspended, blocked bool
+		var suspended bool
 		var observed, until time.Time
 		var generation int64
 		table := "fleet_trust"
-		if !wantRecovery {
+		if !unseeded {
 			table = "fleet_current_trust"
 		}
-		if err := admin.QueryRow(ctx, "SELECT suspended,recovery_blocked,observed_at,fresh_until,source_generation FROM "+table+" WHERE installation_id=$1", a.InstallationID).Scan(&suspended, &blocked, &observed, &until, &generation); err != nil {
+		if err := admin.QueryRow(ctx, "SELECT suspended,observed_at,fresh_until,source_generation FROM "+table+" WHERE installation_id=$1", a.InstallationID).Scan(&suspended, &observed, &until, &generation); err != nil {
 			t.Fatal(err)
 		}
-		if suspended != wantSuspended || blocked != wantRecovery {
-			t.Fatal("unexpected authority flags", suspended, blocked)
+		if suspended != wantSuspended {
+			t.Fatal("unexpected suspension", suspended)
 		}
 		want := a.FreshUntil
-		if !wantRecovery {
+		if !unseeded {
 			// Migration 00074: the positive observation row lives 30 seconds
 			// from its own observation; the caller's interval bounds the call.
 			want = a.ObservedAt.Add(30 * time.Second)
@@ -89,29 +91,7 @@ func TestEnrollmentFleetObservationWithRealPostgres(t *testing.T) {
 			t.Fatal("observation deadline or revision changed")
 		}
 	}
-	t.Run("enabled-flag-alone-cannot-activate-database", func(t *testing.T) {
-		a, o := setup()
-		if err := o.ObserveAdministration(ctx, fleetBasisFixture(t, ctx, o), a); err != nil {
-			t.Fatal(err)
-		}
-		// An old backup can carry both flags cleared. Configuration freshness
-		// is not independent evidence that this database may serve authority.
-		if _, err := admin.Exec(ctx, "UPDATE fleet_trust SET suspended=false,recovery_blocked=false WHERE installation_id=$1", a.InstallationID); err != nil {
-			t.Fatal(err)
-		}
-		refresh(&a)
-		if err := o.ObserveAdministration(ctx, fleetBasisFixture(t, ctx, o), a); err != nil {
-			t.Fatal(err)
-		}
-		reader, err := postgres.NewRecoveryReader(ctx, pool, a.InstallationID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err = reader.RecoveryState(ctx); err == nil {
-			t.Fatal("restored enabled flags plus current configuration reactivated the database")
-		}
-	})
-	t.Run("missing-root-starts-blocked-and-restart-cannot-clear", func(t *testing.T) {
+	t.Run("unseeded-root-stays-suspended-after-restart", func(t *testing.T) {
 		a, o := setup()
 		if err := o.ObserveAdministration(ctx, fleetBasisFixture(t, ctx, o), a); err != nil {
 			t.Fatal(err)
@@ -127,55 +107,13 @@ func TestEnrollmentFleetObservationWithRealPostgres(t *testing.T) {
 		}
 		check(a, true, true)
 	})
-	for _, field := range []string{"postmaster", "database"} {
-		t.Run("stale-activation-"+field, func(t *testing.T) {
-			a, o := setup()
-			if err := o.ObserveAdministration(ctx, fleetBasisFixture(t, ctx, o), a); err != nil {
-				t.Fatal(err)
-			}
-			// Model independent activation with fixture-only administrator SQL.
-			if _, err := admin.Exec(ctx, `UPDATE fleet_trust SET suspended=false,recovery_blocked=false,
-			 activated_postmaster_at=pg_catalog.pg_postmaster_start_time(),
-			 activated_database_oid=(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database())
-			 WHERE installation_id=$1`, a.InstallationID); err != nil {
-				t.Fatal(err)
-			}
-			if _, err := seedSyntheticFleetObservation(ctx, admin, a.InstallationID); err != nil {
-				t.Fatal("explicit synthetic activation observation", err)
-			}
-			reader, err := postgres.NewRecoveryReader(ctx, pool, a.InstallationID)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if _, err = reader.RecoveryState(ctx); err != nil {
-				t.Fatal("current fixture activation unavailable", err)
-			}
-			change := "activated_postmaster_at=activated_postmaster_at-interval '1 microsecond'"
-			if field == "database" {
-				change = "activated_database_oid=0::oid"
-			}
-			if _, err = admin.Exec(ctx, "UPDATE fleet_trust SET "+change+" WHERE installation_id=$1", a.InstallationID); err != nil {
-				t.Fatal(err)
-			}
-			if _, err = reader.RecoveryState(ctx); err == nil {
-				t.Fatal("stale activation remained current")
-			}
-			refresh(&a)
-			if err = o.ObserveAdministration(ctx, fleetBasisFixture(t, ctx, o), a); err != nil {
-				t.Fatal(err)
-			}
-			if _, err = reader.RecoveryState(ctx); err == nil {
-				t.Fatal("configuration refresh renewed stale activation")
-			}
-		})
-	}
 	t.Run("current-observation-preserves-original-deadline", func(t *testing.T) {
 		a, o := setup()
 		if err := o.ObserveAdministration(ctx, fleetBasisFixture(t, ctx, o), a); err != nil {
 			t.Fatal(err)
 		}
-		// Synthetic separate recovery authority; this observer has no such grant.
-		if _, err := admin.Exec(ctx, "UPDATE fleet_trust SET activated_postmaster_at=pg_catalog.pg_postmaster_start_time(),activated_database_oid=(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()),suspended=false,recovery_blocked=false WHERE installation_id=$1", a.InstallationID); err != nil {
+		// Synthetic setup seed; this observer has no such grant.
+		if _, err := admin.Exec(ctx, "UPDATE fleet_trust SET activated_postmaster_at=pg_catalog.pg_postmaster_start_time(),activated_database_oid=(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()),suspended=false WHERE installation_id=$1", a.InstallationID); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := seedSyntheticFleetObservation(ctx, admin, a.InstallationID); err != nil {
@@ -248,24 +186,24 @@ func TestEnrollmentFleetObservationWithRealPostgres(t *testing.T) {
 		}
 		check(a, true, true)
 	})
-	t.Run("failed-current-read-fences-without-clearing-recovery", func(t *testing.T) {
+	t.Run("failed-current-read-fences", func(t *testing.T) {
 		a, o := setup()
 		if err := o.ObserveAdministration(ctx, fleetBasisFixture(t, ctx, o), a); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := admin.Exec(ctx, "UPDATE fleet_trust SET suspended=false,recovery_blocked=false WHERE installation_id=$1", a.InstallationID); err != nil {
+		if _, err := admin.Exec(ctx, "UPDATE fleet_trust SET suspended=false WHERE installation_id=$1", a.InstallationID); err != nil {
 			t.Fatal(err)
 		}
 		started := time.Now().UTC().Truncate(time.Microsecond)
 		if err := o.FenceAdministration(ctx, fleetBasisFixture(t, ctx, o), started); err != nil {
 			t.Fatal(err)
 		}
-		var suspended, blocked bool
-		if err := admin.QueryRow(ctx, "SELECT suspended,recovery_blocked FROM fleet_trust WHERE installation_id=$1", a.InstallationID).Scan(&suspended, &blocked); err != nil {
+		var suspended bool
+		if err := admin.QueryRow(ctx, "SELECT suspended FROM fleet_trust WHERE installation_id=$1", a.InstallationID).Scan(&suspended); err != nil {
 			t.Fatal(err)
 		}
-		if !suspended || blocked {
-			t.Fatal("read failure changed recovery or left authority live")
+		if !suspended {
+			t.Fatal("read failure left authority live")
 		}
 		if err := o.ObserveAdministration(ctx, fleetBasisFixture(t, ctx, o), a); err == nil {
 			t.Fatal("pre-failure snapshot resurrected authority")
@@ -316,17 +254,17 @@ func TestEnrollmentFleetObservationWithRealPostgres(t *testing.T) {
 			check(original, true, true)
 		})
 	}
-	t.Run("role-cannot-clear-recovery-rotate-epoch-or-activate-peer", func(t *testing.T) {
+	t.Run("role-cannot-unsuspend-rotate-epoch-or-activate-peer", func(t *testing.T) {
 		a, o := setup()
 		if err := o.ObserveAdministration(ctx, fleetBasisFixture(t, ctx, o), a); err != nil {
 			t.Fatal(err)
 		}
-		for _, sql := range []string{"UPDATE fleet_trust SET recovery_blocked=false WHERE installation_id=$1", "UPDATE fleet_trust SET issuer_epoch=gen_random_uuid() WHERE installation_id=$1", "UPDATE fleet_trust SET source_uid='replacement' WHERE installation_id=$1", "DELETE FROM fleet_trust WHERE installation_id=$1", "UPDATE fleet_peer SET enabled=true WHERE installation_id=$1", "UPDATE fleet_bootstrap SET revoked=false WHERE installation_id=$1"} {
+		for _, sql := range []string{"UPDATE fleet_trust SET suspended=false WHERE installation_id=$1", "UPDATE fleet_trust SET issuer_epoch=gen_random_uuid() WHERE installation_id=$1", "UPDATE fleet_trust SET source_uid='replacement' WHERE installation_id=$1", "DELETE FROM fleet_trust WHERE installation_id=$1", "UPDATE fleet_peer SET enabled=true WHERE installation_id=$1", "UPDATE fleet_bootstrap SET revoked=false WHERE installation_id=$1"} {
 			if _, err := pool.Exec(ctx, sql, a.InstallationID); err == nil {
 				t.Fatal("observer exceeded purpose")
 			}
 		}
-		if _, err := pool.Exec(ctx, `INSERT INTO fleet_trust(installation_id,issuer_epoch,source_uid,source_generation,source_digest,observed_at,fresh_until,recovery_blocked) VALUES($1,$2,'injected',1,$3,clock_timestamp(),clock_timestamp()+interval '1 second',false)`, uuid.NewString(), uuid.NewString(), a.Revision.Digest[:]); err == nil {
+		if _, err := pool.Exec(ctx, `INSERT INTO fleet_trust(installation_id,issuer_epoch,source_uid,source_generation,source_digest,observed_at,fresh_until) VALUES($1,$2,'injected',1,$3,clock_timestamp(),clock_timestamp()+interval '1 second')`, uuid.NewString(), uuid.NewString(), a.Revision.Digest[:]); err == nil {
 			t.Fatal("observer inserted unblocked root")
 		}
 		for _, mutation := range []struct{ sql, code string }{
@@ -334,13 +272,12 @@ func TestEnrollmentFleetObservationWithRealPostgres(t *testing.T) {
 			{"UPDATE fleet_trust SET activated_database_oid=(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()) WHERE installation_id=$1", "42501"},
 			{"UPDATE fleet_trust SET activated_postmaster_at=pg_catalog.pg_postmaster_start_time(),activated_database_oid=(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()) WHERE installation_id=$1", "42501"},
 			// The CTE-backed view is structurally read-only before column ACLs.
-			{"UPDATE fleet_current_trust SET recovery_blocked=false WHERE installation_id=$1", "55000"},
 			{"UPDATE fleet_current_trust SET issuer_epoch=gen_random_uuid() WHERE installation_id=$1", "55000"},
 		} {
 			_, err := pool.Exec(ctx, mutation.sql, a.InstallationID)
 			var pgerr *pgconn.PgError
 			if !errors.As(err, &pgerr) || pgerr.Code != mutation.code {
-				t.Fatal("expected exact SQL rejection for recovery mutation", mutation.code, err)
+				t.Fatal("expected exact SQL rejection for activation mutation", mutation.code, err)
 			}
 		}
 	})
