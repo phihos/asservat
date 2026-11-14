@@ -1206,3 +1206,5 @@ The brief's domain-registration and trademark work remains a maintainer-owned pu
 - [ADR-328 — Administrator-only Asservat namespaces](328-administrator-only-namespaces.md) trusts everyone inside the Asservat namespaces and cluster administrators; earlier namespace-writer threat assumptions are superseded.
 
 - [ADR-329 — AccessBindings in application namespaces](329-accessbindings-in-application-namespaces.md) moves AccessBindings next to the workloads they grant, managed by namespace RBAC and delivered through connectors.
+
+- [ADR-330 — Event-driven system design](330-event-driven-system-design.md) replaces polling, expiring caches, per-request Jobs, private PKI layers, object-store audit pairs and spent-on-uncertain accounting with watches, pushes, LISTEN/NOTIFY, one connector connection, long-running readers, SQL audit rows and idempotency keys.
