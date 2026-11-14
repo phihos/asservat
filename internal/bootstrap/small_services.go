@@ -512,9 +512,19 @@ func (s secretStore) copyImmutable(ctx context.Context, target typed.SecretInter
 		return secretsFailure("SecretUnavailable " + c.Source)
 	}
 	defer clearData(source.Data)
+	// The download worker reads its own closed format (no empty session token).
+	stored, err := contracts.DecodeOwnerStorageCredential(bytes.NewReader(source.Data[contracts.ObjectStoreCredentialFile]))
+	if err != nil || stored.AccessKeyID == "" || stored.SecretAccessKey == "" || stored.SessionToken != "" {
+		return secretsFailure("InvalidObjectStoreCredential " + c.Source)
+	}
+	worker, err := json.Marshal(contracts.WorkerStoreCredentials{AccessKeyID: stored.AccessKeyID, SecretAccessKey: stored.SecretAccessKey})
+	if err != nil {
+		return secretsFailure("InvalidObjectStoreCredential " + c.Source)
+	}
+	defer clear(worker)
 	immutable := true
 	object := &core.Secret{ObjectMeta: meta.ObjectMeta{Name: c.Secret, Namespace: c.Namespace, Labels: map[string]string{"app.kubernetes.io/part-of": "asservat", "app.kubernetes.io/created-by": "asservat-secrets"}}, Type: core.SecretTypeOpaque, Immutable: &immutable,
-		Data: map[string][]byte{contracts.ObjectStoreCredentialFile: source.Data[contracts.ObjectStoreCredentialFile]}}
+		Data: map[string][]byte{contracts.ObjectStoreCredentialFile: worker}}
 	if _, err = target.Create(ctx, object, meta.CreateOptions{FieldValidation: "Strict"}); err != nil && !apierrors.IsAlreadyExists(err) {
 		return secretsFailure("SecretUnavailable " + c.Namespace + "/" + c.Secret)
 	}

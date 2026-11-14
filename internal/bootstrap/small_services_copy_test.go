@@ -10,7 +10,7 @@ import (
 )
 
 func TestSecretsCopyCreatesOneImmutableCredential(t *testing.T) {
-	api := fake.NewClientset(&core.Secret{ObjectMeta: meta.ObjectMeta{Name: "a-s3-download-read", Namespace: "hub"}, Data: map[string][]byte{contracts.ObjectStoreCredentialFile: []byte(`{"x":1}`), "other": []byte("no")}})
+	api := fake.NewClientset(&core.Secret{ObjectMeta: meta.ObjectMeta{Name: "a-s3-download-read", Namespace: "hub"}, Data: map[string][]byte{contracts.ObjectStoreCredentialFile: []byte(`{"accessKeyID":"AK","secretAccessKey":"SK","sessionToken":""}`), "other": []byte("no")}})
 	store := secretStore{api: api.CoreV1().Secrets("hub"), namespace: "hub"}
 	c := contracts.SecretsCopy{Source: "a-s3-download-read", Namespace: "a-downloads", Secret: "a-s3-download-read"}
 	for range 2 {
@@ -19,7 +19,7 @@ func TestSecretsCopyCreatesOneImmutableCredential(t *testing.T) {
 		}
 	}
 	got, err := api.CoreV1().Secrets("a-downloads").Get(t.Context(), c.Secret, meta.GetOptions{})
-	if err != nil || got.Immutable == nil || !*got.Immutable || len(got.Data) != 1 || string(got.Data[contracts.ObjectStoreCredentialFile]) != `{"x":1}` {
+	if err != nil || got.Immutable == nil || !*got.Immutable || len(got.Data) != 1 || string(got.Data[contracts.ObjectStoreCredentialFile]) != `{"accessKeyID":"AK","secretAccessKey":"SK"}` {
 		t.Fatal("copy", got, err)
 	}
 	missing := contracts.SecretsCopy{Source: "absent", Namespace: "a-downloads", Secret: "other"}
