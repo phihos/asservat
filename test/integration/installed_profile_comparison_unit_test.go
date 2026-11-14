@@ -1,9 +1,6 @@
 package integration
 
 import (
-	capacity "asservat.local/asservat/internal/application/capacity"
-	"asservat.local/asservat/internal/contracts"
-	"asservat.local/asservat/internal/domain/artifact"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -11,6 +8,10 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	capacity "asservat.local/asservat/internal/application/capacity"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/artifact"
 
 	query "asservat.local/asservat/internal/domain/analysis"
 	"github.com/google/pprof/profile"

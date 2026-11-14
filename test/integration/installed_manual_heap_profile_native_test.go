@@ -1,13 +1,8 @@
 package integration
 
 import (
-	"context"
 	"encoding/json"
 	"os"
-	"strings"
-	"testing"
-
-	"github.com/google/pprof/profile"
 )
 
 const manualHeapProfileName = "go-heap-snapshot"
@@ -73,24 +68,4 @@ func manualHeapProfileDefinition() (map[string]any, error) {
 	action["limits"].(map[string]any)["timeout"] = "5s"
 	doc.Definition["editableFields"] = []any{map[string]any{"actionID": "heap", "field": "actionMaxBytes", "label": "Output limit"}}
 	return doc.Definition, nil
-}
-
-func qualifyManualHeapNative(t *testing.T, ctx context.Context, native []byte, captureID string) {
-	t.Helper()
-	p, err := profile.ParseData(native)
-	if err != nil || p.CheckValid() != nil || len(p.Sample) == 0 || p.DurationNanos != 0 {
-		t.Fatal("downloaded heap snapshot is invalid or invents a sampling duration", err)
-	}
-	const path = "../results/manual-heap.pb.gz"
-	if err := os.WriteFile(path, native, 0600); err != nil {
-		t.Fatal(err)
-	}
-	out, err := installedCombinedOutput(ctx, installedLocalToolTimeout, "go", "tool", "pprof", "-top", "-sample_index=inuse_space", "-symbolize=none", path)
-	if err != nil || !strings.Contains(string(out), "main.main") {
-		t.Fatalf("native pprof cannot open retained fixture heap allocation samples: %v\n%s", err, out)
-	}
-	if err := os.WriteFile("../results/manual-heap-pprof.txt", out, 0600); err != nil {
-		t.Fatal(err)
-	}
-	t.Logf("manual heap %s: %d authenticated native bytes, %d samples, native snapshot duration unknown; go tool pprof opened inuse_space without symbol lookup", captureID, len(native), len(p.Sample))
 }

@@ -1,17 +1,13 @@
 package providerconfig
 
 import (
-	"bytes"
-	"context"
 	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/json"
 	"encoding/json/jsontext"
 	"time"
 
-	"asservat.local/asservat/internal/adapters/mtls"
 	"asservat.local/asservat/internal/contracts"
-	"asservat.local/asservat/internal/domain/identity"
 )
 
 // ConfigurationSetupCheck can only be produced by the concrete installer
@@ -24,9 +20,6 @@ type ConfigurationSetupCheck struct {
 	signing           *ContextDeletionSigningReadback
 }
 
-func (o ConfigurationSetupCheck) ObservedAt() time.Time { return o.observedAt }
-func (o ConfigurationSetupCheck) FreshUntil() time.Time { return o.until }
-
 // ContextDeletionSigningReadback is the context deletion signing key as the
 // configuration readback observed it (ADR-205 decision 6): its latest
 // version and the public key of each version Transit returned, for the
@@ -37,19 +30,6 @@ type ContextDeletionSigningReadback struct {
 	PublicKeys map[int]ed25519.PublicKey
 }
 
-// ContextDeletionSigning returns a copy of the observed signing key, or false
-// for a profile without one.
-func (o ConfigurationSetupCheck) ContextDeletionSigning() (ContextDeletionSigningReadback, bool) {
-	if o.signing == nil {
-		return ContextDeletionSigningReadback{}, false
-	}
-	out := *o.signing
-	out.PublicKeys = make(map[int]ed25519.PublicKey, len(o.signing.PublicKeys))
-	for v, k := range o.signing.PublicKeys {
-		out.PublicKeys[v] = bytes.Clone(k)
-	}
-	return out, true
-}
 func (o ConfigurationSetupCheck) Matches(in contracts.HubWorkerDeployment, profile contracts.ConfigurationProviderAuthentication, now time.Time) bool {
 	if o.binding == ([32]byte{}) || ValidateConfigurationProviderAuthentication(in, profile, now) != nil || o.observedAt.IsZero() || now.Before(o.observedAt) || !now.Before(o.until) || o.until.Sub(o.observedAt) > 5*time.Second {
 		return false
@@ -76,153 +56,4 @@ func configurationSetupBinding(in contracts.HubWorkerDeployment, profile contrac
 		return [32]byte{}, ErrSetupUnavailable
 	}
 	return sha256.Sum256(canonical), nil
-}
-
-// VerifyConfiguration checks exactly the generated two audit purposes. It
-// never writes provider configuration or issues a token; the inspection token
-// stays only in the separately owned SetupReader. Endpoint and original caller
-// bounds are checked by begin before the first named GET.
-func (r *SetupReader) VerifyConfiguration(ctx context.Context, in contracts.HubWorkerDeployment, profile contracts.ConfigurationProviderAuthentication) (ConfigurationSetupCheck, error) {
-	var zero ConfigurationSetupCheck
-	if ctx == nil || ctx.Err() != nil || ValidateConfigurationProviderAuthentication(in, profile, time.Now()) != nil {
-		return zero, ErrSetupUnavailable
-	}
-	binding, err := configurationSetupBinding(in, profile)
-	if err != nil {
-		return zero, ErrSetupUnavailable
-	}
-	recipe, err := ConfigurationProviderRecipeFor(in, configurationProviderSelectionOf(profile), profile.ServiceAccount, time.Now())
-	if err != nil {
-		return zero, ErrSetupUnavailable
-	}
-	paths := []string{"sys/mounts/auth/" + profile.AuthMount, "auth/" + profile.AuthMount + "/config",
-		"sys/mounts/" + in.KeyService.AuditMount, in.KeyService.AuditMount + "/keys/" + in.KeyService.AuditKey}
-	for _, role := range recipe.Roles {
-		paths = append(paths, "sys/policies/acl/"+role.Name, "auth/"+profile.AuthMount+"/role/"+role.Name)
-	}
-	// ADR-204: the worker configuration audit key, read after the purposes
-	// (whose policies the recipe already extends to it).
-	worker := profile.WorkerConfigurationAudit
-	var workerReads []string
-	if worker != (contracts.OwnerPublicTransit{}) {
-		workerReads = configurationWorkerAuditReads(in, worker)
-		paths = append(paths, workerReads...)
-	}
-	// ADR-205: the context deletion signing key, on the configuration audit
-	// mount already read.
-	signing := profile.ContextDeletionSigning
-	if signing != (contracts.OwnerPublicTransit{}) {
-		paths = append(paths, signing.Mount+"/keys/"+signing.Key)
-	}
-	o, err := r.begin(ctx, contracts.OwnerProviderEndpoint{Endpoint: in.KeyService.Endpoint, Roots: in.KeyService.Roots}, paths)
-	if err != nil {
-		return zero, err
-	}
-	defer o.finish()
-	data, err := o.get(paths[0])
-	if err != nil || verifyAuthMount(data, profile.AuthMountAccessor) != nil {
-		return zero, setupComponentError("configuration auth mount")
-	}
-	data, err = o.get(paths[1])
-	if err != nil || r.verifyKubernetesAuthConfig(data, in.Kubernetes) != nil {
-		return zero, setupComponentError("configuration Kubernetes authentication")
-	}
-	data, err = o.get(paths[2])
-	if err != nil || verifyTransitMount(data) != nil {
-		return zero, setupComponentError("configuration Transit mount")
-	}
-	data, err = o.get(paths[3])
-	if err != nil || verifyTransitKey(data, in.KeyService.AuditKey) != nil {
-		return zero, setupComponentError("configuration Transit key")
-	}
-	for i, role := range recipe.Roles {
-		data, err = o.get(paths[4+2*i])
-		if err != nil || verifyACL(data, role.Name, role.Policy) != nil {
-			return zero, setupComponentError("configuration purpose policy")
-		}
-		data, err = o.get(paths[5+2*i])
-		if err != nil || verifyKubernetesRole(data, role.Role) != nil {
-			return zero, setupComponentError("configuration purpose role")
-		}
-	}
-	if len(workerReads) == 2 {
-		data, err = o.get(workerReads[0])
-		if err != nil || verifyTransitMount(data) != nil {
-			return zero, setupComponentError("worker configuration Transit mount")
-		}
-	}
-	if len(workerReads) > 0 {
-		data, err = o.get(workerReads[len(workerReads)-1])
-		if err != nil || verifyTransitKey(data, worker.Key) != nil {
-			return zero, setupComponentError("worker configuration Transit key")
-		}
-	}
-	var observed *ContextDeletionSigningReadback
-	if signing != (contracts.OwnerPublicTransit{}) {
-		data, err = o.get(paths[len(paths)-1])
-		if err != nil {
-			return zero, setupComponentError("context deletion signing key")
-		}
-		version, keys, e := verifySigningKeyVersions(data, signing.Key)
-		if e != nil {
-			return zero, setupComponentError("context deletion signing key")
-		}
-		observed = &ContextDeletionSigningReadback{Mount: signing.Mount, Key: signing.Key, Version: version, PublicKeys: keys}
-	}
-	if !o.valid() {
-		return zero, ErrSetupUnavailable
-	}
-	until := o.until
-	for _, anchors := range [][][]byte{in.Kubernetes.Roots, in.Postgres.Roots, in.AuditStore.Roots, in.KeyService.Roots} {
-		_, end, e := mtls.OwnerTrustRoots(anchors, time.Now())
-		if e != nil {
-			return zero, ErrSetupUnavailable
-		}
-		until = identity.Earlier(until, end)
-	}
-	out := ConfigurationSetupCheck{binding: binding, observedAt: o.observedAt, until: until, signing: observed}
-	if !out.Matches(in, profile, time.Now()) {
-		return zero, ErrSetupUnavailable
-	}
-	return out, nil
-}
-
-// ReadContextDeletionSigning reads the hub-worker's context deletion signing
-// key (ADR-205 decision 6) with the phase-3 inspection token: the owner
-// artifact that lists the evidence delete credential also lets that token
-// read this one key. The installer pins the result in the capacity
-// projection.
-func (r *SetupReader) ReadContextDeletionSigning(ctx context.Context, endpoint contracts.OwnerProviderEndpoint, mount, key string) (ContextDeletionSigningReadback, error) {
-	var zero ContextDeletionSigningReadback
-	if !providerName.MatchString(mount) || !providerName.MatchString(key) {
-		return zero, ErrSetupUnavailable
-	}
-	path := mount + "/keys/" + key
-	o, err := r.begin(ctx, endpoint, []string{path})
-	if err != nil {
-		return zero, err
-	}
-	defer o.finish()
-	data, err := o.get(path)
-	if err != nil {
-		return zero, setupComponentError("context deletion signing key")
-	}
-	version, keys, err := verifySigningKeyVersions(data, key)
-	if err != nil {
-		return zero, setupComponentError("context deletion signing key")
-	}
-	if !o.valid() {
-		return zero, ErrSetupUnavailable
-	}
-	return ContextDeletionSigningReadback{Mount: mount, Key: key, Version: version, PublicKeys: keys}, nil
-}
-
-// configurationWorkerAuditReads are the named reads of the worker
-// configuration audit key: its mount, unless it is the configuration audit
-// mount already read, then the key.
-func configurationWorkerAuditReads(in contracts.HubWorkerDeployment, worker contracts.OwnerPublicTransit) []string {
-	if worker.Mount == in.KeyService.AuditMount {
-		return []string{worker.Mount + "/keys/" + worker.Key}
-	}
-	return []string{"sys/mounts/" + worker.Mount, worker.Mount + "/keys/" + worker.Key}
 }

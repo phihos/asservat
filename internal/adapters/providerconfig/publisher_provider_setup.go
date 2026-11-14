@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/adapters/mtls"
-	"asservat.local/asservat/internal/contracts"
 )
 
 // PublisherProviderSetup is the publisher's part of the phase-3 provider
@@ -16,21 +15,6 @@ type PublisherProviderSetup struct {
 	Authentication PublisherProviderRecipe `json:"authentication"`
 	PKIRole        OwnerPKIRoleRecipe      `json:"pkiRole"`
 	TransitKey     json.RawMessage         `json:"transitKey"`
-}
-
-func PublisherProviderSetupFor(in contracts.PublisherDeployment) (PublisherProviderSetup, error) {
-	var out PublisherProviderSetup
-	recipe, err := PublisherProviderRecipeFor(in, in.ProviderAuthentication)
-	if err != nil || recipe.Profile != in.ProviderAuthentication {
-		return out, ErrSetupUnavailable
-	}
-	role, err := publisherVerifierPKIRole(in.InstallationID)
-	if err != nil {
-		return out, err
-	}
-	out.Authentication, out.PKIRole = recipe, OwnerPKIRoleRecipe{Name: in.Verifier.Role, Role: role}
-	out.TransitKey = json.RawMessage(`{"type":"aes256-gcm96","derived":false,"exportable":false,"allow_plaintext_backup":false}`)
-	return out, nil
 }
 
 // publisherVerifierPKIRole is the exact verifier PKI role (ADR-203 decision
@@ -56,10 +40,4 @@ func publisherVerifierPKIRole(installation string) (json.RawMessage, error) {
 		"allow_globs_in_identity_templates": false, "allow_token_displayname": false, "allowed_ip_sans_cidr": []string{},
 		"signature_bits": 0, "use_pss": false, "cn_validations": []string{"email", "hostname"},
 	})
-}
-
-// publisherSetupPaths are the named paths the inspection token may read.
-func publisherSetupPaths(in contracts.PublisherDeployment, s PublisherProviderSetup) []string {
-	paths := setupNamedPaths(s.Authentication.Profile.AuthMount, in.AuditKeys.Mount, in.AuditKeys.Key, s.Authentication.Roles[:])
-	return append(paths, "sys/mounts/"+in.Verifier.PKIMount, in.Verifier.PKIMount+"/cert/ca", in.Verifier.PKIMount+"/roles/"+in.Verifier.Role)
 }

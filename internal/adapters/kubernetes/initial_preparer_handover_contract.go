@@ -1,12 +1,13 @@
 package kubernetes
 
 import (
+	"time"
+
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
 	admission "k8s.io/api/admissionregistration/v1"
-	"time"
 )
 
 // This is the final guard/source/configuration inventory, distinct from the

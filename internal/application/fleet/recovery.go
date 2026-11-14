@@ -1,8 +1,9 @@
 package fleet
 
 import (
-	value "asservat.local/asservat/internal/domain/fleet"
 	"context"
+
+	value "asservat.local/asservat/internal/domain/fleet"
 )
 
 // Read-only current recovery state; no method here can activate an installation.

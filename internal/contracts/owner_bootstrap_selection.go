@@ -5,7 +5,6 @@ import (
 	"time"
 )
 
-const OwnerBootstrapPlanFormat = "asservat-owner-bootstrap-plan/v1"
 const OwnerBootstrapInitialPeers = 16
 
 // The initial batch is a public installation choice, not a live connector or
@@ -54,27 +53,6 @@ type OwnerBootstrapObjectReceipt struct {
 	Object          WorkerObjectReference `json:"object"`
 	ResourceVersion string                `json:"resourceVersion"`
 	ObservedAt      time.Time             `json:"observedAt"`
-}
-
-// The immutable child carries the full public roots. Its own UID and CREATE
-// attempt are intentionally outside its body, avoiding self-reference cycles.
-type OwnerBootstrapSelection struct {
-	ObservationFormat string                 `json:"observationFormat,omitempty"`
-	InitialFormat     string                 `json:"initialFormat"`
-	Format            string                 `json:"format"`
-	InstallationID    string                 `json:"installationID"`
-	ControlClusterID  string                 `json:"controlClusterID"`
-	IssuerEpoch       string                 `json:"issuerEpoch"`
-	Namespace         WorkerObjectReference  `json:"namespace"`
-	Resources         WorkerObjectReference  `json:"resources"`
-	ResourceSetupID   string                 `json:"resourceSetupID"`
-	ResourceBinding   string                 `json:"resourceBinding"`
-	OperationID       string                 `json:"operationID"`
-	PermissionRootID  string                 `json:"permissionRootID"`
-	PKIMount          string                 `json:"pkiMount"`
-	Connections       int                    `json:"connections"`
-	Concurrency       int                    `json:"concurrency"`
-	Peers             []OwnerObservationPeer `json:"peers"`
 }
 
 func OwnerBootstrapSelectionName(installationID string) string {

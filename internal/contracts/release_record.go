@@ -2,7 +2,6 @@ package contracts
 
 import (
 	"bytes"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
@@ -76,21 +75,6 @@ var releaseImage = regexp.MustCompile(`^[a-z0-9][a-z0-9._/-]*(?::[0-9]+/[a-z0-9]
 // ReleaseImageValid accepts only a digest-pinned image reference.
 func ReleaseImageValid(image string) bool {
 	return len(image) <= 456 && releaseImage.MatchString(image)
-}
-
-// ReleaseImageDigest returns the hex digest of a valid image reference.
-func ReleaseImageDigest(image string) ([32]byte, bool) {
-	var out [32]byte
-	_, text, ok := strings.Cut(image, "@sha256:")
-	if !ok || !ReleaseImageValid(image) {
-		return out, false
-	}
-	b, err := hex.DecodeString(text)
-	if err != nil || len(b) != 32 {
-		return out, false
-	}
-	copy(out[:], b)
-	return out, true
 }
 
 func (w ReleaseWorkload) valid(revision int64, previous bool) bool {

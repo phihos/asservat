@@ -1,10 +1,11 @@
 package kubernetes
 
 import (
-	cfg "asservat.local/asservat/internal/domain/configuration"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"strings"
 	"time"
+
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/authorization"

@@ -1,15 +1,8 @@
 package integration
 
 import (
-	"context"
 	"errors"
 	"testing"
-	"time"
-
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
 // Resolve the physical API once, before any installation plan or effect. The
@@ -56,28 +49,4 @@ func TestInstallerContextTopologySelectsOriginalAPI(t *testing.T) {
 			}
 		})
 	}
-}
-
-func assertUnusedRegionalAPI(t *testing.T, ctx context.Context, f fixture, connectorNamespace, workloadNamespace string) {
-	t.Helper()
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-	if len(f.Clusters) == 1 {
-		t.Log("same-api trial has one physical API and no unused cluster")
-		return
-	}
-	config, err := clientcmd.BuildConfigFromFlags("", f.Clusters[1].Config)
-	if err != nil {
-		t.Fatal("unused physical API configuration", err)
-	}
-	api, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		t.Fatal("unused physical API observer", err)
-	}
-	for _, name := range []string{connectorNamespace, workloadNamespace} {
-		if _, err := api.CoreV1().Namespaces().Get(ctx, name, meta.GetOptions{}); !apierrors.IsNotFound(err) {
-			t.Fatal("same-api trial touched the unused physical workload API", name, err)
-		}
-	}
-	t.Log("same-api unused physical API contains neither the actual connector nor workload namespace")
 }

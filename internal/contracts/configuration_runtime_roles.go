@@ -71,10 +71,6 @@ type ConfigurationRoleObservation struct {
 	FreshUntil     time.Time                       `json:"freshUntil"`
 }
 
-func DecodeConfigurationRuntimeRoles(r io.Reader) (ConfigurationRuntimeRoles, error) {
-	return decodeClosedRPC[ConfigurationRuntimeRoles](r, 8192)
-}
-
 // Original one-use private installation state. Unlike the public role root,
 // this compartment has no audit/account seeds or public runtime credentials.
 type ConfigurationRuntimeRoleState struct {

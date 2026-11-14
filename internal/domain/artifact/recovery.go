@@ -1,8 +1,9 @@
 package artifact
 
 import (
-	"asservat.local/asservat/internal/domain/identity"
 	"time"
+
+	"asservat.local/asservat/internal/domain/identity"
 )
 
 // RecoveryProof is a finite observation of separately accepted installation

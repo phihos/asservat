@@ -12,21 +12,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-// PermissionAdministrationOf converts the installed permission deployment's
-// control section into the trusted guard plan (ADR-189). The installer and
-// the hub-worker derive the same plan, so the guard digest is shared.
-func PermissionAdministrationOf(c contracts.PermissionControlDeployment) cfg.PermissionAdministration {
-	actors := func(v []contracts.OwnerDeploymentActor) []cfg.KubernetesActor {
-		out := make([]cfg.KubernetesActor, 0, len(v))
-		for _, a := range v {
-			out = append(out, cfg.KubernetesActor{Kind: a.Kind, Name: a.Name})
-		}
-		return out
-	}
-	p := cfg.PermissionAdministration{Name: c.Guard.Name, ControlNamespace: cfg.NamespaceRef{Name: c.Namespace.Name, UID: c.Namespace.UID}, Administrators: actors(c.Guard.Administrators), StatusUsers: append([]string(nil), c.StatusUsers...)}
-	return p
-}
-
 // ensureAdmissionGuard creates a policy and its binding, or reopens them
 // only when their specs match exactly, and returns the acknowledged pin. It
 // never updates an existing guard.

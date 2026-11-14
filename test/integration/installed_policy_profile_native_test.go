@@ -1,13 +1,14 @@
 package integration
 
 import (
+	"encoding/json"
+	"errors"
+	"testing"
+
 	compiler "asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/targets"
 	"asservat.local/asservat/internal/transport/conversion"
-	"encoding/json"
-	"errors"
-	"testing"
 )
 
 const installedPolicyProfileName = "regional-finite-go-profile"

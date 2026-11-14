@@ -7,25 +7,16 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"net/http"
-	"reflect"
-	"strings"
 	"testing"
 	"time"
 
-	"asservat.local/asservat/internal/contracts"
 	query "asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
-	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 const installedRawSyscallQueries = 2
 const installedArgumentQueryUnits = installedSyscallProjectionQueries*query.SyscallProjectionQueryUnits + installedRawSyscallQueries*query.SyscallQueryQueryUnits
 
-type installedSyscallQueryContinuation struct {
-	BeforeQuery func()
-	RawQueries  func(afterEach func())
-}
 type installedSyscallArgumentPage struct {
 	Kind     string                      `json:"kind"`
 	Events   []artifact.RawArgumentEvent `json:"events"`
@@ -46,77 +37,6 @@ func installedRawSyscallRequest(s installedSyscallQueryBrowserSource, key string
 	return map[string]any{"case_id": s.CaseID, "artifact_id": s.ArtifactID, "grant_id": s.GrantID, "idempotency_key": key, "limit": 20, "syscall_names": []string{"write"}, "errors_only": false}
 }
 
-func queryInstalledRawSyscalls(t *testing.T, ctx context.Context, identity *installedIdentity, transport http.RoundTripper, origin string, s installedSyscallQueryBrowserSource, check installedProjectionCheck) installedSyscallArgumentPage {
-	t.Helper()
-	if check == nil {
-		t.Fatal("raw syscall query requires independent SQL check")
-	}
-	verify := check(s.ArtifactID)
-	token := identity.packetQueryTokenSource(origin) // Existing read+raw/no download/capture session.
-	if _, e := token.Token(ctx); e != nil {
-		t.Fatal(e)
-	}
-	wire, e := contracts.NewInvestigationContracts()
-	if e != nil {
-		t.Fatal(e)
-	}
-	client := sdk.NewClient(&sdk.Implementation{Name: "installed-raw-syscalls", Version: "1"}, nil)
-	session, e := client.Connect(ctx, &sdk.StreamableClientTransport{Endpoint: strings.TrimSuffix(origin, "/") + "/mcp", HTTPClient: &http.Client{Transport: installedJourneyBearer{transport, token.Token}, Timeout: 60 * time.Second}, MaxRetries: -1, DisableStandaloneSSE: true}, nil)
-	if e != nil {
-		t.Fatal(e)
-	}
-	defer session.Close()
-	call := func(name string, args any) installedComparisonReply {
-		t.Helper()
-		start := time.Now()
-		r, e := session.CallTool(ctx, &sdk.CallToolParams{Name: name, Arguments: args})
-		if e != nil {
-			t.Fatal("raw syscall outcome unavailable; no unknown replay", name, e)
-		}
-		raw, e := json.Marshal(r.StructuredContent)
-		var out installedComparisonReply
-		if e != nil || wire.ValidateOutput(name, raw) != nil || json.Unmarshal(raw, &out) != nil || r.IsError != (out.Status == "error") {
-			t.Fatal("raw syscall canonical reply", name)
-		}
-		t.Logf("installed raw syscall %s status=%s elapsed=%s", name, out.Status, time.Since(start))
-		return out
-	}
-	if r := call("prepare_artifact_download", map[string]string{"artifact_id": s.ArtifactID, "idempotency_key": "raw-syscall-no-native"}); r.Status != "error" {
-		t.Fatal("raw query session obtained native authority")
-	}
-	verify("", "")
-	return queryInstalledRawSyscallsWithCall(t, ctx, s, installedRawSyscallRequest(s, "installed-syscall-mcp-"+s.ArtifactID), call, verify, true)
-}
-func queryInstalledRawSyscallsBrowser(t *testing.T, ctx context.Context, b *installedBrowser, address string, s installedSyscallQueryBrowserSource, check installedProjectionCheck) installedSyscallArgumentPage {
-	t.Helper()
-	if check == nil {
-		t.Fatal("raw syscall browser needs independent SQL proof")
-	}
-	verify := check(s.ArtifactID)
-	operation, handle := "", ""
-	checked := false
-	defer func() {
-		if !checked && operation != "" {
-			verify(handle, operation)
-		}
-	}()
-	request := installedRawSyscallRequest(s, "not-injected-ui-key")
-	call, finish := installedSyscallQueryBrowser(t, ctx, b, address, s, request, func(r installedComparisonReply) {
-		if operation == "" {
-			operation = r.RequestID
-		}
-		if handle == "" && r.Status == "pending" {
-			var p struct {
-				Handle string `json:"query_handle"`
-			}
-			if json.Unmarshal(r.Data, &p) == nil {
-				handle = p.Handle
-			}
-		}
-	})
-	defer finish()
-	return queryInstalledRawSyscallsWithCall(t, ctx, s, request, call, func(qid, op string) func() { finish(); checked = true; return verify(qid, op) }, false)
-}
 func queryInstalledRawSyscallsWithCall(t *testing.T, ctx context.Context, s installedSyscallQueryBrowserSource, request map[string]any, call func(string, any) installedComparisonReply, verify func(string, string) func(), replay bool) installedSyscallArgumentPage {
 	t.Helper()
 	out := call("syscall_query", request)
@@ -270,30 +190,4 @@ func installedRawSyscallOracle(native []byte, pod string) ([]artifact.RawArgumen
 		return nil, errors.New("incomplete native tail")
 	}
 	return events, nil
-}
-func qualifyInstalledRawSyscallParity(t *testing.T, native []byte, s installedSyscallQueryBrowserSource, pages ...installedSyscallArgumentPage) {
-	t.Helper()
-	events, e := installedRawSyscallOracle(native, s.PodUID)
-	if e != nil {
-		t.Fatal(e)
-	}
-	_, _, counts, e := installedSyscallExpected(native, artifact.SyscallArgumentsArtifact, s.PodUID)
-	if e != nil {
-		t.Fatal(e)
-	}
-	var filtered []artifact.RawArgumentEvent
-	for _, event := range events {
-		if event.Syscall == "write" {
-			filtered = append(filtered, event)
-		}
-	}
-	if len(filtered) < 1 {
-		t.Fatal("native lacks original selected writes")
-	}
-	for _, p := range pages {
-		if !reflect.DeepEqual(p.Events, filtered[:min(20, len(filtered))]) || p.Coverage.Dropped != nil || p.Coverage.Truncated != nil || p.Coverage.RecordCount != counts.RecordCount || p.Coverage.Unmatched != counts.UnmatchedEvents || p.Coverage.Unfinished != counts.UnfinishedEvents || p.Coverage.Unknown != counts.UnknownEvents || len(p.Coverage.Gaps) == 0 {
-			t.Fatal("raw query differs from SAME original recorded values/order/full-file counters")
-		}
-	}
-	t.Logf("raw syscall MCP+React: exact recorded arguments/value bytes/truncation and counters match SAME authenticated nativeJSONL (%d records), no decoding/execution/new acquisition", len(events))
 }

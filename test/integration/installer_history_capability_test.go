@@ -4,66 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"os"
-	"strings"
 	"testing"
 
-	"asservat.local/asservat/internal/adapters/objectstore"
-	"asservat.local/asservat/internal/contracts"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/smithy-go"
 )
-
-// The owned installer fixture provisions the operator's separate history
-// capability using the production proposal, never the evidence writer key.
-func installerRegionalHistoryCredential(t *testing.T, ctx context.Context, p *initialRuntimeNativeProviders, bucket, root, cluster string) []byte {
-	t.Helper()
-	capability, err := objectstore.SeaweedHistoryCapability(bucket, root, cluster)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var native struct {
-		Container string `json:"runtimeProviderPairS3Container"`
-	}
-	raw, err := os.ReadFile(os.Getenv("ASSERVAT_CONTEXT_FIXTURES"))
-	if err != nil || json.Unmarshal(raw, &native) != nil || !strings.HasPrefix(native.Container, "asservat-context-") || !strings.HasSuffix(native.Container, "-s3") {
-		clear(raw)
-		t.Fatal("owned history S3 container missing", err)
-	}
-	clear(raw)
-	runID := strings.TrimSuffix(strings.TrimPrefix(native.Container, "asservat-"), "-s3")
-	label, err := installedOutput(ctx, installedDockerTimeout, "docker", "inspect", "--format", "{{ index .Config.Labels \"asservat.test\" }}", native.Container)
-	if err != nil || strings.TrimSpace(string(label)) != runID {
-		t.Fatal("refuse non-owned history storage administration", err)
-	}
-	key, secret := "history-"+cluster, "synthetic-history-secret-"+cluster
-	shell := "s3.configure -user=" + capability.Identity + " -access_key=" + key + " -secret_key=" + secret + " -actions=" + strings.Join(capability.SeaweedIdentityActions, ",") + " -apply\n"
-	command, commandDone := installedBoundedCommand(ctx, installedDockerTimeout, "docker", "exec", "-i", native.Container, "/usr/bin/weed", "shell", "-master=localhost:9333", "-filer=localhost:8888")
-	defer commandDone()
-	command.Stdin = strings.NewReader(shell)
-	if output, e := command.CombinedOutput(); e != nil {
-		clear(output)
-		t.Fatal("owned history IAM provisioning failed", e)
-	}
-	var historyPolicy struct {
-		Version   string
-		Statement []map[string]any
-	}
-	if json.Unmarshal(capability.S3BucketPolicy, &historyPolicy) != nil {
-		t.Fatal("history policy proposal invalid")
-	}
-	for _, statement := range historyPolicy.Statement {
-		if sid, ok := statement["Sid"].(string); ok {
-			statement["Sid"] = sid + strings.ReplaceAll(cluster, "-", "")
-		}
-	}
-	addition, _ := json.Marshal(historyPolicy)
-	installerMergeBucketPolicy(t, ctx, p, bucket, addition)
-	out, _ := json.Marshal(contracts.OwnerStorageCredential{AccessKeyID: key, SecretAccessKey: secret})
-	return out
-}
 
 // Preserve other region capabilities and existing writer deletion denials.
 // Reinstalling a region is idempotent and never replaces the bucket's policy.

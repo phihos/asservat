@@ -5,51 +5,7 @@ import (
 	"sync"
 	"testing"
 	"time"
-
-	kube "asservat.local/asservat/internal/adapters/kubernetes"
-	"asservat.local/asservat/internal/contracts"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
-	apps "k8s.io/api/apps/v1"
-	"k8s.io/client-go/kubernetes"
 )
-
-// This fixed fixture continuation borrows the actual still-live predecessor.
-// It is never supplied to a product constructor as authority or a callback.
-type initialRuntimeOwnerContinuation struct {
-	resources *kube.InitialRuntimeResources
-	bridge    *kube.InitialRuntimeBridge
-	original  *apps.Deployment
-}
-
-// The enclosing worker owns this cleanup, registered before qualify can launch
-// an owner. Keep its Deployment present through the worker's later source-loss
-// assertions so owner deletion cannot become a different guard-loss trigger.
-func (o *initialRuntimeOwnerContinuation) cleanup(t *testing.T, api kubernetes.Interface) {
-	if o != nil && o.original != nil {
-		providerWorkerNativeCleanup(t, api, o.original)
-	}
-}
-
-func providerOwnerScopedPool(t *testing.T, ctx context.Context, config *pgx.ConnConfig, credential contracts.OwnerSQLCredential) *pgxpool.Pool {
-	t.Helper()
-	if credential.Username == "" || credential.Password == "" {
-		t.Fatal("original scoped credential missing")
-	}
-	p, err := pgxpool.ParseConfig("")
-	if err != nil {
-		t.Fatal(err)
-	}
-	p.ConnConfig = config.Copy()
-	p.ConnConfig.User, p.ConnConfig.Password = credential.Username, credential.Password
-	p.ConnConfig.RuntimeParams = map[string]string{"application_name": "asservat-original-owner-native-observer", "statement_timeout": "5000ms", "lock_timeout": "1000ms", "idle_in_transaction_session_timeout": "5000ms"}
-	p.MaxConns, p.MinConns = contracts.OwnerIdentityPoolConnections, 0
-	pool, err := pgxpool.NewWithConfig(ctx, p)
-	if err != nil {
-		t.Fatal("original scoped observer connection", err)
-	}
-	return pool
-}
 
 // Counts and original request-deadline minima are diagnostics only. This fixed
 // six-client recorder sees neither paths, headers nor bodies, performs no I/O,
@@ -66,7 +22,6 @@ type nativeOwnerDeadlinePhase struct {
 	before, after           [6]time.Duration
 }
 
-func (x *nativeOwnerDeadlineTrace) enable() { x.mu.Lock(); x.enabled = true; x.mu.Unlock() }
 func (x *nativeOwnerDeadlineTrace) begin(name string) func(*testing.T) {
 	x.mu.Lock()
 	if !x.enabled {

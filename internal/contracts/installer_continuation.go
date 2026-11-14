@@ -19,33 +19,6 @@ const (
 	InstallerInboxCleanupVerifyCredential = "cleanup-verify.json"
 )
 
-type InstallerContinuation struct {
-	Format         string `json:"format"`
-	IdentitySource string `json:"identitySource,omitempty"`
-	// ObjectStoreSource selects the fixed public bundled-store projection.
-	// Resolve it before ordinary provider consumers; it grants no authority.
-	ObjectStoreSource string `json:"objectStoreSource,omitempty"`
-	// KeyServiceSource explicitly selects the fixed public bundled provider.
-	KeyServiceSource string `json:"keyServiceSource,omitempty"`
-	// Optional existing private TLS/OIDC material in the bootstrap namespace.
-	// Credentials remain outside values and the public continuation document.
-	MaterialSecretName string `json:"materialSecretName,omitempty"`
-	// Namespace is the chart's release namespace holding the outbox and inbox;
-	// operators cannot write the guarded installation namespace.
-	Namespace      string                     `json:"namespace"`
-	WorkerProvider InstallerProviderSelection `json:"workerProvider"`
-	OwnerProvider  InstallerProviderSelection `json:"ownerProvider"`
-	// OwnerIssuerRootsPEM are the owner PKI roots the operator created.
-	OwnerIssuerRootsPEM string `json:"ownerIssuerRootsPEM"`
-	// The owner bootstrap plan; its one peer is the hub cluster (ADR-179).
-	OwnerPKIMount    string `json:"ownerPKIMount"`
-	OwnerConnections int    `json:"ownerConnections"`
-	OwnerConcurrency int    `json:"ownerConcurrency"`
-	// Public names the operator's browser identity choices (ADR-185); absent,
-	// the continuation launches an observation-only owner.
-	Public *InstallerPublicSettings `json:"public,omitempty"`
-}
-
 // InstallerPublicSettings become the browser and identity settings
 // ConfigMaps. Revisions, the browser root and the session epoch are generated.
 type InstallerPublicSettings struct {

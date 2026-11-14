@@ -1,22 +1,23 @@
 package integration
 
 import (
-	capacity "asservat.local/asservat/internal/application/capacity"
-	"asservat.local/asservat/internal/contracts"
-	query "asservat.local/asservat/internal/domain/analysis"
 	"bytes"
 	"context"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/gopacket/gopacket"
-	"github.com/gopacket/gopacket/layers"
-	"github.com/gopacket/gopacket/pcapgo"
 	"net"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
+
+	capacity "asservat.local/asservat/internal/application/capacity"
+	"asservat.local/asservat/internal/contracts"
+	query "asservat.local/asservat/internal/domain/analysis"
+	"github.com/gopacket/gopacket"
+	"github.com/gopacket/gopacket/layers"
+	"github.com/gopacket/gopacket/pcapgo"
 )
 
 func TestInstalledPacketQueryOriginalFunding(t *testing.T) {

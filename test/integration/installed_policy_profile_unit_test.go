@@ -1,10 +1,11 @@
 package integration
 
 import (
-	"asservat.local/asservat/internal/contracts"
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"asservat.local/asservat/internal/contracts"
 )
 
 func TestInstalledPolicyProfileProtectedInputs(t *testing.T) {

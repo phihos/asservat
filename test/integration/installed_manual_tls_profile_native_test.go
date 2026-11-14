@@ -1,7 +1,6 @@
 package integration
 
 import (
-	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -18,7 +17,6 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/contracts"
-	"k8s.io/client-go/kubernetes"
 )
 
 const manualProfileTLSServerName = "profile.fixture.invalid"
@@ -151,67 +149,4 @@ func manualWrongTLSProfileArguments(cluster, namespace, workload string) map[str
 	component := arguments["profile_composition"].(map[string]any)["components"].([]any)[0].(map[string]any)
 	component["profileRef"] = map[string]string{"catalog": "namespace", "name": manualProfileWrongTLSProfile, "version": "v1"}
 	return arguments
-}
-
-// A second independently reviewed CPU action exercises a valid named endpoint
-// whose server name intentionally differs from the original app certificate.
-// It must fail before pprof HTTP, with retained admission and no artifact.
-func qualifyManualProfileTLSWrongPeer(t *testing.T, ctx context.Context, api kubernetes.Interface, namespace, pod, uid, regionalConfig, cluster, workload string, read func(string, any, any), readContext func(context.Context, string, any, any), invoke func(string, any) (installedJourneyEnvelope, string), approve func(string), check func(string, string, string) time.Time) {
-	t.Helper()
-	if check == nil {
-		t.Fatal("TLS refusal SQL evidence reader missing")
-	}
-	publishNamespaceCaptureProfile(t, ctx, regionalConfig, namespace, manualProfileWrongTLSProfile, "v1", manualWrongTLSProfileDefinition(t))
-	state := func() profileWorkloadState {
-		value, err := profileWorkloadControl(ctx, api, namespace, pod, uid, "state")
-		if err != nil {
-			t.Fatal("original TLS app state", err)
-		}
-		return value
-	}
-	before := state()
-	capture, grant := requestRefusedManualProfile(t, ctx, "wrong-tls-peer", pod, uid, manualWrongTLSProfileArguments(cluster, namespace, workload), read, invoke, approve, func() {
-		if state() != before {
-			t.Fatal("TLS preview/review contacted pprof")
-		}
-	})
-	poll, stop := context.WithTimeout(ctx, 30*time.Second)
-	defer stop()
-	var progress installedJourneyCaptureProgress
-	for {
-		readContext(poll, "get_capture", map[string]string{"capture_id": capture}, &progress)
-		if progress.CaptureID != capture {
-			t.Fatal("TLS refusal replaced capture")
-		}
-		if progress.Phase == "Failed" {
-			break
-		}
-		if progress.Phase != "Pending" && progress.Phase != "Running" {
-			t.Fatal("TLS refusal not a bounded terminal failure", progress)
-		}
-		if err := installedJourneyPause(poll, time.Second); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if progress.CaseID != "" || len(progress.Actions) != 1 || progress.Actions[0].Phase != "Failed" || progress.Actions[0].ReasonCode != "ProfileUnavailable" {
-		t.Fatal("wrong TLS peer exposed evidence or lost known refusal", progress)
-	}
-	cutoff := check(capture, grant, "ProfileUnavailable")
-	if cutoff.IsZero() {
-		t.Fatal("TLS refusal original slot cutoff missing")
-	}
-	if remaining := time.Until(cutoff); remaining > 0 {
-		if err := installedJourneyPause(ctx, remaining); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if state() != before {
-		t.Fatal("wrong TLS peer reached pprof HTTP, changed app profiler or retried")
-	}
-	var replay installedJourneyCaptureProgress
-	read("get_capture", map[string]string{"capture_id": capture}, &replay)
-	if replay.CaptureID != capture || replay.Phase != "Failed" || replay.CaseID != "" || len(replay.Actions) != 1 || replay.Actions[0] != progress.Actions[0] || state() != before {
-		t.Fatal("TLS refusal passive replay changed original outcome or reached pprof")
-	}
-	t.Logf("installed TLS wrong peer: original Pod=%s capture=%s; independently approved Failed/ProfileUnavailable, zero pprof GET delta, no artifact/retry, retained admission/control charge; health/control8080 separate from TLS6060", uid, capture)
 }

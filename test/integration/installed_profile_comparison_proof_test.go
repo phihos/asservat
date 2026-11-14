@@ -1,18 +1,19 @@
 package integration
 
 import (
-	value "asservat.local/asservat/internal/domain/authorization"
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
+	"testing"
+	"time"
+
+	value "asservat.local/asservat/internal/domain/authorization"
 	batch "k8s.io/api/batch/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
-	"reflect"
-	"testing"
-	"time"
 )
 
 // This reproduces fixture scheduling only: the next paid result may arrive
