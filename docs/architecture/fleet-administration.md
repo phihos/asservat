@@ -1,21 +1,59 @@
-# Protected fleet administration
+# Fleet administration and trust
 
-C-04/C-21 under REQ-FED-001 and TASK-03. Fleet operators enroll/revoke clusters; that installation responsibility does not grant workload collection, evidence reading or independent approval. The first protected administration projection is separate from workload AccessBinding roles and adds no public permission CRUD API.
+C-04/C-21 under REQ-FED-001, REQ-DB-005 and TASK-03. Fleet operators enroll and
+revoke clusters. That responsibility grants no workload collection, evidence
+reading or approval, and is separate from workload AccessBinding roles. There
+is no public permission CRUD API.
 
-`fleet.json` in a pinned, administrator-protected installation ConfigMap follows [fleet-settings/v1](../../specs/contracts/fleet-settings.schema.json). Its [example](../../examples/fleet-settings.json) declares the installation and issuer epoch, monotonic reviewed revision, suspension, one organization issuer, allowed clients, explicit qualified human/workload subjects or stable operator groups, approved secret-delivery profile names and finite enrollment/registry ceilings. Empty subjects/groups deny all new enrollment. No field may select an arbitrary delivery URL or place a secret in the response. A delivery profile name must resolve through the separate protected credential-delivery catalog.
+## Fleet settings
 
-The reader pins control-namespace UID and ConfigMap UID, reads only that configured object, rejects unknown fields and case aliases, and returns an original five-second observation deadline. It cannot mint current SQL trust, attest its own write protection or clear restore fencing. Invalid/replaced/stale configuration grants nothing. The configured issuer must be HTTPS with no user info, query or fragment. Identity resolution independently verifies issuer/client/class/organization membership and qualified current groups; those checks do not come from this fleet document.
+`fleet.json` follows [fleet-settings/v1](../../specs/contracts/fleet-settings.schema.json)
+([example](../../examples/fleet-settings.json)). The Helm chart renders it into a
+ConfigMap in the Asservat namespace. It declares:
 
-`EnrollmentAuthorizer` resolves the supplied credential through C-02 and checks current settings afterward. The pure decision requires an explicit operator subject/group, allowed client and selected approved delivery profile. Its deadline is the intersection of current identity and original fleet observation. It carries exact identity/settings revisions and finite ceilings for the eventual issuance transaction. A subject's human/workload class is significant; a same-named service account does not inherit a human assignment. A workload-maintainer group by itself cannot enroll clusters.
+- the installation and issuer epoch, and a monotonic revision;
+- administrative suspension;
+- one organization issuer (HTTPS, no user info, query or fragment) and the
+  allowed clients;
+- explicit human/workload operator subjects or stable operator group IDs
+  (empty lists deny all new enrollment);
+- approved credential-delivery profile names, resolved through the separate
+  [bootstrap channel](bootstrap-channel.md) catalog; no field selects a URL or
+  carries a secret;
+- enrollment ceilings: 1–128 active bootstrap slots, 1–65,536 retained bootstrap
+  records (≥ the active ceiling) and 1–1,024 registered clusters. These are
+  rejection bounds, not supported-scale claims; there are no silent defaults.
 
-The first bounds are administrator-selected values within implementation ceilings: 1–128 simultaneously active bootstrap slots, 1–65,536 retained bootstrap records (at least the active ceiling), and 1–1,024 registered clusters. These are rejection bounds, not qualified supported-scale claims. No defaults silently enlarge them. The SQL issuance producer must reserve under the current policy/root lock; these fields alone enforce no storage or enrollment rate limit. Finite request-rate and metadata-retention policies remain required before public ingress.
+hub-worker reads the file through a shared informer (or the mounted file) and
+rejects unknown fields and case aliases. A valid change is written to SQL
+`fleet_trust` as a new revision, in one transaction with a `NOTIFY` so other
+hub processes reload. The revision may advance but not regress, and the same
+revision cannot carry different content. Unchanged content writes nothing. The
+stored revision stays valid until a later change replaces it; it does not
+expire. A watch or parse failure keeps the last valid revision and reports the
+error; it does not suspend the installation.
 
-## Verification and remaining composition
+## Recovery fence
 
-The pure evaluator and bounded-reader race tests passed in `test/results/fleet-administration-unit.log`. They cover explicit operator/class/client/delivery separation, stale identity/settings, suspension, wrong installation/epoch, malformed or duplicate inputs, budget overflow, replacement UID and expiration during I/O. The real Kubernetes fixture passed pinned reads, native read-only RBAC and replacement rejection with exit 0 in `test/results/fleet-administration-integration-check.log`; its environment report records unchanged source hashes and complete cleanup.
+The recovery fence is the database incarnation. The `setup` Job seeds the first
+`fleet_trust` row with the incarnation of the freshly migrated database. A
+supported restore changes the PostgreSQL process/database incarnation and the
+restore procedure records the new incarnation before service resumes. Effects
+read the stored incarnation and suspension with plain MVCC in their own
+transaction and include the expected incarnation in their conditional write;
+they do not lock the trust row. A configuration change by itself never clears
+recovery or changes the issuer epoch.
 
-This component is a protected reader and authorization prerequisite. Production installation/admission qualification, SQL trust observation/restore checkpoints, audited bootstrap issuance, the actual browser enrollment command and delivery composition remain pending. A [bounded OpenBao credential-channel adapter](bootstrap-channel.md) now exists and has real-provider tests; it does not activate a bootstrap slot. Do not turn the example, a test identity, caller-created authority struct or constructor success into production authority.
+## Enrollment authorization
 
-[Audited bootstrap issuance](bootstrap-issuance.md) now composes reservations, credential delivery, encrypted issuance-intent audit and current atomic activation, with real PostgreSQL/S3/OpenBao tests. This supersedes the issuance-producer gap stated above; protected trust/recovery, provider lifecycle qualification and public ingress remain pending.
+`EnrollmentAuthorizer` authorizes a fleet operation once, using the caller's
+identity handle ([current request identity](current-request-identity.md)) and
+the current fleet revision. It requires an explicit operator subject or group,
+an allowed client and an approved delivery profile. A subject's human/workload
+class is significant: a same-named service account does not inherit a human
+assignment, and a workload-maintainer group cannot enroll clusters. The decision
+carries the identity and fleet revisions and the ceilings for the issuance
+transaction, which enforces them with conditional counts.
 
-The [SQL observer](fleet-observation.md) now projects finite protected configuration and fences stale/error results. It starts absent roots blocked and cannot clear recovery or change issuer epoch. Its real SQL tests pass; recovery activation remains pending.
+Issuance itself is described in [bootstrap issuance](bootstrap-issuance.md);
+connector enrollment in [connector enrollment](enrollment-activation.md).

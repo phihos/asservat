@@ -1,38 +1,32 @@
-# Local durable start journal
+# Start consumption
 
-C-07/C-11/C-20/C-21/C-24 under I-02, TASK-03/05 and S-01/S-02; partial REQ-FED-002, REQ-CAP-002/005 and REQ-ARC-003/004 implementation. This is a narrow local journal, not a node execution listener or a complete distributed permit service.
+C-07/C-11/C-20/C-21/C-24 under I-02, TASK-03/05 and S-01/S-02; part of REQ-FED-002, REQ-CAP-002/005 and REQ-ARC-003/004. Design follows [ADR-330](../decisions/330-event-driven-system-design.md) D7/D8.
 
-The first `CapacityReservation` profile, `onTriggerStart/v1`, stores one immutable prepaid effect. Operation/capture/action/attempt, cluster/issuer epoch, pod/node/boot/collector epoch, scope/authority/budget/audit digests, native-byte limit and original start interval are required. The interval is at most 60 seconds. No evidence, reason, command, tokens or keys enter this record. Record name is derived from the immutable attempt; the reference resolver also pins its original Kubernetes object UID. Work IDs, delivery fences and reconnects cannot choose another effect identity.
+An intrusive `onTrigger` effect starts at most once. The start right is one hub SQL row, `capture_start`, keyed by the attempt ID (the effect's idempotency key). It records operation/capture/action/attempt, target Pod (and node for node execution, executor Pod for the [regional API profile](api-context-runner.md)), scope and budget digests, native-byte limit and the original start interval (at most 60 seconds). No evidence, reason, command, token or key enters the row. There is no Kubernetes object per attempt.
 
-The capacity writer creates the object only after all required reservations are durably held, then makes it Ready. The execution role may only change Ready to StartCommitted through the status subresource. A resourceVersion compare-and-swap consumes the start before any effect. The adapter never creates, recreates, resets, refunds or deletes a reservation. Initial cleanup intentionally has no implementation or permission; finite record quotas and proven-spend retirement must precede production readiness.
+## States
 
-`ConsumeStart` checks original authority freshness before and after blocking API work, reads the fixed control namespace UID and exact record, verifies every immutable binding and issues a single non-retrying status PUT. Only receipt of the successful update while authority remains valid returns `MayStart`. A duplicate or restarted reader returns the existing disposition without this allowance. A lost reply requires `LookupStart`; lookup after the original deadline is useful for reconciliation but never authorizes execution. Expiry after the successful write leaves the record consumed. A crash between consumption and the effect may lose evidence; it cannot justify a second unproven start.
+1. **Ready.** Admission writes the row after the workload charge succeeds ([custody](custody-transactions.md)), in the same transaction.
+2. **StartCommitted.** The executor consumes the right with one conditional update before any effect:
 
-The structural CRD enforces bounds, immutable spec and forward-only consumption. A separately installed native admission policy separates capacity and execution users even if ordinary resource RBAC is broadened. It rejects deletion, parent owner references, metadata/spec updates and a consumer trying to create or mark Ready. Installation-policy protection and narrow production credentials still require qualification. Administrator control of admission itself remains a trust boundary, as for the permission guards.
+   ```sql
+   UPDATE capture_start SET state = 'StartCommitted', committed_at = clock_timestamp()
+    WHERE attempt_id = $1 AND state = 'Ready' AND clock_timestamp() < start_not_after
+   RETURNING attempt_id;
+   ```
 
-Native CEL matches the namespace name; it does not independently attest namespace UID. An attempted UID expression was rejected by the actual Kubernetes server because that metadata field is absent from its CEL namespace type (`test/results/local-start-namespace-cel-unavailable.log`). The journal and protected configuration readers therefore retain their independent API namespace-UID check on every read. The real namespace-replacement test exercises that authoritative boundary. A policy object's presence or a successful dry run cannot substitute for it.
+   One returned row is `MayStart`. Zero rows means the right was already consumed, expired or never existed; the caller reads the row to learn which.
+3. **Terminal.** Completion, failure or expiry records the outcome and releases unused charges (D7).
 
-`StartCommitted` means only that the right was consumed. It does not prove a process began, a capture succeeded, evidence committed or a writer stopped. The receiver must still authenticate enrollment, resolve current signed references, enforce the protected local ceiling, recheck the target, hold local process exclusion, and check the returned deadline immediately before the effect. No HTTP handler can accept an arbitrary `execution.Request` as authority. Duplicate response delivery, old collector processes and partition exclusion require the node-side gate; this adapter alone does not establish them.
+The executor reaches this update through its existing connection: collector → connector stream → hub. A lost reply is resolved by reading the row by attempt ID. Only the reply of the successful update authorizes the effect; a later read of `StartCommitted` never does. A crash between consumption and the effect may lose evidence; it never justifies a second start.
 
-## Verification
+`StartCommitted` means only that the right was consumed. It does not prove that a process began, a capture succeeded or evidence was committed. The executor still checks the returned deadline immediately before the effect and holds local process exclusion. No HTTP handler accepts an arbitrary `execution.Request` as authority.
 
-Actual TLS component tests race twelve callers, reconstruct the adapter, lose a committed PUT reply, expire authority during GET/PUT and substitute UID, namespace, boot, collector, audit, byte limit, generation, deletion state and owner references. A case-insensitive JSON field regression was reproduced before the exact-key check was added. The fixed component suite passes under the race detector (`test/results/local-start-unit.log`).
+Rows follow the capture's audit-retention partitioning; no separate cleanup is needed.
 
-The owned real Kubernetes fixture passed with exit 0, exercising the structural CRD, admission policy, separate users, Ready initialization, competing CAS, restart and denial of reset/mutation/deletion. The permission observation/reconciliation checks also passed. Source hashes were unchanged and all owned resources were removed. Results are in `test/results/local-start-integration-check.log`, `test/results/permission-admission.log` and the permission environment report. Go/import architecture, SQL generation, specification and architecture gates subsequently passed in `test/results/local-start-gates.log`. This is journal/admission evidence, not distributed node exclusion or full execution qualification.
+## Profiles
 
-
-ADR-106 adds the separate private `apiContextStart/v1` profile for the fixed
-regional API snapshot. Target node/boot fields are absent; executor Pod/account
-and process identity are mandatory. Each policy now matches its own control
-namespace so independent node/API journals can coexist. This does not replace
-the journal's exact namespace UID check. The API preparation, result and current
-qualification boundary are in [regional API execution](api-context-runner.md).
-
-The same API start profile accepts the finite logs producer's exact `logs`
-native type with a positive ceiling of 64 MiB and generated action ID. It keeps
-the original five-second start permit, executor Pod/account identity and absence
-of node/boot fields. This aligns the structural schema and reviewed CEL with
-the existing execution-domain binding; it adds no permission, runtime journal,
-retry or lifetime. The original installed logs attempt stopped at this contract
-mismatch. A synthetic server dry-run reproduced its rejection; full fresh
-installed logs qualification after the correction remains pending.
+| Profile | Executor | Native types |
+| --- | --- | --- |
+| `onTriggerStart/v1` | Node collector; binds node and target Pod | Action-specific |
+| `apiContextStart/v1` | Regional API executor; no node fields | `pod-status`; `logs` up to 64 MiB |
