@@ -1,5 +1,22 @@
 # Sustained implementation progress
 
+## Recovery fence and installer-era code removed (2026-11-14)
+
+Branch `clean/recovery`. Migration 00167 removes the database-incarnation
+fence (REQ-DB-005): no restart lineage, re-activation or derived recovery
+block; `fleet_current_trust.recovery_blocked` is a constant `false` kept for
+stored function bodies. Code unreachable from any command or test
+(`deadcode -test`) in installer, witness, initial-preparation,
+configuration-runtime and provider-setup files is deleted with the
+installer-era Kubernetes tests and the installation witness.
+`make database-recovery-integration` and `initial-installation-integration`
+are gone. Open: the setup recovery step of REQ-DB-005 (re-apply audited
+revocations, drop sessions, recompute usage) and the `recovery` chart values;
+`RecoveryProof`/`EffectTransactionGuards`, which still carry fleet trust
+identity into SQL capacity and connector functions; retention topology and
+proofs (D12); the installed-journey modes of `scripts/test-context-storage.py`
+whose Go tests no longer exist.
+
 ## Standing connector identity (ADR-332, 2026-11-14)
 
 Branch `fix/connector-backing-expiry`. Homelab defect: after the offer's
@@ -85,7 +102,7 @@ implement the canonical contract.
 | (no JSON schema) node channel | Hello with version and capabilities; no enroll/poll, CSR, boot ID or epoch | `internal/contracts/node_channel.go`, `internal/bootstrap/node_channel.go` |
 
 Schemas kept because Go still embeds them with production code paths:
-`work-trust`, `submission-trust`, `installation-witness` and `retention-topology`
+`work-trust`, `submission-trust` and `retention-topology`
 (`internal/adapters/kubernetes/permission_decode.go` and their readers). Remove
 each with its code.
 `local-key-configuration.schema.json` had no runtime consumer and is deleted.
