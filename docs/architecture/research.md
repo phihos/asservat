@@ -12,16 +12,13 @@ Checked 2026-10-09. These are primary references for architecture organization a
 | [Kubernetes API concepts](https://kubernetes.io/docs/reference/using-api/api-concepts/) | Resource versions support concurrency/watch behavior and must be treated as opaque. | CAS local control records and reconcile watch/relist freshness; no numeric comparison or claim of multi-object atomicity. |
 | [Kubernetes leases](https://kubernetes.io/docs/concepts/architecture/leases/) | Lease objects support coordination such as heartbeats and leader election. | Leader election selects work ownership; application attempt/epoch checks must still fence side effects. A lease is not evidence that an external process stopped. |
 | [Linux Unix sockets](https://man7.org/linux/man-pages/man7/unix.7.html) | Unix-domain sockets support local communication and peer-credential mechanisms. | A restricted local core-helper handoff. Credentials do not prove forensic truth against trusted host root or solve PID reuse. |
-| [JWS, RFC 7515](https://www.rfc-editor.org/rfc/rfc7515.html) | Standard signed-message serializations bind protected headers and payload bytes. | Use a maintained JOSE implementation for signed work, with strict size/key/purpose/algorithm policy and no remote key selection. No custom signature protocol. |
-| [Fully specified JOSE algorithms, RFC 9864](https://www.rfc-editor.org/rfc/rfc9864.html) | Defines the explicit Ed25519 identifier and deprecates the polymorphic EdDSA identifier. | Select Ed25519 JWS for v1 internal work. Qualify library/key-provider support; unsupported peers cannot silently reinterpret the identifier or downgrade to another algorithm. |
+| [Kubernetes informers and watch](https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes) | A LIST followed by WATCH delivers every change; a relist is needed only after the watch ends or its resource version expires (410). | Kubernetes state is held in shared informer caches that stay valid until the watch replaces them (ADR-330). |
 
 ## Design choices
 
 The accepted approach is a modular hub with independently scheduled API/background roles and separate privileged/local/offline roles. A shared Go binary does not make these one security identity. Feature modules remain code modules unless a demonstrated privilege/locality/lifetime/scaling boundary warrants a service. PostgreSQL, Kubernetes and regional objects retain their already accepted authority split.
 
-V1 signed control uses JWS compact serialization, protected `typ=asservat-internal-work+jws`, `alg=Ed25519` and a trusted configured `kid`. The payload is the exact canonical UTF-8 control-work JSON. Validate the decoded payload against the negotiated strict schema, then current authority/freshness/fences; do not use signature validity as sufficient permission. Private hub signing keys and separately delegated cluster signing keys use configured protected key handling and rotation. Node-start tickets have a distinct protected type/purpose and are restricted by the hub delegation and local ceiling. No key/algorithm supplied in an incoming message becomes trusted by itself. Library and key-provider qualification belongs to S-00, including old-key overlap bounded by permit expiry and no use after revocation.
-
-This signing refinement is internal only. It does not change OAuth/OIDC provider algorithms or prescribe the operator's TLS certificate algorithm. It also does not replace streaming evidence encryption. No cryptographic implementation or compatibility test was performed in this documentation pass.
+Internal work and results travel unsigned over mutually authenticated TLS connections ([peer identity](peer-identity.md)); every operation is authorized against current state by its owning component. Evidence keeps streaming envelope encryption.
 
 ## Reconciled gaps
 
@@ -29,9 +26,9 @@ This signing refinement is internal only. It does not change OAuth/OIDC provider
 | --- | --- |
 | Two illustrative package layouts | One canonical domain/application/adapter/transport layout and explicit dependency catalog |
 | Regional evidence index described as a hub process without locality qualification | Regional bounded index hosted with connector initially; hub caching only within allowed locality |
-| Controller-to-node interaction unspecified despite no inbound node requirement | Collector-initiated private mTLS plus narrow local reservation/checkpoint methods |
-| Leader leases could be mistaken for effect fencing | Stable start identity, durable disposition before effect, no replay on uncertainty |
-| Live traffic could be treated as durable control results | Separate transient owner/exchange path with no outbox/SQL row payload |
+| Controller-to-node interaction unspecified despite no inbound node requirement | Collector-initiated long-lived connection to its connector with pushed work |
+| Leader leases could be mistaken for effect fencing | Idempotency key stored with each effect; an unknown outcome is resolved by looking the key up |
+| Live traffic could be treated as durable control results | Separate transient stream on the connector connection with no SQL row payload |
 | Analysis images versus executable/SA ownership unclear | Role-selecting binary, separate image contents and acquire/analyze/publish identities |
 | Security work appeared later than generic collectors in task numbering | Implementation slices require authority/audit/privacy/capacity foundations before enabling effects |
 

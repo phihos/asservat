@@ -1,138 +1,84 @@
-# Named workload target resolution
+# Workload target resolution
 
-Initial C-05 observation adapter for the C-09 context preview path, under
-REQ-EXE-001/002, TASK-02/03 and S-01/S-02. This is private target observation,
-not public inventory, eligibility, capture admission or an execution permit.
+C-05 target resolution for the C-09 preview and request paths, under
+REQ-TGT-001/002/003/006, REQ-EXE-001/002, TASK-02/03/05 and S-01/S-02. It
+observes targets; it is not inventory permission, eligibility, admission or an
+execution permit.
 
-`targets.WorkloadRequest` accepts the existing public `target_ref` fields:
-cluster UUID, namespace name, kind (`Deployment`, `StatefulSet`, `Pod`) and
-name. The caller supplies no namespace/workload/pod UID, node facts, endpoint
-or credential. Bootstrap constructs `PodTargets` with an independently
-selected enrolled-cluster `PermissionClient`; another cluster ID is rejected
-before API I/O. No container selector or permission scope is introduced.
+## Source of state
+
+Each connector runs shared informers (LIST once, then WATCH) for Namespaces,
+Pods, ReplicaSets, Deployments, StatefulSets and, for the node-collector class,
+Nodes. Resolution reads these caches; it issues no per-request API GET or LIST.
+A cache stays valid while its informer is synced. After a watch failure the
+cache is unavailable until the relist completes, and resolution returns
+`Unavailable` rather than a stale or partial answer. The hub sends a resolution
+request as a stream on the [connector connection](regional-context-start.md)
+and receives the typed result on the same stream.
+
+The connector's ServiceAccount needs get/list/watch on those resources (Nodes
+only for the node class). These are read permissions; they grant no user
+authority to enumerate a namespace.
+
+## Request
+
+`targets.WorkloadRequest` accepts the public `target_ref` fields: cluster UUID,
+namespace name, kind (`Deployment`, `StatefulSet`, `Pod`) and name. The caller
+supplies no UID, node fact, endpoint or credential. A request for a cluster
+other than the connection's cluster is rejected. Scope is the whole Pod; there
+is no container selector.
+
+## Ownership
+
+Labels narrow candidates; they never establish ownership. A Deployment target
+requires the Pod → ReplicaSet → Deployment controller chain with matching
+names, API versions and UIDs; a StatefulSet requires the direct StatefulSet
+controller. A foreign owner with identical labels does not qualify.
+
+A direct Pod reference resolves its actual supported workload root. An owned
+Deployment/StatefulSet Pod keeps that workload's UID for permissions,
+retention and quotas. An unowned Pod uses its own UID, and a Pod that gains a
+controller after pinning no longer matches an unowned pin. Other controller
+families are unsupported and return a closed unsupported result.
+
+## Selection for the single-Pod context profile
+
+`builtin-pod-status-v1` captures one Pod. Among eligible candidates of the
+named workload (scheduled and nonterminating for the node class; any phase for
+the [API reader class](api-context-execution.md)), the resolver selects the
+first by lexical name whose controller chain belongs to the workload.
+Readiness and phase are not requirements: status collection stays useful for
+unhealthy Pods. The preview names the selected Pod (`lexicalEligiblePod`, or
+`explicitPod` for a direct reference) and states that the recipe collects one
+Pod. This does not change the all-replica monitoring default of other
+recipes.
+
+An unscheduled Pod returns `ErrUnscheduled` for the node class; the API class
+supports it without a node identity.
 
 ## Recording inventory root identity
 
-Manual recording inventory uses a separate `ResolveWorkloadIdentity` observation.
-It reads the named namespace and Deployment/StatefulSet identities without a Pod
-LIST, Pod selection, node lookup or replacement Pod. This permits discovery of
-retained recordings when the workload still exists with no live replicas. A
-direct Pod reference still resolves that actual Pod's supported owner; a deleted
-named object cannot be replaced with fabricated historical identity.
+`ResolveWorkloadIdentity` returns the current namespace and Deployment or
+StatefulSet UIDs without selecting a Pod, so retained recordings remain
+discoverable for a workload with no live replicas. A deleted object is not
+replaced with fabricated identity. Current workload eligibility precedes
+source lookup, and each original Pod still needs current eligibility before a
+row is returned.
 
-The typed result contains the exact input reference, current namespace/workload
-UIDs and the original first-read interval, bounded to five seconds. The existing
-private regional query channel carries it; unsupported resolvers return a closed
-unsupported result. Current workload eligibility must precede source lookup, and
-each original Pod still needs current collection eligibility before a row is
-returned. This result grants no source, capture or evidence authority. Existing
-`ResolveWorkload`/`ResolvePod` capture selection behavior is unchanged.
+## Result and pinning
 
-Cost: two existing namespace/workload GETs for Deployment/StatefulSet discovery,
-one bounded private query and no new permission, credential, service, watch,
-timer or user setting. No selector compilation or Pod payload is needed on that
-path. Direct Pod references retain their existing Pod/owner reads. Synthetic
-HTTP/query tests do not establish installed Kubernetes or multi-cluster runtime
-qualification.
+The result contains the exact input reference, namespace/workload/Pod UIDs,
+the immediate controller UID, the node name and UID for the node class, and
+resource versions. It contains no labels, annotations, container names,
+environment values or other raw API content.
 
-## Selecting one pod for the initial context profile
+Request acceptance resolves the same target again and compares it with the
+approved scope; a replaced Pod, workload root or node is never substituted and
+cannot extend an approval. The executing collector or API reader verifies the
+Pod UID once when the effect starts. No value returned here is a permission.
 
-`ResolveWorkload` observes the actual namespace and named workload. For a
-Deployment or StatefulSet it compiles that object's Kubernetes label selector,
-requests a bounded Pod LIST and requires a complete result with at most 256
-items. Empty/invalid selectors, continuation, excess items, inconsistent
-remaining counts, duplicate identities and incorrectly filtered results do
-not produce a selection. This path retains the existing 2 MiB per-response
-transport bound and does not request a stale Kubernetes resource version.
-
-The initial `builtin-pod-status-v1` profile captures one pod. The original
-node-collector class considers scheduled nonterminating candidates; the
-[API reader class](api-context-execution.md) also supports unscheduled pods.
-For its class's eligible candidates, the resolver checks names in lexical order and
-selects the first whose actual current controller chain belongs to the named
-workload. Labels only narrow candidate enumeration; they do not establish
-ownership. A Deployment requires Pod → ReplicaSet → Deployment identities;
-a StatefulSet requires the direct StatefulSet controller. A foreign owner
-with identical labels does not qualify. Unreadable or changed owner objects
-fail rather than being treated as an absent foreign owner.
-
-Readiness and running phase are not selection requirements: status collection
-must remain useful for unhealthy pods. A failed pod can therefore be selected.
-The preview uses `lexicalEligiblePod` (or `explicitPod` for a direct reference),
-must explicitly identify the selected pod and say that
-the recipe collects one pod. It must not imply diagnosis of every replica or
-choose a different pod at request acceptance. Workloads exceeding this bounded
-preview ceiling require an explicit Pod reference until the separate inventory
-workflow is implemented; this ceiling does not change the specified all-replica
-monitoring default.
-
-A direct Pod reference resolves its supported real workload root. An owned
-Deployment/StatefulSet pod retains that workload's UID for permissions,
-retention and quotas; it cannot manufacture a separate Pod workload allocation.
-An unowned Pod uses its own UID. Other controller families are explicitly
-unsupported by this initial resolver. Naming a Pod does not list siblings or
-choose a replacement.
-
-## Independent pins and deadlines
-
-The selected name and observed identities feed the existing `ResolvePod`
-implementation. It independently rechecks the exact namespace, pod and owner
-chain. The node class also pins scheduled node UID and node boot ID; the API
-class carries no invented node/runtime provenance. Its result is the existing
-`PodResolution`, without workload labels, annotations, container names,
-configuration or other raw API content. The operation retains its original I/O
-deadline and cancellation checks. Under [ADR-260](../decisions/260-api-target-observation-freshness.md),
-a successfully completed API-class observation retains at most five seconds
-from its earliest target read, independently of the completed transport proof's
-expiry. The later `ResolvePod` call cannot renew the first namespace/workload
-reads. Cancellation, clock rollback and expiry fail after blocking work.
-NodeExecution retains its existing caller/observation cutoff behavior.
-
-The coordinator authenticates the current caller and checks current ordinary
-eligibility for the exact resolved target before disclosing preview metadata.
-It must preserve the resulting `targets.Request` and canonical preview scope.
-Request acceptance refreshes that exact request using `ResolvePod`, then
-compares the approved scope. A replaced pod/root/node or changed boot identity
-cannot become an implicit alternative or extend a prior approval. No value
-returned here is a permission or recovery proof.
-
-For an approved packet request, `resolve-packet-recorder` combines exact Pod
-resolution and point-in-time recorder availability under one regional query.
-It retains the same eight Namespace/Pod/ReplicaSet/Deployment GETs for a
-Deployment target and reuses the final Pod's scheduling/status fields locally,
-removing the separate availability exchange and its two Namespace/Pod GETs.
-Source/owner authentication and ordinary entitlement checks remain separate;
-these counts do not include those unchanged reads. The API execution pin still
-has no node name, UID or boot identity. Availability is a transient observation,
-not authority or an added NodeView lease. Recording start independently rereads
-the Pod's node and requires a current collector report before enqueueing.
-
-The combined result keeps its original target observation interval; its query
-I/O and completion keep the original receiver deadline. Unsupported peers
-refuse; there is no fallback query, target replacement or restarted interval.
-Preview retains its existing workload selection
-and availability query because it also produces plans for unavailable or
-unsupported recorders. The combined path applies only to an exact approved
-packet target. Local fake-API/transport tests establish the GET counts, final
-Pod reuse and refusals; installed latency qualification is recorded separately.
-
-## Qualification and composition
-
-The focused real-TLS fake-API race suite passes in
-`test/results/workload-targets-unit.log`: domain 1.005 seconds and Kubernetes
-adapter 3.028 seconds, including existing pinned-Pod regressions. New cases
-cover real-owner selection despite spoofed matching labels, StatefulSet and
-owned/unowned Pod roots, bounded complete lists, duplicates, selector errors,
-RBAC denial, replacement, node reboot, original-deadline expiry and canceled
-I/O. The initial test run rejected client-go's legitimate `timeout=5s` query
-parameter; the fixture now explicitly checks it together with the selector and
-limit. No production restriction was relaxed.
-
-Native component results and any pending class-specific qualification are
-recorded in [implementation progress](../implementation-progress.md). These fixtures do not establish
-production reader credentials, namespace ownership protection, accepted
-permission projections, public workflows, discovery permissions or authority
-to execute a collection. The adapter needs read-only namespace/workload/
-ReplicaSet/Pod GET permissions and namespace-scoped Pod LIST; only the node
-class additionally requires Node GET. Adding those
-permissions to runtime installation remains separate from this implementation.
+For an approved packet request, `resolve-packet-recorder` returns the exact Pod
+resolution together with recorder availability from the node collectors'
+current status, in one response. Availability is an observation, not
+authority. Preview keeps its separate workload selection because it also
+produces plans for unavailable or unsupported recorders.
