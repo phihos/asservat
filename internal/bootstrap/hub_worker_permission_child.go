@@ -194,6 +194,14 @@ func (w *hubWorker) openPermission(ctx context.Context) (_ *permissionWorker, er
 	if err != nil {
 		return nil, err
 	}
+	// PermissionSources and ClusterAccessBindings name clusters (ADR-335 D4).
+	names := map[string]string{}
+	if c := w.config.Capacity; c != nil {
+		for _, r := range c.RemoteClusters {
+			names[r.Name] = r.ClusterID
+		}
+	}
+	observer = observer.WithClusterNames(names)
 	digest, err := permissionTrustDigest(cluster, permissionPlan(c, w.namespace))
 	if err != nil {
 		return nil, err
@@ -229,7 +237,7 @@ func (w *hubWorker) openPermission(ctx context.Context) (_ *permissionWorker, er
 	p.closers = append(p.closers, stopListening)
 	changes := postgres.Listen(listening, pools["permission-accept"], postgres.RemoteBindingsChannel)
 	p.reconciler = app.BindingReconciler{RootID: root, Reader: observer, Watcher: observer, Trust: trust, Store: store, Namespaces: namespaces, NamespaceClusterID: cluster,
-		Guards: &w.guards, Remote: &w.guards, Workloads: &w.guards, WorkloadGuards: &w.guards, RemoteBindings: remoteBindings, RemoteBindingChanges: changes, Now: time.Now, NewID: uuid.NewString}
+		Remote: &w.guards, Workloads: &w.guards, RemoteBindings: remoteBindings, RemoteBindingChanges: changes, Now: time.Now, NewID: uuid.NewString}
 	if id := c.Identity; id != nil {
 		uid, e := observer.ConfigMapUID(startup, id.Settings)
 		if e != nil {
@@ -237,9 +245,9 @@ func (w *hubWorker) openPermission(ctx context.Context) (_ *permissionWorker, er
 		}
 		settings, e := kube.NewIdentityPolicyClient(observer, id.Settings, uid, id.Issuer)
 		if e != nil {
-			return nil, &fixedStepError{"identity/directory", e}
+			return nil, &fixedStepError{"identity/settings", e}
 		}
-		p.reconciler.Directory = identityDirectory{settings}
+		p.reconciler.Issuer = id.Issuer
 		grants, e := postgres.NewPolicies(startup, pools["permission-accept"], root, installation)
 		if e != nil {
 			return nil, &fixedStepError{"identity/policy-grant-settings", e}

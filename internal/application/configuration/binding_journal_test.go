@@ -181,7 +181,4 @@ func TestBindingJournalScopeIsTheBindingsNamespace(t *testing.T) {
 	if err != nil || len(b.Bases) != 1 || b.Bases[0].Resource.UID != "binding" {
 		t.Fatalf("invalid binding granted: %v %+v", err, b.Bases)
 	}
-	if bases, _ := j.Budget(now); bases != 1 {
-		t.Fatal("invalid binding counted", bases)
-	}
 }

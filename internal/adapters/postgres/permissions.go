@@ -112,9 +112,6 @@ func currentPermissionRows(ctx context.Context, q *custodydb.Queries, root strin
 	if err != nil {
 		return nil, nil, err
 	}
-	if len(bases) > 1024 || len(rows) > 4096 {
-		return nil, nil, cfg.ErrLimit
-	}
 	out := map[string]custodydb.PermissionBasis{}
 	for _, b := range bases {
 		out[b.BasisKey] = b
@@ -596,9 +593,6 @@ func permissionProjection(ctx context.Context, q *custodydb.Queries, s custodydb
 	rows, err := q.SelectPermissionAssignments(ctx, custodydb.SelectPermissionAssignmentsParams{StreamID: s.ID, ClusterID: id(target.ClusterID), NamespaceUid: target.NamespaceUID, Column4: target.WorkloadUID})
 	if err != nil {
 		return authorization.Projection{}, err
-	}
-	if len(rows) > 256 {
-		return authorization.Projection{}, cfg.ErrLimit
 	}
 	until := identity.Earlier(s.FreshUntil.Time, s.LeaseUntil.Time)
 	out = authorization.Projection{Target: target, Revision: identity.Revision{UID: uid(s.Epoch), Generation: s.Sequence}, ObservedAt: s.ObservedAt.Time, FreshUntil: until, DeniesComplete: true, DeniesObservedAt: s.ObservedAt.Time, DeniesFreshUntil: until}

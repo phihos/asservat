@@ -62,9 +62,10 @@
                   "enabled": {
                     "type": "boolean"
                   },
-                  "clusterID": {
+                  "cluster": {
+                    "description": "Name of the cluster the source derives access in (ADR-335 D4).",
                     "type": "string",
-                    "format": "uuid"
+                    "pattern": "^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?$"
                   },
                   "type": {
                     "type": "string",
@@ -85,7 +86,7 @@
                           "minLength": 1,
                           "maxLength": 63
                         },
-                        "maxProperties": 16
+                        "description": "Label values are at most 63 characters (Kubernetes label syntax). Not capped: the Kubernetes object size limit (about 1.5 MiB in etcd) bounds this list."
                       }
                     },
                     "required": [
@@ -99,8 +100,8 @@
                       "minLength": 1,
                       "maxLength": 63
                     },
-                    "maxItems": 64,
-                    "x-kubernetes-list-type": "set"
+                    "x-kubernetes-list-type": "set",
+                    "description": "Namespace names (DNS label, 63 characters). Not capped: the Kubernetes object size limit (about 1.5 MiB in etcd) bounds this list."
                   },
                   "role": {
                     "type": "string",
@@ -110,16 +111,6 @@
                       "evidence-owner",
                       "action-approver"
                     ]
-                  },
-                  "maxDecisionAgeSeconds": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "maximum": 60
-                  },
-                  "maxNamespaces": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "maximum": 1000
                   },
                   "protection": {
                     "type": "object",
@@ -133,25 +124,17 @@
                       },
                       "reviewRef": {
                         "type": "string",
-                        "minLength": 1,
-                        "maxLength": 256
+                        "minLength": 1
                       },
                       "guardRef": {
                         "type": "string",
-                        "minLength": 1,
-                        "maxLength": 256
+                        "minLength": 1
                       }
                     },
                     "required": [
-                      "mode",
-                      "reviewRef"
+                      "mode"
                     ],
-                    "x-kubernetes-validations": [
-                      {
-                        "rule": "self.mode != \"admissionEnforced\" || has(self.guardRef)",
-                        "message": "An enforcing protection profile requires guardRef."
-                      }
-                    ]
+                    "description": "administratorManaged: the source itself is the administrator's statement. admissionEnforced: the Helm-rendered label ValidatingAdmissionPolicy protects the keys. reviewRef and guardRef are optional notes."
                   },
                   "metadataMapping": {
                     "type": "object",
@@ -166,45 +149,47 @@
                       "key": {
                         "type": "string",
                         "minLength": 1,
-                        "maxLength": 253
+                        "description": "Kubernetes label or annotation key (at most 253 characters)."
                       },
                       "mode": {
                         "type": "string",
                         "enum": [
-                          "groupID",
+                          "groupName",
                           "valueMap"
                         ]
                       },
                       "issuer": {
                         "type": "string",
-                        "format": "uri"
+                        "format": "uri",
+                        "description": "Defaults to the installation's issuer."
                       },
                       "values": {
                         "type": "object",
-                        "maxProperties": 128,
                         "additionalProperties": {
                           "type": "array",
                           "items": {
                             "type": "string",
-                            "minLength": 1,
-                            "maxLength": 256
+                            "minLength": 1
                           },
                           "minItems": 1,
-                          "maxItems": 16,
                           "x-kubernetes-list-type": "set"
                         }
+                      },
+                      "prefix": {
+                        "description": "groupName mode: prepended to the value (label values cannot contain /).",
+                        "type": "string",
+                        "minLength": 1
                       }
                     },
                     "required": [
                       "field",
                       "key",
-                      "mode",
-                      "issuer"
+                      "mode"
                     ],
                     "x-kubernetes-validations": [
                       {
-                        "rule": "self.mode == \"valueMap\" ? (has(self.values) && size(self.values) > 0) : !has(self.values)",
-                        "message": "valueMap requires nonempty values; groupID forbids values."
+                        "rule": "self.mode == \"valueMap\" ? (has(self.values) && size(self.values) > 0 && !has(self.prefix)) : !has(self.values)",
+                        "message": "valueMap requires nonempty values and no prefix; groupName forbids values."
                       }
                     ]
                   },
@@ -218,7 +203,7 @@
                           "minLength": 1,
                           "maxLength": 63
                         },
-                        "maxProperties": 16
+                        "description": "Label values are at most 63 characters (Kubernetes label syntax). Not capped: the Kubernetes object size limit (about 1.5 MiB in etcd) bounds this list."
                       }
                     },
                     "required": [
@@ -227,8 +212,7 @@
                   },
                   "identityMappingRef": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 63
+                    "minLength": 1
                   },
                   "admissionParity": {
                     "type": "object",
@@ -242,18 +226,15 @@
                       },
                       "reviewRef": {
                         "type": "string",
-                        "minLength": 1,
-                        "maxLength": 256
+                        "minLength": 1
                       },
                       "adapterRef": {
                         "type": "string",
-                        "minLength": 1,
-                        "maxLength": 63
+                        "minLength": 1
                       }
                     },
                     "required": [
-                      "mode",
-                      "reviewRef"
+                      "mode"
                     ],
                     "x-kubernetes-validations": [
                       {
@@ -282,17 +263,13 @@
                 },
                 "required": [
                   "enabled",
-                  "clusterID",
+                  "cluster",
                   "type",
-                  "namespaceSelector",
-                  "excludedNamespaces",
-                  "role",
-                  "maxDecisionAgeSeconds",
-                  "maxNamespaces"
+                  "role"
                 ],
                 "x-kubernetes-validations": [
                   {
-                    "rule": "self.type in [\"namespaceMetadata\", \"workloadMetadata\"] ? (has(self.protection) && has(self.metadataMapping) && !has(self.identityMappingRef) && !has(self.admissionParity) && !has(self.accessReview)) : (has(self.identityMappingRef) && has(self.admissionParity) && self.role in [\"evidence-reader\", \"workload-maintainer\"] && !has(self.protection) && !has(self.metadataMapping) && !has(self.workloadSelector))",
+                    "rule": "self.type in [\"namespaceMetadata\", \"workloadMetadata\"] ? (has(self.protection) && has(self.metadataMapping) && !has(self.identityMappingRef) && !has(self.admissionParity) && !has(self.accessReview)) : (has(self.identityMappingRef) && has(self.admissionParity) && !has(self.protection) && !has(self.metadataMapping) && !has(self.workloadSelector))",
                     "message": "Metadata and access-review sources require their own qualification fields."
                   },
                   {
@@ -336,10 +313,8 @@
                     "type": "array",
                     "items": {
                       "type": "string",
-                      "minLength": 1,
-                      "maxLength": 256
-                    },
-                    "maxItems": 16
+                      "minLength": 1
+                    }
                   }
                 },
                 "required": [

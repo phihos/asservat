@@ -2,6 +2,7 @@ package configuration
 
 import (
 	"slices"
+	"strings"
 	"time"
 
 	"asservat.local/asservat/internal/domain/artifact"
@@ -27,12 +28,9 @@ const (
 	ReviewWorkloadUpdate         = "workloadUpdate"
 )
 
-// MaxReviewSourcesPerCluster bounds the SubjectAccessReviews one request makes
-// on one cluster. Further sources of that cluster (in UID order) grant nothing.
-const MaxReviewSourcesPerCluster = 4
-
-// MaxDecisionAge is the REQ-PER-006 maximum positive source decision age.
-const MaxDecisionAge = 60 * time.Second
+// ReviewDecisionAge is how long an allowed review is reused
+// (identity.AuthorityRecheckInterval, ADR-311).
+const ReviewDecisionAge = identity.AuthorityRecheckInterval
 
 // ReviewSource is the accepted form of one decision-time source. It is
 // configuration, not a grant: a principal gains the role on one Pod only
@@ -44,10 +42,8 @@ type ReviewSource struct {
 	Check              string
 	NamespaceSelector  map[string]string `json:",omitempty"`
 	ExcludedNamespaces []string          `json:",omitempty"`
-	MaxDecisionAge     time.Duration
-	MaxNamespaces      int
 	IdentityMappingRef string
-	ParityReviewRef    string
+	ParityReviewRef    string `json:",omitempty"`
 }
 
 // SameAuthority reports whether two accepted versions decide whose access a
@@ -78,16 +74,16 @@ func ReviewSourceFor(s Source) (ReviewSource, string) {
 		}
 		check = ReviewPodExec
 	default:
-		if !slices.Contains([]string{ReviewNamespaceCaptureCreate, ReviewWorkloadGet, ReviewWorkloadPatch, ReviewWorkloadUpdate}, check) || s.Role != "evidence-reader" && s.Role != "workload-maintainer" {
+		// An access review may map to any role (REQ-PER-004).
+		if !slices.Contains([]string{ReviewNamespaceCaptureCreate, ReviewWorkloadGet, ReviewWorkloadPatch, ReviewWorkloadUpdate}, check) || !slices.Contains(Roles, s.Role) {
 			return ReviewSource{}, SourceUnsupported
 		}
 	}
 	p := s.AdmissionParity
-	if p.Mode != "noAdditionalRestrictions" || p.AdapterRef != "" || !identity.Text(p.ReviewRef, 256) || !identity.Text(s.IdentityMappingRef, 63) ||
-		!authorization.UUID(s.ClusterID) || s.MaxDecisionAge < time.Second || s.MaxDecisionAge > MaxDecisionAge || s.MaxNamespaces < 1 || s.MaxNamespaces > 1000 || len(s.ExcludedNamespaces) > 64 || len(s.NamespaceSelector) > 16 {
+	if p.Mode != "noAdditionalRestrictions" || p.AdapterRef != "" || !identity.Text(s.IdentityMappingRef, 63) || !authorization.UUID(s.ClusterID) {
 		return ReviewSource{}, SourceUnsupported
 	}
-	r := ReviewSource{Resource: s.Resource, Type: s.Type, ClusterID: s.ClusterID, Role: s.Role, Check: check, MaxDecisionAge: s.MaxDecisionAge, MaxNamespaces: s.MaxNamespaces, IdentityMappingRef: s.IdentityMappingRef, ParityReviewRef: p.ReviewRef}
+	r := ReviewSource{Resource: s.Resource, Type: s.Type, ClusterID: s.ClusterID, Role: s.Role, Check: check, IdentityMappingRef: s.IdentityMappingRef, ParityReviewRef: p.ReviewRef}
 	if len(s.NamespaceSelector) > 0 {
 		r.NamespaceSelector = map[string]string{}
 		for k, v := range s.NamespaceSelector {
@@ -104,7 +100,7 @@ func (r ReviewSource) Valid() bool {
 	if res.Kind != "PermissionSource" || !identity.Text(res.UID, 64) || !identity.Text(res.ResourceVersion, 128) || res.Generation < 1 || res.Generation > 2147483647 || res.SpecDigest == (artifact.Digest{}) || res.Deleting {
 		return false
 	}
-	want := Source{Resource: res, Enabled: true, Type: r.Type, ClusterID: r.ClusterID, Role: r.Role, NamespaceSelector: r.NamespaceSelector, ExcludedNamespaces: r.ExcludedNamespaces, MaxDecisionAge: r.MaxDecisionAge, MaxNamespaces: r.MaxNamespaces, IdentityMappingRef: r.IdentityMappingRef, AdmissionParity: AdmissionParity{Mode: "noAdditionalRestrictions", ReviewRef: r.ParityReviewRef}}
+	want := Source{Resource: res, Enabled: true, Type: r.Type, ClusterID: r.ClusterID, Role: r.Role, NamespaceSelector: r.NamespaceSelector, ExcludedNamespaces: r.ExcludedNamespaces, IdentityMappingRef: r.IdentityMappingRef, AdmissionParity: AdmissionParity{Mode: "noAdditionalRestrictions", ReviewRef: r.ParityReviewRef}}
 	if r.Type == SourceKubernetesAccessReview {
 		want.AccessReviewCheck = r.Check
 	}
@@ -117,44 +113,26 @@ func (r ReviewSource) Valid() bool {
 			return false
 		}
 	}
-	return identity.Strings(r.ExcludedNamespaces, 64, 63)
+	return identity.Strings(r.ExcludedNamespaces, len(r.ExcludedNamespaces), 63)
 }
 
 // ReviewSources selects the accepted decision-time sources of a source list:
-// valid kubernetesExec/kubernetesAccessReview sources, at most
-// MaxReviewSourcesPerCluster per cluster in UID order.
+// valid kubernetesExec/kubernetesAccessReview sources in UID order.
 func ReviewSources(sources []Source) []ReviewSource {
 	sorted := slices.Clone(sources)
-	slices.SortFunc(sorted, func(a, b Source) int {
-		switch {
-		case a.Resource.UID < b.Resource.UID:
-			return -1
-		case a.Resource.UID > b.Resource.UID:
-			return 1
-		}
-		return 0
-	})
+	slices.SortFunc(sorted, func(a, b Source) int { return strings.Compare(a.Resource.UID, b.Resource.UID) })
 	var out []ReviewSource
-	per := map[string]int{}
 	for _, s := range sorted {
-		r, reason := ReviewSourceFor(s)
-		if reason != "" || per[r.ClusterID] >= MaxReviewSourcesPerCluster {
-			continue
+		if r, reason := ReviewSourceFor(s); reason == "" {
+			out = append(out, r)
 		}
-		per[r.ClusterID]++
-		out = append(out, r)
 	}
 	return out
 }
 
-// ReviewDecisionUntil is the end of a positive review decided at decidedAt:
-// the source's maxDecisionAgeSeconds, never more than MaxDecisionAge.
+// ReviewDecisionUntil is the end of a positive review decided at decidedAt.
 func (r ReviewSource) ReviewDecisionUntil(decidedAt time.Time) time.Time {
-	age := r.MaxDecisionAge
-	if age > MaxDecisionAge || age <= 0 {
-		age = MaxDecisionAge
-	}
-	return decidedAt.Add(age)
+	return decidedAt.Add(ReviewDecisionAge)
 }
 
 // EquivalentReview reports whether an accepted review source version keeps

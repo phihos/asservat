@@ -44,26 +44,13 @@ func (s *bindingRun) refreshRemoteBindings(ctx context.Context) {
 // exactly like the hub cluster's (ADR-329), in cluster order. The last
 // delivery stays in effect until a newer one replaces it: connector liveness
 // is a health signal, not authority, and new remote actions need the
-// connector anyway. A cluster whose bases do not fit the stream's remaining
-// budget contributes nothing. Continuity is never claimed across deliveries.
-func (s *bindingRun) remoteBindingBases(now time.Time, out *inheritanceState, bases, rows *int) {
+// connector anyway.
+func (s *bindingRun) remoteBindingBases(now time.Time, out *inheritanceState) {
 	for _, cluster := range slices.Sorted(maps.Keys(s.remoteBindings)) {
-		d := s.remoteBindings[cluster]
-		var add []value.PermissionBasis
-		added := 0
-		for _, b := range d.Bindings {
-			if b.Invalid || (b.Resource.Deleting && b.Effect == "Allow") || (!b.NotAfter.IsZero() && !now.Before(b.NotAfter)) {
-				continue
+		for _, b := range s.remoteBindings[cluster].Bindings {
+			if p, ok := bindingBasis(b, now); ok {
+				out.Bases = append(out.Bases, p)
 			}
-			p := value.PermissionBasis{Resource: b.Resource, Scope: b.Scope, Effect: b.Effect, Subjects: slices.Clone(b.Subjects), Roles: slices.Clone(b.Roles), NotAfter: b.NotAfter, Automation: b.Automation}
-			p.ScopeDigest = PermissionScopeDigest(p)
-			add = append(add, p)
-			added += len(b.Subjects) * len(b.Roles)
 		}
-		if *bases+len(add) > 1024 || *rows+added > 4096 {
-			continue
-		}
-		*bases, *rows = *bases+len(add), *rows+added
-		out.Bases = append(out.Bases, add...)
 	}
 }

@@ -98,29 +98,6 @@ func TestReconcilerAcceptsRemoteClusterBindings(t *testing.T) {
 	}
 }
 
-// A cluster whose bindings exceed the stream's remaining budget contributes
-// nothing rather than a partial set.
-func TestReconcilerSkipsRemoteClusterOverBudget(t *testing.T) {
-	f, _, s, ctx := inheritanceRun(t)
-	var many []value.Binding
-	for i := range 1024 {
-		name := "b" + string(rune('a'+i%26)) + string(rune('a'+i/26%26)) + string(rune('a'+i/676))
-		many = append(many, remoteBinding(remoteCluster, name, "uid-"+name, "Allow"))
-	}
-	delivery := value.RemoteBindings{ClusterID: remoteCluster, ObservedAt: s.r.Now(), Bindings: many}
-	if !delivery.Valid() {
-		t.Fatal("fixture delivery invalid")
-	}
-	s.r.RemoteBindings = &remoteBindingFixture{deliveries: []value.RemoteBindings{delivery}}
-	s.refreshRemoteBindings(ctx)
-	if err := s.accept(ctx, false); err != nil {
-		t.Fatal(err)
-	}
-	if got := remoteBases(f.accepted[len(f.accepted)-1], remoteCluster); len(got) != 0 {
-		t.Fatalf("partial remote cluster accepted: %d bases", len(got))
-	}
-}
-
 func TestRemoteBindingsValidBounds(t *testing.T) {
 	d := value.RemoteBindings{ClusterID: remoteCluster, ObservedAt: time.Now(), Bindings: []value.Binding{remoteBinding(remoteCluster, "a", "uid-a", "Allow")}}
 	if !d.Valid() {
@@ -130,13 +107,7 @@ func TestRemoteBindingsValidBounds(t *testing.T) {
 	dup.Bindings = append(dup.Bindings, remoteBinding(remoteCluster, "a", "uid-b", "Allow"))
 	other := d
 	other.Bindings = []value.Binding{remoteBinding(inheritanceCluster, "a", "uid-a", "Allow")}
-	rows := d
-	b := remoteBinding(remoteCluster, "wide", "uid-w", "Allow")
-	for i := range 4097 {
-		b.Subjects = append(b.Subjects, value.Subject{Kind: "User", Issuer: "https://id.example.test", ID: string(rune(i))})
-	}
-	rows.Bindings = []value.Binding{b}
-	for name, bad := range map[string]value.RemoteBindings{"duplicate name": dup, "other cluster": other, "rows": rows} {
+	for name, bad := range map[string]value.RemoteBindings{"duplicate name": dup, "other cluster": other} {
 		if bad.Valid() {
 			t.Fatal(name)
 		}

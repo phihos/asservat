@@ -22,11 +22,11 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 )
 
+// permissionPageBytes bounds one LIST page response (64 objects of at most
+// the Kubernetes object size limit stay well below it for real specs).
 const (
-	permissionPageBytes  = 2 << 20
-	permissionTotalBytes = 8 << 20
-	permissionPageSize   = 64
-	permissionMaxObjects = 1024 // Per kind; overflow is unavailable, never partial.
+	permissionPageBytes = 2 << 20
+	permissionPageSize  = 64
 )
 
 // PermissionClient reads an explicit cluster endpoint. The hub reader lists
@@ -81,7 +81,24 @@ func NewPermissionClient(config *rest.Config, clusterID string, control value.Na
 	if err != nil {
 		return nil, err
 	}
+	v.clusters = map[string]string{LocalClusterName: clusterID}
 	return &PermissionClient{api: api, clusterID: clusterID, control: control, now: now, validator: v, bindings: &bindingNamespaces{byBinding: map[string]value.NamespaceRef{}}}, nil
+}
+
+// WithClusterNames returns c resolving the joined clusters' names (values
+// clusters[].name to clusterID) in PermissionSources and
+// ClusterAccessBindings, besides LocalClusterName for its own cluster.
+func (c *PermissionClient) WithClusterNames(names map[string]string) *PermissionClient {
+	out := *c
+	v := *c.validator
+	v.clusters = map[string]string{LocalClusterName: c.clusterID}
+	for name, id := range names {
+		if name != LocalClusterName && authorization.UUID(id) {
+			v.clusters[name] = id
+		}
+	}
+	out.validator = &v
+	return &out
 }
 
 // newBoundedAPI supplies transport restrictions shared by the narrow adapters.
@@ -243,9 +260,6 @@ func (c *PermissionClient) placeBinding(ctx context.Context, m permissionMetadat
 	}
 	c.bindings.mu.Lock()
 	defer c.bindings.mu.Unlock()
-	if len(c.bindings.byBinding) >= 4*permissionMaxObjects {
-		c.bindings.byBinding = map[string]value.NamespaceRef{}
-	}
 	c.bindings.byBinding[m.UID] = ref
 	return ref, nil
 }
@@ -270,23 +284,24 @@ func (c *PermissionClient) bindingNamespace(ctx context.Context, m permissionMet
 }
 
 // listPath is a kind's LIST path: every namespace for AccessBindings
-// (ADR-329), the control namespace for PermissionSources.
+// (ADR-329), the cluster for ClusterAccessBindings, the control namespace
+// for PermissionSources.
 func (c *PermissionClient) listPath(plural string) string {
-	if plural == "accessbindings" {
-		return "/apis/asservat.io/v1alpha1/accessbindings"
+	if plural == "accessbindings" || plural == "clusteraccessbindings" {
+		return "/apis/asservat.io/v1alpha1/" + plural
 	}
 	return "/apis/asservat.io/v1alpha1/namespaces/" + c.control.Name + "/" + plural
 }
 
 // list returns the complete LIST of one kind. Bindings whose namespace is not
 // yet known are returned in unplaced, and the LIST then is not complete.
-func (c *PermissionClient) list(ctx context.Context, kind, plural string, start time.Time, budget *int) (string, []permissionObject, []value.Resource, []permissionMetadata, error) {
+func (c *PermissionClient) list(ctx context.Context, kind, plural string, start time.Time) (string, []permissionObject, []value.Resource, []permissionMetadata, error) {
 	var objects []permissionObject
 	var refs []value.Resource
 	var unplaced []permissionMetadata
 	rv, continuation := "", ""
 	seenUID, seenName, seenContinue := map[string]bool{}, map[string]bool{}, map[string]bool{}
-	for page := 0; page < 32; page++ {
+	for {
 		if err := c.current(ctx, start, 5*time.Second); err != nil {
 			return "", nil, nil, nil, err
 		}
@@ -300,10 +315,6 @@ func (c *PermissionClient) list(ctx context.Context, kind, plural string, start 
 		if err != nil {
 			return "", nil, nil, nil, err
 		}
-		*budget -= len(b)
-		if *budget < 0 {
-			return "", nil, nil, nil, value.ErrLimit
-		}
 		meta, items, err := listEnvelope(b, kind)
 		if err != nil {
 			return "", nil, nil, nil, err
@@ -312,7 +323,7 @@ func (c *PermissionClient) list(ctx context.Context, kind, plural string, start 
 			return "", nil, nil, nil, value.ErrUnavailable
 		}
 		rv = meta.ResourceVersion
-		if len(items) > permissionPageSize || len(objects)+len(items) > permissionMaxObjects {
+		if len(items) > permissionPageSize {
 			return "", nil, nil, nil, value.ErrLimit
 		}
 		for _, item := range items {
@@ -320,9 +331,9 @@ func (c *PermissionClient) list(ctx context.Context, kind, plural string, start 
 			if err != nil || o.APIVersion != "asservat.io/v1alpha1" || o.Kind != kind {
 				return "", nil, nil, nil, value.ErrUnavailable
 			}
-			m, err := decodeMetadata(o.Metadata, false)
+			m, err := decodeObjectMetadata(o.Metadata, kind != value.ClusterAccessBindingKind)
 			key := m.Namespace + "/" + m.Name
-			if err != nil || kind != "AccessBinding" && m.Namespace != c.control.Name || seenUID[m.UID] || seenName[key] {
+			if err != nil || kind == "PermissionSource" && m.Namespace != c.control.Name || seenUID[m.UID] || seenName[key] {
 				return "", nil, nil, nil, value.ErrUnavailable
 			}
 			seenUID[m.UID], seenName[key] = true, true
@@ -347,7 +358,6 @@ func (c *PermissionClient) list(ctx context.Context, kind, plural string, start 
 		seenContinue[meta.Continue] = true
 		continuation = meta.Continue
 	}
-	return "", nil, nil, nil, value.ErrLimit
 }
 
 // PermissionSnapshot discards incomplete lists (including 410). A binding error
@@ -388,8 +398,7 @@ func (c *PermissionClient) snapshot(ctx context.Context) (value.Snapshot, []perm
 	if ns.Deleting {
 		return value.Snapshot{}, nil, value.ErrChanged
 	}
-	budget := permissionTotalBytes
-	rv, objects, refs, unplaced, err := c.list(ctx, "AccessBinding", "accessbindings", start, &budget)
+	rv, objects, refs, unplaced, err := c.list(ctx, "AccessBinding", "accessbindings", start)
 	if err != nil {
 		return value.Snapshot{}, nil, err
 	}
@@ -400,7 +409,16 @@ func (c *PermissionClient) snapshot(ctx context.Context) (value.Snapshot, []perm
 	for i, o := range objects {
 		out.Bindings = append(out.Bindings, c.validator.observedBinding(o, refs[i]))
 	}
-	rv, objects, refs, _, err = c.list(ctx, "PermissionSource", "permissionsources", start, &budget)
+	// ClusterAccessBindings deny as well, so an incomplete LIST fails the
+	// snapshot like AccessBindings.
+	_, objects, refs, _, err = c.list(ctx, value.ClusterAccessBindingKind, "clusteraccessbindings", start)
+	if err != nil {
+		return value.Snapshot{}, nil, err
+	}
+	for i, o := range objects {
+		out.ClusterBindings = append(out.ClusterBindings, c.validator.clusterBindings(o, refs[i])...)
+	}
+	rv, objects, refs, _, err = c.list(ctx, "PermissionSource", "permissionsources", start)
 	if err == nil {
 		out.SourcesComplete = true
 		out.SourceResourceVersion = rv

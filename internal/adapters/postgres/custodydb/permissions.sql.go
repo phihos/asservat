@@ -210,7 +210,7 @@ func (q *Queries) ListAuthorityAudit(ctx context.Context, streamID pgtype.UUID) 
 }
 
 const listCurrentPermissionAssignments = `-- name: ListCurrentPermissionAssignments :many
-SELECT id, stream_id, basis_key, subject_kind, issuer, subject_id, role, basis_digest, created_at, retired_at, activation_audit_id, retirement_audit_id FROM permission_assignment WHERE stream_id=$1 AND retired_at IS NULL ORDER BY id LIMIT 4097
+SELECT id, stream_id, basis_key, subject_kind, issuer, subject_id, role, basis_digest, created_at, retired_at, activation_audit_id, retirement_audit_id FROM permission_assignment WHERE stream_id=$1 AND retired_at IS NULL ORDER BY id
 `
 
 func (q *Queries) ListCurrentPermissionAssignments(ctx context.Context, streamID pgtype.UUID) ([]PermissionAssignment, error) {
@@ -247,7 +247,7 @@ func (q *Queries) ListCurrentPermissionAssignments(ctx context.Context, streamID
 }
 
 const listPermissionBases = `-- name: ListPermissionBases :many
-SELECT b.stream_id, b.basis_key, b.uid, b.kind, b.generation, b.resource_version, b.observation_version, b.spec_digest, b.scope_digest, b.cluster_id, b.namespace_uid, b.workload_uids, b.effect, b.not_after, b.seen_sequence, b.automation_json, b.automation_audit_id FROM permission_basis b WHERE b.stream_id=$1 AND EXISTS (SELECT 1 FROM permission_assignment a WHERE a.stream_id=b.stream_id AND a.basis_key=b.basis_key AND a.retired_at IS NULL) ORDER BY b.basis_key LIMIT 1025
+SELECT b.stream_id, b.basis_key, b.uid, b.kind, b.generation, b.resource_version, b.observation_version, b.spec_digest, b.scope_digest, b.cluster_id, b.namespace_uid, b.workload_uids, b.effect, b.not_after, b.seen_sequence, b.automation_json, b.automation_audit_id FROM permission_basis b WHERE b.stream_id=$1 AND EXISTS (SELECT 1 FROM permission_assignment a WHERE a.stream_id=b.stream_id AND a.basis_key=b.basis_key AND a.retired_at IS NULL) ORDER BY b.basis_key
 `
 
 func (q *Queries) ListPermissionBases(ctx context.Context, streamID pgtype.UUID) ([]PermissionBasis, error) {
@@ -551,8 +551,8 @@ SELECT a.id, a.stream_id, a.basis_key, a.subject_kind, a.issuer, a.subject_id, a
 au.object_key,au.object_version,au.object_etag,au.object_bytes,au.object_sha256
 FROM permission_assignment a JOIN permission_basis b ON a.stream_id=b.stream_id AND a.basis_key=b.basis_key
 LEFT JOIN authority_audit au ON au.id=a.activation_audit_id AND au.stream_id=a.stream_id
-WHERE a.stream_id=$1 AND a.retired_at IS NULL AND b.cluster_id=$2 AND b.namespace_uid=$3
-AND (cardinality(b.workload_uids)=0 OR $4::text=ANY(b.workload_uids)) ORDER BY a.id LIMIT 257
+WHERE a.stream_id=$1 AND a.retired_at IS NULL AND b.cluster_id=$2 AND b.namespace_uid IN ($3,'*')
+AND (cardinality(b.workload_uids)=0 OR $4::text=ANY(b.workload_uids)) ORDER BY a.id
 `
 
 type SelectPermissionAssignmentsParams struct {

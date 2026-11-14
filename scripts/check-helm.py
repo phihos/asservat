@@ -188,7 +188,7 @@ def check_accessbindings(render):
     view = named(docs, "ClusterRole", base + "-view")
     assert {k for k, v in view["metadata"]["labels"].items() if k.startswith("rbac.authorization.k8s.io/aggregate-to-") and v == "true"} == {
         "rbac.authorization.k8s.io/aggregate-to-view", "rbac.authorization.k8s.io/aggregate-to-edit", "rbac.authorization.k8s.io/aggregate-to-admin"}
-    assert view["rules"] == [{"apiGroups": ["asservat.io"], "resources": ["accessbindings"], "verbs": ["get", "list", "watch"]}]
+    assert view["rules"] == [{"apiGroups": ["asservat.io"], "resources": ["accessbindings", "clusteraccessbindings"], "verbs": ["get", "list", "watch"]}]
     admin = named(docs, "ClusterRole", base + "-admin")
     assert admin["metadata"]["labels"].get("rbac.authorization.k8s.io/aggregate-to-admin") == "true"
     assert "rbac.authorization.k8s.io/aggregate-to-edit" not in admin["metadata"]["labels"]
@@ -200,7 +200,7 @@ def check_accessbindings(render):
     rule, = policy["spec"]["matchConstraints"]["resourceRules"]
     # DELETE stays unchecked, like RoleBindings: the namespace controller
     # must be able to remove a deleted namespace's bindings.
-    assert rule["operations"] == ["CREATE", "UPDATE"] and rule["resources"] == ["accessbindings"] and policy["spec"]["failurePolicy"] == "Fail"
+    assert rule["operations"] == ["CREATE", "UPDATE"] and rule["resources"] == ["accessbindings", "clusteraccessbindings"] and policy["spec"]["failurePolicy"] == "Fail"
     expressions = [v["expression"] for v in policy["spec"]["validations"]]
     assert any("object.spec.roles.all(r, (request.operation == 'UPDATE' && has(oldObject.spec.roles) && r in oldObject.spec.roles) || authorizer.group('asservat.io').resource('accessroles').namespace(request.namespace).name(r).check('bind')" in e for e in expressions)
     assert any("name('automation').check('bind')" in e for e in expressions)
@@ -398,7 +398,8 @@ def main():
     expected = {p.name: yaml.safe_load(p.read_text()) for p in (CHART / "crds").glob("*.yaml")}
     # ADR-228 adds the hub-held DebugPolicy CRD (structural accepted subset).
     # S-04 increment 11 adds the CaptureProfile catalog CRD (REQ-CPR-001).
-    assert len(expected) == 5, "review newly added installation resources"
+    # ADR-335 D14 adds the cluster-scoped ClusterAccessBinding CRD.
+    assert len(expected) == 6, "review newly added installation resources"
     cache = Path(os.environ.get("ASSERVAT_BUILD_TMP", Path.home() / ".cache/asservat-build/tmp"))
     cache.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="helm-check-", dir=cache) as directory:

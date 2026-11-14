@@ -9,8 +9,7 @@ import (
 
 func reviewFixtureSource() Source {
 	return Source{Resource: Resource{Kind: "PermissionSource", UID: "exec-uid", ResourceVersion: "1", Generation: 1, SpecDigest: artifact.Digest{7}}, Enabled: true, Type: SourceKubernetesExec,
-		ClusterID: "11111111-1111-4111-8111-111111111111", Role: "workload-maintainer", NamespaceSelector: map[string]string{"managed": "true"}, ExcludedNamespaces: []string{"kube-system"},
-		MaxDecisionAge: 30 * time.Second, MaxNamespaces: 10, IdentityMappingRef: "company", AdmissionParity: AdmissionParity{Mode: "noAdditionalRestrictions", ReviewRef: "platform-review"}}
+		ClusterID: "11111111-1111-4111-8111-111111111111", Role: "workload-maintainer", NamespaceSelector: map[string]string{"managed": "true"}, ExcludedNamespaces: []string{"kube-system"}, IdentityMappingRef: "company", AdmissionParity: AdmissionParity{Mode: "noAdditionalRestrictions", ReviewRef: "platform-review"}}
 }
 
 func TestReviewSourceForAcceptsOnlyQualifiedDecisionTimeForms(t *testing.T) {
@@ -34,7 +33,6 @@ func TestReviewSourceForAcceptsOnlyQualifiedDecisionTimeForms(t *testing.T) {
 		},
 		"no parity":           func(s *Source) { s.AdmissionParity = AdmissionParity{} },
 		"no mapping":          func(s *Source) { s.IdentityMappingRef = "" },
-		"decision age > 60s":  func(s *Source) { s.MaxDecisionAge = 61 * time.Second },
 		"bad cluster":         func(s *Source) { s.ClusterID = "cluster" },
 		"owner role via exec": func(s *Source) { s.Role = "evidence-owner" },
 	} {
@@ -44,10 +42,11 @@ func TestReviewSourceForAcceptsOnlyQualifiedDecisionTimeForms(t *testing.T) {
 			t.Errorf("%s accepted", name)
 		}
 	}
-	owner := access
-	owner.Role = "evidence-owner"
-	if _, reason := ReviewSourceFor(owner); reason == "" {
-		t.Error("access review granted evidence-owner: SAR maintainership supplies no team ownership or sharing")
+	// REQ-PER-004: an access review maps to any role.
+	approver := access
+	approver.Role = "action-approver"
+	if _, reason := ReviewSourceFor(approver); reason != "" {
+		t.Error("access review refused action-approver", reason)
 	}
 }
 
@@ -82,7 +81,7 @@ func TestEquivalentReviewKeepsOnlyOneSpecTransitionWithSameAuthority(t *testing.
 	}
 }
 
-func TestReviewSourcesBoundedPerCluster(t *testing.T) {
+func TestReviewSourcesInUIDOrder(t *testing.T) {
 	var sources []Source
 	for _, uid := range []string{"e", "d", "c", "b", "a"} {
 		s := reviewFixtureSource()
@@ -90,8 +89,8 @@ func TestReviewSourcesBoundedPerCluster(t *testing.T) {
 		sources = append(sources, s)
 	}
 	got := ReviewSources(sources)
-	if len(got) != MaxReviewSourcesPerCluster || got[0].Resource.UID != "a" || got[3].Resource.UID != "d" {
-		t.Fatalf("per-cluster bound: %+v", got)
+	if len(got) != 5 || got[0].Resource.UID != "a" || got[4].Resource.UID != "e" {
+		t.Fatalf("review sources: %+v", got)
 	}
 	now := time.Now()
 	id := "22222222-2222-4222-8222-222222222222"
@@ -101,11 +100,6 @@ func TestReviewSourcesBoundedPerCluster(t *testing.T) {
 	}
 	for name, change := range map[string]func(*PermissionBatch){
 		"duplicate": func(b *PermissionBatch) { b.ReviewSources = append(got, got[0]) },
-		"over cluster": func(b *PermissionBatch) {
-			extra := got[0]
-			extra.Resource.UID = "z"
-			b.ReviewSources = append(got, extra)
-		},
 		"unreadable list": func(b *PermissionBatch) { b.SourcesUnavailable = true },
 		"tampered authority": func(b *PermissionBatch) {
 			b.ReviewSources = append([]ReviewSource{}, got...)

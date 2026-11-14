@@ -35,8 +35,7 @@ func (c *PermissionClient) AccessBindingDelivery(ctx context.Context) (contracts
 func (c *PermissionClient) bindingDelivery(ctx context.Context) (contracts.AccessBindingDelivery, []permissionMetadata, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	budget := permissionTotalBytes
-	rv, objects, refs, unplaced, err := c.list(ctx, "AccessBinding", "accessbindings", c.now(), &budget)
+	rv, objects, refs, unplaced, err := c.list(ctx, "AccessBinding", "accessbindings", c.now())
 	if err != nil || len(unplaced) != 0 {
 		return contracts.AccessBindingDelivery{}, unplaced, err
 	}
@@ -53,7 +52,7 @@ func (c *PermissionClient) bindingDelivery(ctx context.Context) (contracts.Acces
 // spec the embedded schema refuses becomes an invalid entry that grants and
 // denies nothing (ADR-329). Malformed identities refuse the whole delivery.
 func (d *AccessBindingSpecDecoder) DeliveredBindings(cluster string, delivery contracts.AccessBindingDelivery) ([]value.Binding, error) {
-	if d == nil || d.validator == nil || !identity.Text(delivery.ResourceVersion, 128) || len(delivery.Items) > value.MaxClusterBindings {
+	if d == nil || d.validator == nil || !identity.Text(delivery.ResourceVersion, 128) {
 		return nil, value.ErrInvalid
 	}
 	out := make([]value.Binding, 0, len(delivery.Items))

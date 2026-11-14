@@ -167,6 +167,7 @@
     ],
     "$defs": {
       "d1": {
+        "description": "Authored subject (ADR-335 D4): a user by username, a group by the name the provider emits (for example /payments) or a workload identity. issuer defaults to the installation's issuer.",
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -184,13 +185,11 @@
           },
           "id": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 256
+            "minLength": 1
           }
         },
         "required": [
           "kind",
-          "issuer",
           "id"
         ]
       },
@@ -217,19 +216,20 @@
           "name": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 253
+            "maxLength": 253,
+            "description": "Kubernetes object name (DNS subdomain)."
           },
           "uid": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 64
+            "description": "Kubernetes UID (a UUID; 64 characters leaves room for its textual forms)."
           }
         },
         "required": [
           "kind",
-          "name",
-          "uid"
-        ]
+          "name"
+        ],
+        "description": "Workload by kind and name; a recreated workload of the same name keeps its access. Optional uid pins one instance."
       },
       "d4": {
         "type": "object",
@@ -311,7 +311,6 @@
               "$ref": "#/$defs/d1"
             },
             "minItems": 1,
-            "maxItems": 32,
             "uniqueItems": true
           },
           "roles": {
@@ -320,7 +319,6 @@
               "$ref": "#/$defs/d2"
             },
             "minItems": 1,
-            "maxItems": 4,
             "uniqueItems": true
           },
           "workloads": {
@@ -329,7 +327,6 @@
               "$ref": "#/$defs/d3"
             },
             "minItems": 1,
-            "maxItems": 64,
             "uniqueItems": true
           },
           "notAfter": {
@@ -339,7 +336,7 @@
           "reason": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 512
+            "description": "Optional."
           },
           "automation": {
             "$ref": "#/$defs/d4"
@@ -348,8 +345,7 @@
         "required": [
           "effect",
           "subjects",
-          "roles",
-          "reason"
+          "roles"
         ],
         "allOf": [
           {
@@ -380,7 +376,8 @@
               }
             }
           }
-        ]
+        ],
+        "description": "Lists are not capped: the Kubernetes object size limit (about 1.5 MiB) bounds them; roles are bounded by their enum and uniqueItems."
       },
       "d5": {
         "type": "object",
@@ -389,12 +386,13 @@
           "name": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 63
+            "maxLength": 63,
+            "description": "Kubernetes namespace name (DNS label)."
           },
           "uid": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 64
+            "description": "Kubernetes UID (a UUID; 64 characters leaves room for its textual forms)."
           }
         },
         "required": [
@@ -413,7 +411,7 @@
               "minLength": 1,
               "maxLength": 63
             },
-            "maxProperties": 16
+            "description": "Label values are at most 63 characters (Kubernetes label syntax). Not capped: the Kubernetes object size limit (about 1.5 MiB in etcd) bounds this list."
           }
         },
         "required": [
@@ -433,35 +431,17 @@
           },
           "reviewRef": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 256
+            "minLength": 1
           },
           "guardRef": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 256
+            "minLength": 1
           }
         },
         "required": [
-          "mode",
-          "reviewRef"
+          "mode"
         ],
-        "allOf": [
-          {
-            "if": {
-              "properties": {
-                "mode": {
-                  "const": "admissionEnforced"
-                }
-              }
-            },
-            "then": {
-              "required": [
-                "guardRef"
-              ]
-            }
-          }
-        ]
+        "description": "administratorManaged: the source itself is the administrator's statement. admissionEnforced: the Helm-rendered label ValidatingAdmissionPolicy protects the keys. reviewRef and guardRef are optional notes."
       },
       "d9": {
         "type": "object",
@@ -477,40 +457,42 @@
           "key": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 253
+            "description": "Kubernetes label or annotation key (at most 253 characters)."
           },
           "mode": {
             "type": "string",
             "enum": [
-              "groupID",
+              "groupName",
               "valueMap"
             ]
           },
           "issuer": {
             "type": "string",
-            "format": "uri"
+            "format": "uri",
+            "description": "Defaults to the installation's issuer."
           },
           "values": {
             "type": "object",
-            "maxProperties": 128,
             "additionalProperties": {
               "type": "array",
               "items": {
                 "type": "string",
-                "minLength": 1,
-                "maxLength": 256
+                "minLength": 1
               },
               "minItems": 1,
-              "maxItems": 16,
               "uniqueItems": true
             }
+          },
+          "prefix": {
+            "description": "groupName mode: prepended to the value (label values cannot contain /).",
+            "type": "string",
+            "minLength": 1
           }
         },
         "required": [
           "field",
           "key",
-          "mode",
-          "issuer"
+          "mode"
         ],
         "allOf": [
           {
@@ -529,6 +511,11 @@
                 "values": {
                   "minProperties": 1
                 }
+              },
+              "not": {
+                "required": [
+                  "prefix"
+                ]
               }
             },
             "else": {
@@ -548,9 +535,10 @@
           "enabled": {
             "type": "boolean"
           },
-          "clusterID": {
+          "cluster": {
+            "description": "Name of the cluster the source derives access in (ADR-335 D4).",
             "type": "string",
-            "format": "uuid"
+            "pattern": "^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?$"
           },
           "type": {
             "type": "string",
@@ -571,21 +559,11 @@
               "minLength": 1,
               "maxLength": 63
             },
-            "maxItems": 64,
-            "uniqueItems": true
+            "uniqueItems": true,
+            "description": "Namespace names (DNS label, 63 characters). Not capped: the Kubernetes object size limit (about 1.5 MiB in etcd) bounds this list."
           },
           "role": {
             "$ref": "#/$defs/d2"
-          },
-          "maxDecisionAgeSeconds": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 60
-          },
-          "maxNamespaces": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 1000
           },
           "protection": {
             "$ref": "#/$defs/d8"
@@ -598,8 +576,7 @@
           },
           "identityMappingRef": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 63
+            "minLength": 1
           },
           "admissionParity": {
             "type": "object",
@@ -614,18 +591,15 @@
               },
               "reviewRef": {
                 "type": "string",
-                "minLength": 1,
-                "maxLength": 256
+                "minLength": 1
               },
               "adapterRef": {
                 "type": "string",
-                "minLength": 1,
-                "maxLength": 63
+                "minLength": 1
               }
             },
             "required": [
-              "mode",
-              "reviewRef"
+              "mode"
             ],
             "allOf": [
               {
@@ -672,13 +646,9 @@
         },
         "required": [
           "enabled",
-          "clusterID",
+          "cluster",
           "type",
-          "namespaceSelector",
-          "excludedNamespaces",
-          "role",
-          "maxDecisionAgeSeconds",
-          "maxNamespaces"
+          "role"
         ],
         "allOf": [
           {
@@ -722,15 +692,6 @@
                 "identityMappingRef",
                 "admissionParity"
               ],
-              "properties": {
-                "role": {
-                  "type": "string",
-                  "enum": [
-                    "evidence-reader",
-                    "workload-maintainer"
-                  ]
-                }
-              },
               "not": {
                 "anyOf": [
                   {
@@ -1341,8 +1302,7 @@
           },
           "id": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 256
+            "minLength": 1
           }
         },
         "required": [

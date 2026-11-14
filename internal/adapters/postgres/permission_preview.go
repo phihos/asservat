@@ -36,9 +36,6 @@ func (p *Permissions) PreviewProjections(ctx context.Context, r cfg.PreviewRead)
 		if err != nil {
 			return err
 		}
-		if len(bases) > 1024 {
-			return cfg.ErrLimit
-		}
 		namespaces := slices.Clone(r.Namespaces)
 		// ADR-245: a decision-time source has no basis; its persistent
 		// per-principal assignments, with the workloads they were reviewed
@@ -111,8 +108,7 @@ func (p *Permissions) PreviewProjections(ctx context.Context, r cfg.PreviewRead)
 					continue
 				}
 				if src.Type == "workloadMetadata" {
-					// ADR-247: a workload source needs a current workload guard
-					// proof, which the preview does not read.
+					// ADR-247: the preview reads no workload journal.
 					out.Sources = append(out.Sources, cfg.PreviewSourceGrants{Unevaluated: cfg.MetadataUnavailable})
 					continue
 				}
@@ -124,10 +120,6 @@ func (p *Permissions) PreviewProjections(ctx context.Context, r cfg.PreviewRead)
 				switch reason {
 				case cfg.MetadataUnavailable, cfg.MetadataNotObserved:
 					out.Sources = append(out.Sources, cfg.PreviewSourceGrants{Unevaluated: reason})
-					continue
-				case cfg.GuardUnavailable, cfg.DirectoryUnavailable:
-					// The preview reads no guard proof or group directory.
-					out.Sources = append(out.Sources, cfg.PreviewSourceGrants{Unevaluated: cfg.MetadataUnavailable})
 					continue
 				}
 				out.Sources = append(out.Sources, cfg.PreviewSourceGrants{Grants: grants})

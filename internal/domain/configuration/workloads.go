@@ -9,10 +9,6 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 )
 
-// MaxObservedWorkloads bounds one workload journal (ADR-247); more selected
-// workloads make it unavailable, never partial.
-const MaxObservedWorkloads = 4096
-
 // WorkloadKinds are the controllers a workloadMetadata source reads.
 var WorkloadKinds = []string{"Deployment", "StatefulSet"}
 
@@ -25,7 +21,7 @@ type WorkloadSelection struct {
 }
 
 func (s WorkloadSelection) Valid() bool {
-	if len(s.Selector) == 0 || len(s.Selector) > 16 || !s.Keys.Valid() || len(s.Keys.Labels)+len(s.Keys.Annotations) == 0 {
+	if len(s.Selector) == 0 || !s.Keys.Valid() || len(s.Keys.Labels)+len(s.Keys.Annotations) == 0 {
 		return false
 	}
 	for k, v := range s.Selector {
@@ -74,7 +70,7 @@ type WorkloadObservation struct {
 }
 
 func (o WorkloadObservation) Valid() bool {
-	if !authorization.UUID(o.ClusterID) || !o.Selection.Valid() || len(o.Workloads) > MaxObservedWorkloads {
+	if !authorization.UUID(o.ClusterID) || !o.Selection.Valid() {
 		return false
 	}
 	for i, w := range o.Workloads {

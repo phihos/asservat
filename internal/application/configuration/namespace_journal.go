@@ -52,7 +52,7 @@ func cloneNamespace(n value.ObservedNamespace) value.ObservedNamespace {
 }
 
 func NewNamespaceJournal(l value.NamespaceList) (*NamespaceJournal, error) {
-	if !authorization.UUID(l.ClusterID) || !identity.Text(l.ResourceVersion, 128) || !l.Keys.Valid() || l.ObservedAt.IsZero() || len(l.Namespaces) > value.MaxObservedNamespaces {
+	if !authorization.UUID(l.ClusterID) || !identity.Text(l.ResourceVersion, 128) || !l.Keys.Valid() || l.ObservedAt.IsZero() {
 		return nil, value.ErrInvalid
 	}
 	j := &NamespaceJournal{cluster: l.ClusterID, keys: l.Keys, byUID: map[string]value.ObservedNamespace{}, observed: l.ObservedAt}
@@ -107,9 +107,6 @@ func (j *NamespaceJournal) Apply(e value.NamespaceEvent) error {
 			if uid != n.UID && other.Name == n.Name {
 				return fail()
 			}
-		}
-		if !exists && len(j.byUID) >= value.MaxObservedNamespaces {
-			return fail()
 		}
 		if !sameObserved(old, *n, exists, true) {
 			j.changed(n.UID)

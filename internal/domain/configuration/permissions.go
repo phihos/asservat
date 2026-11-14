@@ -28,7 +28,18 @@ type Resource struct {
 	SpecDigest                                                           artifact.Digest
 	Deleting                                                             bool
 }
+
+// Subject is a user, group or workload identity. An empty Issuer is the
+// installation's issuer (ADR-335 D4); it is filled in before acceptance.
 type Subject struct{ Kind, Issuer, ID string }
+
+// ClusterAccessBindingKind is the cluster-scoped AccessBinding (ADR-335 D14).
+// Its bases cover AllNamespaces of each cluster it names.
+const ClusterAccessBindingKind = "ClusterAccessBinding"
+
+// AllNamespaces is the namespace of a ClusterAccessBinding basis.
+var AllNamespaces = NamespaceRef{Name: "*", UID: "*"}
+
 type NamespaceRef struct{ Name, UID string }
 type WorkloadRef struct{ Kind, Name, UID string }
 type Scope struct {
@@ -62,8 +73,6 @@ type Source struct {
 	Type, ClusterID, Role string
 	NamespaceSelector     map[string]string
 	ExcludedNamespaces    []string
-	MaxDecisionAge        time.Duration
-	MaxNamespaces         int
 	Protection            Protection
 	Mapping               Mapping
 	// WorkloadSelector selects the Deployments/StatefulSets a
@@ -92,9 +101,12 @@ type Snapshot struct {
 	BindingResourceVersion, SourceResourceVersion string
 	ObservedAt, FreshUntil                        time.Time
 	Bindings                                      []Binding
-	Sources                                       []Source
-	SourcesComplete                               bool
-	InvalidSources                                []Resource
+	// ClusterBindings are the hub cluster's ClusterAccessBindings, one
+	// binding per cluster each covers (ADR-335 D14).
+	ClusterBindings []Binding
+	Sources         []Source
+	SourcesComplete bool
+	InvalidSources  []Resource
 }
 
 // NamespaceQuery is assembled internally from configured keys, not from a
@@ -156,20 +168,15 @@ type NamespaceObservation struct {
 	Namespaces []ObservedNamespace
 }
 
-// MaxObservedNamespaces bounds one cluster's observation; more namespaces
-// carrying an observed key make the observation unavailable, never partial.
-const MaxObservedNamespaces = 4096
-
 // Why a namespaceMetadata source grants nothing or cannot be evaluated
-// (ADR-242). Disabled, SourceUnsupported and TooManyNamespaces are settled
-// configuration: the source grants nothing. MetadataUnavailable and
+// (ADR-242). Disabled and SourceUnsupported are settled configuration: the
+// source grants nothing. MetadataUnavailable and
 // MetadataNotObserved mean that its current namespace metadata is unknown.
 const (
-	SourceDisabled          = "Disabled"
-	SourceUnsupported       = "SourceUnsupported"
-	SourceTooManyNamespaces = "TooManyNamespaces"
-	MetadataUnavailable     = "MetadataUnavailable"
-	MetadataNotObserved     = "MetadataNotObserved"
+	SourceDisabled      = "Disabled"
+	SourceUnsupported   = "SourceUnsupported"
+	MetadataUnavailable = "MetadataUnavailable"
+	MetadataNotObserved = "MetadataNotObserved"
 	// DecisionTimeSource is a supported kubernetesExec/kubernetesAccessReview
 	// source (ADR-245): it grants per principal and Pod at request time, so
 	// a configuration preview cannot evaluate it.
@@ -196,8 +203,8 @@ func hexDigest(s string) bool {
 }
 
 func (k NamespaceKeys) Valid() bool {
-	return len(k.Labels)+len(k.Annotations) <= 32 && slices.IsSorted(k.Labels) && slices.IsSorted(k.Annotations) &&
-		identity.Strings(k.Labels, 32, 317) && identity.Strings(k.Annotations, 32, 317)
+	return slices.IsSorted(k.Labels) && slices.IsSorted(k.Annotations) &&
+		identity.Strings(k.Labels, len(k.Labels), 317) && identity.Strings(k.Annotations, len(k.Annotations), 317)
 }
 
 // Valid checks one observed namespace against keys; live requires the opaque
@@ -220,7 +227,7 @@ func (n ObservedNamespace) Valid(k NamespaceKeys, live bool) bool {
 }
 
 func (o NamespaceObservation) Valid() bool {
-	if !authorization.UUID(o.ClusterID) || !o.Keys.Valid() || len(o.Keys.Labels)+len(o.Keys.Annotations) == 0 || len(o.Namespaces) > MaxObservedNamespaces {
+	if !authorization.UUID(o.ClusterID) || !o.Keys.Valid() || len(o.Keys.Labels)+len(o.Keys.Annotations) == 0 {
 		return false
 	}
 	names := map[string]bool{}
@@ -269,52 +276,4 @@ func ProposeBinding(b Binding, target Target, now time.Time) Proposal {
 		}
 	}
 	return Proposal{Candidates: out, Reason: "RequiresAcceptance"}
-}
-
-// Why a guarded or group-ID source grants nothing for now (ADR-247): its
-// admission guard proof or the configured group directory is not current.
-// Like MetadataUnavailable, the source's accepted assignments are kept but
-// grant nothing until a current observation is accepted.
-const (
-	GuardUnavailable     = "GuardUnavailable"
-	DirectoryUnavailable = "DirectoryUnavailable"
-)
-
-// NamespaceGuardProof is a current proof that an enforcing admission guard
-// protects these namespace label and annotation keys of one cluster against
-// writers other than its administrators (ADR-247): a live dry-run denial of
-// an unprivileged probe, within its original interval. It says nothing about
-// historical values: the source's reviewRef attests their review.
-type NamespaceGuardProof struct {
-	ClusterID, Name           string
-	LabelKeys, AnnotationKeys []string
-	ObservedAt, FreshUntil    time.Time
-}
-
-// GroupDirectory is the administrator-configured set of stable group IDs of
-// one issuer (the protected identity settings' eligibleGroups) that groupID
-// mapping validates values against (ADR-247). It is not a directory reader.
-type GroupDirectory struct {
-	Issuer                 string
-	Groups                 []string
-	ObservedAt, FreshUntil time.Time
-}
-
-// SourceEvidence is what a guarded or group-ID source needs at evaluation
-// time; nil fields are unknown.
-type SourceEvidence struct {
-	Guard *NamespaceGuardProof
-	// WorkloadGuard proves the workload metadata guard of a
-	// workloadMetadata source's cluster (ADR-247).
-	WorkloadGuard *NamespaceGuardProof
-	Directory     *GroupDirectory
-	Now           time.Time
-}
-
-func (p *NamespaceGuardProof) Current(now time.Time) bool {
-	return p != nil && !now.Before(p.ObservedAt) && now.Before(p.FreshUntil) && p.FreshUntil.Sub(p.ObservedAt) <= 30*time.Second
-}
-
-func (d *GroupDirectory) Current(now time.Time) bool {
-	return d != nil && !now.Before(d.ObservedAt) && now.Before(d.FreshUntil) && d.FreshUntil.Sub(d.ObservedAt) <= 5*time.Minute
 }

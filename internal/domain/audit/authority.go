@@ -70,7 +70,7 @@ type ReviewDecisionChange struct {
 func (c ReviewDecisionChange) valid() bool {
 	switch c.Change {
 	case ReviewGranted, ReviewRestored:
-		if c.Outcome != "Allowed" || !c.FreshUntil.After(c.DecidedAt) || c.FreshUntil.After(c.DecidedAt.Add(configuration.MaxDecisionAge)) {
+		if c.Outcome != "Allowed" || !c.FreshUntil.After(c.DecidedAt) || c.FreshUntil.After(c.DecidedAt.Add(configuration.ReviewDecisionAge)) {
 			return false
 		}
 	case ReviewRevoked:

@@ -3,31 +3,37 @@ export type paths = Record<string, never>;
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description Lists are not capped: the Kubernetes object size limit (about 1.5 MiB) bounds them; roles are bounded by their enum and uniqueItems. */
         Contract_access_binding_ad816c81a7733f89: {
             /** @enum {string} */
             effect: "Allow" | "Deny";
-            subjects: components["schemas"]["Contract_permission_common_3ecc34f302c77f66"][];
+            subjects: components["schemas"]["Contract_permission_common_29c9711e543c29dd"][];
             roles: components["schemas"]["Contract_permission_common_4158ef06eeec0fc1"][];
             workloads?: components["schemas"]["Contract_permission_common_a7eab82de91b4ad7"][];
             /** Format: date-time */
             notAfter?: string;
-            reason: string;
+            /** @description Optional. */
+            reason?: string;
             automation?: components["schemas"]["Contract_policy_authority_82c5ee701fbfe76f"];
         } & unknown;
-        Contract_permission_common_3ecc34f302c77f66: {
+        /** @description Authored subject (ADR-335 D4): a user by username, a group by the name the provider emits (for example /payments) or a workload identity. issuer defaults to the installation's issuer. */
+        Contract_permission_common_29c9711e543c29dd: {
             /** @enum {string} */
             kind: "User" | "Group" | "Workload";
             /** Format: uri */
-            issuer: string;
+            issuer?: string;
             id: string;
         };
         /** @enum {string} */
         Contract_permission_common_4158ef06eeec0fc1: "evidence-reader" | "workload-maintainer" | "evidence-owner" | "action-approver";
+        /** @description Workload by kind and name; a recreated workload of the same name keeps its access. Optional uid pins one instance. */
         Contract_permission_common_a7eab82de91b4ad7: {
             /** @enum {string} */
             kind: "Deployment" | "StatefulSet";
+            /** @description Kubernetes object name (DNS subdomain). */
             name: string;
-            uid: string;
+            /** @description Kubernetes UID (a UUID; 64 characters leaves room for its textual forms). */
+            uid?: string;
         };
         Contract_policy_authority_82c5ee701fbfe76f: {
             allowedActions: ("kubernetesSnapshot" | "logs" | "processSnapshot" | "fileRead" | "packetCapture" | "networkSnapshot" | "runtimeDiagnostic" | "kernelCore" | "liveCore" | "command" | "httpDiagnostic" | "artifactCollect" | "profile" | "syscallTrace")[];
@@ -38,20 +44,21 @@ export interface components {
             maxObservedEvents?: number;
         };
         Contract_permission_common_94881780cf4467f4: {
+            /** @description Kubernetes namespace name (DNS label). */
             name: string;
+            /** @description Kubernetes UID (a UUID; 64 characters leaves room for its textual forms). */
             uid: string;
         };
         Contract_permission_source_ad816c81a7733f89: {
             enabled: boolean;
-            /** Format: uuid */
-            clusterID: string;
+            /** @description Name of the cluster the source derives access in (ADR-335 D4). */
+            cluster: string;
             /** @enum {string} */
             type: "namespaceMetadata" | "workloadMetadata" | "kubernetesExec" | "kubernetesAccessReview";
-            namespaceSelector: components["schemas"]["Contract_permission_common_f38038cf755001e7"];
-            excludedNamespaces: string[];
+            namespaceSelector?: components["schemas"]["Contract_permission_common_f38038cf755001e7"];
+            /** @description Namespace names (DNS label, 63 characters). Not capped: the Kubernetes object size limit (about 1.5 MiB in etcd) bounds this list. */
+            excludedNamespaces?: string[];
             role: components["schemas"]["Contract_permission_common_4158ef06eeec0fc1"];
-            maxDecisionAgeSeconds: number;
-            maxNamespaces: number;
             protection?: components["schemas"]["Contract_permission_common_75520915533164b6"];
             metadataMapping?: components["schemas"]["Contract_permission_common_f75e769ddd84f0e8"];
             workloadSelector?: components["schemas"]["Contract_permission_common_f38038cf755001e7"];
@@ -59,7 +66,7 @@ export interface components {
             admissionParity?: {
                 /** @enum {string} */
                 mode: "noAdditionalRestrictions" | "qualifiedAdapter";
-                reviewRef: string;
+                reviewRef?: string;
                 adapterRef?: string;
             } & unknown;
             accessReview?: {
@@ -68,27 +75,35 @@ export interface components {
             };
         } & (unknown & unknown & unknown & unknown);
         Contract_permission_common_f38038cf755001e7: {
+            /** @description Label values are at most 63 characters (Kubernetes label syntax). Not capped: the Kubernetes object size limit (about 1.5 MiB in etcd) bounds this list. */
             matchLabels: {
                 [key: string]: string;
             };
         };
+        /** @description administratorManaged: the source itself is the administrator's statement. admissionEnforced: the Helm-rendered label ValidatingAdmissionPolicy protects the keys. reviewRef and guardRef are optional notes. */
         Contract_permission_common_75520915533164b6: {
             /** @enum {string} */
             mode: "administratorManaged" | "admissionEnforced";
-            reviewRef: string;
+            reviewRef?: string;
             guardRef?: string;
-        } & unknown;
+        };
         Contract_permission_common_f75e769ddd84f0e8: {
             /** @enum {string} */
             field: "annotation" | "label";
+            /** @description Kubernetes label or annotation key (at most 253 characters). */
             key: string;
             /** @enum {string} */
-            mode: "groupID" | "valueMap";
-            /** Format: uri */
-            issuer: string;
+            mode: "groupName" | "valueMap";
+            /**
+             * Format: uri
+             * @description Defaults to the installation's issuer.
+             */
+            issuer?: string;
             values?: {
                 [key: string]: string[];
             };
+            /** @description groupName mode: prepended to the value (label values cannot contain /). */
+            prefix?: string;
         } & unknown;
         McpInput_preview_access_change: {
             changes: ({
@@ -153,6 +168,13 @@ export interface components {
             /** Format: uuid */
             artifactID: string;
             digest: string;
+        };
+        Contract_permission_common_3ecc34f302c77f66: {
+            /** @enum {string} */
+            kind: "User" | "Group" | "Workload";
+            /** Format: uri */
+            issuer: string;
+            id: string;
         };
         McpOutput_preview_access_change: components["schemas"]["Contract_mcp_result"] & ({
             /** @constant */

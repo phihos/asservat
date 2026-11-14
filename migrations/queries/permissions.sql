@@ -32,7 +32,7 @@ SELECT * FROM permission_acceptance WHERE request_id=$1;
 INSERT INTO permission_acceptance(request_id,stream_id,epoch,sequence,request_digest,audit_id,assignments,retired) VALUES($1,$2,$3,$4,$5,$6,$7,$8);
 
 -- name: ListPermissionBases :many
-SELECT b.* FROM permission_basis b WHERE b.stream_id=$1 AND EXISTS (SELECT 1 FROM permission_assignment a WHERE a.stream_id=b.stream_id AND a.basis_key=b.basis_key AND a.retired_at IS NULL) ORDER BY b.basis_key LIMIT 1025;
+SELECT b.* FROM permission_basis b WHERE b.stream_id=$1 AND EXISTS (SELECT 1 FROM permission_assignment a WHERE a.stream_id=b.stream_id AND a.basis_key=b.basis_key AND a.retired_at IS NULL) ORDER BY b.basis_key;
 
 -- name: UpsertPermissionBasis :exec
 INSERT INTO permission_basis(stream_id,basis_key,uid,kind,generation,resource_version,spec_digest,scope_digest,cluster_id,namespace_uid,workload_uids,effect,not_after,seen_sequence,observation_version,automation_json,automation_audit_id)
@@ -48,7 +48,7 @@ AND (cardinality(b.workload_uids)=0 OR $5::text=ANY(b.workload_uids))
 ORDER BY b.basis_key LIMIT 2;
 
 -- name: ListCurrentPermissionAssignments :many
-SELECT * FROM permission_assignment WHERE stream_id=$1 AND retired_at IS NULL ORDER BY id LIMIT 4097;
+SELECT * FROM permission_assignment WHERE stream_id=$1 AND retired_at IS NULL ORDER BY id;
 
 -- name: InsertPermissionAssignment :one
 INSERT INTO permission_assignment(id,stream_id,basis_key,subject_kind,issuer,subject_id,role,basis_digest,activation_audit_id)
@@ -68,8 +68,8 @@ SELECT a.*, b.uid AS source_uid,b.kind AS source_kind,b.effect,b.not_after,b.see
 au.object_key,au.object_version,au.object_etag,au.object_bytes,au.object_sha256
 FROM permission_assignment a JOIN permission_basis b ON a.stream_id=b.stream_id AND a.basis_key=b.basis_key
 LEFT JOIN authority_audit au ON au.id=a.activation_audit_id AND au.stream_id=a.stream_id
-WHERE a.stream_id=$1 AND a.retired_at IS NULL AND b.cluster_id=$2 AND b.namespace_uid=$3
-AND (cardinality(b.workload_uids)=0 OR $4::text=ANY(b.workload_uids)) ORDER BY a.id LIMIT 257;
+WHERE a.stream_id=$1 AND a.retired_at IS NULL AND b.cluster_id=$2 AND b.namespace_uid IN ($3,'*')
+AND (cardinality(b.workload_uids)=0 OR $4::text=ANY(b.workload_uids)) ORDER BY a.id;
 
 -- name: ReadAuthorityAudit :one
 SELECT * FROM authority_audit WHERE id=$1;
