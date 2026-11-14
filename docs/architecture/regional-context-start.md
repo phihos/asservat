@@ -1,220 +1,106 @@
-# Regional API context start
+# Connector connection and regional context start
 
-ADR-135 connects the existing hub `ContextAcceptedStart` port to a region over a retained connector-originated HTTP/2 exchange. Since [ADR-171](../decisions/171-hub-run-context-execution.md) the hub runs `APIContextRunner` itself and the region answers only cluster-local operations. This is a private first-profile component. It does not enable public collection or supply missing installer authority.
+Each region's connector (A-CONN) holds one outbound, multiplexed HTTP/2
+connection to the hub with mutual TLS ([ADR-330](../decisions/330-event-driven-system-design.md)
+D2). Hub commands, cluster-state pushes, live rows and download bytes are
+separate streams on that connection. This document defines the connection and
+the regional half of a context start. Identities are defined in
+[peer identity](peer-identity.md).
 
-## Ownership and flow
+## Connection
 
-`bootstrap.RegionalAPIContextStart` reads the exact accepted API work with current identity/recovery, checks the protected capability, reserves a cluster capture slot and signs only the existing reference. It has no collector, evidence-key or evidence-reader dependency. `contextstart.Router` attaches that request to a current standby on the same hub process. Historical request replay stays passive; explicit fresh-current continuation uses the original key/preview/capture and exact acknowledged SQL52 read.
+- The connector dials the hub Service and authenticates with its cluster
+  client certificate. The hub verifies the chain against the installation CA
+  and reads the cluster ID from the certificate. Authentication happens once
+  per TLS handshake; streams on the connection need no further peer proof.
+- The hub replica that accepts the connection records it in one SQL row
+  (`cluster_connection`: cluster ID, replica, connection ID, connected-at).
+  A replica that needs to reach a cluster reads that row and forwards the
+  request to the holding replica over hub mTLS, or serves it locally. The row
+  is replaced on reconnect and removed on clean close; a row naming a replica
+  that no longer exists is replaced by the next connection.
+- The connector reconnects only after the connection fails, with exponential
+  backoff (1 s doubling to 60 s, with jitter). There are no standby sockets,
+  idle pools or periodic re-dials.
+- The first frame on the connection is `Hello`: cluster ID, connector
+  version and a capability list. The hub sends only commands whose capability
+  the connector announced. Decoders ignore unknown fields; a field whose
+  absence changes meaning is introduced behind a capability. This gives the
+  documented N−1 skew between hub, connector and node collectors (R-10).
+- Every stream has its own deadline from the operation that opened it and
+  byte/frame ceilings fixed by its message type. Cancelling the originating
+  operation resets the stream; resetting a stream cancels the work it carried
+  on the other side.
 
-`mtls.ContextStartClient` opens one fixed-path POST to a currently accepted owner route using process-owned connector client keys. One actual TLS1.3 socket is handed to Go's standard HTTP/2 transport. There is no redirect, compression, rewindable body or uncertain POST retry. `ContextStartIngress` verifies the actual TLS chain, current exact connector leaf/process/source and local hub owner. Independently supplied executor pins are checked against the Hello; Hello does not supply collection authority.
+## Cluster-state pushes
 
-`contextstart.ServeRegionalOperations` waits passively for the first work frame under the original standby residency. Only after receipt does it acquire a fresh exact peer proof and verify the disjoint signed API work. It then answers the hub runner's operations (resolve Pod, read process, prepare/ready/consume start, prepare output, acquire context, complete stored) only for that exact work, in order. Plaintext and data keys stay in the region; only acquisition instants and copy receipts cross. No key preparation follows an old or uncertain execution preparation. The regional result contains only a finite disposition, not native bytes or raw errors. Publication still requires the separate existing verification/audit/catalog path.
+The connector runs shared informers (LIST once, then WATCH) for the
+namespaces, workloads, Pods, Nodes, EndpointSlices, AccessBindings and
+permission sources the hub needs, and pushes changes as deltas on a state
+stream. Each delta carries a per-kind sequence number. After a reconnect the
+connector sends a digest per kind; the hub requests a full resend only for
+kinds whose digest differs. While the connection is down, the hub marks that
+cluster's state unavailable; it does not expire it on a timer while the
+connection is up.
 
-The work type is `asservat-api-context-work+jws`, fixed Ed25519. Work binds the exact capture/attempt, human actor/client, target, scope/expectation/minimized-intent/budget digests, capability and projection, actual connector leaf and connector/API/hub process identities. Groups and scopes never leave the hub. No public token/cookie is forwarded. A dedicated verify-only trust ConfigMap uses current recovery plus its own independent native enforcement proof. Existing node work bytes and trust purpose remain unchanged.
+Target resolution reads this pushed state (or the connector's own cache for
+cluster-local operations); see [workload target resolution](workload-target-resolution.md).
 
-## Original bounds and resource ceilings
+## Context start
+
+The hub runs `APIContextRunner` ([ADR-171](../decisions/171-hub-run-context-execution.md)).
+`RegionalAPIContextStart` authorizes the operation once
+([ADR-311](../decisions/311-operation-authority-recheck.md)), reserves the
+cluster capture capacity with the operation's idempotency key and opens a
+command stream to the cluster. The stream carries the capture, attempt,
+target, scope/expectation/budget digests, capability and the operation
+deadline. Groups, scopes and public tokens never leave the hub.
+
+The region answers, in order and only for that stream's capture, the
+cluster-local operations: resolve Pod (or `resolve-packet-source` for a policy
+executor), read process, prepare/ready/consume start, prepare output, acquire
+context and complete stored. Plaintext and data keys stay in the region; only
+acquisition instants, copy receipts and a finite disposition cross. Native
+bytes and raw errors do not. Publication follows the separate verification,
+audit and catalog path.
+
+Each regional operation verifies the target Pod UID once at its effect and
+never substitutes a replacement Pod. A retry uses the same idempotency key;
+the region returns the stored outcome for a key it has already executed.
+An unknown outcome is resolved by looking the key up, not by charging it as
+spent ([ADR-330](../decisions/330-event-driven-system-design.md) D7).
+
+`start-policy-recording` carries the SQL observation receipt and the exact
+source returned by `resolve-packet-source`. The region checks that the
+expectation digest matches the stream's, derives the program digest from the
+frozen instructions and starts the node queue for that source without a
+second Pod or node resolution. Raw predicates stay refused until their
+separate qualification.
+
+The connector process trusts its mounted configuration and ServiceAccount
+([ADR-328](../decisions/328-administrator-only-namespaces.md)); it performs no
+self-verification of its Deployment, Pod chain, settings objects or admission
+policies before serving an operation.
+
+## Ceilings
 
 | Item | Bound |
 | --- | --- |
-| Standby residence | Original connector caller end (at most 30 seconds), intersected with the original hub native/request end; no human authority |
-| Setup, peer proof, work and operations | At most original 5 seconds; minimum of all contributing observations |
-| Complete discovered owner set | 16; oversized/incomplete list is unavailable |
-| Whole hub standby budget | At most 64, independently reserved per cluster |
-| Whole hub capture budget | At most 16, independently reserved per cluster |
-| Regional owner conversations | At most 16, one per exact owner/process |
-| Work / signed work | 8 KiB canonical / 16 KiB JWS |
+| Command (request) frame | 32 KiB canonical |
 | Operation request/reply | 32 KiB canonical each |
-| Whole exchange | 36 frames, 2 MiB, at most 16 sequential operations |
-| Connector API settings | 16 KiB, at most 16 exact input references |
+| Context-start stream | 36 frames, 2 MiB, at most 16 sequential operations |
+| Concurrent captures per cluster | Capture capacity of the cluster (C-07) |
+| Connector settings | 16 KiB |
 
-JSON encoding disables HTML escaping before canonicalization. Actual maximum-string encoding is tested, including quotes, backslashes and Unicode. The settings bound was corrected after the maximum legal 16-input test failed at 8 KiB. This changes only the new private settings format.
+## Capture history metadata
 
-Work and independently current peer/trust observations may overlap without having identical ends. Verification takes their minimum; it does not reject a valid shorter proof or renew it. Every blocking read/sign/write retains that minimum. The stream owns a single bounded EOF reader, one queued frame and one decoder frame. Socket/pipe callbacks cancel and join before release. Stream termination cancels the hub runner and the regional operation contexts, including a blocked operation. A late positive backend result cannot authorize a reply after cancellation.
+Capture-history control metadata (settings, save reasons, filters) is stored
+as ordinary hub SQL rows under the existing authorization
+([ADR-330](../decisions/330-event-driven-system-design.md) D8). It does not
+travel to the region and has no object-store envelopes.
 
-Standby and capture reservations count closing owners until joined completion. Each discovered owner has an independent thirty-second conversation with at least one second before a fresh empty standby; after a TLS refusal (a registered owner process the hub no longer serves) the next attempt to that owner waits thirty seconds, so its setup proofs do not contend with the live owner's opening. A hub target query or attachment that finds no idle standby waits for the next registration only within its own original deadline, keeping 2.5 seconds for the operation and the caller. Attachment waits only before reserving a conversation or dispatching work; actual capture capacity, duplicate capture IDs and invalid inputs still refuse immediately. Once waiting begins its fixed cutoff is checked again under the selection mutex, including when registration and expiry are both ready. An immediately available standby retains the original short-deadline behavior. A retry never carries a capture or signed work from a prior connection. SQL52/ADR134 determine whether an explicit current continuation can proceed; transport failure is not proof of non-admission or no effect.
+## Ownership
 
-The private Hello carries required `standbyUntil`, the connector's original
-caller end floored to UTC microseconds. It is an availability observation, never
-peer/work authority. The hub rejects missing, malformed, expired or more-than-30s
-future values, and parents RegisterStandby from the minimum of that original end
-and its independent native/request context. Selection, idle retirement, stream
-ownership and passive socket-deadline restoration therefore use the same earlier
-end. Authentication/setup and every frame retain their independent original
-five-second bounds. The stream joins before that parent is released. Strict old
-closed decoders refuse the new field; new decoders refuse old missing input.
-There is no legacy fallback or rolling-upgrade qualification claim. These absolute
-UTC observations share the existing cross-cluster clock assumptions of the
-five-second peer/source proofs; no clock synchronization or monotonic remote
-lifetime can be established by this field, and a peer can still disconnect early.
-
-Router selection and attachment checks also observe the stream's own
-cancellation, even before the surrounding HTTP request notices it. A joined
-callback cancels the standby and active conversation; its reservation remains
-charged until the handler closes the stream and calls `Finish`.
-[ADR-211](../decisions/211-completed-query-standby-transition.md) separates a
-fully validated pre-work query from subsequent passive waiting: after its
-frame callbacks join, both hub socket deadlines return to the same original
-standby cutoff. Its target and receiver proofs retain their original bounds.
-Queries exclusively reserve their standby through completion, excluding
-other queries and attachment source pulls. Failure withdraws the standby
-before exposing the result. An attempted work lease, cancellation or expiry
-permanently prevents this passive transition. Withdrawal permits
-later operations to select another current standby; it never replays an
-uncertain query, capture or signed work.
-
-The installed regional supervisor reports failed candidate observation, an empty
-candidate set, failed connection setup and failed exchange service using fixed
-private labels and the existing exponentially suppressed logger. Optional nested
-steps are explicitly allowlisted; error text, target identity and credentials are
-excluded. Omitting the reporter preserves the same operation, retry and deadline
-behavior. A capacity standby is a separate protocol and does not establish that
-a context-start standby is available for preview target resolution.
-
-## Work transport observation
-
-[ADR-163](../decisions/163-original-work-transport-observation-lease.md) bounds repeated frame traffic with one complete receiver observation owned by the actual stream. The hub obtains it at work Send; the region obtains it only after the passive work frame arrives. Setup and standby observations cannot supply this lease. Its original start, earliest observation/caller expiry and exact root/exchange/challenge/leaf/process channel remain fixed. There is no renewal or replacement lease for that accepted work.
-
-Correctly ordered operation frames reuse that transport observation. The hub runner still performs its complete current identity, permission, target, recovery and capability checks, and each regional operation its own current local check. The stream validates direction and phase: one work, paired operation requests/replies, one result, one receipt. Unexpected work, unsolicited replies, a result while an operation is pending, premature receipts or frames after receipt close it.
-
-A regional result Send and hub result Receive each perform a full current receiver check after preceding blocking work, bounded by the initial lease and matching its exact channel. The result check can only shorten the retained interval. The terminal receipt must fit the resulting original bounds. Negative/late final reads never fall back to the initial observation.
-
-A retained expiry callback cancels the stream between frames as well as during I/O. Original cancellation, EOF and known transport/peer failures close it permanently, with all readers, producers and callbacks joined. Remote changes not otherwise observed can remain unknown during operation-frame traffic until the original lease expires, at most five seconds; this is bounded freshness, not instantaneous distributed revocation. An application denial creates no effects and its finite unavailable disposition still needs a final full peer proof. No application authority reader uses the transport cache.
-
-The bare-Pod native fixture's original identity-frame graph required seventeen full process observations for seven identity round trips, which a 20-token bucket at 20 QPS could not complete within five seconds. The lease reduced that to two transport observations; ADR-171 then removed the identity frames. Current application checks remain additional.
-
-## Protected connector API process
-
-`ConnectorAPIExecutionProtection` composes the concrete connector attester, owned credentials, namespace guard and separate immutable API settings. It checks current online Pod-bound TokenReview, SSR account/Pod identity, live Deployment/ReplicaSet/Pod chain, current original CSR/leaf registration and all exact settings/input pins. A new independent API process epoch is generated once; it is not the connector epoch and cannot follow a replacement connector process silently.
-
-One concrete protection instance coalesces a single positively completed process proof. Reuse retains the original observation start and earliest end, including the original TokenReview and independent admission-denial intervals. It performs current process credential/source/registration, SSR account/Pod identity, namespace/account, exact guard policy/binding, immutable settings, full workload digest and approved input metadata checks before returning. These later reads can shorten the interval; they cannot create a new denial proof or renew it. An error or known change invalidates the snapshot and any in-flight publication generation. A cancelled waiter cannot detach the original producer; cancellation, expiry or invalidation prevents a late positive producer from entering the cache. There is no background refresh or general Kubernetes client cache.
-
-The concrete executor also implements `mtls.ContextStartProcessReader`. Its
-combined read returns the connector observation already checked inside that
-complete native proof, only for the identical process-owned credentials
-instance. The transport need not make a second outer connector observation
-before the same proof. Both results retain their original starts and earliest
-expiry; returned CSR/profile buffers are copies. The transport validates both
-identities and the exact expected channel after the read. Other process readers
-keep the separate connector/process checks. This removes one duplicate per
-local read; it neither caches a whole connection setup nor removes its later
-owner, source or executor checks. Whole installed opening timing remains
-unqualified.
-
-New work retains the three-second proof-reuse margin for preparation headroom.
-When the caller's deadline is already at or before a still-valid cached proof's
-expiry, the proof covers the entire remaining operation: the reader performs
-the same current native recheck instead of repeating the full denial/TokenReview
-producer merely to obtain headroom the caller cannot use. This particularly
-applies to final result checks bounded by the original work lease. The original
-proof interval, current checks, invalidation and failure behavior are unchanged.
-A coalesced waiter applies its own deadline: a later or unbounded caller cannot
-inherit this short-caller exception. After validating the completed flight, it
-re-enters proof selection iteratively and obtains the ordinary headroom.
-
-After expiry, a new independent invocation may perform the full proof again under its own original caller bound. Existing preparation, binding and request deadlines remain fixed. [ADR-163](../decisions/163-original-work-transport-observation-lease.md) separately selects an exchange-owned transport observation lease, described below. Source-reader reuse remains unimplemented; neither mechanism qualifies the installed HTTP/2 path or removes current effect checks inside the production credential source.
-
-The accepted template is the API-returned defaulted Deployment template. Comparison retains every PodSpec/security/mount/token field and template label/annotation. It normalizes only the deprecated service-account alias and Pod-only zero priority/default preemption/default service-links scalars. It removes exactly the qualified ReplicaSet controller hash and actual node assignment for comparison. Both 300-second not-ready/unreachable tolerations are explicit. Automount is false; the projected service-account token is explicit and dynamic, with its entire specification pinned. Init/ephemeral/sidecar injection, different mounts, privilege, image or arguments fail closed.
-
-ConfigMap/Secret metadata reads bind exact UID and resourceVersion. Settings cannot include their own future UID/RV: those are independent constructor pins plus a current exact immutable source read. Changes to SQL/provider input revisions require an accepted new configuration/rollout; they do not silently refresh a running profile.
-
-PartialObjectMetadata limits returned data, not Kubernetes privileges. `dedicatedToAPI` is an immutable installer-owned whole-object approval required for Secret references and forbidden for ConfigMap references. The installer must construct role-owned dedicated objects and independently accept those exact names/UIDs. Mounting one file does not establish ownership of other keys. Native grants permit GET on only these whole approved objects; unrelated GET and namespace LIST must fail. No payload hash is used, and the reader does not fetch Secret payloads. A metadata reader with broader credentials would be an unqualified composition.
-
-The optional owner policy branch admits exact capacity-account CREATE on the main CapacityReservation and exact capacity/execution-account UPDATE on its status subresource. It grants no RBAC and no main UPDATE, deletion, Secret/token/input mutation or arbitrary CRD privilege. Independently pinned StartAdmission enforces the original immutable binding, Ready and one StartCommitted transition. Legacy bare-Pod and omitted owner-capability bytes are unchanged.
-
-The regional operator installs the matching chart CRDs before enrollment.
-For an executor offer, `installer-cluster` checks served API discovery before
-creating its namespace or installation objects: the namespaced
-`CapacityReservation` resource must advertise create/get and its status
-subresource must advertise update. The check preserves caller cancellation
-and the earlier original deadline within five seconds, with bounded response
-bytes and resource count. Missing or conflicting discovery fails at the closed
-`start-api` step. This proves API availability only, not schema compatibility,
-RBAC, admission protection or activation. The installer gains no CRD mutation
-rights or ownership; ordinary connector-only offers keep their existing path.
-
-## SQL and components
-
-`OwnerEnrollments.ReadContextStartOwners` reuses the existing current owner read facet. It locks recovery before owner configuration, reads at most seventeen candidates, rejects overflow and returns no addresses or certificates. Only audited enrolled server-purpose processes with a current activated certificate are candidates. Exact route/TLS checks remain mandatory. The query adds no schema, role, durable row or authority producer.
-
-C-20 owns closed wire DTOs and `internal/transport/contextstart`. C-21 owns the existing adapter/bootstrap composition. Application/domain imports remain inward; adapters never import transport handlers in production. The bootstrap connections supervisor owns joined shutdown, not a new durable queue.
-
-## Qualification and remaining work
-
-Focused races exercise actual loopback TLS1.3/HTTP2 with process-owned keys: hub-run operations end to end, owner cancellation joined with a blocked operation, original-work expiry rejecting a late operation result, and EOF joining a blocked operation. (Before ADR-171 these covered seven identity round trips.) Sources/registries/routes/API process in those tests are explicitly synthetic. Separate stream races cover passive first wait, shorter peer expiry interrupting a blocked body pipe, finite bidirectional frames and blocked operation cancellation. Signed-work tests include wrong purpose/profile/process, closed encoding, maximum strings and retention of the original trust/peer deadline. The earlier overlap condition and settings-size defect both have preserved failing-before evidence.
-
-`TestConnectorAPIProcessWithRealKubernetes` now passes the complete local-start sequence under [ADR-173](../decisions/173-work-scoped-process-observation.md) ([run 6](../../test/results/connector-api-timing-6/result.json): 2.57 s of the original 5 s, with a cold 71-call process proof). It covers real guarded Deployment/Pod defaulting, TokenReview/SSR, source/input pins, named Secret grants and both local status transitions. Its accepted connector source, CA/registry and first preparation claim are explicit fixture inputs. Earlier runs exhausted PrepareStart or ReadyStart because every start check re-proved the whole process; those failures are retained. Actual API/QPS cost must fit the existing five-second intervals; whole-test duration is not evidence of a particular authority timeout.
-
-The native public journey (adr171-journey-2) passes the whole signed exchange with hub-run execution, regional capture/storage, publication and native download on the bare-Pod executor; see ADR-171. Pending qualification: the connector-Deployment executor's local start below, and failure/unknown partitions across those components. No deadline or client QPS limit is enlarged.
-
-Missing production inputs remain dedicated work-signing key/sign-only hub credential, verify-only regional trust, exact connector API profile/input ownership/RBAC, protected installed composition and regional command startup. Existing initial installation does not yet provision those inputs. The first installed context investigation remains unavailable until these producers and the combined runtime path are implemented and qualified.
-
-## Separate history ciphertext effects
-
-Capture-history control metadata uses `asservat-history-work+jws` with the
-existing protected work-signing trust and a separate `history-work/v1` payload.
-It is not an API execution. The dispatcher selects a live connector session
-before SQL issues authority, exposing that session's original deadline and
-actual executor process epoch. Signed authority fixes root, capture, original
-storage registration/allocation, attempt, request, operation, ciphertext or
-receipt digest, process epoch and original deadline. Each regional receive and
-final reply retains current channel checks and cancellation. A preparation
-lookup grants no storage authority; only signed write/read/purge work invokes
-storage effects.
-
-The distinct history frame family (32–35) carries at most **486077 bytes** of
-base64-encoded ciphertext bundle: data 192 KiB, index 4 KiB, manifest 128 KiB,
-commit 32 KiB, plus exact base64 expansion and 13 array bytes. An independently
-bounded 65536-byte envelope covers four version/ETag receipts, signed work and
-completions; total frame ceiling 551613 bytes. The shared codec checks each role
-before decoding allocation. Common query/operation frames remain 32 KiB and the
-existing exchange ceiling remains 2 MiB. Wire contracts are
-[history-work](../../specs/contracts/history-work.schema.json) and
-[history-ciphertexts](../../specs/contracts/history-ciphertexts.schema.json).
-
-Write completion requires all four acknowledged PUTs to return. Read pins exact
-stored versions. Purge inventories/removes versions, markers and incomplete
-multipart uploads and returns an independent typed completion bound to the
-original deletion fence. Zero receipts are accepted only for purge after the
-original WriteUntil and only with the exact zero-receipt digest; the SQL producer
-must independently establish that no writer claim was issued. Neither expiry
-nor object lookup establishes writer completion or releases capacity.
-
-The regional loader uses the fixed `history-storage.json` capability, limited
-to this root/cluster's history prefix. It cannot read/delete evidence or unwrap
-keys. [Installation instructions](../installation/helm.md) distinguish externally
-provisioned capabilities, readonly permission proposals and actual pinned
-Seaweed qualification. The focused storage gate does not qualify installed
-SQL-to-channel composition. Preparation currently inherits the router's finite
-five-second selection/exchange bound; measure the composed workflow before
-choosing any history-specific bound, preserving the original caller and signed
-operation deadlines.
-
-## Finite policy observation companion (ADR-261, not enabled)
-
-The same verified API work can explicitly replace `resolve-pod` with
-`resolve-packet-source`. Only a policy executor can use it; the regional resolver
-returns the exact Pod graph and original authenticated node-report interval in
-one resolution. Existing metadata queries retain their old shape and omit Source.
-The receiver keeps a value copy of this source for this exchange. Unavailable or
-unsupported source resolution refuses without falling back to a metadata answer.
-
-`start-policy-recording` carries the original finite SQL observation receipt and
-that exact source. Its expectation digest is compared with the independently
-verified signed work; `prepare-output` already matched the frozen expectation to
-that signed digest. The canonical program digest is derived again from those
-frozen instructions, not accepted from another receipt field. Capture, action,
-Pod, duration and source incarnation must agree. Source timestamps compare by
-instant, preserving their original cutoffs. The holder checks the actual prefix
-proof, transfers prepared keys once, and calls the expected-source node queue
-with the original permit StartBy. It performs no second Pod/node resolution.
-The authenticated queue independently checks the current node incarnation and
-original source interval under its existing mutex. No initial permit signature,
-new key, provider, watch or renewal loop is added; the initial work signature
-precedes this later receipt and is not represented as signing it.
-
-The runner uses the existing companion preparation transaction and preparation
-gate. A first=false receipt remains passive before key creation or dispatch.
-The ordinary start still refuses raw predicates before transferring keys. The
-policy trigger's raw guard remains closed pending actual node/meter, old-node
-refusal, positive retirement, complete backing and native qualification; this
-contract does not enable manual raw or ongoing acquisition.
+C-20 owns the wire DTOs and `internal/transport/contextstart`. C-21 owns the
+adapter and bootstrap composition. Application and domain imports stay
+inward; adapters never import transport handlers.
