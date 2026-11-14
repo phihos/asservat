@@ -14,7 +14,7 @@ Given equivalent browser and MCP requests, when current scope/permissions/limits
 
 ## REQ-INT-002 — Configuration and human authority
 
-Administrator permission/retention/budget configuration writes remain Kubernetes-only. Browser drafts/preview/export do not create a second authority. Authenticated maintainer submission is restricted to reviewed configuration kinds and existing provenance/current-rights rules. Review decisions require independent human authority and verified step-up; no MCP tool approves grants. Connector bootstrap tokens are delivered as Kubernetes Secrets, not in response bodies or command history.
+Administrator permission/retention/budget configuration writes remain Kubernetes-only. Browser drafts/preview/export do not create a second authority. Authenticated maintainer submission is restricted to reviewed configuration kinds and existing provenance/current-rights rules. Review decisions require independent human authority, with step-up re-authentication only where the installation enables it (off by default, [ADR-335](../docs/decisions/335-usable-by-default.md) D5); no MCP tool approves grants. Connectors authenticate with their projected ServiceAccount token to the hub's one HTTPS endpoint (ADR-334); no bootstrap token appears in a response body or command history.
 
 ### SC-INT-002
 
