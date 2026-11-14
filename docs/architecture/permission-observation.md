@@ -6,7 +6,8 @@ SQL adapters and C-24 holds the values. Parts of REQ-PER-001 to REQ-PER-008,
 REQ-DB-001 and TASK-07. Kubernetes is the only permission authoring surface;
 the hub stores an accepted projection and evaluates it per operation. Design
 rules: [ADR-329](../decisions/329-accessbindings-in-application-namespaces.md)
-and [ADR-330](../decisions/330-event-driven-system-design.md) D1, D5, D6, D11.
+and [ADR-330](../decisions/330-event-driven-system-design.md) D1, D5, D6, D11,
+[ADR-335](../decisions/335-usable-by-default.md) D4, D14.
 
 ## Sources
 
@@ -14,20 +15,29 @@ and [ADR-330](../decisions/330-event-driven-system-design.md) D1, D5, D6, D11.
 | --- | --- | --- |
 | AccessBinding | The application namespace it grants access to, in the workload's cluster | Anyone ordinary namespace RBAC lets write AccessBindings there |
 | AccessBinding with `spec.automation` (ADR-059) | The application namespace it grants access to | Namespace writers who also hold `bind` on `accessroles.asservat.io` named `automation` |
-| PermissionSource (`namespaceMetadata`, `workloadMetadata`, `groupID`, `kubernetesExec`, `kubernetesAccessReview`) | Hub control namespace | Asservat administrators only (ADR-328) |
+| ClusterAccessBinding | Cluster-scoped, in a workload cluster (that cluster) or the hub cluster (named clusters or all) | Principals with cluster-scoped write access and `bind` on the roles |
+| PermissionSource (`namespaceMetadata`, `workloadMetadata`, `kubernetesExec`, `kubernetesAccessReview`) | Hub control namespace | Asservat administrators only (ADR-328) |
+| `identity.administrators` | Helm values | The chart operator |
 
-A binding's scope is its own namespace, optionally narrowed to named
-workloads; it names no cluster or namespace UID. A Helm-rendered
+A binding's scope is its own namespace, optionally narrowed to workloads
+named by kind and name; it names no cluster or namespace UID. Subjects are
+users by username and groups by name; `issuer` defaults to the installation's
+issuer. A ClusterAccessBinding's scope is its cluster's namespaces matching its
+optional `namespaceSelector`, and in the hub cluster the clusters it names.
+A Helm-rendered
 ValidatingAdmissionPolicy requires `bind` on `accessroles.asservat.io` for
 each role a binding adds or changes, and `bind` on `automation` for an added
 or changed `spec.automation`; the chart never aggregates `automation` into
-`admin` ([REQ-PER-001](../../specs/permissions.md)). Cluster-wide or
-multi-namespace grants use PermissionSources.
+`admin` unless `permissions.aggregateAutomation` is set
+([REQ-PER-001](../../specs/permissions.md)). The chart ships one bindable
+ClusterRole per role (`asservat-bind-<role>`).
 
 The generated structural CRDs and their reviewed CEL rules validate shape
 only (`make permission-crd-check`). Who may write a resource is decided by
 Kubernetes RBAC and the `bind` admission policy above; there is no
 delegation envelope, dry-run probe, bootstrap review object or namespace UID pin.
+Objects that exist before the hub first starts, for example synced by GitOps
+before the chart, are accepted on first observation like any later object.
 Namespace labels that `namespaceMetadata` sources read are protected by the
 Helm-installed admission policies of ADR-247; Asservat does not prove those
 policies at runtime. Status fields, field managers and annotations never
@@ -35,11 +45,12 @@ confer authority.
 
 ## Observation
 
-Each region's connector runs client-go shared informers for AccessBindings in
-its cluster and for the namespace labels and workload metadata that accepted
+Each region's connector runs client-go shared informers for AccessBindings and
+ClusterAccessBindings in its cluster and for the namespace labels and workload metadata that accepted
 PermissionSources select (only the selected keys are kept; values are
 SHA-256 digests). The hub-worker runs informers for PermissionSources in
-the hub control namespace. An informer LISTs once and then
+the hub control namespace and for ClusterAccessBindings in the hub cluster.
+An informer LISTs once and then
 WATCHes; it relists only after a watch restart or `410 Gone`. Its cache stays
 valid while the informer is synced and becomes unavailable only when the
 watch is lost and the relist has not completed.
@@ -51,12 +62,14 @@ only on mismatch. Per-object payloads keep the object UID, resourceVersion,
 generation, deletion state and the SHA-256 of the RFC 8785 canonical spec;
 free-text reasons count toward the digest but are not stored.
 
-Fail-closed bounds (no silent truncation): 1,024 bindings and 1,024 sources
-per cluster, 64 KiB per spec, at most 32 selected label keys per source,
-4,096 namespaces carrying a selected key, 1,024 effective bases and 4,096
-current assignments per installation, 256 rows for one Pod. An overflow
-rejects the push with a narrowing diagnostic rather than dropping an owner
-or a deny. A malformed object is reported as invalid; valid objects of the
+Fail-closed bounds (no silent truncation): 1,024 bindings per namespace,
+1,024 ClusterAccessBindings and 1,024 sources per cluster, 64 KiB per spec, at
+most 32 selected label keys per source, 65,536 namespaces carrying a selected
+key per cluster, 256 rows for one Pod. Delivery and storage are paged, so the
+number of namespaces and bindings per cluster is otherwise bounded only by
+memory. An overflow rejects only the offending namespace's bindings (or the
+offending source) with a narrowing diagnostic, never by dropping an owner or a
+deny, and never the rest of the cluster. A malformed object is reported as invalid; valid objects of the
 same kind stay usable. A terminating deny stays effective until it is gone.
 
 ## Acceptance
@@ -87,20 +100,23 @@ renews or expires it.
 
 C-03 evaluates the current accepted bindings and sources per operation.
 Evidence audiences and share managers are recorded at capture or share time
-as stable identity-provider group IDs and subject identifiers, never as
+as identity-provider group names and subject identifiers, never as
 assignment IDs. An ordinary read requires a recorded audience member (or an
 EvidenceShare) who also holds a current matching allow and no deny. A new
 owner team therefore sees only evidence captured after it was granted;
 older evidence needs an explicit share or ownership decision (REQ-PER-008).
 A relist, a harmless binding edit or an A → B → A change neither revokes nor
 reissues access: the current bindings decide. Share management passes to an
-evidence administrator only when the managing group no longer exists. The
+administrator only when the managing group no longer exists. The
 authorization result is reused for at most `identity.AuthorityRecheckInterval`
 within the operation's original deadline (ADR-311).
 
-Explicit bindings match namespace and optional workload kind/name. Namespace
-sources match exact selector values and exclusions; value maps keep several
-owner teams and never split comma-separated group IDs. `workloadMetadata`
+Explicit bindings match namespace and optional workload kind/name; the
+workload UID current at evaluation is recorded as provenance, and an optional
+`uid` pin must equal it. Namespace sources match exact selector values and
+exclusions; value maps keep several owner teams and never split
+comma-separated group names; `groupName` mode takes the value (with the
+configured prefix) as one group name. `workloadMetadata`
 sources match one workload per basis.
 
 ## Decision-time sources (pod exec inheritance)
@@ -112,7 +128,11 @@ principal holds the configured Kubernetes permission (for exec,
 (principal, groups, attributes) for at most `identity.AuthorityRecheckInterval`
 (30 s, ADR-311); denials are not cached; a miss runs a SubjectAccessReview.
 This is the only time-bounded permission cache. An allow adds a `Reviewed` user allow for that principal and Pod to the
-current evaluation only; nothing is stored per decision. The operation that
+current evaluation only; nothing is stored per decision. At capture time the
+connector also reviews each of the principal's current groups alone (at most
+256, batched) to record the groups that hold the same right as audience
+(REQ-PER-008). A source mapped to another role (`evidence-owner`,
+`action-approver`) contributes that role the same way. The operation that
 used the decision records it in its own audit row.
 
 ## Automation envelopes
