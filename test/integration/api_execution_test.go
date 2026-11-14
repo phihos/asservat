@@ -525,13 +525,11 @@ func (f contextKeyUnwrapFixture) queued(ctx context.Context, capture string) boo
 // password is a fixed synthetic literal.
 func narrowRole(t *testing.T, ctx context.Context, admin *pgxpool.Pool, prefix, password string, grants func(string) []string) string {
 	role := prefix + strings.ReplaceAll(custodyID(), "-", "")[:12]
-	if _, err := admin.Exec(ctx, "CREATE ROLE "+pgx.Identifier{role}.Sanitize()+" LOGIN NOINHERIT PASSWORD '"+password+"'"); err != nil {
-		t.Fatal(err)
-	}
-	for _, grant := range grants(role) {
-		if _, err := admin.Exec(ctx, grant); err != nil {
-			t.Fatal(grant, err)
-		}
+	// One simple-protocol batch runs as one implicit transaction: hundreds of
+	// grants then cost one synchronous commit instead of one each.
+	statements := append([]string{"CREATE ROLE " + pgx.Identifier{role}.Sanitize() + " LOGIN NOINHERIT PASSWORD '" + password + "'"}, grants(role)...)
+	if _, err := admin.Exec(ctx, strings.Join(statements, ";\n")); err != nil {
+		t.Fatal("create narrow role", role, err)
 	}
 	t.Cleanup(func() {
 		cleanup, stop := context.WithTimeout(context.Background(), 5*time.Second)

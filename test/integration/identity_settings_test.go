@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"os"
 	"testing"
 	"time"
 
@@ -26,7 +25,7 @@ func testIdentitySettings(t *testing.T, ctx context.Context, c *rest.Config, clu
 	if err != nil {
 		t.Fatal(err)
 	}
-	data, err := os.ReadFile("../../examples/identity-settings.json")
+	data, err := readImplementedExample("../../examples/", "identity-settings.json")
 	if err != nil {
 		t.Fatal(err)
 	}

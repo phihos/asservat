@@ -60,3 +60,7 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
 $$;
 -- +goose StatementEnd
 REVOKE ALL ON FUNCTION read_capacity_qualification(uuid) FROM PUBLIC;
+
+-- +goose Down
+DROP FUNCTION read_capacity_qualification(uuid);
+DROP FUNCTION initialize_capacity_source(uuid,uuid,text,bytea,text,jsonb);
