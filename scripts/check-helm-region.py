@@ -165,7 +165,9 @@ def main():
             p.write_text(json.dumps(c))
             paths.append(str(p))
         env = dict(os.environ, ASSERVAT_RENDERED_CONNECTOR_CONFIG=os.pathsep.join(paths))
-        env.setdefault("TMPDIR", str(Path.home() / ".cache/go-tmp"))
+        tmp = Path(env.get("TMPDIR") or Path.home() / ".cache/go-tmp")
+        tmp.mkdir(parents=True, exist_ok=True)
+        env["TMPDIR"] = str(tmp)
         r = subprocess.run(["go", "test", "-count=1", "-run", "TestRenderedConnectorConfigDecodes", "./internal/bootstrap/"], cwd=ROOT, env=env, text=True, capture_output=True, timeout=600)
         assert r.returncode == 0 and "no tests to run" not in r.stdout, r.stdout + r.stderr
     print("helm region templates OK: cluster (executor, plain), combined, refusals, Go loader decode")
