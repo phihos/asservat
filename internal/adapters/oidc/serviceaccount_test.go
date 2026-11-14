@@ -182,6 +182,9 @@ func TestServiceAccountVerifierSelectsByIssuerAndRetriesFailedDiscovery(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
+	var clock atomic.Int64
+	clock.Store(time.Now().UnixNano())
+	v.clusters[0].now = func() time.Time { return time.Unix(0, clock.Load()) }
 	ctx := context.Background()
 	if _, err = v.VerifyConnector(ctx, key.token(t, "https://other.example.test", saSubject, saAudience, time.Now().Add(time.Minute))); err == nil || discoveries.Load() != 0 {
 		t.Fatal("foreign issuer reached discovery", err, discoveries.Load())
@@ -190,10 +193,56 @@ func TestServiceAccountVerifierSelectsByIssuerAndRetriesFailedDiscovery(t *testi
 	if _, err = v.VerifyConnector(ctx, token); err == nil || discoveries.Load() != 1 {
 		t.Fatal("failed discovery accepted", err, discoveries.Load())
 	}
+	// Within the interval a failed discovery is not retried.
+	if _, err = v.VerifyConnector(ctx, token); err == nil || discoveries.Load() != 1 {
+		t.Fatal("failed discovery retried within the interval", err, discoveries.Load())
+	}
+	clock.Add(int64(jwksRefetchInterval))
 	if _, err = v.VerifyConnector(ctx, token); err != nil || discoveries.Load() != 2 {
 		t.Fatal("discovery not retried", err, discoveries.Load())
 	}
 	if _, err = v.VerifyConnector(ctx, token); err != nil || discoveries.Load() != 2 {
 		t.Fatal("discovery repeated after success", err, discoveries.Load())
+	}
+}
+
+// A failed first JWKS fetch spaces the next one like an unknown key ID: two
+// tokens within the interval cause one fetch.
+func TestServiceAccountVerifierSpacesFailedFirstKeyFetch(t *testing.T) {
+	key := newSAKey(t, "k1")
+	var fetches atomic.Int32
+	mux := http.NewServeMux()
+	server := httptest.NewTLSServer(mux)
+	defer server.Close()
+	mux.HandleFunc("/.well-known/openid-configuration", func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]string{"issuer": server.URL, "jwks_uri": server.URL + "/openid/v1/jwks"})
+	})
+	mux.HandleFunc("/openid/v1/jwks", func(w http.ResponseWriter, _ *http.Request) {
+		if fetches.Add(1) == 1 {
+			http.Error(w, "unavailable", http.StatusServiceUnavailable)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(jose.JSONWebKeySet{Keys: []jose.JSONWebKey{key.public()}})
+	})
+	v, err := NewServiceAccountVerifier([]string{saAudience}, []ServiceAccountCluster{{ClusterID: "eu", PeerID: "eu-peer", Issuer: server.URL, Namespace: "asservat-system", Account: "asservat-connector", Client: server.Client()}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var clock atomic.Int64
+	clock.Store(time.Now().UnixNano())
+	v.clusters[0].now = func() time.Time { return time.Unix(0, clock.Load()) }
+	ctx := context.Background()
+	token := key.token(t, server.URL, saSubject, saAudience, time.Now().Add(time.Minute))
+	for range 2 {
+		if _, err = v.VerifyConnector(ctx, token); err == nil {
+			t.Fatal("token accepted without keys")
+		}
+	}
+	if fetches.Load() != 1 {
+		t.Fatal("failed first fetch retried within the interval", fetches.Load())
+	}
+	clock.Add(int64(jwksRefetchInterval))
+	if _, err = v.VerifyConnector(ctx, token); err != nil || fetches.Load() != 2 {
+		t.Fatal("key fetch after the interval", err, fetches.Load())
 	}
 }

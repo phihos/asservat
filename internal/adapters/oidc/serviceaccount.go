@@ -51,6 +51,9 @@ type saCluster struct {
 	state   atomic.Pointer[saState]
 	flight  singleflight.Group
 	now     func() time.Time
+	// attempted is the UnixNano of the last discovery attempt; a failed
+	// discovery is retried no sooner than jwksRefetchInterval later.
+	attempted atomic.Int64
 }
 
 type saState struct {
@@ -128,15 +131,20 @@ func (c *saCluster) candidate(issuer, subject string) bool {
 
 // current returns the discovered verifier, discovering the issuer on demand
 // (once at a time, outside any lock, within its own I/O timeout). A failed
-// discovery is not cached; the next request that needs it tries again.
+// discovery is not cached; a later request tries again, no sooner than
+// jwksRefetchInterval after the failed attempt.
 func (c *saCluster) current(ctx context.Context) (*saState, error) {
 	if s := c.state.Load(); s != nil {
 		return s, nil
+	}
+	if a := c.attempted.Load(); a != 0 && c.now().Sub(time.Unix(0, a)) < jwksRefetchInterval {
+		return nil, ErrServiceAccountDenied
 	}
 	out, err, _ := c.flight.Do("discover", func() (any, error) {
 		if s := c.state.Load(); s != nil {
 			return s, nil
 		}
+		c.attempted.Store(c.now().UnixNano())
 		call, cancel := context.WithTimeout(context.WithoutCancel(ctx), discoveryTimeout)
 		defer cancel()
 		s, err := c.discover(call)
@@ -200,6 +208,9 @@ type remoteKeys struct {
 	fetched atomic.Int64 // UnixNano of the last fetch attempt
 	flight  singleflight.Group
 	now     func() time.Time
+	// attempted is the UnixNano of the last discovery attempt; a failed
+	// discovery is retried no sooner than jwksRefetchInterval later.
+	attempted atomic.Int64
 }
 
 func (r *remoteKeys) VerifySignature(ctx context.Context, raw string) ([]byte, error) {
@@ -210,7 +221,7 @@ func (r *remoteKeys) VerifySignature(ctx context.Context, raw string) ([]byte, e
 	kid := jws.Signatures[0].Header.KeyID
 	set := r.keys.Load()
 	if set == nil || len(set.Key(kid)) == 0 {
-		if set != nil && r.now().Sub(time.Unix(0, r.fetched.Load())) < jwksRefetchInterval {
+		if f := r.fetched.Load(); f != 0 && r.now().Sub(time.Unix(0, f)) < jwksRefetchInterval {
 			return nil, ErrServiceAccountDenied
 		}
 		if set, err = r.fetch(ctx); err != nil {

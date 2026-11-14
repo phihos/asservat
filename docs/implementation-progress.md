@@ -94,7 +94,7 @@ records, their audited issuance, reservations and KV channel
 (`fleet-bootstrap` mount, provider role), `<name>-region-bootstrap`, the
 join Secret's record, the rotating cluster credential (lineage, rotation
 endpoint, `<name>-cluster-credential` Secret), enrollment claim/certificate
-tables (migration 00168) and the 15-cluster cap. Fresh all-bundled
+tables (migration 00169) and the 15-cluster cap. Fresh all-bundled
 combined install on the owned kind cluster `asservat-cn` (since deleted):
 the connector enrolled with its token (no `region-bootstrap` or
 `cluster-credential` Secret exists) and `TestHelmNativeKindJourney` passed
