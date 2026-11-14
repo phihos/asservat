@@ -38,7 +38,6 @@ builds() {
       hub_image
       collector_image
       "${fixture[@]}" ./test/fixtures/worker-resource-probe/main.go
-      CGO_ENABLED=0 go run ./test/fixtures/installed-sql-budget/main.go >/dev/null
       ;;
     race)
       go test -race -count=1 -run '^$' ./test/integration >/dev/null
