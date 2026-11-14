@@ -14,7 +14,21 @@ with the maintainer AccessBinding in the workload namespace `apps-hn`;
 server dry-runs confirmed `edit` refused by RBAC, `admin` allowed, a writer
 without `bind` refused, automation refused without the automation ClusterRole.
 Not run: `make permission-integration` (its suite was adapted, not executed).
-Pending: `mode: cluster` regions deliver no AccessBindings yet.
+
+Follow-up branch `feat/hn-remote-bindings` (ADR-329 decision (c)):
+`mode: cluster` connectors deliver their cluster's AccessBinding LIST every
+10 seconds over the lifecycle channel (purpose `access-bindings`); the
+federation validates and stores it under the cluster credential's cluster
+(migration 00161); the hub-worker reconciler accepts it scoped to that
+cluster (allows within 30 s of the delivery, denies until removed). Component
+tests cover the reconciler, the real HTTP/2 lifecycle channel with a 4 MiB
+delivery, federation attribution and the Kubernetes LIST/decode round trip.
+Migration 00161 and the store/read adapter passed on real PostgreSQL in
+`scripts/test-custody.py --run '^TestContextAdmissionWithRealServices$/^connector-identity-fast$'`
+(store, older-delivery refusal, changed-row reread);
+`make permission-integration` passed. Not run: a kind journey with a joined
+`mode: cluster` connector (the chart cannot complete a `mode: cluster` join
+yet) and the full custody suite.
 
 ## Helm-native installation (2026-11-14)
 

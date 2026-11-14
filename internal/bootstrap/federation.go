@@ -208,7 +208,15 @@ func NewFederation(ctx context.Context, files, ids *os.Root) (f *Federation, err
 	if f.rotation, err = clustercredential.NewHandler(presenter, c.Concurrency); err != nil {
 		return f, mounts.ErrUnavailable
 	}
-	f.handler, err = connectorlifecycle.NewHandler(presenter, mtls.EnrollmentProof{}, federationServices{connectorlifecycle.Runners(peers.resolve), peers}, c.Concurrency)
+	decoder, err := kube.NewAccessBindingSpecDecoder()
+	if err != nil {
+		return f, mounts.ErrUnavailable
+	}
+	remote, err := postgres.NewRemoteAccessBindings(startup, pools["cluster-credential"], c.PermissionRootID)
+	if err != nil {
+		return f, mounts.ErrUnavailable
+	}
+	f.handler, err = connectorlifecycle.NewHandler(presenter, mtls.EnrollmentProof{}, federationServices{connectorlifecycle.Runners(peers.resolve), peers, &federationBindings{decoder, remote}}, c.Concurrency)
 	if err != nil {
 		return f, mounts.ErrUnavailable
 	}
@@ -451,7 +459,48 @@ func (p federationPresenter) Present(ctx context.Context, r value.ClusterCredent
 
 type federationServices struct {
 	connectorlifecycle.Runners
-	peers *federationPeers
+	peers    *federationPeers
+	bindings *federationBindings
+}
+
+// federationBindings records connectors' AccessBinding deliveries (ADR-329)
+// with the shared observed-binding validator.
+type federationBindings struct {
+	decoder *kube.AccessBindingSpecDecoder
+	store   interface {
+		StoreRemoteBindings(context.Context, configuration.RemoteBindings) error
+	}
+}
+
+// AccessBindings stores the presenting connector's delivery under its
+// authenticated cluster, observed no later than the presentation (ADR-329).
+// The payload names no cluster; a binding the schema refuses grants nothing.
+func (s federationServices) AccessBindings(ctx context.Context, region *connectorlifecycle.Region) error {
+	if s.bindings == nil || region == nil {
+		return mounts.ErrUnavailable
+	}
+	p := region.Presented()
+	if p.Profile.RootID != s.peers.ids.PermissionRootID || p.Profile.InstallationID != s.peers.ids.InstallationID || p.Profile.ClusterID == s.peers.ids.ClusterID {
+		return mounts.ErrUnavailable
+	}
+	delivery, err := region.ReadAccessBindings(ctx)
+	if err != nil {
+		return err
+	}
+	bindings, err := s.bindings.decoder.DeliveredBindings(p.Profile.ClusterID, delivery)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "federation access bindings refused: invalid delivery")
+		return err
+	}
+	d := configuration.RemoteBindings{ClusterID: p.Profile.ClusterID, ObservedAt: p.CheckedAt, Bindings: bindings}
+	if !d.Valid() {
+		fmt.Fprintln(os.Stderr, "federation access bindings refused: over the per-cluster bounds")
+		return configuration.ErrLimit
+	}
+	if err = s.bindings.store.StoreRemoteBindings(ctx, d); err != nil {
+		fmt.Fprintln(os.Stderr, "federation access bindings store failed: "+federationCause(err))
+	}
+	return err
 }
 
 // Bootstrap enrolls generation 1 for one claimed slot (ADR-193 step 3).

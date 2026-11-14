@@ -48,6 +48,10 @@ type BindingReconciler struct {
 	// unavailable.
 	Workloads      RemoteWorkloadReader
 	WorkloadGuards WorkloadGuardReader
+	// RemoteBindings reads the AccessBinding deliveries of workload
+	// clusters joined with mode: cluster (ADR-329). Without it their
+	// AccessBindings grant and deny nothing.
+	RemoteBindings RemoteBindingReader
 	Now            func() time.Time
 	NewID          func() string
 }
@@ -89,6 +93,13 @@ type RemoteWorkloadReader interface {
 // WorkloadGuardReader proves a cluster's workload metadata guard (ADR-247).
 type WorkloadGuardReader interface {
 	WorkloadGuard(context.Context, string) (value.NamespaceGuardProof, error)
+}
+
+// RemoteBindingReader returns the latest AccessBinding delivery of each
+// joined workload cluster (ADR-329), attributed by the hub to the
+// delivering connector's authenticated cluster.
+type RemoteBindingReader interface {
+	RemoteBindings(context.Context) ([]value.RemoteBindings, error)
 }
 
 // MaxWorkloadSelections bounds the workload journals the reconciler reads.
@@ -136,6 +147,8 @@ type bindingRun struct {
 	// and workloadGuards the last workload guard proof per cluster.
 	workloads      map[string]*remoteWorkloads
 	workloadGuards map[string]*value.NamespaceGuardProof
+	// remoteBindings is the last valid delivery per joined cluster (ADR-329).
+	remoteBindings map[string]value.RemoteBindings
 }
 
 // refreshWorkloads rereads, like refreshRemote, the workload journals the
@@ -426,6 +439,7 @@ var errWatchBehind = errors.New("permission watch has not reached current comple
 
 func (s *bindingRun) refresh(ctx context.Context) error {
 	// Before the trust window opens: a slow connector cannot consume it.
+	s.refreshRemoteBindings(ctx)
 	s.refreshRemote(ctx)
 	s.refreshWorkloads(ctx)
 	// Proofs last: closest to the acceptance that uses them.

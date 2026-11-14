@@ -31,7 +31,11 @@ type Regional struct {
 	bootstrap   regionalBootstrap
 	context     *regionalContext // nil without the optional ADR-171 input
 	nodes       *regionalNodes   // nil without the optional ADR-246 input
-	closers     []func()
+	// bindings delivers this cluster's AccessBindings to the hub (ADR-329);
+	// nil in mode=combined, where the hub-worker observes the hub cluster.
+	bindings  AccessBindingReader
+	lifecycle *RegionalLifecycle
+	closers   []func()
 	// API round trips of the shared observer client, for the executor's stop
 	// line (ADR-196): counts and transport time only.
 	observerStats regionalAPIStats
@@ -84,6 +88,9 @@ const (
 	regionalRetry     = 5 * time.Second
 	regionalReconcile = time.Minute
 	regionalRotation  = time.Minute
+	// regionalBindingDelivery spaces AccessBinding deliveries: three per
+	// 30-second ADR-311 window, so one lost delivery keeps allows current.
+	regionalBindingDelivery = 10 * time.Second
 )
 
 func RunRegional(ctx context.Context, podUID string) error {
@@ -271,6 +278,9 @@ func NewRegional(ctx context.Context, files *os.Root, podUID string) (r *Regiona
 	r.rotator = fleetapp.ClusterCredentialRotator{Profile: value.ClusterCredentialProfile{RootID: c.rootID(), PeerID: c.PeerID, InstallationID: c.binding.InstallationID, ClusterID: c.ClusterID}, Policy: value.DefaultClusterCredentialPolicy(), Store: secret, Exchange: rotation, Now: time.Now}
 	lifecycle := &RegionalLifecycle{Client: channel, Local: regionalLocal{native, source}, Credential: r.rotator, Now: time.Now, Timing: r.lifecycleTiming()}
 	r.bootstrap = regionalBootstrap{store: secret, seed: secret, record: regionalBootstrapRecord{in}, channel: channel, local: regionalLocal{native, source}, binding: c.binding, root: c.rootID(), now: time.Now}
+	if raw.Mode == contracts.ConnectorModeCluster {
+		r.bindings, r.lifecycle = observer, lifecycle
+	}
 	r.credentials, err = mtls.NewConnectorProcessCredentials(ctx, current.Source.Observation.Profile, podUID, lifecycle, lifecycle, source, lifecycle, time.Now)
 	if err != nil {
 		return r, mounts.ErrUnavailable
@@ -353,6 +363,12 @@ func (r *Regional) Run(ctx context.Context) error {
 			r.nodes = nil
 		}
 	}()
+	// ADR-329: deliveries run beside the supervision loop once enrolled.
+	var delivering atomic.Bool
+	if r.bindings != nil {
+		wait := goJoined(func() { r.deliverBindings(contextCtx, &delivering) })
+		defer func() { stopContext(); wait() }()
+	}
 	var attemptAt time.Time
 	var observerAt int64
 	var observerTime time.Duration
@@ -410,6 +426,7 @@ func (r *Regional) Run(ctx context.Context) error {
 			err := r.credentials.Reconcile(ctx)
 			if err == nil && !enrolled {
 				enrolled = true
+				delivering.Store(true)
 				fmt.Fprintln(os.Stderr, "connector process credentials active")
 			}
 			// One closed cause per change, never inputs or remote text.
@@ -428,6 +445,30 @@ func (r *Regional) Run(ctx context.Context) error {
 			if err := r.rotator.Reconcile(ctx); errors.Is(err, value.ErrClusterCredentialFenced) {
 				return err
 			}
+		}
+	}
+}
+
+// deliverBindings sends this cluster's AccessBindings to the hub every
+// regionalBindingDelivery while enrolled (ADR-329) and logs each change of
+// outcome. A failed delivery is retried at the next interval.
+func (r *Regional) deliverBindings(ctx context.Context, enrolled *atomic.Bool) {
+	last := "ok"
+	tick := time.NewTicker(regionalBindingDelivery)
+	defer tick.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-tick.C:
+		}
+		if !enrolled.Load() {
+			continue
+		}
+		err := r.lifecycle.DeliverAccessBindings(ctx, r.bindings)
+		if cause := regionalOutcome(err); cause != last && ctx.Err() == nil {
+			last = cause
+			fmt.Fprintln(os.Stderr, "connector access binding delivery: "+cause)
 		}
 	}
 }

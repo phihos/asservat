@@ -2429,6 +2429,14 @@ type RecordingSelectionSet struct {
 	ExpiresAt      pgtype.Timestamptz
 }
 
+type RemoteAccessBindingDelivery struct {
+	RootID     pgtype.UUID
+	ClusterID  pgtype.UUID
+	ObservedAt pgtype.Timestamptz
+	Digest     []byte
+	Bindings   []byte
+}
+
 type RetentionCatchup struct {
 	CheckpointID pgtype.UUID
 	AfterAttempt pgtype.UUID

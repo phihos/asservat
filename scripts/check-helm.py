@@ -208,8 +208,11 @@ def check_accessbindings(render):
     assert any("object.spec.roles.all(r, (request.operation == 'UPDATE' && has(oldObject.spec.roles) && r in oldObject.spec.roles) || authorizer.group('asservat.io').resource('accessroles').namespace(request.namespace).name(r).check('bind')" in e for e in expressions)
     assert any("name('automation').check('bind')" in e for e in expressions)
     assert named(docs, "ValidatingAdmissionPolicyBinding", base)["spec"] == {"policyName": base, "validationActions": ["Deny"]}
-    # A workload-cluster release observes no AccessBindings yet.
-    assert not any(r["metadata"]["name"].startswith(base) for r in render({"mode": "cluster"}))
+    # A workload-cluster release renders the same RBAC and policy: its
+    # connector delivers the cluster's bindings to the hub.
+    cluster = render({"mode": "cluster"})
+    assert named(cluster, "ValidatingAdmissionPolicy", base)["spec"] == policy["spec"]
+    assert named(cluster, "ClusterRole", base + "-admin")["rules"] == admin["rules"]
 
 
 def check_exposure(render):
@@ -270,6 +273,8 @@ def check_collector(directory):
         return result if not ok else [r for r in yaml.safe_load_all(result) if r]
 
     docs = render(base)
+    # ADR-329: the mode=cluster connector lists this cluster's AccessBindings.
+    assert {"apiGroups": ["asservat.io"], "resources": ["accessbindings"], "verbs": ["get", "list", "watch"]} in named(docs, "ClusterRole", "asservat-region-asservat-connector")["rules"]
     collector = [r for r in docs if r["metadata"].get("namespace") == "asservat-collector" or r["kind"] == "Namespace" and r["metadata"]["name"] == "asservat-collector"]
     assert sorted(r["kind"] for r in collector) == ["ConfigMap", "ConfigMap", "DaemonSet", "Namespace", "Role", "RoleBinding", "ServiceAccount"], [r["kind"] for r in collector]
     namespace = next(r for r in collector if r["kind"] == "Namespace")

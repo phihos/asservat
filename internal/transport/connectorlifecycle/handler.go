@@ -35,6 +35,13 @@ type BootstrapService interface {
 	Bootstrap(context.Context, *Region, value.ClusterBootstrapRequest, ed25519.PublicKey) (value.ClusterBootstrapResult, error)
 }
 
+// AccessBindingsService records a connector's AccessBinding delivery for its
+// presented cluster (ADR-329). The Region reads the delivery; the service
+// must attribute it to region.Presented().Profile.ClusterID only.
+type AccessBindingsService interface {
+	AccessBindings(context.Context, *Region) error
+}
+
 type Handler struct {
 	presenter clustercredential.Presenter
 	keys      app.EnrollmentProofVerifier
@@ -134,6 +141,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			err = ErrChannel // only the observed certificate, never another owner
 		}
 		result.Owner = &owner
+	case PurposeAccessBindings:
+		if sink, ok := h.services.(AccessBindingsService); ok {
+			err = sink.AccessBindings(ctx, region)
+		} else {
+			err = ErrChannel
+		}
 	case PurposeRegistration:
 		var registration app.ConnectorLeafRegistration
 		registration, err = h.services.Registration(ctx, region, *opening.Certificate)
@@ -212,7 +225,7 @@ func (h *Handler) admit(ctx context.Context, o Opening, exporter []byte) (value.
 		if o.Certificate == nil || o.Certificate.Binding != o.Request.Process.Binding {
 			return zero, false
 		}
-	case PurposeOwnerCandidates, PurposeRecovery, PurposeOwnerObservationCandidates:
+	case PurposeOwnerCandidates, PurposeRecovery, PurposeOwnerObservationCandidates, PurposeAccessBindings:
 	case PurposeOwnerAuthentication, PurposeOwnerRegistration:
 		if o.Owner == nil || o.Owner.Usage != "server" || o.Owner.Binding.InstallationID != o.Request.Process.Binding.InstallationID {
 			return zero, false
@@ -256,6 +269,8 @@ type Region struct {
 	// slot is the claimed bootstrap slot of a bootstrap conversation; every
 	// source value is checked against it instead of a presentation.
 	slot *value.PeerBinding
+	// delivered marks the conversation's one AccessBinding request.
+	delivered bool
 }
 
 // BindBootstrap binds a bootstrap conversation to its claimed slot, once.
@@ -324,6 +339,28 @@ func (r *Region) ReadConnectorIdentityConfiguration(ctx context.Context) (app.Co
 		return app.ConnectorIdentityConfiguration{}, ErrChannel
 	}
 	return *reply.Configuration, nil
+}
+
+// ReadAccessBindings asks the presenting connector for its cluster's complete
+// AccessBinding LIST (ADR-329), once per conversation. Only this request
+// raises the conversation's read bound, by the delivery's own byte bound.
+func (r *Region) ReadAccessBindings(ctx context.Context) (contracts.AccessBindingDelivery, error) {
+	r.conn.mu.Lock()
+	defer r.conn.mu.Unlock()
+	if r.slot != nil || r.delivered {
+		return contracts.AccessBindingDelivery{}, ErrChannel
+	}
+	r.delivered = true
+	r.conn.limit.n += contracts.AccessBindingDeliveryMaxBytes
+	var reply RegionFrame
+	if err := r.ask(ctx, "access-bindings", &reply); err != nil {
+		return contracts.AccessBindingDelivery{}, err
+	}
+	if reply.AccessBindings == nil || reply.Source != nil || reply.Configuration != nil || reply.Observation != nil {
+		r.closed = true
+		return contracts.AccessBindingDelivery{}, ErrChannel
+	}
+	return *reply.AccessBindings, nil
 }
 
 func (r *Region) BeginConnectorLifecycle(ctx context.Context, req app.ConnectorLifecycleRequest) (app.ConnectorLifecycleOperation, error) {

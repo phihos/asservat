@@ -350,6 +350,8 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("permission_review_source", "DELETE")
 		add("permission_review_source", "UPDATE", "epoch", "seen_sequence", "generation", "resource_version", "spec_digest", "authority_digest", "cluster_id", "role", "source_json", "accepted_audit_id")
 		add("permission_review_assignment", "UPDATE", "retired_at", "retirement_audit_id")
+		// ADR-329: joined clusters' AccessBinding deliveries.
+		read("remote_access_binding_delivery")
 	case "permission-audit":
 		// The publisher's pending read and acknowledgement only; the stream
 		// column grant permits its existing FOR UPDATE lock.

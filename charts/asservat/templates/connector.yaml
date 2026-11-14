@@ -155,6 +155,13 @@ rules:
   - apiGroups: [apps]
     resources: [replicasets]
     verbs: [get]
+  {{- if eq $mode "cluster" }}
+  # ADR-329: the connector delivers this cluster's AccessBindings to the hub
+  # (with namespaces get above for their namespace UIDs).
+  - apiGroups: [asservat.io]
+    resources: [accessbindings]
+    verbs: [get, list, watch]
+  {{- end }}
   {{- if $executor }}
   # ADR-179/230/241/283: target resolution, probe Events, logs, metrics,
   # capture profiles and Kubernetes packet peers in this cluster.

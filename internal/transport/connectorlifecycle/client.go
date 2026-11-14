@@ -141,6 +141,18 @@ func (c *Client) Run(ctx context.Context, open func(exporter []byte) (Opening, e
 				return zero, ErrChannel
 			}
 			reply = RegionFrame{Kind: "configuration", Configuration: &cfg}
+		case frame.Kind == "access-bindings":
+			reader, ok := local.(AccessBindingsLocal)
+			if !ok {
+				_ = out.Send(RegionFrame{Kind: "error"})
+				return zero, ErrChannel
+			}
+			delivery, err := reader.ReadAccessBindings(ctx)
+			if err != nil {
+				_ = out.Send(RegionFrame{Kind: "error"})
+				return zero, ErrChannel
+			}
+			reply = RegionFrame{Kind: "access-bindings", AccessBindings: &delivery}
 		case frame.Kind == "close" && operation != nil:
 			operation.Close()
 			operation = nil

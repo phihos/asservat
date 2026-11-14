@@ -222,8 +222,14 @@ func (w *hubWorker) openPermission(ctx context.Context) (_ *permissionWorker, er
 	if err != nil {
 		return nil, err
 	}
+	// ADR-329: AccessBindings of workload clusters joined with mode: cluster,
+	// as their connectors delivered them to the federation.
+	remoteBindings, err := postgres.NewRemoteAccessBindings(startup, pools["permission-accept"], root)
+	if err != nil {
+		return nil, &fixedStepError{"permission/remote-bindings", err}
+	}
 	p.reconciler = app.BindingReconciler{RootID: root, Reader: observer, Watcher: observer, Trust: trust, Store: store, Namespaces: namespaces, NamespaceClusterID: cluster,
-		Guards: &w.guards, Remote: &w.guards, Workloads: &w.guards, WorkloadGuards: &w.guards, Now: time.Now, NewID: uuid.NewString}
+		Guards: &w.guards, Remote: &w.guards, Workloads: &w.guards, WorkloadGuards: &w.guards, RemoteBindings: remoteBindings, Now: time.Now, NewID: uuid.NewString}
 	if b := c.Browser; b != nil {
 		browserObserver, e := w.kubeOpeningClient()
 		if e != nil {
