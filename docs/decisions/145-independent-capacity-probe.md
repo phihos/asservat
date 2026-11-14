@@ -1,10 +1,12 @@
 # ADR-145 — Independent capacity admission probe
 
-Status: selected under continued implementation authorization. Requirements:
+> Superseded (2026-11-13): this probe existed to prove at runtime that installer-created admission policies deny namespace writers. ADR-328 trusts everyone who can write in Asservat namespaces, so capacity resources are protected by plain RBAC and no dry-run probe account or policy exception is needed.
+
+Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan. Originally selected under continued implementation authorization. Requirements:
 REQ-DEP-003, REQ-FED-001, REQ-CAP-001. Component and native results remain in
 [implementation progress](../implementation-progress.md).
 
-The installed configuration worker must prove that the capacity administrator
+The installed configuration worker had to prove that the capacity administrator
 policy rejects its two dry-run CREATE requests. The private namespace policy
 otherwise rejects the same requests, which can mask the required independent
 capacity-policy denial. RBAC permission alone cannot prove either policy.

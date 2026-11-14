@@ -1,5 +1,7 @@
 # ADR-198 — Installed key service
 
+> Superseded in part by ADR-328 (2026-11-13): the continuation generating the key material, the ConfigMap's UID and SHA-256 pins on the key Secret, the admission guard on the key configuration ConfigMap, and the continuation-built SQL projection (decisions 2, 3 and 5) no longer apply. The Helm `secrets` hook Job creates the root key Secret once if missing and never rotates it; Helm renders the configuration ConfigMap and the key-service RBAC. Still valid: a separate key-service Deployment that alone mounts the key (decision 1), permanent SQL logins, connectors resolved from SQL (decision 4), the operator serving Secret, worker-PKI key clients and no download unwrap.
+
 Date: 2026-10-17. Status: accepted; implemented and natively qualified
 ([ADR-196 continuation run 8](../../test/results/adr196-continuation-native-8/environment.json)).
 Requirements: REQ-DEP-003/005, REQ-FED-002, artifact-downloads, S-02; TASK-03, TASK-11.
@@ -49,23 +51,21 @@ nothing installs it. These are the code facts:
    - Exposure: an L4 Service on port 9447, with the federation's service
      type and an optional pinned NodePort, because regions dial it
      outbound (ADR-176).
-2. **The continuation generates the root key once.** After the federation
-   workload, the continuation:
+2. **The root key is generated once.** (The continuation did this; the
+   Helm `secrets` hook Job now creates the Secret if missing and never
+   rotates it.) It:
    - creates the immutable Opaque Secret with 32 bytes from `crypto/rand`
      as version 1 of `asservat-local-keys/v1`, and clears the buffer;
-   - creates the ConfigMap `asservat-local-key-configuration/v1`, which
-     names the Secret by name, UID and SHA-256, at revision 1, with the
-     fleet issuer epoch as `RecoveryEpoch`, unsuspended.
+   - names it in the Helm-rendered ConfigMap
+     `asservat-local-key-configuration/v1` by name, at revision 1, with
+     the fleet issuer epoch as `RecoveryEpoch`, unsuspended.
 
-   A rerun reopens both by UID and digest and never regenerates. A guard
-   (ValidatingAdmissionPolicy and binding) refuses writes to the ConfigMap
-   by anyone except the installation administrators. The Secret needs no
-   guard: it is immutable, and the ConfigMap pins its UID and SHA-256, so a
-   replaced Secret is refused rather than used. The continuation
-   prints a fixed instruction to back up the Secret, because losing it
+   A rerun never regenerates. RBAC limits writes to administrators;
+   ADR-328 removes the former ConfigMap guard and the UID and SHA-256 pins
+   on the Secret. The installation documentation
+   gives a fixed instruction to back up the Secret, because losing it
    makes stored artifacts unreadable and ADR-067 recovery is unfinished.
-   The root key passes through the installer process's memory once, and
-   only the key-service Pod ever mounts it.
+   Only the key-service Pod ever mounts it.
 3. **Key-service SQL logins are permanent.**
    - `key-configuration`, `key-wrap` and `key-verify` get ordinals 82–84.
    - They use product grant lists. `key-configuration` gets the fixture's
@@ -114,8 +114,7 @@ Adding a region needs no key-service change. A key-service outage stops
 regional captures before any source opens. A cluster administrator of the
 hub cluster can still read the root key; that is
 [small-deployments.md](../research/small-deployments.md)'s stated
-limitation. The hub cannot prove the key guard live, and the service does
-not check it: an administrator-changed configuration still has to pass the
+limitation. An administrator-changed configuration still has to pass the
 ADR-067 monotonic SQL acceptance. Root rotation, retirement and
 OpenBao-wrapped roots stay future work.
 

@@ -1,5 +1,7 @@
 # ADR-106 — Regional API context start and completed-result provenance
 
+> Superseded in part by ADR-328 (2026-11-13): Pinned namespace/Pod/specification identities, the native admission probe and namespace-UID guard matching defended against writers in the Asservat namespace and no longer apply. The execution identity, its SelfSubjectReview binding, the SQL execution row and the one-attempt start protocol remain valid.
+
 Status: implementation decision under the maintainer's continuation authorization.
 Native qualification and deployment remain separate from this decision.
 
@@ -8,11 +10,10 @@ This continuation joins the existing accepted capture, local start journal,
 wrap-only producer, semantic verifier and catalog publication. It does not
 introduce another broker, generic job system or approval evaluator.
 
-Use a dedicated Restricted regional execution Pod, with independently pinned
-namespace, account, Pod, full specification and image digest. The compiler's
-collector image must equal that protected execution image. Actual API-server
-SelfSubjectReview and live account/Pod reads bind its projected credential; a
-separate native admission probe establishes current namespace protection. A
+Use a dedicated Restricted regional execution Pod with its own ServiceAccount.
+The compiler's collector image must equal the configured execution image. An
+API-server SelfSubjectReview binds its projected credential to that account and
+Pod; RBAC and Pod Security protect its namespace (ADR-328). A
 fresh local process epoch identifies an instance. A Pod token does not prove
 process uniqueness or historical workload cleanliness. Reusing the hub-owner,
 connector or download-worker role would improperly combine their authorities.
@@ -30,10 +31,9 @@ stored process binding. Unknown starts remain spent.
 
 The private `apiContextStart/v1` profile replaces target node/boot claims with
 exact executor Pod/account/process binding. Historical `onTriggerStart/v1`
-serialization and node validation remain unchanged. Each start admission guard
-matches its own control namespace. A global match followed by a namespace
-rejection prevented independent control namespaces from coexisting; namespace
-UID checks remain independently mandatory for each journal.
+serialization and node validation remain unchanged. Each control namespace has
+its own start journal; separation of capacity and execution accounts relies on
+RBAC, not on namespace-UID admission guards.
 
 Successful acquisition records its original start/acquisition/completion times
 and exact bounded ciphertext copy receipts. Publication uses this immutable

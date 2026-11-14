@@ -1,5 +1,7 @@
 # ADR-205 — Installed context deletion
 
+> Superseded in part by ADR-328 (2026-11-13): the `installer-continue` steps, the handoff after the final native projection proof and the resource-journal template and role pins no longer apply; Helm and its hook Jobs provision the Secret, signing key and section from mounted configuration. The deletion child, its three SQL purposes, the separate delete-only evidence credential, the signed encrypted deletion record and charge release remain valid.
+
 Date: 2026-10-18. Status: accepted; implemented and merged; installed deletion qualification pending.
 Requirements: S-02 (expiry and deletion in the installed journey); REQ-EVD-006,
 REQ-PRV-004, REQ-DEP-003; TASK-03.
@@ -93,7 +95,7 @@ and its storage charge is never released.
    worker template do change: fresh installations reserve the three purposes
    and optional projected file paths. Their role/template digests change even
    when the child is disabled.
-   `installer-continue` fills the section exactly when the publisher is
+   The installation fills the section exactly when the publisher is
    installed.
 
 ## Options not taken

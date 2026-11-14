@@ -1,6 +1,8 @@
 # ADR-158 — Owner startup preflight before recovery locking
 
-Status: implemented; qualification pending. Requirements:
+> Superseded (2026-11-13): the preflight split served the installer's owner-startup operations (native brackets, private password journal, guarded effects under the recovery lock). Helm renders the owner, its Secrets and RBAC, so these operations and their critical sections are removed.
+
+Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan. Historical status: implemented; qualification was pending. Requirements:
 REQ-FED-001, REQ-DB-005 and REQ-DEP-003.
 
 ## Observed failure

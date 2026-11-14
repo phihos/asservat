@@ -1,5 +1,7 @@
 # ADR-157: Separate protected observation dial ports from serving identity
 
+> Superseded in part by ADR-328 (2026-11-13): the protected Service/EndpointSlice port profile and the native/template pins on the regional input no longer apply. The decision to accept a fixed dial host:port that differs from the served port, with unchanged TLS name, HTTP authority and no redirect or second dial, remains valid.
+
 - Status: accepted; component and scoped direct native qualification passed; installed selection remains pending
 - Date: 2026-10-13
 - Related: ADR-144, ADR-150
@@ -17,7 +19,7 @@ ADR-144 already distinguishes the installer-owned reachable TCP hint from the in
 
 Accept a separately fixed constructor-owned host:port with a finite numeric TCP port 1–65535. Preserve the current host syntax/length restrictions. Remove only the dial-port-equals-NativePort requirement from NewOwnerObservationClient; make its documented input provenance explicit. Do not introduce a request-selected address, URL callback, fallback, proxy setting, redirect or retry. The address remains immutable for the client lifetime and is supplied by the accepted regional composition, never by a remote response or a capacity request.
 
-Dial the fixed endpoint once under the original setup/request deadline. Verify ordinary TLS 1.3 roots and the common name derived from original ServiceUID/issuer/cluster/installation. Require the actual leaf to match the independently read complete current owner candidate set, then the unchanged purpose-specific current registry/source/native/channel checks. Use the original common-SNI plus Pool.NativePort for HTTP authority and fixed path, even when the TCP dial port differs. The already authenticated socket is the sole transport socket; redirects and second dials remain unavailable.
+Dial the fixed endpoint once under the original setup/request deadline. Verify ordinary TLS 1.3 roots and the common name derived from original ServiceUID/issuer/cluster/installation. Require the actual leaf to match the independently read complete current owner candidate set, then the current registry and channel checks. Use the original common-SNI plus Pool.NativePort for HTTP authority and fixed path, even when the TCP dial port differs. The already authenticated socket is the sole transport socket; redirects and second dials remain unavailable.
 
 The protected Service/EndpointSlice port profile and original owner listener remain unchanged. Same-cluster HWORK exact-Pod routing remains unchanged. This expands only the accepted installation-owned connection hint, not identity, issuer roots, grants, source freshness, deadlines or standby/effect authority.
 

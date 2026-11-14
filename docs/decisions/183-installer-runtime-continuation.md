@@ -1,6 +1,8 @@
 # ADR-183 — Installer runtime continuation
 
-Date: 2026-10-15. Status: accepted; implemented. Native qualification passed
+> Superseded (2026-11-13): the continuation Pod, its resource journal and 30-minute window, guard bridge and handover checks existed to let a trusted installer verify its own objects against namespace writers. ADR-328 trusts the namespaces; Helm renders the runtime objects and idempotent hook Jobs do the remaining live work (docs/reviews/helm-native-install-plan.md).
+
+Date: 2026-10-15. Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan. Native qualification had passed
 ([run 10](../../test/results/adr183-continuation-native-10/result.json));
 replay after the guard bridge remains open.
 Requirements: REQ-DEP-001/003/005, S-02; TASK-11.

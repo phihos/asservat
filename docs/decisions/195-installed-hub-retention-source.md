@@ -1,5 +1,7 @@
 # ADR-195 — Installed hub retention source
 
+> Superseded in part by ADR-328 (2026-11-13): the retention guard with its status user and protection digest (decision 4), its pin in the permission projection (decision 5), the workload-guard dry-run exception and probe rights (decision 7) and the continuation creating the baseline policy as administrator (decision 6) no longer apply. Helm renders the baseline `EvidenceRetentionPolicy` from required chart values and the hub-worker RBAC; the retention source needs no protection digest. Decisions 1–3, 8 and 9 remain valid.
+
 Date: 2026-10-17. Status: accepted; steps 1–4, 5a, 6 and 7 implemented and
 natively qualified ([continuation run 8](../../test/results/adr195-continuation-native-8/environment.json)).
 The hub retention source becomes Ready with the baseline policy, read
@@ -83,7 +85,7 @@ source.
    It is deferred to the capture composition, because before any installed
    capture exists there is no evidence a decision could shorten, and no
    native run could exercise it.
-4. **The guard (D1).** The continuation creates the retention guard after
+4. **The guard (D1, removed by ADR-328).** The continuation created the retention guard after
    the permission step, through the shared `ensureAdmissionGuard`.
    - Administrators: the installation administrators.
    - Status users: one reserved name,
@@ -103,16 +105,16 @@ source.
    permission root, from the same mount, so a separate projection adds no
    isolation, and nothing has been released that the old bytes would serve.
 6. **The initial policy set (D2).** The first acceptance covers an empty
-   policy set, which needs no review. Afterwards the continuation, acting as
-   administrator, creates the baseline policy from required chart values
-   that have no defaults. Without a baseline value it creates none, and
+   policy set, which needs no review. Helm renders the baseline policy
+   from required chart values that have no defaults (originally the
+   continuation created it as administrator). Without a baseline value it creates none, and
    captures fail closed until the operator applies one. A protected review
    is not used: it expires within an hour, and pinned inside an immutable
    projection it could not be recovered.
-7. **RBAC.** The hub-worker gets `get`, `list`, `watch` and `create` on
-   `evidenceretentionpolicies`, and `get` on the retention guard. The
-   workload guard gets the matching dry-run exception, and the chart's
-   continuation ClusterRole the same rules.
+7. **RBAC.** The hub-worker gets `get`, `list` and `watch` on
+   `evidenceretentionpolicies`. (The `create` right for the guard's dry-run
+   probe, `get` on the retention guard and the workload-guard exception are
+   removed with the guard by ADR-328.)
 8. **Readiness (D5).** The continuation does not wait for Ready. The native
    test asserts that the hub source becomes Ready through a `retention-read`
    login, and returns to Ready after a baseline edit and a restart under a

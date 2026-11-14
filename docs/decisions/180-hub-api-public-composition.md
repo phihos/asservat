@@ -1,5 +1,7 @@
 # ADR-180 — hub-api public composition and its protected inputs
 
+> Superseded in part by ADR-328 (2026-11-13): UID pins and admission guards on the browser settings, identity settings, capability, work-trust, worker configuration and download environment ConfigMaps no longer apply. hub-api reads them, and the mounted files, under RBAC. The fixed-file inputs, audiences, pools and HTTPS rules remain valid.
+
 Date: 2026-10-15. Status: accepted; P1–P5 composed in product code with unit tests; P6, the hub-worker and installer producers, and native qualification pending.
 Requirements: S-02, REQ-DEP, REQ-DB-004, REQ-FED-001; TASK-03 / TASK-11.
 
@@ -44,29 +46,29 @@ read.
    under ADR-177.
 3. **Identity** uses the Keycloak profile ([ADR-053](053-keycloak-access-profile.md))
    only.
-   - **Issuer, client ID and origin** come from the protected browser settings
-     ConfigMap, pinned by name and UID.
+   - **Issuer, client ID and origin** come from the browser settings ConfigMap,
+     read by its fixed name.
    - **Browser login** verifies access tokens for one explicit installer
      audience.
    - **MCP and download bearer tokens** are verified for the audiences the
      transports already derive: `<origin>/mcp` and `<origin>/api/v1/downloads`.
    - **Provider CA and client secret** are fixed files: `oidc-roots.pem` and
      `oidc-client-secret`.
-   - **Organization and client policy** comes from the pinned
+   - **Organization and client policy** comes from the
      identity-settings ConfigMap.
    - **Browser session ciphertext** uses an OpenBao Transit key through two
      fixed token files, one encrypt-only and one decrypt-only.
 4. **Investigation and regional start:**
    - **Targets** use `contextstart.Targets` over the owner's context-start
      router.
-   - **Capability** has one hub-held guarded ConfigMap per workload cluster,
+   - **Capability** has one hub-held ConfigMap per workload cluster,
      routed by target cluster.
    - **Retention** uses `AcceptedRetentionReader` over the native retention
      topology pins, with no selector reader.
    - **Work signing:**
      - one OpenBao Ed25519 signing key, read through a fixed token file;
      - signing is routed per target cluster;
-     - each cluster has a hub-held guarded work-trust ConfigMap.
+     - each cluster has a hub-held work-trust ConfigMap.
 
      Like the capability source, the work-trust source no longer pins its
      settings to the reading client's cluster. The regional validation keeps
@@ -78,7 +80,7 @@ read.
    - Lifecycle policies come from their installer-provisioned SQL backings,
      never from code constants.
 6. **Downloads.**
-   - **Worker configuration and download environment** are hub-held guarded
+   - **Worker configuration and download environment** are hub-held
      ConfigMaps.
      - hub-api reads the worker profile from its source and serves only a
        revision already current in SQL (ADR-070). Accepting a revision is
@@ -105,7 +107,7 @@ read.
 ## Consequences
 
 hub-api's public startup fails closed when any listed input, credential or
-pinned object is missing or changed. The process holds every public purpose's
+object is missing. The process holds every public purpose's
 credential, as ADR-177 already accepts. Changing an audience, issuer or origin
 requires a new installer revision, never a runtime switch.
 

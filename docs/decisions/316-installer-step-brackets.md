@@ -1,9 +1,15 @@
 # ADR-316: Installer step brackets
 
-Status: accepted (agent decision under the maintainer's 2026-10-20 proportionality
+> Superseded (2026-11-13): The brackets reduced repeated handover, root and
+> owner-identity proofs between installer continuation steps. ADR-328 removes
+> those proofs and the continuation Pod. Helm renders the runtime objects and
+> the `setup` hook Job provisions SQL roles idempotently under plain RBAC.
+
+Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan.
+Previously: accepted (agent decision under the maintainer's 2026-10-20 proportionality
 rule and the merged [test runtime plan](../reviews/test-runtime-plan-2026-11-08.md),
-option 4). Generalizes [ADR-315](315-batched-initial-schema.md) beyond the
-schema phase. Amends decision 3 and 4 of
+option 4). Generalized [ADR-315](315-batched-initial-schema.md) beyond the
+schema phase and amended decisions 3 and 4 of
 [ADR-186](186-operation-scoped-public-role-proof.md) and the per-step proofs of
 the runtime resource producer.
 

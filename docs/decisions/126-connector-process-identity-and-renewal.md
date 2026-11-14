@@ -1,5 +1,7 @@
 # ADR-126: Bind connector identity to automatic process enrollment and bounded renewal
 
+> Superseded in part by ADR-328 (2026-11-13): Independently protected source/guard proof and live controller-chain reads defended against forged Pods and tampered configuration in the connector namespace and no longer apply. Pod-bound TokenReview, process-epoch enrollment, bounded renewal and SQL lifecycle rows remain valid.
+
 Status: Accepted design; the isolated component checkpoint has no installed runtime enablement. Actual qualification and outstanding retirement work are listed in [the architecture contract](../architecture/connector-renewal.md).
 
 ## Context
@@ -8,7 +10,7 @@ A connector needs its own client identity and a separate server identity for pri
 
 ## Decision
 
-Keep the installation/cluster/logical connector identity stable. Current Pod-bound TokenReview, live Pod/account/controller reads and independently protected source/guard proof may enroll a new bounded process epoch with two process-owned P-256 keys. No request provides a chosen human actor or fabricates an authenticated TLS leaf. The existing legacy bootstrap identity remains historical and unchanged.
+Keep the installation/cluster/logical connector identity stable. Current Pod-bound TokenReview of the connector's ServiceAccount token may enroll a new bounded process epoch with two process-owned P-256 keys. No request provides a chosen human actor or fabricates an authenticated TLS leaf. The existing legacy bootstrap identity remains historical and unchanged.
 
 Retain one pending epoch per Pod and separately bounded serving/retained epochs. A same-Pod replacement retires the prior serving epoch atomically only when the new client and server leaves both have independent encrypted audit acknowledgement. Old pending/unknown epochs, signing attempts and possible leaves remain charged. A delayed reply cannot activate an epoch retired by a newer admission. Rolling Pods consume independently bounded serving slots.
 

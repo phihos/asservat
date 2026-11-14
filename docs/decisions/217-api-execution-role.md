@@ -1,5 +1,9 @@
 # ADR-217 — One SQL login for API execution facets
 
+> Superseded in part by ADR-328 (2026-11-13): the installer verifier connection
+> and installer-side credential claims/receipts no longer exist; Helm hook Jobs
+> provision roles. The single `api-execution` login, grant union and pool remain valid.
+
 Date: 2026-10-23. Status: selected under the maintainer's instruction to implement
 the specification and simplify when sensible; implementation in progress,
 qualification pending.
@@ -24,13 +28,13 @@ deletion, schema creation, role membership or administrative privilege is added.
 No `SET ROLE` or SQL schema migration is introduced.
 
 Use new permanent ordinal 94; ordinals 21–23 are retired and never reused.
-The three credentials, claim/receipt sequences, projection files and pool
-objects become one. Total public-runtime credentials fall from 81 to 79;
+The three credentials, projection files and pool objects become one. Total public-runtime credentials fall from 81 to 79;
 hub public entries fall from 46 to 44, or from 52 to 50 including the unchanged
 six owner credentials. The new pool uses `MinConns=0`, `MaxConns=3`, preserving
 the former group's aggregate concurrency. Each retained hub process still has
-the same global 32-connection governor. The installation role limit is 13:
-four retained hub processes times three, plus one serialized installer verifier.
+the same global 32-connection governor. The installation role limit was 13:
+four retained hub processes times three, plus one serialized installer
+verifier that ADR-328 removes.
 
 The pool no longer serializes each facet independently: up to three reads,
 preparations or records can use the group's three slots. Existing SQL locks,

@@ -1,5 +1,7 @@
 # ADR-172 — Delegated owner discovery and authentication for regional exchanges
 
+> Superseded in part by ADR-328 (2026-11-13): the owner workload-protection (guard) reads, the guard plan copied into `FederationDeployment.Owner` and the guard-denied dry-run probe no longer apply. The hub-side owner registration, revocation and route checks and the region's own TLS verification of the observed certificate remain valid.
+
 Date: 2026-10-14. Status: accepted; channel purposes, regional authenticator, pinned-endpoint client and federation owner-read composition implemented with component tests; native qualification pending.
 Requirements: REQ-FED-001/003, S-02 regional context start; TASK-03 / TASK-11.
 
@@ -31,7 +33,7 @@ checks on the hub peer.
      candidate set (the existing SQL read).
    - `owner-authentication`: the region sends the owner certificate it observed
      in an actual TLS session. The hub runs its own unchanged `OwnerAuthenticator`
-     (registry, protection and route checks) and returns the authenticated facts
+     (registry and route checks) and returns the authenticated facts
      and the first registration's configuration observation. The hub's own
      verify step can only require the certificate to be exactly that one.
 2. The region completes authentication locally. It verifies the same TLS
@@ -50,8 +52,8 @@ checks on the hub peer.
    common-name exception) remains open.
 4. The federation process gains the hub's owner reads: one more fixed role
    with the owner registry/configuration read grants, and read-only access to
-   the owner namespace's EndpointSlices and workload guard. It still holds no
-   owner signing, audit or activation authority.
+   the owner namespace's EndpointSlices. It still holds no owner signing, audit or activation
+   authority.
 
 ## Consequences
 

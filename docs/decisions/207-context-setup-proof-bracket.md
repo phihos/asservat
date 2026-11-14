@@ -1,8 +1,11 @@
 # ADR-207 — One native proof bracket for context-start setup
 
-Date: 2026-10-18. Status: registration source handoff and private setup operation
+> Superseded (2026-11-13): this decision amortizes the connector's native proof of its own installation (live namespace/account, guard policy/binding pairs, workload and approved inputs) across one opening. ADR-328 removes that self-verification; the connector reads mounted configuration and the hub authenticates it with TLS and TokenReview. The two remote-owner authentications of decision 5 remain under their own ADRs.
+
+Date: 2026-10-18. Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan.
+Earlier status: registration source handoff and private setup operation
 implemented with component and selected native tests; installed openings reached
-acquisition and publication. Sustained availability remains unqualified.
+acquisition and publication.
 Requirements: REQ-EXE-002, REQ-FED-001/003, S-02; TASK-03 / TASK-11.
 
 Current qualification (2026-10-20):

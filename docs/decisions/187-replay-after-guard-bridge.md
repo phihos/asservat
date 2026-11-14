@@ -1,6 +1,8 @@
 # ADR-187 — Replay after the guard bridge
 
-Date: 2026-10-15. Status: accepted; implemented. Native qualification passed
+> Superseded (2026-11-13): The guard bridge, retained guard generations and journal replay existed to protect the installer handover against namespace writers. Helm renders the objects, plain RBAC protects the namespace, and `helm upgrade` simply re-runs idempotent hook Jobs.
+
+Date: 2026-10-15. Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan. Formerly accepted; implemented. Native qualification passed
 ([continuation run 23](../../test/results/adr183-continuation-native-23/result.json)):
 the bootstrap hook replay and a second continuation after the bridge, with the
 guard generation and the journal unchanged.

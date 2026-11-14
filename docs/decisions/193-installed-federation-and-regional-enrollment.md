@@ -1,5 +1,7 @@
 # ADR-193 — Installed federation and regional cluster enrollment
 
+> Superseded in part by ADR-328 (2026-11-13): the continuation's federation provisioning and journal window (decision 3 and steps 2a, 2d), `installer-cluster` creating and proving the regional workload and source guards with a minted token (decision 4, steps 5 and 6), the connector re-proving its own protection at startup, and binding the staged source's UID and protection digest into the generation-1 audit no longer apply. Helm renders the federation and the `mode=cluster` connector objects, and RBAC protects their namespaces. Still valid: bootstrap issuance by a fleet operator (decision 1), federation peers from SQL (decision 2), in-band generation-1 enrollment by the connector over the pinned TLS channel (decision 5), the PKI roles and the issuance route.
+
 Date: 2026-10-15. Status: accepted; steps 1–3 and 5 implemented and natively
 qualified ([federation run 3](../../test/results/adr193-federation-native-3/result.json):
 generation 1 from a product `BootstrapIssuer` slot;
@@ -63,9 +65,10 @@ Three facts constrain the design:
    - The hub-api hosts it as an OIDC fleet-operator operation.
    - Its SQL purposes join the fixed public role layout, so they apply to
      new installations.
-   - A new generation-1 credential audit binds:
-     - the bootstrap, the claim audit, the lineage and the key digest;
-     - the staged source's UID, generation and protection digest.
+   - A new generation-1 credential audit binds the bootstrap, the claim
+     audit, the lineage and the key digest. (It also bound the staged
+     source's UID, generation and protection digest; ADR-328 drops that
+     binding.)
    - The cluster catalog stays configuration, not authority.
 2. **Federation peers come from SQL.** `FederationDeployment` replaces
    `Peers` with one installation-wide connector block, which matches the
@@ -75,9 +78,10 @@ Three facts constrain the design:
    - The lifecycle handler already resolves duties from the presented
      profile, so peers resolve per request.
    - The federation starts with zero peers.
-3. **The continuation provisions the federation**, after the owner
-   selection, in one role operation like the permission step:
-   - an immutable projection Secret holding the six SQL logins and the
+3. **The installation provisions the federation.** (Originally a
+   continuation step in one role operation; Helm and the `setup` hook Job
+   now render and fill these objects.)
+   - a Secret holding the six SQL logins and the
      federation audit keys (from the role state's MAC material);
    - OpenBao Kubernetes-auth provider effects, like the owner, instead of
      static token files;
@@ -109,8 +113,10 @@ Three facts constrain the design:
      - the workload guard and the `connector-identity` source with its
        guard;
      - the credential Secret and `regional.json`.
-   - Before ungating, it proves the protection with a minted short-lived
-     account token. The connector proves it again at startup.
+   - Before ungating, it proved the protection with a minted short-lived
+     account token, and the connector proved it again at startup. ADR-328
+     removes both proofs and the guards; Helm `mode=cluster` renders these
+     objects under plain RBAC.
 5. **Generation 1 is enrolled in-band by the connector.** No seed is
    generated outside the connector process.
    - The Secret starts at generation 0 with only the one-use bootstrap

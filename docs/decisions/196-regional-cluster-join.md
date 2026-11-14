@@ -1,5 +1,7 @@
 # ADR-196 — Regional cluster join
 
+> Superseded in part by ADR-328 (2026-11-13): the guards on the slot's sources, the topology naming the hub source by guard digest, the requirement that the join run as the accepted installer identity because cluster-admin RBAC cannot pass the admission guards, the protection digests in the join record and staged generation 1 (decisions 4 and 7), the executor's guard proofs, and the addendum's per-slot dry-run probe pairs no longer apply. Under ADR-328 any administrator may write the catalog entry and sources under RBAC, and the connector source is a plain ConfigMap. Still valid: the public join record (without protection digests), the hub-api restarting its process on a catalog change (decision 3), the owner L4 Service (decision 5), the offer values, the write-only regional evidence credential, the topology pin in the catalog entry and eight slots.
+
 Date: 2026-10-17. Status: accepted; decision 5 and steps 1–5 implemented and
 natively qualified ([continuation run 8](../../test/results/adr196-continuation-native-8/environment.json): the region installs
 the executor layout and join record, the executor composes, and the hub joins
@@ -50,16 +52,17 @@ written.
    installation administrator (the chart's bootstrap runner, as a Helm hook
    or from the CLI). For one regional cluster it creates, create-only and
    with exact-spec reopen:
-   - the slot's capability and work-trust sources, immutable, each with its
-     guard (the installation administrators);
-   - the slot's retention topology, immutable, naming the hub source from
-     the continuation's guard digest;
+   - the slot's capability and work-trust sources, immutable (each had
+     its own guard until ADR-328);
+   - the slot's retention topology, immutable, naming the hub source (by
+     the guard digest until ADR-328);
    - the catalog entry, which is an update of the mutable catalog.
 
    Neither the continuation (which has finished) nor the hub-worker (not an
    administrator, and it cannot know the startup digest) writes the entry.
-   The CLI kubeconfig must select that accepted runner identity; cluster-admin
-   RBAC alone does not satisfy the installation's admission guards. Its existing
+   The CLI kubeconfig had to select that accepted runner identity, because
+   cluster-admin RBAC alone did not satisfy the admission guards; under
+   ADR-328 any administrator's RBAC suffices. Its existing
    continuation role also permits the intended operator maintenance actions:
    updating an `EvidenceStoragePool` and deleting an `AccessBinding`. These
    verbs let the selected administrator extend a regional pool and remove a
@@ -68,7 +71,8 @@ written.
    record to an immutable ConfigMap in the region and prints it. It
    carries:
    - the bootstrap slot (cluster, peer, issuer epoch);
-   - the connector `FederationPeer` (source UID, bytes, protection digest);
+   - the connector `FederationPeer` (source UID and bytes; the protection
+     digest is dropped by ADR-328);
    - the executor pin.
 
    The operator copies it into the hub's join input, as the offer travels
@@ -85,7 +89,9 @@ written.
    container in the same Pod. The new process reads the catalog at start, as
    ADR-185 requires. No Pod, template or pin changes, and no live reload is
    introduced.
-4. **The regional executor layout before ungating.** `installer-cluster`
+4. **The regional executor layout before ungating** (its guards and the
+   staged protection digest are removed by ADR-328; Helm `mode=cluster`
+   renders the layout). `installer-cluster`
    installs the connector with its `APIContext` settings: the capacity
    account, the workload guard's `APIContextStarts` section, the settings
    source and the start guard. The protection digest staged at generation 1

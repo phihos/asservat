@@ -1,5 +1,7 @@
 # ADR-199 — One source read at each end of the executor proof
 
+> Superseded in part by ADR-328 (2026-11-13): the executor proof's connector source reads, the workload and settings guard checks, the Deployment/ReplicaSet/Pod chain and the token reviews re-verified the connector's own installation and no longer apply; the connector reads its source and settings as mounted ConfigMaps. Still valid: the process-credential check (the client leaf chain verifies under the configured roots and the hub registration is current), with decision 5's local close bounded by the opening registration's original FreshUntil.
+
 Date: 2026-10-16. Status: accepted; implemented and natively qualified
 ([ADR-196 continuation run 8](../../test/results/adr196-continuation-native-8/environment.json): the installed executor's first cold proof
 fits its five seconds).

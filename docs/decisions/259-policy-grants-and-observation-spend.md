@@ -1,5 +1,9 @@
 # ADR-259: Team-policy grants and prepaid sensitive observation
 
+> Superseded in part by ADR-328 (2026-11-13): the settings observer reads the approval
+> settings ConfigMap under RBAC; no source guard proof is taken. Grants, budgets, clamping and
+> observation spend remain valid.
+
 Status: accepted design; implementation and qualification in progress.
 
 ## Decision
@@ -88,10 +92,10 @@ exists; one settings change/day and the scenario row counts are assumptions.
 The benchmark is not qualification of the final SQL schema or deployed load.
 
 
-One joined settings observer reuses the permission worker and its protected cached
-client at a ten-second cadence. Its source/SQL failures are local to policy-grant
+One joined settings observer reuses the permission worker and its cached client
+at a ten-second cadence. Its source/SQL failures are local to policy-grant
 availability and cannot terminate permission/browser loops. Maximum additional
-source proof traffic is 0.3 GET/s per installation, independent of workload count;
+source read traffic is 0.3 GET/s per installation, independent of workload count;
 acceptance uses one SQL call per newly cached observation plus the lower-change
 clamp above. Original source expiry, request cancellation and joined shutdown bind.
 

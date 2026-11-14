@@ -1,6 +1,8 @@
 # ADR-148 — One public projection enforcement interval
 
-Status: accepted; component Go/race/vet checks pass; native qualification pending.
+> Superseded (2026-11-13): the reused, independently denied enforcement proof and its five boundary rechecks of policy/binding pins, worker journal, Deployment, account and Lease existed only to verify the installation's own admission policies at runtime. Helm renders the projection Secret and RBAC; the worker reads it as mounted configuration.
+
+Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan. Historical status: accepted; component Go/race/vet checks pass; native qualification was pending.
 
 The public role projection repeatedly traversed the same native proof through
 nested current/read/update calls. With the unchanged 20 QPS/Burst 20 clients,

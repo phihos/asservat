@@ -1,5 +1,7 @@
 # ADR-214 — Reuse bounded policy observations in download preparation
 
+> Superseded in part by ADR-328 (2026-11-13): the protected policy read (complete protection, guard and probe requests) no longer applies; the download policy is read from its ConfigMap under RBAC. The 60-second reuse bound, identity-policy reuse within its 30 seconds and the current SQL effect checks remain valid. With the cheaper read, the reuse store should be re-measured and dropped if it no longer pays for itself.
+
 Date: 2026-10-20. Status: selected under the maintainer's explicit complexity-review
 continuation; implementation and qualification in progress.
 Requirements: REQ-DLD-002/003, TASK-03/11, S-02.
@@ -27,9 +29,9 @@ current SQL permissions, recovery, processing restrictions and transaction spend
    selected starting interval for qualification. Cache hits never reset it.
    Each caller still evaluates its own principal/client, artifact class, purpose
    and exact installed path against that observation.
-2. The raw Kubernetes source remains unchanged: its complete protection, two
-   source reads and closing guard must succeed within the caller's original
-   deadline and the existing five-second I/O limit. Only a successfully completed,
+2. The Kubernetes source read is a plain ConfigMap read under RBAC and must
+   succeed within the caller's original deadline and the existing five-second
+   I/O limit. Only a successfully completed,
    currently valid source observation can enter the download observation store.
    The 60-second bound concerns reuse of the observed configuration; it does not
    extend the source read, its caller, a human session or any evidence lifetime.

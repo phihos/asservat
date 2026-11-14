@@ -1,7 +1,9 @@
 # ADR-156: Finite owner configuration audit epochs
 
-Status: accepted direction; the standalone value, accounting, reader-port and
-encrypted snapshot codec foundation passes component qualification. It remains
+> Superseded (2026-11-13): acceptance epochs existed so the runtime could keep re-accepting the installer's owner configuration with a current encrypted acceptance record and an installer-bound reserve. Under ADR-328 the owner reads its mounted configuration; no acceptance epochs, installer facet or epoch reserve are needed. The unselected component is removed.
+
+Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan. Historical status: accepted direction; the standalone value, accounting, reader-port and
+encrypted snapshot codec foundation passed component qualification. It remains
 unselected. No runtime, schema, grant or installation format is enabled by this
 record.
 

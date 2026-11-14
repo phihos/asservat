@@ -1,6 +1,8 @@
 # ADR-186 — Operation-scoped public role proof
 
-Date: 2026-10-15. Status: accepted; implemented. Native qualification passed
+> Superseded (2026-11-13): This ADR batched the installer's per-role proofs of the owner workload guard, its probes, the owner Deployment and the worker binding around journal writes. Administrators are trusted in the hub namespace, so no such proof or journal is needed: the Helm `setup` hook Job creates the SQL roles idempotently from the compiled grant plan.
+
+Date: 2026-10-15. Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan. Formerly accepted; implemented. Native qualification passed
 ([continuation run 18](../../test/results/adr183-continuation-native-18/result.json)):
 all 66 public roles and the projection. Decision 3 and the completion proofs
 of decision 4 are superseded by [ADR-316](316-installer-step-brackets.md):

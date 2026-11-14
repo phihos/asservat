@@ -1,5 +1,7 @@
 # ADR-160 — Purpose-separated context service assembly
 
+> Superseded in part by ADR-328 (2026-11-13): the source-owned layout digest that rejected older installer states and receipts no longer applies; Helm renders the role inventory. The two purpose roles, their narrow grants and the public operation assembly remain valid.
+
 Status: implemented; component and native role checks pass, installed workflow pending.
 
 The shared HTTP boundary already expects complete capture, case and download
@@ -11,7 +13,7 @@ new evidence admission.
 
 Add `capture-preview` at permanent ordinal 46 and `capture-resolution` at 47.
 Existing ordinals, including cleanup 43–45 and capacity 70–71, retain their
-meaning. The installer inventory has 33 purposes and the hub projection 28.
+meaning. The role inventory has 33 purposes and the hub projection 28.
 Both new roles retain the existing five-connection hub envelope; each runtime
 pool remains one connection. This adds ten possible role connections to the
 complete installation budget, not a larger per-role or per-process pool. Total
@@ -50,11 +52,8 @@ downloads and Stop. Original caller identity, cancellation, deadlines, retained
 scope, managed encryption and local-download behavior remain with the existing
 use cases. This decision adds no API, route, approval or public configuration.
 
-The source-owned layout digest incorporates both purposes, grants and projection
-filenames. Old 31-purpose installer states and 26-purpose hub manifests cannot
-satisfy the new complete inventory. Different layout digests also reject.
-Preserve historical receipts for inspection; do not silently add credentials,
-reissue claims or reinterpret old state as the new layout.
+Helm renders both purposes, their grants and projection files with the rest of
+the role inventory. An upgrade adds them like any other rendered role.
 
 The [component gate](../../test/results/public-context-assembly-component-1/result.json)
 passes 300 top-level race tests, compilation, vet and canonical checks. It tests
@@ -64,7 +63,7 @@ fixture: all 87 named tests pass with owned PostgreSQL/S3/OpenBao services.
 The wrapper omitted four existing test names and retains exit 1; the
 [independent verification](../../test/results/public-context-assembly-native-verification/result.json)
 checks the source-derived complete inventory, original limits and cleanup.
-Protected installed observation/configuration producers, credentials and backing
+Credentials and backing
 for every downstream download role, regional entrypoint, owned supervision and
 the complete browser/MCP capture-to-download journey remain necessary before
 public or Helm runtime enablement. Component assembly does not complete S-02.

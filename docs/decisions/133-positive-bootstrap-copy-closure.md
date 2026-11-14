@@ -1,6 +1,8 @@
 # ADR-133: Close managed setup copies after positive original retirement
 
-Status: accepted implementation direction; staged implementation and native qualification pending.
+> Superseded (2026-11-13): Closing setup copies, tombstone admission policies and seed retirement only applied to installer-created copies and guards. Under the Helm-native plan, Secrets are created once by the `secrets` hook Job and survive uninstall; erasure is a documented explicit step.
+
+Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan.
 
 The original fixed command chain can create its manager, initialize the embedded schema, activate its original Pod and retire setup authority. Its v2 guard deliberately retains the SQL/provider source Secret copies and broad seed. Final installation must remove those managed copies after positive closure without changing the original authority or requiring operators to author dynamic pins.
 

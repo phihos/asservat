@@ -1,5 +1,7 @@
 # ADR-144 — Current cluster-local observation delegation
 
+> Superseded in part by ADR-328 (2026-11-13): the namespace/source guards, the live SA/Pod/ReplicaSet/Deployment/template chain, installed-template and native-protection checks, and the repeated fresh source-proof replies existed to defend against writers inside Asservat namespaces and no longer apply. Still valid: one closed observation purpose on the connector mTLS boundary, TokenReview of the local caller, current SQL registration/activation, exact TLS binding, bounded results and the original request deadline.
+
 Date: 2026-10-12. Status: implementation direction accepted; isolated components
 are in progress. The local HWORK hop has passing component tests. The optional owner leaf profile now passes component and actual OpenBao/SQL/S3
 registration checks. Remote proof exchange, installed producer and multi-cluster
@@ -7,23 +9,19 @@ runtime qualification remain separate, unqualified checkpoints.
 
 REQ-FED-001 and REQ-DEP-003 require centrally managed clusters without hub-stored
 cluster administrator credentials. A process observes Kubernetes in its own
-cluster. A connector's role certificate or a self-reported healthy boolean cannot
-replace the existing independent current source, namespace guard and route
+cluster. A self-reported healthy boolean cannot replace current registration and route
 checks. The installed producer is therefore an explicit, narrowly delegated
-local observer: its installation/root, cluster, profile/process, original
-namespace/account/controller, code/input template, current native guard and
-independent SQL activation must all agree. This trust boundary assumes the
+local observer: its installation/root, cluster, profile/process, TokenReview
+identity and independent SQL activation must agree. This trust boundary assumes the
 continuing integrity of that authorized process and installation administrator;
 it does not cryptographically prove facts against a compromised observer.
 
 Use one closed observation purpose on the existing connector mTLS control
 boundary, rather than a Kubernetes proxy, new persistent SQL observation ledger,
 remote token broker or general transport registry. Its permitted results are
-own-peer bootstrap facts, the protected namespace selector-key guard, bounded
-candidate pages and exact selected workload metadata for the existing capacity
+own-peer bootstrap facts, bounded candidate pages and exact selected workload metadata for the existing capacity
 ports. The local HWORK process calls a fixed hub HTTPS path using a dedicated
-kubelet-projected audience. Online TokenReview and the exact live original
-SA/Pod/ReplicaSet/Deployment/template/guard chain precede delegation. This grants
+kubelet-projected audience. Online TokenReview of the caller precedes delegation. This grants
 no hub capacity-effect SQL credential and no remote Kubernetes credential.
 The regional capacity writer remains a separately protected process/authority.
 
@@ -33,7 +31,7 @@ queueing, reconnect or a new page cannot restart it. Target, approved selector
 keys, namespace/workload UID and kind, cursor, challenge and actual TLS channel
 binding are exact. Candidate discovery is not effect authority. Missing, stale,
 changed or uncertain observations deny; they never become an empty successful
-list. Only minimized own-peer source/guard/route facts may cross the bounded
+list. Only minimized own-peer source/route facts may cross the bounded
 bootstrap phase before full authentication. No human credential, workload
 metadata, evidence, command, source mutation or allocation crosses that phase.
 The independent current registry/configuration is checked before these facts
@@ -105,13 +103,12 @@ identity phase owns NativePort, and only the fixed own-owner proof path exists.
 A later backend transition must close and join that listener before taking the
 same port; neither file presence nor a mutable discovery value enables routes.
 
-Original input pins the owner source, template/image and guard. The bootstrap
+The owner configuration is read from its mounted ConfigMap. The bootstrap
 allowlist is at most sixteen stable connector identities with separate client
 issuer roots. It excludes Pod/process/leaf values that cannot exist before
 enrollment. Actual TLS selects an installed logical binding; it does not
 authorize workload reads. The reply carries only minimized own-server facts
-after current local guard/workload/Ready-route and independent SQL activation
-checks. It is bounded to 8 KiB and the original five-second request, with an
+after Ready-route and independent SQL activation checks. It is bounded to 8 KiB and the original five-second request, with an
 exact challenge and actual TLS exporter/both leaf bindings. The receiver keeps
 its pre-handshake owner candidate set and performs independent current SQL and
 root verification before accepting it. A closed or replaced connection cannot
@@ -133,7 +130,7 @@ not the public backend whose readiness depends on capacity. Before any token
 read or delivery it reads a finite independent SQL candidate set, performs
 ordinary TLS verification using the original-Service-derived common name,
 then independently checks the actual matched owner's current registration,
-accepted source/roots, Ready route, native guard and original template. Unused
+accepted roots and Ready route. Unused
 SQL candidates are not labeled Ready and are not serially probed. Current reads
 use role70's existing pool before capacity transactions; the separate fixed
 registry read grant extension changes its compiled layout and cannot adopt an
@@ -172,11 +169,8 @@ standby. Do not forward the HWORK token or replay an uncertain selected POST.
 All these hops spend the original at-most-five-second request interval.
 
 The purpose has one closed frame contract, separate from capture/execution
-messages, with same-channel own-owner and own-connector proof. The connector's
-configuration-source guard and workload namespace guard are independently
-pinned. The unchanged SQL49 leaf registry consumes genuinely new source
-observations on each pre/post read; no cached bootstrap proof is relabeled as a
-fresh source query. Compatible accepted source/backing revisions retain original
+messages, with same-channel own-owner and own-connector proof. The SQL49 leaf registry
+is checked for current activation. Compatible accepted source/backing revisions retain original
 installed scope and cannot change during one request. Unknown or changed proof
 fails that conversation without authority renewal or another signing attempt.
 
@@ -187,13 +181,12 @@ native multi-owner/two-cluster qualification pass. Integrated local-hop, stream
 and owner-profile component evidence does not qualify that whole workflow.
 
 The regional producer's new conversation uses a private process/key/CSR/leaf
-snapshot only as a local replacement/closure veto. It keeps the native attester's
-two full fresh source reads, online TokenReviews and before/after native
-workload/guard checks, exact installed template verification and strict leaf
-validation against pinned plus proof-current roots. The attestation returns its
-already-read complete source, never a reconstructed role list. Hub-side SQL49
-activation remains separately checked before metadata and after the result,
-bracketed by four numbered fresh remote replies. Ordinary
+snapshot only as a local replacement/closure veto. It keeps online TokenReview
+and strict leaf validation against the accepted roots. Hub-side SQL49
+activation is checked before metadata. (The earlier design also required two
+fresh source reads, before/after native workload/guard checks, installed
+template verification and four numbered fresh remote replies; ADR-328 removes
+them.) Ordinary
 `ObserveConnectorProcess` is unchanged. This avoids nested local registry/source
 recursion without caching mutable authority or changing the original five-second
 bound; structural call reduction is not measured availability qualification.
@@ -223,9 +216,8 @@ start another thirty seconds. Slots include pre-Hello setup and failed/closing
 work. Before successful Receipt, exact routing removal precedes the existing
 request EOF/response EOF exchange and actual admitted-work joins. Listener
 socket ownership remains an additional requirement. The staged component adds
-no selected runtime route, authority cache, retry or deadline extension. Its
-SQL pre/post checks still consume all four fresh same-channel source replies;
-installed latency and API-call accounting must be measured independently.
+no selected runtime route, authority cache, retry or deadline extension.
+Installed latency and API-call accounting must be measured independently.
 
 
 The separate explicit regional receiving listener shares the existing native
@@ -249,15 +241,14 @@ locator/claim formats and media types. The locator reply is at most 4 KiB and
 retains exact original request/challenge, holder Pod/process, exchange and
 nonwrapping uint64 sequence. Its dates intersect every earlier bound. Sequence
 encoding preserves all 64 bits rather than applying floating-point JSON number
-canonicalization. Existing observation request bytes/digests and all four fresh
-source-proof ordinals remain unchanged. The claim's full envelope is at most
+canonicalization. Existing observation request bytes/digests remain unchanged. The claim's full envelope is at most
 196 KiB, including its unchanged request and selected locator; the original
 child limits remain independently binding. Unknown/duplicate fields, alternate
 query encodings, changed tuples and extended intervals deny.
 
 A decoded routing value is not current peer/source proof, a reservation or a
 claim acknowledgement. Actual same-pool installed delegation and exact current
-TLS/registry/route/native protection precede use. Common-SNI and exact-SNI
+TLS/registry/route checks precede use. Common-SNI and exact-SNI
 purposes are mutually exclusive at admission, including HTTP authority checks.
 No token is forwarded, and no failed/unknown selected POST is replayed or
 replaced. This checkpoint adds no receiving runtime route, candidate SQL limit,
@@ -273,11 +264,8 @@ receiving/forwarding composition and native availability remain pending.
 
 The receiving locator/claim component uses actual common-SNI versus exact-SNI
 mutual TLS and matching HTTP authorities. A concrete same-pool checker binds
-both original installed owner workloads and current registry/Ready/guard facts
-before touching the local holder and independently before returning its result.
-The second check cannot renew the first proof or original request. Claim success
-requires the holder's existing four fresh source replies and joined terminal
-EOF; write/flush alone never acknowledges remote completion. Failed or unknown
+current registry/Ready facts before touching the local holder. Claim success
+requires joined terminal EOF; write/flush alone never acknowledges remote completion. Failed or unknown
 claims do not select a replacement. The component remains unselected by a
 listener/runtime until complete installed-v2 and routing consumers qualify.
 
@@ -311,8 +299,8 @@ flow still requires native qualification within its unchanged five seconds.
 ### One selected observation claim across bounded owner lookup
 
 The bootstrap-owned observation forwarder accepts only the original owner pin,
-process-owned client key and concrete purpose-scoped registry/configuration,
-endpoint, native protection and installed-workload adapters. Requests provide
+process-owned client key and concrete purpose-scoped registry/configuration
+and endpoint adapters. Requests provide
 neither a locator, URL, peer callback nor a candidate limit. This component does
 not select a receiving listener or an installed runtime profile.
 
@@ -320,8 +308,7 @@ At most two observations per process each use at most two concurrent read-only
 locator lookups. The fixed worker pair traverses the complete current Ready Pod
 groups, retaining all original SQL process members. It authenticates the actual
 common-SNI leaf against those members and the selected Pod, then checks both
-owners' current registry, accepted roots, Ready routes, namespace protection
-and exact installed templates before and after the bounded GET. These are
+owners' current registry, accepted roots and Ready routes before the bounded GET. These are
 per-process concurrency bounds, not installation-wide serving capacity.
 
 Only a positive exact locator selects the holder. All other local lookup work
@@ -330,8 +317,8 @@ claim POST. The selected holder/process, exact client and server leaves,
 accepted source revision and installed delegation must still agree; independent
 current checks bracket that POST too. An unknown lookup is not absence, and an
 unknown claim/result never selects a replacement or repeats the metadata read.
-The HWORK token is never forwarded. Existing request bytes/digest, exact uint64
-locator sequence and four regional proof ordinals are unchanged.
+The HWORK token is never forwarded. Existing request bytes/digest and the exact uint64
+locator sequence are unchanged.
 
 Discovery, locator lookup, joined cancellation, claim and final result retain
 one original at-most-five-second interval. Every original caller, source, route,
@@ -356,7 +343,7 @@ verifies HWORK online/native and invokes its own original regional standby.
 The owner-to-owner component APIs above remain unchanged and unselected.
 The new local locator/claim paths are separate from owner-mTLS routing; no HWORK
 owner client certificate or credential delegation is introduced. Both actual
-TLS connections and all current SQL, source, key, token and final native checks
-preserve the earliest original interval. This direct component checkpoint passes
+TLS connections and the current SQL, key and token checks preserve the earliest
+original interval. This direct component checkpoint passes
 its focused checks; the full native critical path remains unqualified. It
 adds no runtime/producer selection or new credential/grant.

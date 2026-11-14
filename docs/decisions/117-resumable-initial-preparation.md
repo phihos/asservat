@@ -1,6 +1,8 @@
 # ADR-117: Resume fixed declarative setup after a lost create reply
 
-Status: accepted implementation refinement; native qualification pending.
+> Superseded (2026-11-13): The resumable nine-object set, its continuity guards and occupied names existed for the installer Pod. Helm owns all declarative objects and re-renders them on upgrade; ADR-328 trusts writers in Asservat namespaces.
+
+Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan.
 
 An ordinary interrupted installation must resume its original plan. ADR-102's
 lookup-only rule is still required for credentials, provider calls and effects

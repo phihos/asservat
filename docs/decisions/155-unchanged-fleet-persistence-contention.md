@@ -1,6 +1,8 @@
 # ADR-155 — Unchanged fleet observation persistence contention
 
-Status: implemented; component and focused native qualification pass. Requirements: REQ-FED-001 and REQ-DB-005. Broad fleet regression and the original installed owner transition remain pending.
+> Superseded (2026-11-13): the contention came from protected installer operations holding the fleet recovery row FOR SHARE through native self-verification. Helm-native installation removes that lock holder; ADR-161 had already replaced the write mechanism.
+
+Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan. Historical status: implemented; component and focused native qualification passed. Requirements: REQ-FED-001 and REQ-DB-005.
 
 [ADR-161](161-fleet-observation-separation.md) supersedes the single-row write and
 lock-call mechanism below. It preserves this narrow unavailable classification

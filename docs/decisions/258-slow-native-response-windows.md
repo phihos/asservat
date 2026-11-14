@@ -1,5 +1,11 @@
 # ADR-258 — Native response windows under slow delivery
 
+> Superseded in part by ADR-328 (2026-11-13): worker attestation is the TokenReview of the
+> bound Pod token, matched to the worker's stored Job/Pod (ADR-221 as amended). The live
+> namespace, account, Job and Pod reads of ADR-068 no longer apply, because the download-worker
+> namespace is administrator-only. The finite response window, the retained reviewed token
+> expiry and native owner renewal remain valid.
+
 > [ADR-312](312-started-downloads-run-to-original-bounds.md) (2026-11-07)
 > supersedes the per-lease current human authority below: a started response's
 > later leases continue its start decision without identity, permission or
@@ -57,8 +63,8 @@ between chunks.
 
 ## Finite original Pod identity
 
-ADR-068's full initial TokenReview and live namespace/account/Job/Pod proof
-remain required. A purpose-specific local attester output also returns the
+The initial TokenReview of the bound Pod token, matched to the worker's
+stored Job/Pod, remains required. A purpose-specific local attester output also returns the
 actual token expiry already read after successful TokenReview. NativeOrigin
 retains that reviewed bound privately; neither wire fields nor deserializing an
 origin can manufacture it. A missing producer fails closed for responses.
@@ -73,9 +79,8 @@ native cutoff through the final HTTP write and ACK, intersected with the human
 lease without replacing it. A missing remote cutoff denies delivery. A blocked
 or failed write cannot be revived under another lease.
 
-The accepted tradeoff is up to twenty seconds before a Kubernetes-only
-Pod/Job/account deletion or spec change is independently re-observed. The next
-window performs full fresh attestation. We retain no raw token, refresh timer,
+The accepted tradeoff is up to twenty seconds before a Pod deletion is
+independently re-observed. The next window performs a fresh TokenReview. We retain no raw token, refresh timer,
 periodic Kubernetes check or replacement identity. Repeating the full attester
 inside a window would add at least two TokenReviews plus eight object GETs per
 proof refresh, plus profile/source checks; three two-hop refresh cycles would
