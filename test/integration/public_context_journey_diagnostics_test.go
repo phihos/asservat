@@ -1,13 +1,14 @@
 package integration
 
 import (
-	"asservat.local/asservat/internal/domain/identity"
 	"context"
 	"errors"
 	"reflect"
 	"sync"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/domain/identity"
 
 	auditapp "asservat.local/asservat/internal/application/audit"
 	captureapp "asservat.local/asservat/internal/application/capture"

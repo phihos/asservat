@@ -1,6 +1,16 @@
 package integration
 
 import (
+	"context"
+	"crypto/ed25519"
+	"crypto/rand"
+	"encoding/json"
+	"errors"
+	"reflect"
+	"sync"
+	"testing"
+	"time"
+
 	"asservat.local/asservat/internal/adapters/jose"
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
@@ -9,16 +19,7 @@ import (
 	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/identity"
 	value "asservat.local/asservat/internal/domain/privacy"
-	"context"
-	"crypto/ed25519"
-	"crypto/rand"
-	"encoding/json"
-	"errors"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"reflect"
-	"sync"
-	"testing"
-	"time"
 )
 
 func retentionTestDecision(t *testing.T, ctx context.Context, s *postgres.Retention, loc artifact.Location, expires, deleteBy time.Time) value.LifecycleDecision {

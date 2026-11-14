@@ -4,78 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"strings"
 	"testing"
 	"time"
 
-	"asservat.local/asservat/internal/contracts"
 	query "asservat.local/asservat/internal/domain/analysis"
 	"github.com/google/pprof/profile"
-	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
-
-// One query through the installed public service, using a real OAuth session
-// without native-download scope. SQL inspection supplies no runtime authority.
-func qualifyInstalledProfileSummary(t *testing.T, ctx context.Context, identity *installedIdentity, transport http.RoundTripper, origin, caseID, artifactID, version string, native []byte, expires time.Time, check installedProjectionCheck) {
-	t.Helper()
-	summary := queryInstalledProfileSummary(t, ctx, identity, transport, origin, caseID, artifactID, version, "cpu", expires, check)
-	if err := installedProfileSummaryMatchesNative(summary, native, "burn"); err != nil || summary.Total <= 0 {
-		t.Fatal("CPU summary differs from authenticated native samples", err)
-	}
-	t.Log("installed profile summary: ordinary read-only OAuth, native-download denial, exact CPU total, closed hotspots and original joined worker/key lifetime verified; no raw query or additional approval")
-}
-
-// Query and join before a separately authorized native download. The returned
-// aggregate supplies no raw authority; the downloaded original validates it.
-// Heap may replace only the query/polls with the installed React caller. The
-// read-only MCP native denial still runs, without admitting a second query.
-func queryInstalledProfileSummary(t *testing.T, ctx context.Context, identity *installedIdentity, transport http.RoundTripper, origin, caseID, artifactID, version, sampleType string, expires time.Time, check installedProjectionCheck, browserCall ...func(string, any) installedComparisonReply) query.ProfileSummary {
-	t.Helper()
-	if check == nil || len(browserCall) > 1 {
-		t.Fatal("profile summary requires independent SQL readback and at most one browser caller")
-	}
-	verify := check(artifactID)
-	source := identity.approvedTokenSource(origin)
-	if _, err := source.Token(ctx); err != nil {
-		t.Fatal(err)
-	}
-	wire, err := contracts.NewInvestigationContracts()
-	if err != nil {
-		t.Fatal(err)
-	}
-	client := sdk.NewClient(&sdk.Implementation{Name: "installed-profile-summary", Version: "1"}, nil)
-	session, err := client.Connect(ctx, &sdk.StreamableClientTransport{Endpoint: strings.TrimSuffix(origin, "/") + "/mcp", HTTPClient: &http.Client{Transport: installedJourneyBearer{transport, source.Token}, Timeout: 60 * time.Second}, MaxRetries: -1, DisableStandaloneSSE: true}, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer session.Close()
-	type summaryReply = installedComparisonReply
-	call := func(name string, args any) summaryReply {
-		t.Helper()
-		began := time.Now()
-		result, err := session.CallTool(ctx, &sdk.CallToolParams{Name: name, Arguments: args})
-		if err != nil {
-			t.Fatal("summary operation outcome unavailable; no replay", name, err)
-		}
-		raw, err := json.Marshal(result.StructuredContent)
-		var out summaryReply
-		if err != nil || wire.ValidateOutput(name, raw) != nil || json.Unmarshal(raw, &out) != nil || result.IsError != (out.Status == "error") {
-			t.Fatal("profile summary response contract", name)
-		}
-		t.Logf("installed profile summary %s status=%s elapsed=%s", name, out.Status, time.Since(began))
-		return out
-	}
-	denied := call("prepare_artifact_download", map[string]string{"artifact_id": artifactID, "idempotency_key": "profile-read-only-denied"})
-	if denied.Status != "error" {
-		t.Fatal("read-only profile session obtained native download")
-	}
-	verify("", "")
-	if len(browserCall) == 1 {
-		call = browserCall[0]
-	}
-	return queryInstalledProfileSummaryWithCall(t, ctx, caseID, artifactID, version, sampleType, expires, call, verify)
-}
 
 // Preserve the exact canonical source/handle/deadline checks across MCP and
 // installed React. The caller supplies an already independently funded verifier.

@@ -67,20 +67,12 @@ jobs:
       # pull of the same reference joins the in-flight one.
       - name: Pull pinned images
         if: matrix.pull
-        env:
-          BUILDER: "${{ matrix.builder }}"
         run: |
-          builder=()
-          if [[ $BUILDER == true ]]; then
-            builder=(experiments/syscall-argument-budget/pins.json)
-          fi
-          grep -ohE '[a-z0-9./-]+@sha256:[0-9a-f]{64}' scripts/test-*.py "${builder[@]}" | sort -u > /tmp/images
+          grep -ohE '[a-z0-9./-]+@sha256:[0-9a-f]{64}' scripts/test-*.py | sort -u > /tmp/images
           nohup sh -c 'while read -r i; do docker pull -q "$i" & done < /tmp/images; wait' > /tmp/pulls.log 2>&1 &
       - uses: ./.github/actions/setup
         with:
           go-cache: ${{ matrix.go-cache }}
-          # Node builds the installed console and drives its browser checks.
-          console: ${{ matrix.console }}
           sql-tools: ${{ matrix.sql-tools }}
           kind: ${{ matrix.kind }}
           helm: ${{ matrix.helm }}
@@ -117,21 +109,6 @@ jobs:
           fi
           tshark --version | head -1
           capinfos --version | head -1
-      # History, packet summaries, saved comparison and heap inspection drive installed React.
-      # Reuse console CI's pinned Playwright browser/cache; no new image.
-      - if: matrix.playwright
-        id: playwright
-        run: echo "version=$(node -p "require('./web/node_modules/@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
-      - if: matrix.playwright
-        uses: actions/cache@v6
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
-      - if: matrix.playwright
-        name: Installed React browser
-        timeout-minutes: 3
-        working-directory: web
-        run: timeout --signal=TERM --kill-after=5s 170s npm exec --offline -- playwright install --only-shell chromium
       - name: Run ${{ matrix.suite }}
         env:
           SUITE: ${{ matrix.suite }}

@@ -1,19 +1,20 @@
 package integration
 
 import (
+	"context"
+	"errors"
+	"sync"
+	"testing"
+	"time"
+
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
 	app "asservat.local/asservat/internal/application/audit"
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/identity"
-	"context"
-	"errors"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"sync"
-	"testing"
-	"time"
 )
 
 func qualifyOperationAuditOverdue(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, create func(*testing.T, int64) captureAdmissionScenario) {

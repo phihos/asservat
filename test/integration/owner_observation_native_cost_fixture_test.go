@@ -1,12 +1,13 @@
 package integration
 
 import (
-	"asservat.local/asservat/internal/contracts"
 	"context"
 	"encoding/hex"
 	"strings"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/contracts"
 
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/domain/artifact"

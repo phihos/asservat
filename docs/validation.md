@@ -90,12 +90,10 @@ Each shard uploads a record of the plan, its executed units and measured times;
 `ci-ok` fails unless all fourteen records share one plan and together executed
 every unit exactly once. `check-go-tests.py --update-weights <dir>` refreshes the
 weights from downloaded records. Pushes that change only documentation outside
-`docs/interfaces/`, recorded results, the design prototype or root Markdown run
+`docs/interfaces/`, the design prototype or root Markdown run
 only the documentation and schema gates. The documentation, schema, SQL, Helm,
 console (`console-check`, no Go) and console browser gates run as parallel jobs. Native suites run only
-on dispatch (`native.yml`, suites from `scripts/ci-native.sh --list`; grouped
-installed suites run several focuses after one bootstrap, see
-docs/development-workflow.md), each on a fresh runner; their `test/results` output is uploaded as a run artifact. A CI run
+on dispatch (`native.yml`, suites from `scripts/ci-native.sh --list`), each on a fresh runner; their `test/results` output is uploaded as a run artifact. A CI run
 is recorded like a local run: run URL, exit, selected tests and the harness's
 source hashes. The custody suite (`make custody-integration`, about 16 minutes
 locally) runs in CI as `custody-1` … `custody-4` (`CUSTODY_SHARDS` in
@@ -114,17 +112,6 @@ must be resolved). The ruleset requires the `ci-ok` job: `changes` and `checks` 
 pass, and the Go, test and console jobs must pass unless `changes` classified the
 change as documentation-only. Native suites can be
 dispatched on a pull request branch with `gh workflow run native.yml --ref <branch>`.
-
-For local debugging, `scripts/test-context-storage.py --keep-on-failure` leaves
-a failed run's own clusters and labelled containers (and the Go fixtures'
-objects) running and records them in a manifest under the build cache;
-`--cleanup-kept MANIFEST` later removes exactly those resources after checking
-each name or label against the run, and writes
-`test/results/kept-cleanup-<run>.json` as the cleanup evidence. A kept run is
-never a qualification result. The direct-observation suite
-(`scripts/ci-native.sh direct-observation`, about eight minutes) covers every
-regional capacity purpose, including the combined guarded workload, without
-the full installation replay.
 
 S-01/S-02 qualification includes the actual installed constructor and every
 nested authority/provider read on its successful path. Passing isolated

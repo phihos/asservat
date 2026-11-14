@@ -1,6 +1,15 @@
 package integration
 
 import (
+	"context"
+	"encoding/json"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/contracts"
@@ -8,8 +17,6 @@ import (
 	value "asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
-	"context"
-	"encoding/json"
 	auth "k8s.io/api/authentication/v1"
 	core "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
@@ -20,12 +27,6 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/utils/ptr"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"strings"
-	"testing"
-	"time"
 )
 
 const syntheticAcquisitionHelper = `package main

@@ -6,28 +6,16 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"encoding/json/jsontext"
-	"errors"
 	"fmt"
-	"net/http"
 	"os"
 	"path/filepath"
 	"reflect"
-	"slices"
-	"strings"
 	"syscall"
 	"testing"
 	"time"
 
 	"asservat.local/asservat/internal/contracts"
-	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/privacy"
-	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgxpool"
-	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
-	core "k8s.io/api/core/v1"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 )
 
 type reportPageSummary struct {
@@ -53,27 +41,6 @@ type processingReportExport struct {
 	Pages    []installedJourneyEnvelope   `json:"pages"`
 	Next     *value.ProcessingReportQuery `json:"next,omitempty"`
 	Complete bool                         `json:"complete"`
-}
-
-func TestInstalledReportSharingAuthority(t *testing.T) {
-	for _, fixture := range []struct {
-		foci  string
-		owner bool
-	}{
-		{"privacy-inventory", true}, {"share", true}, {"browser", true}, {"share-retirement", true},
-		{"early-erasure", false}, {"early-erasure,privacy-inventory", true},
-	} {
-		t.Run(fixture.foci, func(t *testing.T) {
-			t.Setenv("ASSERVAT_JOURNEY_FOCUS", fixture.foci)
-			owner := false
-			for _, role := range installedRegionalBindingRoles() {
-				owner = owner || role == "evidence-owner"
-			}
-			if owner != fixture.owner {
-				t.Fatal("installed sharing fixture must bind evidence-owner before capture so it joins the retained audience", owner, fixture.owner)
-			}
-		})
-	}
 }
 
 func startProcessingReportBrowser(t *testing.T, ctx context.Context, config map[string]any) (*installedLiveBrowser, string) {
@@ -233,207 +200,4 @@ func readProcessingReportExports(t *testing.T, driver *installedLiveBrowser, dir
 	}
 	awaitInstalledProcessingBrowser(t, driver)
 	return records
-}
-
-func installedProcessingReportSource(ctx context.Context, client kubernetes.Interface, namespace, installation string) (*core.ConfigMap, error) {
-	deployments, err := client.AppsV1().Deployments(namespace).List(ctx, meta.ListOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("report owner deployment: %w", err)
-	}
-	configuration := ""
-	owners := 0
-	for _, deployment := range deployments.Items {
-		if deployment.Spec.Template.Labels["asservat.io/private-role"] != "hub-api" {
-			continue
-		}
-		owners++
-		for _, volume := range deployment.Spec.Template.Spec.Volumes {
-			if volume.Projected == nil {
-				continue
-			}
-			for _, projection := range volume.Projected.Sources {
-				if projection.ConfigMap == nil {
-					continue
-				}
-				for _, item := range projection.ConfigMap.Items {
-					if item.Key == "deployment.json" && item.Path == "deployment.json" {
-						if configuration != "" {
-							return nil, errors.New("report owner deployment has ambiguous input projection")
-						}
-						configuration = projection.ConfigMap.Name
-					}
-				}
-			}
-		}
-	}
-	if owners != 1 || configuration == "" {
-		return nil, fmt.Errorf("report owner deployment input unavailable: owners=%d", owners)
-	}
-	input, err := client.CoreV1().ConfigMaps(namespace).Get(ctx, configuration, meta.GetOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("report owner input: %w", err)
-	}
-	deployment, err := contracts.DecodeOwnerDeployment(strings.NewReader(input.Data["deployment.json"]))
-	if err != nil || deployment.Format != contracts.OwnerDeploymentFormat || deployment.InstallationID != installation || deployment.Public == nil || deployment.Public.Processing == nil {
-		return nil, errors.New("report owner processing source input invalid")
-	}
-	pin := deployment.Public.Processing.Source
-	source, err := client.CoreV1().ConfigMaps(namespace).Get(ctx, pin.Name, meta.GetOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("report selected processing source: %w", err)
-	}
-	if pin.Name == "" || pin.UID == "" || string(source.UID) != pin.UID {
-		return nil, errors.New("report selected processing source UID changed")
-	}
-	return source, nil
-}
-
-func installedReportProvenanceMismatch(got, want value.ProcessingReportPage) string {
-	var mismatches []string
-	for _, field := range []struct{ name, got, want string }{
-		{"root_id", got.RootID, want.RootID}, {"installation_id", got.InstallationID, want.InstallationID},
-		{"policy_revision.uid", got.PolicyRevision.UID, want.PolicyRevision.UID},
-		{"policy_revision.generation", fmt.Sprint(got.PolicyRevision.Generation), fmt.Sprint(want.PolicyRevision.Generation)},
-		{"policy_revision.digest", got.PolicyRevision.Digest, want.PolicyRevision.Digest},
-		{"processor_declarations", got.ProcessorDeclarations, want.ProcessorDeclarations},
-	} {
-		if field.got != field.want {
-			mismatches = append(mismatches, fmt.Sprintf("%s: got=%q want=%q", field.name, field.got, field.want))
-		}
-	}
-	return strings.Join(mismatches, "; ")
-}
-
-func qualifyInstalledReportRollbackGuard(t *testing.T, parent context.Context, admin *pgxpool.Pool) {
-	t.Helper()
-	ctx, cancel := context.WithTimeout(parent, 5*time.Second)
-	defer cancel()
-	raw, err := os.ReadFile(filepath.Join("..", "..", "migrations", "00152_processing_report.sql"))
-	if err != nil {
-		t.Fatal("read exact processing report migration", err)
-	}
-	_, down, found := strings.Cut(string(raw), "-- +goose Down\n")
-	lock, statement, begin := strings.Cut(down, "-- +goose StatementBegin\n")
-	guard, _, end := strings.Cut(statement, "\n-- +goose StatementEnd")
-	if !found || !begin || !end || strings.TrimSpace(lock) != "LOCK TABLE public.operation_audit IN SHARE MODE;" ||
-		!strings.HasPrefix(guard, "DO $$ BEGIN\n") || !strings.HasSuffix(guard, "END $$;") {
-		t.Fatal("processing report Down guard source shape changed")
-	}
-	readLayout := func() string {
-		t.Helper()
-		var head, indexes int64
-		var applied bool
-		var definitions string
-		if err := admin.QueryRow(ctx, `
-SELECT v.version_id,v.is_applied,
- (SELECT count(*) FROM pg_indexes WHERE schemaname='public' AND indexname IN ('processing_report_downloads','processing_report_operations','processing_report_rule_created')),
- (SELECT jsonb_object_agg(indexname,indexdef ORDER BY indexname)::text FROM pg_indexes WHERE schemaname='public' AND indexname IN ('processing_report_downloads','processing_report_operations','processing_report_rule_created'))
-FROM goose_db_version v ORDER BY v.id DESC LIMIT 1`).Scan(&head, &applied, &indexes, &definitions); err != nil || head != 152 || !applied || indexes != 3 {
-			t.Fatal("processing report retained layout", head, applied, indexes, err)
-		}
-		return definitions
-	}
-	before := readLayout()
-	tx, err := admin.Begin(ctx)
-	if err != nil {
-		t.Fatal("begin rollback guard qualification", err)
-	}
-	defer func() {
-		cleanup, stop := context.WithTimeout(context.Background(), 3*time.Second)
-		defer stop()
-		_ = tx.Rollback(cleanup)
-	}()
-	if _, err = tx.Exec(ctx, lock); err != nil {
-		t.Fatal("acquire exact Down audit lock", err)
-	}
-	_, err = tx.Exec(ctx, guard)
-	var refusal *pgconn.PgError
-	if !errors.As(err, &refusal) || refusal.Code != "23514" || refusal.Message != "retained processing report audit prevents rollback" {
-		t.Fatal("actual retained report audit did not refuse exact Down guard", err)
-	}
-	if err := tx.Rollback(ctx); err != nil {
-		t.Fatal("rollback refused report guard transaction", err)
-	}
-	if after := readLayout(); after != before {
-		t.Fatal("refused report guard changed report index definitions")
-	}
-	t.Log("exact SQL152 Down guard refused retained report audit with 23514; rolled back, schema152 and all three index definitions unchanged")
-}
-
-type installedReportShare struct {
-	ID, OutsiderID string
-	Recipients     []authorization.ShareRecipient
-}
-
-func createInstalledReportShare(t *testing.T, ctx context.Context, run installedProcessingRun) installedReportShare {
-	t.Helper()
-	reply, err := run.Call(ctx, "get_case", map[string]string{"case_id": run.CaseID})
-	// Public case metadata supplies the exact version; SQL supplies no input.
-	var data struct {
-		Artifacts []struct {
-			ID     string `json:"artifact_id"`
-			Digest string `json:"digest"`
-		} `json:"artifacts"`
-	}
-	decodeErr := json.Unmarshal(reply.Data, &data)
-	if err != nil || reply.Status != "ok" || decodeErr != nil || len(data.Artifacts) != 1 || data.Artifacts[0].ID != run.ArtifactID {
-		t.Fatal("installed report share source case", "status", reply.Status, "request", reply.RequestID, "call", err, "decode", decodeErr, "artifacts", len(data.Artifacts))
-	}
-	recipient := run.Identity.unrelated().mcpTokenSource(run.Origin)
-	if _, err := recipient.Token(ctx); err != nil || recipient.subject == "" {
-		t.Fatal("installed report recipient", err)
-	}
-	client := sdk.NewClient(&sdk.Implementation{Name: "installed-report-share", Version: "1"}, &sdk.ClientOptions{Capabilities: &sdk.ClientCapabilities{}})
-	owner := run.Identity.shareTokenSource(run.Origin)
-	if _, err := owner.Token(ctx); err != nil || owner.subject == "" {
-		t.Fatal("installed report owner", err)
-	}
-	// These two users and stable groups are created by the actual fixture
-	// realm. Four recipients exercise a continuation within one share at limit 3.
-	recipients := []authorization.ShareRecipient{
-		{Kind: "User", Issuer: run.Identity.Issuer, ID: recipient.subject},
-		{Kind: "User", Issuer: run.Identity.Issuer, ID: owner.subject},
-		{Kind: "Group", Issuer: run.Identity.Issuer, ID: installedIdentityGroup},
-		{Kind: "Group", Issuer: run.Identity.Issuer, ID: installedUnrelatedGroup},
-	}
-	slices.SortFunc(recipients, func(a, b authorization.ShareRecipient) int { return strings.Compare(a.Key(), b.Key()) })
-	wires := make([]map[string]string, 0, len(recipients))
-	for _, recipient := range recipients {
-		wires = append(wires, map[string]string{"kind": recipient.Kind, "issuer": recipient.Issuer, "id": recipient.ID})
-	}
-	session, err := client.Connect(ctx, &sdk.StreamableClientTransport{Endpoint: strings.TrimSuffix(run.Origin, "/") + "/mcp",
-		HTTPClient: &http.Client{Transport: installedJourneyBearer{run.Transport, owner.Token}, Timeout: 30 * time.Second}, MaxRetries: -1, DisableStandaloneSSE: true}, nil)
-	if err != nil {
-		t.Fatal("installed report share session", err)
-	}
-	defer session.Close()
-	result, err := session.CallTool(ctx, &sdk.CallToolParams{Name: "create_share", Arguments: map[string]any{
-		"case_id": run.CaseID, "artifacts": []map[string]string{{"artifactID": run.ArtifactID, "digest": data.Artifacts[0].Digest}},
-		"recipients":   wires,
-		"data_classes": []string{"metadata"}, "operations": []string{"get_case"}, "expires_at": run.ExpiresAt.UTC().Format(time.RFC3339Nano),
-		"reason": "synthetic inventory report qualification", "idempotency_key": "installed-inventory-share",
-	}})
-	wire, wireErr := contracts.NewInvestigationContracts()
-	if err != nil || wireErr != nil {
-		t.Fatal("installed report share", err, wireErr)
-	}
-	envelope, code, err := installedJourneyReplyCode(wire, "create_share", result)
-	var created struct {
-		ID    string `json:"share_id"`
-		Phase string `json:"phase"`
-	}
-	decodeErr = json.Unmarshal(envelope.Data, &created)
-	if err != nil || envelope.Status != "ok" || decodeErr != nil || created.ID == "" || created.Phase != "Active" {
-		t.Fatal("installed report share receipt", "status", envelope.Status, "code", code, "request", envelope.RequestID, "contract", err, "decode", decodeErr, "phase", created.Phase)
-	}
-	t.Logf("installed report create_share -> %s %s request %s with %d existing fixture recipients", envelope.Status, created.Phase, envelope.RequestID, len(recipients))
-	return installedReportShare{ID: created.ID, OutsiderID: recipient.subject, Recipients: recipients}
-}
-
-func canonicalReportSource(raw string) ([]byte, error) {
-	value := jsontext.Value(raw)
-	if err := value.Canonicalize(); err != nil {
-		return nil, err
-	}
-	return value, nil
 }

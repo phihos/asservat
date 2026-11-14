@@ -1,8 +1,6 @@
 package integration
 
 import (
-	"asservat.local/asservat/internal/contracts"
-	"asservat.local/asservat/internal/domain/audit"
 	"context"
 	"crypto/sha256"
 	"errors"
@@ -11,6 +9,9 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/audit"
 
 	"asservat.local/asservat/internal/adapters/postgres"
 	authapp "asservat.local/asservat/internal/application/authorization"

@@ -1,11 +1,6 @@
 package integration
 
 import (
-	"asservat.local/asservat/internal/adapters/kms"
-	"asservat.local/asservat/internal/adapters/mtls"
-	"asservat.local/asservat/internal/domain/artifact"
-	value "asservat.local/asservat/internal/domain/fleet"
-	"asservat.local/asservat/internal/domain/identity"
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
@@ -18,6 +13,12 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/adapters/kms"
+	"asservat.local/asservat/internal/adapters/mtls"
+	"asservat.local/asservat/internal/domain/artifact"
+	value "asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
 )
 
 // Actual provider role separation, signing and mutual TLS. Accepted enrollment,

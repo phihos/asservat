@@ -332,12 +332,3 @@ func installedProjectionBrowserSource(t *testing.T, ctx context.Context, browser
 	}
 	return invoke, download, finish
 }
-
-// The original independent review selects one client, never both; no second
-// raw approval or enlarged parent disclosure pool is introduced for heap UI.
-func installedProfileResultClient() string {
-	if installedProfileFocus() && installedHeapProfileVariant() {
-		return "console"
-	}
-	return "mcp"
-}

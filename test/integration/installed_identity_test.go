@@ -57,91 +57,6 @@ func installedConsoleScopes() []string {
 	return scopes
 }
 
-func newInstalledIdentity(t *testing.T, f fixture, origin, consoleSecret string) *installedIdentity {
-	t.Helper()
-	id := f.Identity
-	if id == nil {
-		t.Fatal("harness started no owned Keycloak")
-	}
-	roots := x509.NewCertPool()
-	if !roots.AppendCertsFromPEM([]byte(id.RootCA)) {
-		t.Fatal("owned Keycloak root")
-	}
-	kc := &kcFixture{t: t, base: id.Base, Issuer: id.Base + "/realms/asservat", AdminUser: id.AdminUser, AdminPassword: id.AdminPassword, UserPassword: id.UserPassword}
-	kc.http = &http.Client{Timeout: 5 * time.Second, Transport: &http.Transport{Proxy: nil, TLSClientConfig: &tls.Config{RootCAs: roots, MinVersion: tls.VersionTLS12}}, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-	kc.admin = kc.tokens(kc.base+"/realms/master/protocol/openid-connect/token", url.Values{"grant_type": {"password"}, "client_id": {"admin-cli"}, "username": {kc.AdminUser}, "password": {kc.AdminPassword}}, 200).Access
-	kc.json("POST", "/admin/realms", map[string]any{"realm": "asservat", "enabled": true, "registrationAllowed": false, "accessTokenLifespan": 300, "revokeRefreshToken": true, "refreshTokenMaxReuse": 0})
-	prefix := "/admin/realms/asservat"
-	var profile map[string]any
-	if err := json.Unmarshal(kc.json("GET", prefix+"/users/profile", nil), &profile); err != nil {
-		t.Fatal("user profile", err)
-	}
-	attributes, _ := profile["attributes"].([]any)
-	profile["attributes"] = append(attributes, map[string]any{"name": "asservat_group_id", "multivalued": true, "permissions": map[string]any{"view": []string{"admin"}, "edit": []string{"admin"}}})
-	delete(profile, "unmanagedAttributePolicy")
-	kc.json("PUT", prefix+"/users/profile", profile)
-	for _, scope := range []string{"evidence:read", "evidence:download", "evidence:capture", "evidence:share", "evidence:raw"} {
-		kc.json("POST", prefix+"/client-scopes", map[string]any{"name": scope, "protocol": "openid-connect", "attributes": map[string]string{"include.in.token.scope": "true"}})
-	}
-	groups := map[string]any{"name": "stable-groups", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-attribute-mapper", "config": map[string]string{"user.attribute": "asservat_group_id", "claim.name": "asservat_groups", "jsonType.label": "String", "multivalued": "true", "aggregate.attrs": "true", "access.token.claim": "true", "id.token.claim": "false", "userinfo.token.claim": "false"}}
-	audience := func(value string) map[string]any {
-		return map[string]any{"name": "audience", "protocol": "openid-connect", "protocolMapper": "oidc-audience-mapper", "config": map[string]string{"included.custom.audience": value, "access.token.claim": "true", "id.token.claim": "false"}}
-	}
-	scopes := installedConsoleScopes()
-	kc.json("POST", prefix+"/clients", map[string]any{"clientId": "console", "protocol": "openid-connect", "publicClient": false, "secret": consoleSecret, "standardFlowEnabled": true, "directAccessGrantsEnabled": false, "implicitFlowEnabled": false, "serviceAccountsEnabled": false, "fullScopeAllowed": false, "redirectUris": []string{strings.TrimSuffix(origin, "/") + "/auth/callback"}, "defaultClientScopes": scopes, "optionalClientScopes": []string{}, "attributes": map[string]string{"pkce.code.challenge.method": "S256"}, "protocolMappers": []any{audience("asservat-api"), groups}})
-	// Each MCP token names exactly one resource: the MCP endpoint, or the
-	// download content route (ADR-204 decision 10). The client requests one
-	// of two optional scopes, each carrying one audience.
-	for name, resource := range map[string]string{installedMCPScope: "/mcp", installedDownloadsScope: "/api/v1/downloads"} {
-		kc.json("POST", prefix+"/client-scopes", map[string]any{"name": name, "protocol": "openid-connect", "attributes": map[string]string{"include.in.token.scope": "false"}, "protocolMappers": []any{audience(strings.TrimSuffix(origin, "/") + resource)}})
-	}
-	kc.json("POST", prefix+"/clients", map[string]any{"clientId": "mcp", "protocol": "openid-connect", "publicClient": true, "standardFlowEnabled": true, "directAccessGrantsEnabled": false, "implicitFlowEnabled": false, "serviceAccountsEnabled": false, "fullScopeAllowed": false, "redirectUris": []string{"http://127.0.0.1:1/callback"}, "defaultClientScopes": []string{"basic", "evidence:read"}, "optionalClientScopes": []string{installedMCPScope, installedDownloadsScope, "evidence:download", "evidence:capture", "evidence:share", "evidence:raw"}, "attributes": map[string]string{"pkce.code.challenge.method": "S256"}, "protocolMappers": []any{groups}})
-	created := func(path string, value any) string {
-		t.Helper()
-		body, _ := json.Marshal(value)
-		status, _, headers := kc.request("POST", kc.base+prefix+path, kc.admin, "application/json", body)
-		location := headers.Get("Location")
-		if status != 201 || len(location) < 36 {
-			t.Fatalf("realm create %s: status %d", path, status)
-		}
-		return location[strings.LastIndex(location, "/")+1:]
-	}
-	group := created("/groups", map[string]any{"name": "maintainers"})
-	kc.json("PUT", prefix+"/groups/"+group, map[string]any{"name": "maintainers", "attributes": map[string]any{"asservat_group_id": []string{installedIdentityGroup}}})
-	user := created("/users", map[string]any{"username": "developer", "enabled": true, "email": "synthetic@example.invalid", "firstName": "Synthetic", "lastName": "Developer", "credentials": []any{map[string]any{"type": "password", "value": kc.UserPassword, "temporary": false}}})
-	kc.json("PUT", prefix+"/users/"+user+"/groups/"+group, nil)
-	var reviewer string
-	if installedRecordingFocus() || installedLogsFocus() {
-		reviewer = created("/users", map[string]any{"username": "reviewer", "enabled": true, "email": "reviewer@example.invalid", "firstName": "Synthetic", "lastName": "Reviewer", "credentials": []any{map[string]any{"type": "password", "value": kc.UserPassword, "temporary": false}}})
-		kc.json("PUT", prefix+"/users/"+reviewer+"/groups/"+group, nil)
-	}
-	// An organization member the installation accepts (eligible group) whom no
-	// AccessBinding names: the S-02 unrelated principal.
-	outsiders := created("/groups", map[string]any{"name": "outsiders"})
-	kc.json("PUT", prefix+"/groups/"+outsiders, map[string]any{"name": "outsiders", "attributes": map[string]any{"asservat_group_id": []string{installedUnrelatedGroup}}})
-	outsider := created("/users", map[string]any{"username": "outsider", "enabled": true, "email": "outsider@example.invalid", "firstName": "Synthetic", "lastName": "Outsider", "credentials": []any{map[string]any{"type": "password", "value": kc.UserPassword, "temporary": false}}})
-	kc.json("PUT", prefix+"/users/"+outsider+"/groups/"+outsiders, nil)
-	return &installedIdentity{kc: kc, Issuer: kc.Issuer, RootPEM: id.RootCA, ReviewerSubject: reviewer}
-}
-
-// reopenInstalledIdentity attaches to the realm a keep run created
-// (development-only focus rerun); it creates nothing.
-func reopenInstalledIdentity(t *testing.T, f fixture, reviewer string) *installedIdentity {
-	t.Helper()
-	id := f.Identity
-	roots := x509.NewCertPool()
-	if id == nil || !roots.AppendCertsFromPEM([]byte(id.RootCA)) {
-		t.Fatal("kept Keycloak unavailable")
-	}
-	kc := &kcFixture{t: t, base: id.Base, Issuer: id.Base + "/realms/asservat", AdminUser: id.AdminUser, AdminPassword: id.AdminPassword, UserPassword: id.UserPassword}
-	kc.http = &http.Client{Timeout: 5 * time.Second, Transport: &http.Transport{Proxy: nil, TLSClientConfig: &tls.Config{RootCAs: roots, MinVersion: tls.VersionTLS12}}, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-	kc.admin = kc.tokens(kc.base+"/realms/master/protocol/openid-connect/token", url.Values{"grant_type": {"password"}, "client_id": {"admin-cli"}, "username": {kc.AdminUser}, "password": {kc.AdminPassword}}, 200).Access
-	return &installedIdentity{kc: kc, Issuer: kc.Issuer, RootPEM: id.RootCA, ReviewerSubject: reviewer}
-}
-
-// installedUnrelatedGroup is eligible for sign-in but named by no AccessBinding.
-const installedUnrelatedGroup = "synthetic-unrelated-group"
-
 // unrelated returns the same realm's outsider user with its own HTTP client.
 func (i *installedIdentity) unrelated() *installedIdentity {
 	kc, client := *i.kc, *i.kc.http
@@ -170,18 +85,6 @@ func (i *installedIdentity) downloadResourceScope() string {
 		return i.DownloadsScope
 	}
 	return installedDownloadsScope
-}
-func (i *installedIdentity) usersGroup() string {
-	if i.UsersGroupID != "" {
-		return i.UsersGroupID
-	}
-	return installedIdentityGroup
-}
-
-// mcpToken logs the synthetic user in to the MCP client with authorization
-// code and S256 PKCE and returns its access token for the MCP endpoint.
-func (i *installedIdentity) mcpToken() string {
-	return i.kc.loginScope(i.mcpClient(), i.mcpResourceScope()).Access
 }
 
 // downloadToken returns the same client's access token for the download
@@ -397,11 +300,4 @@ func (i *installedIdentity) initializeProcessing(t *testing.T, ctx context.Conte
 		case <-time.After(2 * time.Second):
 		}
 	}
-}
-
-// Raw query inspection is a distinct OAuth session; it has no capture or native-download scope.
-func (i *installedIdentity) packetQueryTokenSource(origin string) *installedJourneyTokenSource {
-	return &installedJourneyTokenSource{issuer: i.Issuer, clientID: i.mcpClient(), resource: strings.TrimSuffix(origin, "/") + "/mcp", now: time.Now, approvedOnly: true, packetQueryOnly: true, login: func() kcTokens {
-		return i.kc.loginScopes(i.mcpClient(), "openid evidence:read evidence:raw "+i.mcpResourceScope())
-	}, refresh: func(token string) kcTokens { return i.kc.refresh(i.mcpClient(), token, http.StatusOK) }}
 }

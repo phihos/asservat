@@ -1,6 +1,11 @@
 package integration
 
 import (
+	"context"
+	"strings"
+	"testing"
+	"time"
+
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
 	auditapp "asservat.local/asservat/internal/application/audit"
@@ -9,11 +14,7 @@ import (
 	"asservat.local/asservat/internal/domain/audit"
 	value "asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
-	"context"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"strings"
-	"testing"
-	"time"
 )
 
 type countedWorkerAudit struct {

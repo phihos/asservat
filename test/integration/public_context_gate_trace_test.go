@@ -1,18 +1,19 @@
 package integration
 
 import (
+	"context"
+	"errors"
+	"sync"
+	"testing"
+	"time"
+
 	auditapp "asservat.local/asservat/internal/application/audit"
 	"asservat.local/asservat/internal/application/evidence"
 	fleetapp "asservat.local/asservat/internal/application/fleet"
 	privacyapp "asservat.local/asservat/internal/application/privacy"
 	auditvalue "asservat.local/asservat/internal/domain/audit"
 	fleetvalue "asservat.local/asservat/internal/domain/fleet"
-	"context"
-	"errors"
 	"github.com/jackc/pgx/v5"
-	"sync"
-	"testing"
-	"time"
 
 	authapp "asservat.local/asservat/internal/application/authorization"
 	"asservat.local/asservat/internal/domain/artifact"

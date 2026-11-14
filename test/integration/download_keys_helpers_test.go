@@ -1,7 +1,6 @@
 package integration
 
 import (
-	"asservat.local/asservat/internal/application/evidence"
 	"bytes"
 	"context"
 	"crypto/rand"
@@ -12,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/application/evidence"
 
 	"asservat.local/asservat/internal/adapters/kms"
 	"asservat.local/asservat/internal/domain/artifact"

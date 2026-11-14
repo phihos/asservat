@@ -1,14 +1,15 @@
 package integration
 
 import (
+	"testing"
+	"time"
+
 	app "asservat.local/asservat/internal/application/capacity"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/privacy"
-	"testing"
-	"time"
 )
 
 // This attempts the provisional S02 envelope; a compiled test is not evidence

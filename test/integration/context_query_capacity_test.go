@@ -1,18 +1,19 @@
 package integration
 
 import (
+	"context"
+	"crypto/tls"
+	"encoding/json"
+	"testing"
+	"time"
+
 	"asservat.local/asservat/internal/adapters/objectstore"
 	app "asservat.local/asservat/internal/application/capacity"
 	value "asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
-	"context"
-	"crypto/tls"
-	"encoding/json"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"testing"
-	"time"
 )
 
 // SQL qualification of one original shared logical reservation. Deployment

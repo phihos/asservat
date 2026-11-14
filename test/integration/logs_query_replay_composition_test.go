@@ -1,14 +1,15 @@
 package integration
 
 import (
+	"context"
+	"testing"
+	"time"
+
 	app "asservat.local/asservat/internal/application/analysis"
 	identities "asservat.local/asservat/internal/application/identity"
 	query "asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/identity"
-	"context"
-	"testing"
-	"time"
 )
 
 type logsReplayNoEffects struct{ replayCompositionNoEffects }

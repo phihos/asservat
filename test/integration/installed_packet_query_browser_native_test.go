@@ -1,10 +1,11 @@
 package integration
 
 import (
-	query "asservat.local/asservat/internal/domain/analysis"
 	"context"
 	"encoding/json"
 	"testing"
+
+	query "asservat.local/asservat/internal/domain/analysis"
 )
 
 type installedPacketQueryBrowserInput struct {

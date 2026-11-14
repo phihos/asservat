@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"github.com/jackc/pgx/v5"
 	"os"
 	"path/filepath"
 	"sort"
@@ -13,6 +12,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 
 	"asservat.local/asservat/internal/adapters/postgres"
 	"asservat.local/asservat/internal/application/capacity"

@@ -1,21 +1,22 @@
 package integration
 
 import (
+	"context"
+	"crypto/ed25519"
+	"crypto/rand"
+	"errors"
+	"slices"
+	"sync"
+	"testing"
+	"time"
+
 	"asservat.local/asservat/internal/adapters/jose"
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/capture"
-	"context"
-	"crypto/ed25519"
-	"crypto/rand"
-	"errors"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"slices"
-	"sync"
-	"testing"
-	"time"
 )
 
 // Extends the real SQL/S3 producer/publication case. Scope/process/bootstrap and

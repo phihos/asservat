@@ -1,6 +1,11 @@
 package integration
 
 import (
+	"context"
+	"errors"
+	"testing"
+	"time"
+
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
 	authorizationapp "asservat.local/asservat/internal/application/authorization"
@@ -8,12 +13,8 @@ import (
 	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
-	"context"
-	"errors"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"testing"
-	"time"
 )
 
 // Called by the owned custody suite. Actual PostgreSQL/S3/encrypted paired

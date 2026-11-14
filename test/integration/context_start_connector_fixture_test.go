@@ -110,9 +110,3 @@ func (f *contextStartConnectorFixture) ConnectorLeafRegistration(ctx context.Con
 	}
 	return app.ConnectorLeafRegistration{Certificate: c, Process: origin, Revision: f.profile.Revision, ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}, nil
 }
-
-type contextStartPodToken []byte
-
-func (t contextStartPodToken) ReadConnectorPodToken(context.Context) ([]byte, error) {
-	return append([]byte(nil), t...), nil
-}
