@@ -1,144 +1,58 @@
-# Current context download control
+# Context download control
 
-C-14 now has a private typed `ContextDownloadCoordinator` for ordinary approved
-pod-status preparation and status (REQ-DLD-002–004, S-02). It consumes request-owned
-C-02 `CurrentIdentity`, the existing C-03 current download authority, C-07 accepted
-transfer-plan input and the separately configured regional native-work port.
-This is not a mounted browser/MCP service. Public cancellation, operation-audit
-mediation, protected environment/allocation production, the actual regional
-native-work channel and attachment relay remain required before public use.
+C-14 `ContextDownloadCoordinator` prepares and reports native downloads of
+approved pod-status evidence (REQ-DLD-002–004, S-02). Every evidence kind uses
+the same path; the mechanism supplies its native format.
 
-## Original requests and initial startup
+## Prepare
 
-A preparation key is bound to the exact artifact and qualified operation. Lookup
-uses original actor/client and recovery; a failed lookup is not absence. Private
-artifact routing uses only the published ADR-109 locator and verified ciphertext
-version. It discloses no native metadata and gives no permissions. Current whole-
-pod download rights, retained audience, current retention/environment and recovery
-precede the separate exact source reader. That reader checks accepted expectation,
-publication/verification and the complete immutable custody copy set under the
-existing transaction guards; it reads no file bytes or unwrap keys.
+`prepare_artifact_download` carries an idempotency key bound to the exact
+artifact. One authorization per operation ([ADR-311](../decisions/311-operation-authority-recheck.md))
+covers identity, whole-pod download rights, retained audience, stored
+retention deadlines and environment restrictions. The artifact locator gives
+routing only and discloses no native metadata.
 
-New sessions require a real configured regional runtime and accepted, backed
-finite transfer plan. Missing runtime denies before reservation or worker effects.
-There is no default capacity or fixture-backed production authority. The new key
-is checked again atomically in `ReserveDownload` before locking a newly proposed
-allocation. An existing request keeps its original session, allocation, limits,
-deadline and spend even when today's plan differs or its proposed allocation is
-absent; different scope/request under the same key conflicts.
+One SQL transaction then reserves the transfer budget on the workload's
+counter, creates the session row with the key and writes the audit row (D6).
+A retry with the same key returns the existing session; the same key with a
+different artifact conflicts. A failed reservation releases nothing because
+nothing was charged. A missing regional reader denies before any reservation.
 
-[ADR-218](../decisions/218-consumed-download-preflight.md) consumes passive runtime
-readiness at its check and plan freshness through acknowledged session reservation.
-An expired check or a reservation that crosses the plan's original cutoff refuses
-continuation. After reservation, that consumed freshness bound does not shorten
-worker startup. The original request/identity/authority bounds and the session's
-accepted limits, allocation/access expiry and hard backing deadline remain.
-Worker effects independently check current SQL configuration and authorization;
-Job creation also retains its current configuration check. This adds no renewed
-observation or automatic retry after an uncertain effect.
+The hub forwards the prepared session to the regional reader (A-READ) over
+the cluster's connector connection ([ADR-330](../decisions/330-event-driven-system-design.md) D2/D4).
+The reader reads the committed manifest, unwraps with its own credential and
+returns the native metadata: format, length, full SHA-256, coverage and
+filename. No Job, certificate or key slot is created per download.
 
-Normal startup can outlast a five-second request-owned identity observation.
-An acknowledged Preparing result permits bounded automatic **same-key prepare
-POST continuation** while the initiating view and session remain active. This is
-part of the original Download intent, not another confirmation click. The caller
-must apply backoff, a finite retry/time ceiling and cancellation on view/session
-loss; every new request obtains fresh identity and preserves the original session
-and all budgets/deadlines. An uncertain response is not acknowledged startup and
-needs original-key reconciliation. No retry invents a new key/session or refunds
-read work. Status reads never initiate continuation. UI scheduling and the public
-mapping of the internal continuation indication remain pending; no enabled flow
-claims this orchestration exists yet.
+## Status
 
-`ContinueContextDownload` is an explicitly effectful private runtime port, called
-only for an original session still Preparing and before its original transfer
-deadline. Both source reads and continuation use a context bounded by that
-deadline, rechecked after source I/O. An acknowledged continuation may
-report startup pending or finish the paid preparation; an error cannot fabricate
-Preparing success. Runtime implementations must serialize exact-session result
-lookup/preparation and reuse actual dispatch identities. The current credential-
-only worker command is not such an implementation.
+Session state changes (Preparing, Ready, Streaming, Interrupted, Completed,
+Cancelled, Failed, Denied, Expired) are written to SQL and signalled with
+`NOTIFY`. The console receives them over its SSE stream; MCP
+`get_artifact_download` waits server-side up to 30 s and returns on the first
+change. Clients do not repeat prepare requests to make progress.
 
-## Immutable file facts versus fresh disclosure
+Status reads are MVCC selects under the operation's authorization. The reader
+keeps the session's native metadata for the session lifetime; status never
+re-decrypts evidence. If the reader lost it, status reports unavailable, never
+a placeholder hash. SQL stores no native filename or checksum.
 
-`PreparedDownload` holds bounded immutable verified native metadata and its exact
-scope/session/preparation batch identity. It is supplied only by an authenticated
-regional native-work path. The intended one-result-per-original-worker/session
-memory entry contains neither file bytes nor unwrap keys and has the original
-worker/session/artifact lifetime. SQL stores no filename, native SHA or coverage.
-The private [regional result owner](context-download-result.md) retains one
-acknowledged preparation result before first delivery and checks fresh authority
-when reading it. Its protected native-work channel/executable composition remains
-pending; it is not an enabled production runtime.
+Terminal sessions stay terminal. An elapsed nonterminal session reports
+Expired. Status returns the stored `AccessUntil` and deletion deadline; it does
+not extend any session, retention or authority bound.
 
-The metadata facts do not expire when the first response's authorization lease
-ends. `GetContextDownload` freshly checks current identity, rights, audience,
-retention, environment and recovery, reads the existing regional result and asks
-SQL for a new bounded observation. It never dispatches, prepares, unwraps, reads
-S3 or changes spend. Returned read/delete dates come from the new current decision,
-not the retained metadata entry. Final identity checks preserve a shorter current
-deadline and deny group/scope/policy changes.
+## Bytes
 
-`ObserveDownload` checks current transaction guards and the exact immutable,
-successful, acknowledged preparation outcome. Later content generations may use
-the same verified native facts, including Streaming and Completed metadata. It
-does not reopen the preparation batch, extend its old lease, authorize bytes or
-mutate counters/state. The existing `PermitDownloadMetadata` remains unchanged:
-it fences the initial worker response by the original preparation lease.
+The content GET authenticates the session's principal and client and
+authorizes once before the response starts. The reader streams the native
+bytes over the connector connection; the started response then continues to
+its original bounds (session deadline, `AccessUntil`, retention cutoff, Stop,
+byte reservation) without further identity or permission reads
+([ADR-312](../decisions/312-started-downloads-run-to-original-bounds.md)).
+Stop and retention cut-offs reach the stream as events.
 
-Ready/Streaming/Interrupted require verified metadata. Cache loss returns
-explicit unavailable instead of a placeholder hash, incomplete Ready or automatic
-re-decryption. Post-ready deliberate charged re-preparation is not implemented in
-this step. Preparing status may omit native metadata; only the explicit prepare
-operation can progress it.
+## Storage
 
-Fresh authorized terminal status remains available after the transfer deadline,
-without extending the worker, cache, key, artifact or session lifetime. Completed,
-Cancelled, Failed, Denied and Expired return a terminal-only status without a
-regional runtime/cache dependency. No native metadata is invented or re-decrypted.
-Elapsed nonterminal sessions project Expired in the returned copy; SQL state,
-active batches, counters and original deadlines are unchanged. Historical
-Completed stays Completed. Same-key preparation replay routes these sessions to
-that passive status path before runtime/source/capacity calls. Active prepared
-replay likewise skips startup checks, retaining current verified-metadata checks.
-
-Current identity, evidence rights, retention, environment, recovery and original
-response freshness remain mandatory for every status response. Active response
-validity is additionally bounded by the original transfer deadline. The private view retains current `AccessUntil` and `DeleteBy` independently of
-optional native metadata, including terminal-only responses. A future public
-projection uses current access for `managed_read_until` and may clamp displayed
-`expires_at` to the earlier of that value and the original session deadline;
-it must not mutate the persisted deadline or substitute a response lease for
-artifact retention. Status cannot
-renew any preparation/byte permit or revive Completed. The original five-second
-worker response gate and all transfer-effect deadline checks remain unchanged.
-
-## Ports, credentials and qualification
-
-The new lookup/route/source/status methods belong to the existing SQL download
-facet; no private table, migration, public schema or new dependency was needed.
-The route reads the existing published locator, and source reads existing custody
-receipts. The fixture grants only SELECT on `context_case_locator` and
-`custody_copy` in addition to the existing download runtime privileges; the
-protected production role assembly must provide these exact reads independently.
-It gains no locator/copy/publication writes. The C-14 → C-02 architecture edge is
-for request-owned identity as a consumer input, following the existing C-16 path.
-
-Focused race tests cover normal same-key startup across the original observation
-interval, configuration change, no reservation without runtime, lost replies,
-original-key conflict, status/ready replay without another preparation, cache
-loss/terminal non-revival, terminal status without runtime after transfer expiry,
-source reads crossing the transfer deadline, final identity changes/cancellation
-and deadline shortening. SQL adapter/domain packages also pass their fixture-free race tests.
-The real SQL/S3 fixture now passes: it exercises actual publication, exact source
-reads, rotated-plan and parallel replay, real encrypted native preparation, later
-current observations after the old lease, active/Completed generations, wrong
-receipt, expiry behind locks, terminal status after the original transfer deadline
-and recovery blocking. The focused run in
-`test/results/context-audit-download-focused-final.log` passed five selected tests
-(download control: 20.996s), with 871 unchanged source hashes and empty cleanup.
-The combined run in `test/results/context-audit-download-full-custody.log` passed
-287 named entries in 139.453s, also with 871 unchanged hashes and empty cleanup.
-Current identity/source/installation inputs and content-completion accounting
-remain explicitly synthetic; no public transfer is claimed. These results qualify
-the preceding coordinator/status implementation, not the newly staged regional
-result owner or a native-work channel.
+Sessions are rows in the existing SQL download facet of the hub's single SQL
+login. Released or unused transfer budget returns to the workload counter
+when the session ends.

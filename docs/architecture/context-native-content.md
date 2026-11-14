@@ -1,152 +1,29 @@
-# First-context native content
+# Native content delivery
 
-[ADR-288](../decisions/288-profile-native-streaming.md) extends the registered profile path to
-two bounded 64 MiB response windows. Planning consumes the coordinator's exact
-published source observation and narrows session funding by its accepted native
-type and registration limit, reusing that source for preparation without another
-read or renewed deadline. Response/control admission accounts for both windows.
-The real SQL/S3 and TLS component results are recorded in that decision; installed
-profile qualification remains pending.
+C-14 owns the download session and native stream, C-03 evidence authority, C-02 request identity, C-20 HTTP transport and C-21 the SQL, object-store and connector adapters. Implements REQ-DLD-001/003 for every evidence kind (PCAPNG, cores and companions, JSON projections) under [ADR-330](../decisions/330-event-driven-system-design.md) D2/D4/D5 and [ADR-312](../decisions/312-started-downloads-run-to-original-bounds.md). Session state is described in [download sessions](download-sessions.md).
 
-[ADR-136](../decisions/136-first-context-native-content.md) joins the existing C14
-coordinator to regional acquisition and the native HTTP sink. C03 still owns current
-evidence authority, C02 owns each request or live-reader batch, C20 owns HTTP/native
-transport and C21 supplies the concrete SQL/API/provider adapters.
+## Preparation
 
-`NewContextDownloadPlans` reads the unique live allocation for the exact root and
-target using LIMIT 2. It checks current recovery and the original accepted worker
-configuration, existing allocation/control/native/Stop backing and finite constructor
-limits. It neither selects another candidate after an unsupported match nor creates
-capacity. Its nonzero `HardUntil` is the minimum original backing end; reservation
-also checks the plan's independently short `ValidUntil`. Stop retention must satisfy
-its original SQL47 cleanup/proof margin, anchored to the session's original deadline.
-Current permission checks precede this read in `ContextDownloadCoordinator`.
+`prepare_artifact_download` (browser or MCP) carries an idempotency key. In one SQL transaction it authorizes the caller once (ADR-311), checks the artifact's stored retention deadline, charges the workload's transfer budget, inserts the session row with its original bounds (session deadline, `AccessUntil`, byte reservation) and writes the audit row. A retry with the same key returns the same session. It returns the content URL immediately; no Job, worker enrollment or key slot is created.
 
-`NewContextNativeDownloadRuntime` requires the actual `OwnerRuntime`, an accepted
-native v2 profile, concrete first-context preparation/native/response SQL adapters,
-current configuration, actual dispatcher and request/enrollment ownership, encrypted
-audit providers and exact key-binding facets. It supplies the same serving process
-to enrollment and native registration and wires the Stop hook to that runtime's
-bounded active-transfer registry. Optional legacy component hooks cannot be selected
-by the production factory. The returned services enable no public route by themselves.
+## Serving bytes
 
-A same-key prepare POST reuses the original Job, worker, enrollment, session, budgets
-and dates under a fresh request-owned identity. A positively known startup wait is
-Pending. Only the first acknowledged metadata admission may prepare. Lost replies,
-unknown key/read/outcome effects and lost regional result never authorize another
-batch. The SQL attachment reader requires the sole original worker and successful
-independently acknowledged original metadata outcome; it validates old proof only
-as immutable provenance. Each actual Observe/content exchange obtains fresh actual
-TLS, Pod/token/configuration/path and SQL checks from NativeOrigins/NativePeers.
-No old proof is rewritten or treated as live authority.
+`NewDownloadContentHandler` serves `/api/v1/downloads/{id}/content` and the `/.well-known/oauth-protected-resource/downloads` metadata path, over TLS on the configured host, without forwarded trust, query/body credentials, redirects or CORS. Browser requests use the session cookie with same-origin Fetch Metadata; bearer requests use the pinned resource/issuer resolver. Both require `evidence:read` and `evidence:download` plus current rights to the artifact.
 
-When the original worker is already bound, continuation observes that exact live
-Job/Pod and independently rereads the current SQL attachment under fresh ordinary
-authority, followed by another authority check after the potentially blocking
-read. It does not replay completed launch reservation, receipt, claim, recording
-or binding operations. A changed or missing worker, uncertain/busy state or current
-denial cannot fall back to launch. Unbound launches retain the existing recovery
-path. Every original request, source, attachment and worker deadline still bounds
-the operation; this branch introduces no permission cache or renewed lease.
+For each GET:
 
-If that initial attachment already has an exact activated enrollment, the current
-Job/Pod and second SQL attachment must preserve the same worker, public-key
-enrollment and activated peer. The peer must cover the original request bound
-without entering the supervisor's actual leaf renewal window, including equality
-at its boundary. The existing original certificate-period calculation remains a
-compatibility check, with the supervisor's exact final-period exception. Only then may continuation
-omit enrollment-route registration and its wait. A changed or missing selected
-identity denies rather than falling back to issuance. Pending enrollment and
-renewal retain the existing route, original-key recovery and bounded wait. Native
-routing has its own exact hub Pod/process operation, local registration and SQL
-claim; it still proves current TLS, token/Pod, certificate, authority, key binding
-and each frame. This branch neither supplies a TLS proof nor renews authority,
-changes worker polling, retries a failed preparation or refunds uncertain spend.
+1. Authenticate the principal and client and authorize the session's artifact once, before the response starts.
+2. Evaluate `If-Match`/`If-Range`/`Range`. A 304, 412 or 416 transfers nothing and consumes no budget.
+3. The hub sends the read request to the region's reader (A-READ, `asservat download-worker`) as a stream on the connector connection ([connector identity](connector-credentials.md)). The reader holds the region's unwrap credential, opens the three keysets, reads the range with the framed cursor ([artifact format](artifact-format.md)) and streams the bytes back on the same connection.
+4. The response continues under `DownloadAuthority.Continue`: a local comparison with the original bounds — caller session or token expiry, session deadline, `AccessUntil`, stored retention deadline, Stop and the byte reservation. There are no identity, permission, share or policy reads after the response starts, and no per-chunk, per-frame or per-window checks.
+5. Delivered bytes are recorded against the reservation when the response ends; the unused remainder is released.
 
-The metadata cache has sixteen entries and retains only exact immutable native facts.
-It keys the original session/worker generation/binding/public key, preparation,
-source version, current path identity and original dates. Coalesced misses do not
-borrow the leader's identity or extend a waiter's deadline. Failed/unknown loads
-remain bounded negative entries; eviction never replenishes SQL credits. A response
-pins its entry through joined close. Warm status still checks current C03 and SQL,
-and a known unjoined/uncertain owner cannot be projected as actionable Ready.
+Range requests resume interrupted transfers; each GET is its own operation. The reader is long-running and scaled by replicas; reads do not depend on live source-workload capacity. Failures after headers abort the stream.
 
-The paired SQL admission adapters use the existing recovery/permission/session lock
-order. They exclude status-vs-content interference before any charge. One Observe
-costs claim+close; it must leave content claim+close and final retirement room. The
-required five remaining updates are specific to this small context path. Expired
-owners remain exclusive until positive closure. At the minimum eight updates, normal
-preparation, one metadata miss and one GET use six; any number of warm status polls
-uses zero more. A cold miss while content is active returns bounded unavailable and
-cannot terminate the content exchange. Generic native operations remain unchanged.
+## Stop and revocation
 
-`NewDownloadContentHandler` serves `/api/v1/downloads/{id}/content` and the fixed
-`/.well-known/oauth-protected-resource/downloads` metadata path. It requires actual
-TLS and the exact configured host, no forwarded trust, query/body credentials,
-redirect or CORS. Browser requests use one cookie, same-origin Fetch Metadata and
-read-only session resolution. Bearer requests use a distinct pinned resource/issuer
-resolver and its credential-observation facet, preserving original token/group ends.
-Both require evidence:read and evidence:download plus current exact artifact rights.
-The same healthy audited-operations owner is shared with browser/MCP controls.
+Stop, revocation and retention cut-offs are SQL updates that `NOTIFY` the hub replica serving the response and the reader; both cancel matching streams. A Stop is complete when its SQL row commits; delivery of the cancellation is best effort within seconds.
 
-`TransferAudited` commits the HTTP preflight intent before lookup/Describe, finishes
-its original finite outcome before disclosure/reservation, and rechecks current
-identity and C03 afterward. Its outcome says only that preflight succeeded or failed,
-never that an eight-hour body completed. Conditional 304/412/416 consumes no response,
-window or content key. Content uses fresh batches and the original response bounds.
-The sink reports exact writes/flushes; remote acknowledgement remains tied to the
-original chunk/window/lease. Failures after headers abort the stream after joins.
+## Metadata reads
 
-After positive preflight and before waiting for a fresh content batch, the HTTP
-factory moves the socket to the already bounded response idle deadline. It must
-do so while the original preflight is still current: an expired HTTP/2 write
-deadline cannot be revived by the first content write. Conditional/error paths
-retain their preflight bound. This transition emits no bytes and creates no
-authority; each write still installs its current short lease, joins cancellation
-after flush and restores only the original idle bound. Actual TLS/HTTP2 tests
-reproduce the old first-byte reset and verify both the corrected transition and
-the existing pause-between-chunks behavior.
-
-Positive restrictive Stop SQL first denies further work. The installed hook then
-cancels exact matching local session/principal responses before Stop audit I/O. It
-joins only until the original Stop deadline and retains entries through actual handler
-and source cleanup. Timeout reports unavailable with retained charges. Remote hubs
-observe the existing current SQL fence within the original delivery bound.
-
-## Staged qualification
-
-The latest integrated qualification is recorded in
-[implementation progress](../implementation-progress.md). The active-enrollment
-branch has a failing-before regression and passing affected races/vet. Its actual
-combined SQL/S3/TLS run passes ordinary content and range resume, but interruption,
-control preparation and publication setup fail in other cases. It is not a
-combined-suite or sustained-availability pass. The staged evidence below retains
-its original narrower scope.
-
-The absolute plan-end regression failed before the fix after a two-second simulated
-lookup delay; the fixed evidence race selection passed. All six affected evidence/audit/domain/browser/presentation/PostgreSQL package
-races pass, including the metadata cache, preflight audit, socket-bound denial,
-Stop join and backing checks with explicitly synthetic ports. Isolated SQL53
-query generation preserves every existing binding, including ADR135. The three
-new native fixtures compile against the staged PostgreSQL/bootstrap/runtime
-composition; their external executions remain unrun. Nine affected packages pass
-overlay vet. Integrated repository gates and external ADR136 qualification remain
-pending.
-
-The staged selectors under `TestContextAdmissionWithRealServices` are
-`download-worker-native-preparation-race`, `download-worker-native-control-races`
-and `download-worker-native-content`. The last composes actual SQL/S3/A-KEY, the
-real regional result and two h2 hops, runtime, authenticated content handler and
-HTTPS sink. It requires the exact bytes/hash, all three worker conversations Joined,
-conditional zero reservation, forty warm polls with zero native updates and one
-original three-key preparation plus one three-key content window. Its original
-session/Job/Pod/issuer and accepted installation/backing inputs remain synthetic.
-The existing strict `download-worker-native-exchange` selector is preserved.
-
-Installed scope remains incomplete: protected allocation/control/native/Stop and
-public audit provisioning, production connector/server identity and native listeners,
-v2 credential projection, accepted measured native/window cleanup/history backing,
-public host/session/bearer configuration and the complete installed journey must be
-qualified before enablement. ADR138 owns public mux/static/session composition.
-This context path has no large-file throughput, slow-reader, full one-TiB or deployed
-RSS claim; short original I-13 leases remain binding.
+Status reads (`get_download`) are plain SQL reads under the operation's authorization; browsers receive changes over Server-Sent Events, MCP clients through a bounded server-side wait (at most 30 s) that returns on the first change. Status reads are never charged.

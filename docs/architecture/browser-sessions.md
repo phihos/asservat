@@ -1,71 +1,114 @@
 # Browser sessions
 
-Scope: C-02 owns session coordination, C-20 the HTTP ingress, C-21 the OIDC/SQL/KMS adapters and C-24 the values. This continues REQ-AUT-001, TASK-07 and S-01/S-02 under [ADR-060](../decisions/060-bounded-browser-sessions.md). A session identifies a current human; it never grants target permissions, evidence disclosure, policy execution or approval authority.
+Scope: C-02 owns session coordination, C-20 the HTTP ingress and C-21 the
+OIDC/SQL adapters. This implements REQ-AUT-001, TASK-07 and S-01/S-02 under
+[ADR-060](../decisions/060-bounded-browser-sessions.md) and ADR-330. The design
+is the standard backend-for-frontend pattern (IETF *OAuth 2.0 for Browser-Based
+Applications*, BFF; oauth2-proxy; Grafana server-side sessions). A session
+identifies a current human; it never grants target permissions, evidence
+disclosure, policy execution or approval authority.
 
-## Login and use
+## Login
 
-1. GET `/auth/login?return_to=/investigations` validates a local return path, writes a five-minute encrypted challenge and redirects to the pinned authorization endpoint. The challenge binds independently random state, nonce, verifier and browser cookie. SQL stores hashes of the external state/cookie. PKCE uses S256.
-GET `/auth/step-up?return_to=/approvals/<id>` starts the same bounded login with
-`acr_values` from the current protected identity policy and `max_age=0`, requesting
-fresh provider authentication. It accepts only the local return path. A redirect
-or a successful login does not establish approval assurance: each approval still
-checks the returned signed `acr`/`auth_time`, current policy and current exact
-target permissions. The console returns to the reviewed plan for an explicit
-decision. Unconfigured or unavailable step-up settings yield a sanitized failure
-directing the user to their administrator. See [ADR-253](../decisions/253-approval-stepup-login.md).
+1. GET `/auth/login?return_to=/investigations` validates a local return path,
+   stores a five-minute login row (hashes of state and a browser-binding
+   cookie, nonce, PKCE S256 verifier) and redirects to the configured
+   authorization endpoint.
+2. GET `/auth/step-up?return_to=/approvals/<id>` starts the same login with
+   `acr_values` from the identity policy and `max_age=0`. A successful login
+   does not establish approval assurance: each approval checks the returned
+   signed `acr`/`auth_time`, current policy and current target permissions.
+   Missing step-up settings yield a sanitized failure. See
+   [ADR-253](../decisions/253-approval-stepup-login.md).
+3. The callback requires the configured issuer, exact state and browser
+   cookie, deletes the login row in the same transaction that claims it (a
+   repeated or concurrent callback cannot exchange again), verifies the ID
+   and access tokens and resolves the human through the current organization
+   policy.
+4. It creates a session row and sets an opaque random HttpOnly, Secure,
+   SameSite=Lax cookie. SQL stores the cookie hash, subject, issuer, client,
+   provider session ID, authentication time, the fixed session deadline, a
+   CSRF token and the refresh/access tokens encrypted with the application
+   session key (AES-GCM, session ID as associated data). The session key comes
+   from a mounted Secret; a key ID per row allows rotation, and no KMS call is
+   on the request path. The fixed deadline is the shorter of the configured
+   maximum and 24 hours; there is no sliding renewal.
+5. At most ten active sessions per subject are accepted; a further login is
+   refused without evicting another session. Login, logout and refusal write
+   an audit row in the same transaction (ADR-330 D6).
 
-2. The GET callback requires the selected issuer, exact state and browser cookie. It atomically consumes the challenge before exchange, verifies ID/access token purpose and binding, and resolves the human through current protected organization policy. Concurrent or repeated callbacks cannot exchange again. A wrong browser cannot consume the legitimate challenge.
-3. A fresh random session cookie identifies an encrypted credential record. The envelope binds installation epoch, issuer, client, row, purpose and version; swapping rows/versions cannot authenticate the credential. SQL retains only minimal identity/session metadata outside that envelope. The finite lifetime is the shorter of the private composition limit and current administrator maximum, bounded to one minute–24 hours. SQL returns the effective expiry for the callback cookie; there is no sliding renewal.
-4. GET `/api/v1/session` returns the existing documented subject, empty installation-wide roles, CSRF token, fixed expiry and `step_up: unavailable`. Roles remain target-specific. It verifies the existing access token and reads current identity policy without rotating tokens.
-5. A returning tab first GETs `/auth/csrf`, then POSTs `/auth/refresh` with that token and exact Origin. This bootstrap exposes no identity/evidence and requires an unexpired retained session in the current epoch. CSRF-only lookup and local logout also work while settings are suspended/stale; refresh does not. Normal authenticated POST operations may also refresh through the same ingress facet. The caller retries a busy refresh briefly; it must not start another OIDC exchange itself.
+`GET /api/v1/session` returns the subject, CSRF token, fixed expiry and
+`step_up` state. A returning tab calls `GET /auth/csrf` and then
+`POST /auth/refresh` with that token and an exact `Origin`. State-changing
+requests require the CSRF token and exact `Origin`.
 
-All routes require direct, correctly addressed HTTPS. This handler does not trust arbitrary forwarded headers. Bootstrap must terminate TLS here or implement a separately trusted ingress boundary. Responses disable caching, framing and referrers. Provider tokens, client secrets and arbitrary upstream errors never enter responses. The [authentication OpenAPI](../interfaces/browser-auth-openapi.yaml) is separate from business-operation/MCP parity because redirects and signed provider callbacks are protocol endpoints.
+All routes require HTTPS. The handler trusts no forwarded headers unless a
+separately configured ingress boundary terminates TLS. Responses disable
+caching, framing and referrers. Provider tokens, client secrets and upstream
+error bodies never reach the browser. The
+[authentication OpenAPI](../interfaces/browser-auth-openapi.yaml) is separate
+from business-operation/MCP parity because redirects and provider callbacks are
+protocol endpoints.
 
-## Refresh, expiry and logout
+## Use and refresh
 
-Each use revalidates the current access token, group freshness and protected issuer/client eligibility. SQL session expiry never extends token/group freshness. The initial refresh schedule is the earlier of one minute, access-token expiry minus fifteen seconds and fixed session expiry; stricter current group freshness can force an earlier refresh. A policy/key-service outage does not cause refresh or stale-claim fallback.
+A request resolves its session once and authorizes the operation once
+(ADR-311); the resulting identity is reused for at most
+`identity.AuthorityRecheckInterval` and never past the session deadline or
+access-token expiry. Group membership comes entirely from the current access
+token.
 
-Current SQL reads/creation additionally return a transient `SessionObservation`: exact settings revision, original observation time and the earlier of its original five-second deadline and fixed session expiry. This value is not persisted as a reusable lease; a new read cannot extend it. `BrowserSession.Current` distinguishes it from stored credentials and CSRF-only reads. The callback retains its original settings handoff. Current session resolution
-checks the exact session identity and fresh persisted observation after
-I/O/cancellation, then caps request identity at the independently verified
-token/key/group/policy and actual session expiries. The operation owner keeps its
-original selected window; ordinary requests stay five seconds and evidence reads
-can use the existing twenty seconds. Every later resolution/final check still
-requires fresh current settings and cannot revive a revoked session. The
-five-second credential scheduling window does not truncate that identity.
-[ADR-300](../decisions/300-browser-evidence-request-lifetime.md) amends the earlier
-observation-to-request coupling without extending an observation, changing the
-settings observer or adding a renewal loop. Current-state checks are distinct
-from instantaneous interruption during in-flight work.
+The server refreshes the provider tokens only when the access token expires
+within 60 seconds at the time of use. Rotation is optimistic: the update
+succeeds only if the row's credential version is unchanged; a concurrent
+request that loses the race re-reads the row and uses the new tokens. The
+provider's refresh-token reuse detection covers replay. If the provider call
+fails or its reply is lost, the request fails; the next request retries with
+the stored token, and a provider-revoked token requires a new login. A refresh
+never extends the fixed session deadline. The new tokens must keep the
+subject, client, provider session and original authentication time.
 
-If creation has an unknown outcome or the callback cannot hand off a current identity, make one independent, at-most-one-second attempt to revoke its exact newly generated session ID. This still runs after client cancellation, preserves the original failure and never revokes an existing session. It prevents known failed callbacks from unnecessarily consuming the per-user session ceiling when storage is available. If cleanup also fails, the original finite expiry remains; do not claim removal or renew the credentials. A successful callback keeps its session.
+## Logout
 
-One SQL claim consumes a credential version for refresh. Concurrent same-session rotation returns a closed HTTP 409 problem with Retry-After: 1. The console preserves the current page and cookie while retrying within one original ten-second attempt, narrowed by the original session expiry. CSRF lookup and its subsequent POST share this budget. Budget exhaustion resumes ordinary refresh scheduling without extending session or data authority; denial still removes the active view. After a failed/ambiguous provider call, the claim is never released or reassigned; sign-in is required. The new token must retain subject/client/provider session and original authentication time. Group membership comes entirely from the new verified access token. Completion checks the original ten-second claim and session deadlines after locks. A final SQL read prevents logout during crypto/provider/policy I/O from returning a revived identity.
+`POST /auth/logout` validates CSRF and `Origin` and deletes the session row.
+The UI claims sign-out only after a successful response; an unknown outcome
+offers retry. This signs out of Asservat, not every service using the identity
+provider.
 
-CSRF lookup rechecks the original session after decryption. A newer committed credential version for the same immutable session returns Busy without exposing the old CSRF token. Changed identity, provider session, creation/authentication time, expiry extension, cancellation or revocation never becomes retryable Busy.
+OIDC back-channel logout tokens are validated for issuer, audience, signature,
+expiry, recent issue time, event ID, logout event and subject/session binding,
+with `nonce` forbidden. The handler deletes the matching sessions and stores
+the event ID for 25 hours so a delayed duplicate cannot be replayed.
 
-POST `/auth/logout` validates CSRF and removes the local session. A rotation during its CSRF precondition may return the same bounded Busy response before revocation starts; the console retries within the original logout budget. Once revocation starts, an uncertain result returns unavailable and never retryable Busy. Lost responses and generic errors require explicit user retry; the UI does not claim sign-out until successful revocation or a confirmed absent session. This signs out of Asservat, not every service using the identity provider. It requires no additional human approval. OIDC back-channel tokens use a separate validator: issuer, audience, signature, expiration, recent issue time, unique event ID, logout event and subject/session binding, with nonce forbidden. SQL stores a bounded 25-hour event receipt, preventing delayed callbacks from recreating the logged-out session. Exact retries do not extend receipt lifetime. An abandoned refresh cannot defeat a later logout.
+## Settings
 
-## Persistence and roles
+Under [ADR-061](../decisions/061-current-browser-configuration.md) the hub reads
+`browser.json` from a mounted ConfigMap. The
+[example](../../examples/browser-settings.json) and
+[schema](../../specs/contracts/browser-settings.schema.json) contain issuer,
+client, exact HTTPS origin (no path, userinfo, query or fragment; lowercase
+host; default port omitted), session ceilings and the maximum lifetime, never
+credentials. The process validates the file at startup and on change and keeps
+the last valid settings until a new valid file replaces them; an invalid file
+is logged and ignored. Sessions whose issuer or client differs from the
+current settings are rejected. Lowering the maximum lifetime clamps existing
+session deadlines (from their creation times) with one SQL update when the
+new settings load; raising it affects only new sessions.
 
-Migration 00020 provides `browser_session_root`, `browser_login`, `browser_session` and `browser_logout`. Migration 00021 adds the current settings projection and previously used session epochs. Initial schema ceilings allow up to 10,000 pending logins, 100,000 sessions and 100,000 logout receipts; actual installation values must be smaller when capacity requires it. At most ten active sessions per issuer/client/subject are accepted. Full capacity rejects work without evicting another user's valid session or dropping an accepted logout receipt.
+## Persistence
 
-Under [ADR-061](../decisions/061-current-browser-configuration.md), `BrowserSettingsClient` reads only `browser.json` from a pinned administrator-protected ConfigMap in the pinned control namespace. The [example](../../examples/browser-settings.json) and [closed schema](../../specs/contracts/browser-settings.schema.json) contain issuer/client/origin, a monotonic revision, root/epoch, suspension and finite ceilings, never credentials. The exact HTTPS browser origin has no path, userinfo, query or fragment; use lowercase hostname and omit the default port. Provider endpoints and client/KMS credentials remain separately qualified inputs. The identity-policy reader still independently determines eligible people and clients.
+Migration 00020 provides `browser_login`, `browser_session` and
+`browser_logout`. Rows are bounded (256 KiB ciphertext per session).
+Concurrent operations lock only the affected session row; there is no shared
+root row. The browser role has no evidence or capture privileges.
 
-`BrowserSettingsObserver` transfers a complete observation into SQL using separate credentials. Its original five-second source deadline is checked after all locks and shortening work. Missing, failed, stale, replaced, backward-revision and same-revision/different-digest observations cannot enable the root. A failed read attempts a bounded disable; a later successful read wins over an older failure. Ingress cannot extend this lease. Each runtime pins a BrowserBinding matching root, epoch, issuer, client and origin; a differently configured replica cannot use the root. Epoch changes invalidate old credentials; issuer/client/origin changes require a never-before-used epoch. First qualification revokes any legacy unqualified login/session records.
+Expired login, session and logout rows have no event source, so the hub worker
+deletes them in batches of at most 256 rows on a timer set to the earliest
+expiry from an index, at most once per minute.
 
-Lowering `maxLifetimeSeconds` permanently clamps retained session/refresh deadlines from their original creation times in the acceptance transaction. A subsequent increase affects only newly created sessions. A timeout rolls back the configuration change and the previous lease expires; there is no partial accepted shortening. This is bounded by the root's session ceiling, but performance at the largest supported ceiling still needs measurement. The projection role can change configuration, revoke old credentials and narrow deadlines; it cannot read or write their ciphertext or create a login/session.
+## Verification
 
-The browser runtime can lock the root but cannot change its epoch, enabled state or ceilings. It has no evidence/capture SQL privileges. Root locks order before individual session locks; capacity creation and provider logout serialize at the root. All transactions use the existing bounded primary-only SQL adapter and recheck database time after blocking locks. Ciphertext is bounded to 256 KiB; provider responses and credentials have independent lower bounds. KMS uses a separate credential key, not an evidence key. There is no fallback to plaintext state or cookies containing provider tokens.
-
-Expired state is pruned in batches of at most 256 rows per table. The separate `SessionCleanup` facet and one-second application loop work independently of HTTP traffic, including while the root is disabled. Its SQL role can delete expired state but cannot create/renew sessions or change root configuration; it has no KMS credentials. Bootstrap must run and monitor this loop and the settings observer. Physical cleanup is bounded work, not an instantaneous deletion guarantee; restore must rotate the epoch and retire old credentials. Protected source qualification, restoration/epoch rotation and operational rate limiting remain prerequisites for deployment. CSRF-only retrieval and signed/local revocation continue during settings-source outages without returning an identity or extending any deadline.
-
-## Qualification and remaining composition
-
-The migration 00021 continuation passes the full real provider, custody and Kubernetes suites (`browser-settings-final-integration-check.log`). The provider suite additionally verifies source continuity, runtime binding, role isolation, permanent session shortening, stale-source revocation paths and epoch reuse rejection. The Kubernetes suite exercises actual named read-only RBAC and a current ConfigMap → observer → SQL path, including suspension and same-name replacement. The three `browser-settings-final-*-environment.json` reports record unchanged tested sources and empty cleanup failures. Configuration is still seeded by fixture administration; deployment protection and restoration acceptance are not inferred from these tests. Exact commands and timings are in [implementation progress](../implementation-progress.md).
-
-`make identity-integration` now owns Keycloak, PostgreSQL and OpenBao fixtures. It exercises the actual HTTP handler, code/PKCE/nonce exchange, current identity adapter, envelope encryption, SQL session creation and eight simultaneous refresh callers, plus removal of eligible group membership and local logout. The first run passed in 3.649 seconds with unchanged sources and complete cleanup (`browser-first-provider.log`, `browser-first-environment.json`). The final combined run passed in 3.890 seconds (`browser-final-provider.log`, `browser-final-environment.json`), with unchanged sources and empty cleanup failures. It additionally checks one-use login races, capacity, expiry during a held SQL lock, actual Keycloak back-channel delivery while a refresh is claimed, and the separate cleanup role deleting 300 expired rows in bounded 256/44 batches. The first callback delivery attempt timed out from the bridged provider; the fixture now binds both provider and callback exclusively to loopback, verified from the actual listener. An intermediate listener check rejected Java's IPv4-mapped IPv6 spelling; normalization now still requires the exact loopback IP and selected port. Failed runs are preserved separately.
-
-Negative unit tests reproduced future `nbf` and access/ID token-purpose confusion in the new logout validator (`browser-token-negative-before.log`). The corrected validator now rejects them; `browser-token-negative-after.log` records the affected race tests. This is a defect fixed before public activation, not a qualification of arbitrary issuer mappings.
-
-Protected identity/root/KMS configuration in the integration fixture is synthetic, and its privileged fixture setup is not a runtime requirement. Step-up, discovery/configuration acceptance, production ingress/rate limits, bootstrap supervision of cleanup and the React/MCP/public capture workflow remain unqualified or unimplemented. The Helm runtime remains disabled. Human browser completion does not complete TASK-07 or enable a collector.
+`make identity-integration` runs the handler against owned Keycloak and
+PostgreSQL fixtures: code/PKCE/nonce exchange, session creation, concurrent
+refresh, group removal, local and back-channel logout and cleanup. Results are
+recorded in [implementation progress](../implementation-progress.md).

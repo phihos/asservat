@@ -1,15 +1,12 @@
 version: 1
-status: reviewed architecture; artifact/context foundations started, remaining paths planned
+status: reviewed architecture (ADR-330); implementation in progress
 applications:
-- id: A-INSTALL
-  entrypoint: asservat initial-install
-  deployment: Pod
+- id: A-SETUP
+  entrypoint: asservat secrets / asservat setup
+  deployment: Job
   location: management
-  privilege: scoped-initial-activation
+  privilege: helm-hook
   components:
-  - C-04
-  - C-08
-  - C-20
   - C-21
   - C-24
 - id: A-KEY
@@ -23,7 +20,7 @@ applications:
   - C-21
   - C-24
 - id: A-MIGRATE
-  entrypoint: asservat migrate
+  entrypoint: asservat setup
   deployment: Job
   location: management
   privilege: database-ddl
@@ -80,7 +77,7 @@ applications:
   - C-21
   - C-24
 - id: A-CONN
-  entrypoint: asservat controller
+  entrypoint: asservat connector
   deployment: Deployment
   location: workload-cluster
   privilege: unprivileged
@@ -151,6 +148,17 @@ applications:
   - C-18
   - C-21
   - C-24
+- id: A-READ
+  entrypoint: asservat download-worker
+  deployment: Deployment
+  location: region
+  privilege: unprivileged
+  components:
+  - C-14
+  - C-15
+  - C-18
+  - C-21
+  - C-24
 - id: A-ANALYZE
   entrypoint: asservat analyze
   deployment: Job
@@ -179,26 +187,17 @@ components:
   - internal/application/configuration
   allowed_dependencies:
   - C-24
-  responsibility: Accepted Kubernetes projections, freshness, immutable definitions and configuration handoff.
+  responsibility: Kubernetes configuration projections from informers and mounted files, kept until replaced.
   provided_ports:
   - ConfigurationReader
-  - ConfigurationAcceptor
   - PermissionReader
   - NamespaceReader
   - PermissionStore
-  - RetentionTopologyReader
   - RetentionSourceReader
-  - RetentionJournal
   - RetentionListReader
   - RetentionWatcher
   - RetentionWatch
-  - RetentionCheckpointStore
-  - RetentionAcceptanceJournal
-  - RetentionAcceptanceWriter
-  - RetentionProtectionReader
-  - PermissionTrustReader
   - BindingWatcher
-  - BootstrapReviewReader
 - id: C-02
   name: Identity
   layer: application
@@ -212,7 +211,6 @@ components:
   - BrowserSessionStore
   - BrowserProvider
   - BrowserSettingsReader
-  - BrowserSettingsProjection
   - CredentialCipher
   - LogoutVerifier
   - StepUpVerifier
@@ -238,7 +236,6 @@ components:
   - KeyOperationBackend
   - KeyMaterialReader
   - KeyConfigurationLedger
-  - KeyConfigurationGuard
   - KeyService
 - id: C-04
   name: Fleet
@@ -250,50 +247,17 @@ components:
   - C-02
   - C-08
   - C-24
-  responsibility: Enrollment, node/connector epochs, trust, compatibility and capability reports.
+  responsibility: Per-cluster registration, connector certificate rotation, connection routing, compatibility and reported capabilities.
   provided_ports:
+  - ConnectionRegistry
   - EnrollmentService
   - PeerVerifier
   - CapabilityReader
-  - WorkTrustReader
-  - RunActionVerifier
   - PeerRegistry
   - PeerAuthenticator
-  - EnrollmentLedger
   - CertificateIssuer
-  - EnrollmentProofVerifier
-  - SigningLedger
-  - EnrollmentActivator
   - AdministrationReader
   - BootstrapCredentials
-  - BootstrapReservations
-  - EnrollmentAuthorityResolver
-  - BootstrapCredentialRecorder
-  - BootstrapActivator
-  - FleetTrustProjection
-  - RecoveryReader
-  - OwnerEndpointReader
-  - OwnerConfigurationReader
-  - OwnerConfigurationLedger
-  - OwnerCertificateIssuer
-  - OwnerPodToken
-  - OwnerEnrollmentProofReader
-  - OwnerEnrollmentLedger
-  - OwnerCertificateActivator
-  - OwnerCertificateRegistry
-  - OwnerCredentialEnrollment
-  - OwnerCredentialClient
-  - OwnerEnrollmentCleanup
-  - OwnerEnrollmentVerifier
-  - OwnerRouteReader
-  - OwnerPeerConnection
-  - OwnerServingIdentity
-  - OwnerClientIdentity
-  - OwnerProtectionReader
-  - InstallationWitnessReader
-  - InstallationWitnessConsumer
-  - InitialInstallationPreparation
-  - InitialInstallationActivation
 - id: C-05
   name: Targets
   layer: application
@@ -329,21 +293,14 @@ components:
   allowed_dependencies:
   - C-01
   - C-24
-  responsibility: Protected allocations, prepaid slices, fair scheduling and conservative accounting.
+  responsibility: Per-workload live-count quotas, rate limits, fair scheduling and idempotent charge release.
   provided_ports:
   - CapacityFacet
   - LocalAdmission
   - FairScheduler
   - ContextStorageBindings
-  - ContextControlBacking
-  - CapacitySourceJournal
   - CapacityPermissionReader
-  - CapacityRootStore
-  - CapacityRootCapture
-  - CapacityEnrollmentStore
-  - CapacityCaptureBacking
   - CapacityWorkloadReader
-  - CapacityNamespaceProtectionReader
 - id: C-08
   name: Audit
   layer: application
@@ -351,34 +308,10 @@ components:
   - internal/application/audit
   allowed_dependencies:
   - C-24
-  responsibility: Durable intent/result gates, protected immutable records and minimized references.
+  responsibility: Append-only audit rows in the effect transaction, batched export and partition retention.
   provided_ports:
-  - AuditGate
-  - AuditPublisher
-  - AuthorityLedger
-  - AuthorityWriter
-  - CaptureIntentLedger
-  - CaptureIntentWriter
-  - EnrollmentClaimLedger
-  - EnrollmentClaimWriter
-  - EnrollmentCertificateLedger
-  - EnrollmentCertificateWriter
-  - BootstrapIssueLedger
-  - BootstrapIssueWriter
-  - InitialInstallationWriter
-  - InitialInstallationAcknowledgements
-  - PolicyAcceptanceLedger
-  - PolicyAcceptanceWriter
-  - DownloadWorkerWriter
-  - DownloadWorkerAcknowledgements
-  - WorkerConfigurationWriter
-  - WorkerConfigurationAcknowledgements
-  - OwnerConfigurationWriter
-  - OwnerConfigurationAcknowledgements
-  - OwnerEnrollmentWriter
-  - OwnerEnrollmentAcknowledgements
-  - WorkerEnrollmentWriter
-  - WorkerEnrollmentAcknowledgements
+  - AuditWriter
+  - AuditExporter
 - id: C-09
   name: Capture
   layer: application
@@ -400,15 +333,11 @@ components:
   provided_ports:
   - CaptureService
   - AdmissionTransaction
-  - ContextPreviewStore
   - ContextAdmissionReplay
   - CaptureReader
   - PolicySourceWriter
   - PolicySourceReader
   - PolicyAcceptor
-  - SubmissionTrustReader
-  - PolicySubmissionSigner
-  - PolicySubmissionVerifier
 - id: C-10
   name: Monitoring
   layer: application
@@ -447,7 +376,6 @@ components:
   - ExecutionDispatcher
   - StartJournal
   - ActionExecutor
-  - ContextWorkResolver
   - ContextCollector
 - id: C-12
   name: Recording
@@ -507,43 +435,10 @@ components:
   - PreparedContext
   - ContextNativeReader
   - ContextBatchNativeReader
-  - DownloadKeyGrants
-  - DownloadPeerToken
-  - DownloadPeerProofReader
-  - DownloadKeyBindingLedger
-  - DownloadWorkerLedger
-  - DownloadWorkerBindings
-  - DownloadWorkerJobs
-  - WorkerConfigurationReader
-  - WorkerConfigurationLedger
-  - WorkerConfigurationGuard
-  - WorkerEnrollmentBindings
-  - WorkerEnrollmentProofReader
-  - WorkerCSRVerifier
-  - WorkerEnrollmentLedger
-  - WorkerCertificateIssuer
-  - WorkerCertificateActivator
-  - WorkerEnrollmentExchange
-  - WorkerEnrollmentDelivery
-  - WorkerEnrollmentRouter
-  - WorkerEnrollmentRoute
-  - WorkerOwnerStore
-  - WorkerOwnerLookup
-  - WorkerOwnerEnrollment
-  - WorkerRequestOwners
-  - WorkerOwnerRegistration
-  - WorkerProofFactory
-  - WorkerCredentialClient
-  - WorkerCredentialSupervisor
   - ContextDownloadWorker
   - DownloadDestination
   - DownloadSessions
-  - DownloadAuditAcknowledger
-  - DownloadAuthorityGate
-  - ContextPublicationGate
   - ContextAcceptanceReader
-  - ContextVerificationRecorder
-  - ContextVerificationAuditor
   - ContextCatalogPublisher
   - ContextPublicationLedger
   - EvidenceWriter
@@ -564,17 +459,10 @@ components:
   - RetentionResolver
   - RetentionShortener
   - RetentionLedger
-  - RetentionCatchup
   - LifecyclePublisher
-  - LifecycleJournal
   - LifecycleWriter
-  - LifecycleSigner
-  - LifecycleVerifier
   - RetentionReader
   - RetainedPolicyReader
-  - AcceptedRetentionReader
-  - RetentionSelectorReader
-  - PolicyProtectionReader
   - PolicySnapshotReader
   - CopyLedger
   - PrivacyService
@@ -630,7 +518,6 @@ components:
   - AnalysisService
   - ContextProjectionService
   - ContextQueryAdmission
-  - ContextQueryBatches
   - StageCoordinator
   - AnalyzerRegistry
 - id: C-19
@@ -641,7 +528,7 @@ components:
   allowed_dependencies:
   - C-08
   - C-24
-  responsibility: Outbox claims, peer work transport, receipts, leases and content-minimized notifications.
+  responsibility: Outbox, LISTEN/NOTIFY wake-ups, connector-connection routing, receipts and content-minimized notifications.
   provided_ports:
   - WorkRouter
   - ReceiptService
@@ -682,7 +569,6 @@ components:
   - PeerHandlers
   - AdmissionHandlers
   - KeyServiceHandlers
-  - WorkerEnrollmentHandler
 - id: C-21
   name: Persistence adapters
   layer: adapter
@@ -774,7 +660,7 @@ interfaces:
   name: Hub federation
   caller: A-CONN
   provider: A-HAPI
-  transport: outbound-mtls-json
+  transport: outbound-mtls-multiplexed-streams
   spec: docs/architecture/interfaces.md
   schema: specs/contracts/internal-work.schema.json
 - id: I-02
@@ -849,7 +735,7 @@ interfaces:
   schema: specs/contracts/live-watch.schema.json
 - id: I-13
   name: Native artifact transient relay
-  caller: A-ACQUIRE
+  caller: A-READ
   provider: A-HAPI
   spec: docs/architecture/interfaces.md
   schema: specs/contracts/artifact-download.schema.json
