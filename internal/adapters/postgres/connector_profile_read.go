@@ -30,7 +30,7 @@ func NewConnectorIdentityProfiles(ctx context.Context, pool *pgxpool.Pool) (*Con
 // ReadStagedConnector returns the staged profile (with the regional guard's
 // protection digest) and the root's current backing for exactly the
 // presented peer. A suspended, blocked or never staged peer is unavailable.
-func (s *ConnectorIdentityProfiles) ReadStagedConnector(ctx context.Context, p value.ClusterCredentialProfile) (value.ConnectorCredentialProfile, app.ConnectorIdentityBacking, error) {
+func (s *ConnectorIdentityProfiles) ReadStagedConnector(ctx context.Context, p value.ConnectorCluster) (value.ConnectorCredentialProfile, app.ConnectorIdentityBacking, error) {
 	var profile value.ConnectorCredentialProfile
 	var backing app.ConnectorIdentityBacking
 	if s == nil || ctx == nil || ctx.Err() != nil || !p.Valid() {
@@ -57,7 +57,7 @@ func (s *ConnectorIdentityProfiles) ReadStagedConnector(ctx context.Context, p v
 // ReadConnectorProfile returns exactly the presented peer's staged profile,
 // without the root backing, for the key service's peer resolver (ADR-198).
 // A suspended, blocked or never staged peer is unavailable.
-func (s *ConnectorIdentityProfiles) ReadConnectorProfile(ctx context.Context, p value.ClusterCredentialProfile) (value.ConnectorCredentialProfile, error) {
+func (s *ConnectorIdentityProfiles) ReadConnectorProfile(ctx context.Context, p value.ConnectorCluster) (value.ConnectorCredentialProfile, error) {
 	var profile value.ConnectorCredentialProfile
 	if s == nil || ctx == nil || ctx.Err() != nil || !p.Valid() {
 		return profile, value.ErrUnavailable

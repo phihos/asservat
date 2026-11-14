@@ -49,37 +49,3 @@ func (a Administration) Operator(i identity.Identity) bool {
 	}
 	return permitted
 }
-
-type EnrollmentAuthority struct {
-	InstallationID, IssuerEpoch, DeliveryProfile          string
-	Actor                                                 identity.Principal
-	IdentityRevision, AdministrationRevision              identity.Revision
-	CheckedAt, ValidUntil                                 time.Time
-	MaxActiveBootstraps, MaxBootstrapHistory, MaxClusters int
-}
-
-func (a EnrollmentAuthority) Valid(now time.Time) bool {
-	return authorization.UUID(a.InstallationID) && authorization.UUID(a.IssuerEpoch) && identity.Text(a.DeliveryProfile, 64) && a.Actor.Valid() && a.IdentityRevision.Valid() && a.AdministrationRevision.Valid() && identity.Fresh(a.CheckedAt, a.ValidUntil, now, 5*time.Second) && a.MaxActiveBootstraps >= 1 && a.MaxActiveBootstraps <= 128 && a.MaxBootstrapHistory >= a.MaxActiveBootstraps && a.MaxBootstrapHistory <= 65536 && a.MaxClusters >= 1 && a.MaxClusters <= 1024
-}
-
-// InstallationEnrollmentActor is the installation itself, the actor of the
-// combined-mode connector's own bootstrap (no human session).
-func InstallationEnrollmentActor(installationID string) identity.Principal {
-	return identity.Principal{Issuer: "urn:asservat:installation:" + installationID, Subject: "local-cluster", ClientID: "hub-api", Kind: identity.Workload}
-}
-
-// AuthorizeInstallationEnrollment authorizes the installation's own connector
-// bootstrap from the current protected fleet administration: it is bound to
-// the same suspension, delivery profiles and bootstrap/cluster limits as an
-// operator's issuance, with the administration revision as identity revision.
-func AuthorizeInstallationEnrollment(a Administration, profile string, now time.Time) (EnrollmentAuthority, error) {
-	var out EnrollmentAuthority
-	if !a.Valid(now) {
-		return out, ErrUnavailable
-	}
-	if a.Suspended || !slices.Contains(a.DeliveryProfiles, profile) {
-		return out, ErrDenied
-	}
-	return EnrollmentAuthority{InstallationID: a.InstallationID, IssuerEpoch: a.IssuerEpoch, DeliveryProfile: profile, Actor: InstallationEnrollmentActor(a.InstallationID), IdentityRevision: a.Revision, AdministrationRevision: a.Revision,
-		CheckedAt: now, ValidUntil: a.FreshUntil, MaxActiveBootstraps: a.MaxActiveBootstraps, MaxBootstrapHistory: a.MaxBootstrapHistory, MaxClusters: a.MaxClusters}, nil
-}

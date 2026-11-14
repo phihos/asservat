@@ -17,7 +17,7 @@ func federationTestConfig() contracts.FederationConfig {
 	return contracts.FederationConfig{Name: "asservat", Namespace: "asservat", Port: 9446, Concurrency: 2,
 		Postgres:   contracts.ServicePostgres{Host: "postgres.asservat.svc", Port: 5432, Database: "asservat"},
 		AuditStore: contracts.ServiceObjectStore{Endpoint: "https://s3.example", Region: "us-east-1", Bucket: "audit"},
-		OpenBao:    "https://bao.example"}
+		OpenBao:    "https://bao.example", Audiences: []string{"https://asservat-federation.asservat.svc:9446"}}
 }
 
 // The federation's Helm inputs are closed: unknown fields and unbounded
@@ -33,7 +33,7 @@ func TestFederationInputsAreClosed(t *testing.T) {
 	}
 	for name, mutate := range map[string]func(*contracts.FederationConfig){
 		"plain HTTP provider":     func(c *contracts.FederationConfig) { c.OpenBao = "http://bao.example" },
-		"unbounded concurrency":   func(c *contracts.FederationConfig) { c.Concurrency = 17 },
+		"no token audience":       func(c *contracts.FederationConfig) { c.Audiences = nil },
 		"no name":                 func(c *contracts.FederationConfig) { c.Name = "" },
 		"name over 30":            func(c *contracts.FederationConfig) { c.Name = strings.Repeat("a", 31) },
 		"invalid namespace":       func(c *contracts.FederationConfig) { c.Namespace = "Hub_NS" },
@@ -78,21 +78,6 @@ func TestFederationOwnerProtectionIsThePlatformDigest(t *testing.T) {
 func TestFederationIssuerDispatchesByUsage(t *testing.T) {
 	if _, err := (federationIssuer{}).SignConnectorCredential(context.Background(), value.ConnectorCredentialPermit{Usage: "owner"}, nil); err == nil {
 		t.Fatal("unknown usage signed")
-	}
-}
-
-// ADR-193: a presented peer of another root or installation is refused
-// before any SQL.
-func TestFederationPeersComeFromStagedSQLOnly(t *testing.T) {
-	c := serviceTestIDs
-	peers := &federationPeers{ids: c}
-	for _, p := range []value.ClusterCredentialProfile{
-		{RootID: "10000000-0000-4000-8000-000000000009", PeerID: c.ClusterID, InstallationID: c.InstallationID, ClusterID: c.ClusterID},
-		{RootID: c.PermissionRootID, PeerID: c.ClusterID, InstallationID: "10000000-0000-4000-8000-000000000009", ClusterID: c.ClusterID},
-	} {
-		if _, err := peers.resolve(context.Background(), p); !errors.Is(err, value.ErrDenied) {
-			t.Fatal("foreign peer not refused", err)
-		}
 	}
 }
 

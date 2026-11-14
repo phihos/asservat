@@ -6,27 +6,23 @@
 {{- if not (has $mode (list "cluster" "combined")) }}{{ fail "region.enabled requires mode=cluster or mode=combined" }}{{ end }}
 {{- $image := include "asservat.image" . }}
 {{- /* mode=cluster: the copied join Secret supplies the cluster and peer
-  IDs, the offer, the bootstrap record and (by default) the executor's
-  object-store capabilities as files. mode=combined: the connector reads
-  clusterID and peerID from the `<name>-ids` Secret, the hub's own cluster
-  and local connector peer. */}}
-{{- $bootstrap := $r.bootstrapSecret }}
+  IDs, the offer and (by default) the executor's object-store capabilities
+  as files. mode=combined: the connector reads clusterID and peerID from the
+  `<name>-ids` Secret, the hub's own cluster and local connector peer. The
+  connector authenticates to the hub with its ServiceAccount token
+  (ADR-334); no credential is copied. */}}
 {{- $join := $r.joinSecret }}
 {{- if eq $mode "cluster" }}
 {{- if not $join }}{{ fail "region.joinSecret names the hub's join Secret <name>-join-<cluster>, copied into this namespace" }}{{ end }}
-{{- if $bootstrap }}{{ fail "region.bootstrapSecret is for mode=combined; mode=cluster reads bootstrap.json from region.joinSecret" }}{{ end }}
-{{- $bootstrap = $join }}
 {{- else }}
 {{- if $join }}{{ fail "region.joinSecret is for mode=cluster" }}{{ end }}
-{{- $bootstrap = $bootstrap | default (printf "%s-region-bootstrap" $n) }}
 {{- end }}
 {{- $account := printf "%s-connector" $n }}
-{{- $credential := printf "%s-cluster-credential" $n }}
 {{- $nodes := printf "%s-connector-nodes" $n }}
 {{- $collector := .Values.collector.enabled }}
 {{- $x := $r.executor }}
 {{- $executor := $x.enabled }}
-{{- $cfg := dict "format" "asservat-connector-config/v1" "mode" $mode "namespace" $ns "deployment" $account "serviceAccount" $account "clusterCredential" $credential "imageDigest" (trimPrefix "sha256:" .Values.image.digest) }}
+{{- $cfg := dict "format" "asservat-connector-config/v1" "mode" $mode "namespace" $ns "deployment" $account "serviceAccount" $account "imageDigest" (trimPrefix "sha256:" .Values.image.digest) }}
 {{- $evidence := $x.evidenceSecret | default $join }}
 {{- if ne $mode "cluster" }}
 {{- $_ := set $cfg "offerConfigMap" ($r.offerConfigMap | default (printf "%s-regional-offer" $n)) }}
@@ -52,19 +48,6 @@ metadata:
   labels: {{- include "asservat.labels" (list $ "connector") | nindent 4 }}
 automountServiceAccountToken: false
 ---
-# The rotating cluster credential (ADR-168). Helm renders it empty and keeps
-# it; the connector seeds it from the bootstrap record and CAS-updates it.
-# Its data is connector-owned: exclude it from GitOps diffs.
-apiVersion: v1
-kind: Secret
-metadata:
-  name: {{ $credential }}
-  namespace: {{ $ns }}
-  labels: {{- include "asservat.labels" (list $ "connector") | nindent 4 }}
-  annotations:
-    helm.sh/resource-policy: keep
-type: Opaque
----
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -81,11 +64,13 @@ metadata:
   namespace: {{ $ns }}
   labels: {{- include "asservat.labels" (list $ "connector") | nindent 4 }}
 rules:
-  # Its own credential (and node listener pair): read and CAS update only.
+  {{- if $collector }}
+  # The node listener pair: read and CAS update only.
   - apiGroups: [""]
     resources: [secrets]
-    resourceNames: [{{ $credential }}{{ if $collector }}, {{ $nodes }}{{ end }}]
+    resourceNames: [{{ $nodes }}]
     verbs: [get, update]
+  {{- end }}
   # Startup reads its account, Deployment and the Pod → ReplicaSet chain by name.
   - apiGroups: [""]
     resources: [serviceaccounts]
@@ -296,6 +281,11 @@ spec:
                   path: connector-pod.token
                   audience: asservat-connector-process-enrollment
                   expirationSeconds: 600
+              # ADR-334: the connector's credential toward the hub.
+              - serviceAccountToken:
+                  path: hub.token
+                  audience: {{ include "asservat.connectorAudience" . | quote }}
+                  expirationSeconds: 3600
               {{- if eq $mode "cluster" }}
               # The copied join Secret: the Pod waits until it exists.
               - secret:
@@ -305,11 +295,6 @@ spec:
                     - { key: peerID, path: peerID }
                     - { key: regional-offer.json, path: regional-offer.json }
               {{- end }}
-              # Read only while the cluster credential Secret is empty.
-              - secret:
-                  name: {{ $bootstrap }}
-                  optional: true
-                  items: [{ key: bootstrap.json, path: bootstrap.json }]
               {{- if $executor }}
               {{- if eq $mode "cluster" }}
               - secret:

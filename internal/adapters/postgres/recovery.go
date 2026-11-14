@@ -169,3 +169,9 @@ func effectGuardsFor(root string, guards []EffectTransactionGuards) (EffectTrans
 	}
 	return guards[0], nil
 }
+
+func trustRevision(root custodydb.FleetCurrentTrust) identity.Revision {
+	r := identity.Revision{UID: root.SourceUid, Generation: root.SourceGeneration}
+	copy(r.Digest[:], root.SourceDigest)
+	return r
+}

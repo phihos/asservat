@@ -11,7 +11,6 @@ import (
 	"time"
 
 	app "asservat.local/asservat/internal/application/fleet"
-	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
@@ -21,16 +20,19 @@ type digestKeys struct{}
 
 func (digestKeys) EnrollmentKey(csr []byte) (artifact.Digest, error) { return sha256.Sum256(csr), nil }
 
-type acceptPresenter struct{ calls int }
+// acceptTokens attributes the synthetic token to the test cluster.
+type acceptTokens struct{ calls int }
 
-func (p *acceptPresenter) Present(_ context.Context, r value.ClusterCredentialRequest, sig, exporter []byte) (value.ClusterCredentialPresentation, error) {
+func (p *acceptTokens) VerifyConnector(_ context.Context, token string) (value.ConnectorCluster, error) {
 	p.calls++
-	if len(sig) != 3 || len(exporter) != 32 {
-		return value.ClusterCredentialPresentation{}, value.ErrClusterCredentialDenied
+	if token != "synthetic-token" {
+		return value.ConnectorCluster{}, value.ErrDenied
 	}
-	now := time.Now()
-	return value.ClusterCredentialPresentation{Profile: r.Profile, LineageID: "10000000-0000-4000-8000-000000000009", Operation: r.Operation, Generation: 1, CheckedAt: now, ValidUntil: now.Add(5 * time.Second)}, nil
+	b := localReader{}.binding()
+	return value.ConnectorCluster{RootID: "10000000-0000-4000-8000-000000000007", PeerID: b.PeerID, InstallationID: b.InstallationID, ClusterID: b.ClusterID}, nil
 }
+
+func syntheticToken() ([]byte, error) { return []byte("synthetic-token"), nil }
 
 // scriptedServices drives the remote reader like the ADR-153 runner would.
 type scriptedServices struct {
@@ -76,7 +78,7 @@ func (s *scriptedServices) OwnerRegistration(context.Context, *Region, value.Own
 
 func (s *scriptedServices) Recovery(_ context.Context, region *Region) (value.RecoveryState, error) {
 	now := time.Now().UTC()
-	installation := region.Presented().Profile.InstallationID
+	installation := region.Presented().InstallationID
 	if s.foreign {
 		installation = "10000000-0000-4000-8000-0000000000ee" // another installation's state
 	}
@@ -155,8 +157,7 @@ func (o *localOperation) Close() {}
 
 func TestDelegatedLifecycleChannelOverRealHTTP2(t *testing.T) {
 	services := &scriptedServices{}
-	presenter := &acceptPresenter{}
-	h, err := NewHandler(presenter, digestKeys{}, services, 2)
+	h, err := NewHandler(&acceptTokens{}, services, 2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -167,62 +168,56 @@ func TestDelegatedLifecycleChannelOverRealHTTP2(t *testing.T) {
 	defer server.Close()
 	roots := x509.NewCertPool()
 	roots.AddCert(server.Certificate())
-	client, err := NewClient(server.URL, "example.com", roots)
+	client, err := NewClient(server.URL, "example.com", roots, syntheticToken)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stranger, err := NewClient(server.URL, "example.com", roots, func() ([]byte, error) { return []byte("other-token"), nil })
 	if err != nil {
 		t.Fatal(err)
 	}
 	process := value.ConnectorProcessIdentity{Binding: value.PeerBinding{InstallationID: "10000000-0000-4000-8000-000000000001", ClusterID: "10000000-0000-4000-8000-000000000002", IssuerEpoch: "10000000-0000-4000-8000-000000000003", PeerID: "10000000-0000-4000-8000-000000000004", Role: value.ConnectorPeer}, PodUID: "10000000-0000-4000-8000-000000000005", ProcessEpoch: "10000000-0000-4000-8000-000000000006"}
 	request := value.ConnectorProcessRequest{Process: process, ClientCSRDER: make([]byte, 64), ServerCSRDER: append(make([]byte, 63), 1)}
-	client1, server1 := sha256.Sum256(request.ClientCSRDER), sha256.Sum256(request.ServerCSRDER)
-	open := func(clientKey, serverKey [32]byte) func([]byte) (Opening, error) {
-		return func(exporter []byte) (Opening, error) {
-			w := contracts.ClusterCredentialWire{Format: contracts.ClusterCredentialWireFormat, Operation: value.ClusterAdmission, RootID: "10000000-0000-4000-8000-000000000007", PeerID: process.Binding.PeerID, InstallationID: process.Binding.InstallationID, ClusterID: process.Binding.ClusterID, Generation: 1, PodUID: process.PodUID, ProcessEpoch: process.ProcessEpoch, ClientKey: clientKey[:], ServerKey: serverKey[:], RequestedAt: time.Now().UTC().Truncate(time.Microsecond), Signature: []byte{1, 2, 3}}
-			return Opening{Presentation: w, Purpose: value.ConnectorLifecycleEnroll, OperationID: "10000000-0000-4000-8000-000000000008", Request: request}, nil
-		}
-	}
-	result, err := client.Run(context.Background(), open(client1, server1), localReader{})
+	enroll := Opening{Purpose: value.ConnectorLifecycleEnroll, OperationID: "10000000-0000-4000-8000-000000000008", Request: request}
+	result, err := client.Run(context.Background(), enroll, localReader{})
 	if err != nil || result.Kind != "result" || result.Process == nil || result.Process.Binding != process.Binding || len(services.phases) != 4 {
 		t.Fatal("delegated enrollment", result, err, services.phases)
 	}
-	// A presentation for other CSR keys never reaches the lifecycle.
+	// A token of another cluster never reaches the lifecycle.
 	services.phases = nil
-	if _, err = client.Run(context.Background(), open(server1, client1), localReader{}); err == nil || len(services.phases) != 0 {
-		t.Fatal("presentation not bound to the CSR keys", err)
+	if _, err = stranger.Run(context.Background(), enroll, localReader{}); err == nil || len(services.phases) != 0 {
+		t.Fatal("foreign token accepted", err)
 	}
 	// An observation for another binding is refused by the hub reader.
-	result, err = client.Run(context.Background(), open(client1, server1), localReader{corrupt: true})
+	result, err = client.Run(context.Background(), enroll, localReader{corrupt: true})
 	if err != nil || result.Kind != "failure" || len(services.phases) != 0 {
 		t.Fatal("foreign observation accepted", result, err)
 	}
 	// Registration: a renewal presentation plus this process's own leaf; the
 	// hub reads the delegated source and returns only that process's record.
 	cert := value.ConnectorCredentialCertificate{Binding: process.Binding, Usage: "client", Digest: artifact.Digest{1}}
-	register := func(c *value.ConnectorCredentialCertificate, operation string) func([]byte) (Opening, error) {
-		return func(exporter []byte) (Opening, error) {
-			o, err := open(client1, server1)(exporter)
-			o.Purpose, o.Certificate, o.Presentation.Operation = PurposeRegistration, c, operation
-			return o, err
-		}
+	register := func(c *value.ConnectorCredentialCertificate) Opening {
+		o := enroll
+		o.Purpose, o.Certificate = PurposeRegistration, c
+		return o
 	}
-	result, err = client.Run(context.Background(), register(&cert, value.ClusterRenewal), localReader{})
+	result, err = client.Run(context.Background(), register(&cert), localReader{})
 	if err != nil || result.Kind != "result" || result.Registration == nil || result.Registration.Certificate != cert || services.sources != 2 {
 		t.Fatal("delegated registration", result, err, services.sources)
 	}
 	services.foreign = true
-	if result, err = client.Run(context.Background(), register(&cert, value.ClusterRenewal), localReader{}); err != nil || result.Kind != "failure" {
+	if result, err = client.Run(context.Background(), register(&cert), localReader{}); err != nil || result.Kind != "failure" {
 		t.Fatal("another process's registration returned", result, err)
 	}
 	services.foreign, services.sources = false, 0
-	if result, err = client.Run(context.Background(), register(&cert, value.ClusterRenewal), localReader{corrupt: true}); err != nil || result.Kind != "failure" || services.sources != 0 {
+	if result, err = client.Run(context.Background(), register(&cert), localReader{corrupt: true}); err != nil || result.Kind != "failure" || services.sources != 0 {
 		t.Fatal("foreign source accepted", result, err)
 	}
 	// ADR-172 owner reads under the same renewal presentation.
-	ownerOpening := func(purpose value.ConnectorLifecyclePurpose, owner *value.OwnerCertificate) func([]byte) (Opening, error) {
-		return func(exporter []byte) (Opening, error) {
-			o, err := open(client1, server1)(exporter)
-			o.Purpose, o.Owner, o.Presentation.Operation = purpose, owner, value.ClusterRenewal
-			return o, err
-		}
+	ownerOpening := func(purpose value.ConnectorLifecyclePurpose, owner *value.OwnerCertificate) Opening {
+		o := enroll
+		o.Purpose, o.Owner = purpose, owner
+		return o
 	}
 	if result, err = client.Run(context.Background(), ownerOpening(PurposeOwnerCandidates, nil), localReader{}); err != nil || result.Kind != "result" || result.Owners == nil {
 		t.Fatal("owner candidates", result, err)
@@ -246,16 +241,16 @@ func TestDelegatedLifecycleChannelOverRealHTTP2(t *testing.T) {
 	services.foreign = false
 	clientCert := ownerCert
 	clientCert.Usage = "client"
-	for _, bad := range []func([]byte) (Opening, error){ownerOpening(PurposeOwnerAuthentication, nil), ownerOpening(PurposeOwnerAuthentication, &clientCert), ownerOpening(PurposeOwnerCandidates, &ownerCert), ownerOpening(PurposeRecovery, &ownerCert)} {
+	for _, bad := range []Opening{ownerOpening(PurposeOwnerAuthentication, nil), ownerOpening(PurposeOwnerAuthentication, &clientCert), ownerOpening(PurposeOwnerCandidates, &ownerCert), ownerOpening(PurposeRecovery, &ownerCert)} {
 		if _, err = client.Run(context.Background(), bad, localReader{}); err == nil {
 			t.Fatal("owner opening without a server certificate, or one on another purpose, accepted")
 		}
 	}
 	other := cert
 	other.Binding.PeerID = "10000000-0000-4000-8000-0000000000ff"
-	for _, bad := range []func([]byte) (Opening, error){register(&other, value.ClusterRenewal), register(nil, value.ClusterRenewal), register(&cert, value.ClusterAdmission)} {
+	for _, bad := range []Opening{register(&other), register(nil)} {
 		if _, err = client.Run(context.Background(), bad, localReader{}); err == nil {
-			t.Fatal("registration opening for another peer, without a leaf or under admission accepted")
+			t.Fatal("registration opening for another peer or without a leaf accepted")
 		}
 	}
 }

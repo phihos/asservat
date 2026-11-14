@@ -261,7 +261,7 @@ def check_collector(directory):
     # privileged Pod Security exception is its namespace. It needs the
     # regional connector (mode=cluster or combined).
     path = Path(directory) / "collector-values.yaml"
-    base = {**hub_values(), "mode": "cluster", "collector": {"enabled": True}, "region": {"enabled": True, "joinSecret": "asservat-join-region"}}
+    base = {**hub_values(), "mode": "cluster", "collector": {"enabled": True}, "region": {"enabled": True, "joinSecret": "asservat-join-region", "hub": {"federation": "https://hub.example.invalid:31446"}}}
     del base["services"]
 
     def render(v, ok=True, namespace="asservat-region"):
@@ -333,10 +333,18 @@ def check_cluster_join(render):
     remote = {"federation": "https://hub.example:31446", "owners": "hub.example:31444", "keyService": "https://hub.example:31448", "objectStore": "https://hub.example:31433"}
     v = bundled_values("hub")
     v["federation"] = {"connector": dict(PROFILE["federation"]["connector"])}
-    v.update({"clusters": [{"name": "eu", "clusterID": cluster}], "remote": remote})
+    v.update({"clusters": [{"name": "eu", "clusterID": cluster, "issuer": "https://eu.example", "jwks": {"keys": [{"kty": "EC"}]}}], "remote": remote})
     docs = render(v)
     config = json.loads(named(docs, "ConfigMap", "asservat-hub-api-config")["data"]["config.json"])
-    assert config["clusters"] == [{"name": "eu", "clusterID": cluster, "namespace": "asservat-system", "standby": 2, "captures": 8}], config.get("clusters")
+    assert config["clusters"][0] == {"name": "eu", "clusterID": cluster, "namespace": "asservat-system", "standby": 2, "captures": 8}, config.get("clusters")
+    # ADR-334: the federation registers clusters by public issuer data only.
+    fed = json.loads(named(docs, "ConfigMap", "asservat-federation-config")["data"]["config.json"])
+    assert fed["clusters"] == [{"name": "eu", "clusterID": cluster, "issuer": "https://eu.example", "jwks": '{"keys":[{"kty":"EC"}]}', "connector": "asservat-system/asservat-connector"}], fed.get("clusters")
+    assert fed["audiences"] == ["https://asservat-federation.asservat-system.svc:9446", remote["federation"]] and "localConnector" not in fed, fed
+    revoked = copy.deepcopy(v)
+    revoked["clusters"][0]["revoked"] = True
+    fed = json.loads(named(render(revoked), "ConfigMap", "asservat-federation-config")["data"]["config.json"])
+    assert fed["clusters"] == [], fed
     offer = config["public"]["regionalOffer"]
     assert offer["hubOnly"] is True and offer["remote"] == remote, offer
     named(docs, "ConfigMap", "asservat-regional-offer")
@@ -369,7 +377,7 @@ def check_cluster_join(render):
     for bad in [{"remote": {}}, {"clusters": [{"name": "eu", "clusterID": "not-a-uuid"}]}, {"clusters": [{"name": "Bad", "clusterID": cluster}]}]:
         render({**v, **bad}, ok=False)
     # The workload cluster: the copied join Secret supplies IDs and offer.
-    work = {"mode": "cluster", "image": hub_values()["image"], "region": {"enabled": True, "joinSecret": "asservat-join-eu"}}
+    work = {"mode": "cluster", "image": hub_values()["image"], "region": {"enabled": True, "joinSecret": "asservat-join-eu", "hub": {"federation": remote["federation"]}}}
     docs = render(work)
     cfg = json.loads(named(docs, "ConfigMap", "asservat-connector-config")["data"]["config.json"])
     assert "clusterID" not in cfg and "offer" not in cfg and cfg["mode"] == "cluster", cfg
@@ -377,12 +385,14 @@ def check_cluster_join(render):
     sources = pod["volumes"][-1]["projected"]["sources"]
     join = [x["secret"] for x in sources if "secret" in x and x["secret"]["name"] == "asservat-join-eu"]
     assert any(not j.get("optional") and {i["key"] for i in j["items"]} == {"clusterID", "peerID", "regional-offer.json"} for j in join), join
-    assert any(j.get("optional") and j["items"] == [{"key": "bootstrap.json", "path": "bootstrap.json"}] for j in join), join
+    assert not [x for x in sources if "secret" in x and any(i["key"] == "bootstrap.json" for i in x["secret"]["items"])], sources
+    hub_token = [x["serviceAccountToken"] for x in sources if x.get("serviceAccountToken", {}).get("path") == "hub.token"]
+    assert hub_token == [{"path": "hub.token", "audience": remote["federation"], "expirationSeconds": 3600}], hub_token
     assert any({i["key"] for i in j["items"]} == {"evidence-storage.json", "history-storage.json"} for j in join), join
     connector = named(docs, "ClusterRole", "asservat-system-asservat-connector")["rules"]
     assert {"apiGroups": ["apps"], "resources": ["deployments", "statefulsets"], "verbs": ["get", "list", "watch"]} in connector
     assert {"apiGroups": [""], "resources": ["pods"], "verbs": ["get", "list", "watch"]} in connector
-    for bad in [{"region": {"enabled": True}}, {"region": {"enabled": True, "joinSecret": "x", "bootstrapSecret": "y"}}, {"region": {"enabled": True, "clusterID": cluster}}]:
+    for bad in [{"region": {"enabled": True}}, {"region": {"enabled": True, "joinSecret": "x"}}, {"region": {"enabled": True, "joinSecret": "x", "bootstrapSecret": "y"}}, {"region": {"enabled": True, "clusterID": cluster}}]:
         render({**work, **bad}, ok=False)
 
 

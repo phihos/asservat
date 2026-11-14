@@ -397,14 +397,14 @@
     },
     "clusters": {
       "type": "array",
-      "maxItems": 15,
-      "description": "Workload clusters joined with mode=cluster; the hub-api issues each one's join Secret <name>-join-<name>.",
+      "description": "Workload clusters joined with mode=cluster, registered by their ServiceAccount issuer (ADR-334); the hub-api keeps each one's join Secret <name>-join-<name>.",
       "items": {
         "type": "object",
         "additionalProperties": false,
         "required": [
           "name",
-          "clusterID"
+          "clusterID",
+          "issuer"
         ],
         "properties": {
           "name": {
@@ -425,6 +425,24 @@
             "type": "integer",
             "minimum": 1,
             "maximum": 16
+          },
+          "issuer": {
+            "type": "string",
+            "pattern": "^https://",
+            "description": "The cluster's ServiceAccount token issuer (kubectl get --raw /.well-known/openid-configuration)."
+          },
+          "jwks": {
+            "type": ["string", "object"],
+            "description": "The issuer's public JWKS (kubectl get --raw /openid/v1/jwks) when the hub cannot reach the issuer."
+          },
+          "connector": {
+            "type": "string",
+            "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?/[a-z0-9]([-a-z0-9.]*[a-z0-9])?$",
+            "description": "The connector's namespace/ServiceAccount; default <namespace>/<name>-connector."
+          },
+          "revoked": {
+            "type": "boolean",
+            "description": "Refuse this cluster's connector tokens."
           }
         }
       }
@@ -557,12 +575,6 @@
           "maxLength": 253,
           "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$",
           "description": "mode=cluster: the hub's join Secret <name>-join-<cluster>, copied into this release's namespace."
-        },
-        "bootstrapSecret": {
-          "type": "string",
-          "maxLength": 253,
-          "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$",
-          "description": "mode=combined: existing Secret with bootstrap.json; default <name>-region-bootstrap."
         },
         "offerConfigMap": {
           "type": "string",

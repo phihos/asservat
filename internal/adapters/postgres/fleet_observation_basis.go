@@ -12,17 +12,17 @@ import (
 // recovery, source or effect authority and holds no lock across native work.
 func (s *FleetObservation) ReadAdministrationBasis(ctx context.Context) (value.ObservationBasis, error) {
 	var out value.ObservationBasis
-	if s == nil || s.claims == nil || ctx == nil || ctx.Err() != nil {
+	if s == nil || s.ledger == nil || ctx == nil || ctx.Err() != nil {
 		return out, value.ErrUnavailable
 	}
 	started := ownerTime(time.Now())
 	call, cancel := context.WithDeadline(ctx, started.Add(5*time.Second))
 	defer cancel()
 	until, _ := call.Deadline()
-	out.InstallationID, out.ObservedAt, out.FreshUntil = s.claims.installation, started, ownerTime(until)
+	out.InstallationID, out.ObservedAt, out.FreshUntil = s.installation, started, ownerTime(until)
 	var at time.Time
 	var primary bool
-	err := s.claims.ledger.pool.QueryRow(call, `SELECT COALESCE(t.semantic_version,0),
+	err := s.ledger.pool.QueryRow(call, `SELECT COALESCE(t.semantic_version,0),
  pg_catalog.pg_postmaster_start_time(),
  (SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()),
  NOT pg_catalog.pg_is_in_recovery(),pg_catalog.clock_timestamp()

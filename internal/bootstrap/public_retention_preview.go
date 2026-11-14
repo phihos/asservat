@@ -17,13 +17,13 @@ func composePublicRetentionPreview(c PublicContextOperationsConfig, s PublicCont
 		return nil, nil
 	}
 	v, err := composePublicContextUseCases(c, s)
-	if err != nil || pc.fleet.Settings == nil || pc.retentionSources == nil {
+	if err != nil || pc.fleet == nil || pc.retentionSources == nil {
 		return nil, presentation.ErrOperationsConfiguration
 	}
 	decoder, err := kube.NewRetentionPolicySpecDecoder()
 	if err != nil {
 		return nil, presentation.ErrOperationsConfiguration
 	}
-	service := privacyapp.RetentionPreviewer{InstallationID: c.InstallationID, Administration: pc.fleet.Settings, Catalog: pc.retentionSources, Decoder: decoder, Recovery: v.submission.Recovery, Now: c.Now}
+	service := privacyapp.RetentionPreviewer{InstallationID: c.InstallationID, Administration: pc.fleet, Catalog: pc.retentionSources, Decoder: decoder, Recovery: v.submission.Recovery, Now: c.Now}
 	return presentation.NewRetentionPreviewOperations(c.PublicOrigin, c.Now, c.NewID, service)
 }

@@ -325,7 +325,7 @@ func newConnectorSQLFixtureWithOptions(t *testing.T, ctx context.Context, admin 
 		if err := f.source.StageConnectorIdentity(ctx, c); err != nil {
 			t.Fatal("restage original connector source", err)
 		}
-		regionalEnrollmentDiagnostics(t, ctx, admin, binding.InstallationID, custodyID(), s.a.RootID, binding.PeerID)
+		regionalEnrollmentDiagnostics(t, ctx, admin, binding.InstallationID, s.a.RootID, binding.PeerID)
 	}
 	f.process, e = f.enrollment.Enroll(ctx, f.processID, f.request)
 	if e != nil {
@@ -464,7 +464,7 @@ func qualifyConnectorIdentity(t *testing.T, ctx context.Context, admin *pgxpool.
 		f := newConnectorSQLFixtureWithOptions(t, ctx, admin, poolFor, store, keys, create(t, 1), 3600, connectorRetirementFixtureOptions{Enabled: true, Admission: time.Minute, TrialProfile: true})
 		f.issue(t, "client")
 		f.issue(t, "server")
-		regionalEnrollmentDiagnostics(t, ctx, admin, f.request.Process.Binding.InstallationID, custodyID(), f.scenario.a.RootID, f.request.Process.Binding.PeerID)
+		regionalEnrollmentDiagnostics(t, ctx, admin, f.request.Process.Binding.InstallationID, f.scenario.a.RootID, f.request.Process.Binding.PeerID)
 		var profiles, transitions, processes int64
 		if err := admin.QueryRow(ctx, `SELECT r.profiles,r.source_transitions,(SELECT count(*) FROM connector_identity_process p WHERE p.root_id=r.root_id) FROM connector_identity_root r WHERE root_id=$1`, f.scenario.a.RootID).Scan(&profiles, &transitions, &processes); err != nil {
 			t.Fatal(err)
@@ -487,7 +487,6 @@ func qualifyConnectorIdentity(t *testing.T, ctx context.Context, admin *pgxpool.
 			t.Fatal(e)
 		}
 		qualifyConnectorLiveProfileCleanupGuard(t, f)
-		qualifyClusterEnrollmentCredential(t, ctx, poolFor, f)
 		f.renewBacking(t)
 		for _, leaf := range []value.IssuedConnectorCredential{client, server} {
 			if _, e := f.registry.ConnectorLeafRegistration(ctx, leaf.Certificate); e != nil {

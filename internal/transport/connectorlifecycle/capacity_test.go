@@ -2,12 +2,10 @@ package connectorlifecycle
 
 import (
 	"context"
-	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"asservat.local/asservat/internal/contracts"
 	value "asservat.local/asservat/internal/domain/fleet"
@@ -32,7 +30,7 @@ func (s *capacityServices) Capacity(ctx context.Context, region *Region) error {
 	if _, _, err = region.ReadAccessBindings(ctx, ""); err == nil {
 		return ErrChannel // and no AccessBinding request beside it
 	}
-	s.cluster, s.namespaces, s.unchanged = region.Presented().Profile.ClusterID, len(d.Namespaces), unchanged
+	s.cluster, s.namespaces, s.unchanged = region.Presented().ClusterID, len(d.Namespaces), unchanged
 	return nil
 }
 
@@ -51,7 +49,7 @@ func (d capacityReader) ReadCapacity(context.Context) (contracts.CapacityDeliver
 // service.
 func TestCapacityDeliveryOverRealHTTP2(t *testing.T) {
 	services := &capacityServices{}
-	h, err := NewHandler(&acceptPresenter{}, digestKeys{}, services, 2)
+	h, err := NewHandler(&acceptTokens{}, services, 2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,17 +60,13 @@ func TestCapacityDeliveryOverRealHTTP2(t *testing.T) {
 	defer server.Close()
 	roots := x509.NewCertPool()
 	roots.AddCert(server.Certificate())
-	client, err := NewClient(server.URL, "example.com", roots)
+	client, err := NewClient(server.URL, "example.com", roots, syntheticToken)
 	if err != nil {
 		t.Fatal(err)
 	}
 	process := value.ConnectorProcessIdentity{Binding: localReader{}.binding(), PodUID: "10000000-0000-4000-8000-000000000005", ProcessEpoch: "10000000-0000-4000-8000-000000000006"}
 	request := value.ConnectorProcessRequest{Process: process, ClientCSRDER: make([]byte, 64), ServerCSRDER: append(make([]byte, 63), 1)}
-	clientKey, serverKey := sha256.Sum256(request.ClientCSRDER), sha256.Sum256(request.ServerCSRDER)
-	open := func(exporter []byte) (Opening, error) {
-		w := contracts.ClusterCredentialWire{Format: contracts.ClusterCredentialWireFormat, Operation: value.ClusterRenewal, RootID: "10000000-0000-4000-8000-000000000007", PeerID: process.Binding.PeerID, InstallationID: process.Binding.InstallationID, ClusterID: process.Binding.ClusterID, Generation: 1, PodUID: process.PodUID, ProcessEpoch: process.ProcessEpoch, ClientKey: clientKey[:], ServerKey: serverKey[:], RequestedAt: time.Now().UTC().Truncate(time.Microsecond), Signature: []byte{1, 2, 3}}
-		return Opening{Presentation: w, Purpose: PurposeCapacity, OperationID: "10000000-0000-4000-8000-000000000008", Request: request}, nil
-	}
+	open := Opening{Purpose: PurposeCapacity, OperationID: "10000000-0000-4000-8000-000000000008", Request: request}
 	delivery := contracts.CapacityDelivery{}
 	for range 300 {
 		delivery.Namespaces = append(delivery.Namespaces, contracts.DeliveredCapacityNamespace{Name: "payments", UID: "ns", ResourceVersion: "1", Labels: map[string]string{"team": "payments"},
@@ -90,7 +84,7 @@ func TestCapacityDeliveryOverRealHTTP2(t *testing.T) {
 	if _, err = client.Run(context.Background(), open, localReader{}); err == nil || services.namespaces != 0 {
 		t.Fatal("delivery without a local reader", err)
 	}
-	plain, err := NewHandler(&acceptPresenter{}, digestKeys{}, &scriptedServices{}, 2)
+	plain, err := NewHandler(&acceptTokens{}, &scriptedServices{}, 2)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -77,17 +77,6 @@ func newOwnerProviderControl(in contracts.OwnerDeployment, profile contracts.Own
 			}
 		}
 	}
-	// ADR-193: the bootstrap channel comes from its own pinned fleet recipe.
-	if name == "" && purpose == providerconfig.OwnerFleetProviderPurpose && in.Public != nil && in.Public.Fleet != nil {
-		if providerconfig.ValidateOwnerFleetProviderRecipe(in, profile, now()) != nil {
-			return nil, ErrKeyService
-		}
-		role, _, err := providerconfig.OwnerFleetProviderRecipeFor(in, profile, now())
-		if err != nil {
-			return nil, ErrKeyService
-		}
-		name = role.Name
-	}
 	u, err := url.Parse(in.KeyService.Endpoint)
 	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.Path != "" && u.Path != "/" || name == "" {
 		return nil, ErrKeyService

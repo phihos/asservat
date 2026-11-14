@@ -66,7 +66,7 @@ func (s *FleetObservation) confirmFleetObservationContention(ctx context.Context
 	// confirmation cannot manufacture a fresh five-second observation interval.
 	call, cancel := context.WithDeadline(ctx, until)
 	defer cancel()
-	q := custodydb.New(s.claims.ledger.pool)
+	q := custodydb.New(s.ledger.pool)
 	after, err := q.ReadFleetTrust(call, id(a.InstallationID))
 	if err != nil || call.Err() != nil || !sameFleetObservationRow(before, after) {
 		return false

@@ -16,14 +16,12 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
-	"asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
 	"github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 )
 
 type installedAuditRecords struct {
-	bootstrap   audit.BootstrapIssue
 	worker      authorization.DownloadWorker
 	enrollment  authorization.WorkerEnrollment
 	certificate audit.WorkerCertificate
@@ -55,7 +53,6 @@ func providerAuditRecords(t *testing.T) installedAuditRecords {
 	}
 	attempt := authorization.WorkerCertificateAttempt{ID: id, Epoch: epoch, Ordinal: 1, Enrollment: enrollment, Proof: proof, RecoveryEpoch: id, EnrollmentAudit: artifact.Digest{5}, CheckedAt: now, SignBefore: proof.FreshUntil, CertificateNotAfter: leaf}
 	certificate := audit.WorkerCertificate{Attempt: attempt, Peer: authorization.KeyPeer{InstallationID: id, PeerID: id, Role: "acquisition", Certificate: artifact.Digest{6}, NotBefore: now, NotAfter: leaf}}
-	bootstrap := audit.BootstrapIssue{ID: id, Binding: fleet.PeerBinding{InstallationID: id, ClusterID: id, PeerID: id, IssuerEpoch: id, Role: fleet.ConnectorPeer}, RequestDigest: artifact.Digest{1}, Actor: principal, IdentityRevision: rev, AdministrationRevision: rev, DisplayName: "synthetic cluster", Region: "eu-test", DeliveryProfile: "channel", NotBefore: now, NotAfter: now.Add(5 * time.Minute), Credential: fleet.BootstrapCredential{SlotID: id, DeliveryProfile: "channel", SecretDigest: artifact.Digest{4}, Version: 1}}
 	download := audit.DownloadIntent{SessionID: id, Batch: artifact.DownloadBatch{ID: id, Generation: 1, Purpose: artifact.DownloadMetadata, ReadBytes: 4096, StartedAt: now, LeaseUntil: now.Add(time.Second), Authority: authority}}
 	response := artifact.DownloadResponse{ID: id, SessionID: id, OwnerID: id, Generation: 2, Plan: artifact.DownloadResponsePlan{Version: 1, Selection: artifact.DownloadSelection{Length: 100}, WholeFile: true, WindowReadLimit: 1024}, StartedAt: now, Until: now.Add(time.Minute), WindowCount: 1, ActiveWindowID: id}
 	window := audit.DownloadWindowIntent{Response: response, Window: artifact.DownloadWindow{ID: id, ResponseID: id, SessionID: id, OwnerID: id, AuditStoreID: id, Generation: 2, Ordinal: 1, Length: 100, ReadLimit: 1024, StartedAt: now, WriteUntil: now.Add(2 * time.Minute), Authority: authority}}
@@ -63,14 +60,14 @@ func providerAuditRecords(t *testing.T) installedAuditRecords {
 	policy := audit.DownloadStopLifecyclePolicy{RootID: id, InstallationID: id, StoreID: id, PolicyID: id, BackupProfileID: id, QualificationID: id, PolicyDigest: artifact.Digest{1}, BackupProfileDigest: artifact.Digest{2}, QualificationDigest: artifact.Digest{3}, Layout: audit.DownloadStopHistoryLayout, CleanupBudgetSeconds: 60, ProofWindowSeconds: 60, MaximumRowFootprintBytes: 128 << 10, MaximumTransitionWALBytes: 128 << 10, BackupCopies: 1, WALCopies: 1, MaxPurgeLeases: 4}
 	d := stop.RetainUntil
 	stopBinding := audit.DownloadStopLifecycleBinding{Protocol: audit.DownloadStopWriterProtocol, RootID: id, DownloadID: id, AllocationID: id, IssuerEpoch: id, Policy: policy, ReservedAt: now, TransferUntil: now.Add(time.Minute), HardDeleteBy: d, OriginalPurgeAt: d.Add(-4 * time.Minute), CertificatePurgeAt: d.Add(-2 * time.Minute), LiveRetireBy: d.Add(-time.Minute), HistoryReleaseAt: d.Add(-time.Minute), HistoryDeleteBy: d}
-	if !bootstrap.Valid() || !worker.Valid() || !enrollment.Valid() || !certificate.Valid() || !download.Valid() || !window.Valid() || !stop.Valid() || !stopBinding.Valid() {
+	if !worker.Valid() || !enrollment.Valid() || !certificate.Valid() || !download.Valid() || !window.Valid() || !stop.Valid() || !stopBinding.Valid() {
 		t.Fatal("invalid synthetic audit records")
 	}
-	return installedAuditRecords{bootstrap, worker, enrollment, certificate, download, window, stop, stopBinding}
+	return installedAuditRecords{worker, enrollment, certificate, download, window, stop, stopBinding}
 }
 
 func TestInstalledProviderAuditFamiliesOwnCredentialAndJoinedIO(t *testing.T) {
-	for _, purpose := range []string{"bootstrap", "dispatch", "enrollment", "certificate", "download-intent", "download-outcome", "window-intent", "window-outcome", "stop", "closed-stop"} {
+	for _, purpose := range []string{"dispatch", "enrollment", "certificate", "download-intent", "download-outcome", "window-intent", "window-outcome", "stop", "closed-stop"} {
 		for _, mode := range []string{"success", "blocked-put", "blocked-get", "blocked-body", "blocked-open", "blocked-original-write", "lookup", "lookup-after-write"} {
 			if (mode == "lookup" || mode == "lookup-after-write" || mode == "blocked-original-write") && !strings.HasPrefix(purpose, "window-") && purpose != "stop" && purpose != "closed-stop" {
 				continue
@@ -171,8 +168,6 @@ func TestInstalledProviderAuditFamiliesOwnCredentialAndJoinedIO(t *testing.T) {
 				}
 				var completed bool
 				switch purpose {
-				case "bootstrap":
-					receipt, e = layout.bootstrapObjects().WriteBootstrapIssue(ctx, records.bootstrap)
 				case "dispatch":
 					receipt, e = layout.workerObjects().WriteDownloadWorkerIntent(ctx, records.worker.Intent)
 				case "enrollment":
@@ -274,7 +269,10 @@ func TestInstalledAuditSlotsRemainOwnedUntilVerificationJoins(t *testing.T) {
 	in.AuditStore = contracts.OwnerAuditStore{Endpoint: server.URL, Region: "us-east-1", Bucket: "synthetic"}
 	s := &installedOperationAudit{input: in, providers: creds, http: server.Client(), seal: keys, open: keys, slots: make(chan struct{}, 1)}
 	records := providerAuditRecords(t)
-	go func() { _, err := s.WriteBootstrapIssue(context.Background(), records.bootstrap); joined <- err }()
+	go func() {
+		_, err := s.WriteDownloadWorkerIntent(context.Background(), records.worker.Intent)
+		joined <- err
+	}()
 	select {
 	case <-keys.enteredOpen:
 	case <-time.After(time.Second):
@@ -287,7 +285,7 @@ func TestInstalledAuditSlotsRemainOwnedUntilVerificationJoins(t *testing.T) {
 	waiting, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
 	defer cancel()
 	clone := *s // Every typed port shares the same owner, including policy copies.
-	if _, err := clone.WriteBootstrapIssue(waiting, records.bootstrap); err == nil || creds.reads.Load() != 1 || len(s.slots) != 1 {
+	if _, err := clone.WriteDownloadWorkerIntent(waiting, records.worker.Intent); err == nil || creds.reads.Load() != 1 || len(s.slots) != 1 {
 		close(release)
 		<-joined
 		t.Fatal("expired unjoined owner released capacity")
@@ -298,7 +296,7 @@ func TestInstalledAuditSlotsRemainOwnedUntilVerificationJoins(t *testing.T) {
 	}
 	keys.enteredOpen = nil
 	creds.until = time.Now().Add(time.Second)
-	if _, err := clone.WriteBootstrapIssue(context.Background(), records.bootstrap); err != nil || len(s.slots) != 0 || creds.reads.Load() != 2 {
+	if _, err := clone.WriteDownloadWorkerIntent(context.Background(), records.worker.Intent); err != nil || len(s.slots) != 0 || creds.reads.Load() != 2 {
 		t.Fatal("joined owner prevented independent bounded operation", err)
 	}
 }

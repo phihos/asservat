@@ -1,5 +1,6 @@
 // Package connectorlifecycle carries ADR-169's delegated regional lifecycle
-// conversation: one exporter-bound ADR-168 presentation, then hub-driven
+// conversation: one opening authenticated by the connector's ServiceAccount
+// token (ADR-334), then hub-driven
 // ADR-153 phase requests answered by the regional process over the same
 // full-duplex HTTP/2 stream. Every effect stays with the hub.
 package connectorlifecycle
@@ -47,20 +48,7 @@ const (
 	// cluster (ADR-331), attributed to the presented cluster like
 	// PurposeAccessBindings.
 	PurposeCapacity value.ConnectorLifecyclePurpose = "capacity"
-	// PurposeBootstrap enrolls cluster credential generation 1 from a fleet
-	// operator's one-use bootstrap (ADR-193). It carries no presentation.
-	PurposeBootstrap value.ConnectorLifecyclePurpose = "bootstrap"
 )
-
-// BootstrapOpening is the generation-1 request: the one-use bootstrap
-// secret, the identity-free CSR of the pending key, and the signature of that
-// key over this connection's exporter.
-type BootstrapOpening struct {
-	Secret    string
-	CSRDER    []byte
-	Request   value.ClusterBootstrapRequest
-	Signature []byte
-}
 
 // OwnerAuthentication is the hub's answer for one observed owner certificate.
 // It cannot authenticate a TLS peer until the region verifies its own actual
@@ -74,13 +62,11 @@ var ErrChannel = errors.New("connector lifecycle channel unavailable")
 
 // Opening is the connector's first frame.
 type Opening struct {
-	Presentation contracts.ClusterCredentialWire
-	Purpose      value.ConnectorLifecyclePurpose
-	OperationID  string
-	Request      value.ConnectorProcessRequest
-	Certificate  *value.ConnectorCredentialCertificate `json:",omitempty"` // registration only
-	Owner        *value.OwnerCertificate               `json:",omitempty"` // owner authentication only
-	Bootstrap    *BootstrapOpening                     `json:",omitempty"` // bootstrap only
+	Purpose     value.ConnectorLifecyclePurpose
+	OperationID string
+	Request     value.ConnectorProcessRequest
+	Certificate *value.ConnectorCredentialCertificate `json:",omitempty"` // registration only
+	Owner       *value.OwnerCertificate               `json:",omitempty"` // owner authentication only
 }
 
 // HubFrame drives the conversation; exactly one of its payloads is set.
@@ -96,7 +82,6 @@ type HubFrame struct {
 	// OwnerRegistration answers PurposeOwnerRegistration (ADR-197).
 	OwnerRegistration *value.OwnerRegistrationObservation `json:",omitempty"`
 	Recovery          *value.RecoveryState                `json:",omitempty"`
-	Bootstrap         *value.ClusterBootstrapResult       `json:",omitempty"`
 	Failure           string                              `json:",omitempty"`
 	// Digest is the hub's stored delivery digest of an "access-bindings" or
 	// "capacity" request; the connector answers Unchanged when its current

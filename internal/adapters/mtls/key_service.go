@@ -104,10 +104,10 @@ func (v *KeyPeerVerifier) verifyCertificates(certs []*x509.Certificate) (value.K
 // ContextKeyWraps checks its activation, process and attempt in SQL.
 type ConnectorKeyPeerVerifier struct {
 	installation, root string
-	read               func(context.Context, fleetvalue.ClusterCredentialProfile) (fleetvalue.ConnectorCredentialProfile, error)
+	read               func(context.Context, fleetvalue.ConnectorCluster) (fleetvalue.ConnectorCredentialProfile, error)
 	now                func() time.Time
 	mu                 sync.Mutex
-	peers              map[fleetvalue.ClusterCredentialProfile]connectorKeyPeer
+	peers              map[fleetvalue.ConnectorCluster]connectorKeyPeer
 }
 
 type connectorKeyPeer struct {
@@ -119,11 +119,11 @@ type connectorKeyPeer struct {
 // connectorKeyPeerLimit bounds the cached profiles, as the former pin list did.
 const connectorKeyPeerLimit = 16
 
-func NewConnectorKeyPeerVerifier(installation, root string, read func(context.Context, fleetvalue.ClusterCredentialProfile) (fleetvalue.ConnectorCredentialProfile, error), now func() time.Time) (*ConnectorKeyPeerVerifier, error) {
+func NewConnectorKeyPeerVerifier(installation, root string, read func(context.Context, fleetvalue.ConnectorCluster) (fleetvalue.ConnectorCredentialProfile, error), now func() time.Time) (*ConnectorKeyPeerVerifier, error) {
 	if !value.UUID(installation) || !value.UUID(root) || read == nil || now == nil {
 		return nil, app.ErrKeyDenied
 	}
-	return &ConnectorKeyPeerVerifier{installation: installation, root: root, read: read, now: now, peers: map[fleetvalue.ClusterCredentialProfile]connectorKeyPeer{}}, nil
+	return &ConnectorKeyPeerVerifier{installation: installation, root: root, read: read, now: now, peers: map[fleetvalue.ConnectorCluster]connectorKeyPeer{}}, nil
 }
 
 func (v *ConnectorKeyPeerVerifier) verify(ctx context.Context, certs []*x509.Certificate) (value.KeyPeer, error) {
@@ -134,7 +134,7 @@ func (v *ConnectorKeyPeerVerifier) verify(ctx context.Context, certs []*x509.Cer
 	if err != nil {
 		return value.KeyPeer{}, app.ErrKeyDenied
 	}
-	key := fleetvalue.ClusterCredentialProfile{RootID: v.root, PeerID: b.PeerID, InstallationID: v.installation, ClusterID: b.ClusterID}
+	key := fleetvalue.ConnectorCluster{RootID: v.root, PeerID: b.PeerID, InstallationID: v.installation, ClusterID: b.ClusterID}
 	profile, err := v.read(ctx, key)
 	if err != nil || ctx.Err() != nil || profile.RootID != v.root || profile.Binding != b || profile.Suspended {
 		return value.KeyPeer{}, app.ErrKeyDenied
@@ -156,7 +156,7 @@ func (v *ConnectorKeyPeerVerifier) verify(ctx context.Context, certs []*x509.Cer
 
 // peer reuses the verifier of an unchanged staged profile; a restaged profile
 // replaces it.
-func (v *ConnectorKeyPeerVerifier) peer(key fleetvalue.ClusterCredentialProfile, profile fleetvalue.ConnectorCredentialProfile) (connectorKeyPeer, error) {
+func (v *ConnectorKeyPeerVerifier) peer(key fleetvalue.ConnectorCluster, profile fleetvalue.ConnectorCredentialProfile) (connectorKeyPeer, error) {
 	staged, err := json.Marshal(profile)
 	if err != nil {
 		return connectorKeyPeer{}, err
