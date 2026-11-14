@@ -31,6 +31,8 @@ import (
 	"asservat.local/asservat/internal/transport/clustercredential"
 	"asservat.local/asservat/internal/transport/connectorlifecycle"
 	"github.com/jackc/pgx/v5/pgxpool"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 )
 
 // Federation is the ADR-170 hub process for connector-facing duties. It serves
@@ -187,7 +189,7 @@ func NewFederation(ctx context.Context, files, ids *os.Root) (f *Federation, err
 	if err != nil {
 		return f, mounts.ErrUnavailable
 	}
-	peers := &federationPeers{providers: providers, ids: c.ServiceIDs, pools: pools, mac: mac, accountVersion: accountVersion, recovery: recovery, store: store, seal: providers.Sealer(), open: providers.Opener(), owners: owners, profiles: profiles, duties: map[value.ClusterCredentialProfile]federationPeerEntry{}}
+	peers := &federationPeers{providers: providers, ids: c.ServiceIDs, pools: pools, mac: mac, accountVersion: accountVersion, recovery: recovery, store: store, seal: providers.Sealer(), open: providers.Opener(), owners: owners, profiles: profiles, offerBacking: federationOfferBacking(c), duties: map[value.ClusterCredentialProfile]federationPeerEntry{}}
 	credentials, err := postgres.NewClusterCredentials(startup, pools["cluster-credential"], c.PermissionRootID)
 	if err != nil {
 		return f, mounts.ErrUnavailable
@@ -271,6 +273,9 @@ type federationPeers struct {
 	open           *kms.Opener
 	owners         connectorlifecycle.OwnerReads
 	profiles       *postgres.ConnectorIdentityProfiles
+	// offerBacking reads the hub's published regional offer backing; the
+	// first bootstrap stages the identity root from it (no root row yet).
+	offerBacking func(context.Context) (fleetapp.ConnectorIdentityBacking, error)
 	// bootstrap is the generation-1 activation (ADR-193).
 	bootstrap *fleetapp.ClusterBootstrapActivation
 
@@ -469,6 +474,15 @@ func (s *federationPeers) stage(ctx context.Context, region *connectorlifecycle.
 	if err != nil {
 		return zero, &fixedStepError{"stage/backing-read", err}
 	}
+	if !found && s.offerBacking != nil {
+		// No identity root yet: the first stage creates it from the backing
+		// the hub-api published in its regional offer (the same document
+		// every connector observes).
+		if backing, err = s.offerBacking(ctx); err != nil {
+			return zero, &fixedStepError{"stage/offer-backing", err}
+		}
+		found = true
+	}
 	q := backing.Policy
 	if !found || !backing.Valid() || q.History == nil || backing.AccountVersion != s.accountVersion || q.RootID != s.ids.PermissionRootID || q.InstallationID != s.ids.InstallationID {
 		step := "stage/backing"
@@ -637,4 +651,37 @@ func (p platformOwnerProtection) ReadOwnerProtection(ctx context.Context, pool v
 	}
 	start := p.now()
 	return value.OwnerProtection{Pool: pool, Digest: artifact.Digest(contracts.WorkloadSourceDigest(pool.ClusterID, pool.Namespace, pool.Deployment)), ObservedAt: start, FreshUntil: start.Add(5 * time.Second)}, nil
+}
+
+// federationOfferBacking reads connectorBacking of `<name>-regional-offer`
+// (get on that one name) for the first bootstrap of an installation.
+func federationOfferBacking(c federationInputs) func(context.Context) (fleetapp.ConnectorIdentityBacking, error) {
+	return func(ctx context.Context) (fleetapp.ConnectorIdentityBacking, error) {
+		var zero fleetapp.ConnectorIdentityBacking
+		config, err := serviceKubernetes()
+		if err != nil {
+			return zero, mounts.ErrUnavailable
+		}
+		api, err := kubernetes.NewForConfig(config)
+		if err != nil {
+			return zero, mounts.ErrUnavailable
+		}
+		call, end := context.WithTimeout(ctx, 5*time.Second)
+		defer end()
+		object, err := api.CoreV1().ConfigMaps(c.Namespace).Get(call, c.Name+"-regional-offer", meta.GetOptions{})
+		if err != nil {
+			return zero, mounts.ErrUnavailable
+		}
+		var offer contracts.RegionalOffer
+		if json.Unmarshal([]byte(object.Data[contracts.RegionalOfferFile]), &offer) != nil || offer.InstallationID != c.InstallationID || offer.PermissionRootID != c.PermissionRootID {
+			return zero, mounts.ErrUnavailable
+		}
+		var backing fleetapp.ConnectorIdentityBacking
+		d := json.NewDecoder(bytes.NewReader(offer.ConnectorBacking))
+		d.DisallowUnknownFields()
+		if d.Decode(&backing) != nil || !backing.Valid() {
+			return zero, value.ErrInvalid
+		}
+		return backing, nil
+	}
 }

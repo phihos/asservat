@@ -13,7 +13,7 @@
   "auditStore" (dict "endpoint" $p.objectStore.endpoint "region" $p.objectStore.region "bucket" $p.objectStore.auditBucket)
   "openBao" $p.openBao.endpoint) }}
 {{- $rules := list
-  (dict "apiGroups" (list "") "resources" (list "configmaps") "resourceNames" (list (printf "%s-owner-source" $n)) "verbs" (list "get"))
+  (dict "apiGroups" (list "") "resources" (list "configmaps") "resourceNames" (list (printf "%s-owner-source" $n) (printf "%s-regional-offer" $n)) "verbs" (list "get"))
   (dict "apiGroups" (list "") "resources" (list "pods" "services") "verbs" (list "get"))
   (dict "apiGroups" (list "apps") "resources" (list "replicasets" "deployments") "verbs" (list "get"))
   (dict "apiGroups" (list "discovery.k8s.io") "resources" (list "endpointslices") "verbs" (list "list")) }}
