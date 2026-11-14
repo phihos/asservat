@@ -1,41 +1,30 @@
 # Native download interruption and explicit restart
 
-The browser action **Start a new download** stops the previous download and creates
-one new transfer request for the same saved artifact. It restarts the browser file
-from the beginning; it does not append bytes to a browser-owned partial file.
-Collection is not repeated. Current evidence rights, processing, retention and
-installation capacity are checked again without another approval step.
+## Start a new download
 
-The controller retains the old cancellation key and the proposed new preparation
-key within its existing page/session ownership. It submits no new preparation until
-Stop returns the exact download's acknowledged restrictive Cancelled/AlreadyTerminal
-receipt (or its permitted terminal metadata status). Audit pending in that receipt
-means the restrictive SQL fence is already effective; it is not an unknown Stop.
-An uncertain Stop retries only its original key. An uncertain new preparation
-retries only the new preparation key, retaining the prior Stop key until positive
-new admission. Status reads and native GET never create a replacement. Scope loss
-cancels continuation; late replies cannot resume it.
+The browser action **Start a new download** stops the previous download and
+prepares one new session for the same saved artifact. The browser file restarts
+from the beginning; the console never appends to a browser-owned partial file.
+Collection is not repeated and no approval step is added. Current evidence
+rights, processing restrictions, retention and quota are checked as for any new
+preparation.
 
-All earlier reservations and emitted/uncertain bytes stay charged. New preparation
-uses remaining accepted allocation/worker/key/audit backing and can fail for lack of
-capacity. It never refills an old session, revives an old worker, changes an artifact
-version or extends an earlier grant, session or evidence lifetime.
+The console keeps the old Stop idempotency key and the new preparation key in
+its page state. It submits the new preparation only after Stop returns
+`Cancelled` or `AlreadyTerminal` (or status shows a terminal state). An unknown
+Stop reply is retried with its original key; an unknown preparation reply is
+retried with the new preparation key. Status reads and GETs never create a
+replacement session. The new session never extends an old session, grant or
+evidence lifetime and can fail for lack of quota.
 
-Authenticated local clients can retain the actual local partial-file length, the
-original artifact ID, ETag and full SHA256, explicitly prepare a fresh session under
-current covering rights, verify its native metadata and request its content path
-with Range and the original strong If-Match. They must require 206 plus the exact
-Content-Range before appending; never append 200, and leave the incomplete file intact
-on 412 or denial. Verify the entire reconstructed SHA256. Server emitted-byte counters
-are not proof of bytes present in a local file.
+## Resume from a local client
 
-Two intentionally completed 206 ranges on one original session and recovery after
-an actual broken connection are different qualifications. The original first-context
-worker stops after an Uncertain conversation; local HTTP/source cleanup is not a
-remote Joined receipt. Failed/unknown old work must remain charged and cannot be
-presented as safely resumable solely because local owner rows were closed. Native
-qualification must establish each claimed flow separately. No JavaScript file Blob,
-redirect to storage or background GET preparation is introduced.
+An authenticated local client keeps the partial file length, artifact ID, strong
+ETag and full SHA-256. To resume it requests the content path with `Range` from
+its current length and `If-Match` set to the original ETag, preparing a fresh
+session under current rights if the old one has ended. It appends only a 206
+with the exact expected `Content-Range`; on 200, 412 or denial it leaves the
+partial file untouched. It verifies the SHA-256 of the reconstructed file.
 
-This staged change does not enable runtime services or prove installed SSO, browser
-partial-file append, a complete local-save outcome, or large-artifact throughput.
+No JavaScript Blob assembly, redirect to object storage or background GET is
+used.

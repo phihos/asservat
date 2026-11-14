@@ -45,7 +45,7 @@ spec:
     - detector: probe-failed
   recipeRef:
     name: incident-context
-    digest: 15421a58e7aacf180c36598de312a5b7a8bfbdcc6acb5d0a2271731bbf24e8f2
+    digest: e722f814e860fe25c9b686be0ab23107fc224327ada6fa0f1fa779c6724d6896
   budgets:
     cooldown: 5m
     burst: 2

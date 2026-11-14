@@ -22,12 +22,14 @@ Given a maintainer composing context, HTTP evidence and a live core, when they r
 
 All surfaces implement relevant loading, empty, denied, stale/expired, disconnected, capacity-blocked and partial states with an actionable next step. Acceptance is not acquisition, configured is not qualified, access expiry is not verified deletion, and cancellation is not instantaneous offline completion. Preserve idempotency after a lost response; distinguish old accepted state from edited drafts. Stored authorized evidence remains usable when new collection/analysis is unavailable.
 
+Each open page receives progress, status and live rows over one Server-Sent Events stream; the console does not poll operations. Disconnected means that stream is closed: the page shows it, reconnects with backoff and resynchronizes current state once on reconnect.
+
 Session expiry, revocation and unavailable current checks clear protected views.
 Sign-out clears the local view immediately, but an unconfirmed server response
 must retain an explicit retry path and cannot be presented as successful logout.
 Returning to that tab must not silently reopen the workspace. Background and
 page-cache restoration recheck the session before redisplaying protected data;
-current server authorization remains mandatory for every operation.
+every operation is authorized by the server under REQ-INT-003.
 
 ### SC-UI-003
 
@@ -35,7 +37,7 @@ Given partial packets and an awaiting-approval core, when a cluster disconnects 
 
 ## REQ-UI-004 — Sharing, review and administration
 
-Make concrete sharing, per-capture future sharing, bounded recurring instructions, manager teams and immutable creator distinct. Preview the recipient’s projection. Differentiate stopping future publication from revoking child shares. Human review binds exact scope, current revision, independence and verified step-up. Configuration previews hand administrator writes back to Kubernetes/GitOps. Privacy/capacity views show managed-copy deadlines, uncertain charges and verification gaps.
+Make concrete sharing, per-capture future sharing, bounded recurring instructions, manager teams and immutable creator distinct. Preview the recipient’s projection. Differentiate stopping future publication from revoking child shares. Human review binds exact scope, current revision, independence and verified step-up. Configuration previews hand administrator writes back to Kubernetes/GitOps. Privacy/capacity views show managed-copy deadlines, unresolved charges and verification gaps.
 
 ### SC-UI-004
 

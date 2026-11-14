@@ -1,5 +1,7 @@
 # ADR-299: TLS for protected named Go profile endpoints
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 Status: private implementation preparation; installed qualification pending.
 Requirements: REQ-PRF-001/002/004. Extends ADR-285/287/296.
 

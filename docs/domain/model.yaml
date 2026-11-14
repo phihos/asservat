@@ -14,7 +14,7 @@ entities:
     type: Instant
 - name: BrowserSession
   boundary: identity
-  authority: current-OIDC-and-protected-policy
+  authority: current-OIDC-session
   storage: encrypted-SQL
   fields:
   - name: cookieHash
@@ -87,10 +87,6 @@ entities:
     type: PermissionRule
   - name: protectedKeys
     type: String[]
-  - name: freshnessLimit
-    type: Duration
-  - name: guardQualification
-    type: EvidenceRef
 - name: AccessBinding
   boundary: authorization
   authority: Kubernetes
@@ -159,8 +155,8 @@ entities:
     type: SubjectId?
   - name: scopeDigest
     type: Digest
-  - name: planRef
-    type: ProtectedRef
+  - name: planDigest
+    type: Digest
   - name: operation
     type: GrantKind
   - name: limits
@@ -218,7 +214,7 @@ entities:
 - name: ResolvedTarget
   boundary: targeting
   authority: accepted-scope
-  storage: protected-object
+  storage: resolved_target
   fields:
   - name: pod
     type: PodIdentity
@@ -227,13 +223,13 @@ entities:
   - name: processes
     type: ProcessIdentity[]
   - name: resolutionRule
-    type: ProtectedRef
+    type: ResolutionRule
   - name: resolvedAt
     type: Instant
 - name: CapabilityReport
   boundary: fleet
   authority: qualified-observation
-  storage: config_projection-or-protected-object
+  storage: config_projection
   fields:
   - name: id
     type: ReportId
@@ -268,16 +264,16 @@ entities:
     type: Version
   - name: definitionDigest
     type: Digest
-  - name: definitionRef
-    type: ProtectedRef
+  - name: definition
+    type: ConfigRef
   - name: editableFields
     type: FieldConstraint[]
   - name: availability
     type: Availability
 - name: RecipeDefinition
   boundary: authoring
-  authority: Kubernetes-or-protected-request
-  storage: config_projection-or-protected-object
+  authority: Kubernetes-or-authenticated-request
+  storage: config_projection-or-SQL
   fields:
   - name: identity
     type: DefinitionId
@@ -310,8 +306,8 @@ entities:
     type: Count
   - name: recordingSavesEnabled
     type: Bool
-  - name: sharingRef
-    type: ProtectedRef?
+  - name: sharingInstruction
+    type: SharingInstruction?
 - name: PolicyActivation
   boundary: execution
   authority: hub-with-local-projections
@@ -344,7 +340,7 @@ entities:
 - name: AcceptedScope
   boundary: execution
   authority: immutable-acceptance
-  storage: protected-object
+  storage: accepted_scope
   fields:
   - name: captureId
     type: CaptureId
@@ -393,8 +389,8 @@ entities:
     type: OperationState
   - name: deadline
     type: Instant
-  - name: outcomeRef
-    type: ProtectedRef?
+  - name: outcome
+    type: OperationOutcome?
 - name: Capture
   boundary: execution
   authority: hub
@@ -408,8 +404,8 @@ entities:
     type: CaptureKind
   - name: origin
     type: CaptureOrigin
-  - name: scopeRef
-    type: ProtectedRef
+  - name: scopeId
+    type: AcceptedScopeId
   - name: scopeDigest
     type: Digest
   - name: acceptedAt
@@ -424,7 +420,7 @@ entities:
     type: OccurrenceId?
 - name: ActionAttempt
   boundary: execution
-  authority: hub-with-fenced-local-work
+  authority: hub-accepted-work
   storage: action_attempt
   fields:
   - name: id
@@ -449,8 +445,8 @@ entities:
     type: Instant
 - name: SourceSession
   boundary: recording
-  authority: node-with-signed-hub-projection
-  storage: local-runtime-and-protected-checkpoint
+  authority: node-under-admitted-hub-work
+  storage: local-runtime-and-source_session
   fields:
   - name: id
     type: SourceSessionId
@@ -468,7 +464,7 @@ entities:
     type: Generation
   - name: state
     type: SourceState
-  - name: leaseUntil
+  - name: hardEnd
     type: Instant
   - name: retentionEnd
     type: Instant
@@ -478,8 +474,8 @@ entities:
     type: ResourceVector
 - name: SourceSnapshot
   boundary: recording
-  authority: accepted-capture-and-fenced-node
-  storage: action_attempt-and-protected-object
+  authority: accepted-capture
+  storage: action_attempt
   fields:
   - name: id
     type: SnapshotId
@@ -510,8 +506,8 @@ entities:
     type: CaptureId
   - name: selectorKey
     type: Digest
-  - name: settingsRef
-    type: ProtectedRef
+  - name: settings
+    type: HistorySettings
   - name: settingsKind
     type: CaptureKind
   - name: audienceId
@@ -531,8 +527,8 @@ entities:
     type: Revision
   - name: groupingKey
     type: Digest
-  - name: labelRef
-    type: ProtectedRef?
+  - name: label
+    type: BoundedText?
   - name: createdAt
     type: Instant
   - name: lastActivityAt
@@ -559,7 +555,7 @@ entities:
 - name: Artifact
   boundary: evidence
   authority: committed-manifest-with-hub-index
-  storage: artifact-and-protected-manifest
+  storage: artifact-and-regional-manifest
   fields:
   - name: id
     type: ArtifactId
@@ -624,7 +620,7 @@ entities:
 - name: AudienceAssignment
   boundary: authorization
   authority: acquisition-and-accepted-sharing
-  storage: audience_assignment
+  storage: artifact_audience
   fields:
   - name: id
     type: AudienceId
@@ -638,8 +634,8 @@ entities:
     type: Instant
 - name: AnalysisRun
   boundary: analysis
-  authority: hub-with-fenced-local-work
-  storage: operation-and-protected-outcome
+  authority: hub-accepted-work
+  storage: operation-and-result-artifact
   fields:
   - name: id
     type: QueryId
@@ -647,8 +643,8 @@ entities:
     type: OperationId
   - name: inputs
     type: ArtifactId[]
-  - name: queryRef
-    type: ProtectedRef
+  - name: query
+    type: BoundedQuery
   - name: authorization
     type: DecisionRef
   - name: limits
@@ -683,7 +679,7 @@ entities:
 - name: SharingIntent
   boundary: sharing
   authority: hub-from-authenticated-instruction
-  storage: sharing_intent
+  storage: policy_acceptance-and-capture-sharing-instruction
   fields:
   - name: id
     type: IntentId
@@ -691,8 +687,8 @@ entities:
     type: Revision
   - name: origin
     type: InstructionOrigin
-  - name: selectionRef
-    type: ProtectedRef
+  - name: selection
+    type: OutputSelection
   - name: recipientSetDigest
     type: Digest
   - name: publicationLimit
@@ -706,7 +702,7 @@ entities:
 - name: ManagerAssignment
   boundary: sharing
   authority: hub-from-current-owner-authority
-  storage: manager_assignment
+  storage: evidence_share-manager-group-ids
   fields:
   - name: id
     type: AssignmentId
@@ -723,7 +719,7 @@ entities:
 - name: SharingRegistration
   boundary: sharing
   authority: hub
-  storage: sharing_registration-and-publication_slot
+  storage: evidence_share-created-at-publication
   fields:
   - name: id
     type: RegistrationId
@@ -742,7 +738,7 @@ entities:
 - name: SelectionApproval
   boundary: sharing
   authority: hub
-  storage: selection_approval
+  storage: policy_acceptance-and-capture-sharing-instruction
   fields:
   - name: id
     type: ApprovalId
@@ -760,7 +756,7 @@ entities:
     type: ApprovalState
 - name: CapacityAccount
   boundary: capacity
-  authority: hub-or-fenced-local-slice
+  authority: hub-workload-counter
   storage: capacity_account
   fields:
   - name: id
@@ -775,16 +771,12 @@ entities:
     type: ResourceVector
   - name: reserved
     type: ResourceVector
-  - name: uncertain
-    type: ResourceVector
-  - name: fence
-    type: Fence
   - name: revision
     type: Revision
 - name: CapacityReservation
   boundary: capacity
-  authority: hub-or-fenced-local-slice
-  storage: capacity_reservation-and-allocation_slice
+  authority: hub
+  storage: capacity_reservation
   fields:
   - name: id
     type: ReservationId
@@ -796,8 +788,6 @@ entities:
     type: ResourceVector
   - name: state
     type: ReservationState
-  - name: fence
-    type: Fence
   - name: deadline
     type: Instant
 - name: EvidenceRetentionPolicy
@@ -818,7 +808,7 @@ entities:
 - name: PrivacyDecision
   boundary: privacy
   authority: authorized-hub-decision
-  storage: revocation-and-lifecycle_work-and-protected-outcome
+  storage: revocation-and-lifecycle_work
   fields:
   - name: id
     type: DecisionId
@@ -828,8 +818,8 @@ entities:
     type: Revision
   - name: action
     type: PrivacyAction
-  - name: reasonRef
-    type: ProtectedRef
+  - name: reason
+    type: BoundedText
   - name: actor
     type: SubjectId
   - name: acceptedAt
@@ -858,7 +848,7 @@ entities:
 - name: AuditReference
   boundary: audit
   authority: append-only-audit
-  storage: audit_reference
+  storage: audit_event
   fields:
   - name: id
     type: AuditId
@@ -870,14 +860,14 @@ entities:
     type: Digest
   - name: decision
     type: Decision
-  - name: protectedRecordRef
-    type: ProtectedRef
+  - name: operationId
+    type: OperationId
   - name: committedAt
     type: Instant
 - name: DeliveryWork
   boundary: delivery
-  authority: hub-or-local-authorized-queue
-  storage: outbox-and-work_lease
+  authority: hub-work-row
+  storage: outbox-and-work
   fields:
   - name: id
     type: WorkId
@@ -887,8 +877,8 @@ entities:
     type: EventId
   - name: kind
     type: EventKind
-  - name: leaseOwner
-    type: WorkerId?
+  - name: claimExpiresAt
+    type: Instant?
   - name: fence
     type: Fence
   - name: nextAttemptAt
@@ -921,8 +911,8 @@ entities:
     type: Shortcut[]
 - name: LiveWatch
   boundary: live-observation
-  authority: hub-session-with-fenced-source-projection
-  storage: live_watch-and-protected-scope
+  authority: hub-authorized-view
+  storage: live_watch
   fields:
   - name: id
     type: WatchId
@@ -932,12 +922,12 @@ entities:
     type: SubjectId
   - name: client
     type: ClientId
-  - name: sourceBindings
-    type: ProtectedRef
+  - name: sourceSessions
+    type: SourceSessionId[]
   - name: projection
     type: ProjectionKind
-  - name: displayFilterRef
-    type: ProtectedRef
+  - name: displayFilter
+    type: LiveFilter
   - name: state
     type: WatchState
   - name: acceptedAt
@@ -950,13 +940,9 @@ entities:
     type: Bytes
   - name: reservations
     type: ReservationId[]
-  - name: fence
-    type: Fence
-  - name: workerLease
-    type: LeaseRef
 - name: LiveBatch
   boundary: live-observation
-  authority: hub-session-with-fenced-source-projection
+  authority: hub-authorized-view
   storage: transient-bounded-memory-only
   fields:
   - name: id
@@ -977,8 +963,8 @@ entities:
     type: Instant
 - name: ArtifactDownload
   boundary: evidence
-  authority: hub-with-fenced-regional-transfer
-  storage: download-session-and-capacity-reservations
+  authority: hub-authorized-regional-reader
+  storage: artifact_download
   fields:
   - name: id
     type: DownloadId
@@ -998,8 +984,6 @@ entities:
     type: ResourceVector
   - name: emittedBytes
     type: ByteCount
-  - name: uncertainBytes
-    type: ByteCount
   - name: deadline
     type: Instant
 relations:
@@ -1014,7 +998,7 @@ relations:
 - source: PolicyActivation
   target: SourceSession
   cardinality: 1:N
-  invariant: independently leased observed pod/action epochs
+  invariant: independently admitted observed pod/action epochs
 - source: Capture
   target: ActionAttempt
   cardinality: 1:N
@@ -1022,7 +1006,7 @@ relations:
 - source: Capture
   target: AcceptedScope
   cardinality: '1:1'
-  invariant: protected immutable plan
+  invariant: immutable accepted plan
 - source: SourceSession
   target: SourceSnapshot
   cardinality: 1:N
@@ -1058,7 +1042,7 @@ relations:
 - source: SharingIntent
   target: SharingRegistration
   cardinality: 1:N
-  invariant: bounded publication slots
+  invariant: one share per published artifact, created in the publication transaction
 - source: SharingRegistration
   target: EvidenceShare
   cardinality: 1:0..1

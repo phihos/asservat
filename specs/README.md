@@ -33,7 +33,7 @@ These files define the proposed product. Read [conventions and workflow](../docs
 | [Federation and events](federation.md) | Multi-cluster control, disconnects, reconciliation and CloudEvents |
 | [APIs](apis.md) | CRD inventory, common types, state machines and API conventions |
 
-`contracts/` contains portable JSON Schema 2020-12 contracts. [Examples](../examples/README.md) include proposed CRDs and hub runtime DTOs. Only the CRD examples are intended for future kubectl use; grants, shares and sharing intents are service records. [Traceability](traceability.yaml) connects every normative requirement to acceptance scenarios and implementation tasks.
+`contracts/` contains portable JSON Schema 2020-12 contracts. [Examples](../examples/README.md) include proposed CRDs and hub runtime DTOs. Only the CRD examples are intended for future kubectl use; grants, shares and accepted executions with their sharing instructions are service records. [Traceability](traceability.yaml) connects every normative requirement to acceptance scenarios and implementation tasks.
 
 The [implementation architecture requirements](implementation-architecture.md) and [architecture package](../docs/architecture/README.md) assign the behavioral requirements to applications/components and internal contracts. Validate that mapping with `make architecture-check` in addition to `make spec-check`.
 

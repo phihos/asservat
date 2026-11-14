@@ -132,10 +132,6 @@
           "minimum": 1,
           "maximum": 16
         },
-        "handle_expires_at": {
-          "type": "string",
-          "format": "date-time"
-        },
         "available_before_seconds": {
           "type": "number",
           "minimum": 0,
@@ -461,20 +457,9 @@
         "operation": {
           "const": "recordingSave"
         },
-        "preview_id": {
-          "type": "string",
-          "format": "uuid"
-        },
-        "capture_id": {
-          "type": "string",
-          "format": "uuid"
-        },
-        "expires_at": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "save_scope_digest": {
-          "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/hash"
+        "plan_digest": {
+          "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/hash",
+          "description": "Digest of the resolved recording-save/v1 plan. Submit it as request_capture expected_plan_digest with the same preview request and an idempotency key."
         },
         "selected_recordings": {
           "type": "array",
@@ -544,10 +529,7 @@
       "required": [
         "kind",
         "operation",
-        "preview_id",
-        "capture_id",
-        "expires_at",
-        "save_scope_digest",
+        "plan_digest",
         "selected_recordings",
         "windows",
         "capture_assessment",

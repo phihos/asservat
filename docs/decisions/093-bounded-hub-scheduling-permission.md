@@ -1,5 +1,7 @@
 # ADR-093 — Bounded scheduling permission inside the private hub namespace
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded (2026-11-13): this exception existed only because ADR-080's namespace admission policy blocked Lease updates. With that policy removed (ADR-328), plain named get/update RBAC on the Lease suffices.
 
 Date: 2026-10-11. Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan.

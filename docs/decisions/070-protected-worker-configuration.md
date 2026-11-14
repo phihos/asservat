@@ -1,5 +1,7 @@
 # ADR-070 — Protected worker configuration and rollout fencing
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded in part by ADR-328 (2026-11-13): the ConfigMap UID pin, admission-policy check and non-administrator dry-run probe no longer apply. The worker profile is a Helm-rendered ConfigMap read by name under RBAC. Revision tracking, rollout interruption and cleanup under historical identity remain.
 
 Date: 2026-10-10. Status: implemented component refinement of ADR-069; scoped Kubernetes/SQL/S3 qualification passed, production runtime remains pending.
@@ -14,4 +16,4 @@ The initial rollout policy interrupts old-profile downloads: a changed revision 
 
 Configuration history is capped at 1024 immutable revisions per enrolled source; observations reuse the existing revision. Safe history cleanup and its backup obligations remain required. The actual acquisition executable/issuer, continuous runtime supervision and Helm composition remain unfinished. The transactional projection establishes these particular boundaries without claiming a deployed investigation platform.
 
-See [worker configuration contract](../architecture/worker-configuration.md), [schema](../../specs/contracts/worker-configuration.schema.json) and [implementation progress](../implementation-progress.md) for actual tests and limits.
+See worker configuration contract, schema and [implementation progress](../implementation-progress.md) for actual tests and limits.

@@ -1,5 +1,7 @@
 # ADR-133: Close managed setup copies after positive original retirement
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded (2026-11-13): Closing setup copies, tombstone admission policies and seed retirement only applied to installer-created copies and guards. Under the Helm-native plan, Secrets are created once by the `secrets` hook Job and survive uninstall; erasure is a documented explicit step.
 
 Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan.
@@ -16,4 +18,4 @@ For each original immutable copy, add only its exact closure annotation through 
 
 This removes only Asservat's two setup input copies and broad seed payload. It does not revoke operator-owned upstream credentials, remove operator originals, erase Go memory or guarantee erasure from Kubernetes/etcd backups. The retained history-only credential and public provenance remain purpose-scoped. Official Helm packaging and public runtime enablement remain separate qualification work.
 
-See the [implementation contract](../architecture/initial-bootstrap-copy-closure.md) for ordering and unresolved crash cases.
+See the implementation contract for ordering and unresolved crash cases.

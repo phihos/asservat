@@ -1,5 +1,7 @@
 # ADR-117: Resume fixed declarative setup after a lost create reply
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded (2026-11-13): The resumable nine-object set, its continuity guards and occupied names existed for the installer Pod. Helm owns all declarative objects and re-renders them on upgrade; ADR-328 trusts writers in Asservat namespaces.
 
 Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan.
@@ -57,7 +59,7 @@ supervisor or enable Helm runtime services; the same supported installation path
 must compose those remaining typed effects.
 
 Evidence and implementation scope are described in
-[initial preparer](../architecture/initial-preparer.md). This refines ADR-102 only
+initial preparer. This refines ADR-102 only
 for this continuously protected finite set and leaves its original APIs unchanged.
 
 Primary references: Kubernetes [object names and UIDs](https://kubernetes.io/docs/concepts/overview/working-with-objects/names/),

@@ -10,7 +10,12 @@ import addFormats from 'ajv-formats';
 import standalone from 'ajv/dist/standalone/index.js';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
-const browser = parse(await readFile(resolve(root, 'docs/interfaces/browser-openapi.yaml'), 'utf8'));
+// specs/contracts/implemented/ holds the earlier version of each contract this
+// console does not yet implement in its canonical ADR-330 form (see
+// scripts/implemented_contracts.py); it takes precedence over the canonical file.
+const implemented = resolve(root, 'specs/contracts/implemented');
+const implementedFiles = new Set(await readdir(implemented));
+const browser = parse(await readFile(implementedFiles.has('browser-openapi.yaml') ? resolve(implemented, 'browser-openapi.yaml') : resolve(root, 'docs/interfaces/browser-openapi.yaml'), 'utf8'));
 const auth = parse(await readFile(resolve(root, 'docs/interfaces/browser-auth-openapi.yaml'), 'utf8'));
 auth.components.schemas = { Session: browser.components.schemas.Session };
 auth.paths['/api/v1/session'] = browser.paths['/api/v1/session'];
@@ -39,8 +44,9 @@ const outputs = {
 // canonical documents remain shared with MCP; this is a code-generation adapter,
 // not another manually maintained wire schema or a network schema loader.
 const registry = new Map();
-for (const file of (await readdir(resolve(root, 'specs/contracts'))).filter(file => file.endsWith('.schema.json')).sort()) {
-  const schema = JSON.parse(await readFile(resolve(root, 'specs/contracts', file), 'utf8'));
+const contractFiles = new Set([...(await readdir(resolve(root, 'specs/contracts'))), ...implementedFiles]);
+for (const file of [...contractFiles].filter(file => file.endsWith('.schema.json')).sort()) {
+  const schema = JSON.parse(await readFile(implementedFiles.has(file) ? resolve(implemented, file) : resolve(root, 'specs/contracts', file), 'utf8'));
   registry.set(schema.$id, { name: 'Contract_' + file.replace('.schema.json', '').replaceAll('-', '_'), schema });
 }
 async function operationBundle(names, bundle, direct = []) {

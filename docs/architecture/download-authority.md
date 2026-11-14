@@ -1,41 +1,30 @@
-# Current context-download authorization
+# Download authorization
 
-C-03 now composes the ordinary access decision for the initial approved context artifact. `ContextDownloadAuthority` implements C-14's current download gate through domain values and consumer-owned ports. It has no SQL, Kubernetes, OIDC, object-store or transport dependency. Bootstrap supplies the separately scoped readers; missing readers deny access.
+C-03's `ContextDownloadAuthority` makes the ordinary access decision for a download of published evidence. It uses domain values and consumer-owned ports; it has no SQL, Kubernetes, OIDC, object-store or transport dependency. Missing readers deny access.
 
-Before an initial or independent catalog lookup, resolve the authenticated credential, require the exact human/workload and OAuth client bound to the requested scope, and evaluate current target permissions, complete denies and download scopes. Then load a SELECT-only projection of the audited, verified catalog entry, original retained audience, current cutoff and the union of original/later-applied retention-policy identities. The SQL projection binds capture, artifact/attempt, exact pod/workload/namespace, ciphertext version and diagnostic purpose. It contains no native file content, checksum or filename. A generic custody record or unverified upload cannot produce this projection.
+## One decision per operation
 
-Evaluate ordinary rights against the original audience; newer ownership alone does not grant access to old evidence. Resolve current retained policy obligations using the trusted original classification, acquisition anchor and requested lifetime, preserving all prior policy relationships. Require a complete current retention proof, the original diagnostic purpose, and cutoffs no later than the already-effective dates. Acquisition may have ended: authorized download remains available until its separate evidence-access deadline.
+Each public download operation (session creation, metadata view, content GET) is authorized once, as [ADR-311](../decisions/311-operation-authority-recheck.md) and [ADR-330](../decisions/330-event-driven-system-design.md) D5 specify:
 
-A mandatory `DownloadEnvironmentReader` independently checks current recovery, processing restrictions, client disclosure and the exact regional store/relay path. Its finite result binds root, artifact/attempt/store, principal/client, region, policy revision and recovery epoch. The concrete [current environment composition](download-environment.md) joins independently guarded client/path policy with explicitly initialized SQL processing state and current recovery. It retains no permissive implementation or static region fallback. The [current SQL recovery reader and transaction fence](download-recovery.md) are now implemented and qualified with actual SQL/S3/native HTTPS tests. Protected source/backing installation, activation/restore reconciliation, business-history retirement and final runtime composition remain required before public use. Synthetic fixture acceptance of regional policy is not that producer.
+1. Authenticate the caller once at ingress: the exact human or workload and the OAuth client bound to the request.
+2. Evaluate current target permissions, denies and download scopes from the permission projection.
+3. Load the published catalog entry: capture, artifact/attempt, exact Pod/workload/namespace, ciphertext version, diagnostic purpose, original retained audience, stored effective deletion deadline and retained policy references. The projection contains no native file content, checksum or filename. Unpublished custody records cannot produce it.
+4. Evaluate ordinary rights against the original audience. Newer ownership alone does not grant access to older evidence.
+5. Check the [download environment](download-environment.md): delivery policy, processing restrictions and region/store path.
+6. Read the [recovery fence](download-recovery.md) epoch the operation runs under.
 
-After catalog/privacy/environment I/O, resolve identity and permissions again and re-evaluate the original audience. Changed identity policy or permission revision requires a fresh attempt; removed membership/rights or new denies refuse the download. The final lease is bounded by every original observation, current rights, effective retention, and at most five seconds from the initial check. A fresh later read cannot renew an earlier decision. The content-minimized decision digest records this provenance without retaining the credential or native evidence.
+The result is a `DownloadAuthority` that binds principal/client, artifact/attempt/store, region, policy revision, recovery epoch and a content-minimized decision digest. It is reused for at most `identity.AuthorityRecheckInterval` (30 s; 60 s for the shared delivery-policy observation) and never past the earliest original deadline: caller session or token expiry, download session deadline and `AccessUntil`. A later operation authorizes again. Blocking reads inside one operation do not trigger another identity or permission read.
 
-A started content response is not checked again
-([ADR-312](../decisions/312-started-downloads-run-to-original-bounds.md), superseding
-ADR-220's response-owned 30-second entitlement). The transfer runs this complete
-check before the response starts; afterwards `DownloadAuthority.Continue` restates
-that decision as at-most-five-second delivery leases without I/O, ending at
-`AccessUntil` and the response's original end. `AccessUntil` is the retention end,
-narrowed to an admitting share's expiry or the raw grant child's end. The native
-response consumes the coordinator's exact authority privately and does not
-re-read identity.
+`AccessUntil` is the stored effective deletion deadline, narrowed to an admitting share's expiry or the raw grant child's end. Acquisition may have ended; download remains available until that deadline.
 
-[ADR-233](../decisions/233-recipient-native-download.md) adds the concrete-share branch of
-[ADR-232](../decisions/232-concrete-evidence-share.md): only when ordinary target eligibility
-refuses, the caller's own shares of exactly the scope's artifact and version are read before the
-catalog lookup (no admitting share, no lookup); after the catalog read the share must also name
-the artifact's case, its pinned manager must be in the original audience, and the final check
-re-reads the share. A started response is not rechecked and ends no later than the share's expiry
-(ADR-312); the decision digest binds the share ID and revision. Current
-denies win, `evidence:download` is required, and sessions are charged to the workload's existing
-allocation.
+## Started responses
 
-The SQL [retention effect checks](retention-effects.md), batch accounting and immutable encrypted audit still precede every disclosure. The authorizer alone does not emit bytes or reserve a session. Raw artifacts require their separately reviewed access facet; unsupported input cannot be relabeled as approved context. Browser and MCP will use the same application path, without a second consent step for ordinary access.
+A content response is fully authorized before its first byte ([ADR-312](../decisions/312-started-downloads-run-to-original-bounds.md)). It then runs without identity, permission, share or policy reads until an original bound ends it: caller session/token expiry, session deadline, `AccessUntil`, a shortened stored deletion deadline, Stop, a recovery epoch change, or exhaustion of its byte reservation. Stop, retention shortening and recovery changes reach a running response as events (ADR-330 D1).
 
-Unit/race tests pass in `test/results/download-authority-unit.log`: revoked membership, denies arriving during I/O, changed client/identity policy, unrelated artifact/version/store, purpose changes, closed/lengthened retention and expired original observations all refuse access. The real SQL/S3/native-HTTPS suite passed with this authorizer and its actual catalog/permission/retained-policy adapters (`test/results/download-authority-integration.log`, 52.904 seconds; unchanged source and complete cleanup). Go/race/import/SQL/spec/architecture/design gates also passed in `test/results/download-authority-gates.log`. IdP claims, installation observations and regional/recovery qualification remain explicit fixture inputs. Public ingress/relay, complete raw/share authority and the developer UI/MCP workflow are still pending.
+## Shares
 
-The [ADR-220 component archive](../../test/results/resumed-c62e02ac-response-permission-cadence/README.md)
-records genuine RED and passing affected package race checks for the response
-owner and private native handoff. Its real SQL suspension assertion is compiled
-but unrun. This does not qualify sustained installed streaming or other artifact
-classes; older qualification paragraphs above retain their original scope.
+When ordinary target eligibility refuses, the caller's own concrete shares of exactly the requested artifact and version are read ([ADR-233](../decisions/233-recipient-native-download.md)). No admitting share means no catalog lookup. After the catalog read the share must name the artifact's case and its managing team (stable group ID) must be in the original audience. The decision digest binds the share ID and revision; `AccessUntil` ends no later than the share's expiry. Current denies win, `evidence:download` is required, and transfer bytes are charged to the workload's existing allocation.
+
+## Effects
+
+The authorizer emits no bytes and reserves nothing. The SQL effect transaction that starts a session or response compares the authorized recovery epoch and stored deletion deadline, charges the workload allocation with a conditional update and writes one audit row in the same transaction (ADR-330 D6). Raw artifacts additionally require their reviewed access facet. Browser and MCP use the same application path, with no second consent step for ordinary access.

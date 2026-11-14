@@ -1,5 +1,7 @@
 # ADR-189 — Installed permission stream
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded in part by ADR-328 (2026-11-13): the installer-created permission guard with its recorded pin (decision 3), its dry-run probe and the workload-guard exception (decision 4) and the continuation's permission step no longer apply. Helm renders the hub-worker RBAC and the projection Secret. The hub-worker stream, its SQL purposes, audit, root, initial review and retention item remain valid.
 
 Date: 2026-10-15. Status: accepted; steps 1–7 implemented and natively qualified

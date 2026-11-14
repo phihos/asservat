@@ -1,5 +1,7 @@
 # ADR-067 — Protected local key source and bounded lifecycle observations
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded in part by ADR-328 (2026-11-13): pinning the key Secret by UID and SHA-256 through an administrator-protected ConfigMap, and rejecting source substitution, no longer apply. The key service reads its mounted key configuration and Secret under RBAC. Keys stay confined to the key service, rotation is additive and old versions remain readable.
 
 Date: 2026-10-10. Status: implementation refinement of accepted ADR-063/064/065. Components implemented; integration qualification and runtime/installer remain separate.
@@ -12,4 +14,4 @@ A bounded public observation may be reused inside one service instance for at mo
 
 Migration 23 records public configuration snapshots and immutable version fingerprints. The private lifecycle facet checks current installation recovery under the existing fleet lock, then serializes scope transitions and checks freshness again after blocking locks. It rejects accepted revision rollback, different content at the same revision, active-version rollback, version material changes and material reuse across purposes/key IDs. First acceptance requires live recovery; it is not public registration. The current transition supports additive rotation only. Removal is refused until a retirement operation can prove all retained-data and recovery obligations permit it; maximum sixteen versions is a recovery/rotation planning ceiling, not automatic pruning.
 
-A fresh immutable backend loads the accepted active version; its historical keys read retained evidence. The old backend never mutates or silently reloads. Reconfiguration/peer issuance, encrypted key-administration audit, backup/recovery, retirement and runnable service/Helm composition remain unfinished. No collector, hub or acquisition process receives a static root. [Lifecycle contract](../architecture/local-key-lifecycle.md) gives implemented scope and test boundaries.
+A fresh immutable backend loads the accepted active version; its historical keys read retained evidence. The old backend never mutates or silently reloads. Reconfiguration/peer issuance, encrypted key-administration audit, backup/recovery, retirement and runnable service/Helm composition remain unfinished. No collector, hub or acquisition process receives a static root. Lifecycle contract gives implemented scope and test boundaries.

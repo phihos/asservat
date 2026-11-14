@@ -10,8 +10,8 @@
     "namespace_uid": "namespace-payments-uid",
     "accepted_at": "2026-10-09T12:00:00Z",
     "expires_at": "2026-10-16T11:55:00Z",
-    "settings_digest": "a540fd83bd4f5308c942d6f12b240da6f6438716dc16c6b8754ae49f79aa292a",
-    "original_execution_digest": "aa80b097302f82697f33bbdb9f3a0a894bbfa775c1d1d4509d1c6fcba2309d97",
+    "settings_digest": "eb742e262f4c33d68a6cd34b2a0ac549448c464c012bfaf2e9173993d462601e",
+    "original_execution_digest": "81ec8e7f3085121334bec8ce027aade7c9ffdfacbd6e748621dd29c4a9579ca8",
     "settings": {
       "target": {
         "namespace": "payments",
@@ -68,8 +68,7 @@
                 ],
                 "protocol": "tcp",
                 "resolution": "frozen",
-                "maxEndpoints": 1,
-                "maxStaleness": "5s"
+                "maxEndpoints": 1
               },
               "maxFrozenBytes": 67108864,
               "maxConcurrentSnapshots": 1,
@@ -159,7 +158,7 @@
       "dependency_pins": [
         {
           "role": "captureProfile",
-          "digest": "7a296e8c2a6acb8061a98db21e1f02c9d1aaac4bb31a352347fba1b7674d1d26"
+          "digest": "6c498263cabcdba0e773251fec20c176644dab1f943ff78b976954aff73ef265"
         },
         {
           "role": "captureProfile",
@@ -175,7 +174,7 @@
         },
         {
           "role": "recipe",
-          "digest": "7bcaf9e5423dc00a3fec7df8797337fd356cb9750792523b2280d07f051dbb21"
+          "digest": "12fd90e16a56b9fe48830257953655628fe3cb80b3acf27633c600fee04c610b"
         },
         {
           "role": "retention",
@@ -229,7 +228,7 @@
               "name": "http-headers",
               "version": "v1"
             },
-            "definitionDigest": "7a296e8c2a6acb8061a98db21e1f02c9d1aaac4bb31a352347fba1b7674d1d26"
+            "definitionDigest": "6c498263cabcdba0e773251fec20c176644dab1f943ff78b976954aff73ef265"
           },
           {
             "componentID": "calls",

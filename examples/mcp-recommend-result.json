@@ -70,8 +70,7 @@
               8080
             ],
             "resolution": "follow",
-            "maxEndpoints": 256,
-            "maxStaleness": "5s"
+            "maxEndpoints": 256
           },
           "maxFrozenBytes": 50331648,
           "maxConcurrentSnapshots": 1,

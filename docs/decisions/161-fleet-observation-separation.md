@@ -1,5 +1,7 @@
 # ADR-161 — Separate fleet freshness from restrictive authority locks
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded in part by ADR-328 (2026-11-13): the migration's hostile-role inventory, credential-retirement wait and trigger/reference refusals, the witness check before first activation, and the native guard part of the source read no longer apply. The split between the semantic authority row and the positive observation row, its version/ABA rule and the fixed producer functions remain valid.
 
 Status: implemented; focused component and production SQL qualification pass. Installed availability and broad regression remain pending. Requirements: REQ-FED-001 and REQ-DB-005.

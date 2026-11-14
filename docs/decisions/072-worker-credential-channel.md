@@ -1,5 +1,7 @@
 # ADR-072 — Process-owned acquisition credentials and private enrollment channel
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 Date: 2026-10-10. Status: implemented refinement; qualification is recorded in [implementation progress](../implementation-progress.md).
 
 ADR-071 supplies audited issuance but does not supply the worker's private key or confidential token transport. Add a bounded TLS 1.3 bootstrap operation within the existing download control/relay boundary. Initial server authentication uses explicitly pinned server roots and the endpoint's verified DNS/IP name. Client authentication is the exact dedicated-audience Pod-bound token verified by the existing current worker attester. Do not require the not-yet-issued acquisition certificate or forward a developer's token into the worker.
@@ -14,4 +16,4 @@ Each actual enrollment uses a fresh TLS handshake to check current server-certif
 
 TLS certificate snapshots retain their own original expiry during renewal. Closing the owner cancels enrollment and disables every retained signer snapshot. Go heap zeroization and termination of existing independent TLS sockets are not promised; runtime supervision must close its connections and every evidence/key effect must still check current identity/authority. No CA-valid certificate alone grants evidence access.
 
-No database migration, public permission or additional developer approval is introduced. The [channel contract](../architecture/worker-credential-channel.md) and [schema](../../specs/contracts/worker-enrollment.schema.json) refine REQ-DEP-003, REQ-DLD-003 and REQ-CAP-003. A complete acquisition executable, protected issuer/endpoint provisioning, active requester/connector routing, runtime connection supervision and Helm wiring remain required before public use.
+No database migration, public permission or additional developer approval is introduced. The channel contract and schema refine REQ-DEP-003, REQ-DLD-003 and REQ-CAP-003. A complete acquisition executable, protected issuer/endpoint provisioning, active requester/connector routing, runtime connection supervision and Helm wiring remain required before public use.

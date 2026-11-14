@@ -116,7 +116,7 @@ def timestamp(value):
 
 # Semantic examples use an explicit synthetic peer/source context, not real grants.
 peer_cluster = works['runAction']['clusterId']
-peer_boot = works['runAction']['target']['nodeBootID']
+peer_pod = works['runAction']['target']['podUID']
 now = timestamp('2026-10-09T12:00:10Z')
 
 def validate_semantics(work):
@@ -125,11 +125,8 @@ def validate_semantics(work):
         raise ValueError('Wrong authenticated cluster')
     if not timestamp(work['issuedAt']) <= now < timestamp(work['notAfter']):
         raise ValueError('Invalid or expired start interval')
-    if work['recipient'] == 'node' and work['target']['nodeBootID'] != peer_boot:
-        raise ValueError('Wrong boot epoch')
-    for name in ('scopeRef', 'authorityRef', 'budgetRef', 'auditRef'):
-        if work[name]['region'] != 'eu-central' or timestamp(work[name]['expiresAt']) < timestamp(work['notAfter']):
-            raise ValueError('Reference outlives fixture authority or leaves region')
+    if work['purpose'] == 'runAction' and work['target']['podUID'] != peer_pod:
+        raise ValueError('Wrong target Pod')
     if work['purpose'] == 'saveRecording':
         if timestamp(work['payload']['windowEnd']) > timestamp(work['issuedAt']):
             raise ValueError('Save cannot use a future end')
@@ -144,14 +141,12 @@ for work in works.values():
             bad = copy.deepcopy(work)
             (bad if where is None else bad[where])[key] = 'must not cross this boundary'
             rejected(lambda b=bad: validator.validate(b), key)
-    for key, value in [('deliveryFence', 0), ('schemaVersion', 'internal-work/v9'), ('purpose', 'executeAnything'), ('recipient', 'anonymous')]:
+    for key, value in [('issuerEpoch', '00000000-0000-4000-8000-000000000004'), ('deliveryFence', 1), ('authorityRef', {}), ('schemaVersion', 'internal-work/v9'), ('purpose', 'executeAnything'), ('recipient', 'anonymous')]:
         bad = copy.deepcopy(work); bad[key] = value
         rejected(lambda b=bad: validator.validate(b), key)
     for key, value in [('clusterId', '00000000-0000-4000-8000-000000000099'), ('notAfter', '2026-10-09T11:59:00Z')]:
         bad = copy.deepcopy(work); bad[key] = value
         rejected(lambda b=bad: validate_semantics(b), key)
-    bad = copy.deepcopy(work); bad['authorityRef']['region'] = 'unapproved-region'
-    rejected(lambda: validate_semantics(bad), 'reference region')
 
 bad = copy.deepcopy(works['projectLive']); bad['payload']['projection'] = 'rawPackets'
 rejected(lambda: validator.validate(bad), 'raw live projection')
@@ -165,8 +160,8 @@ bad = copy.deepcopy(works['analysisStage']); bad['payload']['stage'] = 'runShell
 rejected(lambda: validator.validate(bad), 'arbitrary analysis stage')
 bad = copy.deepcopy(works['eraseCopy']); bad['payload']['path'] = '/host'
 rejected(lambda: validator.validate(bad), 'path in copy deletion')
-bad = copy.deepcopy(works['runAction']); bad['target']['nodeBootID'] = '00000000-0000-4000-8000-000000000098'
-rejected(lambda: validate_semantics(bad), 'boot substitution')
+bad = copy.deepcopy(works['runAction']); bad['target']['podUID'] = '00000000-0000-4000-8000-000000000098'
+rejected(lambda: validate_semantics(bad), 'Pod substitution')
 bad = copy.deepcopy(works['runAction']); bad['requiredCapabilities'] = ['control/v1'] * 33
 rejected(lambda: validator.validate(bad), 'unbounded capabilities')
 

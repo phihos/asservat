@@ -1,5 +1,7 @@
 # ADR-150 — Operation-owned native observation proof
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded in part by ADR-328 (2026-11-13): the native boundary observations (namespace guards, exact Pod/ReplicaSet/Deployment/template chains, installer receipt pins) and the regional source-value ordinals that reread the protected connector source no longer apply. The direct HWORK → holder → regional topology, real TLS with common/exact SNI, the dedicated-audience TokenReview of the HWORK token, current SQL registration checks, the original request bound and the joined active/retained slot accounting remain valid.
 
 Date: 2026-10-13. Status: accepted implementation direction; operation, SQL, framed-stream, pending-receiver and direct HWORK-to-holder components are integrated with passing component checks. Installed selection and complete native qualification remain pending. The source-backed amplification below is established from concrete adapters. The real receiver counterexample below is native-qualified. It establishes an availability defect, not a usable observation route.

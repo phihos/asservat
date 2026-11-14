@@ -1,0 +1,186 @@
+{
+  "schema_version": "mcp-result/v1",
+  "request_id": "00000000-0000-4000-8000-000000000172",
+  "data_class": "metadata",
+  "status": "ok",
+  "data": {
+    "preview_id": "00000000-0000-4000-8000-000000000173",
+    "expires_at": "2026-10-10T12:01:00Z",
+    "execution_digest": "d24f6150e545a06d127b483e80fabf6af76e5107b3971c99d246eb972139998c",
+    "pod_count": 1,
+    "max_bytes": 4096,
+    "max_process_starts": 0,
+    "approval_required": false,
+    "capture_enabled": false,
+    "blockers": [
+      {
+        "code": "CapabilityUnavailable",
+        "message": "Collection is currently unavailable. An administrator can check the configured collectors.",
+        "responsible_role": "administrator",
+        "retryable": false
+      }
+    ],
+    "warnings": [
+      "Selects one eligible pod by name; it does not monitor every replica."
+    ],
+    "navigation_uri": "https://asservat.example.invalid/captures/new",
+    "lifecycle_plan": {
+      "schemaVersion": "action-lifecycle/v1",
+      "requestKind": "DebugCapture",
+      "actions": [
+        {
+          "actionID": "pod-status",
+          "kind": "kubernetesSnapshot",
+          "executionMode": "onTrigger"
+        }
+      ],
+      "ongoingPodScope": "none"
+    },
+    "capture_assessment": {
+      "schemaVersion": "capture-assessment/v1",
+      "assessmentID": "00000000-0000-4000-8000-000000000174",
+      "planDigest": "d24f6150e545a06d127b483e80fabf6af76e5107b3971c99d246eb972139998c",
+      "generatedAt": "2026-10-10T12:00:00Z",
+      "validUntil": "2026-10-10T12:00:05Z",
+      "basis": {
+        "rulesDigest": "50bade393d4dca58374e58e5478aded51b98a5be9fec17f5e23e88321ea91bb4",
+        "capabilityDigest": "0200000000000000000000000000000000000000000000000000000000000000",
+        "metrics": {
+          "state": "unavailable"
+        }
+      },
+      "scope": {
+        "observationPods": 0,
+        "incidentPods": 1
+      },
+      "combinedImpact": {
+        "level": "unknown",
+        "hasUnknowns": true,
+        "effects": [
+          "nodeCPU",
+          "collectorMemory",
+          "storageIO",
+          "uploadContention"
+        ],
+        "explanation": "Uses the Kubernetes API server and collector; no process attach or application command. Status reads, encryption and upload consume resources. Current load and combined overhead are unmeasured."
+      },
+      "actions": [
+        {
+          "actionID": "pod-status",
+          "executionMode": "onTrigger",
+          "impact": {
+            "level": "unknown",
+            "hasUnknowns": true,
+            "effects": [
+              "nodeCPU",
+              "collectorMemory",
+              "storageIO",
+              "uploadContention"
+            ],
+            "explanation": "Uses the Kubernetes API server and collector; no process attach or application command. Status reads, encryption and upload consume resources. Current load and combined overhead are unmeasured."
+          },
+          "data": {
+            "classification": "potentialPersonalData",
+            "basis": "conservativeMechanism",
+            "retainedPossible": [
+              "personalIdentifiers",
+              "networkAddresses",
+              "paths"
+            ],
+            "transientOnly": [
+              "userContent",
+              "credentials",
+              "unknownApplicationData"
+            ],
+            "unknownContent": true
+          },
+          "retention": {
+            "anchorRule": "submissionPreparation",
+            "accessAgeSeconds": 3600,
+            "deleteAgeSeconds": 3900,
+            "maximumAgeSeconds": 86400,
+            "deletionBudgetSeconds": 300,
+            "policyDigests": [
+              "0400000000000000000000000000000000000000000000000000000000000000"
+            ],
+            "automaticDeletion": true,
+            "managedCopiesOnly": true,
+            "preservationException": "possible"
+          },
+          "quantities": [
+            {
+              "dimension": "outputBytes",
+              "phase": "perIncident",
+              "scope": "wholePlan",
+              "basis": "configuredLimit",
+              "lower": 0,
+              "upper": 4096,
+              "sourceRef": "builtin-pod-status-v1",
+              "coverage": "Native saved status only; excludes the API response, object/encryption overhead and total collector memory."
+            }
+          ]
+        }
+      ],
+      "combinedQuantities": [
+        {
+          "dimension": "outputBytes",
+          "phase": "perIncident",
+          "scope": "wholePlan",
+          "basis": "configuredLimit",
+          "lower": 0,
+          "upper": 4096,
+          "sourceRef": "builtin-pod-status-v1",
+          "coverage": "Native saved status only; excludes the API response, object/encryption overhead and total collector memory."
+        }
+      ],
+      "interactions": [
+        {
+          "actionIDs": [
+            "pod-status"
+          ],
+          "kind": "sharedPressure",
+          "message": "Current node, API and upload pressure and other collectors are not measured by this preview.",
+          "blocking": false
+        }
+      ],
+      "alternatives": [],
+      "handlingCodes": [
+        "minimizeCapture",
+        "restrictAccess",
+        "preferApprovedExtracts",
+        "reviewBeforeSharing",
+        "approvedClientsOnly",
+        "externalCopiesNotRecalled"
+      ]
+    },
+    "preset_ref": {
+      "name": "pod-status",
+      "version": "v1"
+    },
+    "target_ref": {
+      "cluster_id": "00000000-0000-4000-8000-000000000001",
+      "namespace": "payments",
+      "kind": "Deployment",
+      "name": "api"
+    },
+    "selected_pods": [
+      {
+        "cluster_id": "00000000-0000-4000-8000-000000000001",
+        "namespace": "payments",
+        "name": "api-a",
+        "uid": "pod-uid",
+        "workload": {
+          "kind": "Deployment",
+          "name": "api",
+          "uid": "deployment-api-uid"
+        }
+      }
+    ],
+    "pod_selection": "lexicalEligiblePod"
+  },
+  "truncated": false,
+  "next_cursor": null,
+  "narrowing_hint": null,
+  "warnings": [],
+  "provenance": []
+}

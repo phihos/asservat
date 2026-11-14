@@ -1,12 +1,12 @@
 // Synthetic canonical fixtures for unit tests only; never imported by the UI.
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import type { Session } from '../auth/session';
 import type { Input, Output, Operation, Operations } from './http';
 
 export const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 export const session: Session = { principal: { issuer: 'https://identity.invalid', subject_id: 'synthetic-developer', kind: 'user' }, roles: [], csrf_token: 'C'.repeat(43), expires_at: new Date(Date.now() + 120_000).toISOString(), step_up: 'unavailable' };
 export const target = { cluster_id: id(1), namespace: 'payments', kind: 'Deployment' as const, name: 'api' };
-const example = (name: string) => JSON.parse(readFileSync(new URL('../../../examples/' + name, import.meta.url), 'utf8'));
+const example = (name: string) => JSON.parse(readFileSync(existsSync(new URL('../../../examples/implemented/' + name, import.meta.url)) ? new URL('../../../examples/implemented/' + name, import.meta.url) : new URL('../../../examples/' + name, import.meta.url), 'utf8'));
 export function previewResult(): Output<'preview_capture'> {
   const value = example('mcp-pod-status-preview-result.json');
   value.data.capture_enabled = true; value.data.blockers = []; value.data.warnings = [];

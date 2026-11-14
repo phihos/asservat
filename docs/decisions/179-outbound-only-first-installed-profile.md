@@ -1,5 +1,7 @@
 # ADR-179 — Outbound-only scope of the first installed investigation profile
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded in part by ADR-328 (2026-11-13): the capability ConfigMaps and namespace labels are no longer guarded; the hub reads them under RBAC. The outbound-only scope, delegated target resolution and selector-free retention remain valid.
 
 Date: 2026-10-15. Status: accepted; fences, hub-held capability and target queries implemented with unit and real-TLS tests; hub-api composition pending.

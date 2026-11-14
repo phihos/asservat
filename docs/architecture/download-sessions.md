@@ -1,53 +1,70 @@
 # Native download sessions and accounting
 
-[ADR-113](../decisions/113-large-native-response-accounting.md) specifies the
-separate whole-response/window ledger required for large files. Its 64 MiB
-prepaid accounting windows and short delivery leases do not change the legacy
-small-context implementation documented below. The implementation and native
-qualification of that new path remain in progress.
+C-14/C-07/C-08/C-21 contract for REQ-DLD-002–004 under
+[ADR-054](../decisions/054-native-download-protocol.md) and
+[ADR-330](../decisions/330-event-driven-system-design.md). Byte delivery is in
+[native responses](download-responses.md); caller identity in
+[native reader identity](native-reader-identity.md).
 
-Partial C-14/C-07/C-08/C-21, S-02 and REQ-DLD-002–004 implementation. This is an internal component contract, not an enabled public download service. The first SQL facet accepts only the currently qualified approved pod-status artifact. Additional artifact mechanisms must gain their native transfer path before they can be enabled.
+## Session
 
-Migration 00013 creates finite, immutable per-workload transfer allocations, actor/client-bound ArtifactDownload sessions and purpose-specific preparation/content batches. These resources are separate from custody and incident upload allocations. Reserving a session atomically reserves its complete output/read-work limits and one session slot. Actor/client/idempotency retries keep the original identifier, deadline and spend; a different accepted request conflicts. A cancelled/expired request never refunds uncertain reservations. Protected configuration supplies allocations; a public request cannot pick another workload's allocation or increase its bounds. The configuration producer, installation-wide allocation backing and policy refresh remain to be composed before public use.
+`prepare_artifact_download` creates one SQL `ArtifactDownload` row for an exact
+immutable artifact/version, actor/client and absolute deadline. The request
+carries an idempotency key: a retry with the same key and request returns the
+existing session; a different request under the same key conflicts. States:
+Preparing, Ready, Streaming, Completed, Interrupted, Cancelled, Expired, Denied,
+Failed. Terminal states never restart.
 
-SQL keeps control identities, accepted scope/ciphertext version digests, state, finite counters and audit references. It keeps no native checksum, filename, coverage text, token or evidence bytes. Detailed metadata continues to come from the encrypted artifact. Preparation is independently charged read work, not a free decryption endpoint.
+Preparation authorizes once ([ADR-311](../decisions/311-operation-authority-recheck.md)),
+then a regional reader verifies the artifact's encrypted manifest and returns its
+native metadata (filename, format, size, SHA-256, ETag, coverage). Before that
+metadata exists the session exposes none of it; Ready, Streaming and Interrupted
+expose the complete group. Evidence bytes, unwrap keys and tokens never enter SQL.
 
-Each batch has a unique identifier, monotonically increasing generation, exact range/output/read-work ceiling and an effect lease of at most five seconds. Its intent is immutably encrypted and acknowledged before any metadata/content disclosure. The ledger rechecks the current permission root, its original audits, the exact published catalog/version and the supplied current identity/retention/locality decision after blocking locks. A second begin never becomes another writer for the same prepaid batch. An uncertain start stays charged; a fresh batch after lease expiry consumes more capacity and fences the old generation. The acquisition/relay worker must enforce the original lease with I/O deadlines; expiry is not proof that all socket buffers have drained.
+## Quotas
 
-The public `prepare_artifact_download` and `get_artifact_download` requests use the twenty-second evidence-read request window (2026-10-23, `identity.EvidenceReadRequestWindow`) chosen after installed native78-80 showed five seconds cannot cover audit, authorization, SQL fences and the worker read; batch leases and authority observations inside the request keep their own five-second bounds.
+Downloads draw on a per-workload transfer allocation configured by the
+administrator. Admission is one conditional update on the affected workload
+allocation row (`used + n <= limit`); no installation-wide lock or row is
+taken. Concurrency limits per principal and per workload are administrator
+settings, not fixed constants, and incident uploads have priority over
+downloads in reader scheduling.
 
-The initial ledger enforces at most sixteen simultaneous batches per installation permission root and two per principal across clients. Preparation consumes these slots too. Cancellation blocks subsequent permits immediately, while the still-live batch occupies its slot until termination or its original lease ends. Current administrator limits, workload/node/region scheduling and priority for protected incident uploads must further narrow these hard ceilings in the composed service. It is not yet a qualified transfer scheduler.
+A response reserves its selected range at start and records the actual emitted
+bytes when it ends; the unused remainder is released then. If the end is not
+known (process crash), the reservation is released when the response's hard
+deadline has passed, because no writer can emit after it. Bytes already emitted
+stay counted. Emitted-byte counters are server facts, not proof that a client
+stored the bytes.
 
-Outcome accounting records actual bytes handed to the transport, including historical outcomes after cancellation. Late outcomes cannot take over a newer writer generation; duplicate acknowledgements cannot charge twice. The full charge stays reserved when actual delivery is uncertain. Ready/Completed publication waits for the exact encrypted outcome audit. A partial range response leaves an auditable resumable outcome; it does not prove that a client has assembled or persisted the whole file. Cancelled and other terminal sessions never restart. Historical audit acknowledgement cannot renew authority or evidence retention.
+## Audit
 
-Use separate SQL configuration, runtime and audit credentials. Configuration cannot mutate session state. Runtime cannot rewrite allocations, session scope/deadlines or audit receipts. Audit cannot change output/read-work counters or reported outcomes. Database constraints reject terminal revival, decreasing spend, rewritten scope and replaced batch/audit facts. No process gets database-owner or schema-creation privileges.
+Every prepare, response start, response end and Stop writes one append-only
+audit row in the same SQL transaction as its state change; the operation fails
+if the row cannot be written. Rows record actor/client, artifact/version, range
+and emitted bytes; they contain no native filename, checksum or evidence bytes.
+Rows are exported in batches and retained under the common audit retention.
 
-Intent/outcome agreement across SQL, JSON and process boundaries compares exact
-wall-clock instants and all non-time fields. Process-local monotonic clock data
-and timezone representation are not persisted audit identity. No timestamp is
-rounded or extended for this comparison; current authority, original deadlines,
-generation and prepaid accounting checks remain separate requirements. The
-SQL50 regression includes the nested processing observation and rejects even a
-one-nanosecond deadline change.
+## Stop
 
-[ADR-054](../decisions/054-native-download-protocol.md) fixes truthful preparation metadata and standard HTTP resume. The browser adapter's bounded single-range parser implements checked If-Match resume and standard If-Range full-response fallback; selection is not authorization. Full fallback must reserve the full response. The prototype preparation/cancellation changes passed the synthetic browser gate (662 checks, 63 screens, no reported axe violations or external requests); those checks do not qualify runtime identity or accessibility with users.
+`cancel_artifact_download` requires the original actor/client to authenticate
+and remains available after the caller loses download scopes. It is one SQL
+transition to Cancelled with its audit row, keyed by the request's idempotency
+key; a replay returns the first receipt. The receipt is `Cancelled` or
+`AlreadyTerminal` and reveals no other metadata. The transaction issues
+`NOTIFY`; the hub replica serving an active response for that session receives
+it and closes the stream. Bytes already in transport buffers cannot be recalled.
+Stop does not delete the artifact.
 
-The first real PostgreSQL/S3 run exposed an allocation replay comparison that confused timestamp location with timestamp identity, and fixture pools that remained open beyond their test phase. Those failures are retained in `test/results/download-failure-01.log`. Both were fixed without weakening authority/time checks. The corrected ledger fixture passed with unchanged source and no cleanup failures. The follow-up composed fixture also passed (`test/results/download-composed-integration-check.log`): actual encrypted source verification, exact encrypted intent/outcome audit, SQL session accounting, partial then full HTTPS delivery, native JSON validation and SHA-256 verification of the synthetic local file. Sixteen simultaneous installation streams and two per principal across clients are enforced; late generation outcomes cannot take over a replacement writer. Authority/retention/relay eligibility inputs in this fixture remain synthetic.
+## Credentials
 
-The regional ContextDownloadWorker composes those ports. It charges a conservative 4 MiB read/decode allowance for the bounded pod-status profile, checks current authority before and after decrypting, retains the original five-second effect deadline, and clears transient native buffers on success/failure. Metadata is returned only after its immutable outcome audit and a final current SQL check. The HTTP sink emits exact native attachment/range bytes over TLS with no-store, nosniff, strong ETag, known Content-Length and a socket write deadline. The complete context fits one bounded final batch, withheld until full native verification. The sink cannot authenticate a caller or select an artifact. It must not be installed as a standalone public route. Other artifact mechanisms require their own chunked workers and range/read-work qualification.
+Each hub process uses its one SQL login (ADR-222). Table grants and triggers
+reject terminal revival, decreasing counters and rewritten scope; no process
+has database-owner or schema-creation rights.
 
-Client receipt of Content-Length bytes can precede the server's final accounting acknowledgement. Status remains pending until the outcome audit commits; it never proves client disk persistence. An immediate competing range can receive a retryable active-transfer conflict. A failed outcome-audit write must reconcile its existing immutable outcome, never rewrite it as a failure or refund delivery.
+## Retention and recovery
 
-Public metadata/status presentation, cancellation outcome auditing/active relay disconnect, protected policy producers, restore fencing, regional dispatch/relay, browser/OAuth ingress and browser/MCP composition remain required. Installation-wide backing and priority scheduling still narrow the tested fixed limits. Audit/SQL control-data cleanup and backup horizons also remain separate finite-retention obligations. No S-02 or TASK exit is claimed.
-
-The [retention lifecycle](retention-lifecycle.md) now fences catalog lookup and each download permit using effective SQL cutoffs. Current authority includes the effective deletion deadline; the worker shows current dates and shortens I/O deadlines after renewed checks. Older audit payloads without that field remain historical records only and cannot authorize new disclosure. Active cross-process relay cancellation remains pending.
-
-The [final retention effect contract](retention-effects.md) now requires the complete accepted source proof inside the SQL effect transaction. Its real SQL/S3 qualification and repository gates pass; it adds no public approval or policy-source selection step.
-
-The initial [current download authorizer](download-authority.md) now composes the catalog, retained audience and current retention source proof. Environment/recovery and public transport composition remain required.
-
-[ADR-066 local unwrap authority](download-key-authority.md) adds a private exact-batch/acquisition-certificate binding and three single-use key slots for the initial bounded context reader. The local-provider worker obtains it only after audit/current permission and uses real mTLS remote unwrap; binding cannot extend the parent or bypass the final byte-delivery checks. Large-file workers must retain a bounded authorized reader across delivery batches rather than introducing per-frame key calls.
-
-Current batch/window admission, metadata permission and native parent checks require nonempty, non-`null` versions in the exact retained audit receipts. This applies to recognized historical formats without changing their bytes or inventing a version. Separate historical decoders preserve cancellation and recording of bytes already emitted; their acknowledgement flags cannot authorize a new lease, unwrap or transfer. Invalid current history stays unavailable and uncertain physical copies stay charged. Generic evidence stores and complete version/null-version retirement remain separate from these audit authority predicates.
-
-[ADR-244](../decisions/244-native-artifact-types.md) adds the first multi-frame `NativeResponseSource`: `objectstore.FramedNativeSource` serves exact sequential chunks of any registered artifact type from one framed cursor (keys opened once, every frame authenticated before its bytes, whole-file hashes before the final chunk of a whole-file response), with a per-window read bound of nine frames and two index pages. For such a local source the transfer renews the delivery lease, with a fresh current-authority observation, before any chunk write that would start with less than two seconds left; frame loads run under the response, not the lease, because reading discloses nothing. Remote sources keep their lease-bound chunk acknowledgement. A 200 MiB synthetic PCAPNG passed whole and resumed transfers through the real HTTP sink; the installed worker exchange and the first-context SQL response facet remain pod-status-only.
+Catalog lookup and response start use the artifact's stored effective deletion
+deadline; a started response is cut off at that deadline
+([retention lifecycle](retention-lifecycle.md)). Effects compare the current
+database incarnation in their transaction ([download recovery](download-recovery.md)).

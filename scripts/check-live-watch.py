@@ -33,7 +33,7 @@ reject(open_request,open_schema,lambda d:d.update(display_filter={'all':[{'field
 packet_open=copy.deepcopy(open_request);packet_open.update(projection='packetMetadata',display_filter={'all':[{'field':'remote_ip','op':'eq','value':'192.0.2.10'}]});validate(packet_open,open_schema);checks+=1
 reject(packet_open,open_schema,lambda d:d['display_filter']['all'][0].update(value='example.invalid'))
 read_input=read('examples/mcp-live-read-input.json');read_schema=tools['read_live_watch']['inputSchema']
-reject(read_input,read_schema,lambda d:d.update(wait_ms=5001))
+reject(read_input,read_schema,lambda d:d.update(wait_ms=30001))
 reject(read_input,read_schema,lambda d:d.update(limit=101))
 reject(read_input,read_schema,lambda d:d.pop('cursor'))
 u=read('examples/mcp-live-update-input.json');us=tools['update_live_watch']['inputSchema']
@@ -62,12 +62,22 @@ def timeline(fixture):
   ids.add(row['row_id'])
   assert ts(b['interval_from'])<=ts(row['observed_at'])<=ts(b['interval_until'])
   assert ts(row['observed_at'])<=ts(row['received_at'])<=ts(b['received_at'])<ts(row['expires_at'])<=ts(w['expires_at'])
-  assert (ts(row['expires_at'])-ts(row['observed_at'])).total_seconds()<=w['limits']['row_max_age_seconds']
 f=read('examples/live-watch.json');validate(f,schemas[B+'live-watch.schema.json']);timeline(f);checks+=1
-for change in [lambda d:d['batch']['rows'][0].update(expires_at='2026-10-09T12:06:00Z'),lambda d:d['batch']['rows'][0].update(source_session_id='00000000-0000-4000-8000-000000000999'),lambda d:d['batch'].update(state='Paused'),lambda d:d['batch'].update(output_bytes_spent=16777217),lambda d:d['watch'].update(expires_at='2026-10-09T13:05:00Z'),lambda d:d['batch']['rows'].append(copy.deepcopy(d['batch']['rows'][0]))]:
+for change in [lambda d:d['batch']['rows'][0].update(expires_at='2026-10-09T12:16:00Z'),lambda d:d['batch']['rows'][0].update(source_session_id='00000000-0000-4000-8000-000000000999'),lambda d:d['batch'].update(state='Paused'),lambda d:d['batch'].update(output_bytes_spent=16777217),lambda d:d['watch'].update(expires_at='2026-10-09T13:05:00Z'),lambda d:d['batch']['rows'].append(copy.deepcopy(d['batch']['rows'][0]))]:
  bad=copy.deepcopy(f);change(bad)
  try:timeline(bad)
  except AssertionError:checks+=1
  else:raise AssertionError('Invalid live timeline accepted')
+# The browser receives the same row, gap and state types as SSE events.
+event_schema={'$ref':B+'live-watch.schema.json#/$defs/event'}
+row=f['batch']['rows'][0]
+event={'event_id':row['row_id'],'watch_id':f['watch']['watch_id'],'revision':f['watch']['revision'],'type':'row','row':row,'handling':f['batch']['handling']}
+validate(event,event_schema);checks+=1
+state={**{k:v for k,v in event.items() if k!='row'},'type':'state','state':{'state':'Paused','sources':f['batch']['sources'],'output_bytes_spent':f['batch']['output_bytes_spent']}}
+validate(state,event_schema);checks+=1
+reject(event,event_schema,lambda d:d.update(type='gap'))
+reject(event,event_schema,lambda d:d.update(state=state['state']))
+reject(event,event_schema,lambda d:d['row']['fields'].update(body='forbidden'))
+reject(state,event_schema,lambda d:d['state'].update(retry_after_ms=1000))
 assert set(tools['open_live_watch']['inputSchema']['properties'])=={'source_handles','projection','display_filter','duration_seconds','max_output_bytes','idempotency_key'}
 print(f'PASS: {checks} live schema/timeline checks; raw content, hidden predicates, renewed lifetimes, invalid replay and scope drift rejected. Runtime checks remain pending.')

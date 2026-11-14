@@ -1,5 +1,7 @@
 # ADR-289 — Bounded outer capture-preview composition
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 Date: 2026-11-03. Status: implementation selected under the maintainer's
 standing authorization to simplify costly timing choices; installed
 qualification pending. Requirements: REQ-HIS-002, REQ-INV-003.

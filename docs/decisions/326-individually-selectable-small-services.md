@@ -230,7 +230,7 @@ Historical: describes the installer continuation that the Helm-native
 installation plan replaces (ADR-328).
 
 `provider-material.json` is an operator fragment described by
-[`initial-bootstrap-provider-input.schema.json`](../../specs/contracts/initial-bootstrap-provider-input.schema.json).
+`initial-bootstrap-provider-input.schema.json`.
 It keeps the existing material format and field names. Supply only the external
 provider's credentials: `issuerToken` for an external key provider, `storage` for
 an external object store, and an original `storageUseUntil` for either mixed or

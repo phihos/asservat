@@ -1,98 +1,56 @@
-# Bounded native response accounting
+# Native download responses
 
-ADR-113 separates a whole native HTTP response from prepaid accounting and short current delivery authority. This implements C14 domain/application/SQL ports and a C20 sink; it does not enable a public native endpoint or a regional byte channel.
+C-14/C-20 contract for one native HTTP content response under
+[ADR-312](../decisions/312-started-downloads-run-to-original-bounds.md) and
+[ADR-330](../decisions/330-event-driven-system-design.md). Session, quota,
+audit and Stop rules are in [download sessions](download-sessions.md).
 
-One response has an immutable session, process/request owner, generation, selected range, whole-file classification and original hard end. The existing session generation fences both legacy and new writers. The legacy 4 KiB context path and its 1,024-request ceiling are unchanged. A response cannot overlap an existing current legacy batch; a legacy batch cannot overlap a current response.
+## Start
 
-Version 1 fixes each accounting window at at most 64 MiB. The exact selected range reserves `max(1, ceil(length / 64 MiB))` window slots as a subreservation of a separately configured allocation. Allocation and session envelopes are bounded by `ceil(authorized output / 64 MiB) + R`, with at most 1,024 responses. No migration backfill grants control credit to existing allocations. Each reserved window has two encrypted audit object slots, each bounded by 128 KiB. Response rows, window rows, paired object count and reserved ciphertext bytes are all finite; unknown results never release these reservations.
+A content GET is served by the hub replica that receives it:
 
-A 1 TiB selection has 16,384 windows and 32,768 audit objects, reserving 4 GiB of audit object capacity at the maximum object size. These are limits, not measured storage use or throughput. The implementation still requires realistic SQL/object-store/KMS cost measurement. Current source tests model this arithmetic without allocating a 1 TiB file.
+1. Authenticate the caller once ([native reader identity](native-reader-identity.md))
+   and authorize the exact session, artifact and version once.
+2. Parse the single range with RFC 9110 `Range`, `If-Range` and `If-Match`.
+   A stale `If-Range` yields a full 200 response; a failed `If-Match` yields 412.
+3. In one SQL transaction: check session state, stored deletion deadline and
+   database incarnation, reserve the selected range on the workload allocation,
+   move the session to Streaming and write the response-start audit row.
+4. Send headers: `Content-Length`, strong `ETag`, optional `Content-Range`,
+   attachment disposition, `Cache-Control: no-store`, `nosniff`.
 
-Once `BeginDownloadResponse` has admitted this response under a complete check,
-its later windows and leases continue that start decision
-([ADR-312](../decisions/312-started-downloads-run-to-original-bounds.md)): no identity
-batch, permission, share or policy read follows, except the caller authentication
-of a raw window's grant-pool reservation. SQL window/lease transactions keep the
-original validity, published copy and effective retention cutoffs, Stop,
-generation/owner fences and the recovery incarnation; they skip the permission,
-processing, retention-topology and worker-configuration observations. The
-five-second lease is the owner's liveness interval. ADR-220's response-owned
-entitlement and bootstrap factory are removed.
+Any failure before step 3 commits has no effect and emits nothing.
 
-Within one window, the continued start decision and the SQL fences above establish a delivery lease of at most five seconds. Sequential reads/writes of at most 1 MiB reuse that lease only within its original interval. Every chunk checks the exact response/window/owner/generation, range, context cancellation and deadline. No bytes flow while obtaining a new observation. A new observation does not renew any old CurrentIdentity or lease; old work closes before the next identity batch begins. Reentry after an expired lease also reacquires the finite installation/principal stream lane. Known cancellation follows the owning context; independent remote changes are bounded by the original five-second interval plus bytes already emitted into transport buffers.
+## Bytes
 
-The synchronous coordinator first checks identity and existing session authority and obtains verified native metadata/read-cost limits from a protected source. Unavailable source preflight has no reservation effects. It derives the selection through the existing HTTP conditional/range parser and derives whole-file status from the verified native size. It then reserves the exact response, admits one window, writes and independently verifies its encrypted intent, and obtains the audit acknowledgement before exposing headers or bytes. Intent/outcome keys use their own `download-window-audit/v1` namespace and cryptographic purposes. Existing v1 per-chunk records retain their original contract.
+The hub opens one stream to a regional reader over the connector's connection
+to the hub ([ADR-330](../decisions/330-event-driven-system-design.md) D2, D4).
+The reader is a long-running Deployment; it opens the artifact's keys once per
+response, reads frames sequentially, authenticates each frame before passing its
+bytes, and streams the selected range back. The hub copies the stream to the
+HTTP response. For a whole-file response the reader verifies the whole-file
+SHA-256 and withholds the last chunk on mismatch. The hub holds no unwrap keys
+and buffers at most one bounded chunk.
 
-A successful first conditional PUT followed by an exact independently verified GET can produce a phase-specific joined write completion. A 412, unknown PUT/GET, or read-only Find cannot produce that fact. The completion is not a writer-quiescence or deletion certificate. SQL stores only minimized response/accounting/scope facts and encrypted-object receipts; native checksums, filenames, payload and unwrap keys are absent.
+## Bounds
 
-Window output and native read work are charged before use. A failed window retains its whole prepaid charge. Every joined partial write contributes to historical emitted-byte accounting, including after cancellation or generation replacement. Contiguous window progress and response completion require the separately acknowledged outcome. Only a verified final whole-file result with exact cumulative length can reach Completed; partial range responses remain Interrupted. Earlier response, session and effective access deadlines remain binding. The coordinator hashes a full response incrementally and withholds its last chunk if its native checksum or the protected source's final integrity proof does not match. It keeps only one bounded chunk and clears that owned buffer after use.
+The started response reads no further identity, permission, share or policy
+state. It ends at the first of:
 
-The HTTP sink emits one standard Content-Length, ETag and optional Content-Range for the complete selected response. It has no SQL, authorization or unwrap keys. Writes and flushes have the original short lease deadline, and cancellation callbacks join before deadline reuse or return. Close joins any active write. A failed or expired write cannot be reset into a new authorized write on the same failed response.
+- completion of the selected range;
+- client disconnect or write timeout;
+- Stop (delivered by `NOTIFY`, see download sessions);
+- the caller's session or token expiry, the session deadline, the artifact's
+  access end or stored deletion deadline;
+- a database-incarnation change (restore).
 
-## Current adapter boundary
+Revocation and retention changes reach the stream as events, not by
+re-checking per chunk.
 
-Migration 00042 adds `download_control_allocation`, `download_response` and `download_window`, with immutable transitions, finite reservations and separate runtime/audit/configuration facets. Its current `Downloads` adapter deliberately retains the existing published-context authority fence. It cannot authorize generic PCAP/core artifacts merely because the generic domain can represent 1 TiB. Generic catalog authority remains a separate integration.
+## End
 
-The source port is a protected regional adapter, not public JSON or a worker capability inferred from a certificate. No production implementation of that byte port or I-13 native exchange is supplied here. The existing worker certificate channel remains certificate-only. Personal credentials, CurrentIdentity and provider tokens never become worker messages. The hub receives bounded plaintext only for authorized native delivery; it gains no object unwrap credentials.
-
-Stale Streaming state or the many-hour response deadline is not proof of active demand. A GET never refreshes the browser session ([ADR-224](../decisions/224-remove-download-refresh-owners.md)). The coordinator stops on an identity acquisition error, including a session that needs refreshing, and preserves spent windows; the client resumes with Range.
-
-Window-audit retirement, independently verified object cleanup, finite backup cooling and slot release remain unimplemented. All current response/window records and reservations remain charged. Operation-audit migration 00041 is purpose-specific and does not provide this lifecycle. These missing producers prevent runtime enablement; increasing constants is not a substitute.
-
-## Qualification
-
-Focused domain tests simulate a 1 TiB whole response and 16,384 windows. Coordinator tests transfer synthetic 64 MiB-plus-tail data with two pairs and many 1 MiB writes, separate current batches, uncertain outcomes, partial writes, final integrity checks and empty files. Actual loopback TLS HTTP tests verify whole-response headers/ranges and joined cancellation. Encrypted paired-object tests use the actual codec/S3 adapter against an owned TLS test server and check first write, unknown result, conflict, changed/corrupt read and phase/owner binding. These are component tests, not throughput or a production regional transfer.
-
-`test/integration/download_response_test.go` now passes its selected owned PostgreSQL/S3 case using real published context/native metadata preparation. Large emitted byte counts there remain explicitly synthetic accounting observations. It verifies cumulative audited completion, legacy interlock, original response replay refusal, exact finite paired backing and scoped roles. The first run found a missing audit-role row-lock privilege. Granting only `UPDATE(id)` allows that lock; immutable identity checks remain enforced and lease updates remain forbidden. The [second terminal report](../../test/results/native-response-second-check.log) records one selected pass, 925 unchanged source hashes and complete cleanup. The subsequent [combined full custody report](../../test/results/native-response-refresh-full-check.log) records 291 passing entries, unchanged sources and clean teardown, including exact privilege-denial SQLSTATEs and rejection of ID mutation through that lock column. Real regional native bytes remain separate qualification.
-
-## Metadata and content phase boundary
-
-A completed metadata observation releases and joins its first current-identity batch before response/window admission. The same request-owned live reader acquires a new, independently checked batch for the exact original actor/client and artifact/version. The old observation is never extended, and metadata discovery/decryption is not repeated. Only the already verified immutable native facts are retained; current access/deletion dates and original session/response/connection bounds are intersected before content admission. Current denial or cancellation prevents a response reservation and any native read. This prevents a normally slow metadata conversation from consuming almost all of the following content conversation's five-second authority interval.
-
-The SQL45 fixture uses the actual browser live-reader implementation with explicitly synthetic session storage, rather than a one-use fake reader. This does not qualify a real provider or generic large-file throughput; that historical fixture bounded each individual context conversation by its original five-second proof/operation interval. ADR-258 below separates the regional response conversation from current disclosure observations.
-
-
-## Regional response renewal (ADR-258)
-
-One remote cursor and its original key opening serve the same prepaid window,
-source/version, range, owner and generation across multiple current delivery
-leases. Between acknowledged chunks, the live caller may provide a new
-independently checked identity batch. A higher delivery sequence is atomically
-bound to the existing native owner using the existing SQL renewal transition;
-its acknowledged sequence replaces the process cache. Unknown renewal closes
-the conversation and retains uncertain spend. No old identity batch, lease,
-failed write or closed owner can be revived.
-
-The native response operation pins processing identity from a proof valid at
-its original StartedAt. That immutable identity is not current processing or
-disclosure authority: SQL claim, observation and renewal independently check
-current processing state, recovery, parent and worker/certificate. The original
-proof's dates remain unchanged. Other operation kinds retain their existing
-processing-observation rules. Response ownership has one fixed candidate
-20-second ceiling, intersected with original caller, worker and access bounds;
-each returned native/delivery observation still lasts at most five seconds.
-Inbound waits may use the fixed ceiling; outbound disclosure requires the short
-current check. No observation rolls the original conversation forward.
-
-The full initial worker attestation also returns its independently reviewed
-actual token expiry through a local purpose-specific port. NativeOrigin retains
-that immutable admission privately; short proof dates are never extended and
-key binding still requires fresh five-second proof. Each receiving hop attests
-independently. During the fixed response SQL worker/certificate/processing and
-permission checks continue, with no extra Kubernetes calls or retained raw token.
-A Kubernetes-only identity change can take at most the original twenty-second
-window to be independently observed; the next window fully reattests. Actual
-token/certificate/worker/access cutoffs still bound every final write and ACK
-through the exact checked chunk's NativeUntil. Missing remote cutoff denies.
-
-Local qualification uses real two-hop mTLS and the production final HTTPS sink,
-with deterministic 750 ms blocking final writes: an 8,126,572-byte window took
-6.313 s (1.228 MiB/s), with 70 current-check callbacks and two lease renewals.
-Resume and stale If-Range fallback retained exact bytes and one source opening
-per window. Paced revocation stopped after 7,340,032 bytes and original-request
-expiry after 4,194,304 bytes. SQL/source/identity in this transport test are
-synthetic; callback count is not an API/SQL count. Actual native SQL renewal,
-real Kubernetes attestation and the full SQL/S3/KMS cost remain separately qualified.
-The candidate ceiling still implies about 0.4 MiB/s for a full 8 MiB window
-before control overhead; these results do not establish arbitrary slow-client
-support or complete the installed download requirement.
+One SQL transaction records the emitted bytes, releases the unused reservation,
+sets the session to Completed (whole file, exact length, checksum verified) or
+Interrupted, and writes the response-end audit row. Interrupted sessions resume
+with a new GET and `Range` within their original deadlines. A partial range
+never reaches Completed.

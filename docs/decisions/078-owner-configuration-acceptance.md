@@ -1,5 +1,7 @@
 # ADR-078 — Durable owner configuration acceptance
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded (2026-11-13): durable acceptance existed to detect rollback or unaudited changes of the owner-configuration ConfigMap. Anyone who can write that ConfigMap is trusted under ADR-328; the hub reads the Helm-rendered ConfigMap under RBAC.
 
 Date: 2026-10-10. Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan.
@@ -12,4 +14,4 @@ A changed revision immediately displaces the old head but remains unusable until
 
 Persist failure watermarks even before the first successful observation. Reject delayed observations at or before a known failure; a later valid observation can restore availability without changing the immutable revision content. A known rollback or same-generation mutation commits a fence before returning a conflict: rolling back that transaction would otherwise leave the previous fresh trust usable. Old cleanup cannot fence a newer observation. Equal timestamps cannot renew freshness; comparisons use PostgreSQL microsecond precision. If negative cleanup itself cannot reach SQL, consumers remain bounded by the already-issued original deadline; do not claim the failure was durably recorded.
 
-The acceptance record contains only public routing/trust configuration, not signing keys or evidence credentials. Public CA validity is still qualified by the Kubernetes/X.509 source. Audited acceptance does not activate a certificate, clear recovery, authorize a request or provide a protected issuer bootstrap. Those remain required before private forwarding or public downloads are enabled. See [the architecture contract](../architecture/owner-configuration.md).
+The acceptance record contains only public routing/trust configuration, not signing keys or evidence credentials. Public CA validity is still qualified by the Kubernetes/X.509 source. Audited acceptance does not activate a certificate, clear recovery, authorize a request or provide a protected issuer bootstrap. Those remain required before private forwarding or public downloads are enabled. See the architecture contract.

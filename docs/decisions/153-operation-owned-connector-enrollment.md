@@ -1,5 +1,7 @@
 # ADR-153: Bind connector enrollment and signing to one native operation
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded (2026-11-13): the operation-owned native boundaries existed to fit repeated namespace-guard probes, live controller-chain reads and protected-source rereads into one five-second admission. Under ADR-328 one online TokenReview of the connector Pod token, the CSR binding and the existing SQL, audit and signing-attempt checks replace them.
 
 Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan. Historical status: implemented component; reproduced before/after deadline, race and canonical

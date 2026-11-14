@@ -1,5 +1,7 @@
 # ADR-100 — Temporary initial-installation SQL credentials
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded (2026-11-13): Temporary initial SQL logins, their guard-checked immutable Secret and their retirement proofs protected the installer Pod against namespace writers, which ADR-328 places inside the trust boundary. The Helm `secrets` hook Job creates fixed SQL role passwords once and never rotates them; the `setup` Job creates runtime roles and grants from the compiled grant plan. PostgreSQL's warning about plaintext passwords in role DDL still supports deriving SCRAM verifiers client-side.
 
 Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan.
@@ -13,7 +15,7 @@ the precise schema/table/column grant options; it is not a superuser and must
 never be mounted into the activation Pod or ordinary services.
 
 Generate independent 256-bit secrets, persist their exact closed
-[private state](../../specs/contracts/initial-sql-credentials.schema.json) in
+private state in
 protected immutable storage before creating roles, and keep one fifteen-minute
 password validity interval. Bind that state to the installation and the digest
 of its complete public startup plan. Replay neither replaces passwords nor

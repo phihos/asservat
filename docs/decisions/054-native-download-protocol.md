@@ -1,5 +1,7 @@
 # ADR-054 — Native download preparation and HTTP resume
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 Date: 2026-10-10. Status: implementation correction preserving REQ-DLD-003 and the maintainer's native local-tool workflow.
 
 Preparation may need authorized regional manifest reads before file size/checksum are known. Make the complete native metadata group optional during Preparing/early failure and mandatory when ready or completed. Unknown values are omitted, never fabricated. Include the opaque strong ETag in verified preparation metadata so the client needs no extra request before a checked resume. Preparing and terminal states cannot advertise resume.

@@ -272,10 +272,6 @@
           "minLength": 1,
           "maxLength": 128
         },
-        "handle_expires_at": {
-          "type": "string",
-          "format": "date-time"
-        },
         "source_session_id": {
           "type": "string",
           "format": "uuid"
@@ -352,7 +348,6 @@
       },
       "required": [
         "source_handle",
-        "handle_expires_at",
         "source_session_id",
         "workload_uid",
         "pod_uid",
@@ -396,11 +391,6 @@
           "minimum": 1,
           "maximum": 1048576
         },
-        "row_max_age_seconds": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 30
-        },
         "replay_seconds": {
           "type": "integer",
           "minimum": 0,
@@ -413,7 +403,6 @@
         "bytes_per_second",
         "max_rows_per_batch",
         "max_buffer_bytes",
-        "row_max_age_seconds",
         "replay_seconds"
       ]
     },
@@ -537,11 +526,6 @@
         "may_contain_user_data": {
           "const": true
         },
-        "managed_row_max_age_seconds": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 30
-        },
         "raw_available_live": {
           "const": false
         },
@@ -555,7 +539,6 @@
       "required": [
         "transient",
         "may_contain_user_data",
-        "managed_row_max_age_seconds",
         "raw_available_live",
         "external_copies_recallable",
         "save_semantics"
@@ -591,7 +574,8 @@
             },
             "expires_at": {
               "type": "string",
-              "format": "date-time"
+              "format": "date-time",
+              "description": "min(source/content privacy deadline, watch deadline). Managed views clear the row by then."
             },
             "clock_uncertainty_ms": {
               "type": "integer",
@@ -724,7 +708,8 @@
             },
             "expires_at": {
               "type": "string",
-              "format": "date-time"
+              "format": "date-time",
+              "description": "min(source/content privacy deadline, watch deadline). Managed views clear the row by then."
             },
             "clock_uncertainty_ms": {
               "type": "integer",
@@ -890,7 +875,8 @@
             },
             "expires_at": {
               "type": "string",
-              "format": "date-time"
+              "format": "date-time",
+              "description": "min(source/content privacy deadline, watch deadline). Managed views clear the row by then."
             },
             "clock_uncertainty_ms": {
               "type": "integer",
@@ -1133,11 +1119,6 @@
           "minimum": 0,
           "maximum": 67108864
         },
-        "retry_after_ms": {
-          "type": "integer",
-          "minimum": 100,
-          "maximum": 5000
-        },
         "handling": {
           "$ref": "https://asservat.io/spec/v1/live-watch.schema.json#/$defs/handling"
         }
@@ -1154,7 +1135,6 @@
         "interval_until",
         "received_at",
         "output_bytes_spent",
-        "retry_after_ms",
         "handling"
       ]
     },
@@ -1173,6 +1153,151 @@
       },
       "required": [
         "sources"
+      ]
+    },
+    "event": {
+      "description": "One Server-Sent Events message of a watch stream. The SSE id is the event_id; a reconnect sends it as Last-Event-ID and resumes after it within the replay buffer, otherwise with a gap.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "event_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 180
+        },
+        "watch_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000000
+        },
+        "type": {
+          "enum": [
+            "row",
+            "gap",
+            "state"
+          ]
+        },
+        "row": {
+          "$ref": "https://asservat.io/spec/v1/live-watch.schema.json#/$defs/row"
+        },
+        "gap": {
+          "$ref": "https://asservat.io/spec/v1/live-watch.schema.json#/$defs/gap"
+        },
+        "state": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "state": {
+              "$ref": "https://asservat.io/spec/v1/live-watch.schema.json#/$defs/watch/properties/state"
+            },
+            "sources": {
+              "type": "array",
+              "items": {
+                "$ref": "https://asservat.io/spec/v1/live-watch.schema.json#/$defs/sourceStatus"
+              },
+              "minItems": 0,
+              "maxItems": 16
+            },
+            "output_bytes_spent": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 67108864
+            }
+          },
+          "required": [
+            "state",
+            "sources",
+            "output_bytes_spent"
+          ]
+        },
+        "handling": {
+          "$ref": "https://asservat.io/spec/v1/live-watch.schema.json#/$defs/handling"
+        }
+      },
+      "required": [
+        "event_id",
+        "watch_id",
+        "revision",
+        "type",
+        "handling"
+      ],
+      "oneOf": [
+        {
+          "properties": {
+            "type": {
+              "const": "row"
+            }
+          },
+          "required": [
+            "row"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "gap"
+                ]
+              },
+              {
+                "required": [
+                  "state"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "gap"
+            }
+          },
+          "required": [
+            "gap"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "row"
+                ]
+              },
+              {
+                "required": [
+                  "state"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "state"
+            }
+          },
+          "required": [
+            "state"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "row"
+                ]
+              },
+              {
+                "required": [
+                  "gap"
+                ]
+              }
+            ]
+          }
+        }
       ]
     }
   },

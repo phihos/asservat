@@ -1,5 +1,7 @@
 # ADR-135: live outbound regional API context start
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded in part by ADR-328 (2026-11-13): Pinned connector source UID/RV, Deployment/template/image comparison, namespace-guard additions and installer approval of whole Secrets defended against writers in the connector namespace and no longer apply. The live exchange, signed work reference, current identity round trips and budgets remain valid.
 
 Status: accepted for implementation; public collection remains disabled pending the qualified composition described below.

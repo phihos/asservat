@@ -20,7 +20,6 @@
     "navigation_uri": "https://asservat.example.invalid/captures/00000000-0000-4000-8000-000000000031",
     "approval_navigation_uri": "https://asservat.example.invalid/grants/00000000-0000-4000-8000-000000000044",
     "grant_id": "00000000-0000-4000-8000-000000000044",
-    "retry_after_seconds": 5,
     "can_cancel": true,
     "blockers": [
       {

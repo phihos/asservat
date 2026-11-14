@@ -1,79 +1,53 @@
 # Processing coverage at context admission
 
 [ADR-146](../decisions/146-processing-coverage-before-collection.md) adds a
-current pre-collection check to C-09 and the existing C-21 admission transaction.
-It implements REQ-CAP-005 and REQ-EXE-002 for the fixed pod-status slice.
+pre-collection processing check to C-09 and the C-21 admission transaction.
+It implements REQ-CAP-005 and REQ-EXE-002 for the pod-status slice.
 
-The proposed original artifact location, exact target, acquisition anchor and
-resolved deletion date enter `ContextProcessingCoverageReader`. Its concrete
-implementation is `postgres.ProcessingReads`, using the existing purpose15
-processing read credential, recovery guard and bounded SQL transaction. It
-checks original installation/issuer/root/source/initialization, qualified
-backing, counters and the full bounded active-rule inventory, then reads the
-root again. Changed state, malformed rows, cancellation and expired original
-bounds fail unavailable. Matching retained restrictive rules keep their original
-horizon; root renewal cannot change those dates. The result retains the earliest
-caller, recovery, initial five-second read and root cutoff after commit.
+## Check
 
-Preview checks coverage before persisting its draft. New submission resolves
-accepted same-key history first; only an absent original request proceeds to
-fresh retention, storage and processing checks. Neither the observation nor its
-freshness enters approval digests. Retention stays exactly as selected through
-the existing resolver; this check never shortens it.
+`ContextProcessingCoverageReader` (concrete `postgres.ProcessingReads`) takes
+the proposed artifact location, exact target, acquisition anchor and resolved
+deletion date. It reads the processing root and the active rules matching that
+target, and reports whether a restrictive rule covers the proposed artifact.
+Matching restrictive rules keep their original horizon. The check never
+shortens or chooses retention; retention comes from the stored deadlines
+described in [retention](retention-lifecycle.md).
 
-SQL54 managed admission repeats the check while holding the existing permission
-root, before custody registration and control/capture/audit inserts. Purpose40
-adds SELECT on exactly `processing_root` and `processing_rule`; it gains no
-processing mutation or source privileges. The finite managed-admission result
-selects this branch, rather than any caller flag. Legacy unmanaged account
-semantics stay unchanged. Final freshness checks precede commit.
+Preview runs the check before returning its plan. It is advisory: a positive
+preview does not reserve the lineage slot, and the published `captures`
+counter excludes pending captures. Submission with an existing operation ID
+returns the existing outcome; a new submission runs the check again inside
+admission.
 
-The serialization order is established by supported writers:
+## Admission transaction
 
-- `ProcessingConfiguration.AcceptCurrent`: recovery, permission, processing
-  root, then insertion or exact backing update.
-- `ProcessingDecisions.transaction`: recovery, permission, processing root,
-  exact decision/rule; apply obtains the processing audit pool before the
-  immutable audit row. Nested rule/decision triggers retain this order.
-- Catalog publication: its effect transaction already holds recovery and
-  permission. SQL50 `project_context_processing` takes permission then processing
-  root before lineage insertion and the counter update.
-- SQL54 root reserve/renew: `capacity_lock_root_observation` takes recovery,
-  permission and source before backing locks. Renewal joins the bounded retained
-  configuration before updating the processing root. It preserves rule dates.
-- SQL50 rejects root/rule deletion. Its row triggers repeat permission checks,
-  but a BEFORE row trigger alone cannot establish order ahead of an arbitrary
-  SQL statement's implicit tuple lock. The supported scoped writers acquire
-  permission first; direct administrator SQL is not a runtime path.
+Admission runs in one transaction under the hub process's single SQL login:
 
-Admission uses nonlocking processing reads under that shared serialization
-point. It does not acquire a late processing-row lock behind the audit/storage
-locks. Read-only preview instead detects an intervening root change and fails;
-it makes no reservation. In particular, the published `captures` counter does
-not include pending captures, so a positive preview is not a promise that the
-final lineage slot remains available. Publication always rechecks independently.
+1. `SELECT … FOR SHARE` on the processing root.
+2. Read the matching rules and evaluate coverage.
+3. Update the per-workload counters with conditional updates that lock only
+   the affected workload row (ADR-330 D7).
+4. Insert the custody registration, capture row and audit row, keyed by the
+   operation ID.
 
-Known insufficient coverage has a shared browser/MCP message distinct from a
-transient unavailable read. A request failure preserves original-key recovery
-and uncertainty about an earlier accepted attempt. No new authority, automatic
-retry, retention choice or public collection enablement is introduced.
+Processing writers (configuration acceptance, decisions, release and catalog
+publication) take the root `FOR UPDATE`, so admission and those writers
+serialize on that one row. There is no second root read and no writer-specific
+lock order. Root and rule rows are never deleted.
 
-The production public graph has no `ContextInvestigation` constructor yet. Its
-installed composition must supply the original purpose15 reader; neither the
-application fixture nor the real SQL native helper supplies that missing
-installation boundary. Constructor sites are inventoried in the handoff.
+A retry with the same operation ID returns the stored outcome. An unknown
+outcome is resolved by looking up the operation ID; a charge is released
+once the outcome is known.
 
-The source and native tests for this follow-up remain unrun until recorded by
-the owned qualification harness. The existing SQL54 matrix passed before this
-change; it is not evidence for these added checks.
+Insufficient coverage returns a shared browser/MCP message distinct from a
+transient unavailable read.
 
 ## Operator inventory and release
 
 [ADR-318](../decisions/318-processing-operator-rule-inventory-and-release.md)
-composes current operator authority, the existing processing transaction and
-reserved release lane with same-origin console controls. Inventory uses bounded
-queries under the existing processing duty; it does not grant ordinary evidence
-inspection. Artifact selection resolves one immutable location before audit;
-release uses the persisted scope and exact revision. No new credential, pool,
-watch, background task or authority-renewal mechanism is introduced. Current
-qualification and remaining gaps are in implementation progress.
+adds same-origin console controls for processing operators. Inventory uses
+bounded queries under the processing duty and grants no ordinary evidence
+inspection. Artifact selection resolves one immutable location; release
+names the persisted scope and exact revision and writes its audit row in the
+release transaction.

@@ -369,10 +369,6 @@
           "type": "string",
           "format": "date-time"
         },
-        "validUntil": {
-          "type": "string",
-          "format": "date-time"
-        },
         "basis": {
           "type": "object",
           "additionalProperties": false,
@@ -638,7 +634,6 @@
         "assessmentID",
         "planDigest",
         "generatedAt",
-        "validUntil",
         "basis",
         "scope",
         "combinedImpact",

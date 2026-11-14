@@ -1,5 +1,7 @@
 # ADR-241 — Log and resource triggers from the Kubernetes log and metrics APIs
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 Date: 2026-10-27. Status: accepted; implemented; qualification below.
 Requirements: REQ-TRG-001/002/003/004/006/007, S-03 (TASK-04). Extends
 [ADR-228](228-restart-triggered-policy-captures.md), [ADR-230](230-s03-detectors.md) and

@@ -1,5 +1,7 @@
 # ADR-294 — Fixed saved-syscall projections
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 Date: 2026-11-03. Status: implemented; owned metadata/argument saved-view fixtures qualified.
 The argument Go test passed; its outer workflow was cancelled at the job limit.
 Broader query/kernel qualification remains open; see implementation progress.

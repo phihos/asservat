@@ -1,5 +1,7 @@
 # Grouped Save dispatch within original authority
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 Status: engineering decision; implementation and local controlled checks in
 progress. Installed and sixteen-source native qualification remain pending.
 

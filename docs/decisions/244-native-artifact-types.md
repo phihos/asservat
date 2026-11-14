@@ -1,5 +1,7 @@
 # ADR-244 — Native artifact types and larger saves (S-04 increment 2)
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 Date: 2026-10-27. Status: accepted; implemented at component level; qualification below.
 Requirements: REQ-DLD-001/003 (SC-DLD-001/003), REQ-LIF-005/006, REQ-EVD-001–003, REQ-NET-001,
 REQ-SYS-001; TASK-05/07/11. Plan: [S-04 plan](../reviews/s04-plan-2026-10-27.md) §4 row 2, gate

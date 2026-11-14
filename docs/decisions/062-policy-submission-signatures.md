@@ -1,5 +1,7 @@
 # ADR-062 — Post-persistence policy submission signatures
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded in part by ADR-328 (2026-11-13): the trust ConfigMap is read by name under RBAC; source-replacement detection and protected bootstrap of the trust source no longer apply. The signature format, Transit signer and acceptance checks remain.
 
 Date: 2026-10-10. Status: engineering refinement of REQ-PER-007 and REQ-EXE-001; initial components, production ingress and compiler composition still pending.

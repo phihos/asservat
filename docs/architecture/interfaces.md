@@ -1,140 +1,93 @@
 # Internal interfaces
 
-[I-14 — Private local key operations](local-key-service.md) defines the optional A-KEY mTLS wrap/unwrap/sign boundary under ADR-065. It is separate from public permission configuration and carries keys/signing inputs, never artifact payloads. Production current-authority/issuer/bootstrap composition remains required.
-
-Public browser/MCP operations and schemas remain in the [interface package](../interfaces/README.md). These internal ports implement those operations. Interface IDs and callers/providers are recorded in the [catalog](catalog.yaml); none is an additional user permission API.
+Public browser/MCP operations and schemas are in the [interface package](../interfaces/README.md). The internal ports below implement them. Interface IDs, callers and providers are recorded in the [catalog](catalog.yaml); none is a user permission API. Mechanisms follow [ADR-330](../decisions/330-event-driven-system-design.md).
 
 ## Common contract rules
 
-Internal control uses versioned strict JSON over authenticated TLS. Authenticate and enforce wire limits before decoding; reject duplicate JSON keys, nonfinite numbers, malformed UTF-8, unknown fields and ambiguous normalization. Accepted work uses the existing canonical scope rules, exact immutable IDs and portable integer limits. Never put an arbitrary callback, object URL, shell command or evidence row in a control envelope. Protected references resolve only inside a configured pool and authorized region; they are not bearer capabilities.
+Internal control uses versioned strict JSON over mutual TLS. Enforce wire limits before decoding; reject duplicate keys, nonfinite numbers, malformed UTF-8, unknown fields and ambiguous normalization. Never put an arbitrary callback, object URL, shell command or evidence row in a control message. Protected references resolve only inside a configured pool and authorized region; they are not bearer capabilities.
 
-The [internal-work/v1 schema](../../specs/contracts/internal-work.schema.json) defines seven disjoint purposes and their receipts. `workId` identifies stable work; `operationId` identifies the parent operation; action `attemptId`, recording `snapshotId` and analysis `stageGeneration` identify effects independently of delivery. `issuerEpoch` binds recovery/enrollment authority, `deliveryFence` binds the current sender lease, `scopeDigest` binds the exact purpose-specific accepted scope, and `notAfter` caps a new start. `authorityRef`, `budgetRef` and `auditRef` resolve to purpose-specific, current, durable authorization. Their mere presence is not proof of validity. No generic “execute this payload” handler exists.
+The [internal-work/v1 schema](../../specs/contracts/internal-work.schema.json) defines disjoint purposes and their receipts. `operationId` is the idempotency key of the parent operation; action `attemptId`, recording `snapshotId` and analysis `stageGeneration` identify effects independently of delivery. `scopeDigest` binds the accepted scope and `notAfter` caps a new start. The hub authorized the operation once at admission and recorded its charge and audit row in SQL under that ID; the receiver deduplicates by ID and never treats a reference's presence as authority. No generic "execute this payload" handler exists. Work messages are not signed: the mutually authenticated connection identifies the sender (D2).
 
 | Purpose | Payload | Required receiver behavior |
 | --- | --- | --- |
-| armSource | Source session/epoch, activation and action IDs | Verify ongoing mode, observation approval/resources and target before attaching. Duplicate work cannot create another source. |
-| runAction | Capture/action/attempt IDs | Resolve the frozen onTrigger plan and durable start record; no action/argv override in transport. |
-| saveRecording | Capture/snapshot/source/epoch, immutable end time, bounded lookback and original policy execution digest | Verify a recording-save scope, source rights and reviewed enablement. Dispatch only SnapshotExecutor. The 1-hour schema cap is a transport ceiling; effective source/policy limits can be shorter. |
-| analysisStage | Analysis ID, acquire/analyze/publish stage, generation, exact input ref and output slot | Only the connector schedules the matching reviewed Job template. A claimed stage never proves the previous writer stopped. |
-| eraseCopy | Exact copy identity/generation and deletion-work ID | Check current cleanup authority and the copy ledger. Expired acquisition grants must not prevent required deletion. |
-| downloadArtifact | Exact download/artifact/digest and transfer generation | Schedule only the bounded download Job; no analysis, acquisition of new evidence or arbitrary destination. |
-| projectLive | Watch/source/epoch, approved projection and view revision | Verify a live-purpose permit and independent view budget. Never arm a source or borrow capture authority. |
+| armSource | Source session, activation and action IDs | Verify ongoing mode, observation approval/resources and target before attaching. A duplicate cannot create another source. |
+| runAction | Capture/action/attempt IDs | Resolve the frozen `onTrigger` plan and consume its [start row](local-start.md); no action/argv override. |
+| saveRecording | Capture/snapshot/source, immutable end time, bounded lookback, policy execution digest | Verify the recording-save scope, source rights and reviewed enablement. Dispatch only SnapshotExecutor. The one-hour cap is a transport ceiling. |
+| analysisStage | Analysis ID, stage, generation, input ref, output slot | Only the connector schedules the matching reviewed Job template. |
+| eraseCopy | Copy identity/generation and deletion-work ID | Check cleanup authority and the copy ledger. Expired acquisition grants never block required deletion. |
+| downloadArtifact | Download/artifact/digest | Stream the artifact through a regional reader replica; no analysis, new acquisition or arbitrary destination. |
+| projectLive | Watch/source, approved projection, view revision | Verify the live-purpose authorization and view budget. Never arm a source or borrow capture authority. |
 
-The schema describes decoded payloads; signed work additionally uses a standard JWS wrapper with a pinned algorithm/key purpose, protected `typ`, `alg`, `kid`, and the exact canonical payload bytes. Select trusted keys only from configured installation/cluster trust; reject `none`, algorithm/key substitution, remote `jku`/`x5u`, embedded untrusted keys and unsupported critical headers. Bind version, issuer epoch, intended cluster/node, purpose and deadline in the signed payload. TLS peer authentication remains mandatory. The selected signing suite and library qualification are recorded in [research](research.md); no hand-written signature framing or cryptographic primitive is permitted. The design fixtures remain unsigned DTOs; the initial [runAction verifier](../research/signed-work-foundation.md) now signs/verifies the runAction fixture with real ephemeral Ed25519 keys and adversarial protocol tests. It does not implement enrollment or dispatch authority.
+Receipts bind work, operation and a monotonically increasing sequence. `Completed` means the work stopped; its result distinguishes success, partial, cancelled and failure. A receipt is not proof of artifact commit or deletion. A stale receipt never overwrites a newer state.
 
-Scope references can identify protected definitions that outlive a start permit. They must remain valid at resolution; their storage lifetime cannot extend execution or evidence retention. Receipts bind work/operation/cluster/epoch/fence and monotonically increasing sequence. `Completed` means that work stopped; its referenced result distinguishes success, partial, cancelled and failure. A receipt is not proof of artifact commit or copy deletion. Stale receipts can be retained as bounded reconciliation evidence but cannot overwrite a newer accepted state or refund a charge.
-
-## Network and IPC contracts
+## Network contracts
 
 ### I-01 — Hub federation
 
-Connector initiates requests to its configured hub origin. Bootstrap/renewal belongs to C-04 and uses one-use enrollment/current peer identity. After enrollment, separate mTLS connections carry control and transient delivery so traffic cannot monopolize cancellation or heartbeat. Proposed private routes under `/internal/v1/federation/` are `negotiate`, `poll`, `receipts`, `heartbeat` and `resolve-reference`; only peers can reach them. Endpoint literals are internal protocol, not additions to the public OpenAPI.
+Each connector holds one outbound, multiplexed HTTP/2 connection to the hub with mutual TLS (D2). Commands, receipts, cluster-state pushes, live rows and download bytes are separate streams on it, with per-stream flow control so bulk bytes cannot starve control. The connector identity comes from a bootstrap token and is renewed by CSR before expiry (ADR-330 D3). The hub routes to the replica holding a connector's connection through one SQL row naming that replica. Routes under `/internal/v1/federation/` are internal protocol, not public OpenAPI.
 
-Negotiation binds peer/build identities, protocol major/minor, supported action/projection schema versions, maximum byte/item limits and issuer/enrollment epoch. Hub and connector support N/N-1 minors of the same major; use the negotiated strict schema, not field stripping of an unsupported accepted plan. Required capabilities fail explicitly. No downgrade may omit an authority/limit check. A protocol-compatible peer still needs qualified mechanisms.
+Negotiation binds peer build identity, protocol major/minor, supported action/projection schema versions and maximum byte/item limits. Hub and connector support N/N-1 minors of one major; required capabilities fail explicitly and no downgrade omits a limit.
 
-Poll request carries connector epoch and an opaque continuation; response has up to 16 signed items, at most 256 KiB total encoded bytes, and a bounded retry hint. One signed item is at most 128 KiB and its decoded canonical control payload at most 64 KiB. Wait up to 25 seconds; transport timeout does not change operation identity. Receipt/heartbeat requests are at most 64 KiB and 100 receipt entries, whichever limit is reached first. Heartbeat defaults remain 15 seconds / offline after 60 seconds; heartbeat has independent scheduling. Compression is disabled for control in v1. Reference resolution has per-kind byte caps and never returns an unrestricted evidence object.
+Work is pushed: a hub transaction that makes work eligible issues `NOTIFY`, and the replica holding the connection sends it on the command stream. Work moves `Queued → Sent → Running` and then to a terminal state; `Sent` records the connection epoch. After a reconnect the hub resends every non-terminal item and the connector returns the existing state for a known `workID`. Commands carry no signatures. One work message is at most 128 KiB; its decoded control payload at most 64 KiB. Receipts are at most 64 KiB or 100 entries per message.
 
-Delivery is at least once. SQL outbox/audit gate makes work eligible; a poll lease is not a start approval. The connector acknowledges Accepted only after its relevant local durable state exists. Lost acknowledgements cause replay of the same identity. Exponential backoff with jitter respects original deadlines; overload returns bounded retry guidance, not a fresh request. Error vocabulary: UnsupportedVersion/Capability, Denied, Expired, Conflict, StaleEpoch/Fence, CapacityUnavailable, DependencyUnavailable, Indeterminate. HTTP success does not replace checking disposition.
+Cluster state (namespaces, workloads, Pods, EndpointSlices, AccessBindings, permission sources) is pushed when it changes. After a reconnect the connector compares a digest and resends only on mismatch. HTTP/2 PING frames detect a dead connection; there is no separate heartbeat request.
+
+Delivery is at least once. The connector acknowledges Accepted only after its durable local state exists; a lost acknowledgement causes redelivery of the same ID. Error vocabulary: UnsupportedVersion/Capability, Denied, Expired, Conflict, CapacityUnavailable, DependencyUnavailable, Indeterminate.
 
 ### I-02 — Node control
 
-Collectors initiate mTLS requests to the private connector service with the same bounded work/receipt DTO family. Enrollment derives node UID from the admitted DaemonSet pod bound through current Kubernetes identity and records the node boot ID plus collector generation; request-supplied node names alone are insufficient. Scoped node credentials cannot poll another node's work or resolve another source's protected references. No privileged generic Kubernetes proxy is exposed.
+Each collector holds one mTLS connection to its regional connector, with the same work/receipt message family. The collector authenticates once per connection with its audience-bound projected ServiceAccount token, checked by TokenReview; the connector then issues its client certificate ([node collector](node-collector.md), D3). Node identity comes from the reviewed Pod's node, never from a request field. A collector credential cannot receive another node's work or resolve another source's references. One collector process per node; a replacement process's new connection supersedes the old one.
 
-Routes under `/internal/v1/node/` support negotiate/poll/receipts/heartbeat/resolve-reference plus typed `reserve-start`, `lookup-start`, `checkpoint-source` and `reconcile-spend`. The latter are narrow C-07/C-11 ports; they do not accept arbitrary CRD YAML or SQL. Start reservation binds operation/attempt, scope, node boot, prepaid bundle, exact charge and expected local revision. The connector CASes existing local control records and returns a signed bounded ticket or the existing disposition. A lost response is looked up; the node does not assume reservation failed. No new CRD kind or node-held general writer token is needed.
+Work kinds include `armSource`, `stopSource`, `snapshot`, `peerGeneration`, `packetSource` and `stopPacketSource`. Start consumption goes through the [start row](local-start.md). Typed ports `lookup-start`, `checkpoint-source` and `report-usage` accept no CRD YAML or SQL.
 
-The initial [local start journal](local-start.md) implements the internal single-start `CapacityReservation` profile and non-retrying CAS adapter. These node routes, signed ticket issuance, current-reference resolver and local process exclusion are still pending. An adapter disposition is not a reusable network execution credential.
+Node status is sent as a delta when a source, ring or accounting state changes. Live-viewing counters (active cohorts, buffered rows, scan and delivery totals, refused admissions, source-loss and dropped-row counts) are cumulative and included in those deltas; they carry no source, filter or payload labels. C-19 aggregates node totals per cluster for fleet status. A first report or nonmonotonic counter marks rates incomplete.
 
-[ADR-246](../decisions/246-node-collector-role.md) implements the first three routes, `enroll`, `poll` and `status` ([node collector](node-collector.md)): Pod-bound token plus identity-free CSR enrollment attested by TokenReview and live Pod/DaemonSet/Node reads (node UID and kubelet boot ID), a 20-minute client leaf from the connector's in-memory issuer, long-poll work of the closed kinds `armSource`/`stopSource`/`snapshot`/`peerGeneration` (identity only, no producer yet), and a 15-second batched status. One current collector process per node; a replaced process loses authentication at once. The remaining routes (reservations, references, checkpoints, spend) are still pending.
-
-[ADR-263](../decisions/263-ordinary-ongoing-source-leases.md) adds the private
-ordinary `packetSource`/`stopPacketSource` purposes over this existing channel.
-They bind one source/fence and actual Pod/node/boot/collector process, use current
-policy/resource admission and cumulative pre-filter wire credit, and keep one
-ring across quiet renewals. The regional work uses a separate JWS purpose under
-the existing work key; enqueue is not attach acknowledgement or complete-history
-proof. Node status retains its original source-set snapshot time, cumulative
-accounting and distinct natural Stopped/Closed/unknown-input facts on the existing
-fifteen-second cadence. When live viewing is enabled, an optional content-minimized
-live snapshot adds active cohorts, buffered pending rows, the rate-limit window
-start and process-lifetime cumulative scan events/bytes/CPU, delivered
-rows/encoded bytes, refused cohort admissions, source-loss events and rows dropped
-by bounded reply encoding, with no source/filter/payload labels. Pending rows are
-a current shared-buffer occupancy gauge, not an exact per-viewer lag or viewer
-count; loss and reply-drop counts are cumulative. C-19 also aggregates current
-node totals and report-to-report rates per cluster. The existing idle regional
-query `read-live-runtime` returns that bounded aggregate without node labels;
-a first report, nonmonotonic counter or missing predecessor makes all rates
-explicitly incomplete instead of presenting a partial installation-wide rate.
-The browser-only `get_live_capacity` operation exposes one explicitly selected
-cluster to a current fleet operator after fresh identity/administration/recovery
-checks. An exact active-viewer gauge counts distinct unexpired Active, Paused
-and Disconnected watch controls only while current trust, their owner enrollment
-and an activated unexpired certificate still resolve that owner. It uses the
-validated target cluster's domain-separated SHA-256 digest and the existing hub
-SQL function credential/pool; the owner's cluster is not the target placement.
-No principal, source or workload identifier is returned. The operation does not poll, enumerate
-sources or start acquisition.
-Public ongoing compilation, Save composition and installed source qualification
-remain gated as recorded in implementation progress.
-
-Sensors/sources may continue within existing leases when disconnected. Ordinary intrusive starts need the durable reservation and remaining permit. Natural-core acceptance is the prepared special path in I-03. Losing the local journal, boot identity or collector epoch makes past unproven starts unavailable/Indeterminate; a new leader cannot authorize replay by advancing only a delivery fence. Multi-node admission is conservative and may produce partial outcomes; it is not an atomic Kubernetes transaction.
+A started source runs to its admitted hard end while the connector is disconnected; a pending stop is delivered on reconnect. While disconnected, natural cores (I-03) and policy-triggered starts spend only the connector's budget lease under unexpired local policy permits; other new intrusive starts need their hub `capture_start` row and wait for the connection. Multi-node admission may produce partial outcomes; it is not atomic across nodes.
 
 ### I-03 — Host core handoff
 
-Use an installation-owned Unix-domain stream socket with restricted path ownership/mode, authenticated peer credentials and collector-generation handshake. The helper verifies the expected privileged peer; the collector verifies the permitted helper peer and independently resolves the kernel-provided process identifiers. UID alone cannot prove an executable identity against root; node/root remains trusted. No caller-controlled executable path or argument string becomes authority.
+Use an installation-owned Unix-domain stream socket with restricted ownership/mode and peer credentials. The helper verifies the collector peer; the collector verifies the helper and resolves the kernel-provided process identifiers itself. No caller-supplied executable path or argument becomes authority.
 
-A fixed-version header of at most 4 KiB carries numeric IDs, node boot/process start identity when available and a nonce. The node either refuses promptly or returns a bounded acceptance tied to one preprepared envelope, durable spend allocation and monotonic byte/time limit. Only then consume bytes, with bounded backpressure and a hard close deadline. No remote refill, audit upload, DNS or key call occurs while holding the crashed process. The encrypted spool has its own budget. Exact Linux header/pidfd qualification is a required native-core spike; socket credentials alone do not solve PID reuse.
+A fixed-version header of at most 4 KiB carries numeric IDs, process start identity when available and a nonce. The node refuses promptly or returns an acceptance tied to one prepared envelope, a budget-lease allocation and a byte/time limit. Only then consume bytes, with bounded backpressure and a hard close deadline. No remote call occurs while the crashed process is held. The encrypted spool has its own budget. Exact Linux header/pidfd behavior is a required native-core spike; socket credentials alone do not solve PID reuse.
 
 ### I-04 — Gadget observation
 
-The C-23 adapter drives only pinned approved gadget definitions via the engine linked into the collector process (ADR-246, S-04 plan S1); there is no separate engine Pod or node-local transport. Its public port is `Attach(VerifiedSource, Limits) → Session`, bounded event reads, atomic membership-generation replacement and `Stop`. No user gadget registry, script, path or arbitrary BPF program is accepted. It reports attach/restart/map-overflow/filter-update and entry/exit-pairing gaps. Qualification must establish the actual private transport and supported ABI for the pinned build before enabling it; the diagram is not proof that every Gadget version supports this topology.
+The C-23 adapter drives pinned approved gadget definitions through the engine linked into the collector process ([ADR-246](../decisions/246-node-collector-role.md)). Its port is `Attach(VerifiedSource, Limits) → Session`, bounded event reads, atomic membership-generation replacement and `Stop`. No user gadget registry, script, path or BPF program is accepted. It reports attach/restart/map-overflow/filter-update and entry/exit-pairing gaps.
 
-### I-07 and I-12 — Transient live delivery and owner routing
+### I-07 and I-12 — Live delivery and ingress routing
 
-[Pre-Ready owner enrollment proof](owner-enrollment-proof.md) binds the private CSR request to current online Pod-token/workload observations and accepted configuration. It adds typed C-04 ports, not a public listener or forwarding permission; durable registration and activation remain required.
+SQL stores a LiveWatch's control state (filter, view revision, deadline) and charges. A view holds at most sixteen source references and sixteen typed predicates and never writes rows into SQL or audit rows ([ADR-310](../decisions/310-finite-approved-live-observation.md)).
 
-[Private hub workload protection](owner-workload-protection.md) narrows namespace mutation before owner enrollment. It adds no public or network interface and supplies no forwarding authority. Current admission proof, historical installation integrity, token/CSR proof and certificate activation remain distinct checks.
-
-A-HWORK owns a fenced LiveWatch projection lease; SQL stores only control/charges. The current owner holds at most sixteen source references and sixteen typed predicates in bounded memory, clears them after joined close/expiry and never puts details into SQL or audit bodies; existing mTLS carries private details (ADR-310). Any A-HAPI replica accepts a browser/MCP request, resolves the current owner and forwards a bounded authenticated query over a private same-cluster mTLS service (I-12). The caller cannot supply a worker address. Forwarding binds authenticated viewer/client, watch revision/fence and query identity; the owner repeats current authority checks. No sticky browser session or new public endpoint is required. If the original remote owner cannot complete forwarding, ADR-317 closes only the minimized durable control after full principal/client cursor verification and returns a same-revision terminal batch; the replacement never adopts the private source/filter session.
-
-The connector opens an outbound bounded exchange to the configured hub origin (`/internal/v1/live/exchange`), whose API ingress routes to the current owner (I-07). The exchange contains exact watch/source/revision bindings and already approved rows with original observation/expiry/coverage metadata. Existing live schema and public batch/output limits apply; no unbounded HTTP stream, websocket, raw payload, durable replay, SQL event row or control-outbox body. Each hop charges transfer/processing, expires rows and preserves loss provenance. A disconnected client cannot back up acquisition; bounded queues drop with a gap or close. Resume is bounded/current-source only. If the hub path violates region policy, reject the view; this design does not silently deploy a regional frontend or relax residency.
+Live rows arrive on the connector's live stream (I-01) at the A-HAPI replica holding the connection. Any A-HAPI replica accepts the viewer's request; if another replica holds the connection, the viewer's replica opens the row stream from it over hub mTLS, found through the connection's SQL row (I-12). There is no separate projection owner. The browser receives rows over one Server-Sent Events stream per page; MCP waits server-side up to 30 seconds and returns on the first batch. The viewer is authorized once per operation (D5). Rows carry their original observation/expiry/coverage metadata; there is no durable replay, SQL row per event or outbox body. Bounded queues drop with a recorded gap or close; a slow viewer never backs up acquisition. If the connection moves to another replica, the stream reports a gap and resumes from the current source head. A view that would violate region policy is rejected.
 
 ## In-process and staged contracts
 
 ### I-05 — Evidence commit and copy ledger
 
-C-14 requests a C-15 copy registration with exact store/version generation, class, source times, parent lineage, reserved capacity, read cutoff and delete-by. Register pending copies before writing. A typed bounded writer compresses when appropriate, encrypts with unique material, tracks multipart/partial bytes and reports checksums inside protected manifests. Finalization verifies expected object/manifest state, completes artifact/lineage and converts reservations using the existing commit protocol. C-16 and C-17 consume commit references, never an upload-complete callback as authority. Original and derived copies have one authoritative privacy ledger; deletion and indexes cannot extend their age.
-
-The initial [custody facet](custody-transactions.md) supplies registration, `CheckVerification`, unpublished ciphertext receipts and deletion work. It does not yet satisfy the complete finalization/publication boundary above. Cleanup binds the configured store identity, confirms the writer barrier, verifies all version/multipart inventory and acknowledges only the current SQL deletion fence. A no-op production writer barrier or a caller-supplied `verified: true` is not an implementation of this contract.
-
-The subsequent [context verification facet](manifest-verification.md) adds `ContextExpectation`, `ContextVerifier` and `ContextCustodian`: match a complete authenticated manifest/native pod-status document to independently supplied target, audience, origin, classification and retention facts before storing receipts. There is no production accepted-execution resolver or persisted semantic-verification verdict yet. Both custodians still yield `stored_unpublished`; neither authorizes publication/disclosure. The catalog coordinator must establish current authority, durable audit and the full verification boundary itself.
+C-14 registers pending copies with C-15 before writing: store/version, class, source times, parent lineage, charge, read cutoff and deletion deadline. The writer compresses when useful, encrypts with unique material and sends each object's SHA-256 to the store. Finalization records the copies; [manifest verification](manifest-verification.md) and [publication](context-publication.md) commit the artifact. C-16 and C-17 consume commit references, never an upload-complete callback. Original and derived copies share one privacy ledger; deletion and indexes cannot extend their age. [Custody](custody-transactions.md) defines registration, receipts and deletion.
 
 ### I-06 — Analysis handoff
 
-C-18 owns one stage-generation state machine. C-15 registers input/output volumes before use. Acquisition writes exact inputs, exits and is confirmed terminated/unmounted; the analyzer mounts input read-only and output under its bounded policy with no network. After analyzer termination/unmount, a separate publisher walks outputs with confined paths, no-follow/type/size/count rules and trusted manifest fields. The controller fences old Job UID/generation and prevents simultaneous writers, including across a partition. Unknown detach/termination blocks the next stage. No shared emptyDir, executable input script, plaintext fallback PVC or user-supplied Job spec. Cleanup survives parent/controller failure.
+C-18 owns one stage-generation state machine. C-15 registers input/output volumes before use. Acquisition writes inputs and exits; the analyzer mounts input read-only and output under its bounded policy with no network. After the analyzer Job completes, a separate publisher walks outputs with confined paths, no-follow/type/size/count rules and trusted manifest fields. The controller watches the Job and starts the next stage only on its terminal condition. No shared emptyDir, executable input script, plaintext fallback PVC or user-supplied Job spec.
 
 ### I-08 — Configuration projection
 
-C-01 consumes typed Kubernetes list/watch objects through a read port and records full source identity plus opaque resourceVersion. A relist boundary is required after lost synchronization; freshness and accepted generation differ from authored generation. Deleted/recreated namespaces/resources invalidate old mappings. Permission configuration writes use Kubernetes RBAC/admission; configuration previews cannot become an alternate SQL configuration store. The transport must verify submission identity rather than attribute GitOps work to a privileged reconciler.
+C-01 consumes Kubernetes objects through shared informers and keeps each object's resourceVersion. The cache stays valid until a watch event replaces it; a watch failure marks it unavailable until the relist completes. Remote clusters push the same objects through I-01. Permission writes use Kubernetes RBAC; previews never become an alternate configuration store.
 
-The initial [identity/eligibility facet](identity-eligibility.md) defines consumer-owned `TokenVerifier`, `PolicyReader`, `ProjectionReader` and `AudienceReader` ports. Token verification, the protected Kubernetes identity-policy reader and the accepted SQL permission projection now have concrete adapters. The committed-evidence AudienceReader remains pending. Current policy/source deadlines intersect token/group/key deadlines. `Result.ContributingAssignments` explains one caller's eligibility, not an execution permit or the complete audience to persist for a capture. Ordinary scope checks precede artifact lookup; raw/share/audit/effect gates remain separately required.
-
-The subsequent [permission observation boundary](permission-observation.md) adds C-01 `PermissionReader` / `NamespaceReader` facets with a concrete Kubernetes implementation. Their values deliberately do not satisfy the accepted `ProjectionReader` contract. Binding lists are complete and at most five seconds old; automatic allow-source availability is separate. Namespace reads return selected metadata only. Current deny state, including an empty list, has an independent five-second interval in the evaluator. The subsequent SQL acceptance, encrypted authority audit, native admission guard and explicit-binding journal/reconciler now provide that boundary for AccessBindings; inherited-source acceptance remains pending.
-
-The [owner configuration acceptance](owner-configuration.md) follows ADR-078: C-04 observes the protected source into a monotonic SQL head; C-08 writes/verifies encrypted audit and separately acknowledges the exact revision. Current route readers consume the audited projection under original freshness and fleet recovery, never a raw ConfigMap alone. Negative observations and known rollback fence old trust; acknowledgement cannot refresh it. This adds no public configuration API.
+The [identity/eligibility facet](identity-eligibility.md) defines `TokenVerifier`, `PolicyReader`, `ProjectionReader` and `AudienceReader`. The eligibility result names the contributing bindings and sources for one caller; it is not an execution permit or the audience to persist. Ordinary scope checks precede artifact lookup. The [permission observation](permission-observation.md) facet supplies bindings, denies and namespace metadata from the informer cache.
 
 ### I-09 — Transactional facets
 
-Application services request named transactions such as AdmitCapture, PublishSelection, RegisterCopy or ExpireScope. Each transaction receives typed immutable proofs/expected versions and narrow owner facets. PostgreSQL acquires the existing canonical lock order; CAS/conditional writes enforce counters. It may retry the pure database callback within the existing bounded policy, never process actions or remote I/O. UNKNOWN commit is resolved by operation uniqueness. Kubernetes local spend uses a distinct CAS contract; there is no interchangeable universal repository claiming identical atomicity.
+Application services call named transactions such as AdmitCapture, PublishSelection, RegisterCopy or ExpireScope. Each receives the operation ID and expected versions. Counters change with conditional updates on the affected workload row (plus one pool row only when burst limits apply); there is no installation-wide lock. The database incarnation is compared, not locked. The pure database callback may be retried on serialization failure, never process actions or remote I/O. An unknown commit is resolved by looking up the operation ID. Each security-relevant transaction inserts its audit row (D6).
 
-The initial [context admission facet](context-admission.md) now atomically rechecks SQL authority after locks, binds workload storage, reserves all four objects and saves independent manifest expectations. It also has a separately credentialed encrypted-intent publisher with exact durable acknowledgements. Neither acceptance nor intent acknowledgement dispatches or publishes evidence.
+[Context admission](context-admission.md) atomically checks authorization, charges workload storage, reserves the four objects and saves the manifest expectation.
 
 ### I-10 — Collector adapters
 
-The consumer-owned Go ports below describe responsibilities; exact production types are generated/reviewed in the first slice. Every method receives a framework-constructed verified scope, finite limits and cancellation context, never just a pod name or arbitrary argv. A port is not a Go plugin ABI or a network endpoint.
+The consumer-owned Go ports below describe responsibilities. Every method receives a framework-constructed verified scope, finite limits and cancellation context, never just a Pod name or argv. A port is not a plugin ABI or network endpoint.
 
 ```go
-// Illustrative interfaces: no runtime code or unforgeable-capability claim.
+// Illustrative interfaces.
 type ActionAdapter interface {
     Describe() MechanismDescriptor
     Acquire(context.Context, VerifiedAction, BoundedEvidenceWriter) (ActionOutcome, error)
@@ -149,72 +102,18 @@ type LiveProjectionAdapter interface {
 }
 ```
 
-Descriptor fields include immutable mechanism/schema/projection versions, supported action kinds/modes, kernel/runtime/privilege prerequisites, required qualification reference, data classification/impact rule, budget dimensions, readiness and cancellation/loss behavior. Passive Describe cannot attach, sample or inspect user data. The dispatcher constructs typed scopes only after current checks. Adapter code is trusted but isolated and tested; a Go interface alone is not a security sandbox. Block arbitrary outbound URLs, host paths and uncontrolled writer access. Snapshot-only dispatch depends on the snapshot port, not ActionAdapter, so it has no callable dump path. Packet/syscall onTrigger variants still use their explicit zero-history semantics.
+Descriptors include mechanism/schema/projection versions, supported action kinds/modes, kernel/runtime/privilege prerequisites, qualification reference, data classification and impact rule, budget dimensions, readiness and cancellation/loss behavior. Describe never attaches, samples or reads user data. Snapshot-only dispatch depends on the snapshot port, not ActionAdapter, so it has no callable dump path. The producer runs its type's structural check before encryption ([manifest verification](manifest-verification.md)).
 
 ### I-11 — Analyzer adapters
 
-`Analyze(context, VerifiedInputs, TypedQuery, BoundedOutputTree) → AnalysisOutcome` runs only in the offline role. Descriptor pins tool/image/runtime pack, input kind/sample units, supported approved/raw queries, required private symbols and output classification. No network fallback, shell interpolation, target code execution or arbitrary debugger commands. Stderr/stdout are bounded and treated as potentially sensitive evidence, not central service logs. Publisher validation is independent of an analyzer's self-reported paths, class or retention. Missing symbols or incompatible profiles produce explicit unavailable/partial results.
+`Analyze(context, VerifiedInputs, TypedQuery, BoundedOutputTree) → AnalysisOutcome` runs only in the offline role. Descriptors pin tool/image/runtime pack, input kind/sample units, supported approved/raw queries, required private symbols and output classification. No network fallback, shell interpolation, target code execution or arbitrary debugger commands. Stdout/stderr are bounded and treated as potentially sensitive evidence. Publisher validation ignores an analyzer's self-reported paths, class or retention. Missing symbols or incompatible profiles produce explicit unavailable/partial results.
 
 ### I-13 — Native artifact byte relay
 
-[ADR-206 context projection](context-projection.md) permits reuse of bounded
-verification/TLS/framing primitives for an explicitly distinct query operation.
-Its approved DTO, query admission, worker/key ledgers and original five-second
-request authority must remain separate from native-download sessions and ranges.
-No existing download command/profile is implicitly query-capable. This extension
-is an implementation contract with native qualification pending.
+Downloads and stored-evidence queries are served by the long-running regional reader Deployment (D4). The hub replica serving the browser GET authorizes once (D5), writes the audit row and sends `downloadArtifact` on the connector's command stream; a reader replica streams the decrypted range back on a byte stream of the same connection to that replica ([REQ-DLD-003](../../specs/artifact-downloads.md)). The started response runs to its original bounds ([ADR-312](../decisions/312-started-downloads-run-to-original-bounds.md)); Stop and retention cut-offs arrive as events. Bytes are never stored in SQL, the outbox or a durable queue, and there is no storage redirect or plaintext disk cache. Range bytes use their own streams, separate from live rows and control. A hop that violates region policy blocks the transfer.
 
-[ADR-122](../decisions/122-private-native-owner-listener.md) composes an optional
-separate native HTTP/2 port on the exact accepted owner Pod/process, with protected
-worker API/topology pins and a distinct read/lock SQL credential. Its bounded
-listener joins shutdown; credentials and request callbacks retain their original
-authority. Connector server identity, installed projection provisioning and public
-download mounting remain separate requirements. See the
-[listener contract](native-owner-listener.md) for limits and qualification scope.
+[Context projection](context-projection.md) queries use the same readers with their own approved DTO and admission; a download is never implicitly query-capable.
 
-A download-only acquisition Job opens an authenticated regional connector stream for its exact transfer generation. The connector initiates the bounded outbound relay to the configured hub ingress; the authenticated HTTP reader receives native bytes. Purpose, artifact/version, actor/client, region, range, original deadline and delivery fence are bound and rechecked under [REQ-DLD-003](../../specs/artifact-downloads.md). Separate bounded queues and short authorization leases apply; no arbitrary callback, storage redirect, durable byte queue or SQL/outbox payload. Range bytes are distinct from live projections and control receipts. Resume may reread verified ciphertext only inside a reserved decode/read-work budget; no plaintext disk cache. Hops that violate locality block the transfer.
+### I-14 — Private local key operations
 
-[ADR-113](../decisions/113-large-native-response-accounting.md) requires a distinct
-whole-response lifetime, prepaid accounting windows and current short leases for
-large files. Only the original hub reader retains human authentication; no
-serialized identity or decoded authority-shaped message can replace independent
-peer, stored-operation and current-generation checks. Accounting measures the
-final HTTP handoff, not merely a connector's successful send. The existing
-credential-operation locators and certificate channels do not become long-lived
-native ownership by extending their deadlines. Native protocol composition is
-still pending.
-
-The [context publication continuation](context-publication.md) now implements the initial C-14 verification/catalog transaction and a SELECT-only `AudienceReader`. This supersedes the earlier absence of persisted semantic-verification/catalog facets. External result/privacy authority, disclosure audits/native sessions and public composition remain required; generic custody does not confer visibility.
-
-Private acquisition credential bootstrap within I-13 follows [ADR-072](worker-credential-channel.md): pinned server TLS plus current Pod-bound token/CSR, bound to active authenticated control. Its certificate response is separate from native evidence bytes and does not confer download authority.
-
-[ADR-074 request ownership](worker-request-routing.md) adds the bounded process-local owner registry and private response lifetime. Registration checks current human scope and admitted SQL worker identity; original cancellation/deadlines survive response write/flush. Cross-replica and connector/hub owner rendezvous remains required and is not supplied by this local registry.
-
-
-[ADR-075 shared locators](worker-owner-locator.md) provide the finite request-to-hub-process mapping for I-13 and an exact local owner receiver. The mapping stores no address or credential and grants no authority. Private forwarding must independently authenticate the named process and current connector-origin proof; that transport remains pending.
-
-[ADR-076 owner discovery](hub-owner-discovery.md) adds bounded pinned hub-cluster EndpointSlice/Pod/account/Deployment observations and exact TLS Pod/process identity verification. Both are required before a future forwarder transmits credentials; they do not themselves qualify protected bootstrap, certificate activation, current owner authority or the network path.
-
-[ADR-077 owner configuration](owner-configuration.md) supplies protected public pool/root observations and checks matching current configuration around discovery. The original deadlines survive composition. Durable acceptance/recovery, certificate activation and authenticated forwarding remain separate prerequisites.
-
-The private [owner certificate issuer](owner-issuance.md) consumes an already-spent, original-deadline permit under ADR-079. It returns a verified leaf/chain only; durable activation and actual TLS/current-owner checks remain separate. Server and client signers have distinct fixed provider roles. No public enrollment or forwarding endpoint is introduced by this port.
-
-[ADR-082 owner enrollment](owner-registration.md) adds private typed enrollment-ledger, certificate-activation/registry, current-crypto-verifier and retirement/pruning ports under C-04, with separate C-11 encrypted audit writer/acknowledgement facets. They do not add a public permission or enrollment API. Certificates remain unusable without actual TLS/current trust and exact request/developer authority.
-
-[ADR-083](owner-authentication.md) adds C-04 `OwnerPeerConnection` and `OwnerProtectionReader` private ports. The former is backed by an actual verified TLS snapshot; the latter is bound to the independently pinned native workload. `AuthenticatedOwner` is finite transient identity, not a wire bearer capability or a replacement for current locator/developer authority.
-
-[ADR-084](owner-credentials.md) adds C-04 `OwnerCredentialEnrollment` and `OwnerCredentialClient` in-process ports. The existing audited coordinator supplies enrollment; C-21 owns process keys and TLS callbacks. Paired supervision provides nonblocking identity status only. There is no new enrollment HTTP endpoint, public permission API or evidence grant.
-
-[ADR-085](owner-relay.md) adds C-04 `OwnerServingIdentity`, C-14 `WorkerOwnerEnrollment` and the private C-20 [owner relay request](../../specs/contracts/owner-relay.schema.json). Local serving checks never fabricate remote TLS; wire locators resolve existing live registrations only. Current admission and output checks preserve original operation deadlines. The public worker request/response contract is unchanged; outbound forwarding remains separate.
-
-[ADR-086](owner-forwarding.md) adds C-04 `OwnerClientIdentity` and C-14 read-only `WorkerOwnerLookup`, without changing I-13 wire or the existing live delivery contract. C-21 performs one finite verified transfer; its public certificate result cannot become a remote owner context or evidence capability.
-
-[ADR-087](../decisions/087-live-owner-delivery.md) changes the private owner wire to v2: one bounded length-prefixed response frame followed by an open silent body. C-21 now implements the existing C-14 `WorkerEnrollmentExchange` with a live cancellation context, retained socket and joined monitor. C-20's worker handler closes that delivery after its response flush. No new interface ID, durable entity, user API or evidence authority is added.
-
-[ADR-088](owner-startup.md) adds the private C-04 `OwnerReadinessIdentity` public CSR/certificate snapshot port and finite readiness check. C-21 supplies the process-owned adapter; bootstrap joins current components. No new I-13 wire, durable entity, outward API or evidence permission is introduced. Readiness is a scheduling hint, not an authenticated peer or operation grant.
-
-[Multi-cluster I-13 routing](worker-routing.md) uses installation/root-bound `WorkerEnrollmentBindings` and `WorkerOwnerLookup` reads, with exact current stored profile and control-digest issuer selection. The catalog provides public material only; profile-scoped effects and live delivery limits are unchanged.
-
-[ADR-090 protected deployment](owner-deployment.md) adds private installation DTOs for fixed public provider/pin inputs, separate credentials and an exact worker-control bundle. Bootstrap constructs existing ports; no new public interface, entity or evidence authority is introduced. C-21 mounted-file reads support confined projection rotation; current accepted SQL/native proof remains independently required.
-
-[ADR-091 reconciliation](configuration-reconciliation.md) adds a private installation DTO and reuses current C-04 administration/configuration and C-08 audit ports. The scheduling Lease conveys no I-13 peer, evidence or recovery authority. Original source deadlines and monotonic SQL checks remain required after every blocking operation.
+[Local key service](local-key-service.md): the optional A-KEY mTLS wrap/unwrap boundary ([ADR-065](../decisions/065-local-key-service-boundary.md)). Unwrap is authorized by the caller's mTLS role (`download-reader`, the A-READ regional reader) and the AEAD binding of the wrapped keyset; there is no hub ticket or per-call SQL lookup. It carries key material, never artifact payloads.

@@ -1,5 +1,7 @@
 # ADR-129: Original installation handover and healthy retirement
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded (2026-11-13): The handover, staging-policy retirement, gate-removal claims, pinned history manager and eight cleanup steps existed for the installer Pod and its temporary credentials. There is no installer Pod to hand over; the `setup` Job seeds the activation, trust and capacity rows idempotently.
 
 Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan.
@@ -26,6 +28,6 @@ An already completed invocation can reopen history using current protected boots
 
 Uncertain original writes and launches remain explicit unresolved states. A known terminal failed activation cannot become a replacement attempt. Existing-record adoption, reconciliation after a database restart/restore, expired issuer retirement and deployment packaging remain required follow-up work; this healthy completion path is not a generic recovery protocol.
 
-See [the implementation contract](../architecture/initial-activation-handover.md), [ADR-120](120-gated-installation-preparation.md), and [ADR-128](128-initial-provider-provisioning.md). Kubernetes [Pod lifecycle](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/) and [object names/UIDs](https://kubernetes.io/docs/concepts/overview/working-with-objects/names/) provide platform semantics; production qualification remains necessary. The pinned `metav1.Time` serializer uses RFC3339 without subseconds; time comparisons preserve this observation precision explicitly.
+See the implementation contract, [ADR-120](120-gated-installation-preparation.md), and [ADR-128](128-initial-provider-provisioning.md). Kubernetes [Pod lifecycle](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/) and [object names/UIDs](https://kubernetes.io/docs/concepts/overview/working-with-objects/names/) provide platform semantics; production qualification remains necessary. The pinned `metav1.Time` serializer uses RFC3339 without subseconds; time comparisons preserve this observation precision explicitly.
 
 The selected real PostgreSQL diagnostic confirmed one exact bootstrap-superuser creator grant before and after the creator's REVOKE, which completed without removing it. The unchanged production verifier then rejected that retained grant. This measured failure and [PostgreSQL18 role attributes](https://www.postgresql.org/docs/18/role-attributes.html), [membership catalogue](https://www.postgresql.org/docs/18/catalog-pg-auth-members.html) and [bootstrap identity definition](https://raw.githubusercontent.com/postgres/postgres/REL_18_STABLE/src/include/catalog/pg_authid.dat) establish the correction's basis. Passing corrected native qualification is recorded separately.

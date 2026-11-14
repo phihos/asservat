@@ -46,6 +46,7 @@ spec:
       burstBytes: 8388608
     maxSpoolBytes: 4294967296
     impactProfileRef: standard-node
-    unhealthySamples: 3
-    sampleIntervalSeconds: 5
-    recoveryHealthySeconds: 60
+    pressureTriggers:
+    - {resource: memory, kind: some, stallMicroseconds: 150000, windowMicroseconds: 1000000}
+    - {resource: io, kind: full, stallMicroseconds: 300000, windowMicroseconds: 1000000}
+    recoverySeconds: 60

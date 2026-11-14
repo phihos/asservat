@@ -1,5 +1,7 @@
 # ADR-248 — Manual packet capture end to end, network headers only (S-04 increment 4)
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 Date: 2026-10-27. Status: accepted; implemented; qualification below.
 Requirements: REQ-NET-001/003/004 (networkHeaders only), REQ-LIF-001/005 (manual sessions),
 REQ-DLD-001/003, REQ-CAP-002/004; TASK-05/07/11. Plan:

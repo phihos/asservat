@@ -396,14 +396,6 @@ examples:
   tool: preview_capture
 - file: examples/capture-pod-status-preset.json
   schema: https://asservat.io/spec/v1/capture.schema.json
-- file: examples/mcp-resolve-capture-input.json
-  input_tool: resolve_capture_request
-- file: examples/mcp-resolve-capture-accepted.json
-  schema: https://asservat.io/spec/v1/mcp-result.schema.json
-  tool: resolve_capture_request
-- file: examples/mcp-resolve-capture-closed.json
-  schema: https://asservat.io/spec/v1/mcp-result.schema.json
-  tool: resolve_capture_request
 - file: examples/mcp-context-excerpt-result.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
   tool: get_file_excerpt

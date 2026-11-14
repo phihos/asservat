@@ -1,5 +1,7 @@
 # ADR-086 — Outbound owner enrollment transfer
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded in part by ADR-328 (2026-11-13): namespace-protection checks no longer apply; registry, Ready-route and TLS identity checks remain.
 
 Follow-up: [ADR-087](087-live-owner-delivery.md) supersedes the finite-only transport limitation with a versioned live response, retaining this decision's authentication and no-replay constraints.

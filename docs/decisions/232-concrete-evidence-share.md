@@ -1,5 +1,7 @@
 # ADR-232 — Concrete evidence share of one stored artifact (S-06 increment 1)
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 Date: 2026-10-26. Status: accepted; implemented; qualification below. Amended the same day by
 [increment 4 (team management)](#increment-4-team-management).
 Requirements: REQ-SHR-001/002/003 (narrowed below), S-06 (TASK-07). Plan: the S-06 plan

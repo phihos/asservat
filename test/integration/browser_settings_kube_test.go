@@ -31,7 +31,7 @@ func testBrowserSettingsSource(t *testing.T, ctx context.Context, c *rest.Config
 	if e != nil {
 		t.Fatal(e)
 	}
-	data, e := os.ReadFile("../../examples/browser-settings.json")
+	data, e := readImplementedExample("../../examples/", "browser-settings.json")
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -165,4 +165,14 @@ func testBrowserSettingsSource(t *testing.T, ctx context.Context, c *rest.Config
 		t.Fatal("source replacement did not fence SQL")
 	}
 	t.Log("real named Kubernetes RBAC, current settings to SQL, suspension and source replacement fencing passed")
+}
+
+// readImplementedExample reads the example this runtime implements:
+// examples/implemented/ (pre-ADR-330 contracts) when present, otherwise the
+// canonical example.
+func readImplementedExample(dir, name string) ([]byte, error) {
+	if b, err := os.ReadFile(dir + "implemented/" + name); err == nil {
+		return b, nil
+	}
+	return os.ReadFile(dir + name)
 }

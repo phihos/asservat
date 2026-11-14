@@ -57,11 +57,9 @@
     "interval_until": "2026-10-09T12:05:02Z",
     "received_at": "2026-10-09T12:05:02Z",
     "output_bytes_spent": 1024,
-    "retry_after_ms": 1000,
     "handling": {
       "transient": true,
       "may_contain_user_data": true,
-      "managed_row_max_age_seconds": 30,
       "raw_available_live": false,
       "external_copies_recallable": false,
       "save_semantics": "freshCurrentWindow"

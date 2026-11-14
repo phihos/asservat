@@ -31,7 +31,7 @@
       },
       "recipeRef": {
         "name": "composition-7bcaf9e5423dc00a3fec7df8",
-        "digest": "7bcaf9e5423dc00a3fec7df8797337fd356cb9750792523b2280d07f051dbb21"
+        "digest": "12fd90e16a56b9fe48830257953655628fe3cb80b3acf27633c600fee04c610b"
       },
       "deadline": "2026-10-09T12:05:00Z"
     }
@@ -39,7 +39,7 @@
   "dependencies": [
     {
       "role": "captureProfile",
-      "digest": "7a296e8c2a6acb8061a98db21e1f02c9d1aaac4bb31a352347fba1b7674d1d26"
+      "digest": "6c498263cabcdba0e773251fec20c176644dab1f943ff78b976954aff73ef265"
     },
     {
       "role": "captureProfile",
@@ -55,7 +55,7 @@
     },
     {
       "role": "recipe",
-      "digest": "7bcaf9e5423dc00a3fec7df8797337fd356cb9750792523b2280d07f051dbb21"
+      "digest": "12fd90e16a56b9fe48830257953655628fe3cb80b3acf27633c600fee04c610b"
     },
     {
       "role": "retention",
@@ -108,7 +108,7 @@
           "name": "http-headers",
           "version": "v1"
         },
-        "definitionDigest": "7a296e8c2a6acb8061a98db21e1f02c9d1aaac4bb31a352347fba1b7674d1d26"
+        "definitionDigest": "6c498263cabcdba0e773251fec20c176644dab1f943ff78b976954aff73ef265"
       },
       {
         "componentID": "calls",

@@ -1,47 +1,60 @@
-# Initial storage custody transactions
+# Storage custody transactions
 
-[ADR-096](../decisions/096-database-incarnation-fence.md) requires current database-incarnation acceptance in recovery reads and final effect transactions. Migration 00031's `fleet_current_trust` view computes effective recovery denial; ordinary stored flags and source freshness do not substitute for activation. Trusted activation/recovery orchestration remains unfinished.
+Scope: C-07 capacity, C-14 evidence, C-15 privacy and C-21 adapters under I-05/I-09; part of REQ-DB-002–004, REQ-CAP-004/005, REQ-EVD-001–003 and REQ-PRV-004. Design follows [ADR-330](../decisions/330-event-driven-system-design.md). The [verification record](../research/custody-foundation.md) and [implementation progress](../implementation-progress.md) hold test results.
 
-Scope: C-07 capacity, C-14 evidence, C-15 privacy and C-21 adapters under I-05/I-09. This implements part of REQ-DB-002–004, REQ-CAP-004/005, REQ-EVD-001–003 and REQ-PRV-004. It does not complete those requirements or S-01/S-02. The [verification record](../research/custody-foundation.md) distinguishes component tests from remaining qualification.
+## Records
 
-## What these records mean
+[Migration 00001](../../migrations/00001_custody.sql) defines the storage facet:
 
-The first [migration](../../migrations/00001_custody.sql) introduces a bounded storage facet, not the complete capture/grant/catalog schema. `custody_pool` holds accepted backing; `custody_allocation` holds a protected workload/service allocation; `custody_attempt` holds immutable attempt identity and deadlines; four `custody_copy` rows exist before writes. `custody_event` is minimized transactional outbox work, **not acknowledged durable object audit**. These names deliberately distinguish storage progress from a published Artifact or an authorized Capture.
+- `custody_pool`: accepted backing.
+- `custody_allocation`: one workload or service allocation with its byte/object limit and `used` counter.
+- `custody_attempt`: immutable attempt identity, operation ID and deadlines.
+- `custody_copy`: one row per object (envelope, manifest, index, data), created before any write.
+- `custody_event`: transactional outbox rows. Hub processes signal outbox inserts with `LISTEN/NOTIFY` in the writing transaction.
 
-`Register` is idempotent by attempt ID and a digest of the complete normalized registration. Different bounds, deadlines, store, allocation or identities conflict. A repeated call returns the existing storage state; even a successful replay after deletion never authorizes another acquisition or key reuse. One artifact identity is reserved to one attempt in this initial path. Multi-attempt artifact selection needs the future capture coordinator and is not silently enabled.
+These rows track storage progress. They are not a published artifact or an authorized capture.
 
-The initial registration accepts at most 8 MiB native data and reserves ADR-048's exact worst-case data/index ceilings, 1088 KiB manifest and 32 KiB envelope, plus four object slots. It retains the entire conservative reservation until physical cleanup. It does not refund the difference between a small receipt and its ceiling: unseen versions or uncertain writes may still exist. Production multipart acquisition, replicas and additional spools require their own pre-registered charges and remain unavailable through this path.
+`Register` is idempotent by attempt ID (the operation's idempotency key) and a digest of the normalized registration. The same ID with different bounds, deadlines, store, allocation or identities conflicts. A repeated call returns the existing state; a replay after deletion never authorizes another acquisition or key reuse. One artifact identity belongs to one attempt.
 
-The configuration reconciliation facet inserts protected allocations only after reserving their full limits at the pool. Allocations cannot borrow each other's unused space. There is no public SQL configuration or permission-writing API. Pool configuration, accepted workload-to-account mapping, updates/shrink and shared-burst scheduling remain to be wired to the Kubernetes configuration owner. Capture clients must never choose the allocation ID themselves. A pool row seeded by an integration fixture is not configuration or execution authority.
+Registration charges the allocation with one conditional update and locks no pool row:
 
-## Verification and visibility
+```sql
+UPDATE custody_allocation SET used = used + $n
+ WHERE id = $allocation AND used + $n <= limit RETURNING used;
+```
 
-`evidence.Custodian` checks the existing registration and current database deadlines/fences through `CheckVerification`, calls a separately wired store verifier outside SQL locks, and records exact ciphertext identities, lengths and hashes through `StoreCopies`. The complete verification pass is bounded to 30 seconds or the earlier write deadline; finalization rechecks database time. The configured store UUID must match the registration: absence or verification on another bucket must never release or publish this store's obligation. All four receipts are immutable and share one transaction with the stored event.
+No row returned means `CapacityUnavailable`. The charge covers ADR-048's worst-case data/index ceilings, the 1088 KiB manifest, the 32 KiB envelope and four object slots. Allocations do not borrow each other's space. Allocation limits come from the Helm-rendered configuration; capture clients never choose the allocation ID.
 
-The resulting state is **`stored_unpublished`**. By itself it proves only that the four claimed ciphertext objects were reread and matched at verification time. It is not a catalog entry, a complete detailed-manifest validation, a grant, or permission to unwrap/download. The subsequent [context custodian](manifest-verification.md) also verifies the full manifest, index and native pod-status document against independent expected facts before recording this same state. SQL does not distinguish its stronger verification from the generic ciphertext-only path. The future commit coordinator must establish the full authenticated verification and current execution/audit authority before publication, as required by [ADR-048](artifact-format.md); it cannot promote a custody status alone. No public acquisition, viewer, download or MCP method is enabled by these records.
+## Integrity and visibility
 
-SQL holds opaque identities and ciphertext digests, not evidence bytes, native hashes, plaintext keysets or full manifests. Detailed audit, encrypted inventory, metadata/tombstone lifetime and backup-horizon reconciliation remain required before production use; the initial migration does not implement indefinite-retention production policy.
+The writer computes each object's SHA-256 while streaming and sends it as the S3 `x-amz-checksum-sha256` checksum, so the store rejects a corrupted upload. `StoreCopies` records each object's identity, version, length and checksum in one transaction with its outbox event. A stored copy is not a catalog entry, a grant or permission to unwrap or download.
 
-## Locks, clocks and retries
+The configured store UUID must match the registration. Absence or a copy on another bucket never releases or publishes this store's charge.
 
-Queries use pgx v5 with checked-in sqlc bindings and explicit goose SQL migrations. Runtime pool construction rejects plaintext/insecure TLS, fallback endpoints, more than 32 connections, tracing, superuser/createdb/createrole roles and public-schema create privileges. It checks the supported migration version and rejects a standby. Deployment must also prevent table ownership and migration-history writes; these constructor checks do not replace credential/role qualification, primary fencing or restore qualification.
+The regional reader checks the envelope, manifest and index before publication ([manifest verification](manifest-verification.md)); data frames are authenticated by their AEAD tag when read. Publication ([context publication](context-publication.md)) requires that verification, the stored deadlines and its `audit_event` row in the publishing transaction; a custody status alone never confers visibility.
 
-Lock pool, then allocation, then attempt. Non-locking identity lookups are hints; recheck ownership after locking. Use `clock_timestamp()` after all blocking locks; recheck after potentially contended unique inserts and receipt updates. Transactions have a five-second total context bound including connection-pool waiting and retries, five-second statement/idle timeouts, one-second lock waits and synchronous commit. No storage, identity or Kubernetes call runs under a transaction lock.
+SQL holds opaque identities and ciphertext checksums, never evidence bytes, native hashes, plaintext keysets or full manifests.
 
-Only definite serialization/deadlock aborts receive up to three complete transaction attempts. Unknown COMMIT/connection outcomes remain unavailable and charged until original-key replay resolves them. The product tests cover duplicate replay and rollback; actual wire-level lost-COMMIT and restart evidence remains in the separate feasibility experiment, not a new production recovery claim.
+## Transactions
 
-## Deletion and late writers
+Queries use pgx v5 with checked-in sqlc bindings and goose migrations. Each hub process uses one SQL login (ADR-222); the database role's grants, not runtime self-checks, limit what it can do. The pool rejects plaintext TLS and more than 32 connections and checks the migration version.
 
-After the access cutoff, stored-copy finalization fails and deletion work may claim a 30-second lease with a monotonically increasing fence. Registration checks for overdue obligations in its allocation and blocks affected new work; independent backed allocations remain usable. No public read path exists yet, so this is not evidence that in-flight HTTP/MCP disclosure cutoff has passed.
+Lock order within a registration is allocation, then attempt. Use `clock_timestamp()` after blocking locks. Statement and lock timeouts are I/O bounds (five-second statements, one-second lock waits); the operation's original deadline is the authority bound. No storage, identity or Kubernetes call runs while a transaction holds a lock.
 
-Before deleting, `privacy.Cleaner` requires `WriterBarrier.CloseAndWait`: revoke/fence the attempt's ability to write and confirm all in-flight uploads/completions have stopped. Lease expiry alone, sending a cancellation, or observing an empty listing does not establish this. There is deliberately **no production barrier implementation yet**. Bootstrap must not enable a cleanup worker with a no-op barrier; the test-only barrier is valid only because the fixture explicitly finishes every synthetic writer.
+Serialization and deadlock aborts are retried up to three times. An unknown COMMIT outcome is resolved by looking up the attempt ID; the charge stays until the lookup shows the outcome, then follows it.
 
-The S3 cleanup adapter inventories versions, delete markers, multipart uploads and current objects under the exact UUID-derived attempt prefix. It aborts uploads, deletes explicit versions (including null versions), and rechecks all inventories. Missing permissions, malformed/incomplete responses, unsupported inventory, backend errors or remaining entries leave the charge intact. Each of the three LIST responses must include an explicit `IsTruncated` value before its rows can be used. An omitted field is unknown completeness, never an empty complete page. Malformed initial inventory permits no delete or abort; malformed final inventory cannot certify absence after already completed mutations. The same shared inventory checks apply to operation and download-stop audit cleanup. One call processes at most 128 entries per inventory API; additional entries require a fresh bounded retry. This relies on a qualified backend's complete inventory semantics and a completed writer barrier. It makes no claim about unmanaged replicas or physical disk sanitization.
+## Deletion
 
-Only the current, unexpired deletion lease may finish. SQL releases the original reservation exactly once, clears receipts and retains the minimized deleted record/event for future restore suppression. Duplicate completion of that fence is idempotent; old fences cannot refund. Cleanup failure requires a subsequent lease/retry and remains pending or overdue according to its original deadline. Automatic polling/backoff, operator notices, early erasure/holds, all-store lineage, finite tombstone retention, restore and durable deletion audit are still pending.
+Each attempt stores its effective deletion deadline (`delete_due_at`, see [retention lifecycle](retention-lifecycle.md)); a retention change shortens it with one SQL update. A partial index on `delete_due_at` orders deletion work. The deletion worker sleeps until the earliest due row and wakes early on a `NOTIFY` from any update that moves a deadline earlier.
 
-AWS documents that [multipart abort may require repeated cleanup while parts remain in flight](https://docs.aws.amazon.com/AmazonS3/latest/API/API_AbortMultipartUpload.html) and that [ordinary versioned DELETE creates a delete marker](https://docs.aws.amazon.com/AmazonS3/latest/API/API_DeleteObject.html). These motivate the writer barrier and exact-version inventory; the actual test backend has its own limited qualification record.
+Writers are fenced by their deadline: an upload credential and the attempt's write deadline end before `delete_due_at`, `StoreCopies` refuses after the write deadline, and the bucket's `AbortIncompleteMultipartUpload` lifecycle rule removes abandoned multipart uploads. A claimed deletion row carries a fence number; only the current fence may complete it.
 
-The [context publication continuation](context-publication.md) adds an independent verification/audit/catalog transaction for the bounded context profile. The legacy custody state still cannot establish visibility by itself. The catalog reader also checks current custody deletion/read-cutoff state; it never releases reservations or replaces the production writer barrier.
+The S3 cleanup adapter lists versions, delete markers, multipart uploads and current objects under the attempt's UUID-derived prefix, aborts uploads, deletes explicit versions (including null versions) and lists again. Each LIST response must carry an explicit `IsTruncated`; a missing value is incomplete, never empty. Missing permissions, malformed responses or remaining entries leave the charge in place and the row due. One pass handles at most 128 entries per inventory API.
 
-Migration 00014 adds [effective retention cutoffs](retention-lifecycle.md) without rewriting the registered/manifest dates. Current finalization, due deletion and overdue-allocation admission use that overlay; deletion work retains both original identity and effective dates. Only the separate retention role can tighten it.
+Completion releases the charge once (`used = used - $n`), clears receipts and keeps the minimized deleted record for restore suppression. Duplicate completion of the same fence is idempotent; an old fence cannot release. Failures stay due and are retried at the next wake.
+
+AWS documents that [multipart abort may need repeating while parts are in flight](https://docs.aws.amazon.com/AmazonS3/latest/API/API_AbortMultipartUpload.html), that [lifecycle rules abort incomplete multipart uploads](https://docs.aws.amazon.com/AmazonS3/latest/userguide/mpu-abort-incomplete-mpu-lifecycle-config.html) and that [versioned DELETE creates a delete marker](https://docs.aws.amazon.com/AmazonS3/latest/API/API_DeleteObject.html).
+
+## Recovery fence
+
+Effects compare the database incarnation from [ADR-096](../decisions/096-database-incarnation-fence.md) in their WHERE clause, reading it without a lock. A restore changes the incarnation, so later effects fail their check. `setup` seeds the first incarnation.

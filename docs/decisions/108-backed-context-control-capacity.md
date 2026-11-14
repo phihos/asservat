@@ -1,5 +1,7 @@
 # ADR-108: back context control records per workload
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 - Status: Accepted for the initial bounded context component; native qualification pending.
 - Date: 2026-10-11
 - Owners: C-07 capacity, C-09 captures, C-15 privacy, C-21 SQL adapters

@@ -25,7 +25,7 @@ func canonicalSchema(t *testing.T, name string) *jsonschema.Schema {
 	c.UseLoader(offlineLoader{})
 	c.AssertFormat()
 	for _, file := range []string{"common.schema.json", "privacy-common.schema.json", "capture-assessment.schema.json", "action-lifecycle.schema.json"} {
-		b, err := os.ReadFile("../../../specs/contracts/" + file)
+		b, err := readImplementedContract(file)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -122,4 +122,14 @@ func TestContextProjectionDetachedAndBounded(t *testing.T) {
 	if bytes.Contains(b, []byte("expiresAt")) || bytes.Contains(b, []byte("deleteBy")) {
 		t.Fatal("future evidence received absolute preview-time expiry")
 	}
+}
+
+// readImplementedContract reads the contract version this runtime implements:
+// specs/contracts/implemented/ (pre-ADR-330, scripts/implemented_contracts.py)
+// when present, otherwise the canonical file.
+func readImplementedContract(file string) ([]byte, error) {
+	if b, err := os.ReadFile("../../../specs/contracts/implemented/" + file); err == nil {
+		return b, nil
+	}
+	return os.ReadFile("../../../specs/contracts/" + file)
 }

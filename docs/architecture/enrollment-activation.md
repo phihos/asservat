@@ -1,27 +1,69 @@
-# Audited connector activation
+# Connector enrollment
 
-C-04 coordinates C-08 durable audit and C-21 SQL/object/PKI adapters under TASK-03, S-01 and REQ-FED-001. The first implementation consumes an existing administrator-issued bootstrap slot; it does not yet issue that slot, enroll nodes, expose an ingress route, rotate identities or enable collection. [Claims](enrollment-claims.md), [PKI verification](connector-pki.md) and [current peer checks](peer-identity.md) remain independent boundaries.
+C-04 with C-21 SQL/PKI adapters under TASK-03, S-01 and REQ-FED-001/002. A
+connector obtains its cluster identity from a one-use bootstrap token and a
+certificate signing request, following kubelet TLS bootstrapping and Open
+Cluster Management registration (ADR-330 D3). The hub creates the token
+([connector identity](connector-credentials.md)), the installation CA signs and
+[peer identity](peer-identity.md) checks the certificate at each handshake.
 
-## State and retry behavior
+## Bootstrap token
 
-The coordinator validates the CSR proof on every request, consumes or recovers the same bootstrap/key, publishes and acknowledges its encrypted claim audit, then asks SQL to prepare signing. SQL locks installation trust and the original bootstrap in that order. It checks current root freshness, suspension/recovery/epoch, token/key, original deadline and the exact claim audit after the blocking reads.
+- A random 256-bit secret in canonical unpadded base64url, generated with a
+  CSPRNG. SQL `fleet_bootstrap` stores only a purpose-, installation- and
+  bootstrap-bound SHA-256 digest, the preassigned peer, cluster and issuer
+  epoch, and the token's expiry.
+- The operator supplies the token to the connector through its Helm values or
+  Secret. It travels in the request body or header, never in a URL, log, CRD
+  status or error.
+- Possessing the token never lets the caller choose installation, cluster, peer
+  or epoch; the bootstrap row fixes them.
 
-A bootstrap permits at most two provider calls. Each attempt has a server-generated immutable UUID, ordinal, pinned trust revision and original signing interval of at most five seconds, intersected with current root freshness and the original enrollment expiry. Only the transaction that inserts the attempt returns `MaySign`. Concurrent or reconstructed callers see the existing attempt with no permission to sign again. After its deadline an uncertain attempt remains spent; one second attempt is possible, and there is no third attempt. A lost COMMIT reply is treated as uncertainty. Provider calls occur outside SQL transactions and are never automatically retried by the HTTP adapter.
+## Enrollment request
 
-A verified signing result is stored against the exact current attempt before its original deadline. SQL contains the public certificate/chain as bounded control metadata (at most 48 KiB serialized), digest and original validity; it contains no private key. Its immutable issue audit binds the attempt, original bootstrap/key, claim-audit digest, trust revision and certificate identity/digest/validity. The encrypted object publisher uses conditional creation and authenticated readback before SQL acknowledges its exact receipt. An audit outage leaves a signed result that can be recovered without another provider call. Expired/revoked results may still be audited as history, but cannot activate.
+The connector generates its private key, keeps it in its own Secret and POSTs
+the token with a DER PKCS#10 CSR (at most 8192 bytes).
 
-Activation runs separately with current trust, bootstrap and original key/expiry checks, the exact acknowledged certificate audit, and an unchanged trust revision. One transaction inserts the enabled peer, certificate slot and activated marker. Duplicate activation returns the original certificate only while that exact registration is still current. It cannot re-enable a revoked peer or restore a retired/replaced certificate. The caller receives no certificate from the coordinator before this transaction succeeds. Native TLS chain verification and current registration checks are still required on subsequent requests.
+- Standard-library X.509 verifies proof of possession. Accepted keys: Ed25519,
+  ECDSA P-256/P-384/P-521, RSA 2048–4096 with exponent 65537 and SHA-2/PSS
+  signatures.
+- Requested subjects, SANs, extensions and all attributes are rejected; the
+  identity comes from the bootstrap row. The signed attribute set is checked
+  explicitly because the parsed `Attributes` field drops some shapes.
+- The canonical public-key digest is the idempotency key. The first valid
+  request binds that key to the bootstrap row; a retry with the same key (and a
+  fresh CSR signature) returns the same enrollment and certificate. A different
+  key cannot claim a bound token.
 
-## Persistence and roles
+Signing goes through the installation CA (OpenBao PKI or the Helm-generated CA)
+outside any SQL transaction. The connector may retry the same request any
+number of times until the token expires; an unknown outcome is resolved by the
+retry, which looks the enrollment up by key digest and, if no certificate was
+stored, signs again. The certificate profile (one URI SAN, client-auth EKU, at
+most one hour validity) is in [peer identity](peer-identity.md).
 
-Migration 00009 adds `fleet_certificate_issue` with an ordinal restricted to 1 or 2. A database trigger prevents changing attempt identity/deadline or clearing/replacing signed results, audit receipts and activation markers. Column privileges separate claims, signing results, audit acknowledgements and activation. The signing role cannot activate peers, the audit role cannot sign, and the activation role cannot replace certificates or re-enable a peer. Row-lock privileges do not confer a public CRUD API.
+One transaction stores the public certificate and chain (at most 48 KiB), its
+digest and validity, enables the peer, marks the token consumed and writes one
+append-only audit row. If the audit row cannot be written, nothing is
+committed. A trigger keeps the binding, certificate and audit rows immutable.
+SQL never holds a private key.
 
-An object-store version identifier may be empty for a qualified unversioned backend. The exact key, ciphertext digest, ETag and length remain mandatory at audit acknowledgement. This also fixes the earlier registration table's accidental nonempty-version restriction. No object-store URL or caller-selected audit location is accepted.
+Expired or revoked tokens and suspended or recovering installations are
+rejected. A revoked peer is never re-enabled by a replay.
 
-## Verification and limits
+## Rotation and revocation
 
-Unit/race, import-boundary, sqlc, specification and architecture gates passed in `test/results/enrollment-activation-gates.log`. These gates do not run real services. The disposable PostgreSQL/S3 suite passed the signing/activation scenarios with exit 0 in `test/results/enrollment-activation-integration-check.log`, with unchanged source hashes and complete cleanup. It uses a synthetic CA through the real X.509 verifier. The subsequent `test/results/enrollment-provider-integration-check.log` also passed with unchanged source hashes and complete cleanup: actual OpenBao PKI and separate transit encrypt/decrypt credentials, PostgreSQL, S3 and current TLS admission in one coordinator flow. Recovery returned the original certificate with one provider call; an unregistered CA-signed certificate was denied, and revocation rejected a reused TLS connection and enrollment replay. These are owned synthetic environments with administrator-seeded trust/issuance, not production installation qualification.
+The connector requests its next certificate with a new CSR over its existing
+mTLS connection before the current one expires. The request is idempotent by
+public-key digest; two certificate slots allow overlap, and retiring a slot
+blocks its certificate even while the CA signature is valid. Revoking the peer
+closes its connection and rejects later handshakes.
 
-Still required: [protected operator authorization](fleet-administration.md) is implemented; administrator bootstrap issuance and encrypted issuance audit; protected trust production and restore fencing; bounded issuance/history/rate limits; actual enrollment transport and private-key persistence; credential renewal/revocation producers; node attestation; production roles/bootstrap and public UI/MCP composition. The two-call budget is per already-authorized slot, not a substitute for a fleet-wide enrollment quota. This component enables no collection or disclosure by itself.
+## Persistence
 
-[Audited bootstrap issuance](bootstrap-issuance.md) now composes reservations, credential delivery, encrypted issuance-intent audit and current atomic activation, with real PostgreSQL/S3/OpenBao tests. This supersedes the issuance-producer gap stated above; protected trust/recovery, provider lifecycle qualification and public ingress remain pending.
+`fleet_bootstrap`, `fleet_peer`, `fleet_certificate_issue` and the audit table
+are written by the hub process's single SQL role (ADR-222); immutability is
+enforced by triggers, not by per-column role splits. The ceilings in
+[fleet administration](fleet-administration.md) bound active tokens, retained
+bootstrap records and registered clusters. `ClaimConnector` has no public
+endpoint that accepts caller-created domain values.

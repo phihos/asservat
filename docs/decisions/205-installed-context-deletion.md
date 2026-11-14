@@ -1,5 +1,7 @@
 # ADR-205 — Installed context deletion
 
+> Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
+
 > Superseded in part by ADR-328 (2026-11-13): the `installer-continue` steps, the handoff after the final native projection proof and the resource-journal template and role pins no longer apply; Helm and its hook Jobs provision the Secret, signing key and section from mounted configuration. The deletion child, its three SQL purposes, the separate delete-only evidence credential, the signed encrypted deletion record and charge release remain valid.
 
 Date: 2026-10-18. Status: accepted; implemented and merged; installed deletion qualification pending.

@@ -1,4 +1,16 @@
 {
-  "preview_id": "00000000-0000-4000-8000-000000000080",
+  "preview": {
+    "target_ref": {
+      "cluster_id": "00000000-0000-4000-8000-000000000001",
+      "namespace": "payments",
+      "kind": "Deployment",
+      "name": "api"
+    },
+    "preset_ref": {
+      "name": "incident-context",
+      "version": "v1"
+    }
+  },
+  "expected_plan_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
   "idempotency_key": "synthetic-preview-capture-1"
 }
