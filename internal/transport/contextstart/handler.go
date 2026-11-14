@@ -95,6 +95,15 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.refuse(w, "hello")
 		return
 	}
+	// ADR-332: one protocol major; within it the announced capabilities decide
+	// which operations this connector receives.
+	capabilities := contracts.NewConnectorCapabilities(hello.Capabilities)
+	if hello.Protocol != contracts.ConnectorProtocolMajor || capabilities == nil {
+		stop()
+		release()
+		h.refuse(w, "connector-protocol")
+		return
+	}
 	// The connector started its finite conversation before dialing. Retain its
 	// original declared end as a passive availability bound, intersected with
 	// this request's independently owned native socket/caller lifetime. It is
@@ -167,6 +176,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	defer stream.Close()
 	stream.sources = sources
+	stream.capabilities = capabilities
 	// Hello and the first source were read before the stream was constructed.
 	stream.frames = 2
 	stream.bytes = contracts.APIContextWorkBytes + 5 + contracts.APIContextSourceBytes + 5 // Same ceilings as the connector.

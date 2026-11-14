@@ -567,7 +567,7 @@ func (c *ContextStartClient) open(ctx context.Context, owner value.OwnerBinding,
 	}
 	request.Header.Set("Content-Type", contracts.APIContextStartMedia)
 	request.Header.Set("Accept", contracts.APIContextStartMedia)
-	hello, e := contracts.EncodeAPIContextHello(contracts.APIContextHello{Format: contracts.APIContextExchangeFormat, Channel: contextStartChannelWire(channel), StandbyUntil: until.UTC().Truncate(time.Microsecond)})
+	hello, e := contracts.EncodeAPIContextHello(contracts.APIContextHello{Format: contracts.APIContextExchangeFormat, Channel: contextStartChannelWire(channel), StandbyUntil: until.UTC().Truncate(time.Microsecond), Protocol: contracts.ConnectorProtocolMajor, Capabilities: contracts.APIContextCapabilities()})
 	if e != nil {
 		return nil, e
 	}

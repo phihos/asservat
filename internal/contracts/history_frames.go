@@ -28,7 +28,7 @@ func EncodeHistoryWork(w HistoryWork) ([]byte, error) {
 	return canonicalAPIContext(w, APIContextWorkBytes)
 }
 func DecodeHistoryWork(b []byte) (HistoryWork, error) {
-	w, e := decodeClosedRPC[HistoryWork](bytes.NewReader(b), APIContextWorkBytes)
+	w, e := decodeOpenRPC[HistoryWork](bytes.NewReader(b), APIContextWorkBytes)
 	if e != nil || w.Format != HistoryWorkFormat || len(w.Authority) == 0 {
 		return HistoryWork{}, ErrAPIContextProtocol
 	}
@@ -60,7 +60,7 @@ func EncodeHistoryCiphertexts(w HistoryCiphertextMessage) ([]byte, error) {
 	return b, nil
 }
 func DecodeHistoryCiphertexts(b []byte) (HistoryCiphertextMessage, error) {
-	w, e := decodeClosedRPC[HistoryCiphertextMessage](bytes.NewReader(b), HistoryCiphertextFrameBytes)
+	w, e := decodeOpenRPC[HistoryCiphertextMessage](bytes.NewReader(b), HistoryCiphertextFrameBytes)
 	if e != nil || w.Format != HistoryCiphertextFormat || len(w.OperationID) != 36 || len(w.Bundle) > HistoryBundleBytes || len(w.Copies)+len(w.WriterCompletion)+len(w.DeleteCompletion)+len(w.Failure) > HistoryEnvelopeBytes-1024 || len(w.Failure) > 32 {
 		return HistoryCiphertextMessage{}, ErrAPIContextProtocol
 	}

@@ -89,7 +89,7 @@ func TestNativeSharedPortActualH2StandbyAndIndependentPurpose(t *testing.T) {
 		}
 		req.Header.Set("Content-Type", contracts.APIContextStartMedia)
 		req.Header.Set("Accept", contracts.APIContextStartMedia)
-		hello, e := contracts.EncodeAPIContextHello(contracts.APIContextHello{Format: contracts.APIContextExchangeFormat, StandbyUntil: time.Now().UTC().Add(30 * time.Second), Channel: contracts.APIContextChannel{ExchangeID: id}})
+		hello, e := contracts.EncodeAPIContextHello(contracts.APIContextHello{Format: contracts.APIContextExchangeFormat, StandbyUntil: time.Now().UTC().Add(30 * time.Second), Channel: contracts.APIContextChannel{ExchangeID: id}, Protocol: contracts.ConnectorProtocolMajor, Capabilities: contracts.APIContextCapabilities()})
 		if e != nil {
 			t.Fatal(e)
 		}

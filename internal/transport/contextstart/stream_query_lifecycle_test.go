@@ -177,7 +177,7 @@ func TestContextQueryIncompleteAnswerNeverRestores(t *testing.T) {
 				case "malformed-answer":
 					return contracts.APIContextFrame{Kind: contracts.APIContextAnswerFrame, Payload: []byte("{")}
 				case "invalid-body":
-					reply.Body = json.RawMessage(`{"unknown":true}`)
+					reply.Body = json.RawMessage(`[]`)
 				case "eof":
 					return contracts.APIContextFrame{}
 				case "cancelled":

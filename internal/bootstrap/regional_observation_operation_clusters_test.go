@@ -14,7 +14,7 @@ import (
 func TestRegionalOperationClustersIndexEachCluster(t *testing.T) {
 	pin := func(cluster, root string) value.ConnectorObservationPin {
 		return value.ConnectorObservationPin{Profile: value.ConnectorCredentialProfile{RootID: root, Binding: value.PeerBinding{InstallationID: runtimeID, ClusterID: cluster, IssuerEpoch: runtimeID, PeerID: observationForwardID(503), Role: value.ConnectorPeer}, Revision: identity.Revision{UID: observationForwardID(504), Generation: 1, Digest: artifact.Digest{33}}, ProtectionDigest: artifact.Digest{34}, ServerName: "connector.example.invalid", Deployment: value.ConnectorDeployment{Namespace: "connector", ServiceAccount: "connector", Deployment: "connector", ServingSlots: 2, RetainedProcesses: 8}, ClientIssuerRoots: [][]byte{{1}}, ServerIssuerRoots: [][]byte{{1}}},
-			Roles: value.ConnectorIdentityRoles{Source: "source", Journal: "journal", Acknowledgement: "ack", Cleanup: "cleanup", Verifier: "verifier", Finalizer: "finalizer"}, TemplateDigest: artifact.Digest{35}, ImageDigest: artifact.Digest{36}, ProtectionDigest: artifact.Digest{37}}
+			Roles: value.ConnectorIdentityRoles{Source: "source", Journal: "journal", Acknowledgement: "ack", Cleanup: "cleanup", Verifier: "verifier", Finalizer: "finalizer"}, TemplateDigest: artifact.Digest{35}, ProtectionDigest: artifact.Digest{37}}
 	}
 	registry := &framedRegionalFixture{}
 	root, a, b := observationForwardID(600), observationForwardID(601), observationForwardID(602)

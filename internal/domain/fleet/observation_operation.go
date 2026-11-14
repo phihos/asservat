@@ -117,5 +117,5 @@ func (v ConnectorObservationOperationValue) Continues(first ConnectorObservation
 	return v.BracketID == first.BracketID && v.ConnectionBinding == first.ConnectionBinding && v.Certificate == first.Certificate &&
 		SameOwnerObservationRequest(a.Request, b.Request) && a.NativeStartedAt.Equal(b.NativeStartedAt) && !b.NativeUntil.After(a.NativeUntil) && !b.ValueObservedAt.Before(a.ValueObservedAt) &&
 		a.Source.Roles == b.Source.Roles && a.Source.Observation.SameSource(b.Source.Observation) && !b.Source.Observation.FreshUntil.After(a.Source.Observation.FreshUntil) &&
-		x.Process == y.Process && x.Pod == y.Pod && x.ReplicaSetUID == y.ReplicaSetUID && x.TemplateDigest == y.TemplateDigest && x.ImageDigest == y.ImageDigest && x.ProtectionDigest == y.ProtectionDigest && x.WorkloadDigest == y.WorkloadDigest && x.ObservedAt.Equal(y.ObservedAt) && !y.FreshUntil.After(x.FreshUntil)
+		x.Process == y.Process && x.Pod == y.Pod && x.ReplicaSetUID == y.ReplicaSetUID && x.TemplateDigest == y.TemplateDigest && x.ProtectionDigest == y.ProtectionDigest && x.WorkloadDigest == y.WorkloadDigest && x.ObservedAt.Equal(y.ObservedAt) && !y.FreshUntil.After(x.FreshUntil)
 }

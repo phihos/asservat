@@ -73,7 +73,7 @@ func liveManualMatches(w app.APIContextWork, r value.APIExecution, now time.Time
 		(e.Recording.Kind == "packetCapture" || e.Recording.Kind == "syscallTrace") && r.Valid() && r.Phase == "started" && !now.Before(r.StartedAt) &&
 		r.Binding.CaptureID == w.Accepted.CaptureID && r.Binding.CaptureID == e.CaptureUID && r.Binding.ActionID == e.ActionID && r.Binding.AttemptID == e.Registration.Location.AttemptID &&
 		r.Binding.PodUID == e.PodUID && r.Binding.ClusterID == e.Registration.Location.ClusterID && r.Binding.ScopeDigest == e.PlanDigest && r.Binding.ScopeDigest == w.Accepted.ScopeDigest &&
-		r.Binding.AuditDigest == w.IntentDigest && r.ExpectationDigest == evidence.ContextExpectationDigest(e) && r.Binding.NativeBytes == e.Registration.NativeLimit && r.Process.ImageDigest == e.CollectorImageDigest &&
+		r.Binding.AuditDigest == w.IntentDigest && r.ExpectationDigest == evidence.ContextExpectationDigest(e) && r.Binding.NativeBytes == e.Registration.NativeLimit &&
 		w.Target.ClusterID == e.Registration.Location.ClusterID && w.Target.Namespace.UID == e.NamespaceUID && w.Target.Workload.UID == e.WorkloadUID && w.Target.PodUID == e.PodUID &&
 		now.Before(w.Accepted.Deadline) && now.Before(e.Registration.WriteUntil)
 }

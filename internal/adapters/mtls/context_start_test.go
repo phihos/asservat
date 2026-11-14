@@ -128,8 +128,9 @@ func newContextStartTLSFixture(t *testing.T) *contextStartTLSFixture {
 		return execution.APIProcessObservation{Binding: api, CheckedAt: now, ValidUntil: now.Add(5 * time.Second)}, nil
 	})
 	fixture.api = process
-	pin := ContextStartExecutorPin{StartupDigest: api.StartupDigest, ImageDigest: api.ImageDigest}
-	ingress, e := NewContextStartIngress(fixture.rootID, owner, owners, []ContextStartConnectorAdmission{{Profile: cf.profile, Executor: pin, Registry: contextStartObservationRegistry{cf}}}, time.Now)
+	// No executor digest is configured on the hub (ADR-332): the fixture's
+	// arbitrary startup and image digests are admitted as provenance.
+	ingress, e := NewContextStartIngress(fixture.rootID, owner, owners, []ContextStartConnectorAdmission{{Profile: cf.profile, Registry: contextStartObservationRegistry{cf}}}, time.Now)
 	if e != nil {
 		t.Fatal(e)
 	}

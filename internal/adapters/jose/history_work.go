@@ -48,13 +48,13 @@ func historyWorkValue(b []byte) (app.HistoryWork, error) {
 	}
 	var a capture.HistoryOperationAuthority
 	dec := json.NewDecoder(bytes.NewReader(d.Authority))
-	dec.DisallowUnknownFields()
 	if dec.Decode(&a) != nil {
 		return app.HistoryWork{}, value.ErrInvalid
 	}
 	w := app.HistoryWork{Channel: historyChannelValue(d.Channel), Authority: a}
-	canonical, e := historyWorkBytes(w)
-	if e != nil || !bytes.Equal(canonical, b) {
+	// The signature covers the received bytes; unknown fields of a newer hub
+	// are ignored (ADR-332).
+	if _, e := historyWorkBytes(w); e != nil {
 		return app.HistoryWork{}, value.ErrInvalid
 	}
 	return w, nil

@@ -39,5 +39,5 @@ func EncodeConnectorObservationReply(v ConnectorObservationReply) ([]byte, error
 	return canonicalAPIContext(v, ConnectorObservationBytes)
 }
 func DecodeConnectorObservationReply(b []byte) (ConnectorObservationReply, error) {
-	return decodeClosedRPC[ConnectorObservationReply](bytes.NewReader(b), ConnectorObservationBytes)
+	return decodeOpenRPC[ConnectorObservationReply](bytes.NewReader(b), ConnectorObservationBytes)
 }
