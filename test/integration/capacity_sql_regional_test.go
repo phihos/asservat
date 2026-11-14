@@ -168,9 +168,11 @@ func (f *capacitySQLFixture) qualifyRegionalExtension(t *testing.T, first app.En
 	}) {
 		return
 	}
-	// ADR-200: a refresh demand is recorded only for an enrolled, ready
-	// workload, and only the capacity writer reads demands back.
-	if !t.Run("refresh-demand-names-only-ready-workloads", func(t *testing.T) {
+	// ADR-200 / migration 00161: a refresh demand names any workload, so the
+	// demand lane can enroll one that discovery has not reached yet (the first
+	// preview after deploying it); at most sixteen active demands per root,
+	// and only the capacity writer reads demands back.
+	if !t.Run("refresh-demand-names-unenrolled-workloads-bounded", func(t *testing.T) {
 		var cluster, nsUID, workloadUID string
 		if err := f.admin.QueryRow(f.ctx, `SELECT cluster_id::text,namespace_uid,workload_uid FROM capacity_workload WHERE root_id=$1 AND ready_at IS NOT NULL ORDER BY workload_uid LIMIT 1`, root).Scan(&cluster, &nsUID, &workloadUID); err != nil {
 			t.Fatal("ready workload", err)
@@ -182,8 +184,9 @@ func (f *capacitySQLFixture) qualifyRegionalExtension(t *testing.T, first app.En
 		if err := demand("Deployment", workloadUID); err != nil {
 			t.Fatal("demand for a ready workload", err)
 		}
-		if err := demand("Deployment", custodyID()); err != nil {
-			t.Fatal("an unknown workload must be a silent no-op", err)
+		unenrolled := custodyID()
+		if err := demand("Deployment", unenrolled); err != nil {
+			t.Fatal("demand for a not-yet-enrolled workload", err)
 		}
 		if err := demand("CronJob", workloadUID); err == nil {
 			t.Fatal("an unsupported kind was accepted")
@@ -193,8 +196,26 @@ func (f *capacitySQLFixture) qualifyRegionalExtension(t *testing.T, first app.En
 			t.Fatal(err)
 		}
 		got, err := reader.ReadCapacityRefreshDemands(f.ctx)
-		if err != nil || len(got) != 1 || got[0].ClusterID != cluster || got[0].Workload.UID != workloadUID || got[0].Namespace.Name != "payments" || got[0].Workload.Name != "api" {
+		if err != nil || len(got) != 2 || got[0].ClusterID != cluster || got[0].Workload.UID != workloadUID || got[1].Workload.UID != unenrolled || got[0].Namespace.Name != "payments" || got[0].Workload.Name != "api" {
 			t.Fatal("capacity writer demand read", got, err)
+		}
+		for range 14 {
+			if err := demand("Deployment", custodyID()); err != nil {
+				t.Fatal("demand below the bound", err)
+			}
+		}
+		if err := demand("Deployment", custodyID()); err != nil {
+			t.Fatal("a demand past the bound must be a silent no-op", err)
+		}
+		if err := demand("Deployment", unenrolled); err != nil {
+			t.Fatal("an existing demand must be extendable at the bound", err)
+		}
+		var rows int
+		if err := f.admin.QueryRow(f.ctx, `SELECT count(*) FROM capacity_refresh_demand WHERE root_id=$1`, root).Scan(&rows); err != nil || rows != 16 {
+			t.Fatal("demand bound", rows, err)
+		}
+		if _, err := f.admin.Exec(f.ctx, `DELETE FROM capacity_refresh_demand WHERE root_id=$1 AND workload_uid<>$2`, root, workloadUID); err != nil {
+			t.Fatal(err)
 		}
 		// Migration 00076: reads no longer depend on workload capacity, so a
 		// download has nothing to re-arm and the function is gone.
