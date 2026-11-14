@@ -64,6 +64,10 @@ type hubWorker struct {
 	// (ADR-247).
 	deletionMu      sync.Mutex
 	evidenceStoreID string
+	// capacityStarted closes when the capacity child published the store ID:
+	// the permission stream is current and setup's SQL rows exist, so the
+	// children that need them start after it instead of failing noisily.
+	capacityStarted chan struct{}
 	guards          sharedNamespaceGuards
 }
 
@@ -523,8 +527,37 @@ func (w *hubWorker) publishEvidenceStoreID(store string) error {
 	if w.evidenceStoreID != "" && w.evidenceStoreID != store {
 		return mounts.ErrUnavailable
 	}
+	if w.evidenceStoreID == "" {
+		close(w.capacityStartedLocked())
+	}
 	w.evidenceStoreID = store
 	return nil
+}
+
+func (w *hubWorker) capacityStartedLocked() chan struct{} {
+	if w.capacityStarted == nil {
+		w.capacityStarted = make(chan struct{})
+	}
+	return w.capacityStarted
+}
+
+// awaitCapacity waits until the capacity child has started, so a child whose
+// SQL rows the permission stream and capacity initialization create does not
+// attempt (and log) work before they exist. Without a capacity section there
+// is nothing to wait for. It reports false when ctx ends first.
+func (w *hubWorker) awaitCapacity(ctx context.Context) bool {
+	if w.config.Capacity == nil {
+		return ctx.Err() == nil
+	}
+	w.deletionMu.Lock()
+	started := w.capacityStartedLocked()
+	w.deletionMu.Unlock()
+	select {
+	case <-started:
+		return ctx.Err() == nil
+	case <-ctx.Done():
+		return false
+	}
 }
 
 func cloneContextDeletion(v contracts.ContextDeletionDeployment) contracts.ContextDeletionDeployment {

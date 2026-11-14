@@ -20,6 +20,17 @@ unchanged-source evidence, preserve required final checks, and inspect producer
 and consumer boundaries before expensive dispatches. Keep one concise current
 feature ledger; prefer measured simplifications over added infrastructure.
 
+## Event-driven, no polling (maintainer, 2026-11-14)
+
+No polling where an event source exists. Use Kubernetes watches/informers,
+PostgreSQL LISTEN/NOTIFY, push over existing connections or in-process
+signals, and send changes when they happen rather than on a timer. Polling
+does not scale and delays every change by its interval. Resync only after a
+reconnect, a watch restart or a digest mismatch; a slow safety resync needs a
+stated reason. Cached state remains valid until replaced: do not expire it
+merely to force refreshes. Every new ticker/sleep loop, periodic full resend
+or expiry-driven refresh must justify in its PR why no event source works.
+
 ## Threat model and security evidence (maintainer, 2026-11-13)
 
 Operators keep every non-Asservat-administrator completely out of the Asservat

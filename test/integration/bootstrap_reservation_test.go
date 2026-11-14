@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -239,7 +240,8 @@ func TestEnrollmentBootstrapReservationsWithRealServices(t *testing.T) {
 	}
 	// mode=combined: the installation's own connector peer gets a slot for
 	// its fixed generated IDs, a live slot resumes or stays pending, a slot
-	// that expired unclaimed is replaced and a claimed slot ends issuance.
+	// that expired without activation (unclaimed, or claimed by a failed
+	// enrollment) is replaced and an activated enrollment ends issuance.
 	t.Run("local-fixed-binding", func(t *testing.T) {
 		request, _ := setup(1, 16, 1)
 		a := request.Authority
@@ -261,23 +263,62 @@ func TestEnrollmentBootstrapReservationsWithRealServices(t *testing.T) {
 		if _, err = local.ReserveBootstrap(ctx, other); !errors.Is(err, value.ErrPending) {
 			t.Fatal("second live local slot", err)
 		}
-		// Expire the live slot (fixture-only trigger bypass) and replace it.
-		if _, err = admin.Exec(ctx, `ALTER TABLE fleet_bootstrap_intent DISABLE TRIGGER bootstrap_intent_guard; UPDATE fleet_bootstrap_intent SET not_before=not_before-interval '6 minutes',not_after=not_after-interval '6 minutes' WHERE installation_id='`+a.InstallationID+`'; ALTER TABLE fleet_bootstrap_intent ENABLE TRIGGER bootstrap_intent_guard`); err != nil {
-			t.Fatal(err)
+		// Expire the installation's slots (fixture-only trigger bypass).
+		expire := func() {
+			t.Helper()
+			if _, err := admin.Exec(ctx, `ALTER TABLE fleet_bootstrap_intent DISABLE TRIGGER bootstrap_intent_guard; ALTER TABLE fleet_bootstrap DISABLE TRIGGER bootstrap_claim_guard; UPDATE fleet_bootstrap_intent SET not_before=not_before-interval '6 minutes',not_after=not_after-interval '6 minutes' WHERE installation_id='`+a.InstallationID+`'; UPDATE fleet_bootstrap SET claimed_at=claimed_at-interval '6 minutes',not_before=not_before-interval '6 minutes',not_after=not_after-interval '6 minutes' WHERE installation_id='`+a.InstallationID+`'; ALTER TABLE fleet_bootstrap ENABLE TRIGGER bootstrap_claim_guard; ALTER TABLE fleet_bootstrap_intent ENABLE TRIGGER bootstrap_intent_guard`); err != nil {
+				t.Fatal(err)
+			}
 		}
+		expire()
 		replaced, err := local.ReserveBootstrap(ctx, other)
 		if err != nil || replaced.Slot.ID == first.Slot.ID || replaced.Slot.Binding != first.Slot.Binding {
 			t.Fatal("expired unclaimed local slot not replaced for the same peer", err)
 		}
-		// A claimed slot ends local issuance even after it expired.
-		if _, err = admin.Exec(ctx, `INSERT INTO fleet_bootstrap(installation_id,id,cluster_id,peer_id,issuer_epoch,secret_sha256,not_before,not_after,issue_authority_digest,issue_audit_id,issue_audit_key,issue_audit_version,issue_audit_sha256) SELECT installation_id,id,cluster_id,peer_id,issuer_epoch,$2,not_before,not_after,$2,id,'synthetic-local','v1',$2 FROM fleet_bootstrap_intent WHERE installation_id=$1 AND id=$3`, a.InstallationID, a.IdentityRevision.Digest[:], replaced.Slot.ID); err != nil {
+		claim := func(slot string, k byte) {
+			t.Helper()
+			if _, err := admin.Exec(ctx, `INSERT INTO fleet_bootstrap(installation_id,id,cluster_id,peer_id,issuer_epoch,secret_sha256,not_before,not_after,issue_authority_digest,issue_audit_id,issue_audit_key,issue_audit_version,issue_audit_sha256) SELECT installation_id,id,cluster_id,peer_id,issuer_epoch,$2,not_before,not_after,$2,id,'synthetic-local','v1',$2 FROM fleet_bootstrap_intent WHERE installation_id=$1 AND id=$3`, a.InstallationID, bytes.Repeat([]byte{k}, 32), slot); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := admin.Exec(ctx, `UPDATE fleet_bootstrap SET claimed_at=clock_timestamp(),public_key_sha256=$3 WHERE installation_id=$1 AND id=$2`, a.InstallationID, slot, bytes.Repeat([]byte{k}, 32)); err != nil {
+				t.Fatal(err)
+			}
+		}
+		// A live claimed slot is an enrollment in progress: no second slot.
+		claim(replaced.Slot.ID, 3)
+		third := request
+		third.KeyDigest[0] = 7
+		if _, err = local.ReserveBootstrap(ctx, third); !errors.Is(err, value.ErrPending) {
+			t.Fatal("live claimed local slot replaced", err)
+		}
+		// Claimed but never activated before expiry: it can no longer
+		// enroll, so a new slot replaces it.
+		expire()
+		reissued, err := local.ReserveBootstrap(ctx, third)
+		if err != nil || reissued.Slot.ID == replaced.Slot.ID || reissued.Slot.Binding != first.Slot.Binding {
+			t.Fatal("failed claimed local slot not re-issued", err)
+		}
+		// An activated enrollment of the peer ends local issuance, also after
+		// its slot expired (fixture-only activation row without its chain).
+		claim(reissued.Slot.ID, 4)
+		tx, err := admin.Begin(ctx)
+		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err = admin.Exec(ctx, `UPDATE fleet_bootstrap SET claimed_at=clock_timestamp(),public_key_sha256=$2 WHERE installation_id=$1`, a.InstallationID, a.IdentityRevision.Digest[:]); err != nil {
+		defer tx.Rollback(ctx)
+		if _, err = tx.Exec(ctx, `SET LOCAL session_replication_role=replica`); err != nil {
 			t.Fatal(err)
 		}
+		if _, err = tx.Exec(ctx, `INSERT INTO cluster_bootstrap_activation(installation_id,bootstrap_id,root_id,peer_id,cluster_id,issuer_epoch,lineage_id,claim_audit_digest,public_key,key_digest,source_uid,source_generation,protection_digest,validity_seconds,rotation_seconds,reserved_at,audit_acknowledged_at,audit_object_key,audit_object_version,audit_object_etag,audit_object_bytes,audit_object_sha256,activated_at)
+			SELECT installation_id,id,gen_random_uuid(),peer_id,cluster_id,issuer_epoch,gen_random_uuid(),$3,$3,$3,gen_random_uuid(),1,$3,3600,60,clock_timestamp(),clock_timestamp(),'synthetic','v1','etag',1,$3,clock_timestamp() FROM fleet_bootstrap WHERE installation_id=$1 AND id=$2`, a.InstallationID, reissued.Slot.ID, bytes.Repeat([]byte{4}, 32)); err != nil {
+			t.Fatal(err)
+		}
+		if err = tx.Commit(ctx); err != nil {
+			t.Fatal(err)
+		}
+		expire()
 		if _, err = local.ReserveBootstrap(ctx, request); !errors.Is(err, value.ErrLocalBootstrapConsumed) {
-			t.Fatal("claimed local slot replaced", err)
+			t.Fatal("activated local enrollment replaced", err)
 		}
 	})
 	t.Run("role-and-immutable-record", func(t *testing.T) {

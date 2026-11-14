@@ -516,7 +516,9 @@ func (q *Queries) InsertEnrolledPeer(ctx context.Context, arg InsertEnrolledPeer
 }
 
 const latestPeerBootstrapIntent = `-- name: LatestPeerBootstrapIntent :one
-SELECT i.installation_id, i.id, i.actor_digest, i.key_digest, i.request_digest, i.actor_json, i.identity_uid, i.identity_generation, i.identity_digest, i.trust_uid, i.trust_generation, i.trust_digest, i.cluster_id, i.peer_id, i.issuer_epoch, i.delivery_profile, i.display_name, i.region, i.not_before, i.not_after, i.credential_recorded_at, i.credential_sha256, i.credential_version, i.audit_acknowledged_at, i.audit_digest, i.audit_object_key, i.audit_object_version, i.audit_object_etag, i.audit_object_bytes, i.audit_object_sha256, i.issued_at, (b.claimed_at IS NOT NULL)::boolean AS claimed FROM fleet_bootstrap_intent i
+SELECT i.installation_id, i.id, i.actor_digest, i.key_digest, i.request_digest, i.actor_json, i.identity_uid, i.identity_generation, i.identity_digest, i.trust_uid, i.trust_generation, i.trust_digest, i.cluster_id, i.peer_id, i.issuer_epoch, i.delivery_profile, i.display_name, i.region, i.not_before, i.not_after, i.credential_recorded_at, i.credential_sha256, i.credential_version, i.audit_acknowledged_at, i.audit_digest, i.audit_object_key, i.audit_object_version, i.audit_object_etag, i.audit_object_bytes, i.audit_object_sha256, i.issued_at, (b.claimed_at IS NOT NULL)::boolean AS claimed,
+ EXISTS(SELECT 1 FROM cluster_bootstrap_activation a WHERE a.installation_id=i.installation_id AND a.peer_id=i.peer_id AND a.activated_at IS NOT NULL)::boolean AS activated
+FROM fleet_bootstrap_intent i
 LEFT JOIN fleet_bootstrap b ON b.installation_id=i.installation_id AND b.id=i.id
 WHERE i.installation_id=$1 AND i.peer_id=$2 ORDER BY i.not_before DESC LIMIT 1
 `
@@ -529,6 +531,7 @@ type LatestPeerBootstrapIntentParams struct {
 type LatestPeerBootstrapIntentRow struct {
 	FleetBootstrapIntent FleetBootstrapIntent
 	Claimed              bool
+	Activated            bool
 }
 
 func (q *Queries) LatestPeerBootstrapIntent(ctx context.Context, arg LatestPeerBootstrapIntentParams) (LatestPeerBootstrapIntentRow, error) {
@@ -567,6 +570,7 @@ func (q *Queries) LatestPeerBootstrapIntent(ctx context.Context, arg LatestPeerB
 		&i.FleetBootstrapIntent.AuditObjectSha256,
 		&i.FleetBootstrapIntent.IssuedAt,
 		&i.Claimed,
+		&i.Activated,
 	)
 	return i, err
 }

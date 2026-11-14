@@ -67,3 +67,57 @@ func TestNativeNoCommandExactH2Response(t *testing.T) {
 		})
 	}
 }
+
+// Only the exact authenticated "finished" answer stops a download worker.
+func TestNativeFinishedExactH2Response(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		change   func(http.Header)
+		finished bool
+	}{
+		{name: "exact", finished: true},
+		{name: "nonce", change: func(h http.Header) { h.Set("Asservat-Native-Nonce", "wrong") }},
+		{name: "wrong-worker", change: func(h http.Header) { h.Set("Asservat-Native-Worker", "22222222-2222-4222-8222-222222222222") }},
+		{name: "duplicate", change: func(h http.Header) { h.Add("Asservat-Native-Disposition", "finished") }},
+		{name: "until", change: func(h http.Header) {
+			h.Set("Asservat-Native-Until", time.Now().Add(time.Second).UTC().Format(time.RFC3339Nano))
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			hello := nativeHello()
+			hello.Reference.OperationID = ""
+			hello.Reference.Fence = 0
+			_, client := nativeStreamServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				frame, err := contracts.ReadNativeFrame(r.Body)
+				defer clear(frame.Payload)
+				if err != nil {
+					return
+				}
+				h := w.Header()
+				h.Set("Asservat-Native-Disposition", "finished")
+				h.Set("Asservat-Native-Nonce", hello.Nonce)
+				h.Set("Asservat-Native-Installation", hello.Reference.InstallationID)
+				h.Set("Asservat-Native-Session", hello.Reference.SessionID)
+				h.Set("Asservat-Native-Worker", hello.Reference.WorkerID)
+				if tc.change != nil {
+					tc.change(h)
+				}
+				w.WriteHeader(http.StatusNoContent)
+			}), true)
+			ctx, stop := context.WithTimeout(context.Background(), 2*time.Second)
+			defer stop()
+			stream, err := client.Open(ctx, hello)
+			if stream != nil {
+				stream.Close()
+				t.Fatal("unexpected stream")
+			}
+			var finished *contracts.NativeFinished
+			if errors.As(err, &finished) != tc.finished {
+				t.Fatalf("finished=%t error=%v", tc.finished, err)
+			}
+			if finished != nil && (finished.Reference != hello.Reference || finished.Nonce != hello.Nonce) {
+				t.Fatal("wrong positive disposition")
+			}
+		})
+	}
+}

@@ -128,6 +128,15 @@ def check_secrets(render):
     assert not any(r["kind"] == "Job" for r in render({"mode": "cluster"}))
 
 
+def check_keycloak_waits_for_database(render):
+    # Keycloak exits on an unreachable database; its Pod waits for PostgreSQL first.
+    pod = named(render(bundled_values("combined")), "Deployment", "asservat-keycloak")["spec"]["template"]["spec"]
+    wait, = pod["initContainers"]
+    assert wait["name"] == "wait-database" and wait["image"] == pod["containers"][0]["image"]
+    assert wait["command"][:2] == ["bash", "-c"] and "/dev/tcp/asservat-postgres.asservat-system.svc/5432" in wait["command"][2]
+    assert wait["securityContext"]["allowPrivilegeEscalation"] is False
+
+
 def check_setup(render):
     docs = render(bundled_values("combined"))
     jobs = [r for r in docs if r["kind"] == "Job" and r["metadata"]["name"].startswith("asservat-setup-")]
@@ -344,6 +353,7 @@ def main():
         check_secrets(render)
         check_setup(render)
         check_accessbindings(render)
+        check_keycloak_waits_for_database(render)
         check_exposure(render)
         check_examples(render, directory)
         check_collector(directory)

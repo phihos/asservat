@@ -39,9 +39,10 @@ func NewBootstrapReservations(ctx context.Context, pool *pgxpool.Pool, installat
 
 // NewLocalBootstrapReservations reserves slots only for the installation's
 // own connector: the generated cluster and peer IDs. A new slot is reserved
-// only after the peer's latest slot expired unclaimed; a live slot of the
-// same request resumes, any other live slot returns value.ErrPending and a
-// claimed slot returns value.ErrLocalBootstrapConsumed.
+// only after the peer's latest slot expired without activation (unclaimed,
+// or claimed by an enrollment that failed); a live slot of the same request
+// resumes, a live claimed or other slot returns value.ErrPending and an
+// activated enrollment of the peer returns value.ErrLocalBootstrapConsumed.
 func NewLocalBootstrapReservations(ctx context.Context, pool *pgxpool.Pool, installation, clusterID, peerID string, newID func() string) (*BootstrapReservations, error) {
 	if !authorization.UUID(clusterID) || !authorization.UUID(peerID) || clusterID == peerID {
 		return nil, value.ErrInvalid
@@ -66,10 +67,16 @@ func (r *BootstrapReservations) localIntent(ctx context.Context, q *custodydb.Qu
 	}
 	row := latest.FleetBootstrapIntent
 	switch {
-	case latest.Claimed:
+	case latest.Activated:
 		return nil, value.ErrLocalBootstrapConsumed
 	case !now.Before(row.NotAfter.Time):
+		// Expired, claimed or not: activation requires an unexpired slot,
+		// so the old slot can no longer enroll and a new one may replace it.
 		return nil, nil
+	case latest.Claimed:
+		// The connector's enrollment is in progress; it either activates
+		// before expiry or the slot is replaced afterwards.
+		return nil, value.ErrPending
 	case uid(row.ClusterID) != r.local[0] || !bytes.Equal(row.ActorDigest, digest(request.Authority.Actor)) || !bytes.Equal(row.KeyDigest, request.KeyDigest[:]):
 		return nil, value.ErrPending
 	case !bytes.Equal(row.RequestDigest, bootstrapRequestDigest(request)):

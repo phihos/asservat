@@ -51,7 +51,8 @@ type LocalBootstrapRecords interface {
 // the generated local binding through the audited BootstrapIssuer (its
 // Authority is an InstallationEnrollmentAuthorizer and its Reservations
 // reserve only the fixed local peer) and writes the record for the
-// connector. An unclaimed slot that expires is replaced by a new one.
+// connector. A slot that expires without an activated enrollment (unclaimed,
+// or claimed by an enrollment that failed) is replaced by a new one.
 type LocalClusterBootstrap struct {
 	Issuer          BootstrapIssuer
 	Envelopes       BootstrapEnvelopes
@@ -109,10 +110,10 @@ func (l LocalClusterBootstrap) issue(ctx context.Context, key artifact.Digest) (
 	return intent.Slot.NotAfter, nil
 }
 
-// Run keeps one live record for the local connector until its slot is
-// claimed. A slot is reserved only while the record Secret exists (the chart
+// Run keeps one live record for the local connector until its enrollment
+// is activated; a claimed slot still in progress reports pending. A slot is reserved only while the record Secret exists (the chart
 // renders it with the connector), and each replacement of a slot that expired
-// unclaimed waits longer (5 minutes doubling to an hour), so a connector that
+// unactivated waits longer (5 minutes doubling to an hour), so a connector that
 // is down spends the administration's bootstrap history slowly. report
 // receives fixed outcome words only.
 func (l LocalClusterBootstrap) Run(ctx context.Context, report func(string)) error {
@@ -132,7 +133,7 @@ func (l LocalClusterBootstrap) Run(ctx context.Context, report func(string)) err
 				wait = time.Until(notAfter) + time.Second + gap
 				gap = min(max(2*gap, 5*time.Minute), time.Hour)
 			case errors.Is(err, value.ErrLocalBootstrapConsumed):
-				report("claimed")
+				report("enrolled")
 				return nil
 			case errors.Is(err, value.ErrPending):
 				report("pending")

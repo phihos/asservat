@@ -194,7 +194,7 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 	if err != nil {
 		return nil, &fixedStepError{"downloads/workerAcks", mounts.ErrUnavailable}
 	}
-	dispatch := &evidence.DownloadDispatcher{Ledger: workers, Jobs: jobs, Audit: a.workerObjects(), Acknowledgements: workerAcks, Authority: gate, CurrentAuthority: gate, Profile: profile, Now: time.Now}
+	dispatch := &evidence.DownloadDispatcher{Ledger: workers, Jobs: jobs, Audit: a.workerObjects(), Acknowledgements: workerAcks, Authority: gate, CurrentAuthority: gate, Profile: profile, Now: time.Now, PodStart: downloadPodStart}
 
 	enrollment := func(purpose string) (*postgres.WorkerEnrollments, error) {
 		return postgres.NewWorkerEnrollments(ctx, sql[purpose], root, profile, ownerRandomID)
@@ -307,6 +307,11 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 	}
 	return out, nil
 }
+
+// downloadPodStart is how long one preparation waits for a just-launched
+// worker Pod to run so it is bound before the worker enrolls; a kind/warm-node
+// Pod runs within about a second of its Job.
+const downloadPodStart = 3 * time.Second
 
 // workerSourceClient selects the client that reads the worker profile
 // (ADR-204 decision 2): the one worker API's client in its own namespace, or
