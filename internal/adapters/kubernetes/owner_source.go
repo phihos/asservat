@@ -149,7 +149,7 @@ func (s *OwnerSourceReader) ReadOwnerConfiguration(ctx context.Context) (value.O
 		return out, err
 	}
 	c := value.OwnerConfiguration{Pool: p, Revision: identity.Revision{UID: s.uid, Generation: wire.Revision, Digest: digest}, Suspended: wire.Suspended, IssuerRoots: roots, ProtectionDigest: s.digest}
-	out = value.OwnerConfigurationObservation{Configuration: c, ObservedAt: start, FreshUntil: identity.Earlier(start.Add(5*time.Second), until)}
+	out = value.OwnerConfigurationObservation{Configuration: c, ObservedAt: start, FreshUntil: identity.Check(start, identity.SQLFenced).Narrow(until).Until()}
 	if !out.Valid(s.client.now()) || ctx.Err() != nil {
 		return value.OwnerConfigurationObservation{}, value.ErrUnavailable
 	}

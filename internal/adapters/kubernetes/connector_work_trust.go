@@ -76,7 +76,7 @@ func (s *ConnectorWorkTrust) APIContextWorkTrust(ctx context.Context) (fleet.API
 func (s *ConnectorWorkTrust) read(ctx context.Context) (fleet.APIContextWorkTrust, error) {
 	var zero fleet.APIContextWorkTrust
 	start := s.client.now()
-	until := start.Add(5 * time.Second)
+	until := identity.Check(start, identity.SQLFenced).Until()
 	valid := start.Add(identity.AuthorityRecheckInterval)
 	if d, ok := ctx.Deadline(); ok {
 		until = identity.Earlier(until, d)
