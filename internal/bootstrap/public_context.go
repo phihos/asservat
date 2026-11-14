@@ -40,6 +40,8 @@ type PublicContextServices struct {
 	// Processing is the ADR-210 operator change service; nil leaves it absent.
 	Processing      browser.ProcessingChangeService
 	ProcessingRules browser.ProcessingInventoryService
+	// CaptureChanges feeds the console status stream; nil serves none.
+	CaptureChanges *browser.Changes
 }
 
 // NewPublicContextHandler composes the original HTTP handlers directly. It
@@ -106,8 +108,17 @@ func NewPublicContextHandler(c PublicContextConfig, s PublicContextServices, fil
 			return nil, &fixedStepError{"processing-rules", e}
 		}
 	}
+	var events http.Handler
+	if s.CaptureChanges != nil {
+		handler, e := browser.NewEventsHandler(sessions, audited, s.CaptureChanges)
+		if e != nil {
+			return nil, &fixedStepError{"events", e}
+		}
+		handler.Report = eventLog(os.Stderr, "status event unavailable")
+		events = handler
+	}
 	return &publicContextRoutes{
-		host: host, sessions: sessions, investigations: investigations, processing: processing, processingRules: processingRules,
+		host: host, sessions: sessions, investigations: investigations, processing: processing, processingRules: processingRules, events: events,
 		mcp: mcpHandler, content: content, console: static,
 		mcpPath: mcp.Path, mcpMetadata: mcp.MetadataPath,
 		contentPrefix:   browser.DownloadContentPrefix,

@@ -14,6 +14,7 @@ import (
 	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/audit"
+	"asservat.local/asservat/internal/transport/browser"
 	"asservat.local/asservat/internal/transport/presentation"
 )
 
@@ -165,21 +166,6 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 			return nil, &fixedStepError{"access-preview", mounts.ErrUnavailable}
 		}
 	}
-	// The fleet operators' browser-only single-cluster live-runtime view.
-	viewerPool, err := d.public.open(ctx, "live-watch")
-	if err != nil {
-		return nil, &fixedStepError{"live-capacity-pool", mounts.ErrUnavailable}
-	}
-	capacity, err := composePublicLiveCapacity(ctx, PublicContextOperationsConfig{RootID: root, InstallationID: installation, PublicOrigin: p.Origin, CollectionEnabled: true, Now: time.Now, NewID: ownerRandomID},
-		PublicContextOperationServices{History: pc.history, Investigation: pc.investigation, Intents: pc.intents, Regional: pc.regional, Progress: pc.progress, Cases: pc.cases, Downloads: dl.coordinator, Native: dl.native, Projection: dl.projection}, pc, viewerPool)
-	if err != nil {
-		return nil, &fixedStepError{"live-capacity", mounts.ErrUnavailable}
-	}
-	if capacity != nil {
-		if operations, err = presentation.NewInvestigationLiveCapacityOperations(operations, capacity); err != nil {
-			return nil, &fixedStepError{"live-capacity", mounts.ErrUnavailable}
-		}
-	}
 	// ADR-240: the fleet operators' browser-only preview_retention_change.
 	retentionPreview, err := composePublicRetentionPreview(PublicContextOperationsConfig{RootID: root, InstallationID: installation, PublicOrigin: p.Origin, CollectionEnabled: true, Now: time.Now, NewID: ownerRandomID},
 		PublicContextOperationServices{History: pc.history, Investigation: pc.investigation, Intents: pc.intents, Regional: pc.regional, Progress: pc.progress, Cases: pc.cases, Downloads: dl.coordinator, Native: dl.native, Projection: dl.projection}, pc)
@@ -233,6 +219,13 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 		}
 		services.Processing = publicProcessingChanges{root: root, installation: installation, profiles: profiles, policies: pc.processingPolicy, recovery: pc.recovery, decisions: decisions, artifactScopes: inventory, audit: normal, releaseAudit: release, mac: pc.mac, refused: eventLog(os.Stderr, "processing change refused")}
 	}
+	// One LISTEN connection feeds every console status stream (REQ-INT-003).
+	progressPool, err := d.public.open(ctx, "hub-metadata-read")
+	if err != nil {
+		return nil, &fixedStepError{"capture-progress-pool", mounts.ErrUnavailable}
+	}
+	services.CaptureChanges = browser.NewChanges()
+	postgres.ListenPayloads(ctx, progressPool, postgres.CaptureProgressChannel, services.CaptureChanges.Publish)
 	h, err := NewPublicContextHandler(PublicContextConfig{PublicOrigin: p.Origin, Issuer: id.settings.Issuer, Version: p.Version,
 		OperationConcurrency: p.OperationConcurrency, MCPPerIdentity: p.MCPPerIdentity, DownloadConcurrency: p.DownloadConcurrency, DownloadsPerIdentity: p.DownloadsPerIdentity, DownloadMaxDuration: time.Duration(p.DownloadMaxSeconds) * time.Second,
 		Audit: presentation.AuditedOperationsConfig{RootID: root, Retention: time.Duration(o.RetentionSeconds) * time.Second, NormalConcurrency: o.NormalConcurrency, ResolutionConcurrency: o.ResolutionConcurrency, PerPrincipalConcurrency: o.PerPrincipalConcurrency, NormalPerSecond: o.NormalPerSecond, ResolutionPerSecond: o.ResolutionPerSecond, Now: time.Now, NewID: ownerRandomID}},

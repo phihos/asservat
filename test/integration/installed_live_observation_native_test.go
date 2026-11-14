@@ -615,18 +615,6 @@ func installedLiveMCP(t *testing.T, ctx context.Context, db *pgxpool.Pool, root 
 		if e = db.QueryRow(ctx, activeQuery, root).Scan(&active, &principals); e != nil || active != 2 || principals != 1 {
 			return errors.New("principal ceiling fixture did not retain React and MCP views")
 		}
-		mapped, direct, mappingErr, directErr := installedLiveViewerMapping(ctx, db, root, run.Installation, source)
-		if run.Browser == nil {
-			return errors.New("installed browser capacity channel unavailable")
-		}
-		capacity, _, e := run.Browser.operation(ctx, "get_live_capacity", map[string]any{"cluster_id": source.ClusterID}, "")
-		var gauge struct {
-			ActiveViewers int `json:"active_viewers"`
-		}
-		if e != nil || capacity.Status != "ok" || json.Unmarshal(capacity.Data, &gauge) != nil || gauge.ActiveViewers != 2 {
-			return fmt.Errorf("installed live capacity returned the wrong active viewers: api=%d direct=%d mapped=%d status=%s data=%s mappingErr=%v directErr=%v callErr=%w", gauge.ActiveViewers, direct, mapped, capacity.Status, capacity.Data, mappingErr, directErr, e)
-		}
-		t.Log("installed live capacity: the real fleet operation returned exactly two active viewers")
 		refuse := func(invoke installedLiveCall, input map[string]any) error {
 			refusal, code, err := invoke(ctx, "open_live_watch", input)
 			var failure struct {

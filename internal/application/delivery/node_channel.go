@@ -168,7 +168,6 @@ type nodeEntry struct {
 	report     *collector.Report
 	reportedAt time.Time
 	reports    uint64
-	liveRates  *collector.LiveActivityRates
 	work       []collector.Work
 	nextSeq    uint64
 	wake       chan struct{}
@@ -447,8 +446,7 @@ func (c *NodeChannel) Report(p NodePeer, epoch string, r collector.Report) error
 	stored.Sources = append([]collector.SourceStatus(nil), r.Sources...)
 	stored.Mechanisms = cloneNodeMechanisms(r.Mechanisms)
 	stored.Live = cloneLiveStatus(r.Live)
-	rates := nextLiveRates(e.report, stored)
-	e.report, e.reportedAt, e.liveRates = &stored, now, rates
+	e.report, e.reportedAt = &stored, now
 	e.reports++
 	view := c.view(e, now)
 	c.mu.Unlock()

@@ -536,13 +536,6 @@ func (s *AuditedOperations) normalize(name string, raw []byte) ([]byte, error) {
 		}
 		return json.Marshal(in)
 	}
-	if name == "get_live_capacity" {
-		var in liveCapacityInput
-		if json.Unmarshal(raw, &in) != nil {
-			return nil, contracts.ErrInvestigationWire
-		}
-		return json.Marshal(in)
-	}
 	if name == processingReportOperation {
 		query, err := processingReportQuery(raw)
 		if err != nil {

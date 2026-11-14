@@ -83,7 +83,7 @@ func (f *investigationCalls) receipt() (value.Accepted, error) {
 	return value.Accepted{MetadataValidUntil: until, CaptureID: "00000000-0000-4000-8000-000000000030"}, nil
 }
 func (f *investigationCalls) Get(context.Context, identities.CurrentIdentity, string) (value.ContextProgress, error) {
-	return value.ContextProgress{ValidUntil: time.Now().Add(time.Second), CaptureID: "00000000-0000-4000-8000-000000000030", Revision: 1, Phase: "Pending", ActionPhase: "Pending", ReasonCode: "IntentAuditPending", RetryAfterSeconds: 2}, nil
+	return value.ContextProgress{ValidUntil: time.Now().Add(time.Second), CaptureID: "00000000-0000-4000-8000-000000000030", Revision: 1, Phase: "Pending", ActionPhase: "Pending", ReasonCode: "IntentAuditPending"}, nil
 }
 
 func TestInvestigationBrowserUsesCurrentSessionAndExactIdempotency(t *testing.T) {

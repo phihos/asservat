@@ -112,7 +112,6 @@ await operationBundle(['create_share', 'list_shares', 'revoke_share', 'transfer_
 await operationBundle(['explain_access'], 'access');
 await operationBundle(['preview_access_change'], 'access-preview');
 await operationBundle(['preview_retention_change'], 'retention-preview');
-await operationBundle(['get_live_capacity'], 'capacity');
 await operationBundle(['search_processing_evidence'], 'processing-discovery');
 await operationBundle(['get_processing_erasure'], 'processing-erasure');
 await operationBundle(['get_processing_report'], 'processing-report', ['ProcessingReportExport']);
@@ -154,7 +153,6 @@ outputs['validate-sharing.js'] = browserModules(outputs['validate-sharing.js']);
 outputs['validate-access.js'] = browserModules(outputs['validate-access.js']);
 outputs['validate-access-preview.js'] = browserModules(outputs['validate-access-preview.js']);
 outputs['validate-retention-preview.js'] = browserModules(outputs['validate-retention-preview.js']);
-outputs['validate-capacity.js'] = browserModules(outputs['validate-capacity.js']);
 outputs['validate-approvals.js'] = browserModules(outputs['validate-approvals.js']);
 const output = resolve(root, 'web/src/generated');
 await mkdir(output, { recursive: true });

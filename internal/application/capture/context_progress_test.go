@@ -92,12 +92,6 @@ func TestContextProgressFinalAuthorityAndIndependentNavigation(t *testing.T) {
 			if (got.CaseID != "") != wantCase || got.CanCancel {
 				t.Fatal("unproven navigation/cancel")
 			}
-			if got.Phase == "Pending" && got.RetryAfterSeconds != 2 {
-				t.Fatal("missing bounded polling hint")
-			}
-			if got.Phase == "Succeeded" && got.RetryAfterSeconds != 0 {
-				t.Fatal("terminal result keeps polling")
-			}
 		})
 	}
 }

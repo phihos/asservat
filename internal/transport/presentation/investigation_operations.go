@@ -94,15 +94,6 @@ func NewInvestigationRetentionPreviewOperations(base *InvestigationOperations, p
 	return withOperations(base, preview)
 }
 
-// NewInvestigationLiveCapacityOperations adds the browser-only administrator
-// live-runtime capacity operation the same way.
-func NewInvestigationLiveCapacityOperations(base *InvestigationOperations, capacity *LiveCapacityOperations) (*InvestigationOperations, error) {
-	if capacity == nil {
-		return nil, ErrOperationsConfiguration
-	}
-	return withOperations(base, capacity)
-}
-
 func NewInvestigationProcessingDiscoveryOperations(base *InvestigationOperations, discovery *ProcessingDiscoveryOperations) (*InvestigationOperations, error) {
 	if discovery == nil {
 		return nil, ErrOperationsConfiguration
@@ -253,8 +244,6 @@ func (s *InvestigationOperations) CallWithContext(ctx context.Context, current i
 	case *AccessPreviewOperations:
 		return p.CallWithContext(ctx, current, call, name, raw)
 	case *RetentionPreviewOperations:
-		return p.CallWithContext(ctx, current, call, name, raw)
-	case *LiveCapacityOperations:
 		return p.CallWithContext(ctx, current, call, name, raw)
 	case *ProcessingDiscoveryOperations:
 		return p.CallWithContext(ctx, current, call, name, raw)

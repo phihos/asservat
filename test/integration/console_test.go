@@ -89,10 +89,12 @@ func TestConsoleBrowserWithBuiltPackage(t *testing.T) {
 	if composed, err = presentation.NewInvestigationPolicyOperations(composed, newConsolePolicyStatus(t, origin, managerGrants)); err != nil {
 		t.Fatal(err)
 	}
-	if composed, err = presentation.NewInvestigationLiveCapacityOperations(composed, newConsoleLiveCapacityOperations(t, origin)); err != nil {
+	investigations, err := browser.NewInvestigationHandler(sessionHandler, composed, 4)
+	if err != nil {
 		t.Fatal(err)
 	}
-	investigations, err := browser.NewInvestigationHandler(sessionHandler, composed, 4)
+	captureService.changes = browser.NewChanges()
+	events, err := browser.NewEventsHandler(sessionHandler, composed, captureService.changes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -121,6 +123,10 @@ func TestConsoleBrowserWithBuiltPackage(t *testing.T) {
 		}
 		if strings.HasPrefix(r.URL.Path, "/api/v1/operations/") {
 			investigations.ServeHTTP(w, r)
+			return
+		}
+		if r.URL.Path == browser.EventsPath {
+			events.ServeHTTP(w, r)
 			return
 		}
 		static.ServeHTTP(w, r)
@@ -336,6 +342,7 @@ func consoleCaptureID(n int) string {
 // never evidence that a Kubernetes read, SQL admission or capture occurred.
 type consoleSyntheticCaptures struct {
 	mu               sync.Mutex
+	changes          *browser.Changes
 	state            string
 	preview, key     string
 	lostReply        bool
@@ -481,7 +488,7 @@ func (s *consoleSyntheticCaptures) Get(ctx context.Context, current app.CurrentI
 	if s.state == "unavailable" || s.key == "" || id != consoleCaptureID(8) {
 		return capture.ContextProgress{}, capture.ErrUnavailable
 	}
-	p := capture.ContextProgress{CaptureID: id, Revision: 1, Phase: "Pending", ActionPhase: "Pending", ReasonCode: "DispatchUnconfirmed", RetryAfterSeconds: 1, ValidUntil: identity.Earlier(started.Add(5*time.Second), i.ValidUntil)}
+	p := capture.ContextProgress{CaptureID: id, Revision: 1, Phase: "Pending", ActionPhase: "Pending", ReasonCode: "DispatchUnconfirmed", ValidUntil: identity.Earlier(started.Add(5*time.Second), i.ValidUntil)}
 	if s.historyMode == "history-ready" || s.historyMode == "history-large" {
 		p.HistoryState = "available"
 	} else if s.historyMode != "" {
@@ -491,7 +498,7 @@ func (s *consoleSyntheticCaptures) Get(ctx context.Context, current app.CurrentI
 		p.Revision, p.Phase, p.ActionPhase, p.ReasonCode = 2, "Finalizing", "Finalizing", "VerificationPending"
 	}
 	if s.state == "evidence-ready" {
-		p.Revision, p.Phase, p.ActionPhase, p.ReasonCode, p.RetryAfterSeconds = 3, "Succeeded", "Succeeded", "", 0
+		p.Revision, p.Phase, p.ActionPhase, p.ReasonCode = 3, "Succeeded", "Succeeded", ""
 		p.CaseID = consoleCaptureID(80)
 	}
 	return p, nil
@@ -528,6 +535,9 @@ func (s *consoleSyntheticCaptures) control(w http.ResponseWriter, r *http.Reques
 		s.historyMode = input.State
 	case "ready", "unavailable", "lost-reply", "lost-reply-always", "finalizing", "evidence-ready", "reject-request", "lost-closure", "resolve-unavailable":
 		s.state = input.State
+		if s.changes != nil {
+			s.changes.Publish(consoleCaptureID(8))
+		}
 	default:
 		w.WriteHeader(400)
 		return
