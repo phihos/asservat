@@ -3,7 +3,7 @@
 > Superseded in part by ADR-328 (2026-11-13): the retention guard with its status user and protection digest (decision 4), its pin in the permission projection (decision 5), the workload-guard dry-run exception and probe rights (decision 7) and the continuation creating the baseline policy as administrator (decision 6) no longer apply. Helm renders the baseline `EvidenceRetentionPolicy` from required chart values and the hub-worker RBAC; the retention source needs no protection digest. Decisions 1–3, 8 and 9 remain valid.
 
 Date: 2026-10-17. Status: accepted; steps 1–4, 5a, 6 and 7 implemented and
-natively qualified ([continuation run 8](../../test/results/adr195-continuation-native-8/environment.json)).
+natively qualified (continuation run 8).
 The hub retention source becomes Ready with the baseline policy, read
 through the hub's `retention-read` login. An administrator's baseline edit
 is accepted (sequence 3), and after a hub-worker crash the source returns

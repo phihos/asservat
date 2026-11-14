@@ -3,7 +3,7 @@
 > Superseded in part by ADR-328 (2026-11-13): the executor proof's connector source reads, the workload and settings guard checks, the Deployment/ReplicaSet/Pod chain and the token reviews re-verified the connector's own installation and no longer apply; the connector reads its source and settings as mounted ConfigMaps. Still valid: the process-credential check (the client leaf chain verifies under the configured roots and the hub registration is current), with decision 5's local close bounded by the opening registration's original FreshUntil.
 
 Date: 2026-10-16. Status: accepted; implemented and natively qualified
-([ADR-196 continuation run 8](../../test/results/adr196-continuation-native-8/environment.json): the installed executor's first cold proof
+(ADR-196 continuation run 8: the installed executor's first cold proof
 fits its five seconds).
 Requirements: REQ-EXE-002, S-02 regional context start; TASK-03 / TASK-11.
 Refines [ADR-173](173-work-scoped-process-observation.md). Found by
@@ -13,7 +13,7 @@ Refines [ADR-173](173-work-scoped-process-observation.md). Found by
 
 The installed regional executor never finished its cold process proof
 within the proof's original five seconds.
-[Continuation run 6](../../test/results/adr196-continuation-native-6/environment.json)
+Continuation run 6
 measured each attempt:
 
 - The shared observer client made 100–120 API calls before the bound.
@@ -57,7 +57,7 @@ once when it closes, and every component checks against those two reads.
 5. **The close is local.** *Added after run 7.* The process observation
    asks the hub for the leaf's registration. That is a full lifecycle
    conversation, during which the hub has this cluster run its own
-   boundary proofs. [Continuation run 7](../../test/results/adr196-continuation-native-7/environment.json)
+   boundary proofs. Continuation run 7
    reached the closing source read at 4.45–5 s with 109–120 observer calls,
    so that second conversation does not fit.
    - The closing check (`ConfirmConnectorProcessAt`) is now local. It

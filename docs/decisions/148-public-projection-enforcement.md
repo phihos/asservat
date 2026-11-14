@@ -48,7 +48,7 @@ The unchanged default-limiter regression passes after the correction, completing
 in 3,006 milliseconds of its original 3,550-millisecond interval. Nine top-level
 tests/27 PASS entries and vet pass. The reproduced failure, successful component
 checks and two static mirror packaging failures are retained in the
-[integration record](../../test/results/public-projection-enforcement-integration.json).
+integration record.
 
 ## Fresh worker runtime operation
 

@@ -1,6 +1,0 @@
-=== RUN   TestContextAdmissionWithRealServices
-=== RUN   TestContextAdmissionWithRealServices/operation-audit-bounded-accounts-resolve-and-unknown-write
---- PASS: TestContextAdmissionWithRealServices (1.17s)
-    --- PASS: TestContextAdmissionWithRealServices/operation-audit-bounded-accounts-resolve-and-unknown-write (0.79s)
-PASS
-ok  	asservat.local/asservat/test/integration	2.236s

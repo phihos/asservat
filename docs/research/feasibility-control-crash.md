@@ -1,6 +1,6 @@
 # PostgreSQL authority and native crash-path feasibility
 
-Executed 2026-10-09 after the maintainer authorized the next two spikes. [Executable sources, failures, hashes and results](../../experiments/control-crash/README.md) are retained. These are partial EXP-01/05/11/19 and SC-INV-002 results, not completed release gates or production implementation.
+Executed 2026-10-09 after the maintainer authorized the next two spikes. Executable sources, failures, hashes and results are retained. These are partial EXP-01/05/11/19 and SC-INV-002 results, not completed release gates or production implementation.
 
 ## Findings that refine the design
 
@@ -15,7 +15,7 @@ The clock semantics are documented by [PostgreSQL's time functions](https://www.
 
 ## SQL experiment
 
-PostgreSQL **18.6**, official image pinned by digest, ran non-root on a private Docker internal network with no published service, two CPUs, 768 MiB RAM and a disposable data volume. The client used pgx **v5.11.0**, a maximum of 32 pooled connections, five-second statement and one-second lock timeouts. Fsync and synchronous_commit were on. [Exact fixture/version](../../experiments/control-crash/results/postgres-fixture.json), [server settings](../../experiments/control-crash/results/postgres-version.txt).
+PostgreSQL **18.6**, official image pinned by digest, ran non-root on a private Docker internal network with no published service, two CPUs, 768 MiB RAM and a disposable data volume. The client used pgx **v5.11.0**, a maximum of 32 pooled connections, five-second statement and one-second lock timeouts. Fsync and synchronous_commit were on. Exact fixture/version, server settings.
 
 | Test | Actual result | Scope limit |
 | --- | --- | --- |
@@ -33,7 +33,7 @@ PostgreSQL **18.6**, official image pinned by digest, ran non-root on a private 
 | Work leases | Audit-pending work was not claimable; 24 workers claimed 12 distinct items; a reclaimed lease rejected the prior completion fence | A Boolean models audit acknowledgement. No object audit or remote execution, and SKIP LOCKED does not prove fairness |
 | Abrupt database restart | SIGKILL/restart with the same volume preserved an acknowledged denial and uncertain-charge marker | Single-primary crash recovery only; no standby promotion, old-primary fencing, PITR or restore gate |
 
-The final ordinary suite has **14 passing tests under the Go race detector**, with the post-restart test skipped there and passed separately. [Final log](../../experiments/control-crash/results/sql-test.log), [restart](../../experiments/control-crash/results/sql-restart.log), [publication failure before correction](../../experiments/control-crash/results/publication-expiry-before-fix.log). The first suite found a race in the test's connection-fault wrapper when pgx opened an asynchronous cancellation connection; atomic first-connection selection corrected that harness without disabling the race detector.
+The final ordinary suite has **14 passing tests under the Go race detector**, with the post-restart test skipped there and passed separately. Final log, restart, publication failure before correction. The first suite found a race in the test's connection-fault wrapper when pgx opened an asynchronous cancellation connection; atomic first-connection selection corrected that harness without disabling the race detector.
 
 The lab uses a compact test schema, string IDs, synthetic credentials and generic counter units. It is not a production migration. Database TLS, least-privilege roles, the full configuration/grant/retention hierarchy, parent publication audits, row lifecycle, workload scheduling and OIDC are not qualified. No SQL state stores real evidence.
 
@@ -56,7 +56,7 @@ The helper used a 16 MiB input bound, 64 KiB buffer, two-second monotonic deadli
 | Retry after receiver restart with spent entry | 7.5 ms; rejected |
 | 16-process crash burst | 2,019.7 ms; two helper connections, excess cores skipped |
 
-These are one final run per case, measured by the VM harness including its scheduling/wait overhead. They are not percentile estimates or a hard real-time guarantee under arbitrary node pressure. [Full results and GDB backtraces](../../experiments/control-crash/results/crash-results.json), [kernel observations](../../experiments/control-crash/results/vm-kernel-tail.txt).
+These are one final run per case, measured by the VM harness including its scheduling/wait overhead. They are not percentile estimates or a hard real-time guarantee under arbitrary node pressure. Full results and GDB backtraces, kernel observations.
 
 Both complete artifacts contained **4,640,768 native bytes**, were encrypted with prepared Tink Go primitives, decrypted with matching SHA-256, and opened in GDB with `crash_here` and `main` frames using the exact generated executable. Plaintext existed only in pipes/memory and bounded `/run` tmpfs for that local-tool test; the test removed native files afterwards. Persistent evidence files were ciphertext. The oversized case retained **16,732,160 native bytes** and was explicitly incomplete/unverified, rather than calling a truncated ELF prefix a valid core.
 
@@ -74,7 +74,7 @@ The static-pie helper was built with Rust **1.96.1**, `libc` **0.2.190**, and th
 - **Resource guarantees:** kernel dumping work and the crashing process are outside the helper's cgroup. A node-wide pipe ceiling does not establish per-workload fairness; memory/storage pressure, filesystem stalls, slow-key preparation, collector epoch recovery and storm scheduling remain gates.
 - **Production authorization/durability:** the SQL and crash experiments are independent. No full distributed grant, local CAS, audit, KMS/object-store, OIDC, multicluster or restore workflow was exercised.
 
-The VM's original crash handler and pipe limit were restored, a simulated foreign writer was preserved by the ownership check, and the disposable resources were removed. [Cleanup verification](../../experiments/control-crash/results/cleanup.json) includes unchanged workstation crash settings.
+The VM's original crash handler and pipe limit were restored, a simulated foreign writer was preserved by the ownership check, and the disposable resources were removed. Cleanup verification includes unchanged workstation crash settings.
 
 ## Recommended next implementation work
 

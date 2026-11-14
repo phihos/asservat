@@ -142,11 +142,11 @@ Tests:
   flow (accept, attach pull, work pull, pre-result push).
 - The native transport tests, with their clients sending the source frame.
 
-Native: [journey run 2](../../test/results/adr178-journey-2/result.json) passes
+Native: journey run 2 passes
 the whole public journey with the source frames (exit 0, empty cleanup,
 unchanged sources). The first request took 3.48 s, against 4.285 s before; in
 this fixture the hub no longer makes its own source reads.
-[Run 1](../../test/results/adr178-journey-1/result.json) is retained. Its first
+Run 1 is retained. Its first
 request also succeeded (3.48 s), but it then failed in the unchanged download
 phase: a preparation continuation returned NotAvailable after two worker
 openings admitted no native command. The rerun did not reproduce it, so it is

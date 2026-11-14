@@ -26,7 +26,7 @@ The cold proof itself costs about 71.
 
 Every start step must finish within the process observation's original
 five-second interval. Kubernetes clients stay at 20 QPS/burst 20.
-[Native runs](../../test/results/connector-api-timing-4/result.json) measured
+Native runs measured
 about 1 ms per round trip, so elapsed time is limiter wait. A cold proof took
 2.8 s; ReadyStart's three rechecks took 2.15 s more and were denied 47 ms before
 the bound. Raising limits or dropping the start checks were both rejected.
@@ -80,12 +80,12 @@ The native test's timed phase follows a work's real order: a cold complete
 process read, then observed Prepare and Ready, then Consume, all within that
 read's original interval. The test also gates on an admitted dry-run CREATE
 before timing. It creates the CRD itself, and the first CREATEs after that were
-refused for about two seconds ([runs 1–3](../../test/results/connector-api-timing-3/result.json)).
+refused for about two seconds (runs 1–3).
 The chart installs the CRD long before any start.
 
 ## Native result
 
-[Run 6](../../test/results/connector-api-timing-6/result.json) passes all of
+Run 6 passes all of
 `TestConnectorAPIProcessWithRealKubernetes` (exit 0, empty cleanup, unchanged
 sources). This is the first native pass of the connector-Deployment local
 start. Within one observation's original 5.0 s interval:

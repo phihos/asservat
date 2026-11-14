@@ -11,8 +11,8 @@ acquisition and publication.
 Requirements: REQ-EXE-002, REQ-FED-001/003, S-02; TASK-03 / TASK-11.
 
 Current qualification (2026-10-20):
-[resumed native48](../../test/results/resumed-c62e02ac-native48/result.json)
-and [native49](../../test/results/resumed-c62e02ac-native49/result.json) exercised
+resumed native48
+and native49 exercised
 the compiled setup composition through regional acquisition, storage and
 installed publication. Native49 also recovered the accepted capture and completed
 fresh authorized `get_capture` and `get_case` reads. This establishes completed

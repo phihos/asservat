@@ -1,6 +1,6 @@
 # What Asservat builds and what it reuses
 
-Read with the [technology decisions](../technology.md), [measured experiments](../../experiments/technology-selection/README.md) and [qualification plan](../research/technology-selection.md). This covers every component in the [architecture catalog](catalog.yaml). Reuse means an integration we must implement and qualify; it does not mean that the component already exists.
+Read with the [technology decisions](../technology.md), measured experiments and [qualification plan](../research/technology-selection.md). This covers every component in the [architecture catalog](catalog.yaml). Reuse means an integration we must implement and qualify; it does not mean that the component already exists.
 
 Use existing software for protocol mechanics, storage, cryptography, UI primitives and diagnostic engines. Build the product rules that bind these together. No evaluated library provides Asservat's combined workload authority, disclosure approvals, incident budgets, retention, provenance and failure semantics.
 

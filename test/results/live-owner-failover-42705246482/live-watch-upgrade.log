@@ -1,5 +1,0 @@
-=== RUN   TestLiveWatchUpgradeWithRealPostgres
-    live_watch_upgrade_test.go:254: pristine142→143→142 twice; 147 Up/Down removes only recovery functions before the schema143 compiled Open/Charge checks; retained control and account-only debt each refuse Down23514 with exact schema/functions/history/state unchanged; HTTP/source/audit retained guards not exercised
---- PASS: TestLiveWatchUpgradeWithRealPostgres (6.89s)
-PASS
-ok  	asservat.local/asservat/test/integration	7.970s

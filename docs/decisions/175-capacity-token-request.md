@@ -45,7 +45,7 @@ Option (b). The connector process mints the capacity account's token in memory
 through TokenRequest. This is a regional-only, explicitly admitted exception to
 ADR-094's "no token minting" for the hub-worker.
 
-The first native run ([result](../../test/results/adr175-native-1/result.json))
+The first native run (result)
 showed that the token cannot be bound to the connector's Pod. The API server
 rejects the request: "cannot bind token for serviceaccount "capacity" to pod
 running with different serviceaccount name". The decision is therefore an
@@ -102,7 +102,7 @@ Native tests must cover:
 
 ## Native result
 
-[Run 4](../../test/results/adr175-native-4/result.json) passes all of
+Run 4 passes all of
 `TestConnectorAPIProcessWithRealKubernetes` (exit 0, empty cleanup, unchanged
 sources):
 

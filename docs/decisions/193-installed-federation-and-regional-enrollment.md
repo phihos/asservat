@@ -3,16 +3,16 @@
 > Superseded in part by ADR-328 (2026-11-13): the continuation's federation provisioning and journal window (decision 3 and steps 2a, 2d), `installer-cluster` creating and proving the regional workload and source guards with a minted token (decision 4, steps 5 and 6), the connector re-proving its own protection at startup, and binding the staged source's UID and protection digest into the generation-1 audit no longer apply. Helm renders the federation and the `mode=cluster` connector objects, and RBAC protects their namespaces. Still valid: bootstrap issuance by a fleet operator (decision 1), federation peers from SQL (decision 2), in-band generation-1 enrollment by the connector over the pinned TLS channel (decision 5), the PKI roles and the issuance route.
 
 Date: 2026-10-15. Status: accepted; steps 1–3 and 5 implemented and natively
-qualified ([federation run 3](../../test/results/adr193-federation-native-3/result.json):
+qualified (federation run 3:
 generation 1 from a product `BootstrapIssuer` slot;
-[continuation run 53](../../test/results/adr183-continuation-native-53/environment.json):
+continuation run 53:
 the hub from the continuation and a second cluster from `installer-cluster`,
 both leaves active, a restarted Pod readmitted, a rerun unchanged and a
 non-administrator source write denied). Step 4's components are implemented
 and qualified with Keycloak
-([identity run 3](../../test/results/adr193-identity-3/identity-provider-environment.json));
+(identity run 3);
 their installed wiring waits for the hub-api public layer. Step 6 is natively
-qualified ([Helm cluster run 4](../../test/results/adr193-helm-cluster-native-4/result.json)).
+qualified (Helm cluster run 4).
 Step 7 pending. Retained failures: continuation runs 45–46 and 48–52,
 federation run 2, identity runs 1–2, installer run 1 and Helm cluster runs 1–3.
 Requirements: REQ-FED-001/002, REQ-DEP-001/005, S-02; TASK-03, TASK-11.
@@ -172,7 +172,7 @@ Three facts constrain the design:
   retained processes): its process run time, the retention minus two backup
   horizons, three cleanup budgets, the proof window and a minute, must be at
   least half the retention and 30 minutes. With a one-hour backup horizon
-  that needs at least 15000 seconds of retention. [Continuation run 52](../../test/results/adr183-continuation-native-52/context-storage.log)
+  that needs at least 15000 seconds of retention. Continuation run 52
   derived a 3600-second retention, and every regional source then failed to
   decode; the continuation now refuses such settings.
 - **Where the backing is checked.** `FederationDeployment.connector` and the
@@ -190,7 +190,7 @@ Three facts constrain the design:
   namespace-wide admission policy. It now admits exactly one persistent
   UPDATE of the named credential Secret by the connector account
   (`regional.json` `clusterCredentialAccount`), like the ADR-093 Lease
-  exception. [Federation run 2](../../test/results/adr193-federation-native-2/result.json)
+  exception. Federation run 2
   failed without it: the pending-seed CAS was refused before any hub request.
   Daily ADR-168 rotation had never exercised that write natively.
 - **Open:** the staged profile's issuer roots and server name are the
@@ -242,7 +242,7 @@ Three facts constrain the design:
   identity. The hub-api public layer routes `POST
   /api/v1/fleet/cluster-bootstraps` when `public.fleet` is set: 403 for a
   denial, 429 for an exhausted ceiling, 201 with the slot reference.
-- **Qualified (4e).** [Identity run 3](../../test/results/adr193-identity-3/identity-provider.log)
+- **Qualified (4e).** Identity run 3
   drives the route with an actual Keycloak browser session, real SQL
   issuance logins, OpenBao KV and encrypted S3 audit. A member of another
   group gets 403 before any reservation; the operator's bootstrap is issued
@@ -277,7 +277,7 @@ Three facts constrain the design:
 - **Diagnostics.** A failure names its installer step and a closed cause:
   an API reason, a guard-proof code or a class. Server text and object
   content are never printed.
-- **Qualified alone.** [Installer run 2](../../test/results/adr193-installer-native-2/result.json)
+- **Qualified alone.** Installer run 2
   installs into an owned cluster from a synthetic offer and envelope, proves
   both guards with the connector token, ungates, reruns unchanged and has a
   non-administrator source write denied. Run 1 failed because both proofs
@@ -302,7 +302,7 @@ Three facts constrain the design:
   TokenRequest for the proof and the Deployment scale update.
 - **Open:** the connector Deployment carries no image pull secret, so a
   private registry needs node-level pull credentials or a public image.
-- **Qualified.** [Helm cluster run 4](../../test/results/adr193-helm-cluster-native-4/result.json)
+- **Qualified.** Helm cluster run 4
   installs the packaged chart in `mode=cluster` from the authenticated
   registry with a synthetic offer and record. The hook's installer account
   administers both guards, the Deployment is ungated, and an upgrade reruns

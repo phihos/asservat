@@ -108,4 +108,4 @@ termination and SQL retirement with original RunUntil retained; raw two-batch
 queries retain their behavior. Go/harness finish0 with complete cleanup and
 source verification. The outer job is cancelled after a GitHub upload-finalization
 failure crosses its20-minute limit; this is not a green hosted workflow or a
-universal performance claim. [Original report](../../test/results/saved-syscall-query-native-42065554713/README.md).
+universal performance claim. Original report.

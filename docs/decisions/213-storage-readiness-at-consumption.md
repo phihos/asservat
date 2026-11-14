@@ -8,7 +8,7 @@ Refines [ADR-200](200-on-demand-capacity-refresh.md).
 
 ## Context
 
-[Resumed native47](../../test/results/resumed-c62e02ac-native47/result.json)
+Resumed native47
 passed the installed demand-refresh check with six distinct observations and
 37 usable samples over 15 seconds. Its first capture request nevertheless
 failed at `request/facts/storage/margin`: the final authoritative storage
@@ -100,14 +100,14 @@ with a one-second margin does not promise that later audit, SQL locks or
 execution will finish before the original deadlines. ADR-212's preparation
 floor and passive uncertainty rules remain unchanged.
 
-The [component regression](../../test/results/resumed-c62e02ac-storage-consumption/verification.json)
+The component regression
 failed before implementation. The full capture race suite then passed
 (10.066 seconds, exit 0), including original-cutoff, selection, cancellation
 and one-demand cases. Independent review found no blockers. The integration
 package compiled with no tests selected; no installed result is inferred
 from that compile check.
 
-[Native48](../../test/results/resumed-c62e02ac-native48/result.json) includes
+Native48 includes
 this correction and reaches installed admission, acquisition and publication.
 Its timing logs do not establish whether a consumption-phase poll was
 required. The complete test failed in subsequent client recovery before

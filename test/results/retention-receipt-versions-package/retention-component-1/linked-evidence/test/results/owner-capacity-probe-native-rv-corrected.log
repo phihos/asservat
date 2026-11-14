@@ -1,4 +1,0 @@
-=== RUN   TestOwnerCapacityProbeWithRealKubernetes
---- PASS: TestOwnerCapacityProbeWithRealKubernetes (8.00s)
-PASS
-ok  	asservat.local/asservat/test/integration	9.059s

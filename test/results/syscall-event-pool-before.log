@@ -1,8 +1,0 @@
-=== RUN   TestContextAdmissionWithRealServices
-=== RUN   TestContextAdmissionWithRealServices/adhoc-observation-event-pool
-    approved_recording_test.go:426: ERROR: function spend_adhoc_observation(unknown, unknown, integer, integer) does not exist (SQLSTATE 42883)
---- FAIL: TestContextAdmissionWithRealServices (2.38s)
-    --- FAIL: TestContextAdmissionWithRealServices/adhoc-observation-event-pool (2.01s)
-FAIL
-FAIL	asservat.local/asservat/test/integration	2.442s
-FAIL

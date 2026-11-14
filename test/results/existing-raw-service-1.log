@@ -1,7 +1,0 @@
-=== RUN   TestContextAdmissionWithRealServices
-=== RUN   TestContextAdmissionWithRealServices/existing-artifact-raw-grants
-    context_publication_test.go:290: real RequestRaw producer -> SQL scope/review -> independent service decision -> schema-validated get_grant -> exact child/spend replay passed; raw catalog selection remains synthetic
---- PASS: TestContextAdmissionWithRealServices (13.19s)
-    --- PASS: TestContextAdmissionWithRealServices/existing-artifact-raw-grants (12.34s)
-PASS
-ok  	asservat.local/asservat/test/integration	14.365s

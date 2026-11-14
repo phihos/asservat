@@ -14,7 +14,7 @@ exhausted a 256 MiB process; a 512 MiB process accepted it with 439 MiB peak RSS
 Two million labels (12,000,169 bytes) exhausted both process limits. Compact
 malformed sample/function tables also exhausted both limits. Raising every
 worker to 512 MiB would add 256 MiB per worker without resolving the failure.
-The [before report](../../test/results/pprof-summary-resources-nested/report.json)
+The before report
 retains terminal OOM exits, process/cgroup measurements and input hashes.
 
 One fixed, nonrecursive preflight scan now counts allocation-bearing fields
@@ -69,8 +69,8 @@ therefore unnecessarily rejects a heap with more than that many allocation
 buckets even if its other tables are small. A fresh owned Go process generated
 40,007 actual heap samples/bytes labels, 20 locations, 14 functions and 760,054
 location references: only 1,401,571 decompressed bytes (127,059 gzip bytes).
-The [native generator report](../../test/results/pprof-runtime-heap-generator.json)
-and [generator](../../experiments/pprof-runtime-heap/main.go) retain its exact
+The native generator report
+and generator retain its exact
 hashes and Go version. This deliberately dense synthetic allocation-stack case
 shows native writer behavior; it is not a claim about deployment frequency.
 
@@ -94,14 +94,14 @@ then passed with the shared allowance; the 100,000-sample/all-labeled shape
 still refuses. All caps intersect: neither 100,000 samples nor a label-count
 maximum is an independent acceptance promise.
 
-The [mixed-shape report](../../test/results/pprof-common-allowance-mixed/report.json)
+The mixed-shape report
 measures two additional near-ceiling combinations under the same 256 MiB process
 limit and modeled 16 MiB buffer reserve: 64,000 samples plus 64,000 numeric labels
 (640,257 units), and 100,000 samples plus 57,000 numeric labels (656,257 units).
 Both also contain approximately one million lines/references, 300,000 strings
 and nearly 16 MiB input. They pass at 181.7 and 183.4 MiB peak RSS. The
-[native heap summary report](../../test/results/pprof-common-allowance-heap/report.json)
-returns a valid typed result; the [refusal report](../../test/results/pprof-common-allowance-refused/report.json)
+native heap summary report
+returns a valid typed result; the refusal report
 keeps the original dense-sample, dense-function, two-million-label and expensive
 full-table failures below 60 MiB RSS with no OOM. These are a bounded empirical
 qualification corpus, not proof of every possible permitted combination or an
@@ -115,7 +115,7 @@ still reject this inexpensive heap summary, so the measured common allowance
 is the smaller usable contract. Process memory containment remains mandatory.
 
 One generator invocation continued after its helper compile failed and used the
-previous executable. Its [unqualified report](../../test/results/pprof-runtime-heap-generator-stale-build.json)
+previous executable. Its unqualified report
 is retained explicitly; the final native measurements use the rebuilt helper
 and matching source/binary hashes. No stale-build observation is claimed as the
 final source qualification. The measurement harness is retained in the isolated
@@ -127,7 +127,7 @@ by the publication parser. Reports bind the exact helper/runtime source hashes.
 The shared-allowance follow-up passed the full diagnostics race suite (12.127 s),
 affected `go vet`, and the same spec/architecture gates (13,475 assertions,
 1,330 architecture checks, 69 Go packages/426 edges). Its retained
-[fuzz log](../../test/results/pprof-common-allowance-fuzz.log) records 81,778
+fuzz log records 81,778
 executions in a 15-second two-worker smoke, with no failure.
 
 The red valid-label regression initially returned success. With preflight, the
@@ -140,22 +140,22 @@ The final isolated publication branch passed `go test -race
 ./internal/adapters/diagnostics -count=1` (11.292 s), affected `go vet`,
 `make spec-check` (13,467 assertions), `architecture-check` (1,330 checks)
 and `go-architecture-check` (69 packages, 426 edges). The retained
-[fuzz log](../../test/results/pprof-preflight-fuzz.log) records the final
+fuzz log records the final
 15-second, two-worker malformed-input smoke. These are component/static gates,
 not installed qualification.
 
-The [after publisher report](../../test/results/pprof-preflight-supported/report.json)
+The after publisher report
 contains 23 fresh process runs under a 256 MiB memory limit with no swap. All
 previous OOM cases now return a bounded refusal; combined supported profiles
 are accepted. The largest measured combined numeric-label shape has 100,000
 samples/locations/functions, 32,768 labels with units, 16 values/sample,
 one million lines and references, 300,000 strings and nearly 16 MiB input.
 It peaks at 190.5 MiB process RSS / 186.2 MiB cgroup memory, in 0.183 seconds.
-An additional [summary component report](../../test/results/pprof-preflight-summary/report.json)
+An additional summary component report
 retains the analyzer's independent aggregate frame-visit refusal: parser
 acceptance does not promise every profile query can traverse every shape.
 
-The [native-byte regression](../../test/results/pprof-preflight-native/report.json)
+The native-byte regression
 accepts the exact CPU loopback and heap Pod-IP pprof files from native run
 41592789877, with hashes and provenance retained. This replays existing
 synthetic native bytes through the guarded parser; it is not a fresh installed

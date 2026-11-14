@@ -3,7 +3,7 @@
 > Superseded (2026-11-13): the single promoted first launch existed because the owner input was an immutable, UID-pinned journal claim inside the continuation's window. ADR-328 removes those pins; Helm renders the owner Deployment with its Native and Public sections, and a values change rolls it like any other Deployment.
 
 Date: 2026-10-15. Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan. Steps 1–4 and 6 had been implemented and natively
-qualified ([continuation run 18](../../test/results/adr183-continuation-native-18/result.json));
+qualified (continuation run 18);
 steps 5, 7 and 8 pending.
 Requirements: REQ-DEP-001/003/005, S-02; TASK-11.
 Builds on [ADR-182](182-installed-owner-promotion.md) and

@@ -129,7 +129,7 @@ the full installation replay.
 S-01/S-02 qualification includes the actual installed constructor and every
 nested authority/provider read on its successful path. Passing isolated
 components does not establish that their composition can finish. The recorded
-[native observation failure](../test/results/regional-observation-native-cost-test.log)
+native observation failure
 is an expected-denial regression, not a successful routing result.
 
 Before an expensive native run, count requests by the actual shared API client
@@ -359,11 +359,11 @@ The [user-task review](reviews/user-task-review.md) is expert inspection, not pa
 
 ## Technology-selection evidence and pending gates
 
-The [isolated dependency experiments](../experiments/technology-selection/README.md) record actual Go tests, frontend build, TypeScript generation and failed Go-generation/version-resolution attempts. They do not replace EXP gates. The [technology research](research/technology-selection.md) adds explicit pre-freeze qualification for large native-range artifact layout, parser/schema parity, real libpcap-to-Gadget filter integration and the React dependency set. Use the [build/reuse matrix](architecture/build-or-reuse.md) when assigning implementation/qualification owners; all 24 components retain their existing requirements.
+The isolated dependency experiments record actual Go tests, frontend build, TypeScript generation and failed Go-generation/version-resolution attempts. They do not replace EXP gates. The [technology research](research/technology-selection.md) adds explicit pre-freeze qualification for large native-range artifact layout, parser/schema parity, real libpcap-to-Gadget filter integration and the React dependency set. Use the [build/reuse matrix](architecture/build-or-reuse.md) when assigning implementation/qualification owners; all 24 components retain their existing requirements.
 
 ## First mechanism spikes: partial evidence, 2026-10-09
 
-The [lab and reproduction instructions](../experiments/feasibility/README.md) retain final command exits, source hashes, failed assumptions and cleanup records. Eleven ordinary Go tests passed with the race detector; three explicitly opt-in measurement tests each passed separately. The VM kernel filter corpus passed all 11 libpcap-generated cases. Gadget's own compiler rejected one valid IPv6 case, so a successful comparison-test exit is not compiler parity.
+The lab and reproduction instructions retain final command exits, source hashes, failed assumptions and cleanup records. Eleven ordinary Go tests passed with the race detector; three explicitly opt-in measurement tests each passed separately. The VM kernel filter corpus passed all 11 libpcap-generated cases. Gadget's own compiler rejected one valid IPv6 case, so a successful comparison-test exit is not compiler parity.
 
 | Gate | Measured subset | Still required |
 | --- | --- | --- |
@@ -376,7 +376,7 @@ The storage fixture is SeaweedFS for testing, not a replacement production selec
 
 ## SQL and crash-path spikes: partial evidence, 2026-10-09
 
-The [second lab](../experiments/control-crash/README.md) retained 14 passing race-tested Go tests, one separately passing post-restart test, and 14 passing VM crash cases. It preserved the intentionally unsafe SQL baseline, the publication-expiry regression before its fix, the initial fault-wrapper race and the corrected PID-1 signal fixture. See [findings, environment, timings and limitations](research/feasibility-control-crash.md).
+The second lab retained 14 passing race-tested Go tests, one separately passing post-restart test, and 14 passing VM crash cases. It preserved the intentionally unsafe SQL baseline, the publication-expiry regression before its fix, the initial fault-wrapper race and the corrected PID-1 signal fixture. See [findings, environment, timings and limitations](research/feasibility-control-crash.md).
 
 | Gate | Measured subset | Still required |
 | --- | --- | --- |

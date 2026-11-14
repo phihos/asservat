@@ -3,7 +3,7 @@
 > Superseded in part by ADR-328 (2026-11-13): the guards on the slot's sources, the topology naming the hub source by guard digest, the requirement that the join run as the accepted installer identity because cluster-admin RBAC cannot pass the admission guards, the protection digests in the join record and staged generation 1 (decisions 4 and 7), the executor's guard proofs, and the addendum's per-slot dry-run probe pairs no longer apply. Under ADR-328 any administrator may write the catalog entry and sources under RBAC, and the connector source is a plain ConfigMap. Still valid: the public join record (without protection digests), the hub-api restarting its process on a catalog change (decision 3), the owner L4 Service (decision 5), the offer values, the write-only regional evidence credential, the topology pin in the catalog entry and eight slots.
 
 Date: 2026-10-17. Status: accepted; decision 5 and steps 1–5 implemented and
-natively qualified ([continuation run 8](../../test/results/adr196-continuation-native-8/environment.json): the region installs
+natively qualified (continuation run 8: the region installs
 the executor layout and join record, the executor composes, and the hub joins
 the slot and restarts to accept it). Regional capacity (ADR-197) and the
 capture run remain.
@@ -195,7 +195,7 @@ possible only once ADR-197 and ADR-198 are also implemented.
 ## Progress
 
 - **Decision 5, owner exposure.** Natively qualified in
-  [continuation run 1](../../test/results/adr196-continuation-native-1/environment.json).
+  continuation run 1.
 - **Step 4, the executor layout and join record.** In code with unit
   tests.
   - `InstallRegionalConnector` installs the executor when the offer names
@@ -227,7 +227,7 @@ possible only once ADR-197 and ADR-198 are also implemented.
   - The hub-api reads the catalog in a new `cluster-catalog` phase before
     its native configuration, and unions each entry's topology pin. Its Role
     reads the fixed slot topology names.
-- **[Continuation run 2](../../test/results/adr196-continuation-native-2/environment.json)
+- **Continuation run 2
   failed and is retained.** It passed:
   - all ADR-198 key-service checks;
   - the regional connector's enrollment at generation 1 with the full
@@ -239,7 +239,7 @@ possible only once ADR-197 and ADR-198 are also implemented.
   only an error class. The executor's proof now names fixed stages, the
   stop line prints them, and the test captures `regional` lines and still
   runs the join when the executor check fails.
-- **[Continuation run 3](../../test/results/adr196-continuation-native-3/environment.json)
+- **Continuation run 3
   natively qualified step 5.**
   - `installer-cluster-join` wrote the slot's sources, topology and catalog
     entry, and its rerun was exact.
@@ -254,7 +254,7 @@ possible only once ADR-197 and ADR-198 are also implemented.
   `execution-process (unavailable)`, because the proof-reuse wrapper
   replaced the producer's error. The wrapper now keeps the cause; callers
   still see unavailable. The process attestation's checks are labelled too.
-- **[Continuation run 4](../../test/results/adr196-continuation-native-4/environment.json)
+- **Continuation run 4
   failed and is retained.**
   - Step 5 passed natively a second time.
   - The executor's stop lines named a different check on each attempt:
@@ -269,14 +269,14 @@ possible only once ADR-197 and ADR-198 are also implemented.
     before its exit notification. The test binary had already been built
     from the frozen sources, so the run's diagnostics stand. Its freeze
     evidence does not.
-- **[Continuation run 5](../../test/results/adr196-continuation-native-5/environment.json)
+- **Continuation run 5
   failed and is retained.** It confirmed the budget hypothesis: every
   executor stop came at 4.4–5.0 s of the proof's original five seconds.
   The attestation alone took up to 4.4 s; the fixture's whole proof took
   1.8 s. Step 5 passed a third time. The stop line now also reports the
   attempt's API calls and transport time per shared client, separating
   slow responses from limiter waits.
-- **[Continuation run 6](../../test/results/adr196-continuation-native-6/environment.json)
+- **Continuation run 6
   measured the cause.** Each executor attempt made 100–120 observer calls,
   with only 80–150 ms of transport time between them, so the time is all
   waiting on the limiter. The ADR-173 fixture's 71 calls used a synthetic
@@ -284,12 +284,12 @@ possible only once ADR-197 and ADR-198 are also implemented.
   times, about 145 calls, which needs at least 6.25 s at 20 QPS.
   [ADR-199](199-executor-proof-source-reads.md) reads it once at each end
   of the proof instead. Step 5 passed a fourth time.
-- **[Continuation run 7](../../test/results/adr196-continuation-native-7/environment.json)
+- **Continuation run 7
   ran the first ADR-199 change.** The proof now reached its closing source
   read, but still at 4.45–5 s. The closing process observation's hub
   registration conversation was the remaining cost. ADR-199 decision 5
   makes the close local. Step 5 passed a fifth time.
-- **[Continuation run 8](../../test/results/adr196-continuation-native-8/environment.json) passed.** Exit 0, all four tests,
+- **Continuation run 8 passed.** Exit 0, all four tests,
   no cleanup failures, source unchanged.
   - The ADR-198 key service passes every check.
   - The regional connector enrolls with the full executor layout, and the

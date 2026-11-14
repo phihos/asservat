@@ -5,7 +5,7 @@
 > Superseded in part by ADR-328 (2026-11-13): the installer-created permission guard with its recorded pin (decision 3), its dry-run probe and the workload-guard exception (decision 4) and the continuation's permission step no longer apply. Helm renders the hub-worker RBAC and the projection Secret. The hub-worker stream, its SQL purposes, audit, root, initial review and retention item remain valid.
 
 Date: 2026-10-15. Status: accepted; steps 1–7 implemented and natively qualified
-([continuation run 26](../../test/results/adr183-continuation-native-26/result.json)):
+(continuation run 26):
 a fresh stream with acknowledged initial and epoch audits. Step 8 (retention)
 pending; runs 24–25 are retained failures fixed by ADR-191.
 Requirements: REQ-AUTH (C-01 permission acceptance), REQ-DB-004, REQ-CAP-004,

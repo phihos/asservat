@@ -120,7 +120,7 @@ it.
 
 ## Verified local checkpoint
 
-[Local evidence](../../test/results/saved-packet-query-local/README.md), [managed services](../../test/results/saved-packet-query-services-local/README.md) and [resources](../../test/results/saved-packet-query-resource-local/README.md) retain original failures, exact source
+Local evidence, managed services and resources retain original failures, exact source
 scopes and readback. The implemented path includes screened pinned compilation,
 exact ordinary/raw source authority, standalone/combined query grants,
 current-client default, original-key pending replay, atomic per-batch

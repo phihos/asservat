@@ -82,7 +82,7 @@ class CIChanges(unittest.TestCase):
             return (root / "output").read_text()
 
     def test_small_documentation_change_skips_code(self):
-        paths = ["README.md", "docs/guide.md", "test/results/result.json", "design/ui.html"]
+        paths = ["README.md", "docs/guide.md", "design/ui.html"]
         for event in ("pull_request", "push"):
             with self.subTest(event=event):
                 self.assertEqual(self.detect(paths, event=event), "code=false\n")

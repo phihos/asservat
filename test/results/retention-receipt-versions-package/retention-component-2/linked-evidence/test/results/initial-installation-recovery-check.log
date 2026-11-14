@@ -1,2 +1,0 @@
-python3 scripts/test-custody.py --database-recovery
-Database-recovery integration exit: 0
