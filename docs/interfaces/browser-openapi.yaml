@@ -2709,7 +2709,6 @@ components:
         reason:
           type: string
           minLength: 1
-          maxLength: 4096
         idempotency_key:
           type: string
           minLength: 1
@@ -2763,7 +2762,6 @@ components:
         reason:
           type: string
           minLength: 1
-          maxLength: 4096
         idempotency_key:
           type: string
           minLength: 1
@@ -4047,7 +4045,6 @@ components:
         reason:
           type: string
           minLength: 1
-          maxLength: 4096
         sharing:
           $ref: https://asservat.io/spec/v1/sharing-request.schema.json#/$defs/capture
         history_capture_id:
@@ -4770,7 +4767,6 @@ components:
         reason:
           type: string
           minLength: 1
-          maxLength: 4096
         idempotency_key:
           type: string
           minLength: 1
@@ -4834,7 +4830,6 @@ components:
             reason:
               type: string
               minLength: 1
-              maxLength: 4096
             sharing:
               $ref: https://asservat.io/spec/v1/sharing-request.schema.json#/$defs/capture
             history_capture_id:
@@ -5065,7 +5060,6 @@ components:
         reason:
           type: string
           minLength: 1
-          maxLength: 4096
         max_bytes:
           type: integer
           minimum: 1
@@ -6761,7 +6755,6 @@ components:
                 reason:
                   type: string
                   minLength: 1
-                  maxLength: 4096
                   description: Authorized parent Save reason, preserved verbatim;
                     never restored on repeat.
                 reason_state:
@@ -8220,7 +8213,6 @@ components:
                       reason:
                         type: string
                         minLength: 1
-                        maxLength: 4096
                       authentication_context:
                         type: object
                         additionalProperties: false
@@ -8867,7 +8859,6 @@ components:
                       reason:
                         type: string
                         minLength: 1
-                        maxLength: 4096
                       authentication_context:
                         type: object
                         additionalProperties: false
@@ -8928,7 +8919,6 @@ components:
                       reason:
                         type: string
                         minLength: 1
-                        maxLength: 4096
                       operations:
                         type: array
                         items:
@@ -10623,7 +10613,6 @@ components:
                             reason:
                               type: string
                               minLength: 1
-                              maxLength: 4096
                             authentication_context:
                               type: object
                               additionalProperties: false
@@ -10924,7 +10913,6 @@ components:
                             reason:
                               type: string
                               minLength: 1
-                              maxLength: 4096
                             authentication_context:
                               type: object
                               additionalProperties: false
@@ -10983,7 +10971,6 @@ components:
                             reason:
                               type: string
                               minLength: 1
-                              maxLength: 4096
                             operations:
                               type: array
                               items:

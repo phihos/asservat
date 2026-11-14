@@ -135,8 +135,7 @@
         },
         "reason": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 4096
+          "minLength": 1
         },
         "notAfter": {
           "type": "string",

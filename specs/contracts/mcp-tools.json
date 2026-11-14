@@ -3624,8 +3624,7 @@
           },
           "reason": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 4096
+            "minLength": 1
           },
           "max_bytes": {
             "type": "integer",
@@ -4052,8 +4051,7 @@
                               },
                               "reason": {
                                 "type": "string",
-                                "minLength": 1,
-                                "maxLength": 4096
+                                "minLength": 1
                               },
                               "authentication_context": {
                                 "type": "object",
@@ -5031,8 +5029,7 @@
                               },
                               "reason": {
                                 "type": "string",
-                                "minLength": 1,
-                                "maxLength": 4096
+                                "minLength": 1
                               },
                               "authentication_context": {
                                 "type": "object",
@@ -5114,8 +5111,7 @@
                               },
                               "reason": {
                                 "type": "string",
-                                "minLength": 1,
-                                "maxLength": 4096
+                                "minLength": 1
                               },
                               "operations": {
                                 "type": "array",
@@ -5661,8 +5657,7 @@
                                     },
                                     "reason": {
                                       "type": "string",
-                                      "minLength": 1,
-                                      "maxLength": 4096
+                                      "minLength": 1
                                     },
                                     "authentication_context": {
                                       "type": "object",
@@ -6093,8 +6088,7 @@
                                     },
                                     "reason": {
                                       "type": "string",
-                                      "minLength": 1,
-                                      "maxLength": 4096
+                                      "minLength": 1
                                     },
                                     "authentication_context": {
                                       "type": "object",
@@ -6173,8 +6167,7 @@
                                     },
                                     "reason": {
                                       "type": "string",
-                                      "minLength": 1,
-                                      "maxLength": 4096
+                                      "minLength": 1
                                     },
                                     "operations": {
                                       "type": "array",
@@ -6377,8 +6370,7 @@
           },
           "reason": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 4096
+            "minLength": 1
           },
           "idempotency_key": {
             "type": "string",
@@ -8275,8 +8267,7 @@
           },
           "reason": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 4096
+            "minLength": 1
           },
           "idempotency_key": {
             "type": "string",
@@ -8980,8 +8971,7 @@
           },
           "reason": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 4096
+            "minLength": 1
           },
           "idempotency_key": {
             "type": "string",
@@ -9063,8 +9053,7 @@
               },
               "reason": {
                 "type": "string",
-                "minLength": 1,
-                "maxLength": 4096
+                "minLength": 1
               },
               "sharing": {
                 "$ref": "https://asservat.io/spec/v1/sharing-request.schema.json#/$defs/capture"
@@ -10337,8 +10326,7 @@
           },
           "reason": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 4096
+            "minLength": 1
           },
           "sharing": {
             "$ref": "https://asservat.io/spec/v1/sharing-request.schema.json#/$defs/capture"
@@ -11383,7 +11371,6 @@
                       "reason": {
                         "type": "string",
                         "minLength": 1,
-                        "maxLength": 4096,
                         "description": "Authorized parent Save reason, preserved verbatim; never restored on repeat."
                       },
                       "reason_state": {

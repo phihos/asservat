@@ -186,8 +186,7 @@
           "uniqueItems": true
         },
         "reason": {
-          "type": "string",
-          "maxLength": 4096
+          "type": "string"
         }
       },
       "required": [

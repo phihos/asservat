@@ -37,7 +37,6 @@ ALLOW = [
     ("maxLength", 255, r"executableName|executable_name|filename", None, "Linux NAME_MAX"),
     ("maxLength", 4096, r"path|filePath|logical_path|executable_path|executablePath|workingDirectory", None, "Linux PATH_MAX"),
     ("maxLength", 131072, r"argv|commandArgv|value", None, "Linux MAX_ARG_STRLEN per argument"),
-    ("maxLength", 4096, r"reason", None, "free-text reasons bound stored audit record size (specs/apis.md)"),
     ("maxLength", 1024, r"versionID", None, "S3 object version IDs are at most 1024 bytes"),
     ("maxLength", 1572864, r"manifest_yaml", None, "Kubernetes API server request limit (1.5 MiB) for the staged object"),
     ("maxLength", 5464, r"data", r"log-record", "base64 of a 4096-byte log fragment; log record bytes protect collector memory (specs/apis.md)"),

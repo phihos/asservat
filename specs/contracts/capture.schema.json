@@ -44,7 +44,6 @@
             "reason": {
               "type": "string",
               "minLength": 1,
-              "maxLength": 4096,
               "description": "Optional; shown to approvers."
             },
             "caseID": {
@@ -89,7 +88,6 @@
             "reason": {
               "type": "string",
               "minLength": 1,
-              "maxLength": 4096,
               "description": "Optional; shown to approvers."
             },
             "caseID": {
