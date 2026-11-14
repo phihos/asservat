@@ -85,8 +85,7 @@ def postgres_fixture_options(regional_context_start=None, lock_waits=False, inst
         raise ValueError("unknown regional context qualification")
     options = ["-c", "max_connections=48", "-c", "shared_buffers=128MB", "-c", "fsync=on", "-c", "synchronous_commit=on"]
     if installed_budget is not None:
-        # Only the complete installed graph selects this allowance, generated
-        # by test/fixtures/installed-sql-budget from the product's Go plan.
+        # Only the removed installer graph selected this allowance.
         fields = ("requiredOrdinary", "maxConnections", "superuserReserved", "reserved", "fixtureAdminConnections")
         if (regional_context_start is not None or
                 any(type(installed_budget.get(key)) is not int for key in fields) or
@@ -962,10 +961,6 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
             build_env = os.environ.copy()
             build_env.update({"TMPDIR": str(build_scratch or work), "CGO_ENABLED": "0"})
             installed_budget = None
-            if installer_continuation:
-                installed_budget = json.loads(subprocess.check_output(
-                    ["go", "run", "./test/fixtures/installed-sql-budget/main.go"], cwd=ROOT, env=build_env, text=True))
-                report["postgresqlConnectionBudget"] = installed_budget
             build_hub_binaries(image_dir, build_env)
             helper_copy = ""
             containment_fixture = None
@@ -977,10 +972,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                 helper_copy += "COPY profile-native /profile-native\n"
                 report["profileWorkloadSHA256"] = hashlib.sha256((image_dir/"profile-native").read_bytes()).hexdigest()
             if direct_observation:
-                qualify_direct_helper_issuer(build_env, report)
-                subprocess.run(["go", "build", "-trimpath", "-buildvcs=false", "-o", str(image_dir/"observation-native"), *[str(ROOT/"test/fixtures/observation-native"/name) for name in DIRECT_OBSERVATION_HELPER_SOURCES]], cwd=ROOT, env=build_env, check=True)
-                helper_copy = "COPY observation-native /observation-native\n"
-                report["directObservation"] = {"helperSHA256": hashlib.sha256((image_dir/"observation-native").read_bytes()).hexdigest(), "runtimeSelection": False, "setupAuthority": "synthetic installer/issuer acceptance; actual API/SQL/S3/TLS path", "fullInstalledHWORKBackground": False}
+                raise ValueError("direct observation was removed with the installer-era guards")
             if installer_continuation:
                 # ADR-194: the promoted hub-api serves the image-owned console
                 # package; build it fresh into the image, never from web/dist.
