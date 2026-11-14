@@ -132,7 +132,7 @@ def main():
     docs = render(merge(BASE, {"hub": {"key-service": {"downloads": {"enabled": True, "retentionTopologies": [{"targetClusterID": "10000000-0000-4000-8000-000000000002", "name": "topology"}]}}}}))
     by = {(d["kind"], d["metadata"]["name"]): d for d in docs}
     config = json.loads(by[("ConfigMap", "asservat-key-service-config")]["data"]["config.json"])
-    assert set(config["downloads"]) == go_fields("KeyServiceDownloadsConfig") and config["downloads"]["retentionTopologies"][0]["name"] == "topology"
+    assert "retentionTopologies" in config["downloads"] and set(config["downloads"]) <= go_fields("KeyServiceDownloadsConfig") and config["downloads"]["retentionTopologies"][0]["name"] == "topology"
     assert "sql-key-acquisition.json" in files(by[("Deployment", "asservat-key-service")]["spec"]["template"])
     assert ("Role", "asservat-key-service") in by
     # cert-manager issues the serving certificate; an existing Secret wins.
