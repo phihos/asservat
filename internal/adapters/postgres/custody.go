@@ -31,7 +31,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-const currentSchemaVersion = 165
+const currentSchemaVersion = 166
 
 // schemaFloorComment prefixes the version table's comment that records the
 // oldest binary schema the database still serves (ADR-227). Only the schema
