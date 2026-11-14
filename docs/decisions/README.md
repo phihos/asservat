@@ -1210,3 +1210,5 @@ The brief's domain-registration and trademark work remains a maintainer-owned pu
 - [ADR-330 — Event-driven system design](330-event-driven-system-design.md) replaces polling, expiring caches, per-request Jobs, private PKI layers, object-store audit pairs and spent-on-uncertain accounting with watches, pushes, LISTEN/NOTIFY, one connector connection, long-running readers, SQL audit rows and idempotency keys.
 
 - [ADR-331 — Joining workload clusters with `mode: cluster`](331-remote-cluster-join.md) registers clusters in the hub's values; the hub-api issues each one's join Secret (IDs, offer with external addresses and in-cluster server names, its own object-store capabilities, a one-use bootstrap), derives its context-start entry and topology, and the connector delivers its capacity observation over the lifecycle channel.
+
+- [ADR-335 — Usable by default](335-usable-by-default.md) makes a default install work, removes install-time-fixed values, UUID entry, unnecessary second approvals and step-up, short human-facing deadlines and tiny caps, and adds off-cluster backup/restore, standard external-service setup and zero-downtime upgrades.
