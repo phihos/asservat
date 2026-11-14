@@ -22,7 +22,7 @@ Given a maintainer composing context, HTTP evidence and a live core, when they r
 
 Every surface implements loading, empty, denied, expired, disconnected, capacity-blocked and partial states with a next step (reasons and remedies: [REQ-UX-004](ergonomics.md)). Accepted is not acquired, configured is not qualified, access expiry is not verified deletion. Stored evidence stays usable when new collection is unavailable.
 
-Each open page receives progress, status and live rows over one Server-Sent Events stream and does not poll; on reconnect it resynchronizes once. Session expiry or revocation clears protected views. Sign-out clears the view at once; an unconfirmed server logout keeps a retry path and is not shown as successful. Restored or cached pages recheck the session before showing protected data.
+Each open page receives progress, status and live rows over Server-Sent Events ([REQ-INT-003](interfaces.md#req-int-003--bounded-errors-retries-and-asynchronous-work)) and does not poll; on reconnect it resynchronizes once. Session expiry or revocation clears protected views. Sign-out clears the view at once; an unconfirmed server logout keeps a retry path and is not shown as successful. Restored or cached pages recheck the session before showing protected data.
 
 ### SC-UI-003
 

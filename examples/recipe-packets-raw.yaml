@@ -21,8 +21,7 @@ spec:
       ring:
         maxAge: 30s
         maxBytes: 16777216
-        segmentBytes: 4194304
-        maxSegments: 4
+        segments: 4
       peers:
         entries:
         - resourceRef:
@@ -39,7 +38,6 @@ spec:
         ports:
         - 8080
         resolution: follow
-      maxFrozenBytes: 67108864
       filter: tcp and port 8080
     required: false
     impact: sensitiveRead

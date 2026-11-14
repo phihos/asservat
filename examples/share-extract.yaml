@@ -16,8 +16,7 @@ spec:
   operations:
   - get_case
   - list_artifacts
-  - get_backtrace
-  - get_timeline
+  - get_extract
   reason: Review the selected stack extract without granting workload access.
   notAfter: '2026-10-09T17:55:00Z'
   includeFutureArtifacts: false

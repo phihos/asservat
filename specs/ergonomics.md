@@ -28,7 +28,7 @@ A preset is a builtin capture profile: `presetRef: {name, version}` is shorthand
 
 `pod-status/v1` accepts a Deployment, StatefulSet or Pod. A workload resolves one scheduled, non-deleting pod in name order; a direct Pod keeps its real owner for permissions and budgets. Preview names that pod. A missing probe source is Unknown, not successful monitoring. Preview shows monitored pod counts, evidence classes, maximum bytes, approval need and expiry, and never collects. The impact and data-handling panel is the [capture assessment](capture-assessment.md).
 
-The controller resolves cluster, workload, digests and execution identity ([execution](execution.md)); users never compute hashes, UIDs or grant names. Retention requests above the administrator maximum are clamped with a visible explanation.
+The controller resolves cluster, workload, digests and execution identity ([execution](execution.md)); users never compute hashes, UIDs or grant names. Retention requests above the administrator maximum are clamped ([privacy](privacy.md)) with a visible explanation.
 
 ### SC-UX-002
 

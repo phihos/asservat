@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/capacity.schema.json",
+  "title": "Asservat capacity values v1",
+  "description": "The hub chart's `capacity` values (ADR-335 D2, D8; REQ-CAP-004). Every field is optional; defaults derive from the evidence store and the cluster. Changes apply on helm upgrade. Ring, frozen, spool, upload and ongoing-source limits are node collector values (ADR-246).",
+  "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "quantity": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]*(Ki|Mi|Gi|Ti|Pi|k|M|G|T|P)?$",
+      "description": "Kubernetes quantity in bytes."
+    },
+    "share": {
+      "oneOf": [
+        {
+          "$ref": "https://asservat.io/spec/v1/capacity.schema.json#/$defs/quantity"
+        },
+        {
+          "type": "string",
+          "pattern": "^(100|[1-9]?[0-9])(\\.[0-9])?%$",
+          "description": "Percentage of the usable evidence storage."
+        }
+      ]
+    }
+  },
+  "properties": {
+    "evidenceStorage": {
+      "$ref": "https://asservat.io/spec/v1/capacity.schema.json#/$defs/quantity",
+      "description": "Usable evidence bytes after the backend full threshold and replication overhead. Default: the bundled object store's volume size; required for an external store."
+    },
+    "storageAssurance": {
+      "enum": [
+        "qualifiedReservedBackend",
+        "bestEffort"
+      ],
+      "default": "bestEffort",
+      "description": "qualifiedReservedBackend requires dedicated or backend-enforced capacity; only it satisfies the isolation claim."
+    },
+    "capturesPerCluster": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991,
+      "description": "Concurrent captures per cluster. Default max(8, node count)."
+    },
+    "namespaceLimit": {
+      "$ref": "https://asservat.io/spec/v1/capacity.schema.json#/$defs/share",
+      "description": "Maximum stored bytes per namespace, so many small workloads cannot monopolize enrollment. Omitted: no namespace cap."
+    },
+    "workload": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "share": {
+          "$ref": "https://asservat.io/spec/v1/capacity.schema.json#/$defs/share",
+          "description": "Protected allocation per workload. Default usable capacity ÷ max(eligible workloads, 8)."
+        },
+        "limit": {
+          "$ref": "https://asservat.io/spec/v1/capacity.schema.json#/$defs/share",
+          "description": "Hard maximum per workload (protected share plus burst). Default 10%."
+        },
+        "dump": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "burst": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "default": 1
+            },
+            "minimumIntervalSeconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "default": 900
+            }
+          }
+        },
+        "maxConcurrentExpensive": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991,
+          "default": 1
+        },
+        "onFull": {
+          "enum": [
+            "RejectNewExpensive",
+            "DeleteOldestEligibleInAccount"
+          ],
+          "default": "RejectNewExpensive"
+        }
+      }
+    }
+  }
+}

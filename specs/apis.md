@@ -2,7 +2,7 @@
 
 ## REQ-API-001 — Resource model
 
-Configuration is Kubernetes resources in `asservat.io/v1alpha1`, namespaced unless stated. The portable [contracts](contracts/) are design examples, not deployable CRDs.
+Configuration is Kubernetes resources in `asservat.io/v1alpha1`, namespaced unless stated; installation-wide capacity is Helm values ([capacity](capacity.md#operator-values)). The portable [contracts](contracts/) are design examples, not deployable CRDs.
 
 | Kind | Location / writer | Content |
 | --- | --- | --- |
@@ -14,8 +14,6 @@ Configuration is Kubernetes resources in `asservat.io/v1alpha1`, namespaced unle
 | `ClusterAccessBinding` | Cluster-scoped; cluster administrators | AccessBinding for every matching namespace, or named clusters from the hub cluster ([permissions](permissions.md)) |
 | `PermissionSource` | Hub control namespace; administrators | Typed derivation rule, scope and trusted mapping |
 | `CollectionCeiling` | Collector namespace; cluster admin | Optional narrowing of the default (every non-system namespace collectable) |
-| `EvidenceStoragePool` | Hub control namespace; administrator | Backed capacity and reserves ([capacity](capacity.md)) |
-| `EvidenceBudgetPolicy` | Hub control namespace; administrator | Per-workload capacity and storm limits ([capacity](capacity.md)) |
 | `EvidenceRetentionPolicy` | Hub/collector control namespace; administrator | Default/maximum ages ([privacy](privacy.md)) |
 
 Every resource reports Conditions with `observedGeneration`. Runtime records (cluster registrations, grants, shares, capacity counters, work, cases, accepted executions and audit rows) are PostgreSQL rows defined by [persistence](persistence.md); they have no Kubernetes endpoint. Per-attempt and per-delivery state is not a Kubernetes object: the connector keeps it in memory keyed by operation ID and rebuilds it from hub work after a reconnect ([ADR-330](../docs/decisions/330-event-driven-system-design.md) D8). Secrets hold credentials; no other resource contains secret values or evidence bytes.
@@ -54,7 +52,7 @@ One outbound, multiplexed HTTP/2 connection per connector to the hub's one HTTPS
 
 ## User HTTP interface
 
-The console uses a same-origin HTTP API with OIDC sessions and CSRF protection, projecting the same data as MCP ([interfaces](interfaces.md)). Mutations require the expected revision and an idempotency key. Intrusive and raw approvals are browser-only. Permission configuration uses only the [Kubernetes API](permissions.md).
+The console uses a same-origin HTTP API with OIDC sessions and CSRF protection, projecting the same data as MCP ([interfaces](interfaces.md)). Mutations follow [REQ-INT-003](interfaces.md#req-int-003--bounded-errors-retries-and-asynchronous-work). Intrusive and raw approvals are browser-only. Permission configuration uses only the [Kubernetes API](permissions.md).
 
 ## Bounds in the contracts
 
@@ -66,6 +64,6 @@ A contract bound needs a stated reason (maintainer rule, 2026-11-14); otherwise 
 - **Hub/connector frames:** data frames are 1 MiB (connector and hub memory per stream); command/control frames are at most 64 KiB, enough for a 4,096-instruction BPF program (32 KiB) plus its envelope.
 - **MCP results:** one tool result is at most 96 KiB, derived from the common MCP client tool-output limit (Claude Code `MAX_MCP_OUTPUT_TOKENS`, 25,000 tokens ≈ 100 KB); results aim at 24 KiB by default to leave room in the model context. Page sizes derive from this result bound minus the fixed envelope; the client may request smaller pages. The browser has no client-side response byte ceiling: server pages and the SSE stream bound it.
 - **Memory and storage:** packet/syscall ring and segment sizes, frozen-snapshot bytes and HTTP parser memory are maintainer-approved bounds for recorders (ADR-335 D6: rates and ring sizes); their defaults derive from the node collector's memory request. Argument bytes per event and log record bytes protect collector memory. The framed artifact layout fixes 8 MiB frames and 256-frame index pages (reader memory per frame, [artifact format](../docs/architecture/artifact-format.md)).
-- **Maintainer decisions:** storm-protection rate and concurrency limits (policy `budgets`, budget-policy dump, queue, upload and source limits; ADR-335 D8), the administrator retention maximum (D7), expiring grants for automatic intrusive actions (D6), finite manual requests, reviewed observation budgets for syscall arguments and the finite parent disclosure pool.
+- **Maintainer decisions:** storm-protection rate and concurrency limits (policy `budgets`, the hub's `capacity` values and the node collector's upload and source limits; ADR-335 D8), the administrator retention maximum (D7), expiring grants for automatic intrusive actions (D6), finite manual requests, reviewed observation budgets for syscall arguments and the finite parent disclosure pool.
 
 Lists have no item caps beyond fixed structures (a classic-BPF program, the six syscall arguments, the PSI trigger kinds, a framed index page). Detectors, expressions, recipe actions, composition components and edits, ordinals, label selectors, sharing recipients and outputs, grant artifacts and allocations are bounded by the resources they consume (capacity admission, the compiled filter, the Kubernetes object size); list-shaped results use cursor pagination instead of caps. Expression nesting stays at depth 8 to bound evaluator recursion. `scripts/check-limits.py` (run by `make spec-check`) fails on any contract bound without one of these reasons.

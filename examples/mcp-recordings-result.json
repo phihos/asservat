@@ -35,9 +35,6 @@
           },
           "continuesAfterCreatorLeaves": true,
           "notAfter": "2026-11-08T12:00:00Z",
-          "limits": {
-            "maxBytes": 1099511627776
-          },
           "state": "Ready",
           "reasonCodes": [],
           "ownerTeams": [
@@ -78,9 +75,6 @@
           },
           "continuesAfterCreatorLeaves": true,
           "notAfter": "2026-11-08T12:00:00Z",
-          "limits": {
-            "maxBytes": 1099511627776
-          },
           "state": "Ready",
           "reasonCodes": [],
           "ownerTeams": [

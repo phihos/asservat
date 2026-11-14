@@ -24,15 +24,13 @@ spec:
               name: http-response-headers
               version: v1
             maxHeaderBytes: 32768
-            maxReassemblyBytesPerFlow: 65536
             maxReassemblyBytes: 16777216
           before: 30s
           after: 30s
           ring:
             maxAge: 30s
             maxBytes: 16777216
-            segmentBytes: 4194304
-            maxSegments: 4
+            segments: 4
           peers:
             entries:
             - cidrs:
@@ -40,7 +38,6 @@ spec:
               - ::/0
             protocol: tcp
             resolution: frozen
-          maxFrozenBytes: 67108864
         required: true
         impact: sensitiveRead
         limits:

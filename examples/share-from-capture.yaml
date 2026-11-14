@@ -15,7 +15,7 @@ spec:
   operations:
   - get_case
   - list_artifacts
-  - get_backtrace
+  - get_extract
   reason: Share the requested approved stack projection as it becomes ready.
   notAfter: '2026-10-09T17:55:00Z'
   includeFutureArtifacts: false

@@ -1,6 +1,6 @@
 # Authorization, approvals, sharing and audit
 
-Mechanisms follow [ADR-330](../docs/decisions/330-event-driven-system-design.md) and [ADR-335](../docs/decisions/335-usable-by-default.md): one authorization per operation, reused for at most `identity.AuthorityRecheckInterval` (30 s; 60 s for the shared delivery-policy observation) and never past an original deadline ([ADR-311](../docs/decisions/311-operation-authority-recheck.md)); started streams run to their original bounds ([ADR-312](../docs/decisions/312-started-downloads-run-to-original-bounds.md)); audit is a database row; effects carry idempotency keys.
+Mechanisms follow [ADR-330](../docs/decisions/330-event-driven-system-design.md) and [ADR-335](../docs/decisions/335-usable-by-default.md). Authority reuse and idempotency follow [REQ-INT-003](interfaces.md#req-int-003--bounded-errors-retries-and-asynchronous-work); started downloads run to their original bounds ([REQ-DLD-002](artifact-downloads.md#req-dld-002--reuse-authority-review-only-where-required)); audit is REQ-AUT-005.
 
 ## REQ-AUT-001 — Identity and ordinary access
 
@@ -58,7 +58,7 @@ A review stays decidable until its request changes, the requester cancels it or 
 
 The approval page shows exact scope and impact, the requester's reason and the plan; it supports approve, deny, revoke and renew and is protected against CSRF and clickjacking. The grant records requester, approver, optional comment, authentication context and digest.
 
-Packet and syscall plans with a raw-byte filter predicate, or every recording when `approvals.requireRecordingApproval` is set, need an individual grant ([ADR-249](../docs/decisions/249-sensitive-acquisition-grants.md)). `request_capture` stores the exact plan, opens one review and returns `ApprovalRequired` with its link. Approval submits the stored request itself: the approval transaction admits the plan against its exact target under the requester's current entitlement, and the capture starts without the requester. If the Pod is gone or no longer fits, the request ends `TargetChanged`. Deny and `revoke_grant` (requester or current approver) never need step-up. `get_grant` shows the plan to the requester or a current approver.
+Packet and syscall plans with a raw-byte filter predicate need an individual grant ([ADR-249](../docs/decisions/249-sensitive-acquisition-grants.md)). `request_capture` stores the exact plan, opens one review and returns `ApprovalRequired` with its link. Approval submits the stored request itself: the approval transaction admits the plan against its exact target under the requester's current entitlement, and the capture starts without the requester. If the Pod is gone or no longer fits, the request ends `TargetChanged`. Deny and `revoke_grant` (requester or current approver) never need step-up. `get_grant` shows the plan to the requester or a current approver.
 
 ### SC-AUT-003
 

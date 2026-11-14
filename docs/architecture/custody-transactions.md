@@ -23,7 +23,7 @@ UPDATE custody_allocation SET used = used + $n
  WHERE id = $allocation AND used + $n <= limit RETURNING used;
 ```
 
-No row returned means `CapacityUnavailable`. The charge covers ADR-048's worst-case data/index ceilings, the manifest and envelope maxima ([manifest verification](manifest-verification.md)) and four object slots; it is settled to the actual size at publication. Allocations do not borrow each other's space. Allocation limits come from the Helm-rendered configuration (cross-workload storage-exhaustion protection, REQ-CAP-006); capture clients never choose the allocation ID.
+No row returned means `CapacityUnavailable`. The charge covers ADR-048's worst-case data/index ceilings, the manifest and envelope maxima ([manifest verification](manifest-verification.md)); it is settled to the actual size at publication. Allocations do not borrow each other's space. Allocation limits come from the Helm-rendered configuration (cross-workload storage-exhaustion protection, REQ-CAP-006); capture clients never choose the allocation ID.
 
 ## Integrity and visibility
 

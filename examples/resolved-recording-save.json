@@ -18,7 +18,7 @@
     "clusterID": "00000000-0000-4000-8000-000000000001",
     "namespaceUID": "namespace-payments-uid",
     "policyUID": "policy-trigger-lifecycles-uid",
-    "executionDigest": "af3c34322b0bc20a8d3a6a6d3bb4f12d6425fd9df5f731c695b5187965d9471f"
+    "executionDigest": "0a9895762b93d04fd91252df40bfb756a1eb9a535660c4cbbed2cc97686275e0"
   },
   "workloadUID": "workload-api-uid",
   "sources": [
@@ -29,7 +29,7 @@
       "nodeBootID": "00000000-0000-4000-8000-000000000006",
       "actionID": "traffic",
       "kind": "packetCapture",
-      "sourceDefinitionDigest": "9250e72a468c18a2e0d482e7f2d138179423472f53ac7780264c7325e1f201e7",
+      "sourceDefinitionDigest": "c9dc13373a877a352748af0ff4c1461ac0bdbde1c6a1a88b753a244f344e827f",
       "retainedAudienceDigest": "9999999999999999999999999999999999999999999999999999999999999999",
       "before": "20s",
       "after": "0s",
@@ -42,7 +42,7 @@
       "nodeBootID": "00000000-0000-4000-8000-000000000006",
       "actionID": "syscalls",
       "kind": "syscallTrace",
-      "sourceDefinitionDigest": "1a8c4f312b54b57c8a30300dd050f619cc5c36d13b3fcd8b270475b2ea6a03b4",
+      "sourceDefinitionDigest": "b9808c35133a5be2b44e54e3febe8febb57e9589c7e04e549c549d48293e1e9f",
       "retainedAudienceDigest": "9999999999999999999999999999999999999999999999999999999999999999",
       "before": "20s",
       "after": "0s",

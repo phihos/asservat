@@ -28,7 +28,7 @@ Given deletion/recreation of a namespace/workload or a recycled PID, when a prev
 
 ## REQ-DOM-002 — Capture and source lifecycles
 
-Capture, ActionAttempt, SourceSession and source snapshot are separate. A recording save binds existing sources. A source has its own end, budget and readiness; cancelling or retrying a snapshot neither starts a source nor stops an unrelated recorder. A start with an unknown outcome is resolved by its operation ID ([persistence](persistence.md)).
+Capture, ActionAttempt, SourceSession and source snapshot are separate. A recording save binds existing sources. A source has its own end, budget and readiness; cancelling or retrying a snapshot neither starts a source nor stops an unrelated recorder. A start with an unknown outcome is resolved by its operation ID ([REQ-FED-002](federation.md#req-fed-002--durable-outbound-work-and-compatibility)).
 
 ### SC-DOM-002
 

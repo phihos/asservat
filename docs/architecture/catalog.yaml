@@ -757,11 +757,9 @@ entity_owners:
   CollectionCeiling: C-01
   EvidenceRetentionPolicy: C-01
   Principal: C-02
-  BrowserLogin: C-02
   BrowserSession: C-02
   AccessDecision: C-03
   AccessGrant: C-03
-  GrantReservation: C-03
   AudienceAssignment: C-03
   ClusterRegistration: C-04
   CapabilityReport: C-04
@@ -775,7 +773,6 @@ entity_owners:
   SourceSession: C-12
   SourceSnapshot: C-12
   LiveWatch: C-13
-  LiveBatch: C-13
   Artifact: C-14
   ArtifactParent: C-14
   ArtifactCopy: C-15
@@ -788,13 +785,10 @@ entity_owners:
   EvidenceShare: C-17
   SharingIntent: C-17
   ManagerAssignment: C-17
-  SharingRegistration: C-17
   SelectionApproval: C-17
   CapacityAccount: C-07
-  CapacityReservation: C-07
   AuditReference: C-08
   AnalysisRun: C-18
-  DeliveryWork: C-19
   InterfaceHelp: C-20
   ArtifactDownload: C-14
 requirement_owners:

@@ -187,7 +187,7 @@ def guidance_checks(data: dict) -> None:
                 require(size["segments"] == needed, "Sizing omits required segment/history allowance")
                 require(size["ring_bytes"] == size["segments"] * size["segment_bytes"], "Sizing bytes do not match segments")
                 ring = params["ring"]
-                require((ring["maxBytes"], ring["maxSegments"], ring["segmentBytes"]) == (size["ring_bytes"], size["segments"], size["segment_bytes"]), "Sizing differs from proposed packet plan")
+                require((ring["maxBytes"], ring["segments"]) == (size["ring_bytes"], size["segments"]), "Sizing differs from proposed packet plan")
                 require(duration_seconds(params["before"]) == size["history_seconds"], "Sizing differs from proposed history")
             if "process_selector" in rec:
                 batch = rec["process_batch"]
@@ -498,7 +498,6 @@ def semantic_checks(doc: dict) -> None:
             require(doc["executor"] == {"issuer": "urn:asservat:installation:" + authority["installationID"], "subject": "policy:" + doc["source"]["resourceUID"], "clientID": "policy-executor", "identityType": "workload"}, "Policy executor is not installation/policy bound")
             require(timestamp(authority["issuedAt"]) < timestamp(authority["notAfter"]), "Invalid finite policy authority")
             owners = authority["ownerAssignments"]
-            require(len({o["assignmentID"] for o in owners}) == len(owners), "Duplicate automation owner assignment")
             require(all(o["basisUID"] == authority["delegation"]["uid"] for o in owners), "Automation owner does not match delegation")
         require(len({canonical_digest(p) for p in doc["dependencies"]}) == len(doc["dependencies"]), "Duplicate execution dependency pin")
         effective = doc.get("effectiveRetention", [])
@@ -626,9 +625,7 @@ def semantic_checks(doc: dict) -> None:
                 params = a["parameters"]
                 ring, profile, peers = params["ring"], params["profile"], params["peers"]
                 seconds = duration_seconds
-                require(ring["segmentBytes"] * ring["maxSegments"] <= ring["maxBytes"], "Ring segment allocation exceeds bytes")
                 require(seconds(params["before"]) <= seconds(ring["maxAge"]), "Invalid ring history bound")
-                require(ring["segmentBytes"] <= params["maxFrozenBytes"] <= a["limits"]["maxBytes"], "Invalid frozen output reservation")
                 require(seconds(params["before"]) + seconds(params["after"]) > 0, "Empty packet window")
                 require(seconds(params["after"]) < seconds(a["limits"]["timeout"]), "Packet action lacks completion margin")
                 for entry in peers["entries"]:
@@ -641,18 +638,16 @@ def semantic_checks(doc: dict) -> None:
                     require(a["impact"] in {"sensitiveRead", "intrusive"}, "Sensitive packet acquisition mislabeled")
                 if profile["kind"] == "httpHeaders":
                     require(peers["protocol"] == "tcp", "HTTP/1 requires TCP peers")
-                    require(profile["maxHeaderBytes"] <= profile["maxReassemblyBytesPerFlow"] <= profile["maxReassemblyBytes"], "HTTP parser memory cannot contain header/flow")
+                    require(2 * profile["maxHeaderBytes"] <= profile["maxReassemblyBytes"], "HTTP parser memory cannot hold one flow (2 × maxHeaderBytes)")
                 if profile["kind"] == "rawPackets":
                     protocols = [rule["protocol"] for rule in profile.get("protocolSnaplen", [])]
                     require(len(protocols) == len(set(protocols)), "Ambiguous raw protocol snaplen rules")
             if a["kind"] == "syscallTrace":
                 params = a["parameters"]
                 ring = params["ring"]
-                require(ring["segmentBytes"] * ring["maxSegments"] <= ring["maxBytes"], "Syscall ring exceeds allocation")
                 require(duration_seconds(params["before"]) <= duration_seconds(ring["maxAge"]), "Invalid syscall ring history")
                 require(duration_seconds(params["before"]) + duration_seconds(params["after"]) > 0, "Empty syscall interval")
                 require(duration_seconds(params["after"]) < duration_seconds(a["limits"]["timeout"]), "Invalid syscall completion deadline")
-                require(ring["segmentBytes"] <= params["maxFrozenBytes"] <= a["limits"]["maxBytes"], "Invalid syscall frozen reservation")
                 if params["mode"] == "arguments":
                     require(a["impact"] in {"sensitiveRead", "intrusive"}, "Syscall arguments mislabeled as observe")
             require(duration_seconds(a["limits"]["timeout"]) <= duration_seconds(spec["maxDuration"]), "Action exceeds recipe deadline")
@@ -721,7 +716,6 @@ def semantic_checks(doc: dict) -> None:
             authority = spec["policyAuthority"]
             require(spec["policyExecutor"] == {"issuer": "urn:asservat:installation:" + authority["installationID"], "subject": "policy:" + spec["target"]["policyUID"], "clientID": "policy-executor", "identityType": "workload"}, "Grant executor is not policy-bound")
             require(timestamp(authority["issuedAt"]) <= timestamp(spec["issuedAt"]) < timestamp(spec["notAfter"]) <= timestamp(authority["notAfter"]), "Grant outlives team authority")
-            require(all(spec["limits"][key] <= authority["limits"][key] for key in ("maxBytes",)), "Grant widens team limits")
         start = spec["issuedAt"]
         if "renewal" in spec:
             # ADR-335 D6: renewal in place keeps the grant and sets a new expiry.
@@ -733,7 +727,7 @@ def semantic_checks(doc: dict) -> None:
         age = (timestamp(spec["notAfter"]) - timestamp(start)).total_seconds()
         # Policy grants: the administrator's maximum (ADR-335 D6). Raw-query and
         # capture grants default to the evidence's access end; no product cap.
-        require(0 < age and (spec["grantType"] != "policy" or age <= spec["approvalPolicyRef"]["maxAgeSeconds"]), "Grant exceeds approval lifetime")
+        require(0 < age and (spec["grantType"] != "policy" or age <= spec["maxAgeSeconds"]), "Grant exceeds approval lifetime")
         if "resultAccess" in spec:
             result = spec["resultAccess"]
             require(timestamp(spec["issuedAt"]) < timestamp(result["notAfter"]) <= timestamp(spec["notAfter"]), "Result access exceeds parent lifetime")
@@ -749,13 +743,14 @@ def semantic_checks(doc: dict) -> None:
         state = doc.get("status", {})
         require(state.get("reservedBytes", 0) + state.get("spentBytes", 0) <= spec["limits"]["maxBytes"], "Grant byte budget exceeded")
         require(state.get("executionsReserved", 0) + state.get("executionsSpent", 0) <= spec["limits"].get("maxExecutions", float("inf")), "Grant execution budget exceeded")
-    if doc.get("schemaVersion") == "approval-policy/v1":
-        limits = doc["policyGrants"]
+    if doc.get("schemaVersion") == "identity-settings/v1":
+        limits = {"defaultAgeSeconds": 7776000, "maxAgeSeconds": 31536000, "renewalNoticeSeconds": 1209600, **doc.get("approvals", {}).get("policyGrants", {})}
         require(limits["defaultAgeSeconds"] <= limits["maxAgeSeconds"], "Approval default exceeds maximum")
         require(limits["renewalNoticeSeconds"] < limits["defaultAgeSeconds"], "Renewal notice exceeds default lifetime")
     if kind == "EvidenceShare":
         require(not spec["includeFutureArtifacts"] and not spec["allowReshare"], "Share broadens future/delegation scope")
-        raw_ops = {"read_memory", "debugger_command", "pcap_query", "syscall_query", "get_logs", "download_artifact"}
+        # get_extract views (logs is raw) are gated by dataClasses, not by operation name.
+        raw_ops = {"read_memory", "debugger_command", "pcap_query", "syscall_query", "download_artifact"}
         require(not raw_ops.intersection(spec["operations"]) or "raw" in spec["dataClasses"], "Raw operation in extract-only share")
         if "raw" in spec["dataClasses"] and doc.get("status", {}).get("phase") == "Active":
             approver = doc["status"].get("approvedBy")
@@ -769,42 +764,17 @@ def semantic_checks(doc: dict) -> None:
         mapping = spec.get("metadataMapping", {})
         if mapping.get("mode") == "valueMap":
             require(all(group != "*" for groups in mapping["values"].values() for group in groups), "Wildcard mapped group")
-    if kind == "EvidenceStoragePool":
-        # ADR-335 D2: operators give capacity; reserve, headroom and allocations
-        # default from it. The pool invariant holds for the derived figures and
-        # is enforced at enrollment (REQ-CAP-004), not authored as slot arithmetic.
-        def part(field, dimension, default_share):
-            value = spec.get(field, {"share": f"{default_share}%"})
-            if dimension in value:
-                return value[dimension]
-            if "share" in value:
-                return spec["capacity"].get(dimension, 0) * float(value["share"][:-1]) / 100
-            return 0
-        for dimension in ("bytes", "objects"):
-            if dimension not in spec["capacity"]:
-                continue
-            protected = sum(item["workloadSlots"] * item["protectedPerWorkload"][dimension] for item in spec.get("protectedAllocations", []))
-            fixed = part("safetyHeadroom", dimension, 5) + part("systemReserve", dimension, 5) + part("sharedBurst", dimension, 0)
-            require(protected + fixed <= spec["capacity"][dimension], "Storage pool overcommits " + dimension)
-        names = [item["budgetPolicyRef"] for item in spec.get("protectedAllocations", [])]
-        require(len(names) == len(set(names)), "Duplicate budget profile allocation")
-    if kind == "EvidenceBudgetPolicy":
-        workload = spec.get("workload", {})
-        share = lambda q, default: float(q.get("share", default)[:-1]) if "bytes" not in q else None
-        protected, hard = workload.get("protected", {}), workload.get("hardLimit", {})
-        if "bytes" in protected and "bytes" in hard:
-            require(protected["bytes"] <= hard["bytes"], "Invalid workload protected/hard capacity")
-            if "contextReserve" in workload and "bytes" in workload["contextReserve"]:
-                require(0 < workload["contextReserve"]["bytes"] < protected["bytes"], "Invalid workload context reserve")
-        elif "bytes" not in protected and "bytes" not in hard:
-            require(share(protected, "2%") <= share(hard, "10%"), "Invalid workload protected/hard share")
-        node = spec.get("node", {})
-        if "maxConcurrentExpensive" in workload and "maxConcurrentExpensive" in node:
-            require(workload["maxConcurrentExpensive"] <= node["maxConcurrentExpensive"], "Workload concurrency exceeds node ceiling")
-        if "maxSpoolBytes" in workload and "maxSpoolBytes" in node:
-            require(workload["maxSpoolBytes"] <= node["maxSpoolBytes"], "Workload spool exceeds node capacity")
-        dump = workload.get("dump", {})
-        require(dump.get("burst", 1) <= dump.get("maxStartsPerRollingHour", 2), "Dump burst exceeds hourly start budget")
+    if doc.get("kind") is None and "workload" in doc and "evidenceStorage" in doc:
+        # Hub `capacity` values (ADR-335 D2): the protected share fits the hard limit.
+        def capacity_bytes(value, total):
+            if value.endswith("%"):
+                return total * float(value[:-1]) / 100
+            units = {"Ki": 2**10, "Mi": 2**20, "Gi": 2**30, "Ti": 2**40, "Pi": 2**50, "k": 10**3, "M": 10**6, "G": 10**9, "T": 10**12, "P": 10**15}
+            number = value.rstrip("KMGTPkimi")
+            return int(number) * units.get(value[len(number):], 1)
+        total = capacity_bytes(doc["evidenceStorage"], 0)
+        workload = doc["workload"]
+        require(capacity_bytes(workload.get("share", "2%"), total) <= capacity_bytes(workload.get("limit", "10%"), total), "Invalid workload protected/hard share")
     if kind == "EvidenceRetentionPolicy":
         budget = spec["deletionBudgetSeconds"]
         require(all(age > budget for age in spec["maxima"].values()), "Retention maximum leaves no deletion budget")
@@ -1047,14 +1017,9 @@ def main() -> None:
         if "recipeRef" in doc["spec"]:
             recipe = recipes[doc["spec"]["recipeRef"]["name"]]
             require(not any(a["parameters"].get("process") == "selectedPID" for a in recipe["spec"]["actions"]), "Recurring recipe pins an ad hoc PID")
-    # A current delegation can sponsor an unchanged historical assignment.
-    continued_policy = copy.deepcopy(examples["resolved-policy-scope.json"])
-    continued_policy["policyAuthority"]["ownerAssignments"][0]["basisDigest"] = "sha256:" + "a" * 64
-    semantic_checks(continued_policy)
     grant = examples["grant-policy.yaml"]["spec"]["target"]
     require(grant["executionDigest"] == canonical_digest(examples["resolved-policy-scope.json"]), "Grant collection scope digest mismatch")
     require(examples["grant-policy.yaml"]["spec"]["policyAuthority"] == examples["resolved-policy-scope.json"]["policyAuthority"] and examples["grant-policy.yaml"]["spec"]["policyExecutor"] == examples["resolved-policy-scope.json"]["executor"], "Grant and accepted team authority disagree")
-    require(examples["grant-policy.yaml"]["spec"]["approvalPolicyRef"]["digest"] == canonical_digest(examples["approval-policy.yaml"]), "Approval policy digest mismatch")
     require(examples["grant-ad-hoc.yaml"]["spec"]["target"]["executionDigest"] == canonical_digest(examples["resolved-capture-scope.json"]), "Ad hoc scope digest mismatch")
     core_scope = examples["resolved-sharing-capture-scope.json"]
     core_target = examples["manifest-core.json"]["target"]
@@ -1119,11 +1084,6 @@ def main() -> None:
     require(retention["policyRefs"][0]["digest"] == canonical_digest(retention_policy), "Retention provenance digest mismatch")
     core_limit = next(rule["maxAgeSeconds"] for rule in retention_policy["rules"] if rule["name"] == "core-and-heap")
     require(retention["resolvedMaxAgeSeconds"] <= core_limit, "Manifest exceeds example core retention policy")
-    pool = examples["storage-pool.yaml"]
-    budget = examples["budget-policy.yaml"]
-    require(budget["spec"]["poolRef"] == pool["metadata"]["name"], "Unknown example storage pool")
-    # ADR-335 D2: the shipped capacity examples need no byte arithmetic.
-    require("protectedAllocations" not in pool["spec"] and all("share" in budget["spec"]["workload"][k] for k in ("protected", "hardLimit")), "Capacity example reintroduces slot arithmetic")
     manifests = {doc["artifactID"]: doc for doc in examples.values() if doc.get("schemaVersion") == "artifact/v1"}
     intent = examples["sharing-intent.yaml"]
     capture = examples["capture-with-raw-sharing.yaml"]
@@ -1322,11 +1282,10 @@ def main() -> None:
     rejects(examples["manifest.json"], "manifest", lambda d: d.update({"expiresAt": "2026-10-12T12:00:02Z"}), True)
     rejects(examples["manifest.json"], "manifest", lambda d: d["retention"].update({"deleteBy": "2026-10-10T18:00:00Z"}), True)
     rejects(examples["manifest.json"], "manifest", lambda d: d["retention"].pop("parentExpiresAt"), True)
-    rejects(examples["storage-pool.yaml"], "storage-pool", lambda d: d["spec"].update({"protectedAllocations": [{"budgetPolicyRef": "payments-default", "workloadSlots": 9, "protectedPerWorkload": {"bytes": 17179869184, "objects": 10000}}]}), True)
-    rejects(examples["storage-pool.yaml"], "storage-pool", lambda d: d["spec"].update({"sharedBurst": {"share": "95%"}}), True)
-    rejects(examples["budget-policy.yaml"], "budget-policy", lambda d: d["spec"]["workload"]["hardLimit"].update({"share": "1%"}), True)
-    rejects(examples["budget-policy.yaml"], "budget-policy", lambda d: d["spec"]["workload"]["hardLimit"].update({"bytes": 1}))
-    rejects(examples["budget-policy.yaml"], "budget-policy", lambda d: d["spec"]["workload"].update({"onFull": "EvictOtherWorkload"}))
+    rejects(examples["capacity-values.yaml"], "capacity", lambda d: d["workload"].update({"limit": "1%"}), True)
+    rejects(examples["capacity-values.yaml"], "capacity", lambda d: d["workload"].update({"limit": 1}))
+    rejects(examples["capacity-values.yaml"], "capacity", lambda d: d["workload"].update({"onFull": "EvictOtherWorkload"}))
+    rejects(examples["capacity-values.yaml"], "capacity", lambda d: d.update({"protectedAllocations": []}))
     rejects(examples["capture-with-sharing.yaml"], "capture", lambda d: d["spec"]["sharing"].update({"futureCaptures": {"enabled": True, "maxCaptures": 10}}))
     rejects(examples["capture-with-sharing.yaml"], "capture", lambda d: d["spec"]["sharing"].update({"owner": intent["spec"]["createdBy"]}))
     rejects(examples["capture-with-sharing.yaml"], "capture", lambda d: d["spec"]["sharing"]["recipients"][0].update({"id": "*"}), True)
@@ -1368,7 +1327,7 @@ def main() -> None:
     def packet_mutation(change):
         return lambda d: change(d["spec"]["actions"][0]["parameters"])
     rejects(http_recipe, "recipe", packet_mutation(lambda p: p.update({"filter": " "})))
-    rejects(http_recipe, "recipe", packet_mutation(lambda p: p["ring"].update({"maxSegments": 5})), True)
+    rejects(http_recipe, "recipe", packet_mutation(lambda p: p["ring"].update({"segments": 1})))
     rejects(http_recipe, "recipe", packet_mutation(lambda p: p["ring"].update({"maxAge": "10s"})), True)
     # encryptedDisk needs no storage profile in this release (ADR-278); an
     # unknown medium, such as a plaintext disk, stays refused.
@@ -1395,7 +1354,7 @@ def main() -> None:
     rejects(examples["grant-policy.yaml"], "grant", lambda d: d["spec"].update({"grantType": "adHocCapture"}))
     rejects(examples["grant-ad-hoc.yaml"], "grant", lambda d: d["spec"]["target"].pop("captureUID"))
     rejects(examples["grant-policy.yaml"], "grant", lambda d: d["spec"].update({"notAfter": "2027-10-09T12:00:00Z"}), True)
-    rejects(examples["approval-policy.yaml"], "approval-policy", lambda d: d["policyGrants"].update({"defaultAgeSeconds": 31536000}), True)
+    rejects(examples["identity-settings.json"], "identity-settings", lambda d: d.update({"approvals": {"policyGrants": {"defaultAgeSeconds": 31536001}}}), True)
     rejects(examples["policy-deployment.yaml"], "policy", lambda d: d["spec"]["detectors"][1]["options"].update({"sampleInterval": "1ms"}), True)
     rejects(http_recipe, "recipe", packet_mutation(lambda p: p.update({"before": "0s", "after": "0s"})), True)
     rejects(http_recipe, "recipe", packet_mutation(lambda p: p.update({"maxFrozenBytes": 268435456})), True)
@@ -1489,30 +1448,33 @@ def main() -> None:
             return
         raise ValueError("Invalid guidance output accepted: " + example)
 
-    rejects_tool_input("recommend_diagnostics", {"target_handle": "t", "goal": "network", "auto_capture": True})
-    rejects_tool_input("recommend_diagnostics", {"target_handle": "t", "goal": "network", "focus": {"process_refs": ["p"]}})
-    rejects_tool_input("recommend_diagnostics", {"target_handle": "t", "goal": "network", "discovery_capture_ids": [intent["id"]] * 5})
-    rejects_tool_input("recommend_diagnostics", {"target_handle": "t", "goal": "network", "preferences": {"history_seconds": 0}})
-    rejects_tool_input("get_target_discovery", {"capture_id": intent["id"], "section": "rawPackets"})
-    rejects_tool_input("get_target_discovery", {"capture_id": intent["id"], "section": "flows", "container_name": "app"})
+    # Recommendations are list_diagnostics with a goal; discovery projections are a get_extract view.
+    rejects_tool_input("list_diagnostics", {"target_handle": "t", "goal": "network", "auto_capture": True})
+    rejects_tool_input("list_diagnostics", {"target_handle": "t", "goal": "network", "focus": {"process_refs": ["p"]}})
+    rejects_tool_input("list_diagnostics", {"target_handle": "t", "goal": "network", "discovery_capture_ids": [intent["id"]] * 5})
+    rejects_tool_input("list_diagnostics", {"target_handle": "t", "goal": "network", "preferences": {"history_seconds": 0}})
+    rejects_tool_input("list_diagnostics", {"target_handle": "t", "discovery_capture_ids": [intent["id"]]})
+    rejects_tool_input("get_extract", {"view": "discovery", "capture_id": intent["id"], "section": "rawPackets"})
+    rejects_tool_input("get_extract", {"view": "discovery", "capture_id": intent["id"], "section": "flows", "container_name": "app"})
+    rejects_tool_input("get_extract", {"view": "discovery", "case_id": intent["id"], "artifact_id": intent["id"], "section": "flows"})
     valid_focus = {"target_handle": "t", "goal": "hang", "discovery_capture_ids": [intent["id"]], "focus": {"process_refs": ["p"]}}
-    validate(valid_focus, tools["recommend_diagnostics"]["inputSchema"])
-    rejects_guidance("get_target_discovery", "mcp-discovery-processes-result.json", lambda d: d.update({"data_class": "metadata"}))
-    rejects_guidance("get_target_discovery", "mcp-discovery-processes-result.json", lambda d: d["data"]["processes"][0].update({"argv": ["secret"]}))
-    rejects_guidance("get_target_discovery", "mcp-discovery-processes-result.json", lambda d: d["data"]["processes"][0].update({"observed_at": "2026-10-09T13:00:00Z"}), True)
-    rejects_guidance("get_target_discovery", "mcp-discovery-flows-result.json", lambda d: d["data"]["flows"][0].update({"payload": "secret"}))
-    rejects_guidance("get_target_discovery", "mcp-discovery-flows-result.json", lambda d: d["data"]["summary"].update({"capture_mode": "networkHeaders"}), True)
-    rejects_guidance("get_target_discovery", "mcp-discovery-flows-result.json", lambda d: d["data"]["summary"]["coverage"].update({"dropped_packets": 1}), True)
-    rejects_guidance("get_target_discovery", "mcp-discovery-flows-result.json", lambda d: d["data"]["summary"]["coverage"].update({"covered_pods": 2}), True)
-    rejects_guidance("recommend_diagnostics", "mcp-recommend-result.json", lambda d: d["data"]["recommendations"][0]["ring_sizing"].update({"segments": 8}), True)
-    rejects_guidance("recommend_diagnostics", "mcp-recommend-result.json", lambda d: d["data"]["recommendations"][0]["ring_sizing"].update({"retained_bytes_per_second": 0}))
-    rejects_guidance("recommend_diagnostics", "mcp-recommend-result.json", lambda d: d["data"]["recommendations"][0]["packet_parameters"]["ring"].update({"maxBytes": 16777216}), True)
-    rejects_guidance("recommend_diagnostics", "mcp-recommend-result.json", lambda d: d["data"]["recommendations"][0]["packet_parameters"].update({"profile": {"kind": "rawPackets", "snaplen": 2048}}), True)
-    rejects_guidance("recommend_diagnostics", "mcp-recommend-result.json", lambda d: d["data"]["recommendations"][0].update({"auto_approved": True}))
-    rejects_tool_input("recommend_diagnostics", {"target_handle": "t", "goal": "network", "preferences": {"max_ring_bytes": 0}})
-    rejects_guidance("recommend_diagnostics", "mcp-recommend-processes-result.json", lambda d: d["data"]["recommendations"][0]["process_batch"].update({"maxProcesses": 3}), True)
-    rejects_guidance("recommend_diagnostics", "mcp-recommend-processes-result.json", lambda d: d["data"]["recommendations"][0].update({"max_process_starts": 1}), True)
-    rejects_guidance("recommend_diagnostics", "mcp-recommend-processes-result.json", lambda d: d["data"]["recommendations"][0].update({"process_match_count": 3, "blockers": []}), True)
+    validate(valid_focus, tools["list_diagnostics"]["inputSchema"])
+    rejects_guidance("get_extract", "mcp-discovery-processes-result.json", lambda d: d.update({"data_class": "metadata"}))
+    rejects_guidance("get_extract", "mcp-discovery-processes-result.json", lambda d: d["data"]["processes"][0].update({"argv": ["secret"]}))
+    rejects_guidance("get_extract", "mcp-discovery-processes-result.json", lambda d: d["data"]["processes"][0].update({"observed_at": "2026-10-09T13:00:00Z"}), True)
+    rejects_guidance("get_extract", "mcp-discovery-flows-result.json", lambda d: d["data"]["flows"][0].update({"payload": "secret"}))
+    rejects_guidance("get_extract", "mcp-discovery-flows-result.json", lambda d: d["data"]["summary"].update({"capture_mode": "networkHeaders"}), True)
+    rejects_guidance("get_extract", "mcp-discovery-flows-result.json", lambda d: d["data"]["summary"]["coverage"].update({"dropped_packets": 1}), True)
+    rejects_guidance("get_extract", "mcp-discovery-flows-result.json", lambda d: d["data"]["summary"]["coverage"].update({"covered_pods": 2}), True)
+    rejects_guidance("list_diagnostics", "mcp-recommend-result.json", lambda d: d["data"]["recommendations"][0]["ring_sizing"].update({"segments": 8}), True)
+    rejects_guidance("list_diagnostics", "mcp-recommend-result.json", lambda d: d["data"]["recommendations"][0]["ring_sizing"].update({"retained_bytes_per_second": 0}))
+    rejects_guidance("list_diagnostics", "mcp-recommend-result.json", lambda d: d["data"]["recommendations"][0]["packet_parameters"]["ring"].update({"maxBytes": 16777216}), True)
+    rejects_guidance("list_diagnostics", "mcp-recommend-result.json", lambda d: d["data"]["recommendations"][0]["packet_parameters"].update({"profile": {"kind": "rawPackets", "snaplen": 2048}}), True)
+    rejects_guidance("list_diagnostics", "mcp-recommend-result.json", lambda d: d["data"]["recommendations"][0].update({"auto_approved": True}))
+    rejects_tool_input("list_diagnostics", {"target_handle": "t", "goal": "network", "preferences": {"max_ring_bytes": 0}})
+    rejects_guidance("list_diagnostics", "mcp-recommend-processes-result.json", lambda d: d["data"]["recommendations"][0]["process_batch"].update({"maxProcesses": 3}), True)
+    rejects_guidance("list_diagnostics", "mcp-recommend-processes-result.json", lambda d: d["data"]["recommendations"][0].update({"max_process_starts": 1}), True)
+    rejects_guidance("list_diagnostics", "mcp-recommend-processes-result.json", lambda d: d["data"]["recommendations"][0].update({"process_match_count": 3, "blockers": []}), True)
     def rejects_history(name, example, mutate):
         nonlocal negative_checks
         invalid = copy.deepcopy(examples[example])
@@ -1531,7 +1493,8 @@ def main() -> None:
     rejects_tool_input("list_capture_history", {"target_handle": "t", "cluster_id": intent["id"]})
     rejects_tool_input("list_capture_history", {"cluster_id": intent["id"]})
     rejects_tool_input("list_capture_history", {"target_handle": "t", "limit": 0})
-    rejects_tool_input("get_capture_settings", {"capture_id": intent["id"], "include_credentials": True})
+    rejects_tool_input("get_capture", {"capture_id": intent["id"], "view": "settings", "include_credentials": True})
+    rejects_tool_input("get_capture", {"capture_id": intent["id"], "view": "settings", "after_revision": 1})
     rejects_tool_input("request_capture", {"history_capture_id": intent["id"], "idempotency_key": "bypass-preview"})
     rejects_tool_input("preview_capture", {**repeat_input, "repeated_from_capture_id": intent["id"]})
     validate({**examples["mcp-preview-input.json"], "repeated_from_capture_id": intent["id"]}, tools["preview_capture"]["inputSchema"])
@@ -1539,15 +1502,15 @@ def main() -> None:
     rejects_history("list_capture_history", "mcp-history-result.json", lambda d: d["data"]["history"][0].update({"repeated_from_capture_id": d["data"]["history"][0]["capture_id"]}))
     rejects_history("list_capture_history", "mcp-history-result.json", lambda d: d["data"]["history"][0].update({"settings_expires_at": "2027-01-01T00:00:00Z"}))
     rejects_history("list_capture_history", "mcp-history-result.json", lambda d: d["data"]["history"].append(copy.deepcopy(d["data"]["history"][0])))
-    rejects_history("get_capture_settings", "mcp-capture-settings-result.json", lambda d: d["data"]["settings"].update({"grantRef": intent["id"]}))
-    rejects_history("get_capture_settings", "mcp-capture-settings-result.json", lambda d: d["data"]["settings"].update({"sharing": {"recipients": []}}))
-    rejects_history("get_capture_settings", "mcp-capture-settings-result.json", lambda d: d.update({"data_class": "metadata"}))
-    rejects_history("get_capture_settings", "mcp-capture-settings-result.json", lambda d: d["data"].update({"settings_digest": "0" * 64}))
-    rejects_history("get_capture_settings", "mcp-capture-settings-result.json", lambda d: d["data"].update({"expires_at": "2026-10-08T12:00:00Z"}))
+    rejects_history("get_capture", "mcp-capture-settings-result.json", lambda d: d["data"]["settings"].update({"grantRef": intent["id"]}))
+    rejects_history("get_capture", "mcp-capture-settings-result.json", lambda d: d["data"]["settings"].update({"sharing": {"recipients": []}}))
+    rejects_history("get_capture", "mcp-capture-settings-result.json", lambda d: d.update({"data_class": "metadata"}))
+    rejects_history("get_capture", "mcp-capture-settings-result.json", lambda d: d["data"].update({"settings_digest": "0" * 64}))
+    rejects_history("get_capture", "mcp-capture-settings-result.json", lambda d: d["data"].update({"expires_at": "2026-10-08T12:00:00Z"}))
     def corrupt_history_recipe_pin(d):
         d["data"]["settings"]["dependency_pins"][0]["digest"] = "0" * 64
         d["data"]["settings_digest"] = canonical_digest(d["data"]["settings"])
-    rejects_history("get_capture_settings", "mcp-capture-settings-result.json", corrupt_history_recipe_pin)
+    rejects_history("get_capture", "mcp-capture-settings-result.json", corrupt_history_recipe_pin)
     target = examples["mcp-capture-settings-result.json"]["data"]["settings"]["target"]
     grouping = history_selector_fixture_key("cluster-A", "namespace-A", target)
     changed = copy.deepcopy(target); changed["maxPods"] = 3
@@ -1647,7 +1610,7 @@ def main() -> None:
     rejects(argument_recipe, "recipe", syscall_change(lambda p: p.update({"processes": "hostProcesses"})))
     rejects(argument_recipe, "recipe", syscall_change(lambda p: p.update({"before": "0s", "after": "0s"})), True)
     rejects(argument_recipe, "recipe", syscall_change(lambda p: p.update({"after": "61s"})), True)
-    rejects(argument_recipe, "recipe", syscall_change(lambda p: p["ring"].update({"maxSegments": 8})), True)
+    rejects(argument_recipe, "recipe", syscall_change(lambda p: p["ring"].update({"segments": 1})))
     rejects(argument_recipe, "recipe", syscall_change(lambda p: p.update({"maxFrozenBytes": 1})), True)
     rejects(argument_recipe, "recipe", syscall_change(lambda p: p["arguments"].update({"maxBytesPerEvent": 4097})))
     rejects(argument_recipe, "recipe", syscall_change(lambda p: p["syscalls"].update({"names": ["write", "write"]})))
@@ -1662,7 +1625,7 @@ def main() -> None:
     rejects_guidance("get_extract", "mcp-logs-result.json", lambda d: d.update({"data_class": "extract"}))
     rejects_guidance("get_extract", "mcp-logs-result.json", lambda d: d["data"]["entries"][0].update({"bytes_base64": "Cg=="}))
     rejects(examples["share-extract.yaml"], "share", lambda d: d["spec"]["operations"].append("syscall_query"), True)
-    rejects(examples["share-extract.yaml"], "share", lambda d: d["spec"]["operations"].append("get_logs"), True)
+    rejects(examples["share-extract.yaml"], "share", lambda d: d["spec"]["operations"].append("download_artifact"), True)
     rejects_guidance("preview_capture", "mcp-composition-preview-result.json", lambda d: d.update({"data_class": "metadata"}))
     # ADR-335 D6: observation is bounded by rate x session length, not lifetime totals.
     rejects(examples["grant-packet-observation.yaml"], "grant", lambda d: d["spec"]["observationLimits"].update({"maxObservedEvents": 100}))
@@ -1683,7 +1646,7 @@ def main() -> None:
     rejects(composed_scope, "collection-scope", lambda d: d["profileComposition"]["resolvedProfiles"][0].update({"sourceUID": "fixture-http-headers-v1", "sourceClusterID": "00000000-0000-4000-8000-000000000010", "sourceNamespaceUID": "replacement-namespace"}))
     # Both approved metadata projections are permitted in explicit extract selections.
     share_request = copy.deepcopy(examples["capture-with-sharing.yaml"])
-    share_request["spec"]["sharing"]["outputSelection"] = {"mode": "explicit", "outputs": [{"actionID": "syscalls", "dataClass": "extract", "projectionRef": {"name": "syscall-metadata", "version": "v1"}, "operations": ["get_syscall_summary", "get_syscall_events"]}]}
+    share_request["spec"]["sharing"]["outputSelection"] = {"mode": "explicit", "outputs": [{"actionID": "syscalls", "dataClass": "extract", "projectionRef": {"name": "syscall-metadata", "version": "v1"}, "operations": ["get_extract"]}]}
     validate(share_request, schemas[BASE + "capture.schema.json"])
     rejects(share_request, "capture", lambda d: d["spec"]["sharing"]["outputSelection"]["outputs"][0]["operations"].append("syscall_query"))
     # Lifecycle categories, invalid phase dependencies and history claims.
@@ -1848,8 +1811,8 @@ def main() -> None:
     rejects(examples["lifecycle-recording-save.json"], "action-lifecycle", lambda d: d.pop("recordingSaveOrigin"))
     rejects(examples["lifecycle-recording-save.json"], "action-lifecycle", lambda d: d.update({"triggerKind": "manual"}))
     rejects(examples["lifecycle-recording-save.json"], "action-lifecycle", lambda d: d.update({"after": "10s"}))
-    rejects_guidance("get_capture_settings", "mcp-recording-save-settings-result.json", lambda d: d["data"]["settings"].update({"sourceSessionID": "expired"}))
-    rejects_guidance("get_capture_settings", "mcp-recording-save-settings-result.json", lambda d: d["data"].update({"settings_digest": "0"*64}), True)
+    rejects_guidance("get_capture", "mcp-recording-save-settings-result.json", lambda d: d["data"]["settings"].update({"sourceSessionID": "expired"}))
+    rejects_guidance("get_capture", "mcp-recording-save-settings-result.json", lambda d: d["data"].update({"settings_digest": "0"*64}), True)
     rejects_guidance("list_capture_history", "mcp-recording-save-history-result.json", lambda d: d["data"]["history"][0].update({"action_kinds": ["liveCore"]}))
     rejects_guidance("list_capture_history", "mcp-recording-save-history-result.json", lambda d: d["data"]["history"][0].update({"repeat_state": "available"}))
     report = examples["assessment-mixed-policy.json"]

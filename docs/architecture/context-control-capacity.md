@@ -11,7 +11,7 @@ Evidence bytes and objects keep their separate C-07 counters
 ## Rules
 
 - The limit is derived, not configured: the workload's share of the hub SQL
-  volume (from its `EvidenceBudgetPolicy` storage share) divided by the
+  volume (from `capacity.workload.share`) divided by the
   estimated bytes per capture record including its audit and idempotency rows
   (an internal estimate, ADR-335 D2). The pool row holds the
   installation-wide total so per-workload limits cannot exceed what the hub

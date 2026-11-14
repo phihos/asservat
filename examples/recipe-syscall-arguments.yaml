@@ -23,10 +23,7 @@ spec:
       ring:
         maxAge: 10s
         maxBytes: 8388608
-        segmentBytes: 2097152
-        maxSegments: 4
-      maxFrozenBytes: 16777216
-      maxEvents: 100000
+        segments: 4
       maxEventsPerSecond: 10000
       maxTrackedThreads: 4096
       arguments:

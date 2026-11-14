@@ -94,9 +94,7 @@ small fixtures do not establish the configured maximum.
 
 ## REQ-EVD-006 — Retention, holds and deletion
 
-The [privacy specification](privacy.md) defines administrator maxima, conservative classification, age from first acquisition, parent deadlines and legal-exception policy. Defaults ([ADR-335](../docs/decisions/335-usable-by-default.md) D7): 14 days for evidence including cores, 30 days for content-minimized case metadata and 90 days for audit (at least the backup retention, because restore re-applies exported audit); administrators may set other defaults and maxima by privacy class, type and workload. These are product defaults, not legal recommendations. `expiresAt` denies reads and starts cleanup; `deleteBy` is the storage deadline. Holds require a separate authorized decision and cannot bypass the applicable cap or confer readership.
-
-Each artifact row stores its effective `expiresAt`/`deleteBy` (ADR-330 D12). A retention policy change arrives as an event and applies any shorter deadline with one SQL update per affected set; deadlines never move later than the stored value. Reads, downloads and deletion use the stored deadlines; a started download stops at its `AccessUntil` (ADR-312).
+Retention maxima, defaults, clamping and policy changes are owned by [privacy](privacy.md) (REQ-PRV-002, REQ-PRV-003). Each artifact row stores its effective `expiresAt` (denies reads and starts cleanup) and `deleteBy` (storage deadline); reads, downloads and deletion use them. Holds require a separate authorized decision and cannot bypass the applicable cap or confer readership.
 
 Deletion runs from the stored deadlines (a timer for the earliest one): it deletes every object and version under the artifact's prefix, index copies and derived artifacts, retries failures and writes a SQL tombstone and audit row. The storage charge is released when the deletes succeed (REQ-CAP-005). Bucket lifecycle is a backstop. A legal hold is advertised as storage-enforced only when the backend supports and passes Object Lock tests; otherwise it is an application hold with stated limitations. Held artifacts need lifecycle rules that cannot delete them prematurely.
 

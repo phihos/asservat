@@ -82,7 +82,7 @@ Protocol DTOs use existing snake_case MCP fields, Kubernetes lowerCamelCase fiel
 
 `live_watch` is a minimized hub row keyed by WatchId: viewer/client, state/revision, source sessions, display filter, accepted/absolute/idle deadlines, scope digest and output/resource charges. Index viewer/client/state/expiry and the unique opening idempotency key. Delivery rows and row payloads never enter PostgreSQL, CRDs, outbox or audit. Charges settle when the watch ends; a replica loss resumes from current source heads with an explicit gap.
 
-LiveBatch/replay buffers are bounded memory inside qualified regional/hub delivery boundaries; no evidence broker or stream CRD. Keep Go `LiveWatch`, `LiveRow` tagged projection union, `LiveCursor`, `SourcePosition` and `LiveGap` distinct from capture/artifact/query-result types. Application LiveWatchService implements inventory/open/read/update/close with the same access evaluator as browser/MCP, authorized once and reused within ADR-311. Source projection adapters implement nonblocking bounded reads.
+Live row buffers are bounded memory inside qualified regional/hub delivery boundaries; no evidence broker or stream CRD. Keep Go `LiveWatch`, `LiveRow` tagged projection union, `LiveCursor`, `SourcePosition` and `LiveGap` distinct from capture/artifact/query-result types. Application LiveWatchService implements inventory/open/read/update/close with the same access evaluator as browser/MCP, authorized once and reused within ADR-311. Source projection adapters implement nonblocking bounded reads.
 
 ArtifactDownload is a C-14-owned minimized SQL row with artifact/version, actor/client, authority, deadline and budget. It is not a CRD, analysis run or stored plaintext copy. The regional reader streams the native bytes over the connector connection; laptop copies remain outside the managed copy inventory. See [download contract](../../specs/artifact-downloads.md).
 
@@ -90,7 +90,7 @@ ArtifactDownload is a C-14-owned minimized SQL row with artifact/version, actor/
 
 AccessGrant gains optional ResultAccessScope and ResultAccessCounters value objects; no new top-level entity is needed. Map the resolved instruction and counters to hub SQL; artifacts used count once through a unique (grant, artifact) row. DebugCapture authored resultAccess is an instruction only; it cannot set issued decisions. MCP uses result_access with the same strict nested DTO. Case/Artifact identity and C-14 ownership are unchanged. See [REQ-INV-002](../../specs/investigation-approval.md#req-inv-002--result-access-applies-to-exact-published-artifacts).
 
-BrowserLogin and BrowserSession belong to C-02. SQL stores encrypted provider credentials and minimal principal/session metadata. They are not CRDs, evidence, grants or recurring-policy executors. See [browser sessions](../architecture/browser-sessions.md).
+BrowserSession belongs to C-02; the login challenge is a short-lived part of it. SQL stores encrypted provider credentials and minimal principal/session metadata. They are not CRDs, evidence, grants or recurring-policy executors. See [browser sessions](../architecture/browser-sessions.md).
 
 ## Hub process credentials
 

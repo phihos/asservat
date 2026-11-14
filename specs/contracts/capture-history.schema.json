@@ -29,12 +29,9 @@
         "phase": {
           "enum": [
             "Pending",
-            "Validating",
             "AwaitingApproval",
             "Armed",
-            "Queued",
             "Running",
-            "Finalizing",
             "Succeeded",
             "Partial",
             "Failed",

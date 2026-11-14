@@ -27,11 +27,11 @@ Given an approved policy, when its grant is renewed in place or only recipients 
 
 ## REQ-EXE-002 — Acceptance, deadlines and progress
 
-The hub authorizes an operation once (identity, permission, deny, retention, capacity) and reuses that decision for at most 30 s and never past an original deadline ([ADR-311](../docs/decisions/311-operation-authority-recheck.md)). Five seconds is only an I/O timeout. SQL constraints and conditional updates enforce capacity, retention deadlines and idempotency.
+The hub authorizes an operation once (identity, permission, deny, retention, capacity) and reuses the decision under [REQ-INT-003](interfaces.md#req-int-003--bounded-errors-retries-and-asynchronous-work). SQL constraints and conditional updates enforce capacity, retention deadlines and idempotency.
 
-An interactive request's deadline is its HTTP request context. A status wait returns within 30 s ([ADR-330](../docs/decisions/330-event-driven-system-design.md) D1). Stored capture and grant deadlines are never extended by a retry.
+An interactive request's deadline is its HTTP request context. Stored capture and grant deadlines are never extended by a retry.
 
-A DebugCapture written through Kubernetes uses its UID and generation as operation identity and computes its deadline at acceptance, so a late GitOps sync never runs an expired request. Browser and MCP requests carry an idempotency key. Each execution has an operation ID (capture UID, action ID, attempt), inserted with `INSERT … ON CONFLICT DO NOTHING`. The hub sends the start over the connector's single connection (ADR-330 D2) and the connector starts the work idempotently under that ID. A retry, lost reply or restart looks the ID up and never starts work twice. A process-affecting start with an unknown outcome is `Indeterminate` and never retried automatically (REQ-ACT-001).
+A DebugCapture written through Kubernetes uses its UID and generation as operation identity and computes its deadline at acceptance, so a late GitOps sync never runs an expired request. Browser and MCP requests follow the idempotency rule of REQ-INT-003. Each execution has an operation ID (capture UID, action ID, attempt), inserted with `INSERT … ON CONFLICT DO NOTHING`. The hub sends the start over the connector's single connection (ADR-330 D2) and the connector starts the work idempotently under that ID. A retry, lost reply or restart looks the ID up and never starts work twice. A start with an unknown outcome follows [REQ-FED-002](federation.md#req-fed-002--durable-outbound-work-and-compatibility).
 
 Connectors and in-cluster executors authenticate with projected ServiceAccount tokens ([ADR-334](../docs/decisions/334-connector-workload-identity.md), ADR-330 D3); the region trusts its Kubernetes RBAC. Before each attach the executor checks the target identity locally under REQ-TGT-002 (pod UID, container ID, host PID and start time, node boot ID).
 
@@ -43,7 +43,7 @@ For DebugCapture, `podBindings` is a non-empty list sorted and unique by podUID 
 
 Context that needs no approval runs at acceptance; expensive capacity is reserved close to dispatch, not during a review. Each process-affecting start has its own operation ID and reservation within the parent's bounds. If the pinned process is gone or the deadline passed, nothing starts against a replacement; the user can start a fresh capture. Cancellation is idempotent. Deleting a CRD neither deletes evidence nor revokes sharing.
 
-The summary phase projects action states: Running, AwaitingApproval (no runnable action active, some pending review), Finalizing, then Succeeded, Partial or Failed. Cancellation and uncertain execution are reported explicitly.
+The capture phase ([APIs](apis.md)) projects action states: AwaitingApproval while no runnable action is active and some await review, Running until every output is published or has failed, then Succeeded, Partial or Failed; Cancelled and Indeterminate are explicit.
 
 ### SC-EXE-002
 

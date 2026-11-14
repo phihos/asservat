@@ -53,7 +53,7 @@ Given a matching CRI record split across partial entries and followed by rotatio
 
 Each occurrence has one idempotency key: policy, Pod UID and a detector-specific instant (the restart count, the newest failure second, or the alert's receiver/fingerprint/`startsAt`). The hub stores one row per key under a unique constraint, and the key is the capture's idempotency key, so duplicate deliveries, HA copies and retries never start another capture. A crash artifact and the exit of the same container restart belong to one occurrence.
 
-Admission applies the [capacity](capacity.md#req-cap-001--workload-wide-storm-control) rate limit (a token bucket per workload, shared by every policy and manual save on it) and its concurrency limit. A policy's `budgets` can only tighten them for that policy. An admitted occurrence is charged by its key and released on a definite refusal before start. An occurrence that does not fit is suppressed, never queued: suppression is a content-free saturating count per policy and reason. Budget changes never authorize a previously refused occurrence.
+Admission applies the workload rate and concurrency limits of [capacity](capacity.md#req-cap-001--workload-wide-storm-control), including suppression. A policy's `budgets` can only tighten them for that policy. An admitted occurrence is charged by its key and released on a definite refusal before start. Budget changes never authorize a previously refused occurrence.
 
 ### SC-TRG-004
 

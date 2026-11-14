@@ -65,8 +65,7 @@ spec:
       ring:
         maxAge: 30s
         maxBytes: 16777216
-        segmentBytes: 4194304
-        maxSegments: 4
+        segments: 4
       peers:
         entries:
         - podSelector:
@@ -77,7 +76,6 @@ spec:
         ports:
         - 5432
         resolution: frozen
-      maxFrozenBytes: 67108864
     required: false
     impact: observe
     limits:

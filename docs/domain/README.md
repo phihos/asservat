@@ -54,14 +54,11 @@ A failed capture can have zero artifacts. A partial capture can expose committed
 
 ```mermaid
 erDiagram
-  SharingIntent ||--o{ SharingRegistration : bounds
-  SharingRegistration ||--o| EvidenceShare : publishes
+  SharingIntent ||--o{ EvidenceShare : publishes
   SharingIntent ||--o{ ManagerAssignment : managed_by
   EvidenceShare ||--o{ ManagerAssignment : managed_by
   EvidenceShare }o--|{ Artifact : selects
   EvidenceShare }o--|{ Principal : grants_to
-  AccessGrant ||--o{ GrantReservation : reserves
-  CapacityAccount ||--o{ CapacityReservation : reserves
   ArtifactCopy ||--o{ DeletionWork : reconciles
 ```
 
@@ -112,6 +109,6 @@ Before generating production code, exercise concurrent admission, unknown commit
 
 ## Live views are query sessions, not captures
 
-`LiveWatch` and transient `LiveBatch` extend the model under [REQ-LIV-001–006](../../specs/live-watch.md). A watch is an SQL control row binding one viewer/client, exact source sessions, one approved projection, filter, revision, hard/idle deadlines and view-resource reservations. Many viewers can refer to one SourceSession without owning or renewing its lifetime. Source replacement requires fresh selection. Start/update/close mutate the view aggregate; they never emit a capture-start command.
+`LiveWatch` extends the model under [REQ-LIV-001–006](../../specs/live-watch.md). A watch is an SQL control row binding one viewer/client, exact source sessions, one approved projection, filter, revision, hard/idle deadlines and view-resource reservations. Many viewers can refer to one SourceSession without owning or renewing its lifetime. Source replacement requires fresh selection. Start/update/close mutate the view aggregate; they never emit a capture-start command.
 
-A LiveBatch contains short-lived approved rows, per-source positions and explicit gaps. It is not an Artifact, Case, SourceSnapshot or shareable historical object. Rows keep source-time/clock/expiry provenance, not a fabricated durable artifact ID. View revision orders filter changes; source/filter generations preserve acquisition provenance separately. The budget is cumulative across edits/replays, and pause releases subscriptions without changing the absolute deadline. Committed evidence arises only through an ordinary authorized capture/save transaction.
+Live rows are short-lived approved rows with per-source positions and explicit gaps, held in bounded memory. They are not an Artifact, Case, SourceSnapshot or shareable historical object. Rows keep source-time/clock/expiry provenance, not a fabricated durable artifact ID. View revision orders filter changes; source/filter generations preserve acquisition provenance separately. The budget is cumulative across edits/replays, and pause releases subscriptions without changing the absolute deadline. Committed evidence arises only through an ordinary authorized capture/save transaction.

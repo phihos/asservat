@@ -1,0 +1,7 @@
+evidenceStorage: 128Gi
+storageAssurance: qualifiedReservedBackend
+workload:
+  share: 16Gi
+  limit: 32Gi
+  dump:
+    minimumIntervalSeconds: 900

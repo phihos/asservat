@@ -6,21 +6,26 @@ Read with [triggers](triggers.md), [actions](actions.md), [privacy](privacy.md) 
 
 | Value | Default | Meaning |
 | --- | --- | --- |
-| `capacity.evidenceStorage` | the bundled object store's volume size; required for an external store | Usable evidence bytes of the default pool, after the backend's full threshold and replication overhead |
-| `capacity.workloadShare` | usable capacity ÷ max(eligible workloads, 8) | Each workload's protected allocation (quantity or percentage) |
-| `capacity.workloadLimit` | 10 % | Hard maximum per workload (protected share plus burst) |
+| `capacity.evidenceStorage` | the bundled object store's volume size; required for an external store | Usable evidence bytes, after the backend's full threshold and replication overhead |
+| `capacity.workload.share` | usable capacity ÷ max(eligible workloads, 8) | Each workload's protected allocation (quantity or percentage) |
+| `capacity.workload.limit` | 10 % | Hard maximum per workload (protected share plus burst) |
 | `capacity.capturesPerCluster` | max(8, node count) | Concurrent captures per cluster |
 | retention values | [REQ-EVD-006](evidence.md#req-evd-006--retention-holds-and-deletion) | Maximum evidence age |
 
-The chart renders one `EvidenceStoragePool` and one `EvidenceBudgetPolicy` from these values; changes apply on `helm upgrade` as ordinary edits. Sizes accept Kubernetes quantities. The default policy covers every namespace except system namespaces, the release namespace and namespaces labelled `asservat.io/evidence: disabled`; access still requires an AccessBinding. Administrators add further pools and policies as CRDs for other storage or teams; workload maintainers may narrow a limit, never raise it or select another account. Ordinary users and operators need no quota YAML.
+The full set is [capacity.schema.json](contracts/capacity.schema.json); every field is optional. The hub reads these values from its configuration, and changes apply on `helm upgrade`. Sizes accept Kubernetes quantities. They cover every namespace except system namespaces, the release namespace and namespaces labelled `asservat.io/evidence: disabled`; access still requires an AccessBinding. Workload maintainers may narrow a limit in a policy's `budgets`, never raise it or select another account. Capacity is not a CRD: there is one evidence store per installation, and ordinary users need no quota YAML.
 
 ## REQ-CAP-001 — Workload-wide storm control
 
 Observe signals continuously within sensor budgets, but admit evidence collection separately. The tightest of the policy, workload, node, cluster and pool limits wins. A workload account is keyed by cluster, namespace and workload name (ADR-335 D4) and covers every selected Pod, manual capture, policy and trigger source. Creating another policy, changing a signature, restarting a Pod or recreating a Deployment of the same name does not reset it. Unowned Pods are charged to a namespace account; clients cannot choose an account.
 
-Dumps have a stricter bucket: by default burst 1, at least 15 minutes between dump episodes and at most two episodes' process starts per rolling hour per workload, all budget-policy values. An episode is one immutable action batch for one occurrence; it covers every resolved main process of the Pod by default (bounded by aggregate bytes and `maxTotalStop`), freezes its process set and reserves all starts before dispatch. Classify cores, heap dumps and dump-producing diagnostics by their actual operation; unclassified custom acquisition gets the dump envelope. A dump start with an unknown outcome stays charged until the collector reports the outcome for its start ID (ADR-330 D7). A failed dump is not retried automatically.
+Storm control is two limits per workload, both `capacity` values ([ADR-335](../docs/decisions/335-usable-by-default.md) D8):
 
-Coalesce related signals into the existing occurrence. Suppression is counted per (workload, policy, reason) with first/last times and a saturating count, written at most once per `identity.AuthorityRecheckInterval` (30 s) window, never one row, object or webhook per hit. Report why collection was skipped and when it can next be admitted. No queued dump starts merely because a cooldown expired; an ongoing condition collects again only under an explicitly enabled resampling policy.
+- **Rate limit:** one token bucket (`workload.dump.burst`, default 1; `workload.dump.minimumIntervalSeconds`, default 900) shared by every policy, manual save and trigger source. An occurrence spends one token for its whole action batch, whatever number of processes it covers.
+- **Concurrency limit:** `workload.maxConcurrentExpensive` (REQ-CAP-002).
+
+Classify cores, heap dumps and dump-producing diagnostics by their actual operation; unclassified custom acquisition gets the dump envelope. A start with an unknown outcome stays charged until its outcome is reported ([REQ-FED-002](federation.md#req-fed-002--durable-outbound-work-and-compatibility)). A failed dump is not retried automatically.
+
+Coalesce related signals into the existing occurrence. A refused occurrence is suppressed, never queued: suppression is a saturating count per (workload, policy, reason) with first/last times, never one row, object or webhook per hit. Report why collection was skipped and when it can next be admitted.
 
 ### SC-CAP-001
 
@@ -60,21 +65,19 @@ Given workload A continuously requests large cores while B requests one capture,
 
 ## REQ-CAP-004 — Protected storage plus hard limits
 
-An `EvidenceStoragePool` states one storage profile's usable bytes ([storage-pool.schema.json](contracts/storage-pool.schema.json)). An `EvidenceBudgetPolicy` gives the per-workload protected share and hard limit plus the storm and upload limits above. Both are administrator CRDs. Each enrolled workload uses the matching budget policy with the highest `spec.priority` (ties by name); overlaps are a warning condition, no match is `CapacityNotAllocated`.
-
 Protected capacity is allocated when a workload is enrolled for collection, never lent to another workload, and must fit:
 
 ```text
 sum(protected allocations) + system reserve <= usable pool capacity
 ```
 
-The system reserve (catalog, index and deletion work) is derived from the pool size. Whatever is not protected or reserved is shared burst. Usage within a workload's allocation consumes its own protected capacity; usage above it consumes burst, up to the workload's hard limit. Charges are committed bytes plus outstanding maximum reservations. A small context reserve inside each allocation, derived from the context record size, keeps pod-status capture possible when dumps have filled the rest. Lowering a pool, namespace or policy limit below allocated usage reports over-limit and blocks new allocations; it never retracts an allocation with usage. Recomputing the default share shrinks only allocations without usage.
+The system reserve (catalog, index and deletion work) is derived from the pool size. Whatever is not protected or reserved is shared burst. Usage within a workload's allocation consumes its own protected capacity; usage above it consumes burst, up to the workload's hard limit. Charges are committed bytes plus outstanding maximum reservations. A small context reserve inside each allocation, derived from the context record size, keeps pod-status capture possible when dumps have filled the rest. Lowering a capacity value below allocated usage reports over-limit and blocks new allocations; it never retracts an allocation with usage. Recomputing the default share shrinks only allocations without usage.
 
-Example: a 128 GiB usable pool with a derived 8 GiB reserve and `workloadShare: 16Gi` protects six workloads (96 GiB) and leaves 24 GiB of burst. With a 32 GiB workload limit, A may use its 16 GiB plus 16 GiB of burst; B–F keep their protected 16 GiB however often A triggers.
+Example: a 128 GiB usable pool with a derived 8 GiB reserve and `workload.share: 16Gi` protects six workloads (96 GiB) and leaves 24 GiB of burst. With a 32 GiB workload limit, A may use its 16 GiB plus 16 GiB of burst; B–F keep their protected 16 GiB however often A triggers.
 
-The guarantee is admission within a workload's **remaining** protected capacity on healthy, provisioned storage, not unlimited history. A bucket or prefix reserves no physical disk: `capacityAssurance: qualifiedReservedBackend` requires dedicated or backend-enforced capacity; shared physical storage is `bestEffort` and cannot satisfy the isolation claim.
+The guarantee is admission within a workload's **remaining** protected capacity on healthy, provisioned storage, not unlimited history. A bucket or prefix reserves no physical disk: `storageAssurance: qualifiedReservedBackend` requires dedicated or backend-enforced capacity; shared physical storage is `bestEffort` and cannot satisfy the isolation claim.
 
-Node limits for ring memory, frozen-snapshot memory and upload rate are the collector's Helm values ([ADR-246](../docs/decisions/246-node-collector-role.md)). Ring and frozen memory derive from the collector's memory limit (ring + frozen + baseline ≤ limit, half the remainder each). A budget policy's `node` fields can only lower them. A reservation that does not fit fails without partial effect.
+Node limits for ring memory, frozen-snapshot memory and upload rate are the collector's Helm values ([ADR-246](../docs/decisions/246-node-collector-role.md)). Ring and frozen memory derive from the collector's memory limit (ring + frozen + baseline ≤ limit, half the remainder each). A reservation that does not fit fails without partial effect.
 
 ### SC-CAP-004
 
@@ -82,7 +85,7 @@ Given the 128 GiB example with A at its 32 GiB hard limit, when B requests evide
 
 ## REQ-CAP-005 — Durable hub and local accounting
 
-PostgreSQL holds the quota accounts and reservations. A controller watches pools and budget policies and applies each change to `capacity_account` rows, reporting `status.observedGeneration` and conditions, as the Kubernetes ResourceQuota controller does. A raised limit admits more at once; a lowered one blocks new admissions above it without invalidating evidence. The pool invariant is checked when allocations change.
+PostgreSQL holds the quota accounts and reservations. The hub applies each change of the `capacity` values to `capacity_account` rows when it reloads its configuration. A raised limit admits more at once; a lowered one blocks new admissions above it without invalidating evidence. The pool invariant is checked when allocations change.
 
 Each reservation is keyed by its operation and attempt ID. Admission within a protected allocation is one conditional update of the workload row; only burst also locks the pool row, before the workload row ([persistence](persistence.md)). No database write occurs per packet, log line or byte.
 
@@ -100,9 +103,9 @@ Given two 8 GiB attempts racing for 8 GiB remaining capacity, when both reserve,
 
 ## REQ-CAP-006 — Exhaustion and visibility
 
-A full account rejects new expensive work (`RejectNewExpensive`, the default): prior evidence stays, context continues within its reserve, and the status names `WorkloadStorageFull`, `PoolBurstFull` or `CapacityUnavailable`. Other workloads keep their protected capacity. An administrator may set `onFull: DeleteOldestEligibleInAccount`, which deletes only the same workload's oldest unheld evidence, verifies removal and then reconsiders a still-fresh request; it never evicts another workload or waits while a process is stopped. Retention is a maximum, not a promise to keep every artifact. Held artifacts keep consuming capacity.
+A full account rejects new expensive work (`RejectNewExpensive`, the default): prior evidence stays, context continues within its reserve, and the status names `WorkloadStorageFull`, `PoolBurstFull` or `CapacityUnavailable`. Other workloads keep their protected capacity. An administrator may set `capacity.workload.onFull: DeleteOldestEligibleInAccount`, which deletes only the same workload's oldest unheld evidence, verifies removal and then reconsiders a still-fresh request; it never evicts another workload or waits while a process is stopped. Retention is a maximum, not a promise to keep every artifact. Held artifacts keep consuming capacity.
 
-A budget policy may cap a namespace's total bytes, so many small workloads cannot monopolize enrollment. Automatic onboarding allocates from that namespace capacity; when it cannot, the policy reports `CapacityNotAllocated` before it is Ready. Deleting or renaming a workload does not erase its charges.
+`capacity.namespaceLimit` caps a namespace's total bytes, so many small workloads cannot monopolize enrollment. Automatic onboarding allocates from that namespace capacity; when it cannot, the workload reports `CapacityNotAllocated`. Deleting or renaming a workload does not erase its charges.
 
 Show usage per workload: retained, in flight, deletion pending, protected remaining, burst use, upload pressure, suppression count and next eligible start. A skipped action names the limiting scope and remedy without exposing another team's inventory. MCP and case results distinguish evidence missing because of limits from evidence that never existed.
 
@@ -121,4 +124,4 @@ Given A fills its account, when another trigger arrives, then it records suppres
 
 ### Ongoing source limits
 
-The node collector's Helm values set `maxActiveSources`, `inputBytesPerSecond` and `inputBurstBytes` (all positive, or all zero to deny ongoing sources). Defaults derive from the collector's resources: ring-memory ceiling ÷ minimum per-source ring, and CPU limit ÷ qualified CPU per input byte (burst one second). The collector watches budget policies and applies `min(node value, policy value)`; sources share slices of these totals rather than each receiving the full allowance. These defaults need native performance qualification before ongoing collection is enabled.
+The node collector's Helm values set `maxActiveSources`, `inputBytesPerSecond` and `inputBurstBytes` (all positive, or all zero to deny ongoing sources). Defaults derive from the collector's resources: ring-memory ceiling ÷ minimum per-source ring, and CPU limit ÷ qualified CPU per input byte (burst one second). Sources share slices of these totals rather than each receiving the full allowance. These defaults need native performance qualification before ongoing collection is enabled.

@@ -38,7 +38,7 @@ Given expired evidence but a settings snapshot within its lifetime, when the own
 
 `list_capture_history` takes exactly one of `target_handle`, `target_ref` or a cluster plus `target` selector, an optional origin filter (default manual), cursor and limit (default 20). Authorized namespaces and audiences are resolved once per request (ADR-311) and applied as a SQL filter. Pages are keyset on accepted time then capture ID; no hidden totals.
 
-`get_capture_settings(capture_id)` returns the settings projection: target, expanded recipe, dependency pins, requested retention, settings digest, original execution digest and expiry. An oversized snapshot returns `SettingsTooLarge` with a browser link; repeat by reference still works. The browser reads the full snapshot in one response.
+`get_capture(capture_id, view=settings)` returns the settings projection: target, expanded recipe, dependency pins, requested retention, settings digest, original execution digest and expiry. An oversized snapshot returns `SettingsTooLarge` with a browser link; repeat by reference still works. The browser reads the full snapshot in one response.
 
 `preview_capture(history_capture_id, reason?, sharing?)` returns the normal preview and `plan_digest` for a repeat; it excludes target, diagnostic, preset and retention inputs. Edits use a normal preview with `repeated_from_capture_id`. `request_capture` with `expected_plan_digest` and an idempotency key is the only submission. Both read tools need `evidence:read`; previews and submissions also need collection rights and `evidence:capture`. `get_capture` keeps working after the history row expires.
 

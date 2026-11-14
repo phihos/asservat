@@ -47,9 +47,9 @@ aggregate ring bytes <= collector memory limit
 
 The chart's default collector memory request yields 256 MiB of aggregate ring per node. [Actions](actions.md) use the same formula. Rings are in memory and hold only the retained representation: sanitized headers, structured HTTP headers or authorized raw packets.
 
-`ring.maxBytes` bounds cost; `maxAge` has no built-in maximum and administrators may set a ceiling. Segment count × segment size, including framing and encryption overhead, stays within `maxBytes`; one segment is always writable. Eviction of a segment drops 1/N of history; an oversized record is dropped and counted as loss. `before` cannot exceed `maxAge`, and achieved history is reported, never inferred from the requested time.
+The ring is `maxBytes`, `segments` and `maxAge`. `maxBytes` bounds cost; each segment holds `maxBytes ÷ segments`, including framing and encryption overhead; one segment is always writable. `maxAge` has no built-in maximum and administrators may set a ceiling. Eviction of a segment drops 1/`segments` of history; an oversized record is dropped and counted as loss. `before` cannot exceed `maxAge`, and achieved history is reported, never inferred from the requested time.
 
-A snapshot pins at most one ring's worth of segments, charged against the node's frozen budget in the formula above; snapshot frequency is bounded by the per-workload rate limit ([ADR-335](../docs/decisions/335-usable-by-default.md) D8). Under pressure a new snapshot is coalesced or refused before memory is allocated; an accepted snapshot is never corrupted. A stalled upload never grows memory or takes another workload's storage ([capacity](capacity.md)).
+A save copies at most one ring's worth of segments plus its `after` stream, bounded by the action's output limit and charged against the node's frozen budget in the formula above; there is no separate per-action frozen size. snapshot frequency is bounded by the [workload rate limit](capacity.md#req-cap-001--workload-wide-storm-control). Under pressure a new snapshot is coalesced or refused before memory is allocated; an accepted snapshot is never corrupted. A stalled upload never grows memory or takes another workload's storage ([capacity](capacity.md)).
 
 ### SC-NET-003
 

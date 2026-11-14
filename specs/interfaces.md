@@ -24,7 +24,7 @@ This requirement owns the public API conventions; other specs link here.
 
 - Lists are paginated with authenticated cursors or streamed; any byte or time limit states its reason.
 - Mutations take an idempotency key and the expected revision. A retry with the same key returns the original operation; a different body under the same key conflicts.
-- Each operation is authorized once and the decision reused for at most `identity.AuthorityRecheckInterval` (30 s) and never past its original deadline ([ADR-311](../docs/decisions/311-operation-authority-recheck.md)).
+- Each operation is authorized once and the decision reused for at most `identity.AuthorityRecheckInterval` (30 s; 60 s for the shared delivery-policy observation) and never past its original deadline ([ADR-311](../docs/decisions/311-operation-authority-recheck.md)).
 - Status reads wait server-side for the next change (at most 30 s, ADR-330 D1); the console gets the same changes over its Server-Sent Events stream. Status reads are never charged.
 - Errors are safe problem details with stable domain codes; MCP keeps its result envelope. Before visibility is established, responses reveal no existence.
 

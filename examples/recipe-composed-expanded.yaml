@@ -16,15 +16,13 @@ spec:
           name: http-response-headers
           version: v1
         maxHeaderBytes: 32768
-        maxReassemblyBytesPerFlow: 65536
         maxReassemblyBytes: 16777216
       before: 30s
       after: 30s
       ring:
         maxAge: 30s
         maxBytes: 16777216
-        segmentBytes: 4194304
-        maxSegments: 4
+        segments: 4
       peers:
         entries:
         - cidrs:
@@ -32,7 +30,6 @@ spec:
           - ::/0
         protocol: tcp
         resolution: frozen
-      maxFrozenBytes: 67108864
       filter: tcp port 8080
     required: true
     impact: sensitiveRead
@@ -53,10 +50,7 @@ spec:
       ring:
         maxAge: 30s
         maxBytes: 8388608
-        segmentBytes: 2097152
-        maxSegments: 4
-      maxFrozenBytes: 16777216
-      maxEvents: 100000
+        segments: 4
       maxEventsPerSecond: 10000
       maxTrackedThreads: 4096
     required: true

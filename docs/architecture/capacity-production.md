@@ -1,42 +1,37 @@
 # Capacity production
 
-C-07 turns the administrator's `EvidenceStoragePool` and `EvidenceBudgetPolicy`
-resources into per-workload SQL capacity accounts
+C-07 turns the hub's `capacity` Helm values
+([capacity.schema.json](../../specs/contracts/capacity.schema.json)) into per-workload SQL capacity accounts
 ([REQ-CAP-004 through REQ-CAP-006](../../specs/capacity.md)). C-01 supplies the
 accepted resources; C-20 owns the adapters. Mechanisms follow
 [ADR-330](../decisions/330-event-driven-system-design.md).
 
 ## Inputs
 
-- A-HWORK watches the pool and budget-policy resources with a shared informer.
-  An accepted resource stays valid until the watch replaces or deletes it;
-  validation errors are written to the resource's status conditions with
-  `observedGeneration`.
+- A-HWORK reads the `capacity` values from its configuration; a
+  `helm upgrade` that changes them is a reconcile event. Invalid values fail
+  the chart's schema check.
 - Namespaces and workloads of enrolled clusters come from the
   [cluster state push](cluster-observations.md). Candidate discovery is a query
   over that SQL projection, not a Kubernetes LIST.
-- Kubernetes RBAC protects the resources; the hub does not re-verify admission
-  policies, UIDs or installer receipts.
 
 ## Reconciliation
 
-The capacity reconciler runs in A-HWORK and reacts to events: a pool or policy
+The capacity reconciler runs in A-HWORK and reacts to events: a `capacity` values
 change, a pushed workload or namespace change, or a workload deletion. For each
 affected workload it:
 
-1. selects exactly one matching budget policy (`CapacityNotAllocated` when none
-   matches, `AmbiguousBudgetProfile` when several match);
-2. creates or updates the workload's capacity account and storage binding in
+1. creates or updates the workload's capacity account and storage binding in
    one SQL transaction that locks only that workload's account row and, when
    burst limits apply, the pool row;
-3. writes the outcome to the policy's status conditions.
+2. reports `CapacityNotAllocated` on the workload when its allocation does not fit.
 
 The storage binding is SQL state maintained by these events. Admission reads it
 under ordinary row checks; it has no freshness interval, readiness wait or
 refresh demand. A workload whose binding is missing is reported
 `CapacityNotAllocated` at preview.
 
-Changing a selector never creates a second account or detaches retained
+Changing a value never creates a second account or detaches retained
 charges. Workload deletion or name reuse keeps the account until its retained
 evidence is deleted or moved to a backed residual account (REQ-CAP-006).
 
@@ -53,7 +48,7 @@ outcome is known (D7).
 Pool rows hold the pool's protected total and shared burst counters. Parent
 envelopes subtract unused protected allocations of their children before
 granting burst (REQ-CAP-004). Storm protection uses per-workload token-bucket
-rate limits from the budget policy (maintainer decision, ADR-335 D8; defaults
+rate limits from the `capacity` values (maintainer decision, ADR-335 D8; defaults
 derive from cluster size).
 
 ## Packet evidence funding

@@ -107,8 +107,7 @@ queued work; it is not inherited. The facts are not a grant.
   allocatable memory (ADR-335 D2).
 
 Only manual packet captures exist (no rings in production, policy
-arming or snapshots); budget policy node limits are accepted by the schema but not yet
-intersected at admission.
+arming or snapshots).
 
 ## Ongoing-source resources (ADR-262)
 

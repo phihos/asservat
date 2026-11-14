@@ -34,16 +34,12 @@
         "maxLifetimeSeconds": {
           "type": "integer",
           "minimum": 1
-        },
-        "maxBytes": {
-          "type": "integer",
-          "minimum": 1
         }
       },
       "required": [
         "allowedActions"
       ],
-      "description": "Automation envelope on an AccessBinding (ADR-335 D6). Only allowedActions is required; omitted ceilings are unbounded within the installation's capacity and rate limits. Intrusive actions still need an expiring policy grant. Ceilings are not capped: each is an administrator's own bound, and enum plus uniqueItems bound allowedActions."
+      "description": "Automation envelope on an AccessBinding (ADR-335 D6). Only allowedActions is required; an omitted lifetime is unbounded. Bytes are bounded by the installation's capacity and rate limits, not a lifetime budget. Intrusive actions still need an expiring policy grant."
     },
     "accepted": {
       "type": "object",
@@ -114,23 +110,13 @@
               "basisUID": {
                 "type": "string",
                 "minLength": 1
-              },
-              "basisDigest": {
-                "type": "string",
-                "pattern": "^[a-f0-9]{64}$"
-              },
-              "assignmentID": {
-                "type": "string",
-                "format": "uuid"
               }
             },
             "required": [
               "subject",
               "role",
               "basisKind",
-              "basisUID",
-              "basisDigest",
-              "assignmentID"
+              "basisUID"
             ]
           },
           "minItems": 1,
@@ -142,16 +128,6 @@
         "notAfter": {
           "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/timestamp",
           "description": "Absent for an envelope without a lifetime ceiling (ADR-335 D6)."
-        },
-        "limits": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "maxBytes": {
-              "type": "integer",
-              "minimum": 1
-            }
-          }
         }
       },
       "required": [
@@ -159,8 +135,7 @@
         "installationID",
         "delegation",
         "ownerAssignments",
-        "issuedAt",
-        "limits"
+        "issuedAt"
       ]
     },
     "summary": {
@@ -179,16 +154,6 @@
         "notAfter": {
           "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/timestamp",
           "description": "Absent for an envelope without a lifetime ceiling (ADR-335 D6)."
-        },
-        "limits": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "maxBytes": {
-              "type": "integer",
-              "minimum": 1
-            }
-          }
         },
         "state": {
           "enum": [
@@ -242,7 +207,6 @@
         "mode",
         "executor",
         "continuesAfterCreatorLeaves",
-        "limits",
         "state",
         "reasonCodes",
         "ownerTeams"

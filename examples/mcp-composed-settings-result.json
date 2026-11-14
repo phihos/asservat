@@ -10,8 +10,8 @@
     "namespace_uid": "namespace-payments-uid",
     "accepted_at": "2026-10-09T12:00:00Z",
     "expires_at": "2026-10-16T11:55:00Z",
-    "settings_digest": "509928fdacc866ab75d89b820b66b35c06982aa7ee0bb985957b1a9c2ff1411f",
-    "original_execution_digest": "ab21fff196c1e42ec876903aaa4d62e86e919be74dddb4bbb20c816db222ed9f",
+    "settings_digest": "302b324d0e335fc71cf9648b4e0df1b9755ed0560634409c66cf6acf1572aa01",
+    "original_execution_digest": "1629782a6fe3b18bd619917f8884f247a62b75f740dc1bf91ce6a82701e87ae1",
     "settings": {
       "target": {
         "namespace": "payments",
@@ -43,7 +43,6 @@
                   "version": "v1"
                 },
                 "maxHeaderBytes": 32768,
-                "maxReassemblyBytesPerFlow": 65536,
                 "maxReassemblyBytes": 16777216
               },
               "before": "30s",
@@ -51,8 +50,7 @@
               "ring": {
                 "maxAge": "30s",
                 "maxBytes": 16777216,
-                "segmentBytes": 4194304,
-                "maxSegments": 4
+                "segments": 4
               },
               "peers": {
                 "entries": [
@@ -66,7 +64,6 @@
                 "protocol": "tcp",
                 "resolution": "frozen"
               },
-              "maxFrozenBytes": 67108864,
               "filter": "tcp port 8080"
             },
             "required": true,
@@ -92,11 +89,8 @@
               "ring": {
                 "maxAge": "30s",
                 "maxBytes": 8388608,
-                "segmentBytes": 2097152,
-                "maxSegments": 4
+                "segments": 4
               },
-              "maxFrozenBytes": 16777216,
-              "maxEvents": 100000,
               "maxEventsPerSecond": 10000,
               "maxTrackedThreads": 4096
             },
@@ -151,7 +145,7 @@
       "dependency_pins": [
         {
           "role": "captureProfile",
-          "digest": "069b6fdc426b6a39639338d199d45ed082191df06ba00b436d0691f1b5e66ccd"
+          "digest": "54af7964bb671e4e42030bdc9ed3a86dc45f55eae1a633652edec4a3e97c4e33"
         },
         {
           "role": "captureProfile",
@@ -159,7 +153,7 @@
         },
         {
           "role": "captureProfile",
-          "digest": "a392a28ddd6b561b61bd3c0160a81c0791583a119271354c3c86eb908d3d1451"
+          "digest": "b5a35dd38ab406069c3167e40fcfdb2eebb7274d7c0a6ec4f78ac2c419b4d614"
         },
         {
           "role": "collectionCeiling",
@@ -167,7 +161,7 @@
         },
         {
           "role": "recipe",
-          "digest": "fa243dce62174cbd87789b7b5e0d5a5055a85efb4028bb939e464863365cecd7"
+          "digest": "0ffc91f675282d9f3af11fc19f156ea45d4bb158092e3ba802f252a7ca8b4e3d"
         },
         {
           "role": "retention",
@@ -221,7 +215,7 @@
               "name": "http-headers",
               "version": "v1"
             },
-            "definitionDigest": "069b6fdc426b6a39639338d199d45ed082191df06ba00b436d0691f1b5e66ccd"
+            "definitionDigest": "54af7964bb671e4e42030bdc9ed3a86dc45f55eae1a633652edec4a3e97c4e33"
           },
           {
             "componentID": "calls",
@@ -230,7 +224,7 @@
               "name": "syscall-activity",
               "version": "v1"
             },
-            "definitionDigest": "a392a28ddd6b561b61bd3c0160a81c0791583a119271354c3c86eb908d3d1451"
+            "definitionDigest": "b5a35dd38ab406069c3167e40fcfdb2eebb7274d7c0a6ec4f78ac2c419b4d614"
           },
           {
             "componentID": "context",

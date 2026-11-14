@@ -24,8 +24,7 @@ spec:
           ring:
             maxAge: 30s
             maxBytes: 16777216
-            segmentBytes: 4194304
-            maxSegments: 4
+            segments: 4
           peers:
             entries:
             - cidrs:
@@ -33,7 +32,6 @@ spec:
               - ::/0
             protocol: any
             resolution: frozen
-          maxFrozenBytes: 16777216
         required: true
         impact: observe
         limits:

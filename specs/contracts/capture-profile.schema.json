@@ -44,7 +44,6 @@
                   "syscallAfter",
                   "syscallRing",
                   "syscallArguments",
-                  "syscallMaxEvents",
                   "syscallRate",
                   "filePath",
                   "commandArgv",

@@ -4,8 +4,8 @@
   "applications": 13,
   "components": 24,
   "interfaces": 14,
-  "domainEntitiesMapped": 49,
+  "domainEntitiesMapped": 43,
   "requirementsMapped": 170,
-  "positiveChecks": 1023,
+  "positiveChecks": 1017,
   "rejectedInvalidCases": 127
 }
