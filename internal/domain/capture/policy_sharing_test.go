@@ -51,10 +51,10 @@ func TestPolicySharingStateIsDerived(t *testing.T) {
 	if bad.Valid() {
 		t.Fatal("recipient of another issuer than the creator accepted")
 	}
-	bad = in
-	bad.MaxCaptures = PolicyShareMaxCaptures + 1
-	if bad.Valid() {
-		t.Fatal("more than 100 captures accepted")
+	unlimited := PolicySharingStatus{Instruction: in, Spent: 1000}
+	unlimited.Instruction.MaxCaptures = 0
+	if !unlimited.Instruction.Valid() || unlimited.State(now, 1, 1) != PolicySharingActive {
+		t.Fatal("unlimited recurring sharing")
 	}
 	bad = in
 	bad.Management = nil

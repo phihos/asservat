@@ -8,16 +8,16 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 )
 
-// ADR-239 (S-06 increment 8): bounded recurring-policy sharing. A DebugPolicy
-// may name recipients of its future captures together with a capture limit
-// and an absolute end. There is no SharingIntent record: the policy
+// ADR-239: recurring-policy sharing. A DebugPolicy may name recipients of its
+// future captures with an optional capture limit and an end (default 90 days
+// after acceptance, ADR-335 D7). There is no SharingIntent record: the policy
 // acceptance carries one immutable instruction and a counter, each admitted
 // occurrence capture consumes one slot and copies the ADR-235 capture
 // instruction, and publication materializes one ordinary share.
 const (
-	// PolicyShareMaxCaptures bounds the captures one acceptance may share
-	// (REQ-SHR-005: maxCaptures 1–100).
-	PolicyShareMaxCaptures = 100
+	// PolicyShareDefaultLifetime is the end of recurring sharing when the
+	// policy names none (REQ-SHR-005).
+	PolicyShareDefaultLifetime = 90 * 24 * time.Hour
 	// PolicySharingStatement is the fixed review text of an activation that
 	// shares (REQ-SHR-005: preview/review must say so).
 	PolicySharingStatement = "Repeated collections will be shared"
@@ -26,16 +26,18 @@ const (
 // PolicySharing is a compiled DebugPolicy spec.sharing block: shape only.
 // Time and authority are checked at activation, never by the compiler, so
 // polling an accepted policy never fails because its end has passed.
+// MaxCaptures 0 shares every capture until NotAfter; a zero NotAfter
+// selects PolicyShareDefaultLifetime at activation.
 type PolicySharing struct {
 	Recipients  []authorization.ShareRecipient
 	MaxCaptures int
 	NotAfter    time.Time
 }
 
-// Valid checks 1..8 distinct recipients of one issuer, 1..100 captures and a
-// second-precision end.
+// Valid checks distinct recipients of one issuer, a non-negative capture
+// limit and a second-precision end.
 func (s PolicySharing) Valid() bool {
-	if len(s.Recipients) < 1 || len(s.Recipients) > authorization.ShareMaxRecipients || s.MaxCaptures < 1 || s.MaxCaptures > PolicyShareMaxCaptures || s.NotAfter.IsZero() || s.NotAfter.Year() > 9999 {
+	if len(s.Recipients) < 1 || s.MaxCaptures < 0 || s.NotAfter.Year() > 9999 {
 		return false
 	}
 	seen := map[string]bool{}
@@ -61,7 +63,7 @@ type PolicyShareInstruction struct {
 }
 
 func (s PolicyShareInstruction) Valid() bool {
-	if !s.Creator.Valid() || s.Creator.Kind != identity.Human || len(s.Management) < 1 || len(s.Management) > authorization.ShareMaxManagers || !(PolicySharing{Recipients: s.Recipients, MaxCaptures: s.MaxCaptures, NotAfter: s.NotAfter}).Valid() || s.Recipients[0].Issuer != s.Creator.Issuer {
+	if !s.Creator.Valid() || s.Creator.Kind != identity.Human || len(s.Management) < 1 || s.NotAfter.IsZero() || !(PolicySharing{Recipients: s.Recipients, MaxCaptures: s.MaxCaptures, NotAfter: s.NotAfter}).Valid() || s.Recipients[0].Issuer != s.Creator.Issuer {
 		return false
 	}
 	for i, a := range s.Management {
@@ -119,7 +121,7 @@ func (s PolicySharingStatus) State(now time.Time, accepted, observed int64) stri
 		return PolicySharingPolicyChanged
 	case !now.Before(s.Instruction.NotAfter):
 		return PolicySharingExpired
-	case s.Spent >= int64(s.Instruction.MaxCaptures):
+	case s.Instruction.MaxCaptures > 0 && s.Spent >= int64(s.Instruction.MaxCaptures):
 		return PolicySharingLimitReached
 	}
 	return PolicySharingActive

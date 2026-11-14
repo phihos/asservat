@@ -139,19 +139,9 @@ func TestRestartPolicyRejectsUnsupportedFieldsWithPath(t *testing.T) {
 		{"spec.evaluation.scope", func(s map[string]any) { s["evaluation"].(map[string]any)["scope"] = "workload" }},
 		{"spec.sharing.recipients", func(s map[string]any) { s["sharing"] = map[string]any{} }},
 		{"spec.sharing.futureCaptures.maxCaptures", func(s map[string]any) {
-			sharingSpec(s)["futureCaptures"] = map[string]any{"enabled": true, "maxCaptures": 101}
-		}},
-		{"spec.sharing.futureCaptures.maxCaptures", func(s map[string]any) {
-			sharingSpec(s)["futureCaptures"] = map[string]any{"enabled": true, "maxCaptures": 0}
+			sharingSpec(s)["futureCaptures"] = map[string]any{"enabled": true, "maxCaptures": -1}
 		}},
 		{"spec.sharing.notAfter", func(s map[string]any) { sharingSpec(s)["notAfter"] = "tomorrow" }},
-		{"spec.sharing.recipients", func(s map[string]any) {
-			var r []any
-			for i := 0; i < 9; i++ {
-				r = append(r, map[string]any{"kind": "User", "issuer": "https://id.example.invalid", "id": strings.Repeat("u", i+1)})
-			}
-			sharingSpec(s)["recipients"] = r
-		}},
 		{"spec.sharing.recipients[1].issuer", func(s map[string]any) {
 			sharingSpec(s)["recipients"] = []any{map[string]any{"kind": "Group", "issuer": "https://id.example.invalid", "id": "a"}, map[string]any{"kind": "Group", "issuer": "https://other.example.invalid", "id": "b"}}
 		}},

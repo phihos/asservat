@@ -89,28 +89,11 @@ func TestEvaluateShareMatrix(t *testing.T) {
 			d.Audience.SubjectID, d.Audience.AssignmentID = "outsiders", "99999999-9999-9999-9999-999999999999"
 			p.Denies = []CurrentAssignment{d}
 		}, false, "ExplicitDeny"},
-		{"manager-assignment-retired", func(_ *identity.Identity, p *Projection, _ *Retained, _ *Share) { p.Allows = p.Allows[:1] }, false, "ShareSuspended"},
-		{"manager-regranted-is-new-assignment", func(_ *identity.Identity, p *Projection, _ *Retained, _ *Share) {
-			p.Allows[1].Audience.AssignmentID = "abababab-abab-abab-abab-abababababab"
-		}, false, "ShareSuspended"},
-		{"manager-basis-changed", func(_ *identity.Identity, p *Projection, _ *Retained, _ *Share) {
-			p.Allows[1].Audience.BasisDigest = artifact.Digest{7}
-		}, false, "ShareSuspended"},
-		{"manager-group-denied", func(_ *identity.Identity, p *Projection, _ *Retained, _ *Share) {
-			d := p.Allows[1]
-			d.Audience.AssignmentID = "99999999-9999-9999-9999-999999999999"
-			p.Denies = []CurrentAssignment{d}
-		}, false, "ShareSuspended"},
-		{"creator-user-denied", func(_ *identity.Identity, p *Projection, _ *Retained, s *Share) {
-			d := p.Allows[1]
-			d.Audience.Kind, d.Audience.SubjectID, d.Audience.AssignmentID = "User", s.Creator.Subject, "99999999-9999-9999-9999-999999999999"
-			p.Denies = []CurrentAssignment{d}
-		}, false, "ShareSuspended"},
+		{"manager-assignment-retired-keeps-share", func(_ *identity.Identity, p *Projection, _ *Retained, _ *Share) { p.Allows = p.Allows[:1] }, true, "Shared"},
 		{"no-widening-to-other-artifact", func(_ *identity.Identity, _ *Projection, e *Retained, _ *Share) {
 			e.ArtifactID = "12121212-1212-1212-1212-121212121212"
 		}, false, "EvidenceUnavailable"},
 		{"no-widening-to-other-target", func(_ *identity.Identity, _ *Projection, _ *Retained, s *Share) { s.Target.PodUID = "other-pod" }, false, "InvalidRequest"},
-		{"manager-outside-retained-audience", func(_ *identity.Identity, _ *Projection, e *Retained, _ *Share) { e.Audience = e.Audience[:1] }, false, "ShareSuspended"},
 		{"artifact-retention-ended", func(_ *identity.Identity, _ *Projection, e *Retained, _ *Share) {
 			e.ExpiresAt = e.ExpiresAt.Add(-2 * time.Hour)
 		}, false, "EvidenceUnavailable"},
@@ -155,7 +138,6 @@ func TestShareNeverGrantsOrdinaryOperations(t *testing.T) {
 func TestShareValidity(t *testing.T) {
 	_, _, _, _, s, _ := shareFixture()
 	for name, edit := range map[string]func(*Share){
-		"too-long":          func(s *Share) { s.ExpiresAt = s.CreatedAt.Add(ShareMaxLifetime + time.Second) },
 		"foreign-recipient": func(s *Share) { s.Recipients[0].Issuer = "https://other.example.invalid" },
 		"display-name":      func(s *Share) { s.Recipients[0].Kind = "Name" },
 		"non-owner-manager": func(s *Share) { s.Management[0].Role = "evidence-reader" },
@@ -163,11 +145,6 @@ func TestShareValidity(t *testing.T) {
 		"zero-revision":     func(s *Share) { s.Revision = 0 },
 		"revision-bound":    func(s *Share) { s.Revision = ShareMaxRevision + 1 },
 		"workload-creator":  func(s *Share) { s.Creator.Kind = identity.Workload },
-		"too-many-recipients": func(s *Share) {
-			for len(s.Recipients) <= ShareMaxRecipients {
-				s.Recipients = append(s.Recipients, ShareRecipient{"Group", s.Creator.Issuer, string(rune('a' + len(s.Recipients)))})
-			}
-		},
 	} {
 		c := s
 		c.Recipients = append([]ShareRecipient(nil), s.Recipients...)
@@ -204,41 +181,32 @@ func TestShareDownloadBranch(t *testing.T) {
 	}
 }
 
-// ADR-232 increment 4: a member of a pinned owner team manages the share
-// while that exact assignment is current and no deny names the member.
+// ADR-330 D11: a member of a managing group with evidence:share manages
+// the share; assignment IDs and re-grants do not matter.
 func TestShareManagedBy(t *testing.T) {
-	creator, recipient, p, _, s, now := shareFixture()
+	creator, recipient, _, _, s, now := shareFixture()
 	mate := creator
 	mate.Principal.Subject = "team-mate"
-	if held, until := s.ManagedBy(mate, p, now); len(held) != 1 || held[0] != s.Management[0] || !until.After(now) {
+	if held, until := s.ManagedBy(mate, now); len(held) != 1 || held[0] != s.Management[0] || !until.After(now) {
 		t.Fatal("team member does not manage", held)
 	}
-	if held, _ := s.ManagedBy(recipient, p, now); held != nil {
+	if held, _ := s.ManagedBy(recipient, now); held != nil {
 		t.Fatal("recipient manages")
 	}
 	noScope := mate
 	noScope.Scopes = []string{"evidence:read"}
-	if held, _ := s.ManagedBy(noScope, p, now); held != nil {
+	if held, _ := s.ManagedBy(noScope, now); held != nil {
 		t.Fatal("manager without evidence:share")
 	}
-	denied := p
-	d := p.Allows[0]
-	d.Audience.Kind, d.Audience.SubjectID, d.Audience.AssignmentID = "User", "team-mate", "99999999-9999-9999-9999-999999999999"
-	denied.Denies = []CurrentAssignment{d}
-	if held, _ := s.ManagedBy(mate, denied, now); held != nil {
-		t.Fatal("denied member manages")
-	}
-	// A re-granted owner binding is a new assignment ID: nobody manages.
-	regranted := p
-	regranted.Allows = append([]CurrentAssignment{}, p.Allows...)
-	regranted.Allows[1].Audience.AssignmentID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-	if held, _ := s.ManagedBy(mate, regranted, now); held != nil || s.Phase(regranted, now) != ShareSuspended {
-		t.Fatal("re-granted assignment manages an old share")
+	left := mate
+	left.Groups = nil
+	if held, _ := s.ManagedBy(left, now); held != nil {
+		t.Fatal("former member manages")
 	}
 }
 
-// Default management pins the owner teams; the personal assignment only
-// without any team; more than eight is refused, not truncated.
+// Default management records the owner teams; the personal assignment only
+// without any team.
 func TestShareManagementPrefersTeams(t *testing.T) {
 	creator, _, p, e, _, now := shareFixture()
 	personal := p.Allows[1]
@@ -252,16 +220,5 @@ func TestShareManagementPrefersTeams(t *testing.T) {
 	alone.Groups = nil
 	if r, owners := ShareManagement(alone, p, p.Target, &e, now); !r.Eligible || len(owners) != 1 || owners[0].Kind != "User" {
 		t.Fatal("individual owner", r.Reason, owners)
-	}
-	for n := 0; n < ShareMaxManagers; n++ {
-		team := p.Allows[1]
-		team.Audience.SubjectID = "team-" + string(rune('b'+n))
-		team.Audience.AssignmentID = "cccccccc-cccc-cccc-cccc-cccccccccc0" + string(rune('0'+n))
-		p.Allows = append(p.Allows, team)
-		e.Audience = append(e.Audience, team.Audience)
-		creator.Groups = append(creator.Groups, team.Audience.SubjectID)
-	}
-	if r, owners := ShareManagement(creator, p, p.Target, &e, now); r.Eligible || r.Reason != "ManagementTooBroad" || owners != nil {
-		t.Fatal("nine owner teams", r.Reason, len(owners))
 	}
 }

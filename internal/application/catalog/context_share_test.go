@@ -95,9 +95,7 @@ func TestContextCaseRecipientRefusals(t *testing.T) {
 			d.Audience.Kind, d.Audience.SubjectID, d.Audience.AssignmentID = "User", "outsider", caseID(13)
 			f.p.Denies = []authorization.CurrentAssignment{d}
 		}, false},
-		{"manager-lost", func(f *caseFixture, _ *shareFake) { f.p.Allows = f.p.Allows[:1] }, false},
 		{"changed-version", func(_ *caseFixture, s *shareFake) { s.rows[0].Version = artifact.Digest{9} }, true},
-		{"manager-outside-retained-audience", func(f *caseFixture, _ *shareFake) { f.record.Audience = f.record.Audience[:1] }, true},
 		{"share-store-unavailable", func(_ *caseFixture, s *shareFake) { s.fail = true }, false},
 	} {
 		t.Run(c.name, func(t *testing.T) {

@@ -137,7 +137,7 @@ func (s *EvidenceShares) StopPolicySharing(ctx context.Context, r sharing.Policy
 // authorizes the actor (creator, a pinned current manager the service found,
 // or an administrator) and applies change.
 func (s *EvidenceShares) changePolicySharing(ctx context.Context, r sharing.PolicyRevocation, action string, change func(*custodydb.Queries, custodydb.PolicyAcceptance, pgtype.Text, bool) (bool, error)) (bool, error) {
-	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(r.AcceptanceID) || !authorization.UUID(r.OperationID) || !r.Actor.Valid() || len(r.Managers) > authorization.ShareMaxManagers || !identity.Text(r.IdempotencyKey, 128) || r.ExpectedRevision < 1 {
+	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(r.AcceptanceID) || !authorization.UUID(r.OperationID) || !r.Actor.Valid() || !identity.Text(r.IdempotencyKey, 128) || r.ExpectedRevision < 1 {
 		return false, value.ErrInvalid
 	}
 	replay := false

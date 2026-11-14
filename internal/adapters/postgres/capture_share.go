@@ -73,7 +73,7 @@ func captureShareInstruction(ctx context.Context, q *custodydb.Queries, stream c
 	if err != nil {
 		return nil, err
 	}
-	if !s.NotAfter.IsZero() && (!s.NotAfter.After(n.Time) || s.NotAfter.After(n.Time.Add(authorization.ShareMaxLifetime))) {
+	if !s.NotAfter.IsZero() && !s.NotAfter.After(n.Time) {
 		return nil, value.ErrInvalid
 	}
 	r := a.Registration

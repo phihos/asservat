@@ -183,16 +183,12 @@ func publicShareFailure(err error) OperationFailure {
 	switch {
 	case errors.Is(err, sharing.ErrRetentionCapacity):
 		return OperationFailure{"NotAvailable", "The requested share expiry exceeds its original metadata backing. Choose an earlier expiry, or ask an operator to review backing capacity before submitting a new sharing decision.", false}
-	case errors.Is(err, sharing.ErrManagementTooBroad):
-		return OperationFailure{"ManagementTooBroad", "You hold evidence-owner on this workload through more than eight team assignments, and sharing never picks a subset. Name at most eight of your owner teams in management, or ask an administrator to combine the owner bindings.", false}
 	case errors.Is(err, sharing.ErrManagementNotHeld):
 		return OperationFailure{"ManagementNotHeld", "Management can only name owner teams you belong to that currently hold evidence-owner for this artifact (or, as its creator, only you). Assigning an owner team you do not belong to requires an installation administrator; the team must currently hold evidence-owner for this artifact.", false}
 	case errors.Is(err, value.ErrInvalid):
-		return OperationFailure{"InvalidShare", "Recipients must be stable user or group IDs of your identity provider (at most eight), and the expiry must be in the future and at most seven days away.", false}
+		return OperationFailure{"InvalidShare", "Recipients must be stable user or group IDs of your identity provider, and the expiry must be in the future.", false}
 	case errors.Is(err, value.ErrChanged):
 		return OperationFailure{"ArtifactChanged", "The artifact digest does not match the current verified artifact. Read the case again and share the version you reviewed.", false}
-	case errors.Is(err, value.ErrCapacity):
-		return OperationFailure{"ShareLimit", "This artifact already has the maximum number of active shares (32). Revoke one first.", false}
 	case errors.Is(err, value.ErrConflict):
 		return OperationFailure{"Conflict", "The share changed or this idempotency key was used for another request. List your shares and retry with the current revision or a new key.", false}
 	case errors.Is(err, value.ErrDenied), errors.Is(err, identity.ErrDenied):

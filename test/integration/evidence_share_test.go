@@ -404,12 +404,11 @@ func qualifyEvidenceShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool
 	}
 
 	// A group share and a user share; then one accepted batch denies the user
-	// and retires the owners' assignment: deny wins, and the group share is
-	// Suspended (its pinned owner assignment is gone).
+	// and retires the owners' assignment: deny wins, and the group share
+	// stays (ADR-330 D11: no suspension after a relist).
 	create("share-user", user, time.Now().Add(time.Hour))
 	group := create("share-group", []authorization.ShareRecipient{{Kind: "Group", Issuer: issuer, ID: "synthetic-reviewers"}}, time.Now().Add(time.Hour))
-	// The group share is a transferred one: losing its new managers below
-	// suspends it all the same.
+	// The group share is a transferred one.
 	if group, _, err = shares.Transfer(ctx, mate(), sharing.TransferInput{ShareID: group.ID, ExpectedRevision: 1, Management: authorization.ManagementRequest{Mode: "teams", Teams: []string{"other-owners"}}, IdempotencyKey: "transfer-group"}); err != nil || group.Revision != 2 {
 		t.Fatal("group share transfer", err)
 	}
@@ -427,7 +426,7 @@ func qualifyEvidenceShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool
 	deny := cfg.PermissionBasis{Resource: cfg.Resource{Kind: "AccessBinding", UID: custodyID(), Generation: 1, ResourceVersion: "share-deny-1", SpecDigest: artifact.Digest{96}}, Scope: batch.Bases[0].Scope, Effect: "Deny", Subjects: []cfg.Subject{{Kind: "User", Issuer: issuer, ID: "synthetic-recipient"}}, Roles: []string{"evidence-reader"}}
 	deny.ScopeDigest = configapp.PermissionScopeDigest(deny)
 	changed.Bases = []cfg.PermissionBasis{batch.Bases[0], deny}
-	accepted, err := s.p.AcceptPermissions(ctx, changed)
+	_, err = s.p.AcceptPermissions(ctx, changed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -446,11 +445,10 @@ func qualifyEvidenceShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool
 	if view, err := cases.GetContextCase(ctx, identityAt("synthetic-recipient", nil), e.CaseID); err != value.ErrUnavailable || view.CaseID != "" {
 		t.Fatal("denied recipient read through a share", view, err)
 	}
-	if view, err := cases.GetContextCase(ctx, identityAt("synthetic-reviewer", []string{"synthetic-reviewers"}), e.CaseID); err != value.ErrUnavailable || view.CaseID != "" {
-		t.Fatal("share without a current owner assignment stayed readable", view, err)
+	if view, err := cases.GetContextCase(ctx, identityAt("synthetic-reviewer", []string{"synthetic-reviewers"}), e.CaseID); err != nil || view.CaseID != e.CaseID {
+		t.Fatal("group share lost with its owner assignment", view, err)
 	}
-	// Every managing team lost: Suspended for the creator, and no team
-	// member manages it any longer.
+	// Members of the managing group still manage the share by group name.
 	sharer := func(subject string, groups []string) identities.CurrentIdentity {
 		t.Helper()
 		now := time.Now().UTC().Truncate(time.Microsecond)
@@ -463,76 +461,13 @@ func qualifyEvidenceShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool
 		}
 		return source
 	}
-	suspended := func(when string) {
-		t.Helper()
-		owned, _, err := shares.List(ctx, sharer("synthetic-share-owner", []string{"other-owners"}), "owned", 20)
-		if err != nil || len(owned) == 0 || owned[0].Share.ID != group.ID || owned[0].Phase != authorization.ShareSuspended {
-			t.Fatal(when, "group share not Suspended", err, owned)
-		}
-		if managed, _, err := shares.List(ctx, sharer("synthetic-team-mate", []string{"other-owners"}), "owned", 20); err != nil || len(managed) != 0 {
-			t.Fatal(when, "team member still manages", err, managed)
-		}
-		if _, _, err := shares.Revoke(ctx, sharer("synthetic-team-mate", []string{"other-owners"}), sharing.RevokeInput{ShareID: group.ID, ExpectedRevision: 1, IdempotencyKey: "lost-team"}); !errors.Is(err, capture.ErrDenied) {
-			t.Fatal(when, "team member revoked without a current pinned assignment", err)
-		}
-		// ADR-238: nobody manages a suspended share, so nobody can move it
-		// to another (for example a re-added) owner assignment.
-		if _, _, err := shares.Transfer(ctx, sharer("synthetic-team-mate", []string{"other-owners"}), sharing.TransferInput{ShareID: group.ID, ExpectedRevision: group.Revision, Management: authorization.ManagementRequest{Mode: "teams", Teams: []string{"other-owners"}}, IdempotencyKey: "lost-team-transfer"}); !errors.Is(err, capture.ErrDenied) {
-			t.Fatal(when, "suspended share transferred", err)
-		}
-		// An administrator's recovery can only pin a current owner team
-		// inside the artifact's retained audience: neither the retired nor
-		// the re-added assignment qualifies, so nothing is widened.
-		if _, _, err := administrators.Transfer(ctx, sharer("synthetic-administrator", []string{"platform"}), sharing.TransferInput{ShareID: group.ID, ExpectedRevision: group.Revision, Management: authorization.ManagementRequest{Mode: "teams", Teams: []string{"other-owners"}}, IdempotencyKey: "recover-outside-audience"}); !errors.Is(err, sharing.ErrManagementNotHeld) {
-			t.Fatal(when, "administrator recovery pinned an assignment outside the retained audience", err)
-		}
+	if owned, _, err := shares.List(ctx, sharer("synthetic-team-mate", []string{"other-owners"}), "owned", 20); err != nil || len(owned) == 0 || owned[0].Share.ID != group.ID || owned[0].Phase != authorization.ShareActive {
+		t.Fatal("managing group member does not list the share", err, owned)
 	}
-	suspended("owner assignment retired:")
-	// A newly added owner binding for the same group is a new assignment:
-	// it does not restore the share and its members cannot manage it.
-	now = time.Now().UTC().Truncate(time.Microsecond)
-	regrant := changed
-	regrant.ExpectedSequence = accepted.Sequence
-	regrant.RequestID, regrant.InputDigest = custodyID(), artifact.Digest{98}
-	regrant.ObservedAt, regrant.FreshUntil = now, now.Add(5*time.Second)
-	added := batch.Bases[1]
-	added.Resource.UID, added.Resource.ResourceVersion, added.Resource.SpecDigest = custodyID(), "share-owner-again", artifact.Digest{95}
-	added.ScopeDigest = configapp.PermissionScopeDigest(added)
-	regrant.Bases = []cfg.PermissionBasis{batch.Bases[0], added, deny}
-	readded, err := s.p.AcceptPermissions(ctx, regrant)
-	if err != nil {
-		t.Fatal(err)
+	if revoked, _, err := shares.Revoke(ctx, sharer("synthetic-team-mate", []string{"other-owners"}), sharing.RevokeInput{ShareID: group.ID, ExpectedRevision: group.Revision, IdempotencyKey: "team-revoke"}); err != nil || revoked.RevokedAt.IsZero() {
+		t.Fatal("managing group member could not revoke", err)
 	}
-	regrant.ExpectedSequence = readded.Sequence
-	// New assignments become current after their authority audit.
-	for j := 0; j < 2; j++ {
-		if err := publishAuthority(); err != nil {
-			t.Fatal(err)
-		}
-	}
-	now = time.Now().UTC().Truncate(time.Microsecond)
-	regrant.ObservedAt, regrant.FreshUntil = now, now.Add(5*time.Second)
-	if err := s.p.RefreshPermissions(ctx, regrant); err != nil {
-		t.Fatal(err)
-	}
-	p, err := s.p.Permissions(ctx, group.Target)
-	if err != nil {
-		t.Fatal(err)
-	}
-	regranted := false
-	for _, a := range p.Allows {
-		if a.Audience.Role == "evidence-owner" && a.Audience.SubjectID == "other-owners" {
-			regranted = a.Audience.AssignmentID != group.Management[0].AssignmentID
-		}
-	}
-	if !regranted {
-		t.Fatal("re-added owner binding is not a new current assignment", p.Allows)
-	}
-	suspended("owner binding re-added:")
-	if view, err := cases.GetContextCase(ctx, identityAt("synthetic-reviewer", []string{"synthetic-reviewers"}), e.CaseID); err != value.ErrUnavailable || view.CaseID != "" {
-		t.Fatal("re-added owner binding restored a share", view, err)
-	}
-	t.Log("evidence share: refusal without share, recipient-only read, concurrent revocation, expiry, deny and owner-assignment loss qualified on real PostgreSQL; team management: member revoke after creator departure, all teams lost suspends, re-added owner manages nothing; ADR-238: explicit management, transfer (not-held refused, replay, stale, trigger), administrator revoke without evidence rights, transferred share suspended")
+	t.Log("evidence share: refusal without share, recipient-only read, concurrent revocation, expiry and deny qualified on real PostgreSQL; team management by group name survives owner-assignment loss; ADR-238: explicit management, transfer (not-held refused, replay, stale, trigger), administrator revoke without evidence rights")
 }
 
 // shareAdministration is synthetic identity settings whose administrators

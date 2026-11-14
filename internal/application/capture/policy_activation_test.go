@@ -277,7 +277,7 @@ func TestPolicyActivationAcceptsBoundedSharingWithTheOwnerTeams(t *testing.T) {
 }
 
 func TestPolicyActivationRefusesSharingWithoutOwnerAuthority(t *testing.T) {
-	for _, name := range []string{"no-share-scope", "owner-on-another-binding", "owner-of-another-group", "end-past", "end-beyond-seven-days", "foreign-issuer"} {
+	for _, name := range []string{"no-share-scope", "owner-on-another-binding", "owner-of-another-group", "end-past", "foreign-issuer"} {
 		t.Run(name, func(t *testing.T) {
 			f := newActivationFixture(t)
 			end := time.Now().UTC().Add(48 * time.Hour)
@@ -294,11 +294,6 @@ func TestPolicyActivationRefusesSharingWithoutOwnerAuthority(t *testing.T) {
 				f.author.Groups = append(f.author.Groups, "team-c")
 			case "end-past":
 				f.edit = func(s map[string]any) { sharingSpec(s)["notAfter"] = "2001-01-01T00:00:00Z" }
-				want = value.ErrInvalid
-			case "end-beyond-seven-days":
-				f.edit = func(s map[string]any) {
-					sharingSpec(s)["notAfter"] = time.Now().UTC().Add(8 * 24 * time.Hour).Format(time.RFC3339)
-				}
 				want = value.ErrInvalid
 			case "foreign-issuer":
 				f.edit = func(s map[string]any) {

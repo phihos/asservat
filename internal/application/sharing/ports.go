@@ -22,11 +22,11 @@ type Request struct {
 }
 
 // Revocation revokes one share. The actor is its creator or, with Managers,
-// a current manager (ADR-232 increment 4): Managers are the pinned assignment
-// IDs the service found the actor holding now; the store requires each to be
-// pinned by the row. Administrator marks an installation administrator's
-// revocation (ADR-238): the service checked identity.administrators;
-// revocation only restricts access.
+// a current manager: Managers name the recorded management entries the
+// service found the actor in now; the store requires each to be recorded by
+// the row. Administrator marks an installation administrator's
+// revocation (ADR-238): the service checked
+// identity.administrators; revocation only restricts access.
 type Revocation struct {
 	OperationID      string `json:"-"`
 	ShareID          string
@@ -37,9 +37,9 @@ type Revocation struct {
 	IdempotencyKey   string
 }
 
-// Transfer replaces the pinned management of one active share (ADR-238).
-// Managers are the pinned assignment IDs the service found the actor holding
-// now (the store requires each to be pinned by the row); Management is the
+// Transfer replaces the management of one active share (ADR-238). Managers
+// name the recorded management entries the service found the actor in now
+// (the store requires each to be recorded by the row); Management is the
 // complete new set, all held by the actor now. Creator, recipients, artifact
 // and expiry never change.
 type Transfer struct {
@@ -47,9 +47,8 @@ type Transfer struct {
 	ShareID     string
 	Actor       identity.Principal
 	Managers    []string
-	// Administrator marks an installation administrator's assignment or
-	// recovery (the service checked the fleet administration); the store
-	// recovery (the service checked identity.administrators); the store
+	// Administrator marks an installation administrator's assignment
+	// (the service checked identity.administrators); the store
 	Administrator    bool
 	Management       []artifact.AudienceAssignment
 	ExpectedRevision int64
@@ -102,7 +101,7 @@ type PolicySharing struct {
 
 // PolicyRevocation revokes every share of one acceptance and its future
 // sharing. Actor is the instruction's creator or, with Managers, a current
-// manager (the pinned assignment IDs the service found the actor holding).
+// manager (the recorded management entries the service found the actor in).
 type PolicyRevocation struct {
 	OperationID      string `json:"-"`
 	AcceptanceID     string
@@ -111,7 +110,7 @@ type PolicyRevocation struct {
 	ExpectedRevision int64
 	IdempotencyKey   string
 	// Administrator marks an installation administrator (ADR-238), who
-	// revokes without a pinned assignment.
+	// revokes without being a manager.
 	Administrator bool
 }
 

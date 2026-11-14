@@ -268,7 +268,7 @@ func TestShareCreateListRevoke(t *testing.T) {
 	if len(owned) != 1 || owned[0].Phase != value.ShareRevoked {
 		t.Fatal("revoked phase", owned)
 	}
-	// Loss of the pinned owner assignment suspends a share in the owned view.
+	// Loss of the recorded owner assignment does not change a share (ADR-330 D11).
 	second, _, err := s.Create(context.Background(), f, f.input("k2"))
 	if err != nil {
 		t.Fatal(err)
@@ -276,14 +276,14 @@ func TestShareCreateListRevoke(t *testing.T) {
 	f.p.Allows = f.p.Allows[:1]
 	owned, _, _ = s.List(context.Background(), f, "owned", 20)
 	for _, v := range owned {
-		if v.Share.ID == second.ID && v.Phase != value.ShareSuspended {
-			t.Fatal("owner loss did not suspend", v.Phase)
+		if v.Share.ID == second.ID && v.Phase != value.ShareActive {
+			t.Fatal("owner loss changed the share", v.Phase)
 		}
 	}
 }
 
 func TestShareCreateRefusals(t *testing.T) {
-	for _, name := range []string{"no-share-scope", "not-owner", "foreign-recipient-issuer", "too-long", "changed-version", "unrelated-caller", "too-many-recipients", "workload-caller", "raw-artifact"} {
+	for _, name := range []string{"no-share-scope", "not-owner", "foreign-recipient-issuer", "past-expiry", "changed-version", "unrelated-caller", "workload-caller", "raw-artifact"} {
 		t.Run(name, func(t *testing.T) {
 			f, s := newFixture()
 			in := f.input("k")
@@ -295,17 +295,12 @@ func TestShareCreateRefusals(t *testing.T) {
 				f.i.Groups = []string{"team"}
 			case "foreign-recipient-issuer":
 				in.Recipients[0].Issuer, want = "https://other.invalid", capture.ErrInvalid
-			case "too-long":
-				in.ExpiresAt, want = f.now.Add(value.ShareMaxLifetime+time.Second), capture.ErrInvalid
+			case "past-expiry":
+				in.ExpiresAt, want = f.now.Add(-time.Second), capture.ErrInvalid
 			case "changed-version":
 				in.Version, want = artifact.Digest{99}, capture.ErrChanged
 			case "unrelated-caller":
 				f.i.Groups = nil
-			case "too-many-recipients":
-				for len(in.Recipients) <= value.ShareMaxRecipients {
-					in.Recipients = append(in.Recipients, value.ShareRecipient{Kind: "Group", Issuer: f.i.Principal.Issuer, ID: string(rune('a' + len(in.Recipients)))})
-				}
-				want = capture.ErrInvalid
 			case "workload-caller":
 				f.i.Principal.Kind = identity.Workload
 			case "raw-artifact":
@@ -364,15 +359,14 @@ func TestShareOwnedListSurvivesUnavailableProjection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// The target's projection becomes unavailable: the list still answers,
-	// the revoked row keeps its final phase and the other shows Suspended.
+	// The target's projection becomes unavailable: the owned list needs none.
 	f.p.Target.WorkloadUID = "gone"
 	owned, _, err := s.List(context.Background(), f, "owned", 20)
 	if err != nil || len(owned) != 2 {
 		t.Fatal("owned list failed on an unavailable projection", err, owned)
 	}
 	for _, v := range owned {
-		if want := map[string]value.SharePhase{revoked.ID: value.ShareRevoked, active.ID: value.ShareSuspended}[v.Share.ID]; v.Phase != want {
+		if want := map[string]value.SharePhase{revoked.ID: value.ShareRevoked, active.ID: value.ShareActive}[v.Share.ID]; v.Phase != want {
 			t.Fatal("phase", v.Share.ID, v.Phase, want)
 		}
 	}
@@ -414,13 +408,12 @@ func listed(views []View, id string) (value.SharePhase, bool) {
 	return "", false
 }
 
-// ADR-232 increment 4: management is the creator's owner teams; any current
-// member manages; the creator's departure keeps the share; losing every team
-// suspends it; a newly added owner assignment manages no older share.
+// Management is the creator's owner teams; any current member manages; the
+// creator's departure keeps the share.
 func TestShareTeamManagement(t *testing.T) {
 	ctx := context.Background()
 	f, s := newFixture()
-	teamB := f.addOwnerTeam("owners-b", 13)
+	f.addOwnerTeam("owners-b", 13)
 	creator := f.i
 	creator.Groups = []string{"owners", "owners-b"}
 	f.i = creator
@@ -453,51 +446,6 @@ func TestShareTeamManagement(t *testing.T) {
 		t.Fatal("revoked team share still listed for the member", owned)
 	}
 
-	f.i = creator
-	second, _, err := s.Create(ctx, f, f.input("k2"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Team "owners" loses its assignment: its member no longer manages, the
-	// share stays Active through owners-b.
-	owners := f.p.Allows[1].Audience
-	f.dropAllow(owners.AssignmentID)
-	f.i = mate
-	if _, _, err := s.Revoke(ctx, f, RevokeInput{OperationID: testID(900), ShareID: second.ID, ExpectedRevision: 1, IdempotencyKey: "r-lost"}); !errors.Is(err, capture.ErrDenied) {
-		t.Fatal("member of a team without a current assignment revoked", err)
-	}
-	if owned, _, _ := s.List(ctx, f, "owned", 20); len(owned) != 0 {
-		t.Fatal("member of a lost team lists the share", owned)
-	}
-	f.i = creator
-	if owned, _, _ := s.List(ctx, f, "owned", 20); func() bool { p, ok := listed(owned, second.ID); return !ok || p != value.ShareActive }() {
-		t.Fatal("share with one remaining team not Active", owned)
-	}
-	// Both teams lost: Suspended.
-	f.dropAllow(teamB.AssignmentID)
-	if owned, _, _ := s.List(ctx, f, "owned", 20); func() bool { p, ok := listed(owned, second.ID); return !ok || p != value.ShareSuspended }() {
-		t.Fatal("share without a current team not Suspended", owned)
-	}
-	// Re-granting "owners" is a new assignment ID: no restoration, and its
-	// members cannot manage the old share.
-	regranted := owners
-	regranted.AssignmentID = testID(14)
-	f.p.Allows = append(f.p.Allows, value.CurrentAssignment{Audience: regranted, ObservedAt: f.now, FreshUntil: f.now.Add(30 * time.Second)})
-	if owned, _, _ := s.List(ctx, f, "owned", 20); func() bool { p, ok := listed(owned, second.ID); return !ok || p != value.ShareSuspended }() {
-		t.Fatal("re-granted owner binding restored a suspended share", owned)
-	}
-	f.i = mate
-	if _, _, err := s.Revoke(ctx, f, RevokeInput{OperationID: testID(900), ShareID: second.ID, ExpectedRevision: 1, IdempotencyKey: "r-new"}); !errors.Is(err, capture.ErrDenied) {
-		t.Fatal("newly added owner managed an old share", err)
-	}
-	if owned, _, _ := s.List(ctx, f, "owned", 20); len(owned) != 0 {
-		t.Fatal("newly added owner lists an old share", owned)
-	}
-	// The creator can still revoke the suspended share.
-	f.i = creator
-	if _, _, err := s.Revoke(ctx, f, RevokeInput{OperationID: testID(900), ShareID: second.ID, ExpectedRevision: 1, IdempotencyKey: "r-creator"}); err != nil {
-		t.Fatal("creator could not revoke a suspended share", err)
-	}
 }
 
 func TestShareManagementPersonalTeamsAndDeny(t *testing.T) {
@@ -528,27 +476,10 @@ func TestShareManagementPersonalTeamsAndDeny(t *testing.T) {
 	if err != nil || len(share.Management) != 1 || share.Management[0].Kind != "Group" {
 		t.Fatal("team management not preferred", err, share.Management)
 	}
-	// A current deny of a member removes their management.
 	mate := f.i
 	mate.Principal.Subject = "mate"
-	d := f.p.Allows[0]
-	d.Audience.Kind, d.Audience.SubjectID, d.Audience.AssignmentID = "User", "mate", testID(63)
-	f.p.Denies = []value.CurrentAssignment{d}
 	f.i = mate
-	if _, _, err := s.Revoke(ctx, f, RevokeInput{OperationID: testID(900), ShareID: share.ID, ExpectedRevision: 1, IdempotencyKey: "r"}); !errors.Is(err, capture.ErrDenied) {
-		t.Fatal("denied member revoked", err)
-	}
-	f.p.Denies = nil
 	if _, _, err := s.Revoke(ctx, f, RevokeInput{OperationID: testID(900), ShareID: share.ID, ExpectedRevision: 1, IdempotencyKey: "r"}); err != nil {
 		t.Fatal("member revoke", err)
-	}
-
-	// More than eight owner teams: refused, never truncated.
-	f, s = newFixture()
-	for n := 0; n < value.ShareMaxManagers; n++ {
-		f.i.Groups = append(f.i.Groups, f.addOwnerTeam(fmt.Sprintf("owners-%d", n), 30+n).SubjectID)
-	}
-	if _, _, err := s.Create(ctx, f, f.input("k1")); !errors.Is(err, ErrManagementTooBroad) || len(f.store.created) != 0 {
-		t.Fatal("nine owner teams", err)
 	}
 }

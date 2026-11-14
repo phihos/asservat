@@ -97,8 +97,9 @@ func (s PolicyActivation) activateRecorderPolicy(ctx context.Context, author ide
 	}
 	var sharing *value.PolicyShareInstruction
 	if in := compiled.Sharing; in != nil {
-		if in.Recipients[0].Issuer != author.Principal.Issuer || !in.NotAfter.After(s.Now()) || in.NotAfter.After(issued.Add(authorization.ShareMaxLifetime)) {
-			return zero, value.PolicyFieldError{Path: "spec.sharing.notAfter", Reason: "must be in the future and at most seven days after activation, with recipients of your issuer"}
+		end := sharingEnd(in, issued)
+		if in.Recipients[0].Issuer != author.Principal.Issuer || !end.After(s.Now()) {
+			return zero, value.PolicyFieldError{Path: "spec.sharing.notAfter", Reason: "must be in the future, with recipients of your issuer"}
 		}
 		var sponsors []string
 		for _, owner := range owners {
@@ -108,7 +109,7 @@ func (s PolicyActivation) activateRecorderPolicy(ctx context.Context, author ide
 		if !result.Eligible {
 			return zero, value.ErrSharingDenied
 		}
-		sharing = &value.PolicyShareInstruction{Creator: author.Principal, Management: management, Recipients: slices.Clone(in.Recipients), MaxCaptures: in.MaxCaptures, NotAfter: in.NotAfter.UTC()}
+		sharing = &value.PolicyShareInstruction{Creator: author.Principal, Management: management, Recipients: slices.Clone(in.Recipients), MaxCaptures: in.MaxCaptures, NotAfter: end}
 		if !sharing.Valid() {
 			return zero, value.ErrInvalid
 		}

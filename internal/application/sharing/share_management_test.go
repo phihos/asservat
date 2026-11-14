@@ -66,8 +66,7 @@ func TestShareExplicitManagement(t *testing.T) {
 }
 
 // ADR-238: a current manager transfers management to teams they hold now; a
-// team they do not hold is refused; the replaced team no longer manages; the
-// transferred share is suspended when the new team loses its assignment;
+// team they do not hold is refused; the replaced team no longer manages;
 // expiry and creator never change.
 func TestShareTransfer(t *testing.T) {
 	ctx := context.Background()
@@ -137,20 +136,6 @@ func TestShareTransfer(t *testing.T) {
 	f.i = recipient
 	if got, _, _ := s.List(ctx, f, "received", 20); len(got) != 1 {
 		t.Fatal("transferred share not received", got)
-	}
-	// The new team loses its assignment: Suspended, and the recipient loses it.
-	f.dropAllow(b.AssignmentID)
-	if got, _, _ := s.List(ctx, f, "received", 20); len(got) != 0 {
-		t.Fatal("suspended share still received", got)
-	}
-	f.i = creator
-	if owned, _, _ := s.List(ctx, f, "owned", 20); func() bool { p, ok := listed(owned, share.ID); return !ok || p != value.ShareSuspended }() {
-		t.Fatal("transferred share not suspended after the new team lost its rights", owned)
-	}
-	// Nobody manages a suspended share, so nobody can transfer it back.
-	f.i = mate
-	if _, _, err := s.Transfer(ctx, f, to("t3", 2, "owners")); !errors.Is(err, capture.ErrDenied) {
-		t.Fatal("suspended share transferred", err)
 	}
 }
 
@@ -250,65 +235,6 @@ func TestShareAdministratorAssignsManagement(t *testing.T) {
 	in.Management = value.ManagementRequest{Mode: "teams", Teams: []string{"owners-c"}}
 	if _, _, err := s.Create(ctx, f, in); !errors.Is(err, capture.ErrDenied) {
 		t.Fatal("administrator without owner rights created a share", err)
-	}
-}
-
-// ADR-238 authority recovery: once every manager is lost the share is
-// Suspended; an administrator re-pins current owner teams (new revision,
-// creator and expiry unchanged) and the recipient reads again. A non-admin
-// cannot; a revoked share cannot be recovered.
-func TestShareAdministratorRecovery(t *testing.T) {
-	ctx := context.Background()
-	f, s := newFixture()
-	b := f.addOwnerTeam("owners-b", 13)
-	s.Administration = f.administrators()
-	creator := f.i
-	share, _, err := s.Create(ctx, f, f.input("k1"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	f.dropAllow(share.Management[0].AssignmentID)
-	recipient := creator
-	recipient.Principal.Subject, recipient.Groups = "reader", []string{"outsiders"}
-	f.i = recipient
-	if got, _, _ := s.List(ctx, f, "received", 20); len(got) != 0 {
-		t.Fatal("suspended share received", got)
-	}
-	recover := TransferInput{OperationID: testID(900), ShareID: share.ID, ExpectedRevision: 1, Management: value.ManagementRequest{Mode: "teams", Teams: []string{"owners-b"}}, IdempotencyKey: "recover"}
-	member := creator
-	member.Principal.Subject, member.Groups = "b-member", []string{"owners-b"}
-	f.i = member
-	if _, _, err := s.Transfer(ctx, f, recover); !errors.Is(err, capture.ErrDenied) {
-		t.Fatal("non-admin recovered a suspended share", err)
-	}
-	admin := creator
-	admin.Principal.Subject, admin.Groups = "admin", []string{"platform"}
-	f.i = admin
-	reads := f.catalogReads
-	if _, _, err := s.Transfer(ctx, f, TransferInput{OperationID: testID(900), ShareID: share.ID, ExpectedRevision: 1, Management: value.ManagementRequest{Mode: "creator"}, IdempotencyKey: "c"}); !errors.Is(err, ErrManagementNotHeld) {
-		t.Fatal("administrator chose creator management", err)
-	}
-	recovered, _, err := s.Transfer(ctx, f, recover)
-	if err != nil || recovered.Revision != 2 || len(recovered.Management) != 1 || recovered.Management[0] != b || recovered.Creator != share.Creator || !recovered.ExpiresAt.Equal(share.ExpiresAt) || f.catalogReads == reads {
-		t.Fatal("administrator recovery", err, recovered)
-	}
-	if t2 := f.store.transfers[share.ID]; !t2.Administrator || t2.Actor.Subject != "admin" {
-		t.Fatal("recovery not recorded as administrative", t2)
-	}
-	f.i = recipient
-	if got, _, _ := s.List(ctx, f, "received", 20); len(got) != 1 {
-		t.Fatal("recovered share not received", got)
-	}
-	f.i = member
-	if owned, _, _ := s.List(ctx, f, "owned", 20); len(owned) != 1 || owned[0].Phase != value.ShareActive {
-		t.Fatal("new team does not manage the recovered share", owned)
-	}
-	f.i = admin
-	if _, _, err := s.Revoke(ctx, f, RevokeInput{OperationID: testID(900), ShareID: share.ID, ExpectedRevision: 2, IdempotencyKey: "r"}); err != nil {
-		t.Fatal(err)
-	}
-	if _, _, err := s.Transfer(ctx, f, TransferInput{OperationID: testID(900), ShareID: share.ID, ExpectedRevision: 3, Management: recover.Management, IdempotencyKey: "again"}); !errors.Is(err, capture.ErrDenied) {
-		t.Fatal("revoked share recovered", err)
 	}
 }
 

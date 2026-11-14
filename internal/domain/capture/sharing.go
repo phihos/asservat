@@ -25,10 +25,10 @@ type ContextSharing struct {
 	NotAfter   time.Time `json:",omitzero"`
 }
 
-// Valid checks the shape only: 1..8 distinct recipients of one issuer. That
+// Valid checks the shape only: distinct recipients of one issuer. That
 // issuer is the requester's, checked where the requester is known.
 func (s ContextSharing) Valid() bool {
-	if len(s.Recipients) < 1 || len(s.Recipients) > authorization.ShareMaxRecipients || !s.NotAfter.IsZero() && !previewTime(s.NotAfter) {
+	if len(s.Recipients) < 1 || !s.NotAfter.IsZero() && !previewTime(s.NotAfter) {
 		return false
 	}
 	seen := map[string]bool{}
@@ -53,7 +53,7 @@ func (s *ContextSharing) clone() *ContextSharing {
 // CaptureShareInstruction is the accepted instruction stored with the accepted
 // capture. Publication materializes exactly one evidence share with ShareID
 // from it; it is never re-evaluated against the requester's full current
-// rights at publication (readers re-check the pinned management every time).
+// rights at publication.
 type CaptureShareInstruction struct {
 	ShareID    string
 	Creator    identity.Principal

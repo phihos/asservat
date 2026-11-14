@@ -254,10 +254,11 @@ func (s *EvidenceShares) ReceivedShares(ctx context.Context, caller identity.Ide
 	return out, nil
 }
 
-// CreateShare inserts one share under a per-artifact lock: a replayed creator key returns the original row (replay) when the
-// request digest matches and Conflict otherwise; a 33rd active share of the
-// artifact is Capacity. The insert copies case and target from the published
-// case locator and requires them to equal the prepared share.
+// CreateShare inserts one share under a per-artifact lock: a replayed creator
+// key returns the original row (replay) when the request digest matches and
+// Conflict otherwise. The insert copies case and target from the published
+// case locator and requires them to equal the prepared share. The expiry is
+// shortened to the creating operation's audit backing.
 func (s *EvidenceShares) CreateShare(ctx context.Context, r sharing.Request) (authorization.Share, bool, error) {
 	var zero authorization.Share
 	v := r.Share
@@ -292,9 +293,6 @@ func (s *EvidenceShares) CreateShare(ctx context.Context, r sharing.Request) (au
 		if err != nil {
 			return err
 		}
-		if err = q.LockShareArtifact(ctx, v.ArtifactID); err != nil {
-			return err
-		}
 		row, err := q.ReadShareByKey(ctx, custodydb.ReadShareByKeyParams{RootID: id(s.root), CreatorIssuer: v.Creator.Issuer, CreatorSubject: v.Creator.Subject, IdempotencyKey: r.IdempotencyKey})
 		switch {
 		case err == nil:
@@ -306,23 +304,20 @@ func (s *EvidenceShares) CreateShare(ctx context.Context, r sharing.Request) (au
 			if !effect.EffectAvailable {
 				return value.ErrConflict
 			}
-			if !effect.EffectUntil.Valid || v.ExpiresAt.After(effect.EffectUntil.Time) {
-				return sharing.ErrRetentionCapacity
+			if !effect.EffectUntil.Valid {
+				return value.ErrUnavailable
 			}
-			active, err := q.CountActiveShares(ctx, custodydb.CountActiveSharesParams{RootID: id(s.root), ArtifactID: id(v.ArtifactID)})
-			if err != nil {
-				return err
-			}
-			if active >= authorization.ShareMaxActivePerArtifact {
-				return value.ErrCapacity
+			expires := v.ExpiresAt
+			if expires.After(effect.EffectUntil.Time) {
+				expires = effect.EffectUntil.Time
 			}
 			row, err = q.InsertShare(ctx, custodydb.InsertShareParams{ID: id(v.ID), RootID: id(s.root), ArtifactID: id(v.ArtifactID), CaseID: id(v.CaseID),
 				ClusterID: id(v.Target.ClusterID), NamespaceUid: v.Target.NamespaceUID, WorkloadUid: v.Target.WorkloadUID, PodUid: v.Target.PodUID,
 				Version: v.Version[:], CreatorIssuer: v.Creator.Issuer, CreatorSubject: v.Creator.Subject, CreatorClient: v.Creator.ClientID,
-				Management: management, Recipients: recipients, RecipientKeys: keys, IdempotencyKey: r.IdempotencyKey, RequestDigest: r.RequestDigest[:], ExpiresAt: ts(v.ExpiresAt), OperationID: id(r.OperationID)})
+				Management: management, Recipients: recipients, RecipientKeys: keys, IdempotencyKey: r.IdempotencyKey, RequestDigest: r.RequestDigest[:], ExpiresAt: ts(expires), OperationID: id(r.OperationID)})
 			if errors.Is(err, pgx.ErrNoRows) {
 				// No published route with this case and target, or an expiry
-				// outside (now, now+7 days].
+				// already passed.
 				return value.ErrDenied
 			}
 			if err != nil {
@@ -345,14 +340,14 @@ func (s *EvidenceShares) CreateShare(ctx context.Context, r sharing.Request) (au
 }
 
 // RevokeShare revokes a share once for its creator, with r.Managers for a
-// manager the service found holding those pinned assignments now (ADR-232
-// increment 4; every named assignment must be pinned by the locked row), or
+// manager the service found in a managing group now (every named entry must
+// be recorded by the locked row), or
 // for an administrator the service checked (ADR-238). The same key after
 // success is a replay; another key or a stale expected revision is Conflict;
 // any other share (or none) is Denied without saying which.
 func (s *EvidenceShares) RevokeShare(ctx context.Context, r sharing.Revocation) (authorization.Share, bool, error) {
 	var zero authorization.Share
-	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(r.ShareID) || !authorization.UUID(r.OperationID) || !r.Actor.Valid() || len(r.Managers) > authorization.ShareMaxManagers || !identity.Text(r.IdempotencyKey, 128) || r.ExpectedRevision < 1 {
+	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(r.ShareID) || !authorization.UUID(r.OperationID) || !r.Actor.Valid() || !identity.Text(r.IdempotencyKey, 128) || r.ExpectedRevision < 1 {
 		return zero, false, value.ErrInvalid
 	}
 	var out authorization.Share
@@ -407,8 +402,8 @@ func (s *EvidenceShares) RevokeShare(ctx context.Context, r sharing.Revocation) 
 // managed share is Denied.
 func (s *EvidenceShares) TransferShare(ctx context.Context, r sharing.Transfer) (authorization.Share, bool, error) {
 	var zero authorization.Share
-	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(r.ShareID) || !authorization.UUID(r.OperationID) || !r.Actor.Valid() || len(r.Managers) < 1 && !r.Administrator || len(r.Managers) > authorization.ShareMaxManagers ||
-		len(r.Management) < 1 || len(r.Management) > authorization.ShareMaxManagers || !identity.Text(r.IdempotencyKey, 128) || r.RequestDigest == (artifact.Digest{}) || r.ExpectedRevision < 1 {
+	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(r.ShareID) || !authorization.UUID(r.OperationID) || !r.Actor.Valid() || len(r.Managers) < 1 && !r.Administrator ||
+		len(r.Management) < 1 || !identity.Text(r.IdempotencyKey, 128) || r.RequestDigest == (artifact.Digest{}) || r.ExpectedRevision < 1 {
 		return zero, false, value.ErrInvalid
 	}
 	management, err := json.Marshal(r.Management)
@@ -483,7 +478,7 @@ func pinsAll(management []byte, ids []string) bool {
 }
 
 func shareError(err error) error {
-	for _, sentinel := range []error{sharing.ErrRetentionCapacity, value.ErrConflict, value.ErrCapacity, value.ErrDenied, value.ErrInvalid} {
+	for _, sentinel := range []error{sharing.ErrRetentionCapacity, value.ErrConflict, value.ErrDenied, value.ErrInvalid} {
 		if errors.Is(err, sentinel) {
 			return sentinel
 		}

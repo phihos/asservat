@@ -336,14 +336,14 @@ func (s PolicyActivation) Activate(ctx context.Context, current identities.Curre
 // workload (evidence:share, no deny) through an evidence-owner Group
 // assignment of the automation AccessBinding for a sponsoring group: those
 // assignments are the policy's owner teams and manage every share. The end
-// must be in the future and at most seven days after activation, as for any
-// share. Without sharing, nothing is resolved.
+// must be in the future. Without sharing, nothing is resolved.
 func (s PolicyActivation) sharing(author identity.Identity, in *value.PolicySharing, p authorization.Projection, target authorization.Target, delegation string, sponsors []artifact.AudienceAssignment, issued time.Time) (*value.PolicyShareInstruction, error) {
 	if in == nil {
 		return nil, nil
 	}
-	if in.Recipients[0].Issuer != author.Principal.Issuer || !in.NotAfter.After(s.Now()) || in.NotAfter.After(issued.Add(authorization.ShareMaxLifetime)) {
-		return nil, value.PolicyFieldError{Path: "spec.sharing.notAfter", Reason: "must be in the future and at most seven days after activation, with recipients of your issuer"}
+	end := sharingEnd(in, issued)
+	if in.Recipients[0].Issuer != author.Principal.Issuer || !end.After(s.Now()) {
+		return nil, value.PolicyFieldError{Path: "spec.sharing.notAfter", Reason: "must be in the future, with recipients of your issuer"}
 	}
 	var groups []string
 	for _, o := range sponsors {
@@ -356,11 +356,20 @@ func (s PolicyActivation) sharing(author identity.Identity, in *value.PolicyShar
 		}
 		return nil, value.ErrSharingDenied
 	}
-	out := value.PolicyShareInstruction{Creator: author.Principal, Management: management, Recipients: slices.Clone(in.Recipients), MaxCaptures: in.MaxCaptures, NotAfter: in.NotAfter.UTC()}
+	out := value.PolicyShareInstruction{Creator: author.Principal, Management: management, Recipients: slices.Clone(in.Recipients), MaxCaptures: in.MaxCaptures, NotAfter: end}
 	if !out.Valid() {
 		return nil, value.ErrInvalid
 	}
 	return &out, nil
+}
+
+// sharingEnd is the policy's sharing end, by default 90 days after
+// activation (REQ-SHR-005).
+func sharingEnd(in *value.PolicySharing, issued time.Time) time.Time {
+	if in.NotAfter.IsZero() {
+		return issued.Add(value.PolicyShareDefaultLifetime).UTC().Truncate(time.Second)
+	}
+	return in.NotAfter.UTC()
 }
 
 // ActivateWithGrant composes explicit current-manager attachment with the same

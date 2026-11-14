@@ -75,8 +75,8 @@
               "$ref": "#/$defs/d0"
             },
             "minItems": 1,
-            "maxItems": 8,
-            "uniqueItems": true
+            "uniqueItems": true,
+            "description": "No count limit: recipients are bounded only by the request body byte limit (memory) (maintainer rule: limits need a reason)."
           },
           "notAfter": {
             "$ref": "#/$defs/d1"

@@ -11,7 +11,6 @@ import (
 	"asservat.local/asservat/internal/application/sharing"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
-	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
 )
 
@@ -40,7 +39,7 @@ func (f *shareOperationsFixture) List(_ context.Context, _ identities.CurrentIde
 	again.AssignmentID = "44444444-4444-4444-8444-444444444444"
 	s := authorization.Share{ID: "11111111-1111-4111-8111-111111111111", CaseID: "22222222-2222-4222-8222-222222222222", ExpiresAt: time.Now().Add(time.Hour), Revision: 1,
 		Creator: identity.Principal{Issuer: issuer, Subject: "creator", ClientID: "mcp", Kind: identity.Human}, Management: []artifact.AudienceAssignment{team, again}}
-	return []sharing.View{{Share: s, Phase: authorization.ShareSuspended}}, time.Now().Add(5 * time.Second), nil
+	return []sharing.View{{Share: s, Phase: authorization.ShareActive}}, time.Now().Add(5 * time.Second), nil
 }
 func (f *shareOperationsFixture) Revoke(_ context.Context, _ identities.CurrentIdentity, in sharing.RevokeInput) (authorization.Share, bool, error) {
 	f.calls, f.revoke = append(f.calls, "revoke"), in
@@ -60,7 +59,7 @@ func (f *shareOperationsFixture) ListAdministered(_ context.Context, _ identitie
 	s := authorization.Share{ID: "11111111-1111-4111-8111-111111111111", CaseID: "22222222-2222-4222-8222-222222222222", ArtifactID: "55555555-5555-4555-8555-555555555555", ExpiresAt: time.Now().Add(time.Hour), Revision: 3,
 		Creator: identity.Principal{Issuer: issuer, Subject: "creator", ClientID: "mcp", Kind: identity.Human}, Management: []artifact.AudienceAssignment{team},
 		Recipients: []authorization.ShareRecipient{{Kind: "User", Issuer: issuer, ID: "secret-recipient"}}}
-	return []sharing.View{{Share: s, Phase: authorization.ShareSuspended}}, "s1.1700000000000000.11111111-1111-4111-8111-111111111111", time.Now().Add(5 * time.Second), nil
+	return []sharing.View{{Share: s, Phase: authorization.ShareActive}}, "s1.1700000000000000.11111111-1111-4111-8111-111111111111", time.Now().Add(5 * time.Second), nil
 }
 
 // ADR-238: the administrator view is management-only (no recipients) with a
@@ -73,7 +72,7 @@ func TestShareOperationsAdministration(t *testing.T) {
 	}
 	out := shareCall(t, s, f, "list_shares", `{"view":"administration","limit":1,"cursor":"s1.1.11111111-1111-4111-8111-111111111111"}`)
 	row := out["data"].(map[string]any)["shares"].([]any)[0].(map[string]any)
-	if out["status"] != "ok" || out["next_cursor"] != "s1.1700000000000000.11111111-1111-4111-8111-111111111111" || row["artifact_id"] != "55555555-5555-4555-8555-555555555555" || row["revision"] != float64(3) || row["phase"] != "Suspended" ||
+	if out["status"] != "ok" || out["next_cursor"] != "s1.1700000000000000.11111111-1111-4111-8111-111111111111" || row["artifact_id"] != "55555555-5555-4555-8555-555555555555" || row["revision"] != float64(3) || row["phase"] != "Active" ||
 		row["created_by"].(map[string]any)["id"] != "creator" || row["managed_by"].([]any)[0].(map[string]any)["id"] != "owners" || f.calls[0] != "list-administration:s1.1.11111111-1111-4111-8111-111111111111" {
 		t.Fatal("administration row", out)
 	}
@@ -150,7 +149,7 @@ func TestShareOperationsContract(t *testing.T) {
 	// per team, not per assignment).
 	if out := shareCall(t, s, f, "list_shares", `{"view":"owned"}`); out["status"] != "ok" {
 		t.Fatal("list reply", out)
-	} else if row := out["data"].(map[string]any)["shares"].([]any)[0].(map[string]any); row["phase"] != "Suspended" || row["revision"] != float64(1) ||
+	} else if row := out["data"].(map[string]any)["shares"].([]any)[0].(map[string]any); row["phase"] != "Active" || row["revision"] != float64(1) ||
 		row["created_by"].(map[string]any)["id"] != "creator" || len(row["managed_by"].([]any)) != 1 || row["managed_by"].([]any)[0].(map[string]any)["id"] != "owners" {
 		t.Fatal("owned row", row)
 	}
@@ -184,11 +183,7 @@ func TestShareOperationsContract(t *testing.T) {
 	} else if row := out["data"].(map[string]any)["shares"].([]any)[0].(map[string]any); row["created_by"] != nil || row["managed_by"] != nil || row["revision"] != nil {
 		t.Fatal("received row exposes management", row)
 	}
-	f.scopes, f.createErr = []string{"evidence:read", "evidence:share"}, value.ErrCapacity
-	if out := shareCall(t, s, f, "create_share", create); out["data"].(map[string]any)["code"] != "ShareLimit" {
-		t.Fatal("capacity code", out)
-	}
-	f.createErr = sharing.ErrRetentionCapacity
+	f.scopes, f.createErr = []string{"evidence:read", "evidence:share"}, sharing.ErrRetentionCapacity
 	if out := shareCall(t, s, f, "create_share", create); out["status"] != "error" {
 		t.Fatal("retention backing refusal reported success", out)
 	} else if failure := out["data"].(map[string]any); failure["code"] != "NotAvailable" || failure["retryable"] != false || !strings.Contains(failure["message"].(string), "earlier expiry") {
