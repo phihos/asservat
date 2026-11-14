@@ -400,6 +400,14 @@ func federationPeer(ctx context.Context, c contracts.ServiceIDs, profile value.C
 // Operator diagnostics: one fixed line per refused presentation or failed
 // conversation, with a closed cause. Never inputs, identities or remote text.
 func federationCause(err error) string {
+	var step interface{ FixedStep() string }
+	if errors.As(err, &step) {
+		return step.FixedStep() + "/" + federationClass(err)
+	}
+	return federationClass(err)
+}
+
+func federationClass(err error) string {
 	switch {
 	case errors.Is(err, value.ErrClusterCredentialFenced):
 		return "cluster-credential-fenced"
@@ -455,24 +463,28 @@ func (s federationServices) Bootstrap(ctx context.Context, region *connectorlife
 func (s *federationPeers) stage(ctx context.Context, region *connectorlifecycle.Region, e value.Enrollment) (value.ClusterBootstrapSource, error) {
 	var zero value.ClusterBootstrapSource
 	if err := region.BindBootstrap(e.Binding); err != nil {
-		return zero, value.ErrDenied
+		return zero, &fixedStepError{"stage/bind", value.ErrDenied}
 	}
 	backing, found, err := s.profiles.ReadRootBacking(ctx, s.ids.PermissionRootID)
 	if err != nil {
-		return zero, err
+		return zero, &fixedStepError{"stage/backing-read", err}
 	}
 	q := backing.Policy
 	if !found || !backing.Valid() || q.History == nil || backing.AccountVersion != s.accountVersion || q.RootID != s.ids.PermissionRootID || q.InstallationID != s.ids.InstallationID {
-		return zero, mounts.ErrUnavailable
+		step := "stage/backing"
+		if !found {
+			step += "-missing"
+		}
+		return zero, &fixedStepError{step, mounts.ErrUnavailable}
 	}
 	pin := fleetapp.ConnectorQualificationPin{InstallationID: q.InstallationID, StoreID: q.StoreID, BackupProfileID: q.BackupProfileID, Qualification: *q.History}
 	sources, err := postgres.NewConnectorIdentitySources(ctx, s.pools["connector-source"], s.ids.PermissionRootID, e.Binding, pin)
 	if err != nil {
-		return zero, mounts.ErrUnavailable
+		return zero, &fixedStepError{"stage/sources", mounts.ErrUnavailable}
 	}
 	c, err := fleetapp.ConnectorIdentityObserver{Reader: region, Journal: sources, Qualification: pin, Binding: e.Binding, Now: time.Now, Backing: &backing}.ObserveConfiguration(ctx)
 	if err != nil {
-		return zero, err
+		return zero, &fixedStepError{"stage/observe", err}
 	}
 	profile := c.Source.Observation.Profile
 	return value.ClusterBootstrapSource{UID: profile.Revision.UID, Generation: profile.Revision.Generation, ProtectionDigest: profile.ProtectionDigest}, nil
@@ -481,7 +493,7 @@ func (s *federationPeers) stage(ctx context.Context, region *connectorlifecycle.
 func (s federationServices) Enroll(ctx context.Context, region *connectorlifecycle.Region, id string, r value.ConnectorProcessRequest) (value.ConnectorCredentialProcess, error) {
 	out, err := s.Runners.Enroll(ctx, region, id, r)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "federation enroll failed: "+federationEnrollmentStep(err)+" "+federationCause(err))
+		fmt.Fprintln(os.Stderr, "federation enroll failed: "+federationEnrollmentStep(err)+" "+federationClass(err))
 	}
 	return out, err
 }

@@ -100,7 +100,7 @@ func TestFederationPeersComeFromStagedSQLOnly(t *testing.T) {
 func TestFederationEnrollmentDiagnosticNamesCompositionBoundary(t *testing.T) {
 	private := errors.New("synthetic private provider error")
 	err := federationEnrollmentError{"audit-journal", private}
-	if federationEnrollmentStep(err) != "resolve/audit-journal" || federationCause(err) != "unavailable" || !errors.Is(err, private) {
+	if federationEnrollmentStep(err) != "resolve/audit-journal" || federationClass(err) != "unavailable" || !errors.Is(err, private) {
 		t.Fatal("composition boundary or error class lost")
 	}
 	if strings.Contains(err.Error(), "synthetic") {
