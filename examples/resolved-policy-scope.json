@@ -97,15 +97,10 @@
         },
         "role": "workload-maintainer",
         "basisKind": "AccessBinding",
-        "basisUID": "binding-payments-automation",
-        "basisDigest": "ac64b349471ddc2a142ef66c507dde8ec05005a91eb6dc43a55a553bf3a7f676",
-        "assignmentID": "00000000-0000-4000-8000-000000000097"
+        "basisUID": "binding-payments-automation"
       }
     ],
     "issuedAt": "2026-10-09T12:00:00Z",
-    "notAfter": "2026-11-08T12:00:00Z",
-    "limits": {
-      "maxBytes": 1099511627776
-    }
+    "notAfter": "2026-11-08T12:00:00Z"
   }
 }

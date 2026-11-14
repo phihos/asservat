@@ -1,17 +1,6 @@
 version: 1
 status: conceptual-design; not a physical migration or generated CRD schema
 entities:
-- name: BrowserLogin
-  boundary: identity
-  authority: verified-OIDC-challenge
-  storage: encrypted-SQL
-  fields:
-  - name: stateAndBrowserHashes
-    type: DigestPair
-  - name: encryptedChallenge
-    type: CredentialEnvelope
-  - name: expiresAt
-    type: Instant
 - name: BrowserSession
   boundary: identity
   authority: current-OIDC-session
@@ -169,29 +158,8 @@ entities:
     type: ResourceVector
   - name: resultAccess
     type: ResultAccessScope?
-  - name: resultOrigin
-    type: ResultGrantOrigin?
   - name: resultAccessCounters
     type: ResultAccessCounters?
-- name: GrantReservation
-  boundary: authorization
-  authority: hub
-  storage: grant_reservation
-  fields:
-  - name: id
-    type: ReservationId
-  - name: grantId
-    type: GrantId
-  - name: operationId
-    type: OperationId
-  - name: slice
-    type: ResourceVector
-  - name: fence
-    type: Fence
-  - name: state
-    type: ReservationState
-  - name: deadline
-    type: Instant
 - name: WorkloadProjection
   boundary: targeting
   authority: Kubernetes-derived
@@ -716,25 +684,6 @@ entities:
     type: Revision
   - name: validUntil
     type: Instant?
-- name: SharingRegistration
-  boundary: sharing
-  authority: hub
-  storage: evidence_share-created-at-publication
-  fields:
-  - name: id
-    type: RegistrationId
-  - name: intentId
-    type: IntentId
-  - name: captureId
-    type: CaptureId
-  - name: slot
-    type: Count
-  - name: state
-    type: RegistrationState
-  - name: concreteShareId
-    type: ShareId?
-  - name: deadline
-    type: Instant
 - name: SelectionApproval
   boundary: sharing
   authority: hub
@@ -773,23 +722,6 @@ entities:
     type: ResourceVector
   - name: revision
     type: Revision
-- name: CapacityReservation
-  boundary: capacity
-  authority: hub
-  storage: capacity_reservation
-  fields:
-  - name: id
-    type: ReservationId
-  - name: accountId
-    type: AccountId
-  - name: operationId
-    type: OperationId
-  - name: slice
-    type: ResourceVector
-  - name: state
-    type: ReservationState
-  - name: deadline
-    type: Instant
 - name: EvidenceRetentionPolicy
   boundary: privacy
   authority: Kubernetes
@@ -864,29 +796,6 @@ entities:
     type: OperationId
   - name: committedAt
     type: Instant
-- name: DeliveryWork
-  boundary: delivery
-  authority: hub-work-row
-  storage: outbox-and-work
-  fields:
-  - name: id
-    type: WorkId
-  - name: aggregateId
-    type: AggregateId
-  - name: eventId
-    type: EventId
-  - name: kind
-    type: EventKind
-  - name: claimExpiresAt
-    type: Instant?
-  - name: fence
-    type: Fence
-  - name: nextAttemptAt
-    type: Instant
-  - name: deadline
-    type: Instant
-  - name: state
-    type: DeliveryState
 - name: Overview
   boundary: read-model
   authority: derived-authorized
@@ -940,27 +849,6 @@ entities:
     type: Bytes
   - name: reservations
     type: ReservationId[]
-- name: LiveBatch
-  boundary: live-observation
-  authority: hub-authorized-view
-  storage: transient-bounded-memory-only
-  fields:
-  - name: id
-    type: BatchId
-  - name: watchId
-    type: WatchId
-  - name: viewRevision
-    type: Revision
-  - name: sourcePositions
-    type: SourcePosition[]
-  - name: rows
-    type: ApprovedLiveRow[]
-  - name: gaps
-    type: CoverageGap[]
-  - name: nextCursor
-    type: OpaqueCursor?
-  - name: expiresAt
-    type: Instant
 - name: ArtifactDownload
   boundary: evidence
   authority: hub-authorized-regional-reader
@@ -1040,13 +928,9 @@ relations:
   cardinality: N:M
   invariant: authorize all input and output lineage
 - source: SharingIntent
-  target: SharingRegistration
-  cardinality: 1:N
-  invariant: one share per published artifact, created in the publication transaction
-- source: SharingRegistration
   target: EvidenceShare
-  cardinality: 1:0..1
-  invariant: concrete immutable selection
+  cardinality: 1:N
+  invariant: one concrete share per published artifact, created in the publication transaction
 - source: EvidenceShare
   target: Artifact
   cardinality: N:M
@@ -1059,14 +943,6 @@ relations:
   target: ManagerAssignment
   cardinality: 1:N
   invariant: owner teams are not creators
-- source: AccessGrant
-  target: GrantReservation
-  cardinality: 1:N
-  invariant: spend before side effect
-- source: CapacityAccount
-  target: CapacityReservation
-  cardinality: 1:N
-  invariant: reserve before acquisition
 - source: ArtifactCopy
   target: DeletionWork
   cardinality: 1:N
@@ -1075,14 +951,6 @@ relations:
   target: SourceSession
   cardinality: N:M
   invariant: exact authorized epochs; no source lifetime ownership
-- source: LiveWatch
-  target: LiveBatch
-  cardinality: 1:N
-  invariant: bounded transient projection, no artifact or durable replay
-- source: LiveWatch
-  target: CapacityReservation
-  cardinality: 1:N
-  invariant: independent view resources; incident priority
 - source: ArtifactDownload
   target: Artifact
   kind: downloads-exact-existing-version

@@ -212,39 +212,51 @@
     "status": {
       "type": "object",
       "additionalProperties": false,
+      "description": "Kubernetes-native status (ADR-330 D10): observedGeneration plus conditions (Ready; Overlapping as a warning).",
       "properties": {
-        "phase": {
-          "type": "string",
-          "enum": [
-            "Pending",
-            "Ready",
-            "Stale",
-            "Rejected",
-            "Degraded"
-          ]
-        },
         "observedGeneration": {
           "type": "integer",
           "minimum": 1,
           "maximum": 9007199254740991
         },
-        "policyDigest": {
-          "type": "string",
-          "pattern": "^[a-f0-9]{64}$"
-        },
-        "backendCompatible": {
-          "type": "boolean"
-        },
-        "reasons": {
+        "conditions": {
           "type": "array",
           "items": {
-            "type": "string",
-            "minLength": 1
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "status",
+              "reason"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "minLength": 1
+              },
+              "status": {
+                "enum": [
+                  "True",
+                  "False",
+                  "Unknown"
+                ]
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              },
+              "message": {
+                "type": "string"
+              },
+              "lastTransitionTime": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
           }
         }
       },
       "required": [
-        "phase",
         "observedGeneration"
       ]
     }

@@ -42,9 +42,7 @@ spec:
       ring:
         maxAge: 10s
         maxBytes: 8388608
-        segmentBytes: 2097152
-        maxSegments: 4
-        medium: memory
+        segments: 4
       peers:
         entries:
         - cidrs:
@@ -52,9 +50,6 @@ spec:
           - ::/0
         protocol: any
         resolution: frozen
-        maxEndpoints: 1
-      maxFrozenBytes: 8388608
-      maxConcurrentSnapshots: 1
     required: true
     impact: sensitiveRead
     limits:

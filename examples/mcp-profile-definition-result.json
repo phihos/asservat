@@ -9,7 +9,7 @@
       "name": "syscall-activity",
       "version": "v1"
     },
-    "definition_digest": "d372b62bd29c56632939a153dd90da0cbd51bc759f43adea7bf123223d29e180",
+    "definition_digest": "b5a35dd38ab406069c3167e40fcfdb2eebb7274d7c0a6ec4f78ac2c419b4d614",
     "definition": {
       "displayName": "System calls of all pod processes",
       "description": "Bounded syscall metadata from all current and new pod processes; no user-memory reads.",
@@ -31,13 +31,8 @@
               "ring": {
                 "maxAge": "30s",
                 "maxBytes": 8388608,
-                "segmentBytes": 2097152,
-                "maxSegments": 4,
-                "medium": "memory"
+                "segments": 4
               },
-              "maxFrozenBytes": 16777216,
-              "maxConcurrentSnapshots": 1,
-              "maxEvents": 100000,
               "maxEventsPerSecond": 10000,
               "maxTrackedThreads": 4096
             },
@@ -73,11 +68,6 @@
           "actionID": "syscalls",
           "field": "syscallRing",
           "label": "Ring allocation"
-        },
-        {
-          "actionID": "syscalls",
-          "field": "syscallMaxEvents",
-          "label": "Retained event limit"
         },
         {
           "actionID": "syscalls",

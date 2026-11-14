@@ -14,7 +14,7 @@ spec:
     workloadUID: workload-ledger-uid
     captureUID: 00000000-0000-4000-8000-000000000047
     executionDigest: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-    recipeDigest: ce39ee32ecc31bd8361a3d971239e033a19acba73bcc916580f4bbea7d7aee0c
+    recipeDigest: c317408224ce37c521fa52735de3e3ec79198eb0c56cd2c8dedf120bcc858e19
   operations:
   - packetCapture
   reason: Review this one accepted capture before its original deadline.

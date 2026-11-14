@@ -54,17 +54,11 @@
               "default": 32768,
               "description": "Common HTTP server header limits (nginx large_client_header_buffers 4 \u00d7 8 KiB) bound one request header block."
             },
-            "maxReassemblyBytesPerFlow": {
-              "type": "integer",
-              "minimum": 1,
-              "default": 65536,
-              "description": "Default 2 \u00d7 maxHeaderBytes, so one complete header block plus its segment overlap fits."
-            },
             "maxReassemblyBytes": {
               "type": "integer",
               "minimum": 1,
               "default": 16777216,
-              "description": "Per-target reassembly memory budget; tracked flows = maxReassemblyBytes \u00f7 maxReassemblyBytesPerFlow; the default 16 MiB is derived from the node collector memory limit together with the ring and frozen budgets."
+              "description": "Per-target reassembly memory budget; per-flow reassembly is 2 \u00d7 maxHeaderBytes, so tracked flows = maxReassemblyBytes \u00f7 (2 \u00d7 maxHeaderBytes); the default 16 MiB is derived from the node collector memory limit together with the ring budget."
             }
           },
           "required": [
@@ -72,7 +66,6 @@
             "protocol",
             "projectionRef",
             "maxHeaderBytes",
-            "maxReassemblyBytesPerFlow",
             "maxReassemblyBytes"
           ]
         },
@@ -149,35 +142,19 @@
           "minimum": 1,
           "maximum": 9007199254740991
         },
-        "segmentBytes": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 9007199254740991
-        },
-        "maxSegments": {
+        "segments": {
           "type": "integer",
           "minimum": 2,
           "maximum": 9007199254740991,
-          "description": "Derived bound: ring maxBytes \u00f7 segmentBytes; at least 2 so the ring can rotate."
-        },
-        "medium": {
-          "enum": [
-            "memory",
-            "encryptedDisk"
-          ]
-        },
-        "storageProfileRef": {
-          "type": "string",
-          "minLength": 1
+          "description": "Segment count; segment size is maxBytes \u00f7 segments. At least 2 so the ring can rotate; evicting one segment drops 1/segments of history."
         }
       },
       "required": [
         "maxAge",
         "maxBytes",
-        "segmentBytes",
-        "maxSegments",
-        "medium"
-      ]
+        "segments"
+      ],
+      "description": "In-memory ring; a saved window copies at most maxBytes. The collector memory formula (specs/packets.md REQ-NET-003) bounds all rings on a node."
     },
     "peers": {
       "type": "object",
@@ -347,31 +324,14 @@
             "frozen",
             "follow"
           ]
-        },
-        "maxEndpoints": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 9007199254740991
         }
       },
       "required": [
         "entries",
         "protocol",
-        "resolution",
-        "maxEndpoints"
-      ]
-    },
-    "maxFrozenBytes": {
-      "type": "integer",
-      "minimum": 1,
-      "maximum": 9007199254740991,
-      "description": "At most the ring maxBytes; derived from the node collector memory/scratch allocation (budget node maxFrozenBytes), not a fixed constant."
-    },
-    "maxConcurrentSnapshots": {
-      "type": "integer",
-      "minimum": 1,
-      "maximum": 9007199254740991,
-      "description": "Bounded by the node frozen byte budget (node maxFrozenBytes \u00f7 ring maxBytes) and the trigger rate limits."
+        "resolution"
+      ],
+      "description": "Peer generations are bounded only by the compiled program limit (BPF_MAXINSNS 4096)."
     }
   },
   "required": [
@@ -379,8 +339,6 @@
     "before",
     "after",
     "ring",
-    "peers",
-    "maxFrozenBytes",
-    "maxConcurrentSnapshots"
+    "peers"
   ]
 }

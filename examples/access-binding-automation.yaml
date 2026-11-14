@@ -21,4 +21,3 @@ spec:
     - liveCore
     - runtimeDiagnostic
     - command
-    maxBytes: 1099511627776

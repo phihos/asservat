@@ -19,7 +19,7 @@
   "collector": {
     "version": "0.0.0-spec-example",
     "imageDigest": "2222222222222222222222222222222222222222222222222222222222222222",
-    "recipeDigest": "04448c6faf2374ef3097ace4526fded6dcd152a15f62f74f35656551acf2f4a7"
+    "recipeDigest": "c0ddc097372946fe11cab47935350fdf0d4132187194f67bdd0ec1e8a2f25482"
   },
   "startedAt": "2026-10-09T11:59:45Z",
   "completedAt": "2026-10-09T12:00:05Z",
@@ -92,7 +92,7 @@
   "collectionProvenance": {
     "captureUID": "00000000-0000-4000-8000-000000000190",
     "actionID": "traffic",
-    "planDigest": "b514e8e20fa380a9af045442ed2e34c4c7ee7aecce680acb8dab14591339517c"
+    "planDigest": "1fd92b770f6f2d00082f53b224f1ab5b896942177227ab330bb2e2e98064b2f4"
   },
   "actionLifecycle": {
     "executionMode": "ongoing",
@@ -108,7 +108,7 @@
     "windowCoverage": "full",
     "recordingSaveOrigin": {
       "policyUID": "policy-trigger-lifecycles-uid",
-      "policyExecutionDigest": "e04b02717320c8c56bf762d6faa45edcaa7996b6af23690130fdcf3c0cbd7f25"
+      "policyExecutionDigest": "0a9895762b93d04fd91252df40bfb756a1eb9a535660c4cbbed2cc97686275e0"
     }
   }
 }

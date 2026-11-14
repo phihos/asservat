@@ -1,12 +1,10 @@
 # Public interface design
 
-The [interface inventory](../docs/interfaces/README.md), [OpenAPI](../docs/interfaces/browser-openapi.yaml), [operation registry](../docs/interfaces/operations.yaml) and [MCP workflow guide](../docs/interfaces/mcp-workflows.md) describe outward boundaries. These are design artifacts, not a deployed service.
+The [interface inventory](../docs/interfaces/README.md), [OpenAPI](../docs/interfaces/browser-openapi.yaml), [operation registry](../docs/interfaces/operations.yaml) and [MCP workflow guide](../docs/interfaces/mcp-workflows.md) describe the outward boundaries.
 
 ## REQ-INT-001 — Shared domain behavior and explicit transports
 
-Map browser and MCP operations to the same authenticated application services. Reuse canonical MCP input/output schemas for shared operations; human review and operator operations have separate bounded contracts. Keep HTML routes, OAuth, Kubernetes, Alertmanager, CloudEvents, health/metrics and connector interfaces explicitly documented with audiences, versioning and trust boundaries. No generic shell/SQL/Kubernetes proxy is added. Authenticated native evidence downloads are required under [artifact downloads](artifact-downloads.md); anonymous or bearer-only file access remains prohibited.
-
-Browser and MCP use one shared application assembly. Previews, submission, case navigation, download preparation and Stop go through the same owning services in both transports.
+Browser and MCP MUST call the same application services through one assembly; shared operations reuse the canonical MCP input/output schemas. Human review and operator operations have their own contracts. HTML routes, OAuth, Kubernetes, Alertmanager, CloudEvents, health/metrics and connector interfaces are documented with audience, versioning and trust boundary. There is no generic shell, SQL or Kubernetes proxy. Native downloads are authenticated ([artifact downloads](artifact-downloads.md)); anonymous or bearer-only file access is prohibited.
 
 ### SC-INT-001
 
@@ -14,7 +12,7 @@ Given equivalent browser and MCP requests, when current scope/permissions/limits
 
 ## REQ-INT-002 — Configuration and human authority
 
-Administrator permission/retention/budget configuration writes remain Kubernetes-only. Browser drafts/preview/export do not create a second authority. Authenticated maintainer submission is restricted to reviewed configuration kinds and existing provenance/current-rights rules. Review decisions require independent human authority, with step-up re-authentication only where the installation enables it (off by default, [ADR-335](../docs/decisions/335-usable-by-default.md) D5); no MCP tool approves grants. Connectors authenticate with their projected ServiceAccount token to the hub's one HTTPS endpoint (ADR-334); no bootstrap token appears in a response body or command history.
+Permission, retention and budget configuration is written only through Kubernetes; browser drafts and previews create no second authority. Maintainer submissions are limited to reviewed configuration kinds. Review decisions need an independent human ([authorization](authorization.md)); no MCP tool approves.
 
 ### SC-INT-002
 
@@ -22,7 +20,13 @@ Given a permission editor draft or an agent attempting review, when it submits t
 
 ## REQ-INT-003 — Bounded errors, retries and asynchronous work
 
-Paginate or stream list-shaped results; specify a byte or time limit only together with its reason. Specify authenticated cursors, idempotency keys, expected revisions and cancellation semantics. Shared operations preserve MCP result envelopes; transport/console failures use safe problem details with stable domain codes. Before visibility is established, avoid existence oracles. A retry with the same idempotency key returns the original operation; changing the body under a key conflicts. Authorize each operation once and reuse the decision for at most `identity.AuthorityRecheckInterval` (30 s, maintainer decision) and never past its original deadline ([ADR-311](../docs/decisions/311-operation-authority-recheck.md)). Status reads wait server-side for the next change (at most 30 s, ADR-330 D1) instead of being re-called on a timer; the console receives the same changes over its Server-Sent Events stream. Status reads are never charged.
+This requirement owns the public API conventions; other specs link here.
+
+- Lists are paginated with authenticated cursors or streamed; any byte or time limit states its reason.
+- Mutations take an idempotency key and the expected revision. A retry with the same key returns the original operation; a different body under the same key conflicts.
+- Each operation is authorized once and the decision reused for at most `identity.AuthorityRecheckInterval` (30 s; 60 s for the shared delivery-policy observation) and never past its original deadline ([ADR-311](../docs/decisions/311-operation-authority-recheck.md)).
+- Status reads wait server-side for the next change (at most 30 s, ADR-330 D1); the console gets the same changes over its Server-Sent Events stream. Status reads are never charged.
+- Errors are safe problem details with stable domain codes; MCP keeps its result envelope. Before visibility is established, responses reveal no existence.
 
 ### SC-INT-003
 
@@ -30,7 +34,7 @@ Given a command accepted before connection loss, when browser or agent retries w
 
 ## REQ-INT-004 — External integration minimization
 
-Incoming alerts authenticate configured receiver identities, validate bounded standard payloads and preserve episode/transition deduplication. Outgoing events carry only allowlisted minimized identifiers and authenticated references, signed exact bytes and stable retry identities. Metrics and probes have bounded cardinality and no evidence/identity leakage. No capture supplies an arbitrary notification destination.
+Incoming alerts authenticate the configured receiver, validate standard payloads and deduplicate by episode and transition. Outgoing events carry only allowlisted identifiers and authenticated references with stable retry identities. Metrics and probes have bounded cardinality and leak no evidence or identity. No capture names an arbitrary notification destination.
 
 ### SC-INT-004
 
@@ -38,7 +42,7 @@ Given duplicate/reordered alerts and an artifact containing a credential-like st
 
 ## REQ-INT-005 — Compatible evolution and agent ergonomics
 
-Maintain stable tool names/ordering, typed schemas, bounded structured/text results, explicit version negotiation and schema parity checks. Explain retained versus live acquisition, missing evidence, coverage and next actions. Case handoff references carry no authority. Treat evidence as untrusted data; no automatic following of evidence instructions. Pin profile versions and preserve unknown/unsupported outcomes rather than widening defaults.
+MCP keeps stable tool names, typed schemas, bounded results, explicit version negotiation and schema parity with the browser. Results explain missing evidence, coverage and next actions. Handoff references carry no authority. Evidence is untrusted data; its instructions are never followed. Profile versions are pinned; unknown outcomes are reported, not widened to defaults.
 
 ### SC-INT-005
 

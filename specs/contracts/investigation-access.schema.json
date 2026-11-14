@@ -124,39 +124,6 @@
         "digest"
       ]
     },
-    "origin": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "parentGrantID": {
-          "type": "string",
-          "format": "uuid"
-        },
-        "captureUID": {
-          "type": "string",
-          "format": "uuid"
-        },
-        "executionDigest": {
-          "type": "string",
-          "pattern": "^[a-f0-9]{64}$"
-        },
-        "resultAccessDigest": {
-          "type": "string",
-          "pattern": "^[a-f0-9]{64}$"
-        },
-        "actionID": {
-          "type": "string",
-          "minLength": 1
-        }
-      },
-      "required": [
-        "parentGrantID",
-        "captureUID",
-        "executionDigest",
-        "resultAccessDigest",
-        "actionID"
-      ]
-    },
     "status": {
       "type": "object",
       "additionalProperties": false,

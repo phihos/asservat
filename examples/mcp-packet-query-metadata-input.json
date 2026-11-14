@@ -8,5 +8,5 @@
     "source_port"
   ],
   "packet_filter": "tcp port 80",
-  "max_packets": 100
+  "limit": 100
 }

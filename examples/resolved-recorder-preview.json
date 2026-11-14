@@ -113,7 +113,7 @@
     "resolvedProfiles": [
       {
         "componentID": "net",
-        "definitionDigest": "7c8bf05f4f6c650499e61c033d33043377cb246bfbce3e12d3188220497cf882",
+        "definitionDigest": "82a0c9a7eb8a530dffd3462dcbe61aef2b5c0f163543136ef6b4fc68e9268afb",
         "profileRef": {
           "catalog": "builtin",
           "name": "network-connections",
@@ -137,8 +137,6 @@
           "after": "15s",
           "before": "30s",
           "filter": "tcp port 8080 and host 10.0.0.12",
-          "maxConcurrentSnapshots": 1,
-          "maxFrozenBytes": 16777216,
           "peers": {
             "entries": [
               {
@@ -148,7 +146,6 @@
                 ]
               }
             ],
-            "maxEndpoints": 1,
             "protocol": "any",
             "resolution": "frozen"
           },
@@ -158,9 +155,7 @@
           "ring": {
             "maxAge": "30s",
             "maxBytes": 16777216,
-            "maxSegments": 4,
-            "medium": "memory",
-            "segmentBytes": 4194304
+            "segments": 4
           }
         },
         "required": true
@@ -171,8 +166,8 @@
     "maxTotalBytes": 16777216
   },
   "recipeRef": {
-    "digest": "c0555c7b6a2c9cc5f0908d8eb3f48e1ab32bb76725f812004e24680749c19458",
-    "name": "composition-c0555c7b6a2c9cc5f0908d8e"
+    "digest": "91dfebd47db376df50bc7f43b6c34a72bdd4857da2434ca02f789adc387224a7",
+    "name": "composition-91dfebd47db376df50bc7f43"
   },
   "schemaVersion": "recorder-preview/v1",
   "source": {

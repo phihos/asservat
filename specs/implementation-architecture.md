@@ -1,59 +1,35 @@
 # Implementation architecture boundaries
 
-The [architecture package](../docs/architecture/README.md) maps the accepted product to applications, components, modules and internal interfaces. It refines the existing behavior; it does not authorize production deployment or waive qualification gates.
+The [architecture package](../docs/architecture/README.md) maps requirements to applications, components and internal interfaces. `make architecture-check` verifies that every requirement in [traceability](traceability.yaml) and every domain entity has one owning component and that dependencies follow the declared rules. Feature behavior stays in the feature specs: receiver deduplication in [federation](federation.md), unknown outcomes and recovery in [persistence](persistence.md).
 
 ## REQ-ARC-001 — Explicit runtime authority
 
-Each scheduled role MUST have a defined entry point, image/tool set, service identity, network/storage privileges, lifecycle and scaling owner. Share source code and a role-selecting Go binary where appropriate, while retaining separate hub, node collector, regional reader and analyzer authority. The regional reader (A-READ) is a long-running, horizontally scaled Deployment that serves native downloads and stored-evidence queries and verifies committed artifacts for publication under one identity; there is no Job per download or query. Offline analysis keeps its separate acquisition, analyzer and publication Jobs ([ADR-330](../docs/decisions/330-event-driven-system-design.md) D4). hub-api and hub-worker run replicated by default (rolling updates; one leader-elected hub-worker with a standby, ADR-335 D13), so an upgrade or a node loss does not stop the console or reconciliation. Node control is collector-initiated to the local connector; the hub cannot require inbound node access or workload kubeconfigs. Evidence-bearing caches remain within approved regional boundaries. Optional capabilities degrade independently.
+Each scheduled role MUST have a defined entry point, image, ServiceAccount, network/storage privileges and scaling owner; one role-selecting Go binary is allowed. Hub, node collector, regional reader and analyzer keep separate authority. The regional reader is a long-running, scaled Deployment serving downloads, stored-evidence queries and publication verification; offline analysis keeps separate acquisition, analyzer and publication Jobs ([ADR-330](../docs/decisions/330-event-driven-system-design.md) D4). hub-api runs replicated with rolling updates and hub-worker is leader-elected with a standby (ADR-335 D13). Node collectors connect to their local connector; the hub needs no inbound node access or workload kubeconfig. Optional capabilities fail independently.
 
 ### SC-ARC-001
 
 Given a control-plane-only install and an analysis-enabled cluster, when their manifests are generated, then the control roles have no CRI/raw unwrap authority, the analyzer has no network/service token and receives its input only through qualified encrypted scratch (ADR-036). Missing analysis qualification does not disable authorized context reads.
 
-## REQ-ARC-002 — One lifecycle owner and enforceable dependencies
+## REQ-ARC-002 — One owner and enforceable dependencies
 
-Maintain the architecture catalog with one primary component owner per domain entity and requirement, application composition, planned package families and explicit allowed dependencies. Domain types are distinct from SQL rows, Kubernetes objects and transport DTOs. Application services depend on typed consumer-owned ports, never concrete persistence/transport/collector adapters. Cross-component transactions use narrow facets in the canonical lock order. Facets are Go interfaces, not database roles or connection pools: a process uses one SQL login and one pool (REQ-DB-004). No component obtains a generic database or Kubernetes handle through an escape hatch. Only composition roots wire concrete implementations.
+The architecture catalog MUST name one owning component per domain entity and requirement, and the allowed dependencies. Application services depend on consumer-owned ports, never on concrete persistence, transport or collector adapters; only composition roots wire implementations. Cross-component transactions use narrow Go interfaces in the canonical lock order; a process uses one SQL login and one pool (REQ-DB-004).
 
 ### SC-ARC-002
 
 Given a change that adds an entity, imports a concrete adapter into an application service, or creates a component dependency cycle, when design/code architecture checks run, then missing ownership or the invalid dependency fails. Legitimate multi-owner-row admission is a declared transaction with named participating facets, not independent per-component commits.
 
-## REQ-ARC-003 — Bounded versioned internal contracts
+## REQ-ARC-003 — Versioned internal contracts
 
-Internal network/IPC contracts MUST identify peers, supported versions/capabilities, exact purpose, operation ID, source/target and scope digest, deadline, fence and bounded outcomes. Authority stays server-side and is referenced by operation ID, not copied into each message. Strict schemas reject unknown required semantics; negotiated versions do not reinterpret an accepted plan. Control work carries minimized references rather than evidence or arbitrary command strings. Transient live batches have separate privacy/size/expiry rules and never enter a durable control outbox. HTTP/IPC message caps apply before decompression or allocation can escape the memory budget; each cap is the largest legitimate message (a pushed Kubernetes object is at most 1.5 MiB, command frames 64 KiB, data frames 1 MiB), and evidence bytes travel as streamed chunks.
+Internal messages MUST carry purpose, operation ID, target, plan digest and deadline, and negotiate versions; authority stays on the hub and is referenced by operation ID. Unknown required fields are rejected; a negotiated version never reinterprets an accepted plan. Control messages carry references, never evidence or arbitrary command strings. Size caps apply before decompression or allocation (frame sizes: [bounds](apis.md#bounds-in-the-contracts)); evidence travels as streamed chunks. Live rows never enter the durable work outbox.
 
 ### SC-ARC-003
 
 Given an older connector, an unexpected work purpose, a live projection disguised as a capture, or an over-limit body, when decoding/negotiation occurs, then execution is rejected before side effects. A supported N/N-1 peer receives only compatible schemas and preserves operation identity across retries.
 
-## REQ-ARC-004 — Receiver deduplication and effect fencing
-
-Separate work identity (`workID`, `operationID`), individual start identity and evidence commit. The receiving executor MUST persist the authorized start disposition before an intrusive effect; hub retries resend that same identity and the receiver deduplicates against it. Unknown starts stay Indeterminate and charged until the collector reports their outcome or the node's boot ID changes (resolved by operation ID, ADR-330 D7; no time limit). No effect is executed inside a retried SQL callback. Natural cores spend from the connector's local budget without synchronous remote preparation.
-
-### SC-ARC-004
-
-Given the response is lost immediately after a dump starts and then the connector restarts, when the hub resends the work after reconnect, then the start identity is unchanged and no second dump occurs. If the original result cannot be established, it remains Indeterminate; resending does not refund capacity.
-
 ## REQ-ARC-005 — Qualified collector and analyzer extension ports
 
-An adapter MUST declare action kinds, lifecycle modes, environment prerequisites, supported projections, process/target binding, impact/data classification, resource dimensions, cancellation and partial-output semantics. Acquisition requires framework-validated execution authority and bounded output writers. Ongoing sources expose separate arm/snapshot/stop/live operations; save-only dispatch cannot call onTrigger acquisition. No dynamic user-supplied plugin, generic host exec, raw live projection or unconstrained tool output interface. New mechanisms require contract fixtures, isolation tests and qualified impact/loss evidence before advertising readiness.
+An adapter MUST declare action kinds, lifecycle modes, prerequisites, projections, target binding, impact and data class, resources, cancellation and partial-output behavior. Ongoing sources expose separate arm, snapshot, stop and live operations; a save cannot invoke on-trigger acquisition. No user-supplied plugin, generic host exec or unconstrained tool output. A new mechanism needs contract fixtures, isolation tests and measured impact before it reports ready.
 
 ### SC-ARC-005
 
 Given a new profiling or tracing adapter, when it is registered, then unsupported modes/projections fail validation, a preview performs no acquisition, and timeout/target loss yields bounded partial or unavailable output. A recording-save request reaches only the existing-source snapshot port and cannot invoke a dump or command adapter.
-
-## REQ-ARC-006 — Failure, resource and privacy ownership
-
-Every critical runtime flow MUST assign the next transition, retry policy, residual charge/copy, current-rights check and deletion obligation to a component. Preserve separate installation/workload/node budgets, protected snapshot priority over live delivery, denial/cleanup during outages and bounded connector local budgets (capture-storm protection). Expose recovery state and gaps. Database restore must not revive past approvals or watches; the relevant charge is released when the object store or volume confirms deletion.
-
-### SC-ARC-006
-
-Given hub/database failure and saturated live readers during a triggered save, when the system degrades, then local work under the connector's local budget and local deletion remain bounded, live delivery sheds before protected saving, expired reads are denied and reservations or copies with an unknown outcome remain tracked by operation ID until resolved. Recovery revalidates authority instead of trusting restored cache state.
-
-## REQ-ARC-007 — Traceable implementation slices
-
-Each implementation slice MUST identify owned components, existing requirements/tasks, interfaces and observable acceptance/fault tests. The first end-to-end slice includes authorized bounded collection, encrypted evidence, approved UI/MCP retrieval, expiry and verified deletion. Subsequent slices preserve the same services and state authority; feasibility spikes may reject an adapter without creating a parallel production path. Keep documentation checks, simulated contract checks and real runtime qualification results distinct.
-
-### SC-ARC-007
-
-Given an agent implements a slice, when its handoff is reviewed, then component ownership and dependency rules locate the change, API/contract examples agree, required negative/failure checks are reported with actual results, and no successful static validator is presented as proof of runtime security or performance.

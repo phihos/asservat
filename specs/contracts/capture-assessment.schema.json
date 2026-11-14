@@ -653,11 +653,9 @@
         },
         "deletionState": {
           "enum": [
-            "scheduled",
-            "inProgress",
+            "pending",
             "verified",
             "overdue",
-            "unknown",
             "restrictedPreservation"
           ]
         },

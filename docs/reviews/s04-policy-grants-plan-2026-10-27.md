@@ -118,7 +118,7 @@ new kind; policy grants get no invented preview or personal continuation action.
 ## Lifetime and current settings
 
 Reuse the protected installation settings/cache and canonical
-[approval-policy fields](../../specs/contracts/approval-policy.schema.json), not a
+approval-policy fields (since inlined as identity-settings `approvals.policyGrants`), not a
 new watcher, provider credential or configuration service. Proposed initial values
 match the existing example: seven-day default, thirty-day maximum, one-day renewal
 notice; the configurable upper bound remains 365 days. These defaults are an

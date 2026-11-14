@@ -65,9 +65,7 @@ spec:
       ring:
         maxAge: 30s
         maxBytes: 16777216
-        segmentBytes: 4194304
-        maxSegments: 4
-        medium: memory
+        segments: 4
       peers:
         entries:
         - podSelector:
@@ -78,9 +76,6 @@ spec:
         ports:
         - 5432
         resolution: frozen
-        maxEndpoints: 256
-      maxFrozenBytes: 67108864
-      maxConcurrentSnapshots: 1
     required: false
     impact: observe
     limits:

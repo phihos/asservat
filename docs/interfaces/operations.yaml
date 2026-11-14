@@ -15,22 +15,8 @@ operations:
   - mcp
   effect: read
   contract: specs/contracts/mcp-tools.json
-- operation: find_similar_cases
-  path: /api/v1/operations/find_similar_cases
-  transport:
-  - browser
-  - mcp
-  effect: read
-  contract: specs/contracts/mcp-tools.json
 - operation: list_artifacts
   path: /api/v1/operations/list_artifacts
-  transport:
-  - browser
-  - mcp
-  effect: read
-  contract: specs/contracts/mcp-tools.json
-- operation: get_timeline
-  path: /api/v1/operations/get_timeline
   transport:
   - browser
   - mcp
@@ -155,29 +141,8 @@ operations:
   - mcp
   effect: command
   contract: specs/contracts/mcp-tools.json
-- operation: get_target_discovery
-  path: /api/v1/operations/get_target_discovery
-  transport:
-  - browser
-  - mcp
-  effect: read
-  contract: specs/contracts/mcp-tools.json
-- operation: recommend_diagnostics
-  path: /api/v1/operations/recommend_diagnostics
-  transport:
-  - browser
-  - mcp
-  effect: read
-  contract: specs/contracts/mcp-tools.json
 - operation: list_capture_history
   path: /api/v1/operations/list_capture_history
-  transport:
-  - browser
-  - mcp
-  effect: read
-  contract: specs/contracts/mcp-tools.json
-- operation: get_capture_settings
-  path: /api/v1/operations/get_capture_settings
   transport:
   - browser
   - mcp

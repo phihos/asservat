@@ -757,11 +757,9 @@ entity_owners:
   CollectionCeiling: C-01
   EvidenceRetentionPolicy: C-01
   Principal: C-02
-  BrowserLogin: C-02
   BrowserSession: C-02
   AccessDecision: C-03
   AccessGrant: C-03
-  GrantReservation: C-03
   AudienceAssignment: C-03
   ClusterRegistration: C-04
   CapabilityReport: C-04
@@ -775,7 +773,6 @@ entity_owners:
   SourceSession: C-12
   SourceSnapshot: C-12
   LiveWatch: C-13
-  LiveBatch: C-13
   Artifact: C-14
   ArtifactParent: C-14
   ArtifactCopy: C-15
@@ -788,13 +785,10 @@ entity_owners:
   EvidenceShare: C-17
   SharingIntent: C-17
   ManagerAssignment: C-17
-  SharingRegistration: C-17
   SelectionApproval: C-17
   CapacityAccount: C-07
-  CapacityReservation: C-07
   AuditReference: C-08
   AnalysisRun: C-18
-  DeliveryWork: C-19
   InterfaceHelp: C-20
   ArtifactDownload: C-14
 requirement_owners:
@@ -942,13 +936,10 @@ requirement_owners:
   REQ-UI-003: C-20
   REQ-UI-004: C-20
   REQ-UI-005: C-20
-  REQ-UI-006: C-20
   REQ-UI-007: C-20
   REQ-DOM-001: C-24
   REQ-DOM-002: C-24
   REQ-DOM-003: C-24
-  REQ-DOM-004: C-24
-  REQ-DOM-005: C-24
   REQ-INT-001: C-20
   REQ-INT-002: C-20
   REQ-INT-003: C-20
@@ -963,10 +954,7 @@ requirement_owners:
   REQ-ARC-001: C-04
   REQ-ARC-002: C-24
   REQ-ARC-003: C-19
-  REQ-ARC-004: C-11
   REQ-ARC-005: C-23
-  REQ-ARC-006: C-15
-  REQ-ARC-007: C-24
   REQ-DLD-001: C-14
   REQ-DLD-002: C-03
   REQ-DLD-003: C-14

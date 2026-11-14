@@ -103,7 +103,7 @@
                     "burst",
                     "maxConcurrentActions"
                   ],
-                  "description": "Storm protection (maintainer decision, ADR-335 D8); administrator budget policies may only tighten it."
+                  "description": "Storm protection (maintainer decision, ADR-335 D8); the hub's capacity values bound it."
                 },
                 "retention": {
                   "type": "string",

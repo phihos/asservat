@@ -115,7 +115,7 @@
       ]
     },
     "approvals": {
-      "description": "Installation approval settings (ADR-249, ADR-335 D5). stepUp is optional and off by default; when set, approving additionally requires the token's signed acr to be one of acrValues and auth_time at most maxAgeSeconds old. requireRecordingApproval makes metadata packet/syscall recordings need the same individual approval as sensitive acquisitions (REQ-SYS-002).",
+      "description": "Installation approval settings (ADR-249, ADR-335 D5). stepUp is optional and off by default; when set, approving additionally requires the token's signed acr to be one of acrValues and auth_time at most maxAgeSeconds old.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -143,12 +143,30 @@
             "maxAgeSeconds"
           ]
         },
-        "requireRecordingApproval": {
-          "type": "boolean"
-        },
         "policyGrants": {
-          "$ref": "https://asservat.io/spec/v1/approval-policy.schema.json#/$defs/policyGrants",
-          "description": "Policy grant periods (ADR-335 D6). Omitted defaults: 90 days, renewed in place by an approver, maximum 365 days. An accepted lower maximum clamps earlier-issued grants from their original issuedAt; raising it does not extend them."
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "defaultAgeSeconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "default": 7776000
+            },
+            "maxAgeSeconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "default": 31536000
+            },
+            "renewalNoticeSeconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "default": 1209600
+            }
+          },
+          "description": "Policy grant periods (ADR-335 D6): administrator-set default (90 days), maximum (default 365 days) and renewal notice (default 14 days before expiry); an approver renews in place. An accepted lower maximum clamps earlier-issued grants from their original issuedAt; raising it does not extend them."
         }
       }
     }

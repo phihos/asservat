@@ -211,8 +211,7 @@
                   "rawPackets",
                   "httpHeaders",
                   "syscallArguments",
-                  "liveProfile",
-                  "recordingApprovalRequired"
+                  "liveProfile"
                 ]
               }
             },

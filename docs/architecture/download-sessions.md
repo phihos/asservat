@@ -12,14 +12,13 @@ C-14/C-07/C-08/C-21 contract for REQ-DLD-002–004 under
 immutable artifact/version, actor/client and absolute deadline. The request
 carries an idempotency key: a retry with the same key and request returns the
 existing session; a different request under the same key conflicts. States:
-Preparing, Ready, Streaming, Completed, Interrupted, Cancelled, Expired, Denied,
-Failed. Terminal states never restart.
+Ready, Completed, Failed and Cancelled ([REQ-DLD-003](../../specs/artifact-downloads.md));
+terminal states never restart.
 
-Preparation authorizes once ([ADR-311](../decisions/311-operation-authority-recheck.md)),
-then a regional reader verifies the artifact's encrypted manifest and returns its
-native metadata (filename, format, size, SHA-256, ETag, coverage). Before that
-metadata exists the session exposes none of it; Ready, Streaming and Interrupted
-expose the complete group. Evidence bytes, unwrap keys and tokens never enter SQL.
+Preparation authorizes once ([ADR-311](../decisions/311-operation-authority-recheck.md))
+and returns Ready with the native metadata (filename, format, size, SHA-256, ETag,
+coverage) from the verified catalog row. Evidence bytes, unwrap keys and tokens
+never enter SQL.
 
 ## Quotas
 
@@ -68,9 +67,9 @@ Each hub process uses its one SQL login (ADR-222). Table grants and triggers
 reject terminal revival, decreasing counters and rewritten scope; no process
 has database-owner or schema-creation rights.
 
-## Retention and recovery
+## Retention
 
 Catalog lookup and response start use the artifact's stored effective deletion
 deadline; a started response is cut off at that deadline
-([retention lifecycle](retention-lifecycle.md)). Effects compare the current
-database incarnation in their transaction ([download recovery](download-recovery.md)).
+([retention lifecycle](retention-lifecycle.md)). Restore runs with all
+workloads stopped ([persistence](../../specs/persistence.md)).

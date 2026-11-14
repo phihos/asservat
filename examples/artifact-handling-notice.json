@@ -7,7 +7,7 @@
   ],
   "expiresAt": "2026-10-09T17:55:00Z",
   "deleteBy": "2026-10-09T18:00:00Z",
-  "deletionState": "scheduled",
+  "deletionState": "pending",
   "automaticDeletion": true,
   "managedCopiesOnly": true,
   "externalCopiesRecallable": false,

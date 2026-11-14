@@ -5,7 +5,7 @@
   "status": "ok",
   "data": {
     "capture_id": "00000000-0000-4000-8000-000000000190",
-    "phase": "Finalizing",
+    "phase": "Running",
     "operation": "recordingSave",
     "navigation_uri": "https://asservat.example.invalid/captures/00000000-0000-4000-8000-000000000190"
   },

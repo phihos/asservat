@@ -6,7 +6,7 @@
   "data": {
     "kind": "recordingSavePreview",
     "operation": "recordingSave",
-    "plan_digest": "b514e8e20fa380a9af045442ed2e34c4c7ee7aecce680acb8dab14591339517c",
+    "plan_digest": "1fd92b770f6f2d00082f53b224f1ab5b896942177227ab330bb2e2e98064b2f4",
     "selected_recordings": [
       {
         "recording_handle": "recording-synthetic-traffic",
@@ -37,9 +37,6 @@
           },
           "continuesAfterCreatorLeaves": true,
           "notAfter": "2026-11-08T12:00:00Z",
-          "limits": {
-            "maxBytes": 1099511627776
-          },
           "state": "Ready",
           "reasonCodes": [],
           "ownerTeams": [
@@ -81,9 +78,6 @@
           },
           "continuesAfterCreatorLeaves": true,
           "notAfter": "2026-11-08T12:00:00Z",
-          "limits": {
-            "maxBytes": 1099511627776
-          },
           "state": "Ready",
           "reasonCodes": [],
           "ownerTeams": [
@@ -112,7 +106,7 @@
     "capture_assessment": {
       "schemaVersion": "capture-assessment/v1",
       "assessmentID": "00000000-0000-4000-8000-000000000193",
-      "planDigest": "b514e8e20fa380a9af045442ed2e34c4c7ee7aecce680acb8dab14591339517c",
+      "planDigest": "1fd92b770f6f2d00082f53b224f1ab5b896942177227ab330bb2e2e98064b2f4",
       "generatedAt": "2026-10-09T12:00:00Z",
       "basis": {
         "rulesDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",

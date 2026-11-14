@@ -23,16 +23,13 @@ spec:
               name: http-response-headers
               version: v1
             maxHeaderBytes: 32768
-            maxReassemblyBytesPerFlow: 65536
             maxReassemblyBytes: 16777216
           before: 30s
           after: 30s
           ring:
             maxAge: 30s
             maxBytes: 16777216
-            segmentBytes: 4194304
-            maxSegments: 4
-            medium: memory
+            segments: 4
           peers:
             entries:
             - cidrs:
@@ -40,9 +37,6 @@ spec:
               - ::/0
             protocol: tcp
             resolution: frozen
-            maxEndpoints: 1
-          maxFrozenBytes: 67108864
-          maxConcurrentSnapshots: 1
           filter: tcp port 8080
         required: true
         impact: sensitiveRead
@@ -63,12 +57,7 @@ spec:
           ring:
             maxAge: 30s
             maxBytes: 8388608
-            segmentBytes: 2097152
-            maxSegments: 4
-            medium: memory
-          maxFrozenBytes: 16777216
-          maxConcurrentSnapshots: 1
-          maxEvents: 100000
+            segments: 4
           maxEventsPerSecond: 10000
           maxTrackedThreads: 4096
         required: true
@@ -115,25 +104,6 @@ spec:
     - actionID: a5b186fa2f944fc675c96fcc2
       field: actionExecutionMode
       label: When recording starts
-    origins:
-    - componentID: http
-      profileRef:
-        catalog: builtin
-        name: http-headers
-        version: v1
-      definitionDigest: d7b6a10dd58b74c306f92b1c096330eec6392918741bc3f90f4b297cc62aea75
-    - componentID: calls
-      profileRef:
-        catalog: builtin
-        name: syscall-activity
-        version: v1
-      definitionDigest: d372b62bd29c56632939a153dd90da0cbd51bc759f43adea7bf123223d29e180
-    - componentID: context
-      profileRef:
-        catalog: builtin
-        name: process-context
-        version: v1
-      definitionDigest: a92029934333dcc497e760d5e38e6a369acc97d32b9a2dcf7098b03033228c9e
   availability:
     enabled: true
     deprecated: false

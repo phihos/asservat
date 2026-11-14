@@ -37,7 +37,7 @@ Point a policy at a Deployment, StatefulSet, or selected pods. Combine log patte
 | [Kubeshark comparison](research/kubeshark-comparison.md) | Verified overlap, automation capabilities and the broader evidence scope |
 | [Implementation architecture](architecture/README.md) | Applications, component/module ownership, internal protocols, failure walkthroughs and implementation slices |
 | [Architecture](architecture.md) | Central multi-cluster design, trust boundaries, storage and failure behavior |
-| [PostgreSQL reassessment](../specs/changes/postgresql-hub-state/proposal.md) | Accepted change: Kubernetes configuration, PostgreSQL hub state, object-store evidence |
+| [PostgreSQL reassessment (ADR-023)](decisions/README.md) | Accepted change: Kubernetes configuration, PostgreSQL hub state, object-store evidence |
 | [Technology choices](technology.md) | Selected stack, alternatives, dependency licences and no-call-home review |
 | [Small-deployment alternatives](research/small-deployments.md) | Researched internal identity/keys, bundled storage/database, backups, maintenance and migration recommendations |
 | [Build or reuse](architecture/build-or-reuse.md) | All 24 component responsibilities, reusable libraries/tools and integration risks |

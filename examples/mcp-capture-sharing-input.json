@@ -39,7 +39,7 @@
           "operations": [
             "get_case",
             "list_artifacts",
-            "get_backtrace"
+            "get_extract"
           ]
         },
         {

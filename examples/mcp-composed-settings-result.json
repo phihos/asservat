@@ -10,8 +10,8 @@
     "namespace_uid": "namespace-payments-uid",
     "accepted_at": "2026-10-09T12:00:00Z",
     "expires_at": "2026-10-16T11:55:00Z",
-    "settings_digest": "9045a6da3d54514f2581d24a0db3c9bc1b828f47ba98aa94d036e9db1ceaa1c0",
-    "original_execution_digest": "c0cb4537424bdd12e3c60a260d9088c9f7f09991d6b2f6475019ab3618ba1712",
+    "settings_digest": "302b324d0e335fc71cf9648b4e0df1b9755ed0560634409c66cf6acf1572aa01",
+    "original_execution_digest": "1629782a6fe3b18bd619917f8884f247a62b75f740dc1bf91ce6a82701e87ae1",
     "settings": {
       "target": {
         "namespace": "payments",
@@ -43,7 +43,6 @@
                   "version": "v1"
                 },
                 "maxHeaderBytes": 32768,
-                "maxReassemblyBytesPerFlow": 65536,
                 "maxReassemblyBytes": 16777216
               },
               "before": "30s",
@@ -51,9 +50,7 @@
               "ring": {
                 "maxAge": "30s",
                 "maxBytes": 16777216,
-                "segmentBytes": 4194304,
-                "maxSegments": 4,
-                "medium": "memory"
+                "segments": 4
               },
               "peers": {
                 "entries": [
@@ -65,11 +62,8 @@
                   }
                 ],
                 "protocol": "tcp",
-                "resolution": "frozen",
-                "maxEndpoints": 1
+                "resolution": "frozen"
               },
-              "maxFrozenBytes": 67108864,
-              "maxConcurrentSnapshots": 1,
               "filter": "tcp port 8080"
             },
             "required": true,
@@ -95,13 +89,8 @@
               "ring": {
                 "maxAge": "30s",
                 "maxBytes": 8388608,
-                "segmentBytes": 2097152,
-                "maxSegments": 4,
-                "medium": "memory"
+                "segments": 4
               },
-              "maxFrozenBytes": 16777216,
-              "maxConcurrentSnapshots": 1,
-              "maxEvents": 100000,
               "maxEventsPerSecond": 10000,
               "maxTrackedThreads": 4096
             },
@@ -156,7 +145,7 @@
       "dependency_pins": [
         {
           "role": "captureProfile",
-          "digest": "d7b6a10dd58b74c306f92b1c096330eec6392918741bc3f90f4b297cc62aea75"
+          "digest": "54af7964bb671e4e42030bdc9ed3a86dc45f55eae1a633652edec4a3e97c4e33"
         },
         {
           "role": "captureProfile",
@@ -164,7 +153,7 @@
         },
         {
           "role": "captureProfile",
-          "digest": "d372b62bd29c56632939a153dd90da0cbd51bc759f43adea7bf123223d29e180"
+          "digest": "b5a35dd38ab406069c3167e40fcfdb2eebb7274d7c0a6ec4f78ac2c419b4d614"
         },
         {
           "role": "collectionCeiling",
@@ -172,7 +161,7 @@
         },
         {
           "role": "recipe",
-          "digest": "c11a47381287eb3f45a959bbf6bb6f4a6e8478e1136e63ade0109b16baca9f11"
+          "digest": "0ffc91f675282d9f3af11fc19f156ea45d4bb158092e3ba802f252a7ca8b4e3d"
         },
         {
           "role": "retention",
@@ -226,7 +215,7 @@
               "name": "http-headers",
               "version": "v1"
             },
-            "definitionDigest": "d7b6a10dd58b74c306f92b1c096330eec6392918741bc3f90f4b297cc62aea75"
+            "definitionDigest": "54af7964bb671e4e42030bdc9ed3a86dc45f55eae1a633652edec4a3e97c4e33"
           },
           {
             "componentID": "calls",
@@ -235,7 +224,7 @@
               "name": "syscall-activity",
               "version": "v1"
             },
-            "definitionDigest": "d372b62bd29c56632939a153dd90da0cbd51bc759f43adea7bf123223d29e180"
+            "definitionDigest": "b5a35dd38ab406069c3167e40fcfdb2eebb7274d7c0a6ec4f78ac2c419b4d614"
           },
           {
             "componentID": "context",

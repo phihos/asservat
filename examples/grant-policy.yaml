@@ -14,7 +14,7 @@ spec:
     workloadUID: workload-ledger-uid
     recipeDigest: 5a5eff2029e270d2ec764af201abcb29dfaa0305071797ffca2ef784a788af43
     policyUID: policy-ledger-memory-uid
-    executionDigest: ea41cdb6aa97aa7c5aae6c7fcf53dddd6fca988cd184a4ded6dea4407b33045a
+    executionDigest: 7583ee2a26db5beb3caedb75a743ac3238c3139c27eb7cbf0b1f474c93c0a828
   operations:
   - runtimeDiagnostic
   - command
@@ -30,10 +30,7 @@ spec:
     clientID: asservat-browser
     identityType: human
   issuedAt: '2026-10-09T12:00:00Z'
-  approvalPolicyRef:
-    name: installation-default
-    digest: 246f445a9cc43ca1d064737e479adbfc7adc8407f7539046714aa672eac98d15
-    maxAgeSeconds: 15552000
+  maxAgeSeconds: 31536000
   policyAuthority:
     mode: team
     installationID: 00000000-0000-4000-8000-000000000098
@@ -49,12 +46,8 @@ spec:
       role: workload-maintainer
       basisKind: AccessBinding
       basisUID: binding-payments-automation
-      basisDigest: ac64b349471ddc2a142ef66c507dde8ec05005a91eb6dc43a55a553bf3a7f676
-      assignmentID: 00000000-0000-4000-8000-000000000097
     issuedAt: '2026-10-09T12:00:00Z'
     notAfter: '2026-11-08T12:00:00Z'
-    limits:
-      maxBytes: 1099511627776
   policyExecutor:
     issuer: urn:asservat:installation:00000000-0000-4000-8000-000000000098
     subject: policy:policy-ledger-memory-uid

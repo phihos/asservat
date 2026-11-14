@@ -5,7 +5,7 @@
   "status": "ok",
   "data": {
     "plan_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-    "execution_digest": "c0cb4537424bdd12e3c60a260d9088c9f7f09991d6b2f6475019ab3618ba1712",
+    "execution_digest": "1629782a6fe3b18bd619917f8884f247a62b75f740dc1bf91ce6a82701e87ae1",
     "pod_count": 1,
     "max_bytes": 100663296,
     "max_process_starts": 0,
@@ -60,7 +60,7 @@
             "name": "http-headers",
             "version": "v1"
           },
-          "definitionDigest": "d7b6a10dd58b74c306f92b1c096330eec6392918741bc3f90f4b297cc62aea75"
+          "definitionDigest": "54af7964bb671e4e42030bdc9ed3a86dc45f55eae1a633652edec4a3e97c4e33"
         },
         {
           "componentID": "calls",
@@ -69,7 +69,7 @@
             "name": "syscall-activity",
             "version": "v1"
           },
-          "definitionDigest": "d372b62bd29c56632939a153dd90da0cbd51bc759f43adea7bf123223d29e180"
+          "definitionDigest": "b5a35dd38ab406069c3167e40fcfdb2eebb7274d7c0a6ec4f78ac2c419b4d614"
         },
         {
           "componentID": "context",
@@ -144,7 +144,7 @@
     "capture_assessment": {
       "schemaVersion": "capture-assessment/v1",
       "assessmentID": "00000000-0000-4000-8000-000000000161",
-      "planDigest": "c0cb4537424bdd12e3c60a260d9088c9f7f09991d6b2f6475019ab3618ba1712",
+      "planDigest": "1629782a6fe3b18bd619917f8884f247a62b75f740dc1bf91ce6a82701e87ae1",
       "generatedAt": "2026-10-09T12:00:00Z",
       "basis": {
         "rulesDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",

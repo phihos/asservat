@@ -1,12 +1,6 @@
 # Processing and download environment
 
-[ADR-127](../decisions/127-current-processing-and-download-placement.md) separates deployment/client delivery policy from durable processing decisions. This composition belongs to C-03 ordinary authorization and C-15 privacy; it adds no second permission evaluator.
-
-## Delivery policy
-
-`download-environment.json` is a ConfigMap rendered by the Helm chart, closed by [its schema](../../specs/contracts/download-environment.schema.json); its size is bounded only by the Kubernetes ConfigMap limit (1 MiB). Each hub process reads it from a mounted file or a shared informer. The last valid revision stays in force until a newer valid revision replaces it (ADR-330 D1); an invalid update is rejected and logged, and the previous revision remains. The accepted revision and digest are logged.
-
-The policy selects, per region, which configured store/reader paths may deliver; it never restricts a client relative to its user (ADR-335). It may permit or remove a configured path; it cannot invent a reader, hub pool or processing location. Empty permitted sets deny.
+Reader, store and connector placement is static Helm configuration ([artifact downloads](../../specs/artifact-downloads.md)); there is no separate delivery-policy document. Processing decisions are SQL rows. This composition belongs to C-03 ordinary authorization and C-15 privacy; it adds no second permission evaluator.
 
 ## Processing restrictions
 
@@ -16,7 +10,7 @@ Each decision is one SQL transaction that updates the rule, checks the operator'
 
 ## Use in an operation
 
-`CurrentDownloadEnvironment` takes authorized `ContextDownloadEvidence` and the principal, and resolves delivery policy and processing state once per operation. Its result is part of the operation's `DownloadAuthority` and is reused under the same bounds ([download authorization](download-authority.md)). The SQL effect that starts a session or response reads the artifact's processing state in the same transaction and refuses a restricted artifact. Reader dispatch compares the selected store and region with the accepted path. The hub never unwraps artifact keys.
+`CurrentDownloadEnvironment` takes authorized `ContextDownloadEvidence` and the principal, and resolves processing state once per operation. Its result is part of the operation's `DownloadAuthority` and is reused under the same bounds ([download authorization](download-authority.md)). The SQL effect that starts a session or response reads the artifact's processing state in the same transaction and refuses a restricted artifact. The hub never unwraps artifact keys.
 
 A restriction blocks new sessions, metadata views and responses. A response that already started continues to its original bounds ([ADR-312](../decisions/312-started-downloads-run-to-original-bounds.md)); restriction never triggers another capture or grants replacement capacity.
 

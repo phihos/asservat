@@ -9,7 +9,7 @@
     "frame_prefix_hex"
   ],
   "packet_filter": "tcp port 80",
-  "max_packets": 100,
+  "limit": 100,
   "grant_id": "00000000-0000-4000-8000-000000000099",
   "frame_prefix": {
     "offset": 52,

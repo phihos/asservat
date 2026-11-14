@@ -145,8 +145,7 @@
             "Active",
             "Denied",
             "Revoked",
-            "Expired",
-            "Suspended"
+            "Expired"
           ]
         },
         "revision": {

@@ -81,29 +81,11 @@
     "ring": {
       "$ref": "https://asservat.io/spec/v1/packet-capture.schema.json#/properties/ring"
     },
-    "maxFrozenBytes": {
-      "type": "integer",
-      "minimum": 1,
-      "maximum": 9007199254740991,
-      "description": "At most the ring size; derived from the node collector memory allocation (budget node maxFrozenBytes)."
-    },
-    "maxConcurrentSnapshots": {
-      "type": "integer",
-      "minimum": 1,
-      "maximum": 9007199254740991,
-      "description": "Bounded by the node frozen byte budget and the trigger rate limits."
-    },
-    "maxEvents": {
-      "type": "integer",
-      "minimum": 1,
-      "maximum": 9007199254740991,
-      "description": "Optional finite event total for a manual or argument-mode trace (reviewed observation budget). Always-on recorders are bounded by maxEventsPerSecond and the ring, not a lifetime total (ADR-335 D6)."
-    },
     "maxEventsPerSecond": {
       "type": "integer",
       "minimum": 1,
       "maximum": 9007199254740991,
-      "description": "Reviewed observation rate; the shipped default is derived from measured per-node collector event throughput."
+      "description": "Reviewed observation rate; the shipped default is derived from measured per-node collector event throughput. With the ring, it bounds every trace; there is no lifetime event total (ADR-335 D6)."
     },
     "maxTrackedThreads": {
       "type": "integer",
@@ -138,8 +120,6 @@
     "syscalls",
     "result",
     "ring",
-    "maxFrozenBytes",
-    "maxConcurrentSnapshots",
     "maxEventsPerSecond",
     "maxTrackedThreads"
   ],

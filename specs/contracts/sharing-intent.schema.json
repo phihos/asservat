@@ -105,29 +105,19 @@
                 "items": {
                   "type": "string",
                   "enum": [
+                    "list_cases",
                     "get_case",
                     "list_artifacts",
-                    "get_timeline",
-                    "get_backtrace",
-                    "get_runtime_summary",
-                    "get_profile_summary",
-                    "get_pcap_summary",
-                    "get_zeek_log",
-                    "get_file_excerpt",
-                    "get_logs",
+                    "get_extract",
+                    "compare_profiles",
+                    "get_query_result",
                     "read_memory",
                     "debugger_command",
                     "pcap_query",
-                    "list_cases",
-                    "find_similar_cases",
-                    "compare_profiles",
-                    "get_query_result",
-                    "get_http_headers",
                     "syscall_query",
-                    "get_syscall_summary",
-                    "get_syscall_events",
                     "download_artifact"
-                  ]
+                  ],
+                  "description": "Current MCP tool names; raw operations use the grant vocabulary. get_extract views are further limited by the selected data classes."
                 },
                 "minItems": 1,
                 "uniqueItems": true
@@ -258,7 +248,6 @@
             "Active",
             "Draining",
             "Completed",
-            "Suspended",
             "Revoked",
             "Expired",
             "Denied"

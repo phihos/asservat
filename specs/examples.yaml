@@ -1,10 +1,4 @@
 examples:
-- file: examples/work-trust.json
-  schema: https://asservat.io/spec/v1/work-trust.schema.json
-- file: examples/local-start-logs.json
-  schema: https://asservat.io/spec/v1/local-start.schema.json
-- file: examples/local-start.json
-  schema: https://asservat.io/spec/v1/local-start.schema.json
 - file: examples/recipe-context.yaml
   schema: https://asservat.io/spec/v1/recipe.schema.json
 - file: examples/recipe-intrusive.yaml
@@ -74,10 +68,8 @@ examples:
   schema: https://asservat.io/spec/v1/retention-policy.schema.json
 - file: examples/recipe-pprof-template.yaml
   schema: https://asservat.io/spec/v1/recipe.schema.json
-- file: examples/storage-pool.yaml
-  schema: https://asservat.io/spec/v1/storage-pool.schema.json
-- file: examples/budget-policy.yaml
-  schema: https://asservat.io/spec/v1/budget-policy.schema.json
+- file: examples/capacity-values.yaml
+  schema: https://asservat.io/spec/v1/capacity.schema.json
 - file: examples/capture-with-sharing.yaml
   schema: https://asservat.io/spec/v1/capture.schema.json
 - file: examples/policy-with-sharing.yaml
@@ -106,8 +98,6 @@ examples:
 - file: examples/mcp-http-headers-result.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
   tool: get_extract
-- file: examples/approval-policy.yaml
-  schema: https://asservat.io/spec/v1/approval-policy.schema.json
 - file: examples/recipe-selected-process.yaml
   schema: https://asservat.io/spec/v1/recipe.schema.json
 - file: examples/recipe-packets-next.yaml
@@ -145,25 +135,25 @@ examples:
 - file: examples/recipe-inspect-protocols.yaml
   schema: https://asservat.io/spec/v1/recipe.schema.json
 - file: examples/mcp-discovery-input.json
-  input_tool: get_target_discovery
+  input_tool: get_extract
 - file: examples/mcp-recommend-input.json
-  input_tool: recommend_diagnostics
+  input_tool: list_diagnostics
 - file: examples/mcp-discovery-processes-result.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
-  tool: get_target_discovery
+  tool: get_extract
 - file: examples/mcp-discovery-flows-result.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
-  tool: get_target_discovery
+  tool: get_extract
 - file: examples/mcp-recommend-result.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
-  tool: recommend_diagnostics
+  tool: list_diagnostics
 - file: examples/mcp-recommend-processes-result.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
-  tool: recommend_diagnostics
+  tool: list_diagnostics
 - file: examples/mcp-history-input.json
   input_tool: list_capture_history
 - file: examples/mcp-capture-settings-input.json
-  input_tool: get_capture_settings
+  input_tool: get_capture
 - file: examples/mcp-repeat-preview-input.json
   input_tool: preview_capture
 - file: examples/mcp-history-result.json
@@ -171,7 +161,7 @@ examples:
   tool: list_capture_history
 - file: examples/mcp-capture-settings-result.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
-  tool: get_capture_settings
+  tool: get_capture
 - file: examples/mcp-repeat-preview-result.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
   tool: preview_capture
@@ -229,7 +219,7 @@ examples:
   schema: https://asservat.io/spec/v1/recorder-preview.schema.json
 - file: examples/mcp-composed-settings-result.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
-  tool: get_capture_settings
+  tool: get_capture
 - file: examples/recipe-trigger-lifecycles.yaml
   schema: https://asservat.io/spec/v1/recipe.schema.json
 - file: examples/policy-trigger-lifecycles.yaml
@@ -285,7 +275,7 @@ examples:
   schema: https://asservat.io/spec/v1/action-lifecycle.schema.json
 - file: examples/mcp-recording-save-settings-result.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
-  tool: get_capture_settings
+  tool: get_capture
 - file: examples/mcp-recording-save-history-result.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
   tool: list_capture_history
@@ -353,8 +343,6 @@ examples:
   schema: https://asservat.io/spec/v1/internal-work.schema.json
 - file: examples/grant-investigation.yaml
   schema: https://asservat.io/spec/v1/grant.schema.json
-- file: examples/grant-investigation-result.yaml
-  schema: https://asservat.io/spec/v1/grant.schema.json
 - file: examples/capture-investigation.yaml
   schema: https://asservat.io/spec/v1/capture.schema.json
 - file: examples/investigation-access.json
@@ -375,15 +363,11 @@ examples:
   schema: https://asservat.io/spec/v1/collection-scope.schema.json
 - file: examples/recipe-pod-status.json
   schema: https://asservat.io/spec/v1/recipe.schema.json
-- file: examples/retention-topology.json
-  schema: https://asservat.io/spec/v1/retention-topology.schema.json
 - file: examples/access-binding-automation.yaml
   schema: https://asservat.io/spec/v1/access-binding.schema.json
 
 - file: examples/browser-settings.json
   schema: https://asservat.io/spec/v1/browser-settings.schema.json
-- file: examples/submission-trust.json
-  schema: https://asservat.io/spec/v1/submission-trust.schema.json
 - file: examples/mcp-pod-status-diagnostics-input.json
   input_tool: list_diagnostics
 - file: examples/mcp-pod-status-diagnostics-result.json

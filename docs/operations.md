@@ -28,7 +28,7 @@ Maintain reviewed mechanism/qualification rule versions with capability data and
 
 ## Storm and capacity operations
 
-The chart renders the default pool and budget policy from `capacity.*` values (ADR-335 D2); further pools and policies are CRDs. The [sample pool](../examples/storage-pool.yaml) states only its 128 GiB capacity: system reserve and headroom default to 5 % each and workloads are allocated at enrollment. The [budget profile](../examples/budget-policy.yaml) protects 2 % and caps 10 % of the pool per workload and limits dumps to one episode per 15 minutes and two individual process starts per rolling hour. These are illustrative values requiring workload/backend qualification.
+Capacity is the hub's `capacity` Helm values (ADR-335 D2, [schema](../specs/contracts/capacity.schema.json)); there is no capacity CRD. The [sample values](../examples/capacity-values.yaml) state 128 GiB of evidence storage, protect 16 GiB and cap 32 GiB per workload, and limit dumps to one episode per 15 minutes. These are illustrative values requiring workload/backend qualification.
 
 Check byte and object reservations before acquisition; keep versions, multipart remnants and deletion-pending copies charged. Defaults preserve existing evidence and refuse new expensive capture when that workload fills its quota. Optional rolling deletion affects only its own eligible evidence. Never borrow another workload's protected allocation. Show physical/backend capacity separately from logical usage and refuse an unsupported isolation claim on best-effort storage.
 
@@ -111,7 +111,7 @@ Provide runbooks for primary loss, full disk, connection exhaustion, slow querie
 
 Team management setup reuses existing owner-group bindings. The UI shows creator and managing teams separately; group departures do not require per-share reassignment. Historical ownership changes remain explicit, and raw approval remains person-specific.
 
-Policy approval defaults/maxima live in protected installation configuration (`approvals.policyGrants`), not in maintainer requests; see the [approval settings example](../examples/approval-policy.yaml). Observation ceilings are separate from per-incident maxPods. All-replica monitoring reports coverage overflow before Ready; pod-wide fanout shares aggregate budgets. Provide a single readiness/expiry view covering observation, collection approval and independent future-sharing expiry.
+Policy approval defaults/maxima live in protected installation configuration (`approvals.policyGrants`), not in maintainer requests; defaults are 90 days, at most 365 days ([identity settings](../specs/contracts/identity-settings.schema.json)). Observation ceilings are separate from per-incident maxPods. All-replica monitoring reports coverage overflow before Ready; pod-wide fanout shares aggregate budgets. Provide a single readiness/expiry view covering observation, collection approval and independent future-sharing expiry.
 
 Storage/backup preflight checks REQ-PRV-008 residual horizons, not just finite TTL. Read-only preflight reports configuration inspection separately from synthetic deletion/failover verification. Text indexes initially use bounded memory with qualified swap/core exclusion; persistent caches require expiry-cohort qualification.
 

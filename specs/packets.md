@@ -1,14 +1,16 @@
 # Packet selection, rings and protocol evidence
 
-These requirements extend the Inspektor Gadget integration. They are planned capabilities with explicit qualification gates, not claims that an unmodified Gadget currently supplies all of them. See [source research](../docs/research/packet-capture-flexibility.md) and the [portable parameters contract](contracts/packet-capture.schema.json).
+These requirements extend the Inspektor Gadget integration; each capability is advertised only after its qualification gate passes. See [source research](../docs/research/packet-capture-flexibility.md) and the [parameters contract](contracts/packet-capture.schema.json).
 
 ## REQ-NET-001 — Composable bounded filters
 
-The accepted action fixes the authorized observation target, capture profile, peer query and optional `filter` using tcpdump/pcap-filter syntax. The effective selector is **authorized target AND resolved peers AND user filter AND administrator ceilings**. Peer entries are ORed within the peer query; optional transport/port constraints intersect that union. Empty resolution matches no peers; it never means all traffic. Peer discovery is limited by administrator-approved metadata/peer scopes; the picker lists only visible resources and unavailable hidden references return a generic unavailable result. Permission to observe the authorized target does not require ownership of every network peer, but it never authorizes attaching to that peer. Peer selection grants no right to read peer logs, files or memory or attach collectors to peer pods.
+The effective selector is **authorized target AND resolved peers AND user filter AND administrator ceilings**. Peer entries are ORed; optional transport/port constraints intersect that union. An empty peer resolution matches nothing, never all traffic. The peer picker lists only resources the caller may see. Selecting a peer grants no right to read its logs, files or memory or to attach a collector to it.
 
-Validate and compile the expression during preview using the exact pinned compiler/link type. The compiler runs on the hub ([ADR-243](../docs/decisions/243-packet-syscall-plans-in-preview.md)): a statically linked libpcap (pinned version) compiles the whitespace-normalized expression on a dead handle with link type `EN10MB` and snapshot length 65,535 (the IP total-length maximum). The previewed and accepted plan carries the resulting classic BPF program and its digest (SHA-256 over the instructions as little-endian `struct sock_filter`); the node runs that exact program on each captured frame and never compiles an expression ([ADR-248](../docs/decisions/248-manual-packet-capture.md): the published Inspektor Gadget tcpdump gadget delivers the Pod's frames and the collector evaluates the program in user space with `golang.org/x/net/bpf`, `len` against the original wire length; a program that evaluator cannot run exactly is refused at preview). Bounds: the compiled program has at most 4,096 classic-BPF instructions (`BPF_MAXINSNS`, the cBPF program limit; cBPF has no backward jumps, so per-frame cost is at most the program length). That compiled bound is authoritative. The expression text has no length cap; it is screened to at most 4,096 syntax tokens before libpcap, so hub compile work stays proportional to what the instruction bound can admit. The verifier/instruction limits of the qualified engine profile also apply. Reject unsupported syntax with the unsupported construct and remedy; do not silently broaden it. Do not resolve DNS names in filters; offer explicit IPs/CIDRs or Kubernetes refs. Because libpcap would resolve host, network, Ethernet and service names (and `gateway`) while compiling, every term that is not a supported primitive or a numeric, address, CIDR, MAC or port-range literal is refused before compilation, with one exception: a port name from the IANA well-known service table shipped with the release (for example `http`, `https`, `dns`/`domain`, `postgresql`) is rewritten to its number before compilation, without any lookup, and the preview shows the rewritten expression. No arbitrary BPF programs, shell tcpdump arguments, save-file paths, or unbounded protocol-offset inspection. A `proto[offset]` or `proto[offset:size]` access (size 1, 2 or 4) is screened like any other term. An access that ends within the fixed header of its protocol (`ether` 14, `ip` 20, `ip6` 40, `tcp` 20, `udp` 8, `icmp`/`icmp6` 8 bytes), such as a TCP flag test, needs only ordinary capture permission. An access beyond that header can test payload bytes even when retained output is sanitized: the plan records reason `rawBytePredicate` with REQ-AUT-006 observation limits in its execution digest, the preview reports `approval_required` with blocker `ApprovalRequired`, and nothing is armed until a current adHocCapture grant covers that exact plan ([ADR-249](../docs/decisions/249-sensitive-acquisition-grants.md)). The recorder runs such a plan only under the grant's observation limits.
+The optional `filter` uses tcpdump/pcap-filter syntax. The hub compiles it during preview ([ADR-243](../docs/decisions/243-packet-syscall-plans-in-preview.md)) with a statically linked, pinned libpcap on a dead `EN10MB` handle with snapshot length 65,535. The plan carries the classic BPF program and its SHA-256 digest; the node runs that exact program on each frame in user space (`golang.org/x/net/bpf`, [ADR-248](../docs/decisions/248-manual-packet-capture.md)) and never compiles. A program that evaluator cannot run exactly is refused at preview. The only bound is the compiled program: at most 4,096 instructions (`BPF_MAXINSNS`; cBPF has no backward jumps, so per-frame cost is at most the program length).
 
-Filter preview shows normalized expression, peer count, target interfaces, effective output, privacy class, estimated ring coverage and limits. Filter/profile changes create a new reviewed plan generation. A saved policy can follow changing members of the same authorized peer query without a new approval for each rollout; widening that query cannot reuse the old approval.
+libpcap resolves host, network, Ethernet and service names while compiling, so every term that is not a supported primitive or a numeric, address, CIDR, MAC or port-range literal is refused before compilation. One exception: a port name from the IANA table shipped with the release (`http`, `https`, `domain`, `postgresql`, …) is rewritten to its number without lookup, and the preview shows the rewritten expression. No arbitrary BPF programs, tcpdump arguments or save-file paths. A `proto[offset:size]` access that ends within the fixed header of its protocol (`ether` 14, `ip` 20, `ip6` 40, `tcp` 20, `udp` 8, `icmp`/`icmp6` 8 bytes) needs ordinary capture permission. An access beyond that header tests payload bytes, so the plan records `rawBytePredicate` and needs the same approval as raw packets ([ADR-249](../docs/decisions/249-sensitive-acquisition-grants.md)).
+
+A saved policy follows membership changes of its authorized peer query without new approval; changing the filter, profile or peer query is a new plan.
 
 ### SC-NET-001
 
@@ -16,25 +18,25 @@ Given a user filter includes `or host 203.0.113.9`, when combined with a databas
 
 ### SC-NET-007
 
-Given filters `host db.payments.svc`, `tcp port https`, `tcp[13] & 2 != 0` and `tcp[40:4] = 0x47455420`, when previewed, then the first is refused with its term and the remedy and does not reach libpcap, and the second is rewritten to `tcp port 443` from the shipped table and shown so in the preview; no name is resolved. The third compiles under ordinary permission. The fourth compiles into a plan that needs an approval and is refused with `ApprovalRequired` at submission until a covering grant exists. `ip6 and dst host 2001:db8::2` compiles on the hub, and the previewed plan carries its program digest; a different program yields a different execution digest.
+Given filters `host db.payments.svc`, `tcp port https`, `tcp[13] & 2 != 0` and `tcp[40:4] = 0x47455420`, when previewed, then the first is refused with its term and remedy without reaching libpcap, and the second is shown rewritten to `tcp port 443`; no name is resolved. The third compiles under ordinary permission. The fourth compiles into a plan that needs approval. A different program yields a different execution digest.
 
 ## REQ-NET-002 — Kubernetes peers and continuous updates
 
-Support IP/CIDR sets, pod label selectors, Pod, Deployment, StatefulSet and Service references in the target cluster. CIDR entries are compiled on the hub into the accepted program as `(peer expression) and (user filter)` with a recorded peer-set digest ([ADR-283](../docs/decisions/283-cidr-packet-peers.md)); for CIDRs `frozen` and `follow` are equivalent. Kubernetes entries are resolved by the target region's connector into (UID, IP) members whose host prefixes join the same expression; plans are previewed with their endpoint count and members digest. The connector resolves membership from one shared, label- and namespace-scoped informer set (Pods, EndpointSlices, ReplicaSets, StatefulSets, Services) and evaluates each running recording's peer query on informer events, not on a timer. Peers are authored by name; the connector resolves names to UIDs. In `follow` mode a peer deleted and recreated under the same name is the same peer, and its new members join as a new generation; in `frozen` mode the UIDs resolved at arming are pinned and a recreated peer is a recorded gap. Deployment ownership resolves through ReplicaSets, StatefulSets through controller UIDs, and Service endpoints through the union of all EndpointSlices with deduplication, address family and port mapping. Cluster/namespace identity is explicit in resolved state. Cross-cluster Service discovery is not inferred.
+Peers are IP/CIDR sets, pod label selectors, and Pod, Deployment, StatefulSet and Service references in the target cluster, authored by name. CIDRs compile on the hub into `(peer expression) and (user filter)` ([ADR-283](../docs/decisions/283-cidr-packet-peers.md)). Kubernetes entries are resolved by the cluster's connector from its shared informers (Pods, EndpointSlices, ReplicaSets, StatefulSets, Services) into (UID, IP) members whose host prefixes join the same program. Deployments resolve through ReplicaSets, StatefulSets through controller UIDs, Services through the union of their EndpointSlices. Cross-cluster Service discovery is not inferred.
 
-Service refs explicitly select `backends`, `virtualIP` or `both`. Default UI selection is backends, with a visible explanation. With socket-level load balancing (measured on Cilium kube-proxy replacement, docs/research/cni-qualification-cilium.md) the Pod interface carries backend addresses only, so `virtualIP` observes nothing there. Backend selection can match traffic to those endpoints arriving through a different Service. VIP visibility depends on CNI/NAT and hook position; reject an unavailable VIP profile rather than claim Service attribution. Include terminating/not-ready endpoints by default for diagnosis and record their conditions; an endpoint leaves the peer set when Kubernetes removes it from its EndpointSlice (an informer event, no timer); an explicit `readyOnly` choice can narrow them. ExternalName and selectorless Services require an administrator-approved external endpoint profile; never use them for arbitrary DNS/network discovery. Endpoint IP identity and stale/IP-reuse protection must be qualified for each network profile.
+Service references select `backends`, `virtualIP` or `both`; the UI defaults to backends and explains why. With socket-level load balancing (measured on Cilium kube-proxy replacement, docs/research/cni-qualification-cilium.md) the Pod interface carries backend addresses only, so `virtualIP` observes nothing there; an unavailable VIP profile is refused rather than claimed. Terminating and not-ready endpoints are included unless `readyOnly` is set. ExternalName and selectorless Services need an administrator-approved external endpoint profile.
 
-`resolution: frozen` pins membership at capture arming. When a member is deleted, changes its address, or its address now belongs to another object, the connector excludes that member with a new program generation and records the gap; the recording continues with the remaining members and never authorizes a new occupant of an old address. `follow` also admits new members of the same authorized peer query: each coalesced informer change yields a new generation. Authored entries and resolved members have no separate count limit: CIDRs and member host prefixes compile into the same accepted program, so a generation is bounded by the 4,096-instruction program limit (REQ-NET-001). A generation that does not compile within that limit fails closed for the affected membership and is recorded as a gap. The informer cache stays valid until the watch reports an error. During a watch break the last compiled program stays active and provenance records a membership-unknown gap; after the relist completes the connector compiles a fresh generation from the relisted state. Record generation activation times and gaps.
+`resolution: frozen` pins the members resolved at arming; a deleted or readdressed member is removed with a new program generation and a recorded gap, and a new occupant of an old address is never admitted. `follow` also admits new members of the same peer query; a peer recreated under the same name stays the same peer. Each informer change yields a new generation pushed to the node collector; there is no resolution polling. A generation is bounded only by the 4,096-instruction program limit; one that does not compile fails closed for the affected members and is recorded as a gap. During a watch break the last program stays active and provenance records a membership-unknown gap; after the relist a fresh generation is compiled. A quiet watch is healthy; bookmarks are not a freshness clock.
 
-Prepare maps and immutable filter generations, then switch the active reference on already attached capture hooks without restarting those hooks or discarding their rings. Retire old maps after in-flight readers drain. Per-hook activation is atomic, not instantaneous across every node; record generation ID/digest and activation interval per hook. No restart-induced gap is allowed for a healthy membership update, but attach delays on new pods, event-stream loss, queue overflow and other packet loss remain measured gaps. Preserve removed peers' already captured evidence under the original authorization and retention rules. This capability needs an Asservat adapter/custom packaged Gadget using the supported engine; lack of an upstream update RPC is not permission to advertise an untested seamless update.
+The collector switches generations on already attached hooks without restarting them or discarding their rings, and records each generation's activation interval per hook. Attach delays on new pods, event loss and packet loss remain recorded gaps. IP reuse and NAT make peer identity best-effort; Service VIP, backend IP and observed tuple are separate fields.
 
 ### SC-NET-002
 
-Given a Service backend rollout and an unrelated IP reuse while a capture is armed, when membership changes, then existing hooks continue with generation-tagged output and preserved rings. New target attach gaps and update lag are recorded, reused foreign IPs are excluded, and watch loss never broadens capture. Service backend matching is not reported as proof that a particular VIP was used.
+Given a Service backend rollout and an unrelated IP reuse while a capture is armed, when membership changes, then existing hooks continue with generation-tagged output and preserved rings. Attach gaps and update lag are recorded, reused foreign IPs are excluded, and watch loss never broadens capture. Backend matching is not reported as proof that a particular VIP was used.
 
 ## REQ-NET-003 — Bounded segmented rings and snapshots
 
-The simple preset uses a 30-second, 16 MiB per-target ring (editable defaults; collector memory grows with `maxBytes`) and a separate capture output limit. The collector's memory limit bounds all in-memory budgets on a node together:
+The simple preset uses a 30-second, 16 MiB per-target ring with four segments. The collector's memory limit bounds every in-memory budget on a node together:
 
 ```text
 aggregate ring bytes <= collector memory limit
@@ -43,57 +45,31 @@ aggregate ring bytes <= collector memory limit
                         - process overhead
 ```
 
-The chart's default collector memory request yields 256 MiB of aggregate ring per node; a larger limit yields more. [Actions](actions.md) use the same formula. Advanced `ring` settings expose `maxAge`, `maxBytes`, `segmentBytes`, `maxSegments` and `medium`. The baseline medium is memory; the optional encrypted-disk ring/spool is a separately qualified administrator storage profile, not a user path or default. The historical ring contains only the selected retained representation: sanitized packets, structured HTTP headers, or explicitly authorized raw packets.
+The chart's default collector memory request yields 256 MiB of aggregate ring per node. [Actions](actions.md) use the same formula. Rings are in memory and hold only the retained representation: sanitized headers, structured HTTP headers or authorized raw packets.
 
-`maxAge` has no built-in maximum: memory grows with bytes, not age, so `maxBytes` bounds cost; administrators may set a ceiling. All limits apply simultaneously: allocated segment count × segmentBytes <= maxBytes, actual storage including indexes/encryption/framing overhead <= maxBytes, and oldest record age <= maxAge and retention cutoff. Reserve one writable segment in that count; segment eviction can shorten history, and an oversized record is dropped/counts as loss. Rotation does not restart capture. `before` cannot exceed maxAge; achieved coverage is reported, never inferred from desired time. Presets choose four segments by default (eviction granularity: one segment loses 1/N of history, more segments add per-segment overhead); omission of advanced fields resolves them and displays the result.
+The ring is `maxBytes`, `segments` and `maxAge`. `maxBytes` bounds cost; each segment holds `maxBytes ÷ segments`, including framing and encryption overhead; one segment is always writable. `maxAge` has no built-in maximum and administrators may set a ceiling. Eviction of a segment drops 1/`segments` of history; an oversized record is dropped and counted as loss. `before` cannot exceed `maxAge`, and achieved history is reported, never inferred from the requested time.
 
-Frozen snapshots and live rings have separate reservations. Pinning a segment consumes frozen-snapshot capacity; replacement live segments still count toward node totals. Frozen/unuploaded bytes per target are at most that target's ring `maxBytes` (a snapshot pins at most one ring's worth) and together come out of the node's frozen budget in the formula above; snapshot frequency is bounded by the per-workload rate limit ([ADR-335](../docs/decisions/335-usable-by-default.md) D8), with no separate count of concurrent snapshots. On pressure, coalesce or refuse a new snapshot against the frozen byte budget before allocating memory; do not corrupt a previously accepted snapshot or silently exceed the ring bound. Upload bandwidth, durable bytes/object slots, parser buffers and ring memory are distinct budgets under [capacity](capacity.md). Sustained traffic or stalled S3 must neither grow memory nor steal another workload's protected storage.
+A save copies at most one ring's worth of segments plus its `after` stream, bounded by the action's output limit and charged against the node's frozen budget in the formula above; there is no separate per-action frozen size. snapshot frequency is bounded by the [workload rate limit](capacity.md#req-cap-001--workload-wide-storm-control). Under pressure a new snapshot is coalesced or refused before memory is allocated; an accepted snapshot is never corrupted. A stalled upload never grows memory or takes another workload's storage ([capacity](capacity.md)).
 
 ### SC-NET-003
 
-Given a 16 MiB four-segment ring, rapid triggers and a stalled uploader, when segments rotate and snapshots pin old segments, then all live/frozen/node limits hold and suppression is reported. History gets shorter under traffic; configured 30 seconds is not falsely reported as observed coverage.
+Given a 16 MiB four-segment ring, rapid triggers and a stalled uploader, when segments rotate and snapshots pin old segments, then all live, frozen and node limits hold and suppression is reported. History gets shorter under traffic; the configured 30 seconds is not reported as observed coverage.
 
 ## REQ-NET-004 — Network headers, HTTP headers and raw packets
 
-`profile.kind` has three initial choices:
-
 | Profile | Retained evidence | Limits and authority |
 | --- | --- | --- |
-| `networkHeaders` | Sanitized L2/L3/L4 packet headers, valid framing and original wire lengths; no application payload | Default; bounded parser drops unknown/unsafe formats, including unsafe fragments/options; network identifiers still may be personal data. ADR-248: the gadget captures at most 134 bytes per frame (Ethernet + largest IPv4 + largest TCP header); the collector cuts each frame at the end of its transport header with gopacket's decoders and keeps only Ethernet II with unfragmented IPv4 or extension-free IPv6 carrying TCP, UDP, ICMP or ICMPv6; the publication verifier rechecks every packet against the same rule |
-| `httpHeaders` | Structured, projected plain HTTP/1 request/response metadata and approved header fields; no raw packet archive or bodies | SensitiveRead authority for acquisition, even if output qualifies as extract; bounded stateful parser and immutable reviewed projection |
-| `rawPackets` | PCAPNG packet prefixes with original/captured lengths and truncation | Explicit payload approval and raw class; default snaplen plus optional transport-specific caps; a cap is a byte budget, never a payload-redaction guarantee |
+| `networkHeaders` | Sanitized L2/L3/L4 headers and original wire lengths; no payload | Default. The gadget captures at most 134 bytes per frame (Ethernet + largest IPv4 + largest TCP header); the collector cuts each frame at the end of its transport header and keeps only Ethernet II with unfragmented IPv4 or extension-free IPv6 carrying TCP, UDP, ICMP or ICMPv6 ([ADR-248](../docs/decisions/248-manual-packet-capture.md)); publication rechecks every packet against the same rule |
+| `httpHeaders` | Plain HTTP/1 request/response metadata and approved header fields; no packets or bodies | Sensitive acquisition; bounded parser and reviewed projection |
+| `rawPackets` | PCAPNG packet prefixes with original/captured lengths | Payload approval; `snaplen` 1–65,535 (the IP total-length maximum), optionally one cap per transport; a cap bounds bytes, it does not redact |
 
-For rawPackets, protocolSnaplen has at most one rule per transport (tcp, udp, icmp); that rule overrides the default snaplen, and unlisted/unknown transport uses the default. These are transport size caps, not HTTP-aware confidentiality rules. Both limits are 1–65,535 (the IP total-length maximum; each captured byte is stored) and may be narrowed by engine capability. Applying per-transport caps needs a qualified Gadget adapter; an upstream fixed snaplen flag alone does not provide it.
+HTTP uses bounded TCP reassembly and handles split headers, retransmission, out-of-order delivery, chunked/fixed bodies, pipelining and connection reuse. Bodies and unapproved headers are discarded before the ring; they may pass through the parser, which is why acquisition is sensitive. Classification failure never falls back to emitting bodies. Ambiguous, gapped or oversized streams produce partial/unsupported counters; trailers are discarded; upgraded/CONNECT tunnels stop parsing. A user filter that omits part of a TCP stream makes reassembly incomplete; the preview warns and provenance records the gap.
 
-HTTP uses bounded TCP reassembly and message framing. It must handle split headers, retransmission, overlap ambiguity, out-of-order delivery, chunked/fixed-length bodies, pipelining and connection reuse. Discard bodies and unapproved headers before ring/persistent retention. They may transiently enter the trusted bounded parser, which is why acquisition is sensitive. Do not emit bodies as fallback when classification fails. Midstream/ambiguous/gapped/oversized streams produce partial/unsupported counters and drop undecodable content. Discard trailers by default; stop parsing upgraded/CONNECT tunnels. Stop processing a flow before state exceeds its budget. No packet-offset or fixed snaplen value safely identifies arbitrary HTTP headers. A user filter that omits part of a TCP stream can make reassembly incomplete; show that warning in preview and record the gap, without widening the requested filter.
+Parser bounds: `maxHeaderBytes` 32 KiB per header block (common server limits, e.g. nginx `large_client_header_buffers` 4 × 8 KiB); per-flow reassembly 2 × `maxHeaderBytes`; `maxReassemblyBytes` 16 MiB per target, part of the collector memory formula. Flow capacity is their quotient (256 flows at the defaults). A flow ends on FIN/RST or source end; when every slot is held, a new SYN evicts the least recently seen flow (conntrack-style LRU) and counts its partial record. An ongoing HTTP source captures prefixes of 65,535 bytes, the largest GRO/TSO aggregate a Pod-side hook sees, so aggregated traffic leaves no reassembly gaps.
 
-A reviewed `projectionRef` pins allowed fields, header allowlist/redactions, request-target handling and analyzer digest. Initial `http-response-headers/v1` permits method, status, Content-Type and Content-Length, omits URL/query strings/Host and credentials, and emits no Authorization, Proxy-Authorization, Cookie or Set-Cookie values. Values still pass deterministic length/type/redaction checks; unexpected values are dropped, not reclassified as harmless. Broader request/header projections need administrator review and user-data retention. Users do not type regex redactors in the capture wizard.
+A reviewed `projectionRef` pins allowed fields, header allowlist/redactions and analyzer digest. The initial `http-response-headers/v1` keeps method, status, Content-Type and Content-Length, and never URL, query string, Host, Authorization, Proxy-Authorization, Cookie or Set-Cookie. Unexpected values are dropped. Broader projections need administrator review. Saved windows of an ongoing source record their seen/filtered frame counts and mark the state of flows still open at the cut as unknown.
 
-Per-target parser bounds: `maxHeaderBytes` 32 KiB per header block (common server header limits, e.g. nginx `large_client_header_buffers` 4 × 8 KiB; larger header sections are rejected by ordinary servers); `maxReassemblyBytesPerFlow` defaults to 2 × `maxHeaderBytes` (64 KiB: one request and one response header block in flight, since only headers are retained); `maxReassemblyBytes` is the per-target memory budget, default 16 MiB, and comes out of the collector memory formula in REQ-NET-003 together with ring and frozen budgets, with no fixed maximum. Flow capacity is `maxReassemblyBytes ÷ maxReassemblyBytesPerFlow` (256 flows at the defaults); there is no separate flow-count setting. CPU is bounded by the node profile. Preview rejects a parser/ring/node allocation conflict. Default sampling/overload may reduce flow coverage. A flow ends on FIN/RST or source end; there is no idle timer. A stopped direction keeps its sequence tracking (its bytes are discarded) so its FIN frees the flow slot, and a flow returns its slot once both directions stopped. When every slot is held, a new connection's SYN evicts the least recently seen flow as idle-closed, partial records included (conntrack-style LRU), which bounds the coverage loss from connections whose FIN/RST was never captured. Transport read depth is selected by the profile to parse complete bounded headers, not a claimed protocol-dependent safe packet prefix.
-
-An ongoing HTTP source must be explicitly authored and covered by its original
-reviewed observation grant. Its acquisition prefix is 65,535 bytes, the largest
-GRO/TSO aggregate a Pod-side hook can see (`gso_max_size` 65,536), so normal
-aggregated traffic leaves no reassembly gaps; prefix bytes are transient and
-discarded after parsing. It reserves its approved reassembly budget plus its ring before starting. An
-ordinary 134-byte network-header source cannot acquire this capability when a
-viewer opens. The source runs once to its admitted hard end under its original
-grant and wire-byte accounting; saving does not extend or flush it.
-
-For an ongoing source, the ring contains approved records and bounded,
-content-free counter deltas with the original event clock. Save selects these
-entries from the original requested window. In `http-response-headers/v1`, the
-optional `source_window` member identifies `counter_scope: event-window`, actual
-seen/filtered frames and observed wire bytes, history continuity and completed
-records clipped because their original request times fall outside the window.
-Its `counters.open_at_close_flows` is null and open/pending cutoff state is
-explicitly unknown: the independent source was not stopped. A response completed
-after the copied cutoff may be absent even if its request was in the window.
-Projected pages preserve these gaps. Output-limit drops and retained record
-counts are separate from the frame counters. Finite documents omit
-`source_window` and retain their existing numeric close gauge and exact encoding.
-
-HTTP/2 requires a separately qualified frame/HPACK state pack; HTTP/3 and encrypted HTTPS plaintext are unsupported in the initial profile. TLS metadata remains possible with network headers. Never fetch keys, intercept TLS, inject code or decrypt traffic implicitly. Separate approved runtime plaintext instrumentation would be a future action with its own privilege/privacy review.
+HTTP/2 needs a separately qualified frame/HPACK pack; HTTP/3 and HTTPS plaintext are unsupported. TLS metadata remains visible with network headers. Never fetch keys, intercept TLS, inject code or decrypt traffic.
 
 ### SC-NET-004
 
@@ -101,116 +77,38 @@ Given a header spans several packets and a body shares its last packet, when htt
 
 ## REQ-NET-005 — Provenance, MCP and qualification
 
-Each network artifact records profile/projection and engine/compiler digests, link/hook/CNI profile, target identity, authored filter digest, resolved peer generations and activation intervals, requested/achieved time range, wire/captured counts, loss/suppression reasons, ring/frozen/parser ceilings and actual truncation. Generation history records every generation that overlaps the saved window; the window bounds the list, and the recording never stops because membership churned. This provenance is part of the encrypted artifact manifest.
+Each network artifact's encrypted manifest records profile/projection and engine/compiler digests, link/hook/CNI profile, target identity, filter digest, every peer generation overlapping the window with its activation interval, requested/achieved time range, wire/captured counts, loss and suppression reasons, ring/frozen/parser ceilings and actual truncation.
 
-`get_extract(view=pcapSummary)` describes sanitized or raw packet metadata; `get_extract(view=httpHeaders)` returns bounded structured HTTP fields from an approved projection with provenance, cursor/output limits and no body parameter. A raw original remains raw. Its fixed numeric summary may use the transient projection in [ADR-304](../docs/decisions/304-transient-raw-packet-summary.md), with dedicated ordinary aggregate authority and independent output validation. This creates no stored derivative or raw-content permission. `query_artifact(operation=packets)` over a raw original or raw fields remains separately granted; metadata-only queries use ordinary current/retained rights. Native/subprocess analysis retains the separate-Job encrypted-scratch boundary. External-agent disclosures use the acting user's rights and keep audit, share and expiry checks. The UI calls the choices “Network headers”, “HTTP headers” and “Raw packets”, shows unsupported target capabilities early, and lets maintainers choose Kubernetes peers by workload/service rather than typing addresses.
+EXP-02/03 qualify filter compilation, peer updates, CNI/dual-stack/NAT/hostNetwork/loopback behavior, rings under stalls and HTTP secrecy/resource bounds before a capability is advertised. Unsupported environments return specific unavailable results.
 
-EXP-02/03 must qualify filter compilation, continuous peer updates, CNI/dual-stack/NAT/hostNetwork/loopback behavior, rings under stalls and HTTP secrecy/resource bounds before capability advertisement. Unsupported environments return specific unavailable results; no blanket packet coverage claim.
+Saved packet artifacts are read in the [regional reader](evidence.md#req-evd-005--analysis-isolation-and-output-classes):
 
-Saved `get_extract(view=pcapSummary)` ([ADR-303](../docs/decisions/303-saved-packet-summary.md))
-runs in the [regional reader](evidence.md#req-evd-005--analysis-isolation-and-output-classes)
-over the whole authenticated saved PCAPNG within the reader's source size limit:
-fixed directional numeric endpoint/protocol groups, returned in cursor pages (default
-100) over the full computed aggregate list, no filters, DNS, payload or comments. The
-aggregate map (about 100 bytes per aggregate) is bounded by the reader's per-query
-memory budget (reader memory limit ÷ concurrent query slots, REQ-EVD-005); a source
-with more aggregates than that budget fails with a visible limit rather than a
-truncated result. The summary is computed once per artifact version and reused. Packet counts
-mean records in the saved file rather than unique datagrams. `drops` is nullable;
-`drop_reporting` labels finite capture exclusions, snapshot output-limit exclusions
-or unavailable statistics. These reported counters never establish measured
-network loss. Missing statistics remain unknown and repeated cumulative statistics
-are not summed.
+- `get_extract(view=pcapSummary)` ([ADR-303](../docs/decisions/303-saved-packet-summary.md)) returns fixed directional numeric endpoint/protocol groups over the whole authenticated PCAPNG, in cursor pages under [REQ-MCP-002](mcp.md#req-mcp-002--bounded-result-contract). It is computed once per artifact version. A raw original uses the `approved-raw-pcap-summary/v1` definition ([ADR-304](../docs/decisions/304-transient-raw-packet-summary.md)) under ordinary read rights and also reports `unclassified_packets` (records without usable complete headers); this grants no raw query or download. `drops` is nullable and never claims measured network loss.
+- `get_extract(view=httpHeaders)` returns the approved HTTP projection with provenance and gaps; it has no body or header-selection option.
+- `query_artifact(operation=packets)` ([ADR-305](../docs/decisions/305-bounded-saved-packet-queries.md), authorization under [REQ-MCP-003](mcp.md#req-mcp-003--typed-raw-operations)) applies a filter under the acquisition rules of REQ-NET-001, compiled by the same hub compiler and run by the same evaluator, plus typed time bounds and a TCP flag mask/value. Fields come from a closed catalog (times, lengths, network/transport fields and, from a raw original, a bounded captured-frame prefix as hex). Bytes a saved frame does not contain stay unavailable; nothing is padded or inferred. A raw original needs raw authority even for header-only fields; a metadata original needs ordinary rights. Scanning streams in saved order with constant memory until the page fills or the operation deadline ends it, and returns a cursor, so a recording of any admitted size can be scanned. A page authenticates every frame it reads; a frame that fails authentication releases no page.
 
-Raw originals use the distinct `approved-raw-pcap-summary/v1` definition in
-ADR-304. The authenticated source retains its actual raw prefix limits and
-class. `packets` counts all saved records; required `unclassified_packets`
-reports records without usable complete headers, including zero. Conversations
-cover classified records only, with the same deterministic ordering and cursor pages. No
-endpoint or protocol is guessed from a missing header. Metadata results omit
-this raw-only field. Raw-summary authority grants neither raw queries nor native
-download and uses no raw-source share fallback.
+The UI names the profiles “Network headers”, “HTTP headers” and “Raw packets”, shows unsupported target capabilities early and lets maintainers pick peers by workload or Service. Saved packets download as native PCAPNG for Wireshark and HTTP projections as structured data ([REQ-DLD-001](artifact-downloads.md)).
 
 ### SC-NET-005
 
-Given an HTTP-header artifact is shared with an external agent, when it queries the approved projection, then only authorized bounded fields and coverage gaps are returned. The tool cannot expose raw packets, unapproved headers or records from another peer generation/case through pagination.
+Given an HTTP-header artifact is shared with an external agent, when it queries the approved projection, then only authorized fields and coverage gaps are returned; pagination cannot reach raw packets, unapproved headers or another case.
 
-Given an authorized reader inspects a saved raw packet recording, when the fixed
-summary runs, then only authenticated input contributes to the approved numeric
-output, truncated prefixes remain visible as unclassified records and a unique
-payload marker appears only in separately authorized raw/native inspection.
-The original remains raw; another principal, changed source or expired/revoked
-authority cannot reuse the summary's query or widen its output.
-
-### Saved packet queries (REQ-NET-005 / REQ-MCP-003)
-
-[ADR-305](../docs/decisions/305-bounded-saved-packet-queries.md) applies one bounded
-query to an existing metadata or raw PCAPNG in the
-[regional reader](evidence.md#req-evd-005--analysis-isolation-and-output-classes).
-The filter uses tcpdump/libpcap syntax, compiled by the pinned hub compiler and run
-by the same Go filter VM, with the acquisition text, screening and 4,096-instruction
-bounds, and no name resolution. Bracket/raw-byte predicates are
-refused; packet time intervals and TCP flag mask/value use typed selectors. The
-finite field catalog covers packet times/lengths, network/transport fields and a
-bounded raw captured-frame prefix, with exact names/limits in the canonical
-contract. Prefix bytes come from the saved frame; short saved prefixes never yield
-invented headers, endpoints, flags or padding.
-
-Any raw original requires a current exact `query_artifact(operation=packets)` grant even when only header
-fields are selected. Metadata-only fields from a metadata original need ordinary
-rights. Raw fields unavailable from that original are refused. A covering
-standalone or same-human/selected-client combined result-access grant is reused
-without a second approval; original audience/client/retention checks still apply.
-Neither acquisition approval nor the fixed numeric summary supplies packet-query
-or download authority.
-
-Logical scan work counts captured frame bytes visited in saved order, including
-nonmatches. Scanning streams with constant memory; one request scans until its page
-fills or the operation deadline ends it and returns a cursor to continue, so a
-recording of any admitted size can be scanned. A page authenticates
-the manifest and every frame it reads; the whole artifact was verified once at
-publication. A frame that fails authentication releases no page. One transient
-page holds a caller-chosen number of rows (default 100) of any selected fields from
-the finite catalog; over MCP a page fits the 96 KiB tool-result bound and aims at
-24 KiB by default (the common MCP client tool-output limit, [APIs](apis.md)). Report work/limit state without
-claiming full traffic coverage.
-
-A query creates no capture, derivative or capture-history entry. It carries an
-operation ID: a retry with the same ID and selection returns the existing outcome,
-a changed selection under the same ID conflicts. Raw disclosure consumes one
-operation and the delivered output bytes from the grant's disclosure pool when a
-page is delivered; an operation that delivers nothing consumes nothing.
-Query-only grant pools need not cover the whole native source; mixed
-download/query scopes retain the native full-file coverage requirement and use
-one shared pool. SQL, audit rows and logs hold only bounded control selection and
-identity, never projected frame bytes or rows.
+Given an authorized reader inspects a saved raw packet recording, when the fixed summary runs, then only authenticated input contributes, truncated prefixes count as unclassified records and a unique payload marker appears only through separately authorized raw inspection.
 
 ## REQ-NET-006 — Pod scope, zero-history captures and watch health
 
-Capture the pod network namespace once, including sidecar and loopback traffic; there is no container-level filter or permission. A hostNetwork pod requires a qualified pod-attribution mechanism for the requested traffic; never attach a host-wide fallback. Named endpoint/process attribution is distinct from packet scope. Preview explains shared pod networking and unsupported hooks.
+Capture the pod network namespace once, including sidecar and loopback traffic; there is no container-level filter or permission. A hostNetwork pod needs a qualified pod-attribution mechanism; there is no host-wide fallback. Pod-loopback observation is qualified separately from veth traffic; an unavailable hook is reported before capture, never hidden behind a claim of complete pod traffic. Packet-record counts are not necessarily unique datagrams.
 
-Qualify and report pod-loopback observation independently from veth traffic. A successful explicit host-loopback capture does not establish automatic pod-loopback coverage. Required hooks that are unavailable must produce a visible capability/coverage limitation before capture, never a silent claim of complete pod traffic. Deduplicate multiple observation points only through a qualified method and retain counters/uncertainty; packet-record counts are not necessarily unique network datagrams.
-
-before: 0s supports “capture the next interval” with no claim of pre-trigger history; after: 0s supports an already armed retrospective freeze. At least one is positive. The bounded ring remains the staging/rotation buffer even with zero requested history. A positive before with no armed sensor reports achieved history zero, rather than waiting and relabeling post-request traffic as history. Action timeout must include post-trigger time plus setup/finalization margin; maxFrozenBytes cannot exceed action output reservation.
-
-Peer membership follows standard informer semantics: a quiet watch is healthy and the cached membership stays valid until an event replaces it. Only a watch error or `410 Gone` triggers a relist; bookmarks keep the resourceVersion current and are not a freshness clock. A watch break records a membership-unknown gap as in REQ-NET-002; it does not stop the recording.
+`before: 0s` captures the next interval with no claim of history; `after: 0s` freezes an already armed ring. At least one is positive. A positive `before` with no armed recorder reports achieved history zero.
 
 ### SC-NET-006
 
-Given a pod with a sidecar and quiet Service membership, when a 30-second capture with before: 0s runs, then pod traffic is captured once under its scope, no historical coverage is invented, and absent change events cause no API requests, membership refreshes or ring shutdowns. An unqualified hostNetwork target is rejected without capturing neighbors.
+Given a pod with a sidecar and quiet Service membership, when a 30-second capture with before: 0s runs, then pod traffic is captured once, no historical coverage is invented, and absent change events cause no API requests or membership refreshes. An unqualified hostNetwork target is rejected without capturing neighbors.
 
-## Assisted packet planning
+## Lifecycle and live views
 
-[Guidance](guidance.md) defines explicit short surveys, per-field confidence for protocol/Service/process attribution, generated capture filters, qualified observation-point explanations and ring sizing from retained data rate. These are ordinary bounded captures and passive recommendations. Neither a preview nor a rate estimate widens a live filter, changes ring capacity, reads TLS secrets or enables a sensor. The proposed classifier scope does not expand the HTTP/1-only `httpHeaders` acquisition profile.
+`packetCapture` defaults to ongoing ([action lifecycles](action-lifecycle.md)): a policy arms the recorder, and each admitted trigger saves a bounded before/after window while it continues. Triggers never restart the recorder, reset its ring or extend a post-window; peer changes are new generations. An onTrigger variant resolves `before` to 0s; a manual capture records forward for its `duration` (REQ-LIF-005) and never borrows a policy's ring.
 
-## Recording and save lifecycle
+[Live watch](live-watch.md) shows packet metadata and approved HTTP headers of an existing source. Live display filters narrow emitted fields only; they never change acquisition filters, peers, parser or rings. No raw bytes or bodies are shown live; save first and use a raw query.
 
-packetCapture defaults to ongoing under [action lifecycles](action-lifecycle.md). Policy arming starts the recorder after observation authority/reservations; triggers freeze bounded before/after windows from that source while it continues. Peer-map updates, source epochs and frozen snapshot identities remain distinct. Suppressed triggers do not start recorders, reset rings or extend an existing post-window. Expiry/stop detaches the source; peer membership changes produce new generations, never a source restart; losing upload capacity refuses/limits snapshots without growing live storage.
-
-An explicitly selected onTrigger variant resolves before to 0s and captures only the next bounded interval; a manual capture records forward for its `duration` (REQ-LIF-005). The same adapters/ring representation serve that finite action, but no policy source is armed beforehand. A manual request never implicitly borrows another policy's ring or establishes persistent capture. Preview shows source activation and available history separately from per-incident output limits.
-
-## Approved live packet views
-
-[Live-watch projections](live-watch.md) expose qualified packet metadata and approved HTTP headers from an existing source. Live display predicates narrow emitted approved fields and are distinct from pcap acquisition filters or dynamic peer maps; editing one view does not reconfigure hooks, parser mode or rings. Report source filter generations, dropped packets, parser/sampling/subscriber gaps and unknown peer/PID/pairing. Unsupported TLS/plaintext or L7 parsing remains unavailable. Rows reach the browser over the page's Server-Sent Events stream and MCP through a long-poll read. No live raw packet bytes/bodies or arbitrary header selectors; save and use normal raw-query approval for deeper inspection. Live parser/reader CPU and scan/fanout resources must be qualified and reserved without delaying incident snapshots.
-
-Saved sanitized/raw packet artifacts download as their native PCAPNG for Wireshark under [REQ-DLD-001](artifact-downloads.md). Structured HTTP projections download as structured data. Acquisition filters, payload approval, actual truncation and encrypted managed storage are unchanged; a query-only grant does not implicitly authorize a full raw file.
+[Guidance](guidance.md) proposes filters, profiles and ring sizes; it never widens a running filter or enables a sensor.

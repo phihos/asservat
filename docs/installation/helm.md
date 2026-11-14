@@ -267,7 +267,7 @@ Capacity and retention defaults work without values. Change them on any
 | Value | Default | Meaning |
 | --- | --- | --- |
 | `capacity.evidenceStorage` | the bundled object store's volume size | Evidence storage Asservat may use; required for an external store |
-| `capacity.workloadShare` | `2%` | Storage protected for each workload; a quantity or a share of `evidenceStorage` |
+| `capacity.workloadShare` | `evidenceStorage` ÷ max(eligible workloads, 8) | Storage protected for each workload; a quantity or a share of `evidenceStorage` |
 | `capacity.workloadLimit` | `10%` | Most a single workload may use, protected share plus shared burst |
 | `capacity.capturesPerCluster` | larger of 8 and the node count | Concurrent captures per cluster |
 | `retention.evidence`, `retention.cores` | `14d` | Default retention |
@@ -350,9 +350,7 @@ Restore in this order:
 5. Run `helm upgrade` again without `recovery`.
 
 The recovery step re-applies revocations and deletions recorded after the
-restore point, sends restored grants, shares and pending approvals back for
-review when the restore point is older than the latest state, ends all
-sessions and connector leases, and recomputes usage from the object store
+restore point, ends all sessions and recomputes usage from the object store
 ([persistence](../../specs/persistence.md#req-db-005--durability-outage-and-disaster-recovery)).
 Nothing is served until it has finished; an interrupted step resumes on the
 next run.

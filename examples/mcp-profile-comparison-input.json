@@ -5,5 +5,5 @@
   "baseline_artifact_id": "00000000-0000-4000-8000-000000000102",
   "sample_type": "cpu",
   "normalization": "perSecond",
-  "top_n": 20
+  "limit": 20
 }
