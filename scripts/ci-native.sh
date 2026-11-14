@@ -53,12 +53,7 @@ needs() {
     "$suite" "$go_cache" "$sql" "$plain" "$plain" "$sql" "$helm" "$collector" "$collector"
 }
 if [[ ${1:-} == --list ]]; then
-  # The "all" dispatch: every suite.
-  printf '%s\n' "${!suites[@]}" | sort | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read().split()))'
-  exit
-fi
-if [[ ${1:-} == --names ]]; then
-  # Every dispatchable suite.
+  # Every dispatchable suite; the "all" dispatch runs them all.
   printf '%s\n' "${!suites[@]}" | sort | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read().split()))'
   exit
 fi

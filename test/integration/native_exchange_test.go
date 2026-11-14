@@ -43,7 +43,6 @@ import (
 
 type nativeExchangeFixture struct {
 	renewOnly              bool
-	mixedOnly              bool
 	topologySource         privacy.PolicySourceRef
 	content                *nativeContextFixture
 	worker                 value.DownloadWorker
@@ -336,18 +335,14 @@ func qualifyNativeExchangePhase(t *testing.T, ctx context.Context, f nativeExcha
 	if e != nil {
 		t.Fatal(e)
 	}
-	if f.renewOnly || f.mixedOnly {
+	if f.renewOnly {
 		stopWorker()
 		leaf, err := x509.ParseCertificate(clientCertificate.Certificate[0])
 		if err != nil {
 			t.Fatal(err)
 		}
 		peer := value.KeyPeer{InstallationID: target.InstallationID, PeerID: target.PodUID, Role: "acquisition", Certificate: sha256.Sum256(leaf.Raw), NotBefore: leaf.NotBefore, NotAfter: leaf.NotAfter}
-		if f.mixedOnly {
-			qualifyNativeMixedOwners(t, ctx, f, owners, ownerPool, enrollment, peer, session, metadata, objects)
-		} else {
-			qualifyNativeOwnerRenewal(t, ctx, f, owners, readers, enrollment, peer, session, metadata, objects)
-		}
+		qualifyNativeOwnerRenewal(t, ctx, f, owners, readers, enrollment, peer, session, metadata, objects)
 		return
 	}
 	transfer := evidence.DownloadResponseTransfer{Sessions: f.runtime, Responses: f.runtime, Authority: f.gate, Objects: objects, Audit: f.audit, Now: time.Now, NewID: custodyID}
