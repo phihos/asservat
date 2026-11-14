@@ -8,9 +8,6 @@ origin: https://asservat.lab.example.invalid:31450
 identity:
   clientID: asservat-console
   browserAudience: asservat-api
-  # At least one stable identity that may run processing initialization.
-  processingOperators:
-    - { clientID: asservat-console, issuer: https://login.lab.example.invalid:31451/realms/asservat, kind: User, id: REPLACE_OPERATOR_SUBJECT_ID }
 exposure:
   tlsSecret: operator-console-tls
 services:
@@ -34,7 +31,6 @@ services:
     keycloak:
       hostname: https://login.lab.example.invalid:31451
       realm: asservat
-      processingOperators: true
       tlsSecretName: operator-keycloak-tls
       service: { type: NodePort, nodePort: 31451 }
       # The empty host selects the SAME generated PostgreSQL server.

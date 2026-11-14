@@ -12,7 +12,6 @@ import (
 
 	"asservat.local/asservat/internal/adapters/mounts"
 	"asservat.local/asservat/internal/contracts"
-	"github.com/google/uuid"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	validation "k8s.io/apimachinery/pkg/util/validation"
@@ -69,26 +68,14 @@ func BuildSmallKeycloakMaterial(s contracts.SmallKeycloakSettings, random io.Rea
 		clear(admin)
 		return nil, mounts.ErrUnavailable
 	}
-	group, err := uuid.NewRandomFromReader(random)
-	if err != nil {
-		clear(admin)
-		clear(console)
-		return nil, mounts.ErrUnavailable
-	}
 	settings, _ := json.Marshal(s)
-	realm, err := smallKeycloakRealm(s, group.String())
-	if err != nil {
-		clear(admin)
-		clear(console)
-		return nil, mounts.ErrUnavailable
-	}
+	realm := smallKeycloakRealm(s)
 	immutable := true
 	return &core.Secret{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Secret"}, ObjectMeta: meta.ObjectMeta{Namespace: s.Namespace, Name: s.SecretName, Labels: map[string]string{"asservat.io/private-role": "small-keycloak"}}, Type: core.SecretTypeOpaque, Immutable: &immutable, Data: map[string][]byte{
 		contracts.SmallKeycloakSettingsFile:  settings,
 		contracts.SmallKeycloakAdminUsername: []byte("asservat-bootstrap-admin"),
 		contracts.SmallKeycloakAdminPassword: admin,
 		contracts.SmallKeycloakConsoleSecret: console,
-		contracts.SmallKeycloakUsersGroup:    []byte(group.String()),
 		s.Realm + "-realm.json":              realm,
 	}}, nil
 }
@@ -96,7 +83,7 @@ func BuildSmallKeycloakMaterial(s contracts.SmallKeycloakSettings, random io.Rea
 // ValidateSmallKeycloakMaterial checks retained inputs without generating or
 // rotating anything. The caller separately proves ownership of the Secret.
 func ValidateSmallKeycloakMaterial(s contracts.SmallKeycloakSettings, secret *core.Secret) error {
-	if !validSmallKeycloakSettings(s) || secret == nil || secret.APIVersion != "v1" || secret.Kind != "Secret" || secret.Namespace != s.Namespace || secret.Name != s.SecretName || len(secret.Labels) != 1 || secret.Labels["asservat.io/private-role"] != "small-keycloak" || secret.DeletionTimestamp != nil || len(secret.OwnerReferences) != 0 || len(secret.Finalizers) != 0 || secret.Type != core.SecretTypeOpaque || secret.Immutable == nil || !*secret.Immutable || len(secret.Data) != 6 || len(secret.StringData) != 0 {
+	if !validSmallKeycloakSettings(s) || secret == nil || secret.APIVersion != "v1" || secret.Kind != "Secret" || secret.Namespace != s.Namespace || secret.Name != s.SecretName || len(secret.Labels) != 1 || secret.Labels["asservat.io/private-role"] != "small-keycloak" || secret.DeletionTimestamp != nil || len(secret.OwnerReferences) != 0 || len(secret.Finalizers) != 0 || secret.Type != core.SecretTypeOpaque || secret.Immutable == nil || !*secret.Immutable || len(secret.Data) != 5 || len(secret.StringData) != 0 {
 		return mounts.ErrUnavailable
 	}
 	expected, _ := json.Marshal(s)
@@ -111,19 +98,16 @@ func ValidateSmallKeycloakMaterial(s contracts.SmallKeycloakSettings, secret *co
 			return mounts.ErrUnavailable
 		}
 	}
-	group := string(secret.Data[contracts.SmallKeycloakUsersGroup])
-	parsed, err := uuid.Parse(group)
-	if err != nil || parsed.String() != group || parsed.Version() != 4 {
-		return mounts.ErrUnavailable
-	}
-	realm, err := smallKeycloakRealm(s, group)
-	if err != nil || !bytes.Equal(realm, secret.Data[s.Realm+"-realm.json"]) {
+	if !bytes.Equal(smallKeycloakRealm(s), secret.Data[s.Realm+"-realm.json"]) {
 		return mounts.ErrUnavailable
 	}
 	return nil
 }
 
-func smallKeycloakRealm(s contracts.SmallKeycloakSettings, group string) ([]byte, error) {
+// smallKeycloakRealm is the imported realm. Tokens carry the standard groups
+// claim with group paths (/asservat-users, /asservat-administrators), used by name
+// (ADR-335 D4), so values can name groups before the first install.
+func smallKeycloakRealm(s contracts.SmallKeycloakSettings) []byte {
 	audience := func(value string) map[string]any {
 		return map[string]any{"name": "audience", "protocol": "openid-connect", "protocolMapper": "oidc-audience-mapper", "config": map[string]string{"included.custom.audience": value, "access.token.claim": "true", "id.token.claim": "false"}}
 	}
@@ -154,27 +138,8 @@ func smallKeycloakRealm(s contracts.SmallKeycloakSettings, group string) ([]byte
 	profile, _ := json.Marshal(map[string]any{"attributes": []any{
 		map[string]any{"name": "username", "permissions": map[string]any{"view": []string{"admin", "user"}, "edit": []string{"admin", "user"}}, "validations": map[string]any{"length": map[string]int{"min": 3, "max": 255}, "username-prohibited-characters": map[string]any{}, "up-username-not-idn-homograph": map[string]any{}}},
 		map[string]any{"name": "email", "permissions": map[string]any{"view": []string{"admin", "user"}, "edit": []string{"admin", "user"}}, "validations": map[string]any{"email": map[string]any{}, "length": map[string]int{"max": 255}}},
-		map[string]any{"name": "asservat_group_id", "multivalued": true, "permissions": map[string]any{"view": []string{"admin"}, "edit": []string{"admin"}}},
 	}, "groups": []any{}})
-	realmGroups := []any{map[string]any{"id": group, "name": "asservat-users", "attributes": map[string]any{"asservat_group_id": []string{group}}}, map[string]any{"name": "asservat-administrators"}}
-	if s.ProcessingOperators {
-		id, err := smallKeycloakProcessingGroup(group)
-		if err != nil {
-			return nil, err
-		}
-		realmGroups = append(realmGroups, map[string]any{"id": id, "name": smallKeycloakProcessingGroupName, "attributes": map[string]any{"asservat_group_id": []string{id}}})
-	}
-	return json.Marshal(map[string]any{"realm": s.Realm, "attributes": map[string]string{"CreateDefaultClientScopes": "true"}, "enabled": true, "sslRequired": "all", "registrationAllowed": false, "resetPasswordAllowed": false, "loginWithEmailAllowed": false, "accessTokenLifespan": 300, "revokeRefreshToken": true, "refreshTokenMaxReuse": 0, "bruteForceProtected": true, "clientScopes": scopes, "clients": clients, "users": []any{}, "groups": realmGroups, "components": map[string]any{"org.keycloak.userprofile.UserProfileProvider": []any{map[string]any{"providerId": "declarative-user-profile", "config": map[string]any{"kc.user.profile.config": []string{string(profile)}}}}}})
-}
-
-// Public identity derivation only; no secret payload or human membership enters
-// this UUID. The original random users group remains the namespace anchor.
-const smallKeycloakProcessingGroupName = "asservat-processing-operators"
-
-func smallKeycloakProcessingGroup(users string) (string, error) {
-	source, err := uuid.Parse(users)
-	if err != nil || source.String() != users || source.Version() != 4 {
-		return "", mounts.ErrUnavailable
-	}
-	return uuid.NewSHA1(source, []byte(smallKeycloakProcessingGroupName)).String(), nil
+	realmGroups := []any{map[string]any{"name": "asservat-users"}, map[string]any{"name": "asservat-administrators"}}
+	realm, _ := json.Marshal(map[string]any{"realm": s.Realm, "attributes": map[string]string{"CreateDefaultClientScopes": "true"}, "enabled": true, "sslRequired": "all", "registrationAllowed": false, "resetPasswordAllowed": false, "loginWithEmailAllowed": false, "accessTokenLifespan": 300, "revokeRefreshToken": true, "refreshTokenMaxReuse": 0, "bruteForceProtected": true, "clientScopes": scopes, "clients": clients, "users": []any{}, "groups": realmGroups, "components": map[string]any{"org.keycloak.userprofile.UserProfileProvider": []any{map[string]any{"providerId": "declarative-user-profile", "config": map[string]any{"kc.user.profile.config": []string{string(profile)}}}}}})
+	return realm
 }

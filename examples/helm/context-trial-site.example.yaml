@@ -14,11 +14,6 @@ identity:
   clientSecret: {existingSecret: operator-oidc-client}
   clients: [ { id: asservat-console, kind: human } ]
   administrators: {groups: [/asservat-administrators]}
-  processingOperators:
-    - clientID: asservat-console
-      issuer: https://id.example.invalid/realms/homelab
-      kind: Group
-      id: REPLACE_WITH_STABLE_TRIAL_USERS_GROUP_ID
 exposure:
   # Existing kubernetes.io/tls Secret for the origin.
   tlsSecret: operator-console-tls

@@ -170,7 +170,6 @@
 {{- end -}}
 {{- end -}}
 {{- end -}}
-{{- if not $i.processingOperators }}{{ fail "identity.processingOperators needs at least one stable operator identity (the download environment refuses an empty list)" }}{{ end -}}
 {{- $out := dict "format" "asservat-download-environment/v1" "revision" (int .Release.Revision) "suspended" false "permittedRegions" $regions "paths" list "clients" $clients "operators" (default list $i.processingOperators) -}}
 {{- /* With download workers the paths are the readers' installed (derived)
      paths: Helm does not know their generated fields. */ -}}

@@ -88,7 +88,7 @@ func runHelmNativeKindJourney(t *testing.T, joined bool) {
 	}
 	f := fixture{Identity: &struct{ Base, RootCA, AdminUser, AdminPassword, UserPassword string }{Base: settings.Hostname, RootCA: string(ca),
 		AdminUser: string(kc[contracts.SmallKeycloakAdminUsername]), AdminPassword: string(kc[contracts.SmallKeycloakAdminPassword]), UserPassword: "hn-synthetic-human-1"}}
-	identity := newInstalledBundledIdentity(t, f, settings, string(kc[contracts.SmallKeycloakUsersGroup]), string(kc[contracts.SmallKeycloakConsoleSecret]), true)
+	identity := newInstalledBundledIdentity(t, f, settings, string(kc[contracts.SmallKeycloakConsoleSecret]), true)
 	t.Logf("hn journey: synthetic humans created (developer %s) in the bundled realm", identity.SubjectID)
 
 	root, cluster, installation := string(ids["permissionRootID"]), string(ids["clusterID"]), string(ids["installationID"])

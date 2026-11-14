@@ -1719,11 +1719,6 @@
                       }
                     }
                   }
-                },
-                "processingOperators": {
-                  "type": "boolean",
-                  "default": false,
-                  "description": "Explicit opt-in to an initially empty dedicated privacy processing group; never ordinary-users authority."
                 }
               },
               "required": [

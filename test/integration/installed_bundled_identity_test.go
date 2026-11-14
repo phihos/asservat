@@ -13,19 +13,19 @@ import (
 
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/authorization"
-	"github.com/google/uuid"
 )
 
 // newInstalledBundledIdentity attaches to the REAL product-imported realm and
 // client configuration. The native driver supplies the actual retained source
-// settings, original users UUID and console secret; f.Identity supplies the
-// observed selected endpoint/CA/admin plus a synthetic human's test password.
+// settings and console secret; f.Identity supplies the observed selected
+// endpoint/CA/admin plus a synthetic human's test password. The realm's groups
+// are looked up by name; an administrator joins /asservat-admins.
 // Only fixture humans and deliberate memberships are created here. No realm,
 // client, mapper, profile, source policy or identity configuration is replaced.
-func newInstalledBundledIdentity(t *testing.T, f fixture, settings contracts.SmallKeycloakSettings, usersGroup, consoleSecret string, processingOperator bool) *installedIdentity {
+func newInstalledBundledIdentity(t *testing.T, f fixture, settings contracts.SmallKeycloakSettings, consoleSecret string, administrator bool) *installedIdentity {
 	t.Helper()
 	id := f.Identity
-	if id == nil || id.Base != settings.Hostname || id.AdminUser == "" || id.AdminPassword == "" || id.UserPassword == "" || consoleSecret == "" || !authorization.UUID(usersGroup) || settings.ConsoleClientID == "" || settings.MCPClientID == "" || len(settings.MCPRedirectURIs) != 1 || processingOperator && !settings.ProcessingOperators {
+	if id == nil || id.Base != settings.Hostname || id.AdminUser == "" || id.AdminPassword == "" || id.UserPassword == "" || consoleSecret == "" || settings.ConsoleClientID == "" || settings.MCPClientID == "" || len(settings.MCPRedirectURIs) != 1 {
 		t.Fatal("actual retained bundled identity source is incomplete or changed")
 	}
 	roots := x509.NewCertPool()
@@ -37,26 +37,15 @@ func newInstalledBundledIdentity(t *testing.T, f fixture, settings contracts.Sma
 	kc := &kcFixture{t: t, base: id.Base, Issuer: settings.Hostname + "/realms/" + settings.Realm, http: client, AdminUser: id.AdminUser, AdminPassword: id.AdminPassword, UserPassword: id.UserPassword, redirectURI: settings.MCPRedirectURIs[0]}
 	kc.admin = kc.tokens(kc.base+"/realms/master/protocol/openid-connect/token", url.Values{"grant_type": {"password"}, "client_id": {"admin-cli"}, "username": {kc.AdminUser}, "password": {kc.AdminPassword}}, http.StatusOK).Access
 	prefix := "/admin/realms/" + settings.Realm
-	group := func(want string) {
+	group := func(name string) string {
 		t.Helper()
-		var actual struct {
-			ID         string
-			Attributes map[string][]string
+		var actual []struct{ ID, Name string }
+		if json.Unmarshal(kc.json(http.MethodGet, prefix+"/groups?exact=true&search="+name, nil), &actual) != nil || len(actual) != 1 || actual[0].Name != name || !authorization.UUID(actual[0].ID) {
+			t.Fatal("actual imported group missing", name)
 		}
-		if json.Unmarshal(kc.json(http.MethodGet, prefix+"/groups/"+want, nil), &actual) != nil || actual.ID != want || !slices.Equal(actual.Attributes["asservat_group_id"], []string{want}) {
-			t.Fatal("actual imported group differs from retained source")
-		}
+		return actual[0].ID
 	}
-	group(usersGroup)
-	processingGroup := ""
-	if settings.ProcessingOperators {
-		original, err := uuid.Parse(usersGroup)
-		if err != nil || original.Version() != 4 || original.String() != usersGroup {
-			t.Fatal("original generated users UUID")
-		}
-		processingGroup = uuid.NewSHA1(original, []byte("asservat-processing-operators")).String()
-		group(processingGroup)
-	}
+	usersGroup, adminsGroup := group("asservat-users"), group("asservat-admins")
 	for _, expected := range []struct {
 		Name      string
 		Public    bool
@@ -90,11 +79,11 @@ func newInstalledBundledIdentity(t *testing.T, f fixture, settings contracts.Sma
 		return subject
 	}
 	developer, outsider := createUser("developer"), createUser("outsider")
-	if processingOperator {
-		kc.json(http.MethodPut, prefix+"/users/"+developer+"/groups/"+processingGroup, nil)
+	if administrator {
+		kc.json(http.MethodPut, prefix+"/users/"+developer+"/groups/"+adminsGroup, nil)
 	}
 	// The operator's workload AccessBinding names developer's REAL User subject.
 	// Both humans remain ordinary eligible members; outsider has no matching
-	// workload binding and no processing membership. No extra realm group needed.
-	return &installedIdentity{kc: kc, Issuer: kc.Issuer, RootPEM: id.RootCA, UsersGroupID: usersGroup, ProcessingGroupID: processingGroup, SubjectID: developer, UnrelatedSubjectID: outsider, MCPClientID: settings.MCPClientID, MCPScope: "asservat:mcp", DownloadsScope: "asservat:downloads"}
+	// workload binding and no administrator membership.
+	return &installedIdentity{kc: kc, Issuer: kc.Issuer, RootPEM: id.RootCA, UsersGroupID: "/asservat-users", SubjectID: developer, UnrelatedSubjectID: outsider, MCPClientID: settings.MCPClientID, MCPScope: "asservat:mcp", DownloadsScope: "asservat:downloads"}
 }

@@ -53,7 +53,7 @@ func (p DownloadPolicy) DownloadValid(now time.Time) bool {
 func (p DownloadPolicy) WellFormed() bool {
 	if !authorization.UUID(p.RootID) || !authorization.UUID(p.InstallationID) || !authorization.UUID(p.RecoveryEpoch) || !p.Revision.Valid() ||
 		!ProcessingOrganizationsValid(p.Processors) || p.PermittedRegions == nil || !identity.Strings(p.PermittedRegions, 64, 63) ||
-		p.Paths == nil || len(p.Paths) > 32 || p.Clients == nil || len(p.Clients) > 64 || len(p.Operators) < 1 || len(p.Operators) > 32 {
+		p.Paths == nil || len(p.Paths) > 32 || p.Clients == nil || len(p.Clients) > 64 {
 		return false
 	}
 	paths := map[string]bool{}
