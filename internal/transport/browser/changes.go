@@ -11,6 +11,7 @@ type Changes struct {
 
 type changeSubscription struct {
 	changes *Changes
+	watched map[string]bool
 	ready   chan struct{}
 	pending map[string]struct{}
 }
@@ -21,6 +22,9 @@ func (c *Changes) Publish(id string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	for s := range c.subs {
+		if id != "" && !s.watched[id] {
+			continue
+		}
 		s.pending[id] = struct{}{}
 		select {
 		case s.ready <- struct{}{}:
@@ -29,9 +33,14 @@ func (c *Changes) Publish(id string) {
 	}
 }
 
-// Subscribe registers a subscriber until Close.
-func (c *Changes) Subscribe() ChangeSubscription {
-	s := &changeSubscription{changes: c, ready: make(chan struct{}, 1), pending: map[string]struct{}{}}
+// Subscribe registers a subscriber for the watched IDs until Close. It
+// receives only those IDs and the "" any-change marker.
+func (c *Changes) Subscribe(ids []string) ChangeSubscription {
+	watched := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		watched[id] = true
+	}
+	s := &changeSubscription{changes: c, watched: watched, ready: make(chan struct{}, 1), pending: map[string]struct{}{}}
 	c.mu.Lock()
 	c.subs[s] = struct{}{}
 	c.mu.Unlock()

@@ -42,6 +42,9 @@ func NewEventsHandler(sessions SessionHandler, operations presentation.Operation
 	return &EventsHandler{sessions: sessions, operations: operations, captures: captures}, nil
 }
 
+// eventsHeartbeat is the SSE comment interval; see ServeHTTP.
+const eventsHeartbeat = 30 * time.Second
+
 type statusEvent struct {
 	Type     string          `json:"type"`
 	ID       string          `json:"id"`
@@ -76,11 +79,12 @@ func (h *EventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		seen[id] = true
 	}
-	if _, _, err := h.sessions.AuthenticateCurrentWithin(w, r, 5*time.Second); err != nil {
+	_, view, err := h.sessions.AuthenticateCurrentWithin(w, r, 5*time.Second)
+	if err != nil {
 		sessionFailure(w, err)
 		return
 	}
-	subscription := h.captures.Subscribe()
+	subscription := h.captures.Subscribe(ids)
 	defer subscription.Close()
 	control := http.NewResponseController(w)
 	w.Header().Set("Content-Type", "text/event-stream")
@@ -93,10 +97,30 @@ func (h *EventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	// The stream ends at the session's own deadline (one timer at that
+	// instant). Sessions publish no logout or revocation event, so a logged-out
+	// reader is refused at the next send, which reauthenticates; a started
+	// stream is not reauthorized periodically (ADR-311/312).
+	ended := time.NewTimer(time.Until(view.ExpiresAt))
+	defer ended.Stop()
+	// No event source reports TCP peer death, and proxies drop idle streams:
+	// a comment every 30 s keeps the stream open and a failed write ends it.
+	heartbeat := time.NewTicker(eventsHeartbeat)
+	defer heartbeat.Stop()
 	for {
 		select {
 		case <-r.Context().Done():
 			return
+		case <-ended.C:
+			return
+		case <-heartbeat.C:
+			if control.SetWriteDeadline(time.Now().Add(10*time.Second)) != nil {
+				return
+			}
+			if _, err := w.Write([]byte(": ping\n\n")); err != nil || control.Flush() != nil {
+				return
+			}
+			continue
 		case <-subscription.Ready():
 		}
 		changed := subscription.Take()

@@ -227,6 +227,20 @@ it('follows pushed status events instead of polling and stops at a terminal phas
   expect(controller.snapshot().progress?.phase).toBe('Succeeded');
   expect(stream.closed).toBe(true);
 });
+it('resynchronizes once after the stream closes and reports a failed resync', async () => {
+  vi.useFakeTimers(); const { controller, client } = await ready(); await controller.submit();
+  client.responder = () => progressResult('Pending', 1); await controller.refreshProgress();
+  const first = FakeEventSource.instances.at(-1)!;
+  client.responder = () => progressResult('Finalizing', 2);
+  first.fail(); await vi.advanceTimersByTimeAsync(0);
+  expect(controller.snapshot().progress?.phase).toBe('Finalizing');
+  const second = FakeEventSource.instances.at(-1)!;
+  expect(second).not.toBe(first);
+  client.responder = () => { throw new Error('session ended'); };
+  second.fail(); await vi.advanceTimersByTimeAsync(0);
+  expect(controller.snapshot().error).toMatch(/updates stopped/);
+  expect(FakeEventSource.instances.at(-1)).toBe(second);
+});
 it('rejects a selected pod outside the requested workload even in a schema-valid reply', async () => {
   const { controller, client } = await ready();
   const value = previewResult(); if (value.status !== 'ok') throw new Error();

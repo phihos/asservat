@@ -2,15 +2,83 @@ package browser
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
+	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/transport/presentation"
 )
+
+// shortSession ends the browser session soon after the stream starts.
+type shortSession struct {
+	investigationSession
+	expiresAt time.Time
+}
+
+func (s *shortSession) Resolve(ctx context.Context, cookie string, refresh bool) (identities.SessionView, error) {
+	v, err := s.investigationSession.Resolve(ctx, cookie, refresh)
+	v.ExpiresAt = s.expiresAt
+	return v, err
+}
+
+func TestChangesDeliverOnlyWatchedIDsAndAnyChange(t *testing.T) {
+	changes := NewChanges()
+	s := changes.Subscribe([]string{"a"})
+	defer s.Close()
+	changes.Publish("b")
+	select {
+	case <-s.Ready():
+		t.Fatal("signalled for an unwatched ID")
+	default:
+	}
+	changes.Publish("a")
+	changes.Publish("")
+	<-s.Ready()
+	if got := s.Take(); len(got) != 2 {
+		t.Fatal("pending", got)
+	}
+}
+
+func TestEventsStreamEndsAtSessionDeadline(t *testing.T) {
+	var handler *EventsHandler
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { handler.ServeHTTP(w, r) }))
+	defer server.Close()
+	calls := &investigationCalls{}
+	ops, err := presentation.NewContextOperations(presentation.ContextOperationsConfig{PublicOrigin: server.URL, CollectionEnabled: true, Now: time.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000099" }}, calls, calls)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler, err = NewEventsHandler(SessionHandler{Origin: server.URL, Sessions: &shortSession{expiresAt: time.Now().Add(time.Second)}}, ops, NewChanges())
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err := http.NewRequest("GET", server.URL+EventsPath+"?capture_id=00000000-0000-4000-8000-000000000030", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.AddCookie(&http.Cookie{Name: SessionCookie, Value: strings.Repeat("A", 43)})
+	response, err := server.Client().Do(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	done := make(chan error, 1)
+	go func() { _, e := io.ReadAll(response.Body); done <- e }()
+	select {
+	case e := <-done:
+		if e != nil {
+			t.Fatal(e)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("stream outlived the session")
+	}
+}
 
 func TestEventsStreamPushesCaptureProgress(t *testing.T) {
 	var handler *EventsHandler
@@ -65,7 +133,7 @@ func TestEventsStreamPushesCaptureProgress(t *testing.T) {
 	if e := next(); e.Type != "capture" || e.ID != "00000000-0000-4000-8000-000000000030" || e.Revision != 1 || !strings.Contains(string(e.Result), `"phase":"Pending"`) {
 		t.Fatal("initial state", e)
 	}
-	changes.Publish("00000000-0000-4000-8000-000000000031")
+	changes.Publish("00000000-0000-4000-8000-000000000031") // unwatched
 	changes.Publish("00000000-0000-4000-8000-000000000030")
 	if e := next(); e.Type != "capture" || e.Revision != 1 {
 		t.Fatal("pushed state", e)

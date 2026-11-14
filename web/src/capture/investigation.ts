@@ -472,11 +472,24 @@ export class Investigation {
       try { envelope = JSON.parse((message as MessageEvent<string>).data).result; } catch { envelope = undefined; }
       if (!envelope || envelope.status !== 'ok' || !this.applyProgress(id, envelope.data)) this.closeEvents();
     });
+    // EventSource retries a dropped connection itself; a refused reconnect
+    // closes it. Resynchronize once and follow again, or say updates stopped.
+    events.addEventListener('error', () => {
+      if (this.events !== events || events.readyState !== EventSource.CLOSED) return;
+      this.events = undefined;
+      void this.resync(id);
+    });
     events.addEventListener('accessLost', () => {
       if (this.events !== events) return;
       this.closeEvents();
       this.publish({ progress: undefined, error: 'You no longer have access to this collection status.' });
     });
+  }
+  private async resync(id: string) {
+    const data = this.receipt?.captureID === id ? await this.run('get_capture', { capture_id: id }) : undefined;
+    if (this.receipt?.captureID !== id) return;
+    if (!data) { this.publish({ error: 'Collection status updates stopped. Check status again to resume them.' }); return; }
+    if (this.applyProgress(id, data) && !this.events) this.follow(id);
   }
   private closeEvents() { this.events?.close(); this.events = undefined; }
   // Applies one verified status; true while the capture is still running.
