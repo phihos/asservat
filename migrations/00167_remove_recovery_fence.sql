@@ -23,11 +23,13 @@ CREATE OR REPLACE VIEW public.fleet_current_trust AS
  AND o.activated_postmaster_at IS NOT DISTINCT FROM t.activated_postmaster_at
  AND o.activated_database_oid IS NOT DISTINCT FROM t.activated_database_oid;
 
-DROP FUNCTION reactivate_restarted_database(uuid);
-DROP TABLE database_restart;
-DROP FUNCTION database_restart_immutable();
-DROP TRIGGER fleet_activation_incarnation ON fleet_trust;
-DROP FUNCTION fleet_activation_incarnation();
+-- No Down: the removed fence is not restored. IF EXISTS keeps a re-Up after
+-- a downgrade probe working.
+DROP FUNCTION IF EXISTS reactivate_restarted_database(uuid);
+DROP TABLE IF EXISTS database_restart;
+DROP FUNCTION IF EXISTS database_restart_immutable();
+DROP TRIGGER IF EXISTS fleet_activation_incarnation ON fleet_trust;
+DROP FUNCTION IF EXISTS fleet_activation_incarnation();
 
 -- Every recorded server start belongs to the current database: a restart
 -- needs no re-activation and a restore is handled by setup's recovery step.
@@ -148,5 +150,5 @@ BEGIN
 END $$;
 -- +goose StatementEnd
 
-ALTER TABLE fleet_trust DROP COLUMN recovery_blocked,
- DROP COLUMN activated_system_identifier, DROP COLUMN activated_timeline;
+ALTER TABLE fleet_trust DROP COLUMN IF EXISTS recovery_blocked,
+ DROP COLUMN IF EXISTS activated_system_identifier, DROP COLUMN IF EXISTS activated_timeline;
