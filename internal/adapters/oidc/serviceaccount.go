@@ -50,6 +50,7 @@ type saCluster struct {
 	cluster ServiceAccountCluster
 	state   atomic.Pointer[saState]
 	flight  singleflight.Group
+	now     func() time.Time
 }
 
 type saState struct {
@@ -71,7 +72,7 @@ func NewServiceAccountVerifier(audiences []string, clusters []ServiceAccountClus
 		if c.Client == nil {
 			c.Client = http.DefaultClient
 		}
-		s := &saCluster{cluster: c}
+		s := &saCluster{cluster: c, now: time.Now}
 		if len(c.JWKS) != 0 {
 			var set jose.JSONWebKeySet
 			if json.Unmarshal(c.JWKS, &set) != nil || len(set.Keys) == 0 || c.Issuer == "" {
@@ -178,18 +179,27 @@ func (c *saCluster) discover(ctx context.Context) (*saState, error) {
 		// jwks_uri may name an address only reachable outside the cluster.
 		jwks = strings.TrimSuffix(c.cluster.Discovery, "/") + "/openid/v1/jwks"
 	}
-	keys := &remoteKeys{url: jwks, client: c.cluster.Client}
+	keys := &remoteKeys{url: jwks, client: c.cluster.Client, now: c.now}
 	return &saState{issuer: doc.Issuer, verifier: gooidc.NewVerifier(doc.Issuer, keys, saConfig)}, nil
 }
 
+// jwksRefetchInterval spaces unknown-key refetches of one issuer's JWKS. It
+// bounds the load an unauthenticated caller with made-up key IDs can put on
+// the issuer to one fetch per 10 s per issuer, and a legitimately rotated key
+// is accepted within 10 s of its first use.
+const jwksRefetchInterval = 10 * time.Second
+
 // remoteKeys is a discovered JWKS: cached, and fetched again (once at a
-// time, within the I/O timeout) when a token names an unknown key ID, such
-// as after the cluster rotated its ServiceAccount signing key.
+// time, within the I/O timeout, at most every jwksRefetchInterval) when a
+// token names an unknown key ID, such as after the cluster rotated its
+// ServiceAccount signing key.
 type remoteKeys struct {
-	url    string
-	client *http.Client
-	keys   atomic.Pointer[jose.JSONWebKeySet]
-	flight singleflight.Group
+	url     string
+	client  *http.Client
+	keys    atomic.Pointer[jose.JSONWebKeySet]
+	fetched atomic.Int64 // UnixNano of the last fetch attempt
+	flight  singleflight.Group
+	now     func() time.Time
 }
 
 func (r *remoteKeys) VerifySignature(ctx context.Context, raw string) ([]byte, error) {
@@ -200,6 +210,9 @@ func (r *remoteKeys) VerifySignature(ctx context.Context, raw string) ([]byte, e
 	kid := jws.Signatures[0].Header.KeyID
 	set := r.keys.Load()
 	if set == nil || len(set.Key(kid)) == 0 {
+		if set != nil && r.now().Sub(time.Unix(0, r.fetched.Load())) < jwksRefetchInterval {
+			return nil, ErrServiceAccountDenied
+		}
 		if set, err = r.fetch(ctx); err != nil {
 			return nil, err
 		}
@@ -214,6 +227,7 @@ func (r *remoteKeys) VerifySignature(ctx context.Context, raw string) ([]byte, e
 
 func (r *remoteKeys) fetch(ctx context.Context) (*jose.JSONWebKeySet, error) {
 	out, err, _ := r.flight.Do("jwks", func() (any, error) {
+		r.fetched.Store(r.now().UnixNano())
 		call, cancel := context.WithTimeout(context.WithoutCancel(ctx), discoveryTimeout)
 		defer cancel()
 		req, err := http.NewRequestWithContext(call, http.MethodGet, r.url, nil)

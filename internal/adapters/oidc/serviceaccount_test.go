@@ -103,13 +103,33 @@ func TestServiceAccountVerifierDiscoveryRefreshesOnUnknownKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	var clock atomic.Int64
+	clock.Store(time.Now().UnixNano())
+	v.clusters[0].now = func() time.Time { return time.Unix(0, clock.Load()) }
 	ctx := context.Background()
 	if _, err = v.VerifyConnector(ctx, first.token(t, server.URL, saSubject, saAudience, time.Now().Add(time.Minute))); err != nil {
 		t.Fatal("first key", err)
 	}
 	current.Store(&second)
-	if _, err = v.VerifyConnector(ctx, second.token(t, server.URL, saSubject, saAudience, time.Now().Add(time.Minute))); err != nil || fetches.Load() != 2 {
-		t.Fatal("rotated key", err, fetches.Load())
+	clock.Add(int64(jwksRefetchInterval))
+	// Unknown key IDs within the refetch interval cost one fetch at most.
+	made := newSAKey(t, "made-up")
+	for range 2 {
+		if _, err = v.VerifyConnector(ctx, made.token(t, server.URL, saSubject, saAudience, time.Now().Add(time.Minute))); err == nil {
+			t.Fatal("made-up key accepted")
+		}
+	}
+	if fetches.Load() != 2 {
+		t.Fatal("unknown key IDs refetched within the interval", fetches.Load())
+	}
+	current.Store(&saKey{private: newSAKey(t, "k3").private, id: "k3"})
+	third := *current.Load()
+	if _, err = v.VerifyConnector(ctx, third.token(t, server.URL, saSubject, saAudience, time.Now().Add(time.Minute))); err == nil || fetches.Load() != 2 {
+		t.Fatal("rotated key fetched within the interval", err, fetches.Load())
+	}
+	clock.Add(int64(jwksRefetchInterval))
+	if _, err = v.VerifyConnector(ctx, third.token(t, server.URL, saSubject, saAudience, time.Now().Add(time.Minute))); err != nil || fetches.Load() != 3 {
+		t.Fatal("rotated key after the interval", err, fetches.Load())
 	}
 }
 
