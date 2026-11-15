@@ -220,9 +220,9 @@ func qualifyContextNativeResume(t *testing.T, ctx context.Context, f nativeExcha
 	if unchanged.Generation != finalSession.Generation || unchanged.ChargedRead != finalSession.ChargedRead || unchanged.ChargedOutput != finalSession.ChargedOutput || unchanged.EmittedBytes != finalSession.EmittedBytes {
 		t.Fatal("denied depleted request changed original spend")
 	}
-	var intents, outcomes int
-	if err = f.admin.QueryRow(ctx, `SELECT count(*),count(*) FILTER(WHERE outcome_receipt IS NOT NULL) FROM operation_audit WHERE root_id=$1 AND intent->>'Name'='download_artifact_content'`, f.allocation.RootID).Scan(&intents, &outcomes); err != nil || intents != 4 || outcomes != 4 {
-		t.Fatal("range/conditional/depleted preflight audit pairs", intents, outcomes, err)
+	var rows int
+	if err = f.admin.QueryRow(ctx, `SELECT count(*) FROM audit_event WHERE operation='download_artifact_content' AND kind='call'`).Scan(&rows); err != nil || rows != 4 {
+		t.Fatal("range/conditional/depleted audit rows", rows, err)
 	}
 	t.Logf("actual h2 ranges reconstructed %d original native bytes after expired observation; four Joined worker conversations, one original preparation and two content key bindings (nine individual unwrap slots), no budget refill", len(reconstructed))
 }

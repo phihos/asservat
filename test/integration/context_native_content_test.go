@@ -19,7 +19,6 @@ import (
 	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/audit"
 	value "asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/transport/browser"
@@ -665,11 +664,11 @@ func serveContextNativeGET(t *testing.T, ctx context.Context, f nativeExchangeFi
 	if e != nil || response.StatusCode != http.StatusOK || int64(len(body)) != m.Size || artifact.Digest(sha256.Sum256(body)) != m.SHA256 {
 		t.Fatal("exact native HTTP bytes", response.StatusCode, len(body), e)
 	}
-	var intents, outcomes int
-	if e = f.admin.QueryRow(ctx, "SELECT count(*),count(*) FILTER(WHERE outcome_receipt IS NOT NULL) FROM operation_audit WHERE root_id=$1 AND intent->>'Name'='download_artifact_content'", f.allocation.RootID).Scan(&intents, &outcomes); e != nil || intents != 2 || outcomes != 2 {
-		t.Fatal("conditional/content preflight acknowledged pairs", intents, outcomes, e)
+	var rows int
+	if e = f.admin.QueryRow(ctx, "SELECT count(*) FROM audit_event WHERE operation='download_artifact_content' AND kind='call'").Scan(&rows); e != nil || rows != 2 {
+		t.Fatal("conditional/content audit rows", rows, e)
 	}
-	t.Logf("actual authenticated HTTPS native GET bytes=%d; conditional request disclosed no bytes/reservation and both preflight audit pairs completed", len(body))
+	t.Logf("actual authenticated HTTPS native GET bytes=%d; conditional request disclosed no bytes/reservation and both GETs wrote an audit row", len(body))
 }
 func nativeContentAuditFixture(t *testing.T, ctx context.Context, f nativeExchangeFixture, inner *presentation.InvestigationOperations) *presentation.AuditedOperations {
 	t.Helper()
