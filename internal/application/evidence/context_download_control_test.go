@@ -102,7 +102,6 @@ func (f *downloadControlFixture) ContinueContextDownload(ctx context.Context, _ 
 	}
 	if !f.pending {
 		f.session.State = artifact.DownloadReady
-		f.session.Requests++
 		f.session.Generation++
 		m := contextDownloadMetadata(ContextDownloadRequest{Scope: s.Scope, Expectation: f.source.Expectation}, []byte("synthetic context"))
 		f.prepared = artifact.PreparedDownload{Preparation: artifact.DownloadPreparation{SessionID: s.ID, BatchID: s.ID, Generation: 1}, Scope: s.Scope, Native: m}
@@ -137,7 +136,7 @@ func newDownloadControlFixture(t *testing.T) (*downloadControlFixture, ContextDo
 	f.a.Retention = proof
 	f.i = identity.Identity{Principal: p.Principal, Policy: rev, Scopes: []string{"evidence:read", "evidence:download"}}
 	f.source = ContextDownloadSource{Scope: p, Expectation: r.Expectation, Copies: r.Copies}
-	f.plan = ContextDownloadPlan{Allocation: artifact.DownloadAllocation{ID: p.RootID, RootID: p.RootID, ClusterID: p.ClusterID, NamespaceUID: p.NamespaceUID, WorkloadUID: p.WorkloadUID, OutputLimit: 1 << 20, ReadLimit: 128 << 20, ValidUntil: n.Add(time.Hour)}, OutputLimit: 8192, ReadLimit: 16 << 20, RequestLimit: 4, Duration: 30 * time.Minute}
+	f.plan = ContextDownloadPlan{Allocation: artifact.DownloadAllocation{ID: p.RootID, RootID: p.RootID, ClusterID: p.ClusterID, NamespaceUID: p.NamespaceUID, WorkloadUID: p.WorkloadUID, OutputLimit: 1 << 20, ReadLimit: 128 << 20, ValidUntil: n.Add(time.Hour)}, OutputLimit: 8192, ReadLimit: 16 << 20}
 	f.refresh(n)
 	if !f.a.Valid(n) || !f.source.Valid(n) || !f.plan.Valid(p, n) {
 		t.Fatal("invalid synthetic control fixture")
@@ -377,7 +376,7 @@ func TestContextDownloadTerminalStatusOutlivesTransferDeadlineWithoutRuntime(t *
 			if err != nil || replay.Session.State != expected || replay.Session.ID != before.ID || replay.Metadata != nil || replay.ContinuePreparation {
 				t.Fatal(replay, err)
 			}
-			if f.session.State != before.State || f.session.Deadline != before.Deadline || f.session.Requests != before.Requests || f.session.Generation != before.Generation {
+			if f.session.State != before.State || f.session.Deadline != before.Deadline || f.session.Generation != before.Generation {
 				t.Fatal("status mutated stored session")
 			}
 			for _, forbidden := range []string{"runtime-check", "metadata-read", "continue", "source", "reserve", "plan"} {

@@ -22,14 +22,14 @@ import (
 // ADR-180: Public is optional, requires Native and an exact origin, and must
 // leave cold governor slots beside the owner pools.
 func TestOwnerPublicInputsRequireNativeOriginAndBudget(t *testing.T) {
-	for _, mode := range []string{"valid", "no-native", "origin-path", "http-origin", "format", "owner-connections", "same-settings", "audit-transit", "no-provider-roots", "native-port", "per-identity"} {
+	for _, mode := range []string{"valid", "no-native", "origin-path", "http-origin", "format", "owner-connections", "same-settings", "audit-transit", "no-provider-roots", "native-port"} {
 		t.Run(mode, func(t *testing.T) {
 			in, dir, c := nativeInputFixture(t)
 			c.Postgres.MaxConnections = 1 // the shared public allocation leaves six owner slots
 			c.Public = &contracts.OwnerPublicDeployment{Format: contracts.OwnerPublicDeploymentFormat, Origin: "https://asservat.example.test",
 				BrowserSettings: contracts.WorkerObjectReference{Name: "browser-settings", UID: runtimeID}, IdentitySettings: contracts.WorkerObjectReference{Name: "identity-settings", UID: runtimeID},
 				BrowserAudience: "asservat-api", ProviderRoots: c.Kubernetes.Roots, SessionTransit: contracts.OwnerPublicTransit{Mount: "browser-transit", Key: "sessions"},
-				Port: 8443, Version: "v1", OperationConcurrency: 8, MCPPerIdentity: 2, DownloadConcurrency: 4, DownloadsPerIdentity: 2, DownloadMaxSeconds: 3600}
+				Port: 8443, Version: "v1", OperationConcurrency: 8, MCPPerIdentity: 2, DownloadConcurrency: 4}
 			switch mode {
 			case "same-settings":
 				c.Public.IdentitySettings.Name = c.Public.BrowserSettings.Name
@@ -39,8 +39,6 @@ func TestOwnerPublicInputsRequireNativeOriginAndBudget(t *testing.T) {
 				c.Public.ProviderRoots = nil
 			case "native-port":
 				c.Public.Port = contracts.OwnerInstalledNativePort
-			case "per-identity":
-				c.Public.DownloadsPerIdentity = c.Public.DownloadConcurrency + 1
 			case "no-native":
 				c.Native = nil
 			case "origin-path":

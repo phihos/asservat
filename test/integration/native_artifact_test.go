@@ -122,7 +122,7 @@ func newNativeDownloadLedger(e artifact.ContextExpectation, c artifact.Copies, a
 	scope := artifact.DownloadScope{RootID: custodyID(), ArtifactID: e.Registration.Location.ArtifactID, CaptureID: e.CaptureUID, ClusterID: e.Registration.Location.ClusterID, NamespaceUID: e.NamespaceUID, WorkloadUID: e.WorkloadUID, PodUID: e.PodUID, Version: evidence.ContextCopiesDigest(c), Principal: principal}
 	revision := identity.Revision{UID: "synthetic-policy", Generation: 1, Digest: [32]byte{9}}
 	return &nativeDownloadLedger{
-		s:         artifact.DownloadSession{ID: custodyID(), AllocationID: custodyID(), Scope: scope, RequestDigest: artifact.Digest{7}, State: artifact.DownloadReady, CreatedAt: now, Deadline: now.Add(30 * time.Minute), OutputLimit: 1 << 30, ReadLimit: 4 << 30, RequestLimit: 8, Requests: 1},
+		s:         artifact.DownloadSession{ID: custodyID(), AllocationID: custodyID(), Scope: scope, RequestDigest: artifact.Digest{7}, State: artifact.DownloadReady, CreatedAt: now, Deadline: now.Add(30 * time.Minute), OutputLimit: 1 << 30, ReadLimit: 4 << 30},
 		authority: artifact.DownloadAuthority{Scope: scope, PermissionEpoch: custodyID(), PermissionSequence: 1, ProjectionDigest: artifact.Digest{1}, DecisionDigest: artifact.Digest{2}, IdentityRevision: revision, AccessUntil: e.Registration.ExpiresAt, DeleteBy: e.Registration.DeleteBy},
 		actor:     identity.Identity{Principal: principal, Policy: revision, Scopes: []string{"evidence:read", "evidence:download"}},
 		store:     auditStore,

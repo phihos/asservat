@@ -175,7 +175,7 @@ func (t DownloadResponseTransfer) TransferAudited(ctx context.Context, reader id
 	return t.transfer(ctx, reader, request, source, destination, auditor)
 }
 func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identities.ReaderIdentity, request DownloadResponseRequest, source NativeResponseSource, destination DownloadResponseSinkFactory, auditor DownloadContentAuditor) (err error) {
-	if !t.valid() || ctx == nil || reader == nil || source == nil || destination == nil || !authorization.UUID(request.SessionID) || !authorization.UUID(request.ResponseID) || !authorization.UUID(request.OwnerID) || !t.Now().Before(request.HardUntil) || request.HardUntil.After(t.Now().Add(8*time.Hour)) {
+	if !t.valid() || ctx == nil || reader == nil || source == nil || destination == nil || !authorization.UUID(request.SessionID) || !authorization.UUID(request.ResponseID) || !authorization.UUID(request.OwnerID) || !t.Now().Before(request.HardUntil) {
 		return stepped("request", artifact.ErrInvalid)
 	}
 	// Every refusal names its closed stage for the operator report; the

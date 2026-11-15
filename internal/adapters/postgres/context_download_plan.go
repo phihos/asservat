@@ -19,12 +19,11 @@ import (
 // SQL allocations and separately accepted backing must already exist. This read
 // facet can neither provision them nor choose a newer/larger/default candidate.
 type ContextDownloadPlanLimits struct {
-	OutputLimit, ReadLimit, RequestLimit int64
-	Duration                             time.Duration
+	OutputLimit, ReadLimit int64
 }
 
 func (l ContextDownloadPlanLimits) valid() bool {
-	return l.OutputLimit >= artifact.MaxContextBytes && l.OutputLimit <= artifact.MaxDownloadOutput && l.ReadLimit >= 2*evidence.ContextDownloadReadWork && l.ReadLimit <= artifact.MaxDownloadReadWork && l.RequestLimit >= 2 && l.RequestLimit <= artifact.MaxDownloadRequests && l.Duration > 0 && l.Duration <= 8*time.Hour
+	return l.OutputLimit >= artifact.MaxContextBytes && l.OutputLimit <= artifact.MaxDownloadOutput && l.ReadLimit >= 2*evidence.ContextDownloadReadWork && l.ReadLimit <= artifact.MaxDownloadReadWork
 }
 
 type ContextDownloadPlans struct {
@@ -108,7 +107,7 @@ func (s *ContextDownloadPlans) ContextDownloadPlan(ctx context.Context, source e
 		// Every contributing original deadline survives the configuration and SQL
 		// waits. This snapshot grants no effect; reservation rechecks current backing.
 		hard := identity.Earlier(allocation.ValidUntil, identity.Earlier(control.ValidUntil.Time, identity.Earlier(native.ValidUntil.Time, pool.ValidUntil.Time)))
-		out = evidence.ContextDownloadPlan{HardUntil: hard, Allocation: allocation, OutputLimit: limits.OutputLimit, ReadLimit: limits.ReadLimit, RequestLimit: limits.RequestLimit, Duration: limits.Duration, ObservedAt: start.Time, ValidUntil: downloadObservationDeadline(call, start.Time, original, until, hard)}
+		out = evidence.ContextDownloadPlan{HardUntil: hard, Allocation: allocation, OutputLimit: limits.OutputLimit, ReadLimit: limits.ReadLimit, ObservedAt: start.Time, ValidUntil: downloadObservationDeadline(call, start.Time, original, until, hard)}
 		if !out.Valid(scope, now.Time) || call.Err() != nil {
 			return artifact.ErrDownloadUnavailable
 		}

@@ -107,10 +107,12 @@ func (a DownloadAuthority) Valid(now time.Time) bool {
 }
 
 const (
-	MaxDownloadRequests int64 = 1024
+	// Sanity ceilings that keep the int64 byte accounting far from overflow;
+	// the effective limits come from the capacity allocation.
 	MaxDownloadOutput   int64 = 16 * MaxNativeBytes
 	MaxDownloadReadWork int64 = 64 * MaxNativeBytes
-	DownloadLease             = 5 * time.Second
+	// DownloadLease is the shared ADR-214 freshness of one plan observation.
+	DownloadLease = 5 * time.Second
 )
 
 // Each workload receives a separate finite transfer allocation. It is disjoint
@@ -130,16 +132,16 @@ func (a DownloadAllocation) Covers(s DownloadScope) bool {
 
 type DownloadSession struct {
 	// Absent only for historical/component sessions; public acquisition requires prepaid stop.
-	StopProtocol                                       string `json:",omitzero"`
-	ID, AllocationID                                   string
-	Scope                                              DownloadScope
-	RequestDigest                                      Digest
-	State                                              DownloadState
-	CreatedAt, Deadline                                time.Time
-	OutputLimit, ReadLimit, RequestLimit               int64
-	ChargedOutput, ChargedRead, Requests, EmittedBytes int64
-	Generation                                         int64
-	Active                                             *DownloadBatch
+	StopProtocol                             string `json:",omitzero"`
+	ID, AllocationID                         string
+	Scope                                    DownloadScope
+	RequestDigest                            Digest
+	State                                    DownloadState
+	CreatedAt, Deadline                      time.Time
+	OutputLimit, ReadLimit                   int64
+	ChargedOutput, ChargedRead, EmittedBytes int64
+	Generation                               int64
+	Active                                   *DownloadBatch
 }
 type DownloadPurpose string
 
@@ -162,7 +164,7 @@ type DownloadBatch struct {
 }
 
 func (s DownloadSession) Valid() bool {
-	return (s.StopProtocol == "" || s.StopProtocol == DownloadStopProtocol) && uuid(s.ID) && uuid(s.AllocationID) && s.Scope.Valid() && s.RequestDigest != (Digest{}) && s.State.Valid() && !s.CreatedAt.IsZero() && s.Deadline.After(s.CreatedAt) && !s.Deadline.After(s.CreatedAt.Add(8*time.Hour)) && s.OutputLimit > 0 && s.OutputLimit <= MaxDownloadOutput && s.ReadLimit > 0 && s.ReadLimit <= MaxDownloadReadWork && s.RequestLimit > 0 && s.RequestLimit <= MaxDownloadRequests && s.ChargedOutput >= 0 && s.ChargedOutput <= s.OutputLimit && s.ChargedRead >= 0 && s.ChargedRead <= s.ReadLimit && s.Requests >= 0 && s.Requests <= s.RequestLimit && s.EmittedBytes >= 0 && s.EmittedBytes <= s.ChargedOutput && s.Generation >= 0
+	return (s.StopProtocol == "" || s.StopProtocol == DownloadStopProtocol) && uuid(s.ID) && uuid(s.AllocationID) && s.Scope.Valid() && s.RequestDigest != (Digest{}) && s.State.Valid() && !s.CreatedAt.IsZero() && s.Deadline.After(s.CreatedAt) && s.OutputLimit > 0 && s.OutputLimit <= MaxDownloadOutput && s.ReadLimit > 0 && s.ReadLimit <= MaxDownloadReadWork && s.ChargedOutput >= 0 && s.ChargedOutput <= s.OutputLimit && s.ChargedRead >= 0 && s.ChargedRead <= s.ReadLimit && s.EmittedBytes >= 0 && s.EmittedBytes <= s.ChargedOutput && s.Generation >= 0
 }
 
 // current requires a complete check. Only a started response's windows and
@@ -201,11 +203,10 @@ func (s DownloadSession) Start(a DownloadAuthority, b DownloadBatch, now time.Ti
 	if s.Active != nil && now.Before(s.Active.LeaseUntil) {
 		return s, ErrDownloadConflict
 	}
-	if s.Requests == s.RequestLimit || b.OutputBytes > s.OutputLimit-s.ChargedOutput || b.ReadBytes > s.ReadLimit-s.ChargedRead {
+	if b.OutputBytes > s.OutputLimit-s.ChargedOutput || b.ReadBytes > s.ReadLimit-s.ChargedRead {
 		return s, ErrDownloadCapacity
 	}
 	s.Generation++
-	s.Requests++
 	s.ChargedOutput += b.OutputBytes
 	s.ChargedRead += b.ReadBytes
 	b.Generation = s.Generation

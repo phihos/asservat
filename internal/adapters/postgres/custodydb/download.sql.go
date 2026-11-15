@@ -89,34 +89,8 @@ func (q *Queries) ChargeDownloadAllocation(ctx context.Context, arg ChargeDownlo
 	return result.RowsAffected(), nil
 }
 
-const downloadStreams = `-- name: DownloadStreams :one
-SELECT count(*)::bigint AS total,count(*) FILTER(WHERE s.principal_key=$2)::bigint AS principal
-FROM artifact_download s
-WHERE s.root_id=$1 AND (
- EXISTS(SELECT 1 FROM download_batch b WHERE b.id=s.active_batch AND b.lease_until>clock_timestamp() AND b.outcome_json IS NULL)
- OR EXISTS(SELECT 1 FROM download_response r WHERE r.session_id=s.id AND r.generation=s.generation AND NOT r.closed AND r.lease_until>clock_timestamp())
-)
-`
-
-type DownloadStreamsParams struct {
-	RootID       pgtype.UUID
-	PrincipalKey []byte
-}
-
-type DownloadStreamsRow struct {
-	Total     int64
-	Principal int64
-}
-
-func (q *Queries) DownloadStreams(ctx context.Context, arg DownloadStreamsParams) (DownloadStreamsRow, error) {
-	row := q.db.QueryRow(ctx, downloadStreams, arg.RootID, arg.PrincipalKey)
-	var i DownloadStreamsRow
-	err := row.Scan(&i.Total, &i.Principal)
-	return i, err
-}
-
 const findDownloadSession = `-- name: FindDownloadSession :one
-SELECT id, root_id, allocation_id, artifact_id, principal_key, actor_key, idempotency_digest, request_digest, scope_json, state, created_at, deadline, output_limit, read_limit, request_limit, charged_output, charged_read, requests, emitted_bytes, generation, active_batch, stop_protocol FROM artifact_download WHERE root_id=$1 AND actor_key=$2 AND idempotency_digest=$3
+SELECT id, root_id, allocation_id, artifact_id, principal_key, actor_key, idempotency_digest, request_digest, scope_json, state, created_at, deadline, output_limit, read_limit, charged_output, charged_read, emitted_bytes, generation, active_batch, stop_protocol FROM artifact_download WHERE root_id=$1 AND actor_key=$2 AND idempotency_digest=$3
 `
 
 type FindDownloadSessionParams struct {
@@ -143,10 +117,8 @@ func (q *Queries) FindDownloadSession(ctx context.Context, arg FindDownloadSessi
 		&i.Deadline,
 		&i.OutputLimit,
 		&i.ReadLimit,
-		&i.RequestLimit,
 		&i.ChargedOutput,
 		&i.ChargedRead,
-		&i.Requests,
 		&i.EmittedBytes,
 		&i.Generation,
 		&i.ActiveBatch,
@@ -235,8 +207,8 @@ func (q *Queries) InsertDownloadBatch(ctx context.Context, arg InsertDownloadBat
 }
 
 const insertDownloadSession = `-- name: InsertDownloadSession :one
-INSERT INTO artifact_download(id,root_id,allocation_id,artifact_id,principal_key,actor_key,idempotency_digest,request_digest,scope_json,deadline,output_limit,read_limit,request_limit,stop_protocol)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id, root_id, allocation_id, artifact_id, principal_key, actor_key, idempotency_digest, request_digest, scope_json, state, created_at, deadline, output_limit, read_limit, request_limit, charged_output, charged_read, requests, emitted_bytes, generation, active_batch, stop_protocol
+INSERT INTO artifact_download(id,root_id,allocation_id,artifact_id,principal_key,actor_key,idempotency_digest,request_digest,scope_json,deadline,output_limit,read_limit,stop_protocol)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id, root_id, allocation_id, artifact_id, principal_key, actor_key, idempotency_digest, request_digest, scope_json, state, created_at, deadline, output_limit, read_limit, charged_output, charged_read, emitted_bytes, generation, active_batch, stop_protocol
 `
 
 type InsertDownloadSessionParams struct {
@@ -252,7 +224,6 @@ type InsertDownloadSessionParams struct {
 	Deadline          pgtype.Timestamptz
 	OutputLimit       int64
 	ReadLimit         int64
-	RequestLimit      int64
 	StopProtocol      pgtype.Text
 }
 
@@ -270,7 +241,6 @@ func (q *Queries) InsertDownloadSession(ctx context.Context, arg InsertDownloadS
 		arg.Deadline,
 		arg.OutputLimit,
 		arg.ReadLimit,
-		arg.RequestLimit,
 		arg.StopProtocol,
 	)
 	var i ArtifactDownload
@@ -289,10 +259,8 @@ func (q *Queries) InsertDownloadSession(ctx context.Context, arg InsertDownloadS
 		&i.Deadline,
 		&i.OutputLimit,
 		&i.ReadLimit,
-		&i.RequestLimit,
 		&i.ChargedOutput,
 		&i.ChargedRead,
-		&i.Requests,
 		&i.EmittedBytes,
 		&i.Generation,
 		&i.ActiveBatch,
@@ -356,7 +324,7 @@ func (q *Queries) LockDownloadBatch(ctx context.Context, arg LockDownloadBatchPa
 }
 
 const lockDownloadSession = `-- name: LockDownloadSession :one
-SELECT id, root_id, allocation_id, artifact_id, principal_key, actor_key, idempotency_digest, request_digest, scope_json, state, created_at, deadline, output_limit, read_limit, request_limit, charged_output, charged_read, requests, emitted_bytes, generation, active_batch, stop_protocol FROM artifact_download WHERE id=$1 AND root_id=$2 FOR UPDATE
+SELECT id, root_id, allocation_id, artifact_id, principal_key, actor_key, idempotency_digest, request_digest, scope_json, state, created_at, deadline, output_limit, read_limit, charged_output, charged_read, emitted_bytes, generation, active_batch, stop_protocol FROM artifact_download WHERE id=$1 AND root_id=$2 FOR UPDATE
 `
 
 type LockDownloadSessionParams struct {
@@ -382,10 +350,8 @@ func (q *Queries) LockDownloadSession(ctx context.Context, arg LockDownloadSessi
 		&i.Deadline,
 		&i.OutputLimit,
 		&i.ReadLimit,
-		&i.RequestLimit,
 		&i.ChargedOutput,
 		&i.ChargedRead,
-		&i.Requests,
 		&i.EmittedBytes,
 		&i.Generation,
 		&i.ActiveBatch,
@@ -422,7 +388,7 @@ func (q *Queries) ReadDownloadBatch(ctx context.Context, arg ReadDownloadBatchPa
 }
 
 const readDownloadSession = `-- name: ReadDownloadSession :one
-SELECT id, root_id, allocation_id, artifact_id, principal_key, actor_key, idempotency_digest, request_digest, scope_json, state, created_at, deadline, output_limit, read_limit, request_limit, charged_output, charged_read, requests, emitted_bytes, generation, active_batch, stop_protocol FROM artifact_download WHERE id=$1 AND root_id=$2
+SELECT id, root_id, allocation_id, artifact_id, principal_key, actor_key, idempotency_digest, request_digest, scope_json, state, created_at, deadline, output_limit, read_limit, charged_output, charged_read, emitted_bytes, generation, active_batch, stop_protocol FROM artifact_download WHERE id=$1 AND root_id=$2
 `
 
 type ReadDownloadSessionParams struct {
@@ -448,10 +414,8 @@ func (q *Queries) ReadDownloadSession(ctx context.Context, arg ReadDownloadSessi
 		&i.Deadline,
 		&i.OutputLimit,
 		&i.ReadLimit,
-		&i.RequestLimit,
 		&i.ChargedOutput,
 		&i.ChargedRead,
-		&i.Requests,
 		&i.EmittedBytes,
 		&i.Generation,
 		&i.ActiveBatch,
@@ -479,7 +443,7 @@ func (q *Queries) SetDownloadOutcome(ctx context.Context, arg SetDownloadOutcome
 }
 
 const updateDownloadSession = `-- name: UpdateDownloadSession :execrows
-UPDATE artifact_download SET state=$3,charged_output=$4,charged_read=$5,requests=$6,emitted_bytes=$7,generation=$8,active_batch=$9
+UPDATE artifact_download SET state=$3,charged_output=$4,charged_read=$5,emitted_bytes=$6,generation=$7,active_batch=$8
 WHERE id=$1 AND root_id=$2
 `
 
@@ -489,7 +453,6 @@ type UpdateDownloadSessionParams struct {
 	State         string
 	ChargedOutput int64
 	ChargedRead   int64
-	Requests      int64
 	EmittedBytes  int64
 	Generation    int64
 	ActiveBatch   pgtype.UUID
@@ -502,7 +465,6 @@ func (q *Queries) UpdateDownloadSession(ctx context.Context, arg UpdateDownloadS
 		arg.State,
 		arg.ChargedOutput,
 		arg.ChargedRead,
-		arg.Requests,
 		arg.EmittedBytes,
 		arg.Generation,
 		arg.ActiveBatch,

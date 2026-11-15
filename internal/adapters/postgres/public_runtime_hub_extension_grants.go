@@ -231,8 +231,6 @@ var publicRuntimeHubExtensionGrantTable = map[string][]publicRuntimeGrant{
 		{"table", "artifact_download", "principal_key", "INSERT"},
 		{"table", "artifact_download", "read_limit", "INSERT"},
 		{"table", "artifact_download", "request_digest", "INSERT"},
-		{"table", "artifact_download", "request_limit", "INSERT"},
-		{"table", "artifact_download", "requests", "UPDATE"},
 		{"table", "artifact_download", "root_id", "INSERT"},
 		{"table", "artifact_download", "scope_json", "INSERT"},
 		{"table", "artifact_download", "state", "UPDATE"},

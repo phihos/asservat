@@ -118,10 +118,8 @@ type ArtifactDownload struct {
 	Deadline          pgtype.Timestamptz
 	OutputLimit       int64
 	ReadLimit         int64
-	RequestLimit      int64
 	ChargedOutput     int64
 	ChargedRead       int64
-	Requests          int64
 	EmittedBytes      int64
 	Generation        int64
 	ActiveBatch       pgtype.UUID

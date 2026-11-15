@@ -259,7 +259,7 @@ func newPublicJourneyNative(t *testing.T, ctx context.Context, s captureAdmissio
 	publicJourneyRequire(t, "original content control backing", config.BindDownloadControlAllocation(ctx, control))
 	objects, e := objectstore.NewDownloadWindowAuditObjects(store, f.storeID, keys, keys)
 	publicJourneyRequire(t, "content audit", e)
-	plans, e := postgres.NewContextDownloadPlans(ctx, open("native_plan_runtime", "synthetic-native-plan"), root, installation, f.profile, configuration, postgres.ContextDownloadPlanLimits{OutputLimit: 8192, ReadLimit: 8 << 20, RequestLimit: 4, Duration: time.Minute})
+	plans, e := postgres.NewContextDownloadPlans(ctx, open("native_plan_runtime", "synthetic-native-plan"), root, installation, f.profile, configuration, postgres.ContextDownloadPlanLimits{OutputLimit: 8192, ReadLimit: 8 << 20})
 	publicJourneyRequire(t, "download plans", e)
 	f.coordinator = evidence.ContextDownloadCoordinator{RootID: root, InstallationID: installation, Routes: f.runtime, Sources: f.runtime, Authority: f.gate, Sessions: f.runtime, Plans: plans, Now: time.Now, NewID: custodyID}
 	stopLedger, e := postgres.NewDownloadStops(ctx, open("download_stop_runtime", "synthetic-download-stop"), root, "")

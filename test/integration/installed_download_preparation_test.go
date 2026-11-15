@@ -60,7 +60,7 @@ func qualifyInstalledDownloadPreparation(t *testing.T, ctx context.Context, admi
 		t.Fatal("setup session authority", err)
 	}
 	now := time.Now().UTC()
-	session, err := sessions.ReserveDownload(ctx, evidence.DownloadReservation{Session: artifact.DownloadSession{ID: custodyID(), AllocationID: allocation.ID, Scope: scope, RequestDigest: artifact.Digest{8}, State: artifact.DownloadPreparing, CreatedAt: now, Deadline: now.Add(5 * time.Minute), OutputLimit: 8192, ReadLimit: 8 << 20, RequestLimit: 4}, IdempotencyDigest: artifact.Digest{9}, Authority: setupAuthority})
+	session, err := sessions.ReserveDownload(ctx, evidence.DownloadReservation{Session: artifact.DownloadSession{ID: custodyID(), AllocationID: allocation.ID, Scope: scope, RequestDigest: artifact.Digest{8}, State: artifact.DownloadPreparing, CreatedAt: now, Deadline: now.Add(5 * time.Minute), OutputLimit: 8192, ReadLimit: 8 << 20}, IdempotencyDigest: artifact.Digest{9}, Authority: setupAuthority})
 	if err != nil {
 		t.Fatal("setup session reservation", err)
 	}

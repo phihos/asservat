@@ -139,16 +139,8 @@ func (s *DownloadWorkers) ReserveDownloadWorker(ctx context.Context, session, at
 		} else if !errors.Is(e, pgx.ErrNoRows) {
 			return e
 		}
-		if generation > parent.RequestLimit {
-			return artifact.ErrDownloadCapacity
-		}
-		counts, e := q.AcquisitionWorkerCapacity(ctx, custodydb.AcquisitionWorkerCapacityParams{InstallationID: id(p.InstallationID), ClusterID: id(a.Scope.ClusterID), NamespaceUid: a.Scope.NamespaceUID, WorkloadUid: a.Scope.WorkloadUID, PrincipalKey: principalKey(a.Scope.Principal)})
-		if e != nil {
-			return e
-		}
-		if counts.Total >= 16 || counts.Workload >= 2 || counts.Principal >= 2 {
-			return artifact.ErrDownloadCapacity
-		}
+		// MaxRuntime stays: worker certificate epochs (ADR-071, 24 x 20 min)
+		// cover at most the profile's runtime ceiling.
 		until := identity.Earlier(parent.Deadline, identity.Earlier(a.AccessUntil, now.Add(p.MaxRuntime))).UTC().Truncate(time.Microsecond)
 		if until.Sub(now) < time.Second {
 			return artifact.ErrDownloadExpired

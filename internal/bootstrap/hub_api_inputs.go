@@ -209,7 +209,7 @@ func buildHubAPIPublic(ctx context.Context, files *os.Root, c contracts.OwnerDep
 	out := &contracts.OwnerPublicDeployment{Format: contracts.OwnerPublicDeploymentFormat, Origin: p.Origin, BrowserAudience: p.BrowserAudience, ProviderRoots: providerRoots,
 		SessionTransit: contracts.OwnerPublicTransit{Mount: transit, Key: names.BrowserSessionKey}, CaptureHistory: p.CaptureHistory, WorkloadRate: p.WorkloadRate, Standby: p.Standby, Captures: p.Captures, PreviewSeconds: p.PreviewSeconds, ArtifactKeyID: artifactKeyID(ids.InstallationID),
 		DownloadPlan: p.DownloadPlan, ProxyTLS: p.ProxyTLS, Port: contracts.OwnerInstalledPublicPort, Version: p.Version, OperationConcurrency: p.OperationConcurrency, MCPPerIdentity: p.MCPPerIdentity,
-		DownloadConcurrency: p.DownloadConcurrency, DownloadsPerIdentity: p.DownloadsPerIdentity, DownloadMaxSeconds: p.DownloadMaxSeconds, OperationAudit: p.OperationAudit, WorkerPKI: contracts.OwnerPublicWorkerPKI{Mount: contracts.SmallOpenBaoWorkerPKIMount, Role: names.DownloadWorkerRole, IssuerEpoch: ids.IssuerEpoch}}
+		DownloadConcurrency: p.DownloadConcurrency, OperationAudit: p.OperationAudit, WorkerPKI: contracts.OwnerPublicWorkerPKI{Mount: contracts.SmallOpenBaoWorkerPKIMount, Role: names.DownloadWorkerRole, IssuerEpoch: ids.IssuerEpoch}}
 	for _, v := range []struct {
 		name, step string
 		target     *contracts.WorkerObjectReference

@@ -31,5 +31,5 @@ func capacityNativeContextInput(target targets.PodResolution, retained privacy.R
 }
 
 func capacityNativeSession(scope artifact.DownloadScope, allocationID, sessionID string, n, plannedUntil time.Time) artifact.DownloadSession {
-	return artifact.DownloadSession{ID: sessionID, AllocationID: allocationID, Scope: scope, RequestDigest: artifact.Digest{26}, State: artifact.DownloadPreparing, CreatedAt: n, Deadline: identity.Earlier(n.Add(30*time.Second), plannedUntil), OutputLimit: 8192, ReadLimit: 8 << 20, RequestLimit: 3, StopProtocol: artifact.DownloadStopProtocol}
+	return artifact.DownloadSession{ID: sessionID, AllocationID: allocationID, Scope: scope, RequestDigest: artifact.Digest{26}, State: artifact.DownloadPreparing, CreatedAt: n, Deadline: identity.Earlier(n.Add(30*time.Second), plannedUntil), OutputLimit: 8192, ReadLimit: 8 << 20, StopProtocol: artifact.DownloadStopProtocol}
 }

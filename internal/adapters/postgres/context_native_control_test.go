@@ -16,7 +16,6 @@ func TestFirstContextPreparationDoesNotGrantASecondAttempt(t *testing.T) {
 		func(s *artifact.DownloadSession) { s.StopProtocol = "" },
 		func(s *artifact.DownloadSession) { s.State = artifact.DownloadReady },
 		func(s *artifact.DownloadSession) { s.Generation = 1 },
-		func(s *artifact.DownloadSession) { s.Requests = 1 },
 		func(s *artifact.DownloadSession) { s.Active = &batch },
 		func(s *artifact.DownloadSession) { s.ChargedRead = 1 },
 		func(s *artifact.DownloadSession) { s.ChargedOutput = 1 },

@@ -71,7 +71,7 @@ func readNativeResumeAccounting(t *testing.T, ctx context.Context, f nativeExcha
 }
 func requireNativeResumeOriginal(t *testing.T, original, next artifact.DownloadSession) {
 	t.Helper()
-	if next.ID != original.ID || next.AllocationID != original.AllocationID || next.Scope != original.Scope || next.RequestDigest != original.RequestDigest || next.StopProtocol != original.StopProtocol || !next.CreatedAt.Equal(original.CreatedAt) || !next.Deadline.Equal(original.Deadline) || next.OutputLimit != original.OutputLimit || next.ReadLimit != original.ReadLimit || next.RequestLimit != original.RequestLimit || next.Requests != original.Requests {
+	if next.ID != original.ID || next.AllocationID != original.AllocationID || next.Scope != original.Scope || next.RequestDigest != original.RequestDigest || next.StopProtocol != original.StopProtocol || !next.CreatedAt.Equal(original.CreatedAt) || !next.Deadline.Equal(original.Deadline) || next.OutputLimit != original.OutputLimit || next.ReadLimit != original.ReadLimit {
 		t.Fatal("range resumed with a changed original session, artifact/version or budget")
 	}
 }
@@ -102,7 +102,7 @@ func qualifyContextNativeResume(t *testing.T, ctx context.Context, f nativeExcha
 		t.Fatal(err)
 	}
 	sessions := &nativeResumeSessions{nativeContentSessions: nativeContentSessions{workerBrowserSession{initial, original.Deadline, 5 * time.Second}}}
-	handler, err := browser.NewDownloadContentHandler(browser.DownloadContentConfig{PublicOrigin: origin, Issuer: initial.Principal.Issuer, MaxConcurrent: 2, MaxPerIdentity: 2, MaxDuration: time.Minute, Now: time.Now, NewID: custodyID}, browser.SessionHandler{Origin: origin, Issuer: initial.Principal.Issuer, Sessions: sessions}, nativeContentDeniedBearer{}, shared, runtime, transfer)
+	handler, err := browser.NewDownloadContentHandler(browser.DownloadContentConfig{PublicOrigin: origin, Issuer: initial.Principal.Issuer, MaxConcurrent: 2, Now: time.Now, NewID: custodyID}, browser.SessionHandler{Origin: origin, Issuer: initial.Principal.Issuer, Sessions: sessions}, nativeContentDeniedBearer{}, shared, runtime, transfer)
 	if err != nil {
 		t.Fatal("native resume HTTP handler", err)
 	}

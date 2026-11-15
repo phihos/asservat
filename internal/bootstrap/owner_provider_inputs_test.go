@@ -72,7 +72,7 @@ func TestInstalledOwnerPromotionInputs(t *testing.T) {
 					BrowserSettings: contracts.WorkerObjectReference{Name: "browser-settings", UID: runtimeID}, IdentitySettings: contracts.WorkerObjectReference{Name: "identity-settings", UID: runtimeID},
 					BrowserAudience: "asservat-api", ProviderRoots: c.Kubernetes.Roots, SessionTransit: contracts.OwnerPublicTransit{Mount: "browser-transit", Key: "sessions"},
 					WorkerPKI: contracts.OwnerPublicWorkerPKI{Mount: "worker-pki", Role: "worker", IssuerEpoch: runtimeID, Roots: c.Kubernetes.Roots},
-					Port:      contracts.OwnerInstalledPublicPort, Version: "v1", OperationConcurrency: 8, MCPPerIdentity: 2, DownloadConcurrency: 4, DownloadsPerIdentity: 2, DownloadMaxSeconds: 3600,
+					Port:      contracts.OwnerInstalledPublicPort, Version: "v1", OperationConcurrency: 8, MCPPerIdentity: 2, DownloadConcurrency: 4,
 					RuntimeProjection: contracts.WorkerObjectReference{Name: contracts.PublicRuntimeProjectionName(c.InstallationID), UID: runtimeID}}
 				_, digest, err := providerconfig.OwnerPublicProviderRecipeFor(c, *c.ProviderAuthentication, time.Now())
 				if err != nil {

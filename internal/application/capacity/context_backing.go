@@ -73,7 +73,7 @@ func CompileContextProtocolBacking(contextSlice BudgetAmount, h ContextBackingHi
 	if unit <= 0 {
 		return zero, ErrBudgetInvalid
 	}
-	n := min(contextSlice.Bytes/unit, contextSlice.Objects/4, artifact.MaxDownloadRequests/contextDownloadResponses)
+	n := min(contextSlice.Bytes/unit, contextSlice.Objects/4, artifact.DownloadPartialWindows/contextDownloadResponses)
 	if n < 1 {
 		return zero, ErrBudgetFull
 	}

@@ -126,7 +126,7 @@ func ValidateRootBackingInput(in RootBackingInput) bool {
 
 func CompileRootBacking(in RootBackingInput) (RootBackingPlan, error) {
 	var zero RootBackingPlan
-	if in.Format != RootBackingFormat || !authorization.UUID(in.RootID) || !authorization.UUID(in.InstallationID) || !authorization.UUID(in.QualificationID) || in.QualificationDigest == (artifact.Digest{}) || !identity.Text(in.SystemPoolUID, 64) || !identity.Text(in.AccountVersion, 64) || in.Accounts < 1 || in.Accounts > MaxManagedCapacityAccounts || in.RecordsPerAccount < 1 || in.RecordsPerAccount > artifact.MaxDownloadRequests/contextDownloadResponses || in.AdmissionSeconds < 60 || in.AdmissionSeconds > 86400 || !authorization.UUID(in.ProcessingEpoch) || !authorization.UUID(in.ProcessingSourceUID) || in.ProcessingProtectionDigest == (artifact.Digest{}) || !in.Metadata.Valid() {
+	if in.Format != RootBackingFormat || !authorization.UUID(in.RootID) || !authorization.UUID(in.InstallationID) || !authorization.UUID(in.QualificationID) || in.QualificationDigest == (artifact.Digest{}) || !identity.Text(in.SystemPoolUID, 64) || !identity.Text(in.AccountVersion, 64) || in.Accounts < 1 || in.Accounts > MaxManagedCapacityAccounts || in.RecordsPerAccount < 1 || in.RecordsPerAccount > artifact.DownloadPartialWindows/contextDownloadResponses || in.AdmissionSeconds < 60 || in.AdmissionSeconds > 86400 || !authorization.UUID(in.ProcessingEpoch) || !authorization.UUID(in.ProcessingSourceUID) || in.ProcessingProtectionDigest == (artifact.Digest{}) || !in.Metadata.Valid() {
 		return zero, ErrBudgetInvalid
 	}
 	for _, x := range []struct {

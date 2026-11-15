@@ -186,7 +186,7 @@ func qualifyDownloadStopLifecycle(t *testing.T, ctx context.Context, admin *pgxp
 			}
 			for _, mode := range []string{"written", "unused", "unwritten", "unknown"} {
 				a := current()
-				session, e := ledger.ReserveDownload(ctx, evidence.DownloadReservation{Authority: a, IdempotencyDigest: evidence.ContextDownloadKeyDigest("lifecycle-" + mode), Session: artifact.DownloadSession{ID: custodyID(), AllocationID: allocation.ID, Scope: scope, RequestDigest: evidence.ContextDownloadRequestDigest(scope.ArtifactID), State: artifact.DownloadPreparing, StopProtocol: artifact.DownloadStopProtocol, CreatedAt: time.Now().UTC().Truncate(time.Microsecond), Deadline: deadline, OutputLimit: 8192, ReadLimit: 16 << 20, RequestLimit: 4}})
+				session, e := ledger.ReserveDownload(ctx, evidence.DownloadReservation{Authority: a, IdempotencyDigest: evidence.ContextDownloadKeyDigest("lifecycle-" + mode), Session: artifact.DownloadSession{ID: custodyID(), AllocationID: allocation.ID, Scope: scope, RequestDigest: evidence.ContextDownloadRequestDigest(scope.ArtifactID), State: artifact.DownloadPreparing, StopProtocol: artifact.DownloadStopProtocol, CreatedAt: time.Now().UTC().Truncate(time.Microsecond), Deadline: deadline, OutputLimit: 8192, ReadLimit: 16 << 20}})
 				if e != nil {
 					t.Fatal("reserve lifecycle", mode, e)
 				}
@@ -491,7 +491,7 @@ func qualifyStopBackingExpiryAfterLock(t *testing.T, ctx context.Context, admin 
 		}
 	}()
 	go func() {
-		_, e := ledger.ReserveDownload(opctx, evidence.DownloadReservation{Authority: a, IdempotencyDigest: evidence.ContextDownloadKeyDigest("lifecycle-lock-expiry"), Session: artifact.DownloadSession{ID: sessionID, AllocationID: backing.AllocationID, Scope: scope, RequestDigest: evidence.ContextDownloadRequestDigest(scope.ArtifactID), State: artifact.DownloadPreparing, StopProtocol: artifact.DownloadStopProtocol, CreatedAt: time.Now().UTC().Truncate(time.Microsecond), Deadline: deadline, OutputLimit: 8192, ReadLimit: 16 << 20, RequestLimit: 4}})
+		_, e := ledger.ReserveDownload(opctx, evidence.DownloadReservation{Authority: a, IdempotencyDigest: evidence.ContextDownloadKeyDigest("lifecycle-lock-expiry"), Session: artifact.DownloadSession{ID: sessionID, AllocationID: backing.AllocationID, Scope: scope, RequestDigest: evidence.ContextDownloadRequestDigest(scope.ArtifactID), State: artifact.DownloadPreparing, StopProtocol: artifact.DownloadStopProtocol, CreatedAt: time.Now().UTC().Truncate(time.Microsecond), Deadline: deadline, OutputLimit: 8192, ReadLimit: 16 << 20}})
 		done <- e
 	}()
 	blocked := false

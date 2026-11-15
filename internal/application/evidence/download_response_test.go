@@ -233,7 +233,6 @@ func newResponseTransferFixture(t *testing.T, size int64) (*responseTransferFixt
 	base.s.State = artifact.DownloadReady
 	base.s.OutputLimit = max(1, size)
 	base.s.ReadLimit = 2 * artifact.DownloadWindowBytes
-	base.s.Requests = 1
 	f := &responseTransferFixture{downloadWorkerFixture: base, size: size}
 	count := 0
 	service := DownloadResponseTransfer{Sessions: f, Responses: f, Authority: f, Objects: f, Audit: f, Now: func() time.Time { return f.now }, NewID: func() string { count++; return fmt.Sprintf("22222222-2222-4222-8222-%012d", count) }}
@@ -248,7 +247,7 @@ func TestResponseTransferMultipleWindowsReuseLeaseAndFinishWholeFile(t *testing.
 	}
 	// Two batches and two complete checks, all before the response starts;
 	// the second window continues the started decision (ADR-312).
-	if f.s.State != artifact.DownloadCompleted || f.emitted != f.size || f.chunks != 65 || f.intents != 2 || f.outcomes != 2 || f.leases != 2 || f.batches != 2 || f.checks != 2 || f.s.Requests != 1 || f.s.ChargedOutput != f.size {
+	if f.s.State != artifact.DownloadCompleted || f.emitted != f.size || f.chunks != 65 || f.intents != 2 || f.outcomes != 2 || f.leases != 2 || f.batches != 2 || f.checks != 2 || f.s.ChargedOutput != f.size {
 		t.Fatalf("state=%s chunks=%d leases=%d batches=%d checks=%d intent=%d outcome=%d", f.s.State, f.chunks, f.leases, f.batches, f.checks, f.intents, f.outcomes)
 	}
 	for _, b := range f.backing {

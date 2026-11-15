@@ -81,7 +81,7 @@ func qualifyDownloadStop(t *testing.T, ctx context.Context, admin *pgxpool.Pool,
 		if err = config.BindDownloadAllocation(ctx, allocation); err != nil {
 			t.Fatal(err)
 		}
-		request := evidence.DownloadReservation{Authority: a, IdempotencyDigest: evidence.ContextDownloadKeyDigest("stop-fixture"), Session: artifact.DownloadSession{ID: custodyID(), AllocationID: allocation.ID, Scope: scope, RequestDigest: evidence.ContextDownloadRequestDigest(scope.ArtifactID), State: artifact.DownloadPreparing, StopProtocol: artifact.DownloadStopProtocol, CreatedAt: time.Now().UTC(), Deadline: time.Now().UTC().Add(20 * time.Second).Truncate(time.Microsecond), OutputLimit: 8192, ReadLimit: 16 << 20, RequestLimit: 4}}
+		request := evidence.DownloadReservation{Authority: a, IdempotencyDigest: evidence.ContextDownloadKeyDigest("stop-fixture"), Session: artifact.DownloadSession{ID: custodyID(), AllocationID: allocation.ID, Scope: scope, RequestDigest: evidence.ContextDownloadRequestDigest(scope.ArtifactID), State: artifact.DownloadPreparing, StopProtocol: artifact.DownloadStopProtocol, CreatedAt: time.Now().UTC(), Deadline: time.Now().UTC().Add(20 * time.Second).Truncate(time.Microsecond), OutputLimit: 8192, ReadLimit: 16 << 20}}
 		if _, err = ledger.ReserveDownload(ctx, request); err == nil {
 			t.Fatal("admitted without prepaid stop backing")
 		}

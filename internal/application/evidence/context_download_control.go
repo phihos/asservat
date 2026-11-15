@@ -48,9 +48,8 @@ type ContextDownloadPlans interface {
 	ContextDownloadPlan(context.Context, ContextDownloadSource) (ContextDownloadPlan, error)
 }
 type ContextDownloadPlan struct {
-	Allocation                           artifact.DownloadAllocation
-	OutputLimit, ReadLimit, RequestLimit int64
-	Duration                             time.Duration
+	Allocation             artifact.DownloadAllocation
+	OutputLimit, ReadLimit int64
 	// Freshness of this admission snapshot, consumed by session reservation.
 	ObservedAt, ValidUntil time.Time
 	// Absolute accepted backing end. Zero is historical component-only.
@@ -58,7 +57,7 @@ type ContextDownloadPlan struct {
 }
 
 func (p ContextDownloadPlan) Valid(scope artifact.DownloadScope, now time.Time) bool {
-	return (p.HardUntil.IsZero() || now.Before(p.HardUntil) && !p.HardUntil.After(p.Allocation.ValidUntil)) && p.Allocation.Valid() && p.Allocation.Covers(scope) && identity.Fresh(p.ObservedAt, p.ValidUntil, now, artifact.DownloadLease) && now.Before(p.Allocation.ValidUntil) && p.OutputLimit >= artifact.MaxContextBytes && p.OutputLimit <= p.Allocation.OutputLimit && p.ReadLimit >= 2*ContextDownloadReadWork && p.ReadLimit <= p.Allocation.ReadLimit && p.RequestLimit >= 2 && p.RequestLimit <= artifact.MaxDownloadRequests && p.Duration > 0 && p.Duration <= 8*time.Hour
+	return (p.HardUntil.IsZero() || now.Before(p.HardUntil) && !p.HardUntil.After(p.Allocation.ValidUntil)) && p.Allocation.Valid() && p.Allocation.Covers(scope) && identity.Fresh(p.ObservedAt, p.ValidUntil, now, artifact.DownloadLease) && now.Before(p.Allocation.ValidUntil) && p.OutputLimit >= artifact.MaxContextBytes && p.OutputLimit <= p.Allocation.OutputLimit && p.ReadLimit >= 2*ContextDownloadReadWork && p.ReadLimit <= p.Allocation.ReadLimit
 }
 
 // All three methods belong to an actual configured regional native-work path.
@@ -261,7 +260,7 @@ func (s ContextDownloadCoordinator) prepare(ctx context.Context, current identit
 			return zero, collapsed("plan-expired", artifact.ErrDownloadUnavailable, ctx.Err())
 		}
 		now := s.Now().UTC().Truncate(time.Microsecond)
-		session = artifact.DownloadSession{StopProtocol: artifact.DownloadStopProtocol, ID: s.NewID(), AllocationID: plan.Allocation.ID, Scope: scope, RequestDigest: ContextDownloadRequestDigest(artifactID), State: artifact.DownloadPreparing, CreatedAt: now, Deadline: identity.Earlier(now.Add(plan.Duration), identity.Earlier(a.AccessUntil, plan.Allocation.ValidUntil)).UTC().Truncate(time.Microsecond), OutputLimit: plan.OutputLimit, ReadLimit: plan.ReadLimit, RequestLimit: plan.RequestLimit}
+		session = artifact.DownloadSession{StopProtocol: artifact.DownloadStopProtocol, ID: s.NewID(), AllocationID: plan.Allocation.ID, Scope: scope, RequestDigest: ContextDownloadRequestDigest(artifactID), State: artifact.DownloadPreparing, CreatedAt: now, Deadline: identity.Earlier(a.AccessUntil, plan.Allocation.ValidUntil).UTC().Truncate(time.Microsecond), OutputLimit: plan.OutputLimit, ReadLimit: plan.ReadLimit}
 		if !plan.HardUntil.IsZero() {
 			session.Deadline = identity.Earlier(session.Deadline, plan.HardUntil).UTC().Truncate(time.Microsecond)
 		}

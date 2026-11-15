@@ -156,8 +156,6 @@ type HubAPIPublic struct {
 	OperationConcurrency int                     `json:"operationConcurrency"`
 	MCPPerIdentity       int                     `json:"mcpPerIdentity"`
 	DownloadConcurrency  int                     `json:"downloadConcurrency"`
-	DownloadsPerIdentity int                     `json:"downloadsPerIdentity"`
-	DownloadMaxSeconds   int                     `json:"downloadMaxSeconds"`
 	// OperationAudit.RetentionSeconds is ignored: the current capacity
 	// qualification supplies it.
 	OperationAudit OwnerPublicOperationAudit `json:"operationAudit"`

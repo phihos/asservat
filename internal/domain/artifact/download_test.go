@@ -12,7 +12,7 @@ func downloadFixture() (DownloadSession, DownloadAuthority, time.Time) {
 	id := "10000000-0000-4000-8000-000000000001"
 	scope := DownloadScope{RootID: id, ArtifactID: id, CaptureID: id, ClusterID: id, NamespaceUID: "ns", WorkloadUID: "workload", PodUID: "pod", Version: Digest{1}, Principal: identity.Principal{Issuer: "https://id.invalid", Subject: "dev", ClientID: "console", Kind: identity.Human}}
 	a := DownloadAuthority{Scope: scope, PermissionEpoch: id, PermissionSequence: 1, ProjectionDigest: Digest{2}, DecisionDigest: Digest{3}, IdentityRevision: identity.Revision{UID: "policy", Generation: 1, Digest: Digest{4}}, CheckedAt: now, ValidUntil: now.Add(5 * time.Second), AccessUntil: now.Add(time.Hour)}
-	s := DownloadSession{ID: id, AllocationID: id, Scope: scope, RequestDigest: Digest{5}, State: DownloadPreparing, CreatedAt: now, Deadline: now.Add(30 * time.Minute), OutputLimit: 8192, ReadLimit: 8 << 20, RequestLimit: 4}
+	s := DownloadSession{ID: id, AllocationID: id, Scope: scope, RequestDigest: Digest{5}, State: DownloadPreparing, CreatedAt: now, Deadline: now.Add(30 * time.Minute), OutputLimit: 8192, ReadLimit: 8 << 20}
 	return s, a, now
 }
 func TestDownloadCannotDiscloseBeforeAuditedPreparation(t *testing.T) {
@@ -41,7 +41,7 @@ func TestDownloadCannotDiscloseBeforeAuditedPreparation(t *testing.T) {
 	if err != nil || s.State != DownloadReady {
 		t.Fatal(s.State, err)
 	}
-	if s.ChargedRead != 2<<20 || s.Requests != 1 {
+	if s.ChargedRead != 2<<20 {
 		t.Fatal("preparation not charged")
 	}
 	b.Purpose = DownloadContent
@@ -143,11 +143,6 @@ func TestDownloadBudgetAndPartialOutcomes(t *testing.T) {
 		t.Fatal(err)
 	}
 	s.ReadLimit = 8 << 20
-	s.Requests = s.RequestLimit
-	if _, err = s.Start(a, b, n); !errors.Is(err, ErrDownloadCapacity) {
-		t.Fatal(err)
-	}
-	s.Requests = 0
 	s.Deadline = n.Add(time.Second)
 	s, err = s.Start(a, b, n)
 	if err != nil {

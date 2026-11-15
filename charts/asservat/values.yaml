@@ -247,9 +247,9 @@ hub:
       previewSeconds: 120
       operationConcurrency: 8
       mcpPerIdentity: 2
+      # Concurrent download responses per hub-api replica; each runs one
+      # download-worker Pod (download-worker.cpuMillis/memoryBytes).
       downloadConcurrency: 4
-      downloadsPerIdentity: 2
-      downloadMaxSeconds: 3600
       # Retention comes from the capacity qualification.
       operationAudit:
         normalConcurrency: 8
@@ -260,8 +260,6 @@ hub:
       downloadPlan:
         outputLimit: 268435456
         readLimit: 311164928
-        requestLimit: 4
-        durationSeconds: 300
       # Read the capacity processing source <name>-processing-source.
       processing: false
   hub-worker:
@@ -357,6 +355,8 @@ hub:
     enabled: true
     cpuMillis: 500
     memoryBytes: 402653184
+    # Runtime ceiling of one download-worker or query Job; worker certificate
+    # epochs (ADR-071) cover at most eight hours.
     maxRuntimeSeconds: 3600
 
 # Generated Secrets (created once by the `secrets` hook, never rotated, kept

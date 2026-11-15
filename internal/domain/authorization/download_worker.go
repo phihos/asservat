@@ -72,7 +72,7 @@ type DownloadWorkerIntent struct {
 }
 
 func (i DownloadWorkerIntent) Valid() bool {
-	return UUID(i.ID) && UUID(i.SessionID) && i.Generation > 0 && i.Generation <= artifact.MaxDownloadRequests && i.Profile.Valid() && i.Authority.Valid(i.CreatedAt) && i.Authority.Environment.InstallationID == i.Profile.InstallationID && i.RunUntil.Sub(i.CreatedAt) >= time.Second && !i.RunUntil.After(i.CreatedAt.Add(i.Profile.MaxRuntime)) && !i.RunUntil.After(i.Authority.AccessUntil)
+	return UUID(i.ID) && UUID(i.SessionID) && i.Generation > 0 && i.Profile.Valid() && i.Authority.Valid(i.CreatedAt) && i.Authority.Environment.InstallationID == i.Profile.InstallationID && i.RunUntil.Sub(i.CreatedAt) >= time.Second && !i.RunUntil.After(i.CreatedAt.Add(i.Profile.MaxRuntime)) && !i.RunUntil.After(i.Authority.AccessUntil)
 }
 func (i DownloadWorkerIntent) JobName() string { return "asservat-download-" + i.ID }
 
