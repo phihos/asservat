@@ -56,7 +56,7 @@ func NewDownloads(ctx context.Context, pool *pgxpool.Pool, root string, guards .
 }
 func principalKey(p identity.Principal) []byte { p.ClientID = ""; return digest(p) }
 func downloadAllocation(r custodydb.DownloadAllocation) artifact.DownloadAllocation {
-	return artifact.DownloadAllocation{ID: uid(r.ID), RootID: uid(r.RootID), ClusterID: uid(r.ClusterID), NamespaceUID: r.NamespaceUid, WorkloadUID: r.WorkloadUid, OutputLimit: r.OutputLimit, ReadLimit: r.ReadLimit, SessionLimit: r.SessionLimit, ValidUntil: r.ValidUntil.Time.UTC()}
+	return artifact.DownloadAllocation{ID: uid(r.ID), RootID: uid(r.RootID), ClusterID: uid(r.ClusterID), NamespaceUID: r.NamespaceUid, WorkloadUID: r.WorkloadUid, OutputLimit: r.OutputLimit, ReadLimit: r.ReadLimit, ValidUntil: r.ValidUntil.Time.UTC()}
 }
 func (s *Downloads) BindDownloadAllocation(ctx context.Context, a artifact.DownloadAllocation) error {
 	a.ValidUntil = a.ValidUntil.UTC().Truncate(time.Microsecond)
@@ -84,7 +84,7 @@ func (s *Downloads) BindDownloadAllocation(ctx context.Context, a artifact.Downl
 		if !n.Time.Before(a.ValidUntil) || a.ValidUntil.After(n.Time.Add(8*time.Hour)) {
 			return artifact.ErrInvalid
 		}
-		_, err = q.InsertDownloadAllocation(ctx, custodydb.InsertDownloadAllocationParams{ID: id(a.ID), RootID: id(a.RootID), ClusterID: id(a.ClusterID), NamespaceUid: a.NamespaceUID, WorkloadUid: a.WorkloadUID, OutputLimit: a.OutputLimit, ReadLimit: a.ReadLimit, SessionLimit: a.SessionLimit, ValidUntil: ts(a.ValidUntil)})
+		_, err = q.InsertDownloadAllocation(ctx, custodydb.InsertDownloadAllocationParams{ID: id(a.ID), RootID: id(a.RootID), ClusterID: id(a.ClusterID), NamespaceUid: a.NamespaceUID, WorkloadUid: a.WorkloadUID, OutputLimit: a.OutputLimit, ReadLimit: a.ReadLimit, ValidUntil: ts(a.ValidUntil)})
 		return err
 	})
 }
@@ -96,10 +96,6 @@ func decodeDownload(r custodydb.ArtifactDownload) (artifact.DownloadSession, err
 	}
 	s := artifact.DownloadSession{StopProtocol: r.StopProtocol.String, ID: uid(r.ID), AllocationID: uid(r.AllocationID), Scope: scope, RequestDigest: artifact.Digest(r.RequestDigest), State: artifact.DownloadState(r.State), CreatedAt: r.CreatedAt.Time, Deadline: r.Deadline.Time, OutputLimit: r.OutputLimit, ReadLimit: r.ReadLimit, RequestLimit: r.RequestLimit, ChargedOutput: r.ChargedOutput, ChargedRead: r.ChargedRead, Requests: r.Requests, EmittedBytes: r.EmittedBytes, Generation: r.Generation}
 	if !s.Valid() {
-		return artifact.DownloadSession{}, privacy.ErrFence
-	}
-	backing, err := decodeCapacitySessionBacking(r.CapacityBacking, r.CapacityBackingDigest, r.CapacityAccountID.Valid, s)
-	if err != nil || backing != nil && backing.AccountID != uid(r.CapacityAccountID) {
 		return artifact.DownloadSession{}, privacy.ErrFence
 	}
 	return s, nil
@@ -329,7 +325,7 @@ func (s *Downloads) ReserveDownload(ctx context.Context, r evidence.DownloadRese
 		if !budget.Valid() || !budget.Covers(request.Scope) || request.Deadline.After(budget.ValidUntil) || request.Deadline.After(a.AccessUntil) {
 			return privacy.ErrFence
 		}
-		if request.OutputLimit > budget.OutputLimit-allocation.ReservedOutput || request.ReadLimit > budget.ReadLimit-allocation.ReservedRead || allocation.ReservedSessions >= budget.SessionLimit {
+		if request.OutputLimit > budget.OutputLimit-allocation.ReservedOutput || request.ReadLimit > budget.ReadLimit-allocation.ReservedRead {
 			return artifact.ErrDownloadCapacity
 		}
 		now, err := q.CurrentTime(ctx)

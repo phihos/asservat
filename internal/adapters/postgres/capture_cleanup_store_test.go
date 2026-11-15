@@ -14,21 +14,3 @@ func TestCaptureCleanupStoreRequiresOneSharedLaneStore(t *testing.T) {
 		}
 	}
 }
-
-func TestCaptureCleanupReadsOnlyQualificationOfCapacitySource(t *testing.T) {
-	for _, purpose := range []string{"capture-cleanup", "capture-verifier", "capture-finalizer"} {
-		grants, _ := publicRuntimeCaptureCleanupGrants(purpose)
-		var columns []string
-		for _, g := range grants {
-			if g.object == "capacity_source" {
-				if g.privilege != "SELECT" {
-					t.Fatal("cleanup writes capacity source", purpose, g.key())
-				}
-				columns = append(columns, g.column)
-			}
-		}
-		if len(columns) != 2 || columns[0] != "root_id" || columns[1] != "qualification" {
-			t.Fatal("cleanup capacity source read is not the store lookup", purpose, columns)
-		}
-	}
-}

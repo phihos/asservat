@@ -1,4 +1,5 @@
 -- +goose Up
+SET LOCAL check_function_bodies = off;
 -- ADR-323: fresh explicit share-qualified layouts. Retained old layouts keep
 -- their exact formulas; no row/profile is promoted or adopted. The existing
 -- profile-covers predicate continues to refuse cross-layout replacement.
@@ -548,15 +549,16 @@ END $$;
 -- +goose StatementEnd
 
 -- +goose Down
-LOCK TABLE public.operation_audit_pool,public.operation_audit,public.operation_audit_lifecycle,public.operation_audit_history,public.evidence_share,public.capacity_source,public.capture_audit_allocation IN ACCESS EXCLUSIVE MODE;
+SET LOCAL check_function_bodies = off;
+-- 00172 drops capacity_source; its layouts are not checked here.
+LOCK TABLE public.operation_audit_pool,public.operation_audit,public.operation_audit_lifecycle,public.operation_audit_history,public.evidence_share,public.capture_audit_allocation IN ACCESS EXCLUSIVE MODE;
 -- +goose StatementBegin
 DO $$ BEGIN
  IF EXISTS(SELECT 1 FROM public.operation_audit_pool WHERE history_profile#>>'{History,Layout}' IN ('operation-audit-history/v4','capture-intent-history/v2')) OR
     EXISTS(SELECT 1 FROM public.operation_audit_lifecycle WHERE share_effect_target IS NOT NULL OR binding#>>'{Policy,History,Layout}' IN ('operation-audit-history/v4','capture-intent-history/v2')) OR
     EXISTS(SELECT 1 FROM public.operation_audit_history WHERE history_policy#>>'{History,Layout}' IN ('operation-audit-history/v4','capture-intent-history/v2')) OR
     EXISTS(SELECT 1 FROM public.capture_audit_allocation WHERE policy#>>'{History,Layout}'='capture-intent-history/v2') OR
-    EXISTS(SELECT 1 FROM public.evidence_share) OR
-    EXISTS(SELECT 1 FROM public.capacity_source WHERE qualification#>>'{RootBacking,Capture,Policy,History,Layout}'='capture-intent-history/v2' OR qualification#>>'{RootBacking,Normal,Policy,History,Layout}'='operation-audit-history/v4' OR qualification#>>'{RootBacking,Resolution,Policy,History,Layout}'='operation-audit-history/v4') THEN
+    EXISTS(SELECT 1 FROM public.evidence_share) THEN
   RAISE EXCEPTION 'retained share-qualified layouts or paid effects prevent rollback' USING ERRCODE='23514';
  END IF;
 END $$;

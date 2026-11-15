@@ -73,7 +73,7 @@ func CompileContextProtocolBacking(contextSlice BudgetAmount, h ContextBackingHi
 	if unit <= 0 {
 		return zero, ErrBudgetInvalid
 	}
-	n := min(contextSlice.Bytes/unit, contextSlice.Objects/4, artifact.MaxDownloadResponses/contextDownloadResponses)
+	n := min(contextSlice.Bytes/unit, contextSlice.Objects/4, artifact.MaxDownloadRequests/contextDownloadResponses)
 	if n < 1 {
 		return zero, ErrBudgetFull
 	}
@@ -172,7 +172,7 @@ func CompileContextProtocolBacking(contextSlice BudgetAmount, h ContextBackingHi
 		}
 		*field.dst = v
 	}
-	if !contextSlice.contains(out.Evidence) || out.OutputBytes > artifact.MaxDownloadOutput || out.ReadBytes > artifact.MaxDownloadReadWork || out.Responses > artifact.MaxDownloadResponses || out.Windows > artifact.MaxDownloadWindows || out.WindowObjects.Bytes > artifact.MaxDownloadWindowAuditBytes {
+	if !contextSlice.contains(out.Evidence) || out.OutputBytes > artifact.MaxDownloadOutput || out.ReadBytes > artifact.MaxDownloadReadWork || out.Windows > artifact.MaxDownloadWindows || out.WindowObjects.Bytes > artifact.MaxDownloadWindowAuditBytes {
 		return zero, ErrBudgetInvalid
 	}
 	return out, nil

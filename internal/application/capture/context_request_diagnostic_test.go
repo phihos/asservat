@@ -76,19 +76,6 @@ func TestContextRequestChangedDiagnosticIsNotDuplicated(t *testing.T) {
 	}
 }
 
-func TestContextPreviewStorageMarginStageRemainsUnchanged(t *testing.T) {
-	f := newInvestigationFixture()
-	f.store.Binding.FreshUntil = f.now.Add(50 * time.Millisecond)
-	var reports []string
-	f.svc.ReportPreviewFailure = func(stage string) { reports = append(reports, stage) }
-	_, err := f.svc.Preview(t.Context(), f.source(t, t.Context()), f.intent())
-	var step interface{ FixedStep() string }
-	if !errors.Is(err, value.ErrUnavailable) || !errors.As(err, &step) || step.FixedStep() != "facts/storage" ||
-		!slices.Equal(reports, []string{"facts/storage"}) || len(f.previews) != 0 || f.admissions.Load() != 0 {
-		t.Fatal("private request margin marker changed preview semantics", err, reports)
-	}
-}
-
 type requestStorageReadMarker struct {
 	error
 	stage string

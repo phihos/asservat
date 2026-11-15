@@ -88,30 +88,3 @@ func (v CapacityQualification) Valid() bool {
 	}
 	return system && (v.ContextQuery == nil || v.ContextQuery.Valid(v.RootBacking))
 }
-
-func (v CapacityQualification) BackendFor(p ProtectedPoolPlan) (CapacityBackendQualification, error) {
-	if !v.Valid() {
-		return CapacityBackendQualification{}, ErrBudgetInvalid
-	}
-	for _, b := range v.Backends {
-		if b.PoolUID == p.UID {
-			if p.Format != ProtectedPoolPlanFormat || b.StorageProfile != p.StorageProfile || !b.Usable.contains(p.Capacity) {
-				return CapacityBackendQualification{}, ErrBudgetFull
-			}
-			return b, nil
-		}
-	}
-	return CapacityBackendQualification{}, ErrBudgetInvalid
-}
-
-// The production compiler must call this protected boundary; the lower-level
-// arithmetic compiler intentionally cannot establish backend/source ownership.
-func CompileQualifiedRootBacking(q CapacityQualification, systemPool ProtectedPoolPlan) (RootBackingPlan, error) {
-	if !q.Valid() || systemPool.UID != q.RootBacking.SystemPoolUID {
-		return RootBackingPlan{}, ErrBudgetInvalid
-	}
-	if _, e := q.BackendFor(systemPool); e != nil {
-		return RootBackingPlan{}, e
-	}
-	return CompileRootBacking(q.RootBacking, systemPool)
-}

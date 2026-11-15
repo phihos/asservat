@@ -20,10 +20,6 @@ func capacityNativeProcessingPolicy(q app.CapacityQualification, epoch string) p
 	return privacy.DownloadPolicy{RootID: q.RootBacking.RootID, InstallationID: q.RootBacking.InstallationID, RecoveryEpoch: epoch, Revision: identity.Revision{UID: q.RootBacking.ProcessingSourceUID, Generation: 1, Digest: artifact.Digest{15}}, ProtectionDigest: q.RootBacking.ProcessingProtectionDigest, PermittedRegions: []string{"synthetic-region"}, Paths: []privacy.DownloadPath{path}, Clients: []privacy.DownloadClient{{Issuer: "https://id.example.test", ID: "console", Kind: identity.Human, DataClasses: []string{"metadata"}, PrivacyClasses: []string{"potentialPersonalData"}, EvidenceTypes: []string{"context"}, Purposes: []string{"diagnostics"}, PathIDs: []string{path.ID}}}, Operators: []privacy.ProcessingOperator{{Issuer: "https://id.example.test", ClientID: "console", Kind: "Group", ID: "operators"}}}
 }
 
-func capacityNativeWorkload(cluster string, namespace cfg.NamespaceRef, workload cfg.WorkloadRef, n, until time.Time) app.CapacityWorkloadObservation {
-	return app.CapacityWorkloadObservation{Namespace: cfg.NamespaceMetadata{ClusterID: cluster, Namespace: namespace, Labels: map[string]string{"team": "synthetic"}, ResourceVersion: "synthetic-ns-1", ObservedAt: n, FreshUntil: until}, Workload: workload, WorkloadResourceVersion: "synthetic-workload-1", ObservedAt: n, FreshUntil: until}
-}
-
 func capacityNativeTarget(cluster string, namespace cfg.NamespaceRef, workload cfg.WorkloadRef, n time.Time) targets.PodResolution {
 	target := targets.PodResolution{Request: targets.Request{ClusterID: cluster, Namespace: namespace, Workload: workload, PodName: "first-synthetic", PodUID: custodyID()}, Pin: artifact.PinnedPod{Namespace: namespace.Name, NamespaceUID: namespace.UID, Name: "first-synthetic", UID: "", NodeName: "synthetic-node", ControllerUID: custodyID()}, NodeUID: custodyID(), NodeBootID: custodyID(), PodResourceVersion: "synthetic-1", WorkloadResourceVersion: "synthetic-workload-1", ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}
 	target.Pin.UID = target.Request.PodUID

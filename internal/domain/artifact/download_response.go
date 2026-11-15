@@ -6,12 +6,12 @@ import (
 )
 
 const (
-	DownloadResponseVersion           = 1
-	DownloadWindowBytes         int64 = 64 << 20
-	DownloadWindowAuditBytes    int64 = 128 << 10
-	MaxDownloadResponses        int64 = 1024
-	MaxDownloadWindows                = MaxDownloadOutput/DownloadWindowBytes + MaxDownloadResponses
-	MaxDownloadWindowAuditBytes       = 2 * MaxDownloadWindows * DownloadWindowAuditBytes
+	DownloadResponseVersion        = 1
+	DownloadWindowBytes      int64 = 64 << 20
+	DownloadWindowAuditBytes int64 = 128 << 10
+	// One partial window per request beyond the full output windows.
+	MaxDownloadWindows          = MaxDownloadOutput/DownloadWindowBytes + MaxDownloadRequests
+	MaxDownloadWindowAuditBytes = 2 * MaxDownloadWindows * DownloadWindowAuditBytes
 	// MaxDownloadWindowWrite bounds a window's audit write deadline, which SQL
 	// pins to its control allocation's AuditWriteUntil. A protected-capacity
 	// control lives up to its 24 h admission plus the 5 min audit grace, so the
@@ -23,13 +23,13 @@ const (
 // output/read quota. Existing download allocations have no implicit control
 // credit. Original reservations remain charged until qualified lifecycle cleanup.
 type DownloadControlAllocation struct {
-	ID, RootID, AuditStoreID                   string
-	ResponseLimit, WindowLimit, AuditByteLimit int64
-	ValidUntil, AuditWriteUntil                time.Time
+	ID, RootID, AuditStoreID    string
+	WindowLimit, AuditByteLimit int64
+	ValidUntil, AuditWriteUntil time.Time
 }
 
 func (a DownloadControlAllocation) Valid() bool {
-	return uuid(a.ID) && uuid(a.RootID) && uuid(a.AuditStoreID) && a.ResponseLimit > 0 && a.ResponseLimit <= MaxDownloadResponses && a.WindowLimit > 0 && a.WindowLimit <= MaxDownloadWindows && a.AuditByteLimit > 0 && a.AuditByteLimit <= MaxDownloadWindowAuditBytes && !a.ValidUntil.IsZero() && a.AuditWriteUntil.After(a.ValidUntil) && !a.AuditWriteUntil.After(a.ValidUntil.Add(5*time.Minute))
+	return uuid(a.ID) && uuid(a.RootID) && uuid(a.AuditStoreID) && a.WindowLimit > 0 && a.WindowLimit <= MaxDownloadWindows && a.AuditByteLimit > 0 && a.AuditByteLimit <= MaxDownloadWindowAuditBytes && !a.ValidUntil.IsZero() && a.AuditWriteUntil.After(a.ValidUntil) && !a.AuditWriteUntil.After(a.ValidUntil.Add(5*time.Minute))
 }
 
 // Plan uses a verified native selection, not public caller sizes. The read bound

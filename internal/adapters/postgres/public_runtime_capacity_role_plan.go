@@ -1,72 +1,15 @@
 package postgres
 
-// Fixed SQL54 compartment RPCs copied from the reviewed V6 adapter corpus.
-// This is a compiled allowlist; neither a projected document nor caller may
-// choose a signature. No private helper or capacity/audit table grant. The
-// general facet additionally reads the fixed owner registry before disclosing
-// its local projected observation token; it cannot issue or activate peers.
+// The hub-worker's capacity login applies the Helm capacity values and reads
+// the stored qualification; the capture login keeps its schema access only.
 func publicRuntimeCapacityGrants(purpose string) ([]publicRuntimeGrant, bool) {
-	var signatures []string
-	switch purpose {
-	case "capacity":
-		signatures = []string{
-			"read_capacity_runtime_scope(uuid,jsonb,jsonb,timestamptz,timestamptz)",
-			"read_capacity_recovery(uuid,timestamptz,timestamptz)",
-			"read_capacity_permission_scopes(uuid,jsonb)",
-			"read_capacity_source_revision(uuid,jsonb)",
-			"accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea)",
-			"invalidate_capacity_source(uuid,bigint,jsonb,timestamptz,timestamptz)",
-			"read_capacity_root(uuid,jsonb,bytea,bytea)",
-			"reserve_capacity_root(uuid,jsonb,bytea,bytea,uuid)",
-			"publish_capacity_root(uuid,jsonb,bytea,bytea,jsonb)",
-			"renew_capacity_root(uuid,jsonb,bytea,bytea,jsonb)",
-			"read_capacity_enrollment(uuid,jsonb,bytea,bytea,bytea)",
-			"reserve_capacity_enrollment(uuid,jsonb,bytea,bytea,bytea,uuid,uuid,uuid,uuid,bytea)",
-			"publish_capacity_enrollment(uuid,jsonb,bytea,bytea,bytea,jsonb)",
-			"continue_capacity_publication(uuid,jsonb,bytea,bytea,bytea,jsonb)",
-			"refresh_capacity_enrollment(uuid,jsonb,bytea,bytea,bytea,jsonb)",
-			// ADR-197: the regional namespace pins.
-			"read_capacity_cluster_qualifications(uuid)",
-			// ADR-331: the joined clusters' write-once qualifications.
-			"qualify_capacity_cluster(uuid,uuid,uuid,uuid,bytea,jsonb)",
-			// ADR-200: active refresh demands.
-			"read_capacity_refresh_demands(uuid)",
-			// ADR-219: shared query backing follows these existing publications.
-			"ensure_shared_context_query_capacity(uuid)",
-			"ensure_shared_context_query_allocation(uuid,uuid,text,text)",
-			// Helm-native decision 6: the hub-worker initializes the root.
-			"initialize_capacity_source(uuid,uuid,text,bytea,text,jsonb)",
-			"read_capacity_qualification(uuid)",
-		}
-	case "capacity-capture":
-		signatures = []string{
-			"read_capacity_runtime_scope(uuid,jsonb,jsonb,timestamptz,timestamptz)",
-			"read_capacity_capture_enrollment(uuid,jsonb,bytea,bytea,bytea)",
-			"back_capacity_root(uuid,jsonb,bytea,bytea,jsonb)",
-			"back_capacity_enrollment(uuid,jsonb,bytea,bytea,bytea,jsonb)",
-			"continue_capacity_capture(uuid,jsonb,bytea,bytea,bytea,jsonb)",
-		}
-	default:
+	if purpose != "capacity" && purpose != "capacity-capture" {
 		return nil, false
 	}
 	out := []publicRuntimeGrant{{"schema", "public", "", "USAGE"}, {"table", "goose_db_version", "", "SELECT"}}
 	if purpose == "capacity" {
-		// Exact read graph of OwnerEnrollments.current(false),
-		// ReadContextStartOwners and ReadOwnerRegistration. The two column
-		// UPDATE grants permit existing FOR SHARE locks; immutable-key and
-		// recovery guards remain enforced. No certificate/configuration effect
-		// column, enrollment INSERT, DELETE or activation function is granted.
-		for _, table := range []string{"fleet_current_trust", "hub_owner_configuration", "hub_owner_configuration_revision", "hub_owner_enrollment", "hub_owner_certificate"} {
-			out = append(out, publicRuntimeGrant{"table", table, "", "SELECT"})
-		}
-		out = append(out,
-			publicRuntimeGrant{"table", "fleet_current_trust", "installation_id", "UPDATE"},
-			publicRuntimeGrant{"table", "hub_owner_configuration", "source_uid", "UPDATE"},
-			// ADR-331: the joined clusters' delivered capacity observations.
-			publicRuntimeGrant{"table", "remote_capacity_delivery", "", "SELECT"})
-	}
-	for _, signature := range signatures {
-		out = append(out, publicRuntimeGrant{"function", signature, "", "EXECUTE"})
+		out = append(out, publicRuntimeGrant{"function", "capacity_apply(uuid,uuid,text,text,jsonb,jsonb)", "", "EXECUTE"},
+			publicRuntimeGrant{"function", "read_capacity_qualification(uuid)", "", "EXECUTE"})
 	}
 	return out, true
 }

@@ -12,7 +12,7 @@ import (
 )
 
 const readContextDownloadAllocations = `-- name: ReadContextDownloadAllocations :many
-SELECT id, root_id, cluster_id, namespace_uid, workload_uid, output_limit, read_limit, session_limit, reserved_output, reserved_read, reserved_sessions, valid_until FROM download_allocation
+SELECT id, root_id, cluster_id, namespace_uid, workload_uid, output_limit, read_limit, reserved_output, reserved_read, valid_until FROM download_allocation
 WHERE root_id=$1 AND cluster_id=$2 AND namespace_uid=$3 AND workload_uid=$4
  AND clock_timestamp()<valid_until
 ORDER BY id LIMIT 2
@@ -49,10 +49,8 @@ func (q *Queries) ReadContextDownloadAllocations(ctx context.Context, arg ReadCo
 			&i.WorkloadUid,
 			&i.OutputLimit,
 			&i.ReadLimit,
-			&i.SessionLimit,
 			&i.ReservedOutput,
 			&i.ReservedRead,
-			&i.ReservedSessions,
 			&i.ValidUntil,
 		); err != nil {
 			return nil, err

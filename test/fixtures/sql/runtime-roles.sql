@@ -49,12 +49,12 @@ GRANT SELECT ON goose_db_version,context_capture,custody_attempt,context_verific
 CREATE ROLE download_config_runtime LOGIN PASSWORD 'synthetic-download-config'; GRANT CONNECT ON DATABASE custody_test TO download_config_runtime; GRANT USAGE ON SCHEMA public TO download_config_runtime;
 GRANT SELECT ON goose_db_version,permission_stream,download_allocation TO download_config_runtime;
 GRANT UPDATE(id) ON permission_stream,download_allocation TO download_config_runtime;
-GRANT INSERT(id,root_id,cluster_id,namespace_uid,workload_uid,output_limit,read_limit,session_limit,valid_until) ON download_allocation TO download_config_runtime;
+GRANT INSERT(id,root_id,cluster_id,namespace_uid,workload_uid,output_limit,read_limit,valid_until) ON download_allocation TO download_config_runtime;
 
 CREATE ROLE download_runtime LOGIN PASSWORD 'synthetic-download'; GRANT CONNECT ON DATABASE custody_test TO download_runtime; GRANT USAGE ON SCHEMA public TO download_runtime;
 GRANT SELECT ON goose_db_version,permission_stream,authority_audit,context_catalog,context_capture,context_verification,custody_attempt,download_allocation,artifact_download,download_batch,download_response TO download_runtime;
 GRANT UPDATE(id) ON permission_stream TO download_runtime;
-GRANT UPDATE(reserved_output,reserved_read,reserved_sessions) ON download_allocation TO download_runtime;
+GRANT UPDATE(reserved_output,reserved_read) ON download_allocation TO download_runtime;
 GRANT INSERT(id,root_id,allocation_id,artifact_id,principal_key,actor_key,idempotency_digest,request_digest,scope_json,deadline,output_limit,read_limit,request_limit) ON artifact_download TO download_runtime;
 GRANT UPDATE(state,charged_output,charged_read,requests,emitted_bytes,generation,active_batch) ON artifact_download TO download_runtime;
 GRANT INSERT(id,session_id,generation,intent_json,lease_until) ON download_batch TO download_runtime;
@@ -353,20 +353,14 @@ GRANT SELECT ON policy_recording_source,policy_source TO context_preview_runtime
 CREATE ROLE context_control_config_runtime LOGIN PASSWORD 'synthetic-context-control-config';
 GRANT CONNECT ON DATABASE custody_test TO context_control_config_runtime;
 GRANT USAGE ON SCHEMA public TO context_control_config_runtime;
-GRANT SELECT ON goose_db_version,permission_stream,context_storage_binding,custody_pool,custody_allocation,context_control_pool,context_control_account TO context_control_config_runtime;
+GRANT SELECT ON goose_db_version,permission_stream,context_storage_binding,custody_pool,custody_allocation TO context_control_config_runtime;
 GRANT UPDATE(id) ON permission_stream,custody_pool,custody_allocation TO context_control_config_runtime;
 GRANT UPDATE(source_uid) ON context_storage_binding TO context_control_config_runtime;
-GRANT INSERT ON context_control_pool,context_control_account TO context_control_config_runtime;
-GRANT UPDATE(root_id,configured,paused,revision,valid_until,full_limit,replay_limit) ON context_control_pool,context_control_account TO context_control_config_runtime;
-GRANT SELECT ON context_control_pool,context_control_account,context_control_charge TO capture_runtime;
-GRANT UPDATE(root_id) ON context_control_pool,context_control_account TO capture_runtime;
-GRANT INSERT ON context_control_charge TO capture_runtime;
 CREATE ROLE context_retirement_read_runtime LOGIN PASSWORD 'synthetic-context-retirement-read';
 GRANT CONNECT ON DATABASE custody_test TO context_retirement_read_runtime;
 GRANT USAGE ON SCHEMA public TO context_retirement_read_runtime;
 GRANT SELECT ON goose_db_version,context_capture,custody_attempt,custody_copy,context_verification,context_execution,artifact_download,retention_decision,retention_checkpoint,retention_catchup TO context_retirement_read_runtime;
 
-GRANT SELECT ON context_control_pool,context_control_account TO context_storage_read_runtime;
 
 -- Migration54: mirror the production capture-admit/storage-read function grant.
 -- This reads the current managed cutoff; it grants no capacity configuration.
@@ -552,7 +546,7 @@ GRANT EXECUTE ON FUNCTION read_capture_operation(uuid,uuid),capture_audit_journa
 GRANT EXECUTE ON FUNCTION capture_audit_acknowledge(uuid,jsonb,text,jsonb,jsonb,jsonb),acknowledge_capture_pair(uuid,jsonb) TO capture_operation_ack_runtime;
 -- Admission retains the existing exact authority/custody/control transaction,
 -- without inheriting another role or gaining audit/provider acknowledgement.
-GRANT SELECT ON permission_stream,permission_basis,permission_assignment,permission_review_source,permission_review_assignment,permission_review_decision,authority_audit,context_storage_binding,context_preview,context_preview_fence,context_control_pool,context_control_account,context_control_charge TO capture_operation_admit_runtime;
+GRANT SELECT ON permission_stream,permission_basis,permission_assignment,permission_review_source,permission_review_assignment,permission_review_decision,authority_audit,context_storage_binding,context_preview,context_preview_fence TO capture_operation_admit_runtime;
 GRANT UPDATE(id) ON permission_stream TO capture_operation_admit_runtime;
 -- Match the existing admission lock-only column grant; no allocation/freshness writes.
 GRANT UPDATE(source_uid) ON context_storage_binding TO capture_operation_admit_runtime;
@@ -561,8 +555,7 @@ GRANT SELECT,INSERT,UPDATE ON custody_pool,custody_allocation,custody_copy,custo
 GRANT SELECT,INSERT ON custody_attempt TO capture_operation_admit_runtime;
 GRANT UPDATE(id,state,copies_digest,deletion_fence,lease_until,deleted_at) ON custody_attempt TO capture_operation_admit_runtime;
 GRANT SELECT ON retention_source,retention_checkpoint,retention_catchup,retention_catchup_effect,retention_decision TO capture_operation_admit_runtime;
-GRANT UPDATE(root_id) ON retention_source,context_control_pool,context_control_account TO capture_operation_admit_runtime;
-GRANT INSERT ON context_control_charge TO capture_operation_admit_runtime;
+GRANT UPDATE(root_id) ON retention_source TO capture_operation_admit_runtime;
 GRANT SELECT ON fleet_trust,fleet_current_trust TO capture_operation_admit_runtime;
 GRANT UPDATE(installation_id) ON fleet_trust,fleet_current_trust TO capture_operation_admit_runtime;
 -- Fixed filtered cleanup views; no SELECT or UPDATE on human/other lanes.
@@ -617,7 +610,6 @@ GRANT UPDATE(root_id) ON retention_source TO retention_preview_read_runtime;
 -- ADR-252: fixed read retention and exact current approval; no grant table access.
 GRANT EXECUTE ON FUNCTION context_preview_read_until(uuid,uuid) TO context_preview_runtime,context_preview_cleanup_runtime,context_request_resolution_runtime;
 -- ADR-200: mirror the compiled capture-preview duty; wakeup only, no table grant.
-GRANT EXECUTE ON FUNCTION demand_capacity_refresh(uuid,uuid,text,text,text,text,text) TO context_preview_runtime;
 GRANT EXECUTE ON FUNCTION lock_approved_context_grant(uuid,uuid,uuid,text,text,text,bytea) TO capture_runtime,api_execution_read_runtime,api_execution_prepare_runtime,api_execution_runtime;
 
 -- ADR-255: existing metadata/retention facets read typed history obligations.
@@ -648,3 +640,5 @@ GRANT UPDATE(attempt_id,writer_epoch,plan_digest,revision) ON custody_stream TO 
 GRANT UPDATE(attempt_id,state,revision,released_at) ON custody_stream TO context_cleanup_finalize_runtime;
 
 GRANT UPDATE(installation_id) ON fleet_current_trust TO capture_runtime,context_publish_runtime,context_verify_runtime,download_key_bind_runtime,download_key_read_runtime,download_runtime,download_worker_identity_runtime,download_worker_runtime,local_keys_runtime,owner_configuration_read_runtime,owner_configuration_runtime,owner_enrollment_activate_runtime,owner_enrollment_read_runtime,owner_enrollment_runtime,policy_accept_runtime,policy_read_runtime,worker_configuration_read_runtime,worker_configuration_runtime,worker_enrollment_activate_runtime,worker_enrollment_runtime,worker_owner_runtime,worker_routing_read_runtime;
+-- Migration 00170: account charge/release (SECURITY DEFINER) for every login that charges custody bytes.
+GRANT EXECUTE ON FUNCTION capacity_charge(uuid,bigint,bigint),capacity_release(uuid,bigint,bigint) TO custody_runtime,capture_runtime,context_cleanup_finalize_runtime,capture_operation_admit_runtime;

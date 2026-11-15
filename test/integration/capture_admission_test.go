@@ -17,7 +17,6 @@ import (
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
 	auditapp "asservat.local/asservat/internal/application/audit"
-	"asservat.local/asservat/internal/application/capacity"
 	configapp "asservat.local/asservat/internal/application/configuration"
 	"asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -150,7 +149,6 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 	authorityPool := authorityOpen("authority_runtime", "synthetic-authority")
 	capturePool := poolFor("capture_runtime", "synthetic-capture")
 	custodyPool := poolFor("custody_runtime", "synthetic-runtime")
-	controlPool := poolFor("context_control_config_runtime", "synthetic-context-control-config")
 	auditPool := poolFor("capture_audit_runtime", "synthetic-capture-audit")
 	for _, sql := range []string{"UPDATE permission_stream SET suspended=false", "UPDATE context_storage_binding SET fresh_until=clock_timestamp()+interval '1 day'", "UPDATE context_capture SET deadline=clock_timestamp()+interval '1 day'", "DELETE FROM context_capture"} {
 		if _, err := capturePool.Exec(ctx, sql); err == nil {
@@ -193,10 +191,6 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	controlBacking, err := postgres.New(ctx, controlPool)
-	if err != nil {
-		t.Fatal(err)
-	}
 	seedRetention, resetRetention := newRetentionEffectFixtures(t, ctx, poolFor, store, keys)
 	seedRecovery, resetRecovery := newRecoveryEffectFixtures(t, ctx, admin, poolFor)
 	if native == nil {
@@ -208,7 +202,7 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 	type scenario = captureAdmissionScenario
 	// ADR-248: a recording scenario registers the 8 MiB per-capture limit.
 	scenarioNativeLimit := int64(4096)
-	createForTargetWithControl := func(t *testing.T, slots, full, replay int64, source func(context.Context) (targets.PodResolution, error), image artifact.Digest) scenario {
+	createForTargetWithControl := func(t *testing.T, slots, _, _ int64, source func(context.Context) (targets.PodResolution, error), image artifact.Digest) scenario {
 		t.Helper()
 		now := time.Now().UTC().Truncate(time.Microsecond)
 		root, epoch, cluster, namespace, workload, pod := custodyID(), custodyID(), custodyID(), custodyID(), custodyID(), custodyID()
@@ -308,21 +302,13 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 		if _, err = admin.Exec(ctx, "INSERT INTO custody_pool(id,store_id,revision,valid_until,byte_limit,object_limit) VALUES($1,$2,1,clock_timestamp()+interval '1 hour',$3,$4)", poolID, storeID, r.ReservedBytes()*max(slots, 1)*2, max(slots, 1)*8); err != nil {
 			t.Fatal(err)
 		}
-		if err = ledger.ProvisionAllocation(ctx, capacity.StorageAllocation{ID: allocationID, PoolID: poolID, ScopeID: custodyID(), ServiceClass: "context", PoolRevision: 1, Revision: 1, Bytes: r.ReservedBytes() * slots, Objects: slots * 4, ValidUntil: now.Add(30 * time.Minute)}); err != nil {
+		if err = provisionAllocation(ctx, admin, testAllocation{ID: allocationID, PoolID: poolID, ScopeID: custodyID(), ServiceClass: "context", PoolRevision: 1, Revision: 1, Bytes: r.ReservedBytes() * slots, Objects: slots * 4, ValidUntil: now.Add(30 * time.Minute)}); err != nil {
 			t.Fatal(err)
 		}
 		storage := capture.StorageBinding{RootID: root, ClusterID: cluster, NamespaceUID: namespace, WorkloadUID: workload, AllocationID: allocationID, Revision: identity.Revision{UID: "budget-binding", Generation: 1, Digest: [32]byte{9}}, ObservedAt: now, FreshUntil: now.Add(30 * time.Second)}
 		// Protected configuration is synthesized by the fixture, never a capture
 		// caller. This role cannot update authority or binding freshness.
 		if _, err = admin.Exec(ctx, "INSERT INTO context_storage_binding(root_id,cluster_id,namespace_uid,workload_uid,allocation_id,source_uid,source_generation,source_digest,observed_at,fresh_until) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)", root, cluster, namespace, workload, allocationID, storage.Revision.UID, storage.Revision.Generation, storage.Revision.Digest[:], now, storage.FreshUntil); err != nil {
-			t.Fatal(err)
-		}
-		controlNow := time.Now().UTC().Truncate(time.Microsecond)
-		if err = controlBacking.ProvisionContextControlPool(ctx, capacity.ContextControlPool{ObservedAt: controlNow, FreshUntil: controlNow.Add(5 * time.Second), RootID: root, Revision: 1, FullRecords: max(full, 1) * 2, ReplayRecords: max(replay, 1) * 2, ValidUntil: now.Add(30 * time.Minute)}); err != nil {
-			t.Fatal(err)
-		}
-		controlNow = time.Now().UTC().Truncate(time.Microsecond)
-		if err = controlBacking.ProvisionContextControlAllocation(ctx, capacity.ContextControlAllocation{ObservedAt: controlNow, FreshUntil: controlNow.Add(5 * time.Second), RootID: root, AllocationID: allocationID, PoolRevision: 1, Revision: 1, FullRecords: full, ReplayRecords: replay, ValidUntil: now.Add(30 * time.Minute)}); err != nil {
 			t.Fatal(err)
 		}
 		recoveryState, err := recoveryFixture.reader.RecoveryState(ctx)
@@ -337,9 +323,6 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 	}
 	createForTarget := func(t *testing.T, slots int64, source func(context.Context) (targets.PodResolution, error), image artifact.Digest) scenario {
 		return createForTargetWithControl(t, slots, max(slots, 1)*2, max(slots, 1)*2, source, image)
-	}
-	createWithControl := func(t *testing.T, slots, full, replay int64) scenario {
-		return createForTargetWithControl(t, slots, full, replay, nil, artifact.Digest{})
 	}
 	if native != nil {
 		regional := os.Getenv("ASSERVAT_CONTEXT_REGIONAL_START_NATIVE")
@@ -358,7 +341,6 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 				// These legacy/setup adapters have no later work in that branch.
 				capturePool.Close()
 				custodyPool.Close()
-				controlPool.Close()
 				return s
 			}
 		}
@@ -369,7 +351,6 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 	}
 	create := func(t *testing.T, slots int64) scenario { return createForTarget(t, slots, nil, artifact.Digest{}) }
 	qualifyHistoryParameters(t, ctx, admin, poolFor, store, keys, create)
-	qualifyContextControlCapacity(t, ctx, admin, capturePool, controlPool, ledger, controlBacking, poolFor, createWithControl)
 	t.Run("suspended-installation-blocks-new-context-admission", func(t *testing.T) {
 		s := create(t, 1)
 		if _, err := admin.Exec(ctx, "UPDATE fleet_trust SET suspended=true WHERE installation_id=$1", s.recovery.installation); err != nil {
@@ -414,7 +395,6 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 		admin.Reset()
 		capturePool.Reset()
 		custodyPool.Reset()
-		controlPool.Reset()
 		auditPool.Reset()
 		resetRetention()
 		resetRecovery()

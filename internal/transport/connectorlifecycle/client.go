@@ -112,21 +112,6 @@ func (c *Client) Run(ctx context.Context, opening Opening, local any) (HubFrame,
 			if frame.Digest != "" && frame.Digest == delivery.Digest() {
 				reply = RegionFrame{Kind: "access-bindings", Unchanged: true}
 			}
-		case frame.Kind == "capacity":
-			reader, ok := local.(CapacityLocal)
-			if !ok {
-				_ = out.Send(RegionFrame{Kind: "error"})
-				return zero, ErrChannel
-			}
-			delivery, err := reader.ReadCapacity(ctx)
-			if err != nil {
-				_ = out.Send(RegionFrame{Kind: "error"})
-				return zero, ErrChannel
-			}
-			reply = RegionFrame{Kind: "capacity", Capacity: &delivery}
-			if frame.Digest != "" && frame.Digest == delivery.Digest() {
-				reply = RegionFrame{Kind: "capacity", Unchanged: true}
-			}
 		case frame.Kind == "result" || frame.Kind == "failure":
 			return frame, nil
 		default:

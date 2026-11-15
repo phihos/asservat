@@ -109,11 +109,6 @@ func TestRuntimeRolesCoverEveryMountedComponentLogin(t *testing.T) {
 			}
 		}
 	}
-	for _, purpose := range []string{"capture-cleanup", "capture-verifier", "capture-finalizer"} {
-		if !grant(purpose, publicRuntimeGrant{"table", "capacity_source", "root_id", "SELECT"}) || !grant(purpose, publicRuntimeGrant{"table", "capacity_source", "qualification", "SELECT"}) {
-			t.Error("cleanup lane lacks capacity_source(root_id, qualification)", purpose)
-		}
-	}
 	if !grant("capacity-profile-read", publicRuntimeGrant{"function", "read_capacity_qualification_pin(uuid,uuid)", "", "EXECUTE"}) {
 		t.Error("hub-api cannot read the capacity qualification pin")
 	}

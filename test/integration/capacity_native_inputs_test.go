@@ -8,7 +8,6 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
-	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/privacy"
 )
 
@@ -52,46 +51,19 @@ func capacityNativeBacking(root, installation, accountVersion string) app.RootBa
 	return in
 }
 
-func capacityNativeQualification(t *testing.T, root, installation, cluster, controlUID, accountVersion string) (app.CapacityQualification, app.CapacitySnapshot) {
+func capacityNativeQualification(t *testing.T, root, installation, cluster, accountVersion string) app.CapacityQualification {
 	t.Helper()
 	in := capacityNativeBacking(root, installation, accountVersion)
 	in.SystemPoolUID = custodyID()
-	unit := (artifact.Registration{NativeLimit: artifact.MaxContextBytes}).ReservedBytes()
-	protected := app.BudgetAmount{Bytes: 3 * unit, Objects: 12}
-	policy := app.PolicyBudgetInput{Name: "applications", Pool: "capacity", Cluster: cluster, Protected: protected, Hard: protected, Context: protected, NamespaceMaximum: app.BudgetAmount{Bytes: capacityNativeAccounts * protected.Bytes, Objects: capacityNativeAccounts * protected.Objects}, NamespaceAccounts: capacityNativeAccounts}
-	pool := app.PoolBudgetInput{Name: "capacity", Capacity: app.BudgetAmount{Bytes: 1 << 50, Objects: 1000000000}, Safety: app.BudgetAmount{Bytes: 1 << 20, Objects: 16}, System: app.BudgetAmount{Bytes: 1 << 40, Objects: 1000000}, Burst: app.BudgetAmount{Bytes: unit, Objects: 4}, Slots: []app.ProtectedSlotInput{{Policy: policy.Name, Workloads: capacityNativeAccounts, Protected: protected}}}
-	n := time.Now().UTC().Truncate(time.Microsecond)
-	ref := func(kind, name, uid string) cfg.Resource {
-		return cfg.Resource{ClusterID: cluster, Namespace: "control", NamespaceUID: controlUID, Kind: kind, Name: name, UID: uid, Generation: 1, ResourceVersion: "synthetic-1", SpecDigest: artifact.Digest{11}}
+	q := app.CapacityQualification{ID: in.QualificationID, Digest: in.QualificationDigest, RootBacking: in, NamespaceGuards: []app.CapacityNamespaceQualification{{ClusterID: cluster, Digest: artifact.Digest{12}, Keys: []string{"team"}}}, Backends: []app.CapacityBackendQualification{{Layout: app.CapacityBackendLayout, ID: custodyID(), Digest: artifact.Digest{13}, PoolUID: in.SystemPoolUID, StorageProfile: "synthetic-dedicated", CapacityID: custodyID(), PoolID: custodyID(), EvidenceStoreID: custodyID(), AuditStoreID: in.Capture.Policy.StoreID, Usable: app.BudgetAmount{Bytes: 1 << 50, Objects: 1000000000}}}}
+	if !q.Valid() || !app.ValidateRootBackingInput(in) {
+		t.Fatal("synthetic complete backing invalid")
 	}
-	source := app.CapacitySnapshot{ClusterID: cluster, ControlNamespace: cfg.NamespaceRef{Name: "control", UID: controlUID}, PoolResourceVersion: "synthetic-pool-1", PolicyResourceVersion: "synthetic-policy-1", ObservedAt: n, FreshUntil: n.Add(5 * time.Second), Pools: []app.PoolObservation{{Resource: ref("EvidenceStoragePool", pool.Name, in.SystemPoolUID), StorageProfile: "synthetic-dedicated", Assurance: "qualifiedReservedBackend", Budget: &pool}}, Policies: []app.BudgetPolicyObservation{{Resource: ref("EvidenceBudgetPolicy", policy.Name, custodyID()), Pool: pool.Name, Scope: &app.BudgetScope{ClusterID: cluster, NamespaceLabels: map[string]string{"team": "synthetic"}}, Budget: &policy}}}
-	q := app.CapacityQualification{ID: in.QualificationID, Digest: in.QualificationDigest, RootBacking: in, NamespaceGuards: []app.CapacityNamespaceQualification{{ClusterID: cluster, Digest: artifact.Digest{12}, Keys: []string{"team"}}}, Backends: []app.CapacityBackendQualification{{Layout: app.CapacityBackendLayout, ID: custodyID(), Digest: artifact.Digest{13}, PoolUID: in.SystemPoolUID, StorageProfile: "synthetic-dedicated", CapacityID: custodyID(), PoolID: custodyID(), EvidenceStoreID: custodyID(), AuditStoreID: in.Capture.Policy.StoreID, Usable: pool.Capacity}}}
-	compiled, err := app.CompileProtectedPoolPlan(source, pool.Name)
-	if err != nil {
-		t.Fatal("synthetic exact source plan invalid", err)
-	}
-	if _, err = app.CompileQualifiedRootBacking(q, compiled); err != nil {
-		t.Fatal("synthetic complete backing invalid", err)
-	}
-	return q, source
+	return q
 }
 
-func capacityNativeSource(t *testing.T, template app.CapacitySnapshot, n, until time.Time) app.CapacitySourceObservation {
-	t.Helper()
-	template.ObservedAt, template.FreshUntil = n, until
-	versions := make([]app.CapacitySourceVersion, 0, len(template.Pools)+len(template.Policies))
-	add := func(r cfg.Resource) {
-		versions = append(versions, app.CapacitySourceVersion{Kind: r.Kind, Name: r.Name, UID: r.UID, Generation: r.Generation, Deleting: r.Deleting, Spec: r.SpecDigest})
-	}
-	for _, p := range template.Pools {
-		add(p.Resource)
-	}
-	for _, p := range template.Policies {
-		add(p.Resource)
-	}
-	digest, err := app.CapacitySourceDigest(template, versions)
-	if err != nil {
-		t.Fatal("synthetic current source invalid", err)
-	}
-	return app.CapacitySourceObservation{Snapshot: template, Versions: versions, Digest: digest}
+// capacityNativeValues are the fixture's Helm capacity values: 16 workload
+// shares of 1 MiB with a 4 MiB burst limit.
+func capacityNativeValues() app.CapacityValues {
+	return app.CapacityValues{EvidenceBytes: 17 << 20, ReserveBytes: 1 << 20, ShareBytes: 1 << 20, LimitBytes: 4 << 20, MaxConcurrentExpensive: 1, OnFull: "RejectNewExpensive"}
 }

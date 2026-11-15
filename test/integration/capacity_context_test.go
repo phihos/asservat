@@ -9,7 +9,6 @@ import (
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
 	auditapp "asservat.local/asservat/internal/application/audit"
-	app "asservat.local/asservat/internal/application/capacity"
 	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -23,7 +22,7 @@ import (
 // This path consumes the actual managed enrollment. It never inserts or
 // replaces custody/control/capture pools, an allocation, or its storage binding.
 // Only the initial human and Kubernetes target observations are synthetic.
-func (f *capacitySQLFixture) admitManagedContext(t *testing.T, root app.RootConfiguration, enrollment app.Enrollment) (captureAdmissionScenario, capturevalue.Accepted) {
+func (f *capacitySQLFixture) admitManagedContext(t *testing.T, root capacityRoot, enrollment capacityEnrollment) (captureAdmissionScenario, capturevalue.Accepted) {
 	t.Helper()
 	return f.admitManagedContextRetention(t, root, enrollment, capacityNativeRetentionSeconds)
 }
@@ -31,10 +30,9 @@ func (f *capacitySQLFixture) admitManagedContext(t *testing.T, root app.RootConf
 // Select the fixture's finite retention before policy acceptance and original
 // submission preparation. This never edits a persisted cutoff or renews a
 // request; the existing renewal cases retain their original 20-second default.
-func (f *capacitySQLFixture) admitManagedContextRetention(t *testing.T, root app.RootConfiguration, enrollment app.Enrollment, retentionSeconds int64) (captureAdmissionScenario, capturevalue.Accepted) {
+func (f *capacitySQLFixture) admitManagedContextRetention(t *testing.T, root capacityRoot, enrollment capacityEnrollment, retentionSeconds int64) (captureAdmissionScenario, capturevalue.Accepted) {
 	t.Helper()
-	s, publisher, policies := f.prepareManagedContext(t, root, enrollment, retentionSeconds)
-	f.checkManagedProcessingAdmission(t, s.s, s.recovery.guard, policies, s.a)
+	s, publisher, _ := f.prepareManagedContext(t, root, enrollment, retentionSeconds)
 	start := time.Now()
 	accepted, err := s.s.AdmitContext(f.ctx, s.a)
 	if err != nil {
@@ -47,7 +45,7 @@ func (f *capacitySQLFixture) admitManagedContextRetention(t *testing.T, root app
 	return s, accepted
 }
 
-func (f *capacitySQLFixture) prepareManagedContext(t *testing.T, root app.RootConfiguration, enrollment app.Enrollment, retentionSeconds int64, additional ...privacy.ScopedPolicy) (captureAdmissionScenario, auditapp.CaptureOperationPublication, privacy.PolicySet) {
+func (f *capacitySQLFixture) prepareManagedContext(t *testing.T, root capacityRoot, enrollment capacityEnrollment, retentionSeconds int64, additional ...privacy.ScopedPolicy) (captureAdmissionScenario, auditapp.CaptureOperationPublication, privacy.PolicySet) {
 	t.Helper()
 	n := time.Now().UTC().Truncate(time.Microsecond)
 	target := capacityNativeTarget(f.input.ControlClusterID, f.namespace, f.workloads[0], n)
@@ -69,7 +67,7 @@ func (f *capacitySQLFixture) prepareManagedContext(t *testing.T, root app.RootCo
 	if err != nil {
 		t.Fatal(err)
 	}
-	material := f.setup.mac
+	material := f.installed.mac
 	mac, err := auditapp.NewOperationMAC(material.InputVersion, material.InputKey, material.AccountVersion, material.AccountKey)
 	if err != nil {
 		t.Fatal(err)
@@ -103,10 +101,6 @@ func (f *capacitySQLFixture) prepareManagedContext(t *testing.T, root app.RootCo
 	f.checkManagedCapturePolicyWire(t, enrollment.AllocationID)
 	// Refresh the actual independently accepted sources before this NEW request.
 	// Nothing rewrites a capture, session, or prior phase to get more time.
-	observation := f.workloadObservation(t, 0)
-	if err = f.enrollments.RefreshCapacityEnrollment(f.ctx, observation, enrollment); err != nil {
-		t.Fatal(err)
-	}
 	policies, err := retention.policies(f.ctx)
 	if err != nil {
 		t.Fatal(err)

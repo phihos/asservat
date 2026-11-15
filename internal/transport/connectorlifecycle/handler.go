@@ -34,12 +34,6 @@ type AccessBindingsService interface {
 	AccessBindings(context.Context, *Region) error
 }
 
-// CapacityService records a connector's capacity delivery for its presented
-// cluster (ADR-331), as AccessBindingsService.
-type CapacityService interface {
-	Capacity(context.Context, *Region) error
-}
-
 type Handler struct {
 	tokens   TokenVerifier
 	services Services
@@ -134,12 +128,6 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		} else {
 			err = ErrChannel
 		}
-	case PurposeCapacity:
-		if sink, ok := h.services.(CapacityService); ok {
-			err = sink.Capacity(ctx, region)
-		} else {
-			err = ErrChannel
-		}
 	default:
 		err = ErrChannel
 	}
@@ -156,7 +144,7 @@ func admit(o Opening, p value.ConnectorCluster) bool {
 		return false
 	}
 	switch o.Purpose {
-	case PurposeOwnerCandidates, PurposeRecovery, PurposeAccessBindings, PurposeCapacity:
+	case PurposeOwnerCandidates, PurposeRecovery, PurposeAccessBindings:
 		if o.Owner != nil {
 			return false
 		}
@@ -232,36 +220,11 @@ func (r *Region) ReadAccessBindings(ctx context.Context, stored string) (_ contr
 	if reply.Unchanged && reply.AccessBindings == nil && stored != "" {
 		return contracts.AccessBindingDelivery{}, true, nil
 	}
-	if reply.Unchanged || reply.AccessBindings == nil || reply.Capacity != nil {
+	if reply.Unchanged || reply.AccessBindings == nil {
 		r.closed = true
 		return contracts.AccessBindingDelivery{}, false, ErrChannel
 	}
 	return *reply.AccessBindings, false, nil
-}
-
-// ReadCapacity asks the presenting connector for its capacity observation
-// (ADR-331) like ReadAccessBindings, raising the read bound by the
-// delivery's own byte bound.
-func (r *Region) ReadCapacity(ctx context.Context, stored string) (_ contracts.CapacityDelivery, unchanged bool, _ error) {
-	r.conn.mu.Lock()
-	defer r.conn.mu.Unlock()
-	if r.delivered {
-		return contracts.CapacityDelivery{}, false, ErrChannel
-	}
-	r.delivered = true
-	r.conn.limit.n += contracts.CapacityDeliveryMaxBytes
-	var reply RegionFrame
-	if err := r.askFrame(ctx, HubFrame{Kind: "capacity", Digest: stored}, &reply); err != nil {
-		return contracts.CapacityDelivery{}, false, err
-	}
-	if reply.Unchanged && reply.Capacity == nil && stored != "" {
-		return contracts.CapacityDelivery{}, true, nil
-	}
-	if reply.Unchanged || reply.Capacity == nil || reply.AccessBindings != nil {
-		r.closed = true
-		return contracts.CapacityDelivery{}, false, ErrChannel
-	}
-	return *reply.Capacity, false, nil
 }
 
 func (r *Region) closeChannel() {

@@ -198,6 +198,7 @@ helm-check: permission-crd-check policy-crd-check retention-crd-check profile-cr
 	$(PYTHON) scripts/test-helm-runtime-node-access.py
 	$(PYTHON) scripts/test-helm-services.py
 	$(PYTHON) scripts/test-helm-hub-api.py
+	$(PYTHON) scripts/test-helm-hub-worker.py
 
 helm-integration: helm-check
 	$(PYTHON) scripts/test-helm.py

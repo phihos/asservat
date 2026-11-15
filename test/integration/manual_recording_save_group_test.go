@@ -4,7 +4,6 @@ package integration
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"slices"
 	"testing"
@@ -13,7 +12,6 @@ import (
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
 	auditapp "asservat.local/asservat/internal/application/audit"
-	"asservat.local/asservat/internal/application/capacity"
 	captureapp "asservat.local/asservat/internal/application/capture"
 	fleetapp "asservat.local/asservat/internal/application/fleet"
 	planningapp "asservat.local/asservat/internal/application/planning"
@@ -310,10 +308,6 @@ func qualifyManualRecordingSaveGroup(t *testing.T, ctx context.Context, f *capac
 		return admissions.AdmitRecordingSaveGroup(call, group)
 	}
 	before := readManualSaveCounters(t, ctx, f, policy)
-	var controlBeforeFull, controlBeforeReplay int64
-	if err := f.admin.QueryRow(ctx, `SELECT charged_full,charged_replay FROM context_control_account WHERE root_id=$1 AND allocation_id=$2`, group.RootID, group.Preview.Storage.AllocationID).Scan(&controlBeforeFull, &controlBeforeReplay); err != nil {
-		t.Fatal(err)
-	}
 	windowBefore := manualGroupWindows(t, ctx, f, policy)
 	capacityBefore := manualGroupCapacity(t, ctx, f)
 	var grantBefore manualPolicyGrantSpend
@@ -391,10 +385,6 @@ func qualifyManualRecordingSaveGroup(t *testing.T, ctx context.Context, f *capac
 	}
 	t.Run("one-parent-shared-t0-policy-and-grant-spend", func(t *testing.T) {
 		after := readManualSaveCounters(t, ctx, f, policy)
-		var full, chargedReplay int64
-		if err := f.admin.QueryRow(ctx, `SELECT charged_full,charged_replay FROM context_control_account WHERE root_id=$1 AND allocation_id=$2`, group.RootID, group.Preview.Storage.AllocationID).Scan(&full, &chargedReplay); err != nil || full != controlBeforeFull+int64(count+1) || chargedReplay != controlBeforeReplay+int64(count+1) {
-			t.Fatal("group metadata did not charge parent plus genuine children", full, chargedReplay, err)
-		}
 		var unsharedManual int
 		if err := f.admin.QueryRow(ctx, `SELECT count(*) FROM context_capture WHERE group_id=$1 AND history_origin='manual' AND share_instruction IS NULL`, accepted.CaptureID).Scan(&unsharedManual); err != nil || unsharedManual != count {
 			t.Fatal("group inherited recurring sharing or automatic history", unsharedManual, err)
@@ -470,8 +460,6 @@ func manualGroupCapacity(t *testing.T, ctx context.Context, f *capacitySQLFixtur
 	var out string
 	if err := f.admin.QueryRow(ctx, `SELECT jsonb_build_array(
  (SELECT COALESCE(jsonb_agg(jsonb_build_array(id,charged_bytes,charged_objects) ORDER BY id),'[]'::jsonb) FROM custody_allocation),
- (SELECT count(*) FROM context_control_charge),
- (SELECT COALESCE(jsonb_agg(jsonb_build_array(root_id,allocation_id,charged_full,charged_replay) ORDER BY root_id,allocation_id),'[]'::jsonb) FROM context_control_account),
  (SELECT count(*) FROM recording_save_reservation),
  (SELECT count(*) FROM custody_attempt))::text`).Scan(&out); err != nil {
 		t.Fatal("bounded owned fixture capacity counters", err)
@@ -542,63 +530,9 @@ func qualifyManualRecordingSaveGroupMixedCancellation(t *testing.T, ctx context.
 	}
 }
 
-func TestManualRecordingSaveGroupFixtureFundsSourcesParentAndChildren(t *testing.T) {
-	for _, count := range []int{2, 16} {
-		t.Run(fmt.Sprintf("sources-%d", count), func(t *testing.T) {
-			root, installation, cluster, control := custodyID(), custodyID(), custodyID(), custodyID()
-			q, template := capacityNativeQualification(t, root, installation, cluster, control, "synthetic-group-account")
-			f := &capacitySQLFixture{qualification: q, template: template}
-			configureManualGroupSourceCapacity(f, count)
-			backing, err := capacity.CompileContextProtocolBacking(f.template.Policies[0].Budget.Context, q.RootBacking.ContextHistory)
-			if err != nil || backing.Records < int64(2*count+1) || backing.ReplayRecords < int64(2*count+1) {
-				t.Fatal("real sources plus parent and children underfunded", count, backing.Records, backing.ReplayRecords, err)
-			}
-			plan, err := capacity.CompileProtectedPoolPlan(f.template, f.template.Pools[0].Budget.Name)
-			if err != nil {
-				t.Fatal(err)
-			}
-			qualified, err := capacity.CompileQualifiedRootBacking(f.qualification, plan)
-			if err != nil {
-				t.Fatal("group configuration lacks protected root backing", err)
-			}
-			raw, _ := qualified.Canonical()
-			var compiled struct{ Input capacity.RootBackingInput }
-			if err := json.Unmarshal(raw, &compiled); err != nil {
-				t.Fatal(err)
-			}
-			if compiled.Input.RecordsPerAccount < backing.Records {
-				t.Fatal("compiled root has fewer records than workload protocol", compiled.Input.RecordsPerAccount, backing.Records)
-			}
-			slots := compiled.Input.Accounts * compiled.Input.RecordsPerAccount
-			if compiled.Input.Capture.RecordsPerAccount != compiled.Input.RecordsPerAccount || compiled.Input.Capture.Policy.MetadataSlots != slots || compiled.Input.ProcessingState.MaxCaptures < slots {
-				t.Fatal("capture/processing root does not cover grouped records")
-			}
-			b, w := compiled.Input.Capture.Policy.History.SlotBacking(compiled.Input.Capture.Policy.MaxPurgeLeases)
-			if compiled.Input.Capture.Policy.BackupReservedBytes != slots*b || compiled.Input.Capture.Policy.WALReservedBytes != slots*w {
-				t.Fatal("capture lane backup/WAL underfunded")
-			}
-			pb, pw, ok := compiled.Input.ProcessingState.RequiredBytes()
-			if !ok || compiled.Input.ProcessingState.BackupBytes < pb || compiled.Input.ProcessingState.WALBytes < pw {
-				t.Fatal("processing state backup/WAL underfunded")
-			}
-			t.Logf("root_records_per_account=%d capture_records_per_account=%d capture_metadata_slots=%d processing_max_captures=%d capture_backup=%d capture_wal=%d processing_backup=%d processing_wal=%d", compiled.Input.RecordsPerAccount, compiled.Input.Capture.RecordsPerAccount, compiled.Input.Capture.Policy.MetadataSlots, compiled.Input.ProcessingState.MaxCaptures, compiled.Input.Capture.Policy.BackupReservedBytes, compiled.Input.Capture.Policy.WALReservedBytes, compiled.Input.ProcessingState.BackupBytes, compiled.Input.ProcessingState.WALBytes)
-			nativeUnit := (artifact.Registration{NativeLimit: artifact.RecordingNativeLimit}).ReservedBytes()
-			if f.template.Policies[0].Budget.Context.Bytes < int64(count)*nativeUnit {
-				t.Fatal("genuine output reservations underfunded")
-			}
-			t.Logf("configured group%d controls=%d (%dsources+1parent+%dchildren); native_output_ceiling=%d; arithmetic only", count, backing.Records, count, count, int64(count)*artifact.RecordingNativeLimit)
-		})
-	}
-}
-
 func configureManualGroupSourceCapacity(f *capacitySQLFixture, count int) {
-	configureManualSourceCapacity(f)
 	unit := (artifact.Registration{NativeLimit: artifact.RecordingNativeLimit}).ReservedBytes()
-	protected := capacity.BudgetAmount{Bytes: int64(max(3, count+1)) * unit, Objects: int64(2*count+1) * 4}
-	p := f.template.Policies[0].Budget
-	p.Protected, p.Hard, p.Context = protected, protected, protected
-	p.NamespaceMaximum = capacity.BudgetAmount{Bytes: capacityNativeAccounts * protected.Bytes, Objects: capacityNativeAccounts * protected.Objects}
-	f.template.Pools[0].Budget.Slots[0].Protected = protected
+	f.fund(int64(max(3, count+1)) * unit)
 	// Configure the protected root before its qualification is serialized and
 	// accepted. Workload object capacity alone does not enlarge root coverage.
 	records := int64(2*count + 1)
@@ -710,7 +644,7 @@ func (r manualGroupHistoryRetention) ResolveRetainedCaseMetadata(ctx context.Con
 // reserving/writing history or refreshing a caller identity.
 func newManualGroupHistoryService(t *testing.T, ctx context.Context, f *capacitySQLFixture, policy policySourceAcceptedFixture, root, installation string) (captureapp.HistoryParameterService, func()) {
 	t.Helper()
-	material := f.setup.mac
+	material := f.installed.mac
 	mac, err := auditapp.NewOperationMAC(material.InputVersion, material.InputKey, material.AccountVersion, material.AccountKey)
 	if err != nil {
 		t.Fatal(err)

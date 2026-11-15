@@ -7,8 +7,7 @@ import (
 	"crypto/rand"
 	"crypto/tls"
 	"encoding/hex"
-	"encoding/json"
-	"slices"
+	"errors"
 	"strconv"
 	"strings"
 	"sync"
@@ -18,56 +17,64 @@ import (
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
 	auditapp "asservat.local/asservat/internal/application/audit"
-	authapp "asservat.local/asservat/internal/application/authorization"
 	app "asservat.local/asservat/internal/application/capacity"
 	configapp "asservat.local/asservat/internal/application/configuration"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/fleet"
-	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/privacy"
-	"asservat.local/asservat/internal/domain/targets"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// capacityFixtureInput names the fixture installation's capacity scope.
+type capacityFixtureInput struct {
+	InstallationID, PermissionRootID, ControlClusterID, ControlNamespaceUID, AccountVersion string
+}
+
+// capacityRoot is the applied root: the standing date and revision 1 that
+// capacity_apply writes for capture and processing backing.
+type capacityRoot struct {
+	PlannedUntil time.Time
+	Revision     int64
+}
+
+// capacityEnrollment is one on-demand enrolled workload account.
+type capacityEnrollment struct {
+	AllocationID, DownloadAllocationID string
+}
+
+var capacityStanding = time.Date(9970, 1, 1, 0, 0, 0, 0, time.UTC)
+
 type capacitySQLFixture struct {
-	fleetRefreshMu     sync.Mutex
-	ctx                context.Context
-	admin              *pgxpool.Pool
-	setup              capacityFixtureSetup
-	input              contracts.CapacityRootSetup
-	protection         capacitySyntheticProtection
-	qualification      app.CapacityQualification
-	template           app.CapacitySnapshot
-	permission         *postgres.Permissions
-	batch              cfg.PermissionBatch
-	observer           *postgres.FleetObservation
-	administration     fleet.Administration
-	roles              map[string]*pgxpool.Pool
-	accounts           *auditapp.CaptureAccounts
-	source             *postgres.CapacitySourceJournal
-	permissionRead     *postgres.CapacityPermissions
-	roots              *postgres.CapacityRootBacking
-	captureRoots       *postgres.CapacityRootCaptureBacking
-	enrollments        *postgres.CapacityEnrollments
-	captureEnrollments *postgres.CapacityCaptureEnrollments
-	namespace          cfg.NamespaceRef
-	workloads          []cfg.WorkloadRef
-	legacy             *postgres.Ledger
-	registered         map[string]artifact.Registration
-	fixturePool        func(string, string) *pgxpool.Pool
-	store              *objectstore.Store
-	authority          *objectstore.AuthorityObjects
-	keys               authorityTestKeys
-	processingPolicy   privacy.DownloadPolicy
-	additional         []app.Enrollment
+	fleetRefreshMu   sync.Mutex
+	ctx              context.Context
+	admin            *pgxpool.Pool
+	installed        capacityFixtureSetup
+	input            capacityFixtureInput
+	qualification    app.CapacityQualification
+	values           app.CapacityValues
+	permission       *postgres.Permissions
+	batch            cfg.PermissionBatch
+	observer         *postgres.FleetObservation
+	administration   fleet.Administration
+	roles            map[string]*pgxpool.Pool
+	accounts         *auditapp.OperationMAC
+	namespace        cfg.NamespaceRef
+	workloads        []cfg.WorkloadRef
+	legacy           *postgres.Ledger
+	registered       map[string]artifact.Registration
+	fixturePool      func(string, string) *pgxpool.Pool
+	store            *objectstore.Store
+	authority        *objectstore.AuthorityObjects
+	keys             authorityTestKeys
+	processingPolicy privacy.DownloadPolicy
 }
 
 func newCapacitySQLFixture(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects, configure ...func(*capacitySQLFixture)) *capacitySQLFixture {
 	t.Helper()
-	f := &capacitySQLFixture{ctx: ctx, admin: admin, setup: newCapacityFixtureSetup(t, scope), administration: administration, roles: map[string]*pgxpool.Pool{}, namespace: cfg.NamespaceRef{Name: "applications", UID: custodyID()}, workloads: []cfg.WorkloadRef{{Kind: "Deployment", Name: "first", UID: custodyID()}, {Kind: "StatefulSet", Name: "second", UID: custodyID()}}}
+	f := &capacitySQLFixture{ctx: ctx, admin: admin, installed: newCapacityFixtureSetup(t, scope), administration: administration, roles: map[string]*pgxpool.Pool{}, namespace: cfg.NamespaceRef{Name: "applications", UID: custodyID()}, workloads: []cfg.WorkloadRef{{Kind: "Deployment", Name: "first", UID: custodyID()}, {Kind: "StatefulSet", Name: "second", UID: custodyID()}}}
 	for len(f.workloads) < capacityNativeAccounts {
 		f.workloads = append(f.workloads, cfg.WorkloadRef{Kind: "Deployment", Name: "envelope-" + strconv.Itoa(len(f.workloads)), UID: custodyID()})
 	}
@@ -120,16 +127,6 @@ func newCapacitySQLFixture(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 		t.Fatal(err)
 	}
 	f.refreshFleet(t)
-	if !t.Run("actual-postgres-function-type-alias", func(t *testing.T) {
-		var same bool
-		var display string
-		if err := admin.QueryRow(ctx, `SELECT p.oid=to_regprocedure('public.capacity_managed_admission_until(uuid,uuid,text,timestamp with time zone)')::oid,replace(oidvectortypes(p.proargtypes),' ','') FROM pg_proc p WHERE p.oid=to_regprocedure('public.capacity_managed_admission_until(uuid,uuid,text,timestamptz)')::oid`).Scan(&same, &display); err != nil || !same || display != "uuid,uuid,text,timestampwithtimezone" {
-			t.Fatal("actual PostgreSQL exact overload/display qualification unavailable")
-		}
-		t.Log("same_function_oid=true display_uses_timestamp_with_time_zone=true")
-	}) {
-		t.FailNow()
-	}
 	// The runtime logins come from the same reconciliation `asservat setup`
 	// runs, with fixture-generated passwords.
 	start := time.Now()
@@ -162,6 +159,10 @@ func newCapacitySQLFixture(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 		}
 		f.roles[purpose] = poolFor(name, logins[name])
 	}
+	// Shared hub duties use the hub-runtime credential (ADR-222).
+	for _, duty := range contracts.PublicRuntimeHubSharedDuties() {
+		f.roles[duty] = f.roles["hub-runtime"]
+	}
 	rootID, epoch := custodyID(), custodyID()
 	f.permission, err = postgres.NewPermissions(ctx, poolFor("authority_runtime", "synthetic-authority"), rootID)
 	if err != nil {
@@ -186,17 +187,18 @@ func newCapacitySQLFixture(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 			t.Fatal("actual encrypted permission audit", err)
 		}
 	}
-	f.qualification, f.template = capacityNativeQualification(t, rootID, scope.InstallationID, scope.ClusterID, scope.NamespaceUID, f.setup.mac.AccountVersion)
+	f.qualification, f.values = capacityNativeQualification(t, rootID, scope.InstallationID, scope.ClusterID, f.installed.mac.AccountVersion), capacityNativeValues()
 	for _, option := range configure {
 		option(f)
 	}
 	f.processingPolicy = capacityNativeProcessingPolicy(f.qualification, scope.IssuerEpoch)
-	raw, err = json.Marshal(f.qualification)
+	f.input = capacityFixtureInput{InstallationID: scope.InstallationID, PermissionRootID: rootID, ControlClusterID: scope.ClusterID, ControlNamespaceUID: scope.NamespaceUID, AccountVersion: f.installed.mac.AccountVersion}
+	material := f.installed.mac
+	f.accounts, err = auditapp.NewOperationMAC(material.InputVersion, material.InputKey, material.AccountVersion, material.AccountKey)
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.protection = capacitySyntheticProtection{cluster: scope.ClusterID, namespace: scope.NamespaceUID, digest: artifact.Digest{14}}
-	f.input = contracts.CapacityRootSetup{Format: contracts.CapacityRootSetupFormat, InstallationID: scope.InstallationID, InitialClaimID: claim, PermissionRootID: rootID, RoleRootUID: custodyID(), RoleSetupID: f.setup.setupID, ControlClusterID: scope.ClusterID, ControlNamespaceUID: scope.NamespaceUID, SourceGuardDigest: capacityGuardHex(f.protection.digest), AccountVersion: f.setup.mac.AccountVersion, Qualification: raw}
+	t.Cleanup(f.accounts.Close)
 	f.legacy, err = postgres.New(ctx, poolFor("custody_runtime", "synthetic-runtime"))
 	if err != nil {
 		t.Fatal(err)
@@ -284,180 +286,59 @@ func (f *capacitySQLFixture) refreshBase(t *testing.T) {
 	}
 }
 
-func (f *capacitySQLFixture) open(t *testing.T) {
-	t.Helper()
-	var err error
-	f.accounts, err = auditapp.NewCaptureAccounts(f.input.InstallationID, f.input.AccountVersion, f.setup.mac.AccountKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(f.accounts.Close)
-	general, capture := f.roles["capacity"], f.roles["capacity-capture"]
-	f.source, err = postgres.NewCapacitySourceJournal(f.ctx, general, f.input.PermissionRootID, f.input.InstallationID, f.qualification.ID, f.qualification.Digest)
-	if err != nil {
-		t.Fatal(err)
-	}
-	f.permissionRead, err = postgres.NewCapacityPermissions(f.ctx, general, f.input.PermissionRootID, f.input.InstallationID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	f.roots, err = postgres.NewCapacityRootBacking(f.ctx, general, f.input.PermissionRootID, f.input.InstallationID, f.qualification.ID, f.qualification.Digest)
-	if err != nil {
-		t.Fatal(err)
-	}
-	f.captureRoots, err = postgres.NewCapacityRootCaptureBacking(f.ctx, capture, f.input.PermissionRootID, f.input.InstallationID, f.qualification.ID, f.qualification.Digest)
-	if err != nil {
-		t.Fatal(err)
-	}
-	f.enrollments, err = postgres.NewCapacityEnrollments(f.ctx, general, f.input.PermissionRootID, f.input.InstallationID, f.accounts)
-	if err != nil {
-		t.Fatal(err)
-	}
-	f.captureEnrollments, err = postgres.NewCapacityCaptureEnrollments(f.ctx, capture, f.input.PermissionRootID, f.input.InstallationID, f.accounts)
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-func (f *capacitySQLFixture) fresh(t *testing.T) (app.AcceptedCapacitySource, artifact.RecoveryProof) {
+// setup applies the fixture capacity values and enrolls the first workload.
+func (f *capacitySQLFixture) setup(t *testing.T) (capacityRoot, capacityEnrollment) {
 	t.Helper()
 	f.refreshBase(t)
-	recovery, err := f.source.RecoveryState(f.ctx)
+	if _, err := postgres.ApplyCapacity(f.ctx, f.roles["capacity"], f.input.ControlClusterID, f.input.ControlNamespaceUID, f.qualification, f.values); err != nil {
+		t.Fatal("actual capacity apply", err)
+	}
+	return capacityRoot{PlannedUntil: capacityStanding, Revision: 1}, f.enroll(t, f.input.ControlClusterID, f.namespace, f.workloads[0])
+}
+
+// enroll reads the workload's storage once under the enrolling metadata
+// login, which creates its account on first use.
+func (f *capacitySQLFixture) enroll(t *testing.T, cluster string, namespace cfg.NamespaceRef, workload cfg.WorkloadRef) capacityEnrollment {
+	t.Helper()
+	reader, err := postgres.NewContextStorageReader(f.ctx, f.roles["hub-metadata-read"], f.input.PermissionRootID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	o, err := reader.WithEnrollment(f.input.InstallationID, f.accounts).ContextStorage(f.ctx, capacityNativeStorageTarget(cluster, namespace, workload))
+	if err != nil {
+		var stage interface{ ContextStorageRead() string }
+		if errors.As(err, &stage) {
+			t.Fatal("on-demand capacity enrollment", err, stage.ContextStorageRead())
+		}
+		t.Fatal("on-demand capacity enrollment", err)
+	}
+	e := capacityEnrollment{AllocationID: o.Selection.AllocationID}
+	if err = f.admin.QueryRow(f.ctx, `SELECT download_allocation_id::text FROM capacity_account WHERE allocation_id=$1`, e.AllocationID).Scan(&e.DownloadAllocationID); err != nil {
+		t.Fatal("enrolled capacity account", err)
+	}
+	return e
+}
+
+// recoveryState reads the current recovery proof through the peer reader.
+func (f *capacitySQLFixture) recoveryState(t *testing.T) artifact.RecoveryProof {
+	t.Helper()
+	reader, err := postgres.NewRecoveryReader(f.ctx, f.fixturePool("peer_read_runtime", "synthetic-peer-read"), f.input.InstallationID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	proof, err := reader.RecoveryState(f.ctx)
 	if err != nil {
 		t.Fatal("actual recovery read", err)
 	}
-	revision, err := f.source.ReadCapacitySourceRevision(f.ctx, recovery)
-	if err != nil {
-		t.Fatal("actual source revision read", err)
-	}
-	protection, err := f.protection.CapacityProtection(f.ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	n := time.Now().UTC().Truncate(time.Microsecond)
-	observation := capacityNativeSource(t, f.template, n, identity.Earlier(n.Add(5*time.Second), recovery.FreshUntil))
-	accepted, err := f.source.AcceptCapacitySource(f.ctx, app.CapacitySourceAcceptance{RootID: f.input.PermissionRootID, InstallationID: f.input.InstallationID, QualificationID: f.qualification.ID, QualificationDigest: f.qualification.Digest, ExpectedRevision: revision, Observation: observation, Protection: protection, Recovery: recovery})
-	if err != nil {
-		t.Fatal("actual source acceptance", err)
-	}
-	return accepted, recovery
+	return proof
 }
 
-func (f *capacitySQLFixture) rootObservation(t *testing.T) app.RootBackingObservation {
-	t.Helper()
-	source, recovery := f.fresh(t)
-	n := time.Now().UTC().Truncate(time.Microsecond)
-	p := f.processingPolicy
-	p.ObservedAt, p.FreshUntil = n, n.Add(5*time.Second)
-	o, err := app.NewRootBackingObservation(f.qualification, source, p, recovery, time.Now())
-	if err != nil {
-		t.Fatal("composed root observation", err)
-	}
-	return o
-}
-
-// addPermissionScope accepts a further permission batch whose bases add one
-// maintainer scope in another cluster, and publishes its authority audit.
-func (f *capacitySQLFixture) addPermissionScope(t *testing.T, cluster string, namespace cfg.NamespaceRef) {
-	t.Helper()
-	base := f.batch.Bases[0]
-	base.Resource.UID = custodyID()
-	base.Scope = cfg.Scope{ClusterID: cluster, Namespace: namespace}
-	base.ScopeDigest = configapp.PermissionScopeDigest(base)
-	next := f.batch
-	next.Bases = append(slices.Clone(f.batch.Bases), base)
-	next.RequestID, next.InputDigest, next.Initial = custodyID(), artifact.Digest{byte(len(next.Bases)), 4}, nil
-	f.refreshFleet(t)
-	next.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
-	next.FreshUntil = next.ObservedAt.Add(5 * time.Second)
-	accepted, err := f.permission.AcceptPermissions(f.ctx, next)
-	if err != nil {
-		t.Fatal("regional permission scope acceptance", err)
-	}
-	next.ExpectedSequence = accepted.Sequence
-	f.batch = next
-	for i := 0; i < 2; i++ {
-		if err = (auditapp.AuthorityPublisher{Ledger: f.permission, Objects: f.authority}).PublishAuthority(f.ctx); err != nil {
-			t.Fatal("regional permission audit", err)
-		}
-	}
-	f.refreshBase(t)
-}
-
-// addReviewScope accepts a kubernetesExec source for cluster (ADR-245),
-// publishes its authority audit and records one allowed review of a Pod of
-// workload, as hub-api does after the cluster's connector allowed it.
-func (f *capacitySQLFixture) addReviewScope(t *testing.T, cluster string, namespace cfg.NamespaceRef, workload cfg.WorkloadRef) {
-	t.Helper()
-	source, reason := cfg.ReviewSourceFor(cfg.Source{Resource: cfg.Resource{Kind: "PermissionSource", UID: custodyID(), ResourceVersion: "exec-1", Generation: 1, SpecDigest: artifact.Digest{41}}, Enabled: true, Type: cfg.SourceKubernetesExec,
-		ClusterID: cluster, Role: "workload-maintainer", MaxDecisionAge: 30 * time.Second, MaxNamespaces: 10, IdentityMappingRef: "company", AdmissionParity: cfg.AdmissionParity{Mode: "noAdditionalRestrictions", ReviewRef: "synthetic-attestation"}})
-	if reason != "" {
-		t.Fatal(reason)
-	}
-	next := f.batch
-	next.ReviewSources = []cfg.ReviewSource{source}
-	next.RequestID, next.InputDigest, next.Initial = custodyID(), artifact.Digest{byte(len(next.Bases)), 5}, nil
-	f.refreshFleet(t)
-	next.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
-	next.FreshUntil = next.ObservedAt.Add(5 * time.Second)
-	accepted, err := f.permission.AcceptPermissions(f.ctx, next)
-	if err != nil {
-		t.Fatal("review source acceptance", err)
-	}
-	next.ExpectedSequence = accepted.Sequence
-	f.batch = next
-	for i := 0; i < 2; i++ {
-		if err = (auditapp.AuthorityPublisher{Ledger: f.permission, Objects: f.authority}).PublishAuthority(f.ctx); err != nil {
-			t.Fatal("review source audit", err)
-		}
-	}
-	reviews, err := postgres.NewAccessReviews(f.ctx, f.fixturePool("authority_runtime", "synthetic-authority"), f.input.PermissionRootID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	target := targets.Request{ClusterID: cluster, Namespace: namespace, Workload: workload, PodName: workload.Name + "-1", PodUID: custodyID()}
-	principal := identity.Principal{Issuer: "https://id.example.test", Subject: "exec-user", ClientID: "console", Kind: identity.Human}
-	if err = reviews.RecordReview(f.ctx, authapp.ReviewDecision{Source: source, Principal: principal, Target: target, Allowed: true, DecidedAt: time.Now()}); err != nil {
-		t.Fatal("recorded review", err)
-	}
-	f.refreshBase(t)
-}
-
-// regionalObservation composes a workload observation in another cluster
-// under that cluster's qualified namespace guard (ADR-197).
-func (f *capacitySQLFixture) regionalObservation(t *testing.T, cluster string, digest artifact.Digest, namespace cfg.NamespaceRef, workload cfg.WorkloadRef) app.EnrollmentObservation {
-	t.Helper()
-	source, recovery := f.fresh(t)
-	permissions, err := f.permissionRead.ReadCapacityPermissions(f.ctx, recovery)
-	if err != nil {
-		t.Fatal("regional maintainer scope", err)
-	}
-	n := time.Now().UTC().Truncate(time.Microsecond)
-	until := identity.Earlier(n.Add(5*time.Second), recovery.FreshUntil)
-	guard := app.CapacityNamespaceProtection{ClusterID: cluster, Digest: digest, Keys: []string{"team"}, ObservedAt: n, FreshUntil: until}
-	o, _, err := app.ComposeEnrollmentObservation(source, guard, capacityNativeWorkload(cluster, namespace, workload, n, until), permissions, recovery, f.input.AccountVersion, time.Now())
-	if err != nil {
-		t.Fatal("composed regional workload observation", err)
-	}
-	return o
-}
-
-func (f *capacitySQLFixture) workloadObservation(t *testing.T, index int) app.EnrollmentObservation {
-	t.Helper()
-	source, recovery := f.fresh(t)
-	permissions, err := f.permissionRead.ReadCapacityPermissions(f.ctx, recovery)
-	if err != nil {
-		t.Fatal("actual accepted maintainer scope", err)
-	}
-	n := time.Now().UTC().Truncate(time.Microsecond)
-	until := identity.Earlier(n.Add(5*time.Second), recovery.FreshUntil)
-	guard := app.CapacityNamespaceProtection{ClusterID: f.input.ControlClusterID, Digest: f.qualification.NamespaceGuards[0].Digest, Keys: []string{"team"}, ObservedAt: n, FreshUntil: until}
-	workload := capacityNativeWorkload(f.input.ControlClusterID, f.namespace, f.workloads[index], n, until)
-	o, _, err := app.ComposeEnrollmentObservation(source, guard, workload, permissions, recovery, f.input.AccountVersion, time.Now())
-	if err != nil {
-		t.Fatal("composed exact workload observation", err)
-	}
-	return o
+// fund raises the per-workload share to at least bytes, keeping the burst
+// limit and evidence size above it for every fixture workload.
+func (f *capacitySQLFixture) fund(bytes int64) {
+	f.values.ShareBytes = max(f.values.ShareBytes, bytes)
+	f.values.LimitBytes = max(f.values.LimitBytes, 4*f.values.ShareBytes)
+	f.values.EvidenceBytes = max(f.values.EvidenceBytes, f.values.ReserveBytes+capacityNativeAccounts*f.values.ShareBytes)
 }
 
 // capacityFixtureSetup holds what `asservat setup` and the chart provide to
@@ -490,11 +371,4 @@ func randomFixtureSecret(t *testing.T) string {
 		t.Fatal(err)
 	}
 	return hex.EncodeToString(b)
-}
-
-// initializeCapacity inserts the capacity root as the hub-worker does, with
-// the capacity login (postgres.InitializeCapacity).
-func (f *capacitySQLFixture) initializeCapacity(ctx context.Context) (postgres.CapacityInitialized, error) {
-	return postgres.InitializeCapacity(ctx, f.roles["capacity"], postgres.CapacityInitialization{ClusterID: f.input.ControlClusterID, NamespaceUID: f.input.ControlNamespaceUID,
-		SourceDigest: f.protection.digest, AccountVersion: f.input.AccountVersion, Qualification: f.qualification})
 }

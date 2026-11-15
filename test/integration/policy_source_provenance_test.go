@@ -13,14 +13,12 @@ import (
 	"asservat.local/asservat/internal/adapters/pcap"
 	"asservat.local/asservat/internal/adapters/postgres"
 	auditapp "asservat.local/asservat/internal/application/audit"
-	capacity "asservat.local/asservat/internal/application/capacity"
 	captureapp "asservat.local/asservat/internal/application/capture"
 	configapp "asservat.local/asservat/internal/application/configuration"
 	compiler "asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
-	"asservat.local/asservat/internal/domain/collector"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
@@ -93,26 +91,14 @@ func qualifySourceSnapshotServicesMode(t *testing.T, mode sourceSnapshotQualific
 			}
 		})
 		sourceCeiling := int64(max(4, groupCount))
-		f.template.Policies[0].SourceResources = &capacity.SourceResourceLimits{Node: collector.PolicyLimits{SourceLimits: collector.SourceLimits{MaxActiveSources: sourceCeiling, InputBytesPerSecond: sourceCeiling << 20, InputBurstBytes: sourceCeiling << 20}}, Workload: collector.SourceLimits{MaxActiveSources: sourceCeiling, InputBytesPerSecond: sourceCeiling << 20, InputBurstBytes: sourceCeiling << 20}}
-		if _, err := f.initializeCapacity(ctx); err != nil {
-			t.Fatal(err)
-		}
-		f.open(t)
+		root, enrollment := f.setup(t)
 		stop := f.keepFleetCurrent()
 		defer func() {
 			if err := stop(); err != nil {
 				t.Error(err)
 			}
 		}()
-		root, err := (&capacity.RootBackingCoordinator{Store: f.roots, Capture: f.captureRoots, Now: time.Now}).Reconcile(ctx, f.rootObservation(t))
-		if err != nil {
-			t.Fatal(err)
-		}
 		f.initializeManagedProcessing(t, root)
-		enrollment, err := (&capacity.EnrollmentCoordinator{Store: f.enrollments, Capture: f.captureEnrollments, Accounts: f.accounts, Now: time.Now}).Reconcile(ctx, f.workloadObservation(t, 0))
-		if err != nil {
-			t.Fatal(err)
-		}
 		seed, intents, _ := f.prepareManagedContext(t, root, enrollment, policySourceFixtureRetentionSeconds)
 		option := policyRecorderProtectedCase{Hub: f.roles["hub-runtime"], Admissions: seed.s, Filters: pcap.NewCompiler(), Expression: "tcp dst port 80", Subjects: []cfg.Subject{{Kind: "Group", Issuer: "https://id.example.test", ID: "maintainers"}}, Ongoing: true, RecordingSaves: manual, RecurringSharing: manual, OrdinaryGrant: requireApproval, Retention: "31s", PermissionsAccepted: func(batch cfg.PermissionBatch) { f.batch = policyRecorderCloneBatch(batch) }}
 		if groupCount > 0 {
@@ -142,10 +128,8 @@ func qualifySourceSnapshotServicesMode(t *testing.T, mode sourceSnapshotQualific
 				t.Helper()
 				// Refresh existing observations only; immutable admission/acceptance,
 				// original source identity, counters and hard policy end remain unchanged.
-				_, recovery := f.fresh(t)
-				if err := f.enrollments.RefreshCapacityEnrollment(ctx, f.workloadObservation(t, 0), enrollment); err != nil {
-					t.Fatal("current storage binding", err)
-				}
+				f.refreshBase(t)
+				recovery := f.recoveryState(t)
 				n := time.Now().UTC().Truncate(time.Microsecond)
 				src := accepted.Source
 				src.ObservedAt = n
@@ -469,14 +453,4 @@ func source107RejectChangedSelections(t *testing.T, ctx context.Context, f *capa
 	}) {
 		t.FailNow()
 	}
-}
-
-func TestSourceSnapshotFixtureFitsExistingStorage(t *testing.T) {
-	_, template := capacityNativeQualification(t, custodyID(), custodyID(), custodyID(), custodyID(), "fixture-version")
-	protected := template.Policies[0].Budget.Protected
-	bytes := (artifact.Registration{NativeLimit: 64 << 10}).ReservedBytes()
-	if bytes < 1 || bytes > protected.Bytes || protected.Objects < 3 {
-		t.Fatal("64KiB snapshot cannot fit unchanged configured fixture backing", bytes, protected)
-	}
-	t.Logf("configured64KiB_snapshot_reserved_bytes=%d existing_workload_protected_bytes=%d; arithmetic only, not measured native overhead", bytes, protected.Bytes)
 }

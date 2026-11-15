@@ -46,7 +46,7 @@ func TestContextDeletionRolesHaveExactFixtureGrants(t *testing.T) {
 		table("custody_allocation", "UPDATE", "charged_bytes", "charged_objects"),
 		table("custody_attempt", "UPDATE", "state", "deleted_at", "lease_until"),
 		table("custody_copy", "UPDATE", "ciphertext_bytes", "ciphertext_sha256", "etag", "version_id"),
-		table("custody_event", "INSERT"))
+		table("custody_event", "INSERT"), capacityChargeGrants)
 	keys := func(v []publicRuntimeGrant) []string {
 		out := make([]string, len(v))
 		for n, g := range v {
@@ -64,7 +64,7 @@ func TestContextDeletionRolesHaveExactFixtureGrants(t *testing.T) {
 			}
 			for _, g := range got {
 				// Only the finalizer deletes the protected finite observation child.
-				if g.kind == "function" || g.privilege == "DELETE" && (purpose != "context-cleanup-finalize" || g.object != "policy_observation_session") {
+				if g.kind == "function" && !slices.Contains(capacityChargeGrants, g) || g.privilege == "DELETE" && (purpose != "context-cleanup-finalize" || g.object != "policy_observation_session") {
 					t.Fatal("effect beyond the purpose", g.key())
 				}
 			}

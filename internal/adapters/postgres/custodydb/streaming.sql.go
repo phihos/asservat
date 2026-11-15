@@ -30,9 +30,8 @@ func (q *Queries) BindPendingStream(ctx context.Context, arg BindPendingStreamPa
 	return result.RowsAffected(), nil
 }
 
-const chargeStreaming = `-- name: ChargeStreaming :execrows
-UPDATE custody_allocation SET charged_bytes = charged_bytes + $2, charged_objects = charged_objects + $3
-WHERE id = $1 AND $2 <= byte_limit - charged_bytes AND $3 <= object_limit - charged_objects
+const chargeStreaming = `-- name: ChargeStreaming :one
+SELECT capacity_charge($1::uuid,$2::bigint,$3::bigint)::boolean AS charged
 `
 
 type ChargeStreamingParams struct {
@@ -41,12 +40,11 @@ type ChargeStreamingParams struct {
 	ChargedObjects int64
 }
 
-func (q *Queries) ChargeStreaming(ctx context.Context, arg ChargeStreamingParams) (int64, error) {
-	result, err := q.db.Exec(ctx, chargeStreaming, arg.ID, arg.ChargedBytes, arg.ChargedObjects)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
+func (q *Queries) ChargeStreaming(ctx context.Context, arg ChargeStreamingParams) (bool, error) {
+	row := q.db.QueryRow(ctx, chargeStreaming, arg.ID, arg.ChargedBytes, arg.ChargedObjects)
+	var charged bool
+	err := row.Scan(&charged)
+	return charged, err
 }
 
 const insertPendingStream = `-- name: InsertPendingStream :exec
@@ -115,9 +113,8 @@ func (q *Queries) LockStream(ctx context.Context, attemptID pgtype.UUID) (Custod
 	return i, err
 }
 
-const releaseStreamingTemporary = `-- name: ReleaseStreamingTemporary :execrows
-UPDATE custody_allocation SET charged_bytes = charged_bytes - $2, charged_objects = charged_objects - $3
-WHERE id = $1 AND charged_bytes >= $2 AND charged_objects >= $3
+const releaseStreamingTemporary = `-- name: ReleaseStreamingTemporary :one
+SELECT capacity_release($1::uuid,$2::bigint,$3::bigint)::boolean AS released
 `
 
 type ReleaseStreamingTemporaryParams struct {
@@ -126,12 +123,11 @@ type ReleaseStreamingTemporaryParams struct {
 	ChargedObjects int64
 }
 
-func (q *Queries) ReleaseStreamingTemporary(ctx context.Context, arg ReleaseStreamingTemporaryParams) (int64, error) {
-	result, err := q.db.Exec(ctx, releaseStreamingTemporary, arg.ID, arg.ChargedBytes, arg.ChargedObjects)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
+func (q *Queries) ReleaseStreamingTemporary(ctx context.Context, arg ReleaseStreamingTemporaryParams) (bool, error) {
+	row := q.db.QueryRow(ctx, releaseStreamingTemporary, arg.ID, arg.ChargedBytes, arg.ChargedObjects)
+	var released bool
+	err := row.Scan(&released)
+	return released, err
 }
 
 const updateStream = `-- name: UpdateStream :execrows

@@ -145,11 +145,13 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("recording_save_group", "UPDATE", "id")
 		// The hub's seven metadata facets share only their existing read and
 		// row-lock privileges. No evidence-object locators, credentials or effect writes.
-		read("authority_audit", "context_capture", "context_case_locator", "context_catalog", "context_control_account", "context_control_pool", "context_execution", "context_processing", "context_storage_binding", "context_verification", "custody_allocation", "custody_attempt", "custody_pool", "fleet_current_trust", "permission_assignment", "permission_basis", "permission_stream", "processing_root", "processing_rule", "retention_catchup", "retention_catchup_effect", "retention_checkpoint", "retention_decision", "retention_source")
+		read("authority_audit", "context_capture", "context_case_locator", "context_catalog", "context_execution", "context_processing", "context_storage_binding", "context_verification", "custody_allocation", "custody_attempt", "custody_pool", "fleet_current_trust", "permission_assignment", "permission_basis", "permission_stream", "processing_root", "processing_rule", "retention_catchup", "retention_catchup_effect", "retention_checkpoint", "retention_decision", "retention_source")
 		add("fleet_current_trust", "UPDATE", "installation_id")
 		add("permission_stream", "UPDATE", "id")
 		add("retention_source", "UPDATE", "root_id")
 		out = append(out, publicRuntimeGrant{"function", "capacity_managed_admission_until(uuid,uuid,text,timestamptz)", "", "EXECUTE"})
+		// A workload enrolls on its first storage read.
+		out = append(out, publicRuntimeGrant{"function", "capacity_enroll(uuid,uuid,text,text,uuid,uuid,bytea)", "", "EXECUTE"})
 	case "capacity-profile-read":
 		// SQL54 independently pins this actual session_user OID and original
 		// provenance. Root/qualification arguments are not a role boundary.
@@ -165,6 +167,7 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("retention_source", "UPDATE", "root_id")
 		add("custody_pool", "UPDATE", "id")
 		add("custody_allocation", "UPDATE", "id", "charged_bytes", "charged_objects")
+		out = append(out, capacityChargeGrants...)
 		add("custody_attempt", "UPDATE", "id", "state", "copies_digest", "deletion_fence", "lease_until", "deleted_at")
 		add("custody_copy", "UPDATE", "ciphertext_bytes", "ciphertext_sha256", "etag", "version_id")
 		for _, table := range []string{"custody_attempt", "custody_copy", "custody_event", "capture_history_parameter", "capture_history_quota"} {
@@ -203,17 +206,16 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("policy_occurrence_capture", "INSERT") // ADR-275 further recorder captures
 		add("policy_acceptance", "UPDATE", "collected_bytes_spent")
 		add("access_grant", "UPDATE", "id", "policy_executions_spent", "policy_bytes_spent")
-		read("fleet_current_trust", "permission_stream", "permission_basis", "permission_assignment", "authority_audit", "context_storage_binding", "context_preview", "context_preview_fence", "context_control_pool", "context_control_account", "context_control_charge", "context_capture", "custody_pool", "custody_allocation", "custody_attempt", "custody_copy", "custody_event", "retention_source", "retention_checkpoint", "retention_catchup", "retention_catchup_effect", "retention_decision")
+		read("fleet_current_trust", "permission_stream", "permission_basis", "permission_assignment", "authority_audit", "context_storage_binding", "context_preview", "context_preview_fence", "context_capture", "custody_pool", "custody_allocation", "custody_attempt", "custody_copy", "custody_event", "retention_source", "retention_checkpoint", "retention_catchup", "retention_catchup_effect", "retention_decision")
 		add("fleet_current_trust", "UPDATE", "installation_id")
 		add("permission_stream", "UPDATE", "id")
 		add("context_storage_binding", "UPDATE", "source_uid")
-		for _, table := range []string{"retention_source", "context_control_pool", "context_control_account"} {
-			add(table, "UPDATE", "root_id")
-		}
+		add("retention_source", "UPDATE", "root_id")
 		add("custody_pool", "UPDATE", "id")
 		add("custody_allocation", "UPDATE", "id", "charged_bytes", "charged_objects")
+		out = append(out, capacityChargeGrants...)
 		add("custody_attempt", "UPDATE", "id")
-		for _, table := range []string{"context_capture", "custody_attempt", "custody_copy", "custody_event", "context_control_charge"} {
+		for _, table := range []string{"context_capture", "custody_attempt", "custody_copy", "custody_event"} {
 			add(table, "INSERT")
 		}
 		for _, signature := range []string{"lock_capture_audit_admission(uuid,uuid)", "reserve_capture_audit(uuid,uuid,jsonb,bytea,timestamptz)", "capacity_managed_admission_until(uuid,uuid,text,timestamptz)"} {
@@ -303,8 +305,6 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("context_preview_fence", "DELETE")
 		add("recording_selection_set", "INSERT")
 		add("recording_selection_set", "DELETE")
-		// ADR-200: a refresh demand for an enrolled workload; no authority.
-		out = append(out, publicRuntimeGrant{"function", "demand_capacity_refresh(uuid,uuid,text,text,text,text,text)", "", "EXECUTE"})
 	case "capture-resolution":
 		// Fencing counts the caller's live previews, which include selections.
 		read("recording_save_group", "recording_selection_set")
@@ -497,6 +497,7 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 			// tombstone and outbox event; triggers require the acknowledged audit.
 			add("context_deletion_checkpoint", "UPDATE", "attempt_id", "finalization_xid")
 			add("custody_allocation", "UPDATE", "charged_bytes", "charged_objects")
+			out = append(out, capacityChargeGrants...)
 			add("custody_attempt", "UPDATE", "state", "deleted_at", "lease_until")
 			add("custody_copy", "UPDATE", "ciphertext_bytes", "ciphertext_sha256", "etag", "version_id")
 			add("custody_event", "INSERT")
@@ -589,4 +590,11 @@ func PublicRuntimeRoleLayoutDigest() string {
 		h.Write([]byte("sql-public-" + purpose + ".json\x00"))
 	}
 	return hex.EncodeToString(h.Sum(nil))
+}
+
+// capacityChargeGrants are the SECURITY DEFINER charge/release of an
+// account (migration 00170), for every login that charges custody bytes.
+var capacityChargeGrants = []publicRuntimeGrant{
+	{"function", "capacity_charge(uuid,bigint,bigint)", "", "EXECUTE"},
+	{"function", "capacity_release(uuid,bigint,bigint)", "", "EXECUTE"},
 }

@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"testing"
-	"time"
 
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/pcap"
@@ -27,30 +26,19 @@ func TestPolicyMetadataBackingWithRealPostgres(t *testing.T) {
 	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects) {
 		profile := installedMetadataProfile
 		f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, func(f *capacitySQLFixture) {
-			policyMetadataProfile(&f.qualification, &f.template)
+			policyMetadataProfile(&f.qualification, &f.values)
 		})
-		if _, err := f.initializeCapacity(ctx); err != nil {
-			t.Fatal("protected setup", err)
-		}
-		f.open(t)
+		root, enrollment := f.setup(t)
 		stop := f.keepFleetCurrent()
 		defer func() {
 			if err := stop(); err != nil {
 				t.Error(err)
 			}
 		}()
-		root, err := (&app.RootBackingCoordinator{Store: f.roots, Capture: f.captureRoots, Now: time.Now}).Reconcile(ctx, f.rootObservation(t))
-		if err != nil {
-			t.Fatal("protected root", err)
-		}
 		f.initializeManagedProcessing(t, root)
-		enrollment, err := (&app.EnrollmentCoordinator{Store: f.enrollments, Capture: f.captureEnrollments, Accounts: f.accounts, Now: time.Now}).Reconcile(ctx, f.workloadObservation(t, 0))
-		if err != nil {
-			t.Fatal("protected workload", err)
-		}
 		var metadata app.RootMetadataQualification
 		var raw []byte
-		if err = admin.QueryRow(ctx, "SELECT qualification->'RootBacking'->'Metadata' FROM capacity_source WHERE root_id=$1", f.input.PermissionRootID).Scan(&raw); err != nil || json.Unmarshal(raw, &metadata) != nil {
+		if err := admin.QueryRow(ctx, "SELECT qualification->'RootBacking'->'Metadata' FROM capacity_settings WHERE root_id=$1", f.input.PermissionRootID).Scan(&raw); err != nil || json.Unmarshal(raw, &metadata) != nil {
 			t.Fatal("accepted profile readback", err)
 		}
 		if metadata != f.qualification.RootBacking.Metadata || metadata.RecordRowBytes != profile.RecordRowBytes || metadata.RecordWALBytes != profile.RecordWALBytes || metadata.BackupCopies != profile.BackupCopies || metadata.WALCopies != profile.WALCopies {
@@ -147,13 +135,12 @@ func TestPolicyMetadataBackingWithRealPostgres(t *testing.T) {
 	})
 }
 
-// installedMetadataProfile holds the installed metadata/copy values the
-// removed installer capacity profile supplied to this fixture.
+// installedMetadataProfile holds the installed metadata/copy values.
 var installedMetadataProfile = struct {
 	AdmissionSeconds, RecordRowBytes, RecordWALBytes, BackupCopies, WALCopies, ConfigurationTransitions int64
 }{AdmissionSeconds: 86400, RecordRowBytes: 128 << 10, RecordWALBytes: 8 << 20, BackupCopies: 2, WALCopies: 3, ConfigurationTransitions: 4096}
 
-func policyMetadataProfile(q *app.CapacityQualification, snapshot *app.CapacitySnapshot) {
+func policyMetadataProfile(q *app.CapacityQualification, values *app.CapacityValues) {
 	profile := installedMetadataProfile
 	// Match the actual installed metadata/copy profile. The pre-existing
 	// fixture still has THREE incident slots, explicitly not native's FOUR.
@@ -164,12 +151,8 @@ func policyMetadataProfile(q *app.CapacityQualification, snapshot *app.CapacityS
 	// Keep exactly three records/native children. Bytes can cover PCAPNG;
 	// objects remain the independent three-record ceiling (no row increase).
 	bytes := (artifact.Registration{NativeLimit: artifact.RecordingNativeLimit}).ReservedBytes() * 3
-	budget := (*snapshot).Policies[0].Budget
-	budget.Protected.Bytes = bytes
-	budget.Hard.Bytes = bytes
-	budget.Context.Bytes = bytes
-	budget.NamespaceMaximum.Bytes = bytes * budget.NamespaceAccounts
-	(*snapshot).Pools[0].Budget.Slots[0].Protected.Bytes = bytes
+	values.ShareBytes, values.LimitBytes = bytes, bytes
+	values.EvidenceBytes = max(values.EvidenceBytes, values.ReserveBytes+capacityNativeAccounts*bytes)
 }
 
 // Convert one NEW pod-status seed into a NEW packet case before compilation.

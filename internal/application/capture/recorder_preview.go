@@ -42,14 +42,14 @@ const profileRepeatPreviewWindow = 8 * time.Second
 // errors are reported only after eligibility, so they disclose nothing about
 // an unauthorized target. The libpcap compiler runs on the hub (S2).
 func (s ContextInvestigation) PreviewComposition(ctx context.Context, source identities.CurrentIdentity, intent value.ContextIntent) (result RecorderPreviewResult, failure error) {
-	return retryColdStorage(ctx, func() (RecorderPreviewResult, error) { return s.previewComposition(ctx, source, intent, nil) })
+	return s.previewComposition(ctx, source, intent, nil)
 }
 
 func (s ContextInvestigation) PreviewCompositionRepeat(ctx context.Context, source identities.CurrentIdentity, intent value.ContextIntent, original authorization.Target) (RecorderPreviewResult, error) {
 	if !authorization.UUID(original.ClusterID) || !identity.Text(original.NamespaceUID, 64) || !identity.Text(original.WorkloadUID, 64) {
 		return RecorderPreviewResult{}, value.ErrInvalid
 	}
-	return retryColdStorage(ctx, func() (RecorderPreviewResult, error) { return s.previewComposition(ctx, source, intent, &original) })
+	return s.previewComposition(ctx, source, intent, &original)
 }
 func (s ContextInvestigation) previewComposition(ctx context.Context, source identities.CurrentIdentity, intent value.ContextIntent, original *authorization.Target) (result RecorderPreviewResult, failure error) {
 	defer func() { s.reportPreviewFailure(failure) }()
@@ -92,7 +92,6 @@ func (s ContextInvestigation) previewComposition(ctx context.Context, source ide
 		return zero, previewFailure("facts/target", value.ErrChanged)
 	}
 	var storageWait *contextStorageWait
-	var ordinaryStorageUntil time.Time
 	if original != nil && s.Recorders != nil && target.ExecutionClass == artifact.ContextAPIExecution && len(intent.Composition.Components) == 1 &&
 		original.ClusterID == target.Request.ClusterID && original.NamespaceUID == target.Request.Namespace.UID &&
 		original.WorkloadUID == target.Request.Workload.UID && (original.PodUID == "" || original.PodUID == target.Request.PodUID) {
@@ -104,7 +103,6 @@ func (s ContextInvestigation) previewComposition(ctx context.Context, source ide
 		if intent.RepeatedFrom != nil {
 			until = identity.Earlier(until, intent.RepeatedFrom.ExpiresAt)
 		}
-		ordinaryStorageUntil = until
 		hint := ctx
 		if profileRepeatCtx != nil {
 			// Initial recovery/target facts authorize only the current review.
@@ -148,9 +146,7 @@ func (s ContextInvestigation) previewComposition(ctx context.Context, source ide
 		// Join the same hint before the existing complete recorder resolution;
 		// its fresh Pod/namespace/workload facts must match the original pin.
 		ctx = profileRepeatCtx
-		select {
-		case <-storageWait.done:
-		case <-ctx.Done():
+		if ctx.Err() != nil {
 			return zero, previewFailure("facts/readiness", ctx.Err())
 		}
 		if !intent.RepeatedFrom.Valid(s.Now()) {
@@ -167,7 +163,6 @@ func (s ContextInvestigation) previewComposition(ctx context.Context, source ide
 		var finish context.CancelFunc
 		ctx, finish = context.WithDeadline(ctx, recovery.FreshUntil)
 		defer finish()
-		storageWait.until = identity.Earlier(storageWait.until, recovery.FreshUntil)
 		profiles, ok := s.Recorders.(ProfileRecorders)
 		if !ok {
 			return zero, previewFailure("recorder", value.ErrRecorderUnavailable)
@@ -186,9 +181,6 @@ func (s ContextInvestigation) previewComposition(ctx context.Context, source ide
 			target = fresh
 		}
 	} else {
-		if storageWait != nil {
-			storageWait.until = ordinaryStorageUntil
-		}
 		available, err = s.packetRecorderAvailable(ctx, intent, target)
 	}
 	if err != nil {

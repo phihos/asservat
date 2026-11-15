@@ -3,7 +3,6 @@
 package integration
 
 import (
-	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json"
@@ -16,13 +15,11 @@ import (
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/pcap"
 	"asservat.local/asservat/internal/adapters/postgres"
-	capacity "asservat.local/asservat/internal/application/capacity"
 	captureapp "asservat.local/asservat/internal/application/capture"
 	"asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
-	"asservat.local/asservat/internal/domain/collector"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
@@ -42,26 +39,14 @@ const policySourceFixtureRetentionSeconds = int64(31)
 func TestPolicySourceLedgerWithRealPostgres(t *testing.T) {
 	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects) {
 		f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects)
-		f.template.Policies[0].SourceResources = &capacity.SourceResourceLimits{Node: collector.PolicyLimits{SourceLimits: collector.SourceLimits{MaxActiveSources: 4, InputBytesPerSecond: 4 << 20, InputBurstBytes: 4 << 20}}, Workload: collector.SourceLimits{MaxActiveSources: 4, InputBytesPerSecond: 4 << 20, InputBurstBytes: 4 << 20}}
-		if _, err := f.initializeCapacity(ctx); err != nil {
-			t.Fatal("actual protected setup", err)
-		}
-		f.open(t)
+		root, enrollment := f.setup(t)
 		stop := f.keepFleetCurrent()
 		defer func() {
 			if err := stop(); err != nil {
 				t.Error(err)
 			}
 		}()
-		root, err := (&capacity.RootBackingCoordinator{Store: f.roots, Capture: f.captureRoots, Now: time.Now}).Reconcile(ctx, f.rootObservation(t))
-		if err != nil {
-			t.Fatal("root backing", err)
-		}
 		f.initializeManagedProcessing(t, root)
-		enrollment, err := (&capacity.EnrollmentCoordinator{Store: f.enrollments, Capture: f.captureEnrollments, Accounts: f.accounts, Now: time.Now}).Reconcile(ctx, f.workloadObservation(t, 0))
-		if err != nil {
-			t.Fatal("workload backing", err)
-		}
 		seed, _, _ := f.prepareManagedContext(t, root, enrollment, policySourceFixtureRetentionSeconds)
 		option := policyRecorderProtectedCase{Hub: f.roles["hub-runtime"], Admissions: seed.s, Filters: pcap.NewCompiler(), Expression: "tcp dst port 80", Subjects: []cfg.Subject{{Kind: "Group", Issuer: "https://id.example.test", ID: "maintainers"}}, Ongoing: true, Retention: strconv.FormatInt(policySourceFixtureRetentionSeconds, 10) + "s", PermissionsAccepted: func(batch cfg.PermissionBatch) { f.batch = policyRecorderCloneBatch(batch) }}
 		option.SourceAccepted = func(t *testing.T, accepted policySourceAcceptedFixture) {
@@ -77,10 +62,8 @@ func TestPolicySourceLedgerWithRealPostgres(t *testing.T) {
 				t.Helper()
 				// Refresh existing observations only; immutable admission/acceptance,
 				// original source identity, counters and hard policy end remain unchanged.
-				_, recovery := f.fresh(t)
-				if err := f.enrollments.RefreshCapacityEnrollment(ctx, f.workloadObservation(t, 0), enrollment); err != nil {
-					t.Fatal("current storage binding", err)
-				}
+				f.refreshBase(t)
+				recovery := f.recoveryState(t)
 				n := time.Now().UTC().Truncate(time.Microsecond)
 				src := accepted.Source
 				src.ObservedAt = n
@@ -110,15 +93,15 @@ func TestPolicySourceLedgerWithRealPostgres(t *testing.T) {
 				}
 				return captureapp.PolicySourceCheck{Policy: accepted.Compiled, Authority: accepted.Authority, Target: target, Node: node, Recovery: recovery, Retention: resolution, Settings: policy, SourceID: sourceID, Fence: fence, BytesPerSecond: 1 << 20, SourceSlots: 4, ObservedAt: n, ValidUntil: n.Add(5 * time.Second)}
 			}
-			count := func(t *testing.T) (int64, int64, int64, int64, int64) {
+			count := func(t *testing.T) (int64, int64, int64) {
 				t.Helper()
-				var full, replay, observed, executions, captures int64
-				if err := admin.QueryRow(ctx, "SELECT a.charged_full,a.charged_replay,p.observed_bytes_spent,p.executions_spent,(SELECT count(*) FROM context_capture WHERE root_id=$1) FROM context_control_account a,policy_acceptance p WHERE a.root_id=$1 AND a.allocation_id=$2 AND p.id=$3", s.a.RootID, enrollment.AllocationID, accepted.Record.Record.ID).Scan(&full, &replay, &observed, &executions, &captures); err != nil {
+				var observed, executions, captures int64
+				if err := admin.QueryRow(ctx, "SELECT p.observed_bytes_spent,p.executions_spent,(SELECT count(*) FROM context_capture WHERE root_id=$1) FROM policy_acceptance p WHERE p.id=$2", s.a.RootID, accepted.Record.Record.ID).Scan(&observed, &executions, &captures); err != nil {
 					t.Fatal(err)
 				}
-				return full, replay, observed, executions, captures
+				return observed, executions, captures
 			}
-			beforeFull, beforeReplay, _, beforeExecutions, beforeCaptures := count(t)
+			_, beforeExecutions, beforeCaptures := count(t)
 			t.Run("initial-source-pays-real-control-unit-no-capture", func(t *testing.T) {
 				initialCheck = fresh(t)
 				initialCheck.Initial = true
@@ -138,49 +121,6 @@ func TestPolicySourceLedgerWithRealPostgres(t *testing.T) {
 					t.Logf("source_accepted_readable=%t", readErr == nil)
 					scopeMatches := readErr == nil && captureapp.RecorderPolicyScopeDigest(diagnosticAuthority.PolicyUID, persisted.IntentVersion, accepted.Source.CollectionDigest, accepted.Compiled, diagnosticAuthority.NamespaceUID, diagnosticAuthority.WorkloadUID, diagnosticAuthority.Delegation, diagnosticAuthority.Owners, diagnosticAuthority.Actions, diagnosticAuthority.Limits) == diagnosticAuthority.ScopeDigest
 					t.Logf("source_accepted_readback authority_exact=%t issued_instant=%t expiry_instant=%t current_scope=%t issuer=%t", readErr == nil && reflect.DeepEqual(diagnosticAuthority, accepted.Authority), readErr == nil && diagnosticAuthority.IssuedAt.Equal(originalCheck.Authority.IssuedAt), readErr == nil && diagnosticAuthority.NotAfter.Equal(originalCheck.Authority.NotAfter), scopeMatches, readErr == nil && originalCheck.Settings.Issuer == diagnosticAuthority.Creator.Issuer)
-
-					var capacityRaw, capacityDigest []byte
-					var revision int64
-					var suspended bool
-					var sourceAt, sourceUntil time.Time
-					var selectedPolicy string
-					if err = f.roles["hub-runtime"].QueryRow(diagnosticCtx, "SELECT s.accepted_revision,s.accepted_snapshot,s.accepted_digest,s.suspended,s.observed_at,s.fresh_until,w.policy_uid FROM capacity_source s JOIN capacity_workload w ON w.root_id=s.root_id WHERE s.root_id=$1 AND w.allocation_id=$2", s.a.RootID, enrollment.AllocationID).Scan(&revision, &capacityRaw, &capacityDigest, &suspended, &sourceAt, &sourceUntil, &selectedPolicy); err != nil {
-						diagnosticErr = errors.Join(diagnosticErr, err)
-						t.Log("source_capacity_query_readable=false")
-					}
-					var capacityObservation capacity.CapacitySourceObservation
-					if err = json.Unmarshal(capacityRaw, &capacityObservation); err != nil {
-						diagnosticErr = errors.Join(diagnosticErr, err)
-						t.Log("source_capacity_json_readable=false")
-					}
-					resourceMatches := false
-					for _, p := range capacityObservation.Snapshot.Policies {
-						if p.Resource.UID == selectedPolicy {
-							resourceMatches = !p.Resource.Deleting && p.Scope != nil && p.Scope.ClusterID == diagnosticAuthority.ClusterID && p.Budget != nil
-						}
-					}
-					var admissionUntil *time.Time
-					if err = f.roles["hub-runtime"].QueryRow(diagnosticCtx, "SELECT capacity_managed_admission_until($1,$2,'context',clock_timestamp())", s.a.RootID, enrollment.AllocationID).Scan(&admissionUntil); err != nil {
-						diagnosticErr = errors.Join(diagnosticErr, err)
-						t.Log("source_managed_cutoff_readable=false")
-					}
-					readAt := time.Now()
-					t.Logf("source_capacity_readback revision_positive=%t current=%t snapshot_valid=%t digest_matches=%t resource_matches=%t managed_admission_current=%t", revision > 0, !suspended && !readAt.Before(sourceAt) && readAt.Before(sourceUntil), capacityObservation.Valid(readAt), bytes.Equal(capacityObservation.Digest[:], capacityDigest), resourceMatches, admissionUntil != nil && readAt.Before(*admissionUntil))
-
-					var bindingFresh, bindingScope, serviceContext, poolCurrent, allocationCurrent, controlCurrent, countersFit bool
-					if err = f.roles["hub-runtime"].QueryRow(diagnosticCtx, `WITH clock AS (SELECT clock_timestamp() AS n)
-SELECT b.observed_at<=n AND n<b.fresh_until,
- b.cluster_id=$3 AND b.namespace_uid=$4 AND b.workload_uid=$5,
- a.service_class='context',NOT p.paused AND n<p.valid_until,NOT a.paused AND n<a.valid_until,
- cp.configured AND ca.configured AND NOT cp.paused AND NOT ca.paused AND n<cp.valid_until AND n<ca.valid_until,
- ca.charged_full<=ca.full_limit AND ca.charged_replay<=ca.replay_limit
-FROM context_storage_binding b JOIN custody_allocation a ON a.id=b.allocation_id JOIN custody_pool p ON p.id=a.pool_id
-JOIN context_control_account ca ON ca.root_id=b.root_id AND ca.allocation_id=b.allocation_id JOIN context_control_pool cp ON cp.root_id=ca.root_id CROSS JOIN clock
-WHERE b.root_id=$1 AND b.allocation_id=$2`, s.a.RootID, enrollment.AllocationID, diagnosticAuthority.ClusterID, diagnosticAuthority.NamespaceUID, diagnosticAuthority.WorkloadUID).Scan(&bindingFresh, &bindingScope, &serviceContext, &poolCurrent, &allocationCurrent, &controlCurrent, &countersFit); err != nil {
-						diagnosticErr = errors.Join(diagnosticErr, err)
-						t.Log("source_backing_query_readable=false")
-					}
-					t.Logf("source_backing_readback binding_fresh=%t binding_scope=%t service_context=%t pool_current=%t allocation_current=%t controls_current=%t counters_fit=%t original_input_current=%t", bindingFresh, bindingScope, serviceContext, poolCurrent, allocationCurrent, controlCurrent, countersFit, time.Now().Before(originalCheck.ValidUntil) && originalCheck.Node.Valid(time.Now()) && originalCheck.Target.Valid(time.Now()))
 
 					topology, topologyErr := s.retention.topology.RetentionTopology(diagnosticCtx, diagnosticAuthority.ClusterID)
 					if topologyErr != nil {
@@ -205,9 +145,9 @@ WHERE b.root_id=$1 AND b.allocation_id=$2`, s.a.RootID, enrollment.AllocationID,
 				if err != nil {
 					t.Fatal("initial source admission", err)
 				}
-				full, replay, observed, executions, captures := count(t)
-				if !old.First || full != beforeFull+1 || replay != beforeReplay+1 || observed != initialCheck.InitialCredit || executions != beforeExecutions || captures != beforeCaptures {
-					t.Fatal("source charge graph differs", full, replay, observed, executions, captures)
+				observed, executions, captures := count(t)
+				if !old.First || observed != initialCheck.InitialCredit || executions != beforeExecutions || captures != beforeCaptures {
+					t.Fatal("source charge graph differs", observed, executions, captures)
 				}
 				if old.Permit.HardUntil.After(accepted.Authority.NotAfter) || old.Permit.Binding.SourceID != sourceID || !old.Permit.Startable(time.Now()) {
 					t.Fatal("invalid original source bounds")
@@ -293,7 +233,7 @@ WHERE b.root_id=$1 AND b.allocation_id=$2`, s.a.RootID, enrollment.AllocationID,
 				if err != nil || quiet.Permit.Credit != next.Permit.Credit {
 					t.Fatal("parent exhaustion blocked prepaid quiet renewal", err)
 				}
-				_, _, observed, executions, captures := count(t)
+				observed, executions, captures := count(t)
 				if observed != next.Permit.Credit || executions != beforeExecutions || captures != beforeCaptures {
 					t.Fatal("credit/capture accounting changed")
 				}
@@ -352,8 +292,8 @@ WHERE b.root_id=$1 AND b.allocation_id=$2`, s.a.RootID, enrollment.AllocationID,
 				if err := admin.QueryRow(ctx, "SELECT slot_released_at FROM policy_recording_source WHERE root_id=$1 AND id=$2", s.a.RootID, sourceID).Scan(&released); err != nil || released == nil || released.Before(ended.Add(30*time.Second)) {
 					t.Fatal("actual quarantine not observed", released, err)
 				}
-				full, replay, observed, executions, captures := count(t)
-				if full != beforeFull+1 || replay != beforeReplay+1 || observed != old.Permit.Credit || executions != beforeExecutions || captures != beforeCaptures {
+				observed, executions, captures := count(t)
+				if observed != old.Permit.Credit || executions != beforeExecutions || captures != beforeCaptures {
 					t.Fatal("terminal transition refunded or fabricated work")
 				}
 			})
@@ -440,29 +380,6 @@ func TestPolicySourceFixtureAuthorityJSONRepresentation(t *testing.T) {
 	}
 	if !authority.IssuedAt.Equal(persisted.IssuedAt) || !authority.NotAfter.Equal(persisted.NotAfter) || !reflect.DeepEqual(authority, persisted) {
 		t.Fatal("fixture UTC/microsecond authority JSON representation differs")
-	}
-}
-
-func TestPolicySourceFixtureCapacityJSONRepresentation(t *testing.T) {
-	root, installation, cluster, namespace := custodyID(), custodyID(), custodyID(), custodyID()
-	_, template := capacityNativeQualification(t, root, installation, cluster, namespace, "synthetic-version")
-	template.Policies[0].SourceResources = &capacity.SourceResourceLimits{Node: collector.PolicyLimits{SourceLimits: collector.SourceLimits{MaxActiveSources: 4, InputBytesPerSecond: 4 << 20, InputBurstBytes: 4 << 20}}, Workload: collector.SourceLimits{MaxActiveSources: 4, InputBytesPerSecond: 4 << 20, InputBurstBytes: 4 << 20}}
-	now := time.Now().UTC().Truncate(time.Microsecond)
-	source := capacityNativeSource(t, template, now, now.Add(5*time.Second))
-	raw, err := json.Marshal(source)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var persisted capacity.CapacitySourceObservation
-	if err = json.Unmarshal(raw, &persisted); err != nil {
-		t.Fatal(err)
-	}
-	if !persisted.Valid(now) || persisted.Digest != source.Digest || len(persisted.Snapshot.Policies) != 1 {
-		t.Fatal("actual capacity/source-resource JSON roundtrip changed current observation")
-	}
-	selected := persisted.Snapshot.Policies[0]
-	if selected.Resource.UID != template.Policies[0].Resource.UID || selected.Scope == nil || selected.Scope.ClusterID != cluster || selected.Budget == nil || !reflect.DeepEqual(selected.SourceResources, template.Policies[0].SourceResources) {
-		t.Fatal("selected resource binding changed through JSON")
 	}
 }
 

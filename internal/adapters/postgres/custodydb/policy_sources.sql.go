@@ -397,42 +397,6 @@ func (q *Queries) ReadPolicyRecordingSource(ctx context.Context, arg ReadPolicyR
 	return i, err
 }
 
-const readPolicySourceResourceSelection = `-- name: ReadPolicySourceResourceSelection :one
-SELECT s.accepted_revision,s.accepted_snapshot,s.accepted_digest,s.observed_at,s.fresh_until,s.suspended,w.policy_uid
-FROM capacity_source s JOIN capacity_workload w ON w.root_id=s.root_id
-WHERE s.root_id=$1 AND w.allocation_id=$2 AND w.ready_at IS NOT NULL AND w.mutation_xid IS NULL FOR SHARE OF s,w
-`
-
-type ReadPolicySourceResourceSelectionParams struct {
-	RootID       pgtype.UUID
-	AllocationID pgtype.UUID
-}
-
-type ReadPolicySourceResourceSelectionRow struct {
-	AcceptedRevision int64
-	AcceptedSnapshot []byte
-	AcceptedDigest   []byte
-	ObservedAt       pgtype.Timestamptz
-	FreshUntil       pgtype.Timestamptz
-	Suspended        bool
-	PolicyUid        string
-}
-
-func (q *Queries) ReadPolicySourceResourceSelection(ctx context.Context, arg ReadPolicySourceResourceSelectionParams) (ReadPolicySourceResourceSelectionRow, error) {
-	row := q.db.QueryRow(ctx, readPolicySourceResourceSelection, arg.RootID, arg.AllocationID)
-	var i ReadPolicySourceResourceSelectionRow
-	err := row.Scan(
-		&i.AcceptedRevision,
-		&i.AcceptedSnapshot,
-		&i.AcceptedDigest,
-		&i.ObservedAt,
-		&i.FreshUntil,
-		&i.Suspended,
-		&i.PolicyUid,
-	)
-	return i, err
-}
-
 const releaseEndedPolicySourceSlots = `-- name: ReleaseEndedPolicySourceSlots :execrows
 UPDATE policy_recording_source dst SET slot_released_at=clock_timestamp() WHERE (dst.root_id,dst.id) IN (SELECT s.root_id,s.id FROM policy_recording_source s WHERE s.root_id=$1 AND s.ended_at IS NOT NULL AND s.slot_released_at IS NULL AND s.ended_at+interval '30 seconds'<=clock_timestamp() ORDER BY s.ended_at,s.id LIMIT 64)
 `

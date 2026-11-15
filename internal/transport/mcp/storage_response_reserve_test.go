@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -37,7 +36,6 @@ func reserveID(n int) string { return fmt.Sprintf("00000000-0000-4000-8000-%012d
 type reserveFacts struct {
 	app.ContextAdmissionReplay
 	app.ContextPreviewStore
-	thin                                                          bool
 	ids, stores, admissions, demands, storageReads, storageActive atomic.Int64
 }
 
@@ -68,15 +66,8 @@ func (f *reserveFacts) ContextStorage(ctx context.Context, target authorization.
 	}
 	now := time.Now()
 	until := now.Add(5 * time.Second)
-	if f.thin {
-		until = now.Add(50 * time.Millisecond)
-	}
 	revision := identity.Revision{UID: "binding", Generation: 1, Digest: [32]byte{4}}
 	return app.ContextStorageObservation{Selection: value.ContextStorageSelection{StoreID: reserveID(7), AllocationID: reserveID(8), PoolRevision: 1, AllocationRevision: 1, BindingRevision: revision}, Binding: value.StorageBinding{RootID: reserveID(1), ClusterID: target.ClusterID, NamespaceUID: target.NamespaceUID, WorkloadUID: target.WorkloadUID, AllocationID: reserveID(8), Revision: revision, ObservedAt: now, FreshUntil: until}}, nil
-}
-func (f *reserveFacts) DemandCapacityRefresh(ctx context.Context, _ targets.Request) error {
-	f.demands.Add(1)
-	return ctx.Err()
 }
 func (f *reserveFacts) RecoveryState(context.Context) (artifact.RecoveryProof, error) {
 	now := time.Now()
@@ -127,9 +118,9 @@ func (a *reserveAudit) Finish(ctx context.Context, _ audit.OperationOutcome) err
 }
 
 func TestStorageReadinessReserveDeliversAuditedHTTP2Preview(t *testing.T) {
-	for _, mode := range []string{"thin", "short-parent-fresh"} {
+	for _, mode := range []string{"short-parent-fresh"} {
 		t.Run(mode, func(t *testing.T) {
-			facts := &reserveFacts{thin: mode == "thin"}
+			facts := &reserveFacts{}
 			gate := &reserveAudit{}
 			var handler *Handler
 			server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -146,7 +137,7 @@ func TestStorageReadinessReserveDeliversAuditedHTTP2Preview(t *testing.T) {
 			server.EnableHTTP2 = true
 			server.StartTLS()
 			defer server.Close()
-			service := app.ContextInvestigation{RootID: reserveID(1), InstallationID: reserveID(2), Previews: facts, Replay: facts, Admission: facts, Targets: facts, Eligibility: access.Evaluator{Permissions: facts, Now: time.Now}, Capabilities: facts, Retention: facts, Storage: facts, Refresh: facts, Processing: facts, Recovery: facts, Lifetime: time.Minute, Now: time.Now, NewID: func() string { return reserveID(100 + int(facts.ids.Add(1))) }}
+			service := app.ContextInvestigation{RootID: reserveID(1), InstallationID: reserveID(2), Previews: facts, Replay: facts, Admission: facts, Targets: facts, Eligibility: access.Evaluator{Permissions: facts, Now: time.Now}, Capabilities: facts, Retention: facts, Storage: facts, Processing: facts, Recovery: facts, Lifetime: time.Minute, Now: time.Now, NewID: func() string { return reserveID(100 + int(facts.ids.Add(1))) }}
 			ops, err := presentation.NewContextOperations(presentation.ContextOperationsConfig{PublicOrigin: server.URL, CollectionEnabled: true, Now: time.Now, NewID: func() string { return reserveID(500) }}, service, &mcpCaptureFixture{})
 			if err != nil {
 				t.Fatal(err)
@@ -195,11 +186,7 @@ func TestStorageReadinessReserveDeliversAuditedHTTP2Preview(t *testing.T) {
 			if json.Unmarshal(rpc.Result.StructuredContent, &result) != nil {
 				t.Fatal(string(body))
 			}
-			if mode == "thin" {
-				if result.Status != "error" || !strings.Contains(string(rpc.Result.StructuredContent), `"code":"NotAvailable"`) || !strings.Contains(string(rpc.Result.StructuredContent), `"retryable":true`) || facts.stores.Load() != 0 || facts.demands.Load() != 1 || facts.storageReads.Load() < 3 {
-					t.Fatalf("thin binding was not a typed retryable refusal: %s stores=%d reads=%d demands=%d", body, facts.stores.Load(), facts.storageReads.Load(), facts.demands.Load())
-				}
-			} else if result.Status != "ok" || facts.stores.Load() != 1 || facts.demands.Load() != 0 || (facts.storageReads.Load() < 1 || facts.storageReads.Load() > 2) {
+			if result.Status != "ok" || facts.stores.Load() != 1 || facts.demands.Load() != 0 || (facts.storageReads.Load() < 1 || facts.storageReads.Load() > 2) {
 				t.Fatalf("short live parent lost fast fresh result: %s stores=%d reads=%d demands=%d", body, facts.stores.Load(), facts.storageReads.Load(), facts.demands.Load())
 			}
 			if gate.begins.Load() != 1 || gate.finishes.Load() != 1 || facts.admissions.Load() != 0 || facts.storageActive.Load() != 0 {

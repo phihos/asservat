@@ -30,9 +30,8 @@ func (q *Queries) BackAllocation(ctx context.Context, arg BackAllocationParams) 
 	return result.RowsAffected(), nil
 }
 
-const charge = `-- name: Charge :execrows
-UPDATE custody_allocation SET charged_bytes = charged_bytes + $2, charged_objects = charged_objects + 4
-WHERE id = $1 AND $2 <= byte_limit - charged_bytes AND 4 <= object_limit - charged_objects
+const charge = `-- name: Charge :one
+SELECT capacity_charge($1::uuid,$2::bigint,4)::boolean AS charged
 `
 
 type ChargeParams struct {
@@ -40,12 +39,11 @@ type ChargeParams struct {
 	ChargedBytes int64
 }
 
-func (q *Queries) Charge(ctx context.Context, arg ChargeParams) (int64, error) {
-	result, err := q.db.Exec(ctx, charge, arg.ID, arg.ChargedBytes)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
+func (q *Queries) Charge(ctx context.Context, arg ChargeParams) (bool, error) {
+	row := q.db.QueryRow(ctx, charge, arg.ID, arg.ChargedBytes)
+	var charged bool
+	err := row.Scan(&charged)
+	return charged, err
 }
 
 const claimDeletion = `-- name: ClaimDeletion :one
@@ -379,9 +377,8 @@ func (q *Queries) ReadCopies(ctx context.Context, attemptID pgtype.UUID) ([]Cust
 	return items, nil
 }
 
-const releaseCharge = `-- name: ReleaseCharge :execrows
-UPDATE custody_allocation SET charged_bytes = charged_bytes - $2, charged_objects = charged_objects - 4
-WHERE id = $1 AND charged_bytes >= $2 AND charged_objects >= 4
+const releaseCharge = `-- name: ReleaseCharge :one
+SELECT capacity_release($1::uuid,$2::bigint,4)::boolean AS released
 `
 
 type ReleaseChargeParams struct {
@@ -389,12 +386,11 @@ type ReleaseChargeParams struct {
 	ChargedBytes int64
 }
 
-func (q *Queries) ReleaseCharge(ctx context.Context, arg ReleaseChargeParams) (int64, error) {
-	result, err := q.db.Exec(ctx, releaseCharge, arg.ID, arg.ChargedBytes)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
+func (q *Queries) ReleaseCharge(ctx context.Context, arg ReleaseChargeParams) (bool, error) {
+	row := q.db.QueryRow(ctx, releaseCharge, arg.ID, arg.ChargedBytes)
+	var released bool
+	err := row.Scan(&released)
+	return released, err
 }
 
 const storeCopy = `-- name: StoreCopy :exec

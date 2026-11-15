@@ -1,5 +1,5 @@
 -- name: InsertDownloadControlAllocation :one
-INSERT INTO download_control_allocation(id,root_id,audit_store_id,response_limit,window_limit,audit_byte_limit,valid_until,audit_write_until) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *;
+INSERT INTO download_control_allocation(id,root_id,audit_store_id,window_limit,audit_byte_limit,valid_until,audit_write_until) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *;
 -- name: ReadDownloadControlAllocation :one
 SELECT * FROM download_control_allocation WHERE id=$1 AND root_id=$2;
 -- name: InsertDownloadResponse :one
@@ -26,6 +26,6 @@ UPDATE download_window SET outcome_json=$4 WHERE id=$1 AND response_id=$2 AND se
 UPDATE download_window SET outcome_receipt=$4,outcome_completion=$5 WHERE id=$1 AND response_id=$2 AND session_id=$3 AND outcome_receipt IS NULL;
 
 -- name: ReadDownloadSessionControl :one
-SELECT sqlc.embed(c), s.capacity_account_id, s.capacity_backing, s.capacity_backing_digest, s.deadline AS session_deadline FROM artifact_download s
+SELECT sqlc.embed(c), s.deadline AS session_deadline FROM artifact_download s
 JOIN download_control_allocation c ON c.id=s.allocation_id AND c.root_id=s.root_id
 WHERE s.id=$1 AND s.root_id=$2;

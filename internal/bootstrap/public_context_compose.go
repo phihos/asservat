@@ -400,17 +400,13 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
+	// A workload enrolls on its first storage read (capacity_enroll).
 	storage, err := postgres.NewContextStorageReader(ctx, sql["hub-metadata-read"], root)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
+	storage = storage.WithEnrollment(installation, out.mac)
 	processing, err := postgres.NewProcessingReads(ctx, sql["hub-metadata-read"], root, recovery)
-	if err != nil {
-		return nil, mounts.ErrUnavailable
-	}
-	// ADR-200: a stale binding records a refresh demand with the
-	// capture-preview credentials; metadata reads gain no demand-writing privilege.
-	refresh, err := postgres.NewCapacityRefreshDemands(ctx, sql["capture-preview"], root)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
@@ -422,7 +418,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	out.reviews = authapp.AccessReviews{Store: reviewStore, Reviewer: queries, Now: time.Now}
 	out.investigation = captureapp.ContextInvestigation{RootID: root, InstallationID: installation, Previews: previews, Replay: admissionsSQL, Admission: admissionsSQL, Resolution: resolution,
 		ReportPreviewFailure: eventLog(os.Stderr, "public preview refused"),
-		Targets:              queries, Eligibility: eligibility, Capabilities: capabilities, Retention: out.retention, Storage: storage, Refresh: refresh, Processing: processing, Recovery: out.recovery, Reviews: out.reviews,
+		Targets:              queries, Eligibility: eligibility, Capabilities: capabilities, Retention: out.retention, Storage: storage, Processing: processing, Recovery: out.recovery, Reviews: out.reviews,
 		// ADR-243: libpcap only in a hub build with the libpcap tag; otherwise a stub.
 		Filters: newPublicRecorderCompiler(),
 		// ADR-283 PR 2: the target's region resolves Kubernetes peers.

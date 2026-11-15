@@ -1,4 +1,5 @@
 -- +goose Up
+SET LOCAL check_function_bodies = off;
 -- This is a contract migration: the prior binary's strict profile decoder
 -- rejects the additional processing lane. Never advertise an old image as
 -- compatible with this development baseline (ADR-227/318).
@@ -100,6 +101,7 @@ END $$;
 
 
 -- +goose Down
+SET LOCAL check_function_bodies = off;
 
 -- +goose StatementBegin
 DO $$ BEGIN

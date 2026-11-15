@@ -23,7 +23,7 @@ spec = importlib.util.spec_from_file_location("helm_checks", Path(__file__).with
 helm = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(helm)
 
-CONFIG_KEYS = {"format", "namespace", "serviceAccount", "ownerSource", "leaderLease", "postgres", "auditStore", "keyService", "provider", "permission"}
+CONFIG_KEYS = {"format", "namespace", "serviceAccount", "ownerSource", "leaderLease", "postgres", "auditStore", "keyService", "provider", "permission", "capacity", "cleanup"}
 KEEP = ("_", "hub-worker-", "hub-retention-baseline.yaml", "provider-roots.yaml", "download-worker.yaml")
 FULL = os.environ.get("ASSERVAT_HELM_FULL") == "1"
 
@@ -75,10 +75,10 @@ class HubWorkerChart(unittest.TestCase):
             self.external["services"][s]["provider"] = "external"
         self.external["services"]["identity"] = {"provider": "external"}
         self.external["identity"] = {"issuer": "https://id.example/realms/org", "clientID": "console"}
-        # The shared fixtures carry capacity for the hub-api's combined-mode
-        # offer; these checks start without it.
-        for v in (self.bundled, self.external):
-            v.pop("capacity", None)
+        # Capacity is on by default (ADR-335 D1); an external object store
+        # needs its size.
+        self.bundled.pop("capacity", None)
+        self.external["capacity"] = {"evidenceStorage": "8Gi"}
 
     def render(self, values, *, ok=True, namespace="asservat-system"):
         path = Path(self.directory.name) / "values.yaml"
@@ -110,13 +110,13 @@ class HubWorkerChart(unittest.TestCase):
         self.assertEqual(c["auditStore"], {"endpoint": "https://asservat-objectstore.asservat-system.svc:8333", "region": "us-east-1", "bucket": "asservat-audit"})
         # Mounts, audience and key names derive in Go; none is rendered.
         self.assertEqual(c["keyService"], {"endpoint": "https://asservat-openbao.asservat-system.svc:8200"})
-        self.assertEqual(c["provider"], {"roles": {"auditWrap": "asservat-hub-worker-audit-wrap", "auditUnwrap": "asservat-hub-worker-audit-unwrap"}})
+        self.assertEqual(set(c["provider"]["roles"]), {"auditWrap", "auditUnwrap", "cleanupWrap", "cleanupOpen", "cleanupVerify", "cleanupSign"})
         p = c["permission"]
         self.assertEqual(p["statusUsers"], ["system:serviceaccount:asservat-system:asservat-hub-worker"])
         self.assertEqual(p["browser"], {"settings": "asservat-browser-settings"})
         self.assertEqual(p["identity"], {"settings": "asservat-identity-settings", "issuer": "https://login.example.org/realms/asservat"})
         self.assertEqual(p["workerConfiguration"], {"namespace": "asservat-downloads", "source": "asservat-worker-profile"})
-        self.assertNotIn("contextDeletion", p)
+        self.assertIn("contextDeletion", p)
         self.assertNotIn("retention", p)
         pod = w["Deployment"]["spec"]["template"]["spec"]
         self.assertEqual(pod["containers"][0]["command"], ["/asservat", "hub-worker"])
@@ -124,10 +124,11 @@ class HubWorkerChart(unittest.TestCase):
         self.assertEqual(wait["command"], ["/asservat", "setup", "--wait-schema", "--config", "/run/asservat/hub-worker/config.json",
                                            "--credential", "/run/asservat/hub-worker/sql-configuration-fleet.json", "--ca", "/run/asservat/hub-worker/roots/postgres.crt"])
         files, tokens, whole = sources(w)
-        self.assertEqual(files, {"config.json": ("asservat-hub-worker-config", "config.json"), "kube-ca.crt": ("kube-root-ca.crt", "ca.crt"),
-                                 "audit-storage.json": ("asservat-s3-configuration-audit", "credentials.json"),
-                                 "roots/postgres.crt": ("asservat-postgres-state", "ca.crt"), "roots/audit-store.crt": ("asservat-objectstore-state", "ca.crt"),
-                                 "roots/key-service.crt": ("asservat-openbao-state", "ca.crt")})
+        # Capacity's own mounts are checked in test_capacity_cleanup_deletion_and_retention.
+        self.assertLessEqual({"config.json": ("asservat-hub-worker-config", "config.json"), "kube-ca.crt": ("kube-root-ca.crt", "ca.crt"),
+                              "audit-storage.json": ("asservat-s3-configuration-audit", "credentials.json"),
+                              "roots/postgres.crt": ("asservat-postgres-state", "ca.crt"), "roots/audit-store.crt": ("asservat-objectstore-state", "ca.crt"),
+                              "roots/key-service.crt": ("asservat-openbao-state", "ca.crt")}.items(), files.items())
         self.assertEqual(tokens, {"kube.token": None, "provider.token": "asservat-configuration-provider"})
         self.assertEqual(whole, ["asservat-sql-hub-worker"])
         self.assertEqual({v["name"] for v in pod["volumes"]}, {"inputs", "ids"})
@@ -174,6 +175,22 @@ class HubWorkerChart(unittest.TestCase):
         for path, key in (("roots/postgres.crt", "postgres.crt"), ("roots/audit-store.crt", "objectStore.crt"), ("roots/key-service.crt", "openBao.crt")):
             self.assertEqual(files[path], ("asservat-provider-roots", key))
 
+    def test_capacity_share_above_limit_refused(self):
+        values = copy.deepcopy(self.bundled)
+        values["capacity"] = {"evidenceStorage": "128Gi", "workload": {"share": "16Gi", "limit": "10%"}}
+        self.assertIn("capacity.workload.share must not exceed capacity.workload.limit", self.render(values, ok=False))
+        values["capacity"]["workload"]["limit"] = "20%"
+        self.render(values)
+        for bad in ("16GB", "16 Gi", "lots"):
+            values["capacity"]["workload"]["limit"] = bad
+            self.assertIn("is not a quantity", self.render(values, ok=False), bad)
+        values["capacity"]["workload"] = {"share": "16 Gi"}
+        self.assertIn("is not a quantity", self.render(values, ok=False))
+        values["capacity"] = {"evidenceStorage": "128Gi", "namespaceLimit": "25 %"}
+        self.assertIn("is not a quantity", self.render(values, ok=False))
+        values["capacity"]["namespaceLimit"] = "25%"
+        self.render(values)
+
     def test_capacity_cleanup_deletion_and_retention(self):
         values = copy.deepcopy(self.bundled)
         values["capacity"] = {"evidenceStorage": "8Gi", "workload": {"share": "256Mi"}}
@@ -181,7 +198,7 @@ class HubWorkerChart(unittest.TestCase):
         docs = self.render(values)
         w = self.worker(docs)
         c = self.config(w)
-        self.assertEqual(set(c), CONFIG_KEYS | {"capacity", "cleanup"})
+        self.assertEqual(set(c), CONFIG_KEYS)
         self.assertEqual(c["cleanup"], {})
         self.assertEqual(c["capacity"]["processingSource"], "asservat-processing-source")
         self.assertEqual((c["capacity"]["paths"], c["capacity"]["sharedQueries"]), ([], True))
@@ -193,12 +210,12 @@ class HubWorkerChart(unittest.TestCase):
         self.assertEqual(files["cleanup-storage.json"], ("asservat-s3-operation-cleanup", "credentials.json"))
         self.assertEqual(files["verify-storage.json"], ("asservat-s3-operation-verify", "credentials.json"))
         self.assertEqual(files["evidence-delete-storage.json"], ("asservat-s3-evidence-delete", "credentials.json"))
-        self.assertEqual(tokens["cluster-observation.token"], "asservat-cluster-observation")
+        self.assertNotIn("cluster-observation.token", tokens)
         self.assertEqual((c["capacity"]["evidenceStorage"], c["capacity"]["revision"]), (values["capacity"]["evidenceStorage"], 1))
         self.assertFalse([d for d in docs if d["kind"] in ("EvidenceStoragePool", "EvidenceBudgetPolicy")])
         retention, = [d for d in docs if d["kind"] == "EvidenceRetentionPolicy"]
         self.assertEqual((retention["metadata"]["name"], retention["spec"]["legalExceptions"]), ("asservat-baseline", "disabled"))
-        self.assertIn({"apiGroups": [""], "resources": ["pods"], "verbs": ["get", "list", "watch"]}, w["ClusterRole"]["rules"])
+        self.assertNotIn({"apiGroups": [""], "resources": ["pods"], "verbs": ["get", "list", "watch"]}, w["ClusterRole"]["rules"])
         self.decode(c)
 
     def test_not_rendered_for_cluster_mode(self):

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres"
-	app "asservat.local/asservat/internal/application/capacity"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/capture"
@@ -18,7 +17,7 @@ import (
 // Reuse the existing managed-capture fixture after real encrypted publication.
 // The login, grants, rows and transactions are real; its protected Kubernetes
 // observations and human identity remain synthetic. This is not installed proof.
-func (f *capacitySQLFixture) qualifySharedMetadataReaders(t *testing.T, s captureAdmissionScenario, e artifact.ContextExpectation, enrollment app.Enrollment) {
+func (f *capacitySQLFixture) qualifySharedMetadataReaders(t *testing.T, s captureAdmissionScenario, e artifact.ContextExpectation, enrollment capacityEnrollment) {
 	t.Helper()
 	if !t.Run("compiled-shared-metadata-readers", func(t *testing.T) {
 		// One ordinary hub pool serves the seven typed readers. The outer
@@ -61,9 +60,6 @@ func (f *capacitySQLFixture) qualifySharedMetadataReaders(t *testing.T, s captur
 		// none of the following calls renews its identity, recovery or caller.
 		f.refreshBase(t)
 		if err = s.retention.observe(f.ctx); err != nil {
-			t.Fatal(err)
-		}
-		if err = f.enrollments.RefreshCapacityEnrollment(f.ctx, f.workloadObservation(t, 0), enrollment); err != nil {
 			t.Fatal(err)
 		}
 		call, cancel := context.WithTimeout(f.ctx, 5*time.Second)

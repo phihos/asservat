@@ -79,7 +79,7 @@ func (s *ContextDownloadPlans) ContextDownloadPlan(ctx context.Context, source e
 			return artifact.ErrDownloadUnavailable
 		}
 		allocation := downloadAllocation(rows[0])
-		if !allocation.Valid() || !allocation.Covers(scope) || rows[0].ReservedSessions >= allocation.SessionLimit || limits.OutputLimit > allocation.OutputLimit-rows[0].ReservedOutput || limits.ReadLimit > allocation.ReadLimit-rows[0].ReservedRead {
+		if !allocation.Valid() || !allocation.Covers(scope) || limits.OutputLimit > allocation.OutputLimit-rows[0].ReservedOutput || limits.ReadLimit > allocation.ReadLimit-rows[0].ReservedRead {
 			return artifact.ErrDownloadUnavailable
 		}
 		control, e := q.ReadDownloadControlAllocation(call, custodydb.ReadDownloadControlAllocationParams{ID: rows[0].ID, RootID: id(s.root)})
@@ -156,7 +156,7 @@ func contextPlanBacking(l ContextDownloadPlanLimits, typ artifact.NativeType, a 
 	}
 	// One supported response fits at most two windows. Original unknown reservations
 	// remain charged; this read cannot recycle them or promise all later races win.
-	if l.OutputLimit > a.OutputLimit || l.ReadLimit > a.ReadLimit || c.ReservedResponses >= c.ResponseLimit || c.WindowLimit-c.ReservedWindows < windows || c.AuditByteLimit-c.ReservedAuditBytes < 2*windows*artifact.DownloadWindowAuditBytes || n.ChargedRows >= n.RowsLimit || n.KeysLimit-n.ChargedKeys < windows || b.Charged >= b.Slots || b.Slots > p.Slots || p.Allocated > p.Slots || p.RetainedSeconds < 60 || p.RetainedSeconds > 316224000 || p.BackupHorizonSeconds != stop.BackupHorizonSeconds || p.RetainedSeconds <= 2*stop.BackupHorizonSeconds+3*stop.CleanupBudgetSeconds+stop.ProofWindowSeconds+30 {
+	if l.OutputLimit > a.OutputLimit || l.ReadLimit > a.ReadLimit || c.WindowLimit-c.ReservedWindows < windows || c.AuditByteLimit-c.ReservedAuditBytes < 2*windows*artifact.DownloadWindowAuditBytes || n.ChargedRows >= n.RowsLimit || n.KeysLimit-n.ChargedKeys < windows || b.Charged >= b.Slots || b.Slots > p.Slots || p.Allocated > p.Slots || p.RetainedSeconds < 60 || p.RetainedSeconds > 316224000 || p.BackupHorizonSeconds != stop.BackupHorizonSeconds || p.RetainedSeconds <= 2*stop.BackupHorizonSeconds+3*stop.CleanupBudgetSeconds+stop.ProofWindowSeconds+30 {
 		return false
 	}
 	cipher, keys, backup, wal := stop.SlotBacking()

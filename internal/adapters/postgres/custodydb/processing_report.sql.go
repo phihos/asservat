@@ -127,13 +127,13 @@ func (q *Queries) ReportProcessingArtifacts(ctx context.Context, arg ReportProce
 
 const reportProcessingDownloads = `-- name: ReportProcessingDownloads :many
 SELECT d.id,d.artifact_id,(d.scope_json->'Principal')::jsonb AS principal,d.created_at,d.deadline,d.state,d.emitted_bytes,
- LEAST(COALESCE((d.capacity_backing#>>'{Native,RetireBy}')::timestamptz,'-infinity'::timestamptz),b.retire_by,p.retire_by)::timestamptz AS visible_until
+ LEAST(b.retire_by,p.retire_by)::timestamptz AS visible_until
 FROM artifact_download d
 JOIN download_native_backing b ON b.root_id=d.root_id AND b.allocation_id=d.allocation_id
 JOIN context_processing p ON p.root_id=d.root_id AND p.artifact_id=d.artifact_id
 WHERE d.root_id=$1::uuid AND d.id>$2::uuid
  AND d.created_at<=$3::timestamptz
- AND LEAST(COALESCE((d.capacity_backing#>>'{Native,RetireBy}')::timestamptz,'-infinity'::timestamptz),b.retire_by,p.retire_by)>$4::timestamptz
+ AND LEAST(b.retire_by,p.retire_by)>$4::timestamptz
 ORDER BY d.id LIMIT $5::integer
 `
 

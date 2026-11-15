@@ -62,7 +62,7 @@ func readNativeResumeAccounting(t *testing.T, ctx context.Context, f nativeExcha
  (SELECT updates FROM download_native_owner WHERE worker_id=$2),
  (SELECT count(*) FROM download_key_binding WHERE session_id=$1),
  (SELECT COALESCE(sum(used_roles),0) FROM download_key_binding WHERE session_id=$1),
- reserved_responses,reserved_windows,reserved_audit_bytes
+ 0::bigint,reserved_windows,reserved_audit_bytes
  FROM download_control_allocation WHERE id=$3`, session.ID, f.worker.Intent.ID, session.AllocationID).Scan(&a.Responses, &a.Closed, &a.Windows, &a.Acknowledged, &a.KeyRows, &a.KeyRoles, &a.NativeUpdates, &a.PreparationRows, &a.PreparationRoles, &a.ReservedResponses, &a.ReservedWindows, &a.ReservedAuditBytes)
 	if err != nil {
 		t.Fatal("native resume accounting", err)
@@ -156,7 +156,7 @@ func qualifyContextNativeResume(t *testing.T, ctx context.Context, f nativeExcha
 	}
 	firstAccounting := readNativeResumeAccounting(t, ctx, f, original)
 	// Prepare and one response; ADR-167 removed the metadata Observe transitions.
-	expectedFirst := nativeResumeAccounting{Responses: 1, Closed: 1, Windows: 1, Acknowledged: 1, KeyRows: 1, KeyRoles: 7, NativeUpdates: 4, PreparationRows: 1, PreparationRoles: 7, ReservedResponses: 1, ReservedWindows: 1, ReservedAuditBytes: 2 * artifact.DownloadWindowAuditBytes}
+	expectedFirst := nativeResumeAccounting{Responses: 1, Closed: 1, Windows: 1, Acknowledged: 1, KeyRows: 1, KeyRoles: 7, NativeUpdates: 4, PreparationRows: 1, PreparationRoles: 7, ReservedWindows: 1, ReservedAuditBytes: 2 * artifact.DownloadWindowAuditBytes}
 	if firstAccounting != expectedFirst {
 		t.Fatalf("first positively closed range accounting: got %+v want %+v", firstAccounting, expectedFirst)
 	}
@@ -203,7 +203,7 @@ func qualifyContextNativeResume(t *testing.T, ctx context.Context, f nativeExcha
 		t.Fatal("two ranges falsely completed/refilled original session")
 	}
 	finalAccounting := readNativeResumeAccounting(t, ctx, f, original)
-	expectedFinal := nativeResumeAccounting{Responses: 2, Closed: 2, Windows: 2, Acknowledged: 2, KeyRows: 2, KeyRoles: 14, NativeUpdates: 6, PreparationRows: 1, PreparationRoles: 7, ReservedResponses: 2, ReservedWindows: 2, ReservedAuditBytes: 4 * artifact.DownloadWindowAuditBytes}
+	expectedFinal := nativeResumeAccounting{Responses: 2, Closed: 2, Windows: 2, Acknowledged: 2, KeyRows: 2, KeyRoles: 14, NativeUpdates: 6, PreparationRows: 1, PreparationRoles: 7, ReservedWindows: 2, ReservedAuditBytes: 4 * artifact.DownloadWindowAuditBytes}
 	if finalAccounting != expectedFinal {
 		t.Fatalf("original two-response accounting: got %+v want %+v", finalAccounting, expectedFinal)
 	}

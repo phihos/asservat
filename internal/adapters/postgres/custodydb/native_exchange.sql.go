@@ -372,7 +372,7 @@ func (q *Queries) ReadNativeOwner(ctx context.Context, arg ReadNativeOwnerParams
 }
 
 const readSessionNativeBacking = `-- name: ReadSessionNativeBacking :one
-SELECT b.allocation_id, b.root_id, b.policy_json, b.rows_limit, b.keys_limit, b.transitions_per_row, b.charged_rows, b.charged_keys, b.backup_horizon_seconds, b.cleanup_seconds, b.valid_until, b.retire_by, b.residual_until, b.overdue, s.capacity_account_id, s.capacity_backing, s.capacity_backing_digest, s.deadline AS session_deadline FROM artifact_download s
+SELECT b.allocation_id, b.root_id, b.policy_json, b.rows_limit, b.keys_limit, b.transitions_per_row, b.charged_rows, b.charged_keys, b.backup_horizon_seconds, b.cleanup_seconds, b.valid_until, b.retire_by, b.residual_until, b.overdue, s.deadline AS session_deadline FROM artifact_download s
 JOIN download_native_backing b ON b.allocation_id=s.allocation_id AND b.root_id=s.root_id
 WHERE s.id=$1 AND s.root_id=$2
 `
@@ -384,9 +384,6 @@ type ReadSessionNativeBackingParams struct {
 
 type ReadSessionNativeBackingRow struct {
 	DownloadNativeBacking DownloadNativeBacking
-	CapacityAccountID     pgtype.UUID
-	CapacityBacking       []byte
-	CapacityBackingDigest []byte
 	SessionDeadline       pgtype.Timestamptz
 }
 
@@ -408,9 +405,6 @@ func (q *Queries) ReadSessionNativeBacking(ctx context.Context, arg ReadSessionN
 		&i.DownloadNativeBacking.RetireBy,
 		&i.DownloadNativeBacking.ResidualUntil,
 		&i.DownloadNativeBacking.Overdue,
-		&i.CapacityAccountID,
-		&i.CapacityBacking,
-		&i.CapacityBackingDigest,
 		&i.SessionDeadline,
 	)
 	return i, err

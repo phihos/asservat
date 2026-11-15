@@ -47,6 +47,28 @@ issuance problem outside these limits, still open; no second workload
 cluster was installed. Older installations keep their finite stored
 backing and must be reinstalled.
 
+## Capacity accounts (2026-11-15)
+
+Branch `clean/capacity-2`, migration 00172. Capacity is on in every hub
+(ADR-335 D1). The hub-worker applies the Helm `capacity` values once at
+start (`capacity_apply`); a workload's account is created on demand in the
+storage read that first needs it (`capacity_enroll`, hub-metadata-read
+login). Rows carry the standing date `capacity_standing()` instead of a
+renewed admission window. Charges grow an account's limit as burst within
+its hard limit, the namespace limit and the pool, and release shrinks it
+back to the protected share. Removed: migration 00054's source, plan,
+renewal and refresh-demand tables and loops, connector capacity delivery,
+cluster-observation capacity purposes, the context-control record counter
+and the download session/response counters (bytes stay bounded).
+`capturesPerCluster` defaults to max(8, node count).
+
+Gaps: the default share divides by max(8, enrolled accounts), not the
+eligible-workload count; namespace eligibility (system/release namespaces,
+`asservat.io/evidence: disabled`) is not checked on enrollment because the
+storage read knows only the namespace UID; `maxConcurrentExpensive` and
+`onFull` are stored but no expensive-action reservation consumes them yet;
+`DeleteOldestEligibleInAccount` has no deletion path.
+
 ## Capacity from Helm values (2026-11-14)
 
 Branch `clean/capacity`. The `capacity` values follow

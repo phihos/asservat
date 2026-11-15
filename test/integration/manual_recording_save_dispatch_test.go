@@ -276,7 +276,7 @@ func newDispatchWorkflowOperations(t *testing.T, ctx context.Context, f *capacit
 	journalPool := f.fixturePool("operation_audit_runtime", "synthetic-operation-journal")
 	ackPool := f.fixturePool("operation_audit_ack_runtime", "synthetic-operation-ack")
 	gates := map[string]*auditapp.HealthyOperationAuditor{}
-	material := f.setup.mac
+	material := f.installed.mac
 	mac, err := auditapp.NewOperationMAC(material.InputVersion, material.InputKey, material.AccountVersion, material.AccountKey)
 	if err != nil {
 		t.Fatal(err)

@@ -66,7 +66,7 @@ func samplePolicyObservationGraph(t *testing.T, ctx context.Context, admin *pgxp
 		{"custody_copy", "EXISTS(SELECT 1 FROM custody_attempt a WHERE a.id=r.attempt_id AND a.allocation_id=$2::uuid)"},
 		{"custody_event", "EXISTS(SELECT 1 FROM custody_attempt a WHERE a.id=r.attempt_id AND a.allocation_id=$2::uuid)"},
 	}
-	for _, name := range []string{"policy_grant_settings", "policy_source", "policy_acceptance", "access_grant", "policy_grant_attachment", "policy_occurrence", "policy_pod_watermark", "policy_workload_window", "policy_suppression", "context_storage_binding", "context_preview", "context_capture", "context_execution", "context_writer_completion", "policy_observation_session", "context_control_pool", "context_control_account", "context_control_charge", "context_verification", "context_catalog", "context_case_locator", "capture_history_quota", "capture_history_parameter", "retention_decision", "context_deletion_checkpoint"} {
+	for _, name := range []string{"policy_grant_settings", "policy_source", "policy_acceptance", "access_grant", "policy_grant_attachment", "policy_occurrence", "policy_pod_watermark", "policy_workload_window", "policy_suppression", "context_storage_binding", "context_preview", "context_capture", "context_execution", "context_writer_completion", "policy_observation_session", "context_verification", "context_catalog", "context_case_locator", "capture_history_quota", "capture_history_parameter", "retention_decision", "context_deletion_checkpoint"} {
 		tables = append(tables, scopedTable{name, "r.root_id=$1::uuid"})
 	}
 	// One closed UNION keeps all logical counts under one MVCC snapshot and
@@ -160,10 +160,10 @@ func qualifyPolicyObservationRetirement(t *testing.T, ctx context.Context, admin
 	read := func() balances {
 		var b balances
 		err := admin.QueryRow(ctx, `SELECT a.observed_bytes_spent,g.policy_observed_bytes_spent,
-   x.charged_bytes,x.charged_objects,c.charged_full,c.charged_replay,p.state,
+   x.charged_bytes,x.charged_objects,0::bigint,0::bigint,p.state,
    (SELECT count(*) FROM policy_observation_session o WHERE o.root_id=a.root_id AND o.capture_id=$5)
    FROM policy_acceptance a JOIN access_grant g ON g.root_id=a.root_id AND g.id=$3
-   JOIN custody_allocation x ON x.id=$4 JOIN context_control_account c ON c.root_id=a.root_id AND c.allocation_id=x.id
+   JOIN custody_allocation x ON x.id=$4
    JOIN custody_attempt p ON p.id=$6 WHERE a.root_id=$1 AND a.id=$2`, s.a.RootID, in.AcceptanceID, in.GrantID, reg.AllocationID, in.Accepted.CaptureID, reg.Location.AttemptID).Scan(&b.Accepted, &b.Grant, &b.Bytes, &b.Objects, &b.Full, &b.Replay, &b.State, &b.Children)
 		if err != nil {
 			t.Fatal(err)
