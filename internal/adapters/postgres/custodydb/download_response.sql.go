@@ -137,14 +137,13 @@ func (q *Queries) CurrentDownloadResponse(ctx context.Context, arg CurrentDownlo
 }
 
 const insertDownloadControlAllocation = `-- name: InsertDownloadControlAllocation :one
-INSERT INTO download_control_allocation(id,root_id,audit_store_id,response_limit,window_limit,audit_byte_limit,valid_until,audit_write_until) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id, root_id, audit_store_id, response_limit, window_limit, audit_byte_limit, reserved_responses, reserved_windows, reserved_audit_bytes, valid_until, audit_write_until
+INSERT INTO download_control_allocation(id,root_id,audit_store_id,window_limit,audit_byte_limit,valid_until,audit_write_until) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id, root_id, audit_store_id, window_limit, audit_byte_limit, reserved_windows, reserved_audit_bytes, valid_until, audit_write_until
 `
 
 type InsertDownloadControlAllocationParams struct {
 	ID              pgtype.UUID
 	RootID          pgtype.UUID
 	AuditStoreID    pgtype.UUID
-	ResponseLimit   int64
 	WindowLimit     int64
 	AuditByteLimit  int64
 	ValidUntil      pgtype.Timestamptz
@@ -156,7 +155,6 @@ func (q *Queries) InsertDownloadControlAllocation(ctx context.Context, arg Inser
 		arg.ID,
 		arg.RootID,
 		arg.AuditStoreID,
-		arg.ResponseLimit,
 		arg.WindowLimit,
 		arg.AuditByteLimit,
 		arg.ValidUntil,
@@ -167,10 +165,8 @@ func (q *Queries) InsertDownloadControlAllocation(ctx context.Context, arg Inser
 		&i.ID,
 		&i.RootID,
 		&i.AuditStoreID,
-		&i.ResponseLimit,
 		&i.WindowLimit,
 		&i.AuditByteLimit,
-		&i.ReservedResponses,
 		&i.ReservedWindows,
 		&i.ReservedAuditBytes,
 		&i.ValidUntil,
@@ -370,7 +366,7 @@ func (q *Queries) LockDownloadWindow(ctx context.Context, arg LockDownloadWindow
 }
 
 const readDownloadControlAllocation = `-- name: ReadDownloadControlAllocation :one
-SELECT id, root_id, audit_store_id, response_limit, window_limit, audit_byte_limit, reserved_responses, reserved_windows, reserved_audit_bytes, valid_until, audit_write_until FROM download_control_allocation WHERE id=$1 AND root_id=$2
+SELECT id, root_id, audit_store_id, window_limit, audit_byte_limit, reserved_windows, reserved_audit_bytes, valid_until, audit_write_until FROM download_control_allocation WHERE id=$1 AND root_id=$2
 `
 
 type ReadDownloadControlAllocationParams struct {
@@ -385,10 +381,8 @@ func (q *Queries) ReadDownloadControlAllocation(ctx context.Context, arg ReadDow
 		&i.ID,
 		&i.RootID,
 		&i.AuditStoreID,
-		&i.ResponseLimit,
 		&i.WindowLimit,
 		&i.AuditByteLimit,
-		&i.ReservedResponses,
 		&i.ReservedWindows,
 		&i.ReservedAuditBytes,
 		&i.ValidUntil,
@@ -432,7 +426,7 @@ func (q *Queries) ReadDownloadResponse(ctx context.Context, arg ReadDownloadResp
 }
 
 const readDownloadSessionControl = `-- name: ReadDownloadSessionControl :one
-SELECT c.id, c.root_id, c.audit_store_id, c.response_limit, c.window_limit, c.audit_byte_limit, c.reserved_responses, c.reserved_windows, c.reserved_audit_bytes, c.valid_until, c.audit_write_until, s.capacity_account_id, s.capacity_backing, s.capacity_backing_digest, s.deadline AS session_deadline FROM artifact_download s
+SELECT c.id, c.root_id, c.audit_store_id, c.window_limit, c.audit_byte_limit, c.reserved_windows, c.reserved_audit_bytes, c.valid_until, c.audit_write_until, s.deadline AS session_deadline FROM artifact_download s
 JOIN download_control_allocation c ON c.id=s.allocation_id AND c.root_id=s.root_id
 WHERE s.id=$1 AND s.root_id=$2
 `
@@ -444,9 +438,6 @@ type ReadDownloadSessionControlParams struct {
 
 type ReadDownloadSessionControlRow struct {
 	DownloadControlAllocation DownloadControlAllocation
-	CapacityAccountID         pgtype.UUID
-	CapacityBacking           []byte
-	CapacityBackingDigest     []byte
 	SessionDeadline           pgtype.Timestamptz
 }
 
@@ -457,17 +448,12 @@ func (q *Queries) ReadDownloadSessionControl(ctx context.Context, arg ReadDownlo
 		&i.DownloadControlAllocation.ID,
 		&i.DownloadControlAllocation.RootID,
 		&i.DownloadControlAllocation.AuditStoreID,
-		&i.DownloadControlAllocation.ResponseLimit,
 		&i.DownloadControlAllocation.WindowLimit,
 		&i.DownloadControlAllocation.AuditByteLimit,
-		&i.DownloadControlAllocation.ReservedResponses,
 		&i.DownloadControlAllocation.ReservedWindows,
 		&i.DownloadControlAllocation.ReservedAuditBytes,
 		&i.DownloadControlAllocation.ValidUntil,
 		&i.DownloadControlAllocation.AuditWriteUntil,
-		&i.CapacityAccountID,
-		&i.CapacityBacking,
-		&i.CapacityBackingDigest,
 		&i.SessionDeadline,
 	)
 	return i, err

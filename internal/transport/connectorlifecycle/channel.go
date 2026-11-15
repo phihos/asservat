@@ -33,10 +33,6 @@ const (
 	// LIST of its cluster (ADR-329). The hub asks for it only after the
 	// presentation verified; the delivery is attributed to that cluster.
 	PurposeAccessBindings Purpose = "access-bindings"
-	// PurposeCapacity delivers the connector's capacity observation of its
-	// cluster (ADR-331), attributed to the presented cluster like
-	// PurposeAccessBindings.
-	PurposeCapacity Purpose = "capacity"
 )
 
 // OwnerAuthentication is the hub's answer for one observed owner certificate.
@@ -60,13 +56,13 @@ type Opening struct {
 
 // HubFrame drives the conversation; exactly one of its payloads is set.
 type HubFrame struct {
-	Kind    string                           // access-bindings, capacity, result, failure
+	Kind    string                           // access-bindings, result, failure
 	Owners  *value.APIContextOwnerCandidates `json:",omitempty"`
 	Owner   *OwnerAuthentication             `json:",omitempty"`
 	Failure string                           `json:",omitempty"`
-	// Digest is the hub's stored delivery digest of an "access-bindings" or
-	// "capacity" request; the connector answers Unchanged when its current
-	// delivery has the same digest (ADR-329, ADR-331).
+	// Digest is the hub's stored delivery digest of an "access-bindings"
+	// request; the connector answers Unchanged when its current delivery has
+	// the same digest (ADR-329).
 	Digest string `json:",omitempty"`
 }
 
@@ -75,16 +71,8 @@ type RegionFrame struct {
 	Kind string // access-bindings, capacity, error
 	// AccessBindings answers the hub's "access-bindings" request (ADR-329).
 	AccessBindings *contracts.AccessBindingDelivery `json:",omitempty"`
-	// Capacity answers the hub's "capacity" request (ADR-331).
-	Capacity *contracts.CapacityDelivery `json:",omitempty"`
 	// Unchanged answers a delivery request whose digest matches.
 	Unchanged bool `json:",omitempty"`
-}
-
-// CapacityLocal is the regional reader of the connector's capacity
-// observation (ADR-331), offered only by a delivering conversation.
-type CapacityLocal interface {
-	ReadCapacity(context.Context) (contracts.CapacityDelivery, error)
 }
 
 // AccessBindingsLocal is the regional reader of the connector's own

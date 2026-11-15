@@ -2,10 +2,8 @@ package delivery
 
 import (
 	"context"
-	"crypto/sha256"
 	"errors"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -18,46 +16,9 @@ const (
 	epochB = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
 )
 
-type fakeAttester struct {
-	mu      sync.Mutex
-	pod     string
-	err     error
-	calls   int
-	block   chan struct{}
-	started chan struct{}
-}
-
-func (a *fakeAttester) PrecheckNode(token []byte) error {
-	if string(token) == "garbage" {
-		return ErrNodeDenied
-	}
-	return nil
-}
-
-func (a *fakeAttester) AttestNode(_ context.Context, token []byte, bootID string) (collector.Identity, error) {
-	a.mu.Lock()
-	a.calls++
-	block, started := a.block, a.started
-	a.mu.Unlock()
-	if block != nil {
-		started <- struct{}{}
-		<-block
-	}
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	if a.err != nil {
-		return collector.Identity{}, a.err
-	}
-	return collector.Identity{NodeName: "node-a", NodeUID: "node-uid", PodName: "collector-x", PodUID: a.pod, BootID: bootID, Runtime: "containerd://2.1.0"}, nil
-}
-
-type fakeIssuer struct{ n atomic.Int64 }
-
-func (i *fakeIssuer) IssueNode(csr []byte, id collector.Identity, notAfter time.Time) ([]byte, [32]byte, error) {
-	n := i.n.Add(1)
-	der := []byte{byte(n), byte(n >> 8), 'c', 'e', 'r', 't'}
-	return der, sha256.Sum256(der), nil
-}
+var allKinds = []collector.WorkKind{collector.WorkLiveRead, collector.WorkArmSource, collector.WorkStopSource, collector.WorkSnapshot, collector.WorkPeerGeneration, collector.WorkPacketCapture,
+	collector.WorkProfileCapture, collector.WorkCancelProfileCapture, collector.WorkCancelSourceSnapshot, collector.WorkSyscallCapture, collector.WorkPacketSource, collector.WorkStopPacketSource,
+	collector.WorkPacketSourceSnapshot, collector.WorkCancelPacketCapture}
 
 type clock struct {
 	mu sync.Mutex
@@ -71,144 +32,150 @@ func (c *clock) add(d time.Duration) {
 	c.mu.Unlock()
 }
 
-func newChannel(t *testing.T) (*NodeChannel, *fakeAttester, *clock, *[]NodeView) {
+func newChannel(t *testing.T) (*NodeChannel, *clock, *[]NodeView) {
 	t.Helper()
-	att := &fakeAttester{pod: "pod-1"}
 	clk := &clock{t: time.Date(2026, 10, 27, 12, 0, 0, 0, time.UTC)}
 	var mu sync.Mutex
 	changes := &[]NodeView{}
-	ch, err := NewNodeChannel(att, &fakeIssuer{}, clk.now, func(v NodeView) { mu.Lock(); *changes = append(*changes, v); mu.Unlock() })
+	ch, err := NewNodeChannel(clk.now, func(v NodeView) { mu.Lock(); *changes = append(*changes, v); mu.Unlock() })
 	if err != nil {
 		t.Fatal(err)
 	}
-	return ch, att, clk, changes
+	return ch, clk, changes
 }
 
-func enroll(t *testing.T, ch *NodeChannel, epoch string) (NodePeer, [32]byte) {
+// enroll connects collector Pod "pod-"+epoch[:1] of node-uid as generation epoch.
+func enroll(t *testing.T, ch *NodeChannel, epoch string) (NodePeer, uint64) {
 	t.Helper()
-	der, notAfter, id, err := ch.Enroll(context.Background(), "10.0.0.1", []byte("token"), []byte("csr"), boot, epoch)
-	if err != nil || id.Epoch != epoch || notAfter.IsZero() {
-		t.Fatalf("enroll: %v %+v", err, id)
+	p, stream, err := ch.Connect(collector.Identity{NodeName: "node-a", NodeUID: "node-uid", PodName: "collector-x", PodUID: "pod-" + epoch[:1], BootID: boot, Epoch: epoch, Runtime: "containerd://2.1.0"}, allKinds)
+	if err != nil {
+		t.Fatal(err)
 	}
-	d := sha256.Sum256(der)
-	p, err := ch.Peer(d)
-	if err != nil || p.Epoch != epoch || p.NodeUID != "node-uid" {
-		t.Fatalf("peer: %v %+v", err, p)
-	}
-	return p, d
+	return p, stream
 }
 
-func report(seq uint64, at time.Time) collector.Report {
+// sourceConnect connects the fixed source-test collector as generation epoch.
+func sourceConnect(ch *NodeChannel, epoch string) (collector.Identity, error) {
+	id := collector.Identity{NodeName: "node", NodeUID: "11111111-1111-4111-8111-111111111111", PodName: "collector", PodUID: "22222222-2222-4222-8222-222222222222", BootID: boot, Epoch: epoch}
+	_, _, err := ch.Connect(id, allKinds)
+	return id, err
+}
+
+// Poll is the test view of Next: queued work after after, or an empty answer
+// when none arrives within hold.
+func (c *NodeChannel) Poll(ctx context.Context, p NodePeer, _ string, after uint64, hold time.Duration) ([]collector.Work, error) {
+	c.mu.Lock()
+	var stream uint64
+	if e := c.nodes[p.NodeUID]; e != nil {
+		stream = e.stream
+	}
+	c.mu.Unlock()
+	bounded, cancel := context.WithTimeout(ctx, max(hold, time.Millisecond))
+	defer cancel()
+	w, err := c.Next(bounded, p, stream, after)
+	if errors.Is(err, ErrNodeUnavailable) && ctx.Err() == nil {
+		return []collector.Work{}, nil
+	}
+	return w, err
+}
+
+func report(at time.Time) collector.Report {
 	f := collector.Facts{Kernel: collector.KernelVersion{Major: 6, Minor: 8, Patch: 0}}
-	return collector.Report{Sequence: seq, ObservedAt: at, Facts: f, Mechanisms: collector.Assess(f)}
+	return collector.Report{ObservedAt: at, Facts: f, Mechanisms: collector.Assess(f)}
 }
 
-func TestEnrollValidatesInputAndAttestation(t *testing.T) {
-	ch, att, _, _ := newChannel(t)
-	ctx := context.Background()
-	for _, c := range []struct{ token, csr, boot, epoch string }{{"", "c", boot, epochA}, {"t", "", boot, epochA}, {"t", "c", "boot", epochA}, {"t", "c", boot, "EPOCH"}} {
-		if _, _, _, err := ch.Enroll(ctx, "10.0.0.1", []byte(c.token), []byte(c.csr), c.boot, c.epoch); !errors.Is(err, ErrNodeInvalid) {
-			t.Fatalf("%+v: %v", c, err)
-		}
+func TestConnectFromAnotherPodReplacesTheEarlierStream(t *testing.T) {
+	ch, clk, changes := newChannel(t)
+	old, oldStream := enroll(t, ch, epochA)
+	if _, err := ch.Enqueue("node-uid", collector.WorkSnapshot, clk.now().Add(time.Minute)); err != nil {
+		t.Fatal(err)
 	}
-	att.err = ErrNodeDenied
-	if _, _, _, err := ch.Enroll(ctx, "10.0.0.1", []byte("t"), []byte("c"), boot, epochA); !errors.Is(err, ErrNodeDenied) {
-		t.Fatalf("attestation failure: %v", err)
-	}
-	if len(ch.Nodes()) != 0 {
-		t.Fatal("a denied enrollment registered a node")
-	}
-	if _, err := ch.Peer([32]byte{1}); !errors.Is(err, ErrNodeUnauthenticated) {
-		t.Fatal("unknown certificate authenticated")
-	}
-}
-
-func TestRestartReplacesTheEarlierProcess(t *testing.T) {
-	ch, att, _, changes := newChannel(t)
-	old, oldCert := enroll(t, ch, epochA)
-	done := make(chan error, 1)
+	ended := make(chan error, 1)
 	go func() {
-		_, err := ch.Poll(context.Background(), old, epochA, 0, collector.PollHold)
-		done <- err
+		_, err := ch.Next(context.Background(), old, oldStream, 1)
+		ended <- err
 	}()
 	time.Sleep(20 * time.Millisecond)
-	att.mu.Lock()
-	att.pod = "pod-2"
-	att.mu.Unlock()
 	fresh, _ := enroll(t, ch, epochB)
 	select {
-	case err := <-done:
+	case err := <-ended:
 		if !errors.Is(err, ErrNodeUnauthenticated) {
-			t.Fatalf("replaced poll: %v", err)
+			t.Fatalf("replaced stream: %v", err)
 		}
 	case <-time.After(5 * time.Second):
-		t.Fatal("the replaced process's poll did not end")
+		t.Fatal("replacement did not end the earlier stream")
 	}
-	if _, err := ch.Peer(oldCert); !errors.Is(err, ErrNodeUnauthenticated) {
-		t.Fatal("the replaced process still authenticates")
-	}
-	if err := ch.Report(old, epochA, report(1, time.Now())); !errors.Is(err, ErrNodeUnauthenticated) {
-		t.Fatalf("replaced report: %v", err)
-	}
-	if err := ch.Report(fresh, epochA, report(1, time.Now())); !errors.Is(err, ErrNodeConflict) {
-		t.Fatalf("epoch mismatch: %v", err)
+	if err := ch.Report(old, cur(ch, old), report(clk.now())); !errors.Is(err, ErrNodeUnauthenticated) {
+		t.Fatal("replaced Pod reported")
 	}
 	nodes := ch.Nodes()
-	if len(nodes) != 1 || nodes[0].Identity.Epoch != epochB || nodes[0].Identity.PodUID != "pod-2" || len(*changes) != 2 {
-		t.Fatalf("one current generation per node: %+v (changes %d)", nodes, len(*changes))
+	if len(nodes) != 1 || nodes[0].Identity.Epoch != epochB || nodes[0].Identity.PodUID != fresh.PodUID || nodes[0].Queued != 0 || len(*changes) != 2 {
+		t.Fatalf("nodes: %+v changes %d", nodes, len(*changes))
 	}
 }
 
-func TestRenewalKeepsOneEarlierCertificateUntilExpiry(t *testing.T) {
-	ch, _, clk, _ := newChannel(t)
-	_, first := enroll(t, ch, epochA)
-	clk.add(19 * time.Minute)
-	_, second := enroll(t, ch, epochA)
-	if _, err := ch.Peer(first); err != nil {
-		t.Fatal("overlap: the earlier certificate is valid until its own expiry")
+func TestReconnectFromTheSamePodKeepsQueueAndGeneration(t *testing.T) {
+	ch, clk, _ := newChannel(t)
+	p, first := enroll(t, ch, epochA)
+	w, err := ch.Enqueue("node-uid", collector.WorkSnapshot, clk.now().Add(time.Minute))
+	if err != nil {
+		t.Fatal(err)
 	}
-	clk.add(time.Minute)
-	if _, err := ch.Peer(first); !errors.Is(err, ErrNodeUnauthenticated) {
-		t.Fatal("an expired certificate authenticated")
+	if err := ch.Report(p, cur(ch, p), report(clk.now())); err != nil || !ch.Nodes()[0].Current {
+		t.Fatalf("report: %v", err)
 	}
-	_, third := enroll(t, ch, epochA)
-	for _, d := range [][32]byte{second, third} {
-		if _, err := ch.Peer(d); err != nil {
-			t.Fatal(err)
-		}
+	ch.Disconnect(p, first)
+	if ch.Nodes()[0].Current {
+		t.Fatal("a closed stream stayed current")
 	}
-	enroll(t, ch, epochA)
-	if _, err := ch.Peer(second); !errors.Is(err, ErrNodeUnauthenticated) {
-		t.Fatal("more than two certificates kept per process")
+	again, second, err := ch.Connect(collector.Identity{NodeName: "node-a", NodeUID: "node-uid", PodUID: p.PodUID, Epoch: epochB}, allKinds)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if again != p || second == first || ch.Nodes()[0].Identity.Epoch != epochA {
+		t.Fatalf("reconnect: %+v %d %+v", again, second, ch.Nodes()[0].Identity)
+	}
+	ch.Disconnect(p, first)
+	if !ch.Nodes()[0].Current {
+		t.Fatal("an old stream's close ended the new stream")
+	}
+	if err := ch.Report(p, first, report(clk.now())); !errors.Is(err, ErrNodeUnauthenticated) {
+		t.Fatalf("a superseded stream reported: %v", err)
+	}
+	if err := ch.Report(p, second, report(clk.now())); err != nil {
+		t.Fatal(err)
+	}
+	got, err := ch.Next(context.Background(), p, second, 0)
+	if err != nil || len(got) != 1 || got[0].ID != w.ID {
+		t.Fatalf("resent work: %+v %v", got, err)
+	}
+	if _, err := ch.Next(context.Background(), p, first, 0); !errors.Is(err, ErrNodeUnauthenticated) {
+		t.Fatal("an old stream still receives work")
 	}
 }
 
-func TestPollDeliversQueuedWorkAndWakesOnEnqueue(t *testing.T) {
-	ch, _, clk, _ := newChannel(t)
-	p, _ := enroll(t, ch, epochA)
-	got, err := ch.Poll(context.Background(), p, epochA, 0, 0)
-	if err != nil || len(got) != 0 {
-		t.Fatalf("empty poll: %v %v", got, err)
-	}
+func TestNextDeliversQueuedWorkAndWakesOnEnqueue(t *testing.T) {
+	ch, clk, _ := newChannel(t)
+	p, stream := enroll(t, ch, epochA)
 	result := make(chan []collector.Work, 1)
 	go func() {
-		w, _ := ch.Poll(context.Background(), p, epochA, 0, collector.PollHold)
+		w, _ := ch.Next(context.Background(), p, stream, 0)
 		result <- w
 	}()
 	time.Sleep(20 * time.Millisecond)
 	w, err := ch.Enqueue("node-uid", collector.WorkSnapshot, clk.now().Add(time.Minute))
-	if err != nil || w.Sequence != 1 || !validID(w.ID) {
+	if err != nil || w.Sequence != 1 {
 		t.Fatalf("enqueue: %+v %v", w, err)
 	}
 	select {
 	case got := <-result:
 		if len(got) != 1 || got[0].ID != w.ID {
-			t.Fatalf("woken poll: %+v", got)
+			t.Fatalf("woken stream: %+v", got)
 		}
 	case <-time.After(5 * time.Second):
-		t.Fatal("enqueue did not wake the poll")
+		t.Fatal("enqueue did not wake the stream")
 	}
-	if got, _ := ch.Poll(context.Background(), p, epochA, 1, 0); len(got) != 0 {
+	if got, _ := ch.Poll(context.Background(), p, "", 1, 0); len(got) != 0 {
 		t.Fatal("work at or below After was repeated")
 	}
 	if _, err := ch.Enqueue("node-uid", "exec", clk.now().Add(time.Minute)); !errors.Is(err, ErrNodeInvalid) {
@@ -225,171 +192,90 @@ func TestPollDeliversQueuedWorkAndWakesOnEnqueue(t *testing.T) {
 	if _, err := ch.Enqueue("node-uid", collector.WorkStopSource, clk.now().Add(time.Minute)); !errors.Is(err, ErrNodeLimit) {
 		t.Fatal("queue bound")
 	}
-	if got, _ := ch.Poll(context.Background(), p, epochA, 0, 0); len(got) != collector.MaxWorkPerPoll {
-		t.Fatalf("one poll returns at most %d items, got %d", collector.MaxWorkPerPoll, len(got))
-	}
 	// Receipts answer work; expired work is dropped as well.
-	r := report(1, clk.now())
+	r := report(clk.now())
 	r.Receipts = []collector.Receipt{{WorkID: w.ID, Sequence: 1, Outcome: collector.OutcomeRefused, Reason: collector.ReasonRecorderNotImplemented}}
-	if err := ch.Report(p, epochA, r); err != nil {
-		t.Fatal(err)
-	}
-	if ch.Nodes()[0].Queued != collector.MaxQueuedWork-1 {
-		t.Fatal("receipt did not remove its work")
+	if err := ch.Report(p, cur(ch, p), r); err != nil || ch.Nodes()[0].Queued != collector.MaxQueuedWork-1 {
+		t.Fatalf("receipt did not remove its work: %v", err)
 	}
 	clk.add(time.Minute)
-	if err := ch.Report(p, epochA, report(2, clk.now())); err != nil || ch.Nodes()[0].Queued != 0 {
+	if err := ch.Report(p, cur(ch, p), report(clk.now())); err != nil || ch.Nodes()[0].Queued != 0 {
 		t.Fatalf("expired work kept: %v", err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if _, err := ch.Poll(ctx, p, epochA, 0, time.Second); !errors.Is(err, ErrNodeUnavailable) {
-		t.Fatal("cancelled poll")
-	}
-	if _, err := ch.Poll(context.Background(), p, epochA, 0, collector.PollHold+1); !errors.Is(err, ErrNodeInvalid) {
-		t.Fatal("unbounded hold")
+	if _, err := ch.Next(ctx, p, stream, 0); !errors.Is(err, ErrNodeUnavailable) {
+		t.Fatal("cancelled stream")
 	}
 }
 
-func TestReportOrderingSpacingAndCurrency(t *testing.T) {
-	ch, _, clk, changes := newChannel(t)
-	p, _ := enroll(t, ch, epochA)
-	if err := ch.Report(p, epochA, report(0, clk.now())); !errors.Is(err, ErrNodeInvalid) {
-		t.Fatal("sequence zero")
-	}
-	if err := ch.Report(p, epochA, report(1, clk.now())); err != nil {
+func TestOnlyAnnouncedKindsAreQueued(t *testing.T) {
+	ch, clk, _ := newChannel(t)
+	if _, _, err := ch.Connect(collector.Identity{NodeName: "node-a", NodeUID: "node-uid", PodUID: "pod", Epoch: epochA}, []collector.WorkKind{collector.WorkStopSource}); err != nil {
 		t.Fatal(err)
 	}
-	clk.add(500 * time.Millisecond)
-	if err := ch.Report(p, epochA, report(2, clk.now())); !errors.Is(err, ErrNodeRateLimited) {
-		t.Fatalf("spacing: %v", err)
+	if _, err := ch.Enqueue("node-uid", collector.WorkSnapshot, clk.now().Add(time.Minute)); !errors.Is(err, ErrNodeUnavailable) {
+		t.Fatalf("unannounced kind: %v", err)
 	}
-	clk.add(time.Second)
-	if err := ch.Report(p, epochA, report(1, clk.now())); !errors.Is(err, ErrNodeConflict) {
-		t.Fatal("sequence did not grow")
-	}
-	if err := ch.Report(p, epochA, report(2, clk.now())); err != nil {
+	if _, err := ch.Enqueue("node-uid", collector.WorkStopSource, clk.now().Add(time.Minute)); err != nil {
 		t.Fatal(err)
 	}
-	if n := len(*changes); n != 2 {
-		t.Fatalf("an unchanged assessment is not a change: %d", n)
+}
+
+func TestReportValidationAndCurrency(t *testing.T) {
+	ch, clk, _ := newChannel(t)
+	p, stream := enroll(t, ch, epochA)
+	if err := ch.Report(p, cur(ch, p), collector.Report{}); !errors.Is(err, ErrNodeInvalid) {
+		t.Fatal("report without time")
 	}
+	observed := clk.now()
+	if err := ch.Report(p, cur(ch, p), report(observed)); err != nil {
+		t.Fatal(err)
+	}
+	clk.add(time.Hour)
 	v := ch.Nodes()[0]
-	if !v.Current || v.Reports != 2 || v.Report.Sequence != 2 {
-		t.Fatalf("view %+v", v)
+	if !v.Current || !v.ReportedAt.Equal(clk.now()) || !v.Report.ObservedAt.Equal(clk.now()) {
+		t.Fatalf("an open stream's report is current: %+v", v)
 	}
-	clk.add(collector.StatusStaleAfter + time.Second)
-	if ch.Nodes()[0].Current {
-		t.Fatal("a node without a report for three intervals is not current")
+	ch.Disconnect(p, stream)
+	if v := ch.Nodes()[0]; v.Current || !v.ReportedAt.Equal(observed) {
+		t.Fatalf("closed stream: %+v", v)
 	}
-	bad := report(3, clk.now())
-	bad.Receipts = []collector.Receipt{{Outcome: "done"}}
-	if err := ch.Report(p, epochA, bad); !errors.Is(err, ErrNodeInvalid) {
-		t.Fatal("open receipt outcome")
-	}
-}
-
-func TestEnrollmentIsBoundedBeforeAnyAPICall(t *testing.T) {
-	ch, att, clk, _ := newChannel(t)
-	ctx := context.Background()
-	enrollFrom := func(source, token string) error {
-		_, _, _, err := ch.Enroll(ctx, source, []byte(token), []byte("csr"), boot, epochA)
-		return err
-	}
-	// A token failing the cheap precheck costs no attestation and no budget.
-	for i := 0; i < 50; i++ {
-		if err := enrollFrom("10.0.0.9", "garbage"); !errors.Is(err, ErrNodeDenied) {
-			t.Fatal(err)
-		}
-	}
-	if att.calls != 0 {
-		t.Fatalf("precheck failures reached the attester %d times", att.calls)
-	}
-	// Per source: a burst of 3, then one per 5 seconds.
-	for i := 0; i < enrollSourceBurst; i++ {
-		if err := enrollFrom("10.0.0.9", "token"); err != nil {
-			t.Fatalf("burst %d: %v", i, err)
-		}
-	}
-	if err := enrollFrom("10.0.0.9", "token"); !errors.Is(err, ErrNodeRateLimited) || att.calls != enrollSourceBurst {
-		t.Fatalf("source over its burst: %v (attestations %d)", err, att.calls)
-	}
-	clk.add(enrollSourceEvery)
-	if err := enrollFrom("10.0.0.9", "token"); err != nil {
-		t.Fatalf("after the source interval: %v", err)
-	}
-	// Globally: the bucket refilled to its burst during the 5 seconds and the
-	// last enrollment took one; the rest go to other sources, then 5 per second.
-	for i := 0; i < enrollBurst-1; i++ {
-		if err := enrollFrom("10.1.0."+string(rune('a'+i)), "token"); err != nil {
-			t.Fatalf("global burst %d: %v", i, err)
-		}
-	}
-	if err := enrollFrom("10.2.0.1", "token"); !errors.Is(err, ErrNodeRateLimited) {
-		t.Fatalf("global burst exhausted: %v", err)
-	}
-	clk.add(time.Second)
-	for i := 0; i < enrollRate; i++ {
-		if err := enrollFrom("10.3.0."+string(rune('a'+i)), "token"); err != nil {
-			t.Fatalf("global refill %d: %v", i, err)
-		}
-	}
-	if err := enrollFrom("10.4.0.1", "token"); !errors.Is(err, ErrNodeRateLimited) {
-		t.Fatal("global rate exceeded")
-	}
-}
-
-func TestEnrollmentInFlightBound(t *testing.T) {
-	ch, att, clk, _ := newChannel(t)
-	att.mu.Lock()
-	att.block, att.started = make(chan struct{}), make(chan struct{}, enrollInFlight)
-	att.mu.Unlock()
-	done := make(chan error, enrollInFlight)
-	for i := 0; i < enrollInFlight; i++ {
-		go func(i int) {
-			_, _, _, err := ch.Enroll(context.Background(), "10.5.0."+string(rune('a'+i)), []byte("token"), []byte("csr"), boot, epochA)
-			done <- err
-		}(i)
-		<-att.started
-	}
-	if _, _, _, err := ch.Enroll(context.Background(), "10.6.0.1", []byte("token"), []byte("csr"), boot, epochA); !errors.Is(err, ErrNodeRateLimited) {
-		t.Fatalf("ninth concurrent attestation: %v", err)
-	}
-	close(att.block)
-	for i := 0; i < enrollInFlight; i++ {
-		<-done
-	}
-	att.mu.Lock()
-	att.block = nil
-	att.mu.Unlock()
-	clk.add(time.Second)
-	if _, _, _, err := ch.Enroll(context.Background(), "10.6.0.1", []byte("token"), []byte("csr"), boot, epochA); err != nil {
-		t.Fatalf("slot released: %v", err)
+	bad := report(clk.now())
+	bad.Receipts = []collector.Receipt{{WorkID: "w", Outcome: "maybe"}}
+	if err := ch.Report(p, cur(ch, p), bad); !errors.Is(err, ErrNodeInvalid) {
+		t.Fatal("open outcome")
 	}
 }
 
 func TestReceiptMustMatchSequenceAndWorkID(t *testing.T) {
-	ch, _, clk, _ := newChannel(t)
+	ch, clk, _ := newChannel(t)
 	p, _ := enroll(t, ch, epochA)
 	w, err := ch.Enqueue("node-uid", collector.WorkSnapshot, clk.now().Add(time.Hour))
 	if err != nil {
 		t.Fatal(err)
 	}
-	r := report(1, clk.now())
+	r := report(clk.now())
 	r.Receipts = []collector.Receipt{{WorkID: "bbbbbbbb-0000-4000-8000-000000000000", Sequence: w.Sequence, Outcome: collector.OutcomeRefused}}
-	if err := ch.Report(p, epochA, r); err != nil || ch.Nodes()[0].Queued != 1 {
+	if err := ch.Report(p, cur(ch, p), r); err != nil || ch.Nodes()[0].Queued != 1 {
 		t.Fatalf("a receipt with another work ID removed the item: %v", err)
 	}
-	clk.add(time.Second)
-	r = report(2, clk.now())
 	r.Receipts = []collector.Receipt{{WorkID: w.ID, Sequence: w.Sequence + 1, Outcome: collector.OutcomeRefused}}
-	if err := ch.Report(p, epochA, r); err != nil || ch.Nodes()[0].Queued != 1 {
+	if err := ch.Report(p, cur(ch, p), r); err != nil || ch.Nodes()[0].Queued != 1 {
 		t.Fatalf("a receipt with another sequence removed the item: %v", err)
 	}
-	clk.add(time.Second)
-	r = report(3, clk.now())
 	r.Receipts = []collector.Receipt{{WorkID: w.ID, Sequence: w.Sequence, Outcome: collector.OutcomeRefused}}
-	if err := ch.Report(p, epochA, r); err != nil || ch.Nodes()[0].Queued != 0 {
+	if err := ch.Report(p, cur(ch, p), r); err != nil || ch.Nodes()[0].Queued != 0 {
 		t.Fatalf("matching receipt: %v", err)
 	}
+}
+
+// cur is the node's current stream, as the server would hold it.
+func cur(c *NodeChannel, p NodePeer) uint64 {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if e := c.nodes[p.NodeUID]; e != nil {
+		return e.stream
+	}
+	return 0
 }

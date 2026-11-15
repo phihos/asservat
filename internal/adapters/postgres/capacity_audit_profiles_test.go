@@ -30,7 +30,7 @@ func TestCapacityAuditProfilesDecodeClosedAndNoLegacyFallback(t *testing.T) {
 	if e != nil || !v.Valid(v.ObservedAt) {
 		t.Fatal("invalid fixture", e)
 	}
-	for _, mode := range []string{"valid", "sql-zone", "expired-after-read", "null-profile", "missing-zero", "null-zero", "case-alias", "duplicate", "unknown", "trailing", "oversized", "missing-processing", "null-processing", "processing-public-layout", "processing-wrong-revision"} {
+	for _, mode := range []string{"valid", "sql-zone", "expired-after-read", "null-profile", "duplicate", "unknown", "trailing", "oversized", "missing-processing", "null-processing", "processing-public-layout", "processing-wrong-revision"} {
 		t.Run(mode, func(t *testing.T) {
 			raw := bytes.Clone(original)
 			now := v.ObservedAt.Add(time.Second)
@@ -39,8 +39,6 @@ func TestCapacityAuditProfilesDecodeClosedAndNoLegacyFallback(t *testing.T) {
 				raw = bytes.ReplaceAll(raw, []byte("Z\""), []byte("+00:00\""))
 			case "expired-after-read":
 				now = v.FreshUntil
-			case "case-alias":
-				raw = bytes.Replace(raw, []byte("\"AccountVersion\""), []byte("\"accountversion\""), 1)
 			case "duplicate":
 				raw = bytes.Replace(raw, []byte("\"SourceRevision\":3"), []byte("\"SourceRevision\":3,\"SourceRevision\":3"), 1)
 			case "trailing":
@@ -57,10 +55,6 @@ func TestCapacityAuditProfilesDecodeClosedAndNoLegacyFallback(t *testing.T) {
 					x["Normal"] = nil
 				case "unknown":
 					x["PreviouslyReady"] = true
-				case "missing-zero":
-					delete(x["Normal"].(map[string]any)["Policy"].(map[string]any), "BackupHorizonSeconds")
-				case "null-zero":
-					x["Normal"].(map[string]any)["Policy"].(map[string]any)["BackupHorizonSeconds"] = nil
 				case "missing-processing":
 					delete(x, "Processing")
 				case "null-processing":

@@ -53,7 +53,7 @@ func TestEnrollmentFleetObservationWithRealPostgres(t *testing.T) {
 	setup := func() (value.Administration, *postgres.FleetObservation) {
 		t.Helper()
 		now := time.Now().UTC().Truncate(time.Microsecond)
-		a := value.Administration{InstallationID: uuid.NewString(), IssuerEpoch: uuid.NewString(), Issuer: "https://identity.example.test", Revision: identity.Revision{UID: "fleet-settings", Generation: 1, Digest: artifact.Digest{1}}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), Clients: []string{"console"}, Groups: []string{"operators"}, DeliveryProfiles: []string{"ops"}, MaxActiveBootstraps: 8, MaxBootstrapHistory: 16, MaxClusters: 16}
+		a := value.Administration{InstallationID: uuid.NewString(), IssuerEpoch: uuid.NewString(), Revision: identity.Revision{UID: "fleet-settings", Generation: 1, Digest: artifact.Digest{1}}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
 		observer, err := postgres.NewFleetObservation(ctx, pool, a.InstallationID)
 		if err != nil {
 			t.Fatal(err)

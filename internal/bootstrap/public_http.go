@@ -101,6 +101,7 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 	// ADR-249: the protected identity settings carry the approval settings
 	// (step-up and the installation's recording-approval switch).
 	pc.investigation.Approvals = id.mcp.Policies
+	pc.administrators = id.mcp.Policies
 	ongoingSources := pc.packetSourceRuntime(time.Now, ownerRandomID)
 	operations, err := NewPublicContextOperations(PublicContextOperationsConfig{RootID: root, InstallationID: installation, PublicOrigin: p.Origin, CollectionEnabled: true, Now: time.Now, NewID: ownerRandomID},
 		PublicContextOperationServices{ongoingSources: ongoingSources, Recordings: pc.recordings, Cancellations: pc.cancellations, History: pc.history, Investigation: pc.investigation, Intents: pc.intents, Regional: pc.regional, Progress: pc.progress, Cases: pc.cases, Downloads: dl.coordinator, Native: dl.native, Projection: dl.projection})

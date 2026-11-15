@@ -55,7 +55,7 @@ func (s *ContextKeyUnwraps) Resolve(ctx context.Context, peer authorization.KeyP
 	defer cancel()
 	start := time.Now()
 	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		trust, _, err := currentTrust(ctx, q, s.scope.InstallationID)
+		trust, err := currentTrust(ctx, q, s.scope.InstallationID)
 		if err != nil {
 			return err
 		}

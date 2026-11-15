@@ -47,8 +47,9 @@ func bindContextNativeStopFixture(t *testing.T, ctx context.Context, cfg *postgr
 	t.Helper()
 	p := audit.DownloadStopLifecyclePolicy{RootID: a.RootID, InstallationID: installation, StoreID: store, PolicyID: custodyID(), BackupProfileID: custodyID(), QualificationID: custodyID(), PolicyDigest: artifact.Digest{1}, BackupProfileDigest: artifact.Digest{2}, QualificationDigest: artifact.Digest{3}, Layout: audit.DownloadStopHistoryLayout, CleanupBudgetSeconds: 6, ProofWindowSeconds: 3, MaximumRowFootprintBytes: 128 << 10, MaximumTransitionWALBytes: 128 << 10, BackupCopies: 1, WALCopies: 1, MaxPurgeLeases: 8}
 	c, k, b, w := p.SlotBacking()
+	const slots = int64(10) // stop slots per allocation, as sessions were before
 	n := time.Now().UTC().Truncate(time.Microsecond)
-	backing := artifact.DownloadStopBacking{AllocationID: a.ID, RootID: a.RootID, InstallationID: installation, StoreID: store, PolicyID: p.PolicyID, BackupProfileID: p.BackupProfileID, PolicyDigest: p.PolicyDigest, BackupProfileDigest: p.BackupProfileDigest, Slots: a.SessionLimit, AllocationSlots: a.SessionLimit, CipherBytes: c * a.SessionLimit, KeyAttempts: k * a.SessionLimit, BackupBytes: b * a.SessionLimit, WALBytes: w * a.SessionLimit, RetainedSeconds: 3600, ObservedAt: n, ValidUntil: a.ValidUntil}
+	backing := artifact.DownloadStopBacking{AllocationID: a.ID, RootID: a.RootID, InstallationID: installation, StoreID: store, PolicyID: p.PolicyID, BackupProfileID: p.BackupProfileID, PolicyDigest: p.PolicyDigest, BackupProfileDigest: p.BackupProfileDigest, Slots: slots, AllocationSlots: slots, CipherBytes: c * slots, KeyAttempts: k * slots, BackupBytes: b * slots, WALBytes: w * slots, RetainedSeconds: 3600, ObservedAt: n, ValidUntil: a.ValidUntil}
 	if e := cfg.BindDownloadStopBacking(ctx, backing); e != nil {
 		t.Fatal("accepted synthetic Stop backing", e)
 	}
@@ -203,7 +204,7 @@ func qualifyContextNativeContent(t *testing.T, ctx context.Context, f nativeExch
 		t.Fatal("original three preparation key slots", roles, e)
 	}
 	prep := artifact.DownloadPreparation{SessionID: session.ID, BatchID: batch, Generation: 1}
-	control := artifact.DownloadControlAllocation{ID: f.allocation.ID, RootID: root, AuditStoreID: f.published.Expectation.Registration.StoreID, ResponseLimit: 2, WindowLimit: 2, AuditByteLimit: 4 * artifact.DownloadWindowAuditBytes, ValidUntil: f.allocation.ValidUntil, AuditWriteUntil: f.allocation.ValidUntil.Add(time.Minute)}
+	control := artifact.DownloadControlAllocation{ID: f.allocation.ID, RootID: root, AuditStoreID: f.published.Expectation.Registration.StoreID, WindowLimit: 2, AuditByteLimit: 4 * artifact.DownloadWindowAuditBytes, ValidUntil: f.allocation.ValidUntil, AuditWriteUntil: f.allocation.ValidUntil.Add(time.Minute)}
 	if e = f.config.BindDownloadControlAllocation(ctx, control); e != nil {
 		t.Fatal(e)
 	}
@@ -260,7 +261,7 @@ func qualifyContextNativeContent(t *testing.T, ctx context.Context, f nativeExch
 	if (f.content.retry == nil || !f.content.retry.second) && (e != nil || plan.HardUntil.IsZero() || plan.HardUntil.After(f.allocation.ValidUntil)) {
 		t.Fatal("accepted allocation plan", e)
 	}
-	for _, q := range []string{"UPDATE download_allocation SET reserved_sessions=0 WHERE id=$1", "UPDATE download_native_backing SET charged_rows=0 WHERE allocation_id=$1", "DELETE FROM download_stop_backing WHERE allocation_id=$1"} {
+	for _, q := range []string{"UPDATE download_allocation SET reserved_output=0 WHERE id=$1", "UPDATE download_native_backing SET charged_rows=0 WHERE allocation_id=$1", "DELETE FROM download_stop_backing WHERE allocation_id=$1"} {
 		_, e = planPool.Exec(ctx, q, f.allocation.ID)
 		var pg *pgconn.PgError
 		if !errors.As(e, &pg) || pg.Code != "42501" {
@@ -359,7 +360,7 @@ func qualifyContextNativeControlRaces(t *testing.T, ctx context.Context, f nativ
 		var v [10]int64
 		if e := f.admin.QueryRow(ctx, `SELECT (SELECT updates FROM download_native_owner WHERE worker_id=$1),
  (SELECT count(*) FROM download_response WHERE session_id=$2),
- (SELECT reserved_responses FROM download_control_allocation WHERE id=$3),
+ 0::bigint,
  (SELECT reserved_windows FROM download_control_allocation WHERE id=$3),
  (SELECT charged_output FROM artifact_download WHERE id=$2),
  (SELECT charged_read FROM artifact_download WHERE id=$2),
@@ -430,7 +431,6 @@ func qualifyContextNativeControlRaces(t *testing.T, ctx context.Context, f nativ
 				t.Fatal("race changed original response identity")
 			}
 			expected[1]++
-			expected[2]++
 			expected[3] += response.Plan.Windows()
 			expected[9]++ // Response generation; no bytes/keys spent before a window.
 		}

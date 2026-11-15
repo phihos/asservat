@@ -137,7 +137,7 @@ func newDownloadControlFixture(t *testing.T) (*downloadControlFixture, ContextDo
 	f.a.Retention = proof
 	f.i = identity.Identity{Principal: p.Principal, Policy: rev, Scopes: []string{"evidence:read", "evidence:download"}}
 	f.source = ContextDownloadSource{Scope: p, Expectation: r.Expectation, Copies: r.Copies}
-	f.plan = ContextDownloadPlan{Allocation: artifact.DownloadAllocation{ID: p.RootID, RootID: p.RootID, ClusterID: p.ClusterID, NamespaceUID: p.NamespaceUID, WorkloadUID: p.WorkloadUID, OutputLimit: 1 << 20, ReadLimit: 128 << 20, SessionLimit: 4, ValidUntil: n.Add(time.Hour)}, OutputLimit: 8192, ReadLimit: 16 << 20, RequestLimit: 4, Duration: 30 * time.Minute}
+	f.plan = ContextDownloadPlan{Allocation: artifact.DownloadAllocation{ID: p.RootID, RootID: p.RootID, ClusterID: p.ClusterID, NamespaceUID: p.NamespaceUID, WorkloadUID: p.WorkloadUID, OutputLimit: 1 << 20, ReadLimit: 128 << 20, ValidUntil: n.Add(time.Hour)}, OutputLimit: 8192, ReadLimit: 16 << 20, RequestLimit: 4, Duration: 30 * time.Minute}
 	f.refresh(n)
 	if !f.a.Valid(n) || !f.source.Valid(n) || !f.plan.Valid(p, n) {
 		t.Fatal("invalid synthetic control fixture")

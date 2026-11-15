@@ -310,7 +310,7 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 		var stream custodydb.PermissionStream
 		var err error
 		if group == nil {
-			trust, _, err = currentTrust(ctx, q, s.installation)
+			trust, err = currentTrust(ctx, q, s.installation)
 			if err != nil {
 				return err
 			}
@@ -503,10 +503,6 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 		if !sameStorage(binding, a.Storage) || allocation.ServiceClass != "context" {
 			return value.ErrChanged
 		}
-		controlUntil, err := lockContextControlCapacity(ctx, q, s.root, r.AllocationID)
-		if err != nil {
-			return err
-		}
 		// Physical bindings also exist in an incomplete managed enrollment.
 		// Keep the exact source/root deadline through all subsequent effects;
 		// this read cannot promote an old record or extend a phase permit.
@@ -576,7 +572,7 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 					return err
 				}
 			}
-			if !planning.VerifyContextPlan(a.Plan, n.Time) || a.Plan.CompiledAt.After(n.Time) || !a.Storage.Valid(n.Time) || !identity.Fresh(binding.ObservedAt.Time, binding.FreshUntil.Time, n.Time, 30*time.Second) {
+			if !planning.VerifyContextPlan(a.Plan, n.Time) || a.Plan.CompiledAt.After(n.Time) || !a.Storage.Valid(n.Time) || !n.Time.Before(binding.FreshUntil.Time) {
 				return value.ErrChanged
 			}
 			if err := current(ctx, q, p, allocation, r, r.ExpiresAt); err != nil {
@@ -617,7 +613,7 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 			if capacityUntil.InfinityModifier < 0 || capacityUntil.InfinityModifier == 0 && !n.Time.Before(capacityUntil.Time) {
 				return value.ErrChanged
 			}
-			if !n.Time.Before(controlUntil) || !planning.VerifyContextPlan(a.Plan, n.Time) || !a.Storage.Valid(n.Time) || !n.Time.Before(binding.FreshUntil.Time) || !n.Time.Before(p.ValidUntil.Time) || !n.Time.Before(allocation.ValidUntil.Time) {
+			if !planning.VerifyContextPlan(a.Plan, n.Time) || !a.Storage.Valid(n.Time) || !n.Time.Before(binding.FreshUntil.Time) || !n.Time.Before(p.ValidUntil.Time) || !n.Time.Before(allocation.ValidUntil.Time) {
 				return value.ErrChanged
 			}
 			return ctx.Err()
@@ -782,10 +778,10 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 			if capacityUntil.InfinityModifier == 0 {
 				managedUntil = capacityUntil.Time
 			}
-			bound := contextMetadataDeadline(ctx, managedUntil, auditUntil, fresh.ValidUntil, a.Eligibility.ValidUntil, a.Eligibility.VerifiedIdentity.ValidUntil, controlUntil, a.Storage.FreshUntil, binding.FreshUntil.Time, p.ValidUntil.Time, allocation.ValidUntil.Time, in.Deadline)
+			bound := contextMetadataDeadline(ctx, managedUntil, auditUntil, fresh.ValidUntil, a.Eligibility.ValidUntil, a.Eligibility.VerifiedIdentity.ValidUntil, a.Storage.FreshUntil, binding.FreshUntil.Time, p.ValidUntil.Time, allocation.ValidUntil.Time, in.Deadline)
 			requestUntil := bound
 			if group != nil && group.RequestBounds != nil {
-				requestUntil, e = recordingGroupAuditUntil(*group.RequestBounds, a, intent, auditHardUntil, controlUntil, p.ValidUntil.Time, allocation.ValidUntil.Time)
+				requestUntil, e = recordingGroupAuditUntil(*group.RequestBounds, a, intent, auditHardUntil, allocation.ValidUntil.Time, p.ValidUntil.Time, allocation.ValidUntil.Time)
 				if e != nil {
 					return e
 				}
@@ -810,9 +806,6 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 			if e = q.ReserveCaptureAudit(ctx, custodydb.ReserveCaptureAuditParams{RootID: id(s.root), CaptureID: row.ID, IntentValue: body, CaptureDigest: digest(intent), OriginalUntil: ts(bound)}); e != nil {
 				return e
 			}
-		}
-		if err = q.InsertContextControlCharge(ctx, custodydb.InsertContextControlChargeParams{CaptureID: row.ID, RootID: id(s.root), AllocationID: allocation.ID}); err != nil {
-			return err
 		}
 		if err = check(); err != nil {
 			return err

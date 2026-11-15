@@ -29,5 +29,5 @@ CREATE TRIGGER remote_capacity_delivery_notify AFTER INSERT OR UPDATE ON remote_
 
 -- +goose Down
 DROP TRIGGER remote_access_binding_delivery_notify ON remote_access_binding_delivery;
-DROP TABLE remote_capacity_delivery;
+DROP TABLE IF EXISTS remote_capacity_delivery;
 DROP FUNCTION notify_remote_delivery();

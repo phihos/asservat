@@ -10,7 +10,6 @@ import (
 
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
-	app "asservat.local/asservat/internal/application/capacity"
 	"asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/capture"
@@ -29,40 +28,9 @@ import (
 func packetLedgerFunding(t *testing.T, f *capacitySQLFixture) {
 	t.Helper()
 	bytes := (artifact.Registration{NativeLimit: artifact.RecordingNativeLimit}).ReservedBytes()
-	policy := f.template.Policies[0].Budget
-	policy.Protected.Bytes = max(policy.Protected.Bytes, bytes)
-	policy.Hard.Bytes = max(policy.Hard.Bytes, bytes)
-	policy.Context.Bytes = max(policy.Context.Bytes, bytes)
-	policy.NamespaceMaximum.Bytes = policy.NamespaceAccounts * policy.Protected.Bytes
-	f.template.Pools[0].Budget.Slots[0].Protected = policy.Protected
-	pool, err := app.CompileProtectedPoolPlan(f.template, f.template.Pools[0].Resource.Name)
-	if err != nil {
-		t.Fatal("packet original pool", err)
-	}
-	if _, err = app.CompileQualifiedRootBacking(f.qualification, pool); err != nil {
-		t.Fatal("packet original backing", err)
-	}
+	f.fund(bytes)
 }
 
-func TestPacketSummaryOriginalFunding(t *testing.T) {
-	q, source := capacityNativeQualification(t, custodyID(), custodyID(), custodyID(), custodyID(), "fixture-accounts-v1")
-	f := &capacitySQLFixture{qualification: q, template: source}
-	queryLedgerQualification(t, f)
-	old := source.Policies[0].Budget.Protected.Bytes
-	native := (artifact.Registration{NativeLimit: artifact.RecordingNativeLimit}).ReservedBytes()
-	if old >= native {
-		t.Fatal("baseline no longer demonstrates original packet funding gap", old, native)
-	}
-	packetLedgerFunding(t, f)
-	if f.template.Policies[0].Budget.Protected.Bytes != native || f.template.Policies[0].Budget.Protected.Objects != 12 {
-		t.Fatal("packet fixture changed unrelated funding")
-	}
-	t.Logf("original fixture only: 8MiB authored native reserves%dB versus pod-status%dB; preserve12objects and fund exact byte difference before installation", native, old)
-}
-
-// One pristine capacity root, real protected admission/start/publication and
-// compiled hub/key process credentials. Native Job/Pod/token/issuer/join inputs
-// are the shared lifecycle's synthetic observations, not installed evidence.
 func TestPacketSummaryLifecycleWithRealServices(t *testing.T) {
 	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects) {
 		t.Run("metadata-pcapng-compiled-lifecycle", func(t *testing.T) {
@@ -71,7 +39,7 @@ func TestPacketSummaryLifecycleWithRealServices(t *testing.T) {
 	})
 }
 
-func admitQueryLedgerPacket(t *testing.T, f *capacitySQLFixture, root app.RootConfiguration, enrollment app.Enrollment) (captureAdmissionScenario, capture.Accepted, *postgres.APIContextExecutions) {
+func admitQueryLedgerPacket(t *testing.T, f *capacitySQLFixture, root capacityRoot, enrollment capacityEnrollment) (captureAdmissionScenario, capture.Accepted, *postgres.APIContextExecutions) {
 	t.Helper()
 	s, publisher, _ := f.prepareManagedContext(t, root, enrollment, 60)
 	in := s.a.Plan.Input

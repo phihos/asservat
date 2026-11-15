@@ -26,6 +26,7 @@ import (
 	"asservat.local/asservat/internal/application/evidence"
 	executionapp "asservat.local/asservat/internal/application/execution"
 	fleetapp "asservat.local/asservat/internal/application/fleet"
+	identities "asservat.local/asservat/internal/application/identity"
 	planningapp "asservat.local/asservat/internal/application/planning"
 	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/contracts"
@@ -109,8 +110,9 @@ type publicContext struct {
 	// clusterIDs are the hub and the catalog's clusters: the installation's
 	// enrolled clusters for the ADR-237 permission impact preview.
 	clusterIDs []string
-	// fleet is the protected fleet administration; nil without Public.Fleet.
-	fleet *kube.ProtectedFleetSettings
+	// administrators reads identity.administrators (ADR-335 D14) from the
+	// identity settings; set with the identity layer.
+	administrators identities.PolicyReader
 	// processingPolicy is the capacity processing source that processing
 	// decisions bind to (ADR-210); nil without Public.Processing.
 	processingPolicy *kube.DownloadEnvironmentSource
@@ -393,17 +395,13 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
+	// A workload enrolls on its first storage read (capacity_enroll).
 	storage, err := postgres.NewContextStorageReader(ctx, sql["hub-metadata-read"], root)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
+	storage = storage.WithEnrollment(installation, out.mac)
 	processing, err := postgres.NewProcessingReads(ctx, sql["hub-metadata-read"], root, installation)
-	if err != nil {
-		return nil, mounts.ErrUnavailable
-	}
-	// ADR-200: a stale binding records a refresh demand with the
-	// capture-preview credentials; metadata reads gain no demand-writing privilege.
-	refresh, err := postgres.NewCapacityRefreshDemands(ctx, sql["capture-preview"], root)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
@@ -415,7 +413,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	out.reviews = authapp.AccessReviews{Store: reviewStore, Reviewer: queries, Now: time.Now}
 	out.investigation = captureapp.ContextInvestigation{RootID: root, InstallationID: installation, Previews: previews, Replay: admissionsSQL, Admission: admissionsSQL, Resolution: resolution,
 		ReportPreviewFailure: eventLog(os.Stderr, "public preview refused"),
-		Targets:              queries, Eligibility: eligibility, Capabilities: capabilities, Retention: out.retention, Storage: storage, Refresh: refresh, Processing: processing, Reviews: out.reviews,
+		Targets:              queries, Eligibility: eligibility, Capabilities: capabilities, Retention: out.retention, Storage: storage, Processing: processing, Reviews: out.reviews,
 		// ADR-243: libpcap only in a hub build with the libpcap tag; otherwise a stub.
 		Filters: newPublicRecorderCompiler(),
 		// ADR-283 PR 2: the target's region resolves Kubernetes peers.
@@ -500,9 +498,6 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	// Freeze a fully initialized read service, never the earlier partial case value.
 	out.grants.RawSelections = out.cases
 	out.investigation.Grants = out.grants
-	if out.fleet, err = newPublicFleet(c, observer, probe); err != nil {
-		return nil, err
-	}
 	// ADR-210: the processing source has no download paths; it is read only
 	// as the policy that names the processing operators.
 	if e := p.Processing; e != nil {

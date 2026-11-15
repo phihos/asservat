@@ -28,7 +28,6 @@ import (
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/objectstore/manifest"
 	"asservat.local/asservat/internal/adapters/postgres"
-	"asservat.local/asservat/internal/application/capacity"
 	"asservat.local/asservat/internal/application/evidence"
 	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/application/privacy"
@@ -285,7 +284,7 @@ func qualifyNativeArtifacts(t *testing.T, ctx context.Context, admin *pgxpool.Po
 	if _, err = admin.Exec(ctx, "INSERT INTO custody_pool(id,store_id,revision,valid_until,byte_limit,object_limit) VALUES($1,$2,1,$3,$4,$5)", root, storeID, valid, 2*bytesPer, 2*objectsPer); err != nil { // two attempts
 		t.Fatal(err)
 	}
-	if err = ledger.ProvisionAllocation(ctx, capacity.StorageAllocation{ID: allocation, PoolID: root, ScopeID: custodyID(), ServiceClass: "evidence", PoolRevision: 1, Revision: 1, Bytes: bytesPer, Objects: objectsPer, ValidUntil: valid}); err != nil {
+	if err = provisionAllocation(ctx, admin, testAllocation{ID: allocation, PoolID: root, ScopeID: custodyID(), ServiceClass: "evidence", PoolRevision: 1, Revision: 1, Bytes: bytesPer, Objects: objectsPer, ValidUntil: valid}); err != nil {
 		t.Fatal(err)
 	}
 	// Migration 00095: the 256 MiB attempt and its 34 temporary objects fit.
@@ -572,7 +571,7 @@ func qualifyNativeArtifacts(t *testing.T, ctx context.Context, admin *pgxpool.Po
 	maxPlan.Registration.Location = artifact.Location{ClusterID: custodyID(), ArtifactID: custodyID(), AttemptID: custodyID()}
 	maxAllocation := custodyID()
 	maxPlan.Registration.AllocationID = maxAllocation
-	if err = ledger.ProvisionAllocation(ctx, capacity.StorageAllocation{ID: maxAllocation, PoolID: root, ScopeID: custodyID(), ServiceClass: "evidence", PoolRevision: 1, Revision: 1, Bytes: bytesPer, Objects: objectsPer, ValidUntil: valid}); err != nil {
+	if err = provisionAllocation(ctx, admin, testAllocation{ID: maxAllocation, PoolID: root, ScopeID: custodyID(), ServiceClass: "evidence", PoolRevision: 1, Revision: 1, Bytes: bytesPer, Objects: objectsPer, ValidUntil: valid}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = ledger.RegisterStreaming(ctx, maxPlan); err != nil {

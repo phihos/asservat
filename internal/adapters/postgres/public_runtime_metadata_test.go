@@ -19,13 +19,15 @@ func TestPublicMetadataReadHasExactExistingReadPrivileges(t *testing.T) {
 		{"table", "permission_stream", "id", "UPDATE"},
 		{"table", "retention_source", "root_id", "UPDATE"},
 		{"function", "capacity_managed_admission_until(uuid,uuid,text,timestamptz)", "", "EXECUTE"},
+		// On-demand capture account enrollment (capacity_enroll, SECURITY DEFINER).
+		{"function", "capacity_enroll(uuid,uuid,text,text,uuid,uuid,bytea)", "", "EXECUTE"},
 	}
 	// Union of the seven pre-consolidation read facets, without redundant
 	// column SELECTs already covered by a full-table SELECT in that union.
 	for _, table := range []string{
 		"goose_db_version", "fleet_current_trust", "permission_stream", "permission_basis", "permission_assignment", "authority_audit",
 		"retention_source", "retention_checkpoint", "retention_catchup", "retention_catchup_effect", "retention_decision",
-		"context_storage_binding", "custody_allocation", "custody_pool", "context_control_pool", "context_control_account",
+		"context_storage_binding", "custody_allocation", "custody_pool",
 		"context_capture", "context_catalog", "custody_attempt", "context_verification", "context_execution", "context_case_locator",
 		"processing_root", "context_processing", "processing_rule",
 		// ADR-245: read with the permission projection that joins them.

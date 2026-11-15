@@ -436,11 +436,11 @@ func (s *ContextDeletions) FinalizeContextDeletion(ctx context.Context, r value.
 		if claimed != 1 {
 			return app.ErrFence
 		}
-		changed, err := q.ReleaseCharge(ctx, custodydb.ReleaseChargeParams{ID: allocation.ID, ChargedBytes: row.ReservedBytes})
+		released, err := q.ReleaseCharge(ctx, custodydb.ReleaseChargeParams{ID: allocation.ID, ChargedBytes: row.ReservedBytes})
 		if err != nil {
 			return err
 		}
-		if changed != 1 {
+		if !released {
 			return app.ErrUnavailable
 		}
 		if err = q.ClearReceipts(ctx, row.ID); err != nil {

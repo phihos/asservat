@@ -260,22 +260,47 @@ checksum/config: {{ $sum | sha256sum | quote }}
 {{- if ne .Values.mode "cluster" }}true{{ end -}}
 {{- end -}}
 
-{{/* The resolved `capacity` values (contracts.CapacityValues), or empty when
-     capacity is off. It runs in the hub when any capacity value is set;
-     evidenceStorage defaults to the bundled store's volume size and is
-     required for an external store. */}}
+{{/* The resolved `capacity` values (contracts.CapacityValues). Capacity
+     runs in every hub (ADR-335 D1). evidenceStorage defaults to the bundled
+     store's volume size and is required for an external store;
+     capturesPerCluster defaults to the larger of 8 and the node count. */}}
 {{- define "asservat.capacity" -}}
 {{- if include "asservat.hub" . -}}
 {{- $c := deepCopy (default dict .Values.capacity) -}}
 {{- $bundled := eq (dig "objectStore" "provider" "external" (default dict .Values.services)) "seaweedfs" -}}
-{{- if $c -}}
 {{- if not $c.evidenceStorage -}}
 {{- if not $bundled }}{{ fail "capacity.evidenceStorage is required with an external object store" }}{{ end -}}
 {{- $_ := set $c "evidenceStorage" .Values.services.objectStore.seaweedfs.persistence.size -}}
 {{- end -}}
+{{- $w := default dict $c.workload -}}
+{{- $total := include "asservat.quantityBytes" (list $c.evidenceStorage 0.0) | float64 -}}
+{{- range $v := list $c.namespaceLimit $w.share $w.limit -}}
+{{- if $v }}{{ $_ := include "asservat.quantityBytes" (list $v $total) }}{{ end -}}
+{{- end -}}
+{{- if and $w.share $w.limit -}}
+{{- if gt (include "asservat.quantityBytes" (list $w.share $total) | float64) (include "asservat.quantityBytes" (list $w.limit $total) | float64) -}}
+{{- fail "capacity.workload.share must not exceed capacity.workload.limit" -}}
+{{- end -}}
+{{- end -}}
+{{- if not $c.capturesPerCluster -}}
+{{- $nodes := lookup "v1" "Node" "" "" -}}
+{{- $_ := set $c "capturesPerCluster" (max 8 (len (default list (dig "items" list (default dict $nodes))))) -}}
+{{- end -}}
 {{- toJson $c -}}
 {{- end -}}
 {{- end -}}
+
+{{/* Bytes of a Kubernetes quantity or a percentage of the given total
+     (list value total), as a float. */}}
+{{- define "asservat.quantityBytes" -}}
+{{- $v := toString (index . 0) -}}
+{{- if not (regexMatch "^[0-9]+(\\.[0-9]+)?(%|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$" $v) -}}
+{{- fail (printf "capacity size %q is not a quantity (for example 16Gi) or a percentage" $v) -}}
+{{- end -}}
+{{- $n := regexFind "^[0-9.]+" $v | float64 -}}
+{{- $unit := trimPrefix (regexFind "^[0-9.]+" $v) $v -}}
+{{- $m := get (dict "" 1.0 "%" (divf (index . 1) 100.0) "k" 1e3 "M" 1e6 "G" 1e9 "T" 1e12 "P" 1e15 "Ki" 1024.0 "Mi" 1048576.0 "Gi" 1073741824.0 "Ti" 1099511627776.0 "Pi" 1125899906842624.0 "E" 1e18 "Ei" 1152921504606846976.0) $unit -}}
+{{- mulf $n $m -}}
 {{- end -}}
 
 {{/* ADR-334: the audience of the connector's ServiceAccount token, the hub

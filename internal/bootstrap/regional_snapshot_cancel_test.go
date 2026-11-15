@@ -77,7 +77,7 @@ func TestRegionalSnapshotCancellationWaitsForRealWriterAndStoredWins(t *testing.
 			var holder *ConnectorRecordings
 			var source *packetSource
 			delivered := make(chan error, 1)
-			n, actualSource, clock, x := sourceSnapshotPipelineFixture(t, func(ctx context.Context, _ string, r collector.PacketResult, native []byte) error {
+			n, actualSource, clock, x := sourceSnapshotPipelineFixture(t, func(ctx context.Context, r collector.PacketResult, native []byte) error {
 				b := source.meter.Permit().Binding
 				err := holder.DeliverPacket(ctx, collector.Identity{NodeUID: b.NodeUID, BootID: b.BootID, PodUID: b.CollectorPodUID, Epoch: b.CollectorEpoch}, r, bytes.NewReader(native))
 				delivered <- err
@@ -117,7 +117,7 @@ func TestRegionalSnapshotCancellationWaitsForRealWriterAndStoredWins(t *testing.
 				t.Fatal(err)
 			}
 			work := collector.Work{ID: x.Request.SnapshotID, Sequence: 1, Kind: collector.WorkPacketSourceSnapshot, NotAfter: x.Request.StartBy, Snapshot: &x}
-			if r := n.decide(t.Context(), x.Binding.CollectorEpoch, work); r.Outcome != collector.OutcomeAccepted {
+			if r := n.decide(t.Context(), work); r.Outcome != collector.OutcomeAccepted {
 				t.Fatal(r)
 			}
 			select {

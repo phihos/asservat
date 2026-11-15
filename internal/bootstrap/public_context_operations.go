@@ -274,11 +274,8 @@ func composePublicShares(c PublicContextOperationsConfig, s PublicContextOperati
 		return nil, presentation.ErrOperationsConfiguration
 	}
 	service := sharing.Service{RootID: c.RootID, InstallationID: c.InstallationID, Routes: pc.caseRoutes, Permissions: pc.permissions, Catalog: pc.catalog, Store: pc.shares, Policies: pc.shares, NewID: c.NewID, Now: c.Now}
-	// ADR-238: the protected fleet administration's operators may revoke any
-	// share; without it only creators and current managers revoke.
-	if pc.fleet != nil {
-		service.Administration = pc.fleet
-	}
+	// ADR-238: identity.administrators may revoke any share.
+	service.Administration = pc.administrators
 	return presentation.NewShareOperations(c.PublicOrigin, c.Now, c.NewID, service)
 }
 
@@ -295,23 +292,19 @@ func composePublicAccess(c PublicContextOperationsConfig, s PublicContextOperati
 }
 
 // composePublicAccessPreview composes the ADR-237 browser-only
-// preview_access_change operation for the fleet operators that the protected
-// fleet administration names (ADR-329: no delegated previewers); the same
-// permission projection and clock as explain_access feed the real
-// evaluator. Nil without fleet administration.
+// preview_access_change operation for identity.administrators (ADR-329: no
+// delegated previewers); the same permission projection and clock as
+// explain_access feed the real evaluator.
 func composePublicAccessPreview(c PublicContextOperationsConfig, s PublicContextOperationServices, pc *publicContext) (*presentation.AccessPreviewOperations, error) {
-	if pc == nil || pc.fleet == nil {
-		return nil, nil
-	}
 	_, err := composePublicContextUseCases(c, s)
-	if err != nil || pc.permissions == nil || pc.fleet == nil || len(pc.clusterIDs) == 0 {
+	if err != nil || pc == nil || pc.permissions == nil || pc.administrators == nil || len(pc.clusterIDs) == 0 {
 		return nil, presentation.ErrOperationsConfiguration
 	}
 	decoder, err := kube.NewAccessBindingSpecDecoder()
 	if err != nil {
 		return nil, presentation.ErrOperationsConfiguration
 	}
-	service := authapp.AccessPreviewer{InstallationID: c.InstallationID, Administration: pc.fleet, Projections: pc.permissions, Decoder: decoder, Clusters: slices.Clone(pc.clusterIDs), Now: c.Now}
+	service := authapp.AccessPreviewer{InstallationID: c.InstallationID, Administrators: pc.administrators, Projections: pc.permissions, Decoder: decoder, Clusters: slices.Clone(pc.clusterIDs), Now: c.Now}
 	return presentation.NewAccessPreviewOperations(c.PublicOrigin, c.Now, c.NewID, service)
 }
 

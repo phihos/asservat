@@ -107,7 +107,7 @@ func (s *ProjectionKeys) resolveComparisonKeyChild(ctx context.Context, peer val
 		if e != nil || count != 1 {
 			return auth.ErrKeyDenied
 		}
-		trust, _, e := currentTrust(ctx, tx, s.scope.InstallationID)
+		trust, e := currentTrust(ctx, tx, s.scope.InstallationID)
 		if e != nil {
 			return e
 		}

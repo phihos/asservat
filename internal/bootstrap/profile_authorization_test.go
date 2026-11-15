@@ -153,7 +153,7 @@ func TestNodeProfileAuthorizationDeliveryOwnsItsPrivateCopy(t *testing.T) {
 	entered, release := make(chan struct{}), make(chan struct{})
 	var calls atomic.Int32
 	var acquired []byte
-	n := &nodeProfiles{identity: func() collector.Identity { return q.node }, now: func() time.Time { return now }, budget: func() *collector.Budget { return budget }, budgetMu: &budgetMu,
+	n := &nodeProfiles{now: func() time.Time { return now }, budget: func() *collector.Budget { return budget }, budgetMu: &budgetMu,
 		acquire: func(_ context.Context, p collector.ProfileCapture, authorization []byte, w io.Writer) (execution.GoProfileOutcome, error) {
 			calls.Add(1)
 			close(entered)
@@ -164,7 +164,7 @@ func TestNodeProfileAuthorizationDeliveryOwnsItsPrivateCopy(t *testing.T) {
 			acquired = authorization
 			_, _ = w.Write([]byte("native"))
 			return execution.GoProfileOutcome{Format: artifact.PprofFormat, StartedAt: now, CompletedAt: now, MayHaveStarted: true, ResponseComplete: true, NativeBytes: 6}, nil
-		}, upload: func(_ context.Context, _ string, result collector.ProfileResult, _ io.Reader) error {
+		}, upload: func(_ context.Context, result collector.ProfileResult, _ io.Reader) error {
 			raw, _ := json.Marshal(result)
 			if bytes.Contains(raw, []byte("receive-only-sentinel")) {
 				t.Error("credential escaped into result provenance")
@@ -172,7 +172,7 @@ func TestNodeProfileAuthorizationDeliveryOwnsItsPrivateCopy(t *testing.T) {
 			return nil
 		}}
 	private := []byte("Bearer receive-only-sentinel")
-	if receipt := n.start(t.Context(), q.node.Epoch, work, private, false); receipt.Outcome != collector.OutcomeAccepted {
+	if receipt := n.start(t.Context(), work, private, false); receipt.Outcome != collector.OutcomeAccepted {
 		t.Fatal("private work refused", receipt)
 	}
 	<-entered
@@ -182,7 +182,7 @@ func TestNodeProfileAuthorizationDeliveryOwnsItsPrivateCopy(t *testing.T) {
 	if calls.Load() != 1 || !bytes.Equal(acquired, make([]byte, len(acquired))) {
 		t.Fatal("private acquisition copy was retained after completion")
 	}
-	if receipt := n.start(t.Context(), q.node.Epoch, work, []byte("Bearer receive-only-sentinel"), false); receipt.Outcome == collector.OutcomeAccepted || calls.Load() != 1 {
+	if receipt := n.start(t.Context(), work, []byte("Bearer receive-only-sentinel"), false); receipt.Outcome == collector.OutcomeAccepted || calls.Load() != 1 {
 		t.Fatal("private replay started another acquisition")
 	}
 }

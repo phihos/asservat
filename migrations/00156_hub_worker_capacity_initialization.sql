@@ -1,4 +1,7 @@
 -- +goose Up
+-- No Down: 00172 removes this capacity code, so a downgrade probe reapplies
+-- this migration. Function bodies are not checked against the removed tables.
+SET LOCAL check_function_bodies = off;
 -- Helm-native installation (decision 6): the hub-worker initializes the
 -- capacity root after its first permission acceptance with its own capacity
 -- login, instead of an installer holding the SQL administrator credential.
@@ -9,7 +12,7 @@
 -- that runtime processes read by permission root at startup).
 
 -- +goose StatementBegin
-CREATE FUNCTION initialize_capacity_source(r uuid,cluster uuid,namespace_uid text,guard bytea,account_version text,q jsonb) RETURNS text
+CREATE OR REPLACE FUNCTION initialize_capacity_source(r uuid,cluster uuid,namespace_uid text,guard bytea,account_version text,q jsonb) RETURNS text
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
 DECLARE s public.capacity_source;installation uuid;prefix text;until_at timestamptz;valid boolean;o oid;i integer;
  purposes text[]:=ARRAY['capacity','capacity-capture','capacity-profile-read','capture-admit','capture-journal','capture-ack','capture-cleanup','capture-verifier','capture-finalizer','capture-intent-read'];
@@ -54,13 +57,9 @@ END $$;
 REVOKE ALL ON FUNCTION initialize_capacity_source(uuid,uuid,text,bytea,text,jsonb) FROM PUBLIC;
 
 -- +goose StatementBegin
-CREATE FUNCTION read_capacity_qualification(r uuid) RETURNS jsonb
+CREATE OR REPLACE FUNCTION read_capacity_qualification(r uuid) RETURNS jsonb
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
  SELECT qualification FROM public.capacity_source WHERE root_id=r
 $$;
 -- +goose StatementEnd
 REVOKE ALL ON FUNCTION read_capacity_qualification(uuid) FROM PUBLIC;
-
--- +goose Down
-DROP FUNCTION read_capacity_qualification(uuid);
-DROP FUNCTION initialize_capacity_source(uuid,uuid,text,bytea,text,jsonb);

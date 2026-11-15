@@ -1,9 +1,10 @@
 package node
 
 import (
-	deliveryapp "asservat.local/asservat/internal/application/delivery"
 	"encoding/hex"
 	"time"
+
+	deliveryapp "asservat.local/asservat/internal/application/delivery"
 
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/collector"

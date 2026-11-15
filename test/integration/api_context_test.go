@@ -10,7 +10,6 @@ import (
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
-	"asservat.local/asservat/internal/application/capacity"
 	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -177,7 +176,7 @@ func qualifyAPIContextAcquisition(t *testing.T, ctx context.Context, f fixture, 
 	if _, err := adminSQL.Exec(ctx, "INSERT INTO custody_pool(id,store_id,revision,valid_until,byte_limit,object_limit) VALUES($1,$2,1,$3,$4,4)", poolID, e.Registration.StoreID, now.Add(time.Hour), e.Registration.ReservedBytes()); err != nil {
 		t.Fatal(err)
 	}
-	if err := ledger.ProvisionAllocation(ctx, capacity.StorageAllocation{ID: e.Registration.AllocationID, PoolID: poolID, ScopeID: custodyID(), ServiceClass: "context", PoolRevision: 1, Revision: 1, Bytes: e.Registration.ReservedBytes(), Objects: 4, ValidUntil: now.Add(time.Hour)}); err != nil {
+	if err := provisionAllocation(ctx, adminSQL, testAllocation{ID: e.Registration.AllocationID, PoolID: poolID, ScopeID: custodyID(), ServiceClass: "context", PoolRevision: 1, Revision: 1, Bytes: e.Registration.ReservedBytes(), Objects: 4, ValidUntil: now.Add(time.Hour)}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := ledger.Register(ctx, e.Registration); err != nil {

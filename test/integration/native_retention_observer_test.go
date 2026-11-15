@@ -25,12 +25,21 @@ type nativeFixtureSourceOwner struct {
 	close     func()
 	workerMu  sync.Mutex
 	worker    func(context.Context) error
+	// held excludes refreshes while a test deliberately changes an observed
+	// source (for example a suspended permission stream) and restores it.
+	held sync.Mutex
 }
 
 func newNativeFixtureSourceOwner(t *testing.T, parent context.Context, base func(context.Context) error) *nativeFixtureSourceOwner {
 	t.Helper()
 	o := &nativeFixtureSourceOwner{}
 	o.ctx, o.close = startNativeFixtureObservations(t, parent, func(call context.Context) error {
+		// Skip the tick while a test holds the sources, so a hold never
+		// consumes this tick's five-second budget.
+		if !o.held.TryLock() {
+			return nil
+		}
+		defer o.held.Unlock()
 		if err := base(call); err != nil {
 			return err
 		}
@@ -47,6 +56,12 @@ func newNativeFixtureSourceOwner(t *testing.T, parent context.Context, base func
 	return o
 }
 func (o *nativeFixtureSourceOwner) Close() { o.closeOnce.Do(o.close) }
+
+// Hold pauses source refreshes until the returned function runs.
+func (o *nativeFixtureSourceOwner) Hold() func() {
+	o.held.Lock()
+	return o.held.Unlock
+}
 func (o *nativeFixtureSourceOwner) SetWorker(t *testing.T, observe func(context.Context) error) {
 	t.Helper()
 	o.workerMu.Lock()

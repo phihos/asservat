@@ -50,21 +50,16 @@ func TestProfileSummaryQueryLedgerWithRealPostgres(t *testing.T) {
 }
 
 func TestContextQueryLedgerOriginalQualification(t *testing.T) {
-	q, source := capacityNativeQualification(t, custodyID(), custodyID(), custodyID(), custodyID(), "fixture-accounts-v1")
-	f := &capacitySQLFixture{qualification: q, template: source}
+	f := &capacitySQLFixture{qualification: capacityNativeQualification(t, custodyID(), custodyID(), custodyID(), "fixture-accounts-v1")}
 	queryLedgerQualification(t, f)
-	pool, err := app.CompileProtectedPoolPlan(source, source.Pools[0].Resource.Name)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err = app.CompileQualifiedRootBacking(f.qualification, pool); err != nil {
-		t.Fatal("complete original normal-audit and query reservation", err)
+	if !app.ValidateRootBackingInput(f.qualification.RootBacking) {
+		t.Fatal("complete original normal-audit and query reservation")
 	}
 }
 
 type queryLedgerFixture struct {
 	base                 *capacitySQLFixture
-	enrolled             app.Enrollment
+	enrolled             capacityEnrollment
 	current              *postgres.SharedContextQueryPlans
 	policies             *authapp.ContextProjectionPolicies
 	profile              value.ContextQueryResourceProfile
@@ -74,11 +69,8 @@ type queryLedgerFixture struct {
 	scenario             captureAdmissionScenario
 	published            artifact.PublishedContext
 	audit                audit.AcceptedCapacityAuditProfiles
-	root                 app.RootConfiguration
+	root                 capacityRoot
 	initialResultGrantID string
-	// workloadGone stops refreshing the workload's capacity observation, as
-	// after the source workload's deletion (maintainer decision 2026-10-23).
-	workloadGone bool
 }
 
 func (f *queryLedgerFixture) currentProfile() value.ContextQueryResourceProfile {
@@ -90,12 +82,6 @@ func (f *queryLedgerFixture) currentProfile() value.ContextQueryResourceProfile 
 // producer refreshes the same accepted workload; query charges never refill.
 func (f *queryLedgerFixture) refresh(t *testing.T) {
 	t.Helper()
-	if !f.workloadGone {
-		o := f.base.workloadObservation(t, 0)
-		if err := f.base.enrollments.RefreshCapacityEnrollment(f.base.ctx, o, f.enrolled); err != nil {
-			t.Fatal("current managed workload", err)
-		}
-	}
 	if f.workerObserver != nil {
 		if err := f.workerObserver.Observe(f.base.ctx); err != nil {
 			t.Fatal("current accepted shared worker", err)
@@ -174,28 +160,7 @@ func withProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *p
 			p.Close()
 		}
 	}()
-	if _, err := f.initializeCapacity(ctx); err != nil {
-		t.Fatal("actual original ledger qualification setup", err)
-	}
-	f.open(t)
-	o := f.rootObservation(t)
-	root, err := f.roots.ReserveCapacityRoot(ctx, o)
-	if err != nil {
-		t.Fatal("reserve original capacity root", err)
-	}
-	root, err = f.captureRoots.BackCapacityRoot(ctx, o, root)
-	if err != nil {
-		t.Fatal("back original capture root", err)
-	}
-	root, err = f.roots.PublishCapacityRoot(ctx, o, root)
-	if err != nil || !root.AdmissionReady(time.Now()) {
-		t.Fatal("publish actual capacity root", err)
-	}
-	coordinator := app.EnrollmentCoordinator{Store: f.enrollments, Capture: f.captureEnrollments, Accounts: f.accounts, Now: time.Now}
-	enrolled, err := coordinator.Reconcile(ctx, f.workloadObservation(t, 0))
-	if err != nil {
-		t.Fatal("actual managed workload", err)
-	}
+	root, enrolled := f.setup(t)
 	// The existing capacity role published the anchor/allocation in its own
 	// transactions. There is no query producer or extra source-observation claim.
 	query := &queryLedgerFixture{base: f, enrolled: enrolled, root: root}
@@ -220,6 +185,7 @@ func withProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *p
 	profile.StoreCredentialSecret, profile.StoreCredentialSecretUID = "query-fixture-store", custodyID()
 	query.workerProfile = profile
 	epoch := fixtureIssuerEpoch(t, ctx, f.admin, f.input.InstallationID)
+	var err error
 	query.workerConfig, _, query.workerObserver, _ = acceptedWorkerConfiguration(t, ctx, f.fixturePool, f.store, f.keys, profile, epoch)
 	path := value.ContextProjectionPath{Purpose: value.ContextProjectionPurpose, ID: f.qualification.ContextQuery.Profile.ID, TargetClusterID: scope.ClusterID, StoreID: f.qualification.Backends[0].EvidenceStoreID, StorageRegion: "local", AcquisitionClusterID: profile.ClusterID, AcquisitionRegion: "local", ConnectorClusterID: profile.ClusterID, ConnectorRegion: "local", HubClusterID: scope.ClusterID, HubRegion: "local", WorkerConfiguration: profile.Configuration, HubConfiguration: profile.Configuration}
 	query.profile, err = f.qualification.ContextQuery.Profile.WithSharedPath(path)
@@ -242,7 +208,7 @@ func withProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *p
 
 // Produce and independently publish an actual managed context. No download
 // session, download policy or download authority supplies query admission.
-func publishQueryLedgerContext(t *testing.T, f *capacitySQLFixture, root app.RootConfiguration, enrollment app.Enrollment, profileSource bool, legacyTiming ...bool) (captureAdmissionScenario, artifact.PublishedContext) {
+func publishQueryLedgerContext(t *testing.T, f *capacitySQLFixture, root capacityRoot, enrollment capacityEnrollment, profileSource bool, legacyTiming ...bool) (captureAdmissionScenario, artifact.PublishedContext) {
 	t.Helper()
 	var s captureAdmissionScenario
 	var accepted capture.Accepted

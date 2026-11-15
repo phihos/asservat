@@ -13,8 +13,6 @@ func publicRuntimeConnectorGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		// under the cluster its ServiceAccount token was attributed to.
 		for _, privilege := range []string{"SELECT", "INSERT", "UPDATE"} {
 			out = append(out, publicRuntimeGrant{"table", "remote_access_binding_delivery", "", privilege})
-			// ADR-331: likewise its capacity observation.
-			out = append(out, publicRuntimeGrant{"table", "remote_capacity_delivery", "", privilege})
 		}
 	case "connector-owner-read":
 		// ADR-172: the hub-api owner registry reads, for owner discovery and

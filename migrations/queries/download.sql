@@ -1,12 +1,12 @@
 -- name: InsertDownloadAllocation :one
-INSERT INTO download_allocation(id,root_id,cluster_id,namespace_uid,workload_uid,output_limit,read_limit,session_limit,valid_until)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *;
+INSERT INTO download_allocation(id,root_id,cluster_id,namespace_uid,workload_uid,output_limit,read_limit,valid_until)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *;
 
 -- name: LockDownloadAllocation :one
 SELECT * FROM download_allocation WHERE id=$1 AND root_id=$2 FOR UPDATE;
 
 -- name: ChargeDownloadAllocation :execrows
-UPDATE download_allocation SET reserved_output=reserved_output+$3,reserved_read=reserved_read+$4,reserved_sessions=reserved_sessions+1 WHERE id=$1 AND root_id=$2;
+UPDATE download_allocation SET reserved_output=reserved_output+$3,reserved_read=reserved_read+$4 WHERE id=$1 AND root_id=$2;
 
 -- name: FindDownloadSession :one
 SELECT * FROM artifact_download WHERE root_id=$1 AND actor_key=$2 AND idempotency_digest=$3;

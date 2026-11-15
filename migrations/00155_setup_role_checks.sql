@@ -1,11 +1,14 @@
 -- +goose Up
+SET LOCAL check_function_bodies = off;
 -- Helm-native installation: runtime roles are created and reconciled by
 -- `asservat setup` from the compiled grant plan, without role comments,
 -- installer claims or a first-installation activation record. The paired
 -- capacity setup and the audit-profile reader therefore check the role
 -- name, attributes and OID only.
 
+-- 00172 drops capacity_source; a re-Up after a downgrade probe skips these.
 -- +goose StatementBegin
+DO $f$ BEGIN IF to_regclass('public.capacity_source') IS NOT NULL THEN EXECUTE $q$
 CREATE OR REPLACE FUNCTION capacity_audit_reader_pin_valid(s public.capacity_source) RETURNS boolean
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
 DECLARE p pg_catalog.pg_roles;
@@ -14,9 +17,7 @@ BEGIN
  RETURN p.oid<>10 AND p.rolcanlogin AND NOT p.rolinherit AND NOT p.rolsuper AND NOT p.rolcreatedb AND NOT p.rolcreaterole AND NOT p.rolreplication AND NOT p.rolbypassrls;
 EXCEPTION WHEN data_exception OR no_data_found OR too_many_rows THEN RETURN false;
 END $$;
--- +goose StatementEnd
-
--- +goose StatementBegin
+$q$; EXECUTE $q$
 CREATE OR REPLACE FUNCTION capacity_setup_original_valid(s public.capacity_source) RETURNS boolean
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
 DECLARE x jsonb;receipt jsonb;
@@ -38,4 +39,5 @@ BEGIN
  RETURN actual=ARRAY[s.writer_role,s.capture_role,s.audit_reader_role,a.admission_role,a.journal_role,a.acknowledge_role,a.cleanup_role,a.verifier_role,a.finalizer_role,a.reader_role] AND a.source_role=s.capture_role;
 EXCEPTION WHEN data_exception OR no_data_found OR too_many_rows THEN RETURN false;
 END $$;
+$q$; END IF; END $f$;
 -- +goose StatementEnd

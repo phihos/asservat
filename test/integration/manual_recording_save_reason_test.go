@@ -21,7 +21,6 @@ import (
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
 	auditapp "asservat.local/asservat/internal/application/audit"
-	"asservat.local/asservat/internal/application/capacity"
 	captureapp "asservat.local/asservat/internal/application/capture"
 	planningapp "asservat.local/asservat/internal/application/planning"
 	auditvalue "asservat.local/asservat/internal/domain/audit"
@@ -43,25 +42,6 @@ func configureManualReasonCapacity(f *capacitySQLFixture) {
 	in.Capture.Policy.BackupHorizonSeconds = 5
 	in.Capture.Policy.CleanupBudgetSeconds = 5
 	in.Capture.Policy.ProofWindowSeconds = 5
-}
-
-func TestManualRecordingSaveReasonShortProfileCompiles(t *testing.T) {
-	root, installation, cluster, control := custodyID(), custodyID(), custodyID(), custodyID()
-	q, template := capacityNativeQualification(t, root, installation, cluster, control, "synthetic-reason-account")
-	f := &capacitySQLFixture{qualification: q, template: template}
-	configureManualSourceCapacity(f)
-	configureManualReasonCapacity(f)
-	plan, err := capacity.CompileProtectedPoolPlan(f.template, f.template.Pools[0].Budget.Name)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err = capacity.CompileQualifiedRootBacking(f.qualification, plan); err != nil {
-		t.Fatal("short preaccepted profile invalid", err)
-	}
-	in := f.qualification.RootBacking
-	if in.Capture.RetainedSeconds <= 2*in.Capture.Policy.BackupHorizonSeconds+3*in.Capture.Policy.CleanupBudgetSeconds+in.Capture.Policy.ProofWindowSeconds+30 {
-		t.Fatal("profile cannot contain original writer interval")
-	}
 }
 
 type reasonFixtureIdentity struct{ who identity.Identity }

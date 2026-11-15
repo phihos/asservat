@@ -115,7 +115,7 @@ func qualifyDownloadStopLifecycle(t *testing.T, ctx context.Context, admin *pgxp
 				}
 				return a
 			}
-			allocation := artifact.DownloadAllocation{ID: custodyID(), RootID: root, ClusterID: scope.ClusterID, NamespaceUID: scope.NamespaceUID, WorkloadUID: scope.WorkloadUID, OutputLimit: 1 << 20, ReadLimit: 128 << 20, SessionLimit: 4, ValidUntil: deadline.Add(2 * time.Minute)}
+			allocation := artifact.DownloadAllocation{ID: custodyID(), RootID: root, ClusterID: scope.ClusterID, NamespaceUID: scope.NamespaceUID, WorkloadUID: scope.WorkloadUID, OutputLimit: 1 << 20, ReadLimit: 128 << 20, ValidUntil: deadline.Add(2 * time.Minute)}
 			if e = config.BindDownloadAllocation(ctx, allocation); e != nil {
 				t.Fatal(e)
 			}
@@ -392,12 +392,9 @@ func qualifyDownloadStopLifecycle(t *testing.T, ctx context.Context, admin *pgxp
 					t.Fatal("retire", e)
 				}
 			}
-			var charged, reserved int64
+			var charged int64
 			if e := admin.QueryRow(ctx, "SELECT charged FROM download_stop_backing WHERE allocation_id=$1", g.allocation.ID).Scan(&charged); e != nil || g.horizon == 0 && charged != 1 || g.horizon > 0 && charged != 4 {
 				t.Fatal("history prematurely refunded", charged, e)
-			}
-			if e := admin.QueryRow(ctx, "SELECT reserved_sessions FROM download_allocation WHERE id=$1", g.allocation.ID).Scan(&reserved); e != nil || reserved != 4 {
-				t.Fatal("retirement changed parent download accounting", reserved, e)
 			}
 			for _, denial := range []struct {
 				p   *pgxpool.Pool

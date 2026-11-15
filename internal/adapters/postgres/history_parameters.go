@@ -77,7 +77,7 @@ func (s *HistoryParametersLedger) transaction(ctx context.Context, f func(*custo
 		return value.ErrUnavailable
 	}
 	return s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		trust, _, e := currentTrust(ctx, q, s.installation)
+		trust, e := currentTrust(ctx, q, s.installation)
 		if e != nil {
 			return e
 		}
@@ -167,12 +167,6 @@ func (s *HistoryParametersLedger) ReserveHistoryParameters(ctx context.Context, 
 		if err != nil {
 			return err
 		}
-		// The capacity constraint validates this exact accepted-history association
-		// after its existing row is inserted in the same transaction. No authority
-		// is inferred from the act of deferral. Ordinary attempts keep their guard.
-		if err = q.DeferHistoryCapacityAdmission(ctx); err != nil {
-			return err
-		}
 		if _, err = registerLocked(ctx, q, pool, allocation, normalized(e.Registration)); err != nil {
 			return err
 		}
@@ -251,9 +245,6 @@ func (s *HistoryParametersLedger) ReserveHistoryParameters(ctx context.Context, 
 		encoded, _ := json.Marshal(e)
 		retained, _ := json.Marshal(retention)
 		if err = q.InsertHistoryParameter(ctx, custodydb.InsertHistoryParameterParams{RootID: id(s.root), CaptureID: id(e.CaptureID), AttemptID: id(e.Registration.Location.AttemptID), SelectorKey: e.SelectorKey[:], SettingsKey: e.SettingsKey[:], MacVersion: e.MACVersion, ExpectationJson: encoded, RetentionJson: retained, SummaryExpiresAt: ts(in.SummaryExpiresAt), CreatedAt: c.CreatedAt}); err != nil {
-			return err
-		}
-		if err = q.CheckHistoryCapacityAdmission(ctx); err != nil {
 			return err
 		}
 		now, err := q.CurrentTime(ctx)
@@ -557,11 +548,11 @@ func (s *HistoryParametersLedger) FinishHistoryDeletion(ctx context.Context, a v
 		if changed != 1 {
 			return custodyprivacy.ErrFence
 		}
-		changed, err = q.ReleaseCharge(ctx, custodydb.ReleaseChargeParams{ID: allocation.ID, ChargedBytes: row.ReservedBytes})
+		released, err := q.ReleaseCharge(ctx, custodydb.ReleaseChargeParams{ID: allocation.ID, ChargedBytes: row.ReservedBytes})
 		if err != nil {
 			return err
 		}
-		if changed != 1 {
+		if !released {
 			return custodyprivacy.ErrUnavailable
 		}
 		if err = q.ClearReceipts(ctx, row.ID); err != nil {

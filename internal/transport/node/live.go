@@ -1,9 +1,6 @@
 package node
 
 import (
-	"asservat.local/asservat/internal/contracts"
-	"asservat.local/asservat/internal/domain/collector"
-	v "asservat.local/asservat/internal/domain/live"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -11,10 +8,14 @@ import (
 	"io"
 	"net/http"
 	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/collector"
+	v "asservat.local/asservat/internal/domain/live"
 )
 
-func WireLiveReply(epoch string, r v.NodeReply) (contracts.NodeLiveResult, error) {
-	out := contracts.NodeLiveResult{Format: contracts.NodeLiveFormat, Epoch: epoch, WorkID: r.WorkID, SourceID: r.SourceID, Fence: r.Fence, BootID: r.BootID, Clock: r.Clock, Sample: r.Sample, Sequence: r.Position.Sequence, Lost: r.Position.Lost, ClockLost: r.Position.ClockLost, Unsupported: r.Position.Unsupported, SensorLost: r.Position.SensorLost, Dropped: r.Dropped, Examined: r.Examined, Bytes: r.Bytes, Rows: make([]contracts.NodeLiveRow, len(r.Rows))}
+func WireLiveReply(r v.NodeReply) (contracts.NodeLiveResult, error) {
+	out := contracts.NodeLiveResult{Format: contracts.NodeLiveFormat, WorkID: r.WorkID, SourceID: r.SourceID, Fence: r.Fence, BootID: r.BootID, Clock: r.Clock, Sample: r.Sample, Sequence: r.Position.Sequence, Lost: r.Position.Lost, ClockLost: r.Position.ClockLost, Unsupported: r.Position.Unsupported, SensorLost: r.Position.SensorLost, Dropped: r.Dropped, Examined: r.Examined, Bytes: r.Bytes, Rows: make([]contracts.NodeLiveRow, len(r.Rows))}
 	if r.Manual != nil && r.ObservedManual != nil {
 		return contracts.NodeLiveResult{}, ErrRefused
 	}
@@ -108,8 +109,8 @@ func DomainLiveReply(w contracts.NodeLiveResult) (v.NodeReply, error) {
 	}
 	return out, nil
 }
-func (c *Client) UploadLive(ctx context.Context, epoch string, r v.NodeReply) error {
-	wire, e := WireLiveReply(epoch, r)
+func (c *Client) UploadLive(ctx context.Context, r v.NodeReply) error {
+	wire, e := WireLiveReply(r)
 	if e != nil {
 		return e
 	}
@@ -118,20 +119,23 @@ func (c *Client) UploadLive(ctx context.Context, epoch string, r v.NodeReply) er
 			clear(r.Row)
 		}
 	}()
-	raw, code, e := c.post(ctx, contracts.NodeLivePath, 5*time.Second, wire)
-	clear(raw)
+	b, e := json.Marshal(wire)
+	defer clear(b)
 	if e != nil {
-		return e
+		return ErrRefused
 	}
-	if code != http.StatusNoContent {
-		return ErrUnavailable
-	}
-	return nil
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	return c.send(ctx, contracts.NodeLivePath, "application/json", int64(len(b)), bytes.NewReader(b))
 }
 func (h *Handler) live(w http.ResponseWriter, r *http.Request) {
 	peer, e := h.peer(r)
 	if e != nil {
-		w.WriteHeader(status(e))
+		fail(w, e)
+		return
+	}
+	if r.Header.Get("Content-Type") != "application/json" {
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	wire, e := contracts.DecodeNodeLiveResult(http.MaxBytesReader(w, r.Body, 24<<10))
@@ -149,8 +153,8 @@ func (h *Handler) live(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	if e = h.channel.DeliverLive(r.Context(), peer, wire.Epoch, reply); e != nil {
-		w.WriteHeader(status(e))
+	if e = h.channel.DeliverLive(r.Context(), peer, reply); e != nil {
+		fail(w, e)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

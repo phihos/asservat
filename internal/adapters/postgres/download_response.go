@@ -18,7 +18,7 @@ var _ evidence.DownloadResponses = (*Downloads)(nil)
 var _ evidence.DownloadWindowAcknowledgements = (*Downloads)(nil)
 
 func downloadControl(r custodydb.DownloadControlAllocation) artifact.DownloadControlAllocation {
-	return artifact.DownloadControlAllocation{ID: uid(r.ID), RootID: uid(r.RootID), AuditStoreID: uid(r.AuditStoreID), ResponseLimit: r.ResponseLimit, WindowLimit: r.WindowLimit, AuditByteLimit: r.AuditByteLimit, ValidUntil: r.ValidUntil.Time, AuditWriteUntil: r.AuditWriteUntil.Time}
+	return artifact.DownloadControlAllocation{ID: uid(r.ID), RootID: uid(r.RootID), AuditStoreID: uid(r.AuditStoreID), WindowLimit: r.WindowLimit, AuditByteLimit: r.AuditByteLimit, ValidUntil: r.ValidUntil.Time, AuditWriteUntil: r.AuditWriteUntil.Time}
 }
 
 // This configuration facet uses separately scoped installation credentials.
@@ -40,7 +40,7 @@ func (s *Downloads) BindDownloadControlAllocation(ctx context.Context, a artifac
 		old, e := q.ReadDownloadControlAllocation(ctx, custodydb.ReadDownloadControlAllocationParams{ID: id(a.ID), RootID: id(s.root)})
 		if e == nil {
 			v := downloadControl(old)
-			if v.ID != a.ID || v.RootID != a.RootID || v.AuditStoreID != a.AuditStoreID || v.ResponseLimit != a.ResponseLimit || v.WindowLimit != a.WindowLimit || v.AuditByteLimit != a.AuditByteLimit || !v.ValidUntil.Equal(a.ValidUntil) || !v.AuditWriteUntil.Equal(a.AuditWriteUntil) {
+			if v.ID != a.ID || v.RootID != a.RootID || v.AuditStoreID != a.AuditStoreID || v.WindowLimit != a.WindowLimit || v.AuditByteLimit != a.AuditByteLimit || !v.ValidUntil.Equal(a.ValidUntil) || !v.AuditWriteUntil.Equal(a.AuditWriteUntil) {
 				return privacy.ErrConflict
 			}
 			return nil
@@ -52,10 +52,10 @@ func (s *Downloads) BindDownloadControlAllocation(ctx context.Context, a artifac
 		if e != nil {
 			return e
 		}
-		if !n.Time.Before(a.ValidUntil) || a.ValidUntil.After(parent.ValidUntil.Time) || a.WindowLimit > (parent.OutputLimit-1)/artifact.DownloadWindowBytes+1+a.ResponseLimit {
+		if !n.Time.Before(a.ValidUntil) || a.ValidUntil.After(parent.ValidUntil.Time) || a.WindowLimit > (parent.OutputLimit-1)/artifact.DownloadWindowBytes+1+artifact.MaxDownloadRequests {
 			return artifact.ErrInvalid
 		}
-		_, e = q.InsertDownloadControlAllocation(ctx, custodydb.InsertDownloadControlAllocationParams{ID: id(a.ID), RootID: id(s.root), AuditStoreID: id(a.AuditStoreID), ResponseLimit: a.ResponseLimit, WindowLimit: a.WindowLimit, AuditByteLimit: a.AuditByteLimit, ValidUntil: ts(a.ValidUntil), AuditWriteUntil: ts(a.AuditWriteUntil)})
+		_, e = q.InsertDownloadControlAllocation(ctx, custodydb.InsertDownloadControlAllocationParams{ID: id(a.ID), RootID: id(s.root), AuditStoreID: id(a.AuditStoreID), WindowLimit: a.WindowLimit, AuditByteLimit: a.AuditByteLimit, ValidUntil: ts(a.ValidUntil), AuditWriteUntil: ts(a.AuditWriteUntil)})
 		return e
 	})
 }

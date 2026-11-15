@@ -38,21 +38,13 @@ func comparisonLedgerQualification(q *capacityapp.ContextQueryQualification) {
 }
 
 func TestProfileComparisonLedgerOriginalQualification(t *testing.T) {
-	qualified, source := capacityNativeQualification(t, custodyID(), custodyID(), custodyID(), custodyID(), "fixture-accounts-v1")
-	f := &capacitySQLFixture{qualification: qualified, template: source}
+	f := &capacitySQLFixture{qualification: capacityNativeQualification(t, custodyID(), custodyID(), custodyID(), "fixture-accounts-v1")}
 	queryLedgerQualification(t, f)
 	comparisonLedgerQualification(f.qualification.ContextQuery)
 	var err error
 	f.qualification.ContextQuery.Envelope, err = f.qualification.ContextQuery.Required()
-	if err != nil || !f.qualification.Valid() {
+	if err != nil || !f.qualification.Valid() || !capacityapp.ValidateRootBackingInput(f.qualification.RootBacking) {
 		t.Fatal("combined original comparison SQL fixture qualification", err)
-	}
-	pool, err := capacityapp.CompileProtectedPoolPlan(source, source.Pools[0].Resource.Name)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err = capacityapp.CompileQualifiedRootBacking(f.qualification, pool); err != nil {
-		t.Fatal("combined comparison resource reservation", err)
 	}
 }
 
@@ -363,10 +355,7 @@ func qualifyComparisonCrossAllocationSQL(t *testing.T, f *queryLedgerFixture, or
 		}
 		return b
 	}
-	coordinator := capacityapp.EnrollmentCoordinator{Store: f.base.enrollments, Capture: f.base.captureEnrollments, Accounts: f.base.accounts, Now: time.Now}
-	if _, e := coordinator.Reconcile(ctx, f.base.workloadObservation(t, 1)); e != nil {
-		t.Fatal("second real capacity enrollment", e)
-	}
+	f.base.enroll(t, f.base.input.ControlClusterID, f.base.namespace, f.base.workloads[1])
 	var cluster, namespace, workload string
 	if e := admin.QueryRow(ctx, "SELECT cluster_id::text,namespace_uid,workload_uid FROM context_query_allocation WHERE root_id=$1 AND id<>$2", original.Scope.RootID, original.Plan.AllocationID).Scan(&cluster, &namespace, &workload); e != nil {
 		t.Fatal("second actual query allocation", e)

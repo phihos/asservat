@@ -18,10 +18,6 @@ UPDATE policy_recording_source dst SET slot_released_at=clock_timestamp() WHERE 
 SELECT * FROM policy_recording_source WHERE root_id=$1 AND policy_uid=$2 AND slot_released_at IS NULL ORDER BY action_id,pod_uid LIMIT 1025;
 -- name: CountPolicyRecordingSources :one
 SELECT count(*) AS source_count,COALESCE(sum(bytes_per_second),0)::bigint AS input_rate FROM policy_recording_source WHERE root_id=$1 AND allocation_id=$2 AND slot_released_at IS NULL;
--- name: ReadPolicySourceResourceSelection :one
-SELECT s.accepted_revision,s.accepted_snapshot,s.accepted_digest,s.observed_at,s.fresh_until,s.suspended,w.policy_uid
-FROM capacity_source s JOIN capacity_workload w ON w.root_id=s.root_id
-WHERE s.root_id=$1 AND w.allocation_id=$2 AND w.ready_at IS NOT NULL AND w.mutation_xid IS NULL FOR SHARE OF s,w;
 -- name: EndInactivePolicyRecordingSources :many
 UPDATE policy_recording_source dst SET ended_at=clock_timestamp() WHERE (dst.root_id,dst.id) IN (
  SELECT s.root_id,s.id FROM policy_recording_source s WHERE s.root_id=$1 AND s.ended_at IS NULL AND (s.hard_until<=clock_timestamp() OR NOT EXISTS (

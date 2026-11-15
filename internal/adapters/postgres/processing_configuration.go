@@ -52,7 +52,7 @@ func (s *ProcessingConfiguration) AcceptCurrent(ctx context.Context, source valu
 		return value.ErrUnavailable
 	}
 	e = s.ledger.transaction(call, func(q *custodydb.Queries) error {
-		trust, _, e := currentTrust(call, q, s.accepted.InstallationID)
+		trust, e := currentTrust(call, q, s.accepted.InstallationID)
 		if e != nil {
 			return e
 		}

@@ -53,23 +53,7 @@ func logsLedgerFunding(t *testing.T, f *capacitySQLFixture, group ...bool) {
 		in.ProcessingState.MaxCaptures = in.Accounts * records
 		in.ProcessingState.BackupBytes, in.ProcessingState.WALBytes, _ = in.ProcessingState.RequiredBytes()
 	}
-	b := f.template.Policies[0].Budget
-	b.Protected.Bytes = max(b.Protected.Bytes, native)
-	b.Protected.Objects = max(b.Protected.Objects, objects)
-	b.Hard.Objects = max(b.Hard.Objects, objects)
-	b.Context.Objects = max(b.Context.Objects, objects)
-	b.NamespaceMaximum.Objects = b.NamespaceAccounts * b.Protected.Objects
-	b.Hard.Bytes = max(b.Hard.Bytes, native)
-	b.Context.Bytes = max(b.Context.Bytes, native)
-	b.NamespaceMaximum.Bytes = b.NamespaceAccounts * b.Protected.Bytes
-	f.template.Pools[0].Budget.Slots[0].Protected = b.Protected
-	pool, err := capacityapp.CompileProtectedPoolPlan(f.template, f.template.Pools[0].Resource.Name)
-	if err != nil {
-		t.Fatal("logs original pool", err)
-	}
-	if _, err = capacityapp.CompileQualifiedRootBacking(f.qualification, pool); err != nil {
-		t.Fatal("logs original backing", err)
-	}
+	f.fund(native)
 }
 func logsQuerySyntheticNative(t *testing.T, e artifact.ContextExpectation, from, until time.Time) []byte {
 	t.Helper()
@@ -96,33 +80,6 @@ func logsQuerySyntheticNative(t *testing.T, e artifact.ContextExpectation, from,
 	}
 	return b.Bytes()
 }
-func TestLogsQueryOriginalFunding(t *testing.T) {
-	q, s := capacityNativeQualification(t, custodyID(), custodyID(), custodyID(), custodyID(), "fixture-accounts-v1")
-	f := &capacitySQLFixture{qualification: q, template: s}
-	queryLedgerQualification(t, f)
-	before := f.template.Policies[0].Budget.Protected.Bytes
-	logsLedgerFunding(t, f)
-	registration := artifact.Registration{NativeLimit: artifact.LogNativeLimit}
-	stream := artifact.StreamingPlan{Registration: registration}
-	needed := registration.ReservedBytes() + stream.TemporaryBytes()
-	backing, err := capacityapp.CompileContextProtocolBacking(f.template.Policies[0].Budget.Context, f.qualification.RootBacking.ContextHistory)
-	if err != nil || backing.Evidence.Bytes < needed || backing.Evidence.Objects < int64(5+stream.PartLimit()) {
-		t.Fatalf("actual compiled logs evidence backing bytes=%d objects=%d records=%d protocol=%q needsbytes=%d objects=%d err=%v", backing.Evidence.Bytes, backing.Evidence.Objects, backing.Records, f.qualification.RootBacking.ContextHistory.ProfileProtocol, needed, 5+stream.PartLimit(), err)
-	}
-	want := needed
-	if before >= want || f.template.Policies[0].Budget.Protected.Bytes != want || f.template.Policies[0].Budget.Protected.Objects != int64(5+stream.PartLimit()) {
-		t.Fatal("logs original funding", before, want)
-	}
-	t.Logf("original logs fixture64MiB authored native reserves%dB; no post-admission top-up; query20units/2reads is configured candidate", want)
-	logsLedgerFunding(t, f, true)
-	wantGroup := 2*want + 2*(artifact.Registration{NativeLimit: artifact.RecordingNativeLimit}).ReservedBytes()
-	wantObjects := 2*int64(5+stream.PartLimit()) + 8
-	if f.template.Policies[0].Budget.Protected.Bytes != wantGroup || f.template.Policies[0].Budget.Protected.Objects != wantObjects {
-		t.Fatal("mixed logs original funding", f.template.Policies[0].Budget.Protected, wantGroup)
-	}
-	t.Logf("mixed fixture original setup+logs+two metadata children reserves%dB/%dobjects before installation", wantGroup, wantObjects)
-}
-
 func assertLogsOriginalCollectCutoff(t *testing.T, ctx context.Context, store *postgres.APIContextExecutions, e artifact.ContextExpectation) {
 	t.Helper()
 	_, end, err := e.Logs.Window(e.TriggeredAt)
@@ -159,7 +116,7 @@ func publishQueryLedgerLogs(t *testing.T, f *capacitySQLFixture, s captureAdmiss
 func logsExistingCapturePublisher(t *testing.T, f *queryLedgerFixture) auditapp.CaptureOperationPublication {
 	t.Helper()
 	b := f.base
-	material := b.setup.mac
+	material := b.installed.mac
 	mac, err := auditapp.NewOperationMAC(material.InputVersion, material.InputKey, material.AccountVersion, material.AccountKey)
 	if err != nil {
 		t.Fatal(err)

@@ -144,7 +144,7 @@ func resolveContextRequest(ctx context.Context, l *Ledger, root, installation st
 	in.Identity.Scopes = slices.Clone(in.Identity.Scopes)
 	err := l.transaction(ctx, func(q *custodydb.Queries) error {
 		out = value.ContextRequestDisposition{}
-		trust, _, err := currentTrust(ctx, q, installation)
+		trust, err := currentTrust(ctx, q, installation)
 		if err != nil {
 			return err
 		}

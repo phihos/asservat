@@ -111,7 +111,7 @@ func (s *OperationJournal) ReserveOperation(ctx context.Context, in audit.Operat
 		return out, app.ErrUnavailable
 	}
 	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		trust, _, e := currentTrust(ctx, q, s.installation)
+		trust, e := currentTrust(ctx, q, s.installation)
 		if e != nil {
 			return e
 		}

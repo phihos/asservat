@@ -147,7 +147,7 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 			*pair.dst = v
 		}
 		e := p.Expectation
-		f.allocation = artifact.DownloadAllocation{ID: custodyID(), RootID: s.a.RootID, ClusterID: e.Registration.Location.ClusterID, NamespaceUID: e.NamespaceUID, WorkloadUID: e.WorkloadUID, OutputLimit: 1 << 20, ReadLimit: 256 << 20, SessionLimit: 64, ValidUntil: time.Now().UTC().Add(30 * time.Minute).Truncate(time.Microsecond)}
+		f.allocation = artifact.DownloadAllocation{ID: custodyID(), RootID: s.a.RootID, ClusterID: e.Registration.Location.ClusterID, NamespaceUID: e.NamespaceUID, WorkloadUID: e.WorkloadUID, OutputLimit: 1 << 20, ReadLimit: 256 << 20, ValidUntil: time.Now().UTC().Add(30 * time.Minute).Truncate(time.Microsecond)}
 		if err := f.config.BindDownloadAllocation(ctx, f.allocation); err != nil {
 			t.Fatal(err)
 		}
@@ -761,7 +761,7 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 					service.CurrentAuthority = f.gate
 					content = &nativeContextFixture{mode: mode, dispatcher: service, workers: ledger, configuration: configurationReader}
 				}
-				qualifyNativeExchange(t, ctx, nativeExchangeFixture{renewOnly: mode == "native-owner-renewal", topologySource: f.s.retention.topology.source, content: content, worker: w, enrollment: enrollment, published: f.p, runtime: f.runtime, audit: f.audit, config: f.config, allocation: f.allocation, gate: f.gate, guards: f.guards, authority: f.authority, store: store, keys: keys, keyScope: nativeScope, keyBackend: nativeBackend, admin: admin, poolFor: poolFor})
+				qualifyNativeExchange(t, ctx, nativeExchangeFixture{sources: f.s.nativeSources, renewOnly: mode == "native-owner-renewal", topologySource: f.s.retention.topology.source, content: content, worker: w, enrollment: enrollment, published: f.p, runtime: f.runtime, audit: f.audit, config: f.config, allocation: f.allocation, gate: f.gate, guards: f.guards, authority: f.authority, store: store, keys: keys, keyScope: nativeScope, keyBackend: nativeBackend, admin: admin, poolFor: poolFor})
 				return
 			}
 			if mode == "enrollment-audit-versions" {
@@ -1014,9 +1014,9 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 				t.Fatal("duplicate session")
 			}
 		}
-		var count, output, read int64
-		if err := admin.QueryRow(ctx, "SELECT reserved_sessions,reserved_output,reserved_read FROM download_allocation WHERE id=$1", f.allocation.ID).Scan(&count, &output, &read); err != nil || count != 1 || output != r.Session.OutputLimit || read != r.Session.ReadLimit {
-			t.Fatal(count, output, read, err)
+		var output, read int64
+		if err := admin.QueryRow(ctx, "SELECT reserved_output,reserved_read FROM download_allocation WHERE id=$1", f.allocation.ID).Scan(&output, &read); err != nil || output != r.Session.OutputLimit || read != r.Session.ReadLimit {
+			t.Fatal(output, read, err)
 		}
 		again, err := postgres.NewDownloads(ctx, runtimePool, f.s.a.RootID, f.guards)
 		if err != nil {
@@ -1645,7 +1645,6 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 		small.ID = custodyID()
 		small.OutputLimit = 8192
 		small.ReadLimit = 8 << 20
-		small.SessionLimit = 1
 		if err := f.config.BindDownloadAllocation(ctx, small); err != nil {
 			t.Fatal(err)
 		}

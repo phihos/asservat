@@ -248,7 +248,6 @@ var publicRuntimeHubExtensionGrantTable = map[string][]publicRuntimeGrant{
 		{"table", "download_allocation", "", "SELECT"},
 		{"table", "download_allocation", "reserved_output", "UPDATE"},
 		{"table", "download_allocation", "reserved_read", "UPDATE"},
-		{"table", "download_allocation", "reserved_sessions", "UPDATE"},
 		{"table", "download_batch", "", "SELECT"},
 		{"table", "download_batch", "generation", "INSERT"},
 		{"table", "download_batch", "id", "INSERT"},
@@ -644,7 +643,6 @@ var publicRuntimeHubExtensionGrantTable = map[string][]publicRuntimeGrant{
 	"regional-capacity": {
 		{"schema", "public", "", "USAGE"},
 		{"table", "goose_db_version", "", "SELECT"},
-		{"function", "qualify_capacity_cluster(uuid,uuid,uuid,uuid,bytea,jsonb)", "", "EXECUTE"},
 	},
 	// ADR-210: a privacy operator's processing decisions, exactly the
 	// component role processing_decision_runtime: decision and rule rows and

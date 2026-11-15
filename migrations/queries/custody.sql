@@ -14,12 +14,10 @@ SELECT * FROM custody_copy WHERE attempt_id = $1 ORDER BY role;
 SELECT clock_timestamp()::timestamptz;
 -- name: Overdue :one
 SELECT EXISTS (SELECT 1 FROM custody_attempt WHERE allocation_id = $1 AND state <> 'deleted' AND effective_delete_by <= $2);
--- name: Charge :execrows
-UPDATE custody_allocation SET charged_bytes = charged_bytes + $2, charged_objects = charged_objects + 4
-WHERE id = $1 AND $2 <= byte_limit - charged_bytes AND 4 <= object_limit - charged_objects;
--- name: ReleaseCharge :execrows
-UPDATE custody_allocation SET charged_bytes = charged_bytes - $2, charged_objects = charged_objects - 4
-WHERE id = $1 AND charged_bytes >= $2 AND charged_objects >= 4;
+-- name: Charge :one
+SELECT capacity_charge(sqlc.arg(id)::uuid,sqlc.arg(charged_bytes)::bigint,4)::boolean AS charged;
+-- name: ReleaseCharge :one
+SELECT capacity_release(sqlc.arg(id)::uuid,sqlc.arg(charged_bytes)::bigint,4)::boolean AS released;
 -- name: InsertAttempt :exec
 INSERT INTO custody_attempt (id,cluster_id,artifact_id,allocation_id,request_digest,pool_revision,allocation_revision,native_limit,reserved_bytes,anchor_at,write_until,expires_at,delete_by)
 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13);

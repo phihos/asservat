@@ -37,7 +37,7 @@ func (s *Policies) AttachPolicyGrant(ctx context.Context, in app.PolicyGrantAtta
 	digest := app.PolicyGrantAttachmentDigest(in)
 	var replay bool
 	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		trust, _, err := currentTrust(ctx, q, s.installation)
+		trust, err := currentTrust(ctx, q, s.installation)
 		if err != nil {
 			return err
 		}

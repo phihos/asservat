@@ -10,7 +10,6 @@ import (
 
 	"asservat.local/asservat/internal/adapters/postgres"
 	auditapp "asservat.local/asservat/internal/application/audit"
-	capacity "asservat.local/asservat/internal/application/capacity"
 	captureapp "asservat.local/asservat/internal/application/capture"
 	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -187,36 +186,9 @@ func qualifyManualRecordingSave(t *testing.T, ctx context.Context, f *capacitySQ
 	t.Logf("manual existing source: one policy execution, reserved output=%d; no detector occurrence, no observation refill or inherited sharing; policy grant present=%t; identity/target/packet/clock facts synthetic", reserved, grant != "")
 }
 
-// Declare adequate fixture backing before initialization; production limits do
-// not change. The configured8MiB ceiling is a bound, not measured output.
+// Fund three authored8MiB recording outputs per workload before setup.
 func configureManualSourceCapacity(f *capacitySQLFixture) {
-	unit := (artifact.Registration{NativeLimit: artifact.RecordingNativeLimit}).ReservedBytes()
-	protected := capacity.BudgetAmount{Bytes: 3 * unit, Objects: 12}
-	policy := f.template.Policies[0].Budget
-	policy.Protected, policy.Hard, policy.Context = protected, protected, protected
-	policy.NamespaceMaximum = capacity.BudgetAmount{Bytes: capacityNativeAccounts * protected.Bytes, Objects: capacityNativeAccounts * protected.Objects}
-	pool := f.template.Pools[0].Budget
-	pool.Slots[0].Protected = protected
-	pool.Burst = capacity.BudgetAmount{Bytes: unit, Objects: 4}
-
-}
-
-func TestManualRecordingSaveFixtureFundsActualOutputCeiling(t *testing.T) {
-	root, installation, cluster, control, account := custodyID(), custodyID(), custodyID(), custodyID(), "synthetic-account-v1"
-	q, template := capacityNativeQualification(t, root, installation, cluster, control, account)
-	f := &capacitySQLFixture{qualification: q, template: template}
-	configureManualSourceCapacity(f)
-	plan, err := capacity.CompileProtectedPoolPlan(f.template, f.template.Pools[0].Budget.Name)
-	if err != nil {
-		t.Fatal("manual fixture protected pool", err)
-	}
-	if _, err = capacity.CompileQualifiedRootBacking(q, plan); err != nil {
-		t.Fatal("manual fixture backing cannot cover authored8MiB output", err)
-	}
-	unit := (artifact.Registration{NativeLimit: artifact.RecordingNativeLimit}).ReservedBytes()
-	if f.template.Policies[0].Budget.Protected.Bytes != 3*unit || f.template.Policies[0].Budget.Hard.Bytes != 3*unit || f.template.Policies[0].Budget.Context.Bytes != 3*unit {
-		t.Fatal("fixture changed record count or underfunded output")
-	}
+	f.fund(3 * (artifact.Registration{NativeLimit: artifact.RecordingNativeLimit}).ReservedBytes())
 }
 
 // Real SQL accounting and the real current policy attachment, not a source-row

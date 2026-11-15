@@ -107,7 +107,7 @@ func TestConnectorConfigIsClosed(t *testing.T) {
 		"no concurrency":           func(c *contracts.ConnectorConfig) { c.Executor.Concurrency = 0 },
 		"alertmanager credentials": func(c *contracts.ConnectorConfig) { c.Executor.Alertmanager = "http://user:pass@alerts.invalid" },
 		"collector in connector namespace": func(c *contracts.ConnectorConfig) {
-			c.Collector = &contracts.RegionalCollector{Namespace: c.Namespace, DaemonSet: "node", ServiceAccount: "node", ListenerSecret: "nodes", RootConfigMap: "nodes", ServerName: "nodes.svc"}
+			c.Collector = &contracts.RegionalCollector{Namespace: c.Namespace, ServiceAccount: "node", ListenerSecret: "nodes", RootConfigMap: "nodes", ServerName: "nodes.svc"}
 		},
 	} {
 		c := connectorTestConfig()

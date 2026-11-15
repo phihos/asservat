@@ -26,9 +26,8 @@ BUNDLED = {
     "mode": "combined",
     "image": {"repository": "registry.example/asservat", "digest": "sha256:" + "a" * 64},
     "origin": "https://asservat.example.test",
-    "identity": {"eligibleGroups": ["00000000-0000-4000-8000-000000000001"], "processingOperators": [{"clientID": "asservat-console", "issuer": "https://login.example.org/realms/asservat", "kind": "User", "id": "0f03f92a-6920-47cd-85d5-26080d3571d5"}]},
+    "identity": {"eligibleGroups": ["00000000-0000-4000-8000-000000000001"], "administrators": {"groups": ["asservat-admins"]}, "processingOperators": [{"clientID": "asservat-console", "issuer": "https://login.example.org/realms/asservat", "kind": "User", "id": "0f03f92a-6920-47cd-85d5-26080d3571d5"}]},
     "exposure": {"tlsSecret": "asservat-public-tls"},
-    "fleet": {"issuer": "https://id.example.test/realms/asservat", "clients": ["asservat-console"], "deliveryProfiles": ["regional-installer"]},
     "capacity": {"workload": {"share": "1Gi"}},
     "federation": {"connector": CONNECTOR},
     "retention": {"purposeRef": "context-trial"},
@@ -44,7 +43,7 @@ BUNDLED = {
 # contracts.HubAPIConfig / HubAPIPublic JSON tags.
 CONFIG_KEYS = {"format", "name", "namespace", "postgres", "objectStore", "openBao", "connections", "concurrency", "observation", "native", "public", "connectorTokens"}
 PUBLIC_KEYS = {"origin", "browserAudience", "processing", "captureHistory", "standby", "captures", "previewSeconds", "downloadPlan", "proxyTLS", "version",
-               "operationConcurrency", "mcpPerIdentity", "downloadConcurrency", "downloadsPerIdentity", "downloadMaxSeconds", "operationAudit", "fleet",
+               "operationConcurrency", "mcpPerIdentity", "downloadConcurrency", "downloadsPerIdentity", "downloadMaxSeconds", "operationAudit",
                "regionalOffer"}
 # Files the loader and runtime open under each mount.
 INPUT_FILES = {"sql-owner-runtime.json", "owner-pod.token", "kube-observer.token", "provider-auth.token", "provider-audit-storage.json",
@@ -114,7 +113,7 @@ class HubAPI(unittest.TestCase):
         self.assertEqual(config["native"], {"workerNamespaces": ["asservat-downloads"], "retentionTopologies": []})
         self.assertEqual(config["observation"], {"localCapacity": {"keys": ["asservat.io/evidence"]}})
         public = config["public"]
-        self.assertEqual((public["origin"], public["browserAudience"], public["fleet"]), ("https://asservat.example.test", "asservat-console", {}))
+        self.assertEqual((public["origin"], public["browserAudience"]), ("https://asservat.example.test", "asservat-console"))
         self.assertTrue(public["processing"])
         self.assertEqual(public["regionalOffer"]["federation"], f"https://asservat-federation.{NS}.svc:9446")
         self.assertEqual(public["regionalOffer"]["connector"], CONNECTOR)
@@ -129,6 +128,7 @@ class HubAPI(unittest.TestCase):
         self.assertNotIn("sessionEpoch", browser)
         identity = json.loads(o[("ConfigMap", NS, "asservat-identity-settings")]["data"]["identity.json"])
         self.assertEqual(identity["clients"], [{"id": "asservat-console", "kind": "human", "classQualified": True}])
+        self.assertEqual(identity["administrators"], {"groups": ["asservat-admins"]})
         env = json.loads(o[("ConfigMap", NS, "asservat-download-environment")]["data"]["download-environment.json"])
         self.assertEqual((env["permittedRegions"], env["clients"][0]["purposes"]), (["us-east-1"], ["context-trial"]))
         self.assertFalse({"rootID", "installationID", "recoveryEpoch"} & set(env))
@@ -174,7 +174,7 @@ class HubAPI(unittest.TestCase):
         self.assertFalse([r for r in rules if "update" in r["verbs"] and r.get("resourceNames") != ["asservat-regional-offer"]])
         self.assertFalse([r for r in rules if "secrets" in r["resources"]])
         names = {n for r in rules for n in r.get("resourceNames", [])}
-        self.assertLessEqual({"asservat-owner-source", "asservat-browser-settings", "asservat-identity-settings", "asservat-cluster-catalog", "asservat-download-environment", "asservat-processing-source", "asservat-fleet"}, names)
+        self.assertLessEqual({"asservat-owner-source", "asservat-browser-settings", "asservat-identity-settings", "asservat-cluster-catalog", "asservat-download-environment", "asservat-processing-source"}, names)
         self.assertEqual(o[("ClusterRole", "", NS + "-asservat-hub-api")]["rules"][0]["resourceNames"], [NS, "asservat-downloads"])
         owner = o[("Service", NS, "asservat-hub-api-owner")]["spec"]
         self.assertEqual((owner["clusterIP"], {(p["name"], p["port"], p["targetPort"]) for p in owner["ports"]}), ("None", {("owner", 9443, 9443), ("observation", 9444, 9444), ("public", 9445, 9445)}))
@@ -207,7 +207,7 @@ class HubAPI(unittest.TestCase):
         # ADR-334: the combined-mode connector's projected token names the
         # in-cluster federation URL, which the federation accepts with its
         # own ServiceAccount as the local connector.
-        o = render(merge(BUNDLED, {"fleet": {"issuer": "", "deliveryProfiles": []}}))
+        o = render(BUNDLED)
         spec = o[("Deployment", NS, "asservat-connector")]["spec"]["template"]["spec"]
         tokens = {s["serviceAccountToken"]["path"]: s["serviceAccountToken"].get("audience") for v in spec["volumes"] if "projected" in v for s in v["projected"]["sources"] if "serviceAccountToken" in s}
         audience = "https://asservat-federation.asservat-system.svc:9446"

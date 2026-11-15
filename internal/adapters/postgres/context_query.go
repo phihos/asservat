@@ -132,7 +132,7 @@ func (s *ContextQueries) current(ctx context.Context, query value.ContextQuery, 
 		})
 	}, func(callback context.Context) error {
 		return s.ledger.transaction(callback, func(tx *custodydb.Queries) error {
-			trust, _, e := currentTrust(callback, tx, s.installation)
+			trust, e := currentTrust(callback, tx, s.installation)
 			if e != nil {
 				return queryRefusal("trust", e)
 			}
@@ -323,7 +323,7 @@ func (s *ContextQueries) AdmitQuery(ctx context.Context, q value.ContextQuery, r
 		if e != nil {
 			return e
 		}
-		trust, _, e := currentTrust(ctx, tx, s.installation)
+		trust, e := currentTrust(ctx, tx, s.installation)
 		if e != nil {
 			return e
 		}

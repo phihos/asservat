@@ -1,0 +1,2 @@
+{{- /* Values of removed features fail with a pointer to their replacement. */ -}}
+{{- if hasKey .Values "fleet" }}{{ fail "fleet was removed; list administrators under identity.administrators" }}{{ end -}}

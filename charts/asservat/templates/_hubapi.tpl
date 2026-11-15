@@ -37,16 +37,6 @@
 {{- end -}}
 {{- end -}}
 
-{{/* fleet.deliveryProfiles (JSON list). mode=combined and clusters default
-     to ["local"]: the hub-api issues the local connector's and the remote
-     clusters' bootstraps itself through the fleet issuance with the first
-     profile. */}}
-{{- define "asservat.hubApi.deliveryProfiles" -}}
-{{- $default := list -}}
-{{- if include "asservat.hubApi.offer" . }}{{ $default = list "local" }}{{ end -}}
-{{- toJson (default $default .Values.fleet.deliveryProfiles) -}}
-{{- end -}}
-
 {{/* True when the regional connector shares this release (mode=combined). */}}
 {{- define "asservat.hubApi.combined" -}}
 {{- if eq .Values.mode "combined" }}true{{ end -}}
@@ -64,7 +54,7 @@
 {{- $out := list -}}
 {{- range .Values.clusters -}}
 {{- if not (regexMatch "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" (toString .clusterID)) }}{{ fail (printf "clusters[%s].clusterID must be a lowercase UUID (uuidgen)" (toString .name)) }}{{ end -}}
-{{- $out = append $out (dict "name" (required "clusters[].name is required" .name) "clusterID" .clusterID "namespace" (default $root.Release.Namespace .namespace) "standby" (int (default 2 .standby)) "captures" (int (dig "capturesPerCluster" 8 (default dict $root.Values.capacity)))) -}}
+{{- $out = append $out (dict "name" (required "clusters[].name is required" .name) "clusterID" .clusterID "namespace" (default $root.Release.Namespace .namespace) "standby" (int (default 2 .standby)) "captures" (int (dig "capturesPerCluster" 8 (fromJson (include "asservat.capacity" $root))))) -}}
 {{- end -}}
 {{- toJson $out -}}
 {{- end -}}
@@ -96,7 +86,7 @@
 {{- $u := $h.public -}}
 {{- $id := fromJson (include "asservat.hubApi.identity" .) -}}
 {{- $pub := dict "origin" .Values.origin "browserAudience" $id.browserAudience "version" (.Chart.AppVersion | default .Chart.Version) -}}
-{{- $_ := set $pub "captures" (int (dig "capturesPerCluster" 8 (default dict .Values.capacity))) -}}
+{{- $_ := set $pub "captures" (int (dig "capturesPerCluster" 8 (fromJson (include "asservat.capacity" .)))) -}}
 {{- with dig "workload" "dump" nil (default dict .Values.capacity) }}{{ $_ := set $pub "workloadRate" . }}{{ end -}}
 {{- range $key := list "standby" "previewSeconds" "operationConcurrency" "mcpPerIdentity" "downloadConcurrency" "downloadsPerIdentity" "downloadMaxSeconds" "operationAudit" "downloadPlan" -}}
 {{- $_ := set $pub $key (index $u $key) -}}
@@ -104,9 +94,6 @@
 {{- if or $u.processing (include "asservat.capacity" .) }}{{ $_ := set $pub "processing" true }}{{ end -}}
 {{- with .Values.captureHistory }}{{ $_ := set $pub "captureHistory" . }}{{ end -}}
 {{- if eq .Values.exposure.tls.mode "proxy" }}{{ $_ := set $pub "proxyTLS" true }}{{ end -}}
-{{- if or .Values.fleet.issuer (include "asservat.hubApi.offer" .) -}}
-{{- $_ := set $pub "fleet" (dict) -}}
-{{- end -}}
 {{- if include "asservat.hubApi.offer" . -}}
 {{- $fed := include "asservat.fullname" (list . "federation") -}}
 {{- $connector := required "mode=combined and clusters require federation.connector (the regional offer's connector limits)" (dig "connector" nil (default dict .Values.federation)) -}}
@@ -150,6 +137,9 @@
 {{- $clients := default (list (dict "id" $id.clientID "kind" "human" "classQualified" true)) $i.clients -}}
 {{- $out := dict "schemaVersion" "identity-settings/v1" "revision" (int .Release.Revision) "issuer" $id.issuer "clients" $clients "eligibleSubjects" (default list $i.eligibleSubjects) "eligibleGroups" (default list $i.eligibleGroups) "groupsAtIssueQualified" true "groupMaxAgeSeconds" (int $i.groupMaxAgeSeconds) -}}
 {{- with $i.approvals }}{{ $_ := set $out "approvals" . }}{{ end -}}
+{{- $admins := dict -}}
+{{- with $i.administrators }}{{ with .groups }}{{ $_ := set $admins "groups" . }}{{ end }}{{ with .subjects }}{{ $_ := set $admins "subjects" . }}{{ end }}{{ end -}}
+{{- if $admins }}{{ $_ := set $out "administrators" $admins }}{{ end -}}
 {{- toJson $out -}}
 {{- end -}}
 

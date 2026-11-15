@@ -40,6 +40,11 @@ identity:
   eligibleSubjects: []
   eligibleGroups: []
   groupMaxAgeSeconds: 300
+  # Installation administrators (ADR-335 D14) by group name or token subject:
+  # configuration previews and share administration.
+  administrators:
+    groups: []
+    subjects: []
   maxLifetimeSeconds: 28800
   maxLogins: 64
   maxSessions: 256
@@ -92,19 +97,6 @@ exposure:
     parentRefs: []
     annotations: {}
 
-# Fleet enrollment identity and bounds.
-fleet:
-  issuer: ""
-  clients: []
-  subjects: []
-  groups: []
-  deliveryProfiles: []
-  # Raised to the hub-issued slots (the combined-mode connector plus one per
-  # clusters[] entry) when lower.
-  maxActiveBootstraps: 1
-  maxBootstrapHistory: 16
-  maxClusters: 1
-
 # Workload clusters joined with `mode: cluster` (hub or combined releases).
 # Their connectors authenticate with their own ServiceAccount tokens
 # (ADR-334); the hub verifies them against the issuer below. The hub-api
@@ -129,18 +121,19 @@ remote:
   keyService: ""   # https://host:port -> <name>-key-service:9447
   objectStore: ""  # https://host:port -> the evidence object store
 
-# Evidence capacity (specs/capacity.md). It is on when any value is set;
-# every field is optional and changes apply on helm upgrade. Namespaces labelled asservat.io/evidence: disabled, system
+# Evidence capacity (specs/capacity.md). Every field is optional and
+# changes apply on helm upgrade; an external object store needs
+# evidenceStorage. Namespaces labelled asservat.io/evidence: disabled, system
 # namespaces and the release namespace take no part.
 capacity: {}
 #   evidenceStorage: 128Gi     # default: the bundled store's volume size;
 #                              # required for an external store
 #   storageAssurance: bestEffort   # or qualifiedReservedBackend
-#   capturesPerCluster: 8      # concurrent captures in each cluster
+#   capturesPerCluster: 8      # default: larger of 8 and the node count
 #   namespaceLimit: 25%        # default: no namespace cap
 #   workload:
 #     share: 16Gi              # protected per workload; default 1/8 of the rest
-#     limit: 10%               # protected share plus burst
+#     limit: 10%               # protected share plus burst; at least the share
 #     dump: {burst: 1, minimumIntervalSeconds: 900}
 #     maxConcurrentExpensive: 1
 #     onFull: RejectNewExpensive   # or DeleteOldestEligibleInAccount
@@ -283,8 +276,6 @@ hub:
       limits: {cpu: 500m, memory: 256Mi}
     nodeSelector: {}
     tolerations: []
-    # Audience of the projected cluster-observation token (with capacity).
-    clusterObservationAudience: asservat-cluster-observation
     # The permission child always runs: the hub cluster's AccessBindings in
     # every namespace (written by namespace RBAC, ADR-329), PermissionSources
     # of the release namespace, the browser/identity settings projections

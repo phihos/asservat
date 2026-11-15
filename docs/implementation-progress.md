@@ -44,6 +44,28 @@ issuance problem outside these limits, still open; no second workload
 cluster was installed. Older installations keep their finite stored
 backing and must be reinstalled.
 
+## Capacity accounts (2026-11-15)
+
+Branch `clean/capacity-2`, migration 00172. Capacity is on in every hub
+(ADR-335 D1). The hub-worker applies the Helm `capacity` values once at
+start (`capacity_apply`); a workload's account is created on demand in the
+storage read that first needs it (`capacity_enroll`, hub-metadata-read
+login). Rows carry the standing date `capacity_standing()` instead of a
+renewed admission window. Charges grow an account's limit as burst within
+its hard limit, the namespace limit and the pool, and release shrinks it
+back to the protected share. Removed: migration 00054's source, plan,
+renewal and refresh-demand tables and loops, connector capacity delivery,
+cluster-observation capacity purposes, the context-control record counter
+and the download session/response counters (bytes stay bounded).
+`capturesPerCluster` defaults to max(8, node count).
+
+Gaps: the default share divides by max(8, enrolled accounts), not the
+eligible-workload count; namespace eligibility (system/release namespaces,
+`asservat.io/evidence: disabled`) is not checked on enrollment because the
+storage read knows only the namespace UID; `maxConcurrentExpensive` and
+`onFull` are stored but no expensive-action reservation consumes them yet;
+`DeleteOldestEligibleInAccount` has no deletion path.
+
 ## Capacity from Helm values (2026-11-14)
 
 Branch `clean/capacity`. The `capacity` values follow
@@ -122,8 +144,40 @@ is still referenced by shared operation-audit functions and stays until
 those functions are rewritten; `federation.connector` values are still
 required though unused; the join Secret still carries the offer and copied
 object-store capabilities; cluster IDs still come from values; `hub.url`/
-`hub.caBundle` are not implemented; work JWS, local-key signing, fleet
-settings and the node channel rows below are unchanged.
+`hub.caBundle` are not implemented; work JWS and local-key signing rows below
+are unchanged; the node channel is in "Node channel stream" below.
+
+## Node channel stream (ADR-330 D2/D3, 2026-11-15)
+
+Branch `clean/connector-3a-node`. The collector holds one HTTP/2 stream to its
+connector (`/internal/v1/node/connect`), presents its projected token
+(TokenReview once per connection, 50/s burst 200, 429 with `Retry-After`),
+sends Hello (version, work kinds) and pushes status on change; the connector
+pushes work and sends only announced kinds. Uploads go on the same connection.
+Removed: node issuer and client certificates, enrollment and its limiter,
+long-poll, status cadence and spacing, renewal, the collector's boot-ID read
+and epoch, Pod/DaemonSet attestation reads and RBAC, and node-side checks of
+work bindings against its own identity. Gap: work bindings still carry
+`bootID`/`collectorEpoch` as hub provenance (SQL, manifests, `internal-work`);
+the connector fills them from the Node object and a per-collector-Pod
+generation.
+
+## Fleet settings removed (ADR-335 D14, 2026-11-15)
+
+Branch `clean/connector-3a-fleet`. The access and retention previews and share
+administration check `identity.administrators` from the identity settings
+the hub-api already reads (added to the implemented identity-settings copy and
+the chart). Removed: the fleet ConfigMap, `fleet` chart values, its schema and
+reader, the fleet protection guard, `contracts.FleetSettings`, the setup Job's
+Kubernetes RBAC, and the unreachable configuration-role/installer chain that
+depended on the reader. The SQL `fleet_trust` row and its observer stay: about
+45 migration functions require a fresh row. Its observation now comes from the
+generated installation ID and issuer epoch alone.
+
+Gaps: the fleet trust heartbeat (one SQL observation per second) remains until those
+functions stop checking `fresh_until`; `administrators` is optional in the
+implemented identity copy until the identity reader adopts the canonical
+contract; the `fleet-operator` role name stays in docs/interfaces.
 
 ## ADR-330 contract divergence (2026-11-14)
 
@@ -152,7 +206,6 @@ implement the canonical contract.
 | `browser-settings.schema.json` | No `revision`, `rootID`, `sessionEpoch`, `suspended` | `internal/adapters/kubernetes/browser_settings.go`, `internal/bootstrap/hub_api_inputs.go`, session-epoch SQL (`internal/adapters/postgres/custodydb`) |
 | `internal-work.schema.json` | Stream message on the connector connection: no `issuerEpoch`, `deliveryFence`, `*Ref`, `nodeBootID`, `StaleFence`, JWS wrapper; analysis input by `inputArtifactId` | `internal/adapters/jose/work.go`, `internal/contracts/work.go`, `internal/domain/fleet/work.go` |
 | `local-key-service.schema.json`, `local-key-secret.schema.json` | wrap/unwrap only, no `validUntil`; purposes `artifact`, `browser-credentials` | `internal/contracts/key_service.go`, `internal/adapters/kms/local_signing.go`, `local_keys.go`, `protected_local_keys.go` |
-| (no JSON schema) node channel | Hello with version and capabilities; no enroll/poll, CSR, boot ID or epoch | `internal/contracts/node_channel.go`, `internal/bootstrap/node_channel.go` |
 
 Schemas kept because Go still embeds them with production code paths:
 `work-trust`, `submission-trust` and `retention-topology`
@@ -190,7 +243,6 @@ examples go through `readImplementedExample` or the console equivalent.
 | Capture/policy/trigger/recipe/packet/syscall schemas | No list-count caps; arbitrary maxima raised to 2^53−1; no packet-filter length cap (BPF limit checked at compile); `argv` items up to `MAX_ARG_STRLEN` | Embedded `policy-schemas/`, `permission-schemas/approval-policy`, manifest `profile` schema; `internal/domain/planning/composition.go` (`MaxCompositionComponents` 8, `MaxComponentEdits` 32, `MaxCompositionBytes`); generated DebugPolicy/CaptureProfile CRDs |
 | `identity-settings.schema.json` | `groupsClaim`, `usernameClaim`, optional `requiredGroups`, `administrators`; no eligible lists, `groupMaxAgeSeconds`, `revision` or list caps | `internal/contracts/identity_settings.go`, `permission_runtime.go`, `installer_continuation.go`; `internal/domain/configuration/permissions.go`; `internal/bootstrap/permission_guards.go`; `internal/adapters/kubernetes/hub_worker_capacity_reads.go` |
 | `browser-settings.schema.json` | `maxLifetimeSeconds` (default 7 d) and `inactivityTimeoutSeconds` (default 24 h); no `maxLogins`/`maxSessions`/`maxLogoutEvents` or per-user session count | `internal/contracts/browser_settings.go`, `installer_continuation.go`; `internal/domain/identity/browser_settings.go` |
-| `fleet-settings.schema.json` (deleted) | Administrators replace fleet operators (D14) | `internal/adapters/kubernetes/fleet_settings.go`, `initial_preparer_inputs.go`, `initial_bootstrap_plan.go`, `hub_workload.go`, `configuration_runtime_*.go`; `internal/bootstrap/hub_api_inputs.go`; `internal/contracts/owner_deployment.go` |
 | `access-binding`, `permission-common`, `cluster-access-binding` (new) | Subject `issuer` and `reason` optional; workload by name with optional `uid`; ClusterAccessBinding; `groupName` mapping mode; `reviewRef`/`guardRef` optional; no list or string caps beyond Kubernetes formats | `internal/adapters/kubernetes/permission_decode.go`; `internal/domain/configuration/permissions.go`, `review.go`; chart CRDs (no ClusterAccessBinding CRD) |
 | `permission-source.schema.json` | `cluster` name instead of `clusterID`; no `maxDecisionAgeSeconds`; exclusions and `maxNamespaces` optional; access reviews map to any role | `internal/adapters/kubernetes/permission_decode.go`; `internal/domain/configuration/permissions.go` |
 | `policy-authority.schema.json` | Envelope ceilings, `notAfter` and limits optional, no maxima | `internal/domain/authorization/automation.go`, `policy_grant.go`, `policy_grant_use.go` |

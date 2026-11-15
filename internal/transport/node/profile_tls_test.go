@@ -8,21 +8,17 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
-	"encoding/json"
 	"encoding/pem"
 	"math/big"
 	"net/netip"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/mtls"
-	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/collector"
 	"asservat.local/asservat/internal/domain/execution"
-	"asservat.local/asservat/internal/domain/planning"
 )
 
 // This is a real canonical certificate near the public-material ceiling, not
@@ -66,59 +62,4 @@ func maximumProfileTLSWork(t *testing.T) collector.Work {
 		t.Fatal("maximum TLS request invalid")
 	}
 	return collector.Work{ID: id, Sequence: ^uint64(0), Kind: collector.WorkProfileCapture, NotAfter: now.Add(time.Second), Profile: &p}
-}
-
-func TestProfileTLSMaximumClosedPollEncodingAndMixedWork(t *testing.T) {
-	const id = "11111111-1111-4111-8111-111111111111"
-	now := time.Date(9999, 12, 31, 23, 58, 0, 999999000, time.UTC)
-	profile := maximumProfileTLSWork(t)
-	p := *profile.Profile
-	material := p.TLS
-	packet := collector.PacketCapture{CaptureID: id, PodUID: id, Program: make([]planning.BPFInstruction, 256), ProgramDigest: [32]byte{1}, Duration: 30 * time.Second, MaxBytes: 8 << 20}
-	for i := range packet.Program {
-		packet.Program[i] = planning.BPFInstruction{Code: 65535, Jt: 255, Jf: 255, K: ^uint32(0)}
-	}
-	if !packet.Valid() {
-		t.Fatal("bounded packet payload invalid")
-	}
-	// Packet domain validation is its existing recorder contract; this shape
-	// exercises every existing numeric wire field's widest representation.
-	packetWork := WireWork(collector.Work{ID: id, Sequence: ^uint64(0), Kind: collector.WorkPacketCapture, NotAfter: now.Add(time.Second), Packet: &packet})
-	for _, profiles := range []int{0, 1, 8, 15, 16} {
-		wire := contracts.NodePollResponse{Format: contracts.NodePollFormat, Work: make([]contracts.NodeWork, collector.MaxWorkPerPoll)}
-		for i := range wire.Work {
-			wire.Work[i] = packetWork
-			if i < profiles {
-				wire.Work[i] = WireWork(profile)
-			}
-		}
-		raw, err := json.Marshal(wire)
-		if err != nil || len(raw) > contracts.NodeMaxResponse {
-			t.Fatal("fixed 16-work poll exceeds unchanged ceiling", profiles, len(raw), err)
-		}
-		decoded, err := contracts.DecodeNodePollResponse(bytes.NewReader(raw))
-		if err != nil || !reflect.DeepEqual(decoded, wire) {
-			t.Fatal("closed poll roundtrip", profiles, len(raw), err)
-		}
-		for i := 0; i < len(decoded.Work); i++ {
-			back, ok := DomainWork(decoded.Work[i])
-			if !ok || (i < profiles && (back.Profile == nil || !reflect.DeepEqual(*back.Profile, p))) || (i >= profiles && (back.Packet == nil || !back.Packet.Valid())) {
-				t.Fatal("TLS scope changed at codec", i)
-			}
-		}
-		t.Logf("profiles=%d packets=%d roots=%d encoded=%d ceiling=%d", profiles, 16-profiles, len(material.RootsPEM), len(raw), contracts.NodeMaxResponse)
-	}
-	legacy := p
-	legacy.TLS = execution.GoProfileTLSMaterial{}
-	raw, _ := json.Marshal(WireProfile(legacy))
-	if bytes.Contains(raw, []byte(`"tls"`)) {
-		t.Fatal("legacy HTTP wire changed")
-	}
-	for _, mutate := range []func(*contracts.NodeProfileTLS){func(m *contracts.NodeProfileTLS) { m.RootsDigest = "" }, func(m *contracts.NodeProfileTLS) { m.ServerName = "https://elsewhere" }, func(m *contracts.NodeProfileTLS) { m.RootsPEM += "x" }} {
-		w := WireProfile(p)
-		mutate(&w.TLS)
-		if _, ok := DomainProfile(w); ok {
-			t.Fatal("malformed TLS wire accepted")
-		}
-	}
 }

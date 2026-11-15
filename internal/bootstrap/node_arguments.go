@@ -10,7 +10,6 @@ import (
 	"asservat.local/asservat/internal/adapters/gadget"
 	"asservat.local/asservat/internal/adapters/syscalls"
 	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/collector"
 )
 
@@ -29,12 +28,12 @@ func traceArgumentCapture(ctx context.Context, r gadget.ArgumentRequest, deliver
 	}
 	return rec.Capture(ctx, deliver, notice)
 }
-func (n *nodePackets) startArguments(ctx context.Context, epoch string, w collector.Work) collector.Receipt {
+func (n *nodePackets) startArguments(ctx context.Context, w collector.Work) collector.Receipt {
 	r := collector.Decide(w, n.now())
 	if r.Reason == collector.ReasonWorkUnknown || r.Reason == collector.ReasonWorkExpired {
 		return r
 	}
-	if w.Packet == nil || !w.Packet.Valid() || w.Packet.Arguments == nil || n.argumentTrace == nil || n.argumentResources == nil || n.identity == nil || ctx == nil || ctx.Err() != nil {
+	if w.Packet == nil || !w.Packet.Valid() || w.Packet.Arguments == nil || n.argumentTrace == nil || n.argumentResources == nil || ctx == nil || ctx.Err() != nil {
 		r.Reason = collector.ReasonEngineUnavailable
 		return r
 	}
@@ -44,12 +43,12 @@ func (n *nodePackets) startArguments(ctx context.Context, epoch string, w collec
 	filter := *p.Syscalls
 	filter.Names = append([]string(nil), filter.Names...)
 	p.Syscalls = &filter
-	id, b := n.identity(), a.Binding
+	b := a.Binding
 	defs, err := syscalls.ArgumentDefinitions(filter.Names, a.CaptureBuffers, int(a.MaxBytesPerEvent))
 	pin, _ := hex.DecodeString(gadget.ArgumentObjectSHA256)
 	var program [32]byte
 	copy(program[:], pin)
-	if err != nil || !a.ValidFinite(n.now()) || !a.StartBy.Equal(w.NotAfter) || !authorization.UUID(id.NodeUID) || !authorization.UUID(id.PodUID) || !authorization.UUID(id.BootID) || !authorization.UUID(id.Epoch) || b.NodeUID != id.NodeUID || b.BootID != id.BootID || b.CollectorPodUID != id.PodUID || b.CollectorEpoch != id.Epoch || b.CollectorEpoch != epoch || b.ProgramDigest != program || b.DefinitionDigest != syscalls.ArgumentDefinitionDigest(defs) || a.MaxProbeBytes != int64(syscalls.ArgumentMaxProbeBytes(defs)) {
+	if err != nil || !a.ValidFinite(n.now()) || !a.StartBy.Equal(w.NotAfter) || b.ProgramDigest != program || b.DefinitionDigest != syscalls.ArgumentDefinitionDigest(defs) || a.MaxProbeBytes != int64(syscalls.ArgumentMaxProbeBytes(defs)) {
 		r.Reason = collector.ReasonWorkUnknown
 		return r
 	}
@@ -94,7 +93,7 @@ func (n *nodePackets) startArguments(ctx context.Context, epoch string, w collec
 			n.running = make(map[string]runningPacket)
 		}
 		started = n.now().UTC().Truncate(time.Microsecond) // one instant for live binding and result, as in node_packets.go
-		holder = n.newManualLive(w, p, started, id)
+		holder = n.newManualLive(w, p, started)
 		if holder != nil {
 			holder.ctx = capture
 		}
@@ -120,11 +119,11 @@ func (n *nodePackets) startArguments(ctx context.Context, epoch string, w collec
 			}
 			n.budgetMu.Unlock()
 		}()
-		n.runArguments(capture, epoch, w.ID, p, started, defs, holder)
+		n.runArguments(capture, w.ID, p, started, defs, holder)
 	}()
 	return r
 }
-func (n *nodePackets) runArguments(parent context.Context, epoch, workID string, p collector.PacketCapture, started time.Time, defs []syscalls.ArgumentDefinition, holders ...*manualLiveHolder) {
+func (n *nodePackets) runArguments(parent context.Context, workID string, p collector.PacketCapture, started time.Time, defs []syscalls.ArgumentDefinition, holders ...*manualLiveHolder) {
 	var holder *manualLiveHolder
 	if len(holders) > 0 {
 		holder = holders[0]
@@ -136,7 +135,7 @@ func (n *nodePackets) runArguments(parent context.Context, epoch, workID string,
 	}
 	ctx, cancel := context.WithDeadline(parent, until)
 	defer cancel()
-	header := syscalls.ArgumentHeader{Record: "header", Format: syscalls.ArgumentNativeFormat, PodUID: p.PodUID, NodeUID: b.NodeUID, BootID: b.BootID, CollectorPodUID: b.CollectorPodUID, SourceEpoch: epoch, SessionID: b.SessionID, Fence: b.Fence, EngineDigest: hex.EncodeToString(b.ProgramDigest[:]), DefinitionDigest: hex.EncodeToString(b.DefinitionDigest[:]), AccountingRule: hex.EncodeToString(b.AccountingRule[:]), Decoder: syscalls.ArgumentDecoderVersion, ABI: syscalls.ABI, StartedAt: started}
+	header := syscalls.ArgumentHeader{Record: "header", Format: syscalls.ArgumentNativeFormat, PodUID: p.PodUID, NodeUID: b.NodeUID, BootID: b.BootID, CollectorPodUID: b.CollectorPodUID, SourceEpoch: b.CollectorEpoch, SessionID: b.SessionID, Fence: b.Fence, EngineDigest: hex.EncodeToString(b.ProgramDigest[:]), DefinitionDigest: hex.EncodeToString(b.DefinitionDigest[:]), AccountingRule: hex.EncodeToString(b.AccountingRule[:]), Decoder: syscalls.ArgumentDecoderVersion, ABI: syscalls.ABI, StartedAt: started}
 	footer := syscalls.ArgumentFooter{Record: "footer", CoverageUnknown: true, Outcome: "failed"}
 	out := make([]byte, 0, p.MaxBytes)
 	defer func() { clear(out[:cap(out)]) }()
@@ -276,7 +275,7 @@ func (n *nodePackets) runArguments(parent context.Context, epoch, workID string,
 	if encodeErr != nil || !result.Valid() || !n.takeUpload(deliver, result.CapturedBytes) {
 		return
 	}
-	if err := n.upload(deliver, epoch, result, out); err != nil && n.log != nil {
+	if err := n.upload(deliver, result, out); err != nil && n.log != nil {
 		n.log("node collector: argument result delivery failed")
 	}
 }

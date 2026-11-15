@@ -19,5 +19,10 @@
     "platform-developers"
   ],
   "groupsAtIssueQualified": true,
-  "groupMaxAgeSeconds": 300
+  "groupMaxAgeSeconds": 300,
+  "administrators": {
+    "groups": [
+      "asservat-admins"
+    ]
+  }
 }

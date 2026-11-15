@@ -193,11 +193,10 @@ func profileResourcesNative(t *testing.T, ctx context.Context, k kubernetes.Inte
 			t.Fatal(ctx.Err())
 		}
 	}
-	// Two uploads share the existing three-connection pool with control. Allow
-	// one original long-poll interval for its status/refusal lane, without
-	// inventing another connection or extending either capture's deadlines.
+	// Two uploads share the stream's connection; the refusal arrives as a
+	// receipt without extending either capture's deadlines.
 	third := enqueue(pods[2], 16<<20)
-	wait("aggregate refusal", collector.PollHold+5*time.Second, func() bool {
+	wait("aggregate refusal", 30*time.Second, func() bool {
 		r, b, ok := small.get(third.Profile.CaptureID)
 		if !ok {
 			return false

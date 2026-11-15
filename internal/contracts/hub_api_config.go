@@ -161,15 +161,10 @@ type HubAPIPublic struct {
 	// OperationAudit.RetentionSeconds is ignored: the current capacity
 	// qualification supplies it.
 	OperationAudit OwnerPublicOperationAudit `json:"operationAudit"`
-	Fleet          *HubAPIFleet              `json:"fleet,omitempty"`
 	// RegionalOffer publishes ConfigMap <name>-regional-offer for the
 	// combined-mode connector (mode=combined).
 	RegionalOffer *HubAPIRegionalOffer `json:"regionalOffer,omitempty"`
 }
-
-// HubAPIFleet enables the fleet operators' previews; the settings
-// ConfigMap is <name>-fleet.
-type HubAPIFleet struct{}
 
 // HubAPIRegionalOffer holds the offer's Helm-known values: the in-cluster
 // federation endpoint and serving name, the image and the operator's

@@ -233,9 +233,7 @@ func newShareCaptureAudit(t *testing.T, ctx context.Context, admin *pgxpool.Pool
 		t.Fatal("original synthetic protected capture pins", err)
 	}
 	account := nativeContinuationAuditAccount(t, s.a.RootID, s.recovery.installation, s.a.Registration.AllocationID, now, mac)
-	if err = admin.QueryRow(ctx, `SELECT full_limit FROM context_control_account WHERE root_id=$1 AND allocation_id=$2`, s.a.RootID, s.a.Registration.AllocationID).Scan(&account.Records); err != nil {
-		t.Fatal("original control record coverage", err)
-	}
+	account.Records = 4 // the capture records this fixture's allocation admits
 	account.RetainedSeconds = 7200
 	account.Policy.MetadataSlots = 2 * account.Records
 	account.Policy.History.Layout = value.ShareCaptureOperationHistoryLayout

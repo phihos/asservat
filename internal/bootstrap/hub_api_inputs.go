@@ -253,13 +253,6 @@ func buildHubAPIPublic(ctx context.Context, files *os.Root, c contracts.OwnerDep
 	out.CaptureAuditPolicy, out.AuditStoreID = pin.CapturePolicy, policy.StoreID
 	out.OperationAudit.RetentionSeconds = int(pin.OperationRetentionSeconds)
 	out.Capacity = contracts.OwnerPublicCapacity{QualificationID: pin.QualificationID, QualificationDigest: pin.QualificationDigest, AccountVersion: pin.AccountVersion}
-	if f := p.Fleet; f != nil {
-		settings, err := configMapUID(ns, name("fleet"), "fleet-settings")
-		if err != nil {
-			return nil, err
-		}
-		out.Fleet = &contracts.OwnerFleetIssuance{Settings: settings}
-	}
 	// The work-signing key is read with the work-sign provider role; its role
 	// name does not depend on the key version.
 	c.Public = out

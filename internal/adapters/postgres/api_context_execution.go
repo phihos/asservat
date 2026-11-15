@@ -140,7 +140,7 @@ func (s *APIContextExecutions) ReadAPIContextWork(ctx context.Context, captureID
 	failed := ""
 	fail := func(step string, e error) error { failed = step; return e }
 	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		trust, _, err := currentTrust(ctx, q, s.installation)
+		trust, err := currentTrust(ctx, q, s.installation)
 		if err != nil {
 			return fail("trust", err)
 		}
@@ -191,7 +191,7 @@ func (s *APIContextExecutions) ReadAPIContextWork(ctx context.Context, captureID
 // check locks permission -> pool/allocation -> attempt -> capture,
 // re-evaluating the same ordinary evaluator after every blocking SQL wait.
 func (s *APIContextExecutions) checked(ctx context.Context, q *custodydb.Queries, c app.APIExecutionCheck, topology privacyvalue.PolicyTopology, effectUntil *time.Time, fn func(custodydb.ContextCapture, *policyCaptureGrantState) error) error {
-	trust, _, err := currentTrust(ctx, q, s.installation)
+	trust, err := currentTrust(ctx, q, s.installation)
 	if err != nil {
 		return sqlStep{"trust", err}
 	}
@@ -654,7 +654,7 @@ func (s *APIContextExecutions) recordAPIOutcome(ctx context.Context, r value.API
 			if completion.ClosedAt.After(now.Time) {
 				return value.ErrInvalid
 			}
-			trust, _, err := currentTrust(ctx, q, s.installation)
+			trust, err := currentTrust(ctx, q, s.installation)
 			if err != nil {
 				return err
 			}

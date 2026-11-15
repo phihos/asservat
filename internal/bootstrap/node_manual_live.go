@@ -29,7 +29,6 @@ type manualLiveHolder struct {
 	active                                      atomic.Pointer[nodeLiveCohort]
 	mu                                          sync.Mutex
 	capture, work, pod                          string
-	identity                                    collector.Identity
 	started, until                              time.Time
 	observationKind, session, fence, projection string
 	program                                     []planning.BPFInstruction
@@ -38,13 +37,13 @@ type manualLiveHolder struct {
 	closed                                      bool
 }
 
-func (n *nodePackets) newManualLive(w collector.Work, p collector.PacketCapture, started time.Time, id collector.Identity) *manualLiveHolder {
-	for _, x := range []string{w.ID, p.CaptureID, p.PodUID, id.NodeUID, id.BootID, id.PodUID, id.Epoch} {
+func (n *nodePackets) newManualLive(w collector.Work, p collector.PacketCapture, started time.Time) *manualLiveHolder {
+	for _, x := range []string{w.ID, p.CaptureID, p.PodUID} {
 		if !authorization.UUID(x) {
 			return nil
 		}
 	}
-	h := &manualLiveHolder{capture: p.CaptureID, work: w.ID, pod: p.PodUID, identity: id, started: started, until: started.Add(p.Duration), program: append([]planning.BPFInstruction(nil), p.Program...), counters: &app.BufferCounters{}, projection: v.Packet}
+	h := &manualLiveHolder{capture: p.CaptureID, work: w.ID, pod: p.PodUID, started: started, until: started.Add(p.Duration), program: append([]planning.BPFInstruction(nil), p.Program...), counters: &app.BufferCounters{}, projection: v.Packet}
 	if p.Syscalls != nil {
 		h.projection = v.Syscall
 	}
@@ -180,11 +179,11 @@ func (h *manualLiveHolder) argument(call syscalls.ArgumentCall, now time.Time) {
 	h.append(gadget.Frame{Data: raw, RawTimestamp: stamp, Clock: "boottime", Wire: uint32(len(raw))}, now)
 	clear(raw)
 }
-func (h *manualLiveHolder) matches(m collector.ManualLiveSource, id collector.Identity, projection string, now time.Time) bool {
-	return !h.closed && h.ctx != nil && h.ctx.Err() == nil && now.Before(h.until) && projection == h.projection && h.identity == id && m.CaptureID == h.capture && m.WorkID == h.work && m.PodUID == h.pod && m.NodeUID == id.NodeUID && m.BootID == id.BootID && m.CollectorPodUID == id.PodUID && m.CollectorEpoch == id.Epoch && m.ObservationKind == h.observationKind && m.ObservationSessionID == h.session && m.ObservationFence == h.fence
+func (h *manualLiveHolder) matches(m collector.ManualLiveSource, projection string, now time.Time) bool {
+	return !h.closed && h.ctx != nil && h.ctx.Err() == nil && now.Before(h.until) && projection == h.projection && m.CaptureID == h.capture && m.WorkID == h.work && m.PodUID == h.pod && m.ObservationKind == h.observationKind && m.ObservationSessionID == h.session && m.ObservationFence == h.fence
 }
 func (n *nodePackets) readManualLive(ctx context.Context, w collector.Work, budget *nodeLiveBudget) (v.NodeReply, error) {
-	if ctx == nil || ctx.Err() != nil || w.Live == nil || w.Live.Manual == nil || !w.Live.Valid() || !n.now().Before(w.NotAfter) || n.identity == nil {
+	if ctx == nil || ctx.Err() != nil || w.Live == nil || w.Live.Manual == nil || !w.Live.Valid() || !n.now().Before(w.NotAfter) {
 		return v.NodeReply{}, v.ErrInvalid
 	}
 	r := w.Live
@@ -197,9 +196,8 @@ func (n *nodePackets) readManualLive(ctx context.Context, w collector.Work, budg
 	}
 	h := running.live
 	now := n.now()
-	id := n.identity()
 	h.mu.Lock()
-	if !h.matches(m, id, r.Projection, now) {
+	if !h.matches(m, r.Projection, now) {
 		h.mu.Unlock()
 		return v.NodeReply{}, v.ErrUnavailable
 	}
@@ -283,7 +281,7 @@ func (n *nodePackets) readManualLive(ctx context.Context, w collector.Work, budg
 		}
 	}
 	h.mu.Lock()
-	current := h.matches(m, n.identity(), r.Projection, n.now())
+	current := h.matches(m, r.Projection, n.now())
 	h.mu.Unlock()
 	if !current || ctx.Err() != nil || !n.now().Before(w.NotAfter) {
 		clear(out.Rows)
@@ -296,16 +294,16 @@ func (n *nodePackets) readManualLive(ctx context.Context, w collector.Work, budg
 	}
 	out.Sample = sample.Nanos
 	out.Examined = len(out.Rows)
-	bounded, encoded, e := boundManualLiveReply(id.Epoch, *r, out)
+	bounded, encoded, e := boundManualLiveReply(*r, out)
 	if e == nil {
 		budget.deliver(n.now(), len(bounded.Rows), encoded, bounded.Dropped)
 	}
 	return bounded, e
 }
-func boundManualLiveReply(epoch string, r collector.LiveRead, out v.NodeReply) (v.NodeReply, int, error) {
+func boundManualLiveReply(r collector.LiveRead, out v.NodeReply) (v.NodeReply, int, error) {
 	rows := out.Rows
 	out.Rows = []v.StampedRow{}
-	base, e := node.WireLiveReply(epoch, out)
+	base, e := node.WireLiveReply(out)
 	if e != nil {
 		return v.NodeReply{}, 0, e
 	}

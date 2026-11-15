@@ -240,20 +240,19 @@ func qualifyProcessingErasureCleanup(t *testing.T, ctx context.Context, admin *p
 		t.Fatal("erase exact closed writer through actual purge, audit and finalization", err)
 	}
 	var deleted, purged, acknowledged time.Time
-	var objects, bytes, full, replay int64
+	var objects, bytes int64
 	installedJourneyReadOnly(t, ctx, admin, func(tx pgx.Tx) error {
 		return tx.QueryRow(ctx, `
-SELECT a.deleted_at, d.purged_at, d.audit_acknowledged_at, ca.charged_objects, ca.charged_bytes, cc.charged_full, cc.charged_replay
+SELECT a.deleted_at, d.purged_at, d.audit_acknowledged_at, ca.charged_objects, ca.charged_bytes
 FROM custody_attempt a
 JOIN context_deletion_checkpoint d ON d.attempt_id=a.id AND d.root_id=$1
 JOIN custody_allocation ca ON ca.id=a.allocation_id
-JOIN context_control_account cc ON cc.allocation_id=ca.id
 WHERE a.id=$2 AND a.state='deleted' AND d.finalization_xid IS NOT NULL`, root, reg.Location.AttemptID).
-			Scan(&deleted, &purged, &acknowledged, &objects, &bytes, &full, &replay)
+			Scan(&deleted, &purged, &acknowledged, &objects, &bytes)
 	})
 	if purged.Before(reg.AnchorAt) || acknowledged.Before(purged) || deleted.Before(acknowledged) ||
-		!deleted.Before(reg.ExpiresAt) || objects != 0 || bytes != 0 || full != 1 || replay != 1 {
-		t.Fatal("erasure changed cleanup ordering or released the wrong charge", deleted, purged, acknowledged, objects, bytes, full, replay)
+		!deleted.Before(reg.ExpiresAt) || objects != 0 || bytes != 0 {
+		t.Fatal("erasure changed cleanup ordering or released the wrong charge", deleted, purged, acknowledged, objects, bytes)
 	}
 	return deleted
 }

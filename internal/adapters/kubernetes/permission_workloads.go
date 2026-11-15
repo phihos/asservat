@@ -22,6 +22,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 )
 
+// Metadata reads for Deployments, StatefulSets and Pods.
+const capacityMetadataAccept = "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1"
+const capacityMetadataListAccept = "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1"
+
 var _ port.WorkloadObserver = (*PermissionClient)(nil)
 
 func workloadCollection(kind string) (string, bool) {

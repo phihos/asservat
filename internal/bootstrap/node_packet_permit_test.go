@@ -23,10 +23,10 @@ func nodePermitWork(now time.Time) (collector.Work, collector.Identity) {
 	return collector.Work{ID: "99999999-9999-4999-8999-999999999999", Sequence: 1, Kind: collector.WorkPacketCapture, NotAfter: p.Observation.StartBy, Packet: &p}, id
 }
 func TestNodeObservedPacketRejectsBeforeBudgetOrEngine(t *testing.T) {
-	for _, mode := range []string{"node", "boot", "collector", "epoch", "capture", "pod", "program", "expectation", "rule", "late-start", "duration", "prefix", "missing-engine", "missing-identity", "cancelled"} {
+	for _, mode := range []string{"capture", "pod", "program", "expectation", "rule", "late-start", "duration", "prefix", "missing-engine", "cancelled"} {
 		t.Run(mode, func(t *testing.T) {
 			now := time.Now()
-			w, id := nodePermitWork(now)
+			w, _ := nodePermitWork(now)
 			var mu sync.Mutex
 			budget, _ := collector.NewBudget(collector.Ceilings{FrozenBytes: 16 << 20}, now)
 			var calls atomic.Int32
@@ -37,19 +37,11 @@ func TestNodeObservedPacketRejectsBeforeBudgetOrEngine(t *testing.T) {
 			n := &nodePackets{engine: engine, observedEngine: func(context.Context, string, int, func(gadget.Frame), func(gadget.InputNotice)) (gadget.CaptureStats, error) {
 				calls.Add(1)
 				return gadget.CaptureStats{}, nil
-			}, identity: func() collector.Identity { return id }, available: true, now: func() time.Time { return now }, budget: func() *collector.Budget { return budget }, budgetMu: &mu, log: func(string) {}}
+			}, available: true, now: func() time.Time { return now }, budget: func() *collector.Budget { return budget }, budgetMu: &mu, log: func(string) {}}
 			o := w.Packet.Observation
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			switch mode {
-			case "node":
-				id.NodeUID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
-			case "boot":
-				id.BootID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
-			case "collector":
-				id.PodUID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
-			case "epoch":
-				id.Epoch = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
 			case "capture":
 				o.Binding.CaptureID = "other"
 			case "pod":
@@ -70,12 +62,10 @@ func TestNodeObservedPacketRejectsBeforeBudgetOrEngine(t *testing.T) {
 				o.Binding.ProgramDigest = w.Packet.ProgramDigest
 			case "missing-engine":
 				n.observedEngine = nil
-			case "missing-identity":
-				n.identity = nil
 			case "cancelled":
 				cancel()
 			}
-			receipt := n.start(ctx, "44444444-4444-4444-8444-444444444444", w)
+			receipt := n.start(ctx, w)
 			if receipt.Outcome == collector.OutcomeAccepted || calls.Load() != 0 || budget.Usage(now).FrozenReserved != 0 {
 				t.Fatal("refusal reached engine/budget", mode, receipt, calls.Load())
 			}
@@ -83,9 +73,9 @@ func TestNodeObservedPacketRejectsBeforeBudgetOrEngine(t *testing.T) {
 	}
 }
 func TestNodeObservedPacketNoticesStopBeforeNextPredicateAndJoin(t *testing.T) {
-	for _, mode := range []string{"credit", "loss", "unknown", "complete", "parent-deadline", "changed-before-engine"} {
+	for _, mode := range []string{"credit", "loss", "unknown", "complete", "parent-deadline"} {
 		t.Run(mode, func(t *testing.T) {
-			w, id := nodePermitWork(time.Now())
+			w, _ := nodePermitWork(time.Now())
 			if mode == "credit" {
 				w.Packet.Observation.Credit = 1
 			}
@@ -95,22 +85,15 @@ func TestNodeObservedPacketNoticesStopBeforeNextPredicateAndJoin(t *testing.T) {
 			stopped, release := make(chan struct{}), make(chan struct{})
 			var joined atomic.Bool
 			var called atomic.Int32
-			var views atomic.Int32
 			n := &nodePackets{engine: func(context.Context, string, int, func(gadget.Frame)) (gadget.CaptureStats, error) {
 				t.Error("observed capture downgraded to ordinary engine")
 				return gadget.CaptureStats{}, nil
-			}, available: true, identity: func() collector.Identity {
-				v := id
-				if mode == "changed-before-engine" && views.Add(1) > 1 {
-					v.Epoch = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
-				}
-				return v
-			}, now: time.Now, version: "fixture", log: func(string) {}, budget: func() *collector.Budget { return budget }, budgetMu: &mu}
-			n.upload = func(ctx context.Context, epoch string, r collector.PacketResult, data []byte) error {
+			}, available: true, now: time.Now, version: "fixture", log: func(string) {}, budget: func() *collector.Budget { return budget }, budgetMu: &mu}
+			n.upload = func(ctx context.Context, r collector.PacketResult, data []byte) error {
 				if called.Load() > 0 && !joined.Load() {
 					t.Error("upload preceded engine join")
 				}
-				return up.upload(ctx, epoch, r, data)
+				return up.upload(ctx, r, data)
 			}
 			n.observedEngine = func(ctx context.Context, _ string, snap int, deliver func(gadget.Frame), notice func(gadget.InputNotice)) (gadget.CaptureStats, error) {
 				called.Add(1)
@@ -143,7 +126,7 @@ func TestNodeObservedPacketNoticesStopBeforeNextPredicateAndJoin(t *testing.T) {
 				ctx, end = context.WithTimeout(ctx, 50*time.Millisecond)
 				defer end()
 			}
-			if r := n.start(ctx, id.Epoch, w); r.Outcome != collector.OutcomeAccepted {
+			if r := n.start(ctx, w); r.Outcome != collector.OutcomeAccepted {
 				t.Fatal(r)
 			}
 			if mode == "credit" || mode == "loss" || mode == "unknown" {
@@ -179,9 +162,6 @@ func TestNodeObservedPacketNoticesStopBeforeNextPredicateAndJoin(t *testing.T) {
 			}
 			if (mode == "loss" || mode == "unknown") && r.Seen != 1 {
 				t.Fatal("post-notice callback reached predicate", r)
-			}
-			if mode == "changed-before-engine" && called.Load() != 0 {
-				t.Fatal("changed local source reached engine")
 			}
 			mu.Lock()
 			reserved := budget.Usage(time.Now()).FrozenReserved

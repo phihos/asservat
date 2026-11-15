@@ -10,6 +10,8 @@ type IdentitySettings struct {
 	EligibleGroups         []string          `json:"eligibleGroups"`
 	GroupsAtIssueQualified bool              `json:"groupsAtIssueQualified"`
 	GroupMaxAgeSeconds     int               `json:"groupMaxAgeSeconds"`
+	// Administrators are the installation administrators (ADR-335 D14).
+	Administrators *IdentityAdministrators `json:"administrators,omitempty"`
 	// Approvals are the protected installation approval settings (ADR-249).
 	// Absent: no step-up is configured, so no approval can be decided.
 	Approvals *IdentityApprovals `json:"approvals,omitempty"`
@@ -29,6 +31,13 @@ type IdentityStepUp struct {
 	ACRValues     []string `json:"acrValues"`
 	MaxAgeSeconds int      `json:"maxAgeSeconds"`
 }
+
+// IdentityAdministrators names administrators by group name or subject.
+type IdentityAdministrators struct {
+	Groups   []string `json:"groups,omitempty"`
+	Subjects []string `json:"subjects,omitempty"`
+}
+
 type IdentityClient struct {
 	ID             string `json:"id"`
 	Kind           string `json:"kind"`

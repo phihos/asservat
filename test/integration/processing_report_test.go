@@ -8,14 +8,12 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres"
-	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	auditapp "asservat.local/asservat/internal/application/audit"
 	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/identity"
 	value "asservat.local/asservat/internal/domain/privacy"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -160,51 +158,4 @@ func stageProcessingReportUnknown(t *testing.T, ctx context.Context, f *processi
 		t.Fatal("stage real acknowledged intent with unknown outcome", err)
 	}
 	return in.ID
-}
-
-func (f *capacitySQLFixture) assertReportOriginalSession(t *testing.T, session artifact.DownloadSession) {
-	t.Helper()
-	var original, shared, metadata time.Time
-	var revision int64
-	if err := f.admin.QueryRow(f.ctx, `
-SELECT (d.capacity_backing#>>'{Native,RetireBy}')::timestamptz,b.retire_by,p.retire_by,(s.root_configuration->>'Revision')::bigint
-FROM artifact_download d JOIN download_native_backing b ON b.root_id=d.root_id AND b.allocation_id=d.allocation_id
-JOIN context_processing p ON p.root_id=d.root_id AND p.artifact_id=d.artifact_id
-JOIN capacity_source s ON s.root_id=d.root_id
-WHERE d.id=$1`, session.ID).Scan(&original, &shared, &metadata, &revision); err != nil || !metadata.After(original) || shared.Before(original) || revision > 1 && !shared.After(original) {
-		t.Fatal("report fixture does not isolate original session retirement from parent metadata", original, shared, metadata, err)
-	}
-	q := custodydb.New(f.roles["hub-runtime"])
-	read := func(observed time.Time) []custodydb.ReportProcessingDownloadsRow {
-		t.Helper()
-		rows, err := q.ReportProcessingDownloads(f.ctx, custodydb.ReportProcessingDownloadsParams{
-			RootID: capacityProjectionUUID(t, session.Scope.RootID), AfterID: capacityProjectionUUID(t, "00000000-0000-0000-0000-000000000000"),
-			CreatedBefore: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true}, ObservedAt: pgtype.Timestamptz{Time: observed, Valid: true}, PageLimit: 3,
-		})
-		if err != nil {
-			t.Fatal("compiled report session query", err)
-		}
-		return rows
-	}
-	before := read(original.Add(-time.Microsecond))
-	found := false
-	for _, row := range before {
-		if row.ID == capacityProjectionUUID(t, session.ID) {
-			found = true
-			if !row.VisibleUntil.Time.Equal(original) {
-				t.Fatal("report renewed the original session visibility", row.VisibleUntil.Time, original)
-			}
-		}
-	}
-	if !found {
-		t.Fatal("original managed session missing before report retirement")
-	}
-	for _, row := range read(original) {
-		if row.ID == capacityProjectionUUID(t, session.ID) {
-			t.Fatal("report disclosed a session at its original retirement after shared backing renewal")
-		}
-	}
-	if shared.After(original) {
-		t.Log("report retained original session visibility while both shared backing and artifact metadata remained valid beyond it")
-	}
 }

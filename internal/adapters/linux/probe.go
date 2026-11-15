@@ -52,15 +52,6 @@ func readSmall(path string, max int) ([]byte, error) {
 	return bytes.TrimSpace(b[:n]), nil
 }
 
-// BootID reads the kernel boot ID (a UUID string).
-func (p FileProbe) BootID() (string, error) {
-	b, err := readSmall(p.path("proc/sys/kernel/random/boot_id"), 64)
-	if err != nil || len(b) != 36 {
-		return "", fs.ErrInvalid
-	}
-	return string(b), nil
-}
-
 func (p FileProbe) magic(path string, want int64) collector.Support {
 	m, err := p.statfs(p.path(path))
 	switch {

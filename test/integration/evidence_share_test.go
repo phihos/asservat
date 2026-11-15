@@ -20,7 +20,6 @@ import (
 	"asservat.local/asservat/internal/domain/capture"
 	value "asservat.local/asservat/internal/domain/catalog"
 	cfg "asservat.local/asservat/internal/domain/configuration"
-	"asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -339,7 +338,7 @@ func qualifyEvidenceShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool
 		t.Fatal("transfer changed the recipients", err)
 	}
 	administrators := shares
-	administrators.Administration = shareAdministration{installation: s.recovery.installation, issuer: issuer, client: s.a.Eligibility.VerifiedIdentity.Principal.ClientID}
+	administrators.Administration = shareAdministration{issuer: issuer}
 	if _, _, err := administrators.Revoke(ctx, as("synthetic-stranger", []string{"maintainers"}, "evidence:read", authorization.ShareScope), sharing.RevokeInput{ShareID: pinned.ID, ExpectedRevision: 2, IdempotencyKey: "stranger-revoke"}); !errors.Is(err, capture.ErrDenied) {
 		t.Fatal("non-admin non-manager revoked", err)
 	}
@@ -536,13 +535,11 @@ func qualifyEvidenceShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool
 	t.Log("evidence share: refusal without share, recipient-only read, concurrent revocation, expiry, deny and owner-assignment loss qualified on real PostgreSQL; team management: member revoke after creator departure, all teams lost suspends, re-added owner manages nothing; ADR-238: explicit management, transfer (not-held refused, replay, stale, trigger), administrator revoke without evidence rights, transferred share suspended")
 }
 
-// shareAdministration is a synthetic protected fleet administration whose
-// operators are the "platform" group (ADR-238 test input, not authority).
-type shareAdministration struct{ installation, issuer, client string }
+// shareAdministration is synthetic identity settings whose administrators
+// are the "platform" group (ADR-238 test input, not authority).
+type shareAdministration struct{ issuer string }
 
-func (a shareAdministration) FleetAdministration(context.Context) (fleet.Administration, error) {
+func (a shareAdministration) IdentityPolicy(context.Context, string) (identity.Policy, error) {
 	now := time.Now().UTC()
-	return fleet.Administration{InstallationID: a.installation, IssuerEpoch: custodyID(), Issuer: a.issuer, Revision: identity.Revision{UID: "synthetic-administration", Generation: 1, Digest: artifact.Digest{1}},
-		ObservedAt: now, FreshUntil: now.Add(5 * time.Second), Clients: []string{a.client}, Groups: []string{"platform"}, DeliveryProfiles: []string{"enrollment"},
-		MaxActiveBootstraps: 1, MaxBootstrapHistory: 1, MaxClusters: 1}, nil
+	return identity.Policy{Issuer: a.issuer, Revision: identity.Revision{UID: "synthetic-administration", Generation: 1, Digest: artifact.Digest{1}}, ObservedAt: now, FreshUntil: now.Add(30 * time.Second), AdministratorGroups: []string{"platform"}}, nil
 }

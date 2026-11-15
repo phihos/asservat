@@ -140,7 +140,7 @@ func (f *preparationPhaseBudget) ObserveDownload(ctx context.Context, _ string, 
 }
 func (f *preparationPhaseBudget) ContextDownloadPlan(ctx context.Context, source evidence.ContextDownloadSource) (evidence.ContextDownloadPlan, error) {
 	scope := source.Scope
-	return evidence.ContextDownloadPlan{Allocation: artifact.DownloadAllocation{ID: ownerID(19100), RootID: scope.RootID, ClusterID: scope.ClusterID, NamespaceUID: scope.NamespaceUID, WorkloadUID: scope.WorkloadUID, OutputLimit: 1 << 20, ReadLimit: 128 << 20, SessionLimit: 4, ValidUntil: f.started.Add(time.Minute)}, OutputLimit: 8192, ReadLimit: 16 << 20, RequestLimit: 4, Duration: 30 * time.Second, ObservedAt: f.started, ValidUntil: f.until}, f.step(ctx, "plan")
+	return evidence.ContextDownloadPlan{Allocation: artifact.DownloadAllocation{ID: ownerID(19100), RootID: scope.RootID, ClusterID: scope.ClusterID, NamespaceUID: scope.NamespaceUID, WorkloadUID: scope.WorkloadUID, OutputLimit: 1 << 20, ReadLimit: 128 << 20, ValidUntil: f.started.Add(time.Minute)}, OutputLimit: 8192, ReadLimit: 16 << 20, RequestLimit: 4, Duration: 30 * time.Second, ObservedAt: f.started, ValidUntil: f.until}, f.step(ctx, "plan")
 }
 func (f *preparationPhaseBudget) ContextNativeReady(ctx context.Context) (time.Time, error) {
 	return f.until, f.step(ctx, "runtime-ready")

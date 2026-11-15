@@ -31,7 +31,7 @@ func (s *profileSink) DeliverProfile(_ context.Context, _ collector.Identity, r 
 	return s.err
 }
 func TestProfileDeliveryBindsProcessRequestAndSingleUse(t *testing.T) {
-	ch, _, clock, _ := newChannel(t)
+	ch, clock, _ := newChannel(t)
 	clock.t = time.Now().UTC().Truncate(time.Microsecond)
 	peer, _ := enroll(t, ch, epochA)
 	const id = "00000000-0000-4000-8000-000000000001"
@@ -42,7 +42,6 @@ func TestProfileDeliveryBindsProcessRequestAndSingleUse(t *testing.T) {
 	ch.nodes[id] = entry
 	peer.NodeUID = id
 	entry.report = &collector.Report{Mechanisms: []collector.Availability{{Mechanism: collector.MechanismProfile, Prerequisites: true, Adapter: collector.AdapterAvailable}}}
-	entry.reportedAt = clock.now()
 	now := clock.now()
 	p := collector.ProfileCapture{CaptureID: id, CollectorEpoch: epochA, ExpectationDigest: artifact.Digest{1}, DefinitionDigest: artifact.Digest{2}, AddressMode: "targetLoopback", Address: netip.MustParseAddr("127.0.0.1"), Port: 6060, Host: "localhost", Request: execution.GoProfileRequest{Binding: artifact.Binding{ClusterID: id, ArtifactID: id, AttemptID: id, MediaType: artifact.ProfileMediaType}, Pin: artifact.PinnedPod{Namespace: "app", NamespaceUID: id, Name: "app-0", UID: id, NodeName: entry.id.NodeName}, NodeUID: id, NodeBootID: boot, SourceRef: "pprof", EndpointDigest: artifact.Digest{3}, Parameters: execution.GoProfileParameters{Type: "heap", Mode: "snapshot"}, NativeLimit: 16 << 20, NotBefore: now, Deadline: now.Add(5 * time.Second)}}
 	sink := &profileSink{}
@@ -55,7 +54,7 @@ func TestProfileDeliveryBindsProcessRequestAndSingleUse(t *testing.T) {
 		t.Fatal("duplicate start", err)
 	}
 	r := collector.ProfileResult{WorkID: w.ID, CaptureID: id, ExpectationDigest: p.ExpectationDigest, EndpointDigest: p.Request.EndpointDigest, Outcome: execution.GoProfileOutcome{Format: artifact.PprofFormat, StartedAt: now, CompletedAt: now, MayHaveStarted: true, ResponseComplete: true, NativeBytes: 3}}
-	for _, change := range []string{"endpoint", "expectation", "future", "bytes", "epoch"} {
+	for _, change := range []string{"endpoint", "expectation", "future", "bytes", "pod"} {
 		bad := r
 		remote := peer
 		switch change {
@@ -67,10 +66,10 @@ func TestProfileDeliveryBindsProcessRequestAndSingleUse(t *testing.T) {
 			bad.Outcome.CompletedAt = now.Add(time.Second)
 		case "bytes":
 			bad.Outcome.NativeBytes = p.Request.NativeLimit + 1
-		case "epoch":
-			remote.Epoch = epochB
+		case "pod":
+			remote.PodUID = "other"
 		}
-		if err := ch.DeliverProfile(context.Background(), remote, epochA, bad, bytes.NewBufferString("abc")); err == nil {
+		if err := ch.DeliverProfile(context.Background(), remote, bad, bytes.NewBufferString("abc")); err == nil {
 			t.Fatal("invalid result", change)
 		}
 	}
@@ -83,24 +82,24 @@ func TestProfileDeliveryBindsProcessRequestAndSingleUse(t *testing.T) {
 		if _, err := ch.EnqueueProfileCancel(stop, id, p.CaptureID, w.ID, now.Add(time.Second)); err != nil {
 			t.Error("active upload lost restrictive cancellation identity", err)
 		}
-		if err := ch.DeliverProfile(t.Context(), peer, epochA, r, bytes.NewBufferString("abc")); !errors.Is(err, ErrNodeConflict) {
+		if err := ch.DeliverProfile(t.Context(), peer, r, bytes.NewBufferString("abc")); !errors.Is(err, ErrNodeConflict) {
 			t.Error("active upload accepted duplicate delivery", err)
 		}
 	}
 	sink.err = errors.New("unknown store result")
-	if err := ch.DeliverProfile(context.Background(), peer, epochA, r, bytes.NewBufferString("abcdef")); !errors.Is(err, ErrNodeUnavailable) {
+	if err := ch.DeliverProfile(context.Background(), peer, r, bytes.NewBufferString("abcdef")); !errors.Is(err, ErrNodeUnavailable) {
 		t.Fatal(err)
 	}
 	if len(sink.results) != 1 || string(sink.bytes) != "abc" {
 		t.Fatal("unbounded result", sink.results, string(sink.bytes))
 	}
-	if err := ch.DeliverProfile(context.Background(), peer, epochA, r, bytes.NewBufferString("abc")); !errors.Is(err, ErrNodeConflict) {
+	if err := ch.DeliverProfile(context.Background(), peer, r, bytes.NewBufferString("abc")); !errors.Is(err, ErrNodeConflict) {
 		t.Fatal("uncertain delivery replay", err)
 	}
 }
 
 func TestProfileTLSQueueRequiresCurrentExplicitCapability(t *testing.T) {
-	ch, _, clock, changes := newChannel(t)
+	ch, clock, changes := newChannel(t)
 	clock.t = time.Now().UTC().Truncate(time.Microsecond)
 	peer, _ := enroll(t, ch, epochA)
 	const id = "00000000-0000-4000-8000-000000000001"
@@ -110,9 +109,9 @@ func TestProfileTLSQueueRequiresCurrentExplicitCapability(t *testing.T) {
 	ch.nodes[id] = entry
 	peer.NodeUID = id
 	now := clock.now()
-	r := report(1, now)
+	r := report(now)
 	r.Mechanisms = []collector.Availability{{Mechanism: collector.MechanismProfile, Prerequisites: true, Adapter: collector.AdapterAvailable}}
-	if err := ch.Report(peer, epochA, r); err != nil {
+	if err := ch.Report(peer, cur(ch, peer), r); err != nil {
 		t.Fatal(err)
 	}
 	material := execution.GoProfileTLSMaterial{RootsPEM: "bounded public bytes", ServerName: "profile.internal"}
@@ -124,11 +123,10 @@ func TestProfileTLSQueueRequiresCurrentExplicitCapability(t *testing.T) {
 	// Updating the same current process report must publish a changed assessment.
 	before := len(*changes)
 	clock.add(time.Second)
-	r.Sequence++
 	r.Mechanisms = append([]collector.Availability(nil), r.Mechanisms...)
 	r.ObservedAt = clock.now()
 	r.Mechanisms[0].ProfileTLS = true
-	if err := ch.Report(peer, epochA, r); err != nil || len(*changes) != before+1 {
+	if err := ch.Report(peer, cur(ch, peer), r); err != nil || len(*changes) != before+1 {
 		t.Fatal("TLS implementation observation not published", err, len(*changes), before)
 	}
 	authenticated := p
@@ -138,11 +136,10 @@ func TestProfileTLSQueueRequiresCurrentExplicitCapability(t *testing.T) {
 	}
 	before = len(*changes)
 	clock.add(time.Second)
-	r.Sequence++
 	r.ObservedAt = clock.now()
 	r.Mechanisms = append([]collector.Availability(nil), r.Mechanisms...)
 	r.Mechanisms[0].ProfileAuthorization = true
-	if err := ch.Report(peer, epochA, r); err != nil || len(*changes) != before+1 || !ch.Nodes()[0].ProfileAuthorizationAvailable() {
+	if err := ch.Report(peer, cur(ch, peer), r); err != nil || len(*changes) != before+1 || !ch.Nodes()[0].ProfileAuthorizationAvailable() {
 		t.Fatal("credential capability not published", err)
 	}
 	w, err := ch.EnqueueProfile(t.Context(), p, now.Add(3*time.Second))
@@ -154,7 +151,9 @@ func TestProfileTLSQueueRequiresCurrentExplicitCapability(t *testing.T) {
 	if err != nil || len(polled) != 1 || polled[0].Profile.TLS != material {
 		t.Fatal("caller mutation changed queued public trust", err)
 	}
-	clock.add(collector.StatusStaleAfter + time.Second)
+	ch.mu.Lock()
+	ch.nodes[peer.NodeUID].open = false
+	ch.mu.Unlock()
 	if ch.Nodes()[0].ProfileTLSAvailable() {
 		t.Fatal("stale report enabled TLS")
 	}

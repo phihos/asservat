@@ -24,7 +24,7 @@ rules:
   - apiGroups: [""]
     resources: [configmaps]
     resourceNames:
-      {{- range list "owner-source" "browser-settings" "identity-settings" "cluster-catalog" "download-environment" "processing-source" "fleet" }}
+      {{- range list "owner-source" "browser-settings" "identity-settings" "cluster-catalog" "download-environment" "processing-source" }}
       - {{ printf "%s-%s" $n . | quote }}
       {{- end }}
     verbs: [get]

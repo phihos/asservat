@@ -16,7 +16,6 @@ import (
 	"asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/packets"
 	"asservat.local/asservat/internal/adapters/pcap"
-	capacityapp "asservat.local/asservat/internal/application/capacity"
 	captureapp "asservat.local/asservat/internal/application/capture"
 	configapp "asservat.local/asservat/internal/application/configuration"
 	"asservat.local/asservat/internal/application/planning"
@@ -86,17 +85,6 @@ func policyMetadataExpectation(t testing.TB, a capture.Admission) artifact.Conte
 
 func TestPolicyMetadataBoundaryShapesOffline(t *testing.T) {
 	filters := pcap.NewCompiler()
-	q, snapshot := capacityNativeQualification(t, custodyID(), custodyID(), custodyID(), custodyID(), "key-v1")
-	policyMetadataProfile(&q, &snapshot)
-	pool, err := capacityapp.CompileProtectedPoolPlan(snapshot, snapshot.Pools[0].Resource.Name)
-	if err != nil {
-		t.Fatal("protected boundary source", err)
-	}
-	totals, err := capacityapp.CompileQualifiedRootBacking(q, pool)
-	if err != nil {
-		t.Fatal("protected boundary profile", err)
-	}
-	t.Logf("offline protected profile records=%d recordRow=%d primaryRecordWAL=%d backupCopies=%d WALCopies=%d; native installer records=4, scoped fixture records=3, no increase", totals.Totals().Records, q.RootBacking.Metadata.RecordRowBytes, q.RootBacking.Metadata.RecordWALBytes, q.RootBacking.Metadata.BackupCopies, q.RootBacking.Metadata.WALCopies)
 	for _, shape := range policyMetadataShapes(t) {
 		t.Run(shape.name, func(t *testing.T) {
 			now := time.Now().UTC().Truncate(time.Microsecond)

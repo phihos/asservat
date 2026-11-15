@@ -54,7 +54,7 @@ func (s *admittedWorkerIdentity) withCurrent(ctx context.Context, parent value.A
 // The caller owns one transaction. Preserve parent -> accepted configuration ->
 // worker lock order; never acquire a second pool connection.
 func (s *admittedWorkerIdentity) current(ctx context.Context, tx *custodydb.Queries, parent value.AcquisitionParent, workerID string, started time.Time, effect func(context.Context, *custodydb.Queries, admittedWorkerCheck, time.Time) error) error {
-	trust, _, err := currentTrust(ctx, tx, s.profile.InstallationID)
+	trust, err := currentTrust(ctx, tx, s.profile.InstallationID)
 	if err != nil {
 		return err
 	}

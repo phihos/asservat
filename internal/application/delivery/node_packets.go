@@ -129,12 +129,12 @@ func (c *NodeChannel) EnqueuePacketExpected(ctx context.Context, expected target
 // DeliverPacket hands one node's result for a queued capture to the sink.
 // Only the process the item was queued for may deliver, only once and only
 // before the capture's deadline.
-func (c *NodeChannel) DeliverPacket(ctx context.Context, p NodePeer, epoch string, r collector.PacketResult, body io.Reader) error {
+func (c *NodeChannel) DeliverPacket(ctx context.Context, p NodePeer, r collector.PacketResult, body io.Reader) error {
 	if ctx == nil || body == nil || !r.Valid() {
 		return ErrNodeInvalid
 	}
 	c.mu.Lock()
-	e, err := c.current(p, epoch)
+	e, err := c.current(p)
 	if err != nil {
 		c.mu.Unlock()
 		return err

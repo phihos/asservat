@@ -15,7 +15,6 @@ import (
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
-	"asservat.local/asservat/internal/application/capacity"
 	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/domain/artifact"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -107,7 +106,7 @@ func TestContextCommitWithRealServices(t *testing.T) {
 			if _, err := admin.Exec(ctx, "INSERT INTO custody_pool(id,store_id,revision,valid_until,byte_limit,object_limit) VALUES($1,$2,1,$3,$4,4)", poolID, storeID, validUntil, e.Registration.ReservedBytes()); err != nil {
 				t.Fatal(err)
 			}
-			if err := ledger.ProvisionAllocation(ctx, capacity.StorageAllocation{ID: allocationID, PoolID: poolID, ScopeID: custodyID(), ServiceClass: "context", PoolRevision: 1, Revision: 1, Bytes: e.Registration.ReservedBytes(), Objects: 4, ValidUntil: validUntil}); err != nil {
+			if err := provisionAllocation(ctx, admin, testAllocation{ID: allocationID, PoolID: poolID, ScopeID: custodyID(), ServiceClass: "context", PoolRevision: 1, Revision: 1, Bytes: e.Registration.ReservedBytes(), Objects: 4, ValidUntil: validUntil}); err != nil {
 				t.Fatal(err)
 			}
 			if _, err := ledger.Register(ctx, e.Registration); err != nil {

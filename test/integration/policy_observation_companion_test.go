@@ -3,8 +3,8 @@ package integration
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"reflect"
 	"testing"
 	"time"
@@ -99,19 +99,9 @@ func qualifyPolicyObservationCompanion(t *testing.T, ctx context.Context, admin,
 	node, boot, collectorPod, epoch := custodyID(), custodyID(), custodyID(), custodyID()
 	// The actual queue is exercised with explicitly synthetic attestation and
 	// issuance. No native collector, certificate or Kubernetes proof is claimed.
-	channel, err := delivery.NewNodeChannel(policyObservationNode{collector.Identity{NodeName: "worker", NodeUID: node, PodUID: collectorPod, BootID: boot}}, policyObservationNodeIssuer{}, clock, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	der, _, nodeIdentity, err := channel.Enroll(ctx, "synthetic-component", []byte("synthetic-token"), []byte("synthetic-csr"), boot, epoch)
-	if err != nil {
-		t.Fatal(err)
-	}
-	peer, err := channel.Peer(sha256.Sum256(der))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err = channel.Report(peer, epoch, collector.Report{Sequence: 1, ObservedAt: clock(), Facts: collector.Facts{Kernel: collector.KernelVersion{Major: 6, Minor: 8}}, Mechanisms: []collector.Availability{{Mechanism: collector.MechanismPacket, Prerequisites: true, Adapter: collector.AdapterAvailable, Hook: collector.HookTC}}}); err != nil {
+	nodeIdentity := collector.Identity{NodeName: "worker", NodeUID: node, PodUID: collectorPod, BootID: boot, Epoch: epoch}
+	channel, peer := connectSyntheticNode(t, clock, nodeIdentity)
+	if err = channel.Report(peer, 1, collector.Report{ObservedAt: clock(), Facts: collector.Facts{Kernel: collector.KernelVersion{Major: 6, Minor: 8}}, Mechanisms: []collector.Availability{{Mechanism: collector.MechanismPacket, Prerequisites: true, Adapter: collector.AdapterAvailable, Hook: collector.HookTC}}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -329,7 +319,7 @@ func qualifyPolicyObservationCompanion(t *testing.T, ctx context.Context, admin,
 	if err != nil {
 		t.Fatal("actual typed policy holder", err)
 	}
-	work, err := channel.Poll(ctx, peer, epoch, 0, 0)
+	work, err := syntheticPoll(ctx, channel, peer, 0)
 	if err != nil || len(work) != 1 || work[0].Packet.Observation == nil || *work[0].Packet.Observation != permit || !work[0].NotAfter.Equal(permit.StartBy) {
 		t.Fatal("actual queue original finite work", work, err)
 	}
@@ -343,10 +333,10 @@ func qualifyPolicyObservationCompanion(t *testing.T, ctx context.Context, admin,
 	if wait := time.Until(resultPacket.EndedAt); wait > 0 {
 		time.Sleep(wait)
 	}
-	if err = channel.DeliverPacket(ctx, peer, epoch, resultPacket, bytes.NewReader(native)); err != nil {
+	if err = channel.DeliverPacket(ctx, peer, resultPacket, bytes.NewReader(native)); err != nil {
 		t.Fatal("actual channel/holder storage", err)
 	}
-	if err = channel.DeliverPacket(ctx, peer, epoch, resultPacket, bytes.NewReader(native)); err == nil {
+	if err = channel.DeliverPacket(ctx, peer, resultPacket, bytes.NewReader(native)); err == nil {
 		t.Fatal("duplicate finite delivery accepted")
 	}
 	signed := fleet.APIContextWork{CaptureID: accepted.CaptureID, AttemptID: e.Registration.Location.AttemptID, ExpectationDigest: evidence.ContextExpectationDigest(e)}
@@ -391,18 +381,17 @@ func qualifyPolicyObservationCompanion(t *testing.T, ctx context.Context, admin,
 
 // Synthetic node trust exists only in this SQL/storage component fixture. The
 // queue, source comparison, result ownership and holder storage are real code.
-type policyObservationNode struct{ identity collector.Identity }
-
-func (n policyObservationNode) PrecheckNode([]byte) error { return nil }
-func (n policyObservationNode) AttestNode(context.Context, []byte, string) (collector.Identity, error) {
-	return n.identity, nil
-}
-
-type policyObservationNodeIssuer struct{}
-
-func (policyObservationNodeIssuer) IssueNode([]byte, collector.Identity, time.Time) ([]byte, [32]byte, error) {
-	b := []byte("synthetic-policy-component-certificate")
-	return b, sha256.Sum256(b), nil
+func connectSyntheticNode(t *testing.T, now func() time.Time, id collector.Identity) (*delivery.NodeChannel, delivery.NodePeer) {
+	t.Helper()
+	channel, err := delivery.NewNodeChannel(now, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	peer, _, err := channel.Connect(id, []collector.WorkKind{collector.WorkPacketCapture, collector.WorkSyscallCapture, collector.WorkCancelPacketCapture, collector.WorkPacketSource, collector.WorkStopPacketSource, collector.WorkPacketSourceSnapshot, collector.WorkCancelSourceSnapshot, collector.WorkLiveRead})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return channel, peer
 }
 
 func TestPolicyObservationSyntheticPacketProgram(t *testing.T) {
@@ -411,4 +400,16 @@ func TestPolicyObservationSyntheticPacketProgram(t *testing.T) {
 	if out := syntheticFilteredRecording(t, time.Now(), policyRawProgram, 2); len(out) == 0 {
 		t.Fatal("missing synthetic filtered PCAPNG")
 	}
+}
+
+// syntheticPoll returns queued work of the single synthetic stream (stream 1),
+// or none when nothing is queued.
+func syntheticPoll(ctx context.Context, channel *delivery.NodeChannel, peer delivery.NodePeer, after uint64) ([]collector.Work, error) {
+	bounded, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
+	defer cancel()
+	work, err := channel.Next(bounded, peer, 1, after)
+	if errors.Is(err, delivery.ErrNodeUnavailable) && ctx.Err() == nil {
+		return nil, nil
+	}
+	return work, err
 }

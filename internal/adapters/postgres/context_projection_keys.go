@@ -158,7 +158,7 @@ func (s *ProjectionKeys) Resolve(ctx context.Context, peer value.KeyPeer, r valu
 		if e != nil || count != 1 {
 			return auth.ErrKeyDenied
 		}
-		trust, _, e := currentTrust(ctx, tx, s.scope.InstallationID)
+		trust, e := currentTrust(ctx, tx, s.scope.InstallationID)
 		if e != nil {
 			return e
 		}

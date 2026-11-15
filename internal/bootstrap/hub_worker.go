@@ -35,8 +35,8 @@ type hubWorker struct {
 	ids       contracts.InstallationIDs
 	files     *os.Root
 	namespace cfg.NamespaceRef
-	// fleetUID and ownerUID are the source ConfigMaps' UIDs, read by name.
-	fleetUID, ownerUID string
+	// ownerUID is the owner source ConfigMap's UID, read by name.
+	ownerUID string
 	// inputs reads mounted credentials and builds Kubernetes/SQL clients.
 	inputs     *providerInputs
 	auditStore contracts.OwnerAuditStore
@@ -134,12 +134,12 @@ func validateHubWorkerConfig(c contracts.HubWorkerConfig) error {
 	if len(validation.IsDNS1123Label(c.Namespace)) != 0 || len(validation.IsDNS1123Subdomain(c.ServiceAccount)) != 0 {
 		return mounts.ErrUnavailable
 	}
-	for _, name := range []string{c.FleetSource, c.OwnerSource, c.LeaderLease} {
+	for _, name := range []string{c.OwnerSource, c.LeaderLease} {
 		if len(validation.IsDNS1123Subdomain(name)) != 0 {
 			return mounts.ErrUnavailable
 		}
 	}
-	if c.FleetSource == c.OwnerSource || c.Postgres.Port < 1 || c.Postgres.Port > 65535 || c.Postgres.Database == "" || c.Postgres.Host == "" ||
+	if c.Postgres.Port < 1 || c.Postgres.Port > 65535 || c.Postgres.Database == "" || c.Postgres.Host == "" ||
 		!ownerEndpoint(c.AuditStore.Endpoint) || c.AuditStore.Bucket == "" || c.AuditStore.Region == "" || !ownerEndpoint(c.KeyService.Endpoint) ||
 		!ownerProviderName.MatchString(c.KeyService.AuditMount) || !ownerProviderName.MatchString(c.KeyService.AuditKey) ||
 		!ownerProviderName.MatchString(c.Provider.AuthMount) || c.Provider.Audience == "" ||
@@ -247,9 +247,6 @@ func newHubWorker(ctx context.Context, files, idFiles *os.Root) (_ *hubWorker, e
 		return nil, err
 	}
 	at = "sources"
-	if w.fleetUID, err = observer.ConfigMapUID(startup, c.FleetSource); err != nil {
-		return nil, err
-	}
 	if w.ownerUID, err = observer.ConfigMapUID(startup, c.OwnerSource); err != nil {
 		return nil, err
 	}
@@ -302,10 +299,6 @@ func newHubWorker(ctx context.Context, files, idFiles *os.Root) (_ *hubWorker, e
 	}
 	w.closers = append(w.closers, w.audit.Close)
 	at = "sources"
-	fleetSource, err := kube.NewFleetSettingsClient(observer, c.FleetSource, w.fleetUID, w.ids.InstallationID, w.ids.IssuerEpoch)
-	if err != nil {
-		return nil, err
-	}
 	// The owner issuer roots are the owner PKI CA (unauthenticated read).
 	ownerRoots := func(ctx context.Context) ([][]byte, error) {
 		return kms.ReadPKIRoots(ctx, c.KeyService.Endpoint, w.keyRoots, contracts.SmallOpenBaoOwnerPKIMount)
@@ -315,7 +308,7 @@ func newHubWorker(ctx context.Context, files, idFiles *os.Root) (_ *hubWorker, e
 		return nil, err
 	}
 	w.reconciler = &app.ConfigurationReconciler{
-		Fleet: &app.TrustObserver{Settings: fleetSource, Projection: &configurationRuntimeFleetProjection{actual: fleetStore, admission: w.admission}, Now: time.Now},
+		Fleet: &app.TrustObserver{Settings: installationTrust{w.ids.InstallationID, w.ids.IssuerEpoch}, Projection: &configurationRuntimeFleetProjection{actual: fleetStore, admission: w.admission}, Now: time.Now},
 		Owner: &app.OwnerConfigurationObserver{Reader: ownerSource, Ledger: ownerStore, Audit: w.audit, Acknowledgements: ack, Now: time.Now},
 	}
 	at = "leader"

@@ -95,7 +95,7 @@ func qualifyDownloadControl(t *testing.T, ctx context.Context, admin *pgxpool.Po
 				t.Fatal("source reader gained writes", q)
 			}
 		}
-		allocation := artifact.DownloadAllocation{ID: custodyID(), RootID: root, ClusterID: scope.ClusterID, NamespaceUID: scope.NamespaceUID, WorkloadUID: scope.WorkloadUID, OutputLimit: 1 << 20, ReadLimit: 128 << 20, SessionLimit: 16, ValidUntil: time.Now().UTC().Add(time.Minute).Truncate(time.Microsecond)}
+		allocation := artifact.DownloadAllocation{ID: custodyID(), RootID: root, ClusterID: scope.ClusterID, NamespaceUID: scope.NamespaceUID, WorkloadUID: scope.WorkloadUID, OutputLimit: 1 << 20, ReadLimit: 128 << 20, ValidUntil: time.Now().UTC().Add(time.Minute).Truncate(time.Microsecond)}
 		if err = config.BindDownloadAllocation(ctx, allocation); err != nil {
 			t.Fatal(err)
 		}

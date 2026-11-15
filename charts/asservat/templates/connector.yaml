@@ -37,7 +37,7 @@
 {{- $_ := set $cfg "executor" $xc }}
 {{- end }}
 {{- if $collector }}
-{{- $_ := set $cfg "collector" (dict "namespace" .Values.collector.namespace "daemonSet" (printf "%s-node" $n) "serviceAccount" (printf "%s-node" $n) "listenerSecret" $nodes "rootConfigMap" (printf "%s-node-connector-ca" $n) "serverName" (printf "%s.%s.svc" $nodes $ns)) }}
+{{- $_ := set $cfg "collector" (dict "namespace" .Values.collector.namespace "serviceAccount" (printf "%s-node" $n) "listenerSecret" $nodes "rootConfigMap" (printf "%s-node-connector-ca" $n) "serverName" (printf "%s.%s.svc" $nodes $ns)) }}
 {{- end }}
 {{- $json := toJson $cfg }}
 apiVersion: v1

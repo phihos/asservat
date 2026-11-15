@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
 	value "asservat.local/asservat/internal/domain/privacy"
 )
@@ -19,7 +18,7 @@ const (
 
 type retentionPreviewFixture struct {
 	caller   identity.Identity
-	admin    fleet.Administration
+	admin    identity.Policy
 	adminErr error
 	catalog  value.PreviewCatalog
 	reads    int
@@ -37,7 +36,10 @@ func (f *retentionPreviewFixture) ResolveIdentity(context.Context) (identity.Ide
 	}
 	return i, nil
 }
-func (f *retentionPreviewFixture) FleetAdministration(context.Context) (fleet.Administration, error) {
+func (f *retentionPreviewFixture) IdentityPolicy(_ context.Context, issuer string) (identity.Policy, error) {
+	if issuer != f.admin.Issuer {
+		return identity.Policy{}, identity.ErrDenied
+	}
 	return f.admin, f.adminErr
 }
 func (f *retentionPreviewFixture) RetentionPreviewCatalog(_ context.Context, limit int) (value.PreviewCatalog, error) {
@@ -60,17 +62,16 @@ func newRetentionPreviewFixture() (*retentionPreviewFixture, RetentionPreviewer)
 	rev := identity.Revision{UID: "policy", Generation: 1, Digest: [32]byte{1}}
 	f := &retentionPreviewFixture{}
 	f.caller = identity.Identity{Principal: identity.Principal{Issuer: "https://id.example.invalid", Subject: "admin", ClientID: "console", Kind: identity.Human}, Groups: []string{"platform-admins"}, Policy: rev, VerifiedAt: n, ValidUntil: n.Add(30 * time.Second)}
-	f.admin = fleet.Administration{InstallationID: retentionPreviewInstallation, IssuerEpoch: retentionPreviewInstallation, Issuer: f.caller.Principal.Issuer, Revision: rev, ObservedAt: n, FreshUntil: n.Add(5 * time.Second),
-		Clients: []string{"console"}, Groups: []string{"platform-admins"}, DeliveryProfiles: []string{"kv"}, MaxActiveBootstraps: 1, MaxBootstrapHistory: 1, MaxClusters: 1}
+	f.admin = identity.Policy{Issuer: f.caller.Principal.Issuer, Revision: rev, ObservedAt: n, FreshUntil: n.Add(5 * time.Second), AdministratorGroups: []string{"platform-admins"}}
 	baseline := value.ScopedPolicy{Name: "baseline", Policy: value.Policy{Revision: identity.Revision{UID: "baseline", Generation: 1, Digest: artifact.Digest{1}}, Baseline: true, PurposeRef: "diagnostics", DefaultSeconds: 600, MaximumSeconds: 7200, DeletionBudgetSeconds: 300}, CaseDefaultSeconds: 3600, CaseMaximumSeconds: 7200, AuditDefaultSeconds: 3600, AuditMaximumSeconds: 7200, LegalExceptions: "disabled"}
 	snapshot := value.PolicySnapshot{SourceClusterID: retentionPreviewCluster, ControlNamespaceUID: "control", Hub: true, Revision: rev, ObservedAt: n, FreshUntil: n.Add(5 * time.Second), Policies: []value.ScopedPolicy{baseline}}
 	f.catalog = value.PreviewCatalog{Sources: []value.PreviewSource{{Ref: value.PolicySourceRef{ClusterID: retentionPreviewCluster, ControlNamespaceUID: "control", Hub: true}, Ready: true, Current: &snapshot}}}
-	return f, RetentionPreviewer{InstallationID: retentionPreviewInstallation, Administration: f, Catalog: f, Decoder: f, Now: time.Now}
+	return f, RetentionPreviewer{InstallationID: retentionPreviewInstallation, Administrators: f, Catalog: f, Decoder: f, Now: time.Now}
 }
 
 var shortenBaseline = []ProposedRetentionChange{{Action: "update", UID: "baseline", Spec: []byte(`{"maxima":"short"}`)}}
 
-// ADR-240: a current fleet operator previews a proposed change over the
+// ADR-240: an administrator previews a proposed change over the
 // catalog; the reply deadline never exceeds identity or administration
 // freshness.
 func TestRetentionPreviewFleetOperator(t *testing.T) {
@@ -81,13 +82,12 @@ func TestRetentionPreviewFleetOperator(t *testing.T) {
 	}
 }
 
-// Callers who are not current fleet operators learn nothing: no proposal is
+// Callers who are not administrators learn nothing: no proposal is
 // decoded and no catalog read.
 func TestRetentionPreviewNonOperatorRefused(t *testing.T) {
 	for name, change := range map[string]func(*retentionPreviewFixture){
 		"other-group":  func(f *retentionPreviewFixture) { f.caller.Groups = []string{"team-a"} },
-		"other-client": func(f *retentionPreviewFixture) { f.caller.Principal.ClientID = "mcp" },
-		"suspended":    func(f *retentionPreviewFixture) { f.admin.Suspended = true },
+		"other-issuer": func(f *retentionPreviewFixture) { f.caller.Principal.Issuer = "https://other.example.invalid" },
 		"expired":      func(f *retentionPreviewFixture) { f.caller.ValidUntil = time.Now().Add(-time.Second) },
 	} {
 		f, s := newRetentionPreviewFixture()

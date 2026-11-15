@@ -53,9 +53,7 @@ func testNodeSourceSnapshot(t *testing.T, stopped bool) {
 		t.Fatal(err)
 	}
 	<-ready
-	n := &nodeSources{now: clock.now, budget: b, budgetMu: mu, sources: map[string]*packetSource{p.Binding.SourceID: source}, identity: func() collector.Identity {
-		return collector.Identity{NodeUID: p.Binding.NodeUID, PodUID: p.Binding.CollectorPodUID, BootID: p.Binding.BootID, Epoch: p.Binding.CollectorEpoch}
-	}, takeUpload: func(context.Context, int64) bool { return true }, upload: func(ctx context.Context, _ string, r collector.PacketResult, native []byte) error {
+	n := &nodeSources{now: clock.now, budget: b, budgetMu: mu, sources: map[string]*packetSource{p.Binding.SourceID: source}, takeUpload: func(context.Context, int64) bool { return true }, upload: func(ctx context.Context, r collector.PacketResult, native []byte) error {
 		if count, err := packets.CheckHeadersOnly(bytes.NewReader(native)); err != nil || count != 1 || bytes.Contains(native, []byte("secret-payload")) {
 			t.Errorf("unsafe snapshot %d %v", count, err)
 		}
@@ -85,7 +83,7 @@ func testNodeSourceSnapshot(t *testing.T, stopped bool) {
 	request := artifact.SourceSnapshotRequest{SourceBindingDigest: artifact.Digest(deliveryapp.SourceBindingDigest(p.Binding)), SourceID: p.Binding.SourceID, Fence: p.Binding.Fence, SnapshotID: p.Binding.SourceID, SourceStartedAt: p.StartedAt, SourceHardUntil: p.HardUntil, T0: clock.now(), IssuedAt: clock.now(), StartBy: now.Add(time.Second), ProcessingUntil: now.Add(time.Minute), Before: time.Second, MaxBytes: 65536}
 	snapshot := collector.SourceSnapshot{AttemptID: p.Binding.SourceID, WriterPodUID: p.Binding.SourceID, WriterEpoch: p.Binding.SourceID, Binding: p.Binding, CaptureID: p.Binding.SourceID, ExpectationDigest: [32]byte{5}, Request: request}
 	work := collector.Work{ID: p.Binding.SourceID, Sequence: 1, Kind: collector.WorkPacketSourceSnapshot, NotAfter: request.StartBy, Snapshot: &snapshot}
-	if r := n.decide(t.Context(), p.Binding.CollectorEpoch, work); r.Outcome != collector.OutcomeAccepted {
+	if r := n.decide(t.Context(), work); r.Outcome != collector.OutcomeAccepted {
 		t.Fatal(r)
 	}
 	var result collector.PacketResult
@@ -101,7 +99,7 @@ func testNodeSourceSnapshot(t *testing.T, stopped bool) {
 	if result.Snapshot == nil || result.Snapshot.WindowComplete || result.Snapshot.HistoryComplete || result.StartedAt != now || !result.EndedAt.Equal(expectedEnd) || stopped && !result.EndedAt.Equal(result.Snapshot.SourceStoppedAt) {
 		t.Fatal("fabricated quiet coverage or changed cutoff", result)
 	}
-	if r := n.decide(t.Context(), p.Binding.CollectorEpoch, work); r.Outcome != collector.OutcomeAccepted {
+	if r := n.decide(t.Context(), work); r.Outcome != collector.OutcomeAccepted {
 		t.Fatal("lost exact replay", r)
 	}
 	mu.Lock()
@@ -126,7 +124,7 @@ func testNodeSourceSnapshot(t *testing.T, stopped bool) {
 	bad := snapshot
 	bad.Binding.Fence = "22222222-2222-4222-8222-222222222222"
 	work.Snapshot = &bad
-	if r := n.decide(t.Context(), p.Binding.CollectorEpoch, work); r.Outcome == collector.OutcomeAccepted {
+	if r := n.decide(t.Context(), work); r.Outcome == collector.OutcomeAccepted {
 		t.Fatal("accepted substituted fence")
 	}
 }

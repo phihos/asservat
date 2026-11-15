@@ -13,7 +13,7 @@ import (
 func workerSchedulingAdministration() value.Administration {
 	const id = "11111111-1111-4111-8111-111111111111"
 	now := time.Now().UTC()
-	return value.Administration{InstallationID: id, IssuerEpoch: id, Issuer: "https://issuer.example", Revision: identity.Revision{UID: id, Generation: 1, Digest: [32]byte{1}}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), Clients: []string{"client"}, DeliveryProfiles: []string{"context"}, MaxActiveBootstraps: 1, MaxBootstrapHistory: 2, MaxClusters: 1}
+	return value.Administration{InstallationID: id, IssuerEpoch: id, Revision: identity.Revision{UID: id, Generation: 1, Digest: [32]byte{1}}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
 }
 
 // This fixture supplies synthetic scheduling notifications only. It proves
@@ -99,7 +99,7 @@ func TestWorkerRuntimeNoticeDoesNotSelectBeforeCommittedOriginalRead(t *testing.
 }
 
 func TestWorkerRuntimeNoticeClosesActiveBeforeUnavailableFenceAndRetainsSlot(t *testing.T) {
-	for _, mode := range []string{"unavailable", "changed", "same-revision-mutation", "expired-commit", "unknown-commit"} {
+	for _, mode := range []string{"unavailable", "changed", "expired-commit", "unknown-commit"} {
 		t.Run(mode, func(t *testing.T) {
 			gate, err := NewWorkerRuntimeAdmission(t.Context())
 			if err != nil {
@@ -122,9 +122,6 @@ func TestWorkerRuntimeNoticeClosesActiveBeforeUnavailableFenceAndRetainsSlot(t *
 			case "changed":
 				a.Revision.Generation++
 				a.Revision.Digest[0]++
-				gate.NoteFleetObservation(a)
-			case "same-revision-mutation":
-				a.Clients[0] = "other"
 				gate.NoteFleetObservation(a)
 			case "expired-commit":
 				a.ObservedAt = time.Now().Add(-6 * time.Second)

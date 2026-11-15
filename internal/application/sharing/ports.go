@@ -8,7 +8,6 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/capture"
-	"asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
 )
 
@@ -26,8 +25,8 @@ type Request struct {
 // a current manager (ADR-232 increment 4): Managers are the pinned assignment
 // IDs the service found the actor holding now; the store requires each to be
 // pinned by the row. Administrator marks an installation administrator's
-// revocation (ADR-238): the service checked the protected fleet
-// administration; revocation only restricts access.
+// revocation (ADR-238): the service checked identity.administrators;
+// revocation only restricts access.
 type Revocation struct {
 	OperationID      string `json:"-"`
 	ShareID          string
@@ -50,7 +49,7 @@ type Transfer struct {
 	Managers    []string
 	// Administrator marks an installation administrator's assignment or
 	// recovery (the service checked the fleet administration); the store
-	// then requires no pinned manager.
+	// recovery (the service checked identity.administrators); the store
 	Administrator    bool
 	Management       []artifact.AudienceAssignment
 	ExpectedRevision int64
@@ -83,11 +82,11 @@ type ShareCursor struct {
 	ID        string
 }
 
-// Administrators reads the protected fleet administration whose operators
-// are the installation administrators (ADR-237, ADR-238). It grants them no
-// evidence read: the share service uses it only to let them revoke.
+// Administrators reads the identity settings whose administrators list
+// names the installation administrators (ADR-238, ADR-335 D14). It grants
+// them no evidence read: the share service uses it only to let them revoke.
 type Administrators interface {
-	FleetAdministration(context.Context) (fleet.Administration, error)
+	IdentityPolicy(context.Context, string) (identity.Policy, error)
 }
 
 // PolicySharing is one policy acceptance's recurring sharing (ADR-239): its

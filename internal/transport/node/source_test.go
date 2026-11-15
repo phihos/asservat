@@ -1,7 +1,6 @@
 package node
 
 import (
-	deliveryapp "asservat.local/asservat/internal/application/delivery"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -9,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	deliveryapp "asservat.local/asservat/internal/application/delivery"
 
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/collector"
@@ -79,8 +80,8 @@ func TestSourceStatusMaximumAndUnknownCounterValidation(t *testing.T) {
 		id := fmt.Sprintf("11111111-1111-4111-8111-%012x", i)
 		r.Sources = append(r.Sources, collector.SourceStatus{SourceStoppedAt: r.ObservedAt, SnapshotUntil: r.ObservedAt.Add(30 * time.Second), Stopped: true, SourceID: id, Fence: id, IssuedAt: r.ObservedAt, LeafUntil: r.ObservedAt.Add(30 * time.Second), Credit: 1<<63 - 1, ObservedBytes: 1<<63 - 2})
 		if i == 15 || i == 1023 || i == int(collector.SourceStatusLimit)-1 {
-			raw, err := json.Marshal(WireStatus("epoch", r))
-			if err != nil || len(raw) > contracts.NodeStatusMaxRequest {
+			raw, err := json.Marshal(WireStatus(r))
+			if err != nil || len(raw) > contracts.NodeMaxMessage {
 				t.Fatal("maximum source status overflow", len(raw), err)
 			}
 			t.Logf("%d source statuses: %d bytes", i+1, len(raw))
@@ -89,10 +90,10 @@ func TestSourceStatusMaximumAndUnknownCounterValidation(t *testing.T) {
 	normal := sampleReport()
 	normal.ObservedAt = r.ObservedAt
 	normal.Sources = r.Sources[:16]
-	normalRaw, _ := json.Marshal(WireStatus("epoch", normal))
+	normalRaw, _ := json.Marshal(WireStatus(normal))
 	t.Logf("16 source statuses with normal base report and maximum counters: %d bytes", len(normalRaw))
-	raw, _ := json.Marshal(WireStatus("epoch", r))
-	wire, err := contracts.DecodeNodeStatus(bytes.NewReader(raw))
+	raw, _ := json.Marshal(WireStatus(r))
+	wire, err := decodeStatus(bytes.NewReader(raw))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +112,7 @@ func TestSourceStatusMaximumAndUnknownCounterValidation(t *testing.T) {
 		"over-count":       func(w *contracts.NodeStatus) { w.Sources = append(w.Sources, w.Sources[0]) },
 	} {
 		t.Run(name, func(t *testing.T) {
-			w := WireStatus("epoch", r)
+			w := WireStatus(r)
 			change(&w)
 			if _, ok := DomainStatus(w); ok {
 				t.Fatal("invalid counters accepted")

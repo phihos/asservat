@@ -25,7 +25,7 @@ type nodeSourceSnapshot struct {
 // snapshotLocked runs with the manager lock held. Registration and the original
 // pre-copy happen before scheduling; neither replay nor a later source arm can
 // substitute another source or a newer window.
-func (n *nodeSources) snapshotLocked(parent context.Context, epoch string, w collector.Work, r collector.Receipt) collector.Receipt {
+func (n *nodeSources) snapshotLocked(parent context.Context, w collector.Work, r collector.Receipt) collector.Receipt {
 	x := *w.Snapshot
 	q := x.Request
 	now := n.now()
@@ -90,12 +90,12 @@ func (n *nodeSources) snapshotLocked(parent context.Context, epoch string, w col
 	owned := &nodeSourceSnapshot{work: x, cancel: cancel, done: make(chan struct{})}
 	n.snapshots[q.SnapshotID] = owned
 	n.snapshotWG.Add(1)
-	go n.runSnapshot(processing, epoch, w.ID, owned, copy)
+	go n.runSnapshot(processing, w.ID, owned, copy)
 	r.Outcome, r.Reason = collector.OutcomeAccepted, ""
 	return r
 }
 
-func (n *nodeSources) runSnapshot(ctx context.Context, epoch, workID string, owned *nodeSourceSnapshot, copy *packetSourceSnapshot) {
+func (n *nodeSources) runSnapshot(ctx context.Context, workID string, owned *nodeSourceSnapshot, copy *packetSourceSnapshot) {
 	defer n.snapshotWG.Done()
 	x, q := owned.work, owned.work.Request
 	defer func() {
@@ -121,7 +121,7 @@ func (n *nodeSources) runSnapshot(ctx context.Context, epoch, workID string, own
 	}
 	if err := copy.Complete(n.now()); err != nil {
 		n.snapshotFailed(x, "complete", err)
-		n.uploadSnapshotFailure(ctx, epoch, workID, x, copy.records)
+		n.uploadSnapshotFailure(ctx, workID, x, copy.records)
 		return
 	}
 	coverage, pre := copy.Coverage(), copy.HistoryCoverage()
@@ -142,7 +142,7 @@ func (n *nodeSources) runSnapshot(ctx context.Context, epoch, workID string, own
 	}
 	if err != nil {
 		n.snapshotFailed(x, "encode", err)
-		n.uploadSnapshotFailure(ctx, epoch, workID, x, copy.records)
+		n.uploadSnapshotFailure(ctx, workID, x, copy.records)
 		return
 	}
 	defer clear(native[:cap(native)])
@@ -152,7 +152,7 @@ func (n *nodeSources) runSnapshot(ctx context.Context, epoch, workID string, own
 	// with no syscalls in a whole window turn out to matter.
 	if counters.Retained == 0 && (!coverage.Complete || copy.records) {
 		n.snapshotFailed(x, "empty", fmt.Errorf("window %s..%s available from %s, stopped %s, closed %s, evicted %t, input unknown %t; source %s", coverage.Requested.From.Format(time.RFC3339Nano), coverage.Requested.Until.Format(time.RFC3339Nano), coverage.AvailableFrom.Format(time.RFC3339Nano), coverage.SourceStoppedAt.Format(time.RFC3339Nano), coverage.SourceClosedAt.Format(time.RFC3339Nano), coverage.HistoryEvicted, coverage.InputUnknown, n.sourceCounters(x.Binding.SourceID)))
-		n.uploadSnapshotFailure(ctx, epoch, workID, x, copy.records)
+		n.uploadSnapshotFailure(ctx, workID, x, copy.records)
 		return
 	}
 	completed := n.now().UTC()
@@ -166,7 +166,7 @@ func (n *nodeSources) runSnapshot(ctx context.Context, epoch, workID string, own
 	}
 	if n.takeUpload(ctx, result.CapturedBytes) {
 		uploadStarted := n.now()
-		err := n.upload(ctx, epoch, result, native)
+		err := n.upload(ctx, result, native)
 		if n.log != nil {
 			n.log(fmt.Sprintf("node collector: source %s snapshot %s: %d events, %d bytes, completed %s, upload %s (%v); source %s", x.Binding.SourceID, q.SnapshotID, counters.Retained, len(native), completed.Format(time.RFC3339Nano), n.now().Sub(uploadStarted).Round(10*time.Millisecond), err, n.sourceCounters(x.Binding.SourceID)))
 		}
@@ -177,7 +177,7 @@ func (n *nodeSources) runSnapshot(ctx context.Context, epoch, workID string, own
 // path. The connector discards this placeholder and never creates an artifact.
 // The connector checks the native type before the failure, so a syscall
 // source's failure carries its type (the placeholder bytes are discarded).
-func (n *nodeSources) uploadSnapshotFailure(ctx context.Context, epoch, workID string, x collector.SourceSnapshot, records bool) {
+func (n *nodeSources) uploadSnapshotFailure(ctx context.Context, workID string, x collector.SourceSnapshot, records bool) {
 	if ctx.Err() != nil {
 		return
 	}
@@ -199,7 +199,7 @@ func (n *nodeSources) uploadSnapshotFailure(ctx context.Context, epoch, workID s
 		result.NativeType = artifact.SyscallRecordsArtifact
 	}
 	if result.Valid() && n.takeUpload(ctx, result.CapturedBytes) {
-		_ = n.upload(ctx, epoch, result, native)
+		_ = n.upload(ctx, result, native)
 	}
 }
 
