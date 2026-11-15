@@ -10,6 +10,7 @@ import (
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
 	authapp "asservat.local/asservat/internal/application/authorization"
+	app "asservat.local/asservat/internal/application/capacity"
 	"asservat.local/asservat/internal/application/evidence"
 	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -86,6 +87,41 @@ func qualifyCapacityAccountsSQL(t *testing.T, ctx context.Context, admin *pgxpoo
 			t.Fatal("step", i, step.fn, s, step.want)
 		}
 	}
+	// An update to a lower share and limit keeps charged bytes, refuses new
+	// charges above the new limit and releases back to the new share.
+	apply := func(v app.CapacityValues) {
+		t.Helper()
+		if _, err := postgres.ApplyCapacity(ctx, f.roles["capacity"], f.input.ControlClusterID, f.input.ControlNamespaceUID, f.qualification, v); err != nil {
+			t.Fatal("capacity update", err)
+		}
+	}
+	protected := func() int64 {
+		t.Helper()
+		var b int64
+		if err := admin.QueryRow(ctx, `SELECT protected_bytes FROM capacity_account WHERE allocation_id=$1`, e.AllocationID).Scan(&b); err != nil {
+			t.Fatal("protected share", err)
+		}
+		return b
+	}
+	if !call("capacity_charge", 3*mib) {
+		t.Fatal("charge up to the hard limit refused")
+	}
+	lower := values
+	lower.ShareBytes, lower.LimitBytes = mib/2, 2*mib
+	apply(lower)
+	if s := read(); s != (state{limit: 3 * mib, charged: 3 * mib, pool: 3 * mib, accounts: 1, bindings: 1, revision: 3}) || protected() != mib/2 {
+		t.Fatal("lower update dropped charged bytes", s)
+	}
+	if call("capacity_charge", 1) {
+		t.Fatal("charge above the lowered limit admitted")
+	}
+	if !call("capacity_release", 3*mib) {
+		t.Fatal("release refused")
+	}
+	if s := read(); s != (state{limit: mib / 2, pool: mib / 2, accounts: 1, bindings: 1, revision: 3}) {
+		t.Fatal("release did not return to the new share", s)
+	}
+	apply(f.values)
 	f.managedContextDownload(t, root, e)
 }
 
