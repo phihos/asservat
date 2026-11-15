@@ -98,7 +98,6 @@ func qualifyDownloadStopLifecycle(t *testing.T, ctx context.Context, admin *pgxp
 				t.Helper()
 				now := time.Now().UTC().Truncate(time.Microsecond)
 				batch := scenario.batch
-				batch.Initial = nil
 				batch.ObservedAt = now
 				batch.FreshUntil = now.Add(5 * time.Second)
 				if e := scenario.p.RefreshPermissions(ctx, batch); e != nil {

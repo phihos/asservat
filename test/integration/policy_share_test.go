@@ -77,7 +77,6 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 			t.Fatal("policy share current original fleet source", err)
 		}
 		b := s.batch
-		b.Initial = nil
 		b.ObservedAt = clock()
 		b.FreshUntil = b.ObservedAt.Add(5 * time.Second)
 		if err := s.p.RefreshPermissions(ctx, b); err != nil {

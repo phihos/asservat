@@ -20,10 +20,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// maxReviewAssignments bounds the current per-principal assignments of one
-// decision-time source; a principal beyond it gains nothing from the source.
-const maxReviewAssignments = 4096
-
 // acceptReviewSources applies a batch's decision-time sources within its
 // acceptance (ADR-245). An equivalent source version keeps its per-principal
 // assignments and its original accepting event; any other change, and a
@@ -34,9 +30,6 @@ func acceptReviewSources(ctx context.Context, q *custodydb.Queries, s custodydb.
 	rows, err := q.ListPermissionReviewSources(ctx, s.ID)
 	if err != nil {
 		return err
-	}
-	if len(rows) > 64 {
-		return cfg.ErrLimit
 	}
 	next := map[string]cfg.ReviewSource{}
 	for _, r := range b.ReviewSources {
@@ -177,9 +170,6 @@ func (r *AccessReviews) ReviewSources(ctx context.Context, cluster string) ([]cf
 		if err != nil {
 			return err
 		}
-		if len(rows) > cfg.MaxReviewSourcesPerCluster {
-			return cfg.ErrLimit
-		}
 		for _, row := range rows {
 			var src cfg.ReviewSource
 			if !currentAuthorityAuditReceipt(uid(s.ID), uid(row.AcceptedAuditID), row.AcknowledgedAt.Valid, row.ObjectKey, row.ObjectVersion, row.ObjectEtag, row.ObjectBytes, row.ObjectSha256) {
@@ -314,13 +304,6 @@ func (r *AccessReviews) RecordReview(ctx context.Context, d authapp.ReviewDecisi
 			return cfg.ErrChanged
 		}
 		if errors.Is(err, pgx.ErrNoRows) {
-			var count int64
-			if count, err = q.CountPermissionReviewAssignments(ctx, custodydb.CountPermissionReviewAssignmentsParams{StreamID: s.ID, SourceUid: src.Resource.UID}); err != nil {
-				return err
-			}
-			if count >= maxReviewAssignments {
-				return cfg.ErrLimit
-			}
 			if err = q.InsertPermissionReviewAssignment(ctx, custodydb.InsertPermissionReviewAssignmentParams{StreamID: s.ID, SourceUid: src.Resource.UID, Issuer: p.Issuer, SubjectID: p.Subject, Role: src.Role, BasisDigest: src.Resource.SpecDigest[:]}); err != nil {
 				return err
 			}

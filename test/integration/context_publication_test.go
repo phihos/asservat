@@ -425,7 +425,6 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 			two := prepareAdmitted(t, ctx, s, second, keys, keys, nil, false)
 			publish := func(f fixture) {
 				batch := s.batch
-				batch.Initial = nil
 				batch.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
 				batch.FreshUntil = batch.ObservedAt.Add(5 * time.Second)
 				if err := s.p.RefreshPermissions(ctx, batch); err != nil {

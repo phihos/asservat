@@ -57,15 +57,9 @@ func TestClusterObservationPermissionWorkloadRequests(t *testing.T) {
 	unobserved.Selector = map[string]string{"other": "a"}
 	none := r.Clone()
 	none.Selector = nil
-	guard := r.Clone()
-	guard.Purpose = ObservePermissionWorkloadGuard
-	for name, x := range map[string]ClusterObservationRequest{"unobserved-selector": unobserved, "no-selector": none, "guard-with-selection": guard} {
+	for name, x := range map[string]ClusterObservationRequest{"unobserved-selector": unobserved, "no-selector": none} {
 		if x.Valid(now) {
 			t.Fatal("invalid request accepted", name)
 		}
-	}
-	guard.Selector, guard.Keys, guard.AnnotationKeys = nil, nil, nil
-	if !guard.Valid(now) {
-		t.Fatal("workload guard request denied")
 	}
 }

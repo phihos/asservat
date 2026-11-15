@@ -20,7 +20,6 @@ type reconciliationFixture struct {
 	storeFence  value.PermissionFence
 	accepted    []value.PermissionBatch
 	suspended   bool
-	review      *value.BootstrapReview
 	trustCalls  int
 	drift       bool
 	watchStarts []string
@@ -41,12 +40,6 @@ func (f *reconciliationFixture) PermissionTrust(context.Context) (PermissionTrus
 	}
 	return t, nil
 }
-func (f *reconciliationFixture) InitialPermissionReview(context.Context) (value.BootstrapReview, error) {
-	if f.review == nil {
-		return value.BootstrapReview{}, value.ErrDenied
-	}
-	return *f.review, nil
-}
 func (f *reconciliationFixture) BeginPermissions(_ context.Context, root, epoch string, d artifact.Digest) (value.PermissionFence, error) {
 	f.storeFence.RootID = root
 	f.storeFence.Epoch = epoch
@@ -61,9 +54,6 @@ func (f *reconciliationFixture) AcceptPermissions(_ context.Context, b value.Per
 	defer f.mu.Unlock()
 	if f.failAccept != nil {
 		return value.PermissionAcceptance{}, f.failAccept
-	}
-	if !f.storeFence.Initialized && (b.Initial == nil || !b.Initial.Valid(b.ObservedAt)) {
-		return value.PermissionAcceptance{}, value.ErrDenied
 	}
 	if b.ExpectedSequence != f.storeFence.Sequence {
 		return value.PermissionAcceptance{}, value.ErrChanged
@@ -119,20 +109,9 @@ func reconciliationTest(t *testing.T) (*reconciliationFixture, BindingReconciler
 	_, snapshot, fence, now := journalFixture(t)
 	f := &reconciliationFixture{snapshot: snapshot, trust: PermissionTrust{Digest: fence.TrustDigest, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}, finished: make(chan struct{})}
 	f.storeFence.LeaseUntil = now.Add(30 * time.Second)
-	f.review = &value.BootstrapReview{Resource: value.Resource{ClusterID: snapshot.ClusterID, Namespace: snapshot.ControlNamespace.Name, NamespaceUID: snapshot.ControlNamespace.UID, Kind: "ConfigMap", UID: "review", ResourceVersion: "rv-review", SpecDigest: artifact.Digest{3}}, Reviewer: "admin", BindingsDigest: InitialBindingDigest(snapshot), ReviewedAt: now, ExpiresAt: now.Add(time.Hour), ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
 	clock := now
-	r := BindingReconciler{RootID: journalID, Reader: f, Watcher: f, Trust: f, Review: f, Store: f, Now: func() time.Time { clock = clock.Add(time.Microsecond); return clock }, NewID: f.newID}
+	r := BindingReconciler{RootID: journalID, Reader: f, Watcher: f, Trust: f, Store: f, Now: func() time.Time { clock = clock.Add(time.Microsecond); return clock }, NewID: f.newID}
 	return f, r
-}
-func TestBindingReconcilerDoesNotTrustPreexistingValuesWithoutReview(t *testing.T) {
-	f, r := reconciliationTest(t)
-	r.Review = nil
-	if err := r.Run(context.Background()); !errors.Is(err, value.ErrDenied) {
-		t.Fatal(err)
-	}
-	if !f.suspended || len(f.accepted) != 0 {
-		t.Fatal("unreviewed bootstrap accepted or not suspended")
-	}
 }
 func TestBindingReconcilerRejectsGuardChangeDuringList(t *testing.T) {
 	f, r := reconciliationTest(t)
@@ -200,9 +179,6 @@ func TestBindingReconcilerResumesCleanWatchAndCommitsEveryOwner(t *testing.T) {
 			t.Fatal("wrong continuity")
 		}
 	}
-	if f.accepted[0].Initial == nil || f.accepted[1].Initial != nil {
-		t.Fatal("bootstrap not limited to first acceptance")
-	}
 }
 func TestBindingReconcilerListCannotSkipPendingOwner(t *testing.T) {
 	f, r := reconciliationTest(t)
@@ -227,7 +203,6 @@ func TestBindingReconcilerNamesTheStoppingPhase(t *testing.T) {
 		name, want string
 		setup      func(*reconciliationFixture, *BindingReconciler)
 	}{
-		{"unreviewed bootstrap", "start", func(_ *reconciliationFixture, r *BindingReconciler) { r.Review = nil }},
 		{"guard change during the list", "start/snapshot", func(f *reconciliationFixture, _ *BindingReconciler) { f.drift = true }},
 		{"store refuses the batch", "start/accept/store-accept", func(f *reconciliationFixture, _ *BindingReconciler) { f.failAccept = value.ErrUnavailable }},
 	} {

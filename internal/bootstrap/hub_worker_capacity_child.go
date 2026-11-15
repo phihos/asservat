@@ -171,7 +171,6 @@ func (w *hubWorker) runCapacity(ctx context.Context) error {
 		err := w.applyCapacity(ctx)
 		if err == nil {
 			fmt.Fprintln(os.Stderr, "capacity applied")
-			defer w.guards.share(w.ids.ClusterID)()
 			<-ctx.Done()
 			break
 		}

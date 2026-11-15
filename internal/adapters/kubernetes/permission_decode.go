@@ -7,7 +7,9 @@ import (
 	"encoding/json"
 	"encoding/json/jsontext"
 	"io"
+	"maps"
 	"net/url"
+	"slices"
 	"strconv"
 	"time"
 
@@ -27,7 +29,16 @@ type permissionLoader struct{}
 
 func (permissionLoader) Load(string) (any, error) { return nil, value.ErrInvalid }
 
-type permissionValidator struct{ bindingSchema, sourceSchema, identitySchema, retentionSchema, retentionTopologySchema, browserSchema *jsonschema.Schema }
+type permissionValidator struct {
+	bindingSchema, clusterBindingSchema, sourceSchema, identitySchema, retentionSchema, retentionTopologySchema, browserSchema *jsonschema.Schema
+	// clusters maps cluster names to IDs (ADR-335 D4): the hub's own
+	// cluster is LocalClusterName, joined clusters their values name.
+	clusters map[string]string
+}
+
+// LocalClusterName names the hub's own cluster in PermissionSources and
+// ClusterAccessBindings (as Rancher names the cluster it runs in).
+const LocalClusterName = "local"
 
 func newPermissionValidator() (*permissionValidator, error) {
 	c := jsonschema.NewCompiler()
@@ -55,6 +66,10 @@ func newPermissionValidator() (*permissionValidator, error) {
 	if err != nil {
 		return nil, value.ErrUnavailable
 	}
+	cb, err := c.Compile("https://asservat.io/spec/v1/cluster-access-binding.schema.json#/properties/spec")
+	if err != nil {
+		return nil, value.ErrUnavailable
+	}
 	s, err := c.Compile("https://asservat.io/spec/v1/permission-source.schema.json#/properties/spec")
 	if err != nil {
 		return nil, value.ErrUnavailable
@@ -75,7 +90,7 @@ func newPermissionValidator() (*permissionValidator, error) {
 	if err != nil {
 		return nil, value.ErrUnavailable
 	}
-	return &permissionValidator{b, s, i, r, t, browser}, nil
+	return &permissionValidator{bindingSchema: b, clusterBindingSchema: cb, sourceSchema: s, identitySchema: i, retentionSchema: r, retentionTopologySchema: t, browserSchema: browser}, nil
 }
 
 // Bound syntax before allocation/schema evaluation; reject duplicate keys,
@@ -160,7 +175,17 @@ func objectEnvelope(b []byte) (permissionObject, error) {
 	return out, nil
 }
 
+// decodeObjectMetadata decodes a custom object's metadata; a cluster-scoped
+// object (namespaced false) has no namespace.
+func decodeObjectMetadata(b []byte, namespaced bool) (permissionMetadata, error) {
+	return decodeMetadataOf(b, false, namespaced)
+}
+
 func decodeMetadata(b []byte, namespace bool) (permissionMetadata, error) {
+	return decodeMetadataOf(b, namespace, true)
+}
+
+func decodeMetadataOf(b []byte, namespace, namespaced bool) (permissionMetadata, error) {
 	var fields map[string]json.RawMessage
 	var out permissionMetadata
 	if json.Unmarshal(b, &fields) != nil {
@@ -175,7 +200,7 @@ func decodeMetadata(b []byte, namespace bool) (permissionMetadata, error) {
 		return out, value.ErrUnavailable
 	}
 	if !namespace {
-		if json.Unmarshal(fields["namespace"], &out.Namespace) != nil || len(validation.IsDNS1123Label(out.Namespace)) != 0 || json.Unmarshal(fields["generation"], &out.Generation) != nil || out.Generation < 1 {
+		if namespaced && (json.Unmarshal(fields["namespace"], &out.Namespace) != nil || len(validation.IsDNS1123Label(out.Namespace)) != 0) || json.Unmarshal(fields["generation"], &out.Generation) != nil || out.Generation < 1 {
 			return out, value.ErrUnavailable
 		}
 	} else {
@@ -233,25 +258,20 @@ func (v *permissionValidator) binding(object permissionObject, ref value.Resourc
 	if ref.ClusterID != "" && (!authorization.UUID(b.Scope.ClusterID) || !namespaceRefValid(b.Scope.Namespace)) {
 		return value.Binding{}, value.ErrUnavailable
 	}
-	for _, s := range spec.Subjects {
-		if !issuerValid(s.Issuer) || !identity.Text(s.ID, 256) {
-			return value.Binding{}, value.ErrUnavailable
-		}
-		b.Subjects = append(b.Subjects, value.Subject{Kind: s.Kind, Issuer: s.Issuer, ID: s.ID})
+	if b.Subjects, err = subjects(spec.Subjects); err != nil {
+		return value.Binding{}, err
 	}
 	seen := map[string]bool{}
 	for _, w := range spec.Workloads {
-		if len(validation.IsDNS1123Subdomain(w.Name)) != 0 || !identity.Text(w.UID, 64) || seen[w.UID] {
+		ref := value.WorkloadRef{Kind: w.Kind, Name: w.Name, UID: w.UID}
+		if len(validation.IsDNS1123Subdomain(w.Name)) != 0 || w.UID != "" && !identity.Text(w.UID, 64) || seen[w.Kind+"/"+w.Name] {
 			return value.Binding{}, value.ErrUnavailable
 		}
-		seen[w.UID] = true
-		b.Scope.Workloads = append(b.Scope.Workloads, value.WorkloadRef{Kind: w.Kind, Name: w.Name, UID: w.UID})
+		seen[w.Kind+"/"+w.Name] = true
+		b.Scope.Workloads = append(b.Scope.Workloads, ref)
 	}
-	if spec.NotAfter != "" {
-		b.NotAfter, err = time.Parse(time.RFC3339Nano, spec.NotAfter)
-		if err != nil {
-			return value.Binding{}, value.ErrUnavailable
-		}
+	if b.NotAfter, err = notAfter(spec.NotAfter); err != nil {
+		return value.Binding{}, err
 	}
 	if spec.Automation != nil {
 		a := spec.Automation
@@ -261,6 +281,86 @@ func (v *permissionValidator) binding(object permissionObject, ref value.Resourc
 		}
 	}
 	return b, nil
+}
+
+// subjects decodes authored subjects; an omitted issuer stays empty and is
+// the installation's issuer (ADR-335 D4).
+func subjects(in []wire.Subject) ([]value.Subject, error) {
+	var out []value.Subject
+	for _, s := range in {
+		if s.Issuer != "" && !issuerValid(s.Issuer) || !identity.Text(s.ID, 256) {
+			return nil, value.ErrUnavailable
+		}
+		out = append(out, value.Subject{Kind: s.Kind, Issuer: s.Issuer, ID: s.ID})
+	}
+	return out, nil
+}
+
+func notAfter(s string) (time.Time, error) {
+	if s == "" {
+		return time.Time{}, nil
+	}
+	t, err := time.Parse(time.RFC3339Nano, s)
+	if err != nil {
+		return time.Time{}, value.ErrUnavailable
+	}
+	return t, nil
+}
+
+// clusterBindings decodes one ClusterAccessBinding of the hub cluster into
+// one binding per cluster it covers, each over AllNamespaces (ADR-335 D14).
+// Omitted clusters are the binding's own cluster; "*" is every known
+// cluster. privacy-operator has no consumer yet and is dropped. An allow
+// narrowed by namespaceSelector grants nothing yet; a deny so narrowed
+// applies to every namespace. A spec that fails validation becomes one
+// invalid binding that grants and denies nothing.
+func (v *permissionValidator) clusterBindings(object permissionObject, ref value.Resource) []value.Binding {
+	invalid := func() []value.Binding {
+		ref.SpecDigest = artifact.Digest(sha256.Sum256(object.Spec))
+		return []value.Binding{{Resource: ref, Invalid: true, Scope: value.Scope{ClusterID: ref.ClusterID, Namespace: value.AllNamespaces}}}
+	}
+	var spec wire.ClusterAccessBindingSpec
+	digest, err := decodePermissionSpec(object.Spec, v.clusterBindingSchema, &spec)
+	if err != nil {
+		return invalid()
+	}
+	ref.SpecDigest = digest
+	subjects, err := subjects(spec.Subjects)
+	if err != nil {
+		return invalid()
+	}
+	expires, err := notAfter(spec.NotAfter)
+	if err != nil {
+		return invalid()
+	}
+	var roles []string
+	for _, r := range spec.Roles {
+		if slices.Contains(value.Roles, r) {
+			roles = append(roles, r)
+		}
+	}
+	if len(roles) == 0 || spec.Effect == "Allow" && spec.NamespaceSelector != nil && len(spec.NamespaceSelector.MatchLabels) > 0 {
+		return invalid()
+	}
+	clusters := []string{ref.ClusterID}
+	if len(spec.Clusters) > 0 {
+		clusters = nil
+		for _, name := range spec.Clusters {
+			if name == "*" {
+				clusters = slices.AppendSeq(clusters, maps.Values(v.clusters))
+			} else if id, ok := v.clusters[name]; ok {
+				clusters = append(clusters, id)
+			}
+		}
+	}
+	slices.Sort(clusters)
+	var out []value.Binding
+	for _, cluster := range slices.Compact(clusters) {
+		r := ref
+		r.ClusterID = cluster
+		out = append(out, value.Binding{Resource: r, Effect: spec.Effect, Subjects: subjects, Roles: roles, NotAfter: expires, Scope: value.Scope{ClusterID: cluster, Namespace: value.AllNamespaces}})
+	}
+	return out
 }
 
 // observedBinding decodes an observed binding. A spec that fails validation
@@ -322,8 +422,13 @@ func (v *permissionValidator) source(object permissionObject, ref value.Resource
 		return value.Source{}, err
 	}
 	ref.SpecDigest = digest
-	s := value.Source{Resource: ref, Enabled: spec.Enabled, Type: spec.Type, ClusterID: spec.ClusterID, Role: spec.Role, NamespaceSelector: spec.NamespaceSelector.MatchLabels, ExcludedNamespaces: spec.ExcludedNamespaces, MaxDecisionAge: time.Duration(spec.MaxDecisionAgeSeconds) * time.Second, MaxNamespaces: spec.MaxNamespaces}
-	if !authorization.UUID(s.ClusterID) || !selectorValid(s.NamespaceSelector) {
+	// An unknown cluster name leaves ClusterID empty: the source grants
+	// nothing until that cluster is registered.
+	s := value.Source{Resource: ref, Enabled: spec.Enabled, Type: spec.Type, ClusterID: v.clusters[spec.Cluster], Role: spec.Role, ExcludedNamespaces: spec.ExcludedNamespaces}
+	if spec.NamespaceSelector != nil {
+		s.NamespaceSelector = spec.NamespaceSelector.MatchLabels
+	}
+	if !selectorValid(s.NamespaceSelector) {
 		return value.Source{}, value.ErrUnavailable
 	}
 	for _, n := range s.ExcludedNamespaces {
@@ -335,11 +440,11 @@ func (v *permissionValidator) source(object permissionObject, ref value.Resource
 		s.Protection = value.Protection{Mode: spec.Protection.Mode, ReviewRef: spec.Protection.ReviewRef, GuardRef: spec.Protection.GuardRef}
 	}
 	if m := spec.MetadataMapping; m != nil {
-		if len(validation.IsQualifiedName(m.Key)) != 0 || !issuerValid(m.Issuer) {
+		if len(validation.IsQualifiedName(m.Key)) != 0 || m.Issuer != "" && !issuerValid(m.Issuer) {
 			return value.Source{}, value.ErrUnavailable
 		}
-		for key, groups := range m.Values {
-			if !identity.Text(key, 256) || !identity.Strings(groups, 16, 256) {
+		for key := range m.Values {
+			if !identity.Text(key, 256) {
 				return value.Source{}, value.ErrUnavailable
 			}
 		}

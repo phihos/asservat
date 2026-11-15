@@ -125,7 +125,6 @@ func qualifyCaptureIntentLifecycle(t *testing.T, ctx context.Context, admin *pgx
 			t.Helper()
 			n := time.Now().UTC().Truncate(time.Microsecond)
 			batch := s.batch
-			batch.Initial = nil
 			batch.ObservedAt = n
 			batch.FreshUntil = n.Add(5 * time.Second)
 			if e := s.p.RefreshPermissions(ctx, batch); e != nil {

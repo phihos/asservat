@@ -16,7 +16,7 @@ const inheritanceCluster = journalID
 
 func inheritanceSource() value.Source {
 	return value.Source{Resource: value.Resource{ClusterID: inheritanceCluster, Namespace: "asservat", NamespaceUID: "control", Kind: "PermissionSource", Name: "owners", UID: "source", Generation: 1, ResourceVersion: "source-rv", SpecDigest: artifact.Digest{7}},
-		Enabled: true, Type: "namespaceMetadata", ClusterID: inheritanceCluster, Role: "workload-maintainer", NamespaceSelector: map[string]string{"managed": "true"}, MaxDecisionAge: 30 * time.Second, MaxNamespaces: 10,
+		Enabled: true, Type: "namespaceMetadata", ClusterID: inheritanceCluster, Role: "workload-maintainer", NamespaceSelector: map[string]string{"managed": "true"},
 		Protection: value.Protection{Mode: "administratorManaged", ReviewRef: "platform-review"},
 		Mapping:    value.Mapping{Field: "annotation", Key: "owner", Mode: "valueMap", Issuer: "https://id.example.test", Values: map[string][]string{"payments": {"team-b", "team-a"}, "Payments": {"team-c"}}}}
 }
@@ -64,18 +64,13 @@ func TestNamespaceGrantsMapOnlyConfiguredValues(t *testing.T) {
 		"deleting namespace": {func(_ *value.Source, o *value.NamespaceObservation) { o.Namespaces[0].Deleting = true }, ""},
 		"disabled":           {func(s *value.Source, _ *value.NamespaceObservation) { s.Enabled = false }, value.SourceDisabled},
 		"deleting source":    {func(s *value.Source, _ *value.NamespaceObservation) { s.Resource.Deleting = true }, value.SourceDisabled},
-		"directory mode":     {func(s *value.Source, _ *value.NamespaceObservation) { s.Mapping.Mode = "groupID" }, value.SourceUnsupported},
-		"guarded mode":       {func(s *value.Source, _ *value.NamespaceObservation) { s.Protection.Mode = "admissionEnforced" }, value.SourceUnsupported},
+		"group name mode":    {func(s *value.Source, _ *value.NamespaceObservation) { s.Mapping.Mode = "groupName" }, value.SourceUnsupported},
 		"exec source":        {func(s *value.Source, _ *value.NamespaceObservation) { s.Type = "kubernetesExec" }, value.SourceUnsupported},
 		"workload source":    {func(s *value.Source, _ *value.NamespaceObservation) { s.Type = "workloadMetadata" }, value.SourceUnsupported},
 		"other cluster": {func(s *value.Source, _ *value.NamespaceObservation) {
 			s.ClusterID = "22222222-2222-4222-8222-222222222222"
 		}, value.SourceUnsupported},
 		"unobserved key": {func(s *value.Source, _ *value.NamespaceObservation) { s.Mapping.Key = "team" }, value.MetadataNotObserved},
-		"too many namespaces": {func(s *value.Source, o *value.NamespaceObservation) {
-			s.MaxNamespaces = 1
-			o.Namespaces = append(o.Namespaces, observedNamespace("payments-2", "z-uid", "rv", "payments"))
-		}, value.SourceTooManyNamespaces},
 	} {
 		t.Run(name, func(t *testing.T) {
 			s, o := inheritanceSource(), inheritanceObservation()
@@ -280,10 +275,9 @@ func TestInheritanceUnavailableStatesKeepNothingCurrent(t *testing.T) {
 	if owners, _ := inheritedOwners(f.accepted[len(f.accepted)-1]); len(owners) != 2 {
 		t.Fatal("observed source not granted")
 	}
-	// Older than maxDecisionAgeSeconds: kept, but unavailable.
-	stale := s.inheritance(s.namespaces.ObservedAt().Add(30 * time.Second))
-	if len(stale.Bases) != 0 || !slices.Equal(stale.UnavailableSources, []string{"source"}) || stale.included["source"] != s.included["source"] {
-		t.Fatalf("stale observation still granted: %+v", stale)
+	// Nothing expires because time passed (REQ-PER-006).
+	if later := s.inheritance(s.namespaces.ObservedAt().Add(time.Hour)); len(later.Bases) == 0 {
+		t.Fatal("an older observation stopped granting")
 	}
 	// An unreadable source list keeps every source unavailable.
 	s.sourcesComplete = false
@@ -309,26 +303,13 @@ func TestInheritanceUnavailableStatesKeepNothingCurrent(t *testing.T) {
 	}
 }
 
-func TestInheritanceRespectsTheBatchBudget(t *testing.T) {
-	_, _, s, ctx := inheritanceRun(t)
-	if err := s.namespaceItem(ctx, nextNamespaceItem(t, s)); err != nil {
-		t.Fatal(err)
-	}
-	for uid := range 1023 {
-		s.journal.byUID[string(rune('a'+uid%26))+string(rune(uid))] = s.journal.byUID["binding"]
-	}
-	if out := s.inheritance(s.r.Now()); len(out.Bases) != 0 || len(out.UnavailableSources) != 0 {
-		t.Fatal("over-budget source granted or kept", len(out.Bases))
-	}
-}
-
 // ADR-245: decision-time sources of every cluster are accepted configuration
 // with no subject, carried in the batch; an unreadable source list carries
 // none (the store then keeps them without renewal).
 func TestInheritanceCarriesDecisionTimeSources(t *testing.T) {
 	f, _, s, ctx := inheritanceRun(t)
 	exec := value.Source{Resource: value.Resource{Kind: "PermissionSource", UID: "exec", ResourceVersion: "1", Generation: 1, SpecDigest: artifact.Digest{9}}, Enabled: true, Type: value.SourceKubernetesExec,
-		ClusterID: "22222222-2222-4222-8222-222222222222", Role: "workload-maintainer", MaxDecisionAge: 30 * time.Second, MaxNamespaces: 10, IdentityMappingRef: "company",
+		ClusterID: "22222222-2222-4222-8222-222222222222", Role: "workload-maintainer", IdentityMappingRef: "company",
 		AdmissionParity: value.AdmissionParity{Mode: "noAdditionalRestrictions", ReviewRef: "platform-review"}}
 	disabled := exec
 	disabled.Resource.UID, disabled.Enabled = "off", false

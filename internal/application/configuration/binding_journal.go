@@ -28,7 +28,8 @@ type BindingJournal struct {
 	pending         *value.PermissionBatch
 	sequence        int64
 	acceptedFence   value.PermissionFence
-	initial         value.PermissionInitialization
+	// Issuer is the installation's issuer for subjects that omit one.
+	Issuer string
 }
 
 func cloneBinding(b value.Binding) value.Binding {
@@ -66,24 +67,9 @@ func NewBindingJournal(s value.Snapshot, now time.Time) (*BindingJournal, error)
 		j.byUID[b.Resource.UID] = cloneBinding(b)
 		j.names[bindingName(b.Resource)] = b.Resource.UID
 	}
-	j.initial = value.PermissionInitialization{ClusterID: s.ClusterID, Control: s.ControlNamespace, BindingsDigest: InitialBindingDigest(s), BindingCount: len(s.Bindings)}
 	return j, nil
 }
 
-// SetInitialReview attaches only a separately read protected installation
-// review. Runtime composition must qualify that reader independently of sources.
-func (j *BindingJournal) SetInitialReview(r value.BootstrapReview, now time.Time) error {
-	if j.pending != nil || j.sequence != 0 || j.initial.BindingCount == 0 {
-		return value.ErrChanged
-	}
-	p := j.initial
-	p.Review = &r
-	if !p.Valid(now) {
-		return value.ErrDenied
-	}
-	j.initial = p
-	return nil
-}
 func (j *BindingJournal) Cursor() string { return j.cursor }
 
 // Constrain preserves the original list deadline while also bounding it by the
@@ -175,14 +161,6 @@ func (j *BindingJournal) Confirm(s value.Snapshot, now time.Time) error {
 	return nil
 }
 func cloneBatch(b value.PermissionBatch) value.PermissionBatch {
-	if b.Initial != nil {
-		p := *b.Initial
-		if p.Review != nil {
-			r := *p.Review
-			p.Review = &r
-		}
-		b.Initial = &p
-	}
 	b.UnavailableSources = slices.Clone(b.UnavailableSources)
 	b.ReviewSources = slices.Clone(b.ReviewSources)
 	b.Bases = slices.Clone(b.Bases)
@@ -204,19 +182,6 @@ func cloneBatch(b value.PermissionBatch) value.PermissionBatch {
 // last transition is accepted and the complete binding list is still current.
 func (j *BindingJournal) Ready(now time.Time) bool {
 	return !j.poisoned && j.pending == nil && j.accepted && identity.Fresh(j.observed, j.until, now, 5*time.Second)
-}
-
-// Budget counts the bases and assignment rows that the explicit bindings
-// would add to a batch prepared at now.
-func (j *BindingJournal) Budget(now time.Time) (bases, rows int) {
-	for _, b := range j.byUID {
-		if b.Invalid || (b.Resource.Deleting && b.Effect == "Allow") || (!b.NotAfter.IsZero() && !now.Before(b.NotAfter)) {
-			continue
-		}
-		bases++
-		rows += len(b.Subjects) * len(b.Roles)
-	}
-	return bases, rows
 }
 
 // Prepare builds the next batch from the processed bindings and the
@@ -257,25 +222,14 @@ func (j *BindingJournal) Prepare(f value.PermissionFence, request string, now ti
 		return value.PermissionBatch{}, value.ErrLimit
 	}
 	batch := value.PermissionBatch{RootID: f.RootID, Epoch: f.Epoch, RequestID: request, ExpectedSequence: f.Sequence, TrustDigest: f.TrustDigest, InputDigest: artifact.Digest(sha256.Sum256(encoded)), ObservedAt: now, FreshUntil: j.until}
-	if !f.Initialized {
-		p := j.initial
-		batch.Initial = &p
-		if !p.Valid(now) {
-			return value.PermissionBatch{}, value.ErrDenied
-		}
-		if p.Review != nil {
-			batch.FreshUntil = identity.Earlier(batch.FreshUntil, identity.Earlier(p.Review.FreshUntil, p.Review.ExpiresAt))
-		}
-	}
 	for _, b := range bindings {
-		if b.Invalid || (b.Resource.Deleting && b.Effect == "Allow") || (!b.NotAfter.IsZero() && !now.Before(b.NotAfter)) {
-			continue
+		if p, ok := bindingBasis(b, now); ok {
+			p.Continuous = j.sequence > 0
+			batch.Bases = append(batch.Bases, p)
 		}
-		p := value.PermissionBasis{Resource: b.Resource, Scope: b.Scope, Effect: b.Effect, Subjects: b.Subjects, Roles: b.Roles, NotAfter: b.NotAfter, Automation: b.Automation, Continuous: j.sequence > 0}
-		p.ScopeDigest = PermissionScopeDigest(p)
-		batch.Bases = append(batch.Bases, p)
 	}
 	batch.Bases = append(batch.Bases, inherited.Bases...)
+	batch.Bases = withIssuer(batch.Bases, j.Issuer)
 	batch.UnavailableSources = slices.Clone(inherited.UnavailableSources)
 	batch.SourcesUnavailable = inherited.SourcesUnavailable
 	batch.Namespaces = inherited.Namespaces
@@ -311,4 +265,50 @@ func (j *BindingJournal) Refreshed(request string) error {
 	}
 	j.pending = nil
 	return nil
+}
+
+// bindingBasis is the accepted basis of an active binding. Evaluation
+// matches workloads by UID only, so a workload named without uid cannot
+// narrow a basis yet: such an allow entry grants nothing and such a deny
+// covers the whole namespace.
+func bindingBasis(b value.Binding, now time.Time) (value.PermissionBasis, bool) {
+	if b.Invalid || (b.Resource.Deleting && b.Effect == "Allow") || (!b.NotAfter.IsZero() && !now.Before(b.NotAfter)) {
+		return value.PermissionBasis{}, false
+	}
+	p := value.PermissionBasis{Resource: b.Resource, Scope: b.Scope, Effect: b.Effect, Subjects: slices.Clone(b.Subjects), Roles: slices.Clone(b.Roles), NotAfter: b.NotAfter, Automation: b.Automation}
+	if pinned := slices.DeleteFunc(slices.Clone(b.Scope.Workloads), func(w value.WorkloadRef) bool { return w.UID == "" }); len(pinned) < len(b.Scope.Workloads) {
+		switch {
+		case b.Effect == "Deny":
+			pinned = nil
+		case len(pinned) == 0:
+			return value.PermissionBasis{}, false
+		}
+		p.Scope.Workloads = pinned
+	}
+	p.ScopeDigest = PermissionScopeDigest(p)
+	return p, true
+}
+
+// withIssuer fills an omitted subject issuer with the installation's issuer
+// (ADR-335 D4). Without a configured issuer such subjects grant and deny
+// nothing; a basis left without subjects is dropped.
+func withIssuer(bases []value.PermissionBasis, issuer string) []value.PermissionBasis {
+	out := bases[:0]
+	for _, p := range bases {
+		var subjects []value.Subject
+		for _, s := range p.Subjects {
+			if s.Issuer == "" {
+				s.Issuer = issuer
+			}
+			if s.Issuer != "" && !slices.Contains(subjects, s) {
+				subjects = append(subjects, s)
+			}
+		}
+		if len(subjects) == 0 {
+			continue
+		}
+		p.Subjects = subjects
+		out = append(out, p)
+	}
+	return out
 }

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -27,7 +28,10 @@ func permissionBinding(index int) map[string]any {
 	return map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "AccessBinding", "metadata": map[string]any{"name": fmt.Sprintf("binding-%d", index), "namespace": "payments", "uid": fmt.Sprintf("uid-%d", index), "generation": 1, "resourceVersion": "opaque:item", "creationTimestamp": "2026-10-10T11:00:00Z"}, "spec": map[string]any{"effect": "Allow", "subjects": []any{map[string]any{"kind": "Group", "issuer": "https://id.example.invalid", "id": "team-a"}}, "roles": []string{"workload-maintainer"}, "reason": "synthetic fixture"}, "status": map[string]any{"phase": "Ready", "observedGeneration": 999}}
 }
 func permissionSource() map[string]any {
-	return map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "PermissionSource", "metadata": map[string]any{"name": "owners", "namespace": permissionControl.Name, "uid": "source-uid", "generation": 1, "resourceVersion": "opaque:source"}, "spec": map[string]any{"enabled": true, "clusterID": permissionCluster, "type": "namespaceMetadata", "namespaceSelector": map[string]any{"matchLabels": map[string]any{"example.invalid/managed": "true"}}, "excludedNamespaces": []string{"kube-system"}, "role": "evidence-owner", "maxDecisionAgeSeconds": 30, "maxNamespaces": 200, "protection": map[string]any{"mode": "administratorManaged", "reviewRef": "synthetic-review"}, "metadataMapping": map[string]any{"field": "annotation", "key": "example.invalid/owner", "mode": "valueMap", "issuer": "https://id.example.invalid", "values": map[string]any{"payments": []string{"team-a", "team-b"}}}}}
+	return map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "PermissionSource", "metadata": map[string]any{"name": "owners", "namespace": permissionControl.Name, "uid": "source-uid", "generation": 1, "resourceVersion": "opaque:source"}, "spec": map[string]any{"enabled": true, "cluster": LocalClusterName, "type": "namespaceMetadata", "namespaceSelector": map[string]any{"matchLabels": map[string]any{"example.invalid/managed": "true"}}, "excludedNamespaces": []string{"kube-system"}, "role": "evidence-owner", "protection": map[string]any{"mode": "administratorManaged", "reviewRef": "synthetic-review"}, "metadataMapping": map[string]any{"field": "annotation", "key": "example.invalid/owner", "mode": "valueMap", "issuer": "https://id.example.invalid", "values": map[string]any{"payments": []string{"team-a", "team-b"}}}}}
+}
+func permissionClusterBinding() map[string]any {
+	return map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "ClusterAccessBinding", "metadata": map[string]any{"name": "sre.approvers", "uid": "cab-uid", "generation": 1, "resourceVersion": "opaque:cab"}, "spec": map[string]any{"effect": "Allow", "subjects": []any{map[string]any{"kind": "Group", "id": "/sre"}}, "roles": []string{"action-approver", "privacy-operator"}}}
 }
 func permissionList(kind, rv, next string, items ...map[string]any) map[string]any {
 	if items == nil {
@@ -72,6 +76,8 @@ func newPermissionFixture(t *testing.T, extra func(http.ResponseWriter, *http.Re
 			permissionReply(w, permissionList("AccessBinding", "opaque:bindings", "", permissionBinding(1)))
 		case "/apis/asservat.io/v1alpha1/namespaces/asservat-system/permissionsources":
 			permissionReply(w, permissionList("PermissionSource", "opaque:sources", "", permissionSource()))
+		case "/apis/asservat.io/v1alpha1/clusteraccessbindings":
+			permissionReply(w, permissionList("ClusterAccessBinding", "opaque:cabs", "", permissionClusterBinding()))
 		default:
 			t.Error("unexpected API path")
 			http.NotFound(w, r)
@@ -92,7 +98,10 @@ func TestPermissionSnapshotAndMinimizedNamespace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(s.Bindings) != 1 || len(s.Sources) != 1 || s.BindingResourceVersion != "opaque:bindings" || s.SourceResourceVersion != "opaque:sources" || s.FreshUntil.Sub(s.ObservedAt) != 5*time.Second {
+	if c := s.ClusterBindings; len(c) != 1 || c[0].Invalid || c[0].Scope.ClusterID != permissionCluster || c[0].Scope.Namespace != value.AllNamespaces || len(c[0].Roles) != 1 || c[0].Subjects[0].Issuer != "" {
+		t.Fatalf("cluster binding %+v", c)
+	}
+	if len(s.Bindings) != 1 || len(s.Sources) != 1 || s.Sources[0].ClusterID != permissionCluster || s.BindingResourceVersion != "opaque:bindings" || s.SourceResourceVersion != "opaque:sources" || s.FreshUntil.Sub(s.ObservedAt) != 5*time.Second {
 		t.Fatal("incomplete snapshot")
 	}
 	b := s.Bindings[0]
@@ -469,9 +478,9 @@ func TestPermissionSchemaMatchesReviewedExamples(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"access-binding", "access-binding-owners", "permission-source-namespace", "permission-source-workload", "permission-source-rbac", "permission-source-exec"} {
+	for _, name := range []string{"access-binding", "access-binding-owners", "cluster-access-binding", "permission-source-namespace", "permission-source-workload", "permission-source-rbac", "permission-source-exec"} {
 		t.Run(name, func(t *testing.T) {
-			b, err := readImplementedExample("../../../examples/", name+".yaml")
+			b, err := os.ReadFile("../../../examples/" + name + ".yaml")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -483,9 +492,15 @@ func TestPermissionSchemaMatchesReviewedExamples(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if o.Kind == "AccessBinding" {
+			switch o.Kind {
+			case "AccessBinding":
 				_, err = v.binding(o, value.Resource{})
-			} else {
+			case value.ClusterAccessBindingKind:
+				v.clusters = map[string]string{LocalClusterName: "11111111-1111-4111-8111-111111111111"}
+				if b := v.clusterBindings(o, value.Resource{ClusterID: "11111111-1111-4111-8111-111111111111"}); len(b) == 0 || b[0].Invalid {
+					err = value.ErrInvalid
+				}
+			default:
 				_, err = v.source(o, value.Resource{})
 			}
 			if err != nil {

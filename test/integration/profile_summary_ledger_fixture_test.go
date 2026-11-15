@@ -194,7 +194,7 @@ func startQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, s captureAdmis
 	process := execution.APIProcessBinding{NamespaceUID: custodyID(), AccountUID: custodyID(), PodUID: custodyID(), ProcessEpoch: custodyID(), StartupDigest: artifact.Digest{1}, ImageDigest: accepted.Expectation.CollectorImageDigest}
 	refresh := func() executionapp.APIExecutionCheck {
 		n := time.Now().UTC().Truncate(time.Microsecond)
-		s.batch.ObservedAt, s.batch.FreshUntil, s.batch.Initial = n, n.Add(5*time.Second), nil
+		s.batch.ObservedAt, s.batch.FreshUntil = n, n.Add(5*time.Second)
 		if err := s.p.RefreshPermissions(f.ctx, s.batch); err != nil {
 			t.Fatal(err)
 		}

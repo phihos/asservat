@@ -69,6 +69,7 @@
                   "subjects": {
                     "type": "array",
                     "items": {
+                      "description": "Authored subject (ADR-335 D4): a user by username, a group by the name the provider emits (for example /payments) or a workload identity. issuer defaults to the installation's issuer.",
                       "type": "object",
                       "properties": {
                         "kind": {
@@ -85,22 +86,18 @@
                         },
                         "id": {
                           "type": "string",
-                          "minLength": 1,
-                          "maxLength": 256
+                          "minLength": 1
                         }
                       },
                       "required": [
                         "kind",
-                        "issuer",
                         "id"
                       ]
                     },
                     "minItems": 1,
-                    "maxItems": 32,
                     "x-kubernetes-list-type": "map",
                     "x-kubernetes-list-map-keys": [
                       "kind",
-                      "issuer",
                       "id"
                     ]
                   },
@@ -116,7 +113,6 @@
                       ]
                     },
                     "minItems": 1,
-                    "maxItems": 4,
                     "x-kubernetes-list-type": "set"
                   },
                   "workloads": {
@@ -134,25 +130,26 @@
                         "name": {
                           "type": "string",
                           "minLength": 1,
-                          "maxLength": 253
+                          "maxLength": 253,
+                          "description": "Kubernetes object name (DNS subdomain)."
                         },
                         "uid": {
                           "type": "string",
                           "minLength": 1,
-                          "maxLength": 64
+                          "description": "Kubernetes UID (a UUID; 64 characters leaves room for its textual forms)."
                         }
                       },
                       "required": [
                         "kind",
-                        "name",
-                        "uid"
-                      ]
+                        "name"
+                      ],
+                      "description": "Workload by kind and name; a recreated workload of the same name keeps its access. Optional uid pins one instance."
                     },
                     "minItems": 1,
-                    "maxItems": 64,
                     "x-kubernetes-list-type": "map",
                     "x-kubernetes-list-map-keys": [
-                      "uid"
+                      "kind",
+                      "name"
                     ]
                   },
                   "notAfter": {
@@ -162,7 +159,7 @@
                   "reason": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 512
+                    "description": "Optional."
                   },
                   "automation": {
                     "type": "object",
@@ -230,8 +227,7 @@
                 "required": [
                   "effect",
                   "subjects",
-                  "roles",
-                  "reason"
+                  "roles"
                 ],
                 "x-kubernetes-validations": [
                   {
@@ -267,10 +263,8 @@
                     "type": "array",
                     "items": {
                       "type": "string",
-                      "minLength": 1,
-                      "maxLength": 256
-                    },
-                    "maxItems": 16
+                      "minLength": 1
+                    }
                   }
                 },
                 "required": [

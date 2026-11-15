@@ -251,9 +251,6 @@ func (s *WorkloadJournalService) follow(ctx context.Context, f *workloadFeed, ki
 	for ctx.Err() == nil {
 		start := s.Now()
 		cursor, items, err := s.Observer.ListWorkloads(ctx, kind, f.selection)
-		if err == nil && len(items) > value.MaxObservedWorkloads {
-			err = value.ErrLimit
-		}
 		for _, w := range items {
 			if err == nil && !valid(w) {
 				err = value.ErrInvalid
@@ -300,7 +297,7 @@ func (s *WorkloadJournalService) follow(ctx context.Context, f *workloadFeed, ki
 						err = value.ErrChanged
 						break
 					}
-					ok := e.Workload != nil && valid(*e.Workload) && f.listed[kind] && (e.Type != "ADDED" || len(f.journal.byUID) < value.MaxObservedWorkloads)
+					ok := e.Workload != nil && valid(*e.Workload) && f.listed[kind]
 					if ok {
 						if old, exists := f.journal.byUID[e.Workload.UID]; exists && (old.Name != e.Workload.Name || old.Namespace.Name != e.Workload.Namespace.Name || old.Kind != kind) {
 							ok = false

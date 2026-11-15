@@ -123,9 +123,6 @@ func (c *PermissionClient) ListNamespaces(ctx context.Context, keys value.Namesp
 			if len(n.Labels)+len(n.Annotations) == 0 {
 				continue
 			}
-			if len(out.Namespaces) == value.MaxObservedNamespaces {
-				return value.NamespaceList{}, value.ErrLimit
-			}
 			out.Namespaces = append(out.Namespaces, n)
 		}
 		if meta.Continue == "" {

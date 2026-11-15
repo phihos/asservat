@@ -60,7 +60,6 @@ func qualifyDownloadControl(t *testing.T, ctx context.Context, admin *pgxpool.Po
 			t.Helper()
 			now := time.Now().UTC().Truncate(time.Microsecond)
 			batch := scenario.batch
-			batch.Initial = nil
 			batch.ObservedAt = now
 			batch.FreshUntil = now.Add(5 * time.Second)
 			if err := scenario.p.RefreshPermissions(ctx, batch); err != nil {

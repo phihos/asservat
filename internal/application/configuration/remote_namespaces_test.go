@@ -58,12 +58,4 @@ func TestReconcilerInheritsRemoteClusterJournal(t *testing.T) {
 	if remote.calls != 2 || s.remote[remoteCluster] == nil {
 		t.Fatal("failed reread dropped the last journal state")
 	}
-	s.remote[remoteCluster].observedAt = now.Add(-src.MaxDecisionAge)
-	if err := s.accept(ctx, false); err != nil {
-		t.Fatal(err)
-	}
-	b = f.accepted[len(f.accepted)-1]
-	if o, _ := inheritedOwners(b); len(o) != 0 || len(b.UnavailableSources) != 1 || len(b.RemoteNamespaces) != 0 {
-		t.Fatalf("lapsed remote journal still granted: %+v", b)
-	}
 }

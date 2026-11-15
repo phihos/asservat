@@ -74,7 +74,7 @@ func qualifyAPIExecutionPreparationBoundaries(t *testing.T, ctx context.Context,
 			refresh := func() executionapp.APIExecutionCheck {
 				t.Helper()
 				n := time.Now().UTC().Truncate(time.Microsecond)
-				s.batch.ObservedAt, s.batch.FreshUntil, s.batch.Initial = n, n.Add(5*time.Second), nil
+				s.batch.ObservedAt, s.batch.FreshUntil = n, n.Add(5*time.Second)
 				if err := s.p.RefreshPermissions(ctx, s.batch); err != nil {
 					t.Fatal(err)
 				}

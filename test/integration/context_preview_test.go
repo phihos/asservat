@@ -402,7 +402,6 @@ func qualifyContextPreviews(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		}
 		now := time.Now().UTC().Truncate(time.Microsecond)
 		batch := s.batch
-		batch.Initial = nil
 		batch.RequestID, batch.InputDigest = custodyID(), artifact.Digest{99}
 		batch.ObservedAt, batch.FreshUntil = now, now.Add(5*time.Second)
 		deny := cfg.PermissionBasis{Resource: cfg.Resource{Kind: "AccessBinding", UID: custodyID(), Generation: 1, ResourceVersion: "deny-1", SpecDigest: artifact.Digest{98}}, Scope: batch.Bases[0].Scope, Effect: "Deny", Subjects: []cfg.Subject{{Kind: "User", Issuer: p.Actor.Issuer, ID: p.Actor.Subject}}, Roles: []string{"workload-maintainer"}}

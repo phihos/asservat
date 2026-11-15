@@ -99,9 +99,6 @@ func (c *PermissionClient) ListWorkloads(ctx context.Context, kind string, sel v
 				return "", nil, value.ErrUnavailable
 			}
 			seen[w.UID] = true
-			if len(out) == value.MaxObservedWorkloads {
-				return "", nil, value.ErrLimit
-			}
 			out = append(out, w)
 		}
 		if list.Continue == "" {

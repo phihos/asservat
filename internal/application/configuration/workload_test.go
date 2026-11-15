@@ -2,7 +2,6 @@ package configuration
 
 import (
 	"context"
-	"errors"
 	"io"
 	"maps"
 	"slices"
@@ -25,14 +24,8 @@ func observedWorkload(name, uid, namespace, rv, owner string) value.ObservedWork
 	return value.ObservedWorkload{Kind: "Deployment", Namespace: value.NamespaceRef{Name: namespace, UID: namespace + "-uid"}, ObservedNamespace: observedNamespace(name, uid, rv, owner)}
 }
 
-func workloadEvidence(now time.Time) value.SourceEvidence {
-	return value.SourceEvidence{Now: now, WorkloadGuard: &value.NamespaceGuardProof{ClusterID: remoteCluster, Name: "workload-guard", LabelKeys: []string{"managed"}, AnnotationKeys: []string{"owner"}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}}
-}
-
-// REQ-PER-005 / ADR-247: one basis per workload of the selection, only with
-// a current workload guard proof covering every key.
-func TestWorkloadGrantsRequireGuardAndSelection(t *testing.T) {
-	now := time.Now()
+// REQ-PER-005 / ADR-247: one basis per workload of the selection.
+func TestWorkloadGrantsRequireSelection(t *testing.T) {
 	src := workloadSource()
 	sel := WorkloadSelectionOf(src)
 	if !slices.Equal(sel.Keys.Labels, []string{"managed"}) || !slices.Equal(sel.Keys.Annotations, []string{"owner"}) {
@@ -41,7 +34,7 @@ func TestWorkloadGrantsRequireGuardAndSelection(t *testing.T) {
 	o := &value.WorkloadObservation{ClusterID: remoteCluster, Selection: sel, Workloads: []value.ObservedWorkload{
 		observedWorkload("api", "a", "shared", "j:0", "payments"), observedWorkload("web", "b", "shared", "j:0", "other"), observedWorkload("job", "c", "excluded", "j:0", "payments")}}
 	src.ExcludedNamespaces = []string{"excluded"}
-	grants, reason := WorkloadGrantsWith(src, o, workloadEvidence(now))
+	grants, reason := WorkloadGrants(src, o)
 	if reason != "" || len(grants) != 1 || grants[0].Workload != (value.WorkloadRef{Kind: "Deployment", Name: "api", UID: "a"}) || grants[0].Namespace.UID != "shared-uid" {
 		t.Fatalf("workload grants %q %+v", reason, grants)
 	}
@@ -51,25 +44,19 @@ func TestWorkloadGrantsRequireGuardAndSelection(t *testing.T) {
 		t.Fatal("workload bases share a key or lack their workload scope")
 	}
 	for name, c := range map[string]struct {
-		mutate func(*value.Source, *value.SourceEvidence)
+		mutate func(*value.Source)
 		reason string
 	}{
-		"no guard":        {func(_ *value.Source, e *value.SourceEvidence) { e.WorkloadGuard = nil }, value.GuardUnavailable},
-		"other guard":     {func(_ *value.Source, e *value.SourceEvidence) { e.WorkloadGuard.Name = "namespace-guard" }, value.SourceUnsupported},
-		"unguarded key":   {func(_ *value.Source, e *value.SourceEvidence) { e.WorkloadGuard.AnnotationKeys = nil }, value.SourceUnsupported},
-		"admin managed":   {func(s *value.Source, _ *value.SourceEvidence) { s.Protection.Mode = "administratorManaged" }, value.SourceUnsupported},
-		"namespace scope": {func(s *value.Source, _ *value.SourceEvidence) { s.NamespaceSelector = map[string]string{"x": "y"} }, value.SourceUnsupported},
-		"other selection": {func(s *value.Source, _ *value.SourceEvidence) {
-			s.WorkloadSelector = map[string]string{"managed": "no"}
-		}, value.MetadataNotObserved},
-		"no selector":     {func(s *value.Source, _ *value.SourceEvidence) { s.WorkloadSelector = nil }, value.SourceUnsupported},
-		"too many":        {func(s *value.Source, _ *value.SourceEvidence) { s.MaxNamespaces = 0 }, value.SourceUnsupported},
-		"group ID no dir": {func(s *value.Source, _ *value.SourceEvidence) { s.Mapping.Mode, s.Mapping.Values = "groupID", nil }, value.DirectoryUnavailable},
+		"admin managed":   {func(s *value.Source) { s.Protection.Mode = "administratorManaged" }, value.SourceUnsupported},
+		"namespace scope": {func(s *value.Source) { s.NamespaceSelector = map[string]string{"x": "y"} }, value.SourceUnsupported},
+		"other selection": {func(s *value.Source) { s.WorkloadSelector = map[string]string{"managed": "no"} }, value.MetadataNotObserved},
+		"no selector":     {func(s *value.Source) { s.WorkloadSelector = nil }, value.SourceUnsupported},
+		"no values":       {func(s *value.Source) { s.Mapping.Values = nil }, value.SourceUnsupported},
 	} {
 		t.Run(name, func(t *testing.T) {
-			s, e := workloadSource(), workloadEvidence(now)
-			c.mutate(&s, &e)
-			if g, r := WorkloadGrantsWith(s, o, e); len(g) != 0 || r != c.reason {
+			s := workloadSource()
+			c.mutate(&s)
+			if g, r := WorkloadGrants(s, o); len(g) != 0 || r != c.reason {
 				t.Fatalf("got %q %+v", r, g)
 			}
 		})
@@ -77,15 +64,14 @@ func TestWorkloadGrantsRequireGuardAndSelection(t *testing.T) {
 	// A pod label or a workload outside the selector value never grants.
 	unselected := observedWorkload("spoof", "d", "shared", "j:0", "payments")
 	unselected.Labels["managed"] = ValueDigest("false")
-	if g, _ := WorkloadGrantsWith(src, &value.WorkloadObservation{ClusterID: remoteCluster, Selection: sel, Workloads: []value.ObservedWorkload{unselected}}, workloadEvidence(now)); len(g) != 0 {
+	if g, _ := WorkloadGrants(src, &value.WorkloadObservation{ClusterID: remoteCluster, Selection: sel, Workloads: []value.ObservedWorkload{unselected}}); len(g) != 0 {
 		t.Fatal("workload outside the selector granted")
 	}
 }
 
 type workloadReaderFixture struct {
-	list  value.WorkloadList
-	err   error
-	proof value.NamespaceGuardProof
+	list value.WorkloadList
+	err  error
 }
 
 func (f *workloadReaderFixture) RemoteWorkloads(_ context.Context, cluster string, sel value.WorkloadSelection) (value.WorkloadList, error) {
@@ -93,20 +79,15 @@ func (f *workloadReaderFixture) RemoteWorkloads(_ context.Context, cluster strin
 	l.ClusterID, l.Selection = cluster, sel
 	return l, f.err
 }
-func (f *workloadReaderFixture) WorkloadGuard(context.Context, string) (value.NamespaceGuardProof, error) {
-	return f.proof, f.err
-}
 
 // The reconciler accepts one workload-scoped basis per granted workload with
 // its journal version, and records the minimized observation.
 func TestReconcilerInheritsWorkloadJournal(t *testing.T) {
 	f, _, s, ctx := inheritanceRun(t)
 	now := s.r.Now()
-	r := &workloadReaderFixture{list: value.WorkloadList{Journal: "j", ObservedAt: now, Workloads: []value.ObservedWorkload{observedWorkload("api", "a", "shared", "j:3", "payments")}},
-		proof: *workloadEvidence(now).WorkloadGuard}
-	s.r.Workloads, s.r.WorkloadGuards, s.sources = r, r, []value.Source{workloadSource()}
+	r := &workloadReaderFixture{list: value.WorkloadList{Journal: "j", ObservedAt: now, Workloads: []value.ObservedWorkload{observedWorkload("api", "a", "shared", "j:3", "payments")}}}
+	s.r.Workloads, s.sources = r, []value.Source{workloadSource()}
 	s.refreshWorkloads(ctx)
-	s.refreshEvidence(ctx)
 	if err := s.accept(ctx, false); err != nil {
 		t.Fatal(err)
 	}
@@ -119,15 +100,6 @@ func TestReconcilerInheritsWorkloadJournal(t *testing.T) {
 	}
 	if !found || len(b.Workloads) != 1 || b.Workloads[0].Workloads[0].ResourceVersion != "" || b.Validate(s.r.Now()) != nil {
 		t.Fatalf("workload basis not accepted: %+v", b)
-	}
-	s.workloadGuards = nil
-	r.err = errors.New("guard lost")
-	s.refreshEvidence(ctx)
-	if err := s.accept(ctx, false); err != nil {
-		t.Fatal(err)
-	}
-	if b := f.accepted[len(f.accepted)-1]; !slices.Equal(b.UnavailableSources, []string{"source"}) {
-		t.Fatalf("lost workload guard still granted: %+v", b)
 	}
 }
 

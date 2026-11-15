@@ -70,8 +70,7 @@ func (c *RetentionClient) RetentionPolicyList(ctx context.Context) (configuratio
 	if err != nil || ns.Deleting {
 		return out, value.ErrUnavailable
 	}
-	budget := permissionTotalBytes
-	rv, objects, refs, _, err := c.client.list(ctx, "EvidenceRetentionPolicy", "evidenceretentionpolicies", start, &budget)
+	rv, objects, refs, _, err := c.client.list(ctx, "EvidenceRetentionPolicy", "evidenceretentionpolicies", start)
 	if err != nil {
 		return out, value.ErrUnavailable
 	}

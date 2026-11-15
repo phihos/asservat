@@ -118,7 +118,6 @@ func qualifyAPIExecutionTransactions(t *testing.T, ctx context.Context, admin *p
 					n := time.Now().UTC().Truncate(time.Microsecond)
 					s.batch.ObservedAt = n
 					s.batch.FreshUntil = n.Add(5 * time.Second)
-					s.batch.Initial = nil
 					if err := s.p.RefreshPermissions(ctx, s.batch); err != nil {
 						t.Fatal(err)
 					}

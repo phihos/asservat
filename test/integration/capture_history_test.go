@@ -29,7 +29,6 @@ func qualifyCaptureHistory(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 		t.Helper()
 		now := time.Now().UTC().Truncate(time.Microsecond)
 		b := s.batch
-		b.Initial = nil
 		b.ObservedAt, b.FreshUntil = now, now.Add(5*time.Second)
 		if err := s.p.RefreshPermissions(ctx, b); err != nil {
 			t.Fatal(err)

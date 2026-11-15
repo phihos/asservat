@@ -58,7 +58,7 @@ func (f *reviewFake) ReviewAccess(_ context.Context, r targets.AccessReviewReque
 
 func reviewSourceFixture(uid string) configuration.ReviewSource {
 	s, _ := configuration.ReviewSourceFor(configuration.Source{Resource: configuration.Resource{Kind: "PermissionSource", UID: uid, ResourceVersion: "1", Generation: 1, SpecDigest: artifact.Digest{7}}, Enabled: true, Type: configuration.SourceKubernetesExec,
-		ClusterID: "11111111-1111-1111-1111-111111111111", Role: "workload-maintainer", MaxDecisionAge: 30 * time.Second, MaxNamespaces: 10, IdentityMappingRef: "company", AdmissionParity: configuration.AdmissionParity{Mode: "noAdditionalRestrictions", ReviewRef: "review"}})
+		ClusterID: "11111111-1111-1111-1111-111111111111", Role: "workload-maintainer", IdentityMappingRef: "company", AdmissionParity: configuration.AdmissionParity{Mode: "noAdditionalRestrictions", ReviewRef: "review"}})
 	return s
 }
 

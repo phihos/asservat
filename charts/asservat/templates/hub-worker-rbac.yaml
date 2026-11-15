@@ -62,9 +62,9 @@ rules:
     resources: [namespaces]
     verbs: [get, list, watch]
   # Permission reconciler: AccessBindings live in the namespaces they grant
-  # (ADR-329).
+  # (ADR-329); ClusterAccessBindings are cluster-scoped (ADR-335 D14).
   - apiGroups: [asservat.io]
-    resources: [accessbindings]
+    resources: [accessbindings, clusteraccessbindings]
     verbs: [get, list, watch]
 ---
 apiVersion: rbac.authorization.k8s.io/v1

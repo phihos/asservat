@@ -90,7 +90,6 @@ func qualifyProcessingRestrictions(t *testing.T, ctx context.Context, admin *pgx
 	cases := catalogapp.ContextCaseService{RootID: s.a.RootID, InstallationID: s.recovery.installation, Routes: routes, Permissions: s.p, Catalog: catalog, Retention: privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, Processing: reader, Now: time.Now}
 	refreshPermission := func() {
 		batch := s.batch
-		batch.Initial = nil
 		batch.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
 		batch.FreshUntil = batch.ObservedAt.Add(5 * time.Second)
 		if err := s.p.RefreshPermissions(ctx, batch); err != nil {
@@ -236,7 +235,6 @@ func qualifyProcessingDownloadEffects(t *testing.T, ctx context.Context, poolFor
 	gate := authorizationapp.ContextDownloadAuthority{RootID: s.a.RootID, Permissions: s.p, Catalog: catalog, Retention: privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, Environment: newDownloadTestEnvironment(t, ctx, readPool, s, e.Registration), Now: time.Now}
 	current := func() artifact.DownloadAuthority {
 		batch := s.batch
-		batch.Initial = nil
 		batch.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
 		batch.FreshUntil = batch.ObservedAt.Add(5 * time.Second)
 		if err := s.p.RefreshPermissions(ctx, batch); err != nil {

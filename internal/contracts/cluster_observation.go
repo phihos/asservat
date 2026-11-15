@@ -25,11 +25,8 @@ const (
 	// ClusterObservationPermissionNamespaces pages the connector's namespace
 	// journal of the requested keys (ADR-247).
 	ClusterObservationPermissionNamespaces = "permission-namespace-metadata"
-	// ClusterObservationPermissionWorkloads pages a workload journal and
-	// ClusterObservationPermissionWorkloadGuard proves the workload metadata
-	// guard (ADR-247).
-	ClusterObservationPermissionWorkloads     = "permission-workload-metadata"
-	ClusterObservationPermissionWorkloadGuard = "permission-workload-guard"
+	// ClusterObservationPermissionWorkloads pages a workload journal (ADR-247).
+	ClusterObservationPermissionWorkloads = "permission-workload-metadata"
 )
 
 var ErrClusterObservationProtocol = errors.New("invalid cluster observation message")

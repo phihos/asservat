@@ -6,8 +6,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"slices"
-	"strings"
-	"time"
 
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/configuration"
@@ -69,37 +67,23 @@ func validRole(role string) bool {
 	return role == "workload-maintainer" || role == "evidence-reader" || role == "evidence-owner" || role == "action-approver"
 }
 
-// NamespaceGrants evaluates a source without guard or directory evidence:
-// guarded and group-ID sources are then unavailable (the impact preview).
-func NamespaceGrants(s value.Source, observed string, o *value.NamespaceObservation) ([]value.NamespaceGrant, string) {
-	return NamespaceGrantsWith(s, observed, o, value.SourceEvidence{})
-}
-
-// NamespaceGrantsWith evaluates one PermissionSource against a namespace
+// NamespaceGrants evaluates one PermissionSource against a namespace
 // observation of cluster observed ("" when unknown) exactly as the
-// reconciler accepts it (REQ-PER-003, ADR-242, ADR-247). A namespaceMetadata
-// source maps the configured label or annotation through an explicit value
-// map or, in groupID mode, to the stable group ID it names when that ID is in
-// the administrator-configured group directory of the source's issuer.
-// Values select only the source's fixed issuer-scoped groups, never roles,
-// issuers or other settings; a missing, unknown, malformed or oversized value
-// grants nothing. administratorManaged protection rests on the
-// administrator's attestation; admissionEnforced protection additionally
-// needs a current proof that the guard named by guardRef protects every
-// selector and mapping key. Without a current proof or directory the source
-// is unavailable (kept, granting nothing). A namespace that is terminating,
-// excluded or outside the selector is never granted.
-func NamespaceGrantsWith(s value.Source, observed string, o *value.NamespaceObservation, ev value.SourceEvidence) ([]value.NamespaceGrant, string) {
+// reconciler accepts it (REQ-PER-003, ADR-242). A namespaceMetadata source
+// maps the configured label or annotation through an explicit value map.
+// Values select only the source's fixed groups, never roles, issuers or other
+// settings; a missing, unknown, malformed or oversized value grants nothing.
+// The protection mode is the administrator's statement (administratorManaged)
+// or the Helm-rendered admission policy (admissionEnforced); Asservat does
+// not prove either at runtime. A namespace that is terminating, excluded or
+// outside the selector is never granted.
+func NamespaceGrants(s value.Source, observed string, o *value.NamespaceObservation) ([]value.NamespaceGrant, string) {
 	if !s.Enabled || s.Resource.Deleting {
 		return nil, value.SourceDisabled
 	}
 	m := s.Mapping
-	valueMap, groupID := m.Mode == "valueMap", m.Mode == "groupID"
-	guarded := s.Protection.Mode == "admissionEnforced"
-	if s.Type != "namespaceMetadata" || !valueMap && !groupID || s.Protection.Mode != "administratorManaged" && !guarded || !identity.Text(s.Protection.ReviewRef, 256) ||
-		guarded && !identity.Text(s.Protection.GuardRef, 256) ||
-		observed != "" && s.ClusterID != observed || !authorization.UUID(s.ClusterID) || !validRole(s.Role) || !identity.Text(m.Issuer, 2048) ||
-		s.MaxNamespaces < 1 || s.MaxNamespaces > 1000 || valueMap && (len(m.Values) == 0 || len(m.Values) > 128) || groupID && len(m.Values) != 0 {
+	if s.Type != "namespaceMetadata" || m.Mode != "valueMap" || len(m.Values) == 0 || s.Protection.Mode != "administratorManaged" && s.Protection.Mode != "admissionEnforced" ||
+		observed != "" && s.ClusterID != observed || !authorization.UUID(s.ClusterID) || !validRole(s.Role) {
 		return nil, value.SourceUnsupported
 	}
 	if o == nil {
@@ -119,15 +103,7 @@ func NamespaceGrantsWith(s value.Source, observed string, o *value.NamespaceObse
 			return nil, value.MetadataNotObserved
 		}
 	}
-	if guarded {
-		if reason := guardCovers(ev.Guard, s.Protection.GuardRef, s.ClusterID, keys, ev.Now); reason != "" {
-			return nil, reason
-		}
-	}
-	groups, reason := mappingGroups(m, ev)
-	if reason != "" {
-		return nil, reason
-	}
+	groups := mappingGroups(m)
 	selector := map[string]string{}
 	for k, v := range s.NamespaceSelector {
 		selector[k] = ValueDigest(v)
@@ -154,9 +130,6 @@ func NamespaceGrantsWith(s value.Source, observed string, o *value.NamespaceObse
 		}
 		out = append(out, value.NamespaceGrant{Namespace: value.NamespaceRef{Name: n.Name, UID: n.UID}, ResourceVersion: n.ResourceVersion, Subjects: slices.Clone(groups[v])})
 	}
-	if len(out) > s.MaxNamespaces {
-		return nil, value.SourceTooManyNamespaces
-	}
 	return out, ""
 }
 
@@ -169,52 +142,21 @@ func SourceBasis(s value.Source, g value.NamespaceGrant, continuous bool) value.
 	return b
 }
 
-// mappingGroups maps value digests to the source's issuer-scoped groups:
-// the explicit value map, or in groupID mode the configured directory's IDs.
-func mappingGroups(m value.Mapping, ev value.SourceEvidence) (map[string][]value.Subject, string) {
+// mappingGroups maps value digests to the source's groups. An empty issuer
+// is the installation's issuer (filled in when the batch is prepared).
+func mappingGroups(m value.Mapping) map[string][]value.Subject {
 	groups := map[string][]value.Subject{}
-	if m.Mode == "groupID" {
-		d := ev.Directory
-		if !d.Current(ev.Now) || d.Issuer != m.Issuer {
-			return nil, value.DirectoryUnavailable
-		}
-		for _, id := range d.Groups {
-			if digest := ValueDigest(id); digest != "" && !strings.Contains(id, ",") {
-				groups[digest] = []value.Subject{{Kind: "Group", Issuer: m.Issuer, ID: id}}
-			}
-		}
-	}
 	for v, ids := range m.Values {
 		d := ValueDigest(v)
-		if d == "" || len(ids) == 0 || !identity.Strings(ids, 16, 256) {
+		if d == "" || len(ids) == 0 {
 			continue
 		}
 		for _, id := range ids {
-			groups[d] = append(groups[d], value.Subject{Kind: "Group", Issuer: m.Issuer, ID: id})
+			if identity.Text(id, 256) && !slices.Contains(groups[d], value.Subject{Kind: "Group", Issuer: m.Issuer, ID: id}) {
+				groups[d] = append(groups[d], value.Subject{Kind: "Group", Issuer: m.Issuer, ID: id})
+			}
 		}
 		slices.SortFunc(groups[d], func(a, b value.Subject) int { return cmp.Compare(a.ID, b.ID) })
 	}
-	return groups, ""
-}
-
-// guardCovers requires a current proof of the named guard of cluster that
-// protects every key.
-func guardCovers(g *value.NamespaceGuardProof, name, cluster string, keys value.NamespaceKeys, now time.Time) string {
-	if !g.Current(now) || g.ClusterID != cluster {
-		return value.GuardUnavailable
-	}
-	if g.Name != name {
-		return value.SourceUnsupported
-	}
-	for _, k := range keys.Labels {
-		if !slices.Contains(g.LabelKeys, k) {
-			return value.SourceUnsupported
-		}
-	}
-	for _, k := range keys.Annotations {
-		if !slices.Contains(g.AnnotationKeys, k) {
-			return value.SourceUnsupported
-		}
-	}
-	return ""
+	return groups
 }

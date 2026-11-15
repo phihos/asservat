@@ -145,8 +145,7 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 		}
 		basis := cfg.PermissionBasis{Resource: cfg.Resource{Kind: "AccessBinding", UID: custodyID(), Generation: 1, ResourceVersion: "v1", SpecDigest: artifact.Digest{2}}, Scope: cfg.Scope{ClusterID: cluster, Namespace: cfg.NamespaceRef{Name: "app", UID: ns}}, Effect: "Allow", Subjects: []cfg.Subject{{Kind: "Group", Issuer: "https://id.example.test", ID: "team-a"}}, Roles: []string{"workload-maintainer"}, Automation: &authorization.AutomationEnvelope{AllowedActions: []string{"logs", "packetCapture"}, MaxLifetimeSeconds: 3600, MaxExecutions: 10, MaxBytes: maxOutput, MaxObservedBytes: 2000}}
 		basis.ScopeDigest = configapp.PermissionScopeDigest(basis)
-		review := cfg.BootstrapReview{Resource: cfg.Resource{ClusterID: cluster, Namespace: "asservat", NamespaceUID: "control", Kind: "ConfigMap", UID: custodyID(), ResourceVersion: "v1", SpecDigest: artifact.Digest{9}}, Reviewer: "synthetic-administrator", BindingsDigest: artifact.Digest{8}, ReviewedAt: now.Add(-time.Minute), ExpiresAt: now.Add(time.Minute), ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
-		batch := cfg.PermissionBatch{RootID: root, Epoch: epoch, RequestID: custodyID(), TrustDigest: trust, InputDigest: artifact.Digest{3}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), Bases: []cfg.PermissionBasis{basis}, Initial: &cfg.PermissionInitialization{ClusterID: cluster, Control: cfg.NamespaceRef{Name: "asservat", UID: "control"}, BindingCount: 1, BindingsDigest: review.BindingsDigest, Review: &review}}
+		batch := cfg.PermissionBatch{RootID: root, Epoch: epoch, RequestID: custodyID(), TrustDigest: trust, InputDigest: artifact.Digest{3}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), Bases: []cfg.PermissionBasis{basis}}
 		accepted, err := p.AcceptPermissions(ctx, batch)
 		if err != nil {
 			t.Fatal(err)

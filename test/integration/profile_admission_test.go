@@ -176,7 +176,7 @@ func qualifyProfileAdmission(t *testing.T, ctx context.Context, admin *pgxpool.P
 				process := execution.APIProcessBinding{NamespaceUID: custodyID(), AccountUID: custodyID(), PodUID: custodyID(), ProcessEpoch: plan.WriterEpoch, StartupDigest: artifact.Digest{1}, ImageDigest: accepted.Expectation.CollectorImageDigest}
 				refresh := func() executionapp.APIExecutionCheck {
 					n := time.Now().UTC().Truncate(time.Microsecond)
-					s.batch.ObservedAt, s.batch.FreshUntil, s.batch.Initial = n, n.Add(5*time.Second), nil
+					s.batch.ObservedAt, s.batch.FreshUntil = n, n.Add(5*time.Second)
 					if err := s.p.RefreshPermissions(ctx, s.batch); err != nil {
 						t.Fatal(err)
 					}

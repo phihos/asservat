@@ -1,6 +1,6 @@
 -- name: ListPermissionReviewSources :many
 -- ADR-245: every accepted decision-time source row of a stream, current or not.
-SELECT * FROM permission_review_source WHERE stream_id=$1 ORDER BY uid LIMIT 65;
+SELECT * FROM permission_review_source WHERE stream_id=$1 ORDER BY uid;
 
 -- name: UpsertPermissionReviewSource :exec
 INSERT INTO permission_review_source(stream_id,uid,epoch,seen_sequence,generation,resource_version,spec_digest,authority_digest,cluster_id,role,source_json,accepted_audit_id)
@@ -24,7 +24,7 @@ DELETE FROM permission_review_source WHERE stream_id=$1;
 SELECT rs.*, au.object_key,au.object_version,au.object_etag,au.object_bytes,au.object_sha256,au.acknowledged_at
 FROM permission_review_source rs JOIN authority_audit au ON au.id=rs.accepted_audit_id AND au.stream_id=rs.stream_id
 WHERE rs.stream_id=$1 AND rs.epoch=$2 AND rs.seen_sequence=$3 AND rs.cluster_id=$4 AND au.acknowledged_at IS NOT NULL
-ORDER BY rs.uid LIMIT 5;
+ORDER BY rs.uid;
 
 -- name: LockPermissionReviewSource :one
 SELECT * FROM permission_review_source WHERE stream_id=$1 AND uid=$2 FOR SHARE;
@@ -36,9 +36,6 @@ ON CONFLICT(stream_id,source_uid,issuer,subject_id) WHERE retired_at IS NULL DO 
 
 -- name: CurrentPermissionReviewAssignment :one
 SELECT * FROM permission_review_assignment WHERE stream_id=$1 AND source_uid=$2 AND issuer=$3 AND subject_id=$4 AND retired_at IS NULL;
-
--- name: CountPermissionReviewAssignments :one
-SELECT count(*) FROM permission_review_assignment WHERE stream_id=$1 AND source_uid=$2 AND retired_at IS NULL;
 
 -- name: UpsertPermissionReviewDecision :execrows
 -- Affects no row for an older decision or another target of the same Pod UID.
@@ -66,21 +63,21 @@ JOIN permission_review_source rs ON rs.stream_id=a.stream_id AND rs.uid=a.source
 LEFT JOIN authority_audit au ON au.id=rs.accepted_audit_id AND au.stream_id=rs.stream_id
 WHERE a.stream_id=$1 AND a.retired_at IS NULL AND rs.epoch=$2 AND rs.seen_sequence=$3
 AND d.cluster_id=$4 AND d.namespace_uid=$5 AND d.workload_uid=$6 AND d.pod_uid=$7 AND d.fresh_until>clock_timestamp()
-ORDER BY d.decided_at DESC,a.id LIMIT 32;
+ORDER BY d.decided_at DESC,a.id;
 
 -- name: SelectRecordedReviews :many
 -- One principal's recorded review targets of one exact Pod.
 SELECT a.source_uid,d.* FROM permission_review_decision d JOIN permission_review_assignment a ON a.id=d.assignment_id
 WHERE a.stream_id=$1 AND a.retired_at IS NULL AND a.issuer=$2 AND a.subject_id=$3
 AND d.cluster_id=$4 AND d.namespace_uid=$5 AND d.workload_uid=$6 AND d.pod_uid=$7
-ORDER BY a.source_uid LIMIT 5;
+ORDER BY a.source_uid;
 
 -- name: SelectRecordedCaptureReviews :many
 -- One principal's recorded review targets of the Pod of one capture.
 SELECT a.source_uid,d.* FROM permission_review_decision d JOIN permission_review_assignment a ON a.id=d.assignment_id
 JOIN context_capture c ON c.root_id=a.stream_id AND d.pod_uid=convert_from(c.pod_pin_json,'UTF8')::jsonb->>'UID' AND d.namespace_uid=convert_from(c.pod_pin_json,'UTF8')::jsonb->>'NamespaceUID'
 WHERE a.stream_id=$1 AND c.id=$2 AND a.retired_at IS NULL AND a.issuer=$3 AND a.subject_id=$4
-ORDER BY a.source_uid LIMIT 5;
+ORDER BY a.source_uid;
 
 -- name: GetPermissionReviewDecision :one
 SELECT * FROM permission_review_decision WHERE assignment_id=$1 AND pod_uid=$2 FOR UPDATE;
@@ -91,7 +88,7 @@ SELECT * FROM permission_review_decision WHERE assignment_id=$1 AND pod_uid=$2 F
 SELECT a.source_uid,d.* FROM permission_review_decision d JOIN permission_review_assignment a ON a.id=d.assignment_id
 JOIN context_preview p ON p.root_id=a.stream_id AND d.pod_uid=convert_from(p.blueprint_json,'UTF8')::jsonb->'Target'->>'PodUID' AND d.namespace_uid=convert_from(p.blueprint_json,'UTF8')::jsonb->'Target'->'Namespace'->>'UID'
 WHERE a.stream_id=$1 AND p.id=$2 AND p.actor_key=$3 AND a.retired_at IS NULL AND a.issuer=$4 AND a.subject_id=$5
-ORDER BY a.source_uid LIMIT 5;
+ORDER BY a.source_uid;
 
 -- name: SelectPreviewReviewAssignments :many
 -- ADR-245 preview: the current assignments a decision-time source minted, per

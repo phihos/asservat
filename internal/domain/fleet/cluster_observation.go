@@ -28,11 +28,8 @@ const (
 	// changes only when an observed key value changes.
 	ObservePermissionNamespaces ClusterObservationPurpose = "permission-namespace-metadata"
 	// ObservePermissionWorkloads pages the connector's workload journal of
-	// one selection (Selector, Keys as labels, AnnotationKeys), and
-	// ObservePermissionWorkloadGuard proves its workload metadata guard
-	// (ADR-247).
+	// one selection (Selector, Keys as labels, AnnotationKeys) (ADR-247).
 	ObservePermissionWorkloads      ClusterObservationPurpose = "permission-workload-metadata"
-	ObservePermissionWorkloadGuard  ClusterObservationPurpose = "permission-workload-guard"
 	ClusterObservationMaximumKeys                             = 256
 	ClusterObservationMaximumItems                            = 64
 	ClusterObservationMaximumCursor                           = 8192
@@ -140,7 +137,7 @@ func (r ClusterObservationRequest) Valid(now time.Time) bool {
 	}
 	emptyNamespace, emptyWorkload := r.Namespace == (cfg.NamespaceRef{}), r.Workload == (cfg.WorkloadRef{})
 	switch r.Purpose {
-	case ObserveCapacityNamespaceGuard, ObservePermissionWorkloadGuard:
+	case ObserveCapacityNamespaceGuard:
 		return emptyNamespace && emptyWorkload && r.Kind == "" && len(r.Keys) == 0 && len(r.AnnotationKeys) == 0 && len(r.Selector) == 0 && r.Continue == ""
 	case ObservePermissionWorkloads:
 		return emptyNamespace && emptyWorkload && r.Kind == "" && cfg.WorkloadSelection{Selector: r.Selector, Keys: cfg.NamespaceKeys{Labels: r.Keys, Annotations: r.AnnotationKeys}}.Valid()
@@ -267,8 +264,6 @@ func (v ClusterObservationResult) Matches(r ClusterObservationRequest, digest ar
 	switch r.Purpose {
 	case ObserveCapacityNamespaceGuard:
 		return v.Guard != nil && v.Guard.Digest != (artifact.Digest{}) && observationKeys(v.Guard.Keys) && len(v.Guard.AnnotationKeys) == 0 && within(v.Guard.Interval)
-	case ObservePermissionWorkloadGuard:
-		return v.Guard != nil && v.Guard.Digest != (artifact.Digest{}) && cfg.NamespaceKeys{Labels: v.Guard.Keys, Annotations: v.Guard.AnnotationKeys}.Valid() && len(v.Guard.Keys)+len(v.Guard.AnnotationKeys) > 0 && within(v.Guard.Interval)
 	case ObservePermissionWorkloads:
 		p := v.PermissionWorkloads
 		if p == nil || !authorization.UUID(p.Journal) || p.Sequence < 0 || p.ObservedAt.IsZero() || p.ObservedAt.After(v.Interval.FreshUntil) || !observationCursor(p.Continue) || len(p.Items) > ClusterObservationMaximumItems || p.Items == nil {

@@ -3,7 +3,6 @@ package kubernetes
 import (
 	"context"
 	"reflect"
-	"slices"
 	"strings"
 
 	"asservat.local/asservat/internal/contracts"
@@ -19,9 +18,6 @@ import (
 )
 
 const workloadMetadataDenial = "Asservat workload ownership administrator is required."
-
-// WorkloadGuardProfile is the guardRef a workloadMetadata source names.
-const WorkloadGuardProfile = "workload-guard"
 
 // WorkloadAdmission is the ADR-247 workload metadata guard: on every
 // Deployment and StatefulSet CREATE and UPDATE, a writer other than the
@@ -87,19 +83,6 @@ func NewWorkloadGuard(observer *PermissionClient, plan cfg.WorkloadAdministratio
 		return nil, err
 	}
 	return &WorkloadGuard{guard: g, plan: plan}, nil
-}
-
-// WorkloadGuardProof is one current observation within the original interval.
-func (g *WorkloadGuard) WorkloadGuardProof(ctx context.Context) (cfg.NamespaceGuardProof, error) {
-	if g == nil || g.guard == nil {
-		return cfg.NamespaceGuardProof{}, cfg.ErrUnavailable
-	}
-	s := g.guard
-	start, until, err := s.current(ctx)
-	if err != nil {
-		return cfg.NamespaceGuardProof{}, err
-	}
-	return cfg.NamespaceGuardProof{ClusterID: s.observer.clusterID, Name: WorkloadGuardProfile, LabelKeys: slices.Clone(g.plan.LabelKeys), AnnotationKeys: slices.Clone(g.plan.AnnotationKeys), ObservedAt: start, FreshUntil: until}, nil
 }
 
 // WorkloadGuardName is the hub cluster's workload metadata guard.

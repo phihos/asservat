@@ -345,7 +345,6 @@ func source107AddReader(t *testing.T, ctx context.Context, f *capacitySQLFixture
 	reader.Continuous = true
 	reader.ScopeDigest = configapp.PermissionScopeDigest(reader)
 	batch.Bases = append(batch.Bases, reader)
-	batch.Initial = nil
 	batch.RequestID = custodyID()
 	batch.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
 	batch.FreshUntil = batch.ObservedAt.Add(5 * time.Second)

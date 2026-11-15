@@ -38,7 +38,6 @@ installation ID in Go, object UIDs are read by name.
 {{- $permission := dict
   "statusUsers" (default (list (printf "system:serviceaccount:%s:%s" .Release.Namespace $account)) $perm.statusUsers)
   "identity" (dict "settings" (printf "%s-identity-settings" $n) "issuer" (include "asservat.hubWorker.identityIssuer" .)) -}}
-{{- with $perm.review }}{{ $_ := set $permission "review" . }}{{ end -}}
 {{- if .Values.retention }}{{ $_ := set $permission "retention" true }}{{ end -}}
 {{- if (index .Values.hub "download-worker").enabled -}}
 {{- $_ := set $permission "workerConfiguration" (dict "namespace" (printf "%s-downloads" $n) "source" (printf "%s-worker-profile" $n)) -}}

@@ -169,7 +169,6 @@ func qualifyPolicyGrantPublicOperations(t *testing.T, ctx context.Context, admin
 	// automation sponsor assignment (the test does not invent current rights).
 	reviewerBasis := cfg.PermissionBasis{Resource: cfg.Resource{Kind: "AccessBinding", UID: custodyID(), Generation: 1, ResourceVersion: "reviewer-v1", SpecDigest: artifact.Digest{79}}, Scope: batch.Bases[0].Scope, Effect: "Allow", Subjects: []cfg.Subject{{Kind: "User", Issuer: author.Principal.Issuer, ID: "policy-public-reviewer"}}, Roles: []string{"action-approver"}}
 	reviewerBasis.ScopeDigest = configapp.PermissionScopeDigest(reviewerBasis)
-	batch.Initial = nil
 	batch.Bases[0].Continuous = true
 	batch.Bases = append(batch.Bases, reviewerBasis)
 	batch.RequestID = custodyID()

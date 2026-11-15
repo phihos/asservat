@@ -134,14 +134,15 @@ func testDecisionTimeReviews(t *testing.T, c *rest.Config, dsn, s3endpoint strin
 	if err != nil {
 		t.Fatal(err)
 	}
-	specJSON, _ := json.Marshal(map[string]any{"enabled": true, "clusterID": cluster, "type": "kubernetesExec", "namespaceSelector": map[string]any{"matchLabels": map[string]any{"review.example.invalid/managed": "true"}},
-		"excludedNamespaces": []any{"kube-system"}, "role": "workload-maintainer", "maxDecisionAgeSeconds": 30, "maxNamespaces": 10, "identityMappingRef": "company",
+	specJSON, _ := json.Marshal(map[string]any{"enabled": true, "cluster": kube.LocalClusterName, "type": "kubernetesExec", "namespaceSelector": map[string]any{"matchLabels": map[string]any{"review.example.invalid/managed": "true"}},
+		"excludedNamespaces": []any{"kube-system"}, "role": "workload-maintainer", "identityMappingRef": "company",
 		"admissionParity": map[string]any{"mode": "noAdditionalRestrictions", "reviewRef": "synthetic-exec-attestation"}})
 	decoded, err := decoder.DecodePermissionSourceSpec(specJSON)
 	if err != nil {
 		t.Fatal(err)
 	}
 	decoded.Resource = cfg.Resource{Kind: "PermissionSource", UID: custodyID(), ResourceVersion: "exec-1", Generation: 1, SpecDigest: decoded.Resource.SpecDigest}
+	decoded.ClusterID = cluster // the preview decoder resolves no cluster names
 	sources := cfg.ReviewSources([]cfg.Source{decoded})
 	if len(sources) != 1 {
 		t.Fatal("decoded exec source not accepted")
@@ -207,9 +208,7 @@ func testDecisionTimeReviews(t *testing.T, c *rest.Config, dsn, s3endpoint strin
 		t.Helper()
 		n := time.Now().UTC().Truncate(time.Microsecond)
 		b := cfg.PermissionBatch{RootID: root, Epoch: epoch, RequestID: custodyID(), ExpectedSequence: sequence, TrustDigest: trust, InputDigest: artifact.Digest{byte(len(bases)) + 1, byte(sequence) + 1, 7}, ObservedAt: n, FreshUntil: n.Add(5 * time.Second), Bases: bases}
-		if initial {
-			b.Initial = &cfg.PermissionInitialization{ClusterID: cluster, Control: cfg.NamespaceRef{Name: ns.Name, UID: string(ns.UID)}, BindingsDigest: artifact.Digest{8}}
-		} else {
+		if !initial {
 			b.ReviewSources = sources
 		}
 		r, err := store.AcceptPermissions(ctx, b)

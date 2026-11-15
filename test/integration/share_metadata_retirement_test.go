@@ -67,7 +67,7 @@ func TestShareMetadataSlotsWithRealServices(t *testing.T) {
 				base.ScopeDigest = configapp.PermissionScopeDigest(base)
 				next.Bases = append(next.Bases, base)
 			}
-			next.RequestID, next.InputDigest, next.Initial = custodyID(), artifact.Digest{83}, nil
+			next.RequestID, next.InputDigest = custodyID(), artifact.Digest{83}
 			next.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
 			next.FreshUntil = next.ObservedAt.Add(5 * time.Second)
 			accepted, err := f.permission.AcceptPermissions(ctx, next)

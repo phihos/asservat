@@ -95,7 +95,6 @@ func startNativeScenarioSources(t *testing.T, parent context.Context, admin *pgx
 			return err
 		}
 		batch := s.batch
-		batch.Initial = nil
 		batch.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
 		batch.FreshUntil = batch.ObservedAt.Add(5 * time.Second)
 		return s.p.RefreshPermissions(call, batch)

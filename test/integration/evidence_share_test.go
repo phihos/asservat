@@ -64,7 +64,6 @@ func qualifyEvidenceShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool
 		t.Helper()
 		now := time.Now().UTC().Truncate(time.Microsecond)
 		b := batch
-		b.Initial = nil
 		b.ObservedAt, b.FreshUntil = now, now.Add(5*time.Second)
 		if err := s.p.RefreshPermissions(ctx, b); err != nil {
 			t.Fatal(err)
@@ -421,7 +420,6 @@ func qualifyEvidenceShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool
 	}
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	changed := batch
-	changed.Initial = nil
 	changed.RequestID, changed.InputDigest = custodyID(), artifact.Digest{97}
 	changed.ObservedAt, changed.FreshUntil = now, now.Add(5*time.Second)
 	deny := cfg.PermissionBasis{Resource: cfg.Resource{Kind: "AccessBinding", UID: custodyID(), Generation: 1, ResourceVersion: "share-deny-1", SpecDigest: artifact.Digest{96}}, Scope: batch.Bases[0].Scope, Effect: "Deny", Subjects: []cfg.Subject{{Kind: "User", Issuer: issuer, ID: "synthetic-recipient"}}, Roles: []string{"evidence-reader"}}

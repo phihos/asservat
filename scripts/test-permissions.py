@@ -38,7 +38,7 @@ def sources():
     paths.append(ROOT/"scripts/retention-crd.py")
     paths.extend((ROOT/"migrations").rglob("*.sql"))
     paths.extend((ROOT/"migrations").rglob("*.go"))
-    return {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(set(paths))}
+    return {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(set(paths)) if p.exists()}
 
 def main():
     cache = Path(os.environ.get("XDG_CACHE_HOME", Path.home()/".cache"))/"asservat-build"
@@ -63,18 +63,18 @@ def main():
             resources = []
             for ns in ["asservat-system", "payments", "other"]:
                 resources.append({"apiVersion": "v1", "kind": "Namespace", "metadata": {"name": ns, "labels": {"pod-security.kubernetes.io/enforce": "restricted", "example.invalid/managed": "true"}, "annotations": {"example.invalid/owner": "payments", "unrelated": "MUST-NOT-LEAK"}}})
-            for kind, plural in [("AccessBinding", "accessbindings"), ("PermissionSource", "permissionsources")]:
-                resources.append({"apiVersion": "apiextensions.k8s.io/v1", "kind": "CustomResourceDefinition", "metadata": {"name": plural+".asservat.io"}, "spec": {"group": "asservat.io", "names": {"kind": kind, "plural": plural}, "scope": "Namespaced", "versions": [{"name": "v1alpha1", "served": True, "storage": True, "subresources": {"status": {}}, "schema": {"openAPIV3Schema": {"type": "object", "properties": {"spec": {"type": "object", "x-kubernetes-preserve-unknown-fields": True}, "status": {"type": "object", "x-kubernetes-preserve-unknown-fields": True}}}}}]}})
+            for kind, plural, scope in [("AccessBinding", "accessbindings", "Namespaced"), ("ClusterAccessBinding", "clusteraccessbindings", "Cluster"), ("PermissionSource", "permissionsources", "Namespaced")]:
+                resources.append({"apiVersion": "apiextensions.k8s.io/v1", "kind": "CustomResourceDefinition", "metadata": {"name": plural+".asservat.io"}, "spec": {"group": "asservat.io", "names": {"kind": kind, "plural": plural}, "scope": scope, "versions": [{"name": "v1alpha1", "served": True, "storage": True, "subresources": {"status": {}}, "schema": {"openAPIV3Schema": {"type": "object", "properties": {"spec": {"type": "object", "x-kubernetes-preserve-unknown-fields": True}, "status": {"type": "object", "x-kubernetes-preserve-unknown-fields": True}}}}}]}})
             resources.extend([
                 {"apiVersion": "v1", "kind": "ServiceAccount", "metadata": {"name": "permission-reader", "namespace": "asservat-system"}},
                 {"apiVersion": "rbac.authorization.k8s.io/v1", "kind": "Role", "metadata": {"name": "permission-reader", "namespace": "asservat-system"}, "rules": [{"apiGroups": ["asservat.io"], "resources": ["permissionsources"], "verbs": ["list", "watch"]}]},
                 {"apiVersion": "rbac.authorization.k8s.io/v1", "kind": "RoleBinding", "metadata": {"name": "permission-reader", "namespace": "asservat-system"}, "subjects": [{"kind": "ServiceAccount", "name": "permission-reader", "namespace": "asservat-system"}], "roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "Role", "name": "permission-reader"}},
                 # ADR-329: AccessBindings in every namespace, as the hub-worker reads them.
-                {"apiVersion": "rbac.authorization.k8s.io/v1", "kind": "ClusterRole", "metadata": {"name": "permission-reader"}, "rules": [{"apiGroups": [""], "resources": ["namespaces"], "resourceNames": ["asservat-system", "payments"], "verbs": ["get"]}, {"apiGroups": ["asservat.io"], "resources": ["accessbindings"], "verbs": ["list", "watch"]}]},
+                {"apiVersion": "rbac.authorization.k8s.io/v1", "kind": "ClusterRole", "metadata": {"name": "permission-reader"}, "rules": [{"apiGroups": [""], "resources": ["namespaces"], "resourceNames": ["asservat-system", "payments"], "verbs": ["get"]}, {"apiGroups": ["asservat.io"], "resources": ["accessbindings", "clusteraccessbindings"], "verbs": ["list", "watch"]}]},
                 {"apiVersion": "rbac.authorization.k8s.io/v1", "kind": "ClusterRoleBinding", "metadata": {"name": "permission-reader"}, "subjects": [{"kind": "ServiceAccount", "name": "permission-reader", "namespace": "asservat-system"}], "roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "ClusterRole", "name": "permission-reader"}},
             ])
             run(k+["apply", "-f", "-"], json.dumps({"apiVersion": "v1", "kind": "List", "items": resources}))
-            run(k+["wait", "--for=condition=Established", "--timeout=30s", "crd/accessbindings.asservat.io", "crd/permissionsources.asservat.io"])
+            run(k+["wait", "--for=condition=Established", "--timeout=30s", "crd/accessbindings.asservat.io", "crd/clusteraccessbindings.asservat.io", "crd/permissionsources.asservat.io"])
             token = run(k+["-n", "asservat-system", "create", "token", "permission-reader", "--duration=1h"])
             fixture = work/"fixture.json"
             fixture.touch(mode=0o600)

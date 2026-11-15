@@ -18,7 +18,6 @@ type PermissionBatch struct {
 	TrustDigest, InputDigest artifact.Digest
 	ObservedAt, FreshUntil   time.Time
 	Bases                    []PermissionBasis
-	Initial                  *PermissionInitialization
 	// UnavailableSources are PermissionSources whose current namespace
 	// observation is unknown (ADR-242). Their accepted assignments are kept,
 	// neither retired nor renewed, and grant nothing until a fresh
@@ -82,47 +81,50 @@ func (p PermissionBasis) Key() string {
 	return k
 }
 
+// Roles are the roles a binding or source may grant. privacy-operator is
+// granted only by a hub-cluster ClusterAccessBinding and has no consumer yet.
+var Roles = []string{"workload-maintainer", "evidence-reader", "evidence-owner", "action-approver"}
+
+// Validate checks a prepared batch. No count limits: Kubernetes object limits
+// bound each spec and the store pages its rows.
 func (b PermissionBatch) Validate(now time.Time) error {
-	if !authorization.UUID(b.RootID) || !authorization.UUID(b.Epoch) || !authorization.UUID(b.RequestID) || b.ExpectedSequence < 0 || b.TrustDigest == (artifact.Digest{}) || b.InputDigest == (artifact.Digest{}) || !identity.Fresh(b.ObservedAt, b.FreshUntil, now, 5*time.Second) || len(b.Bases) > 1024 {
+	if !authorization.UUID(b.RootID) || !authorization.UUID(b.Epoch) || !authorization.UUID(b.RequestID) || b.ExpectedSequence < 0 || b.TrustDigest == (artifact.Digest{}) || b.InputDigest == (artifact.Digest{}) || !identity.Fresh(b.ObservedAt, b.FreshUntil, now, 5*time.Second) {
 		return ErrInvalid
 	}
-	if b.Namespaces != nil && !b.Namespaces.Valid() || !identity.Strings(b.UnavailableSources, 1024, 64) || b.SourcesUnavailable && len(b.UnavailableSources) > 0 || !RemoteNamespacesValid(b.Namespaces, b.RemoteNamespaces) || !WorkloadObservationsValid(b.Workloads) {
+	if b.Namespaces != nil && !b.Namespaces.Valid() || !identity.Strings(b.UnavailableSources, len(b.UnavailableSources), 64) || b.SourcesUnavailable && len(b.UnavailableSources) > 0 || !RemoteNamespacesValid(b.Namespaces, b.RemoteNamespaces) || !WorkloadObservationsValid(b.Workloads) {
 		return ErrInvalid
 	}
-	if len(b.ReviewSources) > 64 || b.SourcesUnavailable && len(b.ReviewSources) > 0 {
+	if b.SourcesUnavailable && len(b.ReviewSources) > 0 {
 		return ErrInvalid
 	}
-	reviews, perCluster := map[string]bool{}, map[string]int{}
+	reviews := map[string]bool{}
 	for _, r := range b.ReviewSources {
 		if !r.Valid() || reviews[r.Resource.UID] || slices.Contains(b.UnavailableSources, r.Resource.UID) {
 			return ErrInvalid
 		}
 		reviews[r.Resource.UID] = true
-		if perCluster[r.ClusterID]++; perCluster[r.ClusterID] > MaxReviewSourcesPerCluster {
-			return ErrInvalid
-		}
 	}
 	seen := map[string]bool{}
-	rows := 0
 	for _, p := range b.Bases {
 		if p.Resource.Kind == "PermissionSource" && (b.SourcesUnavailable || slices.Contains(b.UnavailableSources, p.Resource.UID)) {
 			return ErrInvalid
 		}
 		r := p.Resource
-		if !identity.Text(r.UID, 64) || seen[p.Key()] || !identity.Text(r.ResourceVersion, 128) || r.Generation < 1 || r.Generation > 2147483647 || r.SpecDigest == (artifact.Digest{}) || p.ScopeDigest == (artifact.Digest{}) || !authorization.UUID(p.Scope.ClusterID) || !identity.Text(p.Scope.Namespace.UID, 64) || !identity.Text(p.Scope.Namespace.Name, 63) || (r.Kind != "AccessBinding" && r.Kind != "PermissionSource") || (p.Effect != "Allow" && p.Effect != "Deny") || len(p.Subjects) < 1 || len(p.Subjects) > 32 || !identity.Strings(p.Roles, 4, 32) || len(p.Roles) == 0 || len(p.Scope.Workloads) > 64 {
+		if !identity.Text(r.UID, 64) || seen[p.Key()] || !identity.Text(r.ResourceVersion, 128) || r.Generation < 1 || r.Generation > 2147483647 || r.SpecDigest == (artifact.Digest{}) || p.ScopeDigest == (artifact.Digest{}) || !authorization.UUID(p.Scope.ClusterID) || !identity.Text(p.Scope.Namespace.UID, 64) || !identity.Text(p.Scope.Namespace.Name, 63) || (r.Kind != "AccessBinding" && r.Kind != "PermissionSource" && r.Kind != ClusterAccessBindingKind) || (p.Effect != "Allow" && p.Effect != "Deny") || len(p.Subjects) < 1 || len(p.Roles) == 0 || !identity.Strings(p.Roles, len(p.Roles), 32) {
 			return ErrInvalid
 		}
 		seen[p.Key()] = true
 		if r.Deleting && p.Effect == "Allow" {
 			return ErrInvalid
 		}
-		if r.Kind == "PermissionSource" && p.Effect != "Allow" {
+		// A ClusterAccessBinding covers every namespace of its cluster.
+		if (r.Kind == ClusterAccessBindingKind) != (p.Scope.Namespace == AllNamespaces) || r.Kind == ClusterAccessBindingKind && (len(p.Scope.Workloads) > 0 || p.Automation != nil) {
 			return ErrInvalid
 		}
 		// A namespaceMetadata source grants one role to groups over a whole
 		// namespace (REQ-PER-003), a workloadMetadata source over one workload
 		// (REQ-PER-005, ADR-247); neither denies.
-		if r.Kind == "PermissionSource" && (!identity.Text(p.ObservationVersion, 128) || len(p.Scope.Workloads) > 1 || len(p.Roles) != 1 || slices.ContainsFunc(p.Subjects, func(s Subject) bool { return s.Kind != "Group" })) {
+		if r.Kind == "PermissionSource" && (p.Effect != "Allow" || !identity.Text(p.ObservationVersion, 128) || len(p.Scope.Workloads) > 1 || len(p.Roles) != 1 || slices.ContainsFunc(p.Subjects, func(s Subject) bool { return s.Kind != "Group" })) {
 			return ErrInvalid
 		}
 		if p.Automation != nil {
@@ -136,7 +138,7 @@ func (b PermissionBatch) Validate(now time.Time) error {
 			}
 		}
 		for _, role := range p.Roles {
-			if !slices.Contains([]string{"workload-maintainer", "evidence-reader", "evidence-owner", "action-approver"}, role) {
+			if !slices.Contains(Roles, role) {
 				return ErrInvalid
 			}
 		}
@@ -157,20 +159,13 @@ func (b PermissionBatch) Validate(now time.Time) error {
 		if !p.NotAfter.IsZero() && !now.Before(p.NotAfter) {
 			return ErrInvalid
 		}
-		rows += len(p.Subjects) * len(p.Roles)
-	}
-	if rows > 4096 {
-		return ErrLimit
 	}
 	return nil
 }
 
-// RemoteNamespacesValid bounds remote observations to eight valid ones in
-// strictly ascending cluster order, none for the hub observation's cluster.
+// RemoteNamespacesValid requires valid remote observations in strictly
+// ascending cluster order, none for the hub observation's cluster.
 func RemoteNamespacesValid(hub *NamespaceObservation, remote []NamespaceObservation) bool {
-	if len(remote) > 8 {
-		return false
-	}
 	for i, o := range remote {
 		if !o.Valid() || i > 0 && remote[i-1].ClusterID >= o.ClusterID || hub != nil && hub.ClusterID == o.ClusterID {
 			return false

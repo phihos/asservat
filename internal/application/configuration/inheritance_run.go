@@ -126,6 +126,7 @@ func (f *namespaceFeed) stop() {
 // with more than 32 keys, there is no observation.
 func (s *bindingRun) syncSources(ctx context.Context, snapshot value.Snapshot) {
 	s.sources, s.sourcesComplete = snapshot.Sources, snapshot.SourcesComplete
+	s.clusterBindings = snapshot.ClusterBindings
 	if s.r.Namespaces == nil || !snapshot.SourcesComplete {
 		return
 	}
@@ -204,21 +205,19 @@ type inheritanceState struct {
 
 // inheritance derives the source part of the next batch at now. A source is
 // unavailable (its accepted assignments kept, granting nothing) while its
-// cluster's namespace metadata is unknown or older than its
-// maxDecisionAgeSeconds; it grants nothing, and its assignments are retired,
-// when it is disabled, unsupported or too wide. Sources are taken in UID
-// order; one whose namespaces exceed the batch's remaining basis or
-// assignment budget grants nothing (TooManyNamespaces).
+// cluster's namespace metadata is unknown; it grants nothing, and its
+// assignments are retired, when it is disabled or unsupported.
 func (s *bindingRun) inheritance(now time.Time) inheritanceState {
 	out := inheritanceState{included: map[string]int{}}
-	if !s.fence.Initialized {
-		// The first acceptance binds the reviewed explicit baseline only.
-		return out
-	}
-	bases, rows := s.journal.Budget(now)
 	// ADR-329: joined clusters' AccessBindings do not depend on the hub
 	// cluster's PermissionSource list.
-	s.remoteBindingBases(now, &out, &bases, &rows)
+	s.remoteBindingBases(now, &out)
+	// ClusterAccessBindings are read with every LIST (ADR-335 D14).
+	for _, b := range s.clusterBindings {
+		if p, ok := bindingBasis(b, now); ok {
+			out.Bases = append(out.Bases, p)
+		}
+	}
 	if !s.sourcesComplete {
 		out.SourcesUnavailable = true
 		return out
@@ -248,32 +247,25 @@ func (s *bindingRun) inheritance(now time.Time) inheritanceState {
 	}
 	for _, src := range sources {
 		if src.Type == "workloadMetadata" {
-			s.inheritWorkloads(&out, src, now, &bases, &rows)
+			s.inheritWorkloads(&out, src)
 			continue
 		}
 		cluster, observed := s.r.NamespaceClusterID, live
-		var observedAt time.Time
-		if s.namespaces != nil {
-			observedAt = s.namespaces.ObservedAt()
-		}
 		// ADR-247: another joined cluster's source is evaluated against its
 		// connector's journal. Its versions change only with an observed
 		// value, so exact comparison keeps assignments across unrelated
 		// writes; continuity is never claimed across reads.
 		other := src.ClusterID != s.r.NamespaceClusterID
 		if other {
-			cluster, observed, observedAt = src.ClusterID, nil, time.Time{}
+			cluster, observed = src.ClusterID, nil
 			if r := s.remote[src.ClusterID]; r != nil {
-				observed, observedAt = r.live, r.observedAt
+				observed = r.live
 			}
 		}
-		grants, reason := NamespaceGrantsWith(src, cluster, observed, value.SourceEvidence{Guard: s.guards[src.ClusterID], Directory: s.directories[src.Mapping.Issuer], Now: now})
-		if reason == "" && observed != nil && !now.Before(observedAt.Add(src.MaxDecisionAge)) {
-			reason = value.MetadataUnavailable
-		}
+		grants, reason := NamespaceGrants(src, cluster, observed)
 		switch reason {
 		case "":
-		case value.MetadataUnavailable, value.MetadataNotObserved, value.GuardUnavailable, value.DirectoryUnavailable:
+		case value.MetadataUnavailable, value.MetadataNotObserved:
 			out.UnavailableSources = append(out.UnavailableSources, src.Resource.UID)
 			if n, ok := s.included[src.Resource.UID]; ok {
 				out.included[src.Resource.UID] = n
@@ -282,14 +274,6 @@ func (s *bindingRun) inheritance(now time.Time) inheritanceState {
 		default:
 			continue
 		}
-		added := 0
-		for _, g := range grants {
-			added += len(g.Subjects)
-		}
-		if bases+len(grants) > 1024 || rows+added > 4096 {
-			continue
-		}
-		bases, rows = bases+len(grants), rows+added
 		previous, ok := s.included[src.Resource.UID]
 		continuous := ok && previous == s.continuity && !other
 		for _, g := range grants {
@@ -333,34 +317,21 @@ func minimizedWorkloads(o value.WorkloadObservation) value.WorkloadObservation {
 
 // inheritWorkloads adds one workloadMetadata source's bases (ADR-247): its
 // connector journal's exact versions, never continuity; unavailable while
-// the journal, guard proof or directory is unknown or older than the
-// source's maxDecisionAgeSeconds.
-func (s *bindingRun) inheritWorkloads(out *inheritanceState, src value.Source, now time.Time, bases, rows *int) {
+// the journal is unknown.
+func (s *bindingRun) inheritWorkloads(out *inheritanceState, src value.Source) {
 	var observed *value.WorkloadObservation
-	var observedAt time.Time
 	if w := s.workloads[workloadKey(src.ClusterID, WorkloadSelectionOf(src))]; w != nil {
-		observed, observedAt = w.live, w.observedAt
+		observed = w.live
 	}
-	grants, reason := WorkloadGrantsWith(src, observed, value.SourceEvidence{WorkloadGuard: s.workloadGuards[src.ClusterID], Directory: s.directories[src.Mapping.Issuer], Now: now})
-	if reason == "" && !now.Before(observedAt.Add(src.MaxDecisionAge)) {
-		reason = value.MetadataUnavailable
-	}
+	grants, reason := WorkloadGrants(src, observed)
 	switch reason {
 	case "":
-	case value.MetadataUnavailable, value.MetadataNotObserved, value.GuardUnavailable, value.DirectoryUnavailable:
+	case value.MetadataUnavailable, value.MetadataNotObserved:
 		out.UnavailableSources = append(out.UnavailableSources, src.Resource.UID)
 		return
 	default:
 		return
 	}
-	added := 0
-	for _, g := range grants {
-		added += len(g.Subjects)
-	}
-	if *bases+len(grants) > 1024 || *rows+added > 4096 {
-		return
-	}
-	*bases, *rows = *bases+len(grants), *rows+added
 	for _, g := range grants {
 		out.Bases = append(out.Bases, WorkloadBasis(src, g))
 	}

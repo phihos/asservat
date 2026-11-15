@@ -225,9 +225,7 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 		for i := range bases {
 			bases[i].ScopeDigest = configapp.PermissionScopeDigest(bases[i])
 		}
-		control := cfg.NamespaceRef{Name: "asservat", UID: "control"}
-		review := cfg.BootstrapReview{Resource: cfg.Resource{ClusterID: cluster, Namespace: control.Name, NamespaceUID: control.UID, Kind: "ConfigMap", UID: custodyID(), ResourceVersion: "review-1", SpecDigest: artifact.Digest{9}}, Reviewer: "synthetic-administrator", BindingsDigest: artifact.Digest{8}, ReviewedAt: now.Add(-time.Minute), ExpiresAt: now.Add(time.Minute), ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
-		batch := cfg.PermissionBatch{RootID: root, Epoch: epoch, RequestID: custodyID(), TrustDigest: trust, InputDigest: artifact.Digest{4}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), Bases: bases, Initial: &cfg.PermissionInitialization{ClusterID: cluster, Control: control, BindingCount: 2, BindingsDigest: review.BindingsDigest, Review: &review}}
+		batch := cfg.PermissionBatch{RootID: root, Epoch: epoch, RequestID: custodyID(), TrustDigest: trust, InputDigest: artifact.Digest{4}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), Bases: bases}
 		accepted, err := p.AcceptPermissions(ctx, batch)
 		if err != nil {
 			t.Fatal(err)
@@ -264,7 +262,6 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 		actor := identity.Principal{Issuer: "https://id.example.test", Subject: "developer", ClientID: "browser", Kind: identity.Human}
 		identityValue := identity.Identity{Principal: actor, Scopes: []string{"evidence:capture"}, Groups: []string{"maintainers"}, Policy: identity.Revision{UID: "identity", Generation: 1, Digest: [32]byte{6}}, VerifiedAt: now, ValidUntil: now.Add(30 * time.Second)}
 		if source != nil {
-			batch.Initial = nil
 			batch.ObservedAt = now
 			batch.FreshUntil = now.Add(5 * time.Second)
 			if err = p.RefreshPermissions(ctx, batch); err != nil {
@@ -667,7 +664,6 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 		now := time.Now().UTC().Truncate(time.Microsecond)
 		s.batch.ObservedAt = now
 		s.batch.FreshUntil = now.Add(5 * time.Second)
-		s.batch.Initial = nil
 		if err = s.p.RefreshPermissions(ctx, s.batch); err != nil {
 			t.Fatal(err)
 		}

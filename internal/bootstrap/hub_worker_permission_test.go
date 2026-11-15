@@ -32,7 +32,6 @@ func permissionTestConfig() contracts.HubWorkerConfig {
 		},
 		Permission: &contracts.HubWorkerPermission{
 			StatusUsers:         []string{"system:serviceaccount:asservat:asservat-hub-worker"},
-			Review:              "asservat-permission-review",
 			Retention:           true,
 			WorkerConfiguration: &contracts.HubWorkerWorkerConfiguration{Namespace: "asservat-workers", Source: "asservat-worker-profile"},
 			ContextDeletion:     &contracts.HubWorkerContextDeletion{EvidenceStore: contracts.HubWorkerObjectStore{Endpoint: "https://objects.example.test", Region: "us-east-1", Bucket: "evidence"}},
@@ -44,7 +43,7 @@ func permissionTestConfig() contracts.HubWorkerConfig {
 func TestHubWorkerPermissionConfigDecodesClosed(t *testing.T) {
 	body := `{"format":"` + contracts.HubWorkerConfigFormat + `","permission":{"statusUsers":["u"],"retention":true,` +
 		`"workerConfiguration":{"namespace":"w","source":"s"},"contextDeletion":{"evidenceStore":{"endpoint":"https://e","region":"r","bucket":"b"}},` +
-		`"identity":{"settings":"i","issuer":"https://i"},"review":"r"}}`
+		`"identity":{"settings":"i","issuer":"https://i"}}}`
 	c, err := contracts.DecodeHubWorkerConfig(strings.NewReader(body))
 	if err != nil || c.Permission == nil || !c.Permission.Retention || c.Permission.WorkerConfiguration.Source != "s" || c.Permission.ContextDeletion.EvidenceStore.Bucket != "b" {
 		t.Fatal("permission section not decoded", err)
@@ -68,7 +67,6 @@ func TestHubWorkerPermissionValidation(t *testing.T) {
 	}
 	for name, mutate := range map[string]func(*contracts.HubWorkerConfig){
 		"no-status-users": func(c *contracts.HubWorkerConfig) { c.Permission.StatusUsers = nil },
-		"review-name":     func(c *contracts.HubWorkerConfig) { c.Permission.Review = "Bad_Name" },
 		"worker-in-hub":   func(c *contracts.HubWorkerConfig) { c.Permission.WorkerConfiguration.Namespace = control.Name },
 		"worker-no-transit": func(c *contracts.HubWorkerConfig) {
 			c.Provider.WorkerConfigurationAudit = contracts.OwnerPublicTransit{}
