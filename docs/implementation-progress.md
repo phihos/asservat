@@ -2,13 +2,13 @@
 
 ## Recovery proof removed (2026-11-15)
 
-Branch `clean/recovery-2`. Migration 00170 removes
+Branch `clean/recovery-2`. Migration 00172 removes
 `fleet_current_trust.recovery_blocked` from the view and from every stored
 function body. `RecoveryProof`, `RecoveryState`, every `RecoveryReader`,
 `RecoveryTransactionGuard` and `EffectTransactionGuards` are gone from domain,
 application, adapters, bootstrap and transport; effect transactions no longer
-lock or check the trust row for recovery. The capacity and connector SQL
-functions still read a `"Recovery"` JSON key; the postgres adapter builds it
+lock or check the trust row for recovery. The capacity SQL functions still
+read a `"Recovery"` JSON key; the postgres adapter builds it
 from the trust row in the same transaction (`currentTrust`) until those
 functions are rewritten. Open: the setup recovery step of REQ-DB-005;
 retention topology, proofs and source checkpoints (D12); one-step publication;

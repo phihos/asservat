@@ -9,8 +9,8 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 )
 
-// trustWire is the fleet trust shape that the capacity and connector SQL
-// functions still read under the JSON key "Recovery". The adapter builds it
+// trustWire is the fleet trust shape that the capacity SQL functions still
+// read under the JSON key "Recovery". The adapter builds it
 // from the trust row in its own transaction; callers never carry it.
 type trustWire struct {
 	InstallationID, IssuerEpoch string
