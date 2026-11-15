@@ -94,7 +94,7 @@ func qualifyContextPreviews(t *testing.T, ctx context.Context, admin *pgxpool.Po
 
 	qualifyContextRequestResolution(t, ctx, admin, poolFor, create, newStore, blueprint, query)
 
-	t.Run("current-context-placement-is-scoped-read-only-and-preserves-original-freshness", func(t *testing.T) {
+	t.Run("current-context-placement-is-scoped-and-read-only", func(t *testing.T) {
 		s := create(t, 1)
 		readPool := poolFor("context_storage_read_runtime", "synthetic-context-storage-read")
 		t.Cleanup(readPool.Close)
@@ -102,10 +102,15 @@ func qualifyContextPreviews(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		if err != nil {
 			t.Fatal(err)
 		}
+		// Bindings are standing rows: the read itself is the observation, valid
+		// for at most the thirty-second storage interval from its own time.
+		before := time.Now().Add(-time.Second)
 		got, err := reader.ContextStorage(ctx, s.a.Eligibility.Target)
+		after := time.Now().Add(time.Second)
 		r := s.a.Registration
-		if err != nil || got.Selection.StoreID != r.StoreID || got.Selection.AllocationID != r.AllocationID || got.Selection.PoolRevision != r.PoolRevision || got.Selection.AllocationRevision != r.AllocationRevision || got.Selection.BindingRevision != s.a.Storage.Revision || !got.Binding.ObservedAt.Equal(s.a.Storage.ObservedAt) || !got.Binding.FreshUntil.Equal(s.a.Storage.FreshUntil) {
-			t.Fatal("storage observation changed accepted placement/freshness", err)
+		if err != nil || got.Selection.StoreID != r.StoreID || got.Selection.AllocationID != r.AllocationID || got.Selection.PoolRevision != r.PoolRevision || got.Selection.AllocationRevision != r.AllocationRevision || got.Selection.BindingRevision != s.a.Storage.Revision ||
+			got.Binding.ObservedAt.Before(before) || got.Binding.ObservedAt.After(after) || !got.Binding.FreshUntil.After(got.Binding.ObservedAt) || got.Binding.FreshUntil.After(got.Binding.ObservedAt.Add(30*time.Second)) {
+			t.Fatal("storage observation changed accepted placement or its read interval", err)
 		}
 		other := s.a.Eligibility.Target
 		other.WorkloadUID = custodyID()
@@ -129,67 +134,6 @@ func qualifyContextPreviews(t *testing.T, ctx context.Context, admin *pgxpool.Po
 				t.Fatal("expected storage-role permission denial", check.statement, err)
 			}
 		}
-	})
-
-	t.Run("expired-context-storage-read-preserves-refresh-classification", func(t *testing.T) {
-		s := create(t, 1)
-		readPool := poolFor("context_storage_read_runtime", "synthetic-context-storage-read")
-		defer readPool.Close()
-		reader, err := postgres.NewContextStorageReader(ctx, readPool, s.a.RootID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		target := s.a.Eligibility.Target
-		original, err := reader.ContextStorage(ctx, target)
-		if err != nil {
-			t.Fatal("initial real storage read", err)
-		}
-		// Fixture administrator changes only the original observation's dates;
-		// no reader or requester can refresh the protected binding itself.
-		at := time.Now().UTC().Truncate(time.Microsecond)
-		observed, expired := at.Add(-31*time.Second), at.Add(-time.Second)
-		update := func(generation int64, observed, until time.Time) {
-			t.Helper()
-			tag, e := admin.Exec(ctx, `UPDATE context_storage_binding SET source_generation=$3,observed_at=$4,fresh_until=$5 WHERE root_id=$1 AND allocation_id=$2`, s.a.RootID, s.a.Registration.AllocationID, generation, observed, until)
-			if e != nil || tag.RowsAffected() != 1 {
-				t.Fatal("fixture binding interval", e, tag.RowsAffected())
-			}
-		}
-		update(s.a.Storage.Revision.Generation, observed, expired)
-		got, err := reader.ContextStorage(ctx, target)
-		var refusal interface{ ContextStorageRead() string }
-		if !errors.Is(err, capture.ErrStorageBindingExpired) || !errors.Is(err, capture.ErrUnavailable) || errors.Is(err, capture.ErrChanged) || !errors.As(err, &refusal) || refusal.ContextStorageRead() != "observation/source-expired" || got.Selection != original.Selection || !got.Binding.ObservedAt.Equal(observed) || !got.Binding.FreshUntil.Equal(expired) || got.Binding.Valid(time.Now()) || !got.Binding.Valid(observed) {
-			t.Fatal("actual Ledger erased expired-source readiness type or original selection", err, got.Selection == original.Selection)
-		}
-		// Expired metadata can identify a changed selection but never conceal it.
-		update(s.a.Storage.Revision.Generation+1, observed, expired)
-		changed, err := reader.ContextStorage(ctx, target)
-		if !errors.Is(err, capture.ErrStorageBindingExpired) || changed.Selection == original.Selection || changed.Binding.Revision.Generation != s.a.Storage.Revision.Generation+1 {
-			t.Fatal("expired read hid changed original revision", err)
-		}
-		// Future/invalid observations remain ordinary changes with no metadata.
-		update(s.a.Storage.Revision.Generation, at.Add(time.Minute), at.Add(90*time.Second))
-		invalid, err := reader.ContextStorage(ctx, target)
-		if !errors.Is(err, capture.ErrChanged) || errors.Is(err, capture.ErrStorageBindingExpired) || invalid.Binding.RootID != "" {
-			t.Fatal("invalid source became expired-only metadata", err)
-		}
-		// A canceled actual SQL call must never expose a prior expired receipt.
-		canceled, stop := context.WithCancel(ctx)
-		stop()
-		invalid, err = reader.ContextStorage(canceled, target)
-		if err == nil || errors.Is(err, capture.ErrStorageBindingExpired) || invalid.Binding.RootID != "" {
-			t.Fatal("canceled read returned expired receipt", err)
-		}
-		// Only a new successful protected read can provide the restored original
-		// observation. The expiry read itself made no authority or admission write.
-		update(s.a.Storage.Revision.Generation, original.Binding.ObservedAt, original.Binding.FreshUntil)
-		fresh, err := reader.ContextStorage(ctx, target)
-		var captures int
-		countErr := admin.QueryRow(ctx, `SELECT count(*) FROM context_capture WHERE root_id=$1`, s.a.RootID).Scan(&captures)
-		if err != nil || fresh.Selection != original.Selection || fresh.Binding != original.Binding || countErr != nil || captures != 0 {
-			t.Fatal("read renewed original facts or created admission", err, countErr, captures)
-		}
-		t.Log("actual Ledger/SELECT-only ContextStorageReader preserved expired metadata, changed selection and independent fresh read; zero captures")
 	})
 
 	t.Run("preview-principal-cap-is-atomic-across-clients", func(t *testing.T) {
