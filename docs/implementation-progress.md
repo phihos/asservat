@@ -7,7 +7,7 @@ the requesting human on every client: one registration per artifact counts
 `maxArtifacts`, no per-client children or `clientIDs`. No one-hour review
 window; result access ends at its `notAfter`. Step-up is optional: SQL accepts
 an approval without `acr`/`auth_time` and records them when present.
-Migration 00175. Verification: custody raw-grant, access-grant and
+Migration 00176. Verification: custody raw-grant, access-grant and
 policy-recorder grant subtests pass.
 
 ## Shares without caps or Suspended state (ADR-335 D7, 2026-11-15)
