@@ -56,8 +56,8 @@ func (s ContextProjectionResults) valid() bool {
 		s.Authority != nil && s.Ledger != nil && s.Reader != nil && s.Now != nil && s.NewID != nil
 }
 
-// These dispositions describe acknowledged internal effects for the existing
-// C-20/C-08 outcome mapping. An error after dispatch may still have an unknown
+// These dispositions describe internal effects for the call row's effect
+// field. An error after dispatch may still have an unknown
 // effect; absence of a successful delivery never proves an effect-free call.
 type ContextQueryEffect string
 
@@ -83,9 +83,8 @@ type ContextProjectionAssociation struct {
 }
 
 // ContextProjectionDelivery owns both the prepared result and its live request.
-// C-20 must serialize a bounded copy once, bind that exact body to this pointer,
-// acknowledge its existing outcome and retain the guard through write/flush.
-// Its own audit slot/cancel must also transfer to transport-owned cleanup.
+// C-20 serializes a bounded copy once and retains the guard through
+// write/flush; its cancel transfers to transport-owned cleanup.
 type ContextProjectionDelivery struct {
 	owner                                   *projectionRequest
 	association                             ContextProjectionAssociation
@@ -174,8 +173,7 @@ func (d *ContextProjectionDelivery) ValidUntil() time.Time {
 	return d.owner.until
 }
 
-// CheckDisclosure fails before this exact result's outcome acknowledgement.
-// Each check retains every original interval and rechecks after blocking ports.
+// CheckDisclosure rechecks the request's authority and ledger state. Each check retains every original interval and rechecks after blocking ports.
 func (d *ContextProjectionDelivery) CheckDisclosure(ctx context.Context) error {
 	if d == nil || d.owner == nil {
 		return value.ErrUnavailable
@@ -186,9 +184,6 @@ func (d *ContextProjectionDelivery) CheckDisclosure(ctx context.Context) error {
 		return err
 	}
 	defer cancel()
-	if err := o.invocation.CheckOutcome(checked, d); err != nil {
-		return value.ErrUnavailable
-	}
 	a, err := o.CheckCurrent(checked)
 	if err != nil {
 		return err
@@ -263,7 +258,6 @@ type projectionRequest struct {
 	cancel             context.CancelFunc
 	current            identities.CurrentIdentity
 	initial            identity.Identity
-	invocation         ContextQueryInvocation
 	request            value.ContextQueryRequest
 	query              value.ContextQuery
 	mu                 sync.Mutex
@@ -307,11 +301,11 @@ func sameProjectionIdentity(a, b identity.Identity, now time.Time) bool {
 	return true
 }
 
-func (s ContextProjectionResults) request(ctx context.Context, current identities.CurrentIdentity, invocation ContextQueryInvocation, tool string) (*projectionRequest, error) {
-	if !s.valid() || ctx == nil || ctx.Err() != nil || current == nil || invocation == nil {
+func (s ContextProjectionResults) request(ctx context.Context, current identities.CurrentIdentity, requestID, tool string) (*projectionRequest, error) {
+	if !s.valid() || ctx == nil || ctx.Err() != nil || current == nil || !authorization.UUID(requestID) {
 		return nil, queryStepped("configuration", value.ErrUnavailable)
 	}
-	started := s.Now()
+	started := s.Now().UTC().Truncate(time.Microsecond)
 	until := started.Add(identity.EvidenceReadRequestWindow)
 	if d, ok := ctx.Deadline(); ok {
 		until = identity.Earlier(until, d)
@@ -331,28 +325,17 @@ func (s ContextProjectionResults) request(ctx context.Context, current identitie
 		return nil, queryStepped("read-scope", value.ErrUnavailable)
 	}
 	i.Scopes, i.Groups = slices.Clone(i.Scopes), slices.Clone(i.Groups)
-	until = identity.Earlier(until, i.ValidUntil)
-	callCtx, callCancel := context.WithDeadline(initialCtx, until)
-	defer func() {
-		if !transferred {
-			callCancel()
-		}
-	}()
-	call, err := invocation.Invocation(callCtx)
-	if err != nil || callCtx.Err() != nil || !call.Valid(s.Now()) || call.Tool != tool || call.RootID != s.RootID || call.Principal != i.Principal {
-		return nil, queryCollapsed("invocation", value.ErrUnavailable, errors.Join(err, callCtx.Err()))
-	}
-	until = identity.Earlier(until, call.Until)
+	until = identity.Earlier(until, i.ValidUntil).UTC().Truncate(time.Microsecond)
+	call := value.ContextQueryCall{ID: requestID, RootID: s.RootID, Tool: tool, Principal: i.Principal, StartedAt: started, Until: until, WriteUntil: started.Add(value.ContextQueryCallWrite)}
 	request := value.ContextQueryRequest{Call: call, OwnerID: s.NewID(), HubProcessEpoch: s.HubProcessEpoch}
 	if !request.Valid(s.Now()) || !s.Now().Before(until) {
 		return nil, queryStepped("request-window", value.ErrUnavailable)
 	}
-	owned, cancel := context.WithCancel(callCtx)
-	o := &projectionRequest{service: s, current: current, initial: i, invocation: invocation, request: request, until: until}
+	owned, cancel := context.WithCancel(initialCtx)
+	o := &projectionRequest{service: s, current: current, initial: i, request: request, until: until}
 	o.ctx = projectionContext{Context: owned, owner: o}
 	o.cancel = func() {
 		cancel()
-		callCancel()
 		initialCancel()
 		o.mu.Lock()
 		if o.timer != nil {
@@ -361,9 +344,9 @@ func (s ContextProjectionResults) request(ctx context.Context, current identitie
 		o.mu.Unlock()
 	}
 	transferred = true
-	if !o.shorten("request", until) || invocation.CheckIntent(o.ctx, call) != nil {
+	if !o.shorten("request", until) {
 		o.cancel()
-		return nil, queryStepped("intent", value.ErrUnavailable)
+		return nil, queryStepped("request", value.ErrUnavailable)
 	}
 	if _, err = o.checkIdentity(o.ctx); err != nil {
 		o.cancel()
@@ -488,11 +471,11 @@ func (o *projectionRequest) CheckCurrent(ctx context.Context) (value.ContextProj
 	return a, nil
 }
 
-func (s ContextProjectionService) BeginExcerpt(ctx context.Context, current identities.CurrentIdentity, invocation ContextQueryInvocation, selection value.ContextExcerptSelection) (*ContextProjectionDelivery, error) {
+func (s ContextProjectionService) BeginExcerpt(ctx context.Context, current identities.CurrentIdentity, requestID string, selection value.ContextExcerptSelection) (*ContextProjectionDelivery, error) {
 	var d *ContextProjectionDelivery
 	err := queryStepped("configuration", value.ErrUnavailable)
 	if selection.Valid() && s.Routes != nil {
-		d, err = s.begin(ctx, current, invocation, "get_file_excerpt", ContextQueryInput{Selection: selection}, func(ctx context.Context, caller identity.Identity) (value.ContextProjectionCandidate, error) {
+		d, err = s.begin(ctx, current, requestID, "get_file_excerpt", ContextQueryInput{Selection: selection}, func(ctx context.Context, caller identity.Identity) (value.ContextProjectionCandidate, error) {
 			c, err := s.Routes.ResolveContextProjection(ctx, selection, caller)
 			if err != nil || c.CaseID != selection.CaseID || c.ArtifactID != selection.ArtifactID || c.Selection != selection.Selection || c.NativeType != artifact.PodStatusArtifact {
 				return value.ContextProjectionCandidate{}, errors.Join(value.ErrUnavailable, err)
@@ -508,11 +491,11 @@ func (s ContextProjectionService) BeginExcerpt(ctx context.Context, current iden
 // the content-minimized candidate; C-03 then resolves the
 // exact current scope and the query is admitted, its worker dispatched and
 // the pending handle prepared.
-func (s ContextProjectionService) begin(ctx context.Context, current identities.CurrentIdentity, invocation ContextQueryInvocation, tool string, input ContextQueryInput, route func(context.Context, identity.Identity) (value.ContextProjectionCandidate, error)) (*ContextProjectionDelivery, error) {
+func (s ContextProjectionService) begin(ctx context.Context, current identities.CurrentIdentity, requestID string, tool string, input ContextQueryInput, route func(context.Context, identity.Identity) (value.ContextProjectionCandidate, error)) (*ContextProjectionDelivery, error) {
 	if s.Plans == nil || s.Workers == nil || route == nil {
 		return nil, queryStepped("configuration", value.ErrUnavailable)
 	}
-	o, err := s.Results.request(ctx, current, invocation, tool)
+	o, err := s.Results.request(ctx, current, requestID, tool)
 	if err != nil {
 		return nil, err
 	}
@@ -522,9 +505,6 @@ func (s ContextProjectionService) begin(ctx context.Context, current identities.
 			o.cancel()
 		}
 	}()
-	if err = invocation.CheckInput(o.ctx, input); err != nil {
-		return nil, queryStepped("input", value.ErrUnavailable)
-	}
 	var invocationKey value.ContextQueryInvocationKey
 	if input.PacketQuery.Valid() || input.RawSyscalls.Valid() || input.RawLogs.Valid() {
 		lookup, ok := s.Results.Ledger.(ContextQueryInvocationLookup)
@@ -657,18 +637,18 @@ func (s ContextProjectionService) begin(ctx context.Context, current identities.
 
 // GetQueryResult has no reference to ContextProjectionWorkerAdmission.
 // A paid poll and fresh authorization precede status as well as evidence output.
-func (s ContextProjectionResults) GetQueryResult(ctx context.Context, current identities.CurrentIdentity, invocation ContextQueryInvocation, queryID string) (*ContextProjectionDelivery, error) {
-	d, err := s.getQueryResult(ctx, current, invocation, queryID)
+func (s ContextProjectionResults) GetQueryResult(ctx context.Context, current identities.CurrentIdentity, requestID string, queryID string) (*ContextProjectionDelivery, error) {
+	d, err := s.getQueryResult(ctx, current, requestID, queryID)
 	s.refused(ctx, "result", err)
 	return d, err
 }
 
-func (s ContextProjectionResults) getQueryResult(ctx context.Context, current identities.CurrentIdentity, invocation ContextQueryInvocation, queryID string) (*ContextProjectionDelivery, error) {
+func (s ContextProjectionResults) getQueryResult(ctx context.Context, current identities.CurrentIdentity, requestID string, queryID string) (*ContextProjectionDelivery, error) {
 	if !authorization.UUID(queryID) {
 		return nil, queryStepped("handle", value.ErrInvalid)
 	}
 	mark := time.Now()
-	o, err := s.request(ctx, current, invocation, "get_query_result")
+	o, err := s.request(ctx, current, requestID, "get_query_result")
 	if err != nil {
 		return nil, err
 	}
@@ -679,9 +659,6 @@ func (s ContextProjectionResults) getQueryResult(ctx context.Context, current id
 			o.cancel()
 		}
 	}()
-	if err = invocation.CheckInput(o.ctx, ContextQueryInput{QueryID: queryID}); err != nil {
-		return nil, queryStepped("input", value.ErrUnavailable)
-	}
 	mark = time.Now()
 	q, err := s.Ledger.LookupQuery(o.ctx, o.initial.Principal, queryID)
 	if err != nil || !q.Valid() || q.ID != queryID || q.Scope.RootID != s.RootID || q.Scope.Principal != o.initial.Principal {
@@ -891,7 +868,7 @@ func (s ContextProjectionResults) prepare(o *projectionRequest, effect ContextQu
 	if invalidCursor {
 		// Judged by the worker against the rechecked document after current
 		// read rights; it discloses no record. Keep the charged read alive until
-		// C-20 acknowledges this refusal's outcome, then joins final cleanup.
+		// C-20 writes this refusal, then joins final cleanup.
 		d.refusal = ContextProjectionInvalidCursor
 	}
 	if tooLarge {

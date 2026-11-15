@@ -39,11 +39,11 @@ func RawSyscallQueryRequestDigest(r value.RawSyscallQueryRequest) artifact.Diges
 	}
 	return sha256.Sum256(b)
 }
-func (s RawSyscallReads) Begin(ctx context.Context, current identities.CurrentIdentity, invocation ContextQueryInvocation, r value.RawSyscallQueryRequest) (*ContextProjectionDelivery, error) {
+func (s RawSyscallReads) Begin(ctx context.Context, current identities.CurrentIdentity, requestID string, r value.RawSyscallQueryRequest) (*ContextProjectionDelivery, error) {
 	if !r.Valid() || s.Routes == nil {
 		return nil, value.ErrInvalid
 	}
-	return s.Service.begin(ctx, current, invocation, "syscall_query", ContextQueryInput{RawSyscalls: r}, func(ctx context.Context, i identity.Identity) (value.ContextProjectionCandidate, error) {
+	return s.Service.begin(ctx, current, requestID, "syscall_query", ContextQueryInput{RawSyscalls: r}, func(ctx context.Context, i identity.Identity) (value.ContextProjectionCandidate, error) {
 		c, e := s.Routes.ResolveSyscallProjectionRoute(ctx, r.CaseID, r.ArtifactID, i)
 		if e != nil {
 			return c, e

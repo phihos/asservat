@@ -8,15 +8,12 @@ import (
 	"testing"
 	"time"
 
-	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
-	auditapp "asservat.local/asservat/internal/application/audit"
 	authapp "asservat.local/asservat/internal/application/authorization"
 	"asservat.local/asservat/internal/application/evidence"
 	privacyapp "asservat.local/asservat/internal/application/privacy"
 	value "asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/identity"
 	"github.com/jackc/pgx/v5/pgconn"
 )
@@ -71,14 +68,13 @@ func (f querySQLIdentity) ResolveIdentity(ctx context.Context) (identity.Identit
 	return f.Identity, nil
 }
 
-// Real PostgreSQL and encrypted, positively closed S3 invocation audit against
-// the actual published/verified synthetic context. Current C-03 permissions,
+// Real PostgreSQL against the actual published/verified synthetic context. Current C-03 permissions,
 // retained origins, processing and transaction guards are real adapters. Human
 // identity, resource qualification and C-14 ownership are explicit fixtures.
 func qualifyContextQueries(t *testing.T, f *queryLedgerFixture) {
-	ctx, admin, poolFor, store, keys := f.base.ctx, f.base.admin, f.base.fixturePool, f.base.store, f.base.keys
+	ctx, admin, poolFor := f.base.ctx, f.base.admin, f.base.fixturePool
 	t.Helper()
-	t.Run("context-query-ledger-current-audit-bounds-and-uncertainty", func(t *testing.T) {
+	t.Run("context-query-ledger-current-bounds-and-uncertainty", func(t *testing.T) {
 		s, published := f.scenario, f.published
 		rootID := f.base.input.PermissionRootID
 		runtime := poolFor("context_query_runtime", "synthetic-context-query")
@@ -87,10 +83,6 @@ func qualifyContextQueries(t *testing.T, f *queryLedgerFixture) {
 		defer keySlots.Close()
 		catalogPool := poolFor("context_catalog_read_runtime", "synthetic-context-read")
 		defer catalogPool.Close()
-		journalPool := poolFor("operation_audit_runtime", "synthetic-operation-journal")
-		defer journalPool.Close()
-		ackPool := poolFor("operation_audit_ack_runtime", "synthetic-operation-ack")
-		defer ackPool.Close()
 		requireSQLCode := func(err error, code, action string) {
 			t.Helper()
 			var failure *pgconn.PgError
@@ -101,10 +93,9 @@ func qualifyContextQueries(t *testing.T, f *queryLedgerFixture) {
 		for _, statement := range []string{
 			"UPDATE context_query_backing SET suspended=false", "UPDATE context_query_allocation SET query_limit=query_limit+1",
 			"UPDATE context_query SET deadline=deadline+interval '1 second'", "UPDATE context_query_key_binding SET used_roles=0",
-			"UPDATE fleet_trust SET suspended=false", "UPDATE operation_audit SET intent_receipt='{}'::jsonb",
+			"UPDATE fleet_trust SET suspended=false",
 			"INSERT INTO context_query_worker SELECT * FROM context_query_worker LIMIT 0",
 			"SELECT context_query_complete_object('{\"a\":1}'::jsonb,ARRAY['a'])",
-			"SELECT context_query_outcome_closed('00000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000002','{}'::jsonb,'00000000-0000-4000-8000-000000000003')",
 		} {
 			_, e := runtime.Exec(ctx, statement)
 			requireSQLCode(e, "42501", statement)
@@ -169,38 +160,11 @@ func qualifyContextQueries(t *testing.T, f *queryLedgerFixture) {
 		if err != nil {
 			t.Fatal("actual accepted query plan", err)
 		}
-		policy := f.audit.Normal.Policy
-		journal, err := postgres.NewHealthyOperationJournal(ctx, journalPool, policy)
-		if err != nil {
-			t.Fatal(err)
-		}
-		ack, err := postgres.NewOperationAcknowledgements(ctx, ackPool, plan.RootID, "normal", s.recovery.installation)
-		if err != nil {
-			t.Fatal(err)
-		}
-		completions, err := postgres.NewOperationLifecycles(ctx, journalPool, plan.RootID, "normal", s.recovery.installation)
-		if err != nil {
-			t.Fatal(err)
-		}
-		objects, err := objectstore.NewClosedOperationAuditObjects(store, policy.StoreID, keys, keys)
-		if err != nil {
-			t.Fatal(err)
-		}
-		auditor, err := auditapp.NewHealthyOperationAuditor(policy, journal, ack, &objectstore.OperationAuditObjects{Store: store, Seal: keys, Open: keys}, objects, completions, time.Now)
-		if err != nil {
-			t.Fatal(err)
-		}
-		invocation := func(tool string, p identity.Principal, acknowledge bool) (value.ContextQueryRequest, audit.OperationIntent) {
+		invocation := func(tool string, p identity.Principal) value.ContextQueryRequest {
 			t.Helper()
 			f.refresh(t)
 			n := time.Now().UTC().Truncate(time.Microsecond)
-			in := audit.OperationIntent{ID: custodyID(), RootID: plan.RootID, TraceID: custodyID(), Name: tool, InputFormat: "context-query-input/v1", MACVersion: "query-fixture-v1", AccountVersion: f.base.input.AccountVersion, Actor: p, PrincipalDigest: artifact.Digest{41}, InputDigest: artifact.Digest{42}, CreatedAt: n, RequestUntil: n.Add(5 * time.Second), WriteUntil: n.Add(30 * time.Second), RetainUntil: n.Add(time.Duration(f.audit.Normal.RetainedSeconds) * time.Second)}
-			if acknowledge {
-				if err := auditor.Begin(ctx, in); err != nil {
-					t.Fatal("healthy query intent", err)
-				}
-			}
-			return value.ContextQueryRequest{Call: value.ContextQueryCall{ID: in.ID, RootID: in.RootID, Tool: in.Name, InputFormat: in.InputFormat, MACVersion: in.MACVersion, InputDigest: in.InputDigest, PrincipalDigest: in.PrincipalDigest, Principal: p, StartedAt: in.CreatedAt, Until: in.RequestUntil, WriteUntil: in.WriteUntil}, OwnerID: custodyID(), HubProcessEpoch: custodyID()}, in
+			return value.ContextQueryRequest{Call: value.ContextQueryCall{ID: custodyID(), RootID: plan.RootID, Tool: tool, Principal: p, StartedAt: n, Until: n.Add(5 * time.Second), WriteUntil: n.Add(30 * time.Second)}, OwnerID: custodyID(), HubProcessEpoch: custodyID()}
 		}
 		makeQuery := func(r value.ContextQueryRequest, a value.ContextProjectionAuthority) value.ContextQuery {
 			t.Helper()
@@ -223,15 +187,8 @@ func qualifyContextQueries(t *testing.T, f *queryLedgerFixture) {
 				t.Fatal("query commitments mismatch", root, allocation, principal, queries, err)
 			}
 		}
-		// A receipt-free invocation cannot reserve even though source/identity are current.
-		unaudited, _ := invocation(beginTool, plan.Principal, false)
+		request := invocation(beginTool, plan.Principal)
 		a := authority(plan.Principal)
-		unpaid := makeQuery(unaudited, a)
-		if _, err = ledger.AdmitQuery(ctx, unpaid, unaudited, a); err == nil {
-			t.Fatal("unaudited query admitted")
-		}
-		request, intent := invocation(beginTool, plan.Principal, true)
-		a = authority(plan.Principal)
 		query := makeQuery(request, a)
 		t.Logf("original_evidence_seconds=%.0f original_query_remaining_ms=%d", e.Registration.ExpiresAt.Sub(e.Registration.AnchorAt).Seconds(), time.Until(query.Deadline).Milliseconds())
 		accepted, err := ledger.AdmitQuery(ctx, query, request, a)
@@ -291,14 +248,10 @@ func qualifyContextQueries(t *testing.T, f *queryLedgerFixture) {
 		if profileSummary {
 			// Positive closure remains mandatory even though this source has only
 			// one funded native read. There is no second scan after closure.
-			out := audit.OperationOutcome{Intent: intent, Status: "success", Reason: "prepared", Effect: "accepted", ClientReceipt: "unknown", OutputDigest: artifact.Digest{61}, OutputBytes: 12, MetadataUntil: intent.RequestUntil, RecordedAt: time.Now().UTC().Truncate(time.Microsecond)}
-			if err = auditor.Finish(ctx, out); err != nil {
-				t.Fatal("profile outcome", err)
-			}
 			if err = ledger.CompleteReadBatch(ctx, batch, querySQLClosed{batch}); err != nil {
 				t.Fatal("profile close", err)
 			}
-			poll, _ := invocation("get_query_result", plan.Principal, true)
+			poll := invocation("get_query_result", plan.Principal)
 			a = authority(plan.Principal)
 			if err = ledger.AdmitQueryPoll(ctx, query, poll, a); err != nil {
 				t.Fatal("profile poll", err)
@@ -319,7 +272,7 @@ func qualifyContextQueries(t *testing.T, f *queryLedgerFixture) {
 				}
 			}
 			charged(units)
-			secondRequest, _ := invocation(beginTool, plan.Principal, true)
+			secondRequest := invocation(beginTool, plan.Principal)
 			a = authority(plan.Principal)
 			secondQuery := makeQuery(secondRequest, a)
 
@@ -327,7 +280,7 @@ func qualifyContextQueries(t *testing.T, f *queryLedgerFixture) {
 				t.Fatal("second separately funded summary", err)
 			}
 			charged(2 * units)
-			excessRequest, _ := invocation(beginTool, plan.Principal, true)
+			excessRequest := invocation(beginTool, plan.Principal)
 			a = authority(plan.Principal)
 			if _, err = ledger.AdmitQuery(ctx, makeQuery(excessRequest, a), excessRequest, a); err == nil {
 				t.Fatal("summary exceeded original 20-unit reservation")
@@ -371,7 +324,7 @@ func qualifyContextQueries(t *testing.T, f *queryLedgerFixture) {
 			}
 		}
 		stopWait()
-		blockedPoll, _ := invocation("get_query_result", plan.Principal, true)
+		blockedPoll := invocation("get_query_result", plan.Principal)
 		a = authority(plan.Principal)
 		if err = ledger.AdmitQueryPoll(ctx, query, blockedPoll, a); err != nil {
 			t.Fatal(err)
@@ -380,19 +333,10 @@ func qualifyContextQueries(t *testing.T, f *queryLedgerFixture) {
 			t.Fatal("expired lease fabricated private closure")
 		}
 		charged(units)
-		_, err = runtime.Exec(ctx, "UPDATE context_query_batch SET closed=true WHERE id=$1", batch.ID)
-		requireSQLCode(err, "23514", "batch close before acknowledged outcome")
-		if err = ledger.CompleteReadBatch(ctx, batch, querySQLClosed{batch}); err == nil {
-			t.Fatal("closed before acknowledged outcome")
-		}
-		out := audit.OperationOutcome{Intent: intent, Status: "success", Reason: "prepared", Effect: "accepted", ClientReceipt: "unknown", OutputDigest: artifact.Digest{61}, OutputBytes: 12, MetadataUntil: intent.RequestUntil, RecordedAt: time.Now().UTC().Truncate(time.Microsecond)}
-		if err = auditor.Finish(ctx, out); err != nil {
-			t.Fatal(err)
-		}
 		if err = ledger.CompleteReadBatch(ctx, batch, querySQLClosed{batch}); err != nil {
 			t.Fatal("positive fixture closure", err)
 		}
-		poll, _ := invocation("get_query_result", plan.Principal, true)
+		poll := invocation("get_query_result", plan.Principal)
 		a = authority(plan.Principal)
 		if err = ledger.AdmitQueryPoll(ctx, query, poll, a); err != nil {
 			t.Fatal(err)
@@ -417,7 +361,7 @@ func qualifyContextQueries(t *testing.T, f *queryLedgerFixture) {
 		charged(units)
 		// Synchronize on a real SQL lock, then invalidate the accepted backing.
 		// The earlier independent guard return cannot authorize the later row.
-		blockedRequest, _ := invocation(beginTool, plan.Principal, true)
+		blockedRequest := invocation(beginTool, plan.Principal)
 		blockedAuthority := authority(plan.Principal)
 		blockedQuery := makeQuery(blockedRequest, blockedAuthority)
 		ready, proceed := make(chan struct{}), make(chan struct{})
@@ -491,7 +435,7 @@ func qualifyContextQueries(t *testing.T, f *queryLedgerFixture) {
 		charged(units)
 		// A lost guard/commit response returns no Fresh result, while private lookup
 		// observes the original committed query and all aggregate accounts stay paid.
-		request2, _ := invocation("get_file_excerpt", otherClient, true)
+		request2 := invocation("get_file_excerpt", otherClient)
 		a2 := authority(otherClient)
 		query2 := makeQuery(request2, a2)
 		backing.after = errors.New("synthetic postcommit guard loss")
@@ -505,7 +449,7 @@ func qualifyContextQueries(t *testing.T, f *queryLedgerFixture) {
 			t.Fatal("unknown commit changed original query", err)
 		}
 		charged(2)
-		request3, _ := invocation(beginTool, plan.Principal, true)
+		request3 := invocation(beginTool, plan.Principal)
 		a3 := authority(plan.Principal)
 		query3 := makeQuery(request3, a3)
 		if _, err = ledger.AdmitQuery(ctx, query3, request3, a3); err == nil {
@@ -515,7 +459,7 @@ func qualifyContextQueries(t *testing.T, f *queryLedgerFixture) {
 		// Two polls were already admitted. The remaining original allowance
 		// permits exactly two, regardless of active generation or new IDs.
 		for i := 0; i < 3; i++ {
-			poll, _ := invocation("get_query_result", plan.Principal, true)
+			poll := invocation("get_query_result", plan.Principal)
 			a := authority(plan.Principal)
 			err := ledger.AdmitQueryPoll(ctx, query, poll, a)
 			if (i < 2 && err != nil) || (i == 2 && err == nil) {

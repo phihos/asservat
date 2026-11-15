@@ -12,7 +12,7 @@ import (
 )
 
 type SyscallQueryService interface {
-	Begin(context.Context, identities.CurrentIdentity, analysisapp.ContextQueryInvocation, value.SyscallQueryRequest) (*analysisapp.ContextProjectionDelivery, error)
+	Begin(context.Context, identities.CurrentIdentity, string, value.SyscallQueryRequest) (*analysisapp.ContextProjectionDelivery, error)
 }
 
 type SyscallOperationInput struct {

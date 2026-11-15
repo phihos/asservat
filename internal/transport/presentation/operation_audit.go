@@ -238,8 +238,8 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 	}
 	until = until.UTC().Truncate(time.Microsecond)
 	requestID := s.config.NewID()
-	// The intent value is the invocation description the query and live
-	// owners bind; it is not stored.
+	// The intent value is the invocation description the live owners bind;
+	// it is not stored.
 	intent := audit.OperationIntent{ID: requestID, TraceID: requestID, RootID: s.config.RootID, Name: op, InputFormat: format, MACVersion: s.mac.Version(), AccountVersion: s.mac.AccountVersion(), Actor: initial.Principal, PrincipalDigest: actorDigest, InputDigest: inputDigest, CreatedAt: now, RequestUntil: until, WriteUntil: now.Add(30 * time.Second), RetainUntil: now.Add(time.Hour)}
 	if !intent.Valid() {
 		return OperationReply{}, auditapp.ErrUnavailable
@@ -269,11 +269,7 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 	} else if rejection == IngressDenied {
 		callErr = identity.ErrDenied
 	} else {
-		call := OperationCall{requestID: requestID}
-		if queryOperation(name) {
-			call.queryInvocation = newContextQueryInvocation(ctx, intent, s.mac, s.config.Now)
-		}
-		reply, callErr = s.inner.CallWithContext(ctx, current, call, name, raw)
+		reply, callErr = s.inner.CallWithContext(ctx, current, OperationCall{requestID: requestID}, name, raw)
 		timing.call = time.Now()
 		reply.boundCleanup(intent.WriteUntil)
 		// Only a proven pre-dispatch rejection rules out an effect.

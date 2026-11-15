@@ -1,19 +1,20 @@
 package presentation
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"reflect"
+	"strings"
+	"testing"
+
 	analysisapp "asservat.local/asservat/internal/application/analysis"
 	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/contracts"
 	value "asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/identity"
-	"bytes"
-	"context"
-	"encoding/json"
 	jsonschema "github.com/santhosh-tekuri/jsonschema/v6"
-	"reflect"
-	"strings"
-	"testing"
 )
 
 type packetBridgeCompiler struct{}
@@ -45,8 +46,8 @@ func (p packetBridgePort) AdmitQueryPoll(ctx context.Context, q value.ContextQue
 	return nil
 }
 func (p packetBridgePort) RegisterQueryReplayCall(ctx context.Context, q value.ContextQuery, r value.ContextQueryRequest, a value.ContextProjectionAuthority) error {
-	initial, ok := p.calls[q.OperationID]
-	if !ok || !q.InvocationKey.Valid() || !reflect.DeepEqual(q, p.q) || r.Call.ID == q.OperationID || r.Call.Tool != q.Scope.BeginTool() || r.Call.InputFormat != initial.Call.InputFormat || r.Call.MACVersion != initial.Call.MACVersion || r.Call.InputDigest != initial.Call.InputDigest || r.Call.Principal != q.Scope.Principal {
+	_, ok := p.calls[q.OperationID]
+	if !ok || !q.InvocationKey.Valid() || !reflect.DeepEqual(q, p.q) || r.Call.ID == q.OperationID || r.Call.Tool != q.Scope.BeginTool() || r.Call.Principal != q.Scope.Principal {
 		return value.ErrUnavailable
 	}
 	if old, exists := p.calls[r.Call.ID]; exists && !reflect.DeepEqual(old, r) {
@@ -159,41 +160,10 @@ func TestPacketQueryActualAuditedBeginReplayAndReadyEnvelope(t *testing.T) {
 		})
 	}
 }
-func TestPacketQueryAuditedInputOwnsItsSliceAndRejectsMutation(t *testing.T) {
-	s, f, _, p := bridgeAuditFixture(t)
-	adapter, e := NewContextProjectionOperations(f.s, f.s.Results)
-	if e != nil {
-		t.Fatal(e)
-	}
-	p.adapter = adapter
-	r := value.PacketQueryRequest{CaseID: bridgeID, ArtifactID: bridgeID, IdempotencyKey: "key", Fields: []value.PacketQueryField{value.PacketIndex}, MaxPackets: 1, MaxScanBytes: 100}
-	input, _ := json.Marshal(packetQueryInput(r))
-	// The audit target can intercept a valid query before an unavailable service.
-	p.adapter.packetQueries = packetQueryUnavailable{}
-	checked := false
-	p.mutate = func(call *OperationCall, _ *json.RawMessage) {
-		checked = true
-		in := analysisapp.ContextQueryInput{PacketQuery: r}
-		if e := call.queryInvocation.CheckInput(t.Context(), in); e != nil {
-			t.Fatal(e)
-		}
-		r.Fields[0] = value.PacketTime
-		if call.queryInvocation.input.PacketQuery.Fields[0] != value.PacketIndex {
-			t.Fatal("storedinputalias")
-		}
-		if e := call.queryInvocation.CheckInput(t.Context(), analysisapp.ContextQueryInput{PacketQuery: r}); e == nil {
-			t.Fatal("changedselection")
-		}
-	}
-	_, _ = s.Call(t.Context(), f, "pcap_query", input)
-	if !checked {
-		t.Fatal("actualauditedbindingnotreached")
-	}
-}
 
 type packetQueryUnavailable struct{}
 
-func (packetQueryUnavailable) Begin(context.Context, identities.CurrentIdentity, analysisapp.ContextQueryInvocation, value.PacketQueryRequest) (*analysisapp.ContextProjectionDelivery, error) {
+func (packetQueryUnavailable) Begin(context.Context, identities.CurrentIdentity, string, value.PacketQueryRequest) (*analysisapp.ContextProjectionDelivery, error) {
 	return nil, value.ErrUnavailable
 }
 

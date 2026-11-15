@@ -41,10 +41,10 @@ type operationReplyOwner struct {
 }
 
 // Ownership is private to presentation composition; public constructors do not
-// accept a caller-supplied guard. ack binds C-18's exact prepared association to
-// the existing canonical C-08 outcome after Finish has acknowledged it.
+// accept a caller-supplied guard. ack, when set, runs after the call row is
+// written; a nil ack accepts the written row alone.
 func ownOperationReply(ctx context.Context, reply OperationReply, guard operationReplyGuard, cleanupUntil time.Time, ack func(context.Context, audit.OperationOutcome) error) (OperationReply, error) {
-	if ctx == nil || ctx.Err() != nil || guard == nil || ack == nil || reply.owner != nil || len(reply.Body) == 0 || len(reply.Body) > audit.OperationOutputLimit || reply.ValidUntil.IsZero() || cleanupUntil.Before(reply.ValidUntil) {
+	if ctx == nil || ctx.Err() != nil || guard == nil || reply.owner != nil || len(reply.Body) == 0 || len(reply.Body) > audit.OperationOutputLimit || reply.ValidUntil.IsZero() || cleanupUntil.Before(reply.ValidUntil) {
 		return OperationReply{}, ErrOperationDelivery
 	}
 	deadline, ok := ctx.Deadline()
@@ -144,7 +144,7 @@ func (r OperationReply) acknowledge(ctx context.Context, out audit.OperationOutc
 	if o.closed || o.acknowledged || out.OutputBytes != int64(len(r.Body)) || sha256.Sum256(r.Body) != o.digest || out.MetadataUntil.After(o.until) {
 		return ErrOperationDelivery
 	}
-	if err := o.ack(ctx, out); err != nil {
+	if o.ack != nil && o.ack(ctx, out) != nil {
 		return ErrOperationDelivery
 	}
 	o.until = out.MetadataUntil

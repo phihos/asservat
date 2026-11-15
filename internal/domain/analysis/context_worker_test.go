@@ -46,7 +46,7 @@ func TestQueryWorkerProofCannotSwapPurposeProcessOrOriginalInterval(t *testing.T
 	if p.Matches(q, w, p.ValidUntil) {
 		t.Fatal("expired proof accepted")
 	}
-	request := ContextQueryRequest{Call: ContextQueryCall{ID: queryTestID, RootID: q.Scope.RootID, Tool: "get_file_excerpt", InputFormat: "context-query-input/v1", MACVersion: "v1", InputDigest: artifact.Digest{1}, PrincipalDigest: artifact.Digest{2}, Principal: q.Scope.Principal, StartedAt: a.CheckedAt, Until: a.ValidUntil, WriteUntil: a.CheckedAt.Add(30 * time.Second)}, OwnerID: queryTestID, HubProcessEpoch: queryTestID}
+	request := ContextQueryRequest{Call: ContextQueryCall{ID: queryTestID, RootID: q.Scope.RootID, Tool: "get_file_excerpt", Principal: q.Scope.Principal, StartedAt: a.CheckedAt, Until: a.ValidUntil, WriteUntil: a.CheckedAt.Add(30 * time.Second)}, OwnerID: queryTestID, HubProcessEpoch: queryTestID}
 	b := ContextProjectionKeyBinding{Purpose: ContextProjectionPurpose, ClaimID: queryTestID, Batch: ContextReadBatch{QueryID: q.ID, ID: queryTestID, OperationID: request.Call.ID, Generation: 1, Worker: w, Request: request, StartedAt: a.CheckedAt, Until: a.ValidUntil, CleanupUntil: q.CleanupUntil}, SourceVersion: q.Scope.Version, Scope: authorization.KeyScope{InstallationID: q.Plan.InstallationID, Purpose: "artifact", KeyID: "context"}, Worker: p, Authority: a, CreatedAt: a.CheckedAt, Until: a.ValidUntil}
 	if !b.Valid(q, a.CheckedAt) {
 		t.Fatal("valid key binding rejected")

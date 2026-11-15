@@ -15,7 +15,6 @@ import (
 	"asservat.local/asservat/internal/adapters/mtls"
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
-	auditapp "asservat.local/asservat/internal/application/audit"
 	authapp "asservat.local/asservat/internal/application/authorization"
 	"asservat.local/asservat/internal/application/evidence"
 	privacyapp "asservat.local/asservat/internal/application/privacy"
@@ -128,59 +127,28 @@ func qualifySharedProjectionLifecycleClient(t *testing.T, f *queryLedgerFixture,
 			scope.NativeType, scope.SourceFormat, scope.DisplayVersion = artifact.RawPCAPNGArtifact, artifact.RawPCAPNGFormat, query.RawPacketSummaryDisplayVersion
 		}
 	}
-	policy := f.audit.Normal.Policy
-	journal, err := postgres.NewHealthyOperationJournal(ctx, compiled("hub-runtime"), policy)
-	if err != nil {
-		t.Fatal(err)
-	}
-	acknowledgements, err := postgres.NewOperationAcknowledgements(ctx, compiled("hub-runtime"), root, "normal", s.recovery.installation)
-	if err != nil {
-		t.Fatal(err)
-	}
-	completions, err := postgres.NewOperationLifecycles(ctx, compiled("hub-runtime"), root, "normal", s.recovery.installation)
-	if err != nil {
-		t.Fatal(err)
-	}
-	closedObjects, err := objectstore.NewClosedOperationAuditObjects(base.store, policy.StoreID, base.keys, base.keys)
-	if err != nil {
-		t.Fatal(err)
-	}
-	auditor, err := auditapp.NewHealthyOperationAuditor(policy, journal, acknowledgements, &objectstore.OperationAuditObjects{Store: base.store, Seal: base.keys, Open: base.keys}, closedObjects, completions, time.Now)
-	if err != nil {
-		t.Fatal(err)
-	}
 	hubProcess := custodyID()
-	request := func(tool string) (*sharedProjectionOwner, audit.OperationIntent, context.CancelFunc) {
+	request := func(tool string) (*sharedProjectionOwner, context.CancelFunc) {
 		t.Helper()
 		f.refresh(t)
 		n := time.Now().UTC().Truncate(time.Microsecond)
-		intent := audit.OperationIntent{ID: custodyID(), RootID: root, TraceID: custodyID(), Name: tool, InputFormat: "context-query-input/v1", MACVersion: "query-fixture-v1", AccountVersion: base.input.AccountVersion, Actor: scope.Principal, PrincipalDigest: artifact.Digest{41}, InputDigest: artifact.Digest{42}, CreatedAt: n, RequestUntil: n.Add(5 * time.Second), WriteUntil: n.Add(30 * time.Second), RetainUntil: n.Add(time.Duration(f.audit.Normal.RetainedSeconds) * time.Second)}
-		call, stop := context.WithDeadline(ctx, intent.RequestUntil)
+		until := n.Add(5 * time.Second)
+		call, stop := context.WithDeadline(ctx, until)
 		t.Cleanup(stop)
-		if e := auditor.Begin(call, intent); e != nil {
-			t.Fatal("real invocation intent", e)
-		}
 		who := s.a.Eligibility.VerifiedIdentity
 		who.Principal = scope.Principal
 		who.Scopes = []string{"evidence:read"}
-		who.VerifiedAt, who.ValidUntil = n, intent.RequestUntil
+		who.VerifiedAt, who.ValidUntil = n, until
 		a, e := gate.CheckProjectionCurrent(call, querySQLIdentity{who}, scope)
 		if e != nil {
 			t.Fatal("actual read-only authority", e)
 		}
-		a.ValidUntil = identity.Earlier(a.ValidUntil, intent.RequestUntil)
+		a.ValidUntil = identity.Earlier(a.ValidUntil, until)
 		if !a.Valid(time.Now()) {
 			t.Fatal("authority expired during preparation")
 		}
-		r := query.ContextQueryRequest{Call: query.ContextQueryCall{ID: intent.ID, RootID: root, Tool: tool, InputFormat: intent.InputFormat, MACVersion: intent.MACVersion, InputDigest: intent.InputDigest, PrincipalDigest: intent.PrincipalDigest, Principal: scope.Principal, StartedAt: n, Until: intent.RequestUntil, WriteUntil: intent.WriteUntil}, OwnerID: custodyID(), HubProcessEpoch: hubProcess}
-		return &sharedProjectionOwner{ctx: call, request: r, authority: a}, intent, stop
-	}
-	finish := func(in audit.OperationIntent) {
-		t.Helper()
-		out := audit.OperationOutcome{Intent: in, Status: "success", Reason: "prepared", Effect: "accepted", ClientReceipt: "unknown", OutputDigest: artifact.Digest{61}, OutputBytes: 12, MetadataUntil: in.RequestUntil, RecordedAt: time.Now().UTC().Truncate(time.Microsecond)}
-		if e := auditor.Finish(ctx, out); e != nil {
-			t.Fatal("real outcome acknowledgement", e)
-		}
+		r := query.ContextQueryRequest{Call: query.ContextQueryCall{ID: custodyID(), RootID: root, Tool: tool, Principal: scope.Principal, StartedAt: n, Until: until, WriteUntil: n.Add(30 * time.Second)}, OwnerID: custodyID(), HubProcessEpoch: hubProcess}
+		return &sharedProjectionOwner{ctx: call, request: r, authority: a}, stop
 	}
 	enrollment := func(purpose string) *postgres.ProjectionEnrollments {
 		t.Helper()
@@ -195,20 +163,20 @@ func qualifySharedProjectionLifecycleClient(t *testing.T, f *queryLedgerFixture,
 	jobs := &sharedProjectionJobs{podUID: custodyID()}
 	admission := evidence.ProjectionWorkerAdmission{Ledger: workers, Jobs: jobs, Audit: objects, Now: time.Now}
 	runtime := evidence.ProjectionRuntime{Workers: workers, Identities: workers, Jobs: jobs, Now: time.Now}
-	initial, intent, stopInitial := request(scope.BeginTool())
+	initial, stopInitial := request(scope.BeginTool())
 	var q query.ContextQuery
 	if comparison {
 		plans, e := f.current.ContextComparisonPlans(initial.ctx, initial.authority)
 		if e != nil {
 			t.Fatal("actual shared comparison plans", e)
 		}
-		q, err = query.NewProfileComparisonQuery(custodyID(), intent.ID, custodyID(), initial.authority, plans[0], plans[1], time.Now().UTC().Truncate(time.Microsecond))
+		q, err = query.NewProfileComparisonQuery(custodyID(), initial.request.Call.ID, custodyID(), initial.authority, plans[0], plans[1], time.Now().UTC().Truncate(time.Microsecond))
 	} else {
 		plan, e := f.current.ContextQueryPlan(initial.ctx, initial.authority)
 		if e != nil {
 			t.Fatal("actual shared plan", e)
 		}
-		q, err = query.NewContextQuery(custodyID(), intent.ID, custodyID(), initial.authority, plan, time.Now().UTC().Truncate(time.Microsecond))
+		q, err = query.NewContextQuery(custodyID(), initial.request.Call.ID, custodyID(), initial.authority, plan, time.Now().UTC().Truncate(time.Microsecond))
 	}
 	if err != nil {
 		t.Fatal(err)
@@ -228,8 +196,7 @@ func qualifySharedProjectionLifecycleClient(t *testing.T, f *queryLedgerFixture,
 	if err = admission.AdmitProjectionWorker(initial.ctx, q, initial); err != nil || jobs.creates != 1 || jobs.finds != 1 {
 		t.Fatal("worker replay", jobs.creates, jobs.finds, err)
 	}
-	finish(intent)
-	initialElapsed := time.Since(intent.CreatedAt)
+	initialElapsed := time.Since(initial.request.Call.StartedAt)
 	stopInitial()
 	if initial.ctx.Err() == nil {
 		t.Fatal("original human operation did not close")
@@ -256,7 +223,7 @@ func qualifySharedProjectionLifecycleClient(t *testing.T, f *queryLedgerFixture,
 	if err != nil || again.Peer != cert.Peer || issuer.calls.Load() != 1 {
 		t.Fatal("certificate replay changed identity/sign count", issuer.calls.Load(), err)
 	}
-	poll, pollIntent, stopPoll := request("get_query_result")
+	poll, stopPoll := request("get_query_result")
 	defer stopPoll()
 	a, r := poll.authority, poll.request
 	if err = ledger.AdmitQueryPoll(poll.ctx, q, r, a); err != nil {
@@ -385,7 +352,7 @@ func qualifySharedProjectionLifecycleClient(t *testing.T, f *queryLedgerFixture,
 		}
 	}
 	if err = ledger.CompleteReadBatch(poll.ctx, start.Batch, querySQLClosed{start.Batch}); err == nil {
-		t.Fatal("private closure without outcome acknowledgement released batch")
+		t.Fatal("batch released before private native close")
 	}
 	for _, check := range cleanupChecks {
 		check("native-open", f, workers, q, jobs.worker)
@@ -397,9 +364,8 @@ func qualifySharedProjectionLifecycleClient(t *testing.T, f *queryLedgerFixture,
 	for _, check := range cleanupChecks {
 		check("native-closed", f, workers, q, jobs.worker)
 	}
-	finish(pollIntent)
 	if err = ledger.CompleteReadBatch(ctx, start.Batch, querySQLClosed{start.Batch}); err != nil {
-		t.Fatal("closed batch after real encrypted outcome", err)
+		t.Fatal("closed batch after native close", err)
 	}
 	var downloads, workersCount, certificates, keyRoles, keyChildren, queries, allocated int64
 	var nativeClosed, closed, active, audited, claimed, bound bool
@@ -428,7 +394,7 @@ func qualifySharedProjectionLifecycleClient(t *testing.T, f *queryLedgerFixture,
 	for _, check := range cleanupChecks {
 		check("joined", f, workers, q, jobs.worker)
 	}
-	t.Logf("compiled shared query lifecycle through production NativeKeyAuthority: one read-only query/worker, independent enrollment, one signing attempt, %d independently spent key roles, native+public batch closed, no download session; initial_ms=%d poll_ms=%d; Job/Pod/proof/issuer/join inputs synthetic, no native installed or latency qualification", 3*len(keyIDs), initialElapsed.Milliseconds(), time.Since(pollIntent.CreatedAt).Milliseconds())
+	t.Logf("compiled shared query lifecycle through production NativeKeyAuthority: one read-only query/worker, independent enrollment, one signing attempt, %d independently spent key roles, native+public batch closed, no download session; initial_ms=%d poll_ms=%d; Job/Pod/proof/issuer/join inputs synthetic, no native installed or latency qualification", 3*len(keyIDs), initialElapsed.Milliseconds(), time.Since(poll.request.Call.StartedAt).Milliseconds())
 }
 
 type sharedProjectionOwner struct {

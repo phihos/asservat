@@ -23,7 +23,6 @@ func TestQueryRefusalNamesTheRefusingStage(t *testing.T) {
 		want   string
 	}{
 		{"read-scope", func(f *projectionFixture, _ *projectionInvocationFake) { f.i.Scopes = []string{"evidence:download"} }, "read-scope"},
-		{"intent", func(_ *projectionFixture, i *projectionInvocationFake) { i.intentErr = value.ErrUnavailable }, "intent"},
 		{"authority", func(f *projectionFixture, _ *projectionInvocationFake) { f.authorityErr = fixedCause{} }, "authority/environment/policy"},
 		{"admit", func(f *projectionFixture, _ *projectionInvocationFake) { f.queryErr = errors.New("commit reply lost") }, "admit"},
 	} {
@@ -39,7 +38,7 @@ func TestQueryRefusalNamesTheRefusingStage(t *testing.T) {
 			}
 			i := f.invocation("get_file_excerpt")
 			c.change(f, i)
-			_, err := f.s.BeginExcerpt(context.Background(), f, i, i.input.Selection)
+			_, err := f.s.BeginExcerpt(context.Background(), f, i.id, i.input.Selection)
 			if !errors.Is(err, value.ErrUnavailable) && !errors.Is(err, value.ErrExpired) {
 				t.Fatalf("returned class changed: %v", err)
 			}

@@ -8,7 +8,7 @@ import (
 )
 
 type PacketSummaryQueryService interface {
-	Begin(context.Context, identities.CurrentIdentity, analysisapp.ContextQueryInvocation, value.PacketSummaryRequest) (*analysisapp.ContextProjectionDelivery, error)
+	Begin(context.Context, identities.CurrentIdentity, string, value.PacketSummaryRequest) (*analysisapp.ContextProjectionDelivery, error)
 }
 
 func (s *ContextProjectionOperations) WithPacketSummaries(packets PacketSummaryQueryService) (*ContextProjectionOperations, error) {

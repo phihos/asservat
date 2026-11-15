@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"strconv"
 	"time"
 	"unicode/utf8"
 
@@ -15,7 +14,7 @@ import (
 )
 
 type RawLogQueryService interface {
-	Begin(context.Context, identities.CurrentIdentity, analysisapp.ContextQueryInvocation, value.RawLogQueryRequest) (*analysisapp.ContextProjectionDelivery, error)
+	Begin(context.Context, identities.CurrentIdentity, string, value.RawLogQueryRequest) (*analysisapp.ContextProjectionDelivery, error)
 }
 type RawLogQueryOperationInput struct {
 	CaseID         string `json:"case_id"`
@@ -36,13 +35,6 @@ func (in RawLogQueryOperationInput) request() (value.RawLogQueryRequest, error) 
 	in = normalizeRawLogInput(in)
 	s, err := value.NormalizeLogSelection(in.CaseID, in.ArtifactID, in.Cursor, in.Limit)
 	return value.RawLogQueryRequest{CaseID: in.CaseID, ArtifactID: in.ArtifactID, GrantID: in.GrantID, IdempotencyKey: in.IdempotencyKey, Selection: s.LogWindow}, err
-}
-func rawLogInput(r value.RawLogQueryRequest) RawLogQueryOperationInput {
-	in := RawLogQueryOperationInput{CaseID: r.CaseID, ArtifactID: r.ArtifactID, GrantID: r.GrantID, IdempotencyKey: r.IdempotencyKey, Limit: r.Selection.Limit}
-	if r.Selection.Fragment != 0 || r.Selection.Offset != 0 {
-		in.Cursor = strconv.FormatUint(r.Selection.Fragment, 10) + ":" + strconv.FormatUint(uint64(r.Selection.Offset), 10) + ":" + r.Selection.Binding
-	}
-	return normalizeRawLogInput(in)
 }
 
 type logOriginOutput struct {

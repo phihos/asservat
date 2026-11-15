@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	analysisapp "asservat.local/asservat/internal/application/analysis"
 	value "asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
 )
@@ -80,38 +79,8 @@ func TestProfileSummaryQueryPendingReadyAndOriginalAuditSelection(t *testing.T) 
 	if json.Unmarshal(ready.Body, &out) != nil || out.DataClass != "extract" || out.Data.Tool != "get_profile_summary" || out.Data.Result.Data.SampleType != "cpu" || len(out.Data.Result.Warnings) != 2 {
 		t.Fatalf("closed summary output %s", ready.Body)
 	}
-	if s.contracts.ValidateOutput("get_query_result", ready.Body) != nil || f.reads != 1 || f.starts != 1 || p.last.delivery.Tool() != "get_profile_summary" {
+	if s.contracts.ValidateOutput("get_query_result", ready.Body) != nil || f.reads != 1 || f.starts != 1 || p.last.Tool() != "get_profile_summary" {
 		t.Fatal("poll replaced admitted source")
-	}
-}
-func TestProfileSummaryAuditRefusesChangedOrMixedInput(t *testing.T) {
-	for _, mode := range []string{"sample", "top", "artifact", "mixed"} {
-		t.Run(mode, func(t *testing.T) {
-			s, f, _, p := summaryBridge(t)
-			p.mutate = func(call *OperationCall, raw *json.RawMessage) {
-				var in ProfileSummaryOperationInput
-				_ = json.Unmarshal(*raw, &in)
-				switch mode {
-				case "sample":
-					in.SampleType = "alloc_space"
-				case "top":
-					in.TopN = 19
-				case "artifact":
-					in.ArtifactID = "00000000-0000-4000-8000-000000000099"
-				case "mixed":
-					input := analysisapp.ContextQueryInput{Profile: value.ProfileSummaryRequest{CaseID: in.CaseID, ArtifactID: in.ArtifactID, Selection: value.ProfileSummarySelection{SampleType: "cpu", TopN: 20}}, QueryID: bridgeID}
-					if call.queryInvocation.CheckInput(t.Context(), input) == nil {
-						t.Fatal("mixed query input accepted")
-					}
-					call.queryInvocation = nil
-				}
-				*raw, _ = json.Marshal(in)
-			}
-			out, err := s.Call(t.Context(), f, "get_profile_summary", summaryInput(20))
-			if err == nil || len(out.Body) != 0 || f.admissions != 0 || f.starts != 0 {
-				t.Fatal("unreviewed input dispatched")
-			}
-		})
 	}
 }
 

@@ -55,12 +55,11 @@ func TestDownloadAcceptanceAndAcquisitionRolesHaveExactPurposeGrants(t *testing.
 		publicRuntimeGrant{"table", "download_native_key", "used_roles", "UPDATE"})
 	// ADR-219 adds the same typed query SQL fences and only the existing
 	// irreversible key-consumption write to the isolated acquisition key role.
-	acquisition = append(acquisition, read("context_case_locator", "operation_audit", "operation_audit_lifecycle", "context_query_backing", "context_query_allocation", "context_query_principal", "context_query", "context_query_call", "context_query_worker", "context_query_batch", "context_query_key_binding")...)
-	acquisition = append(acquisition, columns("fleet_trust", "SELECT", "installation_id", "activated_postmaster_at", "activated_database_oid")...)
-	for _, table := range []string{"operation_audit", "context_query_allocation", "context_query_principal", "context_query", "context_query_batch"} {
+	acquisition = append(acquisition, read("context_case_locator", "context_query_backing", "context_query_allocation", "context_query_principal", "context_query", "context_query_call", "context_query_worker", "context_query_batch", "context_query_key_binding")...)
+	for _, table := range []string{"context_query_allocation", "context_query_principal", "context_query", "context_query_batch"} {
 		acquisition = append(acquisition, publicRuntimeGrant{"table", table, "id", "UPDATE"})
 	}
-	acquisition = append(acquisition, publicRuntimeGrant{"table", "operation_audit_lifecycle", "operation_id", "UPDATE"}, publicRuntimeGrant{"table", "context_query_backing", "root_id", "UPDATE"}, publicRuntimeGrant{"table", "context_query_key_binding", "used_roles", "UPDATE"})
+	acquisition = append(acquisition, publicRuntimeGrant{"table", "context_query_backing", "root_id", "UPDATE"}, publicRuntimeGrant{"table", "context_query_key_binding", "used_roles", "UPDATE"})
 	for _, signature := range []string{"lock_context_query_capacity(uuid,uuid)", "context_query_capacity_allocation_current(uuid,uuid)", "context_query_shared_profile_current(uuid,jsonb)", "context_packet_query_grant_current(uuid,uuid,uuid)"} {
 		acquisition = append(acquisition, publicRuntimeGrant{"function", signature, "", "EXECUTE"})
 	}

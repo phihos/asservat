@@ -24,7 +24,7 @@ type SyscallReads struct {
 func (s ContextProjectionService) SyscallQueries() (SyscallReads, bool) {
 	return SyscallReads{Service: s, Routes: s.SyscallRoutes}, s.SyscallRoutes != nil
 }
-func (s SyscallReads) Begin(ctx context.Context, current identities.CurrentIdentity, invocation ContextQueryInvocation, request value.SyscallQueryRequest) (*ContextProjectionDelivery, error) {
+func (s SyscallReads) Begin(ctx context.Context, current identities.CurrentIdentity, requestID string, request value.SyscallQueryRequest) (*ContextProjectionDelivery, error) {
 	var d *ContextProjectionDelivery
 	err := queryStepped("configuration", value.ErrUnavailable)
 	if request.Valid() && s.Routes != nil {
@@ -32,7 +32,7 @@ func (s SyscallReads) Begin(ctx context.Context, current identities.CurrentIdent
 		if request.Selection.View == value.SyscallEventsView {
 			tool = "get_syscall_events"
 		}
-		d, err = s.Service.begin(ctx, current, invocation, tool, ContextQueryInput{Syscalls: request}, func(ctx context.Context, caller identity.Identity) (value.ContextProjectionCandidate, error) {
+		d, err = s.Service.begin(ctx, current, requestID, tool, ContextQueryInput{Syscalls: request}, func(ctx context.Context, caller identity.Identity) (value.ContextProjectionCandidate, error) {
 			c, err := s.Routes.ResolveSyscallProjectionRoute(ctx, request.CaseID, request.ArtifactID, caller)
 			if err != nil || !c.RouteValid() || c.CaseID != request.CaseID || c.ArtifactID != request.ArtifactID || c.Selection != (value.LineSelection{}) || c.Headers != (value.HTTPHeaderWindow{}) || c.Profile != (value.ProfileSummarySelection{}) || c.Syscalls != (value.SyscallWindow{}) || c.NativeType != artifact.SyscallRecordsArtifact && c.NativeType != artifact.SyscallArgumentsArtifact {
 				return value.ContextProjectionCandidate{}, errors.Join(value.ErrUnavailable, err)

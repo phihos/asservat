@@ -12,14 +12,12 @@ import (
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
-	auditapp "asservat.local/asservat/internal/application/audit"
 	authapp "asservat.local/asservat/internal/application/authorization"
 	capacityapp "asservat.local/asservat/internal/application/capacity"
 	"asservat.local/asservat/internal/application/evidence"
 	privacyapp "asservat.local/asservat/internal/application/privacy"
 	value "asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/audit"
 	authorization "asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
@@ -82,10 +80,6 @@ func qualifyProfileComparisonQueries(t *testing.T, f *queryLedgerFixture) {
 	defer slots.Close()
 	catalogPool := poolFor("context_catalog_read_runtime", "synthetic-context-read")
 	defer catalogPool.Close()
-	journalPool := poolFor("operation_audit_runtime", "synthetic-operation-journal")
-	defer journalPool.Close()
-	ackPool := poolFor("operation_audit_ack_runtime", "synthetic-operation-ack")
-	defer ackPool.Close()
 	catalog, e := postgres.NewContextPublications(ctx, catalogPool, root)
 	if e != nil {
 		t.Fatal(e)
@@ -121,38 +115,13 @@ func qualifyProfileComparisonQueries(t *testing.T, f *queryLedgerFixture) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	policy := f.audit.Normal.Policy
-	journal, e := postgres.NewHealthyOperationJournal(ctx, journalPool, policy)
-	if e != nil {
-		t.Fatal(e)
-	}
-	ack, e := postgres.NewOperationAcknowledgements(ctx, ackPool, root, "normal", s.recovery.installation)
-	if e != nil {
-		t.Fatal(e)
-	}
-	completions, e := postgres.NewOperationLifecycles(ctx, journalPool, root, "normal", s.recovery.installation)
-	if e != nil {
-		t.Fatal(e)
-	}
-	objects, e := objectstore.NewClosedOperationAuditObjects(f.base.store, policy.StoreID, f.base.keys, f.base.keys)
-	if e != nil {
-		t.Fatal(e)
-	}
-	auditor, e := auditapp.NewHealthyOperationAuditor(policy, journal, ack, &objectstore.OperationAuditObjects{Store: f.base.store, Seal: f.base.keys, Open: f.base.keys}, objects, completions, time.Now)
-	if e != nil {
-		t.Fatal(e)
-	}
-	invocation := func(tool string) (value.ContextQueryRequest, audit.OperationIntent) {
+	invocation := func(tool string) value.ContextQueryRequest {
 		t.Helper()
 		f.refresh(t)
 		now := time.Now().UTC().Truncate(time.Microsecond)
-		in := audit.OperationIntent{ID: custodyID(), RootID: root, TraceID: custodyID(), Name: tool, InputFormat: "context-query-input/v1", MACVersion: "comparison-fixture/v1", AccountVersion: f.base.input.AccountVersion, Actor: principal, PrincipalDigest: artifact.Digest{41}, InputDigest: artifact.Digest{42}, CreatedAt: now, RequestUntil: now.Add(5 * time.Second), WriteUntil: now.Add(30 * time.Second), RetainUntil: now.Add(time.Duration(f.audit.Normal.RetainedSeconds) * time.Second)}
-		if err := auditor.Begin(ctx, in); err != nil {
-			t.Fatal("pair invocation audit", err)
-		}
-		return value.ContextQueryRequest{Call: value.ContextQueryCall{ID: in.ID, RootID: root, Tool: tool, InputFormat: in.InputFormat, MACVersion: in.MACVersion, InputDigest: in.InputDigest, PrincipalDigest: in.PrincipalDigest, Principal: principal, StartedAt: in.CreatedAt, Until: in.RequestUntil, WriteUntil: in.WriteUntil}, OwnerID: custodyID(), HubProcessEpoch: custodyID()}, in
+		return value.ContextQueryRequest{Call: value.ContextQueryCall{ID: custodyID(), RootID: root, Tool: tool, Principal: principal, StartedAt: now, Until: now.Add(5 * time.Second), WriteUntil: now.Add(30 * time.Second)}, OwnerID: custodyID(), HubProcessEpoch: custodyID()}
 	}
-	request, intent := invocation("compare_profiles")
+	request := invocation("compare_profiles")
 	a := authority()
 	plans, e := f.current.ContextComparisonPlans(ctx, a)
 	if e != nil {
@@ -276,12 +245,8 @@ func qualifyProfileComparisonQueries(t *testing.T, f *queryLedgerFixture) {
 	if _, e = admin.Exec(ctx, "UPDATE context_query_batch SET native_closed=true WHERE id=$1", batch.ID); e != nil {
 		t.Fatal("native SQL close", e)
 	}
-	outcome := audit.OperationOutcome{Intent: intent, Status: "success", Reason: "prepared", Effect: "accepted", ClientReceipt: "unknown", OutputDigest: artifact.Digest{61}, OutputBytes: 12, MetadataUntil: intent.RequestUntil, RecordedAt: time.Now().UTC().Truncate(time.Microsecond)}
-	if e = auditor.Finish(ctx, outcome); e != nil {
-		t.Fatal("paired outcome ack", e)
-	}
 	if e = ledger.CompleteReadBatch(ctx, batch, querySQLClosed{batch}); e != nil {
-		t.Fatal("paired batch closes only after outcome", e)
+		t.Fatal("paired batch close after native close", e)
 	}
 	progress, e := installedProfileComparisonProgress(ctx, admin, root, q.OperationID)
 	var progressFields map[string]any
@@ -345,7 +310,7 @@ func refuseRetainedComparisonDowngrade(t *testing.T, f *queryLedgerFixture) {
 // and a synthetic second source route, inserted through the real SQL guard.
 // It qualifies atomic accounting/worker filters, not second-source publication
 // or C3 eligibility. The Go current fence must refuse that unpublished route.
-func qualifyComparisonCrossAllocationSQL(t *testing.T, f *queryLedgerFixture, original value.ContextQuery, refresh func() value.ContextProjectionAuthority, invocation func(string) (value.ContextQueryRequest, audit.OperationIntent)) {
+func qualifyComparisonCrossAllocationSQL(t *testing.T, f *queryLedgerFixture, original value.ContextQuery, refresh func() value.ContextProjectionAuthority, invocation func(string) value.ContextQueryRequest) {
 	t.Helper()
 	ctx, admin := f.base.ctx, f.base.admin
 	raw := func(v any) []byte {
@@ -389,7 +354,7 @@ func qualifyComparisonCrossAllocationSQL(t *testing.T, f *queryLedgerFixture, or
  SELECT $1,$2,$3,$4,p.principal_key,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,pg_postmaster_start_time(),(SELECT oid FROM pg_database WHERE datname=current_database()),$15 FROM context_query_principal p WHERE p.id=$4 AND p.root_id=$2`, q.ID, q.Scope.RootID, q.Plan.AllocationID, q.Plan.AccountID, raw(q.Scope.Principal), raw(q), raw(r), q.OperationID, q.WorkerID, q.CreatedAt, q.Deadline, q.CleanupUntil, q.Plan.RetireBy, f.scenario.recovery.observation.issuer, baseline)
 		return e
 	}
-	pairRequest, _ := invocation("compare_profiles")
+	pairRequest := invocation("compare_profiles")
 	a := synthetic()
 	plans, e := f.current.ContextComparisonPlans(ctx, a)
 	if e != nil {
@@ -439,7 +404,7 @@ func qualifyComparisonCrossAllocationSQL(t *testing.T, f *queryLedgerFixture, or
 	// Fill only the second allocation with separately audited10-unit summary
 	// rows. These synthetic-source SQL rows do not acquire or expose evidence.
 	for i := 0; i < 3; i++ {
-		r, _ := invocation("get_profile_summary")
+		r := invocation("get_profile_summary")
 		fresh := synthetic()
 		child := *fresh.Baseline
 		p, err := f.current.ContextQueryPlan(ctx, child)
@@ -458,7 +423,7 @@ func qualifyComparisonCrossAllocationSQL(t *testing.T, f *queryLedgerFixture, or
 	if total != 70 || principal != 70 || first != 30 || second != 40 {
 		t.Fatal("second-budget setup mismatch", total, principal, first, second)
 	}
-	r, _ := invocation("compare_profiles")
+	r := invocation("compare_profiles")
 	fresh := synthetic()
 	nextPlans, err := f.current.ContextComparisonPlans(ctx, fresh)
 	if err != nil {

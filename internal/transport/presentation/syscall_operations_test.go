@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	analysisapp "asservat.local/asservat/internal/application/analysis"
 	value "asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/identity"
@@ -109,48 +108,13 @@ func TestSavedSyscallAuditedPendingAndPollBothSourcesAndViews(t *testing.T) {
 				if json.Unmarshal(ready.Body, &out) != nil || out.DataClass != "extract" || out.Data.Tool != tool || out.Data.Result.DataClass != "extract" || out.Data.Result.Next == nil || out.Data.Result.Data.Coverage.Dropped != nil || out.Data.Result.Data.Coverage.Unknown != 1 || out.Data.Result.Data.Coverage.Records != 3 {
 					t.Fatalf("bounded syscall envelope: %s", ready.Body)
 				}
-				if s.contracts.ValidateOutput("get_query_result", ready.Body) != nil || f.reads != 1 || f.starts != 1 || p.last.delivery.Tool() != tool || p.last.delivery.Association().Syscalls != f.q.Scope.Syscalls || ready.CheckDisclosure(t.Context()) != nil {
+				if s.contracts.ValidateOutput("get_query_result", ready.Body) != nil || f.reads != 1 || f.starts != 1 || p.last.Tool() != tool || p.last.Association().Syscalls != f.q.Scope.Syscalls || ready.CheckDisclosure(t.Context()) != nil {
 					t.Fatal("poll lost ownership")
 				}
 			})
 		}
 	}
 }
-func TestSavedSyscallInvocationRejectsChangesAndMixedLegacyInput(t *testing.T) {
-	for _, mode := range []string{"names", "errors", "cursor", "limit", "artifact", "mixed"} {
-		t.Run(mode, func(t *testing.T) {
-			s, f, _, p := syscallBridge(t, artifact.SyscallArgumentsArtifact, value.SyscallEventsView)
-			p.mutate = func(call *OperationCall, raw *json.RawMessage) {
-				var in SyscallOperationInput
-				_ = json.Unmarshal(*raw, &in)
-				switch mode {
-				case "names":
-					in.Names = []string{"write"}
-				case "errors":
-					in.ErrorsOnly = true
-				case "cursor":
-					in.Cursor = "1:" + strings.Repeat("a", 32)
-				case "limit":
-					in.Limit = 1
-				case "artifact":
-					in.ArtifactID = f.next()
-				case "mixed":
-					request := value.SyscallQueryRequest{CaseID: bridgeID, ArtifactID: bridgeID, Selection: f.a.Scope.Syscalls}
-					if call.queryInvocation.CheckInput(t.Context(), analysisapp.ContextQueryInput{Syscalls: request, QueryID: bridgeID}) == nil {
-						t.Fatal("mixed query accepted")
-					}
-					call.queryInvocation = nil
-				}
-				*raw, _ = json.Marshal(in)
-			}
-			out, e := s.Call(t.Context(), f, "get_syscall_events", syscallInput(""))
-			if e == nil || len(out.Body) != 0 || f.admissions+f.starts+f.reads != 0 {
-				t.Fatal("changed input dispatched", e)
-			}
-		})
-	}
-}
-
 func TestSavedSyscallPublicResponseBoundsPrefixAndCursor(t *testing.T) {
 	s, f, _, _ := syscallBridge(t, artifact.SyscallArgumentsArtifact, value.SyscallEventsView)
 	f.a.Scope.Syscalls.Limit = 100

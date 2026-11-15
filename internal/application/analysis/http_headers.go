@@ -28,11 +28,11 @@ type HTTPHeaderReads struct {
 	Routes  ContextProjectionRouteReader
 }
 
-func (s HTTPHeaderReads) Begin(ctx context.Context, current identities.CurrentIdentity, invocation ContextQueryInvocation, sel value.HTTPHeaderSelection) (*ContextProjectionDelivery, error) {
+func (s HTTPHeaderReads) Begin(ctx context.Context, current identities.CurrentIdentity, requestID string, sel value.HTTPHeaderSelection) (*ContextProjectionDelivery, error) {
 	var d *ContextProjectionDelivery
 	err := queryStepped("configuration", value.ErrUnavailable)
 	if sel.Valid() && s.Routes != nil {
-		d, err = s.Service.begin(ctx, current, invocation, "get_http_headers", ContextQueryInput{Headers: sel}, func(ctx context.Context, caller identity.Identity) (value.ContextProjectionCandidate, error) {
+		d, err = s.Service.begin(ctx, current, requestID, "get_http_headers", ContextQueryInput{Headers: sel}, func(ctx context.Context, caller identity.Identity) (value.ContextProjectionCandidate, error) {
 			c, err := s.Routes.ResolveProjectionRoute(ctx, sel.CaseID, sel.ArtifactID, caller)
 			if err != nil || !c.RouteValid() || c.CaseID != sel.CaseID || c.ArtifactID != sel.ArtifactID || c.Selection != (value.LineSelection{}) ||
 				c.NativeType != "" || c.Headers != (value.HTTPHeaderWindow{}) {

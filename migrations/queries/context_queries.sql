@@ -41,10 +41,6 @@ UPDATE context_query_batch SET claim_id=$3 WHERE id=$1 AND query_id=$2 AND claim
 -- name: CloseContextQueryBatch :execrows
 UPDATE context_query_batch SET closed=true WHERE id=$1 AND query_id=$2 AND claim_id IS NOT NULL AND NOT closed;
 
--- name: ReadContextQueryInvocation :one
-SELECT sqlc.embed(a),sqlc.embed(l) FROM operation_audit a JOIN operation_audit_lifecycle l ON l.operation_id=a.id AND l.root_id=a.root_id
-WHERE a.id=$1 AND a.root_id=$2 AND a.lane='normal' AND l.lane='normal' FOR SHARE OF a,l;
-
 -- name: ContextQueryCaseExists :one
 SELECT EXISTS(SELECT 1 FROM context_case_locator WHERE root_id=$1 AND case_id=$2 AND capture_id=$3 AND artifact_id=$4);
 
