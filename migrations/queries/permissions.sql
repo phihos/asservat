@@ -44,7 +44,7 @@ SELECT b.*, a.acknowledged_at FROM permission_basis b
 JOIN authority_audit a ON a.id=b.automation_audit_id
 WHERE b.stream_id=$1 AND b.uid=$2 AND b.kind='AccessBinding'
 AND b.cluster_id=$3 AND b.namespace_uid=$4 AND b.effect='Allow'
-AND (cardinality(b.workload_uids)=0 OR $5::text=ANY(b.workload_uids))
+AND (cardinality(b.workload_uids)=0 OR $5::text=ANY(b.workload_uids) OR EXISTS(SELECT 1 FROM workload_name w WHERE w.cluster_id=b.cluster_id AND w.workload_uid=$5::text AND w.ref=ANY(b.workload_uids)))
 ORDER BY b.basis_key LIMIT 2;
 
 -- name: ListCurrentPermissionAssignments :many
@@ -69,7 +69,7 @@ au.object_key,au.object_version,au.object_etag,au.object_bytes,au.object_sha256
 FROM permission_assignment a JOIN permission_basis b ON a.stream_id=b.stream_id AND a.basis_key=b.basis_key
 LEFT JOIN authority_audit au ON au.id=a.activation_audit_id AND au.stream_id=a.stream_id
 WHERE a.stream_id=$1 AND a.retired_at IS NULL AND b.cluster_id=$2 AND b.namespace_uid IN ($3,'*')
-AND (cardinality(b.workload_uids)=0 OR $4::text=ANY(b.workload_uids)) ORDER BY a.id;
+AND (cardinality(b.workload_uids)=0 OR $4::text=ANY(b.workload_uids) OR EXISTS(SELECT 1 FROM workload_name w WHERE w.cluster_id=b.cluster_id AND w.workload_uid=$4::text AND w.ref=ANY(b.workload_uids))) ORDER BY a.id;
 
 -- name: ReadAuthorityAudit :one
 SELECT * FROM authority_audit WHERE id=$1;
@@ -87,3 +87,7 @@ UPDATE authority_audit SET acknowledged_at=clock_timestamp(),object_key=$2,objec
 -- ADR-242: the authority event of the stream's current acceptance, which
 -- carries the accepted namespace observation.
 SELECT record FROM authority_audit WHERE stream_id=$1 AND epoch=$2 AND sequence=$3 AND event_kind='permission-change';
+
+-- name: RememberWorkloadName :exec
+-- ADR-335 D4: a resolved workload's kind and name never change with its UID.
+INSERT INTO workload_name(cluster_id,workload_uid,ref) VALUES($1,$2,$3) ON CONFLICT DO NOTHING;

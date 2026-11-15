@@ -151,10 +151,10 @@ func (b PermissionBatch) Validate(now time.Time) error {
 		}
 		workloads := map[string]bool{}
 		for _, w := range p.Scope.Workloads {
-			if (w.Kind != "Deployment" && w.Kind != "StatefulSet") || !identity.Text(w.Name, 253) || !identity.Text(w.UID, 64) || workloads[w.UID] {
+			if (w.Kind != "Deployment" && w.Kind != "StatefulSet") || !identity.Text(w.Name, 253) || w.UID != "" && !identity.Text(w.UID, 64) || workloads[w.Kind+"/"+w.Name] {
 				return ErrInvalid
 			}
-			workloads[w.UID] = true
+			workloads[w.Kind+"/"+w.Name] = true
 		}
 		if !p.NotAfter.IsZero() && !now.Before(p.NotAfter) {
 			return ErrInvalid

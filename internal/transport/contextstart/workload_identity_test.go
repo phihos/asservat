@@ -12,7 +12,7 @@ import (
 )
 
 func TestWorkloadIdentityQueryRetainsOriginalRootAndDeadlines(t *testing.T) {
-	for _, mode := range []string{"current", "shorter-observation", "wrong-reference", "wrong-cluster", "wrong-namespace", "empty-root", "expired-observation", "overlong-observation", "expired-receiver", "cancelled"} {
+	for _, mode := range []string{"current", "shorter-observation", "wrong-reference", "wrong-cluster", "wrong-namespace", "empty-root", "expired-observation", "overlong-observation", "expired-receiver", "cancelled", "unrecorded-name"} {
 		t.Run(mode, func(t *testing.T) {
 			now := time.Now().UTC()
 			work := workFixture()
@@ -30,7 +30,11 @@ func TestWorkloadIdentityQueryRetainsOriginalRootAndDeadlines(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer standby.Finish()
-			hub := Targets{Router: router, Now: func() time.Time { return now }}
+			names := &workloadNames{}
+			if mode == "unrecorded-name" {
+				names.err = context.Canceled
+			}
+			hub := Targets{Router: router, Now: func() time.Time { return now }, Names: names}
 			type result struct {
 				root targets.WorkloadIdentityResolution
 				err  error
@@ -78,6 +82,10 @@ func TestWorkloadIdentityQueryRetainsOriginalRootAndDeadlines(t *testing.T) {
 				if got.err != nil || got.root != out || !got.root.Valid(now) {
 					t.Fatal("identity or earliest observation changed", got)
 				}
+				// ADR-335 D4: the resolved name is recorded by UID.
+				if names.got != (cfg.WorkloadRef{Kind: "Deployment", Name: "app", UID: "deployment"}) {
+					t.Fatal("resolved workload name not recorded", names.got)
+				}
 			} else if got.err == nil || got.root != (targets.WorkloadIdentityResolution{}) {
 				t.Fatal("invalid/cancelled metadata accepted", got)
 			}
@@ -88,4 +96,14 @@ func TestWorkloadIdentityQueryRetainsOriginalRootAndDeadlines(t *testing.T) {
 			}
 		})
 	}
+}
+
+type workloadNames struct {
+	got cfg.WorkloadRef
+	err error
+}
+
+func (n *workloadNames) RememberWorkload(_ context.Context, _ string, w cfg.WorkloadRef) error {
+	n.got = w
+	return n.err
 }
