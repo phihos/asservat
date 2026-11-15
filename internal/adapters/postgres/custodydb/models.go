@@ -126,6 +126,54 @@ type ArtifactDownload struct {
 	StopProtocol      pgtype.Text
 }
 
+type AuditEvent struct {
+	EventID       pgtype.UUID
+	RecordedAt    pgtype.Timestamptz
+	OperationID   pgtype.UUID
+	Kind          string
+	Operation     string
+	Issuer        string
+	Subject       string
+	ClientID      string
+	IdentityType  string
+	InputDigest   []byte
+	Status        string
+	Reason        string
+	Effect        string
+	CaseIds       []string
+	ArtifactIds   []string
+	CaptureIds    []string
+	ShareIds      []string
+	GrantIds      []string
+	ReservationID pgtype.UUID
+	OutputBytes   int64
+	OutputDigest  []byte
+}
+
+type AuditEventDefault struct {
+	EventID       pgtype.UUID
+	RecordedAt    pgtype.Timestamptz
+	OperationID   pgtype.UUID
+	Kind          string
+	Operation     string
+	Issuer        string
+	Subject       string
+	ClientID      string
+	IdentityType  string
+	InputDigest   []byte
+	Status        string
+	Reason        string
+	Effect        string
+	CaseIds       []string
+	ArtifactIds   []string
+	CaptureIds    []string
+	ShareIds      []string
+	GrantIds      []string
+	ReservationID pgtype.UUID
+	OutputBytes   int64
+	OutputDigest  []byte
+}
+
 type AuthorityAudit struct {
 	ID             pgtype.UUID
 	StreamID       pgtype.UUID

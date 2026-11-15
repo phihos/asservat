@@ -519,6 +519,9 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		read("download_worker_configuration", "download_worker_configuration_revision", "fleet_current_trust")
 		add("fleet_current_trust", "UPDATE", "installation_id")
 		add("download_worker_configuration", "UPDATE", "source_uid")
+	case "audit":
+		// REQ-AUT-005: append-only rows; no UPDATE or DELETE.
+		add("audit_event", "INSERT")
 	case "audit-normal-journal", "audit-resolution-journal", "audit-normal-ack", "audit-resolution-ack":
 		// The HTTP lanes use separate physical pools and login limits. These
 		// existing public audit tables do not implement per-login human-lane

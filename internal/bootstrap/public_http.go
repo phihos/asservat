@@ -89,13 +89,13 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 			return auditapp.NewHealthyOperationAuditor(policy, journal, acks, objects, closed, lifecycle, time.Now)
 		})
 	}
-	normal, err := auditor("normal")
+	auditPool, err := d.public.open(ctx, "audit")
 	if err != nil {
-		return nil, &fixedStepError{"audit-normal", mounts.ErrUnavailable}
+		return nil, &fixedStepError{"audit", err}
 	}
-	resolution, err := auditor("resolution")
+	recorder, err := postgres.NewAuditEvents(auditPool)
 	if err != nil {
-		return nil, &fixedStepError{"audit-resolution", mounts.ErrUnavailable}
+		return nil, &fixedStepError{"audit", err}
 	}
 
 	// ADR-335 D14: identity.administrators names the installation administrators.
@@ -183,8 +183,7 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 	if operations, err = presentation.NewInvestigationGrantOperations(operations, grantOperations); err != nil {
 		return nil, &fixedStepError{"grants", mounts.ErrUnavailable}
 	}
-	o := p.OperationAudit
-	services := PublicContextServices{Sessions: id.sessions, MCPIdentity: id.mcp, DownloadIdentity: id.download, Operations: operations, NormalAudit: normal, ResolutionAudit: resolution, AuditMAC: pc.mac, Native: dl.native.Runtime, Transfer: dl.native.Transfer}
+	services := PublicContextServices{Sessions: id.sessions, MCPIdentity: id.mcp, DownloadIdentity: id.download, Operations: operations, Audit: recorder, AuditMAC: pc.mac, Native: dl.native.Runtime, Transfer: dl.native.Transfer}
 	// ADR-210: privacy changes use the normal lane and its separately reserved
 	// release lane; both audit facets pin their accepted policy through Finish.
 	if pc.processingPolicy != nil {
@@ -195,6 +194,10 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 		decisions, err := postgres.NewProcessingDecisions(ctx, pool, root)
 		if err != nil {
 			return nil, &fixedStepError{"processing-sql", mounts.ErrUnavailable}
+		}
+		normal, err := auditor("normal")
+		if err != nil {
+			return nil, &fixedStepError{"audit-normal", mounts.ErrUnavailable}
 		}
 		release, err := auditor("processing")
 		if err != nil {
@@ -226,7 +229,7 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 	postgres.ListenPayloads(ctx, progressPool, postgres.CaptureProgressChannel, services.CaptureChanges.Publish)
 	h, err := NewPublicContextHandler(PublicContextConfig{PublicOrigin: p.Origin, Issuer: id.settings.Issuer, Version: p.Version,
 		OperationConcurrency: p.OperationConcurrency, MCPPerIdentity: p.MCPPerIdentity, DownloadConcurrency: p.DownloadConcurrency,
-		Audit: presentation.AuditedOperationsConfig{RootID: root, Retention: time.Duration(o.RetentionSeconds) * time.Second, NormalConcurrency: o.NormalConcurrency, ResolutionConcurrency: o.ResolutionConcurrency, PerPrincipalConcurrency: o.PerPrincipalConcurrency, NormalPerSecond: o.NormalPerSecond, ResolutionPerSecond: o.ResolutionPerSecond, Now: time.Now, NewID: ownerRandomID}},
+		Audit: presentation.AuditedOperationsConfig{RootID: root, Now: time.Now, NewID: ownerRandomID}},
 		services, os.DirFS(contracts.OwnerPublicConsoleRoot))
 	if err != nil {
 		return nil, &fixedStepError{"handler", err}
