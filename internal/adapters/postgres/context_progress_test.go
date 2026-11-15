@@ -92,8 +92,8 @@ func TestProgressRejectsIncompletePublicationOrCorruptIdentity(t *testing.T) {
 		"revision-overflow": func(f *custodydb.ReadContextProgressFactsRow) {
 			f.ContextCapture.ProgressRevision = value.MaxProgressRevision + 1
 		},
-		"registration": func(f *custodydb.ReadContextProgressFactsRow) { f.RequestDigest = digest("other") },
-		"scope":        func(f *custodydb.ReadContextProgressFactsRow) { f.ContextCapture.ScopeJson = []byte(`{}`) },
+		"registration":      func(f *custodydb.ReadContextProgressFactsRow) { f.RequestDigest = digest("other") },
+		"scope":             func(f *custodydb.ReadContextProgressFactsRow) { f.ContextCapture.ScopeJson = []byte(`{}`) },
 		"verification":      func(f *custodydb.ReadContextProgressFactsRow) { f.VerifiedCaptureID = pgtype.UUID{} },
 		"copies":            func(f *custodydb.ReadContextProgressFactsRow) { f.VerifiedCopiesDigest = digest("other") },
 		"outcome-audit":     func(f *custodydb.ReadContextProgressFactsRow) { f.AuditAcknowledgedAt = pgtype.Timestamptz{} },

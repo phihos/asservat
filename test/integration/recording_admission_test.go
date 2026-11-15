@@ -12,7 +12,6 @@ import (
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/packets"
 	"asservat.local/asservat/internal/adapters/postgres"
-	auditapp "asservat.local/asservat/internal/application/audit"
 	"asservat.local/asservat/internal/application/delivery"
 	"asservat.local/asservat/internal/application/evidence"
 	executionapp "asservat.local/asservat/internal/application/execution"
@@ -195,13 +194,6 @@ func qualifyRecordingTransactions(t *testing.T, ctx context.Context, admin *pgxp
 		guards := s.retention.guard
 		executions, err := postgres.NewAPIContextExecutions(ctx, sharedPools.ordinary, s.a.RootID, s.recovery.installation, guards)
 		if err != nil {
-			t.Fatal(err)
-		}
-		intents, err := postgres.NewCaptureIntentAudits(ctx, pool("capture_audit_runtime", "synthetic-capture-audit"), s.a.RootID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err = (auditapp.CaptureIntentPublisher{Ledger: intents, Objects: &objectstore.CaptureIntentObjects{Store: store, Seal: keys, Open: keys}}).PublishCaptureIntents(ctx); err != nil {
 			t.Fatal(err)
 		}
 		// The ADR-171 check of a recording recompiles its recorder plan with

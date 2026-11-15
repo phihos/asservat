@@ -533,15 +533,6 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 					t.Fatal("second real profile occurrence", next, err)
 				}
 				qualifyPolicyProfileExhaustedGrant(t, ctx, admin, hub, admissions, previews, s, a, compiled.Recorder, next[0].ID, grant)
-				intentPool := poolFor("capture_audit_runtime", "synthetic-capture-audit")
-				defer intentPool.Close()
-				intent, err := postgres.NewCaptureIntentAudits(ctx, intentPool, root)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if err = (auditapp.CaptureIntentPublisher{Ledger: intent, Objects: &objectstore.CaptureIntentObjects{Store: store, Seal: keys, Open: keys}}).PublishCaptureIntents(ctx); err != nil {
-					t.Fatal("profile capture intent audit", err)
-				}
 				qualifyOriginalPolicyGrantAcquisition(t, ctx, admin, poolFor, s, authority, output, grant, func() string {
 					return attachOrdinaryPolicyAccountingGrant(t, ctx, admin, poolFor, s, authority, scope, "profile-replacement", *compiled.Recorder)
 				}, refresh)

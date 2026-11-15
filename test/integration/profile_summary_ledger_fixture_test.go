@@ -177,7 +177,7 @@ func admitQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, root capacityR
 		t.Fatal("profile admitted with wrong shape")
 	}
 
-	if _, err = publisher.AcknowledgedCaptureIntent(ctx, accepted.CaptureID); err != nil {
+	if _, err = publisher.AcceptedCaptureIntent(ctx, accepted.CaptureID); err != nil {
 		t.Fatal("managed profile capture intent", err)
 	}
 	execSQL, err := postgres.NewAPIContextExecutions(ctx, pools.ordinary, p.RootID, s.recovery.installation, s.retention.guard)

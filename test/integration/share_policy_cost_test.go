@@ -101,20 +101,19 @@ func shareFixtureFailureStage(err error) string {
 
 // Mirror the existing API-work producer predicates as read-only diagnostics:
 // no scope, state, receipt or cutoff is rewritten by this assertion.
-func assertPolicyAPIWorkSource(t *testing.T, ctx context.Context, admin *pgxpool.Pool, c capture.Accepted, acknowledged bool) {
+func assertPolicyAPIWorkSource(t *testing.T, ctx context.Context, admin *pgxpool.Pool, c capture.Accepted) {
 	t.Helper()
-	var state string
-	var hasAck, paired, namespace, workload, unboundNode bool
-	if err := admin.QueryRow(ctx, `SELECT state,intent_acknowledged_at IS NOT NULL,intent_operation_id=id,
+	var namespace, workload, unboundNode bool
+	if err := admin.QueryRow(ctx, `SELECT
  convert_from(scope_json,'UTF8')::jsonb#>>'{collection,spec,target,namespace}'=$2,
  convert_from(scope_json,'UTF8')::jsonb#>>'{collection,spec,target,workloadRef,uid}'=$3,
  coalesce(convert_from(pod_pin_json,'UTF8')::jsonb->>'NodeName','')=''
- FROM context_capture WHERE id=$1`, c.CaptureID, c.Expectation.Namespace, c.Expectation.WorkloadUID).Scan(&state, &hasAck, &paired, &namespace, &workload, &unboundNode); err != nil {
+ FROM context_capture WHERE id=$1`, c.CaptureID, c.Expectation.Namespace, c.Expectation.WorkloadUID).Scan(&namespace, &workload, &unboundNode); err != nil {
 		t.Fatal("API work source diagnostics", err)
 	}
-	t.Logf("policy_api_source state=%s acknowledged=%t private_pair=%t exact_namespace=%t exact_workload=%t node_unbound=%t", state, hasAck, paired, namespace, workload, unboundNode)
-	if hasAck != acknowledged || !paired || !namespace || !workload || !unboundNode || acknowledged && state != capture.IntentAudited {
-		t.Fatal("prepaid API source violates original producer predicates")
+	t.Logf("policy_api_source exact_namespace=%t exact_workload=%t node_unbound=%t", namespace, workload, unboundNode)
+	if !namespace || !workload || !unboundNode {
+		t.Fatal("API source violates original producer predicates")
 	}
 }
 

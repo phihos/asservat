@@ -189,19 +189,16 @@ func (s paidShareService) StopPolicySharing(ctx context.Context, current identit
 	return out, err
 }
 
-// The protected pins/qualification/MAC and provider credentials remain explicit
-// synthetic fixture inputs. Admission, immutable pair, positive writer closure,
-// independent acknowledgements and publication use the current real components.
+// A capture admission under the compiled capture-admit role. Its audit row
+// commits with the admission (ADR-330 D6).
 type shareCaptureAudit struct {
-	publication   auditapp.CaptureOperationPublication
+	publication   *postgres.CaptureIntents
 	admissions    *postgres.ContextAdmissions
-	mac           *auditapp.OperationMAC
 	admissionRole string
 }
 
 func newShareCaptureAudit(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, s captureAdmissionScenario) shareCaptureAudit {
 	t.Helper()
-	roles := map[string]*pgxpool.Pool{}
 	admissionRole := narrowRole(t, ctx, admin, "share_capture_admit_", "synthetic-share-capture-admit", func(role string) []string {
 		grants, ok := postgres.PublicRuntimeRoleGrantSQL("capture-admit", role)
 		if !ok {
@@ -209,65 +206,15 @@ func newShareCaptureAudit(t *testing.T, ctx context.Context, admin *pgxpool.Pool
 		}
 		return grants
 	})
-	for _, purpose := range []string{"source", "admit", "journal", "ack", "read"} {
-		if purpose == "admit" {
-			roles[purpose] = poolFor(admissionRole, "synthetic-share-capture-admit")
-		} else {
-			roles[purpose] = poolFor("capture_operation_"+purpose+"_runtime", "synthetic-capture-operation-"+purpose)
-		}
-		t.Cleanup(roles[purpose].Close)
-	}
-	defer roles["source"].Close()
-	config, err := postgres.New(ctx, roles["source"])
+	pool := poolFor(admissionRole, "synthetic-share-capture-admit")
+	t.Cleanup(pool.Close)
+	admissions, err := postgres.NewContextAdmissions(ctx, pool, s.a.RootID, s.recovery.installation, s.retention.guard)
 	if err != nil {
 		t.Fatal(err)
 	}
-	mac, err := auditapp.NewOperationMAC("capture-input-v1", bytes.Repeat([]byte{41}, 32), "capture-accounts-v1", bytes.Repeat([]byte{42}, 32))
+	intents, err := postgres.NewCaptureIntents(ctx, pool, s.a.RootID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(mac.Close)
-	now := time.Now().UTC().Truncate(time.Microsecond)
-	if _, err = admin.Exec(ctx, `INSERT INTO capture_audit_root(root_id,installation_id,source_role,admission_role,journal_role,acknowledge_role,cleanup_role,verifier_role,finalizer_role,reader_role,revision,paused,valid_until) VALUES($1,$2,'capture_operation_source_runtime'::regrole::oid,$4::regrole::oid,'capture_operation_journal_runtime'::regrole::oid,'capture_operation_ack_runtime'::regrole::oid,'capture_operation_cleanup_runtime'::regrole::oid,'capture_operation_verify_runtime'::regrole::oid,'capture_operation_retire_runtime'::regrole::oid,'capture_operation_read_runtime'::regrole::oid,1,false,$3)`, s.a.RootID, s.recovery.installation, now.Add(time.Hour), admissionRole); err != nil {
-		t.Fatal("original synthetic protected capture pins", err)
-	}
-	account := nativeContinuationAuditAccount(t, s.a.RootID, s.recovery.installation, s.a.Registration.AllocationID, now, mac)
-	// Two capture records per admitted slot, the coverage the removed context
-	// control account gave this allocation (four objects per slot).
-	var objects int64
-	if err = admin.QueryRow(ctx, `SELECT object_limit FROM custody_allocation WHERE id=$1`, s.a.Registration.AllocationID).Scan(&objects); err != nil || objects < 4 {
-		t.Fatal("original allocation record coverage", err, objects)
-	}
-	account.Records = objects / 4 * 2
-	account.RetainedSeconds = 7200
-	account.Policy.MetadataSlots = 2 * account.Records
-	account.Policy.History.Layout = value.ShareCaptureOperationHistoryLayout
-	backup, wal := account.Policy.History.SlotBacking(account.Policy.MaxPurgeLeases)
-	account.Policy.BackupReservedBytes, account.Policy.WALReservedBytes = backup*account.Policy.MetadataSlots, wal*account.Policy.MetadataSlots
-	policy := account.Policy
-	backing := auditapp.OperationAuditPool{RootID: s.a.RootID, Lane: "capture", AccountVersion: account.AccountVersion, Accounts: 2, RecordsPerAccount: account.Records, RetainedSeconds: account.RetainedSeconds, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), ValidUntil: now.Add(time.Hour)}
-	if err = config.ConfigureCaptureAuditBacking(ctx, postgres.CaptureAuditBacking{Pool: backing, Account: account, ValidUntil: backing.ValidUntil}, mac); err != nil {
-		t.Fatal("original share-qualified capture cohort", err)
-	}
-	admissions, err := postgres.NewAuditedContextAdmissions(ctx, roles["admit"], s.a.RootID, s.recovery.installation, mac, s.retention.guard)
-	if err != nil {
-		t.Fatal(err)
-	}
-	journal, err := postgres.NewCaptureAuditJournal(ctx, roles["journal"], policy)
-	if err != nil {
-		t.Fatal(err)
-	}
-	acks, err := postgres.NewCaptureAuditAcknowledgements(ctx, roles["ack"], policy)
-	if err != nil {
-		t.Fatal(err)
-	}
-	writer, err := objectstore.NewClosedOperationAuditObjects(store, policy.StoreID, keys, keys)
-	if err != nil {
-		t.Fatal(err)
-	}
-	completed, err := postgres.NewCaptureOperationIntents(ctx, roles["read"], s.a.RootID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return shareCaptureAudit{auditapp.CaptureOperationPublication{RootID: s.a.RootID, Completed: completed, Journal: journal, Acknowledgements: acks, Writer: writer, Reader: &objectstore.OperationAuditObjects{Store: store, Seal: keys, Open: keys}, MAC: mac, Now: time.Now}, admissions, mac, admissionRole}
+	return shareCaptureAudit{intents, admissions, admissionRole}
 }

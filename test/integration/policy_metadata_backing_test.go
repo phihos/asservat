@@ -56,7 +56,7 @@ func TestPolicyMetadataBackingWithRealPostgres(t *testing.T) {
 					subjects = append(subjects, cfg.Subject{Kind: "Group", Issuer: "https://id.example.test/" + policyMetadataText(900, "issuer"), ID: policyMetadataText(256, fmt.Sprint(i))})
 				}
 				opt := policyRecorderProtectedCase{Hub: f.roles["hub-runtime"], Admissions: s.s, Filters: pcap.NewCompiler(), Expression: shape.expression, Subjects: subjects, Intent: func(ctx context.Context, id string) error {
-					_, err := publisher.AcknowledgedCaptureIntent(ctx, id)
+					_, err := publisher.AcceptedCaptureIntent(ctx, id)
 					return err
 				}}
 				opt.PermissionsAccepted = func(batch cfg.PermissionBatch) { f.batch = batch }

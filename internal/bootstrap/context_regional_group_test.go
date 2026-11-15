@@ -370,7 +370,7 @@ func (f *groupRegionalFixture) LookupContextAdmission(ctx context.Context, q cap
 	}
 	return f.parent, true, ctx.Err()
 }
-func (f *groupRegionalFixture) AcknowledgedCaptureIntent(ctx context.Context, id string) (auditvalue.CaptureIntent, error) {
+func (f *groupRegionalFixture) AcceptedCaptureIntent(ctx context.Context, id string) (auditvalue.CaptureIntent, error) {
 	active := f.ackActive.Add(1)
 	defer f.ackActive.Add(-1)
 	for old := f.ackMaximum.Load(); active > old; old = f.ackMaximum.Load() {

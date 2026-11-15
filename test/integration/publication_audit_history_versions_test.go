@@ -16,9 +16,6 @@ func withPublicationAuditVersion(t *testing.T, ctx context.Context, admin *pgxpo
 	t.Helper()
 	var read, update string
 	switch kind {
-	case "capture":
-		read = "SELECT intent_object_version,to_jsonb(c)::text FROM context_capture c WHERE id=$1"
-		update = "UPDATE context_capture SET intent_object_version=$2 WHERE id=$1"
 	case "verification":
 		read = "SELECT audit_object_version,to_jsonb(v)::text FROM context_verification v WHERE capture_id=$1"
 		update = "UPDATE context_verification SET audit_object_version=$2 WHERE capture_id=$1"

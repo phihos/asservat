@@ -2,11 +2,9 @@ package integration
 
 import (
 	"context"
-	"errors"
 	"testing"
-	"time"
 
-	auditapp "asservat.local/asservat/internal/application/audit"
+	captureapp "asservat.local/asservat/internal/application/capture"
 	executionapp "asservat.local/asservat/internal/application/execution"
 	"asservat.local/asservat/internal/bootstrap"
 	auditvalue "asservat.local/asservat/internal/domain/audit"
@@ -30,107 +28,22 @@ func (s publicJourneyPreviewDiagnostics) AdmitReviewedContext(c context.Context,
 	return v, e
 }
 
-// These decorators inspect only the original returned error's closed code.
-// In particular an uncertain capture write is never replayed for diagnosis.
+// The decorator inspects only the original returned error's closed code.
 type publicJourneyCaptureDiagnostics struct {
-	auditapp.CaptureOperationIntentReader
-	auditapp.CaptureOperationJournal
-	auditapp.CaptureOperationAcknowledgements
-	auditapp.ClosedOperationObjects
-	auditapp.CaptureOperationReader
+	captureapp.ContextAcceptedIntents
 	trace *publicJourneyDiagnostics
 }
 
-func (s *publicJourneyDiagnostics) Publication(in auditapp.CaptureOperationPublication) auditapp.CaptureOperationPublication {
-	p := publicJourneyCaptureDiagnostics{in.Completed, in.Journal, in.Acknowledgements, in.Writer, in.Reader, s}
-	if in.Completed != nil {
-		in.Completed = p
+func (s *publicJourneyDiagnostics) Publication(in captureapp.ContextAcceptedIntents) captureapp.ContextAcceptedIntents {
+	if in == nil {
+		return nil
 	}
-	if in.Journal != nil {
-		in.Journal = p
-	}
-	if in.Acknowledgements != nil {
-		in.Acknowledgements = p
-	}
-	if in.Writer != nil {
-		in.Writer = p
-	}
-	if in.Reader != nil {
-		in.Reader = p
-	}
-	return in
+	return publicJourneyCaptureDiagnostics{in, s}
 }
-func (s publicJourneyCaptureDiagnostics) ReadCaptureOperationIntent(c context.Context, id string) (auditapp.CaptureOperationIntentSnapshot, error) {
-	v, e := s.CaptureOperationIntentReader.ReadCaptureOperationIntent(c, id)
-	s.trace.record(journeyCaptureCompleted, journeyDiagnosticError(e))
+func (s publicJourneyCaptureDiagnostics) AcceptedCaptureIntent(c context.Context, id string) (auditvalue.CaptureIntent, error) {
+	v, e := s.ContextAcceptedIntents.AcceptedCaptureIntent(c, id)
+	s.trace.record(journeyCaptureIntent, journeyDiagnosticError(e))
 	return v, e
-}
-func (s publicJourneyCaptureDiagnostics) ReadCaptureOperation(c context.Context, id string) (auditvalue.OperationSnapshot, error) {
-	v, e := s.CaptureOperationJournal.ReadCaptureOperation(c, id)
-	s.trace.record(journeyCaptureJournal, journeyDiagnosticError(e))
-	return v, e
-}
-func (s publicJourneyCaptureDiagnostics) ClaimCaptureWrite(c context.Context, in auditvalue.OperationIntent, phase string) (auditvalue.CaptureWriteClaim, error) {
-	v, e := s.CaptureOperationJournal.ClaimCaptureWrite(c, in, phase)
-	s.recordPhase(phase, journeyCaptureClaimIntent, journeyCaptureClaimOutcome, e)
-	return v, e
-}
-func (s publicJourneyCaptureDiagnostics) FreezeOperationOutcome(c context.Context, in auditvalue.OperationOutcome) (auditvalue.OperationSnapshot, error) {
-	v, e := s.CaptureOperationJournal.FreezeOperationOutcome(c, in)
-	s.trace.record(journeyCaptureFreeze, journeyDiagnosticError(e))
-	return v, e
-}
-func (s publicJourneyCaptureDiagnostics) CreateClosedOperationIntent(c context.Context, in auditvalue.OperationIntent) (auditvalue.OperationWriteCompletion, error) {
-	v, e := s.ClosedOperationObjects.CreateClosedOperationIntent(c, in)
-	s.trace.record(journeyCaptureWriteIntent, journeyDiagnosticError(e))
-	return v, e
-}
-func (s publicJourneyCaptureDiagnostics) CreateClosedOperationOutcome(c context.Context, in auditvalue.OperationOutcome) (auditvalue.OperationWriteCompletion, error) {
-	v, e := s.ClosedOperationObjects.CreateClosedOperationOutcome(c, in)
-	s.trace.record(journeyCaptureWriteOutcome, journeyDiagnosticError(e))
-	return v, e
-}
-func (s publicJourneyCaptureDiagnostics) RecordOperationCompletion(c context.Context, in auditvalue.OperationIntent, phase string, v auditvalue.OperationWriteCompletion) error {
-	e := s.CaptureOperationAcknowledgements.RecordOperationCompletion(c, in, phase, v)
-	s.recordPhase(phase, journeyCaptureCompleteIntent, journeyCaptureCompleteOutcome, e)
-	return e
-}
-func (s publicJourneyCaptureDiagnostics) AcknowledgeOperation(c context.Context, in auditvalue.OperationIntent, phase string, r auditvalue.Receipt) error {
-	e := s.CaptureOperationAcknowledgements.AcknowledgeOperation(c, in, phase, r)
-	s.recordPhase(phase, journeyCaptureAckIntent, journeyCaptureAckOutcome, e)
-	return e
-}
-func (s publicJourneyCaptureDiagnostics) AcknowledgeCapturePair(c context.Context, in auditvalue.OperationIntent) error {
-	e := s.CaptureOperationAcknowledgements.AcknowledgeCapturePair(c, in)
-	s.trace.record(journeyCaptureAckPair, journeyDiagnosticError(e))
-	return e
-}
-func (s publicJourneyCaptureDiagnostics) ClaimCaptureReconciliation(c context.Context, in auditvalue.OperationIntent, phase string) (auditvalue.CaptureReconciliationClaim, error) {
-	v, e := s.CaptureOperationJournal.ClaimCaptureReconciliation(c, in, phase)
-	s.recordPhase(phase, journeyCaptureReconcileClaimIntent, journeyCaptureReconcileClaimOutcome, e)
-	return v, e
-}
-func (s publicJourneyCaptureDiagnostics) FindOperationIntent(c context.Context, in auditvalue.OperationIntent) (auditvalue.Receipt, error) {
-	v, e := s.CaptureOperationReader.FindOperationIntent(c, in)
-	s.trace.record(journeyCaptureFindIntent, journeyDiagnosticError(e))
-	return v, e
-}
-func (s publicJourneyCaptureDiagnostics) FindOperationOutcome(c context.Context, in auditvalue.OperationOutcome) (auditvalue.Receipt, error) {
-	v, e := s.CaptureOperationReader.FindOperationOutcome(c, in)
-	s.trace.record(journeyCaptureFindOutcome, journeyDiagnosticError(e))
-	return v, e
-}
-func (s publicJourneyCaptureDiagnostics) AcknowledgeReconciledCapture(c context.Context, in auditvalue.OperationIntent, phase string, r auditvalue.Receipt, claim auditvalue.CaptureReconciliationClaim) error {
-	e := s.CaptureOperationAcknowledgements.AcknowledgeReconciledCapture(c, in, phase, r, claim)
-	s.recordPhase(phase, journeyCaptureReconcileAckIntent, journeyCaptureReconcileAckOutcome, e)
-	return e
-}
-func (s publicJourneyCaptureDiagnostics) recordPhase(phase string, intent, outcome int, e error) {
-	if phase == "intent" {
-		s.trace.record(intent, journeyDiagnosticError(e))
-	} else if phase == "outcome" {
-		s.trace.record(outcome, journeyDiagnosticError(e))
-	}
 }
 
 type publicJourneyRegionalDiagnostics struct {
@@ -151,12 +64,10 @@ func (s publicJourneyRegionalDiagnostics) ReadAPIContextWork(c context.Context, 
 	return v, e
 }
 
-type journeyDiagnosticCaptureRead struct {
-	read func(context.Context, string) (auditapp.CaptureOperationIntentSnapshot, error)
-}
+type journeyDiagnosticCaptureRead func(context.Context, string) (auditvalue.CaptureIntent, error)
 
-func (s journeyDiagnosticCaptureRead) ReadCaptureOperationIntent(c context.Context, id string) (auditapp.CaptureOperationIntentSnapshot, error) {
-	return s.read(c, id)
+func (f journeyDiagnosticCaptureRead) AcceptedCaptureIntent(c context.Context, id string) (auditvalue.CaptureIntent, error) {
+	return f(c, id)
 }
 
 // Drive the actual publication entry point, preserving its normalization and
@@ -182,33 +93,33 @@ func TestPublicJourneyDiagnosticsFirstRequestPublication(t *testing.T) {
 			private := &journeyDiagnosticPrivateError{}
 			id := "00000000-0000-4000-8000-000000000001"
 			calls := 0
-			publication := trace.Publication(auditapp.CaptureOperationPublication{RootID: "00000000-0000-4000-8000-000000000002", Now: time.Now, Completed: journeyDiagnosticCaptureRead{func(c context.Context, got string) (auditapp.CaptureOperationIntentSnapshot, error) {
-				calls++
-				if got != id || c.Err() != nil {
-					t.Fatal("publication changed original ID/context")
+			publication := trace.Publication(journeyDiagnosticCaptureRead(func(c context.Context, got string) (auditvalue.CaptureIntent, error) {
+				if c.Err() != nil {
+					return auditvalue.CaptureIntent{}, c.Err()
 				}
-				return auditapp.CaptureOperationIntentSnapshot{}, private
-			}}})
-			if publication.Journal != nil || publication.Writer != nil || publication.Reader != nil || publication.Acknowledgements != nil {
-				t.Fatal("decorator invented missing publication ports")
-			}
-			_, e := publication.AcknowledgedCaptureIntent(ctx, id)
-			if !errors.Is(e, auditapp.ErrUnavailable) {
-				t.Fatal("publication normalization changed")
+				calls++
+				if got != id {
+					t.Fatal("decorator changed original ID")
+				}
+				return auditvalue.CaptureIntent{}, private
+			}))
+			if ctx.Err() == nil {
+				publication.AcceptedCaptureIntent(ctx, id)
 			}
 			if canceled {
 				if calls != 0 || trace.first != 0 {
 					t.Fatal("canceled publication dispatched")
 				}
-			} else if calls != 1 || trace.first != journeyCaptureCompleted+1 || trace.calls[journeyCaptureCompleted] != 1 || trace.reasons[journeyCaptureCompleted] != 9 {
+			} else if calls != 1 || trace.first != journeyCaptureIntent+1 || trace.calls[journeyCaptureIntent] != 1 || trace.reasons[journeyCaptureIntent] != 9 {
 				t.Fatal("original publication refusal lost or replayed")
 			}
 			trace.Report(t) // Neither private Error nor Unwrap may be invoked.
 			before := trace.calls
-			trace.record(journeyCaptureJournal, 9)
+			trace.record(journeyCaptureIntent, 9)
 			if trace.BeginRequest() || trace.calls != before {
 				t.Fatal("completed first request reopened or observed a later call")
 			}
 		})
 	}
 }
+

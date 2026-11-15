@@ -76,7 +76,7 @@ func admitQueryLedgerPacket(t *testing.T, f *capacitySQLFixture, root capacityRo
 	if accepted.Expectation.NativeType != artifact.PCAPNGArtifact || accepted.Expectation.DataClass != "metadata" || accepted.Expectation.Recording == nil {
 		t.Fatal("packet accepted with wrong source")
 	}
-	if _, err = publisher.AcknowledgedCaptureIntent(f.ctx, accepted.CaptureID); err != nil {
+	if _, err = publisher.AcceptedCaptureIntent(f.ctx, accepted.CaptureID); err != nil {
 		t.Fatal("packet intent audit", err)
 	}
 	executions, err := postgres.NewAPIContextExecutions(f.ctx, f.roles["hub-runtime"], s.a.RootID, s.recovery.installation, s.retention.guard)

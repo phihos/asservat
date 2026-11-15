@@ -131,7 +131,7 @@ func qualifyContextProgress(t *testing.T, ctx context.Context, admin *pgxpool.Po
 			}
 			got, err := r.ReadContextProgress(ctx, q)
 			if want {
-				if err != nil || got.Revision != 1 || got.Phase != "Pending" || got.ReasonCode != "IntentAuditPending" {
+				if err != nil || got.Revision != 1 || got.Phase != "Pending" || got.ReasonCode != "DispatchUnconfirmed" {
 					t.Fatalf("%s: %+v %v", name, got, err)
 				}
 			} else if !errors.Is(err, capture.ErrDenied) || got.CaptureID != "" {
