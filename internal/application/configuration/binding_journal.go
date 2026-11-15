@@ -267,24 +267,13 @@ func (j *BindingJournal) Refreshed(request string) error {
 	return nil
 }
 
-// bindingBasis is the accepted basis of an active binding. Evaluation
-// matches workloads by UID only, so a workload named without uid cannot
-// narrow a basis yet: such an allow entry grants nothing and such a deny
-// covers the whole namespace.
+// bindingBasis is the accepted basis of an active binding.
 func bindingBasis(b value.Binding, now time.Time) (value.PermissionBasis, bool) {
 	if b.Invalid || (b.Resource.Deleting && b.Effect == "Allow") || (!b.NotAfter.IsZero() && !now.Before(b.NotAfter)) {
 		return value.PermissionBasis{}, false
 	}
 	p := value.PermissionBasis{Resource: b.Resource, Scope: b.Scope, Effect: b.Effect, Subjects: slices.Clone(b.Subjects), Roles: slices.Clone(b.Roles), NotAfter: b.NotAfter, Automation: b.Automation}
-	if pinned := slices.DeleteFunc(slices.Clone(b.Scope.Workloads), func(w value.WorkloadRef) bool { return w.UID == "" }); len(pinned) < len(b.Scope.Workloads) {
-		switch {
-		case b.Effect == "Deny":
-			pinned = nil
-		case len(pinned) == 0:
-			return value.PermissionBasis{}, false
-		}
-		p.Scope.Workloads = pinned
-	}
+	p.Scope.Workloads = slices.Clone(b.Scope.Workloads)
 	p.ScopeDigest = PermissionScopeDigest(p)
 	return p, true
 }

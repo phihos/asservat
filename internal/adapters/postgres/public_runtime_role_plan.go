@@ -98,6 +98,10 @@ func publicRuntimeDutyGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		}
 		out = ownerIdentityGrantSet(out)
 	}
+	// ADR-335 D4: workload references match by name through workload_name.
+	if ok && slices.Contains(out, publicRuntimeGrant{"table", "permission_basis", "", "SELECT"}) && !slices.Contains(out, publicRuntimeGrant{"table", "workload_name", "", "SELECT"}) {
+		out = append(out, publicRuntimeGrant{"table", "workload_name", "", "SELECT"})
+	}
 	return out, ok
 }
 
@@ -303,6 +307,9 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("context_preview", "INSERT")
 		add("context_preview", "DELETE")
 		add("context_preview_fence", "DELETE")
+		// ADR-335 D4: resolved workload names (ON CONFLICT DO NOTHING).
+		add("workload_name", "SELECT")
+		add("workload_name", "INSERT")
 		add("recording_selection_set", "INSERT")
 		add("recording_selection_set", "DELETE")
 	case "capture-resolution":

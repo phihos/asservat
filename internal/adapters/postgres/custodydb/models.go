@@ -1871,3 +1871,9 @@ type RetentionSourceEpoch struct {
 	Epoch        pgtype.UUID
 	CreatedAt    pgtype.Timestamptz
 }
+
+type WorkloadName struct {
+	ClusterID   pgtype.UUID
+	WorkloadUid string
+	Ref         string
+}

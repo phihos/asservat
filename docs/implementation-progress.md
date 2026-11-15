@@ -71,7 +71,10 @@ pcap-check`, the CI gate set, `TestCustodyWithRealServices/bounded_streaming`
 
 No blocking initial AccessBinding review: the first permission batch is
 accepted without a bootstrap review. AccessBinding subject `issuer` and
-`reason` are optional and workload `uid` is optional. PermissionSources name
+`reason` are optional and workload `uid` is optional: a workload named
+without uid matches by kind and name through `workload_name`, which the hub
+fills with every Deployment/StatefulSet it resolves (migration 00188); a uid
+pins one instance. PermissionSources name
 their `cluster` (`local` or a joined cluster) and have no
 `maxDecisionAgeSeconds`/`maxNamespaces`; access reviews map to any role.
 New cluster-scoped ClusterAccessBinding CRD, accepted as one all-namespace
@@ -370,7 +373,7 @@ examples go through `readImplementedExample` or the console equivalent.
 | Capture/policy/trigger/recipe/packet/syscall schemas | No list-count caps; arbitrary maxima raised to 2^53−1; no packet-filter length cap (BPF limit checked at compile); `argv` items up to `MAX_ARG_STRLEN` | Embedded `policy-schemas/`, `permission-schemas/approval-policy`, manifest `profile` schema; generated DebugPolicy/CaptureProfile CRDs |
 | `identity-settings.schema.json` | `groupsClaim`, `usernameClaim`, optional `requiredGroups`, `administrators`; no eligible lists, `groupMaxAgeSeconds`, `revision` or list caps | `internal/contracts/identity_settings.go`, `permission_runtime.go`, `installer_continuation.go`; `internal/domain/configuration/permissions.go`; `internal/bootstrap/permission_guards.go`; `internal/adapters/kubernetes/hub_worker_capacity_reads.go` |
 | `browser-settings.schema.json` | `maxLifetimeSeconds` (default 7 d) and `inactivityTimeoutSeconds` (default 24 h); no `maxLogins`/`maxSessions`/`maxLogoutEvents` or per-user session count | `internal/contracts/browser_settings.go`, `installer_continuation.go`; `internal/domain/identity/browser_settings.go` |
-| `access-binding`, `permission-common`, `cluster-access-binding` (new) | Subject `issuer` and `reason` optional; workload by name with optional `uid`; ClusterAccessBinding; `groupName` mapping mode; `reviewRef`/`guardRef` optional; no list or string caps beyond Kubernetes formats | `internal/adapters/kubernetes/permission_decode.go`; `internal/domain/configuration/permissions.go`, `review.go`; chart CRDs (no ClusterAccessBinding CRD) |
+| `access-binding`, `permission-common`, `cluster-access-binding` (new) | Subject `issuer` and `reason` optional; ClusterAccessBinding; `groupName` mapping mode; `reviewRef`/`guardRef` optional; no list or string caps beyond Kubernetes formats | `internal/adapters/kubernetes/permission_decode.go`; `internal/domain/configuration/permissions.go`, `review.go`; chart CRDs (no ClusterAccessBinding CRD) |
 | `permission-source.schema.json` | `cluster` name instead of `clusterID`; no `maxDecisionAgeSeconds`; exclusions and `maxNamespaces` optional; access reviews map to any role | `internal/adapters/kubernetes/permission_decode.go`; `internal/domain/configuration/permissions.go` |
 
 | `policy-authority.schema.json` | Envelope ceilings, `notAfter` and limits optional, no maxima | `internal/domain/authorization/automation.go`, `policy_grant.go`, `policy_grant_use.go` |

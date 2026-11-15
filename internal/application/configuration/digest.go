@@ -17,7 +17,7 @@ import (
 func PermissionScopeDigest(b value.PermissionBasis) artifact.Digest {
 	scope := b.Scope
 	scope.Workloads = append([]value.WorkloadRef{}, scope.Workloads...)
-	slices.SortFunc(scope.Workloads, func(a, b value.WorkloadRef) int { return cmp.Compare(a.UID, b.UID) })
+	slices.SortFunc(scope.Workloads, func(a, b value.WorkloadRef) int { return cmp.Or(cmp.Compare(a.Kind, b.Kind), cmp.Compare(a.Name, b.Name), cmp.Compare(a.UID, b.UID)) })
 	wire := struct {
 		Scope        value.Scope
 		Kind, Effect string

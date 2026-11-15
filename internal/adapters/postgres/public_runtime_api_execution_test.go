@@ -102,6 +102,7 @@ func TestPublicAPIExecutionHasExactFormerGrantUnion(t *testing.T) {
 		{"table", "retention_decision", "", "SELECT"},
 		{"table", "retention_source", "", "SELECT"},
 		{"table", "retention_source", "root_id", "UPDATE"},
+		{"table", "workload_name", "", "SELECT"},
 	}
 	slices.SortFunc(want, func(a, b publicRuntimeGrant) int { return strings.Compare(a.key(), b.key()) })
 	if !slices.Equal(got, want) {

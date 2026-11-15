@@ -34,6 +34,8 @@ func TestPublicMetadataReadHasExactExistingReadPrivileges(t *testing.T) {
 		"permission_review_source", "permission_review_assignment", "permission_review_decision",
 		// ADR-255: bounded summary state/source cutoff, no custody-copy writes.
 		"capture_history_parameter", "recording_save_group",
+		// ADR-335 D4: workload references match by name.
+		"workload_name",
 	} {
 		want = append(want, publicRuntimeGrant{"table", table, "", "SELECT"})
 	}
