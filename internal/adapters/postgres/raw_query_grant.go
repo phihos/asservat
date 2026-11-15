@@ -50,12 +50,11 @@ func (s *AccessGrants) RawQueryRequest(ctx context.Context, p identity.Principal
 func (s *AccessGrants) requestRawQueryGrant(ctx context.Context, in app.StoredGrantRequest) (value.Grant, bool, error) {
 	var out value.Grant
 	g := in.Grant
-	if !g.RequestedAt.IsZero() || !g.ReviewUntil.IsZero() || g.Spent != (value.GrantSpend{}) || !app.RawQueryScopeMatches(g) {
+	if !g.RequestedAt.IsZero() || g.Spent != (value.GrantSpend{}) || !app.RawQueryScopeMatches(g) {
 		return out, false, value.ErrGrantInvalid
 	}
 	probe := g
 	probe.RequestedAt = time.Now().UTC()
-	probe.ReviewUntil = probe.RequestedAt.Add(value.GrantReviewWindow)
 	if !g.RawQuery.NotAfter.Equal(g.RawQuery.NotAfter.UTC().Truncate(time.Microsecond)) {
 		return out, false, value.ErrGrantInvalid
 	}
@@ -117,7 +116,7 @@ func (s *AccessGrants) RawQueryCandidates(ctx context.Context, scope artifact.Do
 	version, _ := json.Marshal(scope.Version)
 	var out []value.Grant
 	err = s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		rows, err := q.ReadRawQueryCandidates(ctx, custodydb.ReadRawQueryCandidatesParams{RootID: id(s.root), RequesterKey: policyGrantActorKey(scope.Principal), RequesterIssuer: scope.Principal.Issuer, RequesterSubject: scope.Principal.Subject, RequesterClient: scope.Principal.ClientID, Member: member, Version: version, ArtifactID: id(scope.ArtifactID), Bytes: use.Bytes, Operations: use.Operations, Operation: use.Operation})
+		rows, err := q.ReadRawQueryCandidates(ctx, custodydb.ReadRawQueryCandidatesParams{RootID: id(s.root), RequesterIssuer: scope.Principal.Issuer, RequesterSubject: scope.Principal.Subject, Member: member, Version: version, ArtifactID: id(scope.ArtifactID), Bytes: use.Bytes, Operations: use.Operations, Operation: use.Operation})
 		if err != nil {
 			return err
 		}
@@ -152,7 +151,7 @@ func (s *AccessGrants) GrantUseByID(ctx context.Context, useID string) (app.Gran
 		if err != nil {
 			return err
 		}
-		out = app.GrantUseRequest{UseID: uid(r.ID), ParentID: uid(r.ParentID), ChildID: uid(r.ChildID), Use: value.GrantUse{Operation: r.Operation, Bytes: r.Bytes, Operations: r.Operations}}
+		out = app.GrantUseRequest{UseID: uid(r.ID), ParentID: uid(r.ParentID), ArtifactRef: uid(r.ChildID), Use: value.GrantUse{Operation: r.Operation, Bytes: r.Bytes, Operations: r.Operations}}
 		return ctx.Err()
 	})
 	if err != nil {
@@ -176,9 +175,9 @@ func rawQueryChildOutput(parent value.Grant, artifactID string) (value.VerifiedO
 }
 
 // CountRegisteredGrantArtifacts only observes the selected artifact capacity;
-// actual materialization still atomically checks and charges the original pool.
+// registration still atomically checks and charges the pool.
 func (s *AccessGrants) CountRegisteredGrantArtifacts(ctx context.Context, parent string, artifacts []string) (int, error) {
-	if s == nil || ctx == nil || ctx.Err() != nil || !value.UUID(parent) || len(artifacts) < 1 || len(artifacts) > value.GrantMaxResultArtifacts {
+	if s == nil || ctx == nil || ctx.Err() != nil || !value.UUID(parent) || len(artifacts) < 1 {
 		return 0, value.ErrGrantInvalid
 	}
 	ids := make([]pgtype.UUID, len(artifacts))

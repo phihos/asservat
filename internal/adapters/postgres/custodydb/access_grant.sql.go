@@ -105,8 +105,7 @@ type ChargeGrantUseParams struct {
 	ID         pgtype.UUID
 }
 
-// Reserves before delivery against the shared pool of every child and
-// client; never refunded.
+// Reserves before delivery against the grant's one pool; never refunded.
 func (q *Queries) ChargeGrantUse(ctx context.Context, arg ChargeGrantUseParams) (AccessGrant, error) {
 	row := q.db.QueryRow(ctx, chargeGrantUse,
 		arg.Bytes,
@@ -188,7 +187,6 @@ SELECT count(DISTINCT c.artifact_id)::bigint FROM access_grant_child c
 JOIN access_grant g ON g.root_id=c.root_id AND g.id=c.parent_id
 WHERE g.root_id=$1::uuid AND g.id=$2::uuid AND g.kind='adHocCapture'
  AND c.artifact_id=ANY($3::uuid[])
- AND (g.result_access->'clientIDs') ? c.client_id
 `
 
 type CountRegisteredGrantArtifactsParams struct {
@@ -197,8 +195,7 @@ type CountRegisteredGrantArtifactsParams struct {
 	ArtifactIds []pgtype.UUID
 }
 
-// One bounded selection, not the parent's unrelated/hidden registered outputs.
-// Artifact capacity is shared across the parent's reviewed clients.
+// One selection, not the grant's unrelated/hidden registered outputs.
 func (q *Queries) CountRegisteredGrantArtifacts(ctx context.Context, arg CountRegisteredGrantArtifactsParams) (int64, error) {
 	row := q.db.QueryRow(ctx, countRegisteredGrantArtifacts, arg.RootID, arg.ParentID, arg.ArtifactIds)
 	var column_1 int64
@@ -209,10 +206,10 @@ func (q *Queries) CountRegisteredGrantArtifacts(ctx context.Context, arg CountRe
 const decideGrant = `-- name: DecideGrant :one
 UPDATE access_grant g SET decision= $1::text, approver_issuer= $2::text, approver_subject= $3::text, approver_client= $4::text,
  decision_reason= $5::text, decision_acr=$6::text, decision_auth_time=$7::timestamptz, decided_at=t.n, decision_key= $8::text,
- expires_at=CASE WHEN $1::text='approved' THEN CASE WHEN g.kind='policy' THEN g.policy_not_after ELSE LEAST(t.n+make_interval(secs => g.lifetime_seconds),COALESCE(g.not_after,'infinity'::timestamptz)) END END, revision=g.revision+1
+ expires_at=CASE WHEN $1::text='approved' THEN CASE WHEN g.kind='policy' THEN g.policy_not_after ELSE COALESCE(g.not_after,t.n+make_interval(secs => g.lifetime_seconds)) END END, revision=g.revision+1
 FROM (SELECT clock_timestamp() AS n) t
-WHERE t.n< $9::timestamptz AND g.root_id= $10::uuid AND g.id= $11::uuid AND g.decision IS NULL AND g.revoked_at IS NULL AND g.review_until>t.n AND g.revision=1
- AND (g.kind<>'policy' OR g.policy_not_after>t.n) AND (g.kind<>'rawQuery' OR g.not_after>t.n)
+WHERE t.n< $9::timestamptz AND g.root_id= $10::uuid AND g.id= $11::uuid AND g.decision IS NULL AND g.revoked_at IS NULL AND g.revision=1
+ AND (g.kind<>'policy' OR g.policy_not_after>t.n) AND (g.not_after IS NULL OR g.not_after>t.n)
  AND NOT (g.requester_issuer= $2::text AND g.requester_subject= $3::text)
 RETURNING g.id, g.root_id, g.kind, g.preview_id, g.capture_id, g.cluster_id, g.namespace_uid, g.workload_uid, g.pod_uid, g.execution_digest, g.result_access_digest, g.review_digest, g.data_class, g.reasons, g.review, g.scope, g.requester_issuer, g.requester_subject, g.requester_client, g.lifetime_seconds, g.result_access, g.not_after, g.max_artifacts, g.max_bytes, g.max_operations, g.artifacts_spent, g.bytes_spent, g.operations_spent, g.idempotency_key, g.request_digest, g.requested_at, g.review_until, g.decision, g.approver_issuer, g.approver_subject, g.approver_client, g.decision_reason, g.decision_acr, g.decision_auth_time, g.decided_at, g.decision_key, g.expires_at, g.revoked_at, g.revoker_issuer, g.revoker_subject, g.revoker_client, g.revoke_key, g.revision, g.requester_kind, g.request_operation, g.requester_key, g.policy_uid, g.policy_acceptance_id, g.policy_scope, g.policy_not_after, g.policy_max_executions, g.policy_max_bytes, g.policy_max_observed_bytes, g.policy_executions_spent, g.policy_bytes_spent, g.policy_observed_bytes_spent, g.policy_observed_events_spent, g.raw_query
 `
@@ -232,7 +229,8 @@ type DecideGrantParams struct {
 }
 
 // One decision by a distinct human while the request is reviewable. The
-// expiry starts at the decision, from the lifetime pinned at request time.
+// expiry is the request's absolute bound, else the pinned lifetime from the
+// decision.
 func (q *Queries) DecideGrant(ctx context.Context, arg DecideGrantParams) (AccessGrant, error) {
 	row := q.db.QueryRow(ctx, decideGrant,
 		arg.Decision,
@@ -316,29 +314,13 @@ func (q *Queries) DecideGrant(ctx context.Context, arg DecideGrantParams) (Acces
 	return i, err
 }
 
-const grantArtifactRegistered = `-- name: GrantArtifactRegistered :one
-SELECT EXISTS(SELECT 1 FROM access_grant_child WHERE parent_id=$1 AND artifact_id=$2)
-`
-
-type GrantArtifactRegisteredParams struct {
-	ParentID   pgtype.UUID
-	ArtifactID pgtype.UUID
-}
-
-func (q *Queries) GrantArtifactRegistered(ctx context.Context, arg GrantArtifactRegisteredParams) (bool, error) {
-	row := q.db.QueryRow(ctx, grantArtifactRegistered, arg.ParentID, arg.ArtifactID)
-	var exists bool
-	err := row.Scan(&exists)
-	return exists, err
-}
-
 const insertGrant = `-- name: InsertGrant :one
 INSERT INTO access_grant(id,root_id,kind,preview_id,capture_id,cluster_id,namespace_uid,workload_uid,pod_uid,execution_digest,result_access_digest,review_digest,data_class,reasons,review,scope,
  requester_issuer,requester_subject,requester_client,lifetime_seconds,result_access,not_after,max_artifacts,max_bytes,max_operations,idempotency_key,request_digest,requested_at,review_until)
 SELECT $1::uuid, $2::uuid, 'adHocCapture', $3::uuid, $4::uuid, $5::uuid, $6::text, $7::text, $8::text,
  $9::bytea, $10::bytea, $11::bytea, $12::text, $13::jsonb, $14::bytea, $15::bytea,
  $16::text, $17::text, $18::text, $19::integer, $20::jsonb, $21::timestamptz,
- $22::integer, $23::bigint, $24::bigint, $25::text, $26::bytea, t.n, t.n+interval '1 hour'
+ $22::integer, $23::bigint, $24::bigint, $25::text, $26::bytea, t.n, NULL
 FROM (SELECT clock_timestamp() AS n) t
 RETURNING id, root_id, kind, preview_id, capture_id, cluster_id, namespace_uid, workload_uid, pod_uid, execution_digest, result_access_digest, review_digest, data_class, reasons, review, scope, requester_issuer, requester_subject, requester_client, lifetime_seconds, result_access, not_after, max_artifacts, max_bytes, max_operations, artifacts_spent, bytes_spent, operations_spent, idempotency_key, request_digest, requested_at, review_until, decision, approver_issuer, approver_subject, approver_client, decision_reason, decision_acr, decision_auth_time, decided_at, decision_key, expires_at, revoked_at, revoker_issuer, revoker_subject, revoker_client, revoke_key, revision, requester_kind, request_operation, requester_key, policy_uid, policy_acceptance_id, policy_scope, policy_not_after, policy_max_executions, policy_max_bytes, policy_max_observed_bytes, policy_executions_spent, policy_bytes_spent, policy_observed_bytes_spent, policy_observed_events_spent, raw_query
 `
@@ -372,7 +354,8 @@ type InsertGrantParams struct {
 	RequestDigest      []byte
 }
 
-// The review window starts at the database clock; the caller never names it.
+// The request time is the database clock; a review stays decidable until its
+// own absolute bound (not_after), never a fixed window.
 func (q *Queries) InsertGrant(ctx context.Context, arg InsertGrantParams) (AccessGrant, error) {
 	row := q.db.QueryRow(ctx, insertGrant,
 		arg.ID,
@@ -471,12 +454,12 @@ func (q *Queries) InsertGrant(ctx context.Context, arg InsertGrantParams) (Acces
 	return i, err
 }
 
-const insertGrantChild = `-- name: InsertGrantChild :one
-INSERT INTO access_grant_child(id,root_id,parent_id,capture_id,action_id,artifact_id,artifact_digest,client_id)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id, root_id, parent_id, capture_id, action_id, artifact_id, artifact_digest, client_id, created_at
+const insertGrantArtifact = `-- name: InsertGrantArtifact :one
+INSERT INTO access_grant_child(id,root_id,parent_id,capture_id,action_id,artifact_id,artifact_digest)
+VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id, root_id, parent_id, capture_id, action_id, artifact_id, artifact_digest, created_at
 `
 
-type InsertGrantChildParams struct {
+type InsertGrantArtifactParams struct {
 	ID             pgtype.UUID
 	RootID         pgtype.UUID
 	ParentID       pgtype.UUID
@@ -484,11 +467,10 @@ type InsertGrantChildParams struct {
 	ActionID       string
 	ArtifactID     pgtype.UUID
 	ArtifactDigest []byte
-	ClientID       string
 }
 
-func (q *Queries) InsertGrantChild(ctx context.Context, arg InsertGrantChildParams) (AccessGrantChild, error) {
-	row := q.db.QueryRow(ctx, insertGrantChild,
+func (q *Queries) InsertGrantArtifact(ctx context.Context, arg InsertGrantArtifactParams) (AccessGrantChild, error) {
+	row := q.db.QueryRow(ctx, insertGrantArtifact,
 		arg.ID,
 		arg.RootID,
 		arg.ParentID,
@@ -496,7 +478,6 @@ func (q *Queries) InsertGrantChild(ctx context.Context, arg InsertGrantChildPara
 		arg.ActionID,
 		arg.ArtifactID,
 		arg.ArtifactDigest,
-		arg.ClientID,
 	)
 	var i AccessGrantChild
 	err := row.Scan(
@@ -507,7 +488,6 @@ func (q *Queries) InsertGrantChild(ctx context.Context, arg InsertGrantChildPara
 		&i.ActionID,
 		&i.ArtifactID,
 		&i.ArtifactDigest,
-		&i.ClientID,
 		&i.CreatedAt,
 	)
 	return i, err
@@ -556,7 +536,7 @@ INSERT INTO access_grant(id,root_id,kind,execution_digest,review_digest,data_cla
  requester_issuer,requester_subject,requester_client,requester_kind,requester_key,request_operation,lifetime_seconds,raw_query,not_after,max_artifacts,max_bytes,max_operations,idempotency_key,request_digest,requested_at,review_until)
 SELECT $1::uuid,$2::uuid,'rawQuery',$3::bytea,$4::bytea,'raw',$5::jsonb,$6::bytea,$7::bytea,
  $8::text,$9::text,$10::text,'human',$11::bytea,'requestRawAccess',$12::integer,$13::jsonb,$14::timestamptz,
- $15::integer,$16::bigint,$17::bigint,$18::text,$19::bytea,t.n,LEAST(t.n+interval '1 hour',$14::timestamptz)
+ $15::integer,$16::bigint,$17::bigint,$18::text,$19::bytea,t.n,NULL
 FROM (SELECT clock_timestamp() AS n) t
 ON CONFLICT(root_id,requester_key,request_operation,idempotency_key) WHERE kind='rawQuery' DO NOTHING
 RETURNING id, root_id, kind, preview_id, capture_id, cluster_id, namespace_uid, workload_uid, pod_uid, execution_digest, result_access_digest, review_digest, data_class, reasons, review, scope, requester_issuer, requester_subject, requester_client, lifetime_seconds, result_access, not_after, max_artifacts, max_bytes, max_operations, artifacts_spent, bytes_spent, operations_spent, idempotency_key, request_digest, requested_at, review_until, decision, approver_issuer, approver_subject, approver_client, decision_reason, decision_acr, decision_auth_time, decided_at, decision_key, expires_at, revoked_at, revoker_issuer, revoker_subject, revoker_client, revoke_key, revision, requester_kind, request_operation, requester_key, policy_uid, policy_acceptance_id, policy_scope, policy_not_after, policy_max_executions, policy_max_bytes, policy_max_observed_bytes, policy_executions_spent, policy_bytes_spent, policy_observed_bytes_spent, policy_observed_events_spent, raw_query
@@ -676,8 +656,8 @@ func (q *Queries) InsertRawQueryGrant(ctx context.Context, arg InsertRawQueryGra
 }
 
 const listPendingGrants = `-- name: ListPendingGrants :many
-SELECT id, root_id, kind, preview_id, capture_id, cluster_id, namespace_uid, workload_uid, pod_uid, execution_digest, result_access_digest, review_digest, data_class, reasons, review, scope, requester_issuer, requester_subject, requester_client, lifetime_seconds, result_access, not_after, max_artifacts, max_bytes, max_operations, artifacts_spent, bytes_spent, operations_spent, idempotency_key, request_digest, requested_at, review_until, decision, approver_issuer, approver_subject, approver_client, decision_reason, decision_acr, decision_auth_time, decided_at, decision_key, expires_at, revoked_at, revoker_issuer, revoker_subject, revoker_client, revoke_key, revision, requester_kind, request_operation, requester_key, policy_uid, policy_acceptance_id, policy_scope, policy_not_after, policy_max_executions, policy_max_bytes, policy_max_observed_bytes, policy_executions_spent, policy_bytes_spent, policy_observed_bytes_spent, policy_observed_events_spent, raw_query FROM access_grant WHERE root_id=$1 AND decision IS NULL AND revoked_at IS NULL AND review_until>clock_timestamp()
- AND (kind<>'policy' OR policy_not_after>clock_timestamp()) AND (kind<>'rawQuery' OR not_after>clock_timestamp())
+SELECT id, root_id, kind, preview_id, capture_id, cluster_id, namespace_uid, workload_uid, pod_uid, execution_digest, result_access_digest, review_digest, data_class, reasons, review, scope, requester_issuer, requester_subject, requester_client, lifetime_seconds, result_access, not_after, max_artifacts, max_bytes, max_operations, artifacts_spent, bytes_spent, operations_spent, idempotency_key, request_digest, requested_at, review_until, decision, approver_issuer, approver_subject, approver_client, decision_reason, decision_acr, decision_auth_time, decided_at, decision_key, expires_at, revoked_at, revoker_issuer, revoker_subject, revoker_client, revoke_key, revision, requester_kind, request_operation, requester_key, policy_uid, policy_acceptance_id, policy_scope, policy_not_after, policy_max_executions, policy_max_bytes, policy_max_observed_bytes, policy_executions_spent, policy_bytes_spent, policy_observed_bytes_spent, policy_observed_events_spent, raw_query FROM access_grant WHERE root_id=$1 AND decision IS NULL AND revoked_at IS NULL
+ AND (kind<>'policy' OR policy_not_after>clock_timestamp()) AND (not_after IS NULL OR not_after>clock_timestamp())
 ORDER BY requested_at DESC, id LIMIT $2
 `
 
@@ -959,6 +939,112 @@ func (q *Queries) ReadGrant(ctx context.Context, arg ReadGrantParams) (AccessGra
 	return i, err
 }
 
+const readGrantArtifact = `-- name: ReadGrantArtifact :one
+SELECT child.id, child.root_id, child.parent_id, child.capture_id, child.action_id, child.artifact_id, child.artifact_digest, child.created_at,c.scope_digest AS source_scope_digest,(CASE WHEN v.capture_id IS NOT NULL AND rg.group_kind='composition' AND c.group_ordinal>=0 AND cardinality(rg.child_ids) BETWEEN 2 AND 16 AND rg.child_ids[c.group_ordinal+1]=c.id AND
+ c.created_at=rg.accepted_at AND c.deadline<=rg.deadline AND sha256(c.scope_json)=c.scope_digest AND sha256(rg.scope_json)=rg.scope_digest AND
+ convert_from(rg.scope_json,'UTF8')::jsonb->>'schemaVersion'='recorder-group/v1' AND
+ convert_from(rg.scope_json,'UTF8')::jsonb->'children'->c.group_ordinal->>'captureID'=c.id::text AND
+ convert_from(rg.scope_json,'UTF8')::jsonb->'children'->c.group_ordinal->>'scopeDigest'=encode(c.scope_digest,'hex') AND
+ convert_from(rg.scope_json,'UTF8')::jsonb->'children'->c.group_ordinal->>'actionID'=convert_from(c.expectation_json,'UTF8')::jsonb->>'ActionID' AND
+ convert_from(c.expectation_json,'UTF8')::jsonb#>>'{Registration,Location,ArtifactID}'=l.artifact_id::text AND
+ convert_from(c.expectation_json,'UTF8')::jsonb#>>'{CompositionGroup,ParentCaptureID}'=rg.id::text AND
+ (convert_from(c.expectation_json,'UTF8')::jsonb#>>'{CompositionGroup,ChildIndex}')::integer=c.group_ordinal AND
+ (convert_from(c.expectation_json,'UTF8')::jsonb#>>'{CompositionGroup,ChildCount}')::integer=cardinality(rg.child_ids) THEN jsonb_build_object('RootID',c.root_id,'ParentCaptureID',rg.id,'CaptureID',c.id,'ArtifactID',l.artifact_id,
+ 'ActionID',convert_from(c.expectation_json,'UTF8')::jsonb->>'ActionID',
+ 'ParentExecutionDigest',to_jsonb(ARRAY(SELECT get_byte(rg.scope_digest,byte_index) FROM generate_series(0,31) AS bytes(byte_index))),
+ 'ExecutionDigest',to_jsonb(ARRAY(SELECT get_byte(c.scope_digest,byte_index) FROM generate_series(0,31) AS bytes(byte_index))),
+ 'ArtifactDigest',to_jsonb(ARRAY(SELECT get_byte(v.copies_digest,byte_index) FROM generate_series(0,31) AS bytes(byte_index))),
+ 'ChildIndex',c.group_ordinal,'ChildCount',cardinality(rg.child_ids)) END)::jsonb AS group_association
+FROM access_grant_child child
+LEFT JOIN context_capture c ON c.root_id=child.root_id AND c.id=child.capture_id
+LEFT JOIN context_case_locator l ON l.root_id=c.root_id AND l.capture_id=c.id AND l.artifact_id=child.artifact_id
+LEFT JOIN context_verification v ON v.root_id=c.root_id AND v.capture_id=c.id AND v.copies_digest=child.artifact_digest AND v.audit_acknowledged_at IS NOT NULL
+LEFT JOIN recording_save_group rg ON rg.root_id=c.root_id AND rg.id=c.group_id
+WHERE child.parent_id=$1 AND child.artifact_id=$2
+`
+
+type ReadGrantArtifactParams struct {
+	ParentID   pgtype.UUID
+	ArtifactID pgtype.UUID
+}
+
+type ReadGrantArtifactRow struct {
+	AccessGrantChild  AccessGrantChild
+	SourceScopeDigest []byte
+	GroupAssociation  []byte
+}
+
+func (q *Queries) ReadGrantArtifact(ctx context.Context, arg ReadGrantArtifactParams) (ReadGrantArtifactRow, error) {
+	row := q.db.QueryRow(ctx, readGrantArtifact, arg.ParentID, arg.ArtifactID)
+	var i ReadGrantArtifactRow
+	err := row.Scan(
+		&i.AccessGrantChild.ID,
+		&i.AccessGrantChild.RootID,
+		&i.AccessGrantChild.ParentID,
+		&i.AccessGrantChild.CaptureID,
+		&i.AccessGrantChild.ActionID,
+		&i.AccessGrantChild.ArtifactID,
+		&i.AccessGrantChild.ArtifactDigest,
+		&i.AccessGrantChild.CreatedAt,
+		&i.SourceScopeDigest,
+		&i.GroupAssociation,
+	)
+	return i, err
+}
+
+const readGrantArtifactByID = `-- name: ReadGrantArtifactByID :one
+SELECT child.id, child.root_id, child.parent_id, child.capture_id, child.action_id, child.artifact_id, child.artifact_digest, child.created_at,c.scope_digest AS source_scope_digest,(CASE WHEN v.capture_id IS NOT NULL AND rg.group_kind='composition' AND c.group_ordinal>=0 AND cardinality(rg.child_ids) BETWEEN 2 AND 16 AND rg.child_ids[c.group_ordinal+1]=c.id AND
+ c.created_at=rg.accepted_at AND c.deadline<=rg.deadline AND sha256(c.scope_json)=c.scope_digest AND sha256(rg.scope_json)=rg.scope_digest AND
+ convert_from(rg.scope_json,'UTF8')::jsonb->>'schemaVersion'='recorder-group/v1' AND
+ convert_from(rg.scope_json,'UTF8')::jsonb->'children'->c.group_ordinal->>'captureID'=c.id::text AND
+ convert_from(rg.scope_json,'UTF8')::jsonb->'children'->c.group_ordinal->>'scopeDigest'=encode(c.scope_digest,'hex') AND
+ convert_from(rg.scope_json,'UTF8')::jsonb->'children'->c.group_ordinal->>'actionID'=convert_from(c.expectation_json,'UTF8')::jsonb->>'ActionID' AND
+ convert_from(c.expectation_json,'UTF8')::jsonb#>>'{Registration,Location,ArtifactID}'=l.artifact_id::text AND
+ convert_from(c.expectation_json,'UTF8')::jsonb#>>'{CompositionGroup,ParentCaptureID}'=rg.id::text AND
+ (convert_from(c.expectation_json,'UTF8')::jsonb#>>'{CompositionGroup,ChildIndex}')::integer=c.group_ordinal AND
+ (convert_from(c.expectation_json,'UTF8')::jsonb#>>'{CompositionGroup,ChildCount}')::integer=cardinality(rg.child_ids) THEN jsonb_build_object('RootID',c.root_id,'ParentCaptureID',rg.id,'CaptureID',c.id,'ArtifactID',l.artifact_id,
+ 'ActionID',convert_from(c.expectation_json,'UTF8')::jsonb->>'ActionID',
+ 'ParentExecutionDigest',to_jsonb(ARRAY(SELECT get_byte(rg.scope_digest,byte_index) FROM generate_series(0,31) AS bytes(byte_index))),
+ 'ExecutionDigest',to_jsonb(ARRAY(SELECT get_byte(c.scope_digest,byte_index) FROM generate_series(0,31) AS bytes(byte_index))),
+ 'ArtifactDigest',to_jsonb(ARRAY(SELECT get_byte(v.copies_digest,byte_index) FROM generate_series(0,31) AS bytes(byte_index))),
+ 'ChildIndex',c.group_ordinal,'ChildCount',cardinality(rg.child_ids)) END)::jsonb AS group_association
+FROM access_grant_child child
+LEFT JOIN context_capture c ON c.root_id=child.root_id AND c.id=child.capture_id
+LEFT JOIN context_case_locator l ON l.root_id=c.root_id AND l.capture_id=c.id AND l.artifact_id=child.artifact_id
+LEFT JOIN context_verification v ON v.root_id=c.root_id AND v.capture_id=c.id AND v.copies_digest=child.artifact_digest AND v.audit_acknowledged_at IS NOT NULL
+LEFT JOIN recording_save_group rg ON rg.root_id=c.root_id AND rg.id=c.group_id
+WHERE child.root_id=$1 AND child.id=$2
+`
+
+type ReadGrantArtifactByIDParams struct {
+	RootID pgtype.UUID
+	ID     pgtype.UUID
+}
+
+type ReadGrantArtifactByIDRow struct {
+	AccessGrantChild  AccessGrantChild
+	SourceScopeDigest []byte
+	GroupAssociation  []byte
+}
+
+func (q *Queries) ReadGrantArtifactByID(ctx context.Context, arg ReadGrantArtifactByIDParams) (ReadGrantArtifactByIDRow, error) {
+	row := q.db.QueryRow(ctx, readGrantArtifactByID, arg.RootID, arg.ID)
+	var i ReadGrantArtifactByIDRow
+	err := row.Scan(
+		&i.AccessGrantChild.ID,
+		&i.AccessGrantChild.RootID,
+		&i.AccessGrantChild.ParentID,
+		&i.AccessGrantChild.CaptureID,
+		&i.AccessGrantChild.ActionID,
+		&i.AccessGrantChild.ArtifactID,
+		&i.AccessGrantChild.ArtifactDigest,
+		&i.AccessGrantChild.CreatedAt,
+		&i.SourceScopeDigest,
+		&i.GroupAssociation,
+	)
+	return i, err
+}
+
 const readGrantByCapture = `-- name: ReadGrantByCapture :one
 SELECT parent.id, parent.root_id, parent.kind, parent.preview_id, parent.capture_id, parent.cluster_id, parent.namespace_uid, parent.workload_uid, parent.pod_uid, parent.execution_digest, parent.result_access_digest, parent.review_digest, parent.data_class, parent.reasons, parent.review, parent.scope, parent.requester_issuer, parent.requester_subject, parent.requester_client, parent.lifetime_seconds, parent.result_access, parent.not_after, parent.max_artifacts, parent.max_bytes, parent.max_operations, parent.artifacts_spent, parent.bytes_spent, parent.operations_spent, parent.idempotency_key, parent.request_digest, parent.requested_at, parent.review_until, parent.decision, parent.approver_issuer, parent.approver_subject, parent.approver_client, parent.decision_reason, parent.decision_acr, parent.decision_auth_time, parent.decided_at, parent.decision_key, parent.expires_at, parent.revoked_at, parent.revoker_issuer, parent.revoker_subject, parent.revoker_client, parent.revoke_key, parent.revision, parent.requester_kind, parent.request_operation, parent.requester_key, parent.policy_uid, parent.policy_acceptance_id, parent.policy_scope, parent.policy_not_after, parent.policy_max_executions, parent.policy_max_bytes, parent.policy_max_observed_bytes, parent.policy_executions_spent, parent.policy_bytes_spent, parent.policy_observed_bytes_spent, parent.policy_observed_events_spent, parent.raw_query FROM access_grant parent WHERE parent.root_id=$1 AND (parent.capture_id=$2 OR parent.capture_id=(SELECT c.group_id FROM context_capture c JOIN recording_save_group g ON g.id=c.group_id AND g.root_id=c.root_id AND g.group_kind='composition' WHERE c.root_id=$1 AND c.id=$2 AND g.child_ids[c.group_ordinal+1]=c.id)) ORDER BY CASE WHEN parent.capture_id=$2 THEN 0 ELSE 1 END LIMIT 1
 `
@@ -1051,7 +1137,7 @@ type ReadGrantByKeyParams struct {
 	IdempotencyKey   string
 }
 
-// ADR-249 adHocCapture AccessGrants, exact child grants and pool spend.
+// ADR-249 adHocCapture AccessGrants, used-artifact registrations and pool spend.
 func (q *Queries) ReadGrantByKey(ctx context.Context, arg ReadGrantByKeyParams) (AccessGrant, error) {
 	row := q.db.QueryRow(ctx, readGrantByKey,
 		arg.RootID,
@@ -1124,115 +1210,6 @@ func (q *Queries) ReadGrantByKey(ctx context.Context, arg ReadGrantByKeyParams) 
 		&i.PolicyObservedBytesSpent,
 		&i.PolicyObservedEventsSpent,
 		&i.RawQuery,
-	)
-	return i, err
-}
-
-const readGrantChild = `-- name: ReadGrantChild :one
-SELECT child.id, child.root_id, child.parent_id, child.capture_id, child.action_id, child.artifact_id, child.artifact_digest, child.client_id, child.created_at,c.scope_digest AS source_scope_digest,(CASE WHEN v.capture_id IS NOT NULL AND rg.group_kind='composition' AND c.group_ordinal>=0 AND cardinality(rg.child_ids) BETWEEN 2 AND 16 AND rg.child_ids[c.group_ordinal+1]=c.id AND
- c.created_at=rg.accepted_at AND c.deadline<=rg.deadline AND sha256(c.scope_json)=c.scope_digest AND sha256(rg.scope_json)=rg.scope_digest AND
- convert_from(rg.scope_json,'UTF8')::jsonb->>'schemaVersion'='recorder-group/v1' AND
- convert_from(rg.scope_json,'UTF8')::jsonb->'children'->c.group_ordinal->>'captureID'=c.id::text AND
- convert_from(rg.scope_json,'UTF8')::jsonb->'children'->c.group_ordinal->>'scopeDigest'=encode(c.scope_digest,'hex') AND
- convert_from(rg.scope_json,'UTF8')::jsonb->'children'->c.group_ordinal->>'actionID'=convert_from(c.expectation_json,'UTF8')::jsonb->>'ActionID' AND
- convert_from(c.expectation_json,'UTF8')::jsonb#>>'{Registration,Location,ArtifactID}'=l.artifact_id::text AND
- convert_from(c.expectation_json,'UTF8')::jsonb#>>'{CompositionGroup,ParentCaptureID}'=rg.id::text AND
- (convert_from(c.expectation_json,'UTF8')::jsonb#>>'{CompositionGroup,ChildIndex}')::integer=c.group_ordinal AND
- (convert_from(c.expectation_json,'UTF8')::jsonb#>>'{CompositionGroup,ChildCount}')::integer=cardinality(rg.child_ids) THEN jsonb_build_object('RootID',c.root_id,'ParentCaptureID',rg.id,'CaptureID',c.id,'ArtifactID',l.artifact_id,
- 'ActionID',convert_from(c.expectation_json,'UTF8')::jsonb->>'ActionID',
- 'ParentExecutionDigest',to_jsonb(ARRAY(SELECT get_byte(rg.scope_digest,byte_index) FROM generate_series(0,31) AS bytes(byte_index))),
- 'ExecutionDigest',to_jsonb(ARRAY(SELECT get_byte(c.scope_digest,byte_index) FROM generate_series(0,31) AS bytes(byte_index))),
- 'ArtifactDigest',to_jsonb(ARRAY(SELECT get_byte(v.copies_digest,byte_index) FROM generate_series(0,31) AS bytes(byte_index))),
- 'ChildIndex',c.group_ordinal,'ChildCount',cardinality(rg.child_ids)) END)::jsonb AS group_association
-FROM access_grant_child child
-LEFT JOIN context_capture c ON c.root_id=child.root_id AND c.id=child.capture_id
-LEFT JOIN context_case_locator l ON l.root_id=c.root_id AND l.capture_id=c.id AND l.artifact_id=child.artifact_id
-LEFT JOIN context_verification v ON v.root_id=c.root_id AND v.capture_id=c.id AND v.copies_digest=child.artifact_digest AND v.audit_acknowledged_at IS NOT NULL
-LEFT JOIN recording_save_group rg ON rg.root_id=c.root_id AND rg.id=c.group_id
-WHERE child.parent_id=$1 AND child.artifact_id=$2 AND child.client_id=$3
-`
-
-type ReadGrantChildParams struct {
-	ParentID   pgtype.UUID
-	ArtifactID pgtype.UUID
-	ClientID   string
-}
-
-type ReadGrantChildRow struct {
-	AccessGrantChild  AccessGrantChild
-	SourceScopeDigest []byte
-	GroupAssociation  []byte
-}
-
-func (q *Queries) ReadGrantChild(ctx context.Context, arg ReadGrantChildParams) (ReadGrantChildRow, error) {
-	row := q.db.QueryRow(ctx, readGrantChild, arg.ParentID, arg.ArtifactID, arg.ClientID)
-	var i ReadGrantChildRow
-	err := row.Scan(
-		&i.AccessGrantChild.ID,
-		&i.AccessGrantChild.RootID,
-		&i.AccessGrantChild.ParentID,
-		&i.AccessGrantChild.CaptureID,
-		&i.AccessGrantChild.ActionID,
-		&i.AccessGrantChild.ArtifactID,
-		&i.AccessGrantChild.ArtifactDigest,
-		&i.AccessGrantChild.ClientID,
-		&i.AccessGrantChild.CreatedAt,
-		&i.SourceScopeDigest,
-		&i.GroupAssociation,
-	)
-	return i, err
-}
-
-const readGrantChildByID = `-- name: ReadGrantChildByID :one
-SELECT child.id, child.root_id, child.parent_id, child.capture_id, child.action_id, child.artifact_id, child.artifact_digest, child.client_id, child.created_at,c.scope_digest AS source_scope_digest,(CASE WHEN v.capture_id IS NOT NULL AND rg.group_kind='composition' AND c.group_ordinal>=0 AND cardinality(rg.child_ids) BETWEEN 2 AND 16 AND rg.child_ids[c.group_ordinal+1]=c.id AND
- c.created_at=rg.accepted_at AND c.deadline<=rg.deadline AND sha256(c.scope_json)=c.scope_digest AND sha256(rg.scope_json)=rg.scope_digest AND
- convert_from(rg.scope_json,'UTF8')::jsonb->>'schemaVersion'='recorder-group/v1' AND
- convert_from(rg.scope_json,'UTF8')::jsonb->'children'->c.group_ordinal->>'captureID'=c.id::text AND
- convert_from(rg.scope_json,'UTF8')::jsonb->'children'->c.group_ordinal->>'scopeDigest'=encode(c.scope_digest,'hex') AND
- convert_from(rg.scope_json,'UTF8')::jsonb->'children'->c.group_ordinal->>'actionID'=convert_from(c.expectation_json,'UTF8')::jsonb->>'ActionID' AND
- convert_from(c.expectation_json,'UTF8')::jsonb#>>'{Registration,Location,ArtifactID}'=l.artifact_id::text AND
- convert_from(c.expectation_json,'UTF8')::jsonb#>>'{CompositionGroup,ParentCaptureID}'=rg.id::text AND
- (convert_from(c.expectation_json,'UTF8')::jsonb#>>'{CompositionGroup,ChildIndex}')::integer=c.group_ordinal AND
- (convert_from(c.expectation_json,'UTF8')::jsonb#>>'{CompositionGroup,ChildCount}')::integer=cardinality(rg.child_ids) THEN jsonb_build_object('RootID',c.root_id,'ParentCaptureID',rg.id,'CaptureID',c.id,'ArtifactID',l.artifact_id,
- 'ActionID',convert_from(c.expectation_json,'UTF8')::jsonb->>'ActionID',
- 'ParentExecutionDigest',to_jsonb(ARRAY(SELECT get_byte(rg.scope_digest,byte_index) FROM generate_series(0,31) AS bytes(byte_index))),
- 'ExecutionDigest',to_jsonb(ARRAY(SELECT get_byte(c.scope_digest,byte_index) FROM generate_series(0,31) AS bytes(byte_index))),
- 'ArtifactDigest',to_jsonb(ARRAY(SELECT get_byte(v.copies_digest,byte_index) FROM generate_series(0,31) AS bytes(byte_index))),
- 'ChildIndex',c.group_ordinal,'ChildCount',cardinality(rg.child_ids)) END)::jsonb AS group_association
-FROM access_grant_child child
-LEFT JOIN context_capture c ON c.root_id=child.root_id AND c.id=child.capture_id
-LEFT JOIN context_case_locator l ON l.root_id=c.root_id AND l.capture_id=c.id AND l.artifact_id=child.artifact_id
-LEFT JOIN context_verification v ON v.root_id=c.root_id AND v.capture_id=c.id AND v.copies_digest=child.artifact_digest AND v.audit_acknowledged_at IS NOT NULL
-LEFT JOIN recording_save_group rg ON rg.root_id=c.root_id AND rg.id=c.group_id
-WHERE child.root_id=$1 AND child.id=$2
-`
-
-type ReadGrantChildByIDParams struct {
-	RootID pgtype.UUID
-	ID     pgtype.UUID
-}
-
-type ReadGrantChildByIDRow struct {
-	AccessGrantChild  AccessGrantChild
-	SourceScopeDigest []byte
-	GroupAssociation  []byte
-}
-
-func (q *Queries) ReadGrantChildByID(ctx context.Context, arg ReadGrantChildByIDParams) (ReadGrantChildByIDRow, error) {
-	row := q.db.QueryRow(ctx, readGrantChildByID, arg.RootID, arg.ID)
-	var i ReadGrantChildByIDRow
-	err := row.Scan(
-		&i.AccessGrantChild.ID,
-		&i.AccessGrantChild.RootID,
-		&i.AccessGrantChild.ParentID,
-		&i.AccessGrantChild.CaptureID,
-		&i.AccessGrantChild.ActionID,
-		&i.AccessGrantChild.ArtifactID,
-		&i.AccessGrantChild.ArtifactDigest,
-		&i.AccessGrantChild.ClientID,
-		&i.AccessGrantChild.CreatedAt,
-		&i.SourceScopeDigest,
-		&i.GroupAssociation,
 	)
 	return i, err
 }
@@ -1333,7 +1310,7 @@ type ReadGrantOutputLocatorParams struct {
 }
 
 // Only an existing published artifact of exactly this capture and target can
-// become a child target; an unknown future artifact never can.
+// be registered; an unknown future artifact never can.
 func (q *Queries) ReadGrantOutputLocator(ctx context.Context, arg ReadGrantOutputLocatorParams) (pgtype.UUID, error) {
 	row := q.db.QueryRow(ctx, readGrantOutputLocator,
 		arg.RootID,
@@ -1457,23 +1434,21 @@ func (q *Queries) ReadRawQueryByKey(ctx context.Context, arg ReadRawQueryByKeyPa
 
 const readRawQueryCandidates = `-- name: ReadRawQueryCandidates :many
 SELECT g.id, g.root_id, g.kind, g.preview_id, g.capture_id, g.cluster_id, g.namespace_uid, g.workload_uid, g.pod_uid, g.execution_digest, g.result_access_digest, g.review_digest, g.data_class, g.reasons, g.review, g.scope, g.requester_issuer, g.requester_subject, g.requester_client, g.lifetime_seconds, g.result_access, g.not_after, g.max_artifacts, g.max_bytes, g.max_operations, g.artifacts_spent, g.bytes_spent, g.operations_spent, g.idempotency_key, g.request_digest, g.requested_at, g.review_until, g.decision, g.approver_issuer, g.approver_subject, g.approver_client, g.decision_reason, g.decision_acr, g.decision_auth_time, g.decided_at, g.decision_key, g.expires_at, g.revoked_at, g.revoker_issuer, g.revoker_subject, g.revoker_client, g.revoke_key, g.revision, g.requester_kind, g.request_operation, g.requester_key, g.policy_uid, g.policy_acceptance_id, g.policy_scope, g.policy_not_after, g.policy_max_executions, g.policy_max_bytes, g.policy_max_observed_bytes, g.policy_executions_spent, g.policy_bytes_spent, g.policy_observed_bytes_spent, g.policy_observed_events_spent, g.raw_query FROM access_grant g
-WHERE g.root_id= $1::uuid AND g.kind='rawQuery' AND g.requester_key= $2::bytea
- AND g.requester_issuer= $3::text AND g.requester_subject= $4::text AND g.requester_client= $5::text AND g.requester_kind='human'
+WHERE g.root_id= $1::uuid AND g.kind='rawQuery'
+ AND g.requester_issuer= $2::text AND g.requester_subject= $3::text AND g.requester_kind='human'
  AND g.decision='approved' AND g.revoked_at IS NULL AND g.expires_at>clock_timestamp()
- AND g.raw_query @> $6::jsonb
- AND ($7::text='' OR (g.raw_query->'Operations') ? $7::text)
- AND EXISTS(SELECT 1 FROM jsonb_array_elements(g.raw_query->'Artifacts') a WHERE a#>>'{Output,ArtifactID}'= ($8::uuid)::text AND a#>'{Output,ArtifactDigest}'= $9::jsonb AND (a->>'ExpiresAt')::timestamptz>clock_timestamp())
- AND $10::bigint<=g.max_bytes-g.bytes_spent AND $11::bigint<=g.max_operations-g.operations_spent
-ORDER BY EXISTS(SELECT 1 FROM access_grant_child c WHERE c.root_id=g.root_id AND c.parent_id=g.id AND c.artifact_id= $8::uuid AND c.client_id=g.requester_client) DESC,g.requested_at,g.id
+ AND g.raw_query @> $4::jsonb
+ AND ($5::text='' OR (g.raw_query->'Operations') ? $5::text)
+ AND EXISTS(SELECT 1 FROM jsonb_array_elements(g.raw_query->'Artifacts') a WHERE a#>>'{Output,ArtifactID}'= ($6::uuid)::text AND a#>'{Output,ArtifactDigest}'= $7::jsonb AND (a->>'ExpiresAt')::timestamptz>clock_timestamp())
+ AND $8::bigint<=g.max_bytes-g.bytes_spent AND $9::bigint<=g.max_operations-g.operations_spent
+ORDER BY EXISTS(SELECT 1 FROM access_grant_child c WHERE c.root_id=g.root_id AND c.parent_id=g.id AND c.artifact_id= $6::uuid) DESC,g.requested_at,g.id
 LIMIT 64
 `
 
 type ReadRawQueryCandidatesParams struct {
 	RootID           pgtype.UUID
-	RequesterKey     []byte
 	RequesterIssuer  string
 	RequesterSubject string
-	RequesterClient  string
 	Member           []byte
 	Operation        string
 	ArtifactID       pgtype.UUID
@@ -1485,10 +1460,8 @@ type ReadRawQueryCandidatesParams struct {
 func (q *Queries) ReadRawQueryCandidates(ctx context.Context, arg ReadRawQueryCandidatesParams) ([]AccessGrant, error) {
 	rows, err := q.db.Query(ctx, readRawQueryCandidates,
 		arg.RootID,
-		arg.RequesterKey,
 		arg.RequesterIssuer,
 		arg.RequesterSubject,
-		arg.RequesterClient,
 		arg.Member,
 		arg.Operation,
 		arg.ArtifactID,

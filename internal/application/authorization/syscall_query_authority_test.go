@@ -20,7 +20,7 @@ func TestRawSyscallAuthorityRequiresExactGrantAndCurrentRawClient(t *testing.T) 
 			f, s, scope := newSyscallProjectionFixture(artifact.SyscallArgumentsArtifact, query.SyscallQueryView)
 			scope.RawGrantID = projectionTestID(80)
 			f.identity.Scopes = append(f.identity.Scopes, "evidence:raw")
-			proof := &syscallGrantProof{packetGrantProof{ref: query.ContextQueryGrant{ParentID: scope.RawGrantID, ChildID: projectionTestID(81)}, until: f.now.Add(time.Minute)}}
+			proof := &syscallGrantProof{packetGrantProof{ref: query.ContextQueryGrant{ParentID: scope.RawGrantID, ArtifactRef: projectionTestID(81)}, until: f.now.Add(time.Minute)}}
 			s.SyscallGrants = proof
 			switch mode {
 			case "missing":

@@ -30,11 +30,11 @@ function Rows({ rows, empty, label }: { rows?: ReviewRow[]; empty: string; label
   if (rows.length === 0) return <p>{empty}</p>;
   return <ul className="progress-actions" aria-label={label}>{rows.map(row => <li key={row.grant_id}>
     <span><a href={'/approvals/' + row.grant_id}>{row.kind === 'rawQuery' ? `${hasQueries(row.raw_access.operations) ? 'Inspect' : 'Download'} ${row.raw_access.artifact_count} existing artifacts` : `${row.target.workload_kind} ${row.target.workload_name}`}</a>{row.kind !== 'rawQuery' && <> in {row.target.namespace}</>} · {phases[row.phase] ?? row.phase} · requested by {row.requested_by.subject} {date(row.requested_at)}
-      {row.phase === 'Pending' && <> · review until {date(row.review_until)}</>}</span>
+      {row.phase === 'Pending' && row.review_until && <> · review until {date(row.review_until)}</>}</span>
   </li>)}</ul>;
 }
 
-function Detail({ grant, busy, onDecide, onRevoke, onResume, onResolve }: { grant: Grant; busy: boolean; onDecide: (approve: boolean, reason: string) => void; onRevoke: () => void; onResume: () => void; onResolve: () => void }) {
+function Detail({ grant, busy, onDecide, onRevoke, onResume }: { grant: Grant; busy: boolean; onDecide: (approve: boolean, reason: string) => void; onRevoke: () => void; onResume: () => void }) {
   const [reason, setReason] = useState('');
   const policy = grant.kind === 'policy' ? grant.policy : undefined;
   return <>
@@ -70,7 +70,7 @@ function Detail({ grant, busy, onDecide, onRevoke, onResume, onResolve }: { gran
         </div>;
       })}
       {grant.observation_limits && <p>Observation limits bound by this approval: {grant.observation_limits.max_session_seconds} s per session, {bytes(grant.observation_limits.max_observed_bytes)} in total, {bytes(grant.observation_limits.max_bytes_per_second)} per second, {grant.observation_limits.max_concurrent_sessions} concurrent session.{grant.observation_limits.max_observed_events !== undefined && <> {grant.observation_limits.max_observed_events} eligible entry and exit probes in total.</>}</p>}
-      {grant.result_access && <p>Follow-up access for the requester only: {grant.result_access.operations.map(accessOperation).join(', ')} by clients {grant.result_access.client_ids.join(', ')}, at most {grant.result_access.max_artifacts} artifacts and {bytes(grant.result_access.max_bytes)} in total until {date(grant.result_access.not_after)} (used: {grant.result_access.artifacts_used} artifacts, {bytes(grant.result_access.bytes_used)}).</p>}
+      {grant.result_access && <p>Follow-up access for the requester only: {grant.result_access.operations.map(accessOperation).join(', ')} on any of their clients, at most {grant.result_access.max_artifacts} artifacts and {bytes(grant.result_access.max_bytes)} in total until {date(grant.result_access.not_after)} (used: {grant.result_access.artifacts_used} artifacts, {bytes(grant.result_access.bytes_used)}).</p>}
       {grant.result_access && hasQueries(grant.result_access.operations) && <p>Each paid query page reserves 24 KiB and one operation from that same follow-up pool. Downloaded bytes and query pages share its limit.</p>}
       {policy ? <>
         <p>Team policy <span className="identifier">{policy.uid}</span> runs as <span className="identifier">{policy.executor.subject}</span> under the reviewed team authority from {date(policy.authority_issued_at)} until {date(policy.authority_not_after)}.</p>
@@ -81,7 +81,7 @@ function Detail({ grant, busy, onDecide, onRevoke, onResume, onResolve }: { gran
     </section>}
     <section className="review-section" aria-labelledby="approval-state">
       <h2 id="approval-state">Decision</h2>
-      <p role="status">{phases[grant.phase] ?? grant.phase}{grant.phase === 'Pending' && <> until {date(grant.review_until)}</>}
+      <p role="status">{phases[grant.phase] ?? grant.phase}{grant.phase === 'Pending' && grant.review_until && <> until {date(grant.review_until)}</>}
         {grant.decision && <> · {grant.decision.decision} by {grant.decision.decided_by.subject} on {date(grant.decision.decided_at)}: {grant.decision.reason}</>}
         {grant.not_after && (grant.kind === 'policy' || grant.phase === 'Approved') && <> · valid until {date(grant.not_after)}</>}
         {grant.revoked_at && <> · revoked {date(grant.revoked_at)}</>}</p>
@@ -94,8 +94,6 @@ function Detail({ grant, busy, onDecide, onRevoke, onResume, onResolve }: { gran
         <Button className="button secondary" isDisabled={busy || reason.trim() === ''} onPress={() => onDecide(false, reason.trim())}>Deny</Button>
       </>}
       {grant.can_resume && <div className="actions"><Button className="button" isDisabled={busy} onPress={onResume}>Continue approved capture</Button><p>Uses the exact reviewed preview and original requester client. It can continue the original accepted acquisition; it cannot create another capture.</p></div>}
-      {grant.can_resolve && grant.phase !== 'Pending' && grant.phase !== 'Denied' && <div className="actions"><Button className="button secondary" isDisabled={busy} onPress={onResolve}>Find capture; otherwise close request</Button><p>Opens the original capture if it was accepted. Otherwise it closes this reviewed request so it cannot start a capture.</p></div>}
-      {grant.resume_requires_original_client && grant.phase === 'Approved' && <p>Collection must continue through the original requesting client ({grant.requested_by.client_id}) with its current permissions. This page does not transfer its approval to another client.</p>}
       {grant.can_revoke && <Button className="button secondary" isDisabled={busy} onPress={onRevoke}>{grant.phase === 'Pending' ? 'Withdraw request' : 'Revoke approval'}</Button>}
     </section>
   </>;
@@ -146,33 +144,21 @@ export function ApprovalsWorkspace({ session, scope, grantID, client = defaultOp
       if (!scope.aborted) setMessage(operationMessage(error) + ' Retrying repeats the same decision.');
     } finally { if (!scope.aborted) setBusy(false); }
   };
-  const continueRequest = async (resolve: boolean) => {
+  const continueRequest = async () => {
     const original = grant;
-    if (!original || original.kind !== 'adHocCapture' || !original.preview_id || busy || scope.aborted || (resolve ? !original.can_resolve : !original.can_resume)) return;
+    if (!original || original.kind !== 'adHocCapture' || !original.preview_id || busy || scope.aborted || !original.can_resume) return;
     command.current?.abort();
     const request = new AbortController(); command.current = request;
     const abort = () => request.abort(); scope.addEventListener('abort', abort, { once: true });
     const input = { preview_id: original.preview_id, idempotency_key: approvalSubmissionKey(original.preview_id) };
     setBusy(true); setMessage(undefined);
     try {
-      if (resolve) {
-        const result = await captureClient.call('resolve_capture_request', input, session.csrf_token, request.signal);
-        if (request.signal.aborted || scope.aborted || command.current !== request) return;
-        if (result.status === 'ok') {
-          if (result.data.state === 'accepted') onAccepted(result.data.capture_id);
-          else {
-            setGrant({ ...original, can_resume: false, can_resolve: false });
-            setMessage('The original request is closed. Prepare a new review before collecting.');
-          }
-        } else setMessage(result.status === 'error' ? result.data.message : 'The original result is not confirmed. Resolve this same request again.');
-      } else {
-        const result = await captureClient.call('request_capture', { ...input, continue_acquisition: true }, session.csrf_token, request.signal);
-        if (request.signal.aborted || scope.aborted || command.current !== request) return;
-        if (result.status === 'ok') onAccepted(result.data.capture_id);
-        else setMessage(result.status === 'error' ? result.data.message : 'The original result is not confirmed. Retry this same approved request.');
-      }
+      const result = await captureClient.call('request_capture', { ...input, continue_acquisition: true }, session.csrf_token, request.signal);
+      if (request.signal.aborted || scope.aborted || command.current !== request) return;
+      if (result.status === 'ok') onAccepted(result.data.capture_id);
+      else setMessage(result.status === 'error' ? result.data.message : 'The original result is not confirmed. Retry this same approved request.');
     } catch (error) {
-      if (!request.signal.aborted && !scope.aborted) setMessage(operationMessage(error) + ' Retrying uses this same reviewed request. You can resolve its original outcome before making another request.');
+      if (!request.signal.aborted && !scope.aborted) setMessage(operationMessage(error) + ' Retrying uses this same reviewed request.');
     } finally {
       scope.removeEventListener('abort', abort);
       if (!request.signal.aborted && !scope.aborted && command.current === request) setBusy(false);
@@ -185,7 +171,7 @@ export function ApprovalsWorkspace({ session, scope, grantID, client = defaultOp
       <p>Sensitive recordings, such as a packet filter that tests payload bytes, need an independent approver before anything is recorded. {grantID ? <a href="/approvals">All approvals</a> : <a href="/captures/new">Collect evidence</a>}</p>
     </div>
     {message && <p role="alert" className="notice">{message}</p>}
-    {grantID ? grant && <Detail grant={grant} busy={busy} onDecide={decide} onRevoke={revoke} onResume={() => void continueRequest(false)} onResolve={() => void continueRequest(true)}/> : <>
+    {grantID ? grant && <Detail grant={grant} busy={busy} onDecide={decide} onRevoke={revoke} onResume={() => void continueRequest()}/> : <>
       <section className="review-section" aria-labelledby="to-review" aria-busy={busy}>
         <h2 id="to-review">Waiting for your review</h2>
         <Rows rows={pending} empty="No requests are waiting for you." label="Requests to review"/>

@@ -35,7 +35,7 @@ INSERT INTO access_grant(id,root_id,kind,cluster_id,namespace_uid,workload_uid,e
 SELECT $1::uuid,$2::uuid,'policy',$3::uuid,$4::text,$5::text,
  $6::bytea,$7::bytea,$8::text,$9::jsonb,$10::bytea,$11::bytea,
  $12::text,$13::text,$14::text,$15::text,sha256(int4send(octet_length(convert_to($12::text,'UTF8'))) || convert_to($12::text,'UTF8') || int4send(octet_length(convert_to($13::text,'UTF8'))) || convert_to($13::text,'UTF8') || int4send(octet_length(convert_to($14::text,'UTF8'))) || convert_to($14::text,'UTF8') || int4send(octet_length(convert_to($15::text,'UTF8'))) || convert_to($15::text,'UTF8')),'requestPolicyGrant',$16::integer,
- $17::text,$18::bytea,t.n,t.n+interval '1 hour',$19::text,$20::uuid,$21::jsonb,
+ $17::text,$18::bytea,t.n,NULL,$19::text,$20::uuid,$21::jsonb,
  LEAST(t.n+make_interval(secs=>$16::integer),$22::timestamptz,t.n+make_interval(secs=>s.max_age_seconds))
 FROM (SELECT clock_timestamp() AS n) t JOIN policy_grant_settings s ON s.root_id=$2::uuid
 WHERE s.issuer=$12::text AND s.fresh_until>t.n

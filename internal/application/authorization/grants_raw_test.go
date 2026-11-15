@@ -60,9 +60,9 @@ func rawGrant(t *testing.T, f *grantFixture, capture int) (value.Grant, artifact
 	return g, scope
 }
 
-// ADR-279: the first raw download materializes the requester's child after
-// verified commit; every later batch reserves one use of the shared pool.
-func TestRawResultAccessMaterializesAndReserves(t *testing.T) {
+// ADR-279: the first raw download registers the artifact under the grant
+// after verified commit; every later batch reserves one use of its pool.
+func TestRawResultAccessRegistersAndReserves(t *testing.T) {
 	ctx := context.Background()
 	f := newGrantFixture(t)
 	g, scope := rawGrant(t, f, 7)
@@ -96,28 +96,15 @@ func TestRawResultAccessMaterializesAndReserves(t *testing.T) {
 	if err = reserve(f.requester, other, 602, 1); !errors.Is(err, value.ErrGrantScope) {
 		t.Fatal("other version reserved", err)
 	}
-	// An approved second client needs its own child, created on its first check.
+	// Another client of the same human uses the same registration and pool.
 	agent := f.requester
 	agent.Principal.ClientID = "agent"
 	agentScope := scope
 	agentScope.Principal = agent.Principal
-	if err = reserve(agent, agentScope, 603, 1); !errors.Is(err, ErrGrantNotFound) {
-		t.Fatal("reserved without a child", err)
+	if err = reserve(agent, agentScope, 604, 10); err != nil || f.store.rows[g.ID].Spent.Bytes != 70 || f.store.rows[g.ID].Spent.Artifacts != 1 {
+		t.Fatal("second client spends the one pool", err)
 	}
-	if _, err = f.svc.CurrentResultAccess(ctx, grantIdentity{agent, &f.now}, agentScope, "a1"); err != nil || f.store.rows[g.ID].Spent.Artifacts != 1 {
-		t.Fatal("second approved client", err)
-	}
-	if err = reserve(agent, agentScope, 604, 10); err != nil || f.store.rows[g.ID].Spent.Bytes != 70 {
-		t.Fatal("second client spends the shared pool", err)
-	}
-	// Unlisted clients and other humans never reach a child or the pool.
-	cli := f.requester
-	cli.Principal.ClientID = "cli"
-	cliScope := scope
-	cliScope.Principal = cli.Principal
-	if _, err = f.svc.CurrentResultAccess(ctx, grantIdentity{cli, &f.now}, cliScope, "a1"); !errors.Is(err, value.ErrGrantScope) {
-		t.Fatal("unlisted client admitted", err)
-	}
+	// Other humans never reach the grant or the pool.
 	outsider := f.outside
 	outsider.Scopes = append(outsider.Scopes, "evidence:download")
 	outScope := scope

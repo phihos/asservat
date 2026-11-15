@@ -102,7 +102,7 @@ func TestRawQueryRequestReplayPreservesOriginalSelectionAndDeadline(t *testing.T
 		t.Fatal("invented collection identity")
 	}
 	var review GrantReview
-	if json.Unmarshal(g.Review, &review) != nil || review.RawQuery == nil || review.RawQuery.MaxOperations != value.GrantMaxResultOperations || review.RawQuery.Artifacts[0].WorkloadName != "api" {
+	if json.Unmarshal(g.Review, &review) != nil || review.RawQuery == nil || review.RawQuery.MaxOperations != value.RawQueryDefaultOperations || review.RawQuery.Artifacts[0].WorkloadName != "api" {
 		t.Fatal("missing readable, bound review")
 	}
 	f.now = f.now.Add(time.Minute)
@@ -164,7 +164,7 @@ func TestRawQueryExactChildAndUseReplayNeverMovesParent(t *testing.T) {
 	if _, err := f.svc.CurrentResultAccess(t.Context(), dev, scope, o.ActionID); err != nil {
 		t.Fatal(err)
 	}
-	child, err := f.store.GrantChildFor(t.Context(), g.ID, o.ArtifactID, f.requester.Principal.ClientID)
+	child, err := f.store.GrantArtifactFor(t.Context(), g.ID, o.ArtifactID)
 	if err != nil || child.Output != o || child.Output.ExecutionDigest == g.ExecutionDigest {
 		t.Fatal("child used raw parent scope digest", child, err)
 	}
@@ -218,9 +218,9 @@ func TestRawQuerySixtyFourSelectedArtifactsFitReviewedRequest(t *testing.T) {
 		in.ArtifactDigests = append(in.ArtifactDigests, artifact.Digest{byte(n)})
 	}
 	selected, _ := f.svc.RawSelections.ResolveRawQuery(t.Context(), grantIdentity{f.requester, &f.now}, in.CaseID, in.ArtifactDigests)
-	scope := value.RawQueryScope{CaseID: in.CaseID, Artifacts: selected.Artifacts, Operations: in.Operations, Reason: in.Reason, MaxBytes: in.MaxBytes, MaxOperations: value.GrantMaxResultOperations, NotAfter: f.now.Add(in.Lifetime)}
+	scope := value.RawQueryScope{CaseID: in.CaseID, Artifacts: selected.Artifacts, Operations: in.Operations, Reason: in.Reason, MaxBytes: in.MaxBytes, MaxOperations: value.RawQueryDefaultOperations, NotAfter: f.now.Add(in.Lifetime)}
 	b, _ := RawQueryScopeBytes(scope)
-	review, _ := json.Marshal(GrantReview{RawQuery: &RawQueryReview{CaseID: in.CaseID, Artifacts: selected.Review, Operations: in.Operations, Reason: in.Reason, MaxBytes: in.MaxBytes, MaxOperations: value.GrantMaxResultOperations, NotAfter: scope.NotAfter}, Deadline: scope.NotAfter})
+	review, _ := json.Marshal(GrantReview{RawQuery: &RawQueryReview{CaseID: in.CaseID, Artifacts: selected.Review, Operations: in.Operations, Reason: in.Reason, MaxBytes: in.MaxBytes, MaxOperations: value.RawQueryDefaultOperations, NotAfter: scope.NotAfter}, Deadline: scope.NotAfter})
 	t.Logf("64 exact artifact scope=%d bytes review=%d bytes", len(b), len(review))
 	requestRawFixture(t, f, in)
 }

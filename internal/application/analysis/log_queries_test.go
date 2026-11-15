@@ -31,7 +31,7 @@ func rawLogAdmissionFixture(t *testing.T) (*projectionFixture, *packetQueryLedge
 	s.NativeType, s.SourceFormat, s.SourceProjectionDigest, s.DisplayVersion = source.NativeType, source.Format, source.ProjectionDigest, source.DisplayVersion
 	s.Selection, s.Logs = value.LineSelection{}, selection.LogWindow
 	s.RawGrantID = f.next()
-	f.a.Grant = value.ContextQueryGrant{ParentID: s.RawGrantID, ChildID: f.next()}
+	f.a.Grant = value.ContextQueryGrant{ParentID: s.RawGrantID, ArtifactRef: f.next()}
 	f.i.Scopes = append(f.i.Scopes, "evidence:raw")
 	f.p.Profile.Worker.MemoryBytes, f.p.Profile.Worker.WorkerTransientBytes = value.LogQueryWorkerBytes, value.LogQueryWorkerBytes
 	candidate := s.Candidate()

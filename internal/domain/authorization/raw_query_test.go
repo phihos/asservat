@@ -26,7 +26,7 @@ func rawQueryFixture(now time.Time) (Grant, VerifiedOutput) {
 	return g, output
 }
 
-func TestRawQueryExactPublishedMembershipAndClient(t *testing.T) {
+func TestRawQueryExactPublishedMembership(t *testing.T) {
 	now := time.Now().UTC()
 	g, output := rawQueryFixture(now)
 	if !g.Valid() {
@@ -46,7 +46,7 @@ func TestRawQueryExactPublishedMembershipAndClient(t *testing.T) {
 	if !g.Valid() || !g.ExpiresAt.Equal(g.RawQuery.NotAfter) {
 		t.Fatal("original request end lost")
 	}
-	if err := CheckMaterialize(g, output, "console", false, now); err != nil {
+	if err := CheckRegister(g, output, false, now, nil); err != nil {
 		t.Fatal(err)
 	}
 	for name, alter := range map[string]func(*VerifiedOutput){
@@ -59,18 +59,17 @@ func TestRawQueryExactPublishedMembershipAndClient(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			changed := output
 			alter(&changed)
-			if err := CheckMaterialize(g, changed, "console", false, now); !errors.Is(err, ErrGrantScope) {
+			if err := CheckRegister(g, changed, false, now, nil); !errors.Is(err, ErrGrantScope) {
 				t.Fatal("unreviewed output admitted", err)
 			}
 		})
 	}
-	if err := CheckMaterialize(g, output, "other-client", false, now); !errors.Is(err, ErrGrantScope) {
-		t.Fatal("client expanded", err)
-	}
-	child := GrantChild{ID: "00000000-0000-4000-8000-000000000014", ParentID: g.ID, ClientID: "console", Output: output, CreatedAt: now}
+	child := GrantArtifact{ID: "00000000-0000-4000-8000-000000000014", ParentID: g.ID, Output: output, CreatedAt: now}
 	caller := reviewer(now, "dev", "console", false)
-	if err := CheckResultUse(g, child, caller, GrantDownloadOperation, now); err != nil {
-		t.Fatal(err)
+	for _, client := range []string{"console", "agent"} {
+		if err := CheckResultUse(g, child, reviewer(now, "dev", client, false), GrantDownloadOperation, now); err != nil {
+			t.Fatal("a client of the requesting human was refused", client, err)
+		}
 	}
 	if err := CheckCaptureUse(g, caller, output.CaptureID, output.ExecutionDigest, g.ReviewDigest, now); !errors.Is(err, ErrGrantScope) {
 		t.Fatal("disclosure granted collection", err)
@@ -78,7 +77,7 @@ func TestRawQueryExactPublishedMembershipAndClient(t *testing.T) {
 	if err := CheckResultUse(g, child, caller, "syscall_query", now); !errors.Is(err, ErrGrantScope) {
 		t.Fatal("unimplemented raw operation admitted", err)
 	}
-	if err := CheckMaterialize(g, output, "console", true, now.Add(20*time.Minute)); !errors.Is(err, ErrGrantScope) {
+	if err := CheckRegister(g, output, true, now.Add(20*time.Minute), nil); !errors.Is(err, ErrGrantScope) {
 		t.Fatal("expired output revived", err)
 	}
 	g.RevokedAt = now
@@ -100,7 +99,7 @@ func TestRawQueryScopeAndDisclosurePoolCannotExpand(t *testing.T) {
 		"unknown size":          func(g *Grant) { g.RawQuery.Artifacts[0].NativeBytes = -1 },
 		"too few bytes":         func(g *Grant) { g.RawQuery.MaxBytes = 799 },
 		"duplicate artifact":    func(g *Grant) { g.RawQuery.Artifacts = append(g.RawQuery.Artifacts, g.RawQuery.Artifacts[0]) },
-		"late expiry":           func(g *Grant) { g.RawQuery.NotAfter = now.Add(GrantMaxLifetime + time.Second) },
+		"expiry before request": func(g *Grant) { g.RawQuery.NotAfter = now },
 	} {
 		t.Run(name, func(t *testing.T) {
 			changed := g

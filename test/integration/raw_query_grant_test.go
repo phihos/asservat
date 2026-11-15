@@ -117,11 +117,11 @@ func qualifyRawQueryGrants(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 		t.Fatal("self approval", err)
 	}
 	approved := approve(pending)
-	child, _, err := store.MaterializeGrantChild(ctx, app.GrantChildRequest{ChildID: custodyID(), ParentID: approved.ID, ClientID: actor.ClientID, Output: output})
+	child, _, err := store.RegisterGrantArtifact(ctx, app.GrantArtifactRequest{ID: custodyID(), ParentID: approved.ID, Output: output})
 	if err != nil || child.Output != output {
 		t.Fatal("exact published child", err)
 	}
-	again, replay, err := store.MaterializeGrantChild(ctx, app.GrantChildRequest{ChildID: custodyID(), ParentID: approved.ID, ClientID: actor.ClientID, Output: output})
+	again, replay, err := store.RegisterGrantArtifact(ctx, app.GrantArtifactRequest{ID: custodyID(), ParentID: approved.ID, Output: output})
 	if err != nil || !replay || again.ID != child.ID {
 		t.Fatal("child replay", err)
 	}
@@ -129,7 +129,7 @@ func qualifyRawQueryGrants(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 	// counts only selected artifact IDs, once, using the compiled hub role.
 	legacyScope := []byte(`{"synthetic":"legacy selected artifact capacity"}`)
 	legacy := value.Grant{ID: custodyID(), RootID: s.a.RootID, Kind: value.GrantAdHocCapture, PreviewID: custodyID(), CaptureID: output.CaptureID, Target: output.Target, ExecutionDigest: sha256.Sum256(legacyScope), Scope: legacyScope, DataClass: "raw", Requester: actor, Lifetime: 5 * time.Minute, Revision: 1, Reasons: []value.SensitiveReason{{ActionID: output.ActionID, Code: "rawDisclosure"}}, Review: []byte(`{"synthetic":"legacy result selection"}`)}
-	legacy.ResultAccess = &value.ResultAccess{ActionIDs: []string{output.ActionID}, Operations: []string{value.GrantDownloadOperation}, ClientIDs: []string{actor.ClientID, "synthetic-other-client"}, MaxArtifacts: 1, MaxBytes: nativeBytes * 2, MaxOperations: 2, NotAfter: time.Now().Add(5 * time.Minute).UTC().Truncate(time.Microsecond)}
+	legacy.ResultAccess = &value.ResultAccess{ActionIDs: []string{output.ActionID}, Operations: []string{value.GrantDownloadOperation}, MaxArtifacts: 1, MaxBytes: nativeBytes * 2, MaxOperations: 2, NotAfter: time.Now().Add(5 * time.Minute).UTC().Truncate(time.Microsecond)}
 	normalizedAccess := app.NormalizeResultAccess(*legacy.ResultAccess)
 	legacy.ResultAccess = &normalizedAccess
 	legacy.ResultAccessDigest = app.ResultAccessDigest(legacy.CaptureID, legacy.ExecutionDigest, *legacy.ResultAccess)
@@ -141,18 +141,18 @@ func qualifyRawQueryGrants(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 	legacy = approve(legacy)
 	legacyOutput := output
 	legacyOutput.ExecutionDigest = legacy.ExecutionDigest
-	for _, client := range legacy.ResultAccess.ClientIDs {
-		if _, _, err = store.MaterializeGrantChild(ctx, app.GrantChildRequest{ChildID: custodyID(), ParentID: legacy.ID, ClientID: client, Output: legacyOutput}); err != nil {
-			t.Fatal("legacy client child", err)
+	for range 2 {
+		if _, _, err = store.RegisterGrantArtifact(ctx, app.GrantArtifactRequest{ID: custodyID(), ParentID: legacy.ID, Output: legacyOutput}); err != nil {
+			t.Fatal("legacy registration", err)
 		}
 	}
 	fullSelection := []string{output.ArtifactID}
-	for len(fullSelection) < value.GrantMaxResultArtifacts {
+	for len(fullSelection) < 100 {
 		fullSelection = append(fullSelection, custodyID())
 	}
 	for _, selected := range [][]string{{output.ArtifactID}, {output.ArtifactID, custodyID()}, fullSelection} {
 		if count, e := store.CountRegisteredGrantArtifacts(ctx, legacy.ID, selected); e != nil || count != 1 {
-			t.Fatal("distinct selected registration across reviewed clients", count, e)
+			t.Fatal("distinct selected registration", count, e)
 		}
 	}
 	if count, e := store.CountRegisteredGrantArtifacts(ctx, legacy.ID, []string{custodyID()}); e != nil || count != 0 {
@@ -161,18 +161,13 @@ func qualifyRawQueryGrants(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 	if count, e := store.CountRegisteredGrantArtifacts(ctx, approved.ID, []string{output.ArtifactID}); e != nil || count != 0 {
 		t.Fatal("nonlegacy parent counted", count, e)
 	}
-	tooMany := make([]string, 65)
-	for n := range tooMany {
-		tooMany[n] = custodyID()
-	}
-	for _, invalid := range [][]string{nil, {output.ArtifactID, output.ArtifactID}, tooMany} {
+	for _, invalid := range [][]string{nil, {output.ArtifactID, output.ArtifactID}} {
 		if _, e := store.CountRegisteredGrantArtifacts(ctx, legacy.ID, invalid); !errors.Is(e, value.ErrGrantInvalid) {
-			t.Fatal("unbounded or duplicate selection accepted", e)
+			t.Fatal("empty or duplicate selection accepted", e)
 		}
 	}
-	for _, alter := range []string{"capture", "action", "version", "client"} {
+	for _, alter := range []string{"capture", "action", "version"} {
 		bad := output
-		client := actor.ClientID
 		switch alter {
 		case "capture":
 			bad.CaptureID = custodyID()
@@ -180,11 +175,9 @@ func qualifyRawQueryGrants(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 			bad.ActionID = "unreviewed"
 		case "version":
 			bad.ArtifactDigest[0]++
-		case "client":
-			client += "other"
 		}
 		// Exercise the SQL member guard directly, independently of the Go check.
-		if _, err = pool.Exec(ctx, `INSERT INTO access_grant_child(id,root_id,parent_id,capture_id,action_id,artifact_id,artifact_digest,client_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, custodyID(), s.a.RootID, approved.ID, bad.CaptureID, bad.ActionID, bad.ArtifactID, bad.ArtifactDigest[:], client); err == nil {
+		if _, err = pool.Exec(ctx, `INSERT INTO access_grant_child(id,root_id,parent_id,capture_id,action_id,artifact_id,artifact_digest) VALUES($1,$2,$3,$4,$5,$6,$7)`, custodyID(), s.a.RootID, approved.ID, bad.CaptureID, bad.ActionID, bad.ArtifactID, bad.ArtifactDigest[:]); err == nil {
 			t.Fatal("SQL child guard", alter)
 		}
 	}
@@ -193,10 +186,15 @@ func qualifyRawQueryGrants(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 	if err != nil || len(candidates) != 1 || candidates[0].ID != approved.ID {
 		t.Fatal("current exact candidate", len(candidates), err)
 	}
+	otherClient := scope
+	otherClient.Principal.ClientID += "other"
+	if c, err := store.RawQueryCandidates(ctx, otherClient, value.GrantUse{}); err != nil || len(c) != 1 || c[0].ID != approved.ID {
+		t.Fatal("another client of the same human lost the grant", err)
+	}
 	wrong := scope
-	wrong.Principal.ClientID += "other"
+	wrong.Principal.Subject += "other"
 	if _, err = store.RawQueryCandidates(ctx, wrong, value.GrantUse{}); !errors.Is(err, app.ErrGrantNotFound) {
-		t.Fatal("other client candidate", err)
+		t.Fatal("another human candidate", err)
 	}
 	// JSONB containment ignores array order; digest equality must not.
 	wrongVersion := scope
@@ -221,7 +219,7 @@ func qualifyRawQueryGrants(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			use := app.GrantUseRequest{UseID: custodyID(), ParentID: approved.ID, ChildID: child.ID, Use: value.GrantUse{Operation: value.GrantDownloadOperation, Bytes: nativeBytes, Operations: 1}}
+			use := app.GrantUseRequest{UseID: custodyID(), ParentID: approved.ID, ArtifactRef: child.ID, Use: value.GrantUse{Operation: value.GrantDownloadOperation, Bytes: nativeBytes, Operations: 1}}
 			_, _, err := store.ReserveGrantUse(ctx, use)
 			uses <- useResult{use, err}
 		}()
@@ -337,6 +335,7 @@ func qualifyRawQueryRollback(t *testing.T, ctx context.Context, admin *pgxpool.P
 		{134, "SELECT EXISTS(SELECT 1 FROM context_verification WHERE acquisition_started_at IS NOT NULL)", "retained acquisition-window verification prevents rollback"},
 		{135, "SELECT EXISTS(SELECT 1 FROM context_execution WHERE phase='profileUnavailable')", "retained profile-unavailable execution prevents rollback"},
 		{145, "SELECT EXISTS(SELECT 1 FROM context_execution WHERE not_after>not_before+interval '5 seconds')", "API start bindings beyond five seconds prevent downgrade"},
+		{200, "SELECT EXISTS(SELECT 1 FROM access_grant)", "retained access grants prevent rollback of client-free result access"},
 	} {
 		var retained bool
 		if original >= newer.version {

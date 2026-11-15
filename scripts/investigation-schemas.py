@@ -372,14 +372,15 @@ def main():
         }[name]
         props = {k: copy.deepcopy(tool["inputSchema"]["properties"][k]) for k in keys}
         if "result_access" in props:
-            # ADR-305: download_artifact/pcap_query, at most four clients and sixteen
-            # actions, a pool of at most 256 GiB; the plan must need review.
+            # ADR-305: the implemented follow-up operations; the plan must need
+            # review. Result access covers every client of the requesting human.
             access = copy.deepcopy(documents["investigation-access.schema.json"]["$defs"]["request"])
             access["properties"]["operations"] = {"type": "array", "minItems": 1, "maxItems": 4, "uniqueItems": True, "items": {"enum": ["download_artifact", "get_logs", "pcap_query", "syscall_query"]}}
-            access["properties"]["clientIDs"]["maxItems"] = 4
-            access["properties"]["actionIds"]["maxItems"] = 16
             access["properties"]["actionIds"]["items"]["maxLength"] = 64
-            access["properties"]["maxBytes"]["maximum"] = 274877906944
+            # The runtime does not yet derive the evidence access end, so the
+            # request names its notAfter.
+            access["required"] = access["required"] + ["notAfter"]
+            access["properties"]["notAfter"].pop("description", None)
             props["result_access"] = access
         if "preset_ref" in props:
             props["preset_ref"]["properties"]["name"] = {"const": "pod-status"}

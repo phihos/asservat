@@ -89,7 +89,7 @@ func TestSensitiveRecorderPlanNeedsApprovalBeforeAnything(t *testing.T) {
 		t.Fatal("pending retry", err)
 	}
 	// A different result-access instruction needs a fresh preview.
-	access := &authorization.ResultAccess{ActionIDs: []string{r.Plan.Actions[0].ID}, Operations: []string{authorization.GrantDownloadOperation}, ClientIDs: []string{"console"}, MaxArtifacts: 1, MaxBytes: 1 << 20, MaxOperations: 4, NotAfter: f.now.Add(time.Hour)}
+	access := &authorization.ResultAccess{ActionIDs: []string{r.Plan.Actions[0].ID}, Operations: []string{authorization.GrantDownloadOperation}, MaxArtifacts: 1, MaxBytes: 1 << 20, MaxOperations: 4, NotAfter: f.now.Add(time.Hour)}
 	if _, err = f.svc.RequestWithResultAccess(ctx, f.source(t, ctx), p.ID, "k3", access); !errors.Is(err, value.ErrConflict) {
 		t.Fatal("result access replaced on a pending request", err)
 	}
@@ -140,7 +140,7 @@ func TestRecorderApprovalSettingsAndResultAccess(t *testing.T) {
 	if err != nil || r.Plan.Approval != nil {
 		t.Fatal(err)
 	}
-	access := &authorization.ResultAccess{ActionIDs: []string{r.Plan.Actions[0].ID}, Operations: []string{authorization.GrantDownloadOperation}, ClientIDs: []string{"console"}, MaxArtifacts: 1, MaxBytes: 1, MaxOperations: 1, NotAfter: f.now.Add(time.Hour)}
+	access := &authorization.ResultAccess{ActionIDs: []string{r.Plan.Actions[0].ID}, Operations: []string{authorization.GrantDownloadOperation}, MaxArtifacts: 1, MaxBytes: 1, MaxOperations: 1, NotAfter: f.now.Add(time.Hour)}
 	if _, err = f.svc.RequestWithResultAccess(ctx, f.source(t, ctx), r.Preview.ID, "k", access); !errors.Is(err, value.ErrInvalid) {
 		t.Fatal("result access on a plan without review", err)
 	}
@@ -241,7 +241,7 @@ func TestArgumentRecorderApprovalRetainsCanonicalEventCeiling(t *testing.T) {
 	}
 	grants := &fakeGrants{}
 	f.svc.Grants = grants
-	access := &authorization.ResultAccess{ActionIDs: []string{preview.Plan.Actions[0].ID}, Operations: []string{authorization.GrantDownloadOperation}, ClientIDs: []string{"console"}, MaxArtifacts: 1, MaxBytes: 16 << 20, MaxOperations: 1, NotAfter: f.now.Add(time.Hour)}
+	access := &authorization.ResultAccess{ActionIDs: []string{preview.Plan.Actions[0].ID}, Operations: []string{authorization.GrantDownloadOperation}, MaxArtifacts: 1, MaxBytes: 16 << 20, MaxOperations: 1, NotAfter: f.now.Add(time.Hour)}
 	_, err = f.svc.RequestWithResultAccess(t.Context(), f.source(t, t.Context()), preview.Preview.ID, "argument-review", access)
 	if !errors.Is(err, authorization.ErrApprovalRequired) || len(grants.requests) != 1 {
 		t.Fatal("review request", err)

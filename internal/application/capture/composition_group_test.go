@@ -119,7 +119,7 @@ func TestLogsAndMetadataRecordersShareOneGroupReview(t *testing.T) {
 				f.svc.Grants = grants
 				for _, a := range r.Plan.Actions {
 					if a.Kind == "logs" {
-						access = &authorization.ResultAccess{ActionIDs: []string{a.ID}, Operations: []string{authorization.GrantDownloadOperation}, ClientIDs: []string{"console"}, MaxArtifacts: 1, MaxBytes: 10 << 20, MaxOperations: 4, NotAfter: f.now.Add(time.Hour)}
+						access = &authorization.ResultAccess{ActionIDs: []string{a.ID}, Operations: []string{authorization.GrantDownloadOperation}, MaxArtifacts: 1, MaxBytes: 10 << 20, MaxOperations: 4, NotAfter: f.now.Add(time.Hour)}
 					}
 				}
 				if _, err := f.svc.RequestWithResultAccess(t.Context(), f.source(t, t.Context()), r.Preview.ID, "mixed-logs", access); !errors.Is(err, authorization.ErrApprovalRequired) || len(grants.requests) != 1 || len(admission.groups) != 0 {

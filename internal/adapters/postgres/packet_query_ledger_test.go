@@ -25,7 +25,7 @@ func packetQueryLedgerValue(t *testing.T) (query.ContextQuery, query.ContextProj
 		t.Fatal(err)
 	}
 	a.Scope.PacketQuery = window
-	a.Grant = query.ContextQueryGrant{ParentID: comparisonPlanID, ChildID: comparisonPlanID}
+	a.Grant = query.ContextQueryGrant{ParentID: comparisonPlanID, ArtifactRef: comparisonPlanID}
 	q, err = query.NewContextQuery(q.ID, q.OperationID, q.WorkerID, a, q.Plan, q.CreatedAt, query.ContextQueryInvocationKey{Key: "original-packet-query", RequestDigest: artifact.Digest{23}})
 	if err != nil || !q.Current(a, q.CreatedAt) {
 		t.Fatal("packet query fixture", err)
@@ -36,7 +36,7 @@ func packetQueryLedgerValue(t *testing.T) (query.ContextQuery, query.ContextProj
 func TestPacketQueryLedgerRowPinsCallerKeyAndGrant(t *testing.T) {
 	q, a := packetQueryLedgerValue(t)
 	changedAuthority := a
-	changedAuthority.Grant.ChildID = "10000000-0000-4000-8000-000000000099"
+	changedAuthority.Grant.ArtifactRef = "10000000-0000-4000-8000-000000000099"
 	if q.Current(changedAuthority, q.CreatedAt) {
 		t.Fatal("current authority substituted original child")
 	}
@@ -50,7 +50,7 @@ func TestPacketQueryLedgerRowPinsCallerKeyAndGrant(t *testing.T) {
 		func(r *custodydb.ContextQuery) { r.RequestDigest = bytes.Repeat([]byte{7}, 32) },
 		func(r *custodydb.ContextQuery) {
 			other := q
-			other.Grant.ChildID = ""
+			other.Grant.ArtifactRef = ""
 			r.Query = comparisonJSON(t, other)
 		},
 	} {

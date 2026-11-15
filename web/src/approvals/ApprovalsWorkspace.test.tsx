@@ -4,7 +4,7 @@ import { ApprovalsWorkspace } from './ApprovalsWorkspace';
 import { operations as approvalOperations } from './http';
 import type { Data, Input, Operation, Operations, Output } from './http';
 import { validInput_decide_review, validOutput_get_grant, validOutput_list_reviews, validOutput_decide_review } from '../generated/validate-approvals';
-import { id, result, session, SyntheticOperations, acceptedResult, resolvedAcceptedResult } from '../capture/test-fixtures';
+import { id, result, session, SyntheticOperations, acceptedResult } from '../capture/test-fixtures';
 
 // Synthetic, content-free approval fixtures for unit tests only.
 const now = Date.now();
@@ -17,7 +17,7 @@ const row = {
   lifetime_seconds: 3600, can_decide: true, can_revoke: true, approval_navigation_uri: 'https://asservat.example.invalid/approvals/' + id(41),
 } satisfies Data<'list_reviews'>['approvals'][number];
 type CollectionGrant = Extract<Data<'get_grant'>, { kind: 'adHocCapture' | 'policy' }>;
-const grant: CollectionGrant = { ...row, can_resume: false, can_resolve: false, resume_requires_original_client: false, observation_limits: { max_session_seconds: 15, max_observed_bytes: 1 << 30, max_bytes_per_second: 16 << 20, max_concurrent_sessions: 1 },
+const grant: CollectionGrant = { ...row, can_resume: false, observation_limits: { max_session_seconds: 15, max_observed_bytes: 1 << 30, max_bytes_per_second: 16 << 20, max_concurrent_sessions: 1 },
   actions: [{ action_id: 'a1', kind: 'packetCapture', execution_mode: 'ongoing', before: '30s', after: '10s', filter: 'tcp[13] & 2 != 0', filter_digest: 'ef'.repeat(32), filter_instructions: 4, max_bytes: 16 << 20, ring_max_bytes: 16 << 20, ring_max_age: '50s', sensitive: ['rawBytePredicate'] }] };
 
 class SyntheticApprovals implements Operations {
@@ -81,7 +81,7 @@ it('explains a step-up refusal without hiding the plan', async () => {
 });
 
 it('resumes one exact original preview with the same key after a lost reply and remount', async () => {
-  const client = new SyntheticApprovals(); client.detail = { ...grant, phase: 'Approved', can_resume: true, can_resolve: true };
+  const client = new SyntheticApprovals(); client.detail = { ...grant, phase: 'Approved', can_resume: true };
   const capture = new SyntheticOperations(); capture.responder = () => { throw new Error('lost accepted reply'); };
   const opened = vi.fn(); const scope = new AbortController();
   const first = render(<ApprovalsWorkspace session={session} scope={scope.signal} client={client} captureClient={capture} grantID={id(41)} onAccepted={opened}/>);
@@ -97,26 +97,10 @@ it('resumes one exact original preview with the same key after a lost reply and 
   expect(original).toMatchObject({ preview_id: id(43), continue_acquisition: true });
 });
 
-it('keeps another original OAuth client from resuming and explains the requesting client', async () => {
-  const client = new SyntheticApprovals(); client.detail = { ...grant, phase: 'Approved', resume_requires_original_client: true, requested_by: principal('synthetic-developer') };
-  client.detail.requested_by.client_id = 'mcp';
-  render(<ApprovalsWorkspace session={session} scope={new AbortController().signal} client={client} grantID={id(41)}/>);
-  expect(await screen.findByText(/original requesting client \(mcp\)/)).toBeTruthy();
-  expect(screen.queryByRole('button', { name: 'Continue approved capture' })).toBeNull();
-  expect(screen.queryByRole('button', { name: 'Find capture; otherwise close request' })).toBeNull();
-});
 
-it('resolves an expired grant original outcome without attempting acquisition', async () => {
-  const client = new SyntheticApprovals(); client.detail = { ...grant, phase: 'Expired', can_resolve: true };
-  const capture = new SyntheticOperations(); capture.responder = () => resolvedAcceptedResult(); const opened = vi.fn();
-  render(<ApprovalsWorkspace session={session} scope={new AbortController().signal} client={client} captureClient={capture} grantID={id(41)} onAccepted={opened}/>);
-  fireEvent.click(await screen.findByRole('button', { name: 'Find capture; otherwise close request' }));
-  await waitFor(() => expect(opened).toHaveBeenCalledWith(id(8)));
-  expect(capture.calls.map(c => c.name)).toEqual(['resolve_capture_request']);
-});
 
 it('cancels resume on unmount and ignores a late accepted reply', async () => {
-  const client = new SyntheticApprovals(); client.detail = { ...grant, phase: 'Approved', can_resume: true, can_resolve: true };
+  const client = new SyntheticApprovals(); client.detail = { ...grant, phase: 'Approved', can_resume: true };
   const capture = new SyntheticOperations(); let complete!: (value: ReturnType<typeof acceptedResult>) => void;
   capture.responder = () => new Promise(resolve => { complete = resolve; });
   const opened = vi.fn();
@@ -130,13 +114,6 @@ it('cancels resume on unmount and ignores a late accepted reply', async () => {
   expect(opened).not.toHaveBeenCalled();
 });
 
-it.each(['Pending', 'Denied'] as const)('never offers destructive outcome lookup or client guidance for %s review', async phase => {
- const client = new SyntheticApprovals(); client.detail = { ...grant, phase, can_resolve: true, resume_requires_original_client: true };
- render(<ApprovalsWorkspace session={session} scope={new AbortController().signal} client={client} grantID={id(41)}/>);
- await screen.findByText('tcp[13] & 2 != 0');
- expect(screen.queryByRole('button', { name: 'Find capture; otherwise close request' })).toBeNull();
- expect(screen.queryByText(/original requesting client/)).toBeNull();
-});
 it('does not tell an independent approved-plan reviewer to continue the requester capture', async () => {
  const client = new SyntheticApprovals(); client.detail = { ...grant, phase: 'Approved', requested_by: principal('another-developer') };
  render(<ApprovalsWorkspace session={session} scope={new AbortController().signal} client={client} grantID={id(41)}/>);
@@ -152,7 +129,7 @@ function teamPolicyGrant(): CollectionGrant {
     policy: { uid: 'team-policy-uid', executor: principal('installation-policy-executor'), authority_issued_at: iso(-86_400_000), authority_not_after: iso(30*86_400_000), max_executions: 10, max_collected_bytes: 64 << 20, max_observed_bytes: 1 << 30, executions_used: 4, collected_bytes_used: 16 << 20, observed_bytes_used: 4000 },
     requested_by: principal('departed-requester'), not_after: iso(3_600_000), can_decide: false, can_revoke: true,
     decision: { decision: 'approved', decided_by: principal('independent-reviewer'), decided_at: iso(-30_000), reason: 'finite team collection', authentication_context: { acr: 'mfa', authenticated_at: iso(-40_000) } },
-    can_resume: false, can_resolve: false, resume_requires_original_client: false,
+    can_resume: false,
   };
   delete value.capture_id; delete value.preview_id; delete value.preview_deadline; delete value.capture_window_seconds;
   return value;
@@ -183,7 +160,7 @@ it('does not infer team revocation from requester provenance and rejects persona
   render(<ApprovalsWorkspace session={session} scope={new AbortController().signal} client={client} grantID={id(41)}/>);
   expect(await screen.findByText('team-policy-uid')).toBeTruthy();
   expect(screen.queryByRole('button', { name: 'Revoke approval' })).toBeNull();
-  for (const patch of [{ capture_id: id(42) }, { preview_id: id(43) }, { preview_deadline: iso(60_000) }, { can_resume: true }, { can_resolve: true }, { resume_requires_original_client: true }, { target: { ...client.detail.target, pod_name: 'invented' } }]) {
+  for (const patch of [{ capture_id: id(42) }, { preview_id: id(43) }, { preview_deadline: iso(60_000) }, { can_resume: true }, { target: { ...client.detail.target, pod_name: 'invented' } }]) {
     expect(validOutput_get_grant(result({ ...client.detail, ...patch }))).toBe(false);
   }
 });
@@ -345,7 +322,7 @@ it('explains argument acquisition and the three-operation follow-up parent witho
   const client = new SyntheticApprovals(); const detail = structuredClone(grant);
   detail.reasons = [{ action_id: 'a1', code: 'syscallArguments' }];
   detail.actions.push({ ...detail.actions[0], action_id: 'calls', kind: 'syscallTrace', sensitive: ['syscallArguments'] });
-  detail.result_access = { action_ids: ['a1', 'calls'], operations: ['download_artifact', 'pcap_query', 'syscall_query'], client_ids: ['console', 'mcp'], max_artifacts: 3, max_bytes: 100000, max_operations: 10, not_after: iso(3600000), artifacts_used: 0, bytes_used: 0, operations_used: 0 };
+  detail.result_access = { action_ids: ['a1', 'calls'], operations: ['download_artifact', 'pcap_query', 'syscall_query'], max_artifacts: 3, max_bytes: 100000, max_operations: 10, not_after: iso(3600000), artifacts_used: 0, bytes_used: 0, operations_used: 0 };
   client.detail = detail;
   expect(validOutput_get_grant(result(detail))).toBe(true);
   render(<ApprovalsWorkspace session={session} scope={new AbortController().signal} client={client} grantID={detail.grant_id}/>);

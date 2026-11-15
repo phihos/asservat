@@ -115,7 +115,7 @@ func rawSyscallBridgeFixture(t *testing.T, limit int) (*AuditedOperations, *brid
 	f.a.Scope.NativeType, f.a.Scope.SourceFormat, f.a.Scope.DisplayVersion = source.NativeType, source.Format, source.DisplayVersion
 	f.a.Scope.SourceProjectionDigest, f.a.Scope.Selection = source.ProjectionDigest, value.LineSelection{}
 	f.a.Scope.Syscalls, f.a.Scope.RawGrantID = selection.Window(), f.next()
-	f.a.Grant = value.ContextQueryGrant{ParentID: f.a.Scope.RawGrantID, ChildID: f.next()}
+	f.a.Grant = value.ContextQueryGrant{ParentID: f.a.Scope.RawGrantID, ArtifactRef: f.next()}
 	f.p.Profile.Worker.MemoryBytes, f.p.Profile.Worker.WorkerTransientBytes = value.SyscallQueryWorkerBytes, value.SyscallQueryWorkerBytes
 	f.s.SyscallRoutes, f.s.Results.Ledger = f, newPacketBridgePort(f)
 	reads, _ := f.s.RawSyscallQueries()

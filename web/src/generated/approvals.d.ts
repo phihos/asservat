@@ -95,7 +95,7 @@ export interface components {
                 /** Format: date-time */
                 requested_at: string;
                 /** Format: date-time */
-                review_until: string;
+                review_until?: string;
                 lifetime_seconds: number;
                 decision?: {
                     /** @enum {unknown} */
@@ -185,7 +185,6 @@ export interface components {
                 result_access?: {
                     action_ids: string[];
                     operations: ("download_artifact" | "get_logs" | "pcap_query" | "syscall_query")[];
-                    client_ids: string[];
                     max_artifacts: number;
                     max_bytes: number;
                     max_operations: number;
@@ -215,10 +214,6 @@ export interface components {
                 capture_window_seconds?: 300;
                 /** @description Advisory current original requester/client collection eligibility under this exact approved grant. Submission rechecks all authority. */
                 can_resume: boolean;
-                /** @description Advisory original requester/client may recover a possibly accepted request after an approved decision. Never offered for pending or denied review; a missing acceptance closes the original intent. */
-                can_resolve: boolean;
-                /** @description Guidance only for the same requesting human on another OAuth client while this marked plan is Approved. It confers no authority or grant transfer. */
-                resume_requires_original_client: boolean;
                 policy?: {
                     uid: string;
                     executor: {
@@ -359,7 +354,7 @@ export interface components {
                 /** Format: date-time */
                 requested_at: string;
                 /** Format: date-time */
-                review_until: string;
+                review_until?: string;
                 lifetime_seconds: number;
                 decision?: {
                     /** @enum {unknown} */
@@ -455,7 +450,6 @@ export interface components {
                 result_access?: {
                     action_ids: string[];
                     operations: ("download_artifact" | "get_logs" | "pcap_query" | "syscall_query")[];
-                    client_ids: string[];
                     max_artifacts: number;
                     max_bytes: number;
                     max_operations: number;
@@ -485,10 +479,6 @@ export interface components {
                 capture_window_seconds?: 300;
                 /** @description Advisory current original requester/client collection eligibility under this exact approved grant. Submission rechecks all authority. */
                 can_resume: boolean;
-                /** @description Advisory original requester/client may recover a possibly accepted request after an approved decision. Never offered for pending or denied review; a missing acceptance closes the original intent. */
-                can_resolve: boolean;
-                /** @description Guidance only for the same requesting human on another OAuth client while this marked plan is Approved. It confers no authority or grant transfer. */
-                resume_requires_original_client: boolean;
                 policy?: {
                     uid: string;
                     executor: {
@@ -532,7 +522,7 @@ export interface components {
                 /** Format: date-time */
                 requested_at: string;
                 /** Format: date-time */
-                review_until: string;
+                review_until?: string;
                 lifetime_seconds: number;
                 decision?: {
                     /** @enum {unknown} */
@@ -566,10 +556,6 @@ export interface components {
                 approval_navigation_uri: string;
                 /** @constant */
                 can_resume?: false;
-                /** @constant */
-                can_resolve?: false;
-                /** @constant */
-                resume_requires_original_client?: false;
                 raw_access: {
                     /** Format: uuid */
                     case_id: string;
@@ -687,7 +673,7 @@ export interface components {
                     /** Format: date-time */
                     requested_at: string;
                     /** Format: date-time */
-                    review_until: string;
+                    review_until?: string;
                     lifetime_seconds: number;
                     decision?: {
                         /** @enum {unknown} */
@@ -777,7 +763,7 @@ export interface components {
                     /** Format: date-time */
                     requested_at: string;
                     /** Format: date-time */
-                    review_until: string;
+                    review_until?: string;
                     lifetime_seconds: number;
                     decision?: {
                         /** @enum {unknown} */

@@ -19,7 +19,7 @@ type RawQueryArtifact struct {
 }
 
 // RawQueryScope is a personal disclosure request, independent of collection.
-// The grant's requester supplies its one exact human/client binding. Target
+// It belongs to the requesting human on every client. Target
 // authority belongs to every selected output, not a representative first item.
 type RawQueryScope struct {
 	CaseID        string
@@ -39,11 +39,8 @@ func (r RawQueryScope) Clone() RawQueryScope {
 
 func (r RawQueryScope) Valid(requestedAt time.Time) bool {
 	if !UUID(r.CaseID) || requestedAt.IsZero() || !identity.Text(r.Reason, 512) ||
-		len(r.Artifacts) < 1 || len(r.Artifacts) > GrantMaxResultArtifacts ||
-		!ValidResultOperations(r.Operations) ||
-		r.MaxBytes < 1 || r.MaxBytes > artifact.MaxNativeBytes || !slices.Contains(r.Operations, GrantDownloadOperation) && r.MaxBytes > 1<<30 ||
-		r.MaxOperations < 1 || r.MaxOperations > GrantMaxResultOperations ||
-		!r.NotAfter.After(requestedAt) || r.NotAfter.After(requestedAt.Add(GrantMaxLifetime)) {
+		len(r.Artifacts) < 1 || !ValidResultOperations(r.Operations) ||
+		r.MaxBytes < 1 || r.MaxOperations < 1 || !r.NotAfter.After(requestedAt) {
 		return false
 	}
 	var total int64
@@ -65,8 +62,7 @@ func (g Grant) validRawQuery() bool {
 	if r == nil || !r.Valid(g.RequestedAt) || g.Policy != nil || !g.PolicyNotAfter.IsZero() ||
 		g.Requester.Kind != identity.Human || g.PreviewID != "" || g.CaptureID != "" ||
 		g.Target != (Target{}) || g.DataClass != "raw" || g.ResultAccess != nil ||
-		g.ResultAccessDigest != (artifact.Digest{}) || g.Lifetime < time.Second ||
-		g.Lifetime > GrantMaxLifetime || g.Lifetime%time.Second != 0 {
+		g.ResultAccessDigest != (artifact.Digest{}) || g.Lifetime < time.Second || g.Lifetime%time.Second != 0 {
 		return false
 	}
 	// The application and store verify canonical scope bytes/digest, as for

@@ -123,16 +123,16 @@ func (s *consoleArgumentCaptures) PreviewComposition(ctx context.Context, curren
 }
 
 func cloneConsoleArgumentAccess(a authorization.ResultAccess) authorization.ResultAccess {
-	a.ActionIDs, a.Operations, a.ClientIDs = slices.Clone(a.ActionIDs), slices.Clone(a.Operations), slices.Clone(a.ClientIDs)
+	a.ActionIDs, a.Operations = slices.Clone(a.ActionIDs), slices.Clone(a.Operations)
 	return a
 }
 func (s *consoleArgumentCaptures) RequestWithResultAccess(ctx context.Context, current identities.CurrentIdentity, preview, key string, access *authorization.ResultAccess) (capture.Accepted, error) {
-	i, err := current.ResolveIdentity(ctx)
+	_, err := current.ResolveIdentity(ctx)
 	if err != nil || access == nil {
 		return capture.Accepted{}, capture.ErrDenied
 	}
 	s.mu.Lock()
-	if preview != s.preview || !slices.Equal(access.ActionIDs, []string{s.action}) || !slices.Equal(access.ClientIDs, []string{i.Principal.ClientID}) || !slices.Contains(access.Operations, "syscall_query") || len(access.Operations) > 2 || access.MaxArtifacts != 1 || access.MaxBytes < 24576 || access.MaxOperations < 1 || !access.NotAfter.After(time.Now()) {
+	if preview != s.preview || !slices.Equal(access.ActionIDs, []string{s.action}) || !slices.Contains(access.Operations, "syscall_query") || len(access.Operations) > 2 || access.MaxArtifacts != 1 || access.MaxBytes < 24576 || access.MaxOperations < 1 || !access.NotAfter.After(time.Now()) {
 		s.mu.Unlock()
 		return capture.Accepted{}, authorization.ErrGrantScope
 	}
@@ -269,7 +269,7 @@ func consoleSyscallCaptureAuthoring(t *testing.T, mode string) {
 	if mode == "both" {
 		want = []string{"download_artifact", "syscall_query"}
 	}
-	if !slices.Equal(service.requests[0].Access.Operations, want) || !slices.Equal(service.requests[0].Access.ClientIDs, []string{"console"}) {
+	if !slices.Equal(service.requests[0].Access.Operations, want) {
 		t.Fatal("submitted different current-client operations", service.requests[0].Access)
 	}
 	t.Logf("%s: real compiler/C20 preview -> built React -> exact current-client result access -> original ApprovalRequired receipt/resume; synthetic authority only\n%s", mode, output.String())

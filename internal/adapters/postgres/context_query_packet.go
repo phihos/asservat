@@ -46,7 +46,7 @@ func (s *ContextQueries) reservePacketQueryBatch(ctx context.Context, tx *custod
 		return err
 	}
 	grants := AccessGrants{root: s.root}
-	_, _, err := grants.reserveGrantUse(ctx, tx, authapp.GrantUseRequest{UseID: batchID, ParentID: q.Grant.ParentID, ChildID: q.Grant.ChildID, Use: authorization.GrantUse{Operation: rawProjectionGrantOperation(q.Scope), Bytes: query.ContextResultBytes, Operations: 1}})
+	_, _, err := grants.reserveGrantUse(ctx, tx, authapp.GrantUseRequest{UseID: batchID, ParentID: q.Grant.ParentID, ArtifactRef: q.Grant.ArtifactRef, Use: authorization.GrantUse{Operation: rawProjectionGrantOperation(q.Scope), Bytes: query.ContextResultBytes, Operations: 1}})
 	if err != nil {
 		return err
 	}

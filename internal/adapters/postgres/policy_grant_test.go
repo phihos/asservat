@@ -32,7 +32,7 @@ func policyGrantTestRow(t *testing.T) custodydb.AccessGrant {
 	r := custodydb.AccessGrant{ID: id(p.ID), RootID: id(p.RootID), Kind: authorization.GrantPolicy, ClusterID: id(a.ClusterID), NamespaceUid: pgtype.Text{String: a.NamespaceUID, Valid: true}, WorkloadUid: pgtype.Text{String: a.WorkloadUID, Valid: true},
 		ExecutionDigest: a.ScopeDigest[:], ReviewDigest: make([]byte, 32), DataClass: "extract", Reasons: []byte(`[{"actionID":"packet","code":"rawBytePredicate"}]`), Review: []byte(`{}`), Scope: p.CanonicalScope,
 		RequesterIssuer: p.Actor.Issuer, RequesterSubject: p.Actor.Subject, RequesterClient: p.Actor.ClientID, RequesterKind: string(p.Actor.Kind), RequestOperation: "requestPolicyGrant",
-		LifetimeSeconds: 604800, RequestedAt: ts(p.CreatedAt), ReviewUntil: ts(p.CreatedAt.Add(time.Hour)), Revision: 1,
+		LifetimeSeconds: 604800, RequestedAt: ts(p.CreatedAt), Revision: 1,
 		PolicyUid: grantText(a.PolicyUID), PolicyAcceptanceID: id(p.CaseID), PolicyScope: b, PolicyNotAfter: ts(p.CreatedAt.Add(7 * 24 * time.Hour)),
 		PolicyMaxExecutions: pgtype.Int8{Int64: a.Limits.MaxExecutions, Valid: true}, PolicyMaxBytes: pgtype.Int8{Int64: a.Limits.MaxBytes, Valid: true}, PolicyMaxObservedBytes: pgtype.Int8{Valid: true}}
 	r.ReviewDigest[0] = 9

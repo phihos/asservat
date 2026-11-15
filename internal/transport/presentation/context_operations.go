@@ -584,7 +584,7 @@ func (s *ContextOperations) CallWithContext(ctx context.Context, current identit
 			} else if in.ResultAccess != nil {
 				// ADR-249: only a reviewed recorder plan takes result access.
 				if reviewed, ok := s.captures.(ContextResultAccessRequest); ok {
-					accepted, operationErr = reviewed.RequestWithResultAccess(ctx, current, in.PreviewID, in.IdempotencyKey, in.ResultAccess.accessForClient(i.Principal.ClientID))
+					accepted, operationErr = reviewed.RequestWithResultAccess(ctx, current, in.PreviewID, in.IdempotencyKey, in.ResultAccess.access())
 				} else {
 					auditNoDispatch = true
 					operationErr = value.ErrInvalid

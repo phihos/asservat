@@ -39,7 +39,7 @@ func maximumRawReviewFixture(t *testing.T) authapp.GrantView {
 	t.Helper()
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	id := func(n int) string { return fmt.Sprintf("00000000-0000-4000-8000-%012d", n) }
-	scope := authorization.RawQueryScope{CaseID: id(2), Reason: strings.Repeat("r", 512), Operations: []string{authorization.GrantDownloadOperation}, MaxBytes: 64 * 512, MaxOperations: authorization.GrantMaxResultOperations, NotAfter: now.Add(time.Hour)}
+	scope := authorization.RawQueryScope{CaseID: id(2), Reason: strings.Repeat("r", 512), Operations: []string{authorization.GrantDownloadOperation}, MaxBytes: 64 * 512, MaxOperations: authorization.RawQueryDefaultOperations, NotAfter: now.Add(time.Hour)}
 	review := authapp.RawQueryReview{CaseID: scope.CaseID, Reason: scope.Reason, Operations: scope.Operations, MaxBytes: scope.MaxBytes, MaxOperations: scope.MaxOperations, NotAfter: scope.NotAfter}
 	for n := 0; n < 64; n++ {
 		digest := artifact.Digest{}
@@ -52,7 +52,7 @@ func maximumRawReviewFixture(t *testing.T) authapp.GrantView {
 		review.Artifacts = append(review.Artifacts, authapp.RawQueryReviewArtifact{Output: output, NativeBytes: 512, ExpiresAt: scope.NotAfter, Namespace: strings.Repeat("n", 63), WorkloadKind: "Deployment", WorkloadName: strings.Repeat("w", 253), PodName: strings.Repeat("p", 253), NativeType: artifact.SyscallArgumentsArtifact})
 	}
 	r := authapp.GrantReview{RawQuery: &review, Deadline: scope.NotAfter}
-	g := authorization.Grant{ID: id(1), RootID: id(4), Kind: authorization.GrantRawQuery, DataClass: "raw", Requester: testIdentity().Principal, RequestedAt: now, ReviewUntil: now.Add(authorization.GrantReviewWindow), Lifetime: time.Hour, RawQuery: &scope, Revision: 1, Reasons: []authorization.SensitiveReason{{ActionID: "download_artifact", Code: "rawDisclosure"}}}
+	g := authorization.Grant{ID: id(1), RootID: id(4), Kind: authorization.GrantRawQuery, DataClass: "raw", Requester: testIdentity().Principal, RequestedAt: now, Lifetime: time.Hour, RawQuery: &scope, Revision: 1, Reasons: []authorization.SensitiveReason{{ActionID: "download_artifact", Code: "rawDisclosure"}}}
 	g.Scope, g.ExecutionDigest = authapp.RawQueryScopeBytes(scope)
 	g.Review, _ = json.Marshal(r)
 	g.ReviewDigest = authapp.ReviewDigest(g, g.Review)

@@ -20,7 +20,7 @@ func TestRawLogAuthorityRequiresExactGrantAndCurrentRawClient(t *testing.T) {
 			f, s, scope := newLogProjectionFixture()
 			scope.RawGrantID = projectionTestID(80)
 			f.identity.Scopes = append(f.identity.Scopes, "evidence:raw")
-			proof := &logGrantProof{packetGrantProof{ref: query.ContextQueryGrant{ParentID: scope.RawGrantID, ChildID: projectionTestID(81)}, until: f.now.Add(time.Minute)}}
+			proof := &logGrantProof{packetGrantProof{ref: query.ContextQueryGrant{ParentID: scope.RawGrantID, ArtifactRef: projectionTestID(81)}, until: f.now.Add(time.Minute)}}
 			s.LogGrants = proof
 			switch mode {
 			case "missing":

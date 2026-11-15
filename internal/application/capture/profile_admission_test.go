@@ -53,7 +53,7 @@ func TestProfileAdmissionRequiresRawReviewAndFrozenEndpoint(t *testing.T) {
 	if _, err = f.request(t, p, "no-result-access"); !errors.Is(err, value.ErrInvalid) || len(grants.requests) != 0 {
 		t.Fatal("raw profile without selected result access", err)
 	}
-	access := &authorization.ResultAccess{ActionIDs: []string{preview.Plan.Actions[0].ID}, Operations: []string{authorization.GrantDownloadOperation}, ClientIDs: []string{"console"}, MaxArtifacts: 1, MaxBytes: 16 << 20, MaxOperations: 1, NotAfter: f.now.Add(time.Hour)}
+	access := &authorization.ResultAccess{ActionIDs: []string{preview.Plan.Actions[0].ID}, Operations: []string{authorization.GrantDownloadOperation}, MaxArtifacts: 1, MaxBytes: 16 << 20, MaxOperations: 1, NotAfter: f.now.Add(time.Hour)}
 	if _, err = base.svc.RequestWithResultAccess(t.Context(), f.source(t, t.Context()), p.ID, "review", access); !errors.Is(err, authorization.ErrApprovalRequired) || len(grants.requests) != 1 {
 		t.Fatal("profile review", err)
 	}

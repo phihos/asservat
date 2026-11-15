@@ -23,7 +23,7 @@ func rawSyscallAdmissionFixture(t *testing.T) (*projectionFixture, *packetQueryL
 	s.NativeType, s.SourceFormat, s.SourceProjectionDigest, s.DisplayVersion = source.NativeType, source.Format, source.ProjectionDigest, source.DisplayVersion
 	s.Selection, s.Syscalls = value.LineSelection{}, selection.Window()
 	s.RawGrantID = f.next()
-	f.a.Grant = value.ContextQueryGrant{ParentID: s.RawGrantID, ChildID: f.next()}
+	f.a.Grant = value.ContextQueryGrant{ParentID: s.RawGrantID, ArtifactRef: f.next()}
 	f.i.Scopes = append(f.i.Scopes, "evidence:raw")
 	f.p.Profile.Worker.MemoryBytes, f.p.Profile.Worker.WorkerTransientBytes = value.SyscallQueryWorkerBytes, value.SyscallQueryWorkerBytes
 	candidate := s.Candidate()
@@ -213,7 +213,7 @@ func TestRawSyscallReplayRegistrationKeepsOriginalGrantAndControl(t *testing.T) 
 				ledger.registerErr = value.ErrUnavailable
 			}
 			if mode == "changed-grant" {
-				f.a.Grant.ChildID = f.next()
+				f.a.Grant.ArtifactRef = f.next()
 			}
 			if mode == "expired" {
 				f.refresh(original.Deadline.Add(time.Millisecond))

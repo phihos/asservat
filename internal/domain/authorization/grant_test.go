@@ -15,7 +15,7 @@ func grantFixture(now time.Time) Grant {
 		PreviewID: "00000000-0000-4000-8000-000000000003", CaptureID: "00000000-0000-4000-8000-000000000004",
 		Target:          Target{ClusterID: "00000000-0000-4000-8000-000000000005", NamespaceUID: "ns", WorkloadUID: "w", PodUID: "p"},
 		ExecutionDigest: artifact.Digest{1}, ReviewDigest: artifact.Digest{2}, DataClass: "extract", Reasons: []SensitiveReason{{"a1", "rawBytePredicate"}},
-		Scope: []byte("{}"), Review: []byte("{}"), Requester: requester, RequestedAt: now, ReviewUntil: now.Add(GrantReviewWindow), Lifetime: GrantDefaultLifetime, Revision: 1}
+		Scope: []byte("{}"), Review: []byte("{}"), Requester: requester, RequestedAt: now, Lifetime: GrantDefaultLifetime, Revision: 1}
 }
 
 func reviewer(now time.Time, subject, client string, stepped bool) identity.Identity {
@@ -52,9 +52,16 @@ func TestGrantEvaluatorMatrix(t *testing.T) {
 		"no step-up":                  {g, reviewer(now, "lead", "console", false), eligibleFor(lead, now), true, ErrStepUpRequired},
 		"deny without step-up":        {g, reviewer(now, "lead", "console", false), eligibleFor(lead, now), false, nil},
 		"approve":                     {g, lead, eligibleFor(lead, now), true, nil},
-		"review window over":          {func() Grant { x := g; x.RequestedAt, x.ReviewUntil = now.Add(-GrantReviewWindow), now; return x }(), lead, eligibleFor(lead, now), true, ErrGrantNotPending},
-		"revoked request":             {func() Grant { x := g; x.RevokedAt, x.Revoker, x.Revision = now, g.Requester, 2; return x }(), lead, eligibleFor(lead, now), true, ErrGrantNotPending},
-		"workload identity":           {g, func() identity.Identity { x := lead; x.Principal.Kind = identity.Workload; return x }(), eligibleFor(lead, now), true, ErrNotApprover},
+		"stays decidable":             {func() Grant { x := g; x.RequestedAt = now.Add(-48 * time.Hour); return x }(), lead, eligibleFor(lead, now), true, nil},
+		"result access lapsed": {func() Grant {
+			x := g
+			x.RequestedAt = now.Add(-2 * time.Hour)
+			x.ResultAccess = &ResultAccess{ActionIDs: []string{"a1"}, Operations: []string{GrantDownloadOperation}, MaxArtifacts: 1, MaxBytes: 1, MaxOperations: 1, NotAfter: now}
+			x.ResultAccessDigest = artifact.Digest{3}
+			return x
+		}(), lead, eligibleFor(lead, now), true, ErrGrantNotPending},
+		"revoked request":   {func() Grant { x := g; x.RevokedAt, x.Revoker, x.Revision = now, g.Requester, 2; return x }(), lead, eligibleFor(lead, now), true, ErrGrantNotPending},
+		"workload identity": {g, func() identity.Identity { x := lead; x.Principal.Kind = identity.Workload; return x }(), eligibleFor(lead, now), true, ErrNotApprover},
 	} {
 		t.Run(name, func(t *testing.T) {
 			if err := CheckDecision(tc.g, tc.who, tc.eligible, tc.approve, now); !errors.Is(err, tc.want) {
@@ -95,9 +102,9 @@ func TestGrantEvaluatorMatrix(t *testing.T) {
 		}(), dev, g.CaptureID, g.ExecutionDigest, now, ErrGrantDenied},
 		"digest mismatch":    {approved, dev, g.CaptureID, artifact.Digest{9}, now, ErrGrantScope},
 		"another capture":    {approved, dev, "00000000-0000-4000-8000-000000000099", g.ExecutionDigest, now, ErrGrantScope},
-		"another client":     {approved, reviewer(now, "dev", "agent", false), g.CaptureID, g.ExecutionDigest, now, ErrGrantPrincipal},
+		"another client":     {approved, reviewer(now, "dev", "agent", false), g.CaptureID, g.ExecutionDigest, now, nil},
 		"another requester":  {approved, lead, g.CaptureID, g.ExecutionDigest, now, ErrGrantPrincipal},
-		"invalid stored row": {func() Grant { x := approved; x.Lifetime = 9 * time.Hour; return x }(), dev, g.CaptureID, g.ExecutionDigest, now, ErrGrantInvalid},
+		"invalid stored row": {func() Grant { x := approved; x.Lifetime = time.Second; return x }(), dev, g.CaptureID, g.ExecutionDigest, now, ErrGrantInvalid},
 	} {
 		t.Run(name, func(t *testing.T) {
 			if err := CheckCaptureUse(tc.g, tc.who, tc.capture, tc.execution, g.ReviewDigest, tc.at); !errors.Is(err, tc.want) {
@@ -107,10 +114,10 @@ func TestGrantEvaluatorMatrix(t *testing.T) {
 	}
 }
 
-func TestGrantPoolAndChildRules(t *testing.T) {
+func TestGrantPoolAndRegistrationRules(t *testing.T) {
 	now := time.Now().UTC()
 	g := grantFixture(now)
-	g.ResultAccess = &ResultAccess{ActionIDs: []string{"a1"}, Operations: []string{GrantDownloadOperation}, ClientIDs: []string{"agent", "console"}, MaxArtifacts: 1, MaxBytes: 10, MaxOperations: 2, NotAfter: now.Add(30 * time.Minute)}
+	g.ResultAccess = &ResultAccess{ActionIDs: []string{"a1"}, Operations: []string{GrantDownloadOperation}, MaxArtifacts: 1, MaxBytes: 10, MaxOperations: 2, NotAfter: now.Add(30 * time.Minute)}
 	g.ResultAccessDigest = artifact.Digest{3}
 	g.Decision = &GrantDecision{Approved: true, Approver: identity.Principal{Issuer: g.Requester.Issuer, Subject: "lead", ClientID: "console", Kind: identity.Human}, Reason: "ok", ACR: "mfa", AuthenticatedAt: now, DecidedAt: now}
 	g.ExpiresAt, g.Revision = now.Add(30*time.Minute), 2
@@ -118,26 +125,31 @@ func TestGrantPoolAndChildRules(t *testing.T) {
 		t.Fatal("NotAfter must cap the approved expiry")
 	}
 	out := VerifiedOutput{CaptureID: g.CaptureID, ActionID: "a1", ArtifactID: "00000000-0000-4000-8000-000000000010", ExecutionDigest: g.ExecutionDigest, ArtifactDigest: artifact.Digest{4}, Target: g.Target}
-	if err := CheckMaterialize(g, out, "console", false, now); err != nil {
+	if err := CheckRegister(g, out, false, now, nil); err != nil {
 		t.Fatal(err)
 	}
 	g.Spent.Artifacts = 1
-	if err := CheckMaterialize(g, out, "agent", true, now); err != nil {
-		t.Fatal("registered artifact for a second client", err)
+	if err := CheckRegister(g, out, true, now, nil); err != nil {
+		t.Fatal("registered artifact used again", err)
 	}
-	if err := CheckMaterialize(g, out, "agent", false, now); !errors.Is(err, ErrGrantPoolExhausted) {
+	other := out
+	other.ArtifactID = "00000000-0000-4000-8000-000000000012"
+	if err := CheckRegister(g, other, false, now, nil); !errors.Is(err, ErrGrantPoolExhausted) {
 		t.Fatal("max artifacts", err)
 	}
-	if err := CheckMaterialize(g, out, "cli", true, now); !errors.Is(err, ErrGrantScope) {
-		t.Fatal("unlisted client", err)
+	other.ActionID = "a2"
+	if err := CheckRegister(g, other, true, now, nil); !errors.Is(err, ErrGrantScope) {
+		t.Fatal("unselected action", err)
 	}
-	child := GrantChild{ID: "00000000-0000-4000-8000-000000000011", ParentID: g.ID, ClientID: "agent", Output: out, CreatedAt: now}
+	child := GrantArtifact{ID: "00000000-0000-4000-8000-000000000011", ParentID: g.ID, Output: out, CreatedAt: now}
 	agent := reviewer(now, "dev", "agent", false)
-	if err := CheckResultUse(g, child, agent, GrantDownloadOperation, now); err != nil {
-		t.Fatal(err)
+	for _, caller := range []identity.Identity{agent, reviewer(now, "dev", "console", false)} {
+		if err := CheckResultUse(g, child, caller, GrantDownloadOperation, now); err != nil {
+			t.Fatal("a client of the requesting human was refused", err)
+		}
 	}
-	if err := CheckResultUse(g, child, reviewer(now, "dev", "console", false), GrantDownloadOperation, now); !errors.Is(err, ErrGrantPrincipal) {
-		t.Fatal("another client of the same human used the child", err)
+	if err := CheckResultUse(g, child, reviewer(now, "lead", "console", false), GrantDownloadOperation, now); !errors.Is(err, ErrGrantPrincipal) {
+		t.Fatal("another human used the grant", err)
 	}
 	if err := CheckResultUse(g, child, agent, "read_memory", now); !errors.Is(err, ErrGrantScope) {
 		t.Fatal("broadened operation", err)

@@ -58,21 +58,21 @@ func TestLogGroupReusesExactInitialParentWithoutNewReviewOrPool(t *testing.T) {
 	if again, _, e := f.svc.LogProjectionGrant(t.Context(), who, scope, record, false); e != nil || again != ref || store.reads != 1 {
 		t.Fatal("current group child", again, e, store.reads)
 	}
-	child, _ := f.store.GrantChild(t.Context(), ref.ChildID)
+	child, _ := f.store.GrantArtifact(t.Context(), ref.ArtifactRef)
 	if child.Output != out || child.Group == nil || child.Output.CaptureID == g.CaptureID {
 		t.Fatal("child relabeled")
 	}
 	use := value.GrantUse{Operation: value.GrantLogQueryOperation, Bytes: query.ContextResultBytes, Operations: 1}
-	if _, _, err = f.svc.Use(t.Context(), who, ref.ChildID, grantID(602), use); err != nil {
+	if _, _, err = f.svc.Use(t.Context(), who, ref.ArtifactRef, grantID(602), use); err != nil {
 		t.Fatal(err)
 	}
-	if _, replay, e := f.svc.Use(t.Context(), who, ref.ChildID, grantID(602), use); e != nil || !replay {
+	if _, replay, e := f.svc.Use(t.Context(), who, ref.ArtifactRef, grantID(602), use); e != nil || !replay {
 		t.Fatal("use replay", e)
 	}
-	if _, _, e := f.svc.Use(t.Context(), who, ref.ChildID, grantID(603), use); e != nil {
+	if _, _, e := f.svc.Use(t.Context(), who, ref.ArtifactRef, grantID(603), use); e != nil {
 		t.Fatal(e)
 	}
-	if _, _, e := f.svc.Use(t.Context(), who, ref.ChildID, grantID(604), use); !errors.Is(e, value.ErrGrantPoolExhausted) {
+	if _, _, e := f.svc.Use(t.Context(), who, ref.ArtifactRef, grantID(604), use); !errors.Is(e, value.ErrGrantPoolExhausted) {
 		t.Fatal("shared pool refilled", e)
 	}
 	if f.store.rows[g.ID].Spent.Artifacts != 1 || f.store.rows[g.ID].Spent.Bytes != 2*query.ContextResultBytes || f.store.rows[g.ID].Spent.Operations != 2 {

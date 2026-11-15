@@ -384,7 +384,7 @@ func qualifyAdHocObservationPool(t *testing.T, ctx context.Context, admin *pgxpo
 	}
 	g := authorization.Grant{ID: custodyID(), RootID: s.a.RootID, Kind: authorization.GrantAdHocCapture, PreviewID: p.ID, CaptureID: p.CaptureID, Target: in.Target.Target(), Requester: p.Actor, ExecutionDigest: sha256.Sum256(scope), Scope: scope, Review: []byte(`{}`), DataClass: "raw", Reasons: []authorization.SensitiveReason{{ActionID: reviewed.Actions[0].ID, Code: planvalue.ReasonRawPackets}}, Lifetime: time.Hour, Revision: 1}
 	if mode == "expiry" {
-		g.ResultAccess = &authorization.ResultAccess{ActionIDs: []string{reviewed.Actions[0].ID}, Operations: []string{authorization.GrantDownloadOperation}, ClientIDs: []string{"synthetic-observation-client"}, MaxArtifacts: 1, MaxBytes: 1, MaxOperations: 1, NotAfter: time.Now().UTC().Add(5 * time.Second).Truncate(time.Microsecond)}
+		g.ResultAccess = &authorization.ResultAccess{ActionIDs: []string{reviewed.Actions[0].ID}, Operations: []string{authorization.GrantDownloadOperation}, MaxArtifacts: 1, MaxBytes: 1, MaxOperations: 1, NotAfter: time.Now().UTC().Add(5 * time.Second).Truncate(time.Microsecond)}
 		g.ResultAccessDigest = authapp.ResultAccessDigest(g.CaptureID, g.ExecutionDigest, *g.ResultAccess)
 	}
 	g.ReviewDigest = authapp.ReviewDigest(g, g.Review)

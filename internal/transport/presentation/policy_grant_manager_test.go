@@ -72,7 +72,6 @@ func TestPolicyGrantManagerRouteUsesCurrentScopeWithoutDecisionOrEvidenceAuthori
 	authority := authorization.AcceptedPolicyAuthority{InstallationID: g.RootID, PolicyUID: "team-policy", Creator: g.Requester, Executor: authorization.PolicyPrincipal(g.RootID, "team-policy"), ScopeDigest: g.ExecutionDigest, ClusterID: target.ClusterID, NamespaceUID: target.NamespaceUID, WorkloadUID: target.WorkloadUID, Delegation: revision, Owners: []artifact.AudienceAssignment{owner}, Actions: []string{"packetCapture"}, Limits: authorization.AutomationLimits{MaxExecutions: 10, MaxBytes: 1 << 20}, IssuedAt: now.Add(-time.Hour), NotAfter: now.Add(24 * time.Hour)}
 	g.Policy = &authorization.PolicyGrantScope{Authority: authority, RecipeDigest: artifact.Digest{7}, Limits: authorization.AutomationLimits{MaxExecutions: 2, MaxBytes: 1 << 20}, ApprovalPolicyRef: revision, ApprovalMaxAge: 24 * time.Hour}
 	g.RequestedAt = now.Add(-time.Minute)
-	g.ReviewUntil = g.RequestedAt.Add(time.Hour)
 	g.PolicyNotAfter = g.RequestedAt.Add(g.Lifetime)
 	g.ExpiresAt = g.PolicyNotAfter
 	g.Decision = &authorization.GrantDecision{Approved: true, Approver: identity.Principal{Issuer: g.Requester.Issuer, Subject: "independent-reviewer", ClientID: "review-console", Kind: identity.Human}, Reason: "finite team collection", ACR: "mfa", AuthenticatedAt: g.RequestedAt, DecidedAt: g.RequestedAt.Add(time.Second)}

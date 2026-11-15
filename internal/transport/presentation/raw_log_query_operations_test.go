@@ -39,7 +39,7 @@ func rawLogBridgeFixture(t *testing.T) (*AuditedOperations, *bridgeFixture, *pre
 	f.a.Scope.Selection = value.LineSelection{}
 	f.a.Scope.Logs = value.LogWindow{Limit: 100}
 	f.a.Scope.RawGrantID = f.next()
-	f.a.Grant = value.ContextQueryGrant{ParentID: f.a.Scope.RawGrantID, ChildID: f.next()}
+	f.a.Grant = value.ContextQueryGrant{ParentID: f.a.Scope.RawGrantID, ArtifactRef: f.next()}
 	f.p.Profile.Worker.MemoryBytes = value.LogQueryWorkerBytes
 	f.p.Profile.Worker.WorkerTransientBytes = value.LogQueryWorkerBytes
 	f.s.LogRoutes = logBridgeRoutes{f}

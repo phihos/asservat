@@ -564,7 +564,6 @@
                             "reasons",
                             "requested_by",
                             "requested_at",
-                            "review_until",
                             "lifetime_seconds",
                             "can_decide",
                             "can_revoke",
@@ -682,12 +681,6 @@
                                     "const": "policyAuthority"
                                   },
                                   "can_resume": {
-                                    "const": false
-                                  },
-                                  "can_resolve": {
-                                    "const": false
-                                  },
-                                  "resume_requires_original_client": {
                                     "const": false
                                   }
                                 },
@@ -1000,7 +993,6 @@
                             "reasons",
                             "requested_by",
                             "requested_at",
-                            "review_until",
                             "lifetime_seconds",
                             "can_decide",
                             "can_revoke",

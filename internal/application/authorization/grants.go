@@ -15,7 +15,7 @@ import (
 )
 
 // ADR-249: C-03 owns individual (adHocCapture) AccessGrants, their review,
-// revocation, exact child grants and the shared result-access pool. It grants
+// revocation and the result-access pool. It grants
 // nothing by itself: every use re-evaluates the stored grant, the caller and
 // the current permission projection.
 
@@ -108,17 +108,18 @@ type GrantRevocationInput struct {
 	IdempotencyKey   string
 }
 
-// GrantChildRequest registers one verified output for one approved client.
-type GrantChildRequest struct {
-	ChildID, ParentID, ClientID string
-	Output                      value.VerifiedOutput
-	Group                       *value.GrantOutputGroup `json:"-"`
+// GrantArtifactRequest registers one verified output under its grant.
+type GrantArtifactRequest struct {
+	ID, ParentID string
+	Output       value.VerifiedOutput
+	Group        *value.GrantOutputGroup `json:"-"`
 }
 
-// GrantUseRequest reserves one follow-up use (an operation ID, idempotent).
+// GrantUseRequest reserves one follow-up use (an operation ID, idempotent)
+// of one registered artifact.
 type GrantUseRequest struct {
-	UseID, ParentID, ChildID string
-	Use                      value.GrantUse
+	UseID, ParentID, ArtifactRef string
+	Use                          value.GrantUse
 }
 
 // GrantStore is the SQL grant ledger (Migration 00097). A replayed key
@@ -132,10 +133,10 @@ type GrantStore interface {
 	RequestedGrants(ctx context.Context, requester identity.Principal, limit int) ([]value.Grant, error)
 	DecideGrant(context.Context, GrantDecisionInput) (value.Grant, bool, error)
 	RevokeGrant(context.Context, GrantRevocationInput) (value.Grant, bool, error)
-	MaterializeGrantChild(context.Context, GrantChildRequest) (value.GrantChild, bool, error)
-	GrantChild(ctx context.Context, childID string) (value.GrantChild, error)
-	// GrantChildFor returns the parent's child for one artifact and client.
-	GrantChildFor(ctx context.Context, parentID, artifactID, clientID string) (value.GrantChild, error)
+	RegisterGrantArtifact(context.Context, GrantArtifactRequest) (value.GrantArtifact, bool, error)
+	GrantArtifact(ctx context.Context, ref string) (value.GrantArtifact, error)
+	// GrantArtifactFor returns the grant's registration of one artifact.
+	GrantArtifactFor(ctx context.Context, parentID, artifactID string) (value.GrantArtifact, error)
 	ReserveGrantUse(context.Context, GrantUseRequest) (value.Grant, bool, error)
 }
 
@@ -165,14 +166,9 @@ type GrantView struct {
 	Approver bool
 	// CanRevoke is current team/approver control, never inferred from provenance.
 	CanRevoke bool
-	// CanResume is an advisory hint for the current original requester/client.
-	// Capture admission remains authoritative.
+	// CanResume is an advisory hint for the requesting human. Capture
+	// admission remains authoritative.
 	CanResume bool
-	// CanResolve permits offering passive lookup/closure, never a new start.
-	CanResolve bool
-	// ResumeRequiresOriginalClient is guidance for this same human on a
-	// different client, only while the marked approval remains Approved.
-	ResumeRequiresOriginalClient bool
 }
 
 func (s GrantService) ready() bool {
@@ -217,7 +213,7 @@ func (s GrantService) final(ctx context.Context, current identities.CurrentIdent
 // NormalizeResultAccess sorts the instruction's sets and truncates NotAfter
 // to the stored microsecond precision, so equal instructions have one digest.
 func NormalizeResultAccess(r value.ResultAccess) value.ResultAccess {
-	r.ActionIDs, r.ClientIDs, r.Operations = slices.Sorted(slices.Values(r.ActionIDs)), slices.Sorted(slices.Values(r.ClientIDs)), slices.Sorted(slices.Values(r.Operations))
+	r.ActionIDs, r.Operations = slices.Sorted(slices.Values(r.ActionIDs)), slices.Sorted(slices.Values(r.Operations))
 	r.NotAfter = r.NotAfter.UTC().Truncate(time.Microsecond)
 	return r
 }
@@ -313,7 +309,6 @@ func (s GrantService) Request(ctx context.Context, current identities.CurrentIde
 	// Validate the prepared row with a provisional request time.
 	probe := g
 	probe.RequestedAt = s.Now()
-	probe.ReviewUntil = probe.RequestedAt.Add(value.GrantReviewWindow)
 	if !probe.Valid() {
 		return zero, false, value.ErrGrantInvalid
 	}
@@ -334,7 +329,7 @@ func (s GrantService) Request(ctx context.Context, current identities.CurrentIde
 	if err != nil {
 		return zero, false, err
 	}
-	if out.CaptureID != g.CaptureID || out.ReviewDigest != g.ReviewDigest || !sameRequester(out.Requester, i.Principal) {
+	if out.CaptureID != g.CaptureID || out.ReviewDigest != g.ReviewDigest || !sameHuman(out.Requester, i.Principal) {
 		return zero, false, ErrGrantConflict
 	}
 	if err = s.final(ctx, current, i); err != nil {
@@ -342,8 +337,6 @@ func (s GrantService) Request(ctx context.Context, current identities.CurrentIde
 	}
 	return out, replay, nil
 }
-
-func sameRequester(a, b identity.Principal) bool { return a == b }
 
 // Covering checks, at use, that an approved grant covers starting exactly
 // this capture plan for the calling identity: the stored row is intact
@@ -531,7 +524,7 @@ func (s GrantService) Get(ctx context.Context, current identities.CurrentIdentit
 		return GrantView{}, time.Time{}, ErrGrantNotFound
 	}
 	until := i.ValidUntil
-	v := GrantView{Grant: g, Phase: g.Phase(s.Now()), CanResolve: g.Kind == value.GrantAdHocCapture && i.Principal == g.Requester && g.Decision != nil && g.Decision.Approved}
+	v := GrantView{Grant: g, Phase: g.Phase(s.Now())}
 	if g.Kind == value.GrantPolicy {
 		if g.Policy == nil || s.WorkloadPermissions == nil {
 			return GrantView{}, time.Time{}, ErrGrantNotFound
@@ -553,15 +546,12 @@ func (s GrantService) Get(ctx context.Context, current identities.CurrentIdentit
 		}
 		v.Approver, until = true, identity.Earlier(until, r.ValidUntil)
 	}
-	// Resume is a UI hint only. The original client must still have current
-	// ordinary collection rights; this never transfers the grant to another
-	// browser/MCP client or replaces the request's admission checks.
+	// Resume is a UI hint only; it never replaces the request's admission checks.
 	var timing struct {
 		Timing string `json:"timing"`
 	}
 	marked := g.Kind == value.GrantAdHocCapture && json.Unmarshal(g.Scope, &timing) == nil && timing.Timing == "approvedAcceptance/v1"
-	v.ResumeRequiresOriginalClient = marked && v.Phase == value.GrantApproved && sameHuman(g.Requester, i.Principal) && i.Principal != g.Requester && slices.Contains(i.Scopes, "evidence:capture")
-	if i.Principal == g.Requester && slices.Contains(i.Scopes, "evidence:capture") && marked &&
+	if sameHuman(i.Principal, g.Requester) && slices.Contains(i.Scopes, "evidence:capture") && marked &&
 		ReviewDigest(g, g.Review) == g.ReviewDigest &&
 		value.CheckCaptureUse(g, i, g.CaptureID, g.ExecutionDigest, g.ReviewDigest, s.Now()) == nil {
 		eligible, e := s.collector(ctx, i, g.Target, value.CollectContext)
@@ -694,16 +684,16 @@ func (s GrantService) List(ctx context.Context, current identities.CurrentIdenti
 	return out, until, nil
 }
 
-// Materialize registers one verified committed output of the approved
-// capture for one approved client (REQ-INV-002). Only C-03 creates
-// children; an unknown or unpublished artifact never becomes a target, and
-// a repeated delivery returns the existing child.
-func (s GrantService) Materialize(ctx context.Context, parentID, clientID string, output value.VerifiedOutput) (value.GrantChild, bool, error) {
-	return s.materialize(ctx, parentID, clientID, output, nil)
+// register records one verified committed output of the approved grant
+// (REQ-INV-002) once, whichever client of the requesting human uses it. Only
+// C-03 registers; an unknown or unpublished artifact never becomes a target,
+// and a repeated delivery returns the existing registration.
+func (s GrantService) Register(ctx context.Context, parentID string, output value.VerifiedOutput) (value.GrantArtifact, bool, error) {
+	return s.register(ctx, parentID, output, nil)
 }
-func (s GrantService) materialize(ctx context.Context, parentID, clientID string, output value.VerifiedOutput, group *value.GrantOutputGroup) (value.GrantChild, bool, error) {
-	var zero value.GrantChild
-	if ctx == nil || ctx.Err() != nil || !s.ready() || !value.UUID(parentID) || !output.Valid() || !identity.Text(clientID, 256) {
+func (s GrantService) register(ctx context.Context, parentID string, output value.VerifiedOutput, group *value.GrantOutputGroup) (value.GrantArtifact, bool, error) {
+	var zero value.GrantArtifact
+	if ctx == nil || ctx.Err() != nil || !s.ready() || !value.UUID(parentID) || !output.Valid() {
 		return zero, false, value.ErrGrantInvalid
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -712,7 +702,7 @@ func (s GrantService) materialize(ctx context.Context, parentID, clientID string
 	if err != nil {
 		return zero, false, err
 	}
-	// The store decides "already registered" under the parent lock; checking
+	// The store decides "already registered" under the grant lock; checking
 	// with registered=true here only rejects scope and phase early.
 	if g.Kind == value.GrantRawQuery && (!RawQueryScopeMatches(g) || ReviewDigest(g, g.Review) != g.ReviewDigest) {
 		return zero, false, value.ErrGrantScope
@@ -723,19 +713,19 @@ func (s GrantService) materialize(ctx context.Context, parentID, clientID string
 			return zero, false, err
 		}
 	}
-	if err = value.CheckMaterialize(g, output, clientID, true, s.Now(), group); err != nil {
+	if err = value.CheckRegister(g, output, true, s.Now(), group); err != nil {
 		return zero, false, err
 	}
-	return s.Store.MaterializeGrantChild(ctx, GrantChildRequest{ChildID: s.NewID(), ParentID: parentID, ClientID: clientID, Output: output, Group: group})
+	return s.Store.RegisterGrantArtifact(ctx, GrantArtifactRequest{ID: s.NewID(), ParentID: parentID, Output: output, Group: group})
 }
 
-// Use reserves one follow-up disclosure of a child grant for the calling
-// identity before delivery: the requesting human through the child's
-// client, current ordinary download eligibility for the target, a current
-// parent and remaining shared pool. useID makes a retry idempotent.
-func (s GrantService) Use(ctx context.Context, current identities.CurrentIdentity, childID, useID string, use value.GrantUse) (value.Grant, bool, error) {
+// Use reserves one follow-up disclosure of a registered artifact for the
+// calling identity before delivery: the requesting human on any client,
+// current ordinary download eligibility for the target, a current grant and
+// remaining pool. useID makes a retry idempotent.
+func (s GrantService) Use(ctx context.Context, current identities.CurrentIdentity, ref, useID string, use value.GrantUse) (value.Grant, bool, error) {
 	var zero value.Grant
-	if ctx == nil || ctx.Err() != nil || !s.ready() || !value.UUID(childID) || !value.UUID(useID) {
+	if ctx == nil || ctx.Err() != nil || !s.ready() || !value.UUID(ref) || !value.UUID(useID) {
 		return zero, false, value.ErrGrantInvalid
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -744,7 +734,7 @@ func (s GrantService) Use(ctx context.Context, current identities.CurrentIdentit
 	if err != nil {
 		return zero, false, err
 	}
-	c, err := s.Store.GrantChild(ctx, childID)
+	c, err := s.Store.GrantArtifact(ctx, ref)
 	if err != nil {
 		return zero, false, err
 	}
@@ -774,7 +764,7 @@ func (s GrantService) Use(ctx context.Context, current identities.CurrentIdentit
 	}
 	effect, stop := context.WithDeadline(ctx, until)
 	defer stop()
-	out, replay, err := s.Store.ReserveGrantUse(effect, GrantUseRequest{UseID: useID, ParentID: g.ID, ChildID: childID, Use: use})
+	out, replay, err := s.Store.ReserveGrantUse(effect, GrantUseRequest{UseID: useID, ParentID: g.ID, ArtifactRef: ref, Use: use})
 	if err != nil {
 		return zero, false, err
 	}
@@ -791,7 +781,7 @@ func (s GrantService) Use(ctx context.Context, current identities.CurrentIdentit
 
 // rawParent resolves the approved ad hoc grant of a raw download scope for
 // its requesting human: intact review, the exact target and the raw class.
-// Another human never reaches Materialize, so nobody else spends its pool.
+// Another human never reaches register, so nobody else spends its pool.
 func (s GrantService) rawParent(ctx context.Context, current identities.CurrentIdentity, scope artifact.DownloadScope) (identity.Identity, value.Grant, error) {
 	var zero value.Grant
 	if ctx == nil || ctx.Err() != nil || !s.ready() || !scope.Valid() || scope.RootID != s.RootID {
@@ -822,10 +812,10 @@ func (s GrantService) rawParent(ctx context.Context, current identities.CurrentI
 }
 
 // CurrentResultAccess is the raw facet of ContextDownloadAuthority (ADR-279).
-// The first download of a published raw artifact materializes the child for
-// the calling client (REQ-INV-002: after verified commit, idempotent); every
-// check then confirms it with a current parent. It returns when the child
-// stops admitting and reserves nothing.
+// The first download of a published raw artifact registers it under the grant
+// (REQ-INV-002: after verified commit, idempotent); every check then confirms
+// it with a current grant. It returns when the grant stops admitting and
+// reserves nothing.
 func (s GrantService) CurrentResultAccess(ctx context.Context, current identities.CurrentIdentity, scope artifact.DownloadScope, actionID string) (time.Time, error) {
 	return s.currentResultAccess(ctx, current, scope, actionID, value.GrantUse{}, false)
 }
@@ -848,7 +838,7 @@ func (s GrantService) currentResultAccess(ctx context.Context, current identitie
 	if err != nil {
 		return time.Time{}, err
 	}
-	c, _, err := s.materialize(ctx, g.ID, i.Principal.ClientID, output, group)
+	c, _, err := s.register(ctx, g.ID, output, group)
 	if err != nil {
 		if preparing && errors.Is(err, value.ErrGrantPoolExhausted) {
 			return time.Time{}, value.ErrApprovalRequired
@@ -878,15 +868,15 @@ func (s GrantService) currentResultAccess(ctx context.Context, current identitie
 	return until, nil
 }
 
-// ReserveRawResult reserves one use of the calling client's existing child
-// for a raw download batch before any of its bytes are read (ADR-279). The
-// child is the one CurrentResultAccess materialized; useID is the batch or
-// window ID, so a retry is idempotent and spend is never refunded.
+// ReserveRawResult reserves one use of a registered artifact for a raw
+// download batch before any of its bytes are read (ADR-279). The registration
+// is the one CurrentResultAccess made; useID is the batch or window ID, so a
+// retry is idempotent and spend is never refunded.
 func (s GrantService) ReserveRawResult(ctx context.Context, current identities.CurrentIdentity, scope artifact.DownloadScope, useID string, use value.GrantUse) error {
 	if ctx == nil || ctx.Err() != nil || !s.ready() || current == nil || !value.UUID(useID) || !scope.Valid() || scope.RootID != s.RootID || use.Operation != value.GrantDownloadOperation || use.Bytes < 0 || use.Operations < 0 || use.Bytes+use.Operations == 0 {
 		return value.ErrGrantInvalid
 	}
-	// An uncertain replay keeps the first parent/child forever. It cannot move
+	// An uncertain replay keeps the first grant forever. It cannot move
 	// to a newer grant after revocation, expiry or pool exhaustion.
 	if s.RawStore != nil {
 		caller, e := s.human(ctx, current, "evidence:download")
@@ -901,11 +891,11 @@ func (s GrantService) ReserveRawResult(ctx context.Context, current identities.C
 			if prior.UseID != useID || prior.Use != use {
 				return ErrGrantConflict
 			}
-			c, e := s.Store.GrantChild(ctx, prior.ChildID)
+			c, e := s.Store.GrantArtifact(ctx, prior.ArtifactRef)
 			if e != nil {
 				return e
 			}
-			if c.ParentID != prior.ParentID || !childMatchesScope(c, scope) {
+			if c.ParentID != prior.ParentID || !registrationMatchesScope(c, scope) {
 				return value.ErrGrantScope
 			}
 			_, _, e = s.Use(ctx, current, c.ID, useID, use)
@@ -915,24 +905,24 @@ func (s GrantService) ReserveRawResult(ctx context.Context, current identities.C
 			return ErrGrantUnavailable
 		}
 	}
-	i, g, output, group, err := s.rawParentFor(ctx, current, scope, "", use, false)
+	_, g, output, group, err := s.rawParentFor(ctx, current, scope, "", use, false)
 	if err != nil {
 		return err
 	}
-	c, err := s.Store.GrantChildFor(ctx, g.ID, scope.ArtifactID, i.Principal.ClientID)
+	c, err := s.Store.GrantArtifactFor(ctx, g.ID, scope.ArtifactID)
 	if errors.Is(err, ErrGrantNotFound) && g.Kind == value.GrantRawQuery {
-		c, _, err = s.materialize(ctx, g.ID, i.Principal.ClientID, output, group)
+		c, _, err = s.register(ctx, g.ID, output, group)
 	}
 	if err != nil {
 		return err
 	}
-	if c.ParentID != g.ID || !childMatchesScope(c, scope) {
+	if c.ParentID != g.ID || !registrationMatchesScope(c, scope) {
 		return value.ErrGrantScope
 	}
 	_, _, err = s.Use(ctx, current, c.ID, useID, use)
 	return err
 }
 
-func childMatchesScope(c value.GrantChild, s artifact.DownloadScope) bool {
-	return c.ClientID == s.Principal.ClientID && c.Output.CaptureID == s.CaptureID && c.Output.ArtifactID == s.ArtifactID && c.Output.ArtifactDigest == s.Version && c.Output.Target == (value.Target{ClusterID: s.ClusterID, NamespaceUID: s.NamespaceUID, WorkloadUID: s.WorkloadUID, PodUID: s.PodUID})
+func registrationMatchesScope(c value.GrantArtifact, s artifact.DownloadScope) bool {
+	return c.Output.CaptureID == s.CaptureID && c.Output.ArtifactID == s.ArtifactID && c.Output.ArtifactDigest == s.Version && c.Output.Target == (value.Target{ClusterID: s.ClusterID, NamespaceUID: s.NamespaceUID, WorkloadUID: s.WorkloadUID, PodUID: s.PodUID})
 }

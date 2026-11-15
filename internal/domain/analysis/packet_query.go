@@ -390,11 +390,16 @@ func (r PacketQueryResult) EncodedSize() int {
 	return n
 }
 
-// New bindings are omitted on all legacy scopes and queries.
-type ContextQueryGrant struct{ ParentID, ChildID string }
+// ContextQueryGrant binds a raw query to its grant and the grant's
+// registration of the queried artifact. The JSON key ChildID is the stored
+// SQL binding name of that registration.
+type ContextQueryGrant struct {
+	ParentID    string
+	ArtifactRef string `json:"ChildID"`
+}
 
 func (g ContextQueryGrant) Valid() bool {
-	return authorization.UUID(g.ParentID) && authorization.UUID(g.ChildID)
+	return authorization.UUID(g.ParentID) && authorization.UUID(g.ArtifactRef)
 }
 
 type ContextQueryInvocationKey struct {

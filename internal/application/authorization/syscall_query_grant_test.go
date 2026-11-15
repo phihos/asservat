@@ -45,8 +45,8 @@ func TestRawSyscallExistingChildCurrentGrantAndWrongOperation(t *testing.T) {
 			if e != nil || !ref.Valid() || ref.ParentID != g.ID || !until.Equal(g.ExpiresAt) {
 				t.Fatal("materialize", e)
 			}
-			prior, eChild := f.store.GrantChildFor(t.Context(), g.ID, scope.ArtifactID, f.requester.Principal.ClientID)
-			if eChild != nil || prior.ID != ref.ChildID {
+			prior, eChild := f.store.GrantArtifactFor(t.Context(), g.ID, scope.ArtifactID)
+			if eChild != nil || prior.ID != ref.ArtifactRef {
 				t.Fatal("child", eChild)
 			}
 			again, _, e := f.svc.SyscallProjectionGrant(t.Context(), caller, scope, record, false)

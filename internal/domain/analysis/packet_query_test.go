@@ -79,7 +79,7 @@ func TestPacketQueryGrantAndInvocationRemainPinned(t *testing.T) {
 		t.Fatal("valid query", e)
 	}
 	changed := a
-	changed.Grant.ChildID = "10000000-0000-4000-8000-000000000006"
+	changed.Grant.ArtifactRef = "10000000-0000-4000-8000-000000000006"
 	if q.Current(changed, a.CheckedAt) {
 		t.Fatal("changed child selected")
 	}

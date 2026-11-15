@@ -527,16 +527,18 @@ export interface components {
             profileRef: components["schemas"]["Contract_capture_composition_f1d3ea703d6af495"];
             overrides?: components["schemas"]["Contract_capture_composition_e9eb2edd44ab3f11"][];
         };
+        /** @description Result access covers every OAuth client and browser session of the same human; clients carry the user's own evidence access (maintainer decision). */
         Contract_investigation_access_0d504ecd6bc8c0fd: {
             actionIds: string[];
             operations: ("debugger_command" | "download_artifact" | "get_logs" | "pcap_query" | "read_memory" | "syscall_query")[];
-            /** @description Selected clients. When omitted, resolve to the authenticated requesting client before recording the review and digest. Explicit selections remain exact; replay never adds or changes a client. */
-            clientIDs?: string[];
             maxArtifacts: number;
             maxBytes: number;
             maxOperations: number;
-            /** Format: date-time */
-            notAfter: string;
+            /**
+             * Format: date-time
+             * @description Optional; defaults to the access end (AccessUntil) of the collected evidence, capped by the administrator maximum. No deadline restarts when an artifact arrives.
+             */
+            notAfter?: string;
         };
         McpInput_preview_capture: ({
             target_handle?: string;
@@ -724,7 +726,6 @@ export interface components {
         Contract_investigation_access_03804ffde11279ad: {
             actionIds: string[];
             operations: ("debugger_command" | "download_artifact" | "get_logs" | "pcap_query" | "read_memory" | "syscall_query")[];
-            clientIDs: string[];
             maxArtifacts: number;
             maxBytes: number;
             maxOperations: number;
