@@ -7,8 +7,6 @@ import (
 	"testing"
 	"time"
 
-	auditapp "asservat.local/asservat/internal/application/audit"
-	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/identity"
 
 	"asservat.local/asservat/internal/adapters/objectstore"

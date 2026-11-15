@@ -10,7 +10,6 @@ import (
 	auditapp "asservat.local/asservat/internal/application/audit"
 	"asservat.local/asservat/internal/application/evidence"
 	privacyapp "asservat.local/asservat/internal/application/privacy"
-	auditvalue "asservat.local/asservat/internal/domain/audit"
 	fleetvalue "asservat.local/asservat/internal/domain/fleet"
 	"github.com/jackc/pgx/v5"
 
