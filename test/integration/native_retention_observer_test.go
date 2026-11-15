@@ -34,7 +34,11 @@ func newNativeFixtureSourceOwner(t *testing.T, parent context.Context, base func
 	t.Helper()
 	o := &nativeFixtureSourceOwner{}
 	o.ctx, o.close = startNativeFixtureObservations(t, parent, func(call context.Context) error {
-		o.held.Lock()
+		// Skip the tick while a test holds the sources, so a hold never
+		// consumes this tick's five-second budget.
+		if !o.held.TryLock() {
+			return nil
+		}
 		defer o.held.Unlock()
 		if err := base(call); err != nil {
 			return err
