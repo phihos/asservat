@@ -54,7 +54,11 @@ accepted without a bootstrap review. AccessBinding subject `issuer` and
 their `cluster` (`local` or a joined cluster) and have no
 `maxDecisionAgeSeconds`/`maxNamespaces`; access reviews map to any role.
 New cluster-scoped ClusterAccessBinding CRD, accepted as one all-namespace
-basis per cluster (migration 00179). Runtime guard proofs, the groupID
+basis per cluster (migration 00179), or with `namespaceSelector` as one basis
+per selected namespace of the cluster's label observation; while those labels
+are unknown an allow grants nothing and a deny covers every namespace. The
+unconsumed `privacy-operator` role is gone (a privacy operator is an
+administrator). Runtime guard proofs, the groupID
 directory and the permission scale caps are gone. Verification:
 `make permission-integration`, focused custody permission subtests.
 
@@ -347,7 +351,6 @@ examples go through `readImplementedExample` or the console equivalent.
 | `access-binding`, `permission-common`, `cluster-access-binding` (new) | Subject `issuer` and `reason` optional; workload by name with optional `uid`; ClusterAccessBinding; `groupName` mapping mode; `reviewRef`/`guardRef` optional; no list or string caps beyond Kubernetes formats | `internal/adapters/kubernetes/permission_decode.go`; `internal/domain/configuration/permissions.go`, `review.go`; chart CRDs (no ClusterAccessBinding CRD) |
 | `permission-source.schema.json` | `cluster` name instead of `clusterID`; no `maxDecisionAgeSeconds`; exclusions and `maxNamespaces` optional; access reviews map to any role | `internal/adapters/kubernetes/permission_decode.go`; `internal/domain/configuration/permissions.go` |
 
-| `cluster-access-binding.schema.json` | `namespaceSelector` narrows a binding; hub-cluster `privacy-operator` role | `internal/adapters/kubernetes/permission_decode.go` `clusterBindings`: a selector-narrowed Allow grants nothing and a selector-narrowed Deny applies to every namespace (fail closed); `privacy-operator` has no consumer and is dropped |
 | `policy-authority.schema.json` | Envelope ceilings, `notAfter` and limits optional, no maxima | `internal/domain/authorization/automation.go`, `policy_grant.go`, `policy_grant_use.go` |
 
 ## Joining workload clusters with `mode: cluster` (ADR-331, 2026-11-14)

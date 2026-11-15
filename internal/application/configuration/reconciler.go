@@ -191,13 +191,18 @@ func (s *bindingRun) refreshRemote(ctx context.Context) {
 			clusters = append(clusters, src.ClusterID)
 		}
 	}
+	for _, b := range s.clusterBindings {
+		if len(b.NamespaceSelector) > 0 && b.Scope.ClusterID != s.r.NamespaceClusterID && !slices.Contains(clusters, b.Scope.ClusterID) {
+			clusters = append(clusters, b.Scope.ClusterID)
+		}
+	}
 	slices.Sort(clusters)
 	now := s.r.Now()
 	next := map[string]*remoteNamespaces{}
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	for _, cluster := range clusters {
-		keys := SourceKeys(s.sources, cluster)
+		keys := namespaceKeys(s.sources, s.clusterBindings, cluster)
 		old := s.remote[cluster]
 		if old != nil && !sameKeys(old.keys, keys) {
 			old = nil

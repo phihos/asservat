@@ -10,7 +10,7 @@ Administrators (`identity.administrators`, [REQ-AUT-001](authorization.md#req-au
 
 An `AccessBinding` lives in the application namespace it grants, in the workload's cluster, like a RoleBinding ([ADR-329](../docs/decisions/329-accessbindings-in-application-namespaces.md)). It assigns users (by username), groups (by name) or workload identities fixed roles over its namespace, optionally narrowed by `spec.workloads` to Deployments/StatefulSets by kind and name. A workload entry matches whatever workload currently has that name; the matched UID is provenance, and an optional `uid` pins one instance. `effect: Deny` subtracts the named roles' operations. Wildcard subjects are not supported.
 
-A `ClusterAccessBinding` is the cluster-scoped equivalent, like a ClusterRoleBinding: in a workload cluster it grants roles in every namespace matching its optional `namespaceSelector`; in the hub cluster it may name `spec.clusters` (or `*`) to grant a role across the fleet, and may grant `privacy-operator`.
+A `ClusterAccessBinding` is the cluster-scoped equivalent, like a ClusterRoleBinding: in a workload cluster it grants roles in every namespace matching its optional `namespaceSelector`; in the hub cluster it may name `spec.clusters` (or `*`) to grant a role across the fleet.
 
 A `PermissionSource` is an administrator-managed derivation rule for one cluster in the hub control namespace: `namespaceMetadata`, `workloadMetadata`, `kubernetesExec` or `kubernetesAccessReview`. Effective decisions are computed, never stored as grants per Pod or member. Existing objects take effect when first observed.
 
@@ -22,7 +22,6 @@ Kubernetes RBAC decides who writes AccessBindings; the Asservat namespaces are a
 | `workload-maintainer` | Reader and owner operations; manage collection policies; collect approved ordinary evidence; request intrusive capture and raw-query grants |
 | `evidence-owner` | Reader operations; create and manage shares and capture/policy sharing instructions (REQ-SHR-008); raw sharing still needs review. For teams that own evidence without collecting it |
 | `action-approver` | Review intrusive capture, raw-query, raw-sharing and policy-grant requests in scope; no evidence reading and no self-approval |
-| `privacy-operator` | Installation-wide privacy workflows ([REQ-PRV-006](privacy.md#req-prv-006--rights-requests-and-restricted-processing)); granted only by a hub-cluster ClusterAccessBinding; administrators hold it implicitly |
 
 A role is never an active intrusive or raw-query grant. `workload-maintainer` makes a caller eligible to request raw access; raw operations still need a grant, an approved raw share or the equivalent Kubernetes right ([REQ-AUT-002](authorization.md#req-aut-002--authorization-composition)). Users cannot relabel a sensitive action as ordinary.
 

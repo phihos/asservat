@@ -130,7 +130,7 @@ func (s *bindingRun) syncSources(ctx context.Context, snapshot value.Snapshot) {
 	if s.r.Namespaces == nil || !snapshot.SourcesComplete {
 		return
 	}
-	keys := SourceKeys(snapshot.Sources, s.r.NamespaceClusterID)
+	keys := namespaceKeys(snapshot.Sources, snapshot.ClusterBindings, s.r.NamespaceClusterID)
 	if s.feed != nil && slices.Equal(s.feed.keys.Labels, keys.Labels) && slices.Equal(s.feed.keys.Annotations, keys.Annotations) {
 		return
 	}
@@ -214,8 +214,26 @@ func (s *bindingRun) inheritance(now time.Time) inheritanceState {
 	s.remoteBindingBases(now, &out)
 	// ClusterAccessBindings are read with every LIST (ADR-335 D14).
 	for _, b := range s.clusterBindings {
-		if p, ok := bindingBasis(b, now); ok {
+		p, ok := bindingBasis(b, now)
+		if !ok {
+			continue
+		}
+		if len(b.NamespaceSelector) == 0 {
 			out.Bases = append(out.Bases, p)
+			continue
+		}
+		// A selector-narrowed binding has one basis per selected namespace.
+		// While its cluster's labels are unknown an allow grants nothing
+		// and a deny covers every namespace.
+		namespaces, known := SelectedNamespaces(b.NamespaceSelector, s.observation(b.Scope.ClusterID))
+		if !known && p.Effect == "Deny" {
+			out.Bases = append(out.Bases, p)
+		}
+		for _, ns := range namespaces {
+			q := p
+			q.Scope.Namespace = ns
+			q.ScopeDigest = PermissionScopeDigest(q)
+			out.Bases = append(out.Bases, q)
 		}
 	}
 	if !s.sourcesComplete {
@@ -282,6 +300,21 @@ func (s *bindingRun) inheritance(now time.Time) inheritanceState {
 		out.included[src.Resource.UID] = s.continuity
 	}
 	return out
+}
+
+// observation is the current namespace observation of cluster: the hub's
+// own feed or a joined cluster's connector journal (ADR-247).
+func (s *bindingRun) observation(cluster string) *value.NamespaceObservation {
+	if cluster != s.r.NamespaceClusterID {
+		if r := s.remote[cluster]; r != nil {
+			return r.live
+		}
+		return nil
+	}
+	if s.namespaces == nil {
+		return nil
+	}
+	return s.namespaces.Observation(true)
 }
 
 // inheritanceDigest identifies the derived state independent of continuity

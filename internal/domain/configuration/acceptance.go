@@ -81,8 +81,7 @@ func (p PermissionBasis) Key() string {
 	return k
 }
 
-// Roles are the roles a binding or source may grant. privacy-operator is
-// granted only by a hub-cluster ClusterAccessBinding and has no consumer yet.
+// Roles are the roles a binding or source may grant.
 var Roles = []string{"workload-maintainer", "evidence-reader", "evidence-owner", "action-approver"}
 
 // Validate checks a prepared batch. No count limits: Kubernetes object limits
@@ -117,8 +116,9 @@ func (b PermissionBatch) Validate(now time.Time) error {
 		if r.Deleting && p.Effect == "Allow" {
 			return ErrInvalid
 		}
-		// A ClusterAccessBinding covers every namespace of its cluster.
-		if (r.Kind == ClusterAccessBindingKind) != (p.Scope.Namespace == AllNamespaces) || r.Kind == ClusterAccessBindingKind && (len(p.Scope.Workloads) > 0 || p.Automation != nil) {
+		// Only a ClusterAccessBinding covers every namespace of its cluster;
+		// a selector-narrowed one has one basis per selected namespace.
+		if r.Kind != ClusterAccessBindingKind && p.Scope.Namespace == AllNamespaces || r.Kind == ClusterAccessBindingKind && (len(p.Scope.Workloads) > 0 || p.Automation != nil) {
 			return ErrInvalid
 		}
 		// A namespaceMetadata source grants one role to groups over a whole
