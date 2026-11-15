@@ -1,5 +1,17 @@
 # Sustained implementation progress
 
+## Permission CRDs follow the canonical contracts (ADR-335 D1/D4/D14, 2026-11-15)
+
+No blocking initial AccessBinding review: the first permission batch is
+accepted without a bootstrap review. AccessBinding subject `issuer` and
+`reason` are optional and workload `uid` is optional. PermissionSources name
+their `cluster` (`local` or a joined cluster) and have no
+`maxDecisionAgeSeconds`/`maxNamespaces`; access reviews map to any role.
+New cluster-scoped ClusterAccessBinding CRD, accepted as one all-namespace
+basis per cluster (migration 00179). Runtime guard proofs, the groupID
+directory and the permission scale caps are gone. Verification:
+`make permission-integration`, focused custody permission subtests.
+
 ## Identity and browser settings follow the canonical contracts (ADR-335 D1/D4/D5/D8, 2026-11-15)
 
 `identity.json` carries `groupsClaim`, `usernameClaim`, optional
@@ -284,8 +296,6 @@ examples go through `readImplementedExample` or the console equivalent.
 | `action.schema.json`, `capture-profile-go-cpu.yaml` | Profile `impact` may be `observe` (pprof GET) | `internal/application/planning/profile_plan.go` (refuses non-intrusive); `internal/application/planning/profiles/go-cpu-v1.json` |
 | `grant.schema.json` | Policy-grant `spec.renewal`, `status.renewalDue` | No renewal: `internal/application/authorization/grants.go`, `internal/adapters/postgres/policy_grant_attachment.go` |
 | Capture/policy/trigger/recipe/packet/syscall schemas | No list-count caps; arbitrary maxima raised to 2^53−1; no packet-filter length cap (BPF limit checked at compile); `argv` items up to `MAX_ARG_STRLEN` | Embedded `policy-schemas/`, `permission-schemas/approval-policy`, manifest `profile` schema; `internal/domain/planning/composition.go` (`MaxCompositionComponents` 8, `MaxComponentEdits` 32, `MaxCompositionBytes`); generated DebugPolicy/CaptureProfile CRDs |
-| `access-binding`, `permission-common`, `cluster-access-binding` (new) | Subject `issuer` and `reason` optional; workload by name with optional `uid`; ClusterAccessBinding; `groupName` mapping mode; `reviewRef`/`guardRef` optional; no list or string caps beyond Kubernetes formats | `internal/adapters/kubernetes/permission_decode.go`; `internal/domain/configuration/permissions.go`, `review.go`; chart CRDs (no ClusterAccessBinding CRD) |
-| `permission-source.schema.json` | `cluster` name instead of `clusterID`; no `maxDecisionAgeSeconds`; exclusions and `maxNamespaces` optional; access reviews map to any role | `internal/adapters/kubernetes/permission_decode.go`; `internal/domain/configuration/permissions.go` |
 | `policy-authority.schema.json` | Envelope ceilings, `notAfter` and limits optional, no maxima | `internal/domain/authorization/automation.go`, `policy_grant.go`, `policy_grant_use.go` |
 
 ## Joining workload clusters with `mode: cluster` (ADR-331, 2026-11-14)
