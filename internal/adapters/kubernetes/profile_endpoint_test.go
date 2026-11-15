@@ -1,12 +1,13 @@
 package kubernetes
 
 import (
-	"asservat.local/asservat/internal/contracts"
-	"asservat.local/asservat/internal/domain/configuration"
-	"asservat.local/asservat/internal/domain/targets"
 	"context"
 	"errors"
 	"testing"
+
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/targets"
 )
 
 func TestProfileEndpointDefinitionAdapterNeedsNoPodObservation(t *testing.T) {

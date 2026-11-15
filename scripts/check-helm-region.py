@@ -78,7 +78,7 @@ def check_common(docs, ns, executor=True, audience="https://hub.example.invalid:
     assert c["securityContext"]["allowPrivilegeEscalation"] is False and c["securityContext"]["capabilities"]["drop"] == ["ALL"]
     sources = next(v for v in pod["volumes"] if v["name"] == "inputs")["projected"]["sources"]
     tokens = {s["serviceAccountToken"]["path"]: s["serviceAccountToken"].get("audience") for s in sources if "serviceAccountToken" in s}
-    assert tokens == {"kube.token": None, "connector-pod.token": "asservat-connector-process-enrollment", "hub.token": audience}, tokens
+    assert tokens == {"kube.token": None, "hub.token": audience}, tokens
     assert not [s for s in sources if "secret" in s and any(i["key"] == "bootstrap.json" for i in s["secret"]["items"])]
     # No installer machinery: no admission policies, and no hook among these
     # templates except the download-worker namespace the secrets hook fills.

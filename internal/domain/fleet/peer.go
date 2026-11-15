@@ -57,20 +57,6 @@ type PeerRegistration struct {
 	Certificates           []PeerCertificate // At most two during bounded rotation overlap.
 }
 
-func (p PeerRegistration) Valid(now time.Time) bool {
-	if !p.Enabled || !p.Binding.Valid() || !p.Revision.Valid() || !identity.Fresh(p.ObservedAt, p.FreshUntil, now, 5*time.Second) || len(p.Certificates) < 1 || len(p.Certificates) > 2 {
-		return false
-	}
-	seen := map[artifact.Digest]bool{}
-	for _, c := range p.Certificates {
-		if c.Binding != p.Binding || c.Digest == (artifact.Digest{}) || seen[c.Digest] || c.NotBefore.IsZero() || !c.NotBefore.Before(c.NotAfter) || c.NotAfter.After(c.NotBefore.Add(time.Hour)) {
-			return false
-		}
-		seen[c.Digest] = true
-	}
-	return true
-}
-
 type AuthenticatedPeer struct {
 	Certificate            PeerCertificate
 	RegistrationRevision   identity.Revision

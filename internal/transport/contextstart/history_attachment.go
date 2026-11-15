@@ -1,12 +1,13 @@
 package contextstart
 
 import (
+	"context"
+	"time"
+
 	fleetapp "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/fleet"
-	"context"
-	"time"
 )
 
 // RunHistory never constructs an APIContextWork or APIExecution. It consumes

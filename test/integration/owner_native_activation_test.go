@@ -214,7 +214,6 @@ func exerciseNativeOwnerActivation(t *testing.T, ctx context.Context, f fixture,
 	owned, ownedServer, ownedClient := exerciseNativeOwnerCredentials(t, ctx, ownedBinding, roots, v, *service, issuers, registry)
 	readiness := app.OwnerStartupReadiness{Binding: ownedBinding, Pool: pool, Server: ownedServer, Client: ownedClient, Registry: registry, Proofs: proofs, Now: time.Now}
 	connections := append([]*mtls.OwnerConnection{serverConnection, clientConnection}, owned...)
-	relayCheck := nativeOwnerRelay(t, ctx, ownedBinding, roots, ownedServer, ownedClient, v, gate)
 	t.Log("native Pod/token/CSR, protected accepted configuration, SQL spend, real scoped OpenBao signing/audit and activation composed before Ready; source suspension fenced activation and resume reused the exact leaf")
 	return func(phase string) {
 		t.Helper()
@@ -223,7 +222,6 @@ func exerciseNativeOwnerActivation(t *testing.T, ctx context.Context, f fixture,
 			if until, e := readiness.Check(ctx); e != nil || !time.Now().Before(until) {
 				t.Fatal("pre-Ready protected startup proof unavailable", e)
 			}
-			relayCheck(403)
 			if _, e := gate.CheckOwnerClient(ctx, ownedClient); e == nil {
 				t.Fatal("unavailable owner remained a local client")
 			}
@@ -247,7 +245,6 @@ func exerciseNativeOwnerActivation(t *testing.T, ctx context.Context, f fixture,
 					t.Fatal("ready activated peer rejected", e)
 				}
 			}
-			relayCheck(503) // Authenticated transport reaches only the synthetic operation.
 			if until, e := gate.CheckOwnerClient(ctx, ownedClient); e != nil || !time.Now().Before(until) {
 				t.Fatal("native current local client", e)
 			}
@@ -267,7 +264,6 @@ func exerciseNativeOwnerActivation(t *testing.T, ctx context.Context, f fixture,
 					t.Fatal("reused TLS session retained removed root")
 				}
 			}
-			relayCheck(403)
 			if _, e := readiness.Check(ctx); e == nil {
 				t.Fatal("readiness retained removed roots")
 			}
@@ -302,7 +298,6 @@ func exerciseNativeOwnerActivation(t *testing.T, ctx context.Context, f fixture,
 			if _, e := readiness.Check(ctx); e == nil {
 				t.Fatal("readiness retained deleted Pod")
 			}
-			relayCheck(403)
 			if _, e := gate.CheckOwnerClient(ctx, ownedClient); e == nil {
 				t.Fatal("unavailable owner remained a local client")
 			}

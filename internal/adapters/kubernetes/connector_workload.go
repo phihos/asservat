@@ -59,12 +59,6 @@ func ReadConnectorWorkload(ctx context.Context, config *rest.Config, clusterID, 
 	return out, nil
 }
 
-// matches checks that the workload names the client's namespace and the
-// profile's Deployment and account.
-func (w ConnectorWorkload) matches(c *PermissionClient, namespace, account, deployment string) bool {
-	return c != nil && c.control.Name == w.Namespace && c.control.UID == w.NamespaceUID && namespace == w.Namespace && account == w.Account && deployment == w.Deployment && w.Digest == ConnectorWorkloadDigest(c.clusterID, w.Namespace, w.Deployment)
-}
-
 // ReadCollectorNamespace resolves the collector namespace's UID by name for
 // the node attester's client (get on that one namespace).
 func ReadCollectorNamespace(ctx context.Context, config *rest.Config, namespace string) (cfg.NamespaceRef, error) {

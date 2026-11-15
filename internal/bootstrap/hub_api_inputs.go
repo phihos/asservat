@@ -139,13 +139,9 @@ func buildHubAPIDeployment(ctx context.Context, files *os.Root, h contracts.HubA
 	profile.RecipeSHA256 = recipe.Profile.RecipeSHA256
 	c.ProviderAuthentication = &profile
 
-	// Native: connector roots from the connector PKI; worker namespaces by name.
+	// Native: connector token trust; worker namespaces by name.
 	n := h.Native
-	connectorRoots, err := r.PKIRoots(ctx, contracts.SmallOpenBaoConnectorPKIMount)
-	if err != nil {
-		return zero, hubAPIInputError("connector-roots")
-	}
-	c.Native = &contracts.OwnerNativeDeployment{ConnectorRoots: connectorRoots, WorkerAPIs: []contracts.OwnerNativeWorkerAPI{}, RetentionTopologies: []contracts.OwnerNativeTopology{}, Connections: h.Connections, Concurrency: h.Concurrency}
+	c.Native = &contracts.OwnerNativeDeployment{ConnectorTokens: h.ConnectorTokens, ConnectorPeerID: ids.PeerID, WorkerAPIs: []contracts.OwnerNativeWorkerAPI{}, RetentionTopologies: []contracts.OwnerNativeTopology{}, Connections: h.Connections, Concurrency: h.Concurrency}
 	for _, namespace := range n.WorkerNamespaces {
 		uid, err := r.NamespaceUID(ctx, namespace)
 		if err != nil {
@@ -159,12 +155,11 @@ func buildHubAPIDeployment(ctx context.Context, files *os.Root, h contracts.HubA
 		return zero, hubAPIInputError("retention-topologies")
 	}
 
-	// Observation: the owner pin names this workload; the local connector
-	// peer comes from the IDs, remote peers from values.
+	// Observation: the owner pin names this workload; peers come from values.
 	protection := contracts.WorkloadSourceDigest(ids.ClusterID, h.Namespace, self)
 	protectionHex := hex.EncodeToString(protection[:])
 	o := &contracts.OwnerObservationBootstrap{Format: contracts.OwnerObservationFormat, TemplateDigest: protectionHex, ImageDigest: protectionHex, ProtectionDigest: protectionHex,
-		Peers: []contracts.OwnerObservationPeer{{InstallationID: ids.InstallationID, ClusterID: ids.ClusterID, IssuerEpoch: ids.IssuerEpoch, PeerID: ids.PeerID, Roots: connectorRoots}}}
+		Peers: []contracts.OwnerObservationPeer{}}
 	for _, p := range h.Observation.Peers {
 		roots, err := providerconfig.TrustRootsPEM([]byte(p.RootsPEM), now)
 		if err != nil {
@@ -375,7 +370,7 @@ func loadHubAPIInputs(ctx context.Context, files, configRoot, idsRoot, public *o
 	if err != nil {
 		return nil, err
 	}
-	offer, err := buildHubAPIRegionalOffer(call, files, h, ids, c.Native.ConnectorRoots, now)
+	offer, err := buildHubAPIRegionalOffer(call, files, h, ids, now)
 	if err != nil {
 		return nil, err
 	}

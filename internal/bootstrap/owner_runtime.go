@@ -41,9 +41,6 @@ type OwnerRuntimeConfig struct {
 	// native port, split by TLS server name (ADR-190 decisions 4 and 6). It
 	// requires Native and binds the same pool.
 	Observation *OwnerObservationServingConfig
-	// Operation additionally serves the ADR-197 v2 operation server on the
-	// pool's OperationPort. It requires Observation and binds the same pool.
-	Operation *OwnerOperationConfig
 }
 
 type ownerReadinessSnapshot struct{ observed, until time.Time }
@@ -65,7 +62,6 @@ type OwnerRuntime struct {
 	ready          atomic.Pointer[ownerReadinessSnapshot]
 	native         *ownerNativeRuntime
 	observation    *ownerObservationServing
-	operation      *OwnerOperationConfig
 	// compose orders ServeAcquisitionWorkers before Run's start; workers is the
 	// optional ADR-204 worker serving on the owner port.
 	compose sync.Mutex
@@ -133,12 +129,6 @@ func NewOwnerRuntime(ctx context.Context, c OwnerRuntimeConfig) (*OwnerRuntime, 
 		if r.observation, err = newOwnerObservationServing(root, *o, r.server, gate, c.Concurrency, &phase); err != nil {
 			return nil, ownerStartupError(phase, "none", err)
 		}
-	}
-	if o := c.Operation; o != nil {
-		if r.observation == nil || o.Pin.Pool != c.Pool || c.Pool.OperationPort == 0 {
-			return nil, value.ErrInvalid
-		}
-		r.operation = o
 	}
 	readiness := c.Proofs
 	if c.ReadinessProofs != nil {
@@ -219,27 +209,15 @@ func (r *OwnerRuntime) Run(listener net.Listener, additional ...net.Listener) (r
 	if r == nil || listener == nil {
 		return value.ErrInvalid
 	}
-	var nativeListener, operationListener net.Listener
+	var nativeListener net.Listener
 	if r.native != nil {
-		want := 1
-		if r.operation != nil {
-			want = 2
-		}
-		if len(additional) != want || additional[0] == nil {
+		if len(additional) != 1 || additional[0] == nil {
 			return value.ErrInvalid
 		}
 		nativeListener = additional[0]
 		address, ok := nativeListener.Addr().(*net.TCPAddr)
 		if !ok || address.Port != r.pool.NativePort {
 			return value.ErrInvalid
-		}
-		if r.operation != nil {
-			operationListener = additional[1]
-			address, ok := operationListener.Addr().(*net.TCPAddr)
-			if operationListener == nil || !ok || address.Port != r.pool.OperationPort {
-				return value.ErrInvalid
-			}
-			defer operationListener.Close()
 		}
 	} else if len(additional) != 0 {
 		return value.ErrInvalid
@@ -270,19 +248,11 @@ func (r *OwnerRuntime) Run(listener net.Listener, additional ...net.Listener) (r
 			finished <- err
 		}()
 	}
-	var operation *ownerOperationServing
 	defer func() {
-		if operation != nil {
-			// After every server has joined below.
-			defer operation.close()
-		}
 		r.stop()
 		listener.Close()
 		if nativeListener != nil {
 			nativeListener.Close()
-		}
-		if operationListener != nil {
-			operationListener.Close()
 		}
 		r.Close()
 		// Cancellation and socket/key closure remove effect authority first.
@@ -334,23 +304,15 @@ func (r *OwnerRuntime) Run(listener net.Listener, additional ...net.Listener) (r
 		launch(startupRunRouter, router.Run)
 		launch(startupRunObservation, func() error { return r.observation.serve(r.root, observed, r.connections) })
 	}
-	if operationListener != nil {
-		// ADR-197: the claim receiver binds the now-active serving leaf.
-		var err error
-		if operation, err = newOwnerOperationServing(r.root, *r.operation, r.server); err != nil {
-			return ownerStartupError(startupOperationServing, "none", err)
-		}
-		launch(startupRunOperation, func() error { return operation.serve(r.root, operationListener) })
-	}
-	if nativeListener != nil {
+	// The native port serves context starts and the live purpose; without
+	// either it stays closed.
+	if nativeListener != nil && (r.native.starts != nil || r.native.live != nil) {
 		launch(startupRunNative, func() error {
+			roots := r.native.roots
 			if r.native.live != nil {
-				return native.ServeWithLiveOwner(r.root, nativeListener, r.native.liveRoots, r.server, r.native.handler, r.native.starts, r.native.live, r.native.connections, r.native.startConnections)
+				roots = r.native.liveRoots
 			}
-			if r.native.starts != nil {
-				return native.ServeWithContextStart(r.root, nativeListener, r.native.roots, r.server, r.native.handler, r.native.starts, r.native.connections, r.native.startConnections)
-			}
-			return native.Serve(r.root, nativeListener, r.native.roots, r.server, r.native.handler, r.native.connections)
+			return native.ServeOwner(r.root, nativeListener, roots, r.server, r.native.authority, r.native.starts, r.native.live, r.native.connections, r.native.startConnections)
 		})
 	}
 	launch(startupRunReadiness, r.observeReadiness)

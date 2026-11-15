@@ -1,10 +1,11 @@
 package kubernetes
 
 import (
+	"testing"
+
 	batch "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"testing"
 )
 
 func TestWorkerStartupWaitExcludesKnownExecutionAndTermination(t *testing.T) {

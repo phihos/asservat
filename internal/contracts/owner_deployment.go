@@ -239,7 +239,10 @@ const (
 // Optional protected native listener dependencies. The accepted owner pool
 // independently supplies NativePort; these inputs cannot select a route/owner.
 type OwnerNativeDeployment struct {
-	ConnectorRoots      [][]byte               `json:"connectorRoots"`
+	// ConnectorTokens verifies the connectors' context-start tokens
+	// (ADR-334); ConnectorPeerID is the combined-mode connector's peer.
+	ConnectorTokens     ConnectorTokens        `json:"connectorTokens"`
+	ConnectorPeerID     string                 `json:"connectorPeerID"`
 	WorkerAPIs          []OwnerNativeWorkerAPI `json:"workerAPIs"`
 	RetentionTopologies []OwnerNativeTopology  `json:"retentionTopologies"`
 	Connections         int                    `json:"connections"`

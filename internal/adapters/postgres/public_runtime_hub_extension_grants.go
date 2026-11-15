@@ -639,13 +639,12 @@ var publicRuntimeHubExtensionGrantTable = map[string][]publicRuntimeGrant{
 		{"table", "fleet_current_trust", "installation_id", "UPDATE"},
 		{"table", "goose_db_version", "", "SELECT"},
 	},
-	// ADR-197: the hub-api's regional capacity duty: the v2 holder's
-	// activated-leaf registry and the write-once cluster qualifications.
+	// ADR-197: the hub-api's regional capacity duty: the write-once cluster
+	// qualifications.
 	"regional-capacity": {
 		{"schema", "public", "", "USAGE"},
 		{"table", "goose_db_version", "", "SELECT"},
 		{"function", "qualify_capacity_cluster(uuid,uuid,uuid,uuid,bytea,jsonb)", "", "EXECUTE"},
-		{"function", "read_connector_activated_leaf(uuid,uuid,text,bytea,jsonb)", "", "EXECUTE"},
 	},
 	// ADR-210: a privacy operator's processing decisions, exactly the
 	// component role processing_decision_runtime: decision and rule rows and

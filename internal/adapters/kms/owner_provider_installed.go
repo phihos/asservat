@@ -91,7 +91,6 @@ func NewInstalledOwnerProviderEffects(ctx context.Context, input contracts.Owner
 	return s, nil
 }
 
-
 func (s *InstalledOwnerProviderEffects) Sealer() *Sealer {
 	if s == nil || s.effects == nil {
 		return nil

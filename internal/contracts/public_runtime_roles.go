@@ -32,7 +32,6 @@ func PublicRuntimeRolePurposes() []string {
 	out = append(out, PublicRuntimeCaptureCleanupPurposes()...)
 	out = append(out, PublicRuntimeFederationPurposes()...)
 	out = append(out, PublicRuntimePublisherPurposes()...)
-	out = append(out, PublicRuntimeConnectorMaintenancePurposes()...)
 	out = append(out, "capacity", "capacity-capture")
 	out = append(out, PublicRuntimePermissionPurposes()...)
 	out = append(out, PublicRuntimeRetentionPurposes()...)
@@ -134,22 +133,10 @@ func PublicRuntimeRoleOrdinal(purpose string) (int, bool) {
 		return 44, true
 	case "capture-finalizer":
 		return 45, true
-	case "connector-source":
-		return 48, true
-	case "connector-journal":
-		return 49, true
-	case "connector-ack":
-		return 50, true
 	case "connector-read":
 		return 51, true
 	case "connector-delivery":
 		return 52, true
-	case "connector-cleanup":
-		return 53, true
-	case "connector-verifier":
-		return 54, true
-	case "connector-finalizer":
-		return 55, true
 	case "connector-owner-read":
 		return 56, true
 	case "publication-gate":

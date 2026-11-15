@@ -44,7 +44,3 @@ func (o *exchangeOrder) admit(kind contracts.ClusterObservationFrameKind, fromRe
 	o.bytes += bytes + 5
 	return nil
 }
-
-func (o *exchangeOrder) complete() bool {
-	return o != nil && !o.failed && o.next == len(observationSteps)
-}

@@ -1,18 +1,19 @@
 package jose
 
 import (
+	"bytes"
+	"context"
+	"crypto/ed25519"
+	"encoding/json"
+	"strings"
+
 	app "asservat.local/asservat/internal/application/fleet"
 	wire "asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/capture"
 	value "asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
-	"bytes"
-	"context"
-	"crypto/ed25519"
-	"encoding/json"
 	"github.com/lestrrat-go/jwx/v4/jwa"
 	"github.com/lestrrat-go/jwx/v4/jws"
-	"strings"
 )
 
 const HistoryWorkType = "asservat-history-work+jws"
@@ -24,15 +25,15 @@ func historyChannelWire(c value.APIContextChannel) wire.APIContextChannel {
 	p, e, h := c.Connector, c.Executor, c.Hub
 	return wire.APIContextChannel{RootID: c.RootID, ExchangeID: c.ExchangeID, Challenge: c.Challenge,
 		Hub:       wire.APIContextOwner{InstallationID: h.InstallationID, ClusterID: h.ClusterID, IssuerEpoch: h.IssuerEpoch, PodUID: h.PodUID, ProcessEpoch: h.ProcessEpoch},
-		Connector: wire.APIContextConnector{InstallationID: p.Binding.InstallationID, ClusterID: p.Binding.ClusterID, IssuerEpoch: p.Binding.IssuerEpoch, PeerID: p.Binding.PeerID, PodUID: p.PodUID, ProcessEpoch: p.ProcessEpoch, LeafDigest: apiContextDigest(c.ConnectorLeaf)},
+		Connector: wire.APIContextConnector{InstallationID: p.Binding.InstallationID, ClusterID: p.Binding.ClusterID, IssuerEpoch: p.Binding.IssuerEpoch, PeerID: p.Binding.PeerID, PodUID: p.PodUID, ProcessEpoch: p.ProcessEpoch},
 		Executor:  wire.APIContextExecutor{NamespaceUID: e.NamespaceUID, AccountUID: e.AccountUID, PodUID: e.PodUID, ProcessEpoch: e.ProcessEpoch, StartupDigest: apiContextDigest(e.StartupDigest), ImageDigest: apiContextDigest(e.ImageDigest)}}
 }
 func historyChannelValue(c wire.APIContextChannel) value.APIContextChannel {
 	p, e, h := c.Connector, c.Executor, c.Hub
 	return value.APIContextChannel{RootID: c.RootID, ExchangeID: c.ExchangeID, Challenge: c.Challenge,
 		Hub:       value.OwnerBinding{InstallationID: h.InstallationID, ClusterID: h.ClusterID, IssuerEpoch: h.IssuerEpoch, PodUID: h.PodUID, ProcessEpoch: h.ProcessEpoch},
-		Connector: value.ConnectorProcessIdentity{Binding: value.PeerBinding{InstallationID: p.InstallationID, ClusterID: p.ClusterID, IssuerEpoch: p.IssuerEpoch, PeerID: p.PeerID, Role: value.ConnectorPeer}, PodUID: p.PodUID, ProcessEpoch: p.ProcessEpoch}, ConnectorLeaf: digestValue(p.LeafDigest),
-		Executor: value.APIContextExecutor{NamespaceUID: e.NamespaceUID, AccountUID: e.AccountUID, PodUID: e.PodUID, ProcessEpoch: e.ProcessEpoch, StartupDigest: digestValue(e.StartupDigest), ImageDigest: digestValue(e.ImageDigest)}}
+		Connector: value.ConnectorProcessIdentity{Binding: value.PeerBinding{InstallationID: p.InstallationID, ClusterID: p.ClusterID, IssuerEpoch: p.IssuerEpoch, PeerID: p.PeerID, Role: value.ConnectorPeer}, PodUID: p.PodUID, ProcessEpoch: p.ProcessEpoch},
+		Executor:  value.APIContextExecutor{NamespaceUID: e.NamespaceUID, AccountUID: e.AccountUID, PodUID: e.PodUID, ProcessEpoch: e.ProcessEpoch, StartupDigest: digestValue(e.StartupDigest), ImageDigest: digestValue(e.ImageDigest)}}
 }
 func historyWorkBytes(w app.HistoryWork) ([]byte, error) {
 	a, e := json.Marshal(w.Authority)

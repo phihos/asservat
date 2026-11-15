@@ -1,9 +1,10 @@
 package bootstrap
 
 import (
-	planning "asservat.local/asservat/internal/domain/planning"
 	"context"
 	"testing"
+
+	planning "asservat.local/asservat/internal/domain/planning"
 )
 
 type packetFilterCompilerFixture struct {

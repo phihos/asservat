@@ -11,8 +11,6 @@ import (
 	"net/url"
 	"sync"
 	"time"
-
-	app "asservat.local/asservat/internal/application/fleet"
 )
 
 // Client is the regional side of one ADR-169 conversation. It dials the
@@ -35,11 +33,11 @@ func NewClient(endpoint, serverName string, roots *x509.CertPool, token func() (
 	return &Client{address: u.Host, host: serverName, roots: roots, token: token}, nil
 }
 
-// Run returns the hub's final frame; local performs the in-cluster native
-// and source reads.
-func (c *Client) Run(ctx context.Context, opening Opening, local Local) (HubFrame, error) {
+// Run returns the hub's final frame; local answers a delivery request and
+// may be nil for a read-only purpose.
+func (c *Client) Run(ctx context.Context, opening Opening, local any) (HubFrame, error) {
 	var zero HubFrame
-	if c == nil || ctx == nil || local == nil {
+	if c == nil || ctx == nil {
 		return zero, ErrChannel
 	}
 	token, err := c.token()
@@ -92,15 +90,6 @@ func (c *Client) Run(ctx context.Context, opening Opening, local Local) (HubFram
 		return zero, ErrChannel
 	}
 	in := NewConn(resp.Body, nil, nil, func(time.Time) error { return nil }) // ctx bounds the client
-	var operation app.ConnectorLifecycleOperation
-	// The begun operation and its reads end no later than its original
-	// NotAfter; the conversation's own longer bound never extends them.
-	opCtx, begun := ctx, false
-	defer func() {
-		if operation != nil {
-			operation.Close()
-		}
-	}()
 	for range 2 * MaxRegionFrame {
 		var frame HubFrame
 		if in.Receive(ctx, &frame) != nil {
@@ -108,37 +97,6 @@ func (c *Client) Run(ctx context.Context, opening Opening, local Local) (HubFram
 		}
 		var reply RegionFrame
 		switch {
-		case frame.Kind == "begin" && frame.Begin != nil && !begun: // one operation per conversation
-			begun = true
-			var stop context.CancelFunc
-			opCtx, stop = context.WithDeadline(ctx, frame.Begin.Binding.NotAfter)
-			defer stop()
-			if operation, err = local.BeginConnectorLifecycle(opCtx, *frame.Begin); err != nil {
-				_ = out.Send(RegionFrame{Kind: "error"})
-				return zero, ErrChannel
-			}
-			reply.Kind = "begun"
-		case frame.Kind == "read" && operation != nil:
-			obs, err := operation.Read(opCtx, frame.Phase)
-			if err != nil {
-				_ = out.Send(RegionFrame{Kind: "error"})
-				return zero, ErrChannel
-			}
-			reply = RegionFrame{Kind: "observation", Observation: &obs}
-		case frame.Kind == "source":
-			src, err := local.ReadConnectorIdentitySource(ctx)
-			if err != nil {
-				_ = out.Send(RegionFrame{Kind: "error"})
-				return zero, ErrChannel
-			}
-			reply = RegionFrame{Kind: "source", Source: &src}
-		case frame.Kind == "configuration":
-			cfg, err := local.ReadConnectorIdentityConfiguration(ctx)
-			if err != nil {
-				_ = out.Send(RegionFrame{Kind: "error"})
-				return zero, ErrChannel
-			}
-			reply = RegionFrame{Kind: "configuration", Configuration: &cfg}
 		case frame.Kind == "access-bindings":
 			reader, ok := local.(AccessBindingsLocal)
 			if !ok {
@@ -169,10 +127,6 @@ func (c *Client) Run(ctx context.Context, opening Opening, local Local) (HubFram
 			if frame.Digest != "" && frame.Digest == delivery.Digest() {
 				reply = RegionFrame{Kind: "capacity", Unchanged: true}
 			}
-		case frame.Kind == "close" && operation != nil:
-			operation.Close()
-			operation = nil
-			continue
 		case frame.Kind == "result" || frame.Kind == "failure":
 			return frame, nil
 		default:

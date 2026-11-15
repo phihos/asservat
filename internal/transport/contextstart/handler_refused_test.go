@@ -2,20 +2,29 @@ package contextstart
 
 import (
 	"context"
-	"crypto/tls"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
-	app "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/fleet"
 )
 
 type refusingIngress struct{}
 
-func (refusingIngress) AuthenticateContextStart(context.Context, *tls.ConnectionState, contracts.APIContextHello, app.ConnectorIdentitySourceReader) (fleet.APIContextReceiver, ReceiverCheck, error) {
+func (refusingIngress) AuthenticateContextStart(context.Context, contracts.APIContextHello, fleet.ConnectorCluster, time.Time) (fleet.APIContextReceiver, ReceiverCheck, error) {
 	return fleet.APIContextReceiver{}, nil, fleet.ErrDenied
+}
+
+// testTokens accepts the token "connector-token" for the test cluster.
+type testTokens struct{}
+
+func (testTokens) VerifyConnectorUntil(_ context.Context, token string) (fleet.ConnectorCluster, time.Time, error) {
+	if token != "connector-token" {
+		return fleet.ConnectorCluster{}, time.Time{}, fleet.ErrDenied
+	}
+	return fleet.ConnectorCluster{}, time.Now().Add(time.Hour), nil
 }
 
 func TestNilHandlerReturnsUnavailable(t *testing.T) {
@@ -32,7 +41,7 @@ func TestHandlerReportsRefusalStage(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	h, e := NewHandler("hub.example:9444", router, refusingIngress{}, 1)
+	h, e := NewHandler("hub.example:9444", router, refusingIngress{}, testTokens{}, 1)
 	if e != nil {
 		t.Fatal(e)
 	}

@@ -19,6 +19,7 @@ import (
 	captureapp "asservat.local/asservat/internal/application/capture"
 	identities "asservat.local/asservat/internal/application/identity"
 	compiler "asservat.local/asservat/internal/application/planning"
+	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	auth "asservat.local/asservat/internal/domain/authorization"
 	capture "asservat.local/asservat/internal/domain/capture"
@@ -51,7 +52,6 @@ type packetMetadataFixture struct {
 	afterStorage                                                 func()
 	lastLocal                                                    targets.PodResolution
 	stages                                                       []string
-	sourceUnavailable                                            atomic.Bool
 }
 
 var metadataAdmitted = errors.New("composed test reached admission")
@@ -170,7 +170,7 @@ func (f *packetMetadataFixture) Covering(ctx context.Context, _ identities.Curre
 	return auth.Grant{ID: metadataID(44), ExpiresAt: until}, until, nil
 }
 func (f *packetMetadataFixture) ReadConnectorIdentitySource(ctx context.Context) (fleet.ConnectorIdentitySource, error) {
-	if ctx.Err() != nil || f.sourceUnavailable.Load() {
+	if ctx.Err() != nil {
 		return fleet.ConnectorIdentitySource{}, fleet.ErrUnavailable
 	}
 	now := time.Now()
@@ -299,8 +299,7 @@ func newPacketMetadataFixture(t *testing.T) *packetMetadataFixture {
 		return s
 	}
 	hub, region := stream(hubSocket, check(true)), stream(regionSocket, check(false))
-	hub.sources = NewSourceFeed(f.channel.ExchangeID, time.Now)
-	region.local = f
+	hub.capabilities = contracts.NewConnectorCapabilities(contracts.APIContextCapabilities())
 	region.targets = f
 	receiver, e := check(true)(parent)
 	if e != nil {
@@ -364,7 +363,7 @@ func TestPacketMetadataTransportCompletionDoesNotExpireOwnedObservation(t *testi
 	}
 }
 func TestPacketMetadataComposedOriginalAuthorityAndIOBoundsRefuse(t *testing.T) {
-	for _, mode := range []string{"source-unavailable", "regional-io-expiry", "hub-io-expiry", "caller-io-cancellation", "human-expiry", "recovery-expiry", "grant-expiry", "current-deny", "request-five-second-bound"} {
+	for _, mode := range []string{"regional-io-expiry", "hub-io-expiry", "caller-io-cancellation", "human-expiry", "recovery-expiry", "grant-expiry", "current-deny", "request-five-second-bound"} {
 		t.Run(mode, func(t *testing.T) {
 			f := newPacketMetadataFixture(t)
 			p, e := f.svc.PreviewComposition(t.Context(), f, metadataIntent(f))
@@ -377,8 +376,6 @@ func TestPacketMetadataComposedOriginalAuthorityAndIOBoundsRefuse(t *testing.T) 
 			short := time.Now().UTC().Truncate(time.Microsecond).Add(100 * time.Millisecond)
 			f.storageDelay = 250 * time.Millisecond
 			switch mode {
-			case "source-unavailable":
-				f.sourceUnavailable.Store(true)
 			case "regional-io-expiry":
 				f.regionUntil = short
 				f.apiDelay = 30 * time.Millisecond

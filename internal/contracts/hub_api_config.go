@@ -56,8 +56,10 @@ type HubAPIConfig struct {
 	Connections int               `json:"connections"`
 	Concurrency int               `json:"concurrency"`
 	Observation HubAPIObservation `json:"observation"`
-	Native      HubAPINative      `json:"native"`
-	Public      *HubAPIPublic     `json:"public,omitempty"`
+	// ConnectorTokens verifies the connectors' context-start tokens.
+	ConnectorTokens ConnectorTokens `json:"connectorTokens"`
+	Native          HubAPINative    `json:"native"`
+	Public          *HubAPIPublic   `json:"public,omitempty"`
 	// Clusters are the remote workload clusters joined with mode=cluster.
 	Clusters []RemoteCluster `json:"clusters,omitempty"`
 }

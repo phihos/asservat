@@ -35,28 +35,10 @@ type ClusterObservationLocator struct {
 	Interval                                ClusterObservationInterval
 }
 
-// Matches requires the independently authenticated holder. Equal wire fields
-// alone cannot supply that peer proof. The trusted caller must bind that holder
-// to the installed permission root; RootID is not the installation UUID. The
-// interval must already intersect the
-// original request, current peer proof and original standby socket deadline.
-func (v ClusterObservationLocator) Matches(q ClusterObservationLocatorQuery, holder OwnerBinding, now time.Time) bool {
-	return q.Valid(now) && holder.Valid() && v.Holder == holder && v.RequestID == q.RequestID && v.Challenge == q.Challenge && v.RootID == q.RootID && v.ClusterID == q.ClusterID && authorization.UUID(v.ExchangeID) && v.Sequence != 0 && v.Interval.Valid(now) && !v.Interval.ObservedAt.Before(q.RequestedAt) && !v.Interval.FreshUntil.After(q.NotAfter)
-}
-
 // ClusterObservationClaim is the one selected non-replayable attempt. Value
 // validation does not claim the local holder, reserve a slot or make unknown
 // delivery retryable. Those remain receiving-transport responsibilities.
 type ClusterObservationClaim struct {
 	Request ClusterObservationRequest
 	Locator ClusterObservationLocator
-}
-
-func (c ClusterObservationClaim) Matches(holder OwnerBinding, now time.Time) bool {
-	return c.Request.Valid(now) && c.Locator.Matches(c.Request.LocatorQuery(), holder, now)
-}
-
-func (c ClusterObservationClaim) Clone() ClusterObservationClaim {
-	c.Request = c.Request.Clone()
-	return c
 }

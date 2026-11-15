@@ -22,7 +22,6 @@ import (
 	"asservat.local/asservat/internal/adapters/mtls"
 	"asservat.local/asservat/internal/application/evidence"
 	app "asservat.local/asservat/internal/application/fleet"
-	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	authorization "asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/fleet"
@@ -195,7 +194,7 @@ func TestOwnerRuntimeReadinessAndShutdown(t *testing.T) {
 	name, _ := mtls.OwnerServerName(r.Binding())
 	tr := &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS13, MaxVersion: tls.VersionTLS13, RootCAs: f.roots, ServerName: name, GetClientCertificate: r.client.GetClientCertificate}}
 	defer tr.CloseIdleConnections()
-	req, _ := http.NewRequest("POST", "https://"+listener.Addr().String()+contracts.OwnerRelayPath, bytes.NewReader([]byte(`{}`)))
+	req, _ := http.NewRequest("POST", "https://"+listener.Addr().String()+"/internal/hub-owner/v2/enroll-worker", bytes.NewReader([]byte(`{}`)))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer synthetic.token")
 	resp, err := (&http.Client{Transport: tr, Timeout: time.Second}).Do(req)

@@ -48,7 +48,7 @@ func apiContextWire(w value.APIContextWork) wire.APIContextWork {
 	return wire.APIContextWork{Format: wire.APIContextWorkFormat, Purpose: "runAction", ExecutionClass: string(artifact.ContextAPIExecution), ActionID: "pod-status", NativeBytes: artifact.MaxContextBytes,
 		Channel: wire.APIContextChannel{RootID: c.RootID, ExchangeID: c.ExchangeID, Challenge: c.Challenge,
 			Hub:       wire.APIContextOwner{InstallationID: h.InstallationID, ClusterID: h.ClusterID, IssuerEpoch: h.IssuerEpoch, PodUID: h.PodUID, ProcessEpoch: h.ProcessEpoch},
-			Connector: wire.APIContextConnector{InstallationID: p.Binding.InstallationID, ClusterID: p.Binding.ClusterID, IssuerEpoch: p.Binding.IssuerEpoch, PeerID: p.Binding.PeerID, PodUID: p.PodUID, ProcessEpoch: p.ProcessEpoch, LeafDigest: apiContextDigest(c.ConnectorLeaf)},
+			Connector: wire.APIContextConnector{InstallationID: p.Binding.InstallationID, ClusterID: p.Binding.ClusterID, IssuerEpoch: p.Binding.IssuerEpoch, PeerID: p.Binding.PeerID, PodUID: p.PodUID, ProcessEpoch: p.ProcessEpoch},
 			Executor:  wire.APIContextExecutor{NamespaceUID: e.NamespaceUID, AccountUID: e.AccountUID, PodUID: e.PodUID, ProcessEpoch: e.ProcessEpoch, StartupDigest: apiContextDigest(e.StartupDigest), ImageDigest: apiContextDigest(e.ImageDigest)}},
 		CaptureID: w.CaptureID, AttemptID: w.AttemptID, Actor: wire.APIContextActor{Issuer: w.Actor.Issuer, Subject: w.Actor.Subject, ClientID: w.Actor.ClientID, Kind: string(w.Actor.Kind)},
 		Target:      wire.APIContextTarget{ClusterID: w.Target.ClusterID, NamespaceUID: w.Target.NamespaceUID, WorkloadUID: w.Target.WorkloadUID, PodUID: w.Target.PodUID},
@@ -62,8 +62,8 @@ func apiContextValue(d wire.APIContextWork) (value.APIContextWork, error) {
 	c, p, e, h := d.Channel, d.Channel.Connector, d.Channel.Executor, d.Channel.Hub
 	w := value.APIContextWork{Channel: value.APIContextChannel{RootID: c.RootID, ExchangeID: c.ExchangeID, Challenge: c.Challenge,
 		Hub:       value.OwnerBinding{InstallationID: h.InstallationID, ClusterID: h.ClusterID, IssuerEpoch: h.IssuerEpoch, PodUID: h.PodUID, ProcessEpoch: h.ProcessEpoch},
-		Connector: value.ConnectorProcessIdentity{Binding: value.PeerBinding{InstallationID: p.InstallationID, ClusterID: p.ClusterID, IssuerEpoch: p.IssuerEpoch, PeerID: p.PeerID, Role: value.ConnectorPeer}, PodUID: p.PodUID, ProcessEpoch: p.ProcessEpoch}, ConnectorLeaf: digestValue(p.LeafDigest),
-		Executor: value.APIContextExecutor{NamespaceUID: e.NamespaceUID, AccountUID: e.AccountUID, PodUID: e.PodUID, ProcessEpoch: e.ProcessEpoch, StartupDigest: digestValue(e.StartupDigest), ImageDigest: digestValue(e.ImageDigest)}},
+		Connector: value.ConnectorProcessIdentity{Binding: value.PeerBinding{InstallationID: p.InstallationID, ClusterID: p.ClusterID, IssuerEpoch: p.IssuerEpoch, PeerID: p.PeerID, Role: value.ConnectorPeer}, PodUID: p.PodUID, ProcessEpoch: p.ProcessEpoch},
+		Executor:  value.APIContextExecutor{NamespaceUID: e.NamespaceUID, AccountUID: e.AccountUID, PodUID: e.PodUID, ProcessEpoch: e.ProcessEpoch, StartupDigest: digestValue(e.StartupDigest), ImageDigest: digestValue(e.ImageDigest)}},
 		CaptureID: d.CaptureID, AttemptID: d.AttemptID, Actor: identity.Principal{Issuer: d.Actor.Issuer, Subject: d.Actor.Subject, ClientID: d.Actor.ClientID, Kind: identity.Kind(d.Actor.Kind)},
 		Target: authorization.Target{ClusterID: d.Target.ClusterID, NamespaceUID: d.Target.NamespaceUID, WorkloadUID: d.Target.WorkloadUID, PodUID: d.Target.PodUID}, ScopeDigest: digestValue(d.ScopeDigest), ExpectationDigest: digestValue(d.ExpectationDigest), IntentDigest: digestValue(d.IntentDigest), BudgetDigest: digestValue(d.BudgetDigest),
 		Capability: identity.Revision{UID: d.Capability.UID, Generation: d.Capability.Generation, Digest: digestValue(d.Capability.Digest)}, ProjectionDigest: digestValue(d.ProjectionDigest), IssuedAt: instant(d.IssuedAt).UTC(), NotAfter: instant(d.NotAfter).UTC()}

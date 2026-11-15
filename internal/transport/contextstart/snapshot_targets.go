@@ -1,11 +1,12 @@
 package contextstart
 
 import (
+	"context"
+	"time"
+
 	"asservat.local/asservat/internal/domain/collector"
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/targets"
-	"context"
-	"time"
 )
 
 const queryResolveSourceSnapshot = "resolve-source-snapshot"

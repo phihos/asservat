@@ -1,13 +1,14 @@
 package contextstart
 
 import (
-	"asservat.local/asservat/internal/domain/identity"
 	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/domain/identity"
 
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"

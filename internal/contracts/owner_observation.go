@@ -52,6 +52,3 @@ func DecodeOwnerObservationRequest(b []byte) (OwnerObservationRequest, error) {
 func EncodeOwnerObservationReply(v OwnerObservationReply) ([]byte, error) {
 	return canonicalAPIContext(v, OwnerObservationBytes)
 }
-func DecodeOwnerObservationReply(b []byte) (OwnerObservationReply, error) {
-	return decodeClosedRPC[OwnerObservationReply](bytes.NewReader(b), OwnerObservationBytes)
-}

@@ -142,14 +142,14 @@ func TestHubAPIInputsMergeConfigIDsAndStartupReads(t *testing.T) {
 		t.Fatal("installer pins entered the composed input")
 	}
 	want := artifact.Digest(contracts.WorkloadSourceDigest(runtimeID, "hub", "asservat-hub-api"))
-	if c.Observation.ProtectionDigest != hubAPIDigestHex(want) || len(c.Observation.Peers) != 1 || c.Observation.Peers[0].PeerID != runtimeID {
-		t.Fatal("observation pin or local peer", c.Observation)
+	if c.Observation.ProtectionDigest != hubAPIDigestHex(want) || len(c.Observation.Peers) != 0 {
+		t.Fatal("observation pin", c.Observation)
 	}
 	l := c.Observation.LocalCapacity
 	if l == nil || l.ProbeNamespace != c.Namespace || l.Caller.AccountUID == "" || l.Caller.ProtectionDigest != c.Observation.ProtectionDigest {
 		t.Fatal("local capacity caller", l)
 	}
-	if n := c.Native; n == nil || len(n.WorkerAPIs) != 1 || n.WorkerAPIs[0].Namespace.UID != workerNamespaceUIDFixture || len(n.ConnectorRoots) != 1 {
+	if n := c.Native; n == nil || len(n.WorkerAPIs) != 1 || n.WorkerAPIs[0].Namespace.UID != workerNamespaceUIDFixture || len(n.ConnectorTokens.Audiences) != 0 {
 		t.Fatal("native worker APIs", c.Native)
 	}
 	p := c.Public
@@ -192,7 +192,6 @@ func TestHubAPIInputsNameTheMissingInput(t *testing.T) {
 		"identity-ca":         {skipCA: contracts.HubAPIIdentityCAFile, want: "input-ca-identity-ca.crt"},
 		"namespace-uid":       {fail: "namespace/hub", want: "input-namespace-uid"},
 		"capacity":            {fail: "capacity", want: "input-capacity-qualification"},
-		"connector-roots":     {fail: "pki/connector-pki", want: "input-connector-roots"},
 		"work-signing":        {fail: "signing/public-transit/" + providerconfig.OpenBaoNamesFor(runtimeID).WorkSigningKey, want: "input-work-signing-key"},
 		"invalid-composition": {mutate: func(c *contracts.HubAPIConfig) { c.Connections = 0 }, want: "identity"},
 	} {

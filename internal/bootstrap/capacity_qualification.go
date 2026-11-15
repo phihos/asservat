@@ -10,7 +10,6 @@ import (
 
 	"asservat.local/asservat/internal/adapters/mounts"
 	app "asservat.local/asservat/internal/application/capacity"
-	fleetapp "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/contracts"
 	query "asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -132,50 +131,6 @@ func capacityIDs(setup string) func() string {
 		n++
 		return uuid.NewSHA1(space, []byte("capacity/"+strconv.Itoa(n))).String()
 	}
-}
-
-// buildConnectorBacking derives the installation-wide connector root backing
-// (ADR-193) from the operator's connector limits and the capacity backup
-// profile. Identities derive from the role setup like capacityIDs, so a
-// replay rebuilds the same backing; source reservations are the minimum the
-// prepaid-retirement layout's own validator accepts.
-func buildConnectorBacking(c contracts.InstallerConnectorSettings, b contracts.InstallerCapacityBackup, root, installation, accountVersion, setup string, now time.Time) (fleetapp.ConnectorIdentityBacking, error) {
-	var zero fleetapp.ConnectorIdentityBacking
-	if !authorization.UUID(setup) {
-		return zero, mounts.ErrUnavailable
-	}
-	space, n := uuid.MustParse(setup), 0
-	newID := func() string {
-		n++
-		return uuid.NewSHA1(space, []byte("connector/"+strconv.Itoa(n))).String()
-	}
-	q := audit.OperationHistoryQualification{ID: newID(), Digest: profileDigest("history/"+audit.ConnectorRetirementHistoryLayout, c.Footprint), Layout: audit.ConnectorRetirementHistoryLayout,
-		MaximumRowFootprintBytes: c.Footprint.RowBytes, MaximumTransitionWALBytes: c.Footprint.TransitionWALBytes, BackupCopies: b.BackupCopies, WALCopies: b.WALCopies}
-	accounts, records := fleetapp.ConnectorStandingAccounts, fleetapp.ConnectorStandingRecordsPerAccount
-	profiles, transitions := fleetapp.ConnectorStandingProfiles, fleetapp.ConnectorStandingSourceTransitions
-	slots := accounts * records
-	backupBytes, walBytes := q.SlotBacking(c.PurgeLeases)
-	now = now.UTC().Truncate(time.Microsecond)
-	out := fleetapp.ConnectorIdentityBacking{AccountVersion: accountVersion, AccountLimit: accounts, RecordsPerAccount: records, RetainedSeconds: c.RetainedSeconds,
-		ProfileLimit: profiles, SourceTransitionLimit: transitions, Policy: audit.OperationLifecyclePolicy{
-			RootID: root, Lane: "identity", InstallationID: installation, StoreID: newID(), PolicyID: newID(), BackupProfileID: newID(),
-			PolicyDigest: profileDigest("connector", c), BackupProfileDigest: profileDigest("backup", b),
-			BackingRevision: 1, MetadataSlots: slots, BackupReservedBytes: slots * backupBytes, WALReservedBytes: slots * walBytes,
-			BackupHorizonSeconds: b.HorizonSeconds, CleanupBudgetSeconds: b.CleanupBudgetSeconds, ProofWindowSeconds: b.ProofWindowSeconds,
-			ValidUntil: fleetapp.ConnectorBackingStanding, MaxPurgeLeases: c.PurgeLeases, History: &q, OverdueTerminal: audit.OperationOverdueTerminal}}
-	if !q.Valid() {
-		return zero, mounts.ErrUnavailable
-	}
-	rows := 1 + profiles + profiles*(transitions+1)
-	out.SourceBackupReservedBytes = rows * 2 * q.MaximumRowFootprintBytes * q.BackupCopies
-	out.SourceWALReservedBytes = (2*transitions + fleetapp.ConnectorRetirementTicketTransitions*profiles*(transitions+1)) * q.MaximumTransitionWALBytes * q.WALCopies
-	// The process run time is the retention minus two backup horizons, three
-	// cleanup budgets, the proof window and a minute; it must cover the fixed
-	// regional deployment shape.
-	if !out.Valid() || !out.SupportsProcessLimits(contracts.RegionalServingSlots, contracts.RegionalRetainedProcesses) {
-		return zero, mounts.ErrUnavailable
-	}
-	return out, nil
 }
 
 // installedQueryBudget declares finite logical work/history under the original

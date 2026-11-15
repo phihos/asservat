@@ -19,7 +19,7 @@ func queryCapability(method string) string     { return "query/" + method }
 
 var (
 	operationMethods = []string{opResolvePod, opResolvePacketSource, opResolveArgumentSource, opStartArgumentRecording, opStartPolicyRecording, opReadProcess, opPrepareOutput, opAcquire, opComplete, opFinish, opStartProfile, opStartLogs, opStartRecording, opCollect, opStartSourceSnapshot, opResolveSourceSnapshot}
-	queryMethods     = []string{queryResolveWorkload, queryResolveWorkloadIdentity, queryResolvePod, queryObserveRestarts, queryReviewAccess, queryCaptureProfiles, queryListCaptureProfiles, queryResolvePacketPeers, queryResolveProfileEndpoint, queryProfileEndpointDefinition, queryPacketRecorder, queryResolvePacketRecorder, queryResolveProfileRecorder, queryResolveSyscallRecorder, queryResolveOngoingRecorders, querySourceWork, queryLiveProjection, queryManualLive}
+	queryMethods     = []string{queryResolveWorkload, queryResolveWorkloadIdentity, queryResolvePod, queryObserveRestarts, queryReviewAccess, queryCaptureProfiles, queryListCaptureProfiles, queryResolvePacketPeers, queryResolveProfileEndpoint, queryProfileEndpointDefinition, queryPacketRecorder, queryResolvePacketRecorder, queryResolveProfileRecorder, queryResolveSyscallRecorder, queryResolveOngoingRecorders, querySourceWork, queryLiveProjection, queryManualLive, queryResolveSourceSnapshots}
 )
 
 // capabilityStream is a stream that knows its connector's announcement.

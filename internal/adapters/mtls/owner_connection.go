@@ -1,11 +1,12 @@
 package mtls
 
 import (
-	app "asservat.local/asservat/internal/application/fleet"
-	value "asservat.local/asservat/internal/domain/fleet"
 	"bytes"
 	"crypto/tls"
 	"crypto/x509"
+
+	app "asservat.local/asservat/internal/application/fleet"
+	value "asservat.local/asservat/internal/domain/fleet"
 )
 
 // An owned snapshot of a completed, verified TLS handshake. Revalidation runs

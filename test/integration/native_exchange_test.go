@@ -12,11 +12,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math/big"
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"strings"
 	"sync"
 	"testing"
@@ -32,7 +30,6 @@ import (
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/authorization"
-	fleet "asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/privacy"
 	"asservat.local/asservat/internal/transport/browser"
 	"asservat.local/asservat/internal/transport/keyservice"
@@ -273,15 +270,8 @@ func qualifyNativeExchangePhase(t *testing.T, ctx context.Context, f nativeExcha
 		qualifyFirstContextPreparationRace(t, ctx, f)
 		return
 	}
-	connectorCertificate := nativeSQLConnectorCertificate(t, f)
-	connectorVerifier, e := mtls.NewPeerVerifier(keyTLS.roots, f.worker.Binding.InstallationID, fleet.ConnectorPeer, time.Now)
-	if e != nil {
-		t.Fatal(e)
-	}
-	hub := &nativeSQLAdmission{test: t, side: "hub", origins: origins, peer: certificate.Peer, router: router, leaf: certificate.DER, connectorVerifier: connectorVerifier, connectorDigest: sha256.Sum256(connectorCertificate.Certificate[0])}
-	upstream := nativeSQLServer(t, contracts.NativeOwnerPath, hub, connectorCertificate, keyTLS)
-	connector := &nativeSQLAdmission{test: t, side: "connector", origins: origins, peer: certificate.Peer, upstream: upstream, verifier: f.enrollment.issuer.verifier}
-	client := nativeSQLServer(t, contracts.NativeWorkerPath, connector, clientCertificate, keyTLS)
+	hub := &nativeSQLAdmission{test: t, side: "hub", origins: origins, peer: certificate.Peer, router: router, verifier: f.enrollment.issuer.verifier}
+	client := nativeSQLServer(t, contracts.NativeWorkerPath, hub, clientCertificate, keyTLS)
 	workerCtx, cancelWorker := context.WithDeadline(ctx, target.RunUntil)
 	defer cancelWorker()
 	workerDone := make(chan error, 1)
@@ -505,17 +495,15 @@ func startNativeFixtureObservations(t *testing.T, parent context.Context, refres
 	}
 }
 
+// nativeSQLAdmission is the hub's worker admission: the actual worker TLS
+// peer, its SQL origin and the router's exact registered exchange.
 type nativeSQLAdmission struct {
-	test              *testing.T
-	side              string
-	origins           evidence.NativeOrigins
-	peer              value.KeyPeer
-	router            *native.HubRouter
-	upstream          *mtls.NativeClient
-	verifier          *mtls.KeyPeerVerifier
-	leaf              []byte
-	connectorVerifier *mtls.PeerVerifier
-	connectorDigest   artifact.Digest
+	test     *testing.T
+	side     string
+	origins  evidence.NativeOrigins
+	peer     value.KeyPeer
+	router   *native.HubRouter
+	verifier *mtls.KeyPeerVerifier
 }
 
 func (a *nativeSQLAdmission) OpenNative(ctx context.Context, state *tls.ConnectionState, h contracts.NativeHello) (conversation native.Conversation, result error) {
@@ -524,20 +512,6 @@ func (a *nativeSQLAdmission) OpenNative(ctx context.Context, state *tls.Connecti
 	defer func() { a.test.Log("native diagnostic", a.side, "admission terminal", time.Since(started), result) }()
 	if state == nil || !state.HandshakeComplete || state.NegotiatedProtocol != "h2" || len(state.VerifiedChains) == 0 || len(state.PeerCertificates) < 1 {
 		return nil, contracts.ErrNativeProtocol
-	}
-	if a.router != nil {
-		// The fixture's connector admission is synthetic; forwarded acquisition leaf
-		// and the operation/Pod proof are still independently exact SQL inputs.
-		connector, e := a.connectorVerifier.Verify(state)
-		if e != nil || connector.Digest != a.connectorDigest || connector.Binding.InstallationID != a.peer.InstallationID || !bytes.Equal(h.WorkerLeaf, a.leaf) {
-			return nil, contracts.ErrNativeProtocol
-		}
-		origin, e := a.origins.Check(ctx, h.Reference.InstallationID, h.Reference.SessionID, h.Reference.WorkerID, a.peer, h.WorkerToken)
-		if e != nil {
-			return nil, e
-		}
-		a.test.Log("native diagnostic", a.side, "origin accepted", origin.Lease.Operation.Kind, "sequence", origin.Lease.Sequence, time.Until(origin.Lease.Until))
-		return a.router.Attach(ctx, origin, h)
 	}
 	peer, e := a.verifier.Verify(state)
 	if e != nil || peer != a.peer {
@@ -551,16 +525,7 @@ func (a *nativeSQLAdmission) OpenNative(ctx context.Context, state *tls.Connecti
 	ref := origin.Lease.Operation.Reference
 	h.Reference = contracts.NativeReference{InstallationID: ref.InstallationID, SessionID: ref.SessionID, WorkerID: ref.WorkerID, OperationID: ref.OperationID, Fence: ref.Fence}
 	h.WorkerLeaf = append([]byte(nil), state.PeerCertificates[0].Raw...)
-	upstream, e := a.upstream.Open(ctx, h)
-	if e != nil {
-		return nil, e
-	}
-	gate, e := evidence.NewNativeFrameGate(ctx, func(c context.Context) (value.NativeLease, error) { return a.origins.Recheck(c, origin) }, time.Now)
-	if e != nil {
-		upstream.Close()
-		return nil, e
-	}
-	return native.NewRelayConversation(gate, upstream)
+	return a.router.Attach(ctx, origin, h)
 }
 
 type nativeSQLServingCertificate struct{ certificate tls.Certificate }
@@ -585,7 +550,8 @@ func nativeSQLServer(t *testing.T, path string, admission native.Admission, clie
 	// The actual bounded native listener is used; this fixture's server issuer
 	// and serving source remain explicitly synthetic protected installation facts.
 	serving := nativeSQLServingCertificate{keys.certificate(t, "server")}
-	go func() { done <- native.Serve(ctx, listener, keys.roots, serving, handler, 2) }()
+	roots := func(time.Time) (*x509.CertPool, error) { return keys.roots, nil }
+	go func() { done <- native.ServeWorker(ctx, listener, roots, serving, handler, 2) }()
 	t.Cleanup(func() {
 		cancel()
 		listener.Close()
@@ -709,22 +675,4 @@ func nativeSQLRoles(t *testing.T, ctx context.Context, admin *pgxpool.Pool) {
 			t.Fatal("native fixture role", e)
 		}
 	}
-}
-
-func nativeSQLConnectorCertificate(t *testing.T, f nativeExchangeFixture) tls.Certificate {
-	t.Helper()
-	public, key, e := ed25519.GenerateKey(rand.Reader)
-	if e != nil {
-		t.Fatal(e)
-	}
-	uri, e := mtls.PeerURI(fleet.PeerBinding{InstallationID: f.worker.Binding.InstallationID, ClusterID: f.worker.Binding.ClusterID, IssuerEpoch: custodyID(), PeerID: custodyID(), Role: fleet.ConnectorPeer})
-	if e != nil {
-		t.Fatal(e)
-	}
-	leaf := &x509.Certificate{SerialNumber: big.NewInt(987654), NotBefore: time.Now().Add(-time.Minute), NotAfter: time.Now().Add(30 * time.Minute), BasicConstraintsValid: true, KeyUsage: x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}, URIs: []*url.URL{uri}}
-	raw, e := x509.CreateCertificate(rand.Reader, leaf, f.enrollment.issuer.ca, public, f.enrollment.issuer.key)
-	if e != nil {
-		t.Fatal(e)
-	}
-	return tls.Certificate{Certificate: [][]byte{raw, f.enrollment.issuer.ca.Raw}, PrivateKey: key}
 }

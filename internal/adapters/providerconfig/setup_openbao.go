@@ -48,20 +48,19 @@ func OpenBaoRoleName(name, component, purpose string) string {
 // the bundled mounts (contracts.SmallOpenBao*Mount). Runtime components use
 // the same names.
 type OpenBaoNames struct {
-	AuditKey, WorkerConfigurationAuditKey, DeletionSigningKey, FederationAuditKey, PublisherAuditKey string // on SmallOpenBaoAuditMount
-	BrowserSessionKey, WorkSigningKey                                                                string // on SmallOpenBaoTransitMount
-	OwnerServerRole, OwnerClientRole                                                                 string // on SmallOpenBaoOwnerPKIMount
-	ConnectorClientRole, ConnectorServerRole                                                         string // on SmallOpenBaoConnectorPKIMount
-	DownloadWorkerRole, VerifierRole                                                                 string // on SmallOpenBaoWorkerPKIMount
+	AuditKey, WorkerConfigurationAuditKey, DeletionSigningKey, PublisherAuditKey string // on SmallOpenBaoAuditMount
+	BrowserSessionKey, WorkSigningKey                                            string // on SmallOpenBaoTransitMount
+	OwnerServerRole, OwnerClientRole                                             string // on SmallOpenBaoOwnerPKIMount
+	DownloadWorkerRole, VerifierRole                                             string // on SmallOpenBaoWorkerPKIMount
 }
 
 func OpenBaoNamesFor(installationID string) OpenBaoNames {
 	p := "asservat-" + strings.ReplaceAll(installationID, "-", "")
 	return OpenBaoNames{AuditKey: "audit", WorkerConfigurationAuditKey: contracts.WorkerConfigurationAuditKeyName(installationID),
-		DeletionSigningKey: contracts.ContextDeletionSigningKeyName(installationID), FederationAuditKey: p + "-federation-audit",
-		PublisherAuditKey: PublisherAuditKey(installationID), BrowserSessionKey: p + "-browser-sessions", WorkSigningKey: p + "-work-signing",
-		OwnerServerRole: p + "-owner-server", OwnerClientRole: p + "-owner-client", ConnectorClientRole: p + "-connector-client",
-		ConnectorServerRole: p + "-connector-server", DownloadWorkerRole: p + "-download-worker", VerifierRole: contracts.PublisherVerifierRole(installationID)}
+		DeletionSigningKey: contracts.ContextDeletionSigningKeyName(installationID),
+		PublisherAuditKey:  PublisherAuditKey(installationID), BrowserSessionKey: p + "-browser-sessions", WorkSigningKey: p + "-work-signing",
+		OwnerServerRole: p + "-owner-server", OwnerClientRole: p + "-owner-client",
+		DownloadWorkerRole: p + "-download-worker", VerifierRole: contracts.PublisherVerifierRole(installationID)}
 }
 
 // SetupOpenBaoLogin authenticates the setup Job with its projected service
@@ -149,12 +148,12 @@ func openBaoSetupPlanFor(in OpenBaoSetupInput) (openBaoSetupPlan, error) {
 	}
 	n := OpenBaoNamesFor(in.InstallationID)
 	audit, transit := contracts.SmallOpenBaoAuditMount, contracts.SmallOpenBaoTransitMount
-	ownerPKI, connectorPKI, workerPKI := contracts.SmallOpenBaoOwnerPKIMount, contracts.SmallOpenBaoConnectorPKIMount, contracts.SmallOpenBaoWorkerPKIMount
+	ownerPKI, workerPKI := contracts.SmallOpenBaoOwnerPKIMount, contracts.SmallOpenBaoWorkerPKIMount
 	p.transit = []string{audit, transit}
-	p.pki = []string{ownerPKI, connectorPKI, workerPKI}
+	p.pki = []string{ownerPKI, workerPKI}
 	p.auth = []string{contracts.SmallOpenBaoConfigurationAuthMount, contracts.SmallOpenBaoOwnerAuthMount}
 	p.keys = []openBaoKey{{audit, n.AuditKey, "aes256-gcm96"}, {audit, n.WorkerConfigurationAuditKey, "aes256-gcm96"}, {audit, n.DeletionSigningKey, "ed25519"},
-		{audit, n.FederationAuditKey, "aes256-gcm96"}, {audit, n.PublisherAuditKey, "aes256-gcm96"},
+		{audit, n.PublisherAuditKey, "aes256-gcm96"},
 		{transit, n.BrowserSessionKey, "aes256-gcm96"}, {transit, n.WorkSigningKey, "ed25519"}}
 	key := func(mount, name, op string) string { return mount + "/" + op + "/" + name }
 	use := func(paths ...string) map[string][]string {
@@ -180,7 +179,6 @@ func openBaoSetupPlanFor(in OpenBaoSetupInput) (openBaoSetupPlan, error) {
 	}
 	encrypt, decrypt, sign := key(audit, n.AuditKey, "encrypt"), key(audit, n.AuditKey, "decrypt"), key(audit, n.DeletionSigningKey, "sign")
 	hub := contracts.OwnerProviderAudience(in.InstallationID, in.ClusterID)
-	federation := contracts.FederationProviderAudience(in.InstallationID, in.ClusterID)
 	publisher := contracts.PublisherProviderAudience(in.InstallationID, in.ClusterID)
 	p.roles = []openBaoRole{
 		worker("audit-wrap", read(use(encrypt, key(audit, n.WorkerConfigurationAuditKey, "encrypt"), sign), audit+"/keys/"+n.DeletionSigningKey)),
@@ -190,8 +188,6 @@ func openBaoSetupPlanFor(in OpenBaoSetupInput) (openBaoSetupPlan, error) {
 		owner("hub-api", hub, "server-sign", use(ownerPKI+"/sign/"+n.OwnerServerRole)), owner("hub-api", hub, "client-sign", use(ownerPKI+"/sign/"+n.OwnerClientRole)),
 		owner("hub-api", hub, "browser-seal", use(key(transit, n.BrowserSessionKey, "encrypt"))), owner("hub-api", hub, "browser-open", use(key(transit, n.BrowserSessionKey, "decrypt"))),
 		owner("hub-api", hub, "work-sign", read(use(key(transit, n.WorkSigningKey, "sign")), transit+"/keys/"+n.WorkSigningKey)), owner("hub-api", hub, "worker-issue", use(workerPKI+"/sign/"+n.DownloadWorkerRole)),
-		owner("federation", federation, "audit-wrap", use(key(audit, n.FederationAuditKey, "encrypt"))), owner("federation", federation, "audit-unwrap", use(key(audit, n.FederationAuditKey, "decrypt"))),
-		owner("federation", federation, "client-sign", use(connectorPKI+"/sign/"+n.ConnectorClientRole)), owner("federation", federation, "server-sign", use(connectorPKI+"/sign/"+n.ConnectorServerRole)),
 		owner("publisher", publisher, "audit-wrap", use(key(audit, n.PublisherAuditKey, "encrypt"))), owner("publisher", publisher, "audit-unwrap", use(key(audit, n.PublisherAuditKey, "decrypt"))),
 		owner("publisher", publisher, "verifier-sign", use(workerPKI+"/sign/"+n.VerifierRole)),
 	}
@@ -199,17 +195,13 @@ func openBaoSetupPlanFor(in OpenBaoSetupInput) (openBaoSetupPlan, error) {
 	hubURI := "spiffe://asservat." + in.InstallationID + "/hub/" + in.ClusterID + "/issuer/" + in.IssuerEpoch + "/pod/*/process/*"
 	hubServer := []string{"p-*.e-*.hub." + in.ClusterID + ".asservat." + in.InstallationID, "s-*.e-" + in.IssuerEpoch + ".hub-bootstrap." + in.ClusterID + ".asservat." + in.InstallationID}
 	ownerTTL := int64((fleet.OwnerCertificatePeriod + fleet.OwnerCertificateRenewBefore) / time.Second)
-	connectorTTL := int64((fleet.ConnectorCertificatePeriod + fleet.ConnectorCertificateRenewBefore) / time.Second)
-	connectorURI := "spiffe://asservat." + in.InstallationID + "/cluster/*/epoch/*/connector/*"
-	connectorServer := []string{"*." + contracts.ConnectorServerSuffix(in.InstallationID)}
 	for _, r := range []struct {
 		mount, name string
 		server      bool
 		domains     []string
 		uri         string
 		ttl         int64
-	}{{ownerPKI, n.OwnerServerRole, true, hubServer, hubURI, ownerTTL}, {ownerPKI, n.OwnerClientRole, false, nil, hubURI, ownerTTL},
-		{connectorPKI, n.ConnectorClientRole, false, nil, connectorURI, connectorTTL}, {connectorPKI, n.ConnectorServerRole, true, connectorServer, connectorURI, connectorTTL}} {
+	}{{ownerPKI, n.OwnerServerRole, true, hubServer, hubURI, ownerTTL}, {ownerPKI, n.OwnerClientRole, false, nil, hubURI, ownerTTL}} {
 		body, err := setupPKIRole(r.server, r.domains, r.uri, r.ttl)
 		if err != nil {
 			return p, err

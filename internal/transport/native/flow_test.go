@@ -68,7 +68,6 @@ type flowAdmission struct {
 	owner        context.Context
 	operation    *native.HubOperation
 	lease        value.NativeLease
-	upstream     *mtls.NativeClient
 	calls        atomic.Int32
 	check        func(context.Context) (value.NativeLease, error)
 	wrap         func(native.Stream) native.Stream
@@ -80,40 +79,13 @@ func (a *flowAdmission) OpenNative(ctx context.Context, peer *tls.ConnectionStat
 	if peer == nil || !peer.HandshakeComplete || len(peer.VerifiedChains) == 0 || len(peer.PeerCertificates) != 1 {
 		return nil, contracts.ErrNativeProtocol
 	}
-	if a.upstream == nil {
-		c, e := a.operation.Attach(ctx, h)
-		if e != nil {
-			return nil, e
-		}
-		return flowConversation{c, "hub", a.t}, nil
-	}
 	h.Reference = contracts.NativeReference{InstallationID: nativeID, SessionID: nativeID, WorkerID: nativeID, OperationID: a.lease.Operation.Reference.OperationID, Fence: a.lease.Operation.Reference.Fence}
 	h.WorkerLeaf = append([]byte(nil), peer.PeerCertificates[0].Raw...)
-	stream, e := a.upstream.Open(a.owner, h)
+	c, e := a.operation.Attach(ctx, h)
 	if e != nil {
 		return nil, e
 	}
-	check := a.check
-	if check == nil {
-		check = func(context.Context) (value.NativeLease, error) { return a.lease, nil }
-	}
-	gate, e := evidence.NewNativeFrameGate(a.owner, check, time.Now)
-	if e != nil {
-		stream.Close()
-		return nil, e
-	}
-	if a.observedGate != nil {
-		a.observedGate(gate)
-	}
-	var wrapped native.Stream = stream
-	if a.wrap != nil {
-		wrapped = a.wrap(stream)
-	}
-	c, e := native.NewRelayConversation(gate, wrapped)
-	if e != nil {
-		return nil, e
-	}
-	return flowConversation{c, "connector", a.t}, nil
+	return flowConversation{c, "hub", a.t}, nil
 }
 func flowServer(t *testing.T, path string, a native.Admission) *mtls.NativeClient {
 	return flowServerReporting(t, path, a, nil)
@@ -216,12 +188,10 @@ func flowOperationWithConnector(t *testing.T, ctx context.Context, source eviden
 		t.Fatal("operation", e)
 	}
 	t.Cleanup(func() { operation.Close() })
-	hub := &flowAdmission{t: t, owner: ctx, operation: operation, lease: l}
-	upstream := flowServer(t, contracts.NativeOwnerPath, hub)
-	connector := &flowAdmission{t: t, owner: ctx, lease: l, upstream: upstream, check: check}
-	var admission native.Admission = connector
+	hub := &flowAdmission{t: t, owner: ctx, operation: operation, lease: l, check: check}
+	var admission native.Admission = hub
 	if construct != nil {
-		admission = construct(connector)
+		admission = construct(hub)
 	}
 	client := flowServer(t, contracts.NativeWorkerPath, admission)
 	return operation, client, o

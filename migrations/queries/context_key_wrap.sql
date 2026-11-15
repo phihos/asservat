@@ -7,17 +7,9 @@ JOIN context_capture c ON c.id=e.capture_id AND c.root_id=e.root_id
 WHERE e.attempt_id=$1 AND e.root_id=$2
 FOR SHARE OF e;
 
--- name: ReadActivatedConnectorClientLeaf :one
--- The presenting certificate must be an activated, attached connector client
--- leaf of a serving, unretired process.
-SELECT p.pod_uid, p.process_epoch, prof.cluster_id, prof.installation_id, a.certificate_not_after
-FROM connector_credential_attempt a
-JOIN connector_identity_process p ON p.id=a.process_id AND p.root_id=a.root_id
-JOIN connector_identity_profile prof ON prof.root_id=a.root_id AND prof.peer_id=a.peer_id
-WHERE a.root_id=$1 AND a.certificate_digest=$2 AND a.usage='client' AND a.activated_at IS NOT NULL AND a.detached_at IS NULL
- AND p.serving AND p.retired_at IS NULL;
-
 -- name: LockContextKeyWrap :one
+-- certificate_sha256 names the presenting peer: a key client's leaf, or a
+-- connector's cluster (ADR-334).
 SELECT attempt_id, root_id, certificate_sha256, used_roles
 FROM context_key_wrap WHERE attempt_id=$1 AND root_id=$2
 FOR UPDATE;

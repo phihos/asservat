@@ -1648,30 +1648,6 @@ type FleetObservation struct {
 	FreshUntil            pgtype.Timestamptz
 }
 
-type FleetPeer struct {
-	InstallationID     pgtype.UUID
-	PeerID             pgtype.UUID
-	ClusterID          pgtype.UUID
-	IssuerEpoch        pgtype.UUID
-	Role               string
-	Revision           int64
-	Enabled            bool
-	NotAfter           pgtype.Timestamptz
-	AuditID            pgtype.UUID
-	AuditObjectKey     pgtype.Text
-	AuditObjectVersion pgtype.Text
-	AuditObjectSha256  []byte
-}
-
-type FleetPeerCertificate struct {
-	InstallationID    pgtype.UUID
-	PeerID            pgtype.UUID
-	Slot              int16
-	CertificateSha256 []byte
-	NotBefore         pgtype.Timestamptz
-	NotAfter          pgtype.Timestamptz
-}
-
 type FleetTrust struct {
 	InstallationID        pgtype.UUID
 	IssuerEpoch           pgtype.UUID

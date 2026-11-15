@@ -1,9 +1,6 @@
 package mtls
 
 import (
-	"asservat.local/asservat/internal/domain/artifact"
-	value "asservat.local/asservat/internal/domain/fleet"
-	"asservat.local/asservat/internal/domain/identity"
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/x509"
@@ -12,6 +9,10 @@ import (
 	"net/url"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/domain/artifact"
+	value "asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
 )
 
 func ownerPermit(now time.Time, roots [][]byte, key artifact.Digest, usage string) value.OwnerCertificatePermit {

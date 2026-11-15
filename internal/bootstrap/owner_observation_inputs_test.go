@@ -15,7 +15,7 @@ import (
 )
 
 func TestOwnerObservationInputIsExplicitAndFinite(t *testing.T) {
-	for _, mode := range []string{"valid", "legacy", "mixed", "format", "empty-peers", "duplicate-peer", "excess-peers", "missing-root", "zero-template", "upper-image", "guessed-process"} {
+	for _, mode := range []string{"valid", "legacy", "mixed", "format", "duplicate-peer", "excess-peers", "missing-root", "zero-template", "upper-image", "guessed-process"} {
 		t.Run(mode, func(t *testing.T) {
 			in, dir, c := ownerInputFixture(t)
 			c.Observation = &contracts.OwnerObservationBootstrap{Format: contracts.OwnerObservationFormat, TemplateDigest: strings.Repeat("1", 64), ImageDigest: strings.Repeat("2", 64), ProtectionDigest: strings.Repeat("3", 64), Activation: ownerObservationTestActivation(c), Peers: []contracts.OwnerObservationPeer{{InstallationID: runtimeID, ClusterID: runtimeID, IssuerEpoch: runtimeID, PeerID: runtimeID, Roots: c.Kubernetes.Roots}}}
@@ -32,8 +32,6 @@ func TestOwnerObservationInputIsExplicitAndFinite(t *testing.T) {
 				c.Native = &contracts.OwnerNativeDeployment{}
 			case "format":
 				c.Observation.Format = "unknown/v1"
-			case "empty-peers":
-				c.Observation.Peers = nil
 			case "duplicate-peer":
 				c.Observation.Peers = append(c.Observation.Peers, c.Observation.Peers[0])
 			case "excess-peers":

@@ -96,10 +96,17 @@ func NewServiceAccountVerifier(audiences []string, clusters []ServiceAccountClus
 // selected by the token's unverified issuer and subject before any key
 // lookup; the verifier then checks signature, issuer, audience and expiry.
 func (v *ServiceAccountVerifier) VerifyConnector(ctx context.Context, raw string) (ServiceAccountCluster, error) {
+	c, _, err := v.VerifyConnectorToken(ctx, raw)
+	return c, err
+}
+
+// VerifyConnectorToken also returns the token's expiry, which bounds any use
+// of the authentication.
+func (v *ServiceAccountVerifier) VerifyConnectorToken(ctx context.Context, raw string) (ServiceAccountCluster, time.Time, error) {
 	var zero ServiceAccountCluster
 	issuer, subject, ok := unverifiedClaims(raw)
 	if v == nil || !ok {
-		return zero, ErrServiceAccountDenied
+		return zero, time.Time{}, ErrServiceAccountDenied
 	}
 	for _, c := range v.clusters {
 		if !c.candidate(issuer, subject) {
@@ -110,10 +117,10 @@ func (v *ServiceAccountVerifier) VerifyConnector(ctx context.Context, raw string
 			continue
 		}
 		if t, err := state.verifier.Verify(gooidc.ClientContext(ctx, c.cluster.Client), raw); err == nil && t.Subject == subject && slices.ContainsFunc(t.Audience, func(a string) bool { return slices.Contains(v.audiences, a) }) {
-			return c.cluster, nil
+			return c.cluster, t.Expiry, nil
 		}
 	}
-	return zero, ErrServiceAccountDenied
+	return zero, time.Time{}, ErrServiceAccountDenied
 }
 
 // candidate matches the connector subject and the registered issuer, or,

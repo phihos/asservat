@@ -57,15 +57,19 @@ type ServiceTopology struct {
 // the contracts.SmallOpenBao* constants; key and PKI role names derive from
 // the installation ID (providerconfig.OpenBaoNamesFor).
 type FederationConfig struct {
-	Name        string             `json:"name"`
-	Namespace   string             `json:"namespace"`
-	Port        int                `json:"port"`
-	Concurrency int                `json:"concurrency"`
-	Postgres    ServicePostgres    `json:"postgres"`
-	AuditStore  ServiceObjectStore `json:"auditStore"`
-	OpenBao     string             `json:"openBao"`
+	Name            string          `json:"name"`
+	Namespace       string          `json:"namespace"`
+	Port            int             `json:"port"`
+	Concurrency     int             `json:"concurrency"`
+	Postgres        ServicePostgres `json:"postgres"`
+	ConnectorTokens ConnectorTokens `json:"connectorTokens"`
+}
+
+// ConnectorTokens is how a hub process verifies connector ServiceAccount
+// tokens (ADR-334).
+type ConnectorTokens struct {
 	// Audiences are the hub URLs connectors dial; a connector's
-	// ServiceAccount token must name one of them (ADR-334).
+	// ServiceAccount token must name one of them.
 	Audiences []string `json:"audiences"`
 	// LocalConnector is the combined-mode connector's ServiceAccount
 	// "namespace/name" in this cluster; empty in mode=hub.
@@ -90,10 +94,11 @@ type KeyServiceConfig struct {
 	Port        int             `json:"port"`
 	Concurrency int             `json:"concurrency"`
 	Postgres    ServicePostgres `json:"postgres"`
-	// OpenBao serves the worker and connector PKI CAs the key service trusts
-	// for client certificates (unauthenticated ca/pem reads).
-	OpenBao   string                     `json:"openBao"`
-	Downloads *KeyServiceDownloadsConfig `json:"downloads,omitempty"`
+	// OpenBao serves the worker PKI CA the key service trusts for client
+	// certificates (unauthenticated ca/pem reads).
+	OpenBao         string                     `json:"openBao"`
+	Downloads       *KeyServiceDownloadsConfig `json:"downloads,omitempty"`
+	ConnectorTokens ConnectorTokens            `json:"connectorTokens"`
 }
 
 // KeyServiceDownloadsConfig enables acquisition unwraps (ADR-204): the worker

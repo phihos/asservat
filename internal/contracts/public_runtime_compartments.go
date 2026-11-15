@@ -19,7 +19,7 @@ const PublicRuntimeRetainedFederationProcesses = 2
 const PublicRuntimeFederationRoleConnections = PublicRuntimeRetainedFederationProcesses + 1
 
 func PublicRuntimeFederationPurposes() []string {
-	return []string{"connector-source", "connector-journal", "connector-ack", "connector-read", "connector-delivery", "connector-owner-read"}
+	return []string{"connector-read", "connector-delivery", "connector-owner-read"}
 }
 
 // ADR-181: the asynchronous publication verifier is its own process kind
@@ -31,13 +31,6 @@ func PublicRuntimePublisherPurposes() []string {
 	return []string{"publication-gate", "context-verify", "context-verification-audit", "context-publish", "publisher-identity-read", "publisher-retention-read"}
 }
 
-// SQL49 pins all six connector duty logins at first source staging, so the
-// three maintenance duties exist from installation. They run in the worker
-// compartment and are projected nowhere until that consumer is composed.
-func PublicRuntimeConnectorMaintenancePurposes() []string {
-	return []string{"connector-cleanup", "connector-verifier", "connector-finalizer"}
-}
-
 // ConnectionLimit describes a fixed purpose, not permission to provision it.
 // The compiled inventory and independently protected workload compartment must
 // also support that purpose before any credential effect or runtime mount.
@@ -46,7 +39,7 @@ func PublicRuntimeRoleConnectionLimit(purpose string) (int, bool) {
 		limit, _ := PublicRuntimeRolePoolLimit(purpose)
 		return PublicRuntimeRetainedHubProcesses*limit + 1, true
 	}
-	if purpose == "browser-settings" || slices.Contains(PublicRuntimeCaptureCleanupPurposes(), purpose) || slices.Contains(PublicRuntimeConnectorMaintenancePurposes(), purpose) || purpose == "capacity" || purpose == "capacity-capture" || slices.Contains(PublicRuntimePermissionPurposes(), purpose) || slices.Contains(PublicRuntimeRetentionPurposes(), purpose) || slices.Contains(PublicRuntimeWorkerConfigurationPurposes(), purpose) || slices.Contains(PublicRuntimeContextDeletionPurposes(), purpose) {
+	if purpose == "browser-settings" || slices.Contains(PublicRuntimeCaptureCleanupPurposes(), purpose) || purpose == "capacity" || purpose == "capacity-capture" || slices.Contains(PublicRuntimePermissionPurposes(), purpose) || slices.Contains(PublicRuntimeRetentionPurposes(), purpose) || slices.Contains(PublicRuntimeWorkerConfigurationPurposes(), purpose) || slices.Contains(PublicRuntimeContextDeletionPurposes(), purpose) {
 		return PublicRuntimeWorkerRoleConnections, true
 	}
 	if slices.Contains(PublicRuntimeFederationPurposes(), purpose) {

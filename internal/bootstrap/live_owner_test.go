@@ -7,12 +7,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/http/httptest"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"asservat.local/asservat/internal/adapters/mtls"
 	liveapp "asservat.local/asservat/internal/application/live"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/identity"
@@ -202,32 +200,6 @@ func (w countedLiveWriter) Write(p []byte) (int, error) {
 	return n, e
 }
 func (w countedLiveWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
-
-type liveOwnerH2Fixture struct {
-	forward    *liveOwnerForwarder
-	facts      *liveOwnerFacts
-	current    *liveOwnerIdentityFixture
-	service    *liveapp.Service
-	request    v.Open
-	watch      v.Watch
-	peer       *observationForwardFixture
-	requests   atomic.Int32
-	in, out    atomic.Int64
-	server     *httptest.Server
-	serverKeys *mtls.OwnerCredentials
-	handler    *native.LiveOwnerHandler
-	joined     atomic.Int32
-	wire       bytes.Buffer
-	wireMu     sync.Mutex
-}
-
-func (f *liveOwnerH2Fixture) begin(ctx context.Context, c liveapp.Command) (liveapp.CommandDelivery, error) {
-	k, e := f.service.OwnerRouteKeys(ctx, f.current, c)
-	if e != nil {
-		return nil, e
-	}
-	return f.forward.begin(ctx, f.current, c, k, f.peer.servers[0])
-}
 
 type liveOwnerRejectNative struct{ calls atomic.Int32 }
 

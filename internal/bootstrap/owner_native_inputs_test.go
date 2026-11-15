@@ -12,14 +12,14 @@ import (
 func nativeInputFixture(t *testing.T) (*ownerInputs, string, contracts.OwnerDeployment) {
 	in, dir, c := ownerInputFixture(t)
 	c.Native = &contracts.OwnerNativeDeployment{
-		ConnectorRoots: c.Kubernetes.Roots, Connections: 2, Concurrency: 1,
+		Connections: 2, Concurrency: 1,
 		WorkerAPIs:          []contracts.OwnerNativeWorkerAPI{{ClusterID: runtimeID, Namespace: contracts.WorkerObjectReference{Name: "workers", UID: runtimeID}, Kubernetes: c.Kubernetes}},
 		RetentionTopologies: []contracts.OwnerNativeTopology{{TargetClusterID: runtimeID, Name: "topology", UID: runtimeID, SHA256: strings.Repeat("1", 64)}},
 	}
 	return in, dir, c
 }
 func TestOwnerNativeInputsAreClosedPinnedAndOptional(t *testing.T) {
-	for _, mode := range []string{"valid", "absent", "duplicate-api", "same-name-api", "missing-api", "empty-api", "empty-topologies", "foreign-namespace", "http-api", "api-credentials", "nil-roots", "duplicate-topology", "zero-topology-digest", "alias-digest", "excess-concurrency", "workload-cluster-api", "unknown-field"} {
+	for _, mode := range []string{"valid", "absent", "duplicate-api", "same-name-api", "missing-api", "empty-api", "empty-topologies", "foreign-namespace", "http-api", "api-credentials", "duplicate-topology", "zero-topology-digest", "alias-digest", "excess-concurrency", "workload-cluster-api", "unknown-field"} {
 		t.Run(mode, func(t *testing.T) {
 			in, dir, c := nativeInputFixture(t)
 			switch mode {
@@ -45,8 +45,6 @@ func TestOwnerNativeInputsAreClosedPinnedAndOptional(t *testing.T) {
 				c.Native.WorkerAPIs[0].Kubernetes.Endpoint = "http://api.invalid"
 			case "api-credentials":
 				c.Native.WorkerAPIs[0].Kubernetes.Endpoint = "https://user:secret@api.invalid"
-			case "nil-roots":
-				c.Native.ConnectorRoots = nil
 			case "duplicate-topology":
 				c.Native.RetentionTopologies = append(c.Native.RetentionTopologies, c.Native.RetentionTopologies[0])
 			case "zero-topology-digest":

@@ -1,17 +1,18 @@
 package contextstart
 
 import (
+	"bytes"
+	"context"
+	"net"
+	"testing"
+	"time"
+
 	fleetapp "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
-	"bytes"
-	"context"
-	"net"
-	"testing"
-	"time"
 )
 
 type historyVerifierFunc func(context.Context, []byte, fleet.APIContextReceiver) (fleetapp.AuthenticatedHistoryWork, error)

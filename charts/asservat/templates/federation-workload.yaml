@@ -3,30 +3,16 @@
 {{- $n := include "asservat.name" . }}
 {{- $p := include "asservat.providers" . | fromJson }}
 {{- $dir := "/run/asservat/federation" }}
-{{- $purposes := list "connector-source" "connector-journal" "connector-ack" "connector-read" "connector-delivery" "connector-owner-read" }}
+{{- $purposes := list "connector-read" "connector-delivery" "connector-owner-read" }}
 {{- $config := (dict
   "name" $n
   "namespace" .Release.Namespace
   "port" 9446
   "concurrency" (int (default 4 $v.concurrency))
   "postgres" $p.postgres
-  "auditStore" (dict "endpoint" $p.objectStore.endpoint "region" $p.objectStore.region "bucket" $p.objectStore.auditBucket)
-  "openBao" $p.openBao.endpoint
-  "audiences" (include "asservat.federationAudiences" . | fromJsonArray)) }}
-{{- /* ADR-334: the registered clusters, public data only; revoked or
-  removed clusters are absent and their tokens are refused. */}}
-{{- $clusters := list }}
-{{- range .Values.clusters }}
-{{- if not .revoked }}
-{{- $c := dict "name" .name "clusterID" .clusterID "issuer" (required (printf "clusters[%s].issuer is the cluster's ServiceAccount issuer" .name) .issuer) "connector" (default (printf "%s/%s-connector" (default $.Release.Namespace .namespace) $n) .connector) }}
-{{- with .jwks }}{{ $_ := set $c "jwks" (ternary . (toJson .) (kindIs "string" .)) }}{{ end }}
-{{- $clusters = append $clusters $c }}
-{{- end }}
-{{- end }}
-{{- $_ := set $config "clusters" $clusters }}
-{{- if eq .Values.mode "combined" }}{{ $_ := set $config "localConnector" (printf "%s/%s-connector" .Release.Namespace $n) }}{{ end }}
+  "connectorTokens" (include "asservat.connectorTokens" . | fromJson)) }}
 {{- $rules := list
-  (dict "apiGroups" (list "") "resources" (list "configmaps") "resourceNames" (list (printf "%s-owner-source" $n) (printf "%s-regional-offer" $n)) "verbs" (list "get"))
+  (dict "apiGroups" (list "") "resources" (list "configmaps") "resourceNames" (list (printf "%s-owner-source" $n)) "verbs" (list "get"))
   (dict "apiGroups" (list "") "resources" (list "pods" "services") "verbs" (list "get"))
   (dict "apiGroups" (list "") "resources" (list "serviceaccounts") "resourceNames" (list (printf "%s-hub-api" $n)) "verbs" (list "get"))
   (dict "apiGroups" (list "apps") "resources" (list "replicasets" "deployments") "verbs" (list "get"))
@@ -34,13 +20,8 @@
 {{- $tls := include "asservat.svc.tlsSecret" (list . "federation") }}
 {{- $sources := list }}
 {{- $sources = append $sources (include "asservat.svc.sql" (list . "federation" $purposes)) }}
-{{- $sources = append $sources (include "asservat.svc.auditMAC" .) }}
-{{- $sources = append $sources (include "asservat.svc.s3" (list . "federation-audit" "audit-storage.json")) }}
 {{- $sources = append $sources (printf "- secret:\n    name: %s\n    items: [{key: tls.crt, path: tls.crt}, {key: tls.key, path: tls.key}]" ($tls | quote)) }}
 {{- $sources = append $sources (include "asservat.providerRoots" (dict "root" . "provider" "postgres" "path" "postgres-ca.crt") | trim) }}
-{{- $sources = append $sources (include "asservat.providerRoots" (dict "root" . "provider" "objectStore" "path" "objectstore-ca.crt") | trim) }}
-{{- $sources = append $sources (include "asservat.providerRoots" (dict "root" . "provider" "openBao" "path" "openbao-ca.crt") | trim) }}
-{{- $sources = append $sources (printf "- serviceAccountToken:\n    audience: %s\n    expirationSeconds: 600\n    path: provider-auth.token" (include "asservat.openBao" . | fromJson).federationAudience) }}
 {{ include "asservat.svc.account" (list . "federation" $rules) }}
 ---
 {{ include "asservat.svc.service" (list . "federation" 9446) }}

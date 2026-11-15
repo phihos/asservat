@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"asservat.local/asservat/internal/contracts"
-	value "asservat.local/asservat/internal/domain/fleet"
 )
 
 type capacityServices struct {
@@ -35,7 +34,6 @@ func (s *capacityServices) Capacity(ctx context.Context, region *Region) error {
 }
 
 type capacityReader struct {
-	localReader
 	delivery contracts.CapacityDelivery
 }
 
@@ -64,9 +62,8 @@ func TestCapacityDeliveryOverRealHTTP2(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	process := value.ConnectorProcessIdentity{Binding: localReader{}.binding(), PodUID: "10000000-0000-4000-8000-000000000005", ProcessEpoch: "10000000-0000-4000-8000-000000000006"}
-	request := value.ConnectorProcessRequest{Process: process, ClientCSRDER: make([]byte, 64), ServerCSRDER: append(make([]byte, 63), 1)}
-	open := Opening{Purpose: PurposeCapacity, OperationID: "10000000-0000-4000-8000-000000000008", Request: request}
+	process := testProcess()
+	open := Opening{Purpose: PurposeCapacity, OperationID: "10000000-0000-4000-8000-000000000008", Process: process}
 	delivery := contracts.CapacityDelivery{}
 	for range 300 {
 		delivery.Namespaces = append(delivery.Namespaces, contracts.DeliveredCapacityNamespace{Name: "payments", UID: "ns", ResourceVersion: "1", Labels: map[string]string{"team": "payments"},
@@ -81,7 +78,7 @@ func TestCapacityDeliveryOverRealHTTP2(t *testing.T) {
 		t.Fatal("unchanged delivery", result.Kind, err)
 	}
 	services.stored = ""
-	if _, err = client.Run(context.Background(), open, localReader{}); err == nil || services.namespaces != 0 {
+	if _, err = client.Run(context.Background(), open, nil); err == nil || services.namespaces != 0 {
 		t.Fatal("delivery without a local reader", err)
 	}
 	plain, err := NewHandler(&acceptTokens{}, &scriptedServices{}, 2)

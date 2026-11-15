@@ -28,7 +28,7 @@ func TestOwnerObservationSelectionAloneCannotActivateV2Runtime(t *testing.T) {
 	}
 	// Original v2 selection is future installation provenance. This component
 	// does not publish a complete regional backend or activate a v2 listener.
-	config.Observation.Format = contracts.OwnerObservationOperationFormat
+	config.Observation.Format = "owner-observation/v2"
 	writeOwnerJSON(t, dir, "deployment.json", config)
 	if _, err = readOwnerDeploymentFixture(context.Background(), in.files); err == nil {
 		t.Fatal("selection alone activated incomplete runtime composition")

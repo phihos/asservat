@@ -1,18 +1,19 @@
 package contextstart
 
 import (
-	auditapp "asservat.local/asservat/internal/application/audit"
-	fleetapp "asservat.local/asservat/internal/application/fleet"
-	"asservat.local/asservat/internal/contracts"
-	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/capture"
-	"asservat.local/asservat/internal/domain/fleet"
 	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"io"
 	"time"
+
+	auditapp "asservat.local/asservat/internal/application/audit"
+	fleetapp "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/capture"
+	"asservat.local/asservat/internal/domain/fleet"
 )
 
 // RegionalHistory receives only authenticated, independently SQL-authorized

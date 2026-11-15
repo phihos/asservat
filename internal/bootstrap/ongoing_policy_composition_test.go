@@ -1,12 +1,13 @@
 package bootstrap
 
 import (
-	"asservat.local/asservat/internal/domain/targets"
 	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"testing"
+
+	"asservat.local/asservat/internal/domain/targets"
 
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/postgres"

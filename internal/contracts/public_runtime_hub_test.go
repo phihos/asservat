@@ -8,7 +8,7 @@ import (
 func TestHubCredentialsPreserveProcessAndPinnedBoundaries(t *testing.T) {
 	all, hub := PublicRuntimeRolePurposes(), PublicRuntimeHubRolePurposes()
 	want := []string{"hub-runtime", "capture-intent-read", "worker-config-read", "capacity-profile-read", "capture-admit", "capture-journal", "capture-ack"}
-	if len(all) != 43 || !slices.Equal(hub, want) {
+	if len(all) != 37 || !slices.Equal(hub, want) {
 		t.Fatalf("wrong physical inventory: all=%d hub=%v", len(all), hub)
 	}
 	if n, ok := PublicRuntimeRoleOrdinal("hub-runtime"); !ok || n != 95 {
@@ -24,7 +24,7 @@ func TestHubCredentialsPreserveProcessAndPinnedBoundaries(t *testing.T) {
 			t.Fatal("retired duty still creates a credential", duty)
 		}
 	}
-	for _, purpose := range []string{"browser-settings", "capacity", "capacity-capture", "connector-source", "context-verify", "context-publish", "key-wrap", "key-acquisition", "context-cleanup"} {
+	for _, purpose := range []string{"browser-settings", "capacity", "capacity-capture", "connector-read", "context-verify", "context-publish", "key-wrap", "key-acquisition", "context-cleanup"} {
 		if !slices.Contains(all, purpose) || slices.Contains(hub, purpose) {
 			t.Fatal("separate process credential moved into hub", purpose)
 		}

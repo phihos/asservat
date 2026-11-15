@@ -1,6 +1,11 @@
 package bootstrap
 
 import (
+	"context"
+	"fmt"
+	"testing"
+	"time"
+
 	authapp "asservat.local/asservat/internal/application/authorization"
 	"asservat.local/asservat/internal/application/delivery"
 	"asservat.local/asservat/internal/application/evidence"
@@ -11,10 +16,6 @@ import (
 	execution "asservat.local/asservat/internal/domain/execution"
 	"asservat.local/asservat/internal/domain/live"
 	"asservat.local/asservat/internal/domain/targets"
-	"context"
-	"fmt"
-	"testing"
-	"time"
 )
 
 type manualCatalogFacts struct {

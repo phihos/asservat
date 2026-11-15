@@ -73,9 +73,3 @@ func (o OwnerObservation) Valid(now time.Time) bool {
 	}
 	return true
 }
-
-// Matches never manufactures a new interval. The local caller retains the
-// original request and independent pin while verifying the actual connection.
-func (o OwnerObservation) Matches(r OwnerObservationRequest, p OwnerObservationPin, connection artifact.Digest, connector PeerCertificate, owner OwnerCertificate, now time.Time) bool {
-	return o.Valid(now) && o.Request.RootID == r.RootID && o.Request.ID == r.ID && o.Request.Challenge == r.Challenge && o.Request.RequestedAt.Equal(r.RequestedAt) && o.Request.NotAfter.Equal(r.NotAfter) && o.Workload.Pin == p && o.ConnectionBinding == connection && o.Connector == connector && o.Owner.Certificate == owner
-}

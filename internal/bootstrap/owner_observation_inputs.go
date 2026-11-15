@@ -28,7 +28,7 @@ func validateOwnerObservationInputs(c *contracts.OwnerObservationBootstrap) erro
 	if c == nil {
 		return nil
 	}
-	if c.Format != contracts.OwnerObservationFormat || ownerObservationDigest(c.TemplateDigest) == (artifact.Digest{}) || ownerObservationDigest(c.ImageDigest) == (artifact.Digest{}) || ownerObservationDigest(c.ProtectionDigest) == (artifact.Digest{}) || len(c.Peers) < 1 || len(c.Peers) > 16 {
+	if c.Format != contracts.OwnerObservationFormat || ownerObservationDigest(c.TemplateDigest) == (artifact.Digest{}) || ownerObservationDigest(c.ImageDigest) == (artifact.Digest{}) || ownerObservationDigest(c.ProtectionDigest) == (artifact.Digest{}) || len(c.Peers) > 16 {
 		return mounts.ErrUnavailable
 	}
 	seen := make(map[value.PeerBinding]bool, len(c.Peers))

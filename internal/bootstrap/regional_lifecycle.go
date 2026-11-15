@@ -3,10 +3,8 @@ package bootstrap
 import (
 	"context"
 	"errors"
-	"sync"
 	"time"
 
-	"asservat.local/asservat/internal/adapters/mtls"
 	fleetapp "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/contracts"
 	value "asservat.local/asservat/internal/domain/fleet"
@@ -15,24 +13,18 @@ import (
 	"github.com/google/uuid"
 )
 
-// RegionalLifecycle implements the connector process credential and leaf
-// registry ports for an outbound regional process (ADR-168/169). Each call is
-// one channel conversation: the connector's ServiceAccount token
-// authenticates it (ADR-334), and the in-cluster readers answer every ADR-153 phase and
-// source read. The hub keeps every effect; this side never holds SQL, signing
-// or audit authority.
+// RegionalLifecycle is the connector's side of its finite hub conversations
+// (ADR-169): each call is one conversation authenticated by the connector's
+// ServiceAccount token (ADR-334) and presented by this process. The hub keeps
+// every effect; this side never holds SQL, signing or audit authority.
 type RegionalLifecycle struct {
-	Client *connectorlifecycle.Client
-	Local  connectorlifecycle.Local
-	RootID string
-	Now    func() time.Time
+	Client  *connectorlifecycle.Client
+	Process value.ConnectorProcessIdentity
+	RootID  string
+	Now     func() time.Time
 	// Timing, when set, is called as each conversation starts and returns
 	// the func its success calls (ADR-197 spike diagnostics; never content).
-	Timing func(value.ConnectorLifecyclePurpose) func()
-
-	mu      sync.Mutex
-	issued  []regionalLeaf // the latest leaves and the process request they belong to
-	current *value.ConnectorProcessRequest
+	Timing func(connectorlifecycle.Purpose) func()
 
 	// recoveryMu serializes recovery fetches so concurrent readers share one
 	// hub round trip; recovery is the last observation, reused only while
@@ -48,14 +40,6 @@ type RegionalLifecycle struct {
 // with under one second left for preparation headroom (installed incident
 // runs 41301126897, 41299848255, 41284876053).
 const recoveryReuseMargin = 3 * time.Second
-
-type regionalLeaf struct {
-	certificate value.ConnectorCredentialCertificate
-	request     value.ConnectorProcessRequest
-}
-
-// ponytail: one process holds at most two current plus two pending leaves.
-const regionalLeaves = 4
 
 // Closed causes kept alongside ErrUnavailable for operator diagnostics only.
 var (
@@ -73,84 +57,20 @@ func unavailable(cause error) error {
 	return errors.Join(value.ErrUnavailable, cause)
 }
 
-var (
-	_ mtls.ConnectorProcessAdmitter  = (*RegionalLifecycle)(nil)
-	_ mtls.ConnectorProcessIssuer    = (*RegionalLifecycle)(nil)
-	_ fleetapp.ConnectorLeafRegistry = (*RegionalLifecycle)(nil)
-)
-
-func (r *RegionalLifecycle) Enroll(ctx context.Context, id string, request value.ConnectorProcessRequest) (value.ConnectorCredentialProcess, error) {
-	frame, err := r.run(ctx, value.ConnectorLifecycleEnroll, id, request, nil)
-	if err != nil || frame.Process == nil {
-		return value.ConnectorCredentialProcess{}, unavailable(err)
-	}
-	r.mu.Lock()
-	admitted := request
-	r.current = &admitted // the admitted process presents owner reads (ADR-172)
-	r.mu.Unlock()
-	return *frame.Process, nil
+func (r *RegionalLifecycle) run(ctx context.Context, purpose connectorlifecycle.Purpose, owner ...value.OwnerCertificate) (connectorlifecycle.HubFrame, error) {
+	return r.runLocal(ctx, purpose, nil, owner...)
 }
 
-func (r *RegionalLifecycle) IssueProcess(ctx context.Context, id, usage string, request value.ConnectorProcessRequest) (value.IssuedConnectorCredential, error) {
-	purpose := value.ConnectorLifecycleClient
-	if usage == "server" {
-		purpose = value.ConnectorLifecycleServer
-	} else if usage != "client" {
-		return value.IssuedConnectorCredential{}, value.ErrInvalid
-	}
-	frame, err := r.run(ctx, purpose, id, request, nil)
-	if err != nil || frame.Credential == nil {
-		return value.IssuedConnectorCredential{}, unavailable(err)
-	}
-	r.mu.Lock()
-	r.issued = append(r.issued, regionalLeaf{frame.Credential.Certificate, request})
-	if len(r.issued) > regionalLeaves {
-		r.issued = r.issued[len(r.issued)-regionalLeaves:]
-	}
-	r.mu.Unlock()
-	return *frame.Credential, nil
-}
-
-// ConnectorLeafRegistration asks the hub for the current registration of a
-// leaf this adapter received, presented by the process that requested it. An
-// unknown leaf is never looked up: it has no process to present.
-func (r *RegionalLifecycle) ConnectorLeafRegistration(ctx context.Context, c value.ConnectorCredentialCertificate) (fleetapp.ConnectorLeafRegistration, error) {
-	return r.connectorLeafRegistration(ctx, c, r.Local)
-}
-
-func (r *RegionalLifecycle) connectorLeafRegistration(ctx context.Context, c value.ConnectorCredentialCertificate, local connectorlifecycle.Local) (fleetapp.ConnectorLeafRegistration, error) {
-	var request *value.ConnectorProcessRequest
-	r.mu.Lock()
-	for i := range r.issued {
-		if r.issued[i].certificate == c {
-			request = &r.issued[i].request
-		}
-	}
-	r.mu.Unlock()
-	if request == nil {
-		return fleetapp.ConnectorLeafRegistration{}, value.ErrUnavailable
-	}
-	frame, err := r.runLocal(ctx, connectorlifecycle.PurposeRegistration, uuid.NewString(), *request, &c, local)
-	if err != nil || frame.Registration == nil || frame.Registration.Certificate != c || frame.Registration.Process != request.Process {
-		return fleetapp.ConnectorLeafRegistration{}, unavailable(err)
-	}
-	return *frame.Registration, nil
-}
-
-func (r *RegionalLifecycle) run(ctx context.Context, purpose value.ConnectorLifecyclePurpose, id string, request value.ConnectorProcessRequest, leaf *value.ConnectorCredentialCertificate, owner ...value.OwnerCertificate) (connectorlifecycle.HubFrame, error) {
-	return r.runLocal(ctx, purpose, id, request, leaf, r.Local, owner...)
-}
-
-func (r *RegionalLifecycle) runLocal(ctx context.Context, purpose value.ConnectorLifecyclePurpose, id string, request value.ConnectorProcessRequest, leaf *value.ConnectorCredentialCertificate, local connectorlifecycle.Local, owner ...value.OwnerCertificate) (connectorlifecycle.HubFrame, error) {
+func (r *RegionalLifecycle) runLocal(ctx context.Context, purpose connectorlifecycle.Purpose, local any, owner ...value.OwnerCertificate) (connectorlifecycle.HubFrame, error) {
 	var zero connectorlifecycle.HubFrame
-	if r.Client == nil || local == nil || r.Now == nil || ctx == nil || !request.Valid() {
+	if r.Client == nil || r.Now == nil || ctx == nil || !r.Process.Valid() {
 		return zero, value.ErrInvalid
 	}
 	finished := func() {}
 	if r.Timing != nil {
 		finished = r.Timing(purpose)
 	}
-	o := connectorlifecycle.Opening{Purpose: purpose, OperationID: id, Request: request, Certificate: leaf}
+	o := connectorlifecycle.Opening{Purpose: purpose, OperationID: uuid.NewString(), Process: r.Process}
 	if len(owner) == 1 {
 		o.Owner = &owner[0]
 	}
@@ -165,81 +85,39 @@ func (r *RegionalLifecycle) runLocal(ctx context.Context, purpose value.Connecto
 	return frame, nil
 }
 
-func (r *RegionalLifecycle) admitted() (value.ConnectorProcessRequest, bool) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if r.current == nil {
-		return value.ConnectorProcessRequest{}, false
-	}
-	return *r.current, true
-}
-
 // ReadContextStartOwners asks the hub for its current context-start owner set
-// (ADR-172), presented by this region's admitted process.
+// (ADR-172), presented by this process.
 func (r *RegionalLifecycle) ReadContextStartOwners(ctx context.Context) (value.APIContextOwnerCandidates, error) {
-	request, ok := r.admitted()
-	if !ok {
-		return value.APIContextOwnerCandidates{}, value.ErrUnavailable
-	}
-	frame, err := r.run(ctx, connectorlifecycle.PurposeOwnerCandidates, uuid.NewString(), request, nil)
+	frame, err := r.run(ctx, connectorlifecycle.PurposeOwnerCandidates)
 	if err != nil || frame.Owners == nil || !frame.Owners.Valid(r.Now()) {
 		return value.APIContextOwnerCandidates{}, unavailable(err)
 	}
 	return *frame.Owners, nil
-}
-
-// ReadOwnerObservationCandidates asks the hub for its owner observation
-// candidates (ADR-197), presented by this region's admitted process.
-func (r *RegionalLifecycle) ReadOwnerObservationCandidates(ctx context.Context) (value.APIContextOwnerCandidates, error) {
-	request, ok := r.admitted()
-	if !ok {
-		return value.APIContextOwnerCandidates{}, value.ErrUnavailable
-	}
-	frame, err := r.run(ctx, connectorlifecycle.PurposeOwnerObservationCandidates, uuid.NewString(), request, nil)
-	if err != nil || frame.Owners == nil || !frame.Owners.Valid(r.Now()) {
-		return value.APIContextOwnerCandidates{}, unavailable(err)
-	}
-	return *frame.Owners, nil
-}
-
-// ReadOwnerRegistration asks the hub for one owner certificate's current
-// registration (ADR-197), presented by this region's admitted process.
-func (r *RegionalLifecycle) ReadOwnerRegistration(ctx context.Context, c value.OwnerCertificate) (value.OwnerRegistrationObservation, error) {
-	request, ok := r.admitted()
-	if !ok {
-		return value.OwnerRegistrationObservation{}, value.ErrUnavailable
-	}
-	frame, err := r.run(ctx, connectorlifecycle.PurposeOwnerRegistration, uuid.NewString(), request, nil, c)
-	if err != nil || frame.OwnerRegistration == nil || frame.OwnerRegistration.Certificate != c {
-		return value.OwnerRegistrationObservation{}, unavailable(err)
-	}
-	return *frame.OwnerRegistration, nil
 }
 
 var _ fleetapp.RecoveryReader = (*RegionalLifecycle)(nil)
 
 // RecoveryState asks the hub for its current recovery state, presented by this
-// region's admitted process. It only feeds verify-only work trust; it can
+// process. It only feeds verify-only work trust; it can
 // never clear or change recovery.
 //
 // Work verification reads it four times per source work; each read was its
 // own hub conversation (native run 41206952018 refused source work at the
 // second trust read). Reuse keeps the observation's original interval.
 func (r *RegionalLifecycle) RecoveryState(ctx context.Context) (value.RecoveryState, error) {
-	request, ok := r.admitted()
-	if !ok || ctx == nil {
+	if ctx == nil {
 		return value.RecoveryState{}, value.ErrUnavailable
 	}
 	if !r.recoveryMu.lock(ctx) {
 		return value.RecoveryState{}, value.ErrUnavailable
 	}
 	defer r.recoveryMu.unlock()
-	if c := r.recovery; c != nil && c.Valid(r.Now().Add(recoveryReuseMargin)) && c.InstallationID == request.Process.Binding.InstallationID && ctx.Err() == nil {
+	if c := r.recovery; c != nil && c.Valid(r.Now().Add(recoveryReuseMargin)) && c.InstallationID == r.Process.Binding.InstallationID && ctx.Err() == nil {
 		return *c, nil
 	}
 	r.recovery = nil
-	frame, err := r.run(ctx, connectorlifecycle.PurposeRecovery, uuid.NewString(), request, nil)
-	if err != nil || frame.Recovery == nil || !frame.Recovery.Valid(r.Now()) || frame.Recovery.InstallationID != request.Process.Binding.InstallationID {
+	frame, err := r.run(ctx, connectorlifecycle.PurposeRecovery)
+	if err != nil || frame.Recovery == nil || !frame.Recovery.Valid(r.Now()) || frame.Recovery.InstallationID != r.Process.Binding.InstallationID {
 		return value.RecoveryState{}, unavailable(err)
 	}
 	cached := *frame.Recovery
@@ -253,15 +131,14 @@ func (r *RegionalLifecycle) RecoveryState(ctx context.Context) (value.RecoverySt
 // configuration. The hub's answer alone authenticates nothing.
 func (r *RegionalLifecycle) AuthenticateOwner(ctx context.Context, connection fleetapp.OwnerPeerConnection) (value.AuthenticatedOwner, error) {
 	var zero value.AuthenticatedOwner
-	request, ok := r.admitted()
-	if !ok || connection == nil || ctx == nil {
+	if connection == nil || ctx == nil {
 		return zero, value.ErrUnavailable
 	}
 	certificate, err := connection.OwnerCertificate()
 	if err != nil || certificate.Usage != "server" || !certificate.Valid(r.Now()) {
 		return zero, value.ErrDenied
 	}
-	frame, err := r.run(ctx, connectorlifecycle.PurposeOwnerAuthentication, uuid.NewString(), request, nil, certificate)
+	frame, err := r.run(ctx, connectorlifecycle.PurposeOwnerAuthentication, certificate)
 	if err != nil || frame.Owner == nil {
 		return zero, unavailable(err)
 	}
@@ -289,7 +166,6 @@ type AccessBindingReader interface {
 // deliveringLocal answers the hub's delivery request of one conversation
 // with a LIST taken after the hub verified the presentation.
 type deliveringLocal struct {
-	connectorlifecycle.Local
 	bindings AccessBindingReader
 }
 
@@ -300,14 +176,13 @@ func (d deliveringLocal) ReadAccessBindings(ctx context.Context) (contracts.Acce
 }
 
 // DeliverAccessBindings sends this cluster's complete AccessBinding LIST to
-// the hub in one lifecycle conversation, presented by the admitted process
+// the hub in one lifecycle conversation, presented by this process
 // (ADR-329). The hub attributes it to the cluster credential's cluster.
 func (r *RegionalLifecycle) DeliverAccessBindings(ctx context.Context, bindings AccessBindingReader) error {
-	request, ok := r.admitted()
-	if !ok || bindings == nil || ctx == nil {
+	if bindings == nil || ctx == nil {
 		return value.ErrUnavailable
 	}
-	_, err := r.runLocal(ctx, connectorlifecycle.PurposeAccessBindings, uuid.NewString(), request, nil, deliveringLocal{r.Local, bindings})
+	_, err := r.runLocal(ctx, connectorlifecycle.PurposeAccessBindings, deliveringLocal{bindings})
 	if err != nil {
 		return unavailable(err)
 	}
@@ -323,7 +198,6 @@ type CapacityReader interface {
 // deliveringCapacity answers the hub's capacity request of one conversation
 // with reads taken after the hub verified the presentation.
 type deliveringCapacity struct {
-	connectorlifecycle.Local
 	capacity CapacityReader
 	keys     []string
 }
@@ -335,13 +209,12 @@ func (d deliveringCapacity) ReadCapacity(ctx context.Context) (contracts.Capacit
 }
 
 // DeliverCapacity sends this cluster's capacity observation to the hub in
-// one lifecycle conversation, presented by the admitted process (ADR-331).
+// one lifecycle conversation, presented by this process (ADR-331).
 func (r *RegionalLifecycle) DeliverCapacity(ctx context.Context, capacity CapacityReader, keys []string) error {
-	request, ok := r.admitted()
-	if !ok || capacity == nil || len(keys) == 0 || ctx == nil {
+	if capacity == nil || len(keys) == 0 || ctx == nil {
 		return value.ErrUnavailable
 	}
-	_, err := r.runLocal(ctx, connectorlifecycle.PurposeCapacity, uuid.NewString(), request, nil, deliveringCapacity{r.Local, capacity, keys})
+	_, err := r.runLocal(ctx, connectorlifecycle.PurposeCapacity, deliveringCapacity{capacity, keys})
 	if err != nil {
 		return unavailable(err)
 	}

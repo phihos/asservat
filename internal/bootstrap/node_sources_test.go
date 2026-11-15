@@ -1,13 +1,14 @@
 package bootstrap
 
 import (
-	"asservat.local/asservat/internal/adapters/packets"
-	deliveryapp "asservat.local/asservat/internal/application/delivery"
 	"context"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/adapters/packets"
+	deliveryapp "asservat.local/asservat/internal/application/delivery"
 
 	"asservat.local/asservat/internal/adapters/gadget"
 	"asservat.local/asservat/internal/domain/collector"

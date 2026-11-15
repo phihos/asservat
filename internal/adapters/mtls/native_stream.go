@@ -1,8 +1,6 @@
 package mtls
 
 import (
-	"asservat.local/asservat/internal/contracts"
-	value "asservat.local/asservat/internal/domain/authorization"
 	"context"
 	"crypto/tls"
 	"io"
@@ -12,6 +10,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	value "asservat.local/asservat/internal/domain/authorization"
 )
 
 // NativeClient is an installation-configured client for the native-only wire.

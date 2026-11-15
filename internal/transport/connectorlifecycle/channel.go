@@ -1,8 +1,7 @@
-// Package connectorlifecycle carries ADR-169's delegated regional lifecycle
-// conversation: one opening authenticated by the connector's ServiceAccount
-// token (ADR-334), then hub-driven
-// ADR-153 phase requests answered by the regional process over the same
-// full-duplex HTTP/2 stream. Every effect stays with the hub.
+// Package connectorlifecycle carries the connector's finite hub
+// conversations: one opening authenticated by the connector's ServiceAccount
+// token (ADR-334), then at most one hub request for a delivery answered over
+// the same full-duplex HTTP/2 stream. Every effect stays with the hub.
 package connectorlifecycle
 
 import (
@@ -13,41 +12,34 @@ import (
 	"sync"
 	"time"
 
-	app "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/contracts"
 	value "asservat.local/asservat/internal/domain/fleet"
 )
 
+// Purpose names one conversation's single question or delivery.
+type Purpose string
+
 const (
 	Path        = "/v1/connector-lifecycle"
 	ContentType = "application/x-ndjson"
-	// Enrollment needs six (one configuration, one begin acknowledgement and
-	// four phase observations) and registration two; two spare.
+	// MaxRegionFrame bounds the connector's frames in one conversation.
 	MaxFrameBytes  = 256 << 10
-	MaxRegionFrame = 8
-	// PurposeRegistration asks for the current activated registration of one
-	// leaf of the presenting process. It runs no lifecycle and has no effect.
-	PurposeRegistration value.ConnectorLifecyclePurpose = "registration"
+	MaxRegionFrame = 2
 	// ADR-172 read-only owner purposes: the current context-start owner set,
 	// and the hub's authentication facts for one observed owner certificate.
-	PurposeOwnerCandidates     value.ConnectorLifecyclePurpose = "owner-candidates"
-	PurposeOwnerAuthentication value.ConnectorLifecyclePurpose = "owner-authentication"
-	// ADR-197 read-only owner purposes for regional capacity observation: the
-	// owner observation candidates, and one owner certificate's current
-	// registration. Answered from hub SQL; no delegated region reads.
-	PurposeOwnerObservationCandidates value.ConnectorLifecyclePurpose = "owner-observation-candidates"
-	PurposeOwnerRegistration          value.ConnectorLifecyclePurpose = "owner-registration"
+	PurposeOwnerCandidates     Purpose = "owner-candidates"
+	PurposeOwnerAuthentication Purpose = "owner-authentication"
 	// PurposeRecovery asks for the hub's current recovery state, which the
 	// region's verify-only work-trust reader requires. It is read-only.
-	PurposeRecovery value.ConnectorLifecyclePurpose = "recovery"
+	PurposeRecovery Purpose = "recovery"
 	// PurposeAccessBindings delivers the connector's complete AccessBinding
 	// LIST of its cluster (ADR-329). The hub asks for it only after the
 	// presentation verified; the delivery is attributed to that cluster.
-	PurposeAccessBindings value.ConnectorLifecyclePurpose = "access-bindings"
+	PurposeAccessBindings Purpose = "access-bindings"
 	// PurposeCapacity delivers the connector's capacity observation of its
 	// cluster (ADR-331), attributed to the presented cluster like
 	// PurposeAccessBindings.
-	PurposeCapacity value.ConnectorLifecyclePurpose = "capacity"
+	PurposeCapacity Purpose = "capacity"
 )
 
 // OwnerAuthentication is the hub's answer for one observed owner certificate.
@@ -60,29 +52,22 @@ type OwnerAuthentication struct {
 
 var ErrChannel = errors.New("connector lifecycle channel unavailable")
 
-// Opening is the connector's first frame.
+// Opening is the connector's first frame. Process names the connector
+// process; its binding must name the token's cluster and peer.
 type Opening struct {
-	Purpose     value.ConnectorLifecyclePurpose
+	Purpose     Purpose
 	OperationID string
-	Request     value.ConnectorProcessRequest
-	Certificate *value.ConnectorCredentialCertificate `json:",omitempty"` // registration only
-	Owner       *value.OwnerCertificate               `json:",omitempty"` // owner authentication only
+	Process     value.ConnectorProcessIdentity
+	Owner       *value.OwnerCertificate `json:",omitempty"` // owner authentication only
 }
 
 // HubFrame drives the conversation; exactly one of its payloads is set.
 type HubFrame struct {
-	Kind         string                            // begin, read, close, source, configuration, result, failure
-	Begin        *app.ConnectorLifecycleRequest    `json:",omitempty"`
-	Phase        value.ConnectorLifecyclePhase     `json:",omitempty"`
-	Process      *value.ConnectorCredentialProcess `json:",omitempty"`
-	Credential   *value.IssuedConnectorCredential  `json:",omitempty"`
-	Registration *app.ConnectorLeafRegistration    `json:",omitempty"`
-	Owners       *value.APIContextOwnerCandidates  `json:",omitempty"`
-	Owner        *OwnerAuthentication              `json:",omitempty"`
-	// OwnerRegistration answers PurposeOwnerRegistration (ADR-197).
-	OwnerRegistration *value.OwnerRegistrationObservation `json:",omitempty"`
-	Recovery          *value.RecoveryState                `json:",omitempty"`
-	Failure           string                              `json:",omitempty"`
+	Kind     string                           // access-bindings, capacity, result, failure
+	Owners   *value.APIContextOwnerCandidates `json:",omitempty"`
+	Owner    *OwnerAuthentication             `json:",omitempty"`
+	Recovery *value.RecoveryState             `json:",omitempty"`
+	Failure  string                           `json:",omitempty"`
 	// Digest is the hub's stored delivery digest of an "access-bindings" or
 	// "capacity" request; the connector answers Unchanged when its current
 	// delivery has the same digest (ADR-329, ADR-331).
@@ -91,10 +76,7 @@ type HubFrame struct {
 
 // RegionFrame answers one hub frame.
 type RegionFrame struct {
-	Kind          string                               // begun, observation, source, configuration, error
-	Observation   *value.ConnectorLifecycleObservation `json:",omitempty"`
-	Source        *value.ConnectorIdentitySource       `json:",omitempty"`
-	Configuration *app.ConnectorIdentityConfiguration  `json:",omitempty"`
+	Kind string // access-bindings, capacity, error
 	// AccessBindings answers the hub's "access-bindings" request (ADR-329).
 	AccessBindings *contracts.AccessBindingDelivery `json:",omitempty"`
 	// Capacity answers the hub's "capacity" request (ADR-331).
@@ -113,14 +95,6 @@ type CapacityLocal interface {
 // AccessBinding LIST (ADR-329), offered only by a delivering conversation.
 type AccessBindingsLocal interface {
 	ReadAccessBindings(context.Context) (contracts.AccessBindingDelivery, error)
-}
-
-// Local is the regional process's in-cluster reader set: the native lifecycle
-// phases and the protected connector source/configuration.
-type Local interface {
-	app.ConnectorLifecycleOperationReader
-	app.ConnectorIdentitySourceReader
-	app.ConnectorIdentityConfigurationReader
 }
 
 // Conn is one decoded/encoded frame stream with a per-read deadline control.

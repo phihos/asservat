@@ -423,13 +423,9 @@ func (f contextKeyWrapFixture) resolve(ctx context.Context, role string) (author
 }
 
 // qualifyContextKeyWraps checks ADR-176 on real PostgreSQL for a prepared
-// execution: only the executor process's activated connector client leaf may
-// wrap, each keyset role once, for exactly this attempt.
+// execution: only the executor's own cluster's connector (token-attributed,
+// ADR-334) may wrap, each keyset role once, for exactly this attempt.
 func qualifyContextKeyWraps(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, s captureAdmissionScenario, e artifact.ContextExpectation, process value.APIProcessBinding) contextKeyWrapFixture {
-	connector := newConnectorSQLFixtureWithOptions(t, ctx, admin, poolFor, store, keys, s, 10800, connectorRetirementFixtureOptions{ClusterID: process.ClusterID, PodUID: process.PodUID})
-	// A connector process serves only with both of its leaves activated.
-	client := connector.issue(t, "client")
-	connector.issue(t, "server")
 	scope := authorization.KeyScope{InstallationID: s.recovery.installation, Purpose: "artifact", KeyID: "fixture"}
 	// The authority runs under its own narrow login with exactly the product
 	// grant list; the ledger refuses superuser or schema-creating roles.
@@ -456,11 +452,16 @@ func qualifyContextKeyWraps(t *testing.T, ctx context.Context, admin *pgxpool.Po
 	if err != nil {
 		t.Fatal(err)
 	}
-	c := client.Certificate
+	now := time.Now().UTC()
 	f := contextKeyWrapFixture{t: t, wraps: wraps, scope: scope, attempt: e.Registration.Location.AttemptID, binding: e.Binding(),
-		peer: authorization.KeyPeer{InstallationID: scope.InstallationID, PeerID: c.Binding.PeerID, Role: "collector", Certificate: c.Digest, NotBefore: c.NotBefore, NotAfter: c.NotAfter}}
+		peer: authorization.KeyPeer{InstallationID: scope.InstallationID, PeerID: custodyID(), ClusterID: process.ClusterID, Role: "collector", Certificate: artifact.Digest{0xc1}, NotBefore: now, NotAfter: now.Add(time.Hour)}}
 	if _, err = f.resolve(ctx, "data-key"); err != nil {
-		t.Fatal("executor connector leaf wrap", err)
+		t.Fatal("executor cluster connector wrap", err)
+	}
+	cluster := f
+	cluster.peer.ClusterID = custodyID()
+	if _, err = cluster.resolve(ctx, "index-key"); err == nil {
+		t.Fatal("another cluster's connector wrapped this attempt")
 	}
 	if _, err = f.resolve(ctx, "data-key"); err == nil {
 		t.Fatal("keyset role wrapped twice")
@@ -468,7 +469,7 @@ func qualifyContextKeyWraps(t *testing.T, ctx context.Context, admin *pgxpool.Po
 	foreign := f
 	foreign.peer.Certificate = artifact.Digest{0xee}
 	if _, err = foreign.resolve(ctx, "index-key"); err == nil {
-		t.Fatal("another certificate wrapped this attempt")
+		t.Fatal("another presenter wrapped this attempt")
 	}
 	other := f
 	other.attempt = custodyID()

@@ -1,7 +1,6 @@
 package bootstrap
 
 import (
-	"asservat.local/asservat/internal/adapters/mtls"
 	"bytes"
 	"context"
 	"crypto/sha256"
@@ -10,6 +9,8 @@ import (
 	"net/netip"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/adapters/mtls"
 
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/application/delivery"

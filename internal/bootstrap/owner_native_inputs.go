@@ -11,12 +11,10 @@ import (
 	"asservat.local/asservat/internal/adapters/mtls"
 	"asservat.local/asservat/internal/adapters/postgres"
 	"asservat.local/asservat/internal/application/evidence"
-	fleetapp "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/authorization"
 	configvalue "asservat.local/asservat/internal/domain/configuration"
-	fleetvalue "asservat.local/asservat/internal/domain/fleet"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"k8s.io/apimachinery/pkg/util/validation"
 )
@@ -57,9 +55,6 @@ func validateOwnerNativeInputs(c *contracts.OwnerNativeDeployment, hub string, i
 		least = 0
 	}
 	if c.Connections < 1 || c.Connections > 64 || c.Concurrency < 1 || c.Concurrency > 16 || c.Concurrency > c.Connections || c.WorkerAPIs == nil || len(c.WorkerAPIs) < least || len(c.WorkerAPIs) > 256 || c.RetentionTopologies == nil || len(c.RetentionTopologies) < least || len(c.RetentionTopologies) > 1024 {
-		return mounts.ErrUnavailable
-	}
-	if _, _, err := mtls.OwnerTrustRoots(c.ConnectorRoots, time.Now()); err != nil {
 		return mounts.ErrUnavailable
 	}
 	seen, files := map[ownerNativeAPIKey]bool{}, map[string]bool{}
@@ -192,18 +187,6 @@ func (d *OwnerDeployment) nativeConfiguration(ctx context.Context, pool *pgxpool
 		d.closers = append(d.closers, closeHTTP)
 		clients[ownerNativeAPIKey{a.ClusterID, a.Namespace.UID}] = client
 	}
-	roots, _, err := mtls.OwnerTrustRoots(n.ConnectorRoots, time.Now())
-	if err != nil {
-		return nil, err
-	}
-	verifier, err := mtls.NewPeerVerifier(roots, c.InstallationID, fleetvalue.ConnectorPeer, time.Now)
-	if err != nil {
-		return nil, err
-	}
-	registry, err := postgres.NewPeerRegistry(ctx, pool, c.InstallationID)
-	if err != nil {
-		return nil, err
-	}
 	origins := evidence.NativeOrigins{Locators: readers, Operations: readers, Now: time.Now, Recent: evidence.NewNativeRecentObservations(), Proofs: func(token evidence.DownloadPeerToken) (evidence.DownloadPeerProofReader, error) {
 		if token == nil {
 			return nil, artifact.ErrInvalid
@@ -211,6 +194,6 @@ func (d *OwnerDeployment) nativeConfiguration(ctx context.Context, pool *pgxpool
 		return &ownerNativeProofs{readers, clients, token}, nil
 	}}
 	d.shared.workers, d.shared.origins = clients, origins
-	peers := &mtls.NativePeerChecks{Workers: readers, WorkerTrust: d.trust, Certificates: readers, Origins: origins, ConnectorVerifier: verifier, Connectors: &fleetapp.PeerAuthenticator{Registry: registry, Now: time.Now}, Now: time.Now}
-	return &OwnerNativeRuntimeConfig{Peers: peers, ConnectorRoots: roots, Connections: n.Connections, Concurrency: n.Concurrency}, nil
+	peers := &mtls.NativePeerChecks{Workers: readers, WorkerTrust: d.trust, Certificates: readers, Origins: origins, Now: time.Now}
+	return &OwnerNativeRuntimeConfig{Peers: peers, Connections: n.Connections, Concurrency: n.Concurrency}, nil
 }

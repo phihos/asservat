@@ -27,7 +27,7 @@ var apiContextCapabilities = []string{
 	"query/resolve-workload", "query/resolve-workload-identity", "query/resolve-pod", "query/observe-workload-restarts", "query/review-access", "query/capture-profiles",
 	"query/list-capture-profiles", "query/resolve-packet-peers", "query/resolve-profile-endpoint", "query/profile-endpoint-definition", "query/packet-recorder",
 	"query/resolve-packet-recorder", "query/resolve-profile-recorder", "query/resolve-syscall-recorder", "query/resolve-ongoing-recorders", "query/source-work",
-	"query/read-live-projection", "query/inspect-manual-live",
+	"query/read-live-projection", "query/inspect-manual-live", "query/resolve-source-snapshots",
 	"history",
 }
 

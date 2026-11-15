@@ -1,11 +1,6 @@
 package contextstart
 
 import (
-	"asservat.local/asservat/internal/contracts"
-	"asservat.local/asservat/internal/domain/collector"
-	"asservat.local/asservat/internal/domain/fleet"
-	"asservat.local/asservat/internal/domain/identity"
-	v "asservat.local/asservat/internal/domain/live"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -13,6 +8,12 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/collector"
+	"asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+	v "asservat.local/asservat/internal/domain/live"
 )
 
 type liveQueryResolver struct {

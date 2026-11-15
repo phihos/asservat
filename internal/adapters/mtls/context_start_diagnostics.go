@@ -2,8 +2,6 @@ package mtls
 
 import (
 	"context"
-	"errors"
-	"strings"
 	"time"
 )
 
@@ -34,51 +32,6 @@ func (d *contextStartOpeningDiagnostic) bound(until time.Time) {
 	if d != nil && !until.IsZero() && (d.until.IsZero() || until.Before(d.until)) {
 		d.until = until
 	}
-}
-
-// setupStep accepts only a closed producer code, never its older FixedStep
-// trace (which contains elapsed marks), an Error string or arbitrary labels.
-func (d *contextStartOpeningDiagnostic) setupStep(err error) {
-	var step interface {
-		ContextStartSetupStep() string
-		ContextStartSetupUntil() time.Time
-	}
-	if errors.As(err, &step) {
-		switch s := step.ContextStartSetupStep(); s {
-		case "source-open", "owned-process", "process-proof", "process-match", "execution-account", "settings-guard", "settings-snapshot", "workload", "settings-guard-after", "settings-snapshot-after", "workload-guard-after", "source-close", "owned-process-after", "fresh":
-			d.stage = "setup-" + s
-			d.bound(step.ContextStartSetupUntil())
-			// The trace belongs to this same setup error, not an outer wrapper.
-			if traced, ok := step.(error); ok {
-				d.trace = setupMarks(traced)
-			}
-		}
-	}
-}
-
-// setupMarks keeps only the completed-check marks of the setup proof's trace
-// ("name@duration ..."), which its producer builds from fixed names and
-// durations, restricted to that alphabet and length.
-func setupMarks(err error) string {
-	fixed, ok := err.(interface{ FixedStep() string })
-	if !ok {
-		return ""
-	}
-	trace := fixed.FixedStep()
-	i := strings.Index(trace, " after [")
-	if i < 0 {
-		return ""
-	}
-	marks, _, ok := strings.Cut(trace[i+len(" after ["):], "]")
-	if !ok || len(marks) > 512 {
-		return ""
-	}
-	for _, r := range marks {
-		if !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || strings.ContainsRune("@.- µ", r)) {
-			return ""
-		}
-	}
-	return marks
 }
 
 func (d *contextStartOpeningDiagnostic) wrap(err error) error {

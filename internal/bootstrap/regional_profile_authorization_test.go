@@ -1,9 +1,6 @@
 package bootstrap
 
 import (
-	"asservat.local/asservat/internal/contracts"
-	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/planning"
 	"context"
 	"encoding/json"
 	"encoding/pem"
@@ -12,6 +9,10 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/planning"
 )
 
 func TestRegionalProfileAuthorizationPrivateFileAndPublicSource(t *testing.T) {
