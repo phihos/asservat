@@ -451,7 +451,7 @@
           "properties": {
             "share": {
               "$ref": "#/definitions/capacityshare",
-              "description": "Protected allocation per workload. Default usable capacity ÷ max(eligible workloads, 8)."
+              "description": "Protected allocation per workload. Default usable capacity ÷ max(enrolled workloads, 8)."
             },
             "limit": {
               "$ref": "#/definitions/capacityshare",
@@ -480,13 +480,6 @@
               "minimum": 1,
               "maximum": 9007199254740991,
               "default": 1
-            },
-            "onFull": {
-              "enum": [
-                "RejectNewExpensive",
-                "DeleteOldestEligibleInAccount"
-              ],
-              "default": "RejectNewExpensive"
             }
           }
         }

@@ -3,6 +3,7 @@ package targets
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"asservat.local/asservat/internal/domain/artifact"
@@ -18,6 +19,10 @@ var (
 	ErrDenied      = errors.New("target observation denied")
 	ErrUnscheduled = errors.New("pod has no execution node")
 	ErrUnsupported = errors.New("target owner kind unsupported by this resolver")
+	// ErrEvidenceDisabled refuses a namespace that capacity does not cover
+	// (specs/capacity.md): system namespaces, the release namespace and
+	// namespaces labelled asservat.io/evidence: disabled.
+	ErrEvidenceDisabled = fmt.Errorf("%w: namespace excluded from evidence collection", ErrDenied)
 )
 
 // Request comes from a previously authorized, pinned selection. The initial
@@ -40,6 +45,9 @@ type PodResolution struct {
 	Pin                                                              artifact.PinnedPod
 	NodeUID, NodeBootID, PodResourceVersion, WorkloadResourceVersion string
 	ObservedAt, FreshUntil                                           time.Time
+	// EvidenceDisabled marks a namespace that capacity does not cover; new
+	// collection there is refused (ErrEvidenceDisabled), reads are not.
+	EvidenceDisabled bool `json:",omitempty"`
 }
 
 func (p PodResolution) Target() authorization.Target {

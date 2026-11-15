@@ -200,7 +200,6 @@ type CapacitySetting struct {
 	LimitBytes             int64
 	NamespaceLimitBytes    pgtype.Int8
 	MaxConcurrentExpensive int32
-	OnFull                 string
 	Revision               int64
 }
 

@@ -267,7 +267,7 @@ derived. Change them on any `helm upgrade`; they take effect at once.
 | Value | Default | Meaning |
 | --- | --- | --- |
 | `capacity.evidenceStorage` | the bundled object store's volume size | Evidence storage Asservat may use; required for an external store |
-| `capacity.workload.share` | `evidenceStorage` ÷ max(eligible workloads, 8) | Storage protected for each workload; a quantity or a share of `evidenceStorage` |
+| `capacity.workload.share` | `evidenceStorage` ÷ max(enrolled workloads, 8) | Storage protected for each workload; a quantity or a share of `evidenceStorage` |
 | `capacity.workload.limit` | `10%` | Most a single workload may use, protected share plus shared burst |
 | `capacity.capturesPerCluster` | larger of 8 and the node count | Concurrent captures per cluster |
 | `retention.evidence`, `retention.cores` | `14d` | Default retention |

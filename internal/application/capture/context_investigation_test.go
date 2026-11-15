@@ -592,3 +592,14 @@ func (f *investigationFixture) ResolveOrCloseContextRequest(_ context.Context, q
 	delete(f.previews, q.PreviewID)
 	return value.ContextRequestDisposition{State: value.RequestClosed, ValidUntil: identity.Earlier(q.Identity.ValidUntil, f.now.Add(5*time.Second))}, nil
 }
+
+// A namespace that capacity does not cover takes no new collection
+// (specs/capacity.md); the resolver still resolves it for reads.
+func TestContextPreviewRefusesNamespaceWithoutEvidence(t *testing.T) {
+	f := newInvestigationFixture()
+	f.target.EvidenceDisabled = true
+	_, err := f.svc.Preview(context.Background(), f.source(t, context.Background()), f.intent())
+	if !errors.Is(err, targets.ErrEvidenceDisabled) || f.admissions.Load() != 0 {
+		t.Fatal(err)
+	}
+}

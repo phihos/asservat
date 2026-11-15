@@ -67,10 +67,7 @@ func capacityValues(c contracts.CapacityValues) (app.CapacityValues, error) {
 	if err != nil || total.Value() <= 0 {
 		return app.CapacityValues{}, errHubWorkerCapacityConfig
 	}
-	out := app.CapacityValues{EvidenceBytes: total.Value(), ReserveBytes: total.Value() / 16, MaxConcurrentExpensive: max(1, c.Workload.MaxConcurrentExpensive), OnFull: c.Workload.OnFull}
-	if out.OnFull == "" {
-		out.OnFull = "RejectNewExpensive"
-	}
+	out := app.CapacityValues{EvidenceBytes: total.Value(), ReserveBytes: total.Value() / 16, MaxConcurrentExpensive: max(1, c.Workload.MaxConcurrentExpensive)}
 	bytes := func(v string) (int64, error) {
 		if v == "" {
 			return 0, nil

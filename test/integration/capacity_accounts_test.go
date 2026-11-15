@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -131,6 +132,7 @@ func (f *capacitySQLFixture) managedContextDownload(t *testing.T, root capacityR
 	t.Helper()
 	s, accepted := f.admitManagedContext(t, root, enrollment)
 	e := accepted.Expectation
+	f.checkExpensiveConcurrency(t, e.Registration)
 	f.checkManagedProcessingLineage(t, e)
 	bound, err := f.store.ForCustody(e.Registration.StoreID)
 	if err != nil {
@@ -207,5 +209,47 @@ func (f *capacitySQLFixture) managedContextDownload(t *testing.T, root capacityR
 	session, err = downloads.LookupDownload(f.ctx, session.ID, actor.Principal)
 	if err != nil || session.Generation != 1 || session.ChargedRead <= 0 || session.AllocationID != enrollment.DownloadAllocationID {
 		t.Fatal("managed session spend not retained", err)
+	}
+}
+
+// checkExpensiveConcurrency: with maxConcurrentExpensive 1, one writable
+// profile attempt of the workload refuses the next profile (REQ-CAP-002). The
+// admitted pod-status capture becomes a profile only inside a rolled-back
+// transaction.
+func (f *capacitySQLFixture) checkExpensiveConcurrency(t *testing.T, r artifact.Registration) {
+	t.Helper()
+	tx, err := f.admin.Begin(f.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback(f.ctx) }()
+	admits := func() bool {
+		t.Helper()
+		var ok bool
+		if err := tx.QueryRow(f.ctx, `SELECT capacity_expensive_admits($1)`, r.AllocationID).Scan(&ok); err != nil {
+			t.Fatal("expensive admission", err)
+		}
+		return ok
+	}
+	if !admits() {
+		t.Fatal("a pod-status capture counted as expensive")
+	}
+	for _, stmt := range []string{
+		`SET LOCAL session_replication_role=replica`,
+		`UPDATE context_capture SET expectation_json=convert_to(jsonb_set(convert_from(expectation_json,'UTF8')::jsonb,'{Profile}','{}')::text,'UTF8') WHERE attempt_id=$1`,
+	} {
+		var args []any
+		if strings.Contains(stmt, "$1") {
+			args = append(args, r.Location.AttemptID)
+		}
+		if _, err = tx.Exec(f.ctx, stmt, args...); err != nil {
+			t.Fatal(stmt, err)
+		}
+	}
+	if admits() {
+		t.Fatal("a writable profile attempt did not fill the workload")
+	}
+	if _, err = tx.Exec(f.ctx, `UPDATE capacity_settings SET max_concurrent_expensive=2`); err != nil || !admits() {
+		t.Fatal("a higher maxConcurrentExpensive did not admit", err)
 	}
 }

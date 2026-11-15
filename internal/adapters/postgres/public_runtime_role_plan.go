@@ -218,7 +218,7 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		for _, table := range []string{"context_capture", "custody_attempt", "custody_copy", "custody_event"} {
 			add(table, "INSERT")
 		}
-		for _, signature := range []string{"lock_capture_audit_admission(uuid,uuid)", "reserve_capture_audit(uuid,uuid,jsonb,bytea,timestamptz)", "capacity_managed_admission_until(uuid,uuid,text,timestamptz)"} {
+		for _, signature := range []string{"lock_capture_audit_admission(uuid,uuid)", "reserve_capture_audit(uuid,uuid,jsonb,bytea,timestamptz)", "capacity_managed_admission_until(uuid,uuid,text,timestamptz)", "capacity_expensive_admits(uuid)"} {
 			out = append(out, publicRuntimeGrant{"function", signature, "", "EXECUTE"})
 		}
 	case "policy-automation":
