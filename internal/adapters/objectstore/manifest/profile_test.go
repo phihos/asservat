@@ -80,7 +80,7 @@ func TestGoProfileExpectation(t *testing.T) {
 			p.EndpointDigest = artifact.Digest{}
 			x.Profile = &p
 		},
-		"cpu over 60 s":         func(x *artifact.ContextExpectation) { p := *x.Profile; p.DurationMillis = 61_000; x.Profile = &p },
+		"cpu fractional second": func(x *artifact.ContextExpectation) { p := *x.Profile; p.DurationMillis = 1_500; x.Profile = &p },
 		"force GC on cpu":       func(x *artifact.ContextExpectation) { p := *x.Profile; p.ForceGC = true; x.Profile = &p },
 		"over the type maximum": func(x *artifact.ContextExpectation) { x.Registration.NativeLimit = artifact.MaxPprofBytes + 1 },
 		"pod-status action":     func(x *artifact.ContextExpectation) { x.ActionID = "pod-status" },
