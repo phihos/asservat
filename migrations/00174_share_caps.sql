@@ -4,6 +4,8 @@
 -- the share caps without a stated reason: seven-day lifetime, eight
 -- recipients/managers and the 100-capture policy limit. Recurring sharing
 -- may name no capture limit (MaxCaptures 0).
+-- No Down: the caps are not restored. Every statement tolerates a re-Up
+-- after a downgrade probe, as in 00167.
 -- +goose StatementBegin
 DO $$
 DECLARE c text;
@@ -16,10 +18,13 @@ BEGIN
 END $$;
 -- +goose StatementEnd
 ALTER TABLE public.evidence_share
+ DROP CONSTRAINT IF EXISTS evidence_share_lifetime,
+ DROP CONSTRAINT IF EXISTS evidence_share_management_shape,
+ DROP CONSTRAINT IF EXISTS evidence_share_recipients_shape,
  ADD CONSTRAINT evidence_share_lifetime CHECK (expires_at>created_at),
  ADD CONSTRAINT evidence_share_management_shape CHECK (jsonb_typeof(management)='array' AND jsonb_array_length(management)>=1),
  ADD CONSTRAINT evidence_share_recipients_shape CHECK (jsonb_typeof(recipients)='array' AND jsonb_array_length(recipients)>=1 AND cardinality(recipient_keys)>=1);
-ALTER TABLE public.policy_acceptance DROP CONSTRAINT policy_acceptance_shares;
+ALTER TABLE public.policy_acceptance DROP CONSTRAINT IF EXISTS policy_acceptance_shares;
 ALTER TABLE public.policy_acceptance ADD CONSTRAINT policy_acceptance_shares CHECK (shares_spent>=0 AND (COALESCE((record#>>'{Sharing,MaxCaptures}')::integer,0)=0 AND (shares_spent=0 OR record ? 'Sharing') OR shares_spent<=(record#>>'{Sharing,MaxCaptures}')::integer));
 
 -- +goose StatementBegin
@@ -209,12 +214,5 @@ BEGIN
   'request_digest',encode(sha256(convert_to('policy-share/v1:'||acc.id::text||':'||NEW.id::text,'UTF8')),'hex'),
   'policy_acceptance_id',acc.id);
  RETURN NEW;
-END $$;
--- +goose StatementEnd
-
--- +goose Down
--- +goose StatementBegin
-DO $$ BEGIN
- RAISE EXCEPTION 'share cap removal has no down migration' USING ERRCODE='23514';
 END $$;
 -- +goose StatementEnd
