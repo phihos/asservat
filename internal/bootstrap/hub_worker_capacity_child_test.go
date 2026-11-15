@@ -64,10 +64,16 @@ func TestHubWorkerCapacitySectionDecodes(t *testing.T) {
 	}
 }
 
-// The values become the SQL settings: reserve 1/16, default limit 10 %.
+// The values become the SQL settings: reserve 1/16, default limit 10 %
+// raised to the effective share.
 func TestCapacityValuesBytes(t *testing.T) {
 	v, err := capacityValues(contracts.CapacityValues{EvidenceStorage: "128Gi", NamespaceLimit: "25%", Workload: contracts.CapacityWorkloadValues{Share: "16Gi"}})
 	if err != nil || v.EvidenceBytes != 128<<30 || v.ReserveBytes != 8<<30 || v.ShareBytes != 16<<30 || v.LimitBytes != 16<<30 || v.NamespaceLimitBytes != 32<<30 || v.MaxConcurrentExpensive != 1 || v.OnFull != "RejectNewExpensive" {
+		t.Fatal(v, err)
+	}
+	// A derived share is at most usable/8 (15 GiB here), above 10 %: the
+	// default limit rises to it.
+	if v, err = capacityValues(contracts.CapacityValues{EvidenceStorage: "128Gi"}); err != nil || v.ShareBytes != 0 || v.LimitBytes != 15<<30 {
 		t.Fatal(v, err)
 	}
 }

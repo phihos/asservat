@@ -141,7 +141,7 @@ capacity: {}
 #   namespaceLimit: 25%        # default: no namespace cap
 #   workload:
 #     share: 16Gi              # protected per workload; default 1/8 of the rest
-#     limit: 10%               # protected share plus burst
+#     limit: 10%               # protected share plus burst; at least the share
 #     dump: {burst: 1, minimumIntervalSeconds: 900}
 #     maxConcurrentExpensive: 1
 #     onFull: RejectNewExpensive   # or DeleteOldestEligibleInAccount

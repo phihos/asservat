@@ -215,7 +215,7 @@ END $$;
 -- fixed limit.
 CREATE OR REPLACE FUNCTION capacity_charge(allocation uuid,bytes bigint,objects bigint) RETURNS boolean
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
-DECLARE a public.custody_allocation;s public.capacity_settings;w public.capacity_account;grow bigint;ns bigint;
+DECLARE a public.custody_allocation;s public.capacity_settings;w public.capacity_account;grow bigint;ns bigint;hard bigint;
 BEGIN
  SELECT * INTO a FROM public.custody_allocation WHERE id=allocation;
  IF NOT FOUND OR bytes<0 OR objects<0 THEN RETURN false;END IF;
@@ -225,7 +225,12 @@ BEGIN
  IF a.charged_objects+objects>a.object_limit THEN RETURN false;END IF;
  IF a.charged_bytes+bytes<=a.byte_limit THEN
   UPDATE public.custody_allocation SET charged_bytes=charged_bytes+bytes,charged_objects=charged_objects+objects WHERE id=allocation;RETURN true;END IF;
- IF w.allocation_id IS NULL OR a.charged_bytes+bytes>GREATEST(s.limit_bytes,w.protected_bytes) THEN RETURN false;END IF;
+ -- The hard limit is the larger of the configured limit and the account's
+ -- effective share (specs/capacity.md): a derived share may exceed an
+ -- explicit limit, and the protected share is always usable.
+ IF w.allocation_id IS NULL THEN RETURN false;END IF;
+ hard:=GREATEST(s.limit_bytes,w.protected_bytes);
+ IF a.charged_bytes+bytes>hard THEN RETURN false;END IF;
  grow:=a.charged_bytes+bytes-a.byte_limit;
  IF s.namespace_limit_bytes IS NOT NULL THEN
   SELECT COALESCE(sum(x.byte_limit),0) INTO ns FROM public.capacity_account c JOIN public.custody_allocation x ON x.id=c.allocation_id

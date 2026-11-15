@@ -60,7 +60,8 @@ func validateHubWorkerCapacity(c *contracts.HubWorkerCapacity, ids contracts.Ins
 }
 
 // capacityValues converts the Helm values to bytes: the system reserve is
-// 1/16 of the evidence storage and the default hard limit 10 %.
+// 1/16 of the evidence storage and the default hard limit 10 %, raised
+// to the effective share.
 func capacityValues(c contracts.CapacityValues) (app.CapacityValues, error) {
 	total, err := resource.ParseQuantity(c.EvidenceStorage)
 	if err != nil || total.Value() <= 0 {
@@ -94,8 +95,13 @@ func capacityValues(c contracts.CapacityValues) (app.CapacityValues, error) {
 		return out, err
 	}
 	if out.LimitBytes == 0 {
-		// Default 10%, never below an explicit share.
-		out.LimitBytes = max(out.EvidenceBytes/10, out.ShareBytes)
+		// Default 10%, never below the effective share: the configured share,
+		// or at most usable/8 when it is derived (specs/capacity.md).
+		share := out.ShareBytes
+		if share == 0 {
+			share = (out.EvidenceBytes - out.ReserveBytes) / 8
+		}
+		out.LimitBytes = max(out.EvidenceBytes/10, share)
 	}
 	if out.NamespaceLimitBytes, err = bytes(c.NamespaceLimit); err != nil {
 		return out, err

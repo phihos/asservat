@@ -186,6 +186,9 @@ class HubWorkerChart(unittest.TestCase):
         self.assertIn("capacity.workload.share must not exceed capacity.workload.limit", self.render(values, ok=False))
         values["capacity"]["workload"]["limit"] = "20%"
         self.render(values)
+        for bad in ("16GB", "16 Gi", "lots"):
+            values["capacity"]["workload"]["limit"] = bad
+            self.assertIn("is not a quantity", self.render(values, ok=False), bad)
 
     def test_capacity_cleanup_deletion_and_retention(self):
         values = copy.deepcopy(self.bundled)

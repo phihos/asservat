@@ -291,10 +291,13 @@ checksum/config: {{ $sum | sha256sum | quote }}
      (list value total), as a float. */}}
 {{- define "asservat.quantityBytes" -}}
 {{- $v := toString (index . 0) -}}
+{{- if not (regexMatch "^[0-9]+(\\.[0-9]+)?(%|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$" $v) -}}
+{{- fail (printf "capacity size %q is not a quantity (for example 16Gi) or a percentage" $v) -}}
+{{- end -}}
 {{- $n := regexFind "^[0-9.]+" $v | float64 -}}
 {{- $unit := trimPrefix (regexFind "^[0-9.]+" $v) $v -}}
-{{- $m := get (dict "" 1.0 "%" (divf (index . 1) 100.0) "k" 1e3 "M" 1e6 "G" 1e9 "T" 1e12 "P" 1e15 "Ki" 1024.0 "Mi" 1048576.0 "Gi" 1073741824.0 "Ti" 1099511627776.0 "Pi" 1125899906842624.0) $unit -}}
-{{- mulf $n (default 0.0 $m) -}}
+{{- $m := get (dict "" 1.0 "%" (divf (index . 1) 100.0) "k" 1e3 "M" 1e6 "G" 1e9 "T" 1e12 "P" 1e15 "Ki" 1024.0 "Mi" 1048576.0 "Gi" 1073741824.0 "Ti" 1099511627776.0 "Pi" 1125899906842624.0 "E" 1e18 "Ei" 1152921504606846976.0) $unit -}}
+{{- mulf $n $m -}}
 {{- end -}}
 
 {{/* ADR-334: the audience of the connector's ServiceAccount token, the hub

@@ -8,7 +8,7 @@ Read with [triggers](triggers.md), [actions](actions.md), [privacy](privacy.md) 
 | --- | --- | --- |
 | `capacity.evidenceStorage` | the bundled object store's volume size; required for an external store | Usable evidence bytes, after the backend's full threshold and replication overhead |
 | `capacity.workload.share` | usable capacity ÷ max(eligible workloads, 8) | Each workload's protected allocation (quantity or percentage) |
-| `capacity.workload.limit` | 10 % | Hard maximum per workload (protected share plus burst) |
+| `capacity.workload.limit` | 10 %, raised to the default share | Hard maximum per workload (protected share plus burst); the effective hard limit is the larger of this limit and the workload's share |
 | `capacity.capturesPerCluster` | max(8, node count) | Concurrent captures per cluster |
 | retention values | [REQ-EVD-006](evidence.md#req-evd-006--retention-holds-and-deletion) | Maximum evidence age |
 

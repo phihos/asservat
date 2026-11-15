@@ -57,7 +57,7 @@
         },
         "limit": {
           "$ref": "https://asservat.io/spec/v1/capacity.schema.json#/$defs/share",
-          "description": "Hard maximum per workload (protected share plus burst), at least the share. Default 10%, or the share when larger."
+          "description": "Hard maximum per workload (protected share plus burst), at least the share. Default 10%, or the share (configured or derived) when larger."
         },
         "dump": {
           "type": "object",
