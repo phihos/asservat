@@ -45,6 +45,9 @@ type PodResolution struct {
 	Pin                                                              artifact.PinnedPod
 	NodeUID, NodeBootID, PodResourceVersion, WorkloadResourceVersion string
 	ObservedAt, FreshUntil                                           time.Time
+	// EvidenceDisabled marks a namespace that capacity does not cover; new
+	// collection there is refused (ErrEvidenceDisabled), reads are not.
+	EvidenceDisabled bool `json:",omitempty"`
 }
 
 func (p PodResolution) Target() authorization.Target {

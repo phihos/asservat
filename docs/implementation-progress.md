@@ -174,8 +174,9 @@ and the download session/response counters (bytes stay bounded).
 `capturesPerCluster` defaults to max(8, node count).
 
 Follow-up (branch `clean/capacity-gaps`, migration 00187): target
-resolution refuses `kube-*`, the release namespace and namespaces labelled
-`asservat.io/evidence: disabled` (`targets.ErrEvidenceDisabled`). A profile
+resolution marks `kube-*`, the release namespace and namespaces labelled
+`asservat.io/evidence: disabled`; new collection there is refused
+(`targets.ErrEvidenceDisabled`), reads still resolve. A profile
 admission counts the workload's still-writable profile attempts under the
 allocation lock (`capacity_expensive_admits`) and refuses at
 `maxConcurrentExpensive`. The spec now divides the default share by enrolled

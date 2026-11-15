@@ -158,21 +158,19 @@ func (c *PodTargets) object(ctx context.Context, path, kind, namespace, name, ui
 	return out, nil
 }
 
-// targetNamespace reads the target's namespace and refuses one that is being
-// deleted or that capacity does not cover: kube-* system namespaces, the
-// release namespace and namespaces labelled asservat.io/evidence: disabled.
-func (c *PodTargets) targetNamespace(ctx context.Context, ref cfg.NamespaceRef) error {
+// targetNamespace reads the target's namespace, refuses one that is being
+// deleted and reports whether capacity covers it: kube-* system namespaces,
+// the release namespace and namespaces labelled asservat.io/evidence:
+// disabled take no new evidence. Reads of existing evidence still resolve.
+func (c *PodTargets) targetNamespace(ctx context.Context, ref cfg.NamespaceRef) (bool, error) {
 	ns, err := c.client.namespace(ctx, ref)
 	if err != nil {
-		return targetReadError(err)
+		return false, targetReadError(err)
 	}
 	if ns.Deleting {
-		return value.ErrChanged
+		return false, value.ErrChanged
 	}
-	if strings.HasPrefix(ns.Name, "kube-") || ns.Name == c.client.control.Name || ns.Labels["asservat.io/evidence"] == "disabled" {
-		return value.ErrEvidenceDisabled
-	}
-	return nil
+	return strings.HasPrefix(ns.Name, "kube-") || ns.Name == c.client.control.Name || ns.Labels["asservat.io/evidence"] == "disabled", nil
 }
 
 func targetReadError(err error) error {
@@ -236,7 +234,7 @@ func (c *PodTargets) ResolvePod(ctx context.Context, r value.Request) (value.Pod
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	start := c.client.now()
-	if err := c.targetNamespace(ctx, r.Namespace); err != nil {
+	if _, err := c.targetNamespace(ctx, r.Namespace); err != nil {
 		return out, err
 	}
 	path := "/api/v1/namespaces/" + r.Namespace.Name + "/pods/" + r.PodName
@@ -275,10 +273,12 @@ func (c *PodTargets) ResolvePod(ctx context.Context, r value.Request) (value.Pod
 	if nodeAgain.bootID != node.bootID {
 		return out, value.ErrChanged
 	}
-	if err = c.targetNamespace(ctx, r.Namespace); err != nil {
+	disabled, err := c.targetNamespace(ctx, r.Namespace)
+	if err != nil {
 		return out, err
 	}
 	out = value.PodResolution{Request: r, Pin: artifact.PinnedPod{Namespace: r.Namespace.Name, NamespaceUID: r.Namespace.UID, Name: r.PodName, UID: r.PodUID, NodeName: last.node}, NodeUID: node.ref.UID, NodeBootID: node.bootID, PodResourceVersion: last.ref.ResourceVersion, WorkloadResourceVersion: workloadRV, ObservedAt: start, FreshUntil: start.Add(5 * time.Second)}
+	out.EvidenceDisabled = disabled
 	if last.owner != nil {
 		out.Pin.ControllerUID = string(last.owner.UID)
 	}

@@ -153,31 +153,48 @@ func TestPodTargetsPinEntireOwnershipAndNodeChain(t *testing.T) {
 	}
 }
 
-func TestPodTargetsRefuseNamespacesWithoutEvidence(t *testing.T) {
-	for name, ns := range map[string]cfg.NamespaceRef{"system": {Name: "kube-system", UID: "kube-uid"}, "release": permissionControl, "labelled": {Name: "payments", UID: "payments-uid"}} {
+func TestPodTargetsMarkNamespacesWithoutEvidence(t *testing.T) {
+	for name, ns := range map[string]cfg.NamespaceRef{"eligible": {Name: "payments", UID: "payments-uid"}, "system": {Name: "kube-system", UID: "kube-uid"}, "release": permissionControl, "labelled": {Name: "payments", UID: "payments-uid"}} {
 		t.Run(name, func(t *testing.T) {
 			f := newPermissionFixture(t, func(w http.ResponseWriter, r *http.Request) bool {
+				base := "/api/v1/namespaces/" + ns.Name
+				var object map[string]any
 				switch r.URL.Path {
-				case "/api/v1/namespaces/kube-system":
-					permissionReply(w, permissionNamespace(ns.Name, ns.UID))
-				case "/api/v1/namespaces/payments":
-					object := permissionNamespace(ns.Name, ns.UID)
-					object["metadata"].(map[string]any)["labels"] = map[string]string{"asservat.io/evidence": "disabled"}
-					permissionReply(w, object)
+				case base:
+					object = permissionNamespace(ns.Name, ns.UID)
+					if name == "labelled" {
+						object["metadata"].(map[string]any)["labels"] = map[string]string{"asservat.io/evidence": "disabled"}
+					}
+				case base + "/pods/app":
+					object = targetMetadata("Pod", "app", "pod-uid")
+					metadata := object["metadata"].(map[string]any)
+					metadata["namespace"] = ns.Name
+					metadata["ownerReferences"] = []any{targetOwner("ReplicaSet", "rs", "rs-uid")}
+					object["spec"] = map[string]any{"nodeName": "node"}
+				case "/apis/apps/v1/namespaces/" + ns.Name + "/replicasets/rs":
+					object = targetMetadata("ReplicaSet", "rs", "rs-uid")
+					metadata := object["metadata"].(map[string]any)
+					metadata["namespace"] = ns.Name
+					metadata["ownerReferences"] = []any{targetOwner("Deployment", "app", "root-uid")}
+				case "/apis/apps/v1/namespaces/" + ns.Name + "/deployments/app":
+					object = targetMetadata("Deployment", "app", "root-uid")
+					object["metadata"].(map[string]any)["namespace"] = ns.Name
 				default:
 					return false
 				}
+				permissionReply(w, object)
 				return true
 			})
-			for _, api := range []bool{false, true} {
-				reader, _ := NewPodTargets(f.client)
-				if api {
-					reader, _ = NewAPIContextTargets(f.client)
-				}
-				request := value.Request{ClusterID: permissionCluster, Namespace: ns, Workload: cfg.WorkloadRef{Kind: "Deployment", Name: "app", UID: "root-uid"}, PodName: "app", PodUID: "pod-uid"}
-				if _, err := reader.ResolvePod(context.Background(), request); !errors.Is(err, value.ErrEvidenceDisabled) || !errors.Is(err, value.ErrDenied) {
-					t.Fatalf("api=%v: %v", api, err)
-				}
+			reader, err := NewAPIContextTargets(f.client)
+			if err != nil {
+				t.Fatal(err)
+			}
+			request := value.Request{ClusterID: permissionCluster, Namespace: ns, Workload: cfg.WorkloadRef{Kind: "Deployment", Name: "app", UID: "root-uid"}, PodName: "app", PodUID: "pod-uid"}
+			// Reads of existing evidence still resolve; only new collection
+			// refuses the marked target.
+			result, err := reader.ResolvePod(context.Background(), request)
+			if err != nil || result.EvidenceDisabled != (name != "eligible") {
+				t.Fatalf("%+v %v", result, err)
 			}
 		})
 	}

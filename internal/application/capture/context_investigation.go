@@ -184,6 +184,9 @@ func (s ContextInvestigation) factsWithStorageWait(ctx context.Context, source i
 	if !snapshotFactsTargetValid(f, s.Now()) {
 		return f, previewFailure("facts/target", value.ErrChanged)
 	}
+	if target.EvidenceDisabled {
+		return f, previewFailure("facts/namespace", targets.ErrEvidenceDisabled)
+	}
 	t := target.Target()
 	mark := time.Now()
 	f.eligibility = s.Eligibility.ContextEligibilityCurrent(ctx, source, t)
