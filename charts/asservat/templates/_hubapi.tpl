@@ -128,7 +128,7 @@
 
 {{/* identity.json (contracts.IdentitySettings). Without identity.clients the
      console client is the one human client. Bundled Keycloak defaults the
-     administrators to its /asservat-administrators group. */}}
+     administrators to its /asservat-admins group. */}}
 {{- define "asservat.hubApi.identitySettings" -}}
 {{- $i := .Values.identity -}}
 {{- $id := fromJson (include "asservat.hubApi.identity" .) -}}
@@ -136,7 +136,7 @@
 {{- $admins := dict -}}
 {{- with $i.administrators.groups }}{{ $_ := set $admins "groups" . }}{{ end -}}
 {{- with $i.administrators.subjects }}{{ $_ := set $admins "subjects" . }}{{ end -}}
-{{- if and (empty $admins) (eq .Values.services.identity.provider "keycloak") }}{{ $_ := set $admins "groups" (list "/asservat-administrators") }}{{ end -}}
+{{- if and (empty $admins) (eq .Values.services.identity.provider "keycloak") }}{{ $_ := set $admins "groups" (list "/asservat-admins") }}{{ end -}}
 {{- if empty $admins }}{{ fail "identity.administrators.groups or identity.administrators.subjects is required" }}{{ end -}}
 {{- $out := dict "schemaVersion" "identity-settings/v1" "issuer" $id.issuer "clients" $clients "groupsClaim" (default "groups" $i.groupsClaim) "usernameClaim" (default "preferred_username" $i.usernameClaim) "administrators" $admins -}}
 {{- with $i.requiredGroups }}{{ $_ := set $out "requiredGroups" . }}{{ end -}}

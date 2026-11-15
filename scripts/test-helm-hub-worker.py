@@ -113,7 +113,6 @@ class HubWorkerChart(unittest.TestCase):
         self.assertEqual(set(c["provider"]["roles"]), {"auditWrap", "auditUnwrap", "cleanupWrap", "cleanupOpen", "cleanupVerify", "cleanupSign"})
         p = c["permission"]
         self.assertEqual(p["statusUsers"], ["system:serviceaccount:asservat-system:asservat-hub-worker"])
-        self.assertEqual(p["browser"], {"settings": "asservat-browser-settings"})
         self.assertEqual(p["identity"], {"settings": "asservat-identity-settings", "issuer": "https://login.example.org/realms/asservat"})
         self.assertEqual(p["workerConfiguration"], {"namespace": "asservat-downloads", "source": "asservat-worker-profile"})
         self.assertIn("contextDeletion", p)

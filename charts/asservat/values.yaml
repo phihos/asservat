@@ -43,7 +43,7 @@ identity:
   # Optional: only members of one of these groups may sign in.
   requiredGroups: []
   # Installation administrators by group name or subject. Bundled Keycloak
-  # defaults to its /asservat-administrators group.
+  # defaults to its /asservat-admins group.
   administrators:
     groups: []
     subjects: []

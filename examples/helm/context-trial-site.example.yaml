@@ -13,7 +13,7 @@ identity:
   providerRootsPEM: REPLACE_WITH_ISSUER_CA_PEM
   clientSecret: {existingSecret: operator-oidc-client}
   clients: [ { id: asservat-console, kind: human } ]
-  administrators: {groups: [/asservat-administrators]}
+  administrators: {groups: [/asservat-admins]}
 exposure:
   # Existing kubernetes.io/tls Secret for the origin.
   tlsSecret: operator-console-tls

@@ -24,7 +24,7 @@ BUNDLED = {
     "mode": "combined",
     "image": {"repository": "registry.example/asservat", "digest": "sha256:" + "a" * 64},
     "origin": "https://asservat.example.test",
-    "identity": {"administrators": {"groups": ["/asservat-administrators"]}, "processingOperators": [{"clientID": "asservat-console", "issuer": "https://login.example.org/realms/asservat", "kind": "User", "id": "0f03f92a-6920-47cd-85d5-26080d3571d5"}]},
+    "identity": {"administrators": {"groups": ["/asservat-admins"]}, "processingOperators": [{"clientID": "asservat-console", "issuer": "https://login.example.org/realms/asservat", "kind": "User", "id": "0f03f92a-6920-47cd-85d5-26080d3571d5"}]},
     "exposure": {"tlsSecret": "asservat-public-tls"},
     "capacity": {"workload": {"share": "1Gi"}},
     "retention": {"purposeRef": "context-trial"},
@@ -125,7 +125,7 @@ class HubAPI(unittest.TestCase):
         self.assertNotIn("sessionEpoch", browser)
         identity = json.loads(o[("ConfigMap", NS, "asservat-identity-settings")]["data"]["identity.json"])
         self.assertEqual(identity["clients"], [{"id": "asservat-console", "kind": "human", "classQualified": True}])
-        self.assertEqual(identity["administrators"], {"groups": ["asservat-admins"]})
+        self.assertEqual(identity["administrators"], {"groups": ["/asservat-admins"]})
         env = json.loads(o[("ConfigMap", NS, "asservat-download-environment")]["data"]["download-environment.json"])
         self.assertEqual((env["permittedRegions"], env["clients"][0]["purposes"]), (["us-east-1"], ["context-trial"]))
         self.assertFalse({"rootID", "installationID", "recoveryEpoch"} & set(env))

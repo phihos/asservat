@@ -114,53 +114,6 @@
         }
       ]
     },
-    "administrators": {
-      "description": "Installation administrators by group name or subject. They hold every administrative right including privacy processing and cluster registration.",
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "groups": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1,
-            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
-          },
-          "uniqueItems": true
-        },
-        "subjects": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1,
-            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
-          },
-          "uniqueItems": true
-        }
-      },
-      "anyOf": [
-        {
-          "required": [
-            "groups"
-          ],
-          "properties": {
-            "groups": {
-              "minItems": 1
-            }
-          }
-        },
-        {
-          "required": [
-            "subjects"
-          ],
-          "properties": {
-            "subjects": {
-              "minItems": 1
-            }
-          }
-        }
-      ]
-    },
     "approvals": {
       "description": "Installation approval settings (ADR-249, ADR-335 D5). stepUp is optional and off by default; when set, approving additionally requires the token's signed acr to be one of acrValues and auth_time at most maxAgeSeconds old.",
       "type": "object",

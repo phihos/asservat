@@ -34,7 +34,7 @@ def hub_values():
     return {
         "image": {"repository": "registry.example/asservat", "digest": DIGEST, "pullPolicy": "IfNotPresent", "pullSecrets": []},
         "origin": "https://asservat.example.org",
-        "identity": {"issuer": "https://id.example.org/realms/org", "clientID": "asservat-console", "administrators": {"groups": ["/asservat-administrators"]}, "clientSecret": {"existingSecret": "operator-oidc"}, "providerRootsPEM": "PUBLIC-CA", "processingOperators": [{"clientID": "asservat-console", "issuer": "https://login.example.org/realms/asservat", "kind": "User", "id": "0f03f92a-6920-47cd-85d5-26080d3571d5"}]},
+        "identity": {"issuer": "https://id.example.org/realms/org", "clientID": "asservat-console", "administrators": {"groups": ["/asservat-admins"]}, "clientSecret": {"existingSecret": "operator-oidc"}, "providerRootsPEM": "PUBLIC-CA", "processingOperators": [{"clientID": "asservat-console", "issuer": "https://login.example.org/realms/asservat", "kind": "User", "id": "0f03f92a-6920-47cd-85d5-26080d3571d5"}]},
         "exposure": {"tlsSecret": "console-tls"},
         "capacity": PROFILE["capacity"],
         "services": {

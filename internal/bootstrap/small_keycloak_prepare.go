@@ -105,13 +105,13 @@ func ValidateSmallKeycloakMaterial(s contracts.SmallKeycloakSettings, secret *co
 }
 
 // smallKeycloakRealm is the imported realm. Tokens carry the standard groups
-// claim with group paths (/asservat-users, /asservat-administrators), used by name
+// claim with group paths (/asservat-users, /asservat-admins), used by name
 // (ADR-335 D4), so values can name groups before the first install.
 func smallKeycloakRealm(s contracts.SmallKeycloakSettings) []byte {
 	audience := func(value string) map[string]any {
 		return map[string]any{"name": "audience", "protocol": "openid-connect", "protocolMapper": "oidc-audience-mapper", "config": map[string]string{"included.custom.audience": value, "access.token.claim": "true", "id.token.claim": "false"}}
 	}
-	// Group names by full path (/asservat-administrators) in the standard
+	// Group names by full path (/asservat-admins) in the standard
 	// groups claim (identity settings groupsClaim, ADR-335 D4).
 	groups := map[string]any{"name": "groups", "protocol": "openid-connect", "protocolMapper": "oidc-group-membership-mapper", "config": map[string]string{"claim.name": "groups", "full.path": "true", "access.token.claim": "true", "id.token.claim": "false", "userinfo.token.claim": "false"}}
 	scopes := []any{}
@@ -139,7 +139,7 @@ func smallKeycloakRealm(s contracts.SmallKeycloakSettings) []byte {
 		map[string]any{"name": "username", "permissions": map[string]any{"view": []string{"admin", "user"}, "edit": []string{"admin", "user"}}, "validations": map[string]any{"length": map[string]int{"min": 3, "max": 255}, "username-prohibited-characters": map[string]any{}, "up-username-not-idn-homograph": map[string]any{}}},
 		map[string]any{"name": "email", "permissions": map[string]any{"view": []string{"admin", "user"}, "edit": []string{"admin", "user"}}, "validations": map[string]any{"email": map[string]any{}, "length": map[string]int{"max": 255}}},
 	}, "groups": []any{}})
-	realmGroups := []any{map[string]any{"name": "asservat-users"}, map[string]any{"name": "asservat-administrators"}}
+	realmGroups := []any{map[string]any{"name": "asservat-users"}, map[string]any{"name": "asservat-admins"}}
 	realm, _ := json.Marshal(map[string]any{"realm": s.Realm, "attributes": map[string]string{"CreateDefaultClientScopes": "true"}, "enabled": true, "sslRequired": "all", "registrationAllowed": false, "resetPasswordAllowed": false, "loginWithEmailAllowed": false, "accessTokenLifespan": 300, "revokeRefreshToken": true, "refreshTokenMaxReuse": 0, "bruteForceProtected": true, "clientScopes": scopes, "clients": clients, "users": []any{}, "groups": realmGroups, "components": map[string]any{"org.keycloak.userprofile.UserProfileProvider": []any{map[string]any{"providerId": "declarative-user-profile", "config": map[string]any{"kc.user.profile.config": []string{string(profile)}}}}}})
 	return realm
 }
