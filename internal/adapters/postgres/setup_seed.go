@@ -53,7 +53,7 @@ func SeedInstallation(ctx context.Context, ddl *pgx.ConnConfig, installation, is
 	}
 	digest := sha256.Sum256([]byte("asservat-installation-trust/v1\x00" + installation + "\x00" + issuerEpoch))
 	if _, err = tx.Exec(ctx, `INSERT INTO public.fleet_trust(installation_id,issuer_epoch,source_uid,source_generation,source_digest)
- VALUES($1,$2,$1::text,1,$3) ON CONFLICT(installation_id) DO NOTHING`, installation, issuerEpoch, digest[:]); err != nil {
+ VALUES($1,$2,$3,1,$4) ON CONFLICT(installation_id) DO NOTHING`, installation, issuerEpoch, installation, digest[:]); err != nil {
 		return cfg.ErrUnavailable
 	}
 	var epoch string
