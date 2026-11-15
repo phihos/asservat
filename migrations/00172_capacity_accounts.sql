@@ -7,6 +7,8 @@
 -- Root and workload rows carry the standing date (capacity_standing) instead
 -- of a renewed admission window. The context-control record counter, which
 -- never released a record, is removed.
+-- No Down: the old subsystem is not restored. Every statement is idempotent,
+-- so a downgrade probe can reapply it.
 
 DROP TRIGGER IF EXISTS aaa_capacity_configuration ON custody_pool;
  DROP TRIGGER IF EXISTS aaa_capacity_configuration ON custody_allocation;
@@ -29,8 +31,8 @@ DROP TRIGGER IF EXISTS aaa_capacity_configuration ON custody_pool;
  DROP TRIGGER IF EXISTS policy_recording_source_backing ON policy_recording_source;
  ALTER TABLE artifact_download DROP CONSTRAINT IF EXISTS capacity_download_snapshot_present;
  ALTER TABLE artifact_download DROP COLUMN IF EXISTS capacity_account_id, DROP COLUMN IF EXISTS capacity_backing, DROP COLUMN IF EXISTS capacity_backing_digest;
- DROP TABLE capacity_refresh_demand, capacity_cluster_qualification, capacity_pool_revision, capacity_workload, capacity_namespace, capacity_cluster, capacity_pool, capacity_source, remote_capacity_delivery CASCADE;
- DROP TABLE context_control_charge, context_control_account, context_control_pool CASCADE;
+ DROP TABLE IF EXISTS capacity_refresh_demand, capacity_cluster_qualification, capacity_pool_revision, capacity_workload, capacity_namespace, capacity_cluster, capacity_pool, capacity_source, remote_capacity_delivery CASCADE;
+ DROP TABLE IF EXISTS context_control_charge, context_control_account, context_control_pool CASCADE;
 
 -- +goose StatementBegin
 DO $$
@@ -46,8 +48,9 @@ BEGIN
 END $$;
 -- +goose StatementEnd
 
-ALTER TABLE context_storage_binding DROP CONSTRAINT context_storage_binding_check;
-ALTER TABLE capture_audit_allocation ADD FOREIGN KEY(allocation_id) REFERENCES custody_allocation(id);
+ALTER TABLE context_storage_binding DROP CONSTRAINT IF EXISTS context_storage_binding_check;
+ALTER TABLE capture_audit_allocation DROP CONSTRAINT IF EXISTS capture_audit_allocation_custody_fk,
+ ADD CONSTRAINT capture_audit_allocation_custody_fk FOREIGN KEY(allocation_id) REFERENCES custody_allocation(id);
 
 -- The standing date of capacity rows: far enough to never end, finite so
 -- every existing date check and JSON encoding still holds (ADR-332 uses the
@@ -56,7 +59,7 @@ ALTER TABLE capture_audit_allocation ADD FOREIGN KEY(allocation_id) REFERENCES c
 CREATE OR REPLACE FUNCTION capacity_standing() RETURNS timestamptz LANGUAGE sql IMMUTABLE AS $$ SELECT '9970-01-01T00:00:00Z'::timestamptz $$;
 -- +goose StatementEnd
 
-CREATE TABLE capacity_settings (
+CREATE TABLE IF NOT EXISTS capacity_settings (
  root_id uuid PRIMARY KEY REFERENCES permission_stream(id),
  installation_id uuid NOT NULL,
  account_version text NOT NULL,
@@ -71,7 +74,7 @@ CREATE TABLE capacity_settings (
  on_full text NOT NULL CHECK(on_full IN('RejectNewExpensive','DeleteOldestEligibleInAccount')),
  revision bigint NOT NULL CHECK(revision>0)
 );
-CREATE TABLE capacity_account (
+CREATE TABLE IF NOT EXISTS capacity_account (
  allocation_id uuid PRIMARY KEY REFERENCES custody_allocation(id),
  download_allocation_id uuid NOT NULL UNIQUE REFERENCES download_allocation(id),
  root_id uuid NOT NULL REFERENCES capacity_settings(root_id),
@@ -517,7 +520,8 @@ BEGIN
 END $$;
 -- +goose StatementEnd
 
-ALTER TABLE context_query_capacity ADD FOREIGN KEY(root_id) REFERENCES capacity_settings(root_id);
+ALTER TABLE context_query_capacity DROP CONSTRAINT IF EXISTS context_query_capacity_settings_fk,
+ ADD CONSTRAINT context_query_capacity_settings_fk FOREIGN KEY(root_id) REFERENCES capacity_settings(root_id);
 
 -- +goose StatementBegin
 -- The shared context-query backing of a root, created with its capacity
@@ -603,8 +607,8 @@ END $$;
 -- Downloads count bytes, not sessions or responses (specs/capacity.md:
 -- sessions are not counted beyond Kubernetes object and rate limits). The
 -- response window bound keeps one partial window per request (1024).
-ALTER TABLE download_allocation DROP COLUMN session_limit, DROP COLUMN reserved_sessions;
-ALTER TABLE download_control_allocation DROP COLUMN response_limit, DROP COLUMN reserved_responses;
+ALTER TABLE download_allocation DROP COLUMN IF EXISTS session_limit, DROP COLUMN IF EXISTS reserved_sessions;
+ALTER TABLE download_control_allocation DROP COLUMN IF EXISTS response_limit, DROP COLUMN IF EXISTS reserved_responses;
 -- +goose StatementBegin
 CREATE OR REPLACE FUNCTION public.guard_download_stop_backing()
  RETURNS trigger
