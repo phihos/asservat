@@ -155,16 +155,15 @@ def check_setup(render):
     assert files("openbao") == {"ca.crt", "token"} and files("objectstore") == {"ca.crt", "credentials.json", "bucket-policies.json"}
     token, = [s["serviceAccountToken"] for s in volumes["openbao"]["projected"]["sources"] if "serviceAccountToken" in s]
     assert token["audience"] == "https://asservat.io/openbao/setup"
-    assert named(docs, "Role", "asservat-setup")["rules"] == [{"apiGroups": [""], "resources": ["configmaps"], "resourceNames": ["asservat-fleet"], "verbs": ["get"]}]
-    cluster = named(docs, "ClusterRole", "asservat-system-asservat-setup")["rules"]
-    assert cluster == [{"apiGroups": [""], "resources": ["namespaces"], "resourceNames": ["asservat-system"], "verbs": ["get"]}]
+    # Setup reads no Kubernetes object.
+    assert not [r for r in docs if r["kind"] in ("Role", "ClusterRole") and r["metadata"]["name"].endswith("asservat-setup")]
     # The name follows chart version, image and values.
     changed = bundled_values("combined")
     changed["identity"]["maxSessions"] = 9
     other = [r for r in render(changed) if r["kind"] == "Job" and r["metadata"]["name"].startswith("asservat-setup-")][0]
     assert other["metadata"]["name"] != job["metadata"]["name"]
     config = json.loads(named(docs, "ConfigMap", "asservat-setup-config")["data"]["config.json"])
-    assert config == {"format": "asservat-setup/v1", "name": "asservat", "namespace": "asservat-system", "fleetSource": "asservat-fleet",
+    assert config == {"format": "asservat-setup/v1", "name": "asservat", "namespace": "asservat-system",
                       "postgres": {"host": "asservat-postgres.asservat-system.svc", "port": 5432, "database": "asservat"},
                       "openBao": {"endpoint": "https://asservat-openbao.asservat-system.svc:8200", "bundled": True, "accounts": {c: f"asservat-{c}" for c in ["hub-api", "hub-worker", "federation", "publisher"]}},
                       "objectStore": {"endpoint": "https://asservat-objectstore.asservat-system.svc:8333", "region": "us-east-1", "bundled": True, "auditBucket": "asservat-audit", "evidenceBucket": "asservat-evidence"}}, config
@@ -365,8 +364,6 @@ def check_cluster_join(render):
     assert publisher["remoteClusters"] == [cluster]
     worker = json.loads(named(docs, "ConfigMap", "asservat-hub-worker-config")["data"]["config.json"])
     assert worker["capacity"]["remoteClusters"] == config["clusters"], worker["capacity"].get("remoteClusters")
-    fleet = json.loads(named(docs, "ConfigMap", "asservat-fleet")["data"]["fleet.json"])
-    assert fleet["maxClusters"] >= 1 and fleet["maxActiveBootstraps"] >= 1
     # combined plus one cluster: ADR-332 has no install-time connector
     # count, and an install-time count field is refused.
     v2 = copy.deepcopy(v)
@@ -374,8 +371,7 @@ def check_cluster_join(render):
     v2["federation"]["connector"]["profiles"] = 2
     render(v2, ok=False)
     del v2["federation"]["connector"]["profiles"]
-    fleet = json.loads(named(render(v2), "ConfigMap", "asservat-fleet")["data"]["fleet.json"])
-    assert fleet["maxClusters"] == 2 and fleet["maxActiveBootstraps"] == 2, fleet
+    render(v2)
     for bad in [{"remote": {}}, {"clusters": [{"name": "eu", "clusterID": "not-a-uuid"}]}, {"clusters": [{"name": "Bad", "clusterID": cluster}]}]:
         render({**v, **bad}, ok=False)
     # The workload cluster: the copied join Secret supplies IDs and offer.

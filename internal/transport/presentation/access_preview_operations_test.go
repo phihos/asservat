@@ -14,7 +14,6 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
-	"asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
 )
 
@@ -30,9 +29,8 @@ type previewOpsFixture struct {
 func (f *previewOpsFixture) ResolveIdentity(context.Context) (identity.Identity, error) {
 	return identity.Identity{Principal: identity.Principal{Issuer: "https://id.example.invalid", Subject: "admin", ClientID: "console", Kind: identity.Human}, Groups: f.groups, Policy: identity.Revision{UID: "identity", Generation: 1, Digest: artifact.Digest{1}}, VerifiedAt: f.now, ValidUntil: f.now.Add(30 * time.Second)}, nil
 }
-func (f *previewOpsFixture) FleetAdministration(context.Context) (fleet.Administration, error) {
-	return fleet.Administration{InstallationID: previewInstallation, IssuerEpoch: previewInstallation, Issuer: "https://id.example.invalid", Revision: identity.Revision{UID: "fleet", Generation: 1, Digest: artifact.Digest{4}}, ObservedAt: f.now, FreshUntil: f.now.Add(5 * time.Second),
-		Clients: []string{"console"}, Groups: []string{"platform-admins"}, DeliveryProfiles: []string{"kv"}, MaxActiveBootstraps: 1, MaxBootstrapHistory: 1, MaxClusters: 1}, nil
+func (f *previewOpsFixture) IdentityPolicy(context.Context, string) (identity.Policy, error) {
+	return identity.Policy{Issuer: "https://id.example.invalid", Revision: identity.Revision{UID: "identity", Generation: 1, Digest: artifact.Digest{4}}, ObservedAt: f.now, FreshUntil: f.now.Add(30 * time.Second), AdministratorGroups: []string{"platform-admins"}}, nil
 }
 func (f *previewOpsFixture) PreviewProjections(_ context.Context, r cfg.PreviewRead) (cfg.PreviewSnapshot, error) {
 	out := cfg.PreviewSnapshot{Cells: f.cells, Unmatched: []cfg.PreviewBasis{{Kind: "AccessBinding", UID: "gone"}}}
@@ -84,7 +82,7 @@ func (f *previewOpsFixture) DecodePermissionSourceSpec(spec []byte) (cfg.Source,
 func newPreviewOps(t *testing.T) (*previewOpsFixture, *AccessPreviewOperations) {
 	f := &previewOpsFixture{now: time.Now().UTC(), groups: []string{"platform-admins"}, issuer: "https://id.example.invalid"}
 	f.cells = []cfg.PreviewCell{f.cell(cfg.OtherWorkloads, "team-a")}
-	service := authapp.AccessPreviewer{InstallationID: previewInstallation, Administration: f, Projections: f, Decoder: f, Recovery: f, Clusters: []string{accessCluster}, Now: func() time.Time { return f.now }}
+	service := authapp.AccessPreviewer{InstallationID: previewInstallation, Administrators: f, Projections: f, Decoder: f, Recovery: f, Clusters: []string{accessCluster}, Now: func() time.Time { return f.now }}
 	s, err := NewAccessPreviewOperations("https://asservat.example.invalid", func() time.Time { return f.now }, func() string { return "88888888-8888-4888-8888-888888888888" }, service)
 	if err != nil {
 		t.Fatal(err)

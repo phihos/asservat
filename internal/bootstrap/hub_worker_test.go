@@ -23,7 +23,7 @@ import (
 
 func hubWorkerTestConfig() contracts.HubWorkerConfig {
 	return contracts.HubWorkerConfig{Format: contracts.HubWorkerConfigFormat, Namespace: "asservat", ServiceAccount: "asservat-hub-worker",
-		FleetSource: "asservat-fleet", OwnerSource: "asservat-owner-source", LeaderLease: "asservat-hub-worker-leader",
+		OwnerSource: "asservat-owner-source", LeaderLease: "asservat-hub-worker-leader",
 		Postgres:   contracts.HubWorkerPostgres{Host: "asservat-postgres.asservat.svc", Port: 5432, Database: "asservat"},
 		AuditStore: contracts.HubWorkerObjectStore{Endpoint: "https://asservat-objectstore.asservat.svc:8333", Region: "us-east-1", Bucket: "asservat-audit"},
 		KeyService: contracts.HubWorkerKeyService{Endpoint: "https://asservat-openbao.asservat.svc:8200"},
@@ -76,7 +76,6 @@ func TestHubWorkerConfigValidation(t *testing.T) {
 	for name, change := range map[string]func(*contracts.HubWorkerConfig){
 		"valid":          func(*contracts.HubWorkerConfig) {},
 		"namespace":      func(c *contracts.HubWorkerConfig) { c.Namespace = "Not_A_Label" },
-		"shared-source":  func(c *contracts.HubWorkerConfig) { c.OwnerSource = c.FleetSource },
 		"http-audit":     func(c *contracts.HubWorkerConfig) { c.AuditStore.Endpoint = "http://objectstore.invalid" },
 		"http-provider":  func(c *contracts.HubWorkerConfig) { c.KeyService.Endpoint = "http://openbao.invalid" },
 		"port":           func(c *contracts.HubWorkerConfig) { c.Postgres.Port = 0 },
@@ -90,7 +89,7 @@ func TestHubWorkerConfigValidation(t *testing.T) {
 			files, _ := hubWorkerFiles(t, c, server)
 			got, err := readHubWorkerConfig(context.Background(), files, hubWorkerTestIDs())
 			if name == "valid" {
-				if err != nil || got.FleetSource != c.FleetSource || got.Provider.AuthMount != "asservat-configuration" || got.Provider.Audience != "asservat-configuration-provider" ||
+				if err != nil || got.OwnerSource != c.OwnerSource || got.Provider.AuthMount != "asservat-configuration" || got.Provider.Audience != "asservat-configuration-provider" ||
 					got.KeyService.AuditMount != "asservat-audit" || got.KeyService.AuditKey != "audit" || got.Provider.ContextDeletionSigning.Key != "" {
 					t.Fatal(err, got.Provider, got.KeyService)
 				}
@@ -138,7 +137,7 @@ func TestHubWorkerStartupReadsUIDsByNameBeforeSQL(t *testing.T) {
 		case "/api/v1/namespaces/asservat":
 			meta["name"] = "asservat"
 			body = map[string]any{"apiVersion": "v1", "kind": "Namespace", "metadata": meta}
-		case "/api/v1/namespaces/asservat/configmaps/asservat-fleet", "/api/v1/namespaces/asservat/configmaps/asservat-owner-source":
+		case "/api/v1/namespaces/asservat/configmaps/asservat-owner-source":
 			meta["name"], meta["namespace"] = filepath.Base(r.URL.Path), "asservat"
 			body = map[string]any{"apiVersion": "v1", "kind": "ConfigMap", "metadata": meta}
 		default:
@@ -164,8 +163,8 @@ func TestHubWorkerStartupReadsUIDsByNameBeforeSQL(t *testing.T) {
 		t.Fatal("started without SQL credentials")
 	}
 	var step interface{ FixedStep() string }
-	if !errors.As(err, &step) || !strings.HasPrefix(step.FixedStep(), "sql") || reads.Load() != 3 {
-		t.Fatal("startup did not reach SQL after three by-name reads", err, reads.Load())
+	if !errors.As(err, &step) || !strings.HasPrefix(step.FixedStep(), "sql") || reads.Load() != 2 {
+		t.Fatal("startup did not reach SQL after two by-name reads", err, reads.Load())
 	}
 }
 

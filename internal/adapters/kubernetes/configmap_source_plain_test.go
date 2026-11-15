@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 	"testing"
-	"time"
 
 	"asservat.local/asservat/internal/contracts"
 	cfg "asservat.local/asservat/internal/domain/configuration"
@@ -65,28 +64,4 @@ func TestRuntimeSourcesArePlainReadsWithoutAdmissionGuards(t *testing.T) {
 			t.Fatal("plain catalog read", err)
 		}
 	})
-}
-
-func TestFleetAndOwnerSourcesArePlainReadsWithoutAdmissionGuards(t *testing.T) {
-	f := newConfigurationSourcePathFixture(t)
-	f.extraHandler = func(w http.ResponseWriter, r *http.Request) bool {
-		if strings.Contains(r.URL.Path, "/admissionregistration.k8s.io/") || strings.Contains(r.URL.Path, "/selfsubject") || r.Method != http.MethodGet {
-			t.Error("plain source read used admission-guard machinery", r.Method, r.URL.Path)
-			http.Error(w, "unexpected", http.StatusForbidden)
-			return true
-		}
-		return false
-	}
-	start := time.Now()
-	a, err := f.source.fleet.FleetAdministration(context.Background())
-	if err != nil || a.ObservedAt.Before(start) || a.FreshUntil.After(a.ObservedAt.Add(5*time.Second)) {
-		t.Fatal("plain fleet read", err)
-	}
-	o, err := f.source.owner.ReadOwnerConfiguration(context.Background())
-	if err != nil || o.Configuration.ProtectionDigest != f.source.owner.protection.digest {
-		t.Fatal("plain owner read lost its configuration digest", err)
-	}
-	if f.probes.Load() != 0 || f.requests.Load() != 6 {
-		t.Fatal("source reads changed their plain request graph", f.requests.Load())
-	}
 }

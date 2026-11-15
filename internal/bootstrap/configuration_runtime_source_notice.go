@@ -57,3 +57,13 @@ func (s *configurationRuntimeFleetProjection) FenceAdministration(ctx context.Co
 	s.admission.InvalidateFleetNotice()
 	return s.actual.FenceAdministration(ctx, basis, started)
 }
+
+// installationTrust is the fleet observer's source: the generated IDs alone.
+type installationTrust struct{ installation, epoch string }
+
+func (t installationTrust) FleetAdministration(ctx context.Context) (fleet.Administration, error) {
+	if ctx.Err() != nil {
+		return fleet.Administration{}, fleet.ErrUnavailable
+	}
+	return fleet.InstallationTrust(t.installation, t.epoch, time.Now()), nil
+}

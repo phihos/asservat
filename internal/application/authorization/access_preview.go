@@ -8,7 +8,6 @@ import (
 	identities "asservat.local/asservat/internal/application/identity"
 	value "asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
-	"asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
 )
 
@@ -18,10 +17,10 @@ type PreviewProjections interface {
 	PreviewProjections(context.Context, cfg.PreviewRead) (cfg.PreviewSnapshot, error)
 }
 
-// PreviewAdministration is the protected fleet administration source that
-// names the installation's operators.
-type PreviewAdministration interface {
-	FleetAdministration(context.Context) (fleet.Administration, error)
+// PreviewAdministrators reads the identity settings whose administrators
+// list names the installation administrators (ADR-335 D14).
+type PreviewAdministrators interface {
+	IdentityPolicy(context.Context, string) (identity.Policy, error)
 }
 
 // BindingSpecDecoder applies the observed AccessBinding and PermissionSource
@@ -44,12 +43,12 @@ type ProposedChange struct {
 
 // AccessPreviewer answers preview_access_change (ADR-237): the delta of the
 // ordinary evaluator's decisions that a proposed permission configuration
-// would cause, over the current accepted projections. Only a current fleet
-// operator (the installation-wide administrator) previews (ADR-329). It reads
+// would cause, over the current accepted projections. Only an installation
+// administrator previews (ADR-329, ADR-335 D14). It reads
 // no catalog or evidence, writes nothing and returns no authority.
 type AccessPreviewer struct {
 	InstallationID string
-	Administration PreviewAdministration
+	Administrators PreviewAdministrators
 	Projections    PreviewProjections
 	Decoder        BindingSpecDecoder
 	Recovery       ExplainRecovery
@@ -59,23 +58,26 @@ type AccessPreviewer struct {
 	Now      func() time.Time
 }
 
-// operator returns the deadline of the caller's fleet operator authority.
-func (s AccessPreviewer) operator(ctx context.Context, i identity.Identity) (time.Time, error) {
-	admin, err := s.Administration.FleetAdministration(ctx)
-	if err != nil || !admin.Valid(s.Now()) || admin.InstallationID != s.InstallationID {
-		return time.Time{}, identity.ErrUnavailable
-	}
-	if !admin.Operator(i) {
+// administrator returns the deadline of the caller's administrator authority.
+func administrator(ctx context.Context, admins PreviewAdministrators, i identity.Identity, now time.Time) (time.Time, error) {
+	p, err := admins.IdentityPolicy(ctx, i.Principal.Issuer)
+	if errors.Is(err, identity.ErrDenied) {
 		return time.Time{}, identity.ErrDenied
 	}
-	return identity.Earlier(i.ValidUntil, admin.FreshUntil), nil
+	if err != nil || !now.Before(p.FreshUntil) {
+		return time.Time{}, identity.ErrUnavailable
+	}
+	if !p.Administrator(i) {
+		return time.Time{}, identity.ErrDenied
+	}
+	return identity.Earlier(i.ValidUntil, p.FreshUntil), nil
 }
 
 // Preview returns the preview and the reply's metadata deadline. cfg.ErrInvalid
 // marks an invalid proposal and cfg.ErrLimit one beyond the preview bounds.
 func (s AccessPreviewer) Preview(ctx context.Context, current identities.CurrentIdentity, proposed []ProposedChange) (cfg.AccessPreview, time.Time, error) {
 	var zero cfg.AccessPreview
-	if ctx == nil || current == nil || s.Administration == nil || s.Projections == nil || s.Decoder == nil || s.Recovery == nil || s.Now == nil || !value.UUID(s.InstallationID) {
+	if ctx == nil || current == nil || s.Administrators == nil || s.Projections == nil || s.Decoder == nil || s.Recovery == nil || s.Now == nil || !value.UUID(s.InstallationID) {
 		return zero, time.Time{}, identity.ErrUnavailable
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -86,7 +88,7 @@ func (s AccessPreviewer) Preview(ctx context.Context, current identities.Current
 	}
 	// Authority precedes decoding, so a caller without it learns nothing,
 	// not even whether a proposal is well formed.
-	until, err := s.operator(ctx, i)
+	until, err := administrator(ctx, s.Administrators, i, s.Now())
 	if err != nil {
 		return zero, time.Time{}, err
 	}
@@ -136,7 +138,7 @@ func (s AccessPreviewer) Preview(ctx context.Context, current identities.Current
 	if err != nil || fresh.Principal != i.Principal || fresh.Policy != i.Policy || !fresh.Valid(s.Now()) {
 		return zero, time.Time{}, identity.ErrDenied
 	}
-	if _, err := s.operator(ctx, fresh); err != nil {
+	if _, err := administrator(ctx, s.Administrators, fresh, s.Now()); err != nil {
 		return zero, time.Time{}, identity.ErrDenied
 	}
 	until = identity.Earlier(until, fresh.ValidUntil)

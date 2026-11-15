@@ -38,9 +38,7 @@ type SetupConfiguration struct {
 	// Name is `.Values.installation.name`, the prefix of every object name.
 	Name string `json:"name"`
 	// Namespace is the release (hub) namespace.
-	Namespace string `json:"namespace"`
-	// FleetSource is the fleet settings ConfigMap name in Namespace.
-	FleetSource string           `json:"fleetSource"`
+	Namespace   string           `json:"namespace"`
 	Postgres    SetupPostgres    `json:"postgres"`
 	OpenBao     SetupOpenBao     `json:"openBao"`
 	ObjectStore SetupObjectStore `json:"objectStore"`

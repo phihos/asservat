@@ -131,6 +131,28 @@
           "minimum": 1,
           "maximum": 300
         },
+        "administrators": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "groups": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "subjects": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
         "maxLifetimeSeconds": {
           "type": "integer",
           "minimum": 60,
@@ -310,88 +332,6 @@
               "type": "object"
             }
           }
-        }
-      }
-    },
-    "fleet": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "issuer": {
-          "type": "string",
-          "maxLength": 2048,
-          "pattern": "^$|^https://"
-        },
-        "clients": {
-          "type": "array",
-          "maxItems": 64,
-          "uniqueItems": true,
-          "items": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 256
-          }
-        },
-        "subjects": {
-          "type": "array",
-          "maxItems": 256,
-          "uniqueItems": true,
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "id",
-              "kind"
-            ],
-            "properties": {
-              "id": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 256
-              },
-              "kind": {
-                "enum": [
-                  "human",
-                  "workload"
-                ]
-              }
-            }
-          }
-        },
-        "groups": {
-          "type": "array",
-          "maxItems": 256,
-          "uniqueItems": true,
-          "items": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 256
-          }
-        },
-        "deliveryProfiles": {
-          "type": "array",
-          "maxItems": 16,
-          "uniqueItems": true,
-          "items": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 64
-          }
-        },
-        "maxActiveBootstraps": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 128
-        },
-        "maxBootstrapHistory": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 65536
-        },
-        "maxClusters": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 1024
         }
       }
     },

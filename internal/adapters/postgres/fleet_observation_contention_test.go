@@ -13,7 +13,7 @@ import (
 func fleetContentionValues() (value.Administration, custodydb.FleetCurrentTrust, time.Time) {
 	n := time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)
 	const uid = "11111111-1111-4111-8111-111111111111"
-	a := value.Administration{InstallationID: uid, IssuerEpoch: uid, Issuer: "https://issuer.example", Revision: identity.Revision{UID: uid, Generation: 1, Digest: [32]byte{1}}, ObservedAt: n, FreshUntil: n.Add(5 * time.Second), Clients: []string{"client"}, DeliveryProfiles: []string{"context"}, MaxActiveBootstraps: 1, MaxBootstrapHistory: 2, MaxClusters: 1}
+	a := value.Administration{InstallationID: uid, IssuerEpoch: uid, Revision: identity.Revision{UID: uid, Generation: 1, Digest: [32]byte{1}}, ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}
 	r := custodydb.FleetCurrentTrust{InstallationID: id(uid), IssuerEpoch: id(uid), SourceUid: uid, SourceGeneration: 1, SourceDigest: append([]byte(nil), a.Revision.Digest[:]...), ObservedAt: ts(n.Add(-time.Second)), FreshUntil: ts(n.Add(4 * time.Second))}
 	return a, r, n
 }

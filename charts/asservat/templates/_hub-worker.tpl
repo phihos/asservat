@@ -45,7 +45,7 @@ installation ID in Go, object UIDs are read by name.
 {{- $_ := set $permission "workerConfiguration" (dict "namespace" (printf "%s-downloads" $n) "source" (printf "%s-worker-profile" $n)) -}}
 {{- end -}}
 {{- $v := dict "format" "asservat-hub-worker-config/v1" "namespace" .Release.Namespace "serviceAccount" $account
-  "fleetSource" (printf "%s-fleet" $n) "ownerSource" (printf "%s-owner-source" $n) "leaderLease" (printf "%s-hub-worker-leader" $n)
+  "ownerSource" (printf "%s-owner-source" $n) "leaderLease" (printf "%s-hub-worker-leader" $n)
   "postgres" $p.postgres
   "auditStore" (dict "endpoint" $p.objectStore.endpoint "region" $p.objectStore.region "bucket" $p.objectStore.auditBucket)
   "keyService" (dict "endpoint" $p.openBao.endpoint) -}}
@@ -67,22 +67,6 @@ installation ID in Go, object UIDs are read by name.
 {{- $_ := set $v "permission" $permission -}}
 {{- $_ := set $v "provider" (dict "roles" $roles) -}}
 {{- toJson $v -}}
-{{- end -}}
-
-{{/* fleet.json (contracts.FleetSettings): chart values only; the readers
-     add the installation ID and issuer epoch from `<name>-ids`. */}}
-{{- define "asservat.hubWorker.fleet" -}}
-{{- $f := .Values.fleet -}}
-{{- $clients := $f.clients -}}
-{{- if not $clients }}{{ $clients = list (default "asservat-console" .Values.identity.clientID) }}{{ end -}}
-{{- /* The hub-issued slots (the local connector and each joined cluster) may
-     be live at once and each is a cluster. */ -}}
-{{- $issued := len (default list .Values.clusters) -}}
-{{- if include "asservat.hubApi.combined" . }}{{ $issued = add1 $issued }}{{ end -}}
-{{- toJson (dict "schemaVersion" "fleet-settings/v1" "revision" (int .Release.Revision) "suspended" false
-  "issuer" (default (include "asservat.hubWorker.identityIssuer" .) $f.issuer)
-  "clients" $clients "subjects" (default list $f.subjects) "groups" (default list $f.groups) "deliveryProfiles" (include "asservat.hubApi.deliveryProfiles" . | fromJsonArray)
-  "maxActiveBootstraps" (max (int $f.maxActiveBootstraps) $issued) "maxBootstrapHistory" (int $f.maxBootstrapHistory) "maxClusters" (max (int $f.maxClusters) $issued)) -}}
 {{- end -}}
 
 {{/* owner-pool.json (contracts.OwnerSource): the hub-api owner pool by name.

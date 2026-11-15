@@ -6,10 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"asservat.local/asservat/internal/adapters/postgres"
 	app "asservat.local/asservat/internal/application/capacity"
 	"asservat.local/asservat/internal/application/planning"
-	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
@@ -165,13 +163,5 @@ func TestCapacityNativeInputsContextAndSession(t *testing.T) {
 	}
 	if _, err = planning.CompileContext(input, n.Add(5*time.Second)); err == nil {
 		t.Fatal("expired synthetic proof compiled")
-	}
-}
-
-func TestCapacityNativeInputsInstalledWorkerRecipe(t *testing.T) {
-	input := contracts.PublicRuntimeRoles{Format: contracts.PublicRuntimeRolesFormat, InstallationID: custodyID(), InitialClaimID: custodyID(), OwnerConfigurationUID: custodyID(), ClusterID: custodyID(), Namespace: contracts.WorkerObjectReference{Name: "control", UID: custodyID()}, LayoutDigest: postgres.PublicRuntimeRoleLayoutDigest()}
-	worker := capacityNativeWorkerScope(t, input)
-	if worker.WorkerLayout != contracts.HubWorkerInstalledLayout {
-		t.Fatal("native worker recipe selected legacy layout")
 	}
 }

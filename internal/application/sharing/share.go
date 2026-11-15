@@ -350,8 +350,8 @@ func (s Service) List(ctx context.Context, current identities.CurrentIdentity, v
 
 // Revoke revokes one share for its creator, a current manager (ADR-232
 // increment 4: a principal holding one of the pinned management assignments
-// now) or an installation administrator (ADR-238: an operator of the
-// protected fleet administration). Revocation only restricts access, so the
+// now) or an installation administrator (ADR-238, identity.administrators).
+// Revocation only restricts access, so the
 // creator needs no current owner assignment and the administrator no evidence
 // right; the operation audit records the acting principal. A share the
 // caller may not revoke is NotAvailable without saying why.
@@ -497,14 +497,13 @@ func decodeShareCursor(s string) (ShareCursor, bool) {
 	return ShareCursor{CreatedAt: time.UnixMicro(micros).UTC(), ID: parts[2]}, true
 }
 
-// administrator reports whether i is an operator of the current protected
-// fleet administration of this installation.
+// administrator reports whether i is a current installation administrator.
 func (s Service) administrator(ctx context.Context, i identity.Identity) bool {
 	if s.Administration == nil {
 		return false
 	}
-	a, err := s.Administration.FleetAdministration(ctx)
-	return err == nil && a.InstallationID == s.InstallationID && a.Valid(s.Now()) && i.Valid(s.Now()) && a.Operator(i)
+	p, err := s.Administration.IdentityPolicy(ctx, i.Principal.Issuer)
+	return err == nil && s.Now().Before(p.FreshUntil) && i.Valid(s.Now()) && p.Administrator(i)
 }
 
 // Transfer replaces the management of one live share (ADR-238,
