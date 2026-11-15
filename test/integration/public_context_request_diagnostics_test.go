@@ -122,4 +122,3 @@ func TestPublicJourneyDiagnosticsFirstRequestPublication(t *testing.T) {
 		})
 	}
 }
-
