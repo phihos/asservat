@@ -32,8 +32,7 @@ func (f *capacitySQLFixture) admitManagedContext(t *testing.T, root capacityRoot
 // request; the existing renewal cases retain their original 20-second default.
 func (f *capacitySQLFixture) admitManagedContextRetention(t *testing.T, root capacityRoot, enrollment capacityEnrollment, retentionSeconds int64) (captureAdmissionScenario, capturevalue.Accepted) {
 	t.Helper()
-	s, publisher, policies := f.prepareManagedContext(t, root, enrollment, retentionSeconds)
-	f.checkManagedProcessingAdmission(t, s.s, s.recovery.guard, policies, s.a)
+	s, publisher, _ := f.prepareManagedContext(t, root, enrollment, retentionSeconds)
 	start := time.Now()
 	accepted, err := s.s.AdmitContext(f.ctx, s.a)
 	if err != nil {

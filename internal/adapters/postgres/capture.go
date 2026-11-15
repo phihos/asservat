@@ -582,7 +582,7 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 					return err
 				}
 			}
-			if !planning.VerifyContextPlan(a.Plan, n.Time) || a.Plan.CompiledAt.After(n.Time) || !a.Storage.Valid(n.Time) || !identity.Fresh(binding.ObservedAt.Time, binding.FreshUntil.Time, n.Time, 30*time.Second) {
+			if !planning.VerifyContextPlan(a.Plan, n.Time) || a.Plan.CompiledAt.After(n.Time) || !a.Storage.Valid(n.Time) || !n.Time.Before(binding.FreshUntil.Time) {
 				return value.ErrChanged
 			}
 			if err := current(ctx, q, p, allocation, r, r.ExpiresAt); err != nil {

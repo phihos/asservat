@@ -120,7 +120,8 @@ BEGIN
   stop:=i->'ContextHistory'->'Stop';
   INSERT INTO public.download_stop_pool(root_id,installation_id,store_id,policy_id,backup_profile_id,policy_digest,backup_profile_digest,slots,cipher_bytes,key_attempts,backup_bytes,wal_bytes,retained_seconds,backup_horizon_seconds,valid_until,lifecycle_policy)
    VALUES(r,installation,(stop->>'StoreID')::uuid,(stop->>'PolicyID')::uuid,(stop->>'BackupProfileID')::uuid,public.connector_digest(stop->'PolicyDigest'),public.connector_digest(stop->'BackupProfileDigest'),
-    slots,slots*65536,slots*6,slots*131072,slots*1048576,(i->>'StopRetainedSeconds')::bigint,(stop->>'BackupHorizonSeconds')::bigint,standing,stop);
+    slots,slots*65536,slots*12,slots*2*(stop->>'MaximumRowFootprintBytes')::bigint*(stop->>'BackupCopies')::bigint,
+    slots*2*(stop->>'MaximumTransitionWALBytes')::bigint*(stop->>'WALCopies')::bigint*(20+3*(stop->>'MaxPurgeLeases')::bigint),(i->>'StopRetainedSeconds')::bigint,(stop->>'BackupHorizonSeconds')::bigint,standing,stop);
   INSERT INTO public.capacity_settings(root_id,installation_id,account_version,qualification,pool_id,evidence_bytes,reserve_bytes,share_bytes,limit_bytes,namespace_limit_bytes,max_concurrent_expensive,on_full,revision)
    VALUES(r,installation,av,q,pool,(v->>'EvidenceBytes')::bigint,(v->>'ReserveBytes')::bigint,NULLIF((v->>'ShareBytes')::bigint,0),(v->>'LimitBytes')::bigint,NULLIF((v->>'NamespaceLimitBytes')::bigint,0),
     (v->>'MaxConcurrentExpensive')::integer,v->>'OnFull',1) RETURNING * INTO s;

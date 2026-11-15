@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"crypto/tls"
 	"encoding/hex"
+	"errors"
 	"strconv"
 	"strings"
 	"sync"
@@ -158,6 +159,10 @@ func newCapacitySQLFixture(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 		}
 		f.roles[purpose] = poolFor(name, logins[name])
 	}
+	// Shared hub duties use the hub-runtime credential (ADR-222).
+	for _, duty := range contracts.PublicRuntimeHubSharedDuties() {
+		f.roles[duty] = f.roles["hub-runtime"]
+	}
 	rootID, epoch := custodyID(), custodyID()
 	f.permission, err = postgres.NewPermissions(ctx, poolFor("authority_runtime", "synthetic-authority"), rootID)
 	if err != nil {
@@ -301,6 +306,10 @@ func (f *capacitySQLFixture) enroll(t *testing.T, cluster string, namespace cfg.
 	}
 	o, err := reader.WithEnrollment(f.input.InstallationID, f.accounts).ContextStorage(f.ctx, capacityNativeStorageTarget(cluster, namespace, workload))
 	if err != nil {
+		var stage interface{ ContextStorageRead() string }
+		if errors.As(err, &stage) {
+			t.Fatal("on-demand capacity enrollment", err, stage.ContextStorageRead())
+		}
 		t.Fatal("on-demand capacity enrollment", err)
 	}
 	e := capacityEnrollment{AllocationID: o.Selection.AllocationID}

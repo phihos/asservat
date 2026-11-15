@@ -81,7 +81,9 @@ func contextStorageObservation(row custodydb.ObserveContextStorageRow, root stri
 	}
 	var d artifact.Digest
 	copy(d[:], row.SourceDigest)
-	b := value.StorageBinding{RootID: uid(row.RootID), ClusterID: uid(row.ClusterID), NamespaceUID: row.NamespaceUid, WorkloadUID: row.WorkloadUid, AllocationID: uid(row.AllocationID), Revision: identity.Revision{UID: row.SourceUid, Generation: row.SourceGeneration, Digest: d}, ObservedAt: row.ObservedAt.Time, FreshUntil: row.FreshUntil.Time}
+	// A capacity binding is a standing row (capacity_standing); this read is
+	// the observation, valid for one SQL-fenced interval.
+	b := value.StorageBinding{RootID: uid(row.RootID), ClusterID: uid(row.ClusterID), NamespaceUID: row.NamespaceUid, WorkloadUID: row.WorkloadUid, AllocationID: uid(row.AllocationID), Revision: identity.Revision{UID: row.SourceUid, Generation: row.SourceGeneration, Digest: d}, ObservedAt: now, FreshUntil: identity.Check(now, identity.SQLFenced).Narrow(row.FreshUntil.Time).Until()}
 	selection := value.ContextStorageSelection{StoreID: uid(row.StoreID), AllocationID: b.AllocationID, PoolRevision: row.PoolRevision, AllocationRevision: row.AllocationRevision, BindingRevision: b.Revision}
 	out := app.ContextStorageObservation{Binding: b, Selection: selection}
 	if b.RootID != root || !b.Matches(target) || !out.Selection.Valid() || !out.Binding.Valid(now) {
