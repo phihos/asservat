@@ -273,8 +273,11 @@ checksum/config: {{ $sum | sha256sum | quote }}
 {{- $_ := set $c "evidenceStorage" .Values.services.objectStore.seaweedfs.persistence.size -}}
 {{- end -}}
 {{- $w := default dict $c.workload -}}
-{{- if and $w.share $w.limit -}}
 {{- $total := include "asservat.quantityBytes" (list $c.evidenceStorage 0.0) | float64 -}}
+{{- range $v := list $c.namespaceLimit $w.share $w.limit -}}
+{{- if $v }}{{ $_ := include "asservat.quantityBytes" (list $v $total) }}{{ end -}}
+{{- end -}}
+{{- if and $w.share $w.limit -}}
 {{- if gt (include "asservat.quantityBytes" (list $w.share $total) | float64) (include "asservat.quantityBytes" (list $w.limit $total) | float64) -}}
 {{- fail "capacity.workload.share must not exceed capacity.workload.limit" -}}
 {{- end -}}
