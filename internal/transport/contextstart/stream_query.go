@@ -411,7 +411,7 @@ func (s *frameStream) answerQuery(ctx context.Context, f contracts.APIContextFra
 			if e == nil {
 				values := make([]contracts.NodeLiveResult, len(replies))
 				for n, reply := range replies {
-					values[n], e = node.WireLiveReply(requests[n].Epoch(), reply)
+					values[n], e = node.WireLiveReply(reply)
 					if e != nil {
 						break
 					}

@@ -129,7 +129,7 @@ func (t Targets) readLiveGroup(call context.Context, requests []collector.LiveRe
 		if e == nil {
 			p, e = v.BindManualLiveReply(r, p)
 		}
-		if e != nil || value.Epoch != r.Epoch() || p.SourceID != r.SourceID() || p.Fence != r.Fence() || p.BootID != r.Boot() || !p.Position.Follows(v.Position{Sequence: r.AfterSequence, Lost: r.AfterLost, ClockLost: r.AfterClockLost, Unsupported: r.AfterUnsupported, SensorLost: r.AfterSensorLost}) {
+		if e != nil || p.SourceID != r.SourceID() || p.Fence != r.Fence() || p.BootID != r.Boot() || !p.Position.Follows(v.Position{Sequence: r.AfterSequence, Lost: r.AfterLost, ClockLost: r.AfterClockLost, Unsupported: r.AfterUnsupported, SensorLost: r.AfterSensorLost}) {
 			return nil, targets.ErrUnavailable
 		}
 		if r.Manual != nil && (p.Manual == nil || !p.Manual.SameBinding(*r.Manual) || !p.Manual.StartedAt.Equal(r.Manual.StartedAt) || !p.Manual.HardUntil.Equal(r.Manual.HardUntil)) {

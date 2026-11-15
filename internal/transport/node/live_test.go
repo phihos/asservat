@@ -1,13 +1,14 @@
 package node
 
 import (
-	"asservat.local/asservat/internal/contracts"
-	"asservat.local/asservat/internal/domain/collector"
-	v "asservat.local/asservat/internal/domain/live"
 	"bytes"
 	"encoding/json"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/collector"
+	v "asservat.local/asservat/internal/domain/live"
 )
 
 func TestLiveWorkWireNeverBecomesAcquisitionAndRetainsOriginalDeadline(t *testing.T) {
@@ -15,11 +16,11 @@ func TestLiveWorkWireNeverBecomesAcquisitionAndRetainsOriginalDeadline(t *testin
 	p := sourceWireFixture(now).Permit
 	r := collector.LiveRead{Binding: p.Binding, ClusterID: p.Binding.RootID, NamespaceUID: "ns", WorkloadUID: "work", Projection: v.Packet, PrivacyUntil: p.HardUntil, Limit: 100}
 	w := collector.Work{ID: p.Binding.SourceID, Sequence: 1, Kind: collector.WorkLiveRead, NotAfter: now.Add(time.Second), Live: &r}
-	raw, e := json.Marshal(contracts.NodePollResponse{Format: contracts.NodePollFormat, Work: []contracts.NodeWork{WireWork(w)}})
+	raw, e := json.Marshal(pollResponse{Work: []contracts.NodeWork{WireWork(w)}})
 	if e != nil {
 		t.Fatal(e)
 	}
-	decoded, e := contracts.DecodeNodePollResponse(bytes.NewReader(raw))
+	decoded, e := decodePollResponse(bytes.NewReader(raw))
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -44,7 +45,7 @@ func TestLiveApprovedReplyStrictCodecPreservesZerosAndRejectsPayload(t *testing.
 	// PID zero is unavailable, unlike a genuine zero port.
 	row.Packet.PID = nil
 	in := v.NodeReply{WorkID: id, SourceID: id, Fence: id, BootID: id, Clock: "monotonic", Sample: 100, Rows: []v.StampedRow{{Row: row, Nanos: 99, Clock: "monotonic"}}, Position: v.Position{Sequence: 1}}
-	wire, e := WireLiveReply(id, in)
+	wire, e := WireLiveReply(in)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -70,7 +71,7 @@ func TestLiveReplyCannotTurnMissingNullableOrZeroFieldsIntoObservedFacts(t *test
 	now := time.Now()
 	id := "11111111-1111-4111-8111-111111111111"
 	row := v.Row{ID: id + ":1", SourceID: id, Sequence: 1, PodUID: id, Projection: v.Syscall, ObservedAt: now, ReceivedAt: now, ExpiresAt: now.Add(time.Second), Syscall: &v.SyscallFields{PID: 1, Name: "read", Error: false, Paired: false}}
-	wire, e := WireLiveReply(id, v.NodeReply{WorkID: id, SourceID: id, Fence: id, BootID: id, Clock: "boottime", Sample: 100, Rows: []v.StampedRow{{Row: row, Nanos: 99, Clock: "boottime"}}, Position: v.Position{Sequence: 1}})
+	wire, e := WireLiveReply(v.NodeReply{WorkID: id, SourceID: id, Fence: id, BootID: id, Clock: "boottime", Sample: 100, Rows: []v.StampedRow{{Row: row, Nanos: 99, Clock: "boottime"}}, Position: v.Position{Sequence: 1}})
 	if e != nil {
 		t.Fatal(e)
 	}

@@ -80,19 +80,19 @@ func (c *NodeChannel) EnqueueProfile(ctx context.Context, p collector.ProfileCap
 	h := hex.EncodeToString(raw[:])
 	copy := p
 	w := collector.Work{ID: h[:8] + "-" + h[8:12] + "-" + h[12:16] + "-" + h[16:20] + "-" + h[20:], Sequence: e.nextSeq, Kind: collector.WorkProfileCapture, NotAfter: startBy, Profile: &copy}
+	if err := e.push(w); err != nil {
+		return collector.Work{}, err
+	}
 	e.captures[w.ID] = pendingCapture{captureID: p.CaptureID, until: p.Request.Deadline.Add(PacketUploadMargin), profile: &copy}
-	e.work = append(e.work, w)
-	close(e.wake)
-	e.wake = make(chan struct{})
 	return w, nil
 }
 
-func (c *NodeChannel) DeliverProfile(ctx context.Context, peer NodePeer, epoch string, r collector.ProfileResult, body io.Reader) error {
+func (c *NodeChannel) DeliverProfile(ctx context.Context, peer NodePeer, r collector.ProfileResult, body io.Reader) error {
 	if ctx == nil || ctx.Err() != nil || body == nil || !r.Valid() {
 		return ErrNodeInvalid
 	}
 	c.mu.Lock()
-	e, err := c.current(peer, epoch)
+	e, err := c.current(peer)
 	if err != nil {
 		c.mu.Unlock()
 		return err
@@ -152,8 +152,8 @@ func (c *NodeChannel) EnqueueProfileCancel(ctx context.Context, nodeUID, capture
 	e.nextSeq++
 	h := hex.EncodeToString(raw[:])
 	w := collector.Work{ID: h[:8] + "-" + h[8:12] + "-" + h[12:16] + "-" + h[16:20] + "-" + h[20:], Sequence: e.nextSeq, Kind: collector.WorkCancelProfileCapture, NotAfter: until, CancelProfile: &cancel}
-	e.work = append(e.work, w)
-	close(e.wake)
-	e.wake = make(chan struct{})
+	if err := e.push(w); err != nil {
+		return collector.Work{}, err
+	}
 	return w, nil
 }

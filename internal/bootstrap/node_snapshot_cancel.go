@@ -1,24 +1,19 @@
 package bootstrap
 
 import (
+	"context"
+
 	deliveryapp "asservat.local/asservat/internal/application/delivery"
 	"asservat.local/asservat/internal/domain/collector"
-	"context"
 )
 
 // Cancellation is restrictive and independent of the source's current leaf.
 // Its accepted receipt is emitted only after owned copy/upload cleanup joins,
 // or an exact no-start tombstone fences the original remaining start interval.
-func (n *nodeSources) cancelSnapshot(parent context.Context, epoch string, w collector.Work, r collector.Receipt) collector.Receipt {
+func (n *nodeSources) cancelSnapshot(parent context.Context, w collector.Work, r collector.Receipt) collector.Receipt {
 	n.mu.Lock()
 	x := *w.CancelSnapshot
-	if parent == nil || parent.Err() != nil || n.closed || n.identity == nil || !x.Valid() || deliveryapp.SourceBindingDigest(x.Binding) != [32]byte(x.Request.SourceBindingDigest) || !n.now().Before(w.NotAfter) {
-		n.mu.Unlock()
-		r.Reason = collector.ReasonWorkUnknown
-		return r
-	}
-	id, b := n.identity(), x.Binding
-	if b.NodeUID != id.NodeUID || b.BootID != id.BootID || b.CollectorPodUID != id.PodUID || b.CollectorEpoch != id.Epoch || id.Epoch != epoch {
+	if parent == nil || parent.Err() != nil || n.closed || !x.Valid() || deliveryapp.SourceBindingDigest(x.Binding) != [32]byte(x.Request.SourceBindingDigest) || !n.now().Before(w.NotAfter) {
 		n.mu.Unlock()
 		r.Reason = collector.ReasonWorkUnknown
 		return r

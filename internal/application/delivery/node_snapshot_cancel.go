@@ -68,11 +68,11 @@ func (c *NodeChannel) EnqueueSourceSnapshotCancel(ctx context.Context, x collect
 	if expires.Before(now) {
 		expires = now
 	}
+	if err := e.push(work); err != nil {
+		return collector.Work{}, err
+	}
 	pending.until = expires.Add(PacketUploadMargin)
 	e.captures[key] = pending
-	e.work = append(e.work, work)
-	close(e.wake)
-	e.wake = make(chan struct{})
 	return work, nil
 }
 

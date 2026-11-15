@@ -109,7 +109,7 @@ def check_common(docs, ns, executor=True, audience="https://hub.example.invalid:
     assert vols["token"]["projected"]["sources"][0]["serviceAccountToken"]["audience"] == "asservat-node"
     assert vols["input"]["projected"]["sources"][1]["configMap"] == {"name": "asservat-node-connector-ca", "optional": True, "items": [{"key": "connector-ca.crt", "path": "connector-ca.crt"}]}
     croles = rules(find(docs, "Role", "asservat-node-connector"))
-    assert croles == {("", "pods", "get"), ("apps", "daemonsets", "get"), ("", "configmaps", "get"), ("", "configmaps", "update")}
+    assert croles == {("", "configmaps", "get"), ("", "configmaps", "update")}
     return json.loads(find(docs, "ConfigMap", "asservat-connector-config")["data"]["config.json"])
 
 

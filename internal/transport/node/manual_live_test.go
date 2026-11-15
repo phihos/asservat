@@ -18,11 +18,11 @@ func TestManualLivePrivateWirePreservesOriginalTupleAndZeroPolicyBytes(t *testin
 	m := collector.ManualLiveSource{RootID: id, ExecutorPodUID: id, ExecutorEpoch: id, CaptureID: id, AttemptID: id, ActionID: "packet", WorkID: id, PodUID: id, NodeUID: id, BootID: id, CollectorPodUID: id, CollectorEpoch: id, Scope: [32]byte{0xab}, ExpectationDigest: [32]byte{2}}
 	r := collector.LiveRead{Manual: &m, Inspect: true, Head: true, ClusterID: id, NamespaceUID: "ns", WorkloadUID: "work", Projection: v.Packet, PrivacyUntil: now.Add(time.Second), Limit: 20}
 	w := collector.Work{ID: id, Sequence: 1, Kind: collector.WorkLiveRead, NotAfter: now.Add(time.Second), Live: &r}
-	raw, e := json.Marshal(contracts.NodePollResponse{Format: contracts.NodePollFormat, Work: []contracts.NodeWork{WireWork(w)}})
+	raw, e := json.Marshal(pollResponse{Work: []contracts.NodeWork{WireWork(w)}})
 	if e != nil {
 		t.Fatal(e)
 	}
-	decoded, e := contracts.DecodeNodePollResponse(bytes.NewReader(raw))
+	decoded, e := decodePollResponse(bytes.NewReader(raw))
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -45,7 +45,7 @@ func TestManualLivePrivateWirePreservesOriginalTupleAndZeroPolicyBytes(t *testin
 	m.StartedAt = now
 	m.HardUntil = now.Add(time.Second)
 	reply := v.NodeReply{Manual: &m, WorkID: id, SourceID: m.CaptureID, Fence: m.WorkID, BootID: m.BootID, Clock: "monotonic", Sample: 1, Rows: []v.StampedRow{}}
-	wr, e := WireLiveReply(id, reply)
+	wr, e := WireLiveReply(reply)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -61,17 +61,12 @@ func TestManualLivePrivateWirePreservesOriginalTupleAndZeroPolicyBytes(t *testin
 	if bytes.Contains(body, []byte(`"rootID"`)) || bytes.Contains(body, []byte(`"scope"`)) || bytes.Contains(body, []byte(`"executorEpoch"`)) {
 		t.Fatal("node echoed unobserved accepted provenance")
 	}
-	unknown := append([]byte{}, body...)
-	unknown = bytes.Replace(unknown, []byte(`"captureID":`), []byte(`"rootID":"`+id+`","captureID":`), 1)
-	if _, err := contracts.DecodeNodeLiveResult(bytes.NewReader(unknown)); err == nil {
-		t.Fatal("unobserved node acceptance fields accepted")
-	}
 	old := collector.LiveRead{Binding: sourceWireFixture(now).Permit.Binding, ClusterID: id, NamespaceUID: "ns", WorkloadUID: "work", Projection: v.Packet, PrivacyUntil: now.Add(time.Second), Limit: 20}
 	oldRaw, _ := json.Marshal(WireLiveRead(old))
 	if bytes.Contains(oldRaw, []byte(`"manual"`)) || bytes.Contains(oldRaw, []byte(`"inspect"`)) {
 		t.Fatal("zero manual branch changed policy wire")
 	}
-	oldReply, _ := WireLiveReply(id, v.NodeReply{WorkID: id, Rows: []v.StampedRow{}})
+	oldReply, _ := WireLiveReply(v.NodeReply{WorkID: id, Rows: []v.StampedRow{}})
 	oldRaw, _ = json.Marshal(oldReply)
 	if bytes.Contains(oldRaw, []byte(`"manual"`)) {
 		t.Fatal("zero manual reply changed policy wire")

@@ -15,7 +15,7 @@ import (
 func TestNodeObservationCompletionCannotMaskEarlierUnknownOrBudget(t *testing.T) {
 	for _, mode := range []string{"normal-deadline", "final-loss", "early-loss", "early-unknown", "early-credit"} {
 		t.Run(mode, func(t *testing.T) {
-			w, id := nodePermitWork(time.Now())
+			w, _ := nodePermitWork(time.Now())
 			if mode == "early-credit" {
 				w.Packet.Observation.Credit = 1
 			}
@@ -25,7 +25,7 @@ func TestNodeObservationCompletionCannotMaskEarlierUnknownOrBudget(t *testing.T)
 			n := &nodePackets{engine: func(context.Context, string, int, func(gadget.Frame)) (gadget.CaptureStats, error) {
 				t.Error("ordinary fallback")
 				return gadget.CaptureStats{}, nil
-			}, identity: func() collector.Identity { return id }, available: true, now: time.Now, version: "fixture", budget: func() *collector.Budget { return budget }, budgetMu: &mu, log: func(string) {}, upload: func(_ context.Context, _ string, r collector.PacketResult, _ []byte) error { result <- r; return nil }}
+			}, available: true, now: time.Now, version: "fixture", budget: func() *collector.Budget { return budget }, budgetMu: &mu, log: func(string) {}, upload: func(_ context.Context, r collector.PacketResult, _ []byte) error { result <- r; return nil }}
 			n.observedEngine = func(ctx context.Context, _ string, _ int, deliver func(gadget.Frame), notice func(gadget.InputNotice)) (gadget.CaptureStats, error) {
 				until, _ := ctx.Deadline()
 				f := syntheticTCP(80, "synthetic marker")
@@ -51,7 +51,7 @@ func TestNodeObservationCompletionCannotMaskEarlierUnknownOrBudget(t *testing.T)
 				}
 				return stats, context.DeadlineExceeded
 			}
-			if r := n.start(t.Context(), id.Epoch, w); r.Outcome != collector.OutcomeAccepted {
+			if r := n.start(t.Context(), w); r.Outcome != collector.OutcomeAccepted {
 				t.Fatal(r)
 			}
 			var got collector.PacketResult

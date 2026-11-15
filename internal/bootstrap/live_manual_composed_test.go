@@ -39,7 +39,6 @@ func TestLiveManualComposedExistingPacketExecutionToActualNodeProjection(t *test
 	catalog.now = time.Now
 	f.holder.recordings.now = time.Now
 	now := time.Now()
-	id := collector.Identity{NodeUID: regionalObservationID(70), BootID: regionalObservationID(71), PodUID: regionalObservationID(72), Epoch: regionalObservationID(73)}
 	budget, e := collector.NewBudget(collector.Ceilings{FrozenBytes: 16 << 20, UploadBytesPerSecond: 32 << 20, UploadBurstBytes: 64 << 20}, now)
 	if e != nil {
 		t.Fatal(e)
@@ -48,7 +47,7 @@ func TestLiveManualComposedExistingPacketExecutionToActualNodeProjection(t *test
 	var starts atomic.Int32
 	engine := make(chan func(gadget.Frame), 1)
 	acquisition, stop := context.WithCancel(t.Context())
-	node := &nodePackets{available: true, identity: func() collector.Identity { return id }, now: time.Now, budget: func() *collector.Budget { return budget }, budgetMu: &mu, log: func(string) {}, upload: func(context.Context, string, collector.PacketResult, []byte) error { return nil }, engine: func(ctx context.Context, pod string, snap int, callback func(gadget.Frame)) (gadget.CaptureStats, error) {
+	node := &nodePackets{available: true, now: time.Now, budget: func() *collector.Budget { return budget }, budgetMu: &mu, log: func(string) {}, upload: func(context.Context, collector.PacketResult, []byte) error { return nil }, engine: func(ctx context.Context, pod string, snap int, callback func(gadget.Frame)) (gadget.CaptureStats, error) {
 		starts.Add(1)
 		if snap != packets.Snaplen || pod != f.rows[0].Work.Accepted.Expectation.PodUID {
 			t.Error("viewer changed original acquisition")
@@ -61,7 +60,7 @@ func TestLiveManualComposedExistingPacketExecutionToActualNodeProjection(t *test
 	accepted := f.rows[0].Work.Accepted.Expectation
 	held := f.holder.recordings.held[accepted.CaptureUID]
 	original := collector.Work{ID: held.workID, Sequence: 1, Kind: collector.WorkPacketCapture, NotAfter: now.Add(time.Second), Packet: &collector.PacketCapture{CaptureID: accepted.CaptureUID, PodUID: accepted.PodUID, Duration: time.Duration(accepted.Recording.DurationMillis) * time.Millisecond, MaxBytes: accepted.Recording.MaxBytes}}
-	if r := node.start(acquisition, id.Epoch, original); r.Outcome != collector.OutcomeAccepted {
+	if r := node.start(acquisition, original); r.Outcome != collector.OutcomeAccepted {
 		t.Fatal(r)
 	}
 	add := <-engine

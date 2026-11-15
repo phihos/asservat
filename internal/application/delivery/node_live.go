@@ -56,12 +56,13 @@ func (c *NodeChannel) ReadLive(ctx context.Context, r collector.LiveRead) (v.Nod
 	if entry.live == nil {
 		entry.live = map[string]*pendingLive{}
 	}
+	entry.nextSeq++
+	if e := entry.push(collector.Work{ID: id, Sequence: entry.nextSeq, Kind: collector.WorkLiveRead, NotAfter: until, Live: &r}); e != nil {
+		c.mu.Unlock()
+		return v.NodeReply{}, e
+	}
 	pending := &pendingLive{r, until, make(chan v.NodeReply, 1)}
 	entry.live[id] = pending
-	entry.nextSeq++
-	entry.work = append(entry.work, collector.Work{ID: id, Sequence: entry.nextSeq, Kind: collector.WorkLiveRead, NotAfter: until, Live: &r})
-	close(entry.wake)
-	entry.wake = make(chan struct{})
 	c.mu.Unlock()
 	defer func() {
 		// A cancellation racing a successful upload must not leave an abandoned
@@ -97,13 +98,13 @@ func (c *NodeChannel) ReadLive(ctx context.Context, r collector.LiveRead) (v.Nod
 
 // DeliverLive accepts exactly one reply from the currently authenticated node.
 // It stores no rows beyond the still-waiting bounded caller and never logs them.
-func (c *NodeChannel) DeliverLive(ctx context.Context, peer NodePeer, epoch string, out v.NodeReply) error {
+func (c *NodeChannel) DeliverLive(ctx context.Context, peer NodePeer, out v.NodeReply) error {
 	if ctx == nil || ctx.Err() != nil {
 		return ErrNodeInvalid
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	entry, e := c.current(peer, epoch)
+	entry, e := c.current(peer)
 	if e != nil {
 		return e
 	}

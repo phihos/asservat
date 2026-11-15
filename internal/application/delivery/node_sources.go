@@ -75,18 +75,6 @@ func (c *NodeChannel) enqueueSource(ctx context.Context, expected *targets.Packe
 		if expected == nil || !expected.Valid(now) || b.PodUID != expected.PodUID || b.NodeUID != expected.NodeUID || b.BootID != expected.BootID || b.CollectorPodUID != expected.CollectorPodUID || b.CollectorEpoch != expected.CollectorEpoch || !c.view(e, now).RecorderAvailable(sourceMechanism(*source)) || !source.Permit.Dispatchable(now) {
 			return collector.Work{}, ErrNodeUnavailable
 		}
-		// Same-process certificate renewal preserves the source incarnation;
-		// each leaf must still fit a currently accepted certificate's expiry.
-		covered := false
-		for _, end := range e.certs {
-			if !source.Permit.LeafUntil.After(end) {
-				covered = true
-				break
-			}
-		}
-		if !covered {
-			return collector.Work{}, ErrNodeUnavailable
-		}
 	}
 	if b.NodeUID != e.id.NodeUID || b.BootID != e.id.BootID || b.CollectorPodUID != e.id.PodUID || b.CollectorEpoch != e.id.Epoch {
 		return collector.Work{}, ErrNodeUnavailable
@@ -114,13 +102,13 @@ func (c *NodeChannel) enqueueSource(ctx context.Context, expected *targets.Packe
 		kind = collector.WorkStopPacketSource
 	}
 	w := collector.Work{ID: h[:8] + "-" + h[8:12] + "-" + h[12:16] + "-" + h[16:20] + "-" + h[20:], Sequence: e.nextSeq, Kind: kind, NotAfter: until, Source: source, StopSource: stop, Snapshot: snapshot}
+	if err := e.push(w); err != nil {
+		return collector.Work{}, err
+	}
 	if snapshot != nil {
 		owned := *snapshot
 		e.captures[w.ID] = pendingCapture{captureID: snapshot.CaptureID, until: snapshot.Request.ProcessingUntil, snapshot: &owned}
 	}
-	e.work = append(e.work, w)
-	close(e.wake)
-	e.wake = make(chan struct{})
 	return w, nil
 }
 

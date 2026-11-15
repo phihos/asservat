@@ -60,7 +60,7 @@ func TestRegionalSnapshotCancellationStopsUnreadFIFOOwner(t *testing.T) {
 			}))
 			defer server.Close()
 			client := server.Client()
-			n, _, clock, x := sourceSnapshotPipelineFixture(t, func(ctx context.Context, _ string, r collector.PacketResult, native []byte) error {
+			n, _, clock, x := sourceSnapshotPipelineFixture(t, func(ctx context.Context, r collector.PacketResult, native []byte) error {
 				ctx, cancel := context.WithCancel(ctx)
 				defer cancel()
 				uploadCancel <- cancel
@@ -112,7 +112,7 @@ func TestRegionalSnapshotCancellationStopsUnreadFIFOOwner(t *testing.T) {
 				}
 			}
 			work := collector.Work{ID: x.Request.SnapshotID, Sequence: 1, Kind: collector.WorkPacketSourceSnapshot, NotAfter: x.Request.StartBy, Snapshot: &x}
-			if result := n.decide(t.Context(), x.Binding.CollectorEpoch, work); result.Outcome != collector.OutcomeAccepted {
+			if result := n.decide(t.Context(), work); result.Outcome != collector.OutcomeAccepted {
 				t.Fatal(result)
 			}
 			cleanupHandler := <-serverReady

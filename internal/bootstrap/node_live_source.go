@@ -1,6 +1,11 @@
 package bootstrap
 
 import (
+	"context"
+	"encoding/json"
+	"sync"
+	"time"
+
 	"asservat.local/asservat/internal/adapters/gadget"
 	"asservat.local/asservat/internal/adapters/httpheaders"
 	"asservat.local/asservat/internal/adapters/packets"
@@ -11,11 +16,7 @@ import (
 	"asservat.local/asservat/internal/domain/collector"
 	v "asservat.local/asservat/internal/domain/live"
 	"asservat.local/asservat/internal/transport/node"
-	"context"
-	"encoding/json"
 	"golang.org/x/sys/unix"
-	"sync"
-	"time"
 )
 
 type liveClockSample struct {
@@ -278,7 +279,7 @@ func (n *nodeSources) readLive(ctx context.Context, w collector.Work) (v.NodeRep
 
 	rows := out.Rows
 	out.Rows = []v.StampedRow{}
-	base, e := node.WireLiveReply(r.Binding.CollectorEpoch, out)
+	base, e := node.WireLiveReply(out)
 	if e != nil {
 		return v.NodeReply{}, e
 	}
@@ -327,7 +328,7 @@ func (p *nodeProcess) takeLiveUpload(reply v.NodeReply) bool {
 	if p.budget == nil {
 		return false
 	}
-	wire, e := node.WireLiveReply(p.epoch, reply)
+	wire, e := node.WireLiveReply(reply)
 	if e != nil {
 		return false
 	}

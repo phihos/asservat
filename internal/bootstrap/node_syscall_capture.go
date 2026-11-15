@@ -17,9 +17,9 @@ import (
 // source syscall engine on one Pod for the recording's duration, written as
 // JSON Lines and uploaded like a packet capture. Without a source permit, a
 // local events-per-second limit bounds retention.
-func (n *nodePackets) startSyscall(ctx context.Context, epoch string, w collector.Work) collector.Receipt {
+func (n *nodePackets) startSyscall(ctx context.Context, w collector.Work) collector.Receipt {
 	if w.Packet != nil && w.Packet.Arguments != nil {
-		return n.startArguments(ctx, epoch, w)
+		return n.startArguments(ctx, w)
 	}
 	r := collector.Decide(w, n.now())
 	if r.Reason == collector.ReasonWorkUnknown || r.Reason == collector.ReasonWorkExpired {
@@ -35,10 +35,6 @@ func (n *nodePackets) startSyscall(ctx context.Context, epoch string, w collecto
 		r.Reason = collector.ReasonFilterUnsupported
 		return r
 	}
-	liveID := collector.Identity{}
-	if n.identity != nil {
-		liveID = n.identity()
-	}
 	capture, stopCapture := context.WithCancel(ctx)
 	n.budgetMu.Lock()
 	if _, busy := n.running[p.CaptureID]; busy || len(n.running) >= collector.MaxQueuedWork {
@@ -49,7 +45,7 @@ func (n *nodePackets) startSyscall(ctx context.Context, epoch string, w collecto
 	}
 	err := n.budget().ReserveFrozen(p.MaxBytes)
 	started := n.now().UTC().Truncate(time.Microsecond) // the decoded result's precision, as in node_packets.go
-	holder := n.newManualLive(w, p, started, liveID)
+	holder := n.newManualLive(w, p, started)
 	if holder != nil {
 		holder.ctx = capture
 	}
@@ -79,12 +75,12 @@ func (n *nodePackets) startSyscall(ctx context.Context, epoch string, w collecto
 			}
 			n.budgetMu.Unlock()
 		}()
-		n.runSyscall(capture, epoch, w.ID, p, engine, started, holder)
+		n.runSyscall(capture, w.ID, p, engine, started, holder)
 	}()
 	return r
 }
 
-func (n *nodePackets) runSyscall(ctx context.Context, epoch, workID string, p collector.PacketCapture, engine observedPacketEngine, started time.Time, holders ...*manualLiveHolder) {
+func (n *nodePackets) runSyscall(ctx context.Context, workID string, p collector.PacketCapture, engine observedPacketEngine, started time.Time, holders ...*manualLiveHolder) {
 	capture, cancel := context.WithTimeout(ctx, p.Duration)
 	var holder *manualLiveHolder
 	if len(holders) > 0 {
@@ -117,7 +113,7 @@ func (n *nodePackets) runSyscall(ctx context.Context, epoch, workID string, p co
 			malformed++
 			return
 		}
-		if line, e = syscalls.AppendEvent(line[:0], c, f.At, p.PodUID, epoch); e != nil {
+		if line, e = syscalls.AppendEvent(line[:0], c, f.At, p.PodUID, p.CaptureID); e != nil {
 			malformed++
 			return
 		}
@@ -174,7 +170,7 @@ func (n *nodePackets) runSyscall(ctx context.Context, epoch, workID string, p co
 			return
 		}
 	}
-	if err := n.upload(deliver, epoch, result, native); err != nil {
+	if err := n.upload(deliver, result, native); err != nil {
 		n.log(fmt.Sprintf("node collector: syscall capture %s upload failed: %v", p.CaptureID, err))
 		return
 	}

@@ -1,13 +1,14 @@
 package node
 
 import (
-	"asservat.local/asservat/internal/contracts"
-	"asservat.local/asservat/internal/domain/collector"
 	"bytes"
 	"encoding/json"
 	"reflect"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/collector"
 )
 
 func argumentNodeWork() collector.Work {
@@ -29,11 +30,11 @@ func TestArgumentPermitClosedWireNoPacketFallback(t *testing.T) {
 	if !w.Packet.Valid() {
 		t.Fatal("fixture")
 	}
-	raw, err := json.Marshal(contracts.NodePollResponse{Format: contracts.NodePollFormat, Work: []contracts.NodeWork{WireWork(w)}})
+	raw, err := json.Marshal(pollResponse{Work: []contracts.NodeWork{WireWork(w)}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	decoded, err := contracts.DecodeNodePollResponse(bytes.NewReader(raw))
+	decoded, err := decodePollResponse(bytes.NewReader(raw))
 	if err != nil {
 		t.Fatal(err)
 	}

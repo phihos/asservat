@@ -16,7 +16,6 @@ type NodeLiveRow struct {
 type NodeLiveResult struct {
 	Manual      *NodeManualLiveObservation `json:"manual,omitempty"`
 	Format      string                     `json:"format"`
-	Epoch       string                     `json:"epoch"`
 	WorkID      string                     `json:"workID"`
 	SourceID    string                     `json:"sourceID"`
 	Fence       string                     `json:"fence"`

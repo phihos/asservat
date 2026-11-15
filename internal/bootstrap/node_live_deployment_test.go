@@ -59,17 +59,4 @@ func TestNodeLiveDeploymentTypedCeilings(t *testing.T) {
 			}
 		})
 	}
-	raw, err := json.Marshal(base)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var fields map[string]any
-	if json.Unmarshal(raw, &fields) != nil {
-		t.Fatal("fixture decode")
-	}
-	fields["live"] = map[string]any{"subscriptions": 1, "memoryBytes": 1048576, "eventsPerSecond": 1, "bytesPerSecond": 1, "processingNanosPerSecond": 1, "enabled": true}
-	unknown, _ := json.Marshal(fields)
-	if _, err := contracts.DecodeNodeDeployment(bytes.NewReader(unknown)); err == nil {
-		t.Fatal("unknown live option accepted")
-	}
 }

@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"crypto/x509"
+	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
+	"math/rand/v2"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -19,28 +21,26 @@ import (
 	"asservat.local/asservat/internal/adapters/gadget"
 	"asservat.local/asservat/internal/adapters/linux"
 	"asservat.local/asservat/internal/adapters/mounts"
-	"asservat.local/asservat/internal/adapters/mtls"
 	"asservat.local/asservat/internal/application/delivery"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/collector"
 	v "asservat.local/asservat/internal/domain/live"
 	"asservat.local/asservat/internal/transport/node"
-	"github.com/google/uuid"
 )
 
 // ADR-246: the `asservat node` collector process. It probes its node once,
-// enrolls with the connector through its Pod-bound projected token and a
-// process-owned key, then reports status every 15 seconds and long-polls for
-// work until it stops. It holds no SQL, Kubernetes writer, evidence or key
-// credential, and in this increment records nothing.
+// then holds one stream to its connector, authenticated by its projected
+// ServiceAccount token: Hello, status on change, pushed work and receipts.
+// It holds no SQL, Kubernetes writer, evidence or key credential.
 
 var errNodeGuard = errors.New("node collector refused: disposable-host guard absent")
 
-const nodeRetry = 5 * time.Second
-
-// nodeReceiptBuffer bounds receipts not yet reported: four full reports.
-const nodeReceiptBuffer = 4 * collector.MaxReceipts
+// Reconnect backoff: jittered exponential from one second up to 30 seconds.
+const (
+	nodeRetryMin = time.Second
+	nodeRetryMax = 30 * time.Second
+)
 
 func readNodeDeployment(ctx context.Context) (contracts.NodeDeployment, *x509.CertPool, error) {
 	root, err := os.OpenRoot(contracts.NodeDeploymentRoot)
@@ -149,11 +149,6 @@ func RunNode(ctx context.Context, podUID string) error {
 	if err != nil {
 		return err
 	}
-	probe := linux.NewFileProbe("/")
-	boot, err := probe.BootID()
-	if err != nil || !authorization.UUID(boot) {
-		return mounts.ErrUnavailable
-	}
 	facts := probeNode()
 	mechanisms := collector.Assess(facts)
 	if gadget.ProfileDialAvailable() && facts.HostProcesses == collector.Supported {
@@ -172,20 +167,21 @@ func RunNode(ctx context.Context, podUID string) error {
 	if err != nil {
 		return mounts.ErrUnavailable
 	}
-	creds, err := mtls.NewNodeCredentials()
-	if err != nil {
-		return err
-	}
-	client, err := node.NewClient(d.Connector.Endpoint, d.Connector.ServerName, roots, creds.GetClientCertificate)
+	client, err := node.NewClient(d.Connector.Endpoint, d.Connector.ServerName, roots, readNodeToken)
 	if err != nil {
 		return mounts.ErrUnavailable
 	}
-	defer client.CloseIdle()
-	p := &nodeProcess{client: client, creds: creds, token: readNodeToken, podUID: podUID, bootID: boot, epoch: uuid.NewString(), facts: facts, mechanisms: mechanisms,
-		budget: budget, now: time.Now, sleep: nodeSleep, log: os.Stderr}
-	p.packets = &nodePackets{engine: gadget.CapturePackets, syscallTrace: syscallTraceIfAvailable(mechanisms), argumentTrace: argumentTraceIfAvailable(mechanisms), argumentResources: gadget.ArgumentWorkingBytes, observedEngine: gadget.CaptureObservedPackets, identity: p.packetIdentity, upload: client.UploadCapture, available: packetAvailable(mechanisms), version: facts.Engine.Version,
+	p := &nodeProcess{connect: func(ctx context.Context) (nodeStream, error) {
+		s, err := client.Connect(ctx, nodeCapabilities)
+		if err != nil {
+			return nil, err
+		}
+		return s, nil
+	}, uploadLive: client.UploadLive, podUID: podUID, facts: facts, mechanisms: mechanisms, budget: budget, now: time.Now, sleep: nodeSleep, log: os.Stderr, changes: make(chan struct{}, 1)}
+	budget.OnChange(p.changed)
+	p.packets = &nodePackets{engine: gadget.CapturePackets, syscallTrace: syscallTraceIfAvailable(mechanisms), argumentTrace: argumentTraceIfAvailable(mechanisms), argumentResources: gadget.ArgumentWorkingBytes, observedEngine: gadget.CaptureObservedPackets, upload: client.UploadCapture, available: packetAvailable(mechanisms), version: facts.Engine.Version,
 		now: time.Now, log: func(line string) { fmt.Fprintln(os.Stderr, line) }, budget: func() *collector.Budget { return p.budget }, budgetMu: &p.mu}
-	p.profiles = &nodeProfiles{identity: p.packetIdentity, acquire: acquireNodeProfile(p.packetIdentity, time.Now), upload: client.UploadProfileStream, now: time.Now, budget: func() *collector.Budget { return p.budget }, budgetMu: &p.mu}
+	p.profiles = &nodeProfiles{acquire: acquireNodeProfile(time.Now), upload: client.UploadProfileStream, now: time.Now, budget: func() *collector.Budget { return p.budget }, budgetMu: &p.mu}
 	ringDir, removed := "", 0
 	if st, err := os.Stat(contracts.NodeRingDiskPath); err == nil && st.IsDir() && d.Ceilings.RingDiskBytes > 0 {
 		ringDir = contracts.NodeRingDiskPath
@@ -200,9 +196,9 @@ func RunNode(ctx context.Context, podUID string) error {
 		}
 	}
 	fmt.Fprintf(os.Stderr, "node collector ring medium: encrypted disk available=%t removedEarlier=%d\n", ringDir != "", removed)
-	p.sources = &nodeSources{ringDir: ringDir, ringDiskBytes: d.Ceilings.RingDiskBytes, log: p.packets.log, upload: client.UploadCapture, takeUpload: p.packets.takeUpload, version: facts.Engine.Version, engine: gadget.CaptureObservedPackets, syscallEngine: syscallTraceIfAvailable(mechanisms), identity: p.packetIdentity, now: time.Now, budget: budget, budgetMu: &p.mu, available: packetAvailable(mechanisms)}
+	p.sources = &nodeSources{changed: p.changed, ringDir: ringDir, ringDiskBytes: d.Ceilings.RingDiskBytes, log: p.packets.log, upload: client.UploadCapture, takeUpload: p.packets.takeUpload, version: facts.Engine.Version, engine: gadget.CaptureObservedPackets, syscallEngine: syscallTraceIfAvailable(mechanisms), now: time.Now, budget: budget, budgetMu: &p.mu, available: packetAvailable(mechanisms)}
 	if d.Live != nil {
-		p.sources.liveBudget = &nodeLiveBudget{limits: nodeLiveLimits(*d.Live)}
+		p.sources.liveBudget = &nodeLiveBudget{limits: nodeLiveLimits(*d.Live), changed: p.changed}
 		for n, m := range p.mechanisms {
 			if m.Adapter == collector.AdapterAvailable && m.Prerequisites {
 				switch m.Mechanism {
@@ -258,29 +254,21 @@ func nodeSleep(ctx context.Context, d time.Duration, kick <-chan struct{}) error
 	return nil
 }
 
-type nodeChannel interface {
-	Enroll(context.Context, contracts.NodeEnrollRequest) (contracts.NodeEnrollResponse, error)
-	Poll(ctx context.Context, epoch string, after uint64) ([]delivery.NodeWorkDelivery, error)
-	Status(ctx context.Context, epoch string, r collector.Report) error
-	UploadCapture(ctx context.Context, epoch string, r collector.PacketResult, pcapng []byte) error
-	CloseIdle()
+// nodeCapabilities are the work kinds this build handles; Hello announces them.
+var nodeCapabilities = []collector.WorkKind{collector.WorkLiveRead, collector.WorkProfileCapture, collector.WorkCancelProfileCapture, collector.WorkPacketCapture,
+	collector.WorkSyscallCapture, collector.WorkCancelPacketCapture, collector.WorkPacketSource, collector.WorkStopPacketSource, collector.WorkPacketSourceSnapshot, collector.WorkCancelSourceSnapshot}
+
+type nodeStream interface {
+	Status(collector.Report) error
+	Receive() (delivery.NodeWorkDelivery, error)
+	Close()
 }
 
-type nodeKey interface {
-	CSR() []byte
-	Install(der []byte, now time.Time) (time.Time, error)
-}
-
-// nodeProcess is one collector generation: its epoch never changes, and a
-// process restart is the only way to obtain a new one.
+// nodeProcess is one collector process.
 type nodeProcess struct {
-	client     nodeChannel
-	creds      nodeKey
-	token      func(context.Context) ([]byte, error)
-	bootID     string
+	connect    func(context.Context) (nodeStream, error)
+	uploadLive func(context.Context, v.NodeReply) error
 	podUID     string // validated startup input, never chosen by a work item
-	nodeUID    string // last successful authenticated enrollment response
-	epoch      string
 	facts      collector.Facts
 	mechanisms []collector.Availability
 	now        func() time.Time
@@ -289,26 +277,18 @@ type nodeProcess struct {
 	// packets runs packet captures (ADR-248); nil refuses every item.
 	packets  *nodePackets
 	profiles *nodeProfiles
-	nodeName string
 	sources  *nodeSources
-	// root is the process context: captures outlive a re-enrollment.
+	// root is the process context: captures outlive a reconnect.
 	root context.Context
+
+	// changes carries change signals to the status loop (capacity 1).
+	changes chan struct{}
 
 	mu       sync.Mutex
 	budget   *collector.Budget
 	receipts []collector.Receipt
-	sequence uint64
-	cadence  collector.StatusCadence
 	last     string
 }
-
-func (p *nodeProcess) packetIdentity() collector.Identity {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	return collector.Identity{NodeName: p.nodeName, NodeUID: p.nodeUID, PodUID: p.podUID, BootID: p.bootID, Epoch: p.epoch}
-}
-
-var errNodeReenroll = errors.New("node channel: enroll again")
 
 func (p *nodeProcess) note(cause string) {
 	p.mu.Lock()
@@ -322,51 +302,12 @@ func (p *nodeProcess) note(cause string) {
 
 func channelCause(err error) string {
 	switch {
-	case errors.Is(err, node.ErrUnauthenticated):
-		return "connector no longer knows this process; enrolling again"
 	case errors.Is(err, node.ErrRefused):
-		return "connector refused the request"
+		return "connector refused the stream"
 	case errors.Is(err, node.ErrUnavailable):
 		return "connector unavailable"
-	case errors.Is(err, mounts.ErrUnavailable):
-		return "projected token unavailable"
 	}
 	return "unavailable"
-}
-
-// enroll obtains a certificate for this process's key, retrying every five
-// seconds. Renewal is the same request with the same key and epoch.
-func (p *nodeProcess) enroll(ctx context.Context) (time.Time, error) {
-	for {
-		token, err := p.token(ctx)
-		if err == nil {
-			var resp contracts.NodeEnrollResponse
-			resp, err = p.client.Enroll(ctx, contracts.NodeEnrollRequest{Token: string(token), CSR: p.creds.CSR(), BootID: p.bootID, Epoch: p.epoch})
-			clear(token)
-			if err == nil {
-				var notAfter time.Time
-				// Certificate installation is local crypto. Keep it and its
-				// authenticated source identity atomic to packet start snapshots.
-				p.mu.Lock()
-				notAfter, err = p.creds.Install(resp.Certificate, p.now())
-				if err == nil {
-					p.nodeUID = resp.NodeUID
-					p.nodeName = resp.NodeName
-				}
-				p.mu.Unlock()
-				if err == nil {
-					p.client.CloseIdle()
-					p.note("")
-					fmt.Fprintf(p.log, "node collector enrolled: node %s, epoch %s, certificate until %s\n", resp.NodeName, p.epoch, notAfter.UTC().Format(time.RFC3339))
-					return notAfter, nil
-				}
-			}
-		}
-		p.note("enrollment pending: " + channelCause(err))
-		if err := p.sleep(ctx, nodeRetry, nil); err != nil {
-			return time.Time{}, err
-		}
-	}
 }
 
 func (p *nodeProcess) report() collector.Report {
@@ -379,7 +320,6 @@ func (p *nodeProcess) report() collector.Report {
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.sequence++
 	n := len(p.receipts)
 	if n > collector.MaxReceipts {
 		n = collector.MaxReceipts
@@ -391,234 +331,173 @@ func (p *nodeProcess) report() collector.Report {
 	if live != nil && live.WindowStartedAt.After(now) {
 		now = live.WindowStartedAt
 	}
-	return collector.Report{Sequence: p.sequence, ObservedAt: now.UTC(), Facts: p.facts, Mechanisms: p.mechanisms, Budget: p.budget.Usage(now), Receipts: append([]collector.Receipt{}, p.receipts[:n]...), Sources: sources, Live: live}
+	return collector.Report{ObservedAt: now.UTC(), Facts: p.facts, Mechanisms: p.mechanisms, Budget: p.budget.Usage(now), Receipts: append([]collector.Receipt{}, p.receipts[:n]...), Sources: sources, Live: live}
 }
 
-// statusLoop sends the first report at once and then one every
-// StatusInterval, sooner (but at least StatusMinimumSpacing apart) when new
-// receipts are pending. A failed report keeps its receipts for the next one.
-func (p *nodeProcess) statusLoop(ctx context.Context, kick <-chan struct{}) error {
-	for {
-		p.mu.Lock()
-		wait := p.cadence.Wait(p.now())
-		p.mu.Unlock()
-		if wait > 0 {
-			if err := p.sleep(ctx, wait, kick); err != nil {
-				return err
-			}
-			continue
-		}
-		r := p.report()
-		err := p.client.Status(ctx, p.epoch, r)
-		if errors.Is(err, node.ErrUnauthenticated) {
-			return errNodeReenroll
-		}
-		if err != nil {
-			if ctx.Err() != nil {
-				return ctx.Err()
-			}
-			p.note("status pending: " + channelCause(err))
-			if err := p.sleep(ctx, nodeRetry, nil); err != nil {
-				return err
-			}
-			continue
-		}
-		p.note("")
-		p.mu.Lock()
-		p.receipts = p.receipts[len(r.Receipts):]
-		p.cadence.Sent(p.now())
-		p.mu.Unlock()
+// statusSpacing coalesces bursts of changes (source counters move with every
+// packet) into at most one report per second.
+const statusSpacing = time.Second
+
+// changed signals that the report may differ from the last one sent.
+func (p *nodeProcess) changed() {
+	select {
+	case p.changes <- struct{}{}:
+	default:
 	}
 }
 
-// pollLoop long-polls for work and answers each item with a receipt in the
-// next report. This build has no recorder, so every item is refused.
-func (p *nodeProcess) pollLoop(ctx context.Context, kick chan<- struct{}) error {
-	var after uint64
+// statusLoop sends a report after Hello and then whenever a change signal
+// arrives (receipts, budget, source and live state), at most once per
+// statusSpacing. An unchanged report is not sent.
+func (p *nodeProcess) statusLoop(ctx context.Context, stream nodeStream) error {
+	var last []byte
+	var sent time.Time
 	for {
-		// Backpressure: while unreported receipts fill the buffer, do not
-		// poll. The cursor only moves past items that have a receipt, so no
-		// queued item is skipped; the connector returns the rest again.
-		p.mu.Lock()
-		full := len(p.receipts) >= nodeReceiptBuffer
-		p.mu.Unlock()
-		if full {
-			select {
-			case kick <- struct{}{}:
-			default:
-			}
-			if err := p.sleep(ctx, collector.StatusMinimumSpacing, nil); err != nil {
+		if wait := sent.Add(statusSpacing).Sub(p.now()); !sent.IsZero() && wait > 0 {
+			if err := p.sleep(ctx, wait, nil); err != nil {
 				return err
 			}
-			continue
 		}
-		started := p.now()
-		work, err := p.client.Poll(ctx, p.epoch, after)
-		if errors.Is(err, node.ErrUnauthenticated) {
-			return errNodeReenroll
-		}
-		if err != nil {
-			if ctx.Err() != nil {
-				return ctx.Err()
-			}
-			p.note("poll pending: " + channelCause(err))
-			if err := p.sleep(ctx, nodeRetry, nil); err != nil {
+		r := p.report()
+		if key := statusKey(r); len(r.Receipts) > 0 || !bytes.Equal(key, last) {
+			if err := stream.Status(r); err != nil {
 				return err
 			}
-			continue
-		}
-		if len(work) == 0 {
-			// The connector holds an empty poll; an early empty answer waits.
-			if p.now().Sub(started) < collector.StatusMinimumSpacing {
-				if err := p.sleep(ctx, collector.StatusMinimumSpacing, nil); err != nil {
-					return err
-				}
-			}
-			continue
-		}
-
-		for _, received := range work {
-			w := received.Work
-			if ctx.Err() != nil {
-				break
-			}
-			if w.Sequence <= after {
+			last, sent = key, p.now()
+			p.mu.Lock()
+			p.receipts = p.receipts[len(r.Receipts):]
+			more := len(p.receipts) > 0
+			p.mu.Unlock()
+			if more {
 				continue
 			}
-			p.mu.Lock()
-			full := len(p.receipts) >= nodeReceiptBuffer
-			p.mu.Unlock()
-			if full {
-				break
-			}
-			// Starting a capture takes the lock for the budget, so decide
-			// without holding it.
-			r := collector.Decide(w, p.now())
-			if uploader, liveUpload := p.client.(interface {
-				UploadLive(context.Context, string, v.NodeReply) error
-			}); liveUpload && w.Kind == collector.WorkLiveRead && p.sources != nil && p.sources.liveBudget != nil && w.Live != nil && r.Reason != collector.ReasonWorkUnknown && r.Reason != collector.ReasonWorkExpired {
-				// One finite task; registration and the closed check share the lifecycle
-				// lock so shutdown joins every task before dropping source/transport state.
-				p.sources.mu.Lock()
-				if !p.sources.closed {
-					p.sources.liveWG.Add(1)
-					go func(w collector.Work) {
-						defer p.sources.liveWG.Done()
-						call, cancel := context.WithDeadline(ctx, w.NotAfter)
-						defer cancel()
-						var reply v.NodeReply
-						var e error
-						if w.Live.Manual != nil && p.packets != nil {
-							reply, e = p.packets.readManualLive(call, w, p.sources.liveBudget)
-						} else {
-							reply, e = p.sources.readLive(call, w)
-						}
-						if e == nil && p.takeLiveUpload(reply) {
-							_ = uploader.UploadLive(call, p.epoch, reply)
-						}
-						clear(reply.Rows)
-					}(w)
-					r.Outcome, r.Reason = collector.OutcomeAccepted, ""
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-p.changes:
+		}
+	}
+}
+
+// statusKey is a report without its time, receipts and the continuously
+// refilling upload budget.
+func statusKey(r collector.Report) []byte {
+	w := node.WireStatus(r)
+	w.ObservedAt, w.Receipts, w.Budget.UploadAvailable = time.Time{}, nil, 0
+	b, _ := json.Marshal(w)
+	return b
+}
+
+// handle decides one pushed work item and returns its receipt.
+func (p *nodeProcess) handle(ctx context.Context, received delivery.NodeWorkDelivery) collector.Receipt {
+	w := received.Work
+	root := p.root
+	if root == nil {
+		root = ctx
+	}
+	// Starting a capture takes the lock for the budget, so decide
+	// without holding it.
+	r := collector.Decide(w, p.now())
+	if p.uploadLive != nil && w.Kind == collector.WorkLiveRead && p.sources != nil && p.sources.liveBudget != nil && w.Live != nil && r.Reason != collector.ReasonWorkUnknown && r.Reason != collector.ReasonWorkExpired {
+		// One finite task; registration and the closed check share the lifecycle
+		// lock so shutdown joins every task before dropping source/transport state.
+		p.sources.mu.Lock()
+		if !p.sources.closed {
+			p.sources.liveWG.Add(1)
+			go func(w collector.Work) {
+				defer p.sources.liveWG.Done()
+				call, cancel := context.WithDeadline(ctx, w.NotAfter)
+				defer cancel()
+				var reply v.NodeReply
+				var e error
+				if w.Live.Manual != nil && p.packets != nil {
+					reply, e = p.packets.readManualLive(call, w, p.sources.liveBudget)
+				} else {
+					reply, e = p.sources.readLive(call, w)
 				}
-				p.sources.mu.Unlock()
-			}
-			if w.Kind == collector.WorkProfileCapture && p.profiles != nil {
-				root := p.root
-				if root == nil {
-					root = ctx
+				if e == nil && p.takeLiveUpload(reply) {
+					_ = p.uploadLive(call, reply)
 				}
-				r = p.profiles.start(root, p.epoch, w, received.ProfileAuthorization, received.ProfileAuthorizationUnavailable)
-			}
-			if w.Kind == collector.WorkCancelProfileCapture && p.profiles != nil {
-				r = p.profiles.stop(w)
-			}
-			if w.Kind == collector.WorkPacketCapture && p.packets != nil {
-				root := p.root
-				if root == nil {
-					root = ctx
-				}
-				r = p.packets.start(root, p.epoch, w)
-			}
-			if w.Kind == collector.WorkSyscallCapture && p.packets != nil {
-				root := p.root
-				if root == nil {
-					root = ctx
-				}
-				r = p.packets.startSyscall(root, p.epoch, w)
-			}
-			if w.Kind == collector.WorkCancelPacketCapture && p.packets != nil {
-				r = p.packets.cancel(w)
-			}
-			if (w.Kind == collector.WorkPacketSource || w.Kind == collector.WorkStopPacketSource || w.Kind == collector.WorkPacketSourceSnapshot || w.Kind == collector.WorkCancelSourceSnapshot) && p.sources != nil {
-				root := p.root
-				if root == nil {
-					root = ctx
-				}
-				r = p.sources.decide(root, p.epoch, w)
-			}
+				clear(reply.Rows)
+			}(w)
+			r.Outcome, r.Reason = collector.OutcomeAccepted, ""
+		}
+		p.sources.mu.Unlock()
+	}
+	switch {
+	case w.Kind == collector.WorkProfileCapture && p.profiles != nil:
+		r = p.profiles.start(root, w, received.ProfileAuthorization, received.ProfileAuthorizationUnavailable)
+	case w.Kind == collector.WorkCancelProfileCapture && p.profiles != nil:
+		r = p.profiles.stop(w)
+	case w.Kind == collector.WorkPacketCapture && p.packets != nil:
+		r = p.packets.start(root, w)
+	case w.Kind == collector.WorkSyscallCapture && p.packets != nil:
+		r = p.packets.startSyscall(root, w)
+	case w.Kind == collector.WorkCancelPacketCapture && p.packets != nil:
+		r = p.packets.cancel(w)
+	case (w.Kind == collector.WorkPacketSource || w.Kind == collector.WorkStopPacketSource || w.Kind == collector.WorkPacketSourceSnapshot || w.Kind == collector.WorkCancelSourceSnapshot) && p.sources != nil:
+		r = p.sources.decide(root, w)
+	}
+	return r
+}
+
+// session runs one stream until it ends. It reports whether the stream
+// opened.
+func (p *nodeProcess) session(ctx context.Context) (bool, error) {
+	stream, err := p.connect(ctx)
+	if err != nil {
+		return false, err
+	}
+	p.note("")
+	fmt.Fprintln(p.log, "node collector connected")
+	session, cancel := context.WithCancel(ctx)
+	done := make(chan error, 1)
+	go func() { done <- p.statusLoop(session, stream) }()
+	go func() {
+		<-session.Done()
+		stream.Close()
+	}()
+	for {
+		received, err := stream.Receive()
+		if err == nil {
+			r := p.handle(session, received)
+			clear(received.ProfileAuthorization)
 			p.mu.Lock()
 			p.receipts = append(p.receipts, r)
 			p.mu.Unlock()
-			after = w.Sequence
+			p.changed()
+			continue
 		}
-		p.mu.Lock()
-		p.cadence.Urgent()
-		p.mu.Unlock()
-		select {
-		case kick <- struct{}{}:
-		default:
+		cancel()
+		if status := <-done; status != nil && !errors.Is(status, context.Canceled) {
+			err = status
 		}
-		for _, received := range work {
-			clear(received.ProfileAuthorization)
-		}
+		return true, err
 	}
 }
 
-// renewLoop renews one minute before each certificate expires, with the
-// same key and epoch, until the session ends.
-func (p *nodeProcess) renewLoop(ctx context.Context, notAfter time.Time) error {
-	for {
-		wait := notAfter.Sub(p.now()) - collector.CertificateRenewal
-		if wait < nodeRetry {
-			wait = nodeRetry
-		}
-		if err := p.sleep(ctx, wait, nil); err != nil {
-			return err
-		}
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-		next, err := p.enroll(ctx)
-		if err != nil {
-			return err
-		}
-		notAfter = next
-	}
-}
-
-// Run enrolls, then runs the status, poll and renewal loops until ctx ends.
-// A connector that no longer knows the process (connector restart) leads to
-// a fresh enrollment with the same key and epoch.
+// Run holds the stream until ctx ends, reconnecting with jittered exponential
+// backoff. A connector restart only drops the stream.
 func (p *nodeProcess) Run(ctx context.Context) error {
 	p.root = ctx
+	if p.changes == nil {
+		p.changes = make(chan struct{}, 1)
+	}
+	backoff := nodeRetryMin
 	for {
-		notAfter, err := p.enroll(ctx)
-		if err != nil {
-			return nil
-		}
-		session, cancel := context.WithCancel(ctx)
-		kick := make(chan struct{}, 1)
-		done := make(chan error, 3)
-		go func() { done <- p.statusLoop(session, kick) }()
-		go func() { done <- p.pollLoop(session, kick) }()
-		go func() { done <- p.renewLoop(session, notAfter) }()
-		<-done
-		cancel()
-		<-done
-		<-done
+		opened, err := p.session(ctx)
 		if ctx.Err() != nil {
 			return nil
 		}
+		if opened {
+			backoff = nodeRetryMin
+		}
+		p.note("stream pending: " + channelCause(err))
+		if p.sleep(ctx, backoff/2+rand.N(backoff/2+1), nil) != nil {
+			return nil
+		}
+		backoff = min(2*backoff, nodeRetryMax)
 	}
 }
 
@@ -627,7 +506,7 @@ func NodeDiagnostic(err error) string {
 	if errors.Is(err, errNodeGuard) {
 		return err.Error() + " (" + contracts.NodeDisposableHostGuard + "); the collector runs only on disposable test hosts until it is qualified"
 	}
-	return "node collector stopped: protected node input, boot ID or process key unavailable"
+	return "node collector stopped: protected node input unavailable"
 }
 
 func nodeLiveLimits(p contracts.NodeLiveProcessing) v.ProcessingLimits {

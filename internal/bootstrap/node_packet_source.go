@@ -61,6 +61,14 @@ type packetSource struct {
 	lowering  collector.PolicyLimits
 	// log reports why the source stopped (nil in tests).
 	log func(string)
+	// changed signals that the source's reported status may have changed.
+	changed func()
+}
+
+func (s *packetSource) notify() {
+	if s.changed != nil {
+		s.changed()
+	}
 }
 
 func newPacketSource(parent context.Context, permit collector.SourcePermit, lowering collector.PolicyLimits, limits packets.RingLimits, program []planning.BPFInstruction, syscallFilter *collector.SyscallFilter, engine observedPacketEngine, now func() time.Time, budget *collector.Budget, budgetMu *sync.Mutex, log func(string), ringDir string, httpConfigs ...*collector.HTTPProjection) (*packetSource, error) {
@@ -151,6 +159,7 @@ func (s *packetSource) scheduleLocked() {
 	if s.closed {
 		return
 	}
+	s.notify()
 	next := s.meter.Permit().LeafUntil
 	if end, ok := s.ctx.Deadline(); ok && end.Before(next) {
 		next = end
@@ -205,6 +214,7 @@ func (s *packetSource) finishLocked() {
 func (s *packetSource) stopLocked(err error) {
 	if !s.closed {
 		s.closed = true
+		s.notify()
 		if s.err == nil {
 			s.err = err
 		}

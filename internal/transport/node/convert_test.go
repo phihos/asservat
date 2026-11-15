@@ -15,7 +15,7 @@ func sampleReport() collector.Report {
 	f := collector.Facts{KernelRelease: "6.11.0-1018-azure", Kernel: collector.KernelVersion{Major: 6, Minor: 11}, BTF: collector.Supported, CgroupV2: collector.Supported, BPF: collector.Supported,
 		TCX: collector.Supported, TC: collector.Supported, DebugFS: collector.Supported, TraceFS: collector.Supported, BPFFS: collector.Supported, HostProcesses: collector.Supported,
 		Runtime: collector.RuntimeContainerd, Engine: collector.Engine{Linked: true, Initialized: true, Version: "v0.57.0"}}
-	return collector.Report{Sequence: 4, ObservedAt: time.Date(2026, 10, 27, 12, 0, 0, 0, time.UTC), Facts: f, Mechanisms: collector.Assess(f),
+	return collector.Report{ObservedAt: time.Date(2026, 10, 27, 12, 0, 0, 0, time.UTC), Facts: f, Mechanisms: collector.Assess(f),
 		Budget:   collector.Usage{Ceilings: collector.Ceilings{RingBytes: 256 << 20, FrozenBytes: 256 << 20, UploadBytesPerSecond: 32 << 20, UploadBurstBytes: 64 << 20}, UploadAvailable: 64 << 20},
 		Receipts: []collector.Receipt{{WorkID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", Sequence: 2, Outcome: collector.OutcomeRefused, Reason: collector.ReasonRecorderNotImplemented}},
 		Live:     &collector.LiveStatus{WindowStartedAt: time.Date(2026, 10, 27, 11, 59, 59, 0, time.UTC), Cohorts: 1, ScanEvents: 2, ScanBytes: 300, ScanCPUNanos: 400, DeliveredRows: 2, DeliveredBytes: 600, RefusedAdmissions: 1, LostEvents: 3, DroppedRows: 2, PendingRows: 1}}
@@ -23,11 +23,11 @@ func sampleReport() collector.Report {
 
 func TestStatusRoundTripsThroughTheClosedWire(t *testing.T) {
 	r := sampleReport()
-	b, err := json.Marshal(WireStatus("epoch", r))
+	b, err := json.Marshal(WireStatus(r))
 	if err != nil {
 		t.Fatal(err)
 	}
-	decoded, err := contracts.DecodeNodeStatus(bytes.NewReader(b))
+	decoded, err := decodeStatus(bytes.NewReader(b))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,7 +37,7 @@ func TestStatusRoundTripsThroughTheClosedWire(t *testing.T) {
 	}
 	// An unparsable kernel is reported as an empty version, not as 0.0.0.
 	r.Facts.Kernel = collector.KernelVersion{}
-	if w := WireStatus("epoch", r); w.Probe.Kernel != "" {
+	if w := WireStatus(r); w.Probe.Kernel != "" {
 		t.Fatalf("kernel %q", w.Probe.Kernel)
 	} else if _, ok := DomainStatus(w); !ok {
 		t.Fatal("empty kernel refused")
@@ -47,7 +47,7 @@ func TestStatusRoundTripsThroughTheClosedWire(t *testing.T) {
 func TestStatusRetainsLossBeforeTheFirstScanWindow(t *testing.T) {
 	r := sampleReport()
 	r.Live = &collector.LiveStatus{LostEvents: 1}
-	if back, ok := DomainStatus(WireStatus("epoch", r)); !ok || !reflect.DeepEqual(back, r) {
+	if back, ok := DomainStatus(WireStatus(r)); !ok || !reflect.DeepEqual(back, r) {
 		t.Fatal("source loss without an accepted scan was refused", ok, back.Live)
 	}
 }
@@ -55,7 +55,7 @@ func TestStatusRetainsLossBeforeTheFirstScanWindow(t *testing.T) {
 func TestStatusProfileTLSCapabilityIsExplicitAndClosed(t *testing.T) {
 	r := sampleReport()
 	r.Mechanisms = []collector.Availability{{Mechanism: collector.MechanismProfile, Prerequisites: true, Adapter: collector.AdapterAvailable}}
-	legacy, err := json.Marshal(WireStatus("epoch", r))
+	legacy, err := json.Marshal(WireStatus(r))
 	if err != nil || bytes.Contains(legacy, []byte(`"profileTLS"`)) {
 		t.Fatal("HTTP-only report changed", err)
 	}
@@ -63,7 +63,7 @@ func TestStatusProfileTLSCapabilityIsExplicitAndClosed(t *testing.T) {
 	// goProfile capability. Missing support remains an ordinary HTTP report.
 	current := bytes.Replace(legacy, []byte(`"mechanism":"goProfile"`), []byte(`"mechanism":"goProfile","profileTLS":true`), 1)
 	for _, raw := range [][]byte{legacy, current} {
-		wire, err := contracts.DecodeNodeStatus(bytes.NewReader(raw))
+		wire, err := decodeStatus(bytes.NewReader(raw))
 		if err != nil {
 			t.Fatal("profile capability report", err)
 		}
@@ -71,7 +71,7 @@ func TestStatusProfileTLSCapabilityIsExplicitAndClosed(t *testing.T) {
 		if !ok {
 			t.Fatal("profile capability refused")
 		}
-		encoded, _ := json.Marshal(WireStatus("epoch", back))
+		encoded, _ := json.Marshal(WireStatus(back))
 		if !bytes.Equal(raw, encoded) {
 			// Field order is intentionally not part of capability semantics.
 			var a, b any
@@ -87,7 +87,7 @@ func TestStatusProfileTLSCapabilityIsExplicitAndClosed(t *testing.T) {
 		bytes.Replace(current, []byte(`"prerequisites":true`), []byte(`"prerequisites":false`), 1),
 		bytes.Replace(current, []byte(`"adapter":"Available"`), []byte(`"adapter":"AdapterUnavailable"`), 1),
 	} {
-		wire, err := contracts.DecodeNodeStatus(bytes.NewReader(raw))
+		wire, err := decodeStatus(bytes.NewReader(raw))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -100,13 +100,13 @@ func TestStatusProfileTLSCapabilityIsExplicitAndClosed(t *testing.T) {
 func TestStatusProfileAuthorizationRequiresExplicitAvailableTLS(t *testing.T) {
 	r := sampleReport()
 	r.Mechanisms = []collector.Availability{{Mechanism: collector.MechanismProfile, Prerequisites: true, Adapter: collector.AdapterAvailable, ProfileTLS: true}}
-	legacy, _ := json.Marshal(WireStatus("epoch", r))
+	legacy, _ := json.Marshal(WireStatus(r))
 	if bytes.Contains(legacy, []byte(`"profileAuthorization"`)) {
 		t.Fatal("old TLS report advertises credentials")
 	}
 	for _, mode := range []string{"current", "without-tls", "other-mechanism", "unavailable"} {
 		t.Run(mode, func(t *testing.T) {
-			wire := WireStatus("epoch", r)
+			wire := WireStatus(r)
 			wire.Mechanisms[0].ProfileAuthorization = true
 			switch mode {
 			case "without-tls":
@@ -129,8 +129,6 @@ func TestStatusProfileAuthorizationRequiresExplicitAvailableTLS(t *testing.T) {
 
 func TestDomainStatusRefusesOpenValues(t *testing.T) {
 	for name, edit := range map[string]func(*contracts.NodeStatus){
-		"format":          func(s *contracts.NodeStatus) { s.Format = "other" },
-		"sequence":        func(s *contracts.NodeStatus) { s.Sequence = 0 },
 		"support value":   func(s *contracts.NodeStatus) { s.Probe.TCX = "maybe" },
 		"runtime":         func(s *contracts.NodeStatus) { s.Probe.Runtime = "docker" },
 		"kernel mismatch": func(s *contracts.NodeStatus) { s.Probe.Kernel = "6.11" },
@@ -148,7 +146,7 @@ func TestDomainStatusRefusesOpenValues(t *testing.T) {
 		"live cohorts":    func(s *contracts.NodeStatus) { s.Live.Cohorts = 17 },
 		"live no window":  func(s *contracts.NodeStatus) { s.Live.WindowStartedAt = time.Time{} },
 	} {
-		s := WireStatus("epoch", sampleReport())
+		s := WireStatus(sampleReport())
 		edit(&s)
 		if _, ok := DomainStatus(s); ok {
 			t.Fatalf("%s accepted", name)
@@ -175,11 +173,11 @@ func TestSourceCeilingsSurviveClosedNodeProjection(t *testing.T) {
 
 	report := sampleReport()
 	report.Budget.Ceilings.SourceLimits = c.SourceLimits
-	raw, err := json.Marshal(WireStatus("epoch", report))
+	raw, err := json.Marshal(WireStatus(report))
 	if err != nil {
 		t.Fatal(err)
 	}
-	decoded, err := contracts.DecodeNodeStatus(bytes.NewReader(raw))
+	decoded, err := decodeStatus(bytes.NewReader(raw))
 	if err != nil {
 		t.Fatal("closed nonzero source ceiling codec", err)
 	}
