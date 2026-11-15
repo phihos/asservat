@@ -56,6 +56,7 @@ type nativeExchangeFixture struct {
 	keyBackend             *kms.LocalOperations
 	admin                  *pgxpool.Pool
 	poolFor                func(string, string) *pgxpool.Pool
+	sources                *nativeFixtureSourceOwner
 }
 
 type nativeSQLProof struct {

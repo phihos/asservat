@@ -766,7 +766,7 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 					service.CurrentAuthority = f.gate
 					content = &nativeContextFixture{mode: mode, dispatcher: service, workers: ledger, configuration: configurationReader, recovery: f.s.recovery.reader}
 				}
-				qualifyNativeExchange(t, ctx, nativeExchangeFixture{renewOnly: mode == "native-owner-renewal", topologySource: f.s.retention.topology.source, content: content, worker: w, enrollment: enrollment, published: f.p, runtime: f.runtime, audit: f.audit, config: f.config, allocation: f.allocation, gate: f.gate, guards: f.guards, authority: f.authority, store: store, keys: keys, keyScope: nativeScope, keyBackend: nativeBackend, admin: admin, poolFor: poolFor})
+				qualifyNativeExchange(t, ctx, nativeExchangeFixture{sources: f.s.nativeSources, renewOnly: mode == "native-owner-renewal", topologySource: f.s.retention.topology.source, content: content, worker: w, enrollment: enrollment, published: f.p, runtime: f.runtime, audit: f.audit, config: f.config, allocation: f.allocation, gate: f.gate, guards: f.guards, authority: f.authority, store: store, keys: keys, keyScope: nativeScope, keyBackend: nativeBackend, admin: admin, poolFor: poolFor})
 				return
 			}
 			if mode == "enrollment-audit-versions" {
