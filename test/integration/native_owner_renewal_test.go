@@ -76,6 +76,14 @@ func qualifyNativeOwnerRenewal(t *testing.T, ctx context.Context, f nativeExchan
 	if !ok {
 		t.Fatal("continued response authority unavailable")
 	}
+	// The background fixture refresh would fail on the suspended stream and
+	// cancel the fixture; hold it until the stream is restored.
+	release := f.sources.Hold()
+	defer func() {
+		if release != nil {
+			release()
+		}
+	}()
 	if _, err := f.admin.Exec(ctx, "UPDATE permission_stream SET suspended=true WHERE id=$1", session.Scope.RootID); err != nil {
 		t.Fatal("suspend renewal permissions", err)
 	}
@@ -107,6 +115,8 @@ func qualifyNativeOwnerRenewal(t *testing.T, ctx context.Context, f nativeExchan
 	if _, restoreErr := f.admin.Exec(ctx, "UPDATE permission_stream SET suspended=false WHERE id=$1", session.Scope.RootID); restoreErr != nil {
 		t.Fatal("restore renewal permissions", restoreErr)
 	}
+	release()
+	release = nil
 	if err != nil || observed.Sequence != second.Sequence || !observed.Operation.Equal(o) {
 		t.Fatal("renewed native observation after permission suspension", err)
 	}

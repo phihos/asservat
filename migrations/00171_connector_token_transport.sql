@@ -3,11 +3,8 @@
 -- connectors by their ServiceAccount tokens. Nothing reads activated
 -- connector leaves or the never-filled peer registry any more.
 -- Unreleased product: their rows are dropped without migration.
-DROP FUNCTION read_connector_activated_leaf(uuid,uuid,text,bytea,jsonb);
-DROP TABLE fleet_peer_certificate;
-DROP TABLE fleet_peer;
-
--- +goose Down
--- +goose StatementBegin
-DO $$ BEGIN RAISE EXCEPTION 'connector leaf reads and the peer registry are not restored' USING ERRCODE='0A000'; END $$;
--- +goose StatementEnd
+-- No Down: the removed registry is not restored. IF EXISTS keeps a re-Up
+-- after a downgrade probe working, as in 00167.
+DROP FUNCTION IF EXISTS read_connector_activated_leaf(uuid,uuid,text,bytea,jsonb);
+DROP TABLE IF EXISTS fleet_peer_certificate;
+DROP TABLE IF EXISTS fleet_peer;
