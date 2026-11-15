@@ -13,6 +13,7 @@ import (
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -189,7 +190,9 @@ func (s *ContextPreviews) ReadContextPreview(ctx context.Context, root, preview 
 		if e != nil {
 			return e
 		}
-		if !until.Valid || !now.Time.Before(until.Time) || now.Time.Before(out.CreatedAt) {
+		// A pending review without notAfter keeps its blueprint (infinity).
+		open := until.Valid && until.InfinityModifier == pgtype.Infinity
+		if !until.Valid || !open && !now.Time.Before(until.Time) || now.Time.Before(out.CreatedAt) {
 			return value.ErrPreviewExpired
 		}
 		return ctx.Err()
