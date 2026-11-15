@@ -105,31 +105,28 @@ type AdhocObservationSpend struct {
 }
 
 type ArtifactDownload struct {
-	ID                    pgtype.UUID
-	RootID                pgtype.UUID
-	AllocationID          pgtype.UUID
-	ArtifactID            pgtype.UUID
-	PrincipalKey          []byte
-	ActorKey              []byte
-	IdempotencyDigest     []byte
-	RequestDigest         []byte
-	ScopeJson             []byte
-	State                 string
-	CreatedAt             pgtype.Timestamptz
-	Deadline              pgtype.Timestamptz
-	OutputLimit           int64
-	ReadLimit             int64
-	RequestLimit          int64
-	ChargedOutput         int64
-	ChargedRead           int64
-	Requests              int64
-	EmittedBytes          int64
-	Generation            int64
-	ActiveBatch           pgtype.UUID
-	StopProtocol          pgtype.Text
-	CapacityAccountID     pgtype.UUID
-	CapacityBacking       []byte
-	CapacityBackingDigest []byte
+	ID                pgtype.UUID
+	RootID            pgtype.UUID
+	AllocationID      pgtype.UUID
+	ArtifactID        pgtype.UUID
+	PrincipalKey      []byte
+	ActorKey          []byte
+	IdempotencyDigest []byte
+	RequestDigest     []byte
+	ScopeJson         []byte
+	State             string
+	CreatedAt         pgtype.Timestamptz
+	Deadline          pgtype.Timestamptz
+	OutputLimit       int64
+	ReadLimit         int64
+	RequestLimit      int64
+	ChargedOutput     int64
+	ChargedRead       int64
+	Requests          int64
+	EmittedBytes      int64
+	Generation        int64
+	ActiveBatch       pgtype.UUID
+	StopProtocol      pgtype.Text
 }
 
 type AuthorityAudit struct {
@@ -213,156 +210,30 @@ type BrowserSessionRoot struct {
 	MaxLifetimeSeconds pgtype.Int4
 }
 
-type CapacityCluster struct {
-	RootID           pgtype.UUID
-	PoolID           pgtype.UUID
-	ClusterID        pgtype.UUID
-	ProtectedBytes   int64
-	ProtectedObjects int64
-	ByteLimit        int64
-	ObjectLimit      int64
-	AccountLimit     int64
-	NamespaceLimit   int64
-	Accounts         int64
-	Namespaces       int64
-	BackedBytes      int64
-	BackedObjects    int64
-}
-
-type CapacityClusterQualification struct {
-	RootID      pgtype.UUID
-	ClusterID   pgtype.UUID
-	PeerID      pgtype.UUID
-	IssuerEpoch pgtype.UUID
-	GuardDigest []byte
-	GuardKeys   []byte
-	QualifiedAt pgtype.Timestamptz
-}
-
-type CapacityNamespace struct {
-	RootID        pgtype.UUID
-	PoolID        pgtype.UUID
-	ClusterID     pgtype.UUID
-	NamespaceUid  string
-	ByteLimit     int64
-	ObjectLimit   int64
-	AccountLimit  int64
-	Accounts      int64
-	BackedBytes   int64
-	BackedObjects int64
-}
-
-type CapacityPool struct {
-	RootID                     pgtype.UUID
-	ID                         pgtype.UUID
-	BackendCapacityID          pgtype.UUID
-	BackendQualificationID     pgtype.UUID
-	BackendQualificationDigest []byte
-	SourceUid                  string
-	SourceName                 string
-	SourceGeneration           int64
-	SourceDigest               []byte
-	Revision                   int64
-	Plan                       []byte
-	PlanDigest                 []byte
-	ProtectedBytes             int64
-	ProtectedObjects           int64
-	SharedBytes                int64
-	SharedObjects              int64
-	SystemBytes                int64
-	SystemObjects              int64
-	AccountLimit               int64
-	NamespaceLimit             int64
-	Accounts                   int64
-	Namespaces                 int64
-	BackedBytes                int64
-	BackedObjects              int64
-	BackedSystemBytes          int64
-	BackedSystemObjects        int64
-}
-
-type CapacityPoolRevision struct {
-	RootID       pgtype.UUID
-	PoolID       pgtype.UUID
-	Revision     int32
-	Plan         []byte
-	PlanDigest   []byte
-	SupersededAt pgtype.Timestamptz
-}
-
-type CapacityRefreshDemand struct {
-	RootID        pgtype.UUID
-	ClusterID     pgtype.UUID
-	NamespaceUid  string
-	NamespaceName string
-	WorkloadKind  string
-	WorkloadName  string
-	WorkloadUid   string
-	RequestedAt   pgtype.Timestamptz
-	NotAfter      pgtype.Timestamptz
-}
-
-type CapacitySource struct {
-	RootID                pgtype.UUID
-	InstallationID        pgtype.UUID
-	ControlClusterID      pgtype.UUID
-	ControlNamespaceUid   string
-	SourceGuardDigest     []byte
-	WriterRole            pgtype.Uint32
-	CaptureRole           pgtype.Uint32
-	AuditReaderRole       pgtype.Uint32
-	AuditReaderProvenance []byte
-	SetupReceipt          []byte
-	SetupInput            []byte
-	SetupRoles            []byte
-	AccountVersion        string
-	ProcessLimit          int16
-	Qualification         []byte
-	QualificationDigest   []byte
-	AcceptedRevision      int64
-	AcceptedSnapshot      []byte
-	AcceptedDigest        []byte
-	NegativeSnapshot      []byte
-	ObservedAt            pgtype.Timestamptz
-	FreshUntil            pgtype.Timestamptz
-	Suspended             bool
-	RootPlan              []byte
-	RootPlanBytes         []byte
-	RootPlanDigest        []byte
-	RootConfiguration     []byte
-	ConfigurationSpent    int64
-	RootMutationXid       pgtype.Uint64
-}
-
-type CapacityWorkload struct {
+type CapacityAccount struct {
+	AllocationID         pgtype.UUID
+	DownloadAllocationID pgtype.UUID
 	RootID               pgtype.UUID
-	PoolID               pgtype.UUID
 	ClusterID            pgtype.UUID
 	NamespaceUid         string
 	WorkloadUid          string
-	ID                   pgtype.UUID
-	AttemptID            pgtype.UUID
-	AllocationID         pgtype.UUID
-	DownloadAllocationID pgtype.UUID
-	Revision             int64
-	PolicyUid            string
-	SourceDigest         []byte
-	Plan                 []byte
-	PlanDigest           []byte
-	AccountVersion       string
-	AccountDigest        []byte
 	ProtectedBytes       int64
-	ProtectedObjects     int64
-	SystemBytes          int64
-	SystemObjects        int64
-	InitialObservedAt    pgtype.Timestamptz
-	InitialUntil         pgtype.Timestamptz
-	ReservedAt           pgtype.Timestamptz
-	CaptureBackedAt      pgtype.Timestamptz
-	ReadyAt              pgtype.Timestamptz
-	CaptureCompletion    []byte
-	ReadyCompletion      []byte
-	MutationXid          pgtype.Uint64
+}
+
+type CapacitySetting struct {
+	RootID                 pgtype.UUID
+	InstallationID         pgtype.UUID
+	AccountVersion         string
+	Qualification          []byte
+	PoolID                 pgtype.UUID
+	EvidenceBytes          int64
+	ReserveBytes           int64
+	ShareBytes             pgtype.Int8
+	LimitBytes             int64
+	NamespaceLimitBytes    pgtype.Int8
+	MaxConcurrentExpensive int32
+	OnFull                 string
+	Revision               int64
 }
 
 type CaptureAuditAllocation struct {
@@ -944,37 +815,6 @@ type ContextCatalog struct {
 	PublishedAt pgtype.Timestamptz
 }
 
-type ContextControlAccount struct {
-	RootID        pgtype.UUID
-	AllocationID  pgtype.UUID
-	Configured    bool
-	Paused        bool
-	Revision      int64
-	ValidUntil    pgtype.Timestamptz
-	FullLimit     int64
-	ReplayLimit   int64
-	ChargedFull   int64
-	ChargedReplay int64
-}
-
-type ContextControlCharge struct {
-	CaptureID    pgtype.UUID
-	RootID       pgtype.UUID
-	AllocationID pgtype.UUID
-}
-
-type ContextControlPool struct {
-	RootID       pgtype.UUID
-	Configured   bool
-	Paused       bool
-	Revision     int64
-	ValidUntil   pgtype.Timestamptz
-	FullLimit    int64
-	ReplayLimit  int64
-	BackedFull   int64
-	BackedReplay int64
-}
-
 type ContextDeletionCheckpoint struct {
 	AttemptID           pgtype.UUID
 	RootID              pgtype.UUID
@@ -1335,18 +1175,16 @@ type CustodyStream struct {
 }
 
 type DownloadAllocation struct {
-	ID               pgtype.UUID
-	RootID           pgtype.UUID
-	ClusterID        pgtype.UUID
-	NamespaceUid     string
-	WorkloadUid      string
-	OutputLimit      int64
-	ReadLimit        int64
-	SessionLimit     int64
-	ReservedOutput   int64
-	ReservedRead     int64
-	ReservedSessions int64
-	ValidUntil       pgtype.Timestamptz
+	ID             pgtype.UUID
+	RootID         pgtype.UUID
+	ClusterID      pgtype.UUID
+	NamespaceUid   string
+	WorkloadUid    string
+	OutputLimit    int64
+	ReadLimit      int64
+	ReservedOutput int64
+	ReservedRead   int64
+	ValidUntil     pgtype.Timestamptz
 }
 
 type DownloadBatch struct {
@@ -1366,10 +1204,8 @@ type DownloadControlAllocation struct {
 	ID                 pgtype.UUID
 	RootID             pgtype.UUID
 	AuditStoreID       pgtype.UUID
-	ResponseLimit      int64
 	WindowLimit        int64
 	AuditByteLimit     int64
-	ReservedResponses  int64
 	ReservedWindows    int64
 	ReservedAuditBytes int64
 	ValidUntil         pgtype.Timestamptz
@@ -2427,14 +2263,6 @@ type RemoteAccessBindingDelivery struct {
 	ObservedAt pgtype.Timestamptz
 	Digest     []byte
 	Bindings   []byte
-}
-
-type RemoteCapacityDelivery struct {
-	RootID     pgtype.UUID
-	ClusterID  pgtype.UUID
-	ObservedAt pgtype.Timestamptz
-	Digest     []byte
-	Namespaces []byte
 }
 
 type RetentionCatchup struct {

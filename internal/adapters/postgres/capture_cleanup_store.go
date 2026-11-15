@@ -18,7 +18,7 @@ var ErrCaptureCleanupStorePending = errors.New("capture cleanup store pending")
 // ReadCaptureCleanupStoreID returns the operation audit store of the
 // capture, normal and resolution lanes from the root's stored capacity
 // qualification. The three lanes share one store; a mismatch is refused.
-// The cleanup purposes have SELECT on capacity_source(root_id,
+// The cleanup purposes have SELECT on capacity_settings(root_id,
 // qualification) only.
 func ReadCaptureCleanupStoreID(ctx context.Context, pool *pgxpool.Pool, root string) (string, error) {
 	if ctx == nil || ctx.Err() != nil || pool == nil || !authorization.UUID(root) {
@@ -28,7 +28,7 @@ func ReadCaptureCleanupStoreID(ctx context.Context, pool *pgxpool.Pool, root str
 	defer end()
 	var capture, normal, resolution *string
 	err := pool.QueryRow(call, `SELECT qualification#>>'{RootBacking,Capture,Policy,StoreID}', qualification#>>'{RootBacking,Normal,Policy,StoreID}', qualification#>>'{RootBacking,Resolution,Policy,StoreID}'
- FROM public.capacity_source WHERE root_id=$1::uuid`, root).Scan(&capture, &normal, &resolution)
+ FROM public.capacity_settings WHERE root_id=$1::uuid`, root).Scan(&capture, &normal, &resolution)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", ErrCaptureCleanupStorePending
 	}

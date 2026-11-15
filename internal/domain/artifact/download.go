@@ -117,12 +117,12 @@ const (
 // from incident upload/storage reservations. Configuration alone is not access.
 type DownloadAllocation struct {
 	ID, RootID, ClusterID, NamespaceUID, WorkloadUID string
-	OutputLimit, ReadLimit, SessionLimit             int64
+	OutputLimit, ReadLimit                           int64
 	ValidUntil                                       time.Time
 }
 
 func (a DownloadAllocation) Valid() bool {
-	return uuid(a.ID) && uuid(a.RootID) && uuid(a.ClusterID) && identity.Text(a.NamespaceUID, 64) && identity.Text(a.WorkloadUID, 64) && a.OutputLimit > 0 && a.OutputLimit <= MaxDownloadOutput && a.ReadLimit > 0 && a.ReadLimit <= MaxDownloadReadWork && a.SessionLimit > 0 && a.SessionLimit <= 100000 && !a.ValidUntil.IsZero()
+	return uuid(a.ID) && uuid(a.RootID) && uuid(a.ClusterID) && identity.Text(a.NamespaceUID, 64) && identity.Text(a.WorkloadUID, 64) && a.OutputLimit > 0 && a.OutputLimit <= MaxDownloadOutput && a.ReadLimit > 0 && a.ReadLimit <= MaxDownloadReadWork && !a.ValidUntil.IsZero()
 }
 func (a DownloadAllocation) Covers(s DownloadScope) bool {
 	return a.RootID == s.RootID && a.ClusterID == s.ClusterID && a.NamespaceUID == s.NamespaceUID && a.WorkloadUID == s.WorkloadUID

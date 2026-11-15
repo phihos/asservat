@@ -66,7 +66,7 @@ func (q *Queries) AcknowledgeDownloadState(ctx context.Context, arg AcknowledgeD
 }
 
 const chargeDownloadAllocation = `-- name: ChargeDownloadAllocation :execrows
-UPDATE download_allocation SET reserved_output=reserved_output+$3,reserved_read=reserved_read+$4,reserved_sessions=reserved_sessions+1 WHERE id=$1 AND root_id=$2
+UPDATE download_allocation SET reserved_output=reserved_output+$3,reserved_read=reserved_read+$4 WHERE id=$1 AND root_id=$2
 `
 
 type ChargeDownloadAllocationParams struct {
@@ -116,7 +116,7 @@ func (q *Queries) DownloadStreams(ctx context.Context, arg DownloadStreamsParams
 }
 
 const findDownloadSession = `-- name: FindDownloadSession :one
-SELECT id, root_id, allocation_id, artifact_id, principal_key, actor_key, idempotency_digest, request_digest, scope_json, state, created_at, deadline, output_limit, read_limit, request_limit, charged_output, charged_read, requests, emitted_bytes, generation, active_batch, stop_protocol, capacity_account_id, capacity_backing, capacity_backing_digest FROM artifact_download WHERE root_id=$1 AND actor_key=$2 AND idempotency_digest=$3
+SELECT id, root_id, allocation_id, artifact_id, principal_key, actor_key, idempotency_digest, request_digest, scope_json, state, created_at, deadline, output_limit, read_limit, request_limit, charged_output, charged_read, requests, emitted_bytes, generation, active_batch, stop_protocol FROM artifact_download WHERE root_id=$1 AND actor_key=$2 AND idempotency_digest=$3
 `
 
 type FindDownloadSessionParams struct {
@@ -151,16 +151,13 @@ func (q *Queries) FindDownloadSession(ctx context.Context, arg FindDownloadSessi
 		&i.Generation,
 		&i.ActiveBatch,
 		&i.StopProtocol,
-		&i.CapacityAccountID,
-		&i.CapacityBacking,
-		&i.CapacityBackingDigest,
 	)
 	return i, err
 }
 
 const insertDownloadAllocation = `-- name: InsertDownloadAllocation :one
-INSERT INTO download_allocation(id,root_id,cluster_id,namespace_uid,workload_uid,output_limit,read_limit,session_limit,valid_until)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id, root_id, cluster_id, namespace_uid, workload_uid, output_limit, read_limit, session_limit, reserved_output, reserved_read, reserved_sessions, valid_until
+INSERT INTO download_allocation(id,root_id,cluster_id,namespace_uid,workload_uid,output_limit,read_limit,valid_until)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id, root_id, cluster_id, namespace_uid, workload_uid, output_limit, read_limit, reserved_output, reserved_read, valid_until
 `
 
 type InsertDownloadAllocationParams struct {
@@ -171,7 +168,6 @@ type InsertDownloadAllocationParams struct {
 	WorkloadUid  string
 	OutputLimit  int64
 	ReadLimit    int64
-	SessionLimit int64
 	ValidUntil   pgtype.Timestamptz
 }
 
@@ -184,7 +180,6 @@ func (q *Queries) InsertDownloadAllocation(ctx context.Context, arg InsertDownlo
 		arg.WorkloadUid,
 		arg.OutputLimit,
 		arg.ReadLimit,
-		arg.SessionLimit,
 		arg.ValidUntil,
 	)
 	var i DownloadAllocation
@@ -196,10 +191,8 @@ func (q *Queries) InsertDownloadAllocation(ctx context.Context, arg InsertDownlo
 		&i.WorkloadUid,
 		&i.OutputLimit,
 		&i.ReadLimit,
-		&i.SessionLimit,
 		&i.ReservedOutput,
 		&i.ReservedRead,
-		&i.ReservedSessions,
 		&i.ValidUntil,
 	)
 	return i, err
@@ -243,7 +236,7 @@ func (q *Queries) InsertDownloadBatch(ctx context.Context, arg InsertDownloadBat
 
 const insertDownloadSession = `-- name: InsertDownloadSession :one
 INSERT INTO artifact_download(id,root_id,allocation_id,artifact_id,principal_key,actor_key,idempotency_digest,request_digest,scope_json,deadline,output_limit,read_limit,request_limit,stop_protocol)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id, root_id, allocation_id, artifact_id, principal_key, actor_key, idempotency_digest, request_digest, scope_json, state, created_at, deadline, output_limit, read_limit, request_limit, charged_output, charged_read, requests, emitted_bytes, generation, active_batch, stop_protocol, capacity_account_id, capacity_backing, capacity_backing_digest
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id, root_id, allocation_id, artifact_id, principal_key, actor_key, idempotency_digest, request_digest, scope_json, state, created_at, deadline, output_limit, read_limit, request_limit, charged_output, charged_read, requests, emitted_bytes, generation, active_batch, stop_protocol
 `
 
 type InsertDownloadSessionParams struct {
@@ -304,15 +297,12 @@ func (q *Queries) InsertDownloadSession(ctx context.Context, arg InsertDownloadS
 		&i.Generation,
 		&i.ActiveBatch,
 		&i.StopProtocol,
-		&i.CapacityAccountID,
-		&i.CapacityBacking,
-		&i.CapacityBackingDigest,
 	)
 	return i, err
 }
 
 const lockDownloadAllocation = `-- name: LockDownloadAllocation :one
-SELECT id, root_id, cluster_id, namespace_uid, workload_uid, output_limit, read_limit, session_limit, reserved_output, reserved_read, reserved_sessions, valid_until FROM download_allocation WHERE id=$1 AND root_id=$2 FOR UPDATE
+SELECT id, root_id, cluster_id, namespace_uid, workload_uid, output_limit, read_limit, reserved_output, reserved_read, valid_until FROM download_allocation WHERE id=$1 AND root_id=$2 FOR UPDATE
 `
 
 type LockDownloadAllocationParams struct {
@@ -331,10 +321,8 @@ func (q *Queries) LockDownloadAllocation(ctx context.Context, arg LockDownloadAl
 		&i.WorkloadUid,
 		&i.OutputLimit,
 		&i.ReadLimit,
-		&i.SessionLimit,
 		&i.ReservedOutput,
 		&i.ReservedRead,
-		&i.ReservedSessions,
 		&i.ValidUntil,
 	)
 	return i, err
@@ -368,7 +356,7 @@ func (q *Queries) LockDownloadBatch(ctx context.Context, arg LockDownloadBatchPa
 }
 
 const lockDownloadSession = `-- name: LockDownloadSession :one
-SELECT id, root_id, allocation_id, artifact_id, principal_key, actor_key, idempotency_digest, request_digest, scope_json, state, created_at, deadline, output_limit, read_limit, request_limit, charged_output, charged_read, requests, emitted_bytes, generation, active_batch, stop_protocol, capacity_account_id, capacity_backing, capacity_backing_digest FROM artifact_download WHERE id=$1 AND root_id=$2 FOR UPDATE
+SELECT id, root_id, allocation_id, artifact_id, principal_key, actor_key, idempotency_digest, request_digest, scope_json, state, created_at, deadline, output_limit, read_limit, request_limit, charged_output, charged_read, requests, emitted_bytes, generation, active_batch, stop_protocol FROM artifact_download WHERE id=$1 AND root_id=$2 FOR UPDATE
 `
 
 type LockDownloadSessionParams struct {
@@ -402,9 +390,6 @@ func (q *Queries) LockDownloadSession(ctx context.Context, arg LockDownloadSessi
 		&i.Generation,
 		&i.ActiveBatch,
 		&i.StopProtocol,
-		&i.CapacityAccountID,
-		&i.CapacityBacking,
-		&i.CapacityBackingDigest,
 	)
 	return i, err
 }
@@ -437,7 +422,7 @@ func (q *Queries) ReadDownloadBatch(ctx context.Context, arg ReadDownloadBatchPa
 }
 
 const readDownloadSession = `-- name: ReadDownloadSession :one
-SELECT id, root_id, allocation_id, artifact_id, principal_key, actor_key, idempotency_digest, request_digest, scope_json, state, created_at, deadline, output_limit, read_limit, request_limit, charged_output, charged_read, requests, emitted_bytes, generation, active_batch, stop_protocol, capacity_account_id, capacity_backing, capacity_backing_digest FROM artifact_download WHERE id=$1 AND root_id=$2
+SELECT id, root_id, allocation_id, artifact_id, principal_key, actor_key, idempotency_digest, request_digest, scope_json, state, created_at, deadline, output_limit, read_limit, request_limit, charged_output, charged_read, requests, emitted_bytes, generation, active_batch, stop_protocol FROM artifact_download WHERE id=$1 AND root_id=$2
 `
 
 type ReadDownloadSessionParams struct {
@@ -471,9 +456,6 @@ func (q *Queries) ReadDownloadSession(ctx context.Context, arg ReadDownloadSessi
 		&i.Generation,
 		&i.ActiveBatch,
 		&i.StopProtocol,
-		&i.CapacityAccountID,
-		&i.CapacityBacking,
-		&i.CapacityBackingDigest,
 	)
 	return i, err
 }

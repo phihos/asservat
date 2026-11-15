@@ -186,8 +186,7 @@ func TestProfileCapacityQualificationFundsRenewalsWithinFiniteEnvelope(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
-	pool := app.ProtectedPoolPlan{Format: app.ProtectedPoolPlanFormat, UID: d.SystemPoolUID, System: q.RootBacking.Envelope.SystemObjects}
-	plan, err := app.CompileRootBacking(q.RootBacking, pool)
+	plan, err := app.CompileRootBacking(q.RootBacking)
 	if err != nil {
 		t.Fatal(err)
 	}

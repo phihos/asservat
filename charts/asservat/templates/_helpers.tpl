@@ -262,20 +262,22 @@ checksum/config: {{ $sum | sha256sum | quote }}
 {{- if ne .Values.mode "cluster" }}true{{ end -}}
 {{- end -}}
 
-{{/* The resolved `capacity` values (contracts.CapacityValues), or empty when
-     capacity is off. It runs in the hub when any capacity value is set;
-     evidenceStorage defaults to the bundled store's volume size and is
-     required for an external store. */}}
+{{/* The resolved `capacity` values (contracts.CapacityValues). Capacity
+     runs in every hub (ADR-335 D1). evidenceStorage defaults to the bundled
+     store's volume size and is required for an external store;
+     capturesPerCluster defaults to the larger of 8 and the node count. */}}
 {{- define "asservat.capacity" -}}
 {{- if include "asservat.hub" . -}}
 {{- $c := deepCopy (default dict .Values.capacity) -}}
 {{- $bundled := eq (dig "objectStore" "provider" "external" (default dict .Values.services)) "seaweedfs" -}}
-{{- if $c -}}
 {{- if not $c.evidenceStorage -}}
 {{- if not $bundled }}{{ fail "capacity.evidenceStorage is required with an external object store" }}{{ end -}}
 {{- $_ := set $c "evidenceStorage" .Values.services.objectStore.seaweedfs.persistence.size -}}
 {{- end -}}
-{{- toJson $c -}}
+{{- if not $c.capturesPerCluster -}}
+{{- $nodes := lookup "v1" "Node" "" "" -}}
+{{- $_ := set $c "capturesPerCluster" (max 8 (len (default list (dig "items" list (default dict $nodes))))) -}}
 {{- end -}}
+{{- toJson $c -}}
 {{- end -}}
 {{- end -}}

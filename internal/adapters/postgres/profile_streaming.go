@@ -33,11 +33,11 @@ func reserveProfileStreamLocked(ctx context.Context, q *custodydb.Queries, r art
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return err
 	}
-	changed, err := q.ChargeStreaming(ctx, custodydb.ChargeStreamingParams{ID: id(r.AllocationID), ChargedBytes: plan.TemporaryBytes(), ChargedObjects: int64(1 + plan.PartLimit())})
+	charged, err := q.ChargeStreaming(ctx, custodydb.ChargeStreamingParams{ID: id(r.AllocationID), ChargedBytes: plan.TemporaryBytes(), ChargedObjects: int64(1 + plan.PartLimit())})
 	if err != nil {
 		return err
 	}
-	if changed != 1 {
+	if !charged {
 		return privacy.ErrCapacity
 	}
 	state, err := json.Marshal(artifact.StreamingState{})

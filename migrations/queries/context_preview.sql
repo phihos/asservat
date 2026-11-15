@@ -48,9 +48,6 @@ DELETE FROM context_preview_fence WHERE (root_id,preview_id,actor_key) IN (
  ORDER BY f.expires_at,f.preview_id LIMIT 1000
 );
 
--- name: DemandCapacityRefresh :exec
-SELECT demand_capacity_refresh(sqlc.arg(root_id)::uuid,sqlc.arg(cluster_id)::uuid,sqlc.arg(namespace_uid)::text,sqlc.arg(namespace_name)::text,sqlc.arg(workload_kind)::text,sqlc.arg(workload_name)::text,sqlc.arg(workload_uid)::text);
-
 -- name: ContextPreviewReadUntil :one
 SELECT context_preview_read_until(sqlc.arg(root_id)::uuid,sqlc.arg(preview_id)::uuid)::timestamptz;
 

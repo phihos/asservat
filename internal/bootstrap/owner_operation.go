@@ -7,11 +7,9 @@ import (
 	"time"
 
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
-	"asservat.local/asservat/internal/adapters/mounts"
 	"asservat.local/asservat/internal/adapters/mtls"
 	"asservat.local/asservat/internal/adapters/postgres"
 	"asservat.local/asservat/internal/contracts"
-	cfg "asservat.local/asservat/internal/domain/configuration"
 	value "asservat.local/asservat/internal/domain/fleet"
 	wire "asservat.local/asservat/internal/transport/clusterobservation"
 	native "asservat.local/asservat/internal/transport/native"
@@ -122,66 +120,3 @@ func (o *ownerOperationServing) close() {
 // ownerOperationConfig builds the v2 server's input from the guarded catalog
 // (ADR-197 decisions 1 and 7). It first records each regional capacity
 // cluster's write-once capacity qualification. A promoted owner without a
-// regional capacity entry serves none.
-func (d *OwnerDeployment) ownerOperationConfig(ctx context.Context, in *ownerInputs, c contracts.OwnerDeployment, pin value.OwnerObservationPin, catalog publicCatalog, guard *kube.OwnerWorkloadProtection, owners *postgres.OwnerEnrollments) (*OwnerOperationConfig, error) {
-	var regional []contracts.OwnerPublicCluster
-	for _, v := range catalog.catalog.Clusters {
-		if v.Capacity != nil {
-			regional = append(regional, v)
-		}
-	}
-	if len(regional) == 0 {
-		return nil, nil
-	}
-	if len(regional) > contracts.OwnerClusterCatalogSlots || pin.Pool.OperationPort == 0 || c.Observation == nil || c.Observation.LocalCapacity == nil || owners == nil {
-		return nil, mounts.ErrUnavailable
-	}
-	pool, err := d.public.open(ctx, "regional-capacity")
-	if err != nil {
-		return nil, err
-	}
-	qualifications, err := postgres.NewCapacityClusterQualifications(ctx, pool, c.PermissionRootID)
-	if err != nil {
-		return nil, mounts.ErrUnavailable
-	}
-	out := &OwnerOperationConfig{Pin: pin, Owners: owners}
-	for _, v := range regional {
-		profile, roles, err := publicConnectorIdentity(v, c.PermissionRootID, c.InstallationID)
-		if err != nil {
-			return nil, err
-		}
-		k := v.Capacity
-		template, a := publicDigest(k.TemplateDigest)
-		protection, b := publicDigest(k.ProtectionDigest)
-		guardDigest, g := publicDigest(k.NamespaceGuardDigest)
-		if !a || !b || !g {
-			return nil, mounts.ErrUnavailable
-		}
-		if err = qualifications.QualifyCapacityCluster(ctx, v.ClusterID, profile.Binding.PeerID, profile.Binding.IssuerEpoch, guardDigest, k.Keys); err != nil {
-			return nil, err
-		}
-		r := RegionalObservationOperationCluster{Pin: value.ConnectorObservationPin{Profile: profile, Roles: roles, TemplateDigest: template, ProtectionDigest: protection}}
-		if r.Registry, err = postgres.NewConnectorObservationOperationRegistry(d.root, pool, r.Pin); err != nil {
-			return nil, mounts.ErrUnavailable
-		}
-		out.Regional = append(out.Regional, r)
-	}
-	// The holder's proofs use their own client instances of the same
-	// identities, each at the fixed 20 QPS: a regional observation can never
-	// spend the owner identity's or the local cluster's API budget.
-	control := cfg.NamespaceRef{Name: c.Namespace.Name, UID: c.Namespace.UID}
-	observerConfig := in.kubernetes("kube-observer.token")
-	observerConfig.Wrap(d.operationStats.wrap)
-	observer, err := kube.NewPermissionClient(observerConfig, c.ClusterID, control, time.Now)
-	if err != nil {
-		return nil, mounts.ErrUnavailable
-	}
-	own, err := guard.WithClients(observer, nil)
-	if err != nil {
-		return nil, mounts.ErrUnavailable
-	}
-	if out.Proof, err = kube.NewOwnerLocalObservationOperationReader(observer, own, pin, ownerCapacityCaller(c)); err != nil {
-		return nil, mounts.ErrUnavailable
-	}
-	return out, nil
-}

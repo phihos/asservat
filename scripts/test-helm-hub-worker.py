@@ -23,7 +23,7 @@ spec = importlib.util.spec_from_file_location("helm_checks", Path(__file__).with
 helm = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(helm)
 
-CONFIG_KEYS = {"format", "namespace", "serviceAccount", "fleetSource", "ownerSource", "leaderLease", "postgres", "auditStore", "keyService", "provider", "permission"}
+CONFIG_KEYS = {"format", "namespace", "serviceAccount", "fleetSource", "ownerSource", "leaderLease", "postgres", "auditStore", "keyService", "provider", "permission", "capacity", "cleanup"}
 KEEP = ("_", "hub-worker-", "hub-retention-baseline.yaml", "provider-roots.yaml", "download-worker.yaml")
 FULL = os.environ.get("ASSERVAT_HELM_FULL") == "1"
 
@@ -75,10 +75,10 @@ class HubWorkerChart(unittest.TestCase):
             self.external["services"][s]["provider"] = "external"
         self.external["services"]["identity"] = {"provider": "external"}
         self.external["identity"] = {"issuer": "https://id.example/realms/org", "clientID": "console"}
-        # The shared fixtures carry capacity for the hub-api's combined-mode
-        # offer; these checks start without it.
-        for v in (self.bundled, self.external):
-            v.pop("capacity", None)
+        # Capacity is on by default (ADR-335 D1); an external object store
+        # needs its size.
+        self.bundled.pop("capacity", None)
+        self.external["capacity"] = {"evidenceStorage": "8Gi"}
 
     def render(self, values, *, ok=True, namespace="asservat-system"):
         path = Path(self.directory.name) / "values.yaml"
@@ -186,7 +186,7 @@ class HubWorkerChart(unittest.TestCase):
         docs = self.render(values)
         w = self.worker(docs)
         c = self.config(w)
-        self.assertEqual(set(c), CONFIG_KEYS | {"capacity", "cleanup"})
+        self.assertEqual(set(c), CONFIG_KEYS)
         self.assertEqual(c["cleanup"], {})
         self.assertEqual(c["capacity"]["processingSource"], "asservat-processing-source")
         self.assertEqual((c["capacity"]["paths"], c["capacity"]["sharedQueries"]), ([], True))
@@ -203,7 +203,7 @@ class HubWorkerChart(unittest.TestCase):
         self.assertFalse([d for d in docs if d["kind"] in ("EvidenceStoragePool", "EvidenceBudgetPolicy")])
         retention, = [d for d in docs if d["kind"] == "EvidenceRetentionPolicy"]
         self.assertEqual((retention["metadata"]["name"], retention["spec"]["legalExceptions"]), ("asservat-baseline", "disabled"))
-        self.assertIn({"apiGroups": [""], "resources": ["pods"], "verbs": ["get", "list", "watch"]}, w["ClusterRole"]["rules"])
+        self.assertNotIn({"apiGroups": [""], "resources": ["pods"], "verbs": ["get", "list", "watch"]}, w["ClusterRole"]["rules"])
         self.decode(c)
 
     def test_not_rendered_for_cluster_mode(self):

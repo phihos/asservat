@@ -15,10 +15,9 @@ const (
 	RootBackingFormat  = "protected-capacity-root/v1"
 	RootMetadataLayout = "capacity-root-history/v1"
 	RootBackingBytes   = 64 << 10
-	// This is a conservative implementation ceiling. Native qualification must
-	// establish worst-case lock and transaction timing before enablement; the
-	// unrelated 512-session arithmetic boundary is not a measured capacity.
-	MaxManagedCapacityAccounts = int64(16)
+	// The SQL operation_audit_pool account bound: one capture account per
+	// enrolled workload.
+	MaxManagedCapacityAccounts = int64(1000000)
 )
 
 // RootMetadataQualification covers the complete fixed source/parent graph,
@@ -121,13 +120,13 @@ func (p RootBackingPlan) Totals() RootBackingTotals            { return p.totals
 // not observe a source pool or accept that envelope; CompileQualifiedRootBacking
 // must still match the independently accepted actual pool before funding it.
 func ValidateRootBackingInput(in RootBackingInput) bool {
-	_, err := CompileRootBacking(in, ProtectedPoolPlan{Format: ProtectedPoolPlanFormat, UID: in.SystemPoolUID, System: in.Envelope.SystemObjects})
+	_, err := CompileRootBacking(in)
 	return err == nil
 }
 
-func CompileRootBacking(in RootBackingInput, systemPool ProtectedPoolPlan) (RootBackingPlan, error) {
+func CompileRootBacking(in RootBackingInput) (RootBackingPlan, error) {
 	var zero RootBackingPlan
-	if in.Format != RootBackingFormat || !authorization.UUID(in.RootID) || !authorization.UUID(in.InstallationID) || !authorization.UUID(in.QualificationID) || in.QualificationDigest == (artifact.Digest{}) || !identity.Text(in.SystemPoolUID, 64) || !identity.Text(in.AccountVersion, 64) || in.Accounts < 1 || in.Accounts > MaxManagedCapacityAccounts || in.RecordsPerAccount < 1 || in.RecordsPerAccount > artifact.MaxDownloadResponses/contextDownloadResponses || in.AdmissionSeconds < 60 || in.AdmissionSeconds > 86400 || !authorization.UUID(in.ProcessingEpoch) || !authorization.UUID(in.ProcessingSourceUID) || in.ProcessingProtectionDigest == (artifact.Digest{}) || !in.Metadata.Valid() || systemPool.Format != ProtectedPoolPlanFormat || systemPool.UID != in.SystemPoolUID || !systemPool.System.positive() {
+	if in.Format != RootBackingFormat || !authorization.UUID(in.RootID) || !authorization.UUID(in.InstallationID) || !authorization.UUID(in.QualificationID) || in.QualificationDigest == (artifact.Digest{}) || !identity.Text(in.SystemPoolUID, 64) || !identity.Text(in.AccountVersion, 64) || in.Accounts < 1 || in.Accounts > MaxManagedCapacityAccounts || in.RecordsPerAccount < 1 || in.RecordsPerAccount > artifact.MaxDownloadRequests/contextDownloadResponses || in.AdmissionSeconds < 60 || in.AdmissionSeconds > 86400 || !authorization.UUID(in.ProcessingEpoch) || !authorization.UUID(in.ProcessingSourceUID) || in.ProcessingProtectionDigest == (artifact.Digest{}) || !in.Metadata.Valid() {
 		return zero, ErrBudgetInvalid
 	}
 	for _, x := range []struct {
@@ -239,7 +238,7 @@ func CompileRootBacking(in RootBackingInput, systemPool ProtectedPoolPlan) (Root
 	if !add(&t.SQLBytes, t.Records, in.ContextHistory.Capture.MaximumRowFootprintBytes) || !add(&t.SQLBytes, t.Records, in.ContextHistory.Stop.MaximumRowFootprintBytes) || !add(&t.SQLBytes, in.Accounts, work.NativeRows+work.NativeKeys, in.ContextHistory.Native.RowBytes) {
 		return zero, ErrBudgetInvalid
 	}
-	if !systemPool.System.contains(t.SystemObjects) || !in.Envelope.SystemObjects.contains(t.SystemObjects) || in.Envelope.SQLBytes < t.SQLBytes || in.Envelope.BackupBytes < t.BackupBytes || in.Envelope.WALBytes < t.WALBytes || in.Envelope.KeyAttempts < t.KeyAttempts {
+	if !in.Envelope.SystemObjects.contains(t.SystemObjects) || in.Envelope.SQLBytes < t.SQLBytes || in.Envelope.BackupBytes < t.BackupBytes || in.Envelope.WALBytes < t.WALBytes || in.Envelope.KeyAttempts < t.KeyAttempts {
 		return zero, ErrBudgetFull
 	}
 	wire := struct {

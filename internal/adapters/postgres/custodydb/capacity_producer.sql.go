@@ -11,243 +11,83 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const acceptCapacitySource = `-- name: AcceptCapacitySource :one
-SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+const applyCapacity = `-- name: ApplyCapacity :one
+SELECT capacity_apply($1::uuid,$2::uuid,$3::text,$4::text,$5::jsonb,$6::jsonb)::jsonb AS applied
 `
 
-type AcceptCapacitySourceParams struct {
-	RootID              pgtype.UUID
-	ExpectedRevision    int64
-	ObservationValue    []byte
-	ProtectionValue     []byte
-	RecoveryValue       []byte
-	QualificationID     pgtype.UUID
-	QualificationDigest []byte
+type ApplyCapacityParams struct {
+	RootID         pgtype.UUID
+	ClusterID      pgtype.UUID
+	NamespaceUid   string
+	AccountVersion string
+	Qualification  []byte
+	SettingsValue  []byte
 }
 
-func (q *Queries) AcceptCapacitySource(ctx context.Context, arg AcceptCapacitySourceParams) ([]byte, error) {
-	row := q.db.QueryRow(ctx, acceptCapacitySource,
-		arg.RootID,
-		arg.ExpectedRevision,
-		arg.ObservationValue,
-		arg.ProtectionValue,
-		arg.RecoveryValue,
-		arg.QualificationID,
-		arg.QualificationDigest,
-	)
-	var acceptance []byte
-	err := row.Scan(&acceptance)
-	return acceptance, err
-}
-
-const backCapacityEnrollment = `-- name: BackCapacityEnrollment :one
-SELECT back_capacity_enrollment($1::uuid,$2::jsonb,$3::bytea,$4::bytea,$5::bytea,$6::jsonb)::jsonb AS enrollment
-`
-
-type BackCapacityEnrollmentParams struct {
-	RootID           pgtype.UUID
-	ObservationValue []byte
-	PlanCanonical    []byte
-	PoolCanonical    []byte
-	SourceCanonical  []byte
-	ExpectedValue    []byte
-}
-
-func (q *Queries) BackCapacityEnrollment(ctx context.Context, arg BackCapacityEnrollmentParams) ([]byte, error) {
-	row := q.db.QueryRow(ctx, backCapacityEnrollment,
-		arg.RootID,
-		arg.ObservationValue,
-		arg.PlanCanonical,
-		arg.PoolCanonical,
-		arg.SourceCanonical,
-		arg.ExpectedValue,
-	)
-	var enrollment []byte
-	err := row.Scan(&enrollment)
-	return enrollment, err
-}
-
-const backCapacityRoot = `-- name: BackCapacityRoot :one
-SELECT back_capacity_root($1::uuid,$2::jsonb,$3::bytea,$4::bytea,$5::jsonb)::jsonb AS result
-`
-
-type BackCapacityRootParams struct {
-	RootID           pgtype.UUID
-	ObservationValue []byte
-	PlanCanonical    []byte
-	PoolCanonical    []byte
-	ExpectedValue    []byte
-}
-
-func (q *Queries) BackCapacityRoot(ctx context.Context, arg BackCapacityRootParams) ([]byte, error) {
-	row := q.db.QueryRow(ctx, backCapacityRoot,
-		arg.RootID,
-		arg.ObservationValue,
-		arg.PlanCanonical,
-		arg.PoolCanonical,
-		arg.ExpectedValue,
-	)
-	var result []byte
-	err := row.Scan(&result)
-	return result, err
-}
-
-const continueCapacityCapture = `-- name: ContinueCapacityCapture :one
-SELECT continue_capacity_capture($1::uuid,$2::jsonb,$3::bytea,$4::bytea,$5::bytea,$6::jsonb)::jsonb AS enrollment
-`
-
-type ContinueCapacityCaptureParams struct {
-	RootID           pgtype.UUID
-	ObservationValue []byte
-	PlanCanonical    []byte
-	PoolCanonical    []byte
-	SourceCanonical  []byte
-	ExpectedValue    []byte
-}
-
-func (q *Queries) ContinueCapacityCapture(ctx context.Context, arg ContinueCapacityCaptureParams) ([]byte, error) {
-	row := q.db.QueryRow(ctx, continueCapacityCapture,
-		arg.RootID,
-		arg.ObservationValue,
-		arg.PlanCanonical,
-		arg.PoolCanonical,
-		arg.SourceCanonical,
-		arg.ExpectedValue,
-	)
-	var enrollment []byte
-	err := row.Scan(&enrollment)
-	return enrollment, err
-}
-
-const continueCapacityPublication = `-- name: ContinueCapacityPublication :one
-SELECT continue_capacity_publication($1::uuid,$2::jsonb,$3::bytea,$4::bytea,$5::bytea,$6::jsonb)::jsonb AS enrollment
-`
-
-type ContinueCapacityPublicationParams struct {
-	RootID           pgtype.UUID
-	ObservationValue []byte
-	PlanCanonical    []byte
-	PoolCanonical    []byte
-	SourceCanonical  []byte
-	ExpectedValue    []byte
-}
-
-func (q *Queries) ContinueCapacityPublication(ctx context.Context, arg ContinueCapacityPublicationParams) ([]byte, error) {
-	row := q.db.QueryRow(ctx, continueCapacityPublication,
-		arg.RootID,
-		arg.ObservationValue,
-		arg.PlanCanonical,
-		arg.PoolCanonical,
-		arg.SourceCanonical,
-		arg.ExpectedValue,
-	)
-	var enrollment []byte
-	err := row.Scan(&enrollment)
-	return enrollment, err
-}
-
-const invalidateCapacitySource = `-- name: InvalidateCapacitySource :one
-SELECT invalidate_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::timestamptz,$5::timestamptz)::boolean AS invalidated
-`
-
-type InvalidateCapacitySourceParams struct {
-	RootID           pgtype.UUID
-	ExpectedRevision int64
-	RecoveryValue    []byte
-	ObservedAt       pgtype.Timestamptz
-	FreshUntil       pgtype.Timestamptz
-}
-
-func (q *Queries) InvalidateCapacitySource(ctx context.Context, arg InvalidateCapacitySourceParams) (bool, error) {
-	row := q.db.QueryRow(ctx, invalidateCapacitySource,
-		arg.RootID,
-		arg.ExpectedRevision,
-		arg.RecoveryValue,
-		arg.ObservedAt,
-		arg.FreshUntil,
-	)
-	var invalidated bool
-	err := row.Scan(&invalidated)
-	return invalidated, err
-}
-
-const publishCapacityEnrollment = `-- name: PublishCapacityEnrollment :one
-SELECT publish_capacity_enrollment($1::uuid,$2::jsonb,$3::bytea,$4::bytea,$5::bytea,$6::jsonb)::jsonb AS enrollment
-`
-
-type PublishCapacityEnrollmentParams struct {
-	RootID           pgtype.UUID
-	ObservationValue []byte
-	PlanCanonical    []byte
-	PoolCanonical    []byte
-	SourceCanonical  []byte
-	ExpectedValue    []byte
-}
-
-func (q *Queries) PublishCapacityEnrollment(ctx context.Context, arg PublishCapacityEnrollmentParams) ([]byte, error) {
-	row := q.db.QueryRow(ctx, publishCapacityEnrollment,
-		arg.RootID,
-		arg.ObservationValue,
-		arg.PlanCanonical,
-		arg.PoolCanonical,
-		arg.SourceCanonical,
-		arg.ExpectedValue,
-	)
-	var enrollment []byte
-	err := row.Scan(&enrollment)
-	return enrollment, err
-}
-
-const publishCapacityRoot = `-- name: PublishCapacityRoot :one
-SELECT publish_capacity_root($1::uuid,$2::jsonb,$3::bytea,$4::bytea,$5::jsonb)::jsonb AS result
-`
-
-type PublishCapacityRootParams struct {
-	RootID           pgtype.UUID
-	ObservationValue []byte
-	PlanCanonical    []byte
-	PoolCanonical    []byte
-	ExpectedValue    []byte
-}
-
-func (q *Queries) PublishCapacityRoot(ctx context.Context, arg PublishCapacityRootParams) ([]byte, error) {
-	row := q.db.QueryRow(ctx, publishCapacityRoot,
-		arg.RootID,
-		arg.ObservationValue,
-		arg.PlanCanonical,
-		arg.PoolCanonical,
-		arg.ExpectedValue,
-	)
-	var result []byte
-	err := row.Scan(&result)
-	return result, err
-}
-
-const qualifyCapacityCluster = `-- name: QualifyCapacityCluster :one
-SELECT qualify_capacity_cluster($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::bytea,$6::jsonb)::boolean AS inserted
-`
-
-type QualifyCapacityClusterParams struct {
-	RootID      pgtype.UUID
-	ClusterID   pgtype.UUID
-	PeerID      pgtype.UUID
-	IssuerEpoch pgtype.UUID
-	GuardDigest []byte
-	GuardKeys   []byte
-}
-
-func (q *Queries) QualifyCapacityCluster(ctx context.Context, arg QualifyCapacityClusterParams) (bool, error) {
-	row := q.db.QueryRow(ctx, qualifyCapacityCluster,
+func (q *Queries) ApplyCapacity(ctx context.Context, arg ApplyCapacityParams) ([]byte, error) {
+	row := q.db.QueryRow(ctx, applyCapacity,
 		arg.RootID,
 		arg.ClusterID,
-		arg.PeerID,
-		arg.IssuerEpoch,
-		arg.GuardDigest,
-		arg.GuardKeys,
+		arg.NamespaceUid,
+		arg.AccountVersion,
+		arg.Qualification,
+		arg.SettingsValue,
 	)
-	var inserted bool
-	err := row.Scan(&inserted)
-	return inserted, err
+	var applied []byte
+	err := row.Scan(&applied)
+	return applied, err
+}
+
+const enrollCapacity = `-- name: EnrollCapacity :one
+SELECT capacity_enroll($1::uuid,$2::uuid,$3::text,$4::text,$5::uuid,$6::uuid,$7::bytea)::uuid AS allocation_id
+`
+
+type EnrollCapacityParams struct {
+	RootID               pgtype.UUID
+	ClusterID            pgtype.UUID
+	NamespaceUid         string
+	WorkloadUid          string
+	AllocationID         pgtype.UUID
+	DownloadAllocationID pgtype.UUID
+	AccountDigest        []byte
+}
+
+func (q *Queries) EnrollCapacity(ctx context.Context, arg EnrollCapacityParams) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, enrollCapacity,
+		arg.RootID,
+		arg.ClusterID,
+		arg.NamespaceUid,
+		arg.WorkloadUid,
+		arg.AllocationID,
+		arg.DownloadAllocationID,
+		arg.AccountDigest,
+	)
+	var allocation_id pgtype.UUID
+	err := row.Scan(&allocation_id)
+	return allocation_id, err
+}
+
+const readCapacityAccount = `-- name: ReadCapacityAccount :one
+SELECT allocation_id FROM capacity_account WHERE root_id=$1 AND cluster_id=$2 AND namespace_uid=$3 AND workload_uid=$4
+`
+
+type ReadCapacityAccountParams struct {
+	RootID       pgtype.UUID
+	ClusterID    pgtype.UUID
+	NamespaceUid string
+	WorkloadUid  string
+}
+
+func (q *Queries) ReadCapacityAccount(ctx context.Context, arg ReadCapacityAccountParams) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, readCapacityAccount,
+		arg.RootID,
+		arg.ClusterID,
+		arg.NamespaceUid,
+		arg.WorkloadUid,
+	)
+	var allocation_id pgtype.UUID
+	err := row.Scan(&allocation_id)
+	return allocation_id, err
 }
 
 const readCapacityAuditProfiles = `-- name: ReadCapacityAuditProfiles :one
@@ -279,175 +119,6 @@ func (q *Queries) ReadCapacityAuditProfiles(ctx context.Context, arg ReadCapacit
 	return profiles, err
 }
 
-const readCapacityCaptureEnrollment = `-- name: ReadCapacityCaptureEnrollment :one
-SELECT read_capacity_capture_enrollment($1::uuid,$2::jsonb,$3::bytea,$4::bytea,$5::bytea)::jsonb AS enrollment
-`
-
-type ReadCapacityCaptureEnrollmentParams struct {
-	RootID           pgtype.UUID
-	ObservationValue []byte
-	PlanCanonical    []byte
-	PoolCanonical    []byte
-	SourceCanonical  []byte
-}
-
-func (q *Queries) ReadCapacityCaptureEnrollment(ctx context.Context, arg ReadCapacityCaptureEnrollmentParams) ([]byte, error) {
-	row := q.db.QueryRow(ctx, readCapacityCaptureEnrollment,
-		arg.RootID,
-		arg.ObservationValue,
-		arg.PlanCanonical,
-		arg.PoolCanonical,
-		arg.SourceCanonical,
-	)
-	var enrollment []byte
-	err := row.Scan(&enrollment)
-	return enrollment, err
-}
-
-const readCapacityClusterQualifications = `-- name: ReadCapacityClusterQualifications :one
-SELECT read_capacity_cluster_qualifications($1::uuid)::jsonb AS qualifications
-`
-
-func (q *Queries) ReadCapacityClusterQualifications(ctx context.Context, rootID pgtype.UUID) ([]byte, error) {
-	row := q.db.QueryRow(ctx, readCapacityClusterQualifications, rootID)
-	var qualifications []byte
-	err := row.Scan(&qualifications)
-	return qualifications, err
-}
-
-const readCapacityEnrollment = `-- name: ReadCapacityEnrollment :one
-SELECT read_capacity_enrollment($1::uuid,$2::jsonb,$3::bytea,$4::bytea,$5::bytea)::jsonb AS enrollment
-`
-
-type ReadCapacityEnrollmentParams struct {
-	RootID           pgtype.UUID
-	ObservationValue []byte
-	PlanCanonical    []byte
-	PoolCanonical    []byte
-	SourceCanonical  []byte
-}
-
-func (q *Queries) ReadCapacityEnrollment(ctx context.Context, arg ReadCapacityEnrollmentParams) ([]byte, error) {
-	row := q.db.QueryRow(ctx, readCapacityEnrollment,
-		arg.RootID,
-		arg.ObservationValue,
-		arg.PlanCanonical,
-		arg.PoolCanonical,
-		arg.SourceCanonical,
-	)
-	var enrollment []byte
-	err := row.Scan(&enrollment)
-	return enrollment, err
-}
-
-const readCapacityPermissionScopes = `-- name: ReadCapacityPermissionScopes :one
-SELECT read_capacity_permission_scopes($1::uuid,$2::jsonb)::jsonb AS scope_json
-`
-
-type ReadCapacityPermissionScopesParams struct {
-	RootID        pgtype.UUID
-	RecoveryValue []byte
-}
-
-func (q *Queries) ReadCapacityPermissionScopes(ctx context.Context, arg ReadCapacityPermissionScopesParams) ([]byte, error) {
-	row := q.db.QueryRow(ctx, readCapacityPermissionScopes, arg.RootID, arg.RecoveryValue)
-	var scope_json []byte
-	err := row.Scan(&scope_json)
-	return scope_json, err
-}
-
-const readCapacityRecovery = `-- name: ReadCapacityRecovery :one
-SELECT read_capacity_recovery($1::uuid,$2::timestamptz,$3::timestamptz)::jsonb AS recovery
-`
-
-type ReadCapacityRecoveryParams struct {
-	RootID     pgtype.UUID
-	ObservedAt pgtype.Timestamptz
-	FreshUntil pgtype.Timestamptz
-}
-
-func (q *Queries) ReadCapacityRecovery(ctx context.Context, arg ReadCapacityRecoveryParams) ([]byte, error) {
-	row := q.db.QueryRow(ctx, readCapacityRecovery, arg.RootID, arg.ObservedAt, arg.FreshUntil)
-	var recovery []byte
-	err := row.Scan(&recovery)
-	return recovery, err
-}
-
-const readCapacityRefreshDemands = `-- name: ReadCapacityRefreshDemands :one
-SELECT read_capacity_refresh_demands($1::uuid)::jsonb AS demands
-`
-
-func (q *Queries) ReadCapacityRefreshDemands(ctx context.Context, rootID pgtype.UUID) ([]byte, error) {
-	row := q.db.QueryRow(ctx, readCapacityRefreshDemands, rootID)
-	var demands []byte
-	err := row.Scan(&demands)
-	return demands, err
-}
-
-const readCapacityRoot = `-- name: ReadCapacityRoot :one
-SELECT read_capacity_root($1::uuid,$2::jsonb,$3::bytea,$4::bytea)::jsonb AS result
-`
-
-type ReadCapacityRootParams struct {
-	RootID           pgtype.UUID
-	ObservationValue []byte
-	PlanCanonical    []byte
-	PoolCanonical    []byte
-}
-
-func (q *Queries) ReadCapacityRoot(ctx context.Context, arg ReadCapacityRootParams) ([]byte, error) {
-	row := q.db.QueryRow(ctx, readCapacityRoot,
-		arg.RootID,
-		arg.ObservationValue,
-		arg.PlanCanonical,
-		arg.PoolCanonical,
-	)
-	var result []byte
-	err := row.Scan(&result)
-	return result, err
-}
-
-const readCapacityRuntimeScope = `-- name: ReadCapacityRuntimeScope :one
-SELECT read_capacity_runtime_scope($1::uuid,$2::jsonb,$3::jsonb,$4::timestamptz,$5::timestamptz)::timestamptz AS until_at
-`
-
-type ReadCapacityRuntimeScopeParams struct {
-	RootID             pgtype.UUID
-	ExpectedValue      []byte
-	QualificationValue []byte
-	ObservedAt         pgtype.Timestamptz
-	FreshUntil         pgtype.Timestamptz
-}
-
-func (q *Queries) ReadCapacityRuntimeScope(ctx context.Context, arg ReadCapacityRuntimeScopeParams) (pgtype.Timestamptz, error) {
-	row := q.db.QueryRow(ctx, readCapacityRuntimeScope,
-		arg.RootID,
-		arg.ExpectedValue,
-		arg.QualificationValue,
-		arg.ObservedAt,
-		arg.FreshUntil,
-	)
-	var until_at pgtype.Timestamptz
-	err := row.Scan(&until_at)
-	return until_at, err
-}
-
-const readCapacitySourceRevision = `-- name: ReadCapacitySourceRevision :one
-SELECT read_capacity_source_revision($1::uuid,$2::jsonb)::bigint AS revision
-`
-
-type ReadCapacitySourceRevisionParams struct {
-	RootID        pgtype.UUID
-	RecoveryValue []byte
-}
-
-func (q *Queries) ReadCapacitySourceRevision(ctx context.Context, arg ReadCapacitySourceRevisionParams) (int64, error) {
-	row := q.db.QueryRow(ctx, readCapacitySourceRevision, arg.RootID, arg.RecoveryValue)
-	var revision int64
-	err := row.Scan(&revision)
-	return revision, err
-}
-
 const readManagedCapacityAdmission = `-- name: ReadManagedCapacityAdmission :one
 SELECT capacity_managed_admission_until($1::uuid,$2::uuid,$3::text,clock_timestamp())::timestamptz AS until_at
 `
@@ -463,116 +134,4 @@ func (q *Queries) ReadManagedCapacityAdmission(ctx context.Context, arg ReadMana
 	var until_at pgtype.Timestamptz
 	err := row.Scan(&until_at)
 	return until_at, err
-}
-
-const refreshCapacityEnrollment = `-- name: RefreshCapacityEnrollment :one
-SELECT refresh_capacity_enrollment($1::uuid,$2::jsonb,$3::bytea,$4::bytea,$5::bytea,$6::jsonb)::jsonb AS enrollment
-`
-
-type RefreshCapacityEnrollmentParams struct {
-	RootID           pgtype.UUID
-	ObservationValue []byte
-	PlanCanonical    []byte
-	PoolCanonical    []byte
-	SourceCanonical  []byte
-	ExpectedValue    []byte
-}
-
-func (q *Queries) RefreshCapacityEnrollment(ctx context.Context, arg RefreshCapacityEnrollmentParams) ([]byte, error) {
-	row := q.db.QueryRow(ctx, refreshCapacityEnrollment,
-		arg.RootID,
-		arg.ObservationValue,
-		arg.PlanCanonical,
-		arg.PoolCanonical,
-		arg.SourceCanonical,
-		arg.ExpectedValue,
-	)
-	var enrollment []byte
-	err := row.Scan(&enrollment)
-	return enrollment, err
-}
-
-const renewCapacityRoot = `-- name: RenewCapacityRoot :one
-SELECT renew_capacity_root($1::uuid,$2::jsonb,$3::bytea,$4::bytea,$5::jsonb)::jsonb AS result
-`
-
-type RenewCapacityRootParams struct {
-	RootID           pgtype.UUID
-	ObservationValue []byte
-	PlanCanonical    []byte
-	PoolCanonical    []byte
-	ExpectedValue    []byte
-}
-
-func (q *Queries) RenewCapacityRoot(ctx context.Context, arg RenewCapacityRootParams) ([]byte, error) {
-	row := q.db.QueryRow(ctx, renewCapacityRoot,
-		arg.RootID,
-		arg.ObservationValue,
-		arg.PlanCanonical,
-		arg.PoolCanonical,
-		arg.ExpectedValue,
-	)
-	var result []byte
-	err := row.Scan(&result)
-	return result, err
-}
-
-const reserveCapacityEnrollment = `-- name: ReserveCapacityEnrollment :one
-SELECT reserve_capacity_enrollment($1::uuid,$2::jsonb,$3::bytea,$4::bytea,$5::bytea,$6::uuid,$7::uuid,$8::uuid,$9::uuid,$10::bytea)::jsonb AS enrollment
-`
-
-type ReserveCapacityEnrollmentParams struct {
-	RootID               pgtype.UUID
-	ObservationValue     []byte
-	PlanCanonical        []byte
-	PoolCanonical        []byte
-	SourceCanonical      []byte
-	AccountID            pgtype.UUID
-	AttemptID            pgtype.UUID
-	AllocationID         pgtype.UUID
-	DownloadAllocationID pgtype.UUID
-	AccountDigest        []byte
-}
-
-func (q *Queries) ReserveCapacityEnrollment(ctx context.Context, arg ReserveCapacityEnrollmentParams) ([]byte, error) {
-	row := q.db.QueryRow(ctx, reserveCapacityEnrollment,
-		arg.RootID,
-		arg.ObservationValue,
-		arg.PlanCanonical,
-		arg.PoolCanonical,
-		arg.SourceCanonical,
-		arg.AccountID,
-		arg.AttemptID,
-		arg.AllocationID,
-		arg.DownloadAllocationID,
-		arg.AccountDigest,
-	)
-	var enrollment []byte
-	err := row.Scan(&enrollment)
-	return enrollment, err
-}
-
-const reserveCapacityRoot = `-- name: ReserveCapacityRoot :one
-SELECT reserve_capacity_root($1::uuid,$2::jsonb,$3::bytea,$4::bytea,$5::uuid)::jsonb AS result
-`
-
-type ReserveCapacityRootParams struct {
-	RootID           pgtype.UUID
-	ObservationValue []byte
-	PlanCanonical    []byte
-	PoolCanonical    []byte
-	AttemptID        pgtype.UUID
-}
-
-func (q *Queries) ReserveCapacityRoot(ctx context.Context, arg ReserveCapacityRootParams) ([]byte, error) {
-	row := q.db.QueryRow(ctx, reserveCapacityRoot,
-		arg.RootID,
-		arg.ObservationValue,
-		arg.PlanCanonical,
-		arg.PoolCanonical,
-		arg.AttemptID,
-	)
-	var result []byte
-	err := row.Scan(&result)
-	return result, err
 }

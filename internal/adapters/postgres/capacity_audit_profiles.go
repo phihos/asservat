@@ -57,8 +57,7 @@ func decodeCapacityAuditProfiles(raw []byte, now time.Time) (value.AcceptedCapac
 	if d.Decode(&extra) != io.EOF {
 		return out, app.ErrUnavailable
 	}
-	w, e := json.Marshal(out)
-	if e != nil || !capacitySameJSONFields(raw, w) || !out.Valid(now) {
+	if !out.Valid(now) {
 		return value.AcceptedCapacityAuditProfiles{}, app.ErrUnavailable
 	}
 	return out, nil

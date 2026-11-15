@@ -60,11 +60,11 @@ func (l *Ledger) RegisterStreaming(ctx context.Context, plan artifact.StreamingP
 			return privacy.ErrCapacity
 		}
 		temporaryObjects := int64(1 + plan.PartLimit())
-		changed, err := q.ChargeStreaming(ctx, custodydb.ChargeStreamingParams{ID: a.ID, ChargedBytes: r.ReservedBytes() + plan.TemporaryBytes(), ChargedObjects: 4 + temporaryObjects})
+		charged, err := q.ChargeStreaming(ctx, custodydb.ChargeStreamingParams{ID: a.ID, ChargedBytes: r.ReservedBytes() + plan.TemporaryBytes(), ChargedObjects: 4 + temporaryObjects})
 		if err != nil {
 			return err
 		}
-		if changed != 1 {
+		if !charged {
 			return privacy.ErrCapacity
 		}
 		if err = q.InsertAttempt(ctx, custodydb.InsertAttemptParams{ID: id(r.Location.AttemptID), ClusterID: id(r.Location.ClusterID), ArtifactID: id(r.Location.ArtifactID), AllocationID: a.ID, RequestDigest: digest(r), PoolRevision: r.PoolRevision, AllocationRevision: r.AllocationRevision, NativeLimit: r.NativeLimit, ReservedBytes: r.ReservedBytes(), AnchorAt: ts(r.AnchorAt), WriteUntil: ts(r.WriteUntil), ExpiresAt: ts(r.ExpiresAt), DeleteBy: ts(r.DeleteBy)}); err != nil {
@@ -152,8 +152,8 @@ func (l *Ledger) AdvanceStreaming(ctx context.Context, plan artifact.StreamingPl
 		released := pgtype.Timestamptz{}
 		if !next.ReleasedAt.IsZero() {
 			released = ts(next.ReleasedAt)
-			changed, e := q.ReleaseStreamingTemporary(ctx, custodydb.ReleaseStreamingTemporaryParams{ID: a.ID, ChargedBytes: stream.TemporaryBytes, ChargedObjects: stream.TemporaryObjects})
-			if e != nil || changed != 1 {
+			ok, e := q.ReleaseStreamingTemporary(ctx, custodydb.ReleaseStreamingTemporaryParams{ID: a.ID, ChargedBytes: stream.TemporaryBytes, ChargedObjects: stream.TemporaryObjects})
+			if e != nil || !ok {
 				return privacy.ErrUnavailable
 			}
 		}
@@ -219,11 +219,11 @@ func releaseStreamWithAttempt(ctx context.Context, q *custodydb.Queries, allocat
 	if err != nil {
 		return err
 	}
-	changed, err := q.ReleaseStreamingTemporary(ctx, custodydb.ReleaseStreamingTemporaryParams{ID: allocation, ChargedBytes: stream.TemporaryBytes, ChargedObjects: stream.TemporaryObjects})
-	if err != nil || changed != 1 {
+	ok, err := q.ReleaseStreamingTemporary(ctx, custodydb.ReleaseStreamingTemporaryParams{ID: allocation, ChargedBytes: stream.TemporaryBytes, ChargedObjects: stream.TemporaryObjects})
+	if err != nil || !ok {
 		return privacy.ErrUnavailable
 	}
-	changed, err = q.UpdateStream(ctx, custodydb.UpdateStreamParams{AttemptID: attempt, State: encoded, Revision: stream.Revision, ReleasedAt: ts(now)})
+	changed, err := q.UpdateStream(ctx, custodydb.UpdateStreamParams{AttemptID: attempt, State: encoded, Revision: stream.Revision, ReleasedAt: ts(now)})
 	if err != nil || changed != 1 {
 		return privacy.ErrUnavailable
 	}

@@ -56,6 +56,6 @@ DELETE FROM download_native_owner WHERE worker_id=$1 AND root_id=$2;
 DELETE FROM download_native_backing WHERE allocation_id=$1 AND root_id=$2;
 
 -- name: ReadSessionNativeBacking :one
-SELECT sqlc.embed(b), s.capacity_account_id, s.capacity_backing, s.capacity_backing_digest, s.deadline AS session_deadline FROM artifact_download s
+SELECT sqlc.embed(b), s.deadline AS session_deadline FROM artifact_download s
 JOIN download_native_backing b ON b.allocation_id=s.allocation_id AND b.root_id=s.root_id
 WHERE s.id=$1 AND s.root_id=$2;

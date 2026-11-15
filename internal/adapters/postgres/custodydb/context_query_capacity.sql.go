@@ -43,36 +43,6 @@ func (q *Queries) ContextQuerySharedProfileCurrent(ctx context.Context, arg Cont
 	return column_1, err
 }
 
-const ensureSharedContextQueryAllocation = `-- name: EnsureSharedContextQueryAllocation :exec
-SELECT ensure_shared_context_query_allocation($1::uuid,$2::uuid,$3::text,$4::text)
-`
-
-type EnsureSharedContextQueryAllocationParams struct {
-	RootID       pgtype.UUID
-	ClusterID    pgtype.UUID
-	NamespaceUid string
-	WorkloadUid  string
-}
-
-func (q *Queries) EnsureSharedContextQueryAllocation(ctx context.Context, arg EnsureSharedContextQueryAllocationParams) error {
-	_, err := q.db.Exec(ctx, ensureSharedContextQueryAllocation,
-		arg.RootID,
-		arg.ClusterID,
-		arg.NamespaceUid,
-		arg.WorkloadUid,
-	)
-	return err
-}
-
-const ensureSharedContextQueryCapacity = `-- name: EnsureSharedContextQueryCapacity :exec
-SELECT ensure_shared_context_query_capacity($1::uuid)
-`
-
-func (q *Queries) EnsureSharedContextQueryCapacity(ctx context.Context, rootID pgtype.UUID) error {
-	_, err := q.db.Exec(ctx, ensureSharedContextQueryCapacity, rootID)
-	return err
-}
-
 const lockContextQueryCapacity = `-- name: LockContextQueryCapacity :one
 SELECT lock_context_query_capacity($1::uuid,$2::uuid)::boolean
 `

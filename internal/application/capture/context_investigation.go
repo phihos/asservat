@@ -62,13 +62,6 @@ type ContextStorageReader interface {
 	ContextStorage(context.Context, authorization.Target) (ContextStorageObservation, error)
 }
 
-// ContextCapacityRefresh records a short-lived demand that the hub-worker
-// refresh one enrolled workload's binding (ADR-200). It names a workload and
-// confers no authority; the worker still performs every check.
-type ContextCapacityRefresh interface {
-	DemandCapacityRefresh(context.Context, targets.Request) error
-}
-
 // ContextInvestigation is the shared browser/MCP use case for the exact bounded
 // pod-status diagnostic. It does not dispatch work or publish/read evidence.
 type ContextInvestigation struct {
@@ -90,8 +83,7 @@ type ContextInvestigation struct {
 	Capabilities           ContextCapabilityReader
 	Retention              ContextRetentionResolver
 	Storage                ContextStorageReader
-	Refresh                ContextCapacityRefresh // optional (ADR-200)
-	Reviews                ContextAccessReviews   // optional (ADR-245)
+	Reviews                ContextAccessReviews // optional (ADR-245)
 	Processing             ContextProcessingCoverageReader
 	Recovery               fleetapp.RecoveryReader
 	ReasonCipher           auditapp.CaptureReasonCipher
@@ -329,7 +321,7 @@ func (s ContextInvestigation) plan(p value.ContextPreview, f contextFacts) (plan
 // Preview observes authorized metadata and writes only a bounded draft. It does
 // not reserve custody/storage, write acquisition intent or start a collector.
 func (s ContextInvestigation) Preview(ctx context.Context, source identities.CurrentIdentity, intent value.ContextIntent) (result ContextPreviewResult, failure error) {
-	return retryColdStorage(ctx, func() (ContextPreviewResult, error) { return s.preview(ctx, source, intent, nil) })
+	return s.preview(ctx, source, intent, nil)
 }
 
 // PreviewRepeat is Preview for "Collect again" (ADR-236): every current check
@@ -340,7 +332,7 @@ func (s ContextInvestigation) PreviewRepeat(ctx context.Context, source identiti
 	if !authorization.UUID(original.ClusterID) || !identity.Text(original.NamespaceUID, 64) || !identity.Text(original.WorkloadUID, 64) {
 		return ContextPreviewResult{}, previewFailure("repeat/original", value.ErrInvalid)
 	}
-	return retryColdStorage(ctx, func() (ContextPreviewResult, error) { return s.preview(ctx, source, intent, &original) })
+	return s.preview(ctx, source, intent, &original)
 }
 
 func (s ContextInvestigation) preview(ctx context.Context, source identities.CurrentIdentity, intent value.ContextIntent, original *authorization.Target) (result ContextPreviewResult, failure error) {
@@ -545,22 +537,9 @@ func (s ContextInvestigation) requestWithGroupBounds(ctx context.Context, source
 			storageWait.close()
 		}
 	}()
-	startStorageWait := func(includePreview bool) {
-		storageUntil, storageBound := p.Deadline, "preview"
-		if !includePreview {
-			storageUntil, storageBound = i.ValidUntil, "identity"
-		}
-		for _, bound := range []struct {
-			at   time.Time
-			name string
-		}{{i.ValidUntil, "identity"}, {recovery.FreshUntil, "recovery"}} {
-			if bound.at.Before(storageUntil) {
-				storageUntil, storageBound = bound.at, bound.name
-			}
-		}
+	startStorageWait := func(bool) {
 		auditapp.MarkStep(ctx, "q-pre-storage", preStorageStarted)
-		storageWait = s.beginStorageWait(ctx, targets.PodResolution{Request: p.Target}, storageUntil, p.Storage)
-		storageWait.bound = storageBound
+		storageWait = s.beginStorageWait(ctx, targets.PodResolution{Request: p.Target}, time.Time{}, p.Storage)
 	}
 	// ADR-243/249: a reviewed packet/syscall plan passes the approval gate
 	// before authority/admission (ApprovalRequired until a grant covers it).
@@ -894,13 +873,6 @@ func (s ContextInvestigation) requestWithGroupBounds(ctx context.Context, source
 	return a, nil
 }
 
-// This private marker distinguishes the final margin refusal without changing
-// the existing preview stage or public error classification.
-type contextStorageMarginRefusal struct{}
-
-func (contextStorageMarginRefusal) Error() string { return "context storage margin unavailable" }
-func (contextStorageMarginRefusal) Unwrap() error { return value.ErrUnavailable }
-
 func (s ContextInvestigation) reportRequestFailure(err error) {
 	var failure *contextPreviewFailure
 	if s.ReportPreviewFailure == nil || !errors.As(err, &failure) {
@@ -908,9 +880,7 @@ func (s ContextInvestigation) reportRequestFailure(err error) {
 	}
 	stage := failure.stage
 	if stage == "facts/storage" {
-		if _, margin := failure.cause.(contextStorageMarginRefusal); margin {
-			stage += "/margin"
-		} else {
+		{
 			stage += "/read"
 			var read interface{ ContextStorageRead() string }
 			if errors.As(failure.cause, &read) {
@@ -927,10 +897,6 @@ func (s ContextInvestigation) reportRequestFailure(err error) {
 	}
 	s.ReportPreviewFailure("request/" + stage)
 }
-
-// storageMargin is the binding freshness required by both the readiness hint
-// and the authoritative read before subsequent processing/admission checks.
-const storageMargin = time.Second
 
 // retentionFailure names a closed retention failure class for diagnostics.
 func retentionFailure(err error) string {

@@ -6,7 +6,6 @@ import (
 	"os"
 	"time"
 
-	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/contracts"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -19,7 +18,6 @@ import (
 // Watched resources of the connector's deliveries (ADR-329, ADR-331).
 var (
 	accessBindingsResource = schema.GroupVersionResource{Group: "asservat.io", Version: "v1alpha1", Resource: "accessbindings"}
-	capacityResources      = []schema.GroupVersionResource{{Version: "v1", Resource: "namespaces"}, {Group: "apps", Version: "v1", Resource: "deployments"}, {Group: "apps", Version: "v1", Resource: "statefulsets"}, {Version: "v1", Resource: "pods"}}
 )
 
 const (
@@ -129,7 +127,7 @@ func deliverOnChange(ctx context.Context, enrolled <-chan struct{}, trigger <-ch
 	}
 }
 
-// staticAccessBindings and staticCapacity answer a conversation with the
+// staticAccessBindings answers a conversation with the
 // delivery built before it.
 type staticAccessBindings contracts.AccessBindingDelivery
 
@@ -137,14 +135,8 @@ func (s staticAccessBindings) AccessBindingDelivery(context.Context) (contracts.
 	return contracts.AccessBindingDelivery(s), nil
 }
 
-type staticCapacity contracts.CapacityDelivery
-
-func (s staticCapacity) CapacityDelivery(context.Context, []string) (contracts.CapacityDelivery, error) {
-	return contracts.CapacityDelivery(s), nil
-}
-
-// runDeliveries watches this cluster's AccessBindings (and, with capacity
-// keys, its capacity metadata) and delivers each on change (ADR-329/330).
+// runDeliveries watches this cluster's AccessBindings and delivers them on
+// change (ADR-329/330).
 func (r *Regional) runDeliveries(ctx context.Context, enrolled <-chan struct{}) {
 	var joins []func()
 	if r.bindings != nil {
@@ -160,24 +152,6 @@ func (r *Regional) runDeliveries(ctx context.Context, enrolled <-chan struct{}) 
 					d, err := r.bindings.AccessBindingDelivery(ctx)
 					return d.Digest(), func(ctx context.Context) error {
 						return r.lifecycle.DeliverAccessBindings(ctx, staticAccessBindings(d))
-					}, err
-				})
-			}))
-		}
-	}
-	if len(r.capacityKeys) != 0 {
-		capacity, err := startResourceWatch(ctx, r.watchConfig, capacityResources)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "connector capacity watch unavailable")
-		} else {
-			joins = append(joins, goJoined(func() {
-				if !capacity.synced(ctx) {
-					return
-				}
-				deliverOnChange(ctx, enrolled, capacity.trigger, "capacity", func(context.Context) (string, func(context.Context) error, error) {
-					d, err := kube.CapacityDeliveryFromCache(r.capacityKeys, capacity.items(0), capacity.items(1), capacity.items(2), capacity.items(3))
-					return d.Digest(), func(ctx context.Context) error {
-						return r.lifecycle.DeliverCapacity(ctx, staticCapacity(d), r.capacityKeys)
 					}, err
 				})
 			}))

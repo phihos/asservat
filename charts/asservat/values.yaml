@@ -123,14 +123,15 @@ remote:
   keyService: ""   # https://host:port -> <name>-key-service:9447
   objectStore: ""  # https://host:port -> the evidence object store
 
-# Evidence capacity (specs/capacity.md). It is on when any value is set;
-# every field is optional and changes apply on helm upgrade. Namespaces labelled asservat.io/evidence: disabled, system
+# Evidence capacity (specs/capacity.md). Every field is optional and
+# changes apply on helm upgrade; an external object store needs
+# evidenceStorage. Namespaces labelled asservat.io/evidence: disabled, system
 # namespaces and the release namespace take no part.
 capacity: {}
 #   evidenceStorage: 128Gi     # default: the bundled store's volume size;
 #                              # required for an external store
 #   storageAssurance: bestEffort   # or qualifiedReservedBackend
-#   capturesPerCluster: 8      # concurrent captures in each cluster
+#   capturesPerCluster: 8      # default: larger of 8 and the node count
 #   namespaceLimit: 25%        # default: no namespace cap
 #   workload:
 #     share: 16Gi              # protected per workload; default 1/8 of the rest

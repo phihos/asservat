@@ -1,10 +1,8 @@
--- name: ChargeStreaming :execrows
-UPDATE custody_allocation SET charged_bytes = charged_bytes + $2, charged_objects = charged_objects + $3
-WHERE id = $1 AND $2 <= byte_limit - charged_bytes AND $3 <= object_limit - charged_objects;
+-- name: ChargeStreaming :one
+SELECT capacity_charge(sqlc.arg(id)::uuid,sqlc.arg(charged_bytes)::bigint,sqlc.arg(charged_objects)::bigint)::boolean AS charged;
 
--- name: ReleaseStreamingTemporary :execrows
-UPDATE custody_allocation SET charged_bytes = charged_bytes - $2, charged_objects = charged_objects - $3
-WHERE id = $1 AND charged_bytes >= $2 AND charged_objects >= $3;
+-- name: ReleaseStreamingTemporary :one
+SELECT capacity_release(sqlc.arg(id)::uuid,sqlc.arg(charged_bytes)::bigint,sqlc.arg(charged_objects)::bigint)::boolean AS released;
 
 -- name: InsertStream :exec
 INSERT INTO custody_stream(attempt_id,writer_epoch,plan_digest,temporary_bytes,temporary_objects,state) VALUES($1,$2,$3,$4,$5,$6);

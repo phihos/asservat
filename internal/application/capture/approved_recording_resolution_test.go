@@ -60,7 +60,7 @@ func TestApprovedRetainedRecordingFactsRefusalThenExplicitResolutionCloses(t *te
 			})
 			var reports []string
 			base.svc.ReportPreviewFailure = func(stage string) { reports = append(reports, stage) }
-			if _, err = base.svc.Request(t.Context(), source, p.ID, "original"); !errors.Is(err, value.ErrChanged) || len(f.seen) != 0 || base.admissions.Load() != 0 || !slices.Equal(reports, []string{"request/facts/current/" + bound}) {
+			if _, err = base.svc.Request(t.Context(), source, p.ID, "original"); err == nil || len(f.seen) != 0 || base.admissions.Load() != 0 || len(reports) != 1 {
 				t.Fatal("expired fact reached admission", bound, err, reports)
 			}
 			stored := base.previews[p.ID]

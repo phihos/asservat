@@ -34,14 +34,10 @@ type Regional struct {
 	nodes       *regionalNodes   // nil without the optional ADR-246 input
 	// bindings delivers this cluster's AccessBindings to the hub (ADR-329);
 	// nil in mode=combined, where the hub-worker observes the hub cluster.
-	bindings  AccessBindingReader
-	lifecycle *RegionalLifecycle
-	// capacityKeys select this cluster's delivered capacity observation
-	// (ADR-331); empty without them. watchConfig is the connector's API
-	// configuration for the delivery watches.
-	capacityKeys []string
-	watchConfig  *rest.Config
-	closers      []func()
+	bindings    AccessBindingReader
+	lifecycle   *RegionalLifecycle
+	watchConfig *rest.Config
+	closers     []func()
 	// API round trips of the shared observer client, for the executor's stop
 	// line (ADR-196): counts and transport time only.
 	observerStats regionalAPIStats
@@ -283,9 +279,6 @@ func NewRegional(ctx context.Context, files *os.Root, podUID string) (r *Regiona
 	r.bootstrap = regionalBootstrap{store: secret, seed: secret, record: regionalBootstrapRecord{in}, channel: channel, local: regionalLocal{native, source}, binding: c.binding, root: c.rootID(), now: time.Now}
 	if raw.Mode == contracts.ConnectorModeCluster {
 		r.bindings, r.lifecycle, r.watchConfig = observer, lifecycle, in.kubernetes(contracts.ConnectorKubeTokenFile)
-		if c.executor && len(c.offer.CapacityKeys) != 0 {
-			r.capacityKeys = c.offer.CapacityKeys
-		}
 	}
 	r.credentials, err = mtls.NewConnectorProcessCredentials(ctx, current.Source.Observation.Profile, podUID, lifecycle, lifecycle, source, lifecycle, time.Now)
 	if err != nil {
@@ -373,7 +366,7 @@ func (r *Regional) Run(ctx context.Context) error {
 	// starting once enrolled.
 	enrolledDeliveries := make(chan struct{})
 	var enrolledOnce sync.Once
-	if r.bindings != nil || len(r.capacityKeys) != 0 {
+	if r.bindings != nil {
 		wait := goJoined(func() { r.runDeliveries(contextCtx, enrolledDeliveries) })
 		defer func() { stopContext(); wait() }()
 	}

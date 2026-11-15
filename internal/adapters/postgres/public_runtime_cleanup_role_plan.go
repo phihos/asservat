@@ -19,7 +19,7 @@ func publicRuntimeCaptureCleanupGrants(purpose string) ([]publicRuntimeGrant, bo
 	}
 	// The root's audit store ID (ReadCaptureCleanupStoreID).
 	for _, column := range []string{"root_id", "qualification"} {
-		out = append(out, publicRuntimeGrant{"table", "capacity_source", column, "SELECT"})
+		out = append(out, publicRuntimeGrant{"table", "capacity_settings", column, "SELECT"})
 	}
 	for _, key := range []struct{ table, column string }{{"fleet_current_trust", "installation_id"}, {"capture_operation_pool", "root_id"}, {"capture_operation_account", "root_id"}, {"capture_operation_audit", "id"}, {"capture_operation_lifecycle", "operation_id"}} {
 		out = append(out, publicRuntimeGrant{"table", key.table, key.column, "UPDATE"})

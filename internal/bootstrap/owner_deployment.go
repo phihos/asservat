@@ -10,7 +10,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"slices"
 	"sync"
 	"time"
 
@@ -251,9 +250,6 @@ func newOwnerDeployment(ctx context.Context, files *os.Root, podUID string, in *
 			}
 			// ADR-331: the connector delivers the namespaces carrying a
 			// capacity key.
-			if c.Observation != nil && c.Observation.LocalCapacity != nil {
-				offer.CapacityKeys = slices.Clone(c.Observation.LocalCapacity.Keys)
-			}
 			offer.Image = in.offer.offer.Image
 			in.remoteEntries, in.remoteOffers = append(in.remoteEntries, entry), append(in.remoteOffers, offer)
 		}
@@ -365,13 +361,7 @@ func newOwnerDeployment(ctx context.Context, files *os.Root, podUID string, in *
 		if e != nil {
 			return nil, errors.Join(mounts.ErrUnavailable, e)
 		}
-		observation = &OwnerObservationServingConfig{Pin: pin, Workloads: workload, Peers: peers, Local: ownerLocalCapacity(in, observer, guard, c, podUID, c.Concurrency, &d.closers)}
-		if c.Public != nil {
-			phase = startupOperationInputs
-			if operation, err = d.ownerOperationConfig(startup, in, c, pin, catalog, guard, ledgers["registry"]); err != nil {
-				return nil, err
-			}
-		}
+		observation = &OwnerObservationServingConfig{Pin: pin, Workloads: workload, Peers: peers}
 	}
 	phase = startupOwnerRuntime
 	var readinessProofs app.OwnerEnrollmentProofReader

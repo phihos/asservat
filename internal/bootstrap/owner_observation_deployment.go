@@ -87,8 +87,7 @@ func newOwnerObservationDeployment(ctx context.Context, files *os.Root, podUID s
 		return nil, errors.Join(mounts.ErrUnavailable, err)
 	}
 	phase = startupObservationRuntime
-	out.Runtime, err = newOwnerObservationRuntime(root, verified, OwnerObservationRuntimeConfig{Pin: pin, PodUID: podUID, Configuration: configs, ServerEnrollment: services["server"], ClientEnrollment: services["client"], Registry: ledgers["registry"], Proofs: proofs, Routes: routes, Protection: guard, Workloads: workload, Peers: peers, Connections: c.Connections, Concurrency: c.Concurrency,
-		Local: ownerLocalCapacity(in, observer, guard, c, podUID, c.Concurrency, &d.closers)})
+	out.Runtime, err = newOwnerObservationRuntime(root, verified, OwnerObservationRuntimeConfig{Pin: pin, PodUID: podUID, Configuration: configs, ServerEnrollment: services["server"], ClientEnrollment: services["client"], Registry: ledgers["registry"], Proofs: proofs, Routes: routes, Protection: guard, Workloads: workload, Peers: peers, Connections: c.Connections, Concurrency: c.Concurrency})
 	if err != nil || verified.Err() != nil {
 		return nil, errors.Join(mounts.ErrUnavailable, err)
 	}

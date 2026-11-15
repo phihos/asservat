@@ -4,8 +4,9 @@ import (
 	"context"
 	"slices"
 	"sync"
+	"time"
 
-	capacityapp "asservat.local/asservat/internal/application/capacity"
+	"asservat.local/asservat/internal/contracts"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
 )
@@ -16,60 +17,37 @@ import (
 // whose administrators alone may set or change its label keys.
 const NamespaceGuardProfile = "namespace-guard"
 
-// sharedNamespaceGuards lends the capacity child's per-cluster namespace
-// guard readers (hub cluster and joined regional clusters) to the permission
-// reconciler of the same hub-worker. While no capacity child runs there is no
-// proof: admissionEnforced sources are then unavailable.
+// sharedNamespaceGuards answers the permission reconciler's namespace
+// guard proof for the hub cluster: the evidence opt-out key, which only
+// administrators set in the admin-only release namespace (ADR-328). Joined
+// clusters have no remote namespace or workload observation, so their
+// admissionEnforced sources stay unavailable.
 type sharedNamespaceGuards struct {
-	mu         sync.Mutex
-	readers    map[string]capacityapp.CapacityNamespaceProtectionReader
-	namespaces map[string]permissionNamespaceObserver
+	mu      sync.Mutex
+	cluster string
 }
 
-// permissionNamespaceObserver is a joined cluster's namespace journal reader
-// over the cluster-observation channel (ADR-247).
-type permissionNamespaceObserver interface {
-	ObservePermissionNamespaces(context.Context, cfg.NamespaceKeys) (cfg.NamespaceList, error)
-	ObservePermissionWorkloads(context.Context, cfg.WorkloadSelection) (cfg.WorkloadList, error)
-	ObservePermissionWorkloadGuard(context.Context) (cfg.NamespaceGuardProof, error)
-}
-
-// share publishes clusters' readers until the returned release is called.
-func (s *sharedNamespaceGuards) share(clusters []capacityapp.CapacityClusterReaders) func() {
-	m := map[string]capacityapp.CapacityNamespaceProtectionReader{}
-	n := map[string]permissionNamespaceObserver{}
-	for _, c := range clusters {
-		if c.Guard != nil {
-			m[c.ClusterID] = c.Guard
-		}
-		if o, ok := c.Guard.(permissionNamespaceObserver); ok {
-			n[c.ClusterID] = o
-		}
-	}
+func (s *sharedNamespaceGuards) share(cluster string) func() {
 	s.mu.Lock()
-	s.readers, s.namespaces = m, n
+	s.cluster = cluster
 	s.mu.Unlock()
 	return func() {
 		s.mu.Lock()
-		s.readers, s.namespaces = nil, nil
+		s.cluster = ""
 		s.mu.Unlock()
 	}
 }
 
-// NamespaceGuard implements configapp.NamespaceGuardReader with the
-// cluster's current live dry-run proof, within its original interval.
-func (s *sharedNamespaceGuards) NamespaceGuard(ctx context.Context, cluster string) (cfg.NamespaceGuardProof, error) {
+// NamespaceGuard implements configapp.NamespaceGuardReader.
+func (s *sharedNamespaceGuards) NamespaceGuard(_ context.Context, cluster string) (cfg.NamespaceGuardProof, error) {
 	s.mu.Lock()
-	reader := s.readers[cluster]
+	current := s.cluster
 	s.mu.Unlock()
-	if reader == nil {
+	if current == "" || current != cluster {
 		return cfg.NamespaceGuardProof{}, cfg.ErrUnavailable
 	}
-	p, err := reader.CapacityNamespaceProtection(ctx)
-	if err != nil || p.ClusterID != cluster {
-		return cfg.NamespaceGuardProof{}, cfg.ErrUnavailable
-	}
-	return cfg.NamespaceGuardProof{ClusterID: cluster, Name: NamespaceGuardProfile, LabelKeys: slices.Clone(p.Keys), ObservedAt: p.ObservedAt, FreshUntil: p.FreshUntil}, nil
+	now := time.Now()
+	return cfg.NamespaceGuardProof{ClusterID: cluster, Name: NamespaceGuardProfile, LabelKeys: contracts.CapacityNamespaceKeys(), ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}, nil
 }
 
 // identityDirectory is the configured group directory of groupID sources
@@ -90,50 +68,18 @@ func (d identityDirectory) GroupDirectory(ctx context.Context, issuer string) (c
 	return cfg.GroupDirectory{Issuer: issuer, Groups: slices.Clone(p.EligibleGroups), ObservedAt: p.ObservedAt, FreshUntil: p.FreshUntil}, nil
 }
 
-// RemoteNamespaces implements configapp.RemoteNamespaceReader for a joined
-// cluster: its connector's namespace journal over the cluster-observation
-// channel (ADR-247).
-func (s *sharedNamespaceGuards) RemoteNamespaces(ctx context.Context, cluster string, keys cfg.NamespaceKeys) (cfg.NamespaceList, error) {
-	s.mu.Lock()
-	o := s.namespaces[cluster]
-	s.mu.Unlock()
-	if o == nil {
-		return cfg.NamespaceList{}, cfg.ErrUnavailable
-	}
-	l, err := o.ObservePermissionNamespaces(ctx, keys)
-	if err != nil || l.ClusterID != cluster {
-		return cfg.NamespaceList{}, cfg.ErrUnavailable
-	}
-	return l, nil
+// RemoteNamespaces implements configapp.RemoteNamespaceReader; joined
+// clusters deliver no namespace observation.
+func (s *sharedNamespaceGuards) RemoteNamespaces(context.Context, string, cfg.NamespaceKeys) (cfg.NamespaceList, error) {
+	return cfg.NamespaceList{}, cfg.ErrUnavailable
 }
 
-// RemoteWorkloads implements configapp.RemoteWorkloadReader: a cluster's
-// connector workload journal (ADR-247), the hub cluster's included.
-func (s *sharedNamespaceGuards) RemoteWorkloads(ctx context.Context, cluster string, sel cfg.WorkloadSelection) (cfg.WorkloadList, error) {
-	s.mu.Lock()
-	o := s.namespaces[cluster]
-	s.mu.Unlock()
-	if o == nil {
-		return cfg.WorkloadList{}, cfg.ErrUnavailable
-	}
-	l, err := o.ObservePermissionWorkloads(ctx, sel)
-	if err != nil || l.ClusterID != cluster {
-		return cfg.WorkloadList{}, cfg.ErrUnavailable
-	}
-	return l, nil
+// RemoteWorkloads implements configapp.RemoteWorkloadReader.
+func (s *sharedNamespaceGuards) RemoteWorkloads(context.Context, string, cfg.WorkloadSelection) (cfg.WorkloadList, error) {
+	return cfg.WorkloadList{}, cfg.ErrUnavailable
 }
 
 // WorkloadGuard implements configapp.WorkloadGuardReader.
-func (s *sharedNamespaceGuards) WorkloadGuard(ctx context.Context, cluster string) (cfg.NamespaceGuardProof, error) {
-	s.mu.Lock()
-	o := s.namespaces[cluster]
-	s.mu.Unlock()
-	if o == nil {
-		return cfg.NamespaceGuardProof{}, cfg.ErrUnavailable
-	}
-	p, err := o.ObservePermissionWorkloadGuard(ctx)
-	if err != nil || p.ClusterID != cluster {
-		return cfg.NamespaceGuardProof{}, cfg.ErrUnavailable
-	}
-	return p, nil
+func (s *sharedNamespaceGuards) WorkloadGuard(context.Context, string) (cfg.NamespaceGuardProof, error) {
+	return cfg.NamespaceGuardProof{}, cfg.ErrUnavailable
 }

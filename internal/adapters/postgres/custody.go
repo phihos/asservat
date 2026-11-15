@@ -31,7 +31,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-const currentSchemaVersion = 168
+const currentSchemaVersion = 169
 
 // schemaFloorComment prefixes the version table's comment that records the
 // oldest binary schema the database still serves (ADR-227). Only the schema
@@ -490,11 +490,11 @@ func (l *Ledger) FinishDeletion(ctx context.Context, d privacy.Deletion) error {
 		if row.State != artifact.Deleting || !row.LeaseUntil.Valid || !row.LeaseUntil.Time.Equal(d.LeaseUntil) || !n.Time.Before(row.LeaseUntil.Time) {
 			return privacy.ErrFence
 		}
-		changed, err := q.ReleaseCharge(ctx, custodydb.ReleaseChargeParams{ID: a.ID, ChargedBytes: row.ReservedBytes})
+		released, err := q.ReleaseCharge(ctx, custodydb.ReleaseChargeParams{ID: a.ID, ChargedBytes: row.ReservedBytes})
 		if err != nil {
 			return err
 		}
-		if changed != 1 {
+		if !released {
 			return privacy.ErrUnavailable
 		}
 		if row.NativeLimit > artifact.FrameBytes {
@@ -543,11 +543,11 @@ func registerLocked(ctx context.Context, q *custodydb.Queries, p custodydb.Custo
 	if overdue {
 		return privacy.Record{}, privacy.ErrCapacity
 	}
-	changed, err := q.Charge(ctx, custodydb.ChargeParams{ID: a.ID, ChargedBytes: r.ReservedBytes()})
+	charged, err := q.Charge(ctx, custodydb.ChargeParams{ID: a.ID, ChargedBytes: r.ReservedBytes()})
 	if err != nil {
 		return privacy.Record{}, err
 	}
-	if changed != 1 {
+	if !charged {
 		return privacy.Record{}, privacy.ErrCapacity
 	}
 	err = q.InsertAttempt(ctx, custodydb.InsertAttemptParams{ID: id(r.Location.AttemptID), ClusterID: id(r.Location.ClusterID), ArtifactID: id(r.Location.ArtifactID), AllocationID: a.ID, RequestDigest: digest(r), PoolRevision: r.PoolRevision, AllocationRevision: r.AllocationRevision, NativeLimit: r.NativeLimit, ReservedBytes: r.ReservedBytes(), AnchorAt: ts(r.AnchorAt), WriteUntil: ts(r.WriteUntil), ExpiresAt: ts(r.ExpiresAt), DeleteBy: ts(r.DeleteBy)})

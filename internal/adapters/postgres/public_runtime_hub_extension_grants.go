@@ -644,7 +644,6 @@ var publicRuntimeHubExtensionGrantTable = map[string][]publicRuntimeGrant{
 	"regional-capacity": {
 		{"schema", "public", "", "USAGE"},
 		{"table", "goose_db_version", "", "SELECT"},
-		{"function", "qualify_capacity_cluster(uuid,uuid,uuid,uuid,bytea,jsonb)", "", "EXECUTE"},
 		{"function", "read_connector_activated_leaf(uuid,uuid,text,bytea,jsonb)", "", "EXECUTE"},
 	},
 	// ADR-210: a privacy operator's processing decisions, exactly the

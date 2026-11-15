@@ -1,8 +1,6 @@
 package postgres
 
 import (
-	planvalue "asservat.local/asservat/internal/domain/planning"
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -11,8 +9,9 @@ import (
 	"slices"
 	"time"
 
+	planvalue "asservat.local/asservat/internal/domain/planning"
+
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
-	capacity "asservat.local/asservat/internal/application/capacity"
 	app "asservat.local/asservat/internal/application/capture"
 	deliveryapp "asservat.local/asservat/internal/application/delivery"
 	compiler "asservat.local/asservat/internal/application/planning"
@@ -208,31 +207,14 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 		if err != nil {
 			return err
 		}
-		binding, err := q.FindContextControlBinding(call, custodydb.FindContextControlBindingParams{RootID: id(s.root), AllocationID: storage.AllocationID})
-		if err != nil {
-			return err
-		}
 		pool, allocation, err := lockAllocation(call, q, uid(storage.AllocationID))
 		if err != nil {
 			return err
 		}
-		controlPool, err := q.LockContextControlPool(call, id(s.root))
-		if err != nil {
-			return err
-		}
-		account, err := q.LockContextControlAccount(call, custodydb.LockContextControlAccountParams{RootID: id(s.root), AllocationID: allocation.ID})
-		if err != nil {
-			return err
-		}
 		step = "resources"
-		resource, err := q.ReadPolicySourceResourceSelection(call, custodydb.ReadPolicySourceResourceSelectionParams{RootID: id(s.root), AllocationID: allocation.ID})
-		if err != nil {
-			return err
-		}
-		limits, resourceDigest, err := sourceResources(resource, a.ClusterID, now.Time)
-		if err != nil {
-			return err
-		}
+		// Node source limits are the collector's Helm values (ADR-246).
+		limits := collector.SourceResources{PolicyUID: storage.SourceUid}
+		resourceDigest := deliveryapp.SourceResourcesDigest(limits)
 		out.Resources = limits
 
 		rate := in.BytesPerSecond
@@ -260,9 +242,7 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 			return value.ErrCapacity
 		}
 
-		narrow("binding", binding.FreshUntil.Time)
-		narrow("resources", resource.FreshUntil.Time)
-		coverageUntil := identity.Earlier(pool.ValidUntil.Time, identity.Earlier(allocation.ValidUntil.Time, identity.Earlier(controlPool.ValidUntil.Time, account.ValidUntil.Time)))
+		coverageUntil := identity.Earlier(pool.ValidUntil.Time, allocation.ValidUntil.Time)
 		narrow("coverage", coverageUntil)
 		// Commit uses the same narrowed original authority as the final
 		// checks. No slow COMMIT can outlive a shorter accepted observation.
@@ -274,8 +254,8 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 			if err != nil {
 				return err
 			}
-			if call.Err() != nil || !sourceCheckCurrent(in, n.Time) || !n.Time.Before(until) || !n.Time.Before(hard) || !sourceResourceCurrent(resource, n.Time) || !identity.Fresh(binding.ObservedAt.Time, binding.FreshUntil.Time, n.Time, 30*time.Second) ||
-				binding.ClusterID != id(a.ClusterID) || binding.NamespaceUid != a.NamespaceUID || binding.WorkloadUid != a.WorkloadUID || binding.AllocationID != allocation.ID || allocation.ServiceClass != "context" || allocation.Paused || pool.Paused || !n.Time.Before(storage.CapacityUntil.Time) || !controlPool.Configured || !account.Configured || controlPool.Paused || account.Paused || account.ChargedFull > account.FullLimit || account.ChargedReplay > account.ReplayLimit {
+			if call.Err() != nil || !sourceCheckCurrent(in, n.Time) || !n.Time.Before(until) || !n.Time.Before(hard) ||
+				storage.ClusterID != id(a.ClusterID) || storage.NamespaceUid != a.NamespaceUID || storage.WorkloadUid != a.WorkloadUID || storage.AllocationID != allocation.ID || allocation.ServiceClass != "context" || allocation.Paused || pool.Paused {
 				return value.ErrChanged
 			}
 			if err = s.guards.Recovery.check(call, q, trust, s.root, in.Recovery); err != nil {
@@ -487,36 +467,6 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 		return app.PolicySourceAdmission{}, app.StagedSourceError("admit-committed-late", value.ErrUnavailable)
 	}
 	return out, nil
-}
-
-// Migration 73/ADR-200 gives the protected accepted SQL row a 30s lifetime.
-// Its original five-second acceptance payload is validated at its original
-// observation instant; it is not a fresh caller receipt or a renewed proof.
-func sourceResourceCurrent(row custodydb.ReadPolicySourceResourceSelectionRow, now time.Time) bool {
-	return !row.Suspended && identity.Fresh(row.ObservedAt.Time, row.FreshUntil.Time, now, 30*time.Second)
-}
-
-func sourceResources(row custodydb.ReadPolicySourceResourceSelectionRow, cluster string, now time.Time) (collector.SourceResources, [32]byte, error) {
-	var zero collector.SourceResources
-	var observation capacity.CapacitySourceObservation
-	if !sourceResourceCurrent(row, now) || row.AcceptedRevision < 1 || len(row.AcceptedDigest) != 32 || json.Unmarshal(row.AcceptedSnapshot, &observation) != nil || !observation.Valid(observation.Snapshot.ObservedAt) || !bytes.Equal(observation.Digest[:], row.AcceptedDigest) {
-		return zero, [32]byte{}, value.ErrChanged
-	}
-	for _, policy := range observation.Snapshot.Policies {
-		if policy.Resource.UID != row.PolicyUid {
-			continue
-		}
-		if policy.Resource.Deleting || policy.Scope == nil || policy.Scope.ClusterID != cluster || policy.Budget == nil {
-			return zero, [32]byte{}, value.ErrChanged
-		}
-		limits := collector.SourceResources{PolicyUID: policy.Resource.UID}
-		if policy.SourceResources != nil {
-			limits.Node = policy.SourceResources.Node
-			limits.Workload = policy.SourceResources.Workload
-		}
-		return limits, deliveryapp.SourceResourcesDigest(limits), nil
-	}
-	return zero, [32]byte{}, value.ErrChanged
 }
 
 func policySourceState(row custodydb.PolicyRecordingSource) (app.PolicySourceState, error) {
