@@ -6,6 +6,7 @@ import (
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	"asservat.local/asservat/internal/domain/artifact"
+	value "asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
 )
 
@@ -19,8 +20,11 @@ type trustWire struct {
 }
 
 // currentTrust reads the installation's fleet trust row and the database
-// time. The returned wire is valid for at most five seconds and never past
-// the trust row's own freshness.
+// time, and refuses a suspended or stale row (as the removed recovery guards
+// did). The returned wire is valid for at most five seconds and never past
+// the trust row's own freshness. It takes no row lock: several callers hold
+// read-only roles, and a suspension racing one effect is within the ADR-311
+// authority reuse window.
 func currentTrust(ctx context.Context, q *custodydb.Queries, installation string) (custodydb.FleetCurrentTrust, trustWire, error) {
 	row, err := q.ReadFleetTrust(ctx, id(installation))
 	if err != nil {
@@ -31,6 +35,9 @@ func currentTrust(ctx context.Context, q *custodydb.Queries, installation string
 		return row, trustWire{}, err
 	}
 	n := now.Time.UTC().Truncate(time.Microsecond)
+	if row.Suspended || !identity.Fresh(row.ObservedAt.Time, row.FreshUntil.Time, n, 30*time.Second) {
+		return row, trustWire{}, value.ErrUnavailable
+	}
 	return row, trustWire{InstallationID: uid(row.InstallationID), IssuerEpoch: uid(row.IssuerEpoch), Revision: trustRevision(row),
 		ObservedAt: n, FreshUntil: identity.Earlier(n.Add(5*time.Second), row.FreshUntil.Time)}, nil
 }
