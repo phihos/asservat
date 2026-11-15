@@ -24,7 +24,6 @@ import (
 	"asservat.local/asservat/internal/adapters/providerconfig"
 	"asservat.local/asservat/internal/contracts"
 	cfg "asservat.local/asservat/internal/domain/configuration"
-	"asservat.local/asservat/internal/domain/fleet"
 )
 
 // SetupStepError names the failed setup step and its error class only; it
@@ -314,7 +313,7 @@ func setupDatabase(ctx context.Context, c contracts.SetupConfiguration, ids setu
 	}
 	// P3: trust root, activation and first fleet observation.
 	err = retryUnavailable(ctx, out, func(ctx context.Context) error {
-		return setupStep("seed", postgres.SeedInstallation(ctx, ddlConfig, fleet.InstallationTrust(ids.InstallationID, ids.IssuerEpoch, time.Now())))
+		return setupStep("seed", postgres.SeedInstallation(ctx, ddlConfig, installationTrustAt(ids.InstallationID, ids.IssuerEpoch, time.Now())))
 	})
 	if err != nil {
 		return err
