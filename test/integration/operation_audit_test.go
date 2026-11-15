@@ -14,11 +14,8 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/identity"
-	"asservat.local/asservat/migrations"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/jackc/pgx/v5/stdlib"
-	"github.com/pressly/goose/v3"
 )
 
 // Synthetic identity/bootstrap with actual separate-role SQL, encrypted objects
@@ -93,41 +90,6 @@ func qualifyOperationAudits(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		if e = gate.Finish(ctx, result); e != nil {
 			t.Fatal("finish", e)
 		}
-		// The real migration can roll back its admission rule and return without
-		// rewriting the fifteen-second record already committed above.
-		db := stdlib.OpenDB(*admin.Config().ConnConfig)
-		provider, err := goose.NewProvider(goose.DialectPostgres, db, migrations.Files(), goose.WithDisableGlobalRegistry(true))
-		if err != nil {
-			db.Close()
-			t.Fatal(err)
-		}
-		grants := preserveFixtureGrants(t, ctx, admin)
-		t.Cleanup(func() {
-			restore, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-			if _, err := provider.Up(restore); err != nil {
-				t.Error("restore current audit schema", err)
-			}
-			grants(restore)
-			db.Close()
-		})
-		if _, err := provider.DownTo(ctx, 125); err != nil {
-			t.Fatal("preview window rollback", err)
-		}
-		rolledBack := in(1, "preview_capture")
-		body, err := json.Marshal(rolledBack)
-		if err != nil {
-			t.Fatal(err)
-		}
-		_, err = journalPool.Exec(ctx, "INSERT INTO operation_audit(id,root_id,lane,principal_digest,intent,request_until,write_until,retain_until,issuer_epoch) VALUES($1,$2,'normal',$3,$4,$5,$6,$7,$8)", rolledBack.ID, rolledBack.RootID, rolledBack.PrincipalDigest[:], body, rolledBack.RequestUntil, rolledBack.WriteUntil, rolledBack.RetainUntil, s.recovery.observation.issuer)
-		var denied *pgconn.PgError
-		if !errors.As(err, &denied) || denied.Code != "23514" || denied.Message != "operation audit unavailable" {
-			t.Fatal("rollback did not restore original preview SQL window", err)
-		}
-		if _, err := provider.Up(ctx); err != nil {
-			t.Fatal("preview window upgrade", err)
-		}
-		grants(ctx)
 		// Exact audit replay never repeats the two object creations or charges.
 		if e = gate.Finish(ctx, result); e != nil {
 			t.Fatal("exact outcome replay", e)

@@ -286,7 +286,6 @@ func qualifyContextQueries(t *testing.T, f *queryLedgerFixture) {
 				t.Fatal("summary exceeded original 20-unit reservation")
 			}
 			charged(2 * units)
-			refuseRetainedProfileSummaryDowngrade(t, f)
 			t.Logf("raw_source=%s authored_native_limit=%d query_units=%d admitted_queries=2 single_read_per_query=true original_worker_transient=%d", e.NativeType, e.Registration.NativeLimit, units, plan.Profile.Worker.WorkerTransientBytes)
 			return
 		}

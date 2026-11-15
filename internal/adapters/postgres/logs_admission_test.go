@@ -32,7 +32,7 @@ func TestLogsAdmissionUsesExactCompiledCapAndApproval(t *testing.T) {
 		if admissionNativeLimit(a) {
 			t.Fatal("recording8MiB cap substituted for accepted64MiB logs")
 		}
-		row := progressFactsFixture(t, "pending").ContextCapture
+		row := progressFactsFixture(t, "accepted").ContextCapture
 		var e artifact.ContextExpectation
 		if err = json.Unmarshal(row.ExpectationJson, &e); err != nil {
 			t.Fatal(err)

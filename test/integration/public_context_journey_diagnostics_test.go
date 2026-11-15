@@ -31,24 +31,7 @@ const (
 	journeyRequestLookup = 18 + iota
 	journeyRequestPreview
 	journeyRequestAdmit
-	journeyCaptureCompleted
-	journeyCaptureJournal
-	journeyCaptureClaimIntent
-	journeyCaptureWriteIntent
-	journeyCaptureCompleteIntent
-	journeyCaptureAckIntent
-	journeyCaptureFreeze
-	journeyCaptureClaimOutcome
-	journeyCaptureWriteOutcome
-	journeyCaptureCompleteOutcome
-	journeyCaptureAckOutcome
-	journeyCaptureAckPair
-	journeyCaptureReconcileClaimIntent
-	journeyCaptureReconcileClaimOutcome
-	journeyCaptureFindIntent
-	journeyCaptureFindOutcome
-	journeyCaptureReconcileAckIntent
-	journeyCaptureReconcileAckOutcome
+	journeyCaptureIntent
 	journeyRegionalRead
 	journeyRunnerRead
 	journeyRunnerTarget
@@ -69,9 +52,7 @@ var journeyDiagnosticNames = [journeyDiagnosticStages]string{
 	"preview-workload", "preview-pod", "preview-eligibility", "preview-capability",
 	"preview-retention", "preview-storage", "preview-processing", "preview-create",
 	"request-lookup", "request-preview-read", "request-admit",
-	"capture-completed", "capture-journal", "capture-claim-intent", "capture-write-intent", "capture-complete-intent", "capture-ack-intent", "capture-freeze",
-	"capture-claim-outcome", "capture-write-outcome", "capture-complete-outcome", "capture-ack-outcome", "capture-ack-pair",
-	"capture-reconcile-claim-intent", "capture-reconcile-claim-outcome", "capture-find-intent", "capture-find-outcome", "capture-reconcile-ack-intent", "capture-reconcile-ack-outcome",
+	"capture-intent",
 	"regional-read", "runner-read", "runner-target", "runner-eligibility", "runner-capability", "runner-retention", "runner-process", "runner-prepare", "runner-keys", "runner-record-start", "runner-eligibility-identity",
 }
 

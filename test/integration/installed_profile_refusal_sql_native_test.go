@@ -30,7 +30,7 @@ func installedProfileRefusalSQLCheck(t *testing.T, ctx context.Context, admin *p
 		var started time.Time
 		var timeoutMillis int64
 		if err := admin.QueryRow(bounded, `SELECT
- c.state='intent_audited' AND c.preview_id=g.preview_id AND c.scope_digest=g.execution_digest AND c.scope_json=g.scope
+ c.preview_id=g.preview_id AND c.scope_digest=g.execution_digest AND c.scope_json=g.scope
  AND g.kind='adHocCapture' AND g.data_class='raw' AND g.decision='approved'
  AND x.phase=$4 AND x.object_uid IS NOT NULL AND x.started_at IS NOT NULL AND x.completed_at>=x.started_at
  AND x.acquired_at IS NULL AND x.copies_json IS NULL AND x.copies_digest IS NULL

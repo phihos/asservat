@@ -23,7 +23,7 @@ func (q ProgressQuery) Valid(now time.Time) bool {
 // case/artifact IDs are not navigation authority or readable evidence references.
 // No status field authorizes execution, disclosure or release of capacity.
 type ContextProgressObservation struct {
-	ReasonMetadata                                  *CaptureReasonMetadata
+	Reason                                          *string
 	Actions                                         []ContextActionProgress
 	CanCancel, CancellationRequested                bool
 	Operation, ActionID                             string

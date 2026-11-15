@@ -10,7 +10,6 @@ import (
 
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
-	auditapp "asservat.local/asservat/internal/application/audit"
 	authapp "asservat.local/asservat/internal/application/authorization"
 	captureapp "asservat.local/asservat/internal/application/capture"
 	executionapp "asservat.local/asservat/internal/application/execution"
@@ -160,14 +159,6 @@ func qualifyProfileAdmission(t *testing.T, ctx context.Context, admin *pgxpool.P
 				}
 				if _, fresh, err := ledger.AdvanceStreaming(ctx, plan, artifact.StreamingStep{Kind: artifact.StreamClaimCreate}); err == nil || fresh {
 					t.Fatal("unbound writer acquired multipart permission")
-				}
-				auditPool := poolFor("capture_audit_runtime", "synthetic-capture-audit")
-				intents, err := postgres.NewCaptureIntentAudits(ctx, auditPool, p.RootID)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if err = (auditapp.CaptureIntentPublisher{Ledger: intents, Objects: &objectstore.CaptureIntentObjects{Store: store, Seal: keys, Open: keys}}).PublishCaptureIntents(ctx); err != nil {
-					t.Fatal(err)
 				}
 				execSQL, err := postgres.NewAPIContextExecutions(ctx, pools.ordinary, p.RootID, s.recovery.installation, s.retention.guard)
 				if err != nil {

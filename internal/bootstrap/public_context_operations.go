@@ -7,7 +7,6 @@ import (
 
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	analysisapp "asservat.local/asservat/internal/application/analysis"
-	auditapp "asservat.local/asservat/internal/application/audit"
 	authapp "asservat.local/asservat/internal/application/authorization"
 	captureapp "asservat.local/asservat/internal/application/capture"
 	catalogapp "asservat.local/asservat/internal/application/catalog"
@@ -30,7 +29,7 @@ type PublicContextOperationServices struct {
 	Cancellations  *captureapp.CaptureCancellation
 	History        *captureapp.HistoryParameterService
 	Investigation  captureapp.ContextInvestigation
-	Intents        auditapp.CaptureOperationPublication
+	Intents        captureapp.ContextAcceptedIntents
 	Regional       RegionalAPIContextStart
 	Progress       captureapp.ContextProgressService
 	Cases          catalogapp.ContextCaseService
@@ -185,10 +184,10 @@ func composePublicContextUseCases(c PublicContextOperationsConfig, s PublicConte
 	i, p, k, d, a := s.Investigation, s.Progress, s.Cases, s.Downloads, s.Intents
 	if !authorization.UUID(c.RootID) || !authorization.UUID(c.InstallationID) || c.Now == nil || c.NewID == nil ||
 		i.RootID != c.RootID || i.InstallationID != c.InstallationID || p.RootID != c.RootID || p.InstallationID != c.InstallationID ||
-		k.RootID != c.RootID || k.InstallationID != c.InstallationID || d.RootID != c.RootID || d.InstallationID != c.InstallationID || a.RootID != c.RootID ||
+		k.RootID != c.RootID || k.InstallationID != c.InstallationID || d.RootID != c.RootID || d.InstallationID != c.InstallationID ||
 		i.Previews == nil || i.Replay == nil || i.Admission == nil || i.Resolution == nil || i.Targets == nil || i.Eligibility == nil || i.Capabilities == nil || i.Retention == nil || i.Storage == nil || i.Processing == nil ||
 		i.Lifetime < time.Second || i.Lifetime > 5*time.Minute || i.Lifetime%time.Microsecond != 0 ||
-		a.Completed == nil || a.Journal == nil || a.Acknowledgements == nil || a.Writer == nil || a.Reader == nil || a.MAC == nil ||
+		a == nil ||
 		!regionalHubRunner(s.Regional.Runner) || s.Regional.Router == nil ||
 		p.Reader == nil || p.Navigation != nil || k.Routes == nil || k.Permissions == nil || k.Catalog == nil || k.Retention == nil || k.Processing == nil ||
 		d.Routes == nil || d.Sources == nil || d.Authority == nil || d.Sessions == nil || d.Plans == nil || d.Runtime != nil ||
@@ -198,7 +197,7 @@ func composePublicContextUseCases(c PublicContextOperationsConfig, s PublicConte
 	i.RecordingSaveEnabled = packetSourceCompositionReady(c, s)
 	// Shared freshness functions are fixed once at assembly; this creates no
 	// observation and replaces no original request deadline.
-	i.Now, i.NewID, a.Now = c.Now, c.NewID, c.Now
+	i.Now, i.NewID = c.Now, c.NewID
 	s.Regional.Runner.Capabilities, s.Regional.Runner.Now, s.Regional.Now = i.Capabilities, c.Now, c.Now
 	p.Now, k.Now = c.Now, c.Now
 	// The raw selection reader uses the same initialized dependencies and clock

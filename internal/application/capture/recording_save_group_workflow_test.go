@@ -32,7 +32,7 @@ type workflowSQL struct {
 func (f *workflowSQL) AdmitRecordingSaveGroup(ctx context.Context, in value.RecordingSaveGroupAdmission) (value.Accepted, error) {
 	f.seen = append(f.seen, in)
 	p := in.Preview
-	parent := value.Accepted{State: value.PendingAudit, CaptureID: p.CaptureID, ScopeDigest: p.ScopeDigest, SubmissionDigest: in.SubmissionDigest, CreatedAt: in.Children[0].Plan.Input.Snapshot.Request.T0, MetadataValidUntil: f.now.Add(5 * time.Second), Group: &value.RecordingSaveGroupAccepted{CaseID: p.CaseID}}
+	parent := value.Accepted{CaptureID: p.CaptureID, ScopeDigest: p.ScopeDigest, SubmissionDigest: in.SubmissionDigest, CreatedAt: in.Children[0].Plan.Input.Snapshot.Request.T0, MetadataValidUntil: f.now.Add(5 * time.Second), Group: &value.RecordingSaveGroupAccepted{CaseID: p.CaseID}}
 	for n, c := range in.Children {
 		input := c.Plan.Input
 		target, r := input.Target, c.Registration
@@ -46,7 +46,7 @@ func (f *workflowSQL) AdmitRecordingSaveGroup(ctx context.Context, in value.Reco
 		// Use the already reviewed source binding bytes retained by the test factory.
 		binding = f.bindings(q.SourceID)
 		e := artifact.ContextExpectation{ExecutionClass: target.ExecutionClass, Registration: r, CaseID: c.CaseID, OccurrenceID: c.OccurrenceID, NodeUID: target.NodeUID, NodeBootID: target.NodeBootID, PodUID: target.Request.PodUID, Namespace: target.Request.Namespace.Name, NamespaceUID: target.Request.Namespace.UID, WorkloadUID: target.Request.Workload.UID, CollectorVersion: input.Capability.CollectorVersion, CollectorImageDigest: input.Capability.CollectorImageDigest, RecipeDigest: c.Plan.RecipeDigest, PlanDigest: c.Plan.ScopeDigest, CaptureUID: input.CaptureID, ActionID: input.Snapshot.ActionID, NativeType: artifact.PCAPNGArtifact, DataClass: "metadata", PurposeRef: retention.PurposeRef, Audience: c.Eligibility.DefaultAudience, RequestedAgeSeconds: retention.RequestedSeconds, MaximumAgeSeconds: retention.MaximumSeconds, DeletionBudgetSeconds: retention.DeletionBudgetSeconds, RetentionRules: retention.Policies, TriggeredAt: q.T0, Snapshot: &q, Lifecycle: lifecycle, SourceSnapshotManifest: &artifact.SourceSnapshotManifest{CanonicalScope: c.Plan.CanonicalScope, Binding: binding}}
-		child := value.Accepted{State: value.PendingAudit, CaptureID: input.CaptureID, ScopeDigest: c.Plan.ScopeDigest, SubmissionDigest: c.SubmissionDigest, CreatedAt: parent.CreatedAt, Deadline: input.Deadline, Pin: target.Pin, Expectation: e}
+		child := value.Accepted{CaptureID: input.CaptureID, ScopeDigest: c.Plan.ScopeDigest, SubmissionDigest: c.SubmissionDigest, CreatedAt: parent.CreatedAt, Deadline: input.Deadline, Pin: target.Pin, Expectation: e}
 		if err := e.Validate(); err != nil {
 			f.ports.t.Fatal("synthetic admitted expectation", n, err)
 		}

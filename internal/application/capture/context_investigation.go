@@ -84,7 +84,6 @@ type ContextInvestigation struct {
 	Storage                ContextStorageReader
 	Reviews                ContextAccessReviews // optional (ADR-245)
 	Processing             ContextProcessingCoverageReader
-	ReasonCipher           auditapp.CaptureReasonCipher
 	// Recorders answers node packet recorder availability (ADR-248). It is
 	// optional: without it every composition stays plan-only.
 	Recorders ContextRecorders
@@ -325,6 +324,10 @@ func (s ContextInvestigation) preview(ctx context.Context, source identities.Cur
 	if !s.configured() || ctx == nil || source == nil || ctx.Err() != nil {
 		return zero, previewFailure("configuration", value.ErrUnavailable)
 	}
+	// Only a recording save carries a reason; callers cannot set one here.
+	if intent.Reason != nil {
+		return zero, previewFailure("reason", value.ErrInvalid)
+	}
 	if intent.Diagnostic != value.ContextDiagnosticName {
 		return zero, previewFailure("diagnostic", value.ErrDiagnosticUnavailable)
 	}
@@ -413,7 +416,7 @@ func (s ContextInvestigation) preview(ctx context.Context, source identities.Cur
 
 func acceptedContext(a value.Accepted, digest artifact.Digest) bool {
 	if a.Group != nil {
-		if (a.State != value.PendingAudit && a.State != value.IntentAudited) || !authorization.UUID(a.CaptureID) || a.SubmissionDigest != digest || a.ScopeDigest == (artifact.Digest{}) || !authorization.UUID(a.Group.CaseID) || len(a.Group.Children) < 2 || len(a.Group.Children) > value.MaxRecordingSaveGroupChildren || !reflect.DeepEqual(a.Expectation, artifact.ContextExpectation{}) || a.CreatedAt.IsZero() || !a.Deadline.After(a.CreatedAt) {
+		if !authorization.UUID(a.CaptureID) || a.SubmissionDigest != digest || a.ScopeDigest == (artifact.Digest{}) || !authorization.UUID(a.Group.CaseID) || len(a.Group.Children) < 2 || len(a.Group.Children) > value.MaxRecordingSaveGroupChildren || !reflect.DeepEqual(a.Expectation, artifact.ContextExpectation{}) || a.CreatedAt.IsZero() || !a.Deadline.After(a.CreatedAt) {
 			return false
 		}
 		seen := map[string]bool{a.CaptureID: true}
@@ -437,7 +440,7 @@ func acceptedContext(a value.Accepted, digest artifact.Digest) bool {
 		return deadline.Equal(a.Deadline)
 	}
 	e := a.Expectation
-	return authorization.UUID(a.CaptureID) && a.CaptureID == e.CaptureUID && a.SubmissionDigest == digest && a.ScopeDigest == e.PlanDigest && e.Validate() == nil && !a.CreatedAt.IsZero() && a.Deadline.After(a.CreatedAt) && (a.State == value.PendingAudit || a.State == value.IntentAudited) && a.Pin.Namespace == e.Namespace && a.Pin.NamespaceUID == e.NamespaceUID && a.Pin.UID == e.PodUID
+	return authorization.UUID(a.CaptureID) && a.CaptureID == e.CaptureUID && a.SubmissionDigest == digest && a.ScopeDigest == e.PlanDigest && e.Validate() == nil && !a.CreatedAt.IsZero() && a.Deadline.After(a.CreatedAt) && a.Pin.Namespace == e.Namespace && a.Pin.NamespaceUID == e.NamespaceUID && a.Pin.UID == e.PodUID
 }
 
 // Request resolves accepted idempotency before touching a preview. Existing

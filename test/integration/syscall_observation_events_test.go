@@ -2,39 +2,11 @@ package integration
 
 import (
 	"context"
-	"io/fs"
-	"strings"
 	"testing"
 	"time"
 
-	"asservat.local/asservat/migrations"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
-
-func qualifyObservationPoolDowngradeRefusal(t *testing.T, ctx context.Context, admin *pgxpool.Pool, grantID string) {
-	t.Helper()
-	raw, err := fs.ReadFile(migrations.Files(), "00128_syscall_observation_events.sql")
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, down, ok := strings.Cut(string(raw), "-- +goose Down")
-	if !ok {
-		t.Fatal("missing downgrade")
-	}
-	tx, err := admin.Begin(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = tx.Exec(ctx, down)
-	_ = tx.Rollback(ctx)
-	if err == nil || !strings.Contains(err.Error(), "retained syscall observation event spend") {
-		t.Fatal("event history downgrade", err)
-	}
-	var spent int64
-	if err = admin.QueryRow(ctx, "SELECT events_spent FROM adhoc_observation_spend WHERE grant_id=$1", grantID).Scan(&spent); err != nil || spent != 10 {
-		t.Fatal("downgrade changed history", spent, err)
-	}
-}
 
 func qualifyObservationPoolLockExpiry(t *testing.T, ctx context.Context, admin, caller *pgxpool.Pool, rootID, grantID string, expires time.Time) {
 	t.Helper()

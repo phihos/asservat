@@ -246,7 +246,7 @@ func apiRunner(t *testing.T) (*apiRunnerFixture, APIContextRunner, identities.Cu
 	}
 	e.PlanDigest = plan.ScopeDigest
 	e.RecipeDigest = plan.RecipeDigest
-	f.work = APIContextWork{Accepted: capture.Accepted{CaptureID: e.CaptureUID, State: capture.IntentAudited, ScopeDigest: e.PlanDigest, Expectation: e, Pin: pin, CreatedAt: f.now, Deadline: e.Registration.WriteUntil}, Target: f.target.Request, Actor: f.actor.Principal, IntentDigest: artifact.Digest{1}}
+	f.work = APIContextWork{Accepted: capture.Accepted{CaptureID: e.CaptureUID, ScopeDigest: e.PlanDigest, Expectation: e, Pin: pin, CreatedAt: f.now, Deadline: e.Registration.WriteUntil}, Target: f.target.Request, Actor: f.actor.Principal, IntentDigest: artifact.Digest{1}}
 	svc := APIContextRunner{Read: f, Prepare: f, Record: f, Process: f, Targets: f, Eligibility: access.Evaluator{Permissions: f, Now: func() time.Time { return f.now }}, Capabilities: f, Retention: apiFixtureRetention{f}, Output: f, Collector: f, Now: func() time.Time { return f.now }}
 	source, _, err := identities.NewBearerRequest(context.Background(), f, "synthetic-token", svc.Now)
 	if err != nil {

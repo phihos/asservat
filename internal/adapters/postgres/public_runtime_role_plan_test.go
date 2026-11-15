@@ -91,7 +91,6 @@ func TestPublicContextDraftRolesHaveExactPurposeGrants(t *testing.T) {
 		publicRuntimeGrant{"table", "context_preview_fence", "", "DELETE"})
 	resolution := append(slices.Clone(common),
 		publicRuntimeGrant{"table", "recording_save_group", "", "SELECT"},
-		publicRuntimeGrant{"function", "capture_preview_reason_copied(context_preview)", "", "EXECUTE"},
 		publicRuntimeGrant{"table", "recording_selection_set", "", "SELECT"},
 		publicRuntimeGrant{"function", "context_preview_read_until(uuid,uuid)", "", "EXECUTE"},
 		publicRuntimeGrant{"table", "fleet_current_trust", "", "SELECT"},

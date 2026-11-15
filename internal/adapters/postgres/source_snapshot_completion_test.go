@@ -99,11 +99,10 @@ func checkSnapshotPublicationDigests(t *testing.T, nativeLimit int64) {
 		t.Fatal("snapshot fixture invalid", err)
 	}
 	facts.ContextCapture.ExpectationJson, _ = json.Marshal(e)
-	intent, err := captureIntent(facts.ContextCapture)
+	_, err = captureIntent(facts.ContextCapture)
 	if err != nil {
 		t.Fatal(err)
 	}
-	facts.ContextCapture.IntentDigest = digest(intent)
 	execution.ExpectationDigest = evidence.ContextExpectationDigest(e)
 	execution.Binding.ActionID = e.ActionID
 	execution.Binding.NativeBytes = request.MaxBytes
@@ -122,7 +121,7 @@ func checkSnapshotPublicationDigests(t *testing.T, nativeLimit int64) {
 		t.Fatal("test failed to separate initial and final digests")
 	}
 	authorityDigest := executionapp.APIExecutionDigest(execution)
-	verification := custodydb.ContextVerification{CaptureID: facts.ContextCapture.ID, RootID: facts.ContextCapture.RootID, VerifiedAt: ts(execution.CompletedAt.Add(time.Second)), ExpectationDigest: digest(final), CopiesDigest: digest(execution.Copies), IntentDigest: facts.ContextCapture.IntentDigest, AuthorityDigest: authorityDigest[:], PermissionEpoch: facts.ContextCapture.PermissionEpoch, PermissionSequence: 1}
+	verification := custodydb.ContextVerification{CaptureID: facts.ContextCapture.ID, RootID: facts.ContextCapture.RootID, VerifiedAt: ts(execution.CompletedAt.Add(time.Second)), ExpectationDigest: digest(final), CopiesDigest: digest(execution.Copies), IntentDigest: captureIntentDigest(facts.ContextCapture), AuthorityDigest: authorityDigest[:], PermissionEpoch: facts.ContextCapture.PermissionEpoch, PermissionSequence: 1}
 	record, err := verificationRecord(facts.ContextCapture, verification, execution)
 	if err != nil || record.APIOutcome == nil || record.ExpectationDigest == execution.ExpectationDigest || record.APIOutcome.ExecutionDigest != authorityDigest {
 		t.Fatal("lost original execution versus final manifest audit binding", err)

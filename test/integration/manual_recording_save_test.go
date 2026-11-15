@@ -4,12 +4,10 @@ package integration
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres"
-	auditapp "asservat.local/asservat/internal/application/audit"
 	captureapp "asservat.local/asservat/internal/application/capture"
 	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -40,7 +38,7 @@ func readManualSaveCounters(t *testing.T, ctx context.Context, f *capacitySQLFix
 
 // Genuine source/policy/permission/custody SQL; initial identity, target, node,
 // source report and packet observations remain explicit synthetic fixture facts.
-func qualifyManualRecordingSave(t *testing.T, ctx context.Context, f *capacitySQLFixture, admissions *postgres.ContextAdmissions, policy policySourceAcceptedFixture, source captureapp.PolicySourceAdmission, fresh captureapp.PolicySourceCheck, intents auditapp.CaptureOperationPublication) {
+func qualifyManualRecordingSave(t *testing.T, ctx context.Context, f *capacitySQLFixture, admissions *postgres.ContextAdmissions, policy policySourceAcceptedFixture, source captureapp.PolicySourceAdmission, fresh captureapp.PolicySourceCheck, intents captureapp.ContextAcceptedIntents) {
 	t.Helper()
 	before := readManualSaveCounters(t, ctx, f, policy)
 	var beforeGrant manualPolicyGrantSpend
@@ -158,17 +156,13 @@ func qualifyManualRecordingSave(t *testing.T, ctx context.Context, f *capacitySQ
 				t.Fatal("late joined cancellation overwrote positively stored evidence")
 			}
 		})
-		intent, err := intents.AcknowledgedCaptureIntent(ctx, accepted.CaptureID)
+		intent, err := intents.AcceptedCaptureIntent(ctx, accepted.CaptureID)
 		if err != nil || intent.Actor != policy.Authority.Executor || intent.Initiator == nil || *intent.Initiator != original.RecordingSave.Initiator.Principal {
 			t.Fatal("immutable manual initiator and original executor audit", intent, err)
 		}
-		var raw []byte
-		if err = f.admin.QueryRow(ctx, `SELECT intent->'Actor' FROM operation_audit WHERE root_id=$1 AND id=$2`, original.RootID, accepted.CaptureID).Scan(&raw); err != nil {
-			t.Fatal(err)
-		}
 		var actor identity.Principal
-		if json.Unmarshal(raw, &actor) != nil || actor != *intent.Initiator {
-			t.Fatal("operation audit actor is not actual manual initiator", actor)
+		if err = f.admin.QueryRow(ctx, `SELECT issuer,subject,client_id,identity_type FROM audit_event WHERE operation_id=$1 AND kind='capture.start'`, accepted.CaptureID).Scan(&actor.Issuer, &actor.Subject, &actor.ClientID, &actor.Kind); err != nil || actor != *intent.Initiator {
+			t.Fatal("capture audit actor is not actual manual initiator", actor, err)
 		}
 		var anchor, deleteBy time.Time
 		if err = f.admin.QueryRow(ctx, `SELECT anchor_at,delete_by FROM context_processing WHERE root_id=$1 AND capture_id=$2`, original.RootID, accepted.CaptureID).Scan(&anchor, &deleteBy); err != nil || !anchor.Equal(accepted.Expectation.Registration.AnchorAt) || !deleteBy.Equal(accepted.Expectation.Registration.DeleteBy) {

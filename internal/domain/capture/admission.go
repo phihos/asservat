@@ -26,9 +26,6 @@ var (
 	ErrAcquisitionNotStarted = errors.New("accepted capture acquisition not started")
 )
 
-const PendingAudit = "accepted_pending_audit"
-const IntentAudited = "intent_audited"
-
 // StorageBinding is supplied only by the protected configuration reconciler.
 // Allocation ownership is permanent in this initial facet; replacement/shrink
 // require explicit draining, not reassignment of another workload's allocation.
@@ -84,7 +81,7 @@ type Accepted struct {
 	HistoryParameters             *HistoryParameters `json:"-"`
 	HistorySource                 *HistoryLineage    `json:"-"`
 	HistoryUnavailable            bool               `json:"-"`
-	CaptureID, State              string
+	CaptureID                     string
 	ScopeDigest, SubmissionDigest artifact.Digest
 	Expectation                   artifact.ContextExpectation
 	Pin                           artifact.PinnedPod

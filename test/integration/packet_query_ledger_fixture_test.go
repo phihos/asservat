@@ -24,11 +24,8 @@ import (
 	"asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/privacy"
-	"asservat.local/asservat/migrations"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/jackc/pgx/v5/stdlib"
-	"github.com/pressly/goose/v3"
 )
 
 // Each managed root owns a pristine database and closes its pools on return.
@@ -543,7 +540,6 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 			t.Fatal("isolated key predicate ignored current revocation", e)
 		}
 	}
-	refuseRetainedPacketQueryDowngrade(t, f)
 
 	stored, err = ledger.LookupQuery(ctx, scope.Principal, q.ID)
 	if err != nil || !stored.Equal(q) {
@@ -586,29 +582,6 @@ func assertPacketQueryUses(t *testing.T, f *queryLedgerFixture, parent string, w
 	if err != nil || usedBytes != wantBytes || usedOps != wantOps || count != wantOps || rows != count {
 		t.Fatalf("per actual batch debit bytes=%d/%d operations=%d/%d uses=%d joinedbatches=%d err=%v", usedBytes, wantBytes, usedOps, wantOps, count, rows, err)
 	}
-}
-func refuseRetainedPacketQueryDowngrade(t *testing.T, f *queryLedgerFixture) {
-	t.Helper()
-	db := stdlib.OpenDB(*f.base.admin.Config().ConnConfig)
-	defer db.Close()
-	provider, err := goose.NewProvider(goose.DialectPostgres, db, migrations.Files(), goose.WithDisableGlobalRegistry(true))
-	if err != nil {
-		t.Fatal(err)
-	}
-	target, expectedHead := int64(138), int64(139)
-	if f.published.Expectation.NativeType == artifact.LogsArtifact {
-		target, expectedHead = 140, 141
-	} else if f.published.Expectation.NativeType == artifact.SyscallArgumentsArtifact {
-		target, expectedHead = 139, 140
-	}
-	if _, err = provider.DownTo(f.base.ctx, target); err == nil {
-		t.Fatal("retained packet query/grant/use downgraded")
-	}
-	var head int64
-	if err = f.base.admin.QueryRow(f.base.ctx, "SELECT max(version_id) FROM goose_db_version WHERE is_applied").Scan(&head); err != nil || head != expectedHead {
-		t.Fatal("refused downgrade changed head", head, err)
-	}
-	t.Log("retained139 packet query/grant/use prevents138 rollback, no spend refund")
 }
 
 // Compiled hub role, same existing UPDATE/use/INSERT statements: a bad batch

@@ -11,15 +11,6 @@ import (
 
 type captureLifecycleQueries struct{ *custodydb.Queries }
 
-// Capture cleanup uses only the private filtered views and the existing fixed
-// retirement functions. Source acceptance and role grants are separate duties.
-func NewCaptureOperationLifecycles(ctx context.Context, pool *pgxpool.Pool, policy value.OperationLifecyclePolicy) (*OperationLifecycles, error) {
-	if !value.CaptureOperationPolicy(policy) {
-		return nil, app.ErrUnavailable
-	}
-	return NewScopedCaptureOperationLifecycles(ctx, pool, policy.RootID, policy.InstallationID, policy.StoreID)
-}
-
 // The installed cleanup compartment pins storage and installation identity, not a
 // newly selected policy. Every historical row still supplies and validates its
 // own original immutable lifecycle in the existing locked transaction.

@@ -142,24 +142,6 @@ func (s healthyOperationObjects) FindOperationOutcome(ctx context.Context, out v
 
 // Digests bind minimized records/ciphertext receipts, never native evidence.
 func OperationLifecycleDigest(v any) artifact.Digest {
-	switch r := v.(type) {
-	case value.OperationIntent:
-		if r.Name == value.CaptureOperationName {
-			return captureCompletionDigest(r, "intent")
-		}
-	case value.OperationOutcome:
-		if r.Intent.Name == value.CaptureOperationName {
-			return captureCompletionDigest(r, "outcome")
-		}
-	case *value.OperationIntent:
-		if r != nil && r.Name == value.CaptureOperationName {
-			return captureCompletionDigest(*r, "intent")
-		}
-	case *value.OperationOutcome:
-		if r != nil && r.Intent.Name == value.CaptureOperationName {
-			return captureCompletionDigest(*r, "outcome")
-		}
-	}
 	b, e := json.Marshal(v)
 	if e != nil || len(b) > 32<<10 {
 		return artifact.Digest{}

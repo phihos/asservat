@@ -11,7 +11,6 @@ import (
 
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
-	auditapp "asservat.local/asservat/internal/application/audit"
 	authapp "asservat.local/asservat/internal/application/authorization"
 	captureapp "asservat.local/asservat/internal/application/capture"
 	executionapp "asservat.local/asservat/internal/application/execution"
@@ -166,15 +165,6 @@ func qualifyManualArgumentPreparation(t *testing.T, ctx context.Context, admin *
 	e := accepted.Expectation
 	if e.NativeType != artifact.SyscallArgumentsArtifact || e.DataClass != "raw" || e.Recording == nil || e.Recording.Arguments == nil {
 		t.Fatal("argument admission lost native class", e.NativeType, e.DataClass)
-	}
-	intentPool := poolFor("capture_audit_runtime", "synthetic-capture-audit")
-	defer intentPool.Close()
-	intents, err := postgres.NewCaptureIntentAudits(ctx, intentPool, s.a.RootID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err = (auditapp.CaptureIntentPublisher{Ledger: intents, Objects: &objectstore.CaptureIntentObjects{Store: store, Seal: keys, Open: keys}}).PublishCaptureIntents(ctx); err != nil {
-		t.Fatal("encrypted intent acknowledgement", err)
 	}
 	// The installed hub aggregates execution; its retired standalone duty cannot issue a credential.
 	executionPool := grantPool

@@ -8,17 +8,16 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 )
 
-// CaptureIntent is minimized accepted-control provenance. The expectation
-// digest binds the complete audience/retention facts without copying evidence,
-// reason text, policy bodies, bearer tokens or source Kubernetes objects here.
 type CaptureGroupBinding struct {
 	ParentCaptureID        string
 	SelectionDigest        artifact.Digest
 	ChildIndex, ChildCount int
 }
 
+// CaptureIntent is the minimized accepted-capture provenance read back from
+// the context_capture row. The expectation digest binds the complete
+// audience/retention facts. It is not acquisition authority.
 type CaptureIntent struct {
-	ReasonRef                                                      *CaptureReasonRef    `json:",omitempty"`
 	Group                                                          *CaptureGroupBinding `json:",omitempty"`
 	Initiator                                                      *identity.Principal  `json:",omitempty"`
 	RootID, CaptureID, CaseID, OccurrenceID, ArtifactID, AttemptID string
@@ -33,9 +32,6 @@ type CaptureIntent struct {
 }
 
 func (r CaptureIntent) Valid() bool {
-	if r.ReasonRef != nil && (!r.ReasonRef.Valid() || r.Initiator == nil) {
-		return false
-	}
 	if g := r.Group; g != nil {
 		// A recording save child runs as its policy for a named initiator; an
 		// ADR-276 composition child runs as the requesting human itself.
@@ -65,10 +61,4 @@ func (r CaptureIntent) Requester() identity.Principal {
 		return *r.Initiator
 	}
 	return r.Actor
-}
-func CaptureIntentKey(root, capture string) string {
-	return "capture-intent/v1/" + root + "/" + capture + "/record"
-}
-func (r Receipt) ValidCaptureIntent(root, capture string) bool {
-	return authorization.UUID(root) && authorization.UUID(capture) && r.Key == CaptureIntentKey(root, capture) && (r.Version != "null" && identity.Text(r.Version, 1024)) && identity.Text(r.ETag, 256) && r.Bytes > 0 && r.Bytes <= 128<<10 && r.SHA256 != (artifact.Digest{})
 }

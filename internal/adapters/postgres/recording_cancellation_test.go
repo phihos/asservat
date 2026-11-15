@@ -14,7 +14,7 @@ import (
 )
 
 func TestArgumentProgressOffersStopButRequestRemainsNonterminal(t *testing.T) {
-	f := progressFactsFixture(t, "pending")
+	f := progressFactsFixture(t, "accepted")
 	var e artifact.ContextExpectation
 	if err := json.Unmarshal(f.ContextCapture.ExpectationJson, &e); err != nil {
 		t.Fatal(err)

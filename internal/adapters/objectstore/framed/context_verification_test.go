@@ -33,9 +33,9 @@ func TestContextVerificationAuditPinsCopiesScopeAndPurpose(t *testing.T) {
 	if json.Unmarshal(b, &envelope) != nil {
 		t.Fatal("fixture")
 	}
-	envelope.Format = captureIntentFormat
+	envelope.Format = "asservat-other-audit/v1"
 	other, _ := json.Marshal(envelope)
-	if verifyControlAudit(ctx, k, captureIntentFormat, r.RootID, r.CaptureID, r, other, 64<<10) == nil {
+	if verifyControlAudit(ctx, k, "asservat-other-audit/v1", r.RootID, r.CaptureID, r, other, 64<<10) == nil {
 		t.Fatal("cross-purpose audit accepted")
 	}
 	envelope.Format = contextVerificationFormat

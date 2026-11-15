@@ -37,11 +37,7 @@ type publicContextOperationPorts struct {
 	captureapp.ContextRetentionResolver
 	captureapp.ContextStorageReader
 	captureapp.ContextProcessingCoverageReader
-	auditapp.CaptureOperationIntentReader
-	auditapp.CaptureOperationJournal
-	auditapp.CaptureOperationAcknowledgements
-	auditapp.ClosedOperationObjects
-	auditapp.CaptureOperationReader
+	captureapp.ContextAcceptedIntents
 	executionapp.APIExecutionReader
 	executionapp.APIExecutionPreparer
 	executionapp.APIExecutionRecorder
@@ -74,7 +70,7 @@ func publicContextOperationFixture(t *testing.T) (PublicContextOperationsConfig,
 	native := &evidence.ContextNativeRuntime{} // handle identity only; never exercised
 	return c, PublicContextOperationServices{
 		Investigation: captureapp.ContextInvestigation{RootID: root, InstallationID: installation, Previews: p, Replay: p, Admission: p, Resolution: p, Targets: p, Eligibility: p, Capabilities: p, Retention: p, Storage: p, Processing: p, Lifetime: time.Minute},
-		Intents:       auditapp.CaptureOperationPublication{RootID: root, Completed: p, Journal: p, Acknowledgements: p, Writer: p, Reader: p, MAC: mac},
+		Intents:       p,
 		Regional:      RegionalAPIContextStart{Runner: executionapp.APIContextRunner{Read: p, Prepare: p, Record: p, Eligibility: p, Retention: p}, Router: &contextstart.Router{}},
 		Progress:      captureapp.ContextProgressService{RootID: root, InstallationID: installation, Reader: p},
 		Cases:         catalogapp.ContextCaseService{RootID: root, InstallationID: installation, Routes: p, Permissions: p, Catalog: p, Retention: p, Processing: p},
@@ -91,10 +87,9 @@ func TestPublicContextOperationsOwnCompleteSubmissionAndNativeBindings(t *testin
 	}
 	var _ presentation.ContextContinuation = v.submission
 	regional, ok := v.submission.Start.(RegionalAPIContextStart)
-	publication, auditOK := v.submission.Intents.(auditapp.CaptureOperationPublication)
 	navigator, navOK := v.progress.Navigation.(captureapp.ContextCaseNavigator)
 	cases, caseOK := navigator.Cases.(catalogapp.ContextCaseService)
-	if !ok || !auditOK || !navOK || !caseOK || regional.Router != s.Regional.Router || regional.Runner.Read != s.Regional.Runner.Read || regional.Runner.Capabilities != s.Investigation.Capabilities || regional.Runner.Now == nil || publication.MAC != s.Intents.MAC || v.submission.Resolution != s.Investigation.Resolution || v.submission.Admission != s.Investigation.Admission || cases.Catalog != s.Cases.Catalog || v.downloads.Runtime != s.Native.Runtime || v.stop.Active != s.Native.Runtime {
+	if !ok || v.submission.Intents != s.Intents || !navOK || !caseOK || regional.Router != s.Regional.Router || regional.Runner.Read != s.Regional.Runner.Read || regional.Runner.Capabilities != s.Investigation.Capabilities || regional.Runner.Now == nil || v.submission.Resolution != s.Investigation.Resolution || v.submission.Admission != s.Investigation.Admission || cases.Catalog != s.Cases.Catalog || v.downloads.Runtime != s.Native.Runtime || v.stop.Active != s.Native.Runtime {
 		t.Fatal("assembly replaced original submission, authority, navigation or native owner")
 	}
 	if s.Regional.Runner.Capabilities != nil || s.Progress.Navigation != nil || s.Downloads.Runtime != nil || s.Investigation.Now != nil {
@@ -146,9 +141,6 @@ func TestPublicContextOperationsRejectMissingOrForeignComposition(t *testing.T) 
 		"foreign-case-installation": func(_ *PublicContextOperationsConfig, s *PublicContextOperationServices) {
 			s.Cases.InstallationID = "10000000-0000-4000-8000-000000000099"
 		},
-		"foreign-audit-root": func(_ *PublicContextOperationsConfig, s *PublicContextOperationServices) {
-			s.Intents.RootID = "10000000-0000-4000-8000-000000000099"
-		},
 		"foreign-download-root": func(_ *PublicContextOperationsConfig, s *PublicContextOperationServices) {
 			s.Downloads.RootID = "10000000-0000-4000-8000-000000000099"
 		},
@@ -161,7 +153,7 @@ func TestPublicContextOperationsRejectMissingOrForeignComposition(t *testing.T) 
 		"admission": func(_ *PublicContextOperationsConfig, s *PublicContextOperationServices) {
 			s.Investigation.Admission = nil
 		},
-		"intent-publication": func(_ *PublicContextOperationsConfig, s *PublicContextOperationServices) { s.Intents.Completed = nil },
+		"intent-reader": func(_ *PublicContextOperationsConfig, s *PublicContextOperationServices) { s.Intents = nil },
 		"regional-reader": func(_ *PublicContextOperationsConfig, s *PublicContextOperationServices) {
 			s.Regional.Runner.Read = nil
 		},

@@ -17,12 +17,12 @@ import (
 	"asservat.local/asservat/internal/application/planning"
 	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/audit"
 	auditvalue "asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
 	privacyvalue "asservat.local/asservat/internal/domain/privacy"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -33,7 +33,6 @@ type ContextAdmissions struct {
 	root         string
 	installation string
 	retention    *RetentionTransactionGuard
-	auditMAC     *auditapp.OperationMAC
 }
 
 var _ captureapp.AdmissionTransaction = (*ContextAdmissions)(nil)
@@ -59,21 +58,6 @@ func NewContextAdmissions(ctx context.Context, pool *pgxpool.Pool, root, install
 		return nil, err
 	}
 	return &ContextAdmissions{ledger: l, root: root, installation: installation, retention: guard}, nil
-}
-
-// NewAuditedContextAdmissions explicitly selects atomic private intent backing.
-// Legacy construction remains unchanged and cannot adopt configured private
-// allocations. The protected pool/account producer must run independently.
-func NewAuditedContextAdmissions(ctx context.Context, pool *pgxpool.Pool, root, installation string, mac *auditapp.OperationMAC, guards ...*RetentionTransactionGuard) (*ContextAdmissions, error) {
-	if mac == nil || mac.AccountVersion() == "" || mac.Version() == "" {
-		return nil, value.ErrInvalid
-	}
-	s, e := NewContextAdmissions(ctx, pool, root, installation, guards...)
-	if e != nil {
-		return nil, e
-	}
-	s.auditMAC = mac
-	return s, nil
 }
 
 func captureError(err error) error {
@@ -177,7 +161,7 @@ func admittedRecord(row custodydb.ContextCapture) (value.Accepted, error) {
 	if json.Unmarshal(row.ExpectationJson, &e) != nil || json.Unmarshal(row.PodPinJson, &pin) != nil || e.Validate() != nil || e.CaptureUID != uid(row.ID) || e.Registration.Location.AttemptID != uid(row.AttemptID) || len(row.ScopeDigest) != 32 || len(row.SubmissionDigest) != 32 {
 		return value.Accepted{}, value.ErrUnavailable
 	}
-	out := value.Accepted{CaptureID: uid(row.ID), State: row.State, Expectation: e, Pin: pin, CreatedAt: row.CreatedAt.Time, Deadline: row.Deadline.Time}
+	out := value.Accepted{CaptureID: uid(row.ID), Expectation: e, Pin: pin, CreatedAt: row.CreatedAt.Time, Deadline: row.Deadline.Time}
 	if row.RepeatedFromCaptureID.Valid {
 		out.RepeatedFrom = &value.HistoryLineage{CaptureID: uid(row.RepeatedFromCaptureID), ExpiresAt: row.RepeatedFromExpiresAt.Time}
 	}
@@ -429,15 +413,9 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 			reviewed.Actor = a.Requester()
 			reviewed.Target = a.Plan.Input.Target.Request
 		}
-		var reasonRef []byte
+		var reason pgtype.Text
 		if reviewed.Intent.Reason != nil {
-			if s.auditMAC == nil {
-				return value.ErrUnavailable
-			}
-			reasonRef, err = json.Marshal(reviewed.Intent.Reason)
-			if err != nil {
-				return value.ErrUnavailable
-			}
+			reason = pgtype.Text{String: *reviewed.Intent.Reason, Valid: true}
 		}
 		var policyReservation *policyCaptureReservation
 		if group == nil {
@@ -470,24 +448,6 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 		}
 		if group != nil && group.Composition {
 			acceptedAt = ts(group.AcceptedAt)
-		}
-		var auditAccount audit.CaptureAuditAccount
-		var auditUntil, auditHardUntil time.Time
-		if s.auditMAC != nil {
-			raw, e := q.LockCaptureAuditAdmission(ctx, custodydb.LockCaptureAuditAdmissionParams{RootID: id(s.root), AllocationID: id(r.AllocationID)})
-			if e != nil {
-				return e
-			}
-			var observed struct {
-				audit.CaptureAuditAccount
-				ValidUntil time.Time
-				HardUntil  time.Time
-			}
-			if len(raw) > 8<<10 || json.Unmarshal(raw, &observed) != nil || !observed.CaptureAuditAccount.Valid() || observed.RootID != s.root || observed.AllocationID != r.AllocationID || observed.AccountVersion != s.auditMAC.AccountVersion() {
-				return value.ErrUnavailable
-			}
-			auditAccount = observed.CaptureAuditAccount
-			auditUntil, auditHardUntil = observed.ValidUntil, observed.HardUntil
 		}
 		p, allocation, err := lockAllocation(ctx, q, r.AllocationID)
 		if err != nil {
@@ -607,9 +567,6 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 					return err
 				}
 			}
-			if s.auditMAC != nil && !n.Time.Before(auditUntil) {
-				return value.ErrChanged
-			}
 			if capacityUntil.InfinityModifier < 0 || capacityUntil.InfinityModifier == 0 && !n.Time.Before(capacityUntil.Time) {
 				return value.ErrChanged
 			}
@@ -705,10 +662,6 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 		if err != nil || len(pinJSON) > 4096 {
 			return value.ErrInvalid
 		}
-		operationID := ""
-		if s.auditMAC != nil {
-			operationID = in.CaptureID
-		}
 		var repeatedID pgtype.UUID
 		var repeatedUntil pgtype.Timestamptz
 		if a.RepeatedFrom != nil {
@@ -760,7 +713,7 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 			childPreviewID = ""
 			childRequestKey = recordingGroupChildRequestKey(group.Preview.CaptureID, int(ordinal.Int16))
 		}
-		row, err := q.InsertContextCapture(ctx, custodydb.InsertContextCaptureParams{ReasonRef: reasonRef, GroupID: groupID, GroupOrdinal: ordinal, ID: id(in.CaptureID), RootID: id(s.root), PreviewID: id(childPreviewID), RequestKey: childRequestKey, SubmissionDigest: a.SubmissionDigest[:], ScopeDigest: a.Plan.ScopeDigest[:], ScopeJson: a.Plan.CanonicalScope, ExpectationJson: expectationJSON, PodPinJson: pinJSON, AttemptID: id(r.Location.AttemptID), PermissionEpoch: stream.Epoch, PermissionSequence: stream.Sequence, IdentityPolicyUid: fresh.IdentityRevision.UID, IdentityPolicyGeneration: fresh.IdentityRevision.Generation, IdentityPolicyDigest: fresh.IdentityRevision.Digest[:], Deadline: ts(in.Deadline), IntentOperationID: id(operationID), ShareInstruction: instruction, RepeatedFromCaptureID: repeatedID, RepeatedFromExpiresAt: repeatedUntil, AcceptedAt: acceptedAt})
+		row, err := q.InsertContextCapture(ctx, custodydb.InsertContextCaptureParams{Reason: reason, GroupID: groupID, GroupOrdinal: ordinal, ID: id(in.CaptureID), RootID: id(s.root), PreviewID: id(childPreviewID), RequestKey: childRequestKey, SubmissionDigest: a.SubmissionDigest[:], ScopeDigest: a.Plan.ScopeDigest[:], ScopeJson: a.Plan.CanonicalScope, ExpectationJson: expectationJSON, PodPinJson: pinJSON, AttemptID: id(r.Location.AttemptID), PermissionEpoch: stream.Epoch, PermissionSequence: stream.Sequence, IdentityPolicyUid: fresh.IdentityRevision.UID, IdentityPolicyGeneration: fresh.IdentityRevision.Generation, IdentityPolicyDigest: fresh.IdentityRevision.Digest[:], Deadline: ts(in.Deadline), ShareInstruction: instruction, RepeatedFromCaptureID: repeatedID, RepeatedFromExpiresAt: repeatedUntil, AcceptedAt: acceptedAt})
 		if err != nil {
 			return err
 		}
@@ -769,43 +722,13 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 				return err
 			}
 		}
-		if s.auditMAC != nil {
-			intent, e := captureIntent(row)
-			if e != nil {
-				return e
-			}
-			managedUntil := in.Deadline
-			if capacityUntil.InfinityModifier == 0 {
-				managedUntil = capacityUntil.Time
-			}
-			bound := contextMetadataDeadline(ctx, managedUntil, auditUntil, fresh.ValidUntil, a.Eligibility.ValidUntil, a.Eligibility.VerifiedIdentity.ValidUntil, a.Storage.FreshUntil, binding.FreshUntil.Time, p.ValidUntil.Time, allocation.ValidUntil.Time, in.Deadline)
-			requestUntil := bound
-			if group != nil && group.RequestBounds != nil {
-				requestUntil, e = recordingGroupAuditUntil(*group.RequestBounds, a, intent, auditHardUntil, allocation.ValidUntil.Time, p.ValidUntil.Time, allocation.ValidUntil.Time)
-				if e != nil {
-					return e
-				}
-			}
-			var operation auditvalue.OperationIntent
-			if reviewed.Intent.Reason != nil {
-				envelope, decodeErr := auditapp.DecodeCaptureReasonEnvelope(reviewed.ReasonEnvelope)
-				if decodeErr != nil {
-					return value.ErrUnavailable
-				}
-				operation, e = auditapp.PrepareCaptureReasonOperation(intent, auditAccount, s.auditMAC, requestUntil, envelope)
-			} else {
-				operation, e = auditapp.PrepareCaptureOperation(intent, auditAccount, s.auditMAC, requestUntil)
-			}
-			if e != nil {
-				return value.ErrUnavailable
-			}
-			body, e := auditapp.EncodeCaptureOperationIntent(operation)
-			if e != nil {
-				return value.ErrUnavailable
-			}
-			if e = q.ReserveCaptureAudit(ctx, custodydb.ReserveCaptureAuditParams{RootID: id(s.root), CaptureID: row.ID, IntentValue: body, CaptureDigest: digest(intent), OriginalUntil: ts(bound)}); e != nil {
-				return e
-			}
+		// ADR-330 D6: the capture's audit row commits with its admission.
+		operation := "request_capture"
+		if _, _, policy := authorization.PolicyExecutor(a.Requester()); policy {
+			operation = "policy_capture"
+		}
+		if err = InsertAuditEvent(ctx, q, auditvalue.Event{ID: uuid.NewString(), OperationID: in.CaptureID, Kind: "capture.start", Operation: operation, Actor: a.Requester(), Status: "success", Effect: "accepted", CaseIDs: []string{a.CaseID}, CaptureIDs: []string{in.CaptureID}}); err != nil {
+			return err
 		}
 		if err = check(); err != nil {
 			return err
@@ -815,9 +738,6 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 			out.MetadataValidUntil = contextMetadataDeadline(ctx, fresh.ValidUntil, a.Eligibility.ValidUntil, a.Eligibility.VerifiedIdentity.ValidUntil)
 			if capacityUntil.InfinityModifier == pgtype.Finite {
 				out.MetadataValidUntil = contextMetadataDeadline(ctx, out.MetadataValidUntil, capacityUntil.Time)
-			}
-			if s.auditMAC != nil {
-				out.MetadataValidUntil = contextMetadataDeadline(ctx, out.MetadataValidUntil, auditUntil)
 			}
 		}
 		return err

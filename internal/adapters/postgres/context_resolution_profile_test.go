@@ -46,7 +46,7 @@ func compiledProfileReplayRow(t *testing.T) custodydb.ContextCapture {
 	encoded, _ := json.Marshal(frozen)
 	r := needed.Request
 	profile := artifact.GoProfileAcquisition{SourceRef: r.SourceRef, EndpointDigest: in.Endpoints[0].EndpointDigest, Type: r.Type, Mode: r.Mode, DurationMillis: r.DurationSeconds * 1000, ForceGC: r.ForceGC, TimeoutMillis: 15000, MaxBytes: r.NativeLimit, Composition: encoded}
-	row := progressFactsFixture(t, "pending").ContextCapture
+	row := progressFactsFixture(t, "accepted").ContextCapture
 	var e artifact.ContextExpectation
 	if err = json.Unmarshal(row.ExpectationJson, &e); err != nil {
 		t.Fatal(err)

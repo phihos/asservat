@@ -12,7 +12,7 @@ import (
 )
 
 const listRetentionPreviewContexts = `-- name: ListRetentionPreviewContexts :many
-SELECT c.id,c.root_id,c.submission_digest,c.scope_digest,c.expectation_json,c.pod_pin_json,c.attempt_id,c.created_at,c.deadline,c.state,
+SELECT c.id,c.root_id,c.submission_digest,c.scope_digest,c.expectation_json,c.pod_pin_json,c.attempt_id,c.created_at,c.deadline,
  a.cluster_id,a.request_digest,a.effective_expires_at,a.effective_delete_by,a.retention_sequence
 FROM context_capture c JOIN custody_attempt a ON a.id=c.attempt_id
 WHERE c.root_id=$1 AND a.state<>'deleted' AND a.effective_delete_by>clock_timestamp()
@@ -36,7 +36,6 @@ type ListRetentionPreviewContextsRow struct {
 	AttemptID          pgtype.UUID
 	CreatedAt          pgtype.Timestamptz
 	Deadline           pgtype.Timestamptz
-	State              string
 	ClusterID          pgtype.UUID
 	RequestDigest      []byte
 	EffectiveExpiresAt pgtype.Timestamptz
@@ -68,7 +67,6 @@ func (q *Queries) ListRetentionPreviewContexts(ctx context.Context, arg ListRete
 			&i.AttemptID,
 			&i.CreatedAt,
 			&i.Deadline,
-			&i.State,
 			&i.ClusterID,
 			&i.RequestDigest,
 			&i.EffectiveExpiresAt,

@@ -172,7 +172,7 @@ func manualGroupWindows(t *testing.T, ctx context.Context, f *capacitySQLFixture
 	return out
 }
 
-func qualifyManualRecordingSaveGroup(t *testing.T, ctx context.Context, f *capacitySQLFixture, admissions *postgres.ContextAdmissions, policy policySourceAcceptedFixture, ledger *postgres.PolicySources, original captureapp.PolicySourceAdmission, refresh func(*testing.T) captureapp.PolicySourceCheck, intents auditapp.CaptureOperationPublication, cancellation bool, controls ...func(value.RecordingSaveGroupAdmission)) {
+func qualifyManualRecordingSaveGroup(t *testing.T, ctx context.Context, f *capacitySQLFixture, admissions *postgres.ContextAdmissions, policy policySourceAcceptedFixture, ledger *postgres.PolicySources, original captureapp.PolicySourceAdmission, refresh func(*testing.T) captureapp.PolicySourceCheck, intents captureapp.ContextAcceptedIntents, cancellation bool, controls ...func(value.RecordingSaveGroupAdmission)) {
 	t.Helper()
 	count := policy.Compiled.IncidentPods
 	if count < 2 || count > 16 || policy.Compiled.ObservedPods < count {

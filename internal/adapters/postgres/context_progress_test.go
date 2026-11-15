@@ -10,7 +10,6 @@ import (
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/audit"
 	value "asservat.local/asservat/internal/domain/capture"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -28,26 +27,9 @@ func progressFactsFixture(t *testing.T, stage string) custodydb.ReadContextProgr
 	}
 	ej, _ := json.Marshal(e)
 	pj, _ := json.Marshal(p.Pin)
-	c := custodydb.ContextCapture{ID: id(p.CaptureID), RootID: id(p.RootID), RequestKey: make([]byte, 32), SubmissionDigest: digest("submission"), ScopeDigest: sd[:], ScopeJson: scope, ExpectationJson: ej, PodPinJson: pj, AttemptID: id(p.AttemptID), PermissionEpoch: id(p.InstallationID), PermissionSequence: 1, IdentityPolicyUid: "identity", IdentityPolicyGeneration: 1, IdentityPolicyDigest: digest("policy"), CreatedAt: ts(now), Deadline: ts(p.Deadline), State: value.PendingAudit, ProgressRevision: 1}
+	c := custodydb.ContextCapture{ID: id(p.CaptureID), RootID: id(p.RootID), RequestKey: make([]byte, 32), SubmissionDigest: digest("submission"), ScopeDigest: sd[:], ScopeJson: scope, ExpectationJson: ej, PodPinJson: pj, AttemptID: id(p.AttemptID), PermissionEpoch: id(p.InstallationID), PermissionSequence: 1, IdentityPolicyUid: "identity", IdentityPolicyGeneration: 1, IdentityPolicyDigest: digest("policy"), CreatedAt: ts(now), Deadline: ts(p.Deadline), ProgressRevision: 1}
 	f := custodydb.ReadContextProgressFactsRow{ContextCapture: c, CustodyState: artifact.Reserved, RequestDigest: digest(normalized(r)), EffectiveExpiresAt: ts(r.ExpiresAt), EffectiveDeleteBy: ts(r.DeleteBy)}
-	if stage == "pending" {
-		return f
-	}
-	intent, err := captureIntent(c)
-	if err != nil {
-		t.Fatal(err)
-	}
-	c.State = value.IntentAudited
-	c.IntentAcknowledgedAt = ts(now.Add(time.Second))
-	c.IntentDigest = digest(intent)
-	c.IntentObjectKey = pgtype.Text{String: audit.CaptureIntentKey(intent.RootID, intent.CaptureID), Valid: true}
-	c.IntentObjectVersion = pgtype.Text{String: "synthetic-version", Valid: true}
-	c.IntentObjectEtag = pgtype.Text{String: "synthetic-etag", Valid: true}
-	c.IntentObjectBytes = pgtype.Int8{Int64: 128, Valid: true}
-	c.IntentObjectSha256 = digest("synthetic-capture-audit")
-	c.ProgressRevision++
-	f.ContextCapture = c
-	if stage == "audited" {
+	if stage == "accepted" {
 		return f
 	}
 	f.CustodyState = artifact.StoredUnpublished
@@ -61,7 +43,7 @@ func progressFactsFixture(t *testing.T, stage string) custodydb.ReadContextProgr
 	f.VerifiedAt = ts(now.Add(2 * time.Second))
 	f.ExpectationDigest = digest(e)
 	f.VerifiedCopiesDigest = f.CopiesDigest
-	f.VerifiedIntentDigest = c.IntentDigest
+	f.VerifiedIntentDigest = captureIntentDigest(c)
 	f.AuthorityDigest = digest("authority")
 	f.PermissionEpoch = c.PermissionEpoch
 	f.PermissionSequence = pgtype.Int8{Int64: 1, Valid: true}
@@ -85,7 +67,7 @@ func progressFactsFixture(t *testing.T, stage string) custodydb.ReadContextProgr
 	return f
 }
 func TestProgressProjectsOnlyDurableFacts(t *testing.T) {
-	for _, tc := range []struct{ stage, phase, reason string }{{"pending", "Pending", "IntentAuditPending"}, {"audited", "Pending", "DispatchUnconfirmed"}, {"stored", "Finalizing", "VerificationPending"}, {"verified", "Finalizing", "VerificationAuditPending"}, {"verification-audited", "Finalizing", "PublicationPending"}, {"published", "Succeeded", "Published"}} {
+	for _, tc := range []struct{ stage, phase, reason string }{{"accepted", "Pending", "DispatchUnconfirmed"}, {"stored", "Finalizing", "VerificationPending"}, {"verified", "Finalizing", "VerificationAuditPending"}, {"verification-audited", "Finalizing", "PublicationPending"}, {"published", "Succeeded", "Published"}} {
 		t.Run(tc.stage, func(t *testing.T) {
 			f := progressFactsFixture(t, tc.stage)
 			got, err := progressFacts(f)
@@ -110,12 +92,8 @@ func TestProgressRejectsIncompletePublicationOrCorruptIdentity(t *testing.T) {
 		"revision-overflow": func(f *custodydb.ReadContextProgressFactsRow) {
 			f.ContextCapture.ProgressRevision = value.MaxProgressRevision + 1
 		},
-		"registration": func(f *custodydb.ReadContextProgressFactsRow) { f.RequestDigest = digest("other") },
-		"scope":        func(f *custodydb.ReadContextProgressFactsRow) { f.ContextCapture.ScopeJson = []byte(`{}`) },
-		"intent-audit": func(f *custodydb.ReadContextProgressFactsRow) {
-			f.ContextCapture.State = value.PendingAudit
-			f.ContextCapture.IntentAcknowledgedAt = pgtype.Timestamptz{}
-		},
+		"registration":      func(f *custodydb.ReadContextProgressFactsRow) { f.RequestDigest = digest("other") },
+		"scope":             func(f *custodydb.ReadContextProgressFactsRow) { f.ContextCapture.ScopeJson = []byte(`{}`) },
 		"verification":      func(f *custodydb.ReadContextProgressFactsRow) { f.VerifiedCaptureID = pgtype.UUID{} },
 		"copies":            func(f *custodydb.ReadContextProgressFactsRow) { f.VerifiedCopiesDigest = digest("other") },
 		"outcome-audit":     func(f *custodydb.ReadContextProgressFactsRow) { f.AuditAcknowledgedAt = pgtype.Timestamptz{} },

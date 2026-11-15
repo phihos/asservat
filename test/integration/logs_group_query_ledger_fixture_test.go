@@ -269,7 +269,7 @@ func admitLogsMixedGroup(t *testing.T, f *queryLedgerFixture) logsMixedAccepted 
 			t.Fatal("mixed child intent window elapsed", n)
 		}
 		childCall, cancel := context.WithDeadline(ctx, end)
-		r, readErr := publisher.AcknowledgedCaptureIntent(childCall, child.CaptureID)
+		r, readErr := publisher.AcceptedCaptureIntent(childCall, child.CaptureID)
 		cancel()
 		if readErr != nil {
 			t.Fatal("actual child capture intent", n, readErr)

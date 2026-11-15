@@ -16,7 +16,6 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
-	"asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
 	privacyvalue "asservat.local/asservat/internal/domain/privacy"
 	"github.com/jackc/pgx/v5"
@@ -63,8 +62,7 @@ func historicalPublication(row custodydb.ContextCapture) (artifact.ContextExpect
 	if err != nil {
 		return artifact.ContextExpectation{}, err
 	}
-	intent, err := captureIntent(row)
-	if err != nil || row.State != capture.IntentAudited || !row.IntentAcknowledgedAt.Valid || !bytes.Equal(row.IntentDigest, digest(intent)) || !accepted.Expectation.ServedClass() {
+	if _, err = captureIntent(row); err != nil || !accepted.Expectation.ServedClass() {
 		return artifact.ContextExpectation{}, privacy.ErrFence
 	}
 	return storedSnapshotProjection(accepted.Expectation, row.SnapshotCoverage, row.SnapshotCoverageDigest, row.SnapshotExpectationDigest)
@@ -191,7 +189,7 @@ func verificationRecord(c custodydb.ContextCapture, v custodydb.ContextVerificat
 	} else if len(executions) > 0 {
 		return audit.ContextVerification{}, privacy.ErrFence
 	}
-	if v.CaptureID != c.ID || v.RootID != c.RootID || r.ExpectationDigest != evidence.ContextExpectationDigest(e) || !bytes.Equal(v.IntentDigest, c.IntentDigest) || !r.Valid() {
+	if v.CaptureID != c.ID || v.RootID != c.RootID || r.ExpectationDigest != evidence.ContextExpectationDigest(e) || !bytes.Equal(v.IntentDigest, captureIntentDigest(c)) || !r.Valid() {
 		return audit.ContextVerification{}, privacy.ErrConflict
 	}
 	return r, nil
@@ -240,7 +238,7 @@ func (s *ContextPublications) RecordContextVerification(ctx context.Context, e a
 			if e.Profile != nil && verified.Acquisition == nil {
 				return artifact.ErrInvalid
 			}
-			params := custodydb.InsertContextVerificationParams{NativeBytes: pgtype.Int8{Int64: nativeBytes, Valid: true}, CaptureID: accepted.ID, RootID: accepted.RootID, ExpectationDigest: digest(e), CopiesDigest: digest(c), IntentDigest: accepted.IntentDigest, AuthorityDigest: a.AuthorityDigest[:], PermissionEpoch: id(a.PermissionEpoch), PermissionSequence: a.PermissionSequence}
+			params := custodydb.InsertContextVerificationParams{NativeBytes: pgtype.Int8{Int64: nativeBytes, Valid: true}, CaptureID: accepted.ID, RootID: accepted.RootID, ExpectationDigest: digest(e), CopiesDigest: digest(c), IntentDigest: captureIntentDigest(accepted), AuthorityDigest: a.AuthorityDigest[:], PermissionEpoch: id(a.PermissionEpoch), PermissionSequence: a.PermissionSequence}
 			if verified.Acquisition != nil {
 				params.AcquisitionStartedAt, params.AcquisitionCompletedAt = ts(verified.Acquisition.StartedAt), ts(verified.Acquisition.CompletedAt)
 			}

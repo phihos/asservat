@@ -12,7 +12,6 @@ import (
 	compiler "asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
-	capture "asservat.local/asservat/internal/domain/capture"
 	value "asservat.local/asservat/internal/domain/execution"
 	"asservat.local/asservat/internal/domain/identity"
 	"github.com/jackc/pgx/v5"
@@ -68,7 +67,7 @@ func liveManualIDs(ids []string) ([]pgtype.UUID, bool) {
 // is the old preparation interval and is never used as a source lifetime.
 func liveManualMatches(w app.APIContextWork, r value.APIExecution, now time.Time) bool {
 	e := w.Accepted.Expectation
-	return w.Accepted.State == capture.IntentAudited && !w.CancellationRequested && w.SourceBinding == nil && w.Actor.Kind == identity.Human && w.Actor.Valid() &&
+	return !w.CancellationRequested && w.SourceBinding == nil && w.Actor.Kind == identity.Human && w.Actor.Valid() &&
 		e.Validate() == nil && e.ExecutionClass == artifact.ContextAPIExecution && e.Recording != nil && e.Snapshot == nil && e.Profile == nil && e.Logs == nil &&
 		(e.Recording.Kind == "packetCapture" || e.Recording.Kind == "syscallTrace") && r.Valid() && r.Phase == "started" && !now.Before(r.StartedAt) &&
 		r.Binding.CaptureID == w.Accepted.CaptureID && r.Binding.CaptureID == e.CaptureUID && r.Binding.ActionID == e.ActionID && r.Binding.AttemptID == e.Registration.Location.AttemptID &&

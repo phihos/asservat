@@ -220,7 +220,7 @@ func (s *dispatchWorkflowOperations) call(ctx context.Context, window time.Durat
 
 // Consume only the already accepted normal/resolution backing. Unlike legacy
 // audit helpers this does not provision a replacement pool or refill a quota.
-func newDispatchWorkflowOperations(t *testing.T, ctx context.Context, f *capacitySQLFixture, policy policySourceAcceptedFixture, admissions *postgres.ContextAdmissions, intents auditapp.CaptureOperationPublication, workflow *manualSnapshotWorkflow, who identity.Identity, history *dispatchHistoryPersistence) *dispatchWorkflowOperations {
+func newDispatchWorkflowOperations(t *testing.T, ctx context.Context, f *capacitySQLFixture, policy policySourceAcceptedFixture, admissions *postgres.ContextAdmissions, intents captureapp.ContextAcceptedIntents, workflow *manualSnapshotWorkflow, who identity.Identity, history *dispatchHistoryPersistence) *dispatchWorkflowOperations {
 	t.Helper()
 	profiles := f.readAuditProfiles(t)
 	journalPool := f.fixturePool("operation_audit_runtime", "synthetic-operation-journal")
@@ -317,14 +317,12 @@ func logDispatchWorkflowFailure(t *testing.T, ctx context.Context, f *capacitySQ
 	defer end()
 	var rows []byte
 	err := f.admin.QueryRow(call, `SELECT coalesce(jsonb_agg(jsonb_build_object(
- 'child',c.id,'ordinal',c.group_ordinal,'state',c.state,'createdAt',c.created_at,
+ 'child',c.id,'ordinal',c.group_ordinal,'createdAt',c.created_at,
  'startBy',convert_from(c.expectation_json,'UTF8')::jsonb#>>'{Snapshot,StartBy}',
  'processingUntil',convert_from(c.expectation_json,'UTF8')::jsonb#>>'{Snapshot,ProcessingUntil}',
- 'executionPhase',e.phase,'auditRequestUntil',a.request_until,'auditWriteUntil',a.write_until,
- 'intentStarted',a.intent_started,'intentAcknowledgedAt',c.intent_acknowledged_at
+ 'executionPhase',e.phase
  ) ORDER BY c.group_ordinal),'[]'::jsonb)::text
  FROM context_capture c LEFT JOIN context_execution e ON e.root_id=c.root_id AND e.capture_id=c.id
- LEFT JOIN operation_audit a ON a.root_id=c.root_id AND a.id=c.intent_operation_id
  WHERE c.group_id=$1`, parent).Scan(&rows)
 	if err != nil {
 		t.Logf("workflow_failure_deadline_readback_error=%v", err)
@@ -333,7 +331,7 @@ func logDispatchWorkflowFailure(t *testing.T, ctx context.Context, f *capacitySQ
 	t.Logf("workflow_failure_stored_child_deadlines=%s", rows)
 }
 
-func qualifyManualRecordingSaveDispatch(t *testing.T, ctx context.Context, f *capacitySQLFixture, admissions *postgres.ContextAdmissions, policy policySourceAcceptedFixture, ledger *postgres.PolicySources, original captureapp.PolicySourceAdmission, refresh func(*testing.T) captureapp.PolicySourceCheck, intents auditapp.CaptureOperationPublication, requestModes ...bool) {
+func qualifyManualRecordingSaveDispatch(t *testing.T, ctx context.Context, f *capacitySQLFixture, admissions *postgres.ContextAdmissions, policy policySourceAcceptedFixture, ledger *postgres.PolicySources, original captureapp.PolicySourceAdmission, refresh func(*testing.T) captureapp.PolicySourceCheck, intents captureapp.ContextAcceptedIntents, requestModes ...bool) {
 	t.Helper()
 	requestMode := len(requestModes) > 0 && requestModes[0]
 	count := policy.Compiled.IncidentPods

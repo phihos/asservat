@@ -69,11 +69,10 @@ func TestGeneratedSourceSnapshotPlanDecodesAcceptedAPIWork(t *testing.T) {
 	row.PodPinJson, _ = json.Marshal(original.Pin)
 	row.ScopeJson, row.ScopeDigest = plan.CanonicalScope, plan.ScopeDigest[:]
 	row.CreatedAt, row.Deadline = ts(now), ts(request.ProcessingUntil)
-	intent, err := captureIntent(row)
+	_, err = captureIntent(row)
 	if err != nil {
 		t.Fatal("full snapshot audit input", err)
 	}
-	row.IntentDigest = digest(intent)
 	work, err := apiWork(row)
 	if err != nil || work.Actor != check.Authority.Executor || work.Accepted.Expectation.Snapshot == nil || !work.Accepted.Expectation.Snapshot.Equal(request) || evidence.ContextExpectationDigest(work.Accepted.Expectation) != evidence.ContextExpectationDigest(e) {
 		t.Fatal("application-generated snapshot failed accepted API codec", err)
