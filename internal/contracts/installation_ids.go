@@ -20,8 +20,6 @@ type InstallationIDs struct {
 	ClusterID        string
 	IssuerEpoch      string
 	PermissionRootID string
-	BrowserRootID    string
-	SessionEpoch     string
 	RoleSetupID      string
 	PeerID           string
 }
@@ -43,7 +41,7 @@ func ReadInstallationIDs(root *os.Root) (InstallationIDs, error) {
 		return out, ErrInstallationIDs
 	}
 	targets := map[string]*string{"installationID": &out.InstallationID, "clusterID": &out.ClusterID, "issuerEpoch": &out.IssuerEpoch,
-		"permissionRootID": &out.PermissionRootID, "browserRootID": &out.BrowserRootID, "sessionEpoch": &out.SessionEpoch, "roleSetupID": &out.RoleSetupID, "peerID": &out.PeerID}
+		"permissionRootID": &out.PermissionRootID, "roleSetupID": &out.RoleSetupID, "peerID": &out.PeerID}
 	for _, key := range InstallationIDKeys() {
 		v, err := readInstallationID(root, key)
 		if err != nil {

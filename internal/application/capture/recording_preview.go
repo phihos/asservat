@@ -169,14 +169,10 @@ func (s ContextInvestigation) previewRecording(ctx context.Context, source ident
 		p.Deadline = identity.Earlier(p.Deadline, intent.RepeatedFrom.ExpiresAt)
 	}
 	p.AssessmentID, p.AssessmentRulesDigest = s.NewID(), compiler.RecorderAssessmentRulesDigest()
-	required, err := s.requireRecordingApproval(ctx, source, i.Principal)
-	if err != nil {
-		return zero, previewFailure("approvals", err)
-	}
 	mark := time.Now()
 	// ADR-283 part 3: Kubernetes peers are resolved once by the target's
 	// region (after eligibility, checked by facts) and frozen in the plan.
-	plan, err := s.compileRecorderPeers(ctx, planning.RecorderInput{CaptureID: p.CaptureID, Executor: p.Actor, Target: target, Composition: *intent.Composition, Retention: f.retention, Deadline: p.Deadline, NodeRecorder: true, RequireApproval: required})
+	plan, err := s.compileRecorderPeers(ctx, planning.RecorderInput{CaptureID: p.CaptureID, Executor: p.Actor, Target: target, Composition: *intent.Composition, Retention: f.retention, Deadline: p.Deadline, NodeRecorder: true})
 	auditapp.MarkStep(ctx, "p-compile", mark)
 	if err != nil {
 		return zero, previewFailure("compile", err)
@@ -185,8 +181,7 @@ func (s ContextInvestigation) previewRecording(ctx context.Context, source ident
 	p.AssessmentRulesDigest = compiler.RecorderAssessmentRulesFor(plan.Actions)
 	recordable := compiler.AcceptableRecorder(plan).Acceptable() || compiler.AcceptableProfile(plan).Acceptable() || compiler.AcceptableLogs(plan).Acceptable()
 	if _, _, policy := authorization.PolicyExecutor(i.Principal); policy {
-		// requireRecordingApproval above already checked the package-private
-		// accepted settings provenance. This structural plan is not a permit:
+		// This structural plan is not a permit:
 		// admission must retain the original reviewed policy grant, and start
 		// must obtain its committed observation receipt for the actual source.
 		var acceptanceErr error

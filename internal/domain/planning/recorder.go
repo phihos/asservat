@@ -47,8 +47,8 @@ const (
 	// ReasonLiveProfile: live profiling is intrusive for approval purposes
 	// even when the mechanism is an HTTP GET (REQ-PRF-002, ADR-285).
 	ReasonLiveProfile = "liveProfile"
-	// ReasonRecordingApproval: the installation requires approval for every
-	// packet/syscall recording (REQ-SYS-002 "unless an administrator requires more").
+	// ReasonRecordingApproval marks the siblings of a composition group that
+	// shares one review because another child needs it.
 	ReasonRecordingApproval = "recordingApprovalRequired"
 	// Fixed observation limits of a manual raw-byte predicate plan
 	// (REQ-AUT-006): cumulative bytes entering the predicate and its rate.
@@ -117,8 +117,7 @@ type RecorderInput struct {
 	Composition ProfileComposition
 	Retention   privacy.Resolution
 	Deadline    time.Time
-	// RequireApproval is the protected installation setting that every
-	// recording needs approval (ADR-249); never a caller option.
+	// RequireApproval makes this child part of its group's shared review.
 	RequireApproval bool
 	// NodeRecorder marks a plan whose target's node collector reported the
 	// packet recorder at preview (ADR-248): acceptance "nodeRecorder" instead

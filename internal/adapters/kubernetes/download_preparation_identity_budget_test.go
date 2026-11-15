@@ -106,7 +106,7 @@ func (f *preparationIdentityBudget) identityService(t *testing.T) identities.Ser
 	}
 	const name = "download-identity"
 	uid := ownerID(19200)
-	settings := contracts.IdentitySettings{SchemaVersion: "identity-settings/v1", Revision: 1, Issuer: f.claims.Issuer, Clients: []contracts.IdentityClient{{ID: f.claims.ClientID, Kind: string(identity.Human), ClassQualified: true}}, EligibleSubjects: []contracts.IdentitySubject{}, EligibleGroups: []string{"team"}, GroupsAtIssueQualified: true, GroupMaxAgeSeconds: 300}
+	settings := contracts.IdentitySettings{SchemaVersion: "identity-settings/v1", Issuer: f.claims.Issuer, Clients: []contracts.IdentityClient{{ID: f.claims.ClientID, Kind: string(identity.Human), ClassQualified: true}}, Administrators: contracts.IdentityAdministrators{Subjects: []string{"admin"}}}
 	encoded, err := json.Marshal(settings)
 	if err != nil {
 		t.Fatal(err)

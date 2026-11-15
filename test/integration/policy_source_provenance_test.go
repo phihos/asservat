@@ -21,7 +21,6 @@ import (
 	value "asservat.local/asservat/internal/domain/capture"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/fleet"
-	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/privacy"
 	"asservat.local/asservat/internal/domain/targets"
 	"asservat.local/asservat/migrations"
@@ -98,7 +97,6 @@ func qualifySourceSnapshotServicesMode(t *testing.T, mode sourceSnapshotQualific
 				t.Error(err)
 			}
 		}()
-		f.initializeManagedProcessing(t, root)
 		seed, intents, _ := f.prepareManagedContext(t, root, enrollment, policySourceFixtureRetentionSeconds)
 		option := policyRecorderProtectedCase{Hub: f.roles["hub-runtime"], Admissions: seed.s, Filters: pcap.NewCompiler(), Expression: "tcp dst port 80", Subjects: []cfg.Subject{{Kind: "Group", Issuer: "https://id.example.test", ID: "maintainers"}}, Ongoing: true, RecordingSaves: manual, RecurringSharing: manual, OrdinaryGrant: requireApproval, Retention: "31s", PermissionsAccepted: func(batch cfg.PermissionBatch) { f.batch = policyRecorderCloneBatch(batch) }}
 		if groupCount > 0 {
@@ -148,7 +146,6 @@ func qualifySourceSnapshotServicesMode(t *testing.T, mode sourceSnapshotQualific
 				if err != nil {
 					t.Fatal(err)
 				}
-				policy := identity.Policy{Revision: identity.Revision{UID: "synthetic-settings", Generation: 1, Digest: [32]byte{1}}, Issuer: accepted.Authority.Creator.Issuer, ObservedAt: n, FreshUntil: n.Add(5 * time.Second), Clients: []identity.Client{{ID: accepted.Authority.Creator.ClientID, Kind: identity.Human, ClassQualified: true}}, RequireRecordingApproval: requireApproval, EligibleGroups: []string{"maintainers"}, GroupsAtIssueQualified: true, GroupMaxAge: time.Minute}
 				node := targets.PacketSourceObservation{PodUID: target.Pin.UID, NodeUID: custodyID(), BootID: custodyID(), CollectorPodUID: custodyID(), CollectorEpoch: custodyID(), ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}
 				if old.Permit.Binding.SourceID != "" {
 					node.NodeUID = old.Permit.Binding.NodeUID
@@ -156,7 +153,7 @@ func qualifySourceSnapshotServicesMode(t *testing.T, mode sourceSnapshotQualific
 					node.CollectorPodUID = old.Permit.Binding.CollectorPodUID
 					node.CollectorEpoch = old.Permit.Binding.CollectorEpoch
 				}
-				return captureapp.PolicySourceCheck{Policy: accepted.Compiled, Authority: accepted.Authority, Target: target, Node: node, Retention: resolution, Settings: policy, SourceID: sourceID, Fence: fence, BytesPerSecond: 1 << 20, SourceSlots: sourceCeiling, ObservedAt: n, ValidUntil: n.Add(5 * time.Second)}
+				return captureapp.PolicySourceCheck{Policy: accepted.Compiled, Authority: accepted.Authority, Target: target, Node: node, Retention: resolution, SourceID: sourceID, Fence: fence, BytesPerSecond: 1 << 20, SourceSlots: sourceCeiling, ObservedAt: n, ValidUntil: n.Add(5 * time.Second)}
 			}
 			var originalGrant manualPolicyGrantSpend
 			if requireApproval {

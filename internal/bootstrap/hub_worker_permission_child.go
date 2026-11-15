@@ -17,7 +17,6 @@ import (
 	"asservat.local/asservat/internal/adapters/postgres"
 	auditapp "asservat.local/asservat/internal/application/audit"
 	app "asservat.local/asservat/internal/application/configuration"
-	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
@@ -71,9 +70,6 @@ func validateHubWorkerPermission(c contracts.HubWorkerConfig, control cfg.Namesp
 		c.Provider.ContextDeletionSigning.Mount != c.KeyService.AuditMount || !ownerProviderName.MatchString(c.Provider.ContextDeletionSigning.Key) || c.Provider.ContextDeletionSigning.Key == c.KeyService.AuditKey) {
 		return &fixedStepError{"permission/config/context-deletion", mounts.ErrUnavailable}
 	}
-	if b := p.Browser; b != nil && len(validation.IsDNS1123Subdomain(b.Settings)) != 0 {
-		return &fixedStepError{"permission/config/browser", mounts.ErrUnavailable}
-	}
 	if i := p.Identity; i != nil && (len(validation.IsDNS1123Subdomain(i.Settings)) != 0 || !identity.Text(i.Issuer, 2048)) {
 		return &fixedStepError{"permission/config/identity", mounts.ErrUnavailable}
 	}
@@ -91,7 +87,6 @@ type permissionWorker struct {
 	retention           *retentionWorker
 	workerConfiguration *workerConfigurationWorker
 	contextDeletion     *contextDeletionWorker
-	browser             *identities.BrowserSettingsObserver
 	policyGrantSettings *app.PolicyGrantSettingsObserver
 	// Startup ordering (scheduling only, never authority): audit writers
 	// start after the provider's first login, and the retention and context
@@ -165,7 +160,7 @@ func (w *hubWorker) runPermission(ctx context.Context) error {
 // `sql-<purpose>.json`, each checked against its derived role name.
 func (w *hubWorker) permissionPools(ctx context.Context, p *permissionWorker, c contracts.HubWorkerPermission) (map[string]*pgxpool.Pool, error) {
 	pools := map[string]*pgxpool.Pool{}
-	for _, purpose := range contracts.PermissionProjectionPurposes(c.Retention, c.WorkerConfiguration != nil, c.ContextDeletion != nil, c.Browser != nil) {
+	for _, purpose := range contracts.PermissionProjectionPurposes(c.Retention, c.WorkerConfiguration != nil, c.ContextDeletion != nil) {
 		role, known := postgres.PublicRuntimeRoleName(w.ids.InstallationID, purpose)
 		if !known {
 			return nil, mounts.ErrUnavailable
@@ -235,25 +230,6 @@ func (w *hubWorker) openPermission(ctx context.Context) (_ *permissionWorker, er
 	changes := postgres.Listen(listening, pools["permission-accept"], postgres.RemoteBindingsChannel)
 	p.reconciler = app.BindingReconciler{RootID: root, Reader: observer, Watcher: observer, Trust: trust, Store: store, Namespaces: namespaces, NamespaceClusterID: cluster,
 		Guards: &w.guards, Remote: &w.guards, Workloads: &w.guards, WorkloadGuards: &w.guards, RemoteBindings: remoteBindings, RemoteBindingChanges: changes, Now: time.Now, NewID: uuid.NewString}
-	if b := c.Browser; b != nil {
-		browserObserver, e := w.kubeOpeningClient()
-		if e != nil {
-			return nil, &fixedStepError{"browser/client", e}
-		}
-		uid, e := browserObserver.ConfigMapUID(startup, b.Settings)
-		if e != nil {
-			return nil, &fixedStepError{"browser/uid", e}
-		}
-		source, e := kube.NewBrowserSettingsReader(browserObserver, b.Settings, uid, w.ids.BrowserRootID, w.ids.SessionEpoch)
-		if e != nil {
-			return nil, &fixedStepError{"browser/source", e}
-		}
-		projection, e := postgres.NewBrowserSettingsProjection(startup, pools["browser-settings"], w.ids.BrowserRootID)
-		if e != nil {
-			return nil, &fixedStepError{"browser/projection", e}
-		}
-		p.browser = &identities.BrowserSettingsObserver{Source: source, Projection: projection, Now: time.Now}
-	}
 	if id := c.Identity; id != nil {
 		uid, e := observer.ConfigMapUID(startup, id.Settings)
 		if e != nil {
@@ -350,21 +326,8 @@ func (p *permissionWorker) run(ctx context.Context) error {
 			p.publish(ctx)
 		}
 	}))
-	// ADR-210: one projection per second keeps the five-second settings
-	// observation current for console logins; a failed read fences it.
 	if p.policyGrantSettings != nil {
 		joins = append(joins, goJoined(func() { p.policyGrantSettings.Run(ctx, permissionReporter("hub-worker policy grant settings: ")) }))
-	}
-	if p.browser != nil {
-		joins = append(joins, goJoined(func() {
-			report := permissionReporter("hub-worker browser settings: ")
-			for ctx.Err() == nil {
-				report(p.browser.Reconcile(ctx))
-				if !sleepContext(ctx, time.Second) {
-					return
-				}
-			}
-		}))
 	}
 	if p.retention != nil {
 		joins = append(joins, goJoined(func() {

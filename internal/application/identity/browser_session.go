@@ -31,42 +31,16 @@ type CredentialCipher interface {
 	Decrypt(context.Context, []byte, []byte) ([]byte, error)
 }
 
-// SessionCleanup has no OIDC credentials and cannot create or renew a session.
-// Bootstrap runs the loop independently of HTTP traffic and observes its health.
-type SessionCleanup interface{ Cleanup(context.Context) error }
-
-func RunSessionCleanup(ctx context.Context, store SessionCleanup, report func(error)) error {
-	if store == nil || report == nil {
-		return value.ErrInvalid
-	}
-	tick := time.NewTicker(time.Second)
-	defer tick.Stop()
-	for {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-		attempt, cancel := context.WithTimeout(ctx, 5*time.Second)
-		err := store.Cleanup(attempt)
-		cancel()
-		report(err)
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-tick.C:
-		}
-	}
-}
-
 type BrowserSessions struct {
-	Store                   BrowserSessionStore
-	Cipher                  CredentialCipher
-	Provider                BrowserProvider
-	Identities              Resolver
-	Policies                PolicyReader
-	Logout                  LogoutVerifier
-	Issuer, ClientID, Epoch string
-	Lifetime                time.Duration
-	Now                     func() time.Time
+	Store            BrowserSessionStore
+	Cipher           CredentialCipher
+	Provider         BrowserProvider
+	Identities       Resolver
+	Policies         PolicyReader
+	Logout           LogoutVerifier
+	Issuer, ClientID string
+	Lifetime         time.Duration
+	Now              func() time.Time
 }
 type LoginRedirect struct {
 	URL, State, Browser string
@@ -97,10 +71,10 @@ func sessionKey(s string) ([32]byte, error) {
 	return sha256.Sum256([]byte(s)), nil
 }
 func (s BrowserSessions) configured() bool {
-	return s.Store != nil && s.Cipher != nil && s.Provider != nil && s.Identities != nil && s.Now != nil && value.Text(s.Issuer, 2048) && value.Text(s.ClientID, 256) && value.Text(s.Epoch, 64) && s.Lifetime >= time.Minute && s.Lifetime <= 24*time.Hour
+	return s.Store != nil && s.Cipher != nil && s.Provider != nil && s.Identities != nil && s.Now != nil && value.Text(s.Issuer, 2048) && value.Text(s.ClientID, 256) && s.Lifetime >= time.Second
 }
 func (s BrowserSessions) binding(purpose string, key [32]byte, version int64) []byte {
-	b, _ := json.Marshal([]any{"asservat-browser/v1", s.Epoch, s.Issuer, s.ClientID, purpose, base64.RawURLEncoding.EncodeToString(key[:]), version})
+	b, _ := json.Marshal([]any{"asservat-browser/v2", s.Issuer, s.ClientID, purpose, base64.RawURLEncoding.EncodeToString(key[:]), version})
 	digest := sha256.Sum256(b)
 	return []byte("asservat-browser/v1:" + base64.RawURLEncoding.EncodeToString(digest[:]))
 }
@@ -264,10 +238,10 @@ func (s BrowserSessions) Complete(ctx context.Context, state, browser, code stri
 			discard()
 		}
 	}()
-	if ctx.Err() != nil || !record.Current(s.Now()) || record.ID != id || record.Principal != i.Principal {
+	if ctx.Err() != nil || !record.Valid(s.Now()) || record.ID != id || record.Principal != i.Principal {
 		return out, value.ErrDenied
 	}
-	i.ValidUntil = value.Earlier(i.ValidUntil, record.Observation.FreshUntil)
+	i.ValidUntil = value.Earlier(i.ValidUntil, record.ExpiresAt)
 	if !i.Valid(s.Now()) {
 		return out, value.ErrDenied
 	}
@@ -301,7 +275,7 @@ func (s BrowserSessions) resolveKey(ctx context.Context, key [32]byte, allowRefr
 	if err != nil {
 		return out, err
 	}
-	if !r.Current(s.Now()) || r.ID != key || r.Principal.Issuer != s.Issuer || r.Principal.ClientID != s.ClientID {
+	if !r.Valid(s.Now()) || r.ID != key || r.Principal.Issuer != s.Issuer || r.Principal.ClientID != s.ClientID {
 		return out, value.ErrDenied
 	}
 	var secrets sessionSecrets
@@ -355,7 +329,7 @@ func (s BrowserSessions) resolveKey(ctx context.Context, key [32]byte, allowRefr
 		return out, e
 	}
 	now := s.Now()
-	if ctx.Err() != nil || current.ID != key || !current.Current(now) {
+	if ctx.Err() != nil || current.ID != key || !current.Valid(now) {
 		return out, value.ErrDenied
 	}
 	if current.Version != r.Version {
@@ -363,7 +337,7 @@ func (s BrowserSessions) resolveKey(ctx context.Context, key [32]byte, allowRefr
 		// while this read-only request verified the old token. It is safe to
 		// request a fresh read, never to return the old token's identity. This
 		// also handles an old expired token racing that committed replacement.
-		if current.Version > r.Version && r.Current(now) && current.ID == r.ID && current.Principal == r.Principal && current.ProviderSession == r.ProviderSession && current.CreatedAt.Equal(r.CreatedAt) && current.AuthenticatedAt.Equal(r.AuthenticatedAt) && !current.ExpiresAt.After(r.ExpiresAt) && current.Observation.Settings == r.Observation.Settings && (errors.Is(resolveErr, value.ErrDenied) || resolveErr == nil && i.Principal == r.Principal) {
+		if current.Version > r.Version && r.Valid(now) && current.ID == r.ID && current.Principal == r.Principal && current.ProviderSession == r.ProviderSession && current.CreatedAt.Equal(r.CreatedAt) && current.AuthenticatedAt.Equal(r.AuthenticatedAt) && !current.ExpiresAt.After(r.ExpiresAt) && (errors.Is(resolveErr, value.ErrDenied) || resolveErr == nil && i.Principal == r.Principal) {
 			return out, value.ErrSessionBusy
 		}
 		return out, value.ErrDenied
@@ -374,9 +348,7 @@ func (s BrowserSessions) resolveKey(ctx context.Context, key [32]byte, allowRefr
 	if i.Principal != current.Principal {
 		return out, value.ErrDenied
 	}
-	// Current checked the original five-second settings observation after the
-	// final session read. Its lease is a freshness precondition for this read;
-	// the returned identity retains token/key/policy and actual session expiry.
+	// The returned identity keeps token/key/policy and actual session expiry.
 	i.ValidUntil = value.Earlier(i.ValidUntil, current.ExpiresAt)
 	if !i.Valid(s.Now()) {
 		return out, value.ErrDenied

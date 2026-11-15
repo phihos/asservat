@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"reflect"
 	"sync"
@@ -60,9 +61,9 @@ func newIdentityObservationFixture(t *testing.T) *identityObservationFixture {
 func (f *identityObservationFixture) set(t *testing.T, revision int, group string) {
 	t.Helper()
 	settings := identitySettingsFixture(t)
-	settings["revision"] = revision
-	settings["eligibleGroups"] = []string{group}
-	settings["eligibleSubjects"] = []any{map[string]any{"id": "direct-user", "kind": "human"}}
+	settings["requiredGroups"] = []string{group}
+	settings["administrators"] = map[string]any{"subjects": []string{"direct-user"}}
+	settings["usernameClaim"] = fmt.Sprintf("name-%d", revision)
 	raw, err := json.Marshal(settings)
 	if err != nil {
 		t.Fatal(err)
@@ -134,7 +135,7 @@ func TestIdentityPolicyObservationReusesOriginalIntervalAndRefreshesRevision(t *
 	}
 	f.api.clock.Add(int64(21 * time.Second))
 	changed, err := f.read(t.Context())
-	if err != nil || changed.Revision.Generation != 2 || changed.Revision.Digest == first.Revision.Digest || changed.ObservedAt != first.FreshUntil || changed.FreshUntil != first.FreshUntil.Add(30*time.Second) || f.reads.Load() != 2 {
+	if err != nil || changed.Revision.Digest == first.Revision.Digest || changed.ObservedAt != first.FreshUntil || changed.FreshUntil != first.FreshUntil.Add(30*time.Second) || f.reads.Load() != 2 {
 		t.Fatal("expired observation did not read the new revision under its own original interval", err)
 	}
 	claims := identity.Claims{Issuer: first.Issuer, Subject: "developer", ClientID: "asservat-console", Groups: []string{"platform-developers"}, IssuedAt: first.ObservedAt, ExpiresAt: first.ObservedAt.Add(time.Minute), KeyUntil: first.ObservedAt.Add(time.Minute)}
@@ -158,7 +159,7 @@ func TestIdentityPolicyObservationExpiryErrorHasNoStaleFallback(t *testing.T) {
 	f.set(t, 3, "new-team")
 	f.status.Store(http.StatusOK)
 	out, err = f.read(t.Context())
-	if err != nil || out.Revision.Generation != 3 || f.reads.Load() != 3 {
+	if err != nil || f.reads.Load() != 3 {
 		t.Fatal("new explicit call did not recover from the failed source read", err)
 	}
 }
@@ -216,15 +217,15 @@ func TestIdentityPolicyObservationClonesAllReturnedSlices(t *testing.T) {
 		t.Fatal(err)
 	}
 	first.Clients[0].ID = "caller-mutated-client"
-	first.EligibleGroups[0] = "caller-mutated-group"
-	first.EligibleSubjects[0].ID = "caller-mutated-user"
+	first.RequiredGroups[0] = "caller-mutated-group"
+	first.AdministratorSubjects[0] = "caller-mutated-user"
 	again, err := f.read(t.Context())
-	if err != nil || again.Clients[0].ID != "asservat-console" || again.EligibleGroups[0] != "platform-developers" || again.EligibleSubjects[0].ID != "direct-user" || f.reads.Load() != 1 {
+	if err != nil || again.Clients[0].ID != "asservat-console" || again.RequiredGroups[0] != "platform-developers" || again.AdministratorSubjects[0] != "direct-user" || f.reads.Load() != 1 {
 		t.Fatal("returned snapshot mutated retained policy or forced another read", err)
 	}
-	again.EligibleGroups[0] = "another-mutation"
+	again.RequiredGroups[0] = "another-mutation"
 	third, err := f.read(t.Context())
-	if err != nil || third.EligibleGroups[0] != "platform-developers" || f.reads.Load() != 1 {
+	if err != nil || third.RequiredGroups[0] != "platform-developers" || f.reads.Load() != 1 {
 		t.Fatal("cache hit exposed mutable retained storage", err)
 	}
 }

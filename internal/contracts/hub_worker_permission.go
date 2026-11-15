@@ -21,9 +21,6 @@ type HubWorkerPermission struct {
 	// ContextDeletion deletes expired context evidence (ADR-205). Its signing
 	// key is HubWorkerProvider.ContextDeletionSigning.
 	ContextDeletion *HubWorkerContextDeletion `json:"contextDeletion,omitempty"`
-	// Browser projects the browser settings ConfigMap into SQL (ADR-210);
-	// its session root is InstallationIDs.BrowserRootID.
-	Browser *HubWorkerBrowserSettings `json:"browser,omitempty"`
 	// Identity names the identity settings ConfigMap and its issuer: the
 	// configured group directory of groupID PermissionSources (ADR-247) and
 	// the policy grant settings projection.
@@ -43,10 +40,6 @@ type HubWorkerWorkerConfiguration struct {
 // credential HubWorkerEvidenceDeleteStorageFile.
 type HubWorkerContextDeletion struct {
 	EvidenceStore HubWorkerObjectStore `json:"evidenceStore"`
-}
-
-type HubWorkerBrowserSettings struct {
-	Settings string `json:"settings"`
 }
 
 type HubWorkerIdentitySettings struct {

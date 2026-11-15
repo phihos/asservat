@@ -1,5 +1,17 @@
 # Sustained implementation progress
 
+## Identity and browser settings follow the canonical contracts (ADR-335 D1/D4/D5/D8, 2026-11-15)
+
+`identity.json` carries `groupsClaim`, `usernameClaim`, optional
+`requiredGroups` and required `administrators`; eligible lists, group age and
+`revision` are gone, and `requireRecordingApproval` with its settings reads.
+Step-up is optional and off by default. Browser sessions end at creation plus
+`maxLifetimeSeconds` (7 d) or after `inactivityTimeoutSeconds` (24 h); session
+roots, epochs, the settings projection and its polling loop are removed
+(migration 00177). Processing is initialized when its root is created
+(migration 00178); bundled Keycloak emits group paths in `groups` and has no
+processing-operator group.
+
 ## Grants cover every client of the requester (ADR-335 D5, 2026-11-15)
 
 An approved ad-hoc or raw-query grant covers matching published artifacts for
@@ -238,7 +250,6 @@ implement the canonical contract.
 | `recording-save.schema.json` | Preview has `plan_digest` instead of `preview_id`/`capture_id`/`expires_at`/`save_scope_digest`; no recording `handle_expires_at` | `internal/transport/presentation/recording_save_operations.go`, `internal/domain/live/source.go` |
 | `capture-assessment.schema.json` | No `validUntil` | `internal/application/planning/context_assessment.go`, `recorder_assessment.go` |
 | `packet-capture.schema.json` | No `peers.maxStaleness` (peers follow watch events) | `internal/application/planning/peers.go`, `recorder.go`, builtin profiles `internal/application/planning/profiles/*.json`, `internal/bootstrap/regional_peer_verifier.go`; DebugPolicy/CaptureProfile CRDs |
-| `browser-settings.schema.json` | No `revision`, `rootID`, `sessionEpoch`, `suspended` | `internal/adapters/kubernetes/browser_settings.go`, `internal/bootstrap/hub_api_inputs.go`, session-epoch SQL (`internal/adapters/postgres/custodydb`) |
 | `local-key-service.schema.json`, `local-key-secret.schema.json` | No `validUntil`; purposes `artifact`, `browser-credentials` | Response `validUntil` and the `audit` purpose: `internal/contracts/key_service.go`, `internal/adapters/kms/local_keys.go`, `internal/domain/authorization/key_service.go` |
 
 Schemas kept because Go still embeds them with production code paths:
@@ -273,8 +284,6 @@ examples go through `readImplementedExample` or the console equivalent.
 | `action.schema.json`, `capture-profile-go-cpu.yaml` | Profile `impact` may be `observe` (pprof GET) | `internal/application/planning/profile_plan.go` (refuses non-intrusive); `internal/application/planning/profiles/go-cpu-v1.json` |
 | `grant.schema.json` | Policy-grant `spec.renewal`, `status.renewalDue` | No renewal: `internal/application/authorization/grants.go`, `internal/adapters/postgres/policy_grant_attachment.go` |
 | Capture/policy/trigger/recipe/packet/syscall schemas | No list-count caps; arbitrary maxima raised to 2^53−1; no packet-filter length cap (BPF limit checked at compile); `argv` items up to `MAX_ARG_STRLEN` | Embedded `policy-schemas/`, `permission-schemas/approval-policy`, manifest `profile` schema; `internal/domain/planning/composition.go` (`MaxCompositionComponents` 8, `MaxComponentEdits` 32, `MaxCompositionBytes`); generated DebugPolicy/CaptureProfile CRDs |
-| `identity-settings.schema.json` | `groupsClaim`, `usernameClaim`, optional `requiredGroups`, `administrators`; no eligible lists, `groupMaxAgeSeconds`, `revision` or list caps | `internal/contracts/identity_settings.go`, `permission_runtime.go`, `installer_continuation.go`; `internal/domain/configuration/permissions.go`; `internal/bootstrap/permission_guards.go`; `internal/adapters/kubernetes/hub_worker_capacity_reads.go` |
-| `browser-settings.schema.json` | `maxLifetimeSeconds` (default 7 d) and `inactivityTimeoutSeconds` (default 24 h); no `maxLogins`/`maxSessions`/`maxLogoutEvents` or per-user session count | `internal/contracts/browser_settings.go`, `installer_continuation.go`; `internal/domain/identity/browser_settings.go` |
 | `access-binding`, `permission-common`, `cluster-access-binding` (new) | Subject `issuer` and `reason` optional; workload by name with optional `uid`; ClusterAccessBinding; `groupName` mapping mode; `reviewRef`/`guardRef` optional; no list or string caps beyond Kubernetes formats | `internal/adapters/kubernetes/permission_decode.go`; `internal/domain/configuration/permissions.go`, `review.go`; chart CRDs (no ClusterAccessBinding CRD) |
 | `permission-source.schema.json` | `cluster` name instead of `clusterID`; no `maxDecisionAgeSeconds`; exclusions and `maxNamespaces` optional; access reviews map to any role | `internal/adapters/kubernetes/permission_decode.go`; `internal/domain/configuration/permissions.go` |
 | `policy-authority.schema.json` | Envelope ceilings, `notAfter` and limits optional, no maxima | `internal/domain/authorization/automation.go`, `policy_grant.go`, `policy_grant_use.go` |

@@ -40,8 +40,8 @@ func qualifyProcessingRestrictions(t *testing.T, ctx context.Context, admin *pgx
 		t.Fatal("actual pre-publication restriction", blocked, err)
 	}
 	var charged, limit int64
-	if err = admin.QueryRow(ctx, "SELECT a.charged,p.records_per_account FROM operation_audit_account a JOIN operation_audit_pool p USING(root_id,lane) WHERE a.root_id=$1 AND a.lane='normal'", s.a.RootID).Scan(&charged, &limit); err != nil || charged != 2 || limit != 2 {
-		t.Fatal("normal audit pool is not actually full", charged, limit, err)
+	if err = admin.QueryRow(ctx, "SELECT a.charged,p.records_per_account FROM operation_audit_account a JOIN operation_audit_pool p USING(root_id,lane) WHERE a.root_id=$1 AND a.lane='normal'", s.a.RootID).Scan(&charged, &limit); err != nil || charged != 1 || limit != 2 {
+		t.Fatal("normal audit account charged once for the restriction", charged, limit, err)
 	}
 	if err = publish(); err != nil {
 		t.Fatal("restricted evidence must still be safely published", err)
@@ -124,7 +124,7 @@ func qualifyProcessingRestrictions(t *testing.T, ctx context.Context, admin *pgx
 		t.Fatal("prepaid release while normal pool full", released, err)
 	}
 	var normalCount, releaseCount int
-	if err = admin.QueryRow(ctx, "SELECT count(*) FILTER(WHERE lane='normal'),count(*) FILTER(WHERE lane='processing') FROM operation_audit WHERE root_id=$1", s.a.RootID).Scan(&normalCount, &releaseCount); err != nil || normalCount != 2 || releaseCount != 1 {
+	if err = admin.QueryRow(ctx, "SELECT count(*) FILTER(WHERE lane='normal'),count(*) FILTER(WHERE lane='processing') FROM operation_audit WHERE root_id=$1", s.a.RootID).Scan(&normalCount, &releaseCount); err != nil || normalCount != 1 || releaseCount != 1 {
 		t.Fatal("release used a new normal account or duplicated audit", normalCount, releaseCount, err)
 	}
 	replay, err := f.service.Change(ctx, f.actor, release)

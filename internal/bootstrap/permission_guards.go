@@ -2,7 +2,6 @@ package bootstrap
 
 import (
 	"context"
-	"slices"
 	"sync"
 	"time"
 
@@ -50,22 +49,17 @@ func (s *sharedNamespaceGuards) NamespaceGuard(_ context.Context, cluster string
 	return cfg.NamespaceGuardProof{ClusterID: cluster, Name: NamespaceGuardProfile, LabelKeys: contracts.CapacityNamespaceKeys(), ObservedAt: now, FreshUntil: identity.Check(now, identity.SQLFenced).Until()}, nil
 }
 
-// identityDirectory is the configured group directory of groupID sources
-// (ADR-247): the protected identity settings' eligibleGroups for their
-// issuer, read through the existing pinned identity settings reader. It is
-// not a directory reader and knows no group members.
+// identityDirectory served groupID sources from the removed eligibleGroups
+// list. Identity settings name no group directory any more (ADR-335 D14), so
+// groupID mapping reports DirectoryUnavailable; groupName mapping needs none.
 type identityDirectory struct {
 	settings interface {
 		IdentityPolicy(context.Context, string) (identity.Policy, error)
 	}
 }
 
-func (d identityDirectory) GroupDirectory(ctx context.Context, issuer string) (cfg.GroupDirectory, error) {
-	p, err := d.settings.IdentityPolicy(ctx, issuer)
-	if err != nil || p.Issuer != issuer {
-		return cfg.GroupDirectory{}, cfg.ErrUnavailable
-	}
-	return cfg.GroupDirectory{Issuer: issuer, Groups: slices.Clone(p.EligibleGroups), ObservedAt: p.ObservedAt, FreshUntil: p.FreshUntil}, nil
+func (d identityDirectory) GroupDirectory(context.Context, string) (cfg.GroupDirectory, error) {
+	return cfg.GroupDirectory{}, cfg.ErrUnavailable
 }
 
 // RemoteNamespaces implements configapp.RemoteNamespaceReader; joined

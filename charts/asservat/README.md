@@ -47,7 +47,7 @@ Apply configuration changes with `helm upgrade` and the same values file.
 | `image.pullPolicy`, `image.pullSecrets` | `IfNotPresent`, `[]` | Pull settings for every product Pod |
 | `installation.name` | `asservat` | Prefix of every object name (DNS label, at most 30 characters) |
 | `origin` | empty | Browser origin of the console and API, e.g. `https://asservat.example.org` |
-| `identity.*` | see values.yaml | Issuer, console client, clients, eligibility, `administrators`, session limits, `approvals`, `processingOperators` |
+| `identity.*` | see values.yaml | Issuer, console client, clients, eligibility, `administrators`, session limits, `approvals`, optional `processingOperators` |
 | `processors`, `captureHistory` | omitted | Privacy inventory organizations; history view/cache ceilings |
 | `exposure.service` | `ClusterIP` | Service type of hub-api (port 9445) |
 | `exposure.tls.mode`, `exposure.tlsSecret` | `pod`, empty | ADR-327: TLS in hub-api with `tlsSecret`, or `proxy` behind an Ingress/Gateway |
@@ -76,7 +76,7 @@ Its Role can only create Secrets and get or patch the named ones.
 
 | Secret | Keys |
 | --- | --- |
-| `<name>-ids` | `installationID`, `clusterID`, `issuerEpoch`, `permissionRootID`, `browserRootID`, `sessionEpoch`, `roleSetupID`, `peerID` |
+| `<name>-ids` | `installationID`, `clusterID`, `issuerEpoch`, `permissionRootID`, `roleSetupID`, `peerID` |
 | `<name>-sql-<component>` | `sql-<purpose>.json` (`{"username","password"}`) per runtime SQL role of hub-api, hub-worker, federation, publisher, key-service |
 | `<name>-audit-mac` | `inputVersion`, `inputKey`, `accountVersion`, `accountKey` |
 | `<name>-artifact-key` | `keys.json`, the local artifact root keyset |

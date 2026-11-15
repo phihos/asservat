@@ -77,7 +77,6 @@ type PolicySourceRuntime struct {
 	Dispatcher PolicySourceDispatcher
 	Observer   OngoingRecorderObserver
 	Retention  ContextRetentionResolver
-	Settings   ApprovalSettings
 	// Storage and Refresh keep the workload's 30-second storage binding fresh
 	// through the existing ADR-200 demand lane; nil leaves refresh to discovery.
 	Storage ContextStorageReader
@@ -86,7 +85,7 @@ type PolicySourceRuntime struct {
 }
 
 func (s *PolicySourceRuntime) configured() bool {
-	return s != nil && s.Ledger != nil && s.Dispatcher != nil && s.Observer != nil && s.Retention != nil && s.Settings != nil && s.Now != nil && s.NewID != nil
+	return s != nil && s.Ledger != nil && s.Dispatcher != nil && s.Observer != nil && s.Retention != nil && s.Now != nil && s.NewID != nil
 }
 
 func (s *PolicySourceRuntime) Sweep(ctx context.Context) error {
@@ -195,14 +194,10 @@ func (s *PolicySourceRuntime) maintain(ctx context.Context, p value.RestartPolic
 		}
 		existing[row.Binding.PodUID] = row
 	}
-	settings, err := s.Settings.IdentityPolicy(ctx, a.Creator.Issuer)
-	if err != nil || settings.Validate(s.Now()) != nil || settings.Issuer != a.Creator.Issuer {
-		return errors.Join(failed, staged("settings", value.ErrUnavailable))
-	}
 	// This check interval starts once. Independent regional/retention reads can
 	// only shorten it, never freshen a complete workload observation.
 	started := cohortStarted
-	until := identity.Earlier(cohortUntil, identity.Earlier(o.FreshUntil, identity.Earlier(settings.FreshUntil, a.NotAfter)))
+	until := identity.Earlier(cohortUntil, identity.Earlier(o.FreshUntil, a.NotAfter))
 	call, end := context.WithDeadline(ctx, until)
 	defer end()
 	type observedSource struct {
@@ -334,7 +329,7 @@ func (s *PolicySourceRuntime) maintain(ctx context.Context, p value.RestartPolic
 			}
 			continue
 		}
-		check := PolicySourceCheck{Policy: p, ActionID: rec.Action.ID, Authority: a, Target: resolved.Recorder.Target, Node: node, Retention: retention, Settings: settings, BytesPerSecond: rate, SourceSlots: slots, ObservedAt: started, ValidUntil: until}
+		check := PolicySourceCheck{Policy: p, ActionID: rec.Action.ID, Authority: a, Target: resolved.Recorder.Target, Node: node, Retention: retention, BytesPerSecond: rate, SourceSlots: slots, ObservedAt: started, ValidUntil: until}
 		if !known {
 			check.SourceID, check.Fence = s.NewID(), s.NewID()
 			check.Initial = true

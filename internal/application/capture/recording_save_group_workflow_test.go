@@ -113,10 +113,9 @@ func TestGroupedSubmissionSixteenStartsBeforeAdvisoryHistory(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			team, _, settings, _ := newTeamRecordingFixture(t)
+			team, _, _ := newTeamRecordingFixture(t)
 			f.audience = team.audience
 			f.cap.ExecutionClass = artifact.ContextAPIExecution
-			f.svc.Approvals = settings
 			accepted := inv.Accepted
 			f.svc.Eligibility = authapp.CaptureEligibility{Human: authapp.Evaluator{Permissions: f, Now: func() time.Time { return f.now }}, Accepted: accepted, Current: accepted.(*teamRecordingAuthority), Now: func() time.Time { return f.now }}
 			x.policy.Policy.IncidentPods = 16

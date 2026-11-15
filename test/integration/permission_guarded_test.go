@@ -56,7 +56,7 @@ func (d realDirectory) GroupDirectory(ctx context.Context, issuer string) (cfg.G
 	if err != nil {
 		return cfg.GroupDirectory{}, err
 	}
-	return cfg.GroupDirectory{Issuer: issuer, Groups: slices.Clone(p.EligibleGroups), ObservedAt: p.ObservedAt, FreshUntil: p.FreshUntil}, nil
+	return cfg.GroupDirectory{Issuer: issuer, ObservedAt: p.ObservedAt, FreshUntil: p.FreshUntil}, nil
 }
 
 // ADR-247: an admissionEnforced namespaceMetadata source under a real
@@ -136,8 +136,7 @@ func testGuardedAndGroupInheritance(t *testing.T, c *rest.Config, reader *kube.P
 		t.Fatal("unprivileged write of a guarded key was not denied", err)
 	}
 	// Identity settings: the configured group directory.
-	settings, err := json.Marshal(contracts.IdentitySettings{SchemaVersion: "identity-settings/v1", Revision: 1, Issuer: issuer, Clients: []contracts.IdentityClient{{ID: "asservat-console", Kind: "human", ClassQualified: true}},
-		EligibleSubjects: []contracts.IdentitySubject{}, EligibleGroups: []string{"platform-developers"}, GroupsAtIssueQualified: true, GroupMaxAgeSeconds: 300})
+	settings, err := json.Marshal(contracts.IdentitySettings{SchemaVersion: "identity-settings/v1", Issuer: issuer, Clients: []contracts.IdentityClient{{ID: "asservat-console", Kind: "human", ClassQualified: true}}, Administrators: contracts.IdentityAdministrators{Subjects: []string{"admin"}}})
 	if err != nil {
 		t.Fatal(err)
 	}

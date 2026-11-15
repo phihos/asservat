@@ -1,10 +1,11 @@
 package capture
 
 import (
-	"asservat.local/asservat/internal/domain/targets"
 	"context"
 	"encoding/json"
 	"testing"
+
+	"asservat.local/asservat/internal/domain/targets"
 
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"

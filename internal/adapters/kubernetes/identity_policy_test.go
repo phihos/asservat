@@ -23,6 +23,8 @@ func identitySettingsFixture(t *testing.T) map[string]any {
 	if json.Unmarshal(b, &v) != nil {
 		t.Fatal("fixture")
 	}
+	v["issuer"] = "https://id.example.invalid"
+	v["requiredGroups"] = []string{"platform-developers"}
 	return v
 }
 func TestIdentityPolicyPinnedConfigAndCurrentRevocation(t *testing.T) {
@@ -62,8 +64,7 @@ func TestIdentityPolicyPinnedConfigAndCurrentRevocation(t *testing.T) {
 	if _, err = identity.Admit(claims, policy, now); err != nil {
 		t.Fatal(err)
 	}
-	settings["eligibleGroups"] = []string{"another-team"}
-	settings["revision"] = 2
+	settings["requiredGroups"] = []string{"another-team"}
 	set(settings, "identity-uid")
 	// Configuration changes are observed when the original thirty-second
 	// policy observation expires; token verification still runs on every use.
@@ -90,7 +91,7 @@ func TestIdentityPolicyPinnedConfigAndCurrentRevocation(t *testing.T) {
 	}
 }
 func TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings(t *testing.T) {
-	for _, mode := range []string{"unknown", "case-alias", "duplicate-client", "unqualified-client", "unqualified-groups", "empty-eligible", "overlong-age", "control-character", "wrong-issuer", "null-groups", "duplicate-json", "oversize", "binary-data", "wrong-namespace", "deleting", "expired-io", "clock-rollback"} {
+	for _, mode := range []string{"unknown", "case-alias", "duplicate-client", "unqualified-client", "no-administrators", "control-character", "wrong-issuer", "null-groups", "duplicate-json", "oversize", "binary-data", "wrong-namespace", "deleting", "expired-io", "clock-rollback"} {
 		t.Run(mode, func(t *testing.T) {
 			settings := identitySettingsFixture(t)
 			switch mode {
@@ -103,22 +104,18 @@ func TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings(t *testing.T) {
 				settings["clients"] = []any{map[string]any{"id": "same", "kind": "human", "classQualified": true}, map[string]any{"id": "same", "kind": "workload", "classQualified": true}}
 			case "unqualified-client":
 				settings["clients"].([]any)[0].(map[string]any)["classQualified"] = false
-			case "unqualified-groups":
-				settings["groupsAtIssueQualified"] = false
-			case "empty-eligible":
-				settings["eligibleGroups"] = []string{}
-			case "overlong-age":
-				settings["groupMaxAgeSeconds"] = 301
+			case "no-administrators":
+				settings["administrators"] = map[string]any{}
 			case "control-character":
-				settings["eligibleGroups"] = []string{"bad\u0085group"}
+				settings["requiredGroups"] = []string{"bad\u0085group"}
 			case "wrong-issuer":
 				settings["issuer"] = "https://another.invalid"
 			case "null-groups":
-				settings["eligibleGroups"] = nil
+				settings["requiredGroups"] = nil
 			}
 			body, _ := json.Marshal(settings)
 			if mode == "duplicate-json" {
-				body = []byte(strings.Replace(string(body), `"revision":1`, `"revision":1,"revision":2`, 1))
+				body = []byte(strings.Replace(string(body), `"schemaVersion":"identity-settings/v1"`, `"schemaVersion":"identity-settings/v1","schemaVersion":"identity-settings/v1"`, 1))
 			}
 			if mode == "oversize" {
 				body = []byte(strings.Repeat(" ", 65537))

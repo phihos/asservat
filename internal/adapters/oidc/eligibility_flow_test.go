@@ -39,7 +39,7 @@ func TestVerifiedTokenThroughCurrentEligibility(t *testing.T) {
 	target := authorization.Target{ClusterID: "11111111-1111-1111-1111-111111111111", NamespaceUID: "namespace", WorkloadUID: "workload", PodUID: "pod"}
 	a := artifact.AudienceAssignment{Kind: "Group", Issuer: f.v.trust.Issuer, SubjectID: "team-a", Role: "workload-maintainer", BasisKind: "AccessBinding", BasisUID: "binding", BasisDigest: artifact.Digest{1}, AssignmentID: "22222222-2222-2222-2222-222222222222"}
 	sources := &flowSources{
-		policy:     identity.Policy{Revision: revision, Issuer: f.v.trust.Issuer, ObservedAt: n, FreshUntil: n.Add(30 * time.Second), Clients: []identity.Client{{ID: "console", Kind: identity.Human, ClassQualified: true}}, EligibleGroups: []string{"team-a", "team-b"}, GroupsAtIssueQualified: true, GroupMaxAge: 5 * time.Minute},
+		policy:     identity.Policy{Revision: revision, Issuer: f.v.trust.Issuer, ObservedAt: n, FreshUntil: n.Add(30 * time.Second), Clients: []identity.Client{{ID: "console", Kind: identity.Human, ClassQualified: true}}},
 		projection: authorization.Projection{Target: target, Revision: revision, ObservedAt: n, FreshUntil: n.Add(30 * time.Second), DeniesComplete: true, DeniesObservedAt: n, DeniesFreshUntil: n.Add(5 * time.Second), Allows: []authorization.CurrentAssignment{{Audience: a, ObservedAt: n, FreshUntil: n.Add(30 * time.Second)}}},
 		retained:   authorization.Retained{ArtifactID: "33333333-3333-3333-3333-333333333333", Target: target, DataClass: "metadata", ExpiresAt: n.Add(time.Hour), Audience: []artifact.AudienceAssignment{a}},
 	}

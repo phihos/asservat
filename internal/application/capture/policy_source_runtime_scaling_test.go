@@ -25,7 +25,6 @@ import (
 type sourceCohortFixture struct {
 	t                                 *testing.T
 	f                                 *investigationFixture
-	settings                          *teamRecordingSettings
 	authority                         authorization.AcceptedPolicyAuthority
 	policy                            value.RestartPolicy
 	runtime                           *PolicySourceRuntime
@@ -52,7 +51,7 @@ func newSourceCohortFixture(t *testing.T, replicas int) *sourceCohortFixture {
 
 func newSourceCohortFixtureWith(t *testing.T, replicas int, composition *planning.ProfileComposition) *sourceCohortFixture {
 	t.Helper()
-	f, accepted, settings, _ := newTeamRecordingFixture(t)
+	f, accepted, _ := newTeamRecordingFixture(t)
 	p, err := compileSpec(t, restartSpec())
 	if err != nil {
 		t.Fatal(err)
@@ -72,8 +71,8 @@ func newSourceCohortFixtureWith(t *testing.T, replicas int, composition *plannin
 	if replicas > targets.MaxRestartPods || int64(min(replicas, 10))*recorder.Action.SegmentBytes*int64(recorder.Action.MaxSegments) > 256<<20 {
 		t.Fatal("cohort no longer fits the explicit two-node ring envelope")
 	}
-	s := &sourceCohortFixture{t: t, f: f, settings: settings, authority: accepted.authority, policy: p, base: f.now, queryCost: 300 * time.Millisecond, actualReplicas: replicas, wirePerDispatch: 1000, rows: map[string]PolicySourceState{}, nodePermits: map[string]collector.SourcePermit{}, nodeMeters: map[string]*collector.SourceMeter{}, firstDispatch: map[string]time.Time{}}
-	s.runtime = &PolicySourceRuntime{Ledger: s, Dispatcher: s, Observer: s, Retention: f, Settings: settings, Now: func() time.Time { return f.now }, NewID: func() string { return fixtureID(1000 + int(f.newIDs.Add(1))) }}
+	s := &sourceCohortFixture{t: t, f: f, authority: accepted.authority, policy: p, base: f.now, queryCost: 300 * time.Millisecond, actualReplicas: replicas, wirePerDispatch: 1000, rows: map[string]PolicySourceState{}, nodePermits: map[string]collector.SourcePermit{}, nodeMeters: map[string]*collector.SourceMeter{}, firstDispatch: map[string]time.Time{}}
+	s.runtime = &PolicySourceRuntime{Ledger: s, Dispatcher: s, Observer: s, Retention: f, Now: func() time.Time { return f.now }, NewID: func() string { return fixtureID(1000 + int(f.newIDs.Add(1))) }}
 	return s
 }
 
@@ -84,7 +83,6 @@ func (s *sourceCohortFixture) maintain(tick int) error {
 	s.tickStart = s.base.Add(time.Duration(tick) * value.TriggerPollInterval)
 	s.tickEnd = s.tickStart.Add(5 * time.Second)
 	s.f.now = s.tickStart
-	s.settings.policy.ObservedAt, s.settings.policy.FreshUntil = s.tickStart, s.tickEnd
 	o := targets.RestartObservation{ClusterID: s.authority.ClusterID, Namespace: s.f.target.Request.Namespace, Workload: s.f.target.Request.Workload, ObservedAt: s.tickStart, FreshUntil: s.tickEnd, Pods: []targets.PodRestarts{}}
 	for n := 0; n < s.actualReplicas; n++ {
 		o.Pods = append(o.Pods, targets.PodRestarts{Name: fmt.Sprintf("api-%02d", n), UID: fixtureID(200 + n)})

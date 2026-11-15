@@ -22,7 +22,6 @@ import (
 	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/fleet"
-	"asservat.local/asservat/internal/domain/identity"
 	planvalue "asservat.local/asservat/internal/domain/planning"
 	"asservat.local/asservat/internal/domain/privacy"
 	"asservat.local/asservat/internal/domain/targets"
@@ -79,7 +78,6 @@ func TestHTTPSourceLedgerWithRealServices(t *testing.T) {
 				t.Error(err)
 			}
 		}()
-		f.initializeManagedProcessing(t, root)
 		seed, _, _ := f.prepareManagedContext(t, root, enrollment, policySourceFixtureRetentionSeconds)
 		option := policyRecorderProtectedCase{Hub: f.roles["hub-runtime"], Admissions: seed.s, Filters: pcap.NewCompiler(), Expression: "tcp port 8080", Subjects: []cfg.Subject{{Kind: "Group", Issuer: "https://id.example.test", ID: "maintainers"}}, Ongoing: true, Retention: "31s", SourceComposition: httpSourceCompositionWire(), SourceCompiler: httpSourceCompiler(t, seed.a.Plan.Input.Target.Request.ClusterID, seed.a.Plan.Input.Target.Request.Namespace.UID), PermissionsAccepted: func(batch cfg.PermissionBatch) { f.batch = policyRecorderCloneBatch(batch) }}
 		option.SourceAccepted = func(t *testing.T, accepted policySourceAcceptedFixture) {
@@ -112,8 +110,7 @@ func TestHTTPSourceLedgerWithRealServices(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				settings := identity.Policy{Revision: identity.Revision{UID: "synthetic-settings", Generation: 1, Digest: [32]byte{1}}, Issuer: accepted.Authority.Creator.Issuer, ObservedAt: n, FreshUntil: n.Add(5 * time.Second), Clients: []identity.Client{{ID: accepted.Authority.Creator.ClientID, Kind: identity.Human, ClassQualified: true}}, EligibleGroups: []string{"maintainers"}, GroupsAtIssueQualified: true, GroupMaxAge: time.Minute}
-				return captureapp.PolicySourceCheck{Policy: accepted.Compiled, Authority: accepted.Authority, Target: target, Node: targets.PacketSourceObservation{PodUID: target.Pin.UID, NodeUID: nodeID, BootID: bootID, CollectorPodUID: collectorID, CollectorEpoch: epoch, ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}, Retention: resolved, Settings: settings, SourceID: sourceID, Fence: fence, BytesPerSecond: 4 << 20, SourceSlots: 4, ObservedAt: n, ValidUntil: n.Add(5 * time.Second)}
+				return captureapp.PolicySourceCheck{Policy: accepted.Compiled, Authority: accepted.Authority, Target: target, Node: targets.PacketSourceObservation{PodUID: target.Pin.UID, NodeUID: nodeID, BootID: bootID, CollectorPodUID: collectorID, CollectorEpoch: epoch, ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}, Retention: resolved, SourceID: sourceID, Fence: fence, BytesPerSecond: 4 << 20, SourceSlots: 4, ObservedAt: n, ValidUntil: n.Add(5 * time.Second)}
 			}
 			in := fresh()
 			in.Initial = true

@@ -36,7 +36,7 @@ func (f *grantSettingsFixture) AcceptPolicyGrantSettings(ctx context.Context, o 
 }
 func newGrantSettingsFixture() (*grantSettingsFixture, *PolicyGrantSettingsObserver) {
 	now := time.Now().UTC().Truncate(time.Microsecond)
-	p := value.Policy{Revision: value.Revision{UID: "identity-settings", Generation: 1, Digest: [32]byte{1}}, Issuer: "https://id.example.test", ObservedAt: now, FreshUntil: now.Add(30 * time.Second), Clients: []value.Client{{ID: "console", Kind: value.Human, ClassQualified: true}}, EligibleGroups: []string{"team"}, GroupsAtIssueQualified: true, GroupMaxAge: time.Minute}
+	p := value.Policy{Revision: value.Revision{UID: "identity-settings", Generation: 1, Digest: [32]byte{1}}, Issuer: "https://id.example.test", ObservedAt: now, FreshUntil: now.Add(30 * time.Second), Clients: []value.Client{{ID: "console", Kind: value.Human, ClassQualified: true}}}
 	f := &grantSettingsFixture{now: now, policy: p}
 	o := &PolicyGrantSettingsObserver{Issuer: p.Issuer, Source: f, Projection: f, Now: func() time.Time { return f.now }}
 	return f, o

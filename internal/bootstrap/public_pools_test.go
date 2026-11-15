@@ -22,12 +22,12 @@ import (
 // ADR-180: Public is optional, requires Native and an exact origin, and must
 // leave cold governor slots beside the owner pools.
 func TestOwnerPublicInputsRequireNativeOriginAndBudget(t *testing.T) {
-	for _, mode := range []string{"valid", "no-native", "origin-path", "http-origin", "format", "owner-connections", "same-settings", "audit-transit", "no-provider-roots", "browser-root", "native-port", "per-identity"} {
+	for _, mode := range []string{"valid", "no-native", "origin-path", "http-origin", "format", "owner-connections", "same-settings", "audit-transit", "no-provider-roots", "native-port", "per-identity"} {
 		t.Run(mode, func(t *testing.T) {
 			in, dir, c := nativeInputFixture(t)
 			c.Postgres.MaxConnections = 1 // the shared public allocation leaves six owner slots
 			c.Public = &contracts.OwnerPublicDeployment{Format: contracts.OwnerPublicDeploymentFormat, Origin: "https://asservat.example.test",
-				BrowserRootID: runtimeID, BrowserSettings: contracts.WorkerObjectReference{Name: "browser-settings", UID: runtimeID}, IdentitySettings: contracts.WorkerObjectReference{Name: "identity-settings", UID: runtimeID},
+				BrowserSettings: contracts.WorkerObjectReference{Name: "browser-settings", UID: runtimeID}, IdentitySettings: contracts.WorkerObjectReference{Name: "identity-settings", UID: runtimeID},
 				BrowserAudience: "asservat-api", ProviderRoots: c.Kubernetes.Roots, SessionTransit: contracts.OwnerPublicTransit{Mount: "browser-transit", Key: "sessions"},
 				Port: 8443, Version: "v1", OperationConcurrency: 8, MCPPerIdentity: 2, DownloadConcurrency: 4, DownloadsPerIdentity: 2, DownloadMaxSeconds: 3600}
 			switch mode {
@@ -41,8 +41,6 @@ func TestOwnerPublicInputsRequireNativeOriginAndBudget(t *testing.T) {
 				c.Public.Port = contracts.OwnerInstalledNativePort
 			case "per-identity":
 				c.Public.DownloadsPerIdentity = c.Public.DownloadConcurrency + 1
-			case "browser-root":
-				c.Public.BrowserRootID = "not-a-uuid"
 			case "no-native":
 				c.Native = nil
 			case "origin-path":

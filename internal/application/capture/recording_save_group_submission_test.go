@@ -1,11 +1,6 @@
 package capture
 
 import (
-	identities "asservat.local/asservat/internal/application/identity"
-	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/audit"
-	value "asservat.local/asservat/internal/domain/capture"
-	"asservat.local/asservat/internal/domain/identity"
 	"context"
 	"crypto/sha256"
 	"encoding/json"
@@ -13,6 +8,12 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	identities "asservat.local/asservat/internal/application/identity"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/audit"
+	value "asservat.local/asservat/internal/domain/capture"
+	"asservat.local/asservat/internal/domain/identity"
 )
 
 type groupedSubmissionPorts struct {
@@ -107,7 +108,7 @@ func groupedSubmissionFixture(t *testing.T, sizes ...int) (ContextSubmission, *g
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, accepted, _, _ := newTeamRecordingFixture(t)
+	_, accepted, _ := newTeamRecordingFixture(t)
 	accepted.f = f
 	parent := value.Accepted{State: value.PendingAudit, CaptureID: fixtureID(9000), ScopeDigest: sha256.Sum256([]byte(`{"schemaVersion":"recording-save/v1"}`)), SubmissionDigest: artifact.Digest{19}, CreatedAt: seed.CreatedAt, Deadline: seed.Deadline, Group: &value.RecordingSaveGroupAccepted{CaseID: seed.Expectation.CaseID}}
 	ports := &groupedSubmissionPorts{t: t, intents: map[string]audit.CaptureIntent{}, policy: accepted.authority.Executor, initiator: caller.Principal, until: f.now.Add(5 * time.Second), failure: errors.New("independent child start unconfirmed")}

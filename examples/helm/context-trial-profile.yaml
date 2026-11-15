@@ -12,11 +12,6 @@ mode: hub
 collector: {enabled: false}
 identity:
   maxLifetimeSeconds: 3600
-  maxLogins: 8
-  maxSessions: 8
-  maxLogoutEvents: 8
-  eligibleSubjects: []
-  groupMaxAgeSeconds: 300
 processors: []
 captureHistory: {perSelector: 16, perInstallation: 32}
 exposure:

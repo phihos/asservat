@@ -83,18 +83,6 @@ func TestShareMetadataSlotsWithRealServices(t *testing.T) {
 			}
 		})
 		root, enrolled := f.setup(t)
-		originalPool := f.fixturePool
-		var processingPools []*pgxpool.Pool
-		f.fixturePool = func(role, password string) *pgxpool.Pool {
-			pool := originalPool(role, password)
-			processingPools = append(processingPools, pool)
-			return pool
-		}
-		f.initializeManagedProcessing(t, root)
-		f.fixturePool = originalPool
-		for _, pool := range processingPools {
-			pool.Close()
-		}
 		// The query helper selects 60s retention and requires its own 120s
 		// processing profile. This baseline uses the original managed-context
 		// 20s retention under the unchanged 60s root instead.

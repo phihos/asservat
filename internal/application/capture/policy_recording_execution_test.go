@@ -36,20 +36,7 @@ func (s *teamRecordingAuthority) PolicyAutomationAuthority(ctx context.Context, 
 	return authorization.AutomationProjection{InstallationID: a.InstallationID, Delegation: a.Delegation, Envelope: authorization.AutomationEnvelope{AllowedActions: s.authority.Actions, MaxLifetimeSeconds: 3600, MaxExecutions: a.Limits.MaxExecutions, MaxBytes: a.Limits.MaxBytes, MaxObservedBytes: a.Limits.MaxObservedBytes}, ObservedAt: s.f.now, FreshUntil: s.f.now.Add(30 * time.Second), Permissions: p}, err
 }
 
-type teamRecordingSettings struct {
-	policy      identity.Policy
-	issuers     []string
-	unavailable bool
-}
-
-func (s *teamRecordingSettings) IdentityPolicy(_ context.Context, issuer string) (identity.Policy, error) {
-	s.issuers = append(s.issuers, issuer)
-	if s.unavailable {
-		return identity.Policy{}, value.ErrUnavailable
-	}
-	return s.policy, nil
-}
-func newTeamRecordingFixture(t *testing.T) (*investigationFixture, *teamRecordingAuthority, *teamRecordingSettings, policyIdentity) {
+func newTeamRecordingFixture(t *testing.T) (*investigationFixture, *teamRecordingAuthority, policyIdentity) {
 	t.Helper()
 	f := newInvestigationFixture()
 	f.target.NodeUID, f.target.NodeBootID, f.target.Pin.NodeName = "", "", ""
@@ -65,25 +52,20 @@ func newTeamRecordingFixture(t *testing.T) (*investigationFixture, *teamRecordin
 	f.actor = a.Executor
 	f.svc.Eligibility = authapp.CaptureEligibility{Accepted: authority, Current: authority, Now: func() time.Time { return f.now }}
 	f.svc.Recorders = availableRecording{f}
-	settings := &teamRecordingSettings{policy: identity.Policy{Revision: identity.Revision{UID: "identity", Generation: 1, Digest: artifact.Digest{1}}, Issuer: creator.Issuer, ObservedAt: f.now, FreshUntil: f.now.Add(30 * time.Second), Clients: []identity.Client{{ID: "console", Kind: identity.Human, ClassQualified: true}}, EligibleGroups: []string{"current-team"}, GroupsAtIssueQualified: true, GroupMaxAge: time.Minute, RequireRecordingApproval: true}}
-	f.svc.Approvals = settings
 	f.svc.ReportPreviewFailure = func(stage string) { t.Log("team preview stage", stage) }
 	current := newPolicyIdentity(context.Background(), authority, a, f.now.Add(45*time.Second), func() time.Time { return f.now })
-	return f, authority, settings, current
+	return f, authority, current
 }
 func finiteTeamComposition() *planvalue.ProfileComposition {
 	return networkComposition(planvalue.ProfileEdit{ActionID: "sample", Field: "actionExecutionMode", Text: "onTrigger"}, planvalue.ProfileEdit{ActionID: "sample", Field: "packetBefore", Text: "0s"}, planvalue.ProfileEdit{ActionID: "sample", Field: "packetAfter", Text: "2s"}, planvalue.ProfileEdit{ActionID: "sample", Field: "actionTimeout", Text: "10s"})
 }
-func TestTeamRecorderUsesAcceptedSettingsIssuerWithoutCreatorCredentials(t *testing.T) {
-	f, a, settings, current := newTeamRecordingFixture(t)
+func TestTeamRecorderWithoutCreatorCredentials(t *testing.T) {
+	f, a, current := newTeamRecordingFixture(t)
 	grants := &fakeGrants{}
 	f.svc.Grants = grants
 	preview, err := f.svc.PreviewComposition(context.Background(), current, f.compositionIntent(finiteTeamComposition()))
-	if err != nil || !preview.Recordable || preview.Plan.Approval == nil {
+	if err != nil || !preview.Recordable {
 		t.Fatal("accepted team recorder preview", err)
-	}
-	if len(settings.issuers) != 1 || settings.issuers[0] != a.authority.Creator.Issuer {
-		t.Fatal("settings lookup did not use accepted provenance", settings.issuers)
 	}
 	for _, member := range preview.Preview.Audience {
 		if member.SubjectID == a.authority.Creator.Subject || member.Kind == "Workload" {
@@ -98,58 +80,10 @@ func TestTeamRecorderUsesAcceptedSettingsIssuerWithoutCreatorCredentials(t *test
 	if !errors.Is(err, reachedRecordingAdmission) || len(admission.seen) != 1 || len(grants.requests) != 0 {
 		t.Fatal("team request opened personal review or missed atomic admission", err, len(grants.requests))
 	}
-	if !admission.seen[0].Plan.Input.Recorder.RequireApproval {
-		t.Fatal("team plan dropped protected recording approval requirement")
-	}
 }
 
-func TestTeamRecorderSettingsRefuseMissingProvenanceAndOutage(t *testing.T) {
-	for _, mode := range []string{"missing-settings", "settings-outage", "different-settings-issuer", "policy-shaped-identity"} {
-		t.Run(mode, func(t *testing.T) {
-			f, _, settings, current := newTeamRecordingFixture(t)
-			var source interface {
-				ResolveIdentity(context.Context) (identity.Identity, error)
-			} = current
-			switch mode {
-			case "missing-settings":
-				f.svc.Approvals = nil
-			case "settings-outage":
-				settings.unavailable = true
-			case "different-settings-issuer":
-				settings.policy.Issuer = "https://other.example.invalid"
-			case "policy-shaped-identity":
-				source = identityOnlyPolicy{resolve: current.ResolveIdentity}
-			}
-			if _, err := f.svc.PreviewComposition(context.Background(), source, f.compositionIntent(finiteTeamComposition())); err == nil || f.admissions.Load() != 0 {
-				t.Fatal("unowned/unavailable protected settings permitted team recording", err)
-			}
-		})
-	}
-}
-
-// Forwarding the identity alone must not also forward private accepted settings
-// provenance. A separate wrapper deliberately exports no such method.
-type identityOnlyPolicy struct {
-	resolve func(context.Context) (identity.Identity, error)
-}
-
-func (s identityOnlyPolicy) ResolveIdentity(ctx context.Context) (identity.Identity, error) {
-	return s.resolve(ctx)
-}
-
-func TestTeamRecorderSettingsProvenanceReusesExistingAcceptanceObservation(t *testing.T) {
-	_, a, _, current := newTeamRecordingFixture(t)
-	if _, err := current.ResolveIdentity(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	reads := a.reads
-	issuer, err := current.acceptedSettingsIssuer(context.Background())
-	if err != nil || issuer != a.authority.Creator.Issuer || a.reads != reads {
-		t.Fatal("provenance added acceptance read or selected another issuer", issuer, err, a.reads, reads)
-	}
-}
 func TestTeamOngoingRawPredicateDoesNotReachAdmissionOrPersonalReview(t *testing.T) {
-	f, _, _, current := newTeamRecordingFixture(t)
+	f, _, current := newTeamRecordingFixture(t)
 	f.svc.Filters = &stubFilters{}
 	grants := &fakeGrants{}
 	f.svc.Grants = grants
@@ -192,7 +126,7 @@ func (s teamNeverStart) StartContext(context.Context, identities.CurrentIdentity
 	return value.ErrUnavailable
 }
 func TestPolicyTriggerUsesActualRecorderPreviewAndOriginalOccurrenceKey(t *testing.T) {
-	f, a, _, _ := newTeamRecordingFixture(t)
+	f, a, _ := newTeamRecordingFixture(t)
 	admission := &teamRecordingAdmission{investigationFixture: f}
 	f.svc.Admission = admission
 	configuration, err := compiler.CompilePolicyRecorder(*finiteTeamComposition(), &stubFilters{})
@@ -215,33 +149,6 @@ func TestPolicyTriggerUsesActualRecorderPreviewAndOriginalOccurrenceKey(t *testi
 		if preview.Intent.Diagnostic != "" || preview.Intent.Composition == nil || preview.Intent.Target.Kind != "Pod" || preview.Intent.Target.Name != f.target.Request.PodName {
 			t.Fatal("trigger substituted pod-status or invented another Pod", preview.Intent)
 		}
-	}
-}
-
-func TestTeamRecorderSettingsChangesAfterPreviewDenyBeforeAdmission(t *testing.T) {
-	for _, mode := range []string{"absent", "outage", "recording-requirement-changed", "issuer-changed"} {
-		t.Run(mode, func(t *testing.T) {
-			f, _, settings, current := newTeamRecordingFixture(t)
-			preview, err := f.svc.PreviewComposition(context.Background(), current, f.compositionIntent(finiteTeamComposition()))
-			if err != nil || !preview.Recordable {
-				t.Fatal(err)
-			}
-			admission := &teamRecordingAdmission{investigationFixture: f}
-			f.svc.Admission = admission
-			switch mode {
-			case "absent":
-				f.svc.Approvals = nil
-			case "outage":
-				settings.unavailable = true
-			case "recording-requirement-changed":
-				settings.policy.RequireRecordingApproval = false
-			case "issuer-changed":
-				settings.policy.Issuer = "https://other.example.invalid"
-			}
-			if _, err = f.svc.Request(context.Background(), current, preview.Preview.ID, fixtureID(902)); err == nil || len(admission.seen) != 0 {
-				t.Fatal("changed/missing settings reached team admission", err)
-			}
-		})
 	}
 }
 
@@ -303,7 +210,7 @@ func TestPolicyTriggerCompilesOnlyExactAcceptedRecorderBeforeTickSpend(t *testin
 }
 
 func TestFinitePolicyRawProducerReachesOnlyOriginalPolicyAdmission(t *testing.T) {
-	f, _, _, current := newTeamRecordingFixture(t)
+	f, _, current := newTeamRecordingFixture(t)
 	f.svc.Filters = &stubFilters{}
 	composition := finiteTeamComposition()
 	composition.Components[0].Edits = append(composition.Components[0].Edits, planvalue.ProfileEdit{ActionID: "sample", Field: "packetFilter", Text: "tcp[13] & 2 != 0"})
@@ -320,8 +227,8 @@ func TestFinitePolicyRawProducerReachesOnlyOriginalPolicyAdmission(t *testing.T)
 		t.Fatal("finite policy raw request bypassed admission or opened a human review", err, len(admission.seen), len(grants.requests))
 	}
 	plan := admission.seen[0].Plan
-	if plan.Input.Executor != current.policy.Executor || plan.Input.Recorder == nil || !plan.Input.Recorder.RequireApproval {
-		t.Fatal("finite raw plan lost policy/settings identity")
+	if plan.Input.Executor != current.policy.Executor || plan.Input.Recorder == nil {
+		t.Fatal("finite raw plan lost policy identity")
 	}
 }
 

@@ -1,6 +1,7 @@
 package kubernetes
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"net/url"
@@ -153,8 +154,9 @@ func (c *IdentityPolicyClient) policyTime(ctx context.Context) (time.Time, error
 
 func cloneIdentityPolicy(p value.Policy) value.Policy {
 	p.Clients = slices.Clone(p.Clients)
-	p.EligibleSubjects = slices.Clone(p.EligibleSubjects)
-	p.EligibleGroups = slices.Clone(p.EligibleGroups)
+	p.RequiredGroups = slices.Clone(p.RequiredGroups)
+	p.AdministratorGroups = slices.Clone(p.AdministratorGroups)
+	p.AdministratorSubjects = slices.Clone(p.AdministratorSubjects)
 	p.StepUp.ACRValues = slices.Clone(p.StepUp.ACRValues)
 	p.AdministratorGroups = slices.Clone(p.AdministratorGroups)
 	p.AdministratorSubjects = slices.Clone(p.AdministratorSubjects)
@@ -177,24 +179,27 @@ func (c *IdentityPolicyClient) readPolicy(ctx context.Context, issuer string) (v
 	if err != nil || wire.Issuer != issuer {
 		return out, value.ErrUnavailable
 	}
-	out = value.Policy{Revision: value.Revision{UID: ref.UID, Generation: wire.Revision, Digest: digest}, Issuer: wire.Issuer, ObservedAt: start, FreshUntil: start.Add(30 * time.Second), EligibleGroups: wire.EligibleGroups, GroupsAtIssueQualified: wire.GroupsAtIssueQualified, GroupMaxAge: time.Duration(wire.GroupMaxAgeSeconds) * time.Second}
-	if a := wire.Administrators; a != nil {
-		out.AdministratorGroups, out.AdministratorSubjects = a.Groups, a.Subjects
-	}
+	out = value.Policy{Revision: value.Revision{UID: ref.UID, Generation: 1, Digest: digest}, Issuer: wire.Issuer, ObservedAt: start, FreshUntil: start.Add(30 * time.Second),
+		GroupsClaim: cmp.Or(wire.GroupsClaim, "groups"), UsernameClaim: cmp.Or(wire.UsernameClaim, "preferred_username"), RequiredGroups: wire.RequiredGroups,
+		AdministratorGroups: wire.Administrators.Groups, AdministratorSubjects: wire.Administrators.Subjects}
+	periods := value.DefaultPolicyGrantApproval()
 	if a := wire.Approvals; a != nil {
-		out.RequireRecordingApproval = a.RequireRecordingApproval
 		if v := a.PolicyGrants; v != nil {
-			out.PolicyGrants = &value.PolicyGrantApproval{DefaultAge: time.Duration(v.DefaultAgeSeconds) * time.Second, MaxAge: time.Duration(v.MaxAgeSeconds) * time.Second, RenewalNotice: time.Duration(v.RenewalNoticeSeconds) * time.Second}
+			seconds := func(v int64, fallback time.Duration) time.Duration {
+				if v == 0 {
+					return fallback
+				}
+				return time.Duration(v) * time.Second
+			}
+			periods = value.PolicyGrantApproval{DefaultAge: seconds(v.DefaultAgeSeconds, periods.DefaultAge), MaxAge: seconds(v.MaxAgeSeconds, periods.MaxAge), RenewalNotice: seconds(v.RenewalNoticeSeconds, periods.RenewalNotice)}
 		}
 		if a.StepUp != nil {
 			out.StepUp = value.StepUpPolicy{ACRValues: slices.Clone(a.StepUp.ACRValues), MaxAge: time.Duration(a.StepUp.MaxAgeSeconds) * time.Second}
 		}
 	}
+	out.PolicyGrants = &periods
 	for _, v := range wire.Clients {
 		out.Clients = append(out.Clients, value.Client{ID: v.ID, Kind: value.Kind(v.Kind), ClassQualified: v.ClassQualified})
-	}
-	for _, v := range wire.EligibleSubjects {
-		out.EligibleSubjects = append(out.EligibleSubjects, value.Subject{ID: v.ID, Kind: value.Kind(v.Kind)})
 	}
 	if c.client.current(ctx, start, 5*time.Second) != nil || out.Validate(c.client.now()) != nil {
 		return value.Policy{}, value.ErrUnavailable

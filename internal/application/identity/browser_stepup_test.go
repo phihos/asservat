@@ -36,7 +36,7 @@ func TestStepUpLoginUsesCurrentProtectedPolicy(t *testing.T) {
 			f.p.StepUp = value.StepUpPolicy{ACRValues: []string{"gold"}, MaxAge: 5 * time.Minute}
 			store := &stepupStore{}
 			provider := &stepupProvider{}
-			service := BrowserSessions{Store: store, Cipher: handoffCipher{}, Provider: provider, Identities: handoffIdentity{}, Policies: f, Issuer: f.p.Issuer, ClientID: "console", Epoch: "epoch", Lifetime: time.Hour, Now: func() time.Time { return f.now }}
+			service := BrowserSessions{Store: store, Cipher: handoffCipher{}, Provider: provider, Identities: handoffIdentity{}, Policies: f, Issuer: f.p.Issuer, ClientID: "console", Lifetime: time.Hour, Now: func() time.Time { return f.now }}
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			switch name {

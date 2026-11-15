@@ -160,12 +160,6 @@ func (s ContextInvestigation) prepareSourceSnapshotPreview(ctx context.Context, 
 		actor = initiator.Principal
 		selected.TriggerKind = "recordingSave"
 	}
-	step = "approval"
-	required, err := s.requireRecordingApproval(ctx, current, i.Principal)
-	if err != nil {
-		return zero, planning.ContextPlan{}, err
-	}
-	selected.Request.RequireApproval = required
 	step = "resolve"
 	var target targets.PodResolution
 	observed := resolved

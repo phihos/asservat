@@ -17,7 +17,7 @@ import (
 func TestPolicyProfilePreviewRetainsFrozenScopeWithoutObservationLease(t *testing.T) {
 	for _, mode := range []string{"current", "changed-endpoint", "denied", "cancelled-owner"} {
 		t.Run(mode, func(t *testing.T) {
-			f, authority, _, _ := newTeamRecordingFixture(t)
+			f, authority, _ := newTeamRecordingFixture(t)
 			authority.authority.Actions = []string{"profile"}
 			authority.authority.Limits.MaxObservedBytes = 0
 			owner, cancel := context.WithCancel(t.Context())

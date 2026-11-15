@@ -46,7 +46,6 @@ func TestPolicySourceLedgerWithRealPostgres(t *testing.T) {
 				t.Error(err)
 			}
 		}()
-		f.initializeManagedProcessing(t, root)
 		seed, _, _ := f.prepareManagedContext(t, root, enrollment, policySourceFixtureRetentionSeconds)
 		option := policyRecorderProtectedCase{Hub: f.roles["hub-runtime"], Admissions: seed.s, Filters: pcap.NewCompiler(), Expression: "tcp dst port 80", Subjects: []cfg.Subject{{Kind: "Group", Issuer: "https://id.example.test", ID: "maintainers"}}, Ongoing: true, Retention: strconv.FormatInt(policySourceFixtureRetentionSeconds, 10) + "s", PermissionsAccepted: func(batch cfg.PermissionBatch) { f.batch = policyRecorderCloneBatch(batch) }}
 		option.SourceAccepted = func(t *testing.T, accepted policySourceAcceptedFixture) {
@@ -82,7 +81,6 @@ func TestPolicySourceLedgerWithRealPostgres(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				policy := identity.Policy{Revision: identity.Revision{UID: "synthetic-settings", Generation: 1, Digest: [32]byte{1}}, Issuer: accepted.Authority.Creator.Issuer, ObservedAt: n, FreshUntil: n.Add(5 * time.Second), Clients: []identity.Client{{ID: accepted.Authority.Creator.ClientID, Kind: identity.Human, ClassQualified: true}}, EligibleGroups: []string{"maintainers"}, GroupsAtIssueQualified: true, GroupMaxAge: time.Minute}
 				node := targets.PacketSourceObservation{PodUID: target.Pin.UID, NodeUID: custodyID(), BootID: custodyID(), CollectorPodUID: custodyID(), CollectorEpoch: custodyID(), ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}
 				if old.Permit.Binding.SourceID != "" {
 					node.NodeUID = old.Permit.Binding.NodeUID
@@ -90,7 +88,7 @@ func TestPolicySourceLedgerWithRealPostgres(t *testing.T) {
 					node.CollectorPodUID = old.Permit.Binding.CollectorPodUID
 					node.CollectorEpoch = old.Permit.Binding.CollectorEpoch
 				}
-				return captureapp.PolicySourceCheck{Policy: accepted.Compiled, Authority: accepted.Authority, Target: target, Node: node, Retention: resolution, Settings: policy, SourceID: sourceID, Fence: fence, BytesPerSecond: 1 << 20, SourceSlots: 4, ObservedAt: n, ValidUntil: n.Add(5 * time.Second)}
+				return captureapp.PolicySourceCheck{Policy: accepted.Compiled, Authority: accepted.Authority, Target: target, Node: node, Retention: resolution, SourceID: sourceID, Fence: fence, BytesPerSecond: 1 << 20, SourceSlots: 4, ObservedAt: n, ValidUntil: n.Add(5 * time.Second)}
 			}
 			count := func(t *testing.T) (int64, int64, int64) {
 				t.Helper()
@@ -119,7 +117,7 @@ func TestPolicySourceLedgerWithRealPostgres(t *testing.T) {
 					}
 					t.Logf("source_accepted_readable=%t", readErr == nil)
 					scopeMatches := readErr == nil && captureapp.RecorderPolicyScopeDigest(diagnosticAuthority.PolicyUID, persisted.IntentVersion, accepted.Source.CollectionDigest, accepted.Compiled, diagnosticAuthority.NamespaceUID, diagnosticAuthority.WorkloadUID, diagnosticAuthority.Delegation, diagnosticAuthority.Owners, diagnosticAuthority.Actions, diagnosticAuthority.Limits) == diagnosticAuthority.ScopeDigest
-					t.Logf("source_accepted_readback authority_exact=%t issued_instant=%t expiry_instant=%t current_scope=%t issuer=%t", readErr == nil && reflect.DeepEqual(diagnosticAuthority, accepted.Authority), readErr == nil && diagnosticAuthority.IssuedAt.Equal(originalCheck.Authority.IssuedAt), readErr == nil && diagnosticAuthority.NotAfter.Equal(originalCheck.Authority.NotAfter), scopeMatches, readErr == nil && originalCheck.Settings.Issuer == diagnosticAuthority.Creator.Issuer)
+					t.Logf("source_accepted_readback authority_exact=%t issued_instant=%t expiry_instant=%t current_scope=%t", readErr == nil && reflect.DeepEqual(diagnosticAuthority, accepted.Authority), readErr == nil && diagnosticAuthority.IssuedAt.Equal(originalCheck.Authority.IssuedAt), readErr == nil && diagnosticAuthority.NotAfter.Equal(originalCheck.Authority.NotAfter), scopeMatches)
 
 					topology, topologyErr := s.retention.topology.RetentionTopology(diagnosticCtx, diagnosticAuthority.ClusterID)
 					if topologyErr != nil {

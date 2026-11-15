@@ -34,7 +34,7 @@ def hub_values():
     return {
         "image": {"repository": "registry.example/asservat", "digest": DIGEST, "pullPolicy": "IfNotPresent", "pullSecrets": []},
         "origin": "https://asservat.example.org",
-        "identity": {"issuer": "https://id.example.org/realms/org", "clientID": "asservat-console", "eligibleGroups": ["00000000-0000-4000-8000-000000000001"], "clientSecret": {"existingSecret": "operator-oidc"}, "providerRootsPEM": "PUBLIC-CA", "processingOperators": [{"clientID": "asservat-console", "issuer": "https://login.example.org/realms/asservat", "kind": "User", "id": "0f03f92a-6920-47cd-85d5-26080d3571d5"}]},
+        "identity": {"issuer": "https://id.example.org/realms/org", "clientID": "asservat-console", "administrators": {"groups": ["/asservat-admins"]}, "clientSecret": {"existingSecret": "operator-oidc"}, "providerRootsPEM": "PUBLIC-CA", "processingOperators": [{"clientID": "asservat-console", "issuer": "https://login.example.org/realms/asservat", "kind": "User", "id": "0f03f92a-6920-47cd-85d5-26080d3571d5"}]},
         "exposure": {"tlsSecret": "console-tls"},
         "capacity": PROFILE["capacity"],
         "services": {
@@ -157,7 +157,7 @@ def check_setup(render):
     assert not [r for r in docs if r["kind"] in ("Role", "ClusterRole") and r["metadata"]["name"].endswith("asservat-setup")]
     # The name follows chart version, image and values.
     changed = bundled_values("combined")
-    changed["identity"]["maxSessions"] = 9
+    changed["identity"]["maxLifetimeSeconds"] = 9
     other = [r for r in render(changed) if r["kind"] == "Job" and r["metadata"]["name"].startswith("asservat-setup-")][0]
     assert other["metadata"]["name"] != job["metadata"]["name"]
     config = json.loads(named(docs, "ConfigMap", "asservat-setup-config")["data"]["config.json"])

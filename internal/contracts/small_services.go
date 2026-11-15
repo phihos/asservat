@@ -86,7 +86,7 @@ type SecretsSQL struct {
 
 // The keys of the `<name>-ids` Secret, mounted at /run/asservat/ids/<key>.
 func InstallationIDKeys() []string {
-	return []string{"installationID", "clusterID", "issuerEpoch", "permissionRootID", "browserRootID", "sessionEpoch", "roleSetupID", "peerID"}
+	return []string{"installationID", "clusterID", "issuerEpoch", "permissionRootID", "roleSetupID", "peerID"}
 }
 
 // The keys of the `<name>-audit-mac` Secret.
@@ -114,7 +114,6 @@ func SQLComponentPurposes(component string) ([]string, bool) {
 		return append(PublicRuntimeHubRolePurposes(), OwnerIdentityRolePurposes()...), true
 	case "hub-worker":
 		out := ConfigurationRuntimeRolePurposes()
-		out = append(out, "browser-settings")
 		out = append(out, PublicRuntimeCaptureCleanupPurposes()...)
 		out = append(out, CapacityRuntimePurposes()...)
 		out = append(out, PublicRuntimePermissionPurposes()...)

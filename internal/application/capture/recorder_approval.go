@@ -25,45 +25,6 @@ type RecorderGrants interface {
 	Covering(context.Context, identities.CurrentIdentity, string, artifact.Digest, authorization.Target) (authorization.Grant, time.Time, error)
 }
 
-// ApprovalSettings reads the protected installation approval settings.
-type ApprovalSettings interface {
-	IdentityPolicy(context.Context, string) (identity.Policy, error)
-}
-
-// requireRecordingApproval reads the installation's REQ-SYS-002 switch for
-// the caller's issuer. Without a configured reader the installation adds no
-// requirement; a failing reader refuses the preview.
-func (s ContextInvestigation) requireRecordingApproval(ctx context.Context, current identities.CurrentIdentity, actor identity.Principal) (bool, error) {
-	issuer := actor.Issuer
-	_, _, policy := authorization.PolicyExecutor(actor)
-	if policy {
-		// Only the package-private request-owned policy identity supplies accepted
-		// issuer provenance. A token or policy-shaped principal cannot select it.
-		accepted, ok := current.(interface {
-			acceptedSettingsIssuer(context.Context) (string, error)
-		})
-		if !ok {
-			return false, value.ErrUnavailable
-		}
-		var err error
-		issuer, err = accepted.acceptedSettingsIssuer(ctx)
-		if err != nil {
-			return false, value.ErrUnavailable
-		}
-	}
-	if s.Approvals == nil {
-		if policy {
-			return false, value.ErrUnavailable
-		}
-		return false, nil
-	}
-	p, err := s.Approvals.IdentityPolicy(ctx, issuer)
-	if err != nil || p.Issuer != issuer || p.Validate(s.Now()) != nil {
-		return false, value.ErrUnavailable
-	}
-	return p.RequireRecordingApproval, nil
-}
-
 // RequestWithResultAccess submits a reviewed packet/syscall preview with an
 // optional same-human result-access instruction (REQ-INV-001). A pod-status
 // preview needs no review and refuses the instruction.
@@ -135,15 +96,6 @@ func (s ContextInvestigation) recorderRequest(ctx context.Context, source identi
 		return authorization.Grant{}, value.ErrRecorderUnavailable
 	}
 
-	required, err := s.requireRecordingApproval(ctx, source, p.Actor)
-	if err != nil {
-		return authorization.Grant{}, err
-	}
-	frozen := approval != nil && slices.ContainsFunc(approval.Reasons, func(r authorization.SensitiveReason) bool { return r.Code == "recordingApprovalRequired" })
-	combinedReview := p.CompositionGroup != nil && approval != nil && slices.ContainsFunc(approval.Reasons, func(r authorization.SensitiveReason) bool { return r.Code != "recordingApprovalRequired" })
-	if required != frozen && !(frozen && !required && combinedReview) {
-		return authorization.Grant{}, s.requestChanged("approval/settings")
-	}
 	if _, _, policy := authorization.PolicyExecutor(p.Actor); policy {
 		if access != nil {
 			return authorization.Grant{}, value.ErrInvalid

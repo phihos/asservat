@@ -39,7 +39,7 @@ func PublicRuntimeRoleConnectionLimit(purpose string) (int, bool) {
 		limit, _ := PublicRuntimeRolePoolLimit(purpose)
 		return PublicRuntimeRetainedHubProcesses*limit + 1, true
 	}
-	if purpose == "browser-settings" || slices.Contains(PublicRuntimeCaptureCleanupPurposes(), purpose) || purpose == "capacity" || purpose == "capacity-capture" || slices.Contains(PublicRuntimePermissionPurposes(), purpose) || slices.Contains(PublicRuntimeRetentionPurposes(), purpose) || slices.Contains(PublicRuntimeWorkerConfigurationPurposes(), purpose) || slices.Contains(PublicRuntimeContextDeletionPurposes(), purpose) {
+	if slices.Contains(PublicRuntimeCaptureCleanupPurposes(), purpose) || purpose == "capacity" || purpose == "capacity-capture" || slices.Contains(PublicRuntimePermissionPurposes(), purpose) || slices.Contains(PublicRuntimeRetentionPurposes(), purpose) || slices.Contains(PublicRuntimeWorkerConfigurationPurposes(), purpose) || slices.Contains(PublicRuntimeContextDeletionPurposes(), purpose) {
 		return PublicRuntimeWorkerRoleConnections, true
 	}
 	if slices.Contains(PublicRuntimeFederationPurposes(), purpose) {

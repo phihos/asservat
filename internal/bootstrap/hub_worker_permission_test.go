@@ -36,7 +36,6 @@ func permissionTestConfig() contracts.HubWorkerConfig {
 			Retention:           true,
 			WorkerConfiguration: &contracts.HubWorkerWorkerConfiguration{Namespace: "asservat-workers", Source: "asservat-worker-profile"},
 			ContextDeletion:     &contracts.HubWorkerContextDeletion{EvidenceStore: contracts.HubWorkerObjectStore{Endpoint: "https://objects.example.test", Region: "us-east-1", Bucket: "evidence"}},
-			Browser:             &contracts.HubWorkerBrowserSettings{Settings: "asservat-browser-settings"},
 			Identity:            &contracts.HubWorkerIdentitySettings{Settings: "asservat-identity-settings", Issuer: "https://id.example.test/realms/a"},
 		},
 	}
@@ -45,7 +44,7 @@ func permissionTestConfig() contracts.HubWorkerConfig {
 func TestHubWorkerPermissionConfigDecodesClosed(t *testing.T) {
 	body := `{"format":"` + contracts.HubWorkerConfigFormat + `","permission":{"statusUsers":["u"],"retention":true,` +
 		`"workerConfiguration":{"namespace":"w","source":"s"},"contextDeletion":{"evidenceStore":{"endpoint":"https://e","region":"r","bucket":"b"}},` +
-		`"browser":{"settings":"b"},"identity":{"settings":"i","issuer":"https://i"},"review":"r"}}`
+		`"identity":{"settings":"i","issuer":"https://i"},"review":"r"}}`
 	c, err := contracts.DecodeHubWorkerConfig(strings.NewReader(body))
 	if err != nil || c.Permission == nil || !c.Permission.Retention || c.Permission.WorkerConfiguration.Source != "s" || c.Permission.ContextDeletion.EvidenceStore.Bucket != "b" {
 		t.Fatal("permission section not decoded", err)
@@ -80,7 +79,6 @@ func TestHubWorkerPermissionValidation(t *testing.T) {
 			c.Permission.ContextDeletion.EvidenceStore.Endpoint = "http://objects"
 		},
 		"identity-no-issuer": func(c *contracts.HubWorkerConfig) { c.Permission.Identity.Issuer = "" },
-		"browser-name":       func(c *contracts.HubWorkerConfig) { c.Permission.Browser.Settings = "" },
 	} {
 		c := permissionTestConfig()
 		mutate(&c)
@@ -121,8 +119,8 @@ func TestPermissionChildSelection(t *testing.T) {
 	if !found {
 		t.Fatal("permission child missing with its section")
 	}
-	got := contracts.PermissionProjectionPurposes(true, true, true, true)
-	if len(got) != 12 || got[0] != "permission-accept" || got[len(got)-1] != "browser-settings" {
+	got := contracts.PermissionProjectionPurposes(true, true, true)
+	if len(got) != 11 || got[0] != "permission-accept" || got[len(got)-1] != "context-cleanup-finalize" {
 		t.Fatal("unexpected permission logins", got)
 	}
 	for _, p := range got {

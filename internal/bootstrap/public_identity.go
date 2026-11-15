@@ -56,15 +56,21 @@ func newPublicIdentity(ctx context.Context, in *ownerInputs, files *providerInpu
 	if ctx == nil || ctx.Err() != nil || p == nil || observer == nil || pools == nil {
 		return fail(mounts.ErrUnavailable)
 	}
-	reader, e := kube.NewBrowserSettingsReader(observer, p.BrowserSettings.Name, p.BrowserSettings.UID, p.BrowserRootID, p.BrowserSessionEpoch)
+	reader, e := kube.NewBrowserSettingsReader(observer, p.BrowserSettings.Name, p.BrowserSettings.UID)
 	if e != nil {
 		return fail(mounts.ErrUnavailable)
 	}
 	settings, e := reader.BrowserSettings(ctx)
-	if e != nil || settings.Suspended || settings.Origin != p.Origin || !settings.Valid(time.Now()) {
+	if e != nil || settings.Origin != p.Origin {
 		return fail(mounts.ErrUnavailable)
 	}
 	policies, e := kube.NewIdentityPolicyClient(observer, p.IdentitySettings.Name, p.IdentitySettings.UID, settings.Issuer)
+	if e != nil {
+		return fail(mounts.ErrUnavailable)
+	}
+	// The groups claim name is fixed for this process; a settings change
+	// rolls hub-api (the Deployment carries the settings checksum).
+	identitySettings, e := policies.IdentityPolicy(ctx, settings.Issuer)
 	if e != nil {
 		return fail(mounts.ErrUnavailable)
 	}
@@ -77,7 +83,7 @@ func newPublicIdentity(ctx context.Context, in *ownerInputs, files *providerInpu
 	// The Keycloak profile (ADR-053) fixes these issuer-relative endpoints.
 	issuer := strings.TrimSuffix(settings.Issuer, "/")
 	trust := func(audience string) oidc.Trust {
-		return oidc.Trust{Issuer: settings.Issuer, Audience: audience, JWKSURL: issuer + "/protocol/openid-connect/certs", Profile: oidc.Keycloak, RootCA: pemRoots(p.ProviderRoots), KeyMaxAge: time.Minute}
+		return oidc.Trust{Issuer: settings.Issuer, Audience: audience, JWKSURL: issuer + "/protocol/openid-connect/certs", GroupsClaim: identitySettings.GroupsClaim, Profile: oidc.Keycloak, RootCA: pemRoots(p.ProviderRoots), KeyMaxAge: time.Minute}
 	}
 	provider, e := oidc.NewBrowser(oidc.BrowserTrust{Access: trust(p.BrowserAudience), ClientID: settings.ClientID, ClientSecret: clientSecret, AuthorizationEndpoint: issuer + "/protocol/openid-connect/auth", TokenEndpoint: issuer + "/protocol/openid-connect/token", RedirectURI: p.Origin + "/auth/callback", Scopes: publicIdentityScopes}, time.Now)
 	if e != nil {
@@ -129,7 +135,7 @@ func newPublicIdentity(ctx context.Context, in *ownerInputs, files *providerInpu
 	if e != nil {
 		return fail(e)
 	}
-	store, e := postgres.NewBrowserSessions(ctx, pool, settings.Binding())
+	store, e := postgres.NewBrowserSessions(ctx, pool, settings)
 	if e != nil {
 		return fail(mounts.ErrUnavailable)
 	}
@@ -138,7 +144,7 @@ func newPublicIdentity(ctx context.Context, in *ownerInputs, files *providerInpu
 		download: identities.Service{Tokens: downloadTokens, Policies: policies, Now: time.Now},
 		sessions: &identities.BrowserSessions{Store: store, Cipher: kms.BrowserCipher{Sealer: seal, Opener: open}, Provider: provider,
 			Identities: identities.Service{Tokens: browserTokens, Policies: policies, Now: time.Now}, Policies: policies, Logout: provider,
-			Issuer: settings.Issuer, ClientID: settings.ClientID, Epoch: settings.Epoch, Lifetime: time.Duration(settings.MaxLifetimeSeconds) * time.Second, Now: time.Now}}
+			Issuer: settings.Issuer, ClientID: settings.ClientID, Lifetime: settings.MaxLifetime, Now: time.Now}}
 	if ctx.Err() != nil {
 		return fail(mounts.ErrUnavailable)
 	}

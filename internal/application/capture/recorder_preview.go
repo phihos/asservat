@@ -208,12 +208,8 @@ func (s ContextInvestigation) previewComposition(ctx context.Context, source ide
 		p.Deadline = identity.Earlier(p.Deadline, intent.RepeatedFrom.ExpiresAt)
 	}
 	p.AssessmentID, p.AssessmentRulesDigest = s.NewID(), compiler.RecorderAssessmentRulesDigest()
-	required, err := s.requireRecordingApproval(ctx, source, i.Principal)
-	if err != nil {
-		return zero, previewFailure("approvals", err)
-	}
 	mark = time.Now()
-	plan, err := s.compileRecorderPeers(ctx, planning.RecorderInput{CaptureID: p.CaptureID, Executor: p.Actor, Target: target, Composition: *intent.Composition, Retention: r, Deadline: p.Deadline, RequireApproval: required})
+	plan, err := s.compileRecorderPeers(ctx, planning.RecorderInput{CaptureID: p.CaptureID, Executor: p.Actor, Target: target, Composition: *intent.Composition, Retention: r, Deadline: p.Deadline})
 	auditapp.MarkStep(ctx, "p-compile", mark)
 	if err != nil {
 		return zero, previewFailure("compile", err)

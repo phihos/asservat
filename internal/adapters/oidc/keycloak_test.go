@@ -12,20 +12,29 @@ func TestKeycloakAccessTokenProfile(t *testing.T) {
 		c := f.claims()
 		delete(c, "client_id")
 		c["azp"], c["typ"] = "console", "Bearer"
-		c["groups"] = []string{"mutable-name-must-not-confer-access"}
-		c["asservat_groups"] = []string{"stable-team-id"}
+		c["groups"] = []string{"/payments"}
 		return c
 	}
 	c, err := f.v.Verify(context.Background(), sign(t, f.key, "key-1", "JWT", claims()))
-	if err != nil || c.ClientID != "console" || len(c.Groups) != 1 || c.Groups[0] != "stable-team-id" {
+	if err != nil || c.ClientID != "console" || len(c.Groups) != 1 || c.Groups[0] != "/payments" {
 		t.Fatalf("provider normalization failed: %v", err)
 	}
-	t.Run("absent-stable-membership-is-empty", func(t *testing.T) {
+	t.Run("absent-groups-is-empty", func(t *testing.T) {
 		input := claims()
-		delete(input, "asservat_groups")
+		delete(input, "groups")
 		out, err := f.v.Verify(context.Background(), sign(t, f.key, "key-1", "JWT", input))
 		if err != nil || len(out.Groups) != 0 {
-			t.Fatal("mutable groups became membership")
+			t.Fatal("absent groups claim yielded membership")
+		}
+	})
+	t.Run("configured-claim", func(t *testing.T) {
+		v := *f.v
+		v.trust.GroupsClaim = "roles"
+		input := claims()
+		input["roles"] = []string{"/ops"}
+		out, err := v.Verify(context.Background(), sign(t, f.key, "key-1", "JWT", input))
+		if err != nil || len(out.Groups) != 1 || out.Groups[0] != "/ops" {
+			t.Fatal("configured groups claim not read", err)
 		}
 	})
 	for name, change := range map[string]func(map[string]any){
@@ -35,10 +44,10 @@ func TestKeycloakAccessTokenProfile(t *testing.T) {
 		"missing-client":     func(c map[string]any) { delete(c, "azp") },
 		"conflicting-client": func(c map[string]any) { c["client_id"] = "other" },
 		"empty-client-alias": func(c map[string]any) { c["client_id"] = "" },
-		"group-alias":        func(c map[string]any) { c["Asservat_groups"] = []string{"admin"} },
+		"group-alias":        func(c map[string]any) { c["Groups"] = []string{"admin"} },
 		"type-alias":         func(c map[string]any) { c["TYP"] = "Bearer" },
-		"null-groups":        func(c map[string]any) { c["asservat_groups"] = nil },
-		"duplicate-groups":   func(c map[string]any) { c["asservat_groups"] = []string{"same", "same"} },
+		"null-groups":        func(c map[string]any) { c["groups"] = nil },
+		"duplicate-groups":   func(c map[string]any) { c["groups"] = []string{"same", "same"} },
 		"wrong-audience":     func(c map[string]any) { c["aud"] = "console" },
 		"delegated":          func(c map[string]any) { c["act"] = map[string]any{"sub": "admin"} },
 	} {

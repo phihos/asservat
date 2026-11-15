@@ -61,7 +61,7 @@ func (f *repeatBrowserFacts) ContextCapability(ctx context.Context, t authorizat
 func (f *repeatBrowserFacts) IdentityPolicy(context.Context, string) (identity.Policy, error) {
 	now := time.Now()
 	actor := testIdentity()
-	return identity.Policy{Revision: actor.Policy, Issuer: actor.Principal.Issuer, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), Clients: []identity.Client{{ID: actor.Principal.ClientID, Kind: identity.Human, ClassQualified: true}}, EligibleGroups: []string{"maintainers"}, GroupsAtIssueQualified: true, GroupMaxAge: time.Minute, RequireRecordingApproval: true}, nil
+	return identity.Policy{Revision: actor.Policy, Issuer: actor.Principal.Issuer, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), Clients: []identity.Client{{ID: actor.Principal.ClientID, Kind: identity.Human, ClassQualified: true}}}, nil
 }
 func (f *repeatBrowserFacts) PacketRecorder(context.Context, targets.PodResolution) error { return nil }
 func (f *repeatBrowserFacts) ResolvePacketRecorder(ctx context.Context, r targets.Request) (targets.PodResolution, error) {
@@ -118,7 +118,7 @@ func testHistoryEditedRepeatBrowser(t *testing.T, nanoseconds bool) {
 	server.EnableHTTP2 = true
 	server.StartTLS()
 	defer server.Close()
-	service := app.ContextInvestigation{RootID: reserveID(1), InstallationID: reserveID(2), Previews: facts, Replay: facts, Admission: facts, Targets: facts, Eligibility: access.Evaluator{Permissions: facts, Now: time.Now}, Capabilities: facts, Retention: facts, Storage: facts, Processing: facts, Recorders: facts, Filters: facts, Approvals: facts, Lifetime: time.Minute, Now: time.Now, NewID: func() string { return reserveID(100 + int(facts.ids.Add(1))) }}
+	service := app.ContextInvestigation{RootID: reserveID(1), InstallationID: reserveID(2), Previews: facts, Replay: facts, Admission: facts, Targets: facts, Eligibility: access.Evaluator{Permissions: facts, Now: time.Now}, Capabilities: facts, Retention: facts, Storage: facts, Processing: facts, Recorders: facts, Filters: facts, Lifetime: time.Minute, Now: time.Now, NewID: func() string { return reserveID(100 + int(facts.ids.Add(1))) }}
 	service.ReportPreviewFailure = func(stage string) { t.Log("preview stage", stage) }
 	history := app.ContextHistoryService{RootID: reserveID(1), InstallationID: reserveID(2), Reader: facts, Targets: facts, Workloads: facts, Previews: service, Now: time.Now}
 	ops, err := presentation.NewContextOperationsWithHistory(presentation.ContextOperationsConfig{PublicOrigin: server.URL, CollectionEnabled: true, Now: time.Now, NewID: func() string { return reserveID(500) }}, service, &mcpCaptureFixture{}, history)
@@ -175,7 +175,7 @@ func testHistoryEditedRepeatBrowser(t *testing.T, nanoseconds bool) {
 	}
 	target := map[string]string{"cluster_id": reserveID(4), "namespace": "payments", "kind": "Deployment", "name": "api"}
 	composition := map[string]any{"components": []any{map[string]any{"id": "network", "profileRef": map[string]string{"catalog": "builtin", "name": "network-connections", "version": "v1"}, "overrides": []any{map[string]any{"actionID": "sample", "field": "packetFilter", "value": "tcp port 8080"}, map[string]any{"actionID": "sample", "field": "packetAfter", "value": "2s"}, map[string]any{"actionID": "sample", "field": "actionTimeout", "value": "10s"}}}}, "maxTotalBytes": 16 << 20, "maxDuration": "10s"}
-	if out := call("preview_capture", map[string]any{"target_ref": target, "profile_composition": composition, "requested_retention_seconds": 600}); out["status"] != "ok" || out["data"].(map[string]any)["approval_required"] != true {
+	if out := call("preview_capture", map[string]any{"target_ref": target, "profile_composition": composition, "requested_retention_seconds": 600}); out["status"] != "ok" || out["data"].(map[string]any)["approval_required"] != false {
 		t.Fatal("original preview", out["data"])
 	}
 	facts.mu.Lock()
@@ -217,8 +217,8 @@ func testHistoryEditedRepeatBrowser(t *testing.T, nanoseconds bool) {
 	if e != nil || deadline.After(sourceExpiry) || deadline.Nanosecond()%1000 != 0 {
 		t.Fatal("repeat extended or failed to normalize original bound", e)
 	}
-	if data["approval_required"] != true || data["repeated_from_capture_id"] != p.CaptureID || data["execution_digest"] == hex.EncodeToString(p.ScopeDigest[:]) {
-		t.Fatal("repeat did not create a fresh edited review")
+	if data["approval_required"] != false || data["repeated_from_capture_id"] != p.CaptureID || data["execution_digest"] == hex.EncodeToString(p.ScopeDigest[:]) {
+		t.Fatal("repeat did not create a fresh edited preview")
 	}
 	facts.mu.Lock()
 	edited := facts.preview.Clone()

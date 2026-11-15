@@ -1,12 +1,13 @@
 package capture
 
 import (
-	"asservat.local/asservat/internal/domain/artifact"
-	value "asservat.local/asservat/internal/domain/capture"
 	"crypto/sha256"
 	"errors"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/domain/artifact"
+	value "asservat.local/asservat/internal/domain/capture"
 )
 
 func TestDisabledManualSaveRetainsAcceptedReplayButCannotContinue(t *testing.T) {

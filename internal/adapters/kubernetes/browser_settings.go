@@ -6,69 +6,47 @@ import (
 	"strings"
 	"time"
 
-	app "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/contracts"
-	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/identity"
 )
 
-// Bootstrap pins the Helm-rendered ConfigMap UID, the installation root and
-// session epoch (the <name>-ids Secret). A Helm-rendered document omits
-// rootID and sessionEpoch; the reader supplies them. Public input cannot
-// select a different configuration or credential.
-type BrowserSettingsClient struct {
-	client                 *PermissionClient
-	name, uid, root, epoch string
+// BrowserSettingsReader reads browser.json from the Helm-rendered ConfigMap
+// pinned by name and UID. Public input cannot select another configuration.
+type BrowserSettingsReader struct {
+	client    *PermissionClient
+	name, uid string
 }
 
-var _ app.BrowserSettingsReader = (*BrowserSettingsClient)(nil)
-
-// NewBrowserSettingsClient reads a document that carries its own session
-// epoch (sessionEpoch present).
-//
-// Deprecated: use NewBrowserSettingsReader with the IDs Secret's epoch.
-func NewBrowserSettingsClient(client *PermissionClient, name, uid, root string) (*BrowserSettingsClient, error) {
-	return NewBrowserSettingsReader(client, name, uid, root, "")
-}
-
-// NewBrowserSettingsReader fills an omitted rootID and sessionEpoch from root
-// and epoch; a present value must equal them.
-func NewBrowserSettingsReader(client *PermissionClient, name, uid, root, epoch string) (*BrowserSettingsClient, error) {
-	if client == nil || !installationRefValid(name, uid) || !authorization.UUID(root) || epoch != "" && !authorization.UUID(epoch) {
+func NewBrowserSettingsReader(client *PermissionClient, name, uid string) (*BrowserSettingsReader, error) {
+	if client == nil || !installationRefValid(name, uid) {
 		return nil, value.ErrInvalid
 	}
-	return &BrowserSettingsClient{client, name, uid, root, epoch}, nil
+	return &BrowserSettingsReader{client, name, uid}, nil
 }
+
 func canonicalBrowserOrigin(s string) bool {
 	u, e := url.Parse(s)
 	return e == nil && u.Scheme == "https" && u.Host != "" && u.User == nil && u.Path == "" && u.RawPath == "" && u.RawQuery == "" && u.Fragment == "" && u.Opaque == "" && u.Host == strings.ToLower(u.Host) && u.Port() != "443" && len(s) <= 2048
 }
-func (c *BrowserSettingsClient) BrowserSettings(ctx context.Context) (value.BrowserSettings, error) {
+
+func (c *BrowserSettingsReader) BrowserSettings(ctx context.Context) (value.BrowserSettings, error) {
 	var zero value.BrowserSettings
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	started := c.client.now()
-	data, ref, err := c.client.installationConfig(ctx, c.name, c.uid)
+	data, _, err := c.client.installationConfig(ctx, c.name, c.uid)
 	if err != nil || len(data) != 1 || data["browser.json"] == "" {
 		return zero, value.ErrUnavailable
 	}
-	var wire contracts.BrowserSettings
-	digest, err := decodePermissionSpec([]byte(data["browser.json"]), c.client.validator.browserSchema, &wire)
-	if wire.RootID == "" {
-		wire.RootID = c.root
-	}
-	if wire.SessionEpoch == "" {
-		wire.SessionEpoch = c.epoch
-	}
-	if err != nil || wire.RootID != c.root || c.epoch != "" && wire.SessionEpoch != c.epoch || !canonicalBrowserOrigin(wire.Origin) {
+	wire := contracts.BrowserSettings{MaxLifetimeSeconds: 604800, InactivityTimeoutSeconds: 86400}
+	if _, err = decodePermissionSpec([]byte(data["browser.json"]), c.client.validator.browserSchema, &wire); err != nil || !canonicalBrowserOrigin(wire.Origin) {
 		return zero, value.ErrUnavailable
 	}
 	u, e := url.Parse(wire.Issuer)
 	if e != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.Opaque != "" {
 		return zero, value.ErrUnavailable
 	}
-	out := value.BrowserSettings{RootID: wire.RootID, Epoch: wire.SessionEpoch, Issuer: wire.Issuer, ClientID: wire.ClientID, Origin: wire.Origin, Revision: value.Revision{UID: ref.UID, Generation: wire.Revision, Digest: digest}, Suspended: wire.Suspended, MaxLifetimeSeconds: wire.MaxLifetimeSeconds, MaxLogins: wire.MaxLogins, MaxSessions: wire.MaxSessions, MaxLogoutEvents: wire.MaxLogoutEvents, ObservedAt: started, FreshUntil: started.Add(5 * time.Second)}
-	if c.client.current(ctx, started, 5*time.Second) != nil || !out.Valid(c.client.now()) {
+	out := value.BrowserSettings{Issuer: wire.Issuer, ClientID: wire.ClientID, Origin: wire.Origin, MaxLifetime: time.Duration(wire.MaxLifetimeSeconds) * time.Second, InactivityTimeout: time.Duration(wire.InactivityTimeoutSeconds) * time.Second}
+	if !out.Valid() {
 		return zero, value.ErrUnavailable
 	}
 	return out, nil

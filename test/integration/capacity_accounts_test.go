@@ -129,7 +129,6 @@ func qualifyCapacityAccountsSQL(t *testing.T, ctx context.Context, admin *pgxpoo
 // context through the enrolled account's allocations.
 func (f *capacitySQLFixture) managedContextDownload(t *testing.T, root capacityRoot, enrollment capacityEnrollment) {
 	t.Helper()
-	f.initializeManagedProcessing(t, root)
 	s, accepted := f.admitManagedContext(t, root, enrollment)
 	e := accepted.Expectation
 	f.checkManagedProcessingLineage(t, e)

@@ -132,7 +132,6 @@ type ongoingCompositionPorts struct {
 	captureapp.RestartObserver
 	captureapp.SourceSnapshotTargets
 	captureapp.SourceSnapshotGroupTargets
-	captureapp.ApprovalSettings
 	captureapp.RecordingPolicies
 	ongoingCandidatePort
 	captureapp.RecordingSaveGroupAdmissions
@@ -144,8 +143,8 @@ func TestTrustedOngoingCompositionBindsRuntimeAndSaveWithoutEffects(t *testing.T
 	ports := &ongoingCompositionPorts{publicContextOperationPorts: s.Investigation.Targets.(*publicContextOperationPorts)}
 	s.Investigation.Targets = ports
 	s.Investigation.RecordingPolicies, s.Investigation.PolicyAccepted = ports, ports
-	s.Investigation.RecordingSources, s.Investigation.RecordingGroups, s.Investigation.Approvals = ports, ports, ports
-	runtime := &captureapp.PolicySourceRuntime{Ledger: ports, Dispatcher: ports, Observer: ports, Retention: s.Investigation.Retention, Settings: ports, Now: c.Now, NewID: c.NewID}
+	s.Investigation.RecordingSources, s.Investigation.RecordingGroups = ports, ports
+	runtime := &captureapp.PolicySourceRuntime{Ledger: ports, Dispatcher: ports, Observer: ports, Retention: s.Investigation.Retention, Now: c.Now, NewID: c.NewID}
 	s.ongoingSources = runtime
 	got, err := composePublicContextUseCases(c, s)
 	if err != nil || !got.submission.RecordingSaveEnabled || got.submission.Targets != ports || s.Investigation.RecordingSaveEnabled {
@@ -193,9 +192,6 @@ func TestTrustedOngoingCompositionBindsRuntimeAndSaveWithoutEffects(t *testing.T
 		}},
 		{"no-policy", func(c *PublicContextOperationsConfig, s *PublicContextOperationServices) {
 			s.Investigation.PolicyAccepted = nil
-		}},
-		{"no-settings", func(c *PublicContextOperationsConfig, s *PublicContextOperationServices) {
-			s.Investigation.Approvals = nil
 		}},
 	} {
 		t.Run(item.name, func(t *testing.T) {

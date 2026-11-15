@@ -1,18 +1,12 @@
 package contracts
 
-// BrowserSettings is administrator-owned ConfigMap content. It contains no
-// provider credentials and cannot be supplied by a session/login request.
+// BrowserSettings is browser.json of the Helm-rendered settings ConfigMap
+// (specs/contracts/browser-settings.schema.json). It holds no credentials.
 type BrowserSettings struct {
-	SchemaVersion      string `json:"schemaVersion"`
-	Revision           int64  `json:"revision"`
-	RootID             string `json:"rootID,omitempty"`
-	SessionEpoch       string `json:"sessionEpoch,omitempty"`
-	Issuer             string `json:"issuer"`
-	ClientID           string `json:"clientID"`
-	Origin             string `json:"origin"`
-	Suspended          bool   `json:"suspended"`
-	MaxLifetimeSeconds int    `json:"maxLifetimeSeconds"`
-	MaxLogins          int    `json:"maxLogins"`
-	MaxSessions        int    `json:"maxSessions"`
-	MaxLogoutEvents    int    `json:"maxLogoutEvents"`
+	SchemaVersion            string `json:"schemaVersion"`
+	Issuer                   string `json:"issuer"`
+	ClientID                 string `json:"clientID"`
+	Origin                   string `json:"origin"`
+	MaxLifetimeSeconds       int64  `json:"maxLifetimeSeconds,omitempty"`
+	InactivityTimeoutSeconds int64  `json:"inactivityTimeoutSeconds,omitempty"`
 }

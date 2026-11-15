@@ -24,7 +24,7 @@ BUNDLED = {
     "mode": "combined",
     "image": {"repository": "registry.example/asservat", "digest": "sha256:" + "a" * 64},
     "origin": "https://asservat.example.test",
-    "identity": {"eligibleGroups": ["00000000-0000-4000-8000-000000000001"], "administrators": {"groups": ["asservat-admins"]}, "processingOperators": [{"clientID": "asservat-console", "issuer": "https://login.example.org/realms/asservat", "kind": "User", "id": "0f03f92a-6920-47cd-85d5-26080d3571d5"}]},
+    "identity": {"administrators": {"groups": ["/asservat-admins"]}, "processingOperators": [{"clientID": "asservat-console", "issuer": "https://login.example.org/realms/asservat", "kind": "User", "id": "0f03f92a-6920-47cd-85d5-26080d3571d5"}]},
     "exposure": {"tlsSecret": "asservat-public-tls"},
     "capacity": {"workload": {"share": "1Gi"}},
     "retention": {"purposeRef": "context-trial"},
@@ -125,7 +125,7 @@ class HubAPI(unittest.TestCase):
         self.assertNotIn("sessionEpoch", browser)
         identity = json.loads(o[("ConfigMap", NS, "asservat-identity-settings")]["data"]["identity.json"])
         self.assertEqual(identity["clients"], [{"id": "asservat-console", "kind": "human", "classQualified": True}])
-        self.assertEqual(identity["administrators"], {"groups": ["asservat-admins"]})
+        self.assertEqual(identity["administrators"], {"groups": ["/asservat-admins"]})
         env = json.loads(o[("ConfigMap", NS, "asservat-download-environment")]["data"]["download-environment.json"])
         self.assertEqual((env["permittedRegions"], env["clients"][0]["purposes"]), (["us-east-1"], ["context-trial"]))
         self.assertFalse({"rootID", "installationID", "recoveryEpoch"} & set(env))
@@ -227,7 +227,7 @@ class HubAPI(unittest.TestCase):
 
     def test_refusals(self):
         for extra, message in [({"exposure": {"tlsSecret": ""}}, "exposure.tlsSecret"),
-                               ({"mode": "hub", "region": {"enabled": False}, "services": {"identity": {"provider": "external"}}, "identity": {"issuer": "https://sso.example.test", "clientID": "c", "providerRootsPEM": "x", "clientSecret": {"existingSecret": "oidc"}, "eligibleGroups": [], "eligibleSubjects": []}}, "identity.eligibleSubjects or identity.eligibleGroups"),
+                               ({"mode": "hub", "region": {"enabled": False}, "services": {"identity": {"provider": "external"}}, "identity": {"issuer": "https://sso.example.test", "clientID": "c", "providerRootsPEM": "x", "clientSecret": {"existingSecret": "oidc"}, "administrators": {"groups": [], "subjects": []}}}, "identity.administrators.groups or identity.administrators.subjects"),
                                ({"mode": "hub", "region": {"enabled": False}, "services": {"identity": {"provider": "external"}}, "identity": {"issuer": "https://sso.example.test", "clientID": "c", "providerRootsPEM": "x"}}, "identity.clientSecret.existingSecret"),
                                ({"mode": "hub", "region": {"enabled": False}, "services": {"identity": {"provider": "external"}}, "identity": {"issuer": "https://sso.example.test", "clientID": "c", "clientSecret": {"existingSecret": "oidc"}}}, "identity.providerRootsPEM")]:
             r = helm("template", merge(BUNDLED, extra), ok=False)

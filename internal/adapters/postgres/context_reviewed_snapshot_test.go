@@ -9,6 +9,7 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
+	"asservat.local/asservat/internal/domain/identity"
 	planvalue "asservat.local/asservat/internal/domain/planning"
 	"asservat.local/asservat/internal/domain/targets"
 )
@@ -23,7 +24,7 @@ func assertReviewedSnapshotPlan(t *testing.T, plan planvalue.ContextPlan, expect
 	p.ArtifactID, p.AttemptID = expected.Registration.Location.ArtifactID, expected.Registration.Location.AttemptID
 	p.Target, p.Pin = in.Target.Request, in.Target.Pin
 	p.Intent = value.ContextIntent{Target: targets.WorkloadRequest{ClusterID: p.Target.ClusterID, Namespace: p.Target.Namespace.Name, Kind: "Pod", Name: p.Target.PodName}, Snapshot: in.Snapshot.Clone(), RequestedSeconds: in.Retention.RequestedSeconds}
-	p.Storage = value.ContextStorageSelection{StoreID: expected.Registration.StoreID, AllocationID: expected.Registration.AllocationID, PoolRevision: expected.Registration.PoolRevision, AllocationRevision: expected.Registration.AllocationRevision, BindingRevision: check.Settings.Revision}
+	p.Storage = value.ContextStorageSelection{StoreID: expected.Registration.StoreID, AllocationID: expected.Registration.AllocationID, PoolRevision: expected.Registration.PoolRevision, AllocationRevision: expected.Registration.AllocationRevision, BindingRevision: identity.Revision{UID: "settings", Generation: 1, Digest: [32]byte{1}}}
 	p.Retention = value.ContextRetentionReview{PurposeRef: in.Retention.PurposeRef, RequestedSeconds: in.Retention.RequestedSeconds, MaximumSeconds: in.Retention.MaximumSeconds, DeletionBudgetSeconds: in.Retention.DeletionBudgetSeconds, Policies: in.Retention.Policies}
 	p.Audience = expected.Audience
 	p.CanonicalScope, p.ScopeDigest = plan.CanonicalScope, plan.ScopeDigest

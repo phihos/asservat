@@ -10,7 +10,6 @@ import (
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/collector"
-	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/privacy"
 	"asservat.local/asservat/internal/domain/targets"
 )
@@ -25,7 +24,6 @@ type PolicySourceCheck struct {
 	Target                                                          targets.PodResolution
 	Node                                                            targets.PacketSourceObservation
 	Retention                                                       privacy.Resolution
-	Settings                                                        identity.Policy
 	SourceID, Fence                                                 string
 	BytesPerSecond, InitialCredit, ExpectedCredit, AdditionalCredit int64
 	SourceSlots                                                     int64

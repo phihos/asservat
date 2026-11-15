@@ -31,7 +31,7 @@ func hubWorkerTestConfig() contracts.HubWorkerConfig {
 }
 
 func hubWorkerTestIDs() contracts.InstallationIDs {
-	return contracts.InstallationIDs{InstallationID: runtimeID, ClusterID: runtimeID, IssuerEpoch: runtimeID, PermissionRootID: runtimeID, BrowserRootID: runtimeID, SessionEpoch: runtimeID, RoleSetupID: runtimeID, PeerID: runtimeID}
+	return contracts.InstallationIDs{InstallationID: runtimeID, ClusterID: runtimeID, IssuerEpoch: runtimeID, PermissionRootID: runtimeID, RoleSetupID: runtimeID, PeerID: runtimeID}
 }
 
 // hubWorkerFiles writes a complete mount for config c with the PEM roots of
@@ -52,7 +52,7 @@ func hubWorkerFiles(t *testing.T, c contracts.HubWorkerConfig, server *httptest.
 	if err := os.WriteFile(filepath.Join(dir, contracts.HubWorkerKubernetesTokenFile), []byte("synthetic-worker"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	for _, key := range []string{"installationID", "clusterID", "issuerEpoch", "permissionRootID", "browserRootID", "sessionEpoch", "roleSetupID", "peerID"} {
+	for _, key := range []string{"installationID", "clusterID", "issuerEpoch", "permissionRootID", "roleSetupID", "peerID"} {
 		if err := os.WriteFile(filepath.Join(ids, key), []byte(runtimeID+"\n"), 0o600); err != nil {
 			t.Fatal(err)
 		}

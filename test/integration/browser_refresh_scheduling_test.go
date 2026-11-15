@@ -15,7 +15,7 @@ import (
 
 // Actual fixture SQL/role/lock qualification; synthetic opaque credentials are
 // deliberate. This is not a provider refresh or native-content assertion.
-func browserRefreshScheduleSQL(t *testing.T, admin *pgxpool.Pool, store *postgres.BrowserSessions, root, issuer, client string) {
+func browserRefreshScheduleSQL(t *testing.T, admin *pgxpool.Pool, store *postgres.BrowserSessions, issuer, client string) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
 	defer cancel()
@@ -37,7 +37,7 @@ func browserRefreshScheduleSQL(t *testing.T, admin *pgxpool.Pool, store *postgre
 		t.Fatal(err)
 	}
 	var claimUntil time.Time
-	if err = admin.QueryRow(ctx, "SELECT claim_until FROM browser_session WHERE root_id=$1 AND id=$2", root, r.ID[:]).Scan(&claimUntil); err != nil {
+	if err = admin.QueryRow(ctx, "SELECT claim_until FROM browser_session WHERE id=$1", r.ID[:]).Scan(&claimUntil); err != nil {
 		t.Fatal(err)
 	}
 	if !claimUntil.After(now) || claimUntil.After(time.Now().Add(10*time.Second)) || claimUntil.After(created.ExpiresAt) {
@@ -49,7 +49,7 @@ func browserRefreshScheduleSQL(t *testing.T, admin *pgxpool.Pool, store *postgre
 	}
 	defer tx.Rollback(context.Background())
 	var blockerPID int32
-	if err = tx.QueryRow(ctx, "SELECT pg_backend_pid() FROM browser_session WHERE root_id=$1 AND id=$2 FOR UPDATE", root, r.ID[:]).Scan(&blockerPID); err != nil {
+	if err = tx.QueryRow(ctx, "SELECT pg_backend_pid() FROM browser_session WHERE id=$1 FOR UPDATE", r.ID[:]).Scan(&blockerPID); err != nil {
 		t.Fatal(err)
 	}
 	due := time.Now().UTC().Add(time.Microsecond)
@@ -93,7 +93,7 @@ func browserRefreshScheduleSQL(t *testing.T, admin *pgxpool.Pool, store *postgre
 		t.Fatal("replacement changed original lifetime or schedule")
 	}
 	var consumed bool
-	if err = admin.QueryRow(ctx, "SELECT refresh_claim IS NULL AND claim_until IS NULL FROM browser_session WHERE root_id=$1 AND id=$2", root, r.ID[:]).Scan(&consumed); err != nil || !consumed {
+	if err = admin.QueryRow(ctx, "SELECT refresh_claim IS NULL AND claim_until IS NULL FROM browser_session WHERE id=$1", r.ID[:]).Scan(&consumed); err != nil || !consumed {
 		t.Fatal("refresh claim not consumed", err)
 	}
 	if err = store.FinishRefresh(ctx, r.ID, 1, claim, replacement, due); !errors.Is(err, identity.ErrDenied) {

@@ -30,7 +30,7 @@ func TestBrowserReadOnlyResolveRecognizesCommittedCredentialReplacement(t *testi
 }
 
 func TestBrowserReadOnlyReplacementDoesNotMaskRealDenial(t *testing.T) {
-	for _, mode := range []string{"unchanged", "decreased", "session-id", "principal", "provider-session", "created-at", "authenticated-at", "expiry-extension", "settings-revision", "expired", "original-observation-expired", "cancelled", "identity-contradiction"} {
+	for _, mode := range []string{"unchanged", "decreased", "session-id", "principal", "provider-session", "created-at", "authenticated-at", "expiry-extension", "expired", "original-observation-expired", "cancelled", "identity-contradiction"} {
 		t.Run(mode, func(t *testing.T) {
 			now, store, service, cookie := handoffFixture(t)
 			ctx, cancel := context.WithCancel(context.Background())
@@ -64,15 +64,11 @@ func TestBrowserReadOnlyReplacementDoesNotMaskRealDenial(t *testing.T) {
 					store.record.AuthenticatedAt = store.record.AuthenticatedAt.Add(time.Millisecond)
 				case "expiry-extension":
 					store.record.ExpiresAt = store.record.ExpiresAt.Add(time.Second)
-				case "settings-revision":
-					store.record.Observation.Settings.Generation++
 				case "expired":
 					*now = now.Add(3 * time.Second)
 				case "original-observation-expired":
 					*now = now.Add(3 * time.Second)
 					store.record.ExpiresAt = now.Add(time.Minute)
-					store.record.Observation.ObservedAt = *now
-					store.record.Observation.FreshUntil = now.Add(time.Second)
 				case "cancelled":
 					cancel()
 				}

@@ -172,7 +172,6 @@ func TestRejectTokenConfusionAndMalformedClaims(t *testing.T) {
 		"delegation even null":            func(c map[string]any) { c["may_act"] = nil },
 		"unsupported proof binding":       func(c map[string]any) { c["cnf"] = map[string]string{"jkt": "key"} },
 		"null groups":                     func(c map[string]any) { c["groups"] = nil },
-		"missing group assertion":         func(c map[string]any) { delete(c, "groups") },
 		"duplicate group":                 func(c map[string]any) { c["groups"] = []string{"team-a", "team-a"} },
 		"group overflow":                  func(c map[string]any) { c["groups"] = make([]string, 257) },
 		"group not array":                 func(c map[string]any) { c["groups"] = "team-a" },

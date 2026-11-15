@@ -541,19 +541,8 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		} else {
 			add("operation_audit", "UPDATE", "intent_receipt", "outcome_receipt")
 		}
-	case "browser-settings":
-		read("browser_session_root", "browser_session_epoch")
-		add("browser_session_root", "INSERT")
-		add("browser_session_root", "UPDATE")
-		add("browser_session_epoch", "INSERT")
-		add("browser_login", "DELETE")
-		add("browser_session", "DELETE")
-		add("browser_login", "SELECT", "root_id")
-		add("browser_session", "SELECT", "root_id", "id", "epoch", "created_at", "expires_at", "refresh_at")
-		add("browser_session", "UPDATE", "expires_at", "refresh_at")
 	case "browser-session":
-		read("browser_session_root", "browser_login", "browser_session", "browser_logout")
-		add("browser_session_root", "UPDATE", "id")
+		read("browser_login", "browser_session", "browser_logout")
 		for _, table := range []string{"browser_login", "browser_session", "browser_logout"} {
 			add(table, "DELETE")
 			add(table, "INSERT")

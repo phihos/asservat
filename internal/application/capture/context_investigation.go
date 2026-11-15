@@ -103,13 +103,10 @@ type ContextInvestigation struct {
 	Profiles CatalogProfiles
 	// Grants is the ADR-249 approval service. Without it a packet/syscall
 	// plan that needs approval is refused with ApprovalRequired, never armed.
-	Grants RecorderGrants
-	// Approvals reads the protected installation approval settings
-	// (ADR-249); nil adds no installation requirement.
-	Approvals ApprovalSettings
-	Lifetime  time.Duration
-	Now       func() time.Time
-	NewID     func() string
+	Grants   RecorderGrants
+	Lifetime time.Duration
+	Now      func() time.Time
+	NewID    func() string
 	// ReportPreviewFailure receives only fixed private stage labels. It is
 	// diagnostic, synchronous and must not perform blocking work or grant authority.
 	ReportPreviewFailure func(string)

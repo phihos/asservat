@@ -302,7 +302,7 @@ func (h *DownloadContentHandler) authenticate(ctx context.Context, r *http.Reque
 		if !v.Identity.Valid(h.config.Now()) || !v.Window.Valid(h.config.Now()) || v.Window.Policy != v.Identity.Policy || v.Window.FreshUntil.After(v.Identity.ValidUntil) || v.Identity.Principal.Issuer != h.config.Issuer {
 			return nil, zero, time.Time{}, "", "", identity.ErrDenied
 		}
-		hard = identity.Earlier(hard, identity.Earlier(v.Window.TokenExpiresAt, v.Window.GroupsExpireAt))
+		hard = identity.Earlier(hard, v.Window.TokenExpiresAt)
 		current, i, e := identities.NewBearerRequest(ctx, contentPinnedResolver{h}, token, h.config.Now)
 		if e == nil && i.Principal != v.Identity.Principal {
 			e = identity.ErrDenied

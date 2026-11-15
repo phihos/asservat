@@ -1,13 +1,14 @@
 package capture
 
 import (
-	deliveryapp "asservat.local/asservat/internal/application/delivery"
-	"asservat.local/asservat/internal/domain/targets"
 	"context"
 	"errors"
 	"slices"
 	"testing"
 	"time"
+
+	deliveryapp "asservat.local/asservat/internal/application/delivery"
+	"asservat.local/asservat/internal/domain/targets"
 
 	compiler "asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -16,8 +17,8 @@ import (
 )
 
 func TestSnapshotAudienceKeepsFullOriginalReadersAndExcludesNewAssignments(t *testing.T) {
-	_, _, _, current := newTeamRecordingFixture(t)
-	f, _, _, _ := newTeamRecordingFixture(t)
+	_, _, current := newTeamRecordingFixture(t)
+	f, _, _ := newTeamRecordingFixture(t)
 	eligible := f.svc.Eligibility.ContextEligibilityCurrent(t.Context(), current, f.target.Target())
 	if !eligible.Eligible || len(eligible.DefaultAudience) < 1 {
 		t.Fatal("complete initial audience fixture")
@@ -94,9 +95,6 @@ func policySourceSnapshotPreview(t *testing.T, composition *planning.ProfileComp
 	source.Target = &targets.SourceSnapshotTarget{Request: target, Pin: f.target.Pin, NodeUID: source.Binding.NodeUID, BootID: source.Binding.BootID, CollectorPodUID: source.Binding.CollectorPodUID, CollectorEpoch: source.Binding.CollectorEpoch, SourceID: source.Binding.SourceID, Fence: source.Binding.Fence, BindingDigest: deliveryapp.SourceBindingDigest(source.Binding)}
 	retained := &retainedSourceTargetsFixture{ContextTargets: f, now: func() time.Time { return f.now }}
 	f.svc.Targets = retained
-	if _, settingsErr := f.svc.requireRecordingApproval(t.Context(), current, cohort.authority.Executor); settingsErr != nil {
-		t.Fatal("source fixture settings", settingsErr)
-	}
 	if !f.svc.configured() {
 		t.Fatal("configured fixture false")
 	}

@@ -12,12 +12,10 @@ import (
 )
 
 const browserSessionLoggedOut = `-- name: BrowserSessionLoggedOut :one
-SELECT EXISTS(SELECT 1 FROM browser_logout WHERE root_id=$1 AND epoch=$2 AND issuer=$3 AND client_id=$4 AND expires_at>clock_timestamp() AND ((provider_session<>'' AND provider_session=$5 AND (subject='' OR subject=$6)) OR (provider_session='' AND subject=$6 AND issued_at>=$7))) AS blocked
+SELECT EXISTS(SELECT 1 FROM browser_logout WHERE issuer=$1 AND client_id=$2 AND expires_at>clock_timestamp() AND ((provider_session<>'' AND provider_session=$3 AND (subject='' OR subject=$4)) OR (provider_session='' AND subject=$4 AND issued_at>=$5))) AS blocked
 `
 
 type BrowserSessionLoggedOutParams struct {
-	RootID          pgtype.UUID
-	Epoch           pgtype.UUID
 	Issuer          string
 	ClientID        string
 	ProviderSession string
@@ -27,8 +25,6 @@ type BrowserSessionLoggedOutParams struct {
 
 func (q *Queries) BrowserSessionLoggedOut(ctx context.Context, arg BrowserSessionLoggedOutParams) (bool, error) {
 	row := q.db.QueryRow(ctx, browserSessionLoggedOut,
-		arg.RootID,
-		arg.Epoch,
 		arg.Issuer,
 		arg.ClientID,
 		arg.ProviderSession,
@@ -41,50 +37,42 @@ func (q *Queries) BrowserSessionLoggedOut(ctx context.Context, arg BrowserSessio
 }
 
 const claimBrowserRefresh = `-- name: ClaimBrowserRefresh :exec
-UPDATE browser_session SET refresh_claim=$4,claim_until=$5 WHERE root_id=$1 AND epoch=$2 AND id=$3
+UPDATE browser_session SET refresh_claim=$2,claim_until=$3 WHERE id=$1
 `
 
 type ClaimBrowserRefreshParams struct {
-	RootID       pgtype.UUID
-	Epoch        pgtype.UUID
 	ID           []byte
 	RefreshClaim []byte
 	ClaimUntil   pgtype.Timestamptz
 }
 
 func (q *Queries) ClaimBrowserRefresh(ctx context.Context, arg ClaimBrowserRefreshParams) error {
-	_, err := q.db.Exec(ctx, claimBrowserRefresh,
-		arg.RootID,
-		arg.Epoch,
-		arg.ID,
-		arg.RefreshClaim,
-		arg.ClaimUntil,
-	)
+	_, err := q.db.Exec(ctx, claimBrowserRefresh, arg.ID, arg.RefreshClaim, arg.ClaimUntil)
+	return err
+}
+
+const clampBrowserSessionLifetimes = `-- name: ClampBrowserSessionLifetimes :exec
+UPDATE browser_session SET expires_at=LEAST(expires_at,created_at+make_interval(secs=>$1::bigint)),refresh_at=LEAST(refresh_at,created_at+make_interval(secs=>$1::bigint)) WHERE expires_at>created_at+make_interval(secs=>$1::bigint)
+`
+
+func (q *Queries) ClampBrowserSessionLifetimes(ctx context.Context, maxLifetimeSeconds int64) error {
+	_, err := q.db.Exec(ctx, clampBrowserSessionLifetimes, maxLifetimeSeconds)
 	return err
 }
 
 const consumeBrowserLogin = `-- name: ConsumeBrowserLogin :one
-DELETE FROM browser_login WHERE root_id=$1 AND epoch=$2 AND id=$3 AND browser=$4 RETURNING root_id, epoch, id, browser, ciphertext, created_at, expires_at
+DELETE FROM browser_login WHERE id=$1 AND browser=$2 RETURNING id, browser, ciphertext, created_at, expires_at
 `
 
 type ConsumeBrowserLoginParams struct {
-	RootID  pgtype.UUID
-	Epoch   pgtype.UUID
 	ID      []byte
 	Browser []byte
 }
 
 func (q *Queries) ConsumeBrowserLogin(ctx context.Context, arg ConsumeBrowserLoginParams) (BrowserLogin, error) {
-	row := q.db.QueryRow(ctx, consumeBrowserLogin,
-		arg.RootID,
-		arg.Epoch,
-		arg.ID,
-		arg.Browser,
-	)
+	row := q.db.QueryRow(ctx, consumeBrowserLogin, arg.ID, arg.Browser)
 	var i BrowserLogin
 	err := row.Scan(
-		&i.RootID,
-		&i.Epoch,
 		&i.ID,
 		&i.Browser,
 		&i.Ciphertext,
@@ -94,107 +82,44 @@ func (q *Queries) ConsumeBrowserLogin(ctx context.Context, arg ConsumeBrowserLog
 	return i, err
 }
 
-const countBrowserLogins = `-- name: CountBrowserLogins :one
-SELECT count(*) FROM browser_login WHERE root_id=$1
-`
-
-func (q *Queries) CountBrowserLogins(ctx context.Context, rootID pgtype.UUID) (int64, error) {
-	row := q.db.QueryRow(ctx, countBrowserLogins, rootID)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
-const countBrowserLogout = `-- name: CountBrowserLogout :one
-SELECT count(*) FROM browser_logout WHERE root_id=$1
-`
-
-func (q *Queries) CountBrowserLogout(ctx context.Context, rootID pgtype.UUID) (int64, error) {
-	row := q.db.QueryRow(ctx, countBrowserLogout, rootID)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
-const countBrowserSessions = `-- name: CountBrowserSessions :one
-SELECT count(*) FROM browser_session WHERE root_id=$1
-`
-
-func (q *Queries) CountBrowserSessions(ctx context.Context, rootID pgtype.UUID) (int64, error) {
-	row := q.db.QueryRow(ctx, countBrowserSessions, rootID)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
-const countBrowserSubject = `-- name: CountBrowserSubject :one
-SELECT count(*) FROM browser_session WHERE root_id=$1 AND issuer=$2 AND client_id=$3 AND subject=$4
-`
-
-type CountBrowserSubjectParams struct {
-	RootID   pgtype.UUID
-	Issuer   string
-	ClientID string
-	Subject  string
-}
-
-func (q *Queries) CountBrowserSubject(ctx context.Context, arg CountBrowserSubjectParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countBrowserSubject,
-		arg.RootID,
-		arg.Issuer,
-		arg.ClientID,
-		arg.Subject,
-	)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
 const deleteBrowserSession = `-- name: DeleteBrowserSession :exec
-DELETE FROM browser_session WHERE root_id=$1 AND epoch=$2 AND id=$3
+DELETE FROM browser_session WHERE id=$1
 `
 
-type DeleteBrowserSessionParams struct {
-	RootID pgtype.UUID
-	Epoch  pgtype.UUID
-	ID     []byte
+func (q *Queries) DeleteBrowserSession(ctx context.Context, id []byte) error {
+	_, err := q.db.Exec(ctx, deleteBrowserSession, id)
+	return err
 }
 
-func (q *Queries) DeleteBrowserSession(ctx context.Context, arg DeleteBrowserSessionParams) error {
-	_, err := q.db.Exec(ctx, deleteBrowserSession, arg.RootID, arg.Epoch, arg.ID)
+const extendBrowserLogoutReceipts = `-- name: ExtendBrowserLogoutReceipts :exec
+UPDATE browser_logout SET expires_at=issued_at+make_interval(secs=>$1::bigint)+interval '1 hour' WHERE expires_at>clock_timestamp() AND expires_at<issued_at+make_interval(secs=>$1::bigint)+interval '1 hour'
+`
+
+func (q *Queries) ExtendBrowserLogoutReceipts(ctx context.Context, maxLifetimeSeconds int64) error {
+	_, err := q.db.Exec(ctx, extendBrowserLogoutReceipts, maxLifetimeSeconds)
 	return err
 }
 
 const finishBrowserRefresh = `-- name: FinishBrowserRefresh :exec
-UPDATE browser_session SET version=version+1,refresh_claim=NULL,claim_until=NULL,ciphertext=$4,refresh_at=$5 WHERE root_id=$1 AND epoch=$2 AND id=$3
+UPDATE browser_session SET version=version+1,refresh_claim=NULL,claim_until=NULL,ciphertext=$2,refresh_at=$3 WHERE id=$1
 `
 
 type FinishBrowserRefreshParams struct {
-	RootID     pgtype.UUID
-	Epoch      pgtype.UUID
 	ID         []byte
 	Ciphertext []byte
 	RefreshAt  pgtype.Timestamptz
 }
 
 func (q *Queries) FinishBrowserRefresh(ctx context.Context, arg FinishBrowserRefreshParams) error {
-	_, err := q.db.Exec(ctx, finishBrowserRefresh,
-		arg.RootID,
-		arg.Epoch,
-		arg.ID,
-		arg.Ciphertext,
-		arg.RefreshAt,
-	)
+	_, err := q.db.Exec(ctx, finishBrowserRefresh, arg.ID, arg.Ciphertext, arg.RefreshAt)
 	return err
 }
 
 const insertBrowserLogin = `-- name: InsertBrowserLogin :exec
-INSERT INTO browser_login(root_id,epoch,id,browser,ciphertext,created_at,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7)
+INSERT INTO browser_login(id,browser,ciphertext,created_at,expires_at) VALUES($1,$2,$3,$4,$5)
 `
 
 type InsertBrowserLoginParams struct {
-	RootID     pgtype.UUID
-	Epoch      pgtype.UUID
 	ID         []byte
 	Browser    []byte
 	Ciphertext []byte
@@ -204,8 +129,6 @@ type InsertBrowserLoginParams struct {
 
 func (q *Queries) InsertBrowserLogin(ctx context.Context, arg InsertBrowserLoginParams) error {
 	_, err := q.db.Exec(ctx, insertBrowserLogin,
-		arg.RootID,
-		arg.Epoch,
 		arg.ID,
 		arg.Browser,
 		arg.Ciphertext,
@@ -216,12 +139,10 @@ func (q *Queries) InsertBrowserLogin(ctx context.Context, arg InsertBrowserLogin
 }
 
 const insertBrowserLogout = `-- name: InsertBrowserLogout :exec
-INSERT INTO browser_logout(root_id,epoch,id,issuer,client_id,subject,provider_session,issued_at,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)
+INSERT INTO browser_logout(id,issuer,client_id,subject,provider_session,issued_at,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7)
 `
 
 type InsertBrowserLogoutParams struct {
-	RootID          pgtype.UUID
-	Epoch           pgtype.UUID
 	ID              []byte
 	Issuer          string
 	ClientID        string
@@ -233,8 +154,6 @@ type InsertBrowserLogoutParams struct {
 
 func (q *Queries) InsertBrowserLogout(ctx context.Context, arg InsertBrowserLogoutParams) error {
 	_, err := q.db.Exec(ctx, insertBrowserLogout,
-		arg.RootID,
-		arg.Epoch,
 		arg.ID,
 		arg.Issuer,
 		arg.ClientID,
@@ -247,12 +166,10 @@ func (q *Queries) InsertBrowserLogout(ctx context.Context, arg InsertBrowserLogo
 }
 
 const insertBrowserSession = `-- name: InsertBrowserSession :exec
-INSERT INTO browser_session(root_id,epoch,id,issuer,client_id,subject,provider_session,ciphertext,created_at,authenticated_at,expires_at,refresh_at,version) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,1)
+INSERT INTO browser_session(id,issuer,client_id,subject,provider_session,ciphertext,created_at,authenticated_at,expires_at,last_used_at,refresh_at,version) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$7,$10,1)
 `
 
 type InsertBrowserSessionParams struct {
-	RootID          pgtype.UUID
-	Epoch           pgtype.UUID
 	ID              []byte
 	Issuer          string
 	ClientID        string
@@ -267,8 +184,6 @@ type InsertBrowserSessionParams struct {
 
 func (q *Queries) InsertBrowserSession(ctx context.Context, arg InsertBrowserSessionParams) error {
 	_, err := q.db.Exec(ctx, insertBrowserSession,
-		arg.RootID,
-		arg.Epoch,
 		arg.ID,
 		arg.Issuer,
 		arg.ClientID,
@@ -283,49 +198,14 @@ func (q *Queries) InsertBrowserSession(ctx context.Context, arg InsertBrowserSes
 	return err
 }
 
-const lockBrowserRoot = `-- name: LockBrowserRoot :one
-SELECT id, epoch, enabled, max_logins, max_sessions, max_logout_events, source_uid, source_generation, source_digest, observed_at, fresh_until, issuer, client_id, origin, max_lifetime_seconds FROM browser_session_root WHERE id=$1 FOR UPDATE
-`
-
-func (q *Queries) LockBrowserRoot(ctx context.Context, id pgtype.UUID) (BrowserSessionRoot, error) {
-	row := q.db.QueryRow(ctx, lockBrowserRoot, id)
-	var i BrowserSessionRoot
-	err := row.Scan(
-		&i.ID,
-		&i.Epoch,
-		&i.Enabled,
-		&i.MaxLogins,
-		&i.MaxSessions,
-		&i.MaxLogoutEvents,
-		&i.SourceUid,
-		&i.SourceGeneration,
-		&i.SourceDigest,
-		&i.ObservedAt,
-		&i.FreshUntil,
-		&i.Issuer,
-		&i.ClientID,
-		&i.Origin,
-		&i.MaxLifetimeSeconds,
-	)
-	return i, err
-}
-
 const lockBrowserSession = `-- name: LockBrowserSession :one
-SELECT root_id, epoch, id, issuer, client_id, subject, provider_session, ciphertext, created_at, authenticated_at, expires_at, refresh_at, version, refresh_claim, claim_until FROM browser_session WHERE root_id=$1 AND epoch=$2 AND id=$3 FOR UPDATE
+SELECT id, issuer, client_id, subject, provider_session, ciphertext, created_at, authenticated_at, expires_at, last_used_at, refresh_at, version, refresh_claim, claim_until FROM browser_session WHERE id=$1 FOR UPDATE
 `
 
-type LockBrowserSessionParams struct {
-	RootID pgtype.UUID
-	Epoch  pgtype.UUID
-	ID     []byte
-}
-
-func (q *Queries) LockBrowserSession(ctx context.Context, arg LockBrowserSessionParams) (BrowserSession, error) {
-	row := q.db.QueryRow(ctx, lockBrowserSession, arg.RootID, arg.Epoch, arg.ID)
+func (q *Queries) LockBrowserSession(ctx context.Context, id []byte) (BrowserSession, error) {
+	row := q.db.QueryRow(ctx, lockBrowserSession, id)
 	var i BrowserSession
 	err := row.Scan(
-		&i.RootID,
-		&i.Epoch,
 		&i.ID,
 		&i.Issuer,
 		&i.ClientID,
@@ -335,6 +215,7 @@ func (q *Queries) LockBrowserSession(ctx context.Context, arg LockBrowserSession
 		&i.CreatedAt,
 		&i.AuthenticatedAt,
 		&i.ExpiresAt,
+		&i.LastUsedAt,
 		&i.RefreshAt,
 		&i.Version,
 		&i.RefreshClaim,
@@ -344,63 +225,40 @@ func (q *Queries) LockBrowserSession(ctx context.Context, arg LockBrowserSession
 }
 
 const pruneBrowserLogins = `-- name: PruneBrowserLogins :exec
-DELETE FROM browser_login AS target WHERE target.root_id=$1 AND target.id IN (SELECT candidate.id FROM browser_login AS candidate WHERE candidate.root_id=$1 AND (candidate.expires_at<=clock_timestamp() OR candidate.epoch<>$2) ORDER BY candidate.expires_at,candidate.id LIMIT 256 FOR UPDATE SKIP LOCKED)
+DELETE FROM browser_login WHERE expires_at<=clock_timestamp()
 `
 
-type PruneBrowserLoginsParams struct {
-	RootID pgtype.UUID
-	Epoch  pgtype.UUID
-}
-
-func (q *Queries) PruneBrowserLogins(ctx context.Context, arg PruneBrowserLoginsParams) error {
-	_, err := q.db.Exec(ctx, pruneBrowserLogins, arg.RootID, arg.Epoch)
+func (q *Queries) PruneBrowserLogins(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, pruneBrowserLogins)
 	return err
 }
 
 const pruneBrowserLogout = `-- name: PruneBrowserLogout :exec
-DELETE FROM browser_logout AS target WHERE target.root_id=$1 AND target.id IN (SELECT candidate.id FROM browser_logout AS candidate WHERE candidate.root_id=$1 AND (candidate.expires_at<=clock_timestamp() OR candidate.epoch<>$2) ORDER BY candidate.expires_at,candidate.id LIMIT 256 FOR UPDATE SKIP LOCKED)
+DELETE FROM browser_logout WHERE expires_at<=clock_timestamp()
 `
 
-type PruneBrowserLogoutParams struct {
-	RootID pgtype.UUID
-	Epoch  pgtype.UUID
-}
-
-func (q *Queries) PruneBrowserLogout(ctx context.Context, arg PruneBrowserLogoutParams) error {
-	_, err := q.db.Exec(ctx, pruneBrowserLogout, arg.RootID, arg.Epoch)
+func (q *Queries) PruneBrowserLogout(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, pruneBrowserLogout)
 	return err
 }
 
 const pruneBrowserSessions = `-- name: PruneBrowserSessions :exec
-DELETE FROM browser_session AS target WHERE target.root_id=$1 AND target.id IN (SELECT candidate.id FROM browser_session AS candidate WHERE candidate.root_id=$1 AND (candidate.expires_at<=clock_timestamp() OR candidate.epoch<>$2 OR candidate.claim_until<=clock_timestamp()) ORDER BY candidate.expires_at,candidate.id LIMIT 256 FOR UPDATE SKIP LOCKED)
+DELETE FROM browser_session WHERE expires_at<=clock_timestamp() OR claim_until<=clock_timestamp() OR last_used_at+make_interval(secs=>$1::bigint)<=clock_timestamp()
 `
 
-type PruneBrowserSessionsParams struct {
-	RootID pgtype.UUID
-	Epoch  pgtype.UUID
-}
-
-func (q *Queries) PruneBrowserSessions(ctx context.Context, arg PruneBrowserSessionsParams) error {
-	_, err := q.db.Exec(ctx, pruneBrowserSessions, arg.RootID, arg.Epoch)
+func (q *Queries) PruneBrowserSessions(ctx context.Context, inactivitySeconds int64) error {
+	_, err := q.db.Exec(ctx, pruneBrowserSessions, inactivitySeconds)
 	return err
 }
 
 const readBrowserLogout = `-- name: ReadBrowserLogout :one
-SELECT root_id, epoch, id, issuer, client_id, subject, provider_session, issued_at, expires_at FROM browser_logout WHERE root_id=$1 AND epoch=$2 AND id=$3
+SELECT id, issuer, client_id, subject, provider_session, issued_at, expires_at FROM browser_logout WHERE id=$1
 `
 
-type ReadBrowserLogoutParams struct {
-	RootID pgtype.UUID
-	Epoch  pgtype.UUID
-	ID     []byte
-}
-
-func (q *Queries) ReadBrowserLogout(ctx context.Context, arg ReadBrowserLogoutParams) (BrowserLogout, error) {
-	row := q.db.QueryRow(ctx, readBrowserLogout, arg.RootID, arg.Epoch, arg.ID)
+func (q *Queries) ReadBrowserLogout(ctx context.Context, id []byte) (BrowserLogout, error) {
+	row := q.db.QueryRow(ctx, readBrowserLogout, id)
 	var i BrowserLogout
 	err := row.Scan(
-		&i.RootID,
-		&i.Epoch,
 		&i.ID,
 		&i.Issuer,
 		&i.ClientID,
@@ -413,21 +271,18 @@ func (q *Queries) ReadBrowserLogout(ctx context.Context, arg ReadBrowserLogoutPa
 }
 
 const readBrowserSession = `-- name: ReadBrowserSession :one
-SELECT root_id, epoch, id, issuer, client_id, subject, provider_session, ciphertext, created_at, authenticated_at, expires_at, refresh_at, version, refresh_claim, claim_until FROM browser_session WHERE root_id=$1 AND epoch=$2 AND id=$3 FOR SHARE
+SELECT id, issuer, client_id, subject, provider_session, ciphertext, created_at, authenticated_at, expires_at, last_used_at, refresh_at, version, refresh_claim, claim_until FROM browser_session WHERE id=$1 AND last_used_at+make_interval(secs=>$2::bigint)>clock_timestamp()
 `
 
 type ReadBrowserSessionParams struct {
-	RootID pgtype.UUID
-	Epoch  pgtype.UUID
-	ID     []byte
+	ID                []byte
+	InactivitySeconds int64
 }
 
 func (q *Queries) ReadBrowserSession(ctx context.Context, arg ReadBrowserSessionParams) (BrowserSession, error) {
-	row := q.db.QueryRow(ctx, readBrowserSession, arg.RootID, arg.Epoch, arg.ID)
+	row := q.db.QueryRow(ctx, readBrowserSession, arg.ID, arg.InactivitySeconds)
 	var i BrowserSession
 	err := row.Scan(
-		&i.RootID,
-		&i.Epoch,
 		&i.ID,
 		&i.Issuer,
 		&i.ClientID,
@@ -437,6 +292,7 @@ func (q *Queries) ReadBrowserSession(ctx context.Context, arg ReadBrowserSession
 		&i.CreatedAt,
 		&i.AuthenticatedAt,
 		&i.ExpiresAt,
+		&i.LastUsedAt,
 		&i.RefreshAt,
 		&i.Version,
 		&i.RefreshClaim,
@@ -446,12 +302,10 @@ func (q *Queries) ReadBrowserSession(ctx context.Context, arg ReadBrowserSession
 }
 
 const revokeBrowserProviderSessions = `-- name: RevokeBrowserProviderSessions :exec
-DELETE FROM browser_session WHERE root_id=$1 AND epoch=$2 AND issuer=$3 AND client_id=$4 AND (($5::text<>'' AND provider_session=$5 AND ($6::text='' OR subject=$6)) OR ($5::text='' AND subject=$6 AND authenticated_at<=$7))
+DELETE FROM browser_session WHERE issuer=$1 AND client_id=$2 AND (($3::text<>'' AND provider_session=$3 AND ($4::text='' OR subject=$4)) OR ($3::text='' AND subject=$4 AND authenticated_at<=$5))
 `
 
 type RevokeBrowserProviderSessionsParams struct {
-	RootID          pgtype.UUID
-	Epoch           pgtype.UUID
 	Issuer          string
 	ClientID        string
 	ProviderSession string
@@ -461,8 +315,6 @@ type RevokeBrowserProviderSessionsParams struct {
 
 func (q *Queries) RevokeBrowserProviderSessions(ctx context.Context, arg RevokeBrowserProviderSessionsParams) error {
 	_, err := q.db.Exec(ctx, revokeBrowserProviderSessions,
-		arg.RootID,
-		arg.Epoch,
 		arg.Issuer,
 		arg.ClientID,
 		arg.ProviderSession,
@@ -472,29 +324,11 @@ func (q *Queries) RevokeBrowserProviderSessions(ctx context.Context, arg RevokeB
 	return err
 }
 
-const shareBrowserRoot = `-- name: ShareBrowserRoot :one
-SELECT id, epoch, enabled, max_logins, max_sessions, max_logout_events, source_uid, source_generation, source_digest, observed_at, fresh_until, issuer, client_id, origin, max_lifetime_seconds FROM browser_session_root WHERE id=$1 FOR SHARE
+const touchBrowserSession = `-- name: TouchBrowserSession :exec
+UPDATE browser_session SET last_used_at=clock_timestamp() WHERE id=$1 AND last_used_at<clock_timestamp()-interval '1 minute'
 `
 
-func (q *Queries) ShareBrowserRoot(ctx context.Context, id pgtype.UUID) (BrowserSessionRoot, error) {
-	row := q.db.QueryRow(ctx, shareBrowserRoot, id)
-	var i BrowserSessionRoot
-	err := row.Scan(
-		&i.ID,
-		&i.Epoch,
-		&i.Enabled,
-		&i.MaxLogins,
-		&i.MaxSessions,
-		&i.MaxLogoutEvents,
-		&i.SourceUid,
-		&i.SourceGeneration,
-		&i.SourceDigest,
-		&i.ObservedAt,
-		&i.FreshUntil,
-		&i.Issuer,
-		&i.ClientID,
-		&i.Origin,
-		&i.MaxLifetimeSeconds,
-	)
-	return i, err
+func (q *Queries) TouchBrowserSession(ctx context.Context, id []byte) error {
+	_, err := q.db.Exec(ctx, touchBrowserSession, id)
+	return err
 }
