@@ -88,33 +88,24 @@ func TestBrowserSettingsBudgetUsesCanonicalBytesAndLeavesMCPBounded(t *testing.T
 	}
 }
 
-func TestLargeBrowserSettingsKeepExistingAuditAndFinalAuthority(t *testing.T) {
-	for _, revoke := range []bool{false, true} {
+func TestLargeBrowserSettingsKeepExistingAudit(t *testing.T) {
+	{
 		s, f, gate := auditedFixture(t)
 		inner := s.inner.(*InvestigationOperations).captures
 		h := &historyFixture{ops: f, accepted: f.i.VerifiedAt.Add(-time.Hour), untilList: f.metadataUntil, recipe: largeHistoryRecipe()}
 		inner.history = h
 		s.inner, _ = NewInvestigationOperations(inner, nil)
-		if revoke {
-			gate.onFinish = func() { f.i.Scopes = nil }
-		}
 		reply, err := s.Call(AuthenticatedBrowserSettingsView(t.Context()), f, "get_capture_settings", []byte(`{"capture_id":"`+historyCapture+`"}`))
-		if len(gate.intents) != 1 || len(gate.outcomes) != 1 || !gate.outcomes[0].Valid() {
+		if len(gate.events) != 1 || !gate.events[0].Valid() {
 			t.Fatal("existing audit path not used", err)
 		}
-		out := gate.outcomes[0]
-		if out.OutputBytes < 120<<10 || out.OutputBytes > 160<<10 || out.OutputDigest == ([32]byte{}) {
+		out := gate.events[0]
+		if out.OutputBytes < 120<<10 || out.OutputBytes > 160<<10 || out.OutputDigest == nil || *out.OutputDigest == ([32]byte{}) {
 			t.Fatalf("wrong minimized output facts: bytes=%d status=%s err=%v body=%s", out.OutputBytes, out.Status, err, reply.Body)
 		}
 		b, _ := json.Marshal(out)
 		if bytes.Contains(b, []byte(strings.Repeat("a", 100))) {
 			t.Fatal("settings entered audit record")
-		}
-		if revoke {
-			if err == nil || len(reply.Body) != 0 {
-				t.Fatal("post-audit revocation disclosed settings")
-			}
-			continue
 		}
 		if err != nil || len(reply.Body) < 120<<10 {
 			t.Fatal("audited large result unavailable", err)

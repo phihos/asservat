@@ -80,7 +80,7 @@ func TestRawLogQueryActualAuditedBeginReplayAndRawPoll(t *testing.T) {
 	if replay.Close(context.Background()) != nil {
 		t.Fatal("replay closure")
 	}
-	if f.admissions != 1 || f.starts != 1 || f.reads != 0 || len(a.outcomes) != 2 || a.outcomes[1].Effect != "none" {
+	if f.admissions != 1 || f.starts != 1 || f.reads != 0 || len(a.events) != 2 || a.events[1].Effect != "none" {
 		t.Fatal("replay read/debit")
 	}
 	f.ready = true
@@ -133,7 +133,7 @@ func TestRawLogQueryApprovalRemedyBeforeEffects(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer reply.Close(context.Background())
-	if !strings.Contains(string(reply.Body), `"code":"RawApprovalRequired"`) || f.admissions+f.starts+f.reads+f.batches != 0 || len(a.outcomes) != 1 || a.outcomes[0].Effect != "none" {
+	if !strings.Contains(string(reply.Body), `"code":"RawApprovalRequired"`) || f.admissions+f.starts+f.reads+f.batches != 0 || len(a.events) != 1 || a.events[0].Effect != "none" {
 		t.Fatalf("lost no-effect remedy: %s", reply.Body)
 	}
 }
@@ -224,7 +224,7 @@ func TestRawLogQueryKnownRefusalKeepsPaidOwnerThroughAuditAndJoin(t *testing.T) 
 				f.ready = true
 				f.result = &value.ProjectionResult{InvalidCursor: kind == "cursor", TooLarge: kind == "size"}
 				if mode == "audit-failed" {
-					a.finishFail = true
+					a.fail = true
 				}
 				if mode == "join-unknown" {
 					f.closeErr = value.ErrUnavailable
@@ -243,8 +243,8 @@ func TestRawLogQueryKnownRefusalKeepsPaidOwnerThroughAuditAndJoin(t *testing.T) 
 				if f.reads != 1 || f.lastRead == nil || !f.lastRead.closed {
 					t.Fatal("paidrefusalnotjoined")
 				}
-				if len(a.outcomes) != 1 || a.outcomes[0].Effect != "accepted" || a.outcomes[0].Status != "denied" && kind == "size" || a.outcomes[0].Status != "invalid" && kind == "cursor" {
-					t.Fatal("paidrefusaloutcomelost", a.outcomes)
+				if len(a.events) != 1 || a.events[0].Effect != "accepted" || a.events[0].Status != "denied" && kind == "size" || a.events[0].Status != "invalid" && kind == "cursor" {
+					t.Fatal("paidrefusaloutcomelost", a.events)
 				}
 			})
 		}

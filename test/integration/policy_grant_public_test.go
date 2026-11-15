@@ -310,7 +310,7 @@ func qualifyPolicyGrantPublicOperations(t *testing.T, ctx context.Context, admin
 		t.Fatal(e)
 	}
 	defer mac.Close()
-	audited, e := presentation.NewAuditedOperations(presentation.AuditedOperationsConfig{RootID: root, Retention: time.Hour, NormalConcurrency: 2, ResolutionConcurrency: 1, PerPrincipalConcurrency: 1, NormalPerSecond: 100, ResolutionPerSecond: 100, Now: clock, NewID: custodyID}, inner, gates["normal"], gates["resolution"], mac)
+	audited, e := presentation.NewAuditedOperations(presentation.AuditedOperationsConfig{RootID: root, Now: clock, NewID: custodyID}, inner, &memoryAuditEvents{}, mac)
 	if e != nil {
 		t.Fatal(e)
 	}

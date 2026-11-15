@@ -63,9 +63,9 @@ func TestPacketSummaryPendingReadyKeepsOriginalSourceAndAudit(t *testing.T) {
 	f.ready = false
 	first, err := s.Call(t.Context(), f, "get_pcap_summary", bridgeInput())
 	if err != nil {
-		t.Fatalf("begin %v %#v admissions=%d starts=%d reads=%d intents=%d", err, err, f.admissions, f.starts, f.reads, len(g.intents))
+		t.Fatalf("begin %v %#v admissions=%d starts=%d reads=%d intents=%d", err, err, f.admissions, f.starts, f.reads, len(g.events))
 	}
-	if s.contracts.ValidateOutput("get_pcap_summary", first.Body) != nil || f.admissions != 1 || f.starts != 1 || f.reads != 0 || g.intents[0].InputFormat != "context-query-input/v1" {
+	if s.contracts.ValidateOutput("get_pcap_summary", first.Body) != nil || f.admissions != 1 || f.starts != 1 || f.reads != 0 {
 		t.Fatal("packet summary admission/audit missing")
 	}
 	_ = first.Close(context.Background())

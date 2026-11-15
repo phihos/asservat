@@ -58,9 +58,9 @@ func comparisonBridge(t *testing.T, same bool) (*AuditedOperations, *pairedBridg
 	f.a.Baseline = &b
 	pair := &pairedBridge{f, plan}
 	f.s.ComparisonRoutes, f.s.Plans = pair, pair
-	gate := &refusalOutcomeGate{presentationAuditGate: g, acknowledged: map[string]audit.OperationOutcome{}}
+	gate := &refusalOutcomeGate{presentationAuditGate: g, acknowledged: map[string]audit.Event{}}
 	ledger := &refusalOutcomeLedger{ContextQueryLedger: f, gate: gate}
-	s.audit["normal"], f.s.Results.Ledger = gate, ledger
+	s.recorder, f.s.Results.Ledger = gate, ledger
 	reads, _ := f.s.ProfileComparisons()
 	adapter, e := NewContextProjectionOperations(f.s, f.s.Results)
 	if e == nil {
@@ -99,7 +99,7 @@ func TestProfileComparisonPublicPendingReadyAndRetainedRefusal(t *testing.T) {
 				f.result = &value.ProjectionResult{IncompatibleProfiles: true}
 			}
 			if mode == "mismatch-audit-failure" {
-				g.finishFail = true
+				g.fail = true
 			}
 			if mode == "mismatch-close-failure" {
 				f.closeErr = value.ErrUnavailable
@@ -121,7 +121,7 @@ func TestProfileComparisonPublicPendingReadyAndRetainedRefusal(t *testing.T) {
 				t.Fatal("mixed summary/comparison association")
 			}
 			if mismatch {
-				if !strings.Contains(string(out.Body), `"code":"IncompatibleProfiles"`) || strings.Contains(string(out.Body), `"rows"`) || g.outcomes[len(g.outcomes)-1].Status != "denied" {
+				if !strings.Contains(string(out.Body), `"code":"IncompatibleProfiles"`) || strings.Contains(string(out.Body), `"rows"`) || g.events[len(g.events)-1].Status != "denied" {
 					t.Fatalf("mismatch envelope %s", out.Body)
 				}
 			} else {

@@ -64,15 +64,14 @@ func policyRequestWireView(now time.Time, actor identity.Principal) authapp.Gran
 }
 func TestPublicPolicyGrantRequestUsesExistingViewAndIndependentAuditBoundary(t *testing.T) {
 	raw := []byte(`{"policy_uid":"team-policy","policy_name":"restarts","idempotency_key":"original-key","limits":{"max_executions":10,"max_collected_bytes":67108864,"max_observed_bytes":0}}`)
-	for _, mode := range []string{"success", "intent-unavailable", "outcome-unavailable", "service-unknown"} {
+	for _, mode := range []string{"success", "outcome-unavailable", "service-unknown"} {
 		t.Run(mode, func(t *testing.T) {
 			audited, current, gate := auditedFixture(t)
 			use := &policyRequestWire{grantUseCase: &grantUseCase{view: policyRequestWireView(current.i.VerifiedAt, current.i.Principal), until: current.metadataUntil}}
 			if mode == "service-unknown" {
 				use.err = authapp.ErrGrantUnavailable
 			}
-			gate.beginFail = mode == "intent-unavailable"
-			gate.finishFail = mode == "outcome-unavailable"
+			gate.fail = mode == "outcome-unavailable"
 			operations, err := NewGrantOperations(audited.inner.PublicOrigin(), audited.config.Now, audited.config.NewID, use)
 			if err != nil {
 				t.Fatal(err)
@@ -82,14 +81,8 @@ func TestPublicPolicyGrantRequestUsesExistingViewAndIndependentAuditBoundary(t *
 				t.Fatal(err)
 			}
 			reply, err := audited.Call(context.Background(), current, "request_policy_grant", raw)
-			if mode == "intent-unavailable" {
-				if err == nil || use.calls != 0 || use.reads != 0 || len(gate.outcomes) != 0 || len(reply.Body) != 0 {
-					t.Fatal("request dispatched before acknowledged encrypted intent", err, use.calls)
-				}
-				return
-			}
-			if use.calls != 1 || len(gate.outcomes) != 1 || !gate.outcomes[0].Valid() {
-				t.Fatal("missing bounded public request/outcome", use.calls, gate.outcomes)
+			if use.calls != 1 || len(gate.events) != 1 || !gate.events[0].Valid() {
+				t.Fatal("missing bounded public request/outcome", use.calls, gate.events)
 			}
 			if mode == "outcome-unavailable" {
 				if err == nil || len(reply.Body) != 0 || use.reads != 1 {
@@ -101,13 +94,13 @@ func TestPublicPolicyGrantRequestUsesExistingViewAndIndependentAuditBoundary(t *
 				t.Fatal(err)
 			}
 			if mode == "service-unknown" {
-				if gate.outcomes[0].Effect != "unknown" || use.reads != 0 {
-					t.Fatal("unknown request was treated as no mutation", gate.outcomes)
+				if gate.events[0].Effect != "unknown" || use.reads != 0 {
+					t.Fatal("unknown request was treated as no mutation", gate.events)
 				}
 				return
 			}
-			if gate.outcomes[0].Effect != "accepted" || use.reads != 1 || use.input.PolicyUID != "team-policy" || use.input.PolicyName != "restarts" || use.input.IdempotencyKey != "original-key" || use.input.Lifetime != 0 || use.input.Limits.MaxBytes != 64<<20 || use.input.Observation != nil {
-				t.Fatal("typed input/default period or actual metadata lost", use.input, gate.outcomes)
+			if gate.events[0].Effect != "accepted" || use.reads != 1 || use.input.PolicyUID != "team-policy" || use.input.PolicyName != "restarts" || use.input.IdempotencyKey != "original-key" || use.input.Lifetime != 0 || use.input.Limits.MaxBytes != 64<<20 || use.input.Observation != nil {
+				t.Fatal("typed input/default period or actual metadata lost", use.input, gate.events)
 			}
 			var out struct{ Data map[string]any }
 			if json.Unmarshal(reply.Body, &out) != nil || out.Data["kind"] != "policy" || out.Data["capture_id"] != nil || out.Data["can_decide"] != false {

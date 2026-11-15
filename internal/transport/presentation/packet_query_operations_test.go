@@ -127,8 +127,8 @@ func TestPacketQueryActualAuditedBeginReplayAndReadyEnvelope(t *testing.T) {
 			if e = repeat.Close(context.Background()); e != nil {
 				t.Fatal(e)
 			}
-			if f.admissions != 1 || f.starts != 1 || f.reads != 0 || f.polls != 0 || len(g.outcomes) != 2 || g.outcomes[1].Effect != "none" {
-				t.Fatal("replaynotpassive", f.admissions, f.starts, f.reads, g.outcomes)
+			if f.admissions != 1 || f.starts != 1 || f.reads != 0 || f.polls != 0 || len(g.events) != 2 || g.events[1].Effect != "none" {
+				t.Fatal("replaynotpassive", f.admissions, f.starts, f.reads, g.events)
 			}
 			f.ready = true
 			index, zero := uint32(1), uint32(0)
@@ -242,7 +242,7 @@ func TestPacketQueryMissingRawGrantIsActionableWithoutEffects(t *testing.T) {
 			Role string `json:"responsible_role"`
 		}
 	}
-	if json.Unmarshal(reply.Body, &out) != nil || out.Status != "error" || out.Data.Code != "RawApprovalRequired" || out.Data.Role != "approver" || f.admissions+f.starts+f.batches+f.reads != 0 || len(g.outcomes) != 1 || g.outcomes[0].Effect != "none" {
+	if json.Unmarshal(reply.Body, &out) != nil || out.Status != "error" || out.Data.Code != "RawApprovalRequired" || out.Data.Role != "approver" || f.admissions+f.starts+f.batches+f.reads != 0 || len(g.events) != 1 || g.events[0].Effect != "none" {
 		t.Fatalf("approvalrefusal %s effects=%d", reply.Body, f.admissions+f.starts+f.batches+f.reads)
 	}
 }

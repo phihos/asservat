@@ -64,7 +64,7 @@ func TestProfileComparisonSizeRefusalRetainsAuditedReadOwner(t *testing.T) {
 					tool, input = "get_query_result", bridgePoll(f.q.ID)
 				}
 				if mode == "failed-audit" {
-					g.finishFail = true
+					g.fail = true
 				}
 				if mode == "unknown-close" {
 					f.closeErr = value.ErrUnavailable
@@ -90,7 +90,7 @@ func TestProfileComparisonSizeRefusalRetainsAuditedReadOwner(t *testing.T) {
 				if json.Unmarshal(out.Body, &body) != nil || body.Status != "error" || body.DataClass != "metadata" || body.Data.Code != "AnalysisUnavailable" || !strings.Contains(body.Data.Message, "Select fewer functions") || strings.Contains(string(out.Body), `"rows"`) {
 					t.Fatalf("size refusal leaked result or lost recovery guidance: %s", out.Body)
 				}
-				outcome := g.outcomes[len(g.outcomes)-1]
+				outcome := g.events[len(g.events)-1]
 				if outcome.Status != "denied" || outcome.Reason != "not_available" || outcome.Effect != "accepted" {
 					t.Fatal("wrong charged refusal outcome")
 				}

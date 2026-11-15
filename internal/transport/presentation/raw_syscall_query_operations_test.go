@@ -56,7 +56,7 @@ func TestRawSyscallQueryMissingApprovalRemedyHasNoEffects(t *testing.T) {
 			Role string `json:"responsible_role"`
 		} `json:"data"`
 	}
-	if json.Unmarshal(reply.Body, &out) != nil || out.Status != "error" || out.Data.Code != "RawApprovalRequired" || out.Data.Role != "approver" || f.admissions+f.starts+f.batches+f.reads != 0 || len(audit.outcomes) != 1 || audit.outcomes[0].Effect != "none" {
+	if json.Unmarshal(reply.Body, &out) != nil || out.Status != "error" || out.Data.Code != "RawApprovalRequired" || out.Data.Role != "approver" || f.admissions+f.starts+f.batches+f.reads != 0 || len(audit.events) != 1 || audit.events[0].Effect != "none" {
 		t.Fatalf("missing approval caused effects or lost its remedy: %s", reply.Body)
 	}
 }
@@ -146,7 +146,7 @@ func TestRawSyscallQueryActualAuditedBeginReplayAndPoll(t *testing.T) {
 	if err = replay.Close(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if f.admissions != 1 || f.starts != 1 || f.reads != 0 || f.polls != 0 || len(audit.outcomes) != 2 || audit.outcomes[1].Effect != "none" {
+	if f.admissions != 1 || f.starts != 1 || f.reads != 0 || f.polls != 0 || len(audit.events) != 2 || audit.events[1].Effect != "none" {
 		t.Fatal("raw replay repeated work or disclosure", f.admissions, f.starts, f.reads, f.polls)
 	}
 	f.ready = true

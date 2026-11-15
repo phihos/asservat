@@ -65,14 +65,14 @@ func TestSavedSyscallAuditedPendingAndPollBothSourcesAndViews(t *testing.T) {
 	for _, kind := range []string{artifact.SyscallRecordsArtifact, artifact.SyscallArgumentsArtifact} {
 		for _, view := range []value.SyscallView{value.SyscallSummaryView, value.SyscallEventsView} {
 			t.Run(kind+"/"+string(view), func(t *testing.T) {
-				s, f, g, p := syscallBridge(t, kind, view)
+				s, f, _, p := syscallBridge(t, kind, view)
 				tool := "get_syscall_" + string(view)
 				f.ready = false
 				pending, e := s.Call(t.Context(), f, tool, syscallInput(""))
 				if e != nil {
 					t.Fatal("pending", e)
 				}
-				if s.contracts.ValidateOutput(tool, pending.Body) != nil || f.admissions != 1 || f.starts != 1 || f.reads != 0 || g.intents[0].InputFormat != "context-query-input/v1" {
+				if s.contracts.ValidateOutput(tool, pending.Body) != nil || f.admissions != 1 || f.starts != 1 || f.reads != 0 {
 					t.Fatal("pending binding")
 				}
 				if e = pending.Close(context.Background()); e != nil {
@@ -235,7 +235,7 @@ func TestSavedSyscallMalformedCursorRefusesBeforeEvidence(t *testing.T) {
 		Status string           `json:"status"`
 		Data   OperationFailure `json:"data"`
 	}
-	if json.Unmarshal(out.Body, &reply) != nil || reply.Status != "error" || reply.Data.Code != "InvalidCursor" || f.admissions+f.reads+f.starts != 0 || len(g.outcomes) != 1 || g.outcomes[0].Effect != "none" {
+	if json.Unmarshal(out.Body, &reply) != nil || reply.Status != "error" || reply.Data.Code != "InvalidCursor" || f.admissions+f.reads+f.starts != 0 || len(g.events) != 1 || g.events[0].Effect != "none" {
 		t.Fatal("malformed continuation accessed evidence")
 	}
 }

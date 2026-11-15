@@ -32,7 +32,7 @@ func (f processingDiscoveryFixture) ReadProcessingDiscovery(_ context.Context, a
 func discoveryID(n int) string { return fmt.Sprintf("00000000-0000-4000-8000-%012d", n) }
 
 func TestAuditedProcessingDiscoveryGuardsMetadataAndFitsOutputBound(t *testing.T) {
-	for _, mode := range []string{"operator", "ordinary-reader", "audit-intent-unavailable", "audit-result-unavailable"} {
+	for _, mode := range []string{"operator", "ordinary-reader", "audit-unavailable"} {
 		t.Run(mode, func(t *testing.T) {
 			s, caller, audit := auditedFixture(t)
 			now, root, epoch := s.config.Now(), s.config.RootID, discoveryID(7)
@@ -41,15 +41,15 @@ func TestAuditedProcessingDiscoveryGuardsMetadataAndFitsOutputBound(t *testing.T
 			if mode == "ordinary-reader" {
 				caller.i.Scopes, caller.i.Groups = []string{"evidence:read"}, []string{"maintainers"}
 			}
-			audit.beginFail, audit.finishFail = mode == "audit-intent-unavailable", mode == "audit-result-unavailable"
+			audit.fail = mode == "audit-unavailable"
 			policy := value.DownloadPolicy{RootID: root, InstallationID: root, RecoveryEpoch: epoch, Revision: caller.i.Policy, ProtectionDigest: artifact.Digest{1}, PermittedRegions: []string{}, Paths: []artifact.DownloadPath{}, Clients: []value.DownloadClient{},
 				Operators: []value.ProcessingOperator{{Issuer: caller.i.Principal.Issuer, ClientID: caller.i.Principal.ClientID, Kind: "Group", ID: "privacy"}}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
 			reads := 0
 			fixture := processingDiscoveryFixture{policy: policy}
 			fixture.read = func(a value.ProcessingAuthority, q value.ProcessingDiscoveryQuery) value.ProcessingDiscoveryPage {
 				reads++
-				if len(audit.intents) != 1 || !a.Valid(now) {
-					t.Fatal("discovery read preceded current authority or audit intent")
+				if len(audit.events) != 0 || !a.Valid(now) {
+					t.Fatal("discovery read without current authority or after the audit row")
 				}
 				page := value.ProcessingDiscoveryPage{RootID: root, Epoch: epoch, Sequence: 1, ObservedAt: a.ObservedAt, ValidUntil: a.ValidUntil}
 				parents := make([]string, value.MaxProcessingParents)
@@ -74,10 +74,10 @@ func TestAuditedProcessingDiscoveryGuardsMetadataAndFitsOutputBound(t *testing.T
 			}
 			reply, err := s.Call(t.Context(), caller, processingDiscoveryOperation, json.RawMessage(`{"case_id":"`+discoveryID(15)+`"}`))
 			if mode == "operator" {
-				if err != nil || reads != 1 || len(reply.Body) == 0 || len(reply.Body) > contracts.InvestigationOutputLimit || len(audit.outcomes) != 1 {
+				if err != nil || reads != 1 || len(reply.Body) == 0 || len(reply.Body) > contracts.InvestigationOutputLimit || len(audit.events) != 1 {
 					t.Fatal("operator discovery", reads, len(reply.Body), err)
 				}
-				out := audit.outcomes[0]
+				out := audit.events[0]
 				if out.Status != "success" || out.Effect != "none" || len(out.ArtifactIDs) != value.ProcessingDiscoveryLimit || len(out.CaseIDs) != 1 || len(out.CaptureIDs) != value.ProcessingDiscoveryLimit {
 					t.Fatal("discovery audit omitted exact references", out)
 				}
@@ -86,10 +86,10 @@ func TestAuditedProcessingDiscoveryGuardsMetadataAndFitsOutputBound(t *testing.T
 			if err == nil || len(reply.Body) != 0 {
 				t.Fatal("metadata escaped refusal", err)
 			}
-			if mode == "ordinary-reader" && (!errors.Is(err, identity.ErrDenied) || reads != 0 || len(audit.outcomes) != 1 || audit.outcomes[0].Status != "denied") {
+			if mode == "ordinary-reader" && (!errors.Is(err, identity.ErrDenied) || reads != 0 || len(audit.events) != 1 || audit.events[0].Status != "denied") {
 				t.Fatal("ordinary reader reached discovery or denial was not audited", reads, err)
 			}
-			if mode == "audit-intent-unavailable" && reads != 0 || mode == "audit-result-unavailable" && reads != 1 {
+			if mode == "audit-unavailable" && (reads != 1 || len(audit.events) != 1) {
 				t.Fatal("wrong audit boundary", reads)
 			}
 		})
@@ -124,8 +124,8 @@ func TestAuditedProcessingErasureStatusUsesExactRequestAndPrivacyAuthority(t *te
 			reads := 0
 			reader := erasureStatusReaderFunc(func(a value.ProcessingAuthority, id string) value.ProcessingErasureStatus {
 				reads++
-				if id != requestID || !a.Valid(now) || len(journal.intents) != 1 {
-					t.Fatal("status reached storage before the exact authorized audit intent")
+				if id != requestID || !a.Valid(now) || len(journal.events) != 0 {
+					t.Fatal("status read without current authority or after the audit row")
 				}
 				return value.ProcessingErasureStatus{RequestID: id, ArtifactID: artifactID, AcceptedAt: now.Add(-time.Minute),
 					AccessUntil: now.Add(-time.Hour), DeleteBy: now.Add(time.Hour), EffectiveDeleteBy: now.Add(time.Hour),
@@ -145,13 +145,13 @@ func TestAuditedProcessingErasureStatusUsesExactRequestAndPrivacyAuthority(t *te
 			}
 			reply, err := s.Call(t.Context(), caller, processingErasureStatusOperation, json.RawMessage(`{"request_id":"`+requestID+`"}`))
 			if !operator {
-				if !errors.Is(err, identity.ErrDenied) || len(reply.Body) != 0 || reads != 0 || len(journal.outcomes) != 1 || journal.outcomes[0].Status != "denied" {
+				if !errors.Is(err, identity.ErrDenied) || len(reply.Body) != 0 || reads != 0 || len(journal.events) != 1 || journal.events[0].Status != "denied" {
 					t.Fatal("ordinary reader obtained erasure status", reads, err)
 				}
 				return
 			}
-			if err != nil || reads != 1 || len(reply.Body) == 0 || len(journal.outcomes) != 1 ||
-				journal.outcomes[0].Effect != "none" || len(journal.outcomes[0].ArtifactIDs) != 1 || journal.outcomes[0].ArtifactIDs[0] != artifactID {
+			if err != nil || reads != 1 || len(reply.Body) == 0 || len(journal.events) != 1 ||
+				journal.events[0].Effect != "none" || len(journal.events[0].ArtifactIDs) != 1 || journal.events[0].ArtifactIDs[0] != artifactID {
 				t.Fatal("audited operator status lost exact artifact reference", reads, err)
 			}
 		})

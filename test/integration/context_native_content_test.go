@@ -706,85 +706,16 @@ func nativeOperationAuditServices(t, owner *testing.T, ctx context.Context, root
 	if len(diagnostics) > 1 || len(diagnostics) == 1 && diagnostics[0] == nil {
 		t.Fatal("invalid fixed journey diagnostic")
 	}
-	open := func(role, password string) *pgxpool.Pool {
-		p := poolFor(role, password)
-		owner.Cleanup(p.Close)
-		return p
-	}
-	cp := open("operation_audit_config_runtime", "synthetic-operation-config")
-	defer cp.Close() // Both audit lanes are provisioned before returning their runtime services.
-	jp := open("operation_audit_runtime", "synthetic-operation-journal")
-	ap := open("operation_audit_ack_runtime", "synthetic-operation-ack")
-	config, e := postgres.New(ctx, cp)
+	recorder, e := postgres.NewAuditEvents(admin)
 	if e != nil {
 		t.Fatal(e)
-	}
-	provision := func(lane string) audit.OperationLifecyclePolicy {
-		n := time.Now().UTC().Truncate(time.Microsecond)
-		backing := auditapp.OperationAuditPool{RootID: root, Lane: lane, AccountVersion: "accounts-v1", Accounts: 2, RecordsPerAccount: 4, RetainedSeconds: 3600, ObservedAt: n, FreshUntil: n.Add(5 * time.Second), ValidUntil: n.Add(time.Hour)}
-		if lane == "normal" {
-			// The processing fixture already provisioned revision one. Extend
-			// that synthetic configuration through its real revisioned API.
-			// Fund all four HTTP preflights independently of transfer depletion.
-			var revision, accounts, records int64
-			if e = cp.QueryRow(ctx, "SELECT revision,account_limit,records_per_account FROM operation_audit_pool WHERE root_id=$1 AND lane='normal'", backing.RootID).Scan(&revision, &accounts, &records); e != nil || revision != 1 || accounts != 2 || records != 2 {
-				t.Fatal("original processing audit backing", revision, accounts, records, e)
-			}
-			backing.ExpectedRevision = revision
-			backing.RecordsPerAccount = normalRecords
-		}
-		if e = config.ProvisionOperationAuditPool(ctx, backing); e != nil {
-			t.Fatal(e)
-		}
-		policy := audit.OperationLifecyclePolicy{RootID: root, Lane: lane, InstallationID: installation, StoreID: storeID, PolicyID: custodyID(), BackupProfileID: custodyID(), PolicyDigest: artifact.Digest{1}, BackupProfileDigest: artifact.Digest{2}, BackingRevision: backing.ExpectedRevision + 1, MetadataSlots: backing.Accounts * backing.RecordsPerAccount, MaxPurgeLeases: 4, CleanupBudgetSeconds: 8, ProofWindowSeconds: 2, ValidUntil: backing.ValidUntil, History: &audit.OperationHistoryQualification{ID: custodyID(), Digest: artifact.Digest{5}, Layout: audit.OperationVerificationHistoryLayout, MaximumRowFootprintBytes: 128 << 10, MaximumTransitionWALBytes: 128 << 10, BackupCopies: 2, WALCopies: 2}}
-		bb, ww := policy.History.SlotBacking(policy.MaxPurgeLeases)
-		policy.BackupReservedBytes = bb * policy.MetadataSlots
-		policy.WALReservedBytes = ww * policy.MetadataSlots
-		return policy
-	}
-	// Provision both finite lanes before opening their runtime connections.
-	// The setup-only role is never retained by either returned auditor.
-	normalPolicy, resolutionPolicy := provision("normal"), provision("resolution")
-	cp.Close()
-	makeAudit := func(policy audit.OperationLifecyclePolicy) *auditapp.HealthyOperationAuditor {
-		lane := policy.Lane
-		j, e := postgres.NewHealthyOperationJournal(ctx, jp, policy)
-		if e != nil {
-			t.Fatal(e)
-		}
-		ack, e := postgres.NewOperationAcknowledgements(ctx, ap, policy.RootID, lane, installation)
-		if e != nil {
-			t.Fatal(e)
-		}
-		lifecycle, e := postgres.NewOperationLifecycles(ctx, jp, policy.RootID, lane, installation)
-		if e != nil {
-			t.Fatal(e)
-		}
-		objects, e := objectstore.NewClosedOperationAuditObjects(store, policy.StoreID, keys, keys)
-		if e != nil {
-			t.Fatal(e)
-		}
-		var journal auditapp.OperationJournal = j
-		var acknowledgements auditapp.OperationAcknowledgements = ack
-		var closed auditapp.ClosedOperationObjects = objects
-		var completions auditapp.OperationCompletions = lifecycle
-		if len(diagnostics) == 1 {
-			probe := publicJourneyAuditDiagnostics{OperationJournal: j, OperationAcknowledgements: ack, ClosedOperationObjects: objects, OperationCompletions: lifecycle, trace: diagnostics[0]}
-			journal, acknowledgements, closed, completions = probe, probe, probe, probe
-		}
-		gate, e := auditapp.NewHealthyOperationAuditor(policy, journal, acknowledgements, &objectstore.OperationAuditObjects{Store: store, Seal: keys, Open: keys}, closed, completions, time.Now)
-		if e != nil {
-			t.Fatal(e)
-		}
-		return gate
 	}
 	mac, e := auditapp.NewOperationMAC("input-v1", bytes.Repeat([]byte{31}, 32), "accounts-v1", bytes.Repeat([]byte{32}, 32))
 	if e != nil {
 		t.Fatal(e)
 	}
 	owner.Cleanup(mac.Close)
-	cfg := presentation.AuditedOperationsConfig{RootID: root, Retention: time.Hour, NormalConcurrency: 2, ResolutionConcurrency: 1, PerPrincipalConcurrency: 2, NormalPerSecond: 100, ResolutionPerSecond: 10, Now: time.Now, NewID: custodyID}
-	out, e := presentation.NewHealthyAuditedOperations(cfg, inner, makeAudit(normalPolicy), makeAudit(resolutionPolicy), mac)
+	out, e := presentation.NewAuditedOperations(presentation.AuditedOperationsConfig{RootID: root, Now: time.Now, NewID: custodyID}, inner, recorder, mac)
 	if e != nil {
 		t.Fatal(e)
 	}

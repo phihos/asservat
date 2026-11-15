@@ -135,7 +135,7 @@ func testHistoryEditedRepeatBrowser(t *testing.T, nanoseconds bool) {
 	}
 	defer mac.Close()
 	gate := &reserveAudit{}
-	audited, err := presentation.NewHealthyAuditedOperations(presentation.AuditedOperationsConfig{RootID: reserveID(1), Retention: time.Hour, NormalConcurrency: 1, ResolutionConcurrency: 1, PerPrincipalConcurrency: 1, NormalPerSecond: 10, ResolutionPerSecond: 10, Now: time.Now, NewID: func() string { return reserveID(501) }}, combined, gate, gate, mac)
+	audited, err := presentation.NewAuditedOperations(presentation.AuditedOperationsConfig{RootID: reserveID(1), Now: time.Now, NewID: func() string { return reserveID(501) }}, combined, gate, mac)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -239,7 +239,7 @@ func testHistoryEditedRepeatBrowser(t *testing.T, nanoseconds bool) {
 	if out["status"] != "error" {
 		t.Fatal("expired source authorized new review")
 	}
-	if gate.begins.Load() != 5 || gate.finishes.Load() != 5 || facts.admissions.Load() != 0 || facts.stores.Load() != 2 {
-		t.Fatal("repeat route audit/effect boundary", gate.begins.Load(), gate.finishes.Load(), facts.stores.Load())
+	if gate.records.Load() != 5 || facts.admissions.Load() != 0 || facts.stores.Load() != 2 {
+		t.Fatal("repeat route audit/effect boundary", gate.records.Load(), facts.stores.Load())
 	}
 }

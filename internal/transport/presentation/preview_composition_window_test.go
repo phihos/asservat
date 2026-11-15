@@ -109,8 +109,8 @@ func TestRepeatPreviewComposesObservationsWithoutRenewingIdentity(t *testing.T) 
 				if err != nil || len(reply.Body) == 0 {
 					t.Fatalf("six-second composition refused: %v elapsed=%v", err, now.Sub(start))
 				}
-				if len(gate.intents) != 1 || !gate.intents[0].RequestUntil.Equal(start.Add(identity.CapturePreviewRequestWindow)) {
-					t.Fatal("wrong outer composition bound", gate.intents)
+				if len(gate.events) != 1 || reply.ValidUntil.After(start.Add(identity.CapturePreviewRequestWindow)) {
+					t.Fatal("wrong outer composition bound", gate.events)
 				}
 			} else if err == nil {
 				var out OperationEnvelope

@@ -127,7 +127,7 @@ func (f *stopProjectionFixture) CancelContextDownload(context.Context, identitie
 	f.calls++
 	return f.out, nil
 }
-func TestDownloadStopUsesPrepaidLaneWithoutReadScopeOrNormalAuditCapacity(t *testing.T) {
+func TestDownloadStopRunsWithoutReadScopeOrCallAudit(t *testing.T) {
 	audited, current, gate := auditedFixture(t)
 	current.i.Scopes = []string{"openid"}
 	downloads, _, _ := downloadProjection(t)
@@ -140,10 +140,9 @@ func TestDownloadStopUsesPrepaidLaneWithoutReadScopeOrNormalAuditCapacity(t *tes
 	}
 	audited.inner = combined
 	audited.stopSlots = make(chan struct{}, 4)
-	audited.lanes["normal"] <- struct{}{}
-	gate.beginFail = true
+	gate.fail = true
 	out, e := audited.Call(t.Context(), current, "cancel_artifact_download", []byte(`{"download_id":"`+downloadID+`","idempotency_key":"same-key"}`))
-	if e != nil || stop.calls != 1 || len(gate.intents) != 0 || len(gate.outcomes) != 0 || !strings.Contains(string(out.Body), `"state":"AlreadyTerminal"`) {
+	if e != nil || stop.calls != 1 || len(gate.events) != 0 || !strings.Contains(string(out.Body), `"state":"AlreadyTerminal"`) {
 		t.Fatal(string(out.Body), e)
 	}
 	for _, field := range []string{"artifact_id", "filename", "sha256", "expires_at", "Completed"} {
@@ -164,7 +163,7 @@ func TestDownloadStopMalformedInputCannotUsePrepaidLane(t *testing.T) {
 	audited.inner = combined
 	audited.stopSlots = make(chan struct{}, 4)
 	_, e = audited.Call(t.Context(), current, "cancel_artifact_download", []byte(`{"download_id":"`+downloadID+`","idempotency_key":"key","actor":"foreign"}`))
-	if !errors.Is(e, contracts.ErrInvestigationWire) || stop.calls != 0 || len(gate.intents) != 1 || gate.intents[0].Name != "invalid_operation" {
+	if !errors.Is(e, contracts.ErrInvestigationWire) || stop.calls != 0 || len(gate.events) != 1 || gate.events[0].Operation != "invalid_operation" {
 		t.Fatal("invalid input reached protected stop", e)
 	}
 }

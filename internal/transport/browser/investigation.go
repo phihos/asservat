@@ -123,7 +123,7 @@ func noOutcomeStage(err error) string {
 	if errors.As(err, &fixed) {
 		step, _, _ := strings.Cut(fixed.FixedStep(), "/")
 		switch step {
-		case "identity", "busy", "audit-begin", "audit-result", "audit-finish", "result-acknowledgement", "request-expired", "final-identity", "reply-expired", "final-disclosure":
+		case "identity", "audit-result", "audit", "result-acknowledgement", "reply-expired", "final-disclosure":
 			return step
 		}
 	}

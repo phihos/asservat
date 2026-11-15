@@ -295,8 +295,8 @@ func TestRecordingSaveSixteenSourcePreviewFitsResponseBound(t *testing.T) {
 		t.Fatal("accepted16-source contract cannot fit current response", len(raw), string(reply.Body))
 	}
 	auditedReply, auditErr := audited.Call(t.Context(), current, "preview_recording_save", input)
-	if auditErr != nil || len(gate.outcomes) != 1 || gate.outcomes[0].OutputBytes != int64(len(auditedReply.Body)) || gate.outcomes[0].Effect != "none" {
-		t.Fatal("large preview escaped exact audit/count", auditErr, gate.outcomes)
+	if auditErr != nil || len(gate.events) != 1 || gate.events[0].OutputBytes != int64(len(auditedReply.Body)) || gate.events[0].Effect != "none" {
+		t.Fatal("large preview escaped exact audit/count", auditErr, gate.events)
 	}
 }
 

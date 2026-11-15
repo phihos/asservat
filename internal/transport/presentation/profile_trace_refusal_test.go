@@ -91,7 +91,7 @@ func TestProfileSummaryCommittedGoTraceReturnsSemanticUnavailableWithoutQuery(t 
 			Code string `json:"code"`
 		} `json:"data"`
 	}
-	if json.Unmarshal(reply.Body, &result) != nil || result.Status != "error" || result.Data.Code != "NotAvailable" || s.contracts.ValidateOutput("get_profile_summary", reply.Body) != nil || ports.catalogs != 1 || f.admissions+f.starts+f.reads != 0 || len(g.outcomes) != 1 || g.outcomes[0].Effect != "none" {
+	if json.Unmarshal(reply.Body, &result) != nil || result.Status != "error" || result.Data.Code != "NotAvailable" || s.contracts.ValidateOutput("get_profile_summary", reply.Body) != nil || ports.catalogs != 1 || f.admissions+f.starts+f.reads != 0 || len(g.events) != 1 || g.events[0].Effect != "none" {
 		t.Fatal("unsupported source consumed query or lost audited fixed refusal", string(reply.Body), ports.catalogs, f.admissions, f.starts, f.reads)
 	}
 }
@@ -124,8 +124,8 @@ func TestProfileSummaryPreAdmissionUnavailableDoesNotDistinguishSourcesOrAccess(
 			} else if !bytes.Equal(common, reply.Body) {
 				t.Fatal("refusal disclosed source/access/provider distinction", mode, string(reply.Body))
 			}
-			if f.admissions+f.starts+f.reads != 0 || len(g.outcomes) != 1 || g.outcomes[0].Effect != "none" || g.outcomes[0].Status != "unavailable" {
-				t.Fatal("source refusal lost zeroeffects or unavailable audit", g.outcomes)
+			if f.admissions+f.starts+f.reads != 0 || len(g.events) != 1 || g.events[0].Effect != "none" || g.events[0].Status != "unavailable" {
+				t.Fatal("source refusal lost zeroeffects or unavailable audit", g.events)
 			}
 			if mode == "denied" && ports.catalogs != 0 {
 				t.Fatal("denied caller reached protected catalog")
@@ -134,23 +134,17 @@ func TestProfileSummaryPreAdmissionUnavailableDoesNotDistinguishSourcesOrAccess(
 	}
 }
 
-func TestProfileSummaryPreAdmissionRefusalStillRequiresAuditCurrentIdentityAndDeadline(t *testing.T) {
-	for _, mode := range []string{"audit-begin", "audit-finish", "cancel-during-catalog", "final-groups-changed", "original-expiry"} {
+func TestProfileSummaryPreAdmissionRefusalStillRequiresAuditAndDeadline(t *testing.T) {
+	for _, mode := range []string{"audit-finish", "original-expiry"} {
 		t.Run(mode, func(t *testing.T) {
-			s, f, g, ports, _ := traceSummaryBridge(t)
+			s, f, g, _, _ := traceSummaryBridge(t)
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			switch mode {
-			case "audit-begin":
-				g.beginFail = true
 			case "audit-finish":
-				g.finishFail = true
-			case "cancel-during-catalog":
-				ports.onCatalog = cancel
-			case "final-groups-changed":
-				g.onFinish = func() { f.i.Groups = nil }
+				g.fail = true
 			case "original-expiry":
-				g.onFinish = func() { f.now = f.i.ValidUntil }
+				g.onRecord = func() { f.now = f.i.ValidUntil }
 			}
 			reply, err := s.Call(ctx, f, "get_profile_summary", summaryInput(20))
 			if err == nil || len(reply.Body) != 0 || f.admissions+f.starts+f.reads != 0 {
@@ -188,8 +182,8 @@ func TestProfileSummaryUnknownAndPostAdmissionErrorsRemainTransportUnavailable(t
 			if err == nil || len(reply.Body) != 0 {
 				t.Fatal("nonclassified or attempted query became zeroeffect semantic refusal", mode, err)
 			}
-			if mode == "attempted-admission" && (f.admissions != 1 || len(g.outcomes) != 1 || g.outcomes[0].Effect != "unknown") {
-				t.Fatal("uncertain admission was represented as no effect", f.admissions, g.outcomes)
+			if mode == "attempted-admission" && (f.admissions != 1 || len(g.events) != 1 || g.events[0].Effect != "unknown") {
+				t.Fatal("uncertain admission was represented as no effect", f.admissions, g.events)
 			}
 		})
 	}

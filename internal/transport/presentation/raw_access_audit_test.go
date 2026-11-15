@@ -8,19 +8,17 @@ import (
 
 	authapp "asservat.local/asservat/internal/application/authorization"
 	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/audit"
 )
 
 func TestRawAccessUsesExistingAuditLaneBeforeDispatch(t *testing.T) {
-	for _, mode := range []string{"accepted", "intent unavailable", "outcome unavailable", "uncertain service"} {
+	for _, mode := range []string{"accepted", "outcome unavailable", "uncertain service"} {
 		t.Run(mode, func(t *testing.T) {
 			audited, current, gate := auditedFixture(t)
 			use := &rawGrantUseCase{grantUseCase: &grantUseCase{view: rawGrantView(current.i.VerifiedAt, 1), until: current.metadataUntil}}
 			if mode == "uncertain service" {
 				use.requestErr = authapp.ErrGrantUnavailable
 			}
-			gate.beginFail = mode == "intent unavailable"
-			gate.finishFail = mode == "outcome unavailable"
+			gate.fail = mode == "outcome unavailable"
 			operations, err := NewGrantOperations(audited.inner.PublicOrigin(), audited.config.Now, audited.config.NewID, use)
 			if err != nil {
 				t.Fatal(err)
@@ -29,7 +27,7 @@ func TestRawAccessUsesExistingAuditLaneBeforeDispatch(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if audit.OperationLane("request_raw_access") != "normal" || !BrowserOperationSupported(audited, "request_raw_access") {
+			if !BrowserOperationSupported(audited, "request_raw_access") {
 				t.Fatal("raw request has no existing authenticated audit route")
 			}
 			tool, ok := audited.Tool("request_raw_access")
@@ -46,23 +44,17 @@ func TestRawAccessUsesExistingAuditLaneBeforeDispatch(t *testing.T) {
 				t.Fatal("audit omitted original selection", string(normalized))
 			}
 			reply, err := audited.Call(t.Context(), current, "request_raw_access", raw)
-			if mode == "intent unavailable" {
-				if err == nil || use.calls != 0 || len(gate.outcomes) != 0 || len(reply.Body) != 0 {
-					t.Fatal("unaudited request ran", err)
-				}
-				return
-			}
-			if use.calls != 1 || len(gate.outcomes) != 1 || !gate.outcomes[0].Valid() {
-				t.Fatal("missing bounded intent/outcome", err, gate.outcomes)
+			if use.calls != 1 || len(gate.events) != 1 || !gate.events[0].Valid() {
+				t.Fatal("missing bounded intent/outcome", err, gate.events)
 			}
 			want := "accepted"
 			if mode == "uncertain service" {
 				want = "unknown"
 			}
-			if gate.outcomes[0].Effect != want {
-				t.Fatal("effect misclassified", gate.outcomes[0].Effect)
+			if gate.events[0].Effect != want {
+				t.Fatal("effect misclassified", gate.events[0].Effect)
 			}
-			encoded, _ := json.Marshal(gate.outcomes)
+			encoded, _ := json.Marshal(gate.events)
 			if bytes.Contains(encoded, []byte("PRIVATE REASON")) {
 				t.Fatal("audit leaked review text")
 			}

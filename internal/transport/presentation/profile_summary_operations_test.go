@@ -48,13 +48,13 @@ func TestProfileSummaryQueryRemainsExplicitlyDisabled(t *testing.T) {
 	}
 }
 func TestProfileSummaryQueryPendingReadyAndOriginalAuditSelection(t *testing.T) {
-	s, f, g, p := summaryBridge(t)
+	s, f, _, p := summaryBridge(t)
 	f.ready = false
 	first, err := s.Call(t.Context(), f, "get_profile_summary", summaryInput(20))
 	if err != nil {
 		t.Fatal("begin", err)
 	}
-	if s.contracts.ValidateOutput("get_profile_summary", first.Body) != nil || f.admissions != 1 || f.starts != 1 || f.reads != 0 || g.intents[0].InputFormat != "context-query-input/v1" {
+	if s.contracts.ValidateOutput("get_profile_summary", first.Body) != nil || f.admissions != 1 || f.starts != 1 || f.reads != 0 {
 		t.Fatal("pending summary admission")
 	}
 	if f.q.Scope.Profile.SampleType != "cpu" || f.q.Scope.Profile.TopN != 20 {

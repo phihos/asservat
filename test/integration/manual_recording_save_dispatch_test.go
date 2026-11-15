@@ -289,7 +289,7 @@ func newDispatchWorkflowOperations(t *testing.T, ctx context.Context, f *capacit
 		t.Fatal(err)
 	}
 	out := &dispatchWorkflowOperations{t: t, identity: dispatchWorkflowIdentity{who: who, until: hardUntil}, groupRequests: groupRequests, times: times}
-	out.service, err = presentation.NewHealthyAuditedOperations(presentation.AuditedOperationsConfig{RootID: investigation.RootID, Retention: time.Duration(profiles.Normal.RetainedSeconds) * time.Second, NormalConcurrency: 1, ResolutionConcurrency: 1, PerPrincipalConcurrency: 1, NormalPerSecond: 100, ResolutionPerSecond: 100, Now: time.Now, NewID: func() string { out.lastID = custodyID(); return out.lastID }}, inner, gates["normal"], gates["resolution"], mac)
+	out.service, err = presentation.NewAuditedOperations(presentation.AuditedOperationsConfig{RootID: investigation.RootID, Now: time.Now, NewID: func() string { out.lastID = custodyID(); return out.lastID }}, inner, &memoryAuditEvents{}, mac)
 	if err != nil {
 		t.Fatal(err)
 	}

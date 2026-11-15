@@ -43,11 +43,11 @@ func (w *auditFailureResponse) WriteHeader(status int) {
 	w.ResponseRecorder.WriteHeader(status)
 }
 
-func TestAuditedMCPBeginFailureReportsBeforeFinalIdentity(t *testing.T) {
+func TestAuditedMCPAuditFailureReportsBeforeFinalIdentity(t *testing.T) {
 	for _, version := range []string{"2025-11-25", "2026-07-28"} {
-		for _, mode := range []string{"original-deadline", "live", "unnamed"} {
+		for _, mode := range []string{"named", "unnamed"} {
 			t.Run(version+"/"+mode, func(t *testing.T) {
-				h, server, capture, normal, resolution, _ := auditedMCPFixture(t)
+				h, server, capture, rows, _ := auditedMCPFixture(t)
 				var mu sync.Mutex
 				var reports, order []string
 				h.Report = func(reason string) {
@@ -64,36 +64,14 @@ func TestAuditedMCPBeginFailureReportsBeforeFinalIdentity(t *testing.T) {
 					i.Scopes = append(i.Scopes, "evidence:capture")
 					return i, nil
 				})
-				bound := time.Second
-				if mode == "original-deadline" {
-					bound = 75 * time.Millisecond
-				}
-				ctx, cancel := context.WithTimeout(t.Context(), bound)
+				ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 				defer cancel()
 				original, _ := ctx.Deadline()
-				normal.onCreate = func(call context.Context) error {
-					until, ok := call.Deadline()
-					if !ok || until.After(original) || original.Sub(until) >= time.Microsecond {
-						t.Error("audit replaced the original request deadline")
-					}
-					if mode == "original-deadline" {
-						<-call.Done()
-						if call.Err() != context.DeadlineExceeded {
-							t.Error("audit did not reach the original deadline")
-						}
-						// Audit SQL rounds its bound down to microseconds.
-						// Join the original HTTP cancellation as well so the
-						// test does not depend on timer scheduling within 1 µs.
-						<-ctx.Done()
-					}
-					if mode == "unnamed" {
-						return errors.New("private provider token and address")
-					}
-					return auditObjectDiagnostic{}
-				}
-				want := "operation-failed request_capture audit-begin/object"
-				if mode != "unnamed" {
-					want += "/credentials-configuration/transaction/begin-deadline"
+				rows.err = auditObjectDiagnostic{}
+				want := "operation-failed request_capture audit/credentials-configuration/transaction/begin-deadline"
+				if mode == "unnamed" {
+					rows.err = errors.New("private provider token and address")
+					want = "operation-failed request_capture audit"
 				}
 				w := &auditFailureResponse{ResponseRecorder: httptest.NewRecorder(), beforeWrite: func() {
 					mu.Lock()
@@ -117,24 +95,14 @@ func TestAuditedMCPBeginFailureReportsBeforeFinalIdentity(t *testing.T) {
 				if !slices.Equal(reports, []string{want}) {
 					t.Fatalf("diagnostic missing or duplicated: %q", reports)
 				}
-				// Expired CurrentIdentity refuses locally before calling its
-				// resolver; a live request still performs the same final read.
-				wantOrder := []string{"identity", "identity", "report"}
-				status := http.StatusUnauthorized
-				if mode != "original-deadline" {
-					wantOrder = append(wantOrder, "identity")
-					status = http.StatusServiceUnavailable
-				}
-				if !slices.Equal(order, wantOrder) || w.Code != status {
+				if len(order) < 2 || order[len(order)-2] != "report" || order[len(order)-1] != "identity" || w.Code != http.StatusServiceUnavailable {
 					t.Fatalf("final identity/response changed: order=%q status=%d", order, w.Code)
 				}
 				if !w.read.Equal(original) || !w.write.Equal(original) {
 					t.Fatal("failure reporting changed original socket bounds")
 				}
-				n, o := normal.count()
-				r, ro := resolution.count()
-				if n != 1 || o != 0 || r != 0 || ro != 0 || normal.claims.Load() != 1 || normal.creates.Load() != 1 || capture.calls.Load() != 0 || capture.continuations.Load() != 0 {
-					t.Fatal("failure reporting repeated audit or dispatched service work")
+				if rows.count() != 1 || capture.calls.Load() != 1 || capture.continuations.Load() != 0 {
+					t.Fatal("failure reporting repeated audit or service work")
 				}
 				if strings.Contains(w.Body.String(), "private") || strings.Contains(w.Body.String(), "credentials") {
 					t.Fatal("private diagnostic entered public response")

@@ -14,19 +14,19 @@ import (
 )
 
 // Component reproduction of the SQL outcome fence: private writer closure
-// alone is insufficient. The exact invocation's acknowledged Finish must
+// alone is insufficient. The exact invocation's written audit row must
 // precede positive read-batch completion. Successful
 // public replies additionally retain the local acknowledged body owner.
 type refusalOutcomeGate struct {
 	*presentationAuditGate
-	acknowledged map[string]audit.OperationOutcome
+	acknowledged map[string]audit.Event
 }
 
-func (g *refusalOutcomeGate) Finish(ctx context.Context, out audit.OperationOutcome) error {
-	if err := g.presentationAuditGate.Finish(ctx, out); err != nil {
+func (g *refusalOutcomeGate) Record(ctx context.Context, e audit.Event) error {
+	if err := g.presentationAuditGate.Record(ctx, e); err != nil {
 		return err
 	}
-	g.acknowledged[out.Intent.ID] = out
+	g.acknowledged[e.OperationID] = e
 	return nil
 }
 
@@ -105,9 +105,9 @@ func TestQueryRefusalRetainsReadUntilExactOutcomeAndTransportClose(t *testing.T)
 					if !strings.HasPrefix(kind, "public-") {
 						f.result = &value.ProjectionResult{InvalidCursor: refusal == "cursor", TooLarge: refusal == "size"}
 					}
-					gate := &refusalOutcomeGate{presentationAuditGate: g, acknowledged: map[string]audit.OperationOutcome{}}
+					gate := &refusalOutcomeGate{presentationAuditGate: g, acknowledged: map[string]audit.Event{}}
 					ledger := &refusalOutcomeLedger{ContextQueryLedger: f, gate: gate}
-					s.audit["normal"], f.s.Results.Ledger = gate, ledger
+					s.recorder, f.s.Results.Ledger = gate, ledger
 					adapter, err := NewContextProjectionOperations(f.s, f.s.Results)
 					if err == nil {
 						switch tool {
@@ -127,7 +127,7 @@ func TestQueryRefusalRetainsReadUntilExactOutcomeAndTransportClose(t *testing.T)
 					}
 					p.adapter = adapter
 					premature := false
-					g.onFinish = func() {
+					g.onRecord = func() {
 						if f.reads > 0 && (f.lastRead.closed || ledger.attempts != 0 || p.last.delivery == nil || p.last.acknowledged) {
 							premature = true
 						}
@@ -162,8 +162,8 @@ func TestQueryRefusalRetainsReadUntilExactOutcomeAndTransportClose(t *testing.T)
 					if premature || json.Unmarshal(reply.Body, &body) != nil || body.Status != "error" || body.Data.Code != wantCode || s.contracts.ValidateOutput(tool, reply.Body) != nil {
 						t.Fatal("refusal closed the read before outcome acknowledgement or changed its wire result", premature, string(reply.Body))
 					}
-					out := g.outcomes[len(g.outcomes)-1]
-					if out.Status != wantStatus || out.Effect != "accepted" || reply.owner == nil || f.lastRead.closed || ledger.attempts != 0 || !f.active || f.completions != 0 || len(s.lanes["normal"]) != 1 || reply.CheckDisclosure(t.Context()) != nil {
+					out := g.events[len(g.events)-1]
+					if out.Status != wantStatus || out.Effect != "accepted" || reply.owner == nil || f.lastRead.closed || ledger.attempts != 0 || !f.active || f.completions != 0 || reply.CheckDisclosure(t.Context()) != nil {
 						t.Fatal("refusal lost exact charged live ownership", out.Status, out.Effect, reply.owner != nil, ledger.attempts, ledger.early, f.active, f.completions)
 					}
 					for _, field := range []string{`"records":`, `"top":`, `"events":`, `"rows":`} {
@@ -171,7 +171,7 @@ func TestQueryRefusalRetainsReadUntilExactOutcomeAndTransportClose(t *testing.T)
 							t.Fatal("refusal disclosed result content")
 						}
 					}
-					if err := reply.Close(context.Background()); err != nil || ledger.attempts != 1 || ledger.early != 0 || f.completions != 1 || f.active || len(s.lanes["normal"]) != 0 {
+					if err := reply.Close(context.Background()); err != nil || ledger.attempts != 1 || ledger.early != 0 || f.completions != 1 || f.active {
 						t.Fatal("acknowledged refusal failed joined fenced cleanup", err, ledger.attempts, ledger.early, f.completions, f.active)
 					}
 				})
@@ -181,12 +181,12 @@ func TestQueryRefusalRetainsReadUntilExactOutcomeAndTransportClose(t *testing.T)
 }
 
 func TestQueryRefusalAuditFailureAndRevocationPreserveClosureFence(t *testing.T) {
-	for _, mode := range []string{"finish-failed", "cancel-after-finish", "identity-after-finish", "uncertain-private-close"} {
+	for _, mode := range []string{"finish-failed", "cancel-after-finish", "uncertain-private-close"} {
 		t.Run(mode, func(t *testing.T) {
 			s, f, g, p := syscallBridge(t, artifact.SyscallArgumentsArtifact, value.SyscallEventsView)
-			gate := &refusalOutcomeGate{presentationAuditGate: g, acknowledged: map[string]audit.OperationOutcome{}}
+			gate := &refusalOutcomeGate{presentationAuditGate: g, acknowledged: map[string]audit.Event{}}
 			ledger := &refusalOutcomeLedger{ContextQueryLedger: f, gate: gate}
-			s.audit["normal"], f.s.Results.Ledger = gate, ledger
+			s.recorder, f.s.Results.Ledger = gate, ledger
 			adapter, err := NewContextProjectionOperations(f.s, f.s.Results)
 			if err != nil {
 				t.Fatal(err)
@@ -202,11 +202,9 @@ func TestQueryRefusalAuditFailureAndRevocationPreserveClosureFence(t *testing.T)
 			defer cancel()
 			switch mode {
 			case "finish-failed":
-				g.finishFail = true
+				g.fail = true
 			case "cancel-after-finish":
-				g.onFinish = cancel
-			case "identity-after-finish":
-				g.onFinish = func() { f.i.Scopes = nil }
+				g.onRecord = cancel
 			case "uncertain-private-close":
 				f.closeErr = value.ErrUnavailable
 			}
@@ -215,12 +213,12 @@ func TestQueryRefusalAuditFailureAndRevocationPreserveClosureFence(t *testing.T)
 				if err != nil || reply.owner == nil || f.completions != 0 {
 					t.Fatal("refusal not prepared before uncertain close", err)
 				}
-				if reply.Close(context.Background()) == nil || reply.Close(context.Background()) == nil || !f.active || f.completions != 0 || ledger.attempts != 0 || len(s.lanes["normal"]) != 0 {
+				if reply.Close(context.Background()) == nil || reply.Close(context.Background()) == nil || !f.active || f.completions != 0 || ledger.attempts != 0 {
 					t.Fatal("unknown private join became positive closure/refund")
 				}
 				return
 			}
-			if err == nil || len(reply.Body) != 0 || f.reads != 1 || f.admissions != 1 || f.batches != 1 || len(s.lanes["normal"]) != 0 || !f.lastRead.closed {
+			if err == nil || len(reply.Body) != 0 || f.reads != 1 || f.admissions != 1 || f.batches != 1 || !f.lastRead.closed {
 				t.Fatal("failed/refused response lost conservative cleanup", err)
 			}
 			if mode == "finish-failed" {

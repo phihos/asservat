@@ -53,12 +53,9 @@ func bridgePoll(id string) []byte {
 }
 
 func TestContextProjectionBridgeRequiresOriginalAuditInputBeforeEffects(t *testing.T) {
-	for _, mode := range []string{"begin", "missing owner", "request ID", "range", "artifact", "wrong branch"} {
+	for _, mode := range []string{"missing owner", "request ID", "range", "artifact", "wrong branch"} {
 		t.Run(mode, func(t *testing.T) {
 			s, f, g, p := bridgeAuditFixture(t)
-			if mode == "begin" {
-				g.beginFail = true
-			}
 			p.mutate = func(call *OperationCall, raw *json.RawMessage) {
 				switch mode {
 				case "missing owner":
@@ -80,7 +77,7 @@ func TestContextProjectionBridgeRequiresOriginalAuditInputBeforeEffects(t *testi
 			if err == nil || len(out.Body) != 0 || f.admissions != 0 || f.starts != 0 || f.reads != 0 {
 				t.Fatal("unbound operation dispatched")
 			}
-			if mode != "begin" && (len(g.outcomes) != 1 || g.outcomes[0].Effect != "none") {
+			if len(g.events) != 1 || g.events[0].Effect != "none" {
 				t.Fatal("pre-dispatch refusal misclassified")
 			}
 		})
@@ -92,7 +89,7 @@ func TestContextProjectionBridgeReadyAndPollHaveExactAuditedOwners(t *testing.T)
 	if len(f.i.Scopes) != 1 || f.i.Scopes[0] != "evidence:read" {
 		t.Fatal("fixture added raw/download rights")
 	}
-	g.onFinish = func() {
+	g.onRecord = func() {
 		if p.last.delivery == nil || p.last.CheckOutcome(context.Background(), p.last.delivery) == nil {
 			t.Fatal("outcome accepted before Finish acknowledgement")
 		}
@@ -102,7 +99,7 @@ func TestContextProjectionBridgeReadyAndPollHaveExactAuditedOwners(t *testing.T)
 		t.Fatal(err)
 	}
 	d := p.last.delivery
-	if first.CheckDisclosure(context.Background()) != nil || f.reads != 1 || f.completions != 0 || len(s.lanes["normal"]) != 1 {
+	if first.CheckDisclosure(context.Background()) != nil || f.reads != 1 || f.completions != 0 {
 		t.Fatal("read did not retain ownership")
 	}
 	if p.last.CheckOutcome(context.Background(), &analysisapp.ContextProjectionDelivery{}) == nil {
@@ -120,7 +117,7 @@ func TestContextProjectionBridgeReadyAndPollHaveExactAuditedOwners(t *testing.T)
 	if json.Unmarshal(first.Body, &initial) != nil || len(initial.Data.Lines) != 14 || !initial.Data.ExpiresAt.Equal(d.QueryDeadline()) {
 		t.Fatal("wrong approved output")
 	}
-	if err = first.Close(context.Background()); err != nil || f.completions != 1 || f.active || len(s.lanes["normal"]) != 0 {
+	if err = first.Close(context.Background()); err != nil || f.completions != 1 || f.active {
 		t.Fatal("read did not join cleanup", err)
 	}
 	if p.last.CheckOutcome(context.Background(), d) == nil || !bytes.Equal(first.Body, make([]byte, len(first.Body))) {
@@ -131,7 +128,7 @@ func TestContextProjectionBridgeReadyAndPollHaveExactAuditedOwners(t *testing.T)
 		t.Fatal(err)
 	}
 	defer second.Close(context.Background())
-	if f.starts != 1 || f.polls != 1 || f.reads != 2 || g.outcomes[1].Effect != "accepted" || g.outcomes[1].Intent.ID == g.outcomes[0].Intent.ID {
+	if f.starts != 1 || f.polls != 1 || f.reads != 2 || g.events[1].Effect != "accepted" || g.events[1].OperationID == g.events[0].OperationID {
 		t.Fatal("poll restarted worker or reused invocation")
 	}
 	if s.contracts.ValidateOutput("get_query_result", second.Body) != nil {
@@ -171,7 +168,7 @@ func TestContextProjectionBridgePendingChargesAndNeverStartsOnPoll(t *testing.T)
 			t.Fatal("pending close")
 		}
 	}
-	if f.admissions != 1 || f.starts != 1 || f.polls != 1 || f.reads != 0 || len(g.outcomes) != 2 || g.outcomes[0].Effect != "accepted" || g.outcomes[1].Effect != "accepted" {
+	if f.admissions != 1 || f.starts != 1 || f.polls != 1 || f.reads != 0 || len(g.events) != 2 || g.events[0].Effect != "accepted" || g.events[1].Effect != "accepted" {
 		t.Fatal("pending control effects missing")
 	}
 }
@@ -185,10 +182,10 @@ func TestContextProjectionBridgeRefusesAfterAuditAndJoinsOriginalCleanup(t *test
 			}
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			g.onFinish = func() {
+			g.onRecord = func() {
 				switch mode {
 				case "finish":
-					g.finishFail = true
+					g.fail = true
 				case "cancel":
 					cancel()
 				case "retention":
@@ -210,10 +207,10 @@ func TestContextProjectionBridgeRefusesAfterAuditAndJoinsOriginalCleanup(t *test
 				f.closeErr = errors.New("unknown remote closure")
 			}
 			reply, err := s.Call(ctx, f, "get_file_excerpt", bridgeInput())
-			if err == nil || len(reply.Body) != 0 || f.reads != 1 || f.lastRead == nil || !f.lastRead.closed || len(s.lanes["normal"]) != 0 {
+			if err == nil || len(reply.Body) != 0 || f.reads != 1 || f.lastRead == nil || !f.lastRead.closed {
 				t.Fatal("failed disclosure discarded cleanup", err)
 			}
-			if !f.lastRead.cleanupUntil.Equal(g.intents[0].WriteUntil) || !time.Now().Before(f.lastRead.cleanupUntil) {
+			if !time.Now().Before(f.lastRead.cleanupUntil) {
 				t.Fatal("cleanup inherited expired public cutoff")
 			}
 			if mode == "uncertain close" {
@@ -299,7 +296,7 @@ func TestContextProjectionBridgeRechecksBeforeActualWrite(t *testing.T) {
 func TestContextProjectionBridgeErrorsAfterDispatchStayUnknown(t *testing.T) {
 	s, f, g, _ := bridgeAuditFixture(t)
 	f.queryErr = errors.New("unknown SQL commit")
-	if reply, err := s.Call(context.Background(), f, "get_file_excerpt", bridgeInput()); err == nil || len(reply.Body) != 0 || f.admissions != 1 || g.outcomes[0].Effect != "unknown" {
+	if reply, err := s.Call(context.Background(), f, "get_file_excerpt", bridgeInput()); err == nil || len(reply.Body) != 0 || f.admissions != 1 || g.events[0].Effect != "unknown" {
 		t.Fatal("uncertain admission reported no effect")
 	}
 }
@@ -331,7 +328,7 @@ func TestContextProjectionBridgePollInputCannotSubstituteAnotherQuery(t *testing
 		}
 		*raw = bridgePoll(f.next())
 	}
-	if out, e := s.Call(context.Background(), f, "get_query_result", bridgePoll(f.q.ID)); e == nil || len(out.Body) != 0 || f.polls != 0 || f.starts != 1 || g.outcomes[1].Effect != "none" {
+	if out, e := s.Call(context.Background(), f, "get_query_result", bridgePoll(f.q.ID)); e == nil || len(out.Body) != 0 || f.polls != 0 || f.starts != 1 || g.events[1].Effect != "none" {
 		t.Fatal("poll input substitution reached effects")
 	}
 }

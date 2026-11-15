@@ -16,88 +16,35 @@ import (
 	"time"
 
 	auditapp "asservat.local/asservat/internal/application/audit"
-	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/transport/presentation"
 )
 
-// Explicit test-only journal with pre-acknowledged synthetic receipts. It proves
-// transport composition, not SQL/object custody or production audit authority.
+// Test-only recorder of the wrapper's call rows. It proves transport
+// composition, not SQL audit storage.
 type ingressAuditFixture struct {
-	mu        sync.Mutex
-	intents   []audit.OperationIntent
-	outcomes  []audit.OperationOutcome
-	onReserve func(context.Context)
-	onOutcome func()
-	onCreate  func(context.Context) error
-	claims    atomic.Int64
-	creates   atomic.Int64
-	fail      bool
+	mu       sync.Mutex
+	events   []audit.Event
+	onRecord func(context.Context)
+	err      error
 }
 
-func ingressReceipt(in audit.OperationIntent, phase string) *audit.Receipt {
-	return &audit.Receipt{Key: audit.OperationAuditKey(in.RootID, in.ID, phase), ETag: "synthetic", Bytes: 100, SHA256: artifact.Digest{1}}
-}
-func (f *ingressAuditFixture) ReserveOperation(ctx context.Context, in audit.OperationIntent) (audit.OperationSnapshot, error) {
+func (f *ingressAuditFixture) Record(ctx context.Context, e audit.Event) error {
 	f.mu.Lock()
-	f.intents = append(f.intents, in)
+	f.events = append(f.events, e)
 	f.mu.Unlock()
-	if f.onReserve != nil {
-		f.onReserve(ctx)
+	if f.onRecord != nil {
+		f.onRecord(ctx)
 	}
-	if f.fail {
-		return audit.OperationSnapshot{}, errors.New("private provider error")
-	}
-	if f.onCreate != nil {
-		return audit.OperationSnapshot{Intent: in}, nil
-	}
-	return audit.OperationSnapshot{Intent: in, IntentReceipt: ingressReceipt(in, "intent")}, nil
+	return f.err
 }
-func (f *ingressAuditFixture) FreezeOperationOutcome(_ context.Context, out audit.OperationOutcome) (audit.OperationSnapshot, error) {
-	f.mu.Lock()
-	f.outcomes = append(f.outcomes, out)
-	f.mu.Unlock()
-	if f.onOutcome != nil {
-		f.onOutcome()
-	}
-	return audit.OperationSnapshot{Intent: out.Intent, IntentReceipt: ingressReceipt(out.Intent, "intent"), Outcome: &out, OutcomeReceipt: ingressReceipt(out.Intent, "outcome")}, nil
-}
-func (f *ingressAuditFixture) ClaimOperationWrite(context.Context, audit.OperationIntent, string) (bool, error) {
-	if f.onCreate != nil {
-		f.claims.Add(1)
-		return true, nil
-	}
-	panic("fixture receipt must exist")
-}
-func (*ingressAuditFixture) AcknowledgeOperation(context.Context, audit.OperationIntent, string, audit.Receipt) error {
-	panic("fixture receipt must exist")
-}
-func (f *ingressAuditFixture) CreateOperationIntent(ctx context.Context, _ audit.OperationIntent) (audit.Receipt, error) {
-	if f.onCreate != nil {
-		f.creates.Add(1)
-		return audit.Receipt{}, f.onCreate(ctx)
-	}
-	panic("fixture receipt must exist")
-}
-func (*ingressAuditFixture) FindOperationIntent(context.Context, audit.OperationIntent) (audit.Receipt, error) {
-	panic("fixture receipt must exist")
-}
-func (*ingressAuditFixture) CreateOperationOutcome(context.Context, audit.OperationOutcome) (audit.Receipt, error) {
-	panic("fixture receipt must exist")
-}
-func (*ingressAuditFixture) FindOperationOutcome(context.Context, audit.OperationOutcome) (audit.Receipt, error) {
-	panic("fixture receipt must exist")
-}
-func (f *ingressAuditFixture) count() (int, int) {
+func (f *ingressAuditFixture) count() int {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return len(f.intents), len(f.outcomes)
+	return len(f.events)
 }
-func (f *ingressAuditFixture) auditor(now func() time.Time) auditapp.OperationAuditor {
-	return auditapp.OperationAuditor{Journal: f, Objects: f, Acknowledgements: f, Now: now}
-}
-func auditedMCPFixture(t *testing.T) (*Handler, *httptest.Server, *mcpCaptureFixture, *ingressAuditFixture, *ingressAuditFixture, *atomic.Bool) {
+func auditedMCPFixture(t *testing.T) (*Handler, *httptest.Server, *mcpCaptureFixture, *ingressAuditFixture, *atomic.Bool) {
 	t.Helper()
 	var h *Handler
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { h.ServeHTTP(w, r) }))
@@ -116,9 +63,9 @@ func auditedMCPFixture(t *testing.T) (*Handler, *httptest.Server, *mcpCaptureFix
 		t.Fatal(err)
 	}
 	t.Cleanup(mac.Close)
-	normal, resolution := &ingressAuditFixture{}, &ingressAuditFixture{}
+	recorder := &ingressAuditFixture{}
 	var sequence atomic.Uint64
-	audited, err := presentation.NewAuditedOperations(presentation.AuditedOperationsConfig{RootID: "00000000-0000-4000-8000-000000000010", Retention: time.Hour, NormalConcurrency: 2, ResolutionConcurrency: 1, PerPrincipalConcurrency: 2, NormalPerSecond: 100, ResolutionPerSecond: 100, Now: time.Now, NewID: func() string { return fmt.Sprintf("00000000-0000-4000-8000-%012d", sequence.Add(1)) }}, inner, normal.auditor(time.Now), resolution.auditor(time.Now), mac)
+	audited, err := presentation.NewAuditedOperations(presentation.AuditedOperationsConfig{RootID: "00000000-0000-4000-8000-000000000010", Now: time.Now, NewID: func() string { return fmt.Sprintf("00000000-0000-4000-8000-%012d", sequence.Add(1)) }}, inner, recorder, mac)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,13 +81,13 @@ func auditedMCPFixture(t *testing.T) (*Handler, *httptest.Server, *mcpCaptureFix
 	if err != nil {
 		t.Fatal(err)
 	}
-	return h, server, capture, normal, resolution, denied
+	return h, server, capture, recorder, denied
 }
 func TestAuditedMCPIngressRejectsOnceBeforeDispatchAcrossRevisions(t *testing.T) {
 	for _, version := range []string{"2025-11-25", "2026-07-28"} {
 		for _, mode := range []string{"unknown", "schema", "scope", "sdk-params", "sdk-meta", "request-state", "missing-id", "null-id", "object-id", "oversized-name"} {
 			t.Run(version+"/"+mode, func(t *testing.T) {
-				_, server, capture, normal, resolution, denied := auditedMCPFixture(t)
+				_, server, capture, rows, denied := auditedMCPFixture(t)
 				params := map[string]any{"name": "resolve_capture_request", "arguments": map[string]any{"preview_id": "00000000-0000-4000-8000-000000000020", "idempotency_key": "same-key"}}
 				switch mode {
 				case "unknown":
@@ -176,15 +123,13 @@ func TestAuditedMCPIngressRejectsOnceBeforeDispatchAcrossRevisions(t *testing.T)
 					req.ContentLength = int64(len(raw))
 				}
 				response, body := send(t, server, req)
-				ni, no := normal.count()
-				ri, ro := resolution.count()
-				if ni != 1 || no != 1 || ri != 0 || ro != 0 || capture.calls.Load() != 0 {
-					t.Fatalf("not exactly one normal rejection: normal=%d/%d resolution=%d/%d effects=%d status=%d body=%s", ni, no, ri, ro, capture.calls.Load(), response.StatusCode, body)
+				if n := rows.count(); n != 1 || capture.calls.Load() != 0 {
+					t.Fatalf("not exactly one rejection row: rows=%d effects=%d status=%d body=%s", n, capture.calls.Load(), response.StatusCode, body)
 				}
-				if normal.intents[0].Name != "invalid_operation" || normal.outcomes[0].Effect != "none" || bytes.Contains(body, []byte("private-user-input")) || len(body) > MaxResponseBytes {
+				if rows.events[0].Operation != "invalid_operation" || rows.events[0].Effect != "none" || bytes.Contains(body, []byte("private-user-input")) || len(body) > MaxResponseBytes {
 					t.Fatalf("rejection leaked/dispatched: %s", body)
 				}
-				if mode == "scope" && normal.outcomes[0].Status != "denied" {
+				if mode == "scope" && rows.events[0].Status != "denied" {
 					t.Fatal("scope misclassified")
 				}
 			})
@@ -192,7 +137,7 @@ func TestAuditedMCPIngressRejectsOnceBeforeDispatchAcrossRevisions(t *testing.T)
 	}
 }
 func TestAuditedMCPValidCallsHaveOneOwnerAndProtocolIsNotAnOperation(t *testing.T) {
-	_, server, capture, normal, resolution, _ := auditedMCPFixture(t)
+	_, server, capture, rows, _ := auditedMCPFixture(t)
 	for _, method := range []string{"initialize", "tools/list", "ping"} {
 		params := map[string]any{}
 		if method == "initialize" {
@@ -200,7 +145,7 @@ func TestAuditedMCPValidCallsHaveOneOwnerAndProtocolIsNotAnOperation(t *testing.
 		}
 		send(t, server, rpcRequest(t, server, "2025-11-25", method, params))
 	}
-	if n, _ := normal.count(); n != 0 {
+	if rows.count() != 0 {
 		t.Fatal("handshake/list consumed audit")
 	}
 	args := map[string]any{"preview_id": "00000000-0000-4000-8000-000000000020", "idempotency_key": "same-key"}
@@ -210,15 +155,13 @@ func TestAuditedMCPValidCallsHaveOneOwnerAndProtocolIsNotAnOperation(t *testing.
 			t.Fatalf("valid call rejected %d %s", response.StatusCode, b)
 		}
 	}
-	n, o := normal.count()
-	r, ro := resolution.count()
-	if n != 1 || o != 1 || r != 1 || ro != 1 || capture.calls.Load() != 1 {
-		t.Fatal("duplicate audit or dispatch", n, o, r, ro, capture.calls.Load())
+	if n := rows.count(); n != 2 || capture.calls.Load() != 1 {
+		t.Fatal("duplicate audit or dispatch", n, capture.calls.Load())
 	}
 }
 func TestAuditedMCPUnavailableAuditBlocksEffectsAndCountsBoundedly(t *testing.T) {
-	h, server, capture, normal, _, _ := auditedMCPFixture(t)
-	normal.fail = true
+	h, server, capture, rows, _ := auditedMCPFixture(t)
+	rows.err = errors.New("private provider error")
 	response, b := send(t, server, rpcRequest(t, server, "2025-11-25", "tools/call", map[string]any{"name": "unknown", "arguments": map[string]any{}}))
 	if response.StatusCode != 503 || capture.calls.Load() != 0 || bytes.Contains(b, []byte("private")) || h.SecurityCounters().AuditUnavailable != 1 {
 		t.Fatalf("failed audit escaped %d %s %#v", response.StatusCode, b, h.SecurityCounters())
@@ -227,9 +170,9 @@ func TestAuditedMCPUnavailableAuditBlocksEffectsAndCountsBoundedly(t *testing.T)
 func TestAuditedMCPOriginalHTTPCancellationReachesBothRevisions(t *testing.T) {
 	for _, version := range []string{"2025-11-25", "2026-07-28"} {
 		t.Run(version, func(t *testing.T) {
-			_, server, capture, normal, _, _ := auditedMCPFixture(t)
+			_, server, capture, _, _ := auditedMCPFixture(t)
 			entered, observed := make(chan struct{}), make(chan struct{})
-			normal.onReserve = func(ctx context.Context) { close(entered); <-ctx.Done(); close(observed) }
+			capture.during = func(ctx context.Context) { close(entered); <-ctx.Done(); close(observed) }
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			req := rpcRequest(t, server, version, "tools/call", map[string]any{"name": "request_capture", "arguments": map[string]any{"preview_id": "00000000-0000-4000-8000-000000000020", "idempotency_key": "same-key"}}).WithContext(ctx)
@@ -302,12 +245,12 @@ type finalRejectionIdentity struct {
 
 func (f *finalRejectionIdentity) ResolveIdentity(context.Context) (identity.Identity, error) {
 	f.calls++
-	if f.late && f.calls == 3 {
+	if f.late && f.calls == 2 {
 		<-time.After(time.Until(f.until.Add(time.Millisecond)))
 	}
 	now := time.Now()
 	until := f.until
-	if f.calls == 3 {
+	if f.calls == 2 {
 		until = now.Add(5 * time.Second)
 	}
 	return identity.Identity{Principal: identity.Principal{Issuer: "https://id.example.invalid", Subject: "dev", ClientID: "browser", Kind: identity.Human}, Policy: identity.Revision{UID: "policy", Generation: 1, Digest: [32]byte{1}}, Scopes: []string{"evidence:read"}, VerifiedAt: now, ValidUntil: until}, nil
@@ -322,14 +265,14 @@ func (w *deadlineRecorder) SetWriteDeadline(until time.Time) error { w.until = u
 
 func TestMCPRejectionPreservesOriginalDeadlineThroughFinalRead(t *testing.T) {
 	for _, late := range []bool{false, true} {
-		h, _, _, normal, _, _ := auditedMCPFixture(t)
+		h, _, _, rows, _ := auditedMCPFixture(t)
 		current := &finalRejectionIdentity{until: time.Now().Add(100 * time.Millisecond), late: late}
 		req := httptest.NewRequest("POST", "https://example.invalid/mcp", nil)
 		w := &deadlineRecorder{ResponseRecorder: httptest.NewRecorder()}
 		delivery := &operationDeadline{until: time.Now().Add(5 * time.Second)}
 		ok := h.rejectIngress(w, req, current, delivery, "unknown", []byte("{}"), presentation.IngressInvalid)
-		if n, o := normal.count(); n != 1 || o != 1 {
-			t.Fatal("missing audit", n, o)
+		if n := rows.count(); n != 1 {
+			t.Fatal("missing audit", n)
 		}
 		if late {
 			if ok || w.Code != 503 || !w.until.IsZero() {
