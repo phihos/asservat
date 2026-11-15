@@ -8,11 +8,9 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres"
-	auditapp "asservat.local/asservat/internal/application/audit"
 	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
-	"asservat.local/asservat/internal/domain/identity"
 	value "asservat.local/asservat/internal/domain/privacy"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -27,7 +25,7 @@ func reportFixtureProcessors() []value.ProcessingOrganization {
 // Read the actual source through the compiled hub pool before erasure and
 // after independently acknowledged physical deletion. Policy/identity inputs
 // remain the existing explicit synthetic service-fixture authority.
-func qualifyProcessingReport(t *testing.T, ctx context.Context, hub *pgxpool.Pool, s captureAdmissionScenario, f *processingTestFixture, e artifact.ContextExpectation, custodyState, unknownOperation string) {
+func qualifyProcessingReport(t *testing.T, ctx context.Context, hub *pgxpool.Pool, s captureAdmissionScenario, f *processingTestFixture, e artifact.ContextExpectation, custodyState, callOperation string) {
 	t.Helper()
 	reader, err := postgres.NewProcessingInventory(ctx, hub, s.a.RootID)
 	if err != nil {
@@ -67,7 +65,7 @@ func qualifyProcessingReport(t *testing.T, ctx context.Context, hub *pgxpool.Poo
 	if !slices.Equal(sections, []string{"artifacts", "shares", "downloads", "operations", "rules", "paths", "processors"}) || pages < 8 {
 		t.Fatal("processing report did not complete all paginated sections", sections, pages)
 	}
-	artifacts, processors, paths, rules, unknown := 0, []value.ProcessingOrganization{}, 0, 0, false
+	artifacts, processors, paths, rules, call, decisions := 0, []value.ProcessingOrganization{}, 0, 0, false, 0
 	for _, record := range records {
 		if a := record.Artifact; a != nil {
 			artifacts++
@@ -96,17 +94,20 @@ func qualifyProcessingReport(t *testing.T, ctx context.Context, hub *pgxpool.Poo
 				t.Fatal("report changed the real immutable restriction/release scope", rule)
 			}
 		}
-		if op := record.Operation; op != nil && op.OperationID == unknownOperation {
-			unknown = true
-			if !op.IntentAcknowledged || op.OutcomeAcknowledged || op.Status != "unknown" || op.OutputBytes != nil || op.ClientReceipt != "unknown" {
-				t.Fatal("report invented delivery or output for missing outcome", op)
+		if op := record.Operation; op != nil && op.OperationID == callOperation {
+			call = true
+			if op.Name != "get_case" || op.ArtifactID != e.Registration.Location.ArtifactID || op.Status != "success" || op.OutputBytes == nil || *op.OutputBytes != 512 || op.ClientReceipt != "unknown" {
+				t.Fatal("report changed the call audit row", op)
 			}
+		}
+		if op := record.Operation; op != nil && (op.Name == "restrict_processing" || op.Name == "release_processing") && op.Subject == "synthetic-report-operator" {
+			decisions++
 		}
 	}
 	wantProcessors, _ := json.Marshal(f.policy.value.Processors)
 	gotProcessors, _ := json.Marshal(processors)
-	if artifacts != 1 || rules != 1 || paths != len(f.policy.value.Paths) || !unknown || string(gotProcessors) != string(wantProcessors) {
-		t.Fatal("report incomplete source coverage or changed operator declarations", artifacts, rules, paths, unknown, string(gotProcessors))
+	if artifacts != 1 || rules != 1 || paths != len(f.policy.value.Paths) || !call || decisions != 2 || string(gotProcessors) != string(wantProcessors) {
+		t.Fatal("report incomplete source coverage or changed operator declarations", artifacts, rules, paths, call, decisions, string(gotProcessors))
 	}
 	outsider := f.actor
 	outsider.value.Principal.Subject = "synthetic-report-outsider"
@@ -118,7 +119,7 @@ func qualifyProcessingReport(t *testing.T, ctx context.Context, hub *pgxpool.Poo
 func stageProcessingReportRule(t *testing.T, ctx context.Context, f *processingTestFixture, e artifact.ContextExpectation) {
 	t.Helper()
 	operator := f.actor
-	operator.value.Principal.Subject = "synthetic-report-unconfirmed-client"
+	operator.value.Principal.Subject = "synthetic-report-operator"
 	f.policy.value.Operators = append(f.policy.value.Operators, value.ProcessingOperator{
 		Issuer: operator.value.Principal.Issuer, ClientID: operator.value.Principal.ClientID, Kind: "User", ID: operator.value.Principal.Subject,
 	})
@@ -138,24 +139,20 @@ func stageProcessingReportRule(t *testing.T, ctx context.Context, f *processingT
 	}
 }
 
-func stageProcessingReportUnknown(t *testing.T, ctx context.Context, f *processingTestFixture) string {
+// stageProcessingReportCall writes the audit row the public boundary writes
+// for one call (REQ-AUT-005).
+func stageProcessingReportCall(t *testing.T, ctx context.Context, hub *pgxpool.Pool, f *processingTestFixture, e artifact.ContextExpectation) string {
 	t.Helper()
-	n := time.Now().UTC().Truncate(time.Microsecond)
-	actor := f.actor.value.Principal
-	actor.Subject = "synthetic-report-unconfirmed-client"
-	account, err := f.mac.Principal(actor)
+	events, err := postgres.NewAuditEvents(hub)
 	if err != nil {
 		t.Fatal(err)
 	}
-	in := audit.OperationIntent{ID: custodyID(), RootID: f.service.RootID, TraceID: custodyID(), Name: "get_case", InputFormat: "context-input/v1",
-		MACVersion: f.mac.Version(), AccountVersion: f.mac.AccountVersion(), Actor: actor, PrincipalDigest: account, InputDigest: artifact.Digest{73},
-		CreatedAt: n, RequestUntil: n.Add(5 * time.Second), WriteUntil: n.Add(30 * time.Second), RetainUntil: n.Add(time.Hour)}
-	in, err = auditapp.BindOperationLifecycle(in, f.service.AuditPolicy)
-	if err != nil || !in.Valid() || actor.Kind != identity.Human {
-		t.Fatal("unconfirmed report operation fixture", err)
+	actor := f.actor.value.Principal
+	actor.Subject = "synthetic-report-reader"
+	operation := custodyID()
+	if err = events.Record(ctx, audit.Event{ID: custodyID(), OperationID: operation, Kind: "call", Operation: "get_case", Actor: actor, InputDigest: &artifact.Digest{73},
+		Status: "success", Effect: "none", ArtifactIDs: []string{e.Registration.Location.ArtifactID}, OutputBytes: 512}); err != nil {
+		t.Fatal("stage call audit row", err)
 	}
-	if err = f.service.Audit.Begin(ctx, in); err != nil {
-		t.Fatal("stage real acknowledged intent with unknown outcome", err)
-	}
-	return in.ID
+	return operation
 }

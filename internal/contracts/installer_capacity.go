@@ -30,7 +30,6 @@ type InstallerCapacityLanes struct {
 	CaptureRetainedSeconds int64                 `json:"captureRetainedSeconds"`
 	Normal                 InstallerCapacityLane `json:"normal"`
 	Resolution             InstallerCapacityLane `json:"resolution"`
-	Processing             InstallerCapacityLane `json:"processing"`
 }
 
 type InstallerCapacityBackup struct {
@@ -48,13 +47,11 @@ type InstallerCapacityFootprint struct {
 
 // Operator-qualified history footprints; no release measurement exists.
 type InstallerCapacityFootprints struct {
-	Capture    InstallerCapacityFootprint `json:"capture"`
-	Operation  InstallerCapacityFootprint `json:"operation"`
-	Processing InstallerCapacityFootprint `json:"processing"`
-	Native     InstallerCapacityFootprint `json:"native"`
-	Stop       InstallerCapacityFootprint `json:"stop"`
-	// ProcessingState is the processing root history (at least 16 KiB rows),
-	// distinct from the processing release audit lane above.
+	Capture   InstallerCapacityFootprint `json:"capture"`
+	Operation InstallerCapacityFootprint `json:"operation"`
+	Native    InstallerCapacityFootprint `json:"native"`
+	Stop      InstallerCapacityFootprint `json:"stop"`
+	// ProcessingState is the processing root history (at least 16 KiB rows).
 	ProcessingState InstallerCapacityFootprint `json:"processingState"`
 }
 

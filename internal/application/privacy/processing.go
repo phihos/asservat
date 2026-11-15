@@ -8,9 +8,7 @@ import (
 	"slices"
 	"time"
 
-	auditapp "asservat.local/asservat/internal/application/audit"
 	"asservat.local/asservat/internal/domain/artifact"
-	auditvalue "asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/identity"
 	value "asservat.local/asservat/internal/domain/privacy"
 )
@@ -23,33 +21,32 @@ type ProcessingIdentity interface {
 type ProcessingPolicyReader interface {
 	DownloadPolicy(context.Context) (value.DownloadPolicy, error)
 }
-type ProcessingPrepared struct {
-	Decision ProcessingDecision
-	Receipt  *value.ProcessingReceipt
-}
+
+// ProcessingDecisions applies a decision and writes its audit row in one SQL
+// transaction (REQ-AUT-005). A replay of the request ID returns the existing
+// receipt and writes no second row.
 type ProcessingDecisions interface {
-	PrepareProcessing(context.Context, value.ProcessingAuthority, ProcessingDecision) (ProcessingPrepared, error)
 	ApplyProcessing(context.Context, value.ProcessingAuthority, ProcessingDecision) (value.ProcessingReceipt, error)
 }
 type ProcessingArtifactScopes interface {
 	ResolveProcessingArtifactScope(context.Context, value.ProcessingAuthority, string) (value.ProcessingScope, error)
-}
-type ProcessingAudit interface {
-	Begin(context.Context, auditvalue.OperationIntent) error
-	Finish(context.Context, auditvalue.OperationOutcome) error
 }
 type ProcessingChanges struct {
 	RootID, InstallationID string
 	Policies               ProcessingPolicyReader
 	Decisions              ProcessingDecisions
 	ArtifactScopes         ProcessingArtifactScopes
-	Audit                  ProcessingAudit
-	ReleaseAudit           ProcessingAudit
-	MAC                    *auditapp.OperationMAC
-	AuditPolicy            auditvalue.OperationLifecyclePolicy
-	ReleaseAuditPolicy     auditvalue.OperationLifecyclePolicy
-	RetainedSeconds        int64
 	Now                    func() time.Time
+}
+
+// ProcessingDecision is one change with its original request interval.
+type ProcessingDecision struct {
+	Change                  value.ProcessingChange
+	CreatedAt, RequestUntil time.Time
+}
+
+func (d ProcessingDecision) Valid() bool {
+	return d.Change.Valid() && !d.CreatedAt.IsZero() && d.RequestUntil.After(d.CreatedAt) && !d.RequestUntil.After(d.CreatedAt.Add(5*time.Second))
 }
 
 func (s ProcessingChanges) authority(ctx context.Context, source ProcessingIdentity, started, until time.Time) (value.ProcessingAuthority, error) {
@@ -73,24 +70,11 @@ func (s ProcessingChanges) authority(ctx context.Context, source ProcessingIdent
 	}
 	return a, nil
 }
-func sameProcessingIdentity(a, b identity.Identity) bool {
-	if a.Principal != b.Principal || a.Policy != b.Policy {
-		return false
-	}
-	x, y := slices.Clone(a.Groups), slices.Clone(b.Groups)
-	slices.Sort(x)
-	slices.Sort(y)
-	if !slices.Equal(x, y) {
-		return false
-	}
-	x, y = slices.Clone(a.Scopes), slices.Clone(b.Scopes)
-	slices.Sort(x)
-	slices.Sort(y)
-	return slices.Equal(x, y)
-}
+
+// Change checks authority once (ADR-311) and applies the decision.
 func (s ProcessingChanges) Change(ctx context.Context, source ProcessingIdentity, c value.ProcessingChange) (value.ProcessingReceipt, error) {
 	var zero value.ProcessingReceipt
-	if ctx == nil || ctx.Err() != nil || source == nil || s.Policies == nil || s.Decisions == nil || s.Audit == nil || s.MAC == nil || s.Now == nil || !c.ValidRequest() || !s.AuditPolicy.CertificateVerificationBacked() || s.RetainedSeconds < 60 || s.RetainedSeconds > 316224000 {
+	if ctx == nil || ctx.Err() != nil || source == nil || s.Policies == nil || s.Decisions == nil || s.Now == nil || !c.ValidRequest() {
 		return zero, value.ErrUnavailable
 	}
 	started := s.Now().UTC().Truncate(time.Microsecond)
@@ -117,119 +101,22 @@ func (s ProcessingChanges) Change(ctx context.Context, source ProcessingIdentity
 		}
 		c.Scope, c.RequestedArtifactID = scope, ""
 	}
-	// The initiating private operation retains RequestID. Replays cannot give
-	// the same decision a new audit ID or acquire another provider attempt.
-	input, e := json.Marshal(struct {
-		Root   string
-		Change value.ProcessingChange
-		Policy identity.Revision
-		Guard  artifact.Digest
-	}{s.RootID, c, authority.Policy.Revision, authority.Policy.ProtectionDigest})
-	if e != nil {
+	decision := ProcessingDecision{Change: c, CreatedAt: started, RequestUntil: until}
+	if !decision.Valid() {
 		return zero, value.ErrUnavailable
 	}
-	inputMAC, e := s.MAC.Digest("processing-input/v1", input)
-	if e != nil {
-		return zero, value.ErrUnavailable
-	}
-	account, e := s.MAC.Principal(authority.Identity.Principal)
-	if e != nil {
-		return zero, value.ErrUnavailable
-	}
-	releaseAccount := artifact.Digest{}
-	if c.RuleID != "" {
-		releaseAccount, e = s.MAC.ProcessingAccount(s.InstallationID, s.RootID, c.RuleID)
-		if e != nil {
-			return zero, value.ErrUnavailable
-		}
-	}
-	auditService, auditPolicy := s.Audit, s.AuditPolicy
-	if c.Action == "release_processing" {
-		auditService, auditPolicy = s.ReleaseAudit, s.ReleaseAuditPolicy
-		account = releaseAccount
-		if auditService == nil || !auditPolicy.CertificateVerificationBacked() || auditPolicy.Lane != "processing" {
-			return zero, value.ErrUnavailable
-		}
-	}
-	in := auditvalue.OperationIntent{ID: c.RequestID, RootID: s.RootID, TraceID: c.RequestID, Name: c.Action, InputFormat: "processing-input/v1", MACVersion: s.MAC.Version(), AccountVersion: s.MAC.AccountVersion(), Actor: authority.Identity.Principal, PrincipalDigest: account, InputDigest: inputMAC, CreatedAt: started, RequestUntil: until, WriteUntil: started.Add(30 * time.Second), RetainUntil: started.Add(time.Duration(s.RetainedSeconds) * time.Second)}
-	in, e = auditapp.BindOperationLifecycle(in, auditPolicy)
-	if e != nil {
-		return zero, value.ErrUnavailable
-	}
-	projection, e := json.Marshal(struct {
-		RequestID, Action, RuleID string
-		ExpectedRevision          int64
-		Decision                  string
-	}{c.RequestID, c.Action, c.RuleID, c.ExpectedRevision, "prepared"})
-	if e != nil {
-		return zero, value.ErrUnavailable
-	}
-	outputMAC, e := s.MAC.Digest("processing-result/v1", projection)
-	if e != nil {
-		return zero, value.ErrUnavailable
-	}
-	outcome := auditvalue.OperationOutcome{Intent: in, Status: "success", Reason: "prepared", Effect: "unknown", ClientReceipt: "unknown", OutputDigest: outputMAC, OutputBytes: int64(len(projection)), MetadataUntil: until, RecordedAt: started}
-	if c.Action == value.RequestEarlyErasure {
-		outcome.ArtifactIDs = []string{c.Scope.Location.ArtifactID}
-	}
-	draft := ProcessingDecision{Change: c, Intent: in, Outcome: outcome, ReleaseAccount: releaseAccount}
-	draft.DecisionDigest = ProcessingDecisionDigest(draft)
-	if !draft.Valid() {
-		return zero, value.ErrUnavailable
-	}
-	prepared, e := s.Decisions.PrepareProcessing(call, authority, draft)
-	if errors.Is(e, value.ErrConflict) {
+	result, e := s.Decisions.ApplyProcessing(call, authority, decision)
+	switch {
+	case errors.Is(e, value.ErrConflict):
 		return zero, value.ErrConflict
-	}
-	if errors.Is(e, ErrCapacity) {
+	case errors.Is(e, ErrCapacity):
 		return zero, ErrCapacity
-	}
-	if e != nil {
+	case e != nil || !result.Valid(s.Now()) || result.RequestID != c.RequestID || call.Err() != nil:
 		return zero, value.ErrUnavailable
 	}
-	if prepared.Receipt != nil {
-		if !prepared.Receipt.Valid(s.Now()) || prepared.Receipt.RequestID != c.RequestID || call.Err() != nil {
-			return zero, value.ErrUnavailable
-		}
-		return s.finalReceipt(call, source, authority, *prepared.Receipt)
-	}
-	decision := prepared.Decision
-	if !decision.Valid() || !decision.Change.Equal(c) || decision.Intent.Actor != authority.Identity.Principal || !s.Now().Before(decision.Intent.RequestUntil) {
-		return zero, value.ErrUnavailable
-	}
-	original := identity.Earlier(until, decision.Intent.RequestUntil)
-	call, stopDecision := context.WithDeadline(call, original)
-	defer stopDecision()
-	if e = auditService.Begin(call, decision.Intent); e != nil {
-		return zero, value.ErrUnavailable
-	}
-	if e = auditService.Finish(call, decision.Outcome); e != nil {
-		return zero, value.ErrUnavailable
-	}
-	// Keep the original completed authority through provider waits (ADR-311).
-	// Current request identity and SQL effect fences still precede the CAS.
-	authority.ValidUntil = identity.Earlier(authority.ValidUntil, original)
-	final, e := s.continueAuthority(call, source, authority)
-	if e != nil {
-		return zero, value.ErrUnavailable
-	}
-	result, e := s.Decisions.ApplyProcessing(call, final, decision)
-	if errors.Is(e, value.ErrConflict) {
-		return zero, value.ErrConflict
-	}
-	if e != nil || !result.Valid(s.Now()) || result.RequestID != c.RequestID || call.Err() != nil {
-		return zero, value.ErrUnavailable
-	}
-	return s.finalReceipt(call, source, final, result)
+	return result, nil
 }
-func ProcessingDecisionDigest(d ProcessingDecision) artifact.Digest {
-	d.DecisionDigest = artifact.Digest{}
-	b, e := json.Marshal(d)
-	if e != nil || len(b) > 32<<10 {
-		return artifact.Digest{}
-	}
-	return sha256.Sum256(b)
-}
+
 func ProcessingRequestDigest(c value.ProcessingChange) artifact.Digest {
 	b, e := json.Marshal(c)
 	if e != nil || !c.Valid() {
@@ -238,16 +125,20 @@ func ProcessingRequestDigest(c value.ProcessingChange) artifact.Digest {
 	return sha256.Sum256(b)
 }
 
-func (s ProcessingChanges) finalReceipt(ctx context.Context, source ProcessingIdentity, original value.ProcessingAuthority, r value.ProcessingReceipt) (value.ProcessingReceipt, error) {
-	now, e := s.continueAuthority(ctx, source, original)
-	if e != nil {
-		return value.ProcessingReceipt{}, value.ErrUnavailable
+func sameProcessingIdentity(a, b identity.Identity) bool {
+	if a.Principal != b.Principal || a.Policy != b.Policy {
+		return false
 	}
-	r.ValidUntil = identity.Earlier(r.ValidUntil, now.ValidUntil)
-	if !r.Valid(s.Now()) || ctx.Err() != nil {
-		return value.ProcessingReceipt{}, value.ErrUnavailable
+	x, y := slices.Clone(a.Groups), slices.Clone(b.Groups)
+	slices.Sort(x)
+	slices.Sort(y)
+	if !slices.Equal(x, y) {
+		return false
 	}
-	return r, nil
+	x, y = slices.Clone(a.Scopes), slices.Clone(b.Scopes)
+	slices.Sort(x)
+	slices.Sort(y)
+	return slices.Equal(x, y)
 }
 
 // Reuse one complete operation observation, preserving every original bound.

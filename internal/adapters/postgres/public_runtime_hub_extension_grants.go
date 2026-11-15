@@ -643,22 +643,23 @@ var publicRuntimeHubExtensionGrantTable = map[string][]publicRuntimeGrant{
 		{"table", "goose_db_version", "", "SELECT"},
 	},
 	// ADR-210: a privacy operator's processing decisions, exactly the
-	// component role processing_decision_runtime: decision and rule rows and
-	// the lock order permission, processing root (ADR-127).
+	// component role processing_decision_runtime: decision and rule rows,
+	// the lock order permission, processing root (ADR-127), and the audit
+	// rows each decision writes and the processing report reads.
 	"processing-decision": {
 		{"schema", "public", "", "USAGE"},
+		{"table", "audit_event", "", "INSERT"},
+		{"table", "audit_event", "", "SELECT"},
 		{"table", "context_catalog", "", "SELECT"},
 		{"table", "context_processing", "", "SELECT"},
 		{"table", "fleet_current_trust", "", "SELECT"},
 		{"table", "fleet_current_trust", "installation_id", "UPDATE"},
 		{"table", "goose_db_version", "", "SELECT"},
-		{"table", "operation_audit", "", "SELECT"},
 		{"table", "permission_stream", "", "SELECT"},
 		{"table", "permission_stream", "id", "UPDATE"},
 		{"table", "processing_decision", "", "INSERT"},
 		{"table", "processing_decision", "", "SELECT"},
 		{"table", "processing_decision", "applied_at", "UPDATE"},
-		{"table", "processing_decision", "audit_digest", "UPDATE"},
 		{"table", "processing_decision", "id", "UPDATE"},
 		{"table", "processing_root", "", "SELECT"},
 		{"table", "processing_root", "root_id", "UPDATE"},

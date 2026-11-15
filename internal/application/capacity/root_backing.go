@@ -46,8 +46,7 @@ func (q RootMetadataQualification) Valid() bool {
 }
 
 // RootAuditBacking describes one fixed root lane. The complete lifecycle is
-// shared by all consumers of that lane, including processing initialization
-// and public prepare/status/content. It is not cloned per component/account.
+// shared by all consumers of that lane. It is not cloned per component/account.
 type RootAuditBacking struct {
 	Accounts, RecordsPerAccount, RetainedSeconds int64
 	Policy                                       audit.OperationLifecyclePolicy
@@ -77,15 +76,15 @@ type RootBackingInput struct {
 	Accounts, RecordsPerAccount                     int64
 	// Derived by the protected installer profile. It bounds a new configuration
 	// revision; it never extends an original SQL phase or admitted session.
-	AdmissionSeconds                        int64
-	Capture, Normal, Resolution, Processing RootAuditBacking
-	ProcessingState                         privacy.ProcessingBacking
-	ProcessingEpoch, ProcessingSourceUID    string
-	ProcessingProtectionDigest              artifact.Digest
-	ContextHistory                          ContextBackingHistory
-	StopRetainedSeconds                     int64
-	Metadata                                RootMetadataQualification
-	Envelope                                RootBackingEnvelope
+	AdmissionSeconds                     int64
+	Capture, Normal, Resolution          RootAuditBacking
+	ProcessingState                      privacy.ProcessingBacking
+	ProcessingEpoch, ProcessingSourceUID string
+	ProcessingProtectionDigest           artifact.Digest
+	ContextHistory                       ContextBackingHistory
+	StopRetainedSeconds                  int64
+	Metadata                             RootMetadataQualification
+	Envelope                             RootBackingEnvelope
 }
 
 // Object capacity is checked against the designated public system slice as
@@ -136,7 +135,6 @@ func CompileRootBacking(in RootBackingInput) (RootBackingPlan, error) {
 		{in.Capture, "capture", audit.CaptureOperationHistoryLayout},
 		{in.Normal, "normal", audit.OperationVerificationHistoryLayout},
 		{in.Resolution, "resolution", audit.OperationVerificationHistoryLayout},
-		{in.Processing, "processing", audit.ProcessingReleaseHistoryLayout},
 	} {
 		if !x.p.valid(in.RootID, in.InstallationID, x.lane, x.layout) || x.p.Policy.StoreID != in.Capture.Policy.StoreID || !x.p.Policy.ValidUntil.Equal(in.Capture.Policy.ValidUntil) {
 			return zero, ErrBudgetInvalid
@@ -165,7 +163,7 @@ func CompileRootBacking(in RootBackingInput) (RootBackingPlan, error) {
 		return zero, ErrBudgetInvalid
 	}
 	ps := in.ProcessingState
-	if !ps.Valid() || ps.RootID != in.RootID || ps.InstallationID != in.InstallationID || ps.MaxCaptures < t.Records || in.Processing.Policy.MetadataSlots < ps.MaxRules*privacy.MaxProcessingChanges || !ps.ValidUntil.Equal(in.Capture.Policy.ValidUntil) {
+	if !ps.Valid() || ps.RootID != in.RootID || ps.InstallationID != in.InstallationID || ps.MaxCaptures < t.Records || !ps.ValidUntil.Equal(in.Capture.Policy.ValidUntil) {
 		return zero, ErrBudgetInvalid
 	}
 	cb, ok := capacityProduct(in.Accounts, work.CaptureBackupBytes)
@@ -179,8 +177,8 @@ func CompileRootBacking(in RootBackingInput) (RootBackingPlan, error) {
 	if t.SystemObjects, ok = work.ProtocolSystemObjects.multiply(in.Accounts); !ok {
 		return zero, ErrBudgetInvalid
 	}
-	// Capture, Stop and native costs already occur in work. Root normal,
-	// resolution and processing are added exactly once here.
+	// Capture, Stop and native costs already occur in work. Root normal
+	// and resolution are added exactly once here.
 	add := func(dst *int64, values ...int64) bool {
 		v, ok := capacityProduct(values...)
 		if !ok {
@@ -192,7 +190,7 @@ func CompileRootBacking(in RootBackingInput) (RootBackingPlan, error) {
 	if !add(&t.SQLBytes, processingRows, ps.History.RowBytes) || !add(&t.BackupBytes, ps.BackupBytes) || !add(&t.WALBytes, ps.WALBytes) {
 		return zero, ErrBudgetInvalid
 	}
-	for _, lane := range []RootAuditBacking{in.Normal, in.Resolution, in.Processing} {
+	for _, lane := range []RootAuditBacking{in.Normal, in.Resolution} {
 		n := lane.Policy.MetadataSlots
 		objects, ok := (BudgetAmount{2 * audit.OperationCipherLimit, 2}).multiply(n)
 		if !ok {

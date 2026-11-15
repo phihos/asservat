@@ -3,7 +3,6 @@ package postgres
 import (
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/privacy"
 	"bytes"
@@ -22,20 +21,19 @@ import (
 type ProcessingConfiguration struct {
 	ledger           *Ledger
 	accepted         value.ProcessingBacking
-	release          audit.OperationLifecyclePolicy
 	epoch, sourceUID string
 	guard            artifact.Digest
 }
 
-func NewProcessingConfiguration(ctx context.Context, pool *pgxpool.Pool, accepted value.ProcessingBacking, release audit.OperationLifecyclePolicy, epoch, sourceUID string, guard artifact.Digest) (*ProcessingConfiguration, error) {
-	if !accepted.Valid() || !release.CertificateVerificationBacked() || release.Lane != "processing" || release.History.Layout != audit.ProcessingReleaseHistoryLayout || release.RootID != accepted.RootID || release.InstallationID != accepted.InstallationID || release.MetadataSlots < accepted.MaxRules*16 || release.ValidUntil.Before(accepted.ValidUntil) || !authorization.UUID(epoch) || !authorization.UUID(sourceUID) || guard == (artifact.Digest{}) {
+func NewProcessingConfiguration(ctx context.Context, pool *pgxpool.Pool, accepted value.ProcessingBacking, epoch, sourceUID string, guard artifact.Digest) (*ProcessingConfiguration, error) {
+	if !accepted.Valid() || !authorization.UUID(epoch) || !authorization.UUID(sourceUID) || guard == (artifact.Digest{}) {
 		return nil, value.ErrUnavailable
 	}
 	l, e := New(ctx, pool)
 	if e != nil {
 		return nil, value.ErrUnavailable
 	}
-	return &ProcessingConfiguration{l, accepted, release, epoch, sourceUID, guard}, nil
+	return &ProcessingConfiguration{l, accepted, epoch, sourceUID, guard}, nil
 }
 func (s *ProcessingConfiguration) AcceptCurrent(ctx context.Context, source value.DownloadPolicy, expectedRevision int64) error {
 	if s == nil || ctx == nil || ctx.Err() != nil || expectedRevision < 0 || source.RootID != s.accepted.RootID || source.InstallationID != s.accepted.InstallationID || source.Revision.UID != s.sourceUID || source.ProtectionDigest != s.guard {
@@ -44,10 +42,6 @@ func (s *ProcessingConfiguration) AcceptCurrent(ctx context.Context, source valu
 	call, stop := context.WithDeadline(ctx, source.FreshUntil)
 	defer stop()
 	encoded, e := json.Marshal(s.accepted)
-	if e != nil {
-		return value.ErrUnavailable
-	}
-	releaseJSON, e := json.Marshal(s.release)
 	if e != nil {
 		return value.ErrUnavailable
 	}
@@ -71,7 +65,7 @@ func (s *ProcessingConfiguration) AcceptCurrent(ctx context.Context, source valu
 			if expectedRevision != 0 {
 				return value.ErrConflict
 			}
-			e = q.InsertProcessingRoot(call, custodydb.InsertProcessingRootParams{RootID: id(s.accepted.RootID), InstallationID: id(s.accepted.InstallationID), IssuerEpoch: trust.IssuerEpoch, Epoch: id(s.epoch), SourceUid: id(s.sourceUID), ProtectionDigest: s.guard[:], Backing: encoded, ReleasePolicy: releaseJSON, ValidUntil: ts(s.accepted.ValidUntil), RetireBy: ts(s.accepted.RetireBy), MaxCaptures: s.accepted.MaxCaptures, MaxRules: s.accepted.MaxRules, MaxRootTransitions: s.accepted.MaxRootTransitions})
+			e = q.InsertProcessingRoot(call, custodydb.InsertProcessingRootParams{RootID: id(s.accepted.RootID), InstallationID: id(s.accepted.InstallationID), IssuerEpoch: trust.IssuerEpoch, Epoch: id(s.epoch), SourceUid: id(s.sourceUID), ProtectionDigest: s.guard[:], Backing: encoded, ValidUntil: ts(s.accepted.ValidUntil), RetireBy: ts(s.accepted.RetireBy), MaxCaptures: s.accepted.MaxCaptures, MaxRules: s.accepted.MaxRules, MaxRootTransitions: s.accepted.MaxRootTransitions})
 		} else {
 			if uid(old.InstallationID) != s.accepted.InstallationID || uid(old.Epoch) != s.epoch || uid(old.SourceUid) != s.sourceUID || !bytes.Equal(old.ProtectionDigest, s.guard[:]) {
 				return value.ErrConflict
@@ -80,15 +74,11 @@ func (s *ProcessingConfiguration) AcceptCurrent(ctx context.Context, source valu
 			if json.Unmarshal(old.Backing, &retained) != nil {
 				return value.ErrUnavailable
 			}
-			var priorRelease audit.OperationLifecyclePolicy
-			if json.Unmarshal(old.ReleasePolicy, &priorRelease) != nil {
-				return value.ErrUnavailable
-			}
-			if !sameAuditJSON(retained, s.accepted) || !sameAuditJSON(priorRelease, s.release) {
+			if !sameAuditJSON(retained, s.accepted) {
 				if old.BackingRevision != expectedRevision {
 					return value.ErrConflict
 				}
-				changed, e := q.UpdateProcessingBacking(call, custodydb.UpdateProcessingBackingParams{RootID: id(s.accepted.RootID), BackingRevision: expectedRevision, Backing: encoded, ReleasePolicy: releaseJSON, ValidUntil: ts(s.accepted.ValidUntil), RetireBy: ts(s.accepted.RetireBy), MaxCaptures: s.accepted.MaxCaptures, MaxRules: s.accepted.MaxRules, MaxRootTransitions: s.accepted.MaxRootTransitions})
+				changed, e := q.UpdateProcessingBacking(call, custodydb.UpdateProcessingBackingParams{RootID: id(s.accepted.RootID), BackingRevision: expectedRevision, Backing: encoded, ValidUntil: ts(s.accepted.ValidUntil), RetireBy: ts(s.accepted.RetireBy), MaxCaptures: s.accepted.MaxCaptures, MaxRules: s.accepted.MaxRules, MaxRootTransitions: s.accepted.MaxRootTransitions})
 				if e != nil {
 					return e
 				}
