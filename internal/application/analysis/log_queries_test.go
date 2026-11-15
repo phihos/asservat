@@ -51,7 +51,7 @@ func TestRawLogBeginPinsInvocationBeforeAdmissionAndReplay(t *testing.T) {
 	}
 	invoke := f.invocation("get_logs")
 	invoke.input = ContextQueryInput{RawLogs: r}
-	d, e := service.Begin(t.Context(), f, invoke, r)
+	d, e := service.Begin(t.Context(), f, invoke.id, r)
 	if e != nil {
 		t.Fatalf("raw query admission: %v", e)
 	}
@@ -59,17 +59,15 @@ func TestRawLogBeginPinsInvocationBeforeAdmissionAndReplay(t *testing.T) {
 		t.Fatal("query funding or immutable grant/key missing")
 	}
 	id, deadline := d.Association().QueryID, d.QueryDeadline()
-	invoke.outcome = d
 	if e = d.Close(context.Background()); e != nil {
 		t.Fatal(e)
 	}
 	replay := f.invocation("get_logs")
 	replay.input = ContextQueryInput{RawLogs: r}
-	again, e := service.Begin(t.Context(), f, replay, r)
+	again, e := service.Begin(t.Context(), f, replay.id, r)
 	if e != nil || !again.Pending() || again.Effect() != ContextQueryReplayed || again.Association().QueryID != id || !again.QueryDeadline().Equal(deadline) || f.starts != 1 || f.admissions != 1 || f.reads != 0 || f.observations != 1 || ledger.lookups != 2 || ledger.registrations != 1 {
 		t.Fatal("replay caused successor or effects", e)
 	}
-	replay.outcome = again
 	if e = again.Close(context.Background()); e != nil {
 		t.Fatal(e)
 	}
@@ -77,7 +75,7 @@ func TestRawLogBeginPinsInvocationBeforeAdmissionAndReplay(t *testing.T) {
 	changed.Selection.Limit--
 	bad := f.invocation("get_logs")
 	bad.input = ContextQueryInput{RawLogs: changed}
-	if d, e = service.Begin(t.Context(), f, bad, changed); e == nil || d != nil || f.starts != 1 || f.admissions != 1 {
+	if d, e = service.Begin(t.Context(), f, bad.id, changed); e == nil || d != nil || f.starts != 1 || f.admissions != 1 {
 		t.Fatal("changed key accepted", e)
 	}
 	if RawLogQueryRequestDigest(r) == PacketQueryRequestDigest(value.PacketQueryRequest{IdempotencyKey: r.IdempotencyKey}) {
@@ -98,7 +96,7 @@ func TestRawLogMissingApprovalRemainsActionableBeforeAnyEffect(t *testing.T) {
 	service, _ := f.s.RawLogQueries()
 	inv := f.invocation("get_logs")
 	inv.input = ContextQueryInput{RawLogs: r}
-	d, err := service.Begin(t.Context(), f, inv, r)
+	d, err := service.Begin(t.Context(), f, inv.id, r)
 	if d != nil || !RawLogQueryApprovalRequiredBeforeAdmission(err) || f.starts != 0 || f.admissions != 0 || f.reads != 0 {
 		t.Fatal("missing approval became effect or opaque failure", err)
 	}

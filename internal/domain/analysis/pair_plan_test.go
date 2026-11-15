@@ -182,7 +182,7 @@ func TestProfileComparisonPlansRequireCandidateMemoryDeclaration(t *testing.T) {
 
 func TestProfileComparisonInvocationKeepsExistingRequestBounds(t *testing.T) {
 	a, _, _ := comparisonPlansFixture()
-	call := ContextQueryCall{ID: queryTestID, RootID: a.Scope.RootID, Tool: "compare_profiles", InputFormat: "context-query-input/v1", MACVersion: "v1", InputDigest: a.DecisionDigest, PrincipalDigest: a.DecisionDigest, Principal: a.Scope.Principal, StartedAt: a.CheckedAt, Until: a.ValidUntil, WriteUntil: a.CheckedAt.Add(30 * time.Second)}
+	call := ContextQueryCall{ID: queryTestID, RootID: a.Scope.RootID, Tool: "compare_profiles", Principal: a.Scope.Principal, StartedAt: a.CheckedAt, Until: a.ValidUntil, WriteUntil: a.CheckedAt.Add(30 * time.Second)}
 	if !call.Valid(a.CheckedAt) {
 		t.Fatal("closed comparison invocation refused")
 	}

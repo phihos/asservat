@@ -16,7 +16,7 @@ import (
 // one approved query per page, answered with its pending handle; the page
 // itself is served by get_query_result.
 type HTTPHeaderQueryService interface {
-	Begin(context.Context, identities.CurrentIdentity, analysisapp.ContextQueryInvocation, value.HTTPHeaderSelection) (*analysisapp.ContextProjectionDelivery, error)
+	Begin(context.Context, identities.CurrentIdentity, string, value.HTTPHeaderSelection) (*analysisapp.ContextProjectionDelivery, error)
 }
 
 // HTTPHeaderOperationInput is the closed get_http_headers input; the audit

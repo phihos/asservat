@@ -18,16 +18,15 @@ import (
 type projectionAuditTarget struct {
 	Operations
 	adapter *ContextProjectionOperations
-	last    *contextQueryInvocation
-	mutate  func(*OperationCall, *json.RawMessage)
+	last    *analysisapp.ContextProjectionDelivery
 }
 
 func (p *projectionAuditTarget) CallWithContext(ctx context.Context, current identities.CurrentIdentity, call OperationCall, name string, raw json.RawMessage) (OperationReply, error) {
-	p.last = call.queryInvocation
-	if p.mutate != nil {
-		p.mutate(&call, &raw)
+	reply, err := p.adapter.CallWithContext(ctx, current, call, name, raw)
+	if reply.owner != nil {
+		p.last = reply.owner.guard.(*contextProjectionGuard).delivery
 	}
-	return p.adapter.CallWithContext(ctx, current, call, name, raw)
+	return reply, err
 }
 
 func bridgeAuditFixture(t *testing.T) (*AuditedOperations, *bridgeFixture, *presentationAuditGate, *projectionAuditTarget) {
@@ -52,61 +51,17 @@ func bridgePoll(id string) []byte {
 	return b
 }
 
-func TestContextProjectionBridgeRequiresOriginalAuditInputBeforeEffects(t *testing.T) {
-	for _, mode := range []string{"begin", "missing owner", "request ID", "range", "artifact", "wrong branch"} {
-		t.Run(mode, func(t *testing.T) {
-			s, f, g, p := bridgeAuditFixture(t)
-			if mode == "begin" {
-				g.beginFail = true
-			}
-			p.mutate = func(call *OperationCall, raw *json.RawMessage) {
-				switch mode {
-				case "missing owner":
-					call.queryInvocation = nil
-				case "request ID":
-					call.requestID = f.next()
-				case "range":
-					*raw = json.RawMessage(`{"case_id":"` + bridgeID + `","artifact_id":"` + bridgeID + `","line_start":2}`)
-				case "artifact":
-					*raw = json.RawMessage(`{"case_id":"` + bridgeID + `","artifact_id":"00000000-0000-4000-8000-000000000099"}`)
-				case "wrong branch":
-					if call.queryInvocation.CheckInput(context.Background(), analysisapp.ContextQueryInput{QueryID: bridgeID}) == nil {
-						t.Fatal("wrong typed input accepted")
-					}
-					call.queryInvocation = nil
-				}
-			}
-			out, err := s.Call(context.Background(), f, "get_file_excerpt", bridgeInput())
-			if err == nil || len(out.Body) != 0 || f.admissions != 0 || f.starts != 0 || f.reads != 0 {
-				t.Fatal("unbound operation dispatched")
-			}
-			if mode != "begin" && (len(g.outcomes) != 1 || g.outcomes[0].Effect != "none") {
-				t.Fatal("pre-dispatch refusal misclassified")
-			}
-		})
-	}
-}
-
-func TestContextProjectionBridgeReadyAndPollHaveExactAuditedOwners(t *testing.T) {
-	s, f, g, p := bridgeAuditFixture(t)
+func TestContextProjectionBridgeReadyAndPollOwnTheirReads(t *testing.T) {
+	s, f, g, _ := bridgeAuditFixture(t)
 	if len(f.i.Scopes) != 1 || f.i.Scopes[0] != "evidence:read" {
 		t.Fatal("fixture added raw/download rights")
-	}
-	g.onFinish = func() {
-		if p.last.delivery == nil || p.last.CheckOutcome(context.Background(), p.last.delivery) == nil {
-			t.Fatal("outcome accepted before Finish acknowledgement")
-		}
 	}
 	first, err := s.Call(context.Background(), f, "get_file_excerpt", bridgeInput())
 	if err != nil {
 		t.Fatal(err)
 	}
-	d := p.last.delivery
 	if first.CheckDisclosure(context.Background()) != nil || f.reads != 1 || f.completions != 0 || len(s.lanes["normal"]) != 1 {
 		t.Fatal("read did not retain ownership")
-	}
-	if p.last.CheckOutcome(context.Background(), &analysisapp.ContextProjectionDelivery{}) == nil {
-		t.Fatal("different pointer accepted")
 	}
 	if s.contracts.ValidateOutput("get_file_excerpt", first.Body) != nil {
 		t.Fatal("invalid excerpt")
@@ -117,14 +72,14 @@ func TestContextProjectionBridgeReadyAndPollHaveExactAuditedOwners(t *testing.T)
 			queryViewTimes
 		} `json:"data"`
 	}
-	if json.Unmarshal(first.Body, &initial) != nil || len(initial.Data.Lines) != 14 || !initial.Data.ExpiresAt.Equal(d.QueryDeadline()) {
+	if json.Unmarshal(first.Body, &initial) != nil || len(initial.Data.Lines) != 14 {
 		t.Fatal("wrong approved output")
 	}
 	if err = first.Close(context.Background()); err != nil || f.completions != 1 || f.active || len(s.lanes["normal"]) != 0 {
 		t.Fatal("read did not join cleanup", err)
 	}
-	if p.last.CheckOutcome(context.Background(), d) == nil || !bytes.Equal(first.Body, make([]byte, len(first.Body))) {
-		t.Fatal("closed owner retained authority or bytes")
+	if !bytes.Equal(first.Body, make([]byte, len(first.Body))) {
+		t.Fatal("closed owner retained bytes")
 	}
 	second, err := s.Call(context.Background(), f, "get_query_result", bridgePoll(f.q.ID))
 	if err != nil {
@@ -239,7 +194,7 @@ func TestContextProjectionBridgeOwnerExpiryInterruptsBlockedWrite(t *testing.T) 
 		t.Fatal(err)
 	}
 	defer reply.Close(context.Background())
-	d := p.last.delivery
+	d := p.last
 	writeCtx, finishWrite := reply.ResponseContext(ctx)
 	defer finishWrite()
 	w := &operationWriter{ResponseRecorder: httptest.NewRecorder(), writeEntered: make(chan struct{}), writeStop: make(chan struct{})}
@@ -301,37 +256,5 @@ func TestContextProjectionBridgeErrorsAfterDispatchStayUnknown(t *testing.T) {
 	f.queryErr = errors.New("unknown SQL commit")
 	if reply, err := s.Call(context.Background(), f, "get_file_excerpt", bridgeInput()); err == nil || len(reply.Body) != 0 || f.admissions != 1 || g.outcomes[0].Effect != "unknown" {
 		t.Fatal("uncertain admission reported no effect")
-	}
-}
-
-func TestContextProjectionBridgePollInputCannotSubstituteAnotherQuery(t *testing.T) {
-	s, f, g, p := bridgeAuditFixture(t)
-	f.ready = false
-	reply, err := s.Call(context.Background(), f, "get_file_excerpt", bridgeInput())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err = reply.Close(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	p.mutate = func(call *OperationCall, raw *json.RawMessage) {
-		original, e := call.queryInvocation.Invocation(context.Background())
-		if e != nil {
-			t.Fatal(e)
-		}
-		changed := original
-		changed.Until = changed.Until.Add(time.Microsecond)
-		if call.queryInvocation.CheckIntent(context.Background(), changed) == nil {
-			t.Fatal("original interval changed")
-		}
-		changed = original
-		changed.Principal.ClientID = "different-client"
-		if call.queryInvocation.CheckIntent(context.Background(), changed) == nil {
-			t.Fatal("client lineage changed")
-		}
-		*raw = bridgePoll(f.next())
-	}
-	if out, e := s.Call(context.Background(), f, "get_query_result", bridgePoll(f.q.ID)); e == nil || len(out.Body) != 0 || f.polls != 0 || f.starts != 1 || g.outcomes[1].Effect != "none" {
-		t.Fatal("poll input substitution reached effects")
 	}
 }

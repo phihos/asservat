@@ -237,9 +237,6 @@ func (s *ContextQueries) CompleteReadBatch(ctx context.Context, b value.ContextR
 			if uid(row.ActiveBatch) != b.ID || int64(row.Generation) != b.Generation {
 				return value.ErrUnavailable
 			}
-			if e = queryOutcomeFence(joined, tx, b.Request.Call); e != nil {
-				return e
-			}
 			now, e := tx.CurrentTime(joined)
 			if e != nil || joined.Err() != nil || !now.Time.Before(q.CleanupUntil) || !now.Time.Before(originalUntil) {
 				return value.ErrUnavailable

@@ -22,7 +22,7 @@ func (r syscallRouteFixture) ResolveSyscallProjectionRoute(context.Context, stri
 func TestSyscallAdmissionBindsOriginalToolInputRouteAndResult(t *testing.T) {
 	for _, kind := range []string{artifact.SyscallRecordsArtifact, artifact.SyscallArgumentsArtifact} {
 		for _, view := range []value.SyscallView{value.SyscallSummaryView, value.SyscallEventsView} {
-			for _, mode := range []string{"pending", "ready", "disabled", "wrong-tool", "wrong-selection", "unacknowledged", "selection-in-route", "wrong-source", "cancelled", "wrong-result", "invalid-cursor", "underfunded-worker"} {
+			for _, mode := range []string{"pending", "ready", "disabled", "selection-in-route", "wrong-source", "cancelled", "wrong-result", "invalid-cursor", "underfunded-worker"} {
 				t.Run(kind+"/"+string(view)+"/"+mode, func(t *testing.T) {
 					f := newProjectionFixture(t)
 					f.p.Profile.Worker.MemoryBytes, f.p.Profile.Worker.WorkerTransientBytes = value.SyscallProjectionWorkerBytes, value.SyscallProjectionWorkerBytes
@@ -49,12 +49,6 @@ func TestSyscallAdmissionBindsOriginalToolInputRouteAndResult(t *testing.T) {
 						f.p.Profile.Worker.WorkerTransientBytes = 8 << 20
 					case "disabled":
 						f.s.SyscallRoutes = nil
-					case "wrong-tool":
-						invocation.call.Tool = "get_file_excerpt"
-					case "wrong-selection":
-						invocation.input.Syscalls.Selection.Limit++
-					case "unacknowledged":
-						invocation.intentErr = value.ErrUnavailable
 					case "selection-in-route":
 						candidate.Syscalls = scope.Syscalls
 						f.s.SyscallRoutes = syscallRouteFixture{candidate}
@@ -68,7 +62,7 @@ func TestSyscallAdmissionBindsOriginalToolInputRouteAndResult(t *testing.T) {
 					if enabled != (mode != "disabled") {
 						t.Fatal("optional composition changed")
 					}
-					d, err := service.Begin(ctx, f, invocation, request)
+					d, err := service.Begin(ctx, f, invocation.id, request)
 					if mode == "wrong-result" {
 						if err == nil || d != nil || f.admissions != 1 || f.starts != 1 || f.reads != 1 {
 							t.Fatal("invalid worker response was not refused after charging", err)
@@ -88,7 +82,6 @@ func TestSyscallAdmissionBindsOriginalToolInputRouteAndResult(t *testing.T) {
 						if d.RefuseOversizedResult() {
 							t.Fatal("typed cursor refusal changed after preparation")
 						}
-						invocation.outcome = d
 						if err := d.Close(context.Background()); err != nil || f.completions != 1 || f.active {
 							t.Fatal("refusal cleanup", err)
 						}

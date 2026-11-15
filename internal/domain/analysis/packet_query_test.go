@@ -91,7 +91,7 @@ func TestPacketQueryGrantAndInvocationRemainPinned(t *testing.T) {
 
 func TestPacketQueryAuditedCallIsRecognized(t *testing.T) {
 	a := testAuthority()
-	call := ContextQueryCall{ID: queryTestID, RootID: a.Scope.RootID, Tool: "pcap_query", InputFormat: "context-query-input/v1", MACVersion: "v1", InputDigest: artifact.Digest{1}, PrincipalDigest: artifact.Digest{2}, Principal: a.Scope.Principal, StartedAt: a.CheckedAt, Until: a.ValidUntil, WriteUntil: a.CheckedAt.Add(30 * time.Second)}
+	call := ContextQueryCall{ID: queryTestID, RootID: a.Scope.RootID, Tool: "pcap_query", Principal: a.Scope.Principal, StartedAt: a.CheckedAt, Until: a.ValidUntil, WriteUntil: a.CheckedAt.Add(30 * time.Second)}
 	if !call.Valid(a.CheckedAt) {
 		t.Fatal("pcap query failed before authority/admission")
 	}

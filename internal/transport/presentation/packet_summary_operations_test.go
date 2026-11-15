@@ -1,14 +1,14 @@
 package presentation
 
 import (
-	analysisapp "asservat.local/asservat/internal/application/analysis"
-	value "asservat.local/asservat/internal/domain/analysis"
-	"asservat.local/asservat/internal/domain/artifact"
 	"context"
 	"encoding/json"
 	"fmt"
 	"slices"
 	"testing"
+
+	value "asservat.local/asservat/internal/domain/analysis"
+	"asservat.local/asservat/internal/domain/artifact"
 )
 
 func packetSummaryBridge(t *testing.T) (*AuditedOperations, *bridgeFixture, *presentationAuditGate, *projectionAuditTarget) {
@@ -31,31 +31,6 @@ func packetSummaryBridge(t *testing.T) (*AuditedOperations, *bridgeFixture, *pre
 	}
 	f.result = &value.ProjectionResult{PacketSummary: &value.PacketSummary{CaptureMode: "networkHeaders", DropReporting: "unavailable", Conversations: []value.PacketConversation{}}}
 	return s, f, g, p
-}
-
-func TestPacketSummaryAuditedSelectionBindsExactSavedArtifact(t *testing.T) {
-	s, f, _, p := packetSummaryBridge(t)
-	var checked bool
-	p.mutate = func(call *OperationCall, raw *json.RawMessage) {
-		input := analysisapp.ContextQueryInput{Packet: value.PacketSummaryRequest{CaseID: bridgeID, ArtifactID: bridgeID}}
-		if err := call.queryInvocation.CheckInput(t.Context(), input); err != nil {
-			t.Fatal("exact saved-packet invocation was not bound", err)
-		}
-		checked = true
-		input.QueryID = bridgeID
-		if err := call.queryInvocation.CheckInput(t.Context(), input); err == nil {
-			t.Fatal("packet request mixed with polling identity")
-		}
-		input.QueryID = ""
-		input.Packet.ArtifactID = "00000000-0000-4000-8000-000000000099"
-		if err := call.queryInvocation.CheckInput(t.Context(), input); err == nil {
-			t.Fatal("changed packet artifact accepted")
-		}
-	}
-	_, _ = s.Call(t.Context(), f, "get_pcap_summary", bridgeInput())
-	if !checked {
-		t.Fatal("saved packet operation never reached audited invocation")
-	}
 }
 
 func TestPacketSummaryPendingReadyKeepsOriginalSourceAndAudit(t *testing.T) {
@@ -88,7 +63,7 @@ func TestPacketSummaryPendingReadyKeepsOriginalSourceAndAudit(t *testing.T) {
 	if json.Unmarshal(ready.Body, &out) != nil || out.DataClass != "extract" || out.Data.Tool != "get_pcap_summary" || !out.Data.Result.Data.Valid() || len(out.Data.Result.Warnings) != 1 {
 		t.Fatalf("closed packet output %s", ready.Body)
 	}
-	if s.contracts.ValidateOutput("get_query_result", ready.Body) != nil || f.reads != 1 || f.starts != 1 || p.last.delivery.Tool() != "get_pcap_summary" {
+	if s.contracts.ValidateOutput("get_query_result", ready.Body) != nil || f.reads != 1 || f.starts != 1 || p.last.Tool() != "get_pcap_summary" {
 		t.Fatal("packet poll replaced admitted source")
 	}
 }

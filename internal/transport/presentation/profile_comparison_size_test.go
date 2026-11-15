@@ -79,7 +79,7 @@ func TestProfileComparisonSizeRefusalRetainsAuditedReadOwner(t *testing.T) {
 				if e != nil {
 					t.Fatal("authenticated size refusal lost its response owner", e)
 				}
-				if !f.active || f.completions != 0 || p.last.delivery == nil || out.CheckDisclosure(t.Context()) != nil {
+				if !f.active || f.completions != 0 || p.last == nil || out.CheckDisclosure(t.Context()) != nil {
 					t.Fatal("read closed before outcome and transport join")
 				}
 				var body struct {

@@ -43,11 +43,11 @@ func RawLogQueryRequestDigest(r value.RawLogQueryRequest) artifact.Digest {
 	}
 	return sha256.Sum256(b)
 }
-func (s RawLogReads) Begin(ctx context.Context, current identities.CurrentIdentity, invocation ContextQueryInvocation, r value.RawLogQueryRequest) (*ContextProjectionDelivery, error) {
+func (s RawLogReads) Begin(ctx context.Context, current identities.CurrentIdentity, requestID string, r value.RawLogQueryRequest) (*ContextProjectionDelivery, error) {
 	if !r.Valid() || s.Routes == nil {
 		return nil, value.ErrInvalid
 	}
-	return s.Service.begin(ctx, current, invocation, "get_logs", ContextQueryInput{RawLogs: r}, func(ctx context.Context, i identity.Identity) (value.ContextProjectionCandidate, error) {
+	return s.Service.begin(ctx, current, requestID, "get_logs", ContextQueryInput{RawLogs: r}, func(ctx context.Context, i identity.Identity) (value.ContextProjectionCandidate, error) {
 		c, e := s.Routes.ResolveLogProjectionRoute(ctx, r.CaseID, r.ArtifactID, i)
 		if e != nil {
 			return c, e

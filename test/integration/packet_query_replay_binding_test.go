@@ -8,10 +8,7 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres"
-	auditapp "asservat.local/asservat/internal/application/audit"
 	query "asservat.local/asservat/internal/domain/analysis"
-	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/audit"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -36,7 +33,7 @@ func assertPacketReplayDelta(t *testing.T, before, after packetReplayState, delt
 		t.Fatalf("replay controls=%d/%d calls=%d/%d immutableEqual=%t", after.controls, before.controls+delta, after.calls, before.calls+delta, after.immutable == before.immutable)
 	}
 }
-func qualifyPacketReplayBindings(t *testing.T, ctx context.Context, admin, hub *pgxpool.Pool, ledger *postgres.ContextQueries, q query.ContextQuery, r query.ContextQueryRequest, a query.ContextProjectionAuthority, auditor *auditapp.HealthyOperationAuditor, intent audit.OperationIntent) {
+func qualifyPacketReplayBindings(t *testing.T, ctx context.Context, admin, hub *pgxpool.Pool, ledger *postgres.ContextQueries, q query.ContextQuery, r query.ContextQueryRequest, a query.ContextProjectionAuthority) {
 	t.Helper()
 	before := readPacketReplayState(t, ctx, admin, q)
 	if err := ledger.RegisterQueryReplayCall(ctx, q, r, a); err != nil {
@@ -47,8 +44,6 @@ func qualifyPacketReplayBindings(t *testing.T, ctx context.Context, admin, hub *
 	}
 	assertPacketReplayDelta(t, before, readPacketReplayState(t, ctx, admin, q), 0)
 	for name, change := range map[string]func(*query.ContextQuery, *query.ContextQueryRequest){
-		"normalized-input-mac":       func(_ *query.ContextQuery, r *query.ContextQueryRequest) { r.Call.InputDigest[0] ^= 1 },
-		"mac-version":                func(_ *query.ContextQuery, r *query.ContextQueryRequest) { r.Call.MACVersion = "different" },
 		"caller-key":                 func(q *query.ContextQuery, _ *query.ContextQueryRequest) { q.InvocationKey.Key += "changed" },
 		"caller-key-digest":          func(q *query.ContextQuery, _ *query.ContextQueryRequest) { q.InvocationKey.RequestDigest[0] ^= 1 },
 		"client":                     func(_ *query.ContextQuery, r *query.ContextQueryRequest) { r.Call.Principal.ClientID += "changed" },
@@ -69,45 +64,7 @@ func qualifyPacketReplayBindings(t *testing.T, ctx context.Context, admin, hub *
 	if err := ledger.RegisterQueryReplayCall(cancelled, q, r, a); err == nil {
 		t.Fatal("cancelled replay accepted")
 	}
-	// The SQL role independently refuses a genuinely acknowledged Begin whose
-	// MAC binds different normalized input, even when Go registration is bypassed.
-	wrong := intent
-	n := time.Now().UTC().Truncate(time.Microsecond)
-	wrong.ID, wrong.TraceID = custodyID(), custodyID()
-	wrong.InputDigest = artifact.Digest{99}
-	wrong.CreatedAt = n
-	wrong.RequestUntil = n.Add(5 * time.Second)
-	wrong.WriteUntil = n.Add(30 * time.Second)
-	call, stopCall := context.WithDeadline(ctx, wrong.RequestUntil)
-	defer stopCall()
-	if err := auditor.Begin(call, wrong); err != nil {
-		t.Fatal("real wrong-input intent", err)
-	}
-	bad := r
-	bad.Call.ID = wrong.ID
-	bad.Call.InputDigest = wrong.InputDigest
-	bad.Call.StartedAt = n
-	bad.Call.Until = wrong.RequestUntil
-	bad.Call.WriteUntil = wrong.WriteUntil
-	bad.OwnerID = custodyID()
-	if err := ledger.RegisterQueryReplayCall(call, q, bad, a); err == nil {
-		t.Fatal("real acknowledged different-input replay accepted")
-	}
-	encoded, err := json.Marshal(bad)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = hub.Exec(call, `INSERT INTO context_query_call(operation_id,query_id,request,is_poll) VALUES($1,$2,$3,false)`, wrong.ID, q.ID, encoded)
-	var pg *pgconn.PgError
-	if !errors.As(err, &pg) || pg.Code != "23514" {
-		t.Fatal("compiled role bypassed replay SQL input binding", err)
-	}
-	assertPacketReplayDelta(t, before, readPacketReplayState(t, ctx, admin, q), 0)
-	out := audit.OperationOutcome{Intent: wrong, Status: "unavailable", Reason: "not_available", Effect: "none", ClientReceipt: "unknown", OutputDigest: artifact.Digest{98}, OutputBytes: 0, MetadataUntil: wrong.RequestUntil, RecordedAt: time.Now().UTC().Truncate(time.Microsecond)}
-	if err = auditor.Finish(ctx, out); err != nil {
-		t.Fatal("wrong replay actual refusal acknowledgement", err)
-	}
-	t.Log("real acknowledged changed-input replay denied by adapter and compiled SQL; same-call replay no control/poll/query/read/grant debit; current source/grant and original query unchanged")
+	t.Log("changed replay denied by adapter; same-call replay no control/poll/query/read/grant debit; current source/grant and original query unchanged")
 }
 
 func qualifyPacketReplayCannotRead(t *testing.T, ctx context.Context, admin, hub *pgxpool.Pool, ledger *postgres.ContextQueries, q query.ContextQuery, r query.ContextQueryRequest, w query.ContextQueryWorker, a query.ContextProjectionAuthority, raw bool) {

@@ -58,7 +58,7 @@ func TestRawPacketSummaryServiceUsesTypedSourceAndOriginalOwner(t *testing.T) {
 			inv := f.invocation("get_pcap_summary")
 			inv.input = ContextQueryInput{Packet: request}
 			reads, _ := f.s.PacketSummaries()
-			d, err := reads.Begin(t.Context(), f, inv, request)
+			d, err := reads.Begin(t.Context(), f, inv.id, request)
 			if mode != "ready" && mode != "pending-to-ready" {
 				if err == nil || d != nil {
 					t.Fatal("invalid raw summary route/result delivered", mode)
@@ -82,7 +82,7 @@ func TestRawPacketSummaryServiceUsesTypedSourceAndOriginalOwner(t *testing.T) {
 				f.ready = true
 				poll := f.invocation("get_query_result")
 				poll.input = ContextQueryInput{QueryID: id}
-				d, err = f.s.Results.GetQueryResult(t.Context(), f, poll, id)
+				d, err = f.s.Results.GetQueryResult(t.Context(), f, poll.id, id)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -115,7 +115,7 @@ func TestPacketSummaryTypedMetadataRoutePreservesExistingResult(t *testing.T) {
 	inv := f.invocation("get_pcap_summary")
 	inv.input = ContextQueryInput{Packet: request}
 	reads, _ := f.s.PacketSummaries()
-	d, err := reads.Begin(t.Context(), f, inv, request)
+	d, err := reads.Begin(t.Context(), f, inv.id, request)
 	if err != nil {
 		t.Fatal(err)
 	}

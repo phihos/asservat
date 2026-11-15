@@ -40,11 +40,11 @@ type ContextPacketProjectionRouteReader interface {
 	ResolvePacketProjectionRoute(context.Context, string, string, identity.Identity) (value.ContextProjectionCandidate, error)
 }
 
-func (s PacketSummaryReads) Begin(ctx context.Context, current identities.CurrentIdentity, invocation ContextQueryInvocation, request value.PacketSummaryRequest) (*ContextProjectionDelivery, error) {
+func (s PacketSummaryReads) Begin(ctx context.Context, current identities.CurrentIdentity, requestID string, request value.PacketSummaryRequest) (*ContextProjectionDelivery, error) {
 	var d *ContextProjectionDelivery
 	err := queryStepped("configuration", value.ErrUnavailable)
 	if request.Valid() && s.Routes != nil {
-		d, err = s.Service.begin(ctx, current, invocation, "get_pcap_summary", ContextQueryInput{Packet: request}, func(ctx context.Context, caller identity.Identity) (value.ContextProjectionCandidate, error) {
+		d, err = s.Service.begin(ctx, current, requestID, "get_pcap_summary", ContextQueryInput{Packet: request}, func(ctx context.Context, caller identity.Identity) (value.ContextProjectionCandidate, error) {
 			var c value.ContextProjectionCandidate
 			var err error
 			if routes, ok := s.Routes.(ContextPacketProjectionRouteReader); ok {

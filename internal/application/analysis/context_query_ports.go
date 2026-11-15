@@ -29,20 +29,7 @@ type ContextComparisonPlans interface {
 	ContextComparisonPlans(context.Context, value.ContextProjectionAuthority) ([2]value.ContextQueryPlan, error)
 }
 
-// ContextQueryInvocation is the original process-owned C-20 invocation, created
-// only after C-08 acknowledges its intent. It does not implement another audit
-// journal/writer. CheckOutcome recognizes only the exact immutable delivery
-// association serialized, validated and acknowledged by the existing wrapper.
-type ContextQueryInvocation interface {
-	Invocation(context.Context) (value.ContextQueryCall, error)
-	CheckInput(context.Context, ContextQueryInput) error
-	CheckIntent(context.Context, value.ContextQueryCall) error
-	CheckOutcome(context.Context, *ContextProjectionDelivery) error
-}
-
-// Exactly one branch is populated for the invocation's fixed tool. The existing
-// C-20 owner compares it with its normalized input before any effect; C-18
-// neither computes another MAC nor accepts an unrelated acknowledged intent.
+// ContextQueryInput is the typed Begin input; exactly one branch is set.
 type ContextQueryInput struct {
 	Selection   value.ContextExcerptSelection
 	Headers     value.HTTPHeaderSelection
@@ -67,9 +54,9 @@ type ContextQueryBatchAdmission struct {
 }
 
 // A lookup is private routing/accounting state. Neither it nor Fresh is a peer
-// permit. Every mutation independently checks exact acknowledged C-08 lineage,
-// accepted C-07 backing, current transaction guards and all original deadlines.
-// ContextQueryReplayCalls registers only a newly audited repetition of a keyed
+// permit. Every mutation independently checks accepted C-07 backing, current
+// transaction guards and all original deadlines.
+// ContextQueryReplayCalls registers only a new repetition of a keyed
 // Begin against its original query. It creates one bounded immutable call/control
 // entry, without a poll, read, grant use, worker or new query allocation.
 // PermitQuery remains mandatory afterwards and never inserts missing calls.

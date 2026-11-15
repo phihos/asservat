@@ -22,7 +22,7 @@ func (r profileRouteFixture) ResolveProjectionRoute(context.Context, string, str
 // Synthetic admitted backing verifies only typed invocation/route composition;
 // production profile funding and worker parsing remain deliberately unavailable.
 func TestProfileSummaryAdmissionBindsOriginalToolInputAndRoute(t *testing.T) {
-	for _, mode := range []string{"pending", "ready", "disabled", "wrong-tool", "wrong-selection", "unacknowledged", "source-in-route", "cancelled", "underfunded-worker"} {
+	for _, mode := range []string{"pending", "ready", "disabled", "source-in-route", "cancelled", "underfunded-worker"} {
 		t.Run(mode, func(t *testing.T) {
 			f := newProjectionFixture(t)
 			f.ready = mode == "ready"
@@ -44,12 +44,6 @@ func TestProfileSummaryAdmissionBindsOriginalToolInputAndRoute(t *testing.T) {
 				f.p.Profile.Worker.WorkerTransientBytes = 8 << 20
 			case "disabled":
 				f.s.ProfileRoutes = nil
-			case "wrong-tool":
-				invocation.call.Tool = "get_file_excerpt"
-			case "wrong-selection":
-				invocation.input.Profile.Selection.SampleType = "alloc_space"
-			case "unacknowledged":
-				invocation.intentErr = value.ErrUnavailable
 			case "source-in-route":
 				candidate.NativeType = artifact.GoTraceArtifact
 				f.s.ProfileRoutes = profileRouteFixture{candidate}
@@ -60,7 +54,7 @@ func TestProfileSummaryAdmissionBindsOriginalToolInputAndRoute(t *testing.T) {
 			if enabled != (mode != "disabled") {
 				t.Fatal("optional composition changed")
 			}
-			result, err := service.Begin(ctx, f, invocation, request)
+			result, err := service.Begin(ctx, f, invocation.id, request)
 			if mode != "pending" && mode != "ready" {
 				if err == nil || result != nil || f.admissions+f.starts+f.reads != 0 {
 					t.Fatal("effect preceded exact invocation/route", err)

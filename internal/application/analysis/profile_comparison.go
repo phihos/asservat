@@ -22,11 +22,11 @@ type ProfileComparisonReads struct {
 	Routes  ContextProjectionRouteReader
 }
 
-func (s ProfileComparisonReads) Begin(ctx context.Context, current identities.CurrentIdentity, invocation ContextQueryInvocation, request value.ProfileComparisonRequest) (*ContextProjectionDelivery, error) {
+func (s ProfileComparisonReads) Begin(ctx context.Context, current identities.CurrentIdentity, requestID string, request value.ProfileComparisonRequest) (*ContextProjectionDelivery, error) {
 	var d *ContextProjectionDelivery
 	err := queryStepped("configuration", value.ErrUnavailable)
 	if request.Valid() && s.Routes != nil {
-		d, err = s.Service.begin(ctx, current, invocation, "compare_profiles", ContextQueryInput{Comparison: request}, func(ctx context.Context, caller identity.Identity) (value.ContextProjectionCandidate, error) {
+		d, err = s.Service.begin(ctx, current, requestID, "compare_profiles", ContextQueryInput{Comparison: request}, func(ctx context.Context, caller identity.Identity) (value.ContextProjectionCandidate, error) {
 			var routes [2]value.ContextProjectionCandidate
 			for i, selection := range [2][2]string{{request.BaselineCaseID, request.BaselineArtifactID}, {request.CaseID, request.ArtifactID}} {
 				c, e := s.Routes.ResolveProjectionRoute(ctx, selection[0], selection[1], caller)

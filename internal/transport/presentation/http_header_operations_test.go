@@ -112,7 +112,7 @@ func TestHTTPHeaderQueryBeginsPendingAndServesPageByPoll(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer second.Close(context.Background())
-	if s.contracts.ValidateOutput("get_query_result", second.Body) != nil || p.last.delivery == nil || p.last.delivery.Tool() != "get_http_headers" {
+	if s.contracts.ValidateOutput("get_query_result", second.Body) != nil || p.last == nil || p.last.Tool() != "get_http_headers" {
 		t.Fatal("invalid nested page")
 	}
 	var poll struct {

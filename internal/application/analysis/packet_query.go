@@ -88,12 +88,12 @@ func PacketQueryRequestDigest(r value.PacketQueryRequest) artifact.Digest {
 	}
 	return sha256.Sum256(b)
 }
-func (s PacketQueryReads) Begin(ctx context.Context, current identities.CurrentIdentity, invocation ContextQueryInvocation, r value.PacketQueryRequest) (*ContextProjectionDelivery, error) {
+func (s PacketQueryReads) Begin(ctx context.Context, current identities.CurrentIdentity, requestID string, r value.PacketQueryRequest) (*ContextProjectionDelivery, error) {
 	r = NormalizePacketQueryRequest(r)
 	if len(r.PacketFilter) > 512 || !r.Valid() || s.Routes == nil || s.Compiler == nil {
 		return nil, value.ErrInvalid
 	}
-	return s.Service.begin(ctx, current, invocation, "pcap_query", ContextQueryInput{PacketQuery: r}, func(ctx context.Context, i identity.Identity) (value.ContextProjectionCandidate, error) {
+	return s.Service.begin(ctx, current, requestID, "pcap_query", ContextQueryInput{PacketQuery: r}, func(ctx context.Context, i identity.Identity) (value.ContextProjectionCandidate, error) {
 		routes, ok := s.Routes.(ContextPacketProjectionRouteReader)
 		if !ok {
 			return value.ContextProjectionCandidate{}, value.ErrUnavailable
