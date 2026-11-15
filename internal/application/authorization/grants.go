@@ -329,7 +329,7 @@ func (s GrantService) Request(ctx context.Context, current identities.CurrentIde
 	if err != nil {
 		return zero, false, err
 	}
-	if out.CaptureID != g.CaptureID || out.ReviewDigest != g.ReviewDigest || !sameRequester(out.Requester, i.Principal) {
+	if out.CaptureID != g.CaptureID || out.ReviewDigest != g.ReviewDigest || !sameHuman(out.Requester, i.Principal) {
 		return zero, false, ErrGrantConflict
 	}
 	if err = s.final(ctx, current, i); err != nil {
@@ -337,8 +337,6 @@ func (s GrantService) Request(ctx context.Context, current identities.CurrentIde
 	}
 	return out, replay, nil
 }
-
-func sameRequester(a, b identity.Principal) bool { return a == b }
 
 // Covering checks, at use, that an approved grant covers starting exactly
 // this capture plan for the calling identity: the stored row is intact

@@ -488,6 +488,14 @@ func TestGrantRevocationDenialAndVisibility(t *testing.T) {
 	if again, replay, err := f.svc.Request(ctx, grantIdentity{f.requester, &f.now}, f.input(3, nil)); err != nil || !replay || again.ID != d.ID {
 		t.Fatal("request replay", err)
 	}
+	// The same human retrying from another client replays the same request.
+	other := f.requester
+	other.Principal.ClientID = "console-retry"
+	retry := f.input(3, nil)
+	retry.Actor = other.Principal
+	if again, replay, err := f.svc.Request(ctx, grantIdentity{other, &f.now}, retry); err != nil || !replay || again.ID != d.ID {
+		t.Fatal("request replay from another client", err)
+	}
 	// A request needs current collection eligibility and the actor's own preview.
 	if _, _, err := f.svc.Request(ctx, grantIdentity{f.approver, &f.now}, f.input(5, nil)); err == nil {
 		t.Fatal("a non-actor opened a request")
