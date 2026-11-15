@@ -210,27 +210,6 @@ func qualifyContextRequestResolution(t *testing.T, ctx context.Context, admin *p
 			}
 		}
 	})
-	t.Run("negative-fences-share-human-preview-cap-across-clients", func(t *testing.T) {
-		s, p := prepare(t)
-		r := resolver(t, s)
-		for i := 0; i < value.MaxPreviewsPerPrincipal; i++ {
-			in := query(t, s, p)
-			in.PreviewID = custodyID()
-			in.SubmissionDigest = app.ContextRequestDigest(in.PreviewID)
-			in.Identity.Principal.ClientID = fmt.Sprintf("client-%d", i%2)
-			if d, err := r.ResolveOrCloseContextRequest(ctx, in); err != nil || d.State != value.RequestClosed {
-				t.Fatal("bounded fence", i, err)
-			}
-		}
-		d, err := r.ResolveOrCloseContextRequest(ctx, query(t, s, p))
-		if !errors.Is(err, value.ErrCapacity) || d.State != "" {
-			t.Fatal("exhaustion claimed terminal closure", err)
-		}
-		if err := storeFor(t, s.a.RootID).CreateContextPreview(ctx, p); !errors.Is(err, value.ErrCapacity) {
-			t.Fatal("preview bypassed fence budget", err)
-		}
-		noCapture(t, s)
-	})
 	t.Run("closure-after-original-expiry-reclaims-without-reopening", func(t *testing.T) {
 		s, p := prepare(t)
 		p.Deadline = time.Now().UTC().Truncate(time.Microsecond).Add(300 * time.Millisecond)

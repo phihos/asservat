@@ -27,11 +27,10 @@ var (
 )
 
 const (
-	ContextDiagnosticName   = "builtin-pod-status-v1"
-	MaxContextPreviewBytes  = 128 << 10
-	MaxContextPreviewScope  = 64 << 10
-	MaxPreviewsPerPrincipal = 10
-	MaxPreviewsPerRoot      = 1000
+	ContextDiagnosticName  = "builtin-pod-status-v1"
+	MaxContextPreviewBytes = 128 << 10
+	MaxContextPreviewScope = 64 << 10
+	MaxPreviewsPerRoot     = 1000
 )
 
 // ProtectedReasonRef identifies separately encrypted, scope-bound control data.

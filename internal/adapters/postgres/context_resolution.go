@@ -328,13 +328,6 @@ func closeMissingContextPreview(ctx context.Context, q *custodydb.Queries, in va
 	if count >= value.MaxPreviewsPerRoot {
 		return value.ErrCapacity
 	}
-	count, err = q.CountPrincipalContextPreviews(ctx, custodydb.CountPrincipalContextPreviewsParams{RootID: id(in.RootID), PrincipalKey: principalKey(actor)})
-	if err != nil {
-		return err
-	}
-	if count >= value.MaxPreviewsPerPrincipal {
-		return value.ErrCapacity
-	}
 	_, err = q.InsertContextPreviewFence(ctx, custodydb.InsertContextPreviewFenceParams{RootID: id(in.RootID), PreviewID: id(in.PreviewID), ActorKey: previewActorKey(actor), PrincipalKey: principalKey(actor), RequestKey: contextRequestKey(actor, in.IdempotencyKey), SubmissionDigest: in.SubmissionDigest[:]})
 	return err
 }

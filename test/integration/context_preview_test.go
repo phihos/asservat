@@ -5,10 +5,8 @@ import (
 	"crypto/sha256"
 	"encoding/json/jsontext"
 	"errors"
-	"fmt"
 	"os"
 	"reflect"
-	"sync"
 	"testing"
 	"time"
 
@@ -136,54 +134,6 @@ func qualifyContextPreviews(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		}
 	})
 
-	t.Run("preview-principal-cap-is-atomic-across-clients", func(t *testing.T) {
-		s := create(t, 1)
-		store := newStore(t, s.a.RootID)
-		previews := make([]capture.ContextPreview, 20)
-		for i := range previews {
-			actor := s.a.Plan.Input.Executor
-			actor.ClientID = fmt.Sprintf("client-%d", i%2)
-			previews[i] = fork(t, s, actor, s.a.Plan.Input.Deadline)
-		}
-		var wg sync.WaitGroup
-		errs := make([]error, len(previews))
-		for i := range previews {
-			wg.Add(1)
-			go func(i int) { defer wg.Done(); errs[i] = store.CreateContextPreview(ctx, previews[i]) }(i)
-		}
-		wg.Wait()
-		accepted := 0
-		for _, err := range errs {
-			if err == nil {
-				accepted++
-			} else if !errors.Is(err, capture.ErrCapacity) {
-				t.Fatal("unexpected preview error", err)
-			}
-		}
-		if accepted != capture.MaxPreviewsPerPrincipal {
-			t.Fatalf("accepted %d previews across clients", accepted)
-		}
-		actor := s.a.Plan.Input.Executor
-		actor.Subject = "another-developer"
-		other := fork(t, s, actor, s.a.Plan.Input.Deadline)
-		if err := store.CreateContextPreview(ctx, other); err != nil {
-			t.Fatal("one developer exhausted another's review slots", err)
-		}
-		for _, table := range []string{"context_capture", "custody_attempt"} {
-			var count int
-			q := "SELECT count(*) FROM context_capture WHERE root_id=$1"
-			key := s.a.RootID
-			if table == "custody_attempt" {
-				q, key = "SELECT count(*) FROM custody_attempt WHERE allocation_id=$1", s.a.Registration.AllocationID
-			}
-			if err := admin.QueryRow(ctx, q, key).Scan(&count); err != nil || count != 0 {
-				t.Fatal("passive preview reserved collection", table, count, err)
-			}
-		}
-	})
-
-	// ADR-243: a plan-only packet/syscall preview persists in the same table
-	// without a storage selection and survives the strict decode/re-encode.
 	t.Run("composition-preview-persists-plan-only-blueprint", func(t *testing.T) {
 		s := create(t, 1)
 		store := newStore(t, s.a.RootID)
@@ -258,11 +208,12 @@ func qualifyContextPreviews(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		}
 	})
 
-	t.Run("expired-previews-reclaim-capacity-without-capture-side-effects", func(t *testing.T) {
+	t.Run("expired-previews-are-deleted-without-capture-side-effects", func(t *testing.T) {
 		s := create(t, 1)
 		store, cleanup := newStore(t, s.a.RootID), newCleanup(t, s.a.RootID)
 		deadline := time.Now().UTC().Truncate(time.Microsecond).Add(time.Second)
-		for i := 0; i < capture.MaxPreviewsPerPrincipal; i++ {
+		const previews = 3
+		for i := 0; i < previews; i++ {
 			p := fork(t, s, s.a.Plan.Input.Executor, deadline)
 			if err := store.CreateContextPreview(ctx, p); err != nil {
 				t.Fatal(err)
@@ -271,16 +222,13 @@ func qualifyContextPreviews(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		if n, err := cleanup.DeleteExpiredContextPreviews(ctx); err != nil || n != 0 {
 			t.Fatal("deleted live previews", n, err)
 		}
-		p := fork(t, s, s.a.Plan.Input.Executor, s.a.Plan.Input.Deadline)
-		if err := store.CreateContextPreview(ctx, p); !errors.Is(err, capture.ErrCapacity) {
-			t.Fatal("full review quota did not deny", err)
-		}
 		time.Sleep(time.Until(deadline) + 10*time.Millisecond)
-		if n, err := cleanup.DeleteExpiredContextPreviews(ctx); err != nil || n != capture.MaxPreviewsPerPrincipal {
-			t.Fatal("expired quota was not reclaimed", n, err)
+		if n, err := cleanup.DeleteExpiredContextPreviews(ctx); err != nil || n != previews {
+			t.Fatal("expired previews were not deleted", n, err)
 		}
-		if err := store.CreateContextPreview(ctx, p); err != nil {
-			t.Fatal("reclaimed preview slot unavailable", err)
+		var captures int
+		if err := admin.QueryRow(ctx, `SELECT count(*) FROM context_capture WHERE root_id=$1`, s.a.RootID).Scan(&captures); err != nil || captures != 0 {
+			t.Fatal("preview expiry created captures", captures, err)
 		}
 	})
 

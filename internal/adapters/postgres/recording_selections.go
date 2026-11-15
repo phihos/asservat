@@ -113,13 +113,6 @@ func (s *ContextPreviews) CreateRecordingSelection(ctx context.Context, set valu
 		if count >= value.MaxPreviewsPerRoot {
 			return value.ErrCapacity
 		}
-		count, err = q.CountPrincipalContextPreviews(ctx, custodydb.CountPrincipalContextPreviewsParams{RootID: id(s.root), PrincipalKey: principalKey(set.Actor)})
-		if err != nil {
-			return err
-		}
-		if count >= value.MaxPreviewsPerPrincipal {
-			return value.ErrCapacity
-		}
 		if err = q.InsertRecordingSelection(ctx, custodydb.InsertRecordingSelectionParams{ID: id(set.ID), RootID: id(s.root), ActorKey: previewActorKey(set.Actor), PrincipalKey: principalKey(set.Actor), ClusterID: id(set.Target.ClusterID), NamespaceUid: set.Target.NamespaceUID, WorkloadUid: set.Target.WorkloadUID, ReferencesJson: raw, CreatedAt: ts(set.CreatedAt), ExpiresAt: ts(set.ExpiresAt), PolicyUid: set.PolicyUID, AfterSourceID: id(set.AfterSourceID), HasMore: set.More}); err != nil {
 			return err
 		}
