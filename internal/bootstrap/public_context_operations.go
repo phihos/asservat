@@ -189,7 +189,7 @@ func composePublicContextUseCases(c PublicContextOperationsConfig, s PublicConte
 		i.Previews == nil || i.Replay == nil || i.Admission == nil || i.Resolution == nil || i.Targets == nil || i.Eligibility == nil || i.Capabilities == nil || i.Retention == nil || i.Storage == nil || i.Processing == nil ||
 		i.Lifetime < time.Second || i.Lifetime > 5*time.Minute || i.Lifetime%time.Microsecond != 0 ||
 		a.Completed == nil || a.Journal == nil || a.Acknowledgements == nil || a.Writer == nil || a.Reader == nil || a.MAC == nil ||
-		!regionalHubRunner(s.Regional.Runner) || s.Regional.Signer == nil || s.Regional.Router == nil ||
+		!regionalHubRunner(s.Regional.Runner) || s.Regional.Router == nil ||
 		p.Reader == nil || p.Navigation != nil || k.Routes == nil || k.Permissions == nil || k.Catalog == nil || k.Retention == nil || k.Processing == nil ||
 		d.Routes == nil || d.Sources == nil || d.Authority == nil || d.Sessions == nil || d.Plans == nil || d.Runtime != nil ||
 		s.Native.Runtime == nil && s.Native.Stop.Active != nil || s.Native.Runtime != nil && s.Native.Stop.Active != s.Native.Runtime || s.Native.Stop.Ledger == nil || s.Native.Stop.Acknowledgements == nil || s.Native.Stop.Objects == nil {

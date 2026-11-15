@@ -10,8 +10,8 @@ import (
 // KeyMaterial stays inside the isolated service. Callers clear Payload after
 // parsing. Configuration.Versions is populated from the actual private payload.
 type KeyMaterial struct {
-	Configuration          value.LocalKeyConfiguration
-	Payload, SigningPublic []byte
+	Configuration value.LocalKeyConfiguration
+	Payload       []byte
 }
 type KeyMaterialReader interface {
 	ReadKeyMaterial(context.Context) (KeyMaterial, error)

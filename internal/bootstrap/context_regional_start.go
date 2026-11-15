@@ -32,7 +32,6 @@ import (
 // Continue remains a caller decision.
 type RegionalAPIContextStart struct {
 	Runner executionapp.APIContextRunner // hub ports; cluster-local ports are per exchange
-	Signer fleetapp.APIContextWorkSigner
 	Router *contextstart.Router
 	Now    func() time.Time
 	// Report receives a failed run's fixed step and error class; diagnostics
@@ -61,7 +60,7 @@ const (
 // deadline is renewed, and a prepared, denied, expired or uncertain run is
 // never repeated (ADR-250).
 func (s RegionalAPIContextStart) StartContext(ctx context.Context, current identities.CurrentIdentity, id string) error {
-	if ctx == nil || ctx.Err() != nil || current == nil || !authorization.UUID(id) || s.Runner.Read == nil || s.Runner.Capabilities == nil || s.Signer == nil || s.Router == nil || s.Now == nil {
+	if ctx == nil || ctx.Err() != nil || current == nil || !authorization.UUID(id) || s.Runner.Read == nil || s.Runner.Capabilities == nil || s.Router == nil || s.Now == nil {
 		return execution.ErrInvalid
 	}
 	window, cancel := context.WithDeadline(ctx, s.Now().UTC().Truncate(time.Microsecond).Add(identity.AuthorityRecheckInterval)) // ADR-311
@@ -176,21 +175,14 @@ func (s RegionalAPIContextStart) startOnce(ctx context.Context, current identiti
 	if e != nil {
 		return e
 	}
-	mark = time.Now()
-	signed, e := s.Signer.SignAPIContextWork(call, work)
-	auditapp.MarkStep(ctx, "st-sign", mark)
-	if e != nil {
-		return e
-	}
-	defer clear(signed)
-	// Signing and every prior blocking read retain their original bounds. The
-	// same retained CurrentIdentity answers regional requests on this attachment.
+	// Every prior blocking read retains its original bounds. The same
+	// retained CurrentIdentity answers regional requests on this attachment.
 	if call.Err() != nil || !s.Now().Before(until) {
 		return execution.ErrUnavailable // the original interval ended: not retryable as not-started
 	}
 	mark = time.Now()
 	outer := ctx
-	state, e := attachment.Run(work, signed, func(ctx context.Context, ops *contextstart.HubOperations) (string, error) {
+	state, e := attachment.Run(work, func(ctx context.Context, ops *contextstart.HubOperations) (string, error) {
 		ops.Timing = func(method string, d time.Duration) { auditapp.MarkDuration(outer, "op-"+method, d) }
 		r := s.Runner
 		r.Process, r.Targets, r.Output, r.Collector = ops, ops, ops, ops
@@ -350,9 +342,9 @@ func regionalStartInitialBound(ctx context.Context, started time.Time) string {
 
 // ServeRegionalAPIContextExchange owns one outbound exchange until all regional
 // operations and stream I/O join. It does not reconnect or retry uncertain
-// work. It answers only cluster-local operations for the verified work.
-func ServeRegionalAPIContextExchange(exchange *mtls.ContextStartExchange, verifier fleetapp.APIContextWorkVerifier, local contextstart.RegionalLocal) error {
-	if exchange == nil || verifier == nil || local.Now == nil {
+// work. It answers only cluster-local operations for the received work.
+func ServeRegionalAPIContextExchange(exchange *mtls.ContextStartExchange, local contextstart.RegionalLocal) error {
+	if exchange == nil || local.Now == nil {
 		return execution.ErrInvalid
 	}
 	defer exchange.Close()
@@ -367,7 +359,7 @@ func ServeRegionalAPIContextExchange(exchange *mtls.ContextStartExchange, verifi
 	}
 	defer stream.Close()
 	ctx, diagnostics := contextstart.NewStreamDiagnosticContext(exchange.Context())
-	if e = contextstart.ServeRegionalOperations(ctx, stream, receiver, verifier, local, local.Now); e != nil {
+	if e = contextstart.ServeRegionalOperations(ctx, stream, receiver, local, local.Now); e != nil {
 		if v := diagnostics.Interruption(); v.Present() {
 			return exchangeStepError{e, v.Stage() + "/" + v.Reason()}
 		}
@@ -386,12 +378,11 @@ func (e exchangeStepError) ExchangeStep() string { return e.step }
 
 // RegionalContextStartConnections supervises only outbound standby exchanges.
 // Each new conversation starts empty under fresh route/peer checks. It cannot
-// retain or resubmit a capture ID, signed work or human CurrentIdentity. An
+// retain or resubmit a capture ID, work or human CurrentIdentity. An
 // uncertain attached conversation therefore never becomes an automatic retry.
 type RegionalContextStartConnections struct {
 	Candidates fleetapp.APIContextOwnerCandidatesReader
 	Client     *mtls.ContextStartClient
-	Verifier   fleetapp.APIContextWorkVerifier
 	Local      contextstart.RegionalLocal
 	// Report receives closed diagnostic labels only and must not block.
 	Report func(string)
@@ -401,7 +392,7 @@ type RegionalContextStartConnections struct {
 }
 
 func (s RegionalContextStartConnections) Run(ctx context.Context) error {
-	if ctx == nil || ctx.Err() != nil || s.Candidates == nil || s.Client == nil || s.Verifier == nil || s.Local.Now == nil {
+	if ctx == nil || ctx.Err() != nil || s.Candidates == nil || s.Client == nil || s.Local.Now == nil {
 		return execution.ErrInvalid
 	}
 	defer s.Client.Close()
@@ -479,7 +470,7 @@ func (s RegionalContextStartConnections) Run(ctx context.Context) error {
 						// ends a used standby by closing it, so its end is usually
 						// a read error. Either way the slot needs its next standby.
 						retry = 0
-						if e = ServeRegionalAPIContextExchange(exchange, s.Verifier, s.Local); e != nil {
+						if e = ServeRegionalAPIContextExchange(exchange, s.Local); e != nil {
 							s.reportFailure("exchange", e)
 						}
 					} else {

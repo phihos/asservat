@@ -15,12 +15,6 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 )
 
-type historyVerifierFunc func(context.Context, []byte, fleet.APIContextReceiver) (fleetapp.AuthenticatedHistoryWork, error)
-
-func (f historyVerifierFunc) VerifyHistoryWork(c context.Context, b []byte, r fleet.APIContextReceiver) (fleetapp.AuthenticatedHistoryWork, error) {
-	return f(c, b, r)
-}
-
 type historyEffectsFunc func(context.Context, capture.HistoryOperationAuthority, capture.HistoryCiphertexts, artifact.Copies) (fleetapp.HistoryReply, error)
 
 func (f historyEffectsFunc) ExecuteHistory(c context.Context, a capture.HistoryOperationAuthority, b capture.HistoryCiphertexts, r artifact.Copies) (fleetapp.HistoryReply, error) {
@@ -83,12 +77,7 @@ func TestHistoryEffectsUseDistinctBoundedStreamAndTypedCompletions(t *testing.T)
 			defer cancel()
 			hub, region := historyStreamPair(t, ctx, r)
 			calls := 0
-			local := &HistoryLocal{Verifier: historyVerifierFunc(func(_ context.Context, _ []byte, actual fleet.APIContextReceiver) (fleetapp.AuthenticatedHistoryWork, error) {
-				if actual.Channel != r.Channel {
-					return fleetapp.AuthenticatedHistoryWork{}, fleet.ErrDenied
-				}
-				return fleetapp.AuthenticatedHistoryWork{Work: w, KeyID: "synthetic", TrustRevision: workFixture().TrustRevision, VerifiedAt: a.StartedAt, ValidUntil: a.NotAfter}, nil
-			}), Effects: historyEffectsFunc(func(c context.Context, auth capture.HistoryOperationAuthority, in capture.HistoryCiphertexts, receipts artifact.Copies) (fleetapp.HistoryReply, error) {
+			local := &HistoryLocal{Effects: historyEffectsFunc(func(c context.Context, auth capture.HistoryOperationAuthority, in capture.HistoryCiphertexts, receipts artifact.Copies) (fleetapp.HistoryReply, error) {
 				calls++
 				if auth != *a || c.Err() != nil {
 					t.Error("operation binding changed")
@@ -121,7 +110,7 @@ func TestHistoryEffectsUseDistinctBoundedStreamAndTypedCompletions(t *testing.T)
 				clear(f.Payload)
 				done <- e
 			}()
-			reply, e := serveHubHistory(ctx, hub, w, []byte("synthetic signature"), b, copies, time.Now)
+			reply, e := serveHubHistory(ctx, hub, w, b, copies, time.Now)
 			if e != nil {
 				t.Fatal(e)
 			}
@@ -165,9 +154,7 @@ func TestHistoryPeerDisconnectCancelsAndJoinsRegionalEffect(t *testing.T) {
 	hub, region := historyStreamPairContexts(t, hubCtx, regionCtx, r)
 	entered := make(chan struct{})
 	canceled := make(chan struct{})
-	local := &HistoryLocal{Verifier: historyVerifierFunc(func(context.Context, []byte, fleet.APIContextReceiver) (fleetapp.AuthenticatedHistoryWork, error) {
-		return fleetapp.AuthenticatedHistoryWork{Work: w, KeyID: "synthetic", TrustRevision: workFixture().TrustRevision, VerifiedAt: w.Authority.StartedAt, ValidUntil: w.Authority.NotAfter}, nil
-	}), Effects: historyEffectsFunc(func(ctx context.Context, _ capture.HistoryOperationAuthority, _ capture.HistoryCiphertexts, _ artifact.Copies) (fleetapp.HistoryReply, error) {
+	local := &HistoryLocal{Effects: historyEffectsFunc(func(ctx context.Context, _ capture.HistoryOperationAuthority, _ capture.HistoryCiphertexts, _ artifact.Copies) (fleetapp.HistoryReply, error) {
 		close(entered)
 		<-ctx.Done()
 		close(canceled)
@@ -183,7 +170,7 @@ func TestHistoryPeerDisconnectCancelsAndJoinsRegionalEffect(t *testing.T) {
 		regional <- e
 	}()
 	result := make(chan error, 1)
-	go func() { _, e := serveHubHistory(hubCtx, hub, w, []byte("synthetic"), b, copies, time.Now); result <- e }()
+	go func() { _, e := serveHubHistory(hubCtx, hub, w, b, copies, time.Now); result <- e }()
 	select {
 	case <-entered:
 	case <-time.After(time.Second):

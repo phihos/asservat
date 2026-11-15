@@ -123,12 +123,6 @@ func (s *InstalledOwnerProviderEffects) BrowserOpener() *Opener {
 	}
 	return s.effects.browserOpen
 }
-func (s *InstalledOwnerProviderEffects) WorkSigner() *SigningKey {
-	if s == nil || s.effects == nil {
-		return nil
-	}
-	return s.effects.work
-}
 func (s *InstalledOwnerProviderEffects) WorkerIssuer() *WorkerCertificateIssuer {
 	if s == nil || s.effects == nil {
 		return nil

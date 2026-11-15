@@ -56,7 +56,7 @@ type regionalObservationFixture struct {
 	receiver                fleet.APIContextReceiver
 	workReads, preparations int
 	check                   executionapp.APIExecutionCheck
-	signed                  fleet.APIContextWork
+	signed                  contracts.APIContextWork
 }
 
 func (f *regionalObservationFixture) Resolve(ctx context.Context, _ string) (identity.Identity, error) {
@@ -80,10 +80,6 @@ type regionalObservationRetention struct{ f *regionalObservationFixture }
 
 func (r regionalObservationRetention) Resolve(ctx context.Context, in privacy.Input) (privacy.Resolution, error) {
 	return r.f.ResolveRetention(ctx, in)
-}
-func (f *regionalObservationFixture) SignAPIContextWork(ctx context.Context, work fleet.APIContextWork) ([]byte, error) {
-	f.signed = work
-	return []byte("synthetic-signer-no-native-authority"), ctx.Err()
 }
 func (f *regionalObservationFixture) PrepareAPIExecution(ctx context.Context, check executionapp.APIExecutionCheck) (value.APIExecution, bool, error) {
 	f.preparations++
@@ -125,7 +121,11 @@ func (s *regionalObservationStream) Send(ctx context.Context, frame contracts.AP
 		return ctx.Err()
 	}
 	switch frame.Kind {
-	case contracts.APIContextWorkFrame, contracts.APIContextReceiptFrame:
+	case contracts.APIContextWorkFrame:
+		var err error
+		s.f.signed, err = contracts.DecodeAPIContextWork(frame.Payload)
+		return err
+	case contracts.APIContextReceiptFrame:
 		return nil
 	case contracts.APIContextOperationRequestFrame:
 		op, err := contracts.DecodeAPIContextOperation(frame.Payload)
@@ -297,7 +297,7 @@ func TestRegionalStartReusesPreludeBeforeFirstPreparation(t *testing.T) {
 	stream := &regionalObservationStream{f: f, ctx: ctx}
 	done := make(chan error, 1)
 	go func() { defer standby.Finish(); done <- standby.Serve(stream, time.Now) }()
-	start := RegionalAPIContextStart{Runner: executionapp.APIContextRunner{Read: f, Prepare: f, Record: f, Eligibility: access.Evaluator{Permissions: f, Now: time.Now}, Capabilities: capability, Retention: regionalObservationRetention{f}, Now: time.Now}, Signer: f, Router: router, Now: time.Now, Report: func(s string) { t.Log(s) }}
+	start := RegionalAPIContextStart{Runner: executionapp.APIContextRunner{Read: f, Prepare: f, Record: f, Eligibility: access.Evaluator{Permissions: f, Now: time.Now}, Capabilities: capability, Retention: regionalObservationRetention{f}, Now: time.Now}, Router: router, Now: time.Now, Report: func(s string) { t.Log(s) }}
 	began := time.Now()
 	err = start.StartContext(ctx, current, f.work.Accepted.CaptureID)
 	elapsed := time.Since(began)

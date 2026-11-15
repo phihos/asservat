@@ -34,7 +34,7 @@ type LocalKeyScope struct {
 
 func (s LocalKeyScope) valid() bool {
 	return authorization.UUID(s.InstallationID) && keyName.MatchString(s.KeyID) &&
-		(s.Purpose == "artifact" || s.Purpose == "audit" || s.Purpose == "browser-credentials" || s.Purpose == "policy-submission")
+		(s.Purpose == "artifact" || s.Purpose == "audit" || s.Purpose == "browser-credentials")
 }
 
 type localKeyVersion struct {
@@ -111,9 +111,6 @@ type LocalKeyBackend struct {
 }
 
 func NewLocalKeyBackend(scope LocalKeyScope, secret io.Reader) (*LocalKeyBackend, error) {
-	if scope.Purpose == "policy-submission" {
-		return nil, artifact.ErrInvalid
-	}
 	s, err := readLocalKeys(scope, secret)
 	if err != nil {
 		return nil, err

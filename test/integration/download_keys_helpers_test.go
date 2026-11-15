@@ -36,7 +36,7 @@ func localDownloadKeys(t *testing.T, installation string) (authorization.KeyScop
 	if err != nil {
 		t.Fatal(err)
 	}
-	backend, err := kms.NewLocalOperations(scope, 0, nil, bytes.NewReader(payload))
+	backend, err := kms.NewLocalOperations(scope, bytes.NewReader(payload))
 	if err != nil {
 		t.Fatal(err)
 	}

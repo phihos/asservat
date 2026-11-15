@@ -11,16 +11,16 @@ import (
 
 // OwnerPublicProviderPurposes are the public layer's provider-authenticated
 // purposes (ADR-182), separate from the four identity purposes.
-var OwnerPublicProviderPurposes = [4]string{"browser-seal", "browser-open", "work-sign", "worker-issue"}
+var OwnerPublicProviderPurposes = [3]string{"browser-seal", "browser-open", "worker-issue"}
 
-// OwnerPublicProviderRecipeFor derives the four public provider roles from the
+// OwnerPublicProviderRecipeFor derives the three public provider roles from the
 // installed owner input and its accepted identity profile. Like the identity
 // recipe it is pure; separate setup installs it and the owner's Public section
 // pins its digest. The identity recipe digest is unchanged.
-func OwnerPublicProviderRecipeFor(in contracts.OwnerDeployment, profile contracts.OwnerProviderAuthentication, now time.Time) ([4]OwnerProviderRoleRecipe, string, error) {
-	var roles [4]OwnerProviderRoleRecipe
+func OwnerPublicProviderRecipeFor(in contracts.OwnerDeployment, profile contracts.OwnerProviderAuthentication, now time.Time) ([3]OwnerProviderRoleRecipe, string, error) {
+	var roles [3]OwnerProviderRoleRecipe
 	p := in.Public
-	if p == nil || !providerName.MatchString(p.SessionTransit.Mount) || !providerName.MatchString(p.SessionTransit.Key) || !providerName.MatchString(p.WorkSigning.Mount) || !providerName.MatchString(p.WorkSigning.Name) || !providerName.MatchString(p.WorkerPKI.Mount) || !providerName.MatchString(p.WorkerPKI.Role) {
+	if p == nil || !providerName.MatchString(p.SessionTransit.Mount) || !providerName.MatchString(p.SessionTransit.Key) || !providerName.MatchString(p.WorkerPKI.Mount) || !providerName.MatchString(p.WorkerPKI.Role) {
 		return roles, "", cfg.ErrInvalid
 	}
 	identity, err := OwnerProviderRecipeFor(in, profile.AuthMount, profile.AuthMountAccessor, profile.ServiceAccount, profile.AuditCredentials, now)
@@ -31,7 +31,7 @@ func OwnerPublicProviderRecipeFor(in contracts.OwnerDeployment, profile contract
 	// ServiceAccount name plus the purpose; setup creates the same names.
 	prefix := profile.ServiceAccount.Name + "-"
 	audience := contracts.OwnerProviderAudience(in.InstallationID, in.ClusterID)
-	paths := [4]string{p.SessionTransit.Mount + "/encrypt/" + p.SessionTransit.Key, p.SessionTransit.Mount + "/decrypt/" + p.SessionTransit.Key, p.WorkSigning.Mount + "/sign/" + p.WorkSigning.Name, p.WorkerPKI.Mount + "/sign/" + p.WorkerPKI.Role}
+	paths := [3]string{p.SessionTransit.Mount + "/encrypt/" + p.SessionTransit.Key, p.SessionTransit.Mount + "/decrypt/" + p.SessionTransit.Key, p.WorkerPKI.Mount + "/sign/" + p.WorkerPKI.Role}
 	for i, purpose := range OwnerPublicProviderPurposes {
 		name := prefix + purpose
 		role := OwnerKubernetesAuthRole{Accounts: []string{profile.ServiceAccount.Name}, Namespaces: []string{in.Namespace.Name}, Audience: audience, AliasSource: "serviceaccount_uid", TTL: contracts.OwnerProviderTokenTTLSeconds, MaxTTL: contracts.OwnerProviderTokenMaxTTLSeconds, ExplicitMaxTTL: contracts.OwnerProviderTokenMaxTTLSeconds, Policies: []string{name}, NoDefault: true, Type: "service", BoundCIDRs: []string{}}
@@ -41,11 +41,6 @@ func OwnerPublicProviderRecipeFor(in contracts.OwnerDeployment, profile contract
 			"auth/token/revoke-self": {Capabilities: []string{"update"}},
 			paths[i]:                 {Capabilities: []string{"update"}},
 		}}
-		if purpose == "work-sign" {
-			// The hub-api reads its signing key's version and public key at
-			// startup (Helm-native installation).
-			acl.Path[p.WorkSigning.Mount+"/keys/"+p.WorkSigning.Name] = ownerProviderACLRule{Capabilities: []string{"read"}}
-		}
 		r, e := ownerProviderCanonical(role)
 		if e != nil {
 			return roles, "", e
@@ -63,10 +58,9 @@ func OwnerPublicProviderRecipeFor(in contracts.OwnerDeployment, profile contract
 		Identity   string                         `json:"identityRecipeSHA256"`
 		KeyService contracts.OwnerKeyService      `json:"keyService"`
 		Transit    contracts.OwnerPublicTransit   `json:"sessionTransit"`
-		Signing    contracts.OwnerPublicSigning   `json:"workSigning"`
 		PKI        contracts.OwnerPublicWorkerPKI `json:"workerPKI"`
-		Roles      [4]OwnerProviderRoleRecipe     `json:"roles"`
-	}{"asservat-owner-public-provider-recipe/v1", profile.RecipeSHA256, in.KeyService, public.SessionTransit, public.WorkSigning, public.WorkerPKI, roles})
+		Roles      [3]OwnerProviderRoleRecipe     `json:"roles"`
+	}{"asservat-owner-public-provider-recipe/v1", profile.RecipeSHA256, in.KeyService, public.SessionTransit, public.WorkerPKI, roles})
 	if err != nil {
 		return roles, "", err
 	}

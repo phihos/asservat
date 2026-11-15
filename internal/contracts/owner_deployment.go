@@ -88,11 +88,10 @@ type OwnerPublicDeployment struct {
 	ProviderRecipeSHA256 string `json:"providerRecipeSHA256,omitempty"`
 	// Investigation and regional start (ADR-180 decision 4). Each workload
 	// cluster has its connector source, router limits and
-	// hub-held guarded capability and work trust (ADR-179). ADR-185: they are
+	// hub-held guarded capability (ADR-179). ADR-185: they are
 	// entries of the guarded cluster catalog, read at process start, because
 	// regional clusters enroll after the owner's one launch.
 	ClusterCatalog OwnerPublicGuardedSource `json:"clusterCatalog"`
-	WorkSigning    OwnerPublicSigning       `json:"workSigning"`
 	Standby        int                      `json:"standby"`
 	Captures       int                      `json:"captures"`
 	// PreviewSeconds is the reviewed preview lifetime.
@@ -171,14 +170,12 @@ type OwnerPublicDownloadPlan struct {
 	DurationSeconds int   `json:"durationSeconds"`
 }
 type OwnerPublicCluster struct {
-	ClusterID  string                      `json:"clusterID"`
-	Connector  FederationPeer              `json:"connector"`
-	Standby    int                         `json:"standby"`
-	Captures   int                         `json:"captures"`
-	Capability OwnerPublicGuardedSource    `json:"capability"`
-	WorkTrust  OwnerPublicGuardedSource    `json:"workTrust"`
-	Settings   ContextCapabilitySettings   `json:"capabilitySettings"`
-	Trust      APIContextWorkTrustSettings `json:"trustSettings"`
+	ClusterID  string                    `json:"clusterID"`
+	Connector  FederationPeer            `json:"connector"`
+	Standby    int                       `json:"standby"`
+	Captures   int                       `json:"captures"`
+	Capability OwnerPublicGuardedSource  `json:"capability"`
+	Settings   ContextCapabilitySettings `json:"capabilitySettings"`
 	// Topology pins the slot's immutable retention topology (ADR-196
 	// decision 7); the hub-api unions it with its input's pins at start.
 	Topology OwnerNativeTopology `json:"topology"`
@@ -199,15 +196,6 @@ type OwnerPublicGuardedSource struct {
 	Guard  OwnerDeploymentGuard  `json:"guard"`
 }
 
-// OwnerPublicSigning is the hub's OpenBao Ed25519 work-signing key; its token
-// is the fixed file OwnerPublicWorkSignToken.
-type OwnerPublicSigning struct {
-	Mount     string `json:"mount"`
-	Name      string `json:"name"`
-	Version   int    `json:"version"`
-	KeyID     string `json:"keyID"`
-	PublicKey []byte `json:"publicKey"`
-}
 type OwnerPublicTransit struct {
 	Mount string `json:"mount"`
 	Key   string `json:"key"`
@@ -220,7 +208,6 @@ const (
 	OwnerPublicClientSecretFile = "oidc-client-secret"
 	OwnerPublicSessionSealToken = "browser-seal.token"
 	OwnerPublicSessionOpenToken = "browser-open.token"
-	OwnerPublicWorkSignToken    = "work-sign.token"
 	OwnerPublicWorkerIssueToken = "worker-issue.token"
 	OwnerPublicTLSCertificate   = "public-tls.crt"
 	OwnerPublicTLSKey           = "public-tls.key"

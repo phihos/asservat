@@ -57,14 +57,9 @@ func TestFinitePolicySourceAndStartUseOneFramedConversation(t *testing.T) {
 			hub, region := historyStreamPair(t, ctx, receiver)
 			joined := make(chan error, 1)
 			go func() {
-				joined <- ServeRegionalOperations(ctx, region, receiver, streamDiagnosticVerifier(func(_ context.Context, signed []byte, got fleet.APIContextReceiver) (fleet.AuthenticatedAPIContextWork, error) {
-					if string(signed) != "synthetic-signed-work" || got.Channel != w.Channel {
-						return fleet.AuthenticatedAPIContextWork{}, fleet.ErrDenied
-					}
-					return authenticated, nil
-				}), ports, time.Now)
+				joined <- ServeRegionalOperations(ctx, region, receiver, ports, time.Now)
 			}()
-			state, err := ServeHubOperations(ctx, hub, w, []byte("synthetic-signed-work"), func(call context.Context, ops *HubOperations) (string, error) {
+			state, err := ServeHubOperations(ctx, hub, w, func(call context.Context, ops *HubOperations) (string, error) {
 				resolved, err := ops.ResolvePacketSource(call, request)
 				if err != nil {
 					return "Unavailable", err

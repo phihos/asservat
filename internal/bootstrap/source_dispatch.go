@@ -16,45 +16,33 @@ import (
 
 type RegionalSourceDispatch struct {
 	Router *contextstart.Router
-	Signer fleetapp.SourceWorkSigner
 	Now    func() time.Time
 }
 
 var _ captureapp.PolicySourceDispatcher = RegionalSourceDispatch{}
 
-// deliver signs w for the standby DeliverSource selects and sends it as one
+// deliver builds w for the standby DeliverSource selects and sends it as one
 // query. The standby keeps waiting for capture work, so source traffic never
 // takes the cluster's one standby from a Save (ADR-209). step names the
 // failing step for content-free counters.
 func (d RegionalSourceDispatch) deliver(call context.Context, cluster string, step *string, w func(fleet.APIContextReceiver) fleetapp.SourceWork) error {
 	*step = "query"
-	return d.Router.DeliverSource(call, cluster, func(r fleet.APIContextReceiver) (fleetapp.SourceWork, []byte, error) {
+	return d.Router.DeliverSource(call, cluster, func(r fleet.APIContextReceiver) (fleetapp.SourceWork, error) {
 		*step = "work"
 		work := w(r)
 		if end, ok := call.Deadline(); ok {
 			work.NotAfter = identity.Earlier(work.NotAfter, end)
 		}
 		if !work.Valid(d.Now()) {
-			return work, nil, fleet.ErrUnavailable
-		}
-		bounded, end := context.WithDeadline(call, work.NotAfter)
-		defer end()
-		*step = "sign"
-		signed, err := d.Signer.SignSourceWork(bounded, work)
-		if err == nil && (bounded.Err() != nil || !work.Valid(d.Now())) {
-			clear(signed)
-			err = fleet.ErrUnavailable
-		}
-		if err != nil {
-			return work, nil, err
+			return work, fleet.ErrUnavailable
 		}
 		*step = "run"
-		return work, signed, nil
+		return work, nil
 	})
 }
 
 func (d RegionalSourceDispatch) DispatchSource(ctx context.Context, target targets.PodResolution, node targets.PacketSourceObservation, source collector.PacketSource) (err error) {
-	if ctx == nil || ctx.Err() != nil || d.Router == nil || d.Signer == nil || d.Now == nil || !source.Permit.Dispatchable(d.Now()) {
+	if ctx == nil || ctx.Err() != nil || d.Router == nil || d.Now == nil || !source.Permit.Dispatchable(d.Now()) {
 		return fleet.ErrUnavailable
 	}
 	call, cancel := context.WithDeadline(ctx, source.Permit.DispatchUntil)
@@ -91,7 +79,7 @@ func (d RegionalSourceDispatch) DispatchSource(ctx context.Context, target targe
 }
 
 func (d RegionalSourceDispatch) StopSource(ctx context.Context, cluster string, binding collector.SourceBinding) error {
-	if ctx == nil || ctx.Err() != nil || d.Router == nil || d.Signer == nil || d.Now == nil || !binding.Valid() {
+	if ctx == nil || ctx.Err() != nil || d.Router == nil || d.Now == nil || !binding.Valid() {
 		return fleet.ErrUnavailable
 	}
 	issued := d.Now().UTC()
@@ -106,7 +94,7 @@ func (d RegionalSourceDispatch) StopSource(ctx context.Context, cluster string, 
 // CancelSourceSnapshot is restrictive control of an already admitted copy. It
 // never refreshes source authority or requires a still-renewable source leaf.
 func (d RegionalSourceDispatch) CancelSourceSnapshot(ctx context.Context, cluster string, snapshot collector.SourceSnapshot) error {
-	if ctx == nil || ctx.Err() != nil || d.Router == nil || d.Signer == nil || d.Now == nil || !snapshot.Valid() {
+	if ctx == nil || ctx.Err() != nil || d.Router == nil || d.Now == nil || !snapshot.Valid() {
 		return fleet.ErrUnavailable
 	}
 	issued := d.Now().UTC()
@@ -119,7 +107,7 @@ func (d RegionalSourceDispatch) CancelSourceSnapshot(ctx context.Context, cluste
 }
 
 func (d RegionalSourceDispatch) CancelProfile(ctx context.Context, cluster string, stop collector.ProfileStop) error {
-	if ctx == nil || ctx.Err() != nil || d.Router == nil || d.Signer == nil || d.Now == nil || !stop.Valid() || stop.ClusterID != cluster {
+	if ctx == nil || ctx.Err() != nil || d.Router == nil || d.Now == nil || !stop.Valid() || stop.ClusterID != cluster {
 		return fleet.ErrUnavailable
 	}
 	issued := d.Now().UTC()
@@ -132,7 +120,7 @@ func (d RegionalSourceDispatch) CancelProfile(ctx context.Context, cluster strin
 }
 
 func (d RegionalSourceDispatch) CancelRecording(ctx context.Context, cluster string, stop collector.RecordingStop) error {
-	if ctx == nil || ctx.Err() != nil || d.Router == nil || d.Signer == nil || d.Now == nil || !stop.Valid() || stop.ClusterID != cluster {
+	if ctx == nil || ctx.Err() != nil || d.Router == nil || d.Now == nil || !stop.Valid() || stop.ClusterID != cluster {
 		return fleet.ErrUnavailable
 	}
 	issued := d.Now().UTC()

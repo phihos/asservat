@@ -123,5 +123,4 @@ func testIdentitySettings(t *testing.T, ctx context.Context, c *rest.Config, clu
 	if _, err = reader.IdentityPolicy(ctx, claims.Issuer); err == nil {
 		t.Fatal("same-name policy replacement accepted")
 	}
-	testSubmissionTrustSource(t, ctx, c, cluster, control, readerToken)
 }

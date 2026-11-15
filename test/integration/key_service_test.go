@@ -3,7 +3,6 @@ package integration
 import (
 	"bytes"
 	"context"
-	"crypto"
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/sha256"
@@ -81,7 +80,6 @@ type keyTLSFixture struct {
 	digests     map[string]artifact.Digest
 	authority   *fixtureKeyAuthority
 	scope       value.KeyScope
-	public      ed25519.PublicKey
 	connections atomic.Int32
 	peerShift   atomic.Int64
 	serial      int64
@@ -136,7 +134,7 @@ func newKeyTLSFor(t *testing.T, installation, purpose string, authority app.KeyO
 	}
 	f := &keyTLSFixture{root: root, rootKey: key, roots: x509.NewCertPool(), clients: map[string]*http.Client{}, digests: map[string]artifact.Digest{}, authority: &fixtureKeyAuthority{allowed: map[artifact.Digest]bool{}}, scope: value.KeyScope{InstallationID: installation, Purpose: purpose, KeyID: "fixture"}, serial: 1}
 	f.roots.AddCert(root)
-	for _, role := range []string{"collector", "publisher", "acquisition", "hub-session", "policy-submitter", "audit-writer", "audit-reader"} {
+	for _, role := range []string{"collector", "publisher", "acquisition", "hub-session", "audit-writer", "audit-reader"} {
 		cert := f.certificate(t, role)
 		f.digests[role] = artifact.Digest(sha256.Sum256(cert.Certificate[0]))
 		f.authority.allowed[f.digests[role]] = true
@@ -149,17 +147,12 @@ func newKeyTLSFor(t *testing.T, installation, purpose string, authority app.KeyO
 		t.Fatal(err)
 	}
 	defer clear(material)
-	version := 0
-	if purpose == "policy-submission" {
-		f.public = ed25519.NewKeyFromSeed(material).Public().(ed25519.PublicKey)
-		version = 1
-	}
 	secret, err := json.Marshal(map[string]any{"format": "asservat-local-keys/v1", "installationID": installation, "purpose": purpose, "keyID": "fixture", "activeVersion": 1, "keys": []any{map[string]any{"version": 1, "material": material}}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer clear(secret)
-	backend, err := kms.NewLocalOperations(f.scope, version, f.public, bytes.NewReader(secret))
+	backend, err := kms.NewLocalOperations(f.scope, bytes.NewReader(secret))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -224,7 +217,7 @@ func TestLocalKeyServiceTLSIsolationAndRevocation(t *testing.T) {
 		t.Fatal("remote unwrap", err)
 	}
 	clear(got)
-	for _, role := range []string{"collector", "publisher", "hub-session", "audit-reader", "policy-submitter"} {
+	for _, role := range []string{"collector", "publisher", "hub-session", "audit-reader"} {
 		wrong, _ := kms.NewRemoteOpener(f.server.URL, f.scope, keyAuthority, f.clients[role])
 		if b, err := wrong.Open(ctx, sealed, binding); err == nil || b != nil {
 			t.Fatalf("%s gained raw unwrap", role)
@@ -250,31 +243,11 @@ func TestLocalKeyServiceTLSIsolationAndRevocation(t *testing.T) {
 	t.Log("real TLS wrap/read; exact binding and authority; collector/publisher/hub unwrap denial; current revocation on existing TLS connection")
 }
 
-func TestLocalKeyServicePurposeAndSigning(t *testing.T) {
-	for _, purpose := range []string{"audit", "browser-credentials", "policy-submission"} {
+func TestLocalKeyServicePurposes(t *testing.T) {
+	for _, purpose := range []string{"audit", "browser-credentials"} {
 		t.Run(purpose, func(t *testing.T) {
 			f := newKeyTLSFixture(t, purpose, nil)
 			ctx := context.Background()
-			if purpose == "policy-submission" {
-				s, err := kms.NewRemoteSigner(f.server.URL, f.scope, keyAuthority, 1, f.public, f.clients["policy-submitter"])
-				if err != nil {
-					t.Fatal(err)
-				}
-				input := []byte("synthetic policy signature input")
-				sig, err := s.ForContext(ctx).Sign(nil, input, crypto.Hash(0))
-				if err != nil || !ed25519.Verify(f.public, input, sig) {
-					t.Fatal("remote signing", err)
-				}
-				if _, err := s.ForContext(ctx).Sign(nil, []byte("unauthorized policy"), crypto.Hash(0)); err == nil {
-					t.Fatal("signing oracle accepted uncovered input")
-				}
-				otherPub, _, _ := ed25519.GenerateKey(rand.Reader)
-				wrong, _ := kms.NewRemoteSigner(f.server.URL, f.scope, keyAuthority, 1, otherPub, f.clients["policy-submitter"])
-				if _, err := wrong.ForContext(ctx).Sign(nil, input, crypto.Hash(0)); err == nil {
-					t.Fatal("signature did not match public pin")
-				}
-				return
-			}
 			writeRole, readRole := "audit-writer", "audit-reader"
 			if purpose == "browser-credentials" {
 				writeRole, readRole = "hub-session", "hub-session"
@@ -372,7 +345,7 @@ func TestLocalKeyClientRejectsMalformedResponses(t *testing.T) {
 					case "expired":
 						response.ValidUntil = time.Now().Add(-time.Second).UTC().Format(time.RFC3339Nano)
 					case "operation":
-						response.Operation = "sign"
+						response.Operation = "wrap"
 					case "irrelevant-sealed":
 						response.Sealed = &contracts.SealedLocalKey{}
 					}

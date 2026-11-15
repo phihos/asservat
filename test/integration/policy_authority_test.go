@@ -3,10 +3,8 @@ package integration
 import (
 	"bytes"
 	"context"
-	"crypto"
 	"crypto/aes"
 	"crypto/cipher"
-	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/json"
@@ -18,7 +16,6 @@ import (
 	"testing"
 	"time"
 
-	"asservat.local/asservat/internal/adapters/jose"
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
 	auditapp "asservat.local/asservat/internal/application/audit"
@@ -662,42 +659,6 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 		})
 	}
 
-	t.Run("signed-submission-to-atomic-acceptance", func(t *testing.T) {
-		s := newSetup(t)
-		pub, key, e := ed25519.GenerateKey(rand.Reader)
-		if e != nil {
-			t.Fatal(e)
-		}
-		x := s.input.Submission
-		expected := capture.PolicySubmissionIntent{RootID: s.input.RootID, InstallationID: s.input.Authority.InstallationID, IssuerEpoch: s.issuerEpoch, ReplacesID: x.ReplacesID, Nonce: x.Nonce, Actor: x.Actor, Source: x.Source, ClusterID: x.ClusterID, NamespaceUID: x.NamespaceUID, Name: x.Name, ScopeDigest: x.ScopeDigest, IssuedAt: x.IssuedAt, ExpiresAt: x.ExpiresAt}
-		trust := &submissionFixtureTrust{value: capture.SubmissionTrust{RootID: expected.RootID, InstallationID: expected.InstallationID, IssuerEpoch: expected.IssuerEpoch, Revision: identity.Revision{UID: "synthetic-signature-trust", Generation: 1, Digest: artifact.Digest{92}}, Keys: []capture.SubmissionKey{{ID: "test-key", PublicKey: pub, NotBefore: clock().Add(-time.Minute), NotAfter: clock().Add(time.Hour)}}}}
-		protocol, e := jose.NewPolicySubmissions(expected.RootID, expected.InstallationID, expected.IssuerEpoch, "test-key", trust, func(context.Context) crypto.Signer { return key }, clock)
-		if e != nil {
-			t.Fatal(e)
-		}
-		signed, e := protocol.SignPolicySubmission(ctx, expected)
-		if e != nil {
-			t.Fatal(e)
-		}
-		service := captureapp.SignedPolicyAcceptor{Verifier: protocol, Store: s.accept, Now: clock}
-		first, e := service.AcceptPolicySubmission(ctx, signed, expected, s.input)
-		if e != nil || first.Replay || first.Record.Submitter != expected.Actor || first.Record.Submission.EnvelopeDigest == x.EnvelopeDigest {
-			t.Fatal("verified submission failed admission", e)
-		}
-		replay, e := service.AcceptPolicySubmission(ctx, signed, expected, s.input)
-		if e != nil || !replay.Replay || replay.Record.ID != first.Record.ID || !replay.Record.AcceptedAt.Equal(first.Record.AcceptedAt) {
-			t.Fatal("signature verification reset acceptance", e)
-		}
-		bad := expected
-		bad.ScopeDigest[0]++
-		if _, e := service.AcceptPolicySubmission(ctx, signed, bad, s.input); e == nil {
-			t.Fatal("signed payload substituted scope")
-		}
-		trust.value.Keys = nil
-		if _, e := service.AcceptPolicySubmission(ctx, signed, expected, s.input); e == nil {
-			t.Fatal("revoked key reached acceptance service")
-		}
-	})
 	for _, mode := range []string{"missing", "changed-envelope", "wrong-installation"} {
 		t.Run("submission-verification/"+mode, func(t *testing.T) {
 			s := newSetup(t)

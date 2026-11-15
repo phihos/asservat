@@ -297,7 +297,7 @@ func TestRegionalGroupChildReachesOriginalPreparation(t *testing.T) {
 			stream := &groupRegionalStream{regionalObservationStream: &regionalObservationStream{f: f.regionalObservationFixture, ctx: ctx}, group: f}
 			done := make(chan error, 1)
 			go func() { defer standby.Finish(); done <- standby.Serve(stream, time.Now) }()
-			start := RegionalAPIContextStart{Runner: executionapp.APIContextRunner{Read: f, Prepare: f, Record: f, Eligibility: f, Capabilities: f, Retention: groupRegionalRetention{f}, Now: time.Now}, Signer: f, Router: router, Now: time.Now, Report: func(s string) { t.Log(s) }}
+			start := RegionalAPIContextStart{Runner: executionapp.APIContextRunner{Read: f, Prepare: f, Record: f, Eligibility: f, Capabilities: f, Retention: groupRegionalRetention{f}, Now: time.Now}, Router: router, Now: time.Now, Report: func(s string) { t.Log(s) }}
 			err = start.StartContext(ctx, current, f.work.Accepted.CaptureID)
 			cancel()
 			end()
@@ -443,7 +443,7 @@ func TestRegionalGroupRouterQueuesEarlierChildWhileLastAuditBlocked(t *testing.T
 	}
 	defer router.Close()
 	f.router = router
-	regional := RegionalAPIContextStart{Runner: executionapp.APIContextRunner{Read: f, Prepare: f, Record: f, Eligibility: f, Capabilities: f, Retention: groupRegionalRetention{f}, Now: time.Now}, Signer: f, Router: router, Now: time.Now, Report: func(s string) { t.Log(s) }}
+	regional := RegionalAPIContextStart{Runner: executionapp.APIContextRunner{Read: f, Prepare: f, Record: f, Eligibility: f, Capabilities: f, Retention: groupRegionalRetention{f}, Now: time.Now}, Router: router, Now: time.Now, Report: func(s string) { t.Log(s) }}
 	_, services := publicContextOperationFixture(t)
 	investigation := services.Investigation
 	investigation.RootID = regionalObservationID(41)

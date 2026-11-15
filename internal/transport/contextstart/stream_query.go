@@ -46,7 +46,7 @@ const (
 	queryResolveProfileRecorder  = "resolve-profile-recorder"
 	queryResolveSyscallRecorder  = "resolve-syscall-recorder"
 	queryResolveOngoingRecorders = "resolve-ongoing-recorders"
-	// One signed source arm/renewal/stop. The only query that verifies and
+	// One source arm/renewal/stop. The only query that checks and
 	// queues work; it keeps the standby waiting like any other query.
 	querySourceWork = "source-work"
 )
@@ -584,12 +584,12 @@ func (s *frameStream) answerQuery(ctx context.Context, f contracts.APIContextFra
 			e = targets.ErrUnsupported
 		}
 	case querySourceWork:
-		var signed []byte
-		if decodeOperationBody(q.Body, &signed) != nil || len(signed) == 0 || len(signed) > contracts.SourceSignedWorkBytes {
+		var payload []byte
+		if decodeOperationBody(q.Body, &payload) != nil || len(payload) == 0 || len(payload) > contracts.SourceWorkBytes {
 			return contracts.ErrAPIContextProtocol
 		}
-		out, e = applySourceWork(bounded, owner, signed, s.sourceWork, time.Now)
-		clear(signed)
+		out, e = applySourceWork(bounded, owner, payload, s.sourceWork, time.Now)
+		clear(payload)
 	default:
 		return contracts.ErrAPIContextProtocol
 	}

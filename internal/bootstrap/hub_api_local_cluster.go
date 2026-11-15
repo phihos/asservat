@@ -58,7 +58,7 @@ func localCatalogCluster(c contracts.OwnerDeployment, o *hubAPIRegionalOffer, st
 
 // catalogCluster is one cluster's context-start entry derived from the
 // stored offer and Helm-known names: the connector identity document and the
-// hub's capability and work trust. A joined mode=cluster cluster is the same
+// hub's capability. A joined mode=cluster cluster is the same
 // entry with its own IDs and release namespace; its retention topology is the
 // in-process one of the hub retention source. image is the hub's current
 // chart image: the capability names it as the collector release that plans
@@ -84,6 +84,5 @@ func catalogCluster(stored contracts.RegionalOffer, image, cluster, peerID, name
 	root, installation, epoch := stored.PermissionRootID, stored.InstallationID, stored.IssuerEpoch
 	return contracts.OwnerPublicCluster{ClusterID: cluster, Connector: peer, Standby: standby, Captures: captures,
 		Settings: contracts.ContextCapabilitySettings{Format: contracts.ContextCapabilityFormat, RootID: root, InstallationID: installation, ClusterID: cluster, IssuerEpoch: epoch, Revision: 1, Enabled: true,
-			ExecutionClass: string(artifact.ContextAPIExecution), CollectorVersion: "sha256-" + image[:32], CollectorImageDigest: image, ProjectionDigest: hex.EncodeToString(projection[:])},
-		Trust: contracts.APIContextWorkTrustSettings{Format: contracts.APIContextTrustFormat, RootID: root, InstallationID: installation, ClusterID: cluster, IssuerEpoch: epoch, Revision: 1, Enabled: true, Keys: []contracts.APIContextWorkPublicKey{*stored.WorkKey}}}, nil
+			ExecutionClass: string(artifact.ContextAPIExecution), CollectorVersion: "sha256-" + image[:32], CollectorImageDigest: image, ProjectionDigest: hex.EncodeToString(projection[:])}}, nil
 }

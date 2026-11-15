@@ -14,7 +14,7 @@ const (
 	// Four receipts each have version+ETag strings of <=1024bytes. JSON may
 	// expand each ASCII '<', '>' or '&' to six bytes; the remaining16KiB
 	// covers bounded authority/identity/completion and punctuation.
-	HistoryEnvelopeBytes        = 4*2*1024*6 + APIContextSignedWorkBytes
+	HistoryEnvelopeBytes        = 4*2*1024*6 + 16<<10
 	HistoryCiphertextFrameBytes = HistoryBundleBytes + HistoryEnvelopeBytes
 )
 

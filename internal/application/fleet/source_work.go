@@ -1,20 +1,12 @@
 package fleet
 
 import (
+	"time"
+
 	"asservat.local/asservat/internal/domain/collector"
 	value "asservat.local/asservat/internal/domain/fleet"
-	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/targets"
-	"context"
-	"time"
 )
-
-type SourceWorkSigner interface {
-	SignSourceWork(context.Context, SourceWork) ([]byte, error)
-}
-type SourceWorkVerifier interface {
-	VerifySourceWork(context.Context, []byte, value.APIContextReceiver) (AuthenticatedSourceWork, error)
-}
 
 // SourceWork is a committed ordinary ongoing source purpose over one retained
 // connector conversation. It has no capture, occurrence, evidence or raw grant.
@@ -67,17 +59,6 @@ func (w SourceWork) IssuedAt() time.Time {
 }
 func (w SourceWork) Matches(r value.APIContextReceiver, now time.Time) bool {
 	return w.Valid(now) && r.Valid(now) && w.Channel == r.Channel
-}
-
-type AuthenticatedSourceWork struct {
-	Work                   SourceWork
-	KeyID                  string
-	TrustRevision          identity.Revision
-	VerifiedAt, ValidUntil time.Time
-}
-
-func (w AuthenticatedSourceWork) Valid(now time.Time) bool {
-	return w.Work.Valid(now) && identity.Text(w.KeyID, 128) && w.TrustRevision.Valid() && identity.Fresh(w.VerifiedAt, w.ValidUntil, now, 5*time.Second) && !w.ValidUntil.After(w.Work.NotAfter)
 }
 
 func (w SourceWork) Binding() collector.SourceBinding {

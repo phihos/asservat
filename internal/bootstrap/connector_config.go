@@ -221,7 +221,7 @@ func resolveRegionalConfig(ctx context.Context, in *providerInputs, c contracts.
 	}
 	s, k := out.store, out.keys
 	if !ownerEndpoint(s.Endpoint) || !identity.Text(s.Region, 128) || !identity.Text(s.Bucket, 63) || !authorization.UUID(s.StoreID) || !ownerEndpoint(k.Endpoint) ||
-		!(authorization.KeyScope{InstallationID: o.InstallationID, Purpose: "artifact", KeyID: k.KeyID}).Valid() || !ownerDialAddress(out.owners.Address) || o.WorkKey == nil {
+		!(authorization.KeyScope{InstallationID: o.InstallationID, Purpose: "artifact", KeyID: k.KeyID}).Valid() || !ownerDialAddress(out.owners.Address) {
 		return out, &fixedStepError{"offer-executor", mounts.ErrUnavailable}
 	}
 	return out, nil

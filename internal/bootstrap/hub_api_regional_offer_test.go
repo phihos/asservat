@@ -102,7 +102,7 @@ func TestHubAPIRegionalOfferExecutorSection(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := contracts.OwnerDeployment{InstallationID: runtimeID, AuditStore: contracts.OwnerAuditStore{Roots: hubAPICAFixture},
-		Public: &contracts.OwnerPublicDeployment{ArtifactKeyID: artifactKeyID(runtimeID), WorkSigning: contracts.OwnerPublicSigning{KeyID: "work-v1", PublicKey: bytes.Repeat([]byte{1}, 32)}}}
+		Public: &contracts.OwnerPublicDeployment{ArtifactKeyID: artifactKeyID(runtimeID)}}
 	if err = o.addExecutor(ctx, root, h, c, "not-a-store", time.Now()); err == nil {
 		t.Fatal("executor without the evidence store ID")
 	}
@@ -123,7 +123,7 @@ func TestHubAPIRegionalOfferExecutorSection(t *testing.T) {
 	if d.Decode(&back) != nil {
 		t.Fatal("offer decode")
 	}
-	if offered, err := back.RegionalExecutorOffered(); err != nil || !offered || back.Owners.Address != "asservat-hub-api-native.hub.svc:9444" || back.KeyService.Endpoint != "https://asservat-key-service.hub.svc:9447" || back.EvidenceStore.StoreID != runtimeID || back.EvidenceStore.Bucket != "asservat-evidence" || back.WorkKey.ID != "work-v1" {
+	if offered, err := back.RegionalExecutorOffered(); err != nil || !offered || back.Owners.Address != "asservat-hub-api-native.hub.svc:9444" || back.KeyService.Endpoint != "https://asservat-key-service.hub.svc:9447" || back.EvidenceStore.StoreID != runtimeID || back.EvidenceStore.Bucket != "asservat-evidence" {
 		t.Fatal("executor section", string(raw))
 	}
 	cfg := regionalConfig{binding: value.PeerBinding{InstallationID: runtimeID, IssuerEpoch: runtimeID}}
@@ -148,8 +148,8 @@ func TestHubAPIRegionalOfferExecutorSection(t *testing.T) {
 	if local.Connector.SourceUID != peer || local.ClusterID != runtimeID {
 		t.Fatal("local connector peer", local.Connector)
 	}
-	if local.Trust.Keys[0].ID != "work-v1" || local.Standby != 2 {
-		t.Fatal("local catalog entry", local.Trust.Keys, local.Standby)
+	if local.Standby != 2 {
+		t.Fatal("local catalog entry", local.Standby)
 	}
 	// A joined mode=cluster cluster derives the same entry for its own IDs
 	// and release namespace; no executor digest is pinned (ADR-333).
@@ -182,7 +182,7 @@ func TestHubAPIRegionalOfferExecutorSection(t *testing.T) {
 	}
 	// The first stored offer stays: a second ensure returns it unchanged.
 	again, err := o.ensure(ctx, api)
-	if err != nil || again.WorkKey.NotBefore != stored.WorkKey.NotBefore {
+	if err != nil || again.EvidenceStore.StoreID != stored.EvidenceStore.StoreID {
 		t.Fatal("stored offer replaced", err)
 	}
 }

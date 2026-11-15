@@ -12,7 +12,6 @@ import (
 	"slices"
 	"time"
 
-	"asservat.local/asservat/internal/adapters/jose"
 	"asservat.local/asservat/internal/adapters/kms"
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/mounts"
@@ -25,7 +24,6 @@ import (
 	configapp "asservat.local/asservat/internal/application/configuration"
 	"asservat.local/asservat/internal/application/evidence"
 	executionapp "asservat.local/asservat/internal/application/execution"
-	fleetapp "asservat.local/asservat/internal/application/fleet"
 	identities "asservat.local/asservat/internal/application/identity"
 	planningapp "asservat.local/asservat/internal/application/planning"
 	privacyapp "asservat.local/asservat/internal/application/privacy"
@@ -34,7 +32,6 @@ import (
 	audit "asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
-	fleet "asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/planning"
 	"asservat.local/asservat/internal/transport/contextstart"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -50,39 +47,6 @@ func (c publicCapabilities) ContextCapability(ctx context.Context, t authorizati
 		return planning.ContextCapability{}, cfg.ErrUnavailable
 	}
 	return s.ContextCapability(ctx, t)
-}
-
-// publicSigners routes work signing to the target cluster's hub-held trust:
-// one hub key signs, but each cluster's trust decides whether it may.
-type publicSigners map[string]*jose.APIContextWorkSignatures
-
-func (s publicSigners) SignAPIContextWork(ctx context.Context, w fleet.APIContextWork) ([]byte, error) {
-	signer := s[w.Target.ClusterID]
-	if signer == nil || w.Channel.Connector.Binding.ClusterID != w.Target.ClusterID {
-		return nil, fleet.ErrUnavailable
-	}
-	return signer.SignAPIContextWork(ctx, w)
-}
-
-func (s publicSigners) SignHistoryWork(ctx context.Context, w fleetapp.HistoryWork) ([]byte, error) {
-	signer := s[w.Authority.Expectation.Registration.Location.ClusterID]
-	if signer == nil || w.Channel.Connector.Binding.ClusterID != w.Authority.Expectation.Registration.Location.ClusterID {
-		return nil, fleet.ErrUnavailable
-	}
-	return signer.SignHistoryWork(ctx, w)
-}
-
-// Source purpose remains distinct from capture/history signing even though
-// each cluster reuses its existing accepted signing trust and key provider.
-func (s publicSigners) SignSourceWork(ctx context.Context, w fleetapp.SourceWork) ([]byte, error) {
-	signer := s[w.Channel.Connector.Binding.ClusterID]
-	if signer == nil {
-		return nil, fleet.ErrUnavailable
-	}
-	if !w.Stop && w.StopSnapshot == nil && w.StopProfile == nil && w.StopRecording == nil && w.Target.Request.ClusterID != w.Channel.Connector.Binding.ClusterID {
-		return nil, fleet.ErrUnavailable
-	}
-	return signer.SignSourceWork(ctx, w)
 }
 
 // publicContext holds the ADR-180 P3 services: the investigation, its audit
@@ -186,8 +150,7 @@ type publicShared struct {
 	origins evidence.NativeOrigins
 }
 
-// files is the public root; providers, in the installed layout, replace the
-// work-signing token file (ADR-182).
+// files is the public root (ADR-182).
 func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInputs, providers *kms.InstalledOwnerProviderEffects, pools *publicPools, observer, probe *kube.PermissionClient, shared publicShared, catalog publicCatalog, a publicAuditStore, closers *[]func()) (*publicContext, error) {
 	c, p := in.config, in.config.Public
 	root, installation := c.PermissionRootID, c.InstallationID
@@ -223,24 +186,8 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	if err != nil {
 		return nil, err
 	}
-	// One hub signing key; each cluster's hub-held trust decides acceptance.
-	s := p.WorkSigning
-	if !ownerProviderName.MatchString(s.Mount) || !ownerProviderName.MatchString(s.Name) || s.Version < 1 || len(s.PublicKey) != 32 || len(s.KeyID) < 1 || len(s.KeyID) > 128 {
-		return nil, mounts.ErrUnavailable
-	}
-	var key *kms.SigningKey
-	if providers != nil {
-		if key = providers.WorkSigner(); key == nil {
-			return nil, mounts.ErrUnavailable
-		}
-	} else {
-		if key, err = kms.NewSigningKeyWithTokenSource(c.KeyService.Endpoint, s.Mount, s.Name, s.Version, s.PublicKey, files.token(contracts.OwnerPublicWorkSignToken), a.keys); err != nil {
-			return nil, mounts.ErrUnavailable
-		}
-		*closers = append(*closers, key.Close)
-	}
 	control := cfg.NamespaceRef{Name: c.Namespace.Name, UID: c.Namespace.UID}
-	capabilities, signers := publicCapabilities{}, publicSigners{}
+	capabilities := publicCapabilities{}
 	limits := contextstart.RouterLimits{Standby: p.Standby, Captures: p.Captures}
 	// ADR-185: the regional clusters come from the guarded catalog, read once
 	// at start before the native configuration (ADR-196 decision 7). Each
@@ -254,18 +201,13 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	for _, v := range in.remoteEntries {
 		out.clusterIDs = append(out.clusterIDs, v.ClusterID)
 	}
-	// admit adds one cluster's capability, work-trust signer and limits.
-	admit := func(v contracts.OwnerPublicCluster, capability *kube.ContextCapabilitySource, trust *kube.APIContextWorkTrustSource) error {
-		var err error
+	// admit adds one cluster's capability and limits.
+	admit := func(v contracts.OwnerPublicCluster, capability *kube.ContextCapabilitySource) {
 		capabilities[v.ClusterID] = capability
-		if signers[v.ClusterID], err = jose.NewAPIContextWorkSignatures(trust, s.KeyID, key.ForContext, time.Now); err != nil {
-			return mounts.ErrUnavailable
-		}
 		limits.Clusters = append(limits.Clusters, contextstart.ClusterLimit{ClusterID: v.ClusterID, Standby: v.Standby, Captures: v.Captures})
-		return nil
 	}
 	for _, v := range catalog.catalog.Clusters {
-		if _, dup := capabilities[v.ClusterID]; dup || v.ClusterID == c.ClusterID || !authorization.UUID(v.ClusterID) || v.Settings.ClusterID != v.ClusterID || v.Trust.ClusterID != v.ClusterID || v.Settings.RootID != root || v.Trust.RootID != root || v.Settings.InstallationID != installation || v.Trust.InstallationID != installation {
+		if _, dup := capabilities[v.ClusterID]; dup || v.ClusterID == c.ClusterID || !authorization.UUID(v.ClusterID) || v.Settings.ClusterID != v.ClusterID || v.Settings.RootID != root || v.Settings.InstallationID != installation {
 			return nil, mounts.ErrUnavailable
 		}
 		ca, cp := capacityWorkerGuard(v.Capability.Guard)
@@ -277,21 +219,10 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 		if err != nil {
 			return nil, mounts.ErrUnavailable
 		}
-		ta, tp := capacityWorkerGuard(v.WorkTrust.Guard)
-		trustGuard, err := kube.NewAPIContextWorkTrustProtection(observer, probe, cfg.ConfigMapAdministration{Name: v.WorkTrust.Guard.Name, SourceName: v.WorkTrust.Source.Name, ControlNamespace: control, Administrators: ta}, tp)
-		if err != nil {
-			return nil, mounts.ErrUnavailable
-		}
-		trust, err := kube.NewAPIContextWorkTrustSource(observer, trustGuard, v.WorkTrust.Source.Name, v.WorkTrust.Source.UID, v.Trust)
-		if err != nil {
-			return nil, mounts.ErrUnavailable
-		}
-		if err = admit(v, capability, trust); err != nil {
-			return nil, err
-		}
+		admit(v, capability)
 	}
 	// mode=combined: the hub admits its own cluster's connector itself; its
-	// capability and work trust are the hub's own settings (no catalog entry).
+	// capability is the hub's own settings (no catalog entry).
 	// Joined mode=cluster clusters are admitted the same way: their entries
 	// derive from the stored offer and values, not from the catalog.
 	derived := slices.Clone(in.remoteEntries)
@@ -309,13 +240,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 		if err != nil {
 			return nil, &fixedStepError{step + "-capability", mounts.ErrUnavailable}
 		}
-		trust, err := kube.NewLocalAPIContextWorkTrustSource(observer, v.Connector.SourceUID, v.Trust)
-		if err != nil {
-			return nil, &fixedStepError{step + "-trust", mounts.ErrUnavailable}
-		}
-		if err = admit(v, capability, trust); err != nil {
-			return nil, &fixedStepError{step, err}
-		}
+		admit(v, capability)
 	}
 	// The installation-wide ceilings cover every joined cluster's own
 	// reservation; each cluster stays bounded by its catalog entry.
@@ -349,7 +274,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	out.history = &captureapp.HistoryParameterService{RootID: root, InstallationID: installation, Ledger: historySQL, Regional: RegionalHistoryDispatch{Router: router, Signer: signers, Now: time.Now, Report: timedEventLog(os.Stderr, "history dispatch")}, Codec: objectstore.HistoryCodec{Sealer: a.seal, Opener: a.open, Keys: out.mac}, Keys: out.mac, Retention: out.retention, Limits: historyBounds, ReportFailure: eventLog(os.Stderr, "history unavailable"), ReportTiming: timedEventLog(os.Stderr, "history timing")}
+	out.history = &captureapp.HistoryParameterService{RootID: root, InstallationID: installation, Ledger: historySQL, Regional: RegionalHistoryDispatch{Router: router, Now: time.Now, Report: timedEventLog(os.Stderr, "history dispatch")}, Codec: objectstore.HistoryCodec{Sealer: a.seal, Opener: a.open, Keys: out.mac}, Keys: out.mac, Retention: out.retention, Limits: historyBounds, ReportFailure: eventLog(os.Stderr, "history unavailable"), ReportTiming: timedEventLog(os.Stderr, "history timing")}
 
 	// ADR-228: policy captures share the investigation; the eligibility port
 	// evaluates a policy executor through its acceptance and team delegation.
@@ -365,7 +290,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	if out.policySources, err = postgres.NewPolicySources(ctx, sql["policy-automation"], root, installation, shared.retention); err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	out.sourceDispatch = RegionalSourceDispatch{Router: router, Signer: signers, Now: time.Now}
+	out.sourceDispatch = RegionalSourceDispatch{Router: router, Now: time.Now}
 	if out.automation, err = postgres.NewAutomationAuthorities(ctx, sql["policy-automation"], root, installation); err != nil {
 		return nil, mounts.ErrUnavailable
 	}
@@ -454,8 +379,8 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	}
 	// One governed pool/credential, retaining the three typed runner ports.
 	runner := executionapp.APIContextRunner{Read: executionSQL, Prepare: executionSQL, Record: executionSQL, Eligibility: eligibility, Retention: out.retention, Profiles: profiles}
-	out.regional = RegionalAPIContextStart{Runner: runner, Signer: signers, Router: router, Report: eventLog(os.Stderr, "context start run refused")}
-	out.collect = RegionalRecordingCollect{Runner: executionapp.APIContextRunner{Record: executionSQL, Capabilities: capabilities, Now: time.Now}, Recordings: executionSQL, Signer: signers, Router: router, Now: time.Now, Report: eventLog(os.Stderr, "recording collect refused")}
+	out.regional = RegionalAPIContextStart{Runner: runner, Router: router, Report: eventLog(os.Stderr, "context start run refused")}
+	out.collect = RegionalRecordingCollect{Runner: executionapp.APIContextRunner{Record: executionSQL, Capabilities: capabilities, Now: time.Now}, Recordings: executionSQL, Router: router, Now: time.Now, Report: eventLog(os.Stderr, "recording collect refused")}
 	out.investigation.ReasonCipher = reasonCipher
 	// ADR-248: node recorder availability is a regional pre-work query.
 	out.investigation.Recorders = queries

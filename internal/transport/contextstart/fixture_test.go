@@ -14,7 +14,13 @@ import (
 )
 
 // workFixture is one synthetic verified API context work for stream tests.
-func workFixture() fleet.AuthenticatedAPIContextWork {
+// testWork is one work with the interval a receiver check accepted it in.
+type testWork struct {
+	Work                   fleet.APIContextWork
+	VerifiedAt, ValidUntil time.Time
+}
+
+func workFixture() testWork {
 	id := func(n string) string { return "00000000-0000-4000-8000-0000000000" + n }
 	n := time.Now().UTC().Truncate(time.Microsecond)
 	actor := identity.Principal{Issuer: "https://identity.invalid", Subject: "actor", ClientID: "console", Kind: identity.Human}
@@ -23,7 +29,7 @@ func workFixture() fleet.AuthenticatedAPIContextWork {
 	peer := fleet.ConnectorProcessIdentity{Binding: fleet.PeerBinding{InstallationID: hub.InstallationID, ClusterID: id("06"), IssuerEpoch: hub.IssuerEpoch, PeerID: id("07"), Role: fleet.ConnectorPeer}, PodUID: id("08"), ProcessEpoch: id("09")}
 	channel := fleet.APIContextChannel{RootID: id("10"), ExchangeID: id("11"), Challenge: id("12"), Hub: hub, Connector: peer, Executor: fleet.APIContextExecutor{NamespaceUID: id("13"), AccountUID: id("14"), PodUID: peer.PodUID, ProcessEpoch: id("15"), StartupDigest: artifact.Digest{2}, ImageDigest: artifact.Digest{3}}}
 	w := fleet.APIContextWork{Channel: channel, CaptureID: id("16"), AttemptID: id("17"), Actor: actor, Target: authorization.Target{ClusterID: peer.Binding.ClusterID, NamespaceUID: id("18"), WorkloadUID: id("19"), PodUID: id("20")}, ScopeDigest: artifact.Digest{1}, ExpectationDigest: artifact.Digest{2}, IntentDigest: artifact.Digest{3}, BudgetDigest: artifact.Digest{4}, Capability: rev, ProjectionDigest: artifact.Digest{5}, IssuedAt: n, NotAfter: n.Add(5 * time.Second)}
-	return fleet.AuthenticatedAPIContextWork{Work: w, KeyID: "key", TrustRevision: rev, VerifiedAt: n, ValidUntil: w.NotAfter}
+	return testWork{Work: w, VerifiedAt: n, ValidUntil: w.NotAfter}
 }
 
 // countingLocal is a regional port set that only counts calls; tests that use

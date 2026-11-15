@@ -111,7 +111,7 @@ func (n *nodePackets) start(ctx context.Context, w collector.Work) collector.Rec
 		}
 		// Scope/expectation remain authenticated producer provenance. Only the
 		// program, finite fit and current local source facts are independent here;
-		// C09 verifies the full expectation against its original signed work.
+		// C09 verifies the full expectation against its original work.
 		if ctx == nil || ctx.Err() != nil {
 			r.Reason = collector.ReasonWorkUnknown
 			return r

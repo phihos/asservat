@@ -8,11 +8,9 @@ import (
 
 	auditapp "asservat.local/asservat/internal/application/audit"
 	executionapp "asservat.local/asservat/internal/application/execution"
-	fleetapp "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/bootstrap"
 	auditvalue "asservat.local/asservat/internal/domain/audit"
 	capturevalue "asservat.local/asservat/internal/domain/capture"
-	fleetvalue "asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
 )
 
@@ -137,28 +135,19 @@ func (s publicJourneyCaptureDiagnostics) recordPhase(phase string, intent, outco
 
 type publicJourneyRegionalDiagnostics struct {
 	executionapp.APIExecutionReader
-	fleetapp.APIContextWorkSigner
 	trace *publicJourneyDiagnostics
 }
 
 func (s *publicJourneyDiagnostics) Regional(in bootstrap.RegionalAPIContextStart) bootstrap.RegionalAPIContextStart {
-	p := publicJourneyRegionalDiagnostics{in.Runner.Read, in.Signer, s}
+	p := publicJourneyRegionalDiagnostics{in.Runner.Read, s}
 	if in.Runner.Read != nil {
 		in.Runner.Read = p
-	}
-	if in.Signer != nil {
-		in.Signer = p
 	}
 	return in
 }
 func (s publicJourneyRegionalDiagnostics) ReadAPIContextWork(c context.Context, id string, actor identity.Identity) (executionapp.APIContextWork, error) {
 	v, e := s.APIExecutionReader.ReadAPIContextWork(c, id, actor)
 	s.trace.record(journeyRegionalRead, journeyDiagnosticError(e))
-	return v, e
-}
-func (s publicJourneyRegionalDiagnostics) SignAPIContextWork(c context.Context, in fleetvalue.APIContextWork) ([]byte, error) {
-	v, e := s.APIContextWorkSigner.SignAPIContextWork(c, in)
-	s.trace.record(journeyRegionalSign, journeyDiagnosticError(e))
 	return v, e
 }
 

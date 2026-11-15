@@ -13,13 +13,10 @@ PREFIX="https://asservat.io/spec/v1/"
 def main():
     parser=argparse.ArgumentParser()
     parser.add_argument("--write", action="store_true")
-    parser.add_argument("--bundle", choices=["manifest", "permissions", "control", "policies"], default="manifest")
+    parser.add_argument("--bundle", choices=["manifest", "permissions", "policies"], default="manifest")
     args=parser.parse_args()
     dest=ROOT/("internal/adapters/objectstore/manifest/schemas" if args.bundle=="manifest" else "internal/adapters/kubernetes/permission-schemas")
-    pending=(["manifest.schema.json","framed-storage.schema.json","pod-status.schema.json","syscall-results.schema.json","syscall-arguments.schema.json"] if args.bundle=="manifest" else ["access-binding.schema.json","permission-source.schema.json","identity-settings.schema.json","browser-settings.schema.json","submission-trust.schema.json","work-trust.schema.json","retention-policy.schema.json","retention-topology.schema.json"])
-    if args.bundle=="control":
-        dest=ROOT/"internal/adapters/jose/schemas"
-        pending=["internal-work.schema.json"]
+    pending=(["manifest.schema.json","framed-storage.schema.json","pod-status.schema.json","syscall-results.schema.json","syscall-arguments.schema.json"] if args.bundle=="manifest" else ["access-binding.schema.json","permission-source.schema.json","identity-settings.schema.json","browser-settings.schema.json","retention-policy.schema.json","retention-topology.schema.json"])
     if args.bundle=="policies":
         dest=ROOT/"internal/adapters/kubernetes/policy-schemas"
         pending=["policy.schema.json"]

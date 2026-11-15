@@ -2,7 +2,6 @@ package bootstrap
 
 import (
 	"context"
-	"crypto/ed25519"
 	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
@@ -43,12 +42,6 @@ func (r *fakeHubAPIResolver) ObjectUID(_ context.Context, _, resource, namespace
 }
 func (r *fakeHubAPIResolver) PKIRoots(_ context.Context, mount string) ([][]byte, error) {
 	return hubAPICAFixture, r.step("pki/" + mount)
-}
-func (r *fakeHubAPIResolver) SigningKey(_ context.Context, role, mount, name string) (int, ed25519.PublicKey, error) {
-	if !strings.HasSuffix(role, "-work-sign") {
-		return 0, nil, errors.New("not the work-sign role")
-	}
-	return 3, make(ed25519.PublicKey, ed25519.PublicKeySize), r.step("signing/" + mount + "/" + name)
 }
 func (r *fakeHubAPIResolver) CapacityPin(_ context.Context, root, installation string) (postgres.CapacityQualificationPin, error) {
 	p := audit.OperationLifecyclePolicy{RootID: root, Lane: "capture", InstallationID: installation, StoreID: runtimeID, PolicyID: runtimeID, BackupProfileID: runtimeID, PolicyDigest: artifact.Digest{1}, BackupProfileDigest: artifact.Digest{2}, BackingRevision: 1, MetadataSlots: 1, BackupReservedBytes: 1<<63 - 1, WALReservedBytes: 1<<63 - 1, MaxPurgeLeases: 8, CleanupBudgetSeconds: 15, ProofWindowSeconds: 1, ValidUntil: time.Now().UTC().Truncate(time.Microsecond).Add(time.Hour), History: &audit.OperationHistoryQualification{ID: runtimeID, Digest: artifact.Digest{3}, Layout: audit.CaptureOperationHistoryLayout, MaximumRowFootprintBytes: 256 << 10, MaximumTransitionWALBytes: 256 << 10, BackupCopies: 2, WALCopies: 2}}
@@ -154,8 +147,8 @@ func TestHubAPIInputsMergeConfigIDsAndStartupReads(t *testing.T) {
 	}
 	p := c.Public
 	names := providerconfig.OpenBaoNamesFor(runtimeID)
-	if p.WorkSigning.Version != 3 || p.WorkSigning.KeyID != names.WorkSigningKey+"-v3" || p.SessionTransit.Key != names.BrowserSessionKey || p.ArtifactKeyID != artifactKeyID(runtimeID) || c.KeyService.ServerRole != names.OwnerServerRole || p.AuditStoreID != runtimeID || p.OperationAudit.RetentionSeconds != 10000 || p.Capacity.QualificationID != runtimeID || !p.ProxyTLS || p.ProviderRecipeSHA256 == "" || p.WorkerPKI.IssuerEpoch != runtimeID || len(p.WorkerPKI.Roots) != 1 {
-		t.Fatal("public J values", p.WorkSigning, p.AuditStoreID, p.Capacity)
+	if p.SessionTransit.Key != names.BrowserSessionKey || p.ArtifactKeyID != artifactKeyID(runtimeID) || c.KeyService.ServerRole != names.OwnerServerRole || p.AuditStoreID != runtimeID || p.OperationAudit.RetentionSeconds != 10000 || p.Capacity.QualificationID != runtimeID || !p.ProxyTLS || p.ProviderRecipeSHA256 == "" || p.WorkerPKI.IssuerEpoch != runtimeID || len(p.WorkerPKI.Roots) != 1 {
+		t.Fatal("public J values", p.AuditStoreID, p.Capacity)
 	}
 	// The provider roles are the ones setup creates: <name>-hub-api-<purpose>.
 	a := *c.ProviderAuthentication
@@ -192,7 +185,6 @@ func TestHubAPIInputsNameTheMissingInput(t *testing.T) {
 		"identity-ca":         {skipCA: contracts.HubAPIIdentityCAFile, want: "input-ca-identity-ca.crt"},
 		"namespace-uid":       {fail: "namespace/hub", want: "input-namespace-uid"},
 		"capacity":            {fail: "capacity", want: "input-capacity-qualification"},
-		"work-signing":        {fail: "signing/public-transit/" + providerconfig.OpenBaoNamesFor(runtimeID).WorkSigningKey, want: "input-work-signing-key"},
 		"invalid-composition": {mutate: func(c *contracts.HubAPIConfig) { c.Connections = 0 }, want: "identity"},
 	} {
 		t.Run(name, func(t *testing.T) {

@@ -50,9 +50,9 @@ func (r APIContextReceiver) Valid(now time.Time) bool {
 	return r.Channel.Valid() && r.Window.Kind() == identity.Recheck && r.Window.Valid(now)
 }
 
-// APIContextWork is a signed reference to one accepted API profile. Human groups
-// and scopes never enter this value. Signature validity is not effect authority.
-// The receiver separately resolves every digest against accepted SQL/local facts.
+// APIContextWork references one accepted API profile. Human groups and scopes
+// never enter this value. The receiver separately resolves every digest
+// against accepted SQL/local facts.
 type APIContextWork struct {
 	Channel                                                    APIContextChannel
 	CaptureID, AttemptID                                       string
@@ -97,42 +97,6 @@ func (w APIContextWork) MismatchStep(r APIContextReceiver, now time.Time) string
 		return "channel"
 	}
 	return "none"
-}
-
-type APIContextWorkTrust struct {
-	RootID, InstallationID, ClusterID, IssuerEpoch string
-	Trust                                          WorkTrust
-}
-
-func (t APIContextWorkTrust) Valid(now time.Time) bool {
-	for _, id := range []string{t.RootID, t.InstallationID, t.ClusterID, t.IssuerEpoch} {
-		if !authorization.UUID(id) {
-			return false
-		}
-	}
-	if !t.Trust.Valid(now) || t.Trust.FreshUntil.After(t.Trust.ObservedAt.Add(identity.AuthorityRecheckInterval)) {
-		return false
-	}
-	for _, k := range t.Trust.Keys {
-		if k.ClusterID != t.ClusterID || k.IssuerEpoch != t.IssuerEpoch {
-			return false
-		}
-	}
-	return true
-}
-func (t APIContextWorkTrust) Matches(w APIContextWork) bool {
-	return t.RootID == w.Channel.RootID && t.InstallationID == w.Channel.Connector.Binding.InstallationID && t.ClusterID == w.Target.ClusterID && t.IssuerEpoch == w.Channel.Connector.Binding.IssuerEpoch
-}
-
-type AuthenticatedAPIContextWork struct {
-	Work                   APIContextWork
-	KeyID                  string
-	TrustRevision          identity.Revision
-	VerifiedAt, ValidUntil time.Time
-}
-
-func (w AuthenticatedAPIContextWork) Valid(now time.Time) bool {
-	return w.Work.Valid(now) && identity.Text(w.KeyID, 128) && w.TrustRevision.Valid() && identity.Fresh(w.VerifiedAt, w.ValidUntil, now, identity.AuthorityRecheckInterval) && !w.ValidUntil.After(w.Work.NotAfter)
 }
 
 // APIContextOwnerCandidates is a complete bounded discovery observation. Empty

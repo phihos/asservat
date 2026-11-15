@@ -3,7 +3,6 @@ package kms
 import (
 	"bytes"
 	"context"
-	"crypto/ed25519"
 	"crypto/sha256"
 	"slices"
 	"sync"
@@ -31,14 +30,14 @@ type ProtectedLocalOperations struct {
 var _ app.KeyOperationBackend = (*ProtectedLocalOperations)(nil)
 var _ app.KeyConfigurationGuard = (*ProtectedLocalOperations)(nil)
 
-func describeLocalMaterial(m app.KeyMaterial, scope value.KeyScope, now time.Time) (value.LocalKeyConfiguration, int, error) {
+func describeLocalMaterial(m app.KeyMaterial, scope value.KeyScope, now time.Time) (value.LocalKeyConfiguration, error) {
 	c := m.Configuration
 	if c.Scope != scope || artifact.Digest(sha256.Sum256(m.Payload)) != c.SecretDigest {
-		return c, 0, ErrKeyService
+		return c, ErrKeyService
 	}
 	k, err := readLocalKeys(LocalKeyScope{scope.InstallationID, scope.Purpose, scope.KeyID}, bytes.NewReader(m.Payload))
 	if err != nil {
-		return c, 0, err
+		return c, err
 	}
 	defer k.clear()
 	c.ActiveVersion = k.ActiveVersion
@@ -47,26 +46,10 @@ func describeLocalMaterial(m app.KeyMaterial, scope value.KeyScope, now time.Tim
 		c.Versions = append(c.Versions, value.LocalKeyVersion{Version: v.Version, Fingerprint: artifact.Digest(sha256.Sum256(v.Material))})
 	}
 	slices.SortFunc(c.Versions, func(a, b value.LocalKeyVersion) int { return a.Version - b.Version })
-	version := 0
-	if scope.Purpose == "policy-submission" {
-		version = k.ActiveVersion
-		for _, v := range k.Keys {
-			if v.Version == version {
-				private := ed25519.NewKeyFromSeed(v.Material)
-				valid := bytes.Equal(private.Public().(ed25519.PublicKey), m.SigningPublic)
-				clear(private)
-				if !valid {
-					return c, 0, ErrKeyService
-				}
-			}
-		}
-	} else if len(m.SigningPublic) != 0 {
-		return c, 0, ErrKeyService
-	}
 	if !c.Valid(now) {
-		return c, 0, ErrKeyService
+		return c, ErrKeyService
 	}
-	return c, version, nil
+	return c, nil
 }
 func LoadProtectedLocalOperations(ctx context.Context, scope value.KeyScope, source app.KeyMaterialReader, ledger app.KeyConfigurationLedger, now func() time.Time) (*ProtectedLocalOperations, error) {
 	if ctx == nil || !scope.Valid() || source == nil || ledger == nil || now == nil {
@@ -79,7 +62,7 @@ func LoadProtectedLocalOperations(ctx context.Context, scope value.KeyScope, sou
 	if err != nil {
 		return nil, ErrKeyService
 	}
-	c, version, err := describeLocalMaterial(m, scope, now())
+	c, err := describeLocalMaterial(m, scope, now())
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +70,7 @@ func LoadProtectedLocalOperations(ctx context.Context, scope value.KeyScope, sou
 	if err != nil || ctx.Err() != nil || c.Suspended || !c.Valid(now()) || !now().Before(until) || until.After(c.FreshUntil) {
 		return nil, ErrKeyService
 	}
-	backend, err := NewLocalOperations(scope, version, m.SigningPublic, bytes.NewReader(m.Payload))
+	backend, err := NewLocalOperations(scope, bytes.NewReader(m.Payload))
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +128,7 @@ func (s *ProtectedLocalOperations) currentSnapshot(ctx context.Context) (value.L
 	if e != nil {
 		return value.LocalKeyConfiguration{}, ErrKeyService
 	}
-	c, _, e := describeLocalMaterial(m, s.scope, s.now())
+	c, e := describeLocalMaterial(m, s.scope, s.now())
 	if e != nil || ctx.Err() != nil {
 		return value.LocalKeyConfiguration{}, ErrKeyService
 	}

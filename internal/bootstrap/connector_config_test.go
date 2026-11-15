@@ -1,9 +1,6 @@
 package bootstrap
 
 import (
-	"crypto/ed25519"
-	"crypto/rand"
-	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
 	"net/http"
@@ -13,7 +10,6 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"asservat.local/asservat/internal/contracts"
 	auth "k8s.io/api/authentication/v1"
@@ -31,18 +27,12 @@ func connectorTestID(n string) string { return "10000000-0000-4000-8000-00000000
 func connectorTestOffer(t *testing.T, roots [][]byte) contracts.RegionalOffer {
 	t.Helper()
 	id := connectorTestID
-	public, _, err := ed25519.GenerateKey(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-	n := time.Now().UTC()
 	return contracts.RegionalOffer{Format: contracts.RegionalOfferFormat, InstallationID: id("01"), HubClusterID: id("30"), PermissionRootID: id("03"), IssuerEpoch: id("04"),
 		Federation: contracts.RegionalHubEndpoint{Endpoint: "https://federation.synthetic.invalid:30443", ServerName: "federation.synthetic.invalid", Roots: roots},
 		Image:      "registry.invalid/asservat@sha256:" + strings.Repeat("a", 64),
 		Owners: &contracts.RegionalContextOwners{Address: "hub.synthetic.invalid:30444", Configuration: contracts.OwnerConfiguration{Format: contracts.OwnerConfigurationFormat, InstallationID: id("01"), ClusterID: id("30"), IssuerEpoch: id("04"), Revision: 1,
 			Namespace: contracts.WorkerObjectReference{Name: "asservat", UID: id("31")}, Service: contracts.WorkerObjectReference{Name: "hub-api", UID: id("32")}, Deployment: contracts.WorkerObjectReference{Name: "hub-api", UID: id("33")}, ServiceAccount: contracts.WorkerObjectReference{Name: "hub-api", UID: id("34")}, Port: 9443, NativePort: 9444, IssuerRoots: roots}},
 		KeyService:    &contracts.RegionalWrapService{Endpoint: "https://keys.synthetic.invalid:30448", Roots: roots, KeyID: "artifact-key"},
-		WorkKey:       &contracts.APIContextWorkPublicKey{ID: "synthetic-key", PublicKey: base64.RawURLEncoding.EncodeToString(public), NotBefore: n.Add(-time.Minute).Format(time.RFC3339Nano), NotAfter: n.Add(time.Hour).Format(time.RFC3339Nano)},
 		EvidenceStore: &contracts.RegionalEvidenceStore{Endpoint: "https://evidence.synthetic.invalid", Roots: roots, Region: "local", Bucket: "evidence", StoreID: connectorTestID("14")}}
 }
 
@@ -175,7 +165,7 @@ func TestResolveConnectorConfigAppliesAddressesAndBinding(t *testing.T) {
 	}
 	c = connectorTestConfig()
 	plain := offer
-	plain.Owners, plain.KeyService, plain.WorkKey, plain.EvidenceStore = nil, nil, nil, nil
+	plain.Owners, plain.KeyService, plain.EvidenceStore = nil, nil, nil
 	if out, err = resolveRegionalConfig(t.Context(), connectorJoinInputs(t, plain), c); err != nil || out.executor {
 		t.Fatal("plain connector offer", err)
 	}

@@ -3,13 +3,10 @@ package kms
 import (
 	"bytes"
 	"context"
-	"crypto"
-	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"io"
 	"strings"
 	"sync"
 	"testing"
@@ -247,84 +244,3 @@ func TestLocalKeyBoundsCancellationAndConcurrency(t *testing.T) {
 	}
 	wg.Wait()
 }
-
-func TestLocalSigningPurposeVersionAndPublicPin(t *testing.T) {
-	scope := localScope
-	scope.Purpose, scope.KeyID = "policy-submission", "submission"
-	raw := localSecret(t, scope, 2, 1, 2)
-	var doc localKeySecret
-	json.Unmarshal(raw, &doc)
-	defer doc.clear()
-	private := ed25519.NewKeyFromSeed(doc.Keys[1].Material)
-	defer clear(private)
-	public := private.Public().(ed25519.PublicKey)
-	k, err := NewLocalSigningKey(scope, 2, public, bytes.NewReader(raw))
-	if err != nil {
-		t.Fatal(err)
-	}
-	message := []byte("synthetic purpose-bound JWS input")
-	s := k.ForContext(context.Background())
-	sig, err := s.Sign(rand.Reader, message, crypto.Hash(0))
-	if err != nil || !ed25519.Verify(public, message, sig) {
-		t.Fatal("invalid local signature", err)
-	}
-	copyPublic := s.Public().(ed25519.PublicKey)
-	clear(copyPublic)
-	if !bytes.Equal(s.Public().(ed25519.PublicKey), public) {
-		t.Fatal("caller mutated public pin")
-	}
-	wrong := bytes.Clone(public)
-	wrong[0] ^= 1
-	for _, args := range []struct {
-		scope   LocalKeyScope
-		version int
-		public  ed25519.PublicKey
-	}{
-		{scope, 1, public}, {scope, 2, wrong}, {localScope, 2, public},
-	} {
-		if _, err := NewLocalSigningKey(args.scope, args.version, args.public, bytes.NewReader(raw)); err == nil {
-			t.Fatal("untrusted signer configuration accepted")
-		}
-	}
-	for _, option := range []crypto.SignerOpts{nil, (*ed25519.Options)(nil), crypto.SHA256, &ed25519.Options{Context: "other-purpose"}, &ed25519.Options{Hash: crypto.SHA512}} {
-		if b, err := s.Sign(rand.Reader, message, option); err == nil || b != nil {
-			t.Fatal("unsupported signing mode accepted")
-		}
-	}
-	for _, message := range [][]byte{nil, make([]byte, 16385)} {
-		if _, err := s.Sign(rand.Reader, message, crypto.Hash(0)); err == nil {
-			t.Fatal("unbounded signing input accepted")
-		}
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	if _, err := k.ForContext(ctx).Sign(rand.Reader, message, crypto.Hash(0)); err == nil {
-		t.Fatal("canceled signature returned")
-	}
-	if _, err := NewLocalKeyBackend(scope, bytes.NewReader(raw)); err == nil {
-		t.Fatal("signing seed loaded as encryption key")
-	}
-}
-
-func FuzzLocalKeySecret(f *testing.F) {
-	f.Add(localSecret(f, localScope, 1, 1))
-	f.Add([]byte(`{"keys":null}`))
-	f.Fuzz(func(t *testing.T, b []byte) {
-		k, err := NewLocalKeyBackend(localScope, bytes.NewReader(b))
-		if err != nil {
-			return
-		}
-		ctx := context.Background()
-		sealed, err := k.Seal(ctx, []byte("synthetic"), []byte("binding"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		plain, err := k.Open(ctx, sealed, []byte("binding"))
-		if err != nil || string(plain) != "synthetic" {
-			t.Fatal("valid loaded key failed readback")
-		}
-		clear(plain)
-	})
-}
-
-var _ io.Reader = failureReader{}

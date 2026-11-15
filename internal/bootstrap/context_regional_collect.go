@@ -7,7 +7,6 @@ import (
 	"time"
 
 	executionapp "asservat.local/asservat/internal/application/execution"
-	fleetapp "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/domain/authorization"
 	capturevalue "asservat.local/asservat/internal/domain/capture"
 	execution "asservat.local/asservat/internal/domain/execution"
@@ -27,7 +26,6 @@ import (
 type RegionalRecordingCollect struct {
 	Runner     executionapp.APIContextRunner // Record, Capabilities, Now
 	Recordings executionapp.RecordingExecutions
-	Signer     fleetapp.APIContextWorkSigner
 	Router     *contextstart.Router
 	Now        func() time.Time
 	Report     func(string)
@@ -44,7 +42,7 @@ const (
 
 func (s RegionalRecordingCollect) valid() bool {
 	r := s.Runner
-	return r.Record != nil && r.Capabilities != nil && s.Recordings != nil && s.Signer != nil && s.Router != nil && s.Now != nil
+	return r.Record != nil && r.Capabilities != nil && s.Recordings != nil && s.Router != nil && s.Now != nil
 }
 
 // Run collects until ctx ends.
@@ -147,18 +145,13 @@ func (s RegionalRecordingCollect) Collect(ctx context.Context, captureID string)
 		return "", execution.ErrUnavailable
 	}
 	until = identity.Earlier(until, receiver.Window.Until())
-	step = "sign"
+	step = "work"
 	work, err := executionapp.NewAPIContextWork(w, receiver.Channel, capability, started, until, s.Now())
 	if err != nil {
 		return "", err
 	}
-	signed, err := s.Signer.SignAPIContextWork(call, work)
-	if err != nil {
-		return "", err
-	}
-	defer clear(signed)
 	step = "run"
-	state, err := attachment.Run(work, signed, func(ctx context.Context, ops *contextstart.HubOperations) (string, error) {
+	state, err := attachment.Run(work, func(ctx context.Context, ops *contextstart.HubOperations) (string, error) {
 		r := s.Runner
 		r.Process = ops
 		result, err := r.CollectRecording(ctx, w, exec, ops)

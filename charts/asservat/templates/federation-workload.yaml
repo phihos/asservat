@@ -3,7 +3,7 @@
 {{- $n := include "asservat.name" . }}
 {{- $p := include "asservat.providers" . | fromJson }}
 {{- $dir := "/run/asservat/federation" }}
-{{- $purposes := list "connector-read" "connector-delivery" "connector-owner-read" }}
+{{- $purposes := list "connector-delivery" "connector-owner-read" }}
 {{- $config := (dict
   "name" $n
   "namespace" .Release.Namespace
@@ -27,5 +27,5 @@
 {{ include "asservat.svc.service" (list . "federation" 9446) }}
 {{- include "asservat.svc.tlsObjects" (list . "federation") }}
 ---
-{{ include "asservat.svc.deployment" (dict "root" . "component" "federation" "command" "hub-federation" "dir" $dir "port" 9446 "grace" 40 "config" (toJson $config) "sqlFile" "sql-connector-read.json" "sources" (join "\n" $sources)) }}
+{{ include "asservat.svc.deployment" (dict "root" . "component" "federation" "command" "hub-federation" "dir" $dir "port" 9446 "grace" 40 "config" (toJson $config) "sqlFile" "sql-connector-delivery.json" "sources" (join "\n" $sources)) }}
 {{- end }}

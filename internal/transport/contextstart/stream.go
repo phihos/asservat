@@ -442,7 +442,7 @@ func (s *frameStream) receive(ctx context.Context) (contracts.APIContextFrame, t
 	return f, until, nil
 }
 
-// AwaitWork is a once-only passive read before any signed capture exists. Its
+// AwaitWork is a once-only passive read before any capture work exists. Its
 // residency bound is not an effect/peer grant. Only after the bounded work frame
 // arrives is the exact connection checked under a fresh original <=5s interval.
 // No later identity/result read can select this passive path.

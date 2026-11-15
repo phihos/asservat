@@ -42,9 +42,9 @@ func newOwnerEffectFixture(t *testing.T, withPublic ...bool) *ownerEffectFixture
 	if err != nil {
 		t.Fatal(err)
 	}
-	var public [4]providerconfig.OwnerProviderRoleRecipe
+	var public [3]providerconfig.OwnerProviderRoleRecipe
 	if len(withPublic) == 1 && withPublic[0] {
-		in.Public = &contracts.OwnerPublicDeployment{SessionTransit: contracts.OwnerPublicTransit{Mount: "browser-transit", Key: "sessions"}, WorkSigning: contracts.OwnerPublicSigning{Mount: "work-transit", Name: "work", Version: 1, PublicKey: make([]byte, 32)}, WorkerPKI: contracts.OwnerPublicWorkerPKI{Mount: "worker-pki", Role: "worker", IssuerEpoch: "10000000-0000-4000-8000-000000000009", Roots: in.KeyService.Roots}}
+		in.Public = &contracts.OwnerPublicDeployment{SessionTransit: contracts.OwnerPublicTransit{Mount: "browser-transit", Key: "sessions"}, WorkerPKI: contracts.OwnerPublicWorkerPKI{Mount: "worker-pki", Role: "worker", IssuerEpoch: "10000000-0000-4000-8000-000000000009", Roots: in.KeyService.Roots}}
 		roles, digest, err := providerconfig.OwnerPublicProviderRecipeFor(in, recipe.Profile, now)
 		if err != nil {
 			t.Fatal(err)
@@ -103,7 +103,7 @@ func newOwnerEffectFixture(t *testing.T, withPublic ...bool) *ownerEffectFixture
 		default:
 			purpose := f.rolePurpose[role]
 			want := map[string]string{"audit-wrap": "/v1/audit/encrypt/owner", "audit-unwrap": "/v1/audit/decrypt/owner", "server-sign": "/v1/owner-pki/sign/server", "client-sign": "/v1/owner-pki/sign/client",
-				"browser-seal": "/v1/browser-transit/encrypt/sessions", "browser-open": "/v1/browser-transit/decrypt/sessions", "work-sign": "/v1/work-transit/sign/work", "worker-issue": "/v1/worker-pki/sign/worker"}[purpose]
+				"browser-seal": "/v1/browser-transit/encrypt/sessions", "browser-open": "/v1/browser-transit/decrypt/sessions", "worker-issue": "/v1/worker-pki/sign/worker"}[purpose]
 			if purpose == "" || r.Method != http.MethodPost || r.URL.Path != want {
 				t.Error("cross-purpose credential reached provider")
 				w.WriteHeader(403)
@@ -252,15 +252,15 @@ func TestOwnerProviderEffectsKeepPermitChecksAndDoNotReplaySigning(t *testing.T)
 	}
 }
 
-// ADR-182: a pinned public recipe adds four separately authenticated
+// ADR-182: a pinned public recipe adds three separately authenticated
 // purposes, each confined to its own provider path; none exists without it.
 func TestOwnerProviderPublicPurposesAreSeparateAndConfined(t *testing.T) {
 	plain := newOwnerEffectFixture(t)
-	if plain.effects.browserSeal != nil || plain.effects.work != nil || plain.effects.worker != nil || len(plain.effects.lifetimes.all()) != 4 {
+	if plain.effects.browserSeal != nil || plain.effects.worker != nil || len(plain.effects.lifetimes.all()) != 4 {
 		t.Fatal("public purposes without a public recipe")
 	}
 	f := newOwnerEffectFixture(t, true)
-	if f.effects.browserSeal == nil || f.effects.browserOpen == nil || f.effects.work == nil || f.effects.worker == nil || len(f.effects.lifetimes.all()) != 8 {
+	if f.effects.browserSeal == nil || f.effects.browserOpen == nil || f.effects.worker == nil || len(f.effects.lifetimes.all()) != 7 {
 		t.Fatal("public purposes missing")
 	}
 	for _, slot := range f.effects.lifetimes.public {

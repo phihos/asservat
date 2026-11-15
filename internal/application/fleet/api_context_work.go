@@ -1,21 +1,10 @@
 package fleet
 
 import (
-	value "asservat.local/asservat/internal/domain/fleet"
 	"context"
-)
 
-// APIContextWorkTrustReader is fixed to an installed root/cluster/key purpose.
-// Incoming work cannot choose a source, endpoint, key URL or trust policy.
-type APIContextWorkTrustReader interface {
-	APIContextWorkTrust(context.Context) (value.APIContextWorkTrust, error)
-}
-type APIContextWorkSigner interface {
-	SignAPIContextWork(context.Context, value.APIContextWork) ([]byte, error)
-}
-type APIContextWorkVerifier interface {
-	VerifyAPIContextWork(context.Context, []byte, value.APIContextReceiver) (value.AuthenticatedAPIContextWork, error)
-}
+	value "asservat.local/asservat/internal/domain/fleet"
+)
 
 // APIContextReceiverCheck retains the exact actual peer and process selected by
 // one connection. Fresh checks never restore a lost human request owner.

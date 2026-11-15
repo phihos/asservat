@@ -124,9 +124,8 @@ type queryResult struct {
 	err   error
 }
 type captureJob struct {
-	ctx    context.Context
-	work   fleet.APIContextWork
-	signed []byte
+	ctx  context.Context
+	work fleet.APIContextWork
 	// run is the ADR-171 hub-run execution over this exchange's operations.
 	run        func(context.Context, *HubOperations) (string, error)
 	historyRun func(context.Context, Stream) (string, error)
@@ -250,7 +249,6 @@ func (s *Standby) Finish() {
 		s.check = nil
 		select {
 		case pending := <-s.job:
-			clear(pending.signed)
 			pending.run = nil
 			pending.result <- jobResult{err: fleet.ErrUnavailable}
 		default:
@@ -292,11 +290,10 @@ func (s *Standby) Serve(stream Stream, now func() time.Time) error {
 			if job.historyRun != nil {
 				state, e = job.historyRun(call, stream)
 			} else {
-				state, e = ServeHubOperations(call, stream, job.work, job.signed, job.run, now)
+				state, e = ServeHubOperations(call, stream, job.work, job.run, now)
 			}
 			stop()
 			cancel()
-			clear(job.signed)
 			job.run = nil
 			job.result <- jobResult{state, e}
 			return e
@@ -566,17 +563,10 @@ func (a *Attachment) Receiver(ctx context.Context) (fleet.APIContextReceiver, er
 	return receiver, nil
 }
 
-// Run sends the signed work and runs run on the hub with this exchange's
+// Run sends the work and runs run on the hub with this exchange's
 // regional operations (ADR-171). The region asks no identity questions.
-func (a *Attachment) Run(w fleet.APIContextWork, signed []byte, run func(context.Context, *HubOperations) (string, error)) (string, error) {
-	if run == nil {
-		return "", fleet.ErrInvalid
-	}
-	return a.dispatch(w, signed, run)
-}
-
-func (a *Attachment) dispatch(w fleet.APIContextWork, signed []byte, run func(context.Context, *HubOperations) (string, error)) (string, error) {
-	if a == nil || !w.Valid(time.Now()) || w.Channel != a.standby.channel || w.CaptureID != a.capture || len(signed) == 0 {
+func (a *Attachment) Run(w fleet.APIContextWork, run func(context.Context, *HubOperations) (string, error)) (string, error) {
+	if a == nil || run == nil || !w.Valid(time.Now()) || w.Channel != a.standby.channel || w.CaptureID != a.capture {
 		return "", fleet.ErrInvalid
 	}
 	a.mu.Lock()
@@ -593,7 +583,7 @@ func (a *Attachment) dispatch(w fleet.APIContextWork, signed []byte, run func(co
 	a.dispatched = true
 	a.work.Add(1)
 	defer a.work.Done()
-	job := &captureJob{ctx: a.ctx, work: w, signed: append([]byte(nil), signed...), run: run, result: make(chan jobResult, 1)}
+	job := &captureJob{ctx: a.ctx, work: w, run: run, result: make(chan jobResult, 1)}
 	a.standby.job <- job
 	a.router.mu.Unlock()
 	a.mu.Unlock()
@@ -617,7 +607,7 @@ func (a *Attachment) dispatch(w fleet.APIContextWork, signed []byte, run func(co
 }
 
 // Close does not release a slot until the actual handler/socket finishes. It
-// also covers a signed work whose delivery/result became uncertain.
+// also covers a work whose delivery/result became uncertain.
 func (a *Attachment) Close() {
 	if a == nil {
 		return

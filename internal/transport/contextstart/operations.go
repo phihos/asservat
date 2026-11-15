@@ -10,7 +10,6 @@ import (
 
 	"asservat.local/asservat/internal/application/evidence"
 	executionapp "asservat.local/asservat/internal/application/execution"
-	fleetapp "asservat.local/asservat/internal/application/fleet"
 	compiler "asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -18,6 +17,7 @@ import (
 	"asservat.local/asservat/internal/domain/collector"
 	value "asservat.local/asservat/internal/domain/execution"
 	"asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/planning"
 	"asservat.local/asservat/internal/domain/targets"
 )
@@ -306,14 +306,18 @@ func (o *remoteOutput) CompleteStored() (artifact.ContextWriterCompletion, error
 	return out, err
 }
 
-// ServeHubOperations sends the signed work, runs run with this exchange's
+// ServeHubOperations sends the work, runs run with this exchange's
 // operations and ends the conversation with run's state: a finish operation,
 // the regional result echo and the receipt.
-func ServeHubOperations(ctx context.Context, stream Stream, w fleet.APIContextWork, signed []byte, run func(context.Context, *HubOperations) (string, error), now func() time.Time) (state string, err error) {
+func ServeHubOperations(ctx context.Context, stream Stream, w fleet.APIContextWork, run func(context.Context, *HubOperations) (string, error), now func() time.Time) (state string, err error) {
 	stage := streamHubSetup
 	defer func() { recordStreamDiagnostic(ctx, stream, err, stage) }()
-	if ctx == nil || ctx.Err() != nil || stream == nil || run == nil || now == nil || !w.Valid(now()) || len(signed) == 0 || len(signed) > contracts.APIContextSignedWorkBytes {
+	if ctx == nil || ctx.Err() != nil || stream == nil || run == nil || now == nil {
 		return "", fleet.ErrInvalid
+	}
+	encoded, err := encodeAPIContextWork(w, now())
+	if err != nil {
+		return "", err
 	}
 	call, cancel := context.WithDeadline(ctx, w.NotAfter)
 	ended := make(chan struct{})
@@ -325,7 +329,7 @@ func ServeHubOperations(ctx context.Context, stream Stream, w fleet.APIContextWo
 		cancel()
 	}()
 	stage = streamHubSend
-	if err = stream.Send(call, contracts.APIContextFrame{Kind: contracts.APIContextWorkFrame, Payload: signed}); err != nil {
+	if err = stream.Send(call, contracts.APIContextFrame{Kind: contracts.APIContextWorkFrame, Payload: encoded}); err != nil {
 		return "", err
 	}
 	ops := &HubOperations{stream: stream, ctx: call}
@@ -660,13 +664,13 @@ func (s *regionalSession) acquire(ctx context.Context, r acquireRequest) (acquir
 	return acquireReply{Acquired: acquired, Copies: copies}, nil
 }
 
-// ServeRegionalOperations accepts exactly one signed work, then answers the
+// ServeRegionalOperations accepts exactly one work, then answers the
 // hub's operations for it until finish, echoes the hub's final state and
 // waits for the receipt.
-func ServeRegionalOperations(ctx context.Context, stream Stream, receiver fleet.APIContextReceiver, verifier fleetapp.APIContextWorkVerifier, local RegionalLocal, now func() time.Time) (err error) {
+func ServeRegionalOperations(ctx context.Context, stream Stream, receiver fleet.APIContextReceiver, local RegionalLocal, now func() time.Time) (err error) {
 	stage := streamRegionalSetup
 	defer func() { recordStreamDiagnostic(ctx, stream, err, stage) }()
-	if ctx == nil || ctx.Err() != nil || stream == nil || verifier == nil || !local.valid() || now == nil || !receiver.Valid(now()) {
+	if ctx == nil || ctx.Err() != nil || stream == nil || !local.valid() || now == nil || !receiver.Valid(now()) {
 		return fleet.ErrInvalid
 	}
 	stage = streamRegionalWork
@@ -684,12 +688,12 @@ func ServeRegionalOperations(ctx context.Context, stream Stream, receiver fleet.
 		return serveRegionalHistory(ctx, stream, current, f.Payload, local.History, now)
 	}
 	stage = streamRegionalVerify
-	authenticated, err := verifier.VerifyAPIContextWork(ctx, f.Payload, current)
+	work, err := decodeAPIContextWork(f.Payload, current, now())
 	clear(f.Payload)
-	if err != nil || !authenticated.Valid(now()) {
+	if err != nil {
 		return fleet.ErrDenied
 	}
-	call, cancel := context.WithDeadline(ctx, authenticated.ValidUntil)
+	call, cancel := context.WithDeadline(ctx, identity.Earlier(work.NotAfter, current.Window.Until()))
 	ended := make(chan struct{})
 	stopStream := context.AfterFunc(stream.Context(), func() { cancel(); close(ended) })
 	defer func() {
@@ -698,7 +702,7 @@ func ServeRegionalOperations(ctx context.Context, stream Stream, receiver fleet.
 		}
 		cancel()
 	}()
-	s := &regionalSession{local: local, work: authenticated.Work}
+	s := &regionalSession{local: local, work: work}
 	defer s.close()
 	stage = streamRegionalOperations
 	for sequence := 1; sequence <= contracts.APIContextMaximumOperations; sequence++ {
@@ -783,7 +787,7 @@ func samePacketSource(a, b targets.PacketSourceObservation) bool {
 	return a.PodUID == b.PodUID && a.NodeUID == b.NodeUID && a.BootID == b.BootID && a.CollectorPodUID == b.CollectorPodUID && a.CollectorEpoch == b.CollectorEpoch && a.ObservedAt.Equal(b.ObservedAt) && a.FreshUntil.Equal(b.FreshUntil)
 }
 
-// The expectation was checked against independently verified signed work at
+// The expectation was checked against the received work at
 // prepare-output; the source was resolved locally in this exchange. Neither is
 // recovered from the permit's caller-supplied copies.
 func policyRecordingMatches(e artifact.ContextExpectation, source targets.PacketSourceObservation, permit collector.ObservationPermit) bool {

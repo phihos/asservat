@@ -2,7 +2,6 @@ package contextstart
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"asservat.local/asservat/internal/application/evidence"
@@ -22,7 +21,6 @@ type SourceLocal struct {
 	Recordings evidence.RecordingCanceller
 	Profiles   evidence.ProfileCanceller
 	Snapshots  evidence.SourceSnapshotCanceller
-	Verifier   app.SourceWorkVerifier
 	Queue      SourceQueue
 	// Report, when set, receives a refused verification's fixed step.
 	Report func(string)
@@ -63,35 +61,23 @@ func matchingSourceReply(w app.SourceWork, r contracts.SourceReply) bool {
 // applySourceWork is the region's answer to one source-work query: verify
 // against the current owner receiver, then queue the restrictive or arming
 // effect. An effect refusal is the closed "unavailable" state, not an error.
-func applySourceWork(ctx context.Context, r fleet.APIContextReceiver, signed []byte, local *SourceLocal, now func() time.Time) (contracts.SourceReply, error) {
-	if local == nil || local.Verifier == nil {
+func applySourceWork(ctx context.Context, r fleet.APIContextReceiver, payload []byte, local *SourceLocal, now func() time.Time) (contracts.SourceReply, error) {
+	if local == nil {
 		return contracts.SourceReply{}, targets.ErrUnsupported
 	}
-	auth, err := local.Verifier.VerifySourceWork(ctx, signed, r)
-	if err != nil || !auth.Valid(now()) {
-		step := "invalid-authentication"
-		var fixed interface{ FixedStep() string }
-		if errors.As(err, &fixed) {
-			step = fixed.FixedStep()
-		} else if err != nil {
-			step = "verify"
-		}
+	w, err := decodeSourceWork(payload, r, now())
+	if err != nil {
 		if local.Report != nil {
-			local.Report(step)
-		}
-		// Only a real denial is denied; an unavailable trust read is not.
-		if err != nil && !errors.Is(err, fleet.ErrDenied) {
-			return contracts.SourceReply{}, targets.ErrUnavailable
+			local.Report("decode")
 		}
 		return contracts.SourceReply{}, targets.ErrDenied
 	}
-	w := auth.Work
 	// API-only logs can be restricted without a node queue. Arming and all
 	// other queue-backed work retain their original node-channel requirement.
 	if local.Queue == nil && w.StopRecording == nil {
 		return contracts.SourceReply{}, targets.ErrUnsupported
 	}
-	call, cancel := context.WithDeadline(ctx, auth.ValidUntil)
+	call, cancel := context.WithDeadline(ctx, identity.Earlier(w.NotAfter, r.Window.Until()))
 	defer cancel()
 	if call.Err() != nil || !w.Valid(now()) {
 		return contracts.SourceReply{}, targets.ErrUnavailable
@@ -124,19 +110,19 @@ func applySourceWork(ctx context.Context, r fleet.APIContextReceiver, signed []b
 	if effectErr != nil {
 		state = "unavailable"
 	}
-	if call.Err() != nil || !auth.Valid(now()) {
+	if call.Err() != nil || !w.Valid(now()) {
 		return contracts.SourceReply{}, targets.ErrUnavailable
 	}
 	return sourceReply(w, state), nil
 }
 
-// DeliverSource sends one signed source work as an ADR-179 query on an idle
+// DeliverSource sends one source work as an ADR-179 query on an idle
 // standby, which keeps waiting for capture work afterwards. Source arms,
 // renewals and stops therefore never consume the cluster's one standby
-// (ADR-209) that Saves and other context starts attach to. sign receives the
+// (ADR-209) that Saves and other context starts attach to. work receives the
 // selected standby's current receiver, since the work binds its channel.
-func (r *Router) DeliverSource(ctx context.Context, cluster string, sign func(fleet.APIContextReceiver) (app.SourceWork, []byte, error)) (err error) {
-	if r == nil || sign == nil {
+func (r *Router) DeliverSource(ctx context.Context, cluster string, work func(fleet.APIContextReceiver) (app.SourceWork, error)) (err error) {
+	if r == nil || work == nil {
 		return fleet.ErrInvalid
 	}
 	var w app.SourceWork
@@ -148,10 +134,11 @@ func (r *Router) DeliverSource(ctx context.Context, cluster string, sign func(fl
 		}
 	}()
 	_, err = r.Query(ctx, cluster, querySourceWork, receiverBody(func(current fleet.APIContextReceiver) (any, error) {
-		var signed []byte
 		var e error
-		w, signed, e = sign(current)
-		return signed, e
+		if w, e = work(current); e != nil {
+			return nil, e
+		}
+		return encodeSourceWork(w, time.Now())
 	}), &reply)
 	if err != nil {
 		return err

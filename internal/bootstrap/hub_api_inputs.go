@@ -3,11 +3,9 @@ package bootstrap
 import (
 	"bytes"
 	"context"
-	"crypto/ed25519"
 	"encoding/hex"
 	"errors"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -65,7 +63,6 @@ type hubAPIResolver interface {
 	NamespaceUID(ctx context.Context, name string) (string, error)
 	ObjectUID(ctx context.Context, group, resource, namespace, name string) (string, error)
 	PKIRoots(ctx context.Context, mount string) ([][]byte, error)
-	SigningKey(ctx context.Context, role, mount, name string) (int, ed25519.PublicKey, error)
 	CapacityPin(ctx context.Context, root, installation string) (postgres.CapacityQualificationPin, error)
 }
 
@@ -212,8 +209,7 @@ func buildHubAPIPublic(ctx context.Context, files *os.Root, c contracts.OwnerDep
 	out := &contracts.OwnerPublicDeployment{Format: contracts.OwnerPublicDeploymentFormat, Origin: p.Origin, BrowserRootID: ids.BrowserRootID, BrowserSessionEpoch: ids.SessionEpoch, BrowserAudience: p.BrowserAudience, ProviderRoots: providerRoots,
 		SessionTransit: contracts.OwnerPublicTransit{Mount: transit, Key: names.BrowserSessionKey}, CaptureHistory: p.CaptureHistory, WorkloadRate: p.WorkloadRate, Standby: p.Standby, Captures: p.Captures, PreviewSeconds: p.PreviewSeconds, ArtifactKeyID: artifactKeyID(ids.InstallationID),
 		DownloadPlan: p.DownloadPlan, ProxyTLS: p.ProxyTLS, Port: contracts.OwnerInstalledPublicPort, Version: p.Version, OperationConcurrency: p.OperationConcurrency, MCPPerIdentity: p.MCPPerIdentity,
-		DownloadConcurrency: p.DownloadConcurrency, DownloadsPerIdentity: p.DownloadsPerIdentity, DownloadMaxSeconds: p.DownloadMaxSeconds, OperationAudit: p.OperationAudit,
-		WorkSigning: contracts.OwnerPublicSigning{Mount: transit, Name: names.WorkSigningKey}, WorkerPKI: contracts.OwnerPublicWorkerPKI{Mount: contracts.SmallOpenBaoWorkerPKIMount, Role: names.DownloadWorkerRole, IssuerEpoch: ids.IssuerEpoch}}
+		DownloadConcurrency: p.DownloadConcurrency, DownloadsPerIdentity: p.DownloadsPerIdentity, DownloadMaxSeconds: p.DownloadMaxSeconds, OperationAudit: p.OperationAudit, WorkerPKI: contracts.OwnerPublicWorkerPKI{Mount: contracts.SmallOpenBaoWorkerPKIMount, Role: names.DownloadWorkerRole, IssuerEpoch: ids.IssuerEpoch}}
 	for _, v := range []struct {
 		name, step string
 		target     *contracts.WorkerObjectReference
@@ -253,19 +249,7 @@ func buildHubAPIPublic(ctx context.Context, files *os.Root, c contracts.OwnerDep
 	out.CaptureAuditPolicy, out.AuditStoreID = pin.CapturePolicy, policy.StoreID
 	out.OperationAudit.RetentionSeconds = int(pin.OperationRetentionSeconds)
 	out.Capacity = contracts.OwnerPublicCapacity{QualificationID: pin.QualificationID, QualificationDigest: pin.QualificationDigest, AccountVersion: pin.AccountVersion}
-	// The work-signing key is read with the work-sign provider role; its role
-	// name does not depend on the key version.
 	c.Public = out
-	roles, _, err := providerconfig.OwnerPublicProviderRecipeFor(c, *c.ProviderAuthentication, now)
-	if err != nil {
-		return nil, hubAPIInputError("public-recipe")
-	}
-	version, public, err := r.SigningKey(ctx, roles[2].Name, out.WorkSigning.Mount, out.WorkSigning.Name)
-	if err != nil {
-		return nil, hubAPIInputError("work-signing-key")
-	}
-	out.WorkSigning.Version, out.WorkSigning.PublicKey = version, public
-	out.WorkSigning.KeyID = out.WorkSigning.Name + "-v" + strconv.Itoa(version)
 	if _, out.ProviderRecipeSHA256, err = providerconfig.OwnerPublicProviderRecipeFor(c, *c.ProviderAuthentication, now); err != nil {
 		return nil, hubAPIInputError("public-recipe")
 	}
@@ -292,14 +276,6 @@ func (r *liveHubAPIResolver) ObjectUID(ctx context.Context, group, resource, nam
 }
 func (r *liveHubAPIResolver) PKIRoots(ctx context.Context, mount string) ([][]byte, error) {
 	return kms.ReadPKIRoots(ctx, r.keyService, r.roots, mount)
-}
-func (r *liveHubAPIResolver) SigningKey(ctx context.Context, role, mount, name string) (int, ed25519.PublicKey, error) {
-	jwt, err := r.files.token(contracts.OwnerProviderTokenFile)(ctx)
-	if err != nil {
-		return 0, nil, err
-	}
-	defer clear(jwt)
-	return kms.ReadSigningPublicKey(ctx, r.keyService, r.roots, contracts.SmallOpenBaoOwnerAuthMount, role, jwt, mount, name)
 }
 func (r *liveHubAPIResolver) CapacityPin(ctx context.Context, root, installation string) (postgres.CapacityQualificationPin, error) {
 	role := "capacity-profile-read"

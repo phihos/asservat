@@ -1,22 +1,13 @@
 package fleet
 
 import (
+	"context"
+	"time"
+
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/capture"
 	value "asservat.local/asservat/internal/domain/fleet"
-	"asservat.local/asservat/internal/domain/identity"
-	"context"
-	"time"
 )
-
-// History work reuses the installed work signing key and current trust source,
-// with a distinct signed purpose and an independently checked effect authority.
-type HistoryWorkSigner interface {
-	SignHistoryWork(context.Context, HistoryWork) ([]byte, error)
-}
-type HistoryWorkVerifier interface {
-	VerifyHistoryWork(context.Context, []byte, value.APIContextReceiver) (AuthenticatedHistoryWork, error)
-}
 
 // HistoryWork binds one separately authorized control-metadata effect to the
 // actual retained hub/connector conversation. It is never an API execution.
@@ -31,17 +22,6 @@ func (w HistoryWork) Valid(now time.Time) bool {
 }
 func (w HistoryWork) Matches(r value.APIContextReceiver, now time.Time) bool {
 	return w.Valid(now) && r.Valid(now) && w.Channel == r.Channel
-}
-
-type AuthenticatedHistoryWork struct {
-	Work                   HistoryWork
-	KeyID                  string
-	TrustRevision          identity.Revision
-	VerifiedAt, ValidUntil time.Time
-}
-
-func (w AuthenticatedHistoryWork) Valid(now time.Time) bool {
-	return w.Work.Valid(now) && identity.Text(w.KeyID, 128) && w.TrustRevision.Valid() && identity.Fresh(w.VerifiedAt, w.ValidUntil, now, 5*time.Second) && !w.ValidUntil.After(w.Work.Authority.NotAfter)
 }
 
 // HistoryReply contains encrypted control metadata and exact storage receipts;

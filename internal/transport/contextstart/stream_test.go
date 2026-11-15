@@ -136,7 +136,7 @@ func TestContextStreamEOFJoinsBlockedHubOperation(t *testing.T) {
 	entered, joined := make(chan struct{}), make(chan struct{})
 	done := make(chan error, 1)
 	go func() {
-		_, e := ServeHubOperations(context.Background(), s, w.Work, []byte("signed"), func(ctx context.Context, ops *HubOperations) (string, error) {
+		_, e := ServeHubOperations(context.Background(), s, w.Work, func(ctx context.Context, ops *HubOperations) (string, error) {
 			close(entered)
 			_, err := ops.ReadAPIProcess(ctx) // blocks on the regional reply
 			close(joined)

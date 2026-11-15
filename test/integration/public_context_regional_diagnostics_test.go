@@ -10,7 +10,6 @@ import (
 	authapp "asservat.local/asservat/internal/application/authorization"
 	"asservat.local/asservat/internal/application/evidence"
 	executionapp "asservat.local/asservat/internal/application/execution"
-	fleetapp "asservat.local/asservat/internal/application/fleet"
 	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -47,23 +46,6 @@ func journeyRegionalCode(err error) uint8 {
 }
 func journeyRegionalReason(err error) string {
 	return journeyDiagnosticReason(journeyRegionalCode(err))
-}
-
-type publicJourneyVerifierDiagnostics struct {
-	source fleetapp.APIContextWorkVerifier
-	trace  *publicJourneyDiagnostics
-}
-
-func (s *publicJourneyDiagnostics) RegionalVerifier(in fleetapp.APIContextWorkVerifier) fleetapp.APIContextWorkVerifier {
-	if in == nil {
-		return nil
-	}
-	return publicJourneyVerifierDiagnostics{in, s}
-}
-func (s publicJourneyVerifierDiagnostics) VerifyAPIContextWork(c context.Context, body []byte, receiver fleetvalue.APIContextReceiver) (fleetvalue.AuthenticatedAPIContextWork, error) {
-	v, e := s.source.VerifyAPIContextWork(c, body, receiver)
-	s.trace.record(journeyRegionalVerify, journeyRegionalCode(e))
-	return v, e
 }
 
 type publicJourneyRunnerDiagnostics struct {
@@ -164,12 +146,6 @@ func (s *publicJourneyRunnerDiagnostics) RecordAPIOutcome(c context.Context, r e
 	return s.in.Record.RecordAPIOutcome(c, r, p)
 }
 
-type journeyDiagnosticVerifier func(context.Context, []byte, fleetvalue.APIContextReceiver) (fleetvalue.AuthenticatedAPIContextWork, error)
-
-func (f journeyDiagnosticVerifier) VerifyAPIContextWork(c context.Context, b []byte, r fleetvalue.APIContextReceiver) (fleetvalue.AuthenticatedAPIContextWork, error) {
-	return f(c, b, r)
-}
-
 type journeyDiagnosticRunnerIdentity func(context.Context) (identity.Identity, error)
 
 func (f journeyDiagnosticRunnerIdentity) ResolveIdentity(c context.Context) (identity.Identity, error) {
@@ -209,39 +185,6 @@ func (f journeyDiagnosticProducer) PrepareContext(c context.Context, e artifact.
 	return f(c, e)
 }
 
-func TestPublicJourneyDiagnosticsOriginalRegionalVerifier(t *testing.T) {
-	for _, failure := range []bool{false, true} {
-		t.Run(map[bool]string{false: "success", true: "private-refusal"}[failure], func(t *testing.T) {
-			trace := &publicJourneyDiagnostics{}
-			body := []byte("original-private-payload")
-			receiver := fleetvalue.APIContextReceiver{}
-			expected := fleetvalue.AuthenticatedAPIContextWork{ValidUntil: time.Unix(123, 0)}
-			private := &journeyDiagnosticPrivateError{}
-			var original error
-			if failure {
-				original = private
-			}
-			calls := 0
-			source := journeyDiagnosticVerifier(func(c context.Context, b []byte, r fleetvalue.APIContextReceiver) (fleetvalue.AuthenticatedAPIContextWork, error) {
-				calls++
-				if c != t.Context() || &b[0] != &body[0] || r != receiver {
-					t.Fatal("changed original verifier input")
-				}
-				return expected, original
-			})
-			v, e := trace.RegionalVerifier(source).VerifyAPIContextWork(t.Context(), body, receiver)
-			if !reflect.DeepEqual(v, expected) || e != original || calls != 1 || trace.calls[journeyRegionalVerify] != 1 {
-				t.Fatal("verifier delegation changed")
-			}
-			if failure && (trace.first != journeyRegionalVerify+1 || trace.reasons[journeyRegionalVerify] != 9) {
-				t.Fatal("private failure not retained as closed code")
-			}
-			if journeyRegionalReason(original) != map[bool]string{false: "none", true: "unknown-refusal"}[failure] {
-				t.Fatal("exchange error not safely classified")
-			}
-		})
-	}
-}
 func TestPublicJourneyDiagnosticsOriginalRegionalRunner(t *testing.T) {
 	for _, stopAt := range []string{"read", "target"} {
 		t.Run(stopAt, func(t *testing.T) {
@@ -311,7 +254,7 @@ func TestPublicJourneyDiagnosticsOriginalRegionalRunner(t *testing.T) {
 }
 func TestPublicJourneyDiagnosticsRegionalFacetPreservation(t *testing.T) {
 	trace := &publicJourneyDiagnostics{}
-	if !reflect.DeepEqual(trace.Runner(executionapp.APIContextRunner{}), executionapp.APIContextRunner{}) || trace.RegionalVerifier(nil) != nil {
+	if !reflect.DeepEqual(trace.Runner(executionapp.APIContextRunner{}), executionapp.APIContextRunner{}) {
 		t.Fatal("nil port became available")
 	}
 	plain := &journeyDiagnosticRunnerSources{}

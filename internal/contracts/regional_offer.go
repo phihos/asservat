@@ -25,13 +25,11 @@ type RegionalOffer struct {
 	Owners *RegionalContextOwners `json:"owners,omitempty"`
 	// KeyService is the hub's artifact key service (ADR-198).
 	KeyService *RegionalWrapService `json:"keyService,omitempty"`
-	// WorkKey verifies the hub's signed context-start work, and
 	// EvidenceStore is where regional artifacts are written (ADR-196
-	// decision 7). An offer naming Owners, KeyService, WorkKey and
-	// EvidenceStore installs the regional executor; one naming none installs
-	// the plain connector; any other combination is refused.
-	WorkKey       *APIContextWorkPublicKey `json:"workKey,omitempty"`
-	EvidenceStore *RegionalEvidenceStore   `json:"evidenceStore,omitempty"`
+	// decision 7). An offer naming Owners, KeyService and EvidenceStore
+	// installs the regional executor; one naming none installs the plain
+	// connector; any other combination is refused.
+	EvidenceStore *RegionalEvidenceStore `json:"evidenceStore,omitempty"`
 	// Capacity is the ADR-197 regional capacity section. It requires the
 	// executor section.
 	Capacity *RegionalCapacityOffer `json:"capacity,omitempty"`
@@ -61,15 +59,15 @@ type RegionalOwnerObservation struct {
 // executor section (true), none of it (false), or only part of it (error).
 func (o RegionalOffer) RegionalExecutorOffered() (bool, error) {
 	n := 0
-	for _, set := range []bool{o.Owners != nil, o.KeyService != nil, o.WorkKey != nil, o.EvidenceStore != nil} {
+	for _, set := range []bool{o.Owners != nil, o.KeyService != nil, o.EvidenceStore != nil} {
 		if set {
 			n++
 		}
 	}
-	if n != 0 && n != 4 || o.Capacity != nil && n != 4 {
+	if n != 0 && n != 3 || o.Capacity != nil && n != 3 {
 		return false, ErrRegionalOfferPartial
 	}
-	return n == 4, nil
+	return n == 3, nil
 }
 
 var ErrRegionalOfferPartial = errors.New("regional offer names only part of the executor section")

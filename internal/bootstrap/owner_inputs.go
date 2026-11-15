@@ -181,7 +181,7 @@ func hubAPIInputWaits(err error) bool {
 		return false
 	}
 	switch s := string(step); s {
-	case "capacity-qualification", "connector-roots", "worker-roots", "work-signing-key":
+	case "capacity-qualification", "connector-roots", "worker-roots":
 		return true
 	default:
 		return strings.HasSuffix(s, "-uid")

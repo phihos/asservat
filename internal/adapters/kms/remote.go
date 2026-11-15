@@ -3,8 +3,6 @@ package kms
 import (
 	"bytes"
 	"context"
-	"crypto"
-	"crypto/ed25519"
 	"crypto/tls"
 	"encoding/hex"
 	"encoding/json"
@@ -33,11 +31,6 @@ type remoteKeyClient struct {
 // reference. It never loads a wrapping key or exposes a second operation.
 type RemoteSealer struct{ client *remoteKeyClient }
 type RemoteOpener struct{ client *remoteKeyClient }
-type RemoteSigner struct {
-	client  *remoteKeyClient
-	version int
-	public  ed25519.PublicKey
-}
 
 var _ evidence.KeySealer = (*RemoteSealer)(nil)
 var _ evidence.KeyOpener = (*RemoteOpener)(nil)
@@ -69,7 +62,7 @@ func remoteClient(endpoint string, scope value.KeyScope, authority string, h *ht
 // NewRemoteSealer authenticates with h's client certificate or, when token is
 // given, with a connector's ServiceAccount token (ADR-334).
 func NewRemoteSealer(endpoint string, scope value.KeyScope, authority string, h *http.Client, token ...func() ([]byte, error)) (*RemoteSealer, error) {
-	if scope.Purpose == "policy-submission" || len(token) > 1 {
+	if len(token) > 1 {
 		return nil, ErrKeyService
 	}
 	c, err := remoteClient(endpoint, scope, authority, h, token...)
@@ -79,24 +72,11 @@ func NewRemoteSealer(endpoint string, scope value.KeyScope, authority string, h 
 	return &RemoteSealer{c}, nil
 }
 func NewRemoteOpener(endpoint string, scope value.KeyScope, authority string, h *http.Client) (*RemoteOpener, error) {
-	if scope.Purpose == "policy-submission" {
-		return nil, ErrKeyService
-	}
 	c, err := remoteClient(endpoint, scope, authority, h)
 	if err != nil {
 		return nil, err
 	}
 	return &RemoteOpener{c}, nil
-}
-func NewRemoteSigner(endpoint string, scope value.KeyScope, authority string, version int, public ed25519.PublicKey, h *http.Client) (*RemoteSigner, error) {
-	if scope.Purpose != "policy-submission" || version < 1 || version > 2147483647 || len(public) != ed25519.PublicKeySize {
-		return nil, ErrKeyService
-	}
-	c, err := remoteClient(endpoint, scope, authority, h)
-	if err != nil {
-		return nil, err
-	}
-	return &RemoteSigner{c, version, bytes.Clone(public)}, nil
 }
 
 func (c *remoteKeyClient) call(ctx context.Context, r value.KeyRequest) (value.KeyResult, error) {
@@ -109,7 +89,7 @@ func (c *remoteKeyClient) call(ctx context.Context, r value.KeyRequest) (value.K
 	if err != nil {
 		return result, ErrKeyService
 	}
-	wire := contracts.KeyServiceRequest{Format: contracts.KeyServiceFormat, Scope: contracts.KeyScope{InstallationID: r.Scope.InstallationID, Purpose: r.Scope.Purpose, KeyID: r.Scope.KeyID}, AuthorityID: r.AuthorityID, Operation: r.Operation, Binding: r.Binding, Input: r.Input, Version: r.Version}
+	wire := contracts.KeyServiceRequest{Format: contracts.KeyServiceFormat, Scope: contracts.KeyScope{InstallationID: r.Scope.InstallationID, Purpose: r.Scope.Purpose, KeyID: r.Scope.KeyID}, AuthorityID: r.AuthorityID, Operation: r.Operation, Binding: r.Binding, Input: r.Input}
 	if r.Operation == "unwrap" {
 		wire.Sealed = &contracts.SealedLocalKey{Reference: r.Sealed.Reference, Ciphertext: r.Sealed.Ciphertext}
 	}
@@ -192,30 +172,4 @@ func (s *RemoteOpener) Close() {
 	if s != nil && s.client != nil && s.client.client != nil {
 		s.client.client.CloseIdleConnections()
 	}
-}
-func (s *RemoteSigner) ForContext(ctx context.Context) crypto.Signer {
-	if s == nil || s.client == nil || ctx == nil {
-		return nil
-	}
-	return &remoteRequestSigner{s, ctx}
-}
-
-type remoteRequestSigner struct {
-	key *RemoteSigner
-	ctx context.Context
-}
-
-func (s *remoteRequestSigner) Public() crypto.PublicKey {
-	return ed25519.PublicKey(bytes.Clone(s.key.public))
-}
-func (s *remoteRequestSigner) Sign(_ io.Reader, input []byte, options crypto.SignerOpts) ([]byte, error) {
-	if !plainEd25519Options(options) {
-		return nil, ErrKeyService
-	}
-	r, err := s.key.client.call(s.ctx, value.KeyRequest{Operation: "sign", Input: input, Version: s.key.version})
-	if err != nil || !ed25519.Verify(s.key.public, input, r.Output) {
-		clear(r.Output)
-		return nil, ErrKeyService
-	}
-	return r.Output, nil
 }

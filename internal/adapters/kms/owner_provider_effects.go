@@ -1,9 +1,7 @@
 package kms
 
 import (
-	"bytes"
 	"context"
-	"crypto/ed25519"
 	"crypto/x509"
 	"errors"
 	"net/http"
@@ -30,7 +28,6 @@ type ownerProviderEffects struct {
 	// ADR-182 public purposes; nil without a pinned public recipe.
 	browserSeal *Sealer
 	browserOpen *Opener
-	work        *SigningKey
 	worker      *WorkerCertificateIssuer
 }
 
@@ -94,7 +91,7 @@ func newOwnerProviderEffects(ctx context.Context, input contracts.OwnerDeploymen
 	return out, nil
 }
 
-// public composes the four ADR-182 public purposes over their own
+// public composes the three ADR-182 public purposes over their own
 // provider-authenticated compartments, each confined to its one path.
 func (out *ownerProviderEffects) public(p *contracts.OwnerPublicDeployment, pool value.OwnerPool) error {
 	slots := out.lifetimes.public
@@ -108,15 +105,6 @@ func (out *ownerProviderEffects) public(p *contracts.OwnerPublicDeployment, pool
 		return err
 	}
 	out.browserOpen = &Opener{client: open, mount: p.SessionTransit.Mount, key: p.SessionTransit.Key, reference: p.SessionTransit.Mount + "/" + p.SessionTransit.Key}
-	w := p.WorkSigning
-	if !keyName.MatchString(w.Mount) || !keyName.MatchString(w.Name) || w.Version < 1 || w.Version > 2147483647 || len(w.PublicKey) != ed25519.PublicKeySize {
-		return ErrKeyService
-	}
-	sign, err := newOwnerProviderEffectClient(slots[2], w.Mount+"/sign/"+w.Name)
-	if err != nil {
-		return err
-	}
-	out.work = &SigningKey{client: sign, mount: w.Mount, name: w.Name, version: w.Version, public: bytes.Clone(w.PublicKey)}
 	k := p.WorkerPKI
 	roots, _, err := mtls.OwnerTrustRoots(k.Roots, time.Now())
 	if err != nil || !keyName.MatchString(k.Mount) || !keyName.MatchString(k.Role) || !authorization.UUID(k.IssuerEpoch) {
@@ -126,7 +114,7 @@ func (out *ownerProviderEffects) public(p *contracts.OwnerPublicDeployment, pool
 	if err != nil {
 		return err
 	}
-	issue, err := newOwnerProviderEffectClient(slots[3], k.Mount+"/sign/"+k.Role)
+	issue, err := newOwnerProviderEffectClient(slots[2], k.Mount+"/sign/"+k.Role)
 	if err != nil {
 		return err
 	}

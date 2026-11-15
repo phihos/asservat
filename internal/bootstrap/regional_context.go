@@ -5,14 +5,12 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"errors"
 	"fmt"
 	"net"
 	"net/http"
 	"os"
 	"time"
 
-	"asservat.local/asservat/internal/adapters/jose"
 	"asservat.local/asservat/internal/adapters/kms"
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/mounts"
@@ -50,7 +48,6 @@ type regionalContext struct {
 	collector *kube.ContextCollector
 	output    regionalArtifactOutput
 	history   objectstore.HistoryObjects
-	verifier  *jose.APIContextWorkSignatures
 	owners    *RegionalLifecycle
 	token     func() ([]byte, error)
 }
@@ -177,17 +174,6 @@ func newRegionalContext(ctx context.Context, c regionalConfig, in *providerInput
 	closers = append(closers, keyTransport.CloseIdleConnections)
 	out.output = regionalArtifactOutput{store: custody, endpoint: c.keys.Endpoint, scope: authorization.KeyScope{InstallationID: c.binding.InstallationID, Purpose: "artifact", KeyID: c.keys.KeyID}, client: &http.Client{Transport: keyTransport, Timeout: 5 * time.Second}, token: hubToken, now: time.Now}
 	out.output.recordings = NewConnectorRecordings(nil, out.collector, time.Now, eventLog(os.Stderr, "regional collection"))
-	settings, err := kube.ConnectorWorkTrustSettings(c.offer, c.ClusterID)
-	if err != nil {
-		return nil, closers, mounts.ErrUnavailable
-	}
-	trust, err := kube.NewConnectorWorkTrust(observer, c.ClusterID, settings)
-	if err != nil {
-		return nil, closers, mounts.ErrUnavailable
-	}
-	if out.verifier, err = jose.NewAPIContextWorkSignatures(trust, "", nil, time.Now); err != nil {
-		return nil, closers, mounts.ErrUnavailable
-	}
 	return out, closers, nil
 }
 
@@ -210,16 +196,16 @@ func (r *regionalContext) run(ctx context.Context) error {
 		defer output.recordings.closeLogs()
 	}
 	local := contextstart.RegionalLocal{Process: process, Targets: reportedTargets{r.targets, timedEventLog(os.Stderr, "regional target answer"), r.output.recordings, timedEventLog(os.Stderr, "regional source snapshot refused")}, Output: output, Collector: r.collector, Now: time.Now}
-	local.History = &contextstart.HistoryLocal{Verifier: r.verifier, Effects: regionalHistoryObjects{objects: r.history, root: r.rootID, cluster: r.c.ClusterID, epoch: process.ProcessEpoch(), now: time.Now}, Report: timedEventLog(os.Stderr, "regional history timing")}
+	local.History = &contextstart.HistoryLocal{Effects: regionalHistoryObjects{objects: r.history, root: r.rootID, cluster: r.c.ClusterID, epoch: process.ProcessEpoch(), now: time.Now}, Report: timedEventLog(os.Stderr, "regional history timing")}
 	if r.output.recordings != nil {
 		local.Recordings = r.output.recordings
-		local.Sources = &contextstart.SourceLocal{Verifier: r.verifier, Snapshots: r.output.recordings, Profiles: r.output.recordings, Recordings: r.output.recordings, Report: eventLog(os.Stderr, "regional source work refused")}
+		local.Sources = &contextstart.SourceLocal{Snapshots: r.output.recordings, Profiles: r.output.recordings, Recordings: r.output.recordings, Report: eventLog(os.Stderr, "regional source work refused")}
 		if queue, ok := r.output.recordings.nodes.(contextstart.SourceQueue); ok {
 			local.Sources.Queue = queue
 		}
 	}
 	fmt.Fprintln(os.Stderr, "regional context start active")
-	return RegionalContextStartConnections{Candidates: r.owners, Client: client, Verifier: reportedWorkVerifier{r.verifier, eventLog(os.Stderr, "regional work refused")}, Local: local, Report: eventLog(os.Stderr, "regional context standby refused"), ReportOpening: contextStartOpeningLog(os.Stderr)}.Run(ctx)
+	return RegionalContextStartConnections{Candidates: r.owners, Client: client, Local: local, Report: eventLog(os.Stderr, "regional context standby refused"), ReportOpening: contextStartOpeningLog(os.Stderr)}.Run(ctx)
 }
 
 // regionalArtifactOutput prepares each attempt's output with a key sealer
@@ -411,25 +397,6 @@ func (t reportedTargets) ResolvePacketPeers(ctx context.Context, r targets.PeerR
 }
 
 func (t reportedTargets) ReportAnswer(steps string) { t.report("answer", steps) }
-
-// reportedWorkVerifier logs a refused work verification's fixed step.
-type reportedWorkVerifier struct {
-	verifier *jose.APIContextWorkSignatures
-	report   func(string)
-}
-
-func (v reportedWorkVerifier) VerifyAPIContextWork(ctx context.Context, encoded []byte, receiver value.APIContextReceiver) (value.AuthenticatedAPIContextWork, error) {
-	out, err := v.verifier.VerifyAPIContextWork(ctx, encoded, receiver)
-	if err != nil {
-		step := "other"
-		var fixed interface{ FixedStep() string }
-		if errors.As(err, &fixed) {
-			step = fixed.FixedStep()
-		}
-		v.report(step)
-	}
-	return out, err
-}
 
 // ResolveProfileRecorder observes the original API target and current profile
 // mechanism in the same bounded regional query, without probing the endpoint.

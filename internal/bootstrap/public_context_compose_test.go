@@ -9,7 +9,6 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	audit "asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
-	fleet "asservat.local/asservat/internal/domain/fleet"
 )
 
 // The capture lane policy is installer-provided, canonical, of its own lane,
@@ -44,21 +43,11 @@ func TestPublicAuditPolicyIsExactCanonicalAndOwnLane(t *testing.T) {
 	}
 }
 
-// Capability and signing route only to the target's own cluster.
-func TestPublicRoutingRefusesUnknownAndCrossClusterTargets(t *testing.T) {
-	ctx := context.Background()
+// Capabilities route only to the target's own cluster.
+func TestPublicRoutingRefusesUnknownClusters(t *testing.T) {
 	other := "10000000-0000-4000-8000-0000000000aa"
-	if _, e := (publicCapabilities{}).ContextCapability(ctx, authorization.Target{ClusterID: other, NamespaceUID: "ns", WorkloadUID: "w", PodUID: "p"}); e == nil {
+	if _, e := (publicCapabilities{}).ContextCapability(context.Background(), authorization.Target{ClusterID: other, NamespaceUID: "ns", WorkloadUID: "w", PodUID: "p"}); e == nil {
 		t.Fatal("capability of an uninstalled cluster")
-	}
-	w := fleet.APIContextWork{Target: authorization.Target{ClusterID: other}}
-	if _, e := (publicSigners{}).SignAPIContextWork(ctx, w); e == nil {
-		t.Fatal("signed for an uninstalled cluster")
-	}
-	signers := publicSigners{other: nil}
-	w.Channel.Connector.Binding.ClusterID = runtimeID
-	if _, e := signers.SignAPIContextWork(ctx, w); e == nil {
-		t.Fatal("signed work routed to another cluster's connector")
 	}
 }
 

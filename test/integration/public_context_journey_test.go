@@ -175,7 +175,6 @@ func qualifyPublicContextJourney(t *testing.T, parent context.Context, fixture f
 	// Observe only the original regional exchange and its original runner ports.
 	// The prepared handle and optional stored-completion facet remain intact.
 	regional.diagnostic = diagnostic
-	regional.verifier = diagnostic.RegionalVerifier(regional.verifier)
 	l := regional.local
 	traced := diagnostic.Runner(executionapp.APIContextRunner{Process: l.Process, Targets: l.Targets, Output: l.Output})
 	regional.local.Process, regional.local.Targets, regional.local.Output = traced.Process, regionalQueryTargets(traced.Targets), traced.Output

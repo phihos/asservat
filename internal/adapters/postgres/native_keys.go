@@ -150,7 +150,7 @@ func (s *NativeKeys) BindNativeDownloadKeys(ctx context.Context, ref value.Nativ
 }
 func (s *NativeKeys) Resolve(ctx context.Context, peer value.KeyPeer, r value.KeyRequestInfo) (value.KeyOperationPermit, error) {
 	var out value.KeyOperationPermit
-	if s == nil || ctx == nil || ctx.Err() != nil || r.Scope != s.scope || r.Operation != "unwrap" || r.Version != 0 || !value.UUID(r.AuthorityID) || r.RequestDigest == (artifact.Digest{}) || len(r.Binding) < 1 || len(r.Binding) > 2048 || peer.Role != "acquisition" || !peer.CanRequest(s.scope, "unwrap") || !strings.HasPrefix(r.Reference, "asservat-local-keyset/v1/"+s.scope.InstallationID+"/artifact/"+s.scope.KeyID+"/") {
+	if s == nil || ctx == nil || ctx.Err() != nil || r.Scope != s.scope || r.Operation != "unwrap" || !value.UUID(r.AuthorityID) || r.RequestDigest == (artifact.Digest{}) || len(r.Binding) < 1 || len(r.Binding) > 2048 || peer.Role != "acquisition" || !peer.CanRequest(s.scope, "unwrap") || !strings.HasPrefix(r.Reference, "asservat-local-keyset/v1/"+s.scope.InstallationID+"/artifact/"+s.scope.KeyID+"/") {
 		return out, authapp.ErrKeyDenied
 	}
 	q := custodydb.New(s.owners.workers.downloads.ledger.pool)

@@ -19,7 +19,7 @@ func (s KeyScope) Valid() bool {
 			return false
 		}
 	}
-	return s.Purpose == "artifact" || s.Purpose == "audit" || s.Purpose == "browser-credentials" || s.Purpose == "policy-submission"
+	return s.Purpose == "artifact" || s.Purpose == "audit" || s.Purpose == "browser-credentials"
 }
 
 // KeyPeer comes from a current verified TLS certificate, never request JSON or
@@ -58,8 +58,6 @@ func (p KeyPeer) CanRequest(scope KeyScope, operation string) bool {
 		return operation == "wrap" && p.Role == "audit-writer" || operation == "unwrap" && p.Role == "audit-reader"
 	case "browser-credentials":
 		return (operation == "wrap" || operation == "unwrap") && p.Role == "hub-session"
-	case "policy-submission":
-		return operation == "sign" && p.Role == "policy-submitter"
 	}
 	return false
 }
@@ -71,17 +69,13 @@ type KeyRequest struct {
 	Binding     []byte
 	Input       []byte
 	Sealed      artifact.SealedKey
-	Version     int
 }
 
 func (r KeyRequest) Valid() bool {
 	if !r.Scope.Valid() || !UUID(r.AuthorityID) {
 		return false
 	}
-	if r.Operation == "sign" {
-		return r.Scope.Purpose == "policy-submission" && r.Version >= 1 && r.Version <= 2147483647 && len(r.Input) >= 1 && len(r.Input) <= 16384 && len(r.Binding) == 0 && r.Sealed == (artifact.SealedKey{})
-	}
-	if r.Scope.Purpose == "policy-submission" || r.Version != 0 || len(r.Binding) < 1 || len(r.Binding) > 2048 {
+	if len(r.Binding) < 1 || len(r.Binding) > 2048 {
 		return false
 	}
 	if r.Operation == "wrap" {
@@ -90,14 +84,13 @@ func (r KeyRequest) Valid() bool {
 	return r.Operation == "unwrap" && len(r.Input) == 0 && len(r.Sealed.Reference) >= 1 && len(r.Sealed.Reference) <= 256 && len(r.Sealed.Ciphertext) >= 1 && len(r.Sealed.Ciphertext) <= 8192 && strings.HasPrefix(r.Sealed.Reference, "asservat-local-keyset/v1/"+r.Scope.InstallationID+"/"+r.Scope.Purpose+"/"+r.Scope.KeyID+"/")
 }
 
-// KeyRequestInfo contains no plaintext keyset or signing input. Binding remains
+// KeyRequestInfo contains no plaintext keyset. Binding remains
 // available to the authority resolver to validate the canonical artifact/session
 // purpose. RequestDigest binds every request field, including payload hashes.
 type KeyRequestInfo struct {
 	Scope                      KeyScope
 	AuthorityID, Operation     string
 	Reference                  string
-	Version                    int
 	Binding                    []byte
 	RequestDigest, InputDigest artifact.Digest
 }
@@ -126,8 +119,6 @@ func (r KeyResult) Valid(operation string) bool {
 		return len(r.Output) == 0 && len(r.Sealed.Reference) >= 1 && len(r.Sealed.Reference) <= 256 && len(r.Sealed.Ciphertext) >= 1 && len(r.Sealed.Ciphertext) <= 8192
 	case "unwrap":
 		return r.Sealed == (artifact.SealedKey{}) && len(r.Output) >= 1 && len(r.Output) <= 4096
-	case "sign":
-		return r.Sealed == (artifact.SealedKey{}) && len(r.Output) == 64
 	}
 	return false
 }
