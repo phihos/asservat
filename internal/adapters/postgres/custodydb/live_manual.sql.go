@@ -12,11 +12,11 @@ import (
 )
 
 const listLiveManualWorks = `-- name: ListLiveManualWorks :many
-SELECT c.id, c.root_id, c.request_key, c.submission_digest, c.scope_digest, c.scope_json, c.expectation_json, c.pod_pin_json, c.attempt_id, c.permission_epoch, c.permission_sequence, c.identity_policy_uid, c.identity_policy_generation, c.identity_policy_digest, c.created_at, c.deadline, c.state, c.intent_acknowledged_at, c.intent_digest, c.intent_object_key, c.intent_object_version, c.intent_object_etag, c.intent_object_bytes, c.intent_object_sha256, c.progress_revision, c.deadline_observed_at, c.preview_id, c.intent_operation_id, c.share_instruction, c.history_cluster_id, c.history_namespace_uid, c.history_workload_uid, c.history_origin, c.history_parameters_required, c.repeated_from_capture_id, c.repeated_from_expires_at, c.snapshot_coverage, c.snapshot_coverage_digest, c.snapshot_expectation_digest, c.snapshot_cancel_key, c.snapshot_cancel_actor, c.snapshot_cancel_requested_at, c.snapshot_cancel_joined_at, c.snapshot_cancel_proof, c.snapshot_cancel_proof_digest, c.group_id, c.group_ordinal, c.reason_ref,e.capture_id, e.root_id, e.attempt_id, e.binding_json, e.process_json, e.expectation_digest, e.created_at, e.not_before, e.not_after, e.object_uid, e.phase, e.started_at, e.acquired_at, e.completed_at, e.copies_json, e.copies_digest, e.writer_protocol
+SELECT c.id, c.root_id, c.request_key, c.submission_digest, c.scope_digest, c.scope_json, c.expectation_json, c.pod_pin_json, c.attempt_id, c.permission_epoch, c.permission_sequence, c.identity_policy_uid, c.identity_policy_generation, c.identity_policy_digest, c.created_at, c.deadline, c.progress_revision, c.deadline_observed_at, c.preview_id, c.intent_operation_id, c.share_instruction, c.history_cluster_id, c.history_namespace_uid, c.history_workload_uid, c.history_origin, c.history_parameters_required, c.repeated_from_capture_id, c.repeated_from_expires_at, c.snapshot_coverage, c.snapshot_coverage_digest, c.snapshot_expectation_digest, c.snapshot_cancel_key, c.snapshot_cancel_actor, c.snapshot_cancel_requested_at, c.snapshot_cancel_joined_at, c.snapshot_cancel_proof, c.snapshot_cancel_proof_digest, c.group_id, c.group_ordinal, c.reason,e.capture_id, e.root_id, e.attempt_id, e.binding_json, e.process_json, e.expectation_digest, e.created_at, e.not_before, e.not_after, e.object_uid, e.phase, e.started_at, e.acquired_at, e.completed_at, e.copies_json, e.copies_digest, e.writer_protocol
 FROM context_capture c JOIN context_execution e ON e.root_id=c.root_id AND e.capture_id=c.id AND e.attempt_id=c.attempt_id
 WHERE c.root_id=$1::uuid
  AND ($2::uuid IS NULL OR c.id>$2::uuid)
- AND c.state='intent_audited' AND e.phase='started' AND c.snapshot_cancel_requested_at IS NULL
+ AND e.phase='started' AND c.snapshot_cancel_requested_at IS NULL
  AND jsonb_typeof(convert_from(c.expectation_json,'UTF8')::jsonb->'Recording')='object'
  AND convert_from(c.scope_json,'UTF8')::jsonb#>>'{executor,identityType}'='human'
  AND convert_from(c.expectation_json,'UTF8')::jsonb#>>'{Registration,Location,ClusterID}'=$3::text
@@ -72,14 +72,6 @@ func (q *Queries) ListLiveManualWorks(ctx context.Context, arg ListLiveManualWor
 			&i.ContextCapture.IdentityPolicyDigest,
 			&i.ContextCapture.CreatedAt,
 			&i.ContextCapture.Deadline,
-			&i.ContextCapture.State,
-			&i.ContextCapture.IntentAcknowledgedAt,
-			&i.ContextCapture.IntentDigest,
-			&i.ContextCapture.IntentObjectKey,
-			&i.ContextCapture.IntentObjectVersion,
-			&i.ContextCapture.IntentObjectEtag,
-			&i.ContextCapture.IntentObjectBytes,
-			&i.ContextCapture.IntentObjectSha256,
 			&i.ContextCapture.ProgressRevision,
 			&i.ContextCapture.DeadlineObservedAt,
 			&i.ContextCapture.PreviewID,
@@ -103,7 +95,7 @@ func (q *Queries) ListLiveManualWorks(ctx context.Context, arg ListLiveManualWor
 			&i.ContextCapture.SnapshotCancelProofDigest,
 			&i.ContextCapture.GroupID,
 			&i.ContextCapture.GroupOrdinal,
-			&i.ContextCapture.ReasonRef,
+			&i.ContextCapture.Reason,
 			&i.ContextExecution.CaptureID,
 			&i.ContextExecution.RootID,
 			&i.ContextExecution.AttemptID,
@@ -139,7 +131,7 @@ SELECT (convert_from(c.expectation_json,'UTF8')::jsonb#>>'{Registration,Location
  (convert_from(c.expectation_json,'UTF8')::jsonb->>'PodUID')::text AS pod_uid
 FROM context_capture c JOIN context_execution e ON e.root_id=c.root_id AND e.capture_id=c.id AND e.attempt_id=c.attempt_id
 WHERE c.root_id=$1::uuid AND c.id=$2::uuid
- AND c.state='intent_audited' AND e.phase='started' AND c.snapshot_cancel_requested_at IS NULL
+ AND e.phase='started' AND c.snapshot_cancel_requested_at IS NULL
  AND jsonb_typeof(convert_from(c.expectation_json,'UTF8')::jsonb->'Recording')='object'
  AND convert_from(c.scope_json,'UTF8')::jsonb#>>'{executor,identityType}'='human'
 `
@@ -171,10 +163,10 @@ func (q *Queries) ReadLiveManualTarget(ctx context.Context, arg ReadLiveManualTa
 }
 
 const readLiveManualWorks = `-- name: ReadLiveManualWorks :many
-SELECT c.id, c.root_id, c.request_key, c.submission_digest, c.scope_digest, c.scope_json, c.expectation_json, c.pod_pin_json, c.attempt_id, c.permission_epoch, c.permission_sequence, c.identity_policy_uid, c.identity_policy_generation, c.identity_policy_digest, c.created_at, c.deadline, c.state, c.intent_acknowledged_at, c.intent_digest, c.intent_object_key, c.intent_object_version, c.intent_object_etag, c.intent_object_bytes, c.intent_object_sha256, c.progress_revision, c.deadline_observed_at, c.preview_id, c.intent_operation_id, c.share_instruction, c.history_cluster_id, c.history_namespace_uid, c.history_workload_uid, c.history_origin, c.history_parameters_required, c.repeated_from_capture_id, c.repeated_from_expires_at, c.snapshot_coverage, c.snapshot_coverage_digest, c.snapshot_expectation_digest, c.snapshot_cancel_key, c.snapshot_cancel_actor, c.snapshot_cancel_requested_at, c.snapshot_cancel_joined_at, c.snapshot_cancel_proof, c.snapshot_cancel_proof_digest, c.group_id, c.group_ordinal, c.reason_ref,e.capture_id, e.root_id, e.attempt_id, e.binding_json, e.process_json, e.expectation_digest, e.created_at, e.not_before, e.not_after, e.object_uid, e.phase, e.started_at, e.acquired_at, e.completed_at, e.copies_json, e.copies_digest, e.writer_protocol
+SELECT c.id, c.root_id, c.request_key, c.submission_digest, c.scope_digest, c.scope_json, c.expectation_json, c.pod_pin_json, c.attempt_id, c.permission_epoch, c.permission_sequence, c.identity_policy_uid, c.identity_policy_generation, c.identity_policy_digest, c.created_at, c.deadline, c.progress_revision, c.deadline_observed_at, c.preview_id, c.intent_operation_id, c.share_instruction, c.history_cluster_id, c.history_namespace_uid, c.history_workload_uid, c.history_origin, c.history_parameters_required, c.repeated_from_capture_id, c.repeated_from_expires_at, c.snapshot_coverage, c.snapshot_coverage_digest, c.snapshot_expectation_digest, c.snapshot_cancel_key, c.snapshot_cancel_actor, c.snapshot_cancel_requested_at, c.snapshot_cancel_joined_at, c.snapshot_cancel_proof, c.snapshot_cancel_proof_digest, c.group_id, c.group_ordinal, c.reason,e.capture_id, e.root_id, e.attempt_id, e.binding_json, e.process_json, e.expectation_digest, e.created_at, e.not_before, e.not_after, e.object_uid, e.phase, e.started_at, e.acquired_at, e.completed_at, e.copies_json, e.copies_digest, e.writer_protocol
 FROM context_capture c JOIN context_execution e ON e.root_id=c.root_id AND e.capture_id=c.id AND e.attempt_id=c.attempt_id
 WHERE c.root_id=$1::uuid AND c.id=ANY($2::uuid[])
- AND c.state='intent_audited' AND e.phase='started' AND c.snapshot_cancel_requested_at IS NULL
+ AND e.phase='started' AND c.snapshot_cancel_requested_at IS NULL
  AND jsonb_typeof(convert_from(c.expectation_json,'UTF8')::jsonb->'Recording')='object'
  AND convert_from(c.scope_json,'UTF8')::jsonb#>>'{executor,identityType}'='human'
 ORDER BY c.id
@@ -216,14 +208,6 @@ func (q *Queries) ReadLiveManualWorks(ctx context.Context, arg ReadLiveManualWor
 			&i.ContextCapture.IdentityPolicyDigest,
 			&i.ContextCapture.CreatedAt,
 			&i.ContextCapture.Deadline,
-			&i.ContextCapture.State,
-			&i.ContextCapture.IntentAcknowledgedAt,
-			&i.ContextCapture.IntentDigest,
-			&i.ContextCapture.IntentObjectKey,
-			&i.ContextCapture.IntentObjectVersion,
-			&i.ContextCapture.IntentObjectEtag,
-			&i.ContextCapture.IntentObjectBytes,
-			&i.ContextCapture.IntentObjectSha256,
 			&i.ContextCapture.ProgressRevision,
 			&i.ContextCapture.DeadlineObservedAt,
 			&i.ContextCapture.PreviewID,
@@ -247,7 +231,7 @@ func (q *Queries) ReadLiveManualWorks(ctx context.Context, arg ReadLiveManualWor
 			&i.ContextCapture.SnapshotCancelProofDigest,
 			&i.ContextCapture.GroupID,
 			&i.ContextCapture.GroupOrdinal,
-			&i.ContextCapture.ReasonRef,
+			&i.ContextCapture.Reason,
 			&i.ContextExecution.CaptureID,
 			&i.ContextExecution.RootID,
 			&i.ContextExecution.AttemptID,

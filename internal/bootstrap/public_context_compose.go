@@ -56,7 +56,7 @@ type publicContext struct {
 	cancellations *captureapp.CaptureCancellation
 	history       *captureapp.HistoryParameterService
 	investigation captureapp.ContextInvestigation
-	intents       auditapp.CaptureOperationPublication
+	intents       *postgres.CaptureIntents
 	regional      RegionalAPIContextStart
 	// collect is the ADR-248 collect loop for started manual recordings.
 	collect     RegionalRecordingCollect
@@ -174,17 +174,13 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 		}
 		return out, nil
 	}
-	sql, err := need("identity-read", "hub-metadata-read", "capture-preview", "capture-admit", "capture-resolution", "capture-intent-read", "capture-journal", "capture-ack", "api-execution", "policy-automation", "evidence-share", "access-review", "capture-history")
+	sql, err := need("identity-read", "hub-metadata-read", "capture-preview", "capture-admit", "capture-resolution", "api-execution", "policy-automation", "evidence-share", "access-review", "capture-history")
 	if err != nil {
 		return nil, err
 	}
 	out := &publicContext{}
 	if out.mac, err = newPublicOperationMAC(ctx, files, in.config.InstallationID); err != nil {
 		return nil, mounts.ErrUnavailable
-	}
-	capture, err := decodeAuditPolicy(p.CaptureAuditPolicy, "capture", root, installation)
-	if err != nil {
-		return nil, err
 	}
 	control := cfg.NamespaceRef{Name: c.Namespace.Name, UID: c.Namespace.UID}
 	capabilities := publicCapabilities{}
@@ -308,11 +304,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 		return nil, mounts.ErrUnavailable
 	}
 	out.history.PreviewCleanup = previewCleanup
-	reasonCipher, err := objectstore.NewCaptureReasonCipher(a.seal, a.open)
-	if err != nil {
-		return nil, mounts.ErrUnavailable
-	}
-	admissionsSQL, err := postgres.NewAuditedContextAdmissions(ctx, sql["capture-admit"], root, installation, out.mac, shared.retention)
+	admissionsSQL, err := postgres.NewContextAdmissions(ctx, sql["capture-admit"], root, installation, shared.retention)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
@@ -355,23 +347,9 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	}
 	out.investigation.Profiles = profiles
 
-	completed, err := postgres.NewCaptureOperationIntents(ctx, sql["capture-intent-read"], root)
-	if err != nil {
+	if out.intents, err = postgres.NewCaptureIntents(ctx, sql["hub-metadata-read"], root); err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	journal, err := postgres.NewCaptureAuditJournal(ctx, sql["capture-journal"], capture)
-	if err != nil {
-		return nil, mounts.ErrUnavailable
-	}
-	acks, err := postgres.NewCaptureAuditAcknowledgements(ctx, sql["capture-ack"], capture)
-	if err != nil {
-		return nil, mounts.ErrUnavailable
-	}
-	reader, writer, err := a.operationObjects(capture.StoreID)
-	if err != nil {
-		return nil, mounts.ErrUnavailable
-	}
-	out.intents = auditapp.CaptureOperationPublication{RootID: root, Completed: completed, Journal: journal, Acknowledgements: acks, Writer: writer, Reader: reader, MAC: out.mac}
 
 	executionSQL, err := postgres.NewAPIContextExecutions(ctx, sql["api-execution"], root, installation, shared.retention)
 	if err != nil {
@@ -381,7 +359,6 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	runner := executionapp.APIContextRunner{Read: executionSQL, Prepare: executionSQL, Record: executionSQL, Eligibility: eligibility, Retention: out.retention, Profiles: profiles}
 	out.regional = RegionalAPIContextStart{Runner: runner, Router: router, Report: eventLog(os.Stderr, "context start run refused")}
 	out.collect = RegionalRecordingCollect{Runner: executionapp.APIContextRunner{Record: executionSQL, Capabilities: capabilities, Now: time.Now}, Recordings: executionSQL, Router: router, Now: time.Now, Report: eventLog(os.Stderr, "recording collect refused")}
-	out.investigation.ReasonCipher = reasonCipher
 	// ADR-248: node recorder availability is a regional pre-work query.
 	out.investigation.Recorders = queries
 	var _ captureapp.SyscallRecorders = queries // B3 finite syscall recordings
@@ -398,7 +375,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	out.progress = captureapp.ContextProgressService{Reasons: captureapp.StoredCaptureReasons{Records: journal, Cipher: reasonCipher}, RootID: root, InstallationID: installation, Reader: progress, Reviews: out.reviews}
+	out.progress = captureapp.ContextProgressService{RootID: root, InstallationID: installation, Reader: progress, Reviews: out.reviews}
 	routes, err := postgres.NewContextCaseReads(ctx, sql["hub-metadata-read"], root)
 	if err != nil {
 		return nil, mounts.ErrUnavailable

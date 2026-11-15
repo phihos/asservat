@@ -16,7 +16,7 @@ import (
 
 func apiCompletedFixture(t *testing.T) (custodydb.ReadContextProgressFactsRow, value.APIExecution, custodydb.ContextExecution) {
 	t.Helper()
-	f := progressFactsFixture(t, "audited")
+	f := progressFactsFixture(t, "accepted")
 	a, err := admittedRecord(f.ContextCapture)
 	if err != nil {
 		t.Fatal(err)
@@ -29,11 +29,10 @@ func apiCompletedFixture(t *testing.T) (custodydb.ReadContextProgressFactsRow, v
 	e.NamespaceUID = e.CaptureUID
 	e.WorkloadUID = e.CaseID
 	f.ContextCapture.ExpectationJson, _ = json.Marshal(e)
-	intent, err := captureIntent(f.ContextCapture)
+	_, err = captureIntent(f.ContextCapture)
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.ContextCapture.IntentDigest = digest(intent)
 	p := value.APIProcessBinding{InstallationID: uid(f.ContextCapture.RootID), ClusterID: e.Registration.Location.ClusterID, IssuerEpoch: uid(f.ContextCapture.PermissionEpoch), NamespaceUID: e.NamespaceUID, AccountUID: e.PodUID, PodUID: e.WorkloadUID, ProcessEpoch: e.CaseID, StartupDigest: artifact.Digest{1}, ImageDigest: e.CollectorImageDigest}
 	b := value.Binding{ExecutionClass: artifact.ContextAPIExecution, ExecutorPodUID: p.PodUID, ExecutorAccountUID: p.AccountUID, OperationID: e.CaptureUID, CaptureID: e.CaptureUID, ActionID: e.ActionID, AttemptID: e.Registration.Location.AttemptID, ClusterID: p.ClusterID, IssuerEpoch: p.IssuerEpoch, PodUID: e.PodUID, CollectorEpoch: p.ProcessEpoch, ScopeDigest: e.PlanDigest, AuthorityDigest: artifact.Digest{1}, BudgetDigest: artifact.Digest{2}, AuditDigest: artifact.Digest{3}, NativeBytes: artifact.MaxContextBytes, NotBefore: f.ContextCapture.CreatedAt.Time.UTC(), NotAfter: f.ContextCapture.CreatedAt.Time.UTC().Add(5 * time.Second)}
 	r := value.APIExecution{RootID: uid(f.ContextCapture.RootID), Binding: b, Process: p, ExpectationDigest: evidence.ContextExpectationDigest(e), ObjectUID: e.CaseID, Phase: "stored", StartedAt: b.NotBefore.Add(time.Second), AcquiredAt: b.NotBefore.Add(2 * time.Second), CompletedAt: b.NotBefore.Add(3 * time.Second)}
@@ -72,7 +71,7 @@ func TestAPIVerificationAuditRequiresExactCompletedResult(t *testing.T) {
 		t.Fatal(err)
 	}
 	ad := app.APIExecutionDigest(r)
-	v := custodydb.ContextVerification{CaptureID: f.ContextCapture.ID, RootID: f.ContextCapture.RootID, VerifiedAt: ts(r.CompletedAt.Add(time.Second)), ExpectationDigest: digest(e), CopiesDigest: digest(r.Copies), IntentDigest: f.ContextCapture.IntentDigest, AuthorityDigest: ad[:], PermissionEpoch: f.ContextCapture.PermissionEpoch, PermissionSequence: 1}
+	v := custodydb.ContextVerification{CaptureID: f.ContextCapture.ID, RootID: f.ContextCapture.RootID, VerifiedAt: ts(r.CompletedAt.Add(time.Second)), ExpectationDigest: digest(e), CopiesDigest: digest(r.Copies), IntentDigest: captureIntentDigest(f.ContextCapture), AuthorityDigest: ad[:], PermissionEpoch: f.ContextCapture.PermissionEpoch, PermissionSequence: 1}
 	record, err := verificationRecord(f.ContextCapture, v, r)
 	if err != nil || record.APIOutcome == nil || record.APIOutcome.StartObjectUID != r.ObjectUID || !record.Valid() {
 		t.Fatal("completed provenance omitted", err)

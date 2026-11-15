@@ -206,7 +206,7 @@ func (f *investigationFixture) AdmitReviewedContext(_ context.Context, previewID
 	in := a.Plan.Input
 	t, r := in.Target, in.Retention
 	e := artifact.ContextExpectation{ExecutionClass: t.ExecutionClass, Registration: a.Registration, CaseID: a.CaseID, OccurrenceID: a.OccurrenceID, NodeUID: t.NodeUID, NodeBootID: t.NodeBootID, PodUID: t.Request.PodUID, Namespace: t.Request.Namespace.Name, NamespaceUID: t.Request.Namespace.UID, WorkloadUID: t.Request.Workload.UID, CollectorVersion: in.Capability.CollectorVersion, CollectorImageDigest: in.Capability.CollectorImageDigest, RecipeDigest: a.Plan.RecipeDigest, PlanDigest: a.Plan.ScopeDigest, CaptureUID: in.CaptureID, ActionID: "pod-status", DataClass: "metadata", PurposeRef: r.PurposeRef, Audience: slices.Clone(a.Eligibility.DefaultAudience), RequestedAgeSeconds: r.RequestedSeconds, MaximumAgeSeconds: r.MaximumSeconds, DeletionBudgetSeconds: r.DeletionBudgetSeconds, RetentionRules: slices.Clone(r.Policies), TriggeredAt: a.Registration.AnchorAt}
-	out := value.Accepted{MetadataValidUntil: identity.Earlier(a.Eligibility.ValidUntil, f.now.Add(5*time.Second)), CaptureID: in.CaptureID, State: value.PendingAudit, ScopeDigest: a.Plan.ScopeDigest, SubmissionDigest: a.SubmissionDigest, Expectation: e, Pin: t.Pin, CreatedAt: f.now, Deadline: in.Deadline}
+	out := value.Accepted{MetadataValidUntil: identity.Earlier(a.Eligibility.ValidUntil, f.now.Add(5*time.Second)), CaptureID: in.CaptureID, ScopeDigest: a.Plan.ScopeDigest, SubmissionDigest: a.SubmissionDigest, Expectation: e, Pin: t.Pin, CreatedAt: f.now, Deadline: in.Deadline}
 	f.accepted[key] = out
 	if f.afterAdmission != nil {
 		f.afterAdmission()
@@ -463,12 +463,13 @@ func TestContextRequiresProtectedAuthorityAndNoDetachedContext(t *testing.T) {
 	})
 }
 
-func TestContextProtectedReasonReferenceRequiresProducedEnvelope(t *testing.T) {
+func TestContextPreviewRefusesCallerReason(t *testing.T) {
 	f := newInvestigationFixture()
 	in := f.intent()
-	in.Reason = &value.ProtectedReasonRef{ID: fixtureID(40), CiphertextDigest: artifact.Digest{4}}
+	reason := "caller supplied"
+	in.Reason = &reason
 	if _, err := f.svc.Preview(context.Background(), f.source(t, context.Background()), in); err == nil || len(f.previews) != 0 {
-		t.Fatal("unproduced reference accepted or persisted")
+		t.Fatal("caller reason accepted or persisted")
 	}
 }
 

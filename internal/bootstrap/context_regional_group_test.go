@@ -259,7 +259,7 @@ func newGroupRegionalFixture(t *testing.T, counts ...int) *groupRegionalFixture 
 			t.Fatal("invalid accepted child expectation", i, e.Validate())
 		}
 	}
-	f.parent = capturevalue.Accepted{CaptureID: regionalObservationID(700), ScopeDigest: digest, SubmissionDigest: captureapp.ContextRequestDigest(regionalObservationID(701)), State: capturevalue.IntentAudited, CreatedAt: base.now, Deadline: base.now.Add(30 * time.Second), MetadataValidUntil: base.now.Add(5 * time.Second), Group: &capturevalue.RecordingSaveGroupAccepted{CaseID: base.work.Accepted.Expectation.CaseID}}
+	f.parent = capturevalue.Accepted{CaptureID: regionalObservationID(700), ScopeDigest: digest, SubmissionDigest: captureapp.ContextRequestDigest(regionalObservationID(701)), CreatedAt: base.now, Deadline: base.now.Add(30 * time.Second), MetadataValidUntil: base.now.Add(5 * time.Second), Group: &capturevalue.RecordingSaveGroupAccepted{CaseID: base.work.Accepted.Expectation.CaseID}}
 	for i := range f.works {
 		w := &f.works[i]
 		w.Initiator = &f.human.Principal

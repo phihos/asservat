@@ -196,7 +196,7 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		// restriction, lineage or counter mutation is delegated to admission.
 		read("processing_root", "processing_rule")
 		// The only effects are one reviewed capture, its original custody
-		// reservation and the atomically prepaid private audit pair. Existing
+		// reservation and its audit_event row. Existing
 		// storage binding and quota/source configuration remain read-only.
 		// ADR-228: a policy executor re-checks its acceptance after locks.
 		read("policy_source", "policy_acceptance")
@@ -218,9 +218,9 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		for _, table := range []string{"context_capture", "custody_attempt", "custody_copy", "custody_event"} {
 			add(table, "INSERT")
 		}
-		for _, signature := range []string{"lock_capture_audit_admission(uuid,uuid)", "reserve_capture_audit(uuid,uuid,jsonb,bytea,timestamptz)", "capacity_managed_admission_until(uuid,uuid,text,timestamptz)"} {
-			out = append(out, publicRuntimeGrant{"function", signature, "", "EXECUTE"})
-		}
+		out = append(out, publicRuntimeGrant{"function", "capacity_managed_admission_until(uuid,uuid,text,timestamptz)", "", "EXECUTE"})
+		// ADR-330 D6: the admission writes its audit row in its transaction.
+		add("audit_event", "INSERT")
 	case "policy-automation":
 		out = append(out, publicRuntimePolicySourceGrants()...)
 		// ADR-228: hub-api policy activation, source observation, acceptance
@@ -286,14 +286,9 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 			"revoked_at", "revoker_issuer", "revoker_subject", "revoker_client", "revoke_key", "revision", "artifacts_spent", "bytes_spent", "operations_spent", "policy_executions_spent", "policy_bytes_spent")
 		add("access_grant_child", "INSERT")
 		add("access_grant_use", "INSERT")
-	case "capture-journal":
-		for _, signature := range []string{"read_capture_operation(uuid,uuid)", "read_capture_reason(uuid,uuid)", "capture_audit_journal(uuid,jsonb,text,jsonb)", "claim_capture_reconciliation(uuid,jsonb,text)"} {
-			out = append(out, publicRuntimeGrant{"function", signature, "", "EXECUTE"})
-		}
-	case "capture-ack":
-		for _, signature := range []string{"capture_audit_acknowledge(uuid,jsonb,text,jsonb,jsonb,jsonb)", "acknowledge_capture_pair(uuid,jsonb)"} {
-			out = append(out, publicRuntimeGrant{"function", signature, "", "EXECUTE"})
-		}
+	case "capture-journal", "capture-ack":
+		// Unused since ADR-330 D6 removed the capture audit pair; the logins
+		// remain only for the capacity setup role layout.
 	case "capture-preview":
 		out = append(out, publicRuntimeGrant{"function", "context_preview_read_until(uuid,uuid)", "", "EXECUTE"})
 		// Passive private blueprints only. SQL33/36 prohibit live deletion,
@@ -308,9 +303,6 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 	case "capture-resolution":
 		// Fencing counts the caller's live previews, which include selections.
 		read("recording_save_group", "recording_selection_set")
-		// Closing a preview runs context_preview_immutable, whose reason check
-		// calls this SECURITY DEFINER predicate (00110 revoked it from PUBLIC).
-		out = append(out, publicRuntimeGrant{"function", "capture_preview_reason_copied(context_preview)", "", "EXECUTE"})
 		out = append(out, publicRuntimeGrant{"function", "context_preview_read_until(uuid,uuid)", "", "EXECUTE"})
 		// Current same-actor request resolution may only close a passive draft
 		// or fence its absent original ID. It cannot admit/cancel accepted work.
@@ -503,8 +495,7 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("permission_stream", "UPDATE", "id")
 		add("retention_source", "UPDATE", "root_id")
 	case "capture-intent-read":
-		read("capture_operation_intents")
-		out = append(out, publicRuntimeGrant{"function", "capture_audit_role_ok(uuid,text)", "", "EXECUTE"})
+		// Unused since ADR-330 D6; kept only for the capacity setup role layout.
 	case "download-source":
 		// Exact ciphertext receipts and minimized routing only. In particular,
 		// there is no allocation/session/audit/key/native-operation mutation.

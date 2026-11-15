@@ -8,7 +8,7 @@ GRANT INSERT,DELETE ON permission_review_source TO authority_runtime; GRANT UPDA
 
 CREATE ROLE capture_runtime LOGIN PASSWORD 'synthetic-capture'; GRANT CONNECT ON DATABASE custody_test TO capture_runtime; GRANT USAGE ON SCHEMA public TO capture_runtime; GRANT SELECT ON goose_db_version,permission_stream,permission_basis,permission_assignment,permission_review_source,permission_review_assignment,permission_review_decision,authority_audit,context_storage_binding,capture_history_parameter TO capture_runtime; GRANT UPDATE(id) ON permission_stream TO capture_runtime; GRANT UPDATE(source_uid) ON context_storage_binding TO capture_runtime; GRANT SELECT,INSERT ON context_capture TO capture_runtime; GRANT SELECT,INSERT,UPDATE ON custody_pool,custody_allocation,custody_attempt,custody_copy,custody_event TO capture_runtime;
 
-CREATE ROLE capture_audit_runtime LOGIN PASSWORD 'synthetic-capture-audit'; GRANT CONNECT ON DATABASE custody_test TO capture_audit_runtime; GRANT USAGE ON SCHEMA public TO capture_audit_runtime; GRANT SELECT ON goose_db_version,permission_stream,context_capture TO capture_audit_runtime; GRANT UPDATE(id) ON permission_stream TO capture_audit_runtime; GRANT UPDATE(state,intent_acknowledged_at,intent_digest,intent_object_key,intent_object_version,intent_object_etag,intent_object_bytes,intent_object_sha256) ON context_capture TO capture_audit_runtime;
+CREATE ROLE capture_audit_runtime LOGIN PASSWORD 'synthetic-capture-audit'; GRANT CONNECT ON DATABASE custody_test TO capture_audit_runtime; GRANT USAGE ON SCHEMA public TO capture_audit_runtime; GRANT SELECT ON goose_db_version,permission_stream,context_capture TO capture_audit_runtime; GRANT UPDATE(id) ON permission_stream TO capture_audit_runtime;
 
 CREATE ROLE peer_read_runtime LOGIN PASSWORD 'synthetic-peer-read'; GRANT CONNECT ON DATABASE custody_test TO peer_read_runtime; GRANT USAGE ON SCHEMA public TO peer_read_runtime; GRANT SELECT ON goose_db_version,fleet_trust TO peer_read_runtime;
 
@@ -339,7 +339,6 @@ GRANT INSERT,DELETE ON context_preview_fence TO context_request_resolution_runti
 GRANT DELETE ON context_preview TO context_request_resolution_runtime;
 -- ADR-266: resolution reads a recording save group (production capture-resolution).
 GRANT SELECT ON recording_save_group,recording_selection_set TO context_request_resolution_runtime;
-GRANT EXECUTE ON FUNCTION capture_preview_reason_copied(context_preview) TO context_request_resolution_runtime;
 GRANT SELECT ON context_preview,context_preview_fence TO capture_runtime;
 GRANT SELECT,DELETE ON context_preview_fence TO context_preview_runtime,context_preview_cleanup_runtime;
 -- 00108: previews create and expire recording selections, as the
@@ -538,10 +537,8 @@ CREATE ROLE capture_operation_read_runtime LOGIN NOINHERIT PASSWORD 'synthetic-c
 GRANT CONNECT ON DATABASE custody_test TO capture_operation_source_runtime,capture_operation_admit_runtime,capture_operation_journal_runtime,capture_operation_ack_runtime,capture_operation_cleanup_runtime,capture_operation_verify_runtime,capture_operation_retire_runtime,capture_operation_read_runtime;
 GRANT USAGE ON SCHEMA public TO capture_operation_source_runtime,capture_operation_admit_runtime,capture_operation_journal_runtime,capture_operation_ack_runtime,capture_operation_cleanup_runtime,capture_operation_verify_runtime,capture_operation_retire_runtime,capture_operation_read_runtime;
 GRANT SELECT ON goose_db_version TO capture_operation_source_runtime,capture_operation_admit_runtime,capture_operation_journal_runtime,capture_operation_ack_runtime,capture_operation_cleanup_runtime,capture_operation_verify_runtime,capture_operation_retire_runtime,capture_operation_read_runtime;
-GRANT EXECUTE ON FUNCTION configure_capture_audit_backing(uuid,jsonb,jsonb,timestamptz,timestamptz) TO capture_operation_source_runtime;
-GRANT EXECUTE ON FUNCTION lock_capture_audit_admission(uuid,uuid),reserve_capture_audit(uuid,uuid,jsonb,bytea,timestamptz),capacity_managed_admission_until(uuid,uuid,text,timestamptz) TO capture_operation_admit_runtime;
-GRANT EXECUTE ON FUNCTION read_capture_operation(uuid,uuid),capture_audit_journal(uuid,jsonb,text,jsonb),claim_capture_reconciliation(uuid,jsonb,text) TO capture_operation_journal_runtime;
-GRANT EXECUTE ON FUNCTION capture_audit_acknowledge(uuid,jsonb,text,jsonb,jsonb,jsonb),acknowledge_capture_pair(uuid,jsonb) TO capture_operation_ack_runtime;
+GRANT EXECUTE ON FUNCTION capacity_managed_admission_until(uuid,uuid,text,timestamptz) TO capture_operation_admit_runtime;
+GRANT INSERT ON audit_event TO capture_runtime,capture_operation_admit_runtime;
 -- Admission retains the existing exact authority/custody/control transaction,
 -- without inheriting another role or gaining audit/provider acknowledgement.
 GRANT SELECT ON permission_stream,permission_basis,permission_assignment,permission_review_source,permission_review_assignment,permission_review_decision,authority_audit,context_storage_binding,context_preview,context_preview_fence TO capture_operation_admit_runtime;
@@ -570,7 +567,6 @@ GRANT EXECUTE ON FUNCTION finish_capture_operation_retirement(uuid,uuid,uuid),fi
 
 -- Passive retained acknowledgement: no base-table read or write privilege.
 GRANT EXECUTE ON FUNCTION capture_audit_role_ok(uuid,text) TO capture_operation_read_runtime;
-GRANT SELECT ON capture_operation_intents TO capture_operation_read_runtime;
 
 -- ADR-206 SQL component fixture only. These are not installed runtime grants.
 -- Protected backing and C-14 worker/key bindings are seeded by the owned fixture

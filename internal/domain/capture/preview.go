@@ -33,19 +33,6 @@ const (
 	MaxPreviewsPerRoot     = 1000
 )
 
-// ProtectedReasonRef identifies separately encrypted, scope-bound control data.
-// Its digest covers ciphertext, never free text. It is descriptive metadata,
-// not collection authority. Zero expiry follows mandatory audit retirement.
-type ProtectedReasonRef struct {
-	ID               string
-	CiphertextDigest artifact.Digest
-	ExpiresAt        time.Time
-}
-
-func (r ProtectedReasonRef) Valid() bool {
-	return authorization.UUID(r.ID) && r.CiphertextDigest != (artifact.Digest{}) && (r.ExpiresAt.IsZero() || previewTime(r.ExpiresAt))
-}
-
 // ContextIntent is private authored intent for the one implemented diagnostic,
 // or (ADR-243) a reviewed capture profile composition. A transport must resolve
 // its diagnostic handle and protect any free-text reason before constructing
@@ -62,7 +49,7 @@ type ContextIntent struct {
 	Target           targets.WorkloadRequest
 	Diagnostic       string
 	RequestedSeconds int64
-	Reason           *ProtectedReasonRef
+	Reason           *string `json:",omitempty"`
 	// Sharing (ADR-235) is an optional capture-time share of the result.
 	Sharing *ContextSharing `json:",omitempty"`
 	// Composition (ADR-243) replaces Diagnostic. Such a preview is a reviewed
@@ -74,7 +61,7 @@ func (i ContextIntent) Valid() bool {
 	if !i.LogsTriggeredAt.IsZero() && (i.Composition == nil || i.LogsTriggeredAt.Year() < 1 || i.LogsTriggeredAt.Year() > 9999) {
 		return false
 	}
-	if (i.HistoryAuthored != nil && (!i.HistoryAuthored.Valid() || i.HistoryAuthored.Target.ClusterID != i.Target.ClusterID)) || (i.RepeatedFrom != nil && (!authorization.UUID(i.RepeatedFrom.CaptureID) || i.RepeatedFrom.ExpiresAt.IsZero())) || !i.Target.Valid() || i.RequestedSeconds < 0 || i.RequestedSeconds > privacy.MaxAgeSeconds || (i.Reason != nil && !i.Reason.Valid()) || (i.Sharing != nil && !i.Sharing.Valid()) {
+	if (i.HistoryAuthored != nil && (!i.HistoryAuthored.Valid() || i.HistoryAuthored.Target.ClusterID != i.Target.ClusterID)) || (i.RepeatedFrom != nil && (!authorization.UUID(i.RepeatedFrom.CaptureID) || i.RepeatedFrom.ExpiresAt.IsZero())) || !i.Target.Valid() || i.RequestedSeconds < 0 || i.RequestedSeconds > privacy.MaxAgeSeconds || (i.Reason != nil && !ValidReason(*i.Reason)) || (i.Sharing != nil && !i.Sharing.Valid()) {
 		return false
 	}
 	if i.Snapshot != nil {
@@ -144,7 +131,6 @@ type ContextPreview struct {
 	ScopeDigest                                            artifact.Digest
 	CreatedAt, Deadline                                    time.Time
 	SelectionUntil                                         time.Time `json:",omitzero"`
-	ReasonEnvelope                                         []byte    `json:",omitempty"`
 }
 
 // Executor is distinct from the immutable initiating principal of a manual
@@ -174,7 +160,7 @@ func (p ContextPreview) Valid() bool {
 	if p.Intent.Snapshot != nil && (!previewTime(p.SelectionUntil) || !p.SelectionUntil.After(p.CreatedAt) || p.SelectionUntil.After(p.CreatedAt.Add(time.Minute)) || !p.Intent.Snapshot.Request.ProcessingUntil.Equal(p.Deadline)) || p.Intent.Snapshot == nil && !p.SelectionUntil.IsZero() {
 		return false
 	}
-	if len(p.ReasonEnvelope) > 16<<10 || (p.Intent.RepeatedFrom != nil && p.Deadline.After(p.Intent.RepeatedFrom.ExpiresAt)) || !authorization.UUID(p.RootID) || !authorization.UUID(p.InstallationID) || !p.Actor.Valid() || !p.Intent.Valid() || !p.Target.Valid() || !p.storageValid() || !p.Retention.Valid() || !previewTime(p.CreatedAt) || !previewTime(p.Deadline) || !p.Deadline.After(p.CreatedAt) || (p.Intent.Snapshot == nil && p.Deadline.After(p.CreatedAt.Add(5*time.Minute))) {
+	if (p.Intent.RepeatedFrom != nil && p.Deadline.After(p.Intent.RepeatedFrom.ExpiresAt)) || !authorization.UUID(p.RootID) || !authorization.UUID(p.InstallationID) || !p.Actor.Valid() || !p.Intent.Valid() || !p.Target.Valid() || !p.storageValid() || !p.Retention.Valid() || !previewTime(p.CreatedAt) || !previewTime(p.Deadline) || !p.Deadline.After(p.CreatedAt) || (p.Intent.Snapshot == nil && p.Deadline.After(p.CreatedAt.Add(5*time.Minute))) {
 		return false
 	}
 	seen := map[string]bool{}
@@ -225,7 +211,6 @@ func (p ContextPreview) Current(now time.Time) bool {
 }
 
 func (p ContextPreview) Clone() ContextPreview {
-	p.ReasonEnvelope = slices.Clone(p.ReasonEnvelope)
 	p.Group = p.Group.Clone()
 	p.CompositionGroup = p.CompositionGroup.Clone()
 	p.CanonicalScope = slices.Clone(p.CanonicalScope)

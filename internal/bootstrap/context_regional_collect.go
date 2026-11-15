@@ -8,7 +8,6 @@ import (
 
 	executionapp "asservat.local/asservat/internal/application/execution"
 	"asservat.local/asservat/internal/domain/authorization"
-	capturevalue "asservat.local/asservat/internal/domain/capture"
 	execution "asservat.local/asservat/internal/domain/execution"
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/transport/contextstart"
@@ -108,7 +107,7 @@ func (s RegionalRecordingCollect) Collect(ctx context.Context, captureID string)
 		return "", err
 	}
 	a := w.Accepted
-	if a.CaptureID != captureID || a.State != capturevalue.IntentAudited || a.Expectation.Recording == nil && a.Expectation.Snapshot == nil && a.Expectation.Profile == nil && a.Expectation.Logs == nil {
+	if a.CaptureID != captureID || a.Expectation.Recording == nil && a.Expectation.Snapshot == nil && a.Expectation.Profile == nil && a.Expectation.Logs == nil {
 		return "", execution.ErrDenied
 	}
 	readyAt := time.Time{}

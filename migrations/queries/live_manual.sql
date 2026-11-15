@@ -7,7 +7,7 @@ SELECT (convert_from(c.expectation_json,'UTF8')::jsonb#>>'{Registration,Location
  (convert_from(c.expectation_json,'UTF8')::jsonb->>'PodUID')::text AS pod_uid
 FROM context_capture c JOIN context_execution e ON e.root_id=c.root_id AND e.capture_id=c.id AND e.attempt_id=c.attempt_id
 WHERE c.root_id=sqlc.arg(root_id)::uuid AND c.id=sqlc.arg(capture_id)::uuid
- AND c.state='intent_audited' AND e.phase='started' AND c.snapshot_cancel_requested_at IS NULL
+ AND e.phase='started' AND c.snapshot_cancel_requested_at IS NULL
  AND jsonb_typeof(convert_from(c.expectation_json,'UTF8')::jsonb->'Recording')='object'
  AND convert_from(c.scope_json,'UTF8')::jsonb#>>'{executor,identityType}'='human';
 
@@ -15,7 +15,7 @@ WHERE c.root_id=sqlc.arg(root_id)::uuid AND c.id=sqlc.arg(capture_id)::uuid
 SELECT sqlc.embed(c),sqlc.embed(e)
 FROM context_capture c JOIN context_execution e ON e.root_id=c.root_id AND e.capture_id=c.id AND e.attempt_id=c.attempt_id
 WHERE c.root_id=sqlc.arg(root_id)::uuid AND c.id=ANY(sqlc.arg(capture_ids)::uuid[])
- AND c.state='intent_audited' AND e.phase='started' AND c.snapshot_cancel_requested_at IS NULL
+ AND e.phase='started' AND c.snapshot_cancel_requested_at IS NULL
  AND jsonb_typeof(convert_from(c.expectation_json,'UTF8')::jsonb->'Recording')='object'
  AND convert_from(c.scope_json,'UTF8')::jsonb#>>'{executor,identityType}'='human'
 ORDER BY c.id;
@@ -25,7 +25,7 @@ SELECT sqlc.embed(c),sqlc.embed(e)
 FROM context_capture c JOIN context_execution e ON e.root_id=c.root_id AND e.capture_id=c.id AND e.attempt_id=c.attempt_id
 WHERE c.root_id=sqlc.arg(root_id)::uuid
  AND (sqlc.narg(after_capture_id)::uuid IS NULL OR c.id>sqlc.narg(after_capture_id)::uuid)
- AND c.state='intent_audited' AND e.phase='started' AND c.snapshot_cancel_requested_at IS NULL
+ AND e.phase='started' AND c.snapshot_cancel_requested_at IS NULL
  AND jsonb_typeof(convert_from(c.expectation_json,'UTF8')::jsonb->'Recording')='object'
  AND convert_from(c.scope_json,'UTF8')::jsonb#>>'{executor,identityType}'='human'
  AND convert_from(c.expectation_json,'UTF8')::jsonb#>>'{Registration,Location,ClusterID}'=sqlc.arg(cluster_id)::text

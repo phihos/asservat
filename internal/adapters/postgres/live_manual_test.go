@@ -36,7 +36,7 @@ func liveManualMatchFixture(t *testing.T) (app.APIContextWork, value.APIExecutio
 	r.Binding.AuditDigest = artifact.Digest{19}
 	r.ExpectationDigest = evidence.ContextExpectationDigest(e)
 	w := app.APIContextWork{Actor: previewTestValue(t).Actor, IntentDigest: r.Binding.AuditDigest,
-		Accepted: capture.Accepted{CaptureID: e.CaptureUID, State: capture.IntentAudited, Expectation: e, ScopeDigest: e.PlanDigest, Deadline: f.ContextCapture.Deadline.Time},
+		Accepted: capture.Accepted{CaptureID: e.CaptureUID, Expectation: e, ScopeDigest: e.PlanDigest, Deadline: f.ContextCapture.Deadline.Time},
 		Target:   targets.Request{ClusterID: e.Registration.Location.ClusterID, Namespace: previewTestValue(t).Target.Namespace, Workload: previewTestValue(t).Target.Workload, PodUID: e.PodUID}}
 	w.Target.Namespace.UID, w.Target.Workload.UID = e.NamespaceUID, e.WorkloadUID
 	// The regional preparation's original five seconds have ended while this
@@ -52,7 +52,6 @@ func liveManualMatchFixture(t *testing.T) (app.APIContextWork, value.APIExecutio
 func TestLiveManualMatchesOriginalFiniteExecutionWithoutInventedSession(t *testing.T) {
 	w, r, now := liveManualMatchFixture(t)
 	for name, change := range map[string]func(*app.APIContextWork, *value.APIExecution){
-		"pending-intent": func(w *app.APIContextWork, _ *value.APIExecution) { w.Accepted.State = capture.PendingAudit },
 		"requested-stop": func(w *app.APIContextWork, _ *value.APIExecution) { w.CancellationRequested = true },
 		"policy-executor": func(w *app.APIContextWork, _ *value.APIExecution) {
 			w.Actor = authorization.PolicyPrincipal(r.RootID, "source")

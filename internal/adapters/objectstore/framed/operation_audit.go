@@ -11,17 +11,11 @@ func SealOperationIntent(ctx context.Context, keys evidence.KeySealer, r audit.O
 	if keys == nil || !r.Valid() {
 		return nil, artifact.ErrInvalid
 	}
-	if r.Name == audit.CaptureOperationName {
-		return sealCaptureOperation(ctx, keys, operationRecordFormat("intent", r), r.RootID, r.ID, r)
-	}
 	return sealControlAudit(ctx, keys, operationRecordFormat("intent", r), r.RootID, r.ID, r, operationRecordLimit("intent", r))
 }
 func VerifyOperationIntent(ctx context.Context, keys evidence.KeyOpener, r audit.OperationIntent, b []byte) error {
 	if keys == nil || !r.Valid() || len(b) == 0 || len(b) > audit.OperationCipherLimit {
 		return artifact.ErrInvalid
-	}
-	if r.Name == audit.CaptureOperationName {
-		return verifyCaptureOperation(ctx, keys, operationRecordFormat("intent", r), r.RootID, r.ID, r, b, operationRecordLimit("intent", r))
 	}
 	return verifyControlAudit(ctx, keys, operationRecordFormat("intent", r), r.RootID, r.ID, r, b, operationRecordLimit("intent", r))
 }
@@ -29,17 +23,11 @@ func SealOperationOutcome(ctx context.Context, keys evidence.KeySealer, r audit.
 	if keys == nil || !r.Valid() {
 		return nil, artifact.ErrInvalid
 	}
-	if r.Intent.Name == audit.CaptureOperationName {
-		return sealCaptureOperation(ctx, keys, operationRecordFormat("outcome", r.Intent), r.Intent.RootID, r.Intent.ID, r)
-	}
 	return sealControlAudit(ctx, keys, operationRecordFormat("outcome", r.Intent), r.Intent.RootID, r.Intent.ID, r, operationRecordLimit("outcome", r.Intent))
 }
 func VerifyOperationOutcome(ctx context.Context, keys evidence.KeyOpener, r audit.OperationOutcome, b []byte) error {
 	if keys == nil || !r.Valid() || len(b) == 0 || len(b) > audit.OperationCipherLimit {
 		return artifact.ErrInvalid
-	}
-	if r.Intent.Name == audit.CaptureOperationName {
-		return verifyCaptureOperation(ctx, keys, operationRecordFormat("outcome", r.Intent), r.Intent.RootID, r.Intent.ID, r, b, operationRecordLimit("outcome", r.Intent))
 	}
 	return verifyControlAudit(ctx, keys, operationRecordFormat("outcome", r.Intent), r.Intent.RootID, r.Intent.ID, r, b, operationRecordLimit("outcome", r.Intent))
 }
@@ -52,27 +40,10 @@ func operationAuditFormat(phase string, healthy bool) string {
 	return "asservat-operation-" + phase + version
 }
 
-// The capture payload is an explicit private format. Other encoded records and
-// their byte ceilings are preserved exactly; this branch cannot promote them.
 func operationRecordFormat(phase string, in audit.OperationIntent) string {
-	if in.Name == audit.CaptureOperationName {
-		if in.ReasonEnvelope != nil {
-			return "asservat-capture-reason-" + phase + "/v1"
-		}
-		return "asservat-capture-" + phase + "/v1"
-	}
 	return operationAuditFormat(phase, in.Lifecycle != nil)
 }
 func operationRecordLimit(phase string, in audit.OperationIntent) int {
-	if in.Name == audit.CaptureOperationName {
-		if in.ReasonEnvelope != nil {
-			return audit.CaptureReasonPlainLimit
-		}
-		if phase == "intent" {
-			return 16 << 10
-		}
-		return 24 << 10
-	}
 	if phase == "intent" {
 		return 8 << 10
 	}

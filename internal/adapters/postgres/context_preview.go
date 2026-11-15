@@ -48,7 +48,7 @@ func previewActorKey(p identity.Principal) []byte {
 
 func previewRecord(row custodydb.ContextPreview) (value.ContextPreview, error) {
 	var out value.ContextPreview
-	if len(row.BlueprintJson)+len(row.ReasonEnvelope) > value.MaxContextPreviewBytes || len(row.BlueprintJson) == 0 || len(row.BlueprintJson) > value.MaxContextPreviewBytes || len(row.BlueprintSha256) != sha256.Size {
+	if len(row.BlueprintJson) == 0 || len(row.BlueprintJson) > value.MaxContextPreviewBytes || len(row.BlueprintSha256) != sha256.Size {
 		return out, value.ErrUnavailable
 	}
 	h := sha256.Sum256(row.BlueprintJson)
@@ -57,19 +57,14 @@ func previewRecord(row custodydb.ContextPreview) (value.ContextPreview, error) {
 	}
 	d := json.NewDecoder(bytes.NewReader(row.BlueprintJson))
 	d.DisallowUnknownFields()
-	if d.Decode(&out) != nil || !app.ValidContextPreview(withPreviewReasonEnvelope(out, row.ReasonEnvelope)) || (out.Group == nil && out.CompositionGroup == nil && row.PreviewKind != "context") || (out.Group != nil && row.PreviewKind != "recordingSaveGroup") || (out.CompositionGroup != nil && row.PreviewKind != "compositionGroup") {
+	if d.Decode(&out) != nil || !app.ValidContextPreview(out) || (out.Group == nil && out.CompositionGroup == nil && row.PreviewKind != "context") || (out.Group != nil && row.PreviewKind != "recordingSaveGroup") || (out.CompositionGroup != nil && row.PreviewKind != "compositionGroup") {
 		return value.ContextPreview{}, value.ErrUnavailable
 	}
 	canonical, err := json.Marshal(out)
 	if err != nil || !bytes.Equal(canonical, row.BlueprintJson) || out.ID != uid(row.ID) || out.RootID != uid(row.RootID) || out.CaptureID != uid(row.CaptureID) || (row.PreviewKind != "compositionGroup" && out.AttemptID != uid(row.AttemptID)) || !out.CreatedAt.Equal(row.CreatedAt.Time) || !out.Deadline.Equal(row.Deadline.Time) || !bytes.Equal(previewActorKey(out.Actor), row.ActorKey) || !bytes.Equal(principalKey(out.Actor), row.PrincipalKey) {
 		return value.ContextPreview{}, value.ErrUnavailable
 	}
-	return withPreviewReasonEnvelope(out, row.ReasonEnvelope), nil
-}
-
-func withPreviewReasonEnvelope(p value.ContextPreview, raw []byte) value.ContextPreview {
-	p.ReasonEnvelope = bytes.Clone(raw)
-	return p
+	return out, nil
 }
 
 func currentPreview(ctx context.Context, q *custodydb.Queries, p value.ContextPreview) error {
@@ -88,9 +83,7 @@ func (s *ContextPreviews) CreateContextPreview(ctx context.Context, p value.Cont
 	if s == nil || s.ledger == nil || p.RootID != s.root || !app.ValidContextPreview(p) {
 		return value.ErrInvalid
 	}
-	blueprint := p.Clone()
-	blueprint.ReasonEnvelope = nil
-	encoded, err := json.Marshal(blueprint)
+	encoded, err := json.Marshal(p)
 	if err != nil {
 		return value.ErrInvalid
 	}
@@ -115,7 +108,7 @@ func (s *ContextPreviews) CreateContextPreview(ctx context.Context, p value.Cont
 			if _, err := previewRecord(old); err != nil {
 				return err
 			}
-			if !bytes.Equal(old.BlueprintJson, encoded) || !bytes.Equal(old.ReasonEnvelope, p.ReasonEnvelope) {
+			if !bytes.Equal(old.BlueprintJson, encoded) {
 				return value.ErrConflict
 			}
 			return currentPreview(ctx, q, p) // exact retry; never renew the deadline
@@ -140,11 +133,11 @@ func (s *ContextPreviews) CreateContextPreview(ctx context.Context, p value.Cont
 			return value.ErrCapacity
 		}
 		if p.CompositionGroup != nil {
-			err = q.InsertCompositionGroupPreview(ctx, custodydb.InsertCompositionGroupPreviewParams{ID: id(p.ID), RootID: id(s.root), CaptureID: id(p.CaptureID), ActorKey: previewActorKey(p.Actor), PrincipalKey: principalKey(p.Actor), ReasonEnvelope: p.ReasonEnvelope, BlueprintJson: encoded, BlueprintSha256: h[:], CreatedAt: ts(p.CreatedAt), Deadline: ts(p.Deadline)})
+			err = q.InsertCompositionGroupPreview(ctx, custodydb.InsertCompositionGroupPreviewParams{ID: id(p.ID), RootID: id(s.root), CaptureID: id(p.CaptureID), ActorKey: previewActorKey(p.Actor), PrincipalKey: principalKey(p.Actor), BlueprintJson: encoded, BlueprintSha256: h[:], CreatedAt: ts(p.CreatedAt), Deadline: ts(p.Deadline)})
 		} else if p.Group != nil {
-			err = q.InsertRecordingGroupPreview(ctx, custodydb.InsertRecordingGroupPreviewParams{ID: id(p.ID), RootID: id(s.root), CaptureID: id(p.CaptureID), ActorKey: previewActorKey(p.Actor), PrincipalKey: principalKey(p.Actor), ReasonEnvelope: p.ReasonEnvelope, BlueprintJson: encoded, BlueprintSha256: h[:], CreatedAt: ts(p.CreatedAt), Deadline: ts(p.Deadline)})
+			err = q.InsertRecordingGroupPreview(ctx, custodydb.InsertRecordingGroupPreviewParams{ID: id(p.ID), RootID: id(s.root), CaptureID: id(p.CaptureID), ActorKey: previewActorKey(p.Actor), PrincipalKey: principalKey(p.Actor), BlueprintJson: encoded, BlueprintSha256: h[:], CreatedAt: ts(p.CreatedAt), Deadline: ts(p.Deadline)})
 		} else {
-			err = q.InsertContextPreview(ctx, custodydb.InsertContextPreviewParams{ID: id(p.ID), RootID: id(s.root), CaptureID: id(p.CaptureID), AttemptID: id(p.AttemptID), ActorKey: previewActorKey(p.Actor), PrincipalKey: principalKey(p.Actor), ReasonEnvelope: p.ReasonEnvelope, BlueprintJson: encoded, BlueprintSha256: h[:], CreatedAt: ts(p.CreatedAt), Deadline: ts(p.Deadline)})
+			err = q.InsertContextPreview(ctx, custodydb.InsertContextPreviewParams{ID: id(p.ID), RootID: id(s.root), CaptureID: id(p.CaptureID), AttemptID: id(p.AttemptID), ActorKey: previewActorKey(p.Actor), PrincipalKey: principalKey(p.Actor), BlueprintJson: encoded, BlueprintSha256: h[:], CreatedAt: ts(p.CreatedAt), Deadline: ts(p.Deadline)})
 		}
 		if err != nil {
 			return err

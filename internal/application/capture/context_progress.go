@@ -34,7 +34,6 @@ type ContextCaseNavigation interface {
 }
 
 type ContextProgressService struct {
-	Reasons                CaptureReasonReader
 	RootID, InstallationID string
 	Reader                 ContextProgressReader
 	Navigation             ContextCaseNavigation
@@ -79,14 +78,9 @@ func (s ContextProgressService) Get(ctx context.Context, source identities.Curre
 	}
 	until := identity.Earlier(p.ValidUntil, i.ValidUntil)
 	out := value.ContextProgress{Actions: slices.Clone(p.Actions), CanCancel: p.CanCancel, CancellationRequested: p.CancellationRequested, Operation: p.Operation, ActionID: p.ActionID, RepeatedFrom: p.RepeatedFrom, HistoryState: p.HistoryState, CaptureID: p.CaptureID, Revision: p.Revision, Phase: p.Phase, ActionPhase: p.ActionPhase, ReasonCode: p.ReasonCode, CreatedAt: p.CreatedAt, Deadline: p.Deadline}
-	if p.ReasonMetadata != nil {
-		out.ReasonState = "unavailable"
-		if s.Reasons != nil && p.ReasonMetadata.Valid() {
-			text, reasonErr := s.Reasons.ReadCaptureReason(ctx, *p.ReasonMetadata)
-			if reasonErr == nil && validOptionalReason(&text) {
-				out.Reason, out.ReasonState = &text, "available"
-			}
-		}
+	if p.Reason != nil && validOptionalReason(p.Reason) {
+		text := *p.Reason
+		out.Reason, out.ReasonState = &text, "available"
 	}
 	if out.Sharing, err = sharingStatus(ctx, s.Shares, p); err != nil {
 		return zero, err

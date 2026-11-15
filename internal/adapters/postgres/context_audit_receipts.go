@@ -9,24 +9,11 @@ import (
 	"asservat.local/asservat/internal/domain/audit"
 )
 
-// Current effects consume the complete retained acknowledgement of the exact
-// selected protocol. Neither a state flag nor a later source observation repairs
-// an unversioned historical receipt. This performs no additional database read.
+// acceptedPublication validates the accepted capture row's durable structure.
 func acceptedPublication(row custodydb.ContextCapture) (artifact.ContextExpectation, error) {
 	e, err := historicalPublication(row)
 	if err != nil {
 		return artifact.ContextExpectation{}, err
-	}
-	if row.IntentOperationID.Valid {
-		snapshot, err := exactCaptureOperationIntent(row)
-		if err != nil || snapshot.Receipt == nil {
-			return artifact.ContextExpectation{}, privacy.ErrFence
-		}
-	} else {
-		snapshot, err := exactCaptureIntent(row)
-		if err != nil || snapshot.Receipt == nil {
-			return artifact.ContextExpectation{}, privacy.ErrFence
-		}
 	}
 	return e, nil
 }
@@ -52,7 +39,7 @@ func currentPublishedContext(row custodydb.ReadPublishedContextRow) (artifact.Co
 	if _, err := verifiedAcquisition(e, v); err != nil {
 		return artifact.ContextExpectation{}, privacy.ErrFence
 	}
-	if v.NativeBytes.Valid && (v.NativeBytes.Int64 < 0 || v.NativeBytes.Int64 > e.Registration.NativeLimit) || !currentVerificationReceipt(v) || v.RootID != c.RootID || v.CaptureID != c.ID || !bytes.Equal(v.ExpectationDigest, digest(e)) || !bytes.Equal(v.IntentDigest, c.IntentDigest) || len(v.CopiesDigest) != 32 || bytes.Equal(v.CopiesDigest, make([]byte, 32)) || !row.PublishedAt.Valid || row.PublishedAt.Time.Before(v.AuditAcknowledgedAt.Time) || !row.PublishedAt.Time.Before(e.Registration.WriteUntil) {
+	if v.NativeBytes.Valid && (v.NativeBytes.Int64 < 0 || v.NativeBytes.Int64 > e.Registration.NativeLimit) || !currentVerificationReceipt(v) || v.RootID != c.RootID || v.CaptureID != c.ID || !bytes.Equal(v.ExpectationDigest, digest(e)) || !bytes.Equal(v.IntentDigest, captureIntentDigest(c)) || len(v.CopiesDigest) != 32 || bytes.Equal(v.CopiesDigest, make([]byte, 32)) || !row.PublishedAt.Valid || row.PublishedAt.Time.Before(v.AuditAcknowledgedAt.Time) || !row.PublishedAt.Time.Before(e.Registration.WriteUntil) {
 		return artifact.ContextExpectation{}, privacy.ErrFence
 	}
 	return e, nil

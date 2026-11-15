@@ -38,8 +38,6 @@ func operationOutputLimit(name string) int64 {
 // Lane is server-selected from the fixed operation, never supplied by a caller.
 func OperationLane(name string) string {
 	switch name {
-	case "persist_capture_intent":
-		return "capture"
 	case "initialize_processing", "restrict_processing", "request_early_erasure":
 		return "normal"
 	case "release_processing":
@@ -73,33 +71,14 @@ func OperationRequestWindow(name string) time.Duration {
 	}
 }
 
-// CaptureOperationRequestWindow bounds bookkeeping for a committed manual
-// group. Its validated group provenance does not authorize acquisition; every
-// effect retains its independently accepted/current authority and deadlines.
-func CaptureOperationRequestWindow(c CaptureIntent) time.Duration {
-	if c.Group != nil && c.Valid() {
-		return identity.RecordingSaveRequestWindow
-	}
-	return 5 * time.Second
-}
-
-func (r OperationIntent) requestWindow() time.Duration {
-	if r.Name == CaptureOperationName && r.Capture != nil {
-		return CaptureOperationRequestWindow(*r.Capture)
-	}
-	return OperationRequestWindow(r.Name)
-}
-
 // OperationIntent contains only bounded audit facts. It is not a permit, and
 // persisted identity/deadline fields never become current caller authority.
 type OperationIntent struct {
-	ReasonEnvelope                                                     *CaptureReasonEnvelope `json:",omitempty"`
 	ID, RootID, TraceID, Name, InputFormat, MACVersion, AccountVersion string
 	Actor                                                              identity.Principal `json:",omitzero"`
 	PrincipalDigest, InputDigest                                       artifact.Digest
 	CreatedAt, RequestUntil, WriteUntil, RetainUntil                   time.Time
 	Lifecycle                                                          *OperationLifecycleBinding `json:",omitempty"`
-	Capture                                                            *CaptureIntent             `json:",omitempty"`
 }
 
 func (r OperationIntent) Valid() bool {
@@ -109,9 +88,9 @@ func (r OperationIntent) Valid() bool {
 		}
 	}
 	return (r.Lifecycle == nil || r.Lifecycle.Valid(r)) && authorization.UUID(r.ID) && authorization.UUID(r.RootID) && authorization.UUID(r.TraceID) && OperationLane(r.Name) != "" &&
-		r.Actor.Valid() && humanOperationInputValid(r.Name, r.InputFormat) && r.capturePayloadValid() && identity.Text(r.MACVersion, 64) && identity.Text(r.AccountVersion, 64) &&
+		r.Actor.Valid() && humanOperationInputValid(r.Name, r.InputFormat) && identity.Text(r.MACVersion, 64) && identity.Text(r.AccountVersion, 64) &&
 		r.PrincipalDigest != (artifact.Digest{}) && r.InputDigest != (artifact.Digest{}) &&
-		identity.Fresh(r.CreatedAt, r.RequestUntil, r.CreatedAt, r.requestWindow()) && r.WriteUntil.After(r.CreatedAt) && !r.WriteUntil.After(r.CreatedAt.Add(30*time.Second)) &&
+		identity.Fresh(r.CreatedAt, r.RequestUntil, r.CreatedAt, OperationRequestWindow(r.Name)) && r.WriteUntil.After(r.CreatedAt) && !r.WriteUntil.After(r.CreatedAt.Add(30*time.Second)) &&
 		!r.RequestUntil.After(r.WriteUntil) && r.RetainUntil.After(r.WriteUntil) && !r.RetainUntil.After(r.CreatedAt.Add(3660*24*time.Hour))
 }
 
@@ -134,10 +113,7 @@ func (r OperationOutcome) Valid() bool {
 		r.MetadataUntil.Before(r.Intent.CreatedAt) || r.MetadataUntil.After(r.Intent.RequestUntil) {
 		return false
 	}
-	if !r.captureOutcomeValid() {
-		return false
-	}
-	if r.Effect != "none" && !r.Intent.processingOperation() && r.Intent.Name != "persist_capture_intent" && r.Intent.Name != "cancel_capture" && r.Intent.Name != "request_capture" && r.Intent.Name != "resolve_capture_request" && r.Intent.Name != "prepare_artifact_download" && r.Intent.Name != "get_file_excerpt" && r.Intent.Name != "get_http_headers" && r.Intent.Name != "get_profile_summary" && r.Intent.Name != "get_pcap_summary" && r.Intent.Name != "pcap_query" && r.Intent.Name != "compare_profiles" && r.Intent.Name != "get_syscall_summary" && r.Intent.Name != "get_syscall_events" && r.Intent.Name != "get_logs" && r.Intent.Name != "syscall_query" && r.Intent.Name != "get_query_result" && r.Intent.Name != "activate_policy" && r.Intent.Name != "deactivate_policy" && r.Intent.Name != "create_share" && r.Intent.Name != "revoke_share" && r.Intent.Name != "transfer_share" && r.Intent.Name != "stop_future_sharing" && r.Intent.Name != "decide_review" && r.Intent.Name != "revoke_grant" && r.Intent.Name != "request_policy_grant" && r.Intent.Name != "request_raw_access" && r.Intent.Name != "open_live_watch" && r.Intent.Name != "read_live_watch" && r.Intent.Name != "update_live_watch" && r.Intent.Name != "close_live_watch" {
+	if r.Effect != "none" && !r.Intent.processingOperation() && r.Intent.Name != "cancel_capture" && r.Intent.Name != "request_capture" && r.Intent.Name != "resolve_capture_request" && r.Intent.Name != "prepare_artifact_download" && r.Intent.Name != "get_file_excerpt" && r.Intent.Name != "get_http_headers" && r.Intent.Name != "get_profile_summary" && r.Intent.Name != "get_pcap_summary" && r.Intent.Name != "pcap_query" && r.Intent.Name != "compare_profiles" && r.Intent.Name != "get_syscall_summary" && r.Intent.Name != "get_syscall_events" && r.Intent.Name != "get_logs" && r.Intent.Name != "syscall_query" && r.Intent.Name != "get_query_result" && r.Intent.Name != "activate_policy" && r.Intent.Name != "deactivate_policy" && r.Intent.Name != "create_share" && r.Intent.Name != "revoke_share" && r.Intent.Name != "transfer_share" && r.Intent.Name != "stop_future_sharing" && r.Intent.Name != "decide_review" && r.Intent.Name != "revoke_grant" && r.Intent.Name != "request_policy_grant" && r.Intent.Name != "request_raw_access" && r.Intent.Name != "open_live_watch" && r.Intent.Name != "read_live_watch" && r.Intent.Name != "update_live_watch" && r.Intent.Name != "close_live_watch" {
 		return false
 	}
 	if r.Status != "success" && (len(r.CaseIDs) > 0 || len(r.ArtifactIDs) > 0 || len(r.CaptureIDs) > 0) {
@@ -184,8 +160,6 @@ func humanOperationInputValid(name, format string) bool {
 		return format == "context-input/v1"
 	case "download_artifact_content":
 		return format == "native-content-input/v1"
-	case "persist_capture_intent":
-		return format == CaptureOperationInputFormat || format == CaptureReasonInputFormat
 	case "initialize_processing", "restrict_processing", "release_processing", "request_early_erasure":
 		return format == "processing-input/v1"
 	case "cancel_capture", "list_recordings", "preview_recording_save", "list_diagnostics", "preview_capture", "request_capture", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "resolve_capture_request", "invalid_operation", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "preview_retention_change", "get_grant", "list_reviews", "decide_review", "revoke_grant", "request_policy_grant", "request_raw_access", "list_capture_profiles", "get_capture_profile", "list_live_sources", "open_live_watch", "read_live_watch", "update_live_watch", "close_live_watch":

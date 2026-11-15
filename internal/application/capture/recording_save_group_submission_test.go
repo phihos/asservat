@@ -30,7 +30,7 @@ type groupedSubmissionPorts struct {
 	failure                 error
 }
 
-func (f *groupedSubmissionPorts) AcknowledgedCaptureIntent(ctx context.Context, id string) (audit.CaptureIntent, error) {
+func (f *groupedSubmissionPorts) AcceptedCaptureIntent(ctx context.Context, id string) (audit.CaptureIntent, error) {
 	if f.intentHook != nil {
 		if err := f.intentHook(ctx, id); err != nil {
 			return audit.CaptureIntent{}, err
@@ -110,7 +110,7 @@ func groupedSubmissionFixture(t *testing.T, sizes ...int) (ContextSubmission, *g
 	}
 	_, accepted, _ := newTeamRecordingFixture(t)
 	accepted.f = f
-	parent := value.Accepted{State: value.PendingAudit, CaptureID: fixtureID(9000), ScopeDigest: sha256.Sum256([]byte(`{"schemaVersion":"recording-save/v1"}`)), SubmissionDigest: artifact.Digest{19}, CreatedAt: seed.CreatedAt, Deadline: seed.Deadline, Group: &value.RecordingSaveGroupAccepted{CaseID: seed.Expectation.CaseID}}
+	parent := value.Accepted{CaptureID: fixtureID(9000), ScopeDigest: sha256.Sum256([]byte(`{"schemaVersion":"recording-save/v1"}`)), SubmissionDigest: artifact.Digest{19}, CreatedAt: seed.CreatedAt, Deadline: seed.Deadline, Group: &value.RecordingSaveGroupAccepted{CaseID: seed.Expectation.CaseID}}
 	ports := &groupedSubmissionPorts{t: t, intents: map[string]audit.CaptureIntent{}, policy: accepted.authority.Executor, initiator: caller.Principal, until: f.now.Add(5 * time.Second), failure: errors.New("independent child start unconfirmed")}
 	count := 2
 	if len(sizes) > 0 {

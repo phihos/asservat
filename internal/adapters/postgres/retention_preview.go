@@ -113,7 +113,7 @@ func (s *RetentionSources) previewPage(ctx context.Context, q *custodydb.Queries
 	var sequences []int64
 	for i, row := range rows {
 		// Exactly the fields retainedContext and admittedRecord read.
-		c := custodydb.ContextCapture{ID: row.ID, RootID: row.RootID, SubmissionDigest: row.SubmissionDigest, ScopeDigest: row.ScopeDigest, ExpectationJson: row.ExpectationJson, PodPinJson: row.PodPinJson, AttemptID: row.AttemptID, CreatedAt: row.CreatedAt, Deadline: row.Deadline, State: row.State}
+		c := custodydb.ContextCapture{ID: row.ID, RootID: row.RootID, SubmissionDigest: row.SubmissionDigest, ScopeDigest: row.ScopeDigest, ExpectationJson: row.ExpectationJson, PodPinJson: row.PodPinJson, AttemptID: row.AttemptID, CreatedAt: row.CreatedAt, Deadline: row.Deadline}
 		a := custodydb.CustodyAttempt{ID: row.AttemptID, ClusterID: row.ClusterID, RequestDigest: row.RequestDigest, EffectiveExpiresAt: row.EffectiveExpiresAt, EffectiveDeleteBy: row.EffectiveDeleteBy, RetentionSequence: row.RetentionSequence}
 		r, err := retainedContext(s.root, c, a)
 		if err != nil {
