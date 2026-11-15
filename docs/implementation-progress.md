@@ -100,15 +100,33 @@ the connector enrolled with its token (no `region-bootstrap` or
 `cluster-credential` Secret exists) and `TestHelmNativeKindJourney` passed
 (19.7 s; 17.6 s again after rebasing on main). Not run: `TestHelmNativeKindClusterJoin` (mode=cluster).
 
-Remaining for this slice: process certificate enrollment/renewal/retirement
-and the mTLS context-start, key-service and owner relay transports still
-carry connector traffic (the next step is bearer-token auth on one HTTP/2
-connection and their deletion); the join Secret still carries the offer and
-copied object-store capabilities; cluster IDs still come from values, not
-names; `hub.url`/`hub.caBundle` are not implemented (mode=cluster sets
-`region.hub.federation` as the token audience); the native forwarded path
-still checks the never-filled `fleet_peer` registry; fleet settings, work
-JWS, local-key signing and the node channel rows below are unchanged.
+Remaining for this slice: see "Connector token transport" below.
+
+## Connector token transport (ADR-334, 2026-11-15)
+
+Branch `clean/connector-2`. Context starts (hub-api native port) and
+key-service wraps authenticate connectors by their ServiceAccount bearer token,
+verified like the federation's (`contracts.ConnectorTokens`, rendered once by
+`asservat.connectorTokens`); the hello must name the token's cluster and peer.
+The hub keeps its owner certificate; the connector process has a random epoch
+and no certificate. Removed: connector process credentials, enrollment,
+renewal, registration and retirement (Go side), the connector PKI mount and
+roles, the federation's audit/OpenBao/object-store credentials and three SQL
+duty logins, the source frames of the context-start stream, the connector
+observation/operation channels and the hub's ADR-197 operation port, owner
+relay and forwarding, the native forwarded path and the owner-path native
+handler, process self-proofs (`ConnectorAPIExecutionProtection`), and
+`fleet_peer`/`fleet_peer_certificate` (migration 00170). The connector now
+announces `query/resolve-source-snapshots`, which hubs refused before.
+
+Gaps: the connector identity SQL lane of migrations 00049/00051/00164
+(`connector_identity_*`, `connector_credential_attempt`, retirement tickets)
+is still referenced by shared operation-audit functions and stays until
+those functions are rewritten; `federation.connector` values are still
+required though unused; the join Secret still carries the offer and copied
+object-store capabilities; cluster IDs still come from values; `hub.url`/
+`hub.caBundle` are not implemented; work JWS, local-key signing, fleet
+settings and the node channel rows below are unchanged.
 
 ## ADR-330 contract divergence (2026-11-14)
 

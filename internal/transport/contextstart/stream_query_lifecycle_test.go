@@ -1,7 +1,6 @@
 package contextstart
 
 import (
-	"asservat.local/asservat/internal/domain/identity"
 	"context"
 	"encoding/json"
 	"errors"
@@ -9,6 +8,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/domain/identity"
 
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/fleet"
@@ -57,7 +58,7 @@ func newQueryLifecycleFixture(t *testing.T, parent context.Context, check Receiv
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.stream.sources = NewSourceFeed(w.Work.Channel.ExchangeID, time.Now)
+	f.stream.capabilities = contracts.NewConnectorCapabilities(contracts.APIContextCapabilities())
 	joined := make(chan struct{})
 	go func() {
 		defer close(joined)
@@ -67,13 +68,6 @@ func newQueryLifecycleFixture(t *testing.T, parent context.Context, check Receiv
 				return
 			}
 			switch frame.Kind {
-			case contracts.APIContextSourceRequestFrame:
-				request, e := contracts.DecodeAPIContextSourceRequest(frame.Payload)
-				if e != nil {
-					t.Error(e)
-					return
-				}
-				frame = contracts.APIContextFrame{Kind: contracts.APIContextSourceFrame, Payload: sourcePayload(t, request.ExchangeID, request.Sequence, time.Now())}
 			case contracts.APIContextQueryFrame:
 				request, e := contracts.DecodeAPIContextOperation(frame.Payload)
 				if e != nil {
@@ -147,8 +141,8 @@ func TestContextQueryCompletedAnswerRetainsProofAndFiniteCounts(t *testing.T) {
 			if f.readRestores.Load() != n || f.writeRestores.Load() != n {
 				t.Fatal("both original passive deadlines were not restored", f.readRestores.Load(), f.writeRestores.Load())
 			}
-			if f.stream.querySeq != int(n) || f.stream.sourceSeq != int(n) || f.stream.frames != 4*int(n) {
-				t.Fatal("finite sequence/frame accounting changed", f.stream.querySeq, f.stream.sourceSeq, f.stream.frames)
+			if f.stream.querySeq != int(n) || f.stream.frames != 2*int(n) {
+				t.Fatal("finite sequence/frame accounting changed", f.stream.querySeq, f.stream.frames)
 			}
 			if _, err := f.stream.query(parent, queryResolvePod, struct{}{}, &struct{}{}); err == nil {
 				t.Fatal("query beyond the budget accepted")
@@ -277,8 +271,8 @@ func TestContextQueryReuseChecksNewSourceAndRejectsRevokedPeer(t *testing.T) {
 	if _, err := f.stream.query(ctx, queryResolvePod, struct{}{}, &struct{}{}); err == nil {
 		t.Fatal("revoked peer reused completed query proof")
 	}
-	if f.stream.sourceSeq != 2 || checks.Load() != 4 || f.readRestores.Load() != 1 || f.writeRestores.Load() != 1 || f.stream.Context().Err() == nil {
-		t.Fatal("reuse did not pull a new source before its rejecting current check")
+	if checks.Load() != 4 || f.readRestores.Load() != 1 || f.writeRestores.Load() != 1 || f.stream.Context().Err() == nil {
+		t.Fatal("reuse did not run its rejecting current check")
 	}
 }
 

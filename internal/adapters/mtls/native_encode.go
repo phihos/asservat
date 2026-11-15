@@ -1,8 +1,9 @@
 package mtls
 
 import (
-	"asservat.local/asservat/internal/contracts"
 	"encoding/json"
+
+	"asservat.local/asservat/internal/contracts"
 )
 
 func encodeNativeHello(h contracts.NativeHello) ([]byte, error) {

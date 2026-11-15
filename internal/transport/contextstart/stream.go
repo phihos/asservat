@@ -7,7 +7,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	app "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
@@ -47,11 +46,6 @@ type frameStream struct {
 	leaseBounds  []framePeerBound
 	stopOwner    func() bool
 	ownerDone    chan struct{}
-	// ADR-178: sources is the hub's per-exchange feed; local is the region's
-	// own source reader. sourceSeq is the last used source sequence.
-	sources   *SourceFeed
-	local     app.ConnectorIdentitySourceReader
-	sourceSeq int
 	// ADR-179: targets answers the hub's pre-work queries on the region;
 	// querySeq is the last used query sequence on either side.
 	targets  QueryTargets
@@ -261,12 +255,6 @@ func (s *frameStream) Send(ctx context.Context, f contracts.APIContextFrame) err
 // send retains the actual original frame bound for the hub's acknowledged
 // pre-work query transition. Generic Send never changes completed deadlines.
 func (s *frameStream) send(ctx context.Context, f contracts.APIContextFrame) (time.Time, error) {
-	// ADR-178: the work check needs the region's fresh source first.
-	if s != nil && (f.Kind == contracts.APIContextWorkFrame || f.Kind == contracts.HistoryWorkFrame) {
-		if e := s.pullSource(ctx); e != nil {
-			return time.Time{}, fleet.ErrUnavailable
-		}
-	}
 	if s != nil {
 		if e := s.admitLeaseFrame(f.Kind, false); e != nil {
 			s.interruptAt(streamSendAdmission, streamErrorReason(e))
@@ -415,29 +403,17 @@ func (s *frameStream) receive(ctx context.Context) (contracts.APIContextFrame, t
 		return contracts.APIContextFrame{}, time.Time{}, e
 	}
 	var f contracts.APIContextFrame
-	for {
-		select {
-		case received, ok := <-incoming:
-			if !ok {
-				return contracts.APIContextFrame{}, time.Time{}, fleet.ErrUnavailable
-			}
-			f = received
-		case <-call.Done():
-			s.interruptAt(streamReceiveCall, streamErrorReason(call.Err()))
-			return contracts.APIContextFrame{}, time.Time{}, fleet.ErrUnavailable
-		case <-s.ctx.Done():
+	select {
+	case received, ok := <-incoming:
+		if !ok {
 			return contracts.APIContextFrame{}, time.Time{}, fleet.ErrUnavailable
 		}
-		if f.Kind != contracts.APIContextSourceFrame {
-			break
-		}
-		// ADR-178: the region's pre-result source never reaches the caller.
-		e = s.absorbSource(f)
-		clear(f.Payload)
-		if e != nil {
-			s.interruptAt(streamReceiveResult, streamErrorReason(e))
-			return contracts.APIContextFrame{}, time.Time{}, fleet.ErrUnavailable
-		}
+		f = received
+	case <-call.Done():
+		s.interruptAt(streamReceiveCall, streamErrorReason(call.Err()))
+		return contracts.APIContextFrame{}, time.Time{}, fleet.ErrUnavailable
+	case <-s.ctx.Done():
+		return contracts.APIContextFrame{}, time.Time{}, fleet.ErrUnavailable
 	}
 	reason := streamNoReason
 	if err := call.Err(); err != nil {
@@ -526,11 +502,8 @@ func (s *frameStream) AwaitWork(ctx context.Context) (contracts.APIContextFrame,
 		case <-s.ctx.Done():
 			return empty, zero, fleet.ErrUnavailable
 		}
-		// ADR-178/179: answer the hub's source requests and target queries
-		// while still waiting for work.
-		if f.Kind == contracts.APIContextSourceRequestFrame {
-			e = s.answerSource(call, f)
-		} else if f.Kind == contracts.APIContextQueryFrame {
+		// ADR-179: answer the hub's target queries while still waiting for work.
+		if f.Kind == contracts.APIContextQueryFrame {
 			e = s.answerQuery(call, f)
 		} else {
 			break

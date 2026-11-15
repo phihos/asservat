@@ -45,8 +45,6 @@ func (s staticBindings) AccessBindingDelivery(context.Context) (contracts.Access
 	return s.d, nil
 }
 
-type noLocal struct{ connectorlifecycle.Local }
-
 // ADR-329: the federation stores a delivery under the cluster its token
 // was attributed to, never the hub cluster's, validating every spec.
 func TestFederationAttributesAccessBindingsToPresentedCluster(t *testing.T) {
@@ -62,7 +60,7 @@ func TestFederationAttributesAccessBindingsToPresentedCluster(t *testing.T) {
 	}
 	store := &recordedBindings{}
 	ids := contracts.ServiceIDs{InstallationID: inst, ClusterID: hub, PermissionRootID: root}
-	services := federationServices{peers: &federationPeers{ids: ids}, bindings: &federationBindings{decoder, store}}
+	services := federationServices{ids: ids, bindings: &federationBindings{decoder, store}}
 	run := func(lineageCluster string) (connectorlifecycle.HubFrame, error) {
 		h, err := connectorlifecycle.NewHandler(clusterTokens{lineageCluster, root, "10000000-0000-4000-8000-000000000004", inst}, services, 2)
 		if err != nil {
@@ -81,10 +79,9 @@ func TestFederationAttributesAccessBindingsToPresentedCluster(t *testing.T) {
 		}
 		// The process binding claims the lineage's cluster, as the real one must.
 		process := value.ConnectorProcessIdentity{Binding: value.PeerBinding{InstallationID: inst, ClusterID: lineageCluster, IssuerEpoch: "10000000-0000-4000-8000-000000000003", PeerID: "10000000-0000-4000-8000-000000000004", Role: value.ConnectorPeer}, PodUID: "10000000-0000-4000-8000-000000000005", ProcessEpoch: "10000000-0000-4000-8000-000000000006"}
-		request := value.ConnectorProcessRequest{Process: process, ClientCSRDER: make([]byte, 64), ServerCSRDER: append(make([]byte, 63), 1)}
 		spec, _ := json.Marshal(map[string]any{"reason": "synthetic fixture", "effect": "Allow", "roles": []string{"evidence-reader"}, "subjects": []any{map[string]string{"kind": "Group", "issuer": "https://id.example.test", "id": "team-a"}}})
 		delivery := contracts.AccessBindingDelivery{ResourceVersion: "9", Items: []contracts.DeliveredAccessBinding{{Namespace: "payments", NamespaceUID: "payments-uid", Name: "readers", UID: "b-1", ResourceVersion: "3", Generation: 1, Spec: spec}}}
-		return client.Run(context.Background(), connectorlifecycle.Opening{Purpose: connectorlifecycle.PurposeAccessBindings, OperationID: "10000000-0000-4000-8000-000000000008", Request: request}, deliveringLocal{noLocal{}, staticBindings{delivery}})
+		return client.Run(context.Background(), connectorlifecycle.Opening{Purpose: connectorlifecycle.PurposeAccessBindings, OperationID: "10000000-0000-4000-8000-000000000008", Process: process}, deliveringLocal{staticBindings{delivery}})
 	}
 	result, err := run(remote)
 	if err != nil || result.Kind != "result" || len(store.stored) != 1 {

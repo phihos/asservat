@@ -1,6 +1,8 @@
 package kubernetes
 
 import (
+	"strings"
+
 	"asservat.local/asservat/internal/contracts"
 	apps "k8s.io/api/apps/v1"
 )
@@ -31,4 +33,9 @@ func ReleaseFollowerNames(installation string) []string {
 func HubDeploymentSettled(d apps.Deployment) bool {
 	s := d.Status
 	return d.Spec.Replicas != nil && *d.Spec.Replicas == 1 && s.ObservedGeneration == d.Generation && s.Replicas == 1 && s.UpdatedReplicas == 1 && s.AvailableReplicas == 1 && s.ReadyReplicas == 1 && s.UnavailableReplicas == 0
+}
+
+// FederationWorkloadName is the federation Deployment of an installation.
+func FederationWorkloadName(installationID string) string {
+	return "asservat-" + strings.ReplaceAll(installationID, "-", "") + "-federation"
 }

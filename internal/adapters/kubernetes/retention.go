@@ -1,15 +1,16 @@
 package kubernetes
 
 import (
+	"context"
+	"slices"
+	"time"
+
 	wire "asservat.local/asservat/api/v1alpha1"
 	configuration "asservat.local/asservat/internal/application/configuration"
 	port "asservat.local/asservat/internal/application/privacy"
 	configvalue "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
 	value "asservat.local/asservat/internal/domain/privacy"
-	"context"
-	"slices"
-	"time"
 )
 
 type RetentionClient struct {

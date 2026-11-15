@@ -1,6 +1,13 @@
 package contextstart
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"strings"
+	"testing"
+	"time"
+
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/collector"
@@ -10,12 +17,6 @@ import (
 	v "asservat.local/asservat/internal/domain/live"
 	"asservat.local/asservat/internal/domain/targets"
 	"asservat.local/asservat/internal/transport/node"
-	"context"
-	"encoding/json"
-	"fmt"
-	"strings"
-	"testing"
-	"time"
 )
 
 func TestLiveManualQueryKeepsOriginalRegionalProcess(t *testing.T) {

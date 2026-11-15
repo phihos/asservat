@@ -5,7 +5,6 @@ import (
 	"crypto"
 	"crypto/ed25519"
 	"crypto/rand"
-	"crypto/tls"
 	"crypto/x509"
 	"net"
 	"net/url"
@@ -21,7 +20,6 @@ import (
 	fleetapp "asservat.local/asservat/internal/application/fleet"
 	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/bootstrap"
-	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	fleet "asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
@@ -61,26 +59,12 @@ func (s contextStartTestRoutes) ReadOwnerProtection(ctx context.Context, p fleet
 	return fleet.OwnerProtection{Pool: p, Digest: artifact.Digest{31}, ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}, nil
 }
 
-type contextStartTestProof func(context.Context, fleet.ConnectorProcessRequest) (fleet.ConnectorProcessProof, error)
-
-func (f contextStartTestProof) ReadConnectorProcessProof(c context.Context, r fleet.ConnectorProcessRequest) (fleet.ConnectorProcessProof, error) {
-	return f(c, r)
-}
-
 type contextStartTestTrust func(context.Context) (fleet.APIContextWorkTrust, error)
 
 func (f contextStartTestTrust) APIContextWorkTrust(c context.Context) (fleet.APIContextWorkTrust, error) {
 	return f(c)
 }
 
-type contextStartUnusedNative struct{}
-
-func (contextStartUnusedNative) OpenNative(context.Context, *tls.ConnectionState, contracts.NativeHello) (native.Conversation, error) {
-	return nil, artifact.ErrDownloadUnavailable
-}
-
-// Start is the real synchronous application bridge. This tap counts invocations
-// and duration only; it cannot start a runner, supply a result or replace peers.
 type regionalAPIStartFixture struct {
 	bridge       bootstrap.RegionalAPIContextStart
 	client       *mtls.ContextStartClient
@@ -239,50 +223,20 @@ func newRegionalAPIStartFixture(t *testing.T, ctx context.Context, f fixture, n 
 	})
 	routes := contextStartTestRoutes{sql, owner, localIP}
 	owners := &fleetapp.OwnerAuthenticator{Registry: sql.reader, Routes: routes, Protection: routes, Now: time.Now}
-	clientCA, clientKey := connectorSQLCA(t)
-	serverCA, serverKey := connectorSQLCA(t)
 	observed, e := runner.Process.ReadAPIProcess(ctx)
 	if e != nil {
 		t.Fatal("real local process before standby", e)
 	}
 	b := observed.Binding
-	profile := fleet.ConnectorCredentialProfile{RootID: s.a.RootID, Binding: fleet.PeerBinding{InstallationID: pool.InstallationID, ClusterID: b.ClusterID, IssuerEpoch: pool.IssuerEpoch, PeerID: custodyID(), Role: fleet.ConnectorPeer}, Revision: identity.Revision{UID: custodyID(), Generation: 1, Digest: artifact.Digest{23}}, ProtectionDigest: artifact.Digest{24}, ServerName: "regional.fixture.invalid", Deployment: fleet.ConnectorDeployment{Namespace: n.control.Name, ServiceAccount: n.plan.Account, Deployment: "synthetic-connector", ServingSlots: 1, RetainedProcesses: 2}, ClientIssuerRoots: [][]byte{clientCA.Raw}, ServerIssuerRoots: [][]byte{serverCA.Raw}}
-	source := &contextStartConnectorFixture{profile: profile, clientCA: clientCA, serverCA: serverCA, clientKey: clientKey, serverKey: serverKey, issued: map[string]fleet.IssuedConnectorCredential{}, origins: map[artifact.Digest]fleet.ConnectorProcessIdentity{}}
-	source.proof = contextStartTestProof(func(c context.Context, r fleet.ConnectorProcessRequest) (fleet.ConnectorProcessProof, error) {
-		started := time.Now().UTC()
-		p, e := runner.Process.ReadAPIProcess(c)
-		if e != nil || p.Binding.PodUID != r.Process.PodUID || p.Binding != b {
-			return fleet.ConnectorProcessProof{}, fleet.ErrDenied
-		}
-		config, e := source.ReadConnectorIdentitySource(c)
-		if e != nil {
-			return fleet.ConnectorProcessProof{}, e
-		}
-		client, e := mtls.EnrollmentKey(r.ClientCSRDER)
-		if e != nil {
-			return fleet.ConnectorProcessProof{}, e
-		}
-		server, e := mtls.EnrollmentKey(r.ServerCSRDER)
-		if e != nil {
-			return fleet.ConnectorProcessProof{}, e
-		}
-		until := identity.Earlier(started.Add(5*time.Second), identity.Earlier(p.ValidUntil, config.Observation.FreshUntil))
-		return fleet.ConnectorProcessProof{Process: r.Process, Configuration: config.Observation, Pod: n.pod.Name, ReplicaSet: "synthetic-connector-rs", ReplicaSetUID: "70000000-0000-4000-8000-000000000071", ClientKeyDigest: client, ServerKeyDigest: server, TokenDigest: artifact.Digest{25}, WorkloadDigest: artifact.Digest{26}, ProtectionDigest: artifact.Digest{27}, ObservedAt: started, FreshUntil: until}, nil
-	})
-	connector, e := mtls.NewConnectorProcessCredentials(ctx, profile, b.PodUID, source, source, source, source, time.Now)
-	if e != nil {
-		t.Fatal(e)
-	}
-	t.Cleanup(connector.Close)
-	if e = connector.Reconcile(ctx); e != nil {
-		t.Fatal("synthetic connector registration with actual process-owned keys", e)
-	}
+	// ADR-334: the connector is this cluster's token-attributed peer.
+	connector := fleet.ConnectorProcessIdentity{Binding: fleet.PeerBinding{InstallationID: pool.InstallationID, ClusterID: b.ClusterID, IssuerEpoch: pool.IssuerEpoch, PeerID: custodyID(), Role: fleet.ConnectorPeer}, PodUID: b.PodUID, ProcessEpoch: custodyID()}
+	tokens := contextStartTestTokens{fleet.ConnectorCluster{RootID: s.a.RootID, PeerID: connector.Binding.PeerID, InstallationID: pool.InstallationID, ClusterID: b.ClusterID}}
 	router, e := contextstart.NewRouter(contextstart.RouterLimits{Standby: 1, Captures: 1, Clusters: []contextstart.ClusterLimit{{ClusterID: b.ClusterID, Standby: 1, Captures: 1}}})
 	if e != nil {
 		t.Fatal(e)
 	}
 	t.Cleanup(router.Close)
-	ingress, e := mtls.NewContextStartIngress(s.a.RootID, serving, owners, []mtls.ContextStartConnectorAdmission{{Profile: profile, Registry: contextStartObservationRegistryFixture{source}}}, time.Now)
+	ingress, e := mtls.NewContextStartIngress(s.a.RootID, serving, owners, time.Now)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -291,20 +245,14 @@ func newRegionalAPIStartFixture(t *testing.T, ctx context.Context, f fixture, n 
 		t.Fatal(e)
 	}
 	host := net.JoinHostPort(name, strconv.Itoa(port))
-	handler, e := contextstart.NewHandler(host, router, ingress, 1)
+	handler, e := contextstart.NewHandler(host, router, ingress, tokens, 1)
 	if e != nil {
 		t.Fatal(e)
 	}
-	nativeHandler, e := native.NewHandler(contracts.NativeOwnerPath, host, contextStartUnusedNative{}, 1)
-	if e != nil {
-		t.Fatal(e)
-	}
-	connectorRoots := x509.NewCertPool()
-	connectorRoots.AddCert(clientCA)
 	live, cancel := context.WithCancel(ctx)
 	serverDone := make(chan error, 1)
 	go func() {
-		serverDone <- native.ServeWithContextStart(live, listener, connectorRoots, serving, nativeHandler, handler, 1, 1)
+		serverDone <- native.ServeOwner(live, listener, roots, serving, host, handler, nil, 1, 1)
 	}()
 	t.Cleanup(func() {
 		cancel()
@@ -313,7 +261,8 @@ func newRegionalAPIStartFixture(t *testing.T, ctx context.Context, f fixture, n 
 			t.Error("shared listener shutdown", e)
 		}
 	})
-	client, e := mtls.NewContextStartClient(ctx, s.a.RootID, pool, roots, routes, owners, connector, runner.Process, 1, time.Now)
+	token := func() ([]byte, error) { return []byte(contextStartTestToken), nil }
+	client, e := mtls.NewContextStartClient(ctx, s.a.RootID, pool, roots, net.JoinHostPort(localIP, strconv.Itoa(port)), owners, connector, token, runner.Process, 1, time.Now)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -342,7 +291,7 @@ func newRegionalAPIStartFixture(t *testing.T, ctx context.Context, f fixture, n 
 	// ADR-171: the hub runs the runner with its SQL/authority ports; the region
 	// answers only its cluster-local ports over the exchange.
 	hub := executionapp.APIContextRunner{Read: runner.Read, Prepare: runner.Prepare, Record: runner.Record, Eligibility: runner.Eligibility, Capabilities: runner.Capabilities, Retention: runner.Retention, Recovery: runner.Recovery, Now: runner.Now}
-	local := contextstart.RegionalLocal{Process: runner.Process, Targets: regionalQueryTargets(runner.Targets), Output: runner.Output, Collector: runner.Collector, Source: source, Now: runner.Now}
+	local := contextstart.RegionalLocal{Process: runner.Process, Targets: regionalQueryTargets(runner.Targets), Output: runner.Output, Collector: runner.Collector, Now: runner.Now}
 	out := &regionalAPIStartFixture{bridge: bootstrap.RegionalAPIContextStart{Runner: hub, Signer: signer, Router: router, Now: time.Now}, client: client, candidates: sql.reader, owner: owner, verifier: verifier, local: local}
 	t.Cleanup(func() {
 		client.Close()
@@ -352,19 +301,6 @@ func newRegionalAPIStartFixture(t *testing.T, ctx context.Context, f fixture, n 
 		}
 	})
 	return out
-}
-
-// contextStartObservationRegistryFixture binds the synthetic registry to each
-// exchange's ADR-178 source feed: the region's own source must answer first.
-type contextStartObservationRegistryFixture struct {
-	registry fleetapp.ConnectorLeafRegistry
-}
-
-func (r contextStartObservationRegistryFixture) ReadConnectorObservationRegistration(ctx context.Context, _ fleet.ConnectorCredentialProfile, source fleetapp.ConnectorIdentitySourceReader, leaf fleet.ConnectorCredentialCertificate) (fleetapp.ConnectorLeafRegistration, error) {
-	if _, e := source.ReadConnectorIdentitySource(ctx); e != nil {
-		return fleetapp.ConnectorLeafRegistration{}, e
-	}
-	return r.registry.ConnectorLeafRegistration(ctx, leaf)
 }
 
 // regionalQueryTargets keeps a full regional resolver for ADR-179 queries; a
@@ -389,4 +325,17 @@ func (p podOnlyTargets) ResolvePod(ctx context.Context, r targets.Request) (targ
 }
 func (podOnlyTargets) ResolveWorkload(context.Context, targets.WorkloadRequest) (targets.PodResolution, error) {
 	return targets.PodResolution{}, targets.ErrUnavailable
+}
+
+const contextStartTestToken = "synthetic-connector-token"
+
+// contextStartTestTokens attributes the synthetic token to the fixture
+// cluster; the hub verifies real tokens with the ServiceAccount verifier.
+type contextStartTestTokens struct{ cluster fleet.ConnectorCluster }
+
+func (t contextStartTestTokens) VerifyConnectorUntil(_ context.Context, token string) (fleet.ConnectorCluster, time.Time, error) {
+	if token != contextStartTestToken {
+		return fleet.ConnectorCluster{}, time.Time{}, fleet.ErrDenied
+	}
+	return t.cluster, time.Now().Add(time.Hour), nil
 }

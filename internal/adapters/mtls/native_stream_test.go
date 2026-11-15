@@ -1,8 +1,6 @@
 package mtls
 
 import (
-	"asservat.local/asservat/internal/contracts"
-	value "asservat.local/asservat/internal/domain/fleet"
 	"bytes"
 	"context"
 	"crypto/tls"
@@ -15,6 +13,9 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	value "asservat.local/asservat/internal/domain/fleet"
 )
 
 // Actual HTTP/2 and mutual TLS; certificates are explicitly synthetic. These

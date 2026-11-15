@@ -10,7 +10,8 @@
   "port" 9447
   "concurrency" (int (default 8 $v.concurrency))
   "postgres" $p.postgres
-  "openBao" $p.openBao.endpoint }}
+  "openBao" $p.openBao.endpoint
+  "connectorTokens" (include "asservat.connectorTokens" . | fromJson) }}
 {{- $purposes := list "key-configuration" "key-wrap" "key-verify" }}
 {{- $rules := list }}
 {{- if $d.enabled }}

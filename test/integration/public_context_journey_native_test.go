@@ -2,7 +2,6 @@ package integration
 
 import (
 	"context"
-	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
@@ -22,7 +21,6 @@ import (
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/authorization"
-	"asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
 	privacyvalue "asservat.local/asservat/internal/domain/privacy"
 	"asservat.local/asservat/internal/transport/keyservice"
@@ -333,13 +331,8 @@ func (f *publicJourneyNative) enrollAndStart(t *testing.T, ctx context.Context, 
 		result.Close()
 		publicJourneyRequire(t, "regional result joined", result.Wait(context.Background()))
 	})
-	connectorCertificate := nativeSQLConnectorCertificate(t, nativeExchangeFixture{worker: f.jobs.snapshot(), enrollment: f.enrollment})
-	connectorVerifier, e := mtls.NewPeerVerifier(keyTLS.roots, f.target.InstallationID, fleet.ConnectorPeer, time.Now)
-	publicJourneyRequire(t, "connector TLS verifier", e)
-	hub := &nativeSQLAdmission{test: t, side: "hub", origins: f.origins, peer: peer, router: f.router, leaf: certificate.Certificate[0], connectorVerifier: connectorVerifier, connectorDigest: sha256.Sum256(connectorCertificate.Certificate[0])}
-	upstream := nativeSQLServer(t, contracts.NativeOwnerPath, hub, connectorCertificate, keyTLS)
-	connector := &nativeSQLAdmission{test: t, side: "connector", origins: f.origins, peer: peer, upstream: upstream, verifier: f.enrollment.issuer.verifier}
-	client := nativeSQLServer(t, contracts.NativeWorkerPath, connector, certificate, keyTLS)
+	hub := &nativeSQLAdmission{test: t, side: "hub", origins: f.origins, peer: peer, router: f.router, verifier: f.enrollment.issuer.verifier}
+	client := nativeSQLServer(t, contracts.NativeWorkerPath, hub, certificate, keyTLS)
 	call, cancel := context.WithDeadline(ctx, f.target.RunUntil)
 	done := make(chan error, 1)
 	joined := make(chan nativeSQLWorkerOutcome, 3)

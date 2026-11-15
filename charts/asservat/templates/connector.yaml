@@ -216,7 +216,7 @@ metadata:
   labels: {{- include "asservat.labels" (list $ "connector") | nindent 4 }}
 spec:
   replicas: 1
-  # One serving process at a time; a replacement enrolls after the old one stops.
+  # One connector process at a time.
   strategy:
     type: Recreate
   selector:
@@ -277,10 +277,6 @@ spec:
               - serviceAccountToken:
                   path: kube.token
                   expirationSeconds: 3600
-              - serviceAccountToken:
-                  path: connector-pod.token
-                  audience: asservat-connector-process-enrollment
-                  expirationSeconds: 600
               # ADR-334: the connector's credential toward the hub.
               - serviceAccountToken:
                   path: hub.token

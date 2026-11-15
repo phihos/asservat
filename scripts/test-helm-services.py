@@ -109,9 +109,8 @@ def main():
         ids = [v for v in pod["spec"]["volumes"] if v["name"] == "ids"][0]["secret"]
         assert ids["secretName"] == "asservat-ids" and "items" not in ids
     fed = files(by[("Deployment", "asservat-federation")]["spec"]["template"])
-    assert fed["audit-storage.json"] == ("secret", "asservat-s3-federation-audit", "credentials.json")
-    assert {fed[k] for k in ("inputVersion", "inputKey", "accountVersion", "accountKey")} == {("secret", "asservat-audit-mac", k) for k in ("inputVersion", "inputKey", "accountVersion", "accountKey")}
-    assert fed["provider-auth.token"] == ("serviceAccountToken", "asservat-federation-provider", None)
+    # The federation holds no audit, object-store or OpenBao credential.
+    assert not {"audit-storage.json", "inputKey", "provider-auth.token"} & set(fed), sorted(fed)
     assert fed["tls.key"] == ("secret", "asservat-federation-tls", "tls.key")
     pub = files(by[("Deployment", "asservat-publisher")]["spec"]["template"])
     assert pub["audit-storage.json"][1] == "asservat-s3-publisher-audit" and pub["evidence-read.json"][1] == "asservat-s3-publisher-read"

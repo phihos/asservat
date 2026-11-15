@@ -64,7 +64,7 @@ func TestInstalledOwnerPromotionInputs(t *testing.T) {
 	for _, mode := range []string{"backend", "public", "public-port", "public-no-recipe", "public-changed-pki", "public-empty-lists", "legacy-recipe"} {
 		t.Run(mode, func(t *testing.T) {
 			in, dir, c := ownerProviderInputFixture(t)
-			c.Native = &contracts.OwnerNativeDeployment{ConnectorRoots: c.Kubernetes.Roots, Connections: 2, Concurrency: 1,
+			c.Native = &contracts.OwnerNativeDeployment{Connections: 2, Concurrency: 1,
 				WorkerAPIs:          []contracts.OwnerNativeWorkerAPI{{ClusterID: c.ClusterID, Namespace: contracts.WorkerObjectReference{Name: "workers", UID: runtimeID}, Kubernetes: c.Kubernetes}},
 				RetentionTopologies: []contracts.OwnerNativeTopology{{TargetClusterID: runtimeID, Name: "topology", UID: runtimeID, SHA256: strings.Repeat("1", 64)}}}
 			if mode != "backend" {

@@ -10,13 +10,13 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/google/uuid"
 	"k8s.io/client-go/rest"
 
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/mounts"
 	"asservat.local/asservat/internal/adapters/mtls"
 	capacityapp "asservat.local/asservat/internal/application/capacity"
-	fleetapp "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
@@ -24,13 +24,12 @@ import (
 	"asservat.local/asservat/internal/transport/connectorlifecycle"
 )
 
-// Regional is the outbound regional connector process (ADR-169). It owns
-// its process keys, authenticates to the hub with its ServiceAccount token
-// (ADR-334) and holds no hub SQL, signing or audit credential.
+// Regional is the outbound regional connector process (ADR-169). It
+// authenticates to the hub with its ServiceAccount token (ADR-334) and holds
+// no hub SQL, signing or audit credential.
 type Regional struct {
-	credentials *mtls.ConnectorProcessCredentials
-	context     *regionalContext // nil without the optional ADR-171 input
-	nodes       *regionalNodes   // nil without the optional ADR-246 input
+	context *regionalContext // nil without the optional ADR-171 input
+	nodes   *regionalNodes   // nil without the optional ADR-246 input
 	// bindings delivers this cluster's AccessBindings to the hub (ADR-329);
 	// nil in mode=combined, where the hub-worker observes the hub cluster.
 	bindings  AccessBindingReader
@@ -50,9 +49,9 @@ type Regional struct {
 // purpose, its elapsed time and the observer client's calls during it
 // (ADR-197 spike): the cost of answering a regional read through the
 // lifecycle channel. Calls may include concurrent work on the same client.
-func (r *Regional) lifecycleTiming() func(value.ConnectorLifecyclePurpose) func() {
+func (r *Regional) lifecycleTiming() func(connectorlifecycle.Purpose) func() {
 	var seen sync.Map
-	return func(purpose value.ConnectorLifecyclePurpose) func() {
+	return func(purpose connectorlifecycle.Purpose) func() {
 		started := time.Now()
 		before, _ := r.observerStats.load()
 		return func() {
@@ -87,12 +86,8 @@ func (t regionalCountingTransport) RoundTrip(r *http.Request) (*http.Response, e
 	return resp, err
 }
 
-// ponytail: fixed supervision cadences. Process leaves renew one minute early
-// within thirty-minute periods.
-const (
-	regionalRetry     = 5 * time.Second
-	regionalReconcile = time.Minute
-)
+// regionalRetry is the fixed delay before a stopped context start reopens.
+const regionalRetry = 5 * time.Second
 
 func RunRegional(ctx context.Context, podUID string) error {
 	// The test diagnostics keep connector lines prefixed "regional".
@@ -115,80 +110,10 @@ func RunRegional(ctx context.Context, podUID string) error {
 	return r.Run(ctx)
 }
 
-type regionalPodToken struct{ inputs *providerInputs }
-
-func (s regionalPodToken) ReadConnectorPodToken(ctx context.Context) ([]byte, error) {
-	b, err := s.inputs.token(contracts.ConnectorPodTokenFile)(ctx)
-	if err != nil || !contracts.ValidWorkerToken(b) {
-		clear(b)
-		return nil, mounts.ErrUnavailable
-	}
-	return b, nil
-}
-
-// regionalLocal answers the hub's delegated reads in this cluster and logs a
-// closed cause for each failed local read (operator diagnostics only).
-type regionalLocal struct {
-	native *kube.ConnectorLifecycleReader
-	source *kube.ConnectorIdentitySource
-}
-
 func regionalLocalFailed(read string, err error) {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "connector local "+read+" failed: "+regionalCause(err))
 	}
-}
-
-// regionalLocalTimed also names the failed step, the elapsed time and the
-// deadline the hub's conversation left when the read began (ADR-197
-// diagnostics); closed values only.
-func regionalLocalTimed(read string, ctx context.Context, started time.Time, err error) {
-	if err == nil {
-		return
-	}
-	cause := regionalCause(err)
-	var step interface{ FixedStep() string }
-	if errors.As(err, &step) {
-		cause = step.FixedStep() + " (" + cause + ")"
-	}
-	left := "none"
-	if d, ok := ctx.Deadline(); ok {
-		left = d.Sub(started).Round(10 * time.Millisecond).String()
-	}
-	fmt.Fprintf(os.Stderr, "connector local %s failed: %s after %s of %s\n", read, cause, time.Since(started).Round(10*time.Millisecond), left)
-}
-
-func (l regionalLocal) BeginConnectorLifecycle(ctx context.Context, r fleetapp.ConnectorLifecycleRequest) (fleetapp.ConnectorLifecycleOperation, error) {
-	op, err := l.native.BeginConnectorLifecycle(ctx, r)
-	regionalLocalFailed("begin", err)
-	if err != nil {
-		return nil, err
-	}
-	return regionalOperation{op}, nil
-}
-
-type regionalOperation struct {
-	fleetapp.ConnectorLifecycleOperation
-}
-
-func (o regionalOperation) Read(ctx context.Context, phase value.ConnectorLifecyclePhase) (value.ConnectorLifecycleObservation, error) {
-	out, err := o.ConnectorLifecycleOperation.Read(ctx, phase)
-	regionalLocalFailed("phase", err)
-	return out, err
-}
-
-func (l regionalLocal) ReadConnectorIdentitySource(ctx context.Context) (value.ConnectorIdentitySource, error) {
-	started := time.Now()
-	out, err := l.source.ReadConnectorIdentitySource(ctx)
-	regionalLocalTimed("source", ctx, started, err)
-	return out, err
-}
-
-func (l regionalLocal) ReadConnectorIdentityConfiguration(ctx context.Context) (fleetapp.ConnectorIdentityConfiguration, error) {
-	started := time.Now()
-	out, err := l.source.ReadConnectorIdentityConfiguration(ctx)
-	regionalLocalTimed("configuration", ctx, started, err)
-	return out, err
 }
 
 func NewRegional(ctx context.Context, files *os.Root, podUID string) (r *Regional, err error) {
@@ -244,22 +169,6 @@ func NewRegional(ctx context.Context, files *os.Root, podUID string) (r *Regiona
 	if err != nil {
 		return r, mounts.ErrUnavailable
 	}
-	document, err := kube.ConnectorIdentityDocument(c.offer, c.ClusterID, c.PeerID, c.connectorDeployment())
-	if err != nil {
-		return r, &fixedStepError{"identity", err}
-	}
-	source, err := kube.NewConnectorIdentitySource(observer, document, c.rootID(), c.binding)
-	if err != nil {
-		return r, &fixedStepError{"identity", err}
-	}
-	current, err := source.ReadConnectorIdentityConfiguration(startup)
-	if err != nil {
-		return r, &fixedStepError{"identity", err}
-	}
-	native, err := kube.NewConnectorLifecycleReader(observer, source, workload, regionalPodToken{in})
-	if err != nil {
-		return r, mounts.ErrUnavailable
-	}
 	roots, _, err := mtls.OwnerTrustRoots(c.hub.Roots, time.Now())
 	if err != nil {
 		return r, mounts.ErrUnavailable
@@ -269,21 +178,17 @@ func NewRegional(ctx context.Context, files *os.Root, podUID string) (r *Regiona
 	if err != nil {
 		return r, mounts.ErrUnavailable
 	}
-	lifecycle := &RegionalLifecycle{Client: channel, Local: regionalLocal{native, source}, RootID: c.rootID(), Now: time.Now, Timing: r.lifecycleTiming()}
+	process := value.ConnectorProcessIdentity{Binding: c.binding, PodUID: podUID, ProcessEpoch: uuid.NewString()}
+	lifecycle := &RegionalLifecycle{Client: channel, Process: process, RootID: c.rootID(), Now: time.Now, Timing: r.lifecycleTiming()}
 	if raw.Mode == contracts.ConnectorModeCluster {
 		r.bindings, r.lifecycle, r.watchConfig = observer, lifecycle, in.kubernetes(contracts.ConnectorKubeTokenFile)
 		if c.executor && len(c.offer.CapacityKeys) != 0 {
 			r.capacityKeys = c.offer.CapacityKeys
 		}
 	}
-	r.credentials, err = mtls.NewConnectorProcessCredentials(ctx, current.Source.Observation.Profile, podUID, lifecycle, lifecycle, source, lifecycle, time.Now)
-	if err != nil {
-		return r, mounts.ErrUnavailable
-	}
-	r.closers = append(r.closers, r.credentials.Close)
 	if c.executor {
 		var closers []func()
-		r.context, closers, err = newRegionalContext(startup, c, in, podUID, workload, source, lifecycle, r.credentials)
+		r.context, closers, err = newRegionalContext(startup, c, in, podUID, workload, lifecycle, hubToken)
 		r.closers = append(r.closers, closers...)
 		if err != nil {
 			return r, err
@@ -321,17 +226,12 @@ func NewRegional(ctx context.Context, files *os.Root, podUID string) (r *Regiona
 	return r, nil
 }
 
-// Run supervises enrollment and renewal until ctx ends; every failure is
-// retried as a new bounded conversation.
+// Run serves context starts and deliveries until ctx ends; a stopped
+// context start reopens after a fixed delay, never resuming old exchanges.
 func (r *Regional) Run(ctx context.Context) error {
-	if r == nil || r.credentials == nil || ctx == nil {
+	if r == nil || ctx == nil {
 		return mounts.ErrUnavailable
 	}
-	enrolled, last := false, ""
-	wait := time.NewTimer(0)
-	defer wait.Stop()
-	// Context start runs only while credentials are active; a stopped run is
-	// retried after the fixed delay, never resumed with old exchanges.
 	contextDone := make(chan error, 1)
 	contextRunning, contextLast := false, ""
 	var contextRetry <-chan time.Time
@@ -355,25 +255,24 @@ func (r *Regional) Run(ctx context.Context) error {
 			r.nodes = nil
 		}
 	}()
-	// ADR-329/330: watch-driven deliveries beside the supervision loop,
-	// starting once enrolled.
-	enrolledDeliveries := make(chan struct{})
-	var enrolledOnce sync.Once
+	// ADR-329/330: watch-driven deliveries beside the context starts.
 	if r.bindings != nil || len(r.capacityKeys) != 0 {
-		wait := goJoined(func() { r.runDeliveries(contextCtx, enrolledDeliveries) })
+		ready := make(chan struct{})
+		close(ready)
+		wait := goJoined(func() { r.runDeliveries(contextCtx, ready) })
 		defer func() { stopContext(); wait() }()
 	}
 	var attemptAt time.Time
 	var observerAt int64
 	var observerTime time.Duration
 	startContext := func() {
-		if r.context == nil || contextRunning || !enrolled || contextRetry != nil {
+		if r.context == nil || contextRunning || contextRetry != nil {
 			return
 		}
 		attemptAt = time.Now()
 		observerAt, observerTime = r.observerStats.load()
 		contextRunning = true
-		go func() { contextDone <- r.context.run(contextCtx, r.credentials) }()
+		go func() { contextDone <- r.context.run(contextCtx) }()
 	}
 	for {
 		startContext()
@@ -400,25 +299,6 @@ func (r *Regional) Run(ctx context.Context) error {
 			contextRetry = time.After(regionalRetry)
 		case <-contextRetry:
 			contextRetry = nil
-		case <-wait.C:
-			err := r.credentials.Reconcile(ctx)
-			if err == nil && !enrolled {
-				enrolled = true
-				enrolledOnce.Do(func() { close(enrolledDeliveries) })
-				fmt.Fprintln(os.Stderr, "connector process credentials active")
-			}
-			// One closed cause per change, never inputs or remote text.
-			if cause := regionalCause(err); err != nil && cause != last {
-				fmt.Fprintln(os.Stderr, "connector enrollment pending: "+cause)
-				last = cause
-			} else if err == nil {
-				last = ""
-			}
-			if enrolled {
-				wait.Reset(regionalReconcile)
-			} else {
-				wait.Reset(regionalRetry)
-			}
 		}
 	}
 }

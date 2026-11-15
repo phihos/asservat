@@ -1,8 +1,6 @@
 package bootstrap
 
 import (
-	"asservat.local/asservat/internal/adapters/gadget"
-	deliveryapp "asservat.local/asservat/internal/application/delivery"
 	"bytes"
 	"context"
 	"crypto/sha256"
@@ -16,6 +14,9 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/adapters/gadget"
+	deliveryapp "asservat.local/asservat/internal/application/delivery"
 
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/application/evidence"

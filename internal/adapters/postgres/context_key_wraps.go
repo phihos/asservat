@@ -20,7 +20,8 @@ import (
 
 // ContextKeyWraps authorizes the artifact keyset wraps of one prepared API
 // context execution (ADR-176). The authority ID is the attempt. Only the
-// executor process's own activated connector client leaf may wrap, each of the
+// executor's own cluster's connector (by its ServiceAccount token, ADR-334)
+// may wrap, each of the
 // three keyset roles at most once, before the execution's original deadline
 // and before any start object exists. Spend is irreversible and never refunded.
 type ContextKeyWraps struct {
@@ -96,8 +97,7 @@ func (s *ContextKeyWraps) Resolve(ctx context.Context, peer authorization.KeyPee
 		if !bytes.Equal(digest[:], exec.ExpectationDigest) {
 			return authapp.ErrKeyDenied
 		}
-		leaf, err := q.ReadActivatedConnectorClientLeaf(ctx, custodydb.ReadActivatedConnectorClientLeafParams{RootID: id(s.root), CertificateDigest: peer.Certificate[:]})
-		if err != nil || uid(leaf.PodUid) != process.PodUID || uid(leaf.ClusterID) != process.ClusterID || uid(leaf.InstallationID) != s.scope.InstallationID || !now.Time.Before(leaf.CertificateNotAfter.Time) {
+		if peer.ClusterID != process.ClusterID || peer.InstallationID != s.scope.InstallationID || process.InstallationID != s.scope.InstallationID {
 			return authapp.ErrKeyDenied
 		}
 		mask := int16(0)
@@ -131,8 +131,7 @@ func (s *ContextKeyWraps) Resolve(ctx context.Context, peer authorization.KeyPee
 		if err = s.guard.check(ctx, q, trust, s.root, proof); err != nil {
 			return err
 		}
-		end := identity.Earlier(exec.NotAfter.Time, leaf.CertificateNotAfter.Time)
-		end = identity.Earlier(end, peer.NotAfter)
+		end := identity.Earlier(exec.NotAfter.Time, peer.NotAfter)
 		end = identity.Earlier(end, identity.Earlier(start.Add(5*time.Second), proof.FreshUntil))
 		out = authorization.KeyOperationPermit{AuthorityID: r.AuthorityID, RecoveryEpoch: s.epoch, Revision: uint64(max(proof.Revision.Generation, 1)), Certificate: peer.Certificate, RequestDigest: r.RequestDigest, ObservedAt: now.Time, ValidUntil: end}
 		after, err := q.CurrentTime(ctx)
@@ -159,9 +158,6 @@ func ContextKeyWrapGrantSQL(role string) []string {
 		"GRANT SELECT, UPDATE (installation_id) ON fleet_current_trust TO " + r,
 		"GRANT SELECT (capture_id, root_id, attempt_id, process_json, expectation_digest, not_after, phase, object_uid), UPDATE (capture_id) ON context_execution TO " + r,
 		"GRANT SELECT (id, root_id, expectation_json) ON context_capture TO " + r,
-		"GRANT SELECT (process_id, root_id, peer_id, certificate_digest, usage, activated_at, detached_at, certificate_not_after) ON connector_credential_attempt TO " + r,
-		"GRANT SELECT (id, root_id, pod_uid, process_epoch, serving, retired_at) ON connector_identity_process TO " + r,
-		"GRANT SELECT (root_id, peer_id, cluster_id, installation_id, configuration, suspended, blocked) ON connector_identity_profile TO " + r,
 		"GRANT SELECT, INSERT (attempt_id, root_id, certificate_sha256, used_roles), UPDATE (used_roles) ON context_key_wrap TO " + r,
 	}
 }

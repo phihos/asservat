@@ -219,7 +219,6 @@ checksum/config: {{ $sum | sha256sum | quote }}
   "auditMount" "asservat-audit"
   "transitMount" "public-transit"
   "ownerPKIMount" "owner-pki"
-  "connectorPKIMount" "connector-pki"
   "workerPKIMount" "worker-pki"
   "hubWorkerAudience" "asservat-configuration-provider"
   "hubAPIAudience" "asservat-owner-provider"
@@ -288,6 +287,27 @@ checksum/config: {{ $sum | sha256sum | quote }}
 {{- else -}}
 {{- .Values.region.hub.federation | default (printf "https://%s-federation.%s.svc:9446" (include "asservat.name" .) .Release.Namespace) -}}
 {{- end -}}
+{{- end -}}
+
+{{/*
+How the hub verifies connector ServiceAccount tokens (ADR-334), as JSON:
+the accepted audiences, the combined-mode connector and the registered
+clusters (public data only; revoked or removed clusters are absent and
+their tokens are refused).
+*/}}
+{{- define "asservat.connectorTokens" -}}
+{{- $n := include "asservat.name" . -}}
+{{- $clusters := list -}}
+{{- range .Values.clusters -}}
+{{- if not .revoked -}}
+{{- $c := dict "name" .name "clusterID" .clusterID "issuer" (required (printf "clusters[%s].issuer is the cluster's ServiceAccount issuer" .name) .issuer) "connector" (default (printf "%s/%s-connector" (default $.Release.Namespace .namespace) $n) .connector) -}}
+{{- with .jwks }}{{ $_ := set $c "jwks" (ternary . (toJson .) (kindIs "string" .)) }}{{ end -}}
+{{- $clusters = append $clusters $c -}}
+{{- end -}}
+{{- end -}}
+{{- $out := dict "audiences" (include "asservat.federationAudiences" . | fromJsonArray) "clusters" $clusters -}}
+{{- if eq .Values.mode "combined" }}{{ $_ := set $out "localConnector" (printf "%s/%s-connector" .Release.Namespace $n) }}{{ end -}}
+{{- toJson $out -}}
 {{- end -}}
 
 {{/* The token audiences the hub's federation accepts (JSON list). */}}

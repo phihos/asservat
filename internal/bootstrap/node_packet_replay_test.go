@@ -1,10 +1,6 @@
 package bootstrap
 
 import (
-	"asservat.local/asservat/internal/adapters/gadget"
-	"asservat.local/asservat/internal/application/delivery"
-	"asservat.local/asservat/internal/domain/collector"
-	"asservat.local/asservat/internal/transport/node"
 	"context"
 	"errors"
 	"fmt"
@@ -12,6 +8,11 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/adapters/gadget"
+	"asservat.local/asservat/internal/application/delivery"
+	"asservat.local/asservat/internal/domain/collector"
+	"asservat.local/asservat/internal/transport/node"
 )
 
 // Same epoch/key re-enrollment starts a new pollLoop at After=0. A lost

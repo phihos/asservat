@@ -1,10 +1,6 @@
 package bootstrap
 
 import (
-	"asservat.local/asservat/internal/adapters/gadget"
-	"asservat.local/asservat/internal/adapters/packets"
-	"asservat.local/asservat/internal/domain/collector"
-	v "asservat.local/asservat/internal/domain/live"
 	"context"
 	"encoding/json"
 	"strings"
@@ -12,6 +8,11 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/adapters/gadget"
+	"asservat.local/asservat/internal/adapters/packets"
+	"asservat.local/asservat/internal/domain/collector"
+	v "asservat.local/asservat/internal/domain/live"
 )
 
 type manualActualNode struct {

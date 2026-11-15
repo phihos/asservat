@@ -62,7 +62,7 @@ func TestSmallOpenBaoSetupPoliciesArePerComponent(t *testing.T) {
 
 func TestSmallOpenBaoSetupMountsMatchBundledConsumers(t *testing.T) {
 	paths := smallOpenBaoPolicyPaths(t)
-	for _, mount := range []string{"asservat-audit", "public-transit", "owner-pki", "connector-pki", "worker-pki"} {
+	for _, mount := range []string{"asservat-audit", "public-transit", "owner-pki", "worker-pki"} {
 		if !slices.Equal(paths["sys/mounts/"+mount], []string{"create", "read", "update"}) {
 			t.Fatal("bundled consumer mount unavailable", mount)
 		}

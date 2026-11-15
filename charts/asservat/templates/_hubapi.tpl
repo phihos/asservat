@@ -90,6 +90,7 @@
 {{- $_ := set $obs "localCapacity" $lc -}}
 {{- end -}}
 {{- $_ := set $c "observation" $obs -}}
+{{- $_ := set $c "connectorTokens" (include "asservat.connectorTokens" . | fromJson) -}}
 {{- $_ := set $c "native" (dict "workerNamespaces" (include "asservat.hubApi.workerNamespaces" . | fromJsonArray) "retentionTopologies" (default list $h.retentionTopologies)) -}}
 {{- if .Values.origin -}}
 {{- $u := $h.public -}}

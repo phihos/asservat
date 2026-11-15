@@ -1,11 +1,12 @@
 package mtls
 
 import (
-	"asservat.local/asservat/internal/domain/artifact"
-	value "asservat.local/asservat/internal/domain/fleet"
 	"bytes"
 	"crypto/sha256"
 	"crypto/x509"
+
+	"asservat.local/asservat/internal/domain/artifact"
+	value "asservat.local/asservat/internal/domain/fleet"
 )
 
 func (v *OwnerPeerVerifier) CheckOwnerCertificate(p value.OwnerCertificatePermit, csr, der []byte, chain [][]byte) (value.IssuedOwnerCertificate, error) {

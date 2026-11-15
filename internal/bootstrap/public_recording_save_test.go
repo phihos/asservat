@@ -1,9 +1,10 @@
 package bootstrap
 
 import (
-	captureapp "asservat.local/asservat/internal/application/capture"
 	"slices"
 	"testing"
+
+	captureapp "asservat.local/asservat/internal/application/capture"
 )
 
 func TestPublicRecordingServicesRemainPassiveUnderOrdinaryCollectionGate(t *testing.T) {

@@ -2,7 +2,6 @@ package contracts
 
 import (
 	"encoding/json"
-	"strings"
 )
 
 // ADR-170 federation process: installation-owned public startup inputs at a
@@ -74,11 +73,6 @@ type FederationProviderAuthentication struct {
 	RecipeSHA256      string                `json:"recipeSHA256"`
 }
 
-// FederationServiceAccountName is the federation's fixed account name.
-func FederationServiceAccountName(installationID string) string {
-	return "asservat-" + strings.ReplaceAll(installationID, "-", "") + "-federation"
-}
-
 type FederationKeyService struct {
 	Endpoint   string   `json:"endpoint"`
 	Roots      [][]byte `json:"roots"`
@@ -109,11 +103,4 @@ type FederationAuditKeys struct {
 	InputKey       []byte `json:"inputKey"`
 	AccountVersion string `json:"accountVersion"`
 	AccountKey     []byte `json:"accountKey"`
-}
-
-// ConnectorServerSuffix is the installation's connector server-name domain
-// (ADR-193): each regional connector serves as <cluster-id>.<suffix>, which
-// the installation-wide connector PKI server role constrains by glob.
-func ConnectorServerSuffix(installationID string) string {
-	return "connector.asservat." + installationID
 }

@@ -10,33 +10,38 @@ import (
 	"sync/atomic"
 	"time"
 
-	app "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/fleet"
 )
 
-// Ingress authenticates actual TLS and returns a check retaining that exact
-// connection. Hello strings are matching inputs, never caller-selected peers.
-// The source reader is this exchange's ADR-178 feed of the region's own
-// current connector source; the hub never reads the regional API.
+// Ingress binds a hello to the cluster its connector's ServiceAccount token
+// was attributed to and returns a check that never outlives the token.
+// Hello strings are matching inputs, never caller-selected peers.
 type Ingress interface {
-	AuthenticateContextStart(context.Context, *tls.ConnectionState, contracts.APIContextHello, app.ConnectorIdentitySourceReader) (fleet.APIContextReceiver, ReceiverCheck, error)
+	AuthenticateContextStart(context.Context, contracts.APIContextHello, fleet.ConnectorCluster, time.Time) (fleet.APIContextReceiver, ReceiverCheck, error)
+}
+
+// TokenVerifier attributes a connector's projected ServiceAccount token to
+// its registered cluster (ADR-334) and returns the token's expiry.
+type TokenVerifier interface {
+	VerifyConnectorUntil(context.Context, string) (fleet.ConnectorCluster, time.Time, error)
 }
 type Handler struct {
 	host      string
 	router    *Router
 	ingress   Ingress
+	tokens    TokenVerifier
 	preflight chan struct{}
 	// Refused, when set, receives a fixed stage name for each refusal. It carries
 	// no request data and changes no response.
 	Refused func(string)
 }
 
-func NewHandler(host string, router *Router, ingress Ingress, preflight int) (*Handler, error) {
-	if host == "" || strings.ContainsAny(host, "/\\ \r\n\t") || router == nil || ingress == nil || preflight < 1 || preflight > 64 {
+func NewHandler(host string, router *Router, ingress Ingress, tokens TokenVerifier, preflight int) (*Handler, error) {
+	if host == "" || strings.ContainsAny(host, "/\\ \r\n\t") || router == nil || ingress == nil || tokens == nil || preflight < 1 || preflight > 64 {
 		return nil, fleet.ErrInvalid
 	}
-	return &Handler{host: host, router: router, ingress: ingress, preflight: make(chan struct{}, preflight)}, nil
+	return &Handler{host: host, router: router, ingress: ingress, tokens: tokens, preflight: make(chan struct{}, preflight)}, nil
 }
 func privateUnavailable(w http.ResponseWriter) {
 	w.Header().Set("Cache-Control", "no-store")
@@ -65,11 +70,25 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.refuse(w, "request")
 		return
 	}
-	for _, k := range []string{"Authorization", "Cookie", "Origin", "Referer", "Forwarded", "X-Forwarded-For", "X-Forwarded-Host", "X-Forwarded-Proto", "Content-Encoding", "Idempotency-Key", "X-Idempotency-Key"} {
+	token, bearer := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+	if !bearer || token == "" || len(r.Header.Values("Authorization")) != 1 {
+		h.refuse(w, "token")
+		return
+	}
+	for _, k := range []string{"Cookie", "Origin", "Referer", "Forwarded", "X-Forwarded-For", "X-Forwarded-Host", "X-Forwarded-Proto", "Content-Encoding", "Idempotency-Key", "X-Idempotency-Key"} {
 		if len(r.Header.Values(k)) != 0 {
 			h.refuse(w, "header")
 			return
 		}
+	}
+	// The token is verified before any slot or hello read: an unauthenticated
+	// caller holds no slot and learns nothing about the hub.
+	verify, endVerify := context.WithTimeout(r.Context(), 5*time.Second)
+	presented, tokenUntil, e := h.tokens.VerifyConnectorUntil(verify, token)
+	endVerify()
+	if e != nil {
+		h.refuse(w, "token")
+		return
 	}
 	select {
 	case h.preflight <- struct{}{}:
@@ -139,21 +158,13 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	sources, e := ReadSourceAfterHello(r.Body, hello.Channel.ExchangeID, time.Now)
-	if e != nil {
-		stop()
-		release()
-		h.refuse(w, "source")
-		return
-	}
-	receiver, check, e := h.ingress.AuthenticateContextStart(ctx, r.TLS, hello, sources)
+	receiver, check, e := h.ingress.AuthenticateContextStart(ctx, hello, presented, tokenUntil)
 	if e != nil || ctx.Err() != nil || !receiver.Valid(time.Now()) || check == nil {
 		stop()
 		release()
 		h.refuse(w, "authenticate")
 		return
 	}
-	// The attach check pulls a fresh regional source over this exchange first.
 	var current atomic.Pointer[frameStream]
 	attach := func(c context.Context) (fleet.APIContextReceiver, error) {
 		s := current.Load()
@@ -162,10 +173,6 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		// Failures are recorded for a caller's diagnostic context only, as
 		// for queries; they change neither the result nor the stream.
-		if e := s.pullSource(c); e != nil {
-			recordStreamDiagnostic(c, s, e, streamHubQuerySource)
-			return fleet.APIContextReceiver{}, fleet.ErrUnavailable
-		}
 		receiver, e := check(c)
 		if e != nil {
 			recordStreamDiagnostic(c, s, e, streamHubQueryCheck)
@@ -193,11 +200,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer stream.Close()
-	stream.sources = sources
 	stream.capabilities = capabilities
-	// Hello and the first source were read before the stream was constructed.
-	stream.frames = 2
-	stream.bytes = contracts.APIContextWorkBytes + 5 + contracts.APIContextSourceBytes + 5 // Same ceilings as the connector.
+	// Hello was read before the stream was constructed.
+	stream.frames = 1
+	stream.bytes = contracts.APIContextWorkBytes + 5 // Same ceiling as the connector.
 	current.Store(stream)
 	if controller.SetWriteDeadline(receiver.Window.Until()) != nil || !time.Now().Before(receiver.Window.Until()) {
 		return

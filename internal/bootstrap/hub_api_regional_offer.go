@@ -3,7 +3,6 @@ package bootstrap
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"os"
 	"time"
 
@@ -11,7 +10,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 
 	"asservat.local/asservat/internal/adapters/mounts"
-	"asservat.local/asservat/internal/adapters/postgres"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/fleet"
@@ -84,7 +82,7 @@ func (o *hubAPIRegionalOffer) setOwners(pool value.OwnerPool, revision int64, ro
 
 // buildHubAPIRegionalOffer derives the plain connector offer (no regional
 // executor section) from the config, the IDs and the connector roots.
-func buildHubAPIRegionalOffer(ctx context.Context, files *os.Root, h contracts.HubAPIConfig, ids hubAPIIDs, connectorRoots [][]byte, now time.Time) (*hubAPIRegionalOffer, error) {
+func buildHubAPIRegionalOffer(ctx context.Context, files *os.Root, h contracts.HubAPIConfig, ids hubAPIIDs, now time.Time) (*hubAPIRegionalOffer, error) {
 	if h.Public == nil || h.Public.RegionalOffer == nil {
 		return nil, nil
 	}
@@ -93,27 +91,9 @@ func buildHubAPIRegionalOffer(ctx context.Context, files *os.Root, h contracts.H
 	if err != nil {
 		return nil, err
 	}
-	var names [6]string
-	for i, purpose := range []string{"connector-source", "connector-journal", "connector-ack", "connector-cleanup", "connector-verifier", "connector-finalizer"} {
-		name, ok := postgres.PublicRuntimeRoleName(ids.InstallationID, purpose)
-		if !ok {
-			return nil, hubAPIInputError("regional-offer-roles")
-		}
-		names[i] = name
-	}
-	backing, err := buildConnectorBacking(o.Connector, contracts.CapacityBackup(), ids.PermissionRootID, ids.InstallationID, capacityAccountVersion(ids), ids.RoleSetupID, now)
-	if err != nil {
-		return nil, hubAPIInputError("regional-offer-backing")
-	}
-	raw, err := json.Marshal(backing)
-	if err != nil {
-		return nil, hubAPIInputError("regional-offer-backing")
-	}
 	offer := contracts.RegionalOffer{Format: contracts.RegionalOfferFormat, InstallationID: ids.InstallationID, HubClusterID: ids.ClusterID, PermissionRootID: ids.PermissionRootID, IssuerEpoch: ids.IssuerEpoch,
-		Federation:            contracts.RegionalHubEndpoint{Endpoint: o.Federation, ServerName: o.ServerName, Roots: federationRoots},
-		ConnectorServerSuffix: contracts.ConnectorServerSuffix(ids.InstallationID), ConnectorIssuerRoots: connectorRoots,
-		Roles:            contracts.ConnectorIdentityRoles{Source: names[0], Journal: names[1], Acknowledgement: names[2], Cleanup: names[3], Verifier: names[4], Finalizer: names[5]},
-		ConnectorBacking: raw, Image: o.Image}
+		Federation: contracts.RegionalHubEndpoint{Endpoint: o.Federation, ServerName: o.ServerName, Roots: federationRoots},
+		Image:      o.Image}
 	return &hubAPIRegionalOffer{namespace: h.Namespace, name: contracts.HubAPIName(h.Name, "regional-offer"), offer: offer, peerID: ids.PeerID, release: h.Name, hubOnly: o.HubOnly}, nil
 }
 

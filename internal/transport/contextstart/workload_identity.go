@@ -1,9 +1,10 @@
 package contextstart
 
 import (
-	"asservat.local/asservat/internal/domain/targets"
 	"context"
 	"time"
+
+	"asservat.local/asservat/internal/domain/targets"
 )
 
 // ResolveWorkloadIdentity discovers only the current named root. Authorization

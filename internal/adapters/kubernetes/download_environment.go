@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"encoding/json/jsontext"
+	"errors"
 	"net/url"
 	"slices"
 	"time"
@@ -236,4 +237,28 @@ func (s *DownloadEnvironmentSource) DownloadPolicy(ctx context.Context) (privacy
 		return zero, privacy.ErrUnavailable
 	}
 	return p, nil
+}
+
+// connectorAPIStage names the check that failed, for diagnostic lines: fixed
+// names only, never inputs or API text.
+func connectorAPIStage(step string, err error) error {
+	if err == nil {
+		return nil
+	}
+	return &connectorAPIStepError{step: step, err: err}
+}
+
+type connectorAPIStepError struct {
+	step string
+	err  error
+}
+
+func (e *connectorAPIStepError) Error() string { return "connector API " + e.step }
+func (e *connectorAPIStepError) Unwrap() error { return e.err }
+func (e *connectorAPIStepError) FixedStep() string {
+	var inner interface{ FixedStep() string }
+	if errors.As(e.err, &inner) {
+		return e.step + "/" + inner.FixedStep()
+	}
+	return e.step
 }

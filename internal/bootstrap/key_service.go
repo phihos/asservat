@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"crypto/tls"
-	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"net"
@@ -312,17 +311,9 @@ func NewKeyService(ctx context.Context, files, ids *os.Root) (k *KeyService, err
 	if err != nil {
 		return k, mounts.ErrUnavailable
 	}
-	// ADR-198: connector peers resolve from their staged SQL profiles.
-	profiles, err := postgres.NewConnectorIdentityProfiles(startup, pools["key-wrap"])
-	if err != nil {
-		return k, mounts.ErrUnavailable
-	}
-	// Client CAs are the worker and connector PKI issuers (field class J).
+	// Client CAs are the worker PKI issuers (field class J); connectors
+	// authenticate with their ServiceAccount tokens (ADR-334).
 	keyClientRoots, err := readPKIRoots(startup, c.OpenBao, baoRoots, contracts.SmallOpenBaoWorkerPKIMount)
-	if err != nil {
-		return k, err
-	}
-	connectorClientRoots, err := readPKIRoots(startup, c.OpenBao, baoRoots, contracts.SmallOpenBaoConnectorPKIMount)
 	if err != nil {
 		return k, err
 	}
@@ -334,9 +325,9 @@ func NewKeyService(ctx context.Context, files, ids *os.Root) (k *KeyService, err
 	if err != nil {
 		return k, mounts.ErrUnavailable
 	}
-	connectors, err := mtls.NewConnectorKeyPeerVerifier(c.InstallationID, c.PermissionRootID, profiles.ReadConnectorProfile, time.Now)
+	connectors, err := newConnectorTokens(c.ConnectorTokens, c.ServiceIDs, "key service")
 	if err != nil {
-		return k, mounts.ErrUnavailable
+		return k, err
 	}
 	unwraps, err := postgres.NewContextKeyUnwraps(startup, pools["key-verify"], c.PermissionRootID, c.IssuerEpoch, scope)
 	if err != nil {
@@ -356,25 +347,15 @@ func NewKeyService(ctx context.Context, files, ids *os.Root) (k *KeyService, err
 		}
 	}
 	authority := keyServiceAuthorities(wraps, unwraps, acquisition)
-	if k.handler, err = keyservice.NewHandler([]authapp.KeyService{{Scope: scope, Authority: authority, Backend: backend, Now: time.Now}}, mtls.KeyPeerUnion{KeyClients: keyClients, Connectors: connectors}, time.Now, c.Concurrency); err != nil {
+	if k.handler, err = keyservice.NewHandler([]authapp.KeyService{{Scope: scope, Authority: authority, Backend: backend, Now: time.Now}}, mtls.KeyPeerUnion{KeyClients: keyClients, Connectors: connectors, Now: time.Now}, time.Now, c.Concurrency); err != nil {
 		return k, mounts.ErrUnavailable
 	}
 	k.handler.Report = eventLog(os.Stderr, "key service refused")
-	// The TLS layer accepts key-client and connector client chains; the
-	// handler's peer union then selects exactly one verifier per leaf.
-	clients := keyRoots.Clone()
-	for _, der := range connectorClientRoots {
-		cert, err := x509.ParseCertificate(der)
-		if err != nil {
-			return k, mounts.ErrUnavailable
-		}
-		clients.AddCert(cert)
-	}
 	pair, err := readServingPair(startup, files)
 	if err != nil {
 		return k, err
 	}
-	k.tls = &tls.Config{MinVersion: tls.VersionTLS13, Certificates: []tls.Certificate{pair}, ClientAuth: tls.RequireAndVerifyClientCert, ClientCAs: clients}
+	k.tls = &tls.Config{MinVersion: tls.VersionTLS13, Certificates: []tls.Certificate{pair}, ClientAuth: tls.VerifyClientCertIfGiven, ClientCAs: keyRoots}
 	return k, nil
 }
 

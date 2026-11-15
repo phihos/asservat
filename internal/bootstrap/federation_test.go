@@ -3,12 +3,10 @@ package bootstrap
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"strings"
 	"testing"
 	"time"
 
-	fleetapp "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/fleet"
@@ -16,9 +14,8 @@ import (
 
 func federationTestConfig() contracts.FederationConfig {
 	return contracts.FederationConfig{Name: "asservat", Namespace: "asservat", Port: 9446, Concurrency: 2,
-		Postgres:   contracts.ServicePostgres{Host: "postgres.asservat.svc", Port: 5432, Database: "asservat"},
-		AuditStore: contracts.ServiceObjectStore{Endpoint: "https://s3.example", Region: "us-east-1", Bucket: "audit"},
-		OpenBao:    "https://bao.example", Audiences: []string{"https://asservat-federation.asservat.svc:9446"}}
+		Postgres:        contracts.ServicePostgres{Host: "postgres.asservat.svc", Port: 5432, Database: "asservat"},
+		ConnectorTokens: contracts.ConnectorTokens{Audiences: []string{"https://asservat-federation.asservat.svc:9446"}}}
 }
 
 // The federation's Helm inputs are closed: unknown fields and unbounded
@@ -33,12 +30,10 @@ func TestFederationInputsAreClosed(t *testing.T) {
 		t.Fatal("valid federation input", err)
 	}
 	for name, mutate := range map[string]func(*contracts.FederationConfig){
-		"plain HTTP provider":     func(c *contracts.FederationConfig) { c.OpenBao = "http://bao.example" },
-		"no token audience":       func(c *contracts.FederationConfig) { c.Audiences = nil },
+		"no token audience":       func(c *contracts.FederationConfig) { c.ConnectorTokens.Audiences = nil },
 		"no name":                 func(c *contracts.FederationConfig) { c.Name = "" },
 		"name over 30":            func(c *contracts.FederationConfig) { c.Name = strings.Repeat("a", 31) },
 		"invalid namespace":       func(c *contracts.FederationConfig) { c.Namespace = "Hub_NS" },
-		"plain HTTP audit store":  func(c *contracts.FederationConfig) { c.AuditStore.Endpoint = "http://s3.example" },
 		"postgres port out of 16": func(c *contracts.FederationConfig) { c.Postgres.Port = 70000 },
 	} {
 		c := federationTestConfig()
@@ -73,58 +68,5 @@ func TestFederationOwnerProtectionIsThePlatformDigest(t *testing.T) {
 	}
 	if _, err = (platformOwnerProtection{time.Now}).ReadOwnerProtection(context.Background(), value.OwnerPool{}); err == nil {
 		t.Fatal("invalid pool protected")
-	}
-}
-
-func TestFederationIssuerDispatchesByUsage(t *testing.T) {
-	if _, err := (federationIssuer{}).SignConnectorCredential(context.Background(), value.ConnectorCredentialPermit{Usage: "owner"}, nil); err == nil {
-		t.Fatal("unknown usage signed")
-	}
-}
-
-// The log consumes fixed local stages and closed classes, never provider text.
-func TestFederationEnrollmentDiagnosticNamesCompositionBoundary(t *testing.T) {
-	private := errors.New("synthetic private provider error")
-	err := federationEnrollmentError{"audit-journal", private}
-	if federationEnrollmentStep(err) != "resolve/audit-journal" || federationClass(err) != "unavailable" || !errors.Is(err, private) {
-		t.Fatal("composition boundary or error class lost")
-	}
-	if strings.Contains(err.Error(), "synthetic") {
-		t.Fatal("provider text entered fixed diagnostic")
-	}
-}
-
-type scriptedStaged struct {
-	errs  []error
-	reads int
-}
-
-func (s *scriptedStaged) ReadStagedConnector(context.Context, value.ConnectorCluster) (value.ConnectorCredentialProfile, fleetapp.ConnectorIdentityBacking, error) {
-	err := s.errs[min(s.reads, len(s.errs)-1)]
-	s.reads++
-	return value.ConnectorCredentialProfile{}, fleetapp.ConnectorIdentityBacking{}, err
-}
-
-// Only a never staged peer is staged; a suspended or blocked peer and a
-// transient read failure return their error without writing.
-func TestFederationStagesOnlyNeverStagedPeers(t *testing.T) {
-	for name, tc := range map[string]struct {
-		errs   []error
-		staged bool
-		want   error
-	}{
-		"never staged":    {[]error{value.ErrNotStaged, nil}, true, nil},
-		"staged":          {[]error{nil}, false, nil},
-		"suspended":       {[]error{value.ErrDenied}, false, value.ErrDenied},
-		"transient":       {[]error{value.ErrUnavailable}, false, value.ErrUnavailable},
-		"staging refused": {[]error{value.ErrNotStaged, value.ErrDenied}, true, value.ErrDenied},
-	} {
-		t.Run(name, func(t *testing.T) {
-			staged := false
-			_, _, err := stagedProfile(context.Background(), &scriptedStaged{errs: tc.errs}, value.ConnectorCluster{}, func(context.Context) error { staged = true; return nil })
-			if staged != tc.staged || tc.want == nil && err != nil || tc.want != nil && !errors.Is(err, tc.want) {
-				t.Fatal("staging", staged, err)
-			}
-		})
 	}
 }

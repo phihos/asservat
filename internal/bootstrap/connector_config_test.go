@@ -20,10 +20,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
-	fleetapp "asservat.local/asservat/internal/application/fleet"
-	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/audit"
-	cfg "asservat.local/asservat/internal/domain/configuration"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,8 +37,8 @@ func connectorTestOffer(t *testing.T, roots [][]byte) contracts.RegionalOffer {
 	}
 	n := time.Now().UTC()
 	return contracts.RegionalOffer{Format: contracts.RegionalOfferFormat, InstallationID: id("01"), HubClusterID: id("30"), PermissionRootID: id("03"), IssuerEpoch: id("04"),
-		Federation:            contracts.RegionalHubEndpoint{Endpoint: "https://federation.synthetic.invalid:30443", ServerName: "federation.synthetic.invalid", Roots: roots},
-		ConnectorServerSuffix: "connectors.synthetic.invalid", ConnectorIssuerRoots: roots, ConnectorBacking: json.RawMessage(`{}`), Image: "registry.invalid/asservat@sha256:" + strings.Repeat("a", 64),
+		Federation: contracts.RegionalHubEndpoint{Endpoint: "https://federation.synthetic.invalid:30443", ServerName: "federation.synthetic.invalid", Roots: roots},
+		Image:      "registry.invalid/asservat@sha256:" + strings.Repeat("a", 64),
 		Owners: &contracts.RegionalContextOwners{Address: "hub.synthetic.invalid:30444", Configuration: contracts.OwnerConfiguration{Format: contracts.OwnerConfigurationFormat, InstallationID: id("01"), ClusterID: id("30"), IssuerEpoch: id("04"), Revision: 1,
 			Namespace: contracts.WorkerObjectReference{Name: "asservat", UID: id("31")}, Service: contracts.WorkerObjectReference{Name: "hub-api", UID: id("32")}, Deployment: contracts.WorkerObjectReference{Name: "hub-api", UID: id("33")}, ServiceAccount: contracts.WorkerObjectReference{Name: "hub-api", UID: id("34")}, Port: 9443, NativePort: 9444, IssuerRoots: roots}},
 		KeyService:    &contracts.RegionalWrapService{Endpoint: "https://keys.synthetic.invalid:30448", Roots: roots, KeyID: "artifact-key"},
@@ -254,7 +250,7 @@ func TestRegionalContextComposesWithoutInstallerInputs(t *testing.T) {
 	}))
 	defer server.Close()
 	dir := t.TempDir()
-	for _, name := range []string{contracts.ConnectorKubeTokenFile, contracts.ConnectorPodTokenFile} {
+	for _, name := range []string{contracts.ConnectorKubeTokenFile} {
 		if err := os.WriteFile(filepath.Join(dir, name), []byte("synthetic-only"), 0600); err != nil {
 			t.Fatal(err)
 		}
@@ -277,16 +273,8 @@ func TestRegionalContextComposesWithoutInstallerInputs(t *testing.T) {
 	// The fixture serves the capacity account for both names; the execution
 	// account must differ, so name it explicitly.
 	workload.Account, workload.AccountUID = c.ServiceAccount, connectorTestID("12")
-	observer, err := kube.NewPermissionClient(in.kubernetes(contracts.ConnectorKubeTokenFile), c.ClusterID, cfg.NamespaceRef{Name: c.Namespace, UID: workload.NamespaceUID}, time.Now)
-	if err != nil {
-		t.Fatal(err)
-	}
-	source, err := kube.NewConnectorIdentitySource(observer, connectorTestDocument(t, offer, c), c.rootID(), c.binding)
-	if err != nil {
-		t.Fatal(err)
-	}
 	before := calls.Load()
-	built, closers, err := newRegionalContext(t.Context(), c, in, pod, workload, source, &RegionalLifecycle{}, nil)
+	built, closers, err := newRegionalContext(t.Context(), c, in, pod, workload, &RegionalLifecycle{}, func() ([]byte, error) { return []byte("synthetic-only"), nil })
 	defer func() {
 		for i := len(closers) - 1; i >= 0; i-- {
 			closers[i]()
@@ -334,28 +322,6 @@ func TestKubernetesRootsReadsProjectedBundle(t *testing.T) {
 	if err != nil || len(roots) != 1 {
 		t.Fatal(err)
 	}
-}
-
-// connectorTestDocument is the identity document of c with a valid synthetic
-// backing (the offer's placeholder backing only satisfies the loader).
-func connectorTestDocument(t *testing.T, offer contracts.RegionalOffer, c regionalConfig) []byte {
-	t.Helper()
-	now := time.Now().UTC().Truncate(time.Microsecond)
-	q := audit.OperationHistoryQualification{ID: connectorTestID("40"), Digest: artifact.Digest{1}, Layout: audit.ConnectorOperationHistoryLayout, MaximumRowFootprintBytes: 1 << 20, MaximumTransitionWALBytes: 1 << 20, BackupCopies: 1, WALCopies: 1}
-	p := audit.OperationLifecyclePolicy{RootID: offer.PermissionRootID, Lane: "identity", OverdueTerminal: audit.OperationOverdueTerminal, InstallationID: offer.InstallationID, StoreID: connectorTestID("41"), PolicyID: connectorTestID("42"), BackupProfileID: connectorTestID("43"), PolicyDigest: artifact.Digest{2}, BackupProfileDigest: artifact.Digest{3}, BackingRevision: 1, MetadataSlots: 256, MaxPurgeLeases: 2, CleanupBudgetSeconds: 60, ProofWindowSeconds: 60, ValidUntil: now.Add(time.Hour), History: &q}
-	b, w := q.SlotBacking(p.MaxPurgeLeases)
-	p.BackupReservedBytes, p.WALReservedBytes = 256*b, 256*w
-	backing, err := json.Marshal(fleetapp.ConnectorIdentityBacking{AccountVersion: "connector-accounts/v1", AccountLimit: 2, RecordsPerAccount: 128, RetainedSeconds: 10800, ProfileLimit: 2, SourceTransitionLimit: 10, SourceBackupReservedBytes: 6 << 20, SourceWALReservedBytes: 20 << 20, Policy: p})
-	if err != nil {
-		t.Fatal(err)
-	}
-	offer.ConnectorBacking = backing
-	offer.Roles = contracts.ConnectorIdentityRoles{Source: "connector_source", Journal: "connector_journal", Acknowledgement: "connector_ack", Cleanup: "connector_cleanup", Verifier: "connector_verifier", Finalizer: "connector_finalizer"}
-	doc, err := kube.ConnectorIdentityDocument(offer, c.ClusterID, c.PeerID, c.connectorDeployment())
-	if err != nil {
-		t.Fatal(err)
-	}
-	return doc
 }
 
 // scripts/check-helm-region.py renders the chart and points this test at each

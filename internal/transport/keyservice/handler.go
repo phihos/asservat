@@ -19,10 +19,10 @@ type PeerVerifier interface {
 	Verify(*tls.ConnectionState) (value.KeyPeer, error)
 }
 
-// ContextPeerVerifier resolves peers with request-scoped reads (ADR-198);
-// the handler then passes its request context.
-type ContextPeerVerifier interface {
-	VerifyContext(context.Context, *tls.ConnectionState) (value.KeyPeer, error)
+// RequestPeerVerifier also reads the request, for a connector's bearer
+// ServiceAccount token (ADR-334); the handler passes its request context.
+type RequestPeerVerifier interface {
+	VerifyRequest(context.Context, *http.Request) (value.KeyPeer, error)
 }
 
 type Handler struct {
@@ -57,8 +57,9 @@ func NewHandler(services []app.KeyService, peers PeerVerifier, now func() time.T
 }
 
 // ServeHTTP requires direct TLS state. Bootstrap must also set TLS 1.3,
-// RequireAndVerifyClientCert, pinned client roots, finite server header/idle
-// limits and private routing. No forwarded client identity is accepted.
+// pinned client roots, finite server header/idle limits and private routing.
+// A peer is a verified client certificate or, with a RequestPeerVerifier, a
+// connector's bearer token. No forwarded client identity is accepted.
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store, private")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -72,7 +73,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		deny("configuration", 503)
 		return
 	}
-	if r.Method != http.MethodPost || r.URL.Path != contracts.KeyServicePath || r.URL.RawPath != "" || r.URL.RawQuery != "" || r.URL.ForceQuery || r.URL.IsAbs() || r.Header.Get("Content-Type") != "application/json" || r.Header.Get("Content-Encoding") != "" || r.Header.Get("Authorization") != "" || r.Header.Get("Cookie") != "" || r.ContentLength > contracts.KeyServiceMaxBody {
+	if r.Method != http.MethodPost || r.URL.Path != contracts.KeyServicePath || r.URL.RawPath != "" || r.URL.RawQuery != "" || r.URL.ForceQuery || r.URL.IsAbs() || r.Header.Get("Content-Type") != "application/json" || r.Header.Get("Content-Encoding") != "" || r.Header.Get("Cookie") != "" || r.ContentLength > contracts.KeyServiceMaxBody {
 		deny("request-shape", 400)
 		return
 	}
@@ -96,10 +97,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer control.SetWriteDeadline(time.Time{})
 	var peer value.KeyPeer
 	var err error
-	if c, ok := h.peers.(ContextPeerVerifier); ok {
-		peer, err = c.VerifyContext(ctx, r.TLS)
-	} else {
+	if c, ok := h.peers.(RequestPeerVerifier); ok {
+		peer, err = c.VerifyRequest(ctx, r)
+	} else if len(r.Header.Values("Authorization")) == 0 {
 		peer, err = h.peers.Verify(r.TLS)
+	} else {
+		err = app.ErrKeyDenied
 	}
 	if err != nil || !peer.Valid(h.now()) {
 		deny("peer", 403)

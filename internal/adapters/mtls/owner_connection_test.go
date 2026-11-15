@@ -1,13 +1,14 @@
 package mtls
 
 import (
-	value "asservat.local/asservat/internal/domain/fleet"
 	"crypto/tls"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	value "asservat.local/asservat/internal/domain/fleet"
 )
 
 func TestOwnerConnectionSnapshotsActualTLSAndRevalidatesCurrentRoots(t *testing.T) {

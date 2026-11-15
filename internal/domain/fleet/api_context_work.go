@@ -26,17 +26,17 @@ func (p APIContextExecutor) Valid() bool {
 }
 
 // APIContextChannel binds one live conversation, not a durable dispatch lease.
-// Both peer bindings come from actual TLS and current accepted registry reads.
+// The hub binding comes from actual TLS; the connector's cluster and peer
+// from its ServiceAccount token (ADR-334).
 type APIContextChannel struct {
 	RootID, ExchangeID, Challenge string
 	Hub                           OwnerBinding
 	Connector                     ConnectorProcessIdentity
-	ConnectorLeaf                 artifact.Digest
 	Executor                      APIContextExecutor
 }
 
 func (c APIContextChannel) Valid() bool {
-	return authorization.UUID(c.RootID) && authorization.UUID(c.ExchangeID) && authorization.UUID(c.Challenge) && c.Hub.Valid() && c.Connector.Valid() && c.ConnectorLeaf != (artifact.Digest{}) && c.Executor.Valid() && c.Hub.InstallationID == c.Connector.Binding.InstallationID && c.Hub.IssuerEpoch == c.Connector.Binding.IssuerEpoch && c.Executor.PodUID == c.Connector.PodUID && c.Executor.ProcessEpoch != c.Connector.ProcessEpoch
+	return authorization.UUID(c.RootID) && authorization.UUID(c.ExchangeID) && authorization.UUID(c.Challenge) && c.Hub.Valid() && c.Connector.Valid() && c.Executor.Valid() && c.Hub.InstallationID == c.Connector.Binding.InstallationID && c.Hub.IssuerEpoch == c.Connector.Binding.IssuerEpoch && c.Executor.PodUID == c.Connector.PodUID && c.Executor.ProcessEpoch != c.Connector.ProcessEpoch
 }
 
 // APIContextReceiver is one completed receiver check. Its window starts at

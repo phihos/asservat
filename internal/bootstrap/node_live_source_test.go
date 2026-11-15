@@ -1,15 +1,16 @@
 package bootstrap
 
 import (
-	"asservat.local/asservat/internal/adapters/gadget"
-	"asservat.local/asservat/internal/domain/authorization"
-	"asservat.local/asservat/internal/domain/collector"
-	v "asservat.local/asservat/internal/domain/live"
 	"context"
 	"encoding/json"
 	"strings"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/adapters/gadget"
+	"asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/collector"
+	v "asservat.local/asservat/internal/domain/live"
 )
 
 func TestLiveExistingSourceTapDoesNotCollectPinOrBorrowRaw(t *testing.T) {

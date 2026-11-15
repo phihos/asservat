@@ -30,7 +30,6 @@ type APIContextConnector struct {
 	PeerID         string `json:"peerId"`
 	PodUID         string `json:"podUID"`
 	ProcessEpoch   string `json:"processEpoch"`
-	LeafDigest     string `json:"leafDigest"`
 }
 type APIContextExecutor struct {
 	NamespaceUID  string `json:"namespaceUID"`

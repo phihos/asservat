@@ -338,13 +338,15 @@ def check_cluster_join(render):
     config = json.loads(named(docs, "ConfigMap", "asservat-hub-api-config")["data"]["config.json"])
     assert config["clusters"][0] == {"name": "eu", "clusterID": cluster, "namespace": "asservat-system", "standby": 2, "captures": 8}, config.get("clusters")
     # ADR-334: the federation registers clusters by public issuer data only.
-    fed = json.loads(named(docs, "ConfigMap", "asservat-federation-config")["data"]["config.json"])
+    fed = json.loads(named(docs, "ConfigMap", "asservat-federation-config")["data"]["config.json"])["connectorTokens"]
     assert fed["clusters"] == [{"name": "eu", "clusterID": cluster, "issuer": "https://eu.example", "jwks": '{"keys":[{"kty":"EC"}]}', "connector": "asservat-system/asservat-connector"}], fed.get("clusters")
     assert fed["audiences"] == ["https://asservat-federation.asservat-system.svc:9446", remote["federation"]] and "localConnector" not in fed, fed
     revoked = copy.deepcopy(v)
     revoked["clusters"][0]["revoked"] = True
-    fed = json.loads(named(render(revoked), "ConfigMap", "asservat-federation-config")["data"]["config.json"])
+    fed = json.loads(named(render(revoked), "ConfigMap", "asservat-federation-config")["data"]["config.json"])["connectorTokens"]
     assert fed["clusters"] == [], fed
+    # The hub-api and the key service verify the same tokens.
+    assert config["connectorTokens"]["audiences"] == fed["audiences"], config.get("connectorTokens")
     offer = config["public"]["regionalOffer"]
     assert offer["hubOnly"] is True and offer["remote"] == remote, offer
     named(docs, "ConfigMap", "asservat-regional-offer")

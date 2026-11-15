@@ -20,7 +20,6 @@ import (
 
 	"asservat.local/asservat/internal/adapters/mtls"
 	"asservat.local/asservat/internal/application/evidence"
-	fleetapp "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	authorization "asservat.local/asservat/internal/domain/authorization"
@@ -111,10 +110,6 @@ func workerServingRuntime(t *testing.T, ctx context.Context) (*runtimeFixture, *
 	c.Pool.NativeBootstrap = value.OwnerBootstrapProfile
 	f.configuration.Pool = c.Pool
 	f.bootstrapSAN = true
-	verifier, err := mtls.NewPeerVerifier(f.roots, runtimeID, value.ConnectorPeer, time.Now)
-	if err != nil {
-		t.Fatal(err)
-	}
 	reads := workerServingReads{}
 	origins := evidence.NativeOrigins{Locators: reads, Operations: reads, Now: time.Now, Proofs: func(evidence.DownloadPeerToken) (evidence.DownloadPeerProofReader, error) {
 		return nil, artifact.ErrDownloadUnavailable
@@ -123,7 +118,7 @@ func workerServingRuntime(t *testing.T, ctx context.Context) (*runtimeFixture, *
 	if err != nil {
 		t.Fatal(err)
 	}
-	c.Native = &OwnerNativeRuntimeConfig{Peers: &mtls.NativePeerChecks{Workers: f, WorkerTrust: trust, Certificates: reads, Origins: origins, ConnectorVerifier: verifier, Connectors: &fleetapp.PeerAuthenticator{}, Now: time.Now}, ConnectorRoots: f.roots, Connections: 2, Concurrency: 1}
+	c.Native = &OwnerNativeRuntimeConfig{Peers: &mtls.NativePeerChecks{Workers: f, WorkerTrust: trust, Certificates: reads, Origins: origins, Now: time.Now}, Connections: 2, Concurrency: 1}
 	r, err := NewOwnerRuntime(ctx, c)
 	if err != nil {
 		t.Fatal(err)
@@ -169,7 +164,7 @@ func TestOwnerRuntimeServesAcquisitionWorkersOnlyWhenComposed(t *testing.T) {
 			exact, _ := mtls.OwnerServerName(r.Binding())
 			tr := &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS13, MaxVersion: tls.VersionTLS13, RootCAs: f.roots, ServerName: exact, GetClientCertificate: r.client.GetClientCertificate}, DisableKeepAlives: true}
 			defer tr.CloseIdleConnections()
-			req, _ := http.NewRequest("POST", "https://"+address+contracts.OwnerRelayPath, bytes.NewReader([]byte(`{}`)))
+			req, _ := http.NewRequest("POST", "https://"+address+"/internal/hub-owner/v2/enroll-worker", bytes.NewReader([]byte(`{}`)))
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("Authorization", "Bearer synthetic.token")
 			resp, err := (&http.Client{Transport: tr, Timeout: 3 * time.Second}).Do(req)

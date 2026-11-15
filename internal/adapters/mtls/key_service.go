@@ -6,16 +6,16 @@ import (
 	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/json"
+	"net/http"
 	"net/url"
 	"strings"
-	"sync"
 	"time"
 
 	app "asservat.local/asservat/internal/application/authorization"
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/authorization"
 	fleetvalue "asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
 )
 
 type KeyPeerVerifier struct {
@@ -97,120 +97,59 @@ func (v *KeyPeerVerifier) verifyCertificates(certs []*x509.Certificate) (value.K
 	return out, nil
 }
 
-// ConnectorKeyPeerVerifier maps a connector's client leaf to the artifact
-// key service's collector role (ADR-176). The leaf names its peer, whose
-// staged profile is read per request (ADR-198), so a joined region needs no
-// key-service change. The verified chain only identifies the leaf;
-// ContextKeyWraps checks its activation, process and attempt in SQL.
-type ConnectorKeyPeerVerifier struct {
-	installation, root string
-	read               func(context.Context, fleetvalue.ConnectorCluster) (fleetvalue.ConnectorCredentialProfile, error)
-	now                func() time.Time
-	mu                 sync.Mutex
-	peers              map[fleetvalue.ConnectorCluster]connectorKeyPeer
+// ConnectorTokenVerifier attributes a connector's ServiceAccount token to its
+// registered cluster (ADR-334) and returns the token's expiry.
+type ConnectorTokenVerifier interface {
+	VerifyConnectorUntil(context.Context, string) (fleetvalue.ConnectorCluster, time.Time, error)
 }
 
-type connectorKeyPeer struct {
-	staged   []byte
-	verifier *ConnectorCredentialVerifier
-	roots    *x509.CertPool
-}
-
-// connectorKeyPeerLimit bounds the cached profiles, as the former pin list did.
-const connectorKeyPeerLimit = 16
-
-func NewConnectorKeyPeerVerifier(installation, root string, read func(context.Context, fleetvalue.ConnectorCluster) (fleetvalue.ConnectorCredentialProfile, error), now func() time.Time) (*ConnectorKeyPeerVerifier, error) {
-	if !value.UUID(installation) || !value.UUID(root) || read == nil || now == nil {
-		return nil, app.ErrKeyDenied
-	}
-	return &ConnectorKeyPeerVerifier{installation: installation, root: root, read: read, now: now, peers: map[fleetvalue.ConnectorCluster]connectorKeyPeer{}}, nil
-}
-
-func (v *ConnectorKeyPeerVerifier) verify(ctx context.Context, certs []*x509.Certificate) (value.KeyPeer, error) {
-	if v == nil || ctx == nil || len(certs) < 1 || certs[0] == nil || len(certs[0].URIs) != 1 {
+// connectorKeyPeer maps a connector's verified token to the artifact key
+// service's collector role (ADR-176). Certificate names the presenting
+// cluster, so the wrap ledger binds an attempt's roles to one cluster;
+// ContextKeyWraps checks that cluster against the prepared execution.
+func connectorKeyPeer(cluster fleetvalue.ConnectorCluster, installation string, until, now time.Time) (value.KeyPeer, error) {
+	if cluster.InstallationID != installation {
 		return value.KeyPeer{}, app.ErrKeyDenied
 	}
-	b, err := parsePeerURI(certs[0].URIs[0], v.installation, fleetvalue.ConnectorPeer)
-	if err != nil {
-		return value.KeyPeer{}, app.ErrKeyDenied
-	}
-	key := fleetvalue.ConnectorCluster{RootID: v.root, PeerID: b.PeerID, InstallationID: v.installation, ClusterID: b.ClusterID}
-	profile, err := v.read(ctx, key)
-	if err != nil || ctx.Err() != nil || profile.RootID != v.root || profile.Binding != b || profile.Suspended {
-		return value.KeyPeer{}, app.ErrKeyDenied
-	}
-	p, err := v.peer(key, profile)
-	if err != nil {
-		return value.KeyPeer{}, app.ErrKeyDenied
-	}
-	leaf, err := p.verifier.verify(certs, "client", p.roots)
-	if err != nil || leaf.Binding != b {
-		return value.KeyPeer{}, app.ErrKeyDenied
-	}
-	out := value.KeyPeer{InstallationID: v.installation, PeerID: leaf.Binding.PeerID, Role: "collector", Certificate: leaf.Digest, NotBefore: leaf.NotBefore.UTC(), NotAfter: leaf.NotAfter.UTC()}
-	if !out.Valid(v.now()) {
+	out := value.KeyPeer{InstallationID: installation, PeerID: cluster.PeerID, ClusterID: cluster.ClusterID, Role: "collector", Certificate: artifact.Digest(sha256.Sum256([]byte("asservat-connector/" + cluster.ClusterID))), NotBefore: now.UTC(), NotAfter: identity.Earlier(until, now.Add(time.Hour)).UTC()}
+	if !out.Valid(now) {
 		return value.KeyPeer{}, app.ErrKeyDenied
 	}
 	return out, nil
 }
 
-// peer reuses the verifier of an unchanged staged profile; a restaged profile
-// replaces it.
-func (v *ConnectorKeyPeerVerifier) peer(key fleetvalue.ConnectorCluster, profile fleetvalue.ConnectorCredentialProfile) (connectorKeyPeer, error) {
-	staged, err := json.Marshal(profile)
-	if err != nil {
-		return connectorKeyPeer{}, err
-	}
-	v.mu.Lock()
-	defer v.mu.Unlock()
-	if p, ok := v.peers[key]; ok && bytes.Equal(p.staged, staged) {
-		return p, nil
-	} else if !ok && len(v.peers) >= connectorKeyPeerLimit {
-		return connectorKeyPeer{}, app.ErrKeyDenied
-	}
-	verifier, err := NewConnectorCredentialVerifier(profile, v.now)
-	if err != nil {
-		return connectorKeyPeer{}, err
-	}
-	roots, _, err := OwnerTrustRoots(profile.ClientIssuerRoots, v.now())
-	if err != nil {
-		return connectorKeyPeer{}, err
-	}
-	p := connectorKeyPeer{staged: staged, verifier: verifier, roots: roots}
-	v.peers[key] = p
-	return p, nil
-}
-
-// KeyPeerUnion accepts key-client leaves and, when configured, connector client
-// leaves (ADR-176). The URI form selects exactly one verifier; there is no
-// fallback from one to the other.
+// KeyPeerUnion accepts key-client leaves and, when configured, connector
+// ServiceAccount tokens (ADR-334). A bearer token selects the connector
+// verifier; there is no fallback from one to the other.
 type KeyPeerUnion struct {
 	KeyClients *KeyPeerVerifier
-	Connectors *ConnectorKeyPeerVerifier
+	Connectors ConnectorTokenVerifier
+	Now        func() time.Time
 }
 
-// Verify serves callers without a request; the key handler passes its
-// request context through VerifyContext.
+// Verify serves callers without a request.
 func (u KeyPeerUnion) Verify(s *tls.ConnectionState) (value.KeyPeer, error) {
-	return u.VerifyContext(context.Background(), s)
+	if u.KeyClients == nil {
+		return value.KeyPeer{}, app.ErrKeyDenied
+	}
+	return u.KeyClients.Verify(s)
 }
 
-func (u KeyPeerUnion) VerifyContext(ctx context.Context, s *tls.ConnectionState) (value.KeyPeer, error) {
-	if u.KeyClients == nil || s == nil || !s.HandshakeComplete || s.Version != tls.VersionTLS13 || len(s.PeerCertificates) < 1 || len(s.PeerCertificates) > 4 || s.PeerCertificates[0] == nil || len(s.VerifiedChains) == 0 {
+func (u KeyPeerUnion) VerifyRequest(ctx context.Context, r *http.Request) (value.KeyPeer, error) {
+	if r == nil || u.KeyClients == nil {
 		return value.KeyPeer{}, app.ErrKeyDenied
 	}
-	leaf := s.PeerCertificates[0]
-	if len(leaf.URIs) == 1 && leaf.URIs[0] != nil && strings.HasPrefix(leaf.URIs[0].Path, "/key-client/") {
-		return u.KeyClients.Verify(s)
+	values := r.Header.Values("Authorization")
+	if len(values) == 0 {
+		return u.KeyClients.Verify(r.TLS)
 	}
-	matched := false
-	for _, chain := range s.VerifiedChains {
-		if len(chain) > 0 && chain[0] != nil && bytes.Equal(chain[0].Raw, leaf.Raw) {
-			matched = true
-		}
-	}
-	if u.Connectors == nil || !matched {
+	token, ok := strings.CutPrefix(values[0], "Bearer ")
+	if u.Connectors == nil || u.Now == nil || len(values) != 1 || !ok || token == "" || r.TLS != nil && len(r.TLS.PeerCertificates) != 0 {
 		return value.KeyPeer{}, app.ErrKeyDenied
 	}
-	return u.Connectors.verify(ctx, s.PeerCertificates)
+	cluster, until, err := u.Connectors.VerifyConnectorUntil(ctx, token)
+	if err != nil {
+		return value.KeyPeer{}, app.ErrKeyDenied
+	}
+	return connectorKeyPeer(cluster, u.KeyClients.installation, until, u.Now())
 }

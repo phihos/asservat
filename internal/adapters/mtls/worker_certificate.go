@@ -1,11 +1,12 @@
 package mtls
 
 import (
-	"asservat.local/asservat/internal/domain/artifact"
-	value "asservat.local/asservat/internal/domain/authorization"
 	"crypto/sha256"
 	"crypto/x509"
 	"net/url"
+
+	"asservat.local/asservat/internal/domain/artifact"
+	value "asservat.local/asservat/internal/domain/authorization"
 )
 
 func WorkerCertificateURI(a value.WorkerCertificateAttempt) (*url.URL, error) {

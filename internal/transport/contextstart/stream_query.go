@@ -165,14 +165,6 @@ func queryFailureLabel(err error) string {
 	}
 	return "unavailable"
 }
-func queryFailureError(label string) error {
-	for _, f := range queryFailures {
-		if f.label == label {
-			return f.err
-		}
-	}
-	return targets.ErrUnavailable
-}
 
 // errQueryAnswer marks a closed regional answer; the exchange stays usable.
 type errQueryAnswer struct{ err error }
@@ -206,18 +198,12 @@ func (s *frameStream) query(ctx context.Context, method string, in, out any) (ti
 	if e := requireCapability(s, queryCapability(method), errQueryClass); e != nil {
 		return time.Time{}, errQueryAnswer{e}
 	}
-	if s.sources == nil {
+	if s.capabilities == nil {
 		return time.Time{}, fleet.ErrInvalid
 	}
 	call, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	defer markQuery(ctx, "q-total", time.Now())
-	pulled := time.Now()
-	if e := s.pullSource(call); e != nil {
-		s.record(streamHubQuerySource, streamErrorReason(e))
-		return time.Time{}, fleet.ErrUnavailable
-	}
-	markQuery(ctx, "q-source", pulled)
 	checked := time.Now()
 	receiver, e := s.check(call)
 	markQuery(ctx, "q-check", checked)
@@ -316,7 +302,7 @@ func (s *frameStream) completeQuery(ctx context.Context, until time.Time) error 
 	}
 	live := func() bool {
 		now := time.Now()
-		return bounded && s.sources != nil && !s.closed && s.first.Load() == nil &&
+		return bounded && s.capabilities != nil && !s.closed && s.first.Load() == nil &&
 			!s.leaseStarted && s.reads == 0 && s.writes == 0 &&
 			ctx.Err() == nil && s.ctx.Err() == nil &&
 			now.Before(until) && now.Before(passiveUntil)
@@ -622,7 +608,7 @@ func (s *frameStream) answerQuery(ctx context.Context, f contracts.APIContextFra
 	}
 	defer clear(encoded)
 	written := time.Now()
-	e = s.writeSourceFrame(bounded, contracts.APIContextFrame{Kind: contracts.APIContextAnswerFrame, Payload: encoded})
+	e = s.writeIdleFrame(bounded, contracts.APIContextFrame{Kind: contracts.APIContextAnswerFrame, Payload: encoded})
 	auditapp.MarkStep(call, "r-write", written)
 	if e != nil {
 		s.record(streamRegionalQueryWrite, streamErrorReason(e))

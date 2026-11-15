@@ -1,11 +1,6 @@
 package bootstrap
 
 import (
-	"asservat.local/asservat/internal/adapters/objectstore"
-	"asservat.local/asservat/internal/application/evidence"
-	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/collector"
-	"asservat.local/asservat/internal/domain/fleet"
 	"bytes"
 	"context"
 	"fmt"
@@ -13,6 +8,12 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/adapters/objectstore"
+	"asservat.local/asservat/internal/application/evidence"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/collector"
+	"asservat.local/asservat/internal/domain/fleet"
 )
 
 type snapshotCancelQueue struct {

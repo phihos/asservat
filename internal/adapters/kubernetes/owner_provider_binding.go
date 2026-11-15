@@ -5,7 +5,7 @@ import (
 )
 
 func initialRuntimeLayoutStateValid(v contracts.InitialRuntimeResourceState) bool {
-	if !initialRuntimeObservationSelectionValid(v.WorkerLayout, v.OwnerLayout, v.ObservationFormat) || !contracts.InitialRuntimeLayoutsSupported(v.WorkerLayout, v.OwnerLayout) {
+	if v.ObservationFormat != "" || !contracts.InitialRuntimeLayoutsSupported(v.WorkerLayout, v.OwnerLayout) {
 		return false
 	}
 	if v.WorkerLayout == contracts.HubWorkerProviderInstalledLayout {

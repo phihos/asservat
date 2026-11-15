@@ -1,13 +1,9 @@
 package mtls
 
 import (
-	"bytes"
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"encoding/hex"
 	"errors"
-	"sync/atomic"
 	"time"
 
 	app "asservat.local/asservat/internal/application/fleet"
@@ -18,26 +14,16 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 )
 
-// ContextStartConnectorAdmission is constructor-owned protected input, not
-// registry discovery or Hello-derived policy. One exact connector per cluster.
-// The profile is the installer-pinned expected profile; each exchange binds
-// the registry to its own ADR-178 feed of regional source observations.
-// The executor's startup and image digests in Hello are provenance only: a
-// connector of another release is admitted (ADR-333 version skew).
-type ContextStartConnectorAdmission struct {
-	Profile  value.ConnectorCredentialProfile
-	Registry app.ConnectorObservationRegistry
-}
-type contextStartConnectorAdmission struct {
-	ContextStartConnectorAdmission
-	verifier *ConnectorCredentialVerifier
-}
+// ContextStartIngress admits a connector's context-start exchange. The
+// connector authenticated with its ServiceAccount token (ADR-334); the hello
+// must name the cluster and peer that token was attributed to. The executor's
+// startup and image digests in Hello are provenance only: a connector of
+// another release is admitted (ADR-333 version skew).
 type ContextStartIngress struct {
-	rootID   string
-	local    *OwnerCredentials
-	owners   *app.OwnerAuthenticator
-	clusters map[string]contextStartConnectorAdmission
-	now      func() time.Time
+	rootID string
+	local  *OwnerCredentials
+	owners *app.OwnerAuthenticator
+	now    func() time.Time
 	// Refused, when set, receives a fixed stage name for each refusal. It carries
 	// no request data and changes no result.
 	Refused func(string)
@@ -70,66 +56,13 @@ func refusalClass(e error, valid, matches bool) string {
 	return "other"
 }
 
-func NewContextStartIngress(rootID string, local *OwnerCredentials, owners *app.OwnerAuthenticator, inputs []ContextStartConnectorAdmission, now func() time.Time) (*ContextStartIngress, error) {
-	// ADR-185: an empty catalog admits no connector, so every start is denied.
-	if !authorization.UUID(rootID) || local == nil || owners == nil || owners.Now == nil || now == nil || inputs == nil || len(inputs) > 16 {
+func NewContextStartIngress(rootID string, local *OwnerCredentials, owners *app.OwnerAuthenticator, now func() time.Time) (*ContextStartIngress, error) {
+	if !authorization.UUID(rootID) || local == nil || owners == nil || owners.Now == nil || now == nil {
 		return nil, value.ErrInvalid
 	}
-	c := &ContextStartIngress{rootID: rootID, local: local, owners: owners, clusters: make(map[string]contextStartConnectorAdmission, len(inputs)), now: now}
-	for _, input := range inputs {
-		p := input.Profile
-		if !p.Valid() || p.Suspended || p.RootID != rootID || input.Registry == nil {
-			return nil, value.ErrInvalid
-		}
-		if _, exists := c.clusters[p.Binding.ClusterID]; exists {
-			return nil, value.ErrInvalid
-		}
-		verifier, e := NewConnectorCredentialVerifier(p, now)
-		if e != nil {
-			return nil, e
-		}
-		input.Profile = p.Clone()
-		c.clusters[p.Binding.ClusterID] = contextStartConnectorAdmission{input, verifier}
-	}
-	return c, nil
+	return &ContextStartIngress{rootID: rootID, local: local, owners: owners, now: now}, nil
 }
 
-// This copies actual verified handshake evidence before any caller-owned TLS
-// slices can change. Every subsequent use revalidates both root sets and SQL.
-func contextStartPeerChain(s *tls.ConnectionState) ([]*x509.Certificate, error) {
-	if s == nil || !s.HandshakeComplete || s.Version != tls.VersionTLS13 || s.NegotiatedProtocol != "h2" || len(s.PeerCertificates) < 1 || len(s.PeerCertificates) > 4 || len(s.VerifiedChains) < 1 || len(s.VerifiedChains) > 8 {
-		return nil, value.ErrDenied
-	}
-	if s.PeerCertificates[0] == nil {
-		return nil, value.ErrDenied
-	}
-	found := false
-	for _, chain := range s.VerifiedChains {
-		if len(chain) > 0 && chain[0] != nil && bytes.Equal(chain[0].Raw, s.PeerCertificates[0].Raw) {
-			found = true
-		}
-	}
-	if !found {
-		return nil, value.ErrDenied
-	}
-	out := make([]*x509.Certificate, 0, len(s.PeerCertificates))
-	total := 0
-	for _, cert := range s.PeerCertificates {
-		if cert == nil || len(cert.Raw) < 1 || len(cert.Raw) > 16<<10 {
-			return nil, value.ErrDenied
-		}
-		total += len(cert.Raw)
-		if total > 32<<10 {
-			return nil, value.ErrDenied
-		}
-		copied, e := x509.ParseCertificate(bytes.Clone(cert.Raw))
-		if e != nil {
-			return nil, value.ErrDenied
-		}
-		out = append(out, copied)
-	}
-	return out, nil
-}
 func contextStartDigest(s string) artifact.Digest {
 	var d artifact.Digest
 	if len(s) != 64 {
@@ -146,36 +79,35 @@ func contextStartChannel(w contracts.APIContextChannel) value.APIContextChannel 
 	h, c, e := w.Hub, w.Connector, w.Executor
 	return value.APIContextChannel{RootID: w.RootID, ExchangeID: w.ExchangeID, Challenge: w.Challenge,
 		Hub:       value.OwnerBinding{InstallationID: h.InstallationID, ClusterID: h.ClusterID, IssuerEpoch: h.IssuerEpoch, PodUID: h.PodUID, ProcessEpoch: h.ProcessEpoch},
-		Connector: value.ConnectorProcessIdentity{Binding: value.PeerBinding{InstallationID: c.InstallationID, ClusterID: c.ClusterID, IssuerEpoch: c.IssuerEpoch, PeerID: c.PeerID, Role: value.ConnectorPeer}, PodUID: c.PodUID, ProcessEpoch: c.ProcessEpoch}, ConnectorLeaf: contextStartDigest(c.LeafDigest),
-		Executor: value.APIContextExecutor{NamespaceUID: e.NamespaceUID, AccountUID: e.AccountUID, PodUID: e.PodUID, ProcessEpoch: e.ProcessEpoch, StartupDigest: contextStartDigest(e.StartupDigest), ImageDigest: contextStartDigest(e.ImageDigest)}}
+		Connector: value.ConnectorProcessIdentity{Binding: value.PeerBinding{InstallationID: c.InstallationID, ClusterID: c.ClusterID, IssuerEpoch: c.IssuerEpoch, PeerID: c.PeerID, Role: value.ConnectorPeer}, PodUID: c.PodUID, ProcessEpoch: c.ProcessEpoch},
+		Executor:  value.APIContextExecutor{NamespaceUID: e.NamespaceUID, AccountUID: e.AccountUID, PodUID: e.PodUID, ProcessEpoch: e.ProcessEpoch, StartupDigest: contextStartDigest(e.StartupDigest), ImageDigest: contextStartDigest(e.ImageDigest)}}
 }
 func contextStartChannelWire(c value.APIContextChannel) contracts.APIContextChannel {
 	h, p, e := c.Hub, c.Connector, c.Executor
 	digest := func(d artifact.Digest) string { return hex.EncodeToString(d[:]) }
 	return contracts.APIContextChannel{RootID: c.RootID, ExchangeID: c.ExchangeID, Challenge: c.Challenge,
 		Hub:       contracts.APIContextOwner{InstallationID: h.InstallationID, ClusterID: h.ClusterID, IssuerEpoch: h.IssuerEpoch, PodUID: h.PodUID, ProcessEpoch: h.ProcessEpoch},
-		Connector: contracts.APIContextConnector{InstallationID: p.Binding.InstallationID, ClusterID: p.Binding.ClusterID, IssuerEpoch: p.Binding.IssuerEpoch, PeerID: p.Binding.PeerID, PodUID: p.PodUID, ProcessEpoch: p.ProcessEpoch, LeafDigest: digest(c.ConnectorLeaf)},
+		Connector: contracts.APIContextConnector{InstallationID: p.Binding.InstallationID, ClusterID: p.Binding.ClusterID, IssuerEpoch: p.Binding.IssuerEpoch, PeerID: p.Binding.PeerID, PodUID: p.PodUID, ProcessEpoch: p.ProcessEpoch},
 		Executor:  contracts.APIContextExecutor{NamespaceUID: e.NamespaceUID, AccountUID: e.AccountUID, PodUID: e.PodUID, ProcessEpoch: e.ProcessEpoch, StartupDigest: digest(e.StartupDigest), ImageDigest: digest(e.ImageDigest)}}
 }
-func (s *ContextStartIngress) AuthenticateContextStart(ctx context.Context, state *tls.ConnectionState, hello contracts.APIContextHello, sources app.ConnectorIdentitySourceReader) (value.APIContextReceiver, app.APIContextReceiverCheck, error) {
+
+// AuthenticateContextStart binds the hello to the token's cluster. The
+// returned check repeats the hub's own serving check and never outlives the
+// token.
+func (s *ContextStartIngress) AuthenticateContextStart(ctx context.Context, hello contracts.APIContextHello, presented value.ConnectorCluster, tokenUntil time.Time) (value.APIContextReceiver, app.APIContextReceiverCheck, error) {
 	var zero value.APIContextReceiver
-	if s == nil || ctx == nil || ctx.Err() != nil || hello.Format != contracts.APIContextExchangeFormat || sources == nil {
+	if s == nil || ctx == nil || ctx.Err() != nil || hello.Format != contracts.APIContextExchangeFormat {
 		s.refuse("request")
 		return zero, nil, value.ErrDenied
 	}
 	channel := contextStartChannel(hello.Channel)
-	admission, exists := s.clusters[channel.Connector.Binding.ClusterID]
-	if !exists || !channel.Valid() || channel.RootID != s.rootID || channel.Connector.Binding != admission.Profile.Binding {
+	b := channel.Connector.Binding
+	if !channel.Valid() || channel.RootID != s.rootID || presented.RootID != s.rootID || b.ClusterID != presented.ClusterID || b.PeerID != presented.PeerID || b.InstallationID != presented.InstallationID {
 		s.refuse("admission")
 		return zero, nil, value.ErrDenied
 	}
-	chain, e := contextStartPeerChain(state)
-	if e != nil {
-		s.refuse("chain")
-		return zero, nil, e
-	}
 	check := func(call context.Context) (value.APIContextReceiver, error) {
-		return s.current(call, admission, sources, channel, chain)
+		return s.current(call, channel, tokenUntil)
 	}
 	receiver, e := check(ctx)
 	if e != nil {
@@ -183,118 +115,27 @@ func (s *ContextStartIngress) AuthenticateContextStart(ctx context.Context, stat
 	}
 	return receiver, check, nil
 }
-func (s *ContextStartIngress) current(ctx context.Context, a contextStartConnectorAdmission, sources app.ConnectorIdentitySourceReader, channel value.APIContextChannel, chain []*x509.Certificate) (value.APIContextReceiver, error) {
+
+func (s *ContextStartIngress) current(ctx context.Context, channel value.APIContextChannel, tokenUntil time.Time) (value.APIContextReceiver, error) {
 	var zero value.APIContextReceiver
 	if ctx == nil || ctx.Err() != nil {
 		s.refuse("cancelled")
 		return zero, value.ErrUnavailable
 	}
 	started := s.now()
-	call, stop := context.WithDeadline(ctx, started.Add(5*time.Second))
+	if !started.Before(tokenUntil) {
+		s.refuse("token-expired")
+		return zero, value.ErrDenied
+	}
+	call, stop := context.WithDeadline(ctx, identity.Earlier(started.Add(5*time.Second), tokenUntil))
 	defer stop()
-	until, _ := call.Deadline()
-	// until bounds this check's reads; valid is the ADR-311 interval the one
-	// completed peer check may be used for, never past a certificate.
-	valid := identity.Check(started, identity.Recheck)
-	var cancels []context.CancelFunc
-	defer func() {
-		for i := len(cancels) - 1; i >= 0; i-- {
-			cancels[i]()
-		}
-	}()
-	// Every narrowing is retained in the actual context used by later reads.
-	narrow := func(d time.Time) {
-		until = identity.Earlier(until, d)
-		var cancel context.CancelFunc
-		call, cancel = context.WithDeadline(call, until)
-		cancels = append(cancels, cancel)
-	}
-	// The hub's own serving identity is independent of the connector reads, so
-	// both run together within the same original bound. Each result is still
-	// checked and narrows the bound, so no interval is extended.
-	opening, cancelOpening := context.WithCancel(call)
-	var abandoned atomic.Bool
-	var local value.AuthenticatedOwner
-	var localErr error
-	localDone := make(chan struct{})
-	go func() {
-		defer close(localDone)
-		// After a deliberate cancellation its step reports would blame the hub.
-		report := s.refuseStep("local/")
-		local, localErr = s.owners.ObserveOwnerServing(app.WithRefusalSteps(opening, func(step string) {
-			if !abandoned.Load() {
-				report(step)
-			}
-		}), s.local)
-	}()
-	joined := false
-	joinLocal := func() bool {
-		if !joined {
-			<-localDone
-			joined = true
-		}
-		if localErr != nil || !local.Valid(s.now()) || local.Certificate.Binding != channel.Hub {
-			s.refuse("local/" + refusalClass(localErr, local.Valid(s.now()), local.Certificate.Binding == channel.Hub) + app.RemainingBucket(opening, s.now()))
-			return false
-		}
-		return true
-	}
-	defer func() {
-		if !joined {
-			abandoned.Store(true)
-			cancelOpening() // An earlier refusal needs no opening result.
-			<-localDone
-		}
-		cancelOpening()
-	}()
-	source, e := sources.ReadConnectorIdentitySource(call)
-	if e != nil || !source.Valid(s.now()) || !source.Observation.Profile.Equal(a.Profile) {
-		s.refuse("source")
+	local, e := s.owners.ObserveOwnerServing(app.WithRefusalSteps(call, s.refuseStep("local/")), s.local)
+	if e != nil || !local.Valid(s.now()) || local.Certificate.Binding != channel.Hub {
+		s.refuse("local/" + refusalClass(e, local.Valid(s.now()), local.Certificate.Binding == channel.Hub) + app.RemainingBucket(call, s.now()))
 		return zero, value.ErrDenied
 	}
-	narrow(source.Observation.FreshUntil)
-	roots, _, e := OwnerTrustRoots(source.Observation.Profile.ClientIssuerRoots, s.now())
-	if e != nil {
-		s.refuse("roots")
-		return zero, value.ErrDenied
-	}
-	cert, e := a.verifier.verify(chain, "client", roots)
-	if e != nil || cert.Binding != channel.Connector.Binding || cert.Digest != channel.ConnectorLeaf {
-		s.refuse("certificate")
-		return zero, value.ErrDenied
-	}
-	narrow(cert.NotAfter)
-	valid = valid.Narrow(cert.NotAfter)
-	registered, e := a.Registry.ReadConnectorObservationRegistration(call, a.Profile, sources, cert)
-	if e != nil || !registered.Valid(s.now()) || registered.Certificate != cert || registered.Process != channel.Connector || registered.Revision != source.Observation.Profile.Revision {
-		switch {
-		case e != nil || !registered.Valid(s.now()):
-			s.refuse("registration/" + refusalClass(e, registered.Valid(s.now()), true))
-		case registered.Certificate != cert:
-			s.refuse("registration/certificate")
-		case registered.Process != channel.Connector:
-			s.refuse("registration/process")
-		default:
-			s.refuse("registration/revision")
-		}
-		return zero, value.ErrDenied
-	}
-	narrow(registered.FreshUntil)
-	if !joinLocal() {
-		return zero, value.ErrDenied
-	}
-	narrow(local.ValidUntil)
-	valid = valid.Narrow(local.ValidUntil)
-	// The hub's own serving observation above already rests on the reused
-	// self-protection proof; only the connector source is read again.
-	finalSource, e := sources.ReadConnectorIdentitySource(call)
-	if e != nil || !finalSource.Valid(s.now()) || !finalSource.Observation.SameSource(source.Observation) || finalSource.Roles != source.Roles {
-		s.refuse("final-source")
-		return zero, value.ErrDenied
-	}
-	narrow(finalSource.Observation.FreshUntil)
-	out := value.APIContextReceiver{Channel: channel, Window: valid}
-	if call.Err() != nil || !s.now().Before(until) || !out.Valid(s.now()) || !source.Valid(s.now()) || !registered.Valid(s.now()) || !local.Valid(s.now()) {
+	out := value.APIContextReceiver{Channel: channel, Window: identity.Check(started, identity.Recheck).Narrow(local.ValidUntil, tokenUntil)}
+	if call.Err() != nil || !out.Valid(s.now()) {
 		s.refuse("expired")
 		return zero, value.ErrUnavailable
 	}
