@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"encoding/json/jsontext"
 	"net/http"
@@ -28,7 +27,6 @@ import (
 	planningapp "asservat.local/asservat/internal/application/planning"
 	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/contracts"
-	"asservat.local/asservat/internal/domain/artifact"
 	audit "asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
@@ -116,16 +114,6 @@ func decodeAuditPolicy(raw json.RawMessage, lane, root, installation string) (au
 		return audit.OperationLifecyclePolicy{}, mounts.ErrUnavailable
 	}
 	return p, nil
-}
-
-func publicDigest(s string) (artifact.Digest, bool) {
-	var d artifact.Digest
-	b, e := hex.DecodeString(s)
-	if e != nil || len(b) != len(d) || hex.EncodeToString(b) != s {
-		return d, false
-	}
-	copy(d[:], b)
-	return d, d != artifact.Digest{}
 }
 
 // publicAuditStore is the owner's audit store and audit Transit keys, shared
