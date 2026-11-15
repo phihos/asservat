@@ -29,7 +29,7 @@ Every request contains `format`, `scope` (installation/purpose/key ID), `authori
 
 Binary members use canonical padded base64. Null, aliases, duplicate or unknown members, fields irrelevant to the operation and trailing values are rejected. Bodies are at most 32768 bytes (base64 of the 4096-byte keyset, 2048-byte binding and 8192-byte ciphertext plus JSON; internal fixed-shape RPC, so per-request memory stays bounded), sealed references at most 256 bytes and encoded ciphertext at most 8192 bytes. Responses carry `format`, `operation` and `requestSHA256`; the client rejects mismatches, unknown fields, malformed output and redirects. Failures carry only a status: 400 malformed, 403 denied, 429 saturated, 503 unavailable.
 
-`requestSHA256` is SHA-256 of RFC 8785 canonical JSON with members `Format` (`asservat-key-request-digest/v1`), `Installation`, `Purpose`, `KeyID`, `Authority`, `Operation`, `Reference`, `Version`, `Binding`, `Input` and `Ciphertext`. `Binding` and `Input` are SHA-256 of the decoded bytes; `Ciphertext` is SHA-256 of the encoded ciphertext string (empty when absent). These three digests are arrays of 32 integers 0–255. The digest is not a credential and is safe to log.
+`requestSHA256` is SHA-256 of RFC 8785 canonical JSON with members `Format` (`asservat-key-request-digest/v2`), `Installation`, `Purpose`, `KeyID`, `Authority`, `Operation`, `Reference`, `Binding`, `Input` and `Ciphertext`. `Binding` and `Input` are SHA-256 of the decoded bytes; `Ciphertext` is SHA-256 of the encoded ciphertext string (empty when absent). These three digests are arrays of 32 integers 0–255. The digest is not a credential and is safe to log.
 
 ## Identity and authorization
 
