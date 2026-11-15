@@ -581,13 +581,12 @@ GRANT USAGE ON SCHEMA public TO context_query_runtime;
 GRANT SELECT ON goose_db_version,fleet_trust,fleet_current_trust,permission_stream,authority_audit,
  retention_source,retention_source_epoch,retention_checkpoint,retention_catchup,retention_catchup_effect,retention_decision,
  context_catalog,context_capture,context_verification,custody_attempt,context_case_locator,
- processing_root,context_processing,processing_rule,operation_audit,operation_audit_lifecycle,
+ processing_root,context_processing,processing_rule,
  context_query_backing,context_query_allocation,context_query_principal,context_query,context_query_call,context_query_worker,context_query_batch
  TO context_query_runtime;
 GRANT UPDATE(installation_id) ON fleet_trust,fleet_current_trust TO context_query_runtime;
-GRANT UPDATE(id) ON permission_stream,operation_audit,context_query_allocation,context_query_principal,context_query TO context_query_runtime;
+GRANT UPDATE(id) ON permission_stream,context_query_allocation,context_query_principal,context_query TO context_query_runtime;
 GRANT UPDATE(root_id) ON retention_source,context_query_backing TO context_query_runtime;
-GRANT UPDATE(operation_id) ON operation_audit_lifecycle TO context_query_runtime;
 GRANT INSERT ON context_query_principal,context_query,context_query_call,context_query_batch TO context_query_runtime;
 GRANT UPDATE(claim_id,closed) ON context_query_batch TO context_query_runtime;
 GRANT EXECUTE ON FUNCTION lock_context_query_capacity(uuid,uuid),context_query_capacity_allocation_current(uuid,uuid),context_query_shared_profile_current(uuid,jsonb) TO context_query_runtime;
