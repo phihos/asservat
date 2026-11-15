@@ -38,20 +38,20 @@ import (
 // admission are explicitly synthetic. No collector, BPF, external service or
 // production grant authorization is established by this regression.
 type packetMetadataFixture struct {
-	channel                                                      fleet.APIContextChannel
-	api                                                          *kube.PodTargets
-	svc                                                          captureapp.ContextInvestigation
-	preview                                                      capture.ContextPreview
-	ids                                                          atomic.Int64
-	admission                                                    atomic.Int64
-	apiReads                                                     atomic.Int64
-	denied                                                       atomic.Bool
-	mu                                                           sync.Mutex
+	channel                                       fleet.APIContextChannel
+	api                                           *kube.PodTargets
+	svc                                           captureapp.ContextInvestigation
+	preview                                       capture.ContextPreview
+	ids                                           atomic.Int64
+	admission                                     atomic.Int64
+	apiReads                                      atomic.Int64
+	denied                                        atomic.Bool
+	mu                                            sync.Mutex
 	hubUntil, regionUntil, humanUntil, grantUntil time.Time
-	storageDelay, apiDelay                                       time.Duration
-	afterStorage                                                 func()
-	lastLocal                                                    targets.PodResolution
-	stages                                                       []string
+	storageDelay, apiDelay                        time.Duration
+	afterStorage                                  func()
+	lastLocal                                     targets.PodResolution
+	stages                                        []string
 }
 
 var metadataAdmitted = errors.New("composed test reached admission")
