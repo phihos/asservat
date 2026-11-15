@@ -92,7 +92,8 @@ func TestHTTPSourceLedgerWithRealServices(t *testing.T) {
 			sourceID, fence, nodeID, bootID, collectorID, epoch := custodyID(), custodyID(), custodyID(), custodyID(), custodyID(), custodyID()
 			fresh := func() captureapp.PolicySourceCheck {
 				t.Helper()
-				_, recovery := f.refreshBase(t)
+				f.refreshBase(t)
+				recovery := f.recoveryState(t)
 				n := time.Now().UTC().Truncate(time.Microsecond)
 				source := accepted.Source
 				source.ObservedAt = n

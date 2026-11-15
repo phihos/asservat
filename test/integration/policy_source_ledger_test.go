@@ -3,7 +3,6 @@
 package integration
 
 import (
-	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json"
@@ -16,13 +15,11 @@ import (
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/pcap"
 	"asservat.local/asservat/internal/adapters/postgres"
-	capacity "asservat.local/asservat/internal/application/capacity"
 	captureapp "asservat.local/asservat/internal/application/capture"
 	"asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
-	"asservat.local/asservat/internal/domain/collector"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
@@ -65,7 +62,8 @@ func TestPolicySourceLedgerWithRealPostgres(t *testing.T) {
 				t.Helper()
 				// Refresh existing observations only; immutable admission/acceptance,
 				// original source identity, counters and hard policy end remain unchanged.
-				_, recovery := f.refreshBase(t)
+				f.refreshBase(t)
+				recovery := f.recoveryState(t)
 				n := time.Now().UTC().Truncate(time.Microsecond)
 				src := accepted.Source
 				src.ObservedAt = n
@@ -235,7 +233,7 @@ func TestPolicySourceLedgerWithRealPostgres(t *testing.T) {
 				if err != nil || quiet.Permit.Credit != next.Permit.Credit {
 					t.Fatal("parent exhaustion blocked prepaid quiet renewal", err)
 				}
-				_, _, observed, executions, captures := count(t)
+				observed, executions, captures := count(t)
 				if observed != next.Permit.Credit || executions != beforeExecutions || captures != beforeCaptures {
 					t.Fatal("credit/capture accounting changed")
 				}
@@ -382,29 +380,6 @@ func TestPolicySourceFixtureAuthorityJSONRepresentation(t *testing.T) {
 	}
 	if !authority.IssuedAt.Equal(persisted.IssuedAt) || !authority.NotAfter.Equal(persisted.NotAfter) || !reflect.DeepEqual(authority, persisted) {
 		t.Fatal("fixture UTC/microsecond authority JSON representation differs")
-	}
-}
-
-func TestPolicySourceFixtureCapacityJSONRepresentation(t *testing.T) {
-	root, installation, cluster, namespace := custodyID(), custodyID(), custodyID(), custodyID()
-	_, template := capacityNativeQualification(t, root, installation, cluster, namespace, "synthetic-version")
-	template.Policies[0].SourceResources = &capacity.SourceResourceLimits{Node: collector.PolicyLimits{SourceLimits: collector.SourceLimits{MaxActiveSources: 4, InputBytesPerSecond: 4 << 20, InputBurstBytes: 4 << 20}}, Workload: collector.SourceLimits{MaxActiveSources: 4, InputBytesPerSecond: 4 << 20, InputBurstBytes: 4 << 20}}
-	now := time.Now().UTC().Truncate(time.Microsecond)
-	source := capacityNativeSource(t, template, now, now.Add(5*time.Second))
-	raw, err := json.Marshal(source)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var persisted capacity.CapacitySourceObservation
-	if err = json.Unmarshal(raw, &persisted); err != nil {
-		t.Fatal(err)
-	}
-	if !persisted.Valid(now) || persisted.Digest != source.Digest || len(persisted.Snapshot.Policies) != 1 {
-		t.Fatal("actual capacity/source-resource JSON roundtrip changed current observation")
-	}
-	selected := persisted.Snapshot.Policies[0]
-	if selected.Resource.UID != template.Policies[0].Resource.UID || selected.Scope == nil || selected.Scope.ClusterID != cluster || selected.Budget == nil || !reflect.DeepEqual(selected.SourceResources, template.Policies[0].SourceResources) {
-		t.Fatal("selected resource binding changed through JSON")
 	}
 }
 

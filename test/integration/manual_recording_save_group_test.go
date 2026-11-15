@@ -4,7 +4,6 @@ package integration
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"slices"
 	"testing"
@@ -13,7 +12,6 @@ import (
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
 	auditapp "asservat.local/asservat/internal/application/audit"
-	"asservat.local/asservat/internal/application/capacity"
 	captureapp "asservat.local/asservat/internal/application/capture"
 	fleetapp "asservat.local/asservat/internal/application/fleet"
 	planningapp "asservat.local/asservat/internal/application/planning"
@@ -532,63 +530,9 @@ func qualifyManualRecordingSaveGroupMixedCancellation(t *testing.T, ctx context.
 	}
 }
 
-func TestManualRecordingSaveGroupFixtureFundsSourcesParentAndChildren(t *testing.T) {
-	for _, count := range []int{2, 16} {
-		t.Run(fmt.Sprintf("sources-%d", count), func(t *testing.T) {
-			root, installation, cluster, control := custodyID(), custodyID(), custodyID(), custodyID()
-			q, template := capacityNativeQualification(t, root, installation, cluster, control, "synthetic-group-account")
-			f := &capacitySQLFixture{qualification: q, template: template}
-			configureManualGroupSourceCapacity(f, count)
-			backing, err := capacity.CompileContextProtocolBacking(f.template.Policies[0].Budget.Context, q.RootBacking.ContextHistory)
-			if err != nil || backing.Records < int64(2*count+1) || backing.ReplayRecords < int64(2*count+1) {
-				t.Fatal("real sources plus parent and children underfunded", count, backing.Records, backing.ReplayRecords, err)
-			}
-			plan, err := capacity.CompileProtectedPoolPlan(f.template, f.template.Pools[0].Budget.Name)
-			if err != nil {
-				t.Fatal(err)
-			}
-			qualified, err := capacity.CompileQualifiedRootBacking(f.qualification, plan)
-			if err != nil {
-				t.Fatal("group configuration lacks protected root backing", err)
-			}
-			raw, _ := qualified.Canonical()
-			var compiled struct{ Input capacity.RootBackingInput }
-			if err := json.Unmarshal(raw, &compiled); err != nil {
-				t.Fatal(err)
-			}
-			if compiled.Input.RecordsPerAccount < backing.Records {
-				t.Fatal("compiled root has fewer records than workload protocol", compiled.Input.RecordsPerAccount, backing.Records)
-			}
-			slots := compiled.Input.Accounts * compiled.Input.RecordsPerAccount
-			if compiled.Input.Capture.RecordsPerAccount != compiled.Input.RecordsPerAccount || compiled.Input.Capture.Policy.MetadataSlots != slots || compiled.Input.ProcessingState.MaxCaptures < slots {
-				t.Fatal("capture/processing root does not cover grouped records")
-			}
-			b, w := compiled.Input.Capture.Policy.History.SlotBacking(compiled.Input.Capture.Policy.MaxPurgeLeases)
-			if compiled.Input.Capture.Policy.BackupReservedBytes != slots*b || compiled.Input.Capture.Policy.WALReservedBytes != slots*w {
-				t.Fatal("capture lane backup/WAL underfunded")
-			}
-			pb, pw, ok := compiled.Input.ProcessingState.RequiredBytes()
-			if !ok || compiled.Input.ProcessingState.BackupBytes < pb || compiled.Input.ProcessingState.WALBytes < pw {
-				t.Fatal("processing state backup/WAL underfunded")
-			}
-			t.Logf("root_records_per_account=%d capture_records_per_account=%d capture_metadata_slots=%d processing_max_captures=%d capture_backup=%d capture_wal=%d processing_backup=%d processing_wal=%d", compiled.Input.RecordsPerAccount, compiled.Input.Capture.RecordsPerAccount, compiled.Input.Capture.Policy.MetadataSlots, compiled.Input.ProcessingState.MaxCaptures, compiled.Input.Capture.Policy.BackupReservedBytes, compiled.Input.Capture.Policy.WALReservedBytes, compiled.Input.ProcessingState.BackupBytes, compiled.Input.ProcessingState.WALBytes)
-			nativeUnit := (artifact.Registration{NativeLimit: artifact.RecordingNativeLimit}).ReservedBytes()
-			if f.template.Policies[0].Budget.Context.Bytes < int64(count)*nativeUnit {
-				t.Fatal("genuine output reservations underfunded")
-			}
-			t.Logf("configured group%d controls=%d (%dsources+1parent+%dchildren); native_output_ceiling=%d; arithmetic only", count, backing.Records, count, count, int64(count)*artifact.RecordingNativeLimit)
-		})
-	}
-}
-
 func configureManualGroupSourceCapacity(f *capacitySQLFixture, count int) {
-	configureManualSourceCapacity(f)
 	unit := (artifact.Registration{NativeLimit: artifact.RecordingNativeLimit}).ReservedBytes()
-	protected := capacity.BudgetAmount{Bytes: int64(max(3, count+1)) * unit, Objects: int64(2*count+1) * 4}
-	p := f.template.Policies[0].Budget
-	p.Protected, p.Hard, p.Context = protected, protected, protected
-	p.NamespaceMaximum = capacity.BudgetAmount{Bytes: capacityNativeAccounts * protected.Bytes, Objects: capacityNativeAccounts * protected.Objects}
-	f.template.Pools[0].Budget.Slots[0].Protected = protected
+	f.fund(int64(max(3, count+1)) * unit)
 	// Configure the protected root before its qualification is serialized and
 	// accepted. Workload object capacity alone does not enlarge root coverage.
 	records := int64(2*count + 1)

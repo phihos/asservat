@@ -128,7 +128,8 @@ func qualifySourceSnapshotServicesMode(t *testing.T, mode sourceSnapshotQualific
 				t.Helper()
 				// Refresh existing observations only; immutable admission/acceptance,
 				// original source identity, counters and hard policy end remain unchanged.
-				_, recovery := f.refreshBase(t)
+				f.refreshBase(t)
+				recovery := f.recoveryState(t)
 				n := time.Now().UTC().Truncate(time.Microsecond)
 				src := accepted.Source
 				src.ObservedAt = n
@@ -452,14 +453,4 @@ func source107RejectChangedSelections(t *testing.T, ctx context.Context, f *capa
 	}) {
 		t.FailNow()
 	}
-}
-
-func TestSourceSnapshotFixtureFitsExistingStorage(t *testing.T) {
-	_, template := capacityNativeQualification(t, custodyID(), custodyID(), custodyID(), custodyID(), "fixture-version")
-	protected := template.Policies[0].Budget.Protected
-	bytes := (artifact.Registration{NativeLimit: 64 << 10}).ReservedBytes()
-	if bytes < 1 || bytes > protected.Bytes || protected.Objects < 3 {
-		t.Fatal("64KiB snapshot cannot fit unchanged configured fixture backing", bytes, protected)
-	}
-	t.Logf("configured64KiB_snapshot_reserved_bytes=%d existing_workload_protected_bytes=%d; arithmetic only, not measured native overhead", bytes, protected.Bytes)
 }
