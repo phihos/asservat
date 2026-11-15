@@ -29,7 +29,7 @@ type liveNodeAnswer struct {
 }
 
 func (r liveProjectionReader) fetch(ctx context.Context, sources []v.Source, projection string, positions []v.Position, limit int, head bool, waitMS int) ([]liveNodeAnswer, error) {
-	if ctx == nil || ctx.Err() != nil || r.remote == nil || r.now == nil || len(sources) < 1 || len(sources) > v.MaxSources || len(positions) != len(sources) || limit < 1 || limit > v.MaxRows || !v.Projection(projection) || waitMS < 0 || waitMS > 5000 {
+	if ctx == nil || ctx.Err() != nil || r.remote == nil || r.now == nil || len(sources) < 1 || len(positions) != len(sources) || limit < 1 || limit > v.MaxRows || !v.Projection(projection) || waitMS < 0 || waitMS > v.MaxWaitMS {
 		return nil, fmt.Errorf("%w: live_projection_reader:32", v.ErrInvalid)
 	}
 	deadline, ok := ctx.Deadline()

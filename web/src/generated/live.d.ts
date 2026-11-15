@@ -42,8 +42,6 @@ export interface components {
         };
         Contract_live_watch_0e1fb13609b49454: {
             source_handle: string;
-            /** Format: date-time */
-            handle_expires_at: string;
             /** Format: uuid */
             source_session_id: string;
             workload_uid: string;
@@ -154,26 +152,23 @@ export interface components {
             watch_id: string;
             revision: number;
             /** @enum {unknown} */
-            state: "Active" | "Paused" | "Closed" | "Expired" | "Exhausted" | "SourceEnded" | "AccessLost" | "Disconnected";
+            state: "Active" | "Paused" | "Closed" | "Expired" | "SourceEnded" | "AccessLost" | "Disconnected";
             source_session_ids: string[];
             projection: components["schemas"]["Contract_live_watch_990f10221e26ab35"];
             /** Format: date-time */
             accepted_at: string;
             /** Format: date-time */
-            expires_at: string;
-            /** Format: date-time */
             idle_expires_at: string;
             limits: components["schemas"]["Contract_live_watch_118dfa56ea0142d0"];
             cursor: string | null;
             handling: components["schemas"]["Contract_live_watch_06bb407a0e6104d6"];
+            /** Format: date-time */
+            source_hard_end?: string;
         };
         Contract_live_watch_118dfa56ea0142d0: {
-            duration_seconds: number;
-            max_output_bytes: number;
             bytes_per_second: number;
             max_rows_per_batch: number;
             max_buffer_bytes: number;
-            row_max_age_seconds: number;
             replay_seconds: number;
         };
         Contract_live_watch_06bb407a0e6104d6: {
@@ -181,7 +176,6 @@ export interface components {
             transient: true;
             /** @constant */
             may_contain_user_data: true;
-            managed_row_max_age_seconds: number;
             /** @constant */
             raw_available_live: false;
             /** @constant */
@@ -223,7 +217,7 @@ export interface components {
             /** Format: uuid */
             batch_id: string;
             /** @enum {unknown} */
-            state: "Active" | "Paused" | "Closed" | "Expired" | "Exhausted" | "SourceEnded" | "AccessLost" | "Disconnected";
+            state: "Active" | "Paused" | "Closed" | "Expired" | "SourceEnded" | "AccessLost" | "Disconnected";
             rows: components["schemas"]["Contract_live_watch_ff90f488760c877d"][];
             sources: components["schemas"]["Contract_live_watch_36ae48d944b9a767"][];
             gaps: components["schemas"]["Contract_live_watch_7016c6981d9b8d01"][];
@@ -234,7 +228,6 @@ export interface components {
             /** Format: date-time */
             received_at: string;
             output_bytes_spent: number;
-            retry_after_ms: number;
             handling: components["schemas"]["Contract_live_watch_06bb407a0e6104d6"];
         };
         Contract_live_watch_ff90f488760c877d: {

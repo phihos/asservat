@@ -115,12 +115,6 @@ func (s *Service) OwnerRouteKeys(ctx context.Context, current CurrentIdentity, c
 	}
 	if c.Open != nil {
 		r := *c.Open
-		if r.Duration == 0 {
-			r.Duration = v.DefaultLimits().Duration
-		}
-		if r.Output == 0 {
-			r.Output = v.DefaultLimits().Output
-		}
 		if r.Filter.All == nil {
 			r.Filter.All = []v.Predicate{}
 		}

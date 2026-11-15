@@ -155,7 +155,7 @@ func (s *DownloadEnvironmentSource) snapshot(ctx context.Context) (privacy.Downl
 			out.LiveRead.Clients = append(out.LiveRead.Clients, privacy.LiveClient{Issuer: c.Issuer, ID: c.ID, Kind: identity.Kind(c.Kind), PathIDs: c.PathIDs})
 		}
 		for _, c := range l.Ceilings {
-			out.LiveRead.Ceilings = append(out.LiveRead.Ceilings, privacy.LiveCeiling{ClusterID: c.ClusterID, NamespaceUID: c.NamespaceUID, WorkloadUID: c.WorkloadUID, Limits: privacy.LiveLimits{Duration: c.Duration, Output: c.Output, Rate: c.Rate, Rows: c.Rows, Buffer: c.Buffer, RowAge: c.RowAge, Replay: c.Replay}})
+			out.LiveRead.Ceilings = append(out.LiveRead.Ceilings, privacy.LiveCeiling{ClusterID: c.ClusterID, NamespaceUID: c.NamespaceUID, WorkloadUID: c.WorkloadUID, Limits: privacy.LiveLimits{Rate: c.Rate, Rows: c.Rows, Buffer: c.Buffer, Replay: c.Replay}})
 		}
 	}
 	// Helm-native: the document names the installed paths without their

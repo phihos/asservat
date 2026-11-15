@@ -29,10 +29,11 @@ type LiveClient struct {
 	Kind       identity.Kind
 	PathIDs    []string
 }
+// LiveLimits are per-viewer resource bounds; a watch has no lifetime or total
+// output limit (ADR-335 D9).
 type LiveLimits struct {
-	Duration                     int
-	Output, Rate                 int64
-	Rows, Buffer, RowAge, Replay int
+	Rate                 int64
+	Rows, Buffer, Replay int
 }
 type LiveCeiling struct {
 	ClusterID, NamespaceUID, WorkloadUID string
@@ -40,10 +41,12 @@ type LiveCeiling struct {
 }
 
 func (l LiveLimits) Valid() bool {
-	return l.Duration > 0 && l.Duration <= 3600 && l.Output > 0 && l.Output <= 64<<20 && l.Rate > 0 && l.Rate <= 256<<10 && l.Rows > 0 && l.Rows <= 100 && l.Buffer > 0 && l.Buffer <= 1<<20 && l.RowAge > 0 && l.RowAge <= 30 && l.Replay >= 0 && l.Replay <= 5
+	// Rows and Buffer follow live.MaxRows and live.MaxBufferBytes (one batch,
+	// one viewer's hub memory).
+	return l.Rate > 0 && l.Rows > 0 && l.Rows <= 100 && l.Buffer > 0 && l.Buffer <= 1<<20 && l.Replay >= 0
 }
 func (l LiveLimits) tighten(o LiveLimits) LiveLimits {
-	return LiveLimits{min(l.Duration, o.Duration), min(l.Output, o.Output), min(l.Rate, o.Rate), min(l.Rows, o.Rows), min(l.Buffer, o.Buffer), min(l.RowAge, o.RowAge), min(l.Replay, o.Replay)}
+	return LiveLimits{min(l.Rate, o.Rate), min(l.Rows, o.Rows), min(l.Buffer, o.Buffer), min(l.Replay, o.Replay)}
 }
 func liveProjection(p string) bool {
 	return p == "packetMetadata" || p == "syscallMetadata" || p == "httpHeaders"

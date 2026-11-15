@@ -49,7 +49,7 @@ func (c *NodeChannel) ReadLive(ctx context.Context, r collector.LiveRead) (v.Nod
 		c.mu.Unlock()
 		return v.NodeReply{}, ErrNodeUnavailable
 	}
-	if len(entry.live) >= v.MaxSources || len(entry.work) >= collector.MaxQueuedWork || entry.nextSeq == ^uint64(0) {
+	if len(entry.live) >= collector.MaxQueuedWork || len(entry.work) >= collector.MaxQueuedWork || entry.nextSeq == ^uint64(0) {
 		c.mu.Unlock()
 		return v.NodeReply{}, ErrNodeLimit
 	}

@@ -36,7 +36,7 @@ func TestLiveRowsOriginalClockTTLAndUnion(t *testing.T) {
 	if !r.Valid(now) {
 		t.Fatal("valid projected row")
 	}
-	for name, mutate := range map[string]func(*Row){"past TTL": func(v *Row) { v.ExpiresAt = now.Add(30 * time.Second) }, "future receive": func(v *Row) { v.ReceivedAt = now.Add(time.Second) }, "unknown clock": func(v *Row) { v.ClockUncertainty = 5001 }, "mixed fields": func(v *Row) { v.Syscall = &SyscallFields{PID: 1, Name: "read"} }, "raw protocol": func(v *Row) { v.Packet.Protocol = "payload" }} {
+	for name, mutate := range map[string]func(*Row){"expired": func(v *Row) { v.ExpiresAt = now }, "future receive": func(v *Row) { v.ReceivedAt = now.Add(time.Second) }, "unknown clock": func(v *Row) { v.ClockUncertainty = 5001 }, "mixed fields": func(v *Row) { v.Syscall = &SyscallFields{PID: 1, Name: "read"} }, "raw protocol": func(v *Row) { v.Packet.Protocol = "payload" }} {
 		t.Run(name, func(t *testing.T) {
 			v := r.Clone()
 			mutate(&v)

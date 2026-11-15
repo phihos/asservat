@@ -230,10 +230,6 @@
             "minLength": 1,
             "maxLength": 128
           },
-          "handle_expires_at": {
-            "type": "string",
-            "format": "date-time"
-          },
           "source_session_id": {
             "type": "string",
             "format": "uuid"
@@ -310,7 +306,6 @@
         },
         "required": [
           "source_handle",
-          "handle_expires_at",
           "source_session_id",
           "workload_uid",
           "pod_uid",

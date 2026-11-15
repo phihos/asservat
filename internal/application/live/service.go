@@ -58,9 +58,9 @@ type Control struct {
 	PrincipalKey, WorkloadKey, RequestDigest [32]byte
 	Revision                                 int64
 	State                                    string
-	AcceptedAt, ExpiresAt, IdleUntil         time.Time
-	OutputLimit, Spent                       int64
-	BytesPerSecond                           int64
+	// ExpiresAt is the selected sources' hard end, not a watch lifetime.
+	AcceptedAt, ExpiresAt, IdleUntil time.Time
+	Spent, BytesPerSecond            int64
 	Fence                                    string
 }
 type Ledger interface {
@@ -200,20 +200,16 @@ func (s *Service) List(ctx context.Context, current CurrentIdentity, target targ
 		if !source.ReferenceValid() {
 			continue
 		}
-		until := minTime(now.Add(time.Minute), source.HardUntil, source.PrivacyUntil)
 		eligible := source.Valid(now) && slices.Contains([]string{"Warming", "Ready", "Degraded"}, source.State) && len(source.Projections) > 0
 		blockers := append([]string{}, source.Blockers...)
 		if !eligible && len(blockers) == 0 {
 			blockers = append(blockers, "ProjectionUnavailable")
 		}
-		if eligible {
-			until = minTime(until, source.HardUntil, source.PrivacyUntil)
-		}
-		id, until, e := s.encodeSourceHandle(i.Principal, source, until)
+		id, e := s.encodeSourceHandle(i.Principal, source)
 		if e != nil {
 			return zero, "", e
 		}
-		out.Sources = append(out.Sources, v.SourceRow{Handle: id, HandleExpires: until, ID: source.ID(), WorkloadUID: source.Target.WorkloadUID, PodUID: source.Target.PodUID, ActionID: source.Action(), OwnerKind: source.OwnerKind, OwnerID: source.OwnerID, State: source.State, Projections: append([]string{}, source.Projections...), Eligible: eligible, Blockers: blockers, SaveVia: source.SaveVia, LeaseUntil: source.LeaseUntil})
+		out.Sources = append(out.Sources, v.SourceRow{Handle: id, ID: source.ID(), WorkloadUID: source.Target.WorkloadUID, PodUID: source.Target.PodUID, ActionID: source.Action(), OwnerKind: source.OwnerKind, OwnerID: source.OwnerID, State: source.State, Projections: append([]string{}, source.Projections...), Eligible: eligible, Blockers: blockers, SaveVia: source.SaveVia, LeaseUntil: source.LeaseUntil})
 	}
 	return out, next, nil
 }
@@ -230,12 +226,6 @@ func (s *Service) Open(ctx context.Context, current CurrentIdentity, r v.Open) (
 	var zero v.Watch
 	if !r.Valid() {
 		return zero, fmt.Errorf("%w: service:211", v.ErrInvalid)
-	}
-	if r.Duration == 0 {
-		r.Duration = v.DefaultLimits().Duration
-	}
-	if r.Output == 0 {
-		r.Output = v.DefaultLimits().Output
 	}
 	if r.Filter.All == nil {
 		r.Filter.All = []v.Predicate{}
@@ -366,13 +356,8 @@ func (s *Service) Open(ctx context.Context, current CurrentIdentity, r v.Open) (
 			limits = limits.Tighten(source.ViewLimits)
 		}
 	}
-	if r.Duration != 0 {
-		limits.Duration = min(limits.Duration, r.Duration)
-	}
-	if r.Output != 0 {
-		limits.Output = min(limits.Output, r.Output)
-	}
-	end := now.Add(time.Duration(limits.Duration) * time.Second)
+	// The watch has no lifetime of its own: it ends with its sources.
+	end := minTime(first.HardUntil, first.PrivacyUntil)
 	for _, source := range selected {
 		end = minTime(end, source.HardUntil, source.PrivacyUntil)
 	}
@@ -390,7 +375,7 @@ func (s *Service) Open(ctx context.Context, current CurrentIdentity, r v.Open) (
 	if keyErr != nil {
 		return zero, fmt.Errorf("%w: service:362", v.ErrUnavailable)
 	}
-	c := Control{OwnerID: s.cfg.OwnerID, ID: s.cfg.NewID(), Fence: s.cfg.NewID(), PrincipalKey: principalKey, WorkloadKey: workloadKey, RequestDigest: requestDigest, Revision: 1, State: "Active", AcceptedAt: now, ExpiresAt: end, IdleUntil: minTime(now.Add(v.IdleAge), end), OutputLimit: limits.Output, BytesPerSecond: limits.Rate}
+	c := Control{OwnerID: s.cfg.OwnerID, ID: s.cfg.NewID(), Fence: s.cfg.NewID(), PrincipalKey: principalKey, WorkloadKey: workloadKey, RequestDigest: requestDigest, Revision: 1, State: "Active", AcceptedAt: now, ExpiresAt: end, IdleUntil: minTime(now.Add(v.IdleAge), end), BytesPerSecond: limits.Rate}
 	stored, reused, err := s.ledger.Create(ctx, first.Target.ClusterID, c, hex.EncodeToString(keyDigest[:]))
 	if err != nil {
 		return zero, err
@@ -420,11 +405,11 @@ func (s *Service) Open(ctx context.Context, current CurrentIdentity, r v.Open) (
 	for n, source := range selected {
 		ids[n] = source.ID()
 	}
-	w := v.Watch{ID: stored.ID, Revision: 1, State: "Active", SourceIDs: ids, Projection: r.Projection, AcceptedAt: stored.AcceptedAt, ExpiresAt: stored.ExpiresAt, IdleUntil: stored.IdleUntil, Limits: limits, Handling: v.Notices()}
+	w := v.Watch{ID: stored.ID, Revision: 1, State: "Active", SourceIDs: ids, Projection: r.Projection, AcceptedAt: stored.AcceptedAt, HardEnd: stored.ExpiresAt, IdleUntil: stored.IdleUntil, Limits: limits, Handling: v.Notices()}
 	st := &session{watch: w, control: stored, actor: i.Principal, selected: selected, filter: v.CloneFilter(r.Filter), positions: positions, replay: map[string]replay{}, updates: map[string]updateReceipt{}}
 	cursor := s.cursor(st)
 	st.watch.Cursor = &cursor
-	st.ownerEnd = w.ExpiresAt
+	st.ownerEnd = w.HardEnd
 	s.sessions[w.ID] = st
 	s.active.Add(1)
 	s.opens[keyDigest] = w.ID
@@ -454,8 +439,8 @@ func (s *Service) get(ctx context.Context, current CurrentIdentity, id string) (
 }
 func (s *Service) current(ctx context.Context, current CurrentIdentity, st *session, i identity.Identity) (time.Time, error) {
 	now := s.cfg.Now()
-	end := minTime(i.ValidUntil, st.watch.ExpiresAt, st.watch.IdleUntil)
-	if !now.Before(st.watch.ExpiresAt) || !now.Before(st.watch.IdleUntil) {
+	end := minTime(i.ValidUntil, st.watch.HardEnd, st.watch.IdleUntil)
+	if !now.Before(st.watch.HardEnd) || !now.Before(st.watch.IdleUntil) {
 		s.clear(st, "Expired")
 		return end, fmt.Errorf("%w: service:431", v.ErrUnavailable)
 	}
@@ -605,7 +590,7 @@ func (s *Service) Read(ctx context.Context, current CurrentIdentity, r v.Read) (
 	if !lagging && (st.watch.Cursor == nil || r.Cursor != *st.watch.Cursor) {
 		return zero, fmt.Errorf("%w: service:524", v.ErrConflict)
 	}
-	batch := v.Batch{DisclosureUntil: end, WatchID: st.watch.ID, Revision: st.watch.Revision, ID: s.cfg.NewID(), State: st.watch.State, Rows: []v.Row{}, Sources: []v.SourceStatus{}, Gaps: append([]v.Gap{}, st.gap...), From: now, Until: now, ReceivedAt: now, RetryAfter: 1000, Handling: v.Notices()}
+	batch := v.Batch{DisclosureUntil: end, WatchID: st.watch.ID, Revision: st.watch.Revision, ID: s.cfg.NewID(), State: st.watch.State, Rows: []v.Row{}, Sources: []v.SourceStatus{}, Gaps: append([]v.Gap{}, st.gap...), From: now, Until: now, ReceivedAt: now, Handling: v.Notices()}
 	st.gap = nil
 	if lagging && !v.Terminal(st.watch.State) {
 		if st.watch.State == "Active" {
@@ -662,7 +647,7 @@ func (s *Service) Read(ctx context.Context, current CurrentIdentity, r v.Read) (
 			}
 			return zero, fmt.Errorf("%w: %w: service:576: %v", v.ErrUnavailable, v.ErrTransient, e)
 		}
-		if len(projected.Rows) > min(defaultLimit(r.Limit), st.watch.Limits.Rows) || projected.Examined < 0 || projected.Examined > 4096 || projected.Bytes < 0 || projected.Bytes > 1<<20 || len(projected.Positions) != len(st.selected) || len(projected.Gaps) > 32 || len(projected.Sources) > v.MaxSources {
+		if len(projected.Rows) > min(defaultLimit(r.Limit), st.watch.Limits.Rows) || projected.Examined < 0 || projected.Examined > 4096 || projected.Bytes < 0 || projected.Bytes > 1<<20 || len(projected.Positions) != len(st.selected) || len(projected.Gaps) > 32 || len(projected.Sources) > len(st.selected) {
 			s.clear(st, "Disconnected")
 			return zero, fmt.Errorf("%w: service:580", v.ErrUnavailable)
 		}
@@ -731,7 +716,7 @@ func (s *Service) Read(ctx context.Context, current CurrentIdentity, r v.Read) (
 				}
 				// Read authority is re-checked by every read and a denial ends the
 				// view; it bounds each read, not how long a disclosed row displays.
-				row.ExpiresAt = minTime(row.ExpiresAt, st.watch.ExpiresAt, st.selected[idx].PrivacyUntil, row.ObservedAt.Add(time.Duration(st.watch.Limits.RowAge)*time.Second-time.Duration(row.ClockUncertainty)*time.Millisecond))
+				row.ExpiresAt = minTime(row.ExpiresAt, st.watch.HardEnd, st.selected[idx].PrivacyUntil)
 				if !row.Valid(now) {
 					continue
 				}
@@ -848,10 +833,6 @@ func (s *Service) charge(ctx context.Context, st *session, b v.Batch) (v.Batch, 
 	cost := int64(len(raw) + 4096)
 	if cost > 24<<10 {
 		return v.Batch{}, fmt.Errorf("%w: service:715", v.ErrCapacity)
-	}
-	if cost > st.control.OutputLimit-st.control.Spent {
-		s.clear(st, "Exhausted")
-		return v.Batch{}, fmt.Errorf("%w: service:719", v.ErrCapacity)
 	}
 	// Durable/account-wide rate enforcement is inside the ledger transaction.
 	next := st.control
@@ -1008,7 +989,7 @@ func (s *Service) Update(ctx context.Context, current CurrentIdentity, r v.Updat
 // currentClosedReceipt validates only the original minimized terminal control.
 // It returns no rows, reads no source, performs no charge and renews no date.
 func (s *Service) currentClosedReceipt(ctx context.Context, current CurrentIdentity, st *session, i identity.Identity) error {
-	if st.control.State != "Closed" || st.control.ID != st.watch.ID || st.actor != i.Principal || !st.control.ExpiresAt.Equal(st.watch.ExpiresAt) || !st.control.IdleUntil.Equal(st.watch.IdleUntil) {
+	if st.control.State != "Closed" || st.control.ID != st.watch.ID || st.actor != i.Principal || !st.control.ExpiresAt.Equal(st.watch.HardEnd) || !st.control.IdleUntil.Equal(st.watch.IdleUntil) {
 		return fmt.Errorf("%w: service:868", v.ErrDenied)
 	}
 	end := minTime(i.ValidUntil, st.control.ExpiresAt, st.control.IdleUntil, st.ownerEnd)

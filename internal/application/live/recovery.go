@@ -14,7 +14,7 @@ type RecoveryLedger interface {
 }
 
 func recoveredControlValid(c Control) bool {
-	return authorization.UUID(c.ID) && authorization.UUID(c.OwnerID) && authorization.UUID(c.Fence) && c.Revision >= 1 && c.OutputLimit >= 1 && c.Spent >= 0 && c.Spent <= c.OutputLimit && c.BytesPerSecond >= 1 && !c.AcceptedAt.IsZero() && c.ExpiresAt.After(c.AcceptedAt) && c.IdleUntil.After(c.AcceptedAt) && !c.IdleUntil.After(c.ExpiresAt)
+	return authorization.UUID(c.ID) && authorization.UUID(c.OwnerID) && authorization.UUID(c.Fence) && c.Revision >= 1 && c.Spent >= 0 && c.BytesPerSecond >= 1 && !c.AcceptedAt.IsZero() && c.ExpiresAt.After(c.AcceptedAt) && c.IdleUntil.After(c.AcceptedAt) && !c.IdleUntil.After(c.ExpiresAt)
 }
 
 func sameRecoveredControl(a, b Control) bool {
@@ -44,7 +44,7 @@ func (s *Service) recoverRead(ctx context.Context, current CurrentIdentity, r v.
 	if ctx.Err() != nil || !now.Before(end) {
 		return zero, fmt.Errorf("%w: recovery:expired", v.ErrDenied)
 	}
-	st := session{watch: v.Watch{ID: control.ID, Revision: control.Revision, State: control.State, AcceptedAt: control.AcceptedAt, ExpiresAt: control.ExpiresAt, IdleUntil: control.IdleUntil}, control: control, actor: i.Principal}
+	st := session{watch: v.Watch{ID: control.ID, Revision: control.Revision, State: control.State, AcceptedAt: control.AcceptedAt, HardEnd: control.ExpiresAt, IdleUntil: control.IdleUntil}, control: control, actor: i.Principal}
 	if _, valid := s.cursorPosition(&st, r.Cursor); !valid {
 		return zero, fmt.Errorf("%w: recovery:cursor", v.ErrConflict)
 	}
@@ -60,7 +60,7 @@ func (s *Service) recoverRead(ctx context.Context, current CurrentIdentity, r v.
 	if ctx.Err() != nil || !now.Before(end) {
 		return zero, fmt.Errorf("%w: recovery:final", v.ErrDenied)
 	}
-	return v.Batch{DisclosureUntil: end, WatchID: closed.ID, Revision: closed.Revision, ID: s.cfg.NewID(), State: closed.State, Rows: []v.Row{}, Sources: []v.SourceStatus{}, Gaps: []v.Gap{{Reason: "reconnect", From: now, Until: now}}, From: now, Until: now, ReceivedAt: now, Spent: closed.Spent, RetryAfter: 1000, Handling: v.Notices()}, nil
+	return v.Batch{DisclosureUntil: end, WatchID: closed.ID, Revision: closed.Revision, ID: s.cfg.NewID(), State: closed.State, Rows: []v.Row{}, Sources: []v.SourceStatus{}, Gaps: []v.Gap{{Reason: "reconnect", From: now, Until: now}}, From: now, Until: now, ReceivedAt: now, Spent: closed.Spent, Handling: v.Notices()}, nil
 }
 
 func (s *Service) BeginRecoveredLocalCommand(ctx context.Context, current CurrentIdentity, r v.Read, keys RouteKeys, ownerID string) (CommandDelivery, error) {

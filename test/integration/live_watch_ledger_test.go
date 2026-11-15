@@ -86,7 +86,7 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(pool.Close)
-	limits := postgres.LiveWatchLimits{InstallationSlots: 2, PrincipalSlots: 1, WorkloadSlots: 2, MemoryBytes: 2 << 20, InstallationRate: 1, InstallationBurst: 1 << 20, PrincipalRate: 1, PrincipalBurst: 48 << 10, WorkloadRate: 1, WorkloadBurst: 48 << 10, WatchBurst: 24 << 10, MaxOutputBytes: 1 << 20, MaxRate: 64 << 10, MaxDurationSeconds: 60, MaxAccounts: 16, MaxControlRecords: 128}
+	limits := postgres.LiveWatchLimits{InstallationSlots: 2, PrincipalSlots: 1, WorkloadSlots: 2, MemoryBytes: 2 << 20, InstallationRate: 1, InstallationBurst: 1 << 20, PrincipalRate: 1, PrincipalBurst: 48 << 10, WorkloadRate: 1, WorkloadBurst: 48 << 10, WatchBurst: 24 << 10, MaxRate: 64 << 10, MaxAccounts: 16, MaxControlRecords: 128}
 	workloadLimits := limits
 	workloadLimits.InstallationSlots = 3
 	workloadLimits.PrincipalSlots = 3
@@ -104,7 +104,7 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 	}
 	makeControl := func(p, w byte) liveapp.Control {
 		now := time.Now().UTC().Truncate(time.Microsecond)
-		return liveapp.Control{ID: custodyID(), OwnerID: request.Binding.ProcessEpoch, Fence: custodyID(), PrincipalKey: [32]byte{p}, WorkloadKey: [32]byte{w}, RequestDigest: [32]byte{3}, Revision: 1, State: "Active", AcceptedAt: now, ExpiresAt: now.Add(8 * time.Second), IdleUntil: now.Add(8 * time.Second), OutputLimit: 1 << 20, BytesPerSecond: 1}
+		return liveapp.Control{ID: custodyID(), OwnerID: request.Binding.ProcessEpoch, Fence: custodyID(), PrincipalKey: [32]byte{p}, WorkloadKey: [32]byte{w}, RequestDigest: [32]byte{3}, Revision: 1, State: "Active", AcceptedAt: now, ExpiresAt: now.Add(8 * time.Second), IdleUntil: now.Add(8 * time.Second), BytesPerSecond: 1}
 	}
 	keyFor := func(v byte) string { return hex.EncodeToString(bytes.Repeat([]byte{v}, 32)) }
 	firstWorkload := makeControl(4, 7)
@@ -455,8 +455,8 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 	// Maintenance-only adversarial backlog, never admission/owner authority:
 	// seeded expired receipts exercise the real64-row SQL cap and ensure a
 	// refused configuration change commits only restrictive prune progress.
-	if _, err = lab.admin.Exec(ctx, `INSERT INTO live_watch_control(root_id,id,owner_id,fence,principal_key,workload_key,request_digest,key_hash,revision,state,accepted_at,expires_at,idle_until,output_limit,spent,bytes_per_second,tokens_micro,refilled_at)
-      SELECT $1::uuid,md5($1::uuid::text||'expired-receipt-'||g.idx)::uuid,$2,$3,$4,$5,$6,sha256(convert_to('expired-receipt-'||g.idx,'UTF8')),1,'Closed',now()-interval '3 seconds',now()-interval '1 second',now()-interval '1 second',24576,0,1,0,now()-interval '3 seconds' FROM generate_series(1,65) AS g(idx)`, root, request.Binding.ProcessEpoch, c.Fence, c.PrincipalKey[:], c.WorkloadKey[:], c.RequestDigest[:]); err != nil {
+	if _, err = lab.admin.Exec(ctx, `INSERT INTO live_watch_control(root_id,id,owner_id,fence,principal_key,workload_key,request_digest,key_hash,revision,state,accepted_at,expires_at,idle_until,spent,bytes_per_second,tokens_micro,refilled_at)
+      SELECT $1::uuid,md5($1::uuid::text||'expired-receipt-'||g.idx)::uuid,$2,$3,$4,$5,$6,sha256(convert_to('expired-receipt-'||g.idx,'UTF8')),1,'Closed',now()-interval '3 seconds',now()-interval '1 second',now()-interval '1 second',0,1,0,now()-interval '3 seconds' FROM generate_series(1,65) AS g(idx)`, root, request.Binding.ProcessEpoch, c.Fence, c.PrincipalKey[:], c.WorkloadKey[:], c.RequestDigest[:]); err != nil {
 		t.Fatal("expired receipt maintenance input", err)
 	}
 	for _, want := range []int64{1, 0} {

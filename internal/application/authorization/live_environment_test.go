@@ -19,7 +19,7 @@ func TestCurrentLiveEnvironmentRetainsOriginalPolicyAndClientBounds(t *testing.T
 			source := live.Source{RootID: f.policy.RootID, Target: target}
 			// Only the root is relevant to this environment port; C3 owns exact source proof.
 			source.Manual = &collector.ManualLiveSource{}
-			f.policy.LiveRead = &privacy.LiveRead{Root: privacy.LiveRootLimits{Watches: 16, PrincipalWatches: 4, WorkloadWatches: 4, Rate: 1 << 20, Burst: 1 << 20}, Projections: []string{live.Packet}, Clients: []privacy.LiveClient{{Issuer: actor.Issuer, ID: actor.ClientID, Kind: actor.Kind, PathIDs: []string{f.policy.Paths[0].ID}}}, Ceilings: []privacy.LiveCeiling{{ClusterID: target.ClusterID, Limits: privacy.LiveLimits{Duration: 60, Output: 1 << 20, Rate: 16 << 10, Rows: 10, Buffer: 64 << 10, RowAge: 10, Replay: 2}}}}
+			f.policy.LiveRead = &privacy.LiveRead{Root: privacy.LiveRootLimits{Watches: 16, PrincipalWatches: 4, WorkloadWatches: 4, Rate: 1 << 20, Burst: 1 << 20}, Projections: []string{live.Packet}, Clients: []privacy.LiveClient{{Issuer: actor.Issuer, ID: actor.ClientID, Kind: actor.Kind, PathIDs: []string{f.policy.Paths[0].ID}}}, Ceilings: []privacy.LiveCeiling{{ClusterID: target.ClusterID, Limits: privacy.LiveLimits{Rate: 16 << 10, Rows: 10, Buffer: 64 << 10, Replay: 2}}}}
 			s := CurrentLiveEnvironment{RootID: f.policy.RootID, InstallationID: f.policy.InstallationID, AcceptedRoot: f.policy.LiveRead.Root, Policies: f, Now: func() time.Time { return f.now }}
 			ctx := t.Context()
 			original := f.now.Add(time.Second)
@@ -53,7 +53,7 @@ func TestCurrentLiveEnvironmentRetainsOriginalPolicyAndClientBounds(t *testing.T
 				}
 				return
 			}
-			if err != nil || !out.ValidUntil.Equal(original) || out.Limits.Rows != 10 || out.Limits.RowAge != 10 || f.policyReads != 1 || f.processingReads != 0 {
+			if err != nil || !out.ValidUntil.Equal(original) || out.Limits.Rows != 10 || out.Limits.Replay != 2 || f.policyReads != 1 || f.processingReads != 0 {
 				t.Fatal(out, err, f.policyReads)
 			}
 		})

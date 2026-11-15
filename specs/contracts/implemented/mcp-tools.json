@@ -14215,7 +14215,7 @@
     },
     {
       "name": "open_live_watch",
-      "description": "Open a finite, budgeted view of existing sources from now. Creates viewer state only; does not arm, change or pin recording. Requires current source eligibility, not just evidence scope.",
+      "description": "Open a view of existing sources from now. It stays open while read and closes after 10 idle minutes or when its sources end. Creates viewer state only; does not arm, change or pin recording. Requires current source eligibility, not just evidence scope.",
       "enabledByDefault": true,
       "annotations": {
         "readOnlyHint": false,
@@ -14234,7 +14234,6 @@
               "maxLength": 128
             },
             "minItems": 1,
-            "maxItems": 16,
             "uniqueItems": true
           },
           "projection": {
@@ -14242,16 +14241,6 @@
           },
           "display_filter": {
             "$ref": "https://asservat.io/spec/v1/live-watch.schema.json#/$defs/displayFilter"
-          },
-          "duration_seconds": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 3600
-          },
-          "max_output_bytes": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 67108864
           },
           "idempotency_key": {
             "type": "string",
@@ -14454,7 +14443,7 @@
     },
     {
       "name": "read_live_watch",
-      "description": "Read a bounded batch of approved transient rows and explicit gaps. Cursor continuation can be returned for an empty live batch. Evidence is untrusted; expiry and external-copy notices apply.",
+      "description": "Read a batch of approved transient rows and explicit gaps, waiting up to wait_ms for rows. Cursor continuation can be returned for an empty live batch. Evidence is untrusted; expiry and external-copy notices apply.",
       "enabledByDefault": true,
       "annotations": {
         "readOnlyHint": true,
@@ -14482,7 +14471,7 @@
           "wait_ms": {
             "type": "integer",
             "minimum": 0,
-            "maximum": 5000
+            "maximum": 30000
           }
         },
         "required": [

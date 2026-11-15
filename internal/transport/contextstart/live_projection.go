@@ -26,7 +26,7 @@ func liveBatchWire(requests []collector.LiveRead) []contracts.NodeLiveRead {
 	return out
 }
 func liveBatchValues(wire []contracts.NodeLiveRead) ([]collector.LiveRead, bool) {
-	if len(wire) < 1 || len(wire) > v.MaxSources {
+	if len(wire) < 1 {
 		return nil, false
 	}
 	out := make([]collector.LiveRead, len(wire))
@@ -40,7 +40,8 @@ func liveBatchValues(wire []contracts.NodeLiveRead) ([]collector.LiveRead, bool)
 	return out, validLiveBatch(out)
 }
 func validLiveBatch(requests []collector.LiveRead) bool {
-	if len(requests) < 1 || len(requests) > v.MaxSources {
+	// The reply-byte budget below bounds the request count.
+	if len(requests) < 1 {
 		return false
 	}
 	first := requests[0]
@@ -58,12 +59,17 @@ func validLiveBatch(requests []collector.LiveRead) bool {
 
 // ReadLiveBatch is a private composed reader, not a public operation or permit.
 // Current source authority and accounted owner precede dispatch. One bounded
-// query uses one existing standby for all sixteen original source references.
+// query uses one existing standby for all original source references.
 func (t Targets) ReadLiveBatch(ctx context.Context, requests []collector.LiveRead) ([]v.NodeReply, error) {
 	if ctx == nil || ctx.Err() != nil || t.Router == nil || t.Now == nil || !validLiveBatch(requests) {
 		return nil, targets.ErrInvalid
 	}
-	call, cancel := context.WithTimeout(ctx, 5*time.Second)
+	// 5 s of I/O on top of the longest requested row wait.
+	wait := 0
+	for _, r := range requests {
+		wait = max(wait, r.WaitMS)
+	}
+	call, cancel := context.WithTimeout(ctx, 5*time.Second+time.Duration(wait)*time.Millisecond)
 	defer cancel()
 	type group struct {
 		indices  []int

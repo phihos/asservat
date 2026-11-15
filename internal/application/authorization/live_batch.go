@@ -34,7 +34,7 @@ func (s LiveSourceAuthority) sourcePhase(ctx context.Context, current identities
 			s.refuse(phase, failure)
 		}
 	}()
-	if !s.configured() || ctx == nil || ctx.Err() != nil || current == nil || len(input) < 1 || len(input) > live.MaxSources || !live.Projection(projection) {
+	if !s.configured() || ctx == nil || ctx.Err() != nil || current == nil || len(input) < 1 || !live.Projection(projection) {
 		return nil, time.Time{}, fmt.Errorf("%w: live_batch:30", live.ErrDenied)
 	}
 	call, stop := context.WithTimeout(ctx, identity.AuthorityRecheckInterval) // ADR-311: the request window bounds the call

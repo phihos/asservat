@@ -104,10 +104,10 @@ func publicLiveLimits(p privacy.LiveRead) (postgres.LiveWatchLimits, live.Limits
 	var limits live.Limits
 	for _, c := range p.Ceilings {
 		l := c.Limits
-		limits = live.Limits{Duration: max(limits.Duration, l.Duration), Output: max(limits.Output, l.Output), Rate: max(limits.Rate, l.Rate), Rows: max(limits.Rows, l.Rows), Buffer: max(limits.Buffer, l.Buffer), RowAge: max(limits.RowAge, l.RowAge), Replay: max(limits.Replay, l.Replay)}
+		limits = live.Limits{Rate: max(limits.Rate, l.Rate), Rows: max(limits.Rows, l.Rows), Buffer: max(limits.Buffer, l.Buffer), Replay: max(limits.Replay, l.Replay)}
 	}
 	r := p.Root
-	numeric := postgres.LiveWatchLimits{InstallationSlots: int64(r.Watches), PrincipalSlots: int64(r.PrincipalWatches), WorkloadSlots: int64(r.WorkloadWatches), MemoryBytes: int64(r.Watches) * live.MaxBufferBytes, InstallationRate: r.Rate, InstallationBurst: r.Burst, PrincipalRate: r.Rate, PrincipalBurst: r.Burst, WorkloadRate: r.Rate, WorkloadBurst: r.Burst, WatchBurst: max(24<<10, limits.Rate), MaxOutputBytes: max(24<<10, limits.Output), MaxRate: limits.Rate, MaxDurationSeconds: int64(limits.Duration), MaxAccounts: 8192, MaxControlRecords: 65536}
+	numeric := postgres.LiveWatchLimits{InstallationSlots: int64(r.Watches), PrincipalSlots: int64(r.PrincipalWatches), WorkloadSlots: int64(r.WorkloadWatches), MemoryBytes: int64(r.Watches) * live.MaxBufferBytes, InstallationRate: r.Rate, InstallationBurst: r.Burst, PrincipalRate: r.Rate, PrincipalBurst: r.Burst, WorkloadRate: r.Rate, WorkloadBurst: r.Burst, WatchBurst: max(24<<10, limits.Rate), MaxRate: limits.Rate, MaxAccounts: 8192, MaxControlRecords: 65536}
 	return numeric, limits
 }
 

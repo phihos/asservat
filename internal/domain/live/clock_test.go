@@ -9,7 +9,7 @@ func TestLiveClockProofNeverUsesArrivalAsOriginalTime(t *testing.T) {
 	now := time.Now().UTC()
 	p := ClockProof{SourceID: "source", BootID: "boot", Clock: "monotonic", RemoteNanos: int64(time.Hour), StartedAt: now, ReceivedAt: now.Add(2 * time.Second), SampleUncertainty: time.Millisecond}
 	at, end, ms, ok := p.Place(int64(time.Hour-time.Second), "source", "boot", "monotonic", now.Add(time.Hour), now.Add(time.Hour), now.Add(time.Hour))
-	if !ok || !at.Equal(now) || !end.Equal(now.Add(29*time.Second-time.Millisecond)) || ms != 1001 {
+	if !ok || !at.Equal(now) || !end.Equal(now.Add(time.Hour)) || ms != 1001 {
 		t.Fatal(at, end, ms, ok)
 	}
 	for name, mut := range map[string]func(*ClockProof){"no sample": func(v *ClockProof) { v.RemoteNanos = 0 }, "new boot": func(v *ClockProof) { v.BootID = "replacement" }, "unbounded transit": func(v *ClockProof) { v.ReceivedAt = now.Add(6 * time.Second) }, "reversed": func(v *ClockProof) { v.ReceivedAt = now.Add(-time.Second) }} {
@@ -24,8 +24,8 @@ func TestLiveClockProofNeverUsesArrivalAsOriginalTime(t *testing.T) {
 	if _, _, _, ok := p.Place(int64(time.Hour+time.Second), "source", "boot", "monotonic", now.Add(time.Hour), now.Add(time.Hour), now.Add(time.Hour)); ok {
 		t.Fatal("future source stamp")
 	}
-	if _, _, _, ok := p.Place(int64(time.Hour-time.Minute), "source", "boot", "monotonic", now.Add(time.Hour), now.Add(time.Hour), now.Add(time.Hour)); ok {
-		t.Fatal("old row replay")
+	if _, end, _, ok := p.Place(int64(time.Hour-time.Minute), "source", "boot", "monotonic", now.Add(time.Hour), now.Add(2*time.Hour), now.Add(3*time.Hour)); !ok || !end.Equal(now.Add(time.Hour)) {
+		t.Fatal("row expiry is not the earliest privacy, watch or authority end", end, ok)
 	}
 }
 

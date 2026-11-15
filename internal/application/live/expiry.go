@@ -12,7 +12,7 @@ func (s *Service) armLocked(st *session) {
 	if st.timer != nil {
 		st.timer.Stop()
 	}
-	end := minTime(st.watch.IdleUntil, st.watch.ExpiresAt)
+	end := minTime(st.watch.IdleUntil, st.watch.HardEnd)
 	for _, p := range st.replay {
 		end = minTime(end, p.until)
 	}
@@ -42,7 +42,7 @@ func (s *Service) expireSession(st *session) {
 			delete(st.replay, key)
 		}
 	}
-	ended := !now.Before(st.watch.ExpiresAt) || !now.Before(st.watch.IdleUntil) || v.Terminal(st.watch.State)
+	ended := !now.Before(st.watch.HardEnd) || !now.Before(st.watch.IdleUntil) || v.Terminal(st.watch.State)
 	if ended {
 		s.clear(st, "Expired")
 		if st.cancelRead != nil {

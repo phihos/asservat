@@ -46,7 +46,7 @@ func TestDownloadEnvironmentClosedPolicyCannotInventInstalledPlacement(t *testin
 			}
 
 			if strings.HasPrefix(mode, "live-") {
-				l := contracts.LiveReadSettings{Root: contracts.LiveRootSettings{Watches: 16, PrincipalWatches: 4, WorkloadWatches: 4, Rate: 1 << 20, Burst: 1 << 20}, Projections: []string{"packetMetadata"}, Clients: []contracts.LiveReadClient{{Issuer: w.Clients[0].Issuer, ID: w.Clients[0].ID, Kind: w.Clients[0].Kind, PathIDs: []string{path.ID}}}, Ceilings: []contracts.LiveReadCeiling{{ClusterID: path.TargetClusterID, Duration: 60, Output: 1 << 20, Rate: 16 << 10, Rows: 10, Buffer: 64 << 10, RowAge: 10, Replay: 2}}}
+				l := contracts.LiveReadSettings{Root: contracts.LiveRootSettings{Watches: 16, PrincipalWatches: 4, WorkloadWatches: 4, Rate: 1 << 20, Burst: 1 << 20}, Projections: []string{"packetMetadata"}, Clients: []contracts.LiveReadClient{{Issuer: w.Clients[0].Issuer, ID: w.Clients[0].ID, Kind: w.Clients[0].Kind, PathIDs: []string{path.ID}}}, Ceilings: []contracts.LiveReadCeiling{{ClusterID: path.TargetClusterID, Rate: 16 << 10, Rows: 10, Buffer: 64 << 10, Replay: 2}}}
 				x, _ := json.Marshal(l)
 				var live map[string]any
 				_ = json.Unmarshal(x, &live)

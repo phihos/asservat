@@ -125,12 +125,9 @@ type LiveReadCeiling struct {
 	ClusterID    string `json:"clusterID"`
 	NamespaceUID string `json:"namespaceUID,omitempty"`
 	WorkloadUID  string `json:"workloadUID,omitempty"`
-	Duration     int    `json:"durationSeconds"`
-	Output       int64  `json:"maxOutputBytes"`
 	Rate         int64  `json:"bytesPerSecond"`
 	Rows         int    `json:"maxRowsPerBatch"`
 	Buffer       int    `json:"maxBufferBytes"`
-	RowAge       int    `json:"rowMaxAgeSeconds"`
 	Replay       int    `json:"replaySeconds"`
 }
 

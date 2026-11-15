@@ -29,5 +29,5 @@ func (r LiveRead) Valid() bool {
 			bound = r.Binding == (SourceBinding{}) && r.Head && r.Manual.BindingValid() && r.Manual.StartedAt.IsZero() && r.Manual.HardUntil.IsZero()
 		}
 	}
-	return bound && len(r.ClusterID) > 0 && len(r.ClusterID) <= 128 && len(r.NamespaceUID) > 0 && len(r.NamespaceUID) <= 128 && len(r.WorkloadUID) > 0 && len(r.WorkloadUID) <= 128 && (r.Projection == "packetMetadata" || r.Projection == "syscallMetadata" || r.Projection == "httpHeaders") && !r.PrivacyUntil.IsZero() && r.Generation >= 0 && r.Generation <= 1000000000 && r.AfterSequence <= 1<<53-1 && r.Limit >= 1 && r.Limit <= 100 && r.WaitMS >= 0 && r.WaitMS <= 5000 && (r.ReplyBytes == 0 || r.ReplyBytes >= 1024 && r.ReplyBytes <= 24<<10)
+	return bound && len(r.ClusterID) > 0 && len(r.ClusterID) <= 128 && len(r.NamespaceUID) > 0 && len(r.NamespaceUID) <= 128 && len(r.WorkloadUID) > 0 && len(r.WorkloadUID) <= 128 && (r.Projection == "packetMetadata" || r.Projection == "syscallMetadata" || r.Projection == "httpHeaders") && !r.PrivacyUntil.IsZero() && r.Generation >= 0 && r.Generation <= 1000000000 && r.AfterSequence <= 1<<53-1 && r.Limit >= 1 && r.Limit <= 100 && r.WaitMS >= 0 && r.WaitMS <= 30000 && (r.ReplyBytes == 0 || r.ReplyBytes >= 1024 && r.ReplyBytes <= 24<<10)
 }

@@ -198,20 +198,10 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "duration_seconds": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 3600
-          },
-          "max_output_bytes": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 67108864
-          },
           "bytes_per_second": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 262144
+            "maximum": 9007199254740991
           },
           "max_rows_per_batch": {
             "type": "integer",
@@ -223,24 +213,16 @@
             "minimum": 1,
             "maximum": 1048576
           },
-          "row_max_age_seconds": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 30
-          },
           "replay_seconds": {
             "type": "integer",
             "minimum": 0,
-            "maximum": 5
+            "maximum": 9007199254740991
           }
         },
         "required": [
-          "duration_seconds",
-          "max_output_bytes",
           "bytes_per_second",
           "max_rows_per_batch",
           "max_buffer_bytes",
-          "row_max_age_seconds",
           "replay_seconds"
         ]
       },
@@ -253,11 +235,6 @@
           },
           "may_contain_user_data": {
             "const": true
-          },
-          "managed_row_max_age_seconds": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 30
           },
           "raw_available_live": {
             "const": false
@@ -272,7 +249,6 @@
         "required": [
           "transient",
           "may_contain_user_data",
-          "managed_row_max_age_seconds",
           "raw_available_live",
           "external_copies_recallable",
           "save_semantics"
@@ -297,7 +273,6 @@
               "Paused",
               "Closed",
               "Expired",
-              "Exhausted",
               "SourceEnded",
               "AccessLost",
               "Disconnected"
@@ -309,17 +284,12 @@
               "type": "string",
               "format": "uuid"
             },
-            "minItems": 1,
-            "maxItems": 16
+            "minItems": 1
           },
           "projection": {
             "$ref": "#/$defs/d1"
           },
           "accepted_at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "expires_at": {
             "type": "string",
             "format": "date-time"
           },
@@ -344,6 +314,10 @@
           },
           "handling": {
             "$ref": "#/$defs/d3"
+          },
+          "source_hard_end": {
+            "type": "string",
+            "format": "date-time"
           }
         },
         "required": [
@@ -353,7 +327,6 @@
           "source_session_ids",
           "projection",
           "accepted_at",
-          "expires_at",
           "idle_expires_at",
           "limits",
           "cursor",
