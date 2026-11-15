@@ -7410,7 +7410,6 @@ components:
                             - integer
                             - 'null'
                             minimum: 1000
-                            maximum: 60000
                             multipleOf: 1000
                           force_gc:
                             type: boolean
@@ -7454,7 +7453,6 @@ components:
                               requested_duration_ms: &profile_acq_duration
                                 type: integer
                                 minimum: 1000
-                                maximum: 60000
                                 multipleOf: 1000
                               force_gc:
                                 const: false
@@ -7467,7 +7465,6 @@ components:
                               requested_duration_ms:
                                 type: integer
                                 minimum: 1000
-                                maximum: 15000
                                 multipleOf: 1000
                               force_gc:
                                 const: false

@@ -361,7 +361,6 @@
                                 "null"
                               ],
                               "minimum": 1000,
-                              "maximum": 60000,
                               "multipleOf": 1000
                             },
                             "force_gc": {
@@ -428,7 +427,6 @@
                                     "requested_duration_ms": {
                                       "type": "integer",
                                       "minimum": 1000,
-                                      "maximum": 60000,
                                       "multipleOf": 1000
                                     },
                                     "force_gc": {
@@ -449,7 +447,6 @@
                                     "requested_duration_ms": {
                                       "type": "integer",
                                       "minimum": 1000,
-                                      "maximum": 15000,
                                       "multipleOf": 1000
                                     },
                                     "force_gc": {
@@ -529,7 +526,6 @@
                                     "requested_duration_ms": {
                                       "type": "integer",
                                       "minimum": 1000,
-                                      "maximum": 60000,
                                       "multipleOf": 1000
                                     },
                                     "force_gc": {

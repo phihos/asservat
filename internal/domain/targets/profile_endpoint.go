@@ -58,7 +58,7 @@ type ProfileEndpointRequest struct {
 }
 
 func (r ProfileEndpointRequest) Valid() bool {
-	if !r.Target.Valid() || !identity.Text(r.SourceRef, 63) || r.DurationSeconds < 0 || r.DurationSeconds > 60 || r.NativeLimit < 1 {
+	if !r.Target.Valid() || !identity.Text(r.SourceRef, 63) || r.DurationSeconds < 0 || r.NativeLimit < 1 {
 		return false
 	}
 	if !artifact.ValidGoProfile(r.Type, r.Mode, time.Duration(r.DurationSeconds)*time.Second, r.ForceGC) {

@@ -25,8 +25,6 @@ const (
 	// than duration plus ten seconds (execution.GoProfileRequest).
 	profileMarginMin = finalizationMargin
 	profileMarginMax = 10 * time.Second
-	// maxSamplerDuration bounds an eBPF CPU sampler session (REQ-PRF-002).
-	maxSamplerDuration = 60 * time.Second
 )
 
 // profileOutputLimit is the registered native bound of a profile action.
@@ -50,13 +48,13 @@ func profileDuration(p *profileParameters) (time.Duration, bool) {
 func goProfileShape(typ string) string {
 	switch typ {
 	case "cpu":
-		return "a Go CPU profile is mode interval for 1 to 60 whole seconds"
+		return "a Go CPU profile is mode interval for whole positive seconds"
 	case "runtimeTrace":
-		return "a Go execution trace is mode interval for 1 to 15 whole seconds"
+		return "a Go execution trace is mode interval for whole positive seconds"
 	case "heap", "goroutine":
-		return "a Go " + typ + " profile is a snapshot without duration, or a delta of 1 to 60 whole seconds"
+		return "a Go " + typ + " profile is a snapshot without duration, or a delta of whole positive seconds"
 	}
-	return "a Go " + typ + " profile is cumulative without duration, or a delta of 1 to 60 whole seconds"
+	return "a Go " + typ + " profile is cumulative without duration, or a delta of whole positive seconds"
 }
 
 // normalizeProfile validates one profile action (REQ-PRF-001/002): the
@@ -110,8 +108,8 @@ func normalizeProfile(path string, a *expandedAction) error {
 		if p.Runtime != "any" || p.Type != "cpu" || p.ForceGC || p.Source.ProfileRef != "" {
 			return refuse(value.CompositionInvalid, path+".parameters.source", "the eBPF sampler records runtime any, type cpu without forceGC or profileRef")
 		}
-		if p.Mode != "interval" || d < time.Second || d > maxSamplerDuration || d%time.Second != 0 {
-			return refuse(value.CompositionInvalid, path+".parameters.duration", "an eBPF sampler session is mode interval for 1 to 60 whole seconds")
+		if p.Mode != "interval" || d < time.Second || d%time.Second != 0 {
+			return refuse(value.CompositionInvalid, path+".parameters.duration", "an eBPF sampler session is mode interval for whole positive seconds")
 		}
 	default:
 		return refuse(value.CompositionRecorderUnavailable, path+".parameters.source.kind", "this release profiles through a Go httpEndpoint or the ebpfSampler; other sources need a qualified capability pack")
