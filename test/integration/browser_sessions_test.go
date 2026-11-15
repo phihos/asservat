@@ -71,7 +71,7 @@ func (p browserFixturePolicy) IdentityPolicy(_ context.Context, issuer string) (
 	if issuer != p.issuer {
 		return identity.Policy{}, identity.ErrDenied
 	}
-	return identity.Policy{Revision: identity.Revision{UID: "synthetic-browser-policy", Generation: 1, Digest: [32]byte{1}}, Issuer: issuer, ObservedAt: now, FreshUntil: now.Add(30 * time.Second), Clients: []identity.Client{{ID: p.client, Kind: identity.Human, ClassQualified: true}}}, nil
+	return identity.Policy{Revision: identity.Revision{UID: "synthetic-browser-policy", Generation: 1, Digest: [32]byte{1}}, Issuer: issuer, ObservedAt: now, FreshUntil: now.Add(30 * time.Second), Clients: []identity.Client{{ID: p.client, Kind: identity.Human, ClassQualified: true}}, RequiredGroups: []string{p.group}}, nil
 }
 
 // The browser fixture requests the provider's baseline ACR solely to qualify
