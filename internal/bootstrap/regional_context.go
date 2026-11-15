@@ -175,7 +175,7 @@ func newRegionalContext(ctx context.Context, c regionalConfig, in *providerInput
 	}
 	keyTransport := &http.Transport{Proxy: nil, TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS13, RootCAs: keyRoots, ServerName: c.keys.ServerName}, DialContext: (&net.Dialer{Timeout: 2 * time.Second, KeepAlive: -1}).DialContext, TLSHandshakeTimeout: 2 * time.Second, ResponseHeaderTimeout: 5 * time.Second, IdleConnTimeout: 5 * time.Second, MaxConnsPerHost: 8, DisableCompression: true}
 	closers = append(closers, keyTransport.CloseIdleConnections)
-	out.output = regionalArtifactOutput{store: custody, endpoint: c.keys.Endpoint, scope: authorization.KeyScope{InstallationID: c.binding.InstallationID, Purpose: "artifact", KeyID: c.keys.KeyID}, client: &http.Client{Transport: bearerTransport{keyTransport, hubToken}, Timeout: 5 * time.Second}, now: time.Now}
+	out.output = regionalArtifactOutput{store: custody, endpoint: c.keys.Endpoint, scope: authorization.KeyScope{InstallationID: c.binding.InstallationID, Purpose: "artifact", KeyID: c.keys.KeyID}, client: &http.Client{Transport: keyTransport, Timeout: 5 * time.Second}, token: hubToken, now: time.Now}
 	out.output.recordings = NewConnectorRecordings(nil, out.collector, time.Now, eventLog(os.Stderr, "regional collection"))
 	// Recovery is the hub's delegated read; the trust source only verifies.
 	settings, err := kube.ConnectorWorkTrustSettings(c.offer, c.ClusterID)
@@ -230,6 +230,7 @@ type regionalArtifactOutput struct {
 	endpoint string
 	scope    authorization.KeyScope
 	client   *http.Client
+	token    func() ([]byte, error)
 	now      func() time.Time
 	// recordings holds started manual recordings (ADR-248); nil without the
 	// collector input, which refuses every recording.
@@ -238,7 +239,7 @@ type regionalArtifactOutput struct {
 }
 
 func (o regionalArtifactOutput) PrepareContext(ctx context.Context, e artifact.ContextExpectation) (evidence.PreparedContext, error) {
-	seal, err := kms.NewRemoteSealer(o.endpoint, o.scope, e.Registration.Location.AttemptID, o.client)
+	seal, err := kms.NewRemoteSealer(o.endpoint, o.scope, e.Registration.Location.AttemptID, o.client, o.token)
 	if err != nil {
 		return nil, err
 	}
@@ -439,25 +440,4 @@ func (t reportedTargets) ResolveProfileRecorder(ctx context.Context, r targets.R
 		return targets.RecorderResolution{}, err
 	}
 	return t.packetTargetAvailability(ctx, p, node, false, collector.MechanismProfile), nil
-}
-
-// bearerTransport adds the connector's current ServiceAccount token to each
-// key-service request (ADR-334).
-type bearerTransport struct {
-	next  http.RoundTripper
-	token func() ([]byte, error)
-}
-
-func (t bearerTransport) RoundTrip(r *http.Request) (*http.Response, error) {
-	token, err := t.token()
-	if err != nil || len(token) == 0 {
-		if r.Body != nil {
-			_ = r.Body.Close()
-		}
-		return nil, mounts.ErrUnavailable
-	}
-	out := r.Clone(r.Context())
-	out.Header.Set("Authorization", "Bearer "+string(token))
-	clear(token)
-	return t.next.RoundTrip(out)
 }
