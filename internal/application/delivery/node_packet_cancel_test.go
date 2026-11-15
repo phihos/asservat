@@ -12,7 +12,7 @@ import (
 // ADR-283: a packet capture cancel names only work this channel queued for
 // the node's process and never creates or extends a result slot.
 func TestPacketCancelTargetsOnlyQueuedCapture(t *testing.T) {
-	ch, _, clk, _ := newChannel(t)
+	ch, clk, _ := newChannel(t)
 	enroll(t, ch, epochA)
 	p := collector.PacketCapture{CaptureID: "22222222-2222-4222-8222-222222222222", PodUID: "33333333-3333-4333-8333-333333333333", Duration: 10 * time.Second, MaxBytes: 1 << 20}
 	started, err := ch.EnqueuePacket("node-uid", p, clk.now().Add(10*time.Second))

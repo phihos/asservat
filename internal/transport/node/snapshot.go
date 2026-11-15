@@ -1,12 +1,13 @@
 package node
 
 import (
+	"encoding/hex"
+	"time"
+
 	deliveryapp "asservat.local/asservat/internal/application/delivery"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/collector"
-	"encoding/hex"
-	"time"
 )
 
 func WireSnapshotRequest(s artifact.SourceSnapshotRequest) contracts.NodeSnapshotRequest {

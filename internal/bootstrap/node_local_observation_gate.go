@@ -1,11 +1,12 @@
 package bootstrap
 
 import (
-	"asservat.local/asservat/internal/domain/collector"
 	"context"
 	"errors"
 	"sync"
 	"time"
+
+	"asservat.local/asservat/internal/domain/collector"
 )
 
 // These aliases preserve the existing local gate API. The shared values carry

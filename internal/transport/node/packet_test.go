@@ -18,8 +18,8 @@ func TestPacketCaptureRoundTripsThroughTheClosedWire(t *testing.T) {
 	p := collector.PacketCapture{CaptureID: "22222222-2222-4222-8222-222222222222", PodUID: "11111111-1111-4111-8111-111111111111",
 		Program: []planning.BPFInstruction{{Code: 6, K: 65535}}, ProgramDigest: [32]byte{1}, Duration: 10 * time.Second, MaxBytes: 8 << 20}
 	w := collector.Work{ID: "33333333-3333-4333-8333-333333333333", Sequence: 9, Kind: collector.WorkPacketCapture, NotAfter: time.Date(2026, 10, 27, 12, 0, 0, 0, time.UTC), Packet: &p}
-	b, _ := json.Marshal(contracts.NodePollResponse{Format: contracts.NodePollFormat, Work: []contracts.NodeWork{WireWork(w)}})
-	resp, err := contracts.DecodeNodePollResponse(bytes.NewReader(b))
+	b, _ := json.Marshal(pollResponse{Work: []contracts.NodeWork{WireWork(w)}})
+	resp, err := decodePollResponse(bytes.NewReader(b))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -34,12 +34,12 @@ func TestPacketCaptureRoundTripsThroughTheClosedWire(t *testing.T) {
 	}
 	r := collector.PacketResult{WorkID: w.ID, CaptureID: p.CaptureID, StartedAt: w.NotAfter, EndedAt: w.NotAfter.Add(10 * time.Second), Seen: 5, Retained: 3, Filtered: 2,
 		CapturedBytes: 512, Snaplen: 134, EngineVersion: "v0.57.0", ProgramDigest: p.ProgramDigest}
-	back, ok := DomainPacketResult(WirePacketResult("epoch", r))
+	back, ok := DomainPacketResult(WirePacketResult(r))
 	if !ok || !reflect.DeepEqual(back, r) {
 		t.Fatalf("%+v", back)
 	}
 	r.Seen = 6 // counters must account for every frame
-	if _, ok := DomainPacketResult(WirePacketResult("epoch", r)); ok {
+	if _, ok := DomainPacketResult(WirePacketResult(r)); ok {
 		t.Fatal("inconsistent counters accepted")
 	}
 }

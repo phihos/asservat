@@ -113,6 +113,18 @@ type Budget struct {
 	tokens                         int64
 	refilled                       time.Time
 	sources, inputRate, inputBurst int64
+	changed                        func()
+}
+
+// OnChange installs a callback run after each reservation or release; the
+// collector uses it to push a changed status report.
+func (b *Budget) OnChange(f func()) { b.changed = f }
+
+func (b *Budget) done(err error) error {
+	if err == nil && b.changed != nil {
+		b.changed()
+	}
+	return err
 }
 
 // SourceReservation is held once for a live source, across all renewals.
@@ -142,7 +154,7 @@ func (b *Budget) ReserveSourceWithin(r SourceReservation, p PolicyLimits) error 
 	b.ring += r.RingBytes
 	b.inputRate += r.InputBytesPerSecond
 	b.inputBurst += r.InputBurstBytes
-	return nil
+	return b.done(nil)
 }
 
 func (b *Budget) ReleaseSource(r SourceReservation) error {
@@ -153,7 +165,7 @@ func (b *Budget) ReleaseSource(r SourceReservation) error {
 	b.ring -= r.RingBytes
 	b.inputRate -= r.InputBytesPerSecond
 	b.inputBurst -= r.InputBurstBytes
-	return nil
+	return b.done(nil)
 }
 
 func (b *Budget) SourceUsage() (count, inputRate, inputBurst int64) {
@@ -188,16 +200,18 @@ func release(held *int64, n int64) error {
 	return nil
 }
 
-func (b *Budget) ReserveRing(n int64) error   { return reserve(&b.ring, b.ceilings.RingBytes, n) }
-func (b *Budget) ReleaseRing(n int64) error   { return release(&b.ring, n) }
-func (b *Budget) ReserveFrozen(n int64) error { return reserve(&b.frozen, b.ceilings.FrozenBytes, n) }
+func (b *Budget) ReserveRing(n int64) error { return b.done(reserve(&b.ring, b.ceilings.RingBytes, n)) }
+func (b *Budget) ReleaseRing(n int64) error { return b.done(release(&b.ring, n)) }
+func (b *Budget) ReserveFrozen(n int64) error {
+	return b.done(reserve(&b.frozen, b.ceilings.FrozenBytes, n))
+}
 func (b *Budget) ReserveFrozenWithin(n int64, p PolicyLimits) error {
 	if !p.Valid() {
 		return ErrInvalid
 	}
-	return reserve(&b.frozen, b.ceilings.Intersect(p).FrozenBytes, n)
+	return b.done(reserve(&b.frozen, b.ceilings.Intersect(p).FrozenBytes, n))
 }
-func (b *Budget) ReleaseFrozen(n int64) error { return release(&b.frozen, n) }
+func (b *Budget) ReleaseFrozen(n int64) error { return b.done(release(&b.frozen, n)) }
 func (b *Budget) refill(now time.Time) {
 	if !now.After(b.refilled) {
 		return

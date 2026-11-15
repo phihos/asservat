@@ -44,9 +44,9 @@ func DomainProfile(p contracts.NodeProfileCapture) (collector.ProfileCapture, bo
 	return out, out.Valid()
 }
 
-func WireProfileResult(epoch string, r collector.ProfileResult) contracts.NodeProfileResult {
+func WireProfileResult(r collector.ProfileResult) contracts.NodeProfileResult {
 	o := r.Outcome
-	return contracts.NodeProfileResult{Format: contracts.NodeProfileCaptureFormat, Epoch: epoch, WorkID: r.WorkID, CaptureID: r.CaptureID, ExpectationDigest: hex.EncodeToString(r.ExpectationDigest[:]), EndpointDigest: hex.EncodeToString(r.EndpointDigest[:]), NativeFormat: o.Format, StartedAt: o.StartedAt, CompletedAt: o.CompletedAt, MayHaveStarted: o.MayHaveStarted, ResponseComplete: o.ResponseComplete, NativeBytes: o.NativeBytes, Failure: string(r.Failure)}
+	return contracts.NodeProfileResult{Format: contracts.NodeProfileCaptureFormat, WorkID: r.WorkID, CaptureID: r.CaptureID, ExpectationDigest: hex.EncodeToString(r.ExpectationDigest[:]), EndpointDigest: hex.EncodeToString(r.EndpointDigest[:]), NativeFormat: o.Format, StartedAt: o.StartedAt, CompletedAt: o.CompletedAt, MayHaveStarted: o.MayHaveStarted, ResponseComplete: o.ResponseComplete, NativeBytes: o.NativeBytes, Failure: string(r.Failure)}
 }
 func DomainProfileResult(r contracts.NodeProfileResult) (collector.ProfileResult, bool) {
 	e, ok := digestHex(r.ExpectationDigest)

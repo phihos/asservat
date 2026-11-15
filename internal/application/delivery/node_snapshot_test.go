@@ -14,15 +14,15 @@ import (
 func TestSourceSnapshotActualChannelDeliversOriginalWindowOnce(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	clk := &clock{t: now}
-	ch, err := NewNodeChannel(sourceNodeAttester{}, &fakeIssuer{}, clk.now, nil)
+	ch, err := NewNodeChannel(clk.now, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, _, id, err := ch.Enroll(t.Context(), "127.0.0.1", []byte("token"), []byte("csr"), boot, epochA)
+	id, err := sourceConnect(ch, epochA)
 	if err != nil {
 		t.Fatal(err)
 	}
-	peer := NodePeer{NodeUID: id.NodeUID, Epoch: id.Epoch}
+	peer := NodePeer{NodeUID: id.NodeUID, PodUID: id.PodUID}
 	sink := &recordingSink{}
 	ch.SetPacketSink(sink)
 	uuid := "33333333-3333-4333-8333-333333333333"
@@ -39,13 +39,13 @@ func TestSourceSnapshotActualChannelDeliversOriginalWindowOnce(t *testing.T) {
 	// Acquisition precedes dispatch. Delivery uses original processing cutoff,
 	// not the already expired five-second enqueue interval.
 	clk.add(20 * time.Second)
-	if err = ch.DeliverPacket(t.Context(), peer, epochA, result, bytes.NewReader([]byte("abc"))); err != nil {
+	if err = ch.DeliverPacket(t.Context(), peer, result, bytes.NewReader([]byte("abc"))); err != nil {
 		t.Fatal("typed snapshot never reached existing output sink", err)
 	}
 	if len(sink.got) != 1 || string(sink.body[0]) != "abc" || !sink.got[0].StartedAt.Equal(q.T0.Add(-q.Before)) {
 		t.Fatal("changed original window", sink.got)
 	}
-	if err = ch.DeliverPacket(t.Context(), peer, epochA, result, bytes.NewReader([]byte("abc"))); err == nil {
+	if err = ch.DeliverPacket(t.Context(), peer, result, bytes.NewReader([]byte("abc"))); err == nil {
 		t.Fatal("snapshot result delivered twice")
 	}
 }
@@ -53,15 +53,15 @@ func TestSourceSnapshotActualChannelDeliversOriginalWindowOnce(t *testing.T) {
 func TestSourceSnapshotCancellationNeedsExactAcceptedNodeReceipt(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	clk := &clock{t: now}
-	channel, err := NewNodeChannel(sourceNodeAttester{}, &fakeIssuer{}, clk.now, nil)
+	channel, err := NewNodeChannel(clk.now, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, _, id, err := channel.Enroll(t.Context(), "127.0.0.1", []byte("token"), []byte("csr"), boot, epochA)
+	id, err := sourceConnect(channel, epochA)
 	if err != nil {
 		t.Fatal(err)
 	}
-	peer := NodePeer{NodeUID: id.NodeUID, Epoch: id.Epoch}
+	peer := NodePeer{NodeUID: id.NodeUID, PodUID: id.PodUID}
 	uuid := "33333333-3333-4333-8333-333333333333"
 	b := collector.SourceBinding{RootID: uuid, PolicyUID: "policy", AcceptanceID: uuid, SourceID: uuid, Fence: uuid, ActionID: "packets", PodUID: uuid, NodeUID: id.NodeUID, BootID: id.BootID, CollectorPodUID: id.PodUID, CollectorEpoch: id.Epoch, Scope: [32]byte{1}, ExpectationDigest: [32]byte{2}, ResourceDigest: [32]byte{3}, AudienceDigest: [32]byte{7}}
 	q := artifact.SourceSnapshotRequest{SourceBindingDigest: artifact.Digest(SourceBindingDigest(b)), SourceID: uuid, Fence: uuid, SnapshotID: uuid, SourceStartedAt: now.Add(-time.Minute), SourceHardUntil: now.Add(time.Hour), T0: now, IssuedAt: now, StartBy: now.Add(time.Second), ProcessingUntil: now.Add(time.Minute), Before: time.Second, MaxBytes: 65536}
@@ -79,41 +79,38 @@ func TestSourceSnapshotCancellationNeedsExactAcceptedNodeReceipt(t *testing.T) {
 	if _, joined := channel.SourceSnapshotCancellation(x, work.ID); joined {
 		t.Fatal("enqueue fabricated join")
 	}
-	report := report(1, clk.now())
+	report := report(clk.now())
 	report.Receipts = []collector.Receipt{{WorkID: work.ID, Sequence: work.Sequence + 1, Outcome: collector.OutcomeAccepted}}
-	if err = channel.Report(peer, epochA, report); err != nil {
+	if err = channel.Report(peer, cur(channel, peer), report); err != nil {
 		t.Fatal(err)
 	}
 	if _, joined := channel.SourceSnapshotCancellation(x, work.ID); joined {
 		t.Fatal("wrong sequence acknowledged cancellation")
 	}
-	clk.add(collector.StatusMinimumSpacing)
-	report.Sequence++
+	clk.add(time.Second)
 	report.ObservedAt = clk.now()
 	report.Receipts[0].Sequence = work.Sequence
 	report.Receipts[0].Outcome = collector.OutcomeRefused
-	if err = channel.Report(peer, epochA, report); err != nil {
+	if err = channel.Report(peer, cur(channel, peer), report); err != nil {
 		t.Fatal(err)
 	}
 	if _, joined := channel.SourceSnapshotCancellation(x, work.ID); joined {
 		t.Fatal("refused control fabricated join")
 	}
-	clk.add(collector.StatusMinimumSpacing)
-	report.Sequence++
+	clk.add(time.Second)
 	report.ObservedAt = clk.now()
 	report.Receipts[0].Outcome = collector.OutcomeAccepted
-	if err = channel.Report(peer, epochA, report); err != nil {
+	if err = channel.Report(peer, cur(channel, peer), report); err != nil {
 		t.Fatal(err)
 	}
 	if at, joined := channel.SourceSnapshotCancellation(x, work.ID); !joined || !at.Equal(clk.now()) {
 		t.Fatal("exact joined receipt lost", at, joined)
 	}
 	// A later report without receipts cannot lose the acknowledged join.
-	clk.add(collector.StatusMinimumSpacing)
-	report.Sequence++
+	clk.add(time.Second)
 	report.ObservedAt = clk.now()
 	report.Receipts = nil
-	if err = channel.Report(peer, epochA, report); err != nil {
+	if err = channel.Report(peer, cur(channel, peer), report); err != nil {
 		t.Fatal(err)
 	}
 	if _, joined := channel.SourceSnapshotCancellation(x, work.ID); !joined {

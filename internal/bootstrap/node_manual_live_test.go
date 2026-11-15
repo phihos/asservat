@@ -39,7 +39,7 @@ func TestManualLiveActualFinitePacketHolderIsPassiveAndDoesNotRenew(t *testing.T
 	deliver := make(chan func(gadget.Frame), 1)
 	source, stop := context.WithCancel(t.Context())
 	defer stop()
-	n := &nodePackets{available: true, identity: func() collector.Identity { return id }, now: time.Now, budget: func() *collector.Budget { return budget }, budgetMu: &mu, log: func(string) {}, upload: func(context.Context, string, collector.PacketResult, []byte) error { return nil }, engine: func(ctx context.Context, pod string, snap int, add func(gadget.Frame)) (gadget.CaptureStats, error) {
+	n := &nodePackets{available: true, now: time.Now, budget: func() *collector.Budget { return budget }, budgetMu: &mu, log: func(string) {}, upload: func(context.Context, collector.PacketResult, []byte) error { return nil }, engine: func(ctx context.Context, pod string, snap int, add func(gadget.Frame)) (gadget.CaptureStats, error) {
 		starts.Add(1)
 		if pod != manualLiveID(20) || snap != packets.Snaplen {
 			t.Error("viewer changed actual acquisition", pod, snap)
@@ -50,7 +50,7 @@ func TestManualLiveActualFinitePacketHolderIsPassiveAndDoesNotRenew(t *testing.T
 	}}
 	defer func() { stop(); n.wg.Wait() }()
 	original := collector.Work{ID: manualLiveID(30), Sequence: 1, Kind: collector.WorkPacketCapture, NotAfter: now.Add(2 * time.Second), Packet: &collector.PacketCapture{CaptureID: manualLiveID(21), PodUID: manualLiveID(20), Duration: 2 * time.Second, MaxBytes: 1 << 20}}
-	if r := n.start(source, id.Epoch, original); r.Outcome != collector.OutcomeAccepted {
+	if r := n.start(source, original); r.Outcome != collector.OutcomeAccepted {
 		t.Fatal(r)
 	}
 	add := <-deliver
@@ -64,7 +64,7 @@ func TestManualLiveActualFinitePacketHolderIsPassiveAndDoesNotRenew(t *testing.T
 	if !m.Valid() || m.HardUntil.Sub(m.StartedAt) != original.Packet.Duration || m.ObservationKind != "" {
 		t.Fatal("invented original observation/times", m)
 	}
-	for _, wrong := range []string{"capture", "work", "node", "boot", "collector", "observation", "projection"} {
+	for _, wrong := range []string{"capture", "work", "observation", "projection"} {
 		q := inspect
 		r := *inspect.Live
 		q.Live = &r
@@ -75,12 +75,6 @@ func TestManualLiveActualFinitePacketHolderIsPassiveAndDoesNotRenew(t *testing.T
 			binding.CaptureID = manualLiveID(99)
 		case "work":
 			binding.WorkID = manualLiveID(99)
-		case "node":
-			binding.NodeUID = manualLiveID(99)
-		case "boot":
-			binding.BootID = manualLiveID(99)
-		case "collector":
-			binding.CollectorEpoch = manualLiveID(99)
 		case "observation":
 			binding.ObservationKind = "packet"
 			binding.ObservationSessionID = manualLiveID(98)
@@ -183,11 +177,12 @@ func TestManualLiveArgumentTapUsesOriginalPermitAndNeverProjectsValues(t *testin
 	}
 	ctx, cancel := context.WithCancel(t.Context())
 	defer func() { cancel(); leaveOnce.Do(func() { close(leave) }); n.wg.Wait() }()
-	if got := n.startSyscall(ctx, n.identity().Epoch, w); got.Outcome != collector.OutcomeAccepted {
+	if got := n.startSyscall(ctx, w); got.Outcome != collector.OutcomeAccepted {
 		t.Fatal(got)
 	}
 	<-entered
-	m := manualLiveBinding(n.identity(), w)
+	b := w.Packet.Arguments.Binding
+	m := manualLiveBinding(collector.Identity{NodeUID: b.NodeUID, BootID: b.BootID, PodUID: b.CollectorPodUID, Epoch: b.CollectorEpoch}, w)
 	m.ActionID = w.Packet.Arguments.Binding.ActionID
 	m.Scope = [32]byte{9} // capture scope is distinct from permit scope
 	m.ObservationKind = "arguments"
@@ -269,7 +264,7 @@ func TestManualLiveHTTPUsesSameFiniteSanitizerAndOriginalClock(t *testing.T) {
 	callback := make(chan func(gadget.Frame), 1)
 	var engines atomic.Int32
 	uploaded := make(chan collector.PacketResult, 1)
-	n := &nodePackets{available: true, identity: func() collector.Identity { return id }, now: time.Now, budget: func() *collector.Budget { return budget }, budgetMu: &mu, log: func(string) {}, upload: func(_ context.Context, _ string, r collector.PacketResult, _ []byte) error { uploaded <- r; return nil }, engine: func(context.Context, string, int, func(gadget.Frame)) (gadget.CaptureStats, error) {
+	n := &nodePackets{available: true, now: time.Now, budget: func() *collector.Budget { return budget }, budgetMu: &mu, log: func(string) {}, upload: func(_ context.Context, r collector.PacketResult, _ []byte) error { uploaded <- r; return nil }, engine: func(context.Context, string, int, func(gadget.Frame)) (gadget.CaptureStats, error) {
 		t.Error("unobserved HTTP fallback")
 		return gadget.CaptureStats{}, nil
 	}, observedEngine: func(ctx context.Context, pod string, snap int, deliver func(gadget.Frame), _ func(gadget.InputNotice)) (gadget.CaptureStats, error) {
@@ -283,7 +278,7 @@ func TestManualLiveHTTPUsesSameFiniteSanitizerAndOriginalClock(t *testing.T) {
 	}}
 	ctx, cancel := context.WithCancel(t.Context())
 	defer func() { cancel(); n.wg.Wait() }()
-	if r := n.start(ctx, id.Epoch, w); r.Outcome != collector.OutcomeAccepted {
+	if r := n.start(ctx, w); r.Outcome != collector.OutcomeAccepted {
 		t.Fatal(r)
 	}
 	add := <-callback
@@ -366,9 +361,9 @@ func TestManualLiveSixteenSourcesCanRetainOneWholeRowWithinPrivateBudget(t *test
 	row := v.Row{ID: m.CaptureID + "-1", SourceID: m.CaptureID, Sequence: 1, ObservedAt: now, ReceivedAt: now, ExpiresAt: now.Add(time.Second), Projection: v.Packet, PodUID: m.PodUID, Packet: &v.PacketFields{Protocol: "TCP", RemoteIP: "192.0.2.1", RemotePort: 8080, Direction: "egress", WireBytes: 1500}}
 	out := v.NodeReply{Manual: &m, WorkID: manualLiveID(60), SourceID: m.CaptureID, Fence: m.WorkID, BootID: m.BootID, Clock: "monotonic", Sample: 1, Rows: []v.StampedRow{{Row: row, Nanos: 1, Clock: "monotonic"}}, Position: v.Position{Sequence: 1}}
 	request := collector.LiveRead{Manual: &m, Limit: 2, ReplyBytes: (28 << 10) / 16}
-	wire, _ := node.WireLiveReply(id.Epoch, out)
+	wire, _ := node.WireLiveReply(out)
 	raw, _ := json.Marshal(wire)
-	got, _, e := boundManualLiveReply(id.Epoch, request, out)
+	got, _, e := boundManualLiveReply(request, out)
 	if e != nil || len(got.Rows) != 1 {
 		t.Fatal("sixteen-source private header consumed every whole row", len(raw), request.ReplyBytes, e, len(got.Rows))
 	}
@@ -387,7 +382,7 @@ func TestManualLiveMetadataSyscallTapAndStopKeepOriginalSource(t *testing.T) {
 	leave := make(chan struct{})
 	var release sync.Once
 	var engines atomic.Int32
-	n := &nodePackets{identity: func() collector.Identity { return id }, now: time.Now, budget: func() *collector.Budget { return budget }, budgetMu: &mu, log: func(string) {}, upload: func(context.Context, string, collector.PacketResult, []byte) error { return nil }, syscallTrace: func(ctx context.Context, pod string, numbers []uint16, deliver func([]byte), _ func(gadget.InputNotice)) (gadget.CaptureStats, error) {
+	n := &nodePackets{now: time.Now, budget: func() *collector.Budget { return budget }, budgetMu: &mu, log: func(string) {}, upload: func(context.Context, collector.PacketResult, []byte) error { return nil }, syscallTrace: func(ctx context.Context, pod string, numbers []uint16, deliver func([]byte), _ func(gadget.InputNotice)) (gadget.CaptureStats, error) {
 		engines.Add(1)
 		if pod != manualLiveID(20) || len(numbers) != 1 || numbers[0] != 0 {
 			t.Error("viewer changed original metadata source")
@@ -405,7 +400,7 @@ func TestManualLiveMetadataSyscallTapAndStopKeepOriginalSource(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	defer func() { cancel(); release.Do(func() { close(leave) }); n.wg.Wait() }()
 	w := collector.Work{ID: manualLiveID(30), Sequence: 1, Kind: collector.WorkSyscallCapture, NotAfter: now.Add(time.Second), Packet: &collector.PacketCapture{CaptureID: manualLiveID(21), PodUID: manualLiveID(20), Duration: time.Second, MaxBytes: 1 << 20, Syscalls: &collector.SyscallFilter{Names: []string{"read"}, MaxEvents: 100, MaxTrackedThreads: 16}, MaxEventsPerSecond: 100}}
-	if r := n.startSyscall(ctx, id.Epoch, w); r.Outcome != collector.OutcomeAccepted {
+	if r := n.startSyscall(ctx, w); r.Outcome != collector.OutcomeAccepted {
 		t.Fatal(r)
 	}
 	emit := <-callback

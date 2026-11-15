@@ -121,9 +121,7 @@ func TestOngoingHTTPSourceOriginalPrefixPrivateRingSaveAndJoinedBudget(t *testin
 		t.Fatal(err)
 	}
 	uploaded := make(chan collector.PacketResult, 1)
-	n := &nodeSources{now: clock.now, budget: budget, budgetMu: bmu, sources: map[string]*packetSource{permit.Binding.SourceID: source}, version: "synthetic", identity: func() collector.Identity {
-		return collector.Identity{NodeUID: permit.Binding.NodeUID, PodUID: permit.Binding.CollectorPodUID, BootID: permit.Binding.BootID, Epoch: permit.Binding.CollectorEpoch}
-	}, takeUpload: func(context.Context, int64) bool { return true }, upload: func(_ context.Context, _ string, r collector.PacketResult, b []byte) error {
+	n := &nodeSources{now: clock.now, budget: budget, budgetMu: bmu, sources: map[string]*packetSource{permit.Binding.SourceID: source}, version: "synthetic", takeUpload: func(context.Context, int64) bool { return true }, upload: func(_ context.Context, r collector.PacketResult, b []byte) error {
 		e := artifact.ContextExpectation{NativeType: artifact.HTTPHeadersArtifact, Snapshot: &r.Snapshot.Request}
 		check := httpheaders.NewExpectationCheck(e)
 		if err := check.Write(b); err != nil {
@@ -141,7 +139,7 @@ func TestOngoingHTTPSourceOriginalPrefixPrivateRingSaveAndJoinedBudget(t *testin
 	q := artifact.SourceSnapshotRequest{HTTP: artifact.RecordingHTTP{MaxFlows: h.MaxFlows, MaxHeaderBytes: h.MaxHeaderBytes, MaxFlowBytes: h.MaxFlowBytes, MaxTotalBytes: h.MaxTotalBytes, IdleMillis: h.IdleTimeout.Milliseconds()}, SourceBindingDigest: artifact.Digest(deliveryapp.SourceBindingDigest(permit.Binding)), SourceID: permit.Binding.SourceID, Fence: permit.Binding.Fence, SnapshotID: permit.Binding.SourceID, SourceStartedAt: permit.StartedAt, SourceHardUntil: permit.HardUntil, T0: clock.now(), IssuedAt: clock.now(), StartBy: now.Add(time.Second), ProcessingUntil: now.Add(time.Minute), Before: time.Second, MaxBytes: 65536}
 	x := collector.SourceSnapshot{Binding: permit.Binding, CaptureID: permit.Binding.SourceID, AttemptID: permit.Binding.SourceID, ExpectationDigest: [32]byte{4}, Request: q}
 	w := collector.Work{ID: permit.Binding.SourceID, Sequence: 1, Kind: collector.WorkPacketSourceSnapshot, NotAfter: q.StartBy, Snapshot: &x}
-	if receipt := n.decide(t.Context(), permit.Binding.CollectorEpoch, w); receipt.Outcome != collector.OutcomeAccepted {
+	if receipt := n.decide(t.Context(), w); receipt.Outcome != collector.OutcomeAccepted {
 		t.Fatal("HTTP source snapshot refused", receipt)
 	}
 	select {

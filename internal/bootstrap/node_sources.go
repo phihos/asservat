@@ -1,12 +1,13 @@
 package bootstrap
 
 import (
-	"asservat.local/asservat/internal/adapters/syscalls"
-	deliveryapp "asservat.local/asservat/internal/application/delivery"
 	"context"
 	"errors"
 	"sync"
 	"time"
+
+	"asservat.local/asservat/internal/adapters/syscalls"
+	deliveryapp "asservat.local/asservat/internal/application/delivery"
 
 	"asservat.local/asservat/internal/adapters/packets"
 	compiler "asservat.local/asservat/internal/application/planning"
@@ -18,6 +19,8 @@ import (
 // collection authority. Initial replay tombstones survive their original start
 // cutoff; a later renewal cannot construct a replacement engine.
 type nodeSources struct {
+	// changed signals a possible status change of any source.
+	changed    func()
 	liveBudget *nodeLiveBudget
 	liveWG     sync.WaitGroup
 	// ringDir is the mounted administrator ring volume; empty means the
@@ -40,7 +43,6 @@ type nodeSources struct {
 	engine        observedPacketEngine
 	// syscallEngine runs syscall sources; nil when the recorder is unavailable.
 	syscallEngine syscallTraceEngine
-	identity      func() collector.Identity
 	now           func() time.Time
 	budget        *collector.Budget
 	budgetMu      *sync.Mutex
@@ -52,21 +54,20 @@ type sourceStop struct {
 	until   time.Time
 }
 
-func (n *nodeSources) decide(parent context.Context, epoch string, w collector.Work) collector.Receipt {
+func (n *nodeSources) decide(parent context.Context, w collector.Work) collector.Receipt {
 	r := collector.Decide(w, n.now())
 	if r.Reason == collector.ReasonWorkUnknown || r.Reason == collector.ReasonWorkExpired {
 		return r
 	}
 	if w.CancelSnapshot != nil {
-		return n.cancelSnapshot(parent, epoch, w, r)
+		return n.cancelSnapshot(parent, w, r)
 	}
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	if n.closed || parent == nil || parent.Err() != nil || n.identity == nil {
+	if n.closed || parent == nil || parent.Err() != nil {
 		r.Reason = collector.ReasonWorkUnknown
 		return r
 	}
-	id := n.identity()
 	b := w.StopSource
 	if w.Snapshot != nil {
 		b = &w.Snapshot.Binding
@@ -74,12 +75,12 @@ func (n *nodeSources) decide(parent context.Context, epoch string, w collector.W
 	if w.Source != nil {
 		b = &w.Source.Permit.Binding
 	}
-	if b == nil || b.NodeUID != id.NodeUID || b.BootID != id.BootID || b.CollectorPodUID != id.PodUID || b.CollectorEpoch != id.Epoch || id.Epoch != epoch {
+	if b == nil {
 		r.Reason = collector.ReasonWorkUnknown
 		return r
 	}
 	if w.Snapshot != nil {
-		return n.snapshotLocked(parent, epoch, w, r)
+		return n.snapshotLocked(parent, w, r)
 	}
 	if w.StopSource != nil {
 		if s := n.sources[b.SourceID]; s != nil {
@@ -214,6 +215,9 @@ func (n *nodeSources) decide(parent context.Context, epoch string, w collector.W
 		r.Reason = collector.ReasonCaptureBusy
 		return r
 	}
+	s.mu.Lock()
+	s.changed = n.changed
+	s.mu.Unlock()
 	n.sources[b.SourceID], n.plans[b.SourceID] = s, p
 	r.Outcome, r.Reason = collector.OutcomeAccepted, ""
 	return r

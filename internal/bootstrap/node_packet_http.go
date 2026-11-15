@@ -1,8 +1,9 @@
 package bootstrap
 
 import (
-	"asservat.local/asservat/internal/adapters/gadget"
 	"time"
+
+	"asservat.local/asservat/internal/adapters/gadget"
 
 	"asservat.local/asservat/internal/adapters/httpheaders"
 	"asservat.local/asservat/internal/adapters/packets"

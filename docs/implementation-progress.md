@@ -148,7 +148,22 @@ those functions are rewritten; `federation.connector` values are still
 required though unused; the join Secret still carries the offer and copied
 object-store capabilities; cluster IDs still come from values; `hub.url`/
 `hub.caBundle` are not implemented; work JWS, local-key signing, fleet
-settings and the node channel rows below are unchanged.
+settings rows below are unchanged; the node channel is in "Node channel stream" below.
+
+## Node channel stream (ADR-330 D2/D3, 2026-11-15)
+
+Branch `clean/connector-3a-node`. The collector holds one HTTP/2 stream to its
+connector (`/internal/v1/node/connect`), presents its projected token
+(TokenReview once per connection, 50/s burst 200, 429 with `Retry-After`),
+sends Hello (version, work kinds) and pushes status on change; the connector
+pushes work and sends only announced kinds. Uploads go on the same connection.
+Removed: node issuer and client certificates, enrollment and its limiter,
+long-poll, status cadence and spacing, renewal, the collector's boot-ID read
+and epoch, Pod/DaemonSet attestation reads and RBAC, and node-side checks of
+work bindings against its own identity. Gap: work bindings still carry
+`bootID`/`collectorEpoch` as hub provenance (SQL, manifests, `internal-work`);
+the connector fills them from the Node object and a per-collector-Pod
+generation.
 
 ## ADR-330 contract divergence (2026-11-14)
 
@@ -177,7 +192,6 @@ implement the canonical contract.
 | `browser-settings.schema.json` | No `revision`, `rootID`, `sessionEpoch`, `suspended` | `internal/adapters/kubernetes/browser_settings.go`, `internal/bootstrap/hub_api_inputs.go`, session-epoch SQL (`internal/adapters/postgres/custodydb`) |
 | `internal-work.schema.json` | Stream message on the connector connection: no `issuerEpoch`, `deliveryFence`, `*Ref`, `nodeBootID`, `StaleFence`, JWS wrapper; analysis input by `inputArtifactId` | `internal/adapters/jose/work.go`, `internal/contracts/work.go`, `internal/domain/fleet/work.go` |
 | `local-key-service.schema.json`, `local-key-secret.schema.json` | wrap/unwrap only, no `validUntil`; purposes `artifact`, `browser-credentials` | `internal/contracts/key_service.go`, `internal/adapters/kms/local_signing.go`, `local_keys.go`, `protected_local_keys.go` |
-| (no JSON schema) node channel | Hello with version and capabilities; no enroll/poll, CSR, boot ID or epoch | `internal/contracts/node_channel.go`, `internal/bootstrap/node_channel.go` |
 
 Schemas kept because Go still embeds them with production code paths:
 `work-trust`, `submission-trust` and `retention-topology`

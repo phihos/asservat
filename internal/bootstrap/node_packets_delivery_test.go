@@ -59,7 +59,7 @@ func TestNodePacketCaptureDeliversOrReportsEveryOutcome(t *testing.T) {
 			var mu, bmu sync.Mutex
 			var got []collector.PacketResult
 			var pcaps [][]byte
-			upload := func(ctx context.Context, _ string, r collector.PacketResult, pcapng []byte) error {
+			upload := func(ctx context.Context, r collector.PacketResult, pcapng []byte) error {
 				if ctx.Err() != nil {
 					t.Error("delivery context already ended")
 				}
@@ -73,7 +73,7 @@ func TestNodePacketCaptureDeliversOrReportsEveryOutcome(t *testing.T) {
 			}
 			n := &nodePackets{engine: engine, upload: upload, available: true, now: func() time.Time { return clock }, log: func(string) {}, budget: func() *collector.Budget { return budget }, budgetMu: &bmu}
 			p := collector.PacketCapture{CaptureID: "22222222-2222-4222-8222-222222222222", PodUID: "11111111-1111-4111-8111-111111111111", Duration: time.Second, MaxBytes: 1 << 20}
-			if r := n.start(node, "epoch", collector.Work{ID: "33333333-3333-4333-8333-333333333333", Sequence: 1, Kind: collector.WorkPacketCapture, NotAfter: clock.Add(time.Second), Packet: &p}); r.Outcome != collector.OutcomeAccepted {
+			if r := n.start(node, collector.Work{ID: "33333333-3333-4333-8333-333333333333", Sequence: 1, Kind: collector.WorkPacketCapture, NotAfter: clock.Add(time.Second), Packet: &p}); r.Outcome != collector.OutcomeAccepted {
 				t.Fatalf("%+v", r)
 			}
 			n.wg.Wait()

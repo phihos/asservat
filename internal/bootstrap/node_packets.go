@@ -12,7 +12,6 @@ import (
 	"asservat.local/asservat/internal/adapters/packets"
 	compiler "asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/collector"
 )
 
@@ -27,7 +26,7 @@ import (
 type packetEngine func(ctx context.Context, podUID string, snaplen int, deliver func(gadget.Frame)) (gadget.CaptureStats, error)
 type observedPacketEngine func(context.Context, string, int, func(gadget.Frame), func(gadget.InputNotice)) (gadget.CaptureStats, error)
 
-type packetUploader func(ctx context.Context, epoch string, r collector.PacketResult, pcapng []byte) error
+type packetUploader func(ctx context.Context, r collector.PacketResult, pcapng []byte) error
 
 // nodePackets runs the node's packet captures.
 type nodePackets struct {
@@ -38,7 +37,6 @@ type nodePackets struct {
 	syscallTrace      syscallTraceEngine
 	argumentTrace     argumentTraceEngine
 	argumentResources func(int) (int64, error)
-	identity          func() collector.Identity
 	upload            packetUploader
 	available         bool // the packet mechanism assessed Available
 	version           string
@@ -46,7 +44,7 @@ type nodePackets struct {
 	log               func(string)
 	budget            func() *collector.Budget
 	budgetMu          *sync.Mutex
-	// Protected by budgetMu; same-epoch poll resets cannot refill one permit.
+	// Protected by budgetMu; a repeated delivery cannot refill one permit.
 	// At most MaxQueuedWork capture IDs, each retained only until StartBy.
 	observations map[string]time.Time
 	// running holds the packetCapture items started by start that have not
@@ -68,7 +66,7 @@ type runningPacket struct {
 
 // start answers one packetCapture item. An accepted item runs in its own
 // goroutine until its duration ends (or ctx ends) and then uploads.
-func (n *nodePackets) start(ctx context.Context, epoch string, w collector.Work) collector.Receipt {
+func (n *nodePackets) start(ctx context.Context, w collector.Work) collector.Receipt {
 	r := collector.Decide(w, n.now())
 	if r.Reason == collector.ReasonWorkUnknown || r.Reason == collector.ReasonWorkExpired {
 		return r
@@ -97,15 +95,13 @@ func (n *nodePackets) start(ctx context.Context, epoch string, w collector.Work)
 	if o := p.Observation; o != nil {
 		permit := *o
 		p.Observation = &permit
-		if n.observedEngine == nil || n.identity == nil {
+		if n.observedEngine == nil {
 			r.Reason = collector.ReasonEngineUnavailable
 			return r
 		}
-		id, b := n.identity(), permit.Binding
+		b := permit.Binding
 		if !permit.ValidFinite(n.now()) || !permit.StartBy.Equal(w.NotAfter) || permit.Duration != p.Duration ||
-			!authorization.UUID(id.NodeUID) || !authorization.UUID(id.PodUID) || !authorization.UUID(id.BootID) || !authorization.UUID(id.Epoch) ||
-			b.CaptureID != p.CaptureID || b.PodUID != p.PodUID || b.ProgramDigest != actual ||
-			b.NodeUID != id.NodeUID || b.BootID != id.BootID || b.CollectorPodUID != id.PodUID || b.CollectorEpoch != id.Epoch || b.CollectorEpoch != epoch {
+			b.CaptureID != p.CaptureID || b.PodUID != p.PodUID || b.ProgramDigest != actual {
 			r.Reason = collector.ReasonWorkUnknown
 			return r
 		}
@@ -126,11 +122,7 @@ func (n *nodePackets) start(ctx context.Context, epoch string, w collector.Work)
 	// started/until) and the uploaded result must name the same instant, or a
 	// live view's original StartedAt never matches the stored capture.
 	started := n.now().UTC().Truncate(time.Microsecond)
-	liveID := collector.Identity{}
-	if n.identity != nil {
-		liveID = n.identity()
-	}
-	holder := n.newManualLive(w, p, started, liveID)
+	holder := n.newManualLive(w, p, started)
 	var rec frameRecorder
 	var err error
 	if h := p.HTTP; h != nil {
@@ -226,7 +218,7 @@ func (n *nodePackets) start(ctx context.Context, epoch string, w collector.Work)
 		}()
 		// A cancel ends capture like a node stop: runObserved reports the
 		// early stop as a failure, never as a shorter recording.
-		n.runObserved(capture, epoch, w.ID, p, rec, started, meter, holder)
+		n.runObserved(capture, w.ID, p, rec, started, meter, holder)
 		n.budgetMu.Lock()
 		if running, ok := n.running[p.CaptureID]; ok && running.workID == w.ID {
 			delete(n.running, p.CaptureID)
@@ -242,11 +234,7 @@ func (n *nodePackets) start(ctx context.Context, epoch string, w collector.Work)
 // within this time; the connector accepts it until startBy + duration + 30 s.
 const packetDeliveryGrace = 10 * time.Second
 
-func (n *nodePackets) run(ctx context.Context, epoch, workID string, p collector.PacketCapture, rec frameRecorder, started time.Time) {
-	n.runObserved(ctx, epoch, workID, p, rec, started, nil)
-}
-
-func (n *nodePackets) runObserved(ctx context.Context, epoch, workID string, p collector.PacketCapture, rec frameRecorder, started time.Time, meter *LocalObservationGate, holders ...*manualLiveHolder) {
+func (n *nodePackets) runObserved(ctx context.Context, workID string, p collector.PacketCapture, rec frameRecorder, started time.Time, meter *LocalObservationGate, holders ...*manualLiveHolder) {
 	capture, cancel := context.WithTimeout(ctx, p.Duration)
 	var stats gadget.CaptureStats
 	var err error
@@ -278,9 +266,8 @@ func (n *nodePackets) runObserved(ctx context.Context, epoch, workID string, p c
 		stats, err = runPacketEngine(capture, engine, p.PodUID, rec, nil)
 	} else {
 		// A queued goroutine cannot inherit a fresh start window. Recheck
-		// original finite fit and current enrollment immediately before engine.
-		b, id := p.Observation.Binding, n.identity()
-		if ctx.Err() != nil || meter.Context().Err() != nil || !p.Observation.ValidFinite(n.now()) || b.NodeUID != id.NodeUID || b.BootID != id.BootID || b.CollectorPodUID != id.PodUID || b.CollectorEpoch != id.Epoch {
+		// original finite fit immediately before engine.
+		if ctx.Err() != nil || meter.Context().Err() != nil || !p.Observation.ValidFinite(n.now()) {
 			meter.Stop(ErrObservationExpired)
 			meter.Close()
 			err = ErrObservationExpired
@@ -341,7 +328,7 @@ func (n *nodePackets) runObserved(ctx context.Context, epoch, workID string, p c
 			return
 		}
 	}
-	if err := n.upload(deliver, epoch, result, out); err != nil {
+	if err := n.upload(deliver, result, out); err != nil {
 		n.log(fmt.Sprintf("node collector: capture %s upload failed: %v", p.CaptureID, err))
 		return
 	}

@@ -33,7 +33,7 @@ func nodeArgumentFixture(t *testing.T) (*nodePackets, collector.Work, chan colle
 	}
 	results := make(chan collector.PacketResult, 4)
 	bodies := make(chan []byte, 4)
-	n := &nodePackets{identity: func() collector.Identity { return id }, now: time.Now, budget: func() *collector.Budget { return budget }, budgetMu: &sync.Mutex{}, argumentResources: func(int) (int64, error) { return gadget.ArgumentWorkingSet(2, 4096, 16) }, log: func(string) {}, upload: func(_ context.Context, _ string, r collector.PacketResult, b []byte) error {
+	n := &nodePackets{now: time.Now, budget: func() *collector.Budget { return budget }, budgetMu: &sync.Mutex{}, argumentResources: func(int) (int64, error) { return gadget.ArgumentWorkingSet(2, 4096, 16) }, log: func(string) {}, upload: func(_ context.Context, r collector.PacketResult, b []byte) error {
 		bodies <- append([]byte(nil), b...)
 		results <- r
 		return nil
@@ -76,11 +76,11 @@ func TestNodeArgumentStopJoinsBeforeResourceReleaseAndPreservesUnknown(t *testin
 	}
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
-	if got := n.startSyscall(ctx, n.identity().Epoch, w); got.Outcome != collector.OutcomeAccepted {
+	if got := n.startSyscall(ctx, w); got.Outcome != collector.OutcomeAccepted {
 		t.Fatal(got)
 	}
 	<-entered
-	if got := n.startSyscall(ctx, n.identity().Epoch, w); got.Outcome == collector.OutcomeAccepted {
+	if got := n.startSyscall(ctx, w); got.Outcome == collector.OutcomeAccepted {
 		t.Fatal("replay accepted")
 	}
 	stop := collector.Work{ID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", Sequence: 2, Kind: collector.WorkCancelPacketCapture, NotAfter: time.Now().Add(time.Second), CancelPacket: &collector.PacketCancel{CaptureID: w.Packet.CaptureID, WorkID: w.ID}}
@@ -116,10 +116,8 @@ func TestNodeArgumentStopJoinsBeforeResourceReleaseAndPreservesUnknown(t *testin
 		t.Fatal("source retained after joined delivery")
 	}
 }
-func TestNodeArgumentRejectsReplacementAndInsufficientWorkingCapacity(t *testing.T) {
-	for _, change := range []func(*nodePackets, *collector.Work){func(_ *nodePackets, w *collector.Work) {
-		w.Packet.Arguments.Binding.CollectorEpoch = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
-	}, func(_ *nodePackets, w *collector.Work) { w.Packet.Arguments.Binding.DefinitionDigest[0]++ }, func(n *nodePackets, _ *collector.Work) {
+func TestNodeArgumentRejectsChangedDefinitionAndInsufficientWorkingCapacity(t *testing.T) {
+	for _, change := range []func(*nodePackets, *collector.Work){func(_ *nodePackets, w *collector.Work) { w.Packet.Arguments.Binding.DefinitionDigest[0]++ }, func(n *nodePackets, _ *collector.Work) {
 		n.argumentResources = func(int) (int64, error) { return 257 << 20, nil }
 	}} {
 		n, w, _, _ := nodeArgumentFixture(t)
@@ -128,7 +126,7 @@ func TestNodeArgumentRejectsReplacementAndInsufficientWorkingCapacity(t *testing
 			return gadget.ArgumentStats{}, nil
 		}
 		change(n, &w)
-		if got := n.startSyscall(t.Context(), n.identity().Epoch, w); got.Outcome == collector.OutcomeAccepted {
+		if got := n.startSyscall(t.Context(), w); got.Outcome == collector.OutcomeAccepted {
 			t.Fatal(got)
 		}
 	}
@@ -176,7 +174,7 @@ func TestNodeArgumentObservationEndsBeforeDelayedJoin(t *testing.T) {
 		send(1, 22, r.Deadline.Add(100*time.Millisecond))
 		return gadget.ArgumentStats{AccountingKnown: true, ConsumedEvents: 4, ConsumedBytes: 1024, CoverageUnknown: true}, ctx.Err()
 	}
-	if got := n.startSyscall(t.Context(), n.identity().Epoch, w); got.Outcome != collector.OutcomeAccepted {
+	if got := n.startSyscall(t.Context(), w); got.Outcome != collector.OutcomeAccepted {
 		t.Fatal(got)
 	}
 	deadline := <-deadlineReached
@@ -245,7 +243,7 @@ func TestNodeArgumentQuietCompletionRequiresFinalAccounting(t *testing.T) {
 				<-ctx.Done()
 				return gadget.ArgumentStats{AccountingKnown: known, CoverageUnknown: true}, ctx.Err()
 			}
-			if receipt := n.startSyscall(t.Context(), n.identity().Epoch, w); receipt.Outcome != collector.OutcomeAccepted {
+			if receipt := n.startSyscall(t.Context(), w); receipt.Outcome != collector.OutcomeAccepted {
 				t.Fatal(receipt)
 			}
 			n.wg.Wait()

@@ -15,13 +15,13 @@ import (
 )
 
 // WireStatus converts one report into its wire form.
-func WireStatus(epoch string, r collector.Report) contracts.NodeStatus {
+func WireStatus(r collector.Report) contracts.NodeStatus {
 	f := r.Facts
 	kernel := ""
 	if f.Kernel != (collector.KernelVersion{}) {
 		kernel = f.Kernel.String()
 	}
-	out := contracts.NodeStatus{Format: contracts.NodeStatusFormat, Epoch: epoch, Sequence: r.Sequence, ObservedAt: r.ObservedAt.UTC(),
+	out := contracts.NodeStatus{ObservedAt: r.ObservedAt.UTC(),
 		Probe: contracts.NodeProbe{KernelRelease: f.KernelRelease, Kernel: kernel, BTF: string(f.BTF), CgroupV2: string(f.CgroupV2), BPF: string(f.BPF),
 			TCX: string(f.TCX), TC: string(f.TC), DebugFS: string(f.DebugFS), TraceFS: string(f.TraceFS), BPFFS: string(f.BPFFS), HostProcesses: string(f.HostProcesses),
 			Runtime: string(f.Runtime), Engine: contracts.NodeEngine{Linked: f.Engine.Linked, Initialized: f.Engine.Initialized, Version: f.Engine.Version}},
@@ -75,7 +75,7 @@ func support(s string) (collector.Support, bool) {
 // value must be one of the closed values; free text is short printable ASCII.
 func DomainStatus(s contracts.NodeStatus) (collector.Report, bool) {
 	var r collector.Report
-	if s.Format != contracts.NodeStatusFormat || s.Sequence == 0 || s.ObservedAt.IsZero() || len(s.Mechanisms) > 8 || len(s.Receipts) > collector.MaxReceipts || int64(len(s.Sources)) > collector.SourceStatusLimit {
+	if s.ObservedAt.IsZero() || len(s.Mechanisms) > 8 || len(s.Receipts) > collector.MaxReceipts || int64(len(s.Sources)) > collector.SourceStatusLimit {
 		return r, false
 	}
 	p := s.Probe
@@ -98,7 +98,7 @@ func DomainStatus(s contracts.NodeStatus) (collector.Report, bool) {
 	if !ok || (f.Runtime != collector.RuntimeUnknown && f.Runtime != collector.RuntimeContainerd && f.Runtime != collector.RuntimeCRIO) {
 		return r, false
 	}
-	r = collector.Report{Sequence: s.Sequence, ObservedAt: s.ObservedAt.UTC(), Facts: f, Mechanisms: []collector.Availability{}, Receipts: []collector.Receipt{},
+	r = collector.Report{ObservedAt: s.ObservedAt.UTC(), Facts: f, Mechanisms: []collector.Availability{}, Receipts: []collector.Receipt{},
 		Budget: collector.Usage{Ceilings: DomainCeilings(s.Budget.Ceilings), RingReserved: s.Budget.RingReserved, FrozenReserved: s.Budget.FrozenReserved, UploadAvailable: s.Budget.UploadAvailable}}
 	if !r.Budget.Ceilings.Valid() || r.Budget.RingReserved < 0 || r.Budget.FrozenReserved < 0 || r.Budget.UploadAvailable < 0 ||
 		r.Budget.RingReserved > r.Budget.Ceilings.RingBytes || r.Budget.FrozenReserved > r.Budget.Ceilings.FrozenBytes || r.Budget.UploadAvailable > r.Budget.Ceilings.UploadBurstBytes {
@@ -364,8 +364,8 @@ func DomainWork(w contracts.NodeWork) (collector.Work, bool) {
 }
 
 // WirePacketResult heads a capture upload.
-func WirePacketResult(epoch string, r collector.PacketResult) contracts.NodePacketResult {
-	out := contracts.NodePacketResult{Format: contracts.NodeCaptureFormat, Epoch: epoch, WorkID: r.WorkID, CaptureID: r.CaptureID, StartedAt: r.StartedAt.UTC(), EndedAt: r.EndedAt.UTC(),
+func WirePacketResult(r collector.PacketResult) contracts.NodePacketResult {
+	out := contracts.NodePacketResult{Format: contracts.NodeCaptureFormat, WorkID: r.WorkID, CaptureID: r.CaptureID, StartedAt: r.StartedAt.UTC(), EndedAt: r.EndedAt.UTC(),
 		Seen: r.Seen, Retained: r.Retained, Filtered: r.Filtered, Unsupported: r.Unsupported, Fragment: r.Fragment, Extension: r.Extension, Malformed: r.Malformed,
 		OutputFull: r.OutputFull, LostSamples: r.LostSamples, WireBytes: r.WireBytes, CapturedBytes: r.CapturedBytes, Snaplen: r.Snaplen, EngineVersion: r.EngineVersion, Failure: string(r.Failure), NativeType: r.NativeType}
 	if r.ProgramDigest != ([32]byte{}) {

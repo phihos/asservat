@@ -165,7 +165,7 @@ func TestNodeCollectorWithRealKubernetes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	attester, err := kube.NewNodeAttester(client, f.DaemonSet, f.ServiceAccount)
+	attester, err := kube.NewNodeAttester(client, f.ServiceAccount)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -174,7 +174,7 @@ func TestNodeCollectorWithRealKubernetes(t *testing.T) {
 		t.Fatal(err)
 	}
 	log := &lineLog{t: t}
-	s, err := bootstrap.NewNodeChannelServer(f.ClusterID, attester, server, log, time.Now)
+	s, err := bootstrap.NewNodeChannelServer(attester, server, log, time.Now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -236,17 +236,16 @@ func TestNodeCollectorWithRealKubernetes(t *testing.T) {
 			}
 		}
 	})
-	var firstReportAt time.Time
 	var view delivery.NodeView
-	wait("enrollment and first report", 2*time.Minute, func() bool {
+	wait("stream and first report", 2*time.Minute, func() bool {
 		v := s.Channel.Nodes()
 		if len(v) == 1 && v[0].Report != nil {
-			view, firstReportAt = v[0], v[0].ReportedAt
+			view = v[0]
 			return true
 		}
 		return false
 	})
-	results["enrolledAfterSeconds"] = time.Since(start).Seconds()
+	results["connectedAfterSeconds"] = time.Since(start).Seconds()
 	wait("Restricted workload Running", 3*time.Minute, func() bool {
 		p, err := k.CoreV1().Pods(workload).Get(ctx, "pause", meta.GetOptions{})
 		return err == nil && p.Status.Phase == core.PodRunning
@@ -306,20 +305,10 @@ func TestNodeCollectorWithRealKubernetes(t *testing.T) {
 		t.Fatalf("budget %+v", view.Report.Budget)
 	}
 
-	// 3. Status flows every 15 seconds.
-	var second delivery.NodeView
-	wait("second report", 40*time.Second, func() bool {
-		v := s.Channel.Nodes()
-		if len(v) == 1 && v[0].Reports >= 2 {
-			second = v[0]
-			return true
-		}
-		return false
-	})
-	interval := second.ReportedAt.Sub(firstReportAt)
-	results["statusIntervalSeconds"] = interval.Seconds()
-	if interval < collector.StatusInterval-time.Second || interval > collector.StatusInterval+3*time.Second || !second.Current {
-		t.Fatalf("status interval %v", interval)
+	// 3. Status is pushed on change; an open stream keeps the node current.
+	second := s.Channel.Nodes()[0]
+	if !second.Current {
+		t.Fatal("node not current while its stream is open")
 	}
 
 	if f.ProfileImage != "" {

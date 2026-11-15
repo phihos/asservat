@@ -12,11 +12,11 @@ import (
 func TestPacketExpectedSourceChecksBeforeQueueEffect(t *testing.T) {
 	for _, mode := range []string{"exact", "foreign-target", "foreign-node", "foreign-boot", "foreign-collector", "foreign-epoch", "expired", "future-observation", "cancelled", "deadline", "late-start", "stale-report", "rotated-before-enqueue", "rotated-after-enqueue"} {
 		t.Run(mode, func(t *testing.T) {
-			ch, _, clk, _ := newChannel(t)
+			ch, clk, _ := newChannel(t)
 			peer, _ := enroll(t, ch, epochA)
-			r := report(1, clk.now())
+			r := report(clk.now())
 			r.Mechanisms = []collector.Availability{{Mechanism: collector.MechanismPacket, Prerequisites: true, Adapter: collector.AdapterAvailable}}
-			if err := ch.Report(peer, epochA, r); err != nil {
+			if err := ch.Report(peer, cur(ch, peer), r); err != nil {
 				t.Fatal(err)
 			}
 			v, ok := ch.NodeByName("node-a")
@@ -53,10 +53,9 @@ func TestPacketExpectedSourceChecksBeforeQueueEffect(t *testing.T) {
 			case "late-start":
 				startBy = startBy.Add(time.Nanosecond)
 			case "stale-report":
-				clk.add(collector.StatusStaleAfter + time.Second)
-				source.ObservedAt = clk.now()
-				source.FreshUntil = clk.now().Add(time.Second)
-				startBy = clk.now().Add(time.Second)
+				ch.mu.Lock()
+				ch.nodes["node-uid"].open = false
+				ch.mu.Unlock()
 			case "rotated-before-enqueue":
 				peer, _ = enroll(t, ch, epochB)
 			}

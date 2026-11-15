@@ -42,7 +42,7 @@ type NodeProfileCapture struct {
 	Host                  string         `json:"host"`
 	TLS                   NodeProfileTLS `json:"tls,omitzero"`
 	AuthorizationRequired bool           `json:"authorizationRequired,omitempty"`
-	// Authorization exists only in the authenticated poll delivery.
+	// Authorization exists only in the authenticated stream delivery.
 	Authorization            []byte `json:"authorization,omitempty"`
 	AuthorizationUnavailable bool   `json:"authorizationUnavailable,omitempty"`
 }
@@ -57,7 +57,6 @@ type NodeProfileTLS struct {
 
 type NodeProfileResult struct {
 	Format            string    `json:"format"`
-	Epoch             string    `json:"epoch"`
 	WorkID            string    `json:"workID"`
 	CaptureID         string    `json:"captureID"`
 	ExpectationDigest string    `json:"expectationDigest"`

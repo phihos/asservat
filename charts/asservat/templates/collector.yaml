@@ -64,8 +64,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
 ---
-# The connector's attestation reads of the collector Pods and DaemonSet and
-# its publication of the listener root.
+# The connector's publication of the listener root.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -73,13 +72,6 @@ metadata:
   namespace: {{ $c.namespace }}
   labels: {{- include "asservat.labels" (list $ "node") | nindent 4 }}
 rules:
-  - apiGroups: [""]
-    resources: [pods]
-    verbs: [get]
-  - apiGroups: [apps]
-    resources: [daemonsets]
-    resourceNames: [{{ $name }}]
-    verbs: [get]
   - apiGroups: [""]
     resources: [configmaps]
     resourceNames: [{{ $root }}]
@@ -140,8 +132,6 @@ spec:
           env:
             - name: ASSERVAT_NODE_POD_UID
               valueFrom: { fieldRef: { fieldPath: metadata.uid } }
-            - name: ASSERVAT_NODE_NAME
-              valueFrom: { fieldRef: { fieldPath: spec.nodeName } }
           securityContext:
             # Root with exactly the capabilities the probe and the packet
             # recorder need, not a privileged container, under the runtime's

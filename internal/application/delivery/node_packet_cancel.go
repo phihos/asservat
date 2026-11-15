@@ -43,8 +43,8 @@ func (c *NodeChannel) EnqueuePacketCancel(ctx context.Context, nodeUID, captureI
 	e.nextSeq++
 	h := hex.EncodeToString(raw[:])
 	work := collector.Work{ID: h[:8] + "-" + h[8:12] + "-" + h[12:16] + "-" + h[16:20] + "-" + h[20:], Sequence: e.nextSeq, Kind: collector.WorkCancelPacketCapture, NotAfter: until, CancelPacket: &cancel}
-	e.work = append(e.work, work)
-	close(e.wake)
-	e.wake = make(chan struct{})
+	if err := e.push(work); err != nil {
+		return collector.Work{}, err
+	}
 	return work, nil
 }

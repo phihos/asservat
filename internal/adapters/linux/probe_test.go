@@ -27,14 +27,13 @@ func fakeRoot(t *testing.T, files map[string]string) string {
 
 func TestFileProbeReadsSyntheticRoot(t *testing.T) {
 	root := fakeRoot(t, map[string]string{
-		"proc/sys/kernel/osrelease":      "6.11.0-1018-azure\n",
-		"proc/sys/kernel/random/boot_id": "0f1e2d3c-4b5a-4968-8776-655443322110\n",
-		"sys/kernel/btf/vmlinux":         "BTF",
-		"proc/1/comm":                    "systemd\n",
-		"proc/412/comm":                  "containerd\n",
-		"proc/530/comm":                  "kubelet\n",
-		"proc/self/comm":                 "asservat\n",
-		"proc/notapid/comm":              "crio\n",
+		"proc/sys/kernel/osrelease": "6.11.0-1018-azure\n",
+		"sys/kernel/btf/vmlinux":    "BTF",
+		"proc/1/comm":               "systemd\n",
+		"proc/412/comm":             "containerd\n",
+		"proc/530/comm":             "kubelet\n",
+		"proc/self/comm":            "asservat\n",
+		"proc/notapid/comm":         "crio\n",
 	})
 	magics := map[string]int64{"sys/fs/cgroup": magicCgroup2, "sys/kernel/debug": magicDebugFS, "sys/kernel/tracing": 0x62656572, "sys/kernel/debug/tracing": magicTraceFS, "sys/fs/bpf": magicBPFFS}
 	p := FileProbe{Root: root, statfs: func(path string) (int64, error) {
@@ -59,9 +58,6 @@ func TestFileProbeReadsSyntheticRoot(t *testing.T) {
 	if f.Runtime != collector.RuntimeContainerd {
 		t.Fatalf("runtime %s (a non-numeric /proc entry must be ignored)", f.Runtime)
 	}
-	if boot, err := p.BootID(); err != nil || boot != "0f1e2d3c-4b5a-4968-8776-655443322110" {
-		t.Fatalf("boot %q %v", boot, err)
-	}
 
 	// A container view: cgroup v1 tmpfs, no BTF, no debug/trace mounts and no
 	// host processes. Every missing fact is reported, none assumed.
@@ -85,8 +81,5 @@ func TestFileProbeReadsSyntheticRoot(t *testing.T) {
 		if !found {
 			t.Fatalf("missing reason %s in %v", r, reasons)
 		}
-	}
-	if _, err := (FileProbe{Root: bare}).BootID(); err == nil {
-		t.Fatal("missing boot ID accepted")
 	}
 }

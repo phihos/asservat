@@ -30,7 +30,7 @@ func TestProfileUploadCancellationJoinsTransportReaderBeforeReturning(t *testing
 	}))
 	defer server.Close()
 	base, _ := url.Parse(server.URL)
-	client := &Client{base: base, http: server.Client()}
+	client := &Client{base: base, http: server.Client(), token: func(context.Context) ([]byte, error) { return []byte("token"), nil }}
 	const id = "11111111-1111-4111-8111-111111111111"
 	now := time.Now().UTC()
 	r := collector.ProfileResult{CaptureID: id, WorkID: id, ExpectationDigest: artifact.Digest{1}, EndpointDigest: artifact.Digest{2}, Outcome: execution.GoProfileOutcome{Format: artifact.PprofFormat, StartedAt: now, CompletedAt: now, MayHaveStarted: true, ResponseComplete: true, NativeBytes: 1}}
@@ -38,7 +38,7 @@ func TestProfileUploadCancellationJoinsTransportReaderBeforeReturning(t *testing
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	done := make(chan error, 1)
-	go func() { done <- client.UploadProfileStream(ctx, id, r, body) }()
+	go func() { done <- client.UploadProfileStream(ctx, r, body) }()
 	select {
 	case <-body.entered:
 	case <-time.After(5 * time.Second):

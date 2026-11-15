@@ -1,16 +1,19 @@
 package contracts
 
 import (
+	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"io"
 	"time"
 )
 
 // ADR-246: the private node work channel (I-02) between the `asservat node`
-// DaemonSet and its cluster connector. The node initiates every request over
-// TLS 1.3; enrollment presents a Pod-bound projected token and an
-// identity-free CSR, every later request a connector-issued client
-// certificate. No human credential, Kubernetes writer token, evidence or key
+// DaemonSet and its cluster connector (docs/architecture/node-collector.md).
+// The collector opens one long-lived HTTP/2 stream over server TLS and
+// presents its audience-bound projected ServiceAccount token; the connector
+// reviews it once per connection. Uploads are further requests on the same
+// connection. No human credential, Kubernetes writer token, evidence or key
 // material crosses this wire.
 const (
 	NodeDeploymentFormat   = "asservat-node-deployment/v1"
@@ -20,7 +23,6 @@ const (
 	NodeTokenRoot          = "/run/asservat/node-token"
 	NodeTokenFile          = "token"
 	NodePodUIDEnvironment  = "ASSERVAT_NODE_POD_UID"
-	NodeNameEnvironment    = "ASSERVAT_NODE_NAME"
 	// NodeDisposableHostGuard is the accidental-use barrier of the S-04 test
 	// environment (plan §5.2): the collector refuses to start, and the chart's
 	// hostPath of type File keeps the Pod from starting, unless the host
@@ -30,21 +32,14 @@ const (
 	// the encrypted-disk ring medium is available only while it is mounted (ADR-278).
 	NodeRingDiskPath = "/var/lib/asservat-ring"
 
-	NodeEnrollFormat = "asservat-node-enroll/v1"
-	NodePollFormat   = "asservat-node-poll/v1"
-	NodeStatusFormat = "asservat-node-status/v1"
-	NodeEnrollPath   = "/internal/v1/node/enroll"
-	NodePollPath     = "/internal/v1/node/poll"
-	NodeStatusPath   = "/internal/v1/node/status"
-	NodeMaxRequest   = 64 << 10
-	// At most1088 content-free source accounting rows plus existing facts.
-	// Enrollment and poll requests keep their existing64KiB bound.
-	NodeStatusMaxRequest = 512 << 10
-	// NodeMaxResponse bounds one poll answer: 16 items, including packet
-	// captures with at most 256 filter instructions and TLS profiles with
-	// at most 8KiB of canonical public roots each.
-	NodeMaxResponse    = 256 << 10
-	NodeMaxCertificate = 8 << 10
+	// NodeConnectPath carries the stream: length-prefixed NodeUp frames from
+	// the collector, length-prefixed NodeWork frames from the connector.
+	NodeConnectPath    = "/internal/v1/node/connect"
+	NodeChannelVersion = 1
+	// NodeMaxMessage bounds one decoded control message: the largest typed
+	// work item, a profile capture whose TLS bundle is bounded by its 1 MiB
+	// ConfigMap, plus credential and envelope.
+	NodeMaxMessage = 2 << 20
 
 	// ADR-248: a finished packet capture travels node → connector as one
 	// request: a 4-byte big-endian header length, the JSON NodePacketResult
@@ -106,34 +101,17 @@ type NodeCeilings struct {
 	RingDiskBytes int64 `json:"ringDiskBytes,omitempty"`
 }
 
-// NodeEnrollRequest carries the projected token, a DER identity-free CSR, the
-// kernel boot ID and the process's random epoch. The server assigns identity.
-type NodeEnrollRequest struct {
-	Format string `json:"format"`
-	Token  string `json:"token"`
-	CSR    []byte `json:"csr"`
-	BootID string `json:"bootID"`
-	Epoch  string `json:"epoch"`
+// NodeHello is the first message of a stream: the protocol version and the
+// work kinds this collector handles. The connector sends no other kind.
+type NodeHello struct {
+	Version      int      `json:"version"`
+	Capabilities []string `json:"capabilities"`
 }
 
-type NodeEnrollResponse struct {
-	Format      string    `json:"format"`
-	Certificate []byte    `json:"certificate"`
-	NotAfter    time.Time `json:"notAfter"`
-	NodeName    string    `json:"nodeName"`
-	NodeUID     string    `json:"nodeUID"`
-}
-
-// NodePollRequest asks for work after the last sequence the node has seen.
-type NodePollRequest struct {
-	Format string `json:"format"`
-	Epoch  string `json:"epoch"`
-	After  uint64 `json:"after"`
-}
-
-type NodePollResponse struct {
-	Format string     `json:"format"`
-	Work   []NodeWork `json:"work"`
+// NodeUp is one collector → connector message.
+type NodeUp struct {
+	Hello  *NodeHello  `json:"hello,omitempty"`
+	Status *NodeStatus `json:"status,omitempty"`
 }
 
 // NodeWork is one closed work item: armSource, stopSource, snapshot,
@@ -329,7 +307,6 @@ type NodeBPFInstruction struct {
 type NodePacketResult struct {
 	Snapshot      *NodeSnapshotOutcome `json:"snapshot,omitempty"`
 	Format        string               `json:"format"`
-	Epoch         string               `json:"epoch"`
 	WorkID        string               `json:"workID"`
 	CaptureID     string               `json:"captureID"`
 	StartedAt     time.Time            `json:"startedAt"`
@@ -352,12 +329,9 @@ type NodePacketResult struct {
 	Failure       string               `json:"failure"`
 }
 
-// NodeStatus is one batched report: probed facts, mechanism assessment, node
-// budget usage and receipts for work seen since the previous report.
+// NodeStatus is one report: probed facts, mechanism assessment, node budget
+// usage and receipts for work handled since the previous report.
 type NodeStatus struct {
-	Format     string             `json:"format"`
-	Epoch      string             `json:"epoch"`
-	Sequence   uint64             `json:"sequence"`
 	ObservedAt time.Time          `json:"observedAt"`
 	Probe      NodeProbe          `json:"probe"`
 	Mechanisms []NodeAdapter      `json:"mechanisms"`
@@ -442,32 +416,52 @@ type NodeReceipt struct {
 	Reason   string `json:"reason"`
 }
 
+// nodeDecode reads one bounded JSON value. Unknown fields are ignored, so
+// collectors and connectors one version apart interoperate.
 func nodeDecode[T any](r io.Reader, limit int64) (T, error) {
-	out, err := decodeClosedRPC[T](r, limit)
-	if err != nil {
+	var out T
+	b, err := io.ReadAll(io.LimitReader(r, limit+1))
+	defer clear(b)
+	if err != nil || int64(len(b)) > limit || json.Unmarshal(b, &out) != nil {
 		var zero T
 		return zero, ErrNodeChannel
 	}
 	return out, nil
 }
 
+// WriteNodeFrame writes one length-prefixed JSON message.
+func WriteNodeFrame(w io.Writer, v any) error {
+	b, err := json.Marshal(v)
+	defer clear(b)
+	if err != nil || len(b) > NodeMaxMessage {
+		return ErrNodeChannel
+	}
+	var size [4]byte
+	binary.BigEndian.PutUint32(size[:], uint32(len(b)))
+	if _, err = w.Write(size[:]); err == nil {
+		_, err = w.Write(b)
+	}
+	return err
+}
+
+// ReadNodeFrame reads one length-prefixed JSON message of at most
+// NodeMaxMessage bytes.
+func ReadNodeFrame[T any](r io.Reader) (T, error) {
+	var size [4]byte
+	if _, err := io.ReadFull(r, size[:]); err != nil {
+		var zero T
+		return zero, err
+	}
+	n := binary.BigEndian.Uint32(size[:])
+	if n == 0 || n > NodeMaxMessage {
+		var zero T
+		return zero, ErrNodeChannel
+	}
+	return nodeDecode[T](io.LimitReader(r, int64(n)), int64(n))
+}
+
 func DecodeNodeDeployment(r io.Reader) (NodeDeployment, error) {
 	return nodeDecode[NodeDeployment](r, NodeDeploymentMaxBytes)
-}
-func DecodeNodeEnrollRequest(r io.Reader) (NodeEnrollRequest, error) {
-	return nodeDecode[NodeEnrollRequest](r, NodeMaxRequest)
-}
-func DecodeNodeEnrollResponse(r io.Reader) (NodeEnrollResponse, error) {
-	return nodeDecode[NodeEnrollResponse](r, NodeMaxResponse)
-}
-func DecodeNodePollRequest(r io.Reader) (NodePollRequest, error) {
-	return nodeDecode[NodePollRequest](r, NodeMaxRequest)
-}
-func DecodeNodePollResponse(r io.Reader) (NodePollResponse, error) {
-	return nodeDecode[NodePollResponse](r, NodeMaxResponse)
-}
-func DecodeNodeStatus(r io.Reader) (NodeStatus, error) {
-	return nodeDecode[NodeStatus](r, NodeStatusMaxRequest)
 }
 func DecodeNodePacketResult(r io.Reader) (NodePacketResult, error) {
 	return nodeDecode[NodePacketResult](r, NodeCaptureMaxHeader)

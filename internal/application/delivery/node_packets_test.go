@@ -26,7 +26,7 @@ func (s *recordingSink) DeliverPacket(_ context.Context, _ collector.Identity, r
 // ADR-248: only the process a capture was queued for may deliver its result,
 // once, before the capture's deadline; the item is a typed packetCapture.
 func TestPacketCaptureDeliveredOnceByItsProcess(t *testing.T) {
-	ch, _, clk, _ := newChannel(t)
+	ch, clk, _ := newChannel(t)
 	sink := &recordingSink{}
 	ch.SetPacketSink(sink)
 	peer, _ := enroll(t, ch, epochA)
@@ -45,17 +45,17 @@ func TestPacketCaptureDeliveredOnceByItsProcess(t *testing.T) {
 	result := collector.PacketResult{WorkID: w.ID, CaptureID: p.CaptureID, StartedAt: clk.now(), EndedAt: clk.now().Add(10 * time.Second), Seen: 1, Retained: 1, CapturedBytes: 3, Snaplen: 134}
 	wrong := result
 	wrong.CaptureID = "44444444-4444-4444-8444-444444444444"
-	if err := ch.DeliverPacket(context.Background(), peer, epochA, wrong, bytes.NewReader([]byte("abc"))); !errors.Is(err, ErrNodeConflict) {
+	if err := ch.DeliverPacket(context.Background(), peer, wrong, bytes.NewReader([]byte("abc"))); !errors.Is(err, ErrNodeConflict) {
 		t.Fatal("another capture's result accepted", err)
 	}
 	clk.add(5 * time.Second)
-	if err := ch.DeliverPacket(context.Background(), peer, epochA, result, bytes.NewReader([]byte("abcdef"))); err != nil {
+	if err := ch.DeliverPacket(context.Background(), peer, result, bytes.NewReader([]byte("abcdef"))); err != nil {
 		t.Fatal(err)
 	}
 	if len(sink.got) != 1 || string(sink.body[0]) != "abc" {
 		t.Fatalf("sink got %+v %q (body bounded by CapturedBytes)", sink.got, sink.body)
 	}
-	if err := ch.DeliverPacket(context.Background(), peer, epochA, result, bytes.NewReader([]byte("abc"))); !errors.Is(err, ErrNodeConflict) {
+	if err := ch.DeliverPacket(context.Background(), peer, result, bytes.NewReader([]byte("abc"))); !errors.Is(err, ErrNodeConflict) {
 		t.Fatal("a second delivery accepted", err)
 	}
 
@@ -64,17 +64,17 @@ func TestPacketCaptureDeliveredOnceByItsProcess(t *testing.T) {
 	clk.add(10*time.Second + p.Duration + PacketUploadMargin)
 	r2 := result
 	r2.WorkID = w2.ID
-	if err := ch.DeliverPacket(context.Background(), peer, epochA, r2, bytes.NewReader([]byte("abc"))); !errors.Is(err, ErrNodeConflict) {
+	if err := ch.DeliverPacket(context.Background(), peer, r2, bytes.NewReader([]byte("abc"))); !errors.Is(err, ErrNodeConflict) {
 		t.Fatal("a late result accepted", err)
 	}
 	w3, _ := ch.EnqueuePacket("node-uid", p, clk.now().Add(10*time.Second))
 	peerB, _ := enroll(t, ch, epochB)
 	r3 := result
 	r3.WorkID = w3.ID
-	if err := ch.DeliverPacket(context.Background(), peerB, epochB, r3, bytes.NewReader([]byte("abc"))); !errors.Is(err, ErrNodeConflict) {
+	if err := ch.DeliverPacket(context.Background(), peerB, r3, bytes.NewReader([]byte("abc"))); !errors.Is(err, ErrNodeConflict) {
 		t.Fatal("a replacement process delivered the earlier process's capture", err)
 	}
-	if err := ch.DeliverPacket(context.Background(), peer, epochA, r3, bytes.NewReader([]byte("abc"))); !errors.Is(err, ErrNodeUnauthenticated) {
+	if err := ch.DeliverPacket(context.Background(), peer, r3, bytes.NewReader([]byte("abc"))); !errors.Is(err, ErrNodeUnauthenticated) {
 		t.Fatal("a replaced process delivered", err)
 	}
 }

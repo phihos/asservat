@@ -29,23 +29,23 @@ func assertSourceBudget(t *testing.T, n *nodeSources, frozen int64, sources int)
 	}
 }
 func TestNodeSnapshotCancelBeforeDelayedStartFencesExactAttempt(t *testing.T) {
-	n, source, clock, x := sourceSnapshotPipelineFixture(t, func(context.Context, string, collector.PacketResult, []byte) error {
+	n, source, clock, x := sourceSnapshotPipelineFixture(t, func(context.Context, collector.PacketResult, []byte) error {
 		t.Error("cancelled snapshot uploaded")
 		return nil
 	})
 	x = distinctCancellationSnapshot(x)
 	cancel := snapshotCancelWork(x, clock.now())
-	if r := n.decide(t.Context(), x.Binding.CollectorEpoch, cancel); r.Outcome != collector.OutcomeAccepted {
+	if r := n.decide(t.Context(), cancel); r.Outcome != collector.OutcomeAccepted {
 		t.Fatal(r)
 	}
 	start := collector.Work{ID: x.CaptureID, Sequence: 3, Kind: collector.WorkPacketSourceSnapshot, NotAfter: x.Request.StartBy, Snapshot: &x}
-	if r := n.decide(t.Context(), x.Binding.CollectorEpoch, start); r.Outcome == collector.OutcomeAccepted {
+	if r := n.decide(t.Context(), start); r.Outcome == collector.OutcomeAccepted {
 		t.Fatal("delayed start ignored exact cancellation fence", r)
 	}
 	bad := x
 	bad.AttemptID = "33333333-3333-4333-8333-333333333333"
 	cancel.CancelSnapshot = &bad
-	if r := n.decide(t.Context(), x.Binding.CollectorEpoch, cancel); r.Outcome == collector.OutcomeAccepted {
+	if r := n.decide(t.Context(), cancel); r.Outcome == collector.OutcomeAccepted {
 		t.Fatal("another attempt borrowed cancellation", r)
 	}
 	assertSourceBudget(t, n, 0, 1)
@@ -61,7 +61,7 @@ func TestNodeSnapshotCancelWaitsForUploaderAndIndependentCopyJoin(t *testing.T) 
 			uploaded := make(chan struct{})
 			observedCancel := make(chan struct{})
 			release := make(chan struct{})
-			n, source, clock, x := sourceSnapshotPipelineFixture(t, func(ctx context.Context, _ string, _ collector.PacketResult, _ []byte) error {
+			n, source, clock, x := sourceSnapshotPipelineFixture(t, func(ctx context.Context, _ collector.PacketResult, _ []byte) error {
 				close(uploaded)
 				<-ctx.Done()
 				close(observedCancel)
@@ -78,7 +78,7 @@ func TestNodeSnapshotCancelWaitsForUploaderAndIndependentCopyJoin(t *testing.T) 
 				}
 			}()
 			start := collector.Work{ID: x.CaptureID, Sequence: 1, Kind: collector.WorkPacketSourceSnapshot, NotAfter: x.Request.StartBy, Snapshot: &x}
-			if r := n.decide(t.Context(), x.Binding.CollectorEpoch, start); r.Outcome != collector.OutcomeAccepted {
+			if r := n.decide(t.Context(), start); r.Outcome != collector.OutcomeAccepted {
 				t.Fatal(r)
 			}
 			select {
@@ -95,11 +95,11 @@ func TestNodeSnapshotCancelWaitsForUploaderAndIndependentCopyJoin(t *testing.T) 
 			}
 			wrong := x
 			wrong.AttemptID = "33333333-3333-4333-8333-333333333333"
-			if r := n.decide(t.Context(), x.Binding.CollectorEpoch, snapshotCancelWork(wrong, clock.now())); r.Outcome == collector.OutcomeAccepted {
+			if r := n.decide(t.Context(), snapshotCancelWork(wrong, clock.now())); r.Outcome == collector.OutcomeAccepted {
 				t.Fatal("wrong attempt cancelled original uploader")
 			}
 			result := make(chan collector.Receipt, 1)
-			go func() { result <- n.decide(t.Context(), x.Binding.CollectorEpoch, snapshotCancelWork(x, clock.now())) }()
+			go func() { result <- n.decide(t.Context(), snapshotCancelWork(x, clock.now())) }()
 			select {
 			case <-observedCancel:
 			case <-time.After(time.Second):

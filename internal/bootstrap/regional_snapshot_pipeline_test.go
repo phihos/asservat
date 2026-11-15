@@ -99,7 +99,7 @@ func TestRegionalSnapshotNodeNanosecondStopReachesRealStore(t *testing.T) {
 		err    error
 	}, 1)
 	natural := make(chan struct{})
-	n, actualSource, clock, x := sourceSnapshotPipelineFixture(t, func(ctx context.Context, _ string, r collector.PacketResult, native []byte) error {
+	n, actualSource, clock, x := sourceSnapshotPipelineFixture(t, func(ctx context.Context, r collector.PacketResult, native []byte) error {
 		err := holder.DeliverPacket(ctx, collector.Identity{NodeUID: xNode(source), BootID: source.meter.Permit().Binding.BootID, PodUID: source.meter.Permit().Binding.CollectorPodUID, Epoch: source.meter.Permit().Binding.CollectorEpoch}, r, bytes.NewReader(native))
 		delivered <- struct {
 			result collector.PacketResult
@@ -136,7 +136,7 @@ func TestRegionalSnapshotNodeNanosecondStopReachesRealStore(t *testing.T) {
 		t.Fatal(err)
 	}
 	work := collector.Work{ID: x.Request.SnapshotID, Sequence: 1, Kind: collector.WorkPacketSourceSnapshot, NotAfter: x.Request.StartBy, Snapshot: &x}
-	if r := n.decide(t.Context(), x.Binding.CollectorEpoch, work); r.Outcome != collector.OutcomeAccepted {
+	if r := n.decide(t.Context(), work); r.Outcome != collector.OutcomeAccepted {
 		t.Fatal(r)
 	}
 	select {
@@ -189,9 +189,7 @@ func sourceSnapshotPipelineFixture(t *testing.T, upload packetUploader, natural 
 		t.Fatal(err)
 	}
 	<-ready
-	n := &nodeSources{sources: map[string]*packetSource{p.Binding.SourceID: source}, now: clock.now, budget: budget, budgetMu: mu, version: "synthetic", takeUpload: func(context.Context, int64) bool { return true }, upload: upload, identity: func() collector.Identity {
-		return collector.Identity{NodeUID: p.Binding.NodeUID, BootID: p.Binding.BootID, PodUID: p.Binding.CollectorPodUID, Epoch: p.Binding.CollectorEpoch}
-	}}
+	n := &nodeSources{sources: map[string]*packetSource{p.Binding.SourceID: source}, now: clock.now, budget: budget, budgetMu: mu, version: "synthetic", takeUpload: func(context.Context, int64) bool { return true }, upload: upload}
 	t.Cleanup(n.Close)
 	q := artifact.SourceSnapshotRequest{SourceBindingDigest: artifact.Digest(deliveryapp.SourceBindingDigest(p.Binding)), SourceID: p.Binding.SourceID, Fence: p.Binding.Fence, SnapshotID: p.Binding.SourceID, SourceStartedAt: p.StartedAt, SourceHardUntil: p.HardUntil, T0: now, IssuedAt: now, StartBy: now.Add(5 * time.Second), ProcessingUntil: now.Add(time.Minute), Before: time.Second, MaxBytes: 65536}
 	x := collector.SourceSnapshot{Binding: p.Binding, CaptureID: p.Binding.SourceID, AttemptID: p.Binding.SourceID, WriterPodUID: p.Binding.SourceID, WriterEpoch: p.Binding.SourceID, ExpectationDigest: [32]byte{5}, Request: q}

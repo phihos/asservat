@@ -1,28 +1,29 @@
 package delivery
 
 import (
-	"asservat.local/asservat/internal/domain/collector"
-	v "asservat.local/asservat/internal/domain/live"
 	"context"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/domain/collector"
+	v "asservat.local/asservat/internal/domain/live"
 )
 
 func TestLiveNodeChannelExactFiniteReplyCancellationAndOldNodeClosed(t *testing.T) {
 	now := time.Now()
 	clk := &clock{t: now}
-	ch, e := NewNodeChannel(sourceNodeAttester{}, &fakeIssuer{}, clk.now, nil)
+	ch, e := NewNodeChannel(clk.now, nil)
 	if e != nil {
 		t.Fatal(e)
 	}
-	_, _, id, e := ch.Enroll(t.Context(), "127.0.0.1", []byte("token"), []byte("csr"), boot, epochA)
+	id, e := sourceConnect(ch, epochA)
 	if e != nil {
 		t.Fatal(e)
 	}
-	peer := NodePeer{NodeUID: id.NodeUID, Epoch: id.Epoch}
-	state := report(1, now)
+	peer := NodePeer{NodeUID: id.NodeUID, PodUID: id.PodUID}
+	state := report(now)
 	state.Mechanisms = []collector.Availability{{Mechanism: collector.MechanismPacket, Prerequisites: true, Adapter: collector.AdapterAvailable}}
-	if e = ch.Report(peer, epochA, state); e != nil {
+	if e = ch.Report(peer, cur(ch, peer), state); e != nil {
 		t.Fatal(e)
 	}
 	uuid := "33333333-3333-4333-8333-333333333333"
@@ -51,19 +52,16 @@ func TestLiveNodeChannelExactFiniteReplyCancellationAndOldNodeClosed(t *testing.
 	reply := v.NodeReply{WorkID: work[0].ID, SourceID: uuid, Fence: uuid, BootID: boot, Clock: "monotonic", Sample: 100, Rows: []v.StampedRow{}, Position: v.Position{Sequence: 7}}
 	foreign := reply
 	foreign.Fence = epochB
-	if e = ch.DeliverLive(call, peer, epochA, foreign); e == nil {
+	if e = ch.DeliverLive(call, peer, foreign); e == nil {
 		t.Fatal("foreign fence reply")
 	}
-	if e = ch.DeliverLive(call, peer, epochB, reply); e == nil {
-		t.Fatal("replacement node")
-	}
-	if e = ch.DeliverLive(call, peer, epochA, reply); e != nil {
+	if e = ch.DeliverLive(call, peer, reply); e != nil {
 		t.Fatal(e)
 	}
 	if e = <-done; e != nil {
 		t.Fatal(e)
 	}
-	if e = ch.DeliverLive(call, peer, epochA, reply); e == nil {
+	if e = ch.DeliverLive(call, peer, reply); e == nil {
 		t.Fatal("reply replayed after handoff")
 	}
 	canceled, stop := context.WithTimeout(t.Context(), time.Second)
