@@ -1,5 +1,15 @@
 # Sustained implementation progress
 
+## Grants cover every client of the requester (ADR-335 D5, 2026-11-15)
+
+An approved ad-hoc or raw-query grant covers matching published artifacts for
+the requesting human on every client: one registration per artifact counts
+`maxArtifacts`, no per-client children or `clientIDs`. No one-hour review
+window; result access ends at its `notAfter`. Step-up is optional: SQL accepts
+an approval without `acr`/`auth_time` and records them when present.
+Migration 00175. Verification: custody raw-grant, access-grant and
+policy-recorder grant subtests pass.
+
 ## Shares without caps or Suspended state (ADR-335 D7, 2026-11-15)
 
 A share lasts until the artifact's access ends unless the creator names an
@@ -222,7 +232,7 @@ implement the canonical contract.
 | `mcp-tools.json`, `browser-openapi.yaml` | Stateless previews: `plan_digest` out, `preview` + `expected_plan_digest` + `idempotency_key` in; `resolve_capture_request` and `continue_acquisition` removed | Stored preview handles, resolution tool and continue flag: `internal/transport/presentation/context_operations.go`, `recording_save_operations.go`, `recorder_preview.go`; `internal/domain/audit/operation.go`; `internal/bootstrap/public_context.go`; console `web/src/capture`, `web/src/recordings` |
 | `mcp-tools.json`, `browser-openapi.yaml` | Pending results carry `revision`; `get_capture`/`get_grant`/`get_query_result`/`get_artifact_download` take `after_revision` and wait ≤30 s; `get_capture` has no poll advice | No `after_revision` wait (the request-scoped identity and audit windows end after 5–20 s); query results keep `retry_after_seconds`: `internal/transport/presentation/context_projection_operations.go` |
 | `browser-openapi.yaml` | SSE: `GET /api/v1/events` (`StatusEvent`), `GET /api/v1/live/watches/{watch_id}/events` (`live-watch.schema.json#/$defs/event`) | `/api/v1/events` serves `capture_id` only (`internal/transport/browser/events.go`); grant, download and query events and the live-watch stream are missing; console still polls queries and live watches |
-| `mcp-tools.json` | `get_grant`/`list_reviews`/`request_policy_grant` drop `preview_id`, `can_resolve`, `resume_requires_original_client` | `internal/application/authorization/grants.go`, `internal/transport/presentation/grant_operations.go` |
+| `mcp-tools.json` | `get_grant`/`list_reviews`/`request_policy_grant` drop `preview_id` (`can_resolve` and `resume_requires_original_client` are gone) | `internal/application/authorization/grants.go`, `internal/transport/presentation/grant_operations.go` |
 | `mcp-tools.json` | `explain_access`/`preview_access_change`: `ClusterNotObserved` replaces `PermissionObservationStale`; no `valid_until` | `internal/domain/authorization/explain.go`, `internal/transport/presentation/access_preview_operations.go` |
 | `live-watch.schema.json`, `read_live_watch` | `wait_ms` ≤30000; no `retry_after_ms`, `row_max_age_seconds`, `managed_row_max_age_seconds`, source `handle_expires_at`; row expiry is min(privacy, watch deadline) | `internal/domain/live/watch.go`, `internal/domain/live/source.go`, `internal/application/live/service.go` |
 | `recording-save.schema.json` | Preview has `plan_digest` instead of `preview_id`/`capture_id`/`expires_at`/`save_scope_digest`; no recording `handle_expires_at` | `internal/transport/presentation/recording_save_operations.go`, `internal/domain/live/source.go` |
@@ -257,7 +267,6 @@ examples go through `readImplementedExample` or the console equivalent.
 | `artifact-download.schema.json` | Preparing/Ready/Completed/Failed/Cancelled; size and SHA-256 on every status; `content_path`, `browser_url`, `access_until`, bundle `representation`; no `continue_preparation`/`expires_at`/`resume_available` | `internal/transport/presentation/context_download.go`; console `web/src/evidence/evidence.ts` |
 | `live-watch.schema.json`, `watch_live` | No watch deadline, duration or lifetime output cap; 10-minute idle close; no `sourcePage` | `internal/domain/live/source.go`, `watch.go` |
 | `recording-save.schema.json`, `errors.yaml` | Rows with `owner_kind`/`save_via`/`live_projections`; `recordingSaves` default true; `NoCurrentSource` replaces `RecordingSelectionRequired` | `internal/transport/presentation/recording_save_history.go`, `recording_save_operations.go` |
-| `investigation-access.schema.json`, grant views | No `clientIDs`: clients carry the user's access, raw and downloads included | `internal/application/authorization/grants.go`, `raw_query.go`; `internal/domain/authorization/grant.go`; `internal/adapters/postgres/access_grant.go`; `internal/transport/presentation/grant_operations.go` |
 | `policy.schema.json`, `target.schema.json` | Budgets/retention/suspended/observation/evaluation/maxPods/selection/adoption optional; `adoption` default `followName`; no `observation.mode`, `grantRef` or hub-held `target.cluster`; optional `automationRef`; `workloadRef.apiVersion` optional | `internal/application/capture/policy_compile.go` (`pinUID` required, `allAuthorized` mode); `internal/adapters/kubernetes/policy_source.go`, `policy_source_hub.go` (`grantRef`, hub-held cluster; test reads `examples/implemented/policy-restart.yaml`); `internal/adapters/postgres/policy_grant_attachment.go`, `policy.go`, `policy_sources.go`; DebugPolicy CRD |
 | `capture.schema.json`, `capture-composition.schema.json` | `recipeRef.digest`, `reason`, `idempotencyKey`, `deadline`, `maxTotalBytes`/`maxDuration`, `profileRef.version` optional | `internal/domain/planning/composition.go`; `internal/transport/presentation/recorder_preview.go`; console `web/src/capture` |
 | `collection-scope.schema.json` | No `observation.mode` | `internal/application/capture/policy_compile.go`; console capture bundle |
