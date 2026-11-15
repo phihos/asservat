@@ -370,7 +370,8 @@ func newOwnerDeployment(ctx context.Context, files *os.Root, podUID string, in *
 	}
 	d.Runtime, err = NewOwnerRuntime(root, OwnerRuntimeConfig{Pool: pool, PodUID: podUID, SourceUID: c.ConfigurationUID, Configuration: configs, ServerEnrollment: services["server"], ClientEnrollment: services["client"], Registry: ledgers["registry"], Proofs: proofs, ReadinessProofs: readinessProofs, Routes: routes, Protection: guard, Connections: c.Connections, Concurrency: c.Concurrency, Native: nativeConfig, Observation: observation})
 	if err != nil || startup.Err() != nil {
-		return nil, mounts.ErrUnavailable
+		// Keep the runtime's own startup phase for the diagnostic line.
+		return nil, errors.Join(mounts.ErrUnavailable, err)
 	}
 	if c.Public != nil {
 		var closers []func()

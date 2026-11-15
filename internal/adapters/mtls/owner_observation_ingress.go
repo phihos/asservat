@@ -29,7 +29,7 @@ type OwnerObservationIngress struct {
 }
 
 func NewOwnerObservationIngress(pin value.OwnerObservationPin, server *OwnerCredentials, owners *app.OwnerAuthenticator, workloads app.OwnerObservationWorkloadReader, peers []OwnerObservationPeer, now func() time.Time) (*OwnerObservationIngress, error) {
-	if !pin.Valid() || server == nil || server.usage != "server" || !server.verifier.matchesPool(pin.Pool) || owners == nil || owners.Now == nil || workloads == nil || len(peers) < 1 || len(peers) > 16 || now == nil {
+	if !pin.Valid() || server == nil || server.usage != "server" || !server.verifier.matchesPool(pin.Pool) || owners == nil || owners.Now == nil || workloads == nil || len(peers) > 16 || now == nil {
 		return nil, value.ErrInvalid
 	}
 	s := &OwnerObservationIngress{pin: pin, server: server, owners: owners, workloads: workloads, peers: make(map[value.PeerBinding]*PeerVerifier, len(peers)), now: now}
