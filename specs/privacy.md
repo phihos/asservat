@@ -85,7 +85,7 @@ Given a 6-hour maximum and an ordinary hold for 3 days, when requested, then sto
 
 ## REQ-PRV-006 — Rights requests and restricted processing
 
-A privacy operator is an administrator or holds `privacy-operator` through a hub-cluster ClusterAccessBinding ([REQ-PER-001](permissions.md#req-per-001--canonical-permission-configuration)). The Processing console locates candidate evidence by case, workload, time and purpose, inspects lineage, restricts processing, requests early erasure and tracks completion. There is no global user-content index.
+A privacy operator is an administrator. The Processing console locates candidate evidence by case, workload, time and purpose, inspects lineage, restricts processing, requests early erasure and tracks completion. There is no global user-content index.
 
 Restriction blocks ordinary analysis, disclosure, sharing and reuse until released. It is SQL state ([ADR-127](../docs/decisions/127-current-processing-and-download-placement.md)): rules over artifacts or workload-time scopes, each change a revisioned row with an audit row. Matching evidence published later is restricted too. Early erasure ([ADR-321](../docs/decisions/321-exact-early-erasure.md)) uses the same deletion worker for the artifact, its derivatives and copies. Access and correction responses are prepared as reviewed extracts outside Asservat's public download path; evidence is never silently edited.
 

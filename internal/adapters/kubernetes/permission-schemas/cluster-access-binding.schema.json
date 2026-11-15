@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://asservat.io/spec/v1/cluster-access-binding.schema.json",
   "title": "Asservat ClusterAccessBinding v1",
-  "description": "Cluster-scoped AccessBinding, like a ClusterRoleBinding (ADR-335 D14, REQ-PER-001). In a workload cluster it grants its roles in every namespace matching namespaceSelector. In the hub cluster spec.clusters names joined clusters (or *) and the role privacy-operator may be granted. Canonical only: the runtime has no CRD yet.",
+  "description": "Cluster-scoped AccessBinding, like a ClusterRoleBinding (ADR-335 D14, REQ-PER-001). In a workload cluster it grants its roles in every namespace matching namespaceSelector. In the hub cluster spec.clusters names joined clusters (or *).",
   "type": "object",
   "additionalProperties": false,
   "properties": {
@@ -49,7 +49,7 @@
         "roles": {
           "type": "array",
           "items": {
-            "$ref": "https://asservat.io/spec/v1/permission-common.schema.json#/$defs/clusterRole"
+            "$ref": "https://asservat.io/spec/v1/permission-common.schema.json#/$defs/role"
           },
           "minItems": 1,
           "uniqueItems": true

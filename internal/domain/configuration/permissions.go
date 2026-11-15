@@ -34,7 +34,8 @@ type Resource struct {
 type Subject struct{ Kind, Issuer, ID string }
 
 // ClusterAccessBindingKind is the cluster-scoped AccessBinding (ADR-335 D14).
-// Its bases cover AllNamespaces of each cluster it names.
+// Its bases cover AllNamespaces of each cluster it names, or each namespace
+// its NamespaceSelector matches.
 const ClusterAccessBindingKind = "ClusterAccessBinding"
 
 // AllNamespaces is the namespace of a ClusterAccessBinding basis.
@@ -58,6 +59,9 @@ type Binding struct {
 	Scope      Scope
 	NotAfter   time.Time
 	Automation *authorization.AutomationEnvelope
+	// NamespaceSelector narrows a ClusterAccessBinding to the namespaces
+	// whose labels match it.
+	NamespaceSelector map[string]string `json:",omitempty"`
 	// Invalid marks a stored binding whose spec failed validation: it grants
 	// and denies nothing and only keeps its identity in the journal.
 	Invalid bool `json:",omitempty"`

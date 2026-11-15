@@ -104,14 +104,12 @@
                   "roles": {
                     "type": "array",
                     "items": {
-                      "description": "Roles a ClusterAccessBinding may grant; privacy-operator only in the hub cluster.",
                       "type": "string",
                       "enum": [
                         "evidence-reader",
                         "workload-maintainer",
                         "evidence-owner",
-                        "action-approver",
-                        "privacy-operator"
+                        "action-approver"
                       ]
                     },
                     "minItems": 1,

@@ -181,14 +181,25 @@ func (s *bindingRun) refreshWorkloads(ctx context.Context) {
 // of the joined clusters the current sources name that are missing, have
 // other keys or are older than RemoteNamespaceRefresh. A failed read keeps
 // the previous journal state; its sources lapse with its ObservedAt.
+// ClusterAccessBinding selectors are observed even while the source list is
+// incomplete.
 func (s *bindingRun) refreshRemote(ctx context.Context) {
-	if s.r.Remote == nil || !s.sourcesComplete {
+	if s.r.Remote == nil {
 		return
 	}
+	sources := s.sources
+	if !s.sourcesComplete {
+		sources = nil
+	}
 	var clusters []string
-	for _, src := range s.sources {
+	for _, src := range sources {
 		if src.Type == "namespaceMetadata" && src.Enabled && src.ClusterID != s.r.NamespaceClusterID && authorization.UUID(src.ClusterID) && !slices.Contains(clusters, src.ClusterID) {
 			clusters = append(clusters, src.ClusterID)
+		}
+	}
+	for _, b := range s.clusterBindings {
+		if len(b.NamespaceSelector) > 0 && b.Scope.ClusterID != s.r.NamespaceClusterID && !slices.Contains(clusters, b.Scope.ClusterID) {
+			clusters = append(clusters, b.Scope.ClusterID)
 		}
 	}
 	slices.Sort(clusters)
@@ -197,7 +208,7 @@ func (s *bindingRun) refreshRemote(ctx context.Context) {
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	for _, cluster := range clusters {
-		keys := SourceKeys(s.sources, cluster)
+		keys := namespaceKeys(sources, s.clusterBindings, cluster)
 		old := s.remote[cluster]
 		if old != nil && !sameKeys(old.keys, keys) {
 			old = nil

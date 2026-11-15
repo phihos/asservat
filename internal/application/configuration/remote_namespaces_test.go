@@ -3,8 +3,11 @@ package configuration
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
+	"time"
 
+	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/configuration"
 )
 
@@ -58,4 +61,51 @@ func TestReconcilerInheritsRemoteClusterJournal(t *testing.T) {
 	if remote.calls != 2 || s.remote[remoteCluster] == nil {
 		t.Fatal("failed reread dropped the last journal state")
 	}
+}
+
+// ADR-335 D14: a selector-narrowed ClusterAccessBinding of a joined cluster
+// is evaluated against that cluster's journal, fetched even while the source
+// list is incomplete. A missing journal, a failed first read and a lapsed
+// journal leave its labels unknown: the allow grants nothing, the deny
+// covers every namespace.
+func TestRemoteClusterBindingSelectorFollowsJournal(t *testing.T) {
+	_, _, s, ctx := inheritanceRun(t)
+	now := s.r.Now()
+	binding := func(effect string) value.Binding {
+		return value.Binding{Resource: value.Resource{ClusterID: inheritanceCluster, Kind: value.ClusterAccessBindingKind, Name: "sre", UID: "cab-" + effect, Generation: 1, ResourceVersion: "1"},
+			Effect: effect, Subjects: []value.Subject{{Kind: "Group", ID: "/sre"}}, Roles: []string{"evidence-reader"}, NamespaceSelector: map[string]string{"managed": "true"}, Scope: value.Scope{ClusterID: remoteCluster, Namespace: value.AllNamespaces}}
+	}
+	scopes := func(at time.Time) map[string][]string {
+		out := map[string][]string{}
+		for _, p := range s.inheritance(at).Bases {
+			if p.Resource.Kind == value.ClusterAccessBindingKind {
+				out[p.Resource.UID] = append(out[p.Resource.UID], p.Scope.Namespace.UID)
+			}
+		}
+		return out
+	}
+	unknown := func(at time.Time, why string) {
+		t.Helper()
+		if got := scopes(at); len(got["cab-Allow"]) != 0 || !slices.Equal(got["cab-Deny"], []string{"*"}) {
+			t.Fatalf("%s: %v", why, got)
+		}
+	}
+	s.clusterBindings = []value.Binding{binding("Allow"), binding("Deny")}
+	s.sources, s.sourcesComplete = nil, false
+	unknown(now, "missing journal")
+	remote := &remoteFixture{err: errors.New("connector unavailable")}
+	s.r.Remote = remote
+	s.refreshRemote(ctx)
+	if remote.calls != 1 {
+		t.Fatal("selector journal not read while sources are incomplete", remote.calls)
+	}
+	unknown(now, "connector failure")
+	remote.err = nil
+	remote.list = value.NamespaceList{ResourceVersion: "j1", ObservedAt: now, Namespaces: []value.ObservedNamespace{observedNamespace("payments", "payments-uid", "j1:0", "")}}
+	s.remote = nil
+	s.refreshRemote(ctx)
+	if got := scopes(now); !slices.Equal(got["cab-Allow"], []string{"payments-uid"}) || !slices.Equal(got["cab-Deny"], []string{"payments-uid"}) {
+		t.Fatalf("selected namespaces: %v", got)
+	}
+	unknown(now.Add(authorization.PermissionObservationInterval), "lapsed journal")
 }

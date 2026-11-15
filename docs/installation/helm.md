@@ -460,7 +460,8 @@ An AccessBinding lives in the application namespace it grants access to, like
 a RoleBinding ([ADR-329](../decisions/329-accessbindings-in-application-namespaces.md)).
 Its scope is that namespace, optionally narrowed to workloads by name; a
 recreated Deployment of the same name keeps its access. A ClusterAccessBinding
-grants a role in every namespace, like a ClusterRoleBinding.
+grants a role in every namespace matching its optional `namespaceSelector`,
+like a ClusterRoleBinding.
 
 ```yaml
 apiVersion: asservat.io/v1alpha1

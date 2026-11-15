@@ -63,6 +63,52 @@ func SourceKeys(sources []value.Source, cluster string) value.NamespaceKeys {
 	return k
 }
 
+// namespaceKeys adds the namespaceSelector labels of the ClusterAccessBindings
+// covering cluster to its SourceKeys.
+func namespaceKeys(sources []value.Source, bindings []value.Binding, cluster string) value.NamespaceKeys {
+	k := SourceKeys(sources, cluster)
+	for _, b := range bindings {
+		if b.Scope.ClusterID == cluster {
+			for key := range b.NamespaceSelector {
+				k.Labels = append(k.Labels, key)
+			}
+		}
+	}
+	slices.Sort(k.Labels)
+	k.Labels = slices.Compact(k.Labels)
+	return k
+}
+
+// selected reports whether n's observed labels match selector.
+func selected(n value.ObservedNamespace, selector map[string]string) bool {
+	for k, v := range selector {
+		if d := ValueDigest(v); d == "" || n.Labels[k] != d {
+			return false
+		}
+	}
+	return true
+}
+
+// SelectedNamespaces returns the namespaces of o that are not terminating
+// and match selector; false while o is unknown or lacks a selector key.
+func SelectedNamespaces(selector map[string]string, o *value.NamespaceObservation) ([]value.NamespaceRef, bool) {
+	if o == nil {
+		return nil, false
+	}
+	for k := range selector {
+		if !slices.Contains(o.Keys.Labels, k) {
+			return nil, false
+		}
+	}
+	var out []value.NamespaceRef
+	for _, n := range o.Namespaces {
+		if !n.Deleting && selected(n, selector) {
+			out = append(out, value.NamespaceRef{Name: n.Name, UID: n.UID})
+		}
+	}
+	return out, true
+}
+
 func validRole(role string) bool {
 	return role == "workload-maintainer" || role == "evidence-reader" || role == "evidence-owner" || role == "action-approver"
 }
@@ -104,22 +150,12 @@ func NamespaceGrants(s value.Source, observed string, o *value.NamespaceObservat
 		}
 	}
 	groups := mappingGroups(m)
-	selector := map[string]string{}
-	for k, v := range s.NamespaceSelector {
-		selector[k] = ValueDigest(v)
-	}
 	var out []value.NamespaceGrant
 	for _, n := range o.Namespaces {
 		if n.Deleting || slices.Contains(s.ExcludedNamespaces, n.Name) {
 			continue
 		}
-		matched := true
-		for k, d := range selector {
-			if v, ok := n.Labels[k]; !ok || d == "" || v != d {
-				matched = false
-				break
-			}
-		}
+		matched := selected(n, s.NamespaceSelector)
 		values := n.Annotations
 		if m.Field == "label" {
 			values = n.Labels
