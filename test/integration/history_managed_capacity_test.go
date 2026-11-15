@@ -56,7 +56,7 @@ func qualifyHistoryManagedCapacity(t *testing.T, f *queryLedgerFixture) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	material := b.root.value.State.MAC
+	material := b.setup.mac
 	mac, err := auditapp.NewOperationMAC(material.InputVersion, material.InputKey, material.AccountVersion, material.AccountKey)
 	if err != nil {
 		t.Fatal(err)

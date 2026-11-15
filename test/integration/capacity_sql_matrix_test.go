@@ -12,7 +12,6 @@ import (
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
 	app "asservat.local/asservat/internal/application/capacity"
-	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	capturevalue "asservat.local/asservat/internal/domain/capture"
 	cfg "asservat.local/asservat/internal/domain/configuration"
@@ -46,67 +45,25 @@ func qualifyCapacityProducerSQL(t *testing.T, ctx context.Context, admin *pgxpoo
 	})
 	// Stop dependent cases after any prerequisite failure. A later missing row
 	// must not hide the actual first failed role/SQL phase.
-	if !t.Run("actual-paired-root-and-lost-receipt", func(t *testing.T) {
-		// A successful immutable claim followed by a lost reply performs no
-		// SQL setup. Resume only under another current invocation after the
-		// original effect interval, retaining every original claim field.
-		f.root.lostSetupClaim = true
-		if _, err := f.producer.InitializeCapacity(ctx, f.input, f.protection); err == nil {
-			t.Fatal("lost postclaim reply returned success")
+	if !t.Run("paired-root-initialized-once", func(t *testing.T) {
+		// The hub-worker's capacity login inserts the paired roots once; a
+		// replay finds them present and other inputs never replace them.
+		if outcome, err := f.initializeCapacity(ctx); err != nil || outcome != postgres.CapacityCreated {
+			t.Fatal("capacity root initialization", outcome, err)
 		}
-		if f.root.value.State.CapacitySetup == nil || f.root.value.State.CapacitySetup.Receipt != nil {
-			t.Fatal("claim without SQL supplied a runtime receipt")
+		if outcome, err := f.initializeCapacity(ctx); err != nil || outcome != postgres.CapacityPresent {
+			t.Fatal("capacity root replay", outcome, err)
 		}
-		original := *f.root.value.State.CapacitySetup
-		var beforeSources, beforeCaptures int
-		if err := admin.QueryRow(ctx, `SELECT (SELECT count(*) FROM capacity_source WHERE root_id=$1),(SELECT count(*) FROM capture_audit_root WHERE root_id=$1)`, f.input.PermissionRootID).Scan(&beforeSources, &beforeCaptures); err != nil || beforeSources != 0 || beforeCaptures != 0 {
-			t.Fatal("postclaim failure changed paired roots", beforeSources, beforeCaptures, err)
-		}
-		capacityWaitUntil(t, ctx, original.Until.Add(10*time.Millisecond))
-		f.refreshBase(t)
-		// Neither a changed original incarnation nor an acknowledged receipt
-		// can turn missing roots into a new initialization opportunity.
-		f.root.value.State.CapacitySetup.DatabaseOID++
-		if _, err := f.producer.InitializeCapacity(ctx, f.input, f.protection); err == nil {
-			t.Fatal("changed original database incarnation adopted")
-		}
-		f.root.value.State.CapacitySetup.DatabaseOID = original.DatabaseOID
-		claimedReceipt := contracts.CapacityRootSetupReceipt{Format: contracts.CapacityRootSetupFormat, OperationID: original.OperationID, InstallationID: f.input.InstallationID, InitialClaimID: f.input.InitialClaimID, PermissionRootID: f.input.PermissionRootID, RoleRootUID: f.input.RoleRootUID, RoleSetupID: f.input.RoleSetupID, InputDigest: original.InputDigest, DatabaseOID: original.DatabaseOID, PostmasterAt: original.PostmasterAt, ClaimedAt: original.ClaimedAt, Until: original.Until}
-		f.root.value.State.CapacitySetup.Receipt = &claimedReceipt
-		if _, err := f.producer.InitializeCapacity(ctx, f.input, f.protection); err == nil {
-			t.Fatal("missing roots after acknowledged receipt recreated")
-		}
-		f.root.value.State.CapacitySetup.Receipt = nil
-		if err := admin.QueryRow(ctx, `SELECT (SELECT count(*) FROM capacity_source WHERE root_id=$1),(SELECT count(*) FROM capture_audit_root WHERE root_id=$1)`, f.input.PermissionRootID).Scan(&beforeSources, &beforeCaptures); err != nil || beforeSources != 0 || beforeCaptures != 0 {
-			t.Fatal("refused setup changed paired roots", beforeSources, beforeCaptures, err)
-		}
-		f.refreshBase(t)
-		f.root.lostSetupReceipt = true
-		if _, err := f.producer.InitializeCapacity(ctx, f.input, f.protection); err == nil {
-			t.Fatal("lost setup receipt returned success")
+		changed := postgres.CapacityInitialization{ClusterID: f.input.ControlClusterID, NamespaceUID: f.input.ControlNamespaceUID, SourceDigest: artifact.Digest{99}, AccountVersion: f.input.AccountVersion, Qualification: f.qualification}
+		if outcome, err := postgres.InitializeCapacity(ctx, f.roles["capacity"], changed); err != nil || outcome != postgres.CapacityDifferent {
+			t.Fatal("changed capacity inputs adopted the original roots", outcome, err)
 		}
 		var sources, captures int
-		if err := admin.QueryRow(ctx, `SELECT (SELECT count(*) FROM capacity_source WHERE root_id=$1),(SELECT count(*) FROM capture_audit_root WHERE root_id=$1)`, f.input.PermissionRootID).Scan(&sources, &captures); err != nil {
-			t.Fatal(err)
+		if err := admin.QueryRow(ctx, `SELECT (SELECT count(*) FROM capacity_source WHERE root_id=$1),(SELECT count(*) FROM capture_audit_root WHERE root_id=$1)`, f.input.PermissionRootID).Scan(&sources, &captures); err != nil || sources != 1 || captures != 1 {
+			t.Fatalf("paired SQL roots: source=%d capture=%d %v", sources, captures, err)
 		}
-		if sources != 1 || captures != 1 {
-			t.Fatalf("original paired SQL write missing: source=%d capture=%d", sources, captures)
-		}
-		if !reflect.DeepEqual(*f.root.value.State.CapacitySetup, original) || f.root.setupClaims != 1 {
-			t.Fatal("resumed creation changed original claim or acknowledged an unknown completion")
-		}
-		f.refreshBase(t)
-		receipt, err := f.producer.InitializeCapacity(ctx, f.input, f.protection)
-		if err != nil {
-			t.Fatal("exact committed setup recovery", err)
-		}
-		if receipt.OperationID != original.OperationID || !receipt.ClaimedAt.Equal(original.ClaimedAt) || !receipt.Until.Equal(original.Until) || f.root.setupClaims != 1 || f.root.setupReceipts != 1 {
-			t.Fatal("setup recovery replaced original claim")
-		}
-		changed := f.input
-		changed.SourceGuardDigest = capacityGuardHex([32]byte{99})
-		if _, err = f.producer.InitializeCapacity(ctx, changed, f.protection); err == nil {
-			t.Fatal("changed setup adopted original roots")
+		if _, err := f.roles["capacity-capture"].Exec(ctx, `SELECT public.initialize_capacity_source(NULL,NULL,NULL,NULL,NULL,NULL)`); capacitySQLState(err) != "42501" {
+			t.Fatal("another login may initialize capacity", capacitySQLState(err))
 		}
 	}) {
 		return

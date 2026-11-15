@@ -127,6 +127,7 @@ def main(fleet=False, test_pattern=None, connector_retirement=False, scoped_audi
         pgname = None
         result_name=result_name or ("installed-evidence-delete" if installed_evidence_delete else "owner-audit-inventory" if owner_audit_inventory else "scoped-audit-storage" if scoped_audit else ("fleet" if fleet else "custody"))
         log_path = ROOT/("test/results/"+result_name+".log")
+        log_path.parent.mkdir(exist_ok=True)
         log_path.write_text("")
         report = {"scope": "storage custody, permission acceptance and bounded context admission components; synthetic control provenance only; no public acquisition or disclosure", "images": {}, "sourceHashes": hashes(), "passedTestNames": []}
         exit_code = 1

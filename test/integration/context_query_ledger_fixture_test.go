@@ -174,7 +174,7 @@ func withProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *p
 			p.Close()
 		}
 	}()
-	if _, err := f.producer.InitializeCapacity(ctx, f.input, f.protection); err != nil {
+	if _, err := f.initializeCapacity(ctx); err != nil {
 		t.Fatal("actual original ledger qualification setup", err)
 	}
 	f.open(t)

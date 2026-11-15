@@ -54,7 +54,7 @@ func (f *capacitySQLFixture) initializeManagedProcessing(t *testing.T, root app.
 	if err != nil {
 		t.Fatal(err)
 	}
-	material := f.root.value.State.MAC
+	material := f.setup.mac
 	mac, err := auditapp.NewOperationMAC(material.InputVersion, material.InputKey, material.AccountVersion, material.AccountKey)
 	if err != nil {
 		t.Fatal(err)

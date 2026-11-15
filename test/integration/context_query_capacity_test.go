@@ -73,7 +73,7 @@ func qualifyContextQueryCapacitySQL(t *testing.T, ctx context.Context, admin *pg
 			t.Fatal("closed shared qualification", mode, valid, err)
 		}
 	}
-	if _, err := f.producer.InitializeCapacity(ctx, f.input, f.protection); err != nil {
+	if _, err := f.initializeCapacity(ctx); err != nil {
 		t.Fatal(err)
 	}
 	f.open(t)
