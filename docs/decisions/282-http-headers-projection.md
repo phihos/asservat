@@ -266,16 +266,6 @@ test and this native focus. Worker transient memory for one page (about three
 frame-sized buffers) is within the 256 MiB Job limit but above the profile's
 declared 8 MiB per unit.
 
-The live acquisition worker caps (16 per installation, two per workload and
-two per principal, shared with downloads) count a projection worker until its
-Job is retired, after its page was delivered. A begin that finds a cap full
-is the retryable `NotAvailable` tool result (`ErrBusy`), not a transport 503.
-The caps are read before the query is admitted, so a busy refusal charges no
-query units; a slot taken between that read and the locked reservation is
-still a charged 503. Native paging measured the third page reaching the cap
-while the first two workers awaited retirement, and a charged busy refusal
-let one retry exhaust the workload's eight query units. A projection worker
-holds its slot for its full 60 s runtime and retires only on a later cleanup
-demand, so the room check is also such a demand; a third page therefore waits
-for the first page's worker to expire. Retiring a worker as soon as its page
-is delivered would shorten that wait and is not implemented.
+Projection workers have no installation, workload or principal count cap
+(removed by migration 00186, ADR-335 D9). Query units and the capacity
+concurrency limit bound them.

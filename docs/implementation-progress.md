@@ -28,8 +28,15 @@ seeded by 00172), which bound window audit bytes.
 
 Verified: `go build`, `go vet` (also `-tags libpcap`), `make go-check
 pcap-check`, the CI gate set, focused download custody tests (real
-PostgreSQL). Gap: projection and query workers still check
-the 16/2/2 acquisition worker caps, which have no stated reason.
+PostgreSQL).
+
+## Acquisition worker caps removed (ADR-335 D9, 2026-11-15)
+
+Projection and query workers no longer check the 16 per installation, two
+per workload and two per principal caps. Removed: the worker-room check,
+`ErrBusy` and its busy refusal, the count query, and the `download_worker`
+principal key and index (migration 00186). Query units and the capacity
+concurrency limit bound expensive work.
 
 ## Live watch without lifetime (ADR-335 D9, 2026-11-15)
 

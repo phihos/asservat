@@ -161,14 +161,12 @@ func TestProfileSummaryPreAdmissionRefusalStillRequiresAuditCurrentIdentityAndDe
 }
 
 func TestProfileSummaryUnknownAndPostAdmissionErrorsRemainTransportUnavailable(t *testing.T) {
-	for _, mode := range []string{"route", "attempted-admission", "worker-room", "post-admission-read"} {
+	for _, mode := range []string{"route", "attempted-admission", "post-admission-read"} {
 		t.Run(mode, func(t *testing.T) {
 			s, f, g, p := summaryBridge(t)
 			switch mode {
 			case "attempted-admission":
 				f.queryErr = errors.New("unknown admission result")
-			case "worker-room":
-				f.workerErr = errors.New("unknown worker admission")
 			case "post-admission-read":
 				f.errorAfterRead = errors.New("unknown read result")
 			}

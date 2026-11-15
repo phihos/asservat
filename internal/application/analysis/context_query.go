@@ -621,11 +621,6 @@ func (s ContextProjectionService) begin(ctx context.Context, current identities.
 	if err != nil {
 		return nil, queryStepped("pre-admit", err)
 	}
-	if err = s.Workers.ProjectionWorkerRoom(o.ctx, q); errors.Is(err, value.ErrBusy) {
-		return nil, queryStepped("worker-room", value.ErrBusy)
-	} else if err != nil {
-		return nil, queryCollapsed("worker-room", value.ErrUnavailable, err)
-	}
 	admitted, err := s.Results.Ledger.AdmitQuery(o.ctx, q, o.request, a)
 	if err != nil {
 		return nil, queryCollapsed("admit", value.ErrUnavailable, err)
