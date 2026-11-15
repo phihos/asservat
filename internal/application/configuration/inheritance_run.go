@@ -123,14 +123,19 @@ func (f *namespaceFeed) stop() {
 
 // syncSources records the latest source list and (re)starts the namespace
 // feed when the observed key set changed. Without a namespace observer, or
-// with more than 32 keys, there is no observation.
+// with more than 32 keys, there is no observation. While the source list is
+// incomplete the feed follows only the ClusterAccessBinding selector keys.
 func (s *bindingRun) syncSources(ctx context.Context, snapshot value.Snapshot) {
 	s.sources, s.sourcesComplete = snapshot.Sources, snapshot.SourcesComplete
 	s.clusterBindings = snapshot.ClusterBindings
-	if s.r.Namespaces == nil || !snapshot.SourcesComplete {
+	if s.r.Namespaces == nil {
 		return
 	}
-	keys := namespaceKeys(snapshot.Sources, snapshot.ClusterBindings, s.r.NamespaceClusterID)
+	sources := snapshot.Sources
+	if !snapshot.SourcesComplete {
+		sources = nil
+	}
+	keys := namespaceKeys(sources, snapshot.ClusterBindings, s.r.NamespaceClusterID)
 	if s.feed != nil && slices.Equal(s.feed.keys.Labels, keys.Labels) && slices.Equal(s.feed.keys.Annotations, keys.Annotations) {
 		return
 	}
@@ -225,7 +230,7 @@ func (s *bindingRun) inheritance(now time.Time) inheritanceState {
 		// A selector-narrowed binding has one basis per selected namespace.
 		// While its cluster's labels are unknown an allow grants nothing
 		// and a deny covers every namespace.
-		namespaces, known := SelectedNamespaces(b.NamespaceSelector, s.observation(b.Scope.ClusterID))
+		namespaces, known := SelectedNamespaces(b.NamespaceSelector, s.observation(b.Scope.ClusterID, now))
 		if !known && p.Effect == "Deny" {
 			out.Bases = append(out.Bases, p)
 		}
@@ -303,10 +308,11 @@ func (s *bindingRun) inheritance(now time.Time) inheritanceState {
 }
 
 // observation is the current namespace observation of cluster: the hub's
-// own feed or a joined cluster's connector journal (ADR-247).
-func (s *bindingRun) observation(cluster string) *value.NamespaceObservation {
+// own feed or a joined cluster's connector journal (ADR-247), which lapses
+// like the recorded RemoteNamespaces.
+func (s *bindingRun) observation(cluster string, now time.Time) *value.NamespaceObservation {
 	if cluster != s.r.NamespaceClusterID {
-		if r := s.remote[cluster]; r != nil {
+		if r := s.remote[cluster]; r != nil && now.Before(r.observedAt.Add(authorization.PermissionObservationInterval)) {
 			return r.live
 		}
 		return nil

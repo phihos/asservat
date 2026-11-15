@@ -362,6 +362,13 @@ func TestInheritanceNarrowsClusterBindingsBySelector(t *testing.T) {
 	if k := namespaceKeys(s.sources, s.clusterBindings, inheritanceCluster); !slices.Equal(k.Labels, []string{"managed"}) {
 		t.Fatalf("keys %v", k)
 	}
+	// The hub feed follows the selector keys while the source list is
+	// incomplete.
+	s.syncSources(ctx, value.Snapshot{ClusterBindings: s.clusterBindings})
+	if s.feed == nil || !slices.Equal(s.feed.keys.Labels, []string{"managed"}) || len(s.feed.keys.Annotations) != 0 {
+		t.Fatal("selector keys not observed without a complete source list")
+	}
+	s.sources, s.sourcesComplete = []value.Source{inheritanceSource()}, true
 	// Labels the observation does not carry are unknown.
 	s.clusterBindings = []value.Binding{binding("Allow", map[string]string{"tier": "a"}), binding("Deny", map[string]string{"tier": "a"})}
 	out = s.inheritance(s.r.Now())
