@@ -38,3 +38,15 @@ func TestAPIContextClosedOperationEncoding(t *testing.T) {
 		t.Fatal("oversize frame encoded")
 	}
 }
+
+func TestAPIContextWorkRequiresFormat(t *testing.T) {
+	for format, ok := range map[string]bool{APIContextWorkFormat: true, "": false, "api-context-work/v0": false} {
+		b, e := EncodeAPIContextWork(APIContextWork{Format: format, Purpose: "runAction"})
+		if e != nil {
+			t.Fatal(e)
+		}
+		if _, e = DecodeAPIContextWork(b); (e == nil) != ok {
+			t.Fatalf("format %q accepted=%v", format, e == nil)
+		}
+	}
+}

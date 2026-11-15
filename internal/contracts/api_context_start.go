@@ -103,7 +103,7 @@ func EncodeAPIContextWork(v APIContextWork) ([]byte, error) {
 }
 func DecodeAPIContextWork(b []byte) (APIContextWork, error) {
 	v, e := decodeOpenRPC[APIContextWork](bytes.NewReader(b), APIContextWorkBytes)
-	if e != nil {
+	if e != nil || v.Format != APIContextWorkFormat {
 		return APIContextWork{}, ErrAPIContextProtocol
 	}
 	return v, nil
