@@ -315,20 +315,24 @@ func (s Share) ManagedBy(i identity.Identity, now time.Time) ([]artifact.Audienc
 	return managedBy(s.Management, i, now)
 }
 
-// ManagerDenied reports whether a current Deny on the share target removes
-// i's management (Gitar #266): a fresh projection whose deny snapshot names
-// i for the sharing role, or a projection that is not current. Creator and
-// administrator revocation do not consult it.
-func ManagerDenied(p Projection, t Target, i identity.Identity, now time.Time) bool {
+// ManagerDenied reports whether a current Deny on the share target names i
+// for the sharing role, which removes i's management. current is false when
+// the projection or one of its denies is not current: the answer is then
+// unknown and callers report Unavailable. Creator and administrator
+// revocation do not consult it.
+func ManagerDenied(p Projection, t Target, i identity.Identity, now time.Time) (denied, current bool) {
 	if !projectionCurrent(p, t, now) {
-		return true
+		return false, false
 	}
 	for _, d := range p.Denies {
-		if !identity.Fresh(d.ObservedAt, d.FreshUntil, now, PermissionObservationInterval) || matches(d.Audience, i) && sharingRole(d.Audience.Role) {
-			return true
+		if !identity.Fresh(d.ObservedAt, d.FreshUntil, now, PermissionObservationInterval) {
+			return false, false
+		}
+		if matches(d.Audience, i) && sharingRole(d.Audience.Role) {
+			denied = true
 		}
 	}
-	return false
+	return denied, true
 }
 
 // PolicySharingManagedBy is ManagedBy for a recurring policy sharing

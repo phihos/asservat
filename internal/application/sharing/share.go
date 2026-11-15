@@ -302,7 +302,14 @@ func (s Service) List(ctx context.Context, current identities.CurrentIdentity, v
 				// A team share is listed only while the caller manages it now.
 				if !createdBy(row, i.Principal) {
 					held, _ := row.ManagedBy(i, s.Now())
-					if len(held) == 0 || value.ManagerDenied(projection(row.Target), row.Target, i, s.Now()) {
+					if len(held) == 0 {
+						continue
+					}
+					denied, current := value.ManagerDenied(projection(row.Target), row.Target, i, s.Now())
+					if !current {
+						return nil, "", time.Time{}, capture.ErrUnavailable
+					}
+					if denied {
 						continue
 					}
 				}
@@ -678,8 +685,8 @@ func (s Service) changePolicySharing(ctx context.Context, current identities.Cur
 }
 
 // managedHeld is the management i holds now on a share or policy sharing
-// target: none while a current Deny names i. A projection outage is
-// Unavailable, never a loss of management.
+// target: none while a current Deny names i. A projection outage or a stale
+// projection is Unavailable, never a loss of management.
 func (s Service) managedHeld(ctx context.Context, held []artifact.AudienceAssignment, t value.Target, i identity.Identity) ([]artifact.AudienceAssignment, error) {
 	if len(held) == 0 {
 		return nil, nil
@@ -688,7 +695,11 @@ func (s Service) managedHeld(ctx context.Context, held []artifact.AudienceAssign
 	if err != nil {
 		return nil, capture.ErrUnavailable
 	}
-	if value.ManagerDenied(p, t, i, s.Now()) {
+	denied, current := value.ManagerDenied(p, t, i, s.Now())
+	if !current {
+		return nil, capture.ErrUnavailable
+	}
+	if denied {
 		return nil, nil
 	}
 	return held, nil
