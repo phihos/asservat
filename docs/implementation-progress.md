@@ -173,7 +173,7 @@ cluster-observation capacity purposes, the context-control record counter
 and the download session/response counters (bytes stay bounded).
 `capturesPerCluster` defaults to max(8, node count).
 
-Follow-up (branch `clean/capacity-gaps`, migration 00185): target
+Follow-up (branch `clean/capacity-gaps`, migration 00187): target
 resolution refuses `kube-*`, the release namespace and namespaces labelled
 `asservat.io/evidence: disabled` (`targets.ErrEvidenceDisabled`). A profile
 admission counts the workload's still-writable profile attempts under the
