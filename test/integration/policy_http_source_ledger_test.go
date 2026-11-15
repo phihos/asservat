@@ -69,15 +69,9 @@ func httpSourceCompiler(t *testing.T, cluster, namespace string) captureapp.Poli
 // privileges. Native target/collector/fleet origins and independent human review
 // are fixture inputs; no collector, HTTP reassembly or installed proof here.
 func TestHTTPSourceLedgerWithRealServices(t *testing.T) {
-	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects) {
-		f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects)
+	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.AuthorityObjects) {
+		f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, objects)
 		root, enrollment := f.setup(t)
-		stop := f.keepFleetCurrent()
-		defer func() {
-			if err := stop(); err != nil {
-				t.Error(err)
-			}
-		}()
 		seed, _, _ := f.prepareManagedContext(t, root, enrollment, policySourceFixtureRetentionSeconds)
 		option := policyRecorderProtectedCase{Hub: f.roles["hub-runtime"], Admissions: seed.s, Filters: pcap.NewCompiler(), Expression: "tcp port 8080", Subjects: []cfg.Subject{{Kind: "Group", Issuer: "https://id.example.test", ID: "maintainers"}}, Ongoing: true, Retention: "31s", SourceComposition: httpSourceCompositionWire(), SourceCompiler: httpSourceCompiler(t, seed.a.Plan.Input.Target.Request.ClusterID, seed.a.Plan.Input.Target.Request.Namespace.UID), PermissionsAccepted: func(batch cfg.PermissionBatch) { f.batch = policyRecorderCloneBatch(batch) }}
 		option.SourceAccepted = func(t *testing.T, accepted policySourceAcceptedFixture) {

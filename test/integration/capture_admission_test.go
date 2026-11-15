@@ -340,24 +340,6 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 	}
 	create := func(t *testing.T, slots int64) scenario { return createForTarget(t, slots, nil, artifact.Digest{}) }
 	qualifyHistoryParameters(t, ctx, admin, poolFor, store, keys, create)
-	t.Run("suspended-installation-blocks-new-context-admission", func(t *testing.T) {
-		s := create(t, 1)
-		if _, err := admin.Exec(ctx, "UPDATE fleet_trust SET suspended=true WHERE installation_id=$1", s.recovery.installation); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := s.s.AdmitContext(ctx, s.a); err == nil {
-			t.Fatal("suspended installation admitted new capture")
-		}
-	})
-	t.Run("database-change-invalidates-already-read-recovery-proof", func(t *testing.T) {
-		s := create(t, 1)
-		if _, err := admin.Exec(ctx, "UPDATE fleet_trust SET activated_postmaster_at=activated_postmaster_at-interval '1 microsecond' WHERE installation_id=$1", s.recovery.installation); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := s.s.AdmitContext(ctx, s.a); err == nil {
-			t.Fatal("old recovery proof admitted a capture against a changed database")
-		}
-	})
 	qualifyOperationAudits(t, ctx, admin, poolFor, store, keys, create)
 	qualifyOperationAuditLifecycle(t, ctx, admin, poolFor, store, keys, s3admin, bucket, create)
 	qualifyCaptureIntentLifecycle(t, ctx, admin, poolFor, store, keys, s3admin, bucket, create)

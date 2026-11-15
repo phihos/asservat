@@ -1,5 +1,19 @@
 # Sustained implementation progress
 
+## Static fleet trust (ADR-330 D1/D13, 2026-11-15)
+
+The fleet trust row is static installation identity that `asservat setup`
+seeds (installation ID, issuer epoch). The hub-worker's one-second fleet
+observer, `fleet_observation`, `observe_fleet_administration`,
+`fence_fleet_observation`, the semantic-version trigger and the trust
+suspension are removed (migration 00185). `fleet_current_trust` keeps
+`suspended` (false) and `observed_at`/`fresh_until` (-infinity/infinity) for
+the stored function bodies that still name them. Provider and audit work no
+longer waits for a fleet observation after admission.
+
+Verified: see the PR. Gap: the `configuration-fleet` SQL login now only waits
+for the schema in the hub-worker init container.
+
 ## Download caps removed (ADR-312, ADR-335 D9, 2026-11-15)
 
 A download session runs to its original authority, access and allocation
@@ -103,8 +117,7 @@ function body; its Down restores the 00167 view for downgrade probes.
 `RecoveryProof`, `RecoveryState`, every `RecoveryReader`,
 `RecoveryTransactionGuard` and `EffectTransactionGuards` are gone from domain,
 application, adapters, bootstrap and transport; effect transactions no longer
-lock or check the trust row for recovery. `currentTrust` refuses a suspended
-or stale trust row. Open: the setup recovery step of REQ-DB-005;
+lock or check the trust row for recovery. Open: the setup recovery step of REQ-DB-005;
 retention topology, proofs and source checkpoints (D12); one-step publication;
 the unused `identity-read` pools that only served recovery reads.
 
@@ -267,12 +280,9 @@ the hub-api already reads (added to the implemented identity-settings copy and
 the chart). Removed: the fleet ConfigMap, `fleet` chart values, its schema and
 reader, the fleet protection guard, `contracts.FleetSettings`, the setup Job's
 Kubernetes RBAC, and the unreachable configuration-role/installer chain that
-depended on the reader. The SQL `fleet_trust` row and its observer stay: about
-45 migration functions require a fresh row. Its observation now comes from the
-generated installation ID and issuer epoch alone.
+depended on the reader.
 
-Gaps: the fleet trust heartbeat (one SQL observation per second) remains until those
-functions stop checking `fresh_until`; `administrators` is optional in the
+Gaps: `administrators` is optional in the
 implemented identity copy until the identity reader adopts the canonical
 contract; the `fleet-operator` role name stays in docs/interfaces.
 

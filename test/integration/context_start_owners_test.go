@@ -135,9 +135,6 @@ func (s *contextStartOwnerSQL) closeEffects() {
 	s.effectPools = nil
 }
 func (s *contextStartOwnerSQL) refresh(ctx context.Context, lifetime time.Duration) (value.OwnerConfigurationObservation, error) {
-	if e := renewSyntheticFleetObservation(ctx, s.lab.admin, s.lab.observation, 30*time.Second, false); e != nil {
-		return value.OwnerConfigurationObservation{}, e
-	}
 	n := time.Now().UTC().Truncate(time.Microsecond)
 	o := value.OwnerConfigurationObservation{Configuration: s.config.Clone(), ObservedAt: n, FreshUntil: n.Add(lifetime)}
 	r, ack, e := s.lab.writer.ObserveOwnerConfiguration(ctx, o)
@@ -378,11 +375,5 @@ func TestContextStartOwnersWithRealServices(t *testing.T) {
 		t.Fatal("configuration fence yielded successful discovery")
 	}
 	read(0)
-	if _, e = l.admin.Exec(ctx, "UPDATE fleet_trust SET suspended=true WHERE installation_id=$1", pool.InstallationID); e != nil {
-		t.Fatal(e)
-	}
-	if _, e = s.reader.ReadContextStartOwners(ctx); e == nil {
-		t.Fatal("recovery fence yielded successful discovery")
-	}
 	t.Log("actual separately credentialed SQL/S3 discovery; missing/audit/activation/purpose/retirement/overflow/privilege and proven held-row original-expiry checks; CA/native proof and initial accepted recovery remain synthetic")
 }

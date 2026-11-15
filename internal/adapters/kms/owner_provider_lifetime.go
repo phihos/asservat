@@ -96,7 +96,7 @@ func (s *ownerProviderLifetime) refreshConfiguration(ctx context.Context, worker
 			return ErrKeyService
 		}
 		defer lease.Release()
-		if lease.AwaitFleetObservation() != nil {
+		if lease.Schedule() != nil {
 			return ErrKeyService
 		}
 		return s.refreshOwned(lease.Context(), worker)
@@ -106,7 +106,7 @@ func (s *ownerProviderLifetime) refreshConfiguration(ctx context.Context, worker
 		return ErrKeyService
 	}
 	defer lease.Release()
-	if lease.AwaitFleetObservation() != nil {
+	if lease.Schedule() != nil {
 		return ErrKeyService
 	}
 	return s.refreshOwned(lease.Context(), worker)

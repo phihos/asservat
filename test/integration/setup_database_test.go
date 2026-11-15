@@ -15,8 +15,6 @@ import (
 
 	"asservat.local/asservat/internal/adapters/postgres"
 	cfg "asservat.local/asservat/internal/domain/configuration"
-	value "asservat.local/asservat/internal/domain/fleet"
-	"asservat.local/asservat/internal/domain/identity"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -144,22 +142,18 @@ func TestCustodySetupDatabaseWithRealPostgres(t *testing.T) {
 
 	// P3: the trust seed activates once; a rerun keeps it, another
 	// installation is refused.
-	now := time.Now()
-	a := value.Administration{InstallationID: installation, IssuerEpoch: custodyID(), Revision: identity.Revision{UID: custodyID(), Generation: 1, Digest: [32]byte{1}},
-		ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
-	if e = postgres.SeedInstallation(ctx, config, a); e != nil {
+	epoch := custodyID()
+	if e = postgres.SeedInstallation(ctx, config, installation, epoch); e != nil {
 		t.Fatal("seed", e)
 	}
-	var suspended bool
-	if e = owned.QueryRow(ctx, "SELECT suspended FROM public.fleet_current_trust WHERE installation_id=$1", installation).Scan(&suspended); e != nil || suspended {
-		t.Fatal("seeded trust not current", suspended, e)
+	var activated bool
+	if e = owned.QueryRow(ctx, "SELECT activated_postmaster_at IS NOT NULL FROM public.fleet_trust WHERE installation_id=$1", installation).Scan(&activated); e != nil || !activated {
+		t.Fatal("seeded trust not activated", activated, e)
 	}
-	if e = postgres.SeedInstallation(ctx, config, a); e != nil {
+	if e = postgres.SeedInstallation(ctx, config, installation, epoch); e != nil {
 		t.Fatal("seed rerun", e)
 	}
-	other := a
-	other.InstallationID = custodyID()
-	if e = postgres.SeedInstallation(ctx, config, other); !errors.Is(e, cfg.ErrChanged) {
+	if e = postgres.SeedInstallation(ctx, config, custodyID(), epoch); !errors.Is(e, cfg.ErrChanged) {
 		t.Fatal("second installation accepted", e)
 	}
 	var stale int

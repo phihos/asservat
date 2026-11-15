@@ -15,7 +15,7 @@ import (
 
 // Called by the existing selected SQL/S3 lifecycle fixture after an actual
 // positive certificate completion. This is not bootstrap/profile qualification.
-func qualifyOperationCertificateVerification(t *testing.T, ctx context.Context, admin, ackPool *pgxpool.Pool, ack *postgres.OperationLifecycles, verifier app.OperationCleanupVerifier, r value.OperationRetirement, receipt value.Receipt, mode string, binding syntheticFleetBinding) {
+func qualifyOperationCertificateVerification(t *testing.T, ctx context.Context, admin, ackPool *pgxpool.Pool, ack *postgres.OperationLifecycles, verifier app.OperationCleanupVerifier, r value.OperationRetirement, receipt value.Receipt, mode string) {
 	t.Helper()
 	count := func(want int64) {
 		t.Helper()
@@ -34,50 +34,6 @@ func qualifyOperationCertificateVerification(t *testing.T, ctx context.Context, 
 		t.Fatal("verifier jumped two claims")
 	}
 	count(0)
-	if mode == "blocked-expiry" {
-		// Refresh only the fixture observation; never change recovery acceptance.
-		refreshAuditFixtureRecovery(t, ctx, admin, binding, 250*time.Millisecond)
-		lock, e := admin.Begin(ctx)
-		if e != nil {
-			t.Fatal(e)
-		}
-		defer lock.Rollback(ctx)
-		if _, e = lock.Exec(ctx, "SELECT 1 FROM operation_audit_pool WHERE root_id=$1 AND lane='normal' FOR UPDATE", r.RootID); e != nil {
-			t.Fatal(e)
-		}
-		end := time.Now().Add(time.Second)
-		done := make(chan error, 1)
-		go func() {
-			bounded, cancel := context.WithDeadline(ctx, end)
-			defer cancel()
-			_, err := ack.ClaimOperationCertificateVerification(bounded, r, receipt)
-			done <- err
-		}()
-		observed := false
-		for time.Now().Before(end) {
-			var waiting int
-			if e = admin.QueryRow(ctx, "SELECT count(*) FROM pg_stat_activity WHERE usename='operation_audit_ack_runtime' AND cardinality(pg_blocking_pids(pid))>0").Scan(&waiting); e != nil {
-				t.Fatal(e)
-			}
-			if waiting > 0 {
-				observed = true
-				break
-			}
-			time.Sleep(5 * time.Millisecond)
-		}
-		if !observed {
-			t.Fatal("claim never reached blocked pool lock")
-		}
-		time.Sleep(275 * time.Millisecond)
-		if e = lock.Rollback(ctx); e != nil {
-			t.Fatal(e)
-		}
-		if e = <-done; e != app.ErrUnavailable {
-			t.Fatal("expired original recovery observation authorized claim", e)
-		}
-		count(0)
-		refreshAuditFixtureRecovery(t, ctx, admin, binding, 30*time.Second)
-	}
 	claim := func() (time.Time, error) { return ack.ClaimOperationCertificateVerification(ctx, r, receipt) }
 	var until time.Time
 	var e error

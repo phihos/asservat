@@ -22,11 +22,11 @@ import (
 // qualifyCapacityAccountsSQL covers capacity_apply, on-demand enrollment,
 // burst charges within the hard limit and the pool, and release back to the
 // protected share.
-func qualifyCapacityAccountsSQL(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects) {
+func qualifyCapacityAccountsSQL(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.AuthorityObjects) {
 	if !t.Run("lifecycle-policy-timestamp-wire", func(t *testing.T) { qualifyCapacityPolicyTimestampSQL(t, ctx, admin) }) {
 		t.FailNow()
 	}
-	f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects)
+	f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, objects)
 	root, e := f.setup(t)
 	const mib = int64(1 << 20)
 	type state struct{ limit, charged, pool, accounts, bindings, revision int64 }

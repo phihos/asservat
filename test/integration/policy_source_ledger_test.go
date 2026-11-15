@@ -37,15 +37,9 @@ const policySourceFixtureRetentionSeconds = int64(31)
 // Workload/collector/administrator/native guard observations remain synthetic;
 // this does not start a collector or establish installed source/Save acceptance.
 func TestPolicySourceLedgerWithRealPostgres(t *testing.T) {
-	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects) {
-		f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects)
+	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.AuthorityObjects) {
+		f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, objects)
 		root, enrollment := f.setup(t)
-		stop := f.keepFleetCurrent()
-		defer func() {
-			if err := stop(); err != nil {
-				t.Error(err)
-			}
-		}()
 		seed, _, _ := f.prepareManagedContext(t, root, enrollment, policySourceFixtureRetentionSeconds)
 		option := policyRecorderProtectedCase{Hub: f.roles["hub-runtime"], Admissions: seed.s, Filters: pcap.NewCompiler(), Expression: "tcp dst port 80", Subjects: []cfg.Subject{{Kind: "Group", Issuer: "https://id.example.test", ID: "maintainers"}}, Ongoing: true, Retention: strconv.FormatInt(policySourceFixtureRetentionSeconds, 10) + "s", PermissionsAccepted: func(batch cfg.PermissionBatch) { f.batch = policyRecorderCloneBatch(batch) }}
 		option.SourceAccepted = func(t *testing.T, accepted policySourceAcceptedFixture) {

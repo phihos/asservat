@@ -27,9 +27,9 @@ import (
 // Actual reviewed raw capture admission/publication and compiled hub/key roles.
 // The workload packet generator, Pod/Job/issuer and native join remain synthetic.
 func TestRawPacketSummaryLifecycleWithRealServices(t *testing.T) {
-	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects) {
+	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.AuthorityObjects) {
 		t.Run("raw-pcapng-compiled-lifecycle", func(t *testing.T) {
-			withProtectedContextQueryLedger(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, qualifyRawPacketSummaryLifecycle, false, false, false, true, true)
+			withProtectedContextQueryLedger(t, ctx, admin, address, tlsConfig, scope, claim, objects, qualifyRawPacketSummaryLifecycle, false, false, false, true, true)
 		})
 	})
 }

@@ -14,9 +14,7 @@ import (
 	"asservat.local/asservat/internal/adapters/kms"
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
-	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/fleet"
-	"asservat.local/asservat/internal/domain/identity"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -30,7 +28,7 @@ func TestCapacityAccountsWithRealPostgres(t *testing.T) {
 	withCapacityProducerFixture(t, qualifyCapacityAccountsSQL)
 }
 
-type capacityProducerCheck func(*testing.T, context.Context, *pgxpool.Pool, string, *tls.Config, value.InstallationWitnessScope, string, value.Administration, *objectstore.AuthorityObjects)
+type capacityProducerCheck func(*testing.T, context.Context, *pgxpool.Pool, string, *tls.Config, value.InstallationWitnessScope, string, *objectstore.AuthorityObjects)
 
 func withCapacityProducerFixture(t *testing.T, qualify capacityProducerCheck) {
 	var f fixture
@@ -105,11 +103,9 @@ func withCapacityProducerFixture(t *testing.T, qualify capacityProducerCheck) {
 	seed.Host, seed.Port, seed.Fallbacks = host, uint16(n), nil
 	seed.TLSConfig = tlsConfig.Clone()
 	seed.TLSConfig.MinVersion = tls.VersionTLS13
-	now := time.Now()
-	current := value.Administration{InstallationID: scope.InstallationID, IssuerEpoch: scope.IssuerEpoch, Revision: identity.Revision{UID: custodyID(), Generation: 1, Digest: artifact.Digest{1}}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
-	if e = postgres.SeedInstallation(ctx, seed, current); e != nil {
+	if e = postgres.SeedInstallation(ctx, seed, scope.InstallationID, scope.IssuerEpoch); e != nil {
 		t.Fatal("capacity prerequisite trust seed unavailable", e)
 	}
-	qualify(t, ctx, admin, address, tlsConfig, scope, custodyID(), current, &objectstore.AuthorityObjects{Store: store, Seal: seal, Open: open})
+	qualify(t, ctx, admin, address, tlsConfig, scope, custodyID(), &objectstore.AuthorityObjects{Store: store, Seal: seal, Open: open})
 	t.Log("setup trust seed and SQL54 purpose facets; source/probe/history inputs synthetic, no window reuse or installed remote observer")
 }

@@ -160,10 +160,10 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 		actor := identity.Principal{Issuer: basis.Subjects[0].Issuer, Subject: "developer", ClientID: "console", Kind: identity.Human}
 		authority := authorization.AcceptedPolicyAuthority{InstallationID: installation, PolicyUID: policy, Creator: actor, Executor: authorization.PolicyPrincipal(installation, policy), ScopeDigest: artifact.Digest{10}, ClusterID: cluster, NamespaceUID: ns, WorkloadUID: workload, Delegation: identity.Revision{UID: basis.Resource.UID, Generation: 1, Digest: basis.Resource.SpecDigest}, Owners: []artifact.AudienceAssignment{projection.Allows[0].Audience}, Actions: []string{"packetCapture"}, Limits: authorization.AutomationLimits{MaxExecutions: 10, MaxBytes: maxOutput, MaxObservedBytes: 2000}, IssuedAt: now, NotAfter: now.Add(time.Hour)}
 		issuerEpoch := custodyID()
-		if _, err = admin.Exec(ctx, `INSERT INTO fleet_trust(activated_postmaster_at,activated_database_oid,installation_id,issuer_epoch,source_uid,source_generation,source_digest,suspended,observed_at,fresh_until) VALUES(pg_catalog.pg_postmaster_start_time(),(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()),$1,$2,'synthetic-trust',1,$3,false,$4,$5)`, installation, issuerEpoch, bytes.Repeat([]byte{4}, 32), now, now.Add(30*time.Second)); err != nil {
+		if _, err = admin.Exec(ctx, `INSERT INTO fleet_trust(activated_postmaster_at,activated_database_oid,installation_id,issuer_epoch,source_uid,source_generation,source_digest) VALUES(pg_catalog.pg_postmaster_start_time(),(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()),$1,$2,'synthetic-trust',1,$3)`, installation, issuerEpoch, bytes.Repeat([]byte{4}, 32)); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := seedSyntheticFleetObservation(ctx, admin, installation); err != nil {
+		if _, err := readSyntheticFleetBinding(ctx, admin, installation); err != nil {
 			t.Fatal(err)
 		}
 		factory := func(pool *pgxpool.Pool) *postgres.Policies {
@@ -558,7 +558,7 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 			t.Fatal("audited edited authority rejected")
 		}
 	})
-	for _, name := range []string{"deleted", "expired-source", "suspended", "scope-tamper", "departed-at-acceptance", "actor-substitution", "removed-envelope", "team-deny"} {
+	for _, name := range []string{"deleted", "expired-source", "scope-tamper", "departed-at-acceptance", "actor-substitution", "removed-envelope", "team-deny"} {
 		t.Run(name, func(t *testing.T) {
 			s := newSetup(t)
 			if name == "departed-at-acceptance" {
@@ -592,10 +592,6 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 				// a microsecond and violate the intentionally strict 5s bound.
 				observed := clock().Add(-6 * time.Second)
 				if _, err = admin.Exec(ctx, "UPDATE policy_source SET observed_at=$2,fresh_until=$3 WHERE root_id=$1", s.input.RootID, observed, observed.Add(5*time.Second)); err != nil {
-					t.Fatal(err)
-				}
-			case "suspended":
-				if _, err = admin.Exec(ctx, "UPDATE fleet_trust SET suspended=true WHERE installation_id=$1", s.input.Authority.InstallationID); err != nil {
 					t.Fatal(err)
 				}
 			case "scope-tamper":

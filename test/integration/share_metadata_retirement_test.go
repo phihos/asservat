@@ -40,8 +40,8 @@ import (
 // Synthetic human/permission inputs and local test crypto remain explicit.
 // Public-operation audit and remote provider costs are outside these samples.
 func TestShareMetadataSlotsWithRealServices(t *testing.T) {
-	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects) {
-		f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, func(f *capacitySQLFixture) {
+	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.AuthorityObjects) {
+		f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, objects, func(f *capacitySQLFixture) {
 			// Select this finite component-test cohort before the first audit.
 			// Counts stay unchanged; these synthetic bounds do not qualify IAM,
 			// maximum-byte rows or the separate 100-share policy transaction.
@@ -203,7 +203,6 @@ func qualifyShareMetadataSlots(t *testing.T, f *capacitySQLFixture, s captureAdm
 	}
 	begin := func(name, key string) auditvalue.OperationIntent {
 		t.Helper()
-		f.refreshFleet(t)
 		return beginPaidShareOperation(t, ctx, gate, mac, policy, creator, name, key, profiles.Normal.RetainedSeconds)
 	}
 	finish := func(in auditvalue.OperationIntent) {
@@ -382,7 +381,6 @@ func qualifyPaidShareRetirement(t *testing.T, f *capacitySQLFixture, s captureAd
 	t.Logf("share_retirement_stage=await_original_purge remaining_ms=%d; original source bound unchanged; synthetic local signing/storage credentials do not qualify installed IAM", time.Until(in.Lifecycle.OriginalPurgeAt).Milliseconds())
 	// Exercise the installed selector with its compiled cleanup credential,
 	// including the normal lane; direct Advance alone cannot prove this path.
-	f.refreshFleet(t)
 	due, err := ledgers[0].DueWorkerOperations(ctx, "")
 	if err != nil || time.Now().Before(in.Lifecycle.OriginalPurgeAt) && slices.Contains(due, in.ID) {
 		t.Fatal("worker selected a normal operation before its original purge", err)
@@ -390,7 +388,6 @@ func qualifyPaidShareRetirement(t *testing.T, f *capacitySQLFixture, s captureAd
 	deadline := in.Lifecycle.LiveRetireBy.Add(5 * time.Second)
 	removed, selected, certificateDecoded := false, false, false
 	for time.Now().Before(deadline) {
-		f.refreshFleet(t)
 		if !selected && !time.Now().Before(in.Lifecycle.OriginalPurgeAt) {
 			due, err = ledgers[0].DueWorkerOperations(ctx, "")
 			if err != nil || !slices.Contains(due, in.ID) {
@@ -466,14 +463,12 @@ func qualifyPaidShareRetirement(t *testing.T, f *capacitySQLFixture, s captureAd
 	eligible, charged := *cooling.Eligible, *cooling.AccountCharge
 	t.Logf("share_retirement_stage=child_and_parent_deleted original_H=%d remaining_cooling_ms=%d charged=%d", policy.BackupHorizonSeconds, time.Until(eligible).Milliseconds(), charged)
 	for time.Now().Before(eligible) {
-		f.refreshFleet(t)
 		select {
 		case <-ctx.Done():
 			t.Fatal(ctx.Err())
 		case <-time.After(100 * time.Millisecond):
 		}
 	}
-	f.refreshFleet(t)
 	keys, err := ledgers[0].DueOperationHistory(ctx)
 	if err != nil || len(keys) != 1 {
 		t.Fatal("original cooling selection", err, len(keys))
@@ -511,7 +506,6 @@ func qualifyCompiledCleanupOverdueCounter(t *testing.T, f *capacitySQLFixture, s
 			t.Fatal(ctx.Err())
 		}
 	}
-	f.refreshFleet(t)
 	cleanup := f.roles["capture-cleanup"]
 	ledger, err := postgres.NewScopedWorkerOperationLifecycles(ctx, cleanup, s.a.RootID, s.recovery.installation, policy.StoreID)
 	if err != nil {

@@ -74,14 +74,7 @@ func (o *nativeFixtureSourceOwner) SetWorker(t *testing.T, observe func(context.
 
 func startNativeScenarioSources(t *testing.T, parent context.Context, admin *pgxpool.Pool, s captureAdmissionScenario) *nativeFixtureSourceOwner {
 	t.Helper()
-	binding := s.recovery.observation
-	if binding.installation != s.recovery.installation || binding.sourceUID != "synthetic-recovery" || binding.sourceGeneration != 1 || binding.sourceDigest != "6161616161616161616161616161616161616161616161616161616161616161" {
-		t.Fatal("original synthetic recovery binding unavailable")
-	}
 	return newNativeFixtureSourceOwner(t, parent, func(call context.Context) error {
-		if err := renewSyntheticFleetObservation(call, admin, binding, 30*time.Second, true); err != nil {
-			return err
-		}
 		if _, err := s.p.RenewPermissions(call, cfg.PermissionFence{RootID: s.batch.RootID, Epoch: s.batch.Epoch, TrustDigest: s.batch.TrustDigest}); err != nil {
 			return err
 		}

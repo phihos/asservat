@@ -39,9 +39,6 @@ type nativeOwnerConfiguration struct {
 }
 
 func (s nativeOwnerConfiguration) ReadOwnerConfiguration(ctx context.Context) (value.OwnerConfigurationObservation, error) {
-	if e := renewSyntheticFleetObservation(ctx, s.lab.admin, s.lab.observation, 30*time.Second, false); e != nil {
-		return value.OwnerConfigurationObservation{}, e
-	}
 	return s.current.ReadOwnerConfiguration(ctx)
 }
 
