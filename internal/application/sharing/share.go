@@ -50,8 +50,8 @@ type Service struct {
 // CreateInput is the validated create_share input. A zero ExpiresAt
 // selects the artifact's access end.
 type CreateInput struct {
-	// OperationID is the current server-owned paid audit operation. It is
-	// private plumbing, never part of the stable business request digest.
+	// OperationID is the public call's request ID; the effect's audit row
+	// carries it. It is never part of the stable business request digest.
 	OperationID        string `json:"-"`
 	CaseID, ArtifactID string
 	Version            artifact.Digest
@@ -601,10 +601,6 @@ func managementError(r value.Result) error {
 // team (or individual assignment) the caller does not hold now for the
 // artifact (ADR-238): management is never assigned to others.
 var ErrManagementNotHeld = errors.New("share management names an assignment the caller does not hold")
-
-// ErrRetentionCapacity refuses a new share whose expiry cannot fit its
-// original paid operation's backing. It never shortens an accepted expiry.
-var ErrRetentionCapacity = errors.New("share expiry exceeds original retained metadata backing")
 
 func createdBy(s value.Share, p identity.Principal) bool {
 	return s.Creator.Issuer == p.Issuer && s.Creator.Subject == p.Subject
