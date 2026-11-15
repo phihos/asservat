@@ -98,11 +98,13 @@ libpcap:
 	LIBPCAP_VERSION=$(LIBPCAP_VERSION) LIBPCAP_SHA256=$(LIBPCAP_SHA256) LIBPCAP_PREFIX="$(LIBPCAP_PREFIX)" TMPDIR="$(ASSERVAT_BUILD_TMP)" scripts/build-libpcap.sh
 
 # Real libpcap compilation tests plus the static hub build. User space only:
-# no capture or BPF load.
+# no capture or BPF load. The libpcap-tagged integration files compile only
+# with this tag, so they are vetted here as well.
 pcap-check: libpcap
 	$(PCAP_ENV) go test -tags libpcap -count=1 ./internal/adapters/pcap/
 	$(PCAP_ENV) go test -tags libpcap -count=1 -run '^TestPacketQueryPinnedLibpcapWireLengthAndTruncation$$' ./internal/bootstrap
 	$(PCAP_ENV) go test -tags libpcap -count=1 -run '^TestRawPolicyApprovedTimingReplayIgnoresRequireAllSwitch$$' ./internal/adapters/postgres/
+	$(PCAP_ENV) go vet -tags libpcap ./test/integration/
 	$(HUB_BUILD) -o "$(ASSERVAT_BUILD_TMP)/asservat-hub" ./cmd/asservat 2>/dev/null
 	file "$(ASSERVAT_BUILD_TMP)/asservat-hub" | grep -q 'statically linked'
 	rm -f "$(ASSERVAT_BUILD_TMP)/asservat-hub"

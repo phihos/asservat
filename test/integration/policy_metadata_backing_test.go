@@ -25,7 +25,7 @@ import (
 // backup result is inferred, nor is the synthetic guard a native installer.
 func TestPolicyMetadataBackingWithRealPostgres(t *testing.T) {
 	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects) {
-		profile := nativeCapacityProfile()
+		profile := installedMetadataProfile
 		f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, func(f *capacitySQLFixture) {
 			policyMetadataProfile(&f.qualification, &f.template)
 		})
@@ -53,7 +53,7 @@ func TestPolicyMetadataBackingWithRealPostgres(t *testing.T) {
 		if err = admin.QueryRow(ctx, "SELECT qualification->'RootBacking'->'Metadata' FROM capacity_source WHERE root_id=$1", f.input.PermissionRootID).Scan(&raw); err != nil || json.Unmarshal(raw, &metadata) != nil {
 			t.Fatal("accepted profile readback", err)
 		}
-		if metadata != f.qualification.RootBacking.Metadata || metadata.RecordRowBytes != profile.Metadata.RecordRowBytes || metadata.RecordWALBytes != profile.Metadata.RecordWALBytes || metadata.BackupCopies != profile.Backup.BackupCopies || metadata.WALCopies != profile.Backup.WALCopies {
+		if metadata != f.qualification.RootBacking.Metadata || metadata.RecordRowBytes != profile.RecordRowBytes || metadata.RecordWALBytes != profile.RecordWALBytes || metadata.BackupCopies != profile.BackupCopies || metadata.WALCopies != profile.WALCopies {
 			t.Fatal("actual protected metadata profile differs")
 		}
 		additional := policyMetadataRetention(t, f.input.ControlClusterID, 63)
@@ -147,14 +147,20 @@ func TestPolicyMetadataBackingWithRealPostgres(t *testing.T) {
 	})
 }
 
+// installedMetadataProfile holds the installed metadata/copy values the
+// removed installer capacity profile supplied to this fixture.
+var installedMetadataProfile = struct {
+	AdmissionSeconds, RecordRowBytes, RecordWALBytes, BackupCopies, WALCopies, ConfigurationTransitions int64
+}{AdmissionSeconds: 86400, RecordRowBytes: 128 << 10, RecordWALBytes: 8 << 20, BackupCopies: 2, WALCopies: 3, ConfigurationTransitions: 4096}
+
 func policyMetadataProfile(q *app.CapacityQualification, snapshot *app.CapacitySnapshot) {
-	profile := nativeCapacityProfile()
+	profile := installedMetadataProfile
 	// Match the actual installed metadata/copy profile. The pre-existing
 	// fixture still has THREE incident slots, explicitly not native's FOUR.
 	(*q).RootBacking.AdmissionSeconds = profile.AdmissionSeconds
 	metadata := &q.RootBacking.Metadata
-	metadata.WALCopies = profile.Backup.WALCopies
-	metadata.ConfigurationTransitions = profile.Metadata.ConfigurationTransitions
+	metadata.WALCopies = profile.WALCopies
+	metadata.ConfigurationTransitions = profile.ConfigurationTransitions
 	// Keep exactly three records/native children. Bytes can cover PCAPNG;
 	// objects remain the independent three-record ceiling (no row increase).
 	bytes := (artifact.Registration{NativeLimit: artifact.RecordingNativeLimit}).ReservedBytes() * 3

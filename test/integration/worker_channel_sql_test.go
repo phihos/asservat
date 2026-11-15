@@ -52,7 +52,7 @@ func (s *recordedWorkerCSR) EnrollmentKey(raw []byte) (artifact.Digest, error) {
 // Composes real TLS/process key -> active control operation -> real authority,
 // SQL signing/audit/activation roles and encrypted S3 audit. The Pod proof and
 // issuer remain explicit test replacements, not Kubernetes/CA qualification.
-func qualifyWorkerEnrollmentChannel(t *testing.T, ctx context.Context, w value.DownloadWorker, f workerEnrollmentFixture) {
+func qualifyWorkerEnrollmentChannel(t *testing.T, ctx context.Context, w value.DownloadWorker, f workerEnrollmentFixture, refresh func() error) {
 	t.Helper()
 	target := value.WorkerCredentialTarget{InstallationID: w.Binding.InstallationID, SessionID: w.Intent.SessionID, WorkerID: w.Intent.ID, PodUID: w.Binding.PodUID, CreatedAt: w.Intent.CreatedAt, RunUntil: w.Intent.RunUntil}
 	parent, cancel := context.WithCancel(ctx)
@@ -128,6 +128,11 @@ func qualifyWorkerEnrollmentChannel(t *testing.T, ctx context.Context, w value.D
 		t.Fatal("response still open but route capacity refunded")
 	}
 	delivery.Close()
+	// The worker configuration observation lasts five seconds; renew it as the
+	// production observer does before the replacement owner's enrollment.
+	if err = refresh(); err != nil {
+		t.Fatal(err)
+	}
 	next, err := router.Register(parent, op)
 	if err != nil {
 		t.Fatal("finished owner slot unavailable", err)

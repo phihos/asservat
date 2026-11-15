@@ -529,6 +529,12 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 					}
 				}
 				refresh()
+				// The installation workload rate defaults to one dump per 15 minutes
+				// (capacity.workload.dump). Let that shared interval elapse; the
+				// policy's own window is unchanged.
+				if _, err := admin.Exec(ctx, "UPDATE policy_workload_window SET tat=clock_timestamp() WHERE root_id=$1 AND policy_uid=''", root); err != nil {
+					t.Fatal(err)
+				}
 				observation.Pods[0].Restarts++
 				observation.ObservedAt = clock()
 				observation.FreshUntil = observation.ObservedAt.Add(5 * time.Second)

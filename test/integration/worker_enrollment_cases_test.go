@@ -27,7 +27,7 @@ func workerEnrollmentCase(t *testing.T, ctx context.Context, mode string, w valu
 		return true
 	}
 	if mode == "enrollment-channel" {
-		qualifyWorkerEnrollmentChannel(t, ctx, w, f)
+		qualifyWorkerEnrollmentChannel(t, ctx, w, f, refresh)
 		return true
 	}
 	key, e := mtls.EnrollmentKey(f.csr)

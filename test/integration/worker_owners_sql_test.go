@@ -55,6 +55,11 @@ func qualifyWorkerOwners(t *testing.T, ctx context.Context, w value.DownloadWork
 		}
 		return op
 	}
+	// The worker configuration observation lasts five seconds; renew it as the
+	// production observer does before each phase.
+	if err := refresh(); err != nil {
+		t.Fatal(err)
+	}
 	first, err := owners[0].Register(ctx, newOperation(ctx))
 	if err != nil {
 		t.Fatal("register first SQL owner", err)
@@ -88,6 +93,9 @@ func qualifyWorkerOwners(t *testing.T, ctx context.Context, w value.DownloadWork
 		t.Fatal("same request changed original timing")
 	}
 	if err = first.Close(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err = refresh(); err != nil {
 		t.Fatal(err)
 	}
 	second, err := owners[1].Register(ctx, newOperation(ctx))
@@ -151,6 +159,9 @@ func qualifyWorkerOwners(t *testing.T, ctx context.Context, w value.DownloadWork
 			stat := pool.Stat()
 			t.Logf("request-owner pool=%d total=%d idle=%d acquired=%d", i, stat.TotalConns(), stat.IdleConns(), stat.AcquiredConns())
 		}
+	}
+	if err = refresh(); err != nil {
+		t.Fatal(err)
 	}
 	a := authority()
 	wrong := a
