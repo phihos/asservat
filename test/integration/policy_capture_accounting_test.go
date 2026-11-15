@@ -61,11 +61,7 @@ func attachPolicyAccountingGrantModeWithLimits(t *testing.T, ctx context.Context
 	if err != nil {
 		t.Fatal(err)
 	}
-	guard, err := postgres.NewRecoveryTransactionGuard(s.a.RootID, a.InstallationID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	store, err := postgres.NewAccessGrants(ctx, hub, s.a.RootID, guard)
+	store, err := postgres.NewAccessGrants(ctx, hub, s.a.RootID, a.InstallationID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -147,15 +143,11 @@ func attachPolicyAccountingGrantModeWithLimits(t *testing.T, ctx context.Context
 	if !blueprint.Valid() || sha256.Sum256(scope) != g.ExecutionDigest || app.ReviewDigest(g, g.Review) != g.ReviewDigest {
 		t.Fatal("synthetic grant blueprint violates immutable domain/scope/review bindings")
 	}
-	recovery, err := s.recovery.reader.RecoveryState(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	g, _, err = store.RequestGrant(ctx, app.StoredGrantRequest{Grant: g, IdempotencyKey: requestKey, RequestDigest: app.PolicyGrantRequestDigest(a.Creator, app.PolicyGrantRequestInput{PolicyUID: a.PolicyUID, PolicyName: "restarts", IdempotencyKey: requestKey, Lifetime: g.Lifetime, Limits: g.Policy.Limits})}, recovery)
+	g, _, err = store.RequestGrant(ctx, app.StoredGrantRequest{Grant: g, IdempotencyKey: requestKey, RequestDigest: app.PolicyGrantRequestDigest(a.Creator, app.PolicyGrantRequestInput{PolicyUID: a.PolicyUID, PolicyName: "restarts", IdempotencyKey: requestKey, Lifetime: g.Lifetime, Limits: g.Policy.Limits})})
 	if err != nil {
 		t.Fatal("policy grant request", err)
 	}
-	g, _, err = store.DecideGrant(ctx, app.GrantDecisionInput{GrantID: g.ID, Approver: identity.Principal{Issuer: a.Creator.Issuer, Subject: "independent-component-reviewer", ClientID: "review-console", Kind: identity.Human}, Approve: true, Reason: "synthetic SQL review", ACR: "fixture-step-up", AuthTime: now, IdempotencyKey: requestKey + "-approval"}, recovery)
+	g, _, err = store.DecideGrant(ctx, app.GrantDecisionInput{GrantID: g.ID, Approver: identity.Principal{Issuer: a.Creator.Issuer, Subject: "independent-component-reviewer", ClientID: "review-console", Kind: identity.Human}, Approve: true, Reason: "synthetic SQL review", ACR: "fixture-step-up", AuthTime: now, IdempotencyKey: requestKey + "-approval"})
 	if err != nil {
 		t.Fatal("independent component decision", err)
 	}
@@ -163,7 +155,7 @@ func attachPolicyAccountingGrantModeWithLimits(t *testing.T, ctx context.Context
 		t.Fatal("ordinary grant changed actual authority or acquired raw observation credit")
 	}
 	actor := identity.Identity{Principal: a.Creator, Scopes: []string{"evidence:read", "evidence:capture"}, Groups: append([]string(nil), s.a.Eligibility.VerifiedIdentity.Groups...), Policy: s.a.Eligibility.VerifiedIdentity.Policy, VerifiedAt: now, ValidUntil: now.Add(30 * time.Second)}
-	if _, _, err = policies.AttachPolicyGrant(ctx, app.PolicyGrantAttachmentInput{ID: custodyID(), PolicyUID: a.PolicyUID, GrantID: g.ID, IdempotencyKey: requestKey + "-attachment", Actor: actor, Recovery: recovery}); err != nil {
+	if _, _, err = policies.AttachPolicyGrant(ctx, app.PolicyGrantAttachmentInput{ID: custodyID(), PolicyUID: a.PolicyUID, GrantID: g.ID, IdempotencyKey: requestKey + "-attachment", Actor: actor}); err != nil {
 		t.Fatal("current manager attachment", err)
 	}
 	return g.ID
@@ -194,18 +186,14 @@ func qualifyOriginalPolicyGrantAcquisition(t *testing.T, ctx context.Context, ad
 	if err != nil || status.ActiveID == "" || status.ExecutionsSpent != wantExecutions || status.CollectedBytesSpent != wantTotalBytes || status.MaxCollectedBytes != a.Limits.MaxBytes || status.ObservedBytesSpent != 0 || status.MaxObservedBytes != a.Limits.MaxObservedBytes {
 		t.Fatal("shared accepted budget status differs from actual charged pool", status, err)
 	}
-	reader, err := postgres.NewAPIContextExecutions(ctx, pool, s.a.RootID, postgres.EffectTransactionGuards{Recovery: s.recovery.guard, Retention: s.retention.guard})
+	reader, err := postgres.NewAPIContextExecutions(ctx, pool, s.a.RootID, s.recovery.installation, s.retention.guard)
 	if err != nil {
 		t.Fatal(err)
 	}
 	read := func() error {
 		refresh()
-		proof, err := s.recovery.reader.RecoveryState(ctx)
-		if err != nil {
-			return err
-		}
 		now := time.Now().UTC().Truncate(time.Microsecond)
-		_, err = reader.ReadAPIContextWork(ctx, c.CaptureID, authorization.PolicyExecutorIdentity(a, now, now.Add(5*time.Second)), proof)
+		_, err = reader.ReadAPIContextWork(ctx, c.CaptureID, authorization.PolicyExecutorIdentity(a, now, now.Add(5*time.Second)))
 		return err
 	}
 	if err = read(); err != nil {
@@ -232,11 +220,7 @@ func qualifyOriginalPolicyGrantAcquisition(t *testing.T, ctx context.Context, ad
 	})
 	hub := poolFor(hubRole, "synthetic-accounting-revoke")
 	defer hub.Close()
-	guard, err := postgres.NewRecoveryTransactionGuard(s.a.RootID, a.InstallationID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	grants, err := postgres.NewAccessGrants(ctx, hub, s.a.RootID, guard)
+	grants, err := postgres.NewAccessGrants(ctx, hub, s.a.RootID, a.InstallationID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -244,11 +228,7 @@ func qualifyOriginalPolicyGrantAcquisition(t *testing.T, ctx context.Context, ad
 	if err != nil {
 		t.Fatal(err)
 	}
-	proof, err := s.recovery.reader.RecoveryState(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, _, err = grants.RevokeGrant(ctx, app.GrantRevocationInput{GrantID: oldGrant, Revoker: a.Creator, ExpectedRevision: original.Revision, IdempotencyKey: "revoke-original-after-replacement"}, proof); err != nil {
+	if _, _, err = grants.RevokeGrant(ctx, app.GrantRevocationInput{GrantID: oldGrant, Revoker: a.Creator, ExpectedRevision: original.Revision, IdempotencyKey: "revoke-original-after-replacement"}); err != nil {
 		t.Fatal(err)
 	}
 	err = read()

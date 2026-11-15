@@ -42,7 +42,7 @@ func regionalEnrollmentDiagnostics(t *testing.T, ctx context.Context, admin *pgx
   'stage',CASE WHEN NOT profile_accepted THEN 'profile-acceptance-pending' WHEN NOT process_accepted THEN 'process-admission-pending'
    WHEN NOT client_leaf_active THEN 'client-leaf-pending' WHEN NOT server_leaf_active THEN 'server-leaf-pending'
    ELSE 'paired-process-not-observed' END,
-  'fleet_trust_current',EXISTS(SELECT 1 FROM fleet_current_trust WHERE installation_id=$1 AND NOT suspended AND NOT recovery_blocked AND clock_timestamp()<fresh_until),
+  'fleet_trust_current',EXISTS(SELECT 1 FROM fleet_current_trust WHERE installation_id=$1 AND NOT suspended AND clock_timestamp()<fresh_until),
   'profile_present',profile_present,'profile_accepted',profile_accepted,
   'profile_suspended',EXISTS(SELECT 1 FROM profile WHERE suspended),
   'profile_fenced',EXISTS(SELECT 1 FROM profile WHERE fenced),'profile_blocked',EXISTS(SELECT 1 FROM profile WHERE blocked),

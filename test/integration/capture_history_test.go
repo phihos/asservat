@@ -61,7 +61,7 @@ func qualifyCaptureHistory(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 	first := admit("history-1")
 	second := admit("history-2")
 	third := admit("history-3")
-	reader, err := postgres.NewContextProgressReads(ctx, readPool, s.a.RootID, s.recovery.guard)
+	reader, err := postgres.NewContextProgressReads(ctx, readPool, s.a.RootID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,18 +73,12 @@ func qualifyCaptureHistory(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 	as := func(subject string, groups []string) (capture.HistoryQuery, capture.SettingsQuery) {
 		t.Helper()
 		refresh()
-		// As in the service: the identity is verified before recovery is read.
 		i := s.a.Eligibility.VerifiedIdentity
 		i.Principal.Subject, i.Groups, i.Scopes = subject, groups, []string{"evidence:read"}
 		i.VerifiedAt = time.Now().UTC()
 		i.ValidUntil = i.VerifiedAt.Add(5 * time.Second)
-		time.Sleep(time.Millisecond)
-		r, err := s.recovery.reader.RecoveryState(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return capture.HistoryQuery{RootID: s.a.RootID, Target: target, Origins: []capture.HistoryOrigin{capture.HistoryManual}, Limit: 20, Identity: i, Recovery: r},
-			capture.SettingsQuery{RootID: s.a.RootID, CaptureID: first, Identity: i, Recovery: r}
+		return capture.HistoryQuery{RootID: s.a.RootID, Target: target, Origins: []capture.HistoryOrigin{capture.HistoryManual}, Limit: 20, Identity: i},
+			capture.SettingsQuery{RootID: s.a.RootID, CaptureID: first, Identity: i}
 	}
 	requester := s.a.Eligibility.VerifiedIdentity.Principal.Subject
 	ids := func(p capture.HistoryPage) []string {

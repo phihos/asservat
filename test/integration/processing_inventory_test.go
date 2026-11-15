@@ -27,7 +27,7 @@ func qualifyProcessingInventory(t *testing.T, ctx context.Context, admin *pgxpoo
 	})
 	pool := poolFor(role, password)
 	defer pool.Close()
-	reader, err := postgres.NewProcessingInventory(ctx, pool, s.a.RootID, s.recovery.guard)
+	reader, err := postgres.NewProcessingInventory(ctx, pool, s.a.RootID)
 	if err != nil {
 		t.Fatal("compiled processing inventory constructor", err)
 	}
@@ -42,12 +42,8 @@ func qualifyProcessingInventory(t *testing.T, ctx context.Context, admin *pgxpoo
 		if err != nil {
 			t.Fatal(err)
 		}
-		r, err := s.recovery.reader.RecoveryState(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
-		until := identity.Earlier(start.Add(5*time.Second), identity.Earlier(i.ValidUntil, identity.Earlier(p.FreshUntil, r.FreshUntil)))
-		a := value.ProcessingAuthority{Identity: i, Policy: p, Recovery: r, ObservedAt: start, ValidUntil: until}
+		until := identity.Earlier(start.Add(5*time.Second), identity.Earlier(i.ValidUntil, p.FreshUntil))
+		a := value.ProcessingAuthority{Identity: i, Policy: p, ObservedAt: start, ValidUntil: until}
 		if !a.Valid(time.Now()) {
 			t.Fatal("current synthetic operator roots unavailable")
 		}
@@ -77,15 +73,13 @@ func qualifyProcessingInventory(t *testing.T, ctx context.Context, admin *pgxpoo
 	if _, err = reader.ResolveProcessingArtifactScope(ctx, authority(), custodyID()); err == nil {
 		t.Fatal("unknown artifact invented an immutable scope")
 	}
-	for _, mode := range []string{"source", "guard", "recovery"} {
+	for _, mode := range []string{"source", "guard"} {
 		a := authority()
 		switch mode {
 		case "source":
 			a.Policy.Revision.UID = custodyID()
 		case "guard":
 			a.Policy.ProtectionDigest[0]++
-		case "recovery":
-			a.Recovery.Revision.Digest[0]++
 		}
 		if result, err := reader.ReadProcessingInventory(ctx, a, q); err == nil || len(result.Rules) != 0 {
 			t.Fatal("inventory ignored SQL fence", mode, err)

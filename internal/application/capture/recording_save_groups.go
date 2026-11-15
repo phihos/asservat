@@ -154,7 +154,7 @@ func (s RecordingSaves) previewRecordingSaveGroup(ctx context.Context, current i
 		}
 		until = identity.Earlier(until, parts[n].ValidUntil)
 	}
-	parent := value.ContextPreview{Group: &value.RecordingSaveGroupPreview{Executor: a.Executor, PolicyName: rows[0].PolicyName, PolicyUID: a.PolicyUID, ExecutionDigest: a.ScopeDigest}, ID: s.Investigation.NewID(), RootID: s.Investigation.RootID, InstallationID: s.Investigation.InstallationID, IssuerEpoch: parts[0].Preview.IssuerEpoch, CaptureID: s.Investigation.NewID(), CaseID: s.Investigation.NewID(), AssessmentID: s.Investigation.NewID(), AssessmentRulesDigest: RecordingSaveGroupAssessmentRulesDigest(), Actor: i.Principal, ExecutionClass: artifact.ContextAPIExecution, Storage: parts[0].Preview.Storage, CreatedAt: now, SelectionUntil: now.Add(time.Minute)}
+	parent := value.ContextPreview{Group: &value.RecordingSaveGroupPreview{Executor: a.Executor, PolicyName: rows[0].PolicyName, PolicyUID: a.PolicyUID, ExecutionDigest: a.ScopeDigest}, ID: s.Investigation.NewID(), RootID: s.Investigation.RootID, InstallationID: s.Investigation.InstallationID, CaptureID: s.Investigation.NewID(), CaseID: s.Investigation.NewID(), AssessmentID: s.Investigation.NewID(), AssessmentRulesDigest: RecordingSaveGroupAssessmentRulesDigest(), Actor: i.Principal, ExecutionClass: artifact.ContextAPIExecution, Storage: parts[0].Preview.Storage, CreatedAt: now, SelectionUntil: now.Add(time.Minute)}
 	parent.Target = rows[0].Source.Target.Request
 	parent.Target.PodUID, parent.Target.PodName = "", ""
 	parent.Intent = value.ContextIntent{Target: targets.WorkloadRequest{ClusterID: set.Target.ClusterID, Namespace: parent.Target.Namespace.Name, Kind: parent.Target.Workload.Kind, Name: parent.Target.Workload.Name}, Sharing: request.Sharing, RepeatedFrom: lineage}
@@ -276,9 +276,9 @@ func aggregateRecordingSaveAssessment(p value.ContextPreview, children []Recordi
 
 // requestRecordingSaveGroup refreshes every member before the one atomic parent
 // admission. No child preview or independent public admission is created.
-func (s ContextInvestigation) requestRecordingSaveGroup(ctx context.Context, current identities.CurrentIdentity, p value.ContextPreview, key string, recovery artifact.RecoveryProof, bounds *value.GroupRequestBounds) (value.Accepted, error) {
+func (s ContextInvestigation) requestRecordingSaveGroup(ctx context.Context, current identities.CurrentIdentity, p value.ContextPreview, key string, bounds *value.GroupRequestBounds) (value.Accepted, error) {
 	var zero value.Accepted
-	if s.RecordingSources == nil || s.RecordingGroups == nil || s.RecordingPolicies == nil || s.PolicyAccepted == nil || p.Group == nil || !p.Current(s.Now()) || p.IssuerEpoch != recovery.IssuerEpoch || p.AssessmentRulesDigest != RecordingSaveGroupAssessmentRulesDigest() {
+	if s.RecordingSources == nil || s.RecordingGroups == nil || s.RecordingPolicies == nil || s.PolicyAccepted == nil || p.Group == nil || !p.Current(s.Now()) || p.AssessmentRulesDigest != RecordingSaveGroupAssessmentRulesDigest() {
 		return zero, value.ErrUnavailable
 	}
 	g := p.Group
@@ -327,7 +327,7 @@ func (s ContextInvestigation) requestRecordingSaveGroup(ctx context.Context, cur
 		return zero, err
 	}
 	t0 := s.Now().UTC().Truncate(time.Microsecond)
-	request := value.RecordingSaveGroupAdmission{RequestBounds: original, Preview: p.Clone(), RootID: s.RootID, IdempotencyKey: key, SubmissionDigest: ContextRequestDigest(p.ID), Recovery: recovery}
+	request := value.RecordingSaveGroupAdmission{RequestBounds: original, Preview: p.Clone(), RootID: s.RootID, IdempotencyKey: key, SubmissionDigest: ContextRequestDigest(p.ID)}
 	facts := make([]contextFacts, len(rows))
 	preparedUntil := make([]time.Time, len(rows))
 	initiators := make([]authorization.CaptureEligibility, len(rows))
@@ -347,7 +347,7 @@ func (s ContextInvestigation) requestRecordingSaveGroup(ctx context.Context, cur
 		if !initiator.Eligible || initiator.Principal != p.Actor || !initiator.VerifiedIdentity.Valid(s.Now()) {
 			return zero, value.ErrDenied
 		}
-		child := value.Admission{RecordingSave: &value.RecordingSaveAdmission{Authority: a, Policy: policy.Policy, Initiator: initiator}, RepeatedFrom: p.Intent.RepeatedFrom, Recovery: recovery, RootID: s.RootID, IdempotencyKey: key, SubmissionDigest: request.SubmissionDigest, Plan: plan, Eligibility: f.eligibility, Storage: f.storage.Binding, Registration: r, CaseID: p.CaseID, OccurrenceID: c.OccurrenceID}
+		child := value.Admission{RecordingSave: &value.RecordingSaveAdmission{Authority: a, Policy: policy.Policy, Initiator: initiator}, RepeatedFrom: p.Intent.RepeatedFrom, RootID: s.RootID, IdempotencyKey: key, SubmissionDigest: request.SubmissionDigest, Plan: plan, Eligibility: f.eligibility, Storage: f.storage.Binding, Registration: r, CaseID: p.CaseID, OccurrenceID: c.OccurrenceID}
 		if !ReviewedRecordingSaveGroupChild(p, child) {
 			return zero, value.ErrChanged
 		}
@@ -376,7 +376,7 @@ func (s ContextInvestigation) requestRecordingSaveGroup(ctx context.Context, cur
 			request.RequestBounds.Until = identity.Earlier(request.RequestBounds.Until, initiator.VerifiedIdentity.ValidUntil).UTC().Truncate(time.Microsecond)
 		}
 	}
-	if !p.Current(s.Now()) || !recovery.Valid(s.Now()) || ctx.Err() != nil {
+	if !p.Current(s.Now()) || ctx.Err() != nil {
 		return zero, value.ErrChanged
 	}
 	if request.RequestBounds != nil && !request.RequestBounds.Valid(s.Now()) {
@@ -389,10 +389,10 @@ func (s ContextInvestigation) requestRecordingSaveGroup(ctx context.Context, cur
 	if !acceptedContext(accepted, request.SubmissionDigest) || accepted.CaptureID != p.CaptureID || accepted.ScopeDigest != p.ScopeDigest {
 		return zero, value.ErrUnavailable
 	}
-	if _, err = s.currentIdentity(ctx, current, caller.Principal, caller.ValidUntil); err != nil || !recovery.Valid(s.Now()) || ctx.Err() != nil {
+	if _, err = s.currentIdentity(ctx, current, caller.Principal, caller.ValidUntil); err != nil || ctx.Err() != nil {
 		return zero, value.ErrDenied
 	}
-	accepted.MetadataValidUntil = identity.Earlier(accepted.MetadataValidUntil, identity.Earlier(caller.ValidUntil, recovery.FreshUntil))
+	accepted.MetadataValidUntil = identity.Earlier(accepted.MetadataValidUntil, caller.ValidUntil)
 	for _, until := range preparedUntil {
 		accepted.MetadataValidUntil = identity.Earlier(accepted.MetadataValidUntil, until)
 	}

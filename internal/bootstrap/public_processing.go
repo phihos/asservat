@@ -19,7 +19,6 @@ type publicProcessingChanges struct {
 	root, installation string
 	profiles           auditapp.CapacityAuditProfiles
 	policies           privacy.ProcessingPolicyReader
-	recovery           privacy.ProcessingRecoveryReader
 	decisions          privacy.ProcessingDecisions
 	artifactScopes     privacy.ProcessingArtifactScopes
 	audit              privacy.ProcessingAudit
@@ -40,7 +39,7 @@ func (s publicProcessingChanges) Change(ctx context.Context, current identities.
 	if c.Action == "release_processing" {
 		retainedSeconds = accepted.Processing.RetainedSeconds
 	}
-	receipt, err := privacy.ProcessingChanges{RootID: s.root, InstallationID: s.installation, Policies: s.policies, Recovery: s.recovery, Decisions: s.decisions, ArtifactScopes: s.artifactScopes,
+	receipt, err := privacy.ProcessingChanges{RootID: s.root, InstallationID: s.installation, Policies: s.policies, Decisions: s.decisions, ArtifactScopes: s.artifactScopes,
 		Audit: s.audit, ReleaseAudit: s.releaseAudit, MAC: s.mac, AuditPolicy: accepted.Normal.Policy, ReleaseAuditPolicy: accepted.Processing.Policy, RetainedSeconds: retainedSeconds, Now: time.Now}.Change(ctx, current, c)
 	if err != nil {
 		s.refuse(s.refusedStep(ctx, current))
@@ -87,13 +86,6 @@ func (s publicProcessingChanges) refusedStep(ctx context.Context, current identi
 	}
 	if p.RootID != s.root || p.InstallationID != s.installation || !p.Operator(i, time.Now()) {
 		return "operator"
-	}
-	_, err = s.recovery.RecoveryState(call)
-	if call.Err() != nil {
-		return "request"
-	}
-	if err != nil {
-		return "recovery"
 	}
 	return "change"
 }

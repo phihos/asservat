@@ -1,11 +1,12 @@
 package capture
 
 import (
-	identities "asservat.local/asservat/internal/application/identity"
-	value "asservat.local/asservat/internal/domain/capture"
 	"context"
 	"testing"
 	"time"
+
+	identities "asservat.local/asservat/internal/application/identity"
+	value "asservat.local/asservat/internal/domain/capture"
 )
 
 type progressReadFunc func(context.Context, value.ProgressQuery) (value.ContextProgressObservation, error)
@@ -20,14 +21,14 @@ func (f progressNavigationFunc) ContextCaseNavigation(c context.Context, i ident
 	return f(c, i, p)
 }
 func TestContextProgressFinalAuthorityAndIndependentNavigation(t *testing.T) {
-	for _, name := range []string{"pending-no-case", "published-no-case", "case-authorized", "case-denied", "wrong-case", "stale-case", "expired-permission", "expired-identity", "changed-groups", "cancelled", "recovery-blocked", "foreign-recovery", "wrong-capture"} {
+	for _, name := range []string{"pending-no-case", "published-no-case", "case-authorized", "case-denied", "wrong-case", "stale-case", "expired-permission", "expired-identity", "changed-groups", "cancelled", "wrong-capture"} {
 		t.Run(name, func(t *testing.T) {
 			f := newInvestigationFixture()
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			source := f.source(t, ctx)
 			p := value.ContextProgressObservation{CaptureID: fixtureID(30), CandidateCaseID: fixtureID(31), CandidateArtifactID: fixtureID(32), Target: f.target.Target(), Revision: 4, Phase: "Pending", ActionPhase: "Pending", ReasonCode: "DispatchUnconfirmed", CreatedAt: f.now.Add(-time.Minute), Deadline: f.now.Add(time.Minute), ObservedAt: f.now, ValidUntil: f.now.Add(2 * time.Second)}
-			s := ContextProgressService{RootID: fixtureID(1), InstallationID: fixtureID(2), Recovery: f, Now: func() time.Time { return f.now }}
+			s := ContextProgressService{RootID: fixtureID(1), InstallationID: fixtureID(2), Now: func() time.Time { return f.now }}
 			wantErr := false
 			wantCase := false
 			s.Reader = progressReadFunc(func(_ context.Context, q value.ProgressQuery) (value.ContextProgressObservation, error) {
@@ -54,12 +55,6 @@ func TestContextProgressFinalAuthorityAndIndependentNavigation(t *testing.T) {
 			})
 			switch name {
 			case "expired-permission", "expired-identity", "changed-groups", "cancelled", "wrong-capture":
-				wantErr = true
-			case "recovery-blocked":
-				f.recoveryBlocked = true
-				wantErr = true
-			case "foreign-recovery":
-				s.InstallationID = fixtureID(90)
 				wantErr = true
 			case "case-authorized", "case-denied", "wrong-case", "stale-case":
 				wantCase = name == "case-authorized"

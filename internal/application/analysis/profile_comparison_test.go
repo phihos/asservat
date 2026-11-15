@@ -59,7 +59,7 @@ func comparisonDisplayFixture() *value.ProfileComparison {
 	facts := value.ProfileComparisonFacts{ProfileComparisonAcquisition: value.ProfileComparisonAcquisition{ProfileType: "cpu", Mode: "interval"}, DurationSeconds: &duration, Total: 10, Period: &value.ProfileComparisonPeriod{Type: "cpu", Unit: "nanoseconds", Value: 100}, SymbolStatus: "complete"}
 	return &value.ProfileComparison{SampleType: "cpu", Unit: "nanoseconds", Normalization: value.ProfileComparisonRate, Aggregation: "cumulative", Comparable: true, Baseline: facts, Incident: facts, BuildStatus: "unknown", SamplingStatus: "same", AcquisitionStatus: "same", Rows: []value.ProfileComparisonRow{{Function: &name, Baseline: 5, Incident: 5, Delta: 0}}, Limitations: []string{"A short sample does not establish a regression."}}
 }
-func (f *comparisonServiceFixture) ResolveProjectionRoute(_ context.Context, caseID, artifactID string, _ identity.Identity, _ artifact.RecoveryProof) (value.ContextProjectionCandidate, error) {
+func (f *comparisonServiceFixture) ResolveProjectionRoute(_ context.Context, caseID, artifactID string, _ identity.Identity) (value.ContextProjectionCandidate, error) {
 	f.routeCalls++
 	for _, c := range f.routes {
 		if c.CaseID == caseID && c.ArtifactID == artifactID {

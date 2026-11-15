@@ -49,15 +49,15 @@ func newShareBusinessAudit(t *testing.T, ctx context.Context, hub *pgxpool.Pool,
 	}
 	t.Cleanup(mac.Close)
 	qualifyShareLifecycleBusinessWAL(t, ctx, hub, policy, retained, mac, s.a.Eligibility.VerifiedIdentity.Principal)
-	journal, err := postgres.NewHealthyOperationJournal(ctx, hub, policy, s.recovery.guard)
+	journal, err := postgres.NewHealthyOperationJournal(ctx, hub, policy)
 	if err != nil {
 		t.Fatal(err)
 	}
-	acks, err := postgres.NewOperationAcknowledgements(ctx, hub, s.a.RootID, "normal", s.recovery.guard)
+	acks, err := postgres.NewOperationAcknowledgements(ctx, hub, s.a.RootID, "normal", s.recovery.installation)
 	if err != nil {
 		t.Fatal(err)
 	}
-	completions, err := postgres.NewOperationLifecycles(ctx, hub, s.a.RootID, "normal", s.recovery.guard)
+	completions, err := postgres.NewOperationLifecycles(ctx, hub, s.a.RootID, "normal", s.recovery.installation)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -244,7 +244,7 @@ func newShareCaptureAudit(t *testing.T, ctx context.Context, admin *pgxpool.Pool
 	if err = config.ConfigureCaptureAuditBacking(ctx, postgres.CaptureAuditBacking{Pool: backing, Account: account, ValidUntil: backing.ValidUntil}, mac); err != nil {
 		t.Fatal("original share-qualified capture cohort", err)
 	}
-	admissions, err := postgres.NewAuditedContextAdmissions(ctx, roles["admit"], s.a.RootID, mac, postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard})
+	admissions, err := postgres.NewAuditedContextAdmissions(ctx, roles["admit"], s.a.RootID, s.recovery.installation, mac, s.retention.guard)
 	if err != nil {
 		t.Fatal(err)
 	}

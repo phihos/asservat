@@ -9,7 +9,6 @@ import (
 	app "asservat.local/asservat/internal/application/analysis"
 	identities "asservat.local/asservat/internal/application/identity"
 	query "asservat.local/asservat/internal/domain/analysis"
-	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/identity"
 )
 
@@ -57,13 +56,13 @@ func (p *replayCompositionNoEffects) fail(name string) error {
 	p.calls = append(p.calls, name)
 	return query.ErrUnavailable
 }
-func (p *replayCompositionNoEffects) ResolveProjectionRoute(context.Context, string, string, identity.Identity, artifact.RecoveryProof) (query.ContextProjectionCandidate, error) {
+func (p *replayCompositionNoEffects) ResolveProjectionRoute(context.Context, string, string, identity.Identity) (query.ContextProjectionCandidate, error) {
 	return query.ContextProjectionCandidate{}, p.fail("route")
 }
-func (p *replayCompositionNoEffects) ResolvePacketProjectionRoute(context.Context, string, string, identity.Identity, artifact.RecoveryProof) (query.ContextProjectionCandidate, error) {
+func (p *replayCompositionNoEffects) ResolvePacketProjectionRoute(context.Context, string, string, identity.Identity) (query.ContextProjectionCandidate, error) {
 	return query.ContextProjectionCandidate{}, p.fail("packet-route")
 }
-func (p *replayCompositionNoEffects) ResolveSyscallProjectionRoute(context.Context, string, string, identity.Identity, artifact.RecoveryProof) (query.ContextProjectionCandidate, error) {
+func (p *replayCompositionNoEffects) ResolveSyscallProjectionRoute(context.Context, string, string, identity.Identity) (query.ContextProjectionCandidate, error) {
 	return query.ContextProjectionCandidate{}, p.fail("syscall-route")
 }
 func (p *replayCompositionNoEffects) CompilePacketQueryFilter(context.Context, string) (query.PacketQueryProgram, error) {
@@ -85,10 +84,10 @@ func (p *replayCompositionNoEffects) ReadProjection(context.Context, query.Conte
 	return nil, p.fail("read")
 }
 
-// The ledger, current C3 and recovery below are the fixture's actual compiled-
+// The ledger and current C3 below are the fixture's actual compiled-
 // role adapters and C8 has already acknowledged the passed call. Human/bootstrap
 // facts remain synthetic. This is C18+SQL composition, not browser/installed proof.
-func qualifyPacketQueryReplayApplication(t *testing.T, ctx context.Context, q query.ContextQuery, r query.ContextQueryRequest, input query.PacketQueryRequest, caller identities.CurrentIdentity, ledger app.ContextQueryLedger, authority app.CurrentContextProjectionAuthority, recovery app.ContextProjectionRecovery) {
+func qualifyPacketQueryReplayApplication(t *testing.T, ctx context.Context, q query.ContextQuery, r query.ContextQueryRequest, input query.PacketQueryRequest, caller identities.CurrentIdentity, ledger app.ContextQueryLedger, authority app.CurrentContextProjectionAuthority) {
 	t.Helper()
 	if input.IdempotencyKey != q.InvocationKey.Key || app.PacketQueryRequestDigest(input) != q.InvocationKey.RequestDigest {
 		t.Fatal("replay fixture does not bind original normalized request")
@@ -101,7 +100,7 @@ func qualifyPacketQueryReplayApplication(t *testing.T, ctx context.Context, q qu
 			return r.OwnerID
 		}
 		return custodyID()
-	}}, Recovery: recovery, PacketRoutes: unused, PacketCompiler: unused, Plans: unused, Workers: unused}
+	}}, PacketRoutes: unused, PacketCompiler: unused, Plans: unused, Workers: unused}
 	reads, ok := service.PacketQueries()
 	if !ok {
 		t.Fatal("replay service unavailable")
@@ -135,7 +134,7 @@ func rawSyscallQueryReplayRequest(scope query.ContextProjectionScope, key string
 	return query.RawSyscallQueryRequest{CaseID: scope.CaseID, ArtifactID: scope.ArtifactID, GrantID: scope.RawGrantID, IdempotencyKey: key, Selection: scope.Syscalls}
 }
 
-func qualifyRawSyscallQueryReplayApplication(t *testing.T, ctx context.Context, q query.ContextQuery, r query.ContextQueryRequest, input query.RawSyscallQueryRequest, caller identities.CurrentIdentity, ledger app.ContextQueryLedger, authority app.CurrentContextProjectionAuthority, recovery app.ContextProjectionRecovery) {
+func qualifyRawSyscallQueryReplayApplication(t *testing.T, ctx context.Context, q query.ContextQuery, r query.ContextQueryRequest, input query.RawSyscallQueryRequest, caller identities.CurrentIdentity, ledger app.ContextQueryLedger, authority app.CurrentContextProjectionAuthority) {
 	t.Helper()
 	if input.IdempotencyKey != q.InvocationKey.Key || app.RawSyscallQueryRequestDigest(input) != q.InvocationKey.RequestDigest {
 		t.Fatal("replay fixture does not bind original normalized request")
@@ -148,7 +147,7 @@ func qualifyRawSyscallQueryReplayApplication(t *testing.T, ctx context.Context, 
 			return r.OwnerID
 		}
 		return custodyID()
-	}}, Recovery: recovery, PacketRoutes: unused, PacketCompiler: unused, Plans: unused, Workers: unused}
+	}}, PacketRoutes: unused, PacketCompiler: unused, Plans: unused, Workers: unused}
 	service.SyscallRoutes = unused
 	reads, ok := service.RawSyscallQueries()
 	if !ok {

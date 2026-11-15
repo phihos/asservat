@@ -29,7 +29,7 @@ func qualifyProcessingRestrictions(t *testing.T, ctx context.Context, admin *pgx
 	qualifyProcessingWorkerFacets(t, ctx, poolFor)
 	pool := poolFor("processing_read_runtime", "synthetic-processing-read")
 	defer pool.Close()
-	reader, err := postgres.NewProcessingReads(ctx, pool, s.a.RootID, s.recovery.guard)
+	reader, err := postgres.NewProcessingReads(ctx, pool, s.a.RootID, s.recovery.installation)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,11 +55,7 @@ func qualifyProcessingRestrictions(t *testing.T, ctx context.Context, admin *pgx
 		if err != nil {
 			return artifact.DownloadProcessingProof{}, err
 		}
-		recovery, err := s.recovery.reader.RecoveryState(ctx)
-		if err != nil {
-			return artifact.DownloadProcessingProof{}, err
-		}
-		return reader.ContextProcessing(ctx, r, recovery)
+		return reader.ContextProcessing(ctx, r)
 	}
 	if p, err := readProof(); err == nil || p != (artifact.DownloadProcessingProof{}) {
 		t.Fatal("later publication bypassed preexisting workload restriction", p, err)
@@ -87,11 +83,11 @@ func qualifyProcessingRestrictions(t *testing.T, ctx context.Context, admin *pgx
 	}
 	casePool := poolFor("context_case_read_runtime", "synthetic-context-case-read")
 	defer casePool.Close()
-	routes, err := postgres.NewContextCaseReads(ctx, casePool, s.a.RootID, s.recovery.guard)
+	routes, err := postgres.NewContextCaseReads(ctx, casePool, s.a.RootID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	cases := catalogapp.ContextCaseService{RootID: s.a.RootID, InstallationID: s.recovery.installation, Routes: routes, Permissions: s.p, Catalog: catalog, Retention: privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, Recovery: s.recovery.reader, Processing: reader, Now: time.Now}
+	cases := catalogapp.ContextCaseService{RootID: s.a.RootID, InstallationID: s.recovery.installation, Routes: routes, Permissions: s.p, Catalog: catalog, Retention: privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, Processing: reader, Now: time.Now}
 	refreshPermission := func() {
 		batch := s.batch
 		batch.Initial = nil
@@ -152,60 +148,6 @@ func qualifyProcessingRestrictions(t *testing.T, ctx context.Context, admin *pgx
 		if !errors.As(err, &pgerr) || pgerr.Code != "42501" {
 			t.Fatal("processing reader gained mutation authority", statement, err)
 		}
-	}
-	r, err := catalog.ContextDownloadEvidence(ctx, e.Registration.Location.ArtifactID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	recovery, err := s.recovery.reader.RecoveryState(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	r.ValidUntil = time.Now().UTC().Add(100 * time.Millisecond)
-	tx, err := admin.Begin(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer tx.Rollback(ctx)
-	if _, err = tx.Exec(ctx, "SELECT installation_id FROM fleet_trust WHERE installation_id=$1 FOR UPDATE", s.recovery.installation); err != nil {
-		t.Fatal(err)
-	}
-	done := make(chan error, 1)
-	go func() { _, err := reader.ContextProcessing(ctx, r, recovery); done <- err }()
-	blocker := tx.Conn().PgConn().PID()
-	waitUntil := time.Now().Add(time.Second)
-	for {
-		var blocked bool
-		if err = admin.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE usename='processing_read_runtime' AND $1=ANY(pg_blocking_pids(pid)))", blocker).Scan(&blocked); err != nil {
-			t.Fatal(err)
-		}
-		if blocked {
-			break
-		}
-		select {
-		case err := <-done:
-			t.Fatal("processing read completed before observed recovery-lock wait", err)
-		default:
-		}
-		if !time.Now().Before(waitUntil) {
-			t.Fatal("processing read never reached the held recovery lock")
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
-	if delay := time.Until(r.ValidUntil.Add(25 * time.Millisecond)); delay > 0 {
-		time.Sleep(delay)
-	}
-	if err = tx.Commit(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if err = <-done; err == nil {
-		t.Fatal("processing proof survived original catalog deadline after lock wait")
-	}
-	if _, err = admin.Exec(ctx, "UPDATE fleet_trust SET suspended=true WHERE installation_id=$1", s.recovery.installation); err != nil {
-		t.Fatal(err)
-	}
-	if _, err = readProof(); err == nil {
-		t.Fatal("stored processing completeness cleared recovery fence")
 	}
 }
 
@@ -272,7 +214,7 @@ func qualifyProcessingDownloadEffects(t *testing.T, ctx context.Context, poolFor
 	defer configPool.Close()
 	readPool := poolFor("context_catalog_read_runtime", "synthetic-context-read")
 	defer readPool.Close()
-	guards := postgres.DownloadTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard}
+	guards := s.retention.guard
 	runtime, err := postgres.NewDownloads(ctx, runtimePool, s.a.RootID, guards)
 	if err != nil {
 		t.Fatal(err)

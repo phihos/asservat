@@ -11,7 +11,6 @@ import (
 
 	captureapp "asservat.local/asservat/internal/application/capture"
 	executionapp "asservat.local/asservat/internal/application/execution"
-	fleetapp "asservat.local/asservat/internal/application/fleet"
 	compiler "asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -38,12 +37,11 @@ func NewContextCapabilityProtection(observer, probe *PermissionClient, p cfg.Con
 }
 
 // The independently installed profile is copied by value. A mutable observed
-// ConfigMap cannot qualify another image, projection, cluster or epoch. Runtime
-// recovery and native admission must remain current on every read.
+// ConfigMap cannot qualify another image, projection, cluster or epoch. Native
+// admission must remain current on every read.
 type ContextCapabilitySource struct {
 	client     *PermissionClient
 	protection *ContextCapabilityProtection
-	recovery   fleetapp.RecoveryReader
 	name, uid  string
 	installed  contracts.ContextCapabilitySettings
 }
@@ -70,22 +68,21 @@ func validInstalledCapability(p contracts.ContextCapabilitySettings) bool {
 // The reader's cluster holds the guarded source; installed.ClusterID names the
 // target cluster it qualifies. The first installed profile keeps every
 // workload cluster's capability in the hub's control namespace (ADR-179).
-func NewContextCapabilitySource(c *PermissionClient, p *ContextCapabilityProtection, recovery fleetapp.RecoveryReader, name, uid string, installed contracts.ContextCapabilitySettings) (*ContextCapabilitySource, error) {
-	if c == nil || p == nil || p.configMapProtection == nil || p.observer != c || p.plan.SourceName != name || recovery == nil || !installationRefValid(name, uid) || !authorization.UUID(uid) || !validInstalledCapability(installed) {
+func NewContextCapabilitySource(c *PermissionClient, p *ContextCapabilityProtection, name, uid string, installed contracts.ContextCapabilitySettings) (*ContextCapabilitySource, error) {
+	if c == nil || p == nil || p.configMapProtection == nil || p.observer != c || p.plan.SourceName != name || !installationRefValid(name, uid) || !authorization.UUID(uid) || !validInstalledCapability(installed) {
 		return nil, planning.ErrInvalid
 	}
-	return &ContextCapabilitySource{c, p, recovery, name, uid, installed}, nil
+	return &ContextCapabilitySource{c, p, name, uid, installed}, nil
 }
 
 // NewLocalContextCapabilitySource serves the hub's own settings for its
 // combined-mode local cluster (no ConfigMap): the installed settings are the
-// source, uid names their revision. Recovery is checked on every read as for
-// a guarded source.
-func NewLocalContextCapabilitySource(c *PermissionClient, recovery fleetapp.RecoveryReader, uid string, installed contracts.ContextCapabilitySettings) (*ContextCapabilitySource, error) {
-	if c == nil || recovery == nil || !authorization.UUID(uid) || !validInstalledCapability(installed) {
+// source, uid names their revision.
+func NewLocalContextCapabilitySource(c *PermissionClient, uid string, installed contracts.ContextCapabilitySettings) (*ContextCapabilitySource, error) {
+	if c == nil || !authorization.UUID(uid) || !validInstalledCapability(installed) {
 		return nil, planning.ErrInvalid
 	}
-	return &ContextCapabilitySource{client: c, recovery: recovery, uid: uid, installed: installed}, nil
+	return &ContextCapabilitySource{client: c, uid: uid, installed: installed}, nil
 }
 
 func (s *ContextCapabilitySource) snapshot(ctx context.Context) (planning.ContextCapability, error) {
@@ -129,7 +126,7 @@ func (s *ContextCapabilitySource) ContextCapability(ctx context.Context, target 
 	}
 	started := s.client.now()
 	// until bounds this check's reads (five seconds); valid is the ADR-311
-	// interval the completed check may be used for, never past recovery.
+	// interval the completed check may be used for.
 	until := started.Add(5 * time.Second)
 	valid := started.Add(identity.AuthorityRecheckInterval)
 	if d, ok := ctx.Deadline(); ok {
@@ -137,26 +134,12 @@ func (s *ContextCapabilitySource) ContextCapability(ctx context.Context, target 
 	}
 	call, stop := context.WithDeadline(ctx, until)
 	defer stop()
-	r, err := s.recovery.RecoveryState(call)
-	if err != nil || !r.Valid(s.client.now()) || r.InstallationID != s.installed.InstallationID || r.IssuerEpoch != s.installed.IssuerEpoch {
-		return zero, cfg.ErrUnavailable
-	}
-	until = identity.Earlier(until, r.FreshUntil)
-	valid = identity.Earlier(valid, r.FreshUntil)
-	call, stopRecovery := context.WithDeadline(call, until)
-	defer stopRecovery()
 	out, err := s.snapshot(call)
 	if err != nil {
 		return zero, err
 	}
-	lastRecovery, err := s.recovery.RecoveryState(call)
-	if err != nil || !lastRecovery.Valid(s.client.now()) || lastRecovery.InstallationID != r.InstallationID || lastRecovery.IssuerEpoch != r.IssuerEpoch || lastRecovery.Revision != r.Revision {
-		return zero, cfg.ErrChanged
-	}
-	until = identity.Earlier(until, lastRecovery.FreshUntil)
-	valid = identity.Earlier(valid, lastRecovery.FreshUntil)
 	out.ObservedAt, out.FreshUntil = started, valid
-	if call.Err() != nil || !out.Valid(s.client.now()) || !r.Valid(s.client.now()) || s.client.now().Before(started) {
+	if call.Err() != nil || !out.Valid(s.client.now()) || s.client.now().Before(started) {
 		return zero, cfg.ErrUnavailable
 	}
 	return out, nil

@@ -43,20 +43,20 @@ func qualifyEvidenceShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool
 	})
 	pool := poolFor(role, "synthetic-share-hub")
 	t.Cleanup(pool.Close) // later subtests share the fixture's connection limit
-	routes, err := postgres.NewContextCaseReads(ctx, pool, s.a.RootID, s.recovery.guard)
+	routes, err := postgres.NewContextCaseReads(ctx, pool, s.a.RootID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	processing, err := postgres.NewProcessingReads(ctx, pool, s.a.RootID, s.recovery.guard)
+	processing, err := postgres.NewProcessingReads(ctx, pool, s.a.RootID, s.recovery.installation)
 	if err != nil {
 		t.Fatal(err)
 	}
-	store, err := postgres.NewEvidenceShares(ctx, pool, s.a.RootID, s.recovery.guard)
+	store, err := postgres.NewEvidenceShares(ctx, pool, s.a.RootID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	cases := catalogapp.ContextCaseService{RootID: s.a.RootID, InstallationID: s.recovery.installation, Routes: routes, Permissions: s.p, Catalog: reader, Retention: privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, Recovery: s.recovery.reader, Processing: processing, Shares: store, Now: time.Now}
-	shares := paidShareService{Service: sharing.Service{RootID: s.a.RootID, InstallationID: s.recovery.installation, Routes: routes, Permissions: s.p, Catalog: reader, Store: store, Recovery: s.recovery.reader, NewID: custodyID, Now: time.Now}, audit: newShareBusinessAudit(t, ctx, pool, objects, keys, s)}
+	cases := catalogapp.ContextCaseService{RootID: s.a.RootID, InstallationID: s.recovery.installation, Routes: routes, Permissions: s.p, Catalog: reader, Retention: privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, Processing: processing, Shares: store, Now: time.Now}
+	shares := paidShareService{Service: sharing.Service{RootID: s.a.RootID, InstallationID: s.recovery.installation, Routes: routes, Permissions: s.p, Catalog: reader, Store: store, NewID: custodyID, Now: time.Now}, audit: newShareBusinessAudit(t, ctx, pool, objects, keys, s)}
 	issuer := s.a.Eligibility.VerifiedIdentity.Principal.Issuer
 	batch := s.batch
 	refresh := func() {
@@ -118,7 +118,7 @@ func qualifyEvidenceShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool
 	// ADR-233: the actual download authorizer with the real share ledger, and
 	// the SQL download fence over a share-admitted decision.
 	download := authapp.ContextDownloadAuthority{RootID: s.a.RootID, Permissions: s.p, Catalog: reader, Retention: privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, Environment: newDownloadTestEnvironment(t, ctx, pool, s, e.Registration), Shares: store, Now: time.Now}
-	ledger, err := postgres.NewDownloads(ctx, pool, s.a.RootID, postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard})
+	ledger, err := postgres.NewDownloads(ctx, pool, s.a.RootID, s.retention.guard)
 	if err != nil {
 		t.Fatal(err)
 	}

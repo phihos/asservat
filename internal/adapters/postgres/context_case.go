@@ -18,27 +18,26 @@ import (
 // ordinary evaluator must authorize each target before reading its metadata.
 // The role cannot insert catalog/locator rows or mutate any capture state.
 type ContextCaseReads struct {
-	ledger   *Ledger
-	root     string
-	recovery *RecoveryTransactionGuard
+	ledger *Ledger
+	root   string
 }
 
 var _ app.ContextCaseRoutes = (*ContextCaseReads)(nil)
 
-func NewContextCaseReads(ctx context.Context, pool *pgxpool.Pool, root string, recovery *RecoveryTransactionGuard) (*ContextCaseReads, error) {
-	if !authorization.UUID(root) || recovery == nil || recovery.root != root {
+func NewContextCaseReads(ctx context.Context, pool *pgxpool.Pool, root string) (*ContextCaseReads, error) {
+	if !authorization.UUID(root) {
 		return nil, value.ErrUnavailable
 	}
 	l, err := New(ctx, pool)
 	if err != nil {
 		return nil, value.ErrUnavailable
 	}
-	return &ContextCaseReads{ledger: l, root: root, recovery: recovery}, nil
+	return &ContextCaseReads{ledger: l, root: root}, nil
 }
 
 func (s *ContextCaseReads) ResolveContextCase(ctx context.Context, request value.CaseRouteQuery) (value.ContextCaseRoutes, error) {
 	var out value.ContextCaseRoutes
-	if ctx == nil || ctx.Err() != nil || s == nil || s.ledger == nil || s.recovery == nil || request.RootID != s.root || !request.Identity.Valid(request.Identity.VerifiedAt) || !request.Recovery.Valid(request.Recovery.ObservedAt) {
+	if ctx == nil || ctx.Err() != nil || s == nil || s.ledger == nil || request.RootID != s.root || !request.Identity.Valid(request.Identity.VerifiedAt) {
 		return out, value.ErrUnavailable
 	}
 	request.Identity.Groups = slices.Clone(request.Identity.Groups)
@@ -54,10 +53,6 @@ func (s *ContextCaseReads) ResolveContextCase(ctx context.Context, request value
 		if !request.Valid(first.Time) {
 			return value.ErrUnavailable
 		}
-		recovery, err := s.recovery.lock(ctx, q, s.root, request.Recovery)
-		if err != nil {
-			return err
-		}
 		rows, err := q.ReadContextCaseRoutes(ctx, custodydb.ReadContextCaseRoutesParams{RootID: id(s.root), CaseID: id(request.CaseID)})
 		if err != nil {
 			return err
@@ -65,7 +60,7 @@ func (s *ContextCaseReads) ResolveContextCase(ctx context.Context, request value
 		if len(rows) < 1 || len(rows) > value.MaxContextCaseArtifacts {
 			return value.ErrUnavailable
 		}
-		out = value.ContextCaseRoutes{CaseID: request.CaseID, ObservedAt: first.Time, ValidUntil: identity.Earlier(first.Time.Add(5*time.Second), identity.Earlier(request.Identity.ValidUntil, request.Recovery.FreshUntil))}
+		out = value.ContextCaseRoutes{CaseID: request.CaseID, ObservedAt: first.Time, ValidUntil: identity.Earlier(first.Time.Add(5*time.Second), request.Identity.ValidUntil)}
 		if d, ok := ctx.Deadline(); ok {
 			out.ValidUntil = identity.Earlier(out.ValidUntil, d)
 		}
@@ -79,9 +74,6 @@ func (s *ContextCaseReads) ResolveContextCase(ctx context.Context, request value
 			var version artifact.Digest
 			copy(version[:], row.Version)
 			out.Routes = append(out.Routes, value.ContextCaseRoute{Version: version, CaptureID: uid(row.CaptureID), ArtifactID: uid(row.ArtifactID), NativeType: row.NativeType, Target: authorization.Target{ClusterID: uid(row.ClusterID), NamespaceUID: row.NamespaceUid, WorkloadUID: row.WorkloadUid, PodUID: row.PodUid}})
-		}
-		if err = s.recovery.check(ctx, q, recovery, s.root, request.Recovery); err != nil {
-			return err
 		}
 		now, err := q.CurrentTime(ctx)
 		if err != nil {

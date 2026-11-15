@@ -111,20 +111,12 @@ func (s *WorkerRouting) ReadAcquisitionEnrollment(ctx context.Context, parent va
 	if err != nil || !currentState.Audited || !currentState.Claimed || currentState.Worker != state.Worker || currentRow.TerminationJson != nil || currentRow.RetiredProofJson != nil {
 		return out, artifact.ErrDownloadUnavailable
 	}
-	trust, err := q.ReadFleetTrust(ctx, id(s.installation))
-	if err != nil {
-		return out, err
-	}
 	now, err := q.CurrentTime(ctx)
 	if err != nil {
 		return out, err
 	}
-	recovery, err := recoveryState(trust, started, now.Time)
-	if err != nil || recovery.InstallationID != s.installation || recovery.IssuerEpoch != query.RecoveryIssuerEpoch {
-		return out, artifact.ErrDownloadUnavailable
-	}
 	deadline, _ := ctx.Deadline()
-	until = identity.Earlier(until, identity.Earlier(recovery.FreshUntil, deadline))
+	until = identity.Earlier(until, deadline)
 	until = identity.Earlier(until, identity.Earlier(query.Deadline, identity.Earlier(query.CredentialUntil, state.Worker.Intent.RunUntil)))
 	out = value.AcquisitionWorkerIdentity{Worker: state.Worker, ObservedAt: started, FreshUntil: until}
 	if ctx.Err() != nil || !out.Valid(now.Time) || !out.Valid(time.Now()) {

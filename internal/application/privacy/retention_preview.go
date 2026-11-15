@@ -5,7 +5,6 @@ import (
 	"errors"
 	"time"
 
-	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
 	value "asservat.local/asservat/internal/domain/privacy"
@@ -27,10 +26,6 @@ type RetentionSpecDecoder interface {
 // list names the installation administrators (ADR-335 D14).
 type PreviewAdministrators interface {
 	IdentityPolicy(context.Context, string) (identity.Policy, error)
-}
-
-type PreviewRecovery interface {
-	RecoveryState(context.Context) (artifact.RecoveryProof, error)
 }
 
 // PreviewIdentity resolves the current caller of one request.
@@ -57,7 +52,6 @@ type RetentionPreviewer struct {
 	Administrators PreviewAdministrators
 	Catalog        RetentionPreviewCatalog
 	Decoder        RetentionSpecDecoder
-	Recovery       PreviewRecovery
 	Now            func() time.Time
 }
 
@@ -67,7 +61,7 @@ type RetentionPreviewer struct {
 // the preview bounds.
 func (s RetentionPreviewer) Preview(ctx context.Context, current PreviewIdentity, proposed []ProposedRetentionChange) (value.RetentionPreview, time.Time, error) {
 	var zero value.RetentionPreview
-	if ctx == nil || current == nil || s.Administrators == nil || s.Catalog == nil || s.Decoder == nil || s.Recovery == nil || s.Now == nil || !authorization.UUID(s.InstallationID) {
+	if ctx == nil || current == nil || s.Administrators == nil || s.Catalog == nil || s.Decoder == nil || s.Now == nil || !authorization.UUID(s.InstallationID) {
 		return zero, time.Time{}, identity.ErrUnavailable
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -102,12 +96,6 @@ func (s RetentionPreviewer) Preview(ctx context.Context, current PreviewIdentity
 			return zero, time.Time{}, value.ErrInvalid
 		}
 	}
-	// Restored databases carry stale effective dates; refuse during recovery.
-	recovery, err := s.Recovery.RecoveryState(ctx)
-	if err != nil || recovery.InstallationID != s.InstallationID || !recovery.Valid(s.Now()) {
-		return zero, time.Time{}, identity.ErrUnavailable
-	}
-	until = identity.Earlier(until, recovery.FreshUntil)
 	catalog, err := s.Catalog.RetentionPreviewCatalog(ctx, value.MaxRetentionPreviewArtifacts)
 	if err != nil {
 		return zero, time.Time{}, identity.ErrUnavailable

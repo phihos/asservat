@@ -40,15 +40,15 @@ func (f *capacitySQLFixture) qualifySharedMetadataReaders(t *testing.T, s captur
 		if err != nil {
 			t.Fatal(err)
 		}
-		progress, err := postgres.NewContextProgressReads(f.ctx, pool, s.a.RootID, s.recovery.guard)
+		progress, err := postgres.NewContextProgressReads(f.ctx, pool, s.a.RootID)
 		if err != nil {
 			t.Fatal(err)
 		}
-		cases, err := postgres.NewContextCaseReads(f.ctx, pool, s.a.RootID, s.recovery.guard)
+		cases, err := postgres.NewContextCaseReads(f.ctx, pool, s.a.RootID)
 		if err != nil {
 			t.Fatal(err)
 		}
-		processing, err := postgres.NewProcessingReads(f.ctx, pool, s.a.RootID, s.recovery.guard)
+		processing, err := postgres.NewProcessingReads(f.ctx, pool, s.a.RootID, s.recovery.installation)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -57,7 +57,7 @@ func (f *capacitySQLFixture) qualifySharedMetadataReaders(t *testing.T, s captur
 			t.Fatal(err)
 		}
 		// Refresh only independent fixture sources before NEW read operations;
-		// none of the following calls renews its identity, recovery or caller.
+		// none of the following calls renews its identity or caller.
 		f.refreshBase(t)
 		if err = s.retention.observe(f.ctx); err != nil {
 			t.Fatal(err)
@@ -103,14 +103,14 @@ func (f *capacitySQLFixture) qualifySharedMetadataReaders(t *testing.T, s captur
 				return err
 			}},
 			{"case", func() error {
-				out, err := cases.ResolveContextCase(call, catalog.CaseRouteQuery{RootID: s.a.RootID, CaseID: e.CaseID, Identity: query.Identity, Recovery: query.Recovery})
+				out, err := cases.ResolveContextCase(call, catalog.CaseRouteQuery{RootID: s.a.RootID, CaseID: e.CaseID, Identity: query.Identity})
 				if err == nil && (out.CaseID != e.CaseID || !out.Valid(time.Now()) || len(out.Routes) != 1 || out.Routes[0] != (catalog.ContextCaseRoute{Version: record.Version, CaptureID: e.CaptureUID, ArtifactID: e.Registration.Location.ArtifactID, NativeType: e.NativeType, Target: target})) {
 					return errors.New("published case route mismatch")
 				}
 				return err
 			}},
 			{"processing", func() error {
-				out, err := processing.ContextProcessing(call, record, query.Recovery)
+				out, err := processing.ContextProcessing(call, record)
 				if err != nil {
 					return err
 				}
@@ -118,7 +118,7 @@ func (f *capacitySQLFixture) qualifySharedMetadataReaders(t *testing.T, s captur
 					return errors.New("processing lineage mismatch")
 				}
 				request := capture.ProcessingCoverageRequest{RootID: s.a.RootID, Location: e.Registration.Location, Target: target, AnchorAt: e.Registration.AnchorAt, DeleteBy: e.Registration.DeleteBy}
-				covered, err := processing.ContextProcessingCoverage(call, request, query.Recovery)
+				covered, err := processing.ContextProcessingCoverage(call, request)
 				if err == nil && (covered.Request != request || !covered.Current(time.Now())) {
 					return errors.New("processing coverage mismatch")
 				}

@@ -10,7 +10,7 @@ import (
 )
 
 // contextEligibilityIn re-evaluates context-collection eligibility after the
-// caller's recovery and permission-root locks. A human is evaluated against
+// caller's permission-root lock. A human is evaluated against
 // the locked projection exactly as before. An accepted policy's executor
 // (ADR-228) is evaluated through its current acknowledged acceptance and
 // current team delegation instead: it has no scopes or groups of its own.

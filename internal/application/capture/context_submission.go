@@ -1,7 +1,6 @@
 package capture
 
 import (
-	auditapp "asservat.local/asservat/internal/application/audit"
 	"bytes"
 	"context"
 	"crypto/sha256"
@@ -10,6 +9,8 @@ import (
 	"slices"
 	"sync"
 	"time"
+
+	auditapp "asservat.local/asservat/internal/application/audit"
 
 	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -120,17 +121,10 @@ func (s ContextSubmission) submit(ctx context.Context, current identities.Curren
 	}
 	var a value.Accepted
 	if continuation {
-		recovery, e := s.currentRecovery(call)
-		if e != nil {
-			return zero, e
-		}
-		if !recovery.Valid(s.Now()) {
-			return zero, value.ErrDenied
-		}
 		digest := ContextRequestDigest(preview)
 		var found bool
-		observed, endRead := context.WithDeadline(call, recovery.FreshUntil)
-		a, found, err = s.Replay.LookupContextAdmission(observed, value.ReplayQuery{RootID: s.RootID, PreviewID: preview, IdempotencyKey: key, SubmissionDigest: digest, Identity: i, Recovery: recovery})
+		observed, endRead := context.WithCancel(call)
+		a, found, err = s.Replay.LookupContextAdmission(observed, value.ReplayQuery{RootID: s.RootID, PreviewID: preview, IdempotencyKey: key, SubmissionDigest: digest, Identity: i})
 		readErr := observed.Err()
 		endRead()
 		if err == nil && readErr != nil {
@@ -141,9 +135,6 @@ func (s ContextSubmission) submit(ctx context.Context, current identities.Curren
 		}
 		if !found || !acceptedContext(a, digest) {
 			return zero, value.ErrUnavailable
-		}
-		if !recovery.Valid(s.Now()) {
-			return zero, value.ErrDenied
 		}
 		a.Replay = true
 	} else {
@@ -295,13 +286,9 @@ func (s ContextSubmission) submit(ctx context.Context, current identities.Curren
 	// The start may have completed after its admission metadata expired. Obtain
 	// one current read-only response for that same accepted operation, never a
 	// new admission, audit write or execution attempt. No stale receipt is renewed.
-	recovery, err := s.currentRecovery(call)
-	if err != nil {
-		return a, err
-	}
-	observed, endRead := context.WithDeadline(call, recovery.FreshUntil)
+	observed, endRead := context.WithCancel(call)
 	defer endRead()
-	fresh, found, err := s.Replay.LookupContextAdmission(observed, value.ReplayQuery{RootID: s.RootID, PreviewID: preview, IdempotencyKey: key, SubmissionDigest: a.SubmissionDigest, Identity: i, Recovery: recovery})
+	fresh, found, err := s.Replay.LookupContextAdmission(observed, value.ReplayQuery{RootID: s.RootID, PreviewID: preview, IdempotencyKey: key, SubmissionDigest: a.SubmissionDigest, Identity: i})
 	if err != nil {
 		return a, err
 	}
@@ -313,8 +300,8 @@ func (s ContextSubmission) submit(ctx context.Context, current identities.Curren
 	if err != nil {
 		return a, err
 	}
-	fresh.MetadataValidUntil = identity.Earlier(fresh.MetadataValidUntil, identity.Earlier(until, recovery.FreshUntil))
-	if observed.Err() != nil || !recovery.Valid(s.Now()) || !s.Now().Before(fresh.MetadataValidUntil) {
+	fresh.MetadataValidUntil = identity.Earlier(fresh.MetadataValidUntil, until)
+	if observed.Err() != nil || !s.Now().Before(fresh.MetadataValidUntil) {
 		return a, value.ErrDenied
 	}
 	fresh.Replay = a.Replay
@@ -425,13 +412,9 @@ func (s ContextSubmission) refreshGroupMetadata(i identity.Identity, a value.Acc
 	if s.Now().Before(a.MetadataValidUntil) {
 		return a, nil
 	}
-	recovery, err := s.currentRecovery(ctx)
-	if err != nil {
-		return a, err
-	}
-	observed, cancel := context.WithDeadline(ctx, recovery.FreshUntil)
+	observed, cancel := context.WithCancel(ctx)
 	defer cancel()
-	fresh, found, err := s.Replay.LookupContextAdmission(observed, value.ReplayQuery{RootID: s.RootID, PreviewID: preview, IdempotencyKey: key, SubmissionDigest: a.SubmissionDigest, Identity: i, Recovery: recovery})
+	fresh, found, err := s.Replay.LookupContextAdmission(observed, value.ReplayQuery{RootID: s.RootID, PreviewID: preview, IdempotencyKey: key, SubmissionDigest: a.SubmissionDigest, Identity: i})
 	if err != nil {
 		return a, err
 	}
@@ -442,8 +425,8 @@ func (s ContextSubmission) refreshGroupMetadata(i identity.Identity, a value.Acc
 	if err != nil {
 		return a, err
 	}
-	fresh.MetadataValidUntil = identity.Earlier(fresh.MetadataValidUntil, identity.Earlier(until, recovery.FreshUntil))
-	if observed.Err() != nil || !recovery.Valid(s.Now()) || !s.Now().Before(fresh.MetadataValidUntil) {
+	fresh.MetadataValidUntil = identity.Earlier(fresh.MetadataValidUntil, until)
+	if observed.Err() != nil || !s.Now().Before(fresh.MetadataValidUntil) {
 		return a, value.ErrDenied
 	}
 	fresh.Replay = a.Replay

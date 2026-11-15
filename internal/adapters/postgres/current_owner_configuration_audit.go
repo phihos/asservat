@@ -14,7 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// This installed reconciler facet retains current recovery/source checks around
+// This installed reconciler facet retains current source checks around
 // the separate acknowledgement. Historical exact acknowledgement remains on
 // OwnerConfigurations; no caller option can select that older path here.
 type CurrentOwnerConfigurationAcknowledgements struct{ configuration *OwnerConfigurations }
@@ -34,7 +34,6 @@ func (s *CurrentOwnerConfigurationAcknowledgements) AcknowledgeOwnerConfiguratio
 	}
 	base := s.configuration
 	c = c.Clone()
-	started := time.Now()
 	live, end := context.WithTimeout(ctx, 5*time.Second)
 	defer end()
 	// The transaction's own context must expire at a shorter source bound too,
@@ -52,15 +51,11 @@ func (s *CurrentOwnerConfigurationAcknowledgements) AcknowledgeOwnerConfiguratio
 		}
 	}()
 	return base.ledger.transaction(live, func(q *custodydb.Queries) error {
-		trust, e := q.ShareFleetTrust(live, id(base.installation))
-		if e != nil {
-			return e
-		}
 		h, e := q.LockOwnerConfiguration(live, custodydb.LockOwnerConfigurationParams{InstallationID: id(base.installation), ClusterID: id(base.cluster)})
 		if e != nil {
 			return e
 		}
-		until := identity.Earlier(trust.FreshUntil.Time, h.FreshUntil.Time)
+		until := h.FreshUntil.Time
 		bound, cancel := context.WithDeadline(live, until)
 		sourceEnd = cancel
 		sourceJoined = make(chan struct{})
@@ -70,8 +65,7 @@ func (s *CurrentOwnerConfigurationAcknowledgements) AcknowledgeOwnerConfiguratio
 			if e != nil {
 				return e
 			}
-			recovery, e := recoveryState(trust, started, n.Time)
-			if e != nil || recovery.IssuerEpoch != c.Pool.IssuerEpoch || uid(h.SourceUid) != base.source || h.Generation != c.Revision.Generation || !identity.Fresh(h.ObservedAt.Time, h.FreshUntil.Time, n.Time, 5*time.Second) || bound.Err() != nil {
+			if uid(h.SourceUid) != base.source || h.Generation != c.Revision.Generation || !identity.Fresh(h.ObservedAt.Time, h.FreshUntil.Time, n.Time, 5*time.Second) || bound.Err() != nil {
 				return value.ErrUnavailable
 			}
 			return nil

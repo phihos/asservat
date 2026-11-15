@@ -182,10 +182,6 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 		refresh()
 		observe()
 		now := clock()
-		recovery, err := s.recovery.reader.RecoveryState(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
 		authorityScope, err = json.Marshal(struct {
 			Format   string
 			Version  byte
@@ -198,12 +194,11 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 		authority = authorization.AcceptedPolicyAuthority{InstallationID: installation, PolicyUID: policyUID, Creator: creator, Executor: authorization.PolicyPrincipal(installation, policyUID), ScopeDigest: sha256.Sum256(authorityScope), ClusterID: pod.ClusterID, NamespaceUID: pod.NamespaceUID, WorkloadUID: pod.WorkloadUID,
 			Delegation: identity.Revision{UID: b.Resource.UID, Generation: b.Resource.Generation, Digest: b.Resource.SpecDigest}, Owners: authorityOwners, Actions: []string{authorization.PolicyContextAction}, Limits: authorization.AutomationLimits{MaxExecutions: maxExecutions, MaxBytes: 1 << 20}, IssuedAt: now, NotAfter: now.Add(time.Hour)}
 		author := identity.Identity{Principal: creator, Scopes: []string{"evidence:read", "evidence:capture", authorization.ShareScope}, Groups: authorGroups, Policy: s.a.Eligibility.VerifiedIdentity.Policy, VerifiedAt: now, ValidUntil: now.Add(30 * time.Second)}
-		in := capture.PolicyAdmission{RootID: root, Recovery: recovery, Target: workload, Authority: authority, Author: author,
+		in := capture.PolicyAdmission{RootID: root, Target: workload, Authority: authority, Author: author,
 			Submission: capture.VerifiedPolicySubmission{ReplacesID: active, Nonce: custodyID(), Actor: creator, Source: source.Revision, ClusterID: source.ClusterID, NamespaceUID: source.NamespaceUID, Name: source.Name, ScopeDigest: authority.ScopeDigest, EnvelopeDigest: artifact.Digest{53}, IssuedAt: now, ExpiresAt: now.Add(30 * time.Second)},
 			Sharing:    &capture.PolicyShareInstruction{Creator: creator, Management: shareManagers, Recipients: shareRecipients, MaxCaptures: maxCaptures, NotAfter: notAfter.UTC().Truncate(time.Second)}}
 		in.Verification = syntheticSubmissionCheck(in, now)
 		if wide {
-			// The recovery read began after the request's original timestamps.
 			// Validate at delivery time, as AcceptPolicy does, without renewing
 			// any original input observation or authority deadline.
 			var version int64
@@ -211,10 +206,10 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 				t.Fatal("wide-sample acceptance source revision", err)
 			}
 			checkedAt := clock()
-			candidate := capture.PolicyAcceptance{ID: custodyID(), RootID: root, Source: source, Submission: in.Submission, Authority: in.Authority, Submitter: in.Author.Principal, IdentityRevision: in.Author.Policy, PermissionRevision: projection.Revision, Recovery: in.Recovery, AcceptedAt: checkedAt, IntentVersion: version, Sharing: in.Sharing}
+			candidate := capture.PolicyAcceptance{ID: custodyID(), RootID: root, Source: source, Submission: in.Submission, Authority: in.Authority, Submitter: in.Author.Principal, IdentityRevision: in.Author.Policy, PermissionRevision: projection.Revision, AcceptedAt: checkedAt, IntentVersion: version, Sharing: in.Sharing}
 			body, encodeErr := json.Marshal(candidate)
 			t.Logf("policy_cost_stage=original_wide_acceptance_shape issuer_bytes=%d source_candidate_valid=%t input_valid=%t encode_ok=%t encoded_bytes=%d closed_adapter_limit=%d", len(creator.Issuer), candidate.Valid(), in.Valid(checkedAt), encodeErr == nil, len(body), 64<<10)
-			t.Logf("policy_acceptance_predicates source=%t submission=%t verification=%t author=%t authority=%t target=%t sharing=%t recovery=%t original_request_precedes_recovery=%t", source.Valid(checkedAt), in.Submission.Valid(checkedAt), in.Verification.Valid(checkedAt), in.Author.Valid(checkedAt), in.Authority.Valid(checkedAt), in.Target.Valid(), in.Sharing.Valid(), in.Recovery.Valid(checkedAt), now.Before(in.Recovery.ObservedAt))
+			t.Logf("policy_acceptance_predicates source=%t submission=%t verification=%t author=%t authority=%t target=%t sharing=%t", source.Valid(checkedAt), in.Submission.Valid(checkedAt), in.Verification.Valid(checkedAt), in.Author.Valid(checkedAt), in.Authority.Valid(checkedAt), in.Target.Valid(), in.Sharing.Valid())
 			if !candidate.Valid() || !in.Valid(checkedAt) || encodeErr != nil || len(body) > 64<<10 {
 				t.Fatal("fixed wide sample violates original acceptance predicates")
 			}
@@ -240,10 +235,6 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 		refresh()
 		observe()
 		now := clock()
-		recovery, err := s.recovery.reader.RecoveryState(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
 		current, err := automation.PolicyAutomationAuthority(ctx, authority, pod)
 		if err != nil {
 			t.Fatal(err)
@@ -292,7 +283,7 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 		if _, err = admin.Exec(ctx, `INSERT INTO policy_occurrence(id,root_id,policy_uid,acceptance_id,cluster_id,workload_uid,pod_uid,restarts) VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, key, root, policyUID, active, pod.ClusterID, pod.WorkloadUID, pod.PodUID, restartOrdinal); err != nil {
 			t.Fatal("synthetic Tick occurrence", active, restartOrdinal, err)
 		}
-		a.Plan, a.Eligibility, a.Recovery, a.IdempotencyKey = plan, eligibility, recovery, key
+		a.Plan, a.Eligibility, a.IdempotencyKey = plan, eligibility, key
 		a.Registration.Location.ArtifactID, a.Registration.Location.AttemptID = custodyID(), custodyID()
 		a.Registration.WriteUntil = in.Deadline
 		a.CaseID, a.OccurrenceID = custodyID(), custodyID()
@@ -389,7 +380,7 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 		// a process restart cannot invent a replacement admission identity.
 		pool := poolFor(qualifiedCapture.admissionRole, "synthetic-share-capture-admit")
 		t.Cleanup(pool.Close)
-		a, err := postgres.NewAuditedContextAdmissions(ctx, pool, root, qualifiedCapture.mac, postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard})
+		a, err := postgres.NewAuditedContextAdmissions(ctx, pool, root, installation, qualifiedCapture.mac, s.retention.guard)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -486,18 +477,18 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	if err = admin.QueryRow(ctx, "SELECT (record#>>'{Sharing,NotAfter}')::timestamptz FROM policy_acceptance WHERE id=$1", second).Scan(&end); err != nil {
 		t.Fatal(err)
 	}
-	// The scenario's synthetic recovery observation lives 30 seconds, which
+	// The scenario's synthetic fleet observation lives 30 seconds, which
 	// this wait (about 25 seconds) would otherwise cross for the publications
 	// below. Renew it as its producer would, once before and once after.
-	renewRecovery := func() {
+	renewFleet := func() {
 		t.Helper()
 		if err := renewSyntheticFleetObservation(ctx, admin, s.recovery.observation, 30*time.Second, true); err != nil {
-			t.Fatal("renew synthetic recovery observation", err)
+			t.Fatal("renew synthetic fleet observation", err)
 		}
 	}
-	renewRecovery()
+	renewFleet()
 	time.Sleep(time.Until(end) + time.Second)
-	renewRecovery()
+	renewFleet()
 	publish(f6)
 	if _, exists := shares()["capture:"+c6.CaptureID]; exists {
 		t.Fatal("a capture published after notAfter was shared")

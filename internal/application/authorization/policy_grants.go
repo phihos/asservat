@@ -198,11 +198,7 @@ func (s GrantService) RequestPolicy(ctx context.Context, current identities.Curr
 	if !probe.Valid() {
 		return zero, false, value.ErrGrantInvalid
 	}
-	recovery, err := s.recovery(ctx)
-	if err != nil {
-		return zero, false, err
-	}
-	out, replay, err := s.Store.RequestGrant(ctx, StoredGrantRequest{Grant: g, IdempotencyKey: in.IdempotencyKey, RequestDigest: inputDigest}, recovery)
+	out, replay, err := s.Store.RequestGrant(ctx, StoredGrantRequest{Grant: g, IdempotencyKey: in.IdempotencyKey, RequestDigest: inputDigest})
 	if err != nil {
 		return zero, false, err
 	}

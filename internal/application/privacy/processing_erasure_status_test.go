@@ -48,7 +48,7 @@ func TestProcessingErasureStatusPreservesOneCurrentOperatorObservation(t *testin
 				}
 				return out, nil
 			})
-			s := ProcessingErasureStatus{RootID: changes.RootID, InstallationID: changes.InstallationID, Policies: f, Recovery: f, Status: reader, Now: changes.Now}
+			s := ProcessingErasureStatus{RootID: changes.RootID, InstallationID: changes.InstallationID, Policies: f, Status: reader, Now: changes.Now}
 			switch name {
 			case "malformed-id":
 				requestID = "not-a-uuid"
@@ -58,8 +58,8 @@ func TestProcessingErasureStatusPreservesOneCurrentOperatorObservation(t *testin
 			out, err := s.Get(t.Context(), f, requestID)
 			if name == "allowed" {
 				if err != nil || !out.Valid(requestID, f.now) || !out.ValidUntil.Equal(wantUntil) ||
-					reads != 1 || f.policyObservations != 1 || f.recoveryObservations != 1 {
-					t.Fatal("status changed its request identity or original observation", out, err, reads, f.policyObservations, f.recoveryObservations)
+					reads != 1 || f.policyObservations != 1 {
+					t.Fatal("status changed its request identity or original observation", out, err, reads, f.policyObservations)
 				}
 				return
 			}

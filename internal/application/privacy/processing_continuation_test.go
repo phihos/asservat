@@ -28,8 +28,8 @@ func TestProcessingContinuationRetainsEarliestOriginalAndIdentityBounds(t *testi
 			if err != nil || !out.ValidUntil.Equal(want) || f.receipt == nil || !f.receipt.ValidUntil.Equal(want) || f.applies != 1 {
 				t.Fatal("continuation renewed original authority or lost identity narrowing", out, err, f.applies)
 			}
-			if f.policyObservations != 1 || f.recoveryObservations != 1 {
-				t.Fatal("continuation repeated complete observations", f.policyObservations, f.recoveryObservations)
+			if f.policyObservations != 1 {
+				t.Fatal("continuation repeated complete observations", f.policyObservations)
 			}
 		})
 	}

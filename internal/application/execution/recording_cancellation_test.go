@@ -20,9 +20,9 @@ type argumentCancellationRecorder struct {
 	err           error
 }
 
-func (r *argumentCancellationRecorder) RecordAPIRecordingCancellation(_ context.Context, result value.APIExecution, proof artifact.RecordingCancellation, process value.APIProcessObservation, recovery artifact.RecoveryProof) (value.APIExecution, error) {
-	if process.Binding != r.process || recovery != r.recovery {
-		panic("changed original process or recovery")
+func (r *argumentCancellationRecorder) RecordAPIRecordingCancellation(_ context.Context, result value.APIExecution, proof artifact.RecordingCancellation, process value.APIProcessObservation) (value.APIExecution, error) {
+	if process.Binding != r.process {
+		panic("changed original process")
 	}
 	r.cancellations++
 	r.result, r.proof = result, proof

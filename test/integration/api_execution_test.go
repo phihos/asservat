@@ -96,9 +96,8 @@ func qualifyAPIExecutionTransactions(t *testing.T, ctx context.Context, admin *p
 				if _, err = sharedPool.Exec(ctx, "UPDATE custody_copy SET etag=etag WHERE false"); err != nil {
 					t.Fatal("shared hub lost its existing capture-history receipt update", err)
 				}
-				guards := postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard}
 				newExecution := func(p *pgxpool.Pool) *postgres.APIContextExecutions {
-					x, e := postgres.NewAPIContextExecutions(ctx, p, s.a.RootID, guards)
+					x, e := postgres.NewAPIContextExecutions(ctx, p, s.a.RootID, s.recovery.installation, s.retention.guard)
 					if e != nil {
 						t.Fatal(e)
 					}
@@ -127,11 +126,7 @@ func qualifyAPIExecutionTransactions(t *testing.T, ctx context.Context, admin *p
 					identity := s.a.Eligibility.VerifiedIdentity
 					identity.VerifiedAt = n
 					identity.ValidUntil = n.Add(5 * time.Second)
-					recovery, err := s.recovery.reader.RecoveryState(ctx)
-					if err != nil {
-						t.Fatal(err)
-					}
-					work, err := read.ReadAPIContextWork(ctx, accepted.CaptureID, identity, recovery)
+					work, err := read.ReadAPIContextWork(ctx, accepted.CaptureID, identity)
 					if err != nil {
 						t.Fatal(err)
 					}
@@ -158,14 +153,14 @@ func qualifyAPIExecutionTransactions(t *testing.T, ctx context.Context, admin *p
 					if err != nil {
 						t.Fatal(err)
 					}
-					process := value.APIProcessObservation{Binding: value.APIProcessBinding{InstallationID: recovery.InstallationID, ClusterID: input.Target.Target().ClusterID, IssuerEpoch: recovery.IssuerEpoch, NamespaceUID: custodyID(), AccountUID: custodyID(), PodUID: executorPod, ProcessEpoch: custodyID(), StartupDigest: artifact.Digest{1}, ImageDigest: accepted.Expectation.CollectorImageDigest}, CheckedAt: n, ValidUntil: n.Add(5 * time.Second)}
+					process := value.APIProcessObservation{Binding: value.APIProcessBinding{InstallationID: s.recovery.installation, ClusterID: input.Target.Target().ClusterID, IssuerEpoch: s.recovery.observation.issuer, NamespaceUID: custodyID(), AccountUID: custodyID(), PodUID: executorPod, ProcessEpoch: custodyID(), StartupDigest: artifact.Digest{1}, ImageDigest: accepted.Expectation.CollectorImageDigest}, CheckedAt: n, ValidUntil: n.Add(5 * time.Second)}
 					until := n.Add(5 * time.Second)
-					for _, d := range []time.Time{eligible.ValidUntil, plan.ValidUntil, recovery.FreshUntil, process.ValidUntil} {
+					for _, d := range []time.Time{eligible.ValidUntil, plan.ValidUntil, process.ValidUntil} {
 						if d.Before(until) {
 							until = d
 						}
 					}
-					return executionapp.APIExecutionCheck{Work: work, Plan: plan, Eligibility: eligible, Recovery: recovery, Process: process, CheckedAt: n, ValidUntil: until.Truncate(time.Microsecond)}
+					return executionapp.APIExecutionCheck{Work: work, Plan: plan, Eligibility: eligible, Process: process, CheckedAt: n, ValidUntil: until.Truncate(time.Microsecond)}
 				}
 				c := refresh()
 				if !c.Valid(time.Now()) {
@@ -266,10 +261,6 @@ func qualifyAPIExecutionTransactions(t *testing.T, ctx context.Context, admin *p
 					t.Fatal(err)
 				}
 				execution.CompletedAt = completion.StoredAt
-				currentRecovery, err := s.recovery.reader.RecoveryState(ctx)
-				if err != nil {
-					t.Fatal(err)
-				}
 				c.Process.CheckedAt = time.Now().UTC().Truncate(time.Microsecond)
 				c.Process.ValidUntil = c.Process.CheckedAt.Add(5 * time.Second)
 				if _, err = execute.RecordAPIOutcome(ctx, execution, c.Process); err == nil {
@@ -277,14 +268,14 @@ func qualifyAPIExecutionTransactions(t *testing.T, ctx context.Context, admin *p
 				}
 				badCompletion := completion
 				badCompletion.ExpectationDigest[0]++
-				if _, err = execute.RecordAPIStoredCompletion(ctx, execution, badCompletion, c.Process, currentRecovery); err == nil {
+				if _, err = execute.RecordAPIStoredCompletion(ctx, execution, badCompletion, c.Process); err == nil {
 					t.Fatal("foreign producer completion accepted")
 				}
-				execution, err = execute.RecordAPIStoredCompletion(ctx, execution, completion, c.Process, currentRecovery)
+				execution, err = execute.RecordAPIStoredCompletion(ctx, execution, completion, c.Process)
 				if err != nil {
 					t.Fatal(err)
 				}
-				if _, err = execute.RecordAPIStoredCompletion(ctx, execution, completion, c.Process, currentRecovery); err != nil {
+				if _, err = execute.RecordAPIStoredCompletion(ctx, execution, completion, c.Process); err != nil {
 					t.Fatal("immutable outcome replay", err)
 				}
 				// Schema106's narrowly granted completion columns cannot turn a
@@ -300,16 +291,16 @@ func qualifyAPIExecutionTransactions(t *testing.T, ctx context.Context, admin *p
 				expiredProcess := c.Process
 				expiredProcess.CheckedAt = time.Now().Add(-time.Second).UTC().Truncate(time.Microsecond)
 				expiredProcess.ValidUntil = expiredProcess.CheckedAt.Add(time.Millisecond)
-				if _, err = execute.RecordAPIStoredCompletion(ctx, execution, completion, expiredProcess, currentRecovery); err == nil {
+				if _, err = execute.RecordAPIStoredCompletion(ctx, execution, completion, expiredProcess); err == nil {
 					t.Fatal("outcome replay extended original process observation")
 				}
 				changed := execution
 				changed.Copies[0].SHA256[0]++
-				if _, err = execute.RecordAPIStoredCompletion(ctx, changed, completion, c.Process, currentRecovery); err == nil {
+				if _, err = execute.RecordAPIStoredCompletion(ctx, changed, completion, c.Process); err == nil {
 					t.Fatal("completed result rewritten")
 				}
 				publication := func(user, password string) *postgres.ContextPublications {
-					p, e := postgres.NewContextPublications(ctx, pool(user, password), s.a.RootID, guards)
+					p, e := postgres.NewContextPublications(ctx, pool(user, password), s.a.RootID, s.retention.guard)
 					if e != nil {
 						t.Fatal(e)
 					}
@@ -333,7 +324,7 @@ func qualifyAPIExecutionTransactions(t *testing.T, ctx context.Context, admin *p
 				verify := publication(verifyRole, verifyPassword)
 				audit := publication("context_verification_audit_runtime", "synthetic-context-audit")
 				publish := publication(publishRole, publishPassword)
-				gate, err := postgres.NewAPIContextPublicationGate(ctx, pool("api_publication_gate_runtime", "synthetic-api-publication-gate"), s.a.RootID, guards, privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, s.recovery.reader)
+				gate, err := postgres.NewAPIContextPublicationGate(ctx, pool("api_publication_gate_runtime", "synthetic-api-publication-gate"), s.a.RootID, s.retention.guard, privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now})
 				if err != nil {
 					t.Fatal(err)
 				}

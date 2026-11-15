@@ -46,8 +46,8 @@ type DownloadRetentionResolver interface {
 	ResolveRetained(context.Context, privacy.Input, privacy.Deadlines, []artifact.RetentionRule) (privacy.RetainedResolution, error)
 }
 
-// The installation composition must supply current recovery, processing and
-// regional/client policy. A static region string or successful SQL read does not
+// The installation composition must supply current processing and regional/client
+// policy. A static region string or successful SQL read does not
 // implement this authority. The consuming effect/relay must fence it again.
 type DownloadEnvironmentReader interface {
 	DownloadEnvironment(context.Context, ContextDownloadEvidence, identity.Principal) (artifact.DownloadEnvironment, error)

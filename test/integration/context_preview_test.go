@@ -56,7 +56,7 @@ func qualifyContextPreviews(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		t.Helper()
 		a, in := s.a, s.a.Plan.Input
 		p := capture.ContextPreview{
-			ID: custodyID(), AssessmentID: custodyID(), AssessmentRulesDigest: artifact.Digest{42}, RootID: a.RootID, InstallationID: a.Recovery.InstallationID, IssuerEpoch: a.Recovery.IssuerEpoch,
+			ID: custodyID(), AssessmentID: custodyID(), AssessmentRulesDigest: artifact.Digest{42}, RootID: a.RootID, InstallationID: s.recovery.installation,
 			CaptureID: in.CaptureID, CaseID: a.CaseID, OccurrenceID: a.OccurrenceID, ArtifactID: a.Registration.Location.ArtifactID, AttemptID: a.Registration.Location.AttemptID,
 			Actor:  in.Executor,
 			Intent: capture.ContextIntent{Target: targets.WorkloadRequest{ClusterID: in.Target.Request.ClusterID, Namespace: in.Target.Request.Namespace.Name, Kind: in.Target.Request.Workload.Kind, Name: in.Target.Request.Workload.Name}, Diagnostic: capture.ContextDiagnosticName, RequestedSeconds: in.Retention.RequestedSeconds},
@@ -85,14 +85,10 @@ func qualifyContextPreviews(t *testing.T, ctx context.Context, admin *pgxpool.Po
 	}
 	query := func(t *testing.T, s captureAdmissionScenario, p capture.ContextPreview) capture.ReplayQuery {
 		t.Helper()
-		r, err := s.recovery.reader.RecoveryState(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
 		i := s.a.Eligibility.VerifiedIdentity
 		i.VerifiedAt = time.Now().UTC().Truncate(time.Microsecond)
 		i.ValidUntil = i.VerifiedAt.Add(5 * time.Second)
-		return capture.ReplayQuery{RootID: s.a.RootID, PreviewID: p.ID, IdempotencyKey: s.a.IdempotencyKey, SubmissionDigest: captureapp.ContextRequestDigest(p.ID), Identity: i, Recovery: r}
+		return capture.ReplayQuery{RootID: s.a.RootID, PreviewID: p.ID, IdempotencyKey: s.a.IdempotencyKey, SubmissionDigest: captureapp.ContextRequestDigest(p.ID), Identity: i}
 	}
 
 	qualifyContextRequestResolution(t, ctx, admin, poolFor, create, newStore, blueprint, query)
@@ -373,7 +369,7 @@ func qualifyContextPreviews(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		in := query(t, s, p)
 		got, found, err := s.s.LookupContextAdmission(ctx, in)
 		original.Replay = true
-		if got.MetadataValidUntil.IsZero() || got.MetadataValidUntil.After(in.Identity.ValidUntil) || got.MetadataValidUntil.After(in.Recovery.FreshUntil) {
+		if got.MetadataValidUntil.IsZero() || got.MetadataValidUntil.After(in.Identity.ValidUntil) {
 			t.Fatal("accepted lookup lost current metadata deadline")
 		}
 		original.MetadataValidUntil = got.MetadataValidUntil // transient reply authority, not immutable admission

@@ -18,15 +18,14 @@ type liveManualHolders interface {
 	ResolveManualLive(context.Context, []targets.ManualLiveTarget) ([]targets.ManualLiveResolution, error)
 }
 type liveManualCatalog struct {
-	root     string
-	works    executionapp.LiveManualWorks
-	recovery authapp.DownloadRecoveryReader
-	holders  liveManualHolders
-	now      func() time.Time
+	root    string
+	works   executionapp.LiveManualWorks
+	holders liveManualHolders
+	now     func() time.Time
 }
 
 func (s liveManualCatalog) configured() bool {
-	return authorization.UUID(s.root) && s.works != nil && s.recovery != nil && s.holders != nil && s.now != nil
+	return authorization.UUID(s.root) && s.works != nil && s.holders != nil && s.now != nil
 }
 func (s liveManualCatalog) target(ctx context.Context, id string) (authorization.Target, error) {
 	if !s.configured() {
@@ -38,10 +37,6 @@ func (s liveManualCatalog) read(ctx context.Context, refs []live.SourceReference
 	if !s.configured() || len(refs) < 1 || len(refs) > 16 {
 		return nil, fmt.Errorf("%w: live_manual_sources:38", live.ErrInvalid)
 	}
-	recovery, e := s.recovery.RecoveryState(ctx)
-	if e != nil || !recovery.Valid(s.now()) {
-		return nil, fmt.Errorf("%w: live_manual_sources:42", live.ErrUnavailable)
-	}
 	ids := make([]string, len(refs))
 	for n, r := range refs {
 		if r.Kind != "manualSession" || !r.Target.Valid() {
@@ -49,7 +44,7 @@ func (s liveManualCatalog) read(ctx context.Context, refs []live.SourceReference
 		}
 		ids[n] = r.ID
 	}
-	rows, e := s.works.ReadLiveManualWork(ctx, ids, recovery)
+	rows, e := s.works.ReadLiveManualWork(ctx, ids)
 	if e == nil && len(rows) < len(refs) {
 		// A known-ended finite session is omitted; the view ends normally.
 		return nil, fmt.Errorf("%w: live_manual_sources:53", live.ErrEnded)
@@ -72,11 +67,7 @@ func (s liveManualCatalog) list(ctx context.Context, target authorization.Worklo
 	if !s.configured() {
 		return nil, "", fmt.Errorf("%w: live_manual_sources:68", live.ErrUnavailable)
 	}
-	recovery, e := s.recovery.RecoveryState(ctx)
-	if e != nil || !recovery.Valid(s.now()) {
-		return nil, "", fmt.Errorf("%w: live_manual_sources:72", live.ErrUnavailable)
-	}
-	rows, next, e := s.works.ListLiveManualWork(ctx, target, cursor, limit, recovery)
+	rows, next, e := s.works.ListLiveManualWork(ctx, target, cursor, limit)
 	if e != nil {
 		return nil, "", e
 	}

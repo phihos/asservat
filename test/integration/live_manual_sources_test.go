@@ -98,8 +98,8 @@ func qualifyLiveManualStartedSource(t *testing.T, f *capacitySQLFixture, s captu
 	if _, err = executions.LiveManualTarget(ctx, custodyID()); err == nil {
 		t.Fatal("unrelated capture acquired a target")
 	}
-	rows, err := executions.ReadLiveManualWork(ctx, []string{id}, check.Recovery)
-	if err != nil || len(rows) != 1 || !reflect.DeepEqual(rows[0].Execution, original) || !reflect.DeepEqual(rows[0].Work.Accepted, check.Work.Accepted) || rows[0].Work.Actor != check.Work.Actor || !time.Now().Before(rows[0].FreshUntil) || rows[0].FreshUntil.After(check.Recovery.FreshUntil) {
+	rows, err := executions.ReadLiveManualWork(ctx, []string{id})
+	if err != nil || len(rows) != 1 || !reflect.DeepEqual(rows[0].Execution, original) || !reflect.DeepEqual(rows[0].Work.Accepted, check.Work.Accepted) || rows[0].Work.Actor != check.Work.Actor || !time.Now().Before(rows[0].FreshUntil) {
 		t.Fatal("current original finite execution/authority", len(rows), err)
 	}
 	rec := accepted.Expectation.Recording
@@ -115,18 +115,18 @@ func qualifyLiveManualStartedSource(t *testing.T, f *capacitySQLFixture, s captu
 		t.Fatal("metadata source invented a sensitive session")
 	}
 	workload := authorization.WorkloadTarget{ClusterID: target.ClusterID, NamespaceUID: target.NamespaceUID, WorkloadUID: target.WorkloadUID}
-	listed, next, err := executions.ListLiveManualWork(ctx, workload, "", 100, check.Recovery)
+	listed, next, err := executions.ListLiveManualWork(ctx, workload, "", 100)
 	if err != nil || next != "" || len(listed) != 1 || listed[0].Work.Accepted.CaptureID != id {
 		t.Fatal("bounded exact manual workload inventory", len(listed), err)
 	}
-	if after, cursor, err := executions.ListLiveManualWork(ctx, workload, id, 100, check.Recovery); err != nil || len(after) != 0 || cursor != "" {
+	if after, cursor, err := executions.ListLiveManualWork(ctx, workload, id, 100); err != nil || len(after) != 0 || cursor != "" {
 		t.Fatal("original capture cursor replayed source", err)
 	}
 	workload.WorkloadUID = "unrelated-workload"
-	if other, _, err := executions.ListLiveManualWork(ctx, workload, "", 100, check.Recovery); err != nil || len(other) != 0 {
+	if other, _, err := executions.ListLiveManualWork(ctx, workload, "", 100); err != nil || len(other) != 0 {
 		t.Fatal("manual inventory crossed workload", err)
 	}
-	if missing, err := executions.ReadLiveManualWork(ctx, []string{custodyID()}, check.Recovery); err != nil || len(missing) != 0 {
+	if missing, err := executions.ReadLiveManualWork(ctx, []string{custodyID()}); err != nil || len(missing) != 0 {
 		t.Fatal("unknown manual source manufactured an execution", err)
 	}
 	if snapshot() != before {
@@ -142,7 +142,7 @@ func qualifyLiveManualStartedSource(t *testing.T, f *capacitySQLFixture, s captu
 			t.Fatal(err)
 		}
 		now := time.Now().UTC().Truncate(time.Microsecond)
-		stop := capture.CancellationCheck{RootID: root, Identity: check.Eligibility.VerifiedIdentity, Recovery: check.Recovery, CheckedAt: now, ValidUntil: identity.Earlier(check.ValidUntil, now.Add(5*time.Second)), Request: capture.CancellationRequest{CaptureID: id, ExpectedRevision: revision, IdempotencyKey: "stop-original-manual-live"}}
+		stop := capture.CancellationCheck{RootID: root, Identity: check.Eligibility.VerifiedIdentity, CheckedAt: now, ValidUntil: identity.Earlier(check.ValidUntil, now.Add(5*time.Second)), Request: capture.CancellationRequest{CaptureID: id, ExpectedRevision: revision, IdempotencyKey: "stop-original-manual-live"}}
 		result, err := executions.RequestCaptureCancellation(ctx, stop)
 		if err != nil || !result.Decision.Requested || result.Recording == nil || result.Recording.CaptureID != id || result.Recording.AttemptID != original.Binding.AttemptID {
 			t.Fatal("actual original finite Stop request", err)
@@ -159,14 +159,14 @@ func qualifyLiveManualStartedSource(t *testing.T, f *capacitySQLFixture, s captu
 			cancelled.Phase, cancelled.CompletedAt = "cancelled", joined.JoinedAt
 			replaced := joined
 			replaced.WriterEpoch = custodyID()
-			if _, err := executions.RecordAPIRecordingCancellation(ctx, cancelled, replaced, check.Process, check.Recovery); err == nil {
+			if _, err := executions.RecordAPIRecordingCancellation(ctx, cancelled, replaced, check.Process); err == nil {
 				t.Fatal("replacement writer proof joined the original Stop")
 			}
-			got, err := executions.RecordAPIRecordingCancellation(ctx, cancelled, joined, check.Process, check.Recovery)
+			got, err := executions.RecordAPIRecordingCancellation(ctx, cancelled, joined, check.Process)
 			if err != nil || got.Phase != "cancelled" || !got.AcquiredAt.IsZero() {
 				t.Fatal("original writer metadata Stop proof", err)
 			}
-			if replay, err := executions.RecordAPIRecordingCancellation(ctx, cancelled, joined, check.Process, check.Recovery); err != nil || !reflect.DeepEqual(replay, got) {
+			if replay, err := executions.RecordAPIRecordingCancellation(ctx, cancelled, joined, check.Process); err != nil || !reflect.DeepEqual(replay, got) {
 				t.Fatal("exact joined replay", err)
 			}
 			now = time.Now().UTC().Truncate(time.Microsecond)
@@ -176,7 +176,7 @@ func qualifyLiveManualStartedSource(t *testing.T, f *capacitySQLFixture, s captu
 			}
 		}
 	case rec.Profile == "rawPackets" || rec.Profile == "httpHeaders":
-		store, err := postgres.NewAccessGrants(ctx, f.roles["hub-runtime"], root, s.recovery.guard)
+		store, err := postgres.NewAccessGrants(ctx, f.roles["hub-runtime"], root, s.recovery.installation)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -188,7 +188,7 @@ func qualifyLiveManualStartedSource(t *testing.T, f *capacitySQLFixture, s captu
 		if err != nil {
 			t.Fatal(err)
 		}
-		g, _, err = store.RevokeGrant(ctx, authapp.GrantRevocationInput{GrantID: g.ID, Revoker: check.Work.Actor, ExpectedRevision: g.Revision, IdempotencyKey: "revoke-original-manual-source"}, check.Recovery)
+		g, _, err = store.RevokeGrant(ctx, authapp.GrantRevocationInput{GrantID: g.ID, Revoker: check.Work.Actor, ExpectedRevision: g.Revision, IdempotencyKey: "revoke-original-manual-source"})
 		if err != nil || g.RevokedAt.IsZero() {
 			t.Fatal("actual original source grant revocation", err)
 		}
@@ -200,7 +200,7 @@ func qualifyLiveManualStartedSource(t *testing.T, f *capacitySQLFixture, s captu
 			t.Fatal("actual terminal finite execution row", err)
 		}
 	}
-	if ended, err := executions.ReadLiveManualWork(ctx, []string{id}, check.Recovery); err != nil || len(ended) != 0 {
+	if ended, err := executions.ReadLiveManualWork(ctx, []string{id}); err != nil || len(ended) != 0 {
 		t.Fatal("ended, Stop-requested or revoked original remained a live source", len(ended), err)
 	}
 	if prepaid() != originalPrepaid {

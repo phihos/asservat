@@ -1,32 +1,30 @@
 package privacy
 
 import (
-	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/audit"
-	value "asservat.local/asservat/internal/domain/privacy"
 	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"time"
+
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/audit"
+	value "asservat.local/asservat/internal/domain/privacy"
 )
 
 type ContextDeletionWork struct {
 	Deletion   Deletion
 	Checkpoint value.ContextDeletionCheckpoint // PurgedAt remains zero until actual purge.
 }
-type ContextDeletionRecovery interface {
-	RecoveryState(context.Context) (artifact.RecoveryProof, error)
-}
 type ContextDeletionLedger interface {
-	ReadContextDeletion(context.Context, artifact.Location, artifact.RecoveryProof) (value.ContextDeletionCheckpoint, bool, error)
-	BeginContextDeletion(context.Context, artifact.Location, artifact.RecoveryProof) (ContextDeletionWork, error)
-	RecordContextPurge(context.Context, ContextDeletionWork, time.Time, artifact.RecoveryProof) (value.ContextDeletionCheckpoint, error)
+	ReadContextDeletion(context.Context, artifact.Location) (value.ContextDeletionCheckpoint, bool, error)
+	BeginContextDeletion(context.Context, artifact.Location) (ContextDeletionWork, error)
+	RecordContextPurge(context.Context, ContextDeletionWork, time.Time) (value.ContextDeletionCheckpoint, error)
 }
 type ContextDeletionAudit interface {
-	AcknowledgeContextDeletion(context.Context, value.ContextDeletionCheckpoint, audit.Receipt, artifact.RecoveryProof) error
+	AcknowledgeContextDeletion(context.Context, value.ContextDeletionCheckpoint, audit.Receipt) error
 }
 type ContextDeletionFinalizer interface {
-	FinalizeContextDeletion(context.Context, value.ContextDeletionCheckpoint, artifact.RecoveryProof) error
+	FinalizeContextDeletion(context.Context, value.ContextDeletionCheckpoint) error
 }
 type ContextDeletionWriter interface {
 	WriteContextDeletion(context.Context, value.ContextDeletionCheckpoint) (audit.Receipt, error)
@@ -56,7 +54,6 @@ type ContextCleaner struct {
 	Finalize ContextDeletionFinalizer
 	Purger   AttemptPurger
 	Objects  ContextDeletionWriter
-	Recovery ContextDeletionRecovery
 	Now      func() time.Time
 }
 
@@ -64,23 +61,15 @@ func (c ContextCleaner) Clean(ctx context.Context, loc artifact.Location) error 
 	if loc.Validate() != nil {
 		return artifact.ErrInvalid
 	}
-	if c.Ledger == nil || c.Audit == nil || c.Finalize == nil || c.Purger == nil || c.Objects == nil || c.Recovery == nil || c.Now == nil {
+	if c.Ledger == nil || c.Audit == nil || c.Finalize == nil || c.Purger == nil || c.Objects == nil || c.Now == nil {
 		return ErrUnavailable
 	}
-	proof, err := c.Recovery.RecoveryState(ctx)
-	if err != nil {
-		return err
-	}
-	checkpoint, found, err := c.Ledger.ReadContextDeletion(ctx, loc, proof)
+	checkpoint, found, err := c.Ledger.ReadContextDeletion(ctx, loc)
 	if err != nil {
 		return err
 	}
 	if !found {
-		proof, err = c.Recovery.RecoveryState(ctx)
-		if err != nil {
-			return err
-		}
-		work, e := c.Ledger.BeginContextDeletion(ctx, loc, proof)
+		work, e := c.Ledger.BeginContextDeletion(ctx, loc)
 		if e != nil {
 			return e
 		}
@@ -93,12 +82,7 @@ func (c ContextCleaner) Clean(ctx context.Context, loc artifact.Location) error 
 			return e
 		}
 		done := c.Now().UTC().Truncate(time.Microsecond)
-		proof, e = c.Recovery.RecoveryState(cleanup)
-		if e != nil {
-			stop()
-			return e
-		}
-		checkpoint, e = c.Ledger.RecordContextPurge(cleanup, work, done, proof)
+		checkpoint, e = c.Ledger.RecordContextPurge(cleanup, work, done)
 		stop()
 		if e != nil {
 			return e
@@ -111,16 +95,8 @@ func (c ContextCleaner) Clean(ctx context.Context, loc artifact.Location) error 
 	if err != nil {
 		return err
 	}
-	proof, err = c.Recovery.RecoveryState(ctx)
-	if err != nil {
+	if err = c.Audit.AcknowledgeContextDeletion(ctx, checkpoint, receipt); err != nil {
 		return err
 	}
-	if err = c.Audit.AcknowledgeContextDeletion(ctx, checkpoint, receipt, proof); err != nil {
-		return err
-	}
-	proof, err = c.Recovery.RecoveryState(ctx)
-	if err != nil {
-		return err
-	}
-	return c.Finalize.FinalizeContextDeletion(ctx, checkpoint, proof)
+	return c.Finalize.FinalizeContextDeletion(ctx, checkpoint)
 }

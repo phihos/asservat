@@ -13,7 +13,7 @@ import (
 // ReadOwnerObservationCandidates is a separate complete observation-routing
 // read using the original accepted candidate limit. It never changes the old
 // fixed-limit context-start reader and reuses the existing read credential.
-// It acquires recovery before the owner configuration shared lock. No writes,
+// It shares the owner configuration lock. No writes,
 // addresses, certificate claims or human authority are produced by discovery.
 func (s *OwnerEnrollments) ReadOwnerObservationCandidates(ctx context.Context) (value.APIContextOwnerCandidates, error) {
 	var out value.APIContextOwnerCandidates
@@ -24,7 +24,7 @@ func (s *OwnerEnrollments) ReadOwnerObservationCandidates(ctx context.Context) (
 	call, stop := context.WithDeadline(ctx, start.Add(5*time.Second))
 	defer stop()
 	original, _ := call.Deadline()
-	err := s.current(call, false, start, func(q *custodydb.Queries, c value.OwnerConfigurationObservation, r value.RecoveryState, n time.Time) error {
+	err := s.current(call, false, start, func(q *custodydb.Queries, c value.OwnerConfigurationObservation, n time.Time) error {
 		if c.Configuration.Pool.NativeCandidateLimit == 0 {
 			return value.ErrUnavailable
 		}
@@ -35,7 +35,7 @@ func (s *OwnerEnrollments) ReadOwnerObservationCandidates(ctx context.Context) (
 		if len(rows) > c.Configuration.Pool.NativeCandidateLimit {
 			return value.ErrUnavailable
 		}
-		until := identity.Earlier(original, identity.Earlier(c.FreshUntil, r.FreshUntil))
+		until := identity.Earlier(original, c.FreshUntil)
 		out = value.APIContextOwnerCandidates{Pool: c.Configuration.Pool, ObservedAt: start, ValidUntil: until}
 		for _, row := range rows {
 			out.Owners = append(out.Owners, value.OwnerBinding{InstallationID: out.Pool.InstallationID, ClusterID: out.Pool.ClusterID, IssuerEpoch: out.Pool.IssuerEpoch, PodUID: uid(row.PodUid), ProcessEpoch: uid(row.ProcessEpoch)})

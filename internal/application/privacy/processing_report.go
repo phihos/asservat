@@ -19,7 +19,6 @@ type ProcessingReportReader interface {
 type ProcessingReport struct {
 	RootID, InstallationID string
 	Policies               ProcessingPolicyReader
-	Recovery               ProcessingRecoveryReader
 	Reports                ProcessingReportReader
 	Now                    func() time.Time
 }
@@ -28,7 +27,7 @@ func (s ProcessingReport) Get(ctx context.Context, caller ProcessingIdentity, qu
 	var zero value.ProcessingReportPage
 	query = query.Normalized()
 	if ctx == nil || ctx.Err() != nil || caller == nil || !query.Valid() ||
-		!authorization.UUID(s.RootID) || !authorization.UUID(s.InstallationID) || s.Policies == nil || s.Recovery == nil || s.Reports == nil || s.Now == nil {
+		!authorization.UUID(s.RootID) || !authorization.UUID(s.InstallationID) || s.Policies == nil || s.Reports == nil || s.Now == nil {
 		return zero, value.ErrUnavailable
 	}
 	started := s.Now().UTC().Truncate(time.Microsecond)
@@ -41,7 +40,7 @@ func (s ProcessingReport) Get(ctx context.Context, caller ProcessingIdentity, qu
 	}
 	call, stop := context.WithDeadline(ctx, window.Until())
 	defer stop()
-	processing := ProcessingChanges{RootID: s.RootID, InstallationID: s.InstallationID, Policies: s.Policies, Recovery: s.Recovery, Now: s.Now}
+	processing := ProcessingChanges{RootID: s.RootID, InstallationID: s.InstallationID, Policies: s.Policies, Now: s.Now}
 	authority, err := processing.authority(call, caller, started, window.Until())
 	if err != nil {
 		return zero, err

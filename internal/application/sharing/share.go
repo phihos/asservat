@@ -27,9 +27,6 @@ import (
 type CaseRoutes interface {
 	ResolveContextCase(context.Context, catalog.CaseRouteQuery) (catalog.ContextCaseRoutes, error)
 }
-type RecoveryReader interface {
-	RecoveryState(context.Context) (artifact.RecoveryProof, error)
-}
 
 // Service implements create_share, list_shares and revoke_share
 // (ADR-232). It grants nothing itself: reads re-check every share through
@@ -40,7 +37,6 @@ type Service struct {
 	Permissions            authapp.ProjectionReader
 	Catalog                authapp.ContextDownloadCatalog
 	Store                  Store
-	Recovery               RecoveryReader
 	NewID                  func() string
 	Now                    func() time.Time
 	// Administration names the installation administrators who may revoke
@@ -99,7 +95,7 @@ type View struct {
 }
 
 func (s Service) ready() bool {
-	return s.Routes != nil && s.Permissions != nil && s.Catalog != nil && s.Store != nil && s.Recovery != nil && s.NewID != nil && s.Now != nil && value.UUID(s.RootID) && value.UUID(s.InstallationID)
+	return s.Routes != nil && s.Permissions != nil && s.Catalog != nil && s.Store != nil && s.NewID != nil && s.Now != nil && value.UUID(s.RootID) && value.UUID(s.InstallationID)
 }
 
 // identity resolves the caller: a human with evidence:read and evidence:share.
@@ -109,14 +105,6 @@ func (s Service) caller(ctx context.Context, current identities.CurrentIdentity)
 		return identity.Identity{}, capture.ErrDenied
 	}
 	return i, nil
-}
-
-func (s Service) recovery(ctx context.Context) (artifact.RecoveryProof, error) {
-	r, err := s.Recovery.RecoveryState(ctx)
-	if err != nil || r.InstallationID != s.InstallationID || !r.Valid(s.Now()) {
-		return artifact.RecoveryProof{}, capture.ErrUnavailable
-	}
-	return r, nil
 }
 
 // Create shares one published artifact that the caller currently owns. The
@@ -157,11 +145,7 @@ func (s Service) Create(ctx context.Context, current identities.CurrentIdentity,
 	if !expires.After(now) || expires.After(now.Add(value.ShareMaxLifetime)) {
 		return zero, false, capture.ErrInvalid
 	}
-	recovery, err := s.recovery(ctx)
-	if err != nil {
-		return zero, false, err
-	}
-	routes, err := s.Routes.ResolveContextCase(ctx, catalog.CaseRouteQuery{RootID: s.RootID, CaseID: in.CaseID, Identity: i, Recovery: recovery})
+	routes, err := s.Routes.ResolveContextCase(ctx, catalog.CaseRouteQuery{RootID: s.RootID, CaseID: in.CaseID, Identity: i})
 	if err != nil || routes.CaseID != in.CaseID || !routes.Valid(s.Now()) {
 		return zero, false, capture.ErrDenied
 	}
@@ -238,7 +222,7 @@ func (s Service) Create(ctx context.Context, current identities.CurrentIdentity,
 	}
 	share := value.Share{ID: s.NewID(), RootID: s.RootID, ArtifactID: route.ArtifactID, CaseID: in.CaseID, Target: route.Target, Version: record.Version,
 		Creator: i.Principal, Management: owners, Recipients: recipients, ExpiresAt: expires, Revision: 1}
-	out, replay, err := s.Store.CreateShare(ctx, Request{OperationID: in.OperationID, Share: share, IdempotencyKey: in.IdempotencyKey, RequestDigest: sha256.Sum256(digest)}, recovery)
+	out, replay, err := s.Store.CreateShare(ctx, Request{OperationID: in.OperationID, Share: share, IdempotencyKey: in.IdempotencyKey, RequestDigest: sha256.Sum256(digest)})
 	if err != nil {
 		return zero, false, err
 	}
@@ -370,10 +354,6 @@ func (s Service) Revoke(ctx context.Context, current identities.CurrentIdentity,
 	if err != nil {
 		return zero, false, err
 	}
-	recovery, err := s.recovery(ctx)
-	if err != nil {
-		return zero, false, err
-	}
 	share, err := s.Store.Share(ctx, shareID)
 	if errors.Is(err, capture.ErrDenied) {
 		return zero, false, capture.ErrDenied
@@ -397,7 +377,7 @@ func (s Service) Revoke(ctx context.Context, current identities.CurrentIdentity,
 		}
 		revocation.Administrator = len(held) == 0
 	}
-	out, replay, err := s.Store.RevokeShare(ctx, revocation, recovery)
+	out, replay, err := s.Store.RevokeShare(ctx, revocation)
 	if err != nil {
 		return zero, false, err
 	}
@@ -529,10 +509,6 @@ func (s Service) Transfer(ctx context.Context, current identities.CurrentIdentit
 	if err != nil {
 		return zero, false, err
 	}
-	recovery, err := s.recovery(ctx)
-	if err != nil {
-		return zero, false, err
-	}
 	share, err := s.Store.Share(ctx, in.ShareID)
 	if errors.Is(err, capture.ErrDenied) {
 		return zero, false, capture.ErrDenied
@@ -606,7 +582,7 @@ func (s Service) Transfer(ctx context.Context, current identities.CurrentIdentit
 	if err != nil || !final.Valid(s.Now()) || final.Principal != i.Principal || ctx.Err() != nil {
 		return zero, false, capture.ErrDenied
 	}
-	out, replay, err := s.Store.TransferShare(ctx, t, recovery)
+	out, replay, err := s.Store.TransferShare(ctx, t)
 	if err != nil {
 		return zero, false, err
 	}
@@ -667,8 +643,8 @@ type PolicyRevokeResult struct {
 // after success is a replay.
 func (s Service) RevokePolicySharing(ctx context.Context, current identities.CurrentIdentity, in PolicyRevokeInput) (PolicyRevokeResult, error) {
 	var out PolicyRevokeResult
-	err := s.changePolicySharing(ctx, current, in, func(ctx context.Context, r PolicyRevocation, recovery artifact.RecoveryProof) error {
-		revoked, replay, err := s.Policies.RevokePolicySharing(ctx, r, recovery)
+	err := s.changePolicySharing(ctx, current, in, func(ctx context.Context, r PolicyRevocation) error {
+		revoked, replay, err := s.Policies.RevokePolicySharing(ctx, r)
 		out = PolicyRevokeResult{AcceptanceID: in.AcceptanceID, Revoked: revoked, Replay: replay}
 		return err
 	})
@@ -684,8 +660,8 @@ func (s Service) RevokePolicySharing(ctx context.Context, current identities.Cur
 // stay until they expire or are revoked. Expected must be revision 1.
 func (s Service) StopPolicySharing(ctx context.Context, current identities.CurrentIdentity, in PolicyRevokeInput) (PolicyRevokeResult, error) {
 	var out PolicyRevokeResult
-	err := s.changePolicySharing(ctx, current, in, func(ctx context.Context, r PolicyRevocation, recovery artifact.RecoveryProof) error {
-		replay, err := s.Policies.StopPolicySharing(ctx, r, recovery)
+	err := s.changePolicySharing(ctx, current, in, func(ctx context.Context, r PolicyRevocation) error {
+		replay, err := s.Policies.StopPolicySharing(ctx, r)
 		out = PolicyRevokeResult{AcceptanceID: in.AcceptanceID, Replay: replay}
 		return err
 	})
@@ -700,7 +676,7 @@ func (s Service) StopPolicySharing(ctx context.Context, current identities.Curre
 // owner-team assignments now on the policy's workload) or an installation
 // administrator (ADR-238). Both only restrict access. An acceptance without
 // sharing, or one the caller may not change, is NotAvailable.
-func (s Service) changePolicySharing(ctx context.Context, current identities.CurrentIdentity, in PolicyRevokeInput, apply func(context.Context, PolicyRevocation, artifact.RecoveryProof) error) error {
+func (s Service) changePolicySharing(ctx context.Context, current identities.CurrentIdentity, in PolicyRevokeInput, apply func(context.Context, PolicyRevocation) error) error {
 	acceptanceID, expected, key := in.AcceptanceID, in.ExpectedRevision, in.IdempotencyKey
 	if ctx == nil || ctx.Err() != nil || current == nil || !s.ready() || s.Policies == nil {
 		return capture.ErrUnavailable
@@ -711,10 +687,6 @@ func (s Service) changePolicySharing(ctx context.Context, current identities.Cur
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	i, err := s.caller(ctx, current)
-	if err != nil {
-		return err
-	}
-	recovery, err := s.recovery(ctx)
 	if err != nil {
 		return err
 	}
@@ -740,5 +712,5 @@ func (s Service) changePolicySharing(ctx context.Context, current identities.Cur
 			r.Managers = append(r.Managers, a.AssignmentID)
 		}
 	}
-	return apply(ctx, r, recovery)
+	return apply(ctx, r)
 }

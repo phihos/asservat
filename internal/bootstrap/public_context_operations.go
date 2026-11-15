@@ -77,7 +77,7 @@ func NewPublicContextOperations(c PublicContextOperationsConfig, s PublicContext
 			reader = s.History
 			v.submission.History = s.History
 		}
-		history = captureapp.ContextHistoryService{RootID: c.RootID, InstallationID: c.InstallationID, Reader: reader, Targets: v.submission.Targets, Workloads: workloads, Previews: v.submission, Recovery: v.submission.Recovery, Now: c.Now}
+		history = captureapp.ContextHistoryService{RootID: c.RootID, InstallationID: c.InstallationID, Reader: reader, Targets: v.submission.Targets, Workloads: workloads, Previews: v.submission, Now: c.Now}
 		if s.History != nil {
 			typed := history.(captureapp.ContextHistoryService)
 			typed.Keys = s.History.Keys
@@ -129,7 +129,7 @@ func NewPublicContextOperations(c PublicContextOperationsConfig, s PublicContext
 		return operations, nil
 	}
 	q := s.Projection
-	if q.Results.RootID != c.RootID || q.Results.InstallationID != c.InstallationID || !authorization.UUID(q.Results.HubProcessEpoch) || q.Results.Authority == nil || q.Results.Ledger == nil || q.Results.Reader == nil || q.Results.Now == nil || q.Results.NewID == nil || q.Recovery == nil || q.Routes == nil || q.Plans == nil || q.Workers == nil {
+	if q.Results.RootID != c.RootID || q.Results.InstallationID != c.InstallationID || !authorization.UUID(q.Results.HubProcessEpoch) || q.Results.Authority == nil || q.Results.Ledger == nil || q.Results.Reader == nil || q.Results.Now == nil || q.Results.NewID == nil || q.Routes == nil || q.Plans == nil || q.Workers == nil {
 		return nil, presentation.ErrOperationsConfiguration
 	}
 	projection, err := presentation.NewContextProjectionOperations(*q, q.Results)
@@ -186,7 +186,7 @@ func composePublicContextUseCases(c PublicContextOperationsConfig, s PublicConte
 	if !authorization.UUID(c.RootID) || !authorization.UUID(c.InstallationID) || c.Now == nil || c.NewID == nil ||
 		i.RootID != c.RootID || i.InstallationID != c.InstallationID || p.RootID != c.RootID || p.InstallationID != c.InstallationID ||
 		k.RootID != c.RootID || k.InstallationID != c.InstallationID || d.RootID != c.RootID || d.InstallationID != c.InstallationID || a.RootID != c.RootID ||
-		i.Previews == nil || i.Replay == nil || i.Admission == nil || i.Resolution == nil || i.Targets == nil || i.Eligibility == nil || i.Capabilities == nil || i.Retention == nil || i.Storage == nil || i.Processing == nil || i.Recovery == nil ||
+		i.Previews == nil || i.Replay == nil || i.Admission == nil || i.Resolution == nil || i.Targets == nil || i.Eligibility == nil || i.Capabilities == nil || i.Retention == nil || i.Storage == nil || i.Processing == nil ||
 		i.Lifetime < time.Second || i.Lifetime > 5*time.Minute || i.Lifetime%time.Microsecond != 0 ||
 		a.Completed == nil || a.Journal == nil || a.Acknowledgements == nil || a.Writer == nil || a.Reader == nil || a.MAC == nil ||
 		!regionalHubRunner(s.Regional.Runner) || s.Regional.Signer == nil || s.Regional.Router == nil ||
@@ -196,21 +196,20 @@ func composePublicContextUseCases(c PublicContextOperationsConfig, s PublicConte
 		return zero, presentation.ErrOperationsConfiguration
 	}
 	i.RecordingSaveEnabled = packetSourceCompositionReady(c, s)
-	// Shared freshness functions and recovery source are fixed once at assembly;
-	// this creates no observation and replaces no original request deadline.
+	// Shared freshness functions are fixed once at assembly; this creates no
+	// observation and replaces no original request deadline.
 	i.Now, i.NewID, a.Now = c.Now, c.NewID, c.Now
-	s.Regional.Runner.Capabilities, s.Regional.Runner.Recovery, s.Regional.Runner.Now, s.Regional.Now = i.Capabilities, i.Recovery, c.Now, c.Now
-	p.Recovery, p.Now = i.Recovery, c.Now
-	k.Recovery, k.Now = i.Recovery, c.Now
+	s.Regional.Runner.Capabilities, s.Regional.Runner.Now, s.Regional.Now = i.Capabilities, c.Now, c.Now
+	p.Now, k.Now = c.Now, c.Now
 	// The raw selection reader uses the same initialized dependencies and clock
 	// as get_case, including assemblies with an explicitly injected clock.
 	if grants, ok := i.Grants.(authapp.GrantService); ok && grants.RawStore != nil {
 		grants.RawSelections = k
-		grants.Now, grants.NewID, grants.Recovery = c.Now, c.NewID, i.Recovery
+		grants.Now, grants.NewID = c.Now, c.NewID
 		i.Grants = grants
 	}
 	p.Navigation = captureapp.ContextCaseNavigator{Cases: k, Now: c.Now}
-	d.Recovery, d.Now, d.NewID = i.Recovery, c.Now, c.NewID
+	d.Now, d.NewID = c.Now, c.NewID
 	// ADR-194 D1: without a configured worker there is no native runtime and
 	// prepare fails closed; a typed nil must not become a non-nil interface.
 	if s.Native.Runtime != nil {
@@ -228,16 +227,16 @@ func composePublicContextUseCases(c PublicContextOperationsConfig, s PublicConte
 }
 
 // regionalHubRunner accepts only the hub's SQL/authority ports (ADR-171):
-// capability, recovery and clock come from the shared assembly, and every
+// capability and clock come from the shared assembly, and every
 // cluster-local port is bound per exchange, never configured here.
 func regionalHubRunner(r executionapp.APIContextRunner) bool {
 	return r.Read != nil && r.Prepare != nil && r.Record != nil && r.Eligibility != nil && r.Retention != nil &&
-		r.Capabilities == nil && r.Recovery == nil && r.Now == nil &&
+		r.Capabilities == nil && r.Now == nil &&
 		r.Process == nil && r.Targets == nil && r.Output == nil && r.Collector == nil
 }
 
 // composePublicPolicies composes the ADR-228 restart-trigger services onto
-// the same investigation, recovery and clock as the public operations. The
+// the same investigation and clock as the public operations. The
 // trigger reuses the composed submission unchanged: preview, admission,
 // intent audit and regional start run exactly as for a human request.
 func composePublicPolicies(c PublicContextOperationsConfig, s PublicContextOperationServices, pc *publicContext) (*presentation.PolicyOperations, *captureapp.PolicyTrigger, error) {
@@ -249,9 +248,9 @@ func composePublicPolicies(c PublicContextOperationsConfig, s PublicContextOpera
 	if !ok {
 		return nil, nil, presentation.ErrOperationsConfiguration
 	}
-	activation := captureapp.PolicyActivation{RootID: c.RootID, InstallationID: c.InstallationID, RecipeName: planningapp.ContextRecipeName, RecipeDigest: planningapp.RecipeDigest(), Documents: pc.hubPolicies, Sources: pc.policies, Observer: observer, Ledger: pc.policyTriggers, Permissions: pc.permissions, Automation: pc.automation, Acceptor: pc.policies, Audit: pc.policyAudit, Recovery: v.submission.Recovery, Now: c.Now, Report: eventLog(os.Stderr, "policy activation refused"), CompileRecorder: publicPolicyRecorderCompiler(pc.investigation.Filters, pc.investigation.Profiles, pc.investigation.ProfileEndpoints), WorkloadAutomation: pc.automation, GrantAttachments: pc.policies}
-	status := captureapp.PolicyStatusService{CompileRecorder: recordingSavePolicyCompiler(v.submission.Filters, v.submission.Profiles, v.submission.ProfileEndpoints), RecipeName: planningapp.ContextRecipeName, RecipeDigest: planningapp.RecipeDigest(), RootID: c.RootID, InstallationID: c.InstallationID, Documents: pc.hubPolicies, Ledger: pc.policyTriggers, Permissions: pc.permissions, Recovery: v.submission.Recovery, Now: c.Now}
-	deactivation := captureapp.PolicyDeactivation{RootID: c.RootID, InstallationID: c.InstallationID, Documents: pc.hubPolicies, Ledger: pc.policyTriggers, Permissions: pc.permissions, Recovery: v.submission.Recovery, Now: c.Now}
+	activation := captureapp.PolicyActivation{RootID: c.RootID, InstallationID: c.InstallationID, RecipeName: planningapp.ContextRecipeName, RecipeDigest: planningapp.RecipeDigest(), Documents: pc.hubPolicies, Sources: pc.policies, Observer: observer, Ledger: pc.policyTriggers, Permissions: pc.permissions, Automation: pc.automation, Acceptor: pc.policies, Audit: pc.policyAudit, Now: c.Now, Report: eventLog(os.Stderr, "policy activation refused"), CompileRecorder: publicPolicyRecorderCompiler(pc.investigation.Filters, pc.investigation.Profiles, pc.investigation.ProfileEndpoints), WorkloadAutomation: pc.automation, GrantAttachments: pc.policies}
+	status := captureapp.PolicyStatusService{CompileRecorder: recordingSavePolicyCompiler(v.submission.Filters, v.submission.Profiles, v.submission.ProfileEndpoints), RecipeName: planningapp.ContextRecipeName, RecipeDigest: planningapp.RecipeDigest(), RootID: c.RootID, InstallationID: c.InstallationID, Documents: pc.hubPolicies, Ledger: pc.policyTriggers, Permissions: pc.permissions, Now: c.Now}
+	deactivation := captureapp.PolicyDeactivation{RootID: c.RootID, InstallationID: c.InstallationID, Documents: pc.hubPolicies, Ledger: pc.policyTriggers, Permissions: pc.permissions, Now: c.Now}
 	operations, err := presentation.NewPolicyOperations(c.PublicOrigin, c.Now, c.NewID, activation, status, deactivation)
 	if err != nil {
 		return nil, nil, err
@@ -268,36 +267,36 @@ func composePublicPolicies(c PublicContextOperationsConfig, s PublicContextOpera
 }
 
 // composePublicShares composes the ADR-232 share operations on the same case
-// routes, permissions, catalog, recovery and clock as get_case.
+// routes, permissions, catalog and clock as get_case.
 func composePublicShares(c PublicContextOperationsConfig, s PublicContextOperationServices, pc *publicContext) (*presentation.ShareOperations, error) {
-	v, err := composePublicContextUseCases(c, s)
+	_, err := composePublicContextUseCases(c, s)
 	if err != nil || pc == nil || pc.shares == nil || pc.caseRoutes == nil || pc.permissions == nil || pc.catalog == nil {
 		return nil, presentation.ErrOperationsConfiguration
 	}
-	service := sharing.Service{RootID: c.RootID, InstallationID: c.InstallationID, Routes: pc.caseRoutes, Permissions: pc.permissions, Catalog: pc.catalog, Store: pc.shares, Policies: pc.shares, Recovery: v.submission.Recovery, NewID: c.NewID, Now: c.Now}
+	service := sharing.Service{RootID: c.RootID, InstallationID: c.InstallationID, Routes: pc.caseRoutes, Permissions: pc.permissions, Catalog: pc.catalog, Store: pc.shares, Policies: pc.shares, NewID: c.NewID, Now: c.Now}
 	// ADR-238: identity.administrators may revoke any share.
 	service.Administration = pc.administrators
 	return presentation.NewShareOperations(c.PublicOrigin, c.Now, c.NewID, service)
 }
 
 // composePublicAccess composes the ADR-234 caller-only explain_access
-// operation on the same target resolution, permission projection, recovery
+// operation on the same target resolution, permission projection
 // and clock as preview_capture and get_case.
 func composePublicAccess(c PublicContextOperationsConfig, s PublicContextOperationServices, pc *publicContext) (*presentation.AccessOperations, error) {
 	v, err := composePublicContextUseCases(c, s)
 	if err != nil || pc == nil || pc.permissions == nil {
 		return nil, presentation.ErrOperationsConfiguration
 	}
-	service := authapp.AccessExplainer{InstallationID: c.InstallationID, Targets: v.submission.Targets, Permissions: pc.permissions, Recovery: v.submission.Recovery, Reviews: pc.reviews, Now: c.Now}
+	service := authapp.AccessExplainer{InstallationID: c.InstallationID, Targets: v.submission.Targets, Permissions: pc.permissions, Reviews: pc.reviews, Now: c.Now}
 	return presentation.NewAccessOperations(c.PublicOrigin, c.Now, c.NewID, service)
 }
 
 // composePublicAccessPreview composes the ADR-237 browser-only
 // preview_access_change operation for identity.administrators (ADR-329: no
-// delegated previewers); the same permission projection, recovery and clock
-// as explain_access feed the real evaluator.
+// delegated previewers); the same permission projection and clock as
+// explain_access feed the real evaluator.
 func composePublicAccessPreview(c PublicContextOperationsConfig, s PublicContextOperationServices, pc *publicContext) (*presentation.AccessPreviewOperations, error) {
-	v, err := composePublicContextUseCases(c, s)
+	_, err := composePublicContextUseCases(c, s)
 	if err != nil || pc == nil || pc.permissions == nil || pc.administrators == nil || len(pc.clusterIDs) == 0 {
 		return nil, presentation.ErrOperationsConfiguration
 	}
@@ -305,7 +304,7 @@ func composePublicAccessPreview(c PublicContextOperationsConfig, s PublicContext
 	if err != nil {
 		return nil, presentation.ErrOperationsConfiguration
 	}
-	service := authapp.AccessPreviewer{InstallationID: c.InstallationID, Administrators: pc.administrators, Projections: pc.permissions, Decoder: decoder, Recovery: v.submission.Recovery, Clusters: slices.Clone(pc.clusterIDs), Now: c.Now}
+	service := authapp.AccessPreviewer{InstallationID: c.InstallationID, Administrators: pc.administrators, Projections: pc.permissions, Decoder: decoder, Clusters: slices.Clone(pc.clusterIDs), Now: c.Now}
 	return presentation.NewAccessPreviewOperations(c.PublicOrigin, c.Now, c.NewID, service)
 }
 

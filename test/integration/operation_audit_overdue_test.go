@@ -54,18 +54,18 @@ func qualifyOperationAuditOverdue(t *testing.T, ctx context.Context, admin *pgxp
 				policy.WALReservedBytes = ww * policy.MetadataSlots
 			}
 			lc := func(p *pgxpool.Pool, lane string) *postgres.OperationLifecycles {
-				x, e := postgres.NewOperationLifecycles(ctx, p, s.a.RootID, lane, s.recovery.guard)
+				x, e := postgres.NewOperationLifecycles(ctx, p, s.a.RootID, lane, s.recovery.installation)
 				if e != nil {
 					t.Fatal(e)
 				}
 				return x
 			}
 			producerLedger, cleanup, verified, finalizer := lc(jp, "normal"), lc(dp, "normal"), lc(ap, "normal"), lc(fp, "normal")
-			j, e := postgres.NewHealthyOperationJournal(ctx, jp, policy, s.recovery.guard)
+			j, e := postgres.NewHealthyOperationJournal(ctx, jp, policy)
 			if e != nil {
 				t.Fatal(e)
 			}
-			ack, e := postgres.NewOperationAcknowledgements(ctx, ap, s.a.RootID, "normal", s.recovery.guard)
+			ack, e := postgres.NewOperationAcknowledgements(ctx, ap, s.a.RootID, "normal", s.recovery.installation)
 			if e != nil {
 				t.Fatal(e)
 			}
@@ -124,11 +124,11 @@ func qualifyOperationAuditOverdue(t *testing.T, ctx context.Context, admin *pgxp
 			unoptedPolicy.Lane = "resolution"
 			unoptedPolicy.OverdueTerminal = ""
 			unoptedPolicy.BackupHorizonSeconds = 0
-			oj, e := postgres.NewHealthyOperationJournal(ctx, jp, unoptedPolicy, s.recovery.guard)
+			oj, e := postgres.NewHealthyOperationJournal(ctx, jp, unoptedPolicy)
 			if e != nil {
 				t.Fatal(e)
 			}
-			oa, e := postgres.NewOperationAcknowledgements(ctx, ap, s.a.RootID, "resolution", s.recovery.guard)
+			oa, e := postgres.NewOperationAcknowledgements(ctx, ap, s.a.RootID, "resolution", s.recovery.installation)
 			if e != nil {
 				t.Fatal(e)
 			}

@@ -155,7 +155,7 @@ func (s *workerOwnerAudit) run(ctx context.Context) {
 // RunWithIndependentOwnerAudit is selected only by the fresh worker2 loader.
 // Both source loops retain their one-second-after-completion cadence, while
 // the fixed audit actor may wait for the shared expensive-operation admission.
-// It neither accepts recovery nor implements a generic background task queue.
+// It does not implement a generic background task queue.
 func (s *ConfigurationReconciler) RunWithIndependentOwnerAudit(ctx context.Context, admission *WorkerRuntimeAdmission) error {
 	if s == nil || admission == nil || admission.self != admission || ctx == nil || ctx.Err() != nil || s.Fleet == nil || s.Owner == nil || s.Fleet.Settings == nil || s.Fleet.Projection == nil || s.Fleet.Now == nil || s.Owner.Reader == nil || s.Owner.Ledger == nil || s.Owner.Audit == nil || s.Owner.Acknowledgements == nil || s.Owner.Now == nil || !s.running.CompareAndSwap(false, true) {
 		return value.ErrInvalid

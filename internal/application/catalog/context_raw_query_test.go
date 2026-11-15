@@ -72,7 +72,7 @@ func TestRawQuerySelectionRefusesUnavailableAndChangedFacts(t *testing.T) {
 			case "expired observation":
 				f.afterRetention = func() { f.now = f.now.Add(6 * time.Second) }
 			case "identity changed":
-				f.afterFinalRecovery = func() { f.i.Principal.ClientID = "other" }
+				f.afterFinalProcessing = func() { f.i.Principal.ClientID = "other" }
 			}
 			got, err := s.ResolveRawQuery(t.Context(), f, f.routes.CaseID, []artifact.Digest{digest})
 			if err == nil || len(got.Artifacts) != 0 {

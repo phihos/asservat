@@ -89,7 +89,7 @@ func admitQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, root capacityR
 		t.Fatal("reviewed source", err)
 	}
 
-	p := capture.ContextPreview{ID: custodyID(), AssessmentID: custodyID(), AssessmentRulesDigest: planning.RecorderAssessmentRulesFor(reviewed.Actions), RootID: s.a.RootID, InstallationID: s.a.Recovery.InstallationID, IssuerEpoch: s.a.Recovery.IssuerEpoch, CaptureID: in.CaptureID, CaseID: s.a.CaseID, OccurrenceID: s.a.OccurrenceID, ArtifactID: s.a.Registration.Location.ArtifactID, AttemptID: s.a.Registration.Location.AttemptID, Actor: in.Executor, ExecutionClass: artifact.ContextAPIExecution,
+	p := capture.ContextPreview{ID: custodyID(), AssessmentID: custodyID(), AssessmentRulesDigest: planning.RecorderAssessmentRulesFor(reviewed.Actions), RootID: s.a.RootID, InstallationID: s.recovery.installation, CaptureID: in.CaptureID, CaseID: s.a.CaseID, OccurrenceID: s.a.OccurrenceID, ArtifactID: s.a.Registration.Location.ArtifactID, AttemptID: s.a.Registration.Location.AttemptID, Actor: in.Executor, ExecutionClass: artifact.ContextAPIExecution,
 		Intent: capture.ContextIntent{Target: targets.WorkloadRequest{ClusterID: in.Target.Request.ClusterID, Namespace: in.Target.Request.Namespace.Name, Kind: in.Target.Request.Workload.Kind, Name: in.Target.Request.Workload.Name}, Composition: &c, RequestedSeconds: in.Retention.RequestedSeconds}, Target: in.Target.Request, Pin: in.Target.Pin,
 		Storage: capture.ContextStorageSelection{StoreID: s.a.Registration.StoreID, AllocationID: s.a.Registration.AllocationID, PoolRevision: s.a.Registration.PoolRevision, AllocationRevision: s.a.Registration.AllocationRevision, BindingRevision: s.a.Storage.Revision}, Retention: reviewOf(in.Retention), Audience: s.a.Eligibility.DefaultAudience, CanonicalScope: reviewed.CanonicalScope, ScopeDigest: reviewed.ScopeDigest, CreatedAt: now, Deadline: input.Deadline}
 	pools, _ := compiledOrdinaryHubPools(t, ctx, admin, poolFor)
@@ -100,7 +100,7 @@ func admitQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, root capacityR
 	if err = previews.CreateContextPreview(ctx, p); err != nil {
 		t.Fatal("profile preview", err)
 	}
-	grants, err := postgres.NewAccessGrants(ctx, pools.ordinary, p.RootID, s.recovery.guard)
+	grants, err := postgres.NewAccessGrants(ctx, pools.ordinary, p.RootID, s.recovery.installation)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +109,7 @@ func admitQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, root capacityR
 		g.Reasons = reviewed.Approval.Reasons
 	}
 	g.ReviewDigest = authapp.ReviewDigest(g, g.Review)
-	g, _, err = grants.RequestGrant(ctx, authapp.StoredGrantRequest{Grant: g, IdempotencyKey: "profile-review", RequestDigest: sha256.Sum256([]byte("synthetic-profile-review"))}, s.a.Recovery)
+	g, _, err = grants.RequestGrant(ctx, authapp.StoredGrantRequest{Grant: g, IdempotencyKey: "profile-review", RequestDigest: sha256.Sum256([]byte("synthetic-profile-review"))})
 	if err != nil {
 		t.Fatal("profile review", err)
 	}
@@ -153,7 +153,7 @@ func admitQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, root capacityR
 	}
 	reviewer := p.Actor
 	reviewer.Subject = "synthetic-independent-profile-reviewer"
-	g, _, err = grants.DecideGrant(ctx, authapp.GrantDecisionInput{GrantID: g.ID, Approve: true, Approver: reviewer, Reason: "synthetic profile review", ACR: "gold", AuthTime: time.Now().Add(-time.Second), IdempotencyKey: "profile-approve"}, s.a.Recovery)
+	g, _, err = grants.DecideGrant(ctx, authapp.GrantDecisionInput{GrantID: g.ID, Approve: true, Approver: reviewer, Reason: "synthetic profile review", ACR: "gold", AuthTime: time.Now().Add(-time.Second), IdempotencyKey: "profile-approve"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -180,7 +180,7 @@ func admitQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, root capacityR
 	if _, err = publisher.AcknowledgedCaptureIntent(ctx, accepted.CaptureID); err != nil {
 		t.Fatal("managed profile capture intent", err)
 	}
-	execSQL, err := postgres.NewAPIContextExecutions(ctx, pools.ordinary, p.RootID, postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard})
+	execSQL, err := postgres.NewAPIContextExecutions(ctx, pools.ordinary, p.RootID, s.recovery.installation, s.retention.guard)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -201,11 +201,7 @@ func startQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, s captureAdmis
 		i := s.a.Eligibility.VerifiedIdentity
 		i.Scopes = append(append([]string(nil), i.Scopes...), "evidence:read")
 		i.VerifiedAt, i.ValidUntil = n, n.Add(5*time.Second)
-		recovery, err := s.recovery.reader.RecoveryState(f.ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
-		work, err := execSQL.ReadAPIContextWork(f.ctx, accepted.CaptureID, i, recovery)
+		work, err := execSQL.ReadAPIContextWork(f.ctx, accepted.CaptureID, i)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -229,13 +225,13 @@ func startQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, s captureAdmis
 		if err != nil {
 			t.Fatal(err)
 		}
-		process.InstallationID, process.ClusterID, process.IssuerEpoch = recovery.InstallationID, input.Target.Target().ClusterID, recovery.IssuerEpoch
+		process.InstallationID, process.ClusterID, process.IssuerEpoch = s.recovery.installation, input.Target.Target().ClusterID, s.recovery.observation.issuer
 		observation := execution.APIProcessObservation{Binding: process, CheckedAt: n, ValidUntil: n.Add(5 * time.Second)}
 		until := n.Add(5 * time.Second)
-		for _, d := range []time.Time{eligible.ValidUntil, compiled.ValidUntil, recovery.FreshUntil, observation.ValidUntil, accepted.Expectation.Registration.WriteUntil} {
+		for _, d := range []time.Time{eligible.ValidUntil, compiled.ValidUntil, observation.ValidUntil, accepted.Expectation.Registration.WriteUntil} {
 			until = identity.Earlier(until, d)
 		}
-		check := executionapp.APIExecutionCheck{Work: work, Plan: compiled, Eligibility: eligible, Recovery: recovery, Process: observation, CheckedAt: n, ValidUntil: until.Truncate(time.Microsecond)}
+		check := executionapp.APIExecutionCheck{Work: work, Plan: compiled, Eligibility: eligible, Process: observation, CheckedAt: n, ValidUntil: until.Truncate(time.Microsecond)}
 		if !check.Valid(time.Now()) {
 			t.Fatal("profile execution fixture invalid")
 		}

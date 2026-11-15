@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"testing"
 	"time"
-
-	"asservat.local/asservat/internal/domain/identity"
 )
 
 func comparisonPlansFixture() (ContextProjectionAuthority, ContextQueryPlan, ContextQueryPlan) {
@@ -128,11 +126,9 @@ func TestProfileComparisonPlansSameWorkloadAndLegacyJSON(t *testing.T) {
 		ID, OperationID, WorkerID                         string
 		Scope                                             ContextProjectionScope
 		Plan                                              ContextQueryPlan
-		RecoveryIssuerEpoch                               string
-		RecoveryRevision                                  identity.Revision
 		CreatedAt, Deadline, WorkerUntil, CredentialUntil time.Time
 		ProviderUntil, CleanupUntil                       time.Time
-	}{q.ID, q.OperationID, q.WorkerID, q.Scope, q.Plan, q.RecoveryIssuerEpoch, q.RecoveryRevision, q.CreatedAt, q.Deadline, q.WorkerUntil, q.CredentialUntil, q.ProviderUntil, q.CleanupUntil}
+	}{q.ID, q.OperationID, q.WorkerID, q.Scope, q.Plan, q.CreatedAt, q.Deadline, q.WorkerUntil, q.CredentialUntil, q.ProviderUntil, q.CleanupUntil}
 	got, e := json.Marshal(q)
 	want, e2 := json.Marshal(old)
 	if e != nil || e2 != nil || !bytes.Equal(got, want) {

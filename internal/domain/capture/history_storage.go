@@ -24,7 +24,6 @@ func (l HistoryLimits) Valid() bool {
 type HistoryReservation struct {
 	Expectation      HistoryExpectation
 	Identity         identity.Identity
-	Recovery         artifact.RecoveryProof
 	Limits           HistoryLimits
 	SummaryExpiresAt time.Time
 	Retention        privacy.Resolution
@@ -54,7 +53,6 @@ type HistoryStorage struct {
 type HistoryWriteRequest struct {
 	Storage       HistoryStorage
 	Identity      identity.Identity
-	Recovery      artifact.RecoveryProof
 	RequestID     string
 	ExecutorEpoch string
 	BundleDigest  artifact.Digest
@@ -63,7 +61,6 @@ type HistoryWriteResult struct {
 	Authority  HistoryOperationAuthority
 	Copies     artifact.Copies
 	Completion HistoryWriterCompletion
-	Recovery   artifact.RecoveryProof
 }
 type HistoryReadRequest struct {
 	Retention     privacy.RetainedResolution
@@ -82,7 +79,6 @@ type HistoryDeletePermission struct {
 }
 type HistoryDeleteRequest struct {
 	CaptureID, RequestID, ExecutorEpoch string
-	Recovery                            artifact.RecoveryProof
 }
 
 type HistoryRetirementCandidate struct{ CaptureID, ClusterID, State string }

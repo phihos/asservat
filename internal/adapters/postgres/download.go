@@ -20,13 +20,10 @@ import (
 	"time"
 )
 
-type DownloadTransactionGuards = EffectTransactionGuards
-
 type Downloads struct {
 	ledger    *Ledger
 	root      string
 	retention *RetentionTransactionGuard
-	recovery  *RecoveryTransactionGuard
 }
 
 var _ evidence.DownloadSessions = (*Downloads)(nil)
@@ -35,7 +32,7 @@ var _ capacity.DownloadAllocations = (*Downloads)(nil)
 
 // Runtime, audit and configuration facets are composed with separate SQL roles.
 // The implementation does not grant roles, decrypt evidence or create authority.
-func NewDownloads(ctx context.Context, pool *pgxpool.Pool, root string, guards ...DownloadTransactionGuards) (*Downloads, error) {
+func NewDownloads(ctx context.Context, pool *pgxpool.Pool, root string, guards ...*RetentionTransactionGuard) (*Downloads, error) {
 	if !authorization.UUID(root) {
 		return nil, artifact.ErrInvalid
 	}
@@ -48,11 +45,11 @@ func NewDownloads(ctx context.Context, pool *pgxpool.Pool, root string, guards .
 	if why := schemaCompatible(ctx, pool); why != "" {
 		return nil, schemaRefusal(privacy.ErrUnavailable, why)
 	}
-	guard, err := effectGuardsFor(root, guards)
+	guard, err := retentionGuardFor(root, guards)
 	if err != nil {
 		return nil, err
 	}
-	return &Downloads{ledger: l, root: root, retention: guard.Retention, recovery: guard.Recovery}, nil
+	return &Downloads{ledger: l, root: root, retention: guard}, nil
 }
 func principalKey(p identity.Principal) []byte { p.ClientID = ""; return digest(p) }
 func downloadAllocation(r custodydb.DownloadAllocation) artifact.DownloadAllocation {
@@ -197,21 +194,13 @@ func (s *Downloads) downloadTopology(ctx context.Context, a artifact.DownloadAut
 	return s.retention.observe(ctx, a.Scope.ClusterID)
 }
 
-func (s *Downloads) lockDownloadRecovery(ctx context.Context, q *custodydb.Queries, root string, a artifact.DownloadAuthority) (custodydb.FleetCurrentTrust, error) {
-	if a.Started() {
-		return s.recovery.lockStarted(ctx, q, root, a.Environment.Recovery())
-	}
-	return s.recovery.lock(ctx, q, root, a.Environment.Recovery())
-}
-
 // Rechecked after blocking locks and before commit. A current permission stream
 // and published catalog row are necessary; the external gate additionally owns
 // identity, retention shortening, locality and (future) raw/share authority.
 // A started response's continuation (ADR-312) skips the permission, processing
 // and retention-policy fences: it keeps only its original bounds, the effective
-// retention cutoffs and managed deletion of the published copy, and the
-// recovery incarnation it started under.
-func (s *Downloads) downloadFence(ctx context.Context, q *custodydb.Queries, p custodydb.PermissionStream, a artifact.DownloadAuthority, topology privacyvalue.PolicyTopology, recovery custodydb.FleetCurrentTrust) error {
+// retention cutoffs and managed deletion of the published copy.
+func (s *Downloads) downloadFence(ctx context.Context, q *custodydb.Queries, p custodydb.PermissionStream, a artifact.DownloadAuthority, topology privacyvalue.PolicyTopology) error {
 	if a.Started() {
 		n, err := q.CurrentTime(ctx)
 		if err != nil {
@@ -220,10 +209,7 @@ func (s *Downloads) downloadFence(ctx context.Context, q *custodydb.Queries, p c
 		if !a.Valid(n.Time) || a.DeleteBy.IsZero() {
 			return artifact.ErrDownloadExpired
 		}
-		if err := publishedDownloadFence(ctx, q, a); err != nil {
-			return err
-		}
-		return s.recovery.checkStarted(recovery, a.Scope.RootID, a.Environment.Recovery())
+		return publishedDownloadFence(ctx, q, a)
 	}
 	if err := processingDownloadFence(ctx, q, a); err != nil {
 		return err
@@ -247,10 +233,7 @@ func (s *Downloads) downloadFence(ctx context.Context, q *custodydb.Queries, p c
 			return privacy.ErrFence
 		}
 	}
-	if err := publishedDownloadFence(ctx, q, a); err != nil {
-		return err
-	}
-	return s.recovery.check(ctx, q, recovery, a.Scope.RootID, a.Environment.Recovery())
+	return publishedDownloadFence(ctx, q, a)
 }
 
 // publishedDownloadFence binds the exact published copy and its effective
@@ -289,15 +272,11 @@ func (s *Downloads) ReserveDownload(ctx context.Context, r evidence.DownloadRese
 		return out, err
 	}
 	err = s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		recovery, err := s.lockDownloadRecovery(ctx, q, a.Scope.RootID, a)
-		if err != nil {
-			return err
-		}
 		p, err := q.LockPermissionStream(ctx, id(s.root))
 		if err != nil {
 			return err
 		}
-		if err = s.downloadFence(ctx, q, p, a, topology, recovery); err != nil {
+		if err = s.downloadFence(ctx, q, p, a, topology); err != nil {
 			return err
 		}
 		existing, err := q.FindDownloadSession(ctx, custodydb.FindDownloadSessionParams{RootID: id(s.root), ActorKey: digest(a.Scope.Principal), IdempotencyDigest: r.IdempotencyDigest[:]})
@@ -310,7 +289,7 @@ func (s *Downloads) ReserveDownload(ctx context.Context, r evidence.DownloadRese
 				return privacy.ErrConflict
 			}
 			// The original ID/deadline/spend survive retry and process restart.
-			return s.downloadFence(ctx, q, p, a, topology, recovery)
+			return s.downloadFence(ctx, q, p, a, topology)
 		}
 		if !errors.Is(err, pgx.ErrNoRows) {
 			return err
@@ -350,7 +329,7 @@ func (s *Downloads) ReserveDownload(ctx context.Context, r evidence.DownloadRese
 		if err != nil {
 			return err
 		}
-		return s.downloadFence(ctx, q, p, a, topology, recovery)
+		return s.downloadFence(ctx, q, p, a, topology)
 	})
 	if err != nil {
 		return artifact.DownloadSession{}, err
@@ -406,10 +385,6 @@ func (s *Downloads) beginDownloadBatch(ctx context.Context, sessionID string, a 
 		return out, err
 	}
 	err = s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		recovery, err := s.lockDownloadRecovery(ctx, q, a.Scope.RootID, a)
-		if err != nil {
-			return err
-		}
 		p, err := q.LockPermissionStream(ctx, id(s.root))
 		if err != nil {
 			return err
@@ -422,7 +397,7 @@ func (s *Downloads) beginDownloadBatch(ctx context.Context, sessionID string, a 
 		if err != nil {
 			return err
 		}
-		if err = s.downloadFence(ctx, q, p, a, topology, recovery); err != nil {
+		if err = s.downloadFence(ctx, q, p, a, topology); err != nil {
 			return err
 		}
 		// A repeated batch ID is deliberately NOT a second writer permit. Lost
@@ -467,7 +442,7 @@ func (s *Downloads) beginDownloadBatch(ctx context.Context, sessionID string, a 
 		if err = updateDownload(ctx, q, current); err != nil {
 			return err
 		}
-		return s.downloadFence(ctx, q, p, a, topology, recovery)
+		return s.downloadFence(ctx, q, p, a, topology)
 	})
 	if err != nil {
 		return audit.DownloadIntent{}, err
@@ -487,10 +462,6 @@ func (s *Downloads) PermitDownloadBatch(ctx context.Context, sessionID string, a
 		return err
 	}
 	return s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		recovery, err := s.lockDownloadRecovery(ctx, q, a.Scope.RootID, a)
-		if err != nil {
-			return err
-		}
 		p, err := q.LockPermissionStream(ctx, id(s.root))
 		if err != nil {
 			return err
@@ -503,7 +474,7 @@ func (s *Downloads) PermitDownloadBatch(ctx context.Context, sessionID string, a
 		if err != nil {
 			return err
 		}
-		if err = s.downloadFence(ctx, q, p, a, topology, recovery); err != nil {
+		if err = s.downloadFence(ctx, q, p, a, topology); err != nil {
 			return err
 		}
 		n, err := q.CurrentTime(ctx)
@@ -594,10 +565,6 @@ func (s *Downloads) PermitDownloadMetadata(ctx context.Context, sessionID string
 		return err
 	}
 	return s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		recovery, err := s.lockDownloadRecovery(ctx, q, a.Scope.RootID, a)
-		if err != nil {
-			return err
-		}
 		p, err := q.LockPermissionStream(ctx, id(s.root))
 		if err != nil {
 			return err
@@ -626,7 +593,7 @@ func (s *Downloads) PermitDownloadMetadata(ctx context.Context, sessionID string
 		if i.Batch.Generation != generation || i.Batch.Purpose != artifact.DownloadMetadata || !b.AuditAcknowledgedAt.Valid || !b.OutcomeAcknowledgedAt.Valid || json.Unmarshal(b.OutcomeJson, &outcome) != nil || !outcome.Valid() || !outcome.Intent.Equal(i) || !outcome.Success || json.Unmarshal(b.OutcomeReceiptJson, &receipt) != nil || !receipt.ValidDownload(s.root, sessionID, batchID, "outcome") {
 			return privacy.ErrFence
 		}
-		if err = s.downloadFence(ctx, q, p, a, topology, recovery); err != nil {
+		if err = s.downloadFence(ctx, q, p, a, topology); err != nil {
 			return err
 		}
 		n, err := q.CurrentTime(ctx)

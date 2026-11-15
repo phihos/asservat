@@ -98,7 +98,6 @@ func newProjectionFixture() (*projectionFixture, ContextProjectionAuthority, ana
 		record:     ContextProjectionEvidence{CaseID: scope.CaseID, CaptureID: scope.CaptureID, PurposeRef: "diagnostics", Version: scope.Version, SourceFormat: scope.SourceFormat, SourceProjectionDigest: scope.SourceProjectionDigest, DataClass: "metadata", Audience: []artifact.AudienceAssignment{audience}, ObservedAt: n, ValidUntil: n.Add(5 * time.Second), Retained: privacy.RetainedArtifact{RootID: scope.RootID, Registration: reg, Input: privacy.Input{Target: target, PrivacyClass: "potentialPersonalData", EvidenceType: "context", RequestedSeconds: 3600, AnchorAt: reg.AnchorAt}, OriginPolicies: refs, Effective: deadlines}},
 		retention:  privacy.RetainedResolution{Target: target, PolicyRevision: proof.Policy, PurposeRef: "diagnostics", Policies: slices.Clone(refs), Deadlines: deadlines, ValidUntil: n.Add(5 * time.Second), Proof: proof},
 		environment: analysis.ContextProjectionEnvironment{RootID: scope.RootID, InstallationID: scope.RootID, Region: "region", StoreID: reg.StoreID, Location: reg.Location, Principal: actor, PolicyRevision: rev(23), ObservedAt: n, ValidUntil: n.Add(5 * time.Second),
-			Recovery:   artifact.RecoveryProof{InstallationID: scope.RootID, IssuerEpoch: projectionTestID(24), Revision: rev(25), ObservedAt: n, FreshUntil: n.Add(5 * time.Second)},
 			Processing: artifact.DownloadProcessingProof{RootID: scope.RootID, Epoch: projectionTestID(26), CaptureID: scope.CaptureID, Location: reg.Location, Sequence: 1, StateDigest: artifact.Digest{27}, ObservedAt: n, ValidUntil: n.Add(5 * time.Second)},
 			Path:       analysis.ContextProjectionPath{Purpose: analysis.ContextProjectionPurpose, ID: projectionTestID(28), TargetClusterID: target.ClusterID, StoreID: reg.StoreID, StorageRegion: "region", AcquisitionClusterID: projectionTestID(29), AcquisitionRegion: "region", ConnectorClusterID: projectionTestID(29), ConnectorRegion: "region", HubClusterID: projectionTestID(30), HubRegion: "region", WorkerConfiguration: rev(31), HubConfiguration: rev(32)}},
 	}
@@ -252,7 +251,7 @@ func TestContextProjectionAuthorityRejectsSourceSubstitution(t *testing.T) {
 }
 
 func TestContextProjectionAuthorityRechecksAfterBlockingReads(t *testing.T) {
-	for _, name := range []string{"deny", "permission-revision", "groups", "scopes", "identity-policy", "recovery", "processing", "path", "environment-policy", "retention-cutoff", "retention-source", "retention-origins", "final-identity", "final-environment"} {
+	for _, name := range []string{"deny", "permission-revision", "groups", "scopes", "identity-policy", "processing", "path", "environment-policy", "retention-cutoff", "retention-source", "retention-origins", "final-identity", "final-environment"} {
 		t.Run(name, func(t *testing.T) {
 			f, s, scope := newProjectionFixture()
 			f.on = func(_ context.Context, port string, count int) {
@@ -272,8 +271,6 @@ func TestContextProjectionAuthorityRechecksAfterBlockingReads(t *testing.T) {
 				}
 				if port == "permissions" && count == 2 {
 					switch name {
-					case "recovery":
-						f.environment.Recovery.IssuerEpoch = projectionTestID(99)
 					case "processing":
 						f.environment.Processing.Sequence++
 					case "path":
@@ -303,12 +300,10 @@ func TestContextProjectionAuthorityRechecksAfterBlockingReads(t *testing.T) {
 }
 
 func TestContextProjectionAuthorityRequiresEveryProof(t *testing.T) {
-	for _, name := range []string{"recovery", "processing", "wrong-processing-capture", "path", "download-purpose", "retention", "retention-target", "retention-extension", "retention-purpose", "environment", "catalog", "permissions", "retention-error"} {
+	for _, name := range []string{"processing", "wrong-processing-capture", "path", "download-purpose", "retention", "retention-target", "retention-extension", "retention-purpose", "environment", "catalog", "permissions", "retention-error"} {
 		t.Run(name, func(t *testing.T) {
 			f, s, scope := newProjectionFixture()
 			switch name {
-			case "recovery":
-				f.environment.Recovery = artifact.RecoveryProof{}
 			case "processing":
 				f.environment.Processing = artifact.DownloadProcessingProof{}
 			case "wrong-processing-capture":
@@ -382,7 +377,6 @@ func TestContextProjectionAuthorityKeepsOriginalIntervals(t *testing.T) {
 					f.retention.Proof.ObservedAt, f.retention.Proof.ValidUntil = f.now, f.now.Add(5*time.Second)
 					f.retention.ValidUntil = f.now.Add(5 * time.Second)
 					f.environment.ObservedAt, f.environment.ValidUntil = f.now, f.now.Add(5*time.Second)
-					f.environment.Recovery.ObservedAt, f.environment.Recovery.FreshUntil = f.now, f.now.Add(5*time.Second)
 					f.environment.Processing.ObservedAt, f.environment.Processing.ValidUntil = f.now, f.now.Add(5*time.Second)
 				}
 				out, err := s.CheckProjectionCurrent(ctx, f, scope)
@@ -469,9 +463,9 @@ func TestContextProjectionAuthorityNamesItsEarliestBound(t *testing.T) {
 		set   func(*projectionFixture)
 	}{
 		{"retention", func(f *projectionFixture) { f.retention.ValidUntil = f.now.Add(2 * time.Second) }},
-		{"environment/recovery", func(f *projectionFixture) {
-			f.environment.Recovery.FreshUntil = f.now.Add(time.Second)
-			f.environment.ValidUntil = f.environment.Recovery.FreshUntil
+		{"environment/processing", func(f *projectionFixture) {
+			f.environment.Processing.ValidUntil = f.now.Add(time.Second)
+			f.environment.ValidUntil = f.environment.Processing.ValidUntil
 		}},
 		{"catalog", func(f *projectionFixture) { f.record.ValidUntil = f.now.Add(time.Second) }},
 	} {

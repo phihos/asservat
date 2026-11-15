@@ -163,11 +163,11 @@ func beginPaidShareOperation(t *testing.T, ctx context.Context, gate *auditapp.H
 func qualifyShareMetadataSlots(t *testing.T, f *capacitySQLFixture, s captureAdmissionScenario, published artifact.PublishedContext) {
 	t.Helper()
 	ctx, hub, e := f.ctx, f.roles["hub-runtime"], published.Expectation
-	store, err := postgres.NewEvidenceShares(ctx, hub, s.a.RootID, s.recovery.guard)
+	store, err := postgres.NewEvidenceShares(ctx, hub, s.a.RootID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	catalog, err := postgres.NewContextPublications(ctx, hub, s.a.RootID, postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard})
+	catalog, err := postgres.NewContextPublications(ctx, hub, s.a.RootID, s.retention.guard)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -177,15 +177,15 @@ func qualifyShareMetadataSlots(t *testing.T, f *capacitySQLFixture, s captureAdm
 	}
 	profiles := f.readAuditProfiles(t)
 	policy := profiles.Normal.Policy
-	journal, err := postgres.NewHealthyOperationJournal(ctx, hub, policy, s.recovery.guard)
+	journal, err := postgres.NewHealthyOperationJournal(ctx, hub, policy)
 	if err != nil {
 		t.Fatal(err)
 	}
-	acknowledgements, err := postgres.NewOperationAcknowledgements(ctx, hub, s.a.RootID, "normal", s.recovery.guard)
+	acknowledgements, err := postgres.NewOperationAcknowledgements(ctx, hub, s.a.RootID, "normal", s.recovery.installation)
 	if err != nil {
 		t.Fatal(err)
 	}
-	completions, err := postgres.NewOperationLifecycles(ctx, hub, s.a.RootID, "normal", s.recovery.guard)
+	completions, err := postgres.NewOperationLifecycles(ctx, hub, s.a.RootID, "normal", s.recovery.installation)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -212,15 +212,6 @@ func qualifyShareMetadataSlots(t *testing.T, f *capacitySQLFixture, s captureAdm
 	}
 	if len(managers) != 8 {
 		t.Fatal("original eight-owner audience", len(managers))
-	}
-	proof := func() artifact.RecoveryProof {
-		t.Helper()
-		f.refreshFleet(t)
-		p, err := s.recovery.reader.RecoveryState(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return p
 	}
 	begin := func(name, key string) auditvalue.OperationIntent {
 		t.Helper()
@@ -251,14 +242,14 @@ func qualifyShareMetadataSlots(t *testing.T, f *capacitySQLFixture, s captureAdm
 		t.Fatal("unacknowledged reservation", err)
 	}
 	request.OperationID = raw.ID
-	if _, _, err = store.CreateShare(ctx, request, proof()); err == nil {
+	if _, _, err = store.CreateShare(ctx, request); err == nil {
 		t.Fatal("unacknowledged operation funded share")
 	}
 	// The already acknowledged source is current and has not spent a marker.
 	request.OperationID = reserved.ID
 	before := sampleShareMetadata(t, f, e.Registration.Location.ArtifactID)
 	started := time.Now()
-	first, replay, err := store.CreateShare(ctx, request, proof())
+	first, replay, err := store.CreateShare(ctx, request)
 	if err != nil || replay {
 		t.Fatal("paid share create", err, replay)
 	}
@@ -267,7 +258,7 @@ func qualifyShareMetadataSlots(t *testing.T, f *capacitySQLFixture, s captureAdm
 	another.Share.ID = custodyID()
 	another.IdempotencyKey = "same-operation-second-share"
 	another.RequestDigest = artifact.Digest{98}
-	if _, _, err = store.CreateShare(ctx, another, proof()); !errors.Is(err, capture.ErrConflict) {
+	if _, _, err = store.CreateShare(ctx, another); !errors.Is(err, capture.ErrConflict) {
 		t.Fatal("paid source created second share", err)
 	}
 	var creatorID, lastID string
@@ -280,7 +271,7 @@ func qualifyShareMetadataSlots(t *testing.T, f *capacitySQLFixture, s captureAdm
 	replayRequest := request
 	replayRequest.OperationID = replayOp.ID
 	replayRequest.Share.ID = custodyID()
-	again, replay, err := store.CreateShare(ctx, replayRequest, proof())
+	again, replay, err := store.CreateShare(ctx, replayRequest)
 	if err != nil || !replay || again.ID != first.ID || !again.ExpiresAt.Equal(first.ExpiresAt) {
 		t.Fatal("fresh operation changed original business replay", err, replay)
 	}
@@ -289,7 +280,7 @@ func qualifyShareMetadataSlots(t *testing.T, f *capacitySQLFixture, s captureAdm
 	rejected := another
 	rejected.OperationID = tooLong.ID
 	rejected.Share.ExpiresAt = tooLong.Lifecycle.OriginalPurgeAt.Add(time.Microsecond)
-	if _, _, err = store.CreateShare(ctx, rejected, proof()); !errors.Is(err, sharing.ErrRetentionCapacity) {
+	if _, _, err = store.CreateShare(ctx, rejected); !errors.Is(err, sharing.ErrRetentionCapacity) {
 		t.Fatal("incompatible original effect bound", err)
 	}
 	transferOp := begin("transfer_share", "one-transfer")
@@ -300,19 +291,19 @@ func qualifyShareMetadataSlots(t *testing.T, f *capacitySQLFixture, s captureAdm
 		ids[n] = a.AssignmentID
 	}
 	transfer := sharing.Transfer{OperationID: transferOp.ID, ShareID: first.ID, Actor: creator, Managers: ids, Management: replacement, ExpectedRevision: 1, IdempotencyKey: "first-transfer", RequestDigest: artifact.Digest{96}}
-	updated, replay, err := store.TransferShare(ctx, transfer, proof())
+	updated, replay, err := store.TransferShare(ctx, transfer)
 	if err != nil || replay {
 		t.Fatal("paid transfer", err, replay)
 	}
 	transfer.IdempotencyKey = "second-transfer"
 	transfer.ExpectedRevision = updated.Revision
 	transfer.RequestDigest = artifact.Digest{95}
-	if _, _, err = store.TransferShare(ctx, transfer, proof()); !errors.Is(err, capture.ErrConflict) {
+	if _, _, err = store.TransferShare(ctx, transfer); !errors.Is(err, capture.ErrConflict) {
 		t.Fatal("one paid operation transferred twice", err)
 	}
 	finish(transferOp)
 	revokeOp := begin("revoke_share", "revoke-original")
-	if _, replay, err = store.RevokeShare(ctx, sharing.Revocation{OperationID: revokeOp.ID, ShareID: first.ID, Actor: creator, ExpectedRevision: updated.Revision, IdempotencyKey: "finite-revoke"}, proof()); err != nil || replay {
+	if _, replay, err = store.RevokeShare(ctx, sharing.Revocation{OperationID: revokeOp.ID, ShareID: first.ID, Actor: creator, ExpectedRevision: updated.Revision, IdempotencyKey: "finite-revoke"}); err != nil || replay {
 		t.Fatal("paid revoke", err, replay)
 	}
 	finish(revokeOp)
@@ -358,7 +349,7 @@ func qualifyPaidShareRetirement(t *testing.T, f *capacitySQLFixture, s captureAd
 	}
 	ledgers := make([]*postgres.OperationLifecycles, 0, 3)
 	for _, purpose := range []string{"capture-cleanup", "capture-verifier", "capture-finalizer"} {
-		l, err := postgres.NewScopedWorkerOperationLifecycles(ctx, f.roles[purpose], s.a.RootID, s.recovery.installation, policy.StoreID, s.recovery.guard)
+		l, err := postgres.NewScopedWorkerOperationLifecycles(ctx, f.roles[purpose], s.a.RootID, s.recovery.installation, policy.StoreID)
 		if err != nil {
 			t.Fatal("compiled worker cleanup facet", purpose, err)
 		}
@@ -534,7 +525,7 @@ func qualifyCompiledCleanupOverdueCounter(t *testing.T, f *capacitySQLFixture, s
 	}
 	f.refreshFleet(t)
 	cleanup := f.roles["capture-cleanup"]
-	ledger, err := postgres.NewScopedWorkerOperationLifecycles(ctx, cleanup, s.a.RootID, s.recovery.installation, policy.StoreID, s.recovery.guard)
+	ledger, err := postgres.NewScopedWorkerOperationLifecycles(ctx, cleanup, s.a.RootID, s.recovery.installation, policy.StoreID)
 	if err != nil {
 		t.Fatal(err)
 	}

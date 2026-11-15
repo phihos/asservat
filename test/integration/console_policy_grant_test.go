@@ -42,7 +42,7 @@ func (s *consoleManagerGrants) Grant(_ context.Context, id string) (authorizatio
 	}
 	return authorization.Grant{}, authapp.ErrGrantNotFound
 }
-func (s *consoleManagerGrants) RevokeGrant(_ context.Context, in authapp.GrantRevocationInput, _ artifact.RecoveryProof) (authorization.Grant, bool, error) {
+func (s *consoleManagerGrants) RevokeGrant(_ context.Context, in authapp.GrantRevocationInput) (authorization.Grant, bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if in.GrantID != s.g.ID || in.ExpectedRevision != s.g.Revision {
@@ -82,16 +82,6 @@ func (consoleManagerNoPods) Permissions(context.Context, authorization.Target) (
 	panic("policy manager metadata invented a Pod")
 }
 
-type consoleManagerRecovery struct {
-	root     string
-	revision identity.Revision
-}
-
-func (s consoleManagerRecovery) RecoveryState(context.Context) (artifact.RecoveryProof, error) {
-	now := time.Now().UTC()
-	return artifact.RecoveryProof{InstallationID: s.root, IssuerEpoch: s.root, Revision: s.revision, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}, nil
-}
-
 func newConsoleManagerGrants(t *testing.T, origin string) (*presentation.GrantOperations, *consoleManagerGrants) {
 	t.Helper()
 	now := time.Now().UTC()
@@ -112,7 +102,7 @@ func newConsoleManagerGrants(t *testing.T, origin string) (*presentation.GrantOp
 		t.Fatal("invalid synthetic policy grant")
 	}
 	store := &consoleManagerGrants{g: g}
-	service := authapp.GrantService{RootID: root, InstallationID: root, Permissions: consoleManagerNoPods{}, WorkloadPermissions: consoleManagerProjection{owner, g.Policy.Workload(), rev}, Store: store, Recovery: consoleManagerRecovery{root, rev}, Now: time.Now, NewID: func() string { return consoleCaptureID(703) }}
+	service := authapp.GrantService{RootID: root, InstallationID: root, Permissions: consoleManagerNoPods{}, WorkloadPermissions: consoleManagerProjection{owner, g.Policy.Workload(), rev}, Store: store, Now: time.Now, NewID: func() string { return consoleCaptureID(703) }}
 	service.PolicyRequests = store
 	service.PolicyPlans = consolePolicyGrantPlan{store}
 	service.ApprovalSettings = consolePolicyGrantSettings{store}
@@ -170,7 +160,7 @@ func (s *consoleManagerGrants) LookupPolicyGrantRequest(_ context.Context, in au
 	}
 	return s.requests[id], true, nil
 }
-func (s *consoleManagerGrants) RequestGrant(_ context.Context, in authapp.StoredGrantRequest, _ artifact.RecoveryProof) (authorization.Grant, bool, error) {
+func (s *consoleManagerGrants) RequestGrant(_ context.Context, in authapp.StoredGrantRequest) (authorization.Grant, bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	g := in.Grant

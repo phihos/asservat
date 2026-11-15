@@ -1,14 +1,15 @@
 package evidence
 
 import (
-	value "asservat.local/asservat/internal/domain/analysis"
-	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/authorization"
-	"asservat.local/asservat/internal/domain/identity"
 	"context"
 	"errors"
 	"testing"
 	"time"
+
+	value "asservat.local/asservat/internal/domain/analysis"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/identity"
 )
 
 const projectionID = "11111111-1111-4111-8111-111111111111"
@@ -48,7 +49,6 @@ func newProjectionWorkerFixture(t *testing.T) *projectionWorkerFixture {
 		HubClusterID: projectionID, HubRegion: "region", WorkerConfiguration: rev, HubConfiguration: rev}
 	f.a = value.ContextProjectionAuthority{Scope: scope, Environment: value.ContextProjectionEnvironment{RootID: projectionID, InstallationID: projectionID,
 		Region: "region", StoreID: projectionID, Location: location, Principal: principal, PolicyRevision: rev, Path: path,
-		Recovery:   artifact.RecoveryProof{InstallationID: projectionID, IssuerEpoch: projectionID, Revision: rev},
 		Processing: artifact.DownloadProcessingProof{RootID: projectionID, Epoch: projectionID, CaptureID: projectionID, Location: location, Sequence: 1, StateDigest: artifact.Digest{1}}},
 		Retention: artifact.RetentionProof{RootID: projectionID, ClusterID: projectionID, NamespaceUID: "namespace", WorkloadUID: "workload", PodUID: "pod",
 			Topology: rev, Policy: rev, Selectors: rev, SourceCount: 1}, PermissionRevision: rev, IdentityRevision: rev, DecisionDigest: artifact.Digest{1},
@@ -87,7 +87,6 @@ func newProjectionWorkerFixture(t *testing.T) *projectionWorkerFixture {
 	until := f.now.Add(4 * time.Second)
 	f.a.CheckedAt, f.a.ValidUntil = f.now, until
 	f.a.Environment.ObservedAt, f.a.Environment.ValidUntil = f.now, until
-	f.a.Environment.Recovery.ObservedAt, f.a.Environment.Recovery.FreshUntil = f.now, until
 	f.a.Environment.Processing.ObservedAt, f.a.Environment.Processing.ValidUntil = f.now, until
 	f.a.Retention.ObservedAt, f.a.Retention.ValidUntil = f.now, until
 	f.p.ObservedAt, f.p.ValidUntil = f.now, until

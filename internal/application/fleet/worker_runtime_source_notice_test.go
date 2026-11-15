@@ -17,7 +17,7 @@ func workerSchedulingAdministration() value.Administration {
 }
 
 // This fixture supplies synthetic scheduling notifications only. It proves
-// application ordering/cancellation, never SQL commit, recovery or availability.
+// application ordering/cancellation, never SQL commit or availability.
 // Each notification is a separate fixed observation after ticket grant; reads
 // never manufacture a refreshed observation for an already selected candidate.
 func workerAuditSchedulingFixture(t *testing.T, ctx context.Context) *WorkerRuntimeAdmission {

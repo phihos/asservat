@@ -143,9 +143,8 @@ func qualifyOperationVerificationMigration(t *testing.T, ctx context.Context, ad
 				t.Fatal(e)
 			}
 			epoch := custodyID()
-			// Only fixture recovery acceptance is synthesized, for this exact scratch
-			// database incarnation. Runtime observers cannot perform this transition.
-			// The scratch schema predates 00167, so it still has the recovery flag.
+			// Fixture trust row for this scratch database. The scratch schema
+			// predates 00167, so it still has the recovery flag.
 			exec("INSERT INTO fleet_trust(activated_postmaster_at,activated_database_oid,installation_id,issuer_epoch,source_uid,source_generation,source_digest,suspended,recovery_blocked,observed_at,fresh_until) VALUES(pg_postmaster_start_time(),(SELECT oid FROM pg_database WHERE datname=current_database()),$1,$2,'synthetic-verifier-migration',1,$3,false,false,statement_timestamp(),statement_timestamp()+interval '30 seconds')", scenario.recovery.installation, epoch, make([]byte, 32))
 			n := now()
 			exec("INSERT INTO operation_audit_pool(root_id,lane,account_version,revision,valid_until,account_limit,records_per_account,retained_seconds) VALUES($1,'normal','accounts-v1',1,$2,1,10,3600)", scenario.a.RootID, n.Add(time.Hour))

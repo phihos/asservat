@@ -17,7 +17,7 @@ import (
 // covering-grant port, with current facts expiring before admission. SQL grant
 // admission/closure and the installed signed review are qualified separately.
 func TestApprovedRetainedRecordingFactsRefusalThenExplicitResolutionCloses(t *testing.T) {
-	for _, bound := range []string{"identity", "recovery", "target", "capability", "retention"} {
+	for _, bound := range []string{"identity", "target", "capability", "retention"} {
 		t.Run(bound, func(t *testing.T) {
 			base := newInvestigationFixture()
 			f := &retainedRecording{investigationFixture: base}
@@ -48,8 +48,6 @@ func TestApprovedRetainedRecordingFactsRefusalThenExplicitResolutionCloses(t *te
 			switch bound {
 			case "identity":
 				source = &shortenedContinuationIdentity{source: source, until: until}
-			case "recovery":
-				base.svc.Recovery = consumptionRecovery{base, until}
 			case "target":
 				base.svc.Targets = consumptionTarget{base, until}
 			}
@@ -68,8 +66,7 @@ func TestApprovedRetainedRecordingFactsRefusalThenExplicitResolutionCloses(t *te
 				t.Fatal("retained approved plan changed")
 			}
 			// Resolution is a separate explicit operation with independently current
-			// identity/recovery. Since admission never occurred, its safe result is closed.
-			base.svc.Recovery = base
+			// identity. Since admission never occurred, its safe result is closed.
 			d, err := base.svc.ResolveContextRequest(t.Context(), f.source(t, t.Context()), p.ID, "original")
 			if err != nil || d.State != value.RequestClosed || d.Accepted != nil || len(f.seen) != 0 {
 				t.Fatal("refusal was mistaken for accepted work", d, err)

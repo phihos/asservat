@@ -169,12 +169,8 @@ func (d *OwnerDeployment) nativeConfiguration(ctx context.Context, pool *pgxpool
 	if err != nil {
 		return nil, err
 	}
-	recovery, err := postgres.NewRecoveryTransactionGuard(c.PermissionRootID, c.InstallationID)
-	if err != nil {
-		return nil, err
-	}
-	d.shared = publicShared{topologies: topologies, guards: postgres.EffectTransactionGuards{Retention: retention, Recovery: recovery}, nativeRead: pool}
-	readers, err := postgres.NewNativeReaders(ctx, pool, c.PermissionRootID, c.InstallationID, postgres.DownloadTransactionGuards{Retention: retention, Recovery: recovery})
+	d.shared = publicShared{topologies: topologies, retention: retention, nativeRead: pool}
+	readers, err := postgres.NewNativeReaders(ctx, pool, c.PermissionRootID, c.InstallationID, retention)
 	if err != nil {
 		return nil, err
 	}

@@ -142,13 +142,13 @@ func TestProcessingExpiredAdministrativeCoverageDoesNotRelease(t *testing.T) {
 }
 
 // Installed native81: the approved-query processing read builds its snapshot
-// over the evidence observation (20 s), the evidence-read recovery proof
-// (20 s) and the processing root (valid for its backing period). That
+// over the evidence observation (20 s) and the processing root (valid for its
+// backing period). That
 // snapshot must be allowed, and still ends at its earliest real bound.
 func TestProcessingSnapshotAllowsEvidenceReadInterval(t *testing.T) {
 	s, n := processingSnapshotFixture()
-	evidenceUntil, recoveryUntil, rootUntil := n.Add(identity.EvidenceReadRequestWindow), n.Add(identity.EvidenceReadRequestWindow), n.Add(time.Hour)
-	s.FreshUntil = identity.Earlier(identity.Earlier(evidenceUntil, recoveryUntil), rootUntil)
+	evidenceUntil, rootUntil := n.Add(identity.EvidenceReadRequestWindow), n.Add(time.Hour)
+	s.FreshUntil = identity.Earlier(evidenceUntil, rootUntil)
 	if !s.Allows(n.Add(time.Second)) {
 		t.Fatal("evidence-read processing snapshot refused")
 	}

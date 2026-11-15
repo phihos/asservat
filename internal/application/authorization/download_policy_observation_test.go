@@ -18,10 +18,10 @@ func (f observationPolicyReader) DownloadPolicy(ctx context.Context) (privacy.Do
 	return f(ctx)
 }
 
-type observationProcessingReader func(context.Context, ContextDownloadEvidence, artifact.RecoveryProof) (artifact.DownloadProcessingProof, error)
+type observationProcessingReader func(context.Context, ContextDownloadEvidence) (artifact.DownloadProcessingProof, error)
 
-func (f observationProcessingReader) ContextProcessing(ctx context.Context, r ContextDownloadEvidence, proof artifact.RecoveryProof) (artifact.DownloadProcessingProof, error) {
-	return f(ctx, r, proof)
+func (f observationProcessingReader) ContextProcessing(ctx context.Context, r ContextDownloadEvidence) (artifact.DownloadProcessingProof, error) {
+	return f(ctx, r)
 }
 
 func TestDownloadPolicyObservationNewRequestNearExpiry(t *testing.T) {
@@ -50,7 +50,7 @@ func TestDownloadPolicyObservationNewRequestNearExpiry(t *testing.T) {
 			offset.Store(0)
 			s.Now, s.Policies = now, reader
 			var processingUntil time.Time
-			s.Processing = observationProcessingReader(func(ctx context.Context, evidence ContextDownloadEvidence, proof artifact.RecoveryProof) (artifact.DownloadProcessingProof, error) {
+			s.Processing = observationProcessingReader(func(ctx context.Context, evidence ContextDownloadEvidence) (artifact.DownloadProcessingProof, error) {
 				if processingUntil.IsZero() {
 					processingUntil, _ = ctx.Deadline()
 					// This joined read needs only 150ms, far below the original
@@ -63,7 +63,7 @@ func TestDownloadPolicyObservationNewRequestNearExpiry(t *testing.T) {
 					case <-timer.C:
 					}
 				}
-				return f.ContextProcessing(ctx, evidence, proof)
+				return f.ContextProcessing(ctx, evidence)
 			})
 			duration := 5 * time.Second
 			if short {
@@ -487,7 +487,7 @@ func TestDownloadPolicyObservationBoundsLiveReadAndRefreshesDenial(t *testing.T)
 }
 
 func TestDownloadPolicyObservationKeepsCurrentEnvironmentBoundsAndFences(t *testing.T) {
-	for _, mode := range []string{"success", "recovery-denied", "processing-denied", "cancel"} {
+	for _, mode := range []string{"success", "processing-denied", "cancel"} {
 		t.Run(mode, func(t *testing.T) {
 			f, s, r, actor := newEnvironmentFixture()
 			// A valid retained configuration may precede this request by 30s.
@@ -499,9 +499,6 @@ func TestDownloadPolicyObservationKeepsCurrentEnvironmentBoundsAndFences(t *test
 			defer cancel()
 			cutoff, _ := ctx.Deadline()
 			switch mode {
-			case "recovery-denied":
-				// The retained policy never substitutes for the current recovery read.
-				f.recovery.IssuerEpoch = r.CaptureID
 			case "processing-denied":
 				f.processingErr = true
 			case "cancel":
@@ -514,7 +511,7 @@ func TestDownloadPolicyObservationKeepsCurrentEnvironmentBoundsAndFences(t *test
 				}
 				return
 			}
-			if err != nil || !out.CurrentValid(f.now) || !out.ValidUntil.Equal(cutoff) || f.recoveryReads != 1 || f.processingReads != 1 {
+			if err != nil || !out.CurrentValid(f.now) || !out.ValidUntil.Equal(cutoff) || f.processingReads != 1 {
 				t.Fatal("retained policy changed request or current checks", out.ValidUntil, cutoff, err)
 			}
 		})

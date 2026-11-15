@@ -7,8 +7,6 @@ import (
 	"time"
 
 	fleetapp "asservat.local/asservat/internal/application/fleet"
-	"asservat.local/asservat/internal/domain/fleet"
-	"asservat.local/asservat/internal/domain/identity"
 )
 
 func TestConfigurationProviderRefreshNeverFallsBackToLegacyProof(t *testing.T) {
@@ -23,8 +21,8 @@ func TestConfigurationProviderRefreshNeverFallsBackToLegacyProof(t *testing.T) {
 	s.effects.wrap.currentProof = func(context.Context) (time.Time, error) { oldProof.Add(1); return time.Now().Add(5 * time.Second), nil }
 	call, end := context.WithTimeout(t.Context(), 5*time.Second)
 	defer end()
-	// The fixture deliberately has no concrete current reader/recovery. A
-	// synthetic old callback must not fill those missing installed predecessors.
+	// The fixture deliberately has no mounted credential. A synthetic old
+	// callback must not fill that missing installed predecessor.
 	if err := s.effects.wrap.refreshConfiguration(call, s); err == nil {
 		t.Fatal("missing native/SQL runtime accepted legacy callback")
 	}
@@ -53,27 +51,6 @@ func TestConfigurationProviderRefreshRejectsAnotherWorkersSlot(t *testing.T) {
 	defer s.effects.wrap.mu.Unlock()
 	if s.effects.wrap.active || s.effects.wrap.failures != 0 || s.effects.wrap.uncertain {
 		t.Fatal("foreign worker altered original slot")
-	}
-}
-
-func TestConfigurationProviderRecoveryComparisonKeepsOriginalAge(t *testing.T) {
-	now := time.Now().UTC()
-	original := fleet.RecoveryState{InstallationID: "fbe5a178-1e6d-48cc-9b9f-146db12c2e73", IssuerEpoch: "1a989cc4-e436-454d-b922-88c4bc72a0de", Revision: identity.Revision{UID: "2c031c76-fc46-442e-b815-e855493c1cc1", Generation: 1, Digest: [32]byte{1}}, ObservedAt: now.Add(-time.Second), FreshUntil: now.Add(2 * time.Second)}
-	current := original
-	current.ObservedAt = now
-	current.FreshUntil = now.Add(5 * time.Second)
-	if !configurationProviderSameRecovery(original, current, now) {
-		t.Fatal("same independently current original revision rejected")
-	}
-	if configurationProviderSameRecovery(original, current, original.FreshUntil) {
-		t.Fatal("new read refreshed the original recovery end")
-	}
-	for _, change := range []func(*fleet.RecoveryState){func(v *fleet.RecoveryState) { v.Revision.Generation++ }, func(v *fleet.RecoveryState) { v.Revision.Digest[0]++ }, func(v *fleet.RecoveryState) { v.IssuerEpoch = "bbafbe54-c18f-40d9-ac5d-a330f25d2482" }, func(v *fleet.RecoveryState) { v.InstallationID = "bbafbe54-c18f-40d9-ac5d-a330f25d2482" }} {
-		v := current
-		change(&v)
-		if configurationProviderSameRecovery(original, v, now) {
-			t.Fatal("changed recovery identity adopted")
-		}
 	}
 }
 

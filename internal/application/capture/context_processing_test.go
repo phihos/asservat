@@ -6,12 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/capture"
 )
 
 // Synthetic coverage is explicit and used only by this application fixture.
-func (f *investigationFixture) ContextProcessingCoverage(_ context.Context, r value.ProcessingCoverageRequest, _ artifact.RecoveryProof) (value.ProcessingCoverage, error) {
+func (f *investigationFixture) ContextProcessingCoverage(_ context.Context, r value.ProcessingCoverageRequest) (value.ProcessingCoverage, error) {
 	return value.ProcessingCoverage{Request: r, ObservedAt: f.now, FreshUntil: f.now.Add(5 * time.Second)}, nil
 }
 
@@ -22,9 +21,9 @@ type coverageReadFixture struct {
 	after func(*value.ProcessingCoverage)
 }
 
-func (r *coverageReadFixture) ContextProcessingCoverage(ctx context.Context, in value.ProcessingCoverageRequest, recovery artifact.RecoveryProof) (value.ProcessingCoverage, error) {
+func (r *coverageReadFixture) ContextProcessingCoverage(ctx context.Context, in value.ProcessingCoverageRequest) (value.ProcessingCoverage, error) {
 	r.calls++
-	o, _ := r.f.ContextProcessingCoverage(ctx, in, recovery)
+	o, _ := r.f.ContextProcessingCoverage(ctx, in)
 	if r.after != nil {
 		r.after(&o)
 	}

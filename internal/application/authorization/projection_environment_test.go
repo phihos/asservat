@@ -14,7 +14,6 @@ import (
 type queryEnvironmentFixture struct {
 	now        time.Time
 	policy     value.ContextProjectionPolicy
-	recovery   artifact.RecoveryProof
 	processing artifact.DownloadProcessingProof
 	count      map[string]int
 	on         func(context.Context, string, int)
@@ -38,13 +37,9 @@ func (f *queryEnvironmentFixture) ContextProjectionPolicy(ctx context.Context, t
 	e := f.step(ctx, "policy")
 	return f.policy, e
 }
-func (f *queryEnvironmentFixture) RecoveryState(ctx context.Context) (artifact.RecoveryProof, error) {
-	e := f.step(ctx, "recovery")
-	return f.recovery, e
-}
-func (f *queryEnvironmentFixture) ContextProjectionProcessing(ctx context.Context, r ContextProjectionEvidence, p artifact.RecoveryProof) (artifact.DownloadProcessingProof, error) {
+func (f *queryEnvironmentFixture) ContextProjectionProcessing(ctx context.Context, r ContextProjectionEvidence) (artifact.DownloadProcessingProof, error) {
 	e := f.step(ctx, "processing")
-	if r.CaptureID != f.processing.CaptureID || p.IssuerEpoch != f.recovery.IssuerEpoch {
+	if r.CaptureID != f.processing.CaptureID {
 		return artifact.DownloadProcessingProof{}, value.ErrUnavailable
 	}
 	return f.processing, e
@@ -53,17 +48,17 @@ func (f *queryEnvironmentFixture) ContextProjectionProcessing(ctx context.Contex
 func newQueryEnvironmentFixture() (*queryEnvironmentFixture, CurrentProjectionEnvironment, ContextProjectionEvidence, identity.Principal) {
 	base, _, scope := newProjectionFixture()
 	e := base.environment
-	f := &queryEnvironmentFixture{now: base.now, policy: value.ContextProjectionPolicy{RootID: scope.RootID, InstallationID: e.InstallationID, RecoveryEpoch: e.Recovery.IssuerEpoch, Revision: e.PolicyRevision, ProtectionDigest: artifact.Digest{2}, Path: e.Path, PermittedRegions: []string{"region"}, Clients: []value.ContextProjectionClient{{Issuer: scope.Principal.Issuer, ID: scope.Principal.ClientID, Kind: scope.Principal.Kind, Purposes: []string{base.record.PurposeRef}}}, ObservedAt: base.now, FreshUntil: base.now.Add(5 * time.Second)}, recovery: e.Recovery, processing: e.Processing, count: map[string]int{}}
-	return f, CurrentProjectionEnvironment{RootID: scope.RootID, InstallationID: e.InstallationID, Policies: f, Recovery: f, Processing: f, Now: func() time.Time { return f.now }}, base.record, scope.Principal
+	f := &queryEnvironmentFixture{now: base.now, policy: value.ContextProjectionPolicy{RootID: scope.RootID, InstallationID: e.InstallationID, RecoveryEpoch: projectionTestID(24), Revision: e.PolicyRevision, ProtectionDigest: artifact.Digest{2}, Path: e.Path, PermittedRegions: []string{"region"}, Clients: []value.ContextProjectionClient{{Issuer: scope.Principal.Issuer, ID: scope.Principal.ClientID, Kind: scope.Principal.Kind, Purposes: []string{base.record.PurposeRef}}}, ObservedAt: base.now, FreshUntil: base.now.Add(5 * time.Second)}, processing: e.Processing, count: map[string]int{}}
+	return f, CurrentProjectionEnvironment{RootID: scope.RootID, InstallationID: e.InstallationID, Policies: f, Processing: f, Now: func() time.Time { return f.now }}, base.record, scope.Principal
 }
 
 func TestCurrentProjectionEnvironmentRequiresIndependentApprovedPolicy(t *testing.T) {
 	f, s, r, a := newQueryEnvironmentFixture()
 	out, e := s.ProjectionEnvironment(context.Background(), r, a)
-	if e != nil || !out.Valid(f.now) || out.Path != f.policy.Path || f.count["policy"] != 2 || f.count["recovery"] != 2 || f.count["processing"] != 2 {
+	if e != nil || !out.Valid(f.now) || out.Path != f.policy.Path || f.count["policy"] != 2 || f.count["processing"] != 2 {
 		t.Fatal("independent query environment failed", e)
 	}
-	for _, name := range []string{"missing-policy", "missing-processing", "missing-recovery", "client", "purpose", "data-class", "source", "native-limit", "download-path", "suspended", "region", "changed-policy", "changed-path", "changed-processing", "changed-recovery"} {
+	for _, name := range []string{"missing-policy", "missing-processing", "client", "purpose", "data-class", "source", "native-limit", "download-path", "suspended", "region", "changed-policy", "changed-path", "changed-processing"} {
 		t.Run(name, func(t *testing.T) {
 			f, s, r, a := newQueryEnvironmentFixture()
 			switch name {
@@ -71,8 +66,6 @@ func TestCurrentProjectionEnvironmentRequiresIndependentApprovedPolicy(t *testin
 				s.Policies = nil
 			case "missing-processing":
 				s.Processing = nil
-			case "missing-recovery":
-				s.Recovery = nil
 			case "client":
 				a.ClientID = "other"
 			case "purpose":
@@ -107,10 +100,6 @@ func TestCurrentProjectionEnvironmentRequiresIndependentApprovedPolicy(t *testin
 						if stage == "processing" {
 							f.processing.Sequence++
 						}
-					case "changed-recovery":
-						if stage == "recovery" {
-							f.recovery.Revision.Generation++
-						}
 					}
 				}
 			}
@@ -122,15 +111,13 @@ func TestCurrentProjectionEnvironmentRequiresIndependentApprovedPolicy(t *testin
 }
 
 func TestCurrentProjectionEnvironmentPreservesEveryOriginalEarlierDeadline(t *testing.T) {
-	for _, stage := range []string{"policy", "recovery", "processing"} {
+	for _, stage := range []string{"policy", "processing"} {
 		t.Run(stage, func(t *testing.T) {
 			f, s, r, a := newQueryEnvironmentFixture()
 			short := f.now.Add(100 * time.Millisecond)
 			switch stage {
 			case "policy":
 				f.policy.FreshUntil = short
-			case "recovery":
-				f.recovery.FreshUntil = short
 			case "processing":
 				f.processing.ValidUntil = short
 			}
@@ -141,9 +128,6 @@ func TestCurrentProjectionEnvironmentPreservesEveryOriginalEarlierDeadline(t *te
 					case "policy":
 						f.policy.ObservedAt = short
 						f.policy.FreshUntil = short.Add(5 * time.Second)
-					case "recovery":
-						f.recovery.ObservedAt = short
-						f.recovery.FreshUntil = short.Add(5 * time.Second)
 					case "processing":
 						f.processing.ObservedAt = short
 						f.processing.ValidUntil = short.Add(5 * time.Second)
@@ -169,7 +153,7 @@ func TestCurrentProjectionEnvironmentNarrowsAfterFinalPolicyRead(t *testing.T) {
 		if name == "policy" && n == 2 {
 			f.policy.FreshUntil = short
 		}
-		if (name == "recovery" || name == "processing") && n == 2 {
+		if name == "processing" && n == 2 {
 			if d, ok := ctx.Deadline(); !ok || d.After(short) {
 				t.Fatal("final source tightening lost before blocking read")
 			}

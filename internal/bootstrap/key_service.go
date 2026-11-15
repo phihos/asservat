@@ -163,7 +163,7 @@ func keyServiceAuthorities(wraps, verifier authapp.KeyOperationAuthorizer, acqui
 
 // keyServiceAcquisition composes the native download key authority from the
 // key-acquisition login, the worker configuration's profile and the retention
-// and recovery transaction guards it needs. Topology pins come from the
+// transaction guard it needs. Topology pins come from the
 // configuration and the cluster catalog.
 func keyServiceAcquisition(ctx context.Context, c keyServiceInputs, api *rest.Config, observer *kube.PermissionClient, pool *pgxpool.Pool, scope authorization.KeyScope) (*postgres.NativeKeyAuthority, publicCatalog, error) {
 	var none publicCatalog
@@ -213,11 +213,7 @@ func keyServiceAcquisition(ctx context.Context, c keyServiceInputs, api *rest.Co
 	if err != nil {
 		return nil, none, mounts.ErrUnavailable
 	}
-	recovery, err := postgres.NewRecoveryTransactionGuard(c.PermissionRootID, c.InstallationID)
-	if err != nil {
-		return nil, none, mounts.ErrUnavailable
-	}
-	native, err := postgres.NewNativeKeyAuthority(ctx, pool, c.PermissionRootID, profile, scope, postgres.DownloadTransactionGuards{Retention: retention, Recovery: recovery})
+	native, err := postgres.NewNativeKeyAuthority(ctx, pool, c.PermissionRootID, profile, scope, retention)
 	if err != nil {
 		return nil, none, mounts.ErrUnavailable
 	}
@@ -225,7 +221,7 @@ func keyServiceAcquisition(ctx context.Context, c keyServiceInputs, api *rest.Co
 	if err != nil {
 		return nil, none, mounts.ErrUnavailable
 	}
-	queries, err := postgres.NewContextQueries(ctx, pool, c.PermissionRootID, postgres.EffectTransactionGuards{Retention: retention, Recovery: recovery}, plans, nil)
+	queries, err := postgres.NewContextQueries(ctx, pool, c.PermissionRootID, c.InstallationID, retention, plans, nil)
 	if err != nil {
 		return nil, none, mounts.ErrUnavailable
 	}

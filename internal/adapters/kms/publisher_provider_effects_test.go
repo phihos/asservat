@@ -23,10 +23,10 @@ import (
 )
 
 // ADR-203 decision 3/4: the publisher's three provider purposes log in
-// through Kubernetes auth only under the current proof, keep each credential
+// through Kubernetes auth, keep each credential
 // on its own path, seal/open audit keys with borrowed tokens and sign only
 // this process's verifier URI, which the in-process credential then verifies.
-func TestPublisherProviderEffectsAreProofBoundAndPurposeSeparated(t *testing.T) {
+func TestPublisherProviderEffectsArePurposeSeparated(t *testing.T) {
 	tlsFixture := newOwnerProviderControlFixture(t)
 	installation := "10000000-0000-4000-8000-000000002040"
 	login := ProviderLogin{Provider: contracts.OwnerProviderEndpoint{Endpoint: tlsFixture.server.URL, Roots: [][]byte{tlsFixture.server.Certificate().Raw}}, AuthMount: "publisher-auth", Namespace: "asservat", ServiceAccount: "asservat-publisher",
@@ -133,34 +133,16 @@ func TestPublisherProviderEffectsAreProofBoundAndPurposeSeparated(t *testing.T) 
 		t.Fatal(err)
 	}
 	defer files.Close()
-	var current sync.Mutex
-	proofOK := false
-	proof := func(context.Context) (time.Time, error) {
-		current.Lock()
-		defer current.Unlock()
-		if !proofOK {
-			return time.Time{}, ErrKeyService
-		}
-		return time.Now().Add(5 * time.Second), nil
-	}
 	unbound := login
 	unbound.Roles = map[string]string{"audit-wrap": "a", "audit-unwrap": "b"}
-	if _, err = NewInstalledPublisherProviderEffects(context.Background(), installation, unbound, keys, files, proof); err == nil {
+	if _, err = NewInstalledPublisherProviderEffects(context.Background(), installation, unbound, keys, files); err == nil {
 		t.Fatal("effects composed without every purpose role")
 	}
-	s, err := NewInstalledPublisherProviderEffects(context.Background(), installation, login, keys, files, proof)
+	s, err := NewInstalledPublisherProviderEffects(context.Background(), installation, login, keys, files)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = s.CloseAndJoin(context.Background()) }()
-	short, end := context.WithTimeout(context.Background(), 1500*time.Millisecond)
-	defer end()
-	if s.Prime(short) == nil || logins != 0 {
-		t.Fatal("logged in without a current proof", logins)
-	}
-	current.Lock()
-	proofOK = true
-	current.Unlock()
 	if err = s.Prime(context.Background()); err != nil || logins != 3 {
 		t.Fatal("prime did not fund exactly three purposes", err, logins)
 	}

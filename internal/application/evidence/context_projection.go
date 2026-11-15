@@ -45,7 +45,7 @@ type ContextProjectionNativeRead interface {
 
 // ContextProjectionKeyOperations is a query-only private key effect boundary.
 // Its implementation must independently consume the exact durable role once
-// under current start/worker/live-owner/recovery/retention fences, including the
+// under current start/worker/live-owner/retention fences, including the
 // whole request hash and sealed key. It may not delegate to download authority
 // or turn this DTO into a grant. Missing protected implementation denies runtime.
 type ContextProjectionKeyOperations interface {
@@ -346,7 +346,6 @@ func sameProjectionAuthority(a, b value.ContextProjectionAuthority) bool {
 	strip := func(v value.ContextProjectionAuthority) value.ContextProjectionAuthority {
 		v.CheckedAt, v.ValidUntil = time.Time{}, time.Time{}
 		v.Environment.ObservedAt, v.Environment.ValidUntil = time.Time{}, time.Time{}
-		v.Environment.Recovery.ObservedAt, v.Environment.Recovery.FreshUntil = time.Time{}, time.Time{}
 		v.Environment.Processing.ObservedAt, v.Environment.Processing.ValidUntil = time.Time{}, time.Time{}
 		v.Retention.ObservedAt, v.Retention.ValidUntil = time.Time{}, time.Time{}
 		v.AccessUntil, v.DeleteBy = v.AccessUntil.UTC(), v.DeleteBy.UTC()

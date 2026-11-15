@@ -1,9 +1,10 @@
 package authorization
 
 import (
-	value "asservat.local/asservat/internal/domain/authorization"
 	"context"
 	"time"
+
+	value "asservat.local/asservat/internal/domain/authorization"
 )
 
 // KeyMaterial stays inside the isolated service. Callers clear Payload after
@@ -17,7 +18,7 @@ type KeyMaterialReader interface {
 }
 type KeyConfigurationLedger interface {
 	// Observe durably rejects rollback, changed version material and cross-purpose
-	// reuse, checking current recovery and source freshness after blocking locks.
+	// reuse, checking current source freshness after blocking locks.
 	ObserveLocalKeys(context.Context, value.LocalKeyConfiguration) (time.Time, error)
 }
 type KeyConfigurationGuard interface {

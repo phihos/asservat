@@ -20,12 +20,12 @@ func ownerPermit(now time.Time, roots [][]byte, key artifact.Digest, usage strin
 	b := value.OwnerBinding{InstallationID: id, ClusterID: id, IssuerEpoch: id, PodUID: id, ProcessEpoch: id}
 	c := value.OwnerConfiguration{Pool: value.OwnerPool{InstallationID: id, ClusterID: id, IssuerEpoch: id, Namespace: "hub", NamespaceUID: id, Service: "owner", ServiceUID: id, Deployment: "owner", DeploymentUID: id, ServiceAccount: "owner", AccountUID: id, Port: 8443}, Revision: identity.Revision{UID: id, Generation: 1, Digest: [32]byte{1}}, ProtectionDigest: artifact.Digest{2}, IssuerRoots: roots}
 	epoch, until, _ := value.OwnerCertificateWindow(now)
-	return value.OwnerCertificatePermit{ID: id, Binding: b, Usage: usage, PublicKeyDigest: key, EnrollmentAudit: artifact.Digest{3}, Configuration: value.OwnerConfigurationObservation{Configuration: c, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}, Recovery: value.RecoveryState{InstallationID: id, IssuerEpoch: id, Revision: identity.Revision{UID: id, Generation: 1, Digest: [32]byte{4}}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}, Epoch: epoch, Ordinal: 1, CheckedAt: now, SignBefore: now.Add(5 * time.Second), CertificateNotAfter: until}
+	return value.OwnerCertificatePermit{ID: id, Binding: b, Usage: usage, PublicKeyDigest: key, EnrollmentAudit: artifact.Digest{3}, Configuration: value.OwnerConfigurationObservation{Configuration: c, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}, Epoch: epoch, Ordinal: 1, CheckedAt: now, SignBefore: now.Add(5 * time.Second), CertificateNotAfter: until}
 }
 
 func TestOwnerIssuedCertificateBindsProofPurposeAndCurrentRoots(t *testing.T) {
 	for _, usage := range []string{"client", "server"} {
-		for _, mode := range []string{"valid", "different-key", "wrong-process", "wrong-purpose", "extra-name", "different-expiry", "wrong-current-root", "suspended", "expired-proof", "expired-recovery", "missing-audit", "oversize-chain", "malformed"} {
+		for _, mode := range []string{"valid", "different-key", "wrong-process", "wrong-purpose", "extra-name", "different-expiry", "wrong-current-root", "suspended", "expired-proof", "missing-audit", "oversize-chain", "malformed"} {
 			t.Run(usage+"/"+mode, func(t *testing.T) {
 				now := time.Now().UTC().Truncate(time.Second)
 				clock := now
@@ -69,8 +69,6 @@ func TestOwnerIssuedCertificateBindsProofPurposeAndCurrentRoots(t *testing.T) {
 					p.Configuration.Configuration.Suspended = true
 				case "expired-proof":
 					clock = now.Add(5 * time.Second)
-				case "expired-recovery":
-					p.Recovery.FreshUntil = now
 				case "missing-audit":
 					p.EnrollmentAudit = artifact.Digest{}
 				}

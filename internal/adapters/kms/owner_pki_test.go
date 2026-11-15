@@ -70,7 +70,7 @@ func TestOwnerIssuerWireTypesPurposeAndNoAutomaticRetry(t *testing.T) {
 			n := time.Now().UTC()
 			epoch, until, _ := value.OwnerCertificateWindow(n)
 			c := value.OwnerConfiguration{Pool: value.OwnerPool{InstallationID: id, ClusterID: id, IssuerEpoch: id, Namespace: "hub", NamespaceUID: id, Service: "owner", ServiceUID: id, Deployment: "owner", DeploymentUID: id, ServiceAccount: "owner", AccountUID: id, Port: 8443}, Revision: identity.Revision{UID: id, Generation: 1, Digest: [32]byte{1}}, ProtectionDigest: artifact.Digest{2}, IssuerRoots: [][]byte{server.Certificate().Raw}}
-			p := value.OwnerCertificatePermit{ID: id, Binding: b, Usage: usage, PublicKeyDigest: key, EnrollmentAudit: artifact.Digest{3}, Configuration: value.OwnerConfigurationObservation{Configuration: c, ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}, Recovery: value.RecoveryState{InstallationID: id, IssuerEpoch: id, Revision: identity.Revision{UID: id, Generation: 1, Digest: [32]byte{4}}, ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}, Epoch: epoch, Ordinal: 1, CheckedAt: n, SignBefore: n.Add(5 * time.Second), CertificateNotAfter: until}
+			p := value.OwnerCertificatePermit{ID: id, Binding: b, Usage: usage, PublicKeyDigest: key, EnrollmentAudit: artifact.Digest{3}, Configuration: value.OwnerConfigurationObservation{Configuration: c, ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}, Epoch: epoch, Ordinal: 1, CheckedAt: n, SignBefore: n.Add(5 * time.Second), CertificateNotAfter: until}
 			s, e := NewOwnerCertificateIssuer(server.URL, "synthetic-role", "owner-pki", usage, id, id, id, usage, roots, server.Client(), time.Now)
 			if e != nil {
 				t.Fatal(e)

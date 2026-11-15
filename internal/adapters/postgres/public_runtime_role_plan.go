@@ -418,7 +418,7 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 	case "key-acquisition":
 		// ADR-204: NativeKeyAuthority's two resolvers, DownloadKeys for the
 		// prepaid metadata batch and NativeKeys for a response window. These
-		// are their recovery, permission, session, processing, retention,
+		// are their permission, session, processing, retention,
 		// catalog and worker configuration reads and locks, and the spend of
 		// one slot of either key record. No binding, session, audit or worker
 		// write; the lock columns are the ones the hub's binders lock with.
@@ -458,7 +458,7 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("download_worker_configuration_revision", "UPDATE", "audit_receipt_json")
 	case "context-cleanup", "context-cleanup-audit", "context-cleanup-finalize":
 		// ADR-205 decision 2: exactly the ADR-111 ContextDeletions facets'
-		// grants. Every facet locks recovery and the permission stream and reads
+		// grants. Every facet locks the permission stream and reads
 		// the joined writer completion and its execution and checkpoint.
 		read("permission_stream", "fleet_current_trust", "context_execution", "context_writer_completion", "context_deletion_checkpoint")
 		add("fleet_trust", "SELECT", "installation_id", "activated_postmaster_at", "activated_database_oid")
@@ -537,7 +537,7 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 			add("operation_audit_pool", "UPDATE", "root_id")
 			add("operation_audit", "INSERT")
 			add("operation_audit", "UPDATE", "intent_started", "outcome", "outcome_started")
-			// Positive writer completion uses recovery -> pool -> account ->
+			// Positive writer completion uses pool -> account ->
 			// audit -> lifecycle locks and exact database-incarnation reads.
 			add("fleet_trust", "SELECT", "installation_id", "activated_postmaster_at", "activated_database_oid")
 			add("operation_audit_account", "UPDATE", "root_id")

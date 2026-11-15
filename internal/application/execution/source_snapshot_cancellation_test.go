@@ -17,12 +17,11 @@ type snapshotCancellationRecorder struct {
 	execution                      value.APIExecution
 	proof                          artifact.SourceSnapshotCancellation
 	process                        value.APIProcessObservation
-	recovery                       artifact.RecoveryProof
 }
 
-func (r *snapshotCancellationRecorder) RecordAPISnapshotCancellation(_ context.Context, e value.APIExecution, p artifact.SourceSnapshotCancellation, process value.APIProcessObservation, recovery artifact.RecoveryProof) (value.APIExecution, error) {
+func (r *snapshotCancellationRecorder) RecordAPISnapshotCancellation(_ context.Context, e value.APIExecution, p artifact.SourceSnapshotCancellation, process value.APIProcessObservation) (value.APIExecution, error) {
 	r.cancellations++
-	r.execution, r.proof, r.process, r.recovery = e, p, process, recovery
+	r.execution, r.proof, r.process = e, p, process
 	return e, nil
 }
 func (r *snapshotCancellationRecorder) RecordAPIOutcome(_ context.Context, e value.APIExecution, _ value.APIProcessObservation) (value.APIExecution, error) {
@@ -50,7 +49,7 @@ func TestAPIContextSnapshotCancellationRequiresDedicatedJoinedCompletion(t *test
 	if err != nil || out.State != "Cancelled" || recorder.cancellations != 1 || recorder.genericOutcomes != 0 || recorder.snapshotCompletions != 0 {
 		t.Fatal("joined cancellation bypassed dedicated persistence", out, err, recorder)
 	}
-	if recorder.execution.Phase != "cancelled" || !recorder.execution.CompletedAt.Equal(c.SnapshotCancellation.JoinedAt) || !recorder.execution.AcquiredAt.IsZero() || recorder.execution.Copies != (artifact.Copies{}) || recorder.execution.ExpectationDigest != execution.ExpectationDigest || recorder.process.Binding != f.process || recorder.recovery != f.recovery {
+	if recorder.execution.Phase != "cancelled" || !recorder.execution.CompletedAt.Equal(c.SnapshotCancellation.JoinedAt) || !recorder.execution.AcquiredAt.IsZero() || recorder.execution.Copies != (artifact.Copies{}) || recorder.execution.ExpectationDigest != execution.ExpectationDigest || recorder.process.Binding != f.process {
 		t.Fatal("cancellation changed admission or invented artifact/acquisition", recorder)
 	}
 	if !recorder.proof.Request.Equal(*f.work.Accepted.Expectation.Snapshot) || execution.Phase != "started" {

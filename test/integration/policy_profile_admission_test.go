@@ -112,7 +112,7 @@ func qualifyPolicyProfileChangedDefinition(t *testing.T, ctx context.Context, ad
 		t.Fatal("changed definition concrete preview", err)
 	}
 	qualifyPolicyProfileAdmissionRefusal(t, ctx, admin, admissions, ledger, s, authority, preview, a)
-	grants, err := postgres.NewAccessGrants(ctx, hub, a.RootID, s.recovery.guard)
+	grants, err := postgres.NewAccessGrants(ctx, hub, a.RootID, s.recovery.installation)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,7 +138,7 @@ func qualifyPolicyProfileExhaustedGrant(t *testing.T, ctx context.Context, admin
 	if after := readPolicyProfileAdmissionState(t, ctx, admin, s, a); before != after {
 		t.Fatal("profile budget refusal left capture/custody/output reservation", before, after)
 	}
-	grants, err := postgres.NewAccessGrants(ctx, hub, a.RootID, s.recovery.guard)
+	grants, err := postgres.NewAccessGrants(ctx, hub, a.RootID, s.recovery.installation)
 	if err != nil {
 		t.Fatal(err)
 	}

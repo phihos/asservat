@@ -1,13 +1,14 @@
 package authorization
 
 import (
+	"context"
+
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/authorization"
-	"context"
 )
 
 // GrantedOutputResolver resolves only an existing published member of this
-// exact accepted capture group. It grants no permission or recovery authority.
+// exact accepted capture group. It grants no permission.
 type GrantedOutputResolver interface {
 	ResolveGrantedOutput(context.Context, string, artifact.DownloadScope, string) (value.VerifiedOutput, *value.GrantOutputGroup, error)
 }

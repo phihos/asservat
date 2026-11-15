@@ -118,7 +118,7 @@ func qualifySourceSnapshotServicesMode(t *testing.T, mode sourceSnapshotQualific
 			source107AddReader(t, ctx, f, "original-source-readers")
 			accepted.Scenario.batch = policyRecorderCloneBatch(f.batch)
 			s := accepted.Scenario
-			ledger, err := postgres.NewPolicySources(ctx, f.roles["hub-runtime"], s.a.RootID, s.recovery.installation, postgres.EffectTransactionGuards{Recovery: s.recovery.guard, Retention: s.retention.guard})
+			ledger, err := postgres.NewPolicySources(ctx, f.roles["hub-runtime"], s.a.RootID, s.recovery.installation, s.retention.guard)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -129,7 +129,6 @@ func qualifySourceSnapshotServicesMode(t *testing.T, mode sourceSnapshotQualific
 				// Refresh existing observations only; immutable admission/acceptance,
 				// original source identity, counters and hard policy end remain unchanged.
 				f.refreshBase(t)
-				recovery := f.recoveryState(t)
 				n := time.Now().UTC().Truncate(time.Microsecond)
 				src := accepted.Source
 				src.ObservedAt = n
@@ -157,7 +156,7 @@ func qualifySourceSnapshotServicesMode(t *testing.T, mode sourceSnapshotQualific
 					node.CollectorPodUID = old.Permit.Binding.CollectorPodUID
 					node.CollectorEpoch = old.Permit.Binding.CollectorEpoch
 				}
-				return captureapp.PolicySourceCheck{Policy: accepted.Compiled, Authority: accepted.Authority, Target: target, Node: node, Recovery: recovery, Retention: resolution, Settings: policy, SourceID: sourceID, Fence: fence, BytesPerSecond: 1 << 20, SourceSlots: sourceCeiling, ObservedAt: n, ValidUntil: n.Add(5 * time.Second)}
+				return captureapp.PolicySourceCheck{Policy: accepted.Compiled, Authority: accepted.Authority, Target: target, Node: node, Retention: resolution, Settings: policy, SourceID: sourceID, Fence: fence, BytesPerSecond: 1 << 20, SourceSlots: sourceCeiling, ObservedAt: n, ValidUntil: n.Add(5 * time.Second)}
 			}
 			var originalGrant manualPolicyGrantSpend
 			if requireApproval {
@@ -396,7 +395,7 @@ func source107RejectChangedSelections(t *testing.T, ctx context.Context, f *capa
 		t.FailNow()
 	}
 	if !t.Run("reject-new-reader-passive-preview", func(t *testing.T) {
-		current, err := postgres.NewAutomationAuthorities(ctx, f.roles["hub-runtime"], a.RootID, a.Recovery.InstallationID)
+		current, err := postgres.NewAutomationAuthorities(ctx, f.roles["hub-runtime"], a.RootID, authority.InstallationID)
 		if err != nil {
 			t.Fatal(err)
 		}

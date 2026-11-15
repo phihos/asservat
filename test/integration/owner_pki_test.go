@@ -21,8 +21,8 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 )
 
-// Actual provider role separation, signing and mutual TLS. Accepted enrollment,
-// recovery and signing spend below are explicit fixture inputs, not runtime
+// Actual provider role separation, signing and mutual TLS. Accepted enrollment
+// and signing spend below are explicit fixture inputs, not runtime
 // activation or permission to expose this issuer as a public endpoint.
 func TestEnrollmentOwnerPKIWithRealServices(t *testing.T) {
 	testEnrollmentOwnerPKIWithRealServices(t, false)
@@ -91,7 +91,7 @@ func testEnrollmentOwnerPKIWithRealServices(t *testing.T, bootstrap bool) {
 		if e != nil {
 			t.Fatal(e)
 		}
-		return value.OwnerCertificatePermit{ID: custodyID(), Binding: b, Usage: usage, PublicKeyDigest: key, EnrollmentAudit: artifact.Digest{3}, Configuration: value.OwnerConfigurationObservation{Configuration: c, ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}, Recovery: value.RecoveryState{InstallationID: b.InstallationID, IssuerEpoch: b.IssuerEpoch, Revision: identity.Revision{UID: custodyID(), Generation: 1, Digest: [32]byte{4}}, ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}, Epoch: epoch, Ordinal: 1, CheckedAt: n, SignBefore: n.Add(5 * time.Second), CertificateNotAfter: until}
+		return value.OwnerCertificatePermit{ID: custodyID(), Binding: b, Usage: usage, PublicKeyDigest: key, EnrollmentAudit: artifact.Digest{3}, Configuration: value.OwnerConfigurationObservation{Configuration: c, ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}, Epoch: epoch, Ordinal: 1, CheckedAt: n, SignBefore: n.Add(5 * time.Second), CertificateNotAfter: until}
 	}
 	for _, usage := range []string{"server", "client"} {
 		role := map[string]any{"require_cn": false, "use_csr_common_name": false, "use_csr_sans": false, "allow_ip_sans": false, "allow_localhost": false, "allowed_uri_sans": []string{uri.String()}, "key_type": "any", "server_flag": usage == "server", "client_flag": usage == "client", "code_signing_flag": false, "email_protection_flag": false, "key_usage": []string{"DigitalSignature"}, "ext_key_usage": []string{}, "basic_constraints_valid_for_non_ca": true, "not_before_duration": "30s", "max_ttl": "1h", "ttl": "20m"}
@@ -206,7 +206,7 @@ func testEnrollmentOwnerPKIWithRealServices(t *testing.T, bootstrap bool) {
 		// valid original key/CSR. These are fixture issuer credentials only.
 		request(t, f.KMS, tokens["server"], mount+"/sign/server", map[string]any{"csr": string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE REQUEST", Bytes: csrs["server"]})), "alt_names": name + "," + commonName + ",unapproved.example", "uri_sans": uri.String(), "ttl": "10m"}, 400)
 	}
-	for _, mode := range []string{"key", "purpose", "process", "expired", "recovery", "audit", "current-root"} {
+	for _, mode := range []string{"key", "purpose", "process", "expired", "audit", "current-root"} {
 		p := permit("client")
 		switch mode {
 		case "key":
@@ -217,8 +217,6 @@ func testEnrollmentOwnerPKIWithRealServices(t *testing.T, bootstrap bool) {
 			p.Binding.ProcessEpoch = custodyID()
 		case "expired":
 			p.SignBefore = p.CheckedAt
-		case "recovery":
-			p.Recovery.FreshUntil = p.CheckedAt
 		case "audit":
 			p.EnrollmentAudit = artifact.Digest{}
 		case "current-root":

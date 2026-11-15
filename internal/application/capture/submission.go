@@ -18,7 +18,7 @@ type PolicySubmissionVerifier interface {
 }
 
 // SignedPolicyAcceptor composes signature verification with the existing SQL
-// current-source/delegation/recovery transaction. Expected scope and author are
+// current-source/delegation transaction. Expected scope and author are
 // private compiler/authenticated-ingress inputs, never decoded from the JWS.
 type SignedPolicyAcceptor struct {
 	Verifier PolicySubmissionVerifier
@@ -31,7 +31,7 @@ func (s SignedPolicyAcceptor) AcceptPolicySubmission(ctx context.Context, signed
 	if s.Verifier == nil || s.Store == nil || s.Now == nil {
 		return zero, value.ErrUnavailable
 	}
-	if !expected.Valid(s.Now()) || !in.Author.Valid(s.Now()) || expected.Actor != in.Author.Principal || expected.RootID != in.RootID || expected.InstallationID != in.Authority.InstallationID || expected.IssuerEpoch != in.Recovery.IssuerEpoch || expected.ScopeDigest != in.Authority.ScopeDigest || expected.Source.UID != in.Authority.PolicyUID {
+	if !expected.Valid(s.Now()) || !in.Author.Valid(s.Now()) || expected.Actor != in.Author.Principal || expected.RootID != in.RootID || expected.InstallationID != in.Authority.InstallationID || expected.ScopeDigest != in.Authority.ScopeDigest || expected.Source.UID != in.Authority.PolicyUID {
 		return zero, value.ErrDenied
 	}
 	verified, e := s.Verifier.VerifyPolicySubmission(ctx, signed, expected)

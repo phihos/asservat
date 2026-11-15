@@ -15,7 +15,7 @@ import (
 // (or failure) with a current connector process observation.
 type RecordingExecutions interface {
 	StartedRecordings(ctx context.Context, startedBefore time.Time, limit int) ([]string, error)
-	ReadRecordingWork(ctx context.Context, captureID string, recovery artifact.RecoveryProof) (APIContextWork, value.APIExecution, error)
+	ReadRecordingWork(ctx context.Context, captureID string) (APIContextWork, value.APIExecution, error)
 }
 
 // CollectRecording records the outcome of one started recording from one
@@ -24,7 +24,7 @@ type RecordingExecutions interface {
 // recording records captureFailed or storeUnconfirmed.
 func (s APIContextRunner) CollectRecording(ctx context.Context, w APIContextWork, r value.APIExecution, collector evidence.RecordingCollector) (ContextResult, error) {
 	e := w.Accepted.Expectation
-	if ctx == nil || collector == nil || s.Process == nil || s.Record == nil || s.Recovery == nil || s.Now == nil || (e.Recording == nil && e.Snapshot == nil && e.Profile == nil && e.Logs == nil) || r.Phase != "started" || r.ExpectationDigest != evidence.ContextExpectationDigest(e) {
+	if ctx == nil || collector == nil || s.Process == nil || s.Record == nil || s.Now == nil || (e.Recording == nil && e.Snapshot == nil && e.Profile == nil && e.Logs == nil) || r.Phase != "started" || r.ExpectationDigest != evidence.ContextExpectationDigest(e) {
 		return ContextResult{}, executeStep{"collect", value.ErrInvalid}
 	}
 	completionRecorder, ok := s.Record.(APIStoredCompletionRecorder)
@@ -55,13 +55,9 @@ func (s APIContextRunner) CollectRecording(ctx context.Context, w APIContextWork
 		if !ok {
 			return ContextResult{State: "Indeterminate"}, value.ErrUnavailable
 		}
-		recovery, err := s.Recovery.RecoveryState(ctx)
-		if err != nil {
-			return ContextResult{State: "Indeterminate"}, err
-		}
 		result.Phase, result.CompletedAt = "cancelled", joined.JoinedAt.UTC()
 		result.AcquiredAt, result.Copies = time.Time{}, artifact.Copies{}
-		if _, err = recorder.RecordAPILogsCancellation(ctx, result, *joined, process, recovery); err != nil {
+		if _, err = recorder.RecordAPILogsCancellation(ctx, result, *joined, process); err != nil {
 			return ContextResult{State: "Indeterminate"}, err
 		}
 		return ContextResult{State: "Cancelled"}, nil
@@ -75,13 +71,9 @@ func (s APIContextRunner) CollectRecording(ctx context.Context, w APIContextWork
 		if !ok {
 			return ContextResult{State: "Indeterminate"}, value.ErrUnavailable
 		}
-		recovery, err := s.Recovery.RecoveryState(ctx)
-		if err != nil {
-			return ContextResult{State: "Indeterminate"}, err
-		}
 		result.Phase, result.CompletedAt = "cancelled", joined.JoinedAt.UTC()
 		result.AcquiredAt, result.Copies = time.Time{}, artifact.Copies{}
-		if _, err = recorder.RecordAPIProfileCancellation(ctx, result, *joined, process, recovery); err != nil {
+		if _, err = recorder.RecordAPIProfileCancellation(ctx, result, *joined, process); err != nil {
 			return ContextResult{State: "Indeterminate"}, err
 		}
 		return ContextResult{State: "Cancelled"}, nil
@@ -95,13 +87,9 @@ func (s APIContextRunner) CollectRecording(ctx context.Context, w APIContextWork
 		if !ok {
 			return ContextResult{State: "Indeterminate"}, executeStep{"RecordAPIRecordingCancellation", value.ErrUnavailable}
 		}
-		recovery, err := s.Recovery.RecoveryState(ctx)
-		if err != nil {
-			return ContextResult{State: "Indeterminate"}, executeStep{"RecoveryState", err}
-		}
 		result.Phase, result.CompletedAt = "cancelled", joined.JoinedAt.UTC()
 		result.AcquiredAt, result.Copies = time.Time{}, artifact.Copies{}
-		if _, err = recorder.RecordAPIRecordingCancellation(ctx, result, *joined, process, recovery); err != nil {
+		if _, err = recorder.RecordAPIRecordingCancellation(ctx, result, *joined, process); err != nil {
 			return ContextResult{State: "Indeterminate"}, executeStep{"RecordAPIRecordingCancellation", err}
 		}
 		return ContextResult{State: "Cancelled"}, nil
@@ -115,23 +103,15 @@ func (s APIContextRunner) CollectRecording(ctx context.Context, w APIContextWork
 		if !ok {
 			return ContextResult{State: "Indeterminate"}, executeStep{"RecordAPISnapshotCancellation", value.ErrUnavailable}
 		}
-		recovery, err := s.Recovery.RecoveryState(ctx)
-		if err != nil {
-			return ContextResult{State: "Indeterminate"}, executeStep{"RecoveryState", err}
-		}
 		result.Phase, result.CompletedAt = "cancelled", joined.JoinedAt.UTC()
 		result.AcquiredAt, result.Copies = time.Time{}, artifact.Copies{}
-		if _, err = recorder.RecordAPISnapshotCancellation(ctx, result, *joined, process, recovery); err != nil {
+		if _, err = recorder.RecordAPISnapshotCancellation(ctx, result, *joined, process); err != nil {
 			return ContextResult{State: "Indeterminate"}, executeStep{"RecordAPISnapshotCancellation", err}
 		}
 		return ContextResult{State: "Cancelled"}, nil
 	}
 	if c.State == evidence.RecordingStored {
 		result.AcquiredAt, result.Copies, result.CompletedAt, result.Phase = c.Acquired.UTC(), c.Completion.Copies, c.Completion.StoredAt, "stored"
-		recovery, err := s.Recovery.RecoveryState(ctx)
-		if err != nil {
-			return ContextResult{State: "Indeterminate"}, executeStep{"RecoveryState", err}
-		}
 		if e.Snapshot != nil {
 			recorder, ok := s.Record.(APIStoredSnapshotCompletionRecorder)
 			if !ok || c.SnapshotCoverage == nil {
@@ -141,7 +121,7 @@ func (s APIContextRunner) CollectRecording(ctx context.Context, w APIContextWork
 			if projectionErr != nil || c.Completion.ExpectationDigest != evidence.ContextExpectationDigest(projected) {
 				return ContextResult{State: "Indeterminate"}, executeStep{"SnapshotCoverage", value.ErrInvalid}
 			}
-			if _, err = recorder.RecordAPIStoredSnapshotCompletion(ctx, result, c.Completion, *c.SnapshotCoverage, process, recovery); err != nil {
+			if _, err = recorder.RecordAPIStoredSnapshotCompletion(ctx, result, c.Completion, *c.SnapshotCoverage, process); err != nil {
 				return ContextResult{State: "Indeterminate"}, executeStep{"RecordAPIStoredSnapshotCompletion", err}
 			}
 			return ContextResult{State: "StoredPendingVerification", Copies: result.Copies}, nil
@@ -149,7 +129,7 @@ func (s APIContextRunner) CollectRecording(ctx context.Context, w APIContextWork
 		if c.SnapshotCoverage != nil {
 			return ContextResult{State: "Indeterminate"}, executeStep{"SnapshotCoverage", value.ErrInvalid}
 		}
-		if _, err = completionRecorder.RecordAPIStoredCompletion(ctx, result, c.Completion, process, recovery); err != nil {
+		if _, err = completionRecorder.RecordAPIStoredCompletion(ctx, result, c.Completion, process); err != nil {
 			return ContextResult{State: "Indeterminate"}, executeStep{"RecordAPIStoredCompletion", err}
 		}
 		return ContextResult{State: "StoredPendingVerification", Copies: result.Copies}, nil
@@ -165,15 +145,15 @@ func (s APIContextRunner) CollectRecording(ctx context.Context, w APIContextWork
 }
 
 type APIProfileCancellationRecorder interface {
-	RecordAPIProfileCancellation(context.Context, value.APIExecution, artifact.ProfileCancellation, value.APIProcessObservation, artifact.RecoveryProof) (value.APIExecution, error)
+	RecordAPIProfileCancellation(context.Context, value.APIExecution, artifact.ProfileCancellation, value.APIProcessObservation) (value.APIExecution, error)
 }
 
 type APILogsCancellationRecorder interface {
-	RecordAPILogsCancellation(context.Context, value.APIExecution, artifact.LogCancellation, value.APIProcessObservation, artifact.RecoveryProof) (value.APIExecution, error)
+	RecordAPILogsCancellation(context.Context, value.APIExecution, artifact.LogCancellation, value.APIProcessObservation) (value.APIExecution, error)
 }
 
 // APIRecordingCancellationRecorder persists one original writer's joined Stop.
 // The durable request alone never supplies this proof.
 type APIRecordingCancellationRecorder interface {
-	RecordAPIRecordingCancellation(context.Context, value.APIExecution, artifact.RecordingCancellation, value.APIProcessObservation, artifact.RecoveryProof) (value.APIExecution, error)
+	RecordAPIRecordingCancellation(context.Context, value.APIExecution, artifact.RecordingCancellation, value.APIProcessObservation) (value.APIExecution, error)
 }

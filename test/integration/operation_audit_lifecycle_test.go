@@ -62,16 +62,16 @@ func qualifyOperationAuditLifecycle(t *testing.T, ctx context.Context, admin *pg
 				bb, ww := policy.History.SlotBacking(policy.MaxPurgeLeases)
 				policy.BackupReservedBytes, policy.WALReservedBytes = bb*policy.MetadataSlots, ww*policy.MetadataSlots
 			}
-			j, e := postgres.NewHealthyOperationJournal(ctx, jp, policy, s.recovery.guard)
+			j, e := postgres.NewHealthyOperationJournal(ctx, jp, policy)
 			if e != nil {
 				t.Fatal(e)
 			}
-			ack, e := postgres.NewOperationAcknowledgements(ctx, ap, s.a.RootID, "normal", s.recovery.guard)
+			ack, e := postgres.NewOperationAcknowledgements(ctx, ap, s.a.RootID, "normal", s.recovery.installation)
 			if e != nil {
 				t.Fatal(e)
 			}
 			lifecycle := func(p *pgxpool.Pool, lane string) *postgres.OperationLifecycles {
-				x, e := postgres.NewOperationLifecycles(ctx, p, s.a.RootID, lane, s.recovery.guard)
+				x, e := postgres.NewOperationLifecycles(ctx, p, s.a.RootID, lane, s.recovery.installation)
 				if e != nil {
 					t.Fatal(e)
 				}
@@ -179,11 +179,11 @@ func qualifyOperationAuditLifecycle(t *testing.T, ctx context.Context, admin *pg
 				}
 				rpolicy = policy
 				rpolicy.Lane = "resolution"
-				rj, e := postgres.NewHealthyOperationJournal(ctx, jp, rpolicy, s.recovery.guard)
+				rj, e := postgres.NewHealthyOperationJournal(ctx, jp, rpolicy)
 				if e != nil {
 					t.Fatal(e)
 				}
-				ra, e := postgres.NewOperationAcknowledgements(ctx, ap, s.a.RootID, "resolution", s.recovery.guard)
+				ra, e := postgres.NewOperationAcknowledgements(ctx, ap, s.a.RootID, "resolution", s.recovery.installation)
 				if e != nil {
 					t.Fatal(e)
 				}
@@ -209,7 +209,7 @@ func qualifyOperationAuditLifecycle(t *testing.T, ctx context.Context, admin *pg
 			if !errors.Is(unknownGate.Begin(ctx, uncertain), app.ErrUnavailable) || !errors.Is(unknownGate.Begin(ctx, uncertain), app.ErrUnavailable) || lost.creates != 1 {
 				t.Fatal("uncertain closed write was reconstructed")
 			}
-			legacy, e := postgres.NewOperationJournal(ctx, jp, s.a.RootID, "normal", s.recovery.guard)
+			legacy, e := postgres.NewOperationJournal(ctx, jp, s.a.RootID, "normal", s.recovery.installation)
 			if e != nil {
 				t.Fatal(e)
 			}
@@ -636,7 +636,7 @@ func qualifyOperationAuditLifecycle(t *testing.T, ctx context.Context, admin *pg
 				}
 				changed := rpolicy
 				changed.BackupProfileID = custodyID()
-				other, e := postgres.NewHealthyOperationJournal(ctx, jp, changed, s.recovery.guard)
+				other, e := postgres.NewHealthyOperationJournal(ctx, jp, changed)
 				if e != nil {
 					t.Fatal(e)
 				}
@@ -672,14 +672,6 @@ func qualifyOperationAuditLifecycle(t *testing.T, ctx context.Context, admin *pg
 			if e = gate.Begin(ctx, intent(4)); e != nil {
 				t.Fatal("empty-account capacity not reusable", e)
 			}
-			// Recovery loss denies new cleanup and release; immutable admission incarnation
-			// is intentionally not remapped by an ordinary observer or this fixture.
-			if _, e = admin.Exec(ctx, "UPDATE fleet_trust SET suspended=true WHERE installation_id=$1", policy.InstallationID); e != nil {
-				t.Fatal(e)
-			}
-			if _, e = cleanup.ReadOperationLifecycle(ctx, uncertain.ID); !errors.Is(e, app.ErrUnavailable) {
-				t.Fatal("recovery-blocked historical audit treated as current", e)
-			}
 		})
 	}
 }
@@ -700,7 +692,7 @@ func (s *closedAuditLostReply) CreateClosedOperationIntent(ctx context.Context, 
 
 func refreshAuditFixtureRecovery(t *testing.T, ctx context.Context, admin *pgxpool.Pool, binding syntheticFleetBinding, valid time.Duration) {
 	t.Helper()
-	// Synthetic observation refresh only; never clears recovery or activates SQL.
+	// Synthetic observation refresh only.
 	if e := renewSyntheticFleetObservation(ctx, admin, binding, valid, false); e != nil {
 		t.Fatal(e)
 	}

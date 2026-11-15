@@ -96,7 +96,7 @@ func (s *InstalledConfigurationProviderEffects) beginAudit(ctx context.Context, 
 		return nil, ErrKeyService
 	}
 	p.material = p.native.material
-	// Keep the initial recovery end visible to the actual S3/KMS I/O.
+	// Keep the initial operation end visible to the actual S3/KMS I/O.
 	// Close also cancels the parent call owned by endBorrow.
 	parentCancel := p.cancel
 	narrowed, narrowCancel := context.WithDeadline(call, p.native.until)

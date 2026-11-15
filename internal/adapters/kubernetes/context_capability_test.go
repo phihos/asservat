@@ -108,33 +108,11 @@ func TestContextCapabilityExactImmutableSnapshot(t *testing.T) {
 	}
 }
 
-type capabilityRecovery struct {
-	clock *atomic.Int64
-	mode  string
-	calls int
-}
-
-func (r *capabilityRecovery) RecoveryState(ctx context.Context) (artifact.RecoveryProof, error) {
-	r.calls++
-	now := time.Unix(0, r.clock.Load()).UTC()
-	p := artifact.RecoveryProof{InstallationID: ownerID(2), IssuerEpoch: ownerID(3), Revision: identity.Revision{UID: ownerID(4), Generation: 1, Digest: [32]byte{1}}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
-	if r.mode == "wrong-epoch" {
-		p.IssuerEpoch = ownerID(9)
-	}
-	if r.mode == "short-recovery" {
-		p.FreshUntil = now.Add(time.Second)
-	}
-	if r.mode == "recovery-change" && r.calls > 1 {
-		p.Revision.Generation++
-	}
-	return p, ctx.Err()
-}
-
-// Real loopback TLS and concrete protection/source adapters; recovery and
-// clock are synthetic. The server has no admission policy, review or dry-run
+// Real loopback TLS and concrete protection/source adapters; the clock is
+// synthetic. The server has no admission policy, review or dry-run
 // endpoint: the source is a plain ConfigMap read under ordinary RBAC.
 func TestContextCapabilityPreservesAllOriginalBounds(t *testing.T) {
-	for _, mode := range []string{"valid", "hub-held", "wrong-target", "wrong-epoch", "source-changed", "rbac-denied", "short-recovery", "recovery-change", "cancelled"} {
+	for _, mode := range []string{"valid", "hub-held", "wrong-target", "source-changed", "rbac-denied", "cancelled"} {
 		t.Run(mode, func(t *testing.T) {
 			installed := capabilityTestSettings()
 			if mode == "hub-held" { // ADR-179: the hub's own cluster holds a workload cluster's capability
@@ -164,9 +142,6 @@ func TestContextCapabilityPreservesAllOriginalBounds(t *testing.T) {
 					if mode == "source-changed" {
 						uid = ownerID(8)
 					}
-					if mode == "short-recovery" {
-						clock.Add(int64(2 * time.Second))
-					}
 					permissionReply(w, map[string]any{"apiVersion": "v1", "kind": "ConfigMap", "immutable": true, "metadata": map[string]any{"name": "context-capability", "namespace": permissionControl.Name, "uid": uid, "resourceVersion": "1"}, "data": map[string]string{"context-capability.json": string(raw)}})
 				case r.URL.Path == "/api/v1/namespaces/"+permissionControl.Name:
 					permissionReply(w, permissionNamespace(permissionControl.Name, permissionControl.UID))
@@ -190,8 +165,7 @@ func TestContextCapabilityPreservesAllOriginalBounds(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			recovery := &capabilityRecovery{clock: clock, mode: mode}
-			s, err := NewContextCapabilitySource(observer, guard, recovery, "context-capability", ownerID(7), installed)
+			s, err := NewContextCapabilitySource(observer, guard, "context-capability", ownerID(7), installed)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -211,7 +185,7 @@ func TestContextCapabilityPreservesAllOriginalBounds(t *testing.T) {
 				}
 				return
 			}
-			if err != nil || !got.Valid(now()) || !got.ObservedAt.Equal(start) || !got.FreshUntil.Equal(start.Add(5*time.Second)) || reads != 1 {
+			if err != nil || !got.Valid(now()) || !got.ObservedAt.Equal(start) || !got.FreshUntil.Equal(start.Add(identity.AuthorityRecheckInterval)) || reads != 1 {
 				t.Fatal("capability lost original observation", err, reads)
 			}
 		})

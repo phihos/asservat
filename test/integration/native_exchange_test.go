@@ -48,7 +48,7 @@ type nativeExchangeFixture struct {
 	runtime, audit, config *postgres.Downloads
 	allocation             artifact.DownloadAllocation
 	gate                   authapp.ContextDownloadAuthority
-	guards                 postgres.DownloadTransactionGuards
+	guards                 *postgres.RetentionTransactionGuard
 	authority              func() artifact.DownloadAuthority
 	store                  *objectstore.Store
 	keys                   authorityTestKeys

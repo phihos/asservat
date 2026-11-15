@@ -76,13 +76,13 @@ func qualifyAccessGrants(t *testing.T, ctx context.Context, admin *pgxpool.Pool,
 	})
 	pool := poolFor(role, "synthetic-grant-hub")
 	t.Cleanup(pool.Close)
-	store, err := postgres.NewAccessGrants(ctx, pool, s.a.RootID, s.recovery.guard)
+	store, err := postgres.NewAccessGrants(ctx, pool, s.a.RootID, s.recovery.installation)
 	if err != nil {
 		t.Fatal(err)
 	}
 	var ids atomic.Int64
 	svc := func(store authapp.GrantStore) authapp.GrantService {
-		return authapp.GrantService{RootID: s.a.RootID, InstallationID: s.recovery.installation, Permissions: s.p, Store: store, Recovery: s.recovery.reader, NewID: func() string { ids.Add(1); return custodyID() }, Now: time.Now}
+		return authapp.GrantService{RootID: s.a.RootID, InstallationID: s.recovery.installation, Permissions: s.p, Store: store, NewID: func() string { ids.Add(1); return custodyID() }, Now: time.Now}
 	}
 	grants := svc(store)
 	as := func(subject, client string, groups []string, stepUp bool, scopes ...string) identities.CurrentIdentity {
@@ -262,7 +262,7 @@ func qualifyAccessGrants(t *testing.T, ctx context.Context, admin *pgxpool.Pool,
 	}
 	// Spend survives a restart: a new store instance sees it, and the retry
 	// of a recorded use is a replay without another charge.
-	restarted, err := postgres.NewAccessGrants(ctx, pool, s.a.RootID, s.recovery.guard)
+	restarted, err := postgres.NewAccessGrants(ctx, pool, s.a.RootID, s.recovery.installation)
 	if err != nil {
 		t.Fatal(err)
 	}

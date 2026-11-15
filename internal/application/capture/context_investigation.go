@@ -10,7 +10,6 @@ import (
 
 	auditapp "asservat.local/asservat/internal/application/audit"
 	authapp "asservat.local/asservat/internal/application/authorization"
-	fleetapp "asservat.local/asservat/internal/application/fleet"
 	identities "asservat.local/asservat/internal/application/identity"
 	compiler "asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -85,7 +84,6 @@ type ContextInvestigation struct {
 	Storage                ContextStorageReader
 	Reviews                ContextAccessReviews // optional (ADR-245)
 	Processing             ContextProcessingCoverageReader
-	Recovery               fleetapp.RecoveryReader
 	ReasonCipher           auditapp.CaptureReasonCipher
 	// Recorders answers node packet recorder availability (ADR-248). It is
 	// optional: without it every composition stays plan-only.
@@ -138,18 +136,7 @@ type contextFacts struct {
 }
 
 func (s ContextInvestigation) configured() bool {
-	return authorization.UUID(s.RootID) && authorization.UUID(s.InstallationID) && s.Previews != nil && s.Replay != nil && s.Admission != nil && s.Targets != nil && s.Eligibility != nil && s.Capabilities != nil && s.Retention != nil && s.Storage != nil && s.Processing != nil && s.Recovery != nil && s.Lifetime >= time.Second && s.Lifetime <= 5*time.Minute && s.Lifetime%time.Microsecond == 0 && s.Now != nil && s.NewID != nil && compiler.ContextRecipeName == value.ContextDiagnosticName
-}
-
-func (s ContextInvestigation) currentRecovery(ctx context.Context) (artifact.RecoveryProof, error) {
-	r, err := s.Recovery.RecoveryState(ctx)
-	if err != nil {
-		return artifact.RecoveryProof{}, err
-	}
-	if ctx.Err() != nil || !r.Valid(s.Now()) || r.InstallationID != s.InstallationID {
-		return artifact.RecoveryProof{}, value.ErrUnavailable
-	}
-	return r, nil
+	return authorization.UUID(s.RootID) && authorization.UUID(s.InstallationID) && s.Previews != nil && s.Replay != nil && s.Admission != nil && s.Targets != nil && s.Eligibility != nil && s.Capabilities != nil && s.Retention != nil && s.Storage != nil && s.Processing != nil && s.Lifetime >= time.Second && s.Lifetime <= 5*time.Minute && s.Lifetime%time.Microsecond == 0 && s.Now != nil && s.NewID != nil && compiler.ContextRecipeName == value.ContextDiagnosticName
 }
 
 func (s ContextInvestigation) currentIdentity(ctx context.Context, source identities.CurrentIdentity, actor identity.Principal, until time.Time) (identity.Identity, error) {
@@ -360,32 +347,26 @@ func (s ContextInvestigation) preview(ctx context.Context, source identities.Cur
 		return zero, previewFailure("sharing", err)
 	}
 	mark = time.Now()
-	recovery, err := s.currentRecovery(ctx)
-	auditapp.MarkStep(ctx, "p-recovery", mark)
-	if err != nil {
-		return zero, previewFailure("recovery", err)
-	}
-	mark = time.Now()
 	target, err := s.Targets.ResolveWorkload(ctx, intent.Target)
 	auditapp.MarkStep(ctx, "p-target", mark)
 	if err != nil {
 		return zero, previewFailure("target", err)
 	}
-	f, err := s.facts(ctx, source, i.Principal, intent, target, created, identity.Earlier(i.ValidUntil, recovery.FreshUntil))
+	f, err := s.facts(ctx, source, i.Principal, intent, target, created, i.ValidUntil)
 	if err != nil {
 		return zero, previewFailure("facts", err)
 	}
 	if original != nil && (target.Request.ClusterID != original.ClusterID || target.Request.Namespace.UID != original.NamespaceUID || target.Request.Workload.UID != original.WorkloadUID || (original.PodUID != "" && target.Request.PodUID != original.PodUID)) {
 		return zero, previewFailure("repeat/target", value.ErrTargetReplaced)
 	}
-	p := value.ContextPreview{ID: s.NewID(), RootID: s.RootID, InstallationID: s.InstallationID, IssuerEpoch: recovery.IssuerEpoch, CaptureID: s.NewID(), CaseID: s.NewID(), OccurrenceID: s.NewID(), ArtifactID: s.NewID(), AttemptID: s.NewID(), Actor: i.Principal, Intent: intent, Target: target.Request, Pin: target.Pin, Storage: f.storage.Selection, Retention: retentionReview(f.retention), Audience: slices.Clone(f.eligibility.DefaultAudience), CreatedAt: created, Deadline: created.Add(s.Lifetime)}
+	p := value.ContextPreview{ID: s.NewID(), RootID: s.RootID, InstallationID: s.InstallationID, CaptureID: s.NewID(), CaseID: s.NewID(), OccurrenceID: s.NewID(), ArtifactID: s.NewID(), AttemptID: s.NewID(), Actor: i.Principal, Intent: intent, Target: target.Request, Pin: target.Pin, Storage: f.storage.Selection, Retention: retentionReview(f.retention), Audience: slices.Clone(f.eligibility.DefaultAudience), CreatedAt: created, Deadline: created.Add(s.Lifetime)}
 	p.ExecutionClass = target.ExecutionClass
 	if intent.RepeatedFrom != nil {
 		p.Deadline = identity.Earlier(p.Deadline, intent.RepeatedFrom.ExpiresAt)
 	}
 	p.AssessmentID, p.AssessmentRulesDigest = s.NewID(), compiler.ContextAssessmentRulesDigestForClass(target.ExecutionClass)
 	processingStarted := time.Now()
-	coverage, err := s.processingCoverage(ctx, p, f, recovery, i.ValidUntil)
+	coverage, err := s.processingCoverage(ctx, p, f, i.ValidUntil)
 	auditapp.MarkStep(ctx, "p-processing", processingStarted)
 	if err != nil {
 		return zero, previewFailure("processing", err)
@@ -404,7 +385,7 @@ func (s ContextInvestigation) preview(ctx context.Context, source identities.Cur
 	if !ValidContextPreview(p) || !p.Current(s.Now()) {
 		return zero, previewFailure("blueprint", value.ErrInvalid)
 	}
-	if _, err = s.currentIdentity(ctx, source, i.Principal, i.ValidUntil); err != nil || !s.factsCurrent(f, s.Now()) || !coverage.Current(s.Now()) || !recovery.Valid(s.Now()) {
+	if _, err = s.currentIdentity(ctx, source, i.Principal, i.ValidUntil); err != nil || !s.factsCurrent(f, s.Now()) || !coverage.Current(s.Now()) {
 		return zero, previewFailure("before-store/current", value.ErrChanged)
 	}
 	mark = time.Now()
@@ -416,10 +397,10 @@ func (s ContextInvestigation) preview(ctx context.Context, source identities.Cur
 	// An uncertain draft write may consume one passive slot, never execution.
 	// Current rights and every original observation also bound the response.
 	current := s.Eligibility.ContextEligibilityCurrent(ctx, source, target.Target())
-	if !current.Eligible || current.Target != target.Target() || current.Principal != i.Principal || !current.VerifiedIdentity.Valid(s.Now()) || !i.Valid(s.Now()) || !slices.Equal(current.DefaultAudience, p.Audience) || !s.Now().Before(current.ValidUntil) || !s.factsCurrent(f, s.Now()) || !coverage.Current(s.Now()) || !recovery.Valid(s.Now()) || ctx.Err() != nil || s.Now().Before(created) {
+	if !current.Eligible || current.Target != target.Target() || current.Principal != i.Principal || !current.VerifiedIdentity.Valid(s.Now()) || !i.Valid(s.Now()) || !slices.Equal(current.DefaultAudience, p.Audience) || !s.Now().Before(current.ValidUntil) || !s.factsCurrent(f, s.Now()) || !coverage.Current(s.Now()) || ctx.Err() != nil || s.Now().Before(created) {
 		return zero, previewFailure("after-store/current", value.ErrChanged)
 	}
-	until := identity.Earlier(i.ValidUntil, recovery.FreshUntil)
+	until := i.ValidUntil
 	until = identity.Earlier(until, current.ValidUntil)
 	until = identity.Earlier(until, current.VerifiedIdentity.ValidUntil)
 	until = identity.Earlier(until, f.eligibility.ValidUntil)
@@ -489,21 +470,17 @@ func (s ContextInvestigation) requestWithGroupBounds(ctx context.Context, source
 	if err != nil || !i.Valid(s.Now()) {
 		return zero, previewFailure("request/identity", value.ErrDenied)
 	}
-	recovery, err := s.currentRecovery(ctx)
-	if err != nil {
-		return zero, err
-	}
 	digest := ContextRequestDigest(previewID)
-	q := value.ReplayQuery{RootID: s.RootID, PreviewID: previewID, IdempotencyKey: key, SubmissionDigest: digest, Identity: i, Recovery: recovery}
+	q := value.ReplayQuery{RootID: s.RootID, PreviewID: previewID, IdempotencyKey: key, SubmissionDigest: digest, Identity: i}
 	previous, found, err := s.Replay.LookupContextAdmission(ctx, q)
 	if err != nil {
 		return zero, err
 	}
-	if _, err = s.currentIdentity(ctx, source, i.Principal, i.ValidUntil); err != nil || !recovery.Valid(s.Now()) || s.Now().Before(started) {
+	if _, err = s.currentIdentity(ctx, source, i.Principal, i.ValidUntil); err != nil || s.Now().Before(started) {
 		return zero, previewFailure("request/identity-current", value.ErrDenied)
 	}
 	if found {
-		previous.MetadataValidUntil = identity.Earlier(previous.MetadataValidUntil, identity.Earlier(i.ValidUntil, recovery.FreshUntil))
+		previous.MetadataValidUntil = identity.Earlier(previous.MetadataValidUntil, i.ValidUntil)
 		if !acceptedContext(previous, digest) || !s.Now().Before(previous.MetadataValidUntil) {
 			return zero, value.ErrUnavailable
 		}
@@ -522,10 +499,10 @@ func (s ContextInvestigation) requestWithGroupBounds(ctx context.Context, source
 		return zero, value.ErrUnavailable
 	}
 	if p.CompositionGroup != nil {
-		return s.requestCompositionGroup(ctx, source, p, key, i, recovery)
+		return s.requestCompositionGroup(ctx, source, p, key, i)
 	}
 	if p.Group != nil {
-		return s.requestRecordingSaveGroup(ctx, source, p, key, recovery, bounds)
+		return s.requestRecordingSaveGroup(ctx, source, p, key, bounds)
 	}
 	executionSource, manualSave, err := s.manualSaveRequest(ctx, source, p)
 	if err != nil {
@@ -567,7 +544,7 @@ func (s ContextInvestigation) requestWithGroupBounds(ctx context.Context, source
 			return zero, s.requestChanged("assessment/scope")
 		}
 	}
-	if recording && p.IssuerEpoch == recovery.IssuerEpoch && p.AssessmentRulesDigest == rules && p.Storage != (value.ContextStorageSelection{}) && acquisitionInput(p.Intent, p.ExecutionClass) {
+	if recording && p.AssessmentRulesDigest == rules && p.Storage != (value.ContextStorageSelection{}) && acquisitionInput(p.Intent, p.ExecutionClass) {
 		// Warm only this existing selection while the grant gate does I/O. The
 		// hint confers no authority; a refused/pending gate cancels and joins it.
 		// An approved retained preview can be expired here, so its post-grant
@@ -599,14 +576,14 @@ func (s ContextInvestigation) requestWithGroupBounds(ctx context.Context, source
 	if !p.Current(s.Now()) {
 		return zero, value.ErrPreviewExpired
 	}
-	if p.IssuerEpoch != recovery.IssuerEpoch || p.AssessmentRulesDigest != rules {
+	if p.AssessmentRulesDigest != rules {
 		return zero, s.requestChanged("epoch")
 	}
 	if storageWait == nil {
 		// Ordinary requests retain their existing post-gate ordering and bound.
 		startStorageWait(true)
 	} else {
-		// The same owner retains its original identity/recovery/request bounds.
+		// The same owner retains its original identity/request bounds.
 		// All authoritative consumption now also inherits the approved preview
 		// cutoff; no concurrent mutation of the wait's original until is needed.
 		var end context.CancelFunc
@@ -695,7 +672,7 @@ func (s ContextInvestigation) requestWithGroupBounds(ctx context.Context, source
 		p.Intent.Snapshot.Request.StartBy = identity.Earlier(p.Intent.Snapshot.Request.StartBy, p.Deadline.Add(-time.Microsecond)).UTC()
 	}
 	processingStarted := time.Now()
-	coverage, err := s.processingCoverage(ctx, p, f, recovery, i.ValidUntil)
+	coverage, err := s.processingCoverage(ctx, p, f, i.ValidUntil)
 	auditapp.MarkStep(ctx, "p-processing", processingStarted)
 	if err != nil {
 		return zero, err
@@ -811,7 +788,6 @@ func (s ContextInvestigation) requestWithGroupBounds(ctx context.Context, source
 		{!s.factsCurrent(f, now), "eligibility/facts"},
 		{!coverage.Current(now), "eligibility/coverage"},
 		{!p.Current(now), "eligibility/preview"},
-		{!recovery.Valid(now), "eligibility/recovery"},
 		{ctx.Err() != nil, "eligibility/deadline"},
 	} {
 		if c.failed {
@@ -827,7 +803,7 @@ func (s ContextInvestigation) requestWithGroupBounds(ctx context.Context, source
 		manualSave.Initiator = currentInitiator
 	}
 	admitStarted := time.Now()
-	a, err := s.Admission.AdmitReviewedContext(ctx, p.ID, value.Admission{RecordingSave: manualSave, RepeatedFrom: p.Intent.RepeatedFrom, Recovery: recovery, RootID: s.RootID, IdempotencyKey: key, SubmissionDigest: digest, Plan: plan, Eligibility: final, Storage: f.storage.Binding, Registration: r, CaseID: p.CaseID, OccurrenceID: p.OccurrenceID})
+	a, err := s.Admission.AdmitReviewedContext(ctx, p.ID, value.Admission{RecordingSave: manualSave, RepeatedFrom: p.Intent.RepeatedFrom, RootID: s.RootID, IdempotencyKey: key, SubmissionDigest: digest, Plan: plan, Eligibility: final, Storage: f.storage.Binding, Registration: r, CaseID: p.CaseID, OccurrenceID: p.OccurrenceID})
 	auditapp.MarkStep(ctx, "q-admit", admitStarted)
 	if err != nil {
 		label := "request/admit-sql"
@@ -853,7 +829,7 @@ func (s ContextInvestigation) requestWithGroupBounds(ctx context.Context, source
 	}
 	// Effects may already be committed when a response becomes unavailable. The
 	// next call recovers the original operation through the read-only lookup.
-	if _, err = s.currentIdentity(ctx, source, i.Principal, i.ValidUntil); err != nil || !recovery.Valid(s.Now()) || s.Now().Before(started) {
+	if _, err = s.currentIdentity(ctx, source, i.Principal, i.ValidUntil); err != nil || s.Now().Before(started) {
 		return zero, previewFailure("request/identity-after", value.ErrDenied)
 	}
 	if !a.Replay {
@@ -865,7 +841,7 @@ func (s ContextInvestigation) requestWithGroupBounds(ctx context.Context, source
 			a.HistoryUnavailable = true
 		}
 	}
-	a.MetadataValidUntil = identity.Earlier(a.MetadataValidUntil, identity.Earlier(i.ValidUntil, recovery.FreshUntil))
+	a.MetadataValidUntil = identity.Earlier(a.MetadataValidUntil, i.ValidUntil)
 	a.MetadataValidUntil = identity.Earlier(a.MetadataValidUntil, identity.Earlier(final.ValidUntil, final.VerifiedIdentity.ValidUntil))
 	if !s.Now().Before(a.MetadataValidUntil) {
 		return zero, previewFailure("request/metadata", value.ErrDenied)

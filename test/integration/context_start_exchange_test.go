@@ -163,7 +163,7 @@ func newRegionalAPIStartFixture(t *testing.T, ctx context.Context, f fixture, n 
 	ca, key := connectorSQLCA(t)
 	roots := x509.NewCertPool()
 	roots.AddCert(ca)
-	pool := fleet.OwnerPool{InstallationID: s.recovery.installation, ClusterID: custodyID(), IssuerEpoch: s.a.Recovery.IssuerEpoch, Namespace: "synthetic-hub", NamespaceUID: custodyID(), Service: "owner", ServiceUID: custodyID(), Deployment: "owner", DeploymentUID: custodyID(), ServiceAccount: "owner", AccountUID: custodyID(), Port: 8443, NativePort: port}
+	pool := fleet.OwnerPool{InstallationID: s.recovery.installation, ClusterID: custodyID(), IssuerEpoch: s.recovery.observation.issuer, Namespace: "synthetic-hub", NamespaceUID: custodyID(), Service: "owner", ServiceUID: custodyID(), Deployment: "owner", DeploymentUID: custodyID(), ServiceAccount: "owner", AccountUID: custodyID(), Port: 8443, NativePort: port}
 	if port == pool.Port {
 		pool.Port = 8445
 	}
@@ -290,7 +290,7 @@ func newRegionalAPIStartFixture(t *testing.T, ctx context.Context, f fixture, n 
 	}
 	// ADR-171: the hub runs the runner with its SQL/authority ports; the region
 	// answers only its cluster-local ports over the exchange.
-	hub := executionapp.APIContextRunner{Read: runner.Read, Prepare: runner.Prepare, Record: runner.Record, Eligibility: runner.Eligibility, Capabilities: runner.Capabilities, Retention: runner.Retention, Recovery: runner.Recovery, Now: runner.Now}
+	hub := executionapp.APIContextRunner{Read: runner.Read, Prepare: runner.Prepare, Record: runner.Record, Eligibility: runner.Eligibility, Capabilities: runner.Capabilities, Retention: runner.Retention, Now: runner.Now}
 	local := contextstart.RegionalLocal{Process: runner.Process, Targets: regionalQueryTargets(runner.Targets), Output: runner.Output, Collector: runner.Collector, Now: runner.Now}
 	out := &regionalAPIStartFixture{bridge: bootstrap.RegionalAPIContextStart{Runner: hub, Signer: signer, Router: router, Now: time.Now}, client: client, candidates: sql.reader, owner: owner, verifier: verifier, local: local}
 	t.Cleanup(func() {

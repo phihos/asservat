@@ -21,7 +21,7 @@ import (
 
 // RetentionTopologyClient reads the named immutable topology ConfigMap of one
 // target under ordinary RBAC (Helm-native: no UID or content pins). Neither a
-// request nor this reader can enroll a target or clear recovery.
+// request nor this reader can enroll a target.
 type RetentionTopologyClient struct {
 	client             *PermissionClient
 	name, root, target string

@@ -1,11 +1,12 @@
 package capture
 
 import (
-	value "asservat.local/asservat/internal/domain/capture"
 	"context"
 	"errors"
 	"testing"
 	"time"
+
+	value "asservat.local/asservat/internal/domain/capture"
 
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
@@ -53,8 +54,8 @@ func (f *recordingTargetTiming) ResolvePacketRecorder(ctx context.Context, r tar
 	}
 	return p, err // availability shares the region's same exact read
 }
-func (f *recordingTargetTiming) ContextProcessingCoverage(ctx context.Context, r value.ProcessingCoverageRequest, recovery artifact.RecoveryProof) (value.ProcessingCoverage, error) {
-	until := recovery.FreshUntil
+func (f *recordingTargetTiming) ContextProcessingCoverage(ctx context.Context, r value.ProcessingCoverageRequest) (value.ProcessingCoverage, error) {
+	until := f.now.Add(5 * time.Second)
 	if d, ok := ctx.Deadline(); ok && d.Before(until) {
 		until = d
 	}

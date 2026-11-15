@@ -17,7 +17,7 @@ import (
 
 var _ evidence.ContextDownloadAttachments = (*DownloadWorkers)(nil)
 
-// The existing current recovery/permission/session/configuration locks enclose
+// The existing current permission/session/configuration locks enclose
 // SELECT-only business reads. No historical row is a refreshed worker proof.
 func (s *DownloadWorkers) ReadContextDownloadAttachment(ctx context.Context, sessionID string, a artifact.DownloadAuthority) (evidence.ContextDownloadAttachment, error) {
 	var out evidence.ContextDownloadAttachment

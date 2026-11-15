@@ -79,7 +79,7 @@ func admitQueryLedgerPacket(t *testing.T, f *capacitySQLFixture, root capacityRo
 	if _, err = publisher.AcknowledgedCaptureIntent(f.ctx, accepted.CaptureID); err != nil {
 		t.Fatal("packet intent audit", err)
 	}
-	executions, err := postgres.NewAPIContextExecutions(f.ctx, f.roles["hub-runtime"], s.a.RootID, postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard})
+	executions, err := postgres.NewAPIContextExecutions(f.ctx, f.roles["hub-runtime"], s.a.RootID, s.recovery.installation, s.retention.guard)
 	if err != nil {
 		t.Fatal(err)
 	}

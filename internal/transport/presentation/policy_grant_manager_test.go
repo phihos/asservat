@@ -26,7 +26,7 @@ func (s *managerWireStore) Grant(_ context.Context, id string) (authorization.Gr
 	}
 	return s.g, nil
 }
-func (s *managerWireStore) RevokeGrant(_ context.Context, in authapp.GrantRevocationInput, _ artifact.RecoveryProof) (authorization.Grant, bool, error) {
+func (s *managerWireStore) RevokeGrant(_ context.Context, in authapp.GrantRevocationInput) (authorization.Grant, bool, error) {
 	if in.GrantID != s.g.ID || in.ExpectedRevision != s.g.Revision {
 		return authorization.Grant{}, false, authapp.ErrGrantConflict
 	}
@@ -51,12 +51,6 @@ type managerWirePermissions struct{ authapp.ProjectionReader }
 
 func (managerWirePermissions) Permissions(context.Context, authorization.Target) (authorization.Projection, error) {
 	panic("policy manager invented a Pod lookup")
-}
-
-type managerWireRecovery struct{ proof artifact.RecoveryProof }
-
-func (s managerWireRecovery) RecoveryState(context.Context) (artifact.RecoveryProof, error) {
-	return s.proof, nil
 }
 
 // Real C03 -> canonical presentation route, with synthetic store/identity/source
@@ -98,7 +92,7 @@ func TestPolicyGrantManagerRouteUsesCurrentScopeWithoutDecisionOrEvidenceAuthori
 	}
 	store := &managerWireStore{g: g}
 	projection := &managerWireWorkload{p: authorization.WorkloadProjection{Target: g.Policy.Workload(), Revision: current.i.Policy, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), DeniesComplete: true, DeniesObservedAt: now, DeniesFreshUntil: now.Add(5 * time.Second), Allows: []authorization.CurrentAssignment{{Audience: owner, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}}}}
-	service := authapp.GrantService{RootID: g.RootID, InstallationID: g.RootID, Permissions: managerWirePermissions{}, WorkloadPermissions: projection, Store: store, Recovery: managerWireRecovery{artifact.RecoveryProof{InstallationID: g.RootID, IssuerEpoch: g.RootID, Revision: revision, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}}, Now: base.config.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000099" }}
+	service := authapp.GrantService{RootID: g.RootID, InstallationID: g.RootID, Permissions: managerWirePermissions{}, WorkloadPermissions: projection, Store: store, Now: base.config.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000099" }}
 	wire, err := NewGrantOperations("https://console.invalid", base.config.Now, service.NewID, service)
 	if err != nil {
 		t.Fatal(err)

@@ -33,7 +33,7 @@ import (
 const policySourceFixtureRetentionSeconds = int64(31)
 
 // Actual protected capacity/account setup, encrypted policy acceptance audit,
-// current SQL permission/retention/recovery and exact installed hub SQL grants.
+// current SQL permission/retention and exact installed hub SQL grants.
 // Workload/collector/administrator/native guard observations remain synthetic;
 // this does not start a collector or establish installed source/Save acceptance.
 func TestPolicySourceLedgerWithRealPostgres(t *testing.T) {
@@ -51,7 +51,7 @@ func TestPolicySourceLedgerWithRealPostgres(t *testing.T) {
 		option := policyRecorderProtectedCase{Hub: f.roles["hub-runtime"], Admissions: seed.s, Filters: pcap.NewCompiler(), Expression: "tcp dst port 80", Subjects: []cfg.Subject{{Kind: "Group", Issuer: "https://id.example.test", ID: "maintainers"}}, Ongoing: true, Retention: strconv.FormatInt(policySourceFixtureRetentionSeconds, 10) + "s", PermissionsAccepted: func(batch cfg.PermissionBatch) { f.batch = policyRecorderCloneBatch(batch) }}
 		option.SourceAccepted = func(t *testing.T, accepted policySourceAcceptedFixture) {
 			s := accepted.Scenario
-			ledger, err := postgres.NewPolicySources(ctx, f.roles["hub-runtime"], s.a.RootID, s.recovery.installation, postgres.EffectTransactionGuards{Recovery: s.recovery.guard, Retention: s.retention.guard})
+			ledger, err := postgres.NewPolicySources(ctx, f.roles["hub-runtime"], s.a.RootID, s.recovery.installation, s.retention.guard)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -63,7 +63,6 @@ func TestPolicySourceLedgerWithRealPostgres(t *testing.T) {
 				// Refresh existing observations only; immutable admission/acceptance,
 				// original source identity, counters and hard policy end remain unchanged.
 				f.refreshBase(t)
-				recovery := f.recoveryState(t)
 				n := time.Now().UTC().Truncate(time.Microsecond)
 				src := accepted.Source
 				src.ObservedAt = n
@@ -91,7 +90,7 @@ func TestPolicySourceLedgerWithRealPostgres(t *testing.T) {
 					node.CollectorPodUID = old.Permit.Binding.CollectorPodUID
 					node.CollectorEpoch = old.Permit.Binding.CollectorEpoch
 				}
-				return captureapp.PolicySourceCheck{Policy: accepted.Compiled, Authority: accepted.Authority, Target: target, Node: node, Recovery: recovery, Retention: resolution, Settings: policy, SourceID: sourceID, Fence: fence, BytesPerSecond: 1 << 20, SourceSlots: 4, ObservedAt: n, ValidUntil: n.Add(5 * time.Second)}
+				return captureapp.PolicySourceCheck{Policy: accepted.Compiled, Authority: accepted.Authority, Target: target, Node: node, Retention: resolution, Settings: policy, SourceID: sourceID, Fence: fence, BytesPerSecond: 1 << 20, SourceSlots: 4, ObservedAt: n, ValidUntil: n.Add(5 * time.Second)}
 			}
 			count := func(t *testing.T) (int64, int64, int64) {
 				t.Helper()

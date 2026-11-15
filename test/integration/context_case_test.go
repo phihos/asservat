@@ -26,15 +26,15 @@ func qualifyContextCase(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	t.Helper()
 	pool := poolFor("context_case_read_runtime", "synthetic-context-case-read")
 	defer pool.Close()
-	routes, err := postgres.NewContextCaseReads(ctx, pool, s.a.RootID, s.recovery.guard)
+	routes, err := postgres.NewContextCaseReads(ctx, pool, s.a.RootID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	processing, err := postgres.NewProcessingReads(ctx, pool, s.a.RootID, s.recovery.guard)
+	processing, err := postgres.NewProcessingReads(ctx, pool, s.a.RootID, s.recovery.installation)
 	if err != nil {
 		t.Fatal(err)
 	}
-	service := catalogapp.ContextCaseService{RootID: s.a.RootID, InstallationID: s.recovery.installation, Routes: routes, Permissions: s.p, Catalog: reader, Retention: privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, Recovery: s.recovery.reader, Processing: processing, Now: time.Now}
+	service := catalogapp.ContextCaseService{RootID: s.a.RootID, InstallationID: s.recovery.installation, Routes: routes, Permissions: s.p, Catalog: reader, Retention: privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, Processing: processing, Now: time.Now}
 	current := func(edit func(*identity.Identity)) identities.CurrentIdentity {
 		t.Helper()
 		now := time.Now().UTC().Truncate(time.Microsecond)
@@ -61,7 +61,7 @@ func qualifyContextCase(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	query := func() value.CaseRouteQuery {
 		t.Helper()
 		q := progressQuery(t, ctx, s)
-		return value.CaseRouteQuery{RootID: s.a.RootID, CaseID: e.CaseID, Identity: q.Identity, Recovery: q.Recovery}
+		return value.CaseRouteQuery{RootID: s.a.RootID, CaseID: e.CaseID, Identity: q.Identity}
 	}
 	var count int
 	if err = admin.QueryRow(ctx, "SELECT count(*) FROM context_case_locator WHERE root_id=$1 AND case_id=$2", s.a.RootID, e.CaseID).Scan(&count); err != nil || count != 0 {
@@ -72,7 +72,7 @@ func qualifyContextCase(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	}
 	excerptSelection := analysis.ContextExcerptSelection{CaseID: e.CaseID, ArtifactID: e.Registration.Location.ArtifactID, Selection: analysis.LineSelection{LineStart: 2, MaxLines: 3}}
 	initialQuery := query()
-	if _, err := routes.ResolveContextProjection(ctx, excerptSelection, initialQuery.Identity, initialQuery.Recovery); err == nil {
+	if _, err := routes.ResolveContextProjection(ctx, excerptSelection, initialQuery.Identity); err == nil {
 		t.Fatal("unpublished route became an approved projection candidate")
 	}
 	for _, sql := range []string{
@@ -109,7 +109,7 @@ func qualifyContextCase(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 		t.Fatal("case version is not verified artifact version", err)
 	}
 	projectionQuery := query()
-	candidate, err := routes.ResolveContextProjection(ctx, excerptSelection, projectionQuery.Identity, projectionQuery.Recovery)
+	candidate, err := routes.ResolveContextProjection(ctx, excerptSelection, projectionQuery.Identity)
 	if err != nil || candidate.RootID != s.a.RootID || candidate.CaseID != e.CaseID || candidate.ArtifactID != e.Registration.Location.ArtifactID ||
 		candidate.CaptureID != e.CaptureUID || candidate.ClusterID != e.Registration.Location.ClusterID || candidate.NamespaceUID != e.NamespaceUID ||
 		candidate.WorkloadUID != e.WorkloadUID || candidate.PodUID != e.PodUID || candidate.Selection != excerptSelection.Selection || candidate.Principal != projectionQuery.Identity.Principal {
@@ -122,13 +122,13 @@ func qualifyContextCase(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 		} else {
 			selection.ArtifactID = custodyID()
 		}
-		if route, err := routes.ResolveContextProjection(ctx, selection, projectionQuery.Identity, projectionQuery.Recovery); err == nil || route != (analysis.ContextProjectionCandidate{}) {
+		if route, err := routes.ResolveContextProjection(ctx, selection, projectionQuery.Identity); err == nil || route != (analysis.ContextProjectionCandidate{}) {
 			t.Fatal("projection silently replaced an unknown selection", err)
 		}
 	}
 	withoutRead := projectionQuery.Identity
 	withoutRead.Scopes = []string{"evidence:download"}
-	if _, err := routes.ResolveContextProjection(ctx, excerptSelection, withoutRead, projectionQuery.Recovery); err == nil {
+	if _, err := routes.ResolveContextProjection(ctx, excerptSelection, withoutRead); err == nil {
 		t.Fatal("projection route accepted download scope without ordinary read scope")
 	}
 	if err = publish(); err != nil {
@@ -169,7 +169,7 @@ func qualifyContextCase(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	}
 	progressPool := poolFor("context_progress_read_runtime", "synthetic-context-progress-read")
 	defer progressPool.Close()
-	progress, err := postgres.NewContextProgressReads(ctx, progressPool, s.a.RootID, s.recovery.guard)
+	progress, err := postgres.NewContextProgressReads(ctx, progressPool, s.a.RootID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -181,26 +181,6 @@ func qualifyContextCase(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	link, err := (captureapp.ContextCaseNavigator{Cases: service, Now: time.Now}).ContextCaseNavigation(ctx, source, p)
 	if err != nil || link.CaseID != e.CaseID || link.ValidUntil.After(p.ValidUntil) {
 		t.Fatal("published authorized case link", link, err)
-	}
-	// Waiting on a recovery lock must not replace the original short identity.
-	q := query()
-	q.Identity.ValidUntil = time.Now().UTC().Add(100 * time.Millisecond)
-	tx, err := admin.Begin(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer tx.Rollback(ctx)
-	if _, err = tx.Exec(ctx, "SELECT installation_id FROM fleet_trust WHERE installation_id=$1 FOR UPDATE", s.recovery.installation); err != nil {
-		t.Fatal(err)
-	}
-	done := make(chan error, 1)
-	go func() { _, err := routes.ResolveContextCase(ctx, q); done <- err }()
-	time.Sleep(150 * time.Millisecond)
-	if err = tx.Commit(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if err = <-done; err != value.ErrUnavailable {
-		t.Fatal("expired lock waiter received routes", err)
 	}
 	// A source suspension closes both metadata and navigation without a live Pod.
 	source = current(nil)

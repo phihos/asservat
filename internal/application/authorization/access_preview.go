@@ -51,7 +51,6 @@ type AccessPreviewer struct {
 	Administrators PreviewAdministrators
 	Projections    PreviewProjections
 	Decoder        BindingSpecDecoder
-	Recovery       ExplainRecovery
 	// Clusters are the installation's enrolled clusters (the hub and the
 	// guarded catalog read at process start).
 	Clusters []string
@@ -77,7 +76,7 @@ func administrator(ctx context.Context, admins PreviewAdministrators, i identity
 // marks an invalid proposal and cfg.ErrLimit one beyond the preview bounds.
 func (s AccessPreviewer) Preview(ctx context.Context, current identities.CurrentIdentity, proposed []ProposedChange) (cfg.AccessPreview, time.Time, error) {
 	var zero cfg.AccessPreview
-	if ctx == nil || current == nil || s.Administrators == nil || s.Projections == nil || s.Decoder == nil || s.Recovery == nil || s.Now == nil || !value.UUID(s.InstallationID) {
+	if ctx == nil || current == nil || s.Administrators == nil || s.Projections == nil || s.Decoder == nil || s.Now == nil || !value.UUID(s.InstallationID) {
 		return zero, time.Time{}, identity.ErrUnavailable
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -118,11 +117,6 @@ func (s AccessPreviewer) Preview(ctx context.Context, current identities.Current
 	if err != nil {
 		return zero, time.Time{}, err
 	}
-	recovery, err := s.Recovery.RecoveryState(ctx)
-	if err != nil || recovery.InstallationID != s.InstallationID || !recovery.Valid(s.Now()) {
-		return zero, time.Time{}, identity.ErrUnavailable
-	}
-	until = identity.Earlier(until, recovery.FreshUntil)
 	snap, err := s.Projections.PreviewProjections(ctx, read)
 	if errors.Is(err, cfg.ErrLimit) {
 		return zero, time.Time{}, cfg.ErrLimit

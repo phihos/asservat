@@ -37,10 +37,6 @@ func (f *accessFixture) Permissions(_ context.Context, t authorization.Target) (
 	n := f.now
 	return authorization.Projection{Target: t, Revision: identity.Revision{UID: "permissions", Generation: 1, Digest: artifact.Digest{2}}, ObservedAt: n, FreshUntil: n.Add(30 * time.Second), DeniesComplete: true, DeniesObservedAt: n, DeniesFreshUntil: n.Add(30 * time.Second), Allows: f.allows, Denies: f.denies}, nil
 }
-func (f *accessFixture) RecoveryState(context.Context) (artifact.RecoveryProof, error) {
-	id := "11111111-2222-4333-8444-555555555555"
-	return artifact.RecoveryProof{InstallationID: id, IssuerEpoch: id, Revision: identity.Revision{UID: "r", Generation: 1, Digest: artifact.Digest{3}}, ObservedAt: f.now, FreshUntil: f.now.Add(5 * time.Second)}, nil
-}
 
 func newAccessFixture() (*accessFixture, *AccessOperations) {
 	n := time.Now().UTC()
@@ -50,7 +46,7 @@ func newAccessFixture() (*accessFixture, *AccessOperations) {
 	other := mine
 	other.SubjectID, other.AssignmentID, other.BasisUID = "team-b", "55555555-5555-4666-8777-888888888888", "binding-b"
 	f.allows = []authorization.CurrentAssignment{{Audience: mine, ObservedAt: n, FreshUntil: n.Add(30 * time.Second)}, {Audience: other, ObservedAt: n, FreshUntil: n.Add(30 * time.Second)}}
-	service := authapp.AccessExplainer{InstallationID: "11111111-2222-4333-8444-555555555555", Targets: f, Permissions: f, Recovery: f, Now: func() time.Time { return f.now }}
+	service := authapp.AccessExplainer{InstallationID: "11111111-2222-4333-8444-555555555555", Targets: f, Permissions: f, Now: func() time.Time { return f.now }}
 	s, err := NewAccessOperations("https://asservat.example.invalid", func() time.Time { return f.now }, func() string { return "88888888-8888-4888-8888-888888888888" }, service)
 	if err != nil {
 		panic(err)

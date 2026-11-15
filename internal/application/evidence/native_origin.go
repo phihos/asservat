@@ -1,14 +1,15 @@
 package evidence
 
 import (
-	"asservat.local/asservat/internal/domain/artifact"
-	value "asservat.local/asservat/internal/domain/authorization"
-	"asservat.local/asservat/internal/domain/identity"
 	"bytes"
 	"context"
 	"errors"
 	"sync"
 	"time"
+
+	"asservat.local/asservat/internal/domain/artifact"
+	value "asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/identity"
 )
 
 type NativeLocator interface {
@@ -55,7 +56,7 @@ type NativeOrigins struct {
 // authority expired before the command was written. Within one second every
 // caller still gets its own complete check of the observation against its
 // original origin, lease and deadlines; only the identical SQL read of the
-// same operation and peer is shared. Revocation, recovery and permission
+// same operation and peer is shared. Revocation and permission
 // changes take effect within that second; nothing extends a lease.
 const NativeRecheckInterval = time.Second
 

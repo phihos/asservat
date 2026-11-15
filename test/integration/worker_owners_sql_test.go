@@ -16,7 +16,7 @@ import (
 
 // Separate owner pools/registries use real SQL fences; Pod/process identities
 // and worker proofs are explicit synthetic inputs, not hub process attestation.
-func qualifyWorkerOwners(t *testing.T, ctx context.Context, w value.DownloadWorker, f workerEnrollmentFixture, guards postgres.DownloadTransactionGuards, authority func() artifact.DownloadAuthority, refresh func() error, cancelSession func() error, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool) {
+func qualifyWorkerOwners(t *testing.T, ctx context.Context, w value.DownloadWorker, f workerEnrollmentFixture, guards *postgres.RetentionTransactionGuard, authority func() artifact.DownloadAuthority, refresh func() error, cancelSession func() error, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool) {
 	t.Helper()
 	poolA := poolFor("worker_owner_runtime", "synthetic-worker-owner")
 	defer poolA.Close()

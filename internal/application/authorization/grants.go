@@ -19,7 +19,7 @@ import (
 // nothing by itself: every use re-evaluates the stored grant, the caller and
 // the current permission projection.
 
-// ErrGrantUnavailable: a dependency (store, recovery, projection) failed.
+// ErrGrantUnavailable: a dependency (store, projection) failed.
 var ErrGrantUnavailable = errors.New("grant service unavailable")
 
 // ErrGrantConflict: an idempotency key or capture already names another request.
@@ -121,28 +121,22 @@ type GrantUseRequest struct {
 	Use                      value.GrantUse
 }
 
-// GrantStore is the SQL grant ledger (Migration 00097). Mutations run under
-// the current recovery fence; a replayed key returns the stored row and
-// replay=true. The store re-checks decision, revocation, expiry, pool and
+// GrantStore is the SQL grant ledger (Migration 00097). A replayed key
+// returns the stored row and replay=true. The store re-checks decision, revocation, expiry, pool and
 // self-approval in SQL; the service's checks come first.
 type GrantStore interface {
-	RequestGrant(context.Context, StoredGrantRequest, artifact.RecoveryProof) (value.Grant, bool, error)
+	RequestGrant(context.Context, StoredGrantRequest) (value.Grant, bool, error)
 	Grant(ctx context.Context, grantID string) (value.Grant, error)
 	GrantByCapture(ctx context.Context, captureID string) (value.Grant, error)
 	PendingGrants(ctx context.Context, limit int) ([]value.Grant, error)
 	RequestedGrants(ctx context.Context, requester identity.Principal, limit int) ([]value.Grant, error)
-	DecideGrant(context.Context, GrantDecisionInput, artifact.RecoveryProof) (value.Grant, bool, error)
-	RevokeGrant(context.Context, GrantRevocationInput, artifact.RecoveryProof) (value.Grant, bool, error)
-	MaterializeGrantChild(context.Context, GrantChildRequest, artifact.RecoveryProof) (value.GrantChild, bool, error)
+	DecideGrant(context.Context, GrantDecisionInput) (value.Grant, bool, error)
+	RevokeGrant(context.Context, GrantRevocationInput) (value.Grant, bool, error)
+	MaterializeGrantChild(context.Context, GrantChildRequest) (value.GrantChild, bool, error)
 	GrantChild(ctx context.Context, childID string) (value.GrantChild, error)
 	// GrantChildFor returns the parent's child for one artifact and client.
 	GrantChildFor(ctx context.Context, parentID, artifactID, clientID string) (value.GrantChild, error)
-	ReserveGrantUse(context.Context, GrantUseRequest, artifact.RecoveryProof) (value.Grant, bool, error)
-}
-
-// GrantRecovery is the current recovery fence.
-type GrantRecovery interface {
-	RecoveryState(context.Context) (artifact.RecoveryProof, error)
+	ReserveGrantUse(context.Context, GrantUseRequest) (value.Grant, bool, error)
 }
 
 // GrantService implements the grant operations. Approval needs a distinct
@@ -158,7 +152,6 @@ type GrantService struct {
 	RawStore               RawQueryGrantStore
 	RawSelections          RawQuerySelectionReader
 	Store                  GrantStore
-	Recovery               GrantRecovery
 	NewID                  func() string
 	Now                    func() time.Time
 }
@@ -183,7 +176,7 @@ type GrantView struct {
 }
 
 func (s GrantService) ready() bool {
-	return s.Permissions != nil && s.Store != nil && s.Recovery != nil && s.NewID != nil && s.Now != nil && value.UUID(s.RootID) && value.UUID(s.InstallationID)
+	return s.Permissions != nil && s.Store != nil && s.NewID != nil && s.Now != nil && value.UUID(s.RootID) && value.UUID(s.InstallationID)
 }
 
 func (s GrantService) actor(ctx context.Context, current identities.CurrentIdentity, scopes ...string) (identity.Identity, error) {
@@ -211,14 +204,6 @@ func (s GrantService) human(ctx context.Context, current identities.CurrentIdent
 		return identity.Identity{}, identity.ErrDenied
 	}
 	return i, nil
-}
-
-func (s GrantService) recovery(ctx context.Context) (artifact.RecoveryProof, error) {
-	r, err := s.Recovery.RecoveryState(ctx)
-	if err != nil || r.InstallationID != s.InstallationID || !r.Valid(s.Now()) {
-		return artifact.RecoveryProof{}, ErrGrantUnavailable
-	}
-	return r, nil
 }
 
 func (s GrantService) final(ctx context.Context, current identities.CurrentIdentity, i identity.Identity) error {
@@ -332,10 +317,6 @@ func (s GrantService) Request(ctx context.Context, current identities.CurrentIde
 	if !probe.Valid() {
 		return zero, false, value.ErrGrantInvalid
 	}
-	recovery, err := s.recovery(ctx)
-	if err != nil {
-		return zero, false, err
-	}
 	eligible, err := s.collector(ctx, i, in.Target, value.CollectContext)
 	if err != nil {
 		return zero, false, err
@@ -349,7 +330,7 @@ func (s GrantService) Request(ctx context.Context, current identities.CurrentIde
 	if err != nil {
 		return zero, false, ErrGrantUnavailable
 	}
-	out, replay, err := s.Store.RequestGrant(ctx, StoredGrantRequest{Grant: g, IdempotencyKey: in.IdempotencyKey, RequestDigest: sha256.Sum256(digest)}, recovery)
+	out, replay, err := s.Store.RequestGrant(ctx, StoredGrantRequest{Grant: g, IdempotencyKey: in.IdempotencyKey, RequestDigest: sha256.Sum256(digest)})
 	if err != nil {
 		return zero, false, err
 	}
@@ -420,10 +401,6 @@ func (s GrantService) Decide(ctx context.Context, current identities.CurrentIden
 	if !value.UUID(grantID) || !identity.Text(reason, 512) || !identity.Text(key, 128) {
 		return zero, false, value.ErrGrantInvalid
 	}
-	recovery, err := s.recovery(ctx)
-	if err != nil {
-		return zero, false, err
-	}
 	g, err := s.Store.Grant(ctx, grantID)
 	if err != nil {
 		return zero, false, err
@@ -460,7 +437,7 @@ func (s GrantService) Decide(ctx context.Context, current identities.CurrentIden
 	}
 	effect, stop := context.WithDeadline(ctx, until)
 	defer stop()
-	out, replay, err := s.Store.DecideGrant(effect, in, recovery)
+	out, replay, err := s.Store.DecideGrant(effect, in)
 	if err != nil {
 		return zero, false, err
 	}
@@ -490,10 +467,6 @@ func (s GrantService) Revoke(ctx context.Context, current identities.CurrentIden
 	if !value.UUID(grantID) || expected < 1 || expected > value.GrantMaxRevision || !identity.Text(key, 128) {
 		return zero, false, value.ErrGrantInvalid
 	}
-	recovery, err := s.recovery(ctx)
-	if err != nil {
-		return zero, false, err
-	}
 	g, err := s.Store.Grant(ctx, grantID)
 	if err != nil {
 		return zero, false, err
@@ -514,7 +487,7 @@ func (s GrantService) Revoke(ctx context.Context, current identities.CurrentIden
 	if g.RevokedAt.IsZero() && !value.CanRevoke(g, i, approver, s.Now()) {
 		return zero, false, value.ErrNotApprover
 	}
-	out, replay, err := s.Store.RevokeGrant(ctx, GrantRevocationInput{GrantID: grantID, Revoker: i.Principal, ExpectedRevision: expected, IdempotencyKey: key}, recovery)
+	out, replay, err := s.Store.RevokeGrant(ctx, GrantRevocationInput{GrantID: grantID, Revoker: i.Principal, ExpectedRevision: expected, IdempotencyKey: key})
 	if err != nil {
 		return zero, false, err
 	}
@@ -735,10 +708,6 @@ func (s GrantService) materialize(ctx context.Context, parentID, clientID string
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	recovery, err := s.recovery(ctx)
-	if err != nil {
-		return zero, false, err
-	}
 	g, err := s.Store.Grant(ctx, parentID)
 	if err != nil {
 		return zero, false, err
@@ -757,7 +726,7 @@ func (s GrantService) materialize(ctx context.Context, parentID, clientID string
 	if err = value.CheckMaterialize(g, output, clientID, true, s.Now(), group); err != nil {
 		return zero, false, err
 	}
-	return s.Store.MaterializeGrantChild(ctx, GrantChildRequest{ChildID: s.NewID(), ParentID: parentID, ClientID: clientID, Output: output, Group: group}, recovery)
+	return s.Store.MaterializeGrantChild(ctx, GrantChildRequest{ChildID: s.NewID(), ParentID: parentID, ClientID: clientID, Output: output, Group: group})
 }
 
 // Use reserves one follow-up disclosure of a child grant for the calling
@@ -772,10 +741,6 @@ func (s GrantService) Use(ctx context.Context, current identities.CurrentIdentit
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	i, err := s.human(ctx, current, "evidence:download")
-	if err != nil {
-		return zero, false, err
-	}
-	recovery, err := s.recovery(ctx)
 	if err != nil {
 		return zero, false, err
 	}
@@ -803,13 +768,13 @@ func (s GrantService) Use(ctx context.Context, current identities.CurrentIdentit
 	if !eligible.Eligible {
 		return zero, false, identity.ErrDenied
 	}
-	until := identity.Earlier(i.ValidUntil, identity.Earlier(eligible.ValidUntil, recovery.FreshUntil))
+	until := identity.Earlier(i.ValidUntil, eligible.ValidUntil)
 	if !s.Now().Before(until) {
 		return zero, false, identity.ErrDenied
 	}
 	effect, stop := context.WithDeadline(ctx, until)
 	defer stop()
-	out, replay, err := s.Store.ReserveGrantUse(effect, GrantUseRequest{UseID: useID, ParentID: g.ID, ChildID: childID, Use: use}, recovery)
+	out, replay, err := s.Store.ReserveGrantUse(effect, GrantUseRequest{UseID: useID, ParentID: g.ID, ChildID: childID, Use: use})
 	if err != nil {
 		return zero, false, err
 	}

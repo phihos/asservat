@@ -304,11 +304,7 @@ func qualifyManualRecordingSaveReason(t *testing.T, ctx context.Context, f *capa
 	replayIdentity := snapshot.Admission.RecordingSave.Initiator.VerifiedIdentity
 	replayIdentity.VerifiedAt = time.Now().UTC().Truncate(time.Microsecond)
 	replayIdentity.ValidUntil = replayIdentity.VerifiedAt.Add(5 * time.Second)
-	replayRecovery, err := policy.Scenario.recovery.reader.RecoveryState(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	replay, found, err := admissions.LookupContextAdmission(ctx, value.ReplayQuery{RootID: a.RootID, PreviewID: p.ID, IdempotencyKey: a.IdempotencyKey, SubmissionDigest: a.SubmissionDigest, Identity: replayIdentity, Recovery: replayRecovery})
+	replay, found, err := admissions.LookupContextAdmission(ctx, value.ReplayQuery{RootID: a.RootID, PreviewID: p.ID, IdempotencyKey: a.IdempotencyKey, SubmissionDigest: a.SubmissionDigest, Identity: replayIdentity})
 	if err != nil || !found || replay.CaptureID != accepted.CaptureID || !replay.CreatedAt.Equal(accepted.CreatedAt) || readManualSaveCounters(t, ctx, f, policy) != after {
 		t.Fatal("accepted replay depended on expired preview or changed spend", err)
 	}
@@ -348,7 +344,7 @@ func waitReasonFixtureUntil(t *testing.T, ctx context.Context, f *capacitySQLFix
 func qualifyReasonProgress(t *testing.T, ctx context.Context, f *capacitySQLFixture, policy policySourceAcceptedFixture, snapshot policySourceSnapshotAdmissionFixture, intents auditapp.CaptureOperationPublication, cipher auditapp.CaptureReasonCipher, reason string) {
 	t.Helper()
 	root := snapshot.Admission.RootID
-	reader, err := postgres.NewContextProgressReads(ctx, f.roles["hub-runtime"], root, policy.Scenario.recovery.guard)
+	reader, err := postgres.NewContextProgressReads(ctx, f.roles["hub-runtime"], root)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -357,7 +353,7 @@ func qualifyReasonProgress(t *testing.T, ctx context.Context, f *capacitySQLFixt
 		t.Fatal("real audit journal lacks bounded descriptive read")
 	}
 	counted := &reasonFixtureCipher{CaptureReasonCipher: cipher}
-	service := captureapp.ContextProgressService{RootID: root, InstallationID: policy.Authority.InstallationID, Reader: reader, Recovery: policy.Scenario.recovery.reader, Reasons: captureapp.StoredCaptureReasons{Records: records, Cipher: counted}, Now: time.Now}
+	service := captureapp.ContextProgressService{RootID: root, InstallationID: policy.Authority.InstallationID, Reader: reader, Reasons: captureapp.StoredCaptureReasons{Records: records, Cipher: counted}, Now: time.Now}
 	current := func() reasonFixtureIdentity {
 		f.refreshBase(t)
 		who := snapshot.Admission.RecordingSave.Initiator.VerifiedIdentity
@@ -406,7 +402,7 @@ func qualifyReasonAuditRetirement(t *testing.T, ctx context.Context, f *capacity
 		t.Fatal("original lifecycle binding", err)
 	}
 	life := func(purpose string) *postgres.OperationLifecycles {
-		v, err := postgres.NewCaptureOperationLifecycles(ctx, f.roles[purpose], in.Lifecycle.Policy, policy.Scenario.recovery.guard)
+		v, err := postgres.NewCaptureOperationLifecycles(ctx, f.roles[purpose], in.Lifecycle.Policy)
 		if err != nil {
 			t.Fatal(purpose, err)
 		}

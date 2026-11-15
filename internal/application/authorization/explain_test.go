@@ -19,7 +19,6 @@ type explainFixture struct {
 	resolved             targets.PodResolution
 	projection           value.Projection
 	targetErr, permErr   error
-	recovery             artifact.RecoveryProof
 	permissionReads      int
 	identityChangesFinal bool
 	identityResolutions  int
@@ -43,9 +42,6 @@ func (f *explainFixture) Permissions(_ context.Context, t value.Target) (value.P
 	}
 	return f.projection, f.permErr
 }
-func (f *explainFixture) RecoveryState(context.Context) (artifact.RecoveryProof, error) {
-	return f.recovery, nil
-}
 
 const explainInstallation = "11111111-2222-4333-8444-555555555555"
 
@@ -57,8 +53,7 @@ func newExplainFixture() (*explainFixture, AccessExplainer) {
 	f.resolved = targets.PodResolution{Request: targets.Request{ClusterID: "22222222-3333-4444-8555-666666666666", Namespace: configuration.NamespaceRef{Name: "payments", UID: "ns"}, Workload: configuration.WorkloadRef{Kind: "Deployment", Name: "api", UID: "deployment"}, PodName: "api-a", PodUID: "pod"}, Pin: artifact.PinnedPod{Namespace: "payments", NamespaceUID: "ns", Name: "api-a", UID: "pod", NodeName: "worker", ControllerUID: "rs"}, NodeUID: "node", NodeBootID: "33333333-4444-4555-8666-777777777777", PodResourceVersion: "1", WorkloadResourceVersion: "2", ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}
 	a := artifact.AudienceAssignment{Kind: "Group", Issuer: f.caller.Principal.Issuer, SubjectID: "team-a", Role: "evidence-reader", BasisKind: "AccessBinding", BasisUID: "binding", AssignmentID: "44444444-5555-4666-8777-888888888888", BasisDigest: artifact.Digest{2}}
 	f.projection = value.Projection{Target: f.resolved.Target(), Revision: rev, ObservedAt: n, FreshUntil: n.Add(30 * time.Second), DeniesComplete: true, DeniesObservedAt: n, DeniesFreshUntil: n.Add(30 * time.Second), Allows: []value.CurrentAssignment{{Audience: a, ObservedAt: n, FreshUntil: n.Add(30 * time.Second)}}}
-	f.recovery = artifact.RecoveryProof{InstallationID: explainInstallation, IssuerEpoch: explainInstallation, Revision: rev, ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}
-	return f, AccessExplainer{InstallationID: explainInstallation, Targets: f, Permissions: f, Recovery: f, Now: func() time.Time { return f.now }}
+	return f, AccessExplainer{InstallationID: explainInstallation, Targets: f, Permissions: f, Now: func() time.Time { return f.now }}
 }
 
 var explainRef = targets.WorkloadRequest{ClusterID: "22222222-3333-4444-8555-666666666666", Namespace: "payments", Kind: "Deployment", Name: "api"}
@@ -69,8 +64,8 @@ func TestAccessExplainerRunsEvaluatorOnResolvedTarget(t *testing.T) {
 	if err != nil || got.Decision != value.Allow || !got.Disclosed || got.Target != f.resolved.Target() || len(got.Assignments) != 1 {
 		t.Fatalf("got %+v err=%v", got, err)
 	}
-	if until.After(f.recovery.FreshUntil) || until.After(f.caller.ValidUntil) {
-		t.Fatalf("reply deadline %v exceeds recovery/identity", until)
+	if until.After(f.caller.ValidUntil) {
+		t.Fatalf("reply deadline %v exceeds identity", until)
 	}
 	got, _, err = s.Explain(context.Background(), f, explainRef, value.CollectContext)
 	if err != nil || got.Decision != value.Deny || got.Unmet != value.UnmetClientScope || got.MissingScope != "evidence:capture" {
@@ -91,11 +86,6 @@ func TestAccessExplainerUnresolvedTargetIsUniform(t *testing.T) {
 
 func TestAccessExplainerUnavailableIsIndeterminate(t *testing.T) {
 	f, s := newExplainFixture()
-	f.recovery.InstallationID = "99999999-2222-4333-8444-555555555555"
-	if got, _, err := s.Explain(context.Background(), f, explainRef, value.ReadApproved); err != nil || got.Decision != value.Indeterminate || got.Disclosed {
-		t.Fatalf("recovery: %+v err=%v", got, err)
-	}
-	f, s = newExplainFixture()
 	f.permErr = errors.New("sql")
 	if got, _, err := s.Explain(context.Background(), f, explainRef, value.ReadApproved); err != nil || got.Decision != value.Indeterminate || got.Disclosed {
 		t.Fatalf("permissions: %+v err=%v", got, err)

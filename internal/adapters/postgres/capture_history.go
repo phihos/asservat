@@ -26,7 +26,7 @@ import (
 // audience. It reads no evidence, live workload or storage capacity.
 func (s *ContextProgressReads) ListCaptureHistory(ctx context.Context, q value.HistoryQuery) (value.HistoryPage, error) {
 	var out value.HistoryPage
-	if s == nil || s.ledger == nil || q.RootID != s.root || !q.Valid(historyInputAt(q.Identity.VerifiedAt, q.Recovery.ObservedAt)) {
+	if s == nil || s.ledger == nil || q.RootID != s.root || !q.Valid(q.Identity.VerifiedAt) {
 		return out, value.ErrInvalid
 	}
 	q.Identity.Groups = slices.Clone(q.Identity.Groups)
@@ -37,10 +37,6 @@ func (s *ContextProgressReads) ListCaptureHistory(ctx context.Context, q value.H
 	}
 	err := s.ledger.transaction(ctx, func(tx *custodydb.Queries) error {
 		out = value.HistoryPage{} // definitely-aborted transaction retry
-		recovery, err := s.recovery.lock(ctx, tx, s.root, q.Recovery)
-		if err != nil {
-			return err
-		}
 		stream, err := tx.LockPermissionStream(ctx, id(s.root))
 		if err != nil {
 			return err
@@ -78,7 +74,7 @@ func (s *ContextProgressReads) ListCaptureHistory(ctx context.Context, q value.H
 		if !scope.Eligible {
 			return value.ErrDenied
 		}
-		until := identity.Earlier(first.Time.Add(5*time.Second), identity.Earlier(scope.ValidUntil, q.Recovery.FreshUntil))
+		until := identity.Earlier(first.Time.Add(5*time.Second), scope.ValidUntil)
 		params := custodydb.ListCaptureHistoryCandidatesParams{SelectorKey: q.SelectorKey[:], SnapshotBefore: ts(q.SnapshotBefore), RootID: id(s.root), ClusterID: id(q.Target.ClusterID), NamespaceUid: q.Target.NamespaceUID, WorkloadUid: q.Target.WorkloadUID, Origins: origins, NotBefore: ts(first.Time.Add(-value.HistoryLifetime)), PageLimit: value.HistoryScan}
 		if q.After != nil {
 			params.AfterAt, params.AfterID = ts(q.After.AcceptedAt), id(q.After.CaptureID)
@@ -94,9 +90,6 @@ func (s *ContextProgressReads) ListCaptureHistory(ctx context.Context, q value.H
 		out.SnapshotBefore = q.SnapshotBefore
 		out.AuthorizationRevision = projection.Revision
 		out.ObservedAt, out.ValidUntil = first.Time, until
-		if err = s.recovery.check(ctx, tx, recovery, s.root, q.Recovery); err != nil {
-			return err
-		}
 		n, err = tx.CurrentTime(ctx)
 		if err != nil {
 			return err
@@ -110,17 +103,6 @@ func (s *ContextProgressReads) ListCaptureHistory(ctx context.Context, q value.H
 		return value.HistoryPage{}, captureError(err)
 	}
 	return out, nil
-}
-
-// historyInputAt is when both independently observed inputs exist: an
-// identity verified before the recovery observation (or after it) is checked
-// together with it at the later instant. After the locks both are checked
-// again at database time.
-func historyInputAt(a, b time.Time) time.Time {
-	if a.After(b) {
-		return a
-	}
-	return b
 }
 
 // historyEntries derives each visible capture's phase exactly as get_capture
@@ -228,17 +210,13 @@ type historyTarget struct {
 // unauthorized captures are the same uniform refusal.
 func (s *ContextProgressReads) ReadCaptureSettings(ctx context.Context, q value.SettingsQuery) (value.CaptureSettings, error) {
 	var out value.CaptureSettings
-	if s == nil || s.ledger == nil || q.RootID != s.root || !q.Valid(historyInputAt(q.Identity.VerifiedAt, q.Recovery.ObservedAt)) {
+	if s == nil || s.ledger == nil || q.RootID != s.root || !q.Valid(q.Identity.VerifiedAt) {
 		return out, value.ErrInvalid
 	}
 	q.Identity.Groups = slices.Clone(q.Identity.Groups)
 	q.Identity.Scopes = slices.Clone(q.Identity.Scopes)
 	err := s.ledger.transaction(ctx, func(tx *custodydb.Queries) error {
 		out = value.CaptureSettings{}
-		recovery, err := s.recovery.lock(ctx, tx, s.root, q.Recovery)
-		if err != nil {
-			return err
-		}
 		stream, err := tx.LockPermissionStream(ctx, id(s.root))
 		if err != nil {
 			return err
@@ -293,10 +271,7 @@ func (s *ContextProgressReads) ReadCaptureSettings(ctx context.Context, q value.
 		out = value.CaptureSettings{CaptureID: accepted.CaptureID, Origin: value.HistoryOrigin(c.HistoryOrigin.String), ClusterID: intent.Target.ClusterID, NamespaceUID: intent.Target.NamespaceUID, WorkloadUID: intent.Target.WorkloadUID,
 			AcceptedAt: accepted.CreatedAt.UTC(), ExpiresAt: expires, TargetJSON: bytes.Clone(scope.Collection.Spec.Target), DependencyJSON: bytes.Clone(scope.Dependencies),
 			Namespace: target.Namespace, WorkloadKind: target.Workload.Kind, WorkloadName: target.Workload.Name, RequestedSeconds: accepted.Expectation.RequestedAgeSeconds, ExecutionDigest: accepted.ScopeDigest,
-			ObservedAt: first.Time, ValidUntil: identity.Earlier(first.Time.Add(5*time.Second), identity.Earlier(identity.Earlier(e.ValidUntil, q.Recovery.FreshUntil), expires))}
-		if err = s.recovery.check(ctx, tx, recovery, s.root, q.Recovery); err != nil {
-			return err
-		}
+			ObservedAt: first.Time, ValidUntil: identity.Earlier(first.Time.Add(5*time.Second), identity.Earlier(e.ValidUntil, expires))}
 		n, err = tx.CurrentTime(ctx)
 		if err != nil {
 			return err

@@ -1,21 +1,17 @@
 # Sustained implementation progress
 
-## Recovery fence and installer-era code removed (2026-11-14)
+## Recovery proof removed (2026-11-15)
 
-Branch `clean/recovery`. Migration 00167 removes the database-incarnation
-fence (REQ-DB-005): no restart lineage, re-activation or derived recovery
-block; `fleet_current_trust.recovery_blocked` is a constant `false` kept for
-stored function bodies. Code unreachable from any command or test
-(`deadcode -test`) in installer, witness, initial-preparation,
-configuration-runtime and provider-setup files is deleted with the
-installer-era Kubernetes tests and the installation witness.
-`make database-recovery-integration` and `initial-installation-integration`
-are gone. Open: the setup recovery step of REQ-DB-005 (re-apply audited
-revocations, drop sessions, recompute usage) and the `recovery` chart values;
-`RecoveryProof`/`EffectTransactionGuards`, which still carry fleet trust
-identity into SQL capacity and connector functions; retention topology and
-proofs (D12); the installed-journey modes of `scripts/test-context-storage.py`
-whose Go tests no longer exist.
+Branch `clean/recovery-2`. Migration 00173 removes
+`fleet_current_trust.recovery_blocked` from the view and from every stored
+function body; its Down restores the 00167 view for downgrade probes.
+`RecoveryProof`, `RecoveryState`, every `RecoveryReader`,
+`RecoveryTransactionGuard` and `EffectTransactionGuards` are gone from domain,
+application, adapters, bootstrap and transport; effect transactions no longer
+lock or check the trust row for recovery. `currentTrust` refuses a suspended
+or stale trust row. Open: the setup recovery step of REQ-DB-005;
+retention topology, proofs and source checkpoints (D12); one-step publication;
+the unused `identity-read` pools that only served recovery reads.
 
 ## Standing connector identity (ADR-332, 2026-11-14)
 

@@ -26,7 +26,7 @@ type NativeKeys struct {
 	scope  value.KeyScope
 }
 
-func NewNativeKeys(ctx context.Context, pool *pgxpool.Pool, root string, p value.DownloadWorkerProfile, scope value.KeyScope, g DownloadTransactionGuards) (*NativeKeys, error) {
+func NewNativeKeys(ctx context.Context, pool *pgxpool.Pool, root string, p value.DownloadWorkerProfile, scope value.KeyScope, g *RetentionTransactionGuard) (*NativeKeys, error) {
 	if !scope.Valid() || scope.Purpose != "artifact" || scope.InstallationID != p.InstallationID {
 		return nil, artifact.ErrInvalid
 	}

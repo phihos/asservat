@@ -203,7 +203,7 @@ func (s *InstalledOwnerProviderEffects) currentConfiguration(v fleet.OwnerConfig
 	return true
 }
 
-// Current runs the provider's native, source and recovery proof once. Startup
+// Current runs the provider's native and source proof once. Startup
 // calls it before Prime so its fixed failure is reported apart from login.
 func (s *InstalledOwnerProviderEffects) Current(ctx context.Context) (time.Time, error) {
 	return s.current(ctx)

@@ -19,17 +19,16 @@ type ContextProjectionDisplayPolicyReader interface {
 }
 
 type ContextProjectionProcessingReader interface {
-	ContextProjectionProcessing(context.Context, ContextProjectionEvidence, artifact.RecoveryProof) (artifact.DownloadProcessingProof, error)
+	ContextProjectionProcessing(context.Context, ContextProjectionEvidence) (artifact.DownloadProcessingProof, error)
 }
 
-// CurrentProjectionEnvironment joins accepted query placement with current
-// recovery and complete durable processing state. Its placement policy is a purpose-specific view of shared installed
+// CurrentProjectionEnvironment joins accepted query placement with complete
+// durable processing state. Its placement policy is a purpose-specific view of shared installed
 // configuration; it never consumes download authority or a download evidence DTO. The original earliest bound survives every
 // blocking read, including the final repeated source checks.
 type CurrentProjectionEnvironment struct {
 	RootID, InstallationID string
 	Policies               ContextProjectionPolicyReader
-	Recovery               DownloadRecoveryReader // recovery is purpose-neutral
 	Processing             ContextProjectionProcessingReader
 	Now                    func() time.Time
 }
@@ -38,7 +37,7 @@ var _ ContextProjectionEnvironmentReader = CurrentProjectionEnvironment{}
 
 func (s CurrentProjectionEnvironment) ProjectionEnvironment(ctx context.Context, r ContextProjectionEvidence, actor identity.Principal) (value.ContextProjectionEnvironment, error) {
 	var zero value.ContextProjectionEnvironment
-	if ctx == nil || ctx.Err() != nil || s.Policies == nil || s.Recovery == nil || s.Processing == nil || s.Now == nil || !actor.Valid() || !r.Retained.Valid() || r.Retained.RootID != s.RootID || !identity.Text(r.PurposeRef, 128) || !projectionSourceKnown(r) {
+	if ctx == nil || ctx.Err() != nil || s.Policies == nil || s.Processing == nil || s.Now == nil || !actor.Valid() || !r.Retained.Valid() || r.Retained.RootID != s.RootID || !identity.Text(r.PurposeRef, 128) || !projectionSourceKnown(r) {
 		return zero, projectionRefused("configuration", value.ErrUnavailable, nil)
 	}
 	start := s.Now()
@@ -69,14 +68,7 @@ func (s CurrentProjectionEnvironment) ProjectionEnvironment(ctx context.Context,
 	narrow(p.FreshUntil)
 	call, c1 := context.WithDeadline(call, until)
 	defer c1()
-	recovery, e := s.Recovery.RecoveryState(call)
-	if e != nil || !recovery.Valid(s.Now()) || recovery.InstallationID != s.InstallationID || recovery.IssuerEpoch != p.RecoveryEpoch {
-		return zero, projectionRefused("recovery", value.ErrUnavailable, e)
-	}
-	narrow(recovery.FreshUntil)
-	call, c2 := context.WithDeadline(call, until)
-	defer c2()
-	processing, e := s.Processing.ContextProjectionProcessing(call, r, recovery)
+	processing, e := s.Processing.ContextProjectionProcessing(call, r)
 	if e != nil || !processing.Valid(s.Now()) || processing.RootID != s.RootID || processing.CaptureID != r.CaptureID || processing.Location != r.Retained.Registration.Location {
 		return zero, projectionRefused("processing", value.ErrUnavailable, e)
 	}
@@ -102,14 +94,7 @@ func (s CurrentProjectionEnvironment) ProjectionEnvironment(ctx context.Context,
 	narrow(last.FreshUntil)
 	call, c4 := context.WithDeadline(call, until)
 	defer c4()
-	finalRecovery, e := s.Recovery.RecoveryState(call)
-	if e != nil || !finalRecovery.Valid(s.Now()) || finalRecovery.InstallationID != recovery.InstallationID || finalRecovery.IssuerEpoch != recovery.IssuerEpoch || finalRecovery.Revision != recovery.Revision {
-		return zero, projectionRefused("recovery-again", value.ErrUnavailable, e)
-	}
-	narrow(finalRecovery.FreshUntil)
-	call, c5 := context.WithDeadline(call, until)
-	defer c5()
-	final, e := s.Processing.ContextProjectionProcessing(call, r, finalRecovery)
+	final, e := s.Processing.ContextProjectionProcessing(call, r)
 	if e != nil || !final.Valid(s.Now()) || final.RootID != processing.RootID || final.Epoch != processing.Epoch || final.Sequence != processing.Sequence || final.CaptureID != processing.CaptureID || final.Location != processing.Location || final.StateDigest != processing.StateDigest {
 		return zero, projectionRefused("processing-again", value.ErrUnavailable, e)
 	}
@@ -127,7 +112,7 @@ func (s CurrentProjectionEnvironment) ProjectionEnvironment(ctx context.Context,
 	}
 	revision := p.Revision
 	revision.Digest = sha256.Sum256(body)
-	out := value.ContextProjectionEnvironment{RootID: s.RootID, InstallationID: s.InstallationID, Region: p.Path.AcquisitionRegion, StoreID: p.Path.StoreID, Location: r.Retained.Registration.Location, Principal: actor, PolicyRevision: revision, Recovery: recovery, Processing: processing, Path: p.Path, ObservedAt: start, ValidUntil: until}
+	out := value.ContextProjectionEnvironment{RootID: s.RootID, InstallationID: s.InstallationID, Region: p.Path.AcquisitionRegion, StoreID: p.Path.StoreID, Location: r.Retained.Registration.Location, Principal: actor, PolicyRevision: revision, Processing: processing, Path: p.Path, ObservedAt: start, ValidUntil: until}
 	if call.Err() != nil || !out.Valid(s.Now()) {
 		return zero, projectionRefused("expired", value.ErrExpired, call.Err())
 	}

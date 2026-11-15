@@ -5,10 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"asservat.local/asservat/internal/adapters/postgres/custodydb"
-	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/fleet"
-	"asservat.local/asservat/internal/domain/identity"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 )
@@ -19,7 +16,6 @@ type OwnerConfigurationReadCheck uint8
 
 const (
 	ownerReadTransaction OwnerConfigurationReadCheck = iota
-	ownerReadFleet
 	ownerReadHead
 	ownerReadHeadSource
 	ownerReadHeadGeneration
@@ -28,27 +24,19 @@ const (
 	ownerReadSnapshotBinding
 	ownerReadSnapshotSuspended
 	ownerReadSnapshotGeneration
-	ownerReadSnapshotIssuer
 	ownerReadAuditDecode
 	ownerReadAuditBinding
 	ownerReadClock
-	ownerReadRecoverySuspended
-	ownerReadRecoveryFleetInterval
-	ownerReadRecoveryIdentity
-	ownerReadRecoveryProofInterval
-	ownerReadRecoveryOther
 	ownerReadObservationConfiguration
 	ownerReadObservationInterval
 )
 
 func (c OwnerConfigurationReadCheck) String() string {
 	names := [...]string{
-		"transaction", "share-fleet", "share-owner", "head-source", "head-generation",
+		"transaction", "share-owner", "head-source", "head-generation",
 		"revision", "snapshot-decode", "snapshot-binding", "snapshot-suspended",
-		"snapshot-generation", "snapshot-issuer", "audit-decode", "audit-binding",
-		"database-time", "recovery-suspended", "fleet-interval",
-		"recovery-identity", "recovery-proof-interval", "recovery-other",
-		"owner-configuration", "owner-interval",
+		"snapshot-generation", "audit-decode", "audit-binding",
+		"database-time", "owner-configuration", "owner-interval",
 	}
 	if int(c) >= len(names) {
 		return "unknown"
@@ -177,26 +165,6 @@ func (d *ownerConfigurationReadDiagnostic) query(check OwnerConfigurationReadChe
 		}
 	}
 	return err
-}
-
-// Called only after the unchanged recoveryState rejects these same inputs.
-// Preserve its ordered predicates and the original SQL clock, without reading
-// the view again or trying to infer the components of its derived recovery bit.
-func ownerReadRecoveryFailure(row custodydb.FleetCurrentTrust, started, now time.Time) ownerConfigurationReadDiagnostic {
-	if row.Suspended {
-		return ownerConfigurationReadDiagnostic{ownerReadRecoverySuspended, ownerReadPredicate}
-	}
-	if !identity.Fresh(row.ObservedAt.Time, row.FreshUntil.Time, now, 30*time.Second) {
-		return ownerConfigurationReadDiagnostic{ownerReadRecoveryFleetInterval, ownerReadIntervalFailure(row.ObservedAt.Time, row.FreshUntil.Time, now, 30*time.Second)}
-	}
-	if !authorization.UUID(uid(row.InstallationID)) || !authorization.UUID(uid(row.IssuerEpoch)) || !trustRevision(row).Valid() {
-		return ownerConfigurationReadDiagnostic{ownerReadRecoveryIdentity, ownerReadPredicate}
-	}
-	until := identity.Earlier(started.Add(5*time.Second), row.FreshUntil.Time)
-	if !identity.Fresh(started, until, now, 5*time.Second) {
-		return ownerConfigurationReadDiagnostic{ownerReadRecoveryProofInterval, ownerReadIntervalFailure(started, until, now, 5*time.Second)}
-	}
-	return ownerConfigurationReadDiagnostic{ownerReadRecoveryOther, ownerReadUnspecified}
 }
 
 func ownerReadObservationFailure(out value.OwnerConfigurationObservation, now time.Time) ownerConfigurationReadDiagnostic {

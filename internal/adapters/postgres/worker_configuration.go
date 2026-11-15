@@ -54,25 +54,20 @@ func (s *WorkerConfigurations) ObserveWorkerConfiguration(ctx context.Context, o
 		return receipt, false, artifact.ErrInvalid
 	}
 	e = s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		trust, e := q.ShareFleetTrust(ctx, id(s.installation))
-		if e != nil {
-			return e
-		}
 		check := func() error {
 			n, e := q.CurrentTime(ctx)
 			if e != nil {
 				return e
 			}
-			recovery, e := recoveryState(trust, o.ObservedAt, n.Time)
-			if e != nil || !o.Valid(n.Time) || recovery.IssuerEpoch != c.RecoveryEpoch {
+			if !o.Valid(n.Time) {
 				return artifact.ErrDownloadExpired
 			}
 			return nil
 		}
-		if e = check(); e != nil {
+		if e := check(); e != nil {
 			return e
 		}
-		if e = q.InsertWorkerConfiguration(ctx, custodydb.InsertWorkerConfigurationParams{InstallationID: id(s.installation), ClusterID: id(s.cluster), SourceUid: id(s.source), Generation: p.Configuration.Generation, ObservedAt: ts(o.ObservedAt), FreshUntil: ts(o.FreshUntil)}); e != nil {
+		if e := q.InsertWorkerConfiguration(ctx, custodydb.InsertWorkerConfigurationParams{InstallationID: id(s.installation), ClusterID: id(s.cluster), SourceUid: id(s.source), Generation: p.Configuration.Generation, ObservedAt: ts(o.ObservedAt), FreshUntil: ts(o.FreshUntil)}); e != nil {
 			return e
 		}
 		head, e := q.LockWorkerConfiguration(ctx, custodydb.LockWorkerConfigurationParams{InstallationID: id(s.installation), ClusterID: id(s.cluster), SourceUid: id(s.source)})
@@ -170,10 +165,10 @@ func (s *WorkerConfigurations) FenceWorkerConfiguration(ctx context.Context, sta
 	})
 }
 
-// Called with the current recovery row locked. The shared head lock prevents
+// The shared head lock prevents
 // configuration changes until the enclosing effect completes. Check time again
 // after every blocking lock and before commit; no old lease is renewed here.
-func currentWorkerConfiguration(ctx context.Context, q *custodydb.Queries, p value.DownloadWorkerProfile, epoch string) (time.Time, error) {
+func currentWorkerConfiguration(ctx context.Context, q *custodydb.Queries, p value.DownloadWorkerProfile) (time.Time, error) {
 	var zero time.Time
 	if !p.Valid() {
 		return zero, artifact.ErrInvalid
@@ -188,7 +183,7 @@ func currentWorkerConfiguration(ctx context.Context, q *custodydb.Queries, p val
 	}
 	var c value.DownloadWorkerConfiguration
 	var receipt audit.Receipt
-	if json.Unmarshal(r.SnapshotJson, &c) != nil || !c.Valid() || c.Suspended || c.Profile != p || c.RecoveryEpoch != epoch || json.Unmarshal(r.AuditReceiptJson, &receipt) != nil || !receipt.ValidWorkerConfiguration(c) {
+	if json.Unmarshal(r.SnapshotJson, &c) != nil || !c.Valid() || c.Suspended || c.Profile != p || json.Unmarshal(r.AuditReceiptJson, &receipt) != nil || !receipt.ValidWorkerConfiguration(c) {
 		return zero, artifact.ErrDownloadUnavailable
 	}
 	n, e := q.CurrentTime(ctx)
@@ -208,15 +203,8 @@ func (s *WorkerConfigurations) CurrentWorkerConfiguration(ctx context.Context, p
 	ctx, end := context.WithTimeout(ctx, 5*time.Second)
 	defer end()
 	e := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		trust, e := q.ShareFleetTrust(ctx, id(s.installation))
-		if e != nil {
-			return e
-		}
-		start, e := q.CurrentTime(ctx)
-		if e != nil {
-			return e
-		}
-		until, e = currentWorkerConfiguration(ctx, q, p, uid(trust.IssuerEpoch))
+		var e error
+		until, e = currentWorkerConfiguration(ctx, q, p)
 		if e != nil {
 			return e
 		}
@@ -224,11 +212,9 @@ func (s *WorkerConfigurations) CurrentWorkerConfiguration(ctx context.Context, p
 		if e != nil {
 			return e
 		}
-		recovery, e := recoveryState(trust, start.Time, n.Time)
-		if e != nil || !n.Time.Before(until) {
+		if !n.Time.Before(until) {
 			return artifact.ErrDownloadExpired
 		}
-		until = identity.Earlier(until, recovery.FreshUntil)
 		return nil
 	})
 	if e != nil {

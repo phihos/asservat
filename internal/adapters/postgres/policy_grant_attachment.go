@@ -37,7 +37,7 @@ func (s *Policies) AttachPolicyGrant(ctx context.Context, in app.PolicyGrantAtta
 	digest := app.PolicyGrantAttachmentDigest(in)
 	var replay bool
 	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		trust, err := s.recovery.lock(ctx, q, s.root, in.Recovery)
+		trust, err := currentTrust(ctx, q, s.installation)
 		if err != nil {
 			return err
 		}
@@ -125,9 +125,6 @@ func (s *Policies) AttachPolicyGrant(ctx context.Context, in app.PolicyGrantAtta
 		}
 		if out.RootID != s.root || out.InstallationID != s.installation || out.AcceptanceID != uid(row.PolicyAcceptanceID) || out.AuthorityDigest != authority.ScopeDigest {
 			return authorization.ErrGrantScope
-		}
-		if err = s.recovery.check(ctx, q, trust, s.root, in.Recovery); err != nil {
-			return err
 		}
 		now, err = q.CurrentTime(ctx)
 		if err != nil {

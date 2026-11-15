@@ -230,17 +230,13 @@ func (s GrantService) RequestRaw(ctx context.Context, current identities.Current
 		}
 		return covering, true, nil
 	}
-	recovery, err := s.recovery(ctx)
-	if err != nil {
-		return zero, false, err
-	}
-	until := identity.Earlier(selected.ValidUntil, identity.Earlier(i.ValidUntil, recovery.FreshUntil))
+	until := identity.Earlier(selected.ValidUntil, i.ValidUntil)
 	if err = s.finalRawQuery(ctx, current, i, until); err != nil {
 		return zero, false, err
 	}
 	effect, stop := context.WithDeadline(ctx, until)
 	defer stop()
-	out, replay, err := s.Store.RequestGrant(effect, StoredGrantRequest{Grant: g, IdempotencyKey: in.IdempotencyKey, RequestDigest: digest}, recovery)
+	out, replay, err := s.Store.RequestGrant(effect, StoredGrantRequest{Grant: g, IdempotencyKey: in.IdempotencyKey, RequestDigest: digest})
 	if err != nil {
 		return zero, false, err
 	}

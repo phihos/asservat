@@ -34,10 +34,6 @@ func (a retentionPreviewAuthority) IdentityPolicy(context.Context, string) (iden
 	n := time.Now().UTC()
 	return identity.Policy{Issuer: "https://id.example.invalid", Revision: identity.Revision{UID: "identity", Generation: 1, Digest: artifact.Digest{2}}, ObservedAt: n, FreshUntil: n.Add(30 * time.Second), AdministratorGroups: []string{"platform-admins"}}, nil
 }
-func (a retentionPreviewAuthority) RecoveryState(context.Context) (artifact.RecoveryProof, error) {
-	n := time.Now().UTC()
-	return artifact.RecoveryProof{InstallationID: a.installation, IssuerEpoch: a.installation, Revision: identity.Revision{UID: "recovery", Generation: 1, Digest: artifact.Digest{3}}, ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}, nil
-}
 
 // retentionPreviewSpec is a hub baseline EvidenceRetentionPolicy spec with
 // the given evidence maximum and a five-minute cleanup budget.
@@ -135,7 +131,7 @@ func qualifyRetentionPreview(t *testing.T, ctx context.Context, admin *pgxpool.P
 			t.Fatal(err)
 		}
 		installation := s.recovery.installation
-		previewer := privacyapp.RetentionPreviewer{InstallationID: installation, Administrators: retentionPreviewAuthority{installation: installation}, Catalog: catalog, Decoder: decoder, Recovery: retentionPreviewAuthority{installation: installation}, Now: time.Now}
+		previewer := privacyapp.RetentionPreviewer{InstallationID: installation, Administrators: retentionPreviewAuthority{installation: installation}, Catalog: catalog, Decoder: decoder, Now: time.Now}
 		authority := retentionPreviewAuthority{installation: installation}
 		anchor := registrations[0].AnchorAt
 		for _, r := range registrations {

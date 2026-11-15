@@ -38,7 +38,6 @@ type publicContextOperationPorts struct {
 	captureapp.ContextRetentionResolver
 	captureapp.ContextStorageReader
 	captureapp.ContextProcessingCoverageReader
-	fleetapp.RecoveryReader
 	auditapp.CaptureOperationIntentReader
 	auditapp.CaptureOperationJournal
 	auditapp.CaptureOperationAcknowledgements
@@ -78,7 +77,7 @@ func publicContextOperationFixture(t *testing.T) (PublicContextOperationsConfig,
 	t.Cleanup(mac.Close)
 	native := &evidence.ContextNativeRuntime{} // handle identity only; never exercised
 	return c, PublicContextOperationServices{
-		Investigation: captureapp.ContextInvestigation{RootID: root, InstallationID: installation, Previews: p, Replay: p, Admission: p, Resolution: p, Targets: p, Eligibility: p, Capabilities: p, Retention: p, Storage: p, Processing: p, Recovery: p, Lifetime: time.Minute},
+		Investigation: captureapp.ContextInvestigation{RootID: root, InstallationID: installation, Previews: p, Replay: p, Admission: p, Resolution: p, Targets: p, Eligibility: p, Capabilities: p, Retention: p, Storage: p, Processing: p, Lifetime: time.Minute},
 		Intents:       auditapp.CaptureOperationPublication{RootID: root, Completed: p, Journal: p, Acknowledgements: p, Writer: p, Reader: p, MAC: mac},
 		Regional:      RegionalAPIContextStart{Runner: executionapp.APIContextRunner{Read: p, Prepare: p, Record: p, Eligibility: p, Retention: p}, Signer: p, Router: &contextstart.Router{}},
 		Progress:      captureapp.ContextProgressService{RootID: root, InstallationID: installation, Reader: p},
@@ -99,13 +98,10 @@ func TestPublicContextOperationsOwnCompleteSubmissionAndNativeBindings(t *testin
 	publication, auditOK := v.submission.Intents.(auditapp.CaptureOperationPublication)
 	navigator, navOK := v.progress.Navigation.(captureapp.ContextCaseNavigator)
 	cases, caseOK := navigator.Cases.(catalogapp.ContextCaseService)
-	if !ok || !auditOK || !navOK || !caseOK || regional.Router != s.Regional.Router || regional.Runner.Read != s.Regional.Runner.Read || regional.Signer != s.Regional.Signer || regional.Runner.Capabilities != s.Investigation.Capabilities || regional.Runner.Recovery != s.Investigation.Recovery || regional.Runner.Now == nil || publication.MAC != s.Intents.MAC || v.submission.Resolution != s.Investigation.Resolution || v.submission.Admission != s.Investigation.Admission || cases.Catalog != s.Cases.Catalog || v.downloads.Runtime != s.Native.Runtime || v.stop.Active != s.Native.Runtime {
+	if !ok || !auditOK || !navOK || !caseOK || regional.Router != s.Regional.Router || regional.Runner.Read != s.Regional.Runner.Read || regional.Signer != s.Regional.Signer || regional.Runner.Capabilities != s.Investigation.Capabilities || regional.Runner.Now == nil || publication.MAC != s.Intents.MAC || v.submission.Resolution != s.Investigation.Resolution || v.submission.Admission != s.Investigation.Admission || cases.Catalog != s.Cases.Catalog || v.downloads.Runtime != s.Native.Runtime || v.stop.Active != s.Native.Runtime {
 		t.Fatal("assembly replaced original submission, authority, navigation or native owner")
 	}
-	if v.progress.Recovery != s.Investigation.Recovery || v.cases.Recovery != s.Investigation.Recovery || v.downloads.Recovery != s.Investigation.Recovery {
-		t.Fatal("split recovery sources")
-	}
-	if s.Regional.Runner.Capabilities != nil || s.Regional.Runner.Recovery != nil || s.Progress.Navigation != nil || s.Downloads.Runtime != nil || s.Investigation.Now != nil {
+	if s.Regional.Runner.Capabilities != nil || s.Progress.Navigation != nil || s.Downloads.Runtime != nil || s.Investigation.Now != nil {
 		t.Fatal("assembly mutated caller's value configuration")
 	}
 	operations, e := NewPublicContextOperations(c, s)
@@ -183,9 +179,6 @@ func TestPublicContextOperationsRejectMissingOrForeignComposition(t *testing.T) 
 		"regional-router": func(_ *PublicContextOperationsConfig, s *PublicContextOperationServices) { s.Regional.Router = nil },
 		"regional-capability-override": func(_ *PublicContextOperationsConfig, s *PublicContextOperationServices) {
 			s.Regional.Runner.Capabilities = s.Investigation.Capabilities
-		},
-		"regional-recovery-override": func(_ *PublicContextOperationsConfig, s *PublicContextOperationServices) {
-			s.Regional.Runner.Recovery = s.Investigation.Recovery
 		},
 		"navigation-override": func(_ *PublicContextOperationsConfig, s *PublicContextOperationServices) {
 			s.Progress.Navigation = captureapp.ContextCaseNavigator{Cases: s.Cases}
@@ -289,7 +282,7 @@ func TestPublicRawAccessUsesInitializedSharedCatalogAuthority(t *testing.T) {
 		t.Fatal("grant service replaced")
 	}
 	cases, ok := grants.RawSelections.(catalogapp.ContextCaseService)
-	if !ok || grants.RawStore != ports || grants.Store != ports || grants.Recovery != s.Investigation.Recovery || grants.Now == nil || grants.NewID == nil || cases.Recovery != s.Investigation.Recovery || cases.Now == nil || cases.Catalog != s.Cases.Catalog || cases.Routes != s.Cases.Routes || cases.Permissions != s.Cases.Permissions || cases.Retention != s.Cases.Retention || cases.Processing != s.Cases.Processing {
+	if !ok || grants.RawStore != ports || grants.Store != ports || grants.Now == nil || grants.NewID == nil || cases.Now == nil || cases.Catalog != s.Cases.Catalog || cases.Routes != s.Cases.Routes || cases.Permissions != s.Cases.Permissions || cases.Retention != s.Cases.Retention || cases.Processing != s.Cases.Processing {
 		t.Fatal("raw selection captured an uninitialized or different authority")
 	}
 	ctx, cancel := context.WithTimeout(context.WithValue(t.Context(), publicOperationContextKey{}, "original"), time.Second)

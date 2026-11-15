@@ -18,8 +18,8 @@ type ContextPreviewStore interface {
 	ReadContextPreview(context.Context, string, string, identity.Principal) (value.ContextPreview, error)
 }
 
-// ContextAdmissionReplay is a read-only transaction with current recovery and
-// current SQL target permissions/denies after locks. Lookup precedes preview
+// ContextAdmissionReplay is a read-only transaction with current SQL target
+// permissions/denies after locks. Lookup precedes preview
 // access, permitting exact accepted replay after preview or target disappearance.
 // A changed digest under the same actor/client/key conflicts. Missing is the
 // only result that permits a new current preview-to-admission attempt.

@@ -14,7 +14,7 @@ import (
 // one artifact: routing facts only, no source or selection. It is never a
 // protected evidence lookup; C-03 checks target rights afterwards.
 type ContextProjectionRouteReader interface {
-	ResolveProjectionRoute(context.Context, string, string, identity.Identity, artifact.RecoveryProof) (value.ContextProjectionCandidate, error)
+	ResolveProjectionRoute(context.Context, string, string, identity.Identity) (value.ContextProjectionCandidate, error)
 }
 
 // HTTPHeaderReads admits get_http_headers (ADR-282) as an approved query of
@@ -32,8 +32,8 @@ func (s HTTPHeaderReads) Begin(ctx context.Context, current identities.CurrentId
 	var d *ContextProjectionDelivery
 	err := queryStepped("configuration", value.ErrUnavailable)
 	if sel.Valid() && s.Routes != nil {
-		d, err = s.Service.begin(ctx, current, invocation, "get_http_headers", ContextQueryInput{Headers: sel}, func(ctx context.Context, caller identity.Identity, recovery artifact.RecoveryProof) (value.ContextProjectionCandidate, error) {
-			c, err := s.Routes.ResolveProjectionRoute(ctx, sel.CaseID, sel.ArtifactID, caller, recovery)
+		d, err = s.Service.begin(ctx, current, invocation, "get_http_headers", ContextQueryInput{Headers: sel}, func(ctx context.Context, caller identity.Identity) (value.ContextProjectionCandidate, error) {
+			c, err := s.Routes.ResolveProjectionRoute(ctx, sel.CaseID, sel.ArtifactID, caller)
 			if err != nil || !c.RouteValid() || c.CaseID != sel.CaseID || c.ArtifactID != sel.ArtifactID || c.Selection != (value.LineSelection{}) ||
 				c.NativeType != "" || c.Headers != (value.HTTPHeaderWindow{}) {
 				return value.ContextProjectionCandidate{}, errors.Join(value.ErrUnavailable, err)

@@ -166,7 +166,7 @@ func (s *WorkerEnrollments) PrepareWorkerCertificate(ctx context.Context, p valu
 			if e != nil {
 				return e
 			}
-			if a.Enrollment != enrollment || a.RecoveryEpoch != checked.recoveryEpoch || a.EnrollmentAudit != receipt.SHA256 {
+			if a.Enrollment != enrollment || a.EnrollmentAudit != receipt.SHA256 {
 				return artifact.ErrIntegrity
 			}
 			out.Attempt = a
@@ -213,7 +213,7 @@ func (s *WorkerEnrollments) PrepareWorkerCertificate(ctx context.Context, p valu
 	return out, nil
 }
 func (s *WorkerEnrollments) StoreWorkerCertificate(ctx context.Context, a value.WorkerCertificateAttempt, c value.WorkerCertificate) error {
-	if !a.Matches(c) || artifact.Digest(sha256.Sum256(c.DER)) != c.Peer.Certificate || a.RecoveryEpoch != a.Enrollment.Worker.Intent.Authority.Environment.RecoveryEpoch {
+	if !a.Matches(c) || artifact.Digest(sha256.Sum256(c.DER)) != c.Peer.Certificate {
 		return artifact.ErrInvalid
 	}
 	b, e := json.Marshal(c)
@@ -257,7 +257,7 @@ func (s *WorkerEnrollments) StoreWorkerCertificate(ctx context.Context, a value.
 }
 func (s *WorkerEnrollments) ActivateWorkerCertificate(ctx context.Context, p value.WorkerEnrollmentProof, a value.WorkerCertificateAttempt) (value.WorkerCertificate, error) {
 	var out value.WorkerCertificate
-	if a.Enrollment.Worker != p.Worker || a.Enrollment.PublicKeyDigest != p.PublicKeyDigest || a.RecoveryEpoch != p.Worker.Intent.Authority.Environment.RecoveryEpoch {
+	if a.Enrollment.Worker != p.Worker || a.Enrollment.PublicKeyDigest != p.PublicKeyDigest {
 		return out, artifact.ErrInvalid
 	}
 	err := s.withProof(ctx, p, func(ctx context.Context, q *custodydb.Queries, checked admittedWorkerCheck, now time.Time) error {

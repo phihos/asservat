@@ -73,7 +73,7 @@ func newSourceCohortFixtureWith(t *testing.T, replicas int, composition *plannin
 		t.Fatal("cohort no longer fits the explicit two-node ring envelope")
 	}
 	s := &sourceCohortFixture{t: t, f: f, settings: settings, authority: accepted.authority, policy: p, base: f.now, queryCost: 300 * time.Millisecond, actualReplicas: replicas, wirePerDispatch: 1000, rows: map[string]PolicySourceState{}, nodePermits: map[string]collector.SourcePermit{}, nodeMeters: map[string]*collector.SourceMeter{}, firstDispatch: map[string]time.Time{}}
-	s.runtime = &PolicySourceRuntime{Ledger: s, Dispatcher: s, Observer: s, Recovery: f, Retention: f, Settings: settings, Now: func() time.Time { return f.now }, NewID: func() string { return fixtureID(1000 + int(f.newIDs.Add(1))) }}
+	s.runtime = &PolicySourceRuntime{Ledger: s, Dispatcher: s, Observer: s, Retention: f, Settings: settings, Now: func() time.Time { return f.now }, NewID: func() string { return fixtureID(1000 + int(f.newIDs.Add(1))) }}
 	return s
 }
 

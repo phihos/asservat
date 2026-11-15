@@ -27,7 +27,6 @@ func testAuthority() ContextProjectionAuthority {
 		HubClusterID: queryTestID, HubRegion: "region", WorkerConfiguration: rev, HubConfiguration: rev}
 	environment := ContextProjectionEnvironment{RootID: queryTestID, InstallationID: queryTestID, Region: "region", StoreID: queryTestID,
 		Location: location, Principal: principal, PolicyRevision: rev, Path: path, ObservedAt: now, ValidUntil: until,
-		Recovery: artifact.RecoveryProof{InstallationID: queryTestID, IssuerEpoch: queryTestID, Revision: rev, ObservedAt: now, FreshUntil: until},
 		Processing: artifact.DownloadProcessingProof{RootID: queryTestID, Epoch: queryTestID, CaptureID: queryTestID, Location: location, Sequence: 1,
 			StateDigest: artifact.Digest{1}, ObservedAt: now, ValidUntil: until}}
 	retention := artifact.RetentionProof{RootID: queryTestID, ClusterID: queryTestID, NamespaceUID: "namespace", WorkloadUID: "workload", PodUID: "pod",
@@ -53,7 +52,6 @@ func TestProjectionAuthorityRequiresEveryCurrentBinding(t *testing.T) {
 		"missing-selection":        func(a *ContextProjectionAuthority) { a.Scope.Selection = LineSelection{} },
 		"missing-environment":      func(a *ContextProjectionAuthority) { a.Environment = ContextProjectionEnvironment{} },
 		"missing-retention":        func(a *ContextProjectionAuthority) { a.Retention = artifact.RetentionProof{} },
-		"missing-recovery":         func(a *ContextProjectionAuthority) { a.Environment.Recovery = artifact.RecoveryProof{} },
 		"missing-processing":       func(a *ContextProjectionAuthority) { a.Environment.Processing = artifact.DownloadProcessingProof{} },
 		"missing-path":             func(a *ContextProjectionAuthority) { a.Environment.Path = ContextProjectionPath{} },
 		"download-purpose":         func(a *ContextProjectionAuthority) { a.Environment.Path.Purpose = "download" },
@@ -66,7 +64,6 @@ func TestProjectionAuthorityRequiresEveryCurrentBinding(t *testing.T) {
 		"other-workload":           func(a *ContextProjectionAuthority) { a.Scope.WorkloadUID = "other" },
 		"other-client":             func(a *ContextProjectionAuthority) { a.Scope.Principal.ClientID = "other" },
 		"other-subject":            func(a *ContextProjectionAuthority) { a.Scope.Principal.Subject = "other" },
-		"other-installation":       func(a *ContextProjectionAuthority) { a.Environment.Recovery.InstallationID = queryOtherID },
 		"other-processing-root":    func(a *ContextProjectionAuthority) { a.Environment.Processing.RootID = queryOtherID },
 		"other-processing-attempt": func(a *ContextProjectionAuthority) { a.Environment.Processing.Location.AttemptID = queryOtherID },
 		"other-store":              func(a *ContextProjectionAuthority) { a.Environment.Path.StoreID = queryOtherID },
@@ -85,9 +82,6 @@ func TestProjectionAuthorityRequiresEveryCurrentBinding(t *testing.T) {
 		"old-retention":            func(a *ContextProjectionAuthority) { a.Retention.ValidUntil = now },
 		"extended-retention":       func(a *ContextProjectionAuthority) { a.Retention.ValidUntil = a.ValidUntil.Add(-time.Nanosecond) },
 		"extended-environment":     func(a *ContextProjectionAuthority) { a.Environment.ValidUntil = a.ValidUntil.Add(-time.Nanosecond) },
-		"extended-recovery": func(a *ContextProjectionAuthority) {
-			a.Environment.Recovery.FreshUntil = a.ValidUntil.Add(-time.Nanosecond)
-		},
 		"extended-processing": func(a *ContextProjectionAuthority) {
 			a.Environment.Processing.ValidUntil = a.ValidUntil.Add(-time.Nanosecond)
 		},

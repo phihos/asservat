@@ -90,11 +90,11 @@ func qualifyProfileComparisonQueries(t *testing.T, f *queryLedgerFixture) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	processing, e := postgres.NewProcessingReads(ctx, catalogPool, root, s.recovery.guard)
+	processing, e := postgres.NewProcessingReads(ctx, catalogPool, root, s.recovery.installation)
 	if e != nil {
 		t.Fatal(e)
 	}
-	environment := authapp.CurrentProjectionEnvironment{RootID: root, InstallationID: f.base.input.InstallationID, Policies: f.policies, Recovery: s.recovery.reader, Processing: processing, Now: time.Now}
+	environment := authapp.CurrentProjectionEnvironment{RootID: root, InstallationID: f.base.input.InstallationID, Policies: f.policies, Processing: processing, Now: time.Now}
 	gate := authapp.ContextProjectionAuthority{RootID: root, Permissions: s.p, Catalog: catalog, Retention: privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, Environment: environment, Now: time.Now}
 	principal := s.a.Plan.Input.Executor
 	scope := value.ContextProjectionScope{RootID: root, CaseID: expected.CaseID, CaptureID: expected.CaptureUID, ArtifactID: expected.Registration.Location.ArtifactID, ClusterID: expected.Registration.Location.ClusterID, NamespaceUID: expected.NamespaceUID, WorkloadUID: expected.WorkloadUID, PodUID: expected.PodUID, Version: evidence.ContextCopiesDigest(f.published.Copies), SourceFormat: artifact.PprofFormat, DisplayVersion: value.ProfileComparisonDisplayVersion, NativeType: artifact.PprofArtifact, Profile: value.ProfileSummarySelection{SampleType: "cpu", TopN: 20}, Principal: principal}
@@ -117,20 +117,20 @@ func qualifyProfileComparisonQueries(t *testing.T, f *queryLedgerFixture) {
 		return a
 	}
 	ownership := &querySQLWorker{}
-	ledger, e := postgres.NewContextQueries(ctx, runtime, root, postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard}, f.current, ownership)
+	ledger, e := postgres.NewContextQueries(ctx, runtime, root, s.recovery.installation, s.retention.guard, f.current, ownership)
 	if e != nil {
 		t.Fatal(e)
 	}
 	policy := f.audit.Normal.Policy
-	journal, e := postgres.NewHealthyOperationJournal(ctx, journalPool, policy, s.recovery.guard)
+	journal, e := postgres.NewHealthyOperationJournal(ctx, journalPool, policy)
 	if e != nil {
 		t.Fatal(e)
 	}
-	ack, e := postgres.NewOperationAcknowledgements(ctx, ackPool, root, "normal", s.recovery.guard)
+	ack, e := postgres.NewOperationAcknowledgements(ctx, ackPool, root, "normal", s.recovery.installation)
 	if e != nil {
 		t.Fatal(e)
 	}
-	completions, e := postgres.NewOperationLifecycles(ctx, journalPool, root, "normal", s.recovery.guard)
+	completions, e := postgres.NewOperationLifecycles(ctx, journalPool, root, "normal", s.recovery.installation)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -386,7 +386,7 @@ func qualifyComparisonCrossAllocationSQL(t *testing.T, f *queryLedgerFixture, or
 			baseline = q.BaselinePlan.AllocationID
 		}
 		_, e := admin.Exec(ctx, `INSERT INTO context_query(id,root_id,allocation_id,account_id,principal_key,actor,query,initial_request,operation_id,worker_id,created_at,deadline,cleanup_until,retire_by,issuer_epoch,postmaster_at,database_oid,baseline_allocation_id)
- SELECT $1,$2,$3,$4,p.principal_key,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,pg_postmaster_start_time(),(SELECT oid FROM pg_database WHERE datname=current_database()),$15 FROM context_query_principal p WHERE p.id=$4 AND p.root_id=$2`, q.ID, q.Scope.RootID, q.Plan.AllocationID, q.Plan.AccountID, raw(q.Scope.Principal), raw(q), raw(r), q.OperationID, q.WorkerID, q.CreatedAt, q.Deadline, q.CleanupUntil, q.Plan.RetireBy, q.RecoveryIssuerEpoch, baseline)
+ SELECT $1,$2,$3,$4,p.principal_key,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,pg_postmaster_start_time(),(SELECT oid FROM pg_database WHERE datname=current_database()),$15 FROM context_query_principal p WHERE p.id=$4 AND p.root_id=$2`, q.ID, q.Scope.RootID, q.Plan.AllocationID, q.Plan.AccountID, raw(q.Scope.Principal), raw(q), raw(r), q.OperationID, q.WorkerID, q.CreatedAt, q.Deadline, q.CleanupUntil, q.Plan.RetireBy, f.scenario.recovery.observation.issuer, baseline)
 		return e
 	}
 	pairRequest, _ := invocation("compare_profiles")

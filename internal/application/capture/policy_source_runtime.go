@@ -8,7 +8,6 @@ import (
 
 	planvalue "asservat.local/asservat/internal/domain/planning"
 
-	fleetapp "asservat.local/asservat/internal/application/fleet"
 	compiler "asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
@@ -77,7 +76,6 @@ type PolicySourceRuntime struct {
 	Ledger     PolicySourceLedger
 	Dispatcher PolicySourceDispatcher
 	Observer   OngoingRecorderObserver
-	Recovery   fleetapp.RecoveryReader
 	Retention  ContextRetentionResolver
 	Settings   ApprovalSettings
 	// Storage and Refresh keep the workload's 30-second storage binding fresh
@@ -88,7 +86,7 @@ type PolicySourceRuntime struct {
 }
 
 func (s *PolicySourceRuntime) configured() bool {
-	return s != nil && s.Ledger != nil && s.Dispatcher != nil && s.Observer != nil && s.Recovery != nil && s.Retention != nil && s.Settings != nil && s.Now != nil && s.NewID != nil
+	return s != nil && s.Ledger != nil && s.Dispatcher != nil && s.Observer != nil && s.Retention != nil && s.Settings != nil && s.Now != nil && s.NewID != nil
 }
 
 func (s *PolicySourceRuntime) Sweep(ctx context.Context) error {
@@ -197,10 +195,6 @@ func (s *PolicySourceRuntime) maintain(ctx context.Context, p value.RestartPolic
 		}
 		existing[row.Binding.PodUID] = row
 	}
-	recovery, err := s.Recovery.RecoveryState(ctx)
-	if err != nil {
-		return errors.Join(failed, staged("recovery", err))
-	}
 	settings, err := s.Settings.IdentityPolicy(ctx, a.Creator.Issuer)
 	if err != nil || settings.Validate(s.Now()) != nil || settings.Issuer != a.Creator.Issuer {
 		return errors.Join(failed, staged("settings", value.ErrUnavailable))
@@ -208,7 +202,7 @@ func (s *PolicySourceRuntime) maintain(ctx context.Context, p value.RestartPolic
 	// This check interval starts once. Independent regional/retention reads can
 	// only shorten it, never freshen a complete workload observation.
 	started := cohortStarted
-	until := identity.Earlier(cohortUntil, identity.Earlier(o.FreshUntil, identity.Earlier(recovery.FreshUntil, identity.Earlier(settings.FreshUntil, a.NotAfter))))
+	until := identity.Earlier(cohortUntil, identity.Earlier(o.FreshUntil, identity.Earlier(settings.FreshUntil, a.NotAfter)))
 	call, end := context.WithDeadline(ctx, until)
 	defer end()
 	type observedSource struct {
@@ -340,7 +334,7 @@ func (s *PolicySourceRuntime) maintain(ctx context.Context, p value.RestartPolic
 			}
 			continue
 		}
-		check := PolicySourceCheck{Policy: p, ActionID: rec.Action.ID, Authority: a, Target: resolved.Recorder.Target, Node: node, Recovery: recovery, Retention: retention, Settings: settings, BytesPerSecond: rate, SourceSlots: slots, ObservedAt: started, ValidUntil: until}
+		check := PolicySourceCheck{Policy: p, ActionID: rec.Action.ID, Authority: a, Target: resolved.Recorder.Target, Node: node, Retention: retention, Settings: settings, BytesPerSecond: rate, SourceSlots: slots, ObservedAt: started, ValidUntil: until}
 		if !known {
 			check.SourceID, check.Fence = s.NewID(), s.NewID()
 			check.Initial = true

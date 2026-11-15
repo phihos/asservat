@@ -5,7 +5,6 @@ import (
 	"time"
 
 	identities "asservat.local/asservat/internal/application/identity"
-	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/planning"
@@ -63,17 +62,6 @@ func (r *consumptionFacts) Resolve(ctx context.Context, in privacy.Input) (priva
 type consumptionAdmission struct {
 	*investigationFixture
 	got value.Admission
-}
-
-type consumptionRecovery struct {
-	*investigationFixture
-	until time.Time
-}
-
-func (r consumptionRecovery) RecoveryState(ctx context.Context) (artifact.RecoveryProof, error) {
-	out, err := r.investigationFixture.RecoveryState(ctx)
-	out.FreshUntil = r.until
-	return out, err
 }
 
 type consumptionTarget struct {

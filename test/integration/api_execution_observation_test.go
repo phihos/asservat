@@ -48,7 +48,7 @@ func qualifyAPIExecutionRetainedObservation(t *testing.T, ctx context.Context, a
 		}
 		sharedPools, role := compiledOrdinaryHubPools(t, ctx, admin, poolFor)
 		sharedPool := sharedPools.ordinary
-		executionSQL, err := postgres.NewAPIContextExecutions(ctx, sharedPool, s.a.RootID, postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard})
+		executionSQL, err := postgres.NewAPIContextExecutions(ctx, sharedPool, s.a.RootID, s.recovery.installation, s.retention.guard)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -69,11 +69,7 @@ func qualifyAPIExecutionRetainedObservation(t *testing.T, ctx context.Context, a
 		}
 		actor := s.a.Eligibility.VerifiedIdentity
 		actor.VerifiedAt, actor.ValidUntil = now, now.Add(5*time.Second)
-		recovery, err := s.recovery.reader.RecoveryState(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
-		work, err := read.ReadAPIContextWork(ctx, accepted.CaptureID, actor, recovery)
+		work, err := read.ReadAPIContextWork(ctx, accepted.CaptureID, actor)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -96,12 +92,12 @@ func qualifyAPIExecutionRetainedObservation(t *testing.T, ctx context.Context, a
 		if err != nil {
 			t.Fatal(err)
 		}
-		process := value.APIProcessObservation{Binding: value.APIProcessBinding{InstallationID: recovery.InstallationID, ClusterID: work.Target.ClusterID, IssuerEpoch: recovery.IssuerEpoch, NamespaceUID: custodyID(), AccountUID: custodyID(), PodUID: custodyID(), ProcessEpoch: custodyID(), StartupDigest: artifact.Digest{1}, ImageDigest: accepted.Expectation.CollectorImageDigest}, CheckedAt: now, ValidUntil: now.Add(5 * time.Second)}
+		process := value.APIProcessObservation{Binding: value.APIProcessBinding{InstallationID: s.recovery.installation, ClusterID: work.Target.ClusterID, IssuerEpoch: s.recovery.observation.issuer, NamespaceUID: custodyID(), AccountUID: custodyID(), PodUID: custodyID(), ProcessEpoch: custodyID(), StartupDigest: artifact.Digest{1}, ImageDigest: accepted.Expectation.CollectorImageDigest}, CheckedAt: now, ValidUntil: now.Add(5 * time.Second)}
 		until := now.Add(5 * time.Second)
-		for _, d := range []time.Time{eligible.ValidUntil, plan.ValidUntil, recovery.FreshUntil, process.ValidUntil, accepted.Expectation.Registration.WriteUntil} {
+		for _, d := range []time.Time{eligible.ValidUntil, plan.ValidUntil, process.ValidUntil, accepted.Expectation.Registration.WriteUntil} {
 			until = identity.Earlier(until, d)
 		}
-		check := executionapp.APIExecutionCheck{Work: work, Plan: plan, Eligibility: eligible, Recovery: recovery, Process: process, CheckedAt: now, ValidUntil: until.Truncate(time.Microsecond)}
+		check := executionapp.APIExecutionCheck{Work: work, Plan: plan, Eligibility: eligible, Process: process, CheckedAt: now, ValidUntil: until.Truncate(time.Microsecond)}
 		if !check.Valid(time.Now()) {
 			t.Fatal("invalid current synthetic execution facts")
 		}

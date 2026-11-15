@@ -1,12 +1,6 @@
 package capture
 
 import (
-	auditapp "asservat.local/asservat/internal/application/audit"
-	fleetapp "asservat.local/asservat/internal/application/fleet"
-	"asservat.local/asservat/internal/domain/artifact"
-	value "asservat.local/asservat/internal/domain/capture"
-	"asservat.local/asservat/internal/domain/identity"
-	privacy "asservat.local/asservat/internal/domain/privacy"
 	"bytes"
 	"context"
 	"crypto/sha256"
@@ -14,6 +8,13 @@ import (
 	"errors"
 	"testing"
 	"time"
+
+	auditapp "asservat.local/asservat/internal/application/audit"
+	fleetapp "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/domain/artifact"
+	value "asservat.local/asservat/internal/domain/capture"
+	"asservat.local/asservat/internal/domain/identity"
+	privacy "asservat.local/asservat/internal/domain/privacy"
 )
 
 // These fakes isolate composed request ordering. They confer no SQL, storage
@@ -142,7 +143,6 @@ func newParameterReadFixture(t *testing.T) (HistoryParameterService, *parameterR
 	if err != nil {
 		t.Fatal(err)
 	}
-	r, _ := f.RecoveryState(t.Context())
 	mac, err := auditapp.NewOperationMAC("input-v1", bytes.Repeat([]byte{1}, 32), "account-v1", bytes.Repeat([]byte{2}, 32))
 	if err != nil {
 		t.Fatal(err)
@@ -151,8 +151,8 @@ func newParameterReadFixture(t *testing.T) (HistoryParameterService, *parameterR
 	expect := value.HistoryExpectation{RootID: f.svc.RootID, CaptureID: fixtureID(90), Registration: artifact.Registration{Location: artifact.Location{ClusterID: fixtureID(4), ArtifactID: fixtureID(91), AttemptID: fixtureID(92)}, StoreID: fixtureID(7), AllocationID: fixtureID(8), PoolRevision: 1, AllocationRevision: 1, NativeLimit: value.MaxHistoryParameters, AnchorAt: f.now, WriteUntil: f.now.Add(30 * time.Second), ExpiresAt: f.now.Add(time.Minute), DeleteBy: f.now.Add(70 * time.Second)}, SelectorKey: artifact.Digest{1}, SettingsKey: artifact.Digest{2}, MACVersion: "account-v1", OriginalExecutionDigest: artifact.Digest{3}}
 	h := &parameterReadFixture{f: f, originalBound: f.now.Add(2 * time.Second), storage: value.HistoryStorage{Expectation: expect, Origin: value.HistoryManual, State: "available", Target: f.target.Target(), SummaryExpiresAt: f.now.Add(time.Hour), Effective: privacy.Deadlines{AnchorAt: f.now, ExpiresAt: f.now.Add(time.Minute), DeleteBy: f.now.Add(70 * time.Second)}}}
 	h.params = value.HistoryParameters{Format: value.HistoryParametersFormat, Target: f.intent().Target, NamespaceUID: "ns", WorkloadUID: "deployment", Diagnostic: value.ContextDiagnosticName, RecipeJSON: json.RawMessage(`{"actions":[]}`), DependencyJSON: json.RawMessage(`[]`), RequestedSeconds: 120, OriginalEffectiveSeconds: 60, OriginalExecutionDigest: artifact.Digest{3}}
-	svc := HistoryParameterService{RootID: f.svc.RootID, InstallationID: f.svc.InstallationID, Ledger: h, Regional: h, Codec: h, Keys: mac, Recovery: f, Retention: h, Limits: value.DefaultHistoryLimits(), Now: func() time.Time { return f.now }, NewID: func() string { return fixtureID(93) }}
-	return svc, h, value.SettingsQuery{RootID: f.svc.RootID, CaptureID: expect.CaptureID, Identity: i, Recovery: r}
+	svc := HistoryParameterService{RootID: f.svc.RootID, InstallationID: f.svc.InstallationID, Ledger: h, Regional: h, Codec: h, Keys: mac, Retention: h, Limits: value.DefaultHistoryLimits(), Now: func() time.Time { return f.now }, NewID: func() string { return fixtureID(93) }}
+	return svc, h, value.SettingsQuery{RootID: f.svc.RootID, CaptureID: expect.CaptureID, Identity: i}
 }
 func TestHistoryReadUsesFinalExpiryAndOriginalSelectedSession(t *testing.T) {
 	svc, h, q := newParameterReadFixture(t)
@@ -228,7 +228,7 @@ func (h *retirementPageFixture) HistoryRetirementCandidates(_ context.Context, _
 	}
 	return page, nil
 }
-func (h *retirementPageFixture) ExpireHistorySummaries(context.Context, artifact.RecoveryProof) error {
+func (h *retirementPageFixture) ExpireHistorySummaries(context.Context) error {
 	return nil
 }
 func (h *retirementPageFixture) PrepareHistory(_ context.Context, cluster, captureID string) (fleetapp.HistorySession, error) {
@@ -246,7 +246,7 @@ func (h *retirementPageFixture) ClaimHistoryDeletion(_ context.Context, in value
 	e.CaptureID = in.CaptureID
 	return value.HistoryDeletePermission{Authority: value.HistoryOperationAuthority{Expectation: e, Operation: "purge", RequestID: in.RequestID, ExecutorEpoch: in.ExecutorEpoch, StartedAt: h.f.now, NotAfter: h.originalBound, CopiesDigest: artifact.Digest{9}, DeletionFence: 1}}, nil
 }
-func (h *retirementPageFixture) FinishHistoryDeletion(_ context.Context, a value.HistoryOperationAuthority, c value.HistoryDeleteCompletion, _ artifact.RecoveryProof) error {
+func (h *retirementPageFixture) FinishHistoryDeletion(_ context.Context, a value.HistoryOperationAuthority, c value.HistoryDeleteCompletion) error {
 	if !c.Valid(a) {
 		return artifact.ErrIntegrity
 	}

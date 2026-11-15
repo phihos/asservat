@@ -1,12 +1,13 @@
 package analysis
 
 import (
-	value "asservat.local/asservat/internal/domain/analysis"
-	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/identity"
 	"context"
 	"testing"
 	"time"
+
+	value "asservat.local/asservat/internal/domain/analysis"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/identity"
 )
 
 type packetQueryCompilerFixture struct {
@@ -23,10 +24,10 @@ type packetQueryRoute struct {
 	candidate value.ContextProjectionCandidate
 }
 
-func (r packetQueryRoute) ResolveProjectionRoute(context.Context, string, string, identity.Identity, artifact.RecoveryProof) (value.ContextProjectionCandidate, error) {
+func (r packetQueryRoute) ResolveProjectionRoute(context.Context, string, string, identity.Identity) (value.ContextProjectionCandidate, error) {
 	return r.candidate, nil
 }
-func (r packetQueryRoute) ResolvePacketProjectionRoute(context.Context, string, string, identity.Identity, artifact.RecoveryProof) (value.ContextProjectionCandidate, error) {
+func (r packetQueryRoute) ResolvePacketProjectionRoute(context.Context, string, string, identity.Identity) (value.ContextProjectionCandidate, error) {
 	return r.candidate, nil
 }
 

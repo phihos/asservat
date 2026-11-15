@@ -83,7 +83,7 @@ func (q *Queries) ObserveFleetAdministration(ctx context.Context, arg ObserveFle
 }
 
 const readFleetTrust = `-- name: ReadFleetTrust :one
-SELECT installation_id, issuer_epoch, source_uid, source_generation, source_digest, suspended, recovery_blocked, observed_at, fresh_until FROM fleet_current_trust WHERE installation_id=$1
+SELECT installation_id, issuer_epoch, source_uid, source_generation, source_digest, suspended, observed_at, fresh_until FROM fleet_current_trust WHERE installation_id=$1
 `
 
 func (q *Queries) ReadFleetTrust(ctx context.Context, installationID pgtype.UUID) (FleetCurrentTrust, error) {
@@ -96,7 +96,6 @@ func (q *Queries) ReadFleetTrust(ctx context.Context, installationID pgtype.UUID
 		&i.SourceGeneration,
 		&i.SourceDigest,
 		&i.Suspended,
-		&i.RecoveryBlocked,
 		&i.ObservedAt,
 		&i.FreshUntil,
 	)
@@ -104,7 +103,7 @@ func (q *Queries) ReadFleetTrust(ctx context.Context, installationID pgtype.UUID
 }
 
 const shareFleetTrust = `-- name: ShareFleetTrust :one
-SELECT installation_id, issuer_epoch, source_uid, source_generation, source_digest, suspended, recovery_blocked, observed_at, fresh_until FROM fleet_current_trust WHERE installation_id=$1 FOR SHARE
+SELECT installation_id, issuer_epoch, source_uid, source_generation, source_digest, suspended, observed_at, fresh_until FROM fleet_current_trust WHERE installation_id=$1 FOR SHARE
 `
 
 func (q *Queries) ShareFleetTrust(ctx context.Context, installationID pgtype.UUID) (FleetCurrentTrust, error) {
@@ -117,7 +116,6 @@ func (q *Queries) ShareFleetTrust(ctx context.Context, installationID pgtype.UUI
 		&i.SourceGeneration,
 		&i.SourceDigest,
 		&i.Suspended,
-		&i.RecoveryBlocked,
 		&i.ObservedAt,
 		&i.FreshUntil,
 	)

@@ -52,7 +52,6 @@ type Admission struct {
 	// current initiator eligibility. Neither is inferred from source handles.
 	RecordingSave          *RecordingSaveAdmission
 	RepeatedFrom           *HistoryLineage
-	Recovery               artifact.RecoveryProof
 	RootID, IdempotencyKey string
 	SubmissionDigest       artifact.Digest
 	Plan                   planning.ContextPlan

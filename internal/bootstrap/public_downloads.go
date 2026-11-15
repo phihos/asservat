@@ -55,7 +55,7 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 	if p == nil || pc == nil || d.publicID == nil || d.Runtime == nil || d.workerIdentities == nil || !authorization.UUID(p.AuditStoreID) || !identity.Text(p.ArtifactKeyID, 128) || p.DownloadPlan.OutputLimit < 1 || p.DownloadPlan.ReadLimit < 1 || p.DownloadPlan.RequestLimit < 1 || p.DownloadPlan.DurationSeconds < 1 || p.DownloadPlan.DurationSeconds > 3600 {
 		return nil, &fixedStepError{"downloads/start", mounts.ErrUnavailable}
 	}
-	g := postgres.DownloadTransactionGuards{Retention: d.shared.guards.Retention, Recovery: d.shared.guards.Recovery}
+	g := d.shared.retention
 	sql := map[string]*pgxpool.Pool{}
 	for _, purpose := range []string{"download-session", "download-source", "download-audit", "download-plan", "worker-config-read", "download-worker", "download-worker-audit", "worker-enrollment", "worker-enrollment-audit", "worker-enrollment-activate", "native-owner", "download-key-bind", "native-key-bind", "download-stop", "download-stop-writer", "download-stop-ack"} {
 		pool, err := d.public.open(ctx, purpose)
@@ -81,7 +81,7 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 	}
 	// Reuse one protected policy observation across download checks. The raw
 	// reader remains independently current for privacy administration; this
-	// download-only view does not cache recovery, processing or human authority.
+	// download-only view does not cache processing or human authority.
 	policies, err := authapp.NewDownloadPolicyObservations(environment, time.Now)
 	if err != nil {
 		return nil, &fixedStepError{"downloads/policies", mounts.ErrUnavailable}
@@ -90,12 +90,12 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 	if err != nil {
 		return nil, &fixedStepError{"downloads/processing", err}
 	}
-	processingReads, err := postgres.NewProcessingReads(ctx, processing, root, d.shared.guards.Recovery)
+	processingReads, err := postgres.NewProcessingReads(ctx, processing, root, installation)
 	if err != nil {
 		return nil, &fixedStepError{"downloads/processingReads", mounts.ErrUnavailable}
 	}
 	gate := authapp.ContextDownloadAuthority{RootID: root, Identities: d.publicID.download, Permissions: pc.permissions, Catalog: pc.catalog, Retention: pc.retention,
-		Environment: authapp.CurrentDownloadEnvironment{RootID: root, InstallationID: installation, Policies: policies, Recovery: pc.recovery, Processing: processingReads, Now: time.Now}, Shares: pc.shares, Reviews: pc.reviews, RawResults: pc.grants, Now: time.Now}
+		Environment: authapp.CurrentDownloadEnvironment{RootID: root, InstallationID: installation, Policies: policies, Processing: processingReads, Now: time.Now}, Shares: pc.shares, Reviews: pc.reviews, RawResults: pc.grants, Now: time.Now}
 
 	makeDownloads := func(purpose string) (*postgres.Downloads, error) {
 		return postgres.NewDownloads(ctx, sql[purpose], root, g)
@@ -112,19 +112,19 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 	if err != nil {
 		return nil, &fixedStepError{"downloads/audits", mounts.ErrUnavailable}
 	}
-	stops, err := postgres.NewDownloadStops(ctx, sql["download-stop"], root)
+	stops, err := postgres.NewDownloadStops(ctx, sql["download-stop"], root, "")
 	if err != nil {
 		return nil, &fixedStepError{"downloads/stops", mounts.ErrUnavailable}
 	}
-	stopWriter, err := postgres.NewDownloadStops(ctx, sql["download-stop-writer"], root, g.Recovery)
+	stopWriter, err := postgres.NewDownloadStops(ctx, sql["download-stop-writer"], root, installation)
 	if err != nil {
 		return nil, &fixedStepError{"downloads/stopWriter", mounts.ErrUnavailable}
 	}
-	stopAcks, err := postgres.NewDownloadStops(ctx, sql["download-stop-ack"], root, g.Recovery)
+	stopAcks, err := postgres.NewDownloadStops(ctx, sql["download-stop-ack"], root, installation)
 	if err != nil {
 		return nil, &fixedStepError{"downloads/stopAcks", mounts.ErrUnavailable}
 	}
-	completions, err := postgres.NewDownloadStopLifecycles(ctx, sql["download-stop-writer"], root, g.Recovery)
+	completions, err := postgres.NewDownloadStopLifecycles(ctx, sql["download-stop-writer"], root, installation)
 	if err != nil {
 		return nil, &fixedStepError{"downloads/completions", mounts.ErrUnavailable}
 	}

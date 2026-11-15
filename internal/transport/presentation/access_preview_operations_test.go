@@ -40,9 +40,6 @@ func (f *previewOpsFixture) PreviewProjections(_ context.Context, r cfg.PreviewR
 	}
 	return out, nil
 }
-func (f *previewOpsFixture) RecoveryState(context.Context) (artifact.RecoveryProof, error) {
-	return artifact.RecoveryProof{InstallationID: previewInstallation, IssuerEpoch: previewInstallation, Revision: identity.Revision{UID: "r", Generation: 1, Digest: artifact.Digest{3}}, ObservedAt: f.now, FreshUntil: f.now.Add(5 * time.Second)}, nil
-}
 
 // DecodeAccessBindingSpec stands in for the Kubernetes adapter's schema
 // decoder (the operation contract has already applied the AccessBinding
@@ -82,7 +79,7 @@ func (f *previewOpsFixture) DecodePermissionSourceSpec(spec []byte) (cfg.Source,
 func newPreviewOps(t *testing.T) (*previewOpsFixture, *AccessPreviewOperations) {
 	f := &previewOpsFixture{now: time.Now().UTC(), groups: []string{"platform-admins"}, issuer: "https://id.example.invalid"}
 	f.cells = []cfg.PreviewCell{f.cell(cfg.OtherWorkloads, "team-a")}
-	service := authapp.AccessPreviewer{InstallationID: previewInstallation, Administrators: f, Projections: f, Decoder: f, Recovery: f, Clusters: []string{accessCluster}, Now: func() time.Time { return f.now }}
+	service := authapp.AccessPreviewer{InstallationID: previewInstallation, Administrators: f, Projections: f, Decoder: f, Clusters: []string{accessCluster}, Now: func() time.Time { return f.now }}
 	s, err := NewAccessPreviewOperations("https://asservat.example.invalid", func() time.Time { return f.now }, func() string { return "88888888-8888-4888-8888-888888888888" }, service)
 	if err != nil {
 		t.Fatal(err)

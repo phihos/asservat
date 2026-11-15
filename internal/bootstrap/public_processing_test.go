@@ -21,7 +21,6 @@ type processingSelectionFixture struct {
 	profiles auditvalue.AcceptedCapacityAuditProfiles
 	identity identity.Identity
 	policy   value.DownloadPolicy
-	recovery artifact.RecoveryProof
 	draft    *privacy.ProcessingDecision
 }
 
@@ -33,9 +32,6 @@ func (f *processingSelectionFixture) ResolveIdentity(context.Context) (identity.
 }
 func (f *processingSelectionFixture) DownloadPolicy(context.Context) (value.DownloadPolicy, error) {
 	return f.policy, nil
-}
-func (f *processingSelectionFixture) RecoveryState(context.Context) (artifact.RecoveryProof, error) {
-	return f.recovery, nil
 }
 func (f *processingSelectionFixture) PrepareProcessing(_ context.Context, _ value.ProcessingAuthority, draft privacy.ProcessingDecision) (privacy.ProcessingPrepared, error) {
 	f.draft = &draft
@@ -63,7 +59,6 @@ func TestPublicProcessingSelectsReservedReleasePolicyAndRetention(t *testing.T) 
 				policy: value.DownloadPolicy{RootID: root, InstallationID: root, RecoveryEpoch: root, Revision: rev,
 					ProtectionDigest: artifact.Digest{2}, PermittedRegions: []string{}, Paths: []artifact.DownloadPath{}, Clients: []value.DownloadClient{},
 					Operators: []value.ProcessingOperator{{Issuer: principal.Issuer, ClientID: principal.ClientID, Kind: "User", ID: principal.Subject}}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)},
-				recovery: artifact.RecoveryProof{InstallationID: root, IssuerEpoch: root, Revision: rev, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)},
 			}
 			lane := func(name, layout string, retained int64) auditvalue.CapacityAuditProfile {
 				q := auditvalue.OperationHistoryQualification{ID: root, Digest: artifact.Digest{1}, Layout: layout, MaximumRowFootprintBytes: 128 << 10, MaximumTransitionWALBytes: 128 << 10, BackupCopies: 1, WALCopies: 1}
@@ -80,7 +75,7 @@ func TestPublicProcessingSelectsReservedReleasePolicyAndRetention(t *testing.T) 
 				t.Fatal(err)
 			}
 			defer mac.Close()
-			s := publicProcessingChanges{root: root, installation: root, profiles: f, policies: f, recovery: f, decisions: f, audit: f, releaseAudit: f, mac: mac}
+			s := publicProcessingChanges{root: root, installation: root, profiles: f, policies: f, decisions: f, audit: f, releaseAudit: f, mac: mac}
 			change := value.ProcessingChange{RequestID: root, Action: action}
 			if action != "initialize_processing" {
 				change.RuleID = "00000000-0000-4000-8000-000000000002"
@@ -144,23 +139,18 @@ func (f *processingRefusalFixture) DownloadPolicy(ctx context.Context) (value.Do
 	f.read(ctx, "policy")
 	return f.policy, nil
 }
-func (f *processingRefusalFixture) RecoveryState(ctx context.Context) (artifact.RecoveryProof, error) {
-	f.read(ctx, "recovery")
-	return artifact.RecoveryProof{}, nil
-}
 
 func TestPublicProcessingRefusalKeepsOriginalRequest(t *testing.T) {
 	for _, test := range []struct {
 		name, cancelAt string
 		reads          int
 	}{
-		{"current", "", 3},
-		{"uncapped-parent", "", 3},
+		{"current", "", 2},
+		{"uncapped-parent", "", 2},
 		{"already-cancelled", "before", 0},
 		{"already-expired", "expired", 0},
 		{"cancelled-after-identity", "identity", 1},
 		{"cancelled-after-policy", "policy", 2},
-		{"cancelled-after-recovery", "recovery", 3},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			now := time.Now()
@@ -188,7 +178,7 @@ func TestPublicProcessingRefusalKeepsOriginalRequest(t *testing.T) {
 					ProtectionDigest: artifact.Digest{2}, PermittedRegions: []string{}, Paths: []artifact.DownloadPath{}, Clients: []value.DownloadClient{},
 					Operators:  []value.ProcessingOperator{{Issuer: principal.Issuer, ClientID: principal.ClientID, Kind: "User", ID: principal.Subject}},
 					ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}}
-			s := publicProcessingChanges{root: root, installation: root, policies: f, recovery: f, refused: func(string) {}}
+			s := publicProcessingChanges{root: root, installation: root, policies: f, refused: func(string) {}}
 			want := "request"
 			if test.cancelAt == "" {
 				want = "change"

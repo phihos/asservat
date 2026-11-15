@@ -57,8 +57,7 @@ func (s CaptureEligibility) ContextEligibilityCurrent(ctx context.Context, curre
 	fresh.ValidUntil = identity.Earlier(fresh.ValidUntil, i.ValidUntil)
 	out := value.PolicyContextEligibility(fresh, accepted.Authority, p, target, s.Now())
 	if out.Eligible {
-		// Recovery is checked by every effect transaction itself; the policy's
-		// own bound is its source observation and expiry (ADR-228).
+		// The policy's own bound is its source observation and expiry (ADR-228).
 		out.ValidUntil = identity.Earlier(out.ValidUntil, accepted.SourceUntil)
 		if !s.Now().Before(out.ValidUntil) {
 			return deny("AutomationUnavailable")

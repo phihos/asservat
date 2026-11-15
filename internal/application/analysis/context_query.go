@@ -30,11 +30,10 @@ type ContextProjectionResults struct {
 }
 
 type ContextProjectionService struct {
-	Results  ContextProjectionResults
-	Recovery ContextProjectionRecovery
-	Routes   ContextProjectionRoutes
-	Plans    ContextQueryPlans
-	Workers  ContextProjectionWorkerAdmission
+	Results ContextProjectionResults
+	Routes  ContextProjectionRoutes
+	Plans   ContextQueryPlans
+	Workers ContextProjectionWorkerAdmission
 	// HeaderRoutes, when composed, admits get_http_headers (ADR-282).
 	HeaderRoutes ContextProjectionRouteReader
 	// ProfileRoutes is opt-in; production composition remains disabled.
@@ -444,7 +443,7 @@ func (o *projectionRequest) cut(err error) error {
 
 // One completed authorization belongs to this exact request. Later helpers
 // validate its original cutoff and scope locally; transactional effects still
-// enforce current SQL permission, recovery, retention and processing state.
+// enforce current SQL permission, retention and processing state.
 // A new poll creates a new owner and performs its own complete authorization.
 func (o *projectionRequest) CheckCurrent(ctx context.Context) (value.ContextProjectionAuthority, error) {
 	checked, cancel, err := o.context(ctx)
@@ -493,8 +492,8 @@ func (s ContextProjectionService) BeginExcerpt(ctx context.Context, current iden
 	var d *ContextProjectionDelivery
 	err := queryStepped("configuration", value.ErrUnavailable)
 	if selection.Valid() && s.Routes != nil {
-		d, err = s.begin(ctx, current, invocation, "get_file_excerpt", ContextQueryInput{Selection: selection}, func(ctx context.Context, caller identity.Identity, recovery artifact.RecoveryProof) (value.ContextProjectionCandidate, error) {
-			c, err := s.Routes.ResolveContextProjection(ctx, selection, caller, recovery)
+		d, err = s.begin(ctx, current, invocation, "get_file_excerpt", ContextQueryInput{Selection: selection}, func(ctx context.Context, caller identity.Identity) (value.ContextProjectionCandidate, error) {
+			c, err := s.Routes.ResolveContextProjection(ctx, selection, caller)
 			if err != nil || c.CaseID != selection.CaseID || c.ArtifactID != selection.ArtifactID || c.Selection != selection.Selection || c.NativeType != artifact.PodStatusArtifact {
 				return value.ContextProjectionCandidate{}, errors.Join(value.ErrUnavailable, err)
 			}
@@ -506,11 +505,11 @@ func (s ContextProjectionService) BeginExcerpt(ctx context.Context, current iden
 }
 
 // begin admits one approved query for tool: the caller's route resolves
-// the content-minimized candidate after recovery; C-03 then resolves the
+// the content-minimized candidate; C-03 then resolves the
 // exact current scope and the query is admitted, its worker dispatched and
 // the pending handle prepared.
-func (s ContextProjectionService) begin(ctx context.Context, current identities.CurrentIdentity, invocation ContextQueryInvocation, tool string, input ContextQueryInput, route func(context.Context, identity.Identity, artifact.RecoveryProof) (value.ContextProjectionCandidate, error)) (*ContextProjectionDelivery, error) {
-	if s.Recovery == nil || s.Plans == nil || s.Workers == nil || route == nil {
+func (s ContextProjectionService) begin(ctx context.Context, current identities.CurrentIdentity, invocation ContextQueryInvocation, tool string, input ContextQueryInput, route func(context.Context, identity.Identity) (value.ContextProjectionCandidate, error)) (*ContextProjectionDelivery, error) {
+	if s.Plans == nil || s.Workers == nil || route == nil {
 		return nil, queryStepped("configuration", value.ErrUnavailable)
 	}
 	o, err := s.Results.request(ctx, current, invocation, tool)
@@ -525,10 +524,6 @@ func (s ContextProjectionService) begin(ctx context.Context, current identities.
 	}()
 	if err = invocation.CheckInput(o.ctx, input); err != nil {
 		return nil, queryStepped("input", value.ErrUnavailable)
-	}
-	recovery, err := s.Recovery.RecoveryState(o.ctx)
-	if err != nil || !recovery.Valid(s.Results.Now()) || recovery.InstallationID != s.Results.InstallationID || !o.shorten("recovery", recovery.FreshUntil) {
-		return nil, queryCollapsed("recovery", value.ErrUnavailable, err)
 	}
 	var invocationKey value.ContextQueryInvocationKey
 	if input.PacketQuery.Valid() || input.RawSyscalls.Valid() || input.RawLogs.Valid() {
@@ -559,13 +554,13 @@ func (s ContextProjectionService) begin(ctx context.Context, current identities.
 			return d, nil
 		}
 	}
-	candidate, err := route(o.ctx, o.initial, recovery)
+	candidate, err := route(o.ctx, o.initial)
 	if err != nil || !candidate.Valid() || candidate.RootID != s.Results.RootID || candidate.Principal != o.initial.Principal {
 		return nil, queryCollapsed("route", value.ErrUnavailable, err)
 	}
 	a, err := s.Results.Authority.ResolveProjectionCurrent(o.ctx, current, candidate)
 	if err != nil || !a.Valid(s.Results.Now()) || a.Scope.Candidate() != candidate || a.Scope.BeginTool() != tool || a.Environment.InstallationID != s.Results.InstallationID ||
-		a.Environment.Recovery.IssuerEpoch != recovery.IssuerEpoch || a.Environment.Recovery.Revision != recovery.Revision || a.IdentityRevision != o.initial.Policy || !o.shorten("resolved-authority/"+a.Bound, a.ValidUntil) {
+		a.IdentityRevision != o.initial.Policy || !o.shorten("resolved-authority/"+a.Bound, a.ValidUntil) {
 		refusal := queryCollapsed("authority", value.ErrUnavailable, err)
 		if tool == "pcap_query" {
 			var proof interface{ PacketQueryApprovalRequired() bool }

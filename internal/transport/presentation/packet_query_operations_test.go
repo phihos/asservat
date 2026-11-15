@@ -63,7 +63,7 @@ func (p packetBridgePort) PermitQuery(ctx context.Context, q value.ContextQuery,
 	return p.bridgeFixture.PermitQuery(ctx, q, r, a)
 }
 
-func (f packetBridgePort) ResolvePacketProjectionRoute(context.Context, string, string, identity.Identity, artifact.RecoveryProof) (value.ContextProjectionCandidate, error) {
+func (f packetBridgePort) ResolvePacketProjectionRoute(context.Context, string, string, identity.Identity) (value.ContextProjectionCandidate, error) {
 	return f.a.Scope.Candidate(), nil
 }
 func (f packetBridgePort) LookupQueryInvocation(_ context.Context, _ identity.Principal, key string, digest artifact.Digest) (value.ContextQuery, bool, error) {

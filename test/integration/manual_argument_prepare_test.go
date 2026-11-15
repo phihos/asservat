@@ -61,7 +61,7 @@ func manualArgumentSQLComposition(t *testing.T, target targets.PodResolution) pl
 // no node collector runs and no fixture row directly supplies observation spend.
 func qualifyManualArgumentPreparation(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, s captureAdmissionScenario) {
 	t.Helper()
-	guards := postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard}
+	guards := s.retention.guard
 	duty := func(purpose string) *pgxpool.Pool {
 		t.Helper()
 		// custodyID has a shared prefix; each compiled duty needs its own role.
@@ -102,7 +102,7 @@ func qualifyManualArgumentPreparation(t *testing.T, ctx context.Context, admin *
 	if err != nil || argumentRules == planning.RecorderAssessmentRulesDigest() {
 		t.Fatal("argument assessment rules", err)
 	}
-	p := capture.ContextPreview{ID: custodyID(), AssessmentID: custodyID(), AssessmentRulesDigest: argumentRules, RootID: s.a.RootID, InstallationID: s.a.Recovery.InstallationID, IssuerEpoch: s.a.Recovery.IssuerEpoch, CaptureID: in.CaptureID, CaseID: s.a.CaseID, OccurrenceID: s.a.OccurrenceID, ArtifactID: s.a.Registration.Location.ArtifactID, AttemptID: s.a.Registration.Location.AttemptID, Actor: in.Executor, ExecutionClass: artifact.ContextAPIExecution,
+	p := capture.ContextPreview{ID: custodyID(), AssessmentID: custodyID(), AssessmentRulesDigest: argumentRules, RootID: s.a.RootID, InstallationID: s.recovery.installation, CaptureID: in.CaptureID, CaseID: s.a.CaseID, OccurrenceID: s.a.OccurrenceID, ArtifactID: s.a.Registration.Location.ArtifactID, AttemptID: s.a.Registration.Location.AttemptID, Actor: in.Executor, ExecutionClass: artifact.ContextAPIExecution,
 		Intent: capture.ContextIntent{Target: targets.WorkloadRequest{ClusterID: in.Target.Request.ClusterID, Namespace: in.Target.Request.Namespace.Name, Kind: in.Target.Request.Workload.Kind, Name: in.Target.Request.Workload.Name}, Composition: &composition, RequestedSeconds: in.Retention.RequestedSeconds}, Target: in.Target.Request, Pin: in.Target.Pin,
 		Storage: capture.ContextStorageSelection{StoreID: s.a.Registration.StoreID, AllocationID: s.a.Registration.AllocationID, PoolRevision: s.a.Registration.PoolRevision, AllocationRevision: s.a.Registration.AllocationRevision, BindingRevision: s.a.Storage.Revision}, Retention: capture.ContextRetentionReview{PurposeRef: in.Retention.PurposeRef, RequestedSeconds: in.Retention.RequestedSeconds, MaximumSeconds: in.Retention.MaximumSeconds, DeletionBudgetSeconds: in.Retention.DeletionBudgetSeconds, Policies: in.Retention.Policies}, Audience: s.a.Eligibility.DefaultAudience, CanonicalScope: reviewed.CanonicalScope, ScopeDigest: reviewed.ScopeDigest, CreatedAt: now, Deadline: oldDeadline}
 	previewPool := poolFor("context_preview_runtime", "synthetic-context-preview")
@@ -115,19 +115,19 @@ func qualifyManualArgumentPreparation(t *testing.T, ctx context.Context, admin *
 		t.Fatal("persist preview", err)
 	}
 	grantPool := duty(manualArgumentHubRolePurpose)
-	grants, err := postgres.NewAccessGrants(ctx, grantPool, s.a.RootID, s.recovery.guard)
+	grants, err := postgres.NewAccessGrants(ctx, grantPool, s.a.RootID, s.recovery.installation)
 	if err != nil {
 		t.Fatal(err)
 	}
 	g := authorization.Grant{ID: custodyID(), RootID: s.a.RootID, Kind: authorization.GrantAdHocCapture, PreviewID: p.ID, CaptureID: p.CaptureID, Target: in.Target.Target(), Requester: p.Actor, ExecutionDigest: p.ScopeDigest, Scope: p.CanonicalScope, Review: []byte(`{}`), DataClass: reviewed.Approval.DataClass, Reasons: reviewed.Approval.Reasons, Lifetime: time.Hour, Revision: 1}
 	g.ReviewDigest = authapp.ReviewDigest(g, g.Review)
-	g, _, err = grants.RequestGrant(ctx, authapp.StoredGrantRequest{Grant: g, IdempotencyKey: "approval", RequestDigest: sha256.Sum256([]byte("synthetic-request"))}, s.a.Recovery)
+	g, _, err = grants.RequestGrant(ctx, authapp.StoredGrantRequest{Grant: g, IdempotencyKey: "approval", RequestDigest: sha256.Sum256([]byte("synthetic-request"))})
 	if err != nil {
 		t.Fatal("persist grant", err)
 	}
 	approver := p.Actor
 	approver.Subject = "synthetic-independent-reviewer"
-	g, _, err = grants.DecideGrant(ctx, authapp.GrantDecisionInput{GrantID: g.ID, Approve: true, Approver: approver, Reason: "synthetic reviewed recording", ACR: "gold", AuthTime: time.Now().Add(-time.Second), IdempotencyKey: "approve"}, s.a.Recovery)
+	g, _, err = grants.DecideGrant(ctx, authapp.GrantDecisionInput{GrantID: g.ID, Approve: true, Approver: approver, Reason: "synthetic reviewed recording", ACR: "gold", AuthTime: time.Now().Add(-time.Second), IdempotencyKey: "approve"})
 	if err != nil {
 		t.Fatal("decision", err)
 	}
@@ -151,7 +151,7 @@ func qualifyManualArgumentPreparation(t *testing.T, ctx context.Context, admin *
 	if r.WriteUntil.After(r.ExpiresAt) {
 		r.WriteUntil = r.ExpiresAt
 	}
-	admissions, err := postgres.NewContextAdmissions(ctx, duty(manualArgumentAdmissionRolePurpose), s.a.RootID, guards)
+	admissions, err := postgres.NewContextAdmissions(ctx, duty(manualArgumentAdmissionRolePurpose), s.a.RootID, s.recovery.installation, guards)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -178,11 +178,11 @@ func qualifyManualArgumentPreparation(t *testing.T, ctx context.Context, admin *
 	}
 	// The installed hub aggregates execution; its retired standalone duty cannot issue a credential.
 	executionPool := grantPool
-	executions, err := postgres.NewAPIContextExecutions(ctx, executionPool, s.a.RootID, guards)
+	executions, err := postgres.NewAPIContextExecutions(ctx, executionPool, s.a.RootID, s.recovery.installation, guards)
 	if err != nil {
 		t.Fatal(err)
 	}
-	process := execution.APIProcessBinding{InstallationID: s.a.Recovery.InstallationID, ClusterID: in.Target.Request.ClusterID, IssuerEpoch: s.a.Recovery.IssuerEpoch, NamespaceUID: custodyID(), AccountUID: custodyID(), PodUID: custodyID(), ProcessEpoch: custodyID(), StartupDigest: artifact.Digest{1}, ImageDigest: e.CollectorImageDigest}
+	process := execution.APIProcessBinding{InstallationID: s.recovery.installation, ClusterID: in.Target.Request.ClusterID, IssuerEpoch: s.recovery.observation.issuer, NamespaceUID: custodyID(), AccountUID: custodyID(), PodUID: custodyID(), ProcessEpoch: custodyID(), StartupDigest: artifact.Digest{1}, ImageDigest: e.CollectorImageDigest}
 	source := targets.PacketSourceObservation{PodUID: e.PodUID, NodeUID: custodyID(), BootID: custodyID(), CollectorPodUID: custodyID(), CollectorEpoch: custodyID()}
 	refresh := func() executionapp.APIExecutionCheck {
 		t.Helper()
@@ -193,11 +193,7 @@ func qualifyManualArgumentPreparation(t *testing.T, ctx context.Context, admin *
 		}
 		verified := s.a.Eligibility.VerifiedIdentity
 		verified.VerifiedAt, verified.ValidUntil = n, n.Add(5*time.Second)
-		recovery, err := s.recovery.reader.RecoveryState(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
-		work, err := executions.ReadAPIContextWork(ctx, e.CaptureUID, verified, recovery)
+		work, err := executions.ReadAPIContextWork(ctx, e.CaptureUID, verified)
 		if err != nil {
 			t.Fatal("original approved API work", err)
 		}
@@ -223,13 +219,13 @@ func qualifyManualArgumentPreparation(t *testing.T, ctx context.Context, admin *
 		}
 		observed := execution.APIProcessObservation{Binding: process, CheckedAt: n, ValidUntil: n.Add(5 * time.Second)}
 		until := n.Add(5 * time.Second)
-		for _, d := range []time.Time{eligible.ValidUntil, plan.ValidUntil, recovery.FreshUntil, observed.ValidUntil} {
+		for _, d := range []time.Time{eligible.ValidUntil, plan.ValidUntil, observed.ValidUntil} {
 			if d.Before(until) {
 				until = d
 			}
 		}
 		checked := time.Now().UTC().Truncate(time.Microsecond)
-		check := executionapp.APIExecutionCheck{Work: work, Plan: plan, Eligibility: eligible, Recovery: recovery, Process: observed, CheckedAt: checked, ValidUntil: until}
+		check := executionapp.APIExecutionCheck{Work: work, Plan: plan, Eligibility: eligible, Process: observed, CheckedAt: checked, ValidUntil: until}
 		source.ObservedAt, source.FreshUntil = n, until
 		if !check.Valid(checked) || !source.Valid(checked) {
 			t.Fatal("manual argument fixture current check")

@@ -83,8 +83,6 @@ func TestQueryFreshRequestCannotResetOriginalBindings(t *testing.T) {
 		func(a *ContextProjectionAuthority) { a.Scope.Version[0]++ },
 		func(a *ContextProjectionAuthority) { a.Scope.Selection.LineStart++ },
 		func(a *ContextProjectionAuthority) { a.Environment.Path.ID = queryOtherID },
-		func(a *ContextProjectionAuthority) { a.Environment.Recovery.IssuerEpoch = queryOtherID },
-		func(a *ContextProjectionAuthority) { a.Environment.Recovery.Revision.Generation++ },
 		func(a *ContextProjectionAuthority) {
 			a.Scope.Principal.ClientID = "new-client"
 			a.Environment.Principal = a.Scope.Principal

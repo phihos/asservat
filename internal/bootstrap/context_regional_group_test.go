@@ -181,7 +181,7 @@ func newGroupRegionalFixture(t *testing.T, counts ...int) *groupRegionalFixture 
 	f := &groupRegionalFixture{regionalObservationFixture: base, capability: cap, retentionByPod: map[string]privacy.Resolution{}, human: base.identity, intents: map[string]auditvalue.CaptureIntent{}, queued: map[string]bool{}, records: map[string]execution.APIExecution{}, methods: map[string]int{}, ackBlocked: make(chan struct{}), releaseACK: make(chan struct{}), firstQueued: make(chan struct{})}
 	human := base.identity.Principal
 	owner := base.work.Accepted.Expectation.Audience[0]
-	authority := authorization.AcceptedPolicyAuthority{InstallationID: base.recovery.InstallationID, PolicyUID: "group-policy", Creator: human, ScopeDigest: artifact.Digest{9}, ClusterID: base.target.Request.ClusterID, NamespaceUID: base.target.Request.Namespace.UID, WorkloadUID: base.target.Request.Workload.UID, Delegation: identity.Revision{UID: owner.BasisUID, Generation: 1, Digest: artifact.Digest{1}}, Owners: []artifact.AudienceAssignment{owner}, Actions: []string{"packetCapture"}, Limits: authorization.AutomationLimits{MaxExecutions: 1, MaxBytes: 16 * artifact.RecordingNativeLimit}, IssuedAt: base.now.Add(-time.Minute), NotAfter: base.now.Add(time.Hour)}
+	authority := authorization.AcceptedPolicyAuthority{InstallationID: regionalObservationID(44), PolicyUID: "group-policy", Creator: human, ScopeDigest: artifact.Digest{9}, ClusterID: base.target.Request.ClusterID, NamespaceUID: base.target.Request.Namespace.UID, WorkloadUID: base.target.Request.Workload.UID, Delegation: identity.Revision{UID: owner.BasisUID, Generation: 1, Digest: artifact.Digest{1}}, Owners: []artifact.AudienceAssignment{owner}, Actions: []string{"packetCapture"}, Limits: authorization.AutomationLimits{MaxExecutions: 1, MaxBytes: 16 * artifact.RecordingNativeLimit}, IssuedAt: base.now.Add(-time.Minute), NotAfter: base.now.Add(time.Hour)}
 	authority.Executor = authorization.PolicyPrincipal(authority.InstallationID, authority.PolicyUID)
 	if !authority.Valid(base.now) {
 		t.Fatal("invalid synthetic reviewed policy")
@@ -297,7 +297,7 @@ func TestRegionalGroupChildReachesOriginalPreparation(t *testing.T) {
 			stream := &groupRegionalStream{regionalObservationStream: &regionalObservationStream{f: f.regionalObservationFixture, ctx: ctx}, group: f}
 			done := make(chan error, 1)
 			go func() { defer standby.Finish(); done <- standby.Serve(stream, time.Now) }()
-			start := RegionalAPIContextStart{Runner: executionapp.APIContextRunner{Read: f, Prepare: f, Record: f, Eligibility: f, Capabilities: f, Retention: groupRegionalRetention{f}, Recovery: f, Now: time.Now}, Signer: f, Router: router, Now: time.Now, Report: func(s string) { t.Log(s) }}
+			start := RegionalAPIContextStart{Runner: executionapp.APIContextRunner{Read: f, Prepare: f, Record: f, Eligibility: f, Capabilities: f, Retention: groupRegionalRetention{f}, Now: time.Now}, Signer: f, Router: router, Now: time.Now, Report: func(s string) { t.Log(s) }}
 			err = start.StartContext(ctx, current, f.work.Accepted.CaptureID)
 			cancel()
 			end()
@@ -315,9 +315,9 @@ func (f *groupRegionalFixture) Resolve(ctx context.Context, _ string) (identity.
 	}
 	return f.identity, ctx.Err()
 }
-func (f *groupRegionalFixture) ReadAPIContextWork(ctx context.Context, id string, who identity.Identity, recovery artifact.RecoveryProof) (executionapp.APIContextWork, error) {
+func (f *groupRegionalFixture) ReadAPIContextWork(ctx context.Context, id string, who identity.Identity) (executionapp.APIContextWork, error) {
 	if !f.complete {
-		return f.regionalObservationFixture.ReadAPIContextWork(ctx, id, who, recovery)
+		return f.regionalObservationFixture.ReadAPIContextWork(ctx, id, who)
 	}
 	for _, w := range f.works {
 		if w.Accepted.CaptureID == id && who.Principal == f.authority.Executor {
@@ -355,7 +355,7 @@ func (f *groupRegionalFixture) RecordAPIStart(ctx context.Context, c executionap
 	f.records[c.Work.Accepted.CaptureID] = r
 	return r, ctx.Err()
 }
-func (f *groupRegionalFixture) RecordAPIStoredCompletion(context.Context, execution.APIExecution, artifact.ContextWriterCompletion, execution.APIProcessObservation, artifact.RecoveryProof) (execution.APIExecution, error) {
+func (f *groupRegionalFixture) RecordAPIStoredCompletion(context.Context, execution.APIExecution, artifact.ContextWriterCompletion, execution.APIProcessObservation) (execution.APIExecution, error) {
 	panic("group route test must not claim stored bytes")
 }
 func (f *groupRegionalFixture) AcceptedPolicyAuthority(ctx context.Context, id string) (authorization.AcceptedPolicySnapshot, error) {
@@ -443,13 +443,12 @@ func TestRegionalGroupRouterQueuesEarlierChildWhileLastAuditBlocked(t *testing.T
 	}
 	defer router.Close()
 	f.router = router
-	regional := RegionalAPIContextStart{Runner: executionapp.APIContextRunner{Read: f, Prepare: f, Record: f, Eligibility: f, Capabilities: f, Retention: groupRegionalRetention{f}, Recovery: f, Now: time.Now}, Signer: f, Router: router, Now: time.Now, Report: func(s string) { t.Log(s) }}
+	regional := RegionalAPIContextStart{Runner: executionapp.APIContextRunner{Read: f, Prepare: f, Record: f, Eligibility: f, Capabilities: f, Retention: groupRegionalRetention{f}, Now: time.Now}, Signer: f, Router: router, Now: time.Now, Report: func(s string) { t.Log(s) }}
 	_, services := publicContextOperationFixture(t)
 	investigation := services.Investigation
 	investigation.RootID = regionalObservationID(41)
-	investigation.InstallationID = f.recovery.InstallationID
+	investigation.InstallationID = regionalObservationID(44)
 	investigation.Replay = f
-	investigation.Recovery = f
 	investigation.PolicyAccepted = f
 	investigation.RecordingSaveEnabled = true
 	investigation.Now = time.Now

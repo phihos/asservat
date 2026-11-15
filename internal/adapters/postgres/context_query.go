@@ -40,26 +40,26 @@ type ContextQueryWorkerGuard interface {
 }
 
 type ContextQueries struct {
-	ledger    *Ledger
-	root      string
-	retention *RetentionTransactionGuard
-	recovery  *RecoveryTransactionGuard
-	backing   ContextQueryBackingGuard
-	workers   ContextQueryWorkerGuard
+	ledger       *Ledger
+	root         string
+	installation string
+	retention    *RetentionTransactionGuard
+	backing      ContextQueryBackingGuard
+	workers      ContextQueryWorkerGuard
 }
 
 var _ app.ContextQueryLedger = (*ContextQueries)(nil)
 var _ app.ContextQueryReplayCalls = (*ContextQueries)(nil)
 
-func NewContextQueries(ctx context.Context, pool *pgxpool.Pool, root string, effects EffectTransactionGuards, backing ContextQueryBackingGuard, workers ContextQueryWorkerGuard) (*ContextQueries, error) {
-	if !authorization.UUID(root) || effects.Retention == nil || effects.Recovery == nil || effects.Retention.root != root || effects.Recovery.root != root || backing == nil {
+func NewContextQueries(ctx context.Context, pool *pgxpool.Pool, root, installation string, retention *RetentionTransactionGuard, backing ContextQueryBackingGuard, workers ContextQueryWorkerGuard) (*ContextQueries, error) {
+	if !authorization.UUID(root) || !authorization.UUID(installation) || retention == nil || retention.root != root || backing == nil {
 		return nil, value.ErrUnavailable
 	}
 	l, e := New(ctx, pool)
 	if e != nil {
 		return nil, value.ErrUnavailable
 	}
-	return &ContextQueries{ledger: l, root: root, retention: effects.Retention, recovery: effects.Recovery, backing: backing, workers: workers}, nil
+	return &ContextQueries{ledger: l, root: root, installation: installation, retention: retention, backing: backing, workers: workers}, nil
 }
 
 func queryJSON(v any) ([]byte, error) { return json.Marshal(v) }
@@ -79,7 +79,7 @@ func queryDecode(raw []byte, limit int, out any) error {
 }
 func queryFromRow(r custodydb.ContextQuery) (value.ContextQuery, error) {
 	var q value.ContextQuery
-	if queryDecode(r.Query, comparisonQueryBytes, &q) != nil || len(r.Query) > projectionQueryBytes(q) || !q.Valid() || q.ID != uid(r.ID) || q.Scope.RootID != uid(r.RootID) || q.OperationID != uid(r.OperationID) || q.WorkerID != uid(r.WorkerID) || q.Plan.AllocationID != uid(r.AllocationID) || q.Plan.AccountID != uid(r.AccountID) || q.BaselinePlan.AllocationID != uid(r.BaselineAllocationID) || q.RecoveryIssuerEpoch != uid(r.IssuerEpoch) || !q.CreatedAt.Equal(r.CreatedAt.Time) || !q.Deadline.Equal(r.Deadline.Time) || !q.CleanupUntil.Equal(r.CleanupUntil.Time) || !q.Plan.RetireBy.Equal(r.RetireBy.Time) || !bytes.Equal(principalKey(q.Scope.Principal), r.PrincipalKey) {
+	if queryDecode(r.Query, comparisonQueryBytes, &q) != nil || len(r.Query) > projectionQueryBytes(q) || !q.Valid() || q.ID != uid(r.ID) || q.Scope.RootID != uid(r.RootID) || q.OperationID != uid(r.OperationID) || q.WorkerID != uid(r.WorkerID) || q.Plan.AllocationID != uid(r.AllocationID) || q.Plan.AccountID != uid(r.AccountID) || q.BaselinePlan.AllocationID != uid(r.BaselineAllocationID) || !q.CreatedAt.Equal(r.CreatedAt.Time) || !q.Deadline.Equal(r.Deadline.Time) || !q.CleanupUntil.Equal(r.CleanupUntil.Time) || !q.Plan.RetireBy.Equal(r.RetireBy.Time) || !bytes.Equal(principalKey(q.Scope.Principal), r.PrincipalKey) {
 		return value.ContextQuery{}, value.ErrUnavailable
 	}
 	if q.InvocationKey == (value.ContextQueryInvocationKey{}) {
@@ -132,9 +132,9 @@ func (s *ContextQueries) current(ctx context.Context, query value.ContextQuery, 
 		})
 	}, func(callback context.Context) error {
 		return s.ledger.transaction(callback, func(tx *custodydb.Queries) error {
-			recovery, e := s.recovery.lock(callback, tx, s.root, authority.Environment.Recovery)
+			trust, e := currentTrust(callback, tx, s.installation)
 			if e != nil {
-				return queryRefusal("recovery-lock", e)
+				return queryRefusal("trust", e)
 			}
 			permissions, e := tx.LockPermissionStream(callback, id(s.root))
 			if e != nil {
@@ -157,14 +157,14 @@ func (s *ContextQueries) current(ctx context.Context, query value.ContextQuery, 
 				return queryRefusal("allocation-lock", e)
 			}
 			fence := func() error {
-				if e := s.fence(callback, tx, query, request, authority, topology, recovery, permissions, backing, allocation); e != nil {
+				if e := s.fence(callback, tx, query, request, authority, topology, trust, permissions, backing, allocation); e != nil {
 					return e
 				}
 				if query.Scope.Comparison == (value.ProfileComparisonWindow{}) {
 					return nil
 				}
 				baselineQuery, baselineAuthority := projectionQuerySource(query, authority, true)
-				return s.fence(callback, tx, baselineQuery, request, baselineAuthority, baselineTopology, recovery, permissions, backing, baselineAllocation)
+				return s.fence(callback, tx, baselineQuery, request, baselineAuthority, baselineTopology, trust, permissions, backing, baselineAllocation)
 			}
 			if e = fence(); e != nil {
 				return e
@@ -184,7 +184,7 @@ func (s *ContextQueries) current(ctx context.Context, query value.ContextQuery, 
 	return nil
 }
 
-func (s *ContextQueries) fence(ctx context.Context, tx *custodydb.Queries, q value.ContextQuery, r value.ContextQueryRequest, a value.ContextProjectionAuthority, topology privacy.PolicyTopology, recovery custodydb.FleetCurrentTrust, p custodydb.PermissionStream, b custodydb.ContextQueryBacking, allocation custodydb.ContextQueryAllocation) error {
+func (s *ContextQueries) fence(ctx context.Context, tx *custodydb.Queries, q value.ContextQuery, r value.ContextQueryRequest, a value.ContextProjectionAuthority, topology privacy.PolicyTopology, trust custodydb.FleetCurrentTrust, p custodydb.PermissionStream, b custodydb.ContextQueryBacking, allocation custodydb.ContextQueryAllocation) error {
 	now, e := tx.CurrentTime(ctx)
 	if e != nil {
 		return queryRefusal("fence-time", e)
@@ -217,7 +217,7 @@ func (s *ContextQueries) fence(ctx context.Context, tx *custodydb.Queries, q val
 		return queryRefusal("fence-retention", e)
 	}
 	expected := a.Environment.Processing
-	snapshot, processing, e := readProcessingSnapshot(ctx, tx, s.root, q.Plan.InstallationID, q.RecoveryIssuerEpoch, q.Scope.ArtifactID, expected.ObservedAt, expected.ValidUntil)
+	snapshot, processing, e := readProcessingSnapshot(ctx, tx, s.root, q.Plan.InstallationID, q.Scope.ArtifactID, expected.ObservedAt, expected.ValidUntil)
 	if e != nil {
 		return queryRefusal("fence-processing-read", e)
 	}
@@ -237,11 +237,8 @@ func (s *ContextQueries) fence(ctx context.Context, tx *custodydb.Queries, q val
 	if e != nil || !linked {
 		return queryRefusal("fence-case", nil)
 	}
-	if e = queryIntentFence(ctx, tx, r.Call, recovery); e != nil {
+	if e = queryIntentFence(ctx, tx, r.Call, trust); e != nil {
 		return queryRefusal("fence-intent", e)
-	}
-	if e = s.recovery.check(ctx, tx, recovery, s.root, a.Environment.Recovery); e != nil {
-		return queryRefusal("fence-recovery", e)
 	}
 	profileBody, e := queryJSON(q.Plan.Profile)
 	if e != nil {
@@ -326,7 +323,11 @@ func (s *ContextQueries) AdmitQuery(ctx context.Context, q value.ContextQuery, r
 		if e != nil {
 			return e
 		}
-		row, e := tx.InsertContextQuery(ctx, custodydb.InsertContextQueryParams{ID: id(q.ID), RootID: id(s.root), AllocationID: id(q.Plan.AllocationID), AccountID: id(q.Plan.AccountID), PrincipalKey: principalKey(q.Scope.Principal), Actor: actor, Query: raw, InitialRequest: initialRequest, OperationID: id(q.OperationID), WorkerID: id(q.WorkerID), CreatedAt: ts(q.CreatedAt), Deadline: ts(q.Deadline), CleanupUntil: ts(q.CleanupUntil), RetireBy: ts(q.Plan.RetireBy), IssuerEpoch: id(q.RecoveryIssuerEpoch), PostmasterAt: incarnation.PostmasterAt, DatabaseOid: incarnation.DatabaseOid, BaselineAllocationID: id(q.BaselinePlan.AllocationID), InvocationKey: nullableString(q.InvocationKey.Key), RequestDigest: queryInvocationDigest(q)})
+		trust, e := currentTrust(ctx, tx, s.installation)
+		if e != nil {
+			return e
+		}
+		row, e := tx.InsertContextQuery(ctx, custodydb.InsertContextQueryParams{ID: id(q.ID), RootID: id(s.root), AllocationID: id(q.Plan.AllocationID), AccountID: id(q.Plan.AccountID), PrincipalKey: principalKey(q.Scope.Principal), Actor: actor, Query: raw, InitialRequest: initialRequest, OperationID: id(q.OperationID), WorkerID: id(q.WorkerID), CreatedAt: ts(q.CreatedAt), Deadline: ts(q.Deadline), CleanupUntil: ts(q.CleanupUntil), RetireBy: ts(q.Plan.RetireBy), IssuerEpoch: trust.IssuerEpoch, PostmasterAt: incarnation.PostmasterAt, DatabaseOid: incarnation.DatabaseOid, BaselineAllocationID: id(q.BaselinePlan.AllocationID), InvocationKey: nullableString(q.InvocationKey.Key), RequestDigest: queryInvocationDigest(q)})
 		if e != nil {
 			return e
 		}

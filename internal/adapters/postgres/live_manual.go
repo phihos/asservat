@@ -78,33 +78,26 @@ func liveManualMatches(w app.APIContextWork, r value.APIExecution, now time.Time
 		now.Before(w.Accepted.Deadline) && now.Before(e.Registration.WriteUntil)
 }
 
-func (s *APIContextExecutions) withLiveManualRead(ctx context.Context, recovery artifact.RecoveryProof, read func(context.Context, *custodydb.Queries, time.Time, time.Time) (time.Time, error)) error {
-	if s == nil || s.ledger == nil || ctx == nil || ctx.Err() != nil || !recovery.Valid(time.Now()) {
+func (s *APIContextExecutions) withLiveManualRead(ctx context.Context, read func(context.Context, *custodydb.Queries, time.Time, time.Time) (time.Time, error)) error {
+	if s == nil || s.ledger == nil || ctx == nil || ctx.Err() != nil {
 		return value.ErrInvalid
 	}
-	call, stop := context.WithDeadline(ctx, identity.Earlier(time.Now().Add(5*time.Second), recovery.FreshUntil))
+	call, stop := context.WithDeadline(ctx, time.Now().Add(5*time.Second))
 	defer stop()
 	return s.ledger.transaction(call, func(q *custodydb.Queries) error {
 		first, err := q.CurrentTime(call)
 		if err != nil {
 			return err
 		}
-		until := identity.Earlier(first.Time.Add(5*time.Second), recovery.FreshUntil)
+		until := first.Time.Add(5 * time.Second)
 		if d, ok := call.Deadline(); ok {
 			until = identity.Earlier(until, d)
-		}
-		trust, err := s.guards.Recovery.lock(call, q, s.root, recovery)
-		if err != nil {
-			return err
 		}
 		if _, err = q.LockPermissionStream(call, id(s.root)); err != nil {
 			return err
 		}
 		until, err = read(call, q, first.Time, until)
 		if err != nil {
-			return err
-		}
-		if err = s.guards.Recovery.check(call, q, trust, s.root, recovery); err != nil {
 			return err
 		}
 		last, err := q.CurrentTime(call)
@@ -184,13 +177,13 @@ func recordingProgram(r *artifact.Recording) []artifact.FilterInstruction {
 	return r.Filter.Program
 }
 
-func (s *APIContextExecutions) ReadLiveManualWork(ctx context.Context, captures []string, recovery artifact.RecoveryProof) ([]app.LiveManualWork, error) {
+func (s *APIContextExecutions) ReadLiveManualWork(ctx context.Context, captures []string) ([]app.LiveManualWork, error) {
 	ids, valid := liveManualIDs(captures)
 	if !valid {
 		return nil, value.ErrInvalid
 	}
 	var out []app.LiveManualWork
-	err := s.withLiveManualRead(ctx, recovery, func(call context.Context, q *custodydb.Queries, at, until time.Time) (time.Time, error) {
+	err := s.withLiveManualRead(ctx, func(call context.Context, q *custodydb.Queries, at, until time.Time) (time.Time, error) {
 		rows, err := q.ReadLiveManualWorks(call, custodydb.ReadLiveManualWorksParams{RootID: id(s.root), CaptureIds: ids})
 		if err != nil {
 			return until, err
@@ -220,13 +213,13 @@ func (s *APIContextExecutions) ReadLiveManualWork(ctx context.Context, captures 
 	return out, nil
 }
 
-func (s *APIContextExecutions) ListLiveManualWork(ctx context.Context, target authorization.WorkloadTarget, after string, limit int, recovery artifact.RecoveryProof) ([]app.LiveManualWork, string, error) {
+func (s *APIContextExecutions) ListLiveManualWork(ctx context.Context, target authorization.WorkloadTarget, after string, limit int) ([]app.LiveManualWork, string, error) {
 	if !target.Valid() || after != "" && !authorization.UUID(after) || limit < 1 || limit > 100 {
 		return nil, "", value.ErrInvalid
 	}
 	var out []app.LiveManualWork
 	next := ""
-	err := s.withLiveManualRead(ctx, recovery, func(call context.Context, q *custodydb.Queries, at, until time.Time) (time.Time, error) {
+	err := s.withLiveManualRead(ctx, func(call context.Context, q *custodydb.Queries, at, until time.Time) (time.Time, error) {
 		rows, err := q.ListLiveManualWorks(call, custodydb.ListLiveManualWorksParams{RootID: id(s.root), AfterCaptureID: id(after), ClusterID: target.ClusterID, NamespaceUid: target.NamespaceUID, WorkloadUid: target.WorkloadUID, PageLimit: int32(limit + 1)})
 		if err != nil {
 			return until, err

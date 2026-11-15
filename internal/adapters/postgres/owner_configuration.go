@@ -13,7 +13,6 @@ import (
 	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/fleet"
-	"asservat.local/asservat/internal/domain/identity"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -65,27 +64,22 @@ func (s *OwnerConfigurations) ObserveOwnerConfiguration(ctx context.Context, o v
 	var rejected error
 	err = s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
 		receipt, ack, rejected = audit.Receipt{}, false, nil
-		trust, e := q.ShareFleetTrust(ctx, id(s.installation))
-		if e != nil {
-			return e
-		}
 		check := func() error {
 			n, e := q.CurrentTime(ctx)
 			if e != nil {
 				return e
 			}
-			r, e := recoveryState(trust, o.ObservedAt, n.Time)
-			if e != nil || !o.Valid(n.Time) || r.IssuerEpoch != c.Pool.IssuerEpoch {
+			if !o.Valid(n.Time) {
 				return value.ErrUnavailable
 			}
 			return nil
 		}
-		if e = check(); e != nil {
+		if e := check(); e != nil {
 			return e
 		}
 		// This provisional unavailable row is never externally visible. Existing
 		// failure rows keep their watermark and cannot be renewed at equal time.
-		_, e = q.InsertOwnerConfiguration(ctx, custodydb.InsertOwnerConfigurationParams{InstallationID: id(s.installation), ClusterID: id(s.cluster), SourceUid: id(s.source), ObservedAt: ts(o.ObservedAt.Add(-time.Microsecond))})
+		_, e := q.InsertOwnerConfiguration(ctx, custodydb.InsertOwnerConfigurationParams{InstallationID: id(s.installation), ClusterID: id(s.cluster), SourceUid: id(s.source), ObservedAt: ts(o.ObservedAt.Add(-time.Microsecond))})
 		if e != nil {
 			return e
 		}
@@ -161,10 +155,6 @@ func (s *OwnerConfigurations) FenceOwnerConfiguration(ctx context.Context, at ti
 	}
 	at = ownerTime(at)
 	return s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		// Negative observations remain possible while recovery is blocked.
-		if _, e := q.ShareFleetTrust(ctx, id(s.installation)); e != nil {
-			return e
-		}
 		n, e := q.CurrentTime(ctx)
 		if e != nil {
 			return e
@@ -248,10 +238,6 @@ func (s *OwnerConfigurations) ReadOwnerConfiguration(ctx context.Context) (value
 func (s *OwnerConfigurations) readOwnerConfiguration(ctx context.Context, q *custodydb.Queries, diagnostic *ownerConfigurationReadDiagnostic) (value.OwnerConfigurationObservation, error) {
 	var out value.OwnerConfigurationObservation
 	diagnostic.reset()
-	trust, e := q.ShareFleetTrust(ctx, id(s.installation))
-	if e != nil {
-		return out, diagnostic.query(ownerReadFleet, e)
-	}
 	h, e := q.ShareOwnerConfiguration(ctx, custodydb.ShareOwnerConfigurationParams{InstallationID: id(s.installation), ClusterID: id(s.cluster)})
 	if e != nil {
 		return out, diagnostic.query(ownerReadHead, e)
@@ -281,9 +267,6 @@ func (s *OwnerConfigurations) readOwnerConfiguration(ctx context.Context, q *cus
 	if c.Revision.Generation != h.Generation {
 		return out, diagnostic.reject(ownerReadSnapshotGeneration)
 	}
-	if c.Pool.IssuerEpoch != uid(trust.IssuerEpoch) {
-		return out, diagnostic.reject(ownerReadSnapshotIssuer)
-	}
 	if json.Unmarshal(v.AuditReceiptJson, &r) != nil {
 		return out, diagnostic.reject(ownerReadAuditDecode)
 	}
@@ -294,12 +277,7 @@ func (s *OwnerConfigurations) readOwnerConfiguration(ctx context.Context, q *cus
 	if e != nil {
 		return out, diagnostic.query(ownerReadClock, e)
 	}
-	recovery, e := recoveryState(trust, h.ObservedAt.Time, n.Time)
-	if e != nil {
-		*diagnostic = ownerReadRecoveryFailure(trust, h.ObservedAt.Time, n.Time)
-		return out, e
-	}
-	out = value.OwnerConfigurationObservation{Configuration: c, ObservedAt: h.ObservedAt.Time, FreshUntil: identity.Earlier(h.FreshUntil.Time, recovery.FreshUntil)}
+	out = value.OwnerConfigurationObservation{Configuration: c, ObservedAt: h.ObservedAt.Time, FreshUntil: h.FreshUntil.Time}
 	if !out.Valid(n.Time) {
 		*diagnostic = ownerReadObservationFailure(out, n.Time)
 		return out, value.ErrUnavailable

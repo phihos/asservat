@@ -11,7 +11,7 @@ import (
 // PublicRuntimeRoleRoot is a separate post-activation installer compartment.
 // Only an actual administrator and the original native namespace guard can
 // read/change it. It does not reuse or revive the retired initial manager.
-// No SQL privilege or recovery authority is derived from this Secret.
+// No SQL privilege or authority is derived from this Secret.
 type PublicRuntimeRoleRoot struct {
 	client         *PermissionClient
 	protection     *OwnerWorkloadProtection

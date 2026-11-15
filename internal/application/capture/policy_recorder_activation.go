@@ -63,7 +63,7 @@ func (s PolicyActivation) recorderPolicyBasis(ctx context.Context, author identi
 	return recorderPolicyBasis{target: target, delegation: delegation, envelope: envelope, owners: owners, until: identity.Earlier(rights.ValidUntil, envelope.FreshUntil)}, nil
 }
 
-func (s PolicyActivation) activateRecorderPolicy(ctx context.Context, author identity.Identity, recovery artifact.RecoveryProof, source value.PolicySource, compiled value.RestartPolicy, observed targets.RestartObservation, status value.PolicyStatus, nonce string, sharingReviewed bool, basis recorderPolicyBasis) (PolicyActivationResult, error) {
+func (s PolicyActivation) activateRecorderPolicy(ctx context.Context, author identity.Identity, source value.PolicySource, compiled value.RestartPolicy, observed targets.RestartObservation, status value.PolicyStatus, nonce string, sharingReviewed bool, basis recorderPolicyBasis) (PolicyActivationResult, error) {
 	var zero PolicyActivationResult
 	now := s.Now()
 	if !source.Valid(now) || !observed.Valid(now) || status.PolicyUID != source.Revision.UID || status.IntentVersion < 1 || !now.Before(basis.until) {
@@ -121,16 +121,16 @@ func (s PolicyActivation) activateRecorderPolicy(ctx context.Context, author ide
 	raw, _ := json.Marshal(submission)
 	submission.EnvelopeDigest = artifact.Digest(sha256.Sum256(raw))
 	until := identity.Earlier(now.Add(5*time.Second), author.ValidUntil)
-	for _, bound := range []time.Time{recovery.FreshUntil, source.FreshUntil, observed.FreshUntil, check.ValidUntil} {
+	for _, bound := range []time.Time{source.FreshUntil, observed.FreshUntil, check.ValidUntil} {
 		until = identity.Earlier(until, bound)
 	}
-	verification := value.SubmissionCheck{Submission: submission, RootID: s.RootID, InstallationID: s.InstallationID, IssuerEpoch: recovery.IssuerEpoch, KeyID: "hub-api-authenticated-session", TrustRevision: author.Policy, VerifiedAt: now, ValidUntil: until.UTC().Truncate(time.Microsecond)}
+	verification := value.SubmissionCheck{Submission: submission, RootID: s.RootID, InstallationID: s.InstallationID, KeyID: "hub-api-authenticated-session", TrustRevision: author.Policy, VerifiedAt: now, ValidUntil: until.UTC().Truncate(time.Microsecond)}
 	if ctx.Err() != nil || !now.Before(until) {
 		return zero, value.ErrChanged
 	}
 	call, cancel := context.WithDeadline(ctx, until)
 	defer cancel()
-	accepted, err := s.Acceptor.AcceptPolicy(call, value.PolicyAdmission{RootID: s.RootID, Submission: submission, Verification: verification, Author: author, Authority: authority, Workload: &target, Recovery: recovery, Sharing: sharing})
+	accepted, err := s.Acceptor.AcceptPolicy(call, value.PolicyAdmission{RootID: s.RootID, Submission: submission, Verification: verification, Author: author, Authority: authority, Workload: &target, Sharing: sharing})
 	if err != nil {
 		return zero, s.refused("accept", err)
 	}

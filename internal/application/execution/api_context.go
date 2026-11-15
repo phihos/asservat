@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/application/evidence"
-	fleetapp "asservat.local/asservat/internal/application/fleet"
 	identities "asservat.local/asservat/internal/application/identity"
 	compiler "asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -47,7 +46,6 @@ type APIExecutionCheck struct {
 	Work                  APIContextWork
 	Plan                  planning.ContextPlan
 	Eligibility           authorization.CaptureEligibility
-	Recovery              artifact.RecoveryProof
 	Process               value.APIProcessObservation
 	CheckedAt, ValidUntil time.Time
 	Initiator             *authorization.CaptureEligibility
@@ -56,14 +54,14 @@ type APIExecutionCheck struct {
 func (c APIExecutionCheck) Valid(now time.Time) bool {
 	w, e := c.Work, c.Work.Accepted.Expectation
 	t := c.Plan.Input.Target
-	return c.initiatorValid(now) && e.ExecutionClass == artifact.ContextAPIExecution && e.Validate() == nil && w.Accepted.State == capture.IntentAudited && w.Actor == c.Eligibility.Principal && c.Eligibility.VerifiedIdentity.Principal == w.Actor && c.Eligibility.Eligible && c.Eligibility.Target == t.Target() && c.Eligibility.VerifiedIdentity.Valid(now) && now.Before(c.Eligibility.ValidUntil) && compiler.VerifyContextPlan(c.Plan, now) && c.Plan.ScopeDigest == e.PlanDigest && c.Plan.Input.Executor == w.Actor && c.Plan.Input.CaptureID == e.CaptureUID && c.Plan.Input.Deadline.Equal(w.Accepted.Deadline) && t.Request == w.Target && t.Pin == w.Accepted.Pin && c.Process.Valid(now) && c.Process.Binding.ClusterID == e.Registration.Location.ClusterID && c.Process.Binding.InstallationID == c.Recovery.InstallationID && c.Process.Binding.IssuerEpoch == c.Recovery.IssuerEpoch && c.Recovery.Valid(now) && c.Plan.Input.Retention.Proof.Valid(now) && identity.Fresh(c.CheckedAt, c.ValidUntil, now, identity.AuthorityRecheckInterval) && !c.ValidUntil.After(c.Eligibility.ValidUntil) && !c.ValidUntil.After(c.Plan.ValidUntil) && !c.ValidUntil.After(c.Process.ValidUntil) && !c.ValidUntil.After(c.Recovery.FreshUntil) && now.Before(e.Registration.WriteUntil) && w.IntentDigest != (artifact.Digest{})
+	return c.initiatorValid(now) && e.ExecutionClass == artifact.ContextAPIExecution && e.Validate() == nil && w.Accepted.State == capture.IntentAudited && w.Actor == c.Eligibility.Principal && c.Eligibility.VerifiedIdentity.Principal == w.Actor && c.Eligibility.Eligible && c.Eligibility.Target == t.Target() && c.Eligibility.VerifiedIdentity.Valid(now) && now.Before(c.Eligibility.ValidUntil) && compiler.VerifyContextPlan(c.Plan, now) && c.Plan.ScopeDigest == e.PlanDigest && c.Plan.Input.Executor == w.Actor && c.Plan.Input.CaptureID == e.CaptureUID && c.Plan.Input.Deadline.Equal(w.Accepted.Deadline) && t.Request == w.Target && t.Pin == w.Accepted.Pin && c.Process.Valid(now) && c.Process.Binding.ClusterID == e.Registration.Location.ClusterID && c.Plan.Input.Retention.Proof.Valid(now) && identity.Fresh(c.CheckedAt, c.ValidUntil, now, identity.AuthorityRecheckInterval) && !c.ValidUntil.After(c.Eligibility.ValidUntil) && !c.ValidUntil.After(c.Plan.ValidUntil) && !c.ValidUntil.After(c.Process.ValidUntil) && now.Before(e.Registration.WriteUntil) && w.IntentDigest != (artifact.Digest{})
 }
 
 // Typed facets share one installed SQL credential and pool (ADR-217). Their
 // transaction checks remain; acquisition, audit, publication and unwrap stay
 // separate privileges and ports.
 type APIExecutionReader interface {
-	ReadAPIContextWork(context.Context, string, identity.Identity, artifact.RecoveryProof) (APIContextWork, error)
+	ReadAPIContextWork(context.Context, string, identity.Identity) (APIContextWork, error)
 }
 type APIExecutionPreparer interface {
 	PrepareAPIExecution(context.Context, APIExecutionCheck) (value.APIExecution, bool, error)
@@ -91,20 +89,20 @@ type APIExecutionRecorder interface {
 	RecordAPIOutcome(context.Context, value.APIExecution, value.APIProcessObservation) (value.APIExecution, error)
 }
 type APIStoredCompletionRecorder interface {
-	RecordAPIStoredCompletion(context.Context, value.APIExecution, artifact.ContextWriterCompletion, value.APIProcessObservation, artifact.RecoveryProof) (value.APIExecution, error)
+	RecordAPIStoredCompletion(context.Context, value.APIExecution, artifact.ContextWriterCompletion, value.APIProcessObservation) (value.APIExecution, error)
 }
 
 // APIStoredSnapshotCompletionRecorder commits authenticated final coverage
 // separately from the original accepted execution digest. Finite completion is
 // intentionally a different port and cannot accept source-window metadata.
 type APIStoredSnapshotCompletionRecorder interface {
-	RecordAPIStoredSnapshotCompletion(context.Context, value.APIExecution, artifact.ContextWriterCompletion, artifact.SourceSnapshotCoverage, value.APIProcessObservation, artifact.RecoveryProof) (value.APIExecution, error)
+	RecordAPIStoredSnapshotCompletion(context.Context, value.APIExecution, artifact.ContextWriterCompletion, artifact.SourceSnapshotCoverage, value.APIProcessObservation) (value.APIExecution, error)
 }
 
 // APISnapshotCancellationRecorder records joined snapshot/writer ownership;
 // enqueueing a cancellation is not sufficient for this terminal outcome.
 type APISnapshotCancellationRecorder interface {
-	RecordAPISnapshotCancellation(context.Context, value.APIExecution, artifact.SourceSnapshotCancellation, value.APIProcessObservation, artifact.RecoveryProof) (value.APIExecution, error)
+	RecordAPISnapshotCancellation(context.Context, value.APIExecution, artifact.SourceSnapshotCancellation, value.APIProcessObservation) (value.APIExecution, error)
 }
 
 type APIProcessReader interface {
@@ -136,7 +134,6 @@ type APIContextRunner struct {
 	Profiles interface {
 		ReadCatalogProfiles(context.Context, targets.PodResolution, []planning.ProfileRef) ([]planning.CatalogProfile, error)
 	}
-	Recovery  fleetapp.RecoveryReader
 	Output    evidence.ContextProducer
 	Collector ContextCollector
 	Now       func() time.Time
@@ -146,7 +143,7 @@ func APIExecutionDigest(r value.APIExecution) artifact.Digest {
 	b, _ := json.Marshal(r)
 	return artifact.Digest(sha256.Sum256(b))
 }
-func (s APIContextRunner) checkObserved(ctx context.Context, current identities.CurrentIdentity, w APIContextWork, original time.Time, capability *planning.ContextCapability, observedRecovery *artifact.RecoveryProof) (APIExecutionCheck, *targets.PacketSourceObservation, error) {
+func (s APIContextRunner) checkObserved(ctx context.Context, current identities.CurrentIdentity, w APIContextWork, original time.Time, capability *planning.ContextCapability) (APIExecutionCheck, *targets.PacketSourceObservation, error) {
 	var out APIExecutionCheck
 	var source *targets.PacketSourceObservation
 	start := s.Now().UTC().Truncate(time.Microsecond)
@@ -325,15 +322,6 @@ func (s APIContextRunner) checkObserved(ctx context.Context, current identities.
 			return out, nil, apiCheckStep{"Logs", value.ErrInvalid}
 		}
 	}
-	var recovery artifact.RecoveryProof
-	if observedRecovery != nil {
-		recovery = *observedRecovery
-	} else {
-		recovery, err = s.Recovery.RecoveryState(ctx)
-		if err != nil {
-			return out, nil, apiCheckStep{"Recovery", err}
-		}
-	}
 	process, err := s.Process.ReadAPIProcess(ctx)
 	if err != nil {
 		return out, nil, apiCheckStep{"Process", err}
@@ -342,7 +330,7 @@ func (s APIContextRunner) checkObserved(ctx context.Context, current identities.
 	if argumentRecording(w) && source != nil {
 		until = identity.Earlier(until, source.FreshUntil)
 	}
-	for _, d := range []time.Time{plan.ValidUntil, eligible.ValidUntil, recovery.FreshUntil, process.ValidUntil, e.Registration.WriteUntil} {
+	for _, d := range []time.Time{plan.ValidUntil, eligible.ValidUntil, process.ValidUntil, e.Registration.WriteUntil} {
 		until = identity.Earlier(until, d)
 	}
 	var initiating *authorization.CaptureEligibility
@@ -364,7 +352,7 @@ func (s APIContextRunner) checkObserved(ctx context.Context, current identities.
 		initiating = &ordinary
 		until = identity.Earlier(until, ordinary.ValidUntil)
 	}
-	out = APIExecutionCheck{Work: w, Plan: plan, Eligibility: eligible, Recovery: recovery, Process: process, CheckedAt: start, ValidUntil: until.UTC().Truncate(time.Microsecond), Initiator: initiating}
+	out = APIExecutionCheck{Work: w, Plan: plan, Eligibility: eligible, Process: process, CheckedAt: start, ValidUntil: until.UTC().Truncate(time.Microsecond), Initiator: initiating}
 	if err := out.current(ctx, s.Now()); err != nil {
 		return APIExecutionCheck{}, nil, err
 	}
@@ -388,7 +376,7 @@ func (c APIExecutionCheck) current(ctx context.Context, now time.Time) error {
 }
 
 func (s APIContextRunner) valid(ctx context.Context, current identities.CurrentIdentity, captureID string) bool {
-	return ctx != nil && current != nil && s.Read != nil && s.Prepare != nil && s.Record != nil && s.Process != nil && s.Targets != nil && s.Eligibility != nil && s.Capabilities != nil && s.Retention != nil && s.Recovery != nil && s.Output != nil && s.Collector != nil && s.Now != nil && authorization.UUID(captureID)
+	return ctx != nil && current != nil && s.Read != nil && s.Prepare != nil && s.Record != nil && s.Process != nil && s.Targets != nil && s.Eligibility != nil && s.Capabilities != nil && s.Retention != nil && s.Output != nil && s.Collector != nil && s.Now != nil && authorization.UUID(captureID)
 }
 
 // Execute starts only within the original request-owned identity interval. It
@@ -407,40 +395,36 @@ func (s APIContextRunner) Execute(ctx context.Context, current identities.Curren
 	original := identity.Earlier(i.ValidUntil, s.Now().Add(identity.AuthorityRecheckInterval)) // ADR-311
 	startCtx, stop := context.WithDeadline(ctx, original)
 	defer stop()
-	recovery, err := s.Recovery.RecoveryState(startCtx)
-	if err != nil {
-		return zero, executeStep{"RecoveryState", err}
-	}
-	w, err := s.Read.ReadAPIContextWork(startCtx, captureID, i, recovery)
+	w, err := s.Read.ReadAPIContextWork(startCtx, captureID, i)
 	if err != nil {
 		return zero, executeStep{"ReadAPIContextWork", err}
 	}
-	return s.execute(ctx, current, w, original, nil, nil)
+	return s.execute(ctx, current, w, original, nil)
 }
 
 // ExecuteObserved consumes the hub start's own already-read prelude. These are
 // local service values, never caller or regional wire authority. The caller
 // must retain the original narrowed context; no input is refreshed or cached.
-func (s APIContextRunner) ExecuteObserved(ctx context.Context, current identities.CurrentIdentity, caller identity.Identity, w APIContextWork, capability planning.ContextCapability, recovery artifact.RecoveryProof) (ContextResult, error) {
+func (s APIContextRunner) ExecuteObserved(ctx context.Context, current identities.CurrentIdentity, caller identity.Identity, w APIContextWork, capability planning.ContextCapability) (ContextResult, error) {
 	if !s.valid(ctx, current, w.Accepted.CaptureID) {
 		return ContextResult{}, executeStep{"start", value.ErrInvalid}
 	}
 	now := s.Now()
 	original, bounded := ctx.Deadline()
-	if !bounded || original.After(now.Add(identity.AuthorityRecheckInterval)) || ctx.Err() != nil || !now.Before(original) || !caller.Valid(now) || w.Actor != caller.Principal || w.Accepted.CaptureID != w.Accepted.Expectation.CaptureUID || !capability.Valid(now) || !recovery.Valid(now) {
+	if !bounded || original.After(now.Add(identity.AuthorityRecheckInterval)) || ctx.Err() != nil || !now.Before(original) || !caller.Valid(now) || w.Actor != caller.Principal || w.Accepted.CaptureID != w.Accepted.Expectation.CaptureUID || !capability.Valid(now) {
 		return ContextResult{}, executeStep{"start", value.ErrDenied}
 	}
-	for _, until := range []time.Time{caller.ValidUntil, capability.FreshUntil, recovery.FreshUntil} {
+	for _, until := range []time.Time{caller.ValidUntil, capability.FreshUntil} {
 		original = identity.Earlier(original, until)
 	}
-	return s.execute(ctx, current, w, original, &capability, &recovery)
+	return s.execute(ctx, current, w, original, &capability)
 }
 
-func (s APIContextRunner) execute(ctx context.Context, current identities.CurrentIdentity, w APIContextWork, original time.Time, capability *planning.ContextCapability, recovery *artifact.RecoveryProof) (ContextResult, error) {
+func (s APIContextRunner) execute(ctx context.Context, current identities.CurrentIdentity, w APIContextWork, original time.Time, capability *planning.ContextCapability) (ContextResult, error) {
 	var zero ContextResult
 	startCtx, stop := context.WithDeadline(ctx, original)
 	defer stop()
-	check, source, err := s.checkObserved(startCtx, current, w, original, capability, recovery)
+	check, source, err := s.checkObserved(startCtx, current, w, original, capability)
 	if err != nil {
 		// The check only reads; nothing was prepared or started. The runner
 		// never inspects a dependency's error: the composing start classifies
@@ -672,11 +656,7 @@ func (s APIContextRunner) finishAcquisition(ctx context.Context, w APIContextWor
 			return ContextResult{State: "Indeterminate"}, executeStep{"finish/complete-stored", value.ErrUnavailable}
 		}
 		result.CompletedAt = completion.StoredAt
-		currentRecovery, recoveryErr := s.Recovery.RecoveryState(ctx)
-		if recoveryErr != nil {
-			return ContextResult{State: "Indeterminate"}, executeStep{"finish/recovery", recoveryErr}
-		}
-		_, recordErr = completionRecorder.RecordAPIStoredCompletion(ctx, result, completion, process, currentRecovery)
+		_, recordErr = completionRecorder.RecordAPIStoredCompletion(ctx, result, completion, process)
 	} else {
 		prepared.Close()
 		_, recordErr = s.Record.RecordAPIOutcome(ctx, result, process)

@@ -46,7 +46,6 @@ func TestComparisonAuthorityMatchesDecodedOwnedBaseline(t *testing.T) {
 	// existing current checks retain the read's original deadline separately.
 	decoded.Baseline.CheckedAt = decoded.Baseline.CheckedAt.Add(time.Microsecond)
 	decoded.Baseline.Environment.ObservedAt = decoded.Baseline.Environment.ObservedAt.Add(time.Microsecond)
-	decoded.Baseline.Environment.Recovery.ObservedAt = decoded.Baseline.Environment.Recovery.ObservedAt.Add(time.Microsecond)
 	decoded.Baseline.Environment.Processing.ObservedAt = decoded.Baseline.Environment.Processing.ObservedAt.Add(time.Microsecond)
 	decoded.Baseline.Retention.ObservedAt = decoded.Baseline.Retention.ObservedAt.Add(time.Microsecond)
 	if !decoded.Valid(now.Add(time.Microsecond)) || !sameProjectionAuthority(a, decoded) {

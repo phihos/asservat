@@ -123,8 +123,7 @@ func TestPolicyArgumentObservationFixtureCompiles(t *testing.T) {
 func qualifyArgumentObservationCompanion(t *testing.T, ctx context.Context, admin, hub *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, s captureAdmissionScenario, admissions *postgres.ContextAdmissions, current *postgres.AutomationAuthorities, authority authorization.AcceptedPolicyAuthority, admission capture.Admission, accepted capture.Accepted, acceptance, grant string) {
 	t.Helper()
 	clock := func() time.Time { return time.Now().UTC().Truncate(time.Microsecond) }
-	guards := postgres.EffectTransactionGuards{Recovery: s.recovery.guard, Retention: s.retention.guard}
-	executions, err := postgres.NewAPIContextExecutions(ctx, hub, s.a.RootID, guards)
+	executions, err := postgres.NewAPIContextExecutions(ctx, hub, s.a.RootID, s.recovery.installation, s.retention.guard)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,7 +144,7 @@ func qualifyArgumentObservationCompanion(t *testing.T, ctx context.Context, admi
 	if e.NativeType != artifact.SyscallArgumentsArtifact || e.Recording == nil || e.Recording.Arguments == nil || e.DataClass != "raw" {
 		t.Fatal("actual argument expectation", e)
 	}
-	process := executionvalue.APIProcessBinding{InstallationID: authority.InstallationID, ClusterID: authority.ClusterID, IssuerEpoch: admission.Recovery.IssuerEpoch, NamespaceUID: custodyID(), AccountUID: custodyID(), PodUID: custodyID(), ProcessEpoch: custodyID(), StartupDigest: artifact.Digest{1}, ImageDigest: e.CollectorImageDigest}
+	process := executionvalue.APIProcessBinding{InstallationID: authority.InstallationID, ClusterID: authority.ClusterID, IssuerEpoch: s.recovery.observation.issuer, NamespaceUID: custodyID(), AccountUID: custodyID(), PodUID: custodyID(), ProcessEpoch: custodyID(), StartupDigest: artifact.Digest{1}, ImageDigest: e.CollectorImageDigest}
 	node, boot, collectorPod, epoch := custodyID(), custodyID(), custodyID(), custodyID()
 	var previewID string
 	if err := admin.QueryRow(ctx, `SELECT preview_id::text FROM context_capture WHERE root_id=$1 AND id=$2`, s.a.RootID, accepted.CaptureID).Scan(&previewID); err != nil {
@@ -168,19 +167,15 @@ func qualifyArgumentObservationCompanion(t *testing.T, ctx context.Context, admi
 		if !eligible.Eligible {
 			t.Fatal("companion accepted team eligibility", eligible.Reason)
 		}
-		recovery, err := s.recovery.reader.RecoveryState(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
 		if !replayChecked {
-			replay, found, err := admissions.LookupContextAdmission(ctx, capture.ReplayQuery{RootID: s.a.RootID, PreviewID: previewID, IdempotencyKey: admission.IdempotencyKey, SubmissionDigest: admission.SubmissionDigest, Identity: verified, Recovery: recovery})
+			replay, found, err := admissions.LookupContextAdmission(ctx, capture.ReplayQuery{RootID: s.a.RootID, PreviewID: previewID, IdempotencyKey: admission.IdempotencyKey, SubmissionDigest: admission.SubmissionDigest, Identity: verified})
 			if err != nil || !found || !replay.Replay || replay.CaptureID != accepted.CaptureID || replay.ScopeDigest != accepted.ScopeDigest || !replay.Deadline.Equal(accepted.Deadline) || replay.Expectation.Recording == nil || replay.Expectation.Recording.RequireApproval {
 				t.Fatal("actual raw policy admission replay with require-all false", found, err)
 			}
 			replayChecked = true
 			t.Log("actual raw policy admission replay retained capture/scope/deadline and require-all=false")
 		}
-		work, err := executions.ReadAPIContextWork(ctx, accepted.CaptureID, verified, recovery)
+		work, err := executions.ReadAPIContextWork(ctx, accepted.CaptureID, verified)
 		if err != nil {
 			t.Fatal("actual raw API work", err)
 		}
@@ -208,10 +203,10 @@ func qualifyArgumentObservationCompanion(t *testing.T, ctx context.Context, admi
 		observed := executionvalue.APIProcessObservation{Binding: process, CheckedAt: targetAt, ValidUntil: targetAt.Add(5 * time.Second)}
 		checked := clock()
 		until := checked.Add(5 * time.Second)
-		for _, bound := range []time.Time{eligible.ValidUntil, plan.ValidUntil, recovery.FreshUntil, observed.ValidUntil} {
+		for _, bound := range []time.Time{eligible.ValidUntil, plan.ValidUntil, observed.ValidUntil} {
 			until = identity.Earlier(until, bound)
 		}
-		check := executionapp.APIExecutionCheck{Work: work, Plan: plan, Eligibility: eligible, Recovery: recovery, Process: observed, CheckedAt: checked, ValidUntil: until}
+		check := executionapp.APIExecutionCheck{Work: work, Plan: plan, Eligibility: eligible, Process: observed, CheckedAt: checked, ValidUntil: until}
 		source := targets.PacketSourceObservation{PodUID: e.PodUID, NodeUID: node, BootID: boot, CollectorPodUID: collectorPod, CollectorEpoch: epoch, ObservedAt: targetAt, FreshUntil: until}
 		if !check.Valid(clock()) || !source.Valid(clock()) || source.FreshUntil.After(input.Target.FreshUntil) {
 			t.Fatal("assembled actual raw companion preflight invalid")
@@ -373,7 +368,7 @@ func qualifyArgumentObservationCompanion(t *testing.T, ctx context.Context, admi
 	})
 	verifierPool := poolFor(verifierRole, "synthetic-argument-verifier")
 	defer verifierPool.Close()
-	publications, err := postgres.NewContextPublications(ctx, verifierPool, s.a.RootID, guards)
+	publications, err := postgres.NewContextPublications(ctx, verifierPool, s.a.RootID, s.retention.guard)
 	if err != nil {
 		t.Fatal(err)
 	}

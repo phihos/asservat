@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	fleetapp "asservat.local/asservat/internal/application/fleet"
 	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
@@ -30,7 +29,6 @@ type PolicyDeactivation struct {
 	Documents              PolicyDocuments
 	Ledger                 PolicyDeactivationLedger
 	Permissions            PolicyPermissions
-	Recovery               fleetapp.RecoveryReader
 	Now                    func() time.Time
 }
 
@@ -42,7 +40,7 @@ type PolicyDeactivationResult struct {
 
 func (s PolicyDeactivation) Deactivate(ctx context.Context, current identities.CurrentIdentity, name string) (PolicyDeactivationResult, error) {
 	var zero PolicyDeactivationResult
-	if ctx == nil || current == nil || s.Documents == nil || s.Ledger == nil || s.Permissions == nil || s.Recovery == nil || s.Now == nil || !authorization.UUID(s.RootID) || !authorization.UUID(s.InstallationID) {
+	if ctx == nil || current == nil || s.Documents == nil || s.Ledger == nil || s.Permissions == nil || s.Now == nil || !authorization.UUID(s.RootID) || !authorization.UUID(s.InstallationID) {
 		return zero, value.ErrUnavailable
 	}
 	if !identity.Text(name, 253) {
@@ -53,10 +51,6 @@ func (s PolicyDeactivation) Deactivate(ctx context.Context, current identities.C
 	i, err := current.ResolveIdentity(ctx)
 	if err != nil || !i.Valid(s.Now()) || i.Principal.Kind != identity.Human {
 		return zero, value.ErrDenied
-	}
-	recovery, err := s.Recovery.RecoveryState(ctx)
-	if err != nil || recovery.InstallationID != s.InstallationID || !recovery.Valid(s.Now()) {
-		return zero, value.ErrUnavailable
 	}
 	source, _, err := s.Documents.ReadPolicy(ctx, name, "")
 	if err != nil {

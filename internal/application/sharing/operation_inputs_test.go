@@ -16,17 +16,17 @@ type observedOperationStore struct {
 	revokes   []Revocation
 }
 
-func (s *observedOperationStore) CreateShare(ctx context.Context, in Request, recovery artifact.RecoveryProof) (value.Share, bool, error) {
+func (s *observedOperationStore) CreateShare(ctx context.Context, in Request) (value.Share, bool, error) {
 	s.creates = append(s.creates, in)
-	return s.Store.CreateShare(ctx, in, recovery)
+	return s.Store.CreateShare(ctx, in)
 }
-func (s *observedOperationStore) TransferShare(ctx context.Context, in Transfer, recovery artifact.RecoveryProof) (value.Share, bool, error) {
+func (s *observedOperationStore) TransferShare(ctx context.Context, in Transfer) (value.Share, bool, error) {
 	s.transfers = append(s.transfers, in)
-	return s.Store.TransferShare(ctx, in, recovery)
+	return s.Store.TransferShare(ctx, in)
 }
-func (s *observedOperationStore) RevokeShare(ctx context.Context, in Revocation, recovery artifact.RecoveryProof) (value.Share, bool, error) {
+func (s *observedOperationStore) RevokeShare(ctx context.Context, in Revocation) (value.Share, bool, error) {
 	s.revokes = append(s.revokes, in)
-	return s.Store.RevokeShare(ctx, in, recovery)
+	return s.Store.RevokeShare(ctx, in)
 }
 
 // Every public invocation has another paid audit operation. That private ID
@@ -79,11 +79,11 @@ type observedPolicyOperations struct {
 func (s *observedPolicyOperations) PolicySharing(context.Context, string) (PolicySharing, error) {
 	return s.policy, nil
 }
-func (s *observedPolicyOperations) RevokePolicySharing(_ context.Context, in PolicyRevocation, _ artifact.RecoveryProof) (int, bool, error) {
+func (s *observedPolicyOperations) RevokePolicySharing(_ context.Context, in PolicyRevocation) (int, bool, error) {
 	s.changes = append(s.changes, in)
 	return 2, len(s.changes) > 1, nil
 }
-func (s *observedPolicyOperations) StopPolicySharing(_ context.Context, in PolicyRevocation, _ artifact.RecoveryProof) (bool, error) {
+func (s *observedPolicyOperations) StopPolicySharing(_ context.Context, in PolicyRevocation) (bool, error) {
 	s.changes = append(s.changes, in)
 	return len(s.changes) > 1, nil
 }

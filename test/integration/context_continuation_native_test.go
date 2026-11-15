@@ -95,7 +95,7 @@ func nativeContinuationApplicationServices(t *testing.T, ctx context.Context, n 
 	if err = config.ConfigureCaptureAuditBacking(ctx, postgres.CaptureAuditBacking{Pool: backing, Account: account, ValidUntil: now.Add(time.Hour)}, mac); err != nil {
 		t.Fatal("native capture audit backing", err)
 	}
-	admissions, err := postgres.NewAuditedContextAdmissions(ctx, roles["admit"], s.a.RootID, mac, postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard})
+	admissions, err := postgres.NewAuditedContextAdmissions(ctx, roles["admit"], s.a.RootID, s.recovery.installation, mac, s.retention.guard)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,13 +115,13 @@ func nativeContinuationApplicationServices(t *testing.T, ctx context.Context, n 
 	if err != nil {
 		t.Fatal(err)
 	}
-	processing, err := postgres.NewProcessingReads(ctx, pool("context_catalog_read_runtime", "synthetic-context-read"), s.a.RootID, s.recovery.guard)
+	processing, err := postgres.NewProcessingReads(ctx, pool("context_catalog_read_runtime", "synthetic-context-read"), s.a.RootID, s.recovery.installation)
 	if err != nil {
 		t.Fatal("current pre-collection processing reader", err)
 	}
 	publisher := auditapp.CaptureOperationPublication{RootID: s.a.RootID, Completed: completed, Journal: journal, Acknowledgements: ack, Writer: writer, Reader: &objectstore.OperationAuditObjects{Store: store, Seal: keys, Open: keys}, MAC: mac, Now: time.Now}
 
-	return captureapp.ContextInvestigation{RootID: s.a.RootID, InstallationID: s.recovery.installation, Previews: previews, Replay: admissions, Admission: admissions, Targets: n.resolver, Eligibility: authapp.Evaluator{Permissions: s.p, Now: time.Now}, Capabilities: nativeAPICapability{s.a.Plan.Input.Capability}, Retention: nativeAPIRetention{s.retention}, Storage: storage, Processing: processing, Recovery: s.recovery.reader, Lifetime: 30 * time.Second, Now: time.Now, NewID: custodyID}, publisher
+	return captureapp.ContextInvestigation{RootID: s.a.RootID, InstallationID: s.recovery.installation, Previews: previews, Replay: admissions, Admission: admissions, Targets: n.resolver, Eligibility: authapp.Evaluator{Permissions: s.p, Now: time.Now}, Capabilities: nativeAPICapability{s.a.Plan.Input.Capability}, Retention: nativeAPIRetention{s.retention}, Storage: storage, Processing: processing, Lifetime: 30 * time.Second, Now: time.Now, NewID: custodyID}, publisher
 }
 
 // Test-only boundary diagnostics report no identity, source, receipt or evidence

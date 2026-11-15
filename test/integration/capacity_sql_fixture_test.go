@@ -319,20 +319,6 @@ func (f *capacitySQLFixture) enroll(t *testing.T, cluster string, namespace cfg.
 	return e
 }
 
-// recoveryState reads the current recovery proof through the peer reader.
-func (f *capacitySQLFixture) recoveryState(t *testing.T) artifact.RecoveryProof {
-	t.Helper()
-	reader, err := postgres.NewRecoveryReader(f.ctx, f.fixturePool("peer_read_runtime", "synthetic-peer-read"), f.input.InstallationID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	proof, err := reader.RecoveryState(f.ctx)
-	if err != nil {
-		t.Fatal("actual recovery read", err)
-	}
-	return proof
-}
-
 // fund raises the per-workload share to at least bytes, keeping the burst
 // limit and evidence size above it for every fixture workload.
 func (f *capacitySQLFixture) fund(bytes int64) {

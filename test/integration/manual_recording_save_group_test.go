@@ -90,7 +90,7 @@ func prepareManualRecordingSaveGroup(t *testing.T, ctx context.Context, f *capac
 	})
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	first := parts[0]
-	parent := value.ContextPreview{ID: custodyID(), CaptureID: custodyID(), CaseID: custodyID(), AssessmentID: custodyID(), AssessmentRulesDigest: captureapp.RecordingSaveGroupAssessmentRulesDigest(), RootID: first.Admission.RootID, InstallationID: first.Preview.InstallationID, IssuerEpoch: first.Preview.IssuerEpoch, Actor: first.Preview.Actor, ExecutionClass: artifact.ContextAPIExecution, Storage: first.Preview.Storage, CreatedAt: now, SelectionUntil: now.Add(time.Minute), Group: &value.RecordingSaveGroupPreview{Executor: policy.Authority.Executor, PolicyName: policy.Source.Name, PolicyUID: policy.Authority.PolicyUID, ExecutionDigest: policy.Authority.ScopeDigest}}
+	parent := value.ContextPreview{ID: custodyID(), CaptureID: custodyID(), CaseID: custodyID(), AssessmentID: custodyID(), AssessmentRulesDigest: captureapp.RecordingSaveGroupAssessmentRulesDigest(), RootID: first.Admission.RootID, InstallationID: first.Preview.InstallationID, Actor: first.Preview.Actor, ExecutionClass: artifact.ContextAPIExecution, Storage: first.Preview.Storage, CreatedAt: now, SelectionUntil: now.Add(time.Minute), Group: &value.RecordingSaveGroupPreview{Executor: policy.Authority.Executor, PolicyName: policy.Source.Name, PolicyUID: policy.Authority.PolicyUID, ExecutionDigest: policy.Authority.ScopeDigest}}
 	parent.Target = first.Source.Target.Request
 	parent.Target.PodUID, parent.Target.PodName = "", ""
 	parent.Intent = value.ContextIntent{Target: targets.WorkloadRequest{ClusterID: parent.Target.ClusterID, Namespace: parent.Target.Namespace.Name, Kind: parent.Target.Workload.Kind, Name: parent.Target.Workload.Name}, RequestedSeconds: policy.Compiled.RetentionSeconds}
@@ -116,7 +116,7 @@ func prepareManualRecordingSaveGroup(t *testing.T, ctx context.Context, f *capac
 	if err != nil {
 		t.Fatal("full grouped source selection", err)
 	}
-	group := value.RecordingSaveGroupAdmission{RootID: parent.RootID, IdempotencyKey: "group-" + custodyID(), SubmissionDigest: captureapp.ContextRequestDigest(parent.ID), Recovery: first.Admission.Recovery}
+	group := value.RecordingSaveGroupAdmission{RootID: parent.RootID, IdempotencyKey: "group-" + custodyID(), SubmissionDigest: captureapp.ContextRequestDigest(parent.ID)}
 	for index := range parts {
 		part := &parts[index]
 		a := part.Admission
@@ -475,29 +475,25 @@ func qualifyManualRecordingSaveGroupMixedCancellation(t *testing.T, ctx context.
 		t.Fatal(err)
 	}
 	f.refreshBase(t)
-	recovery, err := policy.Scenario.recovery.reader.RecoveryState(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	human := pending.Admission.RecordingSave.Initiator.VerifiedIdentity
 	human.VerifiedAt, human.ValidUntil = now, now.Add(5*time.Second) // Explicit synthetic current identity, real SQL permissions below.
-	reader, err := postgres.NewContextProgressReads(ctx, f.roles["hub-runtime"], pending.Admission.RootID, policy.Scenario.recovery.guard)
+	reader, err := postgres.NewContextProgressReads(ctx, f.roles["hub-runtime"], pending.Admission.RootID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	query := value.ProgressQuery{RootID: pending.Admission.RootID, CaptureID: parent.CaptureID, Identity: human, Recovery: recovery}
+	query := value.ProgressQuery{RootID: pending.Admission.RootID, CaptureID: parent.CaptureID, Identity: human}
 	progress, err := reader.ReadContextProgress(ctx, query)
 	if err != nil || len(progress.Actions) != 2 {
 		t.Fatal("real parent progress before mixed cancellation", err)
 	}
-	guards := postgres.EffectTransactionGuards{Recovery: policy.Scenario.recovery.guard, Retention: policy.Scenario.retention.guard}
-	executions, err := postgres.NewAPIContextExecutions(ctx, f.roles["hub-runtime"], pending.Admission.RootID, guards)
+	guards := policy.Scenario.retention.guard
+	executions, err := postgres.NewAPIContextExecutions(ctx, f.roles["hub-runtime"], pending.Admission.RootID, policy.Authority.InstallationID, guards)
 	if err != nil {
 		t.Fatal(err)
 	}
 	checked := time.Now().UTC().Truncate(time.Microsecond)
-	check := value.CancellationCheck{RootID: pending.Admission.RootID, Identity: human, Recovery: recovery, CheckedAt: checked, ValidUntil: identity.Earlier(human.ValidUntil, recovery.FreshUntil), Request: value.CancellationRequest{CaptureID: parent.CaptureID, ExpectedRevision: progress.Revision, IdempotencyKey: "cancel-selected-group"}}
+	check := value.CancellationCheck{RootID: pending.Admission.RootID, Identity: human, CheckedAt: checked, ValidUntil: human.ValidUntil, Request: value.CancellationRequest{CaptureID: parent.CaptureID, ExpectedRevision: progress.Revision, IdempotencyKey: "cancel-selected-group"}}
 	decision, err := executions.RequestCaptureCancellation(ctx, check)
 	if err != nil || !decision.Decision.Requested {
 		t.Fatal("parent cancellation did not request only remaining child", err)
@@ -649,18 +645,18 @@ func newManualGroupHistoryService(t *testing.T, ctx context.Context, f *capacity
 	if err != nil {
 		t.Fatal(err)
 	}
-	guards := postgres.EffectTransactionGuards{Recovery: policy.Scenario.recovery.guard, Retention: policy.Scenario.retention.guard}
-	ledger, err := postgres.NewHistoryParameters(ctx, f.roles["hub-runtime"], root, guards)
+	guards := policy.Scenario.retention.guard
+	ledger, err := postgres.NewHistoryParameters(ctx, f.roles["hub-runtime"], root, installation, guards)
 	if err != nil {
 		mac.Close()
 		t.Fatal(err)
 	}
-	legacy, err := postgres.NewContextProgressReads(ctx, f.roles["hub-runtime"], root, policy.Scenario.recovery.guard)
+	legacy, err := postgres.NewContextProgressReads(ctx, f.roles["hub-runtime"], root)
 	if err != nil {
 		mac.Close()
 		t.Fatal(err)
 	}
-	service := captureapp.HistoryParameterService{RootID: root, InstallationID: installation, Ledger: ledger, Regional: manualGroupHistoryDispatcher{store: f.store}, Codec: objectstore.HistoryCodec{Sealer: f.keys, Opener: f.keys, Keys: mac}, Keys: mac, Recovery: policy.Scenario.recovery.reader, Retention: manualGroupHistoryRetention{fixture: policy.Scenario.retention}, Legacy: legacy, Limits: value.HistoryLimits{PerSelector: 10, PerInstallation: 100}, NewID: custodyID, Now: time.Now}
+	service := captureapp.HistoryParameterService{RootID: root, InstallationID: installation, Ledger: ledger, Regional: manualGroupHistoryDispatcher{store: f.store}, Codec: objectstore.HistoryCodec{Sealer: f.keys, Opener: f.keys, Keys: mac}, Keys: mac, Retention: manualGroupHistoryRetention{fixture: policy.Scenario.retention}, Legacy: legacy, Limits: value.HistoryLimits{PerSelector: 10, PerInstallation: 100}, NewID: custodyID, Now: time.Now}
 	return service, mac.Close
 }
 
@@ -683,19 +679,15 @@ func qualifyManualRecordingSaveGroupHistory(t *testing.T, ctx context.Context, f
 
 func assertManualGroupHistory(t *testing.T, ctx context.Context, f *capacitySQLFixture, policy policySourceAcceptedFixture, preview value.ContextPreview, accepted value.Accepted, human identity.Identity, draft value.HistoryParameters, service captureapp.HistoryParameterService) {
 	t.Helper()
-	recovery, err := policy.Scenario.recovery.reader.RecoveryState(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
 	selector, err := captureapp.HistorySelectorKey(service.Keys, preview.RootID, draft.Selector())
 	if err != nil {
 		t.Fatal(err)
 	}
-	page, err := service.ListCaptureHistory(ctx, value.HistoryQuery{RootID: preview.RootID, Target: authorization.WorkloadScope(policy.Authority.ClusterID, policy.Authority.NamespaceUID, policy.Authority.WorkloadUID), SelectorKey: selector, Origins: []value.HistoryOrigin{value.HistoryManual}, Limit: 20, Identity: human, Recovery: recovery})
+	page, err := service.ListCaptureHistory(ctx, value.HistoryQuery{RootID: preview.RootID, Target: authorization.WorkloadScope(policy.Authority.ClusterID, policy.Authority.NamespaceUID, policy.Authority.WorkloadUID), SelectorKey: selector, Origins: []value.HistoryOrigin{value.HistoryManual}, Limit: 20, Identity: human})
 	if err != nil || len(page.Entries) != 1 || page.Entries[0].CaptureID != accepted.CaptureID || page.Entries[0].Operation != "recordingSave" {
 		t.Fatal("group history duplicated children or lost parent", len(page.Entries), err)
 	}
-	settings, err := service.ReadCaptureSettings(ctx, value.SettingsQuery{RootID: preview.RootID, CaptureID: accepted.CaptureID, Identity: human, Recovery: recovery})
+	settings, err := service.ReadCaptureSettings(ctx, value.SettingsQuery{RootID: preview.RootID, CaptureID: accepted.CaptureID, Identity: human})
 	if err != nil || settings.RecordingSave == nil || settings.Selection != "recordingSelectionRequired" || !settings.AcceptedAt.Equal(accepted.CreatedAt) || settings.RecordingSave.PolicyExecutionDigest != policy.Authority.ScopeDigest {
 		t.Fatal("actual encrypted grouped settings lost original scope/time", err)
 	}
@@ -719,17 +711,13 @@ func manualGroupProofDeadline(group value.RecordingSaveGroupAdmission) time.Time
 func qualifyManualGroupCentralProgress(t *testing.T, ctx context.Context, f *capacitySQLFixture, policy policySourceAcceptedFixture, parent value.Accepted, human identity.Identity) {
 	t.Helper()
 	f.refreshBase(t)
-	recovery, err := policy.Scenario.recovery.reader.RecoveryState(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	human.VerifiedAt, human.ValidUntil = now, now.Add(5*time.Second)
-	reader, err := postgres.NewContextProgressReads(ctx, f.roles["hub-runtime"], policy.Scenario.a.RootID, policy.Scenario.recovery.guard)
+	reader, err := postgres.NewContextProgressReads(ctx, f.roles["hub-runtime"], policy.Scenario.a.RootID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	progress, err := reader.ReadContextProgress(ctx, value.ProgressQuery{RootID: policy.Scenario.a.RootID, CaptureID: parent.CaptureID, Identity: human, Recovery: recovery})
+	progress, err := reader.ReadContextProgress(ctx, value.ProgressQuery{RootID: policy.Scenario.a.RootID, CaptureID: parent.CaptureID, Identity: human})
 	if err != nil || len(progress.Actions) != 16 || progress.CaptureID != parent.CaptureID || progress.Phase == "Succeeded" || progress.CandidateArtifactID != "" {
 		t.Fatal("central-only parent progress lost real children or invented result", len(progress.Actions), progress.Phase, err)
 	}

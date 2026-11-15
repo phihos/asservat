@@ -69,7 +69,7 @@ func TestRegionalStartRepeatsNotStartedAttemptOnNextStandby(t *testing.T) {
 		go func() { defer standby.Finish(); done <- standby.Serve(serve, time.Now) }()
 	}
 	var reports []string
-	start := RegionalAPIContextStart{Runner: executionapp.APIContextRunner{Read: f, Prepare: f, Record: f, Eligibility: access.Evaluator{Permissions: f, Now: time.Now}, Capabilities: capability, Retention: regionalObservationRetention{f}, Recovery: f, Now: time.Now}, Signer: f, Router: router, Now: time.Now, Report: func(s string) { reports = append(reports, s) }}
+	start := RegionalAPIContextStart{Runner: executionapp.APIContextRunner{Read: f, Prepare: f, Record: f, Eligibility: access.Evaluator{Permissions: f, Now: time.Now}, Capabilities: capability, Retention: regionalObservationRetention{f}, Now: time.Now}, Signer: f, Router: router, Now: time.Now, Report: func(s string) { reports = append(reports, s) }}
 	err = start.StartContext(ctx, current, f.work.Accepted.CaptureID)
 	endResident()
 	for _, done := range served {

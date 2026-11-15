@@ -55,9 +55,9 @@ func TestConsoleProcessingReportWithBuiltPackage(t *testing.T) {
 	session := browser.SessionHandler{Origin: origin, Issuer: "https://identity.invalid", Sessions: sessions}
 	facts := &consoleReportFacts{rows: consoleReportRows(time.Now().UTC().Truncate(time.Microsecond)), intents: map[string]audit.OperationIntent{}, outcomes: map[string]audit.OperationOutcome{}}
 	rootID := consoleCaptureID(41)
-	report := &privacyapp.ProcessingReport{RootID: rootID, InstallationID: rootID, Policies: facts, Recovery: facts, Reports: facts, Now: time.Now}
+	report := &privacyapp.ProcessingReport{RootID: rootID, InstallationID: rootID, Policies: facts, Reports: facts, Now: time.Now}
 	processing, err := presentation.NewProcessingDiscoveryOperations(origin, time.Now, custodyID, privacyapp.ProcessingEvidenceDiscovery{
-		RootID: rootID, InstallationID: rootID, Policies: facts, Recovery: facts, Discovery: &facts.consoleProcessingFacts, Now: time.Now,
+		RootID: rootID, InstallationID: rootID, Policies: facts, Discovery: &facts.consoleProcessingFacts, Now: time.Now,
 	}, nil, report)
 	if err != nil {
 		t.Fatal(err)

@@ -11,7 +11,7 @@ import (
 // hub metadata reader supplies the retention sources and retained catalog,
 // and the observed EvidenceRetentionPolicy schema decodes proposals.
 func composePublicRetentionPreview(c PublicContextOperationsConfig, s PublicContextOperationServices, pc *publicContext) (*presentation.RetentionPreviewOperations, error) {
-	v, err := composePublicContextUseCases(c, s)
+	_, err := composePublicContextUseCases(c, s)
 	if err != nil || pc == nil || pc.administrators == nil || pc.retentionSources == nil {
 		return nil, presentation.ErrOperationsConfiguration
 	}
@@ -19,6 +19,6 @@ func composePublicRetentionPreview(c PublicContextOperationsConfig, s PublicCont
 	if err != nil {
 		return nil, presentation.ErrOperationsConfiguration
 	}
-	service := privacyapp.RetentionPreviewer{InstallationID: c.InstallationID, Administrators: pc.administrators, Catalog: pc.retentionSources, Decoder: decoder, Recovery: v.submission.Recovery, Now: c.Now}
+	service := privacyapp.RetentionPreviewer{InstallationID: c.InstallationID, Administrators: pc.administrators, Catalog: pc.retentionSources, Decoder: decoder, Now: c.Now}
 	return presentation.NewRetentionPreviewOperations(c.PublicOrigin, c.Now, c.NewID, service)
 }

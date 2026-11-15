@@ -8,10 +8,19 @@ import (
 )
 
 // This private mechanism is not a runtime authority provider or selected input
-// profile. The installed coordinator must perform current native, accepted SQL
-// and recovery checks before entering refresh, and retain their original bound
-// through the final publication check. Effects themselves never call refresh.
+// profile. The installed coordinator must perform current native and accepted
+// SQL checks before entering refresh, and retain their original bound through
+// the final publication check. Effects themselves never call refresh.
 type ownerProviderCurrent func(context.Context) (time.Time, error)
+
+// callerDeadline bounds a login or renewal by its caller deadline only.
+func callerDeadline(ctx context.Context) (time.Time, error) {
+	d, ok := ctx.Deadline()
+	if !ok || ctx.Err() != nil {
+		return time.Time{}, ErrKeyService
+	}
+	return d, nil
+}
 
 type ownerProviderLifetime struct {
 	currentProof                                 ownerProviderCurrent
@@ -133,7 +142,7 @@ func (s *ownerProviderLifetime) refreshOwned(ctx context.Context, worker *Instal
 	call, cancel := context.WithTimeout(ctx, 5*time.Second)
 	stop := context.AfterFunc(s.root, cancel)
 	defer func() { stop(); cancel() }()
-	// This hook is installed composition's exact native/source/recovery proof,
+	// This hook is installed composition's exact native/source proof,
 	// never provider policy lookup or a caller-selected authority timestamp.
 	var operation *configurationProviderRefreshOperation
 	var bound time.Time

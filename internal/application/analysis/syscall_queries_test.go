@@ -15,7 +15,7 @@ type syscallRouteFixture struct {
 	candidate value.ContextProjectionCandidate
 }
 
-func (r syscallRouteFixture) ResolveSyscallProjectionRoute(context.Context, string, string, identity.Identity, artifact.RecoveryProof) (value.ContextProjectionCandidate, error) {
+func (r syscallRouteFixture) ResolveSyscallProjectionRoute(context.Context, string, string, identity.Identity) (value.ContextProjectionCandidate, error) {
 	return r.candidate, nil
 }
 

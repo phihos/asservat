@@ -1,14 +1,6 @@
 package capture
 
 import (
-	"asservat.local/asservat/internal/adapters/gadget"
-	"asservat.local/asservat/internal/adapters/syscalls"
-	compiler "asservat.local/asservat/internal/application/planning"
-	"asservat.local/asservat/internal/contracts"
-	"asservat.local/asservat/internal/domain/collector"
-	planning "asservat.local/asservat/internal/domain/planning"
-	"asservat.local/asservat/internal/domain/targets"
-	"asservat.local/asservat/internal/transport/conversion"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -18,6 +10,15 @@ import (
 	"slices"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/adapters/gadget"
+	"asservat.local/asservat/internal/adapters/syscalls"
+	compiler "asservat.local/asservat/internal/application/planning"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/collector"
+	planning "asservat.local/asservat/internal/domain/planning"
+	"asservat.local/asservat/internal/domain/targets"
+	"asservat.local/asservat/internal/transport/conversion"
 
 	authapp "asservat.local/asservat/internal/application/authorization"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -53,7 +54,7 @@ func newPolicyGrantPlanFixture(t *testing.T) (*workloadActivationFixture, *accep
 	}
 	in := f.accepted[0]
 	source, _, _ := f.ReadPolicy(context.Background(), "restarts", "policy-uid")
-	record := value.PolicyAcceptance{ID: "99999999-9999-4999-8999-999999999999", RootID: activationRoot, Source: source, Submission: in.Submission, Authority: in.Authority, Submitter: f.author.Principal, IdentityRevision: f.author.Policy, PermissionRevision: f.projection.Revision, Recovery: in.Recovery, IntentVersion: 1, AcceptedAt: f.now}
+	record := value.PolicyAcceptance{ID: "99999999-9999-4999-8999-999999999999", RootID: activationRoot, Source: source, Submission: in.Submission, Authority: in.Authority, Submitter: f.author.Principal, IdentityRevision: f.author.Policy, PermissionRevision: f.projection.Revision, IntentVersion: 1, AcceptedAt: f.now}
 	if !record.Valid() {
 		t.Fatal("invalid accepted fixture")
 	}
@@ -126,8 +127,7 @@ func (f grantPlanSourceFunc) ObservePolicy(ctx context.Context, source value.Pol
 func TestPolicyGrantNamedSourceRefreshPrecedesExpiredSQLAcceptanceRead(t *testing.T) {
 	f, accepted, plans := newPolicyGrantPlanFixture(t)
 	original := accepted.record.Authority
-	// The protected source was last seen before a >30s outage; the independent
-	// current recovery reader still supplies its ordinary five-second preflight.
+	// The protected source was last seen before a >30s outage.
 	f.now = f.now.Add(31 * time.Second)
 	observed := false
 	accepted.before = func() {

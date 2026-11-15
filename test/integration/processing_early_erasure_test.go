@@ -47,11 +47,11 @@ func qualifyProcessingEarlyErasure(t *testing.T, ctx context.Context, admin, hub
 	root, installation := s.a.RootID, s.recovery.installation
 	reg := published.Expectation.Registration
 	loc := reg.Location
-	decisions, err := postgres.NewProcessingDecisions(ctx, hub, root, s.recovery.guard)
+	decisions, err := postgres.NewProcessingDecisions(ctx, hub, root)
 	if err != nil {
 		t.Fatal("erasure decision through the compiled hub login", err)
 	}
-	scopes, err := postgres.NewProcessingInventory(ctx, hub, root, s.recovery.guard)
+	scopes, err := postgres.NewProcessingInventory(ctx, hub, root)
 	if err != nil {
 		t.Fatal("erasure artifact scope through the compiled hub login", err)
 	}
@@ -64,7 +64,7 @@ func qualifyProcessingEarlyErasure(t *testing.T, ctx context.Context, admin, hub
 		t.Fatal("erasure target was not readable before the request", err)
 	}
 	request := value.ProcessingChange{Action: value.RequestEarlyErasure, RequestID: custodyID(), RequestedArtifactID: loc.ArtifactID}
-	statusReader := privacyapp.ProcessingErasureStatus{RootID: root, InstallationID: installation, Policies: processing.policy, Recovery: s.recovery.reader, Status: decisions, Now: time.Now}
+	statusReader := privacyapp.ProcessingErasureStatus{RootID: root, InstallationID: installation, Policies: processing.policy, Status: decisions, Now: time.Now}
 	if _, err := statusReader.Get(ctx, processing.actor, request.RequestID); !errors.Is(err, value.ErrUnavailable) {
 		t.Fatal("unknown erasure request acquired a status", err)
 	}
@@ -235,8 +235,7 @@ func qualifyProcessingErasureCleanup(t *testing.T, ctx context.Context, admin *p
 		t.Fatal(err)
 	}
 	cleaner := privacyapp.ContextCleaner{Ledger: cleanup, Audit: ack, Finalize: finalize, Purger: bound,
-		Objects:  &objectstore.ContextDeletionObjects{Store: store, Seal: keys, Open: keys, Signer: signatures, Verifier: signatures},
-		Recovery: s.recovery.reader, Now: time.Now}
+		Objects: &objectstore.ContextDeletionObjects{Store: store, Seal: keys, Open: keys, Signer: signatures, Verifier: signatures}, Now: time.Now}
 	if err = cleaner.Clean(ctx, reg.Location); err != nil {
 		t.Fatal("erase exact closed writer through actual purge, audit and finalization", err)
 	}

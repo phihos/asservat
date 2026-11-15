@@ -3,8 +3,7 @@ package postgres
 // The same three A-HWORK lifecycle credentials use private views filtered to
 // capture/normal/resolution. Historical capture names remain fixed; identity
 // and processing lanes are outside this worker's SQL authority.
-// This list is derived from captureLifecycleQueries and its recovery-first
-// transaction, not broad grants on the human audit tables. It does not make a
+// This list is derived from captureLifecycleQueries and its transaction, not broad grants on the human audit tables. It does not make a
 // purpose creatable before the separate protected worker projection is bound.
 func publicRuntimeCaptureCleanupGrants(purpose string) ([]publicRuntimeGrant, bool) {
 	if purpose != "capture-cleanup" && purpose != "capture-verifier" && purpose != "capture-finalizer" {

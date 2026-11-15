@@ -1,17 +1,18 @@
 package authorization
 
 import (
+	"context"
+	"testing"
+	"time"
+
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/collector"
 	"asservat.local/asservat/internal/domain/live"
 	"asservat.local/asservat/internal/domain/privacy"
-	"context"
-	"testing"
-	"time"
 )
 
-func TestCurrentLiveEnvironmentRetainsOriginalPolicyRecoveryAndClientBounds(t *testing.T) {
-	for _, mode := range []string{"valid", "disabled", "download-only", "projection", "region", "scope", "late-policy", "late-final", "parent"} {
+func TestCurrentLiveEnvironmentRetainsOriginalPolicyAndClientBounds(t *testing.T) {
+	for _, mode := range []string{"valid", "disabled", "download-only", "projection", "region", "scope", "late-policy", "parent"} {
 		t.Run(mode, func(t *testing.T) {
 			f, _, r, actor := newEnvironmentFixture()
 			target := authorization.Target{ClusterID: r.Retained.Input.Target.ClusterID, NamespaceUID: r.Retained.Input.Target.NamespaceUID, WorkloadUID: r.Retained.Input.Target.WorkloadUID, PodUID: r.Retained.Input.Target.PodUID}
@@ -19,7 +20,7 @@ func TestCurrentLiveEnvironmentRetainsOriginalPolicyRecoveryAndClientBounds(t *t
 			// Only the root is relevant to this environment port; C3 owns exact source proof.
 			source.Manual = &collector.ManualLiveSource{}
 			f.policy.LiveRead = &privacy.LiveRead{Root: privacy.LiveRootLimits{Watches: 16, PrincipalWatches: 4, WorkloadWatches: 4, Rate: 1 << 20, Burst: 1 << 20}, Projections: []string{live.Packet}, Clients: []privacy.LiveClient{{Issuer: actor.Issuer, ID: actor.ClientID, Kind: actor.Kind, PathIDs: []string{f.policy.Paths[0].ID}}}, Ceilings: []privacy.LiveCeiling{{ClusterID: target.ClusterID, Limits: privacy.LiveLimits{Duration: 60, Output: 1 << 20, Rate: 16 << 10, Rows: 10, Buffer: 64 << 10, RowAge: 10, Replay: 2}}}}
-			s := CurrentLiveEnvironment{RootID: f.policy.RootID, InstallationID: f.policy.InstallationID, AcceptedRoot: f.policy.LiveRead.Root, Policies: f, Recovery: f, Now: func() time.Time { return f.now }}
+			s := CurrentLiveEnvironment{RootID: f.policy.RootID, InstallationID: f.policy.InstallationID, AcceptedRoot: f.policy.LiveRead.Root, Policies: f, Now: func() time.Time { return f.now }}
 			ctx := t.Context()
 			original := f.now.Add(time.Second)
 			f.policy.FreshUntil = original
@@ -40,12 +41,6 @@ func TestCurrentLiveEnvironmentRetainsOriginalPolicyRecoveryAndClientBounds(t *t
 						f.now = original
 					}
 				}
-			case "late-final":
-				f.recoveryHook = func() {
-					if f.recoveryReads == 1 {
-						f.now = original
-					}
-				}
 			case "parent":
 				var cancel context.CancelFunc
 				ctx, cancel = context.WithCancel(ctx)
@@ -58,8 +53,8 @@ func TestCurrentLiveEnvironmentRetainsOriginalPolicyRecoveryAndClientBounds(t *t
 				}
 				return
 			}
-			if err != nil || !out.ValidUntil.Equal(original) || out.Limits.Rows != 10 || out.Limits.RowAge != 10 || f.policyReads != 1 || f.recoveryReads != 1 || f.processingReads != 0 {
-				t.Fatal(out, err, f.policyReads, f.recoveryReads)
+			if err != nil || !out.ValidUntil.Equal(original) || out.Limits.Rows != 10 || out.Limits.RowAge != 10 || f.policyReads != 1 || f.processingReads != 0 {
+				t.Fatal(out, err, f.policyReads)
 			}
 		})
 	}

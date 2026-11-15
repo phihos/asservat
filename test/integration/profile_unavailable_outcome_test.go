@@ -50,7 +50,7 @@ func qualifyProfileUnavailableOutcome(t *testing.T, ctx context.Context, admin, 
 	if _, err := admin.Exec(ctx, "UPDATE context_execution SET phase='started',completed_at=NULL WHERE root_id=$1 AND capture_id=$2", s.a.RootID, running.Binding.CaptureID); err == nil {
 		t.Fatal("terminal refusal reset through SQL")
 	}
-	progress, err := postgres.NewContextProgressReads(ctx, readerPool, s.a.RootID, s.recovery.guard)
+	progress, err := postgres.NewContextProgressReads(ctx, readerPool, s.a.RootID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +59,7 @@ func qualifyProfileUnavailableOutcome(t *testing.T, ctx context.Context, admin, 
 		t.Fatal("profile refusal lost from actual authorized SQL progress", result, err)
 	}
 	now := time.Now().UTC().Truncate(time.Microsecond)
-	cancelled, err := executions.RequestCaptureCancellation(ctx, capture.CancellationCheck{RootID: s.a.RootID, Request: capture.CancellationRequest{CaptureID: running.Binding.CaptureID, ExpectedRevision: result.Revision, IdempotencyKey: "already-unavailable"}, Identity: check.Eligibility.VerifiedIdentity, Recovery: check.Recovery, CheckedAt: now, ValidUntil: check.ValidUntil})
+	cancelled, err := executions.RequestCaptureCancellation(ctx, capture.CancellationCheck{RootID: s.a.RootID, Request: capture.CancellationRequest{CaptureID: running.Binding.CaptureID, ExpectedRevision: result.Revision, IdempotencyKey: "already-unavailable"}, Identity: check.Eligibility.VerifiedIdentity, CheckedAt: now, ValidUntil: check.ValidUntil})
 	if err != nil || cancelled.Decision.Phase != "Failed" || cancelled.Decision.Requested || cancelled.Profile != nil {
 		t.Fatal("terminal endpoint refusal opened new cancellation work", cancelled.Decision, err)
 	}

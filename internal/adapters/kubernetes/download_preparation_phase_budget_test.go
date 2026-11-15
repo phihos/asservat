@@ -27,7 +27,6 @@ type preparationPhaseBudget struct {
 	i              identity.Identity
 	a              artifact.DownloadAuthority
 	record         authapp.ContextDownloadEvidence
-	recovery       artifact.RecoveryProof
 	processing     artifact.DownloadProcessingProof
 	source         evidence.ContextDownloadSource
 	profile        value.DownloadWorkerProfile
@@ -99,11 +98,8 @@ func (f *preparationPhaseBudget) DownloadPolicy(ctx context.Context) (privacy.Do
 func (f *preparationPhaseBudget) ResolveIdentity(ctx context.Context) (identity.Identity, error) {
 	return f.i, f.step(ctx, "identity")
 }
-func (f *preparationPhaseBudget) RecoveryState(ctx context.Context) (artifact.RecoveryProof, error) {
-	return f.recovery, f.step(ctx, "recovery")
-}
-func (f *preparationPhaseBudget) ContextProcessing(ctx context.Context, r authapp.ContextDownloadEvidence, recovery artifact.RecoveryProof) (artifact.DownloadProcessingProof, error) {
-	if r.CaptureID != f.record.CaptureID || recovery != f.recovery {
+func (f *preparationPhaseBudget) ContextProcessing(ctx context.Context, r authapp.ContextDownloadEvidence) (artifact.DownloadProcessingProof, error) {
+	if r.CaptureID != f.record.CaptureID {
 		f.t.Fatal("processing changed original selection")
 	}
 	return f.processing, f.step(ctx, "processing")

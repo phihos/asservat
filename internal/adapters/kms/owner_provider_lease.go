@@ -23,7 +23,7 @@ type ownerProviderLease struct {
 type ownerProviderLeaseSource func(context.Context) (ownerProviderLease, error)
 
 // ownerProviderLeaseTransport is selected only by the new fixed owner profile.
-// It supplies no native, recovery, enrollment, audit or signing authority and
+// It supplies no native, enrollment, audit or signing authority and
 // performs no credential refresh or provider inspection on the effect path.
 type ownerProviderLeaseTransport struct {
 	base   http.RoundTripper

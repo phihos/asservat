@@ -16,37 +16,37 @@ import (
 )
 
 // ProcessingReads cannot initialize completeness, publish lineage, remove a
-// restriction or accept recovery. Its business-table privileges are SELECT only.
+// restriction. Its business-table privileges are SELECT only.
 type ProcessingReads struct {
-	ledger   *Ledger
-	root     string
-	recovery *RecoveryTransactionGuard
+	ledger       *Ledger
+	root         string
+	installation string
 }
 
 var _ app.DownloadProcessingReader = (*ProcessingReads)(nil)
 
-func NewProcessingReads(ctx context.Context, pool *pgxpool.Pool, root string, recovery *RecoveryTransactionGuard) (*ProcessingReads, error) {
-	if !authorization.UUID(root) || recovery == nil || recovery.root != root {
+func NewProcessingReads(ctx context.Context, pool *pgxpool.Pool, root, installation string) (*ProcessingReads, error) {
+	if !authorization.UUID(root) || !authorization.UUID(installation) {
 		return nil, value.ErrUnavailable
 	}
 	l, e := New(ctx, pool)
 	if e != nil {
 		return nil, value.ErrUnavailable
 	}
-	return &ProcessingReads{l, root, recovery}, nil
+	return &ProcessingReads{l, root, installation}, nil
 }
 func processingRootValid(p custodydb.ProcessingRoot, installation string, now time.Time) bool {
 	var b value.ProcessingBacking
 	return uid(p.InstallationID) == installation && p.InitializedAt.Valid && p.InitializationID.Valid && now.Before(p.ValidUntil.Time) && json.Unmarshal(p.Backing, &b) == nil && b.Valid() && b.RootID == uid(p.RootID) && b.InstallationID == installation && b.ValidUntil.Equal(p.ValidUntil.Time) && b.RetireBy.Equal(p.RetireBy.Time) && b.MaxCaptures == p.MaxCaptures && b.MaxRules == p.MaxRules && b.MaxRootTransitions == p.MaxRootTransitions
 }
-func readProcessingSnapshot(ctx context.Context, q *custodydb.Queries, root, installation, issuerEpoch, artifactID string, started, until time.Time) (value.ProcessingSnapshot, custodydb.ProcessingRoot, error) {
+func readProcessingSnapshot(ctx context.Context, q *custodydb.Queries, root, installation, artifactID string, started, until time.Time) (value.ProcessingSnapshot, custodydb.ProcessingRoot, error) {
 	var zero value.ProcessingSnapshot
 	p, e := q.ReadProcessingRoot(ctx, id(root))
 	if e != nil {
 		return zero, p, e
 	}
 	n, e := q.CurrentTime(ctx)
-	if e != nil || !processingRootValid(p, installation, n.Time) || uid(p.IssuerEpoch) != issuerEpoch {
+	if e != nil || !processingRootValid(p, installation, n.Time) {
 		return zero, p, value.ErrUnavailable
 	}
 	out := value.ProcessingSnapshot{RootID: root, Epoch: uid(p.Epoch), Sequence: p.Sequence, Complete: true, Nodes: []value.ProcessingNode{}, Rules: []value.ProcessingRule{}, ObservedAt: started, FreshUntil: identity.Earlier(until, p.ValidUntil.Time)}
@@ -114,7 +114,7 @@ func processingProof(s value.ProcessingSnapshot, source custodydb.ProcessingRoot
 	}{s.Epoch, s.Sequence, s.Nodes, s.Rules, uid(source.SourceUid), source.ProtectionDigest, source.Backing})
 	return artifact.DownloadProcessingProof{RootID: s.RootID, Epoch: s.Epoch, CaptureID: s.Nodes[0].CaptureID, Location: s.Subject, Sequence: s.Sequence, StateDigest: sha256.Sum256(b), ObservedAt: s.ObservedAt, ValidUntil: s.FreshUntil}
 }
-func (s *ProcessingReads) ContextProcessing(ctx context.Context, r app.ContextDownloadEvidence, recovery artifact.RecoveryProof) (artifact.DownloadProcessingProof, error) {
+func (s *ProcessingReads) ContextProcessing(ctx context.Context, r app.ContextDownloadEvidence) (artifact.DownloadProcessingProof, error) {
 	var out artifact.DownloadProcessingProof
 	if s == nil || ctx == nil || ctx.Err() != nil || !r.Retained.Valid() || r.Retained.RootID != s.root || !authorization.UUID(r.CaptureID) {
 		return out, value.ErrUnavailable
@@ -126,27 +126,20 @@ func (s *ProcessingReads) ContextProcessing(ctx context.Context, r app.ContextDo
 		if e != nil {
 			return e
 		}
-		if !identity.Fresh(r.ObservedAt, r.ValidUntil, started.Time, 5*time.Second) || !recovery.Valid(started.Time) {
+		if !identity.Fresh(r.ObservedAt, r.ValidUntil, started.Time, 5*time.Second) {
 			return value.ErrUnavailable
 		}
-		trust, e := s.recovery.lock(call, q, s.root, recovery)
-		if e != nil {
-			return e
-		}
-		until := identity.Earlier(started.Time.Add(5*time.Second), identity.Earlier(r.ValidUntil, identity.Earlier(recovery.FreshUntil, r.Retained.Effective.ExpiresAt)))
+		until := identity.Earlier(started.Time.Add(5*time.Second), identity.Earlier(r.ValidUntil, r.Retained.Effective.ExpiresAt))
 		if d, ok := call.Deadline(); ok {
 			until = identity.Earlier(until, d)
 		}
-		snapshot, p, e := readProcessingSnapshot(call, q, s.root, s.recovery.installation, recovery.IssuerEpoch, r.Retained.Registration.Location.ArtifactID, started.Time, until)
+		snapshot, p, e := readProcessingSnapshot(call, q, s.root, s.installation, r.Retained.Registration.Location.ArtifactID, started.Time, until)
 		if e != nil {
 			return e
 		}
 		node := snapshot.Nodes[0]
 		if node.CaptureID != r.CaptureID || node.Location != r.Retained.Registration.Location || node.Target != r.Retained.Input.Target || !node.AnchorAt.Equal(r.Retained.Registration.AnchorAt) || !node.DeleteBy.Equal(r.Retained.Registration.DeleteBy) {
 			return value.ErrUnavailable
-		}
-		if e = s.recovery.check(call, q, trust, s.root, recovery); e != nil {
-			return e
 		}
 		out = processingProof(snapshot, p)
 		now, e := q.CurrentTime(call)
@@ -161,7 +154,7 @@ func (s *ProcessingReads) ContextProcessing(ctx context.Context, r app.ContextDo
 	return out, nil
 }
 
-// Caller owns recovery then the permission root lock. Every processing mutation
+// Caller owns the permission root lock. Every processing mutation
 // takes the same root, so no contrary rule can commit during this effect.
 func processingDownloadFence(ctx context.Context, q *custodydb.Queries, a artifact.DownloadAuthority) error {
 	now, e := q.CurrentTime(ctx)
@@ -169,7 +162,7 @@ func processingDownloadFence(ctx context.Context, q *custodydb.Queries, a artifa
 		return value.ErrUnavailable
 	}
 	expected := a.Environment.Processing
-	snapshot, p, e := readProcessingSnapshot(ctx, q, a.Scope.RootID, a.Environment.InstallationID, a.Environment.RecoveryEpoch, a.Scope.ArtifactID, expected.ObservedAt, expected.ValidUntil)
+	snapshot, p, e := readProcessingSnapshot(ctx, q, a.Scope.RootID, a.Environment.InstallationID, a.Scope.ArtifactID, expected.ObservedAt, expected.ValidUntil)
 	if e != nil {
 		return e
 	}

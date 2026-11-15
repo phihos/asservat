@@ -15,7 +15,7 @@ type profileRouteFixture struct {
 	candidate value.ContextProjectionCandidate
 }
 
-func (r profileRouteFixture) ResolveProjectionRoute(context.Context, string, string, identity.Identity, artifact.RecoveryProof) (value.ContextProjectionCandidate, error) {
+func (r profileRouteFixture) ResolveProjectionRoute(context.Context, string, string, identity.Identity) (value.ContextProjectionCandidate, error) {
 	return r.candidate, nil
 }
 

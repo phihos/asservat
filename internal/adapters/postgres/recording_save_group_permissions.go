@@ -123,11 +123,7 @@ func (p *recordingGroupFacts) acceptedPolicy(ctx context.Context, q *custodydb.Q
 	if err != nil {
 		return zero, err
 	}
-	recovery, err := recoveryState(trust, last.Time, last.Time)
-	if err != nil {
-		return zero, err
-	}
-	until := identity.Earlier(f.snapshot.FreshUntil, identity.Earlier(recovery.FreshUntil, f.snapshot.Authority.NotAfter))
+	until := identity.Earlier(f.snapshot.FreshUntil, f.snapshot.Authority.NotAfter)
 	if last.Time.Before(first.Time) || !f.source.Valid(last.Time) || !f.snapshot.Authority.Valid(last.Time) || !last.Time.Before(until) {
 		return zero, value.ErrUnavailable
 	}

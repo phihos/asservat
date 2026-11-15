@@ -19,13 +19,13 @@ import (
 )
 
 // Native SQL fixture source only until the owning frozen custody suite is run.
-// Permission/recovery/source setup remains the existing explicit fixture setup.
+// Permission/source setup remains the existing explicit fixture setup.
 func qualifyContextRequestResolution(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, create func(*testing.T, int64) captureAdmissionScenario, storeFor func(*testing.T, string) *postgres.ContextPreviews, blueprint func(*testing.T, captureAdmissionScenario) value.ContextPreview, readQuery func(*testing.T, captureAdmissionScenario, value.ContextPreview) value.ReplayQuery) {
 	pool := poolFor("context_request_resolution_runtime", "synthetic-context-request-resolution")
 	defer pool.Close()
 	resolver := func(t *testing.T, s captureAdmissionScenario) *postgres.ContextRequestResolutions {
 		t.Helper()
-		r, err := postgres.NewContextRequestResolutions(ctx, pool, s.a.RootID, s.recovery.guard)
+		r, err := postgres.NewContextRequestResolutions(ctx, pool, s.a.RootID, s.recovery.installation)
 		if err != nil {
 			t.Fatal(err)
 		}

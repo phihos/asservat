@@ -45,30 +45,21 @@ func (s *LocalKeyConfigurations) ObserveLocalKeys(ctx context.Context, c value.L
 	}
 	var until time.Time
 	e = s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		trust, e := q.ShareFleetTrust(ctx, id(s.scope.InstallationID))
-		if e != nil {
-			return e
-		}
-		start, e := q.CurrentTime(ctx)
-		if e != nil {
-			return e
-		}
 		check := func() error {
 			now, e := q.CurrentTime(ctx)
 			if e != nil {
 				return e
 			}
-			recovery, e := recoveryState(trust, start.Time, now.Time)
-			if e != nil || !c.Valid(now.Time) || recovery.IssuerEpoch != c.RecoveryEpoch {
+			if !c.Valid(now.Time) {
 				return app.ErrKeyUnavailable
 			}
-			until = identity.Earlier(c.FreshUntil, recovery.FreshUntil)
+			until = c.FreshUntil
 			return nil
 		}
-		if e = check(); e != nil {
+		if e := check(); e != nil {
 			return e
 		}
-		if e = q.InsertLocalKeyConfiguration(ctx, custodydb.InsertLocalKeyConfigurationParams{InstallationID: id(s.scope.InstallationID), Purpose: s.scope.Purpose, KeyID: s.scope.KeyID, SnapshotJson: b}); e != nil {
+		if e := q.InsertLocalKeyConfiguration(ctx, custodydb.InsertLocalKeyConfigurationParams{InstallationID: id(s.scope.InstallationID), Purpose: s.scope.Purpose, KeyID: s.scope.KeyID, SnapshotJson: b}); e != nil {
 			return e
 		}
 		saved, e := q.LockLocalKeyConfiguration(ctx, custodydb.LockLocalKeyConfigurationParams{InstallationID: id(s.scope.InstallationID), Purpose: s.scope.Purpose, KeyID: s.scope.KeyID})

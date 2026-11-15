@@ -6,7 +6,6 @@ import (
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	app "asservat.local/asservat/internal/application/execution"
-	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/execution"
 )
@@ -15,7 +14,7 @@ import (
 // request. These reads expose only the accepted work and its started
 // execution; they authorize no acquisition, disclosure or new spend. The
 // stored completion is still recorded through RecordAPIStoredCompletion with a
-// current connector process observation and recovery proof.
+// current connector process observation.
 
 var _ app.RecordingExecutions = (*APIContextExecutions)(nil)
 
@@ -41,18 +40,13 @@ func (s *APIContextExecutions) StartedRecordings(ctx context.Context, startedBef
 }
 
 // ReadRecordingWork reads a started recording's accepted work and execution
-// under the current recovery fence.
-func (s *APIContextExecutions) ReadRecordingWork(ctx context.Context, captureID string, recovery artifact.RecoveryProof) (app.APIContextWork, value.APIExecution, error) {
+func (s *APIContextExecutions) ReadRecordingWork(ctx context.Context, captureID string) (app.APIContextWork, value.APIExecution, error) {
 	var w app.APIContextWork
 	var r value.APIExecution
-	if !authorization.UUID(captureID) || !recovery.Valid(recovery.ObservedAt) {
+	if !authorization.UUID(captureID) {
 		return w, r, value.ErrInvalid
 	}
 	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		trust, err := s.guards.Recovery.lock(ctx, q, s.root, recovery)
-		if err != nil {
-			return err
-		}
 		row, err := q.ReadPublicationCapture(ctx, custodydb.ReadPublicationCaptureParams{ID: id(captureID), RootID: id(s.root)})
 		if err != nil {
 			return value.ErrDenied
@@ -77,7 +71,7 @@ func (s *APIContextExecutions) ReadRecordingWork(ctx context.Context, captureID 
 		if r.Phase != "started" {
 			return value.ErrConflict
 		}
-		return s.guards.Recovery.check(ctx, q, trust, s.root, recovery)
+		return nil
 	})
 	if err != nil {
 		return app.APIContextWork{}, value.APIExecution{}, err

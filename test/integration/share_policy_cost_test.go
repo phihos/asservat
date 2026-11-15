@@ -34,7 +34,7 @@ func policyShareAcceptanceSizeFixture(t *testing.T, issuerBytes int) capture.Pol
 	// Fix timestamp width so the encoded-size boundary is reproducible.
 	now := time.Date(2026, time.November, 11, 12, 13, 14, 123456000, time.UTC)
 	creator, groups, recipients := widePolicyShareActors(t, issuerBytes)
-	root, installation, policyID, cluster, epoch, delegation := custodyID(), custodyID(), custodyID(), custodyID(), custodyID(), custodyID()
+	root, installation, policyID, cluster, delegation := custodyID(), custodyID(), custodyID(), custodyID(), custodyID()
 	revision := identity.Revision{UID: policyID, Generation: 1, Digest: artifact.Digest{1}}
 	owners := make([]artifact.AudienceAssignment, 8)
 	managers := make([]artifact.AudienceAssignment, 8)
@@ -48,10 +48,9 @@ func policyShareAcceptanceSizeFixture(t *testing.T, issuerBytes int) capture.Pol
 	source := capture.PolicySource{InstallationID: installation, ClusterID: cluster, NamespaceUID: "control", Name: "synthetic-maximum", Revision: revision, ResourceVersion: "1", ObservedAt: now, FreshUntil: now.Add(30 * time.Second), CollectionDigest: artifact.Digest{2}}
 	authority := authorization.AcceptedPolicyAuthority{InstallationID: installation, PolicyUID: policyID, Creator: creator, Executor: authorization.PolicyPrincipal(installation, policyID), ScopeDigest: artifact.Digest{3}, ClusterID: cluster, NamespaceUID: "app", WorkloadUID: "workload", Delegation: identity.Revision{UID: delegation, Generation: 1, Digest: artifact.Digest{4}}, Owners: owners, Actions: []string{authorization.PolicyContextAction}, Limits: authorization.AutomationLimits{MaxExecutions: 100, MaxBytes: 1 << 20}, IssuedAt: now, NotAfter: now.Add(time.Hour)}
 	submission := capture.VerifiedPolicySubmission{Nonce: custodyID(), Actor: creator, Source: revision, ClusterID: cluster, NamespaceUID: "control", Name: source.Name, ScopeDigest: authority.ScopeDigest, EnvelopeDigest: artifact.Digest{5}, IssuedAt: now, ExpiresAt: now.Add(30 * time.Second)}
-	recovery := artifact.RecoveryProof{InstallationID: installation, IssuerEpoch: epoch, Revision: identity.Revision{UID: epoch, Generation: 1, Digest: artifact.Digest{6}}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
-	record := capture.PolicyAcceptance{ID: custodyID(), RootID: root, Source: source, Submission: submission, Authority: authority, Submitter: creator, IdentityRevision: identity.Revision{UID: "synthetic-identity", Generation: 1, Digest: artifact.Digest{7}}, PermissionRevision: identity.Revision{UID: root, Generation: 1, Digest: artifact.Digest{8}}, Recovery: recovery, IntentVersion: 1, AcceptedAt: now, Sharing: &capture.PolicyShareInstruction{Creator: creator, Management: managers, Recipients: recipients, MaxCaptures: 100, NotAfter: now.Add(time.Hour).Truncate(time.Second)}}
+	record := capture.PolicyAcceptance{ID: custodyID(), RootID: root, Source: source, Submission: submission, Authority: authority, Submitter: creator, IdentityRevision: identity.Revision{UID: "synthetic-identity", Generation: 1, Digest: artifact.Digest{7}}, PermissionRevision: identity.Revision{UID: root, Generation: 1, Digest: artifact.Digest{8}}, IntentVersion: 1, AcceptedAt: now, Sharing: &capture.PolicyShareInstruction{Creator: creator, Management: managers, Recipients: recipients, MaxCaptures: 100, NotAfter: now.Add(time.Hour).Truncate(time.Second)}}
 	if !record.Valid() {
-		t.Fatal("individual maximum components are not domain valid", authority.Valid(now), record.Sharing.Valid(), source.Valid(now), recovery.Valid(now))
+		t.Fatal("individual maximum components are not domain valid", authority.Valid(now), record.Sharing.Valid(), source.Valid(now))
 	}
 	return record
 }
@@ -75,32 +74,6 @@ func TestPolicyShareAcceptanceRecordSizeBoundary(t *testing.T) {
 				t.Fatal("aggregate boundary changed", len(body), tc.rejected)
 			}
 		})
-	}
-}
-
-func TestPolicyShareAcceptanceEvaluatesAfterRecoveryRead(t *testing.T) {
-	r := policyShareAcceptanceSizeFixture(t, policyWideSampleIssuerBytes)
-	created := r.AcceptedAt
-	// A real RecoveryReader starts its SQL observation after the request was
-	// created. Its original cutoff remains fixed while the read completes.
-	r.Recovery.ObservedAt = created.Add(time.Millisecond)
-	originalRecovery := r.Recovery
-	originalAuthority := r.Authority
-	originalSubmission := r.Submission
-	in := capture.PolicyAdmission{RootID: r.RootID, Submission: r.Submission, Authority: r.Authority,
-		Author: identity.Identity{Principal: r.Submitter, Scopes: []string{authorization.ShareScope}, Policy: r.IdentityRevision, VerifiedAt: created, ValidUntil: created.Add(30 * time.Second)},
-		Target: authorization.WorkloadScope(r.Authority.ClusterID, r.Authority.NamespaceUID, r.Authority.WorkloadUID), Recovery: r.Recovery, Sharing: r.Sharing}
-	in.Verification = syntheticSubmissionCheck(in, created)
-	if r.Valid() || in.Valid(created) || r.Recovery.Valid(created) {
-		t.Fatal("past evaluation accepted a subsequently observed recovery proof")
-	}
-	checked := created.Add(2 * time.Millisecond)
-	r.AcceptedAt = checked // The immutable acceptance is created after its reads.
-	if !r.Valid() || !in.Valid(checked) || !r.Recovery.Valid(checked) {
-		t.Fatal("completed-read evaluation refused otherwise current originals")
-	}
-	if r.Recovery != originalRecovery || r.Authority.NotAfter != originalAuthority.NotAfter || r.Authority.IssuedAt != originalAuthority.IssuedAt || r.Submission != originalSubmission {
-		t.Fatal("evaluation changed an original observation, submission or authority bound")
 	}
 }
 
@@ -186,15 +159,15 @@ func newPolicyPaidShareService(t *testing.T, ctx context.Context, admin *pgxpool
 	})
 	pool := poolFor(role, "synthetic-policy-share-hub")
 	t.Cleanup(pool.Close)
-	ledger, err := postgres.NewEvidenceShares(ctx, pool, s.a.RootID, s.recovery.guard)
+	ledger, err := postgres.NewEvidenceShares(ctx, pool, s.a.RootID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	routes, err := postgres.NewContextCaseReads(ctx, pool, s.a.RootID, s.recovery.guard)
+	routes, err := postgres.NewContextCaseReads(ctx, pool, s.a.RootID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	service := paidShareService{Service: sharing.Service{RootID: s.a.RootID, InstallationID: s.recovery.installation, Routes: routes, Permissions: s.p, Catalog: catalog, Store: ledger, Policies: ledger, Recovery: s.recovery.reader, NewID: custodyID, Now: time.Now}, audit: newShareBusinessAudit(t, ctx, pool, objects, keys, s)}
+	service := paidShareService{Service: sharing.Service{RootID: s.a.RootID, InstallationID: s.recovery.installation, Routes: routes, Permissions: s.p, Catalog: catalog, Store: ledger, Policies: ledger, NewID: custodyID, Now: time.Now}, audit: newShareBusinessAudit(t, ctx, pool, objects, keys, s)}
 	return service, pool
 }
 
@@ -318,6 +291,8 @@ func qualifyWidePolicyShareCost(t *testing.T, ctx context.Context, admin *pgxpoo
 	if _, err := admin.Exec(ctx, `CHECKPOINT`); err != nil {
 		t.Fatal("owned full-page-image checkpoint", err)
 	}
+	// The checkpoint can outlast the synthetic fleet observation.
+	f.Refresh()
 	rollbackBefore := samplePolicyShareCost(t, ctx, admin, root)
 	tx, err := hub.Begin(ctx)
 	if err != nil {

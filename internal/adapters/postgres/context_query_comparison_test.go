@@ -58,7 +58,7 @@ func TestComparisonLedgerViewsPreserveEachCompleteSourceAndParent(t *testing.T) 
 }
 func TestComparisonLedgerRowBindsSecondaryAllocationAndPurposeBounds(t *testing.T) {
 	q, a, _, _ := comparisonLedgerFixture(t)
-	row := custodydb.ContextQuery{ID: id(q.ID), RootID: id(q.Scope.RootID), AllocationID: id(q.Plan.AllocationID), BaselineAllocationID: id(q.BaselinePlan.AllocationID), AccountID: id(q.Plan.AccountID), PrincipalKey: principalKey(q.Scope.Principal), Actor: comparisonJSON(t, q.Scope.Principal), Query: comparisonJSON(t, q), OperationID: id(q.OperationID), WorkerID: id(q.WorkerID), CreatedAt: ts(q.CreatedAt), Deadline: ts(q.Deadline), CleanupUntil: ts(q.CleanupUntil), RetireBy: ts(q.Plan.RetireBy), IssuerEpoch: id(q.RecoveryIssuerEpoch)}
+	row := custodydb.ContextQuery{ID: id(q.ID), RootID: id(q.Scope.RootID), AllocationID: id(q.Plan.AllocationID), BaselineAllocationID: id(q.BaselinePlan.AllocationID), AccountID: id(q.Plan.AccountID), PrincipalKey: principalKey(q.Scope.Principal), Actor: comparisonJSON(t, q.Scope.Principal), Query: comparisonJSON(t, q), OperationID: id(q.OperationID), WorkerID: id(q.WorkerID), CreatedAt: ts(q.CreatedAt), Deadline: ts(q.Deadline), CleanupUntil: ts(q.CleanupUntil), RetireBy: ts(q.Plan.RetireBy), IssuerEpoch: id(q.Plan.InstallationID)}
 	if got, e := queryFromRow(row); e != nil || !got.Equal(q) {
 		t.Fatal("compound row decode", e)
 	}

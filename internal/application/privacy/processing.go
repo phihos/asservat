@@ -1,17 +1,18 @@
 package privacy
 
 import (
-	auditapp "asservat.local/asservat/internal/application/audit"
-	"asservat.local/asservat/internal/domain/artifact"
-	auditvalue "asservat.local/asservat/internal/domain/audit"
-	"asservat.local/asservat/internal/domain/identity"
-	value "asservat.local/asservat/internal/domain/privacy"
 	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"slices"
 	"time"
+
+	auditapp "asservat.local/asservat/internal/application/audit"
+	"asservat.local/asservat/internal/domain/artifact"
+	auditvalue "asservat.local/asservat/internal/domain/audit"
+	"asservat.local/asservat/internal/domain/identity"
+	value "asservat.local/asservat/internal/domain/privacy"
 )
 
 // Narrow ports consume existing request-owned identity and protected policy;
@@ -21,9 +22,6 @@ type ProcessingIdentity interface {
 }
 type ProcessingPolicyReader interface {
 	DownloadPolicy(context.Context) (value.DownloadPolicy, error)
-}
-type ProcessingRecoveryReader interface {
-	RecoveryState(context.Context) (artifact.RecoveryProof, error)
 }
 type ProcessingPrepared struct {
 	Decision ProcessingDecision
@@ -43,7 +41,6 @@ type ProcessingAudit interface {
 type ProcessingChanges struct {
 	RootID, InstallationID string
 	Policies               ProcessingPolicyReader
-	Recovery               ProcessingRecoveryReader
 	Decisions              ProcessingDecisions
 	ArtifactScopes         ProcessingArtifactScopes
 	Audit                  ProcessingAudit
@@ -69,14 +66,8 @@ func (s ProcessingChanges) authority(ctx context.Context, source ProcessingIdent
 	if !p.Operator(i, now) {
 		return zero, identity.ErrDenied
 	}
-	r, e := s.Recovery.RecoveryState(ctx)
-	if e != nil {
-		return zero, value.ErrUnavailable
-	}
-	for _, v := range []time.Time{i.ValidUntil, p.FreshUntil, r.FreshUntil} {
-		until = identity.Earlier(until, v)
-	}
-	a := value.ProcessingAuthority{Identity: i, Policy: p, Recovery: r, ObservedAt: started, ValidUntil: until}
+	until = identity.Earlier(until, identity.Earlier(i.ValidUntil, p.FreshUntil))
+	a := value.ProcessingAuthority{Identity: i, Policy: p, ObservedAt: started, ValidUntil: until}
 	if ctx.Err() != nil || !a.Valid(s.Now()) {
 		return zero, value.ErrUnavailable
 	}
@@ -99,7 +90,7 @@ func sameProcessingIdentity(a, b identity.Identity) bool {
 }
 func (s ProcessingChanges) Change(ctx context.Context, source ProcessingIdentity, c value.ProcessingChange) (value.ProcessingReceipt, error) {
 	var zero value.ProcessingReceipt
-	if ctx == nil || ctx.Err() != nil || source == nil || s.Policies == nil || s.Recovery == nil || s.Decisions == nil || s.Audit == nil || s.MAC == nil || s.Now == nil || !c.ValidRequest() || !s.AuditPolicy.CertificateVerificationBacked() || s.RetainedSeconds < 60 || s.RetainedSeconds > 316224000 {
+	if ctx == nil || ctx.Err() != nil || source == nil || s.Policies == nil || s.Decisions == nil || s.Audit == nil || s.MAC == nil || s.Now == nil || !c.ValidRequest() || !s.AuditPolicy.CertificateVerificationBacked() || s.RetainedSeconds < 60 || s.RetainedSeconds > 316224000 {
 		return zero, value.ErrUnavailable
 	}
 	started := s.Now().UTC().Truncate(time.Microsecond)
@@ -260,7 +251,7 @@ func (s ProcessingChanges) finalReceipt(ctx context.Context, source ProcessingId
 }
 
 // Reuse one complete operation observation, preserving every original bound.
-// ResolveIdentity checks the existing request identity; policy/recovery are not
+// ResolveIdentity checks the existing request identity; policy is not
 // observed again and SQL retains its independent current effect checks.
 func (s ProcessingChanges) continueAuthority(ctx context.Context, source ProcessingIdentity, original value.ProcessingAuthority) (value.ProcessingAuthority, error) {
 	current, err := source.ResolveIdentity(ctx)

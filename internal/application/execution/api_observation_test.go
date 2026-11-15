@@ -88,7 +88,7 @@ func observedRunner(t *testing.T) (*apiRunnerFixture, APIContextRunner, identiti
 
 func TestAPIContextObservationRetainsBoundsAfterBlockingEffects(t *testing.T) {
 	for _, boundary := range []string{"wrapping"} {
-		for _, bound := range []string{"caller", "target", "capability", "retention", "recovery", "process", "parent", "cancellation"} {
+		for _, bound := range []string{"caller", "target", "capability", "retention", "process", "parent", "cancellation"} {
 			t.Run(boundary+"/"+bound, func(t *testing.T) {
 				f, s, current, p, b := observedRunner(t)
 				original := f.now
@@ -105,8 +105,6 @@ func TestAPIContextObservationRetainsBoundsAfterBlockingEffects(t *testing.T) {
 				case "retention":
 					f.retention.ValidUntil = until
 					f.retention.Proof.ValidUntil = until
-				case "recovery":
-					f.recovery.FreshUntil = until
 				case "process":
 					p.processUntil = until
 				case "parent":
@@ -164,10 +162,10 @@ func TestAPIContextObservationRetainsSQLEffectChecks(t *testing.T) {
 }
 
 func TestAPIContextObservedPreludeKeepsExactInputs(t *testing.T) {
-	for _, mode := range []string{"valid-short-parent", "valid-short-caller", "actor", "client", "capture", "target", "pin", "capability", "recovery-incarnation", "caller-expired", "capability-expired", "recovery-expired", "scope", "cancelled", "unbounded"} {
+	for _, mode := range []string{"valid-short-parent", "valid-short-caller", "actor", "client", "capture", "target", "pin", "capability", "caller-expired", "capability-expired", "scope", "cancelled", "unbounded"} {
 		t.Run(mode, func(t *testing.T) {
 			f, s, current, p, b := observedRunner(t)
-			caller, w, capability, recovery := f.actor, f.work, f.cap, f.recovery
+			caller, w, capability := f.actor, f.work, f.cap
 			until := f.now.Add(5 * time.Second)
 			if mode == "valid-short-parent" {
 				until = f.now.Add(2 * time.Second)
@@ -189,14 +187,10 @@ func TestAPIContextObservedPreludeKeepsExactInputs(t *testing.T) {
 				w.Accepted.Pin.UID = contextID(99)
 			case "capability":
 				capability.CollectorImageDigest = artifact.Digest{99}
-			case "recovery-incarnation":
-				recovery.IssuerEpoch = contextID(99)
 			case "caller-expired":
 				caller.ValidUntil = f.now
 			case "capability-expired":
 				capability.FreshUntil = f.now
-			case "recovery-expired":
-				recovery.FreshUntil = f.now
 			case "scope":
 				f.actor.Scopes = []string{"evidence:read"}
 			case "cancelled":
@@ -206,7 +200,7 @@ func TestAPIContextObservedPreludeKeepsExactInputs(t *testing.T) {
 			}
 			// Stop at the first preparation without granting a synthetic row/effect.
 			s.Prepare = observationRefusingPreparation{b}
-			_, err := s.ExecuteObserved(ctx, current, caller, w, capability, recovery)
+			_, err := s.ExecuteObserved(ctx, current, caller, w, capability)
 			if strings.HasPrefix(mode, "valid-") {
 				if !errors.Is(err, value.ErrUnavailable) || len(b.checks) != 1 || p.capabilities != 0 {
 					t.Fatal("observed prelude was reread or refused", err, len(b.checks), p.capabilities)

@@ -18,8 +18,7 @@ import (
 
 // RefreshCleanup is called only by the existing serial cleanup child, before
 // entering its effect operation. Healthy credentials cost no native admission.
-// Each login/renewal uses the same recovery brackets as the
-// configuration purposes; no periodic cleanup credential task is introduced.
+// Each login/renewal uses the same bounds as the configuration purposes; no periodic cleanup credential task is introduced.
 func (s *InstalledConfigurationProviderEffects) RefreshCleanup(ctx context.Context) error {
 	if s == nil || s.effects == nil || s.admission == nil || !s.input.cleanup() {
 		return ErrKeyService

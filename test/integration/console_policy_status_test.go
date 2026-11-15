@@ -47,12 +47,6 @@ func (s consolePolicyStatus) Permissions(_ context.Context, target authorization
 	now := time.Now()
 	return authorization.Projection{Target: target, Revision: s.grants.g.Policy.ApprovalPolicyRef, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), DeniesComplete: true, DeniesObservedAt: now, DeniesFreshUntil: now.Add(5 * time.Second), Allows: []authorization.CurrentAssignment{{Audience: s.grants.g.Policy.Authority.Owners[0], ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}}}, nil
 }
-func (s consolePolicyStatus) RecoveryState(context.Context) (artifact.RecoveryProof, error) {
-	s.grants.mu.Lock()
-	defer s.grants.mu.Unlock()
-	now := time.Now()
-	return artifact.RecoveryProof{InstallationID: s.grants.g.RootID, IssuerEpoch: s.grants.g.RootID, Revision: s.grants.g.Policy.ApprovalPolicyRef, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}, nil
-}
 func (s consolePolicyStatus) Activate(context.Context, identities.CurrentIdentity, string, string, bool) (app.PolicyActivationResult, error) {
 	return app.PolicyActivationResult{}, value.ErrUnavailable
 }
@@ -62,8 +56,8 @@ func (s consolePolicyStatus) Deactivate(context.Context, identities.CurrentIdent
 func newConsolePolicyStatus(t *testing.T, origin string, grants *consoleManagerGrants) *presentation.PolicyOperations {
 	t.Helper()
 	f := consolePolicyStatus{grants: grants}
-	service := app.PolicyStatusService{RootID: grants.g.RootID, InstallationID: grants.g.RootID, Documents: f, Ledger: f, Permissions: f, Recovery: f, Now: time.Now}
-	activation := app.PolicyActivation{RootID: grants.g.RootID, InstallationID: grants.g.RootID, Documents: f, Sources: f, Ledger: f, GrantAttachments: f, Recovery: f, Now: time.Now}
+	service := app.PolicyStatusService{RootID: grants.g.RootID, InstallationID: grants.g.RootID, Documents: f, Ledger: f, Permissions: f, Now: time.Now}
+	activation := app.PolicyActivation{RootID: grants.g.RootID, InstallationID: grants.g.RootID, Documents: f, Sources: f, Ledger: f, GrantAttachments: f, Now: time.Now}
 	operations, err := presentation.NewPolicyOperations(origin, time.Now, func() string { return consoleCaptureID(704) }, activation, service, f)
 	if err != nil {
 		t.Fatal(err)

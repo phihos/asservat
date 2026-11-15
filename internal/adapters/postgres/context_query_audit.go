@@ -34,7 +34,7 @@ func queryAuditSnapshot(row custodydb.ReadContextQueryInvocationRow, call value.
 	return snapshot, nil
 }
 
-func queryIntentFence(ctx context.Context, tx *custodydb.Queries, call value.ContextQueryCall, recovery custodydb.FleetCurrentTrust) error {
+func queryIntentFence(ctx context.Context, tx *custodydb.Queries, call value.ContextQueryCall, trust custodydb.FleetCurrentTrust) error {
 	row, e := tx.ReadContextQueryInvocation(ctx, custodydb.ReadContextQueryInvocationParams{ID: id(call.ID), RootID: id(call.RootID)})
 	if e != nil {
 		return e
@@ -43,12 +43,12 @@ func queryIntentFence(ctx context.Context, tx *custodydb.Queries, call value.Con
 	if e != nil {
 		return e
 	}
-	incarnation, e := tx.ReadContextDatabaseIncarnation(ctx, recovery.InstallationID)
+	incarnation, e := tx.ReadContextDatabaseIncarnation(ctx, trust.InstallationID)
 	if e != nil {
 		return e
 	}
 	l := row.OperationAuditLifecycle
-	if l.InstallationID != recovery.InstallationID || l.IssuerEpoch != recovery.IssuerEpoch || !l.PostmasterAt.Time.Equal(incarnation.PostmasterAt.Time) || l.DatabaseOid != incarnation.DatabaseOid {
+	if l.InstallationID != trust.InstallationID || !l.PostmasterAt.Time.Equal(incarnation.PostmasterAt.Time) || l.DatabaseOid != incarnation.DatabaseOid {
 		return value.ErrUnavailable
 	}
 	now, e := tx.CurrentTime(ctx)

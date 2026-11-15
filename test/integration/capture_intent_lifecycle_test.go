@@ -99,7 +99,7 @@ func qualifyCaptureIntentLifecycle(t *testing.T, ctx context.Context, admin *pgx
 			if e = config.ConfigureCaptureAuditBacking(ctx, postgres.CaptureAuditBacking{Pool: pool, Account: a, ValidUntil: n.Add(time.Hour)}, mac); e != nil {
 				t.Fatal("configure private backing", e)
 			}
-			ad, e := postgres.NewAuditedContextAdmissions(ctx, roles["admit"], s.a.RootID, mac, postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard})
+			ad, e := postgres.NewAuditedContextAdmissions(ctx, roles["admit"], s.a.RootID, s.recovery.installation, mac, s.retention.guard)
 			if e != nil {
 				t.Fatal(e)
 			}
@@ -160,10 +160,6 @@ func qualifyCaptureIntentLifecycle(t *testing.T, ctx context.Context, admin *pgx
 				t.Fatal(e)
 			}
 			s.a.Eligibility = authorization.ContextEligibility(caller, projection, in.Target.Target(), time.Now())
-			s.a.Recovery, e = s.recovery.reader.RecoveryState(ctx)
-			if e != nil {
-				t.Fatal(e)
-			}
 			return s
 		}
 		count := func(t *testing.T, s scenario, want int) {
@@ -292,7 +288,7 @@ func qualifyCaptureIntentLifecycle(t *testing.T, ctx context.Context, admin *pgx
 				t.Fatal(e)
 			}
 			defer wrong.Close()
-			ad, e := postgres.NewAuditedContextAdmissions(ctx, roles["admit"], s.s.a.RootID, wrong, postgres.EffectTransactionGuards{Retention: s.s.retention.guard, Recovery: s.s.recovery.guard})
+			ad, e := postgres.NewAuditedContextAdmissions(ctx, roles["admit"], s.s.a.RootID, s.s.recovery.installation, wrong, s.s.retention.guard)
 			if e != nil {
 				t.Fatal(e)
 			}
@@ -527,7 +523,7 @@ func qualifyCaptureIntentLifecycle(t *testing.T, ctx context.Context, admin *pgx
 			}
 			observed(t, in, 2)
 			count(t, s, 1)
-			cleanup, e := postgres.NewCaptureOperationLifecycles(ctx, roles["cleanup"], s.policy, s.s.recovery.guard)
+			cleanup, e := postgres.NewCaptureOperationLifecycles(ctx, roles["cleanup"], s.policy)
 			if e != nil {
 				t.Fatal(e)
 			}
@@ -585,7 +581,7 @@ func qualifyCaptureIntentLifecycle(t *testing.T, ctx context.Context, admin *pgx
 				}
 
 				lifecycle := func(purpose string) *postgres.OperationLifecycles {
-					x, e := postgres.NewCaptureOperationLifecycles(ctx, roles[purpose], s.policy, s.s.recovery.guard)
+					x, e := postgres.NewCaptureOperationLifecycles(ctx, roles[purpose], s.policy)
 					if e != nil {
 						t.Fatal(e)
 					}

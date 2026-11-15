@@ -16,9 +16,6 @@ import (
 type ContextCaseRoutes interface {
 	ResolveContextCase(context.Context, value.CaseRouteQuery) (value.ContextCaseRoutes, error)
 }
-type RecoveryReader interface {
-	RecoveryState(context.Context) (artifact.RecoveryProof, error)
-}
 
 // ContextCaseService composes the existing ordinary evaluator and verified
 // catalog/retention reader. It performs no acquisition, decryption or effects.
@@ -30,7 +27,6 @@ type ContextCaseService struct {
 	Permissions            permissions.ProjectionReader
 	Catalog                permissions.ContextDownloadCatalog
 	Retention              permissions.DownloadRetentionResolver
-	Recovery               RecoveryReader
 	Processing             permissions.DownloadProcessingReader
 	// Shares is the ADR-232 recipient branch. It is consulted only after the
 	// ordinary evaluator refuses, keyed by the caller and one artifact, and
@@ -58,7 +54,7 @@ func (s ContextCaseService) GetContextCase(ctx context.Context, source identitie
 
 func (s ContextCaseService) getContextCase(ctx context.Context, source identities.CurrentIdentity, caseID string, raw *rawCaseSelection) (value.ContextCase, error) {
 	var zero value.ContextCase
-	if ctx == nil || ctx.Err() != nil || source == nil || s.Routes == nil || s.Permissions == nil || s.Catalog == nil || s.Retention == nil || s.Recovery == nil || s.Processing == nil || s.Now == nil || !authorization.UUID(s.RootID) || !authorization.UUID(s.InstallationID) || !authorization.UUID(caseID) {
+	if ctx == nil || ctx.Err() != nil || source == nil || s.Routes == nil || s.Permissions == nil || s.Catalog == nil || s.Retention == nil || s.Processing == nil || s.Now == nil || !authorization.UUID(s.RootID) || !authorization.UUID(s.InstallationID) || !authorization.UUID(caseID) {
 		return zero, value.ErrUnavailable
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -72,15 +68,11 @@ func (s ContextCaseService) getContextCase(ctx context.Context, source identitie
 	if err != nil || !i.Valid(s.Now()) || !slices.Contains(i.Scopes, "evidence:read") || raw != nil && (i.Principal.Kind != identity.Human || (raw.operation == authorization.DownloadApproved && !slices.Contains(i.Scopes, "evidence:download") || raw.operation != authorization.DownloadApproved && !slices.Contains(i.Scopes, "evidence:raw"))) {
 		return zero, value.ErrUnavailable
 	}
-	recovery, err := s.Recovery.RecoveryState(ctx)
-	if err != nil || recovery.InstallationID != s.InstallationID || !recovery.Valid(s.Now()) {
-		return zero, value.ErrUnavailable
-	}
-	routes, err := s.Routes.ResolveContextCase(ctx, value.CaseRouteQuery{RootID: s.RootID, CaseID: caseID, Identity: i, Recovery: recovery})
+	routes, err := s.Routes.ResolveContextCase(ctx, value.CaseRouteQuery{RootID: s.RootID, CaseID: caseID, Identity: i})
 	if err != nil || routes.CaseID != caseID || !routes.Valid(s.Now()) {
 		return zero, value.ErrUnavailable
 	}
-	until := identity.Earlier(started.Add(5*time.Second), identity.Earlier(i.ValidUntil, identity.Earlier(recovery.FreshUntil, routes.ValidUntil)))
+	until := identity.Earlier(started.Add(5*time.Second), identity.Earlier(i.ValidUntil, routes.ValidUntil))
 	if d, ok := ctx.Deadline(); ok {
 		until = identity.Earlier(until, d)
 	}
@@ -163,7 +155,7 @@ func (s ContextCaseService) getContextCase(ctx context.Context, source identitie
 		if err != nil || resolved.Target != route.Target || resolved.PurposeRef != record.PurposeRef || !resolved.Deadlines.ValidRetained() || !resolved.AnchorAt.Equal(r.Effective.AnchorAt) || resolved.ExpiresAt.After(r.Effective.ExpiresAt) || resolved.DeleteBy.After(r.Effective.DeleteBy) || !resolved.PolicyRevision.Valid() || resolved.Proof.Policy != resolved.PolicyRevision || !resolved.Proof.Matches(s.RootID, route.Target.ClusterID, route.Target.NamespaceUID, route.Target.WorkloadUID, route.Target.PodUID) || !resolved.Proof.Valid(s.Now()) || resolved.ValidUntil.After(resolved.Proof.ValidUntil) || !s.Now().Before(resolved.ExpiresAt) {
 			return zero, value.ErrUnavailable
 		}
-		processing, err := s.Processing.ContextProcessing(ctx, record, recovery)
+		processing, err := s.Processing.ContextProcessing(ctx, record)
 		if err != nil || !processing.Valid(s.Now()) || processing.RootID != s.RootID || processing.CaptureID != record.CaptureID || processing.Location != r.Registration.Location {
 			return zero, value.ErrUnavailable
 		}
@@ -203,7 +195,7 @@ func (s ContextCaseService) getContextCase(ctx context.Context, source identitie
 		if !eligible.Eligible {
 			return zero, value.ErrUnavailable
 		}
-		latestProcessing, err := s.Processing.ContextProcessing(ctx, record.record, recovery)
+		latestProcessing, err := s.Processing.ContextProcessing(ctx, record.record)
 		if err != nil || !latestProcessing.Valid(s.Now()) || latestProcessing.RootID != record.processing.RootID || latestProcessing.Epoch != record.processing.Epoch || latestProcessing.Sequence != record.processing.Sequence || latestProcessing.CaptureID != record.processing.CaptureID || latestProcessing.Location != record.processing.Location || latestProcessing.StateDigest != record.processing.StateDigest || !record.processing.Valid(s.Now()) {
 			return zero, value.ErrUnavailable
 		}
@@ -211,12 +203,7 @@ func (s ContextCaseService) getContextCase(ctx context.Context, source identitie
 		until = identity.Earlier(until, eligible.ValidUntil)
 		out.Artifacts = append(out.Artifacts, record.artifact)
 	}
-	latest, err := s.Recovery.RecoveryState(ctx)
-	if err != nil || !latest.Valid(s.Now()) || latest.InstallationID != recovery.InstallationID || latest.IssuerEpoch != recovery.IssuerEpoch || latest.Revision != recovery.Revision {
-		return zero, value.ErrUnavailable
-	}
-	until = identity.Earlier(until, latest.FreshUntil)
-	// Identity can disappear while final permission/recovery reads wait.
+	// Identity can disappear while final permission reads wait.
 	final, err := source.ResolveIdentity(ctx)
 	if err != nil || !sameIdentity(current, final, s.Now()) {
 		return zero, value.ErrUnavailable

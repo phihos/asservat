@@ -28,7 +28,7 @@ import (
 // every Kubernetes object; RBAC protects the sources it reads. It runs the
 // configuration child always and the capacity, cleanup and permission
 // children when their config sections are present, all under one scheduling
-// Lease. Product checks (recovery fence, SQL effect fences, encrypted audit)
+// Lease. Product checks (SQL effect fences, encrypted audit)
 // are unchanged.
 type hubWorker struct {
 	config    contracts.HubWorkerConfig
@@ -43,7 +43,6 @@ type hubWorker struct {
 	keyRoots   [][]byte
 	admission  *app.WorkerRuntimeAdmission
 	authority  *authorityAuditTurn
-	recovery   *postgres.RecoveryReader
 	providers  *kms.InstalledConfigurationProviderEffects
 	audit      *installedConfigurationAudit
 	leader     *kube.ReconciliationLeader
@@ -270,10 +269,6 @@ func newHubWorker(ctx context.Context, files, idFiles *os.Root) (_ *hubWorker, e
 	}
 	w.closers = append(w.closers, w.admission.Close)
 	w.authority = newAuthorityAuditTurn(w.admission)
-	at = "recovery"
-	if w.recovery, err = postgres.NewRecoveryReader(startup, pools[0], w.ids.InstallationID); err != nil {
-		return nil, err
-	}
 	at = "stores"
 	fleetStore, err := postgres.NewFleetObservation(startup, pools[0], w.ids.InstallationID)
 	if err != nil {
@@ -295,7 +290,7 @@ func newHubWorker(ctx context.Context, files, idFiles *os.Root) (_ *hubWorker, e
 		AuditMount: c.KeyService.AuditMount, AuditKey: c.KeyService.AuditKey, Roles: p.Roles,
 		WorkerConfigurationAudit: p.WorkerConfigurationAudit, ContextDeletionSigning: p.ContextDeletionSigning,
 		TokenFile: contracts.HubWorkerProviderTokenFile, AuditCredentialFile: contracts.HubWorkerAuditStorageFile,
-	}, files, w.recovery, w.admission)
+	}, files, w.admission)
 	if err != nil {
 		return nil, err
 	}
@@ -449,7 +444,7 @@ func runHubWorkerChildren(ctx context.Context, children []hubWorkerChild) error 
 }
 
 // runConfiguration runs the fleet/owner reconciler beside the provider
-// credential loop. Missing provider/recovery authority does not prevent the
+// credential loop. Missing provider authority does not prevent the
 // fleet observer from maintaining its own accepted source.
 func (w *hubWorker) runConfiguration(ctx context.Context) error {
 	if w == nil || w.reconciler == nil || w.providers == nil || w.admission == nil || ctx == nil || ctx.Err() != nil {

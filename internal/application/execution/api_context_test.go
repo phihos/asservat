@@ -30,7 +30,6 @@ type apiRunnerFixture struct {
 	target    targets.PodResolution
 	cap       planning.ContextCapability
 	retention privacy.Resolution
-	recovery  artifact.RecoveryProof
 	process   value.APIProcessBinding
 	actor     identity.Identity
 	mu        sync.Mutex
@@ -58,7 +57,7 @@ func (f *apiRunnerFixture) Permissions(ctx context.Context, t authorization.Targ
 	}
 	return authorization.Projection{Target: t, Revision: identity.Revision{UID: "permissions", Generation: 1, Digest: [32]byte{1}}, ObservedAt: f.now, FreshUntil: f.now.Add(5 * time.Second), DeniesObservedAt: f.now, DeniesFreshUntil: f.now.Add(5 * time.Second), DeniesComplete: true, Allows: []authorization.CurrentAssignment{{Audience: f.work.Accepted.Expectation.Audience[0], ObservedAt: f.now, FreshUntil: f.now.Add(5 * time.Second)}}}, nil
 }
-func (f *apiRunnerFixture) ReadAPIContextWork(context.Context, string, identity.Identity, artifact.RecoveryProof) (APIContextWork, error) {
+func (f *apiRunnerFixture) ReadAPIContextWork(context.Context, string, identity.Identity) (APIContextWork, error) {
 	return f.work, nil
 }
 func (f *apiRunnerFixture) ResolvePod(context.Context, targets.Request) (targets.PodResolution, error) {
@@ -131,9 +130,6 @@ type apiFixtureRetention struct{ f *apiRunnerFixture }
 
 func (r apiFixtureRetention) Resolve(ctx context.Context, i privacy.Input) (privacy.Resolution, error) {
 	return r.f.ResolveRetention(ctx, i)
-}
-func (f *apiRunnerFixture) RecoveryState(context.Context) (artifact.RecoveryProof, error) {
-	return f.recovery, nil
 }
 func (f *apiRunnerFixture) ReadAPIProcess(context.Context) (value.APIProcessObservation, error) {
 	p := f.process
@@ -215,8 +211,8 @@ func (f *apiRunnerFixture) RecordAPIOutcome(_ context.Context, r value.APIExecut
 	f.record = r
 	return r, nil
 }
-func (f *apiRunnerFixture) RecordAPIStoredCompletion(ctx context.Context, r value.APIExecution, c artifact.ContextWriterCompletion, p value.APIProcessObservation, recovery artifact.RecoveryProof) (value.APIExecution, error) {
-	if f.closes.Load() < 1 || c.Copies != r.Copies || !c.Valid(f.work.Accepted.Expectation.Registration) || !recovery.Valid(f.now) {
+func (f *apiRunnerFixture) RecordAPIStoredCompletion(ctx context.Context, r value.APIExecution, c artifact.ContextWriterCompletion, p value.APIProcessObservation) (value.APIExecution, error) {
+	if f.closes.Load() < 1 || c.Copies != r.Copies || !c.Valid(f.work.Accepted.Expectation.Registration) {
 		return value.APIExecution{}, value.ErrDenied
 	}
 	return f.RecordAPIOutcome(ctx, r, p)
@@ -238,8 +234,7 @@ func apiRunner(t *testing.T) (*apiRunnerFixture, APIContextRunner, identities.Cu
 	f.cap = planning.ContextCapability{ExecutionClass: artifact.ContextAPIExecution, Enabled: true, Revision: rev, CollectorVersion: e.CollectorVersion, CollectorImageDigest: e.CollectorImageDigest, ProjectionDigest: compiler.ProjectionDigest(), ObservedAt: f.now, FreshUntil: f.now.Add(5 * time.Second)}
 	proof := artifact.RetentionProof{RootID: contextID(41), ClusterID: f.target.Target().ClusterID, NamespaceUID: e.NamespaceUID, WorkloadUID: e.WorkloadUID, PodUID: e.PodUID, Topology: rev, Policy: rev, Selectors: rev, SourceCount: 1, ObservedAt: f.now, ValidUntil: f.now.Add(5 * time.Second), Sources: [2]artifact.RetentionSourceVersion{{ClusterID: f.target.Target().ClusterID, ControlNamespaceUID: contextID(42), Epoch: contextID(43), Hub: true, ProtectionDigest: artifact.Digest{1}, SnapshotDigest: artifact.Digest{2}, Acceptance: rev}}}
 	f.retention = privacy.Resolution{Target: f.target.Target(), PolicyRevision: rev, PurposeRef: e.PurposeRef, PrivacyClass: "potentialPersonalData", EvidenceType: "context", RequestedSeconds: e.RequestedAgeSeconds, MaximumSeconds: e.MaximumAgeSeconds, DeletionBudgetSeconds: e.DeletionBudgetSeconds, Policies: e.RetentionRules, Deadlines: privacy.Deadlines{AnchorAt: e.Registration.AnchorAt, ExpiresAt: e.Registration.ExpiresAt, DeleteBy: e.Registration.DeleteBy}, ValidUntil: f.now.Add(5 * time.Second), Proof: proof}
-	f.recovery = artifact.RecoveryProof{InstallationID: contextID(44), IssuerEpoch: base.receiver.IssuerEpoch, Revision: rev, ObservedAt: f.now, FreshUntil: f.now.Add(5 * time.Second)}
-	f.process = value.APIProcessBinding{InstallationID: f.recovery.InstallationID, ClusterID: f.target.Target().ClusterID, IssuerEpoch: f.recovery.IssuerEpoch, NamespaceUID: contextID(45), AccountUID: contextID(46), PodUID: contextID(47), ProcessEpoch: contextID(48), StartupDigest: artifact.Digest{1}, ImageDigest: artifact.Digest{0xee}}
+	f.process = value.APIProcessBinding{InstallationID: contextID(44), ClusterID: f.target.Target().ClusterID, IssuerEpoch: base.receiver.IssuerEpoch, NamespaceUID: contextID(45), AccountUID: contextID(46), PodUID: contextID(47), ProcessEpoch: contextID(48), StartupDigest: artifact.Digest{1}, ImageDigest: artifact.Digest{0xee}}
 	// ADR-333: the executor runs another image than the capability names; the
 	// digest is provenance, never an admission criterion.
 	if f.process.ImageDigest == e.CollectorImageDigest {
@@ -252,7 +247,7 @@ func apiRunner(t *testing.T) (*apiRunnerFixture, APIContextRunner, identities.Cu
 	e.PlanDigest = plan.ScopeDigest
 	e.RecipeDigest = plan.RecipeDigest
 	f.work = APIContextWork{Accepted: capture.Accepted{CaptureID: e.CaptureUID, State: capture.IntentAudited, ScopeDigest: e.PlanDigest, Expectation: e, Pin: pin, CreatedAt: f.now, Deadline: e.Registration.WriteUntil}, Target: f.target.Request, Actor: f.actor.Principal, IntentDigest: artifact.Digest{1}}
-	svc := APIContextRunner{Read: f, Prepare: f, Record: f, Process: f, Targets: f, Eligibility: access.Evaluator{Permissions: f, Now: func() time.Time { return f.now }}, Capabilities: f, Retention: apiFixtureRetention{f}, Recovery: f, Output: f, Collector: f, Now: func() time.Time { return f.now }}
+	svc := APIContextRunner{Read: f, Prepare: f, Record: f, Process: f, Targets: f, Eligibility: access.Evaluator{Permissions: f, Now: func() time.Time { return f.now }}, Capabilities: f, Retention: apiFixtureRetention{f}, Output: f, Collector: f, Now: func() time.Time { return f.now }}
 	source, _, err := identities.NewBearerRequest(context.Background(), f, "synthetic-token", svc.Now)
 	if err != nil {
 		t.Fatal(err)
@@ -458,7 +453,7 @@ func TestPolicyRawRunnerRequiresSameWorkSourceBeforePreparation(t *testing.T) {
 	f, s, current := apiRunner(t)
 	f.work.Actor = authorization.PolicyPrincipal("11111111-1111-4111-8111-111111111111", "policy")
 	f.work.Accepted.Expectation.Recording = &artifact.Recording{Filter: &artifact.RecordingFilter{Expression: "tcp[13] & 2 != 0"}}
-	_, err := s.execute(t.Context(), current, f.work, f.now.Add(5*time.Second), nil, nil)
+	_, err := s.execute(t.Context(), current, f.work, f.now.Add(5*time.Second), nil)
 	var step apiCheckStep
 	if err == nil || !errors.As(err, &step) || step.step != "ResolvePacketSource" || f.prepares.Load() != 0 || f.captures.Load() != 0 {
 		t.Fatal("unsupported exact source reached preparation/acquisition", err, f.prepares.Load(), f.captures.Load())

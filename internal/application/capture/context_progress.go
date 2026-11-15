@@ -5,7 +5,6 @@ import (
 	"slices"
 	"time"
 
-	fleetapp "asservat.local/asservat/internal/application/fleet"
 	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
@@ -38,7 +37,6 @@ type ContextProgressService struct {
 	Reasons                CaptureReasonReader
 	RootID, InstallationID string
 	Reader                 ContextProgressReader
-	Recovery               fleetapp.RecoveryReader
 	Navigation             ContextCaseNavigation
 	// Shares reads capture-time shares (ADR-235). Without it, a capture
 	// carrying a sharing instruction is reported unavailable.
@@ -57,7 +55,7 @@ type ContextCaptureReviews interface {
 
 func (s ContextProgressService) Get(ctx context.Context, source identities.CurrentIdentity, captureID string) (value.ContextProgress, error) {
 	var zero value.ContextProgress
-	if ctx == nil || source == nil || s.Reader == nil || s.Recovery == nil || s.Now == nil || !authorization.UUID(s.RootID) || !authorization.UUID(s.InstallationID) {
+	if ctx == nil || source == nil || s.Reader == nil || s.Now == nil || !authorization.UUID(s.RootID) || !authorization.UUID(s.InstallationID) {
 		return zero, value.ErrUnavailable
 	}
 	if !authorization.UUID(captureID) {
@@ -69,21 +67,17 @@ func (s ContextProgressService) Get(ctx context.Context, source identities.Curre
 	if err != nil || !i.Valid(s.Now()) {
 		return zero, value.ErrDenied
 	}
-	r, err := s.Recovery.RecoveryState(ctx)
-	if err != nil || r.InstallationID != s.InstallationID || !r.Valid(s.Now()) {
-		return zero, value.ErrUnavailable
-	}
 	if s.Reviews != nil {
 		_ = s.Reviews.ReviewCapture(ctx, i, captureID)
 	}
-	p, err := s.Reader.ReadContextProgress(ctx, value.ProgressQuery{RootID: s.RootID, CaptureID: captureID, Identity: i, Recovery: r})
+	p, err := s.Reader.ReadContextProgress(ctx, value.ProgressQuery{RootID: s.RootID, CaptureID: captureID, Identity: i})
 	if err != nil {
 		return zero, err
 	}
 	if p.CaptureID != captureID || !p.Valid(s.Now()) {
 		return zero, value.ErrUnavailable
 	}
-	until := identity.Earlier(identity.Earlier(p.ValidUntil, i.ValidUntil), r.FreshUntil)
+	until := identity.Earlier(p.ValidUntil, i.ValidUntil)
 	out := value.ContextProgress{Actions: slices.Clone(p.Actions), CanCancel: p.CanCancel, CancellationRequested: p.CancellationRequested, Operation: p.Operation, ActionID: p.ActionID, RepeatedFrom: p.RepeatedFrom, HistoryState: p.HistoryState, CaptureID: p.CaptureID, Revision: p.Revision, Phase: p.Phase, ActionPhase: p.ActionPhase, ReasonCode: p.ReasonCode, CreatedAt: p.CreatedAt, Deadline: p.Deadline}
 	if p.ReasonMetadata != nil {
 		out.ReasonState = "unavailable"

@@ -41,10 +41,9 @@ type nativeContextFixture struct {
 	dispatcher    *evidence.DownloadDispatcher
 	workers       *postgres.DownloadWorkers
 	configuration *postgres.WorkerConfigurations
-	recovery      evidence.ContextDownloadRecovery
 }
 
-func bindContextNativeStopFixture(t *testing.T, ctx context.Context, cfg *postgres.Downloads, a artifact.DownloadAllocation, installation, store string, g postgres.DownloadTransactionGuards, poolFor func(string, string) *pgxpool.Pool) {
+func bindContextNativeStopFixture(t *testing.T, ctx context.Context, cfg *postgres.Downloads, a artifact.DownloadAllocation, installation, store string, poolFor func(string, string) *pgxpool.Pool) {
 	t.Helper()
 	p := audit.DownloadStopLifecyclePolicy{RootID: a.RootID, InstallationID: installation, StoreID: store, PolicyID: custodyID(), BackupProfileID: custodyID(), QualificationID: custodyID(), PolicyDigest: artifact.Digest{1}, BackupProfileDigest: artifact.Digest{2}, QualificationDigest: artifact.Digest{3}, Layout: audit.DownloadStopHistoryLayout, CleanupBudgetSeconds: 6, ProofWindowSeconds: 3, MaximumRowFootprintBytes: 128 << 10, MaximumTransitionWALBytes: 128 << 10, BackupCopies: 1, WALCopies: 1, MaxPurgeLeases: 8}
 	c, k, b, w := p.SlotBacking()
@@ -56,7 +55,7 @@ func bindContextNativeStopFixture(t *testing.T, ctx context.Context, cfg *postgr
 	}
 	pool := poolFor("download_stop_lifecycle_config_runtime", "synthetic-stop-lifecycle-config")
 	defer pool.Close()
-	s, e := postgres.NewDownloadStopLifecycles(ctx, pool, a.RootID, g.Recovery)
+	s, e := postgres.NewDownloadStopLifecycles(ctx, pool, a.RootID, installation)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -274,7 +273,7 @@ func qualifyContextNativeContent(t *testing.T, ctx context.Context, f nativeExch
 		t.Fatal(e)
 	}
 	transfer := evidence.DownloadResponseTransfer{Sessions: first, Responses: responses, Authority: f.gate, Objects: objects, Audit: f.audit, Now: time.Now, NewID: custodyID}
-	coordinator := evidence.ContextDownloadCoordinator{RootID: root, InstallationID: target.InstallationID, Recovery: f.content.recovery, Routes: f.runtime, Sources: f.runtime, Authority: f.gate, Sessions: f.runtime, Plans: plans, Runtime: runtime, Now: time.Now, NewID: custodyID}
+	coordinator := evidence.ContextDownloadCoordinator{RootID: root, InstallationID: target.InstallationID, Routes: f.runtime, Sources: f.runtime, Authority: f.gate, Sessions: f.runtime, Plans: plans, Runtime: runtime, Now: time.Now, NewID: custodyID}
 	if f.content.mode == "native-content-interrupted" {
 		qualifyContextNativeInterrupted(t, ctx, f, runtime, transfer, coordinator, session, firstMetadata.Native, target, joined, stopWorker)
 		return
@@ -700,10 +699,10 @@ func nativeContentAuditFixture(t *testing.T, ctx context.Context, f nativeExchan
 }
 
 func nativeContentAuditFixtureOwned(t, owner *testing.T, ctx context.Context, f nativeExchangeFixture, inner *presentation.InvestigationOperations) *presentation.AuditedOperations {
-	return nativeOperationAuditServices(t, owner, ctx, f.allocation.RootID, f.worker.Binding.InstallationID, f.published.Expectation.Registration.StoreID, f.guards, f.admin, f.poolFor, f.store, f.keys, inner, 8)
+	return nativeOperationAuditServices(t, owner, ctx, f.allocation.RootID, f.worker.Binding.InstallationID, f.published.Expectation.Registration.StoreID, f.admin, f.poolFor, f.store, f.keys, inner, 8)
 }
 
-func nativeOperationAuditServices(t, owner *testing.T, ctx context.Context, root, installation, storeID string, guards postgres.DownloadTransactionGuards, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, inner *presentation.InvestigationOperations, normalRecords int64, diagnostics ...*publicJourneyDiagnostics) *presentation.AuditedOperations {
+func nativeOperationAuditServices(t, owner *testing.T, ctx context.Context, root, installation, storeID string, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, inner *presentation.InvestigationOperations, normalRecords int64, diagnostics ...*publicJourneyDiagnostics) *presentation.AuditedOperations {
 	t.Helper()
 	if len(diagnostics) > 1 || len(diagnostics) == 1 && diagnostics[0] == nil {
 		t.Fatal("invalid fixed journey diagnostic")
@@ -772,15 +771,15 @@ func nativeOperationAuditServices(t, owner *testing.T, ctx context.Context, root
 	cp.Close()
 	makeAudit := func(policy audit.OperationLifecyclePolicy) *auditapp.HealthyOperationAuditor {
 		lane := policy.Lane
-		j, e := postgres.NewHealthyOperationJournal(ctx, jp, policy, guards.Recovery)
+		j, e := postgres.NewHealthyOperationJournal(ctx, jp, policy)
 		if e != nil {
 			t.Fatal(e)
 		}
-		ack, e := postgres.NewOperationAcknowledgements(ctx, ap, policy.RootID, lane, guards.Recovery)
+		ack, e := postgres.NewOperationAcknowledgements(ctx, ap, policy.RootID, lane, installation)
 		if e != nil {
 			t.Fatal(e)
 		}
-		lifecycle, e := postgres.NewOperationLifecycles(ctx, jp, policy.RootID, lane, guards.Recovery)
+		lifecycle, e := postgres.NewOperationLifecycles(ctx, jp, policy.RootID, lane, installation)
 		if e != nil {
 			t.Fatal(e)
 		}

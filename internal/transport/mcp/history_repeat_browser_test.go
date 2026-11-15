@@ -118,9 +118,9 @@ func testHistoryEditedRepeatBrowser(t *testing.T, nanoseconds bool) {
 	server.EnableHTTP2 = true
 	server.StartTLS()
 	defer server.Close()
-	service := app.ContextInvestigation{RootID: reserveID(1), InstallationID: reserveID(2), Previews: facts, Replay: facts, Admission: facts, Targets: facts, Eligibility: access.Evaluator{Permissions: facts, Now: time.Now}, Capabilities: facts, Retention: facts, Storage: facts, Processing: facts, Recovery: facts, Recorders: facts, Filters: facts, Approvals: facts, Lifetime: time.Minute, Now: time.Now, NewID: func() string { return reserveID(100 + int(facts.ids.Add(1))) }}
+	service := app.ContextInvestigation{RootID: reserveID(1), InstallationID: reserveID(2), Previews: facts, Replay: facts, Admission: facts, Targets: facts, Eligibility: access.Evaluator{Permissions: facts, Now: time.Now}, Capabilities: facts, Retention: facts, Storage: facts, Processing: facts, Recorders: facts, Filters: facts, Approvals: facts, Lifetime: time.Minute, Now: time.Now, NewID: func() string { return reserveID(100 + int(facts.ids.Add(1))) }}
 	service.ReportPreviewFailure = func(stage string) { t.Log("preview stage", stage) }
-	history := app.ContextHistoryService{RootID: reserveID(1), InstallationID: reserveID(2), Reader: facts, Targets: facts, Workloads: facts, Previews: service, Recovery: facts, Now: time.Now}
+	history := app.ContextHistoryService{RootID: reserveID(1), InstallationID: reserveID(2), Reader: facts, Targets: facts, Workloads: facts, Previews: service, Now: time.Now}
 	ops, err := presentation.NewContextOperationsWithHistory(presentation.ContextOperationsConfig{PublicOrigin: server.URL, CollectionEnabled: true, Now: time.Now, NewID: func() string { return reserveID(500) }}, service, &mcpCaptureFixture{}, history)
 	if err != nil {
 		t.Fatal(err)

@@ -54,7 +54,6 @@ func (f *projectionFixture) refresh(now time.Time) {
 	f.i.VerifiedAt, f.i.ValidUntil = now, until
 	f.a.CheckedAt, f.a.ValidUntil = now, until
 	f.a.Environment.ObservedAt, f.a.Environment.ValidUntil = now, until
-	f.a.Environment.Recovery.ObservedAt, f.a.Environment.Recovery.FreshUntil = now, until
 	f.a.Environment.Processing.ObservedAt, f.a.Environment.Processing.ValidUntil = now, until
 	f.a.Retention.ObservedAt, f.a.Retention.ValidUntil = now, until
 	f.p.ObservedAt, f.p.ValidUntil = now, until
@@ -73,7 +72,6 @@ func newProjectionFixture(t *testing.T) *projectionFixture {
 		HubClusterID: projectionID, HubRegion: "region", WorkerConfiguration: rev, HubConfiguration: rev}
 	f.a = value.ContextProjectionAuthority{Scope: scope, Environment: value.ContextProjectionEnvironment{RootID: projectionID, InstallationID: projectionID,
 		Region: "region", StoreID: projectionID, Location: location, Principal: principal, PolicyRevision: rev, Path: path,
-		Recovery:   artifact.RecoveryProof{InstallationID: projectionID, IssuerEpoch: projectionID, Revision: rev},
 		Processing: artifact.DownloadProcessingProof{RootID: projectionID, Epoch: projectionID, CaptureID: projectionID, Location: location, Sequence: 1, StateDigest: artifact.Digest{1}}},
 		Retention: artifact.RetentionProof{RootID: projectionID, ClusterID: projectionID, NamespaceUID: "namespace", WorkloadUID: "workload", PodUID: "pod",
 			Topology: rev, Policy: rev, Selectors: rev, SourceCount: 1}, PermissionRevision: rev, IdentityRevision: rev, DecisionDigest: artifact.Digest{1},
@@ -92,7 +90,7 @@ func newProjectionFixture(t *testing.T) *projectionFixture {
 		HardUntil: f.now.Add(time.Minute), EffectsUntil: f.now.Add(3 * time.Minute), CleanupUntil: f.now.Add(4 * time.Minute), RetireBy: f.now.Add(time.Hour)}
 	f.refresh(f.now)
 	f.s = ContextProjectionService{Results: ContextProjectionResults{RootID: projectionID, InstallationID: projectionID, HubProcessEpoch: projectionID,
-		Authority: f, Ledger: f, Reader: f, Now: func() time.Time { return f.now }, NewID: f.next}, Recovery: f, Routes: f, Plans: f, Workers: f}
+		Authority: f, Ledger: f, Reader: f, Now: func() time.Time { return f.now }, NewID: f.next}, Routes: f, Plans: f, Workers: f}
 	if !f.a.Valid(f.now) || !f.p.Valid(f.a.Scope, f.now) {
 		t.Fatal("invalid fixture")
 	}
@@ -104,10 +102,7 @@ func (f *projectionFixture) ResolveIdentity(ctx context.Context) (identity.Ident
 	}
 	return f.i, nil
 }
-func (f *projectionFixture) RecoveryState(context.Context) (artifact.RecoveryProof, error) {
-	return f.a.Environment.Recovery, nil
-}
-func (f *projectionFixture) ResolveContextProjection(ctx context.Context, _ value.ContextExcerptSelection, _ identity.Identity, _ artifact.RecoveryProof) (value.ContextProjectionCandidate, error) {
+func (f *projectionFixture) ResolveContextProjection(ctx context.Context, _ value.ContextExcerptSelection, _ identity.Identity) (value.ContextProjectionCandidate, error) {
 	if f.routeHook != nil {
 		f.routeHook(ctx)
 	}
@@ -491,7 +486,6 @@ func TestQueryRequestObservationAndCurrentSQLFence(t *testing.T) {
 		{"group-revocation", func(f *projectionFixture) { f.i.Groups = []string{"different"}; f.authorityErr = value.ErrUnavailable }},
 		{"source-replacement", func(f *projectionFixture) { f.a.Scope.Version[0]++ }},
 		{"retention-cutoff", func(f *projectionFixture) { f.a.AccessUntil = f.now }},
-		{"recovery-change", func(f *projectionFixture) { f.a.Environment.Recovery.Revision.Generation++ }},
 		{"path-change", func(f *projectionFixture) { f.a.Environment.Path.WorkerConfiguration.Generation++ }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -584,7 +578,7 @@ func TestQueryEveryBlockingPortRetainsEarlierOriginalCutoff(t *testing.T) {
 			}
 			switch stage {
 			case "route":
-				f.a.Environment.Recovery.FreshUntil = cutoff
+				f.i.ValidUntil = cutoff
 				f.routeHook = wait
 			case "plan":
 				f.a.ValidUntil = cutoff
@@ -830,7 +824,7 @@ func TestQueryTwelveSecondReadWithinOneEvidenceRequest(t *testing.T) {
 	start := f.now
 	window := start.Add(identity.EvidenceReadRequestWindow)
 	f.i.ValidUntil, f.a.ValidUntil, f.workerUntil = window, window, window
-	f.a.Environment.ValidUntil, f.a.Environment.Recovery.FreshUntil, f.a.Environment.Processing.ValidUntil = window, window, window
+	f.a.Environment.ValidUntil, f.a.Environment.Processing.ValidUntil = window, window
 	f.a.Retention.ValidUntil = window
 	if !f.a.Valid(start) {
 		t.Fatal("evidence-read authority interval rejected")

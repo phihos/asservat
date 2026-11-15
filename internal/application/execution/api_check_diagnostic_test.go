@@ -9,7 +9,6 @@ import (
 	"time"
 
 	identities "asservat.local/asservat/internal/application/identity"
-	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/execution"
 	"asservat.local/asservat/internal/domain/identity"
@@ -48,11 +47,11 @@ func (p *apiCheckProbe) visit(ctx context.Context, stage string) error {
 	}
 	return nil
 }
-func (p *apiCheckProbe) ReadAPIContextWork(ctx context.Context, id string, i identity.Identity, r artifact.RecoveryProof) (APIContextWork, error) {
+func (p *apiCheckProbe) ReadAPIContextWork(ctx context.Context, id string, i identity.Identity) (APIContextWork, error) {
 	if err := p.visit(ctx, "ReadAPIContextWork"); err != nil {
 		return APIContextWork{}, err
 	}
-	return p.apiRunnerFixture.ReadAPIContextWork(ctx, id, i, r)
+	return p.apiRunnerFixture.ReadAPIContextWork(ctx, id, i)
 }
 func (p *apiCheckProbe) ResolvePod(ctx context.Context, r targets.Request) (targets.PodResolution, error) {
 	p.check++
@@ -76,16 +75,6 @@ func (p *apiCheckProbe) ContextCapability(ctx context.Context, target authorizat
 		out.Enabled = false
 	}
 	return out, err
-}
-func (p *apiCheckProbe) RecoveryState(ctx context.Context) (artifact.RecoveryProof, error) {
-	stage := "Recovery"
-	if p.check == 0 {
-		stage = "InitialRecovery"
-	}
-	if err := p.visit(ctx, stage); err != nil {
-		return artifact.RecoveryProof{}, err
-	}
-	return p.apiRunnerFixture.RecoveryState(ctx)
 }
 func (p *apiCheckProbe) ReadAPIProcess(ctx context.Context) (value.APIProcessObservation, error) {
 	if err := p.visit(ctx, "Process"); err != nil {
@@ -119,30 +108,29 @@ func apiCheckDiagnosticRunner(t *testing.T, fail string, failure error, check in
 	t.Cleanup(cancel)
 	until, _ := ctx.Deadline()
 	p := &apiCheckProbe{apiRunnerFixture: f, t: t, eligibility: runner.Eligibility, until: until, cancel: cancel, fail: fail, failure: failure, failCheck: check}
-	runner.Read, runner.Targets, runner.Eligibility, runner.Capabilities, runner.Retention, runner.Recovery, runner.Process = p, p, p, p, apiCheckRetention{p}, p, p
+	runner.Read, runner.Targets, runner.Eligibility, runner.Capabilities, runner.Retention, runner.Process = p, p, p, p, apiCheckRetention{p}, p
 	return p, runner, current, ctx
 }
 
 func TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects(t *testing.T) {
-	order := []string{"InitialRecovery", "ReadAPIContextWork", "ResolvePod", "Eligibility", "Capability", "Retention", "Recovery", "Process"}
+	order := []string{"ReadAPIContextWork", "ResolvePod", "Eligibility", "Capability", "Retention", "Process"}
 	for _, tc := range []struct {
 		stage, want string
 		reads       int
 		failure     error
 		class       error
 	}{
-		{"ReadAPIContextWork", "ReadAPIContextWork", 2, value.ErrUnavailable, value.ErrUnavailable},
-		{"ResolvePod", "Check/ResolvePod", 3, apiCheckPrivateError{}, value.ErrUnavailable},
-		{"ResolvePod", "Check/ResolvePod", 3, context.DeadlineExceeded, context.DeadlineExceeded},
-		{"ResolvePod", "Check/ResolvePod", 3, context.Canceled, context.Canceled},
-		{"Eligibility", "Check/Eligibility", 4, value.ErrDenied, value.ErrDenied},
-		{"Capability", "Check/Capability", 5, apiCheckPrivateError{}, value.ErrUnavailable},
-		{"Retention", "Check/Retention", 6, apiCheckPrivateError{}, value.ErrUnavailable},
-		{"Compile", "Check/Compile", 6, nil, planning.ErrInvalid},
-		{"Recovery", "Check/Recovery", 7, apiCheckPrivateError{}, value.ErrUnavailable},
-		{"Process", "Check/Process", 8, apiCheckPrivateError{}, value.ErrUnavailable},
-		{"Current", "Check/Current", 8, nil, value.ErrDenied},
-		{"Context", "Check/Context", 8, nil, value.ErrDenied},
+		{"ReadAPIContextWork", "ReadAPIContextWork", 1, value.ErrUnavailable, value.ErrUnavailable},
+		{"ResolvePod", "Check/ResolvePod", 2, apiCheckPrivateError{}, value.ErrUnavailable},
+		{"ResolvePod", "Check/ResolvePod", 2, context.DeadlineExceeded, context.DeadlineExceeded},
+		{"ResolvePod", "Check/ResolvePod", 2, context.Canceled, context.Canceled},
+		{"Eligibility", "Check/Eligibility", 3, value.ErrDenied, value.ErrDenied},
+		{"Capability", "Check/Capability", 4, apiCheckPrivateError{}, value.ErrUnavailable},
+		{"Retention", "Check/Retention", 5, apiCheckPrivateError{}, value.ErrUnavailable},
+		{"Compile", "Check/Compile", 5, nil, planning.ErrInvalid},
+		{"Process", "Check/Process", 6, apiCheckPrivateError{}, value.ErrUnavailable},
+		{"Current", "Check/Current", 6, nil, value.ErrDenied},
+		{"Context", "Check/Context", 6, nil, value.ErrDenied},
 	} {
 		t.Run(tc.stage, func(t *testing.T) {
 			p, runner, current, ctx := apiCheckDiagnosticRunner(t, tc.stage, tc.failure, 1)

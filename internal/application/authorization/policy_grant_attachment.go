@@ -16,7 +16,6 @@ import (
 type PolicyGrantAttachmentInput struct {
 	ID, PolicyUID, GrantID, IdempotencyKey string
 	Actor                                  identity.Identity
-	Recovery                               artifact.RecoveryProof
 }
 
 type PolicyGrantAttachmentStore interface {

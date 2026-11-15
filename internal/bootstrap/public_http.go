@@ -54,7 +54,6 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 		if err != nil {
 			return nil, err
 		}
-		recovery := d.shared.guards.Recovery
 		return auditapp.NewSelectedOperationAuditor(lane, profiles, func(call context.Context, policy audit.OperationLifecyclePolicy) (*auditapp.HealthyOperationAuditor, error) {
 			if policy.Lane != lane || policy.RootID != root || policy.InstallationID != installation {
 				return nil, mounts.ErrUnavailable
@@ -64,20 +63,20 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 			var lifecycle *postgres.OperationLifecycles
 			var err error
 			if lane == "processing" {
-				journal, err = postgres.NewProcessingReleaseJournal(call, journalPool, policy, recovery)
+				journal, err = postgres.NewProcessingReleaseJournal(call, journalPool, policy)
 				if err == nil {
-					acks, err = postgres.NewProcessingReleaseAcknowledgements(call, ackPool, policy, recovery)
+					acks, err = postgres.NewProcessingReleaseAcknowledgements(call, ackPool, policy)
 				}
 				if err == nil {
-					lifecycle, err = postgres.NewProcessingReleaseLifecycles(call, journalPool, policy, recovery)
+					lifecycle, err = postgres.NewProcessingReleaseLifecycles(call, journalPool, policy)
 				}
 			} else {
-				journal, err = postgres.NewHealthyOperationJournal(call, journalPool, policy, recovery)
+				journal, err = postgres.NewHealthyOperationJournal(call, journalPool, policy)
 				if err == nil {
-					acks, err = postgres.NewOperationAcknowledgements(call, ackPool, root, lane, recovery)
+					acks, err = postgres.NewOperationAcknowledgements(call, ackPool, root, lane, installation)
 				}
 				if err == nil {
-					lifecycle, err = postgres.NewOperationLifecycles(call, journalPool, root, lane, recovery)
+					lifecycle, err = postgres.NewOperationLifecycles(call, journalPool, root, lane, installation)
 				}
 			}
 			if err != nil {
@@ -195,7 +194,7 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 		if err != nil {
 			return nil, &fixedStepError{"processing-sql", err}
 		}
-		decisions, err := postgres.NewProcessingDecisions(ctx, pool, root, d.shared.guards.Recovery)
+		decisions, err := postgres.NewProcessingDecisions(ctx, pool, root)
 		if err != nil {
 			return nil, &fixedStepError{"processing-sql", mounts.ErrUnavailable}
 		}
@@ -203,22 +202,22 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 		if err != nil {
 			return nil, &fixedStepError{"audit-processing", mounts.ErrUnavailable}
 		}
-		inventory, err := postgres.NewProcessingInventory(ctx, pool, root, d.shared.guards.Recovery)
+		inventory, err := postgres.NewProcessingInventory(ctx, pool, root)
 		if err != nil {
 			return nil, &fixedStepError{"processing-inventory", mounts.ErrUnavailable}
 		}
-		services.ProcessingRules = publicProcessingInventory{privacyapp.ProcessingRuleInventory{RootID: root, InstallationID: installation, Policies: pc.processingPolicy, Recovery: pc.recovery, Inventory: inventory, Now: time.Now}}
+		services.ProcessingRules = publicProcessingInventory{privacyapp.ProcessingRuleInventory{RootID: root, InstallationID: installation, Policies: pc.processingPolicy, Inventory: inventory, Now: time.Now}}
 		discovery, err := presentation.NewProcessingDiscoveryOperations(p.Origin, time.Now, ownerRandomID,
-			privacyapp.ProcessingEvidenceDiscovery{RootID: root, InstallationID: installation, Policies: pc.processingPolicy, Recovery: pc.recovery, Discovery: inventory, Now: time.Now},
-			&privacyapp.ProcessingErasureStatus{RootID: root, InstallationID: installation, Policies: pc.processingPolicy, Recovery: pc.recovery, Status: decisions, Now: time.Now},
-			&privacyapp.ProcessingReport{RootID: root, InstallationID: installation, Policies: pc.processingPolicy, Recovery: pc.recovery, Reports: inventory, Now: time.Now})
+			privacyapp.ProcessingEvidenceDiscovery{RootID: root, InstallationID: installation, Policies: pc.processingPolicy, Discovery: inventory, Now: time.Now},
+			&privacyapp.ProcessingErasureStatus{RootID: root, InstallationID: installation, Policies: pc.processingPolicy, Status: decisions, Now: time.Now},
+			&privacyapp.ProcessingReport{RootID: root, InstallationID: installation, Policies: pc.processingPolicy, Reports: inventory, Now: time.Now})
 		if err != nil {
 			return nil, &fixedStepError{"processing-discovery", err}
 		}
 		if services.Operations, err = presentation.NewInvestigationProcessingDiscoveryOperations(operations, discovery); err != nil {
 			return nil, &fixedStepError{"processing-discovery", err}
 		}
-		services.Processing = publicProcessingChanges{root: root, installation: installation, profiles: profiles, policies: pc.processingPolicy, recovery: pc.recovery, decisions: decisions, artifactScopes: inventory, audit: normal, releaseAudit: release, mac: pc.mac, refused: eventLog(os.Stderr, "processing change refused")}
+		services.Processing = publicProcessingChanges{root: root, installation: installation, profiles: profiles, policies: pc.processingPolicy, decisions: decisions, artifactScopes: inventory, audit: normal, releaseAudit: release, mac: pc.mac, refused: eventLog(os.Stderr, "processing change refused")}
 	}
 	// One LISTEN connection feeds every console status stream (REQ-INT-003).
 	progressPool, err := d.public.open(ctx, "hub-metadata-read")

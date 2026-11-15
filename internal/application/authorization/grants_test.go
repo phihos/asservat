@@ -35,7 +35,7 @@ func newMemoryGrants(now func() time.Time) *memoryGrants {
 	return &memoryGrants{now: now, rows: map[string]value.Grant{}, keys: map[string]string{}, children: map[string]value.GrantChild{}, uses: map[string]GrantUseRequest{}, decided: map[string]string{}, revoked: map[string]string{}, locator: map[string]string{}, policyInputs: map[string]artifact.Digest{}}
 }
 
-func (m *memoryGrants) RequestGrant(_ context.Context, r StoredGrantRequest, _ artifact.RecoveryProof) (value.Grant, bool, error) {
+func (m *memoryGrants) RequestGrant(_ context.Context, r StoredGrantRequest) (value.Grant, bool, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	k := r.Grant.Requester.Issuer + "\n" + r.Grant.Requester.Subject + "\n" + r.IdempotencyKey
@@ -114,7 +114,7 @@ func (m *memoryGrants) RequestedGrants(_ context.Context, p identity.Principal, 
 	return out, nil
 }
 
-func (m *memoryGrants) DecideGrant(_ context.Context, in GrantDecisionInput, _ artifact.RecoveryProof) (value.Grant, bool, error) {
+func (m *memoryGrants) DecideGrant(_ context.Context, in GrantDecisionInput) (value.Grant, bool, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	g, ok := m.rows[in.GrantID]
@@ -155,7 +155,7 @@ func (m *memoryGrants) DecideGrant(_ context.Context, in GrantDecisionInput, _ a
 	return g, false, nil
 }
 
-func (m *memoryGrants) RevokeGrant(_ context.Context, in GrantRevocationInput, _ artifact.RecoveryProof) (value.Grant, bool, error) {
+func (m *memoryGrants) RevokeGrant(_ context.Context, in GrantRevocationInput) (value.Grant, bool, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	g, ok := m.rows[in.GrantID]
@@ -177,7 +177,7 @@ func (m *memoryGrants) RevokeGrant(_ context.Context, in GrantRevocationInput, _
 	return g, false, nil
 }
 
-func (m *memoryGrants) MaterializeGrantChild(_ context.Context, in GrantChildRequest, _ artifact.RecoveryProof) (value.GrantChild, bool, error) {
+func (m *memoryGrants) MaterializeGrantChild(_ context.Context, in GrantChildRequest) (value.GrantChild, bool, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	g, ok := m.rows[in.ParentID]
@@ -232,7 +232,7 @@ func (m *memoryGrants) GrantChildFor(_ context.Context, parent, artifactID, clie
 	return value.GrantChild{}, ErrGrantNotFound
 }
 
-func (m *memoryGrants) ReserveGrantUse(_ context.Context, in GrantUseRequest, _ artifact.RecoveryProof) (value.Grant, bool, error) {
+func (m *memoryGrants) ReserveGrantUse(_ context.Context, in GrantUseRequest) (value.Grant, bool, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	g := m.rows[in.ParentID]
@@ -304,13 +304,7 @@ func newGrantFixture(t *testing.T) *grantFixture {
 		return value.Projection{Target: t, Revision: rev, ObservedAt: f.now, FreshUntil: f.now.Add(30 * time.Second), DeniesComplete: true, DeniesObservedAt: f.now, DeniesFreshUntil: f.now.Add(30 * time.Second),
 			Allows: []value.CurrentAssignment{assign("dev", "workload-maintainer", 1), assign("lead", "action-approver", 2), assign("other", "workload-maintainer", 3)}}
 	}
-	recovery := artifact.RecoveryProof{InstallationID: grantRoot, IssuerEpoch: grantRoot, Revision: rev, ObservedAt: f.now, FreshUntil: f.now.Add(5 * time.Second)}
 	f.svc = GrantService{RootID: grantRoot, InstallationID: grantRoot, Permissions: projectionFunc(func(t value.Target) value.Projection { return f.projection(t) }), Store: f.store,
-		Recovery: recoveryFunc(func() artifact.RecoveryProof {
-			current := recovery
-			current.ObservedAt, current.FreshUntil = f.now, f.now.Add(5*time.Second)
-			return current
-		}),
 		NewID: func() string { f.ids++; return grantID(100 + f.ids) }, Now: func() time.Time { return f.now }}
 	return f
 }
@@ -320,10 +314,6 @@ type projectionFunc func(value.Target) value.Projection
 func (p projectionFunc) Permissions(_ context.Context, t value.Target) (value.Projection, error) {
 	return p(t), nil
 }
-
-type recoveryFunc func() artifact.RecoveryProof
-
-func (r recoveryFunc) RecoveryState(context.Context) (artifact.RecoveryProof, error) { return r(), nil }
 
 var grantScope = []byte(`{"schemaVersion":"recorder-preview/v1"}`)
 

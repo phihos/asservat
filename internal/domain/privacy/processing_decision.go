@@ -1,10 +1,10 @@
 package privacy
 
 import (
-	"asservat.local/asservat/internal/domain/artifact"
+	"time"
+
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
-	"time"
 )
 
 // ProcessingAuthority is request-owned current authority, never a stored
@@ -12,12 +12,11 @@ import (
 type ProcessingAuthority struct {
 	Identity               identity.Identity
 	Policy                 DownloadPolicy
-	Recovery               artifact.RecoveryProof
 	ObservedAt, ValidUntil time.Time
 }
 
 func (a ProcessingAuthority) Valid(now time.Time) bool {
-	return a.Identity.Valid(now) && a.Policy.Valid(now) && a.Policy.Operator(a.Identity, now) && a.Recovery.Valid(now) && a.Policy.InstallationID == a.Recovery.InstallationID && a.Policy.RecoveryEpoch == a.Recovery.IssuerEpoch && identity.Fresh(a.ObservedAt, a.ValidUntil, now, 5*time.Second) && !a.ValidUntil.After(a.Identity.ValidUntil) && !a.ValidUntil.After(a.Policy.FreshUntil) && !a.ValidUntil.After(a.Recovery.FreshUntil)
+	return a.Identity.Valid(now) && a.Policy.Valid(now) && a.Policy.Operator(a.Identity, now) && identity.Fresh(a.ObservedAt, a.ValidUntil, now, 5*time.Second) && !a.ValidUntil.After(a.Identity.ValidUntil) && !a.ValidUntil.After(a.Policy.FreshUntil)
 }
 
 const RequestEarlyErasure = "request_early_erasure"

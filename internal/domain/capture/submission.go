@@ -54,12 +54,12 @@ func (s PolicySubmissionIntent) Valid(now time.Time) bool {
 // SubmissionCheck is short-lived verification provenance, never collection or
 // approval authority. Consumers recheck it after blocking work.
 type SubmissionCheck struct {
-	Submission                                 VerifiedPolicySubmission
-	RootID, InstallationID, IssuerEpoch, KeyID string
-	TrustRevision                              identity.Revision
-	VerifiedAt, ValidUntil                     time.Time
+	Submission                    VerifiedPolicySubmission
+	RootID, InstallationID, KeyID string
+	TrustRevision                 identity.Revision
+	VerifiedAt, ValidUntil        time.Time
 }
 
 func (s SubmissionCheck) Valid(now time.Time) bool {
-	return s.Submission.Valid(now) && authorization.UUID(s.RootID) && authorization.UUID(s.InstallationID) && authorization.UUID(s.IssuerEpoch) && identity.Text(s.KeyID, 128) && s.TrustRevision.Valid() && identity.Fresh(s.VerifiedAt, s.ValidUntil, now, 5*time.Second) && !s.ValidUntil.After(s.Submission.ExpiresAt)
+	return s.Submission.Valid(now) && authorization.UUID(s.RootID) && authorization.UUID(s.InstallationID) && identity.Text(s.KeyID, 128) && s.TrustRevision.Valid() && identity.Fresh(s.VerifiedAt, s.ValidUntil, now, 5*time.Second) && !s.ValidUntil.After(s.Submission.ExpiresAt)
 }

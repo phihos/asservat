@@ -75,7 +75,7 @@ func qualifyRawPacketSummaryLifecycle(t *testing.T, f *queryLedgerFixture) {
 		return string(b)
 	}
 	before := snapshot()
-	routes, err := postgres.NewContextCaseReads(f.base.ctx, f.base.roles["hub-runtime"], f.base.input.PermissionRootID, f.scenario.recovery.guard)
+	routes, err := postgres.NewContextCaseReads(f.base.ctx, f.base.roles["hub-runtime"], f.base.input.PermissionRootID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,12 +83,8 @@ func qualifyRawPacketSummaryLifecycle(t *testing.T, f *queryLedgerFixture) {
 	who.Scopes = []string{"evidence:read"}
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	who.VerifiedAt, who.ValidUntil = now, now.Add(5*time.Second)
-	recovery, err := f.scenario.recovery.reader.RecoveryState(f.base.ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
 	e := f.published.Expectation
-	route, err := routes.ResolvePacketProjectionRoute(f.base.ctx, e.CaseID, e.Registration.Location.ArtifactID, who, recovery)
+	route, err := routes.ResolvePacketProjectionRoute(f.base.ctx, e.CaseID, e.Registration.Location.ArtifactID, who)
 	if err != nil || route.NativeType != artifact.RawPCAPNGArtifact || route.PodUID != e.PodUID {
 		t.Fatal("same-read raw native route", route.NativeType, err)
 	}
@@ -103,15 +99,11 @@ func qualifyRawPacketSummaryLifecycle(t *testing.T, f *queryLedgerFixture) {
 	who = f.scenario.a.Eligibility.VerifiedIdentity // Original acquisition identity, not the read-only summary identity.
 	n := time.Now().UTC().Truncate(time.Microsecond)
 	who.VerifiedAt, who.ValidUntil = n, n.Add(5*time.Second)
-	recovery, err = f.scenario.recovery.reader.RecoveryState(f.base.ctx)
+	executionSQL, err := postgres.NewAPIContextExecutions(f.base.ctx, f.base.roles["hub-runtime"], f.base.input.PermissionRootID, f.scenario.recovery.installation, f.scenario.retention.guard)
 	if err != nil {
 		t.Fatal(err)
 	}
-	executionSQL, err := postgres.NewAPIContextExecutions(f.base.ctx, f.base.roles["hub-runtime"], f.base.input.PermissionRootID, postgres.EffectTransactionGuards{Retention: f.scenario.retention.guard, Recovery: f.scenario.recovery.guard})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err = executionSQL.ReadAPIContextWork(f.base.ctx, e.CaptureUID, who, recovery); err != nil {
+	if _, err = executionSQL.ReadAPIContextWork(f.base.ctx, e.CaptureUID, who); err != nil {
 		t.Fatal("original acquisition grant live control", err)
 	}
 	var grantID string
@@ -119,15 +111,15 @@ func qualifyRawPacketSummaryLifecycle(t *testing.T, f *queryLedgerFixture) {
 	if err = f.base.admin.QueryRow(f.base.ctx, `SELECT id,revision FROM access_grant WHERE root_id=$1 AND capture_id=$2`, f.base.input.PermissionRootID, e.CaptureUID).Scan(&grantID, &revision); err != nil {
 		t.Fatal(err)
 	}
-	grants, err := postgres.NewAccessGrants(f.base.ctx, f.base.roles["hub-runtime"], f.base.input.PermissionRootID, f.scenario.recovery.guard)
+	grants, err := postgres.NewAccessGrants(f.base.ctx, f.base.roles["hub-runtime"], f.base.input.PermissionRootID, f.scenario.recovery.installation)
 	if err != nil {
 		t.Fatal(err)
 	}
-	revoked, _, err := grants.RevokeGrant(f.base.ctx, authapp.GrantRevocationInput{GrantID: grantID, Revoker: who.Principal, ExpectedRevision: revision, IdempotencyKey: "raw-fixture-revoke-after-query"}, recovery)
+	revoked, _, err := grants.RevokeGrant(f.base.ctx, authapp.GrantRevocationInput{GrantID: grantID, Revoker: who.Principal, ExpectedRevision: revision, IdempotencyKey: "raw-fixture-revoke-after-query"})
 	if err != nil || revoked.RevokedAt.IsZero() {
 		t.Fatal("original raw grant positive revocation", err)
 	}
-	_, err = executionSQL.ReadAPIContextWork(f.base.ctx, e.CaptureUID, who, recovery)
+	_, err = executionSQL.ReadAPIContextWork(f.base.ctx, e.CaptureUID, who)
 	var step interface{ FixedStep() string }
 	phase := ""
 	if err != nil && errors.As(err, &step) {

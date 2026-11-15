@@ -5,7 +5,6 @@ import (
 	"slices"
 	"time"
 
-	fleetapp "asservat.local/asservat/internal/application/fleet"
 	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
@@ -48,13 +47,12 @@ type CaptureCancellation struct {
 	RootID, InstallationID string
 	Ledger                 CaptureCancellationLedger
 	Dispatcher             CaptureSnapshotCancellationDispatcher
-	Recovery               fleetapp.RecoveryReader
 	Now                    func() time.Time
 }
 
 func (s CaptureCancellation) Cancel(ctx context.Context, current identities.CurrentIdentity, request value.CancellationRequest) (value.Cancellation, error) {
 	var zero value.Cancellation
-	if ctx == nil || ctx.Err() != nil || current == nil || s.Ledger == nil || s.Dispatcher == nil || s.Recovery == nil || s.Now == nil || !authorization.UUID(s.RootID) || !authorization.UUID(s.InstallationID) {
+	if ctx == nil || ctx.Err() != nil || current == nil || s.Ledger == nil || s.Dispatcher == nil || s.Now == nil || !authorization.UUID(s.RootID) || !authorization.UUID(s.InstallationID) {
 		return zero, value.ErrUnavailable
 	}
 	if !request.Valid() {
@@ -67,14 +65,10 @@ func (s CaptureCancellation) Cancel(ctx context.Context, current identities.Curr
 	if err != nil || !i.Valid(s.Now()) || !slices.Contains(i.Scopes, "evidence:capture") {
 		return zero, value.ErrDenied
 	}
-	recovery, err := s.Recovery.RecoveryState(call)
-	if err != nil || !recovery.Valid(s.Now()) || recovery.InstallationID != s.InstallationID {
-		return zero, value.ErrUnavailable
-	}
-	until := identity.Earlier(started.Add(5*time.Second), identity.Earlier(i.ValidUntil, recovery.FreshUntil))
+	until := identity.Earlier(started.Add(5*time.Second), i.ValidUntil)
 	bounded, cancel := context.WithDeadline(call, until)
 	defer cancel()
-	check := value.CancellationCheck{RootID: s.RootID, Request: request, Identity: i, Recovery: recovery, CheckedAt: s.Now().UTC().Truncate(time.Microsecond), ValidUntil: until}
+	check := value.CancellationCheck{RootID: s.RootID, Request: request, Identity: i, CheckedAt: s.Now().UTC().Truncate(time.Microsecond), ValidUntil: until}
 	if !check.Valid(s.Now()) {
 		return zero, value.ErrDenied
 	}
@@ -144,7 +138,7 @@ func (s CaptureCancellation) Cancel(ctx context.Context, current identities.Curr
 			return decision, err
 		}
 	}
-	if bounded.Err() != nil || !decision.Valid(s.Now()) || !recovery.Valid(s.Now()) {
+	if bounded.Err() != nil || !decision.Valid(s.Now()) {
 		return zero, value.ErrChanged
 	}
 	return decision, nil

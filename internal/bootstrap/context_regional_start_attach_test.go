@@ -48,7 +48,7 @@ func TestRegionalStartPreservesActualAttachFailure(t *testing.T) {
 				defer func() { standby.Finish(); held.Close() }()
 			}
 			var reports []string
-			start := RegionalAPIContextStart{Runner: executionapp.APIContextRunner{Read: f, Prepare: f, Record: f, Capabilities: capability, Recovery: f, Now: time.Now}, Signer: f, Router: router, Now: time.Now, Report: func(s string) { reports = append(reports, s) }}
+			start := RegionalAPIContextStart{Runner: executionapp.APIContextRunner{Read: f, Prepare: f, Record: f, Capabilities: capability, Now: time.Now}, Signer: f, Router: router, Now: time.Now, Report: func(s string) { reports = append(reports, s) }}
 			err = start.StartContext(ctx, current, f.work.Accepted.CaptureID)
 			if !errors.Is(err, capturevalue.ErrAcquisitionNotStarted) || f.preparations != 0 || f.signed.CaptureID != "" {
 				t.Fatal("attach refusal reached effects", err, f.preparations)

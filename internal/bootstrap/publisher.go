@@ -36,8 +36,8 @@ import (
 // stored, unpublished API context captures through the unchanged
 // ContextPublisher, unwrapping only under its attempt-scoped verifier
 // authority. It serves no route and performs no collection. ADR-203: its
-// provider credentials are Kubernetes-auth lifetimes gated by the recovery
-// state, and its verifier key exists only in this process.
+// provider credentials are Kubernetes-auth lifetimes, and its verifier key
+// exists only in this process.
 type Publisher struct {
 	argumentSources argumentSourceReader
 	config          publisherInputs
@@ -201,27 +201,17 @@ func NewPublisher(ctx context.Context, files, ids *os.Root) (_ *Publisher, err e
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	phase = "recovery"
-	recoveryGuard, err := postgres.NewRecoveryTransactionGuard(root, installation)
-	if err != nil {
-		return nil, mounts.ErrUnavailable
-	}
-	guards := postgres.EffectTransactionGuards{Retention: retentionGuard, Recovery: recoveryGuard}
-	recovery, err := postgres.NewRecoveryReader(startup, pools["publisher-identity-read"], installation)
-	if err != nil {
-		return nil, mounts.ErrUnavailable
-	}
 	sources, err := postgres.NewRetentionSources(startup, pools["publisher-retention-read"], root)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
 	phase = "publication"
 	accepted := privacyapp.AcceptedRetentionReader{Topology: topologies, Sources: sources, Now: time.Now}
-	if out.gate, err = postgres.NewAPIContextPublicationGate(startup, pools["publication-gate"], root, guards, privacyapp.RetentionResolver{Policies: accepted, RetainedPolicies: accepted, Now: time.Now}, recovery); err != nil {
+	if out.gate, err = postgres.NewAPIContextPublicationGate(startup, pools["publication-gate"], root, retentionGuard, privacyapp.RetentionResolver{Policies: accepted, RetainedPolicies: accepted, Now: time.Now}); err != nil {
 		return nil, mounts.ErrUnavailable
 	}
 	facet := func(purpose string) (*postgres.ContextPublications, error) {
-		return postgres.NewContextPublications(startup, pools[purpose], root, guards)
+		return postgres.NewContextPublications(startup, pools[purpose], root, retentionGuard)
 	}
 	verify, err := facet("context-verify")
 	if err != nil {
@@ -241,12 +231,10 @@ func NewPublisher(ctx context.Context, files, ids *os.Root) (_ *Publisher, err e
 		return nil, mounts.ErrUnavailable
 	}
 	phase = "providers"
-	// ADR-203 decision 3: every provider login and renewal needs a current
-	// recovery observation.
 	login := serviceLogin(c.Name, c.Namespace, "publisher", contracts.OwnerProviderEndpoint{Endpoint: c.OpenBao, Roots: roots[contracts.OpenBaoRootsFile]}, "audit-wrap", "audit-unwrap", "verifier-sign")
 	names := providerconfig.OpenBaoNamesFor(installation)
 	keys := kms.PublisherProviderKeys{AuditMount: contracts.SmallOpenBaoAuditMount, AuditKey: names.PublisherAuditKey, PKIMount: contracts.SmallOpenBaoWorkerPKIMount, VerifierRole: names.VerifierRole}
-	if out.providers, err = kms.NewInstalledPublisherProviderEffects(ctx, installation, login, keys, files, recoveryProof(recovery)); err != nil {
+	if out.providers, err = kms.NewInstalledPublisherProviderEffects(ctx, installation, login, keys, files); err != nil {
 		return nil, mounts.ErrUnavailable
 	}
 	providers := out.providers

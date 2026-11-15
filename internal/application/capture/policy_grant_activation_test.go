@@ -72,7 +72,7 @@ func TestPolicyGrantAttachmentControlRetainsFinalIdentityAndSourceDeadlines(t *t
 				case "identity-expired":
 					f.author.ValidUntil = clock
 				case "source-expired":
-					clock = clock.Add(6 * time.Second)
+					clock = clock.Add(31 * time.Second)
 				case "store-unavailable":
 					return authorization.PolicyGrantAttachment{}, false, value.ErrUnavailable
 				}

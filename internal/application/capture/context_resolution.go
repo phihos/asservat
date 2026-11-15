@@ -25,10 +25,10 @@ type ContextRequestResolution interface {
 
 // ResolveContextRequest may resolve or fence the original request while new
 // acquisition is unavailable. No target discovery, capability or storage port
-// is needed. Current caller/recovery/scope and final metadata bounds still apply.
+// is needed. Current caller/scope and final metadata bounds still apply.
 func (s ContextInvestigation) ResolveContextRequest(ctx context.Context, source identities.CurrentIdentity, previewID, key string) (value.ContextRequestDisposition, error) {
 	var zero value.ContextRequestDisposition
-	if ctx == nil || source == nil || s.Now == nil || s.Resolution == nil || s.Recovery == nil || !authorization.UUID(s.RootID) || !authorization.UUID(s.InstallationID) {
+	if ctx == nil || source == nil || s.Now == nil || s.Resolution == nil || !authorization.UUID(s.RootID) || !authorization.UUID(s.InstallationID) {
 		return zero, value.ErrUnavailable
 	}
 	if !authorization.UUID(previewID) || !identity.Text(key, 128) {
@@ -41,24 +41,20 @@ func (s ContextInvestigation) ResolveContextRequest(ctx context.Context, source 
 	if err != nil || !i.Valid(s.Now()) || !slices.Contains(i.Scopes, "evidence:read") {
 		return zero, value.ErrDenied
 	}
-	recovery, err := s.currentRecovery(ctx)
-	if err != nil {
-		return zero, err
-	}
 	if s.Reviews != nil {
 		// A revoked exec right must not resolve the request: the caller's
 		// recorded decision-time reviews of the preview's Pod are repeated
 		// before the resolution re-evaluates eligibility (ADR-245).
 		_ = s.Reviews.ReviewPreview(ctx, i, previewID)
 	}
-	d, err := s.Resolution.ResolveOrCloseContextRequest(ctx, value.ReplayQuery{RootID: s.RootID, PreviewID: previewID, IdempotencyKey: key, SubmissionDigest: ContextRequestDigest(previewID), Identity: i, Recovery: recovery})
+	d, err := s.Resolution.ResolveOrCloseContextRequest(ctx, value.ReplayQuery{RootID: s.RootID, PreviewID: previewID, IdempotencyKey: key, SubmissionDigest: ContextRequestDigest(previewID), Identity: i})
 	if err != nil {
 		return zero, err
 	}
-	if _, err = s.currentIdentity(ctx, source, i.Principal, i.ValidUntil); err != nil || !recovery.Valid(s.Now()) || s.Now().Before(started) {
+	if _, err = s.currentIdentity(ctx, source, i.Principal, i.ValidUntil); err != nil || s.Now().Before(started) {
 		return zero, value.ErrDenied
 	}
-	d.ValidUntil = identity.Earlier(d.ValidUntil, identity.Earlier(i.ValidUntil, recovery.FreshUntil))
+	d.ValidUntil = identity.Earlier(d.ValidUntil, i.ValidUntil)
 	if !d.Valid(s.Now()) {
 		return zero, value.ErrUnavailable
 	}

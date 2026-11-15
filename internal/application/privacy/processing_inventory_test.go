@@ -1,29 +1,26 @@
 package privacy
 
 import (
-	"asservat.local/asservat/internal/domain/artifact"
-	value "asservat.local/asservat/internal/domain/privacy"
 	"context"
 	"encoding/json"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/domain/artifact"
+	value "asservat.local/asservat/internal/domain/privacy"
 )
 
 type processingInventoryFixture struct {
 	*processingFixture
-	reads, scopeReads          int
-	policyReads, recoveryReads int
-	after                      func()
-	scope                      value.ProcessingScope
+	reads, scopeReads int
+	policyReads       int
+	after             func()
+	scope             value.ProcessingScope
 }
 
 func (f *processingInventoryFixture) DownloadPolicy(ctx context.Context) (value.DownloadPolicy, error) {
 	f.policyReads++
 	return f.processingFixture.DownloadPolicy(ctx)
-}
-func (f *processingInventoryFixture) RecoveryState(ctx context.Context) (artifact.RecoveryProof, error) {
-	f.recoveryReads++
-	return f.processingFixture.RecoveryState(ctx)
 }
 func (f *processingInventoryFixture) ReadProcessingInventory(ctx context.Context, a value.ProcessingAuthority, q value.ProcessingInventoryQuery) (value.ProcessingInventoryPage, error) {
 	f.reads++
@@ -45,7 +42,7 @@ func TestProcessingInventoryRequiresCurrentOperatorBeforeSQLAndPreservesOriginal
 		t.Run(mode, func(t *testing.T) {
 			base, changes, _ := newProcessingFixture(t)
 			f := &processingInventoryFixture{processingFixture: base, scope: value.ProcessingScope{Kind: "artifact", Location: artifact.Location{ClusterID: processingID(10), ArtifactID: processingID(11), AttemptID: processingID(12)}}}
-			s := ProcessingRuleInventory{RootID: changes.RootID, InstallationID: changes.InstallationID, Policies: f, Recovery: f, Inventory: f, Now: changes.Now}
+			s := ProcessingRuleInventory{RootID: changes.RootID, InstallationID: changes.InstallationID, Policies: f, Inventory: f, Now: changes.Now}
 			switch mode {
 			case "ordinary-reader":
 				f.i.Groups = nil
@@ -58,7 +55,7 @@ func TestProcessingInventoryRequiresCurrentOperatorBeforeSQLAndPreservesOriginal
 			}
 			page, err := s.List(t.Context(), f, value.ProcessingInventoryQuery{Limit: 50})
 			if mode == "allowed" {
-				if err != nil || len(page.Rules) != 1 || !page.ValidUntil.Equal(base.p.FreshUntil) || f.reads != 1 || f.policyReads != 1 || f.recoveryReads != 1 {
+				if err != nil || len(page.Rules) != 1 || !page.ValidUntil.Equal(base.p.FreshUntil) || f.reads != 1 || f.policyReads != 1 {
 					t.Fatal(page, err)
 				}
 				return

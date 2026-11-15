@@ -126,14 +126,14 @@ func qualifyManualRecordingSave(t *testing.T, ctx context.Context, f *capacitySQ
 		var cancelExecution executionvalue.APIExecution
 		var cancelProcess executionvalue.APIProcessObservation
 		var cancellationLedger *postgres.APIContextExecutions
-		qualifySourceSnapshotCompletion(t, ctx, f, policy, snapshot, intents, func(executions *postgres.APIContextExecutions, candidate executionvalue.APIExecution, process executionvalue.APIProcessObservation, recovery artifact.RecoveryProof) {
+		qualifySourceSnapshotCompletion(t, ctx, f, policy, snapshot, intents, func(executions *postgres.APIContextExecutions, candidate executionvalue.APIExecution, process executionvalue.APIProcessObservation) {
 			var revision int64
 			if err := f.admin.QueryRow(ctx, `SELECT progress_revision FROM context_capture WHERE root_id=$1 AND id=$2`, original.RootID, accepted.CaptureID).Scan(&revision); err != nil {
 				t.Fatal(err)
 			}
 			now := time.Now().UTC()
 			human := original.RecordingSave.Initiator.VerifiedIdentity
-			cancelCheck = value.CancellationCheck{RootID: original.RootID, Request: value.CancellationRequest{CaptureID: accepted.CaptureID, ExpectedRevision: revision, IdempotencyKey: "manual-stored-race-" + custodyID()}, Identity: human, Recovery: recovery, CheckedAt: now, ValidUntil: identity.Earlier(human.ValidUntil, identity.Earlier(recovery.FreshUntil, now.Add(5*time.Second)))}
+			cancelCheck = value.CancellationCheck{RootID: original.RootID, Request: value.CancellationRequest{CaptureID: accepted.CaptureID, ExpectedRevision: revision, IdempotencyKey: "manual-stored-race-" + custodyID()}, Identity: human, CheckedAt: now, ValidUntil: identity.Earlier(human.ValidUntil, now.Add(5*time.Second))}
 			work, err := executions.RequestCaptureCancellation(ctx, cancelCheck)
 			if err != nil || !work.Decision.Requested || work.Decision.Phase != "Running" || work.Snapshot == nil || work.Snapshot.CaptureID != accepted.CaptureID || work.Snapshot.AttemptID != accepted.Expectation.Registration.Location.AttemptID || work.Snapshot.WriterPodUID != candidate.Process.PodUID || work.Snapshot.WriterEpoch != candidate.Process.ProcessEpoch {
 				t.Fatal("durable cancellation before positive SQL storage completion", work, err)
@@ -154,7 +154,7 @@ func qualifyManualRecordingSave(t *testing.T, ctx context.Context, f *capacitySQ
 			if !proof.Valid() || !cancelled.Valid() {
 				t.Fatal("late cancellation fixture is not a valid joined-proof candidate")
 			}
-			if _, err = cancellationLedger.RecordAPISnapshotCancellation(ctx, cancelled, proof, cancelProcess, cancelCheck.Recovery); err == nil {
+			if _, err = cancellationLedger.RecordAPISnapshotCancellation(ctx, cancelled, proof, cancelProcess); err == nil {
 				t.Fatal("late joined cancellation overwrote positively stored evidence")
 			}
 		})

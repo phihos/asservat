@@ -37,7 +37,7 @@ func qualifyDownloadControl(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		defer configPool.Close()
 		catalogPool := poolFor("context_catalog_read_runtime", "synthetic-context-read")
 		defer catalogPool.Close()
-		guards := postgres.EffectTransactionGuards{Retention: scenario.retention.guard, Recovery: scenario.recovery.guard}
+		guards := scenario.retention.guard
 		ledger, err := postgres.NewDownloads(ctx, runtimePool, root, guards)
 		if err != nil {
 			t.Fatal(err)
@@ -79,7 +79,7 @@ func qualifyDownloadControl(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		}
 		a := current()
 		actor, _ := gate.Identities.Resolve(ctx, "synthetic-reference")
-		route, err := ledger.ResolveContextDownload(ctx, artifact.DownloadRouteQuery{ArtifactID: scope.ArtifactID, Identity: actor, Recovery: a.Environment.Recovery()})
+		route, err := ledger.ResolveContextDownload(ctx, artifact.DownloadRouteQuery{ArtifactID: scope.ArtifactID, Identity: actor})
 		if err != nil || route.Scope != scope || !route.Valid(time.Now()) {
 			t.Fatal("private exact route", route, err)
 		}
@@ -87,7 +87,7 @@ func qualifyDownloadControl(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		if err != nil || !source.Valid(time.Now()) || source.Scope != scope || source.Copies != published.Copies || source.Expectation.Registration != e.Registration {
 			t.Fatal("verified exact source", err)
 		}
-		if _, err = ledger.ResolveContextDownload(ctx, artifact.DownloadRouteQuery{ArtifactID: custodyID(), Identity: actor, Recovery: a.Environment.Recovery()}); err == nil {
+		if _, err = ledger.ResolveContextDownload(ctx, artifact.DownloadRouteQuery{ArtifactID: custodyID(), Identity: actor}); err == nil {
 			t.Fatal("unknown artifact acquired a route")
 		}
 		for _, q := range []string{"UPDATE context_case_locator SET pod_uid=pod_uid", "UPDATE custody_copy SET etag=etag", "UPDATE context_catalog SET published_at=published_at"} {
@@ -102,9 +102,9 @@ func qualifyDownloadControl(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		key := evidence.ContextDownloadKeyDigest("original-control-key")
 		// A finite requested transfer lifetime shorter than the independent
 		// thirty-second fixture source observations lets status outlive the
-		// transfer without fabricating renewed evidence/recovery authority.
+		// transfer without fabricating renewed evidence authority.
 		request := evidence.DownloadReservation{Authority: a, IdempotencyDigest: key, Session: artifact.DownloadSession{ID: custodyID(), AllocationID: allocation.ID, Scope: scope, RequestDigest: evidence.ContextDownloadRequestDigest(scope.ArtifactID), State: artifact.DownloadPreparing, CreatedAt: time.Now().UTC(), Deadline: time.Now().UTC().Add(15 * time.Second).Truncate(time.Microsecond), OutputLimit: 8192, ReadLimit: 16 << 20, RequestLimit: 4}}
-		query := artifact.DownloadKeyQuery{Identity: actor, Recovery: a.Environment.Recovery(), Key: key}
+		query := artifact.DownloadKeyQuery{Identity: actor, Key: key}
 		absent, err := ledger.LookupDownloadKey(ctx, query)
 		if err != nil || absent.Found || !absent.Valid(time.Now()) {
 			t.Fatal("absent observation", err)
@@ -318,13 +318,6 @@ func qualifyDownloadControl(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		}
 		if err = <-done; err == nil {
 			t.Fatal("blocking status read renewed authority")
-		}
-		a = current()
-		if _, err = admin.Exec(ctx, "UPDATE fleet_trust SET suspended=true WHERE installation_id=$1", scenario.recovery.installation); err != nil {
-			t.Fatal(err)
-		}
-		if _, err = ledger.ObserveDownload(ctx, session.ID, a, &prep); err == nil {
-			t.Fatal("restored/suspended root disclosed metadata")
 		}
 	})
 }

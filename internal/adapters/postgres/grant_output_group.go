@@ -10,8 +10,8 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// ResolveGrantedOutput reads immutable association metadata, not caller or
-// recovery authority. Effect transactions independently repeat the exact join.
+// ResolveGrantedOutput reads immutable association metadata, not caller
+// authority. Effect transactions independently repeat the exact join.
 func (s *AccessGrants) ResolveGrantedOutput(ctx context.Context, parent string, scope artifact.DownloadScope, action string) (authorization.VerifiedOutput, *authorization.GrantOutputGroup, error) {
 	var out authorization.VerifiedOutput
 	var group *authorization.GrantOutputGroup

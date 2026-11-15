@@ -12,8 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// Public database incarnation facts only, not an activation/recovery proof.
-// The effective recovery view remains mandatory on both row observations.
+// Public database incarnation facts only, not an activation proof.
 type fleetObservationIncarnation struct {
 	postmaster time.Time
 	database   uint32

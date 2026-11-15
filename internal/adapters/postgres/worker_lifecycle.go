@@ -12,8 +12,8 @@ import (
 // NewScopedWorkerOperationLifecycles selects the installed worker's closed
 // capture/normal/resolution compartment. It shares one bounded scheduler and
 // the existing row state machine, with each immutable row's original policy.
-func NewScopedWorkerOperationLifecycles(ctx context.Context, pool *pgxpool.Pool, root, installation, store string, recovery *RecoveryTransactionGuard) (*OperationLifecycles, error) {
-	s, err := NewScopedCaptureOperationLifecycles(ctx, pool, root, installation, store, recovery)
+func NewScopedWorkerOperationLifecycles(ctx context.Context, pool *pgxpool.Pool, root, installation, store string) (*OperationLifecycles, error) {
+	s, err := NewScopedCaptureOperationLifecycles(ctx, pool, root, installation, store)
 	if err != nil {
 		return nil, err
 	}

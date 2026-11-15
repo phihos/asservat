@@ -23,22 +23,20 @@ import (
 // current-history authority and physical-prefix retirement. A generic evidence
 // cleanup result can never settle one of these obligations.
 type HistoryParametersLedger struct {
-	ledger    *Ledger
-	root      string
-	recovery  *RecoveryTransactionGuard
-	retention *RetentionTransactionGuard
+	ledger             *Ledger
+	root, installation string
+	retention          *RetentionTransactionGuard
 }
 
-func NewHistoryParameters(ctx context.Context, pool *pgxpool.Pool, root string, guards EffectTransactionGuards) (*HistoryParametersLedger, error) {
+func NewHistoryParameters(ctx context.Context, pool *pgxpool.Pool, root, installation string, retention *RetentionTransactionGuard) (*HistoryParametersLedger, error) {
+	if !authorization.UUID(installation) || retention == nil || retention.root != root {
+		return nil, artifact.ErrInvalid
+	}
 	l, e := New(ctx, pool)
 	if e != nil {
 		return nil, e
 	}
-	g, e := effectGuardsFor(root, []EffectTransactionGuards{guards})
-	if e != nil {
-		return nil, e
-	}
-	return &HistoryParametersLedger{ledger: l, root: root, recovery: g.Recovery, retention: g.Retention}, nil
+	return &HistoryParametersLedger{ledger: l, root: root, installation: installation, retention: retention}, nil
 }
 
 func decodeHistoryExpectation(h custodydb.CaptureHistoryParameter) (value.HistoryExpectation, error) {
@@ -74,12 +72,12 @@ func historyStorage(ctx context.Context, q *custodydb.Queries, h custodydb.Captu
 	out = value.HistoryStorage{Expectation: e, Copies: r.Copies, State: h.State, SummaryExpiresAt: h.SummaryExpiresAt.Time, Target: retention.Input.Target, Retention: retention, Effective: r.Effective}
 	return out, nil
 }
-func (s *HistoryParametersLedger) transaction(ctx context.Context, r artifact.RecoveryProof, f func(*custodydb.Queries, custodydb.FleetCurrentTrust, custodydb.PermissionStream) error) error {
+func (s *HistoryParametersLedger) transaction(ctx context.Context, f func(*custodydb.Queries, custodydb.FleetCurrentTrust, custodydb.PermissionStream) error) error {
 	if s == nil || ctx == nil {
 		return value.ErrUnavailable
 	}
 	return s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		trust, e := s.recovery.lock(ctx, q, s.root, r)
+		trust, e := currentTrust(ctx, q, s.installation)
 		if e != nil {
 			return e
 		}
@@ -90,7 +88,7 @@ func (s *HistoryParametersLedger) transaction(ctx context.Context, r artifact.Re
 		if e = f(q, trust, stream); e != nil {
 			return e
 		}
-		return s.recovery.check(ctx, q, trust, s.root, r)
+		return nil
 	})
 }
 
@@ -104,8 +102,8 @@ func (s *HistoryParametersLedger) ReserveHistoryParameters(ctx context.Context, 
 	if err != nil {
 		return out, err
 	}
-	err = s.transaction(ctx, in.Recovery, func(q *custodydb.Queries, trust custodydb.FleetCurrentTrust, stream custodydb.PermissionStream) error {
-		c, until, err := historyAuthorizedCapture(ctx, q, s.root, s.recovery.installationID(), e.CaptureID, in.Identity, stream, trust, true)
+	err = s.transaction(ctx, func(q *custodydb.Queries, trust custodydb.FleetCurrentTrust, stream custodydb.PermissionStream) error {
+		c, until, err := historyAuthorizedCapture(ctx, q, s.root, s.installation, e.CaptureID, in.Identity, stream, trust, true)
 		if err != nil {
 			return err
 		}
@@ -130,7 +128,7 @@ func (s *HistoryParametersLedger) ReserveHistoryParameters(ctx context.Context, 
 			return err
 		}
 		// Validate source authority before quota eviction can hide that same
-		// source. Permission/recovery locks serialize this complete transaction.
+		// source. Permission locks serialize this complete transaction.
 		if c.RepeatedFromCaptureID.Valid && (in.Source == nil || in.Source.CaptureID != uid(c.RepeatedFromCaptureID) || in.Source.ExpiresAt.After(c.RepeatedFromExpiresAt.Time)) {
 			return value.ErrDenied
 		}
@@ -139,7 +137,7 @@ func (s *HistoryParametersLedger) ReserveHistoryParameters(ctx context.Context, 
 			if !in.Source.Valid(in.Identity.VerifiedAt) || !c.RepeatedFromCaptureID.Valid || uid(c.RepeatedFromCaptureID) != in.Source.CaptureID || e.Registration.ExpiresAt.After(in.Source.ExpiresAt) {
 				return value.ErrDenied
 			}
-			source, _, err := historyAuthorizedCapture(ctx, q, s.root, s.recovery.installationID(), in.Source.CaptureID, in.Identity, stream, trust, false)
+			source, _, err := historyAuthorizedCapture(ctx, q, s.root, s.installation, in.Source.CaptureID, in.Identity, stream, trust, false)
 			if err != nil {
 				return err
 			}
@@ -256,7 +254,7 @@ func (s *HistoryParametersLedger) ReserveHistoryParameters(ctx context.Context, 
 		if !now.Time.Before(until) || !in.Identity.Valid(now.Time) {
 			return value.ErrDenied
 		}
-		out = value.HistoryStorage{Expectation: e, State: "reserved", SummaryExpiresAt: in.SummaryExpiresAt, ObservedAt: now.Time, ValidUntil: identity.Earlier(until, in.Recovery.FreshUntil), Target: c.Target, Retention: retention, Effective: privacy.Deadlines{AnchorAt: e.Registration.AnchorAt, ExpiresAt: e.Registration.ExpiresAt, DeleteBy: e.Registration.DeleteBy}}
+		out = value.HistoryStorage{Expectation: e, State: "reserved", SummaryExpiresAt: in.SummaryExpiresAt, ObservedAt: now.Time, ValidUntil: until, Target: c.Target, Retention: retention, Effective: privacy.Deadlines{AnchorAt: e.Registration.AnchorAt, ExpiresAt: e.Registration.ExpiresAt, DeleteBy: e.Registration.DeleteBy}}
 		return s.retention.check(ctx, q, topology, in.Retention.Proof, c.Target)
 	})
 	if err != nil {
@@ -271,8 +269,8 @@ func (s *HistoryParametersLedger) ClaimHistoryWrite(ctx context.Context, in valu
 	if !e.Valid() || e.RootID != s.root || !authorization.UUID(in.RequestID) || !authorization.UUID(in.ExecutorEpoch) || in.BundleDigest == (artifact.Digest{}) {
 		return out, value.ErrInvalid
 	}
-	err := s.transaction(ctx, in.Recovery, func(q *custodydb.Queries, trust custodydb.FleetCurrentTrust, stream custodydb.PermissionStream) error {
-		_, until, err := historyAuthorizedCapture(ctx, q, s.root, s.recovery.installationID(), e.CaptureID, in.Identity, stream, trust, true)
+	err := s.transaction(ctx, func(q *custodydb.Queries, trust custodydb.FleetCurrentTrust, stream custodydb.PermissionStream) error {
+		_, until, err := historyAuthorizedCapture(ctx, q, s.root, s.installation, e.CaptureID, in.Identity, stream, trust, true)
 		if err != nil {
 			return err
 		}
@@ -288,7 +286,7 @@ func (s *HistoryParametersLedger) ClaimHistoryWrite(ctx context.Context, in valu
 		if err != nil {
 			return err
 		}
-		until = identity.Earlier(until, identity.Earlier(in.Recovery.FreshUntil, e.Registration.WriteUntil))
+		until = identity.Earlier(until, e.Registration.WriteUntil)
 		if d, ok := ctx.Deadline(); ok {
 			until = identity.Earlier(until, d)
 		}
@@ -314,7 +312,7 @@ func (s *HistoryParametersLedger) CompleteHistoryWrite(ctx context.Context, in v
 	if s == nil || a.Operation != "write" || e.RootID != s.root || !in.Completion.Valid(e) || in.Completion.OperationID != a.RequestID || in.Completion.ProcessEpoch != a.ExecutorEpoch || in.Completion.CopiesDigest != value.HistoryCopiesDigest(in.Copies) || !in.Completion.NotAfter.Equal(a.NotAfter) || in.Completion.CompletedAt.Before(a.StartedAt) || in.Copies.Validate(e.Registration) != nil {
 		return value.ErrInvalid
 	}
-	return s.transaction(ctx, in.Recovery, func(q *custodydb.Queries, _ custodydb.FleetCurrentTrust, _ custodydb.PermissionStream) error {
+	return s.transaction(ctx, func(q *custodydb.Queries, _ custodydb.FleetCurrentTrust, _ custodydb.PermissionStream) error {
 		h, err := q.LockHistoryParameter(ctx, custodydb.LockHistoryParameterParams{RootID: id(s.root), CaptureID: id(e.CaptureID)})
 		if err != nil {
 			return err
@@ -374,8 +372,8 @@ func (s *HistoryParametersLedger) AuthorizeHistoryRead(ctx context.Context, in v
 	if err != nil {
 		return out, err
 	}
-	err = s.transaction(ctx, in.Query.Recovery, func(q *custodydb.Queries, trust custodydb.FleetCurrentTrust, stream custodydb.PermissionStream) error {
-		c, until, err := historyAuthorizedCapture(ctx, q, s.root, s.recovery.installationID(), in.Query.CaptureID, in.Query.Identity, stream, trust, false)
+	err = s.transaction(ctx, func(q *custodydb.Queries, trust custodydb.FleetCurrentTrust, stream custodydb.PermissionStream) error {
+		c, until, err := historyAuthorizedCapture(ctx, q, s.root, s.installation, in.Query.CaptureID, in.Query.Identity, stream, trust, false)
 		if err != nil {
 			return err
 		}
@@ -404,7 +402,7 @@ func (s *HistoryParametersLedger) AuthorizeHistoryRead(ctx context.Context, in v
 			return err
 		}
 		until = identity.Earlier(until, identity.Earlier(in.Retention.ExpiresAt, in.Retention.ValidUntil))
-		until = identity.Earlier(until, identity.Earlier(h.SummaryExpiresAt.Time, identity.Earlier(storage.Effective.ExpiresAt, in.Query.Recovery.FreshUntil)))
+		until = identity.Earlier(until, identity.Earlier(h.SummaryExpiresAt.Time, storage.Effective.ExpiresAt))
 		if d, ok := ctx.Deadline(); ok {
 			until = identity.Earlier(until, d)
 		}
@@ -430,7 +428,7 @@ func (s *HistoryParametersLedger) ClaimHistoryDeletion(ctx context.Context, in v
 	if !authorization.UUID(in.CaptureID) || !authorization.UUID(in.RequestID) || !authorization.UUID(in.ExecutorEpoch) {
 		return out, value.ErrInvalid
 	}
-	err := s.transaction(ctx, in.Recovery, func(q *custodydb.Queries, _ custodydb.FleetCurrentTrust, _ custodydb.PermissionStream) error {
+	err := s.transaction(ctx, func(q *custodydb.Queries, _ custodydb.FleetCurrentTrust, _ custodydb.PermissionStream) error {
 		h, err := q.LockHistoryParameter(ctx, custodydb.LockHistoryParameterParams{RootID: id(s.root), CaptureID: id(in.CaptureID)})
 		if err != nil {
 			return err
@@ -464,7 +462,7 @@ func (s *HistoryParametersLedger) ClaimHistoryDeletion(ctx context.Context, in v
 		if row.LeaseUntil.Valid && now.Time.Before(row.LeaseUntil.Time) {
 			return custodyprivacy.ErrFence
 		}
-		until := identity.Earlier(now.Time.Add(30*time.Second), in.Recovery.FreshUntil)
+		until := now.Time.Add(30 * time.Second)
 		if d, ok := ctx.Deadline(); ok {
 			until = identity.Earlier(until, d)
 		}
@@ -500,11 +498,11 @@ func (s *HistoryParametersLedger) ClaimHistoryDeletion(ctx context.Context, in v
 // FinishHistoryDeletion consumes a positive authenticated inventory completion
 // for the exact current operation/fence. Empty ordinary evidence prefixes are
 // never sufficient to refund this registration.
-func (s *HistoryParametersLedger) FinishHistoryDeletion(ctx context.Context, a value.HistoryOperationAuthority, c value.HistoryDeleteCompletion, recovery artifact.RecoveryProof) error {
+func (s *HistoryParametersLedger) FinishHistoryDeletion(ctx context.Context, a value.HistoryOperationAuthority, c value.HistoryDeleteCompletion) error {
 	if a.Expectation.RootID != s.root || !c.Valid(a) {
 		return value.ErrInvalid
 	}
-	return s.transaction(ctx, recovery, func(q *custodydb.Queries, _ custodydb.FleetCurrentTrust, _ custodydb.PermissionStream) error {
+	return s.transaction(ctx, func(q *custodydb.Queries, _ custodydb.FleetCurrentTrust, _ custodydb.PermissionStream) error {
 		h, err := q.LockHistoryParameter(ctx, custodydb.LockHistoryParameterParams{RootID: id(s.root), CaptureID: id(a.Expectation.CaptureID)})
 		if err != nil {
 			return err
@@ -580,8 +578,8 @@ func (s *HistoryParametersLedger) FinishHistoryDeletion(ctx context.Context, a v
 func (s *HistoryParametersLedger) ReadHistoryStorage(ctx context.Context, in value.SettingsQuery) (value.HistoryStorage, bool, error) {
 	var out value.HistoryStorage
 	required := false
-	err := s.transaction(ctx, in.Recovery, func(q *custodydb.Queries, trust custodydb.FleetCurrentTrust, stream custodydb.PermissionStream) error {
-		c, until, err := historyAuthorizedCapture(ctx, q, s.root, s.recovery.installationID(), in.CaptureID, in.Identity, stream, trust, false)
+	err := s.transaction(ctx, func(q *custodydb.Queries, trust custodydb.FleetCurrentTrust, stream custodydb.PermissionStream) error {
+		c, until, err := historyAuthorizedCapture(ctx, q, s.root, s.installation, in.CaptureID, in.Identity, stream, trust, false)
 		if err != nil {
 			return err
 		}
@@ -652,8 +650,8 @@ func (s *HistoryParametersLedger) HistoryRetirementCandidates(ctx context.Contex
 	}
 	return out, nil
 }
-func (s *HistoryParametersLedger) ExpireHistorySummaries(ctx context.Context, recovery artifact.RecoveryProof) error {
-	return s.transaction(ctx, recovery, func(q *custodydb.Queries, _ custodydb.FleetCurrentTrust, _ custodydb.PermissionStream) error {
+func (s *HistoryParametersLedger) ExpireHistorySummaries(ctx context.Context) error {
+	return s.transaction(ctx, func(q *custodydb.Queries, _ custodydb.FleetCurrentTrust, _ custodydb.PermissionStream) error {
 		now, err := q.CurrentTime(ctx)
 		if err != nil {
 			return err

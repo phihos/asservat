@@ -1,17 +1,18 @@
 package analysis
 
 import (
-	identities "asservat.local/asservat/internal/application/identity"
-	value "asservat.local/asservat/internal/domain/analysis"
-	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/authorization"
-	"asservat.local/asservat/internal/domain/identity"
 	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"slices"
 	"strings"
+
+	identities "asservat.local/asservat/internal/application/identity"
+	value "asservat.local/asservat/internal/domain/analysis"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/identity"
 )
 
 type packetQueryApprovalRefusal struct{ cause error }
@@ -92,12 +93,12 @@ func (s PacketQueryReads) Begin(ctx context.Context, current identities.CurrentI
 	if len(r.PacketFilter) > 512 || !r.Valid() || s.Routes == nil || s.Compiler == nil {
 		return nil, value.ErrInvalid
 	}
-	return s.Service.begin(ctx, current, invocation, "pcap_query", ContextQueryInput{PacketQuery: r}, func(ctx context.Context, i identity.Identity, recovery artifact.RecoveryProof) (value.ContextProjectionCandidate, error) {
+	return s.Service.begin(ctx, current, invocation, "pcap_query", ContextQueryInput{PacketQuery: r}, func(ctx context.Context, i identity.Identity) (value.ContextProjectionCandidate, error) {
 		routes, ok := s.Routes.(ContextPacketProjectionRouteReader)
 		if !ok {
 			return value.ContextProjectionCandidate{}, value.ErrUnavailable
 		}
-		c, e := routes.ResolvePacketProjectionRoute(ctx, r.CaseID, r.ArtifactID, i, recovery)
+		c, e := routes.ResolvePacketProjectionRoute(ctx, r.CaseID, r.ArtifactID, i)
 		if e != nil {
 			return c, e
 		}

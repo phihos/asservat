@@ -40,7 +40,7 @@ func qualifyInstalledDownloadPreparation(t *testing.T, ctx context.Context, admi
 	// facets. This is a transaction fixture, not a whole-hub load measurement.
 	sharedPools, _ := compiledOrdinaryHubPools(t, ctx, admin, poolFor)
 	shared := sharedPools.ordinary
-	guards := postgres.DownloadTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard}
+	guards := s.retention.guard
 	sessions, err := postgres.NewDownloads(ctx, shared, s.a.RootID, guards)
 	if err != nil {
 		t.Fatal(err)

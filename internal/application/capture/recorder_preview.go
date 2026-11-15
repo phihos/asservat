@@ -36,7 +36,7 @@ const profileRepeatPreviewWindow = 8 * time.Second
 
 // PreviewComposition compiles a one-component builtin capture profile
 // composition for a currently authorized workload. It reads identity,
-// recovery, the target, collection eligibility and retention exactly as a
+// the target, collection eligibility and retention exactly as a
 // pod-status preview does, but no collector capability, storage binding or
 // processing coverage: no recorder exists to use them. Authored composition
 // errors are reported only after eligibility, so they disclose nothing about
@@ -78,10 +78,6 @@ func (s ContextInvestigation) previewComposition(ctx context.Context, source ide
 	if err != nil || !i.Valid(s.Now()) {
 		return zero, previewFailure("identity", value.ErrDenied)
 	}
-	recovery, err := s.currentRecovery(ctx)
-	if err != nil {
-		return zero, previewFailure("recovery", err)
-	}
 	mark := time.Now()
 	target, err := s.Targets.ResolveWorkload(ctx, intent.Target)
 	auditapp.MarkStep(ctx, "p-target", mark)
@@ -99,17 +95,17 @@ func (s ContextInvestigation) previewComposition(ctx context.Context, source ide
 		// recorder observations block. It grants no storage authority; final
 		// consumption joins it and reads the binding independently.
 		s.reviewTarget(ctx, source, i.Principal, target)
-		until := identity.Earlier(identity.Earlier(i.ValidUntil, recovery.FreshUntil), target.FreshUntil)
+		until := identity.Earlier(i.ValidUntil, target.FreshUntil)
 		if intent.RepeatedFrom != nil {
 			until = identity.Earlier(until, intent.RepeatedFrom.ExpiresAt)
 		}
 		hint := ctx
 		if profileRepeatCtx != nil {
-			// Initial recovery/target facts authorize only the current review.
-			// The hint grants no authority and retains neither observation for
-			// the final plan. Fresh facts are independently acquired below.
-			if !recovery.Valid(s.Now()) || !target.Valid(s.Now()) || ctx.Err() != nil {
-				return zero, previewFailure("recovery", value.ErrUnavailable)
+			// Initial target facts authorize only the current review. The hint
+			// grants no authority and is not retained for the final plan. Fresh
+			// facts are independently acquired below.
+			if !target.Valid(s.Now()) || ctx.Err() != nil {
+				return zero, previewFailure("target", value.ErrUnavailable)
 			}
 			hint, until = profileRepeatCtx, identity.Earlier(i.ValidUntil, intent.RepeatedFrom.ExpiresAt)
 		}
@@ -132,7 +128,7 @@ func (s ContextInvestigation) previewComposition(ctx context.Context, source ide
 	}
 	if len(intent.Composition.Components) > 1 && target.ExecutionClass == artifact.ContextAPIExecution {
 		// ADR-276: a manual multi-profile composition is a reviewed group.
-		r, err := s.previewCompositionGroup(ctx, source, intent, i, recovery, target, created)
+		r, err := s.previewCompositionGroup(ctx, source, intent, i, target, created)
 		if !errors.Is(err, errRecordingNotAcceptable) && !errors.Is(err, value.ErrRecorderUnavailable) {
 			return r, err
 		}
@@ -142,7 +138,7 @@ func (s ContextInvestigation) previewComposition(ctx context.Context, source ide
 		if until, ok := ctx.Deadline(); ctx.Err() != nil || !ok || !time.Now().Before(until) {
 			return zero, previewFailure("profiles/current", value.ErrChanged)
 		}
-		// Readiness is scheduling, not retained target/recovery authority.
+		// Readiness is scheduling, not retained target authority.
 		// Join the same hint before the existing complete recorder resolution;
 		// its fresh Pod/namespace/workload facts must match the original pin.
 		ctx = profileRepeatCtx
@@ -155,14 +151,6 @@ func (s ContextInvestigation) previewComposition(ctx context.Context, source ide
 		if _, err = s.currentIdentity(ctx, source, i.Principal, i.ValidUntil); err != nil {
 			return zero, previewFailure("identity", err)
 		}
-		freshRecovery, e := s.currentRecovery(ctx)
-		if e != nil || freshRecovery.InstallationID != recovery.InstallationID || freshRecovery.IssuerEpoch != recovery.IssuerEpoch || freshRecovery.Revision != recovery.Revision {
-			return zero, previewFailure("recovery", value.ErrChanged)
-		}
-		recovery = freshRecovery
-		var finish context.CancelFunc
-		ctx, finish = context.WithDeadline(ctx, recovery.FreshUntil)
-		defer finish()
 		profiles, ok := s.Recorders.(ProfileRecorders)
 		if !ok {
 			return zero, previewFailure("recorder", value.ErrRecorderUnavailable)
@@ -187,7 +175,7 @@ func (s ContextInvestigation) previewComposition(ctx context.Context, source ide
 		return zero, previewFailure("recorder", err)
 	}
 	if available {
-		r, err := s.previewRecording(ctx, source, intent, i, recovery, target, created, storageWait)
+		r, err := s.previewRecording(ctx, source, intent, i, target, created, storageWait)
 		if !errors.Is(err, errRecordingNotAcceptable) {
 			return r, err
 		}
@@ -208,12 +196,12 @@ func (s ContextInvestigation) previewComposition(ctx context.Context, source ide
 	}
 	current := func(now time.Time) bool {
 		p := r.Proof
-		return target.Valid(now) && p.Valid(now) && p.Matches(s.RootID, t.ClusterID, t.NamespaceUID, t.WorkloadUID, t.PodUID) && p.Policy == r.PolicyRevision && !r.ValidUntil.After(p.ValidUntil) && now.Before(r.ValidUntil) && now.Before(eligibility.ValidUntil) && eligibility.VerifiedIdentity.Valid(now) && recovery.Valid(now)
+		return target.Valid(now) && p.Valid(now) && p.Matches(s.RootID, t.ClusterID, t.NamespaceUID, t.WorkloadUID, t.PodUID) && p.Policy == r.PolicyRevision && !r.ValidUntil.After(p.ValidUntil) && now.Before(r.ValidUntil) && now.Before(eligibility.ValidUntil) && eligibility.VerifiedIdentity.Valid(now)
 	}
 	if !current(s.Now()) || ctx.Err() != nil {
 		return zero, previewFailure("facts/current", value.ErrChanged)
 	}
-	p := value.ContextPreview{ID: s.NewID(), RootID: s.RootID, InstallationID: s.InstallationID, IssuerEpoch: recovery.IssuerEpoch, CaptureID: s.NewID(), CaseID: s.NewID(), OccurrenceID: s.NewID(), ArtifactID: s.NewID(), AttemptID: s.NewID(), Actor: i.Principal, Intent: intent, Target: target.Request, Pin: target.Pin, Retention: retentionReview(r), Audience: slices.Clone(eligibility.DefaultAudience), CreatedAt: created, Deadline: created.Add(s.Lifetime)}
+	p := value.ContextPreview{ID: s.NewID(), RootID: s.RootID, InstallationID: s.InstallationID, CaptureID: s.NewID(), CaseID: s.NewID(), OccurrenceID: s.NewID(), ArtifactID: s.NewID(), AttemptID: s.NewID(), Actor: i.Principal, Intent: intent, Target: target.Request, Pin: target.Pin, Retention: retentionReview(r), Audience: slices.Clone(eligibility.DefaultAudience), CreatedAt: created, Deadline: created.Add(s.Lifetime)}
 	p.Intent.Composition = intent.Composition.Clone()
 	p.ExecutionClass = target.ExecutionClass
 	if intent.RepeatedFrom != nil {
@@ -252,7 +240,7 @@ func (s ContextInvestigation) previewComposition(ctx context.Context, source ide
 	if !final.Eligible || final.Target != t || final.Principal != i.Principal || !final.VerifiedIdentity.Valid(s.Now()) || !i.Valid(s.Now()) || !slices.Equal(final.DefaultAudience, p.Audience) || !s.Now().Before(final.ValidUntil) || !current(s.Now()) || ctx.Err() != nil || s.Now().Before(created) {
 		return zero, previewFailure("after-store/current", value.ErrChanged)
 	}
-	until := identity.Earlier(i.ValidUntil, recovery.FreshUntil)
+	until := i.ValidUntil
 	for _, bound := range []time.Time{final.ValidUntil, final.VerifiedIdentity.ValidUntil, eligibility.ValidUntil, eligibility.VerifiedIdentity.ValidUntil, assessment.ValidUntil, plan.ValidUntil} {
 		until = identity.Earlier(until, bound)
 	}

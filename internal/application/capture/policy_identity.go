@@ -69,7 +69,7 @@ func (p policyIdentity) ResolveIdentity(ctx context.Context) (identity.Identity,
 		return identity.Identity{}, value.ErrDenied
 	}
 	// Like a human request's token, the identity is bounded by the policy's
-	// own validity and the attempt; recovery proofs are checked separately.
+	// own validity and the attempt.
 	i := authorization.PolicyExecutorIdentity(a, read, identity.Earlier(p.until, snapshot.SourceUntil))
 	if !i.Valid(p.now()) {
 		return identity.Identity{}, value.ErrDenied

@@ -79,7 +79,7 @@ func qualifyDownloadStopLifecycle(t *testing.T, ctx context.Context, admin *pgxp
 			defer verifyPool.Close()
 			finalPool := roles("download_stop_retire_runtime", "synthetic-stop-retire")
 			defer finalPool.Close()
-			guards := postgres.EffectTransactionGuards{Retention: scenario.retention.guard, Recovery: scenario.recovery.guard}
+			guards := scenario.retention.guard
 			ledger, e := postgres.NewDownloads(ctx, runtimePool, root, guards)
 			if e != nil {
 				t.Fatal(e)
@@ -127,7 +127,7 @@ func qualifyDownloadStopLifecycle(t *testing.T, ctx context.Context, admin *pgxp
 				t.Fatal("backed lifecycle", e)
 			}
 			facet := func(pool *pgxpool.Pool) *postgres.DownloadStopLifecycles {
-				x, e := postgres.NewDownloadStopLifecycles(ctx, pool, root, scenario.recovery.guard)
+				x, e := postgres.NewDownloadStopLifecycles(ctx, pool, root, scenario.recovery.installation)
 				if e != nil {
 					t.Fatal(e)
 				}
@@ -142,16 +142,16 @@ func qualifyDownloadStopLifecycle(t *testing.T, ctx context.Context, admin *pgxp
 				qualifyStopBackingExpiryAfterLock(t, ctx, admin, ledger, config, current(), backing, scope, deadline)
 			}
 			g := &group{scenario: scenario, allocation: allocation, writer: facet(producerPool), cleanup: facet(cleanupPool), verifier: facet(verifyPool), finalizer: facet(finalPool), cleanupPool: cleanupPool, verifyPool: verifyPool, finalPool: finalPool, pendingPool: producerPool, horizon: h}
-			stops, e := postgres.NewDownloadStops(ctx, stopPool, root)
+			stops, e := postgres.NewDownloadStops(ctx, stopPool, root, "")
 			if e != nil {
 				t.Fatal(e)
 			}
-			writer, e := postgres.NewDownloadStops(ctx, producerPool, root, scenario.recovery.guard)
+			writer, e := postgres.NewDownloadStops(ctx, producerPool, root, scenario.recovery.installation)
 			if e != nil {
 				t.Fatal(e)
 			}
 			g.pending = writer
-			ack, e := postgres.NewDownloadStops(ctx, ackPool, root, scenario.recovery.guard)
+			ack, e := postgres.NewDownloadStops(ctx, ackPool, root, scenario.recovery.installation)
 			if e != nil {
 				t.Fatal(e)
 			}

@@ -63,7 +63,7 @@ func qualifyProfileAdmission(t *testing.T, ctx context.Context, admin *pgxpool.P
 				if err != nil {
 					t.Fatal(err)
 				}
-				p := capture.ContextPreview{ID: custodyID(), AssessmentID: custodyID(), AssessmentRulesDigest: planning.RecorderAssessmentRulesDigest(), RootID: s.a.RootID, InstallationID: s.a.Recovery.InstallationID, IssuerEpoch: s.a.Recovery.IssuerEpoch, CaptureID: in.CaptureID, CaseID: s.a.CaseID, OccurrenceID: s.a.OccurrenceID, ArtifactID: s.a.Registration.Location.ArtifactID, AttemptID: s.a.Registration.Location.AttemptID, Actor: in.Executor, ExecutionClass: artifact.ContextAPIExecution,
+				p := capture.ContextPreview{ID: custodyID(), AssessmentID: custodyID(), AssessmentRulesDigest: planning.RecorderAssessmentRulesDigest(), RootID: s.a.RootID, InstallationID: s.recovery.installation, CaptureID: in.CaptureID, CaseID: s.a.CaseID, OccurrenceID: s.a.OccurrenceID, ArtifactID: s.a.Registration.Location.ArtifactID, AttemptID: s.a.Registration.Location.AttemptID, Actor: in.Executor, ExecutionClass: artifact.ContextAPIExecution,
 					Intent: capture.ContextIntent{Target: targets.WorkloadRequest{ClusterID: in.Target.Request.ClusterID, Namespace: in.Target.Request.Namespace.Name, Kind: in.Target.Request.Workload.Kind, Name: in.Target.Request.Workload.Name}, Composition: &c, RequestedSeconds: in.Retention.RequestedSeconds}, Target: in.Target.Request, Pin: in.Target.Pin,
 					Storage: capture.ContextStorageSelection{StoreID: s.a.Registration.StoreID, AllocationID: s.a.Registration.AllocationID, PoolRevision: s.a.Registration.PoolRevision, AllocationRevision: s.a.Registration.AllocationRevision, BindingRevision: s.a.Storage.Revision}, Retention: reviewOf(in.Retention), Audience: s.a.Eligibility.DefaultAudience, CanonicalScope: reviewed.CanonicalScope, ScopeDigest: reviewed.ScopeDigest, CreatedAt: now, Deadline: input.Deadline}
 				pools, _ := compiledOrdinaryHubPools(t, ctx, admin, poolFor)
@@ -74,13 +74,13 @@ func qualifyProfileAdmission(t *testing.T, ctx context.Context, admin *pgxpool.P
 				if err = previews.CreateContextPreview(ctx, p); err != nil {
 					t.Fatal("profile preview", err)
 				}
-				grants, err := postgres.NewAccessGrants(ctx, pools.ordinary, p.RootID, s.recovery.guard)
+				grants, err := postgres.NewAccessGrants(ctx, pools.ordinary, p.RootID, s.recovery.installation)
 				if err != nil {
 					t.Fatal(err)
 				}
 				g := authorization.Grant{ID: custodyID(), RootID: p.RootID, Kind: authorization.GrantAdHocCapture, PreviewID: p.ID, CaptureID: p.CaptureID, Target: in.Target.Target(), Requester: p.Actor, ExecutionDigest: p.ScopeDigest, Scope: p.CanonicalScope, Review: []byte(`{}`), DataClass: "raw", Reasons: []authorization.SensitiveReason{{ActionID: reviewed.Actions[0].ID, Code: planvalue.ReasonLiveProfile}}, Lifetime: time.Hour, Revision: 1}
 				g.ReviewDigest = authapp.ReviewDigest(g, g.Review)
-				g, _, err = grants.RequestGrant(ctx, authapp.StoredGrantRequest{Grant: g, IdempotencyKey: "profile-review", RequestDigest: sha256.Sum256([]byte("synthetic-profile-review"))}, s.a.Recovery)
+				g, _, err = grants.RequestGrant(ctx, authapp.StoredGrantRequest{Grant: g, IdempotencyKey: "profile-review", RequestDigest: sha256.Sum256([]byte("synthetic-profile-review"))})
 				if err != nil {
 					t.Fatal("profile review", err)
 				}
@@ -112,7 +112,7 @@ func qualifyProfileAdmission(t *testing.T, ctx context.Context, admin *pgxpool.P
 				}
 				reviewer := p.Actor
 				reviewer.Subject = "synthetic-independent-profile-reviewer"
-				g, _, err = grants.DecideGrant(ctx, authapp.GrantDecisionInput{GrantID: g.ID, Approve: true, Approver: reviewer, Reason: "synthetic profile review", ACR: "gold", AuthTime: time.Now().Add(-time.Second), IdempotencyKey: "profile-approve"}, s.a.Recovery)
+				g, _, err = grants.DecideGrant(ctx, authapp.GrantDecisionInput{GrantID: g.ID, Approve: true, Approver: reviewer, Reason: "synthetic profile review", ACR: "gold", AuthTime: time.Now().Add(-time.Second), IdempotencyKey: "profile-approve"})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -123,15 +123,11 @@ func qualifyProfileAdmission(t *testing.T, ctx context.Context, admin *pgxpool.P
 				if accepted.Expectation.Profile == nil || accepted.Expectation.Recording != nil || accepted.Expectation.DataClass != "raw" || accepted.Expectation.NativeType != artifact.PprofArtifact {
 					t.Fatal("profile admitted with wrong shape")
 				}
-				// Recovery resolves the original approved timing scope rather than
+				// Resolution uses the original approved timing scope rather than
 				// comparing its zero review deadline to the accepted write deadline.
 				resolutionPool := poolFor("context_request_resolution_runtime", "synthetic-context-request-resolution")
 				defer resolutionPool.Close()
-				resolver, err := postgres.NewContextRequestResolutions(ctx, resolutionPool, p.RootID, s.recovery.guard)
-				if err != nil {
-					t.Fatal(err)
-				}
-				recovery, err := s.recovery.reader.RecoveryState(ctx)
+				resolver, err := postgres.NewContextRequestResolutions(ctx, resolutionPool, p.RootID, s.recovery.installation)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -139,7 +135,7 @@ func qualifyProfileAdmission(t *testing.T, ctx context.Context, admin *pgxpool.P
 				i.Scopes = append(append([]string(nil), i.Scopes...), "evidence:read")
 				i.VerifiedAt = time.Now().UTC().Truncate(time.Microsecond)
 				i.ValidUntil = i.VerifiedAt.Add(5 * time.Second)
-				query := capture.ReplayQuery{RootID: p.RootID, PreviewID: p.ID, IdempotencyKey: s.a.IdempotencyKey, SubmissionDigest: s.a.SubmissionDigest, Identity: i, Recovery: recovery}
+				query := capture.ReplayQuery{RootID: p.RootID, PreviewID: p.ID, IdempotencyKey: s.a.IdempotencyKey, SubmissionDigest: s.a.SubmissionDigest, Identity: i}
 				resolved, err := resolver.ResolveOrCloseContextRequest(ctx, query)
 				if err != nil || resolved.State != capture.RequestAccepted || resolved.Accepted == nil || resolved.Accepted.CaptureID != accepted.CaptureID || !resolved.Accepted.Deadline.Equal(accepted.Deadline) {
 					t.Fatal("approved profile request resolution", resolved.State, err)
@@ -173,7 +169,7 @@ func qualifyProfileAdmission(t *testing.T, ctx context.Context, admin *pgxpool.P
 				if err = (auditapp.CaptureIntentPublisher{Ledger: intents, Objects: &objectstore.CaptureIntentObjects{Store: store, Seal: keys, Open: keys}}).PublishCaptureIntents(ctx); err != nil {
 					t.Fatal(err)
 				}
-				execSQL, err := postgres.NewAPIContextExecutions(ctx, pools.ordinary, p.RootID, postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard})
+				execSQL, err := postgres.NewAPIContextExecutions(ctx, pools.ordinary, p.RootID, s.recovery.installation, s.retention.guard)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -187,11 +183,7 @@ func qualifyProfileAdmission(t *testing.T, ctx context.Context, admin *pgxpool.P
 					i := s.a.Eligibility.VerifiedIdentity
 					i.Scopes = append(append([]string(nil), i.Scopes...), "evidence:read")
 					i.VerifiedAt, i.ValidUntil = n, n.Add(5*time.Second)
-					recovery, err := s.recovery.reader.RecoveryState(ctx)
-					if err != nil {
-						t.Fatal(err)
-					}
-					work, err := execSQL.ReadAPIContextWork(ctx, accepted.CaptureID, i, recovery)
+					work, err := execSQL.ReadAPIContextWork(ctx, accepted.CaptureID, i)
 					if err != nil {
 						t.Fatal(err)
 					}
@@ -215,13 +207,13 @@ func qualifyProfileAdmission(t *testing.T, ctx context.Context, admin *pgxpool.P
 					if err != nil {
 						t.Fatal(err)
 					}
-					process.InstallationID, process.ClusterID, process.IssuerEpoch = recovery.InstallationID, input.Target.Target().ClusterID, recovery.IssuerEpoch
+					process.InstallationID, process.ClusterID, process.IssuerEpoch = s.recovery.installation, input.Target.Target().ClusterID, s.recovery.observation.issuer
 					observation := execution.APIProcessObservation{Binding: process, CheckedAt: n, ValidUntil: n.Add(5 * time.Second)}
 					until := n.Add(5 * time.Second)
-					for _, d := range []time.Time{eligible.ValidUntil, compiled.ValidUntil, recovery.FreshUntil, observation.ValidUntil, accepted.Expectation.Registration.WriteUntil} {
+					for _, d := range []time.Time{eligible.ValidUntil, compiled.ValidUntil, observation.ValidUntil, accepted.Expectation.Registration.WriteUntil} {
 						until = identity.Earlier(until, d)
 					}
-					check := executionapp.APIExecutionCheck{Work: work, Plan: compiled, Eligibility: eligible, Recovery: recovery, Process: observation, CheckedAt: n, ValidUntil: until.Truncate(time.Microsecond)}
+					check := executionapp.APIExecutionCheck{Work: work, Plan: compiled, Eligibility: eligible, Process: observation, CheckedAt: n, ValidUntil: until.Truncate(time.Microsecond)}
 					if !check.Valid(time.Now()) {
 						t.Fatal("profile execution fixture invalid")
 					}
@@ -264,7 +256,7 @@ func qualifyProfileAdmission(t *testing.T, ctx context.Context, admin *pgxpool.P
 				if err = admin.QueryRow(ctx, "SELECT progress_revision FROM context_capture WHERE root_id=$1 AND id=$2", p.RootID, p.CaptureID).Scan(&revision); err != nil {
 					t.Fatal(err)
 				}
-				cancellation := capture.CancellationCheck{RootID: p.RootID, Request: capture.CancellationRequest{CaptureID: p.CaptureID, ExpectedRevision: revision, IdempotencyKey: "stop-profile"}, Identity: check.Eligibility.VerifiedIdentity, Recovery: check.Recovery, CheckedAt: time.Now().UTC().Truncate(time.Microsecond), ValidUntil: check.ValidUntil}
+				cancellation := capture.CancellationCheck{RootID: p.RootID, Request: capture.CancellationRequest{CaptureID: p.CaptureID, ExpectedRevision: revision, IdempotencyKey: "stop-profile"}, Identity: check.Eligibility.VerifiedIdentity, CheckedAt: time.Now().UTC().Truncate(time.Microsecond), ValidUntil: check.ValidUntil}
 				stopped, err := execSQL.RequestCaptureCancellation(ctx, cancellation)
 				if err != nil || stopped.Profile == nil || stopped.Snapshot != nil || !stopped.Decision.Requested || stopped.Decision.Phase != "Running" || !stopped.Decision.ApplicationStopUnknown || stopped.Profile.WriterEpoch != running.Process.ProcessEpoch {
 					t.Fatal("typed profile cancellation", stopped, err)
@@ -279,10 +271,10 @@ func qualifyProfileAdmission(t *testing.T, ctx context.Context, admin *pgxpool.P
 				proof := artifact.ProfileCancellation{CaptureID: p.CaptureID, AttemptID: r.Location.AttemptID, WriterPodUID: running.Process.PodUID, WriterEpoch: running.Process.ProcessEpoch, ExpectationDigest: running.ExpectationDigest, JoinedAt: cancelled.CompletedAt, MayHaveStarted: mayHaveStarted}
 				changed := proof
 				changed.WriterEpoch = custodyID()
-				if _, err = execSQL.RecordAPIProfileCancellation(ctx, cancelled, changed, check.Process, check.Recovery); err == nil {
+				if _, err = execSQL.RecordAPIProfileCancellation(ctx, cancelled, changed, check.Process); err == nil {
 					t.Fatal("replacement writer cancelled profile")
 				}
-				if _, err = execSQL.RecordAPIProfileCancellation(ctx, cancelled, proof, check.Process, check.Recovery); err != nil {
+				if _, err = execSQL.RecordAPIProfileCancellation(ctx, cancelled, proof, check.Process); err != nil {
 					t.Fatal("joined profile cancellation", err)
 				}
 				joined, err := execSQL.RequestCaptureCancellation(ctx, cancellation)

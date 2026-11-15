@@ -197,7 +197,7 @@ func TestContextSubmissionConsumesMetadataBeforeIndependentStart(t *testing.T) {
 }
 
 func TestContextSubmissionMetadataRefreshCannotReplaceAcceptedOperation(t *testing.T) {
-	for _, mode := range []string{"missing", "read-error", "capture", "scope", "submission", "pin", "registration", "created", "deadline", "expired-metadata", "identity-after-read", "recovery-after-read", "cancel-after-read"} {
+	for _, mode := range []string{"missing", "read-error", "capture", "scope", "submission", "pin", "registration", "created", "deadline", "expired-metadata", "identity-after-read", "expired-after-read", "cancel-after-read"} {
 		t.Run(mode, func(t *testing.T) {
 			f, x, s, p := submissionTest(t)
 			ctx, cancel := context.WithCancel(context.Background())
@@ -231,7 +231,7 @@ func TestContextSubmissionMetadataRefreshCannotReplaceAcceptedOperation(t *testi
 					a.MetadataValidUntil = f.now
 				case "identity-after-read":
 					f.identityChange = "groups"
-				case "recovery-after-read":
+				case "expired-after-read":
 					f.now = f.now.Add(6 * time.Second)
 				case "cancel-after-read":
 					cancel()

@@ -18,9 +18,6 @@ var ErrDownloadMetadataUnavailable = errors.New("verified download metadata unav
 type CurrentDownloadAuthority interface {
 	CheckDownloadCurrent(context.Context, identities.CurrentIdentity, artifact.DownloadScope) (artifact.DownloadAuthority, error)
 }
-type ContextDownloadRecovery interface {
-	RecoveryState(context.Context) (artifact.RecoveryProof, error)
-}
 type ContextDownloadRoutes interface {
 	ResolveContextDownload(context.Context, artifact.DownloadRouteQuery) (artifact.DownloadRoute, error)
 }
@@ -94,7 +91,6 @@ type ContextDownloadView struct {
 // separate prerequisites; absence of a real runtime permits no reservation.
 type ContextDownloadCoordinator struct {
 	RootID, InstallationID string
-	Recovery               ContextDownloadRecovery
 	Routes                 ContextDownloadRoutes
 	Sources                ContextDownloadSources
 	Authority              CurrentDownloadAuthority
@@ -116,7 +112,7 @@ func ContextDownloadKeyDigest(key string) artifact.Digest {
 	return sha256.Sum256([]byte("context-download-prepare-key/v1\x00" + key))
 }
 func (s ContextDownloadCoordinator) valid() bool {
-	return authorization.UUID(s.RootID) && authorization.UUID(s.InstallationID) && s.Recovery != nil && s.Routes != nil && s.Sources != nil && s.Authority != nil && s.Sessions != nil && s.Plans != nil && s.Now != nil && s.NewID != nil
+	return authorization.UUID(s.RootID) && authorization.UUID(s.InstallationID) && s.Routes != nil && s.Sources != nil && s.Authority != nil && s.Sessions != nil && s.Plans != nil && s.Now != nil && s.NewID != nil
 }
 func downloadSameIdentity(a, b identity.Identity, now time.Time) bool {
 	if !b.Valid(now) || a.Principal != b.Principal || a.Policy != b.Policy {
@@ -187,12 +183,7 @@ func (s ContextDownloadCoordinator) prepare(ctx context.Context, current identit
 	}
 	ctx, cancel := context.WithDeadline(ctx, until)
 	defer cancel()
-	recovery, err := s.Recovery.RecoveryState(ctx)
-	if err != nil || !recovery.Valid(s.Now()) || recovery.InstallationID != s.InstallationID {
-		return zero, collapsed("recovery", artifact.ErrDownloadUnavailable, err)
-	}
-	until = identity.Earlier(until, recovery.FreshUntil)
-	lookup, err := s.Sessions.LookupDownloadKey(ctx, artifact.DownloadKeyQuery{Identity: i, Recovery: recovery, Key: ContextDownloadKeyDigest(key)})
+	lookup, err := s.Sessions.LookupDownloadKey(ctx, artifact.DownloadKeyQuery{Identity: i, Key: ContextDownloadKeyDigest(key)})
 	if err != nil || !lookup.Valid(s.Now()) {
 		return zero, collapsed("key-lookup", artifact.ErrDownloadUnavailable, err)
 	}
@@ -209,7 +200,7 @@ func (s ContextDownloadCoordinator) prepare(ctx context.Context, current identit
 			return zero, collapsed("key-conflict", artifact.ErrDownloadConflict, nil)
 		}
 	} else {
-		route, e := s.Routes.ResolveContextDownload(ctx, artifact.DownloadRouteQuery{ArtifactID: artifactID, Identity: i, Recovery: recovery})
+		route, e := s.Routes.ResolveContextDownload(ctx, artifact.DownloadRouteQuery{ArtifactID: artifactID, Identity: i})
 		if e != nil || !route.Valid(s.Now()) || route.Scope.RootID != s.RootID || route.Scope.ArtifactID != artifactID || route.Scope.Principal != i.Principal {
 			return zero, collapsed("route", artifact.ErrDownloadUnavailable, e)
 		}

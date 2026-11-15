@@ -7,13 +7,12 @@ import (
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	app "asservat.local/asservat/internal/application/audit"
 	"asservat.local/asservat/internal/domain/authorization"
-	"asservat.local/asservat/internal/domain/identity"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // DueCaptureOperations is a bounded scheduling page over the private filtered
 // view. Its IDs grant no deletion authority. The existing lifecycle transaction
-// independently rechecks recovery, exact original row/lease and writer closure.
+// independently rechecks the exact original row/lease and writer closure.
 // The caller retains at most one UUID cursor and wraps only after the last page,
 // so an unresolved early row cannot starve the rest or create an unbounded list.
 func (s *OperationLifecycles) DueCaptureOperations(ctx context.Context, after string) ([]string, error) {
@@ -44,7 +43,7 @@ func (s *OperationLifecycles) dueOperations(ctx context.Context, after string) (
 	j := s.journal
 	var out []string
 	err := j.ledger.transaction(call, func(q *custodydb.Queries) error {
-		trust, started, err := j.trust(call, q)
+		started, err := q.CurrentTime(call)
 		if err != nil {
 			return err
 		}
@@ -66,7 +65,7 @@ func (s *OperationLifecycles) dueOperations(ctx context.Context, after string) (
 			out = append(out, key)
 			last = key
 		}
-		return auditCurrent(call, q, trust, started, identity.Earlier(started.Add(5*time.Second), trust.FreshUntil.Time))
+		return auditCurrent(call, q, started.Time.Add(5*time.Second))
 	})
 	if err != nil || call.Err() != nil {
 		return nil, app.ErrUnavailable
