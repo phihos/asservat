@@ -8,8 +8,8 @@
 Step-up is optional and off by default. Browser sessions end at creation plus
 `maxLifetimeSeconds` (7 d) or after `inactivityTimeoutSeconds` (24 h); session
 roots, epochs, the settings projection and its polling loop are removed
-(migration 00176). Processing is initialized when its root is created
-(migration 00177); bundled Keycloak emits group paths in `groups` and has no
+(migration 00177). Processing is initialized when its root is created
+(migration 00178); bundled Keycloak emits group paths in `groups` and has no
 processing-operator group.
 
 ## Grants cover every client of the requester (ADR-335 D5, 2026-11-15)
