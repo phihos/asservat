@@ -9,7 +9,7 @@ import (
 )
 
 func argumentRecordingFixture() *artifact.Recording {
-	return &artifact.Recording{Kind: "syscallTrace", Profile: "arguments", Composition: []byte("{}"), DurationMillis: 10000, MaxBytes: 64 << 10, Syscalls: &artifact.RecordingSyscalls{Names: []string{"openat"}, MaxEvents: 1000, MaxEventsPerSecond: 100, MaxTrackedThreads: 4096}, Arguments: &artifact.RecordingArguments{ProgramDigest: artifact.Digest{1}, DefinitionDigest: artifact.Digest{2}, AccountingRule: artifact.Digest{3}, MaxProbeBytes: 512, MaxBytesPerEvent: 128, MaxBytesPerSecond: 1024}}
+	return &artifact.Recording{Kind: "syscallTrace", Profile: "arguments", Composition: []byte("{}"), DurationMillis: 10000, MaxBytes: 64 << 10, Syscalls: &artifact.RecordingSyscalls{Names: []string{"openat"}, MaxEventsPerSecond: 100, MaxTrackedThreads: 4096}, Arguments: &artifact.RecordingArguments{ProgramDigest: artifact.Digest{1}, DefinitionDigest: artifact.Digest{2}, AccountingRule: artifact.Digest{3}, MaxProbeBytes: 512, MaxBytesPerEvent: 128, MaxBytesPerSecond: 1024}}
 }
 func TestFiniteManualArgumentsReserveBothPoolsBeforeRead(t *testing.T) {
 	now := time.Date(2026, 11, 3, 0, 0, 0, 0, time.UTC)

@@ -22,13 +22,8 @@
             "ring": {
               "maxAge": "30s",
               "maxBytes": 8388608,
-              "segmentBytes": 2097152,
-              "maxSegments": 4,
-              "medium": "memory"
+              "segments": 4
             },
-            "maxFrozenBytes": 16777216,
-            "maxConcurrentSnapshots": 1,
-            "maxEvents": 100000,
             "maxEventsPerSecond": 10000,
             "maxTrackedThreads": 4096
           },
@@ -64,11 +59,6 @@
         "actionID": "syscalls",
         "field": "syscallRing",
         "label": "Ring allocation"
-      },
-      {
-        "actionID": "syscalls",
-        "field": "syscallMaxEvents",
-        "label": "Retained event limit"
       },
       {
         "actionID": "syscalls",

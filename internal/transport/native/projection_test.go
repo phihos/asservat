@@ -540,7 +540,7 @@ func TestNativeExhaustionRequiresExactSingleBatchJoinedACK(t *testing.T) {
 			if mode == "two-batch-raw" {
 				e.NativeType, e.DataClass, e.Profile = artifact.SyscallArgumentsArtifact, "raw", nil
 				e.Registration.NativeLimit = artifact.RecordingNativeLimit
-				e.Recording = &artifact.Recording{Kind: "syscallTrace", Profile: "arguments", Composition: []byte("{}"), DurationMillis: 1000, MaxBytes: artifact.RecordingNativeLimit, Syscalls: &artifact.RecordingSyscalls{Names: []string{"write"}, MaxEvents: 100, MaxEventsPerSecond: 100, MaxTrackedThreads: 16}, Arguments: &artifact.RecordingArguments{ProgramDigest: artifact.Digest{1}, DefinitionDigest: artifact.Digest{2}, AccountingRule: artifact.Digest{3}, MaxProbeBytes: 256, MaxBytesPerEvent: 128, MaxBytesPerSecond: 1024}}
+				e.Recording = &artifact.Recording{Kind: "syscallTrace", Profile: "arguments", Composition: []byte("{}"), DurationMillis: 1000, MaxBytes: artifact.RecordingNativeLimit, Syscalls: &artifact.RecordingSyscalls{Names: []string{"write"}, MaxEventsPerSecond: 100, MaxTrackedThreads: 16}, Arguments: &artifact.RecordingArguments{ProgramDigest: artifact.Digest{1}, DefinitionDigest: artifact.Digest{2}, AccountingRule: artifact.Digest{3}, MaxProbeBytes: 256, MaxBytesPerEvent: 128, MaxBytesPerSecond: 1024}}
 				s.NativeType, s.SourceFormat, s.DisplayVersion = artifact.SyscallArgumentsArtifact, artifact.SyscallArgumentsFormat, query.SyscallQueryDisplayVersion
 				s.Profile = query.ProfileSummarySelection{}
 				selection, err := query.NormalizeSyscallSelection(s.CaseID, s.ArtifactID, query.SyscallQueryView, "", 20, nil, false)

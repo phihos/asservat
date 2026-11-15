@@ -100,7 +100,7 @@
                     "$ref": "#/$defs/d0"
                   },
                   {
-                    "$ref": "#/$defs/d34"
+                    "$ref": "#/$defs/d33"
                   }
                 ]
               },
@@ -527,8 +527,8 @@
           "filter": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 4096,
-            "pattern": "\\S"
+            "pattern": "\\S",
+            "description": "No length cap on the text; the bound is the compiled classic BPF program, which must fit the kernel limit BPF_MAXINSNS (4096 instructions), checked at compile, and the enclosing Kubernetes object size."
           },
           "ring": {
             "type": "object",
@@ -540,37 +540,21 @@
               "maxBytes": {
                 "type": "integer",
                 "minimum": 1,
-                "maximum": 268435456
+                "maximum": 9007199254740991
               },
-              "segmentBytes": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 67108864
-              },
-              "maxSegments": {
+              "segments": {
                 "type": "integer",
                 "minimum": 2,
-                "maximum": 64
-              },
-              "medium": {
-                "enum": [
-                  "memory",
-                  "encryptedDisk"
-                ]
-              },
-              "storageProfileRef": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 63
+                "maximum": 9007199254740991,
+                "description": "Segment count; segment size is maxBytes \u00f7 segments. At least 2 so the ring can rotate; evicting one segment drops 1/segments of history."
               }
             },
             "required": [
               "maxAge",
               "maxBytes",
-              "segmentBytes",
-              "maxSegments",
-              "medium"
-            ]
+              "segments"
+            ],
+            "description": "In-memory ring; a saved window copies at most maxBytes. The collector memory formula (specs/packets.md REQ-NET-003) bounds all rings on a node."
           },
           "peers": {
             "type": "object",
@@ -762,16 +746,6 @@
               "maxEndpoints",
               "maxStaleness"
             ]
-          },
-          "maxFrozenBytes": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 268435456
-          },
-          "maxConcurrentSnapshots": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 4
           }
         },
         "required": [
@@ -779,9 +753,7 @@
           "before",
           "after",
           "ring",
-          "peers",
-          "maxFrozenBytes",
-          "maxConcurrentSnapshots"
+          "peers"
         ]
       },
       "d9": {
@@ -890,37 +862,21 @@
           "maxBytes": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 268435456
+            "maximum": 9007199254740991
           },
-          "segmentBytes": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 67108864
-          },
-          "maxSegments": {
+          "segments": {
             "type": "integer",
             "minimum": 2,
-            "maximum": 64
-          },
-          "medium": {
-            "enum": [
-              "memory",
-              "encryptedDisk"
-            ]
-          },
-          "storageProfileRef": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 63
+            "maximum": 9007199254740991,
+            "description": "Segment count; segment size is maxBytes \u00f7 segments. At least 2 so the ring can rotate; evicting one segment drops 1/segments of history."
           }
         },
         "required": [
           "maxAge",
           "maxBytes",
-          "segmentBytes",
-          "maxSegments",
-          "medium"
-        ]
+          "segments"
+        ],
+        "description": "In-memory ring; a saved window copies at most maxBytes. The collector memory formula (specs/packets.md REQ-NET-003) bounds all rings on a node."
       },
       "d11": {
         "title": "Bounded pod-wide syscall acquisition parameters",
@@ -984,7 +940,6 @@
                       "pattern": "^[a-zA-Z0-9_]{1,64}$"
                     },
                     "minItems": 1,
-                    "maxItems": 128,
                     "uniqueItems": true
                   }
                 },
@@ -1004,30 +959,17 @@
           "ring": {
             "$ref": "#/$defs/d12"
           },
-          "maxFrozenBytes": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 268435456
-          },
-          "maxConcurrentSnapshots": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 4
-          },
-          "maxEvents": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 1000000
-          },
           "maxEventsPerSecond": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 100000
+            "maximum": 9007199254740991,
+            "description": "Reviewed observation rate; the shipped default is derived from measured per-node collector event throughput. With the ring, it bounds every trace; there is no lifetime event total (ADR-335 D6)."
           },
           "maxTrackedThreads": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 16384
+            "maximum": 9007199254740991,
+            "description": "Sizes the eBPF per-thread map (memory per tracked thread); derived from the collector map memory budget."
           },
           "arguments": {
             "type": "object",
@@ -1056,9 +998,6 @@
           "syscalls",
           "result",
           "ring",
-          "maxFrozenBytes",
-          "maxConcurrentSnapshots",
-          "maxEvents",
           "maxEventsPerSecond",
           "maxTrackedThreads"
         ],
@@ -2613,32 +2552,28 @@
         "properties": {
           "description": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 1024
+            "minLength": 1
           },
           "actions": {
             "type": "array",
             "items": {
               "$ref": "#/$defs/d5"
             },
-            "maxItems": 16,
             "minItems": 1,
             "uniqueItems": true
           },
           "maxTotalBytes": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 1099511627776
+            "maximum": 9007199254740991
           },
           "maxDuration": {
             "type": "string",
-            "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
-            "maxLength": 16
+            "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$"
           },
           "endpointBindings": {
             "type": "array",
             "minItems": 1,
-            "maxItems": 16,
             "uniqueItems": true,
             "items": {
               "type": "object",
@@ -2646,13 +2581,11 @@
               "properties": {
                 "name": {
                   "type": "string",
-                  "minLength": 1,
-                  "maxLength": 63
+                  "minLength": 1
                 },
                 "templateRef": {
                   "type": "string",
-                  "minLength": 1,
-                  "maxLength": 63
+                  "minLength": 1
                 },
                 "addressMode": {
                   "type": "string",
@@ -2781,8 +2714,8 @@
       "d21": {
         "type": "string",
         "minLength": 1,
-        "maxLength": 4096,
-        "pattern": "\\S"
+        "pattern": "\\S",
+        "description": "No length cap on the text; the bound is the compiled classic BPF program, which must fit the kernel limit BPF_MAXINSNS (4096 instructions), checked at compile, and the enclosing Kubernetes object size."
       },
       "d22": {
         "type": "string",
@@ -2822,7 +2755,6 @@
                   "pattern": "^[a-zA-Z0-9_]{1,64}$"
                 },
                 "minItems": 1,
-                "maxItems": 128,
                 "uniqueItems": true
               }
             },
@@ -2883,12 +2815,8 @@
       "d30": {
         "type": "integer",
         "minimum": 1,
-        "maximum": 1000000
-      },
-      "d31": {
-        "type": "integer",
-        "minimum": 1,
-        "maximum": 100000
+        "maximum": 9007199254740991,
+        "description": "Reviewed observation rate; the shipped default is derived from measured per-node collector event throughput. With the ring, it bounds every trace; there is no lifetime event total (ADR-335 D6)."
       },
       "d19": {
         "type": "object",
@@ -3220,20 +3148,10 @@
           {
             "properties": {
               "field": {
-                "const": "syscallMaxEvents"
-              },
-              "value": {
-                "$ref": "#/$defs/d30"
-              }
-            }
-          },
-          {
-            "properties": {
-              "field": {
                 "const": "syscallRate"
               },
               "value": {
-                "$ref": "#/$defs/d31"
+                "$ref": "#/$defs/d30"
               }
             }
           },
@@ -3245,7 +3163,7 @@
               "value": {
                 "type": "integer",
                 "minimum": 1,
-                "maximum": 1099511627776
+                "maximum": 9007199254740991
               }
             }
           },
@@ -3308,8 +3226,7 @@
             "items": {
               "$ref": "#/$defs/d19"
             },
-            "minItems": 0,
-            "maxItems": 32
+            "minItems": 0
           }
         },
         "required": [
@@ -3327,13 +3244,12 @@
             "items": {
               "$ref": "#/$defs/d17"
             },
-            "minItems": 1,
-            "maxItems": 8
+            "minItems": 1
           },
           "maxTotalBytes": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 1099511627776
+            "maximum": 9007199254740991
           },
           "maxDuration": {
             "$ref": "#/$defs/d8"
@@ -3345,7 +3261,7 @@
           "maxDuration"
         ]
       },
-      "d32": {
+      "d31": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -3426,7 +3342,7 @@
           }
         ]
       },
-      "d33": {
+      "d32": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -3465,18 +3381,16 @@
           "resolvedProfiles": {
             "type": "array",
             "items": {
-              "$ref": "#/$defs/d32"
+              "$ref": "#/$defs/d31"
             },
-            "minItems": 1,
-            "maxItems": 8
+            "minItems": 1
           },
           "actionMap": {
             "type": "array",
             "items": {
-              "$ref": "#/$defs/d33"
+              "$ref": "#/$defs/d32"
             },
-            "minItems": 1,
-            "maxItems": 128
+            "minItems": 1
           }
         },
         "required": [
@@ -3572,11 +3486,11 @@
           "navigation_uri"
         ]
       },
-      "d35": {
+      "d34": {
         "type": "string",
         "pattern": "^[a-f0-9]{64}$"
       },
-      "d34": {
+      "d33": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -3608,10 +3522,10 @@
             "format": "date-time"
           },
           "settings_digest": {
-            "$ref": "#/$defs/d35"
+            "$ref": "#/$defs/d34"
           },
           "original_execution_digest": {
-            "$ref": "#/$defs/d35"
+            "$ref": "#/$defs/d34"
           },
           "settings": {
             "type": "object",
@@ -3639,7 +3553,7 @@
                     "maxLength": 64
                   },
                   "executionDigest": {
-                    "$ref": "#/$defs/d35"
+                    "$ref": "#/$defs/d34"
                   }
                 },
                 "required": [

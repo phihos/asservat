@@ -50,7 +50,7 @@ func syscallSourceNative(t *testing.T, ctx context.Context, k kubernetes.Interfa
 	})
 
 	names := []string{"openat", "read"}
-	filter := collector.SyscallFilter{Names: names, MaxEvents: 100_000, MaxTrackedThreads: 4096}
+	filter := collector.SyscallFilter{Names: names, MaxTrackedThreads: 4096}
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	id := view.Identity
 	resources := collector.SourceResources{PolicyUID: "synthetic-syscall-policy"}
@@ -59,7 +59,7 @@ func syscallSourceNative(t *testing.T, ctx context.Context, k kubernetes.Interfa
 		Scope: [32]byte{1}, ExpectationDigest: [32]byte{2}, ProgramDigest: delivery.SyscallFilterDigest(filter), ResourceDigest: delivery.SourceResourcesDigest(resources)}
 	source := collector.PacketSource{Permit: collector.SourcePermit{Binding: b, StartedAt: now, HardUntil: now.Add(2 * time.Minute), StartBy: now.Add(5 * time.Second), IssuedAt: now, DispatchUntil: now.Add(5 * time.Second), LeafUntil: now.Add(30 * time.Second),
 		Credit: 64 << 20, BytesPerSecond: 10_000 * collector.SyscallEventCredit},
-		Ring:      collector.SourceRingLimits{MaxAge: 30 * time.Second, MaxBytes: 8 << 20, SegmentBytes: 2 << 20, MaxSegments: 4, MaxFrozenBytes: 4 << 20, MaxConcurrentSnapshots: 1},
+		Ring:      collector.SourceRingLimits{MaxAge: 30 * time.Second, MaxBytes: 8 << 20, Segments: 4},
 		Resources: resources, Syscalls: &filter}
 	call, cancel := context.WithTimeout(ctx, 4*time.Second)
 	_, err = ch.EnqueueSourceExpected(call, targets.PacketSourceObservation{PodUID: b.PodUID, NodeUID: b.NodeUID, BootID: b.BootID, CollectorPodUID: b.CollectorPodUID, CollectorEpoch: b.CollectorEpoch, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}, source)

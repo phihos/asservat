@@ -7,8 +7,6 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 )
 
-const MaxProfilePodPorts = 256
-
 // ProfilePortName matches EvidenceRecipe.spec.endpointBindings.portName. A
 // declaration is a routing hint for the whole Pod, never process attribution.
 func ProfilePortName(s string) bool {
@@ -45,7 +43,7 @@ type ProfileNetwork struct {
 }
 
 func (p ProfileNetwork) Valid(now time.Time) bool {
-	if !p.Target.Valid(now) || !p.Target.ExecutionClass.Valid() || len(p.Ports) > MaxProfilePodPorts || len(p.PodIPs) > 2 {
+	if !p.Target.Valid(now) || !p.Target.ExecutionClass.Valid() || len(p.PodIPs) > 2 {
 		return false
 	}
 	// Public bindings intentionally retain their existing narrower name grammar.

@@ -143,8 +143,8 @@
     "filter": {
       "type": "string",
       "minLength": 1,
-      "maxLength": 4096,
-      "pattern": "\\S"
+      "pattern": "\\S",
+      "description": "No length cap on the text; the bound is the compiled classic BPF program, which must fit the kernel limit BPF_MAXINSNS (4096 instructions), checked at compile, and the enclosing Kubernetes object size."
     },
     "ring": {
       "type": "object",
@@ -156,37 +156,21 @@
         "maxBytes": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 268435456
+          "maximum": 9007199254740991
         },
-        "segmentBytes": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 67108864
-        },
-        "maxSegments": {
+        "segments": {
           "type": "integer",
           "minimum": 2,
-          "maximum": 64
-        },
-        "medium": {
-          "enum": [
-            "memory",
-            "encryptedDisk"
-          ]
-        },
-        "storageProfileRef": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 63
+          "maximum": 9007199254740991,
+          "description": "Segment count; segment size is maxBytes ÷ segments. At least 2 so the ring can rotate; evicting one segment drops 1/segments of history."
         }
       },
       "required": [
         "maxAge",
         "maxBytes",
-        "segmentBytes",
-        "maxSegments",
-        "medium"
-      ]
+        "segments"
+      ],
+      "description": "In-memory ring; a saved window copies at most maxBytes. The collector memory formula (specs/packets.md REQ-NET-003) bounds all rings on a node."
     },
     "peers": {
       "type": "object",
@@ -378,16 +362,6 @@
         "maxEndpoints",
         "maxStaleness"
       ]
-    },
-    "maxFrozenBytes": {
-      "type": "integer",
-      "minimum": 1,
-      "maximum": 268435456
-    },
-    "maxConcurrentSnapshots": {
-      "type": "integer",
-      "minimum": 1,
-      "maximum": 4
     }
   },
   "required": [
@@ -395,8 +369,6 @@
     "before",
     "after",
     "ring",
-    "peers",
-    "maxFrozenBytes",
-    "maxConcurrentSnapshots"
+    "peers"
   ]
 }

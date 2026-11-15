@@ -116,7 +116,7 @@ func decodeProfileNetwork(raw []byte) (value.ProfileNetwork, profileNetworkMetad
 			}
 			var ports []map[string]json.RawMessage
 			if b, exists := entry["ports"]; exists {
-				if string(b) == "null" || json.Unmarshal(b, &ports) != nil || len(ports)+len(out.Ports) > value.MaxProfilePodPorts || (field == "ephemeralContainers" && len(ports) > 0) {
+				if string(b) == "null" || json.Unmarshal(b, &ports) != nil || (field == "ephemeralContainers" && len(ports) > 0) {
 					return bad()
 				}
 			}

@@ -25,7 +25,7 @@ func TestNodePacketCaptureCancelStopsRunningCapture(t *testing.T) {
 	}
 	n := &nodePackets{engine: engine, upload: up.upload, available: true, now: func() time.Time { return clock }, log: func(string) {}, budget: func() *collector.Budget { return budget }, budgetMu: &mu}
 	const captureID, workID = "22222222-2222-4222-8222-222222222222", "33333333-3333-4333-8333-333333333333"
-	p := collector.PacketCapture{CaptureID: captureID, PodUID: "11111111-1111-4111-8111-111111111111", Duration: collector.MaxPacketCaptureDuration, MaxBytes: 1 << 20}
+	p := collector.PacketCapture{CaptureID: captureID, PodUID: "11111111-1111-4111-8111-111111111111", Duration: 5 * time.Minute, MaxBytes: 1 << 20}
 	if r := n.start(context.Background(), collector.Work{ID: workID, Sequence: 1, Kind: collector.WorkPacketCapture, NotAfter: clock.Add(time.Second), Packet: &p}); r.Outcome != collector.OutcomeAccepted {
 		t.Fatalf("%+v", r)
 	}

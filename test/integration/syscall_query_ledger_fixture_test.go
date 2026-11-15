@@ -60,7 +60,7 @@ func syscallQuerySyntheticNative(t *testing.T, e artifact.ContextExpectation, or
 
 func TestRawSyscallQueryManagedPayloadPreservesArgumentProvenance(t *testing.T) {
 	_, original := manualArgumentsNativeFixture(t)
-	expected := artifact.ContextExpectation{PodUID: original.Source.PodUID, Recording: &artifact.Recording{Kind: "syscallTrace", Profile: "arguments", MaxBytes: artifact.RecordingNativeLimit, DurationMillis: 5000, Syscalls: &artifact.RecordingSyscalls{Names: []string{"write"}, MaxEvents: manualArgumentsRetained, MaxEventsPerSecond: manualArgumentsRate, MaxTrackedThreads: 64}, Arguments: &original.Arguments}}
+	expected := artifact.ContextExpectation{PodUID: original.Source.PodUID, Recording: &artifact.Recording{Kind: "syscallTrace", Profile: "arguments", MaxBytes: artifact.RecordingNativeLimit, DurationMillis: 5000, Syscalls: &artifact.RecordingSyscalls{Names: []string{"write"}, MaxEventsPerSecond: manualArgumentsRate, MaxTrackedThreads: 64}, Arguments: &original.Arguments}}
 	body := syscallQuerySyntheticNative(t, expected, original, original.Source.StartedAt, original.Source.StartedAt.Add(2*time.Millisecond))
 	if footer, err := checkManualArgumentsNative(body, expected.PodUID, original); err != nil || footer.Retained != 1 {
 		t.Fatal("managed argument payload/source/counters", footer.Retained, err)

@@ -37,7 +37,7 @@ func (r *argumentSourceResolver) ResolveArgumentSource(context.Context, targets.
 func argumentOperationExpectation(capture, pod string, now time.Time) artifact.ContextExpectation {
 	return artifact.ContextExpectation{CaptureUID: capture, ActionID: "a0123456789abcdef01234567", PodUID: pod, NativeType: artifact.SyscallArgumentsArtifact, DataClass: "raw", Registration: artifact.Registration{WriteUntil: now.Add(time.Minute)},
 		Recording: &artifact.Recording{Kind: "syscallTrace", Profile: "arguments", Composition: []byte("{}"), DurationMillis: 1000, MaxBytes: 64 << 10,
-			Syscalls:  &artifact.RecordingSyscalls{Names: []string{"read", "write"}, MaxEvents: 1000, MaxEventsPerSecond: 100, MaxTrackedThreads: 16},
+			Syscalls:  &artifact.RecordingSyscalls{Names: []string{"read", "write"}, MaxEventsPerSecond: 100, MaxTrackedThreads: 16},
 			Arguments: &artifact.RecordingArguments{ProgramDigest: artifact.Digest{2}, DefinitionDigest: artifact.Digest{3}, AccountingRule: artifact.Digest(collector.ArgumentObservationAccountingRule()), MaxProbeBytes: 512, MaxBytesPerEvent: 128, MaxBytesPerSecond: 1 << 20, CaptureBuffers: true}}}
 }
 func argumentOperationPermit(e artifact.ContextExpectation, s targets.PacketSourceObservation, n time.Time) collector.ArgumentObservationPermit {

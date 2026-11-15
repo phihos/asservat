@@ -47,7 +47,6 @@
                   "syscallAfter",
                   "syscallRing",
                   "syscallArguments",
-                  "syscallMaxEvents",
                   "syscallRate",
                   "filePath",
                   "commandArgv",
@@ -76,16 +75,14 @@
               "label"
             ]
           },
-          "minItems": 0,
-          "maxItems": 32
+          "minItems": 0
         },
         "origins": {
           "type": "array",
           "items": {
             "$ref": "https://asservat.io/spec/v1/capture-composition.schema.json#/$defs/resolvedProfile"
           },
-          "minItems": 1,
-          "maxItems": 8
+          "minItems": 1
         }
       },
       "required": [

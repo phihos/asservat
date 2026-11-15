@@ -113,12 +113,9 @@ func AssessRecorder(plan value.RecorderPlan, assessmentID string, now time.Time)
 		assessed := value.RecorderActionAssessment{ActionID: a.ID, ExecutionMode: a.ExecutionMode, Retention: retention}
 		assessed.Retention.PolicyDigests = append([]artifact.Digest(nil), digests...)
 		ringPhase, ringScope := "perIncident", "perIncidentPod"
-		// ADR-278: on the encrypted-disk medium only one segment and the
-		// headers stay in collector memory; the rest is node disk.
 		ringMemory, ringRef := a.RingMaxBytes, "action:"+a.ID+":ring.maxBytes"
-		if a.RingMedium == "encryptedDisk" {
-			ringMemory, ringRef = a.SegmentBytes+int64(a.MaxSegments)*32, "action:"+a.ID+":ring.segmentBytes"
-		}
+		// A saved window copies at most the ring and the action output.
+		copied := min(a.RingMaxBytes, a.MaxBytes)
 		if a.ExecutionMode == "ongoing" {
 			ringPhase, ringScope = "whileArmed", "perObservationPod"
 			out.ObservationPods = 1
@@ -126,7 +123,7 @@ func AssessRecorder(plan value.RecorderPlan, assessmentID string, now time.Time)
 		} else {
 			ringIncident += ringMemory
 		}
-		frozen += a.MaxFrozenBytes
+		frozen += copied
 		limit := a.MaxBytes
 		if plan.Input.NodeRecorder && a.Kind == "packetCapture" {
 			limit = min(limit, artifact.RecordingNativeLimit) // ADR-248 interim cap
@@ -189,7 +186,7 @@ func AssessRecorder(plan value.RecorderPlan, assessmentID string, now time.Time)
 		assessed.Quantities = []value.AssessmentQuantity{
 			quantity("outputBytes", "perIncident", "perIncidentPod", "action:"+a.ID+":maxBytes", outputCoverage, limit),
 			quantity("collectorMemoryBytes", ringPhase, ringScope, ringRef, ringCoverage, ringMemory),
-			quantity("collectorMemoryBytes", "perIncident", "perIncidentPod", "action:"+a.ID+":maxFrozenBytes", frozenCoverage, a.MaxFrozenBytes),
+			quantity("collectorMemoryBytes", "perIncident", "perIncidentPod", ringRef, frozenCoverage, copied),
 		}
 		if a.Kind == "profile" || a.Kind == "logs" {
 			// A profile has no ring or frozen snapshot buffers.

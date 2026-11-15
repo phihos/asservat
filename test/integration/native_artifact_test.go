@@ -45,6 +45,10 @@ const nativeArtifactBytes = 200 << 20
 // writeSyntheticPCAPNG writes a deterministic synthetic PCAPNG (one section,
 // one Ethernet interface with a 128-byte snapshot length and 96-byte
 // pseudo-random "header" records; no real traffic) of at most size bytes.
+// nativeStreamingLimit is a 256 MiB streaming plan (33 parts): large enough
+// for multipart behavior, small enough for a fixture write.
+const nativeStreamingLimit int64 = 256 << 20
+
 func writeSyntheticPCAPNG(t *testing.T, path string, size int64) (int64, artifact.Digest) {
 	t.Helper()
 	f, err := os.Create(path)
@@ -265,7 +269,7 @@ func qualifyNativeArtifacts(t *testing.T, ctx context.Context, admin *pgxpool.Po
 	e := artifact.ContextExpectation{
 		NativeType: artifact.PCAPNGArtifact,
 		Lifecycle:  &artifact.OngoingLifecycle{TriggerKind: "policy", SourceSessionID: custodyID(), SourceStartedAt: now.Add(-2 * time.Minute), SnapshotID: custodyID(), RequestedBefore: 30 * time.Second, After: 10 * time.Second, HistoryCoverage: "full", GapReasons: []string{}, WindowCoverage: "full"},
-		Registration: artifact.Registration{Location: artifact.Location{ClusterID: custodyID(), ArtifactID: custodyID(), AttemptID: custodyID()}, StoreID: storeID, AllocationID: allocation, PoolRevision: 1, AllocationRevision: 1, NativeLimit: artifact.StreamingNativeLimit,
+		Registration: artifact.Registration{Location: artifact.Location{ClusterID: custodyID(), ArtifactID: custodyID(), AttemptID: custodyID()}, StoreID: storeID, AllocationID: allocation, PoolRevision: 1, AllocationRevision: 1, NativeLimit: nativeStreamingLimit,
 			AnchorAt: started, WriteUntil: now.Add(10 * time.Minute), ExpiresAt: started.Add(1800 * time.Second), DeleteBy: started.Add(2400 * time.Second)},
 		CaseID: custodyID(), OccurrenceID: custodyID(), NodeUID: "synthetic-node-uid", NodeBootID: custodyID(), PodUID: "synthetic-pod-uid", Namespace: "synthetic", NamespaceUID: "synthetic-namespace-uid", WorkloadUID: "synthetic-workload-uid",
 		CollectorVersion: "synthetic-test", CollectorImageDigest: digest, RecipeDigest: digest, PlanDigest: digest, CaptureUID: custodyID(), ActionID: "a0123456789abcdef01234567", DataClass: "metadata", PurposeRef: "synthetic-test",
@@ -277,7 +281,7 @@ func qualifyNativeArtifacts(t *testing.T, ctx context.Context, admin *pgxpool.Po
 	}
 	plan := artifact.StreamingPlan{Registration: e.Registration, WriterEpoch: custodyID()}
 	bytesPer, objectsPer := plan.Registration.ReservedBytes()+plan.TemporaryBytes(), int64(4+1+plan.PartLimit())
-	if plan.PartLimit() != artifact.StreamingMaxParts {
+	if plan.PartLimit() != 33 {
 		t.Fatal("256 MiB plan part count", plan.PartLimit())
 	}
 	valid := now.Add(time.Hour)
@@ -287,7 +291,7 @@ func qualifyNativeArtifacts(t *testing.T, ctx context.Context, admin *pgxpool.Po
 	if err = provisionAllocation(ctx, admin, testAllocation{ID: allocation, PoolID: root, ScopeID: custodyID(), ServiceClass: "evidence", PoolRevision: 1, Revision: 1, Bytes: bytesPer, Objects: objectsPer, ValidUntil: valid}); err != nil {
 		t.Fatal(err)
 	}
-	// Migration 00095: the 256 MiB attempt and its 34 temporary objects fit.
+	// A 256 MiB attempt and its 34 temporary objects fit.
 	if _, err = ledger.RegisterStreaming(ctx, plan); err != nil {
 		t.Fatal("256 MiB streaming registration", err)
 	}
@@ -323,8 +327,8 @@ func qualifyNativeArtifacts(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		t.Fatal("stored_unpublished", err)
 	}
 	state, err := ledger.ReadStreaming(ctx, plan)
-	if err != nil || state.Receipt == nil || len(state.Parts) != int((copies[0].Bytes+artifact.StreamingPartBytes-1)/artifact.StreamingPartBytes) {
-		t.Fatal("journal", err, len(state.Parts))
+	if err != nil || state.Receipt == nil || state.Parts != int((copies[0].Bytes+artifact.StreamingPartBytes-1)/artifact.StreamingPartBytes) {
+		t.Fatal("journal", err, state.Parts)
 	}
 	if err = privacy.ReleaseStreaming(ctx, plan, state, ledger, objectstore.StreamingObjects{Store: store}); err != nil {
 		t.Fatal("temporary release", err)
@@ -595,8 +599,8 @@ func qualifyNativeArtifacts(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		t.Fatal("worst-case completion", err)
 	}
 	maxState, err := ledger.ReadStreaming(ctx, maxPlan)
-	if err != nil || maxState.Receipt == nil || len(maxState.Parts) != artifact.StreamingMaxParts || maxState.CompleteBytes != maxPlan.TemporaryBytes() {
-		t.Fatal("33-part journal", err, len(maxState.Parts))
+	if err != nil || maxState.Receipt == nil || maxState.Parts != maxPlan.PartLimit() || maxState.CompleteBytes != maxPlan.TemporaryBytes() {
+		t.Fatal("33-part journal", err, maxState.Parts)
 	}
 	if err = privacy.ReleaseStreaming(ctx, maxPlan, maxState, ledger, objectstore.StreamingObjects{Store: store}); err != nil {
 		t.Fatal("worst-case release", err)
@@ -604,7 +608,7 @@ func qualifyNativeArtifacts(t *testing.T, ctx context.Context, admin *pgxpool.Po
 	if b, o := charge(t, maxAllocation); b != maxPlan.Registration.ReservedBytes() || o != 4 {
 		t.Fatal("worst-case temporary obligation", b, o)
 	}
-	t.Logf("ADR-244 native artifact: %d-byte synthetic PCAPNG in %d parts; store %s, full verification %s, whole native download %s (4 windows), interrupted at %d bytes and resumed with Range/If-Match to the identical SHA-256; If-Match/416/If-Range conditions; worst-case 256 MiB attempt in %d parts on real PostgreSQL/S3", size, len(state.Parts), stored.Round(time.Millisecond), verified.Round(time.Millisecond), whole.Round(time.Millisecond), partial, len(maxState.Parts))
+	t.Logf("ADR-244 native artifact: %d-byte synthetic PCAPNG in %d parts; store %s, full verification %s, whole native download %s (4 windows), interrupted at %d bytes and resumed with Range/If-Match to the identical SHA-256; If-Match/416/If-Range conditions; worst-case 256 MiB attempt in %d parts on real PostgreSQL/S3", size, state.Parts, stored.Round(time.Millisecond), verified.Round(time.Millisecond), whole.Round(time.Millisecond), partial, maxState.Parts)
 }
 
 // nativeTestSinks records whether the response sink was opened, so a refusal

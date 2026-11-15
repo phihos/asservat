@@ -1,18 +1,22 @@
 package planning
 
 import (
+	"slices"
 	"strings"
 	"unicode/utf8"
 
 	"asservat.local/asservat/internal/domain/targets"
 )
 
-// Bounds of the authored profile composition (specs/contracts/capture-composition.schema.json).
-const (
-	MaxCompositionComponents = 8
-	MaxComponentEdits        = 32
-	MaxCompositionBytes      = 1 << 40
-)
+// MaxJSONInteger is the largest byte count a composition carries: the JSON
+// exact-integer range RFC 8785 hashing needs (specs/apis.md "Bounds in the
+// contracts"). Component, edit and list counts have no cap: the request size
+// and the compiled filter bound them.
+const MaxJSONInteger = 1<<53 - 1
+
+// maxEditText is Linux MAX_ARG_STRLEN, the longest text value an edit carries
+// (a command argument); paths and filters are bounded by their own checks.
+const maxEditText = 131072
 
 // ProfileRef names one immutable capture profile version. It carries no
 // precedence: builtin, organization and namespace references never shadow each other.
@@ -31,11 +35,9 @@ func (r ProfileRef) Valid() bool {
 
 // RingSettings is the typed value of a packetRing or syscallRing edit.
 type RingSettings struct {
-	MaxAge                 string
-	MaxBytes, SegmentBytes int64
-	MaxSegments            int
-	Medium                 string
-	StorageProfileRef      string `json:",omitempty"`
+	MaxAge   string
+	MaxBytes int64
+	Segments int
 }
 
 // SyscallSelection is the typed value of a syscallFilter edit.
@@ -122,12 +124,12 @@ type CatalogProfile struct {
 }
 
 func (c *ProfileComposition) Valid() bool {
-	if c == nil || len(c.Components) < 1 || len(c.Components) > MaxCompositionComponents || c.MaxTotalBytes < 1 || c.MaxTotalBytes > MaxCompositionBytes || !positiveDuration(c.MaxDuration) {
+	if c == nil || len(c.Components) < 1 || c.MaxTotalBytes < 1 || c.MaxTotalBytes > MaxJSONInteger || !positiveDuration(c.MaxDuration) {
 		return false
 	}
 	seen := map[string]bool{}
 	for _, component := range c.Components {
-		if !lowerName(component.ID, 24) || seen[component.ID] || !component.Profile.Valid() || len(component.Edits) > MaxComponentEdits {
+		if !lowerName(component.ID, 24) || seen[component.ID] || !component.Profile.Valid() {
 			return false
 		}
 		seen[component.ID] = true
@@ -141,7 +143,7 @@ func (c *ProfileComposition) Valid() bool {
 }
 
 func (e ProfileEdit) valid() bool {
-	if e.ActionID == "" || len(e.ActionID) > 63 || e.Field == "" || len(e.Field) > 32 || len(e.Text) > 4096 || !utf8.ValidString(e.Text) || e.Number < 0 {
+	if e.ActionID == "" || len(e.ActionID) > 63 || e.Field == "" || len(e.Field) > 32 || len(e.Text) > maxEditText || !utf8.ValidString(e.Text) || e.Number < 0 {
 		return false
 	}
 	set := 0
@@ -156,38 +158,20 @@ func (e ProfileEdit) valid() bool {
 	if e.SyscallArguments != nil && !e.SyscallArguments.Bounded() {
 		return false
 	}
-	if e.Ring != nil && (len(e.Ring.MaxAge) > 16 || len(e.Ring.Medium) > 16 || len(e.Ring.StorageProfileRef) > 63) {
-		return false
-	}
 	if p := e.Peers; p != nil {
-		if len(p.CIDRs)+len(p.Kubernetes) > 16 || len(p.Ports) > 32 || len(p.Protocol) > 16 || len(p.Resolution) > 16 || len(p.MaxStaleness) > 16 {
-			return false
-		}
 		for _, entry := range p.Kubernetes {
 			if !entry.Bounded() {
 				return false
 			}
 		}
 		for _, entry := range p.CIDRs {
-			if len(entry) > 128 {
+			if slices.Contains(entry, "") {
 				return false
-			}
-			for _, c := range entry {
-				if c == "" || len(c) > 64 {
-					return false
-				}
 			}
 		}
 	}
-	if e.Syscalls != nil {
-		if len(e.Syscalls.Mode) > 16 || len(e.Syscalls.Names) > 128 {
-			return false
-		}
-		for _, n := range e.Syscalls.Names {
-			if n == "" || len(n) > 64 {
-				return false
-			}
-		}
+	if e.Syscalls != nil && slices.Contains(e.Syscalls.Names, "") {
+		return false
 	}
 	return true
 }

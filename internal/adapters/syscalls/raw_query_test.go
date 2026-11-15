@@ -86,7 +86,6 @@ func (r *rawCancelReader) Read(p []byte) (int, error) {
 
 func TestRawSyscallQueryWholeEventByteLimitAndContinuation(t *testing.T) {
 	e, from, until, lines := argumentProjectionFixture(t)
-	e.Recording.Syscalls.MaxEvents = 100
 	var base ArgumentEventLine
 	if json.Unmarshal(lines[1], &base) != nil {
 		t.Fatal("event")

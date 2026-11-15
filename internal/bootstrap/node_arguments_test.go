@@ -25,7 +25,7 @@ func nodeArgumentFixture(t *testing.T) (*nodePackets, collector.Work, chan colle
 	var program [32]byte
 	copy(program[:], raw)
 	a := collector.ArgumentObservationPermit{Binding: collector.ArgumentObservationBinding{Scope: [32]byte{1}, ProgramDigest: program, DefinitionDigest: syscalls.ArgumentDefinitionDigest(defs), ExpectationDigest: [32]byte{2}, AccountingRule: collector.ArgumentObservationAccountingRule(), SessionID: "55555555-5555-4555-8555-555555555555", Fence: "66666666-6666-4666-8666-666666666666", CaptureID: "77777777-7777-4777-8777-777777777777", ActionID: "action", PodUID: "88888888-8888-4888-8888-888888888888", NodeUID: id.NodeUID, BootID: id.BootID, CollectorPodUID: id.PodUID, CollectorEpoch: id.Epoch}, StartedAt: now, StartBy: now.Add(5 * time.Second), SessionUntil: now.Add(6 * time.Second), LeaseUntil: now.Add(6 * time.Second), Duration: time.Second, Sequence: 1, EventCredit: 1000, ByteCredit: 1 << 20, EventsPerSecond: 1000, BytesPerSecond: 1 << 20, MaxProbeBytes: 256, MaxBytesPerEvent: 1, MaxTrackedThreads: 16}
-	p := collector.PacketCapture{CaptureID: a.Binding.CaptureID, PodUID: a.Binding.PodUID, Duration: time.Second, MaxBytes: 64 << 10, Arguments: &a, Syscalls: &collector.SyscallFilter{Names: []string{"close"}, MaxEvents: 100, MaxTrackedThreads: 16}, MaxEventsPerSecond: 1000}
+	p := collector.PacketCapture{CaptureID: a.Binding.CaptureID, PodUID: a.Binding.PodUID, Duration: time.Second, MaxBytes: 64 << 10, Arguments: &a, Syscalls: &collector.SyscallFilter{Names: []string{"close"}, MaxTrackedThreads: 16}, MaxEventsPerSecond: 1000}
 	w := collector.Work{ID: "99999999-9999-4999-8999-999999999999", Sequence: 1, Kind: collector.WorkSyscallCapture, NotAfter: a.StartBy, Packet: &p}
 	budget, err := collector.NewBudget(collector.Ceilings{SourceLimits: collector.SourceLimits{MaxActiveSources: 16, InputBytesPerSecond: 16 << 20, InputBurstBytes: 16 << 20}, RingBytes: 256 << 20, FrozenBytes: 256 << 20, UploadBytesPerSecond: 32 << 20, UploadBurstBytes: 64 << 20}, now)
 	if err != nil {
@@ -212,7 +212,7 @@ func TestNodeArgumentObservationEndsBeforeDelayedJoin(t *testing.T) {
 		t.Fatalf("missing exit fabricated: %+v %v", last, err)
 	}
 	b := a.Binding
-	e := artifact.ContextExpectation{PodUID: b.PodUID, Recording: &artifact.Recording{MaxBytes: w.Packet.MaxBytes, Syscalls: &artifact.RecordingSyscalls{Names: w.Packet.Syscalls.Names, MaxEvents: w.Packet.Syscalls.MaxEvents}, Arguments: &artifact.RecordingArguments{ProgramDigest: artifact.Digest(b.ProgramDigest), DefinitionDigest: artifact.Digest(b.DefinitionDigest), AccountingRule: artifact.Digest(b.AccountingRule), MaxProbeBytes: a.MaxProbeBytes, MaxBytesPerEvent: a.MaxBytesPerEvent}}}
+	e := artifact.ContextExpectation{PodUID: b.PodUID, Recording: &artifact.Recording{MaxBytes: w.Packet.MaxBytes, Syscalls: &artifact.RecordingSyscalls{Names: w.Packet.Syscalls.Names}, Arguments: &artifact.RecordingArguments{ProgramDigest: artifact.Digest(b.ProgramDigest), DefinitionDigest: artifact.Digest(b.DefinitionDigest), AccountingRule: artifact.Digest(b.AccountingRule), MaxProbeBytes: a.MaxProbeBytes, MaxBytesPerEvent: a.MaxBytesPerEvent}}}
 	source := artifact.ArgumentSourceProvenance{PodUID: b.PodUID, NodeUID: b.NodeUID, BootID: b.BootID, CollectorPodUID: b.CollectorPodUID, CollectorEpoch: b.CollectorEpoch, SessionID: b.SessionID, Fence: b.Fence, StartedAt: a.StartedAt, StartBy: a.StartBy, Until: a.SessionUntil}
 	check, err := syscalls.NewArgumentCheck(e, source)
 	if err != nil {

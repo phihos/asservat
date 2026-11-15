@@ -55,7 +55,6 @@ func argumentPolicyCompiler(t *testing.T, cluster, namespace string) captureapp.
 	params["mode"], params["before"], params["after"] = "arguments", "0s", "3s"
 	params["syscalls"] = map[string]any{"mode": "include", "names": []string{"openat"}}
 	params["arguments"] = map[string]any{"maxBytesPerEvent": 128, "captureBuffers": false}
-	params["maxFrozenBytes"] = artifact.RecordingNativeLimit
 	recipe["maxTotalBytes"], recipe["maxDuration"] = 8<<20, "20s"
 	raw, err = json.Marshal(doc)
 	if err != nil {

@@ -16,7 +16,7 @@ type SQLLogin struct{ Username, Password string }
 // maintained SCRAM implementation. Only the verifier reaches role DDL; the
 // plaintext password is never part of an SQL statement or bind parameter.
 func sqlPasswordVerifier(l SQLLogin) (string, error) {
-	if len(l.Password) < 32 || len(l.Password) > 1024 || strings.IndexFunc(l.Password, func(r rune) bool { return r < 0x21 || r > 0x7e }) >= 0 {
+	if l.Password == "" || strings.IndexFunc(l.Password, func(r rune) bool { return r < 0x21 || r > 0x7e }) >= 0 {
 		return "", value.ErrInvalid
 	}
 	c, err := scram.SHA256.NewClient(l.Username, l.Password, "")

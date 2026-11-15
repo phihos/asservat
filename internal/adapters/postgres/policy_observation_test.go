@@ -123,7 +123,7 @@ func TestPolicyObservationPermitPinsOriginalSQLTuple(t *testing.T) {
 }
 
 func TestPolicyObservationPermitDeclinesMalformedFiniteFit(t *testing.T) {
-	for _, mode := range []string{"no-dispatch-slack", "beyond-existing-start", "duration-does-not-fit", "lease-over-twenty", "different-lease", "long-action", "unreviewed-rule"} {
+	for _, mode := range []string{"no-dispatch-slack", "beyond-existing-start", "duration-does-not-fit", "lease-beyond-start-window", "different-lease", "long-action", "unreviewed-rule"} {
 		t.Run(mode, func(t *testing.T) {
 			x := policyObservationRowFixture()
 			switch mode {
@@ -134,8 +134,8 @@ func TestPolicyObservationPermitDeclinesMalformedFiniteFit(t *testing.T) {
 				x.DurationMillis = 1000
 			case "duration-does-not-fit":
 				x.StartBy = ts(x.StartBy.Time.Add(time.Millisecond))
-			case "lease-over-twenty":
-				x.SessionUntil = ts(x.StartedAt.Time.Add(21 * time.Second))
+			case "lease-beyond-start-window":
+				x.SessionUntil = ts(x.StartedAt.Time.Add(26 * time.Second))
 				x.LeaseUntil = x.SessionUntil
 			case "different-lease":
 				x.LeaseUntil = ts(x.SessionUntil.Time.Add(-time.Second))

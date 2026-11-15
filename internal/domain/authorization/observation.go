@@ -1,5 +1,13 @@
 package authorization
 
+import "time"
+
+// FiniteObservationStartWindow is the dispatch headroom a finite sensitive
+// session adds to its recording: the session runs the recording duration
+// plus the node's start window (collector.PacketCaptureStartWithin), within
+// the reviewed MaxSessionSeconds.
+const FiniteObservationStartWindow = 10 * time.Second
+
 // ObservationLimits bounds input entering a sensitive parser/predicate, not
 // retained output. Event limits are retained in reviewed scope for future
 // syscall arguments; absence never authorizes argument-mode acquisition.

@@ -101,7 +101,7 @@ type FinitePolicyObservation struct {
 // The consumer still checks current source/denies/recovery after blocking work.
 func PlanFinitePolicyObservation(g Grant, a AcceptedPolicyAuthority, target Target, duration time.Duration, policyRemaining, activeSessions int64, originalStartBy, hardUntil, now time.Time) (FinitePolicyObservation, error) {
 	var zero FinitePolicyObservation
-	if duration < time.Second || duration > 15*time.Second || originalStartBy.IsZero() || hardUntil.IsZero() || !originalStartBy.After(now) || !hardUntil.After(now) || policyRemaining < 1 || policyRemaining > a.Limits.MaxObservedBytes {
+	if duration < time.Second || originalStartBy.IsZero() || hardUntil.IsZero() || !originalStartBy.After(now) || !hardUntil.After(now) || policyRemaining < 1 || policyRemaining > a.Limits.MaxObservedBytes {
 		return zero, ErrGrantScope
 	}
 	if err := CheckPolicyGrantCurrent(g, a, WorkloadTarget{target.ClusterID, target.NamespaceUID, target.WorkloadUID}, now); err != nil {
@@ -111,7 +111,7 @@ func PlanFinitePolicyObservation(g Grant, a AcceptedPolicyAuthority, target Targ
 		return zero, ErrGrantScope
 	}
 	limits := g.Policy.Observation
-	until := now.Add(20 * time.Second)
+	until := now.Add(duration + FiniteObservationStartWindow)
 	for _, bound := range []time.Time{now.Add(time.Duration(limits.MaxSessionSeconds) * time.Second), g.PolicyNotAfter, g.ExpiresAt, a.NotAfter, hardUntil} {
 		if bound.Before(until) {
 			until = bound

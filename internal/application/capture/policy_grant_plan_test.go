@@ -194,7 +194,6 @@ func argumentGrantPlanFixture(t *testing.T, events int64) (*workloadActivationFi
 	action["limits"].(map[string]any)["maxBytes"] = 8 << 20
 	params := action["parameters"].(map[string]any)
 	params["mode"], params["before"], params["after"] = "arguments", "0s", "3s"
-	params["maxFrozenBytes"] = 8 << 20
 	params["syscalls"] = map[string]any{"mode": "include", "names": []string{"openat"}}
 	params["arguments"] = map[string]any{"maxBytesPerEvent": 128, "captureBuffers": false}
 	recipe["maxTotalBytes"] = 8 << 20

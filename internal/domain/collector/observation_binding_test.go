@@ -30,7 +30,7 @@ func TestFiniteObservationPermitKeepsOriginalStartAndFullDuration(t *testing.T) 
 			case "changed-lease":
 				x.LeaseUntil = x.LeaseUntil.Add(-time.Second)
 			case "too-long":
-				x.SessionUntil = x.SessionUntil.Add(time.Second)
+				x.SessionUntil = x.SessionUntil.Add(6 * time.Second)
 				x.LeaseUntil = x.SessionUntil
 			case "late-start":
 				x.StartBy = x.StartBy.Add(time.Nanosecond)

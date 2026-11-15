@@ -36,8 +36,8 @@ func TestLiveHTTPUsesExistingReviewedProducerOriginalClockAndSanitizer(t *testin
 		<-ctx.Done()
 		return gadget.CaptureStats{}, ctx.Err()
 	}
-	limits := packets.RingLimits{MaxAge: time.Minute, MaxBytes: 4 * 65536, SegmentBytes: 65536, MaxSegments: 4, MaxFrozenBytes: 1 << 20, MaxConcurrentSnapshots: 2}
-	source, e := newPacketSource(t.Context(), permit, collector.PolicyLimits{}, limits, work.Packet.Program, nil, engine, time.Now, budget, bmu, nil, "", &testHTTPProjection)
+	limits := packets.RingLimits{MaxAge: time.Minute, MaxBytes: 4 * 65536, Segments: 4}
+	source, e := newPacketSource(t.Context(), permit, collector.PolicyLimits{}, limits, work.Packet.Program, nil, engine, time.Now, budget, bmu, nil, &testHTTPProjection)
 	if e != nil {
 		t.Fatal(e)
 	}

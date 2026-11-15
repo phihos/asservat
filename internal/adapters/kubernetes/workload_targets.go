@@ -16,10 +16,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 )
 
-// This finite preview path selects one pod. It is not the all-replica monitor or
-// a general public inventory. Larger workloads can name the desired Pod until
-// the separate paginated discovery workflow is qualified.
-const workloadCandidateLimit = 256
+// workloadPodPage is the LIST page size; continue tokens fetch the rest, so it
+// bounds one response's memory, not the workload size.
+const workloadPodPage = 500
 
 // ResolveWorkload privately observes a named target and selects the first
 // nonterminating owned pod in lexical name order. The node class additionally
@@ -195,29 +194,29 @@ func (c *PodTargets) podWorkload(ctx context.Context, namespace string, pod targ
 type workloadCandidate struct{ name, uid string }
 
 func (c *PodTargets) selectWorkloadPod(ctx context.Context, r value.Request, selector labels.Selector, start time.Time) (string, string, error) {
-	raw, err := c.client.raw(ctx, "/api/v1/namespaces/"+r.Namespace.Name+"/pods", map[string]string{"labelSelector": selector.String(), "limit": strconv.Itoa(workloadCandidateLimit + 1)})
-	if err != nil {
-		return "", "", targetReadError(err)
-	}
-	var fields, metadata map[string]json.RawMessage
-	var version, kind, rv, next string
 	var items []json.RawMessage
-	if json.Unmarshal(raw, &fields) != nil || json.Unmarshal(fields["apiVersion"], &version) != nil || version != "v1" || json.Unmarshal(fields["kind"], &kind) != nil || kind != "PodList" || json.Unmarshal(fields["metadata"], &metadata) != nil || json.Unmarshal(metadata["resourceVersion"], &rv) != nil || !identity.Text(rv, 128) || json.Unmarshal(fields["items"], &items) != nil || items == nil {
-		return "", "", value.ErrUnavailable
-	}
-	if data, ok := metadata["continue"]; ok && json.Unmarshal(data, &next) != nil {
-		return "", "", value.ErrUnavailable
-	}
-	if next != "" || len(items) > workloadCandidateLimit {
-		return "", "", value.ErrLimit
-	}
-	if data, ok := metadata["remainingItemCount"]; ok {
-		var remaining int64
-		if json.Unmarshal(data, &remaining) != nil || remaining < 0 {
+	for next := ""; ; {
+		query := map[string]string{"labelSelector": selector.String(), "limit": strconv.Itoa(workloadPodPage)}
+		if next != "" {
+			query["continue"] = next
+		}
+		raw, err := c.client.raw(ctx, "/api/v1/namespaces/"+r.Namespace.Name+"/pods", query)
+		if err != nil {
+			return "", "", targetReadError(err)
+		}
+		var fields, metadata map[string]json.RawMessage
+		var version, kind, rv string
+		var page []json.RawMessage
+		if json.Unmarshal(raw, &fields) != nil || json.Unmarshal(fields["apiVersion"], &version) != nil || version != "v1" || json.Unmarshal(fields["kind"], &kind) != nil || kind != "PodList" || json.Unmarshal(fields["metadata"], &metadata) != nil || json.Unmarshal(metadata["resourceVersion"], &rv) != nil || !identity.Text(rv, 128) || json.Unmarshal(fields["items"], &page) != nil || page == nil {
 			return "", "", value.ErrUnavailable
 		}
-		if remaining != 0 {
-			return "", "", value.ErrLimit
+		next = ""
+		if data, ok := metadata["continue"]; ok && json.Unmarshal(data, &next) != nil {
+			return "", "", value.ErrUnavailable
+		}
+		items = append(items, page...)
+		if next == "" {
+			break
 		}
 	}
 	candidates := make([]workloadCandidate, 0, len(items))

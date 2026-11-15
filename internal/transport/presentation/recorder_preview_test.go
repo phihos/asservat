@@ -159,7 +159,7 @@ func recorderOperations(t *testing.T, enabled bool) (*ContextOperations, *record
 	return s, r
 }
 
-const wireComposition = `{` + wireTarget + `,"requested_retention_seconds":3600,"profile_composition":{"components":[{"id":"net","profileRef":{"catalog":"builtin","name":"network-connections","version":"v1"},"overrides":[{"actionID":"sample","field":"packetFilter","value":"tcp port 8080"},{"actionID":"sample","field":"packetRing","value":{"maxAge":"40s","maxBytes":16777216,"segmentBytes":4194304,"maxSegments":4,"medium":"memory"}},{"actionID":"sample","field":"actionExecutionMode","value":"ongoing"}]}],"maxTotalBytes":16777216,"maxDuration":"20s"}}`
+const wireComposition = `{` + wireTarget + `,"requested_retention_seconds":3600,"profile_composition":{"components":[{"id":"net","profileRef":{"catalog":"builtin","name":"network-connections","version":"v1"},"overrides":[{"actionID":"sample","field":"packetFilter","value":"tcp port 8080"},{"actionID":"sample","field":"packetRing","value":{"maxAge":"40s","maxBytes":16777216,"segments":4}},{"actionID":"sample","field":"actionExecutionMode","value":"ongoing"}]}],"maxTotalBytes":16777216,"maxDuration":"20s"}}`
 
 func TestCompositionPreviewWire(t *testing.T) {
 	s, f := recorderOperations(t, true)
@@ -268,7 +268,6 @@ func TestCompositionRefusalsAndRequestWire(t *testing.T) {
 		"service without mode": strings.Replace(wireComposition, `"field":"packetFilter","value":"tcp port 8080"`, `"field":"packetPeers","value":{"entries":[{"resourceRef":{"kind":"Service","namespace":"payments","name":"db"}}],"protocol":"tcp","resolution":"frozen","maxEndpoints":1,"maxStaleness":"5s"}`, 1),
 		"deployment with mode": strings.Replace(wireComposition, `"field":"packetFilter","value":"tcp port 8080"`, `"field":"packetPeers","value":{"entries":[{"resourceRef":{"kind":"Deployment","namespace":"payments","name":"db","readyOnly":true}}],"protocol":"tcp","resolution":"frozen","maxEndpoints":1,"maxStaleness":"5s"}`, 1),
 		"bad peer":             strings.Replace(wireComposition, `"field":"packetFilter","value":"tcp port 8080"`, `"field":"packetPeers","value":{"entries":[{"cidrs":["10.0.0.0/8"]}],"protocol":"sctp","resolution":"frozen","maxEndpoints":1,"maxStaleness":"5s"}`, 1),
-		"nine":                 strings.Replace(wireComposition, `"components":[{`, `"components":[`+strings.Repeat(`{"id":"other","profileRef":{"catalog":"builtin","name":"syscall-activity","version":"v1"}},`, 8)+`{`, 1),
 		"no field":             strings.Replace(wireComposition, `"field":"packetFilter"`, `"field":"impact"`, 1),
 	} {
 		if _, err := s.Call(t.Context(), f, "preview_capture", []byte(bad)); err == nil {

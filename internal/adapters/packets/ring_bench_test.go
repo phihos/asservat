@@ -19,7 +19,7 @@ func ringBench(b *testing.B, filled bool) (*Ring, time.Time, []byte) {
 	now := time.Now().UTC()
 	ctx, cancel := context.WithDeadline(context.Background(), now.Add(time.Hour))
 	b.Cleanup(cancel)
-	limits := RingLimits{MaxAge: 30 * time.Second, MaxBytes: 16 << 20, SegmentBytes: 4 << 20, MaxSegments: 4, MaxFrozenBytes: 64 << 20, MaxConcurrentSnapshots: 4}
+	limits := RingLimits{MaxAge: 30 * time.Second, MaxBytes: 16 << 20, Segments: 4}
 	r, e := NewRing(ctx, RingBounds{now, now.Add(time.Hour)}, limits, nil)
 	if e != nil {
 		b.Fatal(e)
@@ -154,7 +154,7 @@ func BenchmarkRingConstructAndWireCache(b *testing.B) {
 			now := time.Now()
 			ctx, cancel := context.WithDeadline(context.Background(), now.Add(time.Hour))
 			defer cancel()
-			limits := RingLimits{MaxAge: time.Second, MaxBytes: 4096, SegmentBytes: 2048, MaxSegments: 2, MaxFrozenBytes: 4096, MaxConcurrentSnapshots: 1}
+			limits := RingLimits{MaxAge: time.Second, MaxBytes: 4096, Segments: 2}
 			b.ReportAllocs()
 			for b.Loop() {
 				r, e := NewRing(ctx, RingBounds{now, now.Add(time.Hour)}, limits, greater1000)

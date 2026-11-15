@@ -216,10 +216,6 @@ collector:
     uploadBurstBytes: 67108864
   # Node live-projection processing ceilings; null disables the mechanism.
   live: null
-  # Optional encrypted-disk ring medium (ADR-278).
-  ringDisk:
-    enabled: false
-    bytes: 1073741824
 
 # Hub workloads (mode hub or combined). Every hub component renders in the
 # release namespace; replicas: 0 stops one.

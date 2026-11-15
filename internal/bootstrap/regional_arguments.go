@@ -36,7 +36,7 @@ func (p *preparedRecording) StartArgumentRecording(ctx context.Context, pin arti
 		return time.Time{}, value.ErrDenied
 	}
 	work := collector.PacketCapture{CaptureID: e.CaptureUID, PodUID: e.PodUID, Duration: permit.Duration, MaxBytes: r.MaxBytes, Arguments: &permit,
-		Syscalls: &collector.SyscallFilter{Names: slices.Clone(s.Names), ErrorsOnly: s.ErrorsOnly, MaxEvents: s.MaxEvents, MaxTrackedThreads: s.MaxTrackedThreads}, MaxEventsPerSecond: s.MaxEventsPerSecond}
+		Syscalls: &collector.SyscallFilter{Names: slices.Clone(s.Names), ErrorsOnly: s.ErrorsOnly, MaxTrackedThreads: s.MaxTrackedThreads}, MaxEventsPerSecond: s.MaxEventsPerSecond}
 	if !work.Valid() {
 		return time.Time{}, value.ErrDenied
 	}

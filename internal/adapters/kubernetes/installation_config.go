@@ -66,7 +66,8 @@ func (c *PermissionClient) decodeInstallationConfig(raw []byte, name, uid string
 		return nil, ref, value.ErrInvalid
 	}
 	var data map[string]string
-	if len(object["data"]) > 96<<10 || json.Unmarshal(object["data"], &data) != nil || len(data) == 0 {
+	// A ConfigMap holds at most 1 MiB of data (Kubernetes limit).
+	if len(object["data"]) > 1<<20 || json.Unmarshal(object["data"], &data) != nil || len(data) == 0 {
 		return nil, ref, value.ErrInvalid
 	}
 	canonical := jsontext.Value(object["data"])

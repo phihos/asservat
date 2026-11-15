@@ -26,15 +26,15 @@ func normalizeLogs(path string, a *expandedAction) error {
 	}
 	before, b := durationValue(p.Before, true)
 	after, d := durationValue(p.After, true)
-	if !b || !d || before > 24*time.Hour || after > time.Minute || before+after == 0 || before%time.Millisecond != 0 || after%time.Millisecond != 0 {
-		return refuse(value.CompositionInvalid, path+".parameters", "logs needs a historical window up to 24h and an after interval up to 60s, with at least one positive")
+	if !b || !d || before > 24*time.Hour || before+after == 0 || before%time.Millisecond != 0 || after%time.Millisecond != 0 {
+		return refuse(value.CompositionInvalid, path+".parameters", "logs needs a historical window up to 24h and an after interval, with at least one positive")
 	}
 	if p.Stream != "both" {
 		return refuse(value.CompositionRecorderUnavailable, path+".parameters.stream", "this release captures combined streams; exact stdout or stderr needs a qualified Kubernetes split-stream capability")
 	}
 	timeout, ok := durationValue(a.action.Limits.Timeout, false)
-	if !ok || timeout > 5*time.Minute || timeout <= after || timeout%time.Millisecond != 0 {
-		return refuse(value.CompositionInvalid, path+".limits.timeout", "the original action timeout must leave time after the requested interval for finite collection, up to 5m")
+	if !ok || timeout <= after || timeout%time.Millisecond != 0 {
+		return refuse(value.CompositionInvalid, path+".limits.timeout", "the original action timeout must leave time after the requested interval for finite collection")
 	}
 	if a.action.Limits.MaxBytes < 1 || a.action.Limits.MaxBytes > artifact.LogNativeLimit {
 		return refuse(value.CompositionInvalid, path+".limits.maxBytes", "logs native bytes, including JSON/base64 and provenance, must fit the action cap up to 64 MiB")

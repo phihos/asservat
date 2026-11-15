@@ -79,7 +79,7 @@ func (s RecordingSaves) Preview(ctx context.Context, current identities.CurrentI
 	if ctx == nil || current == nil || s.Inventory.Selections == nil || s.Inventory.Candidates == nil || s.Inventory.Policies == nil || s.Inventory.Accepted == nil || s.Inventory.Now == nil {
 		return zero, value.ErrUnavailable
 	}
-	if len(request.Handles) < 1 || len(request.Handles) > 16 || request.Before < 0 || request.Before > artifact.MaxLifecycleWindow || request.Before%time.Millisecond != 0 || !validOptionalReason(request.Reason) {
+	if len(request.Handles) < 1 || len(request.Handles) > 16 || request.Before < 0 || request.Before%time.Millisecond != 0 || !validOptionalReason(request.Reason) {
 		return zero, value.ErrInvalid
 	}
 	if request.Sharing != nil && !request.Sharing.Valid() {

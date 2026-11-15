@@ -49,7 +49,7 @@ func NewCompiler() *Compiler { return &Compiler{} }
 func (c *Compiler) Version() string { return C.GoString(C.pcap_lib_version()) }
 
 func (c *Compiler) CompileFilter(expression string) (value.CompiledFilter, error) {
-	if c == nil || expression == "" || len(expression) > value.MaxFilterBytes || strings.IndexByte(expression, 0) >= 0 {
+	if c == nil || expression == "" || strings.IndexByte(expression, 0) >= 0 {
 		return value.CompiledFilter{}, errors.New("invalid filter expression")
 	}
 	c.mu.Lock()

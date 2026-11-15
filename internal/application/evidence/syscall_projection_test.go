@@ -23,7 +23,7 @@ func syscallProjectionFixture(t *testing.T, raw bool, view query.SyscallView) (N
 	source, scope, _, _ := httpHeaderPageFixture(t)
 	e := &source.Expectation
 	e.NativeType, e.DataClass = artifact.SyscallRecordsArtifact, "metadata"
-	e.Recording = &artifact.Recording{Kind: "syscallTrace", Profile: "metadata", Composition: []byte("{}"), DurationMillis: 1000, MaxBytes: artifact.RecordingNativeLimit, Snaplen: artifact.RecordingSyscallSnaplen, Syscalls: &artifact.RecordingSyscalls{Names: []string{"write"}, MaxEvents: 100, MaxEventsPerSecond: 100, MaxTrackedThreads: 16}}
+	e.Recording = &artifact.Recording{Kind: "syscallTrace", Profile: "metadata", Composition: []byte("{}"), DurationMillis: 1000, MaxBytes: artifact.RecordingNativeLimit, Snaplen: artifact.RecordingSyscallSnaplen, Syscalls: &artifact.RecordingSyscalls{Names: []string{"write"}, MaxEventsPerSecond: 100, MaxTrackedThreads: 16}}
 	if raw {
 		e.NativeType, e.DataClass = artifact.SyscallArgumentsArtifact, "raw"
 		e.Recording.Profile, e.Recording.Snaplen = "arguments", 0

@@ -30,7 +30,7 @@ export type PlanDiff = { actions: ActionDiff[]; bounds: Change[]; costs: Change[
 export const profileDefault = 'Profile default';
 const overrideLabels: Record<string, string> = {
   packetPeers: 'Peers', packetFilter: 'Packet filter', packetRing: 'Ring', syscallFilter: 'System calls', syscallMode: 'System call mode',
-  syscallRing: 'Ring', syscallArguments: 'Argument capture', syscallMaxEvents: 'Event limit', syscallRate: 'Event rate limit',
+  syscallRing: 'Ring', syscallArguments: 'Argument capture', syscallRate: 'Event rate limit',
   actionMaxBytes: 'Output limit (bytes)', actionTimeout: 'Completion deadline', processSelector: 'Process selector', processBatch: 'Process batch',
   profileDuration: 'Profile duration', filePath: 'File path', commandArgv: 'Command',
 };

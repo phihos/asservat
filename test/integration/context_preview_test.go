@@ -245,7 +245,7 @@ func qualifyContextPreviews(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		store := newStore(t, s.a.RootID)
 		p := blueprint(t, s)
 		p.Intent.Diagnostic = ""
-		p.Intent.Composition = &planDomain.ProfileComposition{Components: []planDomain.ProfileComponent{{ID: "net", Profile: planDomain.ProfileRef{Catalog: "builtin", Name: "network-connections", Version: "v1"}, Edits: []planDomain.ProfileEdit{{ActionID: "sample", Field: "packetFilter", Text: "tcp port 8080"}, {ActionID: "sample", Field: "packetRing", Ring: &planDomain.RingSettings{MaxAge: "40s", MaxBytes: 16 << 20, SegmentBytes: 4 << 20, MaxSegments: 4, Medium: "memory"}}}}}, MaxTotalBytes: 16 << 20, MaxDuration: "20s"}
+		p.Intent.Composition = &planDomain.ProfileComposition{Components: []planDomain.ProfileComponent{{ID: "net", Profile: planDomain.ProfileRef{Catalog: "builtin", Name: "network-connections", Version: "v1"}, Edits: []planDomain.ProfileEdit{{ActionID: "sample", Field: "packetFilter", Text: "tcp port 8080"}, {ActionID: "sample", Field: "packetRing", Ring: &planDomain.RingSettings{MaxAge: "40s", MaxBytes: 16 << 20, Segments: 4}}}}}, MaxTotalBytes: 16 << 20, MaxDuration: "20s"}
 		p.Storage = capture.ContextStorageSelection{}
 		p.AssessmentRulesDigest = planning.RecorderAssessmentRulesDigest()
 		raw, err := readImplementedExample("../../examples/", "resolved-recorder-preview.json")

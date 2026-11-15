@@ -102,14 +102,14 @@ func TestRuntimeAndHostProcesses(t *testing.T) {
 }
 
 func TestSyscallFilterValid(t *testing.T) {
-	ok := SyscallFilter{MaxEvents: 100_000, MaxTrackedThreads: 4096}
+	ok := SyscallFilter{MaxTrackedThreads: 4096}
 	some := ok
 	some.Names = []string{"openat", "read"}
 	if !ok.Valid() || !some.Valid() || (SyscallFilter{}).Valid() {
 		t.Fatal("selection validity")
 	}
 	for _, bad := range [][]string{{"read", "read"}, {"read", "openat"}, {""}, make([]string, MaxSyscallFilter+1)} {
-		if (SyscallFilter{Names: bad, MaxEvents: 1, MaxTrackedThreads: 1}).Valid() {
+		if (SyscallFilter{Names: bad, MaxTrackedThreads: 1}).Valid() {
 			t.Fatalf("%v accepted", bad)
 		}
 	}

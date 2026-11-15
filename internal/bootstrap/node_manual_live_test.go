@@ -399,7 +399,7 @@ func TestManualLiveMetadataSyscallTapAndStopKeepOriginalSource(t *testing.T) {
 	}}
 	ctx, cancel := context.WithCancel(t.Context())
 	defer func() { cancel(); release.Do(func() { close(leave) }); n.wg.Wait() }()
-	w := collector.Work{ID: manualLiveID(30), Sequence: 1, Kind: collector.WorkSyscallCapture, NotAfter: now.Add(time.Second), Packet: &collector.PacketCapture{CaptureID: manualLiveID(21), PodUID: manualLiveID(20), Duration: time.Second, MaxBytes: 1 << 20, Syscalls: &collector.SyscallFilter{Names: []string{"read"}, MaxEvents: 100, MaxTrackedThreads: 16}, MaxEventsPerSecond: 100}}
+	w := collector.Work{ID: manualLiveID(30), Sequence: 1, Kind: collector.WorkSyscallCapture, NotAfter: now.Add(time.Second), Packet: &collector.PacketCapture{CaptureID: manualLiveID(21), PodUID: manualLiveID(20), Duration: time.Second, MaxBytes: 1 << 20, Syscalls: &collector.SyscallFilter{Names: []string{"read"}, MaxTrackedThreads: 16}, MaxEventsPerSecond: 100}}
 	if r := n.startSyscall(ctx, w); r.Outcome != collector.OutcomeAccepted {
 		t.Fatal(r)
 	}

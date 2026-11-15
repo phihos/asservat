@@ -24,7 +24,7 @@ func walkArgumentMetadata(ctx context.Context, source io.Reader, e artifact.Cont
 
 func walkArgumentRecords(ctx context.Context, source io.Reader, e artifact.ContextExpectation, from, until time.Time, visit func(artifact.RawArgumentEvent) error) (analysis.SyscallRecordCounts, error) {
 	var zero, counts analysis.SyscallRecordCounts
-	if e.Recording == nil || e.Recording.Arguments == nil || e.Recording.Syscalls == nil || e.Recording.MaxBytes < 1 || e.Recording.MaxBytes > artifact.RecordingNativeLimit || e.Recording.Syscalls.MaxEvents < 1 || e.Recording.Syscalls.MaxEvents > analysis.SyscallMaxRecords {
+	if e.Recording == nil || e.Recording.Arguments == nil || e.Recording.Syscalls == nil || e.Recording.MaxBytes < 1 || e.Recording.MaxBytes > artifact.RecordingNativeLimit {
 		return zero, artifact.ErrInvalid
 	}
 	a := e.Recording.Arguments

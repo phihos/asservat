@@ -26,7 +26,6 @@ func TestHTTPRecordingBounds(t *testing.T) {
 		t.Fatal("clone shares HTTP bounds")
 	}
 	for name, edit := range map[string]func(*Recording){
-		"over 15 seconds":  func(r *Recording) { r.DurationMillis = 16_000 },
 		"other snaplen":    func(r *Recording) { r.Snaplen = RecordingSnaplen },
 		"no filter":        func(r *Recording) { r.Filter = nil },
 		"no bounds":        func(r *Recording) { r.HTTP = nil },

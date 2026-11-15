@@ -22,7 +22,6 @@ const (
 	MaxPprofMappings    = 4096
 	maxPprofSampleTypes = 16 // profile.schema.json sampleTypes.maxItems
 	maxPprofName        = 64 // profile.schema.json type/unit maxLength
-	maxPprofDuration    = 86_400_000_000_000
 	// MaxGoTraceEvents bounds the events read from one execution trace.
 	MaxGoTraceEvents = 1 << 25
 )
@@ -84,7 +83,7 @@ func parsePprof(r io.Reader, limit int64) (*profile.Profile, error) {
 			return nil, ErrNotProfile
 		}
 	}
-	if p.DurationNanos < 0 || p.DurationNanos > maxPprofDuration || p.TimeNanos < 0 || p.Period < 0 ||
+	if p.DurationNanos < 0 || p.TimeNanos < 0 || p.Period < 0 ||
 		p.PeriodType != nil && (!pprofName(p.PeriodType.Type) || !pprofName(p.PeriodType.Unit)) {
 		return nil, ErrNotProfile
 	}

@@ -7,7 +7,7 @@ import (
 )
 
 func TestRecordingArgumentsKeepMechanismPinsAndLegacyEncoding(t *testing.T) {
-	legacy := Recording{Kind: "syscallTrace", Profile: "metadata", Composition: []byte("{}"), DurationMillis: 1000, MaxBytes: 64 << 10, Snaplen: RecordingSyscallSnaplen, Syscalls: &RecordingSyscalls{Names: []string{"openat"}, MaxEvents: 1000, MaxEventsPerSecond: 100, MaxTrackedThreads: 64}}
+	legacy := Recording{Kind: "syscallTrace", Profile: "metadata", Composition: []byte("{}"), DurationMillis: 1000, MaxBytes: 64 << 10, Snaplen: RecordingSyscallSnaplen, Syscalls: &RecordingSyscalls{Names: []string{"openat"}, MaxEventsPerSecond: 100, MaxTrackedThreads: 64}}
 	raw, _ := json.Marshal(legacy)
 	if !legacy.Valid() || bytes.Contains(raw, []byte("Arguments")) {
 		t.Fatal("legacy syscall encoding changed")
@@ -66,7 +66,7 @@ func TestArgumentExpectationRequiresExactRawRecordingTuple(t *testing.T) {
 	e := typedExpectation(t, SyscallArgumentsArtifact, RecordingNativeLimit)
 	e.ExecutionClass, e.DataClass = ContextAPIExecution, "raw"
 	e.NodeUID, e.NodeBootID = "", ""
-	e.Recording = &Recording{Kind: "syscallTrace", Profile: "arguments", Composition: []byte("{}"), DurationMillis: 1000, MaxBytes: 64 << 10, Syscalls: &RecordingSyscalls{Names: []string{"close"}, MaxEvents: 1000, MaxEventsPerSecond: 100, MaxTrackedThreads: 64}, Arguments: &RecordingArguments{ProgramDigest: Digest{1}, DefinitionDigest: Digest{2}, AccountingRule: Digest{3}, MaxProbeBytes: 256, MaxBytesPerEvent: 1, MaxBytesPerSecond: 25600}}
+	e.Recording = &Recording{Kind: "syscallTrace", Profile: "arguments", Composition: []byte("{}"), DurationMillis: 1000, MaxBytes: 64 << 10, Syscalls: &RecordingSyscalls{Names: []string{"close"}, MaxEventsPerSecond: 100, MaxTrackedThreads: 64}, Arguments: &RecordingArguments{ProgramDigest: Digest{1}, DefinitionDigest: Digest{2}, AccountingRule: Digest{3}, MaxProbeBytes: 256, MaxBytesPerEvent: 1, MaxBytesPerSecond: 25600}}
 	if err := e.Validate(); err != nil {
 		t.Fatal("raw argument expectation", err)
 	}

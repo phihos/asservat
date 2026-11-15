@@ -114,8 +114,8 @@ func TestBuiltinProfilesMatchExampleDefinitions(t *testing.T) {
 // onTrigger before:0s rule, exposure, duplicates and whole-plan bounds.
 func TestCompositionNormalizationMatrix(t *testing.T) {
 	c := &fakeCompiler{program: fixtureProgram}
-	ringValue := func(maxAge string, maxBytes, segment int64, segments int, medium string) value.ProfileEdit {
-		return value.ProfileEdit{ActionID: "sample", Field: "packetRing", Ring: &value.RingSettings{MaxAge: maxAge, MaxBytes: maxBytes, SegmentBytes: segment, MaxSegments: segments, Medium: medium}}
+	ringValue := func(maxAge string, maxBytes int64, segments int) value.ProfileEdit {
+		return value.ProfileEdit{ActionID: "sample", Field: "packetRing", Ring: &value.RingSettings{MaxAge: maxAge, MaxBytes: maxBytes, Segments: segments}}
 	}
 	for name, tc := range map[string]struct {
 		composition value.ProfileComposition
@@ -126,10 +126,8 @@ func TestCompositionNormalizationMatrix(t *testing.T) {
 		"no window":                      {network(text("sample", "packetBefore", "0s"), text("sample", "packetAfter", "0s")), value.CompositionInvalid, "profile_composition.components[0] action sample.parameters"},
 		"unknown mode":                   {network(text("sample", "actionExecutionMode", "periodic")), value.CompositionInvalid, "profile_composition.components[0] action sample.executionMode"},
 		"history beyond ring":            {network(text("sample", "packetBefore", "31s")), value.CompositionInvalid, "profile_composition.components[0] action sample.parameters.ring.maxAge"},
-		"segments exceed ring":           {network(ringValue("30s", 16<<20, 8<<20, 4, "memory")), value.CompositionInvalid, "profile_composition.components[0] action sample.parameters.ring.segmentBytes"},
-		"ring over 256 MiB":              {network(ringValue("30s", 512<<20, 4<<20, 4, "memory")), value.CompositionInvalid, "profile_composition.components[0] action sample.parameters.ring.maxBytes"},
-		"ring age over an hour":          {network(ringValue("2h", 16<<20, 4<<20, 4, "memory")), value.CompositionInvalid, "profile_composition.components[0] action sample.parameters.ring.maxAge"},
-		"unknown ring medium":            {network(ringValue("30s", 16<<20, 4<<20, 4, "nfs")), value.CompositionInvalid, "profile_composition.components[0] action sample.parameters.ring.medium"},
+		"one segment cannot rotate":      {network(ringValue("30s", 16<<20, 1)), value.CompositionInvalid, "profile_composition.components[0] action sample.parameters.ring.segments"},
+		"segment smaller than header":    {network(ringValue("30s", 64, 4)), value.CompositionInvalid, "profile_composition.components[0] action sample.parameters.ring.maxBytes"},
 		"timeout without margin":         {network(text("sample", "packetAfter", "12s")), value.CompositionInvalid, "profile_composition.components[0] action sample.limits.timeout"},
 		"duration below timeout":         {network(text("sample", "actionTimeout", "25s")), value.CompositionInvalid, "profile_composition.maxDuration"},
 		"unexposed field":                {network(value.ProfileEdit{ActionID: "sample", Field: "actionMaxBytes", Number: 1}), value.CompositionInvalid, "profile_composition.components[0].overrides[0].field"},
@@ -138,7 +136,6 @@ func TestCompositionNormalizationMatrix(t *testing.T) {
 		"peers not yet":                  {network(value.ProfileEdit{ActionID: "sample", Field: "packetPeers", Unmodeled: true}), value.CompositionInvalid, "profile_composition.components[0].overrides[0]"},
 		"wrong value type":               {network(value.ProfileEdit{ActionID: "sample", Field: "packetBefore", Number: 3}), value.CompositionInvalid, "profile_composition.components[0].overrides[0]"},
 		"syscall mode not exposed":       {syscalls(text("syscalls", "syscallMode", "arguments")), value.CompositionInvalid, "profile_composition.components[0].overrides[0].field"},
-		"syscall after over 60s":         {syscalls(text("syscalls", "syscallAfter", "61s"), text("syscalls", "actionTimeout", "70s")), value.CompositionInvalid, "profile_composition.components[0] action syscalls.parameters.after"},
 		"duplicate syscall names":        {syscalls(value.ProfileEdit{ActionID: "syscalls", Field: "syscallFilter", Syscalls: &value.SyscallSelection{Mode: "include", Names: []string{"write", "write"}}}), value.CompositionInvalid, "profile_composition.components[0] action syscalls.parameters.syscalls.names"},
 		"syscall rate over bound":        {syscalls(value.ProfileEdit{ActionID: "syscalls", Field: "syscallRate", Number: 100001}), value.CompositionInvalid, "profile_composition.components[0] action syscalls.parameters.maxEventsPerSecond"},
 		"http headers not yet":           {value.ProfileComposition{Components: []value.ProfileComponent{{ID: "http", Profile: value.ProfileRef{Catalog: "builtin", Name: "http-headers", Version: "v1"}}}, MaxTotalBytes: 1, MaxDuration: "1s"}, value.CompositionProfileMissing, "profile_composition.components[0].profileRef"},
@@ -151,8 +148,6 @@ func TestCompositionNormalizationMatrix(t *testing.T) {
 		"service name port":              {network(text("sample", "packetFilter", "tcp port https")), value.CompositionFilterRejected, "profile_composition.components[0] action sample.parameters.filter"},
 		"gateway resolves names":         {network(text("sample", "packetFilter", "gateway 10.0.0.1")), value.CompositionFilterRejected, "profile_composition.components[0] action sample.parameters.filter"},
 		"uppercase keyword is not trust": {network(text("sample", "packetFilter", "HOST 10.0.0.1")), value.CompositionFilterRejected, "profile_composition.components[0] action sample.parameters.filter"},
-		"edit text over 4096 bytes":      {network(text("sample", "packetFilter", strings.Repeat("tcp or ", 600)+"tcp")), value.CompositionInvalid, "profile_composition"},
-		"filter over 256 tokens":         {network(text("sample", "packetFilter", strings.Repeat("tcp or ", 128)+"tcp")), value.CompositionFilterRejected, "profile_composition.components[0] action sample.parameters.filter"},
 		"control characters":             {network(text("sample", "packetFilter", "tcp\x00")), value.CompositionFilterRejected, "profile_composition.components[0] action sample.parameters.filter"},
 		"escaped protocol name":          {network(text("sample", "packetFilter", "ip proto \\tcp")), value.CompositionFilterRejected, "profile_composition.components[0] action sample.parameters.filter"},
 	} {
@@ -201,7 +196,6 @@ func TestFilterScreeningCorpus(t *testing.T) {
 	if err := ScreenFilter("f", "tcp[13] & 2 != 0"); err != nil || !RawBytePredicate("tcp[13] & 2 != 0") || RawBytePredicate("tcp port 80") {
 		t.Fatal("raw byte predicate screening", err)
 	}
-	refusal(t, ScreenFilter("f", strings.Repeat("tcp or ", 600)+"tcp"), value.CompositionFilterRejected, "f")
 	refusal(t, ScreenFilter("f", " \t "), value.CompositionFilterRejected, "f")
 	refusal(t, ScreenFilter("f", "host 10.0.0.1 or host münchen"), value.CompositionFilterRejected, "f")
 	if err := ScreenFilter("f", "ether[0:4] = 0x47455420"); err != nil {
@@ -520,26 +514,6 @@ func TestNarrowPeersFailClosed(t *testing.T) {
 			t.Fatal("narrow peers accepted:", name)
 		}
 	}
-}
-
-// ADR-278: the encrypted-disk ring compiles; its collector memory is one
-// segment plus headers, not the whole ring.
-func TestEncryptedDiskRingAssessesSegmentMemory(t *testing.T) {
-	in, now := recorderInput(t, network(value.ProfileEdit{ActionID: "sample", Field: "packetRing", Ring: &value.RingSettings{MaxAge: "30s", MaxBytes: 16 << 20, SegmentBytes: 4 << 20, MaxSegments: 4, Medium: "encryptedDisk"}}), "packetCapture")
-	p, err := CompileRecorder(in, &fakeCompiler{program: fixtureProgram}, now)
-	if err != nil || p.Actions[0].RingMedium != "encryptedDisk" {
-		t.Fatal(err)
-	}
-	a, err := AssessRecorder(p, "00000000-0000-4000-8000-000000000161", now)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, q := range a.Actions[0].Quantities {
-		if q.SourceRef == "action:"+p.Actions[0].ID+":ring.segmentBytes" && q.Upper == 4<<20+4*32 {
-			return
-		}
-	}
-	t.Fatalf("ring memory quantity %+v", a.Actions[0].Quantities)
 }
 
 // ADR-279: a finite rawPackets action compiles with raw approval and

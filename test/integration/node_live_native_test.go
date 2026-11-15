@@ -231,7 +231,7 @@ func nativeHTTPSource(view delivery.NodeView, pod string, program []planning.BPF
 	resources := collector.SourceResources{PolicyUID: "synthetic-reviewed-http-policy"}
 	h := nativeHTTPProjection()
 	b := collector.SourceBinding{RootID: uuid.NewString(), PolicyUID: resources.PolicyUID, AcceptanceID: uuid.NewString(), SourceID: uuid.NewString(), Fence: uuid.NewString(), ActionID: "native-live-http", ObservationGrantID: uuid.NewString(), AudienceDigest: [32]byte{9}, PodUID: pod, NodeUID: id.NodeUID, BootID: id.BootID, CollectorPodUID: id.PodUID, CollectorEpoch: id.Epoch, Scope: [32]byte{1}, ExpectationDigest: [32]byte{2}, ProgramDigest: [32]byte(compiler.FilterProgramDigest(program)), ResourceDigest: delivery.SourceResourcesDigest(resources)}
-	return collector.PacketSource{HTTP: &h, Permit: collector.SourcePermit{Binding: b, StartedAt: now, IssuedAt: now, HardUntil: now.Add(30 * time.Second), StartBy: now.Add(5 * time.Second), DispatchUntil: now.Add(5 * time.Second), LeafUntil: now.Add(30 * time.Second), Credit: 128 << 20, BytesPerSecond: 16 << 20}, Program: program, Resources: resources, Ring: collector.SourceRingLimits{MaxAge: 15 * time.Second, MaxBytes: 16 << 20, SegmentBytes: 4 << 20, MaxSegments: 4, MaxFrozenBytes: 8 << 20, MaxConcurrentSnapshots: 1}}
+	return collector.PacketSource{HTTP: &h, Permit: collector.SourcePermit{Binding: b, StartedAt: now, IssuedAt: now, HardUntil: now.Add(30 * time.Second), StartBy: now.Add(5 * time.Second), DispatchUntil: now.Add(5 * time.Second), LeafUntil: now.Add(30 * time.Second), Credit: 128 << 20, BytesPerSecond: 16 << 20}, Program: program, Resources: resources, Ring: collector.SourceRingLimits{MaxAge: 15 * time.Second, MaxBytes: 16 << 20, Segments: 4}}
 }
 func (n *nativeLiveQualification) sourceRows(t *testing.T, ctx context.Context, ch *delivery.NodeChannel, s collector.PacketSource, projection string) collector.LiveRead {
 	t.Helper()
@@ -422,7 +422,7 @@ func nativeSourceDiagnosis(ch *delivery.NodeChannel, b collector.SourceBinding, 
 }
 func nativeSyscallCapture(view delivery.NodeView, pod string, args bool) collector.PacketCapture {
 	now := time.Now().UTC()
-	p := collector.PacketCapture{CaptureID: uuid.NewString(), PodUID: pod, Duration: 8 * time.Second, MaxBytes: 1 << 20, Syscalls: &collector.SyscallFilter{Names: []string{"read"}, MaxEvents: 10000, MaxTrackedThreads: 128}, MaxEventsPerSecond: 1000}
+	p := collector.PacketCapture{CaptureID: uuid.NewString(), PodUID: pod, Duration: 8 * time.Second, MaxBytes: 1 << 20, Syscalls: &collector.SyscallFilter{Names: []string{"read"}, MaxTrackedThreads: 128}, MaxEventsPerSecond: 1000}
 	if args {
 		p.Syscalls.Names = []string{"write"}
 		defs, _ := syscalls.ArgumentDefinitions(p.Syscalls.Names, true, 128)

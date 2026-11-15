@@ -45,7 +45,7 @@ func TestNodeSyscallCaptureRecordsPairedCalls(t *testing.T) {
 		up := &uploads{done: make(chan struct{})}
 		n := &nodePackets{syscallTrace: trace, upload: up.upload, version: "v0.57.0", now: func() time.Time { return time.Now().UTC() }, log: func(string) {}, budget: func() *collector.Budget { return budget }, budgetMu: &mu}
 		p := collector.PacketCapture{CaptureID: "22222222-2222-4222-8222-222222222222", PodUID: pod, Duration: time.Second, MaxBytes: 1 << 20,
-			Syscalls: &collector.SyscallFilter{Names: names, MaxEvents: 100, MaxTrackedThreads: 16}, MaxEventsPerSecond: perSecond}
+			Syscalls: &collector.SyscallFilter{Names: names, MaxTrackedThreads: 16}, MaxEventsPerSecond: perSecond}
 		w := collector.Work{ID: "33333333-3333-4333-8333-333333333333", Sequence: 1, Kind: collector.WorkSyscallCapture, NotAfter: time.Now().Add(10 * time.Second), Packet: &p}
 		r := n.startSyscall(context.Background(), w)
 		if r.Outcome == collector.OutcomeAccepted {

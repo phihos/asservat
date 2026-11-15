@@ -24,7 +24,7 @@ func (s *RecordingSaveSettings) Valid() bool {
 	}
 	seen := map[string]bool{}
 	for _, w := range s.Windows {
-		if !identity.Text(w.ActionID, 63) || seen[w.ActionID] || w.Before <= 0 || w.Before > artifact.MaxLifecycleWindow || w.Before%time.Millisecond != 0 {
+		if !identity.Text(w.ActionID, 63) || seen[w.ActionID] || w.Before <= 0 || w.Before%time.Millisecond != 0 {
 			return false
 		}
 		seen[w.ActionID] = true

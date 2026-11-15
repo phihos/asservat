@@ -35,7 +35,7 @@ func prepareSyscallEncryptedFixture(t *testing.T, dir, kind string, maximum, mal
 	e.RequestedAgeSeconds, e.MaximumAgeSeconds = 3600, 7200
 	e.Registration.ExpiresAt = e.Registration.AnchorAt.Add(time.Hour)
 	e.Registration.DeleteBy = e.Registration.ExpiresAt.Add(time.Minute)
-	e.Recording = &artifact.Recording{Kind: "syscallTrace", Profile: "metadata", Composition: []byte("{}"), DurationMillis: 1000, MaxBytes: artifact.RecordingNativeLimit, Snaplen: artifact.RecordingSyscallSnaplen, Syscalls: &artifact.RecordingSyscalls{MaxEvents: 1000000, MaxEventsPerSecond: 100000, MaxTrackedThreads: 16}}
+	e.Recording = &artifact.Recording{Kind: "syscallTrace", Profile: "metadata", Composition: []byte("{}"), DurationMillis: 1000, MaxBytes: artifact.RecordingNativeLimit, Snaplen: artifact.RecordingSyscallSnaplen, Syscalls: &artifact.RecordingSyscalls{MaxEventsPerSecond: 100000, MaxTrackedThreads: 16}}
 	duration := uint64(1)
 	metadata := artifact.SyscallMetadataEvent{Identity: artifact.SyscallMetadataIdentity{PodUID: e.PodUID, ProcessRef: "synthetic-process", ThreadRef: "synthetic-thread"}, Syscall: "write", ABI: "x86_64", Timestamp: e.TriggeredAt.Format(time.RFC3339Nano), DurationNS: &duration, Outcome: "success"}
 	var native bytes.Buffer

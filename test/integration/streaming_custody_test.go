@@ -98,7 +98,7 @@ func qualifyStreamingCustody(t *testing.T, ctx context.Context, admin *pgxpool.P
 		t.Fatal("committed object replaced", err)
 	}
 	state, err := ledger.ReadStreaming(ctx, first)
-	if err != nil || state.Receipt == nil || *state.Receipt != receipt || len(state.Parts) != 3 {
+	if err != nil || state.Receipt == nil || *state.Receipt != receipt || state.Parts != 3 {
 		t.Fatal("journal", err)
 	}
 	if err = privacy.ReleaseStreaming(ctx, first, state, ledger, objects); err != nil {
@@ -136,7 +136,7 @@ func qualifyStreamingCustody(t *testing.T, ctx context.Context, admin *pgxpool.P
 		t.Fatal(err)
 	}
 	state, err = ledger.ReadStreaming(ctx, second)
-	if err != nil || state.UploadID == "" || len(state.Parts) != 1 || state.CompleteSpent {
+	if err != nil || state.UploadID == "" || state.Parts != 1 || state.CompleteSpent {
 		t.Fatal("unfinished journal", err)
 	}
 	if err = privacy.ReleaseStreaming(ctx, second, state, ledger, objects); err != nil {

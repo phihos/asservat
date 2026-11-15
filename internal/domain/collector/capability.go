@@ -142,15 +142,12 @@ const (
 	// Profile HTTP acquisition only; packet/syscall results retain their own
 	// closed failure vocabulary and must not accept this endpoint observation.
 	ReasonProfileUnavailable Reason = "ProfileUnavailable"
-	// ReasonMediumUnavailable: the plan asks for the encrypted-disk ring and
-	// the node has no administrator ring volume, or it failed (ADR-278).
-	ReasonMediumUnavailable Reason = "MediumUnavailable"
 )
 
 func (r Reason) Valid() bool {
 	switch r {
 	case ReasonKernelTooOld, ReasonBTFMissing, ReasonCgroupV1, ReasonBPFUnavailable, ReasonNoTrafficHook, ReasonTracingUnavailable, ReasonHostProcessesHidden, ReasonRuntimeUnknown, ReasonEngineUnavailable, ReasonRecorderNotImplemented, ReasonWorkExpired, ReasonWorkUnknown,
-		ReasonTargetNotFound, ReasonTargetHostNet, ReasonFilterUnsupported, ReasonCaptureBusy, ReasonCaptureFailed, ReasonProfileUnavailable, ReasonMediumUnavailable:
+		ReasonTargetNotFound, ReasonTargetHostNet, ReasonFilterUnsupported, ReasonCaptureBusy, ReasonCaptureFailed, ReasonProfileUnavailable:
 		return true
 	}
 	return false

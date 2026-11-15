@@ -103,7 +103,7 @@ func CompileRecordingSaveScope(in RecordingSaveScopeInput, now time.Time) ([]byt
 	for _, source := range in.Sources {
 		original := source.Original
 		before, validBefore := scopeDuration(source.Before)
-		if source.PolicyUID != a.PolicyUID || source.ExecutionDigest != a.ScopeDigest || !original.Valid() || original.Request.ClusterID != a.ClusterID || original.Request.Namespace.UID != a.NamespaceUID || original.Request.Workload.UID != a.WorkloadUID || !identity.Text(source.ActionID, 63) || !slices.Contains(a.Actions, source.Kind) || source.Kind != "packetCapture" && source.Kind != "syscallTrace" || source.DefinitionDigest == (artifact.Digest{}) || source.AudienceDigest == (artifact.Digest{}) || !validBefore || source.Before > source.ApprovedBefore || source.ApprovedBefore > artifact.MaxLifecycleWindow || source.MaxBytes < 1 || source.MaxBytes > artifact.RecordingNativeLimit || seenSource[original.SourceID] || seenAction[original.Request.PodUID+"\x00"+source.ActionID] {
+		if source.PolicyUID != a.PolicyUID || source.ExecutionDigest != a.ScopeDigest || !original.Valid() || original.Request.ClusterID != a.ClusterID || original.Request.Namespace.UID != a.NamespaceUID || original.Request.Workload.UID != a.WorkloadUID || !identity.Text(source.ActionID, 63) || !slices.Contains(a.Actions, source.Kind) || source.Kind != "packetCapture" && source.Kind != "syscallTrace" || source.DefinitionDigest == (artifact.Digest{}) || source.AudienceDigest == (artifact.Digest{}) || !validBefore || source.Before > source.ApprovedBefore || source.MaxBytes < 1 || source.MaxBytes > artifact.RecordingNativeLimit || seenSource[original.SourceID] || seenAction[original.Request.PodUID+"\x00"+source.ActionID] {
 			return bad()
 		}
 		seenSource[original.SourceID] = true
@@ -186,7 +186,7 @@ func readRecordingSaveScopeIdentity(raw []byte, want artifact.Digest) (ContextSc
 		}
 		before, beforeErr := time.ParseDuration(source.Before)
 		canonicalBefore, beforeValid := scopeDuration(before)
-		if !authorization.UUID(source.SourceID) || !identity.Text(source.PodUID, 64) || !identity.Text(source.NodeUID, 128) || !authorization.UUID(source.BootID) || !identity.Text(source.ActionID, 63) || source.Kind != "packetCapture" && source.Kind != "syscallTrace" || source.After != "0s" || beforeErr != nil || !beforeValid || canonicalBefore != source.Before || before > artifact.MaxLifecycleWindow || source.MaxBytes < 1 || source.MaxBytes > artifact.RecordingNativeLimit || !saveScopeHash(source.DefinitionDigest) || !saveScopeHash(source.AudienceDigest) || index > 0 && s.Sources[index-1].SourceID >= source.SourceID || seenAction[source.PodUID+"\x00"+source.ActionID] {
+		if !authorization.UUID(source.SourceID) || !identity.Text(source.PodUID, 64) || !identity.Text(source.NodeUID, 128) || !authorization.UUID(source.BootID) || !identity.Text(source.ActionID, 63) || source.Kind != "packetCapture" && source.Kind != "syscallTrace" || source.After != "0s" || beforeErr != nil || !beforeValid || canonicalBefore != source.Before || source.MaxBytes < 1 || source.MaxBytes > artifact.RecordingNativeLimit || !saveScopeHash(source.DefinitionDigest) || !saveScopeHash(source.AudienceDigest) || index > 0 && s.Sources[index-1].SourceID >= source.SourceID || seenAction[source.PodUID+"\x00"+source.ActionID] {
 			return ContextScopeIdentity{}, value.ErrInvalid
 		}
 		target := authorization.Target{ClusterID: s.Policy.ClusterID, NamespaceUID: s.Policy.NamespaceUID, WorkloadUID: s.WorkloadUID, PodUID: source.PodUID}

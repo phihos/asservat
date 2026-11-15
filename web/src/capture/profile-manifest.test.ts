@@ -79,9 +79,9 @@ describe('profileManifest (REQ-CPR-005 Save as profile)', () => {
     const source = builtin('syscall-activity');
     const derived = applyOverrides(source, [
       { actionID: 'syscalls', field: 'syscallFilter', value: { mode: 'include', names: ['openat'] } },
-      { actionID: 'syscalls', field: 'syscallMaxEvents', value: 5000 },
+      { actionID: 'syscalls', field: 'syscallRate', value: 5000 },
     ] as Parameters<typeof applyOverrides>[1]);
-    expect(derived.recipe.actions[0]).toMatchObject({ parameters: { syscalls: { mode: 'include', names: ['openat'] }, maxEvents: 5000 } });
+    expect(derived.recipe.actions[0]).toMatchObject({ parameters: { syscalls: { mode: 'include', names: ['openat'] }, maxEventsPerSecond: 5000 } });
   });
 
   it('saves complete argument settings including false as schema-valid defaults without mutating the source', () => {

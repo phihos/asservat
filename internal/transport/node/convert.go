@@ -203,7 +203,7 @@ func WireWork(w collector.Work) contracts.NodeWork {
 			c.Observation = wireObservation(*p.Observation)
 		}
 		if s := p.Syscalls; s != nil {
-			c.Syscalls = &contracts.NodeSyscallFilter{Names: append([]string{}, s.Names...), ErrorsOnly: s.ErrorsOnly, MaxEvents: s.MaxEvents, MaxTrackedThreads: s.MaxTrackedThreads}
+			c.Syscalls = &contracts.NodeSyscallFilter{Names: append([]string{}, s.Names...), ErrorsOnly: s.ErrorsOnly, MaxTrackedThreads: s.MaxTrackedThreads}
 			c.MaxEventsPerSecond = p.MaxEventsPerSecond
 		}
 		if r := p.Raw; r != nil {
@@ -306,7 +306,7 @@ func DomainWork(w contracts.NodeWork) (collector.Work, bool) {
 	}
 	if c := w.PacketCapture; c != nil {
 		// An unusable payload stays an invalid item, answered WorkUnknown.
-		if len(c.Program) > planning.MaxFilterInstructions || c.DurationMillis < 0 || c.DurationMillis > collector.MaxPacketCaptureDuration.Milliseconds() || !text(c.CaptureID, 36) || !text(c.PodUID, 36) {
+		if len(c.Program) > planning.MaxFilterInstructions || c.DurationMillis < 0 || !text(c.CaptureID, 36) || !text(c.PodUID, 36) {
 			out.Packet = &collector.PacketCapture{}
 			return out, true
 		}
@@ -326,7 +326,7 @@ func DomainWork(w contracts.NodeWork) (collector.Work, bool) {
 				out.Packet = &collector.PacketCapture{}
 				return out, true
 			}
-			p.Syscalls = &collector.SyscallFilter{Names: append([]string{}, s.Names...), ErrorsOnly: s.ErrorsOnly, MaxEvents: s.MaxEvents, MaxTrackedThreads: s.MaxTrackedThreads}
+			p.Syscalls = &collector.SyscallFilter{Names: append([]string{}, s.Names...), ErrorsOnly: s.ErrorsOnly, MaxTrackedThreads: s.MaxTrackedThreads}
 			p.MaxEventsPerSecond = c.MaxEventsPerSecond
 		}
 		if r := c.Raw; r != nil {

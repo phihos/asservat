@@ -33,7 +33,7 @@ func (s SourceSnapshotRequest) Valid() bool {
 		s.MaxBytes < minRecordingBytes || s.MaxBytes > RecordingNativeLimit {
 		return false
 	}
-	return s.Before >= 0 && s.Before <= MaxLifecycleWindow && s.After >= 0 && s.After <= MaxLifecycleWindow &&
+	return s.Before >= 0 && s.After >= 0 &&
 		s.Before%time.Millisecond == 0 && s.After%time.Millisecond == 0 && s.Before+s.After > 0 &&
 		s.T0.Add(s.After).Before(s.ProcessingUntil)
 }

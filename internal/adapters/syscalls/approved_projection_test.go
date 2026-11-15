@@ -27,7 +27,7 @@ func argumentProjectionFixture(t *testing.T) (artifact.ContextExpectation, time.
 	}
 	program, rule := artifact.Digest{1}, artifact.Digest{2}
 	definition := artifact.Digest(ArgumentDefinitionDigest(defs))
-	e := artifact.ContextExpectation{PodUID: "pod", NativeType: artifact.SyscallArgumentsArtifact, Recording: &artifact.Recording{MaxBytes: artifact.RecordingNativeLimit, Syscalls: &artifact.RecordingSyscalls{Names: []string{"read", "write"}, MaxEvents: 100}, Arguments: &artifact.RecordingArguments{ProgramDigest: program, DefinitionDigest: definition, AccountingRule: rule, MaxBytesPerEvent: 128, MaxProbeBytes: 512, MaxBytesPerSecond: 1 << 20, CaptureBuffers: true}}}
+	e := artifact.ContextExpectation{PodUID: "pod", NativeType: artifact.SyscallArgumentsArtifact, Recording: &artifact.Recording{MaxBytes: artifact.RecordingNativeLimit, Syscalls: &artifact.RecordingSyscalls{Names: []string{"read", "write"}}, Arguments: &artifact.RecordingArguments{ProgramDigest: program, DefinitionDigest: definition, AccountingRule: rule, MaxBytesPerEvent: 128, MaxProbeBytes: 512, MaxBytesPerSecond: 1 << 20, CaptureBuffers: true}}}
 	header := ArgumentHeader{Record: "header", Format: ArgumentNativeFormat, PodUID: e.PodUID, NodeUID: "node", CollectorPodUID: "collector", SessionID: "session", Fence: "fence", BootID: "boot", SourceEpoch: "epoch", EngineDigest: hex.EncodeToString(program[:]), DefinitionDigest: hex.EncodeToString(definition[:]), AccountingRule: hex.EncodeToString(rule[:]), Decoder: ArgumentDecoderVersion, ABI: ABI, StartedAt: from}
 	var lines [][]byte
 	appendLine := func(v any) {

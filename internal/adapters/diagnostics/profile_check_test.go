@@ -125,7 +125,6 @@ func TestCheckPprof(t *testing.T) {
 			p.DurationNanos = -1
 			return encoded(t, p)
 		},
-		"over a day": func() []byte { p := validProfile(); p.DurationNanos = 86_400_000_000_001; return encoded(t, p) },
 		"negative period": func() []byte {
 			p := validProfile()
 			p.Period = -1

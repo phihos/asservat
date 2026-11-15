@@ -86,8 +86,6 @@ var ErrFilterCompilerUnavailable = errors.New("packet filter compiler unavailabl
 const (
 	FilterLinkType         = "EN10MB"
 	FilterSnaplen          = 65535
-	MaxFilterBytes         = 4096
-	MaxFilterTokens        = 256
 	MaxFilterInstructions  = 256
 	FilterProgramEncoding  = "pcap-cbpf/v1"
 	RecorderPlanVersion    = "recorder-preview/v1"
@@ -137,12 +135,10 @@ type RecorderInput struct {
 type RecorderAction struct {
 	ID, ComponentID, LocalID, Kind, ExecutionMode, EvidenceType string
 	Before, After, Timeout, RingMaxAge                          string
-	RingMaxBytes, SegmentBytes, MaxFrozenBytes, MaxBytes        int64
-	MaxSegments, MaxConcurrentSnapshots                         int
-	// RingMedium is "encryptedDisk" for that medium (ADR-278) and empty for
-	// memory, so existing memory plans serialize exactly as before.
-	RingMedium string `json:",omitempty"`
-	LogStream  string `json:",omitempty"`
+	RingMaxBytes, MaxBytes                                      int64
+	// Segments divides RingMaxBytes; a segment is RingMaxBytes ÷ Segments.
+	Segments  int
+	LogStream string `json:",omitempty"`
 	// Packet actions.
 	PacketProfile, Filter string
 	FilterInstructions    int
@@ -156,9 +152,9 @@ type RecorderAction struct {
 	PeerEndpoints     int    `json:",omitempty"`
 	PeerMembersDigest string `json:",omitempty"`
 	// Syscall actions.
-	SyscallMode, SyscallSelection, Result            string
-	SyscallNames                                     int
-	MaxEvents, MaxEventsPerSecond, MaxTrackedThreads int64
+	SyscallMode, SyscallSelection, Result string
+	SyscallNames                          int
+	MaxEventsPerSecond, MaxTrackedThreads int64
 	// Profile actions (ADR-285): runtime, type, mode, the timed duration
 	// (empty for snapshots and cumulative counters), source kind, forced GC
 	// and the resolved endpoint digest (hex, Go endpoints only).

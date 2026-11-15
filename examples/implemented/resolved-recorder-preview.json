@@ -32,24 +32,114 @@
       "expression": "tcp port 8080 and host 10.0.0.12",
       "linkType": "EN10MB",
       "program": [
-        [40, 0, 0, 12],
-        [21, 15, 0, 34525],
-        [21, 0, 14, 2048],
-        [48, 0, 0, 23],
-        [21, 0, 12, 6],
-        [40, 0, 0, 20],
-        [69, 10, 0, 8191],
-        [177, 0, 0, 14],
-        [72, 0, 0, 14],
-        [21, 2, 0, 8080],
-        [72, 0, 0, 16],
-        [21, 0, 5, 8080],
-        [32, 0, 0, 26],
-        [21, 2, 0, 167772172],
-        [32, 0, 0, 30],
-        [21, 0, 1, 167772172],
-        [6, 0, 0, 65535],
-        [6, 0, 0, 0]
+        [
+          40,
+          0,
+          0,
+          12
+        ],
+        [
+          21,
+          15,
+          0,
+          34525
+        ],
+        [
+          21,
+          0,
+          14,
+          2048
+        ],
+        [
+          48,
+          0,
+          0,
+          23
+        ],
+        [
+          21,
+          0,
+          12,
+          6
+        ],
+        [
+          40,
+          0,
+          0,
+          20
+        ],
+        [
+          69,
+          10,
+          0,
+          8191
+        ],
+        [
+          177,
+          0,
+          0,
+          14
+        ],
+        [
+          72,
+          0,
+          0,
+          14
+        ],
+        [
+          21,
+          2,
+          0,
+          8080
+        ],
+        [
+          72,
+          0,
+          0,
+          16
+        ],
+        [
+          21,
+          0,
+          5,
+          8080
+        ],
+        [
+          32,
+          0,
+          0,
+          26
+        ],
+        [
+          21,
+          2,
+          0,
+          167772172
+        ],
+        [
+          32,
+          0,
+          0,
+          30
+        ],
+        [
+          21,
+          0,
+          1,
+          167772172
+        ],
+        [
+          6,
+          0,
+          0,
+          65535
+        ],
+        [
+          6,
+          0,
+          0,
+          0
+        ]
       ],
       "programDigest": "b7d75a424ddc6befb867e7d09f6905faeb5e1f15f58545a9469fbc96b41ade05",
       "snaplen": 65535
@@ -113,7 +203,7 @@
     "resolvedProfiles": [
       {
         "componentID": "net",
-        "definitionDigest": "ad67f4f61778a3595166fd91cbfdb45e0642a27a35b9eb329d40092fb0c78c17",
+        "definitionDigest": "ed9232ac55d514dd0938869607ba19fd3fc5c58d1e75a85fa7edef88002ba689",
         "profileRef": {
           "catalog": "builtin",
           "name": "network-connections",
@@ -137,8 +227,6 @@
           "after": "15s",
           "before": "30s",
           "filter": "tcp port 8080 and host 10.0.0.12",
-          "maxConcurrentSnapshots": 1,
-          "maxFrozenBytes": 16777216,
           "peers": {
             "entries": [
               {
@@ -159,9 +247,7 @@
           "ring": {
             "maxAge": "30s",
             "maxBytes": 16777216,
-            "maxSegments": 4,
-            "medium": "memory",
-            "segmentBytes": 4194304
+            "segments": 4
           }
         },
         "required": true
@@ -172,8 +258,8 @@
     "maxTotalBytes": 16777216
   },
   "recipeRef": {
-    "digest": "1b1cda1a1600107d0fc4bd36ccff06af6188fbd9940529222e8ff2515af6cc85",
-    "name": "composition-1b1cda1a1600107d0fc4bd36"
+    "digest": "c1af7f9d79ad437f4abedcda984705590a19c725f9424c9410dcf85d05922eb0",
+    "name": "composition-c1af7f9d79ad437f4abedcda"
   },
   "schemaVersion": "recorder-preview/v1",
   "source": {

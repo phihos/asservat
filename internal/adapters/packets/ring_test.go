@@ -20,13 +20,13 @@ import (
 func ringFixture(t *testing.T, edit func(*RingLimits)) (*Ring, time.Time) {
 	t.Helper()
 	now := time.Now().UTC().Truncate(time.Microsecond)
-	limits := RingLimits{MaxAge: 30 * time.Second, MaxBytes: 1024, SegmentBytes: 256, MaxSegments: 4, MaxFrozenBytes: 4096, MaxConcurrentSnapshots: 2}
+	limits := RingLimits{MaxAge: 30 * time.Second, MaxBytes: 1024, Segments: 4}
 	if edit != nil {
 		edit(&limits)
 	}
 	ctx, cancel := context.WithDeadline(t.Context(), now.Add(time.Hour))
 	t.Cleanup(cancel)
-	r, err := testNewRing(ctx, RingBounds{now, now.Add(time.Hour)}, limits, nil)
+	r, err := NewRing(ctx, RingBounds{now, now.Add(time.Hour)}, limits, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +47,7 @@ func ringAdd(t *testing.T, r *Ring, at, now time.Time) []byte {
 }
 func ringCopy(t *testing.T, r *Ring, from, to, now time.Time) *RingSnapshot {
 	t.Helper()
-	s, err := r.Snapshot(RingWindow{from, to}, now, r.limits.MaxFrozenBytes)
+	s, err := r.Snapshot(RingWindow{from, to}, now, r.limits.MaxBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,7 +112,7 @@ func TestRingOriginalRecordDoesNotAliasInputOrLiveRotation(t *testing.T) {
 	if err != nil || p.Header[12] != 8 || !p.At.Equal(now) {
 		t.Fatal("copy changed after overwrite", err, p)
 	}
-	if r.State().HistoryEvicted == 0 || r.State().LiveBytes != MemoryRingBytes(r.limits, ringTestDir != "") {
+	if r.State().HistoryEvicted == 0 || r.State().LiveBytes != MemoryRingBytes(r.limits) {
 		t.Fatal("rotation not bounded", r.State())
 	}
 	if err = r.Close(); err != nil {
@@ -131,7 +131,7 @@ func TestRingOriginalRecordDoesNotAliasInputOrLiveRotation(t *testing.T) {
 }
 func TestRingQuietAgingNeverRestampsOldSegments(t *testing.T) {
 	r, now := ringFixture(t, nil)
-	// Within one slice (MaxAge/MaxSegments = 7.5s) records share a segment,
+	// Within one slice (MaxAge/Segments = 7.5s) records share a segment,
 	// which expires whole with its oldest record; a record beyond the slice
 	// starts a new segment and survives.
 	ringAdd(t, r, now, now)
@@ -211,8 +211,8 @@ func TestRingBoundsAndStoppedSource(t *testing.T) {
 				defer cancel()
 				bound = now.Add(time.Minute)
 			}
-			limits := RingLimits{MaxAge: 30 * time.Second, MaxBytes: 512, SegmentBytes: 256, MaxSegments: 2, MaxFrozenBytes: 512, MaxConcurrentSnapshots: 1}
-			r, err := testNewRing(ctx, RingBounds{now, bound}, limits, nil)
+			limits := RingLimits{MaxAge: 30 * time.Second, MaxBytes: 512, Segments: 2}
+			r, err := NewRing(ctx, RingBounds{now, bound}, limits, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -250,7 +250,7 @@ func TestRingBoundsAndStoppedSource(t *testing.T) {
 	}
 }
 func TestRingCopyCapsAndCloseNextSynchronization(t *testing.T) {
-	r, now := ringFixture(t, func(l *RingLimits) { l.MaxFrozenBytes = 84; l.MaxConcurrentSnapshots = 1 })
+	r, now := ringFixture(t, nil)
 	ringAdd(t, r, now, now)
 	if _, err := r.Snapshot(RingWindow{now, now}, now, 1); !errors.Is(err, ErrRingCapacity) {
 		t.Fatal("copy exceeded declared bytes", err)
@@ -260,8 +260,8 @@ func TestRingCopyCapsAndCloseNextSynchronization(t *testing.T) {
 		t.Fatal(err)
 	}
 	alias := s.data
-	if _, err = r.Snapshot(RingWindow{now, now}, now, 84); !errors.Is(err, ErrRingCapacity) {
-		t.Fatal("stalled consumer exceeded count/frozen", err)
+	if _, err = r.Snapshot(RingWindow{now, now}, now, 0); !errors.Is(err, ErrInvalid) {
+		t.Fatal("empty copy reservation admitted", err)
 	}
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -288,7 +288,7 @@ func TestRingInputAndConstructorNegatives(t *testing.T) {
 		t.Run(mode, func(t *testing.T) {
 			r, now := ringFixture(t, func(l *RingLimits) {
 				if mode == "oversized" {
-					l.SegmentBytes = 64
+					l.MaxBytes = 64 * int64(l.Segments)
 				}
 			})
 			full := tcp4(t, true)
@@ -314,7 +314,7 @@ func TestRingInputAndConstructorNegatives(t *testing.T) {
 	}
 	r, now := ringFixture(t, nil)
 	limits := r.limits
-	for _, mode := range []string{"unbounded", "segments", "product", "age", "frozen", "snapshots"} {
+	for _, mode := range []string{"unbounded", "segments", "header", "age"} {
 		t.Run(mode, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 			defer cancel()
@@ -323,17 +323,13 @@ func TestRingInputAndConstructorNegatives(t *testing.T) {
 			case "unbounded":
 				ctx = context.Background()
 			case "segments":
-				l.MaxSegments = 65
-			case "product":
-				l.SegmentBytes = 1024
+				l.Segments = 1
+			case "header":
+				l.Segments = int(l.MaxBytes / ringSegmentHeader)
 			case "age":
-				l.MaxAge = time.Hour + 1
-			case "frozen":
-				l.MaxFrozenBytes = 0
-			case "snapshots":
-				l.MaxConcurrentSnapshots = 5
+				l.MaxAge = 0
 			}
-			if x, err := testNewRing(ctx, RingBounds{now, now.Add(time.Minute)}, l, nil); err == nil {
+			if x, err := NewRing(ctx, RingBounds{now, now.Add(time.Minute)}, l, nil); err == nil {
 				x.Close()
 				t.Fatal("invalid constructor admitted")
 			}
@@ -356,7 +352,7 @@ func TestRingOutOfOrderTimesAndOriginalWireFilter(t *testing.T) {
 	if r.State().HistoryEvicted != 2 {
 		t.Fatal("out-of-order earliest expiry ignored", r.State())
 	}
-	filtered, err := testNewRing(r.ctx, r.bounds, r.limits, greater1000)
+	filtered, err := NewRing(r.ctx, r.bounds, r.limits, greater1000)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -374,34 +370,6 @@ func TestRingOutOfOrderTimesAndOriginalWireFilter(t *testing.T) {
 		t.Fatal("original wire not copied", e, p.Wire)
 	}
 }
-func TestRingIndependentFrozenAndCountCaps(t *testing.T) {
-	for _, mode := range []string{"bytes", "count"} {
-		t.Run(mode, func(t *testing.T) {
-			r, now := ringFixture(t, func(l *RingLimits) {
-				if mode == "bytes" {
-					l.MaxFrozenBytes = 84
-					l.MaxConcurrentSnapshots = 2
-				} else {
-					l.MaxFrozenBytes = 168
-					l.MaxConcurrentSnapshots = 1
-				}
-			})
-			ringAdd(t, r, now, now)
-			a, e := r.Snapshot(RingWindow{now, now}, now, 84)
-			if e != nil {
-				t.Fatal(e)
-			}
-			defer a.Close()
-			if _, e = r.Snapshot(RingWindow{now, now}, now, 84); !errors.Is(e, ErrRingCapacity) {
-				t.Fatal("independent cap ignored", e)
-			}
-			if r.State().Snapshots != 1 || r.State().FrozenBytes != 84 {
-				t.Fatal("refusal changed reservations", r.State())
-			}
-		})
-	}
-}
-
 func TestRingInvalidArrivalClockCannotLeaveCompleteCoverage(t *testing.T) {
 	r, now := ringFixture(t, nil)
 	end := now.Add(time.Second)
@@ -425,7 +393,7 @@ func ringNext(s *RingSnapshot) (RingPacket, error) {
 
 func TestRingFirstObservationCannotBackfillQuietOrFutureCoverage(t *testing.T) {
 	template, now := ringFixture(t, nil)
-	r, e := testNewRing(template.ctx, template.bounds, template.limits, nil)
+	r, e := NewRing(template.ctx, template.bounds, template.limits, nil)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -498,7 +466,7 @@ func TestRingDecoderBorrowEndsWhenAddReturns(t *testing.T) {
 		t.Run(mode, func(t *testing.T) {
 			r, now := ringFixture(t, func(l *RingLimits) {
 				if mode == "oversized" {
-					l.SegmentBytes = 64
+					l.MaxBytes = 64 * int64(l.Segments)
 				}
 			})
 			frame := ringOptionFrame(t, mode)
@@ -549,7 +517,7 @@ func TestRingDecoderBorrowEndsWhenAddReturns(t *testing.T) {
 }
 
 func TestRingWindowOneReservation(t *testing.T) {
-	r, now := ringFixture(t, func(l *RingLimits) { l.MaxConcurrentSnapshots = 1; l.MaxFrozenBytes = 168 })
+	r, now := ringFixture(t, nil)
 	end := now.Add(time.Second)
 	ringAdd(t, r, now, now)
 	ctx, cancel := context.WithDeadline(t.Context(), now.Add(time.Minute))
@@ -1082,11 +1050,11 @@ func TestRingWindowRetainsKnownCloseWithoutNaturalStop(t *testing.T) {
 }
 
 // Sparse traffic never evicts recent records with an aged-out segment: each
-// segment spans at most MaxAge/MaxSegments, so after expiry the ring keeps at
+// segment spans at most MaxAge/Segments, so after expiry the ring keeps at
 // least MaxAge minus one slice of history (native runs 41282477857/41282479595
 // lost the pre-incident markers to an old record sharing their segment).
 func TestRingSparseRecordsSurviveOlderRecordsAgingOut(t *testing.T) {
-	r, now := ringFixture(t, func(l *RingLimits) { l.MaxAge = 30 * time.Second; l.MaxBytes = 4096; l.SegmentBytes = 1024 })
+	r, now := ringFixture(t, func(l *RingLimits) { l.MaxAge = 30 * time.Second; l.MaxBytes = 4096 })
 	for i := 0; i <= 40; i += 4 { // one packet every 4s for 40s
 		at := now.Add(time.Duration(i) * time.Second)
 		ringAdd(t, r, at, at)
@@ -1131,7 +1099,7 @@ func TestRingAddRecordBypassesPacketDecoder(t *testing.T) {
 }
 
 func TestMinimizedRecordBoundDoesNotWidenPacketIngress(t *testing.T) {
-	r, now := ringFixture(t, func(l *RingLimits) { l.SegmentBytes = 8192; l.MaxBytes = 32768; l.MaxFrozenBytes = 32768 })
+	r, now := ringFixture(t, func(l *RingLimits) { l.MaxBytes = 32768 })
 	record := bytes.Repeat([]byte{'x'}, MaxMinimizedRecordBytes)
 	if err := r.AddRecord(record, now, now); err != nil {
 		t.Fatal("bounded minimized record refused", err)

@@ -69,7 +69,6 @@ func (j *profileStreamingJournal) AdvanceStreaming(ctx context.Context, plan art
 	}
 	j.state = next
 	// Returned observations cannot edit this writer's spent state.
-	next.Parts = append([]artifact.StreamingPart(nil), next.Parts...)
 	if next.Receipt != nil {
 		receipt := *next.Receipt
 		next.Receipt = &receipt

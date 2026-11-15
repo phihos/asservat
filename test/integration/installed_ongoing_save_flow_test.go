@@ -25,7 +25,7 @@ const (
 // Save qualification or the automatic incident snapshot.
 func installedOngoingFocus() bool {
 	f := installedJourneyFocus()
-	return f == "ongoing-save" || f == "ongoing-save-disk" || f == "ongoing-incident" || f == "ongoing-syscall" || f == "ongoing-mixed" || f == "live-observation"
+	return f == "ongoing-save" || f == "ongoing-incident" || f == "ongoing-syscall" || f == "ongoing-mixed" || f == "live-observation"
 }
 
 // ongoingSavePackets requires retained pre-T0 marker headers inside the

@@ -23,10 +23,7 @@ type CaptureComposition struct {
 }
 
 type CaptureRing struct {
-	MaxAge            string `json:"maxAge"`
-	MaxBytes          int64  `json:"maxBytes"`
-	SegmentBytes      int64  `json:"segmentBytes"`
-	MaxSegments       int    `json:"maxSegments"`
-	Medium            string `json:"medium"`
-	StorageProfileRef string `json:"storageProfileRef"`
+	MaxAge   string `json:"maxAge"`
+	MaxBytes int64  `json:"maxBytes"`
+	Segments int    `json:"segments"`
 }

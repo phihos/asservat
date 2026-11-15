@@ -20,7 +20,7 @@ func regionalArgumentFixture(now time.Time) (artifact.ContextExpectation, target
 	e.PodUID, e.ActionID = "55555555-5555-4555-8555-555555555555", "a0123456789abcdef01234567"
 	e.NativeType, e.DataClass = artifact.SyscallArgumentsArtifact, "raw"
 	e.Recording = &artifact.Recording{Kind: "syscallTrace", Profile: "arguments", Composition: []byte("{}"), DurationMillis: 2000, MaxBytes: artifact.RecordingNativeLimit,
-		Syscalls:  &artifact.RecordingSyscalls{Names: []string{"read", "write"}, ErrorsOnly: true, MaxEvents: 1000, MaxEventsPerSecond: 100, MaxTrackedThreads: 16},
+		Syscalls:  &artifact.RecordingSyscalls{Names: []string{"read", "write"}, ErrorsOnly: true, MaxEventsPerSecond: 100, MaxTrackedThreads: 16},
 		Arguments: &artifact.RecordingArguments{ProgramDigest: artifact.Digest{2}, DefinitionDigest: artifact.Digest{3}, AccountingRule: artifact.Digest(collector.ArgumentObservationAccountingRule()), MaxProbeBytes: 512, MaxBytesPerEvent: 128, MaxBytesPerSecond: 1 << 20, CaptureBuffers: true}}
 	s := targets.PacketSourceObservation{PodUID: e.PodUID, NodeUID: "node", BootID: "boot", CollectorPodUID: "collector", CollectorEpoch: "epoch", ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
 	p := collector.ArgumentObservationPermit{Binding: collector.ArgumentObservationBinding{Scope: [32]byte{1}, ProgramDigest: [32]byte{2}, DefinitionDigest: [32]byte{3}, ExpectationDigest: [32]byte(evidence.ContextExpectationDigest(e)), AccountingRule: collector.ArgumentObservationAccountingRule(), SessionID: "66666666-6666-4666-8666-666666666666", Fence: "77777777-7777-4777-8777-777777777777", CaptureID: e.CaptureUID, ActionID: e.ActionID, PodUID: e.PodUID, NodeUID: s.NodeUID, BootID: s.BootID, CollectorPodUID: s.CollectorPodUID, CollectorEpoch: s.CollectorEpoch}, StartedAt: now, SessionUntil: now.Add(4 * time.Second), LeaseUntil: now.Add(4 * time.Second), StartBy: now.Add(2 * time.Second), Duration: 2 * time.Second, Sequence: 1, EventCredit: 1000, ByteCredit: 1 << 20, EventsPerSecond: 100, BytesPerSecond: 1 << 20, MaxProbeBytes: 512, MaxBytesPerEvent: 128, MaxTrackedThreads: 16, CaptureBuffers: true}
@@ -47,7 +47,7 @@ func TestRegionalArgumentStartKeepsExactPermitAndFrozenRecording(t *testing.T) {
 		t.Fatal("argument enqueue", queued, err, nodes.expected)
 	}
 	w := nodes.work[0]
-	if !w.NotAfter.Equal(permit.StartBy) || !w.Packet.Valid() || w.Packet.Arguments == nil || *w.Packet.Arguments != permit || w.Packet.Observation != nil || w.Packet.Program != nil || w.Packet.ProgramDigest != [32]byte{} || w.Packet.Syscalls.Names[0] != "read" || !w.Packet.Syscalls.ErrorsOnly || w.Packet.Syscalls.MaxEvents != 1000 || w.Packet.MaxBytes != artifact.RecordingNativeLimit {
+	if !w.NotAfter.Equal(permit.StartBy) || !w.Packet.Valid() || w.Packet.Arguments == nil || *w.Packet.Arguments != permit || w.Packet.Observation != nil || w.Packet.Program != nil || w.Packet.ProgramDigest != [32]byte{} || w.Packet.Syscalls.Names[0] != "read" || !w.Packet.Syscalls.ErrorsOnly || w.Packet.MaxBytes != artifact.RecordingNativeLimit {
 		t.Fatal("original permit, selection, or limits changed", w.Packet)
 	}
 	p.Close()

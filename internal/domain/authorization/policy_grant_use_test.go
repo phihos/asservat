@@ -149,11 +149,11 @@ func TestFinitePolicyObservationPreservesOriginalBoundsAndConservativeCredit(t *
 			g, a, target, now := finitePolicyObservationFixture(t)
 			duration, remaining := 15*time.Second, int64(1<<30)
 			start, hard := now.Add(10*time.Second), now.Add(time.Minute)
-			wantUntil, wantStart, wantCredit := now.Add(20*time.Second), now.Add(5*time.Second), int64(256<<20)
+			wantUntil, wantStart, wantCredit := now.Add(25*time.Second), now.Add(10*time.Second), int64(256<<20)
 			switch mode {
 			case "fractional-duration":
 				duration = 12500 * time.Millisecond
-				wantStart = now.Add(7500 * time.Millisecond)
+				wantUntil = now.Add(22500 * time.Millisecond)
 				wantCredit = 224 << 20
 			case "reviewed-session":
 				g.Policy.Observation.MaxSessionSeconds = 18
@@ -190,7 +190,7 @@ func TestFinitePolicyObservationPreservesOriginalBoundsAndConservativeCredit(t *
 }
 
 func TestFinitePolicyObservationDeclinesUnusableOrUnauthorizedWindow(t *testing.T) {
-	for _, mode := range []string{"session-cannot-fit", "capture-cannot-fit", "zero-duration", "longer-action", "expired-start", "wrong-pod", "revoked", "concurrency", "grant-empty", "policy-empty", "policy-inflated"} {
+	for _, mode := range []string{"session-cannot-fit", "capture-cannot-fit", "zero-duration", "expired-start", "wrong-pod", "revoked", "concurrency", "grant-empty", "policy-empty", "policy-inflated"} {
 		t.Run(mode, func(t *testing.T) {
 			g, a, target, now := finitePolicyObservationFixture(t)
 			duration, remaining := 15*time.Second, int64(1<<30)
@@ -202,8 +202,6 @@ func TestFinitePolicyObservationDeclinesUnusableOrUnauthorizedWindow(t *testing.
 				hard = now.Add(duration)
 			case "zero-duration":
 				duration = 0
-			case "longer-action":
-				duration = 16 * time.Second
 			case "expired-start":
 				start = now
 			case "wrong-pod":

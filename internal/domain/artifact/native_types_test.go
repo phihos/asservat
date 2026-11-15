@@ -104,11 +104,7 @@ func TestOngoingLifecycleCoverageRules(t *testing.T) {
 		"unknown coverage":       func(l *OngoingLifecycle) { l.WindowCoverage = "mostly" },
 		"empty window":           func(l *OngoingLifecycle) { l.RequestedBefore, l.After = 0, 0 },
 		"sub-millisecond window": func(l *OngoingLifecycle) { l.After = 1500 * time.Microsecond },
-		"window beyond ring ceiling": func(l *OngoingLifecycle) {
-			l.RequestedBefore = 2 * time.Hour
-			l.SourceStartedAt = t0.Add(-3 * time.Hour)
-		},
-		"no source session": func(l *OngoingLifecycle) { l.SourceSessionID = "" },
+		"no source session":      func(l *OngoingLifecycle) { l.SourceSessionID = "" },
 	}
 	for name, change := range cases {
 		l := validLifecycle(t0)
@@ -201,33 +197,23 @@ func TestTypedExpectationBounds(t *testing.T) {
 	}
 }
 
-// A full 33-part journal must fit migration 00061's 16 KiB jsonb state bound,
-// including jsonb's text spacing after every ':' and ','.
+// A complete journal at the largest plan must fit migration 00061's 16 KiB
+// jsonb state bound, including jsonb's text spacing after every ':' and ','.
 func TestStreamingStateFitsJournalAtLimit(t *testing.T) {
 	p := streamingTestPlan(t, StreamingNativeLimit)
-	s := StreamingState{CreateSpent: true, UploadID: string(bytes.Repeat([]byte("u"), 200)), CompleteSpent: true, Receipt: &CopyReceipt{VersionID: string(bytes.Repeat([]byte("v"), 64)), ETag: `"` + string(bytes.Repeat([]byte("e"), 40)) + `"`}, ReleasedAt: time.Now()}
-	var total int64
-	for i := 1; i <= p.PartLimit(); i++ {
-		n := StreamingPartBytes
-		if i == p.PartLimit() {
-			n = p.TemporaryBytes() - total
-		}
-		s.Parts = append(s.Parts, StreamingPart{Number: i, Bytes: n, SHA256: Digest{255, 255, 255}, ETag: `"` + string(bytes.Repeat([]byte("e"), 40)) + `"`})
-		total += n
+	n := p.PartLimit()
+	total := p.TemporaryBytes()
+	last := StreamingPart{Number: n, Bytes: total - int64(n-1)*StreamingPartBytes, ETag: `"` + string(bytes.Repeat([]byte("e"), 1000)) + `"`}
+	for j := range last.SHA256 {
+		last.SHA256[j] = 255
 	}
-	for i := range s.Parts {
-		for j := range s.Parts[i].SHA256 {
-			s.Parts[i].SHA256[j] = 255
-		}
-	}
-	s.CompleteBytes, s.CompleteSHA256 = total, s.Parts[0].SHA256
-	s.Receipt.Bytes, s.Receipt.SHA256 = total, s.CompleteSHA256
+	s := StreamingState{CreateSpent: true, UploadID: string(bytes.Repeat([]byte("u"), 1024)), Parts: n, PartBytes: total, Last: last, CompleteSpent: true, CompleteBytes: total, CompleteSHA256: last.SHA256, Receipt: &CopyReceipt{VersionID: string(bytes.Repeat([]byte("v"), 1024)), ETag: `"` + string(bytes.Repeat([]byte("e"), 1000)) + `"`, Bytes: total, SHA256: last.SHA256}, ReleasedAt: time.Now()}
 	if err := s.Validate(p); err != nil {
 		t.Fatal(err)
 	}
 	b, _ := json.Marshal(s)
 	spaced := len(b) + bytes.Count(b, []byte(",")) + bytes.Count(b, []byte(":"))
-	if len(s.Parts) != StreamingMaxParts || spaced > 16384 {
-		t.Fatal("journal state exceeds its SQL bound", len(s.Parts), spaced)
+	if n != StreamingMaxParts || spaced > 16384 {
+		t.Fatal("journal state exceeds its SQL bound", n, spaced)
 	}
 }

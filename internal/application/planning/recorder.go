@@ -15,6 +15,7 @@ import (
 
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/collector"
 	"asservat.local/asservat/internal/domain/identity"
 	value "asservat.local/asservat/internal/domain/planning"
 	"asservat.local/asservat/internal/domain/targets"
@@ -30,24 +31,21 @@ var builtinFiles embed.FS
 // ExpandedRecipeDescription is the fixed description of an expanded composition.
 const ExpandedRecipeDescription = "Expanded capture profile composition."
 
+// ring is the in-memory recorder ring {maxAge, maxBytes, segments}; a
+// segment is maxBytes ÷ segments (packet-capture.schema.json#/$defs/ring).
 type ring struct {
-	MaxAge            string `json:"maxAge"`
-	MaxBytes          int64  `json:"maxBytes"`
-	SegmentBytes      int64  `json:"segmentBytes"`
-	MaxSegments       int    `json:"maxSegments"`
-	Medium            string `json:"medium"`
-	StorageProfileRef string `json:"storageProfileRef,omitempty"`
+	MaxAge   string `json:"maxAge"`
+	MaxBytes int64  `json:"maxBytes"`
+	Segments int    `json:"segments"`
 }
 
 type packetParameters struct {
-	Profile                json.RawMessage `json:"profile"`
-	Before                 string          `json:"before"`
-	After                  string          `json:"after"`
-	Filter                 string          `json:"filter,omitempty"`
-	Ring                   ring            `json:"ring"`
-	Peers                  json.RawMessage `json:"peers"`
-	MaxFrozenBytes         int64           `json:"maxFrozenBytes"`
-	MaxConcurrentSnapshots int             `json:"maxConcurrentSnapshots"`
+	Profile json.RawMessage `json:"profile"`
+	Before  string          `json:"before"`
+	After   string          `json:"after"`
+	Filter  string          `json:"filter,omitempty"`
+	Ring    ring            `json:"ring"`
+	Peers   json.RawMessage `json:"peers"`
 }
 
 type syscallSelection struct {
@@ -56,19 +54,16 @@ type syscallSelection struct {
 }
 
 type syscallParameters struct {
-	Processes              string           `json:"processes"`
-	Mode                   string           `json:"mode"`
-	Before                 string           `json:"before"`
-	After                  string           `json:"after"`
-	Syscalls               syscallSelection `json:"syscalls"`
-	Result                 string           `json:"result"`
-	Ring                   ring             `json:"ring"`
-	MaxFrozenBytes         int64            `json:"maxFrozenBytes"`
-	MaxConcurrentSnapshots int              `json:"maxConcurrentSnapshots"`
-	MaxEvents              int64            `json:"maxEvents"`
-	MaxEventsPerSecond     int64            `json:"maxEventsPerSecond"`
-	MaxTrackedThreads      int64            `json:"maxTrackedThreads"`
-	Arguments              json.RawMessage  `json:"arguments,omitempty"`
+	Processes          string           `json:"processes"`
+	Mode               string           `json:"mode"`
+	Before             string           `json:"before"`
+	After              string           `json:"after"`
+	Syscalls           syscallSelection `json:"syscalls"`
+	Result             string           `json:"result"`
+	Ring               ring             `json:"ring"`
+	MaxEventsPerSecond int64            `json:"maxEventsPerSecond"`
+	MaxTrackedThreads  int64            `json:"maxTrackedThreads"`
+	Arguments          json.RawMessage  `json:"arguments,omitempty"`
 }
 
 // profileSource is a profile action's named acquisition source.
@@ -203,7 +198,7 @@ func parseProfileDocument(b []byte) (resolvedProfile, error) {
 	if err := strict(doc.Definition, &def); err != nil {
 		return resolvedProfile{}, err
 	}
-	if len(def.Origins) > 8 || def.DisplayName == "" || len(def.DisplayName) > 128 || len(def.Description) > 2048 {
+	if def.DisplayName == "" {
 		return resolvedProfile{}, value.ErrInvalid
 	}
 	_, digest, err := canonical(b)
@@ -348,17 +343,9 @@ func durationValue(s string, zero bool) (time.Duration, bool) {
 	return 0, false
 }
 
-// Portable bounds of the packet and syscall contracts (specs/packets.md
-// REQ-NET-003, specs/syscalls.md REQ-SYS-002). Administrators may lower them;
-// no administrator ceiling source exists in this release.
-const (
-	maxRingAge         = time.Hour
-	maxRingBytes       = 256 << 20
-	maxSegmentBytes    = 64 << 20
-	maxFrozenBytes     = 256 << 20
-	maxSyscallAfter    = 60 * time.Second
-	finalizationMargin = 5 * time.Second
-)
+// finalizationMargin is the time an action needs after its window to seal
+// and upload the copy.
+const finalizationMargin = 5 * time.Second
 
 // editBinding maps a registered field to its action kinds (capture-composition x-field-bindings).
 var editBinding = map[string][]string{
@@ -366,7 +353,7 @@ var editBinding = map[string][]string{
 	"packetPeers": {"packetCapture"}, "packetFilter": {"packetCapture"}, "packetBefore": {"packetCapture"}, "packetAfter": {"packetCapture"}, "packetRing": {"packetCapture"},
 	"processSelector": {"liveCore"}, "processBatch": {"liveCore"}, "profileDuration": {"profile"},
 	"syscallFilter": {"syscallTrace"}, "syscallMode": {"syscallTrace"}, "syscallBefore": {"syscallTrace"}, "syscallAfter": {"syscallTrace"}, "syscallRing": {"syscallTrace"},
-	"syscallArguments": {"syscallTrace"}, "syscallMaxEvents": {"syscallTrace"}, "syscallRate": {"syscallTrace"},
+	"syscallArguments": {"syscallTrace"}, "syscallRate": {"syscallTrace"},
 	"filePath": {"fileRead"}, "commandArgv": {"command"},
 	"actionMaxBytes": {"*"}, "actionTimeout": {"*"}, "actionExecutionMode": {"packetCapture", "syscallTrace"},
 }
@@ -396,7 +383,7 @@ type expandedAction struct {
 }
 
 func editRing(r *value.RingSettings) ring {
-	return ring{MaxAge: r.MaxAge, MaxBytes: r.MaxBytes, SegmentBytes: r.SegmentBytes, MaxSegments: r.MaxSegments, Medium: r.Medium, StorageProfileRef: r.StorageProfileRef}
+	return ring{MaxAge: r.MaxAge, MaxBytes: r.MaxBytes, Segments: r.Segments}
 }
 
 // applyEdit applies one typed literal value. Only the registered value member
@@ -481,8 +468,6 @@ func applyEdit(path string, e value.ProfileEdit, a *expandedAction) error {
 			return refuse(value.CompositionInvalid, path, "syscallFilter takes {mode: all} or {mode: include, names: [...]}")
 		}
 		a.syscall.Syscalls = syscallSelection{Mode: e.Syscalls.Mode, Names: slices.Clone(e.Syscalls.Names)}
-	case "syscallMaxEvents":
-		a.syscall.MaxEvents, err = number()
 	case "syscallRate":
 		a.syscall.MaxEventsPerSecond, err = number()
 	case "actionMaxBytes":
@@ -519,9 +504,6 @@ func wholePodPeers(raw json.RawMessage) bool {
 	c := slices.Sorted(slices.Values(p.Entries[0].CIDRs))
 	return slices.Equal(c, []string{"0.0.0.0/0", "::/0"})
 }
-
-// maxRawAfter bounds a finite raw recording (ADR-261/279).
-const maxRawAfter = 15 * time.Second
 
 // RawProfile is a rawPackets profile's default prefix and per-transport caps.
 type RawProfile struct {
@@ -637,18 +619,12 @@ func validHTTPProfile(path string, raw json.RawMessage) (artifact.RecordingHTTP,
 func validRing(path string, r ring, before time.Duration) error {
 	age, ok := durationValue(r.MaxAge, false)
 	switch {
-	case !ok || age > maxRingAge:
-		return refuse(value.CompositionInvalid, path+".maxAge", "the ring age must be a duration of at most 1h")
-	case r.StorageProfileRef != "":
-		return refuse(value.CompositionInvalid, path+".storageProfileRef", "ring storage profiles are not available in this release; use medium encryptedDisk, which uses the administrator's node ring volume")
-	case r.Medium != "memory" && r.Medium != "encryptedDisk":
-		return refuse(value.CompositionInvalid, path+".medium", "the ring medium is memory or encryptedDisk")
-	case r.MaxSegments < 2 || r.MaxSegments > 64:
-		return refuse(value.CompositionInvalid, path+".maxSegments", "a ring has 2 to 64 segments")
-	case r.MaxBytes < 1 || r.MaxBytes > maxRingBytes:
-		return refuse(value.CompositionInvalid, path+".maxBytes", "a ring holds 1 byte to 256 MiB")
-	case r.SegmentBytes < 1 || r.SegmentBytes > maxSegmentBytes || r.SegmentBytes*int64(r.MaxSegments) > r.MaxBytes:
-		return refuse(value.CompositionInvalid, path+".segmentBytes", "segmentBytes × maxSegments must fit in maxBytes, with segments of at most 64 MiB")
+	case !ok:
+		return refuse(value.CompositionInvalid, path+".maxAge", "the ring age is a positive duration")
+	case r.Segments < 2:
+		return refuse(value.CompositionInvalid, path+".segments", "a ring has at least 2 segments so it can rotate")
+	case r.MaxBytes < 1 || r.MaxBytes > value.MaxJSONInteger || r.MaxBytes/int64(r.Segments) <= collector.RingSegmentHeader:
+		return refuse(value.CompositionInvalid, path+".maxBytes", fmt.Sprintf("each segment (maxBytes ÷ segments) must exceed its %d-byte header; raise maxBytes or use fewer segments", collector.RingSegmentHeader))
 	case before > age:
 		return refuse(value.CompositionInvalid, path+".maxAge", "the requested history (before) cannot exceed the ring age; raise maxAge or shorten before")
 	}
@@ -699,8 +675,6 @@ func normalize(path string, a *expandedAction, compiler FilterCompiler, pc *peer
 	}
 	var beforeText, afterText string
 	var r ring
-	var frozen int64
-	snapshots := 0
 	if a.packet != nil {
 		var kind struct {
 			Kind string `json:"kind"`
@@ -734,7 +708,7 @@ func normalize(path string, a *expandedAction, compiler FilterCompiler, pc *peer
 			}
 			a.sensitive = append(a.sensitive, value.ReasonRawPackets)
 		}
-		beforeText, afterText, r, frozen, snapshots = a.packet.Before, a.packet.After, a.packet.Ring, a.packet.MaxFrozenBytes, a.packet.MaxConcurrentSnapshots
+		beforeText, afterText, r = a.packet.Before, a.packet.After, a.packet.Ring
 	} else {
 		s := a.syscall
 		if arguments {
@@ -756,8 +730,8 @@ func normalize(path string, a *expandedAction, compiler FilterCompiler, pc *peer
 				return refuse(value.CompositionInvalid, path+".parameters.syscalls", "mode all takes no names")
 			}
 		case "include":
-			if len(s.Syscalls.Names) < 1 || len(s.Syscalls.Names) > 128 {
-				return refuse(value.CompositionInvalid, path+".parameters.syscalls.names", "name 1 to 128 syscalls")
+			if len(s.Syscalls.Names) < 1 {
+				return refuse(value.CompositionInvalid, path+".parameters.syscalls.names", "name at least one syscall")
 			}
 			seen := map[string]bool{}
 			for _, n := range s.Syscalls.Names {
@@ -772,16 +746,13 @@ func normalize(path string, a *expandedAction, compiler FilterCompiler, pc *peer
 		if s.Result != "all" && s.Result != "errors" {
 			return refuse(value.CompositionInvalid, path+".parameters.result", "result is all or errors")
 		}
-		if s.MaxEvents < 1 || s.MaxEvents > 1000000 {
-			return refuse(value.CompositionInvalid, path+".parameters.maxEvents", "retain 1 to 1,000,000 events")
-		}
 		if s.MaxEventsPerSecond < 1 || s.MaxEventsPerSecond > 100000 {
 			return refuse(value.CompositionInvalid, path+".parameters.maxEventsPerSecond", "the observed event rate limit is 1 to 100,000 per second")
 		}
 		if s.MaxTrackedThreads < 1 || s.MaxTrackedThreads > 16384 {
 			return refuse(value.CompositionInvalid, path+".parameters.maxTrackedThreads", "track 1 to 16,384 threads")
 		}
-		beforeText, afterText, r, frozen, snapshots = s.Before, s.After, s.Ring, s.MaxFrozenBytes, s.MaxConcurrentSnapshots
+		beforeText, afterText, r = s.Before, s.After, s.Ring
 	}
 	before, okBefore := durationValue(beforeText, true)
 	after, okAfter := durationValue(afterText, true)
@@ -791,18 +762,14 @@ func normalize(path string, a *expandedAction, compiler FilterCompiler, pc *peer
 	if !okAfter {
 		return refuse(value.CompositionInvalid, path+".parameters.after", "after is 0s or a positive duration")
 	}
-	// ADR-279: raw packets are finite for now; rings, Saves and longer
-	// recordings follow in later slices.
-	if arguments && (mode != "onTrigger" || after < time.Second || after > maxSyscallAfter) {
-		return refuse(value.CompositionRecorderUnavailable, path+".executionMode", "argument recording currently requires onTrigger, before 0s and an after interval of 1 to 60s")
+	// ADR-279: raw packets and syscall arguments are finite on-trigger
+	// recordings; their window runs up to the capture's configured duration
+	// (ADR-335 D8) within the reviewed observation session.
+	if arguments && (mode != "onTrigger" || after < time.Second) {
+		return refuse(value.CompositionRecorderUnavailable, path+".executionMode", "argument recording requires onTrigger, before 0s and an after interval of at least 1s")
 	}
-	if raw && (mode != "onTrigger" || after > maxRawAfter) {
-		return refuse(value.CompositionRecorderUnavailable, path+".executionMode", "raw packets are recorded finitely for now: set actionExecutionMode onTrigger, before 0s and after at most 15s")
-	}
-	// Finite HTTP recordings keep their existing bound. Explicit reviewed
-	// ongoing HTTP policies use the source-purpose admission and grant path.
-	if http && mode == "onTrigger" && after > maxRawAfter {
-		return refuse(value.CompositionRecorderUnavailable, path+".executionMode", "HTTP headers are recorded finitely for now: set actionExecutionMode onTrigger, before 0s and after at most 15s")
+	if raw && mode != "onTrigger" {
+		return refuse(value.CompositionRecorderUnavailable, path+".executionMode", "raw packets are recorded finitely: set actionExecutionMode onTrigger and before 0s")
 	}
 	if mode == "onTrigger" && before != 0 {
 		return refuse(value.CompositionInvalid, path+".parameters.before", "an onTrigger recording captures only the next interval: also set before to 0s (no history before the trigger)")
@@ -813,17 +780,8 @@ func normalize(path string, a *expandedAction, compiler FilterCompiler, pc *peer
 	if before == 0 && after == 0 {
 		return refuse(value.CompositionInvalid, path+".parameters", "before or after must be positive")
 	}
-	if a.syscall != nil && after > maxSyscallAfter {
-		return refuse(value.CompositionInvalid, path+".parameters.after", "a syscall post-trigger window is at most 60s")
-	}
 	if err := validRing(path+".parameters.ring", r, before); err != nil {
 		return err
-	}
-	if snapshots < 1 || snapshots > 4 {
-		return refuse(value.CompositionInvalid, path+".parameters.maxConcurrentSnapshots", "1 to 4 concurrent snapshots")
-	}
-	if frozen < 1 || frozen > maxFrozenBytes || frozen > a.action.Limits.MaxBytes {
-		return refuse(value.CompositionInvalid, path+".parameters.maxFrozenBytes", "frozen snapshot bytes must be positive, at most 256 MiB and within the action output limit (limits.maxBytes)")
 	}
 	timeout, ok := durationValue(a.action.Limits.Timeout, false)
 	if !ok {
@@ -832,8 +790,8 @@ func normalize(path string, a *expandedAction, compiler FilterCompiler, pc *peer
 	if timeout < after+finalizationMargin {
 		return refuse(value.CompositionInvalid, path+".limits.timeout", "the action timeout must cover the after interval plus 5s for finalization; raise actionTimeout")
 	}
-	if a.action.Limits.MaxBytes < 1 || a.action.Limits.MaxBytes > value.MaxCompositionBytes {
-		return refuse(value.CompositionInvalid, path+".limits.maxBytes", "the output limit is 1 byte to 1 TiB")
+	if a.action.Limits.MaxBytes < 1 || a.action.Limits.MaxBytes > value.MaxJSONInteger {
+		return refuse(value.CompositionInvalid, path+".limits.maxBytes", "the output limit is a positive byte count")
 	}
 	if a.packet != nil && a.peers != nil {
 		// ADR-283: the CIDR peers and the authored filter compile as one
@@ -893,7 +851,7 @@ func generatedID(prefix, component, local string) string {
 
 // expand resolves every component's profile, applies its typed edits and
 // normalizes every action (REQ-CPR-003). Edits are applied first; the plan
-// is then validated as a whole: generated IDs are unique, at most 16 actions,
+// is then validated as a whole: generated IDs are unique,
 // aggregate bounds cover the sum of outputs and the longest timeout, and
 // recorder sources do not overlap on one Pod.
 func expand(c value.ProfileComposition, compiler FilterCompiler, pc *peerContext) ([]expandedAction, []resolvedProfile, error) {
@@ -962,9 +920,6 @@ func expand(c value.ProfileComposition, compiler FilterCompiler, pc *peerContext
 			ids[id] = component.ID + "/" + a.ID
 			index[a.ID] = len(actions)
 			actions = append(actions, x)
-		}
-		if len(actions) > 16 {
-			return nil, nil, refuse(value.CompositionInvalid, "profile_composition.components", "the composition expands to more than 16 actions; remove a component")
 		}
 		exposed := map[[2]string]bool{}
 		for _, f := range p.Definition.EditableFields {
@@ -1221,7 +1176,7 @@ func normalizedRecorderAction(x expandedAction, componentID string) (recipeActio
 			Kind string `json:"kind"`
 		}
 		_ = json.Unmarshal(x.packet.Profile, &kind)
-		summary.Before, summary.After, summary.MaxFrozenBytes, summary.MaxConcurrentSnapshots, summary.PacketProfile, summary.Filter = x.packet.Before, x.packet.After, x.packet.MaxFrozenBytes, x.packet.MaxConcurrentSnapshots, kind.Kind, x.expression
+		summary.Before, summary.After, summary.PacketProfile, summary.Filter = x.packet.Before, x.packet.After, kind.Kind, x.expression
 		if x.peers != nil {
 			summary.PeerPrefixes = len(x.peers.Prefixes)
 			if k := x.peers.kubernetes; k != nil {
@@ -1241,15 +1196,12 @@ func normalizedRecorderAction(x expandedAction, componentID string) (recipeActio
 	} else {
 		s := x.syscall
 		params = s
-		summary.Before, summary.After, summary.MaxFrozenBytes, summary.MaxConcurrentSnapshots = s.Before, s.After, s.MaxFrozenBytes, s.MaxConcurrentSnapshots
+		summary.Before, summary.After = s.Before, s.After
 		summary.SyscallMode, summary.SyscallSelection, summary.SyscallNames, summary.Result = s.Mode, s.Syscalls.Mode, len(s.Syscalls.Names), s.Result
-		summary.MaxEvents, summary.MaxEventsPerSecond, summary.MaxTrackedThreads = s.MaxEvents, s.MaxEventsPerSecond, s.MaxTrackedThreads
+		summary.MaxEventsPerSecond, summary.MaxTrackedThreads = s.MaxEventsPerSecond, s.MaxTrackedThreads
 		rr = s.Ring
 	}
-	summary.RingMaxAge, summary.RingMaxBytes, summary.SegmentBytes, summary.MaxSegments = rr.MaxAge, rr.MaxBytes, rr.SegmentBytes, rr.MaxSegments
-	if rr.Medium == "encryptedDisk" {
-		summary.RingMedium = rr.Medium
-	}
+	summary.RingMaxAge, summary.RingMaxBytes, summary.Segments = rr.MaxAge, rr.MaxBytes, rr.Segments
 	if encoded, err := json.Marshal(params); err != nil {
 		return recipeAction{}, value.RecorderAction{}, nil, value.ErrInvalid
 	} else {
@@ -1449,6 +1401,7 @@ func CompileRecorder(in value.RecorderInput, filters FilterCompiler, now time.Ti
 		return bad()
 	}
 	b, d, err := canonical(b)
+	// 64 KiB is the admitted scope row size (context_admission.scope_json).
 	if err != nil || len(b) > 64<<10 {
 		return bad()
 	}
@@ -1482,7 +1435,7 @@ func RecorderScopeSummary(scope []byte) ([]value.RecorderAction, *value.Recorder
 		return nil, nil, value.ErrInvalid
 	}
 	var recipe recipeSpec
-	if strict(doc.Recipe, &recipe) != nil || len(recipe.Actions) < 1 || len(recipe.Actions) > 16 {
+	if strict(doc.Recipe, &recipe) != nil || len(recipe.Actions) < 1 {
 		return nil, nil, value.ErrInvalid
 	}
 	filters := map[string]compiledFilterRecord{}
