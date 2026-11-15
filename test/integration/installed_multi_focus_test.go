@@ -27,7 +27,6 @@ func installedJourneyFoci() []string {
 // installedEachFocus evaluates); empty otherwise.
 var installedFocusCurrent string
 
-
 // installedEachFocus calls fn once per listed focus with that focus current
 // (once with the single focus otherwise).
 func installedEachFocus(fn func()) {
