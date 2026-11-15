@@ -783,8 +783,9 @@ func nativeOperationAuditServices(t, owner *testing.T, ctx context.Context, root
 		t.Fatal(e)
 	}
 	owner.Cleanup(mac.Close)
-	cfg := presentation.AuditedOperationsConfig{RootID: root, Retention: time.Hour, NormalConcurrency: 2, ResolutionConcurrency: 1, PerPrincipalConcurrency: 2, NormalPerSecond: 100, ResolutionPerSecond: 10, Now: time.Now, NewID: custodyID}
-	out, e := presentation.NewHealthyAuditedOperations(cfg, inner, makeAudit(normalPolicy), makeAudit(resolutionPolicy), mac)
+	_, _, _ = normalPolicy, resolutionPolicy, makeAudit // fixtures predating the audit_event call row
+	cfg := presentation.AuditedOperationsConfig{RootID: root, Now: time.Now, NewID: custodyID}
+	out, e := presentation.NewAuditedOperations(cfg, inner, discardAuditRows{}, mac)
 	if e != nil {
 		t.Fatal(e)
 	}
