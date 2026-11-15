@@ -312,12 +312,6 @@ func normalizeLiveInput(name string, raw []byte) ([]byte, error) {
 		if in.Filter.All == nil {
 			in.Filter.All = []v.Predicate{}
 		}
-		if in.Duration == 0 {
-			in.Duration = 600
-		}
-		if in.Output == 0 {
-			in.Output = 16 << 20
-		}
 		return json.Marshal(in)
 	case "read_live_watch":
 		var in v.Read

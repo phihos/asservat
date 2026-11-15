@@ -115,20 +115,19 @@ func (s Source) Clone() Source {
 }
 
 type SourceRow struct {
-	Handle        string    `json:"source_handle"`
-	HandleExpires time.Time `json:"handle_expires_at"`
-	ID            string    `json:"source_session_id"`
-	WorkloadUID   string    `json:"workload_uid"`
-	PodUID        string    `json:"pod_uid"`
-	ActionID      string    `json:"action_id"`
-	OwnerKind     string    `json:"owner_kind"`
-	OwnerID       string    `json:"owner_id"`
-	State         string    `json:"state"`
-	Projections   []string  `json:"projections"`
-	Eligible      bool      `json:"eligible"`
-	Blockers      []string  `json:"blocker_codes"`
-	SaveVia       string    `json:"save_via"`
-	LeaseUntil    time.Time `json:"lease_until"`
+	Handle      string    `json:"source_handle"`
+	ID          string    `json:"source_session_id"`
+	WorkloadUID string    `json:"workload_uid"`
+	PodUID      string    `json:"pod_uid"`
+	ActionID    string    `json:"action_id"`
+	OwnerKind   string    `json:"owner_kind"`
+	OwnerID     string    `json:"owner_id"`
+	State       string    `json:"state"`
+	Projections []string  `json:"projections"`
+	Eligible    bool      `json:"eligible"`
+	Blockers    []string  `json:"blocker_codes"`
+	SaveVia     string    `json:"save_via"`
+	LeaseUntil  time.Time `json:"lease_until"`
 }
 type SourcePage struct {
 	Sources []SourceRow `json:"sources"`
@@ -137,13 +136,11 @@ type Open struct {
 	Handles    []string `json:"source_handles"`
 	Projection string   `json:"projection"`
 	Filter     Filter   `json:"display_filter,omitzero"`
-	Duration   int      `json:"duration_seconds,omitempty"`
-	Output     int64    `json:"max_output_bytes,omitempty"`
 	Key        string   `json:"idempotency_key"`
 }
 
 func (r Open) Valid() bool {
-	if !identity.Text(r.Key, 128) || r.Key == "" || !r.Filter.Valid(r.Projection) || len(r.Handles) < 1 || len(r.Handles) > MaxSources || r.Duration < 0 || r.Duration > 3600 || r.Output < 0 || r.Output > 64<<20 {
+	if !identity.Text(r.Key, 128) || r.Key == "" || !r.Filter.Valid(r.Projection) || len(r.Handles) < 1 {
 		return false
 	}
 	for n, h := range r.Handles {
@@ -167,7 +164,8 @@ type Read struct {
 }
 
 func (r Read) Valid() bool {
-	return authorization.UUID(r.ID) && identity.Text(r.Cursor, 4096) && r.Cursor != "" && r.Limit >= 0 && r.Limit <= 100 && r.WaitMS >= 0 && r.WaitMS <= 5000
+	// A read waits at most MaxWait for rows; the request deadline may end it earlier.
+	return authorization.UUID(r.ID) && identity.Text(r.Cursor, 4096) && r.Cursor != "" && r.Limit >= 0 && r.WaitMS >= 0 && r.WaitMS <= MaxWaitMS
 }
 
 type Update struct {

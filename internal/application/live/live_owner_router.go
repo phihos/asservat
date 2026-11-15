@@ -160,7 +160,7 @@ func (s *Service) BeginOwnedLocalCommand(ctx context.Context, current CurrentIde
 		until = minTime(until, result.Batch.DisclosureUntil)
 	}
 	if result.Watch != nil {
-		until = minTime(until, result.Watch.ExpiresAt)
+		until = minTime(until, result.Watch.HardEnd)
 	}
 	if !s.cfg.Now().Before(until) || ctx.Err() != nil {
 		return nil, fmt.Errorf("%w: live_owner_router:161", v.ErrUnavailable)

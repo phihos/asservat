@@ -15,17 +15,21 @@ import (
 )
 
 const (
-	Packet         = "packetMetadata"
-	HTTP           = "httpHeaders"
-	Syscall        = "syscallMetadata"
-	MaxSources     = 16
-	MaxRows        = 100
+	Packet  = "packetMetadata"
+	HTTP    = "httpHeaders"
+	Syscall = "syscallMetadata"
+	// MaxBufferRows and MaxBufferBytes bound one viewer's transient hub memory.
 	MaxBufferRows  = 500
 	MaxBufferBytes = 1 << 20
-	MaxBatchBytes  = 20 << 10 // Reserve the existing 24KiB public envelope.
-	RowAge         = 30 * time.Second
-	ReplayAge      = 5 * time.Second
-	IdleAge        = 30 * time.Second
+	// MaxBatchBytes keeps a batch inside the 24 KiB default MCP result.
+	MaxBatchBytes = 20 << 10
+	// MaxRows is the most rows one MaxBatchBytes batch can hold (a row
+	// encodes to at least about 200 bytes).
+	MaxRows = 100
+	// MaxWaitMS is the longest read wait (30 s, the MCP long-wait bound).
+	MaxWaitMS = 30000
+	// IdleAge closes a watch nobody reads (ADR-335 D9); each read renews it.
+	IdleAge = 10 * time.Minute
 )
 
 var (
@@ -94,7 +98,7 @@ type Filter struct {
 }
 
 func (f Filter) Valid(projection string) bool {
-	if !Projection(projection) || len(f.All) > 16 {
+	if !Projection(projection) {
 		return false
 	}
 	for _, p := range f.All {
@@ -206,7 +210,7 @@ func (r Row) MarshalJSON() ([]byte, error) {
 	}{base(r), fields})
 }
 func (r Row) Valid(now time.Time) bool {
-	if !authorization.UUID(r.SourceID) || !identity.Text(r.ID, 180) || r.ID == "" || r.Sequence < 1 || r.Sequence > 9007199254740991 || !identity.Text(r.PodUID, 64) || r.PodUID == "" || r.ObservedAt.IsZero() || r.ReceivedAt.Before(r.ObservedAt) || r.ReceivedAt.After(now) || !now.Before(r.ExpiresAt) || r.ExpiresAt.After(r.ObservedAt.Add(RowAge)) || r.ClockUncertainty < 0 || r.ClockUncertainty > 5000 || r.Generation < 0 || r.Generation > 1000000000 {
+	if !authorization.UUID(r.SourceID) || !identity.Text(r.ID, 180) || r.ID == "" || r.Sequence < 1 || r.Sequence > 9007199254740991 || !identity.Text(r.PodUID, 64) || r.PodUID == "" || r.ObservedAt.IsZero() || r.ReceivedAt.Before(r.ObservedAt) || r.ReceivedAt.After(now) || !now.Before(r.ExpiresAt) || r.ClockUncertainty < 0 || r.ClockUncertainty > 5000 || r.Generation < 0 || r.Generation > 1000000000 {
 		return false
 	}
 	switch r.Projection {
@@ -342,29 +346,27 @@ type Gap struct {
 type Handling struct {
 	Transient  bool   `json:"transient"`
 	UserData   bool   `json:"may_contain_user_data"`
-	RowAge     int    `json:"managed_row_max_age_seconds"`
 	Raw        bool   `json:"raw_available_live"`
 	Recallable bool   `json:"external_copies_recallable"`
 	Save       string `json:"save_semantics"`
 }
 
 func Notices() Handling {
-	return Handling{Transient: true, UserData: true, RowAge: 30, Save: "freshCurrentWindow"}
+	return Handling{Transient: true, UserData: true, Save: "freshCurrentWindow"}
 }
 
+// Limits are per-viewer resource bounds: rate, rows per batch and the replay
+// buffer. A watch has no lifetime or total output limit (ADR-335 D9).
 type Limits struct {
-	Duration int   `json:"duration_seconds"`
-	Output   int64 `json:"max_output_bytes"`
-	Rate     int64 `json:"bytes_per_second"`
-	Rows     int   `json:"max_rows_per_batch"`
-	Buffer   int   `json:"max_buffer_bytes"`
-	RowAge   int   `json:"row_max_age_seconds"`
-	Replay   int   `json:"replay_seconds"`
+	Rate   int64 `json:"bytes_per_second"`
+	Rows   int   `json:"max_rows_per_batch"`
+	Buffer int   `json:"max_buffer_bytes"`
+	Replay int   `json:"replay_seconds"`
 }
 
-func DefaultLimits() Limits { return Limits{600, 16 << 20, 64 << 10, 100, MaxBufferBytes, 30, 5} }
+func DefaultLimits() Limits { return Limits{64 << 10, 100, MaxBufferBytes, 5} }
 func (l Limits) Valid() bool {
-	return l.Duration > 0 && l.Duration <= 3600 && l.Output > 0 && l.Output <= 64<<20 && l.Rate > 0 && l.Rate <= 256<<10 && l.Rows > 0 && l.Rows <= MaxRows && l.Buffer > 0 && l.Buffer <= MaxBufferBytes && l.RowAge > 0 && l.RowAge <= 30 && l.Replay >= 0 && l.Replay <= 5
+	return l.Rate > 0 && l.Rows > 0 && l.Rows <= MaxRows && l.Buffer > 0 && l.Buffer <= MaxBufferBytes && l.Replay >= 0
 }
 
 type Watch struct {
@@ -374,11 +376,13 @@ type Watch struct {
 	SourceIDs  []string  `json:"source_session_ids"`
 	Projection string    `json:"projection"`
 	AcceptedAt time.Time `json:"accepted_at"`
-	ExpiresAt  time.Time `json:"expires_at"`
 	IdleUntil  time.Time `json:"idle_expires_at"`
-	Limits     Limits    `json:"limits"`
-	Cursor     *string   `json:"cursor"`
-	Handling   Handling  `json:"handling"`
+	// HardEnd is the earliest hard end of the selected sources; the watch
+	// ends then.
+	HardEnd  time.Time `json:"source_hard_end,omitzero"`
+	Limits   Limits    `json:"limits"`
+	Cursor   *string   `json:"cursor"`
+	Handling Handling  `json:"handling"`
 }
 type SourceStatus struct {
 	ID           string     `json:"source_session_id"`
@@ -402,7 +406,6 @@ type Batch struct {
 	Until           time.Time      `json:"interval_until"`
 	ReceivedAt      time.Time      `json:"received_at"`
 	Spent           int64          `json:"output_bytes_spent"`
-	RetryAfter      int            `json:"retry_after_ms"`
 	Handling        Handling       `json:"handling"`
 }
 
@@ -443,5 +446,5 @@ func CloneBatch(b Batch) Batch {
 
 // Tighten retains every original accepted ceiling; it never replenishes spend.
 func (l Limits) Tighten(other Limits) Limits {
-	return Limits{min(l.Duration, other.Duration), min(l.Output, other.Output), min(l.Rate, other.Rate), min(l.Rows, other.Rows), min(l.Buffer, other.Buffer), min(l.RowAge, other.RowAge), min(l.Replay, other.Replay)}
+	return Limits{min(l.Rate, other.Rate), min(l.Rows, other.Rows), min(l.Buffer, other.Buffer), min(l.Replay, other.Replay)}
 }

@@ -197,7 +197,7 @@ func (s liveSourceCatalog) records(ctx context.Context, rows []captureapp.Record
 // ReadLiveSourceRecords performs one protected exact-ID scan per authorization
 // phase after C3 has checked current Pod rights for the complete selection.
 func (s liveSourceCatalog) ReadLiveSourceRecords(ctx context.Context, refs []live.SourceReference) ([]authapp.LiveSourceRecord, error) {
-	if !s.configured() || len(refs) < 1 || len(refs) > live.MaxSources {
+	if !s.configured() || len(refs) < 1 {
 		return nil, fmt.Errorf("%w: live_sources:200", live.ErrInvalid)
 	}
 	first := refs[0].Target

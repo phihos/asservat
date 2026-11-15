@@ -33,8 +33,7 @@ func (s *Service) cursorDigest(st *session, position uint64) (artifact.Digest, e
 		Actor                identity.Principal
 		Revision             int64
 		Position             uint64
-		OutputLimit          int64
-	}{st.watch.ID, st.control.Fence, st.control.PrincipalKey, st.control.RequestDigest, st.actor, st.watch.Revision, position, st.control.OutputLimit})
+	}{st.watch.ID, st.control.Fence, st.control.PrincipalKey, st.control.RequestDigest, st.actor, st.watch.Revision, position})
 	if e != nil {
 		return artifact.Digest{}, e
 	}

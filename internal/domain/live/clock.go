@@ -17,25 +17,21 @@ func (p ClockProof) Valid() bool {
 	return p.SourceID != "" && p.BootID != "" && (p.Clock == "monotonic" || p.Clock == "boottime") && p.RemoteNanos > 0 && !p.StartedAt.IsZero() && !p.ReceivedAt.Before(p.StartedAt) && p.SampleUncertainty >= 0 && p.ReceivedAt.Sub(p.StartedAt)+2*p.SampleUncertainty <= 5*time.Second
 }
 
-// Place uses the earliest possible event time for expiry. The midpoint and
-// uncertainty describe placement; expiry cannot gain time from network delay.
+// Place returns the event time and the row expiry: the earliest of the
+// privacy, watch and authority ends. The midpoint and uncertainty describe
+// placement.
 func (p ClockProof) Place(stamp int64, source, boot, clock string, privacy, watch, authority time.Time) (at, expires time.Time, uncertainty int, ok bool) {
 	if !p.Valid() || stamp <= 0 || stamp > p.RemoteNanos || source != p.SourceID || boot != p.BootID || clock != p.Clock {
 		return
 	}
 	age := time.Duration(p.RemoteNanos - stamp)
-	if age >= RowAge {
-		return time.Time{}, time.Time{}, 0, false
-	}
 	span := p.ReceivedAt.Sub(p.StartedAt)
-	earliest := p.StartedAt.Add(-age - p.SampleUncertainty)
 	at = p.StartedAt.Add(span/2 - age)
-	expires = earliest.Add(RowAge)
-	for _, end := range []time.Time{privacy, watch, authority} {
+	for n, end := range []time.Time{privacy, watch, authority} {
 		if end.IsZero() {
 			return time.Time{}, time.Time{}, 0, false
 		}
-		if end.Before(expires) {
+		if n == 0 || end.Before(expires) {
 			expires = end
 		}
 	}

@@ -6,7 +6,6 @@ func publicRuntimeLiveWatchGrants() []publicRuntimeGrant {
 	return []publicRuntimeGrant{
 		{"function", "live_watch_prune(uuid)", "", "EXECUTE"},
 		{"function", "live_watch_configure(uuid,uuid,uuid,bytea,jsonb)", "", "EXECUTE"},
-		{"function", "live_watch_create(uuid,uuid,bytea,jsonb,bytea,timestamptz)", "", "EXECUTE"},
 		{"function", "live_watch_create_cluster(uuid,uuid,bytea,jsonb,bytea,timestamptz,bytea)", "", "EXECUTE"},
 		{"function", "live_watch_change(uuid,uuid,bytea,jsonb,bigint,bigint,timestamptz)", "", "EXECUTE"},
 		{"function", "live_watch_current(uuid,uuid,bytea,jsonb,timestamptz)", "", "EXECUTE"},

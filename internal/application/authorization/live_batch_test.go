@@ -66,7 +66,7 @@ func TestLiveAuthorizationPhasesShareOnlyCommonObservationsAtOneAndSixteenSource
 			environment.policy.Paths[0].TargetClusterID = base.record.Source.Target.ClusterID
 			actor := base.i.Principal
 			root := privacy.LiveRootLimits{Watches: 16, PrincipalWatches: 16, WorkloadWatches: 16, Rate: 1 << 20, Burst: 1 << 20}
-			environment.policy.LiveRead = &privacy.LiveRead{Root: root, Projections: []string{live.Packet}, Clients: []privacy.LiveClient{{Issuer: actor.Issuer, ID: actor.ClientID, Kind: actor.Kind, PathIDs: []string{environment.policy.Paths[0].ID}}}, Ceilings: []privacy.LiveCeiling{{ClusterID: base.record.Source.Target.ClusterID, Limits: privacy.LiveLimits{Duration: 60, Output: 1 << 20, Rate: 16 << 10, Rows: 10, Buffer: 64 << 10, RowAge: 10, Replay: 2}}}}
+			environment.policy.LiveRead = &privacy.LiveRead{Root: root, Projections: []string{live.Packet}, Clients: []privacy.LiveClient{{Issuer: actor.Issuer, ID: actor.ClientID, Kind: actor.Kind, PathIDs: []string{environment.policy.Paths[0].ID}}}, Ceilings: []privacy.LiveCeiling{{ClusterID: base.record.Source.Target.ClusterID, Limits: privacy.LiveLimits{Rate: 16 << 10, Rows: 10, Buffer: 64 << 10, Replay: 2}}}}
 			s.Catalog = f
 			s.Permissions = f
 			s.Environment = CurrentLiveEnvironment{RootID: s.RootID, InstallationID: environment.policy.InstallationID, AcceptedRoot: root, Policies: environment, Now: func() time.Time { return environment.now }}

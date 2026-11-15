@@ -11,7 +11,7 @@ func TestLiveReadRequiresIndependentOptInExactClientPathAndScope(t *testing.T) {
 	if _, _, ok := p.SelectLive(a, target, "packetMetadata", now); ok {
 		t.Fatal("download policy enabled live")
 	}
-	limits := LiveLimits{600, 16 << 20, 64 << 10, 100, 1 << 20, 30, 5}
+	limits := LiveLimits{64 << 10, 100, 1 << 20, 5}
 	p.LiveRead = &LiveRead{Root: LiveRootLimits{16, 4, 4, 1 << 20, 1 << 20}, Projections: []string{"packetMetadata"}, Clients: []LiveClient{{Issuer: a.Issuer, ID: a.ClientID, Kind: a.Kind, PathIDs: []string{p.Paths[0].ID}}}, Ceilings: []LiveCeiling{{ClusterID: target.ClusterID, Limits: limits}}}
 	// A live viewer is not thereby a native-download client.
 	p.Clients = []DownloadClient{}
@@ -28,8 +28,8 @@ func TestLiveReadRequiresIndependentOptInExactClientPathAndScope(t *testing.T) {
 	if _, ok := p.Select(a, target.ClusterID, p.Paths[0].StoreID, "diagnostics", "metadata", "potentialPersonalData", "context", now); ok {
 		t.Fatal("live opt-in enabled download")
 	}
-	p.LiveRead.Ceilings = append(p.LiveRead.Ceilings, LiveCeiling{ClusterID: target.ClusterID, NamespaceUID: target.NamespaceUID, Limits: LiveLimits{60, 1 << 20, 16 << 10, 10, 64 << 10, 10, 2}})
-	if _, got, ok := p.SelectLive(a, target, "packetMetadata", now); !ok || got.Duration != 60 || got.Rows != 10 || got.Rate != 16<<10 {
+	p.LiveRead.Ceilings = append(p.LiveRead.Ceilings, LiveCeiling{ClusterID: target.ClusterID, NamespaceUID: target.NamespaceUID, Limits: LiveLimits{16 << 10, 10, 64 << 10, 2}})
+	if _, got, ok := p.SelectLive(a, target, "packetMetadata", now); !ok || got.Replay != 2 || got.Rows != 10 || got.Rate != 16<<10 {
 		t.Fatal("scope did not lower cluster ceiling", got, ok)
 	}
 	for _, mode := range []string{"client", "projection", "region", "scope", "expired", "ambiguous", "invalid-child"} {

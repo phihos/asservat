@@ -25,6 +25,7 @@ type fixedIdentity struct{ i identity.Identity }
 func (f fixedIdentity) ResolveIdentity(context.Context) (identity.Identity, error) { return f.i, nil }
 
 type fixture struct {
+	lastWait                       int
 	now                            time.Time
 	authorityUntil                 time.Time
 	afterProjection, afterChange   func()
@@ -73,6 +74,7 @@ func (f *fixture) Head(context.Context, []v.Source, string) ([]v.Position, error
 }
 func (f *fixture) Read(_ context.Context, _ []v.Source, _ string, positions []v.Position, limit, scan, waitMS int) (Projection, error) {
 	f.reads++
+	f.lastWait = waitMS
 	if f.broken {
 		return Projection{}, v.ErrUnavailable
 	}
@@ -106,7 +108,7 @@ func (f *fixture) Change(_ context.Context, c Control, expected, cost int64) (Co
 	if prior.Revision != expected || prior.Fence != c.Fence {
 		return Control{}, v.ErrConflict
 	}
-	if c.Spent != prior.Spent+cost || c.Spent > c.OutputLimit {
+	if c.Spent != prior.Spent+cost {
 		return Control{}, v.ErrCapacity
 	}
 	f.controls[c.ID] = c
@@ -165,14 +167,14 @@ func (f *fixture) add() {
 
 func TestLiveAcceptedScopeCeilingsAndLaterLoweringNeverRenewWatch(t *testing.T) {
 	s, f, i, r := setup(t)
-	f.source.ViewLimits = v.Limits{Duration: 60, Output: 1 << 20, Rate: 16 << 10, Rows: 10, Buffer: 64 << 10, RowAge: 10, Replay: 2}
+	f.source.ViewLimits = v.Limits{Rate: 16 << 10, Rows: 10, Buffer: 64 << 10, Replay: 2}
 	w, e := s.Open(t.Context(), i, r)
-	if e != nil || w.Limits != f.source.ViewLimits || !w.ExpiresAt.Equal(f.now.Add(time.Minute)) {
+	if e != nil || w.Limits != f.source.ViewLimits || !w.HardEnd.Equal(f.source.HardUntil) {
 		t.Fatal(w, e)
 	}
 	f.add()
 	batch, e := s.Read(t.Context(), i, v.Read{ID: w.ID, Cursor: *w.Cursor})
-	if e != nil || len(batch.Rows) != 1 || batch.Rows[0].ExpiresAt.After(f.now.Add(10*time.Second)) {
+	if e != nil || len(batch.Rows) != 1 || batch.Rows[0].ExpiresAt.After(f.now.Add(30*time.Second)) {
 		t.Fatal(batch, e)
 	}
 	// A looser later policy cannot expand the already accepted watch.
@@ -225,7 +227,7 @@ func TestLiveOpenDoesNotBackfillAndReplayChargesSameStableRows(t *testing.T) {
 		t.Fatal("open read/backfill", f)
 	}
 	replay, e := s.Open(t.Context(), i, r)
-	if e != nil || replay.ID != w.ID || !replay.ExpiresAt.Equal(w.ExpiresAt) {
+	if e != nil || replay.ID != w.ID || !replay.HardEnd.Equal(w.HardEnd) {
 		t.Fatal("open replay", e)
 	}
 	f.add()
@@ -249,7 +251,7 @@ func TestLivePauseResumeHeadRevisionAndOriginalExpiry(t *testing.T) {
 		t.Fatal(e)
 	}
 	paused, e := s.Update(t.Context(), i, v.Update{ID: w.ID, Revision: 1, Key: "pause", Mode: "Paused"}, false)
-	if e != nil || paused.State != "Paused" || !paused.ExpiresAt.Equal(w.ExpiresAt) {
+	if e != nil || paused.State != "Paused" || !paused.HardEnd.Equal(w.HardEnd) {
 		t.Fatal(paused, e)
 	}
 	f.add()
@@ -258,7 +260,7 @@ func TestLivePauseResumeHeadRevisionAndOriginalExpiry(t *testing.T) {
 		t.Fatal("paused view read source", e)
 	}
 	resumed, e := s.Update(t.Context(), i, v.Update{ID: w.ID, Revision: 2, Key: "resume", Mode: "Active"}, false)
-	if e != nil || resumed.Revision != 3 || !resumed.ExpiresAt.Equal(w.ExpiresAt) {
+	if e != nil || resumed.Revision != 3 || !resumed.HardEnd.Equal(w.HardEnd) {
 		t.Fatal(resumed, e)
 	}
 	if _, e = s.Update(t.Context(), i, v.Update{ID: w.ID, Revision: 1, Key: "stale", Mode: "Active"}, false); e == nil {
@@ -328,7 +330,7 @@ func TestLiveAbandonedReplayErasedWithoutAnotherRead(t *testing.T) {
 	st.mu.Lock()
 	st.timer.Stop()
 	st.mu.Unlock()
-	f.now = f.now.Add(v.ReplayAge)
+	f.now = f.now.Add(time.Duration(v.DefaultLimits().Replay) * time.Second)
 	s.expireSession(st)
 	st.mu.Lock()
 	if len(st.replay) != 0 {
@@ -402,11 +404,11 @@ func TestLiveOpenReplayDoesNotNeedExpiredDiscoveryOrTouchSourceHead(t *testing.T
 	}
 
 	again, e := s.Open(t.Context(), i, r)
-	if e != nil || again.ID != w.ID || !again.ExpiresAt.Equal(w.ExpiresAt) || f.heads != before || f.created != 1 {
+	if e != nil || again.ID != w.ID || !again.HardEnd.Equal(w.HardEnd) || f.heads != before || f.created != 1 {
 		t.Fatalf("replayed acceptance rediscovered or reacquired: watch=%+v err=%v heads=%d/%d creates=%d", again, e, f.heads, before, f.created)
 	}
 	changed := r
-	changed.Duration = 12
+	changed.Projection = v.Syscall
 	if _, e = s.Open(t.Context(), i, changed); !errors.Is(e, v.ErrConflict) {
 		t.Fatalf("changed retry: %v", e)
 	}
@@ -485,7 +487,7 @@ func TestLiveDisconnectedResumeKeepsScopeAndStartsAtCurrentHead(t *testing.T) {
 	f.add()
 	f.broken = false
 	resumed, e := s.Update(t.Context(), i, v.Update{ID: w.ID, Revision: w.Revision, Key: "reconnect", Mode: "Active"}, false)
-	if e != nil || resumed.State != "Active" || !resumed.ExpiresAt.Equal(w.ExpiresAt) {
+	if e != nil || resumed.State != "Active" || !resumed.HardEnd.Equal(w.HardEnd) {
 		t.Fatal("same original scope could not resume", resumed, e)
 	}
 	f.add()
@@ -572,15 +574,14 @@ func TestLiveStatelessHandleIsReferenceNotFiveSecondObservationOrPermit(t *testi
 		t.Fatal(page, e)
 	}
 	handle := page.Sources[0].Handle
-	end := page.Sources[0].HandleExpires
-	if len(handle) > 128 || !end.After(i.i.ValidUntil) || end.After(f.now.Add(time.Minute)) {
-		t.Fatal("reference borrowed operation observation", handle, end)
+	if len(handle) > 128 {
+		t.Fatal("reference borrowed operation observation", handle)
 	}
 	f.now = f.now.Add(6 * time.Second)
 	i.i.VerifiedAt = f.now
 	i.i.ValidUntil = f.now.Add(5 * time.Second)
 	decoded, e := s.decodeSourceHandle(i.i.Principal, handle)
-	if e != nil || !decoded.Until.Equal(end) {
+	if e != nil || decoded.ID != f.source.ID() {
 		t.Fatal("validation renewed or expired reference", decoded, e)
 	}
 	w, e := s.Open(t.Context(), i, v.Open{Handles: []string{handle}, Projection: v.Packet, Key: "stateless"})
@@ -856,6 +857,23 @@ func TestLiveReadDisclosesUnderFreshCheckAfterLongWait(t *testing.T) {
 	}
 }
 
+// A wait longer than the source check window returns before that window
+// ends, leaving the node time to reply, rather than missing the deadline.
+func TestLiveLongWaitEndsBeforeTheCheckWindow(t *testing.T) {
+	s, _, i, r := setup(t)
+	f := s.reader.(*fixture)
+	w, e := s.Open(t.Context(), i, r)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = s.Read(t.Context(), i, v.Read{ID: w.ID, Cursor: *w.Cursor, WaitMS: v.MaxWaitMS}); e != nil {
+		t.Fatal(e)
+	}
+	if f.lastWait <= 0 || f.lastWait > 5000-liveReplyMarginMS {
+		t.Fatal("wait not bounded by the check window", f.lastWait)
+	}
+}
+
 // A transient source/status miss fails only that read without disclosure
 // and leaves the view open; an access denial still ends it.
 func TestLiveTransientSourceMissKeepsViewOpen(t *testing.T) {
@@ -908,8 +926,8 @@ func TestLiveRowExpiryIsNotTheFreshnessCheckBound(t *testing.T) {
 	if e != nil || len(batch.Rows) != 1 {
 		t.Fatal(batch, e)
 	}
-	if !batch.Rows[0].ExpiresAt.After(f.now.Add(5*time.Second)) || batch.Rows[0].ExpiresAt.After(w.ExpiresAt) {
-		t.Fatal("row expiry is the freshness bound or exceeds the watch", batch.Rows[0].ExpiresAt, f.now, w.ExpiresAt)
+	if !batch.Rows[0].ExpiresAt.After(f.now.Add(5*time.Second)) || batch.Rows[0].ExpiresAt.After(w.HardEnd) {
+		t.Fatal("row expiry is the freshness bound or exceeds the watch", batch.Rows[0].ExpiresAt, f.now, w.HardEnd)
 	}
 }
 

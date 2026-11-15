@@ -1285,7 +1285,6 @@ type LiveWatchControl struct {
 	AcceptedAt     pgtype.Timestamptz
 	ExpiresAt      pgtype.Timestamptz
 	IdleUntil      pgtype.Timestamptz
-	OutputLimit    int64
 	Spent          int64
 	BytesPerSecond int64
 	TokensMicro    int64

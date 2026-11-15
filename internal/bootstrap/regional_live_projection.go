@@ -11,7 +11,7 @@ import (
 // ReadLiveProjection passes an already authorized exact-source request through
 // the existing node registry. This method has no arm/renew/snapshot interface.
 func (t reportedTargets) ReadLiveProjections(ctx context.Context, requests []collector.LiveRead) ([]v.NodeReply, error) {
-	if ctx == nil || ctx.Err() != nil || len(requests) < 1 || len(requests) > v.MaxSources || t.recordings == nil {
+	if ctx == nil || ctx.Err() != nil || len(requests) < 1 || t.recordings == nil {
 		return nil, targets.ErrUnavailable
 	}
 	reader, ok := t.recordings.nodes.(liveNodeReader)

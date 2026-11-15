@@ -97,7 +97,7 @@ func TestLiveOwnerRoutesOriginalSessionAndSameKeyWithoutTakeover(t *testing.T) {
 		t.Fatal(err)
 	}
 	result := d.Result()
-	if result.Batch == nil || len(result.Batch.Rows) != 1 || !result.Batch.DisclosureUntil.Before(w.ExpiresAt) || d.CheckDisclosure(t.Context()) != nil {
+	if result.Batch == nil || len(result.Batch.Rows) != 1 || !result.Batch.DisclosureUntil.Before(w.HardEnd) || d.CheckDisclosure(t.Context()) != nil {
 		t.Fatal("original read/cutoff lost", result, err)
 	}
 	if len(second.sessions) != 0 || f.created != 1 || f.reads != 1 {
@@ -111,7 +111,7 @@ func TestLiveOwnerRoutesOriginalSessionAndSameKeyWithoutTakeover(t *testing.T) {
 	}
 	heads := f.heads
 	replay, err := routed.Open(t.Context(), who, open)
-	if err != nil || replay.ID != w.ID || !replay.ExpiresAt.Equal(w.ExpiresAt) || f.created != 1 || f.heads != heads {
+	if err != nil || replay.ID != w.ID || !replay.HardEnd.Equal(w.HardEnd) || f.created != 1 || f.heads != heads {
 		t.Fatal("same key restarted/reselected", replay, err)
 	}
 	other := who

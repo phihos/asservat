@@ -158,7 +158,7 @@ func (f *consoleLiveFixture) Change(_ context.Context, c app.Control, revision, 
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	old, ok := f.controls[c.ID]
-	if !ok || old.Revision != revision || old.Fence != c.Fence || c.Spent != old.Spent+cost || c.Spent > c.OutputLimit {
+	if !ok || old.Revision != revision || old.Fence != c.Fence || c.Spent != old.Spent+cost {
 		return app.Control{}, v.ErrDenied
 	}
 	f.controls[c.ID] = c

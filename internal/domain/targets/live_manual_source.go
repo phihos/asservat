@@ -38,7 +38,8 @@ func (m ManualLiveSource) BindingValid() bool {
 	return true
 }
 func (m ManualLiveSource) Valid() bool {
-	return m.BindingValid() && !m.StartedAt.IsZero() && m.HardUntil.After(m.StartedAt) && m.HardUntil.Sub(m.StartedAt) <= 5*time.Minute
+	// The manual capture's own duration bounds HardUntil.
+	return m.BindingValid() && !m.StartedAt.IsZero() && m.HardUntil.After(m.StartedAt)
 }
 
 // SameBinding is used only for passive holder discovery, before its original

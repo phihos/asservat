@@ -71,7 +71,7 @@ func (s CurrentLiveEnvironment) LiveSourceReads(ctx context.Context, sources []l
 	}
 	out := make([]LiveEnvironmentDecision, len(sources))
 	for n, l := range limits {
-		out[n] = LiveEnvironmentDecision{ValidUntil: until, Projections: append([]string(nil), p.LiveRead.Projections...), Limits: live.Limits{Duration: l.Duration, Output: l.Output, Rate: l.Rate, Rows: l.Rows, Buffer: l.Buffer, RowAge: l.RowAge, Replay: l.Replay}}
+		out[n] = LiveEnvironmentDecision{ValidUntil: until, Projections: append([]string(nil), p.LiveRead.Projections...), Limits: live.Limits{Rate: l.Rate, Rows: l.Rows, Buffer: l.Buffer, Replay: l.Replay}}
 	}
 	return out, nil
 }

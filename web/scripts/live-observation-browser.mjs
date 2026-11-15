@@ -40,7 +40,7 @@ try{
   const listWait=waitOp('list_live_sources');await panel.getByRole('button',{name:'Find live sources',exact:true}).click();const listed=await checked(await listWait,'list_live_sources');assert.equal(listed.data.sources.length,4);
   await panel.getByRole('checkbox').nth(sourceIndex).check();
   await panel.getByRole('combobox',{name:'Projection',exact:true}).selectOption(projection);
-  const openWait=waitOp('open_live_watch');await panel.getByRole('button',{name:'Open live view',exact:true}).click();const opened=await checked(await openWait,'open_live_watch');assert.equal(opened.data.projection,projection);const originalEnd=opened.data.expires_at;
+  const openWait=waitOp('open_live_watch');await panel.getByRole('button',{name:'Open live view',exact:true}).click();const opened=await checked(await openWait,'open_live_watch');assert.equal(opened.data.projection,projection);const originalEnd=opened.data.source_hard_end;
   await expect(panel.getByRole('table')).toHaveCount(0);
   await emit(projection);
   await expect(panel.getByRole('table',{name:'Approved live observations',exact:true})).toBeVisible();
@@ -48,12 +48,12 @@ try{
   await panel.getByRole('button',{name:/^Inspect observation /}).first().click();
   await expect(panel.getByRole('region',{name:'Selected observation',exact:true})).toBeVisible();
   await expect(panel.getByText(/Gap: sensorLoss; count unknown/)).toBeVisible();
-  const pauseWait=waitOp('update_live_watch');await panel.getByRole('button',{name:'Pause view',exact:true}).click();const paused=await checked(await pauseWait,'update_live_watch');assert.equal(paused.data.state,'Paused');assert.equal(paused.data.expires_at,originalEnd);await expect(panel.getByRole('table')).toBeVisible();
+  const pauseWait=waitOp('update_live_watch');await panel.getByRole('button',{name:'Pause view',exact:true}).click();const paused=await checked(await pauseWait,'update_live_watch');assert.equal(paused.data.state,'Paused');assert.equal(paused.data.source_hard_end,originalEnd);await expect(panel.getByRole('table')).toBeVisible();
   await emit(projection); // underlying source continues, viewer pause does not stop it
-  const resumeWait=waitOp('update_live_watch');await panel.getByRole('button',{name:'Resume from now',exact:true}).click();const resumed=await checked(await resumeWait,'update_live_watch');assert.equal(resumed.data.state,'Active');assert.equal(resumed.data.expires_at,originalEnd);await expect(panel.getByRole('table')).toHaveCount(0);
+  const resumeWait=waitOp('update_live_watch');await panel.getByRole('button',{name:'Resume from now',exact:true}).click();const resumed=await checked(await resumeWait,'update_live_watch');assert.equal(resumed.data.state,'Active');assert.equal(resumed.data.source_hard_end,originalEnd);await expect(panel.getByRole('table')).toHaveCount(0);
   await expect(panel.getByRole('region',{name:'Selected observation',exact:true})).toHaveCount(0);
   await emit(projection);await expect(panel.getByRole('table')).toBeVisible();
-  const closeWait=waitOp('close_live_watch');await panel.getByRole('button',{name:'Close view',exact:true}).click();const closed=await checked(await closeWait,'close_live_watch');assert.equal(closed.data.state,'Closed');assert.equal(closed.data.expires_at,originalEnd);await expect(panel.getByRole('table')).toHaveCount(0);
+  const closeWait=waitOp('close_live_watch');await panel.getByRole('button',{name:'Close view',exact:true}).click();const closed=await checked(await closeWait,'close_live_watch');assert.equal(closed.data.state,'Closed');assert.equal(closed.data.source_hard_end,originalEnd);await expect(panel.getByRole('table')).toHaveCount(0);
   await panel.getByRole('button',{name:'Choose another live view',exact:true}).click();
   console.log(label+': real C13 rows/zero/null/loss, original deadline, pause/resume-head/close cleared');
  }

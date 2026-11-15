@@ -1,5 +1,18 @@
 # Sustained implementation progress
 
+## Live watch without lifetime (ADR-335 D9, 2026-11-15)
+
+A live watch ends with its sources or after 10 idle minutes; it has no
+duration or total output cap (migration 00182). `read_live_watch` waits up
+to 30 s (`wait_ms`) instead of returning `retry_after_ms`. Rows expire at
+their privacy or watch end; source handles stay valid while the source is
+unchanged. The 16-source, 16-predicate and 5-minute manual source caps are
+gone. Per-viewer rate, rows, buffer and the batch envelope stay.
+
+Verified: `go build`, `go vet`, `make go-check pcap-check`, the CI gate set,
+`make console-check`, focused live custody tests (real PostgreSQL). Gaps:
+the five live tools are not yet the single `watch_live` tool.
+
 ## Limits without a reason removed (2026-11-15)
 
 Streaming artifacts may use S3's 10,000 parts of one 8 MiB frame (about
@@ -304,7 +317,7 @@ examples go through `readImplementedExample` or the console equivalent.
 | `mcp-tools.json`, `browser-openapi.yaml`, `operations.yaml` | 33 MCP tools: `get_extract(view)`, `query_artifact(operation)`, `download_artifact(action)`, `watch_live(action)`; recording-save preview in `preview_capture`; live sources in `list_recordings`; capture profiles in `list_diagnostics`; no `activate_policy`/`request_policy_grant`; every tool enabled by default | `internal/contracts/investigation_schema.go`, `investigation-schemas/*.json`; `internal/domain/audit/operation.go`, `connector_operation.go`; `internal/bootstrap/public_context.go`, `public_http.go`; `internal/application/authorization/policy_grant_attachment.go`; `internal/adapters/postgres/policy_grant_attachment.go` |
 | `mcp-tools.json` | Names instead of IDs (`cluster`, workload, `policy`, recipe); reasons optional except `request_raw_access`; raw access by `artifact_ids` with defaulted size/expiry | `internal/transport/presentation/*_operations.go` |
 | `artifact-download.schema.json` | Preparing/Ready/Completed/Failed/Cancelled; size and SHA-256 on every status; `content_path`, `browser_url`, `access_until`, bundle `representation`; no `continue_preparation`/`expires_at`/`resume_available` | `internal/transport/presentation/context_download.go`; console `web/src/evidence/evidence.ts` |
-| `live-watch.schema.json`, `watch_live` | No watch deadline, duration or lifetime output cap; 10-minute idle close; no `sourcePage` | `internal/domain/live/source.go`, `watch.go` |
+| `live-watch.schema.json`, `watch_live` | One `watch_live` tool; no `sourcePage` | `internal/domain/live/source.go`, `watch.go` |
 | `recording-save.schema.json`, `errors.yaml` | Rows with `owner_kind`/`save_via`/`live_projections`; `recordingSaves` default true; `NoCurrentSource` replaces `RecordingSelectionRequired` | `internal/transport/presentation/recording_save_history.go`, `recording_save_operations.go` |
 | `policy.schema.json`, `target.schema.json` | Budgets/retention/suspended/observation/evaluation/maxPods/selection/adoption optional; `adoption` default `followName`; no `observation.mode`, `grantRef` or hub-held `target.cluster`; optional `automationRef`; `workloadRef.apiVersion` optional | `internal/application/capture/policy_compile.go` (`pinUID` required, `allAuthorized` mode); `internal/adapters/kubernetes/policy_source.go`, `policy_source_hub.go` (`grantRef`, hub-held cluster; test reads `examples/implemented/policy-restart.yaml`); `internal/adapters/postgres/policy_grant_attachment.go`, `policy.go`, `policy_sources.go`; DebugPolicy CRD |
 | `capture.schema.json`, `capture-composition.schema.json` | `recipeRef.digest`, `reason`, `idempotencyKey`, `deadline`, `maxTotalBytes`/`maxDuration`, `profileRef.version` optional | `internal/domain/planning/composition.go`; `internal/transport/presentation/recorder_preview.go`; console `web/src/capture` |
