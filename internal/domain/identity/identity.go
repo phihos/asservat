@@ -4,6 +4,7 @@ package identity
 
 import (
 	"errors"
+	"math"
 	"slices"
 	"strings"
 	"time"
@@ -177,8 +178,9 @@ func Strings(v []string, maxCount, maxLength int) bool {
 	return true
 }
 
-// Distinct reports distinct, non-empty, control-free strings.
-func Distinct(v []string) bool { return Strings(v, len(v), 1<<16) }
+// Distinct reports distinct, non-empty, control-free strings. The 1 MiB
+// ConfigMap that carries them bounds their length.
+func Distinct(v []string) bool { return Strings(v, len(v), math.MaxInt) }
 
 func Fresh(observed, until, now time.Time, maximum time.Duration) bool {
 	return !observed.IsZero() && !observed.After(now) && until.After(observed) && !until.After(observed.Add(maximum)) && now.Before(until)

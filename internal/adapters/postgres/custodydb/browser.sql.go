@@ -91,6 +91,15 @@ func (q *Queries) DeleteBrowserSession(ctx context.Context, id []byte) error {
 	return err
 }
 
+const extendBrowserLogoutReceipts = `-- name: ExtendBrowserLogoutReceipts :exec
+UPDATE browser_logout SET expires_at=issued_at+make_interval(secs=>$1::bigint)+interval '1 hour' WHERE expires_at>clock_timestamp() AND expires_at<issued_at+make_interval(secs=>$1::bigint)+interval '1 hour'
+`
+
+func (q *Queries) ExtendBrowserLogoutReceipts(ctx context.Context, maxLifetimeSeconds int64) error {
+	_, err := q.db.Exec(ctx, extendBrowserLogoutReceipts, maxLifetimeSeconds)
+	return err
+}
+
 const finishBrowserRefresh = `-- name: FinishBrowserRefresh :exec
 UPDATE browser_session SET version=version+1,refresh_claim=NULL,claim_until=NULL,ciphertext=$2,refresh_at=$3 WHERE id=$1
 `

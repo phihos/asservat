@@ -4,6 +4,8 @@ DELETE FROM browser_login WHERE expires_at<=clock_timestamp();
 DELETE FROM browser_session WHERE expires_at<=clock_timestamp() OR claim_until<=clock_timestamp() OR last_used_at+make_interval(secs=>sqlc.arg(inactivity_seconds)::bigint)<=clock_timestamp();
 -- name: PruneBrowserLogout :exec
 DELETE FROM browser_logout WHERE expires_at<=clock_timestamp();
+-- name: ExtendBrowserLogoutReceipts :exec
+UPDATE browser_logout SET expires_at=issued_at+make_interval(secs=>sqlc.arg(max_lifetime_seconds)::bigint)+interval '1 hour' WHERE expires_at>clock_timestamp() AND expires_at<issued_at+make_interval(secs=>sqlc.arg(max_lifetime_seconds)::bigint)+interval '1 hour';
 -- name: ClampBrowserSessionLifetimes :exec
 UPDATE browser_session SET expires_at=LEAST(expires_at,created_at+make_interval(secs=>sqlc.arg(max_lifetime_seconds)::bigint)),refresh_at=LEAST(refresh_at,created_at+make_interval(secs=>sqlc.arg(max_lifetime_seconds)::bigint)) WHERE expires_at>created_at+make_interval(secs=>sqlc.arg(max_lifetime_seconds)::bigint);
 -- name: InsertBrowserLogin :exec

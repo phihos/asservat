@@ -34,12 +34,34 @@ func NewBrowserSessions(ctx context.Context, pool *pgxpool.Pool, settings value.
 		return nil, value.ErrUnavailable
 	}
 	s := &BrowserSessions{ledger: l, settings: settings}
+	// A raised maxLifetimeSeconds extends unexpired logout receipts, so a
+	// receipt still outlives every session it can block. Startup also prunes
+	// what expired while no login arrived.
 	if e = s.transaction(ctx, func(q *custodydb.Queries) error {
-		return q.ClampBrowserSessionLifetimes(ctx, int64(settings.MaxLifetime/time.Second))
+		lifetime := int64(settings.MaxLifetime / time.Second)
+		if e := q.ClampBrowserSessionLifetimes(ctx, lifetime); e != nil {
+			return e
+		}
+		if e := q.ExtendBrowserLogoutReceipts(ctx, lifetime); e != nil {
+			return e
+		}
+		if e := q.PruneBrowserLogins(ctx); e != nil {
+			return e
+		}
+		return s.prune(ctx, q)
 	}); e != nil {
 		return nil, e
 	}
 	return s, nil
+}
+
+// prune deletes expired sessions and logout receipts. It runs at startup
+// and on every login callback; PutLogin prunes expired logins.
+func (s *BrowserSessions) prune(ctx context.Context, q *custodydb.Queries) error {
+	if e := q.PruneBrowserSessions(ctx, s.inactivity()); e != nil {
+		return e
+	}
+	return q.PruneBrowserLogout(ctx)
 }
 
 func (s *BrowserSessions) inactivity() int64 {
@@ -78,6 +100,9 @@ func (s *BrowserSessions) PutLogin(ctx context.Context, l value.BrowserLogin) er
 func (s *BrowserSessions) TakeLogin(ctx context.Context, key, browser [32]byte) (value.BrowserLogin, error) {
 	var out value.BrowserLogin
 	err := s.transaction(ctx, func(q *custodydb.Queries) error {
+		if e := s.prune(ctx, q); e != nil {
+			return e
+		}
 		r, e := q.ConsumeBrowserLogin(ctx, custodydb.ConsumeBrowserLoginParams{ID: key[:], Browser: browser[:]})
 		if errors.Is(e, pgx.ErrNoRows) {
 			return value.ErrDenied
