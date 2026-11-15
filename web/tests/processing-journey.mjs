@@ -84,8 +84,11 @@ export async function processingJourney({ page, origin, artifactID, casePath, pa
     await search.getByLabel('Cluster ID', { exact: true }).fill(scope.clusterID);
     await search.getByLabel('Namespace UID', { exact: true }).fill(scope.namespaceUID);
     await search.getByLabel('Workload UID', { exact: true }).fill(scope.workloadUID);
-    await search.getByLabel('Acquired from (UTC)', { exact: true }).fill(from.toISOString().slice(0, 19));
-    await search.getByLabel('Acquired until (UTC)', { exact: true }).fill(until.toISOString().slice(0, 19));
+    // datetime-local normalizes a zero-seconds value to HH:MM; Playwright
+    // rejects a fill whose read-back value differs ("Malformed value").
+    const local = date => date.toISOString().slice(0, 19).replace(/:00$/, '');
+    await search.getByLabel('Acquired from (UTC)', { exact: true }).fill(local(from));
+    await search.getByLabel('Acquired until (UTC)', { exact: true }).fill(local(until));
     await search.getByLabel('Purpose reference (optional)', { exact: true }).fill(candidate.purpose_ref);
     const response = page.waitForResponse(r => new URL(r.url()).pathname === '/api/v1/operations/search_processing_evidence' && r.request().method() === 'POST');
     await search.getByRole('button', { name: 'Search evidence', exact: true }).click();

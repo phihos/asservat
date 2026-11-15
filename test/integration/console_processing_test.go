@@ -124,7 +124,11 @@ func newConsoleProcessing(t *testing.T, erasure bool) (string, string, *consoleP
 	}
 	sessions := &consoleSyntheticSessions{origin: origin, state: "ready", expiresAt: time.Now().Add(3 * time.Minute)}
 	session := browser.SessionHandler{Origin: origin, Issuer: "https://identity.invalid", Sessions: sessions}
-	expires := time.Now().UTC().Truncate(time.Microsecond).Add(time.Hour)
+	// The candidate anchor (expires minus one hour) sits at second :59 so the
+	// workload journey's one-second-later bound is always a whole minute. The
+	// browser drops ":00" from datetime-local values; a wall-clock anchor hit
+	// that case only in 2 of 60 runs.
+	expires := time.Now().UTC().Truncate(time.Minute).Add(time.Hour - time.Second + 250*time.Millisecond)
 	facts := &consoleProcessingFacts{expires: expires, erasure: erasure}
 	changes, err := browser.NewProcessingHandler(session, facts)
 	if err != nil {
