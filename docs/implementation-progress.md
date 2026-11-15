@@ -125,8 +125,8 @@ is still referenced by shared operation-audit functions and stays until
 those functions are rewritten; `federation.connector` values are still
 required though unused; the join Secret still carries the offer and copied
 object-store capabilities; cluster IDs still come from values; `hub.url`/
-`hub.caBundle` are not implemented; work JWS, local-key signing, fleet
-settings rows below are unchanged; the node channel is in "Node channel stream" below.
+`hub.caBundle` are not implemented; work JWS and local-key signing rows below
+are unchanged; the node channel is in "Node channel stream" below.
 
 ## Node channel stream (ADR-330 D2/D3, 2026-11-15)
 
@@ -142,6 +142,23 @@ work bindings against its own identity. Gap: work bindings still carry
 `bootID`/`collectorEpoch` as hub provenance (SQL, manifests, `internal-work`);
 the connector fills them from the Node object and a per-collector-Pod
 generation.
+
+## Fleet settings removed (ADR-335 D14, 2026-11-15)
+
+Branch `clean/connector-3a-fleet`. The access and retention previews and share
+administration check `identity.administrators` from the identity settings
+the hub-api already reads (added to the implemented identity-settings copy and
+the chart). Removed: the fleet ConfigMap, `fleet` chart values, its schema and
+reader, the fleet protection guard, `contracts.FleetSettings`, the setup Job's
+Kubernetes RBAC, and the unreachable configuration-role/installer chain that
+depended on the reader. The SQL `fleet_trust` row and its observer stay: about
+45 migration functions require a fresh row. Its observation now comes from the
+generated installation ID and issuer epoch alone.
+
+Gaps: the fleet trust heartbeat (one SQL observation per second) remains until those
+functions stop checking `fresh_until`; `administrators` is optional in the
+implemented identity copy until the identity reader adopts the canonical
+contract; the `fleet-operator` role name stays in docs/interfaces.
 
 ## ADR-330 contract divergence (2026-11-14)
 
@@ -207,7 +224,6 @@ examples go through `readImplementedExample` or the console equivalent.
 | Capture/policy/trigger/recipe/packet/syscall schemas | No list-count caps; arbitrary maxima raised to 2^53−1; no packet-filter length cap (BPF limit checked at compile); `argv` items up to `MAX_ARG_STRLEN` | Embedded `policy-schemas/`, `permission-schemas/approval-policy`, manifest `profile` schema; `internal/domain/planning/composition.go` (`MaxCompositionComponents` 8, `MaxComponentEdits` 32, `MaxCompositionBytes`); generated DebugPolicy/CaptureProfile CRDs |
 | `identity-settings.schema.json` | `groupsClaim`, `usernameClaim`, optional `requiredGroups`, `administrators`; no eligible lists, `groupMaxAgeSeconds`, `revision` or list caps | `internal/contracts/identity_settings.go`, `permission_runtime.go`, `installer_continuation.go`; `internal/domain/configuration/permissions.go`; `internal/bootstrap/permission_guards.go`; `internal/adapters/kubernetes/hub_worker_capacity_reads.go` |
 | `browser-settings.schema.json` | `maxLifetimeSeconds` (default 7 d) and `inactivityTimeoutSeconds` (default 24 h); no `maxLogins`/`maxSessions`/`maxLogoutEvents` or per-user session count | `internal/contracts/browser_settings.go`, `installer_continuation.go`; `internal/domain/identity/browser_settings.go` |
-| `fleet-settings.schema.json` (deleted) | Administrators replace fleet operators (D14) | `internal/adapters/kubernetes/fleet_settings.go`, `initial_preparer_inputs.go`, `initial_bootstrap_plan.go`, `hub_workload.go`, `configuration_runtime_*.go`; `internal/bootstrap/hub_api_inputs.go`; `internal/contracts/owner_deployment.go` |
 | `access-binding`, `permission-common`, `cluster-access-binding` (new) | Subject `issuer` and `reason` optional; workload by name with optional `uid`; ClusterAccessBinding; `groupName` mapping mode; `reviewRef`/`guardRef` optional; no list or string caps beyond Kubernetes formats | `internal/adapters/kubernetes/permission_decode.go`; `internal/domain/configuration/permissions.go`, `review.go`; chart CRDs (no ClusterAccessBinding CRD) |
 | `permission-source.schema.json` | `cluster` name instead of `clusterID`; no `maxDecisionAgeSeconds`; exclusions and `maxNamespaces` optional; access reviews map to any role | `internal/adapters/kubernetes/permission_decode.go`; `internal/domain/configuration/permissions.go` |
 | `policy-authority.schema.json` | Envelope ceilings, `notAfter` and limits optional, no maxima | `internal/domain/authorization/automation.go`, `policy_grant.go`, `policy_grant_use.go` |

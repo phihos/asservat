@@ -2,7 +2,6 @@ package fleet
 
 import (
 	"context"
-	"slices"
 	"time"
 
 	value "asservat.local/asservat/internal/domain/fleet"
@@ -12,18 +11,10 @@ import (
 // not implement RecoveryReader, return a proof, or permit any effect. Keeping
 // the complete public value detects same-revision mutation before blocked SQL.
 func sameWorkerFleetValue(a, b value.Administration) bool {
-	return a.InstallationID == b.InstallationID && a.IssuerEpoch == b.IssuerEpoch && a.Issuer == b.Issuer && a.Revision == b.Revision && a.Suspended == b.Suspended &&
-		a.MaxActiveBootstraps == b.MaxActiveBootstraps && a.MaxBootstrapHistory == b.MaxBootstrapHistory && a.MaxClusters == b.MaxClusters &&
-		slices.Equal(a.Clients, b.Clients) && slices.Equal(a.Groups, b.Groups) && slices.Equal(a.DeliveryProfiles, b.DeliveryProfiles) && slices.Equal(a.Subjects, b.Subjects)
+	return a.InstallationID == b.InstallationID && a.IssuerEpoch == b.IssuerEpoch && a.Revision == b.Revision && a.Suspended == b.Suspended
 }
 
-func cloneWorkerFleetValue(a value.Administration) *value.Administration {
-	a.Clients = slices.Clone(a.Clients)
-	a.Groups = slices.Clone(a.Groups)
-	a.DeliveryProfiles = slices.Clone(a.DeliveryProfiles)
-	a.Subjects = slices.Clone(a.Subjects)
-	return &a
-}
+func cloneWorkerFleetValue(a value.Administration) *value.Administration { return &a }
 
 // NoteFleetObservation belongs before the real SQL call. A changed or missing
 // source closes active work immediately, including while fencing is blocked.

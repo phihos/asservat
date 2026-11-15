@@ -7,7 +7,6 @@ import (
 
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
-	"asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
 	value "asservat.local/asservat/internal/domain/privacy"
 )
@@ -24,10 +23,10 @@ type RetentionSpecDecoder interface {
 	DecodeRetentionPolicySpec([]byte, bool) (value.ScopedPolicy, error)
 }
 
-// PreviewAdministration is the protected fleet administration source that
-// names the installation's operators.
-type PreviewAdministration interface {
-	FleetAdministration(context.Context) (fleet.Administration, error)
+// PreviewAdministrators reads the identity settings whose administrators
+// list names the installation administrators (ADR-335 D14).
+type PreviewAdministrators interface {
+	IdentityPolicy(context.Context, string) (identity.Policy, error)
 }
 
 type PreviewRecovery interface {
@@ -50,13 +49,12 @@ type ProposedRetentionChange struct {
 // RetentionPreviewer answers preview_retention_change (ADR-240): how a
 // proposed EvidenceRetentionPolicy change would shorten the effective
 // deadlines of retained evidence, computed by the catch-up's own functions
-// over the current catalog. Callers are the installation's current fleet
-// operators: retention policies are installation-wide administrator
+// over the current catalog. Callers are the installation administrators: retention policies are installation-wide administrator
 // configuration and the browser has no mapping to their Kubernetes writers.
 // It returns counts and dates only, never evidence, and writes nothing.
 type RetentionPreviewer struct {
 	InstallationID string
-	Administration PreviewAdministration
+	Administrators PreviewAdministrators
 	Catalog        RetentionPreviewCatalog
 	Decoder        RetentionSpecDecoder
 	Recovery       PreviewRecovery
@@ -64,12 +62,12 @@ type RetentionPreviewer struct {
 }
 
 // Preview returns the preview and the reply's metadata deadline.
-// identity.ErrDenied marks a caller who is not a fleet operator,
+// identity.ErrDenied marks a caller who is not an administrator,
 // value.ErrInvalid an invalid proposal and value.ErrPreviewLimit one beyond
 // the preview bounds.
 func (s RetentionPreviewer) Preview(ctx context.Context, current PreviewIdentity, proposed []ProposedRetentionChange) (value.RetentionPreview, time.Time, error) {
 	var zero value.RetentionPreview
-	if ctx == nil || current == nil || s.Administration == nil || s.Catalog == nil || s.Decoder == nil || s.Recovery == nil || s.Now == nil || !authorization.UUID(s.InstallationID) {
+	if ctx == nil || current == nil || s.Administrators == nil || s.Catalog == nil || s.Decoder == nil || s.Recovery == nil || s.Now == nil || !authorization.UUID(s.InstallationID) {
 		return zero, time.Time{}, identity.ErrUnavailable
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -80,12 +78,12 @@ func (s RetentionPreviewer) Preview(ctx context.Context, current PreviewIdentity
 	}
 	// Authority precedes decoding, so a caller without it learns nothing,
 	// not even whether a proposal is well formed.
-	admin, err := s.Administration.FleetAdministration(ctx)
-	if err != nil || !admin.Valid(s.Now()) || admin.InstallationID != s.InstallationID {
-		return zero, time.Time{}, identity.ErrUnavailable
-	}
-	if !admin.Operator(i) {
+	admin, err := s.Administrators.IdentityPolicy(ctx, i.Principal.Issuer)
+	if errors.Is(err, identity.ErrDenied) || err == nil && !admin.Administrator(i) {
 		return zero, time.Time{}, identity.ErrDenied
+	}
+	if err != nil || !s.Now().Before(admin.FreshUntil) {
+		return zero, time.Time{}, identity.ErrUnavailable
 	}
 	until := identity.Earlier(i.ValidUntil, admin.FreshUntil)
 	if len(proposed) < 1 || len(proposed) > value.MaxRetentionPreviewChanges {
@@ -122,7 +120,7 @@ func (s RetentionPreviewer) Preview(ctx context.Context, current PreviewIdentity
 		return zero, time.Time{}, identity.ErrUnavailable
 	}
 	fresh, err := current.ResolveIdentity(ctx)
-	if err != nil || fresh.Principal != i.Principal || fresh.Policy != i.Policy || !fresh.Valid(s.Now()) || !admin.Operator(fresh) {
+	if err != nil || fresh.Principal != i.Principal || fresh.Policy != i.Policy || !fresh.Valid(s.Now()) || !admin.Administrator(fresh) {
 		return zero, time.Time{}, identity.ErrDenied
 	}
 	until = identity.Earlier(until, fresh.ValidUntil)

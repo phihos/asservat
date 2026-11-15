@@ -40,6 +40,11 @@ identity:
   eligibleSubjects: []
   eligibleGroups: []
   groupMaxAgeSeconds: 300
+  # Installation administrators (ADR-335 D14) by group name or token subject:
+  # configuration previews and share administration.
+  administrators:
+    groups: []
+    subjects: []
   maxLifetimeSeconds: 28800
   maxLogins: 64
   maxSessions: 256
@@ -91,19 +96,6 @@ exposure:
     # Gateway parentRefs copied verbatim.
     parentRefs: []
     annotations: {}
-
-# Fleet enrollment identity and bounds.
-fleet:
-  issuer: ""
-  clients: []
-  subjects: []
-  groups: []
-  deliveryProfiles: []
-  # Raised to the hub-issued slots (the combined-mode connector plus one per
-  # clusters[] entry) when lower.
-  maxActiveBootstraps: 1
-  maxBootstrapHistory: 16
-  maxClusters: 1
 
 # Workload clusters joined with `mode: cluster` (hub or combined releases).
 # Their connectors authenticate with their own ServiceAccount tokens

@@ -131,6 +131,26 @@ type Policy struct {
 	StepUp                   StepUpPolicy
 	RequireRecordingApproval bool
 	PolicyGrants             *PolicyGrantApproval
+	// AdministratorGroups and AdministratorSubjects are identity.administrators
+	// (ADR-335 D14): the installation administrators.
+	AdministratorGroups, AdministratorSubjects []string
+}
+
+// Administrator reports whether i is an installation administrator: a
+// listed subject or a member of a listed group of the policy's issuer.
+func (p Policy) Administrator(i Identity) bool {
+	if i.Principal.Issuer != p.Issuer {
+		return false
+	}
+	if slices.Contains(p.AdministratorSubjects, i.Principal.Subject) {
+		return true
+	}
+	for _, g := range i.Groups {
+		if slices.Contains(p.AdministratorGroups, g) {
+			return true
+		}
+	}
+	return false
 }
 
 type Identity struct {

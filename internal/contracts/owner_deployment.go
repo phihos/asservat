@@ -133,19 +133,10 @@ type OwnerPublicDeployment struct {
 	DownloadsPerIdentity int                       `json:"downloadsPerIdentity"`
 	DownloadMaxSeconds   int                       `json:"downloadMaxSeconds"`
 	OperationAudit       OwnerPublicOperationAudit `json:"operationAudit"`
-	// Fleet names the fleet operators (protected fleet settings).
-	Fleet *OwnerFleetIssuance `json:"fleet,omitempty"`
 	// RuntimeProjection names the immutable public runtime projection Secret
 	// (ADR-184 decision 6, ADR-194). The provider-installed layout requires it;
 	// the owner compares it with the mounted public root at startup.
 	RuntimeProjection WorkerObjectReference `json:"runtimeProjection,omitzero"`
-}
-
-// OwnerFleetIssuance is the protected fleet.json ConfigMap and its guard,
-// which name the fleet operators.
-type OwnerFleetIssuance struct {
-	Settings      WorkerObjectReference `json:"settings"`
-	SettingsGuard OwnerDeploymentGuard  `json:"settingsGuard"`
 }
 
 type OwnerPublicOperationAudit struct {

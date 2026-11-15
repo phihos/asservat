@@ -14,6 +14,8 @@ identity:
   clientSecret: {existingSecret: operator-oidc-client}
   clients: [ { id: asservat-console, kind: human } ]
   eligibleGroups: [REPLACE_WITH_STABLE_TRIAL_USERS_GROUP_ID]
+  administrators:
+    groups: [REPLACE_WITH_ADMINISTRATOR_GROUP]
   processingOperators:
     - clientID: asservat-console
       issuer: https://id.example.invalid/realms/homelab
@@ -22,10 +24,6 @@ identity:
 exposure:
   # Existing kubernetes.io/tls Secret for the origin.
   tlsSecret: operator-console-tls
-fleet:
-  issuer: https://id.example.invalid/realms/homelab
-  clients: [asservat-console]
-  groups: [REPLACE_WITH_STABLE_FLEET_OPERATOR_GROUP_ID]
 federation:
   endpoint: https://federation.hub.example.invalid:31446
   serverName: federation.hub.example.invalid

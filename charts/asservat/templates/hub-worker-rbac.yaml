@@ -11,7 +11,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels: {{ include "asservat.labels" (list . "hub-worker") | nindent 4 }}
 rules:
-  # Fleet, owner, processing, browser/identity settings and cluster catalog
+  # Owner, processing, browser/identity settings and cluster catalog
   # source observers (read by name; UIDs key SQL rows).
   - apiGroups: [""]
     resources: [configmaps]

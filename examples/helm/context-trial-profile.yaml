@@ -21,12 +21,6 @@ processors: []
 captureHistory: {perSelector: 16, perInstallation: 32}
 exposure:
   service: {type: NodePort, nodePort: 31450}
-fleet:
-  subjects: []
-  deliveryProfiles: [regional-installer]
-  maxActiveBootstraps: 1
-  maxBootstrapHistory: 4
-  maxClusters: 1
 capacity:
   evidenceStorage: 8Gi
   storageAssurance: qualifiedReservedBackend

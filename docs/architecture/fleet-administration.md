@@ -10,29 +10,11 @@ is no public permission CRUD API.
 ## Fleet settings
 
 [ADR-335](../decisions/335-usable-by-default.md) D14 removes the separate fleet
-operator list: administrators (`identity.administrators`) administer the fleet, and
-the canonical fleet-settings contract is deleted. The runtime still reads the
-earlier `fleet.json`, described below
-([implemented schema](../../specs/contracts/implemented/fleet-settings.schema.json),
-[example](../../examples/implemented/fleet-settings.json)). The Helm chart renders it into a
-ConfigMap in the Asservat namespace. It declares:
-
-- the installation;
-- administrative suspension;
-- one organization issuer (HTTPS, no user info, query or fragment) and the
-  allowed clients;
-- approved credential-delivery profile names; no field selects a URL or
-  carries a secret.
-
-There are no enrollment ceilings: the registered cluster rows (one per Helm
-release on a workload cluster) bound the cluster count.
-
-hub-worker reads the file through a shared informer (or the mounted file) and
-rejects unknown fields and case aliases. A valid change is written to SQL
-`fleet_trust`, in one transaction with a `NOTIFY` so other hub processes
-reload. Unchanged content writes nothing. The stored content stays valid until
-a later change replaces it; it does not expire. A watch or parse failure keeps the last valid revision and reports the
-error; it does not suspend the installation.
+operator list and the fleet settings: administrators are
+`identity.administrators` in the identity settings. The SQL `fleet_trust` row
+holds only the generated installation ID and issuer epoch. `setup` seeds it and
+the hub-worker refreshes its observation from the same generated IDs; no
+ConfigMap feeds it.
 
 ## Recovery fence
 
