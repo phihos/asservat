@@ -135,11 +135,10 @@ capacity: {}
 #   capturesPerCluster: 8      # default: larger of 8 and the node count
 #   namespaceLimit: 25%        # default: no namespace cap
 #   workload:
-#     share: 16Gi              # protected per workload; default 1/8 of the rest
+#     share: 16Gi              # protected per workload; default the rest ÷ max(8, enrolled workloads)
 #     limit: 10%               # protected share plus burst; at least the share
 #     dump: {burst: 1, minimumIntervalSeconds: 900}
-#     maxConcurrentExpensive: 1
-#     onFull: RejectNewExpensive   # or DeleteOldestEligibleInAccount
+#     maxConcurrentExpensive: 1  # concurrent profiles per workload
 
 # Deployment/StatefulSet label and annotation keys only administrators may
 # set (ADR-247), for workloadMetadata PermissionSources.

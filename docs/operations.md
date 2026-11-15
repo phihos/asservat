@@ -30,7 +30,7 @@ Maintain reviewed mechanism/qualification rule versions with capability data and
 
 Capacity is the hub's `capacity` Helm values (ADR-335 D2, [schema](../specs/contracts/capacity.schema.json)); there is no capacity CRD. The [sample values](../examples/capacity-values.yaml) state 128 GiB of evidence storage, protect 16 GiB and cap 32 GiB per workload, and limit dumps to one episode per 15 minutes. These are illustrative values requiring workload/backend qualification.
 
-Check byte and object reservations before acquisition; keep versions, multipart remnants and deletion-pending copies charged. Defaults preserve existing evidence and refuse new expensive capture when that workload fills its quota. Optional rolling deletion affects only its own eligible evidence. Never borrow another workload's protected allocation. Show physical/backend capacity separately from logical usage and refuse an unsupported isolation claim on best-effort storage.
+Check byte and object reservations before acquisition; keep versions, multipart remnants and deletion-pending copies charged. Defaults preserve existing evidence and refuse new expensive capture when that workload fills its quota. Never borrow another workload's protected allocation. Show physical/backend capacity separately from logical usage and refuse an unsupported isolation claim on best-effort storage.
 
 Fair rate/CPU/scratch profiles must agree with dump size/time budgets: the example 32 MiB/s workload upload ceiling cannot stream an uncompressed 2 GiB artifact in the generic 30-second acquisition deadline. Preflight must expose that conflict and require a supported adjustment; it is not resolved by unlimited buffering or hidden timeout extension.
 

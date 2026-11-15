@@ -7,12 +7,12 @@ Read with [triggers](triggers.md), [actions](actions.md), [privacy](privacy.md) 
 | Value | Default | Meaning |
 | --- | --- | --- |
 | `capacity.evidenceStorage` | the bundled object store's volume size; required for an external store | Usable evidence bytes, after the backend's full threshold and replication overhead |
-| `capacity.workload.share` | usable capacity ÷ max(eligible workloads, 8) | Each workload's protected allocation (quantity or percentage) |
+| `capacity.workload.share` | usable capacity ÷ max(enrolled workloads, 8) | Each workload's protected allocation (quantity or percentage) |
 | `capacity.workload.limit` | 10 %, raised to the default share | Hard maximum per workload (protected share plus burst); the effective hard limit is the larger of this limit and the workload's share |
 | `capacity.capturesPerCluster` | max(8, node count) | Concurrent captures per cluster |
 | retention values | [REQ-EVD-006](evidence.md#req-evd-006--retention-holds-and-deletion) | Maximum evidence age |
 
-The full set is [capacity.schema.json](contracts/capacity.schema.json); every field is optional. The hub reads these values from its configuration, and changes apply on `helm upgrade`. Sizes accept Kubernetes quantities. They cover every namespace except system namespaces, the release namespace and namespaces labelled `asservat.io/evidence: disabled`; access still requires an AccessBinding. Workload maintainers may narrow a limit in a policy's `budgets`, never raise it or select another account. Capacity is not a CRD: there is one evidence store per installation, and ordinary users need no quota YAML.
+The full set is [capacity.schema.json](contracts/capacity.schema.json); every field is optional. The hub reads these values from its configuration, and changes apply on `helm upgrade`. Sizes accept Kubernetes quantities. They cover every namespace except `kube-*` system namespaces, the release namespace and namespaces labelled `asservat.io/evidence: disabled`; collection in those namespaces is refused, and access elsewhere still requires an AccessBinding. Workload maintainers may narrow a limit in a policy's `budgets`, never raise it or select another account. Capacity is not a CRD: there is one evidence store per installation, and ordinary users need no quota YAML.
 
 ## REQ-CAP-001 — Workload-wide storm control
 
@@ -65,13 +65,13 @@ Given workload A continuously requests large cores while B requests one capture,
 
 ## REQ-CAP-004 — Protected storage plus hard limits
 
-Protected capacity is allocated when a workload is enrolled for collection, never lent to another workload, and must fit:
+Protected capacity is allocated when a workload is enrolled, on its first collection, never lent to another workload, and must fit:
 
 ```text
 sum(protected allocations) + system reserve <= usable pool capacity
 ```
 
-The system reserve (catalog, index and deletion work) is derived from the pool size. Whatever is not protected or reserved is shared burst. Usage within a workload's allocation consumes its own protected capacity; usage above it consumes burst, up to the workload's hard limit. Charges are committed bytes plus outstanding maximum reservations. A small context reserve inside each allocation, derived from the context record size, keeps pod-status capture possible when dumps have filled the rest. Lowering a capacity value below allocated usage reports over-limit and blocks new allocations; it never retracts an allocation with usage. Recomputing the default share shrinks only allocations without usage.
+The system reserve (catalog, index and deletion work) is derived from the pool size. Whatever is not protected or reserved is shared burst. Usage within a workload's allocation consumes its own protected capacity; usage above it consumes burst, up to the workload's hard limit. Charges are committed bytes plus outstanding maximum reservations. A small context reserve inside each allocation, derived from the context record size, keeps pod-status capture possible when dumps have filled the rest. Lowering a capacity value below allocated usage reports over-limit and blocks new allocations; it never retracts an allocation with usage. The default share divides by enrolled workloads, not by every workload in the clusters: counting all workloads would need a workload inventory of every cluster and would shrink shares for workloads that never collect. Recomputing the default share shrinks only allocations without usage.
 
 Example: a 128 GiB usable pool with a derived 8 GiB reserve and `workload.share: 16Gi` protects six workloads (96 GiB) and leaves 24 GiB of burst. With a 32 GiB workload limit, A may use its 16 GiB plus 16 GiB of burst; B–F keep their protected 16 GiB however often A triggers.
 
@@ -103,7 +103,7 @@ Given two 8 GiB attempts racing for 8 GiB remaining capacity, when both reserve,
 
 ## REQ-CAP-006 — Exhaustion and visibility
 
-A full account rejects new expensive work (`RejectNewExpensive`, the default): prior evidence stays, context continues within its reserve, and the status names `WorkloadStorageFull`, `PoolBurstFull` or `CapacityUnavailable`. Other workloads keep their protected capacity. An administrator may set `capacity.workload.onFull: DeleteOldestEligibleInAccount`, which deletes only the same workload's oldest unheld evidence, verifies removal and then reconsiders a still-fresh request; it never evicts another workload or waits while a process is stopped. Retention is a maximum, not a promise to keep every artifact. Held artifacts keep consuming capacity.
+A full account rejects new expensive work (`RejectNewExpensive`, the default): prior evidence stays, context continues within its reserve, and the status names `WorkloadStorageFull`, `PoolBurstFull` or `CapacityUnavailable`. Other workloads keep their protected capacity. Asservat never deletes evidence to make room; retention is the only age limit and a maximum, not a promise to keep every artifact. Held artifacts keep consuming capacity.
 
 `capacity.namespaceLimit` caps a namespace's total bytes, so many small workloads cannot monopolize enrollment. Automatic onboarding allocates from that namespace capacity; when it cannot, the workload reports `CapacityNotAllocated`. Deleting or renaming a workload does not erase its charges.
 
@@ -111,7 +111,7 @@ Show usage per workload: retained, in flight, deletion pending, protected remain
 
 ### SC-CAP-006
 
-Given A fills its account, when another trigger arrives, then it records suppression and available context without deleting B's evidence. If own-account rolling deletion is enabled but an object is held or deletion fails, its charge remains and no dump starts. A newly enrolled workload without backed capacity is visibly pending, not falsely protected.
+Given A fills its account, when another trigger arrives, then it records suppression and available context without deleting B's evidence. A newly enrolled workload without backed capacity is visibly pending, not falsely protected.
 
 ## Shared limits for other features
 

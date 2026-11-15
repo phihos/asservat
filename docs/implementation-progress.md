@@ -173,12 +173,16 @@ cluster-observation capacity purposes, the context-control record counter
 and the download session/response counters (bytes stay bounded).
 `capturesPerCluster` defaults to max(8, node count).
 
-Gaps: the default share divides by max(8, enrolled accounts), not the
-eligible-workload count; namespace eligibility (system/release namespaces,
-`asservat.io/evidence: disabled`) is not checked on enrollment because the
-storage read knows only the namespace UID; `maxConcurrentExpensive` and
-`onFull` are stored but no expensive-action reservation consumes them yet;
-`DeleteOldestEligibleInAccount` has no deletion path.
+Follow-up (branch `clean/capacity-gaps`, migration 00185): target
+resolution refuses `kube-*`, the release namespace and namespaces labelled
+`asservat.io/evidence: disabled` (`targets.ErrEvidenceDisabled`). A profile
+admission counts the workload's still-writable profile attempts under the
+allocation lock (`capacity_expensive_admits`) and refuses at
+`maxConcurrentExpensive`. The spec now divides the default share by enrolled
+workloads (an all-cluster workload inventory would add watches for no
+benefit) and drops `onFull`/`DeleteOldestEligibleInAccount`: a full account
+rejects new expensive work. Gap: no expensive request waits; one that finds
+the limit reached is refused at once.
 
 ## Capacity from Helm values (2026-11-14)
 
@@ -200,7 +204,7 @@ set, `TestCapacityValuesSourceWithRealPostgres` (real PostgreSQL). Gaps: the
 default share divides by max(8, clusters + 1), not the eligible-workload
 count; the
 `capturesPerCluster` default ignores node count; `maxConcurrentExpensive`
-and `onFull` are not enforced; capacity is on only when a value is set; the
+is not enforced; capacity is on only when a value is set; the
 SQL capacity subsystem (00054, object counts, five-second observation
 loops) is unchanged.
 

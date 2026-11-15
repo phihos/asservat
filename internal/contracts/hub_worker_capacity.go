@@ -18,7 +18,6 @@ type CapacityWorkloadValues struct {
 	Limit                  string             `json:"limit,omitempty"`
 	Dump                   CapacityDumpValues `json:"dump,omitzero"`
 	MaxConcurrentExpensive int64              `json:"maxConcurrentExpensive,omitempty"`
-	OnFull                 string             `json:"onFull,omitempty"`
 }
 
 type CapacityDumpValues struct {
