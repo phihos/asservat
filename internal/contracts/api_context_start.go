@@ -8,10 +8,9 @@ import (
 )
 
 const (
-	APIContextWorkFormat      = "api-context-work/v1"
-	APIContextExchangeFormat  = "api-context-exchange/v1"
-	APIContextWorkBytes       = 8 << 10
-	APIContextSignedWorkBytes = 16 << 10
+	APIContextWorkFormat     = "api-context-work/v1"
+	APIContextExchangeFormat = "api-context-exchange/v1"
+	APIContextWorkBytes      = 8 << 10
 )
 
 var ErrAPIContextProtocol = errors.New("invalid API context exchange")
@@ -104,7 +103,7 @@ func EncodeAPIContextWork(v APIContextWork) ([]byte, error) {
 }
 func DecodeAPIContextWork(b []byte) (APIContextWork, error) {
 	v, e := decodeOpenRPC[APIContextWork](bytes.NewReader(b), APIContextWorkBytes)
-	if e != nil {
+	if e != nil || v.Format != APIContextWorkFormat {
 		return APIContextWork{}, ErrAPIContextProtocol
 	}
 	return v, nil

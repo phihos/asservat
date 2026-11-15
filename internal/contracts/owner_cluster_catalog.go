@@ -17,8 +17,8 @@ const (
 	OwnerClusterCatalogMaxBytes = 128 << 10
 	// OwnerClusterCatalogSlots is the installation's fixed regional capacity.
 	// Slot names are deterministic, so the owner Role and the namespace
-	// workload guard name every slot's capability and work-trust sources
-	// (two dry-run probe pairs per slot) at install time; an unused slot's
+	// workload guard name every slot's capability source
+	// (one dry-run probe pair per slot) at install time; an unused slot's
 	// names grant nothing because its sources do not exist. Eight covers the
 	// S-02 second cluster with headroom, keeps the catalog (about 6 KiB per
 	// entry) well under its 128 KiB bound and stays below the context-start
@@ -56,7 +56,7 @@ func OwnerIdentitySettingsName(installationID string) string {
 func OwnerPublicGuardedSources(installationID string) []string {
 	out := []string{OwnerClusterCatalogName(installationID)}
 	for slot := 1; slot <= OwnerClusterCatalogSlots; slot++ {
-		out = append(out, OwnerClusterSourceName(installationID, slot, "capability"), OwnerClusterSourceName(installationID, slot, "work-trust"))
+		out = append(out, OwnerClusterSourceName(installationID, slot, "capability"))
 	}
 	return append(out, OwnerWorkerConfigurationName(installationID), OwnerDownloadEnvironmentName(installationID))
 }
@@ -78,7 +78,7 @@ func OwnerClusterCatalogName(installationID string) string {
 
 // OwnerClusterSourceName is a fixed per-slot source name, so the owner Role
 // can name it before any cluster enrolls. kind is "capability" or
-// "work-trust"; slot counts from 1.
+// "topology"; slot counts from 1.
 func OwnerClusterSourceName(installationID string, slot int, kind string) string {
 	return "asservat-" + strings.ReplaceAll(installationID, "-", "") + "-cluster-" + strconv.Itoa(slot) + "-" + kind
 }

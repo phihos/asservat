@@ -69,9 +69,7 @@ func TestHistoryAttachmentWaitsAfterJoinedExchange(t *testing.T) {
 			}
 			return readDeadline(until)
 		}
-		local := &HistoryLocal{Verifier: historyVerifierFunc(func(context.Context, []byte, fleet.APIContextReceiver) (fleetapp.AuthenticatedHistoryWork, error) {
-			return fleetapp.AuthenticatedHistoryWork{Work: work, KeyID: "synthetic", TrustRevision: workFixture().TrustRevision, VerifiedAt: work.Authority.StartedAt, ValidUntil: deadline}, nil
-		}), Effects: historyEffectsFunc(func(context.Context, capture.HistoryOperationAuthority, capture.HistoryCiphertexts, artifact.Copies) (fleetapp.HistoryReply, error) {
+		local := &HistoryLocal{Effects: historyEffectsFunc(func(context.Context, capture.HistoryOperationAuthority, capture.HistoryCiphertexts, artifact.Copies) (fleetapp.HistoryReply, error) {
 			effects++
 			return fleetapp.HistoryReply{Copies: copies, Bundle: bundle}, nil
 		})}
@@ -85,7 +83,7 @@ func TestHistoryAttachmentWaitsAfterJoinedExchange(t *testing.T) {
 			clear(frame.Payload)
 			regional <- e
 		}()
-		reply, e := a.RunHistory(ctx, work, []byte("synthetic signature"), capture.HistoryCiphertexts{}, copies)
+		reply, e := a.RunHistory(ctx, work, capture.HistoryCiphertexts{}, copies)
 		reply.Bundle.Clear()
 		regionalErr := <-regional
 		a.Close()

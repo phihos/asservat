@@ -27,13 +27,13 @@ type OwnerInitialHistoryProbe struct {
 }
 
 // MaxOwnerConfigurationProbes bounds the guard's exact named dry-run UPDATE
-// pairs. The provider-installed hub uses 9 + 2 per regional catalog slot:
-// three worker pairs (fleet, owner and processing sources); for the owner the
-// cluster catalog, worker configuration, download environment and processing
-// source; the publisher's and key service's catalog pairs; and each slot's
-// capability and work-trust sources. With contracts.OwnerClusterCatalogSlots
-// = 8 that is 25, plus the one spare pair the bound has always kept.
-const MaxOwnerConfigurationProbes = 26
+// pairs. The provider-installed hub uses 8 + 1 per regional catalog slot:
+// two worker pairs (owner and processing sources); for the owner the cluster
+// catalog, worker configuration, download environment and processing source;
+// the publisher's and key service's catalog pairs; and each slot's capability
+// source. With contracts.OwnerClusterCatalogSlots = 8 that is 16, plus the one
+// spare pair the bound has always kept.
+const MaxOwnerConfigurationProbes = 17
 
 func (p OwnerInitialHistoryProbe) Valid() bool {
 	return identity.Text(p.Namespace.Name, 63) && authorization.UUID(p.Namespace.UID) && identity.Text(p.ServiceAccount, 253) && authorization.UUID(p.ServiceAccountUID) && identity.Text(p.Configuration, 253)

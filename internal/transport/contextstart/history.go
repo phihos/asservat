@@ -14,6 +14,7 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
 )
 
 // RegionalHistory receives only authenticated, independently SQL-authorized
@@ -22,8 +23,7 @@ type RegionalHistory interface {
 	ExecuteHistory(context.Context, capture.HistoryOperationAuthority, capture.HistoryCiphertexts, artifact.Copies) (fleetapp.HistoryReply, error)
 }
 type HistoryLocal struct {
-	Verifier fleetapp.HistoryWorkVerifier
-	Effects  RegionalHistory
+	Effects RegionalHistory
 	// Report, if set, receives the operation word and its fixed step timing
 	// once per exchange. Diagnostic only.
 	Report func(string, string)
@@ -126,7 +126,7 @@ func historyReplyValue(a capture.HistoryOperationAuthority, m contracts.HistoryC
 	}
 	return r, nil
 }
-func serveHubHistory(ctx context.Context, s Stream, w fleetapp.HistoryWork, signed []byte, b capture.HistoryCiphertexts, c artifact.Copies, now func() time.Time) (fleetapp.HistoryReply, error) {
+func serveHubHistory(ctx context.Context, s Stream, w fleetapp.HistoryWork, b capture.HistoryCiphertexts, c artifact.Copies, now func() time.Time) (fleetapp.HistoryReply, error) {
 	var out fleetapp.HistoryReply
 	if ctx == nil || s == nil || now == nil || !w.Valid(now()) || ctx.Err() != nil {
 		return out, fleet.ErrInvalid
@@ -138,7 +138,11 @@ func serveHubHistory(ctx context.Context, s Stream, w fleetapp.HistoryWork, sign
 	defer cancel()
 	// Step marks are diagnostic only (the caller's step timing, if any).
 	began := time.Now()
-	if e := s.Send(call, contracts.APIContextFrame{Kind: contracts.HistoryWorkFrame, Payload: signed}); e != nil {
+	work, e := encodeHistoryWork(w, now())
+	if e != nil {
+		return out, e
+	}
+	if e := s.Send(call, contracts.APIContextFrame{Kind: contracts.HistoryWorkFrame, Payload: work}); e != nil {
 		return out, e
 	}
 	auditapp.MarkStep(ctx, "x-send-work", began)
@@ -198,8 +202,8 @@ func serveHubHistory(ctx context.Context, s Stream, w fleetapp.HistoryWork, sign
 	auditapp.MarkStep(ctx, "x-send-ack", began)
 	return out, effectErr
 }
-func serveRegionalHistory(ctx context.Context, s Stream, r fleet.APIContextReceiver, signed []byte, l *HistoryLocal, now func() time.Time) error {
-	if l == nil || l.Verifier == nil || l.Effects == nil {
+func serveRegionalHistory(ctx context.Context, s Stream, r fleet.APIContextReceiver, payload []byte, l *HistoryLocal, now func() time.Time) error {
+	if l == nil || l.Effects == nil {
 		return fleet.ErrUnavailable
 	}
 	// Step timing for the region's fixed diagnostic report: only fixed step
@@ -212,18 +216,16 @@ func serveRegionalHistory(ctx context.Context, s Stream, r fleet.APIContextRecei
 			l.Report(operation, steps.String())
 		}
 	}()
-	began := time.Now()
-	verified, e := l.Verifier.VerifyHistoryWork(ctx, signed, r)
-	auditapp.MarkStep(ctx, "r-verify", began)
-	if e != nil || !verified.Valid(now()) || verified.Work.Authority.ExecutorEpoch != r.Channel.Executor.ProcessEpoch {
+	work, e := decodeHistoryWork(payload, r, now())
+	if e != nil {
 		return fleet.ErrDenied
 	}
-	a := verified.Work.Authority
+	a := work.Authority
 	switch a.Operation {
 	case "write", "read", "purge":
 		operation = a.Operation
 	}
-	call, cancel := context.WithDeadline(ctx, verified.ValidUntil)
+	call, cancel := context.WithDeadline(ctx, identity.Earlier(a.NotAfter, r.Window.Until()))
 	ended := make(chan struct{})
 	stopStream := context.AfterFunc(s.Context(), func() { cancel(); close(ended) })
 	defer func() {
@@ -232,7 +234,7 @@ func serveRegionalHistory(ctx context.Context, s Stream, r fleet.APIContextRecei
 		}
 		cancel()
 	}()
-	began = time.Now()
+	began := time.Now()
 	f, e := s.Receive(call)
 	auditapp.MarkStep(ctx, "r-receive-request", began)
 	defer clear(f.Payload)

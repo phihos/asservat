@@ -62,7 +62,7 @@ type InstallerOwnerPromotion struct {
 	// ProviderRootsPEM the identity provider's TLS roots.
 	BrowserAudience  string `json:"browserAudience"`
 	ProviderRootsPEM string `json:"providerRootsPEM"`
-	// TransitMount holds the session and work-signing keys; it must differ
+	// TransitMount holds the session keys; it must differ
 	// from the audit and owner PKI mounts. WorkerPKIMount issues download
 	// worker leaves and must differ from the owner PKI mount.
 	TransitMount   string `json:"transitMount"`

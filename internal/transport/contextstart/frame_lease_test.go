@@ -338,37 +338,6 @@ func TestContextStreamWorkLeaseCallerCancellationAndFinalJoin(t *testing.T) {
 	})
 }
 
-func TestContextStreamWorkLeaseAwaitWorkExposesShorterCallerToVerifier(t *testing.T) {
-	w := workFixture()
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	until, _ := ctx.Deadline()
-	proof := fleet.APIContextReceiver{Channel: w.Work.Channel, Window: identity.Check(w.VerifiedAt, identity.Recheck).Narrow(w.ValidUntil)}
-	if !proof.Window.Until().After(until) {
-		t.Fatal("fixture lacks original shorter caller")
-	}
-	calls := 0
-	s, write := leaseTestStream(t, ctx, w.Work.Channel, func(context.Context) (fleet.APIContextReceiver, error) { calls++; return proof, nil })
-	write(contracts.APIContextFrame{Kind: contracts.APIContextWorkFrame, Payload: []byte("signed")})
-	verified := 0
-	local := &countingLocal{}
-	e := ServeRegionalOperations(ctx, s, proof, streamDiagnosticVerifier(func(c context.Context, _ []byte, r fleet.APIContextReceiver) (fleet.AuthenticatedAPIContextWork, error) {
-		verified++
-		if r.Channel != proof.Channel || r.Window.From() != proof.Window.From() || !r.Window.Until().Equal(until) {
-			t.Error("verifier received a later cutoff than the work lease")
-		}
-		if d, ok := c.Deadline(); !ok || d.After(until) {
-			t.Error("verifier escaped original caller")
-		}
-		// Rejection intentionally prevents an effect; this regression qualifies
-		// the actual passive-read/verifier handoff, not signature authority.
-		return fleet.AuthenticatedAPIContextWork{}, fleet.ErrDenied
-	}), local.local(), time.Now)
-	if e != fleet.ErrDenied || calls != 1 || verified != 1 || local.calls != 0 {
-		t.Fatal("wrong original handoff", e, calls, verified, local.calls)
-	}
-}
-
 func TestContextStreamWorkLeaseConcurrentCloseStopsAndJoinsOnce(t *testing.T) {
 	w := workFixture()
 	ctx, cancel := context.WithDeadline(context.Background(), w.ValidUntil)

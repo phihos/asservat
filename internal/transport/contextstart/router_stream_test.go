@@ -136,7 +136,7 @@ func TestRouterStreamCancellationKeepsCaptureChargedUntilJoined(t *testing.T) {
 	t.Cleanup(func() { operationOnce.Do(func() { close(releaseOperation) }) })
 	runDone := make(chan struct{})
 	go func() {
-		_, _ = attachment.Run(w, []byte("signed"), func(call context.Context, _ *HubOperations) (string, error) {
+		_, _ = attachment.Run(w, func(call context.Context, _ *HubOperations) (string, error) {
 			close(entered)
 			<-call.Done()
 			close(cancelled)

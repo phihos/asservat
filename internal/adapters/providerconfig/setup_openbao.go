@@ -49,7 +49,7 @@ func OpenBaoRoleName(name, component, purpose string) string {
 // the same names.
 type OpenBaoNames struct {
 	AuditKey, WorkerConfigurationAuditKey, DeletionSigningKey, PublisherAuditKey string // on SmallOpenBaoAuditMount
-	BrowserSessionKey, WorkSigningKey                                            string // on SmallOpenBaoTransitMount
+	BrowserSessionKey                                                            string // on SmallOpenBaoTransitMount
 	OwnerServerRole, OwnerClientRole                                             string // on SmallOpenBaoOwnerPKIMount
 	DownloadWorkerRole, VerifierRole                                             string // on SmallOpenBaoWorkerPKIMount
 }
@@ -58,7 +58,7 @@ func OpenBaoNamesFor(installationID string) OpenBaoNames {
 	p := "asservat-" + strings.ReplaceAll(installationID, "-", "")
 	return OpenBaoNames{AuditKey: "audit", WorkerConfigurationAuditKey: contracts.WorkerConfigurationAuditKeyName(installationID),
 		DeletionSigningKey: contracts.ContextDeletionSigningKeyName(installationID),
-		PublisherAuditKey:  PublisherAuditKey(installationID), BrowserSessionKey: p + "-browser-sessions", WorkSigningKey: p + "-work-signing",
+		PublisherAuditKey:  PublisherAuditKey(installationID), BrowserSessionKey: p + "-browser-sessions",
 		OwnerServerRole: p + "-owner-server", OwnerClientRole: p + "-owner-client",
 		DownloadWorkerRole: p + "-download-worker", VerifierRole: contracts.PublisherVerifierRole(installationID)}
 }
@@ -154,7 +154,7 @@ func openBaoSetupPlanFor(in OpenBaoSetupInput) (openBaoSetupPlan, error) {
 	p.auth = []string{contracts.SmallOpenBaoConfigurationAuthMount, contracts.SmallOpenBaoOwnerAuthMount}
 	p.keys = []openBaoKey{{audit, n.AuditKey, "aes256-gcm96"}, {audit, n.WorkerConfigurationAuditKey, "aes256-gcm96"}, {audit, n.DeletionSigningKey, "ed25519"},
 		{audit, n.PublisherAuditKey, "aes256-gcm96"},
-		{transit, n.BrowserSessionKey, "aes256-gcm96"}, {transit, n.WorkSigningKey, "ed25519"}}
+		{transit, n.BrowserSessionKey, "aes256-gcm96"}}
 	key := func(mount, name, op string) string { return mount + "/" + op + "/" + name }
 	use := func(paths ...string) map[string][]string {
 		out := map[string][]string{}
@@ -187,7 +187,7 @@ func openBaoSetupPlanFor(in OpenBaoSetupInput) (openBaoSetupPlan, error) {
 		owner("hub-api", hub, "audit-wrap", use(encrypt)), owner("hub-api", hub, "audit-unwrap", use(decrypt)),
 		owner("hub-api", hub, "server-sign", use(ownerPKI+"/sign/"+n.OwnerServerRole)), owner("hub-api", hub, "client-sign", use(ownerPKI+"/sign/"+n.OwnerClientRole)),
 		owner("hub-api", hub, "browser-seal", use(key(transit, n.BrowserSessionKey, "encrypt"))), owner("hub-api", hub, "browser-open", use(key(transit, n.BrowserSessionKey, "decrypt"))),
-		owner("hub-api", hub, "work-sign", read(use(key(transit, n.WorkSigningKey, "sign")), transit+"/keys/"+n.WorkSigningKey)), owner("hub-api", hub, "worker-issue", use(workerPKI+"/sign/"+n.DownloadWorkerRole)),
+		owner("hub-api", hub, "worker-issue", use(workerPKI+"/sign/"+n.DownloadWorkerRole)),
 		owner("publisher", publisher, "audit-wrap", use(key(audit, n.PublisherAuditKey, "encrypt"))), owner("publisher", publisher, "audit-unwrap", use(key(audit, n.PublisherAuditKey, "decrypt"))),
 		owner("publisher", publisher, "verifier-sign", use(workerPKI+"/sign/"+n.VerifierRole)),
 	}

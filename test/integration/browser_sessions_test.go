@@ -351,13 +351,9 @@ func (f *kcFixture) browserSessions(t *testing.T, ca []byte, mappers []any, user
 		}
 	}
 	submissionSessionID := sha256.Sum256([]byte(submissionCookie))
-	verifiedHuman, err := sessions.Resolve(ctx, submissionCookie, false)
-	if err != nil {
+	if _, err = sessions.Resolve(ctx, submissionCookie, false); err != nil {
 		t.Fatal(err)
 	}
-	t.Run("signed-policy-submission", func(t *testing.T) {
-		testProviderPolicySubmission(t, bridge.URL, bridge.Client(), verifiedHuman.Identity)
-	})
 	if status, _, _ := request("GET", callback, "", ""); status != 401 {
 		t.Fatalf("callback replay %d", status)
 	}

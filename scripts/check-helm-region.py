@@ -29,7 +29,6 @@ OFFER = {"format": "asservat-regional-offer/v1", "installationID": "10000000-000
          "roles": {"source": "a", "journal": "b", "acknowledgement": "c", "cleanup": "d", "verifier": "e", "finalizer": "f"}, "connectorBacking": {},
          "image": "registry.example/asservat@" + DIGEST, "owners": {"address": "hub.example.invalid:31447", "configuration": {}},
          "keyService": {"endpoint": "https://keys.example.invalid:31448", "roots": ["AQ=="], "keyID": "k"},
-         "workKey": {"id": "w", "publicKey": "x", "notBefore": "a", "notAfter": "b"},
          "evidenceStore": {"endpoint": "https://s3.example.invalid", "roots": ["AQ=="], "region": "r", "bucket": "b", "storeID": "10000000-0000-4000-8000-000000000014"}}
 
 

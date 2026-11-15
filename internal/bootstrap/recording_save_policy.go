@@ -113,7 +113,7 @@ func packetSourceCompositionReady(c PublicContextOperationsConfig, s PublicConte
 // Bind the existing source-purpose services only after protected identity
 // settings are available. This constructs no worker, watch or provider client.
 func (p *publicContext) packetSourceRuntime(now func() time.Time, newID func() string) *captureapp.PolicySourceRuntime {
-	if p == nil || p.policySources == nil || p.sourceDispatch.Router == nil || p.sourceDispatch.Signer == nil || p.sourceDispatch.Now == nil {
+	if p == nil || p.policySources == nil || p.sourceDispatch.Router == nil || p.sourceDispatch.Now == nil {
 		return nil
 	}
 	observer, ok := p.investigation.Targets.(captureapp.OngoingRecorderObserver)

@@ -2,9 +2,6 @@ package integration
 
 import (
 	"context"
-	"crypto"
-	"crypto/ed25519"
-	"crypto/rand"
 	"crypto/x509"
 	"net"
 	"net/url"
@@ -12,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"asservat.local/asservat/internal/adapters/jose"
 	"asservat.local/asservat/internal/adapters/mtls"
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
@@ -59,18 +55,11 @@ func (s contextStartTestRoutes) ReadOwnerProtection(ctx context.Context, p fleet
 	return fleet.OwnerProtection{Pool: p, Digest: artifact.Digest{31}, ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}, nil
 }
 
-type contextStartTestTrust func(context.Context) (fleet.APIContextWorkTrust, error)
-
-func (f contextStartTestTrust) APIContextWorkTrust(c context.Context) (fleet.APIContextWorkTrust, error) {
-	return f(c)
-}
-
 type regionalAPIStartFixture struct {
 	bridge       bootstrap.RegionalAPIContextStart
 	client       *mtls.ContextStartClient
 	candidates   *postgres.OwnerEnrollments
 	owner        fleet.OwnerBinding
-	verifier     fleetapp.APIContextWorkVerifier
 	local        contextstart.RegionalLocal
 	calls        int
 	lastDuration time.Duration
@@ -107,7 +96,7 @@ func (s *regionalAPIStartFixture) standby(t *testing.T, ctx context.Context) {
 	s.regional = make(chan error, 1)
 	go func() {
 		defer stop()
-		err := bootstrap.ServeRegionalAPIContextExchange(exchange, s.verifier, s.local)
+		err := bootstrap.ServeRegionalAPIContextExchange(exchange, s.local)
 		if s.diagnostic != nil {
 			// Log this original joined completion separately: the public result may
 			// already have stopped its recorder. Never render the private error.
@@ -127,7 +116,7 @@ func (s *regionalAPIStartFixture) joined(t *testing.T, ctx context.Context) {
 	case e := <-s.regional:
 		s.regional = nil
 		if e != nil {
-			t.Fatal("regional signed exchange did not positively finish", e)
+			t.Fatal("regional exchange did not positively finish", e)
 		}
 	case <-ctx.Done():
 		t.Fatal("regional child did not join", ctx.Err())
@@ -267,32 +256,11 @@ func newRegionalAPIStartFixture(t *testing.T, ctx context.Context, f fixture, n 
 		t.Fatal(e)
 	}
 	t.Cleanup(client.Close)
-	public, private, e := ed25519.GenerateKey(rand.Reader)
-	if e != nil {
-		t.Fatal(e)
-	}
-	t.Cleanup(func() { clear(private) })
-	issued := time.Now().UTC()
-	trust := contextStartTestTrust(func(c context.Context) (fleet.APIContextWorkTrust, error) {
-		if c.Err() != nil {
-			return fleet.APIContextWorkTrust{}, c.Err()
-		}
-		now := time.Now().UTC()
-		return fleet.APIContextWorkTrust{RootID: s.a.RootID, InstallationID: pool.InstallationID, ClusterID: b.ClusterID, IssuerEpoch: pool.IssuerEpoch, Trust: fleet.WorkTrust{Revision: identity.Revision{UID: "synthetic-work-trust", Generation: 1, Digest: artifact.Digest{28}}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), Keys: []fleet.WorkKey{{ID: "synthetic-work", ClusterID: b.ClusterID, IssuerEpoch: pool.IssuerEpoch, PublicKey: public, NotBefore: issued.Add(-time.Second), NotAfter: issued.Add(time.Hour)}}}}, nil
-	})
-	signer, e := jose.NewAPIContextWorkSignatures(trust, "synthetic-work", func(context.Context) crypto.Signer { return private }, time.Now)
-	if e != nil {
-		t.Fatal(e)
-	}
-	verifier, e := jose.NewAPIContextWorkSignatures(trust, "", nil, time.Now)
-	if e != nil {
-		t.Fatal(e)
-	}
 	// ADR-171: the hub runs the runner with its SQL/authority ports; the region
 	// answers only its cluster-local ports over the exchange.
 	hub := executionapp.APIContextRunner{Read: runner.Read, Prepare: runner.Prepare, Record: runner.Record, Eligibility: runner.Eligibility, Capabilities: runner.Capabilities, Retention: runner.Retention, Now: runner.Now}
 	local := contextstart.RegionalLocal{Process: runner.Process, Targets: regionalQueryTargets(runner.Targets), Output: runner.Output, Collector: runner.Collector, Now: runner.Now}
-	out := &regionalAPIStartFixture{bridge: bootstrap.RegionalAPIContextStart{Runner: hub, Signer: signer, Router: router, Now: time.Now}, client: client, candidates: sql.reader, owner: owner, verifier: verifier, local: local}
+	out := &regionalAPIStartFixture{bridge: bootstrap.RegionalAPIContextStart{Runner: hub, Router: router, Now: time.Now}, client: client, candidates: sql.reader, owner: owner, local: local}
 	t.Cleanup(func() {
 		client.Close()
 		if out.regional != nil {

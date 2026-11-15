@@ -18,12 +18,6 @@ import (
 	"asservat.local/asservat/internal/domain/targets"
 )
 
-type sourceWorkVerifierFunc func(context.Context, []byte, fleet.APIContextReceiver) (app.AuthenticatedSourceWork, error)
-
-func (f sourceWorkVerifierFunc) VerifySourceWork(ctx context.Context, b []byte, r fleet.APIContextReceiver) (app.AuthenticatedSourceWork, error) {
-	return f(ctx, b, r)
-}
-
 type sourceQueue struct {
 	calls int
 	last  collector.SourcePermit
@@ -104,10 +98,10 @@ func (c *sourceRecordingCanceller) CancelRecording(ctx context.Context, x collec
 }
 
 // Synthetic admitted authority/queue over actual hub/region frame streams and
-// the real router. Real signature purpose/key checks have their JOSE test.
+// the real router.
 // Every source delivery is one query: the standby stays idle for a Save.
 func TestSourceWorkIsAQueryThatKeepsTheStandby(t *testing.T) {
-	for _, mode := range []string{"arm", "stop", "queue-refusal", "cancel", "cancel-refused", "profile-cancel", "profile-cancel-refused", "recording-cancel", "recording-cancel-refused", "sign-failure"} {
+	for _, mode := range []string{"arm", "stop", "queue-refusal", "cancel", "cancel-refused", "profile-cancel", "profile-cancel-refused", "recording-cancel", "recording-cancel-refused", "work-failure"} {
 		t.Run(mode, func(t *testing.T) {
 			w, r := sourceStreamWorkFixture()
 			switch mode {
@@ -142,12 +136,7 @@ func TestSourceWorkIsAQueryThatKeepsTheStandby(t *testing.T) {
 			snapshots := &sourceSnapshotCanceller{fail: mode == "cancel-refused"}
 			profiles := &sourceProfileCanceller{fail: mode == "profile-cancel-refused"}
 			recordings := &sourceRecordingCanceller{fail: mode == "recording-cancel-refused"}
-			region.sourceWork = &SourceLocal{Recordings: recordings, Queue: queue, Snapshots: snapshots, Profiles: profiles, Verifier: sourceWorkVerifierFunc(func(_ context.Context, b []byte, current fleet.APIContextReceiver) (app.AuthenticatedSourceWork, error) {
-				if current.Channel != w.Channel || string(b) != "synthetic-source-signature" {
-					return app.AuthenticatedSourceWork{}, fleet.ErrDenied
-				}
-				return app.AuthenticatedSourceWork{Work: w, KeyID: "synthetic", TrustRevision: workFixture().TrustRevision, VerifiedAt: w.IssuedAt(), ValidUntil: w.NotAfter}, nil
-			})}
+			region.sourceWork = &SourceLocal{Recordings: recordings, Queue: queue, Snapshots: snapshots, Profiles: profiles}
 			cluster := r.Channel.Connector.Binding.ClusterID
 			router, err := NewRouter(RouterLimits{Standby: 1, Captures: 1, Clusters: []ClusterLimit{{cluster, 1, 1}}})
 			if err != nil {
@@ -167,23 +156,23 @@ func TestSourceWorkIsAQueryThatKeepsTheStandby(t *testing.T) {
 
 			call, end := context.WithTimeout(ctx, time.Second)
 			defer end()
-			err = router.DeliverSource(call, cluster, func(current fleet.APIContextReceiver) (app.SourceWork, []byte, error) {
+			err = router.DeliverSource(call, cluster, func(current fleet.APIContextReceiver) (app.SourceWork, error) {
 				if current.Channel != r.Channel {
-					t.Error("work signed for another channel")
+					t.Error("work built for another channel")
 				}
-				if mode == "sign-failure" {
-					return w, nil, fleet.ErrDenied
+				if mode == "work-failure" {
+					return w, fleet.ErrDenied
 				}
-				return w, []byte("synthetic-source-signature"), nil
+				return w, nil
 			})
 			switch mode {
 			case "queue-refusal", "cancel-refused", "profile-cancel-refused", "recording-cancel-refused":
 				if !errors.Is(err, fleet.ErrUnavailable) {
 					t.Fatal("effect refusal lost", err)
 				}
-			case "sign-failure":
+			case "work-failure":
 				if !errors.Is(err, fleet.ErrDenied) {
-					t.Fatal("sign failure lost", err)
+					t.Fatal("work failure lost", err)
 				}
 			default:
 				if err != nil {
@@ -192,9 +181,9 @@ func TestSourceWorkIsAQueryThatKeepsTheStandby(t *testing.T) {
 			}
 			cancelling := mode == "cancel" || mode == "cancel-refused"
 			switch {
-			case mode == "sign-failure":
+			case mode == "work-failure":
 				if queue.calls != 0 || snapshots.calls != 0 || profiles.calls != 0 {
-					t.Fatal("unsigned work reached the region")
+					t.Fatal("refused work reached the region")
 				}
 			case mode == "profile-cancel" || mode == "profile-cancel-refused":
 				if profiles.calls != 1 || !profiles.last.Equal(*w.StopProfile) || queue.calls != 0 || snapshots.calls != 0 {

@@ -133,8 +133,6 @@ func PublicRuntimeRoleOrdinal(purpose string) (int, bool) {
 		return 44, true
 	case "capture-finalizer":
 		return 45, true
-	case "connector-read":
-		return 51, true
 	case "connector-delivery":
 		return 52, true
 	case "connector-owner-read":

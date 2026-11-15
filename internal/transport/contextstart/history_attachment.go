@@ -12,9 +12,9 @@ import (
 
 // RunHistory never constructs an APIContextWork or APIExecution. It consumes
 // this attachment's same finite slot and joins cancellation before returning.
-func (a *Attachment) RunHistory(ctx context.Context, w fleetapp.HistoryWork, signed []byte, b capture.HistoryCiphertexts, c artifact.Copies) (fleetapp.HistoryReply, error) {
+func (a *Attachment) RunHistory(ctx context.Context, w fleetapp.HistoryWork, b capture.HistoryCiphertexts, c artifact.Copies) (fleetapp.HistoryReply, error) {
 	var out fleetapp.HistoryReply
-	if a == nil || ctx == nil || ctx.Err() != nil || !w.Valid(time.Now()) || w.Channel != a.standby.channel || w.Authority.Expectation.CaptureID != a.capture || len(signed) == 0 {
+	if a == nil || ctx == nil || ctx.Err() != nil || !w.Valid(time.Now()) || w.Channel != a.standby.channel || w.Authority.Expectation.CaptureID != a.capture {
 		return out, fleet.ErrInvalid
 	}
 	a.mu.Lock()
@@ -40,10 +40,10 @@ func (a *Attachment) RunHistory(ctx context.Context, w fleetapp.HistoryWork, sig
 		}
 		cancel()
 	}()
-	job := &captureJob{ctx: call, signed: append([]byte(nil), signed...), result: make(chan jobResult, 1)}
+	job := &captureJob{ctx: call, result: make(chan jobResult, 1)}
 	job.historyRun = func(run context.Context, s Stream) (string, error) {
 		var e error
-		out, e = serveHubHistory(run, s, w, job.signed, b, c, time.Now)
+		out, e = serveHubHistory(run, s, w, b, c, time.Now)
 		recordStreamDiagnostic(run, s, e, streamHubOperations)
 		return "", e
 	}

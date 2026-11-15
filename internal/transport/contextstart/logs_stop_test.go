@@ -1,14 +1,12 @@
 package contextstart
 
 import (
-	"context"
 	"testing"
 	"time"
 
 	app "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/collector"
-	"asservat.local/asservat/internal/domain/fleet"
 )
 
 func TestLogsRestrictiveStopNeedsNoNodeQueue(t *testing.T) {
@@ -20,15 +18,19 @@ func TestLogsRestrictiveStopNeedsNoNodeQueue(t *testing.T) {
 		t.Fatal("invalid accepted restrictive fixture")
 	}
 	called := &sourceRecordingCanceller{}
-	local := &SourceLocal{Recordings: called, Verifier: sourceWorkVerifierFunc(func(context.Context, []byte, fleet.APIContextReceiver) (app.AuthenticatedSourceWork, error) {
-		return app.AuthenticatedSourceWork{Work: request, KeyID: "synthetic", TrustRevision: workFixture().TrustRevision, VerifiedAt: request.IssuedAt(), ValidUntil: request.NotAfter}, nil
-	})}
-	reply, err := applySourceWork(t.Context(), receiver, nil, local, time.Now)
+	local := &SourceLocal{Recordings: called}
+	payload, err := encodeSourceWork(request, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	reply, err := applySourceWork(t.Context(), receiver, payload, local, time.Now)
 	if err != nil || reply.State != "queued" || called.calls != 1 || !called.last.Equal(stop) {
 		t.Fatal("authenticated restrictive recording Stop required a node queue", err, reply.State, called.calls)
 	}
-	request = w
-	if _, err := applySourceWork(t.Context(), receiver, nil, local, time.Now); err == nil || called.calls != 1 {
+	if payload, err = encodeSourceWork(w, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := applySourceWork(t.Context(), receiver, payload, local, time.Now); err == nil || called.calls != 1 {
 		t.Fatal("node-free restrictive route enabled source arming")
 	}
 }

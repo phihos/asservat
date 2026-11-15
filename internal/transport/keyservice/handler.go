@@ -117,7 +117,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		deny("decode", 400)
 		return
 	}
-	request := value.KeyRequest{Scope: value.KeyScope{InstallationID: wire.Scope.InstallationID, Purpose: wire.Scope.Purpose, KeyID: wire.Scope.KeyID}, AuthorityID: wire.AuthorityID, Operation: wire.Operation, Binding: wire.Binding, Input: wire.Input, Version: wire.Version}
+	request := value.KeyRequest{Scope: value.KeyScope{InstallationID: wire.Scope.InstallationID, Purpose: wire.Scope.Purpose, KeyID: wire.Scope.KeyID}, AuthorityID: wire.AuthorityID, Operation: wire.Operation, Binding: wire.Binding, Input: wire.Input}
 	if wire.Sealed != nil {
 		request.Sealed = artifact.SealedKey{Reference: wire.Sealed.Reference, Ciphertext: wire.Sealed.Ciphertext}
 	}

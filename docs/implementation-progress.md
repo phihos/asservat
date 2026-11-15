@@ -146,8 +146,8 @@ statements once the lane is gone, so downgrade probes still work.
 The unused `federation` values (the regional offer's connector limits) are
 removed. Gaps: the join Secret still carries the offer and copied
 object-store capabilities; cluster IDs still come from values; `hub.url`/
-`hub.caBundle` are not implemented; work JWS and local-key signing rows below
-are unchanged; the node channel is in "Node channel stream" below.
+`hub.caBundle` are not implemented; the node channel is in "Node channel
+stream" below.
 
 ## Node channel stream (ADR-330 D2/D3, 2026-11-15)
 
@@ -181,6 +181,18 @@ functions stop checking `fresh_until`; `administrators` is optional in the
 implemented identity copy until the identity reader adopts the canonical
 contract; the `fleet-operator` role name stays in docs/interfaces.
 
+## Plain work frames (ADR-330 D2, 2026-11-15)
+
+Branch `clean/connector-3a`. Context-start, history and source work are plain
+JSON frames on the authenticated connector stream; the connector accepts only
+work naming its own channel and cluster. Removed: the work JWS signers and
+verifiers, hub-held and connector work trust (sources, guards, catalog
+`workTrust` slots, the offer's `workKey`), the OpenBao `work-signing` key and
+`work-sign` role, the lifecycle `recovery` purpose and the federation's
+`connector-read` SQL duty, policy-submission signing (dead since ADR-330) and
+the key service's `sign` operation, `policy-submission` purpose and request
+`version`. Hub authorization and SQL checks before sending work are unchanged.
+
 ## ADR-330 contract divergence (2026-11-14)
 
 The canonical contracts in `specs/contracts/` and `docs/interfaces/` follow
@@ -206,11 +218,10 @@ implement the canonical contract.
 | `capture-assessment.schema.json` | No `validUntil` | `internal/application/planning/context_assessment.go`, `recorder_assessment.go` |
 | `packet-capture.schema.json` | No `peers.maxStaleness` (peers follow watch events) | `internal/application/planning/peers.go`, `recorder.go`, builtin profiles `internal/application/planning/profiles/*.json`, `internal/bootstrap/regional_peer_verifier.go`; DebugPolicy/CaptureProfile CRDs |
 | `browser-settings.schema.json` | No `revision`, `rootID`, `sessionEpoch`, `suspended` | `internal/adapters/kubernetes/browser_settings.go`, `internal/bootstrap/hub_api_inputs.go`, session-epoch SQL (`internal/adapters/postgres/custodydb`) |
-| `internal-work.schema.json` | Stream message on the connector connection: no `issuerEpoch`, `deliveryFence`, `*Ref`, `nodeBootID`, `StaleFence`, JWS wrapper; analysis input by `inputArtifactId` | `internal/adapters/jose/work.go`, `internal/contracts/work.go`, `internal/domain/fleet/work.go` |
-| `local-key-service.schema.json`, `local-key-secret.schema.json` | wrap/unwrap only, no `validUntil`; purposes `artifact`, `browser-credentials` | `internal/contracts/key_service.go`, `internal/adapters/kms/local_signing.go`, `local_keys.go`, `protected_local_keys.go` |
+| `local-key-service.schema.json`, `local-key-secret.schema.json` | No `validUntil`; purposes `artifact`, `browser-credentials` | Response `validUntil` and the `audit` purpose: `internal/contracts/key_service.go`, `internal/adapters/kms/local_keys.go`, `internal/domain/authorization/key_service.go` |
 
 Schemas kept because Go still embeds them with production code paths:
-`work-trust`, `submission-trust` and `retention-topology`
+`retention-topology`
 (`internal/adapters/kubernetes/permission_decode.go` and their readers). Remove
 each with its code.
 `local-key-configuration.schema.json` had no runtime consumer and is deleted.

@@ -44,14 +44,13 @@ func DescribeKeyRequest(r value.KeyRequest) (value.KeyRequestInfo, error) {
 	input := artifact.Digest(sha256.Sum256(r.Input))
 	b, err := json.Marshal(struct {
 		Format, Installation, Purpose, KeyID, Authority, Operation, Reference string
-		Version                                                               int
 		Binding, Input, Ciphertext                                            artifact.Digest
-	}{"asservat-key-request-digest/v1", r.Scope.InstallationID, r.Scope.Purpose, r.Scope.KeyID, r.AuthorityID, r.Operation, r.Sealed.Reference, r.Version, artifact.Digest(sha256.Sum256(r.Binding)), input, artifact.Digest(sha256.Sum256([]byte(r.Sealed.Ciphertext)))})
+	}{"asservat-key-request-digest/v2", r.Scope.InstallationID, r.Scope.Purpose, r.Scope.KeyID, r.AuthorityID, r.Operation, r.Sealed.Reference, artifact.Digest(sha256.Sum256(r.Binding)), input, artifact.Digest(sha256.Sum256([]byte(r.Sealed.Ciphertext)))})
 	canonical := jsontext.Value(b)
 	if err != nil || canonical.Canonicalize() != nil {
 		return value.KeyRequestInfo{}, ErrKeyUnavailable
 	}
-	return value.KeyRequestInfo{Scope: r.Scope, AuthorityID: r.AuthorityID, Operation: r.Operation, Reference: r.Sealed.Reference, Version: r.Version, Binding: bytes.Clone(r.Binding), InputDigest: input, RequestDigest: artifact.Digest(sha256.Sum256(canonical))}, nil
+	return value.KeyRequestInfo{Scope: r.Scope, AuthorityID: r.AuthorityID, Operation: r.Operation, Reference: r.Sealed.Reference, Binding: bytes.Clone(r.Binding), InputDigest: input, RequestDigest: artifact.Digest(sha256.Sum256(canonical))}, nil
 }
 
 func (s KeyService) Execute(ctx context.Context, peer value.KeyPeer, request value.KeyRequest) (value.KeyResult, error) {

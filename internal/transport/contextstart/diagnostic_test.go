@@ -510,7 +510,7 @@ func TestContextStreamDiagnosticOriginalHubRunErrorAndJoinedAttachment(t *testin
 	}()
 	calls := 0
 	private := &streamPrivateError{}
-	state, e := attachment.Run(w.Work, []byte("signed"), func(context.Context, *HubOperations) (string, error) {
+	state, e := attachment.Run(w.Work, func(context.Context, *HubOperations) (string, error) {
 		calls++
 		return "Unavailable", private
 	})
@@ -532,12 +532,6 @@ func TestContextStreamDiagnosticOriginalHubRunErrorAndJoinedAttachment(t *testin
 	}
 }
 
-type streamDiagnosticVerifier func(context.Context, []byte, fleet.APIContextReceiver) (fleet.AuthenticatedAPIContextWork, error)
-
-func (f streamDiagnosticVerifier) VerifyAPIContextWork(c context.Context, b []byte, r fleet.APIContextReceiver) (fleet.AuthenticatedAPIContextWork, error) {
-	return f(c, b, r)
-}
-
 func TestContextStreamDiagnosticRegionalVerificationAndIsolation(t *testing.T) {
 	w := workFixture()
 	parent, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -557,19 +551,9 @@ func TestContextStreamDiagnosticRegionalVerificationAndIsolation(t *testing.T) {
 	go func() {
 		written <- contracts.WriteAPIContextFrame(writer, contracts.APIContextFrame{Kind: contracts.APIContextWorkFrame, Payload: []byte("signed")})
 	}()
-	verifications := 0
 	local := &countingLocal{}
-	e := ServeRegionalOperations(ctx, s, receiver, streamDiagnosticVerifier(func(c context.Context, b []byte, r fleet.APIContextReceiver) (fleet.AuthenticatedAPIContextWork, error) {
-		verifications++
-		expected := receiver
-		deadline, _ := ctx.Deadline() // The work lease retains the shorter original caller.
-		expected.Window = expected.Window.Narrow(deadline)
-		if c != ctx || r != expected || string(b) != "signed" {
-			t.Fatal("original verifier input changed")
-		}
-		return fleet.AuthenticatedAPIContextWork{}, &streamPrivateError{}
-	}), local.local(), time.Now)
-	if e != fleet.ErrDenied || verifications != 1 || checks != 1 || local.calls != 0 {
+	e := ServeRegionalOperations(ctx, s, receiver, local.local(), time.Now)
+	if e != fleet.ErrDenied || checks != 1 || local.calls != 0 {
 		t.Fatal("original verification normalization or call count changed")
 	}
 	if e = <-written; e != nil {

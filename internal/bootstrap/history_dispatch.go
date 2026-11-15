@@ -1,6 +1,10 @@
 package bootstrap
 
 import (
+	"context"
+	"errors"
+	"time"
+
 	auditapp "asservat.local/asservat/internal/application/audit"
 	fleetapp "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -8,16 +12,12 @@ import (
 	"asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/transport/contextstart"
-	"context"
-	"errors"
-	"time"
 )
 
 // RegionalHistoryDispatch selects an existing outbound connector conversation.
 // Only the SQL producer can supply the effect authority after this selection.
 type RegionalHistoryDispatch struct {
 	Router *contextstart.Router
-	Signer fleetapp.HistoryWorkSigner
 	Now    func() time.Time
 	// Report receives only fixed stages and finite timing buckets.
 	Report func(string, string)
@@ -28,7 +28,6 @@ var _ fleetapp.HistoryDispatcher = RegionalHistoryDispatch{}
 type regionalHistorySession struct {
 	attachment *contextstart.Attachment
 	receiver   fleet.APIContextReceiver
-	signer     fleetapp.HistoryWorkSigner
 	now        func() time.Time
 	until      time.Time
 	cancel     context.CancelFunc
@@ -71,7 +70,7 @@ func (d RegionalHistoryDispatch) attach(ctx context.Context, cluster, captureID 
 }
 
 func (d RegionalHistoryDispatch) PrepareHistory(ctx context.Context, cluster, captureID string) (fleetapp.HistorySession, error) {
-	if ctx == nil || ctx.Err() != nil || d.Router == nil || d.Signer == nil || d.Now == nil {
+	if ctx == nil || ctx.Err() != nil || d.Router == nil || d.Now == nil {
 		return nil, fleet.ErrUnavailable
 	}
 	// Retry while history's own budget (ADR-272) still leaves time for the
@@ -123,7 +122,7 @@ func (d RegionalHistoryDispatch) PrepareHistory(ctx context.Context, cluster, ca
 	until = identity.Earlier(until, r.Window.Until())
 	// The attachment retains call's cancellation. Its joined Close is the owner;
 	// do not cancel it at this preparation boundary.
-	return &regionalHistorySession{attachment: a, receiver: r, signer: d.Signer, now: d.Now, until: until, cancel: cancel, report: d.Report}, nil
+	return &regionalHistorySession{attachment: a, receiver: r, now: d.Now, until: until, cancel: cancel, report: d.Report}, nil
 }
 func (s *regionalHistorySession) ExecutorEpoch() string {
 	return s.receiver.Channel.Executor.ProcessEpoch
@@ -151,18 +150,8 @@ func (s *regionalHistorySession) ExecuteHistory(ctx context.Context, a capture.H
 	w := fleetapp.HistoryWork{Channel: s.receiver.Channel, Authority: a}
 	effectUntil := identity.Earlier(s.until, a.NotAfter)
 	began := time.Now()
-	signed, e := s.signer.SignHistoryWork(ctx, w)
-	reportHistoryDispatch(s.report, ctx, "sign", began, effectUntil, e)
-	if e != nil {
-		return out, e
-	}
-	defer clear(signed)
-	if !a.Valid(s.now()) || ctx.Err() != nil {
-		return out, fleet.ErrUnavailable
-	}
-	began = time.Now()
 	observed, diagnostics := contextstart.NewStreamDiagnosticContext(ctx)
-	out, e = s.attachment.RunHistory(observed, w, signed, b, c)
+	out, e := s.attachment.RunHistory(observed, w, b, c)
 	reportHistoryDispatch(s.report, ctx, "exchange", began, effectUntil, e)
 	if e != nil && s.report != nil {
 		if peerUntil, ok := diagnostics.WorkPeerDeadline(); ok {

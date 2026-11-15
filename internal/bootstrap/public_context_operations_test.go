@@ -15,7 +15,6 @@ import (
 	catalogapp "asservat.local/asservat/internal/application/catalog"
 	"asservat.local/asservat/internal/application/evidence"
 	executionapp "asservat.local/asservat/internal/application/execution"
-	fleetapp "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/transport/contextstart"
@@ -46,7 +45,6 @@ type publicContextOperationPorts struct {
 	executionapp.APIExecutionReader
 	executionapp.APIExecutionPreparer
 	executionapp.APIExecutionRecorder
-	fleetapp.APIContextWorkSigner
 	captureapp.ContextProgressReader
 	catalogapp.ContextCaseRoutes
 	permissions.ProjectionReader
@@ -79,7 +77,7 @@ func publicContextOperationFixture(t *testing.T) (PublicContextOperationsConfig,
 	return c, PublicContextOperationServices{
 		Investigation: captureapp.ContextInvestigation{RootID: root, InstallationID: installation, Previews: p, Replay: p, Admission: p, Resolution: p, Targets: p, Eligibility: p, Capabilities: p, Retention: p, Storage: p, Processing: p, Lifetime: time.Minute},
 		Intents:       auditapp.CaptureOperationPublication{RootID: root, Completed: p, Journal: p, Acknowledgements: p, Writer: p, Reader: p, MAC: mac},
-		Regional:      RegionalAPIContextStart{Runner: executionapp.APIContextRunner{Read: p, Prepare: p, Record: p, Eligibility: p, Retention: p}, Signer: p, Router: &contextstart.Router{}},
+		Regional:      RegionalAPIContextStart{Runner: executionapp.APIContextRunner{Read: p, Prepare: p, Record: p, Eligibility: p, Retention: p}, Router: &contextstart.Router{}},
 		Progress:      captureapp.ContextProgressService{RootID: root, InstallationID: installation, Reader: p},
 		Cases:         catalogapp.ContextCaseService{RootID: root, InstallationID: installation, Routes: p, Permissions: p, Catalog: p, Retention: p, Processing: p},
 		Downloads:     evidence.ContextDownloadCoordinator{RootID: root, InstallationID: installation, Routes: p, Sources: p, Authority: p, Sessions: p, Plans: p},
@@ -98,7 +96,7 @@ func TestPublicContextOperationsOwnCompleteSubmissionAndNativeBindings(t *testin
 	publication, auditOK := v.submission.Intents.(auditapp.CaptureOperationPublication)
 	navigator, navOK := v.progress.Navigation.(captureapp.ContextCaseNavigator)
 	cases, caseOK := navigator.Cases.(catalogapp.ContextCaseService)
-	if !ok || !auditOK || !navOK || !caseOK || regional.Router != s.Regional.Router || regional.Runner.Read != s.Regional.Runner.Read || regional.Signer != s.Regional.Signer || regional.Runner.Capabilities != s.Investigation.Capabilities || regional.Runner.Now == nil || publication.MAC != s.Intents.MAC || v.submission.Resolution != s.Investigation.Resolution || v.submission.Admission != s.Investigation.Admission || cases.Catalog != s.Cases.Catalog || v.downloads.Runtime != s.Native.Runtime || v.stop.Active != s.Native.Runtime {
+	if !ok || !auditOK || !navOK || !caseOK || regional.Router != s.Regional.Router || regional.Runner.Read != s.Regional.Runner.Read || regional.Runner.Capabilities != s.Investigation.Capabilities || regional.Runner.Now == nil || publication.MAC != s.Intents.MAC || v.submission.Resolution != s.Investigation.Resolution || v.submission.Admission != s.Investigation.Admission || cases.Catalog != s.Cases.Catalog || v.downloads.Runtime != s.Native.Runtime || v.stop.Active != s.Native.Runtime {
 		t.Fatal("assembly replaced original submission, authority, navigation or native owner")
 	}
 	if s.Regional.Runner.Capabilities != nil || s.Progress.Navigation != nil || s.Downloads.Runtime != nil || s.Investigation.Now != nil {
@@ -175,7 +173,6 @@ func TestPublicContextOperationsRejectMissingOrForeignComposition(t *testing.T) 
 		"regional-local-port": func(_ *PublicContextOperationsConfig, s *PublicContextOperationServices) {
 			s.Regional.Runner.Collector = &contextstart.HubOperations{} // cluster-local ports are per exchange
 		},
-		"regional-signer": func(_ *PublicContextOperationsConfig, s *PublicContextOperationServices) { s.Regional.Signer = nil },
 		"regional-router": func(_ *PublicContextOperationsConfig, s *PublicContextOperationServices) { s.Regional.Router = nil },
 		"regional-capability-override": func(_ *PublicContextOperationsConfig, s *PublicContextOperationServices) {
 			s.Regional.Runner.Capabilities = s.Investigation.Capabilities

@@ -11,7 +11,6 @@ import (
 	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/execution"
-	"asservat.local/asservat/internal/domain/fleet"
 )
 
 // fixtureContext is the synthetic accepted start the API runner tests derive
@@ -27,7 +26,7 @@ type fixtureContext struct {
 
 type contextExecutionFixture struct {
 	now                                          time.Time
-	receiver                                     fleet.Receiver
+	receiver                                     fixtureReceiver
 	resolved                                     fixtureContext
 	mode                                         string
 	spent                                        atomic.Bool
@@ -79,10 +78,13 @@ func (f *contextExecutionFixture) Capture(context.Context, artifact.PinnedPod) (
 	}
 	return []byte("synthetic control-flow fixture; native format tested by real writer"), nil
 }
+
+type fixtureReceiver struct{ ClusterID, IssuerEpoch, NodeUID, NodeBootID, CollectorEpoch string }
+
 func contextID(n int) string { return fmt.Sprintf("00000000-0000-4000-8000-%012d", n) }
 func executionFixture() *contextExecutionFixture {
 	now := time.Now().UTC().Truncate(time.Microsecond)
-	r := fleet.Receiver{PeerID: contextID(1), ClusterID: contextID(2), IssuerEpoch: contextID(3), NodeUID: contextID(4), NodeBootID: contextID(5), CollectorEpoch: contextID(6), Region: "eu-test", Capabilities: []string{"pod-status/v1"}, VerifiedAt: now, ValidUntil: now.Add(30 * time.Second)}
+	r := fixtureReceiver{ClusterID: contextID(2), IssuerEpoch: contextID(3), NodeUID: contextID(4), NodeBootID: contextID(5), CollectorEpoch: contextID(6)}
 	notAfter := now.Add(30 * time.Second)
 	b := value.Binding{OperationID: contextID(8), CaptureID: contextID(10), ActionID: "pod-status", AttemptID: contextID(11), ClusterID: r.ClusterID, IssuerEpoch: r.IssuerEpoch, PodUID: contextID(9), NodeUID: r.NodeUID, NodeBootID: r.NodeBootID, CollectorEpoch: r.CollectorEpoch, ScopeDigest: artifact.Digest{1}, AuthorityDigest: artifact.Digest{2}, BudgetDigest: artifact.Digest{3}, AuditDigest: artifact.Digest{4}, NativeBytes: 4096, NotBefore: now, NotAfter: notAfter}
 	e := artifact.ContextExpectation{Registration: artifact.Registration{Location: artifact.Location{ClusterID: r.ClusterID, ArtifactID: contextID(16), AttemptID: b.AttemptID}, StoreID: contextID(17), AllocationID: contextID(18), PoolRevision: 1, AllocationRevision: 1, NativeLimit: 4096, AnchorAt: now, WriteUntil: now.Add(time.Minute), ExpiresAt: now.Add(60 * time.Second), DeleteBy: now.Add(90 * time.Second)}, CaseID: contextID(21), OccurrenceID: contextID(22), NodeUID: r.NodeUID, NodeBootID: r.NodeBootID, PodUID: b.PodUID, Namespace: "payments", NamespaceUID: contextID(23), WorkloadUID: contextID(24), CollectorVersion: "synthetic", CollectorImageDigest: artifact.Digest{6}, RecipeDigest: artifact.Digest{7}, PlanDigest: b.ScopeDigest, CaptureUID: b.CaptureID, ActionID: b.ActionID, DataClass: "metadata", PurposeRef: "diagnostics", Audience: []artifact.AudienceAssignment{{Kind: "Group", Issuer: "https://id.example.test", SubjectID: "team", Role: "workload-maintainer", BasisKind: "AccessBinding", BasisUID: contextID(25), AssignmentID: contextID(26), BasisDigest: artifact.Digest{8}}}, RequestedAgeSeconds: 60, MaximumAgeSeconds: 120, DeletionBudgetSeconds: 30, RetentionRules: []artifact.RetentionRule{{UID: contextID(27), Generation: 1, Digest: artifact.Digest{9}}}, TriggeredAt: now}

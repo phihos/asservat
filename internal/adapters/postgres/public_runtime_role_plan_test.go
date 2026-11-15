@@ -11,10 +11,10 @@ import (
 func TestPublicRuntimeRolePlanKeepsPurposeIdentityAndProjection(t *testing.T) {
 	const installation = "10000000-0000-4000-8000-000000000001"
 	wantHub := []string{"hub-runtime", "capture-intent-read", "worker-config-read", "capacity-profile-read", "capture-admit", "capture-journal", "capture-ack"}
-	want := append(slices.Clone(wantHub), "browser-settings", "capture-cleanup", "capture-verifier", "capture-finalizer", "connector-read", "connector-delivery", "connector-owner-read", "publication-gate", "context-verify", "context-verification-audit", "context-publish", "publisher-identity-read", "publisher-retention-read", "capacity", "capacity-capture", "permission-accept", "permission-audit", "retention-source", "retention-source-audit", "retention-catchup", "retention-lifecycle-audit", "worker-config-observe", "worker-config-audit", "context-cleanup", "context-cleanup-audit", "context-cleanup-finalize", "key-configuration", "key-wrap", "key-verify", "key-acquisition")
+	want := append(slices.Clone(wantHub), "browser-settings", "capture-cleanup", "capture-verifier", "capture-finalizer", "connector-delivery", "connector-owner-read", "publication-gate", "context-verify", "context-verification-audit", "context-publish", "publisher-identity-read", "publisher-retention-read", "capacity", "capacity-capture", "permission-accept", "permission-audit", "retention-source", "retention-source-audit", "retention-catchup", "retention-lifecycle-audit", "worker-config-observe", "worker-config-audit", "context-cleanup", "context-cleanup-audit", "context-cleanup-finalize", "key-configuration", "key-wrap", "key-verify", "key-acquisition")
 	// ADR-204 takes the next unused ordinals 86-88, ADR-205 89-91 and ADR-210
 	// 92; metadata uses 93 and execution 94; old facet ordinals remain retired.
-	ordinals := []int{95, 16, 20, 34, 40, 41, 42, 1, 43, 44, 45, 51, 52, 56, 24, 25, 26, 27, 65, 66, 70, 71, 72, 73, 78, 79, 80, 81, 86, 87, 89, 90, 91, 82, 83, 84, 88}
+	ordinals := []int{95, 16, 20, 34, 40, 41, 42, 1, 43, 44, 45, 52, 56, 24, 25, 26, 27, 65, 66, 70, 71, 72, 73, 78, 79, 80, 81, 86, 87, 89, 90, 91, 82, 83, 84, 88}
 	for n, purpose := range want {
 		ordinal, known := contracts.PublicRuntimeRoleOrdinal(purpose)
 		name, valid := PublicRuntimeRoleName(installation, purpose)

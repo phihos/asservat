@@ -75,7 +75,7 @@ func apiContextFrameLimit(kind APIContextFrameKind) int {
 	case APIContextHelloFrame:
 		return APIContextWorkBytes
 	case APIContextWorkFrame, HistoryWorkFrame:
-		return APIContextSignedWorkBytes
+		return APIContextWorkBytes
 	case APIContextResultFrame, APIContextReceiptFrame, HistoryReceiptFrame:
 		return 1024
 	case APIContextOperationRequestFrame, APIContextOperationResponseFrame, APIContextQueryFrame, APIContextAnswerFrame:

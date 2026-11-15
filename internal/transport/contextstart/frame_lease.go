@@ -202,7 +202,7 @@ func (s *frameStream) admitLeaseFrame(kind contracts.APIContextFrameKind, receiv
 		return contracts.ErrAPIContextProtocol
 	}
 	switch {
-	// One separately signed history effect, then a current-peer final reply.
+	// One separately authorized history effect, then a current-peer final reply.
 	case !l.regional && !receive && kind == contracts.HistoryRequestFrame && l.phase == peerIdentityIdle:
 		l.phase = peerIdentityReply
 	case l.regional && receive && kind == contracts.HistoryRequestFrame && l.phase == peerIdentityIdle:

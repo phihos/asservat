@@ -16,7 +16,7 @@ type ownerProviderLifetimes struct {
 	auditWrap, auditUnwrap, serverSign, clientSign *ownerProviderLifetime
 	// public holds the ADR-182 public purposes in providerconfig order; all
 	// nil without a pinned public recipe.
-	public [4]*ownerProviderLifetime
+	public [3]*ownerProviderLifetime
 	cancel context.CancelFunc
 }
 

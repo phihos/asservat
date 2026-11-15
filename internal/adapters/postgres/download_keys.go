@@ -147,7 +147,7 @@ func (s *DownloadKeys) BindAttestedDownloadKeys(ctx context.Context, session str
 
 func (s *DownloadKeys) Resolve(ctx context.Context, peer authorization.KeyPeer, r authorization.KeyRequestInfo) (authorization.KeyOperationPermit, error) {
 	var out authorization.KeyOperationPermit
-	if s == nil || s.downloads == nil || ctx == nil || ctx.Err() != nil || r.Scope != s.scope || r.Operation != "unwrap" || r.Version != 0 || !authorization.UUID(r.AuthorityID) || r.RequestDigest == (artifact.Digest{}) || len(r.Binding) < 1 || len(r.Binding) > 2048 || peer.Role != "acquisition" || !peer.CanRequest(s.scope, "unwrap") || !strings.HasPrefix(r.Reference, "asservat-local-keyset/v1/"+s.scope.InstallationID+"/artifact/"+s.scope.KeyID+"/") {
+	if s == nil || s.downloads == nil || ctx == nil || ctx.Err() != nil || r.Scope != s.scope || r.Operation != "unwrap" || !authorization.UUID(r.AuthorityID) || r.RequestDigest == (artifact.Digest{}) || len(r.Binding) < 1 || len(r.Binding) > 2048 || peer.Role != "acquisition" || !peer.CanRequest(s.scope, "unwrap") || !strings.HasPrefix(r.Reference, "asservat-local-keyset/v1/"+s.scope.InstallationID+"/artifact/"+s.scope.KeyID+"/") {
 		return out, authapp.ErrKeyDenied
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)

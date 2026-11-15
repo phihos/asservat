@@ -80,12 +80,10 @@ func TestOlderConnectorRunsSupportedWorkAndRefusesMissingOperation(t *testing.T)
 			}
 			joined := make(chan error, 1)
 			go func() {
-				joined <- ServeRegionalOperations(ctx, region, receiver, streamDiagnosticVerifier(func(context.Context, []byte, fleet.APIContextReceiver) (fleet.AuthenticatedAPIContextWork, error) {
-					return authenticated, nil
-				}), ports, time.Now)
+				joined <- ServeRegionalOperations(ctx, region, receiver, ports, time.Now)
 			}()
 			var resolved, consumed bool
-			state, err := ServeHubOperations(ctx, hub, w, []byte("synthetic-signed-work"), func(call context.Context, ops *HubOperations) (string, error) {
+			state, err := ServeHubOperations(ctx, hub, w, func(call context.Context, ops *HubOperations) (string, error) {
 				r, err := ops.ResolveArgumentSource(call, request)
 				if err != nil {
 					return "Unavailable", err

@@ -8,12 +8,10 @@ import (
 
 const SourceWorkFormat = "ordinary-packet-source-work/v1"
 
-// Canonical little-endian BPF bytes avoid verbose per-instruction JSON. The
-// existing real signers accept at most16KiB signing input;11KiB payload leaves
-// bounded room for JWS base64/protected headers and its final64-byte signature.
-// Finite capture limits remain unchanged.
+// Canonical little-endian BPF bytes avoid verbose per-instruction JSON. 11 KiB
+// holds the largest source work: a full filter program (8 bytes per
+// instruction, planning.MaxFilterInstructions) plus its target and source.
 const SourceWorkBytes = 11 << 10
-const SourceSignedWorkBytes = 16 << 10
 
 type SourceWork struct {
 	Format        string            `json:"format"`

@@ -56,7 +56,7 @@ investigation-check:
 
 # Product component gates. The integration target creates/removes owned fixtures.
 .PHONY: go-check go-architecture-check context-integration
-go-check: manifest-schema-check permission-schema-check policy-schema-check permission-crd-check control-schema-check retention-crd-check profile-crd-check investigation-schema-check authority-window-check
+go-check: manifest-schema-check permission-schema-check policy-schema-check permission-crd-check retention-crd-check profile-crd-check investigation-schema-check authority-window-check
 	go vet ./...
 	# Preserve race/count/deadline checks with exact sequential Kubernetes groups.
 	$(PYTHON) scripts/test-go-shards.py
@@ -171,10 +171,6 @@ permission-crd-check:
 permission-integration:
 	$(PYTHON) scripts/test-permissions.py
 
-.PHONY: control-schema-check
-control-schema-check:
-	$(PYTHON) scripts/manifest-schemas.py --bundle control
-
 .PHONY: fleet-integration
 fleet-integration:
 	$(PYTHON) scripts/test-custody.py --fleet
@@ -210,7 +206,7 @@ helm-integration: helm-check
 # Use the spec virtual environment: make pre-push PYTHON=<spec-venv>/bin/python
 PRE_PUSH_GATES := spec-check architecture-check design-check openapi-check live-check download-check investigation-check \
 	go-architecture-check manifest-schema-check investigation-schema-check permission-schema-check policy-schema-check \
-	permission-crd-check control-schema-check retention-crd-check helm-check \
+	permission-crd-check retention-crd-check helm-check \
 	gate-self-tests sql-check console-check gofmt-check go-vet go-affected-test authority-window-check
 .PHONY: pre-push gate-self-tests gofmt-check go-vet go-affected-test
 pre-push:

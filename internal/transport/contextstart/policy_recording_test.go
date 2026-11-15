@@ -28,7 +28,7 @@ func (o *policyRecorderOutput) StartPolicyRecording(_ context.Context, _ artifac
 }
 
 // The source comes from the local resolver and the expectation from verified
-// signed work, independently of the later caller-supplied observation receipt.
+// work, independently of the later caller-supplied observation receipt.
 func TestPolicyRecordingOperationPinsIndependentWorkAndSource(t *testing.T) {
 	id := func(n string) string { return "10000000-0000-4000-8000-0000000000" + n }
 	now := time.Now().UTC().Truncate(time.Microsecond)

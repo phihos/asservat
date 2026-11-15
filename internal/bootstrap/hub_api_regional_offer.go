@@ -2,7 +2,6 @@ package bootstrap
 
 import (
 	"context"
-	"encoding/base64"
 	"os"
 	"time"
 
@@ -35,14 +34,9 @@ type hubAPIRegionalOffer struct {
 	hubOnly bool
 }
 
-// regionalWorkKeyValidity bounds the offered work key: the offer is
-// written once per installation.
-const regionalWorkKeyValidity = 5 * 365 * 24 * time.Hour
-
 // addExecutor completes the regional executor section (ADR-196/198) of the
 // combined-mode offer except Owners: the key service (its Service endpoint,
-// serving CA and artifact key), the hub's work-signing public key and the
-// evidence store (from the capacity qualification).
+// serving CA and artifact key) and the evidence store (from the capacity qualification).
 func (o *hubAPIRegionalOffer) addExecutor(ctx context.Context, files *os.Root, h contracts.HubAPIConfig, c contracts.OwnerDeployment, storeID string, now time.Time) error {
 	p := c.Public
 	if p == nil || !authorization.UUID(storeID) {
@@ -52,12 +46,7 @@ func (o *hubAPIRegionalOffer) addExecutor(ctx context.Context, files *os.Root, h
 	if err != nil {
 		return err
 	}
-	if len(p.WorkSigning.PublicKey) != 32 || p.WorkSigning.KeyID == "" {
-		return hubAPIInputError("regional-offer-work-key")
-	}
-	from := now.UTC().Truncate(time.Second)
 	o.offer.KeyService = &contracts.RegionalWrapService{Endpoint: "https://" + contracts.HubAPIName(h.Name, "key-service") + "." + h.Namespace + ".svc:9447", Roots: keyRoots, KeyID: p.ArtifactKeyID}
-	o.offer.WorkKey = &contracts.APIContextWorkPublicKey{ID: p.WorkSigning.KeyID, PublicKey: base64.RawURLEncoding.EncodeToString(p.WorkSigning.PublicKey), NotBefore: from.Format(time.RFC3339Nano), NotAfter: from.Add(regionalWorkKeyValidity).Format(time.RFC3339Nano)}
 	o.offer.EvidenceStore = &contracts.RegionalEvidenceStore{Endpoint: h.ObjectStore.Endpoint, Roots: c.AuditStore.Roots, Region: h.ObjectStore.Region, Bucket: h.ObjectStore.EvidenceBucket, StoreID: storeID}
 	o.ownersAddress = contracts.HubAPIName(h.Name, "hub-api-native") + "." + h.Namespace + ".svc:9444"
 	return nil
