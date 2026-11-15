@@ -177,7 +177,10 @@ func (c *IdentityPolicyClient) readPolicy(ctx context.Context, issuer string) (v
 	if err != nil || wire.Issuer != issuer {
 		return out, value.ErrUnavailable
 	}
-	out = value.Policy{Revision: value.Revision{UID: ref.UID, Generation: wire.Revision, Digest: digest}, Issuer: wire.Issuer, ObservedAt: start, FreshUntil: start.Add(30 * time.Second), EligibleGroups: wire.EligibleGroups, GroupsAtIssueQualified: wire.GroupsAtIssueQualified, GroupMaxAge: time.Duration(wire.GroupMaxAgeSeconds) * time.Second, AdministratorGroups: wire.Administrators.Groups, AdministratorSubjects: wire.Administrators.Subjects}
+	out = value.Policy{Revision: value.Revision{UID: ref.UID, Generation: wire.Revision, Digest: digest}, Issuer: wire.Issuer, ObservedAt: start, FreshUntil: start.Add(30 * time.Second), EligibleGroups: wire.EligibleGroups, GroupsAtIssueQualified: wire.GroupsAtIssueQualified, GroupMaxAge: time.Duration(wire.GroupMaxAgeSeconds) * time.Second}
+	if a := wire.Administrators; a != nil {
+		out.AdministratorGroups, out.AdministratorSubjects = a.Groups, a.Subjects
+	}
 	if a := wire.Approvals; a != nil {
 		out.RequireRecordingApproval = a.RequireRecordingApproval
 		if v := a.PolicyGrants; v != nil {

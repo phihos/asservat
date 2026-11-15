@@ -370,6 +370,7 @@ def check_cluster_join(render):
     v2["mode"] = "combined"
     v2["federation"]["connector"]["profiles"] = 2
     render(v2, ok=False)
+    assert "fleet was removed; list administrators under identity.administrators" in render({**v, "fleet": {"groups": ["ops"]}}, ok=False)
     del v2["federation"]["connector"]["profiles"]
     render(v2)
     for bad in [{"remote": {}}, {"clusters": [{"name": "eu", "clusterID": "not-a-uuid"}]}, {"clusters": [{"name": "Bad", "clusterID": cluster}]}]:

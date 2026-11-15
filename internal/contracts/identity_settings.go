@@ -11,7 +11,7 @@ type IdentitySettings struct {
 	GroupsAtIssueQualified bool              `json:"groupsAtIssueQualified"`
 	GroupMaxAgeSeconds     int               `json:"groupMaxAgeSeconds"`
 	// Administrators are the installation administrators (ADR-335 D14).
-	Administrators IdentityAdministrators `json:"administrators"`
+	Administrators *IdentityAdministrators `json:"administrators,omitempty"`
 	// Approvals are the protected installation approval settings (ADR-249).
 	// Absent: no step-up is configured, so no approval can be decided.
 	Approvals *IdentityApprovals `json:"approvals,omitempty"`

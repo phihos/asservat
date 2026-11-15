@@ -335,6 +335,9 @@
         }
       }
     },
+    "fleet": {
+      "description": "Removed; the chart fails with a pointer to identity.administrators."
+    },
     "clusters": {
       "type": "array",
       "description": "Workload clusters joined with mode=cluster, registered by their ServiceAccount issuer (ADR-334); the hub-api keeps each one's join Secret <name>-join-<name>.",
