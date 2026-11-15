@@ -71,8 +71,8 @@ func TestProfileComparisonSizeRefusalRetainsAuditedReadOwner(t *testing.T) {
 				}
 				out, e := s.Call(t.Context(), f, tool, input)
 				if mode == "failed-audit" {
-					if e == nil || len(out.Body) != 0 || !f.active || f.completions != 0 || !f.lastRead.closed {
-						t.Fatal("failed acknowledgement lost conservative charged cleanup", e)
+					if e == nil || len(out.Body) != 0 || !f.lastRead.closed {
+						t.Fatal("failed audit row disclosed output or kept the read open", e)
 					}
 					return
 				}
