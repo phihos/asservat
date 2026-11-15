@@ -132,7 +132,7 @@ func TestDownloadStopUsesPrepaidLaneWithoutReadScopeOrNormalAuditCapacity(t *tes
 	current.i.Scopes = []string{"openid"}
 	downloads, _, _ := downloadProjection(t)
 	downloads.config.Now = audited.config.Now
-	stop := &stopProjectionFixture{out: artifact.DownloadStopReceipt{DownloadID: downloadID, RequestID: caseID, State: "AlreadyTerminal", AuditState: "pending", ObservedAt: current.i.VerifiedAt, ValidUntil: current.i.ValidUntil}}
+	stop := &stopProjectionFixture{out: artifact.DownloadStopReceipt{DownloadID: downloadID, RequestID: caseID, State: "AlreadyTerminal", ObservedAt: current.i.VerifiedAt, ValidUntil: current.i.ValidUntil}}
 	downloads.stop = stop
 	combined, e := NewInvestigationOperations(audited.inner.(*InvestigationOperations).captures, nil, downloads)
 	if e != nil {

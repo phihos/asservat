@@ -74,19 +74,14 @@ func buildCapacityQualification(p contracts.InstallerCapacitySettings, d capacit
 	in := app.RootBackingInput{Format: app.RootBackingFormat, RootID: d.Root, InstallationID: d.Installation, QualificationID: newID(), QualificationDigest: profileDigest("capacity", p),
 		SystemPoolUID: d.SystemPoolUID, AccountVersion: d.AccountVersion, Accounts: p.Accounts, RecordsPerAccount: p.Records, AdmissionSeconds: p.AdmissionSeconds,
 		ProcessingEpoch: newID(), ProcessingSourceUID: d.ProcessingSourceUID, ProcessingProtectionDigest: d.ProcessingProtection,
-		Capture:             lane("capture", capture, p.Accounts, p.Records, l.CaptureRetainedSeconds),
-		Normal:              lane("normal", history(audit.ShareOperationHistoryLayout, p.Footprints.Operation), l.Normal.Accounts, l.Normal.Records, l.Normal.RetainedSeconds),
-		Resolution:          lane("resolution", history(audit.OperationVerificationHistoryLayout, p.Footprints.Operation), l.Resolution.Accounts, l.Resolution.Records, l.Resolution.RetainedSeconds),
-		Processing:          lane("processing", history(audit.ProcessingReleaseHistoryLayout, p.Footprints.Processing), l.Processing.Accounts, l.Processing.Records, l.Processing.RetainedSeconds),
-		StopRetainedSeconds: p.StopRetainedSeconds,
+		Capture:    lane("capture", capture, p.Accounts, p.Records, l.CaptureRetainedSeconds),
+		Normal:     lane("normal", history(audit.ShareOperationHistoryLayout, p.Footprints.Operation), l.Normal.Accounts, l.Normal.Records, l.Normal.RetainedSeconds),
+		Resolution: lane("resolution", history(audit.OperationVerificationHistoryLayout, p.Footprints.Operation), l.Resolution.Accounts, l.Resolution.Records, l.Resolution.RetainedSeconds),
+		Processing: lane("processing", history(audit.ProcessingReleaseHistoryLayout, p.Footprints.Processing), l.Processing.Accounts, l.Processing.Records, l.Processing.RetainedSeconds),
 	}
 	f := p.Footprints
 	in.ContextHistory = app.ContextBackingHistory{ProfileProtocol: app.ProfileProtocolVersion, Capture: capture, CapturePurgeLeases: p.PurgeLeases,
-		Native: authorization.NativeHistoryQualification{ID: newID(), Digest: profileDigest("native", f.Native), RowBytes: f.Native.RowBytes, TransitionWALBytes: f.Native.TransitionWALBytes, BackupCopies: b.BackupCopies, WALCopies: b.WALCopies},
-		Stop: audit.DownloadStopLifecyclePolicy{RootID: d.Root, InstallationID: d.Installation, StoreID: store, PolicyID: newID(), BackupProfileID: backup, QualificationID: newID(),
-			PolicyDigest: profileDigest("stop", p.StopRetainedSeconds), BackupProfileDigest: backupDigest, QualificationDigest: profileDigest("stop-history", f.Stop), Layout: audit.DownloadStopHistoryLayout,
-			BackupHorizonSeconds: b.HorizonSeconds, CleanupBudgetSeconds: b.CleanupBudgetSeconds, ProofWindowSeconds: b.ProofWindowSeconds,
-			MaximumRowFootprintBytes: f.Stop.RowBytes, MaximumTransitionWALBytes: f.Stop.TransitionWALBytes, BackupCopies: b.BackupCopies, WALCopies: b.WALCopies, MaxPurgeLeases: p.PurgeLeases}}
+		Native: authorization.NativeHistoryQualification{ID: newID(), Digest: profileDigest("native", f.Native), RowBytes: f.Native.RowBytes, TransitionWALBytes: f.Native.TransitionWALBytes, BackupCopies: b.BackupCopies, WALCopies: b.WALCopies}}
 	m := p.Metadata
 	in.Metadata = app.RootMetadataQualification{ID: newID(), Layout: app.RootMetadataLayout, Digest: profileDigest("metadata", m), FixedRowBytes: m.FixedRowBytes, AccountRowBytes: m.AccountRowBytes,
 		RecordRowBytes: m.RecordRowBytes, RecordWALBytes: m.RecordWALBytes, RecordKeyAttempts: m.RecordKeyAttempts, TransitionWALBytes: m.TransitionWALBytes,

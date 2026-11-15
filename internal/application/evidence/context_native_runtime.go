@@ -111,7 +111,7 @@ func (r *ContextNativeRuntime) beginResponseRequest(ctx context.Context, current
 
 func (r *ContextNativeRuntime) beginRequestAuthority(ctx context.Context, current identities.CurrentIdentity, session artifact.DownloadSession, observed *artifact.DownloadAuthority) (*ContextNativeRuntime, context.Context, context.CancelFunc, artifact.DownloadAuthority, error) {
 	var zero artifact.DownloadAuthority
-	if r == nil || ctx == nil || ctx.Err() != nil || current == nil || !session.Valid() || session.StopProtocol != artifact.DownloadStopProtocol || session.State.Terminal() {
+	if r == nil || ctx == nil || ctx.Err() != nil || current == nil || !session.Valid() || session.State.Terminal() {
 		return nil, nil, nil, zero, artifact.ErrDownloadUnavailable
 	}
 	call, end := context.WithDeadline(ctx, session.Deadline)

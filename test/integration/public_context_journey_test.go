@@ -352,9 +352,9 @@ func qualifyPublicContextJourney(t *testing.T, parent context.Context, fixture f
 	}
 	reply, e = call("cancel_artifact_download", map[string]string{"download_id": original.ID, "idempotency_key": "public-journey-stop"}, true)
 	stopped := publicJourneyData[presentation.ContextDownloadCancelData](t, "browser prepaid Stop", reply, e)
-	if stopped.DownloadID != original.ID || stopped.AuditState != "recorded" {
+	if stopped.DownloadID != original.ID || stopped.State == "" {
 		native.gateTrace.Report(t)
-		t.Fatal("original Stop lacked acknowledged audit", stopped)
+		t.Fatal("original Stop not confirmed", stopped)
 	}
 	retainedSession, e := native.runtime.LookupDownload(ctx, original.ID, actor.Principal)
 	publicJourneyRequire(t, "retained original Stop", e)

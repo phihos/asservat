@@ -293,10 +293,6 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 				// This is funded before reservation, never a resume-time refill.
 				r.Session.ReadLimit = 12 << 20
 			}
-			if strings.HasPrefix(mode, "native-") && mode != "native-exchange" && mode != "native-owner-renewal" {
-				bindContextNativeStopFixture(t, ctx, f.config, f.allocation, f.installation, f.p.Expectation.Registration.StoreID, poolFor)
-				r.Session.StopProtocol = artifact.DownloadStopProtocol
-			}
 			session, e := f.runtime.ReserveDownload(ctx, r)
 			if e != nil {
 				t.Fatal(e)

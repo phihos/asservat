@@ -212,7 +212,6 @@ func newPublicJourneyNative(t *testing.T, ctx context.Context, s captureAdmissio
 	workers := makeWorkers("download_worker_runtime", "synthetic-download-worker")
 	workerAck := makeWorkers("download_worker_audit_runtime", "synthetic-download-worker-audit")
 	dispatch := &evidence.DownloadDispatcher{Ledger: workers, Jobs: f.jobs, Audit: &objectstore.DownloadWorkerAuditObjects{Store: store, Seal: keys, Open: keys}, Acknowledgements: workerAck, Authority: f.gate, CurrentAuthority: f.gate, Profile: f.profile, Now: time.Now}
-	bindContextNativeStopFixture(t, ctx, config, f.allocation, installation, f.storeID, poolFor)
 	nativeSQLRoles(t, ctx, admin)
 	contextNativeSQLRoles(t, ctx, admin)
 	owners, e := postgres.NewNativeOwners(ctx, open("native_owner_runtime", "synthetic-native-owner"), root, f.profile, g)
@@ -262,23 +261,9 @@ func newPublicJourneyNative(t *testing.T, ctx context.Context, s captureAdmissio
 	plans, e := postgres.NewContextDownloadPlans(ctx, open("native_plan_runtime", "synthetic-native-plan"), root, installation, f.profile, configuration, postgres.ContextDownloadPlanLimits{OutputLimit: 8192, ReadLimit: 8 << 20})
 	publicJourneyRequire(t, "download plans", e)
 	f.coordinator = evidence.ContextDownloadCoordinator{RootID: root, InstallationID: installation, Routes: f.runtime, Sources: f.runtime, Authority: f.gate, Sessions: f.runtime, Plans: plans, Now: time.Now, NewID: custodyID}
-	stopLedger, e := postgres.NewDownloadStops(ctx, open("download_stop_runtime", "synthetic-download-stop"), root, "")
-	publicJourneyRequire(t, "stop restrictions", e)
-	stopWriterPool := open("download_stop_writer_runtime", "synthetic-download-stop-writer")
-	stopWriter, e := postgres.NewDownloadStops(ctx, stopWriterPool, root, s.recovery.installation)
-	publicJourneyRequire(t, "stop writer", e)
-	stopAck, e := postgres.NewDownloadStops(ctx, open("download_stop_ack_runtime", "synthetic-download-stop-ack"), root, s.recovery.installation)
-	publicJourneyRequire(t, "stop acknowledgements", e)
-	// Migration 47 requires the writer's positive lifecycle completion before the
-	// Stop acknowledgement; compose exactly as the lifecycle suite does, using
-	// the same writer role. Native33-35 used the legacy objects alone (23514).
-	stopCompletions, e := postgres.NewDownloadStopLifecycles(ctx, stopWriterPool, root, s.recovery.installation)
-	publicJourneyRequire(t, "stop lifecycle completions", e)
-	closedStops, e := objectstore.NewClosedDownloadStopObjects(store, f.storeID, keys, keys)
-	publicJourneyRequire(t, "closed stop objects", e)
-	stopObjects, e := evidence.NewHealthyDownloadStopObjects(&objectstore.DownloadStopObjects{Store: store, Seal: keys, Open: keys, StoreID: f.storeID}, closedStops, stopCompletions)
-	publicJourneyRequire(t, "healthy stop objects", e)
-	f.services = bootstrap.ContextNativeDownloadServices{Runtime: runtime, Transfer: evidence.DownloadResponseTransfer{Sessions: first, Responses: responses, Authority: f.gate, Objects: objects, Audit: f.audit, Now: time.Now, NewID: custodyID}, Stop: f.gateTrace.WrapStop(evidence.ContextDownloadStopCoordinator{Ledger: stopNativeLedger{stopLedger, stopWriter}, Acknowledgements: stopAck, Objects: stopObjects, Active: runtime, Now: time.Now})}
+	stopLedger, e := postgres.NewDownloadStops(ctx, open("download_stop_runtime", "synthetic-download-stop"), root)
+	publicJourneyRequire(t, "stop ledger", e)
+	f.services = bootstrap.ContextNativeDownloadServices{Runtime: runtime, Transfer: evidence.DownloadResponseTransfer{Sessions: first, Responses: responses, Authority: f.gate, Objects: objects, Audit: f.audit, Now: time.Now, NewID: custodyID}, Stop: f.gateTrace.WrapStop(evidence.ContextDownloadStopCoordinator{Ledger: stopLedger, Active: runtime, Now: time.Now})}
 	return f
 }
 

@@ -123,7 +123,15 @@ type ArtifactDownload struct {
 	EmittedBytes      int64
 	Generation        int64
 	ActiveBatch       pgtype.UUID
-	StopProtocol      pgtype.Text
+}
+
+type ArtifactDownloadStop struct {
+	DownloadID pgtype.UUID
+	RootID     pgtype.UUID
+	RequestID  pgtype.UUID
+	KeyDigest  []byte
+	State      string
+	StoppedAt  pgtype.Timestamptz
 }
 
 type AuditEvent struct {
@@ -1009,97 +1017,6 @@ type DownloadResponse struct {
 	LeaseSequence    int64
 	LeaseUntil       pgtype.Timestamptz
 	Closed           bool
-}
-
-type DownloadStop struct {
-	DownloadID     pgtype.UUID
-	RootID         pgtype.UUID
-	AllocationID   pgtype.UUID
-	InstallationID pgtype.UUID
-	IssuerEpoch    pgtype.UUID
-	StoreID        pgtype.UUID
-	ReservedAt     pgtype.Timestamptz
-	RetainUntil    pgtype.Timestamptz
-	KeyDigest      []byte
-	RequestID      pgtype.UUID
-	RequestedAt    pgtype.Timestamptz
-	WriteUntil     pgtype.Timestamptz
-	Decision       []byte
-	WriteStarted   bool
-	LookupAttempts int64
-	Receipt        []byte
-}
-
-type DownloadStopBacking struct {
-	AllocationID pgtype.UUID
-	RootID       pgtype.UUID
-	Slots        int64
-	Charged      int64
-}
-
-type DownloadStopHistory struct {
-	RootID         pgtype.UUID
-	AllocationID   pgtype.UUID
-	InstallationID pgtype.UUID
-	IssuerEpoch    pgtype.UUID
-	PolicyDigest   []byte
-	ReleaseAt      pgtype.Timestamptz
-	DeleteBy       pgtype.Timestamptz
-	HardDeleteBy   pgtype.Timestamptz
-	EligibleAt     pgtype.Timestamptz
-	HorizonSeconds int64
-	Records        int64
-	Overdue        bool
-	DrainXid       pgtype.Uint64
-}
-
-type DownloadStopLifecycle struct {
-	DownloadID                pgtype.UUID
-	RootID                    pgtype.UUID
-	AllocationID              pgtype.UUID
-	InstallationID            pgtype.UUID
-	IssuerEpoch               pgtype.UUID
-	Binding                   []byte
-	OriginalPurgeAt           pgtype.Timestamptz
-	CertificatePurgeAt        pgtype.Timestamptz
-	LiveRetireBy              pgtype.Timestamptz
-	OriginalCompletion        []byte
-	ClosedAt                  pgtype.Timestamptz
-	Mode                      pgtype.Text
-	OverdueSelectedAt         pgtype.Timestamptz
-	Lease                     []byte
-	LeaseFence                int64
-	Retirement                []byte
-	CertificateStarted        bool
-	CertificateVerifyAttempts int64
-	CertificateCompletion     []byte
-	CertificateReceipt        []byte
-	CertificateAcknowledgedAt pgtype.Timestamptz
-	TerminalPurge             []byte
-	TerminalAcknowledgedAt    pgtype.Timestamptz
-	FinalizationXid           pgtype.Uint64
-}
-
-type DownloadStopPool struct {
-	RootID               pgtype.UUID
-	InstallationID       pgtype.UUID
-	StoreID              pgtype.UUID
-	PolicyID             pgtype.UUID
-	BackupProfileID      pgtype.UUID
-	PolicyDigest         []byte
-	BackupProfileDigest  []byte
-	Slots                int64
-	CipherBytes          int64
-	KeyAttempts          int64
-	BackupBytes          int64
-	WalBytes             int64
-	RetainedSeconds      int64
-	BackupHorizonSeconds int64
-	ValidUntil           pgtype.Timestamptz
-	Revision             int64
-	Allocated            int64
-	LifecyclePolicy      []byte
-	HistoryBackingUntil  pgtype.Timestamptz
 }
 
 type DownloadWindow struct {

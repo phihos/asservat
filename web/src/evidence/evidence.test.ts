@@ -154,7 +154,7 @@ it('passive status cannot authorize preparation and cancellation stops continuat
 it('accepts a minimal stop receipt without revealing native or terminal artifact metadata', async () => {
  const { controller, client } = await ready(); vi.useFakeTimers();
  client.responder = () => downloadResult(); await controller.prepare(controller.snapshot().details!.artifacts[0]);
- client.responder = () => ({ schema_version: 'mcp-result/v1', request_id: id(20), data_class: 'metadata', status: 'ok', warnings: [], provenance: [], data: { download_id: id(4), state: 'AlreadyTerminal', audit_state: 'pending' } });
+ client.responder = () => ({ schema_version: 'mcp-result/v1', request_id: id(20), data_class: 'metadata', status: 'ok', warnings: [], provenance: [], data: { download_id: id(4), state: 'AlreadyTerminal' } });
  await controller.cancel();
  expect(controller.snapshot().cancellation?.state).toBe('AlreadyTerminal');
  expect(controller.snapshot().download).toBeUndefined(); expect(controller.canCancel()).toBe(false); expect(controller.canStart()).toBe(false);
@@ -211,7 +211,7 @@ it('accepts a minimal restrictive Stop receipt without inventing artifact metada
   client.responder = () => downloadResult('Interrupted');
   await controller.prepare(controller.snapshot().details!.artifacts[0]);
   client.responder = name => name === 'cancel_artifact_download'
-    ? { schema_version: 'mcp-result/v1', request_id: id(30), data_class: 'metadata', status: 'ok', warnings: [], provenance: [], data: { download_id: id(4), state: 'AlreadyTerminal', audit_state: 'pending' } }
+    ? { schema_version: 'mcp-result/v1', request_id: id(30), data_class: 'metadata', status: 'ok', warnings: [], provenance: [], data: { download_id: id(4), state: 'AlreadyTerminal' } }
     : downloadResult('Preparing');
   await controller.restartDownload();
   expect(client.calls.map(c => c.name)).toEqual(['get_case', 'prepare_artifact_download', 'cancel_artifact_download', 'prepare_artifact_download']);

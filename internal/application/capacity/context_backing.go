@@ -36,7 +36,6 @@ type ContextBackingHistory struct {
 	Capture            audit.OperationHistoryQualification
 	CapturePurgeLeases int64
 	Native             authorization.NativeHistoryQualification
-	Stop               audit.DownloadStopLifecyclePolicy
 }
 
 // ContextProtocolBacking is the closed, already-bounded part of one workload's
@@ -46,14 +45,14 @@ type ContextBackingHistory struct {
 // configuration WAL. Public normal/resolution/processing pools are root-level
 // system commitments and are intentionally not multiplied here per workload.
 type ContextProtocolBacking struct {
-	Format                                                                                                         string
-	Records, ReplayRecords                                                                                         int64
-	Evidence, CaptureObjects, VerificationObjects, DeletionObjects, PreparationObjects, WindowObjects, StopObjects BudgetAmount
-	ProtocolSystemObjects                                                                                          BudgetAmount
-	Sessions, OutputBytes, ReadBytes, RequestsPerSession, Responses, Windows                                       int64
-	NativeRows, NativeKeys, NativeTransitionsPerRow                                                                int64
-	CaptureKeyAttempts, StopKeyAttempts, ArtifactWraps, PreparationUnwraps, ContentUnwraps                         int64
-	CaptureBackupBytes, CaptureWALBytes, NativeBackupBytes, NativeWALBytes, StopBackupBytes, StopWALBytes          int64
+	Format                                                                                            string
+	Records, ReplayRecords                                                                            int64
+	Evidence, CaptureObjects, VerificationObjects, DeletionObjects, PreparationObjects, WindowObjects BudgetAmount
+	ProtocolSystemObjects                                                                             BudgetAmount
+	Sessions, OutputBytes, ReadBytes, RequestsPerSession, Responses, Windows                          int64
+	NativeRows, NativeKeys, NativeTransitionsPerRow                                                   int64
+	CaptureKeyAttempts, ArtifactWraps, PreparationUnwraps, ContentUnwraps                             int64
+	CaptureBackupBytes, CaptureWALBytes, NativeBackupBytes, NativeWALBytes                            int64
 }
 
 // CompileContextProtocolBacking derives the retained count from the selected
@@ -66,7 +65,7 @@ func CompileContextProtocolBacking(contextSlice BudgetAmount, h ContextBackingHi
 	if h.ProfileProtocol != "" && h.ProfileProtocol != ProfileProtocolVersion {
 		return zero, ErrBudgetInvalid
 	}
-	if !contextSlice.positive() || !h.Capture.Valid() || (h.Capture.Layout != audit.CaptureOperationHistoryLayout && h.Capture.Layout != audit.ShareCaptureOperationHistoryLayout) || h.CapturePurgeLeases < 2 || h.CapturePurgeLeases > 32 || !h.Native.Valid() || !h.Stop.Valid() {
+	if !contextSlice.positive() || !h.Capture.Valid() || (h.Capture.Layout != audit.CaptureOperationHistoryLayout && h.Capture.Layout != audit.ShareCaptureOperationHistoryLayout) || h.CapturePurgeLeases < 2 || h.CapturePurgeLeases > 32 || !h.Native.Valid() {
 		return zero, ErrBudgetInvalid
 	}
 	unit := artifact.Registration{NativeLimit: artifact.MaxContextBytes}.ReservedBytes()
@@ -129,11 +128,7 @@ func CompileContextProtocolBacking(contextSlice BudgetAmount, h ContextBackingHi
 	if out.WindowObjects, e = amount(2*windows*artifact.DownloadWindowAuditBytes, 2*windows); e != nil {
 		return zero, e
 	}
-	stopCipher, stopKeys, stopBackup, stopWAL := h.Stop.SlotBacking()
-	if out.StopObjects, e = amount(stopCipher, 1); e != nil {
-		return zero, e
-	}
-	for _, part := range []BudgetAmount{out.CaptureObjects, out.VerificationObjects, out.DeletionObjects, out.PreparationObjects, out.WindowObjects, out.StopObjects} {
+	for _, part := range []BudgetAmount{out.CaptureObjects, out.VerificationObjects, out.DeletionObjects, out.PreparationObjects, out.WindowObjects} {
 		var ok bool
 		out.ProtocolSystemObjects, ok = out.ProtocolSystemObjects.add(part)
 		if !ok {
@@ -160,11 +155,10 @@ func CompileContextProtocolBacking(contextSlice BudgetAmount, h ContextBackingHi
 		{&out.Responses, contextDownloadResponses}, {&out.Windows, windows}, {&out.NativeRows, 1}, {&out.NativeKeys, windows},
 		// Per original phase: one seal, one self-open, two reconciliations.
 		// Certificate: sign/seal/self-open and two independent verifier opens.
-		{&out.CaptureKeyAttempts, contextCaptureKeyAttempts}, {&out.StopKeyAttempts, stopKeys},
+		{&out.CaptureKeyAttempts, contextCaptureKeyAttempts},
 		{&out.ArtifactWraps, 3}, {&out.PreparationUnwraps, 3}, {&out.ContentUnwraps, 3 * windows},
 		{&out.CaptureBackupBytes, captureBackup}, {&out.CaptureWALBytes, captureWAL},
 		{&out.NativeBackupBytes, nativeBackup}, {&out.NativeWALBytes, nativeWAL},
-		{&out.StopBackupBytes, stopBackup}, {&out.StopWALBytes, stopWAL},
 	} {
 		v, ok := capacityProduct(n, field.perRecord)
 		if !ok {

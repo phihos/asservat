@@ -29,7 +29,7 @@ func (f *browserDownloadFixture) CancelContextDownload(ctx context.Context, curr
 		return artifact.DownloadStopReceipt{}, e
 	}
 	f.stops++
-	return artifact.DownloadStopReceipt{DownloadID: id, RequestID: request, State: "Cancelled", AuditState: "pending", ObservedAt: time.Now(), ValidUntil: i.ValidUntil}, nil
+	return artifact.DownloadStopReceipt{DownloadID: id, RequestID: request, State: "Cancelled", ObservedAt: time.Now(), ValidUntil: i.ValidUntil}, nil
 }
 func TestBrowserStopWithoutEvidenceScopesSurvivesNormalSaturation(t *testing.T) {
 	var h *InvestigationHandler

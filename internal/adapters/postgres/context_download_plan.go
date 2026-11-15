@@ -1,7 +1,6 @@
 package postgres
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"time"
@@ -9,7 +8,6 @@ import (
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -85,14 +83,6 @@ func (s *ContextDownloadPlans) ContextDownloadPlan(ctx context.Context, source e
 		if e != nil {
 			return e
 		}
-		stop, e := q.ReadDownloadStopBacking(call, custodydb.ReadDownloadStopBackingParams{AllocationID: rows[0].ID, RootID: id(s.root)})
-		if e != nil {
-			return e
-		}
-		pool, e := q.ReadDownloadStopPool(call, id(s.root))
-		if e != nil {
-			return e
-		}
 		until, e := s.configuration.CurrentWorkerConfiguration(call, s.profile)
 		if e != nil {
 			return e
@@ -101,12 +91,12 @@ func (s *ContextDownloadPlans) ContextDownloadPlan(ctx context.Context, source e
 		if e != nil {
 			return e
 		}
-		if !contextPlanBacking(limits, source.Expectation.Type(), allocation, control, native, stop, pool, s.installation, now.Time) {
+		if !contextPlanBacking(limits, source.Expectation.Type(), allocation, control, native, now.Time) {
 			return artifact.ErrDownloadUnavailable
 		}
 		// Every contributing original deadline survives the configuration and SQL
 		// waits. This snapshot grants no effect; reservation rechecks current backing.
-		hard := identity.Earlier(allocation.ValidUntil, identity.Earlier(control.ValidUntil.Time, identity.Earlier(native.ValidUntil.Time, pool.ValidUntil.Time)))
+		hard := identity.Earlier(allocation.ValidUntil, identity.Earlier(control.ValidUntil.Time, native.ValidUntil.Time))
 		out = evidence.ContextDownloadPlan{HardUntil: hard, Allocation: allocation, OutputLimit: limits.OutputLimit, ReadLimit: limits.ReadLimit, ObservedAt: start.Time, ValidUntil: downloadObservationDeadline(call, start.Time, original, until, hard)}
 		if !out.Valid(scope, now.Time) || call.Err() != nil {
 			return artifact.ErrDownloadUnavailable
@@ -118,7 +108,7 @@ func (s *ContextDownloadPlans) ContextDownloadPlan(ctx context.Context, source e
 	}
 	return out, nil
 }
-func contextPlanBacking(l ContextDownloadPlanLimits, typ artifact.NativeType, a artifact.DownloadAllocation, c custodydb.DownloadControlAllocation, n custodydb.DownloadNativeBacking, b custodydb.DownloadStopBacking, p custodydb.DownloadStopPool, installation string, now time.Time) bool {
+func contextPlanBacking(l ContextDownloadPlanLimits, typ artifact.NativeType, a artifact.DownloadAllocation, c custodydb.DownloadControlAllocation, n custodydb.DownloadNativeBacking, now time.Time) bool {
 	control := downloadControl(c)
 	// Admission must leave room for one complete supported response. Later
 	// responses reserve again and cannot recycle uncertain window/key charges.
@@ -131,26 +121,18 @@ func contextPlanBacking(l ContextDownloadPlanLimits, typ artifact.NativeType, a 
 		transitions = artifact.ProfileDownloadNativeTransitions
 	}
 	var native authorization.NativeBacking
-	var stop audit.DownloadStopLifecyclePolicy
-	if !l.valid() || !a.Valid() || !control.Valid() || json.Unmarshal(n.PolicyJson, &native) != nil || !native.Valid() || json.Unmarshal(p.LifecyclePolicy, &stop) != nil || !stop.Valid() {
+	if !l.valid() || !a.Valid() || !control.Valid() || json.Unmarshal(n.PolicyJson, &native) != nil || !native.Valid() {
 		return false
 	}
 	if uid(c.ID) != a.ID || uid(c.RootID) != a.RootID || uid(n.AllocationID) != a.ID || uid(n.RootID) != a.RootID || native.AllocationID != a.ID || native.RootID != a.RootID || native.Rows != n.RowsLimit || native.Keys != n.KeysLimit || native.TransitionsPerRow != n.TransitionsPerRow || native.BackupHorizonSeconds != n.BackupHorizonSeconds || native.CleanupSeconds != n.CleanupSeconds || !native.ValidUntil.Equal(n.ValidUntil.Time) || !native.RetireBy.Equal(n.RetireBy.Time) || n.Overdue || native.TransitionsPerRow < transitions {
 		return false
 	}
-	if uid(b.AllocationID) != a.ID || uid(b.RootID) != a.RootID || uid(p.RootID) != a.RootID || uid(p.InstallationID) != installation || stop.RootID != a.RootID || stop.InstallationID != installation || stop.StoreID != uid(p.StoreID) || stop.PolicyID != uid(p.PolicyID) || stop.BackupProfileID != uid(p.BackupProfileID) || !bytes.Equal(stop.PolicyDigest[:], p.PolicyDigest) || !bytes.Equal(stop.BackupProfileDigest[:], p.BackupProfileDigest) {
-		return false
-	}
 	// One supported response fits at most two windows. Original unknown reservations
 	// remain charged; this read cannot recycle them or promise all later races win.
-	if l.OutputLimit > a.OutputLimit || l.ReadLimit > a.ReadLimit || c.WindowLimit-c.ReservedWindows < windows || c.AuditByteLimit-c.ReservedAuditBytes < 2*windows*artifact.DownloadWindowAuditBytes || n.ChargedRows >= n.RowsLimit || n.KeysLimit-n.ChargedKeys < windows || b.Charged >= b.Slots || b.Slots > p.Slots || p.Allocated > p.Slots || p.RetainedSeconds < 60 || p.RetainedSeconds > 316224000 || p.BackupHorizonSeconds != stop.BackupHorizonSeconds || p.RetainedSeconds <= 2*stop.BackupHorizonSeconds+3*stop.CleanupBudgetSeconds+stop.ProofWindowSeconds+30 {
+	if l.OutputLimit > a.OutputLimit || l.ReadLimit > a.ReadLimit || c.WindowLimit-c.ReservedWindows < windows || c.AuditByteLimit-c.ReservedAuditBytes < 2*windows*artifact.DownloadWindowAuditBytes || n.ChargedRows >= n.RowsLimit || n.KeysLimit-n.ChargedKeys < windows {
 		return false
 	}
-	cipher, keys, backup, wal := stop.SlotBacking()
-	if p.Slots < 1 || p.CipherBytes/p.Slots < cipher || p.KeyAttempts/p.Slots < keys || p.BackupBytes/p.Slots < backup || p.WalBytes/p.Slots < wal {
-		return false
-	}
-	for _, end := range []time.Time{a.ValidUntil, c.ValidUntil.Time, n.ValidUntil.Time, p.ValidUntil.Time} {
+	for _, end := range []time.Time{a.ValidUntil, c.ValidUntil.Time, n.ValidUntil.Time} {
 		if !now.Before(end) {
 			return false
 		}

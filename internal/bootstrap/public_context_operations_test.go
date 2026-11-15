@@ -57,8 +57,6 @@ type publicContextOperationPorts struct {
 	evidence.ContextDownloadControlLedger
 	evidence.ContextDownloadPlans
 	evidence.DownloadStopLedger
-	evidence.DownloadStopAcknowledgements
-	evidence.DownloadStopObjects
 }
 
 func publicContextOperationFixture(t *testing.T) (PublicContextOperationsConfig, PublicContextOperationServices) {
@@ -81,7 +79,7 @@ func publicContextOperationFixture(t *testing.T) (PublicContextOperationsConfig,
 		Progress:      captureapp.ContextProgressService{RootID: root, InstallationID: installation, Reader: p},
 		Cases:         catalogapp.ContextCaseService{RootID: root, InstallationID: installation, Routes: p, Permissions: p, Catalog: p, Retention: p, Processing: p},
 		Downloads:     evidence.ContextDownloadCoordinator{RootID: root, InstallationID: installation, Routes: p, Sources: p, Authority: p, Sessions: p, Plans: p},
-		Native:        ContextNativeDownloadServices{Runtime: native, Stop: evidence.ContextDownloadStopCoordinator{Ledger: p, Acknowledgements: p, Objects: p, Active: native}},
+		Native:        ContextNativeDownloadServices{Runtime: native, Stop: evidence.ContextDownloadStopCoordinator{Ledger: p, Now: time.Now, Active: native}},
 	}
 }
 

@@ -33,7 +33,6 @@ func warmContextRuntimeFixture(t *testing.T) (*downloadResultFixture, *contextAt
 	f.a.Environment.Region = p.AcquisitionRegion
 	f.a.Environment.Processing = artifact.DownloadProcessingProof{RootID: f.a.Scope.RootID, Epoch: f.a.Scope.RootID, CaptureID: f.a.Scope.CaptureID, Location: f.a.Environment.Location, Sequence: 1, StateDigest: artifact.Digest{21}, ObservedAt: f.now, ValidUntil: f.a.ValidUntil}
 	f.enrollment.Worker.Intent.Authority = f.a
-	f.s.StopProtocol = artifact.DownloadStopProtocol
 	f.s.State = artifact.DownloadReady
 	prep := artifact.DownloadPreparation{SessionID: f.s.ID, BatchID: "30000000-0000-4000-8000-000000000001", Generation: 1}
 	observed := ContextDownloadAttachment{SessionID: f.s.ID, Scope: f.s.Scope, State: f.s.State, Found: true, Intent: f.enrollment.Worker.Intent, Worker: &f.enrollment.Worker, Enrollment: &f.enrollment, MetadataAttempted: true, Preparation: &prep, NativeTransitions: 4, ObservedAt: f.now, ValidUntil: f.a.ValidUntil}

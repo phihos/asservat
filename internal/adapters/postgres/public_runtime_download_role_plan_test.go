@@ -125,7 +125,7 @@ func TestDownloadFencePurposesReadProcessingAndRetention(t *testing.T) {
 		}
 	}
 	// download-worker-identity serves only readWorkerIdentity (no fence).
-	for _, purpose := range []string{"download-audit", "download-worker-audit", "download-worker-identity", "worker-enrollment-audit", "download-stop", "download-stop-writer", "download-stop-ack", "download-plan", "worker-config-read"} {
+	for _, purpose := range []string{"download-audit", "download-worker-audit", "download-worker-identity", "worker-enrollment-audit", "download-stop", "download-plan", "worker-config-read"} {
 		got, _ := publicRuntimeDutyGrants(purpose)
 		for _, g := range fence {
 			if slices.Contains(got, g) {

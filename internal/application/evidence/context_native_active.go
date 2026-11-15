@@ -11,7 +11,7 @@ import (
 // The only production caller is the positive SQL Stop boundary. No public ID
 // alone can cancel work, and cancellation never refunds durable accounting.
 type DownloadActiveTransfers interface {
-	CancelDownloadTransfers(context.Context, artifact.DownloadStopDecision) error
+	CancelDownloadTransfers(context.Context, artifact.DownloadStop) error
 }
 type contextNativeTransfer struct {
 	session   string
@@ -58,7 +58,7 @@ func (a *contextNativeTransfers) begin(ctx context.Context, id string, p identit
 	release := func() { once.Do(func() { cancel(); a.mu.Lock(); delete(a.live, h); close(h.joined); a.mu.Unlock() }) }
 	return owner, release, nil
 }
-func (r *ContextNativeRuntime) CancelDownloadTransfers(ctx context.Context, d artifact.DownloadStopDecision) error {
+func (r *ContextNativeRuntime) CancelDownloadTransfers(ctx context.Context, d artifact.DownloadStop) error {
 	if r == nil || r.active == nil || ctx == nil || !d.Valid() {
 		return artifact.ErrDownloadUnavailable
 	}

@@ -451,48 +451,14 @@ GRANT EXECUTE ON FUNCTION finish_operation_audit_history(uuid,text,bytea,timesta
 GRANT UPDATE(overdue_selected_at,overdue_purge) ON operation_audit_lifecycle TO operation_audit_cleanup_runtime;
 -- No runtime role can reset or directly increment proof_window_missed.
 
--- Prepaid native stop: fixture identities represent independently wired roles.
--- The public stop writer has no ordinary catalog/native metadata permission.
-GRANT SELECT ON download_stop_pool,download_stop_backing TO download_config_runtime;
-GRANT INSERT ON download_stop_pool,download_stop_backing TO download_config_runtime;
-GRANT UPDATE(revision,valid_until) ON download_stop_pool TO download_config_runtime;
-GRANT INSERT(stop_protocol) ON artifact_download TO download_runtime;
+-- Download stop (ADR-330 D6): one transaction fences the session, stores the
+-- stop and appends its audit row. No catalog/native metadata permission.
 CREATE ROLE download_stop_runtime LOGIN PASSWORD 'synthetic-download-stop';
-CREATE ROLE download_stop_writer_runtime LOGIN PASSWORD 'synthetic-download-stop-writer';
-CREATE ROLE download_stop_ack_runtime LOGIN PASSWORD 'synthetic-download-stop-ack';
-GRANT CONNECT ON DATABASE custody_test TO download_stop_runtime,download_stop_writer_runtime,download_stop_ack_runtime;
-GRANT USAGE ON SCHEMA public TO download_stop_runtime,download_stop_writer_runtime,download_stop_ack_runtime;
-GRANT SELECT ON goose_db_version,download_stop TO download_stop_runtime,download_stop_writer_runtime,download_stop_ack_runtime;
-GRANT SELECT ON artifact_download TO download_stop_runtime;
+GRANT CONNECT ON DATABASE custody_test TO download_stop_runtime;
+GRANT USAGE ON SCHEMA public TO download_stop_runtime;
+GRANT SELECT ON goose_db_version,artifact_download,artifact_download_stop TO download_stop_runtime;
 GRANT UPDATE(id,state) ON artifact_download TO download_stop_runtime;
-GRANT UPDATE(download_id,key_digest,request_id,requested_at,write_until,decision) ON download_stop TO download_stop_runtime;
-GRANT UPDATE(download_id,write_started,lookup_attempts) ON download_stop TO download_stop_writer_runtime;
-GRANT UPDATE(download_id,receipt) ON download_stop TO download_stop_ack_runtime;
-
-GRANT SELECT ON fleet_current_trust TO download_stop_writer_runtime,download_stop_ack_runtime;
-GRANT UPDATE(installation_id) ON fleet_current_trust TO download_stop_writer_runtime,download_stop_ack_runtime;
-
--- Stop lifecycle uses independent producer, cleanup, verification and retirement
--- facets. Immutable-column UPDATE only permits the necessary row locks.
-CREATE ROLE download_stop_lifecycle_config_runtime LOGIN PASSWORD 'synthetic-stop-lifecycle-config';
-CREATE ROLE download_stop_cleanup_runtime LOGIN PASSWORD 'synthetic-stop-cleanup';
-CREATE ROLE download_stop_verify_runtime LOGIN PASSWORD 'synthetic-stop-verify';
-CREATE ROLE download_stop_retire_runtime LOGIN PASSWORD 'synthetic-stop-retire';
-GRANT CONNECT ON DATABASE custody_test TO download_stop_lifecycle_config_runtime,download_stop_cleanup_runtime,download_stop_verify_runtime,download_stop_retire_runtime;
-GRANT USAGE ON SCHEMA public TO download_stop_lifecycle_config_runtime,download_stop_cleanup_runtime,download_stop_verify_runtime,download_stop_retire_runtime;
-GRANT SELECT ON goose_db_version,fleet_current_trust,download_stop_pool,download_stop_backing,download_stop,download_stop_lifecycle,download_stop_history TO download_stop_writer_runtime,download_stop_lifecycle_config_runtime,download_stop_cleanup_runtime,download_stop_verify_runtime,download_stop_retire_runtime;
-GRANT UPDATE(installation_id) ON fleet_current_trust TO download_stop_lifecycle_config_runtime,download_stop_cleanup_runtime,download_stop_verify_runtime,download_stop_retire_runtime;
-GRANT UPDATE(root_id) ON download_stop_pool TO download_stop_writer_runtime,download_stop_lifecycle_config_runtime,download_stop_cleanup_runtime,download_stop_verify_runtime,download_stop_retire_runtime;
-GRANT UPDATE(allocation_id) ON download_stop_backing TO download_stop_writer_runtime,download_stop_cleanup_runtime,download_stop_verify_runtime,download_stop_retire_runtime;
-GRANT UPDATE(download_id) ON download_stop TO download_stop_cleanup_runtime,download_stop_verify_runtime,download_stop_retire_runtime;
-GRANT UPDATE(download_id) ON download_stop_lifecycle TO download_stop_writer_runtime,download_stop_cleanup_runtime,download_stop_verify_runtime,download_stop_retire_runtime;
-GRANT UPDATE(lifecycle_policy) ON download_stop_pool TO download_stop_lifecycle_config_runtime;
-GRANT UPDATE(original_completion) ON download_stop_lifecycle TO download_stop_writer_runtime;
-GRANT UPDATE(closed_at,mode,overdue_selected_at,lease,lease_fence,retirement,certificate_started,certificate_completion,terminal_purge) ON download_stop_lifecycle TO download_stop_cleanup_runtime;
--- Cleanup can only clear a terminal acknowledgement while advancing an exact
--- finite lease; the guard forbids it from installing an acknowledgement.
-GRANT UPDATE(certificate_verify_attempts,certificate_receipt,certificate_acknowledged_at,terminal_acknowledged_at) ON download_stop_lifecycle TO download_stop_verify_runtime;
-GRANT EXECUTE ON FUNCTION finish_download_stop_retirement(uuid,uuid,uuid),finish_download_stop_history(uuid,uuid,bytea,timestamptz,timestamptz,uuid) TO download_stop_retire_runtime;
+GRANT INSERT ON artifact_download_stop,audit_event TO download_stop_runtime;
 
 -- Independently credentialed pre-provider verification spend. Neither the
 -- producer nor cleanup may acquire, reset or erase these attempts.

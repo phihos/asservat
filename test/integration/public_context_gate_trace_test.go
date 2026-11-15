@@ -27,7 +27,7 @@ import (
 // gate maps every failure to one unavailable result; this records which
 // dependency refused, with fixed labels, counts and durations only. Results
 // and errors pass through unchanged; no read, retry or deadline is added.
-var journeyGateNames = [...]string{"permissions", "catalog", "retention", "environment", "publication-retained-policies", "stop-claim", "stop-object", "stop-acknowledgement"}
+var journeyGateNames = [...]string{"permissions", "catalog", "retention", "environment", "publication-retained-policies", "stop"}
 
 type journeyGateTrace struct {
 	mu              sync.Mutex
@@ -215,11 +215,9 @@ func (d journeyGateRetainedPolicies) RetainedRetentionPolicies(c context.Context
 	return v, e
 }
 
-// Fixture-only labels for the Stop audit facets (claim, object, acknowledgement).
+// Fixture-only label for the Stop transaction.
 func (g *journeyGateTrace) WrapStop(in evidence.ContextDownloadStopCoordinator) evidence.ContextDownloadStopCoordinator {
 	in.Ledger = journeyStopLedger{in.Ledger, g}
-	in.Objects = journeyStopObjects{in.Objects, g}
-	in.Acknowledgements = journeyStopAcks{in.Acknowledgements, g}
 	return in
 }
 
@@ -228,33 +226,9 @@ type journeyStopLedger struct {
 	trace *journeyGateTrace
 }
 
-func (d journeyStopLedger) ClaimDownloadStopWrite(c context.Context, x artifact.DownloadStopDecision) (bool, error) {
+func (d journeyStopLedger) StopDownload(c context.Context, i identity.Identity, id string, key artifact.Digest, request string) (artifact.DownloadStop, error) {
 	started, remaining := time.Now(), journeyGateRemaining(c)
-	v, e := d.DownloadStopLedger.ClaimDownloadStopWrite(c, x)
+	v, e := d.DownloadStopLedger.StopDownload(c, i, id, key, request)
 	d.trace.record(5, c, started, remaining, e)
 	return v, e
-}
-
-type journeyStopObjects struct {
-	evidence.DownloadStopObjects
-	trace *journeyGateTrace
-}
-
-func (d journeyStopObjects) CreateDownloadStop(c context.Context, x artifact.DownloadStopDecision) (auditvalue.Receipt, error) {
-	started, remaining := time.Now(), journeyGateRemaining(c)
-	v, e := d.DownloadStopObjects.CreateDownloadStop(c, x)
-	d.trace.record(6, c, started, remaining, e)
-	return v, e
-}
-
-type journeyStopAcks struct {
-	evidence.DownloadStopAcknowledgements
-	trace *journeyGateTrace
-}
-
-func (d journeyStopAcks) AcknowledgeDownloadStop(c context.Context, x artifact.DownloadStopDecision, r auditvalue.Receipt) error {
-	started, remaining := time.Now(), journeyGateRemaining(c)
-	e := d.DownloadStopAcknowledgements.AcknowledgeDownloadStop(c, x, r)
-	d.trace.record(7, c, started, remaining, e)
-	return e
 }

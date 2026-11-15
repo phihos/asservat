@@ -135,7 +135,7 @@ func (s *NativeOwners) claimNativeOperation(ctx context.Context, en value.Worker
 			return lookup
 		}
 		if firstContext && o.Kind == value.NativeObserve {
-			if p.StopProtocol != artifact.DownloadStopProtocol || en.Worker.Intent.Generation != 1 {
+			if en.Worker.Intent.Generation != 1 {
 				return artifact.ErrDownloadUnavailable
 			}
 			control, e := readContextNativeControl(ctx, q, p, en.Worker.Intent.ID)

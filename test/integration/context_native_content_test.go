@@ -42,27 +42,6 @@ type nativeContextFixture struct {
 	configuration *postgres.WorkerConfigurations
 }
 
-func bindContextNativeStopFixture(t *testing.T, ctx context.Context, cfg *postgres.Downloads, a artifact.DownloadAllocation, installation, store string, poolFor func(string, string) *pgxpool.Pool) {
-	t.Helper()
-	p := audit.DownloadStopLifecyclePolicy{RootID: a.RootID, InstallationID: installation, StoreID: store, PolicyID: custodyID(), BackupProfileID: custodyID(), QualificationID: custodyID(), PolicyDigest: artifact.Digest{1}, BackupProfileDigest: artifact.Digest{2}, QualificationDigest: artifact.Digest{3}, Layout: audit.DownloadStopHistoryLayout, CleanupBudgetSeconds: 6, ProofWindowSeconds: 3, MaximumRowFootprintBytes: 128 << 10, MaximumTransitionWALBytes: 128 << 10, BackupCopies: 1, WALCopies: 1, MaxPurgeLeases: 8}
-	c, k, b, w := p.SlotBacking()
-	const slots = int64(10) // stop slots per allocation, as sessions were before
-	n := time.Now().UTC().Truncate(time.Microsecond)
-	backing := artifact.DownloadStopBacking{AllocationID: a.ID, RootID: a.RootID, InstallationID: installation, StoreID: store, PolicyID: p.PolicyID, BackupProfileID: p.BackupProfileID, PolicyDigest: p.PolicyDigest, BackupProfileDigest: p.BackupProfileDigest, Slots: slots, AllocationSlots: slots, CipherBytes: c * slots, KeyAttempts: k * slots, BackupBytes: b * slots, WALBytes: w * slots, RetainedSeconds: 3600, ObservedAt: n, ValidUntil: a.ValidUntil}
-	if e := cfg.BindDownloadStopBacking(ctx, backing); e != nil {
-		t.Fatal("accepted synthetic Stop backing", e)
-	}
-	pool := poolFor("download_stop_lifecycle_config_runtime", "synthetic-stop-lifecycle-config")
-	defer pool.Close()
-	s, e := postgres.NewDownloadStopLifecycles(ctx, pool, a.RootID, installation)
-	if e != nil {
-		t.Fatal(e)
-	}
-	n = time.Now().UTC().Truncate(time.Microsecond)
-	if e = s.Configure(ctx, p, n, n.Add(5*time.Second)); e != nil {
-		t.Fatal(e)
-	}
-}
 func contextNativeSQLRoles(t *testing.T, ctx context.Context, admin *pgxpool.Pool) {
 	t.Helper()
 	// Add only the read sets needed by the new paired adapters. Runtime effect
@@ -73,7 +52,7 @@ func contextNativeSQLRoles(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 		"CREATE ROLE native_plan_runtime LOGIN PASSWORD 'synthetic-native-plan'",
 		"GRANT CONNECT ON DATABASE custody_test TO native_plan_runtime",
 		"GRANT USAGE ON SCHEMA public TO native_plan_runtime",
-		"GRANT SELECT ON goose_db_version,fleet_current_trust,download_allocation,download_control_allocation,download_native_backing,download_stop_backing,download_stop_pool TO native_plan_runtime",
+		"GRANT SELECT ON goose_db_version,fleet_current_trust,download_allocation,download_control_allocation,download_native_backing TO native_plan_runtime",
 		"GRANT UPDATE(installation_id) ON fleet_current_trust TO native_plan_runtime",
 	} {
 		if strings.HasPrefix(q, "CREATE ROLE ") {
@@ -260,7 +239,7 @@ func qualifyContextNativeContent(t *testing.T, ctx context.Context, f nativeExch
 	if (f.content.retry == nil || !f.content.retry.second) && (e != nil || plan.HardUntil.IsZero() || plan.HardUntil.After(f.allocation.ValidUntil)) {
 		t.Fatal("accepted allocation plan", e)
 	}
-	for _, q := range []string{"UPDATE download_allocation SET reserved_output=0 WHERE id=$1", "UPDATE download_native_backing SET charged_rows=0 WHERE allocation_id=$1", "DELETE FROM download_stop_backing WHERE allocation_id=$1"} {
+	for _, q := range []string{"UPDATE download_allocation SET reserved_output=0 WHERE id=$1", "UPDATE download_native_backing SET charged_rows=0 WHERE allocation_id=$1"} {
 		_, e = planPool.Exec(ctx, q, f.allocation.ID)
 		var pg *pgconn.PgError
 		if !errors.As(e, &pg) || pg.Code != "42501" {
