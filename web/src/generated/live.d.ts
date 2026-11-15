@@ -143,8 +143,6 @@ export interface components {
             source_handles: string[];
             projection: components["schemas"]["Contract_live_watch_990f10221e26ab35"];
             display_filter?: components["schemas"]["Contract_live_watch_4ab053de92dad64a"];
-            duration_seconds?: number;
-            max_output_bytes?: number;
             idempotency_key: string;
         } & (unknown & unknown & unknown);
         Contract_live_watch_c46c0af02e1cfc16: {
