@@ -180,12 +180,6 @@ func TestShareOperationsContract(t *testing.T) {
 	} else if row := out["data"].(map[string]any)["shares"].([]any)[0].(map[string]any); row["created_by"] != nil || row["managed_by"] != nil || row["revision"] != nil {
 		t.Fatal("received row exposes management", row)
 	}
-	f.scopes, f.createErr = []string{"evidence:read", "evidence:share"}, sharing.ErrRetentionCapacity
-	if out := shareCall(t, s, f, "create_share", create); out["status"] != "error" {
-		t.Fatal("retention backing refusal reported success", out)
-	} else if failure := out["data"].(map[string]any); failure["code"] != "NotAvailable" || failure["retryable"] != false || !strings.Contains(failure["message"].(string), "earlier expiry") {
-		t.Fatal("retention backing refusal lost its explicit remedy", out)
-	}
 }
 
 func TestShareMutationsCarryServerOperationID(t *testing.T) {

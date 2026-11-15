@@ -13,16 +13,13 @@ import (
 
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
-	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/application/sharing"
 	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -167,15 +164,13 @@ func newPolicyPaidShareService(t *testing.T, ctx context.Context, admin *pgxpool
 	if err != nil {
 		t.Fatal(err)
 	}
-	service := paidShareService{Service: sharing.Service{RootID: s.a.RootID, InstallationID: s.recovery.installation, Routes: routes, Permissions: s.p, Catalog: catalog, Store: ledger, Policies: ledger, NewID: custodyID, Now: time.Now}, audit: newShareBusinessAudit(t, ctx, pool, objects, keys, s)}
+	service := paidShareService{Service: sharing.Service{RootID: s.a.RootID, InstallationID: s.recovery.installation, Routes: routes, Permissions: s.p, Catalog: catalog, Store: ledger, Policies: ledger, NewID: custodyID, Now: time.Now}}
 	return service, pool
 }
 
 type policyShareCostSample struct {
 	WAL                                                                                     string
 	Rows, Revoked, TupleBytes, MaxTupleBytes, HeapBytes, IndexBytes, ToastBytes, TotalBytes int64
-	MaxCreatorTupleBytes, MinOriginalCreatorRowBound                                        int64
-	CreatorTuplesWithinOriginalBounds                                                       bool
 }
 
 func samplePolicyShareCost(t *testing.T, ctx context.Context, admin *pgxpool.Pool, root string) policyShareCostSample {
@@ -184,29 +179,20 @@ func samplePolicyShareCost(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 	if err := admin.QueryRow(ctx, `SELECT pg_current_wal_insert_lsn()::text,count(*)::bigint,count(*) FILTER(WHERE revoked_at IS NOT NULL)::bigint,
  coalesce(sum(pg_column_size(r)),0)::bigint,coalesce(max(pg_column_size(r)),0)::bigint,
  pg_relation_size('public.evidence_share'),pg_indexes_size('public.evidence_share'),
- (SELECT pg_total_relation_size(reltoastrelid) FROM pg_class WHERE oid='public.evidence_share'::regclass),pg_total_relation_size('public.evidence_share'),
- coalesce(max(pg_column_size(a)::bigint+pg_column_size(l)::bigint+pg_column_size(r)::bigint),0),
- coalesce(min((l.binding#>>'{Policy,History,MaximumRowFootprintBytes}')::bigint),0),
- coalesce(bool_and(pg_column_size(a)::bigint+pg_column_size(l)::bigint+pg_column_size(r)::bigint <= (l.binding#>>'{Policy,History,MaximumRowFootprintBytes}')::bigint),true)
- FROM evidence_share r JOIN operation_audit a ON a.id=r.creating_operation_id
- JOIN operation_audit_lifecycle l ON l.operation_id=a.id WHERE r.root_id=$1`, root).Scan(&s.WAL, &s.Rows, &s.Revoked, &s.TupleBytes, &s.MaxTupleBytes, &s.HeapBytes, &s.IndexBytes, &s.ToastBytes, &s.TotalBytes, &s.MaxCreatorTupleBytes, &s.MinOriginalCreatorRowBound, &s.CreatorTuplesWithinOriginalBounds); err != nil {
+ (SELECT pg_total_relation_size(reltoastrelid) FROM pg_class WHERE oid='public.evidence_share'::regclass),pg_total_relation_size('public.evidence_share')
+ FROM evidence_share r WHERE r.root_id=$1`, root).Scan(&s.WAL, &s.Rows, &s.Revoked, &s.TupleBytes, &s.MaxTupleBytes, &s.HeapBytes, &s.IndexBytes, &s.ToastBytes, &s.TotalBytes); err != nil {
 		t.Fatal("policy cost snapshot", err)
-	}
-	if !s.CreatorTuplesWithinOriginalBounds {
-		t.Fatal("creator-slot logical tuples already exceed an original row-footprint bound", s.MaxCreatorTupleBytes, s.MinOriginalCreatorRowBound)
 	}
 	return s
 }
 
-func logPolicyShareCost(t *testing.T, ctx context.Context, admin *pgxpool.Pool, phase string, before, after policyShareCostSample) int64 {
+func logPolicyShareCost(t *testing.T, ctx context.Context, admin *pgxpool.Pool, phase string, before, after policyShareCostSample) {
 	t.Helper()
 	var wal int64
 	if err := admin.QueryRow(ctx, `SELECT pg_wal_lsn_diff($1::pg_lsn,$2::pg_lsn)::bigint`, after.WAL, before.WAL).Scan(&wal); err != nil || wal < 0 {
 		t.Fatal("policy cost WAL", err, wal)
 	}
-	t.Logf("UNQUALIFIED policy_cost phase=%s rows=%d revoked=%d tuple_bytes=%d max_tuple_bytes=%d whole_relation_heap=%d indexes=%d toast=%d total=%d heap_growth=%d index_growth=%d toast_growth=%d total_growth=%d whole_instance_wal_delta=%d; includes background noise/page images and aborted work; physical pages are whole-table observations, not per-slot attribution; no installed IAM/backup/max-Unicode qualification", phase, after.Rows, after.Revoked, after.TupleBytes, after.MaxTupleBytes, after.HeapBytes, after.IndexBytes, after.ToastBytes, after.TotalBytes, after.HeapBytes-before.HeapBytes, after.IndexBytes-before.IndexBytes, after.ToastBytes-before.ToastBytes, after.TotalBytes-before.TotalBytes, wal)
-	t.Logf("UNQUALIFIED creator_slot_logical phase=%s max_audit_lifecycle_share_tuple_bytes=%d minimum_original_row_bound=%d each_within_its_original_bound=%t; logical tuple sizes exclude indexes, TOAST storage and page overhead and cannot qualify the physical bound", phase, after.MaxCreatorTupleBytes, after.MinOriginalCreatorRowBound, after.CreatorTuplesWithinOriginalBounds)
-	return wal
+	t.Logf("UNQUALIFIED policy_cost phase=%s rows=%d revoked=%d tuple_bytes=%d max_tuple_bytes=%d heap=%d indexes=%d toast=%d total=%d whole_instance_wal_delta=%d; includes background noise", phase, after.Rows, after.Revoked, after.TupleBytes, after.MaxTupleBytes, after.HeapBytes, after.IndexBytes, after.ToastBytes, after.TotalBytes, wal)
 }
 
 func qualifyWidePolicyShareCost(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, objects *objectstore.Store, keys authorityTestKeys, f policyShareCostFixture) {
@@ -216,14 +202,9 @@ func qualifyWidePolicyShareCost(t *testing.T, ctx context.Context, admin *pgxpoo
 	if baseline.Rows != 0 {
 		t.Fatal("isolated wide-sample cohort already has shares")
 	}
-	t.Logf("policy_cost_stage=accept_original_wide_sample issuer_bytes=%d manager_groups=8 manager_subject_bytes=256 recipients=8 recipient_id_bytes=256 capture_allocation_slots=112 accepted_executions=100; fixed before authority acceptance; random printable fields resist compression; original basis UID widths retained; not all individual maxima", policyWideSampleIssuerBytes)
 	acceptance := f.Accept()
 	f.Grant()
-	t.Log("policy_cost_stage=first_genuine_wide_admission")
-	firstAccepted := f.Admit()
-	t.Log("policy_cost_stage=first_genuine_wide_pair_and_manifest")
-	first := f.Prepare(firstAccepted, true)
-	t.Log("policy_cost_stage=first_genuine_wide_publication")
+	first := f.Prepare(f.Admit(), true)
 	f.Publish(first)
 	var valid bool
 	if err := admin.QueryRow(ctx, `SELECT count(*)=1 AND bool_and(octet_length(creator_issuer)=$3 AND octet_length(creator_subject)=256 AND octet_length(creator_client)=256
@@ -233,18 +214,8 @@ func qualifyWidePolicyShareCost(t *testing.T, ctx context.Context, admin *pgxpoo
  FROM evidence_share WHERE root_id=$1 AND policy_acceptance_id=$2`, root, acceptance, policyWideSampleIssuerBytes).Scan(&valid); err != nil || !valid {
 		t.Fatal("first wide-sample share was not genuinely materialized", err)
 	}
-	firstSample := samplePolicyShareCost(t, ctx, admin, root)
-	logPolicyShareCost(t, ctx, admin, "first-wide-capture-through-published-share", baseline, firstSample)
+	logPolicyShareCost(t, ctx, admin, "first-wide-capture-through-published-share", baseline, samplePolicyShareCost(t, ctx, admin, root))
 	service, hub := newPolicyPaidShareService(t, ctx, admin, poolFor, objects, keys, f.Scenario, first.reader)
-	policy := service.audit.policy
-	if policy.History.Layout != audit.ShareOperationHistoryLayout || !policy.Valid() {
-		t.Fatal("wide effect requires the actually funded normal-v4 policy")
-	}
-	_, prepaidWAL := policy.History.SlotBacking(policy.MaxPurgeLeases)
-	protocolWAL := 2 * policy.History.WALCopies * policy.History.MaximumTransitionWALBytes * (24 + 3*policy.MaxPurgeLeases)
-	if prepaidWAL-protocolWAL != 2*policy.History.WALCopies*audit.ShareOperationBusinessWALBytes || policy.WALReservedBytes/policy.MetadataSlots < prepaidWAL {
-		t.Fatal("business effect allowance was not prepaid in the original slot", prepaidWAL, protocolWAL, policy.WALReservedBytes, policy.MetadataSlots)
-	}
 	current := func() identities.CurrentIdentity {
 		t.Helper()
 		f.Refresh()
@@ -260,16 +231,11 @@ func qualifyWidePolicyShareCost(t *testing.T, ctx context.Context, admin *pgxpoo
 		}
 		return source
 	}
-	// Check the actual request/resolver contract before paying for 99 more
-	// captures. This reads identity only and consumes no operation slot.
 	if _, err := current().ResolveIdentity(ctx); err != nil {
 		t.Fatal("wide-sample caller preflight", err)
 	}
-	t.Log("policy_cost_stage=first_wide_succeeded_continue_to_100")
 	for n := 1; n < 100; n++ {
-		accepted := f.Admit()
-		ready := f.Prepare(accepted, false)
-		f.Publish(ready)
+		f.Publish(f.Prepare(f.Admit(), false))
 		if (n+1)%25 == 0 {
 			t.Logf("policy_cost_stage=published_count count=%d", n+1)
 		}
@@ -278,107 +244,39 @@ func qualifyWidePolicyShareCost(t *testing.T, ctx context.Context, admin *pgxpoo
 	if complete.Rows != 100 || complete.Revoked != 0 {
 		t.Fatal("genuine 100-share source cohort", complete.Rows, complete.Revoked)
 	}
-	var captured, spent, executions int64
-	if err := admin.QueryRow(ctx, `SELECT shares_spent,executions_spent,(SELECT count(*) FROM evidence_share s JOIN context_capture c ON c.intent_operation_id=s.creating_operation_id AND c.root_id=s.root_id WHERE s.root_id=$1 AND s.policy_acceptance_id=$2) FROM policy_acceptance WHERE root_id=$1 AND id=$2`, root, acceptance).Scan(&spent, &executions, &captured); err != nil || spent != 100 || executions != 100 || captured != 100 {
-		t.Fatal("100 original paid capture associations", err, spent, executions, captured)
+	var spent, executions, audited int64
+	if err := admin.QueryRow(ctx, `SELECT shares_spent,executions_spent,(SELECT count(*) FROM audit_event e JOIN evidence_share s ON s.id::text=ANY(e.share_ids) WHERE e.kind='share.create' AND s.root_id=$1 AND s.policy_acceptance_id=$2) FROM policy_acceptance WHERE root_id=$1 AND id=$2`, root, acceptance).Scan(&spent, &executions, &audited); err != nil || spent != 100 || executions != 100 || audited != 100 {
+		t.Fatal("100 policy shares, each with its publication audit row", err, spent, executions, audited)
 	}
 	logPolicyShareCost(t, ctx, admin, "100-genuine-wide-capture-shares", baseline, complete)
-	// Exercise rollback of the same current generated SQL business transaction.
-	// This deliberately does not claim the outer service authority path ran for
-	// the aborted effect; its acknowledged normal operation stays charged.
-	rollbackIdentity := current()
-	rollbackOp := service.audit.begin(ctx, rollbackIdentity, "revoke_share", "wide-sample-rollback")
-	if _, err := admin.Exec(ctx, `CHECKPOINT`); err != nil {
-		t.Fatal("owned full-page-image checkpoint", err)
-	}
-	// The checkpoint can outlast the synthetic fleet observation.
-	f.Refresh()
-	rollbackBefore := samplePolicyShareCost(t, ctx, admin, root)
-	tx, err := hub.Begin(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer tx.Rollback(context.Background())
-	q := custodydb.New(tx)
-	var rootID, opID, target pgtype.UUID
-	_ = rootID.Scan(root)
-	_ = opID.Scan(rollbackOp.ID)
-	_ = target.Scan(acceptance)
-	effect, err := q.BeginShareEffect(ctx, custodydb.BeginShareEffectParams{RootID: rootID, OperationID: opID, Action: "revoke_share", Issuer: f.Creator.Issuer, Subject: f.Creator.Subject, Client: f.Creator.ClientID, Target: target})
-	if err != nil || !effect.EffectAvailable {
-		t.Fatal("rollback paid effect", err)
-	}
-	// The real hub can update both management and revocation. A structurally
-	// valid management change must still fail in a paid revocation branch,
-	// rather than merely fail its SQL privileges or an array-size constraint.
-	if _, err = tx.Exec(ctx, `SAVEPOINT share_revocation_immutable`); err != nil {
-		t.Fatal(err)
-	}
-	_, err = tx.Exec(ctx, `UPDATE evidence_share SET revoked_at=clock_timestamp(),revoke_key='branch-probe',revision=revision+1,
- last_operation_id=$3,management=jsonb_build_array(management->0)
+	// The real hub role can update both management and revocation; a
+	// revocation that also changes management fails its branch guard.
+	_, err := hub.Exec(ctx, `UPDATE evidence_share SET revoked_at=clock_timestamp(),revoke_key='branch-probe',revision=revision+1,management=jsonb_build_array(management->0)
  WHERE root_id=$1 AND id=(SELECT id FROM evidence_share WHERE root_id=$1 AND policy_acceptance_id=$2
- AND revoked_at IS NULL AND jsonb_array_length(management)=8 ORDER BY id LIMIT 1)`, root, acceptance, rollbackOp.ID)
+ AND revoked_at IS NULL AND jsonb_array_length(management)=8 ORDER BY id LIMIT 1)`, root, acceptance)
 	var refusal *pgconn.PgError
 	if !errors.As(err, &refusal) || refusal.Code != "23514" || refusal.Message != "share revocation changes only the revocation" {
-		t.Fatal("paid revocation changed management or failed outside its branch guard", err)
+		t.Fatal("revocation changed management or failed outside its branch guard", err)
 	}
-	if _, err = tx.Exec(ctx, `ROLLBACK TO SAVEPOINT share_revocation_immutable`); err != nil {
-		t.Fatal(err)
-	}
-	if _, err = tx.Exec(ctx, `RELEASE SAVEPOINT share_revocation_immutable`); err != nil {
-		t.Fatal(err)
-	}
-	t.Log("policy_cost_stage=paid_revocation_immutable_branch_refused; rollback WAL conservatively includes one rejected paid probe and its savepoint rollback")
-	if _, err = q.LockPolicySharingAcceptance(ctx, custodydb.LockPolicySharingAcceptanceParams{RootID: rootID, ID: target}); err != nil {
-		t.Fatal(err)
-	}
-	key := pgtype.Text{String: "wide-sample-rollback", Valid: true}
-	if n, err := q.RevokePolicySharing(ctx, custodydb.RevokePolicySharingParams{RootID: rootID, ID: target, SharingRevokeKey: key}); err != nil || n != 1 {
-		t.Fatal("rollback policy effect", err, n)
-	}
-	if rows, err := q.RevokePolicyShares(ctx, custodydb.RevokePolicySharesParams{RootID: rootID, PolicyAcceptanceID: target, RevokeKey: key, OperationID: opID}); err != nil || len(rows) != 100 {
-		t.Fatal("rollback 100-share mutation", err, len(rows))
-	}
-	if err = tx.Rollback(ctx); err != nil {
-		t.Fatal(err)
-	}
-	rolledBack := samplePolicyShareCost(t, ctx, admin, root)
-	if rolledBack.Revoked != 0 || rolledBack.Rows != 100 {
-		t.Fatal("rollback changed retained shares")
-	}
-	var untouched bool
-	if err = admin.QueryRow(ctx, `SELECT sharing_revoked_at IS NULL AND (SELECT share_effect_target IS NULL FROM operation_audit_lifecycle WHERE operation_id=$2) FROM policy_acceptance WHERE id=$1`, acceptance, rollbackOp.ID).Scan(&untouched); err != nil || !untouched {
-		t.Fatal("rollback retained policy/effect marker", err)
-	}
-	rollbackWAL := logPolicyShareCost(t, ctx, admin, "generated-100-revoke-explicit-rollback", rollbackBefore, rolledBack)
-	service.audit.finish(ctx, rollbackOp, errors.New("explicit fixture rollback"))
-	if _, err = admin.Exec(ctx, `CHECKPOINT`); err != nil {
-		t.Fatal(err)
-	}
-	paidBefore := samplePolicyShareCost(t, ctx, admin, root)
-	t.Log("policy_cost_stage=actual_paid_public_revoke_all")
-	input := sharing.PolicyRevokeInput{AcceptanceID: acceptance, ExpectedRevision: 1, IdempotencyKey: "wide-sample-paid-revoke"}
+	before := samplePolicyShareCost(t, ctx, admin, root)
+	input := sharing.PolicyRevokeInput{AcceptanceID: acceptance, ExpectedRevision: 1, IdempotencyKey: "wide-sample-revoke"}
 	result, err := service.RevokePolicySharing(ctx, current(), input)
 	if err != nil || result.Replay || result.Revoked != 100 {
-		t.Fatal("actual paid 100-share revoke-all", err, result.Revoked, result.Replay)
+		t.Fatal("100-share revoke-all", err, result.Revoked, result.Replay)
 	}
-	paidAfter := samplePolicyShareCost(t, ctx, admin, root)
-	if paidAfter.Rows != 100 || paidAfter.Revoked != 100 {
-		t.Fatal("paid revoke did not preserve exactly 100 originals")
+	after := samplePolicyShareCost(t, ctx, admin, root)
+	if after.Rows != 100 || after.Revoked != 100 {
+		t.Fatal("revoke-all did not preserve exactly 100 originals")
 	}
-	paidWAL := logPolicyShareCost(t, ctx, admin, "full-paid-100-revoke-including-Begin-Finish", paidBefore, paidAfter)
-	beforeReplay := samplePolicyShareCost(t, ctx, admin, root)
+	var revokeRows int64
+	if err := admin.QueryRow(ctx, `SELECT count(*) FROM audit_event WHERE kind='share.revoke' AND operation='revoke_share' AND cardinality(share_ids)=100 AND subject=$1`, f.Creator.Subject).Scan(&revokeRows); err != nil || revokeRows != 1 {
+		t.Fatal("revoke-all wrote one audit row naming its 100 shares", err, revokeRows)
+	}
+	logPolicyShareCost(t, ctx, admin, "100-revoke-all", before, after)
 	if replay, err := service.RevokePolicySharing(ctx, current(), input); err != nil || !replay.Replay || replay.Revoked != 100 {
-		t.Fatal("paid business replay", err, replay.Revoked, replay.Replay)
+		t.Fatal("business replay", err, replay.Revoked, replay.Replay)
 	}
-	afterReplay := samplePolicyShareCost(t, ctx, admin, root)
-	if afterReplay.Revoked != 100 || afterReplay.Rows != 100 {
-		t.Fatal("replay changed business rows")
-	}
-	logPolicyShareCost(t, ctx, admin, "paid-replay-new-normal-operation-no-business-effect", beforeReplay, afterReplay)
-	bound := int64(audit.ShareOperationBusinessWALBytes)
-	t.Logf("policy_cost_stage=observed_budget_comparison prepaid_business_effect_WAL=%d original_fixture_protocol_transition_WAL=%d original_slot_WAL=%d observed_full_paid_WAL=%d observed_rollback_WAL=%d; no universal physical-layout claim", bound, policy.History.MaximumTransitionWALBytes, prepaidWAL, paidWAL, rollbackWAL)
-	if paidWAL > bound || rollbackWAL > bound {
-		t.Fatal("prepaid business effect allowance does not cover measured 100-share transaction", bound, paidWAL, rollbackWAL)
+	if err := admin.QueryRow(ctx, `SELECT count(*) FROM audit_event WHERE kind='share.revoke' AND subject=$1`, f.Creator.Subject).Scan(&revokeRows); err != nil || revokeRows != 1 {
+		t.Fatal("a replay wrote another effect row", err, revokeRows)
 	}
 }

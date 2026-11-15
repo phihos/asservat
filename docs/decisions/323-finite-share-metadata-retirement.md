@@ -2,6 +2,8 @@
 
 > Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
 
+> Superseded by ADR-330 D6 for share effects (migration 00186): shares no longer bind to a creating operation audit row, consume an effect marker or retire with audit finalization; each share effect writes its own `audit_event` row.
+
 > Superseded in part by ADR-328 (2026-11-13): Installer provisioning of the
 > protected cleanup projection, the provider recipe outbox and its input/image
 > pins, the capacity/cleanup journal comparison and the per-key native cleanup

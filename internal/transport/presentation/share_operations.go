@@ -181,8 +181,6 @@ func managedBy(s authorization.Share) []shareRecipientInput {
 
 func publicShareFailure(err error) OperationFailure {
 	switch {
-	case errors.Is(err, sharing.ErrRetentionCapacity):
-		return OperationFailure{"NotAvailable", "The requested share expiry exceeds its original metadata backing. Choose an earlier expiry, or ask an operator to review backing capacity before submitting a new sharing decision.", false}
 	case errors.Is(err, sharing.ErrManagementNotHeld):
 		return OperationFailure{"ManagementNotHeld", "Management can only name owner teams you belong to that currently hold evidence-owner for this artifact (or, as its creator, only you). Assigning an owner team you do not belong to requires an installation administrator; the team must currently hold evidence-owner for this artifact.", false}
 	case errors.Is(err, value.ErrInvalid):
