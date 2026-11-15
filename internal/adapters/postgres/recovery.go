@@ -35,7 +35,7 @@ func currentTrust(ctx context.Context, q *custodydb.Queries, installation string
 		return row, trustWire{}, err
 	}
 	n := now.Time.UTC().Truncate(time.Microsecond)
-	if row.Suspended || !identity.Fresh(row.ObservedAt.Time, row.FreshUntil.Time, n, 30*time.Second) {
+	if row.Suspended || !identity.Fresh(row.ObservedAt.Time, row.FreshUntil.Time, n, identity.AuthorityRecheckInterval) {
 		return row, trustWire{}, value.ErrUnavailable
 	}
 	return row, trustWire{InstallationID: uid(row.InstallationID), IssuerEpoch: uid(row.IssuerEpoch), Revision: trustRevision(row),
