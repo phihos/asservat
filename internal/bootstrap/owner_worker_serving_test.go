@@ -212,9 +212,9 @@ func TestOwnerRuntimeServesAcquisitionWorkersOnlyWhenComposed(t *testing.T) {
 				t.Fatal("worker native path reached its admission", reached, "composed", composed)
 			}
 
-			// The native port keeps its exact-name connector profile: the
-			// fixed worker-facing name is not served there.
-			if c, e := tls.Dial("tcp", nativeListener.Addr().String(), &tls.Config{ServerName: endpoints.Name, RootCAs: f.roots, MinVersion: tls.VersionTLS13, NextProtos: []string{"h2"}, Certificates: []tls.Certificate{workerLeaf}}); e == nil {
+			// The native port never serves the fixed worker-facing name; here it
+			// serves no purpose at all.
+			if c, e := tls.DialWithDialer(&net.Dialer{Timeout: 2 * time.Second, Deadline: time.Now().Add(2 * time.Second)}, "tcp", nativeListener.Addr().String(), &tls.Config{ServerName: endpoints.Name, RootCAs: f.roots, MinVersion: tls.VersionTLS13, NextProtos: []string{"h2"}, Certificates: []tls.Certificate{workerLeaf}}); e == nil {
 				c.Close()
 				t.Fatal("native port accepted the worker-facing name")
 			}
