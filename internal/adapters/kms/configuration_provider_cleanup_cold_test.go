@@ -46,7 +46,7 @@ func TestConfigurationCleanupColdRefreshReachesRequiredNativeProof(t *testing.T)
 				return
 			case <-ticker.C:
 				now := time.Now().UTC()
-				notice := fleetvalue.Administration{InstallationID: in.InstallationID, IssuerEpoch: in.ClusterID, Issuer: "https://issuer.example", Revision: identity.Revision{UID: in.ClusterID, Generation: 1, Digest: [32]byte{1}}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), Clients: []string{"client"}, DeliveryProfiles: []string{"context"}, MaxActiveBootstraps: 1, MaxBootstrapHistory: 2, MaxClusters: 1}
+				notice := fleetvalue.Administration{InstallationID: in.InstallationID, IssuerEpoch: in.ClusterID, Revision: identity.Revision{UID: in.ClusterID, Generation: 1, Digest: [32]byte{1}}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
 				gate.NoteFleetObservation(notice)
 				gate.NoteFleetCommitted(call, notice)
 			}

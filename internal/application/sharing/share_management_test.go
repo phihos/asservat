@@ -10,21 +10,22 @@ import (
 
 	value "asservat.local/asservat/internal/domain/authorization"
 	capture "asservat.local/asservat/internal/domain/capture"
-	"asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
 )
 
-type administration struct{ a fleet.Administration }
+type administration struct{ a identity.Policy }
 
-func (a administration) FleetAdministration(context.Context) (fleet.Administration, error) {
+func (a administration) IdentityPolicy(_ context.Context, issuer string) (identity.Policy, error) {
+	if issuer != a.a.Issuer {
+		return identity.Policy{}, identity.ErrDenied
+	}
 	return a.a, nil
 }
 
-// fleetOperators names the "platform" group of the fixture issuer as the
+// administrators names the "platform" group of the fixture issuer as the
 // installation administrators.
-func (f *fixture) fleetOperators() administration {
-	return administration{fleet.Administration{InstallationID: testID(3), IssuerEpoch: testID(22), Issuer: f.i.Principal.Issuer, Revision: f.p.Revision,
-		ObservedAt: f.now, FreshUntil: f.now.Add(5 * time.Second), Clients: []string{"mcp"}, Groups: []string{"platform"}, DeliveryProfiles: []string{"enrollment"},
-		MaxActiveBootstraps: 1, MaxBootstrapHistory: 1, MaxClusters: 1}}
+func (f *fixture) administrators() administration {
+	return administration{identity.Policy{Issuer: f.i.Principal.Issuer, Revision: f.p.Revision, ObservedAt: f.now, FreshUntil: f.now.Add(5 * time.Second), AdministratorGroups: []string{"platform"}}}
 }
 
 // ADR-238: explicit management at creation is limited to the creator's own
@@ -174,7 +175,7 @@ func TestShareAdministratorRevoke(t *testing.T) {
 	if _, _, err := s.Revoke(ctx, f, RevokeInput{OperationID: testID(900), ShareID: share.ID, ExpectedRevision: 1, IdempotencyKey: "r"}); !errors.Is(err, capture.ErrDenied) {
 		t.Fatal("revoke without a configured administration", err)
 	}
-	s.Administration = f.fleetOperators()
+	s.Administration = f.administrators()
 	stranger := admin
 	stranger.Principal.Subject, stranger.Groups = "stranger", []string{"team"}
 	f.i = stranger
@@ -193,18 +194,18 @@ func TestShareAdministratorRevoke(t *testing.T) {
 		t.Fatal("administrator revoke", err, f.store.revokers)
 	}
 	f.p.Target.PodUID = "pod"
-	// A suspended or foreign administration grants nothing.
-	ops := f.fleetOperators()
-	ops.a.Suspended = true
+	// Expired settings or another issuer's settings grant nothing.
+	ops := f.administrators()
+	ops.a.FreshUntil = f.now
 	s.Administration = ops
 	if _, _, err := s.Revoke(ctx, f, RevokeInput{OperationID: testID(900), ShareID: second.ID, ExpectedRevision: 1, IdempotencyKey: "r2"}); !errors.Is(err, capture.ErrDenied) {
-		t.Fatal("suspended administration revoked", err)
+		t.Fatal("expired administrators revoked", err)
 	}
-	ops = f.fleetOperators()
-	ops.a.InstallationID = testID(99)
+	ops = f.administrators()
+	ops.a.Issuer = "https://other.example.invalid"
 	s.Administration = ops
 	if _, _, err := s.Revoke(ctx, f, RevokeInput{OperationID: testID(900), ShareID: second.ID, ExpectedRevision: 1, IdempotencyKey: "r2"}); !errors.Is(err, capture.ErrDenied) {
-		t.Fatal("another installation's administration revoked", err)
+		t.Fatal("another issuer's administrators revoked", err)
 	}
 	// A manager's revocation is not an administrator's.
 	f.i = owner
@@ -220,7 +221,7 @@ func TestShareAdministratorAssignsManagement(t *testing.T) {
 	ctx := context.Background()
 	f, s := newFixture()
 	c := f.addOwnerTeam("owners-c", 16) // the creator is not a member
-	s.Administration = f.fleetOperators()
+	s.Administration = f.administrators()
 	in := f.input("k1")
 	in.Management = value.ManagementRequest{Mode: "teams", Teams: []string{"owners-c"}}
 	if _, _, err := s.Create(ctx, f, in); !errors.Is(err, ErrManagementNotHeld) {
@@ -260,7 +261,7 @@ func TestShareAdministratorRecovery(t *testing.T) {
 	ctx := context.Background()
 	f, s := newFixture()
 	b := f.addOwnerTeam("owners-b", 13)
-	s.Administration = f.fleetOperators()
+	s.Administration = f.administrators()
 	creator := f.i
 	share, _, err := s.Create(ctx, f, f.input("k1"))
 	if err != nil {
@@ -328,7 +329,7 @@ func TestShareAdministeredListing(t *testing.T) {
 	if _, _, _, err := s.ListAdministered(ctx, f, "", 2); !errors.Is(err, capture.ErrDenied) {
 		t.Fatal("listing without an administration", err)
 	}
-	s.Administration = f.fleetOperators()
+	s.Administration = f.administrators()
 	if _, _, _, err := s.ListAdministered(ctx, f, "", 2); !errors.Is(err, capture.ErrDenied) {
 		t.Fatal("non-admin listed all shares", err)
 	}

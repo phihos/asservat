@@ -6,7 +6,6 @@
 {{- $s3 := eq $s.objectStore.provider "seaweedfs" }}
 {{- $bao := eq $s.keyService.provider "openbao" }}
 {{- $p := include "asservat.providers" . | fromJson }}
-{{- $fleet := printf "%s-fleet" $n }}
 {{- $components := list "hub-api" "hub-worker" "federation" "key-service" "publisher" }}
 {{- $accounts := dict }}
 {{- range list "hub-api" "hub-worker" "federation" "publisher" }}
@@ -14,7 +13,7 @@
 {{- end }}
 {{- if and (not $pg) (not $s.postgres.external.adminSecret) }}{{ fail "services.postgres.external.adminSecret is required" }}{{ end }}
 {{- /* contracts.SetupConfiguration (asservat-setup/v1). */}}
-{{- $config := dict "format" "asservat-setup/v1" "name" $n "namespace" .Release.Namespace "fleetSource" $fleet
+{{- $config := dict "format" "asservat-setup/v1" "name" $n "namespace" .Release.Namespace
   "postgres" $p.postgres
   "openBao" (dict "endpoint" $p.openBao.endpoint "bundled" $bao "accounts" $accounts)
   "objectStore" (dict "endpoint" $p.objectStore.endpoint "region" $p.objectStore.region "bundled" $s3 "auditBucket" $p.objectStore.auditBucket "evidenceBucket" $p.objectStore.evidenceBucket) }}
@@ -27,48 +26,6 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels: {{ include "asservat.labels" (list . "setup") | nindent 4 }}
 automountServiceAccountToken: false
----
-# setup reads the fleet ConfigMap (SeedInstallation) and nothing else.
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: {{ $setup }}
-  namespace: {{ .Release.Namespace }}
-  labels: {{ include "asservat.labels" (list . "setup") | nindent 4 }}
-rules:
-  - apiGroups: [""]
-    resources: [configmaps]
-    resourceNames: [{{ $fleet | quote }}]
-    verbs: [get]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: {{ $setup }}
-  namespace: {{ .Release.Namespace }}
-  labels: {{ include "asservat.labels" (list . "setup") | nindent 4 }}
-roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: {{ $setup }}}
-subjects: [{kind: ServiceAccount, namespace: {{ .Release.Namespace }}, name: {{ $setup }}}]
----
-# Namespaces are cluster-scoped: one get on the release namespace only.
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: {{ printf "%s-%s" .Release.Namespace $setup }}
-  labels: {{ include "asservat.labels" (list . "setup") | nindent 4 }}
-rules:
-  - apiGroups: [""]
-    resources: [namespaces]
-    resourceNames: [{{ .Release.Namespace | quote }}]
-    verbs: [get]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: {{ printf "%s-%s" .Release.Namespace $setup }}
-  labels: {{ include "asservat.labels" (list . "setup") | nindent 4 }}
-roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: {{ printf "%s-%s" .Release.Namespace $setup }}}
-subjects: [{kind: ServiceAccount, namespace: {{ .Release.Namespace }}, name: {{ $setup }}}]
 ---
 apiVersion: v1
 kind: ConfigMap

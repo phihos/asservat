@@ -106,7 +106,7 @@ func withCapacityProducerFixture(t *testing.T, qualify capacityProducerCheck) {
 	seed.TLSConfig = tlsConfig.Clone()
 	seed.TLSConfig.MinVersion = tls.VersionTLS13
 	now := time.Now()
-	current := value.Administration{InstallationID: scope.InstallationID, IssuerEpoch: scope.IssuerEpoch, Issuer: "https://id.example.test", Revision: identity.Revision{UID: custodyID(), Generation: 1, Digest: artifact.Digest{1}}, Clients: []string{"console"}, Groups: []string{"operators"}, DeliveryProfiles: []string{"ops"}, MaxActiveBootstraps: 8, MaxBootstrapHistory: 16, MaxClusters: 16, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
+	current := value.Administration{InstallationID: scope.InstallationID, IssuerEpoch: scope.IssuerEpoch, Revision: identity.Revision{UID: custodyID(), Generation: 1, Digest: artifact.Digest{1}}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
 	if e = postgres.SeedInstallation(ctx, seed, current); e != nil {
 		t.Fatal("capacity prerequisite trust seed unavailable", e)
 	}

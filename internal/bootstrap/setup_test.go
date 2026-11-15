@@ -84,7 +84,7 @@ func TestRunSetupArgumentsAndStepMessages(t *testing.T) {
 }
 
 func TestSetupConfigurationIsClosed(t *testing.T) {
-	valid := `{"format":"asservat-setup/v1","name":"asservat","namespace":"asservat","fleetSource":"asservat-fleet","postgres":{"host":"asservat-postgres.asservat.svc","port":5432,"database":"asservat"},"openBao":{"endpoint":"https://asservat-openbao.asservat.svc:8200","bundled":true,"accounts":{"hub-api":"asservat-hub-api"}},"objectStore":{"endpoint":"https://asservat-objectstore.asservat.svc:8333","region":"us-east-1","bundled":true,"auditBucket":"asservat-audit","evidenceBucket":"asservat-evidence"}}`
+	valid := `{"format":"asservat-setup/v1","name":"asservat","namespace":"asservat","postgres":{"host":"asservat-postgres.asservat.svc","port":5432,"database":"asservat"},"openBao":{"endpoint":"https://asservat-openbao.asservat.svc:8200","bundled":true,"accounts":{"hub-api":"asservat-hub-api"}},"objectStore":{"endpoint":"https://asservat-objectstore.asservat.svc:8333","region":"us-east-1","bundled":true,"auditBucket":"asservat-audit","evidenceBucket":"asservat-evidence"}}`
 	c, err := contracts.DecodeSetupConfiguration(strings.NewReader(valid))
 	if err != nil || !validSetupConfiguration(c) {
 		t.Fatal(c, err)

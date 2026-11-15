@@ -47,13 +47,12 @@ Apply configuration changes with `helm upgrade` and the same values file.
 | `image.pullPolicy`, `image.pullSecrets` | `IfNotPresent`, `[]` | Pull settings for every product Pod |
 | `installation.name` | `asservat` | Prefix of every object name (DNS label, at most 30 characters) |
 | `origin` | empty | Browser origin of the console and API, e.g. `https://asservat.example.org` |
-| `identity.*` | see values.yaml | Issuer, console client, clients, eligibility, session limits, `approvals`, `processingOperators` |
+| `identity.*` | see values.yaml | Issuer, console client, clients, eligibility, `administrators`, session limits, `approvals`, `processingOperators` |
 | `processors`, `captureHistory` | omitted | Privacy inventory organizations; history view/cache ceilings |
 | `exposure.service` | `ClusterIP` | Service type of hub-api (port 9445) |
 | `exposure.tls.mode`, `exposure.tlsSecret` | `pod`, empty | ADR-327: TLS in hub-api with `tlsSecret`, or `proxy` behind an Ingress/Gateway |
 | `exposure.ingress` | disabled | Generic Ingress: `className`, `annotations`, `tls`; the host is the origin host |
 | `exposure.httpRoute` | disabled | Generic Gateway API HTTPRoute: `parentRefs`, `annotations`; the hostname is the origin host |
-| `fleet` | see values.yaml | Fleet enrollment identity and bounds |
 | `capacity` | omitted | Evidence capacity ([capacity.schema.json](../../specs/contracts/capacity.schema.json)); on when any value is set |
 | `workloadKeys` | omitted | Workload label/annotation keys only administrators may set (workloadMetadata PermissionSources) |
 | `retention`, `federation.connector` | omitted | Baseline retention policy and regional connector limits; `mode: combined` needs `federation.connector` |
@@ -98,8 +97,7 @@ Secret; present keys keep their values.
 the chart version, the image and the values, so every change runs it once.
 It mounts `<name>-ids`, every `<name>-sql-*` Secret, the bundled providers'
 administrator credentials or `services.postgres.external.adminSecret`, and
-its own `<name>-setup-config`. Its RBAC allows only `get` on the
-`<name>-fleet` ConfigMap and on the release namespace. It configures OpenBao
+its own `<name>-setup-config`. It has no Kubernetes RBAC. It configures OpenBao
 and SeaweedFS only when they are bundled; see
 [external services](../../docs/installation/helm.md#choose-bundled-or-external-services).
 

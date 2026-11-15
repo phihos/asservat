@@ -18,9 +18,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"k8s.io/apimachinery/pkg/util/validation"
-	"k8s.io/client-go/rest"
 
-	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
 	"asservat.local/asservat/internal/adapters/providerconfig"
@@ -214,7 +212,7 @@ func readRuntimeLogins(root string) (map[string]string, error) {
 
 func validSetupConfiguration(c contracts.SetupConfiguration) bool {
 	return c.Format == contracts.SetupFormat && len(validation.IsDNS1123Label(c.Name)) == 0 && len(c.Name) <= 30 &&
-		len(validation.IsDNS1123Label(c.Namespace)) == 0 && len(validation.IsDNS1123Subdomain(c.FleetSource)) == 0
+		len(validation.IsDNS1123Label(c.Namespace)) == 0
 }
 
 func runSetup(ctx context.Context, path string, out io.Writer) error {
@@ -314,19 +312,8 @@ func setupDatabase(ctx context.Context, c contracts.SetupConfiguration, ids setu
 		_, _ = fmt.Fprintln(out, "  no credential mounted: "+name)
 	}
 	// P3: trust root, activation and first fleet observation.
-	kubernetes, err := rest.InClusterConfig()
-	if err != nil {
-		return setupStep("kubernetes", cfg.ErrUnavailable)
-	}
 	err = retryUnavailable(ctx, out, func(ctx context.Context) error {
-		a, _, err := kube.ReadSetupFleetSource(ctx, kubernetes, ids.ClusterID, c.Namespace, c.FleetSource, ids.InstallationID, ids.IssuerEpoch)
-		if err != nil {
-			return setupStep("fleet-source", err)
-		}
-		if a.IssuerEpoch != ids.IssuerEpoch {
-			return setupStep("fleet-source", cfg.ErrChanged)
-		}
-		return setupStep("seed", postgres.SeedInstallation(ctx, ddlConfig, a))
+		return setupStep("seed", postgres.SeedInstallation(ctx, ddlConfig, installationTrustAt(ids.InstallationID, ids.IssuerEpoch, time.Now())))
 	})
 	if err != nil {
 		return err

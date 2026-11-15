@@ -48,9 +48,8 @@ type HubWorkerConfig struct {
 	// ServiceAccount is the worker's own account name (OpenBao login
 	// metadata).
 	ServiceAccount string `json:"serviceAccount"`
-	// FleetSource and OwnerSource name the fleet and owner configuration
-	// ConfigMaps in Namespace; their UIDs are read by name.
-	FleetSource string `json:"fleetSource"`
+	// OwnerSource names the owner configuration ConfigMap in Namespace; its
+	// UID is read by name.
 	OwnerSource string `json:"ownerSource"`
 	// LeaderLease names the scheduling Lease; leader election creates it.
 	LeaderLease string               `json:"leaderLease"`

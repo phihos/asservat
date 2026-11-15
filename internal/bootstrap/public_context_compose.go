@@ -26,6 +26,7 @@ import (
 	"asservat.local/asservat/internal/application/evidence"
 	executionapp "asservat.local/asservat/internal/application/execution"
 	fleetapp "asservat.local/asservat/internal/application/fleet"
+	identities "asservat.local/asservat/internal/application/identity"
 	planningapp "asservat.local/asservat/internal/application/planning"
 	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/contracts"
@@ -110,8 +111,9 @@ type publicContext struct {
 	// clusterIDs are the hub and the catalog's clusters: the installation's
 	// enrolled clusters for the ADR-237 permission impact preview.
 	clusterIDs []string
-	// fleet is the protected fleet administration; nil without Public.Fleet.
-	fleet *kube.ProtectedFleetSettings
+	// administrators reads identity.administrators (ADR-335 D14) from the
+	// identity settings; set with the identity layer.
+	administrators identities.PolicyReader
 	// processingPolicy is the capacity processing source that processing
 	// decisions bind to (ADR-210); nil without Public.Processing.
 	processingPolicy *kube.DownloadEnvironmentSource
@@ -501,9 +503,6 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	// Freeze a fully initialized read service, never the earlier partial case value.
 	out.grants.RawSelections = out.cases
 	out.investigation.Grants = out.grants
-	if out.fleet, err = newPublicFleet(c, observer, probe); err != nil {
-		return nil, err
-	}
 	// ADR-210: the processing source has no download paths; it is read only
 	// as the policy that names the processing operators.
 	if e := p.Processing; e != nil {

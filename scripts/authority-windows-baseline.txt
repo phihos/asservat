@@ -16,7 +16,6 @@ internal/adapters/kubernetes/download_environment.go 1
 internal/adapters/kubernetes/download_jobs.go 3
 internal/adapters/kubernetes/download_peer.go 2
 internal/adapters/kubernetes/fleet_protection.go 1
-internal/adapters/kubernetes/fleet_settings.go 1
 internal/adapters/kubernetes/identity_policy.go 1
 internal/adapters/kubernetes/owner_configuration.go 1
 internal/adapters/kubernetes/owner_endpoint.go 1

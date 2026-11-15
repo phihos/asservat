@@ -145,8 +145,8 @@ func TestCustodySetupDatabaseWithRealPostgres(t *testing.T) {
 	// P3: the trust seed activates once; a rerun keeps it, another
 	// installation is refused.
 	now := time.Now()
-	a := value.Administration{InstallationID: installation, IssuerEpoch: custodyID(), Issuer: "https://id.example.test", Revision: identity.Revision{UID: custodyID(), Generation: 1, Digest: [32]byte{1}},
-		Clients: []string{"console"}, Groups: []string{"operators"}, DeliveryProfiles: []string{"ops"}, MaxActiveBootstraps: 8, MaxBootstrapHistory: 16, MaxClusters: 16, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
+	a := value.Administration{InstallationID: installation, IssuerEpoch: custodyID(), Revision: identity.Revision{UID: custodyID(), Generation: 1, Digest: [32]byte{1}},
+		ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
 	if e = postgres.SeedInstallation(ctx, config, a); e != nil {
 		t.Fatal("seed", e)
 	}

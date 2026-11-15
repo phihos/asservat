@@ -2,11 +2,13 @@ package bootstrap
 
 import (
 	"context"
+	"crypto/sha256"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres"
 	app "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
 )
 
 // This fixed wrapper forwards only the actual observer. Scheduling notices
@@ -56,4 +58,22 @@ func (s *configurationRuntimeFleetProjection) FenceAdministration(ctx context.Co
 	}
 	s.admission.InvalidateFleetNotice()
 	return s.actual.FenceAdministration(ctx, basis, started)
+}
+
+// installationTrust is the fleet observer's source: the generated IDs alone.
+type installationTrust struct{ installation, epoch string }
+
+func (t installationTrust) FleetAdministration(ctx context.Context) (fleet.Administration, error) {
+	if ctx.Err() != nil {
+		return fleet.Administration{}, fleet.ErrUnavailable
+	}
+	return installationTrustAt(t.installation, t.epoch, time.Now()), nil
+}
+
+// installationTrustAt is the fleet trust observation that setup seeds and the
+// hub-worker refreshes. Its source is the generated IDs alone, so its
+// revision never changes for one installation.
+func installationTrustAt(installation, issuerEpoch string, now time.Time) fleet.Administration {
+	digest := sha256.Sum256([]byte("asservat-installation-trust/v1\x00" + installation + "\x00" + issuerEpoch))
+	return fleet.Administration{InstallationID: installation, IssuerEpoch: issuerEpoch, Revision: identity.Revision{UID: installation, Generation: 1, Digest: digest}, ObservedAt: now, FreshUntil: identity.Check(now, identity.SQLFenced).Until()}
 }

@@ -74,9 +74,7 @@ type InitialPreparationPodRequestCompletion struct {
 
 // Closed public desired input. Private replies and credentials remain separate.
 type InitialPreparationServices struct {
-	Format string        `json:"format"`
-	Fleet  FleetSettings `json:"fleet"`
-	// IssuerEpoch accompanies Fleet; fleet.json no longer carries it.
+	Format      string                  `json:"format"`
 	IssuerEpoch string                  `json:"issuerEpoch"`
 	Kubernetes  OwnerProviderEndpoint   `json:"kubernetes"`
 	Postgres    OwnerPostgresEndpoint   `json:"postgres"`
