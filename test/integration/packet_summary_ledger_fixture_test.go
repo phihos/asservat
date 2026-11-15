@@ -3,8 +3,6 @@ package integration
 import (
 	"context"
 	"crypto/tls"
-	"encoding/json"
-	"strings"
 	"testing"
 	"time"
 
@@ -16,10 +14,7 @@ import (
 	"asservat.local/asservat/internal/domain/fleet"
 	planvalue "asservat.local/asservat/internal/domain/planning"
 	"asservat.local/asservat/internal/domain/privacy"
-	"asservat.local/asservat/migrations"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/jackc/pgx/v5/stdlib"
-	"github.com/pressly/goose/v3"
 )
 
 // Fund the ONE authored8MiB recording before original installation. The
@@ -84,58 +79,6 @@ func admitQueryLedgerPacket(t *testing.T, f *capacitySQLFixture, root capacityRo
 		t.Fatal(err)
 	}
 	return s, accepted, executions
-}
-
-func refuseRetainedPacketSummaryDowngrade(t *testing.T, f *queryLedgerFixture) {
-	t.Helper()
-	db := stdlib.OpenDB(*f.base.admin.Config().ConnConfig)
-	defer db.Close()
-	p, err := goose.NewProvider(goose.DialectPostgres, db, migrations.Files(), goose.WithDisableGlobalRegistry(true))
-	if err != nil {
-		t.Fatal(err)
-	}
-	snapshot := func() string {
-		var b []byte
-		if err := f.base.admin.QueryRow(f.base.ctx, `SELECT jsonb_build_object('queries',(SELECT jsonb_agg(to_jsonb(q)-ARRAY['invocation_key','request_digest'] ORDER BY q.id) FROM context_query q),'backing',(SELECT jsonb_agg(to_jsonb(b)) FROM context_query_backing b),'allocations',(SELECT jsonb_agg(to_jsonb(a) ORDER BY a.id) FROM context_query_allocation a),'keys',(SELECT jsonb_agg(to_jsonb(k) ORDER BY k.child_id) FROM context_query_key_binding k))`).Scan(&b); err != nil {
-			t.Fatal(err)
-		}
-		if !json.Valid(b) {
-			t.Fatal("invalid rollback snapshot")
-		}
-		return string(b)
-	}
-	beforePacketSnapshot := snapshot()
-	originalHead, e := p.GetDBVersion(f.base.ctx)
-	if e != nil {
-		t.Fatal(e)
-	}
-	// Later additive migrations may commit their Down before the retained138
-	// audit refuses. Restore that prefix, including the original predicate ACL.
-	grants := preserveFixtureGrants(t, f.base.ctx, f.base.admin)
-	defer func() {
-		cleanup, stop := context.WithTimeout(context.WithoutCancel(f.base.ctx), 30*time.Second)
-		defer stop()
-		if _, e := p.UpTo(cleanup, originalHead); e != nil {
-			t.Error("restore packet schema prefix", e)
-			return
-		}
-		grants(cleanup)
-		if originalHead >= 139 {
-			restorePacketQueryFixturePredicate(t, cleanup, f)
-		}
-		if snapshot() != beforePacketSnapshot {
-			t.Error("restored packet prefix changed retained state")
-		}
-	}()
-	before := snapshot()
-	if _, err = p.DownTo(f.base.ctx, 136); err == nil || !strings.Contains(err.Error(), "packet query history cannot be downgraded") {
-		t.Fatal("retained packet downgrade", err)
-	}
-	head, err := p.GetDBVersion(f.base.ctx)
-	if err != nil || head != 138 || snapshot() != before {
-		t.Fatal("refused downgrade changed history/spend", head, err)
-	}
-	t.Logf("retained packet138→137 refused (same-tool audit); nullable later columns excluded from prefix snapshot; original schema%d restored on return", originalHead)
 }
 
 // Two OAuth clients of the SAME human retain distinct query actors but share

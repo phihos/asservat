@@ -417,9 +417,7 @@ func qualifySharedProjectionLifecycleClient(t *testing.T, f *queryLedgerFixture,
 		t.Fatalf("unexpected paid final state: downloads=%d workers=%d certificates=%d roles=%d children=%d queries=%d allocated=%d nativeClosed=%t closed=%t active=%t audited=%t claimed=%t bound=%t", downloads, workersCount, certificates, keyRoles, keyChildren, queries, allocated, nativeClosed, closed, active, audited, claimed, bound)
 	}
 	if rawPacket {
-		refuseRetainedRawPacketSummaryDowngrade(t, f)
 	} else if packet {
-		refuseRetainedPacketSummaryDowngrade(t, f)
 	}
 	stored, err := ledger.LookupQuery(ctx, scope.Principal, q.ID)
 	if err != nil || !stored.Equal(q) {

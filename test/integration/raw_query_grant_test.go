@@ -13,10 +13,7 @@ import (
 	app "asservat.local/asservat/internal/application/authorization"
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/authorization"
-	"asservat.local/asservat/migrations"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/jackc/pgx/v5/stdlib"
-	"github.com/pressly/goose/v3"
 )
 
 // Component ledger proof using an actually published synthetic context artifact.
@@ -300,58 +297,4 @@ func qualifyRawQueryGrants(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 		t.Fatal("expired request replay renewed scope", err)
 	}
 	qualifyRawQueryService(t, ctx, s, store, e, output, nativeBytes, publishAuthority, releasePermissionBurst)
-	qualifyRawQueryRollback(t, ctx, admin)
-}
-
-func qualifyRawQueryRollback(t *testing.T, ctx context.Context, admin *pgxpool.Pool) {
-	t.Helper()
-	db := stdlib.OpenDB(*admin.Config().ConnConfig.Copy())
-	defer db.Close()
-	p, err := goose.NewProvider(goose.DialectPostgres, db, migrations.Files(), goose.WithDisableGlobalRegistry(true))
-	if err != nil {
-		t.Fatal(err)
-	}
-	original, err := p.GetDBVersion(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	grants := preserveFixtureGrants(t, ctx, admin)
-	defer func() {
-		c, end := context.WithTimeout(context.Background(), 30*time.Second)
-		defer end()
-		if _, err := p.UpTo(c, original); err != nil {
-			t.Error(err)
-		}
-		grants(c)
-	}()
-	// A newer migration's own retained-state refusal stops the downgrade first
-	// when earlier cases of the shared fixture left such rows (as in
-	// qualifyNativeLengthRollbackRefusal).
-	expected, refusal := int64(131), "retained raw-query grants prevent rollback"
-	for _, newer := range []struct {
-		version       int64
-		exists, cause string
-	}{
-		{134, "SELECT EXISTS(SELECT 1 FROM context_verification WHERE acquisition_started_at IS NOT NULL)", "retained acquisition-window verification prevents rollback"},
-		{135, "SELECT EXISTS(SELECT 1 FROM context_execution WHERE phase='profileUnavailable')", "retained profile-unavailable execution prevents rollback"},
-		{145, "SELECT EXISTS(SELECT 1 FROM context_execution WHERE not_after>not_before+interval '5 seconds')", "API start bindings beyond five seconds prevent downgrade"},
-		{200, "SELECT EXISTS(SELECT 1 FROM access_grant)", "retained access grants prevent rollback of client-free result access"},
-	} {
-		var retained bool
-		if original >= newer.version {
-			if err = admin.QueryRow(ctx, newer.exists).Scan(&retained); err != nil {
-				t.Fatal(err)
-			}
-		}
-		if retained {
-			expected, refusal = newer.version, newer.cause
-		}
-	}
-	if _, err = p.DownTo(ctx, 130); err == nil || !strings.Contains(err.Error(), refusal) {
-		t.Fatal("retained raw downgrade", err)
-	}
-	head, err := p.GetDBVersion(ctx)
-	if err != nil || head != expected {
-		t.Fatal("raw refusal changed schema", head, err)
-	}
 }

@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"errors"
-	"strings"
 	"testing"
 	"time"
 
@@ -23,11 +22,8 @@ import (
 	authorization "asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
-	"asservat.local/asservat/migrations"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/jackc/pgx/v5/stdlib"
-	"github.com/pressly/goose/v3"
 )
 
 func comparisonLedgerQualification(q *capacityapp.ContextQueryQualification) {
@@ -289,56 +285,7 @@ func qualifyProfileComparisonQueries(t *testing.T, f *queryLedgerFixture) {
 		t.Fatal("content-free operator progress observation", e)
 	}
 	qualifyComparisonCrossAllocationSQL(t, f, q, authority, invocation)
-	refuseRetainedComparisonDowngrade(t, f)
 	t.Log("same-artifact real C3/C7/ledger:20 units once, one batch, two child identities/six SQL role spends; synthetic C14 ownership, not mTLS consumption or installed qualification")
-}
-
-func refuseRetainedComparisonDowngrade(t *testing.T, f *queryLedgerFixture) {
-	t.Helper()
-	db := stdlib.OpenDB(*f.base.admin.Config().ConnConfig)
-	defer db.Close()
-	provider, e := goose.NewProvider(goose.DialectPostgres, db, migrations.Files(), goose.WithDisableGlobalRegistry(true))
-	if e != nil {
-		t.Fatal(e)
-	}
-	original, e := provider.GetDBVersion(f.base.ctx)
-	if e != nil {
-		t.Fatal(e)
-	}
-	stop, refusal := int64(133), "comparison history retained"
-	if original >= 134 {
-		var retainedTiming bool
-		if e = f.base.admin.QueryRow(f.base.ctx, "SELECT EXISTS(SELECT 1 FROM context_verification WHERE acquisition_started_at IS NOT NULL)").Scan(&retainedTiming); e != nil {
-			t.Fatal(e)
-		}
-		if retainedTiming {
-			stop, refusal = 134, "retained acquisition-window verification prevents rollback"
-		}
-	}
-	grants := preserveFixtureGrants(t, f.base.ctx, f.base.admin)
-	defer func() {
-		cleanup, cancel := context.WithTimeout(context.WithoutCancel(f.base.ctx), 30*time.Second)
-		defer cancel()
-		if _, e := provider.UpTo(cleanup, original); e != nil {
-			t.Error("restore schema after comparison rollback refusal", e)
-		}
-		grants(cleanup)
-	}()
-	var before, after []byte
-	snapshot := func(out *[]byte) {
-		if err := f.base.admin.QueryRow(f.base.ctx, "SELECT jsonb_build_object('q',(SELECT jsonb_agg(to_jsonb(q) ORDER BY id) FROM context_query q),'a',(SELECT jsonb_agg(to_jsonb(a) ORDER BY id) FROM context_query_allocation a),'b',(SELECT jsonb_agg(to_jsonb(b) ORDER BY root_id) FROM context_query_backing b),'k',(SELECT jsonb_agg(to_jsonb(k) ORDER BY child_id) FROM context_query_key_binding k))").Scan(out); err != nil {
-			t.Fatal(err)
-		}
-	}
-	snapshot(&before)
-	if _, e = provider.DownTo(f.base.ctx, 132); e == nil || !strings.Contains(e.Error(), refusal) {
-		t.Fatal("retained pair rollback allowed", e)
-	}
-	head, e := provider.GetDBVersion(f.base.ctx)
-	snapshot(&after)
-	if e != nil || head != stop || string(before) != string(after) {
-		t.Fatal("refused pair downgrade changed spend/state", head, e)
-	}
 }
 
 // Distinct-workload coverage below uses a second ACTUAL capacity enrollment

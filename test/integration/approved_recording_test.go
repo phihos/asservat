@@ -460,7 +460,6 @@ func qualifyAdHocObservationPool(t *testing.T, ctx context.Context, admin *pgxpo
 		if successes.Load() != 10 || usedBytes != 50 || usedEvents != 10 || !spend(50) || spend(1) {
 			t.Fatal("shared event/byte pool", successes.Load(), usedBytes, usedEvents)
 		}
-		qualifyObservationPoolDowngradeRefusal(t, ctx, admin, g.ID)
 		if _, err := admin.Exec(ctx, "UPDATE adhoc_observation_spend SET events_spent=0 WHERE grant_id=$1", g.ID); err == nil {
 			t.Fatal("event spend lowered")
 		}

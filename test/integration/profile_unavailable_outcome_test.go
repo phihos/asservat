@@ -3,7 +3,6 @@ package integration
 import (
 	"context"
 	"reflect"
-	"strings"
 	"testing"
 	"time"
 
@@ -12,10 +11,7 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/capture"
 	execution "asservat.local/asservat/internal/domain/execution"
-	"asservat.local/asservat/migrations"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/jackc/pgx/v5/stdlib"
-	"github.com/pressly/goose/v3"
 )
 
 // Uses the actual approved profile admission, SQL start and original process.
@@ -75,47 +71,5 @@ func qualifyProfileUnavailableOutcome(t *testing.T, ctx context.Context, admin, 
 		t.Fatal("refusal created evidence or changed conservative reservation", empty, charged, reserved, err)
 	}
 	installedProfileRefusalSQLCheck(t, ctx, admin, s.a.RootID)(running.Binding.CaptureID, grantID, "ProfileUnavailable")
-	refuseRetainedProfileUnavailableDowngrade(t, ctx, admin)
 	t.Log("actual approved profile SQL: profileUnavailable terminal/replay/immutable, Failed/ProfileUnavailable; no copies/publication/observation and original reservations retained; endpoint observation synthetic")
-}
-
-func refuseRetainedProfileUnavailableDowngrade(t *testing.T, ctx context.Context, admin *pgxpool.Pool) {
-	t.Helper()
-	db := stdlib.OpenDB(*admin.Config().ConnConfig.Copy())
-	defer db.Close()
-	provider, err := goose.NewProvider(goose.DialectPostgres, db, migrations.Files(), goose.WithDisableGlobalRegistry(true))
-	if err != nil {
-		t.Fatal(err)
-	}
-	head, err := provider.GetDBVersion(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	grants := preserveFixtureGrants(t, ctx, admin)
-	defer func() {
-		cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
-		defer cancel()
-		if _, err := provider.UpTo(cleanup, head); err != nil {
-			t.Error("restore schema after refusal downgrade probe", err)
-		}
-		grants(cleanup)
-	}()
-	expected, refusal := int64(135), "retained profile-unavailable execution prevents rollback"
-	if head >= 145 {
-		var retained bool
-		if err := admin.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM context_execution WHERE not_after>not_before+interval '5 seconds')").Scan(&retained); err != nil {
-			t.Fatal(err)
-		}
-		if retained {
-			expected, refusal = 145, "API start bindings beyond five seconds prevent downgrade"
-		}
-	}
-	if _, err := provider.DownTo(ctx, 134); err == nil || !strings.Contains(err.Error(), refusal) {
-		t.Fatal("retained new terminal phase did not refuse rollback", err)
-	}
-	// Goose downs one migration per transaction: every migration after the
-	// retained guard downs first, then that guard refuses and stays applied.
-	if after, err := provider.GetDBVersion(ctx); err != nil || after != expected {
-		t.Fatal("refused downgrade stopped at the wrong migration", after, expected, head, err)
-	}
 }

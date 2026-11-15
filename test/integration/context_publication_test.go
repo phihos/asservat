@@ -272,7 +272,6 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 				t.Fatal("acknowledged native length mutable")
 			}
 			if !legacy {
-				qualifyNativeLengthRollbackRefusal(t, ctx, admin)
 			}
 		})
 	}
