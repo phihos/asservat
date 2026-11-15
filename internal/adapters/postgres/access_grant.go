@@ -332,11 +332,13 @@ func (s *AccessGrants) DecideGrant(ctx context.Context, in authapp.GrantDecision
 	}
 	// Carry the caller's original effect deadline through the database clock;
 	// row-lock waits cannot turn a stale reviewer/step-up into a decision.
-	deadline, ok := ctx.Deadline()
-	if !ok {
-		return zero, false, authorization.ErrGrantInvalid
+	// Without a caller deadline the decision is bounded by the authority
+	// recheck interval (ADR-311).
+	until := time.Now().Add(identity.AuthorityRecheckInterval)
+	if deadline, ok := ctx.Deadline(); ok {
+		until = identity.Earlier(until, deadline)
 	}
-	until := deadline.UTC().Truncate(time.Microsecond)
+	until = until.UTC().Truncate(time.Microsecond)
 	decision := "denied"
 	params := custodydb.DecideGrantParams{EffectUntil: ts(until), RootID: id(s.root), ID: id(in.GrantID), ApproverIssuer: in.Approver.Issuer, ApproverSubject: in.Approver.Subject, ApproverClient: in.Approver.ClientID, DecisionReason: in.Reason, DecisionKey: in.IdempotencyKey}
 	stepped := identity.Text(in.ACR, 128) && !in.AuthTime.IsZero()

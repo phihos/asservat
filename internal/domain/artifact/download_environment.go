@@ -20,7 +20,7 @@ type DownloadEnvironment struct {
 }
 
 func (e DownloadEnvironment) Valid(now time.Time) bool {
-	return (e.Path == (DownloadPath{}) || e.Path.Valid() && e.Path.TargetClusterID == e.Location.ClusterID && e.Path.StoreID == e.StoreID) && (e.Processing == (DownloadProcessingProof{}) || e.Processing.Valid(now) && e.Processing.RootID == e.RootID && e.Processing.Location == e.Location && !e.ValidUntil.After(e.Processing.ValidUntil)) && uuid(e.RootID) && uuid(e.InstallationID) && identity.Text(e.Region, 63) && uuid(e.StoreID) && uuid(e.RecoveryEpoch) && e.Location.Validate() == nil && e.Principal.Valid() && e.Revision.Valid() && identity.Fresh(e.ObservedAt, e.ValidUntil, now, 5*time.Second)
+	return (e.Path == (DownloadPath{}) || e.Path.Valid() && e.Path.TargetClusterID == e.Location.ClusterID && e.Path.StoreID == e.StoreID) && (e.Processing == (DownloadProcessingProof{}) || e.Processing.Valid(now) && e.Processing.RootID == e.RootID && e.Processing.Location == e.Location && !e.ValidUntil.After(e.Processing.ValidUntil)) && uuid(e.RootID) && uuid(e.InstallationID) && identity.Text(e.Region, 63) && uuid(e.StoreID) && uuid(e.RecoveryEpoch) && e.Location.Validate() == nil && e.Principal.Valid() && e.Revision.Valid() && identity.Fresh(e.ObservedAt, e.ValidUntil, now, identity.AuthorityRecheckInterval)
 }
 
 // CurrentValid is mandatory for live effects. Valid deliberately still decodes

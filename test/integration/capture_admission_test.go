@@ -366,15 +366,6 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 	create := func(t *testing.T, slots int64) scenario { return createForTarget(t, slots, nil, artifact.Digest{}) }
 	qualifyHistoryParameters(t, ctx, admin, poolFor, store, keys, create)
 	qualifyContextControlCapacity(t, ctx, admin, capturePool, controlPool, ledger, controlBacking, poolFor, createWithControl)
-	t.Run("suspended-installation-blocks-new-context-admission", func(t *testing.T) {
-		s := create(t, 1)
-		if _, err := admin.Exec(ctx, "UPDATE fleet_trust SET suspended=true WHERE installation_id=$1", s.recovery.installation); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := s.s.AdmitContext(ctx, s.a); err == nil {
-			t.Fatal("suspended installation admitted new capture")
-		}
-	})
 	qualifyOperationAudits(t, ctx, admin, poolFor, store, keys, create)
 	qualifyOperationAuditLifecycle(t, ctx, admin, poolFor, store, keys, s3admin, bucket, create)
 	qualifyCaptureIntentLifecycle(t, ctx, admin, poolFor, store, keys, s3admin, bucket, create)

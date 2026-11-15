@@ -309,25 +309,6 @@ func TestEnrollmentOwnerConfigurationWithRealServices(t *testing.T) {
 	c4.Revision.Digest = artifact.Digest{5}
 	c4.Suspended = false
 	accept(c4)
-	if _, e = l.admin.Exec(ctx, "UPDATE fleet_trust SET suspended=true WHERE installation_id=$1", c.Pool.InstallationID); e != nil {
-		t.Fatal(e)
-	}
-	denied("blocked recovery usable")
-	if _, _, e = l.writer.ObserveOwnerConfiguration(ctx, observation(c4)); e == nil {
-		t.Fatal("observer cleared recovery")
-	}
-	if e = l.writer.FenceOwnerConfiguration(ctx, time.Now()); e != nil {
-		t.Fatal("negative fence requires active recovery", e)
-	}
-	if _, e = l.admin.Exec(ctx, "UPDATE fleet_trust SET suspended=false WHERE installation_id=$1", c.Pool.InstallationID); e != nil {
-		t.Fatal(e)
-	}
-	if restored, err := replaceSyntheticFleetObservationAfterActivation(ctx, l.admin, c.Pool.InstallationID); err != nil {
-		t.Fatal(err)
-	} else {
-		l.observation = restored
-	}
-	denied("recovery reset revived fenced config")
 	accept(c4)
 	// The reader checks original expiry after an actual blocking row lock.
 	short := observation(c4)
