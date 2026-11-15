@@ -27,7 +27,7 @@ var smallKeycloakDatabaseHost = regexp.MustCompile(`^[a-zA-Z0-9](?:[a-zA-Z0-9.-]
 // five runtime connections; pgx may additionally open one cancellation socket
 // on failure. It never parses a credential-bearing DSN.
 func NewSmallKeycloakDatabasePresence(p contracts.OwnerPostgresEndpoint, credential contracts.OwnerSQLCredential) (*SmallKeycloakDatabasePresence, error) {
-	if (net.ParseIP(p.Host) == nil && !smallKeycloakDatabaseHost.MatchString(p.Host)) || p.Port < 1 || p.Port > 65535 || !identity.Text(p.Database, 63) || p.MaxConnections != 1 || !identity.Text(credential.Username, 63) || len(credential.Password) < 1 || len(credential.Password) > 4096 || strings.ContainsRune(credential.Password, 0) {
+	if (net.ParseIP(p.Host) == nil && !smallKeycloakDatabaseHost.MatchString(p.Host)) || p.Port < 1 || p.Port > 65535 || !identity.Text(p.Database, 63) || p.MaxConnections != 1 || !identity.Text(credential.Username, 63) || credential.Password == "" || strings.ContainsRune(credential.Password, 0) {
 		return nil, cfg.ErrInvalid
 	}
 	for _, entry := range os.Environ() {

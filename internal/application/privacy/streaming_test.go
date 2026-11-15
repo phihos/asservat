@@ -122,7 +122,7 @@ func TestStreamingWriterStopsAtPlanBound(t *testing.T) {
 			t.Fatal("output beyond the plan's data ceiling accepted")
 		}
 	}
-	if len(journal.state.Parts) > plan.PartLimit() {
+	if journal.state.Parts > plan.PartLimit() {
 		t.Fatal("parts beyond plan")
 	}
 }

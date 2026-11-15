@@ -191,7 +191,7 @@ func (h *ConnectorRecordings) start(ctx context.Context, p *objectstore.Prepared
 	work := collector.PacketCapture{CaptureID: e.CaptureUID, PodUID: e.PodUID, Duration: time.Duration(rec.DurationMillis) * time.Millisecond, MaxBytes: rec.MaxBytes}
 	if s := rec.Syscalls; s != nil {
 		// B3: a finite syscall metadata recording of the same Pod.
-		work.Syscalls = &collector.SyscallFilter{Names: append([]string(nil), s.Names...), ErrorsOnly: s.ErrorsOnly, MaxEvents: s.MaxEvents, MaxTrackedThreads: s.MaxTrackedThreads}
+		work.Syscalls = &collector.SyscallFilter{Names: append([]string(nil), s.Names...), ErrorsOnly: s.ErrorsOnly, MaxTrackedThreads: s.MaxTrackedThreads}
 		work.MaxEventsPerSecond = s.MaxEventsPerSecond
 	}
 	if f := rec.Filter; f != nil {

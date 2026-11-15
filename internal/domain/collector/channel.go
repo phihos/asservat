@@ -81,9 +81,8 @@ type Work struct {
 // Packet capture bounds (ADR-248). The output cap is the interim 8 MiB per
 // capture (one storage frame); the streaming lift is a named follow-up.
 const (
-	MaxPacketCaptureBytes    = 8 << 20
-	MinPacketCaptureBytes    = 64 << 10
-	MaxPacketCaptureDuration = 5 * time.Minute
+	MaxPacketCaptureBytes = 8 << 20
+	MinPacketCaptureBytes = 64 << 10
 	// PacketCaptureStartWithin bounds how long after queueing the node may
 	// still start the capture.
 	PacketCaptureStartWithin = 10 * time.Second
@@ -142,9 +141,6 @@ func (r RawPrefix) valid() bool {
 	return true
 }
 
-// MaxSyscallCaptureDuration is a manual syscall recording's longest window.
-const MaxSyscallCaptureDuration = time.Minute
-
 // Valid checks the payload's own bounds; the node checks the digest against
 // the program it received.
 func (p PacketCapture) Valid() bool {
@@ -154,14 +150,14 @@ func (p PacketCapture) Valid() bool {
 	if o := p.Observation; o != nil && (!o.ValidFinite(o.StartedAt) || o.Duration != p.Duration || o.Binding.CaptureID != p.CaptureID || o.Binding.PodUID != p.PodUID || o.Binding.ProgramDigest != p.ProgramDigest) {
 		return false
 	}
-	if p.Syscalls != nil && (!p.Syscalls.Valid() || len(p.Program) != 0 || p.ProgramDigest != [32]byte{} || p.Observation != nil || p.Duration > MaxSyscallCaptureDuration || p.MaxEventsPerSecond < 1 || p.MaxEventsPerSecond > artifact.MaxRecordingEventsPerSecond) ||
+	if p.Syscalls != nil && (!p.Syscalls.Valid() || len(p.Program) != 0 || p.ProgramDigest != [32]byte{} || p.Observation != nil || p.MaxEventsPerSecond < 1 || p.MaxEventsPerSecond > artifact.MaxRecordingEventsPerSecond) ||
 		p.Syscalls == nil && p.MaxEventsPerSecond != 0 ||
 		p.Raw != nil && (p.Observation == nil || p.Syscalls != nil || len(p.Program) == 0 || !p.Raw.valid()) ||
 		p.HTTP != nil && (p.Raw == nil || *p.Raw != RawPrefix{Snaplen: artifact.MaxRawSnaplen} || !p.HTTP.valid()) {
 		return false
 	}
 	return validUUID(p.CaptureID) && validUUID(p.PodUID) && len(p.Program) <= planning.MaxFilterInstructions && (len(p.Program) == 0) == (p.ProgramDigest == [32]byte{}) &&
-		p.Duration >= time.Second && p.Duration <= MaxPacketCaptureDuration && p.Duration%time.Millisecond == 0 && p.MaxBytes >= MinPacketCaptureBytes && p.MaxBytes <= MaxPacketCaptureBytes
+		p.Duration >= time.Second && p.Duration%time.Millisecond == 0 && p.MaxBytes >= MinPacketCaptureBytes && p.MaxBytes <= MaxPacketCaptureBytes
 }
 
 func validUUID(s string) bool {

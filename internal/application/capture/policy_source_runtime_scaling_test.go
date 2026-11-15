@@ -68,7 +68,7 @@ func newSourceCohortFixtureWith(t *testing.T, replicas int, composition *plannin
 	}
 	// Ten 16MiB rings and ten 1MiB/s slices fit each 256MiB/16MiB/s
 	// node in the twenty-replica case; no capacity denial explains its tail.
-	if replicas > targets.MaxRestartPods || int64(min(replicas, 10))*recorder.Action.SegmentBytes*int64(recorder.Action.MaxSegments) > 256<<20 {
+	if replicas > targets.MaxRestartPods || int64(min(replicas, 10))*recorder.Action.RingMaxBytes > 256<<20 {
 		t.Fatal("cohort no longer fits the explicit two-node ring envelope")
 	}
 	s := &sourceCohortFixture{t: t, f: f, authority: accepted.authority, policy: p, base: f.now, queryCost: 300 * time.Millisecond, actualReplicas: replicas, wirePerDispatch: 1000, rows: map[string]PolicySourceState{}, nodePermits: map[string]collector.SourcePermit{}, nodeMeters: map[string]*collector.SourceMeter{}, firstDispatch: map[string]time.Time{}}

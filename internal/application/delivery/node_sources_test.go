@@ -32,7 +32,7 @@ func TestSourceQueuePreservesCurrentProcessOriginalBoundsAndRestrictiveStop(t *t
 			uuid := "33333333-3333-4333-8333-333333333333"
 			b := collector.SourceBinding{RootID: uuid, PolicyUID: "policy", AcceptanceID: uuid, SourceID: uuid, Fence: uuid, ActionID: "packets", PodUID: uuid, NodeUID: id.NodeUID, BootID: id.BootID, CollectorPodUID: id.PodUID, CollectorEpoch: id.Epoch, Scope: [32]byte{1}, ExpectationDigest: [32]byte{2}, ResourceDigest: SourceResourcesDigest(resource)}
 			p := collector.SourcePermit{Binding: b, StartedAt: now, HardUntil: now.Add(24 * time.Hour), StartBy: now.Add(5 * time.Second), IssuedAt: now, DispatchUntil: now.Add(5 * time.Second), LeafUntil: now.Add(30 * time.Second), Credit: 1000, BytesPerSecond: 1000}
-			source := collector.PacketSource{Permit: p, Resources: resource, Ring: collector.SourceRingLimits{MaxAge: time.Minute, MaxBytes: 1024, SegmentBytes: 256, MaxSegments: 4, MaxFrozenBytes: 1024, MaxConcurrentSnapshots: 2}}
+			source := collector.PacketSource{Permit: p, Resources: resource, Ring: collector.SourceRingLimits{MaxAge: time.Minute, MaxBytes: 1024, Segments: 4}}
 			expected := targets.PacketSourceObservation{PodUID: b.PodUID, NodeUID: b.NodeUID, BootID: b.BootID, CollectorPodUID: b.CollectorPodUID, CollectorEpoch: b.CollectorEpoch, ObservedAt: now, FreshUntil: p.DispatchUntil}
 			end := p.DispatchUntil
 			switch mode {

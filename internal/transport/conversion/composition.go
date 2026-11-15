@@ -24,12 +24,12 @@ func CompositionFromWire(in contracts.CaptureComposition) (*value.ProfileComposi
 			case "packetFilter", "packetBefore", "packetAfter", "syscallMode", "syscallBefore", "syscallAfter", "actionTimeout", "actionExecutionMode", "filePath", "profileDuration", "logBefore", "logAfter", "logStream":
 				err = json.Unmarshal(o.Value, &e.Text)
 				e.TextSet = err == nil && e.Text == "" // present but empty: the field validator gives the remedy
-			case "syscallMaxEvents", "syscallRate", "actionMaxBytes":
+			case "syscallRate", "actionMaxBytes":
 				err = json.Unmarshal(o.Value, &e.Number)
 			case "packetRing", "syscallRing":
 				var r contracts.CaptureRing
 				err = json.Unmarshal(o.Value, &r)
-				e.Ring = &value.RingSettings{MaxAge: r.MaxAge, MaxBytes: r.MaxBytes, SegmentBytes: r.SegmentBytes, MaxSegments: r.MaxSegments, Medium: r.Medium, StorageProfileRef: r.StorageProfileRef}
+				e.Ring = &value.RingSettings{MaxAge: r.MaxAge, MaxBytes: r.MaxBytes, Segments: r.Segments}
 			case "packetPeers":
 				e.Peers, e.Unmodeled, err = peersFromWire(o.Value)
 			case "syscallFilter":

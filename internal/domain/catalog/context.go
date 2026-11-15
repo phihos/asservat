@@ -113,7 +113,7 @@ func validProfileAcquisition(a ContextCaseArtifact) bool {
 	if p == nil {
 		return true
 	}
-	if a.EvidenceType != "profile" || a.DataClass != "raw" || p.DurationMillis < 0 || p.DurationMillis > 60000 || !artifact.ValidGoProfile(p.Type, p.Mode, time.Duration(p.DurationMillis)*time.Millisecond, p.ForceGC) {
+	if a.EvidenceType != "profile" || a.DataClass != "raw" || p.DurationMillis < 0 || !artifact.ValidGoProfile(p.Type, p.Mode, time.Duration(p.DurationMillis)*time.Millisecond, p.ForceGC) {
 		return false
 	}
 	native := artifact.PprofArtifact

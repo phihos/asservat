@@ -31,7 +31,7 @@ func TestPlanFiniteAdHocObservation(t *testing.T) {
 			t.Fatal(name, "planned")
 		}
 	}
-	if _, err := PlanFiniteAdHocObservation(g, limits, 16*time.Second, 0, now.Add(10*time.Second), now.Add(time.Minute), now); err == nil {
-		t.Fatal("over 15 seconds planned")
+	if _, err := PlanFiniteAdHocObservation(g, limits, 60*time.Second, 0, now.Add(10*time.Second), now.Add(time.Minute), now); err == nil {
+		t.Fatal("recording beyond the reviewed session planned")
 	}
 }

@@ -17,7 +17,7 @@ func wireArgumentObservation(p collector.ArgumentObservationPermit) *contracts.N
 }
 
 func domainArgumentObservation(w *contracts.NodeArgumentObservationPermit) (*collector.ArgumentObservationPermit, bool) {
-	if w == nil || w.DurationMillis < 1000 || w.DurationMillis > 60000 {
+	if w == nil || w.DurationMillis < 1000 {
 		return nil, false
 	}
 	b := w.Binding

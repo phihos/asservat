@@ -39,7 +39,7 @@ func TestRuntimeRolesCoverAllCompiledPlansWithUniqueNames(t *testing.T) {
 }
 
 func TestSQLPasswordVerifierRejectsWeakPasswords(t *testing.T) {
-	for _, p := range []string{"", "short", strings.Repeat("a", 31), strings.Repeat("a", 40) + " ", strings.Repeat("a", 1025)} {
+	for _, p := range []string{"", "short", strings.Repeat("a", 31), strings.Repeat("a", 40) + " ", "tab\tinside" + strings.Repeat("a", 32)} {
 		if _, err := sqlPasswordVerifier(SQLLogin{Username: "as_x", Password: p}); err == nil {
 			t.Fatalf("accepted %q", p)
 		}

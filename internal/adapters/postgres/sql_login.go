@@ -15,8 +15,10 @@ type SQLLogin struct{ Username, Password string }
 // sqlPasswordVerifier derives a salted SCRAM-SHA-256 verifier with the
 // maintained SCRAM implementation. Only the verifier reaches role DDL; the
 // plaintext password is never part of an SQL statement or bind parameter.
+// Login roles are reachable over the network, so a password needs at least
+// 32 characters; the generated ones have 43.
 func sqlPasswordVerifier(l SQLLogin) (string, error) {
-	if len(l.Password) < 32 || len(l.Password) > 1024 || strings.IndexFunc(l.Password, func(r rune) bool { return r < 0x21 || r > 0x7e }) >= 0 {
+	if len(l.Password) < 32 || strings.IndexFunc(l.Password, func(r rune) bool { return r < 0x21 || r > 0x7e }) >= 0 {
 		return "", value.ErrInvalid
 	}
 	c, err := scram.SHA256.NewClient(l.Username, l.Password, "")

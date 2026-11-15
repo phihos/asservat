@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"strings"
 	"testing"
 
@@ -113,10 +112,6 @@ func TestCIDRPeerSetDigest(t *testing.T) {
 
 func TestCIDRPeerRefusals(t *testing.T) {
 	path := "profile_composition.components[0] action sample.parameters"
-	many := make([]string, 60)
-	for i := range many {
-		many[i] = fmt.Sprintf("10.0.%d.0/24", i)
-	}
 	for name, tc := range map[string]struct {
 		edits      []value.ProfileEdit
 		compiler   *fakeCompiler
@@ -131,7 +126,6 @@ func TestCIDRPeerRefusals(t *testing.T) {
 		"protocol":              {[]value.ProfileEdit{peersEdit("sctp", nil, []string{"10.0.0.0/8"})}, nil, value.CompositionInvalid, path + ".peers.protocol", ""},
 		"resolution":            {[]value.ProfileEdit{{ActionID: "sample", Field: "packetPeers", Peers: &value.PeerSelection{CIDRs: [][]string{{"10.0.0.0/8"}}, Protocol: "any", Resolution: "live", MaxEndpoints: 1, MaxStaleness: "5s"}}}, nil, value.CompositionInvalid, path + ".peers.resolution", ""},
 		"no compiler":           {[]value.ProfileEdit{peersEdit("any", nil, []string{"10.0.0.0/8"})}, nil, value.CompositionNoCompiler, path + ".peers", ""},
-		"too many tokens":       {[]value.ProfileEdit{peersEdit("any", nil, many)}, &fakeCompiler{program: fixtureProgram}, value.CompositionFilterRejected, path + ".peers", "fewer or broader peer prefixes"},
 		"too many instructions": {[]value.ProfileEdit{peersEdit("any", nil, []string{"10.0.0.0/8"})}, &fakeCompiler{program: make([]value.BPFInstruction, value.MaxFilterInstructions+1)}, value.CompositionFilterRejected, path + ".peers", "fewer or broader peer prefixes"},
 		"break out": {[]value.ProfileEdit{peersEdit("any", nil, []string{"10.0.0.0/8"}), text("sample", "packetFilter", "tcp) or (host 203.0.113.9")},
 			&fakeCompiler{program: fixtureProgram}, value.CompositionFilterRejected, path + ".filter", "balance"},

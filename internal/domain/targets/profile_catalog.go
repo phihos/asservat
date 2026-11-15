@@ -8,10 +8,6 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 )
 
-// MaxCatalogVersions bounds one namespace catalog read: a composition has at
-// most eight components (REQ-CPR-003).
-const MaxCatalogVersions = 8
-
 // ProfileVersion names one exact CaptureProfile version; there is no latest.
 type ProfileVersion struct{ Name, Version string }
 
@@ -25,7 +21,7 @@ type ProfileCatalogRequest struct {
 }
 
 func (r ProfileCatalogRequest) Valid() bool {
-	if !authorization.UUID(r.ClusterID) || !identity.Text(r.Namespace.Name, 63) || !identity.Text(r.Namespace.UID, 64) || len(r.Versions) < 1 || len(r.Versions) > MaxCatalogVersions {
+	if !authorization.UUID(r.ClusterID) || !identity.Text(r.Namespace.Name, 63) || !identity.Text(r.Namespace.UID, 64) || len(r.Versions) < 1 {
 		return false
 	}
 	for _, v := range r.Versions {

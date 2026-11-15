@@ -1,5 +1,21 @@
 # Sustained implementation progress
 
+## Limits without a reason removed (2026-11-15)
+
+Streaming artifacts may use S3's 10,000 parts of one 8 MiB frame (about
+77 GiB, migration 00180); the journal keeps only the latest part. Workload
+Pod lists follow LIST continue tokens. Composition, catalog, filter-text,
+SQL-password maximum and ConfigMap-size caps are gone. pprof windows (were
+60 s CPU, 15 s trace, 60 s delta) and argument observations run to the
+configured duration; the target's pprof server refuses a duration it cannot
+serve. The recorder ring is `{maxAge, maxBytes, segments}`; the
+encrypted-disk medium and the syscall `maxEvents` count are removed.
+Recorder and saved-log windows run to the configured duration (migration 00181).
+
+Verified: `go build`, `go vet` (also `-tags libpcap`), `make go-check
+pcap-check`, the CI gate set, `TestCustodyWithRealServices/bounded_streaming`
+(real PostgreSQL). Gaps: embedded policy schemas still carry list caps.
+
 ## Permission CRDs follow the canonical contracts (ADR-335 D1/D4/D14, 2026-11-15)
 
 No blocking initial AccessBinding review: the first permission batch is
@@ -295,7 +311,12 @@ examples go through `readImplementedExample` or the console equivalent.
 | `collection-scope.schema.json` | No `observation.mode` | `internal/application/capture/policy_compile.go`; console capture bundle |
 | `action.schema.json`, `capture-profile-go-cpu.yaml` | Profile `impact` may be `observe` (pprof GET) | `internal/application/planning/profile_plan.go` (refuses non-intrusive); `internal/application/planning/profiles/go-cpu-v1.json` |
 | `grant.schema.json` | Policy-grant `spec.renewal`, `status.renewalDue` | No renewal: `internal/application/authorization/grants.go`, `internal/adapters/postgres/policy_grant_attachment.go` |
-| Capture/policy/trigger/recipe/packet/syscall schemas | No list-count caps; arbitrary maxima raised to 2^53−1; no packet-filter length cap (BPF limit checked at compile); `argv` items up to `MAX_ARG_STRLEN` | Embedded `policy-schemas/`, `permission-schemas/approval-policy`, manifest `profile` schema; `internal/domain/planning/composition.go` (`MaxCompositionComponents` 8, `MaxComponentEdits` 32, `MaxCompositionBytes`); generated DebugPolicy/CaptureProfile CRDs |
+| Capture/policy/trigger/recipe/packet/syscall schemas | No list-count caps; arbitrary maxima raised to 2^53−1; no packet-filter length cap (BPF limit checked at compile); `argv` items up to `MAX_ARG_STRLEN` | Embedded `policy-schemas/`, `permission-schemas/approval-policy`, manifest `profile` schema; generated DebugPolicy/CaptureProfile CRDs |
+| `identity-settings.schema.json` | `groupsClaim`, `usernameClaim`, optional `requiredGroups`, `administrators`; no eligible lists, `groupMaxAgeSeconds`, `revision` or list caps | `internal/contracts/identity_settings.go`, `permission_runtime.go`, `installer_continuation.go`; `internal/domain/configuration/permissions.go`; `internal/bootstrap/permission_guards.go`; `internal/adapters/kubernetes/hub_worker_capacity_reads.go` |
+| `browser-settings.schema.json` | `maxLifetimeSeconds` (default 7 d) and `inactivityTimeoutSeconds` (default 24 h); no `maxLogins`/`maxSessions`/`maxLogoutEvents` or per-user session count | `internal/contracts/browser_settings.go`, `installer_continuation.go`; `internal/domain/identity/browser_settings.go` |
+| `access-binding`, `permission-common`, `cluster-access-binding` (new) | Subject `issuer` and `reason` optional; workload by name with optional `uid`; ClusterAccessBinding; `groupName` mapping mode; `reviewRef`/`guardRef` optional; no list or string caps beyond Kubernetes formats | `internal/adapters/kubernetes/permission_decode.go`; `internal/domain/configuration/permissions.go`, `review.go`; chart CRDs (no ClusterAccessBinding CRD) |
+| `permission-source.schema.json` | `cluster` name instead of `clusterID`; no `maxDecisionAgeSeconds`; exclusions and `maxNamespaces` optional; access reviews map to any role | `internal/adapters/kubernetes/permission_decode.go`; `internal/domain/configuration/permissions.go` |
+
 | `cluster-access-binding.schema.json` | `namespaceSelector` narrows a binding; hub-cluster `privacy-operator` role | `internal/adapters/kubernetes/permission_decode.go` `clusterBindings`: a selector-narrowed Allow grants nothing and a selector-narrowed Deny applies to every namespace (fail closed); `privacy-operator` has no consumer and is dropped |
 | `policy-authority.schema.json` | Envelope ceilings, `notAfter` and limits optional, no maxima | `internal/domain/authorization/automation.go`, `policy_grant.go`, `policy_grant_use.go` |
 

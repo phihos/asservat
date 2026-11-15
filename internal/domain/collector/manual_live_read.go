@@ -71,7 +71,7 @@ func (o ManualLiveObservation) Valid() bool {
 			return false
 		}
 	}
-	if o.StartedAt.IsZero() || !o.HardUntil.After(o.StartedAt) || o.HardUntil.Sub(o.StartedAt) > MaxPacketCaptureDuration {
+	if o.StartedAt.IsZero() || !o.HardUntil.After(o.StartedAt) {
 		return false
 	}
 	if o.ObservationKind == "" {

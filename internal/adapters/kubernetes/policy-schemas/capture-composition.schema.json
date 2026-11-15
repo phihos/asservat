@@ -171,18 +171,6 @@
         "$ref": "https://asservat.io/spec/v1/syscall-trace.schema.json#/properties/arguments"
       }
     },
-    "syscallMaxEvents": {
-      "actionKinds": [
-        "syscallTrace"
-      ],
-      "path": [
-        "parameters",
-        "maxEvents"
-      ],
-      "valueSchema": {
-        "$ref": "https://asservat.io/spec/v1/syscall-trace.schema.json#/properties/maxEvents"
-      }
-    },
     "syscallRate": {
       "actionKinds": [
         "syscallTrace"
@@ -252,7 +240,7 @@
       "valueSchema": {
         "type": "integer",
         "minimum": 1,
-        "maximum": 1099511627776
+        "maximum": 9007199254740991
       }
     },
     "actionTimeout": {
@@ -687,28 +675,6 @@
               "maxLength": 63
             },
             "field": {
-              "const": "syscallMaxEvents"
-            },
-            "value": {
-              "$ref": "https://asservat.io/spec/v1/syscall-trace.schema.json#/properties/maxEvents"
-            }
-          },
-          "required": [
-            "actionID",
-            "field",
-            "value"
-          ]
-        },
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "actionID": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 63
-            },
-            "field": {
               "const": "syscallRate"
             },
             "value": {
@@ -789,7 +755,7 @@
             "value": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 1099511627776
+              "maximum": 9007199254740991
             }
           },
           "required": [
@@ -936,8 +902,7 @@
           "items": {
             "$ref": "https://asservat.io/spec/v1/capture-composition.schema.json#/$defs/override"
           },
-          "minItems": 0,
-          "maxItems": 32
+          "minItems": 0
         }
       },
       "required": [
@@ -1067,16 +1032,14 @@
           "items": {
             "$ref": "https://asservat.io/spec/v1/capture-composition.schema.json#/$defs/resolvedProfile"
           },
-          "minItems": 1,
-          "maxItems": 8
+          "minItems": 1
         },
         "actionMap": {
           "type": "array",
           "items": {
             "$ref": "https://asservat.io/spec/v1/capture-composition.schema.json#/$defs/actionAlias"
           },
-          "minItems": 1,
-          "maxItems": 128
+          "minItems": 1
         }
       },
       "required": [
@@ -1094,13 +1057,12 @@
       "items": {
         "$ref": "https://asservat.io/spec/v1/capture-composition.schema.json#/$defs/component"
       },
-      "minItems": 1,
-      "maxItems": 8
+      "minItems": 1
     },
     "maxTotalBytes": {
       "type": "integer",
       "minimum": 1,
-      "maximum": 1099511627776
+      "maximum": 9007199254740991
     },
     "maxDuration": {
       "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/duration"

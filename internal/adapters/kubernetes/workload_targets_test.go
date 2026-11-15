@@ -56,7 +56,7 @@ func workloadClient(t *testing.T, clock *atomic.Int64, serve func(http.ResponseW
 }
 
 func TestNamedWorkloadResolutionPinsSelectedPodAndRealOwner(t *testing.T) {
-	modes := []string{"short-parent", "deployment", "statefulset", "expressions", "frozen-request", "pod-deployment", "pod-statefulset", "pod-unowned", "pod-job", "pod-unscheduled", "foreign-only", "empty", "namespace-replaced", "workload-replaced", "pod-replaced", "node-rebooted", "list-denied", "list-incomplete", "list-remaining", "list-oversized", "list-wrong-label", "list-duplicate-name", "list-duplicate-uid", "list-missing-rv", "selector-empty", "selector-invalid", "selector-case-alias", "late-original", "clock-rollback"}
+	modes := []string{"short-parent", "deployment", "statefulset", "expressions", "frozen-request", "pod-deployment", "pod-statefulset", "pod-unowned", "pod-job", "pod-unscheduled", "foreign-only", "empty", "namespace-replaced", "workload-replaced", "pod-replaced", "node-rebooted", "list-denied", "list-paged", "list-wrong-label", "list-duplicate-name", "list-duplicate-uid", "list-missing-rv", "selector-empty", "selector-invalid", "selector-case-alias", "late-original", "clock-rollback"}
 	for _, mode := range modes {
 		t.Run(mode, func(t *testing.T) {
 			var nsReads, rootReads, podReads, nodeReads, lists atomic.Int64
@@ -120,7 +120,12 @@ func TestNamedWorkloadResolutionPinsSelectedPodAndRealOwner(t *testing.T) {
 					if mode == "expressions" {
 						selector += ",track in (stable)"
 					}
-					if r.URL.Query().Get("labelSelector") != selector || r.URL.Query().Get("limit") != "257" || r.URL.Query().Get("timeout") != "5s" || len(r.URL.Query()) != 3 {
+					page := r.URL.Query().Get("continue")
+					want := 3
+					if page != "" {
+						want = 4
+					}
+					if r.URL.Query().Get("labelSelector") != selector || r.URL.Query().Get("limit") != "500" || r.URL.Query().Get("timeout") != "5s" || len(r.URL.Query()) != want {
 						t.Errorf("unexpected candidate enumeration: %s", r.URL.RawQuery)
 					}
 					items := []any{workloadFixturePod("z-app"), workloadFixturePod("a-foreign"), workloadFixturePod("b-app"), workloadFixturePod("a-unscheduled"), workloadFixturePod("a-deleting")}
@@ -129,12 +134,6 @@ func TestNamedWorkloadResolutionPinsSelectedPodAndRealOwner(t *testing.T) {
 					}
 					if mode == "empty" {
 						items = []any{}
-					}
-					if mode == "list-oversized" {
-						items = nil
-						for n := range workloadCandidateLimit + 1 {
-							items = append(items, workloadFixturePod(fmt.Sprintf("pod-%03d", n)))
-						}
 					}
 					if mode == "list-duplicate-name" {
 						items = append(items, workloadFixturePod("b-app"))
@@ -146,14 +145,13 @@ func TestNamedWorkloadResolutionPinsSelectedPodAndRealOwner(t *testing.T) {
 						items[0].(map[string]any)["metadata"].(map[string]any)["labels"] = map[string]string{"app": "other"}
 					}
 					metadata := map[string]any{"resourceVersion": "list-rv", "continue": ""}
-					if mode == "list-incomplete" {
-						metadata["continue"] = "more"
+					if mode == "list-paged" && page == "" {
+						items, metadata["continue"] = items[:2], "more"
+					} else if mode == "list-paged" {
+						items = items[2:]
 					}
 					if mode == "list-missing-rv" {
 						delete(metadata, "resourceVersion")
-					}
-					if mode == "list-remaining" {
-						metadata["remainingItemCount"] = 3
 					}
 					object = map[string]any{"apiVersion": "v1", "kind": "PodList", "metadata": metadata, "items": items}
 				case "/api/v1/namespaces/payments/pods/a-foreign":
@@ -215,7 +213,7 @@ func TestNamedWorkloadResolutionPinsSelectedPodAndRealOwner(t *testing.T) {
 				wantUntil, _ = ctx.Deadline()
 			}
 			out, err := resolver.ResolveWorkload(ctx, r)
-			success := mode == "short-parent" || mode == "deployment" || mode == "statefulset" || mode == "expressions" || mode == "frozen-request" || mode == "pod-deployment" || mode == "pod-statefulset" || mode == "pod-unowned"
+			success := mode == "short-parent" || mode == "deployment" || mode == "statefulset" || mode == "expressions" || mode == "frozen-request" || mode == "pod-deployment" || mode == "pod-statefulset" || mode == "pod-unowned" || mode == "list-paged"
 			if success {
 				if err != nil || !out.Valid(time.Unix(0, clock.Load())) || out.Request.PodName != "b-app" || out.Request.PodUID != "pod-b-app" || out.Request.Namespace.UID != "payments-uid" || out.NodeUID != "node-uid" || !out.ObservedAt.Equal(start) || !out.FreshUntil.Equal(wantUntil) {
 					t.Fatalf("selection failed or pins changed: %+v, %v", out, err)
@@ -230,8 +228,8 @@ func TestNamedWorkloadResolutionPinsSelectedPodAndRealOwner(t *testing.T) {
 			} else if err == nil || out != (value.PodResolution{}) || strings.Contains(fmt.Sprint(err), "MUST-NOT-LEAK") {
 				t.Fatalf("invalid selection admitted or leaked partial data: %+v, %v", out, err)
 			}
-			if (mode == "list-incomplete" || mode == "list-oversized" || mode == "list-remaining") && !errors.Is(err, value.ErrLimit) {
-				t.Fatalf("incomplete enumeration was not a limit failure: %v", err)
+			if mode == "list-paged" && lists.Load() != 2 {
+				t.Fatal("continuation page not followed", lists.Load())
 			}
 			if (mode == "foreign-only" || mode == "empty") && !errors.Is(err, value.ErrNoScheduledPods) {
 				t.Fatalf("missing own pods: %v", err)

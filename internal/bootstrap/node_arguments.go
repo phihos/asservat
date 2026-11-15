@@ -182,7 +182,7 @@ func (n *nodePackets) runArguments(parent context.Context, workID string, p coll
 			return
 		}
 		defer clear(line)
-		if footer.Retained >= uint64(p.Syscalls.MaxEvents) || len(out)+len(line)+2048 > cap(out) {
+		if len(out)+len(line)+2048 > cap(out) {
 			outputFull++
 			cancel()
 			return

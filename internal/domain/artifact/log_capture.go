@@ -17,8 +17,7 @@ type LogCapture struct {
 func (l *LogCapture) Valid() bool {
 	return l != nil && recorderActionID(l.ActionID) && l.Streams == "combined" &&
 		l.BeforeMillis >= 0 && l.BeforeMillis <= int64(24*time.Hour/time.Millisecond) &&
-		l.AfterMillis >= 0 && l.AfterMillis <= int64(time.Minute/time.Millisecond) &&
-		l.TimeoutMillis > l.AfterMillis && l.TimeoutMillis <= int64(5*time.Minute/time.Millisecond) &&
+		l.AfterMillis >= 0 && l.TimeoutMillis > l.AfterMillis &&
 		l.BeforeMillis+l.AfterMillis > 0 && l.MaxNativeBytes > 0 && l.MaxNativeBytes <= LogNativeLimit && len(l.Composition) <= 64<<10
 }
 

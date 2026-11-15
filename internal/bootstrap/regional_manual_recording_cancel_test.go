@@ -55,7 +55,7 @@ func TestRegionalManualRecordingStopJoinsOriginalResult(t *testing.T) {
 			if mode == "syscall-metadata" {
 				e.NativeType = artifact.SyscallRecordsArtifact
 				e.Recording = &artifact.Recording{Kind: "syscallTrace", Profile: "metadata", Snaplen: artifact.RecordingSyscallSnaplen, Composition: []byte("{}"), DurationMillis: 2000, MaxBytes: artifact.RecordingNativeLimit,
-					Syscalls: &artifact.RecordingSyscalls{Names: []string{"read"}, MaxEvents: 1000, MaxEventsPerSecond: 100, MaxTrackedThreads: 64}}
+					Syscalls: &artifact.RecordingSyscalls{Names: []string{"read"}, MaxEventsPerSecond: 100, MaxTrackedThreads: 64}}
 			}
 			pin := artifact.PinnedPod{UID: e.PodUID, NamespaceUID: e.NamespaceUID, Namespace: "app", Name: "web"}
 			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)

@@ -58,8 +58,8 @@ func recorderAcceptance(plan value.RecorderPlan, policy bool) RecorderAcceptance
 	if a.Kind == "syscallTrace" {
 		// B3: one finite syscall metadata recording of the after window.
 		after, ok := durationValue(a.After, true)
-		if a.SyscallMode != "metadata" && a.SyscallMode != "arguments" || !ok || after < time.Second || after > maxSyscallAfter {
-			return RecorderAcceptance{"RecorderUnavailable", "profile_composition.components[0] action " + a.LocalID + ".parameters.after", "a finite syscall recording captures 1 to 60 seconds after it starts"}
+		if a.SyscallMode != "metadata" && a.SyscallMode != "arguments" || !ok || after < time.Second {
+			return RecorderAcceptance{"RecorderUnavailable", "profile_composition.components[0] action " + a.LocalID + ".parameters.after", "a finite syscall recording captures at least 1 second after it starts"}
 		}
 		if a.SyscallMode == "arguments" && (a.ExecutionMode != "onTrigger" || a.Before != "0s" || plan.Approval == nil || plan.Approval.DataClass != "raw" || plan.Approval.ObservationLimits == nil || plan.Approval.ObservationLimits.MaxObservedEvents < 1) {
 			return RecorderAcceptance{"RecorderUnavailable", "profile_composition", "argument tracing requires finite on-trigger execution and reviewed byte and event limits"}
@@ -94,14 +94,14 @@ func recorderAcceptance(plan value.RecorderPlan, policy bool) RecorderAcceptance
 		return RecorderAcceptance{"RecorderUnavailable", "profile_composition", "manual raw byte comparisons need observation authority that this release does not have yet; use a rawPackets profile"}
 	}
 	after, ok := durationValue(a.After, true)
-	if !ok || after < time.Second || after > 5*time.Minute {
-		return RecorderAcceptance{"RecorderUnavailable", "profile_composition.components[0] action " + a.LocalID + ".parameters.after", "a manual capture records between 1 second and 5 minutes after it starts"}
+	if !ok || after < time.Second {
+		return RecorderAcceptance{"RecorderUnavailable", "profile_composition.components[0] action " + a.LocalID + ".parameters.after", "a manual capture records at least 1 second after it starts"}
 	}
 	if (policy || raw || http) && plan.Approval != nil && plan.Approval.ObservationLimits != nil {
 		limits := plan.Approval.ObservationLimits
 		observed := authorization.ObservationLimits{MaxSessionSeconds: limits.MaxSessionSeconds, MaxObservedBytes: limits.MaxObservedBytes, MaxBytesPerSecond: limits.MaxBytesPerSecond, MaxConcurrentSessions: limits.MaxConcurrentSessions}
-		if a.ExecutionMode != "onTrigger" || a.Before != "0s" || after > 15*time.Second || !observed.Valid() {
-			return RecorderAcceptance{"RecorderUnavailable", "profile_composition", "a raw packet or HTTP header recording or policy raw predicate needs one finite on-trigger action (before 0s, after at most 15s) with original observation limits"}
+		if a.ExecutionMode != "onTrigger" || a.Before != "0s" || !observed.Valid() {
+			return RecorderAcceptance{"RecorderUnavailable", "profile_composition", "a raw packet or HTTP header recording or policy raw predicate needs one finite on-trigger action (before 0s) within its reviewed observation session"}
 		}
 	}
 	return maxBytesAcceptance(plan)
@@ -157,7 +157,7 @@ func RecordingFor(plan value.RecorderPlan) (artifact.Recording, string, error) {
 		if len(scope.Filters) != 0 || strict(scope.Recipe, &recipe) != nil || len(recipe.Actions) != 1 || recipe.Actions[0].ID != a.ID || strict(recipe.Actions[0].Parameters, &params) != nil {
 			return artifact.Recording{}, "", value.ErrInvalid
 		}
-		s := &artifact.RecordingSyscalls{ErrorsOnly: params.Result == "errors", MaxEvents: params.MaxEvents, MaxEventsPerSecond: params.MaxEventsPerSecond, MaxTrackedThreads: params.MaxTrackedThreads}
+		s := &artifact.RecordingSyscalls{ErrorsOnly: params.Result == "errors", MaxEventsPerSecond: params.MaxEventsPerSecond, MaxTrackedThreads: params.MaxTrackedThreads}
 		if params.Syscalls.Mode == "include" {
 			s.Names = slices.Sorted(slices.Values(params.Syscalls.Names))
 		}

@@ -28,7 +28,7 @@ func TestLiveExistingSourceTapDoesNotCollectPinOrBorrowRaw(t *testing.T) {
 		<-ctx.Done()
 		return gadget.CaptureStats{}, ctx.Err()
 	}
-	s, e := newPacketSource(t.Context(), p, collector.PolicyLimits{}, sourceOwnerLimits(), nil, nil, engine, time.Now, budget, bmu, nil, "")
+	s, e := newPacketSource(t.Context(), p, collector.PolicyLimits{}, sourceOwnerLimits(), nil, nil, engine, time.Now, budget, bmu, nil)
 	if e != nil {
 		t.Fatal(e)
 	}

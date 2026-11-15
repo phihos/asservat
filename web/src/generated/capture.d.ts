@@ -217,11 +217,6 @@ export interface components {
                 } | {
                     actionID: string;
                     /** @constant */
-                    field: "syscallMaxEvents";
-                    value: components["schemas"]["Contract_syscall_trace_7af1b59de58e9115"];
-                } | {
-                    actionID: string;
-                    /** @constant */
                     field: "syscallRate";
                     value: components["schemas"]["Contract_syscall_trace_09825459ded300c7"];
                 } | {
@@ -325,17 +320,16 @@ export interface components {
             maxStaleness: components["schemas"]["Contract_common_76a8fd22c9ccd9dc"];
         };
         Contract_common_76a8fd22c9ccd9dc: string;
+        /** @description No length cap on the text; the bound is the compiled classic BPF program, which must fit the kernel limit BPF_MAXINSNS (4096 instructions), checked at compile, and the enclosing Kubernetes object size. */
         Contract_packet_capture_bd5424e783362da5: string;
         Contract_packet_capture_3cabf6dd4f1621f2: string;
         Contract_packet_capture_c29139839890e47d: string;
+        /** @description In-memory ring; a saved window copies at most maxBytes. The collector memory formula (specs/packets.md REQ-NET-003) bounds all rings on a node. */
         Contract_packet_capture_8b1a78e06ce5adec: {
             maxAge: components["schemas"]["Contract_common_76a8fd22c9ccd9dc"];
             maxBytes: number;
-            segmentBytes: number;
-            maxSegments: number;
-            /** @enum {unknown} */
-            medium: "memory" | "encryptedDisk";
-            storageProfileRef?: string;
+            /** @description Segment count; segment size is maxBytes ÷ segments. At least 2 so the ring can rotate; evicting one segment drops 1/segments of history. */
+            segments: number;
         };
         Contract_action_f252bcf961e0afcb: {
             match: {
@@ -375,7 +369,7 @@ export interface components {
             maxBytesPerEvent: number;
             captureBuffers: boolean;
         };
-        Contract_syscall_trace_7af1b59de58e9115: number;
+        /** @description Reviewed observation rate; the shipped default is derived from measured per-node collector event throughput. With the ring, it bounds every trace; there is no lifetime event total (ADR-335 D6). */
         Contract_syscall_trace_09825459ded300c7: number;
         Contract_capture_composition_f1d3ea703d6af495: {
             /** @enum {unknown} */
@@ -453,11 +447,6 @@ export interface components {
             /** @constant */
             field: "syscallArguments";
             value: components["schemas"]["Contract_syscall_trace_1e2fcb79248fe77f"];
-        } | {
-            actionID: string;
-            /** @constant */
-            field: "syscallMaxEvents";
-            value: components["schemas"]["Contract_syscall_trace_7af1b59de58e9115"];
         } | {
             actionID: string;
             /** @constant */
@@ -1553,15 +1542,14 @@ export interface components {
             };
             before: string;
             after: string;
+            /** @description No length cap on the text; the bound is the compiled classic BPF program, which must fit the kernel limit BPF_MAXINSNS (4096 instructions), checked at compile, and the enclosing Kubernetes object size. */
             filter?: string;
+            /** @description In-memory ring; a saved window copies at most maxBytes. The collector memory formula (specs/packets.md REQ-NET-003) bounds all rings on a node. */
             ring: {
                 maxAge: components["schemas"]["Contract_common_76a8fd22c9ccd9dc"];
                 maxBytes: number;
-                segmentBytes: number;
-                maxSegments: number;
-                /** @enum {unknown} */
-                medium: "memory" | "encryptedDisk";
-                storageProfileRef?: string;
+                /** @description Segment count; segment size is maxBytes ÷ segments. At least 2 so the ring can rotate; evicting one segment drops 1/segments of history. */
+                segments: number;
             };
             peers: {
                 entries: ({
@@ -1592,8 +1580,6 @@ export interface components {
                 maxEndpoints: number;
                 maxStaleness: components["schemas"]["Contract_common_76a8fd22c9ccd9dc"];
             };
-            maxFrozenBytes: number;
-            maxConcurrentSnapshots: number;
         };
         /** Bounded pod-wide syscall acquisition parameters */
         Contract_syscall_trace: {
@@ -1614,10 +1600,9 @@ export interface components {
             /** @enum {unknown} */
             result: "all" | "errors";
             ring: components["schemas"]["Contract_packet_capture_8b1a78e06ce5adec"];
-            maxFrozenBytes: number;
-            maxConcurrentSnapshots: number;
-            maxEvents: number;
+            /** @description Reviewed observation rate; the shipped default is derived from measured per-node collector event throughput. With the ring, it bounds every trace; there is no lifetime event total (ADR-335 D6). */
             maxEventsPerSecond: number;
+            /** @description Sizes the eBPF per-thread map (memory per tracked thread); derived from the collector map memory budget. */
             maxTrackedThreads: number;
             arguments?: {
                 maxBytesPerEvent: number;
@@ -1776,7 +1761,7 @@ export interface components {
             editableFields: {
                 actionID: string;
                 /** @enum {unknown} */
-                field: "packetPeers" | "packetFilter" | "packetBefore" | "packetAfter" | "packetRing" | "processSelector" | "processBatch" | "profileDuration" | "syscallFilter" | "syscallMode" | "syscallBefore" | "syscallAfter" | "syscallRing" | "syscallArguments" | "syscallMaxEvents" | "syscallRate" | "filePath" | "commandArgv" | "actionMaxBytes" | "actionTimeout" | "actionExecutionMode" | "logBefore" | "logAfter" | "logStream";
+                field: "packetPeers" | "packetFilter" | "packetBefore" | "packetAfter" | "packetRing" | "processSelector" | "processBatch" | "profileDuration" | "syscallFilter" | "syscallMode" | "syscallBefore" | "syscallAfter" | "syscallRing" | "syscallArguments" | "syscallRate" | "filePath" | "commandArgv" | "actionMaxBytes" | "actionTimeout" | "actionExecutionMode" | "logBefore" | "logAfter" | "logStream";
                 label: string;
                 description?: string;
             }[];

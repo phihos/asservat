@@ -20,7 +20,7 @@ func sourceWireFixture(now time.Time) collector.PacketSource {
 	id := "11111111-1111-4111-8111-111111111111"
 	resource := collector.SourceResources{PolicyUID: "budget", Node: collector.PolicyLimits{SourceLimits: collector.SourceLimits{MaxActiveSources: 4}, RingBytes: 1 << 20}}
 	p := collector.SourcePermit{Binding: collector.SourceBinding{RootID: id, PolicyUID: "policy", AcceptanceID: id, SourceID: id, Fence: id, ActionID: "packets", PodUID: id, NodeUID: id, BootID: id, CollectorPodUID: id, CollectorEpoch: id, Scope: [32]byte{1}, ExpectationDigest: [32]byte{2}, ResourceDigest: deliveryapp.SourceResourcesDigest(resource)}, StartedAt: now, HardUntil: now.Add(24 * time.Hour), StartBy: now.Add(5 * time.Second), IssuedAt: now, DispatchUntil: now.Add(5 * time.Second), LeafUntil: now.Add(30 * time.Second), Credit: 1 << 40, BytesPerSecond: 1 << 20}
-	return collector.PacketSource{Permit: p, Program: []planning.BPFInstruction{}, Resources: resource, Ring: collector.SourceRingLimits{MaxAge: time.Minute, MaxBytes: 1 << 20, SegmentBytes: 256 << 10, MaxSegments: 4, MaxFrozenBytes: 1 << 20, MaxConcurrentSnapshots: 2}}
+	return collector.PacketSource{Permit: p, Program: []planning.BPFInstruction{}, Resources: resource, Ring: collector.SourceRingLimits{MaxAge: time.Minute, MaxBytes: 1 << 20, Segments: 4}}
 }
 func TestSourceWorkClosedWireRetainsExactBoundsAndPurpose(t *testing.T) {
 	now := time.Now().UTC()

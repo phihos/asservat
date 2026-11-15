@@ -20,7 +20,7 @@ type ProfileEndpointDefinitionRequest struct {
 }
 
 func (r ProfileEndpointDefinitionRequest) Valid() bool {
-	if !authorization.UUID(r.ClusterID) || !identity.Text(r.Namespace.Name, 63) || !identity.Text(r.Namespace.UID, 64) || !identity.Text(r.SourceRef, 63) || len(r.Bindings) > MaxProfileEndpointBindings {
+	if !authorization.UUID(r.ClusterID) || !identity.Text(r.Namespace.Name, 63) || !identity.Text(r.Namespace.UID, 64) || !identity.Text(r.SourceRef, 63) {
 		return false
 	}
 	seen := map[string]bool{}

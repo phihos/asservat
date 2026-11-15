@@ -156,13 +156,6 @@ func TestProfileNetworkRejectsMalformedAndUnboundedFields(t *testing.T) {
 		{"oversized-port", func(p map[string]any) {
 			p["spec"].(map[string]any)["containers"].([]any)[0].(map[string]any)["ports"] = []any{map[string]any{"containerPort": 65536}}
 		}},
-		{"too-many-ports", func(p map[string]any) {
-			ports := make([]any, 257)
-			for i := range ports {
-				ports[i] = map[string]any{"containerPort": 6000 + i}
-			}
-			p["spec"].(map[string]any)["containers"].([]any)[0].(map[string]any)["ports"] = ports
-		}},
 		{"metadata-case-alias", func(p map[string]any) { m := p["metadata"].(map[string]any); m["UID"] = m["uid"]; delete(m, "uid") }},
 		{"invalid-address", func(p map[string]any) { p["status"].(map[string]any)["podIP"] = "fd00::not-an-address" }},
 		{"too-many-addresses", func(p map[string]any) {

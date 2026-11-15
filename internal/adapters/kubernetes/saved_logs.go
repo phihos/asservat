@@ -112,6 +112,7 @@ func (c *SavedLogClient) Snapshot(ctx context.Context, pin artifact.PinnedPod) (
 	if err != nil {
 		return zero, contextError(err)
 	}
+	// One Pod object: etcd stores at most 1.5 MiB per object.
 	raw, readErr := io.ReadAll(io.LimitReader(body, (2<<20)+1))
 	closeErr := body.Close()
 	defer clear(raw)

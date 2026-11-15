@@ -34,20 +34,22 @@ const SourceLeafLifetime = 30 * time.Second
 const SyscallEventCredit = 256
 const SourceStatusLimit = MaxActiveSources + MaxQueuedWork
 
-// SourceRingLimits is the portable resolved ring plan. Its physical segment
-// allocation includes framing; frozen copies are a separate global budget.
+// SourceRingLimits is the portable resolved in-memory ring {maxAge, maxBytes,
+// segments}; a segment is MaxBytes ÷ Segments including its framing. The node
+// budget bounds every ring and frozen copy on a node (ADR-335 D6), so the
+// plan has no own ceilings: at least two segments let the ring rotate, and a
+// segment must hold its 32-byte header.
+// RingSegmentHeader is the fixed header of one ring segment.
+const RingSegmentHeader = 32
+
 type SourceRingLimits struct {
-	MaxAge                                 time.Duration
-	MaxBytes, SegmentBytes, MaxFrozenBytes int64
-	MaxSegments, MaxConcurrentSnapshots    int
-	// EncryptedDisk selects the encrypted-disk ring medium (ADR-278).
-	EncryptedDisk bool `json:",omitempty"`
+	MaxAge   time.Duration
+	MaxBytes int64
+	Segments int
 }
 
 func (r SourceRingLimits) Valid() bool {
-	return r.MaxAge > 0 && r.MaxAge <= time.Hour && r.MaxBytes > 0 && r.MaxBytes <= 256<<20 &&
-		r.SegmentBytes > 32 && r.SegmentBytes <= 64<<20 && r.MaxSegments >= 2 && r.MaxSegments <= 64 &&
-		int64(r.MaxSegments) <= r.MaxBytes/r.SegmentBytes && r.MaxConcurrentSnapshots >= 1 && r.MaxConcurrentSnapshots <= 4 && r.MaxFrozenBytes > 0 && r.MaxFrozenBytes <= 256<<20
+	return r.MaxAge > 0 && r.MaxBytes > 0 && r.Segments >= 2 && r.MaxBytes/int64(r.Segments) > RingSegmentHeader
 }
 
 // PacketSource is purpose-specific authenticated node work, not collection or
@@ -72,14 +74,13 @@ type PacketSource struct {
 type SyscallFilter struct {
 	Names             []string
 	ErrorsOnly        bool
-	MaxEvents         int64
 	MaxTrackedThreads int64
 }
 
 const MaxSyscallFilter = 128
 
 func (f SyscallFilter) Valid() bool {
-	if len(f.Names) > MaxSyscallFilter || f.MaxEvents < 1 || f.MaxEvents > 1_000_000 || f.MaxTrackedThreads < 1 || f.MaxTrackedThreads > 16_384 {
+	if len(f.Names) > MaxSyscallFilter || f.MaxTrackedThreads < 1 || f.MaxTrackedThreads > 16_384 {
 		return false
 	}
 	for i, n := range f.Names {

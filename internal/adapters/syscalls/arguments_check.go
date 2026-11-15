@@ -213,9 +213,6 @@ func (c *argumentsCheck) record(b []byte) error {
 
 		}
 		c.events++
-		if c.events > uint64(c.e.Recording.Syscalls.MaxEvents) {
-			return artifact.ErrLimit
-		}
 		if c.visitRaw != nil {
 			if !e.Valid(c.e.PodUID, c.from, c.until) {
 				return artifact.ErrInvalid

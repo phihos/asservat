@@ -69,7 +69,7 @@ func TestArgumentObservationPinsDistinctOriginalTuple(t *testing.T) {
 }
 func TestArgumentHistoricalPublicationSourceDoesNotRenewPermit(t *testing.T) {
 	r := argumentObservationRowFixture()
-	e := artifact.ContextExpectation{CaptureUID: uid(r.CaptureID), ActionID: r.ActionID, PodUID: r.PodUid, Registration: artifact.Registration{Location: artifact.Location{AttemptID: uid(r.AttemptID)}}, Recording: &artifact.Recording{Kind: "syscallTrace", Profile: "arguments", Composition: []byte("{}"), DurationMillis: r.DurationMillis, MaxBytes: 65536, Syscalls: &artifact.RecordingSyscalls{Names: []string{"openat"}, MaxEvents: 100, MaxEventsPerSecond: r.MaxEventsPerSecond, MaxTrackedThreads: r.MaxTrackedThreads}, Arguments: &artifact.RecordingArguments{MaxProbeBytes: r.MaxProbeBytes, MaxBytesPerEvent: r.MaxBytesPerEvent, MaxBytesPerSecond: r.MaxBytesPerSecond}}}
+	e := artifact.ContextExpectation{CaptureUID: uid(r.CaptureID), ActionID: r.ActionID, PodUID: r.PodUid, Registration: artifact.Registration{Location: artifact.Location{AttemptID: uid(r.AttemptID)}}, Recording: &artifact.Recording{Kind: "syscallTrace", Profile: "arguments", Composition: []byte("{}"), DurationMillis: r.DurationMillis, MaxBytes: 65536, Syscalls: &artifact.RecordingSyscalls{Names: []string{"openat"}, MaxEventsPerSecond: r.MaxEventsPerSecond, MaxTrackedThreads: r.MaxTrackedThreads}, Arguments: &artifact.RecordingArguments{MaxProbeBytes: r.MaxProbeBytes, MaxBytesPerEvent: r.MaxBytesPerEvent, MaxBytesPerSecond: r.MaxBytesPerSecond}}}
 	copy(e.Recording.Arguments.ProgramDigest[:], r.ProgramDigest)
 	copy(e.Recording.Arguments.DefinitionDigest[:], r.ArgumentDefinitionDigest)
 	copy(e.Recording.Arguments.AccountingRule[:], r.AccountingRule)

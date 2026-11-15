@@ -120,9 +120,6 @@ func TestCompilerRejectsInvalidSyntax(t *testing.T) {
 			t.Fatalf("%q compiled", expression)
 		}
 	}
-	if _, err := c.CompileFilter(strings.Repeat("x", value.MaxFilterBytes+1)); err == nil {
-		t.Fatal("oversized expression reached libpcap")
-	}
 }
 
 // A filter that screens within 256 tokens can still compile to more than 256

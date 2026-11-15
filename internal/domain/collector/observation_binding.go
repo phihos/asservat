@@ -1,6 +1,10 @@
 package collector
 
-import "time"
+import (
+	"time"
+
+	"asservat.local/asservat/internal/domain/authorization"
+)
 
 // ObservationRule pins wire-byte token accounting, including its one-second
 // initial burst. The canonical rule is
@@ -57,8 +61,7 @@ func (p ObservationPermit) Lease() ObservationLease {
 // at StartedAt without reviving the old StartBy or permitting another start.
 func (p ObservationPermit) ValidFinite(now time.Time) bool {
 	return p.Binding.Valid() && p.Sequence == 1 && p.Lease().Valid(now) &&
-		p.LeaseUntil.Equal(p.SessionUntil) && p.SessionUntil.Sub(p.StartedAt) <= 20*time.Second &&
-		p.Duration >= time.Second && p.Duration <= 15*time.Second &&
+		p.LeaseUntil.Equal(p.SessionUntil) && p.Duration >= time.Second && p.SessionUntil.Sub(p.StartedAt) <= p.Duration+authorization.FiniteObservationStartWindow &&
 		p.StartBy.After(p.StartedAt) && !p.StartBy.After(p.StartedAt.Add(PacketCaptureStartWithin)) &&
 		!p.StartBy.Add(p.Duration).After(p.SessionUntil) && now.Before(p.StartBy)
 }

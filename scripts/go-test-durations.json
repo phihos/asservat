@@ -1334,7 +1334,6 @@
 "TestNodeRefusesInvalidHTTPProjectionWork": 0,
 "TestNodeSnapshotCancelBeforeDelayedStartFencesExactAttempt": 0,
 "TestNodeSnapshotCancelWaitsForUploaderAndIndependentCopyJoin": 0,
-"TestNodeSourceEncryptedDiskMedium": 0,
 "TestNodeSourceReportKeepsNaturalStopAfterSourceSetAsOf": 0,
 "TestNodeSourceReportPreservesSnapshotTimeAcrossBlockingMetadata": 0,
 "TestNodeSourceSnapshotCopiesOnceWithoutRearmingAndHoldsBothArenas": 0,

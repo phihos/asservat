@@ -19,7 +19,7 @@ func argumentNodeWork() collector.Work {
 	p.Program = p.Program[:0]
 	p.ProgramDigest = [32]byte{}
 	p.Observation = nil
-	p.Syscalls = &collector.SyscallFilter{Names: []string{"write"}, MaxEvents: 100, MaxTrackedThreads: 16}
+	p.Syscalls = &collector.SyscallFilter{Names: []string{"write"}, MaxTrackedThreads: 16}
 	p.MaxEventsPerSecond = 100
 	p.Arguments = &collector.ArgumentObservationPermit{Binding: collector.ArgumentObservationBinding{Scope: b.Scope, ProgramDigest: [32]byte{2}, DefinitionDigest: [32]byte{3}, ExpectationDigest: b.ExpectationDigest, AccountingRule: collector.ArgumentObservationAccountingRule(), SessionID: b.SessionID, Fence: b.Fence, CaptureID: b.CaptureID, ActionID: b.ActionID, PodUID: b.PodUID, NodeUID: b.NodeUID, BootID: b.BootID, CollectorPodUID: b.CollectorPodUID, CollectorEpoch: b.CollectorEpoch}, StartedAt: old.StartedAt, SessionUntil: old.StartBy.Add(p.Duration), LeaseUntil: old.StartBy.Add(p.Duration), StartBy: old.StartBy, Duration: p.Duration, Sequence: 1, EventCredit: 1000, ByteCredit: 1 << 20, EventsPerSecond: 100, BytesPerSecond: 1 << 20, MaxProbeBytes: 512, MaxBytesPerEvent: 128, MaxTrackedThreads: 16, CaptureBuffers: true}
 	w.Kind = collector.WorkSyscallCapture

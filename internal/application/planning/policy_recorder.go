@@ -131,8 +131,10 @@ func compilePolicyAction(c value.ProfileComposition, ci int, x expandedAction, p
 		return out, refuse(value.CompositionRecorderUnavailable, "profile_composition", "ongoing sources support ordinary network-header predicates only")
 	}
 	after, ok := durationValue(summary.After, true)
-	if !finiteProfile && !finiteLogs && (!ok || after > 5*time.Minute || after < time.Second && summary.ExecutionMode != "ongoing") {
-		return out, refuse(value.CompositionRecorderUnavailable, "profile_composition", "a policy incident records between one second and five minutes")
+	// The window runs up to the capture's configured duration (ADR-335 D8):
+	// the action timeout, bounded by maxDuration, already covers it.
+	if !finiteProfile && !finiteLogs && (!ok || after < time.Second && summary.ExecutionMode != "ongoing") {
+		return out, refuse(value.CompositionRecorderUnavailable, "profile_composition", "a policy incident records for at least one second")
 	}
 	for n, e := range component.Edits {
 		if !finiteProfile && !finiteLogs && e.Field == "actionMaxBytes" && e.Number > artifact.RecordingNativeLimit {
@@ -206,7 +208,7 @@ func compilePolicyAction(c value.ProfileComposition, ci int, x expandedAction, p
 // SyscallSource is the accepted syscall selection a policy source carries
 // (ADR-273); its digest is bound into the source's ProgramDigest.
 func SyscallSource(p value.PolicyRecorderConfiguration) collector.SyscallFilter {
-	return collector.SyscallFilter{Names: slices.Clone(p.SyscallInclude), ErrorsOnly: p.Action.Result == "errors", MaxEvents: p.Action.MaxEvents, MaxTrackedThreads: p.Action.MaxTrackedThreads}
+	return collector.SyscallFilter{Names: slices.Clone(p.SyscallInclude), ErrorsOnly: p.Action.Result == "errors", MaxTrackedThreads: p.Action.MaxTrackedThreads}
 }
 
 // HTTPSource carries only the accepted fixed projection/reassembly bounds.

@@ -23,21 +23,16 @@ const MaxRecordingEventsPerSecond = 100_000
 // (ADR-279); larger caps are refused, never narrowed silently.
 const MaxRawSnaplen = 1500
 
-// maxRawRecordingMillis bounds a finite raw recording (ADR-261/279).
-const maxRawRecordingMillis = 15_000
-
 // RecordingSyscallSnaplen is the fixed per-call metadata record size of a
 // syscall recording (internal/adapters/syscalls.RecordSize).
 const RecordingSyscallSnaplen = 32
 
+// A recording runs for its capture's configured duration (ADR-335 D8); the
+// node budget and the reviewed observation session bound it, not a literal.
 const (
-	// maxSyscallRecordingMillis matches the compiler's finite syscall
-	// after-window bound (ADR-273, specs/syscalls.md).
-	maxSyscallRecordingMillis  = 60 * 1000
-	maxRecordingDurationMillis = 5 * 60 * 1000
-	minRecordingBytes          = 64 << 10
-	maxRecordingProgram        = 256
-	maxRecordingComposition    = 32 << 10
+	minRecordingBytes       = 64 << 10 // one pcapng section with headroom
+	maxRecordingProgram     = 256      // planning.MaxFilterInstructions, the compiled filter bound
+	maxRecordingComposition = 32 << 10 // the accepted composition row size
 )
 
 // FilterInstruction is one classic BPF instruction (struct sock_filter).
@@ -132,13 +127,12 @@ func (p *RecordingPeers) valid() bool {
 
 // The specified httpHeaders parser maxima (specs/packets.md, ADR-282).
 const (
-	MaxHTTPFlows           = 1024
-	MaxHTTPHeaderBytes     = 32 << 10
-	MaxHTTPFlowBytes       = 256 << 10
-	MaxHTTPTotalBytes      = 16 << 20
-	MaxHTTPIdleMillis      = 30_000
-	minHTTPIdleMillis      = 1000
-	maxHTTPRecordingMillis = maxRawRecordingMillis
+	MaxHTTPFlows       = 1024
+	MaxHTTPHeaderBytes = 32 << 10
+	MaxHTTPFlowBytes   = 256 << 10
+	MaxHTTPTotalBytes  = 16 << 20
+	MaxHTTPIdleMillis  = 30_000
+	minHTTPIdleMillis  = 1000
 )
 
 // RecordingHTTP are the profile's projection bounds: flows, one header
@@ -184,13 +178,12 @@ func (p *RecordingProtocolSnaplen) valid() bool {
 type RecordingSyscalls struct {
 	Names              []string `json:",omitempty"`
 	ErrorsOnly         bool     `json:",omitempty"`
-	MaxEvents          int64
 	MaxEventsPerSecond int64
 	MaxTrackedThreads  int64
 }
 
 func (s *RecordingSyscalls) valid() bool {
-	if s == nil || len(s.Names) > 128 || s.MaxEvents < 1 || s.MaxEvents > 1_000_000 || s.MaxEventsPerSecond < 1 || s.MaxEventsPerSecond > MaxRecordingEventsPerSecond || s.MaxTrackedThreads < 1 || s.MaxTrackedThreads > 16_384 {
+	if s == nil || s.MaxEventsPerSecond < 1 || s.MaxEventsPerSecond > MaxRecordingEventsPerSecond || s.MaxTrackedThreads < 1 || s.MaxTrackedThreads > 16_384 {
 		return false
 	}
 	for i, n := range s.Names {
@@ -211,24 +204,24 @@ func (r *Recording) Valid() bool {
 	}
 	switch {
 	case r.Kind == "syscallTrace" && r.Profile == "arguments":
-		return r.Arguments.Valid() && r.Filter == nil && r.Snaplen == 0 && r.DurationMillis <= maxSyscallRecordingMillis && r.Syscalls.valid() && len(r.Syscalls.Names) > 0 && len(r.Syscalls.Names) <= 6 && r.HTTP == nil && r.ProtocolSnaplen == nil && r.Peers == nil
+		return r.Arguments.Valid() && r.Filter == nil && r.Snaplen == 0 && r.Syscalls.valid() && len(r.Syscalls.Names) > 0 && len(r.Syscalls.Names) <= 6 && r.HTTP == nil && r.ProtocolSnaplen == nil && r.Peers == nil
 	case r.Kind == "syscallTrace":
-		return r.Profile == "metadata" && r.Filter == nil && r.Snaplen == RecordingSyscallSnaplen && r.DurationMillis <= maxSyscallRecordingMillis && r.Syscalls.valid() && r.HTTP == nil
+		return r.Profile == "metadata" && r.Filter == nil && r.Snaplen == RecordingSyscallSnaplen && r.Syscalls.valid() && r.HTTP == nil
 	case r.Kind == "packetCapture" && r.Profile == "rawPackets":
-		if r.Syscalls != nil || r.HTTP != nil || r.DurationMillis > maxRawRecordingMillis || r.Snaplen < 1 || r.Snaplen > MaxRawSnaplen || !r.ProtocolSnaplen.valid() {
+		if r.Syscalls != nil || r.HTTP != nil || r.Snaplen < 1 || r.Snaplen > MaxRawSnaplen || !r.ProtocolSnaplen.valid() {
 			return false
 		}
 	case r.Kind == "packetCapture" && r.Profile == "httpHeaders":
 		// ADR-282: a finite filtered projection at the fixed engine snaplen;
 		// truncated frames become gaps, never a longer read.
-		if r.Syscalls != nil || r.ProtocolSnaplen != nil || r.Filter == nil || r.DurationMillis > maxHTTPRecordingMillis || r.Snaplen != MaxRawSnaplen || !r.HTTP.Valid() {
+		if r.Syscalls != nil || r.ProtocolSnaplen != nil || r.Filter == nil || r.Snaplen != MaxRawSnaplen || !r.HTTP.Valid() {
 			return false
 		}
-	case r.Kind != "packetCapture" || r.Profile != "networkHeaders" || r.Syscalls != nil || r.ProtocolSnaplen != nil || r.HTTP != nil || r.DurationMillis > maxRecordingDurationMillis || r.Snaplen != RecordingSnaplen:
+	case r.Kind != "packetCapture" || r.Profile != "networkHeaders" || r.Syscalls != nil || r.ProtocolSnaplen != nil || r.HTTP != nil || r.Snaplen != RecordingSnaplen:
 		return false
 	}
 	if f := r.Filter; f != nil {
-		if len(f.Expression) < 1 || len(f.Expression) > 4096 || len(f.Program) < 1 || len(f.Program) > maxRecordingProgram {
+		if len(f.Expression) < 1 || len(f.Program) < 1 || len(f.Program) > maxRecordingProgram {
 			return false
 		}
 	}

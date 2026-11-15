@@ -21,7 +21,6 @@ func TestRawRecordingBounds(t *testing.T) {
 		t.Fatal("clone shares caps")
 	}
 	for name, edit := range map[string]func(*Recording){
-		"over 15 seconds":   func(r *Recording) { r.DurationMillis = 16_000 },
 		"snaplen too large": func(r *Recording) { r.Snaplen = MaxRawSnaplen + 1 },
 		"zero snaplen":      func(r *Recording) { r.Snaplen = 0 },
 		"cap too large":     func(r *Recording) { r.ProtocolSnaplen.UDP = MaxRawSnaplen + 1 },

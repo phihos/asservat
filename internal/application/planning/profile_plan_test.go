@@ -73,7 +73,7 @@ func TestProfileNormalizationBoundsAndForcedGC(t *testing.T) {
 		{"gc-delta", "heap", "delta", "10s", "15s", true, false},
 		{"cpu-snapshot", "cpu", "snapshot", "", "5s", false, false},
 		{"trace", "runtimeTrace", "interval", "15s", "20s", false, true},
-		{"trace-too-long", "runtimeTrace", "interval", "16s", "21s", false, false},
+		{"trace-long", "runtimeTrace", "interval", "16s", "21s", false, true},
 		{"fractional", "cpu", "interval", "1500ms", "7s", false, false},
 		{"no-margin", "cpu", "interval", "10s", "10s", false, false},
 		{"excess-margin", "cpu", "interval", "10s", "21s", false, false},

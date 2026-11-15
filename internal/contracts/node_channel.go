@@ -28,9 +28,6 @@ const (
 	// hostPath of type File keeps the Pod from starting, unless the host
 	// carries this file. Only disposable CI runners and VM images create it.
 	NodeDisposableHostGuard = "/etc/asservat-disposable-host"
-	// NodeRingDiskPath is the administrator\'s optional collector ring volume;
-	// the encrypted-disk ring medium is available only while it is mounted (ADR-278).
-	NodeRingDiskPath = "/var/lib/asservat-ring"
 
 	// NodeConnectPath carries the stream: length-prefixed NodeUp frames from
 	// the collector, length-prefixed NodeWork frames from the connector.
@@ -96,9 +93,6 @@ type NodeCeilings struct {
 	FrozenBytes          int64 `json:"frozenBytes"`
 	UploadBytesPerSecond int64 `json:"uploadBytesPerSecond"`
 	UploadBurstBytes     int64 `json:"uploadBurstBytes"`
-	// RingDiskBytes is the administrator's ring volume size (ADR-278); zero
-	// without the volume.
-	RingDiskBytes int64 `json:"ringDiskBytes,omitempty"`
 }
 
 // NodeHello is the first message of a stream: the protocol version and the
@@ -177,7 +171,6 @@ type NodePacketSource struct {
 type NodeSyscallFilter struct {
 	Names             []string `json:"names"`
 	ErrorsOnly        bool     `json:"errorsOnly,omitempty"`
-	MaxEvents         int64    `json:"maxEvents"`
 	MaxTrackedThreads int64    `json:"maxTrackedThreads"`
 }
 type NodeSourceLimits struct {
@@ -216,13 +209,9 @@ type NodeSourceBinding struct {
 	ResourceDigest     string `json:"resourceDigest"`
 }
 type NodeSourceRingLimits struct {
-	MaxAgeNanos            int64 `json:"maxAgeNanos"`
-	MaxBytes               int64 `json:"maxBytes"`
-	SegmentBytes           int64 `json:"segmentBytes"`
-	MaxFrozenBytes         int64 `json:"maxFrozenBytes"`
-	MaxSegments            int   `json:"maxSegments"`
-	MaxConcurrentSnapshots int   `json:"maxConcurrentSnapshots"`
-	EncryptedDisk          bool  `json:"encryptedDisk,omitempty"`
+	MaxAgeNanos int64 `json:"maxAgeNanos"`
+	MaxBytes    int64 `json:"maxBytes"`
+	Segments    int   `json:"segments"`
 }
 
 // NodePacketCapture is one manual networkHeaders capture of one Pod. Program

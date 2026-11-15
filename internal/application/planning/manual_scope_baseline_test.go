@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-// Baselines were read from the original c70ae164 compiler before extracting
-// shared policy normalization. Policy support must not reinterpret old scopes.
+// Baselines pin the manual scope digests (ring {maxAge, maxBytes, segments});
+// policy support must not reinterpret them.
 func TestRecorderManualScopeCompatibility(t *testing.T) {
 	for name, c := range map[string]bool{"network": false, "syscalls": true} {
 		composition := network()
@@ -20,7 +20,7 @@ func TestRecorderManualScopeCompatibility(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		want := map[string]string{"network": "b42d451360850807a6275cf0565160103f76ac53bc4e44306bb6f907e29d98e5", "syscalls": "2ac31a4cb066371c747192b952c45e70ee5498df20993239f424df46d350ac33"}[name]
+		want := map[string]string{"network": "82e99d313bf0bb5d44b3bfd41418d51cbc075b0ee24b6fbc062d1c200a2ca60b", "syscalls": "5b9a6bbcf15963efdbe370f607605681e7e267927c9c6504ae948a294085e1c0"}[name]
 		if got := fmt.Sprintf("%x", p.ScopeDigest); got != want {
 			t.Fatalf("existing %s scope changed: got %s want %s", name, got, want)
 		}

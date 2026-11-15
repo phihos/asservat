@@ -38,7 +38,7 @@ func TestOngoingHTTPSourceOriginalPrefixPrivateRingSaveAndJoinedBudget(t *testin
 		t.Fatal(err)
 	}
 	bmu := &sync.Mutex{}
-	limits := packets.RingLimits{MaxAge: time.Minute, MaxBytes: 4 * 65536, SegmentBytes: 65536, MaxSegments: 4, MaxFrozenBytes: 1 << 20, MaxConcurrentSnapshots: 2}
+	limits := packets.RingLimits{MaxAge: time.Minute, MaxBytes: 4 * 65536, Segments: 4}
 	start, ready, joined, cancelled := make(chan struct{}), make(chan struct{}), make(chan struct{}), make(chan struct{})
 	frames := httpExchange()
 	engine := func(ctx context.Context, _ string, snap int, emit func(gadget.Frame), _ func(gadget.InputNotice)) (gadget.CaptureStats, error) {
@@ -57,7 +57,7 @@ func TestOngoingHTTPSourceOriginalPrefixPrivateRingSaveAndJoinedBudget(t *testin
 		<-joined
 		return gadget.CaptureStats{}, ctx.Err()
 	}
-	source, err := newPacketSource(t.Context(), permit, collector.PolicyLimits{}, limits, program, nil, engine, clock.now, budget, bmu, nil, "", &testHTTPProjection)
+	source, err := newPacketSource(t.Context(), permit, collector.PolicyLimits{}, limits, program, nil, engine, clock.now, budget, bmu, nil, &testHTTPProjection)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,7 +82,7 @@ func TestOngoingHTTPSourceOriginalPrefixPrivateRingSaveAndJoinedBudget(t *testin
 		<-ctx.Done()
 		return gadget.CaptureStats{}, ctx.Err()
 	}
-	peer, err := newPacketSource(t.Context(), peerPermit, collector.PolicyLimits{}, sourceOwnerLimits(), nil, nil, peerEngine, clock.now, budget, bmu, nil, "")
+	peer, err := newPacketSource(t.Context(), peerPermit, collector.PolicyLimits{}, sourceOwnerLimits(), nil, nil, peerEngine, clock.now, budget, bmu, nil)
 	if err != nil {
 		t.Fatal("separately funded metadata peer unavailable", err)
 	}
@@ -192,7 +192,7 @@ func TestOngoingHTTPSourceRefusesWorkingMemoryBeforeEngine(t *testing.T) {
 		called = true
 		return gadget.CaptureStats{}, nil
 	}
-	source, err := newPacketSource(t.Context(), permit, collector.PolicyLimits{}, sourceOwnerLimits(), work.Packet.Program, nil, engine, time.Now, budget, bmu, nil, "", &testHTTPProjection)
+	source, err := newPacketSource(t.Context(), permit, collector.PolicyLimits{}, sourceOwnerLimits(), work.Packet.Program, nil, engine, time.Now, budget, bmu, nil, &testHTTPProjection)
 	if err == nil || source != nil || called {
 		t.Fatal("started without aggregate reassembly reservation", err)
 	}

@@ -109,9 +109,6 @@ func (c *argumentsCheck) record(b []byte) error {
 			return artifact.ErrIntegrity
 		}
 		c.events++
-		if c.events > uint64(c.e.Recording.Syscalls.MaxEvents) {
-			return artifact.ErrLimit
-		}
 	case "footer":
 		if c.header == nil {
 			return artifact.ErrIntegrity

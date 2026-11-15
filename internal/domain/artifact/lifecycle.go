@@ -33,9 +33,6 @@ type RecordingSaveOrigin struct {
 	PolicyExecutionDigest Digest
 }
 
-// MaxLifecycleWindow bounds before/after; the ring age ceiling is one hour.
-const MaxLifecycleWindow = time.Hour
-
 var coverages = []string{"full", "partial", "none", "unknown"}
 var gapReasons = []string{"notPreviouslyArmed", "warming", "capacityLimited", "sourceLost", "targetGone", "permitExpired", "retentionCutoff", "snapshotRefused", "clockUncertain", "unknownLoss", "historyEvicted"}
 
@@ -50,7 +47,7 @@ func (l OngoingLifecycle) Validate(t0 time.Time) error {
 		return ErrInvalid
 	}
 	for _, d := range []time.Duration{l.RequestedBefore, l.After} {
-		if d < 0 || d > MaxLifecycleWindow || d%time.Millisecond != 0 {
+		if d < 0 || d%time.Millisecond != 0 {
 			return ErrInvalid
 		}
 	}

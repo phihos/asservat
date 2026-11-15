@@ -2,14 +2,14 @@ package artifact
 
 import "time"
 
-// ADR-166 qualification bounds, raised by ADR-244 from 128 MiB to 256 MiB, the
-// largest S-04 frozen recording ceiling. Not a product size limit: larger
-// native limits need their own part-size and resource qualification. 256 MiB
-// plus 32 frames of cipher overhead needs 33 parts of 8 MiB.
+// Streaming upload bounds. A part is one 8 MiB frame: the writer holds one
+// part in memory. S3 allows at most 10,000 parts per multipart upload, so the
+// largest native artifact is the number of whole frames whose ciphertext fits
+// 10,000 parts (about 77 GiB). The per-workload storage quota bounds actual use.
 const (
-	StreamingNativeLimit int64 = 256 << 20
-	StreamingPartBytes   int64 = 8 << 20
-	StreamingMaxParts          = 33
+	StreamingPartBytes   int64 = FrameBytes
+	StreamingMaxParts          = 10000
+	StreamingNativeLimit       = StreamingMaxParts * StreamingPartBytes / (FrameBytes + CipherOverhead) * FrameBytes
 )
 
 // StreamingPlan extends one storage obligation above a single frame. It grants
@@ -61,42 +61,45 @@ func streamingText(s string) bool {
 }
 
 // StreamingState holds ciphertext metadata only. Spent claims stay spent: a
-// read or retry can never return a fresh create/complete permit.
+// read or retry can never return a fresh create/complete permit. The journal
+// keeps only the latest claimed part and the totals, so its size does not grow
+// with the artifact; the one writer keeps the part ETags for completion.
 type StreamingState struct {
-	CreateSpent    bool            `json:",omitempty"`
-	UploadID       string          `json:",omitempty"`
-	Parts          []StreamingPart `json:",omitempty"`
-	CompleteSpent  bool            `json:",omitempty"`
-	CompleteBytes  int64           `json:",omitempty"`
-	CompleteSHA256 Digest          `json:",omitzero"`
-	Receipt        *CopyReceipt    `json:",omitempty"`
-	Aborted        bool            `json:",omitempty"`
-	ReleasedAt     time.Time       `json:",omitzero"`
+	CreateSpent    bool          `json:",omitempty"`
+	UploadID       string        `json:",omitempty"`
+	Parts          int           `json:",omitempty"`
+	PartBytes      int64         `json:",omitempty"`
+	Last           StreamingPart `json:",omitzero"`
+	CompleteSpent  bool          `json:",omitempty"`
+	CompleteBytes  int64         `json:",omitempty"`
+	CompleteSHA256 Digest        `json:",omitzero"`
+	Receipt        *CopyReceipt  `json:",omitempty"`
+	Aborted        bool          `json:",omitempty"`
+	ReleasedAt     time.Time     `json:",omitzero"`
 }
 
 func (s StreamingState) Validate(p StreamingPlan) error {
-	if p.Validate() != nil || len(s.Parts) > p.PartLimit() {
+	if p.Validate() != nil || s.Parts < 0 || s.Parts > p.PartLimit() {
 		return ErrInvalid
 	}
-	if !s.CreateSpent && (s.UploadID != "" || len(s.Parts) != 0 || s.CompleteSpent) {
+	if !s.CreateSpent && (s.UploadID != "" || s.Parts != 0 || s.CompleteSpent) {
 		return ErrInvalid
 	}
-	if s.UploadID != "" && !streamingText(s.UploadID) || len(s.Parts) > 0 && s.UploadID == "" {
+	if s.UploadID != "" && !streamingText(s.UploadID) || s.Parts > 0 && s.UploadID == "" {
 		return ErrInvalid
 	}
-	var total int64
-	for i, x := range s.Parts {
-		last := i == len(s.Parts)-1
-		if x.Number != i+1 || x.Bytes < 1 || x.Bytes > StreamingPartBytes || x.SHA256 == (Digest{}) || x.ETag != "" && !streamingText(x.ETag) || !last && (x.Bytes != StreamingPartBytes || x.ETag == "") {
-			return ErrInvalid
-		}
-		total += x.Bytes
+	x := s.Last
+	if s.Parts == 0 && (x != StreamingPart{} || s.PartBytes != 0) {
+		return ErrInvalid
 	}
-	if total > p.TemporaryBytes() {
+	if s.Parts > 0 && (x.Number != s.Parts || x.Bytes < 1 || x.Bytes > StreamingPartBytes || x.SHA256 == (Digest{}) || x.ETag != "" && !streamingText(x.ETag) || s.PartBytes != int64(s.Parts-1)*StreamingPartBytes+x.Bytes) {
+		return ErrInvalid
+	}
+	if s.PartBytes > p.TemporaryBytes() {
 		return ErrLimit
 	}
 	if s.CompleteSpent {
-		if len(s.Parts) == 0 || s.Parts[len(s.Parts)-1].ETag == "" || s.CompleteBytes != total || s.CompleteSHA256 == (Digest{}) {
+		if s.Parts == 0 || x.ETag == "" || s.CompleteBytes != s.PartBytes || s.CompleteSHA256 == (Digest{}) {
 			return ErrInvalid
 		}
 	} else if s.CompleteBytes != 0 || s.CompleteSHA256 != (Digest{}) || s.Receipt != nil {
@@ -144,7 +147,6 @@ func (s StreamingState) Advance(p StreamingPlan, x StreamingStep) (next Streamin
 		return s, false, ErrInvalid
 	}
 	next = s
-	next.Parts = append([]StreamingPart(nil), s.Parts...)
 	switch x.Kind {
 	case StreamClaimCreate:
 		if s.CreateSpent {
@@ -167,29 +169,28 @@ func (s StreamingState) Advance(p StreamingPlan, x StreamingStep) (next Streamin
 		if s.UploadID == "" || s.CompleteSpent || x.Part.ETag != "" || n < 1 || x.Part.Bytes < 1 || x.Part.Bytes > StreamingPartBytes || x.Part.SHA256 == (Digest{}) {
 			return s, false, ErrInvalid
 		}
-		if n <= len(s.Parts) {
-			old := s.Parts[n-1]
+		if n == s.Parts {
+			old := s.Last
 			old.ETag = ""
 			if old != x.Part {
 				return s, false, ErrIntegrity
 			}
 			return s, false, nil
 		}
-		if n != len(s.Parts)+1 || n > p.PartLimit() || len(s.Parts) > 0 && (s.Parts[len(s.Parts)-1].ETag == "" || s.Parts[len(s.Parts)-1].Bytes != StreamingPartBytes) {
+		if n != s.Parts+1 || n > p.PartLimit() || s.Parts > 0 && (s.Last.ETag == "" || s.Last.Bytes != StreamingPartBytes) {
 			return s, false, ErrInvalid
 		}
-		next.Parts = append(next.Parts, x.Part)
+		next.Parts, next.PartBytes, next.Last = n, s.PartBytes+x.Part.Bytes, x.Part
 		fresh = true
 	case StreamAckPart:
-		n := x.Part.Number
-		if s.CompleteSpent || n < 1 || n > len(s.Parts) || !streamingText(x.Part.ETag) {
+		if s.CompleteSpent || s.Parts == 0 || x.Part.Number != s.Parts || !streamingText(x.Part.ETag) {
 			return s, false, ErrInvalid
 		}
-		old := s.Parts[n-1]
+		old := s.Last
 		if old.Bytes != x.Part.Bytes || old.SHA256 != x.Part.SHA256 || old.ETag != "" && old.ETag != x.Part.ETag {
 			return s, false, ErrIntegrity
 		}
-		next.Parts[n-1] = x.Part
+		next.Last = x.Part
 	case StreamClaimComplete:
 		if s.CompleteSpent {
 			if s.CompleteBytes != x.Bytes || s.CompleteSHA256 != x.SHA256 {

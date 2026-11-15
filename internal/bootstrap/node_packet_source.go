@@ -51,14 +51,13 @@ type packetSource struct {
 	// (rate, stale time, lost samples) are ring gaps that the saved window's
 	// coverage reports, not a source stop or source-level InputUnknown, which
 	// the hub would end and replace (ADR-273).
-	records   bool
-	maxEvents int64
-	err       error
-	done      chan struct{}
-	release   func()
-	budget    *collector.Budget
-	budgetMu  *sync.Mutex
-	lowering  collector.PolicyLimits
+	records  bool
+	err      error
+	done     chan struct{}
+	release  func()
+	budget   *collector.Budget
+	budgetMu *sync.Mutex
+	lowering collector.PolicyLimits
 	// log reports why the source stopped (nil in tests).
 	log func(string)
 	// changed signals that the source's reported status may have changed.
@@ -71,7 +70,7 @@ func (s *packetSource) notify() {
 	}
 }
 
-func newPacketSource(parent context.Context, permit collector.SourcePermit, lowering collector.PolicyLimits, limits packets.RingLimits, program []planning.BPFInstruction, syscallFilter *collector.SyscallFilter, engine observedPacketEngine, now func() time.Time, budget *collector.Budget, budgetMu *sync.Mutex, log func(string), ringDir string, httpConfigs ...*collector.HTTPProjection) (*packetSource, error) {
+func newPacketSource(parent context.Context, permit collector.SourcePermit, lowering collector.PolicyLimits, limits packets.RingLimits, program []planning.BPFInstruction, syscallFilter *collector.SyscallFilter, engine observedPacketEngine, now func() time.Time, budget *collector.Budget, budgetMu *sync.Mutex, log func(string), httpConfigs ...*collector.HTTPProjection) (*packetSource, error) {
 	if parent == nil || parent.Err() != nil || engine == nil || now == nil || budget == nil || budgetMu == nil || !permit.Startable(now()) {
 		return nil, collector.ErrInvalid
 	}
@@ -104,10 +103,8 @@ func newPacketSource(parent context.Context, permit collector.SourcePermit, lowe
 	}
 	// One-second burst is the existing wire-token rule. Ring physical bytes
 	// include all fixed segment framing and are reserved before allocation.
-	// On the encrypted-disk medium only one segment and the headers are
-	// resident (ADR-278); disk bytes are bounded by the ring volume.
-	r := collector.SourceReservation{RingBytes: packets.MemoryRingBytes(limits, ringDir != ""), InputBytesPerSecond: permit.BytesPerSecond, InputBurstBytes: permit.BytesPerSecond}
-	if limits.MaxSegments < 2 || limits.MaxSegments > 64 || limits.SegmentBytes <= 0 || limits.SegmentBytes > 64<<20 {
+	r := collector.SourceReservation{RingBytes: packets.MemoryRingBytes(limits), InputBytesPerSecond: permit.BytesPerSecond, InputBurstBytes: permit.BytesPerSecond}
+	if !limits.Valid() {
 		return nil, collector.ErrInvalid
 	}
 	if h != nil {
@@ -121,7 +118,7 @@ func newPacketSource(parent context.Context, permit collector.SourcePermit, lowe
 	}
 	release := func() { budgetMu.Lock(); defer budgetMu.Unlock(); _ = budget.ReleaseSource(r) }
 	ctx, cancel := context.WithDeadline(parent, permit.HardUntil)
-	ring, err := packets.NewRingOn(ctx, packets.RingBounds{StartedAt: permit.StartedAt, Until: permit.HardUntil}, limits, program, ringDir)
+	ring, err := packets.NewRing(ctx, packets.RingBounds{StartedAt: permit.StartedAt, Until: permit.HardUntil}, limits, program)
 	if err != nil {
 		cancel()
 		release()
@@ -144,9 +141,6 @@ func newPacketSource(parent context.Context, permit collector.SourcePermit, lowe
 			release()
 			return nil, err
 		}
-	}
-	if syscallFilter != nil {
-		s.maxEvents = syscallFilter.MaxEvents
 	}
 	s.mu.Lock()
 	s.scheduleLocked()
@@ -436,13 +430,12 @@ func (s *packetSource) BeginWindow(processing context.Context, window packets.Ri
 		release()
 		return nil, err
 	}
-	return &packetSourceSnapshot{copy: copy, release: release, records: s.records, maxEvents: s.maxEvents, httpConfig: s.httpConfig}, nil
+	return &packetSourceSnapshot{copy: copy, release: release, records: s.records, httpConfig: s.httpConfig}, nil
 }
 
 type packetSourceSnapshot struct {
 	httpConfig *collector.HTTPProjection
-	records    bool  // syscall records, encoded as JSON Lines
-	maxEvents  int64 // syscall events per saved window
+	records    bool // syscall records, encoded as JSON Lines
 	copy       *packets.WindowSnapshot
 	once       sync.Once
 	release    func()

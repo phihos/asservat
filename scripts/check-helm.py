@@ -303,14 +303,6 @@ def check_collector(directory):
     assert all(m["readOnly"] is True for m in container["volumeMounts"])
     assert volumes["token"]["projected"]["sources"][0]["serviceAccountToken"] == {"path": "token", "audience": "asservat-node", "expirationSeconds": 600}
     assert pod["serviceAccountName"] == account["metadata"]["name"] == ds["metadata"]["name"] == "asservat-node"
-    # ADR-278: the optional ring volume is the only writable collector mount.
-    assert "ring-disk" not in volumes
-    disk = copy.deepcopy(base)
-    disk["collector"]["ringDisk"] = {"enabled": True, "bytes": 2147483648}
-    disk_docs = render(disk)
-    disk_pod = next(r for r in disk_docs if r["kind"] == "DaemonSet")["spec"]["template"]["spec"]
-    assert {v["name"]: v for v in disk_pod["volumes"]}["ring-disk"] == {"name": "ring-disk", "emptyDir": {"sizeLimit": "2147483648"}}
-    assert [m for m in disk_pod["containers"][0]["volumeMounts"] if not m.get("readOnly")] == [{"name": "ring-disk", "mountPath": "/var/lib/asservat-ring"}]
     # Default: nothing of the collector renders.
     assert not any(r["kind"] == "DaemonSet" for r in render({**base, "collector": {"enabled": False}}))
     for change in [{"region": {"enabled": False}}, {"collector": {"namespace": "kube-system"}}, {"collector": {"namespace": "default"}}, {"collector": {"privileged": True}},

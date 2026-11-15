@@ -25,7 +25,7 @@ func (c *packetRingClock) set(at time.Time) { c.mu.Lock(); defer c.mu.Unlock(); 
 func packetRingFixture(t testing.TB, ctx context.Context, start time.Time, segment int64) *packets.Ring {
 	t.Helper()
 	until, _ := ctx.Deadline()
-	r, err := packets.NewRing(ctx, packets.RingBounds{StartedAt: start, Until: until}, packets.RingLimits{MaxAge: 30 * time.Second, MaxBytes: segment * 4, SegmentBytes: segment, MaxSegments: 4, MaxFrozenBytes: 4096, MaxConcurrentSnapshots: 2}, nil)
+	r, err := packets.NewRing(ctx, packets.RingBounds{StartedAt: start, Until: until}, packets.RingLimits{MaxAge: 30 * time.Second, MaxBytes: segment * 4, Segments: 4}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -326,7 +326,7 @@ func BenchmarkPacketRingBridgeCallback(b *testing.B) {
 			start := time.Now().UTC()
 			ctx, cancel := context.WithDeadline(b.Context(), start.Add(time.Hour))
 			defer cancel()
-			ring, err := packets.NewRing(ctx, packets.RingBounds{StartedAt: start, Until: start.Add(time.Hour)}, packets.RingLimits{MaxAge: time.Hour, MaxBytes: 16 << 20, SegmentBytes: 4 << 20, MaxSegments: 4, MaxFrozenBytes: 16 << 20, MaxConcurrentSnapshots: 2}, nil)
+			ring, err := packets.NewRing(ctx, packets.RingBounds{StartedAt: start, Until: start.Add(time.Hour)}, packets.RingLimits{MaxAge: time.Hour, MaxBytes: 16 << 20, Segments: 4}, nil)
 			if err != nil {
 				b.Fatal(err)
 			}

@@ -12,7 +12,6 @@ import (
 	"math/rand/v2"
 	"net/url"
 	"os"
-	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
@@ -182,21 +181,7 @@ func RunNode(ctx context.Context, podUID string) error {
 	p.packets = &nodePackets{engine: gadget.CapturePackets, syscallTrace: syscallTraceIfAvailable(mechanisms), argumentTrace: argumentTraceIfAvailable(mechanisms), argumentResources: gadget.ArgumentWorkingBytes, observedEngine: gadget.CaptureObservedPackets, upload: client.UploadCapture, available: packetAvailable(mechanisms), version: facts.Engine.Version,
 		now: time.Now, log: func(line string) { fmt.Fprintln(os.Stderr, line) }, budget: func() *collector.Budget { return p.budget }, budgetMu: &p.mu}
 	p.profiles = &nodeProfiles{acquire: acquireNodeProfile(time.Now), upload: client.UploadProfileStream, now: time.Now, budget: func() *collector.Budget { return p.budget }, budgetMu: &p.mu}
-	ringDir, removed := "", 0
-	if st, err := os.Stat(contracts.NodeRingDiskPath); err == nil && st.IsDir() && d.Ceilings.RingDiskBytes > 0 {
-		ringDir = contracts.NodeRingDiskPath
-		// The volume outlives container restarts; earlier processes' sealed
-		// segments are unreadable without their keys, so remove them.
-		if entries, err := os.ReadDir(ringDir); err == nil {
-			for _, e := range entries {
-				if os.RemoveAll(filepath.Join(ringDir, e.Name())) == nil {
-					removed++
-				}
-			}
-		}
-	}
-	fmt.Fprintf(os.Stderr, "node collector ring medium: encrypted disk available=%t removedEarlier=%d\n", ringDir != "", removed)
-	p.sources = &nodeSources{changed: p.changed, ringDir: ringDir, ringDiskBytes: d.Ceilings.RingDiskBytes, log: p.packets.log, upload: client.UploadCapture, takeUpload: p.packets.takeUpload, version: facts.Engine.Version, engine: gadget.CaptureObservedPackets, syscallEngine: syscallTraceIfAvailable(mechanisms), now: time.Now, budget: budget, budgetMu: &p.mu, available: packetAvailable(mechanisms)}
+	p.sources = &nodeSources{changed: p.changed, log: p.packets.log, upload: client.UploadCapture, takeUpload: p.packets.takeUpload, version: facts.Engine.Version, engine: gadget.CaptureObservedPackets, syscallEngine: syscallTraceIfAvailable(mechanisms), now: time.Now, budget: budget, budgetMu: &p.mu, available: packetAvailable(mechanisms)}
 	if d.Live != nil {
 		p.sources.liveBudget = &nodeLiveBudget{limits: nodeLiveLimits(*d.Live), changed: p.changed}
 		for n, m := range p.mechanisms {

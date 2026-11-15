@@ -28,7 +28,7 @@ func DomainProfile(p contracts.NodeProfileCapture) (collector.ProfileCapture, bo
 	endpoint, ok2 := digestHex(p.EndpointDigest)
 	definition, ok3 := digestHex(p.DefinitionDigest)
 	address, err := netip.ParseAddr(p.Address)
-	if !ok || !ok2 || !ok3 || err != nil || address.String() != p.Address || p.DurationMillis < 0 || p.DurationMillis > 60000 {
+	if !ok || !ok2 || !ok3 || err != nil || address.String() != p.Address || p.DurationMillis < 0 {
 		return collector.ProfileCapture{}, false
 	}
 	r := execution.GoProfileRequest{Binding: artifact.Binding{ClusterID: p.ClusterID, ArtifactID: p.ArtifactID, AttemptID: p.AttemptID, MediaType: artifact.ProfileMediaType}, Pin: artifact.PinnedPod{Namespace: p.Namespace, NamespaceUID: p.NamespaceUID, Name: p.PodName, UID: p.PodUID, ControllerUID: p.ControllerUID, NodeName: p.NodeName}, NodeUID: p.NodeUID, NodeBootID: p.BootID, SourceRef: p.SourceRef, EndpointDigest: artifact.Digest(endpoint), Parameters: execution.GoProfileParameters{Type: p.Type, Mode: p.Mode, Duration: time.Duration(p.DurationMillis) * time.Millisecond, ForceGC: p.ForceGC}, NativeLimit: p.NativeLimit, NotBefore: p.NotBefore, Deadline: p.Deadline}

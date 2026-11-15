@@ -25,7 +25,6 @@ import (
 const manualArgumentsProfile = "argument-capture"
 const manualArgumentsMarker = "synthetic-approved-recording"
 const manualArgumentsRate = 1000
-const manualArgumentsRetained = 10000
 
 // The existing signal workload's /log handler writes this known synthetic
 // marker to stdout with fmt.Fprintln. Its write syscall is in the qualified
@@ -50,11 +49,10 @@ func manualArgumentsProfileDefinition() (map[string]any, error) {
 	action["impact"], action["executionMode"] = "sensitiveRead", "onTrigger"
 	action["limits"] = map[string]any{"maxBytes": artifact.RecordingNativeLimit, "timeout": "15s"}
 	params := action["parameters"].(map[string]any)
-	params["maxFrozenBytes"] = artifact.RecordingNativeLimit
 	params["mode"], params["before"], params["after"] = "arguments", "0s", "5s"
 	params["syscalls"] = map[string]any{"mode": "include", "names": []string{"write"}}
 	params["arguments"] = map[string]any{"maxBytesPerEvent": 128, "captureBuffers": true}
-	params["maxEvents"], params["maxEventsPerSecond"], params["maxTrackedThreads"] = manualArgumentsRetained, manualArgumentsRate, 64
+	params["maxEventsPerSecond"], params["maxTrackedThreads"] = manualArgumentsRate, 64
 	doc.Definition["editableFields"] = append(doc.Definition["editableFields"].([]any), map[string]any{"actionID": "syscalls", "field": "syscallArguments", "label": "Argument reads"})
 	return doc.Definition, nil
 }
@@ -135,7 +133,7 @@ func checkManualArgumentsNative(native []byte, pod string, expected installedArg
 	if err != nil || expected.Arguments != mechanism || expected.Source.PodUID != pod || expected.Rate != manualArgumentsRate || expected.DurationMillis != 5000 || expected.EventCredit != manualArgumentsRate*6 || expected.ByteCredit != 6*planvalue.SensitiveMaxBytesPerSecond {
 		return footer, fmt.Errorf("original session differs from reviewed bounded write mechanism: %v", err)
 	}
-	e := artifact.ContextExpectation{PodUID: pod, Recording: &artifact.Recording{MaxBytes: artifact.RecordingNativeLimit, Arguments: &expected.Arguments, Syscalls: &artifact.RecordingSyscalls{Names: []string{"write"}, MaxEvents: manualArgumentsRetained}}}
+	e := artifact.ContextExpectation{PodUID: pod, Recording: &artifact.Recording{MaxBytes: artifact.RecordingNativeLimit, Arguments: &expected.Arguments, Syscalls: &artifact.RecordingSyscalls{Names: []string{"write"}}}}
 	check, err := syscalls.NewArgumentCheck(e, expected.Source)
 	if err != nil {
 		return footer, err

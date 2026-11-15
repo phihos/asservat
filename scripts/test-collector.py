@@ -20,10 +20,6 @@ on a workstation, not even with kind.
                              (kube-proxy replacement, WireGuard, dual stack),
                              plus IPv4/IPv6, Service VIP vs backend, pod
                              loopback and hostNetwork refusal measurements
-  test-collector.py ringdisk collector-ringdisk (ADR-278): the chart's ring
-                             volume enabled at its 16 MiB minimum; byte cap,
-                             crash restart and full-volume seal on the node
-                             instead of the capture phases
 """
 import hashlib
 import json
@@ -180,11 +176,10 @@ def cilium(work, name, kubeconfig, report):
 
 # ADR-278: the chart's minimum ring volume; the native phase sizes its rings
 # so that exactly one fits.
-RING_DISK_BYTES = 16 << 20
 
 
-def packet(work, report, cni="", ring_disk=False, profile=False):
-    suite = "collector-" + (cni or ("profile" if profile else "ringdisk" if ring_disk else "packet"))
+def packet(work, report, cni="", profile=False):
+    suite = "collector-" + (cni or ("profile" if profile else "packet"))
     run_id = secrets.token_hex(4)
     name = "asservat-collector-" + run_id
     env = dict(os.environ, TMPDIR=str(work), CGO_ENABLED="0")
@@ -258,13 +253,11 @@ def packet(work, report, cni="", ring_disk=False, profile=False):
         roots, cert, key = certificates(work, gateway)
         values = {"mode": "cluster", "collector": {"enabled": True, "image": image, "installationID": INSTALLATION, "clusterID": CLUSTER,
                   "connector": {"endpoint": f"https://{gateway}:{PORT}", "serverName": "asservat-connector-nodes", "rootsPEM": roots}}}
-        if not profile and not ring_disk and not cni:
+        if not profile and not cni:
             # Existing production node-processing authority; no fixture patch.
             values["collector"]["live"] = {"subscriptions": 4, "memoryBytes": 4 << 20,
                 "eventsPerSecond": 100000, "bytesPerSecond": 256 << 20,
                 "processingNanosPerSecond": 100000000}
-        if ring_disk:
-            values["collector"]["ringDisk"] = {"enabled": True, "bytes": RING_DISK_BYTES}
         (work / "values.yaml").write_text(json.dumps(values))
         rendered = run(["helm", "template", "asservat", str(ROOT / "charts/asservat"), "--namespace", "asservat-region", "--kube-version", "1.37.0", "-f", str(work / "values.yaml")])
         manifests = work / "collector.yaml"
@@ -276,7 +269,7 @@ def packet(work, report, cni="", ring_disk=False, profile=False):
             report["profileBuild"]["kindManifestRef"] = profile_image
         fixture = {"kubeconfig": str(kubeconfig), "collectorNamespace": "asservat-collector", "daemonSet": "asservat-node", "serviceAccount": "asservat-node",
                    "installationID": INSTALLATION, "clusterID": CLUSTER, "listen": f"{gateway}:{PORT}", "serverCertificate": str(cert), "serverKey": str(key),
-                   "profileImage": profile_image, "pause": fixtures[PAUSE], "busybox": fixtures[BUSYBOX], "s3": s3url, "cni": cni, "ringDiskBytes": RING_DISK_BYTES if ring_disk else 0, "work": str(work), "runner": report["runner"], "results": str(work / "native-results.json")}
+                   "profileImage": profile_image, "pause": fixtures[PAUSE], "busybox": fixtures[BUSYBOX], "s3": s3url, "cni": cni, "work": str(work), "runner": report["runner"], "results": str(work / "native-results.json")}
         (work / "fixture.json").write_text(json.dumps(fixture))
         started = time.monotonic()
         test = subprocess.run(["go", "test", "-tags", "libpcap", "-count=1", "-v", "-timeout", "12m", "-run", "^TestNodeCollectorWithRealKubernetes$", "./test/integration"],
@@ -370,8 +363,8 @@ def argument_engine(work, report):
 
 
 def main():
-    if len(sys.argv) != 2 or sys.argv[1] not in ("packet", "cilium", "ringdisk", "profile", "argument-engine"):
-        raise SystemExit("usage: test-collector.py packet|cilium|ringdisk|profile|argument-engine")
+    if len(sys.argv) != 2 or sys.argv[1] not in ("packet", "cilium", "profile", "argument-engine"):
+        raise SystemExit("usage: test-collector.py packet|cilium|profile|argument-engine")
     if not GUARD.is_file():
         raise SystemExit(f"refused: {GUARD} is absent. Collector suites load BPF programs and run only on disposable CI runners or VMs.")
     results = ROOT / "test/results"
@@ -386,7 +379,7 @@ def main():
             argument_engine(work, report)
         else:
             report["sourceHashes"] = source_hashes()
-            packet(work, report, "cilium" if sys.argv[1] == "cilium" else "", ring_disk=sys.argv[1] == "ringdisk", profile=sys.argv[1] == "profile")
+            packet(work, report, "cilium" if sys.argv[1] == "cilium" else "", profile=sys.argv[1] == "profile")
         report["result"] = "passed"
     except BaseException:
         report["result"] = "failed"

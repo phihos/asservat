@@ -54,8 +54,8 @@ func TestFinitePolicyRecorderKeepsRawPlanSeparateFromManualAcceptance(t *testing
 	}
 }
 
-func TestFinitePolicyRawContextDeclinesOngoingOrLongSession(t *testing.T) {
-	for _, mode := range []string{"ongoing", "long-action"} {
+func TestFinitePolicyRawContextDeclinesOngoingSession(t *testing.T) {
+	for _, mode := range []string{"ongoing"} {
 		t.Run(mode, func(t *testing.T) {
 			after, timeout := "1s", "10s"
 			if mode == "long-action" {

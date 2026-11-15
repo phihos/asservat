@@ -32,9 +32,7 @@ spec:
           ring:
             maxAge: 30s
             maxBytes: 16777216
-            segmentBytes: 4194304
-            maxSegments: 4
-            medium: memory
+            segments: 4
           peers:
             entries:
             - cidrs:
@@ -44,8 +42,6 @@ spec:
             resolution: frozen
             maxEndpoints: 1
             maxStaleness: 5s
-          maxFrozenBytes: 67108864
-          maxConcurrentSnapshots: 1
           filter: tcp port 8080
         required: true
         impact: sensitiveRead
@@ -66,12 +62,7 @@ spec:
           ring:
             maxAge: 30s
             maxBytes: 8388608
-            segmentBytes: 2097152
-            maxSegments: 4
-            medium: memory
-          maxFrozenBytes: 16777216
-          maxConcurrentSnapshots: 1
-          maxEvents: 100000
+            segments: 4
           maxEventsPerSecond: 10000
           maxTrackedThreads: 4096
         required: true

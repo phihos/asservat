@@ -59,14 +59,11 @@ func MeteredRecording(r *artifact.Recording) bool {
 	return r != nil && r.Filter != nil && (r.Profile == "rawPackets" || r.Profile == "httpHeaders" || RawBytePredicate(r.Filter.Expression))
 }
 
-// ScreenFilter enforces the REQ-NET-001 bounds before compilation: at most
-// 4,096 bytes and 256 syntax tokens of printable ASCII and no name that
-// libpcap would resolve. A raw byte comparison passes screening; the
+// ScreenFilter enforces the REQ-NET-001 rules before compilation: printable
+// ASCII and no name that libpcap would resolve. The text has no length cap;
+// the compiled program's instruction bound is authoritative. A raw byte comparison passes screening; the
 // compiler marks its plan as needing approval (RawBytePredicate).
 func ScreenFilter(path, expression string) error {
-	if len(expression) > value.MaxFilterBytes {
-		return filterRefusal(value.CompositionFilterRejected, path, fmt.Sprintf("the filter has %d bytes; at most %d are allowed", len(expression), value.MaxFilterBytes))
-	}
 	if strings.TrimSpace(expression) == "" {
 		return filterRefusal(value.CompositionFilterRejected, path, "the filter is empty; omit the edit to record all traffic of the selected pod")
 	}
@@ -82,9 +79,6 @@ func ScreenFilter(path, expression string) error {
 	tokens, err := filterTokens(expression)
 	if err != nil {
 		return filterRefusal(value.CompositionFilterRejected, path, err.Error())
-	}
-	if len(tokens) > value.MaxFilterTokens {
-		return filterRefusal(value.CompositionFilterRejected, path, fmt.Sprintf("the filter has %d syntax tokens; at most %d are allowed", len(tokens), value.MaxFilterTokens))
 	}
 	for _, t := range tokens {
 		if t == "\\" {
@@ -154,9 +148,6 @@ func filterTokens(expression string) ([]string, error) {
 			i++
 		default:
 			return nil, errors.New("unsupported character " + strconv.QuoteRune(rune(c)) + " in the filter")
-		}
-		if len(tokens) > value.MaxFilterTokens {
-			return tokens, nil
 		}
 	}
 	return tokens, nil

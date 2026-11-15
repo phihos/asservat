@@ -90,12 +90,11 @@ func bootWallClock() (time.Time, error) {
 }
 
 // encodeSyscallWindow writes a frozen window of syscall records as JSON Lines
-// into exactly maxBytes of output (the snapshot's reserved native storage),
-// at most maxEvents lines (the policy's per-snapshot event cap).
+// into exactly maxBytes of output (the snapshot's reserved native storage).
 // Each line is stamped with its ring time, which the window already bounds;
 // lines that no longer fit count as OutputFull. Records keep ring order
 // (pairing completion), not sorted by call time.
-func encodeSyscallWindow(ctx context.Context, records packets.PacketIterator, maxBytes int, maxEvents int64, podUID, sourceEpoch string, started, ended time.Time) (out []byte, counters packets.Counters, err error) {
+func encodeSyscallWindow(ctx context.Context, records packets.PacketIterator, maxBytes int, podUID, sourceEpoch string, started, ended time.Time) (out []byte, counters packets.Counters, err error) {
 	if ctx == nil || ctx.Err() != nil || records == nil || maxBytes < 4096 || maxBytes > 8<<20 || started.IsZero() || ended.Before(started) {
 		return nil, counters, packets.ErrInvalid
 	}
@@ -126,7 +125,7 @@ func encodeSyscallWindow(ctx context.Context, records packets.PacketIterator, ma
 		if line, err = syscalls.AppendEvent(line[:0], c, p.At, podUID, sourceEpoch); err != nil {
 			return nil, counters, err
 		}
-		if len(buf)+len(line) > maxBytes || int64(counters.Retained) >= maxEvents {
+		if len(buf)+len(line) > maxBytes {
 			counters.OutputFull++
 			continue
 		}

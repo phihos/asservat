@@ -45,7 +45,7 @@ func (p ArgumentObservationPermit) EffectiveEventsPerSecond() int64 {
 
 func (p ArgumentObservationPermit) ValidFinite(now time.Time) bool {
 	return p.Binding.Valid() && p.Sequence == 1 && !p.StartedAt.IsZero() && !now.Before(p.StartedAt) &&
-		p.Duration >= time.Second && p.Duration <= time.Minute &&
+		p.Duration >= time.Second &&
 		p.SessionUntil.After(p.StartedAt) && !p.SessionUntil.After(p.StartedAt.Add(p.Duration+PacketCaptureStartWithin)) &&
 		p.LeaseUntil.Equal(p.SessionUntil) && p.StartBy.After(p.StartedAt) && !p.StartBy.After(p.StartedAt.Add(PacketCaptureStartWithin)) &&
 		!p.StartBy.Add(p.Duration).After(p.SessionUntil) && now.Before(p.StartBy) &&

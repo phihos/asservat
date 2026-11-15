@@ -16,8 +16,6 @@ import (
 // review that the hub freezes into the plan; it grants nothing.
 
 const (
-	// MaxProfileEndpointBindings is the recipe endpointBindings bound.
-	MaxProfileEndpointBindings = 16
 	// ProfileEndpointTemplateBinding and ProfileEndpointAdministratorProfile
 	// are the two source kinds of a resolution.
 	ProfileEndpointTemplateBinding      = "templateBinding"
@@ -60,7 +58,7 @@ type ProfileEndpointRequest struct {
 }
 
 func (r ProfileEndpointRequest) Valid() bool {
-	if !r.Target.Valid() || !identity.Text(r.SourceRef, 63) || len(r.Bindings) > MaxProfileEndpointBindings || r.DurationSeconds < 0 || r.DurationSeconds > 60 || r.NativeLimit < 1 {
+	if !r.Target.Valid() || !identity.Text(r.SourceRef, 63) || r.DurationSeconds < 0 || r.NativeLimit < 1 {
 		return false
 	}
 	if !artifact.ValidGoProfile(r.Type, r.Mode, time.Duration(r.DurationSeconds)*time.Second, r.ForceGC) {

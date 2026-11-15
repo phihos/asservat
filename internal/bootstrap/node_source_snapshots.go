@@ -136,7 +136,7 @@ func (n *nodeSources) runSnapshot(ctx context.Context, workID string, owned *nod
 		native, counters, nativeComplete, err = httpheaders.EncodeSourceWindow(ctx, copy, httpheaders.Limits{MaxFlows: h.MaxFlows, MaxHeaderBytes: h.MaxHeaderBytes, MaxFlowBytes: h.MaxFlowBytes, MaxTotalBytes: h.MaxTotalBytes, IdleTimeout: h.IdleTimeout}, q.MaxBytes, acquiredFrom, acquiredUntil, coverage.Complete && !coverage.InputUnknown && !coverage.HistoryEvicted)
 	} else if copy.records {
 		nativeType, snaplen = artifact.SyscallRecordsArtifact, syscalls.RecordSize
-		native, counters, err = encodeSyscallWindow(ctx, copy, int(q.MaxBytes), copy.maxEvents, x.Binding.PodUID, x.Binding.SourceID, acquiredFrom, acquiredUntil)
+		native, counters, err = encodeSyscallWindow(ctx, copy, int(q.MaxBytes), x.Binding.PodUID, x.Binding.SourceID, acquiredFrom, acquiredUntil)
 	} else {
 		native, counters, err = packets.EncodeWindow(ctx, copy, int(q.MaxBytes), acquiredFrom, acquiredUntil)
 	}

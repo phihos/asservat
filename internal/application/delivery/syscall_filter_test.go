@@ -7,7 +7,7 @@ import (
 )
 
 func TestSyscallFilterDigestBindsTheWholeSelection(t *testing.T) {
-	base := collector.SyscallFilter{MaxEvents: 100_000, MaxTrackedThreads: 4096}
+	base := collector.SyscallFilter{MaxTrackedThreads: 4096}
 	empty := base
 	empty.Names = []string{}
 	if SyscallFilterDigest(empty) != SyscallFilterDigest(base) {
@@ -17,7 +17,6 @@ func TestSyscallFilterDigestBindsTheWholeSelection(t *testing.T) {
 	for _, edit := range []func(*collector.SyscallFilter){
 		func(f *collector.SyscallFilter) { f.Names = []string{"openat", "read"} },
 		func(f *collector.SyscallFilter) { f.ErrorsOnly = true },
-		func(f *collector.SyscallFilter) { f.MaxEvents = 10 },
 		func(f *collector.SyscallFilter) { f.MaxTrackedThreads = 16 },
 	} {
 		f := base

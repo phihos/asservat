@@ -44,7 +44,7 @@ func DomainSourceBinding(w contracts.NodeSourceBinding) (collector.SourceBinding
 }
 func WirePacketSource(s collector.PacketSource) contracts.NodePacketSource {
 	p, r := s.Permit, s.Ring
-	w := contracts.NodePacketSource{Permit: contracts.NodeSourcePermit{Binding: WireSourceBinding(p.Binding), StartedAt: p.StartedAt.UTC(), HardUntil: p.HardUntil.UTC(), StartBy: p.StartBy.UTC(), IssuedAt: p.IssuedAt.UTC(), DispatchUntil: p.DispatchUntil.UTC(), LeafUntil: p.LeafUntil.UTC(), Credit: p.Credit, BytesPerSecond: p.BytesPerSecond}, Program: make([]contracts.NodeBPFInstruction, len(s.Program)), Ring: contracts.NodeSourceRingLimits{MaxAgeNanos: int64(r.MaxAge), MaxBytes: r.MaxBytes, SegmentBytes: r.SegmentBytes, MaxFrozenBytes: r.MaxFrozenBytes, MaxSegments: r.MaxSegments, MaxConcurrentSnapshots: r.MaxConcurrentSnapshots, EncryptedDisk: r.EncryptedDisk}}
+	w := contracts.NodePacketSource{Permit: contracts.NodeSourcePermit{Binding: WireSourceBinding(p.Binding), StartedAt: p.StartedAt.UTC(), HardUntil: p.HardUntil.UTC(), StartBy: p.StartBy.UTC(), IssuedAt: p.IssuedAt.UTC(), DispatchUntil: p.DispatchUntil.UTC(), LeafUntil: p.LeafUntil.UTC(), Credit: p.Credit, BytesPerSecond: p.BytesPerSecond}, Program: make([]contracts.NodeBPFInstruction, len(s.Program)), Ring: contracts.NodeSourceRingLimits{MaxAgeNanos: int64(r.MaxAge), MaxBytes: r.MaxBytes, Segments: r.Segments}}
 	limits := s.Resources.Node
 	w.ResourcePolicyUID = s.Resources.PolicyUID
 	w.NodeLimits = WireCeilings(collector.Ceilings{SourceLimits: limits.SourceLimits, RingBytes: limits.RingBytes, FrozenBytes: limits.FrozenBytes, UploadBytesPerSecond: limits.UploadBytesPerSecond, UploadBurstBytes: limits.UploadBurstBytes})
@@ -57,7 +57,7 @@ func WirePacketSource(s collector.PacketSource) contracts.NodePacketSource {
 		w.HTTP = &contracts.NodeHTTPProjection{MaxFlows: h.MaxFlows, MaxHeaderBytes: h.MaxHeaderBytes, MaxFlowBytes: h.MaxFlowBytes, MaxTotalBytes: h.MaxTotalBytes, IdleTimeoutMillis: h.IdleTimeout.Milliseconds()}
 	}
 	if s.Syscalls != nil {
-		w.Syscalls = &contracts.NodeSyscallFilter{Names: append([]string{}, s.Syscalls.Names...), ErrorsOnly: s.Syscalls.ErrorsOnly, MaxEvents: s.Syscalls.MaxEvents, MaxTrackedThreads: s.Syscalls.MaxTrackedThreads}
+		w.Syscalls = &contracts.NodeSyscallFilter{Names: append([]string{}, s.Syscalls.Names...), ErrorsOnly: s.Syscalls.ErrorsOnly, MaxTrackedThreads: s.Syscalls.MaxTrackedThreads}
 	}
 	return w
 }
@@ -67,7 +67,7 @@ func DomainPacketSource(w contracts.NodePacketSource) (collector.PacketSource, b
 	if !ok || len(w.Program) > planning.MaxFilterInstructions {
 		return collector.PacketSource{}, false
 	}
-	s := collector.PacketSource{Permit: collector.SourcePermit{Binding: b, StartedAt: p.StartedAt.UTC(), HardUntil: p.HardUntil.UTC(), StartBy: p.StartBy.UTC(), IssuedAt: p.IssuedAt.UTC(), DispatchUntil: p.DispatchUntil.UTC(), LeafUntil: p.LeafUntil.UTC(), Credit: p.Credit, BytesPerSecond: p.BytesPerSecond}, Ring: collector.SourceRingLimits{MaxAge: time.Duration(r.MaxAgeNanos), MaxBytes: r.MaxBytes, SegmentBytes: r.SegmentBytes, MaxFrozenBytes: r.MaxFrozenBytes, MaxSegments: r.MaxSegments, MaxConcurrentSnapshots: r.MaxConcurrentSnapshots, EncryptedDisk: r.EncryptedDisk}, Program: make([]planning.BPFInstruction, len(w.Program))}
+	s := collector.PacketSource{Permit: collector.SourcePermit{Binding: b, StartedAt: p.StartedAt.UTC(), HardUntil: p.HardUntil.UTC(), StartBy: p.StartBy.UTC(), IssuedAt: p.IssuedAt.UTC(), DispatchUntil: p.DispatchUntil.UTC(), LeafUntil: p.LeafUntil.UTC(), Credit: p.Credit, BytesPerSecond: p.BytesPerSecond}, Ring: collector.SourceRingLimits{MaxAge: time.Duration(r.MaxAgeNanos), MaxBytes: r.MaxBytes, Segments: r.Segments}, Program: make([]planning.BPFInstruction, len(w.Program))}
 	for i, ins := range w.Program {
 		s.Program[i] = planning.BPFInstruction{Code: ins.Code, Jt: ins.Jt, Jf: ins.Jf, K: ins.K}
 	}
@@ -79,7 +79,7 @@ func DomainPacketSource(w contracts.NodePacketSource) (collector.PacketSource, b
 		if len(w.Syscalls.Names) > collector.MaxSyscallFilter {
 			return collector.PacketSource{}, false
 		}
-		s.Syscalls = &collector.SyscallFilter{Names: append([]string{}, w.Syscalls.Names...), ErrorsOnly: w.Syscalls.ErrorsOnly, MaxEvents: w.Syscalls.MaxEvents, MaxTrackedThreads: w.Syscalls.MaxTrackedThreads}
+		s.Syscalls = &collector.SyscallFilter{Names: append([]string{}, w.Syscalls.Names...), ErrorsOnly: w.Syscalls.ErrorsOnly, MaxTrackedThreads: w.Syscalls.MaxTrackedThreads}
 	}
 	limits := DomainCeilings(w.NodeLimits)
 	s.Resources = collector.SourceResources{PolicyUID: w.ResourcePolicyUID, Node: collector.PolicyLimits{SourceLimits: limits.SourceLimits, RingBytes: limits.RingBytes, FrozenBytes: limits.FrozenBytes, UploadBytesPerSecond: limits.UploadBytesPerSecond, UploadBurstBytes: limits.UploadBurstBytes}, Workload: collector.SourceLimits{MaxActiveSources: w.WorkloadLimits.MaxActiveSources, InputBytesPerSecond: w.WorkloadLimits.InputBytesPerSecond, InputBurstBytes: w.WorkloadLimits.InputBurstBytes}}

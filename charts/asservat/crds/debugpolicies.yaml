@@ -375,7 +375,7 @@
                       "maxTotalBytes": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 1099511627776
+                        "maximum": 9007199254740991
                       },
                       "maxDuration": {
                         "type": "string",
@@ -450,7 +450,6 @@
                                       "syscallAfter",
                                       "syscallRing",
                                       "syscallArguments",
-                                      "syscallMaxEvents",
                                       "syscallRate",
                                       "filePath",
                                       "commandArgv",
@@ -467,8 +466,7 @@
                                   }
                                 }
                               },
-                              "minItems": 0,
-                              "maxItems": 32
+                              "minItems": 0
                             }
                           },
                           "required": [
@@ -476,8 +474,7 @@
                             "profileRef"
                           ]
                         },
-                        "minItems": 1,
-                        "maxItems": 8
+                        "minItems": 1
                       }
                     }
                   },

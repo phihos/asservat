@@ -117,7 +117,7 @@ func (n *nodePackets) runSyscall(ctx context.Context, workID string, p collector
 			malformed++
 			return
 		}
-		if inSecond >= p.MaxEventsPerSecond || int64(retained) >= p.Syscalls.MaxEvents || len(out)+len(line) > int(p.MaxBytes) {
+		if inSecond >= p.MaxEventsPerSecond || len(out)+len(line) > int(p.MaxBytes) {
 			outputFull++
 			return
 		}

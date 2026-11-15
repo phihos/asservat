@@ -13,11 +13,11 @@ func profileRequestForTest() GoProfileRequest {
 	return GoProfileRequest{Binding: artifact.Binding{ClusterID: id, ArtifactID: id, AttemptID: id, MediaType: GoProfileMediaType}, Pin: artifact.PinnedPod{Namespace: "app", NamespaceUID: id, Name: "app-0", UID: id, ControllerUID: id, NodeName: "node"}, NodeUID: id, NodeBootID: id, SourceRef: "go-debug", EndpointDigest: artifact.Digest{1}, Parameters: GoProfileParameters{Type: "heap", Mode: "snapshot"}, NativeLimit: DefaultGoProfileBytes, NotBefore: n, Deadline: n.Add(5 * time.Second)}
 }
 
-func TestGoProfileParametersUseFiniteRuntimeSemantics(t *testing.T) {
+func TestGoProfileParametersUseRuntimeSemantics(t *testing.T) {
 	for _, p := range []GoProfileParameters{
 		{Type: "cpu", Mode: "interval", Duration: 10 * time.Second},
-		{Type: "cpu", Mode: "interval", Duration: 60 * time.Second},
-		{Type: "runtimeTrace", Mode: "interval", Duration: 15 * time.Second},
+		{Type: "cpu", Mode: "interval", Duration: 60 * time.Second}, {Type: "cpu", Mode: "interval", Duration: 10 * time.Minute},
+		{Type: "runtimeTrace", Mode: "interval", Duration: 15 * time.Second}, {Type: "runtimeTrace", Mode: "interval", Duration: time.Minute},
 		{Type: "heap", Mode: "snapshot"}, {Type: "heap", Mode: "snapshot", ForceGC: true},
 		{Type: "heap", Mode: "delta", Duration: 10 * time.Second},
 		{Type: "goroutine", Mode: "snapshot"}, {Type: "allocs", Mode: "cumulative"},
@@ -28,9 +28,9 @@ func TestGoProfileParametersUseFiniteRuntimeSemantics(t *testing.T) {
 		}
 	}
 	for _, p := range []GoProfileParameters{
-		{Type: "cpu", Mode: "interval"}, {Type: "cpu", Mode: "interval", Duration: 61 * time.Second},
+		{Type: "cpu", Mode: "interval"}, {Type: "cpu", Mode: "interval", Duration: -time.Second},
 		{Type: "cpu", Mode: "interval", Duration: 1500 * time.Millisecond},
-		{Type: "runtimeTrace", Mode: "interval", Duration: 16 * time.Second},
+		{Type: "runtimeTrace", Mode: "interval", Duration: 500 * time.Millisecond},
 		{Type: "heap", Mode: "snapshot", Duration: time.Second},
 		{Type: "heap", Mode: "delta", Duration: time.Second, ForceGC: true},
 		{Type: "mutex", Mode: "cumulative", ForceGC: true},

@@ -14,10 +14,10 @@ func PlanFiniteAdHocObservation(g Grant, limits ObservationLimits, duration time
 	if g.Kind != GrantAdHocCapture || !limits.Valid() || g.Decision == nil || !g.Decision.Approved || !g.RevokedAt.IsZero() || !now.Before(g.ExpiresAt) {
 		return zero, ErrGrantScope
 	}
-	if duration < time.Second || duration > 15*time.Second || originalStartBy.IsZero() || hardUntil.IsZero() || !originalStartBy.After(now) || !hardUntil.After(now) || activeSessions < 0 || activeSessions >= limits.MaxConcurrentSessions {
+	if duration < time.Second || originalStartBy.IsZero() || hardUntil.IsZero() || !originalStartBy.After(now) || !hardUntil.After(now) || activeSessions < 0 || activeSessions >= limits.MaxConcurrentSessions {
 		return zero, ErrGrantScope
 	}
-	until := now.Add(20 * time.Second)
+	until := now.Add(duration + FiniteObservationStartWindow)
 	for _, bound := range []time.Time{now.Add(time.Duration(limits.MaxSessionSeconds) * time.Second), g.ExpiresAt, hardUntil} {
 		if bound.Before(until) {
 			until = bound

@@ -52,23 +52,22 @@ func GoTraceHeader(b []byte) bool {
 		(b[5] > '2' || b[6] >= '2') && string(b[7:GoTraceHeaderBytes]) == " trace\x00\x00\x00"
 }
 
-// ValidGoProfile is the finite net/http/pprof subset: the CPU profile and
-// execution trace are timed intervals (at most 60 and 15 seconds); heap and
-// goroutine are snapshots, the other types cumulative, each also readable as
-// a delta of at most 60 seconds. Forced GC applies only to a heap snapshot,
-// because the handler takes its delta path before the GC branch.
+// ValidGoProfile is the net/http/pprof subset: the CPU profile and execution
+// trace are timed intervals; heap and goroutine are snapshots, the other
+// types cumulative, each also readable as a delta. pprof takes whole seconds.
+// A window runs to the capture's configured duration (ADR-335 D8); the
+// target's pprof server refuses a duration it cannot serve. Forced GC applies
+// only to a heap snapshot, because the handler takes its delta path before
+// the GC branch.
 func ValidGoProfile(typ, mode string, d time.Duration, forceGC bool) bool {
 	if forceGC && (typ != "heap" || mode != "snapshot") {
 		return false
 	}
-	delta := mode == "delta" && d >= time.Second && d <= 60*time.Second && d%time.Second == 0
+	timed := d >= time.Second && d%time.Second == 0
+	delta := mode == "delta" && timed
 	switch typ {
 	case "cpu", "runtimeTrace":
-		limit := 60 * time.Second
-		if typ == "runtimeTrace" {
-			limit = 15 * time.Second
-		}
-		return mode == "interval" && d >= time.Second && d <= limit && d%time.Second == 0
+		return mode == "interval" && timed
 	case "heap", "goroutine":
 		return mode == "snapshot" && d == 0 || delta
 	case "allocs", "block", "mutex", "threadcreate":

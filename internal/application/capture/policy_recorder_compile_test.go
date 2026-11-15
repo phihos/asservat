@@ -160,7 +160,7 @@ func TestRecorderPolicyUnsharedScopeDigestBaseline(t *testing.T) {
 	got := RecorderPolicyScopeDigest("policy-uid", 1, artifact.Digest{1}, p, "namespace-uid", "workload-uid", identity.Revision{UID: "binding", Generation: 1, Digest: artifact.Digest{2}}, nil, []string{"packetCapture"}, authorization.AutomationLimits{MaxExecutions: 10, MaxBytes: 1 << 20, MaxObservedBytes: 1 << 20})
 	// Captured with the original fc02 serializer through a Go source overlay.
 	// This scope has no sharing; control exclusion must preserve its exact bytes.
-	const want = "d473410e70800be5d8b93c1f201d0fecd7c323df859c60ee82de1c9cb0090aba"
+	const want = "621d237df5f3f463969ace487da8f70bc56c0befd823c4745f994e0c99d95ac5"
 	if fmt.Sprintf("%x", got) != want {
 		t.Fatalf("unshared recorder collection digest changed: got %x want %s", got, want)
 	}

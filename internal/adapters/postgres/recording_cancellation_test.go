@@ -22,7 +22,7 @@ func TestArgumentProgressOffersStopButRequestRemainsNonterminal(t *testing.T) {
 	e.ExecutionClass, e.NodeUID, e.NodeBootID = artifact.ContextAPIExecution, "", ""
 	e.NativeType, e.DataClass, e.ActionID = artifact.SyscallArgumentsArtifact, "raw", "a111111111111111111111111"
 	e.Registration.NativeLimit = artifact.RecordingNativeLimit
-	e.Recording = &artifact.Recording{Kind: "syscallTrace", Profile: "arguments", Composition: []byte("{}"), DurationMillis: 1000, MaxBytes: 64 << 10, Syscalls: &artifact.RecordingSyscalls{Names: []string{"close"}, MaxEvents: 1000, MaxEventsPerSecond: 100, MaxTrackedThreads: 64}, Arguments: &artifact.RecordingArguments{ProgramDigest: artifact.Digest{1}, DefinitionDigest: artifact.Digest{2}, AccountingRule: artifact.Digest{3}, MaxProbeBytes: 256, MaxBytesPerEvent: 1, MaxBytesPerSecond: 25600}}
+	e.Recording = &artifact.Recording{Kind: "syscallTrace", Profile: "arguments", Composition: []byte("{}"), DurationMillis: 1000, MaxBytes: 64 << 10, Syscalls: &artifact.RecordingSyscalls{Names: []string{"close"}, MaxEventsPerSecond: 100, MaxTrackedThreads: 64}, Arguments: &artifact.RecordingArguments{ProgramDigest: artifact.Digest{1}, DefinitionDigest: artifact.Digest{2}, AccountingRule: artifact.Digest{3}, MaxProbeBytes: 256, MaxBytesPerEvent: 1, MaxBytesPerSecond: 25600}}
 	if err := e.Validate(); err != nil {
 		t.Fatal("argument progress fixture", err)
 	}

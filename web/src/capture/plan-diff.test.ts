@@ -21,7 +21,7 @@ describe('plan diff (REQ-CPR-005)', () => {
     const after = preview();
     const c = after.profile_composition!;
     c.authored.components[0].overrides = [{ actionID: 'http', field: 'packetFilter', value: 'tcp port 8443' }];
-    c.authored.components[1].overrides = [{ actionID: 'syscalls', field: 'syscallMaxEvents', value: 5000 }];
+    c.authored.components[1].overrides = [{ actionID: 'syscalls', field: 'syscallRate', value: 5000 }];
     c.authored.components.pop(); // remove process-context
     c.authored.maxTotalBytes = 64 << 20;
     c.actionMap = c.actionMap.filter(a => a.componentID !== 'context');
@@ -42,7 +42,7 @@ describe('plan diff (REQ-CPR-005)', () => {
     expect(diff.actions.find(a => a.actionID === calls)!.changes).toEqual(expect.arrayContaining([
       { label: 'When recording starts', before: 'Ongoing; save on trigger', after: 'On trigger' },
       { label: 'History window', before: '30s', after: '0s' },
-      { label: 'Event limit', before: profileDefault, after: '5000' },
+      { label: 'Event rate limit', before: profileDefault, after: '5000' },
     ]));
     expect(diff.actions.filter(a => a.status === 'removed').map(a => [a.actionID, a.alias])).toEqual([[processes, 'context/processes'], [sockets, 'context/sockets']]);
     expect(diff.bounds).toEqual([
