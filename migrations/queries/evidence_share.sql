@@ -32,16 +32,18 @@ ORDER BY created_at, id;
 SELECT * FROM evidence_share WHERE root_id=sqlc.arg(root_id) AND retire_by>clock_timestamp()
  AND ((creator_issuer=sqlc.arg(creator_issuer) AND creator_subject=sqlc.arg(creator_subject))
   OR (revoked_at IS NULL AND expires_at>clock_timestamp() AND management @> ANY(sqlc.arg(managers)::jsonb[])))
--- Active rows first, so old revoked/expired own shares never push a share the
--- caller can still revoke out of the bounded page.
-ORDER BY (revoked_at IS NULL AND expires_at>clock_timestamp()) DESC, created_at DESC, id LIMIT sqlc.arg(row_limit);
+-- Newest first, keyset-paged on (created_at, id) like ListAdministeredShares.
+ AND (NOT sqlc.arg(paged)::boolean OR (created_at,id)<(sqlc.arg(after_created_at)::timestamptz,sqlc.arg(after_id)::uuid))
+ORDER BY created_at DESC, id DESC LIMIT sqlc.arg(row_limit);
 
 -- name: ReadShare :one
 SELECT * FROM evidence_share WHERE root_id=$1 AND id=$2 AND retire_by>clock_timestamp();
 
 -- name: ListReceivedShares :many
-SELECT * FROM evidence_share WHERE root_id=$1 AND retire_by>clock_timestamp() AND recipient_keys && sqlc.arg(keys)::text[] AND revoked_at IS NULL AND expires_at>clock_timestamp()
-ORDER BY created_at DESC, id LIMIT @row_limit;
+-- Newest first, keyset-paged on (created_at, id).
+SELECT * FROM evidence_share WHERE root_id=sqlc.arg(root_id)::uuid AND retire_by>clock_timestamp() AND recipient_keys && sqlc.arg(keys)::text[] AND revoked_at IS NULL AND expires_at>clock_timestamp()
+ AND (NOT sqlc.arg(paged)::boolean OR (created_at,id)<(sqlc.arg(after_created_at)::timestamptz,sqlc.arg(after_id)::uuid))
+ORDER BY created_at DESC, id DESC LIMIT sqlc.arg(row_limit);
 
 -- name: ReadShareForUpdate :one
 SELECT * FROM evidence_share WHERE root_id=$1 AND id=$2 FOR UPDATE;

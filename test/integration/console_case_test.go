@@ -120,10 +120,10 @@ func (s *consoleSyntheticShares) Create(ctx context.Context, current app.Current
 	return share, false, nil
 }
 
-func (s *consoleSyntheticShares) List(ctx context.Context, current app.CurrentIdentity, view string, _ int) ([]sharing.View, time.Time, error) {
+func (s *consoleSyntheticShares) List(ctx context.Context, current app.CurrentIdentity, view, _ string, _ int) ([]sharing.View, string, time.Time, error) {
 	i, err := current.ResolveIdentity(ctx)
 	if err != nil {
-		return nil, time.Time{}, err
+		return nil, "", time.Time{}, err
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -137,7 +137,7 @@ func (s *consoleSyntheticShares) List(ctx context.Context, current app.CurrentId
 			out = append(out, sharing.View{Share: share, Phase: phase})
 		}
 	}
-	return out, i.ValidUntil, nil
+	return out, "", i.ValidUntil, nil
 }
 
 func (s *consoleSyntheticShares) Revoke(_ context.Context, _ app.CurrentIdentity, in sharing.RevokeInput) (authorization.Share, bool, error) {

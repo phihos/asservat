@@ -346,7 +346,7 @@
         },
         "notAfter": {
           "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/timestamp",
-          "description": "Optional end of recurring sharing; defaults to the policy grant end (non-intrusive policies: 90 days, at most 365). No weekly renewal."
+          "description": "Optional end of recurring sharing; defaults to the policy grant end. A policy without a grant must name notAfter or maxCaptures. No weekly renewal."
         },
         "reason": {
           "type": "string",

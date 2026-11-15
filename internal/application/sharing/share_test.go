@@ -108,7 +108,7 @@ func (s *memoryStore) Share(_ context.Context, id string) (value.Share, error) {
 
 // OwnedShares mirrors the SQL candidates: created rows, plus unrevoked,
 // unexpired rows pinning one of the caller's user/group subjects.
-func (s *memoryStore) OwnedShares(_ context.Context, caller identity.Identity, _ int) ([]value.Share, error) {
+func (s *memoryStore) OwnedShares(_ context.Context, caller identity.Identity, _ ShareCursor, _ int) ([]value.Share, error) {
 	var out []value.Share
 	for _, r := range s.rows {
 		pinned := false
@@ -121,7 +121,7 @@ func (s *memoryStore) OwnedShares(_ context.Context, caller identity.Identity, _
 	}
 	return out, nil
 }
-func (s *memoryStore) ReceivedShares(ctx context.Context, caller identity.Identity, _ int) ([]value.Share, error) {
+func (s *memoryStore) ReceivedShares(ctx context.Context, caller identity.Identity, _ ShareCursor, _ int) ([]value.Share, error) {
 	out := []value.Share{}
 	for _, r := range s.rows {
 		rows, _ := s.RecipientShares(ctx, r.ArtifactID, caller)
@@ -254,7 +254,7 @@ func TestShareCreateListRevoke(t *testing.T) {
 	if _, _, err := s.Create(context.Background(), f, changed); !errors.Is(err, capture.ErrConflict) {
 		t.Fatal("changed request under the same key", err)
 	}
-	owned, _, err := s.List(context.Background(), f, "owned", 20)
+	owned, _, _, err := s.List(context.Background(), f, "owned", "", 20)
 	if err != nil || len(owned) != 1 || owned[0].Phase != value.ShareActive {
 		t.Fatal("owned list", err, owned)
 	}
@@ -264,7 +264,7 @@ func TestShareCreateListRevoke(t *testing.T) {
 	if _, replay, err := s.Revoke(context.Background(), f, RevokeInput{OperationID: testID(900), ShareID: created.ID, ExpectedRevision: 1, IdempotencyKey: "r1"}); err != nil || !replay {
 		t.Fatal("revoke replay", err, replay)
 	}
-	owned, _, _ = s.List(context.Background(), f, "owned", 20)
+	owned, _, _, _ = s.List(context.Background(), f, "owned", "", 20)
 	if len(owned) != 1 || owned[0].Phase != value.ShareRevoked {
 		t.Fatal("revoked phase", owned)
 	}
@@ -274,7 +274,7 @@ func TestShareCreateListRevoke(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.p.Allows = f.p.Allows[:1]
-	owned, _, _ = s.List(context.Background(), f, "owned", 20)
+	owned, _, _, _ = s.List(context.Background(), f, "owned", "", 20)
 	for _, v := range owned {
 		if v.Share.ID == second.ID && v.Phase != value.ShareActive {
 			t.Fatal("owner loss changed the share", v.Phase)
@@ -329,7 +329,7 @@ func TestShareReceivedListsOnlyReadableShares(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.i.Principal.Subject, f.i.Groups, f.i.Scopes = "outsider", []string{"outsiders"}, []string{"evidence:read"}
-	got, _, err := s.List(context.Background(), f, "received", 20)
+	got, _, _, err := s.List(context.Background(), f, "received", "", 20)
 	if err != nil || len(got) != 1 || got[0].Phase != value.ShareActive {
 		t.Fatal("received list", err, got)
 	}
@@ -337,11 +337,11 @@ func TestShareReceivedListsOnlyReadableShares(t *testing.T) {
 	d := f.p.Allows[0]
 	d.Audience.Kind, d.Audience.SubjectID, d.Audience.AssignmentID = "User", "outsider", testID(62)
 	f.p.Denies = []value.CurrentAssignment{d}
-	if got, _, err := s.List(context.Background(), f, "received", 20); err != nil || len(got) != 0 {
+	if got, _, _, err := s.List(context.Background(), f, "received", "", 20); err != nil || len(got) != 0 {
 		t.Fatal("denied recipient listed a share", err, got)
 	}
 	// Without evidence:share the owned view is refused.
-	if _, _, err := s.List(context.Background(), f, "owned", 20); !errors.Is(err, capture.ErrDenied) {
+	if _, _, _, err := s.List(context.Background(), f, "owned", "", 20); !errors.Is(err, capture.ErrDenied) {
 		t.Fatal("owned list without evidence:share", err)
 	}
 }
@@ -361,7 +361,7 @@ func TestShareOwnedListSurvivesUnavailableProjection(t *testing.T) {
 	}
 	// The target's projection becomes unavailable: the owned list needs none.
 	f.p.Target.WorkloadUID = "gone"
-	owned, _, err := s.List(context.Background(), f, "owned", 20)
+	owned, _, _, err := s.List(context.Background(), f, "owned", "", 20)
 	if err != nil || len(owned) != 2 {
 		t.Fatal("owned list failed on an unavailable projection", err, owned)
 	}
@@ -380,7 +380,7 @@ func TestShareReceivedListTrimsAfterFiltering(t *testing.T) {
 		}
 	}
 	f.i.Principal.Subject, f.i.Groups, f.i.Scopes = "outsider", []string{"outsiders"}, []string{"evidence:read"}
-	if got, _, err := s.List(context.Background(), f, "received", 1); err != nil || len(got) != 1 {
+	if got, _, _, err := s.List(context.Background(), f, "received", "", 1); err != nil || len(got) != 1 {
 		t.Fatal("received page", err, got)
 	}
 }
@@ -425,7 +425,7 @@ func TestShareTeamManagement(t *testing.T) {
 	mate.Principal.Subject, mate.Groups = "mate", []string{"owners"}
 	// A team member who did not create the share manages it.
 	f.i = mate
-	if owned, _, err := s.List(ctx, f, "owned", 20); err != nil {
+	if owned, _, _, err := s.List(ctx, f, "owned", "", 20); err != nil {
 		t.Fatal(err)
 	} else if phase, ok := listed(owned, share.ID); !ok || phase != value.ShareActive {
 		t.Fatal("team member does not see the managed share", owned)
@@ -434,7 +434,7 @@ func TestShareTeamManagement(t *testing.T) {
 	// for the creator (created) and the member revokes it.
 	f.i = creator
 	f.i.Groups = nil
-	if owned, _, _ := s.List(ctx, f, "owned", 20); len(owned) != 1 || owned[0].Phase != value.ShareActive {
+	if owned, _, _, _ := s.List(ctx, f, "owned", "", 20); len(owned) != 1 || owned[0].Phase != value.ShareActive {
 		t.Fatal("creator departure changed the share", owned)
 	}
 	f.i = mate
@@ -442,7 +442,7 @@ func TestShareTeamManagement(t *testing.T) {
 		t.Fatal("team member could not revoke", err)
 	}
 	// A revoked team share leaves the member's (not the creator's) view.
-	if owned, _, _ := s.List(ctx, f, "owned", 20); len(owned) != 0 {
+	if owned, _, _, _ := s.List(ctx, f, "owned", "", 20); len(owned) != 0 {
 		t.Fatal("revoked team share still listed for the member", owned)
 	}
 

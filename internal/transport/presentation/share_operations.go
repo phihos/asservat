@@ -21,7 +21,7 @@ import (
 // ShareUseCase is the ADR-232 share service.
 type ShareUseCase interface {
 	Create(context.Context, identities.CurrentIdentity, sharing.CreateInput) (authorization.Share, bool, error)
-	List(context.Context, identities.CurrentIdentity, string, int) ([]sharing.View, time.Time, error)
+	List(context.Context, identities.CurrentIdentity, string, string, int) ([]sharing.View, string, time.Time, error)
 	Revoke(context.Context, identities.CurrentIdentity, sharing.RevokeInput) (authorization.Share, bool, error)
 	Transfer(context.Context, identities.CurrentIdentity, sharing.TransferInput) (authorization.Share, bool, error)
 	ListAdministered(context.Context, identities.CurrentIdentity, string, int) ([]sharing.View, string, time.Time, error)
@@ -264,10 +264,8 @@ func (s *ShareOperations) CallWithContext(ctx context.Context, current identitie
 			if in.View == "administration" {
 				// ADR-238: management-only rows; recipients are never listed.
 				views, next, valid, operationErr = s.shares.ListAdministered(ctx, current, in.Cursor, limit)
-			} else if in.Cursor != "" {
-				operationErr = value.ErrInvalid
 			} else {
-				views, valid, operationErr = s.shares.List(ctx, current, in.View, limit)
+				views, next, valid, operationErr = s.shares.List(ctx, current, in.View, in.Cursor, limit)
 			}
 			if operationErr == nil {
 				until = identity.Earlier(until, valid)

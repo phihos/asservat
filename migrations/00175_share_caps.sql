@@ -188,6 +188,8 @@ BEGIN
   RETURN NEW;
  END IF;
  s:=convert_from(NEW.scope_json,'UTF8')::jsonb;
+ -- Manual saves never inherit/debit an automatic recurring sharing intent.
+ IF s->>'schemaVersion'='recording-save/v1' AND s->>'operation'='recordingSave' THEN RETURN NEW; END IF;
  IF s#>>'{executor,identityType}' IS DISTINCT FROM 'workload' OR s#>>'{executor,clientID}' IS DISTINCT FROM 'policy-executor' OR s#>>'{executor,subject}' NOT LIKE 'policy:%' THEN
   RETURN NEW;
  END IF;
@@ -198,7 +200,7 @@ BEGIN
  END IF;
  UPDATE public.policy_acceptance a SET shares_spent=a.shares_spent+1
  WHERE a.id=src.active_id AND a.root_id=NEW.root_id AND a.policy_uid=policy AND a.record ? 'Sharing' AND a.sharing_revoked_at IS NULL AND a.sharing_stopped_at IS NULL
-  AND a.generation=src.generation AND (COALESCE((a.record#>>'{Sharing,MaxCaptures}')::integer,0)=0 OR a.shares_spent<(a.record#>>'{Sharing,MaxCaptures}')::integer) AND (a.record#>>'{Sharing,NotAfter}')::timestamptz>at
+  AND a.generation=src.generation AND (COALESCE((a.record#>>'{Sharing,MaxCaptures}')::integer,0)=0 OR a.shares_spent<(a.record#>>'{Sharing,MaxCaptures}')::integer) AND (a.record#>>'{Sharing,NotAfter}' IS NULL OR (a.record#>>'{Sharing,NotAfter}')::timestamptz>at)
  RETURNING * INTO acc;
  IF NOT FOUND THEN
   RETURN NEW;

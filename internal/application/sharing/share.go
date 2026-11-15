@@ -244,72 +244,91 @@ func (s Service) Create(ctx context.Context, current identities.CurrentIdentity,
 // (received: unrevoked, unexpired shares whose share-level checks pass).
 // Received rows are candidates: the artifact's retained audience, retention
 // end and data class are checked only by the read itself.
-func (s Service) List(ctx context.Context, current identities.CurrentIdentity, view string, limit int) ([]View, time.Time, error) {
+func (s Service) List(ctx context.Context, current identities.CurrentIdentity, view, cursor string, limit int) ([]View, string, time.Time, error) {
 	if ctx == nil || ctx.Err() != nil || current == nil || !s.ready() || limit < 1 || limit > 100 || view != "owned" && view != "received" {
-		return nil, time.Time{}, capture.ErrInvalid
+		return nil, "", time.Time{}, capture.ErrInvalid
+	}
+	after, ok := decodeShareCursor(cursor)
+	if !ok {
+		return nil, "", time.Time{}, capture.ErrInvalid
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	i, err := current.ResolveIdentity(ctx)
 	if err != nil || !i.Valid(s.Now()) || !slices.Contains(i.Scopes, "evidence:read") {
-		return nil, time.Time{}, capture.ErrDenied
+		return nil, "", time.Time{}, capture.ErrDenied
 	}
 	if view == "owned" && (i.Principal.Kind != identity.Human || !slices.Contains(i.Scopes, value.ShareScope)) {
-		return nil, time.Time{}, capture.ErrDenied
+		return nil, "", time.Time{}, capture.ErrDenied
 	}
-	// Filtering happens after the SQL page, so fetch the full bound and trim:
-	// a denied or no longer managed row never pushes a listed one off a small
-	// page. ponytail: beyond 100 candidates add keyset paging.
-	var rows []value.Share
-	if view == "owned" {
-		rows, err = s.Store.OwnedShares(ctx, i, 100)
-	} else {
-		rows, err = s.Store.ReceivedShares(ctx, i, 100)
-	}
-	if err != nil {
-		return nil, time.Time{}, capture.ErrUnavailable
-	}
+	// Filtering happens after each SQL page, so read keyset pages until the
+	// caller's page is full or the candidates end; the cursor is the last
+	// candidate examined, so no row is skipped or listed twice.
 	until := i.ValidUntil
 	projections := map[value.Target]value.Projection{}
-	out := make([]View, 0, len(rows))
-	for _, row := range rows {
-		if row.RootID != s.RootID {
-			return nil, time.Time{}, capture.ErrUnavailable
-		}
-		if len(out) == limit {
-			break
-		}
-		until = identity.Earlier(until, row.ValidUntil)
-		if view == "owned" {
-			// A team share is listed only while the caller is in a managing
-			// group now.
-			if !createdBy(row, i.Principal) {
-				if held, _ := row.ManagedBy(i, s.Now()); len(held) == 0 {
-					continue
-				}
-			}
-			out = append(out, View{row, row.Phase(s.Now())})
-			continue
-		}
-		p, ok := projections[row.Target]
+	projection := func(t value.Target) value.Projection {
+		p, ok := projections[t]
 		if !ok {
-			if p, err = s.Permissions.Permissions(ctx, row.Target); err != nil {
+			if p, err = s.Permissions.Permissions(ctx, t); err != nil {
 				p = value.Projection{}
 			}
-			projections[row.Target] = p
+			projections[t] = p
 		}
-		r := value.EvaluateShare(i, p, row.Target, nil, row, s.Now())
-		if !r.Eligible {
-			continue
+		return p
+	}
+	out := make([]View, 0, limit)
+	next := ""
+	for {
+		var rows []value.Share
+		if view == "owned" {
+			rows, err = s.Store.OwnedShares(ctx, i, after, 100)
+		} else {
+			rows, err = s.Store.ReceivedShares(ctx, i, after, 100)
 		}
-		until = identity.Earlier(until, r.ValidUntil)
-		out = append(out, View{row, value.ShareActive})
+		if err != nil {
+			return nil, "", time.Time{}, capture.ErrUnavailable
+		}
+		for _, row := range rows {
+			if row.RootID != s.RootID {
+				return nil, "", time.Time{}, capture.ErrUnavailable
+			}
+			if len(out) == limit {
+				next = encodeShareCursor(after)
+				break
+			}
+			after = ShareCursor{CreatedAt: row.CreatedAt, ID: row.ID}
+			until = identity.Earlier(until, row.ValidUntil)
+			if view == "owned" {
+				// A team share is listed only while the caller manages it now.
+				if !createdBy(row, i.Principal) {
+					held, _ := row.ManagedBy(i, s.Now())
+					if len(held) == 0 || value.ManagerDenied(projection(row.Target), row.Target, i, s.Now()) {
+						continue
+					}
+				}
+				out = append(out, View{row, row.Phase(s.Now())})
+				continue
+			}
+			r := value.EvaluateShare(i, projection(row.Target), row.Target, nil, row, s.Now())
+			if !r.Eligible {
+				continue
+			}
+			until = identity.Earlier(until, r.ValidUntil)
+			out = append(out, View{row, value.ShareActive})
+		}
+		if next != "" || len(rows) < 100 {
+			break
+		}
+		if len(out) == limit {
+			next = encodeShareCursor(after)
+			break
+		}
 	}
 	final, err := current.ResolveIdentity(ctx)
 	if err != nil || !final.Valid(s.Now()) || final.Principal != i.Principal || ctx.Err() != nil {
-		return nil, time.Time{}, capture.ErrDenied
+		return nil, "", time.Time{}, capture.ErrDenied
 	}
-	return out, identity.Earlier(until, final.ValidUntil), nil
+	return out, next, identity.Earlier(until, final.ValidUntil), nil
 }
 
 // Revoke revokes one share for its creator, a current manager (a member of
@@ -342,6 +361,9 @@ func (s Service) Revoke(ctx context.Context, current identities.CurrentIdentity,
 	revocation := Revocation{OperationID: in.OperationID, ShareID: shareID, Actor: i.Principal, ExpectedRevision: expected, IdempotencyKey: key}
 	if !createdBy(share, i.Principal) {
 		held, _ := share.ManagedBy(i, s.Now())
+		if held, err = s.managedHeld(ctx, held, share.Target, i); err != nil {
+			return zero, false, err
+		}
 		for _, a := range held {
 			revocation.Managers = append(revocation.Managers, a.AssignmentID)
 		}
@@ -470,6 +492,9 @@ func (s Service) Transfer(ctx context.Context, current identities.CurrentIdentit
 		return zero, false, capture.ErrUnavailable
 	}
 	held, _ := share.ManagedBy(i, s.Now())
+	if held, err = s.managedHeld(ctx, held, share.Target, i); err != nil {
+		return zero, false, err
+	}
 	// Authority precedes every further read: a current manager, otherwise
 	// an installation administrator (scoped management delegation).
 	administered := len(held) == 0
@@ -638,6 +663,9 @@ func (s Service) changePolicySharing(ctx context.Context, current identities.Cur
 	instruction := sharing.Instruction
 	if instruction.Creator.Issuer != i.Principal.Issuer || instruction.Creator.Subject != i.Principal.Subject {
 		held, _ := value.PolicySharingManagedBy(instruction.Management, i, s.Now())
+		if held, err = s.managedHeld(ctx, held, sharing.Target, i); err != nil {
+			return err
+		}
 		if len(held) == 0 && !s.administrator(ctx, i) {
 			return capture.ErrDenied
 		}
@@ -647,4 +675,21 @@ func (s Service) changePolicySharing(ctx context.Context, current identities.Cur
 		}
 	}
 	return apply(ctx, r)
+}
+
+// managedHeld is the management i holds now on a share or policy sharing
+// target: none while a current Deny names i. A projection outage is
+// Unavailable, never a loss of management.
+func (s Service) managedHeld(ctx context.Context, held []artifact.AudienceAssignment, t value.Target, i identity.Identity) ([]artifact.AudienceAssignment, error) {
+	if len(held) == 0 {
+		return nil, nil
+	}
+	p, err := s.Permissions.Permissions(ctx, t)
+	if err != nil {
+		return nil, capture.ErrUnavailable
+	}
+	if value.ManagerDenied(p, t, i, s.Now()) {
+		return nil, nil
+	}
+	return held, nil
 }

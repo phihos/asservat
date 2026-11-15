@@ -97,8 +97,11 @@ func (s PolicyActivation) activateRecorderPolicy(ctx context.Context, author ide
 	}
 	var sharing *value.PolicyShareInstruction
 	if in := compiled.Sharing; in != nil {
-		end := sharingEnd(in, issued)
-		if in.Recipients[0].Issuer != author.Principal.Issuer || !end.After(s.Now()) {
+		end := sharingEnd(in, authority.NotAfter)
+		if end.IsZero() && in.MaxCaptures == 0 {
+			return zero, value.PolicyFieldError{Path: "spec.sharing", Reason: "a policy without a grant must name notAfter or maxCaptures"}
+		}
+		if in.Recipients[0].Issuer != author.Principal.Issuer || !end.IsZero() && !end.After(s.Now()) {
 			return zero, value.PolicyFieldError{Path: "spec.sharing.notAfter", Reason: "must be in the future, with recipients of your issuer"}
 		}
 		var sponsors []string

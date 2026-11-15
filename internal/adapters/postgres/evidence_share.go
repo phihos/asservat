@@ -148,8 +148,9 @@ func (s *EvidenceShares) RecipientShares(ctx context.Context, artifactID string,
 // OwnedShares returns the caller's own shares and the unrevoked, unexpired
 // shares pinning a management assignment of the caller's user subject or one
 // of its groups (ADR-232 increment 4). The second set is candidates only.
-func (s *EvidenceShares) OwnedShares(ctx context.Context, caller identity.Identity, limit int) ([]authorization.Share, error) {
-	if s == nil || ctx == nil || ctx.Err() != nil || !caller.Principal.Valid() || len(caller.Groups) > 256 || limit < 1 || limit > 100 {
+func (s *EvidenceShares) OwnedShares(ctx context.Context, caller identity.Identity, after sharing.ShareCursor, limit int) ([]authorization.Share, error) {
+	paged, afterAt, afterID, ok := s.sharePage(after)
+	if s == nil || ctx == nil || ctx.Err() != nil || !caller.Principal.Valid() || !ok || limit < 1 || limit > 101 {
 		return nil, value.ErrUnavailable
 	}
 	// One containment pattern per subject: [{"Kind","Issuer","SubjectID"}].
@@ -170,7 +171,7 @@ func (s *EvidenceShares) OwnedShares(ctx context.Context, caller identity.Identi
 	}
 	var out []authorization.Share
 	err = s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		rows, err := q.ListOwnedShares(ctx, custodydb.ListOwnedSharesParams{RootID: id(s.root), CreatorIssuer: caller.Principal.Issuer, CreatorSubject: caller.Principal.Subject, Managers: managers, RowLimit: int32(limit)})
+		rows, err := q.ListOwnedShares(ctx, custodydb.ListOwnedSharesParams{RootID: id(s.root), CreatorIssuer: caller.Principal.Issuer, CreatorSubject: caller.Principal.Subject, Managers: managers, Paged: paged, AfterCreatedAt: afterAt, AfterID: afterID, RowLimit: int32(limit)})
 		if err != nil {
 			return err
 		}
@@ -211,6 +212,20 @@ func (s *EvidenceShares) AdministeredShares(ctx context.Context, after sharing.S
 	return out, nil
 }
 
+// sharePage is the keyset bound of one owned or received page.
+func (s *EvidenceShares) sharePage(after sharing.ShareCursor) (bool, pgtype.Timestamptz, pgtype.UUID, bool) {
+	if s == nil {
+		return false, pgtype.Timestamptz{}, pgtype.UUID{}, false
+	}
+	if after == (sharing.ShareCursor{}) {
+		return false, ts(time.Unix(0, 0)), id(s.root), true
+	}
+	if !authorization.UUID(after.ID) || after.CreatedAt.IsZero() {
+		return false, pgtype.Timestamptz{}, pgtype.UUID{}, false
+	}
+	return true, ts(after.CreatedAt), id(after.ID), true
+}
+
 // Share reads one share of this root; a missing share is Denied.
 func (s *EvidenceShares) Share(ctx context.Context, shareID string) (authorization.Share, error) {
 	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(shareID) {
@@ -234,14 +249,15 @@ func (s *EvidenceShares) Share(ctx context.Context, shareID string) (authorizati
 	return out[0], nil
 }
 
-func (s *EvidenceShares) ReceivedShares(ctx context.Context, caller identity.Identity, limit int) ([]authorization.Share, error) {
+func (s *EvidenceShares) ReceivedShares(ctx context.Context, caller identity.Identity, after sharing.ShareCursor, limit int) ([]authorization.Share, error) {
 	keys := authorization.RecipientKeys(caller)
-	if s == nil || ctx == nil || ctx.Err() != nil || len(keys) == 0 || len(keys) > 257 || limit < 1 || limit > 100 {
+	paged, afterAt, afterID, ok := s.sharePage(after)
+	if s == nil || ctx == nil || ctx.Err() != nil || len(keys) == 0 || !ok || limit < 1 || limit > 101 {
 		return nil, value.ErrUnavailable
 	}
 	var out []authorization.Share
 	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		rows, err := q.ListReceivedShares(ctx, custodydb.ListReceivedSharesParams{RootID: id(s.root), Keys: keys, RowLimit: int32(limit)})
+		rows, err := q.ListReceivedShares(ctx, custodydb.ListReceivedSharesParams{RootID: id(s.root), Keys: keys, Paged: paged, AfterCreatedAt: afterAt, AfterID: afterID, RowLimit: int32(limit)})
 		if err != nil {
 			return err
 		}

@@ -231,7 +231,8 @@ const listOwnedShares = `-- name: ListOwnedShares :many
 SELECT id, root_id, artifact_id, case_id, cluster_id, namespace_uid, workload_uid, pod_uid, version, creator_issuer, creator_subject, creator_client, management, recipients, recipient_keys, idempotency_key, request_digest, created_at, expires_at, revoked_at, revoke_key, revision, transfer_key, transfer_digest, policy_acceptance_id, creating_operation_id, retire_by, last_operation_id FROM evidence_share WHERE root_id=$1 AND retire_by>clock_timestamp()
  AND ((creator_issuer=$2 AND creator_subject=$3)
   OR (revoked_at IS NULL AND expires_at>clock_timestamp() AND management @> ANY($4::jsonb[])))
-ORDER BY (revoked_at IS NULL AND expires_at>clock_timestamp()) DESC, created_at DESC, id LIMIT $5
+ AND (NOT $5::boolean OR (created_at,id)<($6::timestamptz,$7::uuid))
+ORDER BY created_at DESC, id DESC LIMIT $8
 `
 
 type ListOwnedSharesParams struct {
@@ -239,20 +240,25 @@ type ListOwnedSharesParams struct {
 	CreatorIssuer  string
 	CreatorSubject string
 	Managers       [][]byte
+	Paged          bool
+	AfterCreatedAt pgtype.Timestamptz
+	AfterID        pgtype.UUID
 	RowLimit       int32
 }
 
 // Shares the caller created, in every phase, plus unrevoked, unexpired shares
 // managed by a user or group subject of the caller (each pattern is a
 // one-element array [{"Kind","Issuer","SubjectID"}]).
-// Active rows first, so old revoked/expired own shares never push a share the
-// caller can still revoke out of the bounded page.
+// Newest first, keyset-paged on (created_at, id) like ListAdministeredShares.
 func (q *Queries) ListOwnedShares(ctx context.Context, arg ListOwnedSharesParams) ([]EvidenceShare, error) {
 	rows, err := q.db.Query(ctx, listOwnedShares,
 		arg.RootID,
 		arg.CreatorIssuer,
 		arg.CreatorSubject,
 		arg.Managers,
+		arg.Paged,
+		arg.AfterCreatedAt,
+		arg.AfterID,
 		arg.RowLimit,
 	)
 	if err != nil {
@@ -303,18 +309,30 @@ func (q *Queries) ListOwnedShares(ctx context.Context, arg ListOwnedSharesParams
 }
 
 const listReceivedShares = `-- name: ListReceivedShares :many
-SELECT id, root_id, artifact_id, case_id, cluster_id, namespace_uid, workload_uid, pod_uid, version, creator_issuer, creator_subject, creator_client, management, recipients, recipient_keys, idempotency_key, request_digest, created_at, expires_at, revoked_at, revoke_key, revision, transfer_key, transfer_digest, policy_acceptance_id, creating_operation_id, retire_by, last_operation_id FROM evidence_share WHERE root_id=$1 AND retire_by>clock_timestamp() AND recipient_keys && $2::text[] AND revoked_at IS NULL AND expires_at>clock_timestamp()
-ORDER BY created_at DESC, id LIMIT $3
+SELECT id, root_id, artifact_id, case_id, cluster_id, namespace_uid, workload_uid, pod_uid, version, creator_issuer, creator_subject, creator_client, management, recipients, recipient_keys, idempotency_key, request_digest, created_at, expires_at, revoked_at, revoke_key, revision, transfer_key, transfer_digest, policy_acceptance_id, creating_operation_id, retire_by, last_operation_id FROM evidence_share WHERE root_id=$1::uuid AND retire_by>clock_timestamp() AND recipient_keys && $2::text[] AND revoked_at IS NULL AND expires_at>clock_timestamp()
+ AND (NOT $3::boolean OR (created_at,id)<($4::timestamptz,$5::uuid))
+ORDER BY created_at DESC, id DESC LIMIT $6
 `
 
 type ListReceivedSharesParams struct {
-	RootID   pgtype.UUID
-	Keys     []string
-	RowLimit int32
+	RootID         pgtype.UUID
+	Keys           []string
+	Paged          bool
+	AfterCreatedAt pgtype.Timestamptz
+	AfterID        pgtype.UUID
+	RowLimit       int32
 }
 
+// Newest first, keyset-paged on (created_at, id).
 func (q *Queries) ListReceivedShares(ctx context.Context, arg ListReceivedSharesParams) ([]EvidenceShare, error) {
-	rows, err := q.db.Query(ctx, listReceivedShares, arg.RootID, arg.Keys, arg.RowLimit)
+	rows, err := q.db.Query(ctx, listReceivedShares,
+		arg.RootID,
+		arg.Keys,
+		arg.Paged,
+		arg.AfterCreatedAt,
+		arg.AfterID,
+		arg.RowLimit,
+	)
 	if err != nil {
 		return nil, err
 	}

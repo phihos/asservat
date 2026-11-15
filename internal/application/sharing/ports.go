@@ -64,8 +64,8 @@ type Store interface {
 	authapp.ShareReader
 	CreateShare(context.Context, Request) (authorization.Share, bool, error)
 	Share(ctx context.Context, shareID string) (authorization.Share, error)
-	OwnedShares(ctx context.Context, caller identity.Identity, limit int) ([]authorization.Share, error)
-	ReceivedShares(ctx context.Context, caller identity.Identity, limit int) ([]authorization.Share, error)
+	OwnedShares(ctx context.Context, caller identity.Identity, after ShareCursor, limit int) ([]authorization.Share, error)
+	ReceivedShares(ctx context.Context, caller identity.Identity, after ShareCursor, limit int) ([]authorization.Share, error)
 	RevokeShare(context.Context, Revocation) (authorization.Share, bool, error)
 	TransferShare(context.Context, Transfer) (authorization.Share, bool, error)
 	// AdministeredShares is the administrator's management-only page of all

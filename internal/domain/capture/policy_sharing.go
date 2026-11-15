@@ -9,15 +9,12 @@ import (
 )
 
 // ADR-239: recurring-policy sharing. A DebugPolicy may name recipients of its
-// future captures with an optional capture limit and an end (default 90 days
-// after acceptance, ADR-335 D7). There is no SharingIntent record: the policy
+// future captures with an optional capture limit and an end (default: the
+// end of the policy's grant). There is no SharingIntent record: the policy
 // acceptance carries one immutable instruction and a counter, each admitted
 // occurrence capture consumes one slot and copies the ADR-235 capture
 // instruction, and publication materializes one ordinary share.
 const (
-	// PolicyShareDefaultLifetime is the end of recurring sharing when the
-	// policy names none (REQ-SHR-005).
-	PolicyShareDefaultLifetime = 90 * 24 * time.Hour
 	// PolicySharingStatement is the fixed review text of an activation that
 	// shares (REQ-SHR-005: preview/review must say so).
 	PolicySharingStatement = "Repeated collections will be shared"
@@ -27,7 +24,7 @@ const (
 // Time and authority are checked at activation, never by the compiler, so
 // polling an accepted policy never fails because its end has passed.
 // MaxCaptures 0 shares every capture until NotAfter; a zero NotAfter
-// selects PolicyShareDefaultLifetime at activation.
+// selects the end of the policy's grant at activation.
 type PolicySharing struct {
 	Recipients  []authorization.ShareRecipient
 	MaxCaptures int

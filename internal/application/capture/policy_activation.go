@@ -305,7 +305,7 @@ func (s PolicyActivation) Activate(ctx context.Context, current identities.Curre
 	if check := authorization.ValidatePolicyAcceptance(author, authority, envelope, use, s.Now()); !check.Eligible {
 		return zero, s.delegationRefused("validate")
 	}
-	sharing, err := s.sharing(author, compiled.Sharing, projection, target, delegation.UID, owners, issued)
+	sharing, err := s.sharing(author, compiled.Sharing, projection, target, delegation.UID, owners, authority.NotAfter)
 	if err != nil {
 		return zero, s.refused("sharing", err)
 	}
@@ -337,12 +337,15 @@ func (s PolicyActivation) Activate(ctx context.Context, current identities.Curre
 // assignment of the automation AccessBinding for a sponsoring group: those
 // assignments are the policy's owner teams and manage every share. The end
 // must be in the future. Without sharing, nothing is resolved.
-func (s PolicyActivation) sharing(author identity.Identity, in *value.PolicySharing, p authorization.Projection, target authorization.Target, delegation string, sponsors []artifact.AudienceAssignment, issued time.Time) (*value.PolicyShareInstruction, error) {
+func (s PolicyActivation) sharing(author identity.Identity, in *value.PolicySharing, p authorization.Projection, target authorization.Target, delegation string, sponsors []artifact.AudienceAssignment, grantEnd time.Time) (*value.PolicyShareInstruction, error) {
 	if in == nil {
 		return nil, nil
 	}
-	end := sharingEnd(in, issued)
-	if in.Recipients[0].Issuer != author.Principal.Issuer || !end.After(s.Now()) {
+	end := sharingEnd(in, grantEnd)
+	if end.IsZero() && in.MaxCaptures == 0 {
+		return nil, value.PolicyFieldError{Path: "spec.sharing", Reason: "a policy without a grant must name notAfter or maxCaptures"}
+	}
+	if in.Recipients[0].Issuer != author.Principal.Issuer || !end.IsZero() && !end.After(s.Now()) {
 		return nil, value.PolicyFieldError{Path: "spec.sharing.notAfter", Reason: "must be in the future, with recipients of your issuer"}
 	}
 	var groups []string
@@ -363,13 +366,18 @@ func (s PolicyActivation) sharing(author identity.Identity, in *value.PolicyShar
 	return &out, nil
 }
 
-// sharingEnd is the policy's sharing end, by default 90 days after
-// activation (REQ-SHR-005).
-func sharingEnd(in *value.PolicySharing, issued time.Time) time.Time {
-	if in.NotAfter.IsZero() {
-		return issued.Add(value.PolicyShareDefaultLifetime).UTC().Truncate(time.Second)
+// sharingEnd is the policy's sharing end: its notAfter, else the end of the
+// policy's grant. Recurring sharing is explicitly bounded (maintainer
+// decision): without either, only maxCaptures bounds it, and the zero end
+// means the caller must refuse sharing without a capture limit.
+func sharingEnd(in *value.PolicySharing, grantEnd time.Time) time.Time {
+	if !in.NotAfter.IsZero() {
+		return in.NotAfter.UTC()
 	}
-	return in.NotAfter.UTC()
+	if grantEnd.IsZero() {
+		return time.Time{}
+	}
+	return grantEnd.UTC().Truncate(time.Second)
 }
 
 // ActivateWithGrant composes explicit current-manager attachment with the same

@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"errors"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -170,7 +171,7 @@ func qualifyEvidenceShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool
 	if downloads("synthetic-recipient", nil, "evidence:read") || downloads("synthetic-stranger", nil, "evidence:read", "evidence:download") {
 		t.Fatal("download without evidence:download or through another principal's share")
 	}
-	if got, _, err := shares.List(ctx, recipient(), "received", 20); err != nil || len(got) != 1 || got[0].Share.ID != first.ID {
+	if got, _, _, err := shares.List(ctx, recipient(), "received", "", 20); err != nil || len(got) != 1 || got[0].Share.ID != first.ID {
 		t.Fatal("received list", err, got)
 	}
 	// Rows are immutable apart from one revocation, also for the runtime role.
@@ -260,7 +261,7 @@ func qualifyEvidenceShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool
 	if reads(recipient()) {
 		t.Fatal("expired share still readable")
 	}
-	if owned, _, err := shares.List(ctx, owner(), "owned", 20); err != nil || len(owned) != 2 || owned[0].Share.ID != short.ID || owned[0].Phase != authorization.ShareExpired || owned[1].Phase != authorization.ShareRevoked {
+	if owned, _, _, err := shares.List(ctx, owner(), "owned", "", 20); err != nil || len(owned) != 2 || owned[0].Share.ID != short.ID || owned[0].Phase != authorization.ShareExpired || owned[1].Phase != authorization.ShareRevoked {
 		t.Fatal("owned phases", err, owned)
 	}
 
@@ -272,13 +273,13 @@ func qualifyEvidenceShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool
 	}
 	team := create("share-team", user, time.Now().Add(time.Hour))
 	departed := as("synthetic-share-owner", nil, "evidence:read", authorization.ShareScope)
-	if owned, _, err := shares.List(ctx, departed, "owned", 20); err != nil || len(owned) != 3 || owned[0].Share.ID != team.ID || owned[0].Phase != authorization.ShareActive {
+	if owned, _, _, err := shares.List(ctx, departed, "owned", "", 20); err != nil || len(owned) != 3 || owned[0].Share.ID != team.ID || owned[0].Phase != authorization.ShareActive {
 		t.Fatal("creator departure changed the team share", err, owned)
 	}
 	if !reads(recipient()) {
 		t.Fatal("team share unreadable after the creator left the team")
 	}
-	if owned, _, err := shares.List(ctx, mate(), "owned", 20); err != nil || len(owned) != 1 || owned[0].Share.ID != team.ID || owned[0].Phase != authorization.ShareActive || owned[0].Share.Creator.Subject != "synthetic-share-owner" {
+	if owned, _, _, err := shares.List(ctx, mate(), "owned", "", 20); err != nil || len(owned) != 1 || owned[0].Share.ID != team.ID || owned[0].Phase != authorization.ShareActive || owned[0].Share.Creator.Subject != "synthetic-share-owner" {
 		t.Fatal("team member's managed view", err, owned)
 	}
 	if _, _, err := shares.Revoke(ctx, as("synthetic-stranger", []string{"maintainers"}, "evidence:read", authorization.ShareScope), sharing.RevokeInput{ShareID: team.ID, ExpectedRevision: 1, IdempotencyKey: "stranger"}); !errors.Is(err, capture.ErrDenied) {
@@ -290,7 +291,7 @@ func qualifyEvidenceShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool
 	if reads(recipient()) {
 		t.Fatal("team-revoked share still readable")
 	}
-	if owned, _, err := shares.List(ctx, mate(), "owned", 20); err != nil || len(owned) != 0 {
+	if owned, _, _, err := shares.List(ctx, mate(), "owned", "", 20); err != nil || len(owned) != 0 {
 		t.Fatal("revoked team share still listed for the member", err, owned)
 	}
 
@@ -425,7 +426,10 @@ func qualifyEvidenceShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool
 	changed.ObservedAt, changed.FreshUntil = now, now.Add(5*time.Second)
 	deny := cfg.PermissionBasis{Resource: cfg.Resource{Kind: "AccessBinding", UID: custodyID(), Generation: 1, ResourceVersion: "share-deny-1", SpecDigest: artifact.Digest{96}}, Scope: batch.Bases[0].Scope, Effect: "Deny", Subjects: []cfg.Subject{{Kind: "User", Issuer: issuer, ID: "synthetic-recipient"}}, Roles: []string{"evidence-reader"}}
 	deny.ScopeDigest = configapp.PermissionScopeDigest(deny)
-	changed.Bases = []cfg.PermissionBasis{batch.Bases[0], deny}
+	// A current Deny also removes one managing-group member's management.
+	managerDeny := cfg.PermissionBasis{Resource: cfg.Resource{Kind: "AccessBinding", UID: custodyID(), Generation: 1, ResourceVersion: "share-deny-manager-1", SpecDigest: artifact.Digest{95}}, Scope: batch.Bases[0].Scope, Effect: "Deny", Subjects: []cfg.Subject{{Kind: "User", Issuer: issuer, ID: "synthetic-denied-manager"}}, Roles: []string{"evidence-owner"}}
+	managerDeny.ScopeDigest = configapp.PermissionScopeDigest(managerDeny)
+	changed.Bases = []cfg.PermissionBasis{batch.Bases[0], deny, managerDeny}
 	_, err = s.p.AcceptPermissions(ctx, changed)
 	if err != nil {
 		t.Fatal(err)
@@ -461,13 +465,20 @@ func qualifyEvidenceShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool
 		}
 		return source
 	}
-	if owned, _, err := shares.List(ctx, sharer("synthetic-team-mate", []string{"other-owners"}), "owned", 20); err != nil || len(owned) == 0 || owned[0].Share.ID != group.ID || owned[0].Phase != authorization.ShareActive {
+	if owned, _, _, err := shares.List(ctx, sharer("synthetic-team-mate", []string{"other-owners"}), "owned", "", 20); err != nil || len(owned) == 0 || owned[0].Share.ID != group.ID || owned[0].Phase != authorization.ShareActive {
 		t.Fatal("managing group member does not list the share", err, owned)
+	}
+	denied := sharer("synthetic-denied-manager", []string{"other-owners"})
+	if owned, _, _, err := shares.List(ctx, denied, "owned", "", 20); err != nil || slices.ContainsFunc(owned, func(v sharing.View) bool { return v.Share.ID == group.ID }) {
+		t.Fatal("denied managing group member lists the share", err, owned)
+	}
+	if _, _, err := shares.Revoke(ctx, denied, sharing.RevokeInput{ShareID: group.ID, ExpectedRevision: group.Revision, IdempotencyKey: "denied-revoke"}); !errors.Is(err, capture.ErrDenied) {
+		t.Fatal("denied managing group member revoked the share", err)
 	}
 	if revoked, _, err := shares.Revoke(ctx, sharer("synthetic-team-mate", []string{"other-owners"}), sharing.RevokeInput{ShareID: group.ID, ExpectedRevision: group.Revision, IdempotencyKey: "team-revoke"}); err != nil || revoked.RevokedAt.IsZero() {
 		t.Fatal("managing group member could not revoke", err)
 	}
-	t.Log("evidence share: refusal without share, recipient-only read, concurrent revocation, expiry and deny qualified on real PostgreSQL; team management by group name survives owner-assignment loss; ADR-238: explicit management, transfer (not-held refused, replay, stale, trigger), administrator revoke without evidence rights")
+	t.Log("evidence share: refusal without share, recipient-only read, concurrent revocation, expiry and deny qualified on real PostgreSQL; team management by group name survives owner-assignment loss and a current Deny removes a member's management; ADR-238: explicit management, transfer (not-held refused, replay, stale, trigger), administrator revoke without evidence rights")
 }
 
 // shareAdministration is synthetic identity settings whose administrators

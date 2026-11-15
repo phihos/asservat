@@ -128,13 +128,13 @@ func TestShareTransfer(t *testing.T) {
 	if _, _, err := s.Revoke(ctx, f, RevokeInput{OperationID: testID(900), ShareID: share.ID, ExpectedRevision: 2, IdempotencyKey: "r-old"}); !errors.Is(err, capture.ErrDenied) {
 		t.Fatal("a member of the replaced team still manages", err)
 	}
-	if owned, _, _ := s.List(ctx, f, "owned", 20); len(owned) != 0 {
+	if owned, _, _, _ := s.List(ctx, f, "owned", "", 20); len(owned) != 0 {
 		t.Fatal("the replaced team still lists the share", owned)
 	}
 	recipient := creator
 	recipient.Principal.Subject, recipient.Groups = "reader", []string{"outsiders"}
 	f.i = recipient
-	if got, _, _ := s.List(ctx, f, "received", 20); len(got) != 1 {
+	if got, _, _, _ := s.List(ctx, f, "received", "", 20); len(got) != 1 {
 		t.Fatal("transferred share not received", got)
 	}
 }
