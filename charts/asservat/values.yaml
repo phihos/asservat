@@ -149,10 +149,6 @@ workloadKeys: {}
 # maxima, deletionBudgetSeconds). Set to render `<name>-baseline`.
 retention: {}
 
-# Public context execution also needs federation (former installer DTO
-# field names). No credentials belong here.
-# federation: {...}
-
 # Regional connector (mode=cluster or mode=combined).
 # mode=cluster: register the cluster in the hub's `clusters` values and copy
 # the hub's join Secret `<name>-join-<cluster>` unchanged into this release's

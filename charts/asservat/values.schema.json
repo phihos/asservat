@@ -503,7 +503,7 @@
       ]
     },
     "federation": {
-      "$ref": "#/definitions/installerFederation"
+      "description": "Removed; the chart fails with a pointer to ADR-334."
     },
     "region": {
       "type": "object",
@@ -1916,119 +1916,6 @@
         }
       },
       "description": "Bundled storage derives these public coordinates and roots. External storage requires all four fields."
-    },
-    "installerConnector": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "retainedSeconds": {
-          "type": "integer",
-          "minimum": 60,
-          "maximum": 316224000
-        },
-        "purgeLeases": {
-          "type": "integer",
-          "minimum": 2,
-          "maximum": 32
-        },
-        "footprint": {
-          "$ref": "#/definitions/installerFootprint"
-        }
-      },
-      "required": [
-        "retainedSeconds",
-        "purgeLeases",
-        "footprint"
-      ]
-    },
-    "installerFederation": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "endpoint": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 2048,
-          "pattern": "^https://[^/?#@]+/?$"
-        },
-        "serverName": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 253
-        },
-        "serviceType": {
-          "enum": [
-            "NodePort",
-            "LoadBalancer"
-          ]
-        },
-        "nodePort": {
-          "type": "integer",
-          "minimum": 30000,
-          "maximum": 32767
-        },
-        "ownerAddress": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 253
-        },
-        "ownerNodePort": {
-          "type": "integer",
-          "minimum": 30000,
-          "maximum": 32767
-        },
-        "ownerOperationAddress": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 253
-        },
-        "ownerOperationNodePort": {
-          "type": "integer",
-          "minimum": 30000,
-          "maximum": 32767
-        },
-        "keyServiceEndpoint": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 2048,
-          "pattern": "^https://[^/?#@]+/?$"
-        },
-        "keyServiceNodePort": {
-          "type": "integer",
-          "minimum": 30000,
-          "maximum": 32767
-        },
-        "evidenceStore": {
-          "$ref": "#/definitions/installerEvidenceStore"
-        },
-        "connector": {
-          "$ref": "#/definitions/installerConnector"
-        },
-        "fleet": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "channelMount": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128,
-              "pattern": "^[a-zA-Z0-9_-]+$"
-            },
-            "deliveryProfile": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128
-            }
-          },
-          "required": [
-            "channelMount",
-            "deliveryProfile"
-          ]
-        }
-      },
-      "required": [
-        "connector"
-      ]
     },
     "installerRetentionDurations": {
       "type": "object",

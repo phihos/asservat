@@ -39,8 +39,7 @@ func TestHubAPIRegionalOfferBuildAndPublishOnce(t *testing.T) {
 	if o, err := buildHubAPIRegionalOffer(ctx, root, h, ids, time.Now()); o != nil || err != nil {
 		t.Fatal("offer without the combined-mode section", err)
 	}
-	h.Public.RegionalOffer = &contracts.HubAPIRegionalOffer{Federation: "https://asservat-federation.hub.svc:9446", ServerName: "asservat-federation.hub.svc", Image: "registry.invalid/asservat@sha256:" + string(bytes.Repeat([]byte("a"), 64)),
-		Connector: contracts.InstallerConnectorSettings{RetainedSeconds: 4000, PurgeLeases: 2, Footprint: contracts.InstallerCapacityFootprint{RowBytes: 1 << 20, TransitionWALBytes: 1 << 20}}}
+	h.Public.RegionalOffer = &contracts.HubAPIRegionalOffer{Federation: "https://asservat-federation.hub.svc:9446", ServerName: "asservat-federation.hub.svc", Image: "registry.invalid/asservat@sha256:" + string(bytes.Repeat([]byte("a"), 64))}
 	if _, err := buildHubAPIRegionalOffer(ctx, files, h, ids, time.Now()); err == nil {
 		t.Fatal("offer without the federation CA")
 	}
@@ -95,8 +94,7 @@ func TestHubAPIRegionalOfferExecutorSection(t *testing.T) {
 	defer root.Close()
 	ids, _ := readHubAPIIDs(ctx, hubAPIIDsRoot(t, ""))
 	h := hubAPIConfigFixture()
-	h.Public.RegionalOffer = &contracts.HubAPIRegionalOffer{Federation: "https://asservat-federation.hub.svc:9446", ServerName: "asservat-federation.hub.svc", Image: "registry.invalid/asservat@sha256:" + string(bytes.Repeat([]byte("a"), 64)),
-		Connector: contracts.InstallerConnectorSettings{RetainedSeconds: 4000, PurgeLeases: 2, Footprint: contracts.InstallerCapacityFootprint{RowBytes: 1 << 20, TransitionWALBytes: 1 << 20}}}
+	h.Public.RegionalOffer = &contracts.HubAPIRegionalOffer{Federation: "https://asservat-federation.hub.svc:9446", ServerName: "asservat-federation.hub.svc", Image: "registry.invalid/asservat@sha256:" + string(bytes.Repeat([]byte("a"), 64))}
 	o, err := buildHubAPIRegionalOffer(ctx, root, h, ids, time.Now())
 	if err != nil {
 		t.Fatal(err)

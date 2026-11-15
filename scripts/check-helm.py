@@ -36,8 +36,6 @@ def hub_values():
         "origin": "https://asservat.example.org",
         "identity": {"issuer": "https://id.example.org/realms/org", "clientID": "asservat-console", "eligibleGroups": ["00000000-0000-4000-8000-000000000001"], "clientSecret": {"existingSecret": "operator-oidc"}, "providerRootsPEM": "PUBLIC-CA", "processingOperators": [{"clientID": "asservat-console", "issuer": "https://login.example.org/realms/asservat", "kind": "User", "id": "0f03f92a-6920-47cd-85d5-26080d3571d5"}]},
         "exposure": {"tlsSecret": "console-tls"},
-        # The regional offer's connector and backup limits (mode=combined).
-        "federation": {"connector": PROFILE["federation"]["connector"]},
         "capacity": PROFILE["capacity"],
         "services": {
             "postgres": {"external": {"host": "postgres.example", "port": 5432, "database": "asservat", "rootsPEM": "PUBLIC-CA", "adminSecret": "operator-postgres-admin"}},
@@ -331,7 +329,6 @@ def check_cluster_join(render):
     cluster = "50000000-0000-4000-8000-000000000001"
     remote = {"federation": "https://hub.example:31446", "owners": "hub.example:31444", "keyService": "https://hub.example:31448", "objectStore": "https://hub.example:31433"}
     v = bundled_values("hub")
-    v["federation"] = {"connector": dict(PROFILE["federation"]["connector"])}
     v.update({"clusters": [{"name": "eu", "clusterID": cluster, "issuer": "https://eu.example", "jwks": {"keys": [{"kty": "EC"}]}}], "remote": remote})
     docs = render(v)
     config = json.loads(named(docs, "ConfigMap", "asservat-hub-api-config")["data"]["config.json"])
@@ -364,14 +361,11 @@ def check_cluster_join(render):
     assert publisher["remoteClusters"] == [cluster]
     worker = json.loads(named(docs, "ConfigMap", "asservat-hub-worker-config")["data"]["config.json"])
     assert worker["capacity"]["remoteClusters"] == config["clusters"], worker["capacity"].get("remoteClusters")
-    # combined plus one cluster: ADR-332 has no install-time connector
-    # count, and an install-time count field is refused.
+    # combined plus one cluster.
     v2 = copy.deepcopy(v)
     v2["mode"] = "combined"
-    v2["federation"]["connector"]["profiles"] = 2
-    render(v2, ok=False)
     assert "fleet was removed; list administrators under identity.administrators" in render({**v, "fleet": {"groups": ["ops"]}}, ok=False)
-    del v2["federation"]["connector"]["profiles"]
+    assert "federation was removed" in render({**v, "federation": {"connector": {}}}, ok=False)
     render(v2)
     for bad in [{"remote": {}}, {"clusters": [{"name": "eu", "clusterID": "not-a-uuid"}]}, {"clusters": [{"name": "Bad", "clusterID": cluster}]}]:
         render({**v, **bad}, ok=False)

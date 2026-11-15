@@ -243,11 +243,6 @@ checksum/config: {{ $sum | sha256sum | quote }}
 {{/* Value checks shared by every template. */}}
 {{- define "asservat.validate" -}}
 {{- if not (has .Values.mode (list "hub" "cluster" "combined")) }}{{ fail "mode must be hub, cluster or combined" }}{{ end -}}
-{{- with dig "connector" nil (default dict .Values.federation) -}}
-{{- /* A 1800-second process run, two backup horizons, three cleanup budgets,
-     the proof window and a minute (contracts.CapacityBackup). */ -}}
-{{- if lt (int64 .retainedSeconds) 2102 }}{{ fail "federation.connector.retainedSeconds must be at least 2102" }}{{ end -}}
-{{- end -}}
 {{- $s := .Values.services -}}
 {{- if and (eq .Values.mode "cluster") (or (eq $s.postgres.provider "bundled") (eq $s.identity.provider "keycloak") (eq $s.objectStore.provider "seaweedfs") (eq $s.keyService.provider "openbao")) }}{{ fail "bundled hub services require mode hub or combined" }}{{ end -}}
 {{- if and (eq .Values.services.objectStore.provider "seaweedfs") .Values.secrets -}}

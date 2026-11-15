@@ -96,8 +96,7 @@
 {{- if eq .Values.exposure.tls.mode "proxy" }}{{ $_ := set $pub "proxyTLS" true }}{{ end -}}
 {{- if include "asservat.hubApi.offer" . -}}
 {{- $fed := include "asservat.fullname" (list . "federation") -}}
-{{- $connector := required "mode=combined and clusters require federation.connector (the regional offer's connector limits)" (dig "connector" nil (default dict .Values.federation)) -}}
-{{- $offer := dict "federation" (printf "https://%s.%s.svc:9446" $fed .Release.Namespace) "serverName" (printf "%s.%s.svc" $fed .Release.Namespace) "image" (include "asservat.image" .) "connector" $connector -}}
+{{- $offer := dict "federation" (printf "https://%s.%s.svc:9446" $fed .Release.Namespace) "serverName" (printf "%s.%s.svc" $fed .Release.Namespace) "image" (include "asservat.image" .) -}}
 {{- if not (include "asservat.hubApi.combined" .) }}{{ $_ := set $offer "hubOnly" true }}{{ end -}}
 {{- if .Values.clusters -}}
 {{- $r := .Values.remote -}}

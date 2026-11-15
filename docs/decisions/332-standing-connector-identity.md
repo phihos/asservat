@@ -10,6 +10,10 @@ backing of ADR-193. Resolves ADR-193's open risk "the connector backing's
 `ValidUntil` needs a renewal plan" by removing the expiry instead of renewing
 it.
 
+Superseded by [ADR-334](334-connector-workload-identity.md): connectors
+authenticate with ServiceAccount tokens, the connector identity backing is
+gone and the chart rejects the removed `federation.connector` values.
+
 ## Problem
 
 On a homelab installation (`mode: combined`, upgraded about four hours after

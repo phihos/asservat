@@ -11,13 +11,6 @@ identity:
   providerRootsPEM: PUBLIC-CA
   clientSecret:
     existingSecret: operator-oidc
-federation:
-  connector:
-    retainedSeconds: 4000
-    purgeLeases: 2
-    footprint:
-      rowBytes: 1048576
-      transitionWALBytes: 1048576
 capacity:
   evidenceStorage: 8Gi
   storageAssurance: qualifiedReservedBackend
