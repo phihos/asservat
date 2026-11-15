@@ -94,7 +94,7 @@ func qualifySourceSnapshotServicesMode(t *testing.T, mode sourceSnapshotQualific
 		})
 		sourceCeiling := int64(max(4, groupCount))
 		f.template.Policies[0].SourceResources = &capacity.SourceResourceLimits{Node: collector.PolicyLimits{SourceLimits: collector.SourceLimits{MaxActiveSources: sourceCeiling, InputBytesPerSecond: sourceCeiling << 20, InputBurstBytes: sourceCeiling << 20}}, Workload: collector.SourceLimits{MaxActiveSources: sourceCeiling, InputBytesPerSecond: sourceCeiling << 20, InputBurstBytes: sourceCeiling << 20}}
-		if _, err := f.producer.InitializeCapacity(ctx, f.input, f.protection); err != nil {
+		if _, err := f.initializeCapacity(ctx); err != nil {
 			t.Fatal(err)
 		}
 		f.open(t)

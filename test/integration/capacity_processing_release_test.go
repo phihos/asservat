@@ -36,7 +36,7 @@ func TestProcessingReleaseProfilesWithRealPostgres(t *testing.T) {
 			normal.Policy.BackupReservedBytes, normal.Policy.WALReservedBytes = b*normal.Policy.MetadataSlots, w*normal.Policy.MetadataSlots
 			f.qualification.RootBacking.Processing.RetainedSeconds = normal.RetainedSeconds + 1000
 		})
-		if _, err := f.producer.InitializeCapacity(ctx, f.input, f.protection); err != nil {
+		if _, err := f.initializeCapacity(ctx); err != nil {
 			t.Fatal("initialize original capacity", err)
 		}
 		f.open(t)
@@ -114,7 +114,7 @@ func TestProcessingReleaseProfilesWithRealPostgres(t *testing.T) {
 			}
 			return out
 		}
-		material := f.root.value.State.MAC
+		material := f.setup.mac
 		mac, err := auditapp.NewOperationMAC(material.InputVersion, material.InputKey, material.AccountVersion, material.AccountKey)
 		if err != nil {
 			t.Fatal(err)

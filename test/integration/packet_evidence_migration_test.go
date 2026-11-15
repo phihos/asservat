@@ -58,7 +58,7 @@ func qualifyPacketEvidenceMigration(t *testing.T, ctx context.Context, admin *pg
 	f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, func(f *capacitySQLFixture) {
 		configurePacketEvidenceLegacySource(f, scope.ClusterID, packetUnit)
 	})
-	if _, err := f.producer.InitializeCapacity(ctx, f.input, f.protection); err != nil {
+	if _, err := f.initializeCapacity(ctx); err != nil {
 		t.Fatal("capacity setup", err)
 	}
 	f.open(t)

@@ -256,3 +256,11 @@ func runtimeRoleGrantsExact(ctx context.Context, q publicRoleQuery, oid uint32, 
 	}
 	return nil
 }
+
+// publicRoleQuery is the read side of a connection or transaction.
+type publicRoleQuery interface {
+	QueryRow(context.Context, string, ...any) pgx.Row
+	Query(context.Context, string, ...any) (pgx.Rows, error)
+}
+
+func quoteSQLLiteral(s string) string { return "'" + strings.ReplaceAll(s, "'", "''") + "'" }

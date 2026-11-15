@@ -26,7 +26,7 @@ func (f *capacitySQLFixture) checkCapacityOwnerRegistry(t *testing.T) {
 	setup, stopSetup := context.WithTimeout(ctx, 30*time.Second)
 	defer stopSetup()
 	setupStarted := time.Now()
-	in := f.root.value.State.Input
+	in := f.setup.input
 	ca, key := connectorSQLCA(t)
 	c := value.OwnerConfiguration{Pool: value.OwnerPool{InstallationID: in.InstallationID, ClusterID: in.ClusterID, IssuerEpoch: f.administration.IssuerEpoch,
 		Namespace: in.Namespace.Name, NamespaceUID: in.Namespace.UID, Service: "synthetic-owner", ServiceUID: custodyID(), Deployment: "synthetic-owner", DeploymentUID: custodyID(), ServiceAccount: "synthetic-owner", AccountUID: custodyID(), Port: 9443, NativePort: 9444},

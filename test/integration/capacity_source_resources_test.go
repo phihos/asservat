@@ -29,7 +29,7 @@ func TestCapacitySourceResourcesWithRealPostgres(t *testing.T) {
 
 func qualifyCapacitySourceResourcesSQL(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects) {
 	f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects)
-	if _, err := f.producer.InitializeCapacity(ctx, f.input, f.protection); err != nil {
+	if _, err := f.initializeCapacity(ctx); err != nil {
 		t.Fatal("actual paired setup", err)
 	}
 	f.open(t)

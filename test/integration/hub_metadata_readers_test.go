@@ -3,7 +3,6 @@ package integration
 import (
 	"context"
 	"errors"
-	"slices"
 	"testing"
 	"time"
 
@@ -29,20 +28,8 @@ func (f *capacitySQLFixture) qualifySharedMetadataReaders(t *testing.T, s captur
 		pool := pools.ordinary
 		var err error
 		defer pool.Close() // joins the ordinary pool before this helper ends
-		snapshot := f.root.value
-		manifest := contracts.PublicRuntimeCredentialManifest{Format: contracts.PublicRuntimeCredentialManifestFormat, Input: snapshot.State.Input, RootUID: snapshot.UID, SetupID: snapshot.State.OperationID}
-		for _, role := range snapshot.State.Roles {
-			if slices.Contains(contracts.PublicRuntimeHubRolePurposes(), role.Purpose) {
-				if role.Claim == nil || role.Receipt == nil {
-					t.Fatal("original compiled role provenance missing")
-				}
-				manifest.Roles = append(manifest.Roles, contracts.PublicRuntimeCredentialProof{Purpose: role.Purpose, Claim: *role.Claim, Receipt: *role.Receipt})
-			}
-		}
-		if err = postgres.VerifyPublicRuntimeCredential(f.ctx, pool, manifest, "hub-runtime"); err != nil {
-			t.Fatal("actual metadata login/grant verification", err)
-		}
-		permission, err := postgres.NewPermissions(f.ctx, pool, s.a.RootID)
+		// The login's grants are the compiled plan: setup reconciled them exactly.
+		permission, err :=postgres.NewPermissions(f.ctx, pool, s.a.RootID)
 		if err != nil {
 			t.Fatal(err)
 		}

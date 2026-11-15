@@ -83,7 +83,7 @@ func TestShareMetadataSlotsWithRealServices(t *testing.T) {
 				}
 			}
 		})
-		if _, err := f.producer.InitializeCapacity(ctx, f.input, f.protection); err != nil {
+		if _, err := f.initializeCapacity(ctx); err != nil {
 			t.Fatal("initialize original capacity", err)
 		}
 		f.open(t)
@@ -219,7 +219,7 @@ func qualifyShareMetadataSlots(t *testing.T, f *capacitySQLFixture, s captureAdm
 	if err != nil {
 		t.Fatal(err)
 	}
-	material := f.root.value.State.MAC
+	material := f.setup.mac
 	mac, err := auditapp.NewOperationMAC(material.InputVersion, material.InputKey, material.AccountVersion, material.AccountKey)
 	if err != nil {
 		t.Fatal(err)

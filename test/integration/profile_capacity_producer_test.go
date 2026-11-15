@@ -57,7 +57,7 @@ func TestProfileCapacityProducerInputs(t *testing.T) {
 func TestProfileCapacityProducerWithRealPostgres(t *testing.T) {
 	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects) {
 		f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, func(f *capacitySQLFixture) { profileCapacityFixtureFunding(&f.qualification, &f.template) })
-		if _, err := f.producer.InitializeCapacity(ctx, f.input, f.protection); err != nil {
+		if _, err := f.initializeCapacity(ctx); err != nil {
 			t.Fatal("profile root setup", err)
 		}
 		f.open(t)
