@@ -514,7 +514,7 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("permission_stream", "UPDATE", "id")
 		add("retention_source", "UPDATE", "root_id")
 	case "download-plan":
-		read("download_allocation", "download_control_allocation", "download_native_backing", "download_stop_backing", "download_stop_pool", "fleet_current_trust")
+		read("download_allocation", "download_control_allocation", "download_native_backing", "fleet_current_trust")
 		add("fleet_current_trust", "UPDATE", "installation_id")
 	case "worker-config-read":
 		read("download_worker_configuration", "download_worker_configuration_revision", "fleet_current_trust")

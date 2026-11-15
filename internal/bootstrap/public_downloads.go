@@ -23,17 +23,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// publicStopLedger splits stop restriction and the stop-write claim across
-// their two logins, as migration 47 requires.
-type publicStopLedger struct{ stop, writer *postgres.DownloadStops }
-
-func (s publicStopLedger) StopDownload(ctx context.Context, i identity.Identity, id string, key artifact.Digest, request string) (evidence.DownloadStopSnapshot, error) {
-	return s.stop.StopDownload(ctx, i, id, key, request)
-}
-func (s publicStopLedger) ClaimDownloadStopWrite(ctx context.Context, d artifact.DownloadStopDecision) (bool, error) {
-	return s.writer.ClaimDownloadStopWrite(ctx, d)
-}
-
 // publicDownloads are the ADR-180 P4 services, composed after the owner
 // runtime because native attachments bind its actual Pod and process.
 type publicDownloads struct {
@@ -57,7 +46,7 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 	}
 	g := d.shared.retention
 	sql := map[string]*pgxpool.Pool{}
-	for _, purpose := range []string{"download-session", "download-source", "download-audit", "download-plan", "worker-config-read", "download-worker", "download-worker-audit", "worker-enrollment", "worker-enrollment-audit", "worker-enrollment-activate", "native-owner", "download-key-bind", "native-key-bind", "download-stop", "download-stop-writer", "download-stop-ack"} {
+	for _, purpose := range []string{"download-session", "download-source", "download-audit", "download-plan", "worker-config-read", "download-worker", "download-worker-audit", "worker-enrollment", "worker-enrollment-audit", "worker-enrollment-activate", "native-owner", "download-key-bind", "native-key-bind", "download-stop"} {
 		pool, err := d.public.open(ctx, purpose)
 		if err != nil {
 			return nil, &fixedStepError{"downloads/pool", err}
@@ -112,31 +101,11 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 	if err != nil {
 		return nil, &fixedStepError{"downloads/audits", mounts.ErrUnavailable}
 	}
-	stops, err := postgres.NewDownloadStops(ctx, sql["download-stop"], root, "")
+	stops, err := postgres.NewDownloadStops(ctx, sql["download-stop"], root)
 	if err != nil {
 		return nil, &fixedStepError{"downloads/stops", mounts.ErrUnavailable}
 	}
-	stopWriter, err := postgres.NewDownloadStops(ctx, sql["download-stop-writer"], root, installation)
-	if err != nil {
-		return nil, &fixedStepError{"downloads/stopWriter", mounts.ErrUnavailable}
-	}
-	stopAcks, err := postgres.NewDownloadStops(ctx, sql["download-stop-ack"], root, installation)
-	if err != nil {
-		return nil, &fixedStepError{"downloads/stopAcks", mounts.ErrUnavailable}
-	}
-	completions, err := postgres.NewDownloadStopLifecycles(ctx, sql["download-stop-writer"], root, installation)
-	if err != nil {
-		return nil, &fixedStepError{"downloads/completions", mounts.ErrUnavailable}
-	}
-	legacyStops, closedStops, err := a.stopObjects(p.AuditStoreID)
-	if err != nil {
-		return nil, &fixedStepError{"downloads/legacyStops", mounts.ErrUnavailable}
-	}
-	stopObjects, err := evidence.NewHealthyDownloadStopObjects(legacyStops, closedStops, completions)
-	if err != nil {
-		return nil, &fixedStepError{"downloads/stopObjects", mounts.ErrUnavailable}
-	}
-	stop := evidence.ContextDownloadStopCoordinator{Ledger: publicStopLedger{stops, stopWriter}, Acknowledgements: stopAcks, Objects: stopObjects, Now: time.Now}
+	stop := evidence.ContextDownloadStopCoordinator{Ledger: stops, Now: time.Now}
 	coordinator := evidence.ContextDownloadCoordinator{RootID: root, InstallationID: installation, Routes: sources, Sources: sources, Authority: gate, Sessions: downloads,
 		Refused: downloadRefusalReport(timedEventLog(os.Stderr, "download refused"), time.Now)}
 

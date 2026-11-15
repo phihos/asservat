@@ -20,15 +20,14 @@ func capacityProfileFixture() contracts.InstallerCapacitySettings {
 		return contracts.InstallerCapacityLane{Accounts: accounts, Records: records, RetainedSeconds: 10000}
 	}
 	return contracts.InstallerCapacitySettings{Accounts: 16, Records: 3, AdmissionSeconds: 60,
-		Lanes:               contracts.InstallerCapacityLanes{CaptureRetainedSeconds: 10000, Normal: lane(4, 7), Resolution: lane(4, 2), Processing: lane(2, 16)},
-		StopRetainedSeconds: 10000,
-		Backup:              contracts.InstallerCapacityBackup{HorizonSeconds: 3600, CleanupBudgetSeconds: 60, ProofWindowSeconds: 60, BackupCopies: 2, WALCopies: 3},
-		Footprints:          contracts.InstallerCapacityFootprints{Capture: f(128<<10, 256<<10), Operation: f(128<<10, 256<<10), Processing: f(128<<10, 256<<10), Native: f(64<<10, 128<<10), Stop: f(128<<10, 256<<10), ProcessingState: f(16<<10, 64<<10)},
-		PurgeLeases:         4,
-		Processing:          contracts.InstallerCapacityProcessing{MaxRules: 2, MaxRootTransitions: 8},
-		Metadata:            contracts.InstallerCapacityMetadata{FixedRowBytes: 1 << 20, AccountRowBytes: 256 << 10, RecordRowBytes: 128 << 10, RecordWALBytes: 8 << 20, RecordKeyAttempts: 16, TransitionWALBytes: 1 << 20, ConfigurationTransitions: 100},
-		Envelope:            contracts.InstallerCapacityEnvelope{SystemObjects: contracts.InstallerCapacityAmount{Bytes: 1 << 50, Objects: 1 << 50}, SQLBytes: 1 << 50, BackupBytes: 1 << 50, WALBytes: 1 << 50, KeyAttempts: 1 << 50},
-		Backends:            []contracts.InstallerCapacityBackend{{StorageProfile: "dedicated", Usable: contracts.InstallerCapacityAmount{Bytes: 1 << 50, Objects: 1000000000}}}}
+		Lanes:       contracts.InstallerCapacityLanes{CaptureRetainedSeconds: 10000, Normal: lane(4, 7), Resolution: lane(4, 2), Processing: lane(2, 16)},
+		Backup:      contracts.InstallerCapacityBackup{HorizonSeconds: 3600, CleanupBudgetSeconds: 60, ProofWindowSeconds: 60, BackupCopies: 2, WALCopies: 3},
+		Footprints:  contracts.InstallerCapacityFootprints{Capture: f(128<<10, 256<<10), Operation: f(128<<10, 256<<10), Processing: f(128<<10, 256<<10), Native: f(64<<10, 128<<10), ProcessingState: f(16<<10, 64<<10)},
+		PurgeLeases: 4,
+		Processing:  contracts.InstallerCapacityProcessing{MaxRules: 2, MaxRootTransitions: 8},
+		Metadata:    contracts.InstallerCapacityMetadata{FixedRowBytes: 1 << 20, AccountRowBytes: 256 << 10, RecordRowBytes: 128 << 10, RecordWALBytes: 8 << 20, RecordKeyAttempts: 16, TransitionWALBytes: 1 << 20, ConfigurationTransitions: 100},
+		Envelope:    contracts.InstallerCapacityEnvelope{SystemObjects: contracts.InstallerCapacityAmount{Bytes: 1 << 50, Objects: 1 << 50}, SQLBytes: 1 << 50, BackupBytes: 1 << 50, WALBytes: 1 << 50, KeyAttempts: 1 << 50},
+		Backends:    []contracts.InstallerCapacityBackend{{StorageProfile: "dedicated", Usable: contracts.InstallerCapacityAmount{Bytes: 1 << 50, Objects: 1000000000}}}}
 }
 
 func capacityDerivedFixture() capacityDerived {
@@ -53,7 +52,7 @@ func TestCapacityQualificationFromProfile(t *testing.T) {
 		t.Fatal(err)
 	}
 	in := q.RootBacking
-	if q.Backends[0].AuditStoreID != in.Capture.Policy.StoreID || in.Normal.Policy.StoreID != in.Capture.Policy.StoreID || in.ContextHistory.Stop.StoreID != in.Capture.Policy.StoreID ||
+	if q.Backends[0].AuditStoreID != in.Capture.Policy.StoreID || in.Normal.Policy.StoreID != in.Capture.Policy.StoreID ||
 		q.Backends[0].PoolUID != d.SystemPoolUID || in.Capture.Policy.MetadataSlots != 48 || !in.Capture.Policy.ValidUntil.Equal(d.Now.UTC().Truncate(time.Microsecond)) ||
 		*in.Capture.Policy.History != in.ContextHistory.Capture || in.RootID != d.Root {
 		t.Fatal("qualification lost a cross-field invariant", q)

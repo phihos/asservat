@@ -18,8 +18,8 @@ SELECT * FROM artifact_download WHERE id=$1 AND root_id=$2;
 SELECT * FROM artifact_download WHERE id=$1 AND root_id=$2 FOR UPDATE;
 
 -- name: InsertDownloadSession :one
-INSERT INTO artifact_download(id,root_id,allocation_id,artifact_id,principal_key,actor_key,idempotency_digest,request_digest,scope_json,deadline,output_limit,read_limit,stop_protocol)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,sqlc.narg(stop_protocol)) RETURNING *;
+INSERT INTO artifact_download(id,root_id,allocation_id,artifact_id,principal_key,actor_key,idempotency_digest,request_digest,scope_json,deadline,output_limit,read_limit)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *;
 
 -- name: UpdateDownloadSession :execrows
 UPDATE artifact_download SET state=$3,charged_output=$4,charged_read=$5,emitted_bytes=$6,generation=$7,active_batch=$8

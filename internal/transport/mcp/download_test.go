@@ -30,7 +30,7 @@ func (f *mcpDownloadFixture) CancelContextDownload(ctx context.Context, current 
 		return artifact.DownloadStopReceipt{}, e
 	}
 	f.stops.Add(1)
-	return artifact.DownloadStopReceipt{DownloadID: id, RequestID: request, State: "Cancelled", AuditState: "pending", ObservedAt: time.Now(), ValidUntil: i.ValidUntil}, nil
+	return artifact.DownloadStopReceipt{DownloadID: id, RequestID: request, State: "Cancelled", ObservedAt: time.Now(), ValidUntil: i.ValidUntil}, nil
 }
 func TestMCPStopWithoutEvidenceScopesSurvivesNormalExecutionSaturation(t *testing.T) {
 	for _, version := range []string{"2025-11-25", "2026-07-28"} {

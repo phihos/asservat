@@ -7,8 +7,6 @@ import (
 	"asservat.local/asservat/internal/adapters/mounts"
 	"asservat.local/asservat/internal/adapters/objectstore"
 	auditapp "asservat.local/asservat/internal/application/audit"
-	"asservat.local/asservat/internal/application/evidence"
-	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
 )
@@ -20,8 +18,6 @@ var _ auditapp.DownloadWorkerWriter = (*installedOperationAudit)(nil)
 var _ auditapp.WorkerEnrollmentWriter = (*installedOperationAudit)(nil)
 var _ auditapp.DownloadWriter = (*installedOperationAudit)(nil)
 var _ auditapp.DownloadWindowObjects = (*installedOperationAudit)(nil)
-var _ evidence.DownloadStopObjects = (*installedOperationAudit)(nil)
-var _ evidence.ClosedDownloadStopObjects = (*installedOperationAudit)(nil)
 
 func (s *installedOperationAudit) WriteDownloadWorkerIntent(ctx context.Context, r authorization.DownloadWorkerIntent) (audit.Receipt, error) {
 	if !r.Valid() {
@@ -61,40 +57,6 @@ func (s *installedOperationAudit) WriteDownloadOutcome(ctx context.Context, r au
 	}
 	return withInstalledAudit(ctx, s, time.Now().Add(5*time.Second), func(call context.Context, store *objectstore.Store) (audit.Receipt, error) {
 		return (&objectstore.DownloadAuditObjects{Store: store, Seal: s.seal, Open: s.open}).WriteDownloadOutcome(call, r)
-	})
-}
-func (s *installedOperationAudit) stop(ctx context.Context, r artifact.DownloadStopDecision, create bool) (audit.Receipt, error) {
-	if s == nil || !r.Valid() || r.StoreID != s.storeID {
-		return audit.Receipt{}, mounts.ErrUnavailable
-	}
-	until := r.RetainUntil
-	if create {
-		until = r.WriteUntil
-	}
-	return withInstalledAudit(ctx, s, until, func(call context.Context, store *objectstore.Store) (audit.Receipt, error) {
-		writer := &objectstore.DownloadStopObjects{Store: store, Seal: s.seal, Open: s.open, StoreID: s.storeID}
-		if create {
-			return writer.CreateDownloadStop(call, r)
-		}
-		return writer.FindDownloadStop(call, r)
-	})
-}
-func (s *installedOperationAudit) CreateDownloadStop(ctx context.Context, r artifact.DownloadStopDecision) (audit.Receipt, error) {
-	return s.stop(ctx, r, true)
-}
-func (s *installedOperationAudit) FindDownloadStop(ctx context.Context, r artifact.DownloadStopDecision) (audit.Receipt, error) {
-	return s.stop(ctx, r, false)
-}
-func (s *installedOperationAudit) CreateClosedDownloadStop(ctx context.Context, b audit.DownloadStopLifecycleBinding, r artifact.DownloadStopDecision) (audit.DownloadStopWriteCompletion, error) {
-	if s == nil || !r.Valid() || r.StoreID != s.storeID || !b.Valid() {
-		return audit.DownloadStopWriteCompletion{}, mounts.ErrUnavailable
-	}
-	return withInstalledAudit(ctx, s, r.WriteUntil, func(call context.Context, store *objectstore.Store) (audit.DownloadStopWriteCompletion, error) {
-		writer, e := objectstore.NewClosedDownloadStopObjects(store, s.storeID, s.seal, s.open)
-		if e != nil {
-			return audit.DownloadStopWriteCompletion{}, e
-		}
-		return writer.CreateClosedDownloadStop(call, b, r)
 	})
 }
 func (s *installedOperationAudit) window(ctx context.Context, i audit.DownloadWindowIntent, o *audit.DownloadWindowAuditOutcome, create bool) (audit.DownloadWindowWriteResult, error) {
@@ -154,21 +116,6 @@ func (a publicAuditStore) downloadObjects() auditapp.DownloadWriter {
 		return a.operation
 	}
 	return &objectstore.DownloadAuditObjects{Store: a.store, Seal: a.seal, Open: a.open}
-}
-func (a publicAuditStore) stopObjects(id string) (evidence.DownloadStopObjects, evidence.ClosedDownloadStopObjects, error) {
-	if !authorization.UUID(id) {
-		return nil, nil, mounts.ErrUnavailable
-	}
-	if a.operation != nil {
-		s := *a.operation
-		s.storeID = id
-		return &s, &s, nil
-	}
-	closed, e := objectstore.NewClosedDownloadStopObjects(a.store, id, a.seal, a.open)
-	if e != nil {
-		return nil, nil, e
-	}
-	return &objectstore.DownloadStopObjects{Store: a.store, Seal: a.seal, Open: a.open, StoreID: id}, closed, nil
 }
 func (a publicAuditStore) windowObjects(id string) (auditapp.DownloadWindowObjects, error) {
 	if !authorization.UUID(id) {

@@ -192,7 +192,7 @@ func composePublicContextUseCases(c PublicContextOperationsConfig, s PublicConte
 		!regionalHubRunner(s.Regional.Runner) || s.Regional.Router == nil ||
 		p.Reader == nil || p.Navigation != nil || k.Routes == nil || k.Permissions == nil || k.Catalog == nil || k.Retention == nil || k.Processing == nil ||
 		d.Routes == nil || d.Sources == nil || d.Authority == nil || d.Sessions == nil || d.Plans == nil || d.Runtime != nil ||
-		s.Native.Runtime == nil && s.Native.Stop.Active != nil || s.Native.Runtime != nil && s.Native.Stop.Active != s.Native.Runtime || s.Native.Stop.Ledger == nil || s.Native.Stop.Acknowledgements == nil || s.Native.Stop.Objects == nil {
+		s.Native.Runtime == nil && s.Native.Stop.Active != nil || s.Native.Runtime != nil && s.Native.Stop.Active != s.Native.Runtime || s.Native.Stop.Ledger == nil {
 		return zero, presentation.ErrOperationsConfiguration
 	}
 	i.RecordingSaveEnabled = packetSourceCompositionReady(c, s)

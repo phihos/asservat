@@ -71,7 +71,7 @@ func readNativeResumeAccounting(t *testing.T, ctx context.Context, f nativeExcha
 }
 func requireNativeResumeOriginal(t *testing.T, original, next artifact.DownloadSession) {
 	t.Helper()
-	if next.ID != original.ID || next.AllocationID != original.AllocationID || next.Scope != original.Scope || next.RequestDigest != original.RequestDigest || next.StopProtocol != original.StopProtocol || !next.CreatedAt.Equal(original.CreatedAt) || !next.Deadline.Equal(original.Deadline) || next.OutputLimit != original.OutputLimit || next.ReadLimit != original.ReadLimit {
+	if next.ID != original.ID || next.AllocationID != original.AllocationID || next.Scope != original.Scope || next.RequestDigest != original.RequestDigest || !next.CreatedAt.Equal(original.CreatedAt) || !next.Deadline.Equal(original.Deadline) || next.OutputLimit != original.OutputLimit || next.ReadLimit != original.ReadLimit {
 		t.Fatal("range resumed with a changed original session, artifact/version or budget")
 	}
 }

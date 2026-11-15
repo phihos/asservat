@@ -27,8 +27,6 @@ type installedAuditRecords struct {
 	certificate audit.WorkerCertificate
 	download    audit.DownloadIntent
 	window      audit.DownloadWindowIntent
-	stop        artifact.DownloadStopDecision
-	stopBinding audit.DownloadStopLifecycleBinding
 }
 
 func providerAuditRecords(t *testing.T) installedAuditRecords {
@@ -56,23 +54,16 @@ func providerAuditRecords(t *testing.T) installedAuditRecords {
 	download := audit.DownloadIntent{SessionID: id, Batch: artifact.DownloadBatch{ID: id, Generation: 1, Purpose: artifact.DownloadMetadata, ReadBytes: 4096, StartedAt: now, LeaseUntil: now.Add(time.Second), Authority: authority}}
 	response := artifact.DownloadResponse{ID: id, SessionID: id, OwnerID: id, Generation: 2, Plan: artifact.DownloadResponsePlan{Version: 1, Selection: artifact.DownloadSelection{Length: 100}, WholeFile: true, WindowReadLimit: 1024}, StartedAt: now, Until: now.Add(time.Minute), WindowCount: 1, ActiveWindowID: id}
 	window := audit.DownloadWindowIntent{Response: response, Window: artifact.DownloadWindow{ID: id, ResponseID: id, SessionID: id, OwnerID: id, AuditStoreID: id, Generation: 2, Ordinal: 1, Length: 100, ReadLimit: 1024, StartedAt: now, WriteUntil: now.Add(2 * time.Minute), Authority: authority}}
-	stop := artifact.DownloadStopDecision{Protocol: artifact.DownloadStopProtocol, RootID: id, DownloadID: id, RequestID: id, StoreID: id, Actor: principal, KeyDigest: artifact.Digest{3}, State: "Cancelled", RequestedAt: now, WriteUntil: now.Add(30 * time.Second), RetainUntil: now.Add(time.Hour)}
-	policy := audit.DownloadStopLifecyclePolicy{RootID: id, InstallationID: id, StoreID: id, PolicyID: id, BackupProfileID: id, QualificationID: id, PolicyDigest: artifact.Digest{1}, BackupProfileDigest: artifact.Digest{2}, QualificationDigest: artifact.Digest{3}, Layout: audit.DownloadStopHistoryLayout, CleanupBudgetSeconds: 60, ProofWindowSeconds: 60, MaximumRowFootprintBytes: 128 << 10, MaximumTransitionWALBytes: 128 << 10, BackupCopies: 1, WALCopies: 1, MaxPurgeLeases: 4}
-	d := stop.RetainUntil
-	stopBinding := audit.DownloadStopLifecycleBinding{Protocol: audit.DownloadStopWriterProtocol, RootID: id, DownloadID: id, AllocationID: id, IssuerEpoch: id, Policy: policy, ReservedAt: now, TransferUntil: now.Add(time.Minute), HardDeleteBy: d, OriginalPurgeAt: d.Add(-4 * time.Minute), CertificatePurgeAt: d.Add(-2 * time.Minute), LiveRetireBy: d.Add(-time.Minute), HistoryReleaseAt: d.Add(-time.Minute), HistoryDeleteBy: d}
-	if !worker.Valid() || !enrollment.Valid() || !certificate.Valid() || !download.Valid() || !window.Valid() || !stop.Valid() || !stopBinding.Valid() {
+	if !worker.Valid() || !enrollment.Valid() || !certificate.Valid() || !download.Valid() || !window.Valid() {
 		t.Fatal("invalid synthetic audit records")
 	}
-	return installedAuditRecords{worker, enrollment, certificate, download, window, stop, stopBinding}
+	return installedAuditRecords{worker, enrollment, certificate, download, window}
 }
 
 func TestInstalledProviderAuditFamiliesOwnCredentialAndJoinedIO(t *testing.T) {
-	for _, purpose := range []string{"dispatch", "enrollment", "certificate", "download-intent", "download-outcome", "window-intent", "window-outcome", "stop", "closed-stop"} {
-		for _, mode := range []string{"success", "blocked-put", "blocked-get", "blocked-body", "blocked-open", "blocked-original-write", "lookup", "lookup-after-write"} {
-			if (mode == "lookup" || mode == "lookup-after-write" || mode == "blocked-original-write") && !strings.HasPrefix(purpose, "window-") && purpose != "stop" && purpose != "closed-stop" {
-				continue
-			}
-			if mode == "lookup-after-write" && strings.HasPrefix(purpose, "window-") {
+	for _, purpose := range []string{"dispatch", "enrollment", "certificate", "download-intent", "download-outcome", "window-intent", "window-outcome"} {
+		for _, mode := range []string{"success", "blocked-put", "blocked-get", "blocked-body", "blocked-open", "blocked-original-write", "lookup"} {
+			if (mode == "lookup" || mode == "blocked-original-write") && !strings.HasPrefix(purpose, "window-") {
 				continue
 			}
 			t.Run(purpose+"/"+mode, func(t *testing.T) {
@@ -80,10 +71,6 @@ func TestInstalledProviderAuditFamiliesOwnCredentialAndJoinedIO(t *testing.T) {
 				if mode == "blocked-original-write" {
 					until := time.Now().Add(100 * time.Millisecond).UTC().Truncate(time.Microsecond)
 					records.window.Window.WriteUntil = until
-					records.stop.WriteUntil = until
-				}
-				if mode == "lookup-after-write" {
-					records.stop.WriteUntil = time.Now().Add(75 * time.Millisecond).UTC().Truncate(time.Microsecond)
 				}
 				var puts, gets atomic.Int32
 				var cipher []byte
@@ -129,36 +116,29 @@ func TestInstalledProviderAuditFamiliesOwnCredentialAndJoinedIO(t *testing.T) {
 				}
 				keys := &operationAuditKeys{a: a, waitOpen: mode == "blocked-open"}
 				creds := &operationCredentialFixture{until: time.Now().Add(2 * time.Second)}
-				if mode != "success" && mode != "blocked-original-write" && mode != "lookup" && mode != "lookup-after-write" {
+				if mode != "success" && mode != "blocked-original-write" && mode != "lookup" {
 					creds.until = time.Now().Add(100 * time.Millisecond)
 				}
 				var in contracts.OwnerDeployment
 				in.AuditStore = contracts.OwnerAuditStore{Endpoint: server.URL, Region: "us-east-1", Bucket: "synthetic"}
-				s := &installedOperationAudit{input: in, providers: creds, http: server.Client(), seal: keys, open: keys, storeID: records.stop.StoreID, slots: make(chan struct{}, 1)}
+				s := &installedOperationAudit{input: in, providers: creds, http: server.Client(), seal: keys, open: keys, storeID: records.window.Window.AuditStoreID, slots: make(chan struct{}, 1)}
 				layout := publicAuditStore{operation: s} // No shared static/dynamic store exists in this layout.
 				ctx, cancel := context.WithTimeout(context.Background(), 700*time.Millisecond)
 				defer cancel()
 				start := time.Now()
 				var receipt audit.Receipt
 				var original audit.Receipt
-				lookup := mode == "lookup" || mode == "lookup-after-write"
+				lookup := mode == "lookup"
 				if lookup {
-					if strings.HasPrefix(purpose, "window-") {
-						var r audit.DownloadWindowWriteResult
-						if purpose == "window-intent" {
-							r, e = s.CreateDownloadWindowIntent(ctx, records.window)
-						} else {
-							r, e = s.CreateDownloadWindowOutcome(ctx, audit.DownloadWindowAuditOutcome{Intent: records.window, Outcome: artifact.DownloadWindowOutcome{EmittedBytes: 100, Success: true, VerifiedFinal: true, RecordedAt: records.window.Window.StartedAt}})
-						}
-						original = r.Receipt
+					var r audit.DownloadWindowWriteResult
+					if purpose == "window-intent" {
+						r, e = s.CreateDownloadWindowIntent(ctx, records.window)
 					} else {
-						original, e = s.CreateDownloadStop(ctx, records.stop)
+						r, e = s.CreateDownloadWindowOutcome(ctx, audit.DownloadWindowAuditOutcome{Intent: records.window, Outcome: artifact.DownloadWindowOutcome{EmittedBytes: 100, Success: true, VerifiedFinal: true, RecordedAt: records.window.Window.StartedAt}})
 					}
+					original = r.Receipt
 					if e != nil {
 						t.Fatal("could not prepare immutable lookup fixture", e)
-					}
-					if mode == "lookup-after-write" {
-						time.Sleep(time.Until(records.stop.WriteUntil) + 5*time.Millisecond)
 					}
 					puts.Store(0)
 					gets.Store(0)
@@ -196,21 +176,6 @@ func TestInstalledProviderAuditFamiliesOwnCredentialAndJoinedIO(t *testing.T) {
 						result, e = writer.CreateDownloadWindowOutcome(ctx, audit.DownloadWindowAuditOutcome{Intent: records.window, Outcome: artifact.DownloadWindowOutcome{EmittedBytes: 100, Success: true, VerifiedFinal: true, RecordedAt: records.window.Window.StartedAt}})
 					}
 					receipt, completed = result.Receipt, result.Completion != nil
-				case "stop", "closed-stop":
-					legacy, closed, err := layout.stopObjects(s.storeID)
-					if err != nil {
-						t.Fatal(err)
-					}
-					if lookup {
-						receipt, e = legacy.FindDownloadStop(ctx, records.stop)
-					} else if purpose == "stop" {
-						receipt, e = legacy.CreateDownloadStop(ctx, records.stop)
-					} else {
-						var result audit.DownloadStopWriteCompletion
-						result, e = closed.CreateClosedDownloadStop(ctx, records.stopBinding, records.stop)
-						receipt = result.Receipt
-						completed = result.Valid(records.stopBinding, "decision", records.stop.RequestedAt, records.stop.WriteUntil)
-					}
 				}
 				if lookup {
 					if e != nil || receipt != original || completed || puts.Load() != 0 || gets.Load() != 1 || keys.wraps != 0 || keys.unwraps != 1 {
@@ -220,7 +185,7 @@ func TestInstalledProviderAuditFamiliesOwnCredentialAndJoinedIO(t *testing.T) {
 					if e != nil || receipt.Bytes == 0 || puts.Load() != 1 || gets.Load() != 1 || keys.wraps != 1 || keys.unwraps != 1 {
 						t.Fatal("complete exact audit operation missing", e, puts.Load(), gets.Load(), keys.wraps, keys.unwraps)
 					}
-					if (strings.HasPrefix(purpose, "window-") || purpose == "closed-stop") && !completed {
+					if strings.HasPrefix(purpose, "window-") && !completed {
 						t.Fatal("joined completion missing")
 					}
 				} else {

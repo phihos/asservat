@@ -5,18 +5,17 @@ package contracts
 // values (ADR-335 D2): the hub-worker derives them, and the operator sets
 // only the `capacity` values (CapacityValues).
 type InstallerCapacitySettings struct {
-	Accounts            int64                       `json:"accounts"`
-	Records             int64                       `json:"recordsPerAccount"`
-	AdmissionSeconds    int64                       `json:"admissionSeconds"`
-	Lanes               InstallerCapacityLanes      `json:"lanes"`
-	StopRetainedSeconds int64                       `json:"stopRetainedSeconds"`
-	Backup              InstallerCapacityBackup     `json:"backup"`
-	Footprints          InstallerCapacityFootprints `json:"footprints"`
-	PurgeLeases         int64                       `json:"purgeLeases"`
-	Processing          InstallerCapacityProcessing `json:"processing"`
-	Metadata            InstallerCapacityMetadata   `json:"metadata"`
-	Envelope            InstallerCapacityEnvelope   `json:"envelope"`
-	Backends            []InstallerCapacityBackend  `json:"backends"`
+	Accounts         int64                       `json:"accounts"`
+	Records          int64                       `json:"recordsPerAccount"`
+	AdmissionSeconds int64                       `json:"admissionSeconds"`
+	Lanes            InstallerCapacityLanes      `json:"lanes"`
+	Backup           InstallerCapacityBackup     `json:"backup"`
+	Footprints       InstallerCapacityFootprints `json:"footprints"`
+	PurgeLeases      int64                       `json:"purgeLeases"`
+	Processing       InstallerCapacityProcessing `json:"processing"`
+	Metadata         InstallerCapacityMetadata   `json:"metadata"`
+	Envelope         InstallerCapacityEnvelope   `json:"envelope"`
+	Backends         []InstallerCapacityBackend  `json:"backends"`
 }
 
 type InstallerCapacityLane struct {
@@ -52,7 +51,6 @@ type InstallerCapacityFootprints struct {
 	Operation  InstallerCapacityFootprint `json:"operation"`
 	Processing InstallerCapacityFootprint `json:"processing"`
 	Native     InstallerCapacityFootprint `json:"native"`
-	Stop       InstallerCapacityFootprint `json:"stop"`
 	// ProcessingState is the processing root history (at least 16 KiB rows),
 	// distinct from the processing release audit lane above.
 	ProcessingState InstallerCapacityFootprint `json:"processingState"`

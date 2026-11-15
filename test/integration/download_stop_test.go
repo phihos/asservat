@@ -7,8 +7,6 @@ import (
 	"testing"
 	"time"
 
-	auditapp "asservat.local/asservat/internal/application/audit"
-	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/identity"
 
 	"asservat.local/asservat/internal/adapters/objectstore"
@@ -26,7 +24,7 @@ import (
 // No public native-work channel, regional cache or download endpoint is faked.
 func qualifyDownloadStop(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, create func(*testing.T) (captureAdmissionScenario, artifact.PublishedContext)) {
 	t.Helper()
-	t.Run("prepaid-download-stop-no-read-and-original-replay", func(t *testing.T) {
+	t.Run("download-stop-audit-row-and-original-replay", func(t *testing.T) {
 		scenario, published := create(t)
 		e := published.Expectation
 		root := scenario.a.RootID
@@ -81,28 +79,11 @@ func qualifyDownloadStop(t *testing.T, ctx context.Context, admin *pgxpool.Pool,
 		if err = config.BindDownloadAllocation(ctx, allocation); err != nil {
 			t.Fatal(err)
 		}
-		request := evidence.DownloadReservation{Authority: a, IdempotencyDigest: evidence.ContextDownloadKeyDigest("stop-fixture"), Session: artifact.DownloadSession{ID: custodyID(), AllocationID: allocation.ID, Scope: scope, RequestDigest: evidence.ContextDownloadRequestDigest(scope.ArtifactID), State: artifact.DownloadPreparing, StopProtocol: artifact.DownloadStopProtocol, CreatedAt: time.Now().UTC(), Deadline: time.Now().UTC().Add(20 * time.Second).Truncate(time.Microsecond), OutputLimit: 8192, ReadLimit: 16 << 20}}
-		if _, err = ledger.ReserveDownload(ctx, request); err == nil {
-			t.Fatal("admitted without prepaid stop backing")
-		}
-		var sessions, charged int64
-		if err = admin.QueryRow(ctx, "SELECT count(*) FROM artifact_download WHERE allocation_id=$1", allocation.ID).Scan(&sessions); err != nil || sessions != 0 {
-			t.Fatal("failed admission left session", sessions, err)
-		}
-		if err = admin.QueryRow(ctx, "SELECT reserved_output FROM download_allocation WHERE id=$1", allocation.ID).Scan(&charged); err != nil || charged != 0 {
-			t.Fatal("failed admission charged allocation", charged, err)
-		}
-		now := time.Now().UTC().Truncate(time.Microsecond)
-		backing := artifact.DownloadStopBacking{AllocationID: allocation.ID, RootID: root, InstallationID: scenario.recovery.installation, StoreID: e.Registration.StoreID, PolicyID: custodyID(), BackupProfileID: custodyID(), PolicyDigest: artifact.Digest{1}, BackupProfileDigest: artifact.Digest{2}, Slots: 4, AllocationSlots: 4, CipherBytes: 4 * artifact.DownloadStopCipherLimit, KeyAttempts: 24, BackupBytes: 4 * 131072, WALBytes: 4 * 1048576, RetainedSeconds: 3600, BackupHorizonSeconds: 60, ObservedAt: now, ValidUntil: now.Add(time.Minute)}
-		// Synthetic accepted policy/backing; physical backup/retirement qualification
-		// is deliberately outside this SQL/S3 admission and restriction fixture.
-		if err = config.BindDownloadStopBacking(ctx, backing); err != nil {
-			t.Fatal("stop backing", err)
-		}
+		request := evidence.DownloadReservation{Authority: a, IdempotencyDigest: evidence.ContextDownloadKeyDigest("stop-fixture"), Session: artifact.DownloadSession{ID: custodyID(), AllocationID: allocation.ID, Scope: scope, RequestDigest: evidence.ContextDownloadRequestDigest(scope.ArtifactID), State: artifact.DownloadPreparing, CreatedAt: time.Now().UTC(), Deadline: time.Now().UTC().Add(20 * time.Second).Truncate(time.Microsecond), OutputLimit: 8192, ReadLimit: 16 << 20}}
 		request.Authority = current()
 		session, err := ledger.ReserveDownload(ctx, request)
-		if err != nil || session.StopProtocol != artifact.DownloadStopProtocol {
-			t.Fatal("backed admission", err)
+		if err != nil {
+			t.Fatal("admission", err)
 		}
 		// An admitted but not yet audited acquisition is uncertain work. Stop
 		// must fence it without refunding its read charge or replacing its ID.
@@ -116,70 +97,19 @@ func qualifyDownloadStop(t *testing.T, ctx context.Context, admin *pgxpool.Pool,
 		}
 		stopPool := poolFor("download_stop_runtime", "synthetic-download-stop")
 		defer stopPool.Close()
-		writerPool := poolFor("download_stop_writer_runtime", "synthetic-download-stop-writer")
-		defer writerPool.Close()
-		ackPool := poolFor("download_stop_ack_runtime", "synthetic-download-stop-ack")
-		defer ackPool.Close()
-		stops, err := postgres.NewDownloadStops(ctx, stopPool, root, "")
+		stops, err := postgres.NewDownloadStops(ctx, stopPool, root)
 		if err != nil {
 			t.Fatal(err)
 		}
-		writer, err := postgres.NewDownloadStops(ctx, writerPool, root, scenario.recovery.installation)
-		if err != nil {
-			t.Fatal(err)
-		}
-		stopAck, err := postgres.NewDownloadStops(ctx, ackPool, root, scenario.recovery.installation)
-		if err != nil {
-			t.Fatal(err)
-		}
-		// Exhaust the real normal audit account before stopping. No new normal
-		// operation admission can succeed, while prepaid Stop stays available.
-		auditConfigPool := poolFor("operation_audit_config_runtime", "synthetic-operation-config")
-		auditJournalPool := poolFor("operation_audit_runtime", "synthetic-operation-journal")
-		func() {
-			defer auditConfigPool.Close()
-			defer auditJournalPool.Close()
-			auditConfig, err := postgres.New(ctx, auditConfigPool)
-			if err != nil {
-				t.Fatal(err)
-			}
-			now := time.Now().UTC().Truncate(time.Microsecond)
-			// Processing is initialized at root creation and charges no audit
-			// record (#269). Accept a bounded pool revision with one account and
-			// one record, then occupy that record with one actual operation.
-			var revision int64
-			var validUntil time.Time
-			if err = admin.QueryRow(ctx, "SELECT revision,valid_until FROM operation_audit_pool WHERE root_id=$1 AND lane='normal'", root).Scan(&revision, &validUntil); err != nil {
-				t.Fatal(err)
-			}
-			if err = auditConfig.ProvisionOperationAuditPool(ctx, auditapp.OperationAuditPool{RootID: root, Lane: "normal", AccountVersion: "accounts-v1", ExpectedRevision: revision, Accounts: 1, RecordsPerAccount: 1, RetainedSeconds: 3600, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), ValidUntil: validUntil}); err != nil {
-				t.Fatal(err)
-			}
-			journal, err := postgres.NewOperationJournal(ctx, auditJournalPool, root, "normal", scenario.recovery.installation)
-			if err != nil {
-				t.Fatal(err)
-			}
-			newIntent := func() audit.OperationIntent {
-				id := custodyID()
-				return audit.OperationIntent{ID: id, TraceID: id, RootID: root, Name: "get_artifact_download", InputFormat: "context-input/v1", MACVersion: "stop-test", AccountVersion: "accounts-v1", Actor: scope.Principal, PrincipalDigest: artifact.Digest{1}, InputDigest: artifact.Digest{2}, CreatedAt: now, RequestUntil: now.Add(5 * time.Second), WriteUntil: now.Add(30 * time.Second), RetainUntil: now.Add(time.Hour)}
-			}
-			if _, err = journal.ReserveOperation(ctx, newIntent()); err != nil {
-				t.Fatal("occupy the single normal audit record", err)
-			}
-			intent := newIntent()
-			if _, err = journal.ReserveOperation(ctx, intent); err == nil {
-				t.Fatal("normal audit pool did not exhaust")
-			}
-		}()
 		actor := scenario.a.Eligibility.VerifiedIdentity
 		actor.Scopes = []string{"openid"}
 		actor.VerifiedAt = time.Now()
 		actor.ValidUntil = actor.VerifiedAt.Add(5 * time.Second)
 		currentActor := stopNativeIdentity{actor}
-		service := evidence.ContextDownloadStopCoordinator{Ledger: stopNativeLedger{stops, writer}, Acknowledgements: stopAck, Objects: &objectstore.DownloadStopObjects{Store: store, Seal: keys, Open: keys, StoreID: e.Registration.StoreID}, Now: time.Now}
+		service := evidence.ContextDownloadStopCoordinator{Ledger: stops, Now: time.Now}
 		requestID := custodyID()
 		receipt, err := service.CancelContextDownload(ctx, currentActor, session.ID, "original-stop", requestID)
-		if err != nil || receipt.State != "Cancelled" || receipt.AuditState != "recorded" {
+		if err != nil || receipt.State != "Cancelled" {
 			t.Fatal("scope-independent audited stop", receipt, err)
 		}
 		again, err := service.CancelContextDownload(ctx, currentActor, session.ID, "original-stop", custodyID())
@@ -204,11 +134,16 @@ func qualifyDownloadStop(t *testing.T, ctx context.Context, admin *pgxpool.Pool,
 		if _, err = ledger.FinishDownloadBatch(ctx, session.ID, batchIntent.Batch.ID, batchIntent.Batch.Generation, 0, false, false); err != nil {
 			t.Fatal("historical joined acquisition outcome blocked", err)
 		}
-		var writes, lookups int64
-		if err = admin.QueryRow(ctx, "SELECT write_started::int,lookup_attempts FROM download_stop WHERE download_id=$1", session.ID).Scan(&writes, &lookups); err != nil || writes != 1 || lookups != 0 {
-			t.Fatal("replay repeated audit", writes, lookups, err)
+		// ADR-330 D6: one audit row, written with the stop; replays add none.
+		var rows int64
+		var kind, operation string
+		if err = admin.QueryRow(ctx, "SELECT count(*),min(kind),min(operation) FROM audit_event WHERE operation_id=$1", requestID).Scan(&rows, &kind, &operation); err != nil || rows != 1 || kind != "download.stop" || operation != "cancel_artifact_download" {
+			t.Fatal("stop audit row", rows, kind, operation, err)
 		}
-		for _, q := range []string{"SELECT * FROM context_catalog", "UPDATE download_stop SET receipt=receipt", "DELETE FROM download_stop"} {
+		if err = admin.QueryRow(ctx, "SELECT count(*) FROM audit_event WHERE kind='download.stop' AND $1=ANY(artifact_ids)", scope.ArtifactID).Scan(&rows); err != nil || rows != 1 {
+			t.Fatal("replay repeated the stop audit row", rows, err)
+		}
+		for _, q := range []string{"SELECT * FROM context_catalog", "UPDATE artifact_download_stop SET state=state", "DELETE FROM artifact_download_stop", "DELETE FROM audit_event"} {
 			_, err = stopPool.Exec(ctx, q)
 			var denied *pgconn.PgError
 			if !errors.As(err, &denied) || denied.Code != "42501" {
@@ -227,13 +162,4 @@ type stopNativeIdentity struct{ i identity.Identity }
 
 func (s stopNativeIdentity) ResolveIdentity(ctx context.Context) (identity.Identity, error) {
 	return s.i, ctx.Err()
-}
-
-type stopNativeLedger struct{ stop, writer *postgres.DownloadStops }
-
-func (s stopNativeLedger) StopDownload(ctx context.Context, i identity.Identity, id string, key artifact.Digest, request string) (evidence.DownloadStopSnapshot, error) {
-	return s.stop.StopDownload(ctx, i, id, key, request)
-}
-func (s stopNativeLedger) ClaimDownloadStopWrite(ctx context.Context, d artifact.DownloadStopDecision) (bool, error) {
-	return s.writer.ClaimDownloadStopWrite(ctx, d)
 }

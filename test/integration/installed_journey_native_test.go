@@ -584,7 +584,7 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 		stopEnd()
 		for attempt, receipt := range stopReceipts {
 			if receipt.RequestID != "" {
-				t.Logf("installed Stop call %d: download %s request %s state %s audit %s", attempt+1, receipt.DownloadID, receipt.RequestID, receipt.State, receipt.AuditState)
+				t.Logf("installed Stop call %d: download %s request %s state %s", attempt+1, receipt.DownloadID, receipt.RequestID, receipt.State)
 			}
 		}
 		if err != nil {
@@ -660,12 +660,11 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 type installedJourneyStopReceipt struct {
 	DownloadID string `json:"download_id"`
 	State      string `json:"state"`
-	AuditState string `json:"audit_state"`
 	RequestID  string `json:"-"`
 }
 
 // These are two explicit calls, not an uncertain-mutation retry loop. The
-// second verifies the original acknowledged Stop's identity and audit state.
+// second verifies the original Stop's request identity.
 func installedJourneyStopTwice(ctx context.Context, read func(context.Context, string, any) (installedJourneyEnvelope, error), downloadID, key string) ([2]installedJourneyStopReceipt, error) {
 	var receipts [2]installedJourneyStopReceipt
 	for i := range receipts {
@@ -680,13 +679,12 @@ func installedJourneyStopTwice(ctx context.Context, read func(context.Context, s
 			return receipts, ctx.Err()
 		}
 		if reply.Status != "ok" || reply.RequestID == "" || installedJourneyDecode(reply.Data, &receipts[i]) != nil ||
-			receipts[i].DownloadID != downloadID || receipts[i].State != "Cancelled" ||
-			(receipts[i].AuditState != "pending" && receipts[i].AuditState != "recorded" && receipts[i].AuditState != "overdue") {
+			receipts[i].DownloadID != downloadID || receipts[i].State != "Cancelled" {
 			return receipts, errors.New("Stop did not acknowledge the exact live download")
 		}
 		receipts[i].RequestID = reply.RequestID
-		if i > 0 && (receipts[i].RequestID != receipts[0].RequestID || receipts[0].AuditState == "recorded" && receipts[i].AuditState != "recorded") {
-			return receipts, errors.New("Stop replay changed the original request or lost recorded audit")
+		if i > 0 && (receipts[i].RequestID != receipts[0].RequestID) {
+			return receipts, errors.New("Stop replay changed the original request")
 		}
 	}
 	return receipts, nil

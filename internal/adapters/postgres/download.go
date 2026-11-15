@@ -91,7 +91,7 @@ func decodeDownload(r custodydb.ArtifactDownload) (artifact.DownloadSession, err
 	if json.Unmarshal(r.ScopeJson, &scope) != nil || len(r.RequestDigest) != 32 || !scope.Valid() || scope.RootID != uid(r.RootID) || scope.ArtifactID != uid(r.ArtifactID) || !bytes.Equal(r.ActorKey, digest(scope.Principal)) || !bytes.Equal(r.PrincipalKey, principalKey(scope.Principal)) {
 		return artifact.DownloadSession{}, privacy.ErrFence
 	}
-	s := artifact.DownloadSession{StopProtocol: r.StopProtocol.String, ID: uid(r.ID), AllocationID: uid(r.AllocationID), Scope: scope, RequestDigest: artifact.Digest(r.RequestDigest), State: artifact.DownloadState(r.State), CreatedAt: r.CreatedAt.Time, Deadline: r.Deadline.Time, OutputLimit: r.OutputLimit, ReadLimit: r.ReadLimit, ChargedOutput: r.ChargedOutput, ChargedRead: r.ChargedRead, EmittedBytes: r.EmittedBytes, Generation: r.Generation}
+	s := artifact.DownloadSession{ID: uid(r.ID), AllocationID: uid(r.AllocationID), Scope: scope, RequestDigest: artifact.Digest(r.RequestDigest), State: artifact.DownloadState(r.State), CreatedAt: r.CreatedAt.Time, Deadline: r.Deadline.Time, OutputLimit: r.OutputLimit, ReadLimit: r.ReadLimit, ChargedOutput: r.ChargedOutput, ChargedRead: r.ChargedRead, EmittedBytes: r.EmittedBytes, Generation: r.Generation}
 	if !s.Valid() {
 		return artifact.DownloadSession{}, privacy.ErrFence
 	}
@@ -318,7 +318,7 @@ func (s *Downloads) ReserveDownload(ctx context.Context, r evidence.DownloadRese
 		if err != nil {
 			return artifact.ErrInvalid
 		}
-		row, err := q.InsertDownloadSession(ctx, custodydb.InsertDownloadSessionParams{ID: id(request.ID), RootID: id(s.root), AllocationID: id(request.AllocationID), ArtifactID: id(request.Scope.ArtifactID), PrincipalKey: principalKey(request.Scope.Principal), ActorKey: digest(request.Scope.Principal), IdempotencyDigest: r.IdempotencyDigest[:], RequestDigest: request.RequestDigest[:], ScopeJson: encoded, Deadline: ts(request.Deadline), OutputLimit: request.OutputLimit, ReadLimit: request.ReadLimit, StopProtocol: pgtype.Text{String: request.StopProtocol, Valid: request.StopProtocol != ""}})
+		row, err := q.InsertDownloadSession(ctx, custodydb.InsertDownloadSessionParams{ID: id(request.ID), RootID: id(s.root), AllocationID: id(request.AllocationID), ArtifactID: id(request.Scope.ArtifactID), PrincipalKey: principalKey(request.Scope.Principal), ActorKey: digest(request.Scope.Principal), IdempotencyDigest: r.IdempotencyDigest[:], RequestDigest: request.RequestDigest[:], ScopeJson: encoded, Deadline: ts(request.Deadline), OutputLimit: request.OutputLimit, ReadLimit: request.ReadLimit})
 		if err != nil {
 			return err
 		}

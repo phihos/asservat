@@ -4,7 +4,6 @@ import (
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
 	"encoding/json"
@@ -13,7 +12,7 @@ import (
 	"time"
 )
 
-func TestContextPlanRequiresExactFiniteNativeControlAndStopBacking(t *testing.T) {
+func TestContextPlanRequiresExactFiniteNativeControlBacking(t *testing.T) {
 	const root = "10000000-0000-4000-8000-000000000001"
 	const allocation = "10000000-0000-4000-8000-000000000002"
 	const installation = "10000000-0000-4000-8000-000000000003"
@@ -25,54 +24,35 @@ func TestContextPlanRequiresExactFiniteNativeControlAndStopBacking(t *testing.T)
 	native := authorization.NativeBacking{AllocationID: allocation, RootID: root, PolicyID: store, PolicyDigest: artifact.Digest{1}, Rows: 2, Keys: 2, TransitionsPerRow: 8, BackupBytes: 32 << 20, WALBytes: 64 << 20, CleanupSeconds: 30, ValidUntil: until, RetireBy: until.Add(30 * time.Second), History: authorization.NativeHistoryQualification{ID: installation, Digest: artifact.Digest{2}, RowBytes: 64 << 10, TransitionWALBytes: 64 << 10, BackupCopies: 1, WALCopies: 1}}
 	wire, _ := json.Marshal(native)
 	n := custodydb.DownloadNativeBacking{AllocationID: id(allocation), RootID: id(root), PolicyJson: wire, RowsLimit: 2, KeysLimit: 2, TransitionsPerRow: 8, CleanupSeconds: 30, ValidUntil: ts(until), RetireBy: ts(native.RetireBy)}
-	stop := audit.DownloadStopLifecyclePolicy{RootID: root, InstallationID: installation, StoreID: store, PolicyID: allocation, BackupProfileID: store, QualificationID: installation, PolicyDigest: artifact.Digest{3}, BackupProfileDigest: artifact.Digest{4}, QualificationDigest: artifact.Digest{5}, Layout: audit.DownloadStopHistoryLayout, CleanupBudgetSeconds: 10, ProofWindowSeconds: 3, MaximumRowFootprintBytes: 128 << 10, MaximumTransitionWALBytes: 128 << 10, BackupCopies: 1, WALCopies: 1, MaxPurgeLeases: 8}
-	wire, _ = json.Marshal(stop)
-	cipher, keys, backup, wal := stop.SlotBacking()
-	p := custodydb.DownloadStopPool{RootID: id(root), InstallationID: id(installation), StoreID: id(store), PolicyID: id(allocation), BackupProfileID: id(store), PolicyDigest: stop.PolicyDigest[:], BackupProfileDigest: stop.BackupProfileDigest[:], Slots: 2, Allocated: 2, CipherBytes: 2 * cipher, KeyAttempts: 2 * keys, BackupBytes: 2 * backup, WalBytes: 2 * wal, RetainedSeconds: 64, ValidUntil: ts(until), LifecyclePolicy: wire}
-	b := custodydb.DownloadStopBacking{AllocationID: id(allocation), RootID: id(root), Slots: 2}
 	typ, _ := artifact.LookupNativeType(artifact.PodStatusArtifact)
 	limits := ContextDownloadPlanLimits{OutputLimit: 8192, ReadLimit: 8 << 20}
-	if !contextPlanBacking(limits, typ, a, c, n, b, p, installation, now) {
+	if !contextPlanBacking(limits, typ, a, c, n, now) {
 		t.Fatal("exact supported backing rejected")
 	}
-	// Long requested duration is clamped by absolute backing, not by a new
-	// lookup-relative Stop timer. SQL47 anchors retention to the session end.
-	for _, change := range []func(*custodydb.DownloadControlAllocation, *custodydb.DownloadNativeBacking, *custodydb.DownloadStopBacking, *custodydb.DownloadStopPool){
-		func(c *custodydb.DownloadControlAllocation, _ *custodydb.DownloadNativeBacking, _ *custodydb.DownloadStopBacking, _ *custodydb.DownloadStopPool) {
+	for _, change := range []func(*custodydb.DownloadControlAllocation, *custodydb.DownloadNativeBacking){
+		func(c *custodydb.DownloadControlAllocation, _ *custodydb.DownloadNativeBacking) {
 			c.ReservedWindows = c.WindowLimit
 		},
-		func(c *custodydb.DownloadControlAllocation, _ *custodydb.DownloadNativeBacking, _ *custodydb.DownloadStopBacking, _ *custodydb.DownloadStopPool) {
+		func(c *custodydb.DownloadControlAllocation, _ *custodydb.DownloadNativeBacking) {
 			c.ReservedAuditBytes = c.AuditByteLimit
 		},
-		func(_ *custodydb.DownloadControlAllocation, n *custodydb.DownloadNativeBacking, _ *custodydb.DownloadStopBacking, _ *custodydb.DownloadStopPool) {
+		func(_ *custodydb.DownloadControlAllocation, n *custodydb.DownloadNativeBacking) {
 			n.Overdue = true
 		},
-		func(_ *custodydb.DownloadControlAllocation, n *custodydb.DownloadNativeBacking, _ *custodydb.DownloadStopBacking, _ *custodydb.DownloadStopPool) {
+		func(_ *custodydb.DownloadControlAllocation, n *custodydb.DownloadNativeBacking) {
 			n.ChargedKeys = n.KeysLimit
 		},
-		func(_ *custodydb.DownloadControlAllocation, n *custodydb.DownloadNativeBacking, _ *custodydb.DownloadStopBacking, _ *custodydb.DownloadStopPool) {
+		func(_ *custodydb.DownloadControlAllocation, n *custodydb.DownloadNativeBacking) {
 			n.TransitionsPerRow = 7
 		},
-		func(_ *custodydb.DownloadControlAllocation, _ *custodydb.DownloadNativeBacking, b *custodydb.DownloadStopBacking, _ *custodydb.DownloadStopPool) {
-			b.Charged = b.Slots
-		},
-		func(_ *custodydb.DownloadControlAllocation, _ *custodydb.DownloadNativeBacking, _ *custodydb.DownloadStopBacking, p *custodydb.DownloadStopPool) {
-			p.InstallationID = id(store)
-		},
-		func(_ *custodydb.DownloadControlAllocation, _ *custodydb.DownloadNativeBacking, _ *custodydb.DownloadStopBacking, p *custodydb.DownloadStopPool) {
-			p.BackupBytes--
-		},
-		func(_ *custodydb.DownloadControlAllocation, _ *custodydb.DownloadNativeBacking, _ *custodydb.DownloadStopBacking, p *custodydb.DownloadStopPool) {
-			p.RetainedSeconds = 63
-		},
 	} {
-		cc, nn, bb, pp := c, n, b, p
-		change(&cc, &nn, &bb, &pp)
-		if contextPlanBacking(limits, typ, a, cc, nn, bb, pp, installation, now) {
+		cc, nn := c, n
+		change(&cc, &nn)
+		if contextPlanBacking(limits, typ, a, cc, nn, now) {
 			t.Fatal("unsupported or exhausted backing accepted")
 		}
 	}
-	if contextPlanBacking(limits, typ, a, c, n, b, p, installation, until) {
+	if contextPlanBacking(limits, typ, a, c, n, until) {
 		t.Fatal("expired original backing accepted")
 	}
 	// An old eight-record workload has enough aggregate byte funding for a
@@ -92,7 +72,7 @@ func TestContextPlanRequiresExactFiniteNativeControlAndStopBacking(t *testing.T)
 			legacy.TransitionsPerRow = allowance
 			legacy.PolicyJson, _ = json.Marshal(old)
 			want := allowance == artifact.ProfileDownloadNativeTransitions
-			if got := contextPlanBacking(profileLimits, typ, legacyAllocation, c, legacy, b, p, installation, now); got != want {
+			if got := contextPlanBacking(profileLimits, typ, legacyAllocation, c, legacy, now); got != want {
 				t.Fatalf("profile %s owner allowance %d admission=%v want=%v", name, allowance, got, want)
 			}
 		}
@@ -103,27 +83,27 @@ func TestContextPlanRequiresExactFiniteNativeControlAndStopBacking(t *testing.T)
 	a.OutputLimit, a.ReadLimit = limits.OutputLimit, limits.ReadLimit
 	native.TransitionsPerRow, n.TransitionsPerRow = artifact.ProfileDownloadNativeTransitions, artifact.ProfileDownloadNativeTransitions
 	n.PolicyJson, _ = json.Marshal(native)
-	if !contextPlanBacking(limits, typ, a, c, n, b, p, installation, now) {
+	if !contextPlanBacking(limits, typ, a, c, n, now) {
 		t.Fatal("two-window funding refused")
 	}
 	cc := c
 	cc.ReservedWindows = 1
-	if contextPlanBacking(limits, typ, a, cc, n, b, p, installation, now) {
+	if contextPlanBacking(limits, typ, a, cc, n, now) {
 		t.Fatal("one remaining window funded two-window response")
 	}
 	cc = c
 	cc.ReservedAuditBytes = artifact.DownloadWindowAuditBytes
-	if contextPlanBacking(limits, typ, a, cc, n, b, p, installation, now) {
+	if contextPlanBacking(limits, typ, a, cc, n, now) {
 		t.Fatal("missing window audit funded")
 	}
 	nn := n
 	nn.ChargedKeys = 1
-	if contextPlanBacking(limits, typ, a, c, nn, b, p, installation, now) {
+	if contextPlanBacking(limits, typ, a, c, nn, now) {
 		t.Fatal("one remaining key funded two-window response")
 	}
 	native.TransitionsPerRow, n.TransitionsPerRow = 8, 8
 	n.PolicyJson, _ = json.Marshal(native)
-	if contextPlanBacking(limits, typ, a, c, n, b, p, installation, now) {
+	if contextPlanBacking(limits, typ, a, c, n, now) {
 		t.Fatal("insufficient transitions funded")
 	}
 }

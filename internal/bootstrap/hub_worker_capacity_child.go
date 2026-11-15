@@ -131,10 +131,10 @@ func capacitySettings() contracts.InstallerCapacitySettings {
 		return contracts.InstallerCapacityLane{Accounts: accounts, Records: records, RetainedSeconds: 10000}
 	}
 	return contracts.InstallerCapacitySettings{Accounts: 125000, Records: 8, AdmissionSeconds: 86400,
-		Lanes:               contracts.InstallerCapacityLanes{CaptureRetainedSeconds: 10000, Normal: lane(1000000, 128), Resolution: lane(1000000, 8), Processing: lane(2, 16)},
-		StopRetainedSeconds: 10000, Backup: contracts.CapacityBackup(),
+		Lanes:  contracts.InstallerCapacityLanes{CaptureRetainedSeconds: 10000, Normal: lane(1000000, 128), Resolution: lane(1000000, 8), Processing: lane(2, 16)},
+		Backup: contracts.CapacityBackup(),
 		Footprints: contracts.InstallerCapacityFootprints{Capture: f(128<<10, 256<<10), Operation: f(128<<10, 256<<10), Processing: f(128<<10, 256<<10),
-			Native: f(64<<10, 128<<10), Stop: f(128<<10, 256<<10), ProcessingState: f(16<<10, 64<<10)},
+			Native: f(64<<10, 128<<10), ProcessingState: f(16<<10, 64<<10)},
 		PurgeLeases: 4, Processing: contracts.InstallerCapacityProcessing{MaxRules: 2, MaxRootTransitions: 512},
 		Metadata: contracts.InstallerCapacityMetadata{FixedRowBytes: 1 << 20, AccountRowBytes: 256 << 10, RecordRowBytes: 128 << 10, RecordWALBytes: 8 << 20,
 			RecordKeyAttempts: 16, TransitionWALBytes: 1 << 20, ConfigurationTransitions: 3 + 3*125000},

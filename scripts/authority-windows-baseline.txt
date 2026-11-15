@@ -50,8 +50,6 @@ internal/adapters/postgres/context_publication.go 2
 internal/adapters/postgres/context_query_capacity.go 2
 internal/adapters/postgres/current_owner_configuration_audit.go 1
 internal/adapters/postgres/custody.go 1
-internal/adapters/postgres/download_stop.go 1
-internal/adapters/postgres/download_stop_lifecycle.go 7
 internal/adapters/postgres/evidence_share.go 1
 internal/adapters/postgres/fleet_observation.go 1
 internal/adapters/postgres/history_parameters.go 1

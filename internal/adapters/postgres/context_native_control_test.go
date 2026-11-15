@@ -7,13 +7,12 @@ import (
 )
 
 func TestFirstContextPreparationDoesNotGrantASecondAttempt(t *testing.T) {
-	original := artifact.DownloadSession{StopProtocol: artifact.DownloadStopProtocol, State: artifact.DownloadPreparing}
+	original := artifact.DownloadSession{State: artifact.DownloadPreparing}
 	batch := artifact.DownloadBatch{Purpose: artifact.DownloadMetadata, ReadBytes: evidence.ContextDownloadReadWork}
 	if !firstContextPreparation(original, batch) {
 		t.Fatal("first preparation rejected")
 	}
 	for _, change := range []func(*artifact.DownloadSession){
-		func(s *artifact.DownloadSession) { s.StopProtocol = "" },
 		func(s *artifact.DownloadSession) { s.State = artifact.DownloadReady },
 		func(s *artifact.DownloadSession) { s.Generation = 1 },
 		func(s *artifact.DownloadSession) { s.Active = &batch },
