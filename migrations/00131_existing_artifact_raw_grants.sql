@@ -194,7 +194,8 @@ ALTER TABLE access_grant DROP CONSTRAINT access_grant_root_parent;
 DROP INDEX access_grant_raw_request;
 DROP INDEX access_grant_raw_member;
 DROP INDEX access_grant_raw_requester;
-ALTER TABLE access_grant DROP CONSTRAINT access_grant_kind, DROP CONSTRAINT access_grant_scope_kind, DROP CONSTRAINT access_grant_expiry_kind, DROP CONSTRAINT access_grant_max_bytes_check, DROP CONSTRAINT access_grant_result_digest, DROP CONSTRAINT access_grant_result_pool, DROP CONSTRAINT access_grant_review_check;
+-- 00176 drops access_grant_max_bytes_check without a Down.
+ALTER TABLE access_grant DROP CONSTRAINT access_grant_kind, DROP CONSTRAINT access_grant_scope_kind, DROP CONSTRAINT access_grant_expiry_kind, DROP CONSTRAINT IF EXISTS access_grant_max_bytes_check, DROP CONSTRAINT access_grant_result_digest, DROP CONSTRAINT access_grant_result_pool, DROP CONSTRAINT access_grant_review_check;
 ALTER TABLE access_grant DROP COLUMN raw_query;
 ALTER TABLE access_grant ALTER COLUMN cluster_id SET NOT NULL;
 ALTER TABLE access_grant ALTER COLUMN namespace_uid SET NOT NULL;

@@ -144,17 +144,13 @@ func qualifyDownloadStop(t *testing.T, ctx context.Context, admin *pgxpool.Pool,
 				t.Fatal(err)
 			}
 			now := time.Now().UTC().Truncate(time.Microsecond)
-			// Processing initialization already consumed one actual normal audit
-			// record. Keep that history and accept a bounded pool revision whose
-			// single remaining account/record is fully occupied by it.
+			// Processing is initialized at root creation and charges no audit
+			// record (#269). Accept a bounded pool revision with one account and
+			// one record, then occupy that record with one actual operation.
 			var revision int64
 			var validUntil time.Time
-			var occupied []byte
 			if err = admin.QueryRow(ctx, "SELECT revision,valid_until FROM operation_audit_pool WHERE root_id=$1 AND lane='normal'", root).Scan(&revision, &validUntil); err != nil {
 				t.Fatal(err)
-			}
-			if err = admin.QueryRow(ctx, "SELECT principal_digest FROM operation_audit_account WHERE root_id=$1 AND lane='normal' AND charged=1", root).Scan(&occupied); err != nil || len(occupied) != 32 {
-				t.Fatal("missing charged initialization", err)
 			}
 			if err = auditConfig.ProvisionOperationAuditPool(ctx, auditapp.OperationAuditPool{RootID: root, Lane: "normal", AccountVersion: "accounts-v1", ExpectedRevision: revision, Accounts: 1, RecordsPerAccount: 1, RetainedSeconds: 3600, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), ValidUntil: validUntil}); err != nil {
 				t.Fatal(err)
@@ -163,9 +159,14 @@ func qualifyDownloadStop(t *testing.T, ctx context.Context, admin *pgxpool.Pool,
 			if err != nil {
 				t.Fatal(err)
 			}
-			id := custodyID()
-			intent := audit.OperationIntent{ID: id, TraceID: id, RootID: root, Name: "get_artifact_download", InputFormat: "context-input/v1", MACVersion: "stop-test", AccountVersion: "accounts-v1", Actor: scope.Principal, PrincipalDigest: artifact.Digest{1}, InputDigest: artifact.Digest{2}, CreatedAt: now, RequestUntil: now.Add(5 * time.Second), WriteUntil: now.Add(30 * time.Second), RetainUntil: now.Add(time.Hour)}
-			copy(intent.PrincipalDigest[:], occupied)
+			newIntent := func() audit.OperationIntent {
+				id := custodyID()
+				return audit.OperationIntent{ID: id, TraceID: id, RootID: root, Name: "get_artifact_download", InputFormat: "context-input/v1", MACVersion: "stop-test", AccountVersion: "accounts-v1", Actor: scope.Principal, PrincipalDigest: artifact.Digest{1}, InputDigest: artifact.Digest{2}, CreatedAt: now, RequestUntil: now.Add(5 * time.Second), WriteUntil: now.Add(30 * time.Second), RetainUntil: now.Add(time.Hour)}
+			}
+			if _, err = journal.ReserveOperation(ctx, newIntent()); err != nil {
+				t.Fatal("occupy the single normal audit record", err)
+			}
+			intent := newIntent()
 			if _, err = journal.ReserveOperation(ctx, intent); err == nil {
 				t.Fatal("normal audit pool did not exhaust")
 			}

@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
+	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	app "asservat.local/asservat/internal/application/capture"
@@ -13,6 +14,7 @@ import (
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -137,13 +139,6 @@ func (s *ContextPreviews) CreateContextPreview(ctx context.Context, p value.Cont
 		if count >= value.MaxPreviewsPerRoot {
 			return value.ErrCapacity
 		}
-		count, err = q.CountPrincipalContextPreviews(ctx, custodydb.CountPrincipalContextPreviewsParams{RootID: id(s.root), PrincipalKey: principalKey(p.Actor)})
-		if err != nil {
-			return err
-		}
-		if count >= value.MaxPreviewsPerPrincipal {
-			return value.ErrCapacity
-		}
 		if p.CompositionGroup != nil {
 			err = q.InsertCompositionGroupPreview(ctx, custodydb.InsertCompositionGroupPreviewParams{ID: id(p.ID), RootID: id(s.root), CaptureID: id(p.CaptureID), ActorKey: previewActorKey(p.Actor), PrincipalKey: principalKey(p.Actor), ReasonEnvelope: p.ReasonEnvelope, BlueprintJson: encoded, BlueprintSha256: h[:], CreatedAt: ts(p.CreatedAt), Deadline: ts(p.Deadline)})
 		} else if p.Group != nil {
@@ -189,7 +184,7 @@ func (s *ContextPreviews) ReadContextPreview(ctx context.Context, root, preview 
 		if e != nil {
 			return e
 		}
-		if !until.Valid || !now.Time.Before(until.Time) || now.Time.Before(out.CreatedAt) {
+		if !previewReadable(until, now.Time, out.CreatedAt) {
 			return value.ErrPreviewExpired
 		}
 		return ctx.Err()
@@ -266,4 +261,20 @@ func (s *ContextPreviews) ReadRecordingGroupPreview(ctx context.Context, root, p
 		return value.ContextPreview{}, value.ErrInvalid
 	}
 	return p, nil
+}
+
+// previewReadable reports whether a preview is readable at now. A pending
+// review without notAfter keeps its blueprint (+infinity); -infinity and a
+// passed bound are expired.
+func previewReadable(until pgtype.Timestamptz, now, created time.Time) bool {
+	if !until.Valid || now.Before(created) {
+		return false
+	}
+	switch until.InfinityModifier {
+	case pgtype.Infinity:
+		return true
+	case pgtype.NegativeInfinity:
+		return false
+	}
+	return now.Before(until.Time)
 }

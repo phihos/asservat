@@ -72,29 +72,6 @@ func (q *Queries) CountContextPreviews(ctx context.Context, rootID pgtype.UUID) 
 	return count, err
 }
 
-const countPrincipalContextPreviews = `-- name: CountPrincipalContextPreviews :one
-SELECT count(*) FROM (
- SELECT p.id FROM context_preview AS p WHERE p.root_id=$1 AND p.principal_key=$2 AND context_preview_read_until(p.root_id,p.id)>clock_timestamp()
- UNION ALL
- SELECT r.id FROM recording_selection_set AS r WHERE r.root_id=$1 AND r.principal_key=$2 AND r.expires_at>clock_timestamp()
- UNION ALL
- SELECT f.preview_id FROM context_preview_fence AS f WHERE f.root_id=$1 AND f.principal_key=$2 AND f.expires_at>clock_timestamp()
- LIMIT 10
-) AS bounded
-`
-
-type CountPrincipalContextPreviewsParams struct {
-	RootID       pgtype.UUID
-	PrincipalKey []byte
-}
-
-func (q *Queries) CountPrincipalContextPreviews(ctx context.Context, arg CountPrincipalContextPreviewsParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countPrincipalContextPreviews, arg.RootID, arg.PrincipalKey)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
 const deleteExpiredContextPreviewFences = `-- name: DeleteExpiredContextPreviewFences :execrows
 DELETE FROM context_preview_fence WHERE (root_id,preview_id,actor_key) IN (
  SELECT f.root_id,f.preview_id,f.actor_key FROM context_preview_fence AS f WHERE f.root_id=$1 AND f.expires_at<=clock_timestamp()

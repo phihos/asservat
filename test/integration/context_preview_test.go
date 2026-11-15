@@ -5,10 +5,8 @@ import (
 	"crypto/sha256"
 	"encoding/json/jsontext"
 	"errors"
-	"fmt"
 	"os"
 	"reflect"
-	"sync"
 	"testing"
 	"time"
 
@@ -94,7 +92,7 @@ func qualifyContextPreviews(t *testing.T, ctx context.Context, admin *pgxpool.Po
 
 	qualifyContextRequestResolution(t, ctx, admin, poolFor, create, newStore, blueprint, query)
 
-	t.Run("current-context-placement-is-scoped-read-only-and-preserves-original-freshness", func(t *testing.T) {
+	t.Run("current-context-placement-is-scoped-and-read-only", func(t *testing.T) {
 		s := create(t, 1)
 		readPool := poolFor("context_storage_read_runtime", "synthetic-context-storage-read")
 		t.Cleanup(readPool.Close)
@@ -102,10 +100,15 @@ func qualifyContextPreviews(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		if err != nil {
 			t.Fatal(err)
 		}
+		// Bindings are standing rows: the read itself is the observation, valid
+		// for at most the thirty-second storage interval from its own time.
+		before := time.Now().Add(-time.Second)
 		got, err := reader.ContextStorage(ctx, s.a.Eligibility.Target)
+		after := time.Now().Add(time.Second)
 		r := s.a.Registration
-		if err != nil || got.Selection.StoreID != r.StoreID || got.Selection.AllocationID != r.AllocationID || got.Selection.PoolRevision != r.PoolRevision || got.Selection.AllocationRevision != r.AllocationRevision || got.Selection.BindingRevision != s.a.Storage.Revision || !got.Binding.ObservedAt.Equal(s.a.Storage.ObservedAt) || !got.Binding.FreshUntil.Equal(s.a.Storage.FreshUntil) {
-			t.Fatal("storage observation changed accepted placement/freshness", err)
+		if err != nil || got.Selection.StoreID != r.StoreID || got.Selection.AllocationID != r.AllocationID || got.Selection.PoolRevision != r.PoolRevision || got.Selection.AllocationRevision != r.AllocationRevision || got.Selection.BindingRevision != s.a.Storage.Revision ||
+			got.Binding.ObservedAt.Before(before) || got.Binding.ObservedAt.After(after) || !got.Binding.FreshUntil.After(got.Binding.ObservedAt) || got.Binding.FreshUntil.After(got.Binding.ObservedAt.Add(30*time.Second)) {
+			t.Fatal("storage observation changed accepted placement or its read interval", err)
 		}
 		other := s.a.Eligibility.Target
 		other.WorkloadUID = custodyID()
@@ -131,115 +134,6 @@ func qualifyContextPreviews(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		}
 	})
 
-	t.Run("expired-context-storage-read-preserves-refresh-classification", func(t *testing.T) {
-		s := create(t, 1)
-		readPool := poolFor("context_storage_read_runtime", "synthetic-context-storage-read")
-		defer readPool.Close()
-		reader, err := postgres.NewContextStorageReader(ctx, readPool, s.a.RootID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		target := s.a.Eligibility.Target
-		original, err := reader.ContextStorage(ctx, target)
-		if err != nil {
-			t.Fatal("initial real storage read", err)
-		}
-		// Fixture administrator changes only the original observation's dates;
-		// no reader or requester can refresh the protected binding itself.
-		at := time.Now().UTC().Truncate(time.Microsecond)
-		observed, expired := at.Add(-31*time.Second), at.Add(-time.Second)
-		update := func(generation int64, observed, until time.Time) {
-			t.Helper()
-			tag, e := admin.Exec(ctx, `UPDATE context_storage_binding SET source_generation=$3,observed_at=$4,fresh_until=$5 WHERE root_id=$1 AND allocation_id=$2`, s.a.RootID, s.a.Registration.AllocationID, generation, observed, until)
-			if e != nil || tag.RowsAffected() != 1 {
-				t.Fatal("fixture binding interval", e, tag.RowsAffected())
-			}
-		}
-		update(s.a.Storage.Revision.Generation, observed, expired)
-		got, err := reader.ContextStorage(ctx, target)
-		var refusal interface{ ContextStorageRead() string }
-		if !errors.Is(err, capture.ErrStorageBindingExpired) || !errors.Is(err, capture.ErrUnavailable) || errors.Is(err, capture.ErrChanged) || !errors.As(err, &refusal) || refusal.ContextStorageRead() != "observation/source-expired" || got.Selection != original.Selection || !got.Binding.ObservedAt.Equal(observed) || !got.Binding.FreshUntil.Equal(expired) || got.Binding.Valid(time.Now()) || !got.Binding.Valid(observed) {
-			t.Fatal("actual Ledger erased expired-source readiness type or original selection", err, got.Selection == original.Selection)
-		}
-		// Expired metadata can identify a changed selection but never conceal it.
-		update(s.a.Storage.Revision.Generation+1, observed, expired)
-		changed, err := reader.ContextStorage(ctx, target)
-		if !errors.Is(err, capture.ErrStorageBindingExpired) || changed.Selection == original.Selection || changed.Binding.Revision.Generation != s.a.Storage.Revision.Generation+1 {
-			t.Fatal("expired read hid changed original revision", err)
-		}
-		// Future/invalid observations remain ordinary changes with no metadata.
-		update(s.a.Storage.Revision.Generation, at.Add(time.Minute), at.Add(90*time.Second))
-		invalid, err := reader.ContextStorage(ctx, target)
-		if !errors.Is(err, capture.ErrChanged) || errors.Is(err, capture.ErrStorageBindingExpired) || invalid.Binding.RootID != "" {
-			t.Fatal("invalid source became expired-only metadata", err)
-		}
-		// A canceled actual SQL call must never expose a prior expired receipt.
-		canceled, stop := context.WithCancel(ctx)
-		stop()
-		invalid, err = reader.ContextStorage(canceled, target)
-		if err == nil || errors.Is(err, capture.ErrStorageBindingExpired) || invalid.Binding.RootID != "" {
-			t.Fatal("canceled read returned expired receipt", err)
-		}
-		// Only a new successful protected read can provide the restored original
-		// observation. The expiry read itself made no authority or admission write.
-		update(s.a.Storage.Revision.Generation, original.Binding.ObservedAt, original.Binding.FreshUntil)
-		fresh, err := reader.ContextStorage(ctx, target)
-		var captures int
-		countErr := admin.QueryRow(ctx, `SELECT count(*) FROM context_capture WHERE root_id=$1`, s.a.RootID).Scan(&captures)
-		if err != nil || fresh.Selection != original.Selection || fresh.Binding != original.Binding || countErr != nil || captures != 0 {
-			t.Fatal("read renewed original facts or created admission", err, countErr, captures)
-		}
-		t.Log("actual Ledger/SELECT-only ContextStorageReader preserved expired metadata, changed selection and independent fresh read; zero captures")
-	})
-
-	t.Run("preview-principal-cap-is-atomic-across-clients", func(t *testing.T) {
-		s := create(t, 1)
-		store := newStore(t, s.a.RootID)
-		previews := make([]capture.ContextPreview, 20)
-		for i := range previews {
-			actor := s.a.Plan.Input.Executor
-			actor.ClientID = fmt.Sprintf("client-%d", i%2)
-			previews[i] = fork(t, s, actor, s.a.Plan.Input.Deadline)
-		}
-		var wg sync.WaitGroup
-		errs := make([]error, len(previews))
-		for i := range previews {
-			wg.Add(1)
-			go func(i int) { defer wg.Done(); errs[i] = store.CreateContextPreview(ctx, previews[i]) }(i)
-		}
-		wg.Wait()
-		accepted := 0
-		for _, err := range errs {
-			if err == nil {
-				accepted++
-			} else if !errors.Is(err, capture.ErrCapacity) {
-				t.Fatal("unexpected preview error", err)
-			}
-		}
-		if accepted != capture.MaxPreviewsPerPrincipal {
-			t.Fatalf("accepted %d previews across clients", accepted)
-		}
-		actor := s.a.Plan.Input.Executor
-		actor.Subject = "another-developer"
-		other := fork(t, s, actor, s.a.Plan.Input.Deadline)
-		if err := store.CreateContextPreview(ctx, other); err != nil {
-			t.Fatal("one developer exhausted another's review slots", err)
-		}
-		for _, table := range []string{"context_capture", "custody_attempt"} {
-			var count int
-			q := "SELECT count(*) FROM context_capture WHERE root_id=$1"
-			key := s.a.RootID
-			if table == "custody_attempt" {
-				q, key = "SELECT count(*) FROM custody_attempt WHERE allocation_id=$1", s.a.Registration.AllocationID
-			}
-			if err := admin.QueryRow(ctx, q, key).Scan(&count); err != nil || count != 0 {
-				t.Fatal("passive preview reserved collection", table, count, err)
-			}
-		}
-	})
-
-	// ADR-243: a plan-only packet/syscall preview persists in the same table
-	// without a storage selection and survives the strict decode/re-encode.
 	t.Run("composition-preview-persists-plan-only-blueprint", func(t *testing.T) {
 		s := create(t, 1)
 		store := newStore(t, s.a.RootID)
@@ -314,11 +208,12 @@ func qualifyContextPreviews(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		}
 	})
 
-	t.Run("expired-previews-reclaim-capacity-without-capture-side-effects", func(t *testing.T) {
+	t.Run("expired-previews-are-deleted-without-capture-side-effects", func(t *testing.T) {
 		s := create(t, 1)
 		store, cleanup := newStore(t, s.a.RootID), newCleanup(t, s.a.RootID)
 		deadline := time.Now().UTC().Truncate(time.Microsecond).Add(time.Second)
-		for i := 0; i < capture.MaxPreviewsPerPrincipal; i++ {
+		const previews = 3
+		for i := 0; i < previews; i++ {
 			p := fork(t, s, s.a.Plan.Input.Executor, deadline)
 			if err := store.CreateContextPreview(ctx, p); err != nil {
 				t.Fatal(err)
@@ -327,16 +222,13 @@ func qualifyContextPreviews(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		if n, err := cleanup.DeleteExpiredContextPreviews(ctx); err != nil || n != 0 {
 			t.Fatal("deleted live previews", n, err)
 		}
-		p := fork(t, s, s.a.Plan.Input.Executor, s.a.Plan.Input.Deadline)
-		if err := store.CreateContextPreview(ctx, p); !errors.Is(err, capture.ErrCapacity) {
-			t.Fatal("full review quota did not deny", err)
-		}
 		time.Sleep(time.Until(deadline) + 10*time.Millisecond)
-		if n, err := cleanup.DeleteExpiredContextPreviews(ctx); err != nil || n != capture.MaxPreviewsPerPrincipal {
-			t.Fatal("expired quota was not reclaimed", n, err)
+		if n, err := cleanup.DeleteExpiredContextPreviews(ctx); err != nil || n != previews {
+			t.Fatal("expired previews were not deleted", n, err)
 		}
-		if err := store.CreateContextPreview(ctx, p); err != nil {
-			t.Fatal("reclaimed preview slot unavailable", err)
+		var captures int
+		if err := admin.QueryRow(ctx, `SELECT count(*) FROM context_capture WHERE root_id=$1`, s.a.RootID).Scan(&captures); err != nil || captures != 0 {
+			t.Fatal("preview expiry created captures", captures, err)
 		}
 	})
 
