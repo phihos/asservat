@@ -39,8 +39,8 @@ pushed work, status on change, standard workload identity.
    sends only work kinds and fields the collector announced. Both sides ignore unknown fields, so
    a DaemonSet rolling update and hub/connector/node N−1 skew work without lockstep upgrades.
 5. Status: one full report after Hello, then a report only when facts, assessment, budget or
-   receipts change. Source counters change with every packet and have no event, so the collector
-   compares them every 15 seconds and sends only a changed report. Liveness is the open stream itself: the connector uses HTTP/2 PING (or gRPC
+   receipts change. Budget, source and live-view state signal each change in-process; the collector
+   coalesces bursts to at most one report per second and sends only a changed report. Liveness is the open stream itself: the connector uses HTTP/2 PING (or gRPC
    keepalive) on the connection, and stream close or a keepalive timeout is the event that marks
    the node not current. There is no application heartbeat. Liveness grants, renews or revokes no
    authority, and losing it does not stop sources. The connector keeps the latest report per node

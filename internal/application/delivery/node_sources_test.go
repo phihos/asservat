@@ -25,7 +25,7 @@ func TestSourceQueuePreservesCurrentProcessOriginalBoundsAndRestrictiveStop(t *t
 			peer := NodePeer{NodeUID: id.NodeUID, PodUID: id.PodUID}
 			r := report(now)
 			r.Mechanisms = []collector.Availability{{Mechanism: collector.MechanismPacket, Prerequisites: true, Adapter: collector.AdapterAvailable}}
-			if err = ch.Report(peer, r); err != nil {
+			if err = ch.Report(peer, cur(ch, peer), r); err != nil {
 				t.Fatal(err)
 			}
 			resource := collector.SourceResources{PolicyUID: "capacity"}

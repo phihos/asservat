@@ -111,7 +111,7 @@ func TestProfileTLSQueueRequiresCurrentExplicitCapability(t *testing.T) {
 	now := clock.now()
 	r := report(now)
 	r.Mechanisms = []collector.Availability{{Mechanism: collector.MechanismProfile, Prerequisites: true, Adapter: collector.AdapterAvailable}}
-	if err := ch.Report(peer, r); err != nil {
+	if err := ch.Report(peer, cur(ch, peer), r); err != nil {
 		t.Fatal(err)
 	}
 	material := execution.GoProfileTLSMaterial{RootsPEM: "bounded public bytes", ServerName: "profile.internal"}
@@ -126,7 +126,7 @@ func TestProfileTLSQueueRequiresCurrentExplicitCapability(t *testing.T) {
 	r.Mechanisms = append([]collector.Availability(nil), r.Mechanisms...)
 	r.ObservedAt = clock.now()
 	r.Mechanisms[0].ProfileTLS = true
-	if err := ch.Report(peer, r); err != nil || len(*changes) != before+1 {
+	if err := ch.Report(peer, cur(ch, peer), r); err != nil || len(*changes) != before+1 {
 		t.Fatal("TLS implementation observation not published", err, len(*changes), before)
 	}
 	authenticated := p
@@ -139,7 +139,7 @@ func TestProfileTLSQueueRequiresCurrentExplicitCapability(t *testing.T) {
 	r.ObservedAt = clock.now()
 	r.Mechanisms = append([]collector.Availability(nil), r.Mechanisms...)
 	r.Mechanisms[0].ProfileAuthorization = true
-	if err := ch.Report(peer, r); err != nil || len(*changes) != before+1 || !ch.Nodes()[0].ProfileAuthorizationAvailable() {
+	if err := ch.Report(peer, cur(ch, peer), r); err != nil || len(*changes) != before+1 || !ch.Nodes()[0].ProfileAuthorizationAvailable() {
 		t.Fatal("credential capability not published", err)
 	}
 	w, err := ch.EnqueueProfile(t.Context(), p, now.Add(3*time.Second))

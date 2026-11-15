@@ -11,13 +11,17 @@ import (
 
 	"asservat.local/asservat/internal/application/delivery"
 	"asservat.local/asservat/internal/domain/collector"
+	"golang.org/x/time/rate"
 )
 
-type streamAttester struct{ reviews atomic.Int32 }
+type streamAttester struct {
+	reviews atomic.Int32
+	rotated atomic.Bool
+}
 
 func (a *streamAttester) AttestNode(_ context.Context, token []byte) (collector.Identity, error) {
 	a.reviews.Add(1)
-	if string(token) != "token" {
+	if string(token) != "token" && (!a.rotated.Load() || string(token) != "token2") {
 		return collector.Identity{}, delivery.ErrNodeDenied
 	}
 	return collector.Identity{NodeName: "node-a", NodeUID: "node-uid", PodName: "collector", PodUID: "pod-uid", BootID: "boot"}, nil
@@ -81,8 +85,22 @@ func TestStreamPushesWorkAndReviewsTokenOncePerConnection(t *testing.T) {
 	if n := attester.reviews.Load(); n != 1 {
 		t.Fatalf("token reviews on one connection: %d", n)
 	}
-	token = "other"
-	if _, err := client.Connect(ctx, nil); !errors.Is(err, ErrRefused) {
-		t.Fatalf("denied token: %v", err)
+	// With the new-connection limiter exhausted, a rotated token on the
+	// authenticated connection is still reviewed; a new connection gets 429.
+	h.reviews = rate.NewLimiter(0, 0)
+	token = "token2"
+	attester.rotated.Store(true)
+	if err := client.UploadCapture(ctx, collector.PacketResult{WorkID: w.ID, CaptureID: w.ID}, nil); !errors.Is(err, ErrRefused) {
+		t.Fatalf("upload after rotation: %v", err)
+	}
+	if n := attester.reviews.Load(); n != 2 {
+		t.Fatalf("rotated token reviews: %d", n)
+	}
+	other, err := NewClient(server.URL, "example.com", roots, func(context.Context) ([]byte, error) { return []byte("token"), nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := other.Connect(ctx, nil); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("new connection past the limiter: %v", err)
 	}
 }

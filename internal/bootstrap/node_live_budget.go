@@ -24,6 +24,14 @@ type nodeLiveBudget struct {
 	refusedAdmissions             int64
 	cohorts                       map[*nodeLiveCohort]struct{}
 	lostEvents, droppedRows       int64
+	// changed signals that the live status may have changed.
+	changed func()
+}
+
+func (b *nodeLiveBudget) notify() {
+	if b.changed != nil {
+		b.changed()
+	}
 }
 
 func (b *nodeLiveBudget) reserve() bool {
@@ -32,6 +40,7 @@ func (b *nodeLiveBudget) reserve() bool {
 	}
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	defer b.notify()
 	if !b.limits.Valid() || b.held >= b.limits.Subscriptions || int64(b.held+1)*v.MaxBufferBytes > b.limits.MemoryBytes {
 		b.refusedAdmissions++
 		return false
@@ -64,6 +73,7 @@ func (b *nodeLiveBudget) detach(c *nodeLiveCohort) {
 	if _, ok := b.cohorts[c]; !ok {
 		return
 	}
+	defer b.notify()
 	b.lostEvents += int64(c.buffer.LossPosition().Lost - c.lossBase)
 	delete(b.cohorts, c)
 }
@@ -83,6 +93,7 @@ func (b *nodeLiveBudget) take(now time.Time, bytes int) bool {
 	if now.Before(b.second) {
 		return false
 	}
+	defer b.notify()
 	b.reset(now)
 	if b.windowEvents >= b.limits.EventsPerSecond || int64(bytes) > b.limits.BytesPerSecond-b.windowBytes || b.windowSpent >= b.limits.TimePerSecond {
 		return false
@@ -96,6 +107,7 @@ func (b *nodeLiveBudget) take(now time.Time, bytes int) bool {
 func (b *nodeLiveBudget) finish(elapsed time.Duration) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	defer b.notify()
 	if elapsed > 0 {
 		b.windowSpent += elapsed
 		b.spent += elapsed
@@ -110,6 +122,7 @@ func (b *nodeLiveBudget) deliver(now time.Time, rows, bytes, dropped int) {
 	if now.Before(b.second) {
 		return
 	}
+	defer b.notify()
 	b.reset(now)
 	b.deliveredRows += int64(rows)
 	b.deliveredBytes += int64(bytes)

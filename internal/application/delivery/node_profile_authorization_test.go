@@ -72,7 +72,7 @@ func TestProfileAuthorizationCurrentProcessAndRetainedWorkAfterRead(t *testing.T
 					r := *entry.report
 					r.ObservedAt = clock.now()
 					r.Receipts = []collector.Receipt{{WorkID: work.ID, Sequence: work.Sequence, Outcome: collector.OutcomeAccepted}}
-					if err := ch.Report(peer, r); err != nil {
+					if err := ch.Report(peer, cur(ch, peer), r); err != nil {
 						t.Error(err)
 					}
 				}

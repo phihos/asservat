@@ -212,9 +212,9 @@ func sameAssessment(a, b []collector.Availability) bool {
 	return true
 }
 
-// Report stores the node's latest status. Receipts remove the work they
-// answer from the queue.
-func (c *NodeChannel) Report(p NodePeer, r collector.Report) error {
+// Report stores the status read from stream. A superseded stream cannot
+// report. Receipts remove the work they answer from the queue.
+func (c *NodeChannel) Report(p NodePeer, stream uint64, r collector.Report) error {
 	if r.ObservedAt.IsZero() || len(r.Receipts) > collector.MaxReceipts || len(r.Mechanisms) > 8 || int64(len(r.Sources)) > collector.SourceStatusLimit {
 		return ErrNodeInvalid
 	}
@@ -235,6 +235,9 @@ func (c *NodeChannel) Report(p NodePeer, r collector.Report) error {
 	}
 	c.mu.Lock()
 	e, err := c.current(p)
+	if err == nil && (e.stream != stream || !e.open) {
+		err = ErrNodeUnauthenticated
+	}
 	if err != nil {
 		c.mu.Unlock()
 		return err

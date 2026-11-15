@@ -105,7 +105,7 @@ func TestConnectFromAnotherPodReplacesTheEarlierStream(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("replacement did not end the earlier stream")
 	}
-	if err := ch.Report(old, report(clk.now())); !errors.Is(err, ErrNodeUnauthenticated) {
+	if err := ch.Report(old, cur(ch, old), report(clk.now())); !errors.Is(err, ErrNodeUnauthenticated) {
 		t.Fatal("replaced Pod reported")
 	}
 	nodes := ch.Nodes()
@@ -121,7 +121,7 @@ func TestReconnectFromTheSamePodKeepsQueueAndGeneration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := ch.Report(p, report(clk.now())); err != nil || !ch.Nodes()[0].Current {
+	if err := ch.Report(p, cur(ch, p), report(clk.now())); err != nil || !ch.Nodes()[0].Current {
 		t.Fatalf("report: %v", err)
 	}
 	ch.Disconnect(p, first)
@@ -138,6 +138,12 @@ func TestReconnectFromTheSamePodKeepsQueueAndGeneration(t *testing.T) {
 	ch.Disconnect(p, first)
 	if !ch.Nodes()[0].Current {
 		t.Fatal("an old stream's close ended the new stream")
+	}
+	if err := ch.Report(p, first, report(clk.now())); !errors.Is(err, ErrNodeUnauthenticated) {
+		t.Fatalf("a superseded stream reported: %v", err)
+	}
+	if err := ch.Report(p, second, report(clk.now())); err != nil {
+		t.Fatal(err)
 	}
 	got, err := ch.Next(context.Background(), p, second, 0)
 	if err != nil || len(got) != 1 || got[0].ID != w.ID {
@@ -189,11 +195,11 @@ func TestNextDeliversQueuedWorkAndWakesOnEnqueue(t *testing.T) {
 	// Receipts answer work; expired work is dropped as well.
 	r := report(clk.now())
 	r.Receipts = []collector.Receipt{{WorkID: w.ID, Sequence: 1, Outcome: collector.OutcomeRefused, Reason: collector.ReasonRecorderNotImplemented}}
-	if err := ch.Report(p, r); err != nil || ch.Nodes()[0].Queued != collector.MaxQueuedWork-1 {
+	if err := ch.Report(p, cur(ch, p), r); err != nil || ch.Nodes()[0].Queued != collector.MaxQueuedWork-1 {
 		t.Fatalf("receipt did not remove its work: %v", err)
 	}
 	clk.add(time.Minute)
-	if err := ch.Report(p, report(clk.now())); err != nil || ch.Nodes()[0].Queued != 0 {
+	if err := ch.Report(p, cur(ch, p), report(clk.now())); err != nil || ch.Nodes()[0].Queued != 0 {
 		t.Fatalf("expired work kept: %v", err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -219,11 +225,11 @@ func TestOnlyAnnouncedKindsAreQueued(t *testing.T) {
 func TestReportValidationAndCurrency(t *testing.T) {
 	ch, clk, _ := newChannel(t)
 	p, stream := enroll(t, ch, epochA)
-	if err := ch.Report(p, collector.Report{}); !errors.Is(err, ErrNodeInvalid) {
+	if err := ch.Report(p, cur(ch, p), collector.Report{}); !errors.Is(err, ErrNodeInvalid) {
 		t.Fatal("report without time")
 	}
 	observed := clk.now()
-	if err := ch.Report(p, report(observed)); err != nil {
+	if err := ch.Report(p, cur(ch, p), report(observed)); err != nil {
 		t.Fatal(err)
 	}
 	clk.add(time.Hour)
@@ -237,7 +243,7 @@ func TestReportValidationAndCurrency(t *testing.T) {
 	}
 	bad := report(clk.now())
 	bad.Receipts = []collector.Receipt{{WorkID: "w", Outcome: "maybe"}}
-	if err := ch.Report(p, bad); !errors.Is(err, ErrNodeInvalid) {
+	if err := ch.Report(p, cur(ch, p), bad); !errors.Is(err, ErrNodeInvalid) {
 		t.Fatal("open outcome")
 	}
 }
@@ -251,15 +257,25 @@ func TestReceiptMustMatchSequenceAndWorkID(t *testing.T) {
 	}
 	r := report(clk.now())
 	r.Receipts = []collector.Receipt{{WorkID: "bbbbbbbb-0000-4000-8000-000000000000", Sequence: w.Sequence, Outcome: collector.OutcomeRefused}}
-	if err := ch.Report(p, r); err != nil || ch.Nodes()[0].Queued != 1 {
+	if err := ch.Report(p, cur(ch, p), r); err != nil || ch.Nodes()[0].Queued != 1 {
 		t.Fatalf("a receipt with another work ID removed the item: %v", err)
 	}
 	r.Receipts = []collector.Receipt{{WorkID: w.ID, Sequence: w.Sequence + 1, Outcome: collector.OutcomeRefused}}
-	if err := ch.Report(p, r); err != nil || ch.Nodes()[0].Queued != 1 {
+	if err := ch.Report(p, cur(ch, p), r); err != nil || ch.Nodes()[0].Queued != 1 {
 		t.Fatalf("a receipt with another sequence removed the item: %v", err)
 	}
 	r.Receipts = []collector.Receipt{{WorkID: w.ID, Sequence: w.Sequence, Outcome: collector.OutcomeRefused}}
-	if err := ch.Report(p, r); err != nil || ch.Nodes()[0].Queued != 0 {
+	if err := ch.Report(p, cur(ch, p), r); err != nil || ch.Nodes()[0].Queued != 0 {
 		t.Fatalf("matching receipt: %v", err)
 	}
+}
+
+// cur is the node's current stream, as the server would hold it.
+func cur(c *NodeChannel, p NodePeer) uint64 {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if e := c.nodes[p.NodeUID]; e != nil {
+		return e.stream
+	}
+	return 0
 }

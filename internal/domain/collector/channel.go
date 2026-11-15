@@ -7,14 +7,12 @@ import (
 	"asservat.local/asservat/internal/domain/planning"
 )
 
-// Channel timing (ADR-246, docs/architecture/node-collector.md). The
-// collector pushes a report after Hello and when its content changes; it
-// checks source counters, which have no change event, every StatusInterval.
-// The connector treats the latest report as current while the stream is open.
+// Channel bounds (ADR-246, docs/architecture/node-collector.md). The
+// collector pushes a report after Hello and on every change; the connector
+// treats the latest report as current while the stream is open.
 // StatusStaleAfter bounds how long consumers rely on one connector reading.
 const (
-	StatusInterval   = 15 * time.Second
-	StatusStaleAfter = 3 * StatusInterval
+	StatusStaleAfter = 45 * time.Second
 	MaxQueuedWork    = 64
 	MaxReceipts      = 64
 )

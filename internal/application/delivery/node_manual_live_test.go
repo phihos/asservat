@@ -23,7 +23,7 @@ func TestLiveManualNodeChannelMatchesOriginalHolderAndInspectionIsPassive(t *tes
 	peer := NodePeer{NodeUID: id.NodeUID, PodUID: id.PodUID}
 	state := report(now)
 	state.Mechanisms = []collector.Availability{{Mechanism: collector.MechanismPacket, Prerequisites: true, Adapter: collector.AdapterAvailable, LiveProjections: []string{v.Packet}}}
-	if e = ch.Report(peer, state); e != nil {
+	if e = ch.Report(peer, cur(ch, peer), state); e != nil {
 		t.Fatal(e)
 	}
 	uid := "33333333-3333-4333-8333-333333333333"

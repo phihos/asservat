@@ -82,7 +82,7 @@ func outcome(code int) error {
 
 // send posts one bounded upload of exactly length bytes.
 func (c *Client) send(ctx context.Context, path, contentType string, length int64, body io.Reader) error {
-	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, UploadTimeout)
 	defer cancel()
 	req, err := c.request(ctx, path, contentType, body)
 	if err != nil {

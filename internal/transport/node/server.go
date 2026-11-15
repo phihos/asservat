@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"asservat.local/asservat/internal/application/delivery"
 	"asservat.local/asservat/internal/contracts"
@@ -37,6 +38,10 @@ func NewHandler(ch *delivery.NodeChannel, attester delivery.NodeAttester) (*Hand
 	}
 	return &Handler{channel: ch, attester: attester, reviews: rate.NewLimiter(50, 200)}, nil
 }
+
+// UploadTimeout bounds one upload request on both sides: the largest capture
+// (8 MiB) at the default 32 MiB/s node upload rate plus connection slack.
+const UploadTimeout = 60 * time.Second
 
 type connKey struct{}
 
@@ -87,7 +92,11 @@ func (h *Handler) authenticate(r *http.Request) (collector.Identity, error) {
 	if a.id.NodeUID != "" && a.digest == digest {
 		return a.id, nil
 	}
-	if !h.reviews.Allow() {
+	// The limiter bounds reviews for new connections (reconnect storms). A
+	// rotated token on an authenticated connection costs one review per node
+	// per kubelet refresh, so it is not limited and an upload never fails
+	// with 429 there.
+	if a.id.NodeUID == "" && !h.reviews.Allow() {
 		return collector.Identity{}, delivery.ErrNodeRateLimited
 	}
 	id, err := h.attester.AttestNode(r.Context(), []byte(token))
@@ -107,6 +116,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost || r.URL.RawQuery != "" {
 		w.WriteHeader(http.StatusBadRequest)
 		return
+	}
+	if r.URL.Path != contracts.NodeConnectPath {
+		// One-shot uploads get their own bound; the stream has none.
+		rc := http.NewResponseController(w)
+		_ = rc.SetReadDeadline(time.Now().Add(UploadTimeout))
+		_ = rc.SetWriteDeadline(time.Now().Add(UploadTimeout))
 	}
 	switch r.URL.Path {
 	case contracts.NodeConnectPath:
@@ -165,7 +180,7 @@ func (h *Handler) connect(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			report, ok := DomainStatus(*up.Status)
-			if !ok || h.channel.Report(peer, report) != nil {
+			if !ok || h.channel.Report(peer, stream, report) != nil {
 				return
 			}
 		}

@@ -73,10 +73,11 @@ func (s *NodeChannelServer) Serve(ctx context.Context, l net.Listener) error {
 	}
 	protocols := new(http.Protocols)
 	protocols.SetHTTP2(true)
-	// Streams are long-lived, so there is no read or write timeout; HTTP/2
-	// PING ends a connection whose peer stopped answering.
+	// Streams are long-lived, so there is no server-wide read or write
+	// timeout: uploads set their own per-request deadline, HTTP/2 PING ends a
+	// connection whose peer stopped answering and IdleTimeout closes idle ones.
 	srv := &http.Server{Handler: s.handler, TLSConfig: &tls.Config{Certificates: []tls.Certificate{s.server}, MinVersion: tls.VersionTLS13},
-		ReadHeaderTimeout: 5 * time.Second, MaxHeaderBytes: 32 << 10, Protocols: protocols, HTTP2: &http.HTTP2Config{SendPingTimeout: 30 * time.Second, PingTimeout: 15 * time.Second},
+		ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 90 * time.Second, MaxHeaderBytes: 32 << 10, Protocols: protocols, HTTP2: &http.HTTP2Config{SendPingTimeout: 30 * time.Second, PingTimeout: 15 * time.Second},
 		ErrorLog: log.New(io.Discard, "", 0), BaseContext: func(net.Listener) context.Context { return ctx }, ConnContext: node.ConnContext}
 	stopped := make(chan struct{})
 	go func() {

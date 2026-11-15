@@ -19,6 +19,8 @@ import (
 // collection authority. Initial replay tombstones survive their original start
 // cutoff; a later renewal cannot construct a replacement engine.
 type nodeSources struct {
+	// changed signals a possible status change of any source.
+	changed    func()
 	liveBudget *nodeLiveBudget
 	liveWG     sync.WaitGroup
 	// ringDir is the mounted administrator ring volume; empty means the
@@ -213,6 +215,9 @@ func (n *nodeSources) decide(parent context.Context, w collector.Work) collector
 		r.Reason = collector.ReasonCaptureBusy
 		return r
 	}
+	s.mu.Lock()
+	s.changed = n.changed
+	s.mu.Unlock()
 	n.sources[b.SourceID], n.plans[b.SourceID] = s, p
 	r.Outcome, r.Reason = collector.OutcomeAccepted, ""
 	return r

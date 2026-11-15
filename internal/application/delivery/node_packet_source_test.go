@@ -16,7 +16,7 @@ func TestPacketExpectedSourceChecksBeforeQueueEffect(t *testing.T) {
 			peer, _ := enroll(t, ch, epochA)
 			r := report(clk.now())
 			r.Mechanisms = []collector.Availability{{Mechanism: collector.MechanismPacket, Prerequisites: true, Adapter: collector.AdapterAvailable}}
-			if err := ch.Report(peer, r); err != nil {
+			if err := ch.Report(peer, cur(ch, peer), r); err != nil {
 				t.Fatal(err)
 			}
 			v, ok := ch.NodeByName("node-a")

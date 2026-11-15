@@ -81,7 +81,7 @@ func TestSourceSnapshotCancellationNeedsExactAcceptedNodeReceipt(t *testing.T) {
 	}
 	report := report(clk.now())
 	report.Receipts = []collector.Receipt{{WorkID: work.ID, Sequence: work.Sequence + 1, Outcome: collector.OutcomeAccepted}}
-	if err = channel.Report(peer, report); err != nil {
+	if err = channel.Report(peer, cur(channel, peer), report); err != nil {
 		t.Fatal(err)
 	}
 	if _, joined := channel.SourceSnapshotCancellation(x, work.ID); joined {
@@ -91,7 +91,7 @@ func TestSourceSnapshotCancellationNeedsExactAcceptedNodeReceipt(t *testing.T) {
 	report.ObservedAt = clk.now()
 	report.Receipts[0].Sequence = work.Sequence
 	report.Receipts[0].Outcome = collector.OutcomeRefused
-	if err = channel.Report(peer, report); err != nil {
+	if err = channel.Report(peer, cur(channel, peer), report); err != nil {
 		t.Fatal(err)
 	}
 	if _, joined := channel.SourceSnapshotCancellation(x, work.ID); joined {
@@ -100,7 +100,7 @@ func TestSourceSnapshotCancellationNeedsExactAcceptedNodeReceipt(t *testing.T) {
 	clk.add(time.Second)
 	report.ObservedAt = clk.now()
 	report.Receipts[0].Outcome = collector.OutcomeAccepted
-	if err = channel.Report(peer, report); err != nil {
+	if err = channel.Report(peer, cur(channel, peer), report); err != nil {
 		t.Fatal(err)
 	}
 	if at, joined := channel.SourceSnapshotCancellation(x, work.ID); !joined || !at.Equal(clk.now()) {
@@ -110,7 +110,7 @@ func TestSourceSnapshotCancellationNeedsExactAcceptedNodeReceipt(t *testing.T) {
 	clk.add(time.Second)
 	report.ObservedAt = clk.now()
 	report.Receipts = nil
-	if err = channel.Report(peer, report); err != nil {
+	if err = channel.Report(peer, cur(channel, peer), report); err != nil {
 		t.Fatal(err)
 	}
 	if _, joined := channel.SourceSnapshotCancellation(x, work.ID); !joined {

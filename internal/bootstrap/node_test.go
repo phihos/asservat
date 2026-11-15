@@ -212,3 +212,64 @@ func TestNodeDeploymentValidation(t *testing.T) {
 		}
 	}
 }
+
+type recordingStream struct {
+	mu      sync.Mutex
+	reports []collector.Report
+}
+
+func (s *recordingStream) Status(r collector.Report) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.reports = append(s.reports, r)
+	return nil
+}
+func (s *recordingStream) Receive() (delivery.NodeWorkDelivery, error) {
+	return delivery.NodeWorkDelivery{}, node.ErrUnavailable
+}
+func (s *recordingStream) Close() {}
+func (s *recordingStream) count() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.reports)
+}
+
+func TestNodeStatusIsPushedOnBudgetChangeOnly(t *testing.T) {
+	facts := collector.Facts{Kernel: collector.KernelVersion{Major: 6, Minor: 8}}
+	budget, _ := collector.NewBudget(collector.Ceilings{RingBytes: 1 << 20, FrozenBytes: 1 << 20, UploadBytesPerSecond: 1 << 20, UploadBurstBytes: 1 << 20}, time.Now())
+	var skipped time.Duration
+	p := &nodeProcess{facts: facts, mechanisms: collector.Assess(facts), budget: budget, now: time.Now, changes: make(chan struct{}, 1),
+		sleep: func(_ context.Context, d time.Duration, _ <-chan struct{}) error { skipped += d; return nil }}
+	budget.OnChange(p.changed)
+	stream := &recordingStream{}
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan error, 1)
+	go func() { done <- p.statusLoop(ctx, stream) }()
+	wait := func(n int) {
+		t.Helper()
+		for i := 0; stream.count() < n; i++ {
+			if i > 500 {
+				t.Fatalf("report %d not sent", n)
+			}
+			time.Sleep(5 * time.Millisecond)
+		}
+	}
+	wait(1)
+	// An unchanged signal sends nothing.
+	p.changed()
+	time.Sleep(50 * time.Millisecond)
+	if stream.count() != 1 {
+		t.Fatal("an unchanged report was sent")
+	}
+	p.mu.Lock()
+	if err := budget.ReserveFrozen(1024); err != nil {
+		t.Fatal(err)
+	}
+	p.mu.Unlock()
+	wait(2)
+	if got := stream.reports[1].Budget.FrozenReserved; got != 1024 {
+		t.Fatalf("pushed budget %d", got)
+	}
+	cancel()
+	<-done
+}

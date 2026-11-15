@@ -177,7 +177,8 @@ func RunNode(ctx context.Context, podUID string) error {
 			return nil, err
 		}
 		return s, nil
-	}, uploadLive: client.UploadLive, podUID: podUID, facts: facts, mechanisms: mechanisms, budget: budget, now: time.Now, sleep: nodeSleep, log: os.Stderr}
+	}, uploadLive: client.UploadLive, podUID: podUID, facts: facts, mechanisms: mechanisms, budget: budget, now: time.Now, sleep: nodeSleep, log: os.Stderr, changes: make(chan struct{}, 1)}
+	budget.OnChange(p.changed)
 	p.packets = &nodePackets{engine: gadget.CapturePackets, syscallTrace: syscallTraceIfAvailable(mechanisms), argumentTrace: argumentTraceIfAvailable(mechanisms), argumentResources: gadget.ArgumentWorkingBytes, observedEngine: gadget.CaptureObservedPackets, upload: client.UploadCapture, available: packetAvailable(mechanisms), version: facts.Engine.Version,
 		now: time.Now, log: func(line string) { fmt.Fprintln(os.Stderr, line) }, budget: func() *collector.Budget { return p.budget }, budgetMu: &p.mu}
 	p.profiles = &nodeProfiles{acquire: acquireNodeProfile(time.Now), upload: client.UploadProfileStream, now: time.Now, budget: func() *collector.Budget { return p.budget }, budgetMu: &p.mu}
@@ -195,9 +196,9 @@ func RunNode(ctx context.Context, podUID string) error {
 		}
 	}
 	fmt.Fprintf(os.Stderr, "node collector ring medium: encrypted disk available=%t removedEarlier=%d\n", ringDir != "", removed)
-	p.sources = &nodeSources{ringDir: ringDir, ringDiskBytes: d.Ceilings.RingDiskBytes, log: p.packets.log, upload: client.UploadCapture, takeUpload: p.packets.takeUpload, version: facts.Engine.Version, engine: gadget.CaptureObservedPackets, syscallEngine: syscallTraceIfAvailable(mechanisms), now: time.Now, budget: budget, budgetMu: &p.mu, available: packetAvailable(mechanisms)}
+	p.sources = &nodeSources{changed: p.changed, ringDir: ringDir, ringDiskBytes: d.Ceilings.RingDiskBytes, log: p.packets.log, upload: client.UploadCapture, takeUpload: p.packets.takeUpload, version: facts.Engine.Version, engine: gadget.CaptureObservedPackets, syscallEngine: syscallTraceIfAvailable(mechanisms), now: time.Now, budget: budget, budgetMu: &p.mu, available: packetAvailable(mechanisms)}
 	if d.Live != nil {
-		p.sources.liveBudget = &nodeLiveBudget{limits: nodeLiveLimits(*d.Live)}
+		p.sources.liveBudget = &nodeLiveBudget{limits: nodeLiveLimits(*d.Live), changed: p.changed}
 		for n, m := range p.mechanisms {
 			if m.Adapter == collector.AdapterAvailable && m.Prerequisites {
 				switch m.Mechanism {
@@ -280,6 +281,9 @@ type nodeProcess struct {
 	// root is the process context: captures outlive a reconnect.
 	root context.Context
 
+	// changes carries change signals to the status loop (capacity 1).
+	changes chan struct{}
+
 	mu       sync.Mutex
 	budget   *collector.Budget
 	receipts []collector.Receipt
@@ -330,21 +334,36 @@ func (p *nodeProcess) report() collector.Report {
 	return collector.Report{ObservedAt: now.UTC(), Facts: p.facts, Mechanisms: p.mechanisms, Budget: p.budget.Usage(now), Receipts: append([]collector.Receipt{}, p.receipts[:n]...), Sources: sources, Live: live}
 }
 
-// statusLoop sends a report after Hello, after each receipt and when the
-// report changed. Source counters change with every packet and have no event,
-// so a change check runs every StatusInterval; an unchanged report is not
-// sent.
-func (p *nodeProcess) statusLoop(ctx context.Context, stream nodeStream, kick <-chan struct{}) error {
-	tick := time.NewTicker(collector.StatusInterval)
-	defer tick.Stop()
+// statusSpacing coalesces bursts of changes (source counters move with every
+// packet) into at most one report per second.
+const statusSpacing = time.Second
+
+// changed signals that the report may differ from the last one sent.
+func (p *nodeProcess) changed() {
+	select {
+	case p.changes <- struct{}{}:
+	default:
+	}
+}
+
+// statusLoop sends a report after Hello and then whenever a change signal
+// arrives (receipts, budget, source and live state), at most once per
+// statusSpacing. An unchanged report is not sent.
+func (p *nodeProcess) statusLoop(ctx context.Context, stream nodeStream) error {
 	var last []byte
+	var sent time.Time
 	for {
+		if wait := sent.Add(statusSpacing).Sub(p.now()); !sent.IsZero() && wait > 0 {
+			if err := p.sleep(ctx, wait, nil); err != nil {
+				return err
+			}
+		}
 		r := p.report()
 		if key := statusKey(r); len(r.Receipts) > 0 || !bytes.Equal(key, last) {
 			if err := stream.Status(r); err != nil {
 				return err
 			}
-			last = key
+			last, sent = key, p.now()
 			p.mu.Lock()
 			p.receipts = p.receipts[len(r.Receipts):]
 			more := len(p.receipts) > 0
@@ -356,8 +375,7 @@ func (p *nodeProcess) statusLoop(ctx context.Context, stream nodeStream, kick <-
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-kick:
-		case <-tick.C:
+		case <-p.changes:
 		}
 	}
 }
@@ -434,9 +452,8 @@ func (p *nodeProcess) session(ctx context.Context) (bool, error) {
 	p.note("")
 	fmt.Fprintln(p.log, "node collector connected")
 	session, cancel := context.WithCancel(ctx)
-	kick := make(chan struct{}, 1)
 	done := make(chan error, 1)
-	go func() { done <- p.statusLoop(session, stream, kick) }()
+	go func() { done <- p.statusLoop(session, stream) }()
 	go func() {
 		<-session.Done()
 		stream.Close()
@@ -449,10 +466,7 @@ func (p *nodeProcess) session(ctx context.Context) (bool, error) {
 			p.mu.Lock()
 			p.receipts = append(p.receipts, r)
 			p.mu.Unlock()
-			select {
-			case kick <- struct{}{}:
-			default:
-			}
+			p.changed()
 			continue
 		}
 		cancel()
@@ -467,6 +481,9 @@ func (p *nodeProcess) session(ctx context.Context) (bool, error) {
 // backoff. A connector restart only drops the stream.
 func (p *nodeProcess) Run(ctx context.Context) error {
 	p.root = ctx
+	if p.changes == nil {
+		p.changes = make(chan struct{}, 1)
+	}
 	backoff := nodeRetryMin
 	for {
 		opened, err := p.session(ctx)

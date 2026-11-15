@@ -239,7 +239,7 @@ func startSourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capacit
 	}
 	b := snapshot.Source.Binding
 	channel, peer := connectSyntheticNode(t, clock, collector.Identity{NodeName: "worker", NodeUID: b.NodeUID, PodUID: b.CollectorPodUID, BootID: b.BootID, Epoch: b.CollectorEpoch})
-	if err = channel.Report(peer, collector.Report{ObservedAt: clock(), Facts: collector.Facts{Kernel: collector.KernelVersion{Major: 6, Minor: 8}}, Mechanisms: []collector.Availability{{Mechanism: collector.MechanismPacket, Prerequisites: true, Adapter: collector.AdapterAvailable, Hook: collector.HookTC}}}); err != nil {
+	if err = channel.Report(peer, 1, collector.Report{ObservedAt: clock(), Facts: collector.Facts{Kernel: collector.KernelVersion{Major: 6, Minor: 8}}, Mechanisms: []collector.Availability{{Mechanism: collector.MechanismPacket, Prerequisites: true, Adapter: collector.AdapterAvailable, Hook: collector.HookTC}}}); err != nil {
 		t.Fatal(err)
 	}
 	holder := bootstrap.NewConnectorRecordings(channel, nil, clock, func(line string) { t.Log(line) })

@@ -102,7 +102,7 @@ func qualifyPolicyObservationCompanion(t *testing.T, ctx context.Context, admin,
 	// issuance. No native collector, certificate or Kubernetes proof is claimed.
 	nodeIdentity := collector.Identity{NodeName: "worker", NodeUID: node, PodUID: collectorPod, BootID: boot, Epoch: epoch}
 	channel, peer := connectSyntheticNode(t, clock, nodeIdentity)
-	if err = channel.Report(peer, collector.Report{ObservedAt: clock(), Facts: collector.Facts{Kernel: collector.KernelVersion{Major: 6, Minor: 8}}, Mechanisms: []collector.Availability{{Mechanism: collector.MechanismPacket, Prerequisites: true, Adapter: collector.AdapterAvailable, Hook: collector.HookTC}}}); err != nil {
+	if err = channel.Report(peer, 1, collector.Report{ObservedAt: clock(), Facts: collector.Facts{Kernel: collector.KernelVersion{Major: 6, Minor: 8}}, Mechanisms: []collector.Availability{{Mechanism: collector.MechanismPacket, Prerequisites: true, Adapter: collector.AdapterAvailable, Hook: collector.HookTC}}}); err != nil {
 		t.Fatal(err)
 	}
 
