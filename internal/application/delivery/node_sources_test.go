@@ -9,30 +9,23 @@ import (
 	"asservat.local/asservat/internal/domain/targets"
 )
 
-type sourceNodeAttester struct{}
-
-func (sourceNodeAttester) PrecheckNode([]byte) error { return nil }
-func (sourceNodeAttester) AttestNode(_ context.Context, _ []byte, boot string) (collector.Identity, error) {
-	return collector.Identity{NodeName: "node", NodeUID: "11111111-1111-4111-8111-111111111111", PodName: "collector", PodUID: "22222222-2222-4222-8222-222222222222", BootID: boot}, nil
-}
-
 func TestSourceQueuePreservesCurrentProcessOriginalBoundsAndRestrictiveStop(t *testing.T) {
-	for _, mode := range []string{"exact", "foreign-node", "foreign-epoch", "expired", "short-certificate", "earlier-request", "stop-without-workload"} {
+	for _, mode := range []string{"exact", "foreign-node", "foreign-epoch", "expired", "earlier-request", "stop-without-workload"} {
 		t.Run(mode, func(t *testing.T) {
 			now := time.Now().UTC()
 			clock := &clock{t: now}
-			ch, err := NewNodeChannel(sourceNodeAttester{}, &fakeIssuer{}, clock.now, nil)
+			ch, err := NewNodeChannel(clock.now, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
-			_, _, id, err := ch.Enroll(t.Context(), "127.0.0.1", []byte("token"), []byte("csr"), boot, epochA)
+			id, err := sourceConnect(ch, epochA)
 			if err != nil {
 				t.Fatal(err)
 			}
-			peer := NodePeer{NodeUID: id.NodeUID, Epoch: id.Epoch}
-			r := report(1, now)
+			peer := NodePeer{NodeUID: id.NodeUID, PodUID: id.PodUID}
+			r := report(now)
 			r.Mechanisms = []collector.Availability{{Mechanism: collector.MechanismPacket, Prerequisites: true, Adapter: collector.AdapterAvailable}}
-			if err = ch.Report(peer, epochA, r); err != nil {
+			if err = ch.Report(peer, r); err != nil {
 				t.Fatal(err)
 			}
 			resource := collector.SourceResources{PolicyUID: "capacity"}
@@ -49,12 +42,6 @@ func TestSourceQueuePreservesCurrentProcessOriginalBoundsAndRestrictiveStop(t *t
 				expected.CollectorEpoch = uuid
 			case "expired":
 				source.Permit.DispatchUntil = now
-			case "short-certificate":
-				ch.mu.Lock()
-				for digest := range ch.nodes[id.NodeUID].certs {
-					ch.nodes[id.NodeUID].certs[digest] = now.Add(20 * time.Second)
-				}
-				ch.mu.Unlock()
 			case "earlier-request":
 				end = now.Add(time.Second)
 			case "stop-without-workload":

@@ -29,7 +29,7 @@ func (privateProfileSink) DeliverProfile(context.Context, collector.Identity, co
 func TestProfileAuthorizationCurrentProcessAndRetainedWorkAfterRead(t *testing.T) {
 	for _, mode := range []string{"current", "changed-epoch", "cancelled", "expired", "receipted", "changed-epoch-with-refusal"} {
 		t.Run(mode, func(t *testing.T) {
-			ch, _, clock, _ := newChannel(t)
+			ch, clock, _ := newChannel(t)
 			clock.t = time.Now().UTC().Truncate(time.Microsecond)
 			peer, _ := enroll(t, ch, epochA)
 			const id = "11111111-1111-4111-8111-111111111111"
@@ -39,8 +39,7 @@ func TestProfileAuthorizationCurrentProcessAndRetainedWorkAfterRead(t *testing.T
 			ch.nodes[id] = entry
 			peer.NodeUID = id
 			now := clock.now()
-			entry.report = &collector.Report{Sequence: 1, Mechanisms: []collector.Availability{{Mechanism: collector.MechanismProfile, Prerequisites: true, Adapter: collector.AdapterAvailable, ProfileTLS: true, ProfileAuthorization: true}}}
-			entry.reportedAt = now
+			entry.report = &collector.Report{ObservedAt: now, Mechanisms: []collector.Availability{{Mechanism: collector.MechanismProfile, Prerequisites: true, Adapter: collector.AdapterAvailable, ProfileTLS: true, ProfileAuthorization: true}}}
 			material := execution.GoProfileTLSMaterial{RootsPEM: "public", RootsDigest: artifact.Digest(sha256.Sum256([]byte("public"))), ServerName: "profile.internal"}
 			p := collector.ProfileCapture{CaptureID: id, CollectorEpoch: epochA, ExpectationDigest: artifact.Digest{1}, DefinitionDigest: artifact.Digest{2}, AddressMode: "targetLoopback", Address: netip.MustParseAddr("::1"), Port: 6060, Host: "profile.internal", TLS: material, AuthorizationRequired: true, Request: execution.GoProfileRequest{Binding: artifact.Binding{ClusterID: id, ArtifactID: id, AttemptID: id, MediaType: artifact.ProfileMediaType}, Pin: artifact.PinnedPod{Namespace: "app", NamespaceUID: id, Name: "app", UID: id, NodeName: entry.id.NodeName}, NodeUID: id, NodeBootID: boot, SourceRef: "pprof", EndpointDigest: artifact.Digest{3}, Parameters: execution.GoProfileParameters{Type: "heap", Mode: "snapshot"}, NativeLimit: 16 << 20, NotBefore: now, Deadline: now.Add(10 * time.Second)}}
 			work, err := ch.EnqueueProfile(t.Context(), p, now.Add(3*time.Second))
@@ -62,7 +61,7 @@ func TestProfileAuthorizationCurrentProcessAndRetainedWorkAfterRead(t *testing.T
 				switch mode {
 				case "changed-epoch", "changed-epoch-with-refusal":
 					ch.mu.Lock()
-					entry.id.Epoch = epochB
+					entry.id.PodUID = "other"
 					ch.mu.Unlock()
 				case "cancelled":
 					cancel()
@@ -71,10 +70,9 @@ func TestProfileAuthorizationCurrentProcessAndRetainedWorkAfterRead(t *testing.T
 				case "receipted":
 					clock.add(time.Second)
 					r := *entry.report
-					r.Sequence++
 					r.ObservedAt = clock.now()
 					r.Receipts = []collector.Receipt{{WorkID: work.ID, Sequence: work.Sequence, Outcome: collector.OutcomeAccepted}}
-					if err := ch.Report(peer, epochA, r); err != nil {
+					if err := ch.Report(peer, r); err != nil {
 						t.Error(err)
 					}
 				}
@@ -86,10 +84,10 @@ func TestProfileAuthorizationCurrentProcessAndRetainedWorkAfterRead(t *testing.T
 			}})
 			wrong := work
 			wrong.Sequence++
-			if _, err := ch.ProfileAuthorization(ctx, peer, epochA, wrong); err == nil || reads != 0 {
+			if _, err := ch.ProfileAuthorization(ctx, peer, wrong); err == nil || reads != 0 {
 				t.Fatal("wrong sequence reached provider")
 			}
-			got, err := ch.ProfileAuthorization(ctx, peer, epochA, work)
+			got, err := ch.ProfileAuthorization(ctx, peer, work)
 			if (mode == "changed-epoch" || mode == "changed-epoch-with-refusal") && !errors.Is(err, ErrNodeUnauthenticated) {
 				t.Fatal("final peer expiry masked as per-item refusal", err)
 			}

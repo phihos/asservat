@@ -1,10 +1,11 @@
 package bootstrap
 
 import (
-	"asservat.local/asservat/internal/domain/collector"
-	v "asservat.local/asservat/internal/domain/live"
 	"sync"
 	"time"
+
+	"asservat.local/asservat/internal/domain/collector"
+	v "asservat.local/asservat/internal/domain/live"
 )
 
 // nodeLiveBudget is separate from source/ring/snapshot credit. Its limits are

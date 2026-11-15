@@ -38,7 +38,7 @@ type uploads struct {
 	done chan struct{}
 }
 
-func (u *uploads) upload(_ context.Context, _ string, r collector.PacketResult, pcapng []byte) error {
+func (u *uploads) upload(_ context.Context, r collector.PacketResult, pcapng []byte) error {
 	u.mu.Lock()
 	u.r, u.pcap = append(u.r, r), append(u.pcap, append([]byte(nil), pcapng...))
 	u.mu.Unlock()
@@ -80,7 +80,7 @@ func TestNodePacketCaptureFiltersCutsAndUploads(t *testing.T) {
 	p := collector.PacketCapture{CaptureID: "22222222-2222-4222-8222-222222222222", PodUID: "11111111-1111-4111-8111-111111111111", Program: program,
 		ProgramDigest: [32]byte(compiler.FilterProgramDigest(program)), Duration: time.Second, MaxBytes: 1 << 20}
 	w := collector.Work{ID: "33333333-3333-4333-8333-333333333333", Sequence: 1, Kind: collector.WorkPacketCapture, NotAfter: clock.Add(10 * time.Second), Packet: &p}
-	r := n.start(context.Background(), "epoch", w)
+	r := n.start(context.Background(), w)
 	if r.Outcome != collector.OutcomeAccepted {
 		t.Fatalf("%+v", r)
 	}
@@ -108,20 +108,20 @@ func TestNodePacketCaptureFiltersCutsAndUploads(t *testing.T) {
 	bad := p
 	bad.Program = append([]planning.BPFInstruction(nil), program...)
 	bad.Program[0].K = 13
-	if r := n.start(context.Background(), "epoch", collector.Work{ID: w.ID, Sequence: 2, Kind: w.Kind, NotAfter: w.NotAfter, Packet: &bad}); r.Reason != collector.ReasonFilterUnsupported {
+	if r := n.start(context.Background(), collector.Work{ID: w.ID, Sequence: 2, Kind: w.Kind, NotAfter: w.NotAfter, Packet: &bad}); r.Reason != collector.ReasonFilterUnsupported {
 		t.Fatalf("%+v", r)
 	}
 	big := p
 	big.MaxBytes = 8 << 20
 	_ = budget.ReserveFrozen(10 << 20)
-	if r := n.start(context.Background(), "epoch", collector.Work{ID: w.ID, Sequence: 3, Kind: w.Kind, NotAfter: w.NotAfter, Packet: &big}); r.Reason != collector.ReasonCaptureBusy {
+	if r := n.start(context.Background(), collector.Work{ID: w.ID, Sequence: 3, Kind: w.Kind, NotAfter: w.NotAfter, Packet: &big}); r.Reason != collector.ReasonCaptureBusy {
 		t.Fatalf("%+v", r)
 	}
 	n.available = false
-	if r := n.start(context.Background(), "epoch", collector.Work{ID: w.ID, Sequence: 4, Kind: w.Kind, NotAfter: w.NotAfter, Packet: &p}); r.Reason != collector.ReasonEngineUnavailable {
+	if r := n.start(context.Background(), collector.Work{ID: w.ID, Sequence: 4, Kind: w.Kind, NotAfter: w.NotAfter, Packet: &p}); r.Reason != collector.ReasonEngineUnavailable {
 		t.Fatalf("%+v", r)
 	}
-	if r := n.start(context.Background(), "epoch", collector.Work{ID: w.ID, Sequence: 5, Kind: w.Kind, NotAfter: clock, Packet: &p}); r.Reason != collector.ReasonWorkExpired {
+	if r := n.start(context.Background(), collector.Work{ID: w.ID, Sequence: 5, Kind: w.Kind, NotAfter: clock, Packet: &p}); r.Reason != collector.ReasonWorkExpired {
 		t.Fatalf("%+v", r)
 	}
 }
@@ -136,7 +136,7 @@ func TestNodePacketCaptureReportsTargetFailure(t *testing.T) {
 	}
 	n := &nodePackets{engine: engine, upload: up.upload, available: true, now: func() time.Time { return clock }, log: func(string) {}, budget: func() *collector.Budget { return budget }, budgetMu: &mu}
 	p := collector.PacketCapture{CaptureID: "22222222-2222-4222-8222-222222222222", PodUID: "11111111-1111-4111-8111-111111111111", Duration: time.Second, MaxBytes: 1 << 20}
-	if r := n.start(context.Background(), "epoch", collector.Work{ID: "33333333-3333-4333-8333-333333333333", Sequence: 1, Kind: collector.WorkPacketCapture, NotAfter: clock.Add(time.Second), Packet: &p}); r.Outcome != collector.OutcomeAccepted {
+	if r := n.start(context.Background(), collector.Work{ID: "33333333-3333-4333-8333-333333333333", Sequence: 1, Kind: collector.WorkPacketCapture, NotAfter: clock.Add(time.Second), Packet: &p}); r.Outcome != collector.OutcomeAccepted {
 		t.Fatalf("%+v", r)
 	}
 	<-up.done

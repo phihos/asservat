@@ -4,7 +4,6 @@ package integration
 
 import (
 	"context"
-	"crypto/sha256"
 	"errors"
 	"fmt"
 	"sync"
@@ -91,19 +90,8 @@ func newManualSnapshotWorkflow(t *testing.T, ctx context.Context, f *capacitySQL
 		if _, ok := w.nodes[manualSnapshotKey(b)]; ok {
 			continue
 		}
-		channel, err := delivery.NewNodeChannel(policyObservationNode{collector.Identity{NodeName: "worker", NodeUID: b.NodeUID, PodUID: b.CollectorPodUID, BootID: b.BootID}}, policyObservationNodeIssuer{}, workflowNow, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		der, _, _, err := channel.Enroll(ctx, "synthetic-component", []byte("synthetic-token"), []byte("synthetic-csr"), b.BootID, b.CollectorEpoch)
-		if err != nil {
-			t.Fatal(err)
-		}
-		peer, err := channel.Peer(sha256.Sum256(der))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err = channel.Report(peer, b.CollectorEpoch, collector.Report{Sequence: 1, ObservedAt: workflowNow(), Facts: collector.Facts{Kernel: collector.KernelVersion{Major: 6, Minor: 8}}, Mechanisms: []collector.Availability{{Mechanism: collector.MechanismPacket, Prerequisites: true, Adapter: collector.AdapterAvailable, Hook: collector.HookTC}}}); err != nil {
+		channel, peer := connectSyntheticNode(t, workflowNow, collector.Identity{NodeName: "worker", NodeUID: b.NodeUID, PodUID: b.CollectorPodUID, BootID: b.BootID, Epoch: b.CollectorEpoch})
+		if err = channel.Report(peer, collector.Report{ObservedAt: workflowNow(), Facts: collector.Facts{Kernel: collector.KernelVersion{Major: 6, Minor: 8}}, Mechanisms: []collector.Availability{{Mechanism: collector.MechanismPacket, Prerequisites: true, Adapter: collector.AdapterAvailable, Hook: collector.HookTC}}}); err != nil {
 			t.Fatal(err)
 		}
 		holder := bootstrap.NewConnectorRecordings(channel, nil, workflowNow, func(line string) { t.Log(line) })
@@ -212,7 +200,7 @@ func (p *manualWorkflowPrepared) StartSourceSnapshot(ctx context.Context, x coll
 	if err != nil {
 		return queued, err
 	}
-	work, err := p.node.channel.Poll(ctx, p.node.peer, x.Binding.CollectorEpoch, p.node.after, 0)
+	work, err := syntheticPoll(ctx, p.node.channel, p.node.peer, p.node.after)
 	if err != nil {
 		return time.Time{}, err
 	}

@@ -82,7 +82,7 @@ func TestNodeProfileTLSCollectsOnlyOverExactVerifiedSocket(t *testing.T) {
 			const id = "11111111-1111-4111-8111-111111111111"
 			request := execution.GoProfileRequest{Binding: artifact.Binding{ClusterID: id, ArtifactID: id, AttemptID: id, MediaType: artifact.ProfileMediaType}, Pin: artifact.PinnedPod{Namespace: "app", NamespaceUID: id, Name: "app", UID: id, NodeName: "node"}, NodeUID: id, NodeBootID: id, SourceRef: "pprof", EndpointDigest: artifact.Digest{1}, Parameters: execution.GoProfileParameters{Type: "heap", Mode: "snapshot"}, NativeLimit: 16 << 20, NotBefore: now, Deadline: now.Add(4 * time.Second)}
 			p := collector.ProfileCapture{CollectorEpoch: id, Request: request}
-			guard := nodeProfileMechanism{p: p, identity: func() collector.Identity { return collector.Identity{Epoch: id, NodeUID: id, BootID: id} }, now: time.Now}
+			guard := nodeProfileMechanism{p: p, now: time.Now}
 			dialer := &profileTLSFixtureDialer{connection: raw, material: bad, authorization: authorization}
 			collector, err := diagnostics.NewGoProfileCollector(dialer, guard, time.Now)
 			if err != nil {

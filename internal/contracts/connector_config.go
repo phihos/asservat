@@ -105,16 +105,14 @@ func DecodeConnectorConfig(r io.Reader) (ConnectorConfig, error) {
 	return out, nil
 }
 
-// RegionalCollector names the collector namespace, DaemonSet and service
-// account whose Pod-bound tokens the connector attests, and the node
-// listener's Helm-rendered objects: the Secret (connector namespace) holding
-// the listener pair the connector generates once, the ConfigMap (collector
+// RegionalCollector names the collector namespace and service account whose
+// projected tokens the connector reviews, and the node listener's
+// Helm-rendered objects: the Secret (connector namespace) holding the
+// listener pair the connector generates once, the ConfigMap (collector
 // namespace) where it publishes the issuing root, and the certificate's
-// server name (the listener Service's DNS name). Node client certificates
-// come from an in-memory issuer of the connector process.
+// server name (the listener Service's DNS name).
 type RegionalCollector struct {
 	Namespace      string `json:"namespace"`
-	DaemonSet      string `json:"daemonSet"`
 	ServiceAccount string `json:"serviceAccount"`
 	ListenerSecret string `json:"listenerSecret"`
 	RootConfigMap  string `json:"rootConfigMap"`

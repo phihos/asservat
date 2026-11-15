@@ -55,7 +55,7 @@ func (n *nativeLiveQualification) read(ctx context.Context, ch *delivery.NodeCha
 	if err != nil {
 		return out, err
 	}
-	wire, err := node.WireLiveReply(q.Epoch(), out)
+	wire, err := node.WireLiveReply(out)
 	if err != nil {
 		return v.NodeReply{}, err
 	}
@@ -407,7 +407,7 @@ func nativeSourceDiagnosis(ch *delivery.NodeChannel, b collector.SourceBinding, 
 	if !ok || view.Report == nil {
 		return "no current node report"
 	}
-	out := fmt.Sprintf("waited=%s earlier-phases=%s report-seq=%d observed=%s", time.Since(waitFrom).Round(time.Millisecond), phaseElapsed.Round(time.Millisecond), view.Report.Sequence, view.Report.ObservedAt.Format(time.RFC3339Nano))
+	out := fmt.Sprintf("waited=%s earlier-phases=%s reports=%d observed=%s", time.Since(waitFrom).Round(time.Millisecond), phaseElapsed.Round(time.Millisecond), view.Reports, view.Report.ObservedAt.Format(time.RFC3339Nano))
 	for _, r := range view.Report.Receipts {
 		if r.WorkID == workID {
 			out += fmt.Sprintf(" receipt=%s/%s", r.Outcome, r.Reason)

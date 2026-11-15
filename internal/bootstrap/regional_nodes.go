@@ -12,9 +12,8 @@ import (
 )
 
 // regionalNodes is the connector's optional ADR-246 node listener. Its
-// Kubernetes reads (TokenReview, collector Pods/DaemonSet, Nodes) and the
-// listener objects' get/update use the connector account; the chart grants
-// exactly those.
+// Kubernetes calls (TokenReview, Nodes) and the listener objects' get/update
+// use the connector account.
 type regionalNodes struct {
 	server   *NodeChannelServer
 	listener net.Listener
@@ -35,11 +34,11 @@ func newRegionalNodes(ctx context.Context, c regionalConfig, in *providerInputs)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	attester, err := kube.NewNodeAttester(client, n.DaemonSet, n.ServiceAccount)
+	attester, err := kube.NewNodeAttester(client, n.ServiceAccount)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	s, err := NewNodeChannelServer(c.ClusterID, attester, server, os.Stderr, time.Now)
+	s, err := NewNodeChannelServer(attester, server, os.Stderr, time.Now)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}

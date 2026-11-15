@@ -41,7 +41,7 @@ func TestProfileWirePreservesExactRequestAndRejectsMalformedRoute(t *testing.T) 
 		}
 	}
 	r := collector.ProfileResult{WorkID: id, CaptureID: id, ExpectationDigest: p.ExpectationDigest, EndpointDigest: p.Request.EndpointDigest, Outcome: execution.GoProfileOutcome{Format: artifact.PprofFormat, StartedAt: now, CompletedAt: now, MayHaveStarted: true, ResponseComplete: true, NativeBytes: 3}}
-	wire := WireProfileResult(id, r)
+	wire := WireProfileResult(r)
 	out, ok := DomainProfileResult(wire)
 	if !ok || !reflect.DeepEqual(out, r) {
 		t.Fatal("result roundtrip", out, ok)

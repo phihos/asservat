@@ -147,7 +147,7 @@ func TestLiveManualRegionalCompactReplyRebindsSixteenOriginals(t *testing.T) {
 					observed.WorkID = c.Executor.PodUID
 				}
 				row := v.Row{ID: id + ":1", SourceID: id, Sequence: 1, PodUID: m.PodUID, ObservedAt: now, ReceivedAt: now, ExpiresAt: now.Add(time.Second), Projection: v.Packet, Packet: &v.PacketFields{Protocol: "TCP", RemoteIP: "192.0.2.1", Direction: "egress"}}
-				wire[n], err = node.WireLiveReply(m.CollectorEpoch, v.NodeReply{ObservedManual: &observed, SourceID: id, Fence: id, BootID: m.BootID, Clock: "monotonic", Sample: 100, Position: v.Position{Sequence: 1}, Rows: []v.StampedRow{{Row: row, Nanos: 100, Clock: "monotonic"}}, Examined: 1})
+				wire[n], err = node.WireLiveReply(v.NodeReply{ObservedManual: &observed, SourceID: id, Fence: id, BootID: m.BootID, Clock: "monotonic", Sample: 100, Position: v.Position{Sequence: 1}, Rows: []v.StampedRow{{Row: row, Nanos: 100, Clock: "monotonic"}}, Examined: 1})
 				if err != nil {
 					t.Fatal(err)
 				}

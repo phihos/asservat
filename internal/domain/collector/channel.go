@@ -7,51 +7,17 @@ import (
 	"asservat.local/asservat/internal/domain/planning"
 )
 
-// Channel timing (ADR-246, plan S9). One batched report per node every 15
-// seconds plus an immediate report after enrollment and on stop/loss; a node
-// whose last report is older than three intervals is no longer current.
+// Channel timing (ADR-246, docs/architecture/node-collector.md). The
+// collector pushes a report after Hello and when its content changes; it
+// checks source counters, which have no change event, every StatusInterval.
+// The connector treats the latest report as current while the stream is open.
+// StatusStaleAfter bounds how long consumers rely on one connector reading.
 const (
-	StatusInterval       = 15 * time.Second
-	StatusStaleAfter     = 3 * StatusInterval
-	StatusMinimumSpacing = time.Second
-	PollHold             = 25 * time.Second
-	CertificateLifetime  = 20 * time.Minute
-	CertificateRenewal   = time.Minute
-	MaxQueuedWork        = 64
-	MaxWorkPerPoll       = 16
-	MaxReceipts          = 64
+	StatusInterval   = 15 * time.Second
+	StatusStaleAfter = 3 * StatusInterval
+	MaxQueuedWork    = 64
+	MaxReceipts      = 64
 )
-
-// StatusCadence decides when the next report is due. Urgent reports (stop,
-// loss) are sent at once but never closer than StatusMinimumSpacing, which
-// the connector also enforces.
-type StatusCadence struct {
-	last    time.Time
-	sent    bool
-	pending bool
-}
-
-func (s *StatusCadence) Urgent() { s.pending = true }
-
-// Wait returns how long until a report is due at now; zero means send now.
-func (s *StatusCadence) Wait(now time.Time) time.Duration {
-	if !s.sent {
-		return 0
-	}
-	next := s.last.Add(StatusInterval)
-	if s.pending {
-		next = s.last.Add(StatusMinimumSpacing)
-	}
-	if !now.Before(next) {
-		return 0
-	}
-	return next.Sub(now)
-}
-
-// Sent records a successful report at the time it was sent.
-func (s *StatusCadence) Sent(at time.Time) {
-	s.last, s.sent, s.pending = at, true, false
-}
 
 // WorkKind is the closed set of connector-to-node work items (I-02).
 type WorkKind string
@@ -300,9 +266,11 @@ func Decide(w Work, now time.Time) Receipt {
 	return r
 }
 
-// Identity is one attested node collector process. Node, Pod and boot values
-// come from Kubernetes (TokenReview and live objects); Epoch is the process's
-// random start identity, so a restart is a new collector generation.
+// Identity is one connected node collector. Node and Pod values come from
+// the TokenReview of its bound token, BootID and Runtime from its Node object;
+// Epoch is the connector-assigned generation of that collector Pod, so a new
+// Pod on the node does not inherit earlier work. The collector never sees it
+// except as provenance inside work bindings.
 type Identity struct {
 	NodeName, NodeUID string
 	PodName, PodUID   string
@@ -315,7 +283,6 @@ type Identity struct {
 
 // Report is one node status report.
 type Report struct {
-	Sequence   uint64
 	ObservedAt time.Time
 	Facts      Facts
 	Mechanisms []Availability

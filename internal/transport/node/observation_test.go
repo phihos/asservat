@@ -1,15 +1,16 @@
 package node
 
 import (
-	"asservat.local/asservat/internal/contracts"
-	"asservat.local/asservat/internal/domain/collector"
-	"asservat.local/asservat/internal/domain/planning"
 	"bytes"
 	"encoding/json"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/collector"
+	"asservat.local/asservat/internal/domain/planning"
 )
 
 func observedNodeWork() collector.Work {
@@ -21,11 +22,11 @@ func observedNodeWork() collector.Work {
 func TestNodeObservationClosedWireRetainsOriginalPermit(t *testing.T) {
 	w := observedNodeWork()
 	wire := WireWork(w)
-	data, err := json.Marshal(contracts.NodePollResponse{Format: contracts.NodePollFormat, Work: []contracts.NodeWork{wire}})
+	data, err := json.Marshal(pollResponse{Work: []contracts.NodeWork{wire}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	decoded, err := contracts.DecodeNodePollResponse(bytes.NewReader(data))
+	decoded, err := decodePollResponse(bytes.NewReader(data))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,48 +51,14 @@ func TestNodeObservationClosedWireRetainsOriginalPermit(t *testing.T) {
 		t.Fatal("nil metadata wire changed")
 	}
 }
-func TestNodeObservationMaximumPollFitsExistingBound(t *testing.T) {
-	w := observedNodeWork()
-	p := w.Packet
-	o := p.Observation
-	p.Program = make([]planning.BPFInstruction, planning.MaxFilterInstructions)
-	for i := range p.Program {
-		p.Program[i] = planning.BPFInstruction{Code: 65535, Jt: 255, Jf: 255, K: ^uint32(0)}
-	}
-	b := &o.Binding
-	b.ActionID = strings.Repeat(`\`, 128)
-	b.NodeUID = strings.Repeat(`\`, 128)
-	b.BootID = strings.Repeat(`\`, 128)
-	b.CollectorPodUID = strings.Repeat(`\`, 128)
-	b.CollectorEpoch = strings.Repeat(`\`, 128)
-	w.Sequence = ^uint64(0)
-	p.Duration, o.Duration = 15*time.Second, 15*time.Second
-	o.SessionUntil, o.LeaseUntil = o.StartedAt.Add(20*time.Second), o.StartedAt.Add(20*time.Second)
-	o.Credit, o.BytesPerSecond = 1<<40, 1<<30
-	poll := contracts.NodePollResponse{Format: contracts.NodePollFormat, Work: make([]contracts.NodeWork, collector.MaxWorkPerPoll)}
-	for i := range poll.Work {
-		poll.Work[i] = WireWork(w)
-	}
-	data, err := json.Marshal(poll)
-	if err != nil || len(data) > contracts.NodeMaxResponse {
-		t.Fatal("real JSON exceeds unchanged response bound", len(data), err)
-	}
-	if _, err := contracts.DecodeNodePollResponse(bytes.NewReader(data)); err != nil {
-		t.Fatal(err)
-	}
-	t.Logf("actual maximal observed poll JSON bytes=%d, ceiling=%d", len(data), contracts.NodeMaxResponse)
-}
-
-// ADR-279: a raw recording's prefix caps cross the closed wire exactly and
-// are executable only on an observed capture within the engine maximum.
 func TestRawPrefixClosedWireRoundTrips(t *testing.T) {
 	w := observedNodeWork()
 	w.Packet.Raw = &collector.RawPrefix{Snaplen: 96, TCP: 1500}
-	data, err := json.Marshal(contracts.NodePollResponse{Format: contracts.NodePollFormat, Work: []contracts.NodeWork{WireWork(w)}})
+	data, err := json.Marshal(pollResponse{Work: []contracts.NodeWork{WireWork(w)}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	decoded, err := contracts.DecodeNodePollResponse(bytes.NewReader(data))
+	decoded, err := decodePollResponse(bytes.NewReader(data))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -121,14 +88,14 @@ func TestHTTPProjectionClosedWireRoundTrips(t *testing.T) {
 	}
 	w := observedNodeWork()
 	w.Packet.Raw, w.Packet.HTTP = &collector.RawPrefix{Snaplen: 1500}, http()
-	data, err := json.Marshal(contracts.NodePollResponse{Format: contracts.NodePollFormat, Work: []contracts.NodeWork{WireWork(w)}})
+	data, err := json.Marshal(pollResponse{Work: []contracts.NodeWork{WireWork(w)}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !bytes.Contains(data, []byte(`"http":{"maxFlows":1024,"maxHeaderBytes":32768,"maxFlowBytes":262144,"maxTotalBytes":16777216,"idleTimeoutMillis":30000}`)) {
 		t.Fatal("HTTP wire field", string(data))
 	}
-	decoded, err := contracts.DecodeNodePollResponse(bytes.NewReader(data))
+	decoded, err := decodePollResponse(bytes.NewReader(data))
 	if err != nil {
 		t.Fatal(err)
 	}

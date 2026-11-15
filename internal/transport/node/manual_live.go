@@ -1,9 +1,10 @@
 package node
 
 import (
+	"encoding/hex"
+
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/collector"
-	"encoding/hex"
 )
 
 func WireManualLive(m collector.ManualLiveSource) contracts.NodeManualLiveSource {

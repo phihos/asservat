@@ -100,7 +100,7 @@ func httpWork(now time.Time) (collector.Work, collector.Identity) {
 // the JSON projection: approved headers kept, credentials, URL, Host,
 // cookies and bodies absent.
 func TestNodeProjectsHTTPHeaders(t *testing.T) {
-	w, id := httpWork(time.Now())
+	w, _ := httpWork(time.Now())
 	if !w.Packet.Valid() {
 		t.Fatal("fixture invalid")
 	}
@@ -116,8 +116,8 @@ func TestNodeProjectsHTTPHeaders(t *testing.T) {
 	n := &nodePackets{engine: func(context.Context, string, int, func(gadget.Frame)) (gadget.CaptureStats, error) {
 		t.Error("unobserved fallback")
 		return gadget.CaptureStats{}, nil
-	}, identity: func() collector.Identity { return id }, available: true, now: time.Now, version: "fixture", budget: func() *collector.Budget { return budget }, budgetMu: &mu, log: func(string) {},
-		upload: func(_ context.Context, _ string, r collector.PacketResult, out []byte) error {
+	}, available: true, now: time.Now, version: "fixture", budget: func() *collector.Budget { return budget }, budgetMu: &mu, log: func(string) {},
+		upload: func(_ context.Context, r collector.PacketResult, out []byte) error {
 			result <- upload{r, append([]byte(nil), out...)}
 			return nil
 		}}
@@ -129,7 +129,7 @@ func TestNodeProjectsHTTPHeaders(t *testing.T) {
 		<-ctx.Done()
 		return gadget.CaptureStats{}, ctx.Err()
 	}
-	if r := n.start(t.Context(), id.Epoch, w); r.Outcome != collector.OutcomeAccepted {
+	if r := n.start(t.Context(), w); r.Outcome != collector.OutcomeAccepted {
 		t.Fatal(r)
 	}
 	var got upload
@@ -167,7 +167,7 @@ func TestNodeRefusesInvalidHTTPProjectionWork(t *testing.T) {
 	for _, mode := range []string{"floors", "no-observation", "snaplen"} {
 		t.Run(mode, func(t *testing.T) {
 			now := time.Now()
-			w, id := httpWork(now)
+			w, _ := httpWork(now)
 			switch mode {
 			case "floors":
 				// Within the specified maxima, but the header block's read
@@ -191,8 +191,8 @@ func TestNodeRefusesInvalidHTTPProjectionWork(t *testing.T) {
 			n := &nodePackets{engine: engine, observedEngine: func(context.Context, string, int, func(gadget.Frame), func(gadget.InputNotice)) (gadget.CaptureStats, error) {
 				calls.Add(1)
 				return gadget.CaptureStats{}, nil
-			}, identity: func() collector.Identity { return id }, available: true, now: func() time.Time { return now }, budget: func() *collector.Budget { return budget }, budgetMu: &mu, log: func(string) {}}
-			receipt := n.start(context.Background(), id.Epoch, w)
+			}, available: true, now: func() time.Time { return now }, budget: func() *collector.Budget { return budget }, budgetMu: &mu, log: func(string) {}}
+			receipt := n.start(context.Background(), w)
 			if receipt.Outcome == collector.OutcomeAccepted || receipt.Reason != collector.ReasonWorkUnknown || calls.Load() != 0 || budget.Usage(now).FrozenReserved != 0 || len(n.observations) != 0 {
 				t.Fatal("invalid HTTP projection work was not refused before the engine", receipt, calls.Load())
 			}

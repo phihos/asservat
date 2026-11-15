@@ -21,14 +21,14 @@ type ProfileAuthorizationSource interface {
 
 // ProfileAuthorization reuses the original retained work and process pins both
 // before and after the independent protected material read.
-func (c *NodeChannel) ProfileAuthorization(ctx context.Context, peer NodePeer, epoch string, work collector.Work) ([]byte, error) {
+func (c *NodeChannel) ProfileAuthorization(ctx context.Context, peer NodePeer, work collector.Work) ([]byte, error) {
 	if ctx == nil || ctx.Err() != nil || work.Profile == nil || !work.Profile.AuthorizationRequired {
 		return nil, ErrNodeInvalid
 	}
 	current := func() (collector.Identity, ProfileAuthorizationSource, error) {
 		c.mu.Lock()
 		defer c.mu.Unlock()
-		e, err := c.current(peer, epoch)
+		e, err := c.current(peer)
 		if err != nil {
 			return collector.Identity{}, nil, err
 		}

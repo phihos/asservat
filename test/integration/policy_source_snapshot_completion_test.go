@@ -238,19 +238,8 @@ func startSourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capacit
 		t.Fatal(err)
 	}
 	b := snapshot.Source.Binding
-	channel, err := delivery.NewNodeChannel(policyObservationNode{collector.Identity{NodeName: "worker", NodeUID: b.NodeUID, PodUID: b.CollectorPodUID, BootID: b.BootID}}, policyObservationNodeIssuer{}, clock, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	der, _, _, err := channel.Enroll(ctx, "synthetic-component", []byte("synthetic-token"), []byte("synthetic-csr"), b.BootID, b.CollectorEpoch)
-	if err != nil {
-		t.Fatal(err)
-	}
-	peer, err := channel.Peer(sha256.Sum256(der))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err = channel.Report(peer, b.CollectorEpoch, collector.Report{Sequence: 1, ObservedAt: clock(), Facts: collector.Facts{Kernel: collector.KernelVersion{Major: 6, Minor: 8}}, Mechanisms: []collector.Availability{{Mechanism: collector.MechanismPacket, Prerequisites: true, Adapter: collector.AdapterAvailable, Hook: collector.HookTC}}}); err != nil {
+	channel, peer := connectSyntheticNode(t, clock, collector.Identity{NodeName: "worker", NodeUID: b.NodeUID, PodUID: b.CollectorPodUID, BootID: b.BootID, Epoch: b.CollectorEpoch})
+	if err = channel.Report(peer, collector.Report{ObservedAt: clock(), Facts: collector.Facts{Kernel: collector.KernelVersion{Major: 6, Minor: 8}}, Mechanisms: []collector.Availability{{Mechanism: collector.MechanismPacket, Prerequisites: true, Adapter: collector.AdapterAvailable, Hook: collector.HookTC}}}); err != nil {
 		t.Fatal(err)
 	}
 	holder := bootstrap.NewConnectorRecordings(channel, nil, clock, func(line string) { t.Log(line) })
@@ -266,7 +255,7 @@ func startSourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capacit
 	if _, err = prepared.StartSourceSnapshot(ctx, x); err != nil {
 		t.Fatal("original source snapshot queue", err)
 	}
-	work, err := channel.Poll(ctx, peer, b.CollectorEpoch, 0, 0)
+	work, err := syntheticPoll(ctx, channel, peer, 0)
 	if err != nil || len(work) != 1 || work[0].Snapshot == nil || !work[0].Snapshot.Equal(x) {
 		t.Fatal("queued original source snapshot", work, err)
 	}
@@ -322,10 +311,10 @@ func completeSourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capa
 		t.Fatal(err)
 	}
 	result := collector.PacketResult{Snapshot: &outcome, WorkID: work[0].ID, CaptureID: accepted.CaptureID, StartedAt: artifact.SourceSnapshotAnchor(*e.Snapshot), EndedAt: end, Seen: 50, Retained: 50, CapturedBytes: int64(len(native)), Snaplen: artifact.RecordingSnaplen, ProgramDigest: b.ProgramDigest}
-	if err = channel.DeliverPacket(ctx, peer, b.CollectorEpoch, result, bytes.NewReader(native)); err != nil {
+	if err = channel.DeliverPacket(ctx, peer, result, bytes.NewReader(native)); err != nil {
 		t.Fatal("actual snapshot channel/producer", err)
 	}
-	if err = channel.DeliverPacket(ctx, peer, b.CollectorEpoch, result, bytes.NewReader(native)); err == nil {
+	if err = channel.DeliverPacket(ctx, peer, result, bytes.NewReader(native)); err == nil {
 		t.Fatal("snapshot uploaded twice")
 	}
 	collected, err := holder.Collect(fleet.APIContextWork{CaptureID: accepted.CaptureID, AttemptID: e.Registration.Location.AttemptID, ExpectationDigest: evidence.ContextExpectationDigest(e)})

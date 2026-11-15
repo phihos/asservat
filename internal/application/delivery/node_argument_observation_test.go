@@ -3,20 +3,21 @@ package delivery
 import (
 	"asservat.local/asservat/internal/domain/collector"
 
-	"asservat.local/asservat/internal/domain/targets"
 	"context"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/domain/targets"
 )
 
 func TestArgumentObservationExpectedSourceAndOriginalFitBeforeQueue(t *testing.T) {
 	for _, mode := range []string{"exact", "legacy", "node", "boot", "collector", "epoch", "capture", "duration", "start", "expired"} {
 		t.Run(mode, func(t *testing.T) {
-			ch, _, clk, _ := newChannel(t)
+			ch, clk, _ := newChannel(t)
 			peer, _ := enroll(t, ch, epochA)
-			r := report(1, clk.now())
+			r := report(clk.now())
 			r.Mechanisms = []collector.Availability{{Mechanism: collector.MechanismSyscall, Prerequisites: true, Adapter: collector.AdapterAvailable}}
-			if err := ch.Report(peer, epochA, r); err != nil {
+			if err := ch.Report(peer, r); err != nil {
 				t.Fatal(err)
 			}
 			v, _ := ch.NodeByName("node-a")

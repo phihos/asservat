@@ -94,7 +94,7 @@ func validConnectorConfig(c contracts.ConnectorConfig) error {
 		}
 	}
 	if n := c.Collector; n != nil {
-		if len(validation.IsDNS1123Label(n.Namespace)) != 0 || n.Namespace == c.Namespace || len(validation.IsDNS1123Subdomain(n.DaemonSet)) != 0 || len(validation.IsDNS1123Subdomain(n.ServiceAccount)) != 0 ||
+		if len(validation.IsDNS1123Label(n.Namespace)) != 0 || n.Namespace == c.Namespace || len(validation.IsDNS1123Subdomain(n.ServiceAccount)) != 0 ||
 			len(validation.IsDNS1123Subdomain(n.ListenerSecret)) != 0 || len(validation.IsDNS1123Subdomain(n.RootConfigMap)) != 0 || len(validation.IsDNS1123Subdomain(n.ServerName)) != 0 {
 			return bad("collector")
 		}

@@ -20,10 +20,9 @@ import (
 )
 
 type profileAcquirer func(context.Context, collector.ProfileCapture, []byte, io.Writer) (execution.GoProfileOutcome, error)
-type profileUploader func(context.Context, string, collector.ProfileResult, io.Reader) error
+type profileUploader func(context.Context, collector.ProfileResult, io.Reader) error
 
 type nodeProfiles struct {
-	identity func() collector.Identity
 	acquire  profileAcquirer
 	upload   profileUploader
 	now      func() time.Time
@@ -41,7 +40,7 @@ type runningProfile struct {
 	uncertainUntil    time.Time
 }
 
-func (n *nodeProfiles) start(ctx context.Context, epoch string, w collector.Work, authorization []byte, authorizationUnavailable bool) collector.Receipt {
+func (n *nodeProfiles) start(ctx context.Context, w collector.Work, authorization []byte, authorizationUnavailable bool) collector.Receipt {
 	reply := collector.Decide(w, n.now())
 	if reply.Reason == collector.ReasonWorkUnknown || reply.Reason == collector.ReasonWorkExpired {
 		return reply
@@ -51,11 +50,6 @@ func (n *nodeProfiles) start(ctx context.Context, epoch string, w collector.Work
 		return reply
 	}
 	p := *w.Profile
-	id := n.identity()
-	if id.Epoch != epoch || epoch != p.CollectorEpoch || id.NodeUID != p.Request.NodeUID || id.NodeName != p.Request.Pin.NodeName || id.BootID != p.Request.NodeBootID {
-		reply.Reason = collector.ReasonWorkUnknown
-		return reply
-	}
 	n.budgetMu.Lock()
 	if n.running == nil {
 		n.running = map[string]runningProfile{}
@@ -82,7 +76,7 @@ func (n *nodeProfiles) start(ctx context.Context, epoch string, w collector.Work
 		if !replay && len(n.spent) < collector.MaxQueuedWork && now.Before(w.NotAfter) {
 			n.spent[p.CaptureID] = w.NotAfter
 			n.wg.Add(1)
-			go n.refuse(ctx, epoch, w, p, collector.ReasonProfileUnavailable)
+			go n.refuse(ctx, w, p, collector.ReasonProfileUnavailable)
 		}
 		n.budgetMu.Unlock()
 		reply.Reason = collector.ReasonProfileUnavailable
@@ -95,7 +89,7 @@ func (n *nodeProfiles) start(ctx context.Context, epoch string, w collector.Work
 		if !replay && len(n.spent) < collector.MaxQueuedWork && now.Before(w.NotAfter) {
 			n.spent[p.CaptureID] = w.NotAfter
 			n.wg.Add(1)
-			go n.refuse(ctx, epoch, w, p, collector.ReasonCaptureBusy)
+			go n.refuse(ctx, w, p, collector.ReasonCaptureBusy)
 		}
 		n.budgetMu.Unlock()
 		reply.Reason = collector.ReasonCaptureBusy
@@ -107,12 +101,12 @@ func (n *nodeProfiles) start(ctx context.Context, epoch string, w collector.Work
 	n.wg.Add(1)
 	n.budgetMu.Unlock()
 	private := bytes.Clone(authorization)
-	go n.run(ctx, action, cancel, epoch, w, p, private)
+	go n.run(ctx, action, cancel, w, p, private)
 	reply.Outcome, reply.Reason = collector.OutcomeAccepted, ""
 	return reply
 }
 
-func (n *nodeProfiles) run(parent, action context.Context, cancel context.CancelFunc, epoch string, w collector.Work, p collector.ProfileCapture, authorization []byte) {
+func (n *nodeProfiles) run(parent, action context.Context, cancel context.CancelFunc, w collector.Work, p collector.ProfileCapture, authorization []byte) {
 	defer clear(authorization)
 	defer n.wg.Done()
 	defer cancel()
@@ -170,10 +164,10 @@ func (n *nodeProfiles) run(parent, action context.Context, cancel context.Cancel
 	}
 	n.budgetMu.Unlock()
 	if len(data) == 0 {
-		_ = n.upload(upload, epoch, result, bytes.NewReader(nil))
+		_ = n.upload(upload, result, bytes.NewReader(nil))
 		return
 	}
-	_ = n.upload(upload, epoch, result, &profileUploadReader{owner: n, ctx: upload, source: bytes.NewReader(data)})
+	_ = n.upload(upload, result, &profileUploadReader{owner: n, ctx: upload, source: bytes.NewReader(data)})
 }
 
 func (n *nodeProfiles) stop(w collector.Work) collector.Receipt {
@@ -220,7 +214,6 @@ func (b *profileNativeBuffer) Write(p []byte) (int, error) {
 }
 
 type nodeProfileMechanism struct {
-	identity      func() collector.Identity
 	p             collector.ProfileCapture
 	authorization []byte
 	now           func() time.Time
@@ -288,9 +281,8 @@ func nodeProfileTLSConnection(ctx context.Context, connection net.Conn, material
 	return secure, nil
 }
 func (m nodeProfileMechanism) ObserveGoProfile(ctx context.Context, r execution.GoProfileRequest) (execution.GoProfileCurrent, error) {
-	id := m.identity()
 	now := m.now()
-	if ctx.Err() != nil || r != m.p.Request || id.Epoch != m.p.CollectorEpoch || id.NodeUID != r.NodeUID || id.BootID != r.NodeBootID || r.Validate(now) != nil {
+	if ctx.Err() != nil || r != m.p.Request || r.Validate(now) != nil {
 		return execution.GoProfileCurrent{}, execution.ErrDenied
 	}
 	until := now.Add(5 * time.Second)
@@ -299,9 +291,9 @@ func (m nodeProfileMechanism) ObserveGoProfile(ctx context.Context, r execution.
 	}
 	return execution.GoProfileCurrent{CheckedAt: now, ValidUntil: until}, nil
 }
-func acquireNodeProfile(identity func() collector.Identity, now func() time.Time) profileAcquirer {
+func acquireNodeProfile(now func() time.Time) profileAcquirer {
 	return func(ctx context.Context, p collector.ProfileCapture, authorization []byte, destination io.Writer) (execution.GoProfileOutcome, error) {
-		mechanism := nodeProfileMechanism{identity: identity, p: p, authorization: authorization, now: now}
+		mechanism := nodeProfileMechanism{p: p, authorization: authorization, now: now}
 		collector, err := diagnostics.NewGoProfileCollector(mechanism, mechanism, now)
 		if err != nil {
 			return execution.GoProfileOutcome{}, err
@@ -346,10 +338,10 @@ func (r *profileUploadReader) Read(p []byte) (int, error) {
 	return r.source.Read(p[:n])
 }
 
-func (n *nodeProfiles) refuse(parent context.Context, epoch string, w collector.Work, p collector.ProfileCapture, reason collector.Reason) {
+func (n *nodeProfiles) refuse(parent context.Context, w collector.Work, p collector.ProfileCapture, reason collector.Reason) {
 	defer n.wg.Done()
 	ctx, cancel := context.WithDeadline(parent, p.Request.Deadline.Add(30*time.Second))
 	defer cancel()
 	result := collector.ProfileResult{WorkID: w.ID, CaptureID: p.CaptureID, ExpectationDigest: p.ExpectationDigest, EndpointDigest: p.Request.EndpointDigest, Failure: reason, Outcome: execution.GoProfileOutcome{Format: p.Request.Parameters.Format(), CompletedAt: n.now().UTC()}}
-	_ = n.upload(ctx, epoch, result, bytes.NewReader(nil))
+	_ = n.upload(ctx, result, bytes.NewReader(nil))
 }

@@ -165,7 +165,7 @@ func TestNodeCollectorWithRealKubernetes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	attester, err := kube.NewNodeAttester(client, f.DaemonSet, f.ServiceAccount)
+	attester, err := kube.NewNodeAttester(client, f.ServiceAccount)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -174,7 +174,7 @@ func TestNodeCollectorWithRealKubernetes(t *testing.T) {
 		t.Fatal(err)
 	}
 	log := &lineLog{t: t}
-	s, err := bootstrap.NewNodeChannelServer(f.ClusterID, attester, server, log, time.Now)
+	s, err := bootstrap.NewNodeChannelServer(attester, server, log, time.Now)
 	if err != nil {
 		t.Fatal(err)
 	}

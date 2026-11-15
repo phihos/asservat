@@ -1,38 +1,55 @@
 package node
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/binary"
-	"encoding/json"
 	"errors"
 	"io"
 	"net"
 	"net/http"
-	"time"
+	"strings"
+	"sync"
 
 	"asservat.local/asservat/internal/application/delivery"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/collector"
+	"github.com/google/uuid"
+	"golang.org/x/time/rate"
 )
 
-// Handler serves the three node routes. Enrollment needs no client
-// certificate; poll and status need a client certificate that the TLS layer
-// verified against the connector's node issuer and that still maps to the
-// node's current process. Error bodies are empty: status codes are the only
-// signal (400 invalid, 401 unknown process, 403 attestation denied, 409 stale
-// process, 429 too soon, 503 unavailable).
+// Handler serves the node routes. Every request carries the collector's
+// projected token; the connector reviews it once per connection (and again
+// only after the kubelet rotated it). Error bodies are empty: status codes
+// are the only signal (400 invalid, 401 unknown or replaced collector, 403
+// denied, 409 stale work, 429 too many new streams, 503 unavailable).
 type Handler struct {
-	channel *delivery.NodeChannel
-	hold    time.Duration
+	channel  *delivery.NodeChannel
+	attester delivery.NodeAttester
+	// reviews bounds TokenReviews within the connector's API-client QPS:
+	// 5,000 nodes reconnect in about 100 seconds.
+	reviews *rate.Limiter
 }
 
-func NewHandler(ch *delivery.NodeChannel) (*Handler, error) {
-	if ch == nil {
+func NewHandler(ch *delivery.NodeChannel, attester delivery.NodeAttester) (*Handler, error) {
+	if ch == nil || attester == nil {
 		return nil, delivery.ErrNodeInvalid
 	}
-	return &Handler{channel: ch, hold: collector.PollHold}, nil
+	return &Handler{channel: ch, attester: attester, reviews: rate.NewLimiter(50, 200)}, nil
+}
+
+type connKey struct{}
+
+// connAuth is one connection's reviewed token.
+type connAuth struct {
+	mu     sync.Mutex
+	digest [32]byte
+	id     collector.Identity
+}
+
+// ConnContext gives each connection its own authentication slot.
+func ConnContext(ctx context.Context, _ net.Conn) context.Context {
+	return context.WithValue(ctx, connKey{}, &connAuth{})
 }
 
 func status(err error) int {
@@ -51,155 +68,150 @@ func status(err error) int {
 	return http.StatusServiceUnavailable
 }
 
-func write(w http.ResponseWriter, v any) {
-	b, err := json.Marshal(v)
-	if err != nil {
-		w.WriteHeader(http.StatusServiceUnavailable)
-		return
+func fail(w http.ResponseWriter, err error) {
+	if errors.Is(err, delivery.ErrNodeRateLimited) {
+		w.Header().Set("Retry-After", "1")
 	}
-	defer clear(b)
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Cache-Control", "no-store")
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(b)
+	w.WriteHeader(status(err))
+}
+
+func (h *Handler) authenticate(r *http.Request) (collector.Identity, error) {
+	token, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+	a, _ := r.Context().Value(connKey{}).(*connAuth)
+	if !ok || !contracts.ValidWorkerToken([]byte(token)) || a == nil {
+		return collector.Identity{}, delivery.ErrNodeUnauthenticated
+	}
+	digest := sha256.Sum256([]byte(token))
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.id.NodeUID != "" && a.digest == digest {
+		return a.id, nil
+	}
+	if !h.reviews.Allow() {
+		return collector.Identity{}, delivery.ErrNodeRateLimited
+	}
+	id, err := h.attester.AttestNode(r.Context(), []byte(token))
+	if err != nil {
+		return collector.Identity{}, err
+	}
+	a.digest, a.id = digest, id
+	return id, nil
 }
 
 func (h *Handler) peer(r *http.Request) (delivery.NodePeer, error) {
-	if r.TLS == nil || len(r.TLS.PeerCertificates) == 0 || len(r.TLS.VerifiedChains) == 0 {
-		return delivery.NodePeer{}, delivery.ErrNodeUnauthenticated
-	}
-	return h.channel.Peer(sha256.Sum256(r.TLS.PeerCertificates[0].Raw))
+	id, err := h.authenticate(r)
+	return delivery.NodePeer{NodeUID: id.NodeUID, PodUID: id.PodUID}, err
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodPost && r.TLS != nil && r.URL.RawQuery == "" && r.URL.Path == contracts.NodeLivePath && r.Header.Get("Content-Type") == "application/json" {
-		h.live(w, r)
-		return
-	}
-	if r.Method == http.MethodPost && r.TLS != nil && r.URL.RawQuery == "" && r.URL.Path == contracts.NodeProfileCapturePath && r.Header.Get("Content-Type") == contracts.NodeProfileCaptureContentType {
-		h.profile(w, r)
-		return
-	}
-	if r.Method == http.MethodPost && r.TLS != nil && r.URL.RawQuery == "" && r.URL.Path == contracts.NodeCapturePath && r.Header.Get("Content-Type") == contracts.NodeCaptureContentType {
-		h.capture(w, r)
-		return
-	}
-	if r.Method != http.MethodPost || r.TLS == nil || r.URL.RawQuery != "" || r.Header.Get("Content-Type") != "application/json" {
+	if r.Method != http.MethodPost || r.URL.RawQuery != "" {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	limit := int64(contracts.NodeMaxRequest)
-	if r.URL.Path == contracts.NodeStatusPath {
-		limit = contracts.NodeStatusMaxRequest
-	}
-	body := http.MaxBytesReader(w, r.Body, limit)
 	switch r.URL.Path {
-	case contracts.NodeEnrollPath:
-		req, err := contracts.DecodeNodeEnrollRequest(body)
-		token := []byte(req.Token)
-		defer clear(token)
-		if err != nil || req.Format != contracts.NodeEnrollFormat || !contracts.ValidWorkerToken(token) || len(req.CSR) > contracts.NodeMaxCertificate {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		source, _, err := net.SplitHostPort(r.RemoteAddr)
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		der, notAfter, id, err := h.channel.Enroll(r.Context(), source, token, req.CSR, req.BootID, req.Epoch)
-		if err != nil {
-			w.WriteHeader(status(err))
-			return
-		}
-		write(w, contracts.NodeEnrollResponse{Format: contracts.NodeEnrollFormat, Certificate: der, NotAfter: notAfter, NodeName: id.NodeName, NodeUID: id.NodeUID})
-	case contracts.NodePollPath:
-		p, err := h.peer(r)
-		if err != nil {
-			w.WriteHeader(status(err))
-			return
-		}
-		req, err := contracts.DecodeNodePollRequest(body)
-		if err != nil || req.Format != contracts.NodePollFormat {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		ctx, cancel := context.WithTimeout(r.Context(), h.hold+5*time.Second)
-		defer cancel()
-		work, err := h.channel.Poll(ctx, p, req.Epoch, req.After, h.hold)
-		if err != nil {
-			w.WriteHeader(status(err))
-			return
-		}
-		out := pollPrefix(work)
-		if len(work) > 0 && len(out.Work) == 0 {
-			w.WriteHeader(http.StatusServiceUnavailable)
-			return
-		}
-		defer func() {
-			for _, item := range out.Work {
-				if item.ProfileCapture != nil {
-					clear(item.ProfileCapture.Authorization)
-				}
-			}
-		}()
-		for i := range out.Work {
-			if profile := out.Work[i].ProfileCapture; profile != nil && profile.AuthorizationRequired {
-				clear(profile.Authorization)
-				profile.Authorization, err = h.channel.ProfileAuthorization(ctx, p, req.Epoch, work[i])
-				if err != nil {
-					if ctx.Err() != nil || errors.Is(err, delivery.ErrNodeUnauthenticated) {
-						w.WriteHeader(status(err))
-						return
-					}
-					clear(profile.Authorization)
-					profile.Authorization = nil
-					profile.AuthorizationUnavailable = true
-				}
-			}
-		}
-		if ctx.Err() != nil {
-			w.WriteHeader(http.StatusServiceUnavailable)
-			return
-		}
-		write(w, out)
-	case contracts.NodeStatusPath:
-		p, err := h.peer(r)
-		if err != nil {
-			w.WriteHeader(status(err))
-			return
-		}
-		s, err := contracts.DecodeNodeStatus(body)
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		report, ok := DomainStatus(s)
-		if !ok {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		if err := h.channel.Report(p, s.Epoch, report); err != nil {
-			w.WriteHeader(status(err))
-			return
-		}
-		w.WriteHeader(http.StatusNoContent)
+	case contracts.NodeConnectPath:
+		h.connect(w, r)
+	case contracts.NodeCapturePath:
+		h.capture(w, r)
+	case contracts.NodeProfileCapturePath:
+		h.profile(w, r)
+	case contracts.NodeLivePath:
+		h.live(w, r)
 	default:
 		w.WriteHeader(http.StatusNotFound)
 	}
-	_, _ = io.Copy(io.Discard, io.LimitReader(body, 1))
+}
+
+// connect runs one stream: Hello, then status reports from the collector and
+// pushed work from the connector until either side ends it or a stream from
+// another collector Pod replaces it.
+func (h *Handler) connect(w http.ResponseWriter, r *http.Request) {
+	id, err := h.authenticate(r)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	first, err := contracts.ReadNodeFrame[contracts.NodeUp](r.Body)
+	if err != nil || first.Hello == nil || first.Hello.Version != contracts.NodeChannelVersion {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	var kinds []collector.WorkKind
+	for _, k := range first.Hello.Capabilities {
+		if kind := collector.WorkKind(k); kind.Valid() {
+			kinds = append(kinds, kind)
+		}
+	}
+	id.Epoch = uuid.NewString()
+	peer, stream, err := h.channel.Connect(id, kinds)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	defer h.channel.Disconnect(peer, stream)
+	ctx, cancel := context.WithCancel(r.Context())
+	defer cancel()
+	rc := http.NewResponseController(w)
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.WriteHeader(http.StatusOK)
+	if rc.Flush() != nil {
+		return
+	}
+	go func() {
+		defer cancel()
+		for {
+			up, err := contracts.ReadNodeFrame[contracts.NodeUp](r.Body)
+			if err != nil || up.Status == nil {
+				return
+			}
+			report, ok := DomainStatus(*up.Status)
+			if !ok || h.channel.Report(peer, report) != nil {
+				return
+			}
+		}
+	}()
+	var after uint64
+	for {
+		work, err := h.channel.Next(ctx, peer, stream, after)
+		if err != nil {
+			return
+		}
+		for _, item := range work {
+			wire := WireWork(item)
+			if profile := wire.ProfileCapture; profile != nil && profile.AuthorizationRequired {
+				profile.Authorization, err = h.channel.ProfileAuthorization(ctx, peer, item)
+				if err != nil {
+					if ctx.Err() != nil || errors.Is(err, delivery.ErrNodeUnauthenticated) {
+						return
+					}
+					profile.Authorization, profile.AuthorizationUnavailable = nil, true
+				}
+			}
+			err = contracts.WriteNodeFrame(w, wire)
+			if wire.ProfileCapture != nil {
+				clear(wire.ProfileCapture.Authorization)
+			}
+			if err != nil {
+				return
+			}
+			after = item.Sequence
+		}
+		if rc.Flush() != nil {
+			return
+		}
+	}
 }
 
 // capture receives one finished packet capture (ADR-248): a 4-byte
 // big-endian header length, the JSON header, then exactly CapturedBytes of
-// PCAPNG. The peer must be the node process the capture was queued for.
+// PCAPNG. The peer must be the collector Pod the capture was queued for.
 func (h *Handler) capture(w http.ResponseWriter, r *http.Request) {
 	p, err := h.peer(r)
 	if err != nil {
-		w.WriteHeader(status(err))
+		fail(w, err)
 		return
 	}
-	if r.ContentLength < 4 || r.ContentLength > 4+contracts.NodeCaptureMaxHeader+collector.MaxPacketCaptureBytes {
+	if r.Header.Get("Content-Type") != contracts.NodeCaptureContentType || r.ContentLength < 4 || r.ContentLength > 4+contracts.NodeCaptureMaxHeader+collector.MaxPacketCaptureBytes {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -224,20 +236,9 @@ func (h *Handler) capture(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	if err := h.channel.DeliverPacket(r.Context(), p, head.Epoch, result, body); err != nil {
-		w.WriteHeader(status(err))
+	if err := h.channel.DeliverPacket(r.Context(), p, result, body); err != nil {
+		fail(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
-
-// encode marshals a request body; shared by the client.
-func encode(v any) (*bytes.Reader, error) {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return nil, err
-	}
-	return bytes.NewReader(b), nil
-}
-
-func bytesReader(b []byte) *bytes.Reader { return bytes.NewReader(b) }
