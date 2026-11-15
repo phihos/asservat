@@ -6,7 +6,7 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"crypto/tls"
-	"errors"
+	"encoding/hex"
 	"strconv"
 	"strings"
 	"sync"
@@ -50,8 +50,7 @@ type capacitySQLFixture struct {
 	fleetRefreshMu   sync.Mutex
 	ctx              context.Context
 	admin            *pgxpool.Pool
-	root             *capacitySQLRoot
-	producer         *postgres.PublicRuntimeSQLRoles
+	installed        capacityFixtureSetup
 	input            capacityFixtureInput
 	qualification    app.CapacityQualification
 	values           app.CapacityValues
@@ -74,9 +73,7 @@ type capacitySQLFixture struct {
 
 func newCapacitySQLFixture(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects, configure ...func(*capacitySQLFixture)) *capacitySQLFixture {
 	t.Helper()
-	input := contracts.PublicRuntimeRoles{Format: contracts.PublicRuntimeRolesFormat, InstallationID: scope.InstallationID, InitialClaimID: claim, OwnerConfigurationUID: custodyID(), ClusterID: scope.ClusterID, Namespace: contracts.WorkerObjectReference{Name: scope.Namespace, UID: scope.NamespaceUID}, LayoutDigest: postgres.PublicRuntimeRoleLayoutDigest()}
-	input.Worker = capacityNativeWorkerScope(t, input)
-	f := &capacitySQLFixture{ctx: ctx, admin: admin, root: newCapacitySQLRoot(t, input), administration: administration, roles: map[string]*pgxpool.Pool{}, namespace: cfg.NamespaceRef{Name: "applications", UID: custodyID()}, workloads: []cfg.WorkloadRef{{Kind: "Deployment", Name: "first", UID: custodyID()}, {Kind: "StatefulSet", Name: "second", UID: custodyID()}}}
+	f := &capacitySQLFixture{ctx: ctx, admin: admin, installed: newCapacityFixtureSetup(t, scope), administration: administration, roles: map[string]*pgxpool.Pool{}, namespace: cfg.NamespaceRef{Name: "applications", UID: custodyID()}, workloads: []cfg.WorkloadRef{{Kind: "Deployment", Name: "first", UID: custodyID()}, {Kind: "StatefulSet", Name: "second", UID: custodyID()}}}
 	for len(f.workloads) < capacityNativeAccounts {
 		f.workloads = append(f.workloads, cfg.WorkloadRef{Kind: "Deployment", Name: "envelope-" + strconv.Itoa(len(f.workloads)), UID: custodyID()})
 	}
@@ -129,58 +126,37 @@ func newCapacitySQLFixture(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 		t.Fatal(err)
 	}
 	f.refreshFleet(t)
-	// SeedInstallation (Helm-native setup) records no initial activation; the
-	// role producer still requires one for its installation claim.
-	if _, e := admin.Exec(ctx, `INSERT INTO fleet_initial_activation(installation_id,claim_id,record_json,audit_receipt_json,activated_at) VALUES($1,$2,'{}','{}',clock_timestamp()) ON CONFLICT DO NOTHING`, scope.InstallationID, claim); e != nil {
-		t.Fatal("fixture initial activation", e)
-	}
-	f.producer, err = postgres.NewPublicRuntimeSQLRoles(ctx, c, f.root, input)
-	if err != nil {
-		t.Fatal("actual post-activation role constructor", err)
-	}
-	t.Cleanup(f.producer.Close)
-	if !t.Run("actual-postgres-function-type-alias", func(t *testing.T) {
-		var same bool
-		var display string
-		if err := admin.QueryRow(ctx, `SELECT p.oid=to_regprocedure('public.capacity_managed_admission_until(uuid,uuid,text,timestamp with time zone)')::oid,replace(oidvectortypes(p.proargtypes),' ','') FROM pg_proc p WHERE p.oid=to_regprocedure('public.capacity_managed_admission_until(uuid,uuid,text,timestamptz)')::oid`).Scan(&same, &display); err != nil || !same || display != "uuid,uuid,text,timestampwithtimezone" {
-			t.Fatal("actual PostgreSQL exact overload/display qualification unavailable")
-		}
-		t.Log("same_function_oid=true display_uses_timestamp_with_time_zone=true")
-	}) {
-		t.FailNow()
-	}
-	// Production observes fleet trust continuously; this fixture's single
-	// observation lasts five seconds, shorter than producing all public roles
-	// (eighty with ADR-197). Keep it current, as the observer would.
-	stopFleet := f.keepFleetCurrent()
+	// The runtime logins come from the same reconciliation `asservat setup`
+	// runs, with fixture-generated passwords.
 	start := time.Now()
-	_, err = f.producer.Provision(ctx)
-	if failure := stopFleet(); failure != nil {
-		t.Fatal("fixture fleet observation during role production", failure)
-	}
+	logins := map[string]string{}
+	roles, err := postgres.RuntimeRoles(scope.InstallationID)
 	if err != nil {
-		// The stop names its step only; say which closed cause ended it.
-		cause := "other"
-		switch {
-		case errors.Is(err, context.DeadlineExceeded), errors.Is(err, context.Canceled):
-			cause = "deadline"
-		case errors.Is(err, cfg.ErrChanged):
-			cause = "changed"
-		case errors.Is(err, cfg.ErrInvalid):
-			cause = "invalid"
-		case errors.Is(err, cfg.ErrUnavailable):
-			cause = "unavailable"
-		}
-		t.Fatal("actual fixed role production", err, cause, time.Since(start).Round(time.Millisecond))
+		t.Fatal(err)
 	}
-	t.Logf("fixed_role_production_ms=%d", time.Since(start).Milliseconds())
-	// Original protected material comes only from the fixture root whose claims
-	// the actual SQL producer completed. No catalogue-discovered role is adopted.
-	for _, m := range f.root.value.State.Roles {
-		if m.Receipt == nil {
-			t.Fatal("actual original role receipt missing")
+	for _, role := range roles {
+		logins[role.Name] = randomFixtureSecret(t)
+	}
+	if report, err := postgres.EnsureRuntimeRoles(ctx, c, scope.InstallationID, logins); err != nil || len(report.Missing) != 0 {
+		t.Fatal("setup runtime role reconciliation", err, report.Missing)
+	}
+	t.Cleanup(func() {
+		cleanup, stop := context.WithTimeout(context.Background(), 10*time.Second)
+		defer stop()
+		for name := range logins {
+			q := pgx.Identifier{name}.Sanitize()
+			if _, err := admin.Exec(cleanup, "DROP OWNED BY "+q+"; DROP ROLE "+q); err != nil {
+				t.Error("drop setup runtime role", name, err)
+			}
 		}
-		f.roles[m.Purpose] = poolFor(m.Receipt.RoleName, m.Password)
+	})
+	t.Logf("setup_role_reconciliation_ms=%d", time.Since(start).Milliseconds())
+	for _, purpose := range contracts.PublicRuntimeRolePurposes() {
+		name, ok := postgres.PublicRuntimeRoleName(scope.InstallationID, purpose)
+		if !ok {
+			t.Fatal("missing compiled role name", purpose)
+		}
+		f.roles[purpose] = poolFor(name, logins[name])
 	}
 	rootID, epoch := custodyID(), custodyID()
 	f.permission, err = postgres.NewPermissions(ctx, poolFor("authority_runtime", "synthetic-authority"), rootID)
@@ -206,13 +182,13 @@ func newCapacitySQLFixture(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 			t.Fatal("actual encrypted permission audit", err)
 		}
 	}
-	f.qualification, f.values = capacityNativeQualification(t, rootID, scope.InstallationID, scope.ClusterID, f.root.value.State.MAC.AccountVersion), capacityNativeValues()
+	f.qualification, f.values = capacityNativeQualification(t, rootID, scope.InstallationID, scope.ClusterID, f.installed.mac.AccountVersion), capacityNativeValues()
 	for _, option := range configure {
 		option(f)
 	}
 	f.processingPolicy = capacityNativeProcessingPolicy(f.qualification, scope.IssuerEpoch)
-	f.input = capacityFixtureInput{InstallationID: scope.InstallationID, PermissionRootID: rootID, ControlClusterID: scope.ClusterID, ControlNamespaceUID: scope.NamespaceUID, AccountVersion: f.root.value.State.MAC.AccountVersion}
-	material := f.root.value.State.MAC
+	f.input = capacityFixtureInput{InstallationID: scope.InstallationID, PermissionRootID: rootID, ControlClusterID: scope.ClusterID, ControlNamespaceUID: scope.NamespaceUID, AccountVersion: f.installed.mac.AccountVersion}
+	material := f.installed.mac
 	f.accounts, err = auditapp.NewOperationMAC(material.InputVersion, material.InputKey, material.AccountVersion, material.AccountKey)
 	if err != nil {
 		t.Fatal(err)
@@ -354,4 +330,36 @@ func (f *capacitySQLFixture) fund(bytes int64) {
 	f.values.ShareBytes = max(f.values.ShareBytes, bytes)
 	f.values.LimitBytes = max(f.values.LimitBytes, 4*f.values.ShareBytes)
 	f.values.EvidenceBytes = max(f.values.EvidenceBytes, f.values.ReserveBytes+capacityNativeAccounts*f.values.ShareBytes)
+}
+
+// capacityFixtureSetup holds what `asservat setup` and the chart provide to
+// the capacity root: the installation scope and the audit MAC material.
+type capacityFixtureSetup struct {
+	input   contracts.PublicRuntimeRoles
+	setupID string
+	mac     contracts.PublicAuditKeyMaterial
+}
+
+func newCapacityFixtureSetup(t *testing.T, scope fleet.InstallationWitnessScope) capacityFixtureSetup {
+	t.Helper()
+	setupID := custodyID()
+	s := capacityFixtureSetup{setupID: setupID,
+		input: contracts.PublicRuntimeRoles{InstallationID: scope.InstallationID, OwnerConfigurationUID: custodyID(), ClusterID: scope.ClusterID, Namespace: contracts.WorkerObjectReference{Name: scope.Namespace, UID: scope.NamespaceUID}},
+		mac:   contracts.PublicAuditKeyMaterial{InputVersion: setupID + "-input/v1", AccountVersion: setupID + "-account/v1", InputKey: make([]byte, 32), AccountKey: make([]byte, 32)}}
+	for _, key := range [][]byte{s.mac.InputKey, s.mac.AccountKey} {
+		if _, err := rand.Read(key); err != nil {
+			t.Fatal("synthetic key generation unavailable")
+		}
+	}
+	t.Cleanup(func() { clear(s.mac.InputKey); clear(s.mac.AccountKey) })
+	return s
+}
+
+func randomFixtureSecret(t *testing.T) string {
+	t.Helper()
+	b := make([]byte, 24)
+	if _, err := rand.Read(b); err != nil {
+		t.Fatal(err)
+	}
+	return hex.EncodeToString(b)
 }

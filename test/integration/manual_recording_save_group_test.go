@@ -700,7 +700,7 @@ func (r manualGroupHistoryRetention) ResolveRetainedCaseMetadata(ctx context.Con
 // reserving/writing history or refreshing a caller identity.
 func newManualGroupHistoryService(t *testing.T, ctx context.Context, f *capacitySQLFixture, policy policySourceAcceptedFixture, root, installation string) (captureapp.HistoryParameterService, func()) {
 	t.Helper()
-	material := f.root.value.State.MAC
+	material := f.installed.mac
 	mac, err := auditapp.NewOperationMAC(material.InputVersion, material.InputKey, material.AccountVersion, material.AccountKey)
 	if err != nil {
 		t.Fatal(err)

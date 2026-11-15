@@ -68,7 +68,7 @@ func (f *capacitySQLFixture) prepareManagedContext(t *testing.T, root capacityRo
 	if err != nil {
 		t.Fatal(err)
 	}
-	material := f.root.value.State.MAC
+	material := f.installed.mac
 	mac, err := auditapp.NewOperationMAC(material.InputVersion, material.InputKey, material.AccountVersion, material.AccountKey)
 	if err != nil {
 		t.Fatal(err)

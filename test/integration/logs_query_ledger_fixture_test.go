@@ -116,7 +116,7 @@ func publishQueryLedgerLogs(t *testing.T, f *capacitySQLFixture, s captureAdmiss
 func logsExistingCapturePublisher(t *testing.T, f *queryLedgerFixture) auditapp.CaptureOperationPublication {
 	t.Helper()
 	b := f.base
-	material := b.root.value.State.MAC
+	material := b.installed.mac
 	mac, err := auditapp.NewOperationMAC(material.InputVersion, material.InputKey, material.AccountVersion, material.AccountKey)
 	if err != nil {
 		t.Fatal(err)
