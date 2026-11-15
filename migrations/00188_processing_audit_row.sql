@@ -22,6 +22,7 @@ ALTER TABLE processing_rule DROP COLUMN IF EXISTS release_account;
 ALTER TABLE processing_root DROP COLUMN IF EXISTS release_policy;
 DROP FUNCTION IF EXISTS processing_release_policy_valid(jsonb,uuid,uuid,bigint);
 
+-- +goose StatementBegin
 CREATE OR REPLACE FUNCTION public.guard_processing_root() RETURNS trigger
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'pg_catalog', 'pg_temp'
@@ -77,8 +78,10 @@ BEGIN
  END IF;
  RETURN NEW;
 END $$;
+-- +goose StatementEnd
 
 
+-- +goose StatementBegin
 CREATE OR REPLACE FUNCTION public.guard_processing_rule() RETURNS trigger
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'pg_catalog', 'pg_temp'
@@ -106,8 +109,10 @@ BEGIN
  END IF;
  RETURN NEW;
 END $$;
+-- +goose StatementEnd
 
 
+-- +goose StatementBegin
 CREATE OR REPLACE FUNCTION public.processing_erasure_attempt(d public.processing_decision, p public.processing_root) RETURNS public.custody_attempt
     LANGUAGE plpgsql
     SET search_path TO 'pg_catalog', 'pg_temp'
@@ -169,8 +174,10 @@ BEGIN
   RAISE EXCEPTION 'processing erasure payload does not match retained custody' USING ERRCODE='23514'; END IF;
  RETURN a;
 END $$;
+-- +goose StatementEnd
 
 
+-- +goose StatementBegin
 CREATE OR REPLACE FUNCTION public.guard_processing_decision() RETURNS trigger
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'pg_catalog', 'pg_temp'
@@ -255,8 +262,10 @@ BEGIN
  END IF;
  RETURN NEW;
 END $$;
+-- +goose StatementEnd
 
 
+-- +goose StatementBegin
 CREATE OR REPLACE FUNCTION public.capacity_apply(r uuid, cluster uuid, namespace_uid text, av text, q jsonb, v jsonb) RETURNS jsonb
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'pg_catalog', 'pg_temp'
@@ -319,5 +328,6 @@ BEGIN
  END IF;
  RETURN jsonb_build_object('Qualification',s.qualification,'Revision',s.revision);
 END $$;
+-- +goose StatementEnd
 
 
