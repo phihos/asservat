@@ -1,9 +1,10 @@
 package audit
 
 import (
-	"asservat.local/asservat/internal/domain/artifact"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/domain/artifact"
 )
 
 func TestProcessingReleaseHistoryCannotBorrowPublicOrConnectorBacking(t *testing.T) {
@@ -16,14 +17,14 @@ func TestProcessingReleaseHistoryCannotBorrowPublicOrConnectorBacking(t *testing
 	if !p.CertificateVerificationBacked() || w != 2*q.MaximumTransitionWALBytes*q.WALCopies*(32+3*p.MaxPurgeLeases) {
 		t.Fatal("processing release allowance is not fully prepaid")
 	}
-	for _, lane := range []string{"normal", "resolution", "identity", "unknown"} {
+	for _, lane := range []string{"normal", "resolution", "unknown"} {
 		copy := p
 		copy.Lane = lane
 		if copy.Valid() {
 			t.Fatalf("processing backing authorized %s", lane)
 		}
 	}
-	for _, layout := range []string{OperationHistoryLayout, OperationOverdueHistoryLayout, OperationVerificationHistoryLayout, ConnectorOperationHistoryLayout, "processing-release-history/v2"} {
+	for _, layout := range []string{OperationHistoryLayout, OperationOverdueHistoryLayout, OperationVerificationHistoryLayout, "processing-release-history/v2"} {
 		copy := p
 		other := q
 		other.Layout = layout

@@ -1,10 +1,11 @@
 package audit
 
 import (
+	"time"
+
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
-	"time"
 )
 
 const CaptureOperationName = "persist_capture_intent"
@@ -22,7 +23,7 @@ func (r OperationIntent) capturePayloadValid() bool {
 	c := r.Capture
 	// The actor is the authenticated human or an accepted policy executor
 	// (ADR-228); the encrypted intent names it either way.
-	if c == nil || !c.Valid() || !authorization.CaptureActor(c.Actor) || r.Actor != c.Requester() || r.Peer != nil || r.Process != nil || r.ID != c.CaptureID || r.RootID != c.RootID || r.TraceID != c.OccurrenceID || !r.captureInputFormatValid() || !r.CreatedAt.Equal(c.CreatedAt) || r.WriteUntil.After(c.Deadline) {
+	if c == nil || !c.Valid() || !authorization.CaptureActor(c.Actor) || r.Actor != c.Requester() || r.ID != c.CaptureID || r.RootID != c.RootID || r.TraceID != c.OccurrenceID || !r.captureInputFormatValid() || !r.CreatedAt.Equal(c.CreatedAt) || r.WriteUntil.After(c.Deadline) {
 		return false
 	}
 	// BindOperationLifecycle first validates the payload without a binding.
@@ -34,7 +35,7 @@ func (r OperationOutcome) captureOutcomeValid() bool {
 		return true
 	}
 	// Persistence of already accepted intent says nothing about acquisition.
-	return r.Status == "success" && r.Reason == "prepared" && r.Effect == "accepted" && len(r.CaseIDs) == 0 && len(r.ArtifactIDs) == 0 && len(r.CaptureIDs) == 1 && r.CaptureIDs[0] == r.Intent.ID && r.OutputBytes == 0 && r.Credential == nil
+	return r.Status == "success" && r.Reason == "prepared" && r.Effect == "accepted" && len(r.CaseIDs) == 0 && len(r.ArtifactIDs) == 0 && len(r.CaptureIDs) == 1 && r.CaptureIDs[0] == r.Intent.ID && r.OutputBytes == 0
 }
 func CaptureOperationPolicy(p OperationLifecyclePolicy) bool {
 	return p.CertificateVerificationBacked() && p.Lane == "capture" && p.History != nil && captureHistoryLayout(p.History.Layout)

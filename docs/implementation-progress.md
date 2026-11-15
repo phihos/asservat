@@ -137,11 +137,12 @@ handler, process self-proofs (`ConnectorAPIExecutionProtection`), and
 `fleet_peer`/`fleet_peer_certificate` (migration 00171). The connector now
 announces `query/resolve-source-snapshots`, which hubs refused before.
 
-Gaps: the connector identity SQL lane of migrations 00049/00051/00164
-(`connector_identity_*`, `connector_credential_attempt`, retirement tickets)
-is still referenced by shared operation-audit functions and stays until
-those functions are rewritten; `federation.connector` values are still
-required though unused; the join Secret still carries the offer and copied
+Migration 00172 drops the connector identity SQL lane of migrations
+00049/00051/00164 (`connector_identity_*`, `connector_credential_attempt`,
+retirement tickets, `connector_operation_*` views, the `identity` audit lane)
+after rewriting the shared operation-audit functions without it.
+
+Gaps: `federation.connector` values are still required though unused; the join Secret still carries the offer and copied
 object-store capabilities; cluster IDs still come from values; `hub.url`/
 `hub.caBundle` are not implemented; work JWS and local-key signing rows below
 are unchanged; the node channel is in "Node channel stream" below.

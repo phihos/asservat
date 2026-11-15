@@ -2,14 +2,10 @@ package audit
 
 import (
 	"testing"
-
-	"asservat.local/asservat/internal/domain/identity"
 )
 
 func TestProcessingEvidenceSearchUsesNormalAuditAndContextInput(t *testing.T) {
-	intent := connectorAuditIntent()
-	intent.Name, intent.InputFormat, intent.Peer = "search_processing_evidence", "context-input/v1", nil
-	intent.Actor = identity.Principal{Issuer: "https://identity.invalid", Subject: "operator", ClientID: "console", Kind: identity.Human}
+	intent := humanAuditIntent("search_processing_evidence", "context-input/v1")
 	if OperationLane(intent.Name) != "normal" || !intent.Valid() {
 		t.Fatal("processing evidence search did not accept a normal context intent")
 	}

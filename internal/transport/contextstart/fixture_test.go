@@ -51,11 +51,6 @@ func (c *countingLocal) Capture(context.Context, artifact.PinnedPod) ([]byte, er
 	return nil, value.ErrUnavailable
 }
 
-func (c *countingLocal) ReadConnectorIdentitySource(context.Context) (fleet.ConnectorIdentitySource, error) {
-	c.calls++
-	return fleet.ConnectorIdentitySource{}, fleet.ErrUnavailable
-}
-
 func (c *countingLocal) local() RegionalLocal {
 	return RegionalLocal{Process: c, Targets: c, Output: c, Collector: c, Now: time.Now}
 }

@@ -35,17 +35,6 @@ type FederationDeployment struct {
 	// provider purposes (ADR-193). Without it the legacy static token files
 	// remain the only provider credential source.
 	ProviderAuthentication *FederationProviderAuthentication `json:"providerAuthentication,omitempty"`
-	// Connector is the installation-wide connector block (ADR-193); without
-	// it the bootstrap purpose stays refused.
-	Connector *FederationConnector `json:"connector,omitempty"`
-}
-
-// FederationConnector holds the hub-decided connector root backing (an
-// application ConnectorIdentityBacking). A first staging under bootstrap
-// authority must name exactly this backing; once the root exists, its stored
-// backing is the reference instead.
-type FederationConnector struct {
-	Backing json.RawMessage `json:"backing"`
 }
 
 const FederationProviderAuthenticationFormat = "asservat-federation-kubernetes-auth/v1"

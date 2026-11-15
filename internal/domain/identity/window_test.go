@@ -70,15 +70,12 @@ func TestWindowNestedLaterChecksNeverExceedTheOuterInterval(t *testing.T) {
 // Go-only change fails here instead of on an installed run. Only the latest Up
 // definition of each fence counts.
 func TestWindowIntervalsMatchSQLFences(t *testing.T) {
-	recovery := `'Recovery'->>'FreshUntil'\)::timestamptz<=\(\w+->'Recovery'->>'ObservedAt'\)::timestamptz\+interval '(\d+) seconds?'`
 	for _, fence := range []struct {
 		name, definition, pattern string
 		interval                  time.Duration
 	}{
 		{"context_execution_check", `ADD CONSTRAINT context_execution_check CHECK\(`, `not_after<=not_before\+interval '(\d+) seconds?'`, AuthorityRecheckInterval},
 		{"capacity_recovery_current", `CREATE (?:OR REPLACE )?FUNCTION (?:public\.)?capacity_recovery_current\(`, `\(a->>'FreshUntil'\)::timestamptz<=\(a->>'ObservedAt'\)::timestamptz\+interval '(\d+) seconds?'`, SQLFencedInterval},
-		{"lock_connector_process_current", `CREATE (?:OR REPLACE )?FUNCTION (?:public\.)?lock_connector_process_current\(`, recovery, SQLFencedInterval},
-		{"lock_connector_backing_current", `CREATE (?:OR REPLACE )?FUNCTION (?:public\.)?lock_connector_backing_current\(`, recovery, SQLFencedInterval},
 	} {
 		body := latestSQLDefinition(t, regexp.MustCompile(fence.definition))
 		matches := regexp.MustCompile(fence.pattern).FindAllStringSubmatch(body, -1)

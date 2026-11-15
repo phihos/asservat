@@ -103,13 +103,6 @@ func (c *sourceRecordingCanceller) CancelRecording(ctx context.Context, x collec
 	return nil
 }
 
-type freshConnectorSource struct{ countingLocal }
-
-func (freshConnectorSource) ReadConnectorIdentitySource(context.Context) (fleet.ConnectorIdentitySource, error) {
-	now := time.Now()
-	return fleet.ConnectorIdentitySource{Observation: fleet.ConnectorCredentialObservation{ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}}, nil
-}
-
 // Synthetic admitted authority/queue over actual hub/region frame streams and
 // the real router. Real signature purpose/key checks have their JOSE test.
 // Every source delivery is one query: the standby stays idle for a Save.

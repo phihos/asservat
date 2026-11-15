@@ -1,9 +1,10 @@
 package audit
 
 import (
+	"time"
+
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
-	"time"
 )
 
 const OperationWriterProtocol = "closed-operation-audit/v1"
@@ -19,26 +20,13 @@ const ShareOperationHistoryLayout = "operation-audit-history/v4"
 // Every residual generation and WAL copy retains this allowance until release.
 const ShareOperationBusinessWALBytes int64 = 8 << 20
 
-// This distinct private qualification includes retained connector source/process/
-// certificate dependencies; a public v3 result is never automatically sufficient.
-const ConnectorOperationHistoryLayout = "connector-operation-history/v1"
-
-// V2 additionally backs the immutable restrictive ticket, complete reservation
-// set, one-use consumption and retirement closures. V1 evidence does not
-// qualify this shape.
-const ConnectorRetirementHistoryLayout = "connector-operation-history/v2"
-
-func connectorHistoryLayout(layout string) bool {
-	return layout == ConnectorOperationHistoryLayout || layout == ConnectorRetirementHistoryLayout
-}
-
 func captureHistoryLayout(layout string) bool {
 	return layout == CaptureOperationHistoryLayout || layout == ShareCaptureOperationHistoryLayout
 }
 
 func verificationHistoryLayout(layout string) bool {
 	return layout == OperationVerificationHistoryLayout || layout == ShareOperationHistoryLayout ||
-		connectorHistoryLayout(layout) || layout == ProcessingReleaseHistoryLayout || captureHistoryLayout(layout)
+		layout == ProcessingReleaseHistoryLayout || captureHistoryLayout(layout)
 }
 
 const ProcessingReleaseHistoryLayout = "processing-release-history/v1"
@@ -58,7 +46,7 @@ type OperationHistoryQualification struct {
 }
 
 func (q OperationHistoryQualification) Valid() bool {
-	return authorization.UUID(q.ID) && q.Digest != (artifact.Digest{}) && (q.Layout == OperationHistoryLayout || q.Layout == OperationOverdueHistoryLayout || verificationHistoryLayout(q.Layout)) && (!connectorHistoryLayout(q.Layout) || q.MaximumRowFootprintBytes >= 1<<20) && q.MaximumRowFootprintBytes >= 128<<10 && q.MaximumRowFootprintBytes <= 16<<20 && q.MaximumTransitionWALBytes >= 128<<10 && q.MaximumTransitionWALBytes <= 64<<20 && q.BackupCopies >= 1 && q.BackupCopies <= 64 && q.WALCopies >= 1 && q.WALCopies <= 64
+	return authorization.UUID(q.ID) && q.Digest != (artifact.Digest{}) && (q.Layout == OperationHistoryLayout || q.Layout == OperationOverdueHistoryLayout || verificationHistoryLayout(q.Layout)) && q.MaximumRowFootprintBytes >= 128<<10 && q.MaximumRowFootprintBytes <= 16<<20 && q.MaximumTransitionWALBytes >= 128<<10 && q.MaximumTransitionWALBytes <= 64<<20 && q.BackupCopies >= 1 && q.BackupCopies <= 64 && q.WALCopies >= 1 && q.WALCopies <= 64
 }
 func (q OperationHistoryQualification) SlotBacking(leases int64) (backup, wal int64) {
 	// At most two residual generations overlap; every reuse waits through H.
@@ -84,16 +72,6 @@ func (q OperationHistoryQualification) SlotBacking(leases int64) (backup, wal in
 		transitions = 32
 	} else if q.Layout == ProcessingReleaseHistoryLayout {
 		// Separately qualified release account/business and existing lifecycle writes.
-		transitions = 32
-	} else if q.Layout == ConnectorRetirementHistoryLayout {
-		// Eight additional bounded ticket reserve/bind/consume-or-close/retire
-		// writes; the independently accepted WAL bound includes full multi-peer
-		// transactions, not only one row. No qualification is inferred here.
-		transitions = 40
-	} else if q.Layout == ConnectorOperationHistoryLayout {
-		// Existing 21 lifecycle transitions plus at most eleven source/business
-		// admission, acceptance, signing, activation and dependency retirements.
-		// SQL49 enforces that graph; actual transaction cost needs its own test.
 		transitions = 32
 	}
 	business := int64(0)
@@ -146,8 +124,6 @@ func (p OperationLifecyclePolicy) historyLaneValid() bool {
 		return p.History != nil && captureHistoryLayout(p.History.Layout)
 	case "processing":
 		return p.History != nil && p.History.Layout == ProcessingReleaseHistoryLayout
-	case "identity":
-		return p.History != nil && connectorHistoryLayout(p.History.Layout)
 	}
 	return false
 }
@@ -293,7 +269,7 @@ type OperationHistoryKey struct {
 }
 
 func (k OperationHistoryKey) Valid() bool {
-	return authorization.UUID(k.RootID) && (k.Lane == "normal" || k.Lane == "resolution" || k.Lane == "identity" || k.Lane == "processing" || k.Lane == "capture") && k.PrincipalDigest != (artifact.Digest{}) && microTime(k.ReleaseAt) && microTime(k.DeleteBy) && k.ReleaseAt.Before(k.DeleteBy)
+	return authorization.UUID(k.RootID) && (k.Lane == "normal" || k.Lane == "resolution" || k.Lane == "processing" || k.Lane == "capture") && k.PrincipalDigest != (artifact.Digest{}) && microTime(k.ReleaseAt) && microTime(k.DeleteBy) && k.ReleaseAt.Before(k.DeleteBy)
 }
 
 type OperationHistoryRelease struct {
