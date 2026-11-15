@@ -6,7 +6,7 @@ A share lasts until the artifact's access ends unless the creator names an
 earlier end. No Suspended phase or administrator resume; managers are members
 of a managing group now. The 24 h/7 d lifetime, recipient and manager counts,
 32 active shares per artifact and the 100-capture policy limit are gone.
-Migration 00174 drops the SQL checks; the runtime reads the canonical
+Migration 00175 drops the SQL checks; the runtime reads the canonical
 `sharing-request` schema. Verification: custody `TestContextAdmissionWithRealServices`
 share subtests; the two `policy-share-*` subtests fail identically on main
 (context admission unavailable).
