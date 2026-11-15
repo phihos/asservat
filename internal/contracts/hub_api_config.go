@@ -167,13 +167,11 @@ type HubAPIPublic struct {
 }
 
 // HubAPIRegionalOffer holds the offer's Helm-known values: the in-cluster
-// federation endpoint and serving name, the image and the operator's
-// connector limits (values federation.connector), from which the hub-api derives the connector backing.
+// federation endpoint and serving name and the image.
 type HubAPIRegionalOffer struct {
-	Federation string                     `json:"federation"`
-	ServerName string                     `json:"serverName"`
-	Image      string                     `json:"image"`
-	Connector  InstallerConnectorSettings `json:"connector"`
+	Federation string `json:"federation"`
+	ServerName string `json:"serverName"`
+	Image      string `json:"image"`
 	// HubOnly is mode=hub: no local connector, so no local bootstrap or
 	// hub-cluster catalog entry; the offer serves remote clusters only.
 	HubOnly bool `json:"hubOnly,omitempty"`

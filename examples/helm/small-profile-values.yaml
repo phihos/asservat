@@ -14,13 +14,6 @@ identity:
     - { clientID: asservat-console, issuer: https://login.lab.example.invalid:31451/realms/asservat, kind: User, id: REPLACE_OPERATOR_SUBJECT_ID }
 exposure:
   tlsSecret: operator-console-tls
-federation:
-  endpoint: https://federation.lab.example.invalid:31446
-  serverName: federation.lab.example.invalid
-  ownerAddress: owner.lab.example.invalid:31447
-  ownerOperationAddress: owner.lab.example.invalid:31449
-  keyServiceEndpoint: https://keys.lab.example.invalid:31448
-  evidenceStore: {} # Same bundled bucket, separate keys.
 services:
   postgres:
     provider: bundled

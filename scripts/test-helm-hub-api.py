@@ -20,8 +20,6 @@ CHART = ROOT / "charts/asservat"
 HELM = os.environ.get("HELM", "helm")
 NS = "asservat-system"
 
-CONNECTOR = {"retainedSeconds": 4000, "purgeLeases": 2,
-             "footprint": {"rowBytes": 1048576, "transitionWALBytes": 1048576}}
 BUNDLED = {
     "mode": "combined",
     "image": {"repository": "registry.example/asservat", "digest": "sha256:" + "a" * 64},
@@ -29,7 +27,6 @@ BUNDLED = {
     "identity": {"eligibleGroups": ["00000000-0000-4000-8000-000000000001"], "administrators": {"groups": ["asservat-admins"]}, "processingOperators": [{"clientID": "asservat-console", "issuer": "https://login.example.org/realms/asservat", "kind": "User", "id": "0f03f92a-6920-47cd-85d5-26080d3571d5"}]},
     "exposure": {"tlsSecret": "asservat-public-tls"},
     "capacity": {"workload": {"share": "1Gi"}},
-    "federation": {"connector": CONNECTOR},
     "retention": {"purposeRef": "context-trial"},
     "region": {"enabled": True},
     "services": {
@@ -116,7 +113,7 @@ class HubAPI(unittest.TestCase):
         self.assertEqual((public["origin"], public["browserAudience"]), ("https://asservat.example.test", "asservat-console"))
         self.assertTrue(public["processing"])
         self.assertEqual(public["regionalOffer"]["federation"], f"https://asservat-federation.{NS}.svc:9446")
-        self.assertEqual(public["regionalOffer"]["connector"], CONNECTOR)
+        self.assertNotIn("connector", public["regionalOffer"])
         text = cm["config.json"].lower()
         for forbidden in ["uid", "guard", "activation", "installationid", "auditkey", "role\"", "mount"]:
             self.assertNotIn(forbidden, text)
@@ -232,8 +229,7 @@ class HubAPI(unittest.TestCase):
         for extra, message in [({"exposure": {"tlsSecret": ""}}, "exposure.tlsSecret"),
                                ({"mode": "hub", "region": {"enabled": False}, "services": {"identity": {"provider": "external"}}, "identity": {"issuer": "https://sso.example.test", "clientID": "c", "providerRootsPEM": "x", "clientSecret": {"existingSecret": "oidc"}, "eligibleGroups": [], "eligibleSubjects": []}}, "identity.eligibleSubjects or identity.eligibleGroups"),
                                ({"mode": "hub", "region": {"enabled": False}, "services": {"identity": {"provider": "external"}}, "identity": {"issuer": "https://sso.example.test", "clientID": "c", "providerRootsPEM": "x"}}, "identity.clientSecret.existingSecret"),
-                               ({"mode": "hub", "region": {"enabled": False}, "services": {"identity": {"provider": "external"}}, "identity": {"issuer": "https://sso.example.test", "clientID": "c", "clientSecret": {"existingSecret": "oidc"}}}, "identity.providerRootsPEM"),
-                               ({"federation": None}, "federation.connector")]:
+                               ({"mode": "hub", "region": {"enabled": False}, "services": {"identity": {"provider": "external"}}, "identity": {"issuer": "https://sso.example.test", "clientID": "c", "clientSecret": {"existingSecret": "oidc"}}}, "identity.providerRootsPEM")]:
             r = helm("template", merge(BUNDLED, extra), ok=False)
             self.assertIn(message, r.stderr)
 

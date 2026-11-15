@@ -31,16 +31,5 @@ retention:
   defaults: {evidenceSeconds: 300, caseMetadataSeconds: 3600, auditMetadataSeconds: 3600}
   maxima: {evidenceSeconds: 3600, caseMetadataSeconds: 3600, auditMetadataSeconds: 3600}
   deletionBudgetSeconds: 300
-federation:
-  serviceType: NodePort
-  nodePort: 31446
-  ownerNodePort: 31447
-  ownerOperationNodePort: 31449
-  keyServiceNodePort: 31448
-  connector:
-    retainedSeconds: 4000
-    purgeLeases: 2
-    footprint: {rowBytes: 1048576, transitionWALBytes: 1048576}
-  fleet: {channelMount: fleet-bootstrap, deliveryProfile: regional-installer}
 hub:
   hub-api: {connections: 4, concurrency: 2}

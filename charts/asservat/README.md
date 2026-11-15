@@ -55,7 +55,7 @@ Apply configuration changes with `helm upgrade` and the same values file.
 | `exposure.httpRoute` | disabled | Generic Gateway API HTTPRoute: `parentRefs`, `annotations`; the hostname is the origin host |
 | `capacity` | omitted | Evidence capacity ([capacity.schema.json](../../specs/contracts/capacity.schema.json)); on when any value is set |
 | `workloadKeys` | omitted | Workload label/annotation keys only administrators may set (workloadMetadata PermissionSources) |
-| `retention`, `federation.connector` | omitted | Baseline retention policy and regional connector limits; `mode: combined` needs `federation.connector` |
+| `retention` | omitted | Baseline retention policy |
 | `region` | see values.yaml | Connector settings for `cluster` and `combined` |
 | `hub.<component>` | see values.yaml | `replicas`, `resources`, `nodeSelector`, `tolerations` of hub-api, hub-worker, federation, key-service, publisher |
 | `secrets.<key>.existingSecret` | none | Use an existing Secret instead of generating it (see below) |

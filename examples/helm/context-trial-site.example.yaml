@@ -24,13 +24,6 @@ identity:
 exposure:
   # Existing kubernetes.io/tls Secret for the origin.
   tlsSecret: operator-console-tls
-federation:
-  endpoint: https://federation.hub.example.invalid:31446
-  serverName: federation.hub.example.invalid
-  ownerAddress: owner.hub.example.invalid:31447
-  ownerOperationAddress: owner.hub.example.invalid:31449
-  keyServiceEndpoint: https://keys.hub.example.invalid:31448
-  evidenceStore: { endpoint: "https://s3.example.invalid", region: us-east-1, bucket: asservat-evidence, rootsPEM: "" }
 services:
   postgres:
     external: { host: postgres.example.invalid, database: asservat, rootsPEM: "", adminSecret: operator-postgres-admin }
