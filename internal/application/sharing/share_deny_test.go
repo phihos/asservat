@@ -8,6 +8,7 @@ import (
 
 	value "asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/capture"
+	"asservat.local/asservat/internal/domain/identity"
 )
 
 // A current Deny removes a team member's management; removing it restores
@@ -83,5 +84,49 @@ func TestShareManagerDeny(t *testing.T) {
 	f.i = admin
 	if revoked, _, err := s.Revoke(ctx, f, RevokeInput{OperationID: testID(901), ShareID: second.ID, ExpectedRevision: 1, IdempotencyKey: "admin"}); err != nil || revoked.RevokedAt.IsZero() || !f.store.revokers[len(f.store.revokers)-1].Administrator {
 		t.Fatal("administrator revocation under a Deny", err)
+	}
+}
+
+// pagedOwned serves owned candidates newest first by keyset; none of them is
+// managed by the caller, so List filters every row.
+type pagedOwned struct {
+	*memoryStore
+	root  string
+	rows  []value.Share
+	calls int
+}
+
+func (p *pagedOwned) OwnedShares(_ context.Context, _ identity.Identity, after ShareCursor, limit int) ([]value.Share, error) {
+	p.calls++
+	var out []value.Share
+	for _, r := range p.rows {
+		if after != (ShareCursor{}) && !r.CreatedAt.Before(after.CreatedAt) {
+			continue
+		}
+		if len(out) == limit {
+			break
+		}
+		out = append(out, r)
+	}
+	return out, nil
+}
+
+// One List request reads at most shareListScanPages candidate pages and
+// returns a cursor; the next request continues where it stopped.
+func TestShareListScanBudget(t *testing.T) {
+	f, s := newFixture()
+	store := &pagedOwned{memoryStore: f.store, root: s.RootID}
+	for n := range shareListPageRows * (shareListScanPages + 2) {
+		store.rows = append(store.rows, value.Share{RootID: s.RootID, ID: testID(1000 + n), CreatedAt: f.now.Add(-time.Duration(n+1) * time.Second)})
+	}
+	s.Store = store
+	got, next, _, err := s.List(context.Background(), f, "owned", "", 20)
+	if err != nil || len(got) != 0 || next == "" || store.calls != shareListScanPages {
+		t.Fatal("first request", err, len(got), next, store.calls)
+	}
+	store.calls = 0
+	got, next, _, err = s.List(context.Background(), f, "owned", next, 20)
+	if err != nil || len(got) != 0 || next != "" || store.calls != 3 {
+		t.Fatal("continuation", err, len(got), next, store.calls)
 	}
 }

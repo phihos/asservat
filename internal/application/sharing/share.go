@@ -244,6 +244,15 @@ func (s Service) Create(ctx context.Context, current identities.CurrentIdentity,
 // (received: unrevoked, unexpired shares whose share-level checks pass).
 // Received rows are candidates: the artifact's retained audience, retention
 // end and data class are checked only by the read itself.
+// shareListPageRows and shareListScanPages bound one List request's database
+// work: at most five candidate pages of 100 rows are read and filtered.
+// When most candidates are filtered out, the request returns a shorter page
+// with a cursor, and the next request continues where this one stopped.
+const (
+	shareListPageRows  = 100
+	shareListScanPages = 5
+)
+
 func (s Service) List(ctx context.Context, current identities.CurrentIdentity, view, cursor string, limit int) ([]View, string, time.Time, error) {
 	if ctx == nil || ctx.Err() != nil || current == nil || !s.ready() || limit < 1 || limit > 100 || view != "owned" && view != "received" {
 		return nil, "", time.Time{}, capture.ErrInvalid
@@ -278,12 +287,12 @@ func (s Service) List(ctx context.Context, current identities.CurrentIdentity, v
 	}
 	out := make([]View, 0, limit)
 	next := ""
-	for {
+	for page := 1; ; page++ {
 		var rows []value.Share
 		if view == "owned" {
-			rows, err = s.Store.OwnedShares(ctx, i, after, 100)
+			rows, err = s.Store.OwnedShares(ctx, i, after, shareListPageRows)
 		} else {
-			rows, err = s.Store.ReceivedShares(ctx, i, after, 100)
+			rows, err = s.Store.ReceivedShares(ctx, i, after, shareListPageRows)
 		}
 		if err != nil {
 			return nil, "", time.Time{}, capture.ErrUnavailable
@@ -323,10 +332,12 @@ func (s Service) List(ctx context.Context, current identities.CurrentIdentity, v
 			until = identity.Earlier(until, r.ValidUntil)
 			out = append(out, View{row, value.ShareActive})
 		}
-		if next != "" || len(rows) < 100 {
+		if next != "" || len(rows) < shareListPageRows {
 			break
 		}
-		if len(out) == limit {
+		if len(out) == limit || page == shareListScanPages {
+			// The page is full or this request's scan budget is spent; the
+			// cursor continues after the last examined candidate.
 			next = encodeShareCursor(after)
 			break
 		}

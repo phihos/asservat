@@ -396,15 +396,20 @@ func compileSharing(raw json.RawMessage) (value.PolicySharing, error) {
 	}
 	var future struct {
 		Enabled     bool
-		MaxCaptures int
+		MaxCaptures *int
 	}
 	if strict(fields["futureCaptures"], &future) != nil || !future.Enabled {
 		return reject(".futureCaptures", "invalid")
 	}
-	if future.MaxCaptures < 0 {
-		return reject(".futureCaptures.maxCaptures", "must be positive")
+	// Absent maxCaptures means no count bound; notAfter or the grant end
+	// then bounds the share (checked at activation). An explicit value is
+	// at least 1, as the schema says.
+	if future.MaxCaptures != nil {
+		if *future.MaxCaptures < 1 {
+			return reject(".futureCaptures.maxCaptures", "must be at least 1")
+		}
+		out.MaxCaptures = *future.MaxCaptures
 	}
-	out.MaxCaptures = future.MaxCaptures
 	if raw, ok := fields["notAfter"]; ok {
 		var end string
 		if strict(raw, &end) != nil {

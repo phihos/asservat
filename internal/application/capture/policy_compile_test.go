@@ -141,6 +141,9 @@ func TestRestartPolicyRejectsUnsupportedFieldsWithPath(t *testing.T) {
 		{"spec.sharing.futureCaptures.maxCaptures", func(s map[string]any) {
 			sharingSpec(s)["futureCaptures"] = map[string]any{"enabled": true, "maxCaptures": -1}
 		}},
+		{"spec.sharing.futureCaptures.maxCaptures", func(s map[string]any) {
+			sharingSpec(s)["futureCaptures"] = map[string]any{"enabled": true, "maxCaptures": 0}
+		}},
 		{"spec.sharing.notAfter", func(s map[string]any) { sharingSpec(s)["notAfter"] = "tomorrow" }},
 		{"spec.sharing.recipients[1].issuer", func(s map[string]any) {
 			sharingSpec(s)["recipients"] = []any{map[string]any{"kind": "Group", "issuer": "https://id.example.invalid", "id": "a"}, map[string]any{"kind": "Group", "issuer": "https://other.example.invalid", "id": "b"}}
@@ -189,6 +192,11 @@ func TestPolicySharingCompilesShapeOnly(t *testing.T) {
 	want := time.Date(2026, 10, 30, 18, 0, 0, 0, time.UTC)
 	if p.Sharing == nil || p.Sharing.MaxCaptures != 10 || !p.Sharing.NotAfter.Equal(want) || len(p.Sharing.Recipients) != 1 || p.Sharing.Recipients[0].Kind != "Group" || p.Sharing.Recipients[0].ID != "incident-response" {
 		t.Fatalf("compiled sharing %+v", p.Sharing)
+	}
+	// An absent maxCaptures is no count bound (notAfter bounds the share).
+	sharingSpec(s)["futureCaptures"] = map[string]any{"enabled": true}
+	if p, err := compileSpec(t, s); err != nil || p.Sharing == nil || p.Sharing.MaxCaptures != 0 {
+		t.Fatal("absent maxCaptures", err)
 	}
 	// An end in the past still compiles: a running policy's poll never fails
 	// on it; activation refuses it and the counter claim stops at it.
