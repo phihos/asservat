@@ -42,7 +42,9 @@ func NewBrowserSessions(ctx context.Context, pool *pgxpool.Pool, settings value.
 	return s, nil
 }
 
-func (s *BrowserSessions) inactivity() int64 { return int64(s.settings.InactivityTimeout / time.Second) }
+func (s *BrowserSessions) inactivity() int64 {
+	return int64(s.settings.InactivityTimeout / time.Second)
+}
 
 func (s *BrowserSessions) transaction(ctx context.Context, f func(*custodydb.Queries) error) error {
 	err := s.ledger.transaction(ctx, f)

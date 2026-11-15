@@ -32,15 +32,15 @@ type CredentialCipher interface {
 }
 
 type BrowserSessions struct {
-	Store                   BrowserSessionStore
-	Cipher                  CredentialCipher
-	Provider                BrowserProvider
-	Identities              Resolver
-	Policies                PolicyReader
-	Logout                  LogoutVerifier
-	Issuer, ClientID        string
-	Lifetime                time.Duration
-	Now                     func() time.Time
+	Store            BrowserSessionStore
+	Cipher           CredentialCipher
+	Provider         BrowserProvider
+	Identities       Resolver
+	Policies         PolicyReader
+	Logout           LogoutVerifier
+	Issuer, ClientID string
+	Lifetime         time.Duration
+	Now              func() time.Time
 }
 type LoginRedirect struct {
 	URL, State, Browser string
