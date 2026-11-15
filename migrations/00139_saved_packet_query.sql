@@ -1,4 +1,5 @@
 -- +goose Up
+SET LOCAL check_function_bodies = off;
 -- ADR305: one immutable caller-key association, existing grant uses per raw batch.
 LOCK TABLE context_query,context_query_batch,access_grant,access_grant_use IN ACCESS EXCLUSIVE MODE;
 ALTER TABLE context_query ADD COLUMN invocation_key text, ADD COLUMN request_digest bytea;
@@ -610,6 +611,7 @@ END $$;
 -- +goose StatementEnd
 
 -- +goose Down
+SET LOCAL check_function_bodies = off;
 -- No retained new operation can be hidden by a downgrade. Existing scopes/uses stay immutable.
 -- +goose StatementBegin
 DO $$ BEGIN

@@ -1,9 +1,12 @@
 -- +goose Up
+-- No Down: 00172 removes this capacity code, so a downgrade probe reapplies
+-- this migration. Function bodies are not checked against the removed tables.
+SET LOCAL check_function_bodies = off;
 -- ADR-301: these are separately charged parameters of an already accepted
 -- capture, not another workload acquisition. Purpose comes from the actual
 -- immutable history association, never a caller flag, role or native size.
 -- +goose StatementBegin
-CREATE FUNCTION capacity_accepted_history_until(r uuid,attempt uuid,n timestamptz) RETURNS timestamptz
+CREATE OR REPLACE FUNCTION capacity_accepted_history_until(r uuid,attempt uuid,n timestamptz) RETURNS timestamptz
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
 DECLARE h public.capture_history_parameter;a public.custody_attempt;c public.context_capture;g public.recording_save_group;
  source public.capacity_source;managed_pool public.capacity_pool;compiled jsonb;
@@ -93,37 +96,7 @@ BEGIN
  IF until_at IS NULL OR clock_timestamp()>=until_at THEN RAISE EXCEPTION 'managed capacity admission incomplete or expired' USING ERRCODE='23514';END IF;
  RETURN NEW;
 END $$;
-DROP TRIGGER zzz_capacity_new_admission ON custody_attempt;
+DROP TRIGGER IF EXISTS zzz_capacity_new_admission ON custody_attempt;
 CREATE CONSTRAINT TRIGGER zzz_capacity_new_admission AFTER INSERT ON custody_attempt
  DEFERRABLE INITIALLY IMMEDIATE FOR EACH ROW EXECUTE FUNCTION require_capacity_new_admission();
--- +goose StatementEnd
-
--- +goose Down
--- No persisted columns or obligations change. Only future registration returns
--- to the previous requirement for live workload capacity.
--- +goose StatementBegin
-DROP TRIGGER zzz_capacity_new_admission ON custody_attempt;
-CREATE TRIGGER zzz_capacity_new_admission AFTER INSERT ON custody_attempt FOR EACH ROW EXECUTE FUNCTION require_capacity_new_admission();
-CREATE OR REPLACE FUNCTION require_capacity_new_admission() RETURNS trigger
-LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
-DECLARE r uuid;a uuid;until_at timestamptz;
-BEGIN
- IF TG_TABLE_SCHEMA<>'public' OR TG_WHEN<>'AFTER' OR TG_LEVEL<>'ROW' OR TG_OP<>'INSERT' THEN RAISE EXCEPTION 'invalid capacity admission source' USING ERRCODE='23514';END IF;
- IF TG_RELID='public.custody_attempt'::regclass THEN
-  SELECT p.root_id INTO r FROM public.custody_allocation allocation JOIN public.capacity_pool p ON p.id=allocation.pool_id WHERE allocation.id=NEW.allocation_id;
-  IF NOT FOUND THEN RETURN NEW;END IF;
-  a:=NEW.allocation_id;
- ELSIF TG_RELID='public.context_capture'::regclass THEN
-  r:=NEW.root_id;SELECT allocation_id INTO STRICT a FROM public.custody_attempt WHERE id=NEW.attempt_id;
- ELSIF TG_RELID='public.operation_audit'::regclass THEN
-  -- Only collection audit is workload-capacity gated; read and other lanes
-  -- are bounded by their own per-principal audit allowance.
-  IF NEW.lane<>'capture' THEN RETURN NEW;END IF;
-  r:=NEW.root_id;SELECT allocation_id INTO STRICT a FROM public.custody_attempt WHERE id=(NEW.intent#>>'{Capture,AttemptID}')::uuid;
- ELSE RAISE EXCEPTION 'invalid capacity admission table' USING ERRCODE='23514';END IF;
- until_at:=public.capacity_managed_admission_until(r,a,'context',clock_timestamp());
- IF until_at IS NULL OR clock_timestamp()>=until_at THEN RAISE EXCEPTION 'managed capacity admission incomplete or expired' USING ERRCODE='23514';END IF;
- RETURN NEW;
-END $$;
-DROP FUNCTION capacity_accepted_history_until(uuid,uuid,timestamptz);
 -- +goose StatementEnd
