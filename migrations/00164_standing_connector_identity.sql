@@ -14,17 +14,22 @@
 -- 4. connectors are not counted against an install-time limit: profiles
 --    (one per registered cluster), source transitions and identity audit
 --    accounts are created on demand, keyed by peer/cluster.
+-- Statements on connector identity objects run only while those objects
+-- exist: 00174 drops them, and a downgrade probe reruns this file.
 -- +goose StatementBegin
+DO $cgd$ BEGIN IF to_regclass('public.connector_identity_root') IS NOT NULL THEN EXECUTE $cg$
 DO $$
 DECLARE c text;
 BEGIN
  SELECT conname INTO STRICT c FROM pg_catalog.pg_constraint WHERE conrelid='public.connector_retirement_ticket'::regclass AND contype='c'
   AND pg_catalog.pg_get_constraintdef(oid) LIKE '%reserved_at < admission_until%' AND pg_catalog.pg_get_constraintdef(oid) LIKE '%original_purge_at%';
  EXECUTE format('ALTER TABLE public.connector_retirement_ticket DROP CONSTRAINT %I',c);
-END $$;
+END $$
+$cg$; END IF; END $cgd$;
 -- +goose StatementEnd
-ALTER TABLE connector_retirement_ticket ADD CONSTRAINT connector_retirement_ticket_admission CHECK(reserved_at<admission_until);
+ALTER TABLE IF EXISTS connector_retirement_ticket ADD CONSTRAINT connector_retirement_ticket_admission CHECK(reserved_at<admission_until);
 -- +goose StatementBegin
+DO $cgd$ BEGIN IF to_regclass('public.connector_identity_root') IS NOT NULL THEN EXECUTE $cg$
 CREATE OR REPLACE FUNCTION connector_retirement_ticket_valid(t jsonb) RETURNS boolean
 LANGUAGE plpgsql IMMUTABLE SET search_path=pg_catalog,pg_temp AS $$
 DECLARE p jsonb:=t->'Policy'; b jsonb:=t->'Binding'; actor jsonb:=t->'OriginalActor';
@@ -50,9 +55,11 @@ BEGIN
   a<ordinary_end AND consume_end=original_end-interval '30 seconds' AND original_end>a+interval '1 minute' AND
   original_end<retained AND retained<=a+interval '3660 days' AND original_end<=(t->>'OriginalAcceptancePurgeAt')::timestamptz,false);
 EXCEPTION WHEN invalid_text_representation OR datetime_field_overflow OR numeric_value_out_of_range THEN RETURN false;
-END $$;
+END $$
+$cg$; END IF; END $cgd$;
 -- +goose StatementEnd
 -- +goose StatementBegin
+DO $cgd$ BEGIN IF to_regclass('public.connector_identity_root') IS NOT NULL THEN EXECUTE $cg$
 CREATE OR REPLACE FUNCTION guard_connector_identity_process() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
 DECLARE cfg public.connector_identity_profile; backing public.connector_identity_root; event public.operation_audit; n timestamptz; retained bigint;
 BEGIN
@@ -90,7 +97,8 @@ BEGIN
   END IF;
  END IF;
  RETURN NEW;
-END $$;
+END $$
+$cg$; END IF; END $cgd$;
 -- +goose StatementEnd
 -- +goose StatementBegin
 CREATE OR REPLACE FUNCTION guard_operation_audit() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
@@ -147,6 +155,7 @@ BEGIN
 END $$;
 -- +goose StatementEnd
 -- +goose StatementBegin
+DO $cgd$ BEGIN IF to_regclass('public.connector_identity_root') IS NOT NULL THEN EXECUTE $cg$
 CREATE OR REPLACE FUNCTION preserve_connector_ticket_backing() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
 DECLARE pool public.operation_audit_pool; account public.operation_audit_account; reserved bigint; n timestamptz;
@@ -169,9 +178,11 @@ BEGIN
   IF NOT EXISTS(SELECT 1 FROM public.connector_retirement_ticket t WHERE t.id=NEW.id AND t.root_id=NEW.root_id AND t.principal_digest=NEW.principal_digest AND t.retirement_operation=NEW.id AND t.admitted_at=(NEW.intent->>'CreatedAt')::timestamptz AND t.restriction_at IS NOT NULL AND t.superseded_at IS NULL AND t.closed_unused_at IS NULL AND t.admission_closed_at IS NULL AND t.acceptance_reference=t.acceptance_id AND t.ticket=NEW.intent->'RetirementOrigin'->'Ticket' AND public.connector_digest(NEW.intent->'RetirementOrigin'->'TicketDigest')=t.ticket_digest) THEN RAISE EXCEPTION 'connector retirement has no exact prepaid admission' USING ERRCODE='23514';END IF;
  END IF;
  RETURN NEW;
-END $$;
+END $$
+$cg$; END IF; END $cgd$;
 -- +goose StatementEnd
 -- +goose StatementBegin
+DO $cgd$ BEGIN IF to_regclass('public.connector_identity_root') IS NOT NULL THEN EXECUTE $cg$
 CREATE OR REPLACE FUNCTION guard_connector_ticket_reservation() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
 DECLARE root public.connector_identity_root; cfg public.connector_identity_profile; pool public.operation_audit_pool; account public.operation_audit_account; trust public.fleet_current_trust;
@@ -321,7 +332,8 @@ BEGIN
  SELECT count(*) INTO reserved FROM public.connector_retirement_ticket WHERE root_id=NEW.root_id AND principal_digest=NEW.principal_digest AND admitted_at IS NULL AND closed_unused_at IS NULL;
  IF clock_timestamp()>=NEW.reserved_at+interval '5 seconds' OR clock_timestamp()>=trust.fresh_until OR clock_timestamp()>=root.valid_until THEN RAISE EXCEPTION 'connector restrictive reservation capacity or interval unavailable' USING ERRCODE='23514';END IF;
  RETURN NEW;
-END $$;
+END $$
+$cg$; END IF; END $cgd$;
 -- +goose StatementEnd
 -- +goose StatementBegin
 CREATE OR REPLACE FUNCTION guard_operation_audit_pool() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
@@ -363,6 +375,7 @@ BEGIN
 END $$;
 -- +goose StatementEnd
 -- +goose StatementBegin
+DO $cgd$ BEGIN IF to_regclass('public.connector_identity_root') IS NOT NULL THEN EXECUTE $cg$
 DO $$
 DECLARE c text;
 BEGIN
@@ -378,12 +391,14 @@ BEGIN
   AND pg_catalog.pg_get_constraintdef(oid) LIKE '%accounts <= account_limit%' LOOP
   EXECUTE format('ALTER TABLE public.operation_audit_pool DROP CONSTRAINT %I',c);
  END LOOP;
-END $$;
+END $$
+$cg$; END IF; END $cgd$;
 -- +goose StatementEnd
-ALTER TABLE connector_identity_root ADD CONSTRAINT connector_identity_root_counts CHECK(profiles>=0 AND source_transitions>=0);
+ALTER TABLE IF EXISTS connector_identity_root ADD CONSTRAINT connector_identity_root_counts CHECK(profiles>=0 AND source_transitions>=0);
 ALTER TABLE operation_audit_account ADD CONSTRAINT operation_audit_account_charged CHECK(charged>=0 AND (lane='identity' OR charged<=1000000));
 ALTER TABLE operation_audit_pool ADD CONSTRAINT operation_audit_pool_accounts CHECK(accounts>=0 AND (lane='identity' OR accounts<=account_limit));
 -- +goose StatementBegin
+DO $cgd$ BEGIN IF to_regclass('public.connector_identity_root') IS NOT NULL THEN EXECUTE $cg$
 CREATE OR REPLACE FUNCTION guard_connector_identity_profile() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
 DECLARE r public.connector_identity_root; n timestamptz; c jsonb; a public.operation_audit; attempt public.connector_credential_attempt; child public.connector_identity_process;
@@ -453,9 +468,11 @@ BEGIN
  IF OLD.accepted_id IS NULL AND NEW.accepted_id IS NULL AND NEW.fenced AND a.intent->>'Name'='connector_process_enrollment' AND child.accepted_at IS NULL AND n<a.request_until THEN RETURN NEW;END IF;
  IF a.intent_receipt IS NULL OR a.outcome_receipt IS NULL OR a.outcome->>'Status' IS DISTINCT FROM 'success' OR NEW.accepted_id IS DISTINCT FROM NEW.candidate_id OR NEW.fenced OR (a.intent->>'Name'='connector_process_enrollment' AND (child.accepted_at IS NULL OR n>=child.run_until)) OR (a.intent->>'Name'<>'connector_process_enrollment' AND n>=attempt.certificate_not_after) THEN RAISE EXCEPTION 'connector candidate acknowledgement unavailable' USING ERRCODE='23514';END IF;
  RETURN NEW;
-END $$;
+END $$
+$cg$; END IF; END $cgd$;
 -- +goose StatementEnd
 -- +goose StatementBegin
+DO $cgd$ BEGIN IF to_regclass('public.connector_identity_root') IS NOT NULL THEN EXECUTE $cg$
 CREATE OR REPLACE FUNCTION lock_connector_process_current(r uuid,c jsonb,allow_candidate boolean) RETURNS public.connector_identity_profile LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
 DECLARE proof jsonb:=c->'Proof'; source jsonb:=proof->'Configuration'; p jsonb:=source->'Profile'; cfg public.connector_identity_profile; root public.connector_identity_root; trust public.fleet_current_trust; n timestamptz;
 BEGIN
@@ -473,9 +490,11 @@ BEGIN
    (c->'Recovery'->>'InstallationID')::uuid=root.installation_id AND (c->'Recovery'->>'IssuerEpoch')::uuid=root.issuer_epoch AND (c->'Recovery'->>'ObservedAt')::timestamptz<=n AND (c->'Recovery'->>'FreshUntil')::timestamptz>n AND (c->'Recovery'->>'FreshUntil')::timestamptz<=(c->'Recovery'->>'ObservedAt')::timestamptz+interval '5 seconds' AND (c->'Recovery'->>'FreshUntil')::timestamptz<=trust.fresh_until AND c->'Recovery'->'Revision'->>'UID'=trust.source_uid AND (c->'Recovery'->'Revision'->>'Generation')::bigint=trust.source_generation AND public.connector_digest(c->'Recovery'->'Revision'->'Digest')=trust.source_digest AND
    jsonb_array_length(proof->'WorkloadDigest')=32 AND jsonb_array_length(proof->'ProtectionDigest')=32 AND public.connector_digest(proof->'ClientKeyDigest')<>public.connector_digest(proof->'ServerKeyDigest'),false) THEN RAISE EXCEPTION 'connector process proof unavailable' USING ERRCODE='23514';END IF;
  RETURN cfg;
-END $$;
+END $$
+$cg$; END IF; END $cgd$;
 -- +goose StatementEnd
 -- +goose StatementBegin
+DO $cgd$ BEGIN IF to_regclass('public.connector_identity_root') IS NOT NULL THEN EXECUTE $cg$
 CREATE OR REPLACE FUNCTION lock_connector_credential_candidate(r uuid,candidate jsonb) RETURNS public.connector_identity_process LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
 DECLARE cur jsonb:=candidate->'Current'; source jsonb:=cur->'Source'->'Observation'; p jsonb:=source->'Profile'; proof jsonb:=cur->'ProcessProof'; actor jsonb:=cur->'Peer'; cfg public.connector_identity_profile; root public.connector_identity_root; trust public.fleet_current_trust; child public.connector_identity_process; leaf public.connector_credential_attempt; n timestamptz;
 BEGIN
@@ -501,9 +520,11 @@ BEGIN
   IF NOT COALESCE(child.serving AND leaf.activated_at IS NOT NULL AND leaf.detached_at IS NULL AND n>=leaf.certificate_not_before AND n<leaf.certificate_not_after AND actor->'Certificate'->'Binding'=child.process->'Binding' AND (actor->>'VerifiedAt')::timestamptz<=n AND (actor->>'ValidUntil')::timestamptz>n AND (actor->>'ValidUntil')::timestamptz<=(actor->>'VerifiedAt')::timestamptz+interval '5 seconds' AND (cur->>'Until')::timestamptz<=(actor->>'ValidUntil')::timestamptz,false) THEN RAISE EXCEPTION 'connector actual client leaf unavailable' USING ERRCODE='23514';END IF;
  END IF;
  RETURN child;
-END $$;
+END $$
+$cg$; END IF; END $cgd$;
 -- +goose StatementEnd
 -- +goose StatementBegin
+DO $cgd$ BEGIN IF to_regclass('public.connector_identity_root') IS NOT NULL THEN EXECUTE $cg$
 CREATE OR REPLACE FUNCTION read_connector_activated_leaf(r uuid,peer uuid,usage_value text,digest_value bytea,source_value jsonb) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
 DECLARE started timestamptz:=clock_timestamp(); n timestamptz; until_at timestamptz; cfg public.connector_identity_profile; backing public.connector_identity_root; trust public.fleet_current_trust; child public.connector_identity_process; leaf public.connector_credential_attempt; event public.operation_audit; matched record;
@@ -524,13 +545,29 @@ BEGIN
   ((usage_value='client' AND leaf.id IN(child.client_current_id,child.client_previous_id)) OR (usage_value='server' AND leaf.id IN(child.server_current_id,child.server_previous_id))) AND leaf.activated_at IS NOT NULL AND leaf.detached_at IS NULL AND n>=leaf.certificate_not_before AND n<until_at AND ROW(leaf.source_uid,leaf.source_generation,leaf.source_digest)=ROW(cfg.source_uid,cfg.source_generation,cfg.source_digest) AND
   event.intent_receipt IS NOT NULL AND event.outcome_receipt IS NOT NULL AND event.outcome->>'Status'='success',false) THEN RAISE EXCEPTION 'connector activated leaf unavailable' USING ERRCODE='23514';END IF;
  RETURN jsonb_build_object('Certificate',leaf.issued->'Certificate','Process',child.process->'Attested','Revision',cfg.configuration->'Revision','ObservedAt',started,'FreshUntil',until_at);
-END $$;
+END $$
+$cg$; END IF; END $cgd$;
 -- +goose StatementEnd
 
 -- +goose Down
-ALTER TABLE connector_retirement_ticket DROP CONSTRAINT connector_retirement_ticket_admission;
-ALTER TABLE connector_retirement_ticket ADD CONSTRAINT connector_retirement_ticket_admission CHECK(reserved_at<admission_until AND admission_until<=original_purge_at-interval '1 minute') NOT VALID;
+-- After 00174 the connector lane is gone. Older shared audit functions that a
+-- downgrade probe restores still call these two helpers; without the lane they
+-- answer as for any non-identity record.
 -- +goose StatementBegin
+DO $stub$ BEGIN
+ IF to_regclass('public.connector_identity_root') IS NULL THEN
+  CREATE OR REPLACE FUNCTION public.connector_retirement_prepaid(event public.operation_audit) RETURNS boolean
+   LANGUAGE sql STABLE SET search_path=pg_catalog,pg_temp AS 'SELECT false';
+  CREATE OR REPLACE FUNCTION public.connector_operation_actor_valid(i jsonb) RETURNS boolean
+   LANGUAGE sql IMMUTABLE SET search_path=pg_catalog,pg_temp AS
+   $f$SELECT COALESCE(NOT(i ? 'RetirementOrigin') AND public.operation_audit_lane(i->>'Name')<>'identity' AND NOT(i ? 'Peer') AND NOT(i ? 'Process') AND public.operation_audit_human_input_valid(i->>'Name',i->>'InputFormat'),false)$f$;
+ END IF;
+END $stub$;
+-- +goose StatementEnd
+ALTER TABLE IF EXISTS connector_retirement_ticket DROP CONSTRAINT IF EXISTS connector_retirement_ticket_admission;
+ALTER TABLE IF EXISTS connector_retirement_ticket ADD CONSTRAINT connector_retirement_ticket_admission CHECK(reserved_at<admission_until AND admission_until<=original_purge_at-interval '1 minute') NOT VALID;
+-- +goose StatementBegin
+DO $cgd$ BEGIN IF to_regclass('public.connector_identity_root') IS NOT NULL THEN EXECUTE $cg$
 CREATE OR REPLACE FUNCTION connector_retirement_ticket_valid(t jsonb) RETURNS boolean
 LANGUAGE plpgsql IMMUTABLE SET search_path=pg_catalog,pg_temp AS $$
 DECLARE p jsonb:=t->'Policy'; b jsonb:=t->'Binding'; actor jsonb:=t->'OriginalActor';
@@ -556,9 +593,11 @@ BEGIN
   a<ordinary_end AND ordinary_end<=original_end-interval '1 minute' AND consume_end=original_end-interval '30 seconds' AND original_end>a+interval '1 minute' AND
   original_end<retained AND retained<=a+interval '3660 days' AND original_end<=(t->>'OriginalAcceptancePurgeAt')::timestamptz,false);
 EXCEPTION WHEN invalid_text_representation OR datetime_field_overflow OR numeric_value_out_of_range THEN RETURN false;
-END $$;
+END $$
+$cg$; END IF; END $cgd$;
 -- +goose StatementEnd
 -- +goose StatementBegin
+DO $cgd$ BEGIN IF to_regclass('public.connector_identity_root') IS NOT NULL THEN EXECUTE $cg$
 CREATE OR REPLACE FUNCTION guard_connector_identity_process() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
 DECLARE cfg public.connector_identity_profile; backing public.connector_identity_root; event public.operation_audit; n timestamptz; retained bigint;
 BEGIN
@@ -598,7 +637,8 @@ BEGIN
   END IF;
  END IF;
  RETURN NEW;
-END $$;
+END $$
+$cg$; END IF; END $cgd$;
 -- +goose StatementEnd
 -- +goose StatementBegin
 CREATE OR REPLACE FUNCTION guard_operation_audit() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
@@ -655,6 +695,7 @@ BEGIN
 END $$;
 -- +goose StatementEnd
 -- +goose StatementBegin
+DO $cgd$ BEGIN IF to_regclass('public.connector_identity_root') IS NOT NULL THEN EXECUTE $cg$
 CREATE OR REPLACE FUNCTION preserve_connector_ticket_backing() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
 DECLARE pool public.operation_audit_pool; account public.operation_audit_account; reserved bigint; n timestamptz;
@@ -677,9 +718,11 @@ BEGIN
   IF NOT EXISTS(SELECT 1 FROM public.connector_retirement_ticket t WHERE t.id=NEW.id AND t.root_id=NEW.root_id AND t.principal_digest=NEW.principal_digest AND t.retirement_operation=NEW.id AND t.admitted_at=(NEW.intent->>'CreatedAt')::timestamptz AND t.restriction_at IS NOT NULL AND t.superseded_at IS NULL AND t.closed_unused_at IS NULL AND t.admission_closed_at IS NULL AND t.acceptance_reference=t.acceptance_id AND t.ticket=NEW.intent->'RetirementOrigin'->'Ticket' AND public.connector_digest(NEW.intent->'RetirementOrigin'->'TicketDigest')=t.ticket_digest) THEN RAISE EXCEPTION 'connector retirement has no exact prepaid admission' USING ERRCODE='23514';END IF;
  END IF;
  RETURN NEW;
-END $$;
+END $$
+$cg$; END IF; END $cgd$;
 -- +goose StatementEnd
 -- +goose StatementBegin
+DO $cgd$ BEGIN IF to_regclass('public.connector_identity_root') IS NOT NULL THEN EXECUTE $cg$
 CREATE OR REPLACE FUNCTION guard_connector_ticket_reservation() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
 DECLARE root public.connector_identity_root; cfg public.connector_identity_profile; pool public.operation_audit_pool; account public.operation_audit_account; trust public.fleet_current_trust;
@@ -829,7 +872,8 @@ BEGIN
  SELECT count(*) INTO reserved FROM public.connector_retirement_ticket WHERE root_id=NEW.root_id AND principal_digest=NEW.principal_digest AND admitted_at IS NULL AND closed_unused_at IS NULL;
  IF account.charged+reserved>=pool.records_per_account OR clock_timestamp()>=NEW.reserved_at+interval '5 seconds' OR clock_timestamp()>=trust.fresh_until OR clock_timestamp()>=root.valid_until THEN RAISE EXCEPTION 'connector restrictive reservation capacity or interval unavailable' USING ERRCODE='23514';END IF;
  RETURN NEW;
-END $$;
+END $$
+$cg$; END IF; END $cgd$;
 -- +goose StatementEnd
 -- +goose StatementBegin
 CREATE OR REPLACE FUNCTION guard_operation_audit_pool() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
@@ -874,10 +918,11 @@ ALTER TABLE operation_audit_account DROP CONSTRAINT operation_audit_account_char
 ALTER TABLE operation_audit_account ADD CHECK(charged>=0 AND charged<=1000000) NOT VALID;
 ALTER TABLE operation_audit_pool DROP CONSTRAINT operation_audit_pool_accounts;
 ALTER TABLE operation_audit_pool ADD CHECK(accounts>=0 AND accounts<=account_limit) NOT VALID;
-ALTER TABLE connector_identity_root DROP CONSTRAINT connector_identity_root_counts;
-ALTER TABLE connector_identity_root ADD CHECK(profiles>=0 AND profiles<=profile_limit) NOT VALID;
-ALTER TABLE connector_identity_root ADD CHECK(source_transitions>=0 AND source_transitions<=source_transition_limit) NOT VALID;
+ALTER TABLE IF EXISTS connector_identity_root DROP CONSTRAINT IF EXISTS connector_identity_root_counts;
+ALTER TABLE IF EXISTS connector_identity_root ADD CHECK(profiles>=0 AND profiles<=profile_limit) NOT VALID;
+ALTER TABLE IF EXISTS connector_identity_root ADD CHECK(source_transitions>=0 AND source_transitions<=source_transition_limit) NOT VALID;
 -- +goose StatementBegin
+DO $cgd$ BEGIN IF to_regclass('public.connector_identity_root') IS NOT NULL THEN EXECUTE $cg$
 CREATE OR REPLACE FUNCTION guard_connector_identity_profile() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
 DECLARE r public.connector_identity_root; n timestamptz; c jsonb; a public.operation_audit; attempt public.connector_credential_attempt; child public.connector_identity_process;
@@ -947,9 +992,11 @@ BEGIN
  IF OLD.accepted_id IS NULL AND NEW.accepted_id IS NULL AND NEW.fenced AND a.intent->>'Name'='connector_process_enrollment' AND child.accepted_at IS NULL AND n<a.request_until THEN RETURN NEW;END IF;
  IF a.intent_receipt IS NULL OR a.outcome_receipt IS NULL OR a.outcome->>'Status' IS DISTINCT FROM 'success' OR NEW.accepted_id IS DISTINCT FROM NEW.candidate_id OR NEW.fenced OR (a.intent->>'Name'='connector_process_enrollment' AND (child.accepted_at IS NULL OR n>=child.run_until)) OR (a.intent->>'Name'<>'connector_process_enrollment' AND n>=attempt.certificate_not_after) THEN RAISE EXCEPTION 'connector candidate acknowledgement unavailable' USING ERRCODE='23514';END IF;
  RETURN NEW;
-END $$;
+END $$
+$cg$; END IF; END $cgd$;
 -- +goose StatementEnd
 -- +goose StatementBegin
+DO $cgd$ BEGIN IF to_regclass('public.connector_identity_root') IS NOT NULL THEN EXECUTE $cg$
 CREATE OR REPLACE FUNCTION lock_connector_process_current(r uuid,c jsonb,allow_candidate boolean) RETURNS public.connector_identity_profile LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
 DECLARE proof jsonb:=c->'Proof'; source jsonb:=proof->'Configuration'; p jsonb:=source->'Profile'; cfg public.connector_identity_profile; root public.connector_identity_root; trust public.fleet_current_trust; n timestamptz;
 BEGIN
@@ -967,9 +1014,11 @@ BEGIN
    (c->'Recovery'->>'InstallationID')::uuid=root.installation_id AND (c->'Recovery'->>'IssuerEpoch')::uuid=root.issuer_epoch AND (c->'Recovery'->>'ObservedAt')::timestamptz<=n AND (c->'Recovery'->>'FreshUntil')::timestamptz>n AND (c->'Recovery'->>'FreshUntil')::timestamptz<=(c->'Recovery'->>'ObservedAt')::timestamptz+interval '5 seconds' AND (c->'Recovery'->>'FreshUntil')::timestamptz<=trust.fresh_until AND c->'Recovery'->'Revision'->>'UID'=trust.source_uid AND (c->'Recovery'->'Revision'->>'Generation')::bigint=trust.source_generation AND public.connector_digest(c->'Recovery'->'Revision'->'Digest')=trust.source_digest AND
    jsonb_array_length(proof->'WorkloadDigest')=32 AND jsonb_array_length(proof->'ProtectionDigest')=32 AND public.connector_digest(proof->'ClientKeyDigest')<>public.connector_digest(proof->'ServerKeyDigest'),false) THEN RAISE EXCEPTION 'connector process proof unavailable' USING ERRCODE='23514';END IF;
  RETURN cfg;
-END $$;
+END $$
+$cg$; END IF; END $cgd$;
 -- +goose StatementEnd
 -- +goose StatementBegin
+DO $cgd$ BEGIN IF to_regclass('public.connector_identity_root') IS NOT NULL THEN EXECUTE $cg$
 CREATE OR REPLACE FUNCTION lock_connector_credential_candidate(r uuid,candidate jsonb) RETURNS public.connector_identity_process LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
 DECLARE cur jsonb:=candidate->'Current'; source jsonb:=cur->'Source'->'Observation'; p jsonb:=source->'Profile'; proof jsonb:=cur->'ProcessProof'; actor jsonb:=cur->'Peer'; cfg public.connector_identity_profile; root public.connector_identity_root; trust public.fleet_current_trust; child public.connector_identity_process; leaf public.connector_credential_attempt; n timestamptz;
 BEGIN
@@ -995,9 +1044,11 @@ BEGIN
   IF NOT COALESCE(child.serving AND leaf.activated_at IS NOT NULL AND leaf.detached_at IS NULL AND n>=leaf.certificate_not_before AND n<leaf.certificate_not_after AND actor->'Certificate'->'Binding'=child.process->'Binding' AND (actor->>'VerifiedAt')::timestamptz<=n AND (actor->>'ValidUntil')::timestamptz>n AND (actor->>'ValidUntil')::timestamptz<=(actor->>'VerifiedAt')::timestamptz+interval '5 seconds' AND (cur->>'Until')::timestamptz<=(actor->>'ValidUntil')::timestamptz,false) THEN RAISE EXCEPTION 'connector actual client leaf unavailable' USING ERRCODE='23514';END IF;
  END IF;
  RETURN child;
-END $$;
+END $$
+$cg$; END IF; END $cgd$;
 -- +goose StatementEnd
 -- +goose StatementBegin
+DO $cgd$ BEGIN IF to_regclass('public.connector_identity_root') IS NOT NULL THEN EXECUTE $cg$
 CREATE OR REPLACE FUNCTION read_connector_activated_leaf(r uuid,peer uuid,usage_value text,digest_value bytea,source_value jsonb) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
 DECLARE started timestamptz:=clock_timestamp(); n timestamptz; until_at timestamptz; cfg public.connector_identity_profile; backing public.connector_identity_root; trust public.fleet_current_trust; child public.connector_identity_process; leaf public.connector_credential_attempt; event public.operation_audit; matched record;
@@ -1018,5 +1069,6 @@ BEGIN
   ((usage_value='client' AND leaf.id IN(child.client_current_id,child.client_previous_id)) OR (usage_value='server' AND leaf.id IN(child.server_current_id,child.server_previous_id))) AND leaf.activated_at IS NOT NULL AND leaf.detached_at IS NULL AND n>=leaf.certificate_not_before AND n<until_at AND ROW(leaf.source_uid,leaf.source_generation,leaf.source_digest)=ROW(cfg.source_uid,cfg.source_generation,cfg.source_digest) AND
   event.intent_receipt IS NOT NULL AND event.outcome_receipt IS NOT NULL AND event.outcome->>'Status'='success',false) THEN RAISE EXCEPTION 'connector activated leaf unavailable' USING ERRCODE='23514';END IF;
  RETURN jsonb_build_object('Certificate',leaf.issued->'Certificate','Process',child.process->'Attested','Revision',cfg.configuration->'Revision','ObservedAt',started,'FreshUntil',until_at);
-END $$;
+END $$
+$cg$; END IF; END $cgd$;
 -- +goose StatementEnd

@@ -2,15 +2,17 @@
 -- ADR-334: connectors authenticate with ServiceAccount tokens. No Go code
 -- uses the connector identity lane any more: its tables, views, functions
 -- and the 'identity' operation-audit lane are dropped. Unreleased product:
--- existing identity-lane rows are deleted without migration.
-DROP TRIGGER aab_connector_reservation_ack ON operation_audit;
-DROP TRIGGER connector_reservation_event ON operation_audit;
-DROP TRIGGER operation_audit_01_connector_reserve ON operation_audit;
-DROP TRIGGER aaa_connector_audit_access ON operation_audit_pool;
-DROP TRIGGER aaa_connector_audit_access ON operation_audit_account;
-DROP TRIGGER aaa_connector_audit_access ON operation_audit;
-DROP TRIGGER aaa_connector_audit_access ON operation_audit_lifecycle;
-DROP TRIGGER aaa_connector_audit_access ON operation_audit_history;
+-- existing identity-lane rows are deleted without migration. There is no
+-- Down: a downgrade probe keeps the dropped lane, and rerunning this file
+-- after it changes nothing.
+DROP TRIGGER IF EXISTS aab_connector_reservation_ack ON operation_audit;
+DROP TRIGGER IF EXISTS connector_reservation_event ON operation_audit;
+DROP TRIGGER IF EXISTS operation_audit_01_connector_reserve ON operation_audit;
+DROP TRIGGER IF EXISTS aaa_connector_audit_access ON operation_audit_pool;
+DROP TRIGGER IF EXISTS aaa_connector_audit_access ON operation_audit_account;
+DROP TRIGGER IF EXISTS aaa_connector_audit_access ON operation_audit;
+DROP TRIGGER IF EXISTS aaa_connector_audit_access ON operation_audit_lifecycle;
+DROP TRIGGER IF EXISTS aaa_connector_audit_access ON operation_audit_history;
 
 -- +goose StatementBegin
 CREATE OR REPLACE FUNCTION guard_operation_audit()
@@ -26,7 +28,7 @@ BEGIN
  IF TG_OP='DELETE' THEN
   IF NOT EXISTS(SELECT 1 FROM public.operation_audit_lifecycle d JOIN public.fleet_current_trust t ON t.installation_id=d.installation_id
    WHERE d.operation_id=OLD.id AND d.root_id=OLD.root_id AND d.finalization_xid=pg_current_xact_id() AND d.terminal_acknowledged_at IS NOT NULL AND
-    NOT t.recovery_blocked AND NOT t.suspended AND clock_timestamp()<t.fresh_until AND t.issuer_epoch=d.issuer_epoch AND public.incarnation_current(d.postmaster_at) AND (SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database())=d.database_oid AND clock_timestamp()<(d.lease->>'Until')::timestamptz)
+    NOT t.suspended AND clock_timestamp()<t.fresh_until AND t.issuer_epoch=d.issuer_epoch AND public.incarnation_current(d.postmaster_at) AND (SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database())=d.database_oid AND clock_timestamp()<(d.lease->>'Until')::timestamptz)
    THEN RAISE EXCEPTION 'audit retirement unavailable' USING ERRCODE='23514'; END IF;
   RETURN OLD;
  END IF;
@@ -96,7 +98,7 @@ BEGIN
   (p->>'BackingRevision')::bigint<>a.revision OR (p->>'MetadataSlots')::bigint<a.account_limit*a.records_per_account OR (p->>'MetadataSlots')::bigint>1000000000000 OR
   budget<interval '1 second' OR budget>interval '1 day' OR horizon<interval '0 seconds' OR horizon>interval '3660 days' OR proof<interval '1 second' OR proof>interval '3660 days' OR
   (p->>'BackupReservedBytes')::bigint<0 OR (p->>'WALReservedBytes')::bigint<0 OR horizon>interval '0 seconds' AND ((p->>'BackupReservedBytes')::bigint<=0 OR (p->>'WALReservedBytes')::bigint<=0) OR
-  n>=(p->>'ValidUntil')::timestamptz OR n>=NEW.request_until OR n>=a.valid_until OR t.recovery_blocked OR t.suspended OR n>=t.fresh_until OR t.observed_at>n OR t.issuer_epoch<>NEW.issuer_epoch OR
+  n>=(p->>'ValidUntil')::timestamptz OR n>=NEW.request_until OR n>=a.valid_until OR t.suspended OR n>=t.fresh_until OR t.observed_at>n OR t.issuer_epoch<>NEW.issuer_epoch OR
   (p->>'MaxPurgeLeases')::bigint NOT BETWEEN 2 AND 32 OR
   (b->>'HistoryReleaseAt')::timestamptz<>NEW.retain_until-horizon-budget OR (b->>'HistoryDeleteBy')::timestamptz<>NEW.retain_until-horizon OR
   (b->>'LiveRetireBy')::timestamptz<>NEW.retain_until-2*horizon-budget OR (b->>'CertificatePurgeAt')::timestamptz<>(b->>'LiveRetireBy')::timestamptz-budget OR
@@ -156,9 +158,6 @@ CREATE OR REPLACE FUNCTION guard_operation_audit_pool()
  SET search_path TO 'pg_catalog', 'pg_temp'
 AS $function$
 BEGIN
- IF TG_OP='INSERT' AND NEW.lane='capture' AND NEW.proof_window_missed=0 AND NEW.accounts=0 AND NEW.history_profile IS NULL AND NEW.history_backing_until IS NULL AND public.capacity_capture_pool_revision(NEW) THEN RETURN NEW;END IF;
- IF TG_OP='UPDATE' AND NEW.lane='capture' AND (to_jsonb(NEW)-ARRAY['revision','valid_until']) IS NOT DISTINCT FROM (to_jsonb(OLD)-ARRAY['revision','valid_until']) AND
-  NEW.revision>OLD.revision AND NEW.valid_until>OLD.valid_until AND public.capacity_capture_pool_revision(NEW) THEN RETURN NEW;END IF;
  IF TG_OP='DELETE' THEN RAISE EXCEPTION 'audit backing retirement unavailable' USING ERRCODE='23514'; END IF;
  IF TG_OP='INSERT' THEN
   IF NEW.proof_window_missed<>0 OR NEW.revision<>1 OR NEW.accounts<>0 OR NEW.history_profile IS NOT NULL OR NEW.history_backing_until IS NOT NULL THEN RAISE EXCEPTION 'invalid initial audit backing' USING ERRCODE='23514'; END IF;
@@ -237,74 +236,74 @@ AS $function$
 $function$;
 -- +goose StatementEnd
 
-DROP VIEW connector_operation_pool, connector_operation_account, connector_operation_audit, connector_operation_lifecycle, connector_operation_history;
--- IF EXISTS only where sqlc cannot resolve a row-type argument.
-DROP FUNCTION accept_connector_process(uuid,uuid,jsonb);
-DROP FUNCTION activate_connector_credential(uuid,uuid,jsonb,jsonb);
-DROP FUNCTION activate_connector_reservations(uuid,uuid,jsonb);
-DROP FUNCTION admit_connector_backing_reserved(uuid,jsonb,jsonb,bytea[]);
-DROP FUNCTION admit_connector_backing(uuid,jsonb,jsonb);
-DROP FUNCTION admit_connector_credential(uuid,jsonb,jsonb,jsonb);
-DROP FUNCTION admit_connector_process_reserved(uuid,jsonb,jsonb,jsonb,bytea[]);
-DROP FUNCTION admit_connector_process(uuid,jsonb,jsonb,jsonb);
-DROP FUNCTION admit_connector_retirement(uuid,uuid,jsonb,timestamp with time zone,timestamp with time zone);
-DROP FUNCTION claim_connector_credential(uuid,uuid,jsonb,jsonb);
-DROP FUNCTION close_connector_backing_candidate(uuid,uuid);
-DROP FUNCTION close_connector_retirement_admission(uuid,uuid);
-DROP FUNCTION close_connector_retirement_writer_reference(uuid,uuid);
-DROP FUNCTION connector_audit_acknowledge(uuid,jsonb,text,jsonb,jsonb);
-DROP FUNCTION connector_audit_current(uuid,uuid);
-DROP FUNCTION connector_audit_journal(uuid,jsonb,text,jsonb);
+
+DROP VIEW IF EXISTS connector_operation_pool, connector_operation_account, connector_operation_audit, connector_operation_lifecycle, connector_operation_history;
+DROP FUNCTION IF EXISTS accept_connector_process(uuid,uuid,jsonb);
+DROP FUNCTION IF EXISTS activate_connector_credential(uuid,uuid,jsonb,jsonb);
+DROP FUNCTION IF EXISTS activate_connector_reservations(uuid,uuid,jsonb);
+DROP FUNCTION IF EXISTS admit_connector_backing_reserved(uuid,jsonb,jsonb,bytea[]);
+DROP FUNCTION IF EXISTS admit_connector_backing(uuid,jsonb,jsonb);
+DROP FUNCTION IF EXISTS admit_connector_credential(uuid,jsonb,jsonb,jsonb);
+DROP FUNCTION IF EXISTS admit_connector_process_reserved(uuid,jsonb,jsonb,jsonb,bytea[]);
+DROP FUNCTION IF EXISTS admit_connector_process(uuid,jsonb,jsonb,jsonb);
+DROP FUNCTION IF EXISTS admit_connector_retirement(uuid,uuid,jsonb,timestamp with time zone,timestamp with time zone);
+DROP FUNCTION IF EXISTS claim_connector_credential(uuid,uuid,jsonb,jsonb);
+DROP FUNCTION IF EXISTS close_connector_backing_candidate(uuid,uuid);
+DROP FUNCTION IF EXISTS close_connector_retirement_admission(uuid,uuid);
+DROP FUNCTION IF EXISTS close_connector_retirement_writer_reference(uuid,uuid);
+DROP FUNCTION IF EXISTS connector_audit_acknowledge(uuid,jsonb,text,jsonb,jsonb);
+DROP FUNCTION IF EXISTS connector_audit_current(uuid,uuid);
+DROP FUNCTION IF EXISTS connector_audit_journal(uuid,jsonb,text,jsonb);
 DROP FUNCTION IF EXISTS connector_audit_snapshot(operation_audit);
-DROP FUNCTION connector_backing_can_renew(jsonb,jsonb);
+DROP FUNCTION IF EXISTS connector_backing_can_renew(jsonb,jsonb);
 DROP FUNCTION IF EXISTS connector_backing_observed(connector_identity_root,connector_identity_profile,jsonb);
-DROP FUNCTION connector_identity_login_is_private();
-DROP FUNCTION connector_identity_role_ok(uuid,text);
-DROP FUNCTION connector_operation_actor_valid(jsonb);
-DROP FUNCTION connector_reservation_acknowledged(uuid,uuid);
+DROP FUNCTION IF EXISTS connector_identity_login_is_private();
+DROP FUNCTION IF EXISTS connector_identity_role_ok(uuid,text);
+DROP FUNCTION IF EXISTS connector_operation_actor_valid(jsonb);
+DROP FUNCTION IF EXISTS connector_reservation_acknowledged(uuid,uuid);
 DROP FUNCTION IF EXISTS connector_retirement_prepaid(operation_audit);
 DROP FUNCTION IF EXISTS connector_retirement_row_valid(connector_retirement_ticket);
-DROP FUNCTION connector_retirement_set_digest(uuid,uuid);
-DROP FUNCTION connector_retirement_ticket_digest(bytea);
-DROP FUNCTION connector_retirement_ticket_valid(jsonb);
+DROP FUNCTION IF EXISTS connector_retirement_set_digest(uuid,uuid);
+DROP FUNCTION IF EXISTS connector_retirement_ticket_digest(bytea);
+DROP FUNCTION IF EXISTS connector_retirement_ticket_valid(jsonb);
 DROP FUNCTION IF EXISTS connector_ticket_admission_ended(connector_retirement_ticket,timestamp with time zone);
-DROP FUNCTION delete_connector_retirement_ticket(uuid,uuid);
-DROP FUNCTION detach_connector_identity(uuid,uuid);
-DROP FUNCTION fence_connector_identity(uuid,uuid,timestamp with time zone);
-DROP FUNCTION finish_connector_operation_history(uuid,text,bytea,timestamp with time zone,timestamp with time zone,uuid);
-DROP FUNCTION finish_connector_operation_retirement(uuid,uuid,uuid);
-DROP FUNCTION lock_connector_backing_current(uuid,jsonb);
-DROP FUNCTION lock_connector_credential_candidate(uuid,jsonb);
-DROP FUNCTION lock_connector_process_current(uuid,jsonb,boolean);
-DROP FUNCTION promote_connector_backing(uuid,uuid,jsonb);
-DROP FUNCTION read_connector_backing_admission(uuid,uuid,jsonb);
-DROP FUNCTION read_connector_backing_candidate(uuid,jsonb);
-DROP FUNCTION read_connector_credential_attempt(uuid,uuid,jsonb);
-DROP FUNCTION read_connector_credential_process(uuid,jsonb);
-DROP FUNCTION read_connector_process_admission(uuid,uuid,jsonb);
-DROP FUNCTION read_connector_process_backing(uuid,jsonb);
-DROP FUNCTION read_connector_process_ticket(uuid,jsonb);
-DROP FUNCTION read_connector_retirement(uuid,uuid,timestamp with time zone,timestamp with time zone);
-DROP FUNCTION read_connector_successor_cohorts(uuid,jsonb);
-DROP FUNCTION reserve_connector_retirement_images(uuid,uuid,bytea[],timestamp with time zone);
-DROP FUNCTION restrict_connector_retirement(uuid,uuid,text,jsonb);
-DROP FUNCTION stage_connector_identity(uuid,jsonb,jsonb);
-DROP FUNCTION store_connector_backing_outcome(uuid,uuid,jsonb,jsonb);
-DROP FUNCTION store_connector_credential(uuid,uuid,jsonb,jsonb,jsonb);
-DROP FUNCTION store_connector_process_outcome(uuid,uuid,jsonb,jsonb);
-DROP FUNCTION store_connector_retirement_outcome(uuid,uuid,jsonb,timestamp with time zone,timestamp with time zone);
-DROP TABLE connector_backing_transition, connector_credential_attempt, connector_retirement_ticket, connector_identity_process, connector_identity_profile, connector_identity_root;
-DROP FUNCTION check_connector_reservation_event();
-DROP FUNCTION check_connector_ticket_acceptance();
-DROP FUNCTION guard_connector_audit_access();
-DROP FUNCTION guard_connector_backing_transition();
-DROP FUNCTION guard_connector_credential_attempt();
-DROP FUNCTION guard_connector_identity_process();
-DROP FUNCTION guard_connector_identity_profile();
-DROP FUNCTION guard_connector_identity_root();
-DROP FUNCTION guard_connector_reservation_acknowledgement();
-DROP FUNCTION guard_connector_ticket_reservation();
-DROP FUNCTION preserve_connector_ticket_backing();
+DROP FUNCTION IF EXISTS delete_connector_retirement_ticket(uuid,uuid);
+DROP FUNCTION IF EXISTS detach_connector_identity(uuid,uuid);
+DROP FUNCTION IF EXISTS fence_connector_identity(uuid,uuid,timestamp with time zone);
+DROP FUNCTION IF EXISTS finish_connector_operation_history(uuid,text,bytea,timestamp with time zone,timestamp with time zone,uuid);
+DROP FUNCTION IF EXISTS finish_connector_operation_retirement(uuid,uuid,uuid);
+DROP FUNCTION IF EXISTS lock_connector_backing_current(uuid,jsonb);
+DROP FUNCTION IF EXISTS lock_connector_credential_candidate(uuid,jsonb);
+DROP FUNCTION IF EXISTS lock_connector_process_current(uuid,jsonb,boolean);
+DROP FUNCTION IF EXISTS promote_connector_backing(uuid,uuid,jsonb);
+DROP FUNCTION IF EXISTS read_connector_backing_admission(uuid,uuid,jsonb);
+DROP FUNCTION IF EXISTS read_connector_backing_candidate(uuid,jsonb);
+DROP FUNCTION IF EXISTS read_connector_credential_attempt(uuid,uuid,jsonb);
+DROP FUNCTION IF EXISTS read_connector_credential_process(uuid,jsonb);
+DROP FUNCTION IF EXISTS read_connector_process_admission(uuid,uuid,jsonb);
+DROP FUNCTION IF EXISTS read_connector_process_backing(uuid,jsonb);
+DROP FUNCTION IF EXISTS read_connector_process_ticket(uuid,jsonb);
+DROP FUNCTION IF EXISTS read_connector_retirement(uuid,uuid,timestamp with time zone,timestamp with time zone);
+DROP FUNCTION IF EXISTS read_connector_successor_cohorts(uuid,jsonb);
+DROP FUNCTION IF EXISTS reserve_connector_retirement_images(uuid,uuid,bytea[],timestamp with time zone);
+DROP FUNCTION IF EXISTS restrict_connector_retirement(uuid,uuid,text,jsonb);
+DROP FUNCTION IF EXISTS stage_connector_identity(uuid,jsonb,jsonb);
+DROP FUNCTION IF EXISTS store_connector_backing_outcome(uuid,uuid,jsonb,jsonb);
+DROP FUNCTION IF EXISTS store_connector_credential(uuid,uuid,jsonb,jsonb,jsonb);
+DROP FUNCTION IF EXISTS store_connector_process_outcome(uuid,uuid,jsonb,jsonb);
+DROP FUNCTION IF EXISTS store_connector_retirement_outcome(uuid,uuid,jsonb,timestamp with time zone,timestamp with time zone);
+DROP TABLE IF EXISTS connector_backing_transition, connector_credential_attempt, connector_retirement_ticket, connector_identity_process, connector_identity_profile, connector_identity_root;
+DROP FUNCTION IF EXISTS check_connector_reservation_event();
+DROP FUNCTION IF EXISTS check_connector_ticket_acceptance();
+DROP FUNCTION IF EXISTS guard_connector_audit_access();
+DROP FUNCTION IF EXISTS guard_connector_backing_transition();
+DROP FUNCTION IF EXISTS guard_connector_credential_attempt();
+DROP FUNCTION IF EXISTS guard_connector_identity_process();
+DROP FUNCTION IF EXISTS guard_connector_identity_profile();
+DROP FUNCTION IF EXISTS guard_connector_identity_root();
+DROP FUNCTION IF EXISTS guard_connector_reservation_acknowledgement();
+DROP FUNCTION IF EXISTS guard_connector_ticket_reservation();
+DROP FUNCTION IF EXISTS preserve_connector_ticket_backing();
 
 ALTER TABLE operation_audit_history DISABLE TRIGGER USER;
 ALTER TABLE operation_audit_lifecycle DISABLE TRIGGER USER;
@@ -321,13 +320,8 @@ ALTER TABLE operation_audit_lifecycle ENABLE TRIGGER USER;
 ALTER TABLE operation_audit ENABLE TRIGGER USER;
 ALTER TABLE operation_audit_account ENABLE TRIGGER USER;
 ALTER TABLE operation_audit_pool ENABLE TRIGGER USER;
-ALTER TABLE operation_audit_pool DROP CONSTRAINT operation_audit_pool_lane_check, ADD CONSTRAINT operation_audit_pool_lane_check CHECK (lane IN ('normal','resolution','processing','capture'));
-ALTER TABLE operation_audit_lifecycle DROP CONSTRAINT operation_audit_lifecycle_lane_check, ADD CONSTRAINT operation_audit_lifecycle_lane_check CHECK (lane IN ('normal','resolution','processing','capture'));
-ALTER TABLE operation_audit_history DROP CONSTRAINT operation_audit_history_lane_check, ADD CONSTRAINT operation_audit_history_lane_check CHECK (lane IN ('normal','resolution','processing','capture'));
-ALTER TABLE operation_audit_account DROP CONSTRAINT operation_audit_account_charged, ADD CONSTRAINT operation_audit_account_charged CHECK (charged BETWEEN 0 AND 1000000);
-ALTER TABLE operation_audit_pool DROP CONSTRAINT operation_audit_pool_accounts, ADD CONSTRAINT operation_audit_pool_accounts CHECK (accounts BETWEEN 0 AND account_limit);
-
--- +goose Down
--- +goose StatementBegin
-DO $$ BEGIN RAISE EXCEPTION 'the connector identity lane is not restored' USING ERRCODE='0A000'; END $$;
--- +goose StatementEnd
+ALTER TABLE operation_audit_pool DROP CONSTRAINT IF EXISTS operation_audit_pool_lane_check, ADD CONSTRAINT operation_audit_pool_lane_check CHECK (lane IN ('normal','resolution','processing','capture'));
+ALTER TABLE operation_audit_lifecycle DROP CONSTRAINT IF EXISTS operation_audit_lifecycle_lane_check, ADD CONSTRAINT operation_audit_lifecycle_lane_check CHECK (lane IN ('normal','resolution','processing','capture'));
+ALTER TABLE operation_audit_history DROP CONSTRAINT IF EXISTS operation_audit_history_lane_check, ADD CONSTRAINT operation_audit_history_lane_check CHECK (lane IN ('normal','resolution','processing','capture'));
+ALTER TABLE operation_audit_account DROP CONSTRAINT IF EXISTS operation_audit_account_charged, ADD CONSTRAINT operation_audit_account_charged CHECK (charged BETWEEN 0 AND 1000000);
+ALTER TABLE operation_audit_pool DROP CONSTRAINT IF EXISTS operation_audit_pool_accounts, ADD CONSTRAINT operation_audit_pool_accounts CHECK (accounts BETWEEN 0 AND account_limit);

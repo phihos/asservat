@@ -472,13 +472,19 @@ WHERE lane IN ('capture','normal','resolution') AND current_user=session_user AN
  public.capture_audit_role_ok(root_id,'finalizer'))
 WITH LOCAL CHECK OPTION;
 
+-- Statements on connector identity objects run only while those objects
+-- exist: 00174 drops them, and a downgrade probe reruns this file.
+-- +goose StatementBegin
+DO $cgd$ BEGIN IF to_regclass('public.connector_identity_root') IS NOT NULL THEN EXECUTE $cg$
 CREATE OR REPLACE VIEW connector_operation_lifecycle WITH (security_barrier=true) AS
 SELECT * FROM public.operation_audit_lifecycle
 WHERE lane='identity' AND current_user=session_user AND (
  public.connector_identity_role_ok(root_id,'cleanup') OR
  public.connector_identity_role_ok(root_id,'verifier') OR
  public.connector_identity_role_ok(root_id,'finalizer'))
-WITH LOCAL CHECK OPTION;
+WITH LOCAL CHECK OPTION
+$cg$; END IF; END $cgd$;
+-- +goose StatementEnd
 
 -- +goose StatementBegin
 DO $$ BEGIN EXECUTE 'COMMENT ON TABLE public.goose_db_version IS ''asservat:oldest-binary-schema=154'''; END $$;
@@ -1024,7 +1030,8 @@ BEGIN
    FROM pg_attribute a CROSS JOIN LATERAL aclexplode(a.attacl) x WHERE a.attrelid=c.oid AND a.attnum>0 AND NOT a.attisdropped),'[]'::jsonb)))
  INTO saved FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
  WHERE n.nspname='public' AND c.relname IN ('capture_operation_lifecycle','connector_operation_lifecycle') AND c.relkind='v';
- IF jsonb_array_length(saved)<>2 OR EXISTS(SELECT 1 FROM jsonb_array_elements(saved) v CROSS JOIN LATERAL jsonb_array_elements(v->'columns') g WHERE g->>'column' IN ('share_effect_target','share_effect_xid')) THEN
+ -- 00174 drops connector_operation_lifecycle; a downgrade probe restores only the capture view.
+ IF jsonb_array_length(saved)<>(CASE WHEN to_regclass('public.connector_identity_root') IS NULL THEN 1 ELSE 2 END) OR EXISTS(SELECT 1 FROM jsonb_array_elements(saved) v CROSS JOIN LATERAL jsonb_array_elements(v->'columns') g WHERE g->>'column' IN ('share_effect_target','share_effect_xid')) THEN
   RAISE EXCEPTION 'lifecycle view rollback has unsupported shape or marker-column grants' USING ERRCODE='23514';
  END IF;
  FOR item IN SELECT jsonb_array_elements(saved) LOOP
