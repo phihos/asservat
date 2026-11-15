@@ -34,7 +34,7 @@ import (
 
 // This fixture composes real C09 preview/request, C03 eligibility evaluation,
 // Router/Standby, both frame streams and the real regional Kubernetes resolver.
-// Kubernetes replies, node availability, identity/recovery/grant authority and
+// Kubernetes replies, node availability, identity/grant authority and
 // admission are explicitly synthetic. No collector, BPF, external service or
 // production grant authorization is established by this regression.
 type packetMetadataFixture struct {
@@ -47,7 +47,7 @@ type packetMetadataFixture struct {
 	apiReads                                                     atomic.Int64
 	denied                                                       atomic.Bool
 	mu                                                           sync.Mutex
-	hubUntil, regionUntil, humanUntil, recoveryUntil, grantUntil time.Time
+	hubUntil, regionUntil, humanUntil, grantUntil time.Time
 	storageDelay, apiDelay                                       time.Duration
 	afterStorage                                                 func()
 	lastLocal                                                    targets.PodResolution
@@ -60,10 +60,10 @@ func metadataID(n int) string { return fmt.Sprintf("00000000-0000-4000-8000-%012
 func (f *packetMetadataFixture) actor() identity.Principal {
 	return identity.Principal{Issuer: "https://identity.invalid", Subject: "developer", ClientID: "console", Kind: identity.Human}
 }
-func (f *packetMetadataFixture) bounds() (time.Time, time.Time, time.Time, time.Time, time.Time, time.Duration, time.Duration) {
+func (f *packetMetadataFixture) bounds() (time.Time, time.Time, time.Time, time.Time, time.Duration, time.Duration) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return f.hubUntil, f.regionUntil, f.humanUntil, f.recoveryUntil, f.grantUntil, f.storageDelay, f.apiDelay
+	return f.hubUntil, f.regionUntil, f.humanUntil, f.grantUntil, f.storageDelay, f.apiDelay
 }
 func originalBound(bound, fallback time.Time) time.Time {
 	if bound.IsZero() {
@@ -72,7 +72,7 @@ func originalBound(bound, fallback time.Time) time.Time {
 	return bound
 }
 func (f *packetMetadataFixture) ResolveIdentity(ctx context.Context) (identity.Identity, error) {
-	_, _, human, _, _, _, _ := f.bounds()
+	_, _, human, _, _, _ := f.bounds()
 	now := time.Now()
 	until := originalBound(human, now.Add(5*time.Second))
 	if ctx.Err() != nil || !now.Before(until) {
@@ -103,7 +103,7 @@ func (f *packetMetadataFixture) Resolve(_ context.Context, in privacy.Input) (pr
 	return privacy.Resolve(set, in, now)
 }
 func (f *packetMetadataFixture) ContextStorage(ctx context.Context, t auth.Target) (captureapp.ContextStorageObservation, error) {
-	_, _, _, _, _, delay, _ := f.bounds()
+	_, _, _, _, delay, _ := f.bounds()
 	if delay > 0 {
 		timer := time.NewTimer(delay)
 		defer timer.Stop()
@@ -153,7 +153,7 @@ func (f *packetMetadataFixture) Request(context.Context, identities.CurrentIdent
 	return auth.Grant{}, false, errors.New("test must use its existing covering grant")
 }
 func (f *packetMetadataFixture) Covering(ctx context.Context, _ identities.CurrentIdentity, _ string, _ artifact.Digest, _ auth.Target) (auth.Grant, time.Time, error) {
-	_, _, _, _, bound, _, _ := f.bounds()
+	_, _, _, bound, _, _ := f.bounds()
 	until := originalBound(bound, time.Now().UTC().Truncate(time.Microsecond).Add(time.Minute))
 	if ctx.Err() != nil || !time.Now().Before(until) {
 		return auth.Grant{}, time.Time{}, auth.ErrGrantExpired
@@ -195,7 +195,7 @@ func newPacketMetadataFixture(t *testing.T) *packetMetadataFixture {
 	f := &packetMetadataFixture{channel: workFixture().Work.Channel}
 	api := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		f.apiReads.Add(1)
-		_, _, _, _, _, _, delay := f.bounds()
+		_, _, _, _, _, delay := f.bounds()
 		if delay > 0 {
 			timer := time.NewTimer(delay)
 			defer timer.Stop()
@@ -269,7 +269,7 @@ func newPacketMetadataFixture(t *testing.T) *packetMetadataFixture {
 	hubSocket, regionSocket := net.Pipe()
 	check := func(hub bool) ReceiverCheck {
 		return func(ctx context.Context) (fleet.APIContextReceiver, error) {
-			h, r, _, _, _, _, _ := f.bounds()
+			h, r, _, _, _, _ := f.bounds()
 			until := r
 			if hub {
 				until = h
@@ -354,7 +354,7 @@ func TestPacketMetadataTransportCompletionDoesNotExpireOwnedObservation(t *testi
 	}
 }
 func TestPacketMetadataComposedOriginalAuthorityAndIOBoundsRefuse(t *testing.T) {
-	for _, mode := range []string{"regional-io-expiry", "hub-io-expiry", "caller-io-cancellation", "human-expiry", "recovery-expiry", "grant-expiry", "current-deny", "request-five-second-bound"} {
+	for _, mode := range []string{"regional-io-expiry", "hub-io-expiry", "caller-io-cancellation", "human-expiry", "grant-expiry", "current-deny", "request-five-second-bound"} {
 		t.Run(mode, func(t *testing.T) {
 			f := newPacketMetadataFixture(t)
 			p, e := f.svc.PreviewComposition(t.Context(), f, metadataIntent(f))
@@ -378,8 +378,6 @@ func TestPacketMetadataComposedOriginalAuthorityAndIOBoundsRefuse(t *testing.T) 
 				f.apiDelay = 30 * time.Millisecond
 			case "human-expiry":
 				f.humanUntil = short
-			case "recovery-expiry":
-				f.recoveryUntil = short
 			case "grant-expiry":
 				f.grantUntil = short
 			case "current-deny":

@@ -35,8 +35,8 @@ import (
 )
 
 // OwnerDeployment composes only the private owner subsystem. Installation and
-// continuously reconciled audited configuration/recovery are independent; this
-// process cannot initialize them, accept profiles or clear RecoveryBlocked.
+// continuously reconciled audited configuration are independent; this
+// process cannot initialize them or accept profiles.
 type OwnerDeployment struct {
 	observerStats, operationStats regionalAPIStats
 	// readinessStats and identityStats count the readiness loop's and the
