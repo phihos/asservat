@@ -187,7 +187,7 @@ func (s *ContextQueries) PermitReadBatch(ctx context.Context, b value.ContextRea
 }
 
 // Only the actual C-14 closure handle can enter this restrictive transition.
-// The active generation remains occupied through outcome audit/final write and
+// The active generation remains occupied through the final write and
 // joined worker+hub cleanup. No expired lease or absence observation substitutes
 // for this callback, and no key/read/audit/history charge is refunded.
 func (s *ContextQueries) CompleteReadBatch(ctx context.Context, b value.ContextReadBatch, closed app.ContextProjectionClosed) error {

@@ -56,8 +56,8 @@ func (s ContextProjectionResults) valid() bool {
 		s.Authority != nil && s.Ledger != nil && s.Reader != nil && s.Now != nil && s.NewID != nil
 }
 
-// These dispositions describe acknowledged internal effects for the existing
-// C-20/C-08 outcome mapping. An error after dispatch may still have an unknown
+// These dispositions describe internal effects for the call row's effect
+// field. An error after dispatch may still have an unknown
 // effect; absence of a successful delivery never proves an effect-free call.
 type ContextQueryEffect string
 
@@ -83,9 +83,8 @@ type ContextProjectionAssociation struct {
 }
 
 // ContextProjectionDelivery owns both the prepared result and its live request.
-// C-20 must serialize a bounded copy once, bind that exact body to this pointer,
-// acknowledge its existing outcome and retain the guard through write/flush.
-// Its own audit slot/cancel must also transfer to transport-owned cleanup.
+// C-20 serializes a bounded copy once and retains the guard through
+// write/flush; its cancel transfers to transport-owned cleanup.
 type ContextProjectionDelivery struct {
 	owner                                   *projectionRequest
 	association                             ContextProjectionAssociation
@@ -869,7 +868,7 @@ func (s ContextProjectionResults) prepare(o *projectionRequest, effect ContextQu
 	if invalidCursor {
 		// Judged by the worker against the rechecked document after current
 		// read rights; it discloses no record. Keep the charged read alive until
-		// C-20 acknowledges this refusal's outcome, then joins final cleanup.
+		// C-20 writes this refusal, then joins final cleanup.
 		d.refusal = ContextProjectionInvalidCursor
 	}
 	if tooLarge {
