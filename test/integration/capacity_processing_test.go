@@ -7,7 +7,6 @@ import (
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
 	auditapp "asservat.local/asservat/internal/application/audit"
-	app "asservat.local/asservat/internal/application/capacity"
 	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
@@ -18,9 +17,9 @@ import (
 // Capacity only prepays processing state. The distinct privacy operator must
 // still perform actual independently audited initialization. This helper does
 // not create or replace processing/normal audit backing as older fixtures do.
-func (f *capacitySQLFixture) initializeManagedProcessing(t *testing.T, root app.RootConfiguration) {
+func (f *capacitySQLFixture) initializeManagedProcessing(t *testing.T, root capacityRoot) {
 	t.Helper()
-	f.fresh(t)
+	f.refreshBase(t)
 	guard, err := postgres.NewRecoveryTransactionGuard(f.input.PermissionRootID, f.input.InstallationID)
 	if err != nil {
 		t.Fatal(err)

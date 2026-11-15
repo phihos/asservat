@@ -58,13 +58,6 @@ rules:
       {{- end }}
     verbs: [get]
   {{- end }}
-  {{- if and .Values.region.enabled (include "asservat.hubApi.combined" .) }}
-  # The combined-mode connector's bootstrap record, written by the hub-api.
-  - apiGroups: [""]
-    resources: [secrets]
-    resourceNames: [{{ printf "%s-region-bootstrap" $n | quote }}]
-    verbs: [get, update]
-  {{- end }}
   {{- end }}
   - apiGroups: [asservat.io]
     resources: [debugpolicies]

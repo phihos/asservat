@@ -327,7 +327,7 @@ func qualifyNativeExchangePhase(t *testing.T, ctx context.Context, f nativeExcha
 		t.Fatal(e)
 	}
 	preparation := artifact.DownloadPreparation{SessionID: session.ID, BatchID: batchID, Generation: session.Generation}
-	control := artifact.DownloadControlAllocation{ID: f.allocation.ID, RootID: root, AuditStoreID: f.published.Expectation.Registration.StoreID, ResponseLimit: 2, WindowLimit: 2, AuditByteLimit: 4 * artifact.DownloadWindowAuditBytes, ValidUntil: f.allocation.ValidUntil, AuditWriteUntil: f.allocation.ValidUntil.Add(time.Minute)}
+	control := artifact.DownloadControlAllocation{ID: f.allocation.ID, RootID: root, AuditStoreID: f.published.Expectation.Registration.StoreID, WindowLimit: 2, AuditByteLimit: 4 * artifact.DownloadWindowAuditBytes, ValidUntil: f.allocation.ValidUntil, AuditWriteUntil: f.allocation.ValidUntil.Add(time.Minute)}
 	if e = f.config.BindDownloadControlAllocation(ctx, control); e != nil {
 		t.Fatal("window control", e)
 	}

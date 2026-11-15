@@ -94,11 +94,11 @@ func qualifyDownloadResponses(t *testing.T, ctx context.Context, admin *pgxpool.
 		}
 
 		a := current()
-		allocation := artifact.DownloadAllocation{ID: custodyID(), RootID: root, ClusterID: scope.ClusterID, NamespaceUID: scope.NamespaceUID, WorkloadUID: scope.WorkloadUID, OutputLimit: 1 << 30, ReadLimit: 2 << 30, SessionLimit: 4, ValidUntil: time.Now().UTC().Add(time.Minute).Truncate(time.Microsecond)}
+		allocation := artifact.DownloadAllocation{ID: custodyID(), RootID: root, ClusterID: scope.ClusterID, NamespaceUID: scope.NamespaceUID, WorkloadUID: scope.WorkloadUID, OutputLimit: 1 << 30, ReadLimit: 2 << 30, ValidUntil: time.Now().UTC().Add(time.Minute).Truncate(time.Microsecond)}
 		if err := config.BindDownloadAllocation(ctx, allocation); err != nil {
 			t.Fatal(err)
 		}
-		control := artifact.DownloadControlAllocation{ID: allocation.ID, RootID: root, AuditStoreID: e.Registration.StoreID, ResponseLimit: 2, WindowLimit: 2, AuditByteLimit: 4 * artifact.DownloadWindowAuditBytes, ValidUntil: allocation.ValidUntil, AuditWriteUntil: allocation.ValidUntil.Add(time.Minute)}
+		control := artifact.DownloadControlAllocation{ID: allocation.ID, RootID: root, AuditStoreID: e.Registration.StoreID, WindowLimit: 2, AuditByteLimit: 4 * artifact.DownloadWindowAuditBytes, ValidUntil: allocation.ValidUntil, AuditWriteUntil: allocation.ValidUntil.Add(time.Minute)}
 		if err := config.BindDownloadControlAllocation(ctx, control); err != nil {
 			t.Fatal("backing", err)
 		}
@@ -231,9 +231,9 @@ func qualifyDownloadResponses(t *testing.T, ctx context.Context, admin *pgxpool.
 		if err != nil || got.State != artifact.DownloadCompleted || got.EmittedBytes != request.Plan.Selection.Length || got.ChargedOutput != request.Plan.Selection.Length || got.Requests != 1 || got.Generation != finalGeneration {
 			t.Fatal("cumulative completion", got, err)
 		}
-		var responses, windows, auditBytes int64
-		if err = admin.QueryRow(ctx, "SELECT reserved_responses,reserved_windows,reserved_audit_bytes FROM download_control_allocation WHERE id=$1", control.ID).Scan(&responses, &windows, &auditBytes); err != nil || responses != 1 || windows != 2 || auditBytes != 4*artifact.DownloadWindowAuditBytes {
-			t.Fatal("finite control accounting", responses, windows, auditBytes, err)
+		var windows, auditBytes int64
+		if err = admin.QueryRow(ctx, "SELECT reserved_windows,reserved_audit_bytes FROM download_control_allocation WHERE id=$1", control.ID).Scan(&windows, &auditBytes); err != nil || windows != 2 || auditBytes != 4*artifact.DownloadWindowAuditBytes {
+			t.Fatal("finite control accounting", windows, auditBytes, err)
 		}
 		// An independent second session cannot consume a first response's fully
 		// reserved pair slots. SQL/S3 uncertainty never makes those slots free.
@@ -275,7 +275,7 @@ func qualifyDownloadResponses(t *testing.T, ctx context.Context, admin *pgxpool.
 			// ADR-312: actual SQL fences a complete check after a permission
 			// suspension, while the started response's continuation still gets
 			// its next window and byte lease under the original bounds.
-			third := artifact.DownloadAllocation{ID: custodyID(), RootID: root, ClusterID: scope.ClusterID, NamespaceUID: scope.NamespaceUID, WorkloadUID: scope.WorkloadUID, OutputLimit: 1 << 30, ReadLimit: 2 << 30, SessionLimit: 4, ValidUntil: time.Now().UTC().Add(time.Minute).Truncate(time.Microsecond)}
+			third := artifact.DownloadAllocation{ID: custodyID(), RootID: root, ClusterID: scope.ClusterID, NamespaceUID: scope.NamespaceUID, WorkloadUID: scope.WorkloadUID, OutputLimit: 1 << 30, ReadLimit: 2 << 30, ValidUntil: time.Now().UTC().Add(time.Minute).Truncate(time.Microsecond)}
 			if err := config.BindDownloadAllocation(ctx, third); err != nil {
 				t.Fatal(err)
 			}

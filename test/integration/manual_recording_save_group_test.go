@@ -310,10 +310,6 @@ func qualifyManualRecordingSaveGroup(t *testing.T, ctx context.Context, f *capac
 		return admissions.AdmitRecordingSaveGroup(call, group)
 	}
 	before := readManualSaveCounters(t, ctx, f, policy)
-	var controlBeforeFull, controlBeforeReplay int64
-	if err := f.admin.QueryRow(ctx, `SELECT charged_full,charged_replay FROM context_control_account WHERE root_id=$1 AND allocation_id=$2`, group.RootID, group.Preview.Storage.AllocationID).Scan(&controlBeforeFull, &controlBeforeReplay); err != nil {
-		t.Fatal(err)
-	}
 	windowBefore := manualGroupWindows(t, ctx, f, policy)
 	capacityBefore := manualGroupCapacity(t, ctx, f)
 	var grantBefore manualPolicyGrantSpend
@@ -391,10 +387,6 @@ func qualifyManualRecordingSaveGroup(t *testing.T, ctx context.Context, f *capac
 	}
 	t.Run("one-parent-shared-t0-policy-and-grant-spend", func(t *testing.T) {
 		after := readManualSaveCounters(t, ctx, f, policy)
-		var full, chargedReplay int64
-		if err := f.admin.QueryRow(ctx, `SELECT charged_full,charged_replay FROM context_control_account WHERE root_id=$1 AND allocation_id=$2`, group.RootID, group.Preview.Storage.AllocationID).Scan(&full, &chargedReplay); err != nil || full != controlBeforeFull+int64(count+1) || chargedReplay != controlBeforeReplay+int64(count+1) {
-			t.Fatal("group metadata did not charge parent plus genuine children", full, chargedReplay, err)
-		}
 		var unsharedManual int
 		if err := f.admin.QueryRow(ctx, `SELECT count(*) FROM context_capture WHERE group_id=$1 AND history_origin='manual' AND share_instruction IS NULL`, accepted.CaptureID).Scan(&unsharedManual); err != nil || unsharedManual != count {
 			t.Fatal("group inherited recurring sharing or automatic history", unsharedManual, err)
@@ -470,8 +462,6 @@ func manualGroupCapacity(t *testing.T, ctx context.Context, f *capacitySQLFixtur
 	var out string
 	if err := f.admin.QueryRow(ctx, `SELECT jsonb_build_array(
  (SELECT COALESCE(jsonb_agg(jsonb_build_array(id,charged_bytes,charged_objects) ORDER BY id),'[]'::jsonb) FROM custody_allocation),
- (SELECT count(*) FROM context_control_charge),
- (SELECT COALESCE(jsonb_agg(jsonb_build_array(root_id,allocation_id,charged_full,charged_replay) ORDER BY root_id,allocation_id),'[]'::jsonb) FROM context_control_account),
  (SELECT count(*) FROM recording_save_reservation),
  (SELECT count(*) FROM custody_attempt))::text`).Scan(&out); err != nil {
 		t.Fatal("bounded owned fixture capacity counters", err)

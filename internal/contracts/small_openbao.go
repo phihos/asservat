@@ -32,7 +32,7 @@ const SmallOpenBaoTransitMount = "public-transit"
 const SmallOpenBaoOwnerPKIMount = "owner-pki"
 const SmallOpenBaoConnectorPKIMount = "connector-pki"
 const SmallOpenBaoWorkerPKIMount = "worker-pki"
-const SmallOpenBaoBootstrapMount = "fleet-bootstrap"
+
 const SmallOpenBaoInitialIssuerRole = "asservat-install-issuer-issue"
 
 var smallOpenBaoImage = regexp.MustCompile(`^[a-zA-Z0-9./:_-]+@sha256:[a-f0-9]{64}$`)

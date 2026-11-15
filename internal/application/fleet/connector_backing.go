@@ -143,7 +143,7 @@ func (s ConnectorIdentityObserver) ObserveConfiguration(ctx context.Context) (Co
 		stop, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer cancel()
 		_ = s.Journal.FenceConnectorIdentity(stop, s.Binding, start)
-		return zero, &BootstrapIssueStage{refused, value.ErrUnavailable}
+		return zero, &IdentityStage{refused, value.ErrUnavailable}
 	}
 	until := identity.Earlier(start.Add(5*time.Second), identity.Earlier(c.Source.Observation.FreshUntil, c.Backing.Policy.ValidUntil))
 	bounded, cancel := context.WithDeadline(live, until)
@@ -263,3 +263,14 @@ func (next ConnectorIdentityBacking) SameResources(previous ConnectorIdentityBac
 	a.Policy.PolicyDigest = b.Policy.PolicyDigest
 	return a == b
 }
+
+// IdentityStage names the refused identity stage (a fixed word); errors.Is
+// still sees the wrapped cause.
+type IdentityStage struct {
+	Stage string
+	Err   error
+}
+
+func (e *IdentityStage) Error() string     { return "connector identity " + e.Stage + ": " + e.Err.Error() }
+func (e *IdentityStage) Unwrap() error     { return e.Err }
+func (e *IdentityStage) FixedStep() string { return e.Stage }

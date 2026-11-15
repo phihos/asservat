@@ -56,7 +56,6 @@ func (f *capacitySQLFixture) checkManagedProcessingAdmission(t *testing.T, admis
 		var data []byte
 		err := f.admin.QueryRow(ctx, `SELECT jsonb_build_object(
  'storage',(SELECT jsonb_build_array(charged_bytes,charged_objects) FROM custody_allocation WHERE id=$2),
- 'control',(SELECT jsonb_build_array(charged_full,charged_replay) FROM context_control_account WHERE root_id=$1 AND allocation_id=$2),
  'attempts',(SELECT count(*) FROM custody_attempt WHERE allocation_id=$2),
  'captures',(SELECT count(*) FROM context_capture WHERE root_id=$1),
  'audit',(SELECT COALESCE(jsonb_agg(jsonb_build_array(principal_digest,charged) ORDER BY principal_digest),'[]') FROM operation_audit_account WHERE root_id=$1 AND lane='capture'),

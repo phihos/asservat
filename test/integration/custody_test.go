@@ -22,7 +22,6 @@ import (
 
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
-	"asservat.local/asservat/internal/application/capacity"
 	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -169,7 +168,7 @@ func TestCustodyWithRealServices(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = ledger.ProvisionAllocation(ctx, capacity.StorageAllocation{ID: allocation, PoolID: root, ScopeID: custodyID(), ServiceClass: "context", PoolRevision: 1, Revision: 1, Bytes: r.ReservedBytes() * int64(slots), Objects: int64(4 * slots), ValidUntil: valid})
+		err = provisionAllocation(ctx, admin, testAllocation{ID: allocation, PoolID: root, ScopeID: custodyID(), ServiceClass: "context", PoolRevision: 1, Revision: 1, Bytes: r.ReservedBytes() * int64(slots), Objects: int64(4 * slots), ValidUntil: valid})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -281,7 +280,7 @@ func TestCustodyWithRealServices(t *testing.T) {
 	})
 	t.Run("protected backing cannot be overallocated", func(t *testing.T) {
 		root, a, s := setup(t, 1)
-		err := ledger.ProvisionAllocation(ctx, capacity.StorageAllocation{ID: custodyID(), PoolID: root, ScopeID: custodyID(), ServiceClass: "evidence", PoolRevision: 1, Revision: 1, Bytes: 1, Objects: 1, ValidUntil: time.Now().UTC().Truncate(time.Microsecond).Add(time.Minute)})
+		err := provisionAllocation(ctx, admin, testAllocation{ID: custodyID(), PoolID: root, ScopeID: custodyID(), ServiceClass: "evidence", PoolRevision: 1, Revision: 1, Bytes: 1, Objects: 1, ValidUntil: time.Now().UTC().Truncate(time.Microsecond).Add(time.Minute)})
 		if !errors.Is(err, privacy.ErrCapacity) {
 			t.Fatal(err)
 		}
@@ -297,7 +296,7 @@ func TestCustodyWithRealServices(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, allocation := range []string{one, two} {
-			if err := ledger.ProvisionAllocation(ctx, capacity.StorageAllocation{ID: allocation, PoolID: root, ScopeID: custodyID(), ServiceClass: "context", PoolRevision: 1, Revision: 1, Bytes: bytesPerAttempt, Objects: 4, ValidUntil: valid}); err != nil {
+			if err := provisionAllocation(ctx, admin, testAllocation{ID: allocation, PoolID: root, ScopeID: custodyID(), ServiceClass: "context", PoolRevision: 1, Revision: 1, Bytes: bytesPerAttempt, Objects: 4, ValidUntil: valid}); err != nil {
 				t.Fatal(err)
 			}
 		}

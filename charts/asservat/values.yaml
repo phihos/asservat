@@ -106,11 +106,17 @@ fleet:
   maxClusters: 1
 
 # Workload clusters joined with `mode: cluster` (hub or combined releases).
-# The hub-api issues each one's bootstrap into the join Secret
-# `<name>-join-<name>`, which the operator copies to that cluster.
+# Their connectors authenticate with their own ServiceAccount tokens
+# (ADR-334); the hub verifies them against the issuer below. The hub-api
+# keeps the join Secret `<name>-join-<name>` with the cluster's IDs, offer
+# and object-store capabilities.
 clusters: []
 # - name: payments-eu        # DNS label; names the join Secret
 #   clusterID: ""            # a lowercase UUID you choose (uuidgen)
+#   issuer: https://eu-apiserver.example  # its ServiceAccount issuer
+#   # jwks: '<kubectl get --raw /openid/v1/jwks>'  # when the hub cannot reach the issuer
+#   # connector: asservat-system/asservat-connector  # default <namespace>/<name>-connector
+#   # revoked: true          # refuse its tokens
 #   namespace: ""            # its release namespace; default: this one
 #   standby: 2               # context-start standby connections
 
@@ -159,22 +165,19 @@ retention: {}
 # mode=cluster: register the cluster in the hub's `clusters` values and copy
 # the hub's join Secret `<name>-join-<cluster>` unchanged into this release's
 # namespace; joinSecret names it. It carries the cluster and peer IDs, the
-# hub's regional offer, the executor's object-store capabilities and the
-# one-use bootstrap record, valid for five minutes from issuance (delete the
-# hub's Secret to get a fresh one). The connector seeds its rotating cluster
-# credential from that record once; keep the Secret for the other values.
+# hub's regional offer and the executor's object-store capabilities; set
+# hub.federation to the hub's remote.federation URL. The connector
+# authenticates with its ServiceAccount token (ADR-334), no credential.
 # mode=combined: the connector uses the generated `<name>-ids` clusterID and
-# peerID and reads its bootstrap record from bootstrapSecret (default
-# `<name>-region-bootstrap`).
+# peerID.
 region:
   enabled: false
   # mode=cluster only: the copied join Secret.
   joinSecret: ""
-  # mode=combined only.
-  bootstrapSecret: ""
-  # mode=combined only: the hub's offer ConfigMap in the release namespace
-  # and the in-cluster addresses the connector dials. Empty values use the
-  # chart's Service names.
+  # mode=combined only: the hub's offer ConfigMap in the release namespace.
+  # hub: the addresses the connector dials; empty values use the chart's
+  # Service names (mode=combined). In mode=cluster hub.federation is the
+  # hub's remote.federation URL and the connector's token audience.
   offerConfigMap: ""
   hub:
     federation: ""
@@ -281,8 +284,6 @@ hub:
       limits: {cpu: 500m, memory: 256Mi}
     nodeSelector: {}
     tolerations: []
-    # Audience of the projected cluster-observation token (with capacity).
-    clusterObservationAudience: asservat-cluster-observation
     # The permission child always runs: the hub cluster's AccessBindings in
     # every namespace (written by namespace RBAC, ADR-329), PermissionSources
     # of the release namespace, the browser/identity settings projections

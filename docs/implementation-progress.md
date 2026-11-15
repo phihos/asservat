@@ -47,6 +47,28 @@ issuance problem outside these limits, still open; no second workload
 cluster was installed. Older installations keep their finite stored
 backing and must be reinstalled.
 
+## Capacity accounts (2026-11-15)
+
+Branch `clean/capacity-2`, migration 00170. Capacity is on in every hub
+(ADR-335 D1). The hub-worker applies the Helm `capacity` values once at
+start (`capacity_apply`); a workload's account is created on demand in the
+storage read that first needs it (`capacity_enroll`, hub-metadata-read
+login). Rows carry the standing date `capacity_standing()` instead of a
+renewed admission window. Charges grow an account's limit as burst within
+its hard limit, the namespace limit and the pool, and release shrinks it
+back to the protected share. Removed: migration 00054's source, plan,
+renewal and refresh-demand tables and loops, connector capacity delivery,
+cluster-observation capacity purposes, the context-control record counter
+and the download session/response counters (bytes stay bounded).
+`capturesPerCluster` defaults to max(8, node count).
+
+Gaps: the default share divides by max(8, enrolled accounts), not the
+eligible-workload count; namespace eligibility (system/release namespaces,
+`asservat.io/evidence: disabled`) is not checked on enrollment because the
+storage read knows only the namespace UID; `maxConcurrentExpensive` and
+`onFull` are stored but no expensive-action reservation consumes them yet;
+`DeleteOldestEligibleInAccount` has no deletion path.
+
 ## Capacity from Helm values (2026-11-14)
 
 Branch `clean/capacity`. The `capacity` values follow
@@ -79,6 +101,36 @@ progress revisions notify over PostgreSQL (`asservat_capture_progress`,
 migration 00168); the console follows `GET /api/v1/events?capture_id=` and
 `get_capture` no longer returns poll advice. Remaining divergence is in the
 tables below.
+
+## Connector ServiceAccount tokens (ADR-334, 2026-11-14)
+
+Branch `clean/connector`. Connectors authenticate every lifecycle
+conversation with their projected ServiceAccount token (`hub.token`,
+audience: the federation URL they dial). The federation verifies it against
+the hub cluster's API server issuer (combined mode) or each registered
+cluster's `issuer`/`jwks` from the `clusters` values (go-oidc; discovered
+keys refresh on an unknown `kid`) and attributes the conversation to that
+cluster; `revoked: true` or removal refuses its tokens. A cluster's first
+conversation stages its connector source. Removed: one-use bootstrap
+records, their audited issuance, reservations and KV channel
+(`fleet-bootstrap` mount, provider role), `<name>-region-bootstrap`, the
+join Secret's record, the rotating cluster credential (lineage, rotation
+endpoint, `<name>-cluster-credential` Secret), enrollment claim/certificate
+tables (migration 00169) and the 15-cluster cap. Fresh all-bundled
+combined install on the owned kind cluster `asservat-cn` (since deleted):
+the connector enrolled with its token (no `region-bootstrap` or
+`cluster-credential` Secret exists) and `TestHelmNativeKindJourney` passed
+(19.7 s; 17.6 s again after rebasing on main). Not run: `TestHelmNativeKindClusterJoin` (mode=cluster).
+
+Remaining for this slice: process certificate enrollment/renewal/retirement
+and the mTLS context-start, key-service and owner relay transports still
+carry connector traffic (the next step is bearer-token auth on one HTTP/2
+connection and their deletion); the join Secret still carries the offer and
+copied object-store capabilities; cluster IDs still come from values, not
+names; `hub.url`/`hub.caBundle` are not implemented (mode=cluster sets
+`region.hub.federation` as the token audience); the native forwarded path
+still checks the never-filled `fleet_peer` registry; fleet settings, work
+JWS, local-key signing and the node channel rows below are unchanged.
 
 ## ADR-330 contract divergence (2026-11-14)
 

@@ -73,49 +73,21 @@ func qualifyContextQueryCapacitySQL(t *testing.T, ctx context.Context, admin *pg
 			t.Fatal("closed shared qualification", mode, valid, err)
 		}
 	}
-	if _, err := f.producer.InitializeCapacity(ctx, f.input, f.protection); err != nil {
-		t.Fatal(err)
-	}
-	f.open(t)
-	o := f.rootObservation(t)
-	root, err := f.roots.ReserveCapacityRoot(ctx, o)
-	if err != nil {
-		t.Fatal(err)
-	}
-	root, err = f.captureRoots.BackCapacityRoot(ctx, o, root)
-	if err != nil {
-		t.Fatal(err)
-	}
-	root, err = f.roots.PublishCapacityRoot(ctx, o, root)
-	if err != nil {
-		t.Fatal("publish shared original root", err)
-	}
+	f.setup(t)
+	var err error
 	var acceptance, hard string
 	var observations int64
 	if err = admin.QueryRow(ctx, "SELECT acceptance_id::text,plan->>'HardUntil',observations FROM context_query_capacity WHERE root_id=$1", f.input.PermissionRootID).Scan(&acceptance, &hard, &observations); err != nil || acceptance != f.qualification.ContextQuery.CapacityID || observations != 0 {
 		t.Fatal("one installed anchor without query observer", err)
-	}
-	coordinator := app.EnrollmentCoordinator{Store: f.enrollments, Capture: f.captureEnrollments, Accounts: f.accounts, Now: time.Now}
-	enrolled, err := coordinator.Reconcile(ctx, f.workloadObservation(t, 0))
-	if err != nil {
-		t.Fatal("publish shared workload", err)
 	}
 	var allocation string
 	var valid bool
 	if err = admin.QueryRow(ctx, "SELECT id::text,context_query_capacity_allocation_current(root_id,id) FROM context_query_allocation WHERE root_id=$1 AND cluster_id=$2 AND namespace_uid=$3 AND workload_uid=$4", f.input.PermissionRootID, scope.ClusterID, f.namespace.UID, f.workloads[0].UID).Scan(&allocation, &valid); err != nil || !valid {
 		t.Fatal("exact workload allocation", err)
 	}
-	if err = f.enrollments.RefreshCapacityEnrollment(ctx, f.workloadObservation(t, 0), enrolled); err != nil {
-		t.Fatal(err)
-	}
 	var again, againHard, againAllocation string
 	if err = admin.QueryRow(ctx, "SELECT c.acceptance_id::text,c.plan->>'HardUntil',a.id::text FROM context_query_capacity c JOIN context_query_allocation a USING(root_id) WHERE c.root_id=$1", f.input.PermissionRootID).Scan(&again, &againHard, &againAllocation); err != nil || again != acceptance || againHard != hard || againAllocation != allocation {
 		t.Fatal("source refresh replaced original charge or deadline", err)
-	}
-	// A second workload cannot borrow the one reserved query allocation. Its
-	// existing capacity transaction rolls back; the first charge remains exact.
-	if _, err = coordinator.Reconcile(ctx, f.workloadObservation(t, 1)); err == nil {
-		t.Fatal("unfunded query workload admitted")
 	}
 	var count int
 	if err = admin.QueryRow(ctx, "SELECT count(*) FROM context_query_allocation WHERE root_id=$1", f.input.PermissionRootID).Scan(&count); err != nil || count != 1 {

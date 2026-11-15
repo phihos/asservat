@@ -277,8 +277,8 @@ func composePublicShares(c PublicContextOperationsConfig, s PublicContextOperati
 	service := sharing.Service{RootID: c.RootID, InstallationID: c.InstallationID, Routes: pc.caseRoutes, Permissions: pc.permissions, Catalog: pc.catalog, Store: pc.shares, Policies: pc.shares, Recovery: v.submission.Recovery, NewID: c.NewID, Now: c.Now}
 	// ADR-238: the protected fleet administration's operators may revoke any
 	// share; without it only creators and current managers revoke.
-	if pc.fleet != nil && pc.fleet.Settings != nil {
-		service.Administration = pc.fleet.Settings
+	if pc.fleet != nil {
+		service.Administration = pc.fleet
 	}
 	return presentation.NewShareOperations(c.PublicOrigin, c.Now, c.NewID, service)
 }
@@ -305,14 +305,14 @@ func composePublicAccessPreview(c PublicContextOperationsConfig, s PublicContext
 		return nil, nil
 	}
 	v, err := composePublicContextUseCases(c, s)
-	if err != nil || pc.permissions == nil || pc.fleet.Settings == nil || len(pc.clusterIDs) == 0 {
+	if err != nil || pc.permissions == nil || pc.fleet == nil || len(pc.clusterIDs) == 0 {
 		return nil, presentation.ErrOperationsConfiguration
 	}
 	decoder, err := kube.NewAccessBindingSpecDecoder()
 	if err != nil {
 		return nil, presentation.ErrOperationsConfiguration
 	}
-	service := authapp.AccessPreviewer{InstallationID: c.InstallationID, Administration: pc.fleet.Settings, Projections: pc.permissions, Decoder: decoder, Recovery: v.submission.Recovery, Clusters: slices.Clone(pc.clusterIDs), Now: c.Now}
+	service := authapp.AccessPreviewer{InstallationID: c.InstallationID, Administration: pc.fleet, Projections: pc.permissions, Decoder: decoder, Recovery: v.submission.Recovery, Clusters: slices.Clone(pc.clusterIDs), Now: c.Now}
 	return presentation.NewAccessPreviewOperations(c.PublicOrigin, c.Now, c.NewID, service)
 }
 

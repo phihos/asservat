@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres"
-	"asservat.local/asservat/internal/application/capacity"
 	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/application/privacy"
 	"github.com/google/pprof/profile"
@@ -91,7 +90,7 @@ func qualifyProfileArtifacts(t *testing.T, ctx context.Context, store *objectsto
 			if _, err = admin.Exec(ctx, "INSERT INTO custody_pool(id,store_id,revision,valid_until,byte_limit,object_limit) VALUES($1,$2,1,$3,$4,$5)", root, e.Registration.StoreID, valid, reserved, objects); err != nil {
 				t.Fatal(err)
 			}
-			if err = ledger.ProvisionAllocation(ctx, capacity.StorageAllocation{ID: e.Registration.AllocationID, PoolID: root, ScopeID: custodyID(), ServiceClass: "evidence", PoolRevision: 1, Revision: 1, Bytes: reserved, Objects: objects, ValidUntil: valid}); err != nil {
+			if err = provisionAllocation(ctx, admin, testAllocation{ID: e.Registration.AllocationID, PoolID: root, ScopeID: custodyID(), ServiceClass: "evidence", PoolRevision: 1, Revision: 1, Bytes: reserved, Objects: objects, ValidUntil: valid}); err != nil {
 				t.Fatal(err)
 			}
 			if _, err = ledger.RegisterStreaming(ctx, plan); err != nil {

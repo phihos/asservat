@@ -110,13 +110,13 @@ class HubWorkerChart(unittest.TestCase):
         self.assertEqual(c["auditStore"], {"endpoint": "https://asservat-objectstore.asservat-system.svc:8333", "region": "us-east-1", "bucket": "asservat-audit"})
         # Mounts, audience and key names derive in Go; none is rendered.
         self.assertEqual(c["keyService"], {"endpoint": "https://asservat-openbao.asservat-system.svc:8200"})
-        self.assertEqual(c["provider"], {"roles": {"auditWrap": "asservat-hub-worker-audit-wrap", "auditUnwrap": "asservat-hub-worker-audit-unwrap"}})
+        self.assertEqual(set(c["provider"]["roles"]), {"auditWrap", "auditUnwrap", "cleanupWrap", "cleanupOpen", "cleanupVerify", "cleanupSign"})
         p = c["permission"]
         self.assertEqual(p["statusUsers"], ["system:serviceaccount:asservat-system:asservat-hub-worker"])
         self.assertEqual(p["browser"], {"settings": "asservat-browser-settings"})
         self.assertEqual(p["identity"], {"settings": "asservat-identity-settings", "issuer": "https://login.example.org/realms/asservat"})
         self.assertEqual(p["workerConfiguration"], {"namespace": "asservat-downloads", "source": "asservat-worker-profile"})
-        self.assertNotIn("contextDeletion", p)
+        self.assertIn("contextDeletion", p)
         self.assertNotIn("retention", p)
         pod = w["Deployment"]["spec"]["template"]["spec"]
         self.assertEqual(pod["containers"][0]["command"], ["/asservat", "hub-worker"])
@@ -124,10 +124,11 @@ class HubWorkerChart(unittest.TestCase):
         self.assertEqual(wait["command"], ["/asservat", "setup", "--wait-schema", "--config", "/run/asservat/hub-worker/config.json",
                                            "--credential", "/run/asservat/hub-worker/sql-configuration-fleet.json", "--ca", "/run/asservat/hub-worker/roots/postgres.crt"])
         files, tokens, whole = sources(w)
-        self.assertEqual(files, {"config.json": ("asservat-hub-worker-config", "config.json"), "kube-ca.crt": ("kube-root-ca.crt", "ca.crt"),
-                                 "audit-storage.json": ("asservat-s3-configuration-audit", "credentials.json"),
-                                 "roots/postgres.crt": ("asservat-postgres-state", "ca.crt"), "roots/audit-store.crt": ("asservat-objectstore-state", "ca.crt"),
-                                 "roots/key-service.crt": ("asservat-openbao-state", "ca.crt")})
+        # Capacity's own mounts are checked in test_capacity_cleanup_deletion_and_retention.
+        self.assertLessEqual({"config.json": ("asservat-hub-worker-config", "config.json"), "kube-ca.crt": ("kube-root-ca.crt", "ca.crt"),
+                              "audit-storage.json": ("asservat-s3-configuration-audit", "credentials.json"),
+                              "roots/postgres.crt": ("asservat-postgres-state", "ca.crt"), "roots/audit-store.crt": ("asservat-objectstore-state", "ca.crt"),
+                              "roots/key-service.crt": ("asservat-openbao-state", "ca.crt")}.items(), files.items())
         self.assertEqual(tokens, {"kube.token": None, "provider.token": "asservat-configuration-provider"})
         self.assertEqual(whole, ["asservat-sql-hub-worker"])
         self.assertEqual({v["name"] for v in pod["volumes"]}, {"inputs", "ids"})
@@ -198,7 +199,7 @@ class HubWorkerChart(unittest.TestCase):
         self.assertEqual(files["cleanup-storage.json"], ("asservat-s3-operation-cleanup", "credentials.json"))
         self.assertEqual(files["verify-storage.json"], ("asservat-s3-operation-verify", "credentials.json"))
         self.assertEqual(files["evidence-delete-storage.json"], ("asservat-s3-evidence-delete", "credentials.json"))
-        self.assertEqual(tokens["cluster-observation.token"], "asservat-cluster-observation")
+        self.assertNotIn("cluster-observation.token", tokens)
         self.assertEqual((c["capacity"]["evidenceStorage"], c["capacity"]["revision"]), (values["capacity"]["evidenceStorage"], 1))
         self.assertFalse([d for d in docs if d["kind"] in ("EvidenceStoragePool", "EvidenceBudgetPolicy")])
         retention, = [d for d in docs if d["kind"] == "EvidenceRetentionPolicy"]

@@ -221,7 +221,6 @@ checksum/config: {{ $sum | sha256sum | quote }}
   "ownerPKIMount" "owner-pki"
   "connectorPKIMount" "connector-pki"
   "workerPKIMount" "worker-pki"
-  "bootstrapMount" "fleet-bootstrap"
   "hubWorkerAudience" "asservat-configuration-provider"
   "hubAPIAudience" "asservat-owner-provider"
   "federationAudience" "asservat-federation-provider"
@@ -280,4 +279,23 @@ checksum/config: {{ $sum | sha256sum | quote }}
 {{- end -}}
 {{- toJson $c -}}
 {{- end -}}
+{{- end -}}
+
+{{/* ADR-334: the audience of the connector's ServiceAccount token, the hub
+     URL it dials: in mode=cluster the hub's remote.federation (set as
+     region.hub.federation), otherwise the in-cluster federation Service. */}}
+{{- define "asservat.connectorAudience" -}}
+{{- if eq .Values.mode "cluster" -}}
+{{- required "region.hub.federation is the hub's remote.federation URL, the connector's token audience" .Values.region.hub.federation -}}
+{{- else -}}
+{{- .Values.region.hub.federation | default (printf "https://%s-federation.%s.svc:9446" (include "asservat.name" .) .Release.Namespace) -}}
+{{- end -}}
+{{- end -}}
+
+{{/* The token audiences the hub's federation accepts (JSON list). */}}
+{{- define "asservat.federationAudiences" -}}
+{{- $out := list (printf "https://%s-federation.%s.svc:9446" (include "asservat.name" .) .Release.Namespace) -}}
+{{- with .Values.remote.federation }}{{ $out = append $out . }}{{ end -}}
+{{- if and (eq .Values.mode "combined") .Values.region.hub.federation }}{{ $out = append $out .Values.region.hub.federation }}{{ end -}}
+{{- toJson (uniq $out) -}}
 {{- end -}}

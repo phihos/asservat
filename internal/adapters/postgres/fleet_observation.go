@@ -7,25 +7,37 @@ import (
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	port "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/fleet"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type FleetObservation struct{ claims *EnrollmentClaims }
+type FleetObservation struct {
+	ledger       *Ledger
+	installation string
+}
 
 var _ port.FleetTrustProjection = (*FleetObservation)(nil)
 
 func NewFleetObservation(ctx context.Context, pool *pgxpool.Pool, installation string) (*FleetObservation, error) {
-	c, err := NewEnrollmentClaims(ctx, pool, installation)
-	if err != nil {
-		return nil, err
+	if !authorization.UUID(installation) {
+		return nil, value.ErrInvalid
 	}
-	return &FleetObservation{c}, nil
+	l, err := New(ctx, pool)
+	if err != nil {
+		return nil, value.ErrUnavailable
+	}
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	if why := schemaCompatible(ctx, pool); why != "" {
+		return nil, schemaRefusal(value.ErrUnavailable, why)
+	}
+	return &FleetObservation{ledger: l, installation: installation}, nil
 }
 func (s *FleetObservation) ObserveAdministration(ctx context.Context, basis value.ObservationBasis, a value.Administration) error {
-	if s == nil || s.claims == nil || ctx == nil || basis.InstallationID != s.claims.installation || basis.Database.SchemaVersion != currentSchemaVersion || !basis.Valid() || a.InstallationID != basis.InstallationID || !a.Valid(a.ObservedAt) {
+	if s == nil || s.ledger == nil || ctx == nil || basis.InstallationID != s.installation || basis.Database.SchemaVersion != currentSchemaVersion || !basis.Valid() || a.InstallationID != basis.InstallationID || !a.Valid(a.ObservedAt) {
 		return value.ErrInvalid
 	}
 	a.ObservedAt, a.FreshUntil = ownerTime(a.ObservedAt), ownerTime(a.FreshUntil)
@@ -42,7 +54,7 @@ func (s *FleetObservation) ObserveAdministration(ctx context.Context, basis valu
 	ctx = original
 	var comparison custodydb.FleetCurrentTrust
 	lockContention := false
-	err := s.claims.ledger.transaction(ctx, func(q *custodydb.Queries) error {
+	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
 		comparison, lockContention = custodydb.FleetCurrentTrust{}, false
 		now, err := q.CurrentTime(ctx)
 		if err != nil {
@@ -102,14 +114,14 @@ func (s *FleetObservation) ObserveAdministration(ctx context.Context, basis valu
 	return err
 }
 func (s *FleetObservation) FenceAdministration(ctx context.Context, basis value.ObservationBasis, started time.Time) error {
-	if s == nil || s.claims == nil || ctx == nil || !basis.Valid() || basis.Database.SchemaVersion != currentSchemaVersion || basis.InstallationID != s.claims.installation || started.Year() < 2020 || started.Year() > 9999 {
+	if s == nil || s.ledger == nil || ctx == nil || !basis.Valid() || basis.Database.SchemaVersion != currentSchemaVersion || basis.InstallationID != s.installation || started.Year() < 2020 || started.Year() > 9999 {
 		return value.ErrInvalid
 	}
 	started = ownerTime(started)
 	// Structural basis validity deliberately suffices here. A failed source may
 	// already have consumed its positive interval; the separately bounded fence
 	// only restricts the original version and cannot affect a newer semantic root.
-	return s.claims.ledger.transaction(ctx, func(q *custodydb.Queries) error {
+	return s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
 		now, err := q.CurrentTime(ctx)
 		if err != nil {
 			return err
@@ -117,7 +129,7 @@ func (s *FleetObservation) FenceAdministration(ctx context.Context, basis value.
 		if started.After(now.Time) {
 			return value.ErrInvalid
 		}
-		_, err = q.FenceFleetObservation(ctx, custodydb.FenceFleetObservationParams{InstallationID: id(s.claims.installation), SemanticVersion: basis.SemanticVersion, PostmasterAt: ts(basis.Database.StartedAt), DatabaseOid: pgtype.Uint32{Uint32: basis.Database.DatabaseOID, Valid: true}, ObservationStarted: ts(started)})
+		_, err = q.FenceFleetObservation(ctx, custodydb.FenceFleetObservationParams{InstallationID: id(s.installation), SemanticVersion: basis.SemanticVersion, PostmasterAt: ts(basis.Database.StartedAt), DatabaseOid: pgtype.Uint32{Uint32: basis.Database.DatabaseOID, Valid: true}, ObservationStarted: ts(started)})
 		return err
 	})
 }

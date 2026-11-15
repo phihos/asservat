@@ -167,6 +167,7 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("retention_source", "UPDATE", "root_id")
 		add("custody_pool", "UPDATE", "id")
 		add("custody_allocation", "UPDATE", "id", "charged_bytes", "charged_objects")
+		out = append(out, capacityChargeGrants...)
 		add("custody_attempt", "UPDATE", "id", "state", "copies_digest", "deletion_fence", "lease_until", "deleted_at")
 		add("custody_copy", "UPDATE", "ciphertext_bytes", "ciphertext_sha256", "etag", "version_id")
 		for _, table := range []string{"custody_attempt", "custody_copy", "custody_event", "capture_history_parameter", "capture_history_quota"} {
@@ -212,6 +213,7 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("retention_source", "UPDATE", "root_id")
 		add("custody_pool", "UPDATE", "id")
 		add("custody_allocation", "UPDATE", "id", "charged_bytes", "charged_objects")
+		out = append(out, capacityChargeGrants...)
 		add("custody_attempt", "UPDATE", "id")
 		for _, table := range []string{"context_capture", "custody_attempt", "custody_copy", "custody_event"} {
 			add(table, "INSERT")
@@ -495,6 +497,7 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 			// tombstone and outbox event; triggers require the acknowledged audit.
 			add("context_deletion_checkpoint", "UPDATE", "attempt_id", "finalization_xid")
 			add("custody_allocation", "UPDATE", "charged_bytes", "charged_objects")
+			out = append(out, capacityChargeGrants...)
 			add("custody_attempt", "UPDATE", "state", "deleted_at", "lease_until")
 			add("custody_copy", "UPDATE", "ciphertext_bytes", "ciphertext_sha256", "etag", "version_id")
 			add("custody_event", "INSERT")
@@ -587,4 +590,11 @@ func PublicRuntimeRoleLayoutDigest() string {
 		h.Write([]byte("sql-public-" + purpose + ".json\x00"))
 	}
 	return hex.EncodeToString(h.Sum(nil))
+}
+
+// capacityChargeGrants are the SECURITY DEFINER charge/release of an
+// account (migration 00170), for every login that charges custody bytes.
+var capacityChargeGrants = []publicRuntimeGrant{
+	{"function", "capacity_charge(uuid,bigint,bigint)", "", "EXECUTE"},
+	{"function", "capacity_release(uuid,bigint,bigint)", "", "EXECUTE"},
 }

@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	capacityapp "asservat.local/asservat/internal/application/capacity"
 	executionapp "asservat.local/asservat/internal/application/execution"
 	"asservat.local/asservat/internal/domain/execution"
 	"asservat.local/asservat/internal/domain/identity"
@@ -33,7 +32,7 @@ import (
 // Managed profile admission uses the real original capacity root and current
 // permission/retention/grant adapters. Target and independent human identities
 // are synthetic; this fixture does not invoke a workload profiler.
-func admitQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, root capacityapp.RootConfiguration, enrollment capacityapp.Enrollment, rawPacket ...bool) (captureAdmissionScenario, capture.Accepted, *postgres.APIContextExecutions) {
+func admitQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, root capacityRoot, enrollment capacityEnrollment, rawPacket ...bool) (captureAdmissionScenario, capture.Accepted, *postgres.APIContextExecutions) {
 	t.Helper()
 	ctx, admin, poolFor := f.ctx, f.admin, f.fixturePool
 	raw := len(rawPacket) > 0 && rawPacket[0]

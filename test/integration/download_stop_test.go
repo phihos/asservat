@@ -78,7 +78,7 @@ func qualifyDownloadStop(t *testing.T, ctx context.Context, admin *pgxpool.Pool,
 			return a
 		}
 		a := current()
-		allocation := artifact.DownloadAllocation{ID: custodyID(), RootID: root, ClusterID: scope.ClusterID, NamespaceUID: scope.NamespaceUID, WorkloadUID: scope.WorkloadUID, OutputLimit: 1 << 20, ReadLimit: 128 << 20, SessionLimit: 4, ValidUntil: time.Now().UTC().Add(time.Minute).Truncate(time.Microsecond)}
+		allocation := artifact.DownloadAllocation{ID: custodyID(), RootID: root, ClusterID: scope.ClusterID, NamespaceUID: scope.NamespaceUID, WorkloadUID: scope.WorkloadUID, OutputLimit: 1 << 20, ReadLimit: 128 << 20, ValidUntil: time.Now().UTC().Add(time.Minute).Truncate(time.Microsecond)}
 		if err = config.BindDownloadAllocation(ctx, allocation); err != nil {
 			t.Fatal(err)
 		}
@@ -90,7 +90,7 @@ func qualifyDownloadStop(t *testing.T, ctx context.Context, admin *pgxpool.Pool,
 		if err = admin.QueryRow(ctx, "SELECT count(*) FROM artifact_download WHERE allocation_id=$1", allocation.ID).Scan(&sessions); err != nil || sessions != 0 {
 			t.Fatal("failed admission left session", sessions, err)
 		}
-		if err = admin.QueryRow(ctx, "SELECT reserved_sessions FROM download_allocation WHERE id=$1", allocation.ID).Scan(&charged); err != nil || charged != 0 {
+		if err = admin.QueryRow(ctx, "SELECT reserved_output FROM download_allocation WHERE id=$1", allocation.ID).Scan(&charged); err != nil || charged != 0 {
 			t.Fatal("failed admission charged allocation", charged, err)
 		}
 		now := time.Now().UTC().Truncate(time.Microsecond)

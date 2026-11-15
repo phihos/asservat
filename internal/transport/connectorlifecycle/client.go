@@ -13,34 +13,37 @@ import (
 	"time"
 
 	app "asservat.local/asservat/internal/application/fleet"
-	"asservat.local/asservat/internal/contracts"
-	value "asservat.local/asservat/internal/domain/fleet"
 )
 
 // Client is the regional side of one ADR-169 conversation. It dials the
-// pinned hub, signs the opening over this connection's exporter and answers
+// pinned hub, authenticates with the connector's ServiceAccount token and answers
 // each phase request with the local in-cluster lifecycle reader. No retry.
 type Client struct {
 	address, host string
 	roots         *x509.CertPool
+	token         func() ([]byte, error)
 }
 
 // NewClient pins the hub endpoint, the server name its certificate must carry
 // and the issuer roots. The name is separate from the dialed address so an
 // installer-pinned identity survives any reachable address.
-func NewClient(endpoint, serverName string, roots *x509.CertPool) (*Client, error) {
+func NewClient(endpoint, serverName string, roots *x509.CertPool, token func() ([]byte, error)) (*Client, error) {
 	u, err := url.Parse(endpoint)
-	if err != nil || roots == nil || serverName == "" || u.Scheme != "https" || u.Host == "" || u.Path != "" || u.RawQuery != "" || u.User != nil || u.Port() == "" {
+	if err != nil || roots == nil || token == nil || serverName == "" || u.Scheme != "https" || u.Host == "" || u.Path != "" || u.RawQuery != "" || u.User != nil || u.Port() == "" {
 		return nil, ErrChannel
 	}
-	return &Client{address: u.Host, host: serverName, roots: roots}, nil
+	return &Client{address: u.Host, host: serverName, roots: roots, token: token}, nil
 }
 
-// Run returns the hub's final frame. open builds the opening for this
-// connection's exporter; local performs the in-cluster native and source reads.
-func (c *Client) Run(ctx context.Context, open func(exporter []byte) (Opening, error), local Local) (HubFrame, error) {
+// Run returns the hub's final frame; local performs the in-cluster native
+// and source reads.
+func (c *Client) Run(ctx context.Context, opening Opening, local Local) (HubFrame, error) {
 	var zero HubFrame
-	if c == nil || ctx == nil || open == nil || local == nil {
+	if c == nil || ctx == nil || local == nil {
+		return zero, ErrChannel
+	}
+	token, err := c.token()
+	if err != nil {
 		return zero, ErrChannel
 	}
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
@@ -52,13 +55,7 @@ func (c *Client) Run(ctx context.Context, open func(exporter []byte) (Opening, e
 	}
 	conn := raw.(*tls.Conn)
 	defer conn.Close()
-	state := conn.ConnectionState()
-	exporter, err := state.ExportKeyingMaterial(value.ClusterCredentialExporter, nil, contracts.ClusterCredentialExporterLen)
-	if err != nil || state.NegotiatedProtocol != "h2" {
-		return zero, ErrChannel
-	}
-	opening, err := open(exporter)
-	if err != nil {
+	if conn.ConnectionState().NegotiatedProtocol != "h2" {
 		return zero, ErrChannel
 	}
 	var once sync.Once
@@ -84,6 +81,7 @@ func (c *Client) Run(ctx context.Context, open func(exporter []byte) (Opening, e
 		return zero, ErrChannel
 	}
 	req.Header.Set("Content-Type", ContentType)
+	req.Header.Set("Authorization", "Bearer "+string(token))
 	client := &http.Client{Transport: transport, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	resp, err := client.Do(req)
 	if err != nil {

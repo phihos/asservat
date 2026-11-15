@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"testing"
-	"time"
 
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/pcap"
@@ -29,28 +28,17 @@ func TestPolicyMetadataBackingWithRealPostgres(t *testing.T) {
 		f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, func(f *capacitySQLFixture) {
 			policyMetadataProfile(&f.qualification, &f.template)
 		})
-		if _, err := f.producer.InitializeCapacity(ctx, f.input, f.protection); err != nil {
-			t.Fatal("protected setup", err)
-		}
-		f.open(t)
+		root, enrollment := f.setup(t)
 		stop := f.keepFleetCurrent()
 		defer func() {
 			if err := stop(); err != nil {
 				t.Error(err)
 			}
 		}()
-		root, err := (&app.RootBackingCoordinator{Store: f.roots, Capture: f.captureRoots, Now: time.Now}).Reconcile(ctx, f.rootObservation(t))
-		if err != nil {
-			t.Fatal("protected root", err)
-		}
 		f.initializeManagedProcessing(t, root)
-		enrollment, err := (&app.EnrollmentCoordinator{Store: f.enrollments, Capture: f.captureEnrollments, Accounts: f.accounts, Now: time.Now}).Reconcile(ctx, f.workloadObservation(t, 0))
-		if err != nil {
-			t.Fatal("protected workload", err)
-		}
 		var metadata app.RootMetadataQualification
 		var raw []byte
-		if err = admin.QueryRow(ctx, "SELECT qualification->'RootBacking'->'Metadata' FROM capacity_source WHERE root_id=$1", f.input.PermissionRootID).Scan(&raw); err != nil || json.Unmarshal(raw, &metadata) != nil {
+		if err = admin.QueryRow(ctx, "SELECT qualification->'RootBacking'->'Metadata' FROM capacity_settings WHERE root_id=$1", f.input.PermissionRootID).Scan(&raw); err != nil || json.Unmarshal(raw, &metadata) != nil {
 			t.Fatal("accepted profile readback", err)
 		}
 		if metadata != f.qualification.RootBacking.Metadata || metadata.RecordRowBytes != profile.Metadata.RecordRowBytes || metadata.RecordWALBytes != profile.Metadata.RecordWALBytes || metadata.BackupCopies != profile.Backup.BackupCopies || metadata.WALCopies != profile.Backup.WALCopies {

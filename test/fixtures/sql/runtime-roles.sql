@@ -14,23 +14,14 @@ CREATE ROLE capture_audit_runtime LOGIN PASSWORD 'synthetic-capture-audit'; GRAN
 
 CREATE ROLE peer_read_runtime LOGIN PASSWORD 'synthetic-peer-read'; GRANT CONNECT ON DATABASE custody_test TO peer_read_runtime; GRANT USAGE ON SCHEMA public TO peer_read_runtime; GRANT SELECT ON goose_db_version,fleet_trust,fleet_peer,fleet_peer_certificate TO peer_read_runtime;
 
-CREATE ROLE enrollment_claim_runtime LOGIN PASSWORD 'synthetic-enrollment-claim'; GRANT CONNECT ON DATABASE custody_test TO enrollment_claim_runtime; GRANT USAGE ON SCHEMA public TO enrollment_claim_runtime; GRANT SELECT ON goose_db_version,fleet_trust,fleet_bootstrap TO enrollment_claim_runtime; GRANT UPDATE(installation_id) ON fleet_trust TO enrollment_claim_runtime; GRANT UPDATE(claimed_at,public_key_sha256) ON fleet_bootstrap TO enrollment_claim_runtime;
 
-CREATE ROLE enrollment_audit_runtime LOGIN PASSWORD 'synthetic-enrollment-audit'; GRANT CONNECT ON DATABASE custody_test TO enrollment_audit_runtime; GRANT USAGE ON SCHEMA public TO enrollment_audit_runtime; GRANT SELECT ON goose_db_version,fleet_trust,fleet_bootstrap TO enrollment_audit_runtime; GRANT UPDATE(installation_id) ON fleet_trust TO enrollment_audit_runtime; GRANT UPDATE(id,claim_acknowledged_at,claim_audit_digest,claim_object_key,claim_object_version,claim_object_etag,claim_object_bytes,claim_object_sha256) ON fleet_bootstrap TO enrollment_audit_runtime;
 
-CREATE ROLE enrollment_sign_runtime LOGIN PASSWORD 'synthetic-enrollment-sign'; GRANT CONNECT ON DATABASE custody_test TO enrollment_sign_runtime; GRANT USAGE ON SCHEMA public TO enrollment_sign_runtime; GRANT SELECT ON goose_db_version,fleet_trust,fleet_bootstrap,fleet_certificate_issue TO enrollment_sign_runtime; GRANT UPDATE(installation_id) ON fleet_trust TO enrollment_sign_runtime; GRANT UPDATE(id) ON fleet_bootstrap TO enrollment_sign_runtime; GRANT INSERT ON fleet_certificate_issue TO enrollment_sign_runtime; GRANT UPDATE(signed_at,certificate_json,certificate_sha256,certificate_not_before,certificate_not_after) ON fleet_certificate_issue TO enrollment_sign_runtime;
 
-GRANT SELECT ON fleet_certificate_issue TO enrollment_audit_runtime; GRANT UPDATE(audit_acknowledged_at,audit_digest,audit_object_key,audit_object_version,audit_object_etag,audit_object_bytes,audit_object_sha256) ON fleet_certificate_issue TO enrollment_audit_runtime;
 
-CREATE ROLE enrollment_activate_runtime LOGIN PASSWORD 'synthetic-enrollment-activate'; GRANT CONNECT ON DATABASE custody_test TO enrollment_activate_runtime; GRANT USAGE ON SCHEMA public TO enrollment_activate_runtime; GRANT SELECT ON goose_db_version,fleet_trust,fleet_bootstrap,fleet_certificate_issue,fleet_peer,fleet_peer_certificate TO enrollment_activate_runtime; GRANT UPDATE(installation_id) ON fleet_trust TO enrollment_activate_runtime; GRANT UPDATE(id) ON fleet_bootstrap TO enrollment_activate_runtime; GRANT UPDATE(activated_at) ON fleet_certificate_issue TO enrollment_activate_runtime; GRANT INSERT ON fleet_peer,fleet_peer_certificate TO enrollment_activate_runtime; GRANT UPDATE(installation_id) ON fleet_peer TO enrollment_activate_runtime;
 
-CREATE ROLE bootstrap_reserve_runtime LOGIN PASSWORD 'synthetic-bootstrap-reserve'; GRANT CONNECT ON DATABASE custody_test TO bootstrap_reserve_runtime; GRANT USAGE ON SCHEMA public TO bootstrap_reserve_runtime; GRANT SELECT ON goose_db_version,fleet_trust,fleet_peer,fleet_bootstrap,fleet_bootstrap_intent,cluster_bootstrap_activation TO bootstrap_reserve_runtime; GRANT UPDATE(installation_id) ON fleet_trust TO bootstrap_reserve_runtime; GRANT INSERT ON fleet_bootstrap_intent TO bootstrap_reserve_runtime;
 
-CREATE ROLE bootstrap_record_runtime LOGIN PASSWORD 'synthetic-bootstrap-record'; GRANT CONNECT ON DATABASE custody_test TO bootstrap_record_runtime; GRANT USAGE ON SCHEMA public TO bootstrap_record_runtime; GRANT SELECT ON goose_db_version,fleet_trust,fleet_bootstrap_intent TO bootstrap_record_runtime; GRANT UPDATE(installation_id) ON fleet_trust TO bootstrap_record_runtime; GRANT UPDATE(id,credential_recorded_at,credential_sha256,credential_version) ON fleet_bootstrap_intent TO bootstrap_record_runtime;
 
-CREATE ROLE bootstrap_audit_runtime LOGIN PASSWORD 'synthetic-bootstrap-audit'; GRANT CONNECT ON DATABASE custody_test TO bootstrap_audit_runtime; GRANT USAGE ON SCHEMA public TO bootstrap_audit_runtime; GRANT SELECT ON goose_db_version,fleet_trust,fleet_bootstrap_intent TO bootstrap_audit_runtime; GRANT UPDATE(installation_id) ON fleet_trust TO bootstrap_audit_runtime; GRANT UPDATE(id,audit_acknowledged_at,audit_digest,audit_object_key,audit_object_version,audit_object_etag,audit_object_bytes,audit_object_sha256) ON fleet_bootstrap_intent TO bootstrap_audit_runtime;
 
-CREATE ROLE bootstrap_activate_runtime LOGIN PASSWORD 'synthetic-bootstrap-activate'; GRANT CONNECT ON DATABASE custody_test TO bootstrap_activate_runtime; GRANT USAGE ON SCHEMA public TO bootstrap_activate_runtime; GRANT SELECT ON goose_db_version,fleet_trust,fleet_bootstrap_intent,fleet_bootstrap TO bootstrap_activate_runtime; GRANT UPDATE(installation_id) ON fleet_trust TO bootstrap_activate_runtime; GRANT UPDATE(id,issued_at) ON fleet_bootstrap_intent TO bootstrap_activate_runtime; GRANT INSERT ON fleet_bootstrap TO bootstrap_activate_runtime; GRANT UPDATE(id) ON fleet_bootstrap TO bootstrap_activate_runtime;
 
 CREATE ROLE fleet_observe_runtime LOGIN PASSWORD 'synthetic-fleet-observe'; GRANT CONNECT ON DATABASE custody_test TO fleet_observe_runtime; GRANT USAGE ON SCHEMA public TO fleet_observe_runtime; GRANT SELECT ON goose_db_version,fleet_trust TO fleet_observe_runtime; GRANT EXECUTE ON FUNCTION observe_fleet_administration(uuid,bigint,timestamptz,oid,timestamptz,uuid,text,bigint,bytea,boolean,timestamptz,timestamptz),fence_fleet_observation(uuid,bigint,timestamptz,oid,timestamptz) TO fleet_observe_runtime;
 
@@ -58,12 +49,12 @@ GRANT SELECT ON goose_db_version,context_capture,custody_attempt,context_verific
 CREATE ROLE download_config_runtime LOGIN PASSWORD 'synthetic-download-config'; GRANT CONNECT ON DATABASE custody_test TO download_config_runtime; GRANT USAGE ON SCHEMA public TO download_config_runtime;
 GRANT SELECT ON goose_db_version,permission_stream,download_allocation TO download_config_runtime;
 GRANT UPDATE(id) ON permission_stream,download_allocation TO download_config_runtime;
-GRANT INSERT(id,root_id,cluster_id,namespace_uid,workload_uid,output_limit,read_limit,session_limit,valid_until) ON download_allocation TO download_config_runtime;
+GRANT INSERT(id,root_id,cluster_id,namespace_uid,workload_uid,output_limit,read_limit,valid_until) ON download_allocation TO download_config_runtime;
 
 CREATE ROLE download_runtime LOGIN PASSWORD 'synthetic-download'; GRANT CONNECT ON DATABASE custody_test TO download_runtime; GRANT USAGE ON SCHEMA public TO download_runtime;
 GRANT SELECT ON goose_db_version,permission_stream,authority_audit,context_catalog,context_capture,context_verification,custody_attempt,download_allocation,artifact_download,download_batch,download_response TO download_runtime;
 GRANT UPDATE(id) ON permission_stream TO download_runtime;
-GRANT UPDATE(reserved_output,reserved_read,reserved_sessions) ON download_allocation TO download_runtime;
+GRANT UPDATE(reserved_output,reserved_read) ON download_allocation TO download_runtime;
 GRANT INSERT(id,root_id,allocation_id,artifact_id,principal_key,actor_key,idempotency_digest,request_digest,scope_json,deadline,output_limit,read_limit,request_limit) ON artifact_download TO download_runtime;
 GRANT UPDATE(state,charged_output,charged_read,requests,emitted_bytes,generation,active_batch) ON artifact_download TO download_runtime;
 GRANT INSERT(id,session_id,generation,intent_json,lease_until) ON download_batch TO download_runtime;
@@ -289,8 +280,7 @@ GRANT UPDATE(source_uid) ON download_worker_configuration TO worker_routing_read
 -- Effective recovery is computed from this PostgreSQL process/database.
 -- Runtime roles cannot set either activation field or mutate the derived flag.
 GRANT UPDATE(installation_id) ON fleet_current_trust TO fleet_observe_runtime;
-GRANT SELECT ON fleet_current_trust TO bootstrap_activate_runtime,bootstrap_audit_runtime,bootstrap_record_runtime,bootstrap_reserve_runtime,capture_runtime,context_publish_runtime,context_verify_runtime,download_key_bind_runtime,download_key_read_runtime,download_runtime,download_worker_identity_runtime,download_worker_runtime,enrollment_activate_runtime,enrollment_audit_runtime,enrollment_claim_runtime,enrollment_sign_runtime,fleet_observe_runtime,local_keys_runtime,owner_configuration_audit_runtime,owner_configuration_read_runtime,owner_configuration_runtime,owner_enrollment_activate_runtime,owner_enrollment_read_runtime,owner_enrollment_runtime,peer_read_runtime,policy_accept_runtime,policy_read_runtime,worker_configuration_audit_runtime,worker_configuration_read_runtime,worker_configuration_runtime,worker_enrollment_activate_runtime,worker_enrollment_runtime,worker_owner_runtime,worker_routing_read_runtime;
-GRANT UPDATE(installation_id) ON fleet_current_trust TO bootstrap_activate_runtime,bootstrap_audit_runtime,bootstrap_record_runtime,bootstrap_reserve_runtime,capture_runtime,context_publish_runtime,context_verify_runtime,download_key_bind_runtime,download_key_read_runtime,download_runtime,download_worker_identity_runtime,download_worker_runtime,enrollment_activate_runtime,enrollment_audit_runtime,enrollment_claim_runtime,enrollment_sign_runtime,local_keys_runtime,owner_configuration_read_runtime,owner_configuration_runtime,owner_enrollment_activate_runtime,owner_enrollment_read_runtime,owner_enrollment_runtime,policy_accept_runtime,policy_read_runtime,worker_configuration_read_runtime,worker_configuration_runtime,worker_enrollment_activate_runtime,worker_enrollment_runtime,worker_owner_runtime,worker_routing_read_runtime;
+GRANT SELECT ON fleet_current_trust TO capture_runtime,context_publish_runtime,context_verify_runtime,download_key_bind_runtime,download_key_read_runtime,download_runtime,download_worker_identity_runtime,download_worker_runtime,fleet_observe_runtime,local_keys_runtime,owner_configuration_audit_runtime,owner_configuration_read_runtime,owner_configuration_runtime,owner_enrollment_activate_runtime,owner_enrollment_read_runtime,owner_enrollment_runtime,peer_read_runtime,policy_accept_runtime,policy_read_runtime,worker_configuration_audit_runtime,worker_configuration_read_runtime,worker_configuration_runtime,worker_enrollment_activate_runtime,worker_enrollment_runtime,worker_owner_runtime,worker_routing_read_runtime;
 
 -- Private passive previews: no evidence, admission, audit or key authority.
 CREATE ROLE context_preview_runtime LOGIN PASSWORD 'synthetic-context-preview';
@@ -363,20 +353,14 @@ GRANT SELECT ON policy_recording_source,policy_source TO context_preview_runtime
 CREATE ROLE context_control_config_runtime LOGIN PASSWORD 'synthetic-context-control-config';
 GRANT CONNECT ON DATABASE custody_test TO context_control_config_runtime;
 GRANT USAGE ON SCHEMA public TO context_control_config_runtime;
-GRANT SELECT ON goose_db_version,permission_stream,context_storage_binding,custody_pool,custody_allocation,context_control_pool,context_control_account TO context_control_config_runtime;
+GRANT SELECT ON goose_db_version,permission_stream,context_storage_binding,custody_pool,custody_allocation TO context_control_config_runtime;
 GRANT UPDATE(id) ON permission_stream,custody_pool,custody_allocation TO context_control_config_runtime;
 GRANT UPDATE(source_uid) ON context_storage_binding TO context_control_config_runtime;
-GRANT INSERT ON context_control_pool,context_control_account TO context_control_config_runtime;
-GRANT UPDATE(root_id,configured,paused,revision,valid_until,full_limit,replay_limit) ON context_control_pool,context_control_account TO context_control_config_runtime;
-GRANT SELECT ON context_control_pool,context_control_account,context_control_charge TO capture_runtime;
-GRANT UPDATE(root_id) ON context_control_pool,context_control_account TO capture_runtime;
-GRANT INSERT ON context_control_charge TO capture_runtime;
 CREATE ROLE context_retirement_read_runtime LOGIN PASSWORD 'synthetic-context-retirement-read';
 GRANT CONNECT ON DATABASE custody_test TO context_retirement_read_runtime;
 GRANT USAGE ON SCHEMA public TO context_retirement_read_runtime;
 GRANT SELECT ON goose_db_version,context_capture,custody_attempt,custody_copy,context_verification,context_execution,artifact_download,retention_decision,retention_checkpoint,retention_catchup TO context_retirement_read_runtime;
 
-GRANT SELECT ON context_control_pool,context_control_account TO context_storage_read_runtime;
 
 -- Migration54: mirror the production capture-admit/storage-read function grant.
 -- This reads the current managed cutoff; it grants no capacity configuration.
@@ -562,7 +546,7 @@ GRANT EXECUTE ON FUNCTION read_capture_operation(uuid,uuid),capture_audit_journa
 GRANT EXECUTE ON FUNCTION capture_audit_acknowledge(uuid,jsonb,text,jsonb,jsonb,jsonb),acknowledge_capture_pair(uuid,jsonb) TO capture_operation_ack_runtime;
 -- Admission retains the existing exact authority/custody/control transaction,
 -- without inheriting another role or gaining audit/provider acknowledgement.
-GRANT SELECT ON permission_stream,permission_basis,permission_assignment,permission_review_source,permission_review_assignment,permission_review_decision,authority_audit,context_storage_binding,context_preview,context_preview_fence,context_control_pool,context_control_account,context_control_charge TO capture_operation_admit_runtime;
+GRANT SELECT ON permission_stream,permission_basis,permission_assignment,permission_review_source,permission_review_assignment,permission_review_decision,authority_audit,context_storage_binding,context_preview,context_preview_fence TO capture_operation_admit_runtime;
 GRANT UPDATE(id) ON permission_stream TO capture_operation_admit_runtime;
 -- Match the existing admission lock-only column grant; no allocation/freshness writes.
 GRANT UPDATE(source_uid) ON context_storage_binding TO capture_operation_admit_runtime;
@@ -571,8 +555,7 @@ GRANT SELECT,INSERT,UPDATE ON custody_pool,custody_allocation,custody_copy,custo
 GRANT SELECT,INSERT ON custody_attempt TO capture_operation_admit_runtime;
 GRANT UPDATE(id,state,copies_digest,deletion_fence,lease_until,deleted_at) ON custody_attempt TO capture_operation_admit_runtime;
 GRANT SELECT ON retention_source,retention_checkpoint,retention_catchup,retention_catchup_effect,retention_decision TO capture_operation_admit_runtime;
-GRANT UPDATE(root_id) ON retention_source,context_control_pool,context_control_account TO capture_operation_admit_runtime;
-GRANT INSERT ON context_control_charge TO capture_operation_admit_runtime;
+GRANT UPDATE(root_id) ON retention_source TO capture_operation_admit_runtime;
 GRANT SELECT ON fleet_trust,fleet_current_trust TO capture_operation_admit_runtime;
 GRANT UPDATE(installation_id) ON fleet_trust,fleet_current_trust TO capture_operation_admit_runtime;
 -- Fixed filtered cleanup views; no SELECT or UPDATE on human/other lanes.
@@ -590,7 +573,6 @@ GRANT EXECUTE ON FUNCTION finish_capture_operation_retirement(uuid,uuid,uuid),fi
 -- Passive retained acknowledgement: no base-table read or write privilege.
 GRANT EXECUTE ON FUNCTION capture_audit_role_ok(uuid,text) TO capture_operation_read_runtime;
 GRANT SELECT ON capture_operation_intents TO capture_operation_read_runtime;
-CREATE ROLE cluster_credential_runtime LOGIN PASSWORD 'synthetic-cluster-credential'; GRANT CONNECT ON DATABASE custody_test TO cluster_credential_runtime; GRANT USAGE ON SCHEMA public TO cluster_credential_runtime; GRANT SELECT ON goose_db_version TO cluster_credential_runtime; GRANT SELECT(root_id,peer_id,installation_id,cluster_id) ON connector_identity_profile TO cluster_credential_runtime; GRANT SELECT,UPDATE ON cluster_enrollment_lineage,cluster_enrollment_credential TO cluster_credential_runtime; GRANT INSERT ON cluster_enrollment_credential TO cluster_credential_runtime; GRANT EXECUTE ON FUNCTION reserve_cluster_bootstrap(uuid,uuid,uuid,bytea,uuid,bigint,bytea,bigint,bigint),acknowledge_cluster_bootstrap(uuid,uuid,text,text,text,bigint,bytea),activate_cluster_bootstrap(uuid,uuid,bytea,bytea) TO cluster_credential_runtime; GRANT SELECT,INSERT,UPDATE ON remote_access_binding_delivery TO cluster_credential_runtime; -- ADR-329
 
 -- ADR-206 SQL component fixture only. These are not installed runtime grants.
 -- Protected backing and C-14 worker/key bindings are seeded by the owned fixture
@@ -628,7 +610,6 @@ GRANT UPDATE(root_id) ON retention_source TO retention_preview_read_runtime;
 -- ADR-252: fixed read retention and exact current approval; no grant table access.
 GRANT EXECUTE ON FUNCTION context_preview_read_until(uuid,uuid) TO context_preview_runtime,context_preview_cleanup_runtime,context_request_resolution_runtime;
 -- ADR-200: mirror the compiled capture-preview duty; wakeup only, no table grant.
-GRANT EXECUTE ON FUNCTION demand_capacity_refresh(uuid,uuid,text,text,text,text,text) TO context_preview_runtime;
 GRANT EXECUTE ON FUNCTION lock_approved_context_grant(uuid,uuid,uuid,text,text,text,bytea) TO capture_runtime,api_execution_read_runtime,api_execution_prepare_runtime,api_execution_runtime;
 
 -- ADR-255: existing metadata/retention facets read typed history obligations.
@@ -657,3 +638,7 @@ GRANT UPDATE(attempt_id) ON custody_stream TO capture_runtime;
 GRANT SELECT ON custody_stream TO api_execution_prepare_runtime,context_cleanup_finalize_runtime;
 GRANT UPDATE(attempt_id,writer_epoch,plan_digest,revision) ON custody_stream TO api_execution_prepare_runtime;
 GRANT UPDATE(attempt_id,state,revision,released_at) ON custody_stream TO context_cleanup_finalize_runtime;
+
+GRANT UPDATE(installation_id) ON fleet_current_trust TO capture_runtime,context_publish_runtime,context_verify_runtime,download_key_bind_runtime,download_key_read_runtime,download_runtime,download_worker_identity_runtime,download_worker_runtime,local_keys_runtime,owner_configuration_read_runtime,owner_configuration_runtime,owner_enrollment_activate_runtime,owner_enrollment_read_runtime,owner_enrollment_runtime,policy_accept_runtime,policy_read_runtime,worker_configuration_read_runtime,worker_configuration_runtime,worker_enrollment_activate_runtime,worker_enrollment_runtime,worker_owner_runtime,worker_routing_read_runtime;
+-- Migration 00170: account charge/release (SECURITY DEFINER) for every login that charges custody bytes.
+GRANT EXECUTE ON FUNCTION capacity_charge(uuid,bigint,bigint),capacity_release(uuid,bigint,bigint) TO custody_runtime,capture_runtime,context_cleanup_finalize_runtime,capture_operation_admit_runtime;

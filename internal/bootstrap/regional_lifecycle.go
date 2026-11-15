@@ -11,22 +11,21 @@ import (
 	"asservat.local/asservat/internal/contracts"
 	value "asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
-	"asservat.local/asservat/internal/transport/clustercredential"
 	"asservat.local/asservat/internal/transport/connectorlifecycle"
 	"github.com/google/uuid"
 )
 
 // RegionalLifecycle implements the connector process credential and leaf
 // registry ports for an outbound regional process (ADR-168/169). Each call is
-// one channel conversation: the cluster credential presents possession over
-// that connection, and the in-cluster readers answer every ADR-153 phase and
+// one channel conversation: the connector's ServiceAccount token
+// authenticates it (ADR-334), and the in-cluster readers answer every ADR-153 phase and
 // source read. The hub keeps every effect; this side never holds SQL, signing
 // or audit authority.
 type RegionalLifecycle struct {
-	Client     *connectorlifecycle.Client
-	Local      connectorlifecycle.Local
-	Credential fleetapp.ClusterCredentialRotator
-	Now        func() time.Time
+	Client *connectorlifecycle.Client
+	Local  connectorlifecycle.Local
+	RootID string
+	Now    func() time.Time
 	// Timing, when set, is called as each conversation starts and returns
 	// the func its success calls (ADR-197 spike diagnostics; never content).
 	Timing func(value.ConnectorLifecyclePurpose) func()
@@ -81,7 +80,7 @@ var (
 )
 
 func (r *RegionalLifecycle) Enroll(ctx context.Context, id string, request value.ConnectorProcessRequest) (value.ConnectorCredentialProcess, error) {
-	frame, err := r.run(ctx, value.ConnectorLifecycleEnroll, value.ClusterAdmission, id, request, nil)
+	frame, err := r.run(ctx, value.ConnectorLifecycleEnroll, id, request, nil)
 	if err != nil || frame.Process == nil {
 		return value.ConnectorCredentialProcess{}, unavailable(err)
 	}
@@ -99,7 +98,7 @@ func (r *RegionalLifecycle) IssueProcess(ctx context.Context, id, usage string, 
 	} else if usage != "client" {
 		return value.IssuedConnectorCredential{}, value.ErrInvalid
 	}
-	frame, err := r.run(ctx, purpose, value.ClusterRenewal, id, request, nil)
+	frame, err := r.run(ctx, purpose, id, request, nil)
 	if err != nil || frame.Credential == nil {
 		return value.IssuedConnectorCredential{}, unavailable(err)
 	}
@@ -131,53 +130,31 @@ func (r *RegionalLifecycle) connectorLeafRegistration(ctx context.Context, c val
 	if request == nil {
 		return fleetapp.ConnectorLeafRegistration{}, value.ErrUnavailable
 	}
-	frame, err := r.runLocal(ctx, connectorlifecycle.PurposeRegistration, value.ClusterRenewal, uuid.NewString(), *request, &c, local)
+	frame, err := r.runLocal(ctx, connectorlifecycle.PurposeRegistration, uuid.NewString(), *request, &c, local)
 	if err != nil || frame.Registration == nil || frame.Registration.Certificate != c || frame.Registration.Process != request.Process {
 		return fleetapp.ConnectorLeafRegistration{}, unavailable(err)
 	}
 	return *frame.Registration, nil
 }
 
-func (r *RegionalLifecycle) run(ctx context.Context, purpose value.ConnectorLifecyclePurpose, operation, id string, request value.ConnectorProcessRequest, leaf *value.ConnectorCredentialCertificate, owner ...value.OwnerCertificate) (connectorlifecycle.HubFrame, error) {
-	return r.runLocal(ctx, purpose, operation, id, request, leaf, r.Local, owner...)
+func (r *RegionalLifecycle) run(ctx context.Context, purpose value.ConnectorLifecyclePurpose, id string, request value.ConnectorProcessRequest, leaf *value.ConnectorCredentialCertificate, owner ...value.OwnerCertificate) (connectorlifecycle.HubFrame, error) {
+	return r.runLocal(ctx, purpose, id, request, leaf, r.Local, owner...)
 }
 
-func (r *RegionalLifecycle) runLocal(ctx context.Context, purpose value.ConnectorLifecyclePurpose, operation, id string, request value.ConnectorProcessRequest, leaf *value.ConnectorCredentialCertificate, local connectorlifecycle.Local, owner ...value.OwnerCertificate) (connectorlifecycle.HubFrame, error) {
+func (r *RegionalLifecycle) runLocal(ctx context.Context, purpose value.ConnectorLifecyclePurpose, id string, request value.ConnectorProcessRequest, leaf *value.ConnectorCredentialCertificate, local connectorlifecycle.Local, owner ...value.OwnerCertificate) (connectorlifecycle.HubFrame, error) {
 	var zero connectorlifecycle.HubFrame
 	if r.Client == nil || local == nil || r.Now == nil || ctx == nil || !request.Valid() {
 		return zero, value.ErrInvalid
-	}
-	client, err := mtls.EnrollmentKey(request.ClientCSRDER)
-	if err != nil {
-		return zero, value.ErrInvalid
-	}
-	server, err := mtls.EnrollmentKey(request.ServerCSRDER)
-	if err != nil {
-		return zero, value.ErrInvalid
-	}
-	presented, sign, err := r.Credential.Signer(ctx, value.ClusterCredentialRequest{Operation: operation, PodUID: request.Process.PodUID, ProcessEpoch: request.Process.ProcessEpoch, ClientKey: client, ServerKey: server, RequestedAt: r.Now().UTC().Truncate(time.Microsecond)})
-	if err != nil {
-		return zero, errors.Join(err, errRegionalCredential)
-	}
-	b := request.Process.Binding
-	if presented.Profile.InstallationID != b.InstallationID || presented.Profile.ClusterID != b.ClusterID || presented.Profile.PeerID != b.PeerID {
-		return zero, value.ErrInvalid // the credential belongs to another profile
 	}
 	finished := func() {}
 	if r.Timing != nil {
 		finished = r.Timing(purpose)
 	}
-	frame, err := r.Client.Run(ctx, func(exporter []byte) (connectorlifecycle.Opening, error) {
-		signature, err := sign(exporter)
-		if err != nil {
-			return connectorlifecycle.Opening{}, err
-		}
-		o := connectorlifecycle.Opening{Presentation: clustercredential.Wire(presented, signature), Purpose: purpose, OperationID: id, Request: request, Certificate: leaf}
-		if len(owner) == 1 {
-			o.Owner = &owner[0]
-		}
-		return o, nil
-	}, local)
+	o := connectorlifecycle.Opening{Purpose: purpose, OperationID: id, Request: request, Certificate: leaf}
+	if len(owner) == 1 {
+		o.Owner = &owner[0]
+	}
+	frame, err := r.Client.Run(ctx, o, local)
 	if err != nil {
 		return zero, errRegionalChannel
 	}
@@ -204,7 +181,7 @@ func (r *RegionalLifecycle) ReadContextStartOwners(ctx context.Context) (value.A
 	if !ok {
 		return value.APIContextOwnerCandidates{}, value.ErrUnavailable
 	}
-	frame, err := r.run(ctx, connectorlifecycle.PurposeOwnerCandidates, value.ClusterRenewal, uuid.NewString(), request, nil)
+	frame, err := r.run(ctx, connectorlifecycle.PurposeOwnerCandidates, uuid.NewString(), request, nil)
 	if err != nil || frame.Owners == nil || !frame.Owners.Valid(r.Now()) {
 		return value.APIContextOwnerCandidates{}, unavailable(err)
 	}
@@ -218,7 +195,7 @@ func (r *RegionalLifecycle) ReadOwnerObservationCandidates(ctx context.Context) 
 	if !ok {
 		return value.APIContextOwnerCandidates{}, value.ErrUnavailable
 	}
-	frame, err := r.run(ctx, connectorlifecycle.PurposeOwnerObservationCandidates, value.ClusterRenewal, uuid.NewString(), request, nil)
+	frame, err := r.run(ctx, connectorlifecycle.PurposeOwnerObservationCandidates, uuid.NewString(), request, nil)
 	if err != nil || frame.Owners == nil || !frame.Owners.Valid(r.Now()) {
 		return value.APIContextOwnerCandidates{}, unavailable(err)
 	}
@@ -232,7 +209,7 @@ func (r *RegionalLifecycle) ReadOwnerRegistration(ctx context.Context, c value.O
 	if !ok {
 		return value.OwnerRegistrationObservation{}, value.ErrUnavailable
 	}
-	frame, err := r.run(ctx, connectorlifecycle.PurposeOwnerRegistration, value.ClusterRenewal, uuid.NewString(), request, nil, c)
+	frame, err := r.run(ctx, connectorlifecycle.PurposeOwnerRegistration, uuid.NewString(), request, nil, c)
 	if err != nil || frame.OwnerRegistration == nil || frame.OwnerRegistration.Certificate != c {
 		return value.OwnerRegistrationObservation{}, unavailable(err)
 	}
@@ -261,7 +238,7 @@ func (r *RegionalLifecycle) RecoveryState(ctx context.Context) (value.RecoverySt
 		return *c, nil
 	}
 	r.recovery = nil
-	frame, err := r.run(ctx, connectorlifecycle.PurposeRecovery, value.ClusterRenewal, uuid.NewString(), request, nil)
+	frame, err := r.run(ctx, connectorlifecycle.PurposeRecovery, uuid.NewString(), request, nil)
 	if err != nil || frame.Recovery == nil || !frame.Recovery.Valid(r.Now()) || frame.Recovery.InstallationID != request.Process.Binding.InstallationID {
 		return value.RecoveryState{}, unavailable(err)
 	}
@@ -284,7 +261,7 @@ func (r *RegionalLifecycle) AuthenticateOwner(ctx context.Context, connection fl
 	if err != nil || certificate.Usage != "server" || !certificate.Valid(r.Now()) {
 		return zero, value.ErrDenied
 	}
-	frame, err := r.run(ctx, connectorlifecycle.PurposeOwnerAuthentication, value.ClusterRenewal, uuid.NewString(), request, nil, certificate)
+	frame, err := r.run(ctx, connectorlifecycle.PurposeOwnerAuthentication, uuid.NewString(), request, nil, certificate)
 	if err != nil || frame.Owner == nil {
 		return zero, unavailable(err)
 	}
@@ -330,7 +307,7 @@ func (r *RegionalLifecycle) DeliverAccessBindings(ctx context.Context, bindings 
 	if !ok || bindings == nil || ctx == nil {
 		return value.ErrUnavailable
 	}
-	_, err := r.runLocal(ctx, connectorlifecycle.PurposeAccessBindings, value.ClusterRenewal, uuid.NewString(), request, nil, deliveringLocal{r.Local, bindings})
+	_, err := r.runLocal(ctx, connectorlifecycle.PurposeAccessBindings, uuid.NewString(), request, nil, deliveringLocal{r.Local, bindings})
 	if err != nil {
 		return unavailable(err)
 	}

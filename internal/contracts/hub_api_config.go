@@ -165,11 +165,9 @@ type HubAPIPublic struct {
 	RegionalOffer *HubAPIRegionalOffer `json:"regionalOffer,omitempty"`
 }
 
-// HubAPIFleet enables bootstrap issuance (fleet.issuer set); the settings
-// ConfigMap is <name>-fleet and the channel mount SmallOpenBaoBootstrapMount.
-type HubAPIFleet struct {
-	DeliveryProfile string `json:"deliveryProfile"`
-}
+// HubAPIFleet enables the fleet operators' previews; the settings
+// ConfigMap is <name>-fleet.
+type HubAPIFleet struct{}
 
 // HubAPIRegionalOffer holds the offer's Helm-known values: the in-cluster
 // federation endpoint and serving name, the image and the operator's

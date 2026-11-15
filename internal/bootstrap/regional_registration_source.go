@@ -18,7 +18,7 @@ var _ app.ConnectorLeafRegistryAt = (*RegionalLifecycle)(nil)
 // acceptance may use this reader; the ordinary registry method is unchanged.
 func (r *RegionalLifecycle) ConnectorLeafRegistrationAt(ctx context.Context, leaf value.ConnectorCredentialCertificate, source value.ConnectorIdentitySource) (app.ConnectorLeafRegistration, error) {
 	var zero app.ConnectorLeafRegistration
-	if r == nil || r.Local == nil || r.Now == nil || ctx == nil || ctx.Err() != nil || !source.Valid(r.Now()) || !leaf.Valid(r.Now()) || source.Observation.Profile.Binding != leaf.Binding || source.Observation.Profile.RootID != r.Credential.Profile.RootID {
+	if r == nil || r.Local == nil || r.Now == nil || ctx == nil || ctx.Err() != nil || !source.Valid(r.Now()) || !leaf.Valid(r.Now()) || source.Observation.Profile.Binding != leaf.Binding || source.Observation.Profile.RootID != r.RootID {
 		return zero, value.ErrUnavailable
 	}
 	until := source.Observation.FreshUntil

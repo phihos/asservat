@@ -10,9 +10,6 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 )
 
-// Metadata reads for Deployments, StatefulSets and Pods.
-const capacityMetadataAccept = "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1"
-const capacityMetadataListAccept = "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1"
 
 // capacityGuard observes that the probe namespace still exists with its
 // UID; Kubernetes RBAC decides who may write the guarded metadata. The digest
@@ -47,17 +44,18 @@ func (g *capacityGuard) current(ctx context.Context) (time.Time, time.Time, erro
 		return fail("request", cfg.ErrUnavailable)
 	}
 	start := g.observer.now()
-	until := start.Add(5 * time.Second)
+	w := identity.Check(start, identity.SQLFenced)
 	if d, ok := ctx.Deadline(); ok {
-		until = identity.Earlier(until, d)
+		w = w.Narrow(d)
 	}
+	until := w.Until()
 	call, cancel := context.WithDeadline(ctx, until)
 	defer cancel()
 	ns, err := g.observer.namespace(call, g.namespace)
 	if err != nil || ns.Deleting {
 		return fail("namespace", cfg.ErrChanged)
 	}
-	if call.Err() != nil || !identity.Fresh(start, until, g.observer.now(), 5*time.Second) {
+	if call.Err() != nil || !w.Valid(g.observer.now()) {
 		return fail("freshness", cfg.ErrUnavailable)
 	}
 	return start, until, nil

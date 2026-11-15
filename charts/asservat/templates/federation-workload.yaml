@@ -3,15 +3,28 @@
 {{- $n := include "asservat.name" . }}
 {{- $p := include "asservat.providers" . | fromJson }}
 {{- $dir := "/run/asservat/federation" }}
-{{- $purposes := list "connector-source" "connector-journal" "connector-ack" "connector-read" "cluster-credential" "connector-owner-read" }}
-{{- $config := toJson (dict
+{{- $purposes := list "connector-source" "connector-journal" "connector-ack" "connector-read" "connector-delivery" "connector-owner-read" }}
+{{- $config := (dict
   "name" $n
   "namespace" .Release.Namespace
   "port" 9446
   "concurrency" (int (default 4 $v.concurrency))
   "postgres" $p.postgres
   "auditStore" (dict "endpoint" $p.objectStore.endpoint "region" $p.objectStore.region "bucket" $p.objectStore.auditBucket)
-  "openBao" $p.openBao.endpoint) }}
+  "openBao" $p.openBao.endpoint
+  "audiences" (include "asservat.federationAudiences" . | fromJsonArray)) }}
+{{- /* ADR-334: the registered clusters, public data only; revoked or
+  removed clusters are absent and their tokens are refused. */}}
+{{- $clusters := list }}
+{{- range .Values.clusters }}
+{{- if not .revoked }}
+{{- $c := dict "name" .name "clusterID" .clusterID "issuer" (required (printf "clusters[%s].issuer is the cluster's ServiceAccount issuer" .name) .issuer) "connector" (default (printf "%s/%s-connector" (default $.Release.Namespace .namespace) $n) .connector) }}
+{{- with .jwks }}{{ $_ := set $c "jwks" (ternary . (toJson .) (kindIs "string" .)) }}{{ end }}
+{{- $clusters = append $clusters $c }}
+{{- end }}
+{{- end }}
+{{- $_ := set $config "clusters" $clusters }}
+{{- if eq .Values.mode "combined" }}{{ $_ := set $config "localConnector" (printf "%s/%s-connector" .Release.Namespace $n) }}{{ end }}
 {{- $rules := list
   (dict "apiGroups" (list "") "resources" (list "configmaps") "resourceNames" (list (printf "%s-owner-source" $n) (printf "%s-regional-offer" $n)) "verbs" (list "get"))
   (dict "apiGroups" (list "") "resources" (list "pods" "services") "verbs" (list "get"))
@@ -33,5 +46,5 @@
 {{ include "asservat.svc.service" (list . "federation" 9446) }}
 {{- include "asservat.svc.tlsObjects" (list . "federation") }}
 ---
-{{ include "asservat.svc.deployment" (dict "root" . "component" "federation" "command" "hub-federation" "dir" $dir "port" 9446 "grace" 40 "config" $config "sqlFile" "sql-connector-read.json" "sources" (join "\n" $sources)) }}
+{{ include "asservat.svc.deployment" (dict "root" . "component" "federation" "command" "hub-federation" "dir" $dir "port" 9446 "grace" 40 "config" (toJson $config) "sqlFile" "sql-connector-read.json" "sources" (join "\n" $sources)) }}
 {{- end }}

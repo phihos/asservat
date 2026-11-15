@@ -288,9 +288,8 @@ func qualifyPositiveContextDeletion(t *testing.T, ctx context.Context, admin *pg
 			t.Fatal("finalization replay", err)
 		}
 	}
-	var full, replay int64
-	if err = admin.QueryRow(ctx, "SELECT ca.charged_objects,cc.charged_full,cc.charged_replay FROM custody_allocation ca JOIN context_control_account cc ON cc.allocation_id=ca.id WHERE ca.id=$1", registration.AllocationID).Scan(&charged, &full, &replay); err != nil || charged != 0 || full != 1 || replay != 1 {
-		t.Fatal("wrong release scope", charged, full, replay, err)
+	if err = admin.QueryRow(ctx, "SELECT charged_objects FROM custody_allocation WHERE id=$1", registration.AllocationID).Scan(&charged); err != nil || charged != 0 {
+		t.Fatal("wrong release scope", charged, err)
 	}
 	if listed() {
 		t.Fatal("finalized attempt still listed")

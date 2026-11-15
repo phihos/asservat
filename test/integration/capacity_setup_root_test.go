@@ -3,14 +3,11 @@ package integration
 import (
 	"context"
 	"crypto/rand"
-	"encoding/hex"
 	"reflect"
 	"testing"
 	"time"
 
-	capacity "asservat.local/asservat/internal/application/capacity"
 	"asservat.local/asservat/internal/contracts"
-	"asservat.local/asservat/internal/domain/artifact"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 )
 
@@ -98,22 +95,3 @@ func (r *capacitySQLRoot) CompleteCapacityRootSetup(ctx context.Context, origina
 	r.value.State.CapacitySetup.Receipt = &receipt
 	return nil
 }
-
-type capacitySyntheticProtection struct {
-	cluster, namespace string
-	digest             artifact.Digest
-}
-
-func (s capacitySyntheticProtection) CapacityProtection(ctx context.Context) (capacity.CapacitySourceProtection, error) {
-	if ctx.Err() != nil {
-		return capacity.CapacitySourceProtection{}, ctx.Err()
-	}
-	n := time.Now().UTC().Truncate(time.Microsecond)
-	until := n.Add(5 * time.Second)
-	if d, ok := ctx.Deadline(); ok && d.Before(until) {
-		until = d
-	}
-	return capacity.CapacitySourceProtection{ClusterID: s.cluster, ControlNamespaceUID: s.namespace, Digest: s.digest, ObservedAt: n, FreshUntil: until}, nil
-}
-
-func capacityGuardHex(v artifact.Digest) string { return hex.EncodeToString(v[:]) }

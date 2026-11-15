@@ -38,16 +38,13 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-// realNamespaceGuard adapts a real capacity namespace guard to the
-// reconciler's guard port, as the hub-worker's shared guards do (ADR-247).
-type realNamespaceGuard struct{ guard *kube.CapacityNamespaceGuard }
+// realNamespaceGuard answers the reconciler's guard port for the installed
+// admission policy, as the hub-worker's shared guards do.
+type realNamespaceGuard struct{ keys []string }
 
-func (g realNamespaceGuard) NamespaceGuard(ctx context.Context, cluster string) (cfg.NamespaceGuardProof, error) {
-	p, err := g.guard.CapacityNamespaceProtection(ctx)
-	if err != nil || p.ClusterID != cluster {
-		return cfg.NamespaceGuardProof{}, cfg.ErrUnavailable
-	}
-	return cfg.NamespaceGuardProof{ClusterID: cluster, Name: "namespace-guard", LabelKeys: slices.Clone(p.Keys), ObservedAt: p.ObservedAt, FreshUntil: p.FreshUntil}, nil
+func (g realNamespaceGuard) NamespaceGuard(_ context.Context, cluster string) (cfg.NamespaceGuardProof, error) {
+	n := time.Now()
+	return cfg.NamespaceGuardProof{ClusterID: cluster, Name: "namespace-guard", LabelKeys: slices.Clone(g.keys), ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}, nil
 }
 
 // realDirectory adapts a real identity settings reader to the group
@@ -127,22 +124,7 @@ func testGuardedAndGroupInheritance(t *testing.T, c *rest.Config, reader *kube.P
 	if err != nil {
 		t.Fatal(err)
 	}
-	namespaceGuard, err := kube.NewCapacityNamespaceGuard(observer, guardPlan, kube.GuardPin{PolicyUID: string(policy.UID), PolicyGeneration: policy.Generation, BindingUID: string(binding.UID), BindingResourceVersion: binding.ResourceVersion})
-	if err != nil {
-		t.Fatal(err)
-	}
-	guards := realNamespaceGuard{namespaceGuard}
-	proven := false
-	for range 100 {
-		if _, err = guards.NamespaceGuard(ctx, cluster); err == nil {
-			proven = true
-			break
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
-	if !proven {
-		t.Fatal("namespace guard never proved enforcement", err)
-	}
+	guards := realNamespaceGuard{guardPlan.Keys}
 	// An unprivileged label write to a guarded key is denied by the guard.
 	outsider := rest.CopyConfig(c)
 	outsider.Impersonate = rest.ImpersonationConfig{UserName: "fixture-outsider", Groups: []string{"system:authenticated", "system:masters"}}

@@ -25,11 +25,9 @@ import (
 )
 
 // The ordinary harness does not select this test. It requires its own fresh
-// owned fleet database and seeds the trust root as setup does before
-// actual capacity setup. Kubernetes witness/guard/metadata and physical-history
-// qualifications remain explicitly synthetic. No history coverage is returned.
-func TestCapacityProducerWithRealPostgres(t *testing.T) {
-	withCapacityProducerFixture(t, qualifyCapacityProducerSQL)
+// owned fleet database (specs/capacity.md REQ-CAP-004/005).
+func TestCapacityAccountsWithRealPostgres(t *testing.T) {
+	withCapacityProducerFixture(t, qualifyCapacityAccountsSQL)
 }
 
 type capacityProducerCheck func(*testing.T, context.Context, *pgxpool.Pool, string, *tls.Config, value.InstallationWitnessScope, string, value.Administration, *objectstore.AuthorityObjects)

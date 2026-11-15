@@ -3,17 +3,14 @@ package bootstrap
 import (
 	"context"
 	"crypto/ecdsa"
-	"crypto/ed25519"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
-	"errors"
 	"net/http/httptest"
 	"testing"
 	"time"
 
-	"asservat.local/asservat/internal/adapters/mtls"
 	fleetapp "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/fleet"
@@ -21,36 +18,19 @@ import (
 	"asservat.local/asservat/internal/transport/connectorlifecycle"
 )
 
-type regionalSecret struct {
-	state fleetapp.ClusterCredentialSecret
+// countingTokens accepts the synthetic connector token like the hub's
+// ServiceAccount verifier and records each conversation.
+type countingTokens struct {
+	cluster value.ConnectorCluster
+	seen    []string
 }
 
-func (s *regionalSecret) ReadClusterCredential(context.Context) (fleetapp.ClusterCredentialSecret, string, error) {
-	return s.state, "1", nil
-}
-func (s *regionalSecret) WriteClusterCredential(context.Context, string, fleetapp.ClusterCredentialSecret) (string, error) {
-	return "", errors.New("unused")
-}
-
-type regionalNoExchange struct{}
-
-func (regionalNoExchange) ExchangeClusterCredential(context.Context, value.ClusterCredentialRequest, func([]byte) ([]byte, error)) (int64, error) {
-	return 0, errors.New("unused")
-}
-
-// verifyingPresenter checks the exporter-bound Ed25519 signature like the hub.
-type verifyingPresenter struct {
-	public ed25519.PublicKey
-	seen   []value.ClusterCredentialRequest
-}
-
-func (p *verifyingPresenter) Present(_ context.Context, r value.ClusterCredentialRequest, sig, exporter []byte) (value.ClusterCredentialPresentation, error) {
-	if !fleetapp.VerifyClusterCredentialRequest(p.public, r, sig, exporter) {
-		return value.ClusterCredentialPresentation{}, value.ErrClusterCredentialDenied
+func (p *countingTokens) VerifyConnector(_ context.Context, token string) (value.ConnectorCluster, error) {
+	if token != "synthetic-connector-token" {
+		return value.ConnectorCluster{}, value.ErrDenied
 	}
-	p.seen = append(p.seen, r)
-	now := time.Now()
-	return value.ClusterCredentialPresentation{Profile: r.Profile, LineageID: "10000000-0000-4000-8000-000000000009", Operation: r.Operation, Generation: r.Generation, CheckedAt: now, ValidUntil: now.Add(5 * time.Second)}, nil
+	p.seen = append(p.seen, token)
+	return p.cluster, nil
 }
 
 type regionalServices struct {
@@ -99,7 +79,7 @@ func (s *regionalServices) OwnerRegistration(_ context.Context, _ *connectorlife
 
 func (s *regionalServices) Recovery(_ context.Context, region *connectorlifecycle.Region) (value.RecoveryState, error) {
 	now := time.Now().UTC()
-	installation := region.Presented().Profile.InstallationID
+	installation := region.Presented().InstallationID
 	return value.RecoveryState{InstallationID: installation, IssuerEpoch: installation, Revision: identity.Revision{UID: "recovery", Generation: 1, Digest: artifact.Digest{1}}, ObservedAt: now, FreshUntil: now.Add(time.Second)}, nil
 }
 
@@ -119,8 +99,7 @@ func (s *regionalServices) Registration(ctx context.Context, region *connectorli
 		return fleetapp.ConnectorLeafRegistration{}, err
 	}
 	// The scripted hub answers for the process that presented.
-	p := region.Presented()
-	return fleetapp.ConnectorLeafRegistration{Certificate: c, Process: value.ConnectorProcessIdentity{Binding: src.Observation.Profile.Binding, PodUID: regionalPod, ProcessEpoch: regionalEpoch}, Revision: src.Observation.Profile.Revision, ObservedAt: p.CheckedAt}, nil
+	return fleetapp.ConnectorLeafRegistration{Certificate: c, Process: value.ConnectorProcessIdentity{Binding: src.Observation.Profile.Binding, PodUID: regionalPod, ProcessEpoch: regionalEpoch}, Revision: src.Observation.Profile.Revision, ObservedAt: region.VerifiedAt()}, nil
 }
 
 const (
@@ -169,19 +148,16 @@ func regionalCSR(t *testing.T) []byte {
 // with a verifying presenter and scripted hub duties.
 func regionalLifecycleFixture(t *testing.T) (*RegionalLifecycle, *regionalServices, value.ConnectorProcessRequest) {
 	t.Helper()
-	r, services, request, _, _ := regionalLifecycleSetup(t)
+	r, services, request, _ := regionalLifecycleSetup(t)
 	return r, services, request
 }
 
-func regionalLifecycleSetup(t *testing.T) (*RegionalLifecycle, *regionalServices, value.ConnectorProcessRequest, *verifyingPresenter, *regionalSecret) {
+func regionalLifecycleSetup(t *testing.T) (*RegionalLifecycle, *regionalServices, value.ConnectorProcessRequest, *countingTokens) {
 	t.Helper()
-	seed := make([]byte, ed25519.SeedSize)
-	seed[0] = 7
-	profile := value.ClusterCredentialProfile{RootID: "10000000-0000-4000-8000-000000000007", PeerID: "10000000-0000-4000-8000-000000000004", InstallationID: "10000000-0000-4000-8000-000000000001", ClusterID: "10000000-0000-4000-8000-000000000002"}
-	secret := &regionalSecret{fleetapp.ClusterCredentialSecret{Generation: 3, Seed: seed, RotatedAt: time.Now()}}
-	presenter := &verifyingPresenter{public: ed25519.NewKeyFromSeed(seed).Public().(ed25519.PublicKey)}
+	profile := value.ConnectorCluster{RootID: "10000000-0000-4000-8000-000000000007", PeerID: "10000000-0000-4000-8000-000000000004", InstallationID: "10000000-0000-4000-8000-000000000001", ClusterID: "10000000-0000-4000-8000-000000000002"}
+	presenter := &countingTokens{cluster: profile}
 	services := &regionalServices{}
-	h, err := connectorlifecycle.NewHandler(presenter, mtls.EnrollmentProof{}, services, 2)
+	h, err := connectorlifecycle.NewHandler(presenter, services, 2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -192,31 +168,30 @@ func regionalLifecycleSetup(t *testing.T) (*RegionalLifecycle, *regionalServices
 	t.Cleanup(server.Close)
 	roots := x509.NewCertPool()
 	roots.AddCert(server.Certificate())
-	client, err := connectorlifecycle.NewClient(server.URL, "example.com", roots)
+	client, err := connectorlifecycle.NewClient(server.URL, "example.com", roots, func() ([]byte, error) { return []byte("synthetic-connector-token"), nil })
 	if err != nil {
 		t.Fatal(err)
 	}
 	process := value.ConnectorProcessIdentity{Binding: value.PeerBinding{InstallationID: profile.InstallationID, ClusterID: profile.ClusterID, IssuerEpoch: "10000000-0000-4000-8000-000000000003", PeerID: profile.PeerID, Role: value.ConnectorPeer}, PodUID: regionalPod, ProcessEpoch: regionalEpoch}
-	r := &RegionalLifecycle{Client: client, Local: regionalTestLocal{process.Binding}, Credential: fleetapp.ClusterCredentialRotator{Profile: profile, Policy: value.DefaultClusterCredentialPolicy(), Store: secret, Exchange: regionalNoExchange{}, Now: time.Now}, Now: time.Now}
+	r := &RegionalLifecycle{Client: client, Local: regionalTestLocal{process.Binding}, RootID: profile.RootID, Now: time.Now}
 	request := value.ConnectorProcessRequest{Process: process, ClientCSRDER: regionalCSR(t), ServerCSRDER: regionalCSR(t)}
-	return r, services, request, presenter, secret
+	return r, services, request, presenter
 }
 
-func TestRegionalLifecyclePresentsCurrentGenerationOverRealHTTP2(t *testing.T) {
-	r, services, request, presenter, secret := regionalLifecycleSetup(t)
-	seed := secret.state.Seed
+func TestRegionalLifecyclePresentsServiceAccountTokenOverRealHTTP2(t *testing.T) {
+	r, services, request, presenter := regionalLifecycleSetup(t)
 	process := request.Process
 	got, err := r.Enroll(context.Background(), "10000000-0000-4000-8000-000000000008", request)
-	if err != nil || got.Binding != process.Binding || len(presenter.seen) != 1 || presenter.seen[0].Generation != 3 || presenter.seen[0].Operation != value.ClusterAdmission {
+	if err != nil || got.Binding != process.Binding || len(presenter.seen) != 1 {
 		t.Fatal("regional enrollment", got, err, presenter.seen)
 	}
 	issued, err := r.IssueProcess(context.Background(), "10000000-0000-4000-8000-00000000000a", "server", request)
-	if err != nil || services.usage != "server" || presenter.seen[1].Operation != value.ClusterRenewal {
+	if err != nil || services.usage != "server" || len(presenter.seen) != 2 {
 		t.Fatal("regional renewal", err, services.usage)
 	}
 	// The registry lookup presents the process that requested the leaf.
 	registration, err := r.ConnectorLeafRegistration(context.Background(), issued.Certificate)
-	if err != nil || registration.Process != process || len(presenter.seen) != 3 || presenter.seen[2].PodUID != process.PodUID {
+	if err != nil || registration.Process != process || len(presenter.seen) != 3 {
 		t.Fatal("regional registration", registration, err)
 	}
 	unknown := issued.Certificate
@@ -224,16 +199,10 @@ func TestRegionalLifecyclePresentsCurrentGenerationOverRealHTTP2(t *testing.T) {
 	if _, err = r.ConnectorLeafRegistration(context.Background(), unknown); err == nil || len(presenter.seen) != 3 {
 		t.Fatal("leaf this adapter never received was looked up", err)
 	}
-	// A pending rotation stops presentations until it completes.
-	secret.state.PendingSeed = seed
-	if _, err = r.Enroll(context.Background(), "10000000-0000-4000-8000-00000000000b", request); err == nil || len(presenter.seen) != 3 {
-		t.Fatal("presented while a rotation was pending", err)
-	}
-	secret.state.PendingSeed = nil
-	// A process for another peer is refused before any connection.
+	// A process for another peer is refused by the hub.
 	other := request
 	other.Process.Binding.PeerID = "10000000-0000-4000-8000-0000000000ff"
-	if _, err = r.Enroll(context.Background(), "10000000-0000-4000-8000-00000000000c", other); err == nil || len(presenter.seen) != 3 {
+	if _, err = r.Enroll(context.Background(), "10000000-0000-4000-8000-00000000000c", other); err == nil {
 		t.Fatal("foreign profile presented", err)
 	}
 }

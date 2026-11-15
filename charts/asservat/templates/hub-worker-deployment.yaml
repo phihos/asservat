@@ -69,10 +69,6 @@ spec:
                   name: {{ include "asservat.secretName" (list . "s3-configuration-audit") | quote }}
                   items: [{key: credentials.json, path: audit-storage.json}]
               {{- if $capacity }}
-              - serviceAccountToken:
-                  path: cluster-observation.token
-                  audience: {{ default "asservat-cluster-observation" $w.clusterObservationAudience | quote }}
-                  expirationSeconds: 600
               - secret:
                   name: {{ include "asservat.secretName" (list . "audit-mac") | quote }}
                   items: [{key: accountKey, path: capture-account.key}]

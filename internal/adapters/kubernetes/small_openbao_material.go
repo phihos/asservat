@@ -211,7 +211,6 @@ func SmallOpenBaoSetupPolicy(name string) string {
 		// Transit key writes have no existence check: creating needs update.
 		paths[mount+"/keys/*"] = map[string]any{"capabilities": []string{"create", "read", "update"}}
 	}
-	paths["sys/mounts/"+contracts.SmallOpenBaoBootstrapMount] = map[string]any{"capabilities": write}
 	for _, mount := range []string{contracts.SmallOpenBaoOwnerPKIMount, contracts.SmallOpenBaoConnectorPKIMount, contracts.SmallOpenBaoWorkerPKIMount} {
 		paths["sys/mounts/"+mount] = map[string]any{"capabilities": write}
 		paths[mount+"/issuers"] = map[string]any{"capabilities": []string{"list"}}

@@ -22,7 +22,7 @@ func nativeCompletionSnapshot(t *testing.T, ctx context.Context, f nativeExchang
 	var charged [5]int64
 	if e := f.admin.QueryRow(ctx, `SELECT operation_json,lease_sequence,lease_started,lease_until,closed,updates,
  (SELECT count(*) FROM download_response WHERE session_id=$2),
- (SELECT reserved_responses FROM download_control_allocation WHERE id=$3),
+ 0::bigint,
  (SELECT reserved_windows FROM download_control_allocation WHERE id=$3),
  (SELECT coalesce(sum(used_roles),0) FROM download_native_key WHERE worker_id=$1)
  FROM download_native_owner WHERE worker_id=$1`, f.worker.Intent.ID, f.worker.Intent.SessionID, f.allocation.ID).Scan(&encoded, &l.Sequence, &l.ObservedAt, &l.Until, &closed, &charged[0], &charged[1], &charged[2], &charged[3], &charged[4]); e != nil {

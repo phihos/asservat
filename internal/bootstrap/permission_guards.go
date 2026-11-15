@@ -47,7 +47,7 @@ func (s *sharedNamespaceGuards) NamespaceGuard(_ context.Context, cluster string
 		return cfg.NamespaceGuardProof{}, cfg.ErrUnavailable
 	}
 	now := time.Now()
-	return cfg.NamespaceGuardProof{ClusterID: cluster, Name: NamespaceGuardProfile, LabelKeys: contracts.CapacityNamespaceKeys(), ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}, nil
+	return cfg.NamespaceGuardProof{ClusterID: cluster, Name: NamespaceGuardProfile, LabelKeys: contracts.CapacityNamespaceKeys(), ObservedAt: now, FreshUntil: identity.Check(now, identity.SQLFenced).Until()}, nil
 }
 
 // identityDirectory is the configured group directory of groupID sources

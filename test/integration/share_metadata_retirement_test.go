@@ -18,7 +18,6 @@ import (
 	"asservat.local/asservat/internal/adapters/postgres"
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	auditapp "asservat.local/asservat/internal/application/audit"
-	capacityapp "asservat.local/asservat/internal/application/capacity"
 	configapp "asservat.local/asservat/internal/application/configuration"
 	"asservat.local/asservat/internal/application/sharing"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -83,28 +82,7 @@ func TestShareMetadataSlotsWithRealServices(t *testing.T) {
 				}
 			}
 		})
-		if _, err := f.producer.InitializeCapacity(ctx, f.input, f.protection); err != nil {
-			t.Fatal("initialize original capacity", err)
-		}
-		f.open(t)
-		o := f.rootObservation(t)
-		root, err := f.roots.ReserveCapacityRoot(ctx, o)
-		if err != nil {
-			t.Fatal("reserve original root", err)
-		}
-		root, err = f.captureRoots.BackCapacityRoot(ctx, o, root)
-		if err != nil {
-			t.Fatal("back original root", err)
-		}
-		root, err = f.roots.PublishCapacityRoot(ctx, o, root)
-		if err != nil || !root.AdmissionReady(time.Now()) {
-			t.Fatal("publish original root", err)
-		}
-		coordinator := capacityapp.EnrollmentCoordinator{Store: f.enrollments, Capture: f.captureEnrollments, Accounts: f.accounts, Now: time.Now}
-		enrolled, err := coordinator.Reconcile(ctx, f.workloadObservation(t, 0))
-		if err != nil {
-			t.Fatal("original workload enrollment", err)
-		}
+		root, enrolled := f.setup(t)
 		originalPool := f.fixturePool
 		var processingPools []*pgxpool.Pool
 		f.fixturePool = func(role, password string) *pgxpool.Pool {

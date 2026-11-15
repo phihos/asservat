@@ -19,7 +19,7 @@ const PublicRuntimeRetainedFederationProcesses = 2
 const PublicRuntimeFederationRoleConnections = PublicRuntimeRetainedFederationProcesses + 1
 
 func PublicRuntimeFederationPurposes() []string {
-	return []string{"connector-source", "connector-journal", "connector-ack", "connector-read", "cluster-credential", "connector-owner-read"}
+	return []string{"connector-source", "connector-journal", "connector-ack", "connector-read", "connector-delivery", "connector-owner-read"}
 }
 
 // ADR-181: the asynchronous publication verifier is its own process kind

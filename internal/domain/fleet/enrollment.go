@@ -8,17 +8,6 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 )
 
-// EnrollmentClaim contains a hash of a random 256-bit bootstrap secret and an
-// independently checked CSR key. Neither field is a peer execution credential.
-type EnrollmentClaim struct {
-	InstallationID, BootstrapID   string
-	SecretDigest, PublicKeyDigest artifact.Digest
-}
-
-func (c EnrollmentClaim) Valid() bool {
-	return authorization.UUID(c.InstallationID) && authorization.UUID(c.BootstrapID) && c.SecretDigest != (artifact.Digest{}) && c.PublicKeyDigest != (artifact.Digest{})
-}
-
 type Enrollment struct {
 	BootstrapID         string
 	Binding             PeerBinding

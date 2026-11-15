@@ -36,24 +36,9 @@ func TestProcessingReleaseProfilesWithRealPostgres(t *testing.T) {
 			normal.Policy.BackupReservedBytes, normal.Policy.WALReservedBytes = b*normal.Policy.MetadataSlots, w*normal.Policy.MetadataSlots
 			f.qualification.RootBacking.Processing.RetainedSeconds = normal.RetainedSeconds + 1000
 		})
-		if _, err := f.producer.InitializeCapacity(ctx, f.input, f.protection); err != nil {
-			t.Fatal("initialize original capacity", err)
-		}
-		f.open(t)
-		o := f.rootObservation(t)
-		root, err := f.roots.ReserveCapacityRoot(ctx, o)
-		if err != nil {
-			t.Fatal("reserve original root", err)
-		}
-		root, err = f.captureRoots.BackCapacityRoot(ctx, o, root)
-		if err != nil {
-			t.Fatal("back original root", err)
-		}
-		root, err = f.roots.PublishCapacityRoot(ctx, o, root)
-		if err != nil || !root.AdmissionReady(time.Now()) {
-			t.Fatal("publish original root", err)
-		}
-		f.fresh(t)
+		f.setup(t)
+		var err error
+		f.refreshBase(t)
 		profiles := f.readAuditProfiles(t)
 		var originalPolicy []byte
 		var retained int64
@@ -129,7 +114,7 @@ func TestProcessingReleaseProfilesWithRealPostgres(t *testing.T) {
 			Audit: buildAudit(profiles.Normal.Policy), ReleaseAudit: buildAudit(profiles.Processing.Policy), MAC: mac, AuditPolicy: profiles.Normal.Policy, ReleaseAuditPolicy: profiles.Processing.Policy, RetainedSeconds: profiles.Normal.RetainedSeconds, Now: time.Now}
 		change := func(in privacy.ProcessingChange, want string) privacy.ProcessingReceipt {
 			t.Helper()
-			f.fresh(t)
+			f.refreshBase(t)
 			r, err := service.Change(ctx, actor, in)
 			if err != nil || r.State != want {
 				t.Fatal("compiled hub processing change", in.Action, r, err)

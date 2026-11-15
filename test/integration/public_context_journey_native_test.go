@@ -173,7 +173,7 @@ func newPublicJourneyNative(t *testing.T, ctx context.Context, s captureAdmissio
 	defer configPool.Close() // No backing configuration writes after this setup phase.
 	config, e := postgres.NewDownloads(ctx, configPool, root, g)
 	publicJourneyRequire(t, "download backing configuration", e)
-	f.allocation = artifact.DownloadAllocation{ID: custodyID(), RootID: root, ClusterID: s.a.Registration.Location.ClusterID, NamespaceUID: s.a.Plan.Input.Target.Target().NamespaceUID, WorkloadUID: s.a.Plan.Input.Target.Target().WorkloadUID, OutputLimit: 1 << 20, ReadLimit: 256 << 20, SessionLimit: 64, ValidUntil: time.Now().UTC().Add(30 * time.Minute).Truncate(time.Microsecond)}
+	f.allocation = artifact.DownloadAllocation{ID: custodyID(), RootID: root, ClusterID: s.a.Registration.Location.ClusterID, NamespaceUID: s.a.Plan.Input.Target.Target().NamespaceUID, WorkloadUID: s.a.Plan.Input.Target.Target().WorkloadUID, OutputLimit: 1 << 20, ReadLimit: 256 << 20, ValidUntil: time.Now().UTC().Add(30 * time.Minute).Truncate(time.Microsecond)}
 	publicJourneyRequire(t, "original download allocation", config.BindDownloadAllocation(ctx, f.allocation))
 	f.profile = syntheticWorkerProfile(installation)
 	f.profile.StoreCredentialSecret, f.profile.StoreCredentialSecretUID = "synthetic-native-store", custodyID()
@@ -257,7 +257,7 @@ func newPublicJourneyNative(t *testing.T, ctx context.Context, s captureAdmissio
 	runtime, e := evidence.NewContextNativeRuntime(evidence.ContextNativeRuntimeConfig{Serving: nativeContextServing{loginUntil}, Profile: f.profile, Configuration: configuration, Workers: workers, Preparation: first, Dispatcher: dispatch, Sources: f.runtime, Authority: journeyEnrollmentPorts{CurrentDownloadAuthority: f.gate, trace: f.enrollmentTrace}, Audit: &objectstore.DownloadAuditObjects{Store: store, Seal: keys, Open: keys}, Acknowledgements: f.audit, Native: evidence.NativeAttachmentConfig{HubPodUID: ownerPod, HubProcessEpoch: epoch, KeyScope: artifactKeys.scope, Owners: firstOwners, Fences: owners, Origins: f.origins, Registrar: f.router, PreparationKeys: prepKeys, WindowKeys: windowKeys}, Now: time.Now, NewID: custodyID})
 	publicJourneyRequire(t, "native runtime before any session", e)
 	t.Cleanup(runtime.Close)
-	control := artifact.DownloadControlAllocation{ID: f.allocation.ID, RootID: root, AuditStoreID: f.storeID, ResponseLimit: 2, WindowLimit: 2, AuditByteLimit: 4 * artifact.DownloadWindowAuditBytes, ValidUntil: f.allocation.ValidUntil, AuditWriteUntil: f.allocation.ValidUntil.Add(time.Minute)}
+	control := artifact.DownloadControlAllocation{ID: f.allocation.ID, RootID: root, AuditStoreID: f.storeID, WindowLimit: 2, AuditByteLimit: 4 * artifact.DownloadWindowAuditBytes, ValidUntil: f.allocation.ValidUntil, AuditWriteUntil: f.allocation.ValidUntil.Add(time.Minute)}
 	publicJourneyRequire(t, "original content control backing", config.BindDownloadControlAllocation(ctx, control))
 	objects, e := objectstore.NewDownloadWindowAuditObjects(store, f.storeID, keys, keys)
 	publicJourneyRequire(t, "content audit", e)

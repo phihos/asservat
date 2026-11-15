@@ -15,13 +15,11 @@ import (
 	"asservat.local/asservat/internal/adapters/postgres"
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	authapp "asservat.local/asservat/internal/application/authorization"
-	capacity "asservat.local/asservat/internal/application/capacity"
 	captureapp "asservat.local/asservat/internal/application/capture"
 	"asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
-	"asservat.local/asservat/internal/domain/collector"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
@@ -74,26 +72,14 @@ func httpSourceCompiler(t *testing.T, cluster, namespace string) captureapp.Poli
 func TestHTTPSourceLedgerWithRealServices(t *testing.T) {
 	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects) {
 		f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects)
-		f.template.Policies[0].SourceResources = &capacity.SourceResourceLimits{Node: collector.PolicyLimits{SourceLimits: collector.SourceLimits{MaxActiveSources: 4, InputBytesPerSecond: 4 << 20, InputBurstBytes: 4 << 20}}, Workload: collector.SourceLimits{MaxActiveSources: 4, InputBytesPerSecond: 4 << 20, InputBurstBytes: 4 << 20}}
-		if _, err := f.producer.InitializeCapacity(ctx, f.input, f.protection); err != nil {
-			t.Fatal(err)
-		}
-		f.open(t)
+		root, enrollment := f.setup(t)
 		stop := f.keepFleetCurrent()
 		defer func() {
 			if err := stop(); err != nil {
 				t.Error(err)
 			}
 		}()
-		root, err := (&capacity.RootBackingCoordinator{Store: f.roots, Capture: f.captureRoots, Now: time.Now}).Reconcile(ctx, f.rootObservation(t))
-		if err != nil {
-			t.Fatal(err)
-		}
 		f.initializeManagedProcessing(t, root)
-		enrollment, err := (&capacity.EnrollmentCoordinator{Store: f.enrollments, Capture: f.captureEnrollments, Accounts: f.accounts, Now: time.Now}).Reconcile(ctx, f.workloadObservation(t, 0))
-		if err != nil {
-			t.Fatal(err)
-		}
 		seed, _, _ := f.prepareManagedContext(t, root, enrollment, policySourceFixtureRetentionSeconds)
 		option := policyRecorderProtectedCase{Hub: f.roles["hub-runtime"], Admissions: seed.s, Filters: pcap.NewCompiler(), Expression: "tcp port 8080", Subjects: []cfg.Subject{{Kind: "Group", Issuer: "https://id.example.test", ID: "maintainers"}}, Ongoing: true, Retention: "31s", SourceComposition: httpSourceCompositionWire(), SourceCompiler: httpSourceCompiler(t, seed.a.Plan.Input.Target.Request.ClusterID, seed.a.Plan.Input.Target.Request.Namespace.UID), PermissionsAccepted: func(batch cfg.PermissionBatch) { f.batch = policyRecorderCloneBatch(batch) }}
 		option.SourceAccepted = func(t *testing.T, accepted policySourceAcceptedFixture) {
@@ -106,10 +92,7 @@ func TestHTTPSourceLedgerWithRealServices(t *testing.T) {
 			sourceID, fence, nodeID, bootID, collectorID, epoch := custodyID(), custodyID(), custodyID(), custodyID(), custodyID(), custodyID()
 			fresh := func() captureapp.PolicySourceCheck {
 				t.Helper()
-				_, recovery := f.fresh(t)
-				if err := f.enrollments.RefreshCapacityEnrollment(ctx, f.workloadObservation(t, 0), enrollment); err != nil {
-					t.Fatal(err)
-				}
+				_, recovery := f.refreshBase(t)
 				n := time.Now().UTC().Truncate(time.Microsecond)
 				source := accepted.Source
 				source.ObservedAt = n

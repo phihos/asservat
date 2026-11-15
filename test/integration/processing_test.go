@@ -286,7 +286,7 @@ func qualifyProcessingDownloadEffects(t *testing.T, ctx context.Context, poolFor
 		t.Fatal(err)
 	}
 	e := published.Expectation
-	allocation := artifact.DownloadAllocation{ID: custodyID(), RootID: s.a.RootID, ClusterID: e.Registration.Location.ClusterID, NamespaceUID: e.NamespaceUID, WorkloadUID: e.WorkloadUID, OutputLimit: 1 << 20, ReadLimit: 256 << 20, SessionLimit: 4, ValidUntil: time.Now().UTC().Add(10 * time.Minute).Truncate(time.Microsecond)}
+	allocation := artifact.DownloadAllocation{ID: custodyID(), RootID: s.a.RootID, ClusterID: e.Registration.Location.ClusterID, NamespaceUID: e.NamespaceUID, WorkloadUID: e.WorkloadUID, OutputLimit: 1 << 20, ReadLimit: 256 << 20, ValidUntil: time.Now().UTC().Add(10 * time.Minute).Truncate(time.Microsecond)}
 	if err = config.BindDownloadAllocation(ctx, allocation); err != nil {
 		t.Fatal(err)
 	}

@@ -41,10 +41,10 @@ func TestConnectorClientLeafIsTheArtifactCollector(t *testing.T) {
 	}
 	state := connectorKeyState(t, leaf)
 	staged, reads := cf.profile, 0
-	read := func(_ context.Context, p value.ClusterCredentialProfile) (value.ConnectorCredentialProfile, error) {
+	read := func(_ context.Context, p value.ConnectorCluster) (value.ConnectorCredentialProfile, error) {
 		reads++
 		b := staged.Binding
-		if p != (value.ClusterCredentialProfile{RootID: staged.RootID, PeerID: b.PeerID, InstallationID: b.InstallationID, ClusterID: b.ClusterID}) {
+		if p != (value.ConnectorCluster{RootID: staged.RootID, PeerID: b.PeerID, InstallationID: b.InstallationID, ClusterID: b.ClusterID}) {
 			return value.ConnectorCredentialProfile{}, value.ErrUnavailable
 		}
 		return staged, nil
