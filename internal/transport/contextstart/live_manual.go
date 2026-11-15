@@ -1,16 +1,17 @@
 package contextstart
 
 import (
-	"asservat.local/asservat/internal/contracts"
-	"asservat.local/asservat/internal/domain/fleet"
-	"asservat.local/asservat/internal/domain/identity"
-	"asservat.local/asservat/internal/domain/targets"
-	"asservat.local/asservat/internal/transport/node"
 	"context"
 	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/domain/targets"
+	"asservat.local/asservat/internal/transport/node"
 )
 
 const queryManualLive = "inspect-manual-live"

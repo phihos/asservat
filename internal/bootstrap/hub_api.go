@@ -82,16 +82,6 @@ func RunHubAPI(ctx context.Context, podUID string) (result error) {
 		}
 		defer nativeListener.Close()
 		listeners := []net.Listener{nativeListener}
-		if d.Runtime.operation != nil {
-			// ADR-197: the v2 operation server's own port.
-			phase = startupNativeListener
-			operationListener, err := (&net.ListenConfig{KeepAlive: -1}).Listen(ctx, "tcp", net.JoinHostPort("", strconv.Itoa(d.Runtime.pool.OperationPort)))
-			if err != nil {
-				return errors.Join(mounts.ErrUnavailable, err)
-			}
-			defer operationListener.Close()
-			listeners = append(listeners, operationListener)
-		}
 		if p := mode.config.Public; p != nil && d.publicHandler != nil {
 			// ADR-180: the public HTTPS layer shares the deployment's lifetime.
 			publicListener, err := (&net.ListenConfig{}).Listen(ctx, "tcp", net.JoinHostPort("", strconv.Itoa(p.Port)))

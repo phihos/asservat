@@ -1,7 +1,5 @@
 package contracts
 
-import "bytes"
-
 const (
 	ConnectorObservationFormat = "connector-observation/v1"
 	ConnectorObservationBytes  = 8 << 10
@@ -33,11 +31,4 @@ type ConnectorObservationReply struct {
 	WorkloadFreshUntil string                  `json:"workloadFreshUntil"`
 	ObservedAt         string                  `json:"observedAt"`
 	FreshUntil         string                  `json:"freshUntil"`
-}
-
-func EncodeConnectorObservationReply(v ConnectorObservationReply) ([]byte, error) {
-	return canonicalAPIContext(v, ConnectorObservationBytes)
-}
-func DecodeConnectorObservationReply(b []byte) (ConnectorObservationReply, error) {
-	return decodeOpenRPC[ConnectorObservationReply](bytes.NewReader(b), ConnectorObservationBytes)
 }

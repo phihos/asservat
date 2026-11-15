@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	app "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/fleet"
 )
@@ -25,14 +24,14 @@ type residenceIngress struct {
 	until time.Time
 }
 
-func (i *residenceIngress) AuthenticateContextStart(ctx context.Context, _ *tls.ConnectionState, _ contracts.APIContextHello, _ app.ConnectorIdentitySourceReader) (fleet.APIContextReceiver, ReceiverCheck, error) {
+func (i *residenceIngress) AuthenticateContextStart(ctx context.Context, _ contracts.APIContextHello, _ fleet.ConnectorCluster, _ time.Time) (fleet.APIContextReceiver, ReceiverCheck, error) {
 	i.calls++
 	i.until, _ = ctx.Deadline()
 	<-ctx.Done()
 	return fleet.APIContextReceiver{}, nil, fleet.ErrDenied
 }
 
-func TestHandlerRefusesInvalidOriginalConversationEndBeforeSourceOrPeer(t *testing.T) {
+func TestHandlerRefusesInvalidOriginalConversationEndBeforeIngress(t *testing.T) {
 	for _, mode := range []string{"missing", "null", "malformed", "expired", "overlong"} {
 		t.Run(mode, func(t *testing.T) {
 			router, e := NewRouter(RouterLimits{Standby: 1, Captures: 1})
@@ -41,7 +40,7 @@ func TestHandlerRefusesInvalidOriginalConversationEndBeforeSourceOrPeer(t *testi
 			}
 			defer router.Close()
 			ingress := &residenceIngress{}
-			h, e := NewHandler("hub.example:9444", router, ingress, 1)
+			h, e := NewHandler("hub.example:9444", router, ingress, testTokens{}, 1)
 			if e != nil {
 				t.Fatal(e)
 			}
@@ -66,8 +65,7 @@ func TestHandlerRefusesInvalidOriginalConversationEndBeforeSourceOrPeer(t *testi
 			if e = contracts.WriteAPIContextFrame(&framed, contracts.APIContextFrame{Kind: contracts.APIContextHelloFrame, Payload: body}); e != nil {
 				t.Fatal(e)
 			}
-			// There is deliberately no source frame: malformed/expired availability
-			// must refuse before reading it or consulting independently trusted peers.
+			// Malformed or expired availability is refused before the ingress.
 			r := httptest.NewRequest(http.MethodPost, "https://hub.example:9444"+contracts.APIContextStartPath, &framed)
 			r.ProtoMajor = 2
 			r.ContentLength = -1
@@ -77,10 +75,11 @@ func TestHandlerRefusesInvalidOriginalConversationEndBeforeSourceOrPeer(t *testi
 			r.TLS = &tls.ConnectionState{Version: tls.VersionTLS13, NegotiatedProtocol: "h2"}
 			r.Header.Set("Content-Type", contracts.APIContextStartMedia)
 			r.Header.Set("Accept", contracts.APIContextStartMedia)
+			r.Header.Set("Authorization", "Bearer connector-token")
 			w := residenceWriter{httptest.NewRecorder()}
 			h.ServeHTTP(w, r)
 			if w.Code != http.StatusNotFound || stage != "hello" || ingress.calls != 0 {
-				t.Fatal("invalid residence reached source/peer", w.Code, stage, ingress.calls)
+				t.Fatal("invalid residence reached the ingress", w.Code, stage, ingress.calls)
 			}
 		})
 	}

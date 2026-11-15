@@ -370,9 +370,6 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 		}
 	})
 	qualifyOperationAudits(t, ctx, admin, poolFor, store, keys, create)
-	qualifyConnectorIdentity(t, ctx, admin, poolFor, store, keys, create)
-	qualifyConnectorObservationOperation(t, ctx, admin, poolFor, store, keys, create)
-	qualifyConnectorRetirement(t, ctx, admin, poolFor, store, keys, create)
 	qualifyOperationAuditLifecycle(t, ctx, admin, poolFor, store, keys, s3admin, bucket, create)
 	qualifyCaptureIntentLifecycle(t, ctx, admin, poolFor, store, keys, s3admin, bucket, create)
 	qualifyOperationAuditOverdue(t, ctx, admin, poolFor, store, keys, create)

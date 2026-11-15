@@ -1,10 +1,6 @@
 package bootstrap
 
 import (
-	captureapp "asservat.local/asservat/internal/application/capture"
-	"asservat.local/asservat/internal/application/evidence"
-	auditvalue "asservat.local/asservat/internal/domain/audit"
-	capturevalue "asservat.local/asservat/internal/domain/capture"
 	"context"
 	"crypto/sha256"
 	"encoding/json"
@@ -14,6 +10,11 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	captureapp "asservat.local/asservat/internal/application/capture"
+	"asservat.local/asservat/internal/application/evidence"
+	auditvalue "asservat.local/asservat/internal/domain/audit"
+	capturevalue "asservat.local/asservat/internal/domain/capture"
 
 	deliveryapp "asservat.local/asservat/internal/application/delivery"
 	executionapp "asservat.local/asservat/internal/application/execution"

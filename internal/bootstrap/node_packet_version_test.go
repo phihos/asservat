@@ -1,11 +1,6 @@
 package bootstrap
 
 import (
-	"asservat.local/asservat/internal/adapters/mtls"
-	"asservat.local/asservat/internal/contracts"
-	"asservat.local/asservat/internal/domain/collector"
-	"asservat.local/asservat/internal/domain/targets"
-	"asservat.local/asservat/internal/transport/node"
 	"bytes"
 	"context"
 	"crypto/sha256"
@@ -24,6 +19,12 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/adapters/mtls"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/collector"
+	"asservat.local/asservat/internal/domain/targets"
+	"asservat.local/asservat/internal/transport/node"
 )
 
 type nodeVersionBinary struct{ Head, Path, SHA256, SourceInventorySHA string }

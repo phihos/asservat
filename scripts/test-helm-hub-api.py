@@ -42,7 +42,7 @@ BUNDLED = {
 }
 
 # contracts.HubAPIConfig / HubAPIPublic JSON tags.
-CONFIG_KEYS = {"format", "name", "namespace", "postgres", "objectStore", "openBao", "connections", "concurrency", "observation", "native", "public"}
+CONFIG_KEYS = {"format", "name", "namespace", "postgres", "objectStore", "openBao", "connections", "concurrency", "observation", "native", "public", "connectorTokens"}
 PUBLIC_KEYS = {"origin", "browserAudience", "processing", "captureHistory", "standby", "captures", "previewSeconds", "downloadPlan", "proxyTLS", "version",
                "operationConcurrency", "mcpPerIdentity", "downloadConcurrency", "downloadsPerIdentity", "downloadMaxSeconds", "operationAudit", "fleet",
                "regionalOffer"}
@@ -212,9 +212,12 @@ class HubAPI(unittest.TestCase):
         tokens = {s["serviceAccountToken"]["path"]: s["serviceAccountToken"].get("audience") for v in spec["volumes"] if "projected" in v for s in v["projected"]["sources"] if "serviceAccountToken" in s}
         audience = "https://asservat-federation.asservat-system.svc:9446"
         self.assertEqual(tokens["hub.token"], audience)
-        fed = json.loads(o[("ConfigMap", NS, "asservat-federation-config")]["data"]["config.json"])
+        fed = json.loads(o[("ConfigMap", NS, "asservat-federation-config")]["data"]["config.json"])["connectorTokens"]
         self.assertEqual((fed["audiences"], fed["localConnector"]), ([audience], "asservat-system/asservat-connector"))
         self.assertEqual(fed["clusters"], [])
+        # The hub-api verifies the same tokens on context starts.
+        hub = json.loads(o[("ConfigMap", NS, "asservat-hub-api-config")]["data"]["config.json"])["connectorTokens"]
+        self.assertEqual(hub, fed)
 
     def test_without_origin_no_public(self):
         values = merge(BUNDLED, {"mode": "hub", "region": {"enabled": False}, "origin": "", "identity": {"issuer": "https://sso.example.test/realms/org", "clientID": "console"}, "services": {"identity": {"provider": "external"}}})

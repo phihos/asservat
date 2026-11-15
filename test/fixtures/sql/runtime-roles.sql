@@ -12,7 +12,7 @@ CREATE ROLE capture_runtime LOGIN PASSWORD 'synthetic-capture'; GRANT CONNECT ON
 
 CREATE ROLE capture_audit_runtime LOGIN PASSWORD 'synthetic-capture-audit'; GRANT CONNECT ON DATABASE custody_test TO capture_audit_runtime; GRANT USAGE ON SCHEMA public TO capture_audit_runtime; GRANT SELECT ON goose_db_version,permission_stream,context_capture TO capture_audit_runtime; GRANT UPDATE(id) ON permission_stream TO capture_audit_runtime; GRANT UPDATE(state,intent_acknowledged_at,intent_digest,intent_object_key,intent_object_version,intent_object_etag,intent_object_bytes,intent_object_sha256) ON context_capture TO capture_audit_runtime;
 
-CREATE ROLE peer_read_runtime LOGIN PASSWORD 'synthetic-peer-read'; GRANT CONNECT ON DATABASE custody_test TO peer_read_runtime; GRANT USAGE ON SCHEMA public TO peer_read_runtime; GRANT SELECT ON goose_db_version,fleet_trust,fleet_peer,fleet_peer_certificate TO peer_read_runtime;
+CREATE ROLE peer_read_runtime LOGIN PASSWORD 'synthetic-peer-read'; GRANT CONNECT ON DATABASE custody_test TO peer_read_runtime; GRANT USAGE ON SCHEMA public TO peer_read_runtime; GRANT SELECT ON goose_db_version,fleet_trust TO peer_read_runtime;
 
 
 

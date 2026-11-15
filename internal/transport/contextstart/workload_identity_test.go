@@ -1,13 +1,14 @@
 package contextstart
 
 import (
+	"context"
+	"testing"
+	"time"
+
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/targets"
-	"context"
-	"testing"
-	"time"
 )
 
 func TestWorkloadIdentityQueryRetainsOriginalRootAndDeadlines(t *testing.T) {

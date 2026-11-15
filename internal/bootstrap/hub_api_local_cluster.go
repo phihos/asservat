@@ -76,7 +76,7 @@ func catalogCluster(stored contracts.RegionalOffer, image, cluster, peerID, name
 	image = parts[1]
 	account := release + "-connector"
 	deployment := contracts.ConnectorDeployment{Namespace: namespace, ServiceAccount: account, Deployment: account, ServingSlots: contracts.RegionalServingSlots, RetainedProcesses: contracts.RegionalRetainedProcesses}
-	peer, err := kube.ConnectorCatalogPeer(stored, cluster, peerID, deployment)
+	peer, err := kube.ConnectorCatalogPeer(cluster, peerID, deployment)
 	if err != nil {
 		return zero, &fixedStepError{step + "-peer", err}
 	}

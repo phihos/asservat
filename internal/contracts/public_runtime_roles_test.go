@@ -8,7 +8,7 @@ import (
 func TestPublicRuntimeCleanupCompartmentCannotEnterHubProjection(t *testing.T) {
 	all, hub := PublicRuntimeRolePurposes(), PublicRuntimeHubRolePurposes()
 	// Physical hub credentials are consolidated; separate process roles remain.
-	if len(all) != 43 || len(hub) != 7 || PublicRuntimeRetainedWorkerProcesses != 2 || PublicRuntimeRetainedHubProcesses != 4 {
+	if len(all) != 37 || len(hub) != 7 || PublicRuntimeRetainedWorkerProcesses != 2 || PublicRuntimeRetainedHubProcesses != 4 {
 		t.Fatal("unreviewed compartment expansion")
 	}
 	// ADR-205 decision 2: the hub-worker's deletion logins, in this order.
@@ -65,9 +65,8 @@ func TestPublicRuntimeCleanupCompartmentCannotEnterHubProjection(t *testing.T) {
 			t.Fatal("capacity compartment changed", purpose)
 		}
 	}
-	// ADR-172 appended connector-owner-read at 56 after the maintenance roles.
-	connector := []int{48, 49, 50, 51, 52, 56, 53, 54, 55}
-	for n, purpose := range append(PublicRuntimeFederationPurposes(), PublicRuntimeConnectorMaintenancePurposes()...) {
+	connector := []int{51, 52, 56}
+	for n, purpose := range PublicRuntimeFederationPurposes() {
 		id, ok := PublicRuntimeRoleOrdinal(purpose)
 		limit, bounded := PublicRuntimeRoleConnectionLimit(purpose)
 		if !ok || id != connector[n] || !bounded || limit != 3 || !slices.Contains(all, purpose) || slices.Contains(hub, purpose) {

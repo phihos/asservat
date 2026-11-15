@@ -27,8 +27,10 @@ func (s KeyScope) Valid() bool {
 // grant. Current accepted authority must separately bind each request.
 type KeyPeer struct {
 	InstallationID, PeerID, Role string
-	Certificate                  artifact.Digest
-	NotBefore, NotAfter          time.Time
+	// ClusterID is a connector's token-attributed cluster; empty otherwise.
+	ClusterID           string
+	Certificate         artifact.Digest
+	NotBefore, NotAfter time.Time
 }
 
 func (p KeyPeer) Valid(now time.Time) bool {

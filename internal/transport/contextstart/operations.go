@@ -375,8 +375,6 @@ type RegionalLocal struct {
 	Targets   QueryTargets
 	Output    evidence.ContextProducer
 	Collector executionapp.ContextCollector
-	// Source is this region's own connector source reader (ADR-178).
-	Source fleetapp.ConnectorIdentitySourceReader
 	// Recordings answers collects of held recordings (ADR-248); optional.
 	Recordings RegionalRecordings
 	History    *HistoryLocal
@@ -757,12 +755,6 @@ func (s *regionalSession) finish(ctx context.Context, stream Stream, q contracts
 	clear(ack)
 	if err != nil {
 		return err
-	}
-	// ADR-178: a fresh regional source precedes the result for the hub's final check.
-	if pusher, ok := stream.(interface{ pushSource(context.Context) error }); ok {
-		if err = pusher.pushSource(ctx); err != nil {
-			return err
-		}
 	}
 	encoded, err := contracts.EncodeAPIContextResult(contracts.APIContextResult{Format: contracts.APIContextExchangeFormat, ExchangeID: s.work.Channel.ExchangeID, CaptureID: s.work.CaptureID, State: state})
 	if err != nil {

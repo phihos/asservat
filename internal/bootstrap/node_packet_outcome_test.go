@@ -1,14 +1,15 @@
 package bootstrap
 
 import (
-	"asservat.local/asservat/internal/adapters/gadget"
-	"asservat.local/asservat/internal/adapters/packets"
-	"asservat.local/asservat/internal/domain/collector"
 	"context"
 	"errors"
 	"sync"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/adapters/gadget"
+	"asservat.local/asservat/internal/adapters/packets"
+	"asservat.local/asservat/internal/domain/collector"
 )
 
 func TestNodeObservationCompletionCannotMaskEarlierUnknownOrBudget(t *testing.T) {

@@ -1,16 +1,17 @@
 package bootstrap
 
 import (
-	"asservat.local/asservat/internal/adapters/jose"
-	fleetapp "asservat.local/asservat/internal/application/fleet"
-	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/collector"
-	"asservat.local/asservat/internal/domain/fleet"
 	"context"
 	"crypto"
 	"errors"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/adapters/jose"
+	fleetapp "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/collector"
+	"asservat.local/asservat/internal/domain/fleet"
 )
 
 type recordingSigningTrust struct{}
@@ -64,9 +65,9 @@ func TestPublicRecordingStopRetainsRestrictivePurposeValidation(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	const other = "22222222-2222-4222-8222-222222222222"
 	channel := fleet.APIContextChannel{RootID: runtimeID, ExchangeID: runtimeID, Challenge: runtimeID,
-		Hub:           fleet.OwnerBinding{InstallationID: runtimeID, ClusterID: runtimeID, IssuerEpoch: runtimeID, PodUID: runtimeID, ProcessEpoch: runtimeID},
-		Connector:     fleet.ConnectorProcessIdentity{Binding: fleet.PeerBinding{InstallationID: runtimeID, ClusterID: runtimeID, IssuerEpoch: runtimeID, PeerID: runtimeID, Role: fleet.ConnectorPeer}, PodUID: runtimeID, ProcessEpoch: other},
-		ConnectorLeaf: artifact.Digest{1}, Executor: fleet.APIContextExecutor{NamespaceUID: runtimeID, AccountUID: runtimeID, PodUID: runtimeID, ProcessEpoch: runtimeID, StartupDigest: artifact.Digest{1}, ImageDigest: artifact.Digest{1}}}
+		Hub:       fleet.OwnerBinding{InstallationID: runtimeID, ClusterID: runtimeID, IssuerEpoch: runtimeID, PodUID: runtimeID, ProcessEpoch: runtimeID},
+		Connector: fleet.ConnectorProcessIdentity{Binding: fleet.PeerBinding{InstallationID: runtimeID, ClusterID: runtimeID, IssuerEpoch: runtimeID, PeerID: runtimeID, Role: fleet.ConnectorPeer}, PodUID: runtimeID, ProcessEpoch: other},
+		Executor:  fleet.APIContextExecutor{NamespaceUID: runtimeID, AccountUID: runtimeID, PodUID: runtimeID, ProcessEpoch: runtimeID, StartupDigest: artifact.Digest{1}, ImageDigest: artifact.Digest{1}}}
 	stop := collector.RecordingStop{RootID: runtimeID, ClusterID: runtimeID, CaptureID: runtimeID, AttemptID: runtimeID, WriterPodUID: runtimeID, WriterEpoch: runtimeID, ExpectationDigest: artifact.Digest{1}, WriteUntil: now.Add(time.Minute)}
 	base := fleetapp.SourceWork{Channel: channel, StopRecording: &stop, StopIssuedAt: now, NotAfter: now.Add(3 * time.Second)}
 	if !base.Valid(now) {

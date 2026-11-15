@@ -1,7 +1,6 @@
 package contextstart
 
 import (
-	"asservat.local/asservat/internal/domain/identity"
 	"context"
 	"errors"
 	"fmt"
@@ -10,6 +9,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/domain/identity"
 
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/fleet"
@@ -151,7 +152,7 @@ func TestContextStreamWorkLeaseFinalCurrentNegativeIsTerminal(t *testing.T) {
 						case "private-error":
 							return fleet.APIContextReceiver{}, secret
 						case "channel-change":
-							out.Channel.ConnectorLeaf[0]++
+							out.Channel.Challenge = w.Work.Channel.ExchangeID
 						case "late-positive":
 							cancel()
 						}

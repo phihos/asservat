@@ -193,7 +193,7 @@ func resolveRegionalConfig(ctx context.Context, in *providerInputs, c contracts.
 		out.offer = offer
 	}
 	o := out.offer
-	if o.Format != contracts.RegionalOfferFormat || !authorization.UUID(o.InstallationID) || !authorization.UUID(o.PermissionRootID) || !authorization.UUID(o.IssuerEpoch) || len(o.ConnectorIssuerRoots) == 0 || len(o.ConnectorBacking) == 0 {
+	if o.Format != contracts.RegionalOfferFormat || !authorization.UUID(o.InstallationID) || !authorization.UUID(o.PermissionRootID) || !authorization.UUID(o.IssuerEpoch) {
 		return out, &fixedStepError{"offer/fields", mounts.ErrUnavailable}
 	}
 	out.binding = value.PeerBinding{InstallationID: o.InstallationID, ClusterID: c.ClusterID, IssuerEpoch: o.IssuerEpoch, PeerID: c.PeerID, Role: value.ConnectorPeer}
@@ -255,9 +255,4 @@ func readCombinedOffer(ctx context.Context, in *providerInputs, namespace, name 
 		return zero, &fixedStepError{"decode", cfg.ErrInvalid}
 	}
 	return offer, nil
-}
-
-// connectorDeployment is the identity document's workload section.
-func (c regionalConfig) connectorDeployment() contracts.ConnectorDeployment {
-	return contracts.ConnectorDeployment{Namespace: c.Namespace, ServiceAccount: c.ServiceAccount, Deployment: c.Deployment, ServingSlots: contracts.RegionalServingSlots, RetainedProcesses: contracts.RegionalRetainedProcesses}
 }

@@ -41,7 +41,6 @@ type regionalContext struct {
 	rootID     string
 	pool       value.OwnerPool
 	roots      *x509.CertPool
-	attester   *kube.ConnectorProcessAttester
 	settings   contracts.ConnectorAPIContextSettings
 	targets    *kube.PodTargets
 	// peers re-resolves frozen Kubernetes packet peers for the running
@@ -53,7 +52,7 @@ type regionalContext struct {
 	history   objectstore.HistoryObjects
 	verifier  *jose.APIContextWorkSignatures
 	owners    *RegionalLifecycle
-	source    *kube.ConnectorIdentitySource
+	token     func() ([]byte, error)
 }
 
 // regionalOwnerPool converts the pinned hub owner configuration. Its pool must
@@ -92,7 +91,7 @@ func storageCredentials(in *providerInputs, name string) aws.CredentialsProvider
 // let other regional reads starve the opening setup's original five seconds
 // (installed native 53). It uses the kube.WithOpeningBurst limiter (ADR-208,
 // installed native 55/57).
-func newRegionalContext(ctx context.Context, c regionalConfig, in *providerInputs, podUID string, workload kube.ConnectorWorkload, source *kube.ConnectorIdentitySource, owners *RegionalLifecycle, credentials *mtls.ConnectorProcessCredentials) (*regionalContext, []func(), error) {
+func newRegionalContext(ctx context.Context, c regionalConfig, in *providerInputs, podUID string, workload kube.ConnectorWorkload, owners *RegionalLifecycle, hubToken func() ([]byte, error)) (*regionalContext, []func(), error) {
 	var closers []func()
 	x := *c.Executor
 	control := cfg.NamespaceRef{Name: c.Namespace, UID: workload.NamespaceUID}
@@ -101,14 +100,11 @@ func newRegionalContext(ctx context.Context, c regionalConfig, in *providerInput
 	if err != nil {
 		return nil, closers, mounts.ErrUnavailable
 	}
-	out := &regionalContext{c: c, rootID: c.rootID(), podUID: podUID, owners: owners, source: source}
+	out := &regionalContext{c: c, rootID: c.rootID(), podUID: podUID, owners: owners, token: hubToken}
 	if out.pool, err = regionalOwnerPool(c, c.owners.Configuration); err != nil {
 		return nil, closers, err
 	}
 	if out.roots, _, err = mtls.OwnerTrustRoots(c.owners.Configuration.IssuerRoots, time.Now()); err != nil {
-		return nil, closers, mounts.ErrUnavailable
-	}
-	if out.attester, err = kube.NewConnectorProcessAttester(observer, source, workload, regionalPodToken{in}); err != nil {
 		return nil, closers, mounts.ErrUnavailable
 	}
 	if out.settings, err = kube.ConnectorAPISettings(c.rootID(), c.binding, workload, c.ImageDigest); err != nil {
@@ -171,15 +167,15 @@ func newRegionalContext(ctx context.Context, c regionalConfig, in *providerInput
 	}
 	closers = append(closers, metadata.Close)
 	out.history = objectstore.HistoryObjects{Store: metadata, StoreID: a.StoreID}
-	// ADR-176: keysets are wrapped by the local key service, per attempt, with
-	// this process's own connector client leaf.
+	// ADR-176: keysets are wrapped by the local key service, per attempt; the
+	// connector authenticates with its ServiceAccount token (ADR-334).
 	keyRoots, _, err := mtls.OwnerTrustRoots(c.keys.Roots, time.Now())
 	if err != nil {
 		return nil, closers, mounts.ErrUnavailable
 	}
-	keyTransport := &http.Transport{Proxy: nil, TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS13, RootCAs: keyRoots, ServerName: c.keys.ServerName, GetClientCertificate: credentials.GetClientCertificate}, DialContext: (&net.Dialer{Timeout: 2 * time.Second, KeepAlive: -1}).DialContext, TLSHandshakeTimeout: 2 * time.Second, ResponseHeaderTimeout: 5 * time.Second, IdleConnTimeout: 5 * time.Second, MaxConnsPerHost: 8, DisableCompression: true}
+	keyTransport := &http.Transport{Proxy: nil, TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS13, RootCAs: keyRoots, ServerName: c.keys.ServerName}, DialContext: (&net.Dialer{Timeout: 2 * time.Second, KeepAlive: -1}).DialContext, TLSHandshakeTimeout: 2 * time.Second, ResponseHeaderTimeout: 5 * time.Second, IdleConnTimeout: 5 * time.Second, MaxConnsPerHost: 8, DisableCompression: true}
 	closers = append(closers, keyTransport.CloseIdleConnections)
-	out.output = regionalArtifactOutput{store: custody, endpoint: c.keys.Endpoint, scope: authorization.KeyScope{InstallationID: c.binding.InstallationID, Purpose: "artifact", KeyID: c.keys.KeyID}, client: &http.Client{Transport: keyTransport, Timeout: 5 * time.Second}, now: time.Now}
+	out.output = regionalArtifactOutput{store: custody, endpoint: c.keys.Endpoint, scope: authorization.KeyScope{InstallationID: c.binding.InstallationID, Purpose: "artifact", KeyID: c.keys.KeyID}, client: &http.Client{Transport: keyTransport, Timeout: 5 * time.Second}, token: hubToken, now: time.Now}
 	out.output.recordings = NewConnectorRecordings(nil, out.collector, time.Now, eventLog(os.Stderr, "regional collection"))
 	// Recovery is the hub's delegated read; the trust source only verifies.
 	settings, err := kube.ConnectorWorkTrustSettings(c.offer, c.ClusterID)
@@ -196,19 +192,15 @@ func newRegionalContext(ctx context.Context, c regionalConfig, in *providerInput
 	return out, closers, nil
 }
 
-// run builds the API process for the active connector credentials and serves
-// outbound standby exchanges until ctx ends or a component fails.
-func (r *regionalContext) run(ctx context.Context, credentials *mtls.ConnectorProcessCredentials) error {
+// run builds the executor process and serves outbound standby exchanges
+// until ctx ends or a component fails.
+func (r *regionalContext) run(ctx context.Context) error {
 	// Fixed stage names for the stop line; never inputs or API text.
-	protected, err := kube.NewConnectorAPIExecutionProtection(r.attester, credentials, r.settings)
-	if err != nil {
-		return &fixedStepError{"execution-protection", err}
-	}
-	process, err := kube.NewConnectorAPIExecutionProcess(ctx, protected)
+	process, err := kube.NewConnectorAPIProcess(r.settings, r.podUID, time.Now)
 	if err != nil {
 		return &fixedStepError{"execution-process", err}
 	}
-	client, err := mtls.NewRegionalContextStartClient(ctx, r.rootID, r.pool, r.roots, r.c.owners.Address, r.owners, credentials, process, r.c.Executor.Concurrency, time.Now)
+	client, err := mtls.NewContextStartClient(ctx, r.rootID, r.pool, r.roots, r.c.owners.Address, r.owners, r.owners.Process, r.token, process, r.c.Executor.Concurrency, time.Now)
 	if err != nil {
 		return &fixedStepError{"start-client", err}
 	}
@@ -218,7 +210,7 @@ func (r *regionalContext) run(ctx context.Context, credentials *mtls.ConnectorPr
 		output.recordings.configureLogs(ctx, r.rootID, r.logsClient, r.podUID, process.ProcessEpoch())
 		defer output.recordings.closeLogs()
 	}
-	local := contextstart.RegionalLocal{Process: process, Targets: reportedTargets{r.targets, timedEventLog(os.Stderr, "regional target answer"), r.output.recordings, timedEventLog(os.Stderr, "regional source snapshot refused")}, Output: output, Collector: r.collector, Source: r.source, Now: time.Now}
+	local := contextstart.RegionalLocal{Process: process, Targets: reportedTargets{r.targets, timedEventLog(os.Stderr, "regional target answer"), r.output.recordings, timedEventLog(os.Stderr, "regional source snapshot refused")}, Output: output, Collector: r.collector, Now: time.Now}
 	local.History = &contextstart.HistoryLocal{Verifier: r.verifier, Effects: regionalHistoryObjects{objects: r.history, root: r.rootID, cluster: r.c.ClusterID, epoch: process.ProcessEpoch(), now: time.Now}, Report: timedEventLog(os.Stderr, "regional history timing")}
 	if r.output.recordings != nil {
 		local.Recordings = r.output.recordings
@@ -238,6 +230,7 @@ type regionalArtifactOutput struct {
 	endpoint string
 	scope    authorization.KeyScope
 	client   *http.Client
+	token    func() ([]byte, error)
 	now      func() time.Time
 	// recordings holds started manual recordings (ADR-248); nil without the
 	// collector input, which refuses every recording.
@@ -246,7 +239,7 @@ type regionalArtifactOutput struct {
 }
 
 func (o regionalArtifactOutput) PrepareContext(ctx context.Context, e artifact.ContextExpectation) (evidence.PreparedContext, error) {
-	seal, err := kms.NewRemoteSealer(o.endpoint, o.scope, e.Registration.Location.AttemptID, o.client)
+	seal, err := kms.NewRemoteSealer(o.endpoint, o.scope, e.Registration.Location.AttemptID, o.client, o.token)
 	if err != nil {
 		return nil, err
 	}

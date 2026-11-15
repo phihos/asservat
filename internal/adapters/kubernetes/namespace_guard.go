@@ -10,7 +10,6 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 )
 
-
 // capacityGuard observes that the probe namespace still exists with its
 // UID; Kubernetes RBAC decides who may write the guarded metadata. The digest
 // names the cluster and namespace.

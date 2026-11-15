@@ -11,7 +11,6 @@ import (
 	"asservat.local/asservat/internal/adapters/mtls"
 	"asservat.local/asservat/internal/application/evidence"
 	app "asservat.local/asservat/internal/application/fleet"
-	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	authorization "asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/transport/contextstart"
@@ -23,7 +22,6 @@ import (
 // request is never a peer or original-caller authority source.
 type OwnerNativeRuntimeConfig struct {
 	Peers                    *mtls.NativePeerChecks
-	ConnectorRoots           *x509.CertPool
 	Connections, Concurrency int
 	ContextStarts            *OwnerContextStartRuntimeConfig
 }
@@ -31,12 +29,11 @@ type OwnerNativeRuntimeConfig struct {
 // OwnerContextStartRuntimeConfig is installation-owned input for the two fixed
 // purposes on the already accepted NativePort. Router is the same request-owned
 // router used by RegionalAPIContextStart; this gives no public caller a route.
-// Current profile/registry checks remain in ContextStartIngress. The existing
-// protected loader does not yet provision this optional composition.
+// Tokens verifies the connectors' ServiceAccount tokens (ADR-334).
 type OwnerContextStartRuntimeConfig struct {
 	RootID                 string
 	Router                 *contextstart.Router
-	Admissions             []mtls.ContextStartConnectorAdmission
+	Tokens                 contextstart.TokenVerifier
 	Connections, Preflight int
 	// Authenticator, when set, serves the ingress's owner self-checks from
 	// API clients of its own (as regionalCapacityClients does) instead of the
@@ -48,7 +45,7 @@ type ownerNativeRuntime struct {
 	liveRoots        *x509.CertPool
 	live             *native.LiveOwnerHandler
 	router           *native.HubRouter
-	handler          *native.Handler
+	authority        string
 	connections      int
 	starts           *contextstart.Handler
 	startRouter      *contextstart.Router
@@ -61,11 +58,11 @@ type ownerNativeRuntime struct {
 }
 
 func newOwnerNativeRuntime(r *OwnerRuntime, c OwnerNativeRuntimeConfig, auth *app.OwnerAuthenticator) (*ownerNativeRuntime, error) {
-	if r == nil || auth == nil || c.Peers == nil || c.ConnectorRoots == nil || len(c.ConnectorRoots.Subjects()) == 0 || c.Connections < 1 || c.Connections > 64 || c.Concurrency < 1 || c.Concurrency > 16 || c.Concurrency > c.Connections {
+	if r == nil || auth == nil || c.Peers == nil || r.roots == nil || c.Connections < 1 || c.Connections > 64 || c.Concurrency < 1 || c.Concurrency > 16 || c.Concurrency > c.Connections {
 		return nil, artifact.ErrInvalid
 	}
 	p := *c.Peers
-	if p.Workers == nil || p.WorkerTrust == nil || p.Certificates == nil || p.ConnectorVerifier == nil || p.Connectors == nil || p.Now == nil || p.Origins.Locators == nil || p.Origins.Operations == nil || p.Origins.Proofs == nil || p.Origins.Now == nil || !p.WorkerTrust.ForInstallation(r.binding.InstallationID) {
+	if p.Workers == nil || p.WorkerTrust == nil || p.Certificates == nil || p.Now == nil || p.Origins.Locators == nil || p.Origins.Operations == nil || p.Origins.Proofs == nil || p.Origins.Now == nil || !p.WorkerTrust.ForInstallation(r.binding.InstallationID) {
 		return nil, artifact.ErrInvalid
 	}
 	router, err := native.NewHubRouter(c.Concurrency)
@@ -73,25 +70,15 @@ func newOwnerNativeRuntime(r *OwnerRuntime, c OwnerNativeRuntimeConfig, auth *ap
 		return nil, err
 	}
 	serving := &mtls.OwnerRequestPeers{Authenticator: auth, Server: r.server}
-	admission, err := native.NewHubAdmission(&p, serving, router, time.Now)
-	if err != nil {
-		router.Close()
-		return nil, err
-	}
 	name, err := mtls.OwnerServerName(r.binding)
 	if err != nil {
 		router.Close()
 		return nil, err
 	}
-	handler, err := native.NewHandler(contracts.NativeOwnerPath, net.JoinHostPort(name, strconv.Itoa(r.pool.NativePort)), admission, c.Concurrency)
-	if err != nil {
-		router.Close()
-		return nil, err
-	}
-	out := &ownerNativeRuntime{roots: c.ConnectorRoots.Clone(), router: router, handler: handler, connections: c.Connections, peers: &p, hub: serving, concurrency: c.Concurrency}
+	out := &ownerNativeRuntime{roots: r.roots.Clone(), router: router, authority: net.JoinHostPort(name, strconv.Itoa(r.pool.NativePort)), connections: c.Connections, peers: &p, hub: serving, concurrency: c.Concurrency}
 	if c.ContextStarts != nil {
 		start := c.ContextStarts
-		if !authorization.UUID(start.RootID) || start.Router == nil || start.Connections < 1 || start.Connections > 64 || start.Preflight < 1 || start.Preflight > start.Connections || c.Connections+start.Connections > 64 {
+		if !authorization.UUID(start.RootID) || start.Router == nil || start.Tokens == nil || start.Connections < 1 || start.Connections > 64 || start.Preflight < 1 || start.Preflight > start.Connections || c.Connections+start.Connections > 64 {
 			router.Close()
 			return nil, artifact.ErrInvalid
 		}
@@ -99,13 +86,13 @@ func newOwnerNativeRuntime(r *OwnerRuntime, c OwnerNativeRuntimeConfig, auth *ap
 		if start.Authenticator != nil {
 			self = start.Authenticator
 		}
-		ingress, e := mtls.NewContextStartIngress(start.RootID, r.server, self, start.Admissions, time.Now)
+		ingress, e := mtls.NewContextStartIngress(start.RootID, r.server, self, time.Now)
 		if e != nil {
 			router.Close()
 			return nil, e
 		}
 		ingress.Refused = eventLog(os.Stderr, "context start ingress refused")
-		h, e := contextstart.NewHandler(net.JoinHostPort(name, strconv.Itoa(r.pool.NativePort)), start.Router, ingress, start.Preflight)
+		h, e := contextstart.NewHandler(net.JoinHostPort(name, strconv.Itoa(r.pool.NativePort)), start.Router, ingress, start.Tokens, start.Preflight)
 		if e != nil {
 			router.Close()
 			return nil, e

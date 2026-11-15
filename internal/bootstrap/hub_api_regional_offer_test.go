@@ -36,15 +36,15 @@ func TestHubAPIRegionalOfferBuildAndPublishOnce(t *testing.T) {
 	defer root.Close()
 	ids, _ := readHubAPIIDs(ctx, hubAPIIDsRoot(t, ""))
 	h := hubAPIConfigFixture()
-	if o, err := buildHubAPIRegionalOffer(ctx, root, h, ids, hubAPICAFixture, time.Now()); o != nil || err != nil {
+	if o, err := buildHubAPIRegionalOffer(ctx, root, h, ids, time.Now()); o != nil || err != nil {
 		t.Fatal("offer without the combined-mode section", err)
 	}
 	h.Public.RegionalOffer = &contracts.HubAPIRegionalOffer{Federation: "https://asservat-federation.hub.svc:9446", ServerName: "asservat-federation.hub.svc", Image: "registry.invalid/asservat@sha256:" + string(bytes.Repeat([]byte("a"), 64)),
 		Connector: contracts.InstallerConnectorSettings{RetainedSeconds: 4000, PurgeLeases: 2, Footprint: contracts.InstallerCapacityFootprint{RowBytes: 1 << 20, TransitionWALBytes: 1 << 20}}}
-	if _, err := buildHubAPIRegionalOffer(ctx, files, h, ids, hubAPICAFixture, time.Now()); err == nil {
+	if _, err := buildHubAPIRegionalOffer(ctx, files, h, ids, time.Now()); err == nil {
 		t.Fatal("offer without the federation CA")
 	}
-	o, err := buildHubAPIRegionalOffer(ctx, root, h, ids, hubAPICAFixture, time.Now())
+	o, err := buildHubAPIRegionalOffer(ctx, root, h, ids, time.Now())
 	if err != nil || o == nil || o.name != "asservat-regional-offer" || o.namespace != "hub" {
 		t.Fatal("offer", err)
 	}
@@ -52,7 +52,7 @@ func TestHubAPIRegionalOfferBuildAndPublishOnce(t *testing.T) {
 	var back contracts.RegionalOffer
 	d := json.NewDecoder(bytes.NewReader(raw))
 	d.DisallowUnknownFields()
-	if d.Decode(&back) != nil || back.Format != contracts.RegionalOfferFormat || back.InstallationID != runtimeID || back.IssuerEpoch != runtimeID || len(back.ConnectorIssuerRoots) != 1 || len(back.ConnectorBacking) == 0 || len(back.Federation.Roots) != 1 || back.Roles.Source == "" {
+	if d.Decode(&back) != nil || back.Format != contracts.RegionalOfferFormat || back.InstallationID != runtimeID || back.IssuerEpoch != runtimeID || len(back.Federation.Roots) != 1 {
 		t.Fatal("offer content", string(raw))
 	}
 	if executor, err := back.RegionalExecutorOffered(); err != nil || executor {
@@ -97,7 +97,7 @@ func TestHubAPIRegionalOfferExecutorSection(t *testing.T) {
 	h := hubAPIConfigFixture()
 	h.Public.RegionalOffer = &contracts.HubAPIRegionalOffer{Federation: "https://asservat-federation.hub.svc:9446", ServerName: "asservat-federation.hub.svc", Image: "registry.invalid/asservat@sha256:" + string(bytes.Repeat([]byte("a"), 64)),
 		Connector: contracts.InstallerConnectorSettings{RetainedSeconds: 4000, PurgeLeases: 2, Footprint: contracts.InstallerCapacityFootprint{RowBytes: 1 << 20, TransitionWALBytes: 1 << 20}}}
-	o, err := buildHubAPIRegionalOffer(ctx, root, h, ids, hubAPICAFixture, time.Now())
+	o, err := buildHubAPIRegionalOffer(ctx, root, h, ids, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,9 +145,8 @@ func TestHubAPIRegionalOfferExecutorSection(t *testing.T) {
 	if err != nil {
 		t.Fatal("local cluster", err)
 	}
-	profile, err := publicConnectorProfile(local, runtimeID, runtimeID)
-	if err != nil || profile.Binding.PeerID != peer || profile.Binding.ClusterID != runtimeID {
-		t.Fatal("local connector profile", err)
+	if local.Connector.SourceUID != peer || local.ClusterID != runtimeID {
+		t.Fatal("local connector peer", local.Connector)
 	}
 	if local.Trust.Keys[0].ID != "work-v1" || local.Standby != 2 {
 		t.Fatal("local catalog entry", local.Trust.Keys, local.Standby)
@@ -163,8 +162,8 @@ func TestHubAPIRegionalOfferExecutorSection(t *testing.T) {
 	if err != nil {
 		t.Fatal("remote cluster", err)
 	}
-	if profile, err := publicConnectorProfile(entry, runtimeID, runtimeID); err != nil || profile.Binding.PeerID != remotePeer || profile.Binding.ClusterID != remote || profile.Deployment.Namespace != "asservat-system" {
-		t.Fatal("remote connector profile", err)
+	if entry.Connector.SourceUID != remotePeer || entry.ClusterID != remote {
+		t.Fatal("remote connector peer", entry.Connector)
 	}
 	// The join offer dials the configured addresses and verifies the
 	// in-cluster names; backing and roots are the stored offer's.
@@ -174,7 +173,7 @@ func TestHubAPIRegionalOfferExecutorSection(t *testing.T) {
 		t.Fatal("join offer", err)
 	}
 	if join.Federation.Endpoint != addresses.Federation || join.Federation.ServerName != stored.Federation.ServerName || join.Owners.Address != addresses.Owners || join.KeyService.Endpoint != addresses.KeyService || join.KeyService.ServerName != "asservat-key-service.hub.svc" ||
-		join.EvidenceStore.Endpoint != addresses.ObjectStore || join.EvidenceStore.ServerName == "" || !bytes.Equal(join.ConnectorBacking, stored.ConnectorBacking) || stored.KeyService.ServerName != "" {
+		join.EvidenceStore.Endpoint != addresses.ObjectStore || join.EvidenceStore.ServerName == "" || stored.KeyService.ServerName != "" {
 		t.Fatalf("join offer %+v", join.KeyService)
 	}
 	addresses.Owners = "https://hub.example.test:31447"

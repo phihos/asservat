@@ -1,12 +1,13 @@
 package mtls
 
 import (
-	"asservat.local/asservat/internal/domain/identity"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"sync"
 	"time"
+
+	"asservat.local/asservat/internal/domain/identity"
 
 	app "asservat.local/asservat/internal/application/fleet"
 	permissions "asservat.local/asservat/internal/domain/authorization"

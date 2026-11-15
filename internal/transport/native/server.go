@@ -25,13 +25,6 @@ type ServerCredentials interface {
 	GetCertificate(*tls.ClientHelloInfo) (*tls.Certificate, error)
 }
 
-// Serve takes ownership of one separate private listener after validation. It
-// serves the exact native Handler with h2/TLS1.3 only. Handshake admission does
-// not replace the handler's current per-frame SQL, proof and serving checks.
-func Serve(ctx context.Context, listener net.Listener, roots *x509.CertPool, credentials ServerCredentials, handler *Handler, connections int) error {
-	return serve(ctx, listener, roots, nil, credentials, handler, nil, nil, connections, 0)
-}
-
 // ClientRoots returns the current client-certificate roots for one handshake.
 type ClientRoots func(time.Time) (*x509.CertPool, error)
 
@@ -45,37 +38,29 @@ func ServeWorker(ctx context.Context, listener net.Listener, roots ClientRoots, 
 	if roots == nil || handler == nil || handler.path != contracts.NativeWorkerPath {
 		return contracts.ErrNativeProtocol
 	}
-	return serve(ctx, listener, nil, roots, credentials, handler, nil, nil, connections, 0)
+	return serve(ctx, listener, nil, roots, credentials, handler.host, handler, nil, nil, connections, 0)
 }
 
-// ServeWithContextStart shares the accepted native port between exactly two
-// private purposes. The same serving identity and connector roots apply at TLS;
-// each handler independently proves its exact current operation. Purpose socket
-// reservations are disjoint and remain charged until the owned socket and its
-// handler have joined. No request chooses an endpoint, lifetime or handler.
-func ServeWithContextStart(ctx context.Context, listener net.Listener, roots *x509.CertPool, credentials ServerCredentials, handler *Handler, starts *contextstart.Handler, nativeConnections, startConnections int) error {
-	if starts == nil || startConnections < 1 || startConnections > 64 || nativeConnections < 1 || nativeConnections+startConnections > 64 {
+// ServeOwner serves the hub owner's private port: connector context starts
+// and, when set, the same-owner live purpose. host is the exact authority.
+// Purpose socket reservations are disjoint and remain charged until the owned
+// socket and its handler have joined. No request chooses an endpoint, lifetime
+// or handler.
+func ServeOwner(ctx context.Context, listener net.Listener, roots *x509.CertPool, credentials ServerCredentials, host string, starts *contextstart.Handler, live *LiveOwnerHandler, liveConnections, startConnections int) error {
+	if starts == nil && live == nil || starts == nil && startConnections != 0 || starts != nil && startConnections < 1 || live != nil && (live.authority != host || cap(live.slots) > liveConnections) || liveConnections < 1 || liveConnections+startConnections > 64 {
 		return contracts.ErrNativeProtocol
 	}
-	return serve(ctx, listener, roots, nil, credentials, handler, starts, nil, nativeConnections, startConnections)
-}
-
-// ServeWithLiveOwner adds one closed same-owner client purpose. It shares the
-// original native slots; context-start reservations and total caps are unchanged.
-func ServeWithLiveOwner(ctx context.Context, listener net.Listener, roots *x509.CertPool, credentials ServerCredentials, handler *Handler, starts *contextstart.Handler, live *LiveOwnerHandler, nativeConnections, startConnections int) error {
-	if live == nil || handler == nil || live.authority != handler.host || cap(live.slots) > nativeConnections || starts == nil && startConnections != 0 || starts != nil && startConnections < 1 {
-		return contracts.ErrNativeProtocol
-	}
-	return serve(ctx, listener, roots, nil, credentials, handler, starts, live, nativeConnections, startConnections)
+	return serve(ctx, listener, roots, nil, credentials, host, nil, starts, live, liveConnections, startConnections)
 }
 
 // Exactly one of roots (fixed) and current (per handshake) supplies ClientCAs.
-func serve(ctx context.Context, listener net.Listener, roots *x509.CertPool, current ClientRoots, credentials ServerCredentials, handler *Handler, starts *contextstart.Handler, live *LiveOwnerHandler, nativeConnections, startConnections int) error {
+// handler is nil on the owner port, which serves only starts and live.
+func serve(ctx context.Context, listener net.Listener, roots *x509.CertPool, current ClientRoots, credentials ServerCredentials, authority string, handler *Handler, starts *contextstart.Handler, live *LiveOwnerHandler, nativeConnections, startConnections int) error {
 	connections := nativeConnections + startConnections
-	if ctx == nil || ctx.Err() != nil || listener == nil || (roots == nil) == (current == nil) || roots != nil && len(roots.Subjects()) == 0 || credentials == nil || handler == nil || nativeConnections < 1 || connections > 64 || cap(handler.slots) > nativeConnections {
+	if ctx == nil || ctx.Err() != nil || listener == nil || (roots == nil) == (current == nil) || roots != nil && len(roots.Subjects()) == 0 || credentials == nil || handler == nil && starts == nil && live == nil || nativeConnections < 1 || connections > 64 || handler != nil && cap(handler.slots) > nativeConnections {
 		return contracts.ErrNativeProtocol
 	}
-	host, _, err := net.SplitHostPort(handler.host)
+	host, _, err := net.SplitHostPort(authority)
 	if err != nil || host == "" {
 		return contracts.ErrNativeProtocol
 	}
@@ -99,14 +84,21 @@ func serve(ctx context.Context, listener net.Listener, roots *x509.CertPool, cur
 	nativeSlots := make(chan struct{}, nativeConnections)
 	startSlots := make(chan struct{}, startConnections)
 	defer owned.Close()
-	config := &tls.Config{MinVersion: tls.VersionTLS13, MaxVersion: tls.VersionTLS13, ClientAuth: tls.RequireAndVerifyClientCert, SessionTicketsDisabled: true, NextProtos: []string{"h2"}}
+	// Context starts authenticate with the connector's ServiceAccount token
+	// (ADR-334), so a client certificate is optional on a port that serves
+	// them; every other purpose still requires a verified chain below.
+	clientAuth := tls.RequireAndVerifyClientCert
+	if starts != nil {
+		clientAuth = tls.VerifyClientCertIfGiven
+	}
+	config := &tls.Config{MinVersion: tls.VersionTLS13, MaxVersion: tls.VersionTLS13, ClientAuth: clientAuth, SessionTicketsDisabled: true, NextProtos: []string{"h2"}}
 	if roots != nil {
 		config.ClientCAs = roots.Clone()
 	}
 	// net/http may prepare compatibility ALPN entries internally. Enforce the
 	// private protocol on the completed handshake before any HTTP request.
 	config.VerifyConnection = func(state tls.ConnectionState) error {
-		if root.Err() != nil || state.Version != tls.VersionTLS13 || state.NegotiatedProtocol != "h2" || state.ServerName != sni || len(state.VerifiedChains) == 0 {
+		if root.Err() != nil || state.Version != tls.VersionTLS13 || state.NegotiatedProtocol != "h2" || state.ServerName != sni || clientAuth == tls.RequireAndVerifyClientCert && len(state.VerifiedChains) == 0 {
 			return contracts.ErrNativeProtocol
 		}
 		return nil
@@ -195,16 +187,23 @@ func serve(ctx context.Context, listener net.Listener, roots *x509.CertPool, cur
 			return
 		}
 		defer close(connection.handlerDone)
-		if r.TLS == nil || r.TLS.ServerName != sni || r.Host != handler.host {
+		if r.TLS == nil || r.TLS.ServerName != sni || r.Host != authority {
 			unavailable(w)
 			return
 		}
-		selected, lifetime, slots := http.Handler(handler), 30*time.Second, nativeSlots
+		var selected http.Handler
+		lifetime, slots := 30*time.Second, nativeSlots
 		if starts != nil && r.RequestURI == contracts.APIContextStartPath {
-			selected, lifetime, slots = starts, 30*time.Second, startSlots
+			selected, slots = starts, startSlots
 		} else if live != nil && r.RequestURI == contracts.LiveOwnerPath {
 			selected, lifetime = live, 5*time.Second
-		} else if r.RequestURI != handler.path {
+		} else if handler != nil && r.RequestURI == handler.path {
+			selected = handler
+		} else {
+			unavailable(w)
+			return
+		}
+		if selected != http.Handler(starts) && len(r.TLS.VerifiedChains) == 0 {
 			unavailable(w)
 			return
 		}

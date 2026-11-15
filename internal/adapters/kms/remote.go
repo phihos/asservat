@@ -24,6 +24,9 @@ type remoteKeyClient struct {
 	endpoint, authority string
 	scope               value.KeyScope
 	client              *http.Client
+	// token, when set, authenticates a connector by its ServiceAccount token
+	// instead of a client certificate (ADR-334).
+	token func() ([]byte, error)
 }
 
 // Each facet holds only a short-lived client TLS credential and an authority
@@ -39,13 +42,17 @@ type RemoteSigner struct {
 var _ evidence.KeySealer = (*RemoteSealer)(nil)
 var _ evidence.KeyOpener = (*RemoteOpener)(nil)
 
-func remoteClient(endpoint string, scope value.KeyScope, authority string, h *http.Client) (*remoteKeyClient, error) {
+func remoteClient(endpoint string, scope value.KeyScope, authority string, h *http.Client, token ...func() ([]byte, error)) (*remoteKeyClient, error) {
+	var bearer func() ([]byte, error)
+	if len(token) == 1 {
+		bearer = token[0]
+	}
 	u, err := url.Parse(endpoint)
 	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.Opaque != "" || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" || u.RawPath != "" || (u.Path != "" && u.Path != "/") || !scope.Valid() || !value.UUID(authority) || h == nil {
 		return nil, ErrKeyService
 	}
 	t, ok := h.Transport.(*http.Transport)
-	if !ok || t == nil || t.TLSClientConfig == nil || t.TLSClientConfig.InsecureSkipVerify || (len(t.TLSClientConfig.Certificates) == 0 && t.TLSClientConfig.GetClientCertificate == nil) || t.TLSClientConfig.MaxVersion != 0 && t.TLSClientConfig.MaxVersion < tls.VersionTLS13 {
+	if !ok || t == nil || t.TLSClientConfig == nil || t.TLSClientConfig.InsecureSkipVerify || (bearer == nil) == (len(t.TLSClientConfig.Certificates) == 0 && t.TLSClientConfig.GetClientCertificate == nil) || t.TLSClientConfig.MaxVersion != 0 && t.TLSClientConfig.MaxVersion < tls.VersionTLS13 {
 		return nil, ErrKeyService
 	}
 	t = t.Clone()
@@ -56,14 +63,16 @@ func remoteClient(endpoint string, scope value.KeyScope, authority string, h *ht
 	t.TLSClientConfig.MinVersion = tls.VersionTLS13
 	client := &http.Client{Transport: t, Timeout: 5 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	u.Path = contracts.KeyServicePath
-	return &remoteKeyClient{u.String(), authority, scope, client}, nil
+	return &remoteKeyClient{u.String(), authority, scope, client, bearer}, nil
 }
 
-func NewRemoteSealer(endpoint string, scope value.KeyScope, authority string, h *http.Client) (*RemoteSealer, error) {
-	if scope.Purpose == "policy-submission" {
+// NewRemoteSealer authenticates with h's client certificate or, when token is
+// given, with a connector's ServiceAccount token (ADR-334).
+func NewRemoteSealer(endpoint string, scope value.KeyScope, authority string, h *http.Client, token ...func() ([]byte, error)) (*RemoteSealer, error) {
+	if scope.Purpose == "policy-submission" || len(token) > 1 {
 		return nil, ErrKeyService
 	}
-	c, err := remoteClient(endpoint, scope, authority, h)
+	c, err := remoteClient(endpoint, scope, authority, h, token...)
 	if err != nil {
 		return nil, err
 	}
@@ -120,6 +129,14 @@ func (c *remoteKeyClient) call(ctx context.Context, r value.KeyRequest) (value.K
 	req.ContentLength = int64(len(b))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
+	if c.token != nil {
+		token, err := c.token()
+		if err != nil || len(token) == 0 {
+			return result, ErrKeyService
+		}
+		req.Header.Set("Authorization", "Bearer "+string(token))
+		clear(token)
+	}
 	resp, err := c.client.Do(req)
 	if resp != nil && resp.Body != nil {
 		defer resp.Body.Close()

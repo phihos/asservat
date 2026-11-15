@@ -1,15 +1,16 @@
 package native
 
 import (
+	"context"
+	"encoding/json"
+	"sync"
+	"time"
+
 	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/contracts"
 	query "asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/authorization"
-	"context"
-	"encoding/json"
-	"sync"
-	"time"
 )
 
 type nativeAction struct {
@@ -43,33 +44,6 @@ type HubOperation struct {
 	action          chan nativeAction
 	done            chan struct{}
 	doneOnce        sync.Once
-}
-
-func NewHubOperation(gate *evidence.NativeFrameGate, c contracts.NativeCommand, expected evidence.NativeContextSource, complete evidence.NativeCompletion) (*HubOperation, error) {
-	if c.Kind == string(value.NativeResponse) {
-		return nil, artifact.ErrInvalid
-	}
-	return newHubOperation(gate, c, expected, artifact.DownloadDeliveryLease{}, complete)
-}
-
-// NewHubResponseOperation pins the complete original delivery lease locally.
-// Neither the worker command nor a matching range can substitute another owner,
-// scope or current authority observation when acknowledging a final sink write.
-func NewHubResponseOperation(gate *evidence.NativeFrameGate, c contracts.NativeCommand, expected evidence.NativeContextSource, delivery artifact.DownloadDeliveryLease, complete evidence.NativeCompletion) (*HubOperation, error) {
-	if c.Kind != string(value.NativeResponse) || !delivery.Valid(time.Now()) {
-		return nil, artifact.ErrInvalid
-	}
-	return newHubOperation(gate, c, expected, delivery, complete)
-}
-func newHubOperation(gate *evidence.NativeFrameGate, c contracts.NativeCommand, expected evidence.NativeContextSource, delivery artifact.DownloadDeliveryLease, complete evidence.NativeCompletion) (*HubOperation, error) {
-	if gate == nil || complete == nil {
-		return nil, artifact.ErrInvalid
-	}
-	checked, e := checkNativeAdmission(gate.Context(), gate)
-	if e != nil {
-		return nil, e
-	}
-	return newHubOperationChecked(gate, checked, c, expected, delivery, complete)
 }
 
 // Only synchronous native-package callers may transfer an already performed

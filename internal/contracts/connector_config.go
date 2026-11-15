@@ -22,7 +22,6 @@ const RegionalPodUIDEnvironment = "ASSERVAT_REGIONAL_POD_UID"
 // and Kubernetes API), the API roots, the optional bootstrap record and the
 // executor's object-store capabilities.
 const (
-	ConnectorPodTokenFile  = "connector-pod.token"
 	ConnectorKubeTokenFile = "kube.token"
 	// ConnectorHubTokenFile is the projected ServiceAccount token with the
 	// hub URL as audience that authenticates the connector (ADR-334).

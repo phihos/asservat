@@ -1,12 +1,13 @@
 package mtls
 
 import (
-	"asservat.local/asservat/internal/contracts"
 	"context"
 	"errors"
 	"net/http"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/contracts"
 )
 
 // A generic HTTP failure cannot become an instruction to repeat an uncertain

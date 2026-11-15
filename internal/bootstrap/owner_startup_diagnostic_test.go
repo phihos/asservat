@@ -5,11 +5,9 @@ import (
 	"errors"
 	"strings"
 	"testing"
-	"time"
 
 	"asservat.local/asservat/internal/adapters/mounts"
 	cfg "asservat.local/asservat/internal/domain/configuration"
-	value "asservat.local/asservat/internal/domain/fleet"
 )
 
 type startupPrivateError struct{}
@@ -52,21 +50,5 @@ func TestOwnerStartupDiagnosticRejectsRawProcessOutput(t *testing.T) {
 		if got, ok := OwnerStartupDiagnosticLine(bad); ok || got != "" {
 			t.Fatal("untrusted process output accepted")
 		}
-	}
-}
-func TestOwnerObservationRuntimeReportsOriginalSetupDeadline(t *testing.T) {
-	f, c := observationRuntimeConfig(t)
-	s := &observationSetupReader{base: f}
-	c.Configuration = s
-	until := time.Now().Add(40 * time.Millisecond)
-	ctx, cancel := context.WithDeadline(context.Background(), until)
-	defer cancel()
-	d, err := newOwnerObservationRuntime(context.Background(), ctx, c)
-	if d != nil {
-		d.Close()
-		t.Fatal("late source accepted")
-	}
-	if !errors.Is(err, context.DeadlineExceeded) || !errors.Is(err, value.ErrUnavailable) || !s.deadline.Equal(until) || f.signings.Load() != 0 || f.routes.Load() != 0 || !strings.Contains(OwnerStartupDiagnostic(err), "phase=runtime-configuration role=none reason=deadline ") {
-		t.Fatal("original setup failure misclassified or performed effects", err)
 	}
 }

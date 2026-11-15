@@ -171,7 +171,7 @@ func TestHandlerChecksProtocolMajorOnly(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	h, e := NewHandler("hub.example:9444", router, refusingIngress{}, 1)
+	h, e := NewHandler("hub.example:9444", router, refusingIngress{}, testTokens{}, 1)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -192,8 +192,8 @@ func TestHandlerChecksProtocolMajorOnly(t *testing.T) {
 		{"unversioned", 0, nil, "connector-protocol"},
 		{"next-major", contracts.ConnectorProtocolMajor + 1, contracts.APIContextCapabilities(), "connector-protocol"},
 		// Same major, fewer capabilities (an older release): the Hello is
-		// accepted and the exchange proceeds to its source frame.
-		{"older-release", contracts.ConnectorProtocolMajor, []string{"history"}, "source"},
+		// accepted and the exchange proceeds to authentication.
+		{"older-release", contracts.ConnectorProtocolMajor, []string{"history"}, "authenticate"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			mu.Lock()
@@ -210,6 +210,7 @@ func TestHandlerChecksProtocolMajorOnly(t *testing.T) {
 			r.Host = "hub.example:9444"
 			r.Header.Set("Content-Type", contracts.APIContextStartMedia)
 			r.Header.Set("Accept", contracts.APIContextStartMedia)
+			r.Header.Set("Authorization", "Bearer connector-token")
 			resp, e := srv.Client().Do(r)
 			if e != nil {
 				t.Fatal(e)

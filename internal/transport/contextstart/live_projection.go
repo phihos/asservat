@@ -1,14 +1,15 @@
 package contextstart
 
 import (
+	"context"
+	"sync"
+	"time"
+
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/collector"
 	v "asservat.local/asservat/internal/domain/live"
 	"asservat.local/asservat/internal/domain/targets"
 	"asservat.local/asservat/internal/transport/node"
-	"context"
-	"sync"
-	"time"
 )
 
 const queryLiveProjection = "read-live-projection"

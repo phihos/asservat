@@ -30,6 +30,7 @@ import (
 	value "asservat.local/asservat/internal/domain/fleet"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
 // OwnerDeployment composes only the private owner subsystem. Installation and
@@ -332,6 +333,11 @@ func newOwnerDeployment(ctx context.Context, files *os.Root, podUID string, in *
 			return nil, err
 		}
 		nativeConfig.ContextStarts = d.publicContext.starts
+		ids := contracts.ServiceIDs{InstallationID: c.InstallationID, ClusterID: c.ClusterID, PermissionRootID: c.PermissionRootID, PeerID: c.Native.ConnectorPeerID}
+		local := func() (*rest.Config, error) { return in.kubernetes("kube-observer.token"), nil }
+		if nativeConfig.ContextStarts.Tokens, err = newConnectorTokensFor(c.Native.ConnectorTokens, ids, "hub-api", local); err != nil {
+			return nil, err
+		}
 		if nativeConfig.ContextStarts.Authenticator, err = contextStartOwnerAuthenticator(in, c, guard, pool, configs, ledgers["registry"], &d.contextStartStats); err != nil {
 			return nil, mounts.ErrUnavailable
 		}
@@ -340,7 +346,6 @@ func newOwnerDeployment(ctx context.Context, files *os.Root, podUID string, in *
 	// observation handler set, now beside the native handler on its port.
 	phase = startupOwnerRuntime
 	var observation *OwnerObservationServingConfig
-	var operation *OwnerOperationConfig
 	if installed {
 		phase = startupObservationInputs
 		pin, peers, e := ownerObservationConfig(c, pool)
@@ -359,9 +364,10 @@ func newOwnerDeployment(ctx context.Context, files *os.Root, podUID string, in *
 	if parts.readinessProofs != nil {
 		readinessProofs = parts.readinessProofs
 	}
-	d.Runtime, err = NewOwnerRuntime(root, OwnerRuntimeConfig{Pool: pool, PodUID: podUID, SourceUID: c.ConfigurationUID, Configuration: configs, ServerEnrollment: services["server"], ClientEnrollment: services["client"], Registry: ledgers["registry"], Proofs: proofs, ReadinessProofs: readinessProofs, Routes: routes, Protection: guard, Connections: c.Connections, Concurrency: c.Concurrency, Native: nativeConfig, Observation: observation, Operation: operation})
+	d.Runtime, err = NewOwnerRuntime(root, OwnerRuntimeConfig{Pool: pool, PodUID: podUID, SourceUID: c.ConfigurationUID, Configuration: configs, ServerEnrollment: services["server"], ClientEnrollment: services["client"], Registry: ledgers["registry"], Proofs: proofs, ReadinessProofs: readinessProofs, Routes: routes, Protection: guard, Connections: c.Connections, Concurrency: c.Concurrency, Native: nativeConfig, Observation: observation})
 	if err != nil || startup.Err() != nil {
-		return nil, mounts.ErrUnavailable
+		// Keep the runtime's own startup phase for the diagnostic line.
+		return nil, errors.Join(mounts.ErrUnavailable, err)
 	}
 	if c.Public != nil {
 		var closers []func()

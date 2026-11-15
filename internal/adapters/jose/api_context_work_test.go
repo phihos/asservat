@@ -29,7 +29,7 @@ func apiWorkFixture(t *testing.T) (value.APIContextWork, value.APIContextReceive
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	hub := value.OwnerBinding{InstallationID: id("01"), ClusterID: id("02"), IssuerEpoch: id("03"), PodUID: id("04"), ProcessEpoch: id("05")}
 	conn := value.ConnectorProcessIdentity{Binding: value.PeerBinding{InstallationID: hub.InstallationID, ClusterID: id("06"), IssuerEpoch: hub.IssuerEpoch, PeerID: id("07"), Role: value.ConnectorPeer}, PodUID: id("08"), ProcessEpoch: id("09")}
-	channel := value.APIContextChannel{RootID: id("10"), ExchangeID: id("11"), Challenge: id("12"), Hub: hub, Connector: conn, ConnectorLeaf: artifact.Digest{1}, Executor: value.APIContextExecutor{NamespaceUID: id("13"), AccountUID: id("14"), PodUID: conn.PodUID, ProcessEpoch: id("15"), StartupDigest: artifact.Digest{2}, ImageDigest: artifact.Digest{3}}}
+	channel := value.APIContextChannel{RootID: id("10"), ExchangeID: id("11"), Challenge: id("12"), Hub: hub, Connector: conn, Executor: value.APIContextExecutor{NamespaceUID: id("13"), AccountUID: id("14"), PodUID: conn.PodUID, ProcessEpoch: id("15"), StartupDigest: artifact.Digest{2}, ImageDigest: artifact.Digest{3}}}
 	work := value.APIContextWork{Channel: channel, CaptureID: id("16"), AttemptID: id("17"), Actor: identity.Principal{Issuer: "https://identity.invalid", Subject: "actor", ClientID: "console", Kind: identity.Human}, Target: authorization.Target{ClusterID: conn.Binding.ClusterID, NamespaceUID: id("18"), WorkloadUID: id("19"), PodUID: id("20")}, ScopeDigest: artifact.Digest{4}, ExpectationDigest: artifact.Digest{5}, IntentDigest: artifact.Digest{6}, BudgetDigest: artifact.Digest{7}, Capability: identity.Revision{UID: "capability", Generation: 1, Digest: [32]byte{8}}, ProjectionDigest: artifact.Digest{9}, IssuedAt: now, NotAfter: now.Add(5 * time.Second)}
 	pub, key, e := ed25519.GenerateKey(rand.Reader)
 	if e != nil {
@@ -94,7 +94,6 @@ func TestAPIContextWorkRejectsSignedProfileAndChannelConfusion(t *testing.T) {
 		"hub":                 func(d *wire.APIContextWork) { d.Channel.Hub.ProcessEpoch = d.CaptureID },
 		"connector":           func(d *wire.APIContextWork) { d.Channel.Connector.ProcessEpoch = d.CaptureID },
 		"executor":            func(d *wire.APIContextWork) { d.Channel.Executor.ProcessEpoch = d.CaptureID },
-		"leaf":                func(d *wire.APIContextWork) { d.Channel.Connector.LeafDigest = strings.Repeat("b", 64) },
 		"exchange":            func(d *wire.APIContextWork) { d.Channel.ExchangeID = d.CaptureID },
 		"challenge":           func(d *wire.APIContextWork) { d.Channel.Challenge = d.CaptureID },
 		"cluster":             func(d *wire.APIContextWork) { d.Target.ClusterID = d.CaptureID },

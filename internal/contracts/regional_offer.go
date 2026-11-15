@@ -1,15 +1,12 @@
 package contracts
 
 import (
-	"encoding/json"
 	"errors"
 )
 
 // RegionalOffer is the hub's public offer to regional installers (ADR-193):
-// the federation endpoint and roots and the installation-wide connector
-// values a regional connector source must name. It holds no credential and
-// confers no enrollment authority; enrollment needs a fleet operator's
-// audited bootstrap.
+// the federation endpoint and roots and the hub endpoints a connector
+// reaches. It holds no credential.
 const RegionalOfferFormat = "asservat-regional-offer/v1"
 const RegionalOfferFile = "regional-offer.json"
 
@@ -22,15 +19,7 @@ type RegionalOffer struct {
 	// Federation is what the connector dials: the external endpoint, the
 	// server name and the roots of the operator's serving certificate.
 	Federation RegionalHubEndpoint `json:"federation"`
-	// ConnectorServerSuffix and ConnectorIssuerRoots constrain the connector
-	// leaves; Roles are the six installation-wide connector duty logins.
-	ConnectorServerSuffix string                 `json:"connectorServerSuffix"`
-	ConnectorIssuerRoots  [][]byte               `json:"connectorIssuerRoots"`
-	Roles                 ConnectorIdentityRoles `json:"roles"`
-	// ConnectorBacking is the hub-decided root backing the regional source
-	// names unchanged (FederationConnector.Backing).
-	ConnectorBacking json.RawMessage `json:"connectorBacking"`
-	Image            string          `json:"image"`
+	Image      string              `json:"image"`
 	// Owners is where regional context starts reach the hub's owners: the
 	// exposed native address and the accepted owner pool (ADR-196).
 	Owners *RegionalContextOwners `json:"owners,omitempty"`

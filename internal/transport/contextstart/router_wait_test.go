@@ -1,11 +1,12 @@
 package contextstart
 
 import (
-	"asservat.local/asservat/internal/domain/identity"
 	"context"
 	"errors"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/domain/identity"
 
 	"asservat.local/asservat/internal/domain/fleet"
 )

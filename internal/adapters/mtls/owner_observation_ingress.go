@@ -29,7 +29,7 @@ type OwnerObservationIngress struct {
 }
 
 func NewOwnerObservationIngress(pin value.OwnerObservationPin, server *OwnerCredentials, owners *app.OwnerAuthenticator, workloads app.OwnerObservationWorkloadReader, peers []OwnerObservationPeer, now func() time.Time) (*OwnerObservationIngress, error) {
-	if !pin.Valid() || server == nil || server.usage != "server" || !server.verifier.matchesPool(pin.Pool) || owners == nil || owners.Now == nil || workloads == nil || len(peers) < 1 || len(peers) > 16 || now == nil {
+	if !pin.Valid() || server == nil || server.usage != "server" || !server.verifier.matchesPool(pin.Pool) || owners == nil || owners.Now == nil || workloads == nil || len(peers) > 16 || now == nil {
 		return nil, value.ErrInvalid
 	}
 	s := &OwnerObservationIngress{pin: pin, server: server, owners: owners, workloads: workloads, peers: make(map[value.PeerBinding]*PeerVerifier, len(peers)), now: now}
@@ -136,46 +136,4 @@ func (s *OwnerObservationIngress) ObserveOwnerPeer(ctx context.Context, state *t
 		return zero, value.ErrUnavailable
 	}
 	return ownerObservationReplyWire(out)
-}
-
-// This is invoked only by the concrete client over the same actual connection
-// and its immutable pre-handshake candidate set. It does not re-discover a new
-// owner after the load balancer selected one, and never performs source writes.
-func checkOwnerObservation(ctx context.Context, state *tls.ConnectionState, verifier *OwnerPeerVerifier, registry app.OwnerCertificateRegistry, candidates value.APIContextOwnerCandidates, pin value.OwnerObservationPin, request value.OwnerObservationRequest, connector value.PeerCertificate, wire contracts.OwnerObservationReply, now func() time.Time) (value.OwnerObservation, error) {
-	var zero value.OwnerObservation
-	if ctx == nil || ctx.Err() != nil || verifier == nil || registry == nil || now == nil || !pin.Valid() || !request.Valid(now()) || !connector.Valid(now()) || candidates.Pool != pin.Pool || !candidates.Valid(now()) {
-		return zero, value.ErrUnavailable
-	}
-	owner, e := verifier.VerifyBootstrapServer(state, candidates)
-	if e != nil {
-		return zero, e
-	}
-	connection, e := ownerObservationConnection(state, request)
-	if e != nil {
-		return zero, e
-	}
-	out, e := parseOwnerObservationReply(wire, pin, connector, owner, now())
-	if e != nil || !out.Matches(request, pin, connection, connector, owner, now()) {
-		return zero, value.ErrDenied
-	}
-	until := identity.Earlier(request.NotAfter, identity.Earlier(candidates.ValidUntil, out.FreshUntil))
-	call, stop := context.WithDeadline(ctx, until)
-	defer stop()
-	registered, e := registry.ReadOwnerRegistration(call, owner)
-	if e != nil || !registered.Valid(now()) || registered.Certificate != owner || registered.Enrollment.ID != out.Owner.EnrollmentID || registered.Enrollment.Pool != pin.Pool || registered.Enrollment.SourceUID != pin.SourceUID || registered.Enrollment.Pod != out.Owner.Pod || registered.Enrollment.ReplicaSetUID != out.Owner.ReplicaSetUID || registered.Configuration.Configuration.Revision != out.Owner.ConfigurationRevision {
-		return zero, value.ErrUnavailable
-	}
-	current, e := verifier.currentVerifier(registered.Configuration)
-	if e != nil {
-		return zero, e
-	}
-	checked, e := current.VerifyBootstrapServer(state, candidates)
-	if e != nil || checked != owner || call.Err() != nil || !out.Matches(request, pin, connection, connector, owner, now()) || !candidates.Valid(now()) || !registered.Valid(now()) {
-		return zero, value.ErrUnavailable
-	}
-	out.FreshUntil = identity.Earlier(until, registered.FreshUntil)
-	if !out.Valid(now()) {
-		return zero, value.ErrUnavailable
-	}
-	return out, nil
 }

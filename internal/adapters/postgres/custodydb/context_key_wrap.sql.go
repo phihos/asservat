@@ -54,6 +54,8 @@ type LockContextKeyWrapRow struct {
 	UsedRoles         int16
 }
 
+// certificate_sha256 names the presenting peer: a key client's leaf, or a
+// connector's cluster (ADR-334).
 func (q *Queries) LockContextKeyWrap(ctx context.Context, arg LockContextKeyWrapParams) (LockContextKeyWrapRow, error) {
 	row := q.db.QueryRow(ctx, lockContextKeyWrap, arg.AttemptID, arg.RootID)
 	var i LockContextKeyWrapRow
@@ -62,43 +64,6 @@ func (q *Queries) LockContextKeyWrap(ctx context.Context, arg LockContextKeyWrap
 		&i.RootID,
 		&i.CertificateSha256,
 		&i.UsedRoles,
-	)
-	return i, err
-}
-
-const readActivatedConnectorClientLeaf = `-- name: ReadActivatedConnectorClientLeaf :one
-SELECT p.pod_uid, p.process_epoch, prof.cluster_id, prof.installation_id, a.certificate_not_after
-FROM connector_credential_attempt a
-JOIN connector_identity_process p ON p.id=a.process_id AND p.root_id=a.root_id
-JOIN connector_identity_profile prof ON prof.root_id=a.root_id AND prof.peer_id=a.peer_id
-WHERE a.root_id=$1 AND a.certificate_digest=$2 AND a.usage='client' AND a.activated_at IS NOT NULL AND a.detached_at IS NULL
- AND p.serving AND p.retired_at IS NULL
-`
-
-type ReadActivatedConnectorClientLeafParams struct {
-	RootID            pgtype.UUID
-	CertificateDigest []byte
-}
-
-type ReadActivatedConnectorClientLeafRow struct {
-	PodUid              pgtype.UUID
-	ProcessEpoch        pgtype.UUID
-	ClusterID           pgtype.UUID
-	InstallationID      pgtype.UUID
-	CertificateNotAfter pgtype.Timestamptz
-}
-
-// The presenting certificate must be an activated, attached connector client
-// leaf of a serving, unretired process.
-func (q *Queries) ReadActivatedConnectorClientLeaf(ctx context.Context, arg ReadActivatedConnectorClientLeafParams) (ReadActivatedConnectorClientLeafRow, error) {
-	row := q.db.QueryRow(ctx, readActivatedConnectorClientLeaf, arg.RootID, arg.CertificateDigest)
-	var i ReadActivatedConnectorClientLeafRow
-	err := row.Scan(
-		&i.PodUid,
-		&i.ProcessEpoch,
-		&i.ClusterID,
-		&i.InstallationID,
-		&i.CertificateNotAfter,
 	)
 	return i, err
 }

@@ -38,12 +38,7 @@ func ServeOwnerLocalObservation(ctx context.Context, listener net.Listener, root
 }
 
 func serveOwnerObservation(ctx context.Context, listener net.Listener, roots *x509.CertPool, credentials ServerCredentials, handler *clusterobservation.OwnerHandler, local *clusterobservation.LocalHandler, connections int) error {
-	return serveOwnerObservationPurposes(ctx, listener, roots, credentials, handler, local, nil, connections, 0)
-}
-
-func serveOwnerObservationPurposes(ctx context.Context, listener net.Listener, roots *x509.CertPool, credentials ServerCredentials, handler *clusterobservation.OwnerHandler, local *clusterobservation.LocalHandler, regional *clusterobservation.HubObservationHandler, proofConnections, regionalConnections int) error {
-	connections := proofConnections + regionalConnections
-	if ctx == nil || ctx.Err() != nil || listener == nil || roots == nil || len(roots.Subjects()) == 0 || credentials == nil || handler == nil || proofConnections < 1 || proofConnections > 64 || regionalConnections < 0 || regionalConnections > 64 || connections > 64 || (regional == nil) != (regionalConnections == 0) {
+	if ctx == nil || ctx.Err() != nil || listener == nil || roots == nil || len(roots.Subjects()) == 0 && local == nil || credentials == nil || handler == nil || connections < 1 || connections > 64 {
 		return contracts.ErrNativeProtocol
 	}
 	name, _, e := net.SplitHostPort(handler.Authority())
@@ -52,12 +47,7 @@ func serveOwnerObservationPurposes(ctx context.Context, listener net.Listener, r
 	}
 	root, cancel := context.WithCancel(ctx)
 	defer cancel()
-	residency, prelude := 5*time.Second, time.Duration(0)
-	if regional != nil {
-		residency, prelude = 30*time.Second, 2*time.Second
-	}
-	owned := &nativeListener{Listener: netutil.LimitListener(listener, connections), root: root, residency: residency, prelude: prelude}
-	proofSlots, regionalSlots := make(chan struct{}, proofConnections), make(chan struct{}, regionalConnections)
+	owned := &nativeListener{Listener: netutil.LimitListener(listener, connections), root: root, residency: 5 * time.Second}
 	defer owned.Close()
 	config := &tls.Config{MinVersion: tls.VersionTLS13, MaxVersion: tls.VersionTLS13, ClientAuth: tls.RequireAndVerifyClientCert, ClientCAs: roots.Clone(), SessionTicketsDisabled: true, NextProtos: []string{"h2"}}
 	if local != nil {
@@ -90,7 +80,7 @@ func serveOwnerObservationPurposes(ctx context.Context, listener net.Listener, r
 	}
 	protocols := &http.Protocols{}
 	protocols.SetHTTP2(true)
-	server := &http.Server{TLSConfig: config, Protocols: protocols, HTTP2: &http.HTTP2Config{MaxConcurrentStreams: 1, MaxDecoderHeaderTableSize: 4096, MaxEncoderHeaderTableSize: 4096, MaxReadFrameSize: 16 << 10, MaxReceiveBufferPerConnection: 16 << 10, MaxReceiveBufferPerStream: 16 << 10}, ReadHeaderTimeout: 2 * time.Second, ReadTimeout: residency, WriteTimeout: residency, IdleTimeout: time.Second, MaxHeaderBytes: 8 << 10, ErrorLog: log.New(io.Discard, "", 0)}
+	server := &http.Server{TLSConfig: config, Protocols: protocols, HTTP2: &http.HTTP2Config{MaxConcurrentStreams: 1, MaxDecoderHeaderTableSize: 4096, MaxEncoderHeaderTableSize: 4096, MaxReadFrameSize: 16 << 10, MaxReceiveBufferPerConnection: 16 << 10, MaxReceiveBufferPerStream: 16 << 10}, ReadHeaderTimeout: 2 * time.Second, ReadTimeout: 5 * time.Second, WriteTimeout: 5 * time.Second, IdleTimeout: time.Second, MaxHeaderBytes: 8 << 10, ErrorLog: log.New(io.Discard, "", 0)}
 	server.BaseContext = func(net.Listener) context.Context { return root }
 	server.ConnContext = func(_ context.Context, c net.Conn) context.Context {
 		if t, ok := c.(*tls.Conn); ok {
@@ -113,53 +103,9 @@ func serveOwnerObservationPurposes(ctx context.Context, listener net.Listener, r
 		}
 		defer close(connection.handlerDone)
 		// Both the socket and handler use the actual SNI, not merely HTTP Host.
-		if r.TLS == nil || r.TLS.ServerName != name || r.Host != handler.Authority() || (r.RequestURI != contracts.OwnerObservationPath && (local == nil || r.RequestURI != contracts.ClusterObservationLocalPath) && (regional == nil || r.RequestURI != contracts.ClusterObservationExchangePath)) {
+		if r.TLS == nil || r.TLS.ServerName != name || r.Host != handler.Authority() || (r.RequestURI != contracts.OwnerObservationPath && (local == nil || r.RequestURI != contracts.ClusterObservationLocalPath)) {
 			unavailable(w)
 			return
-		}
-		if regional != nil {
-			// Original accept time owns both purposes. Selecting a valid path
-			// can only shorten residency; idle standby cannot consume the
-			// separately prepaid finite-proof slots.
-			lifetime, slots := 5*time.Second, proofSlots
-			if r.RequestURI == contracts.ClusterObservationExchangePath {
-				lifetime, slots = 30*time.Second, regionalSlots
-			}
-			select {
-			case slots <- struct{}{}:
-				connection.mu.Lock()
-				connection.release = func() { <-slots }
-				connection.mu.Unlock()
-			default:
-				unavailable(w)
-				return
-			}
-			if connection.finishPrelude() != nil || connection.shorten(connection.accepted.Add(lifetime)) != nil {
-				return
-			}
-			// The TLS pre-authentication root union does not select a peer.
-			// The concrete per-path handler verifies its installed identity;
-			// even before that, a presented leaf may only shorten this socket.
-			if len(r.TLS.PeerCertificates) > 0 && connection.shorten(r.TLS.PeerCertificates[0].NotAfter) != nil {
-				return
-			}
-			connection.mu.Lock()
-			until := connection.until
-			connection.mu.Unlock()
-			call, end := context.WithDeadline(r.Context(), until)
-			interrupted := make(chan struct{})
-			stopCall := context.AfterFunc(call, func() {
-				connection.cancel()
-				_ = connection.Conn.Close()
-				close(interrupted)
-			})
-			defer func() {
-				if !stopCall() {
-					<-interrupted
-				}
-				end()
-			}()
-			r = r.WithContext(call)
 		}
 		mu.Lock()
 		if closing || root.Err() != nil || r.Context().Err() != nil {
@@ -178,10 +124,6 @@ func serveOwnerObservationPurposes(ctx context.Context, listener net.Listener, r
 		// path. Every own-peer request still requires verified mutual TLS.
 		if len(r.TLS.PeerCertificates) == 0 || len(r.TLS.VerifiedChains) == 0 {
 			unavailable(w)
-			return
-		}
-		if regional != nil && r.RequestURI == contracts.ClusterObservationExchangePath {
-			regional.ServeHTTP(w, r)
 			return
 		}
 		handler.ServeHTTP(w, r)

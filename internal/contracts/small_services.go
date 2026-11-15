@@ -116,7 +116,6 @@ func SQLComponentPurposes(component string) ([]string, bool) {
 		out := ConfigurationRuntimeRolePurposes()
 		out = append(out, "browser-settings")
 		out = append(out, PublicRuntimeCaptureCleanupPurposes()...)
-		out = append(out, PublicRuntimeConnectorMaintenancePurposes()...)
 		out = append(out, CapacityRuntimePurposes()...)
 		out = append(out, PublicRuntimePermissionPurposes()...)
 		out = append(out, PublicRuntimeRetentionPurposes()...)

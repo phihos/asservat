@@ -54,10 +54,6 @@ type OwnerObservationRuntime struct {
 	ready          atomic.Pointer[ownerReadinessSnapshot]
 }
 
-func NewOwnerObservationRuntime(ctx context.Context, c OwnerObservationRuntimeConfig) (*OwnerObservationRuntime, error) {
-	return newOwnerObservationRuntime(ctx, ctx, c)
-}
-
 // setup preserves the installed loader's independently observed original proof
 // deadline without making it the lifetime of the supervised process.
 func newOwnerObservationRuntime(ctx, setup context.Context, c OwnerObservationRuntimeConfig) (result *OwnerObservationRuntime, err error) {
@@ -119,15 +115,6 @@ func newOwnerObservationRuntime(ctx, setup context.Context, c OwnerObservationRu
 	return r, nil
 }
 
-func (r *OwnerObservationRuntime) Binding() value.OwnerBinding { return r.binding }
-func (r *OwnerObservationRuntime) Ready() bool {
-	if r == nil || r.root == nil || r.root.Err() != nil {
-		return false
-	}
-	s := r.ready.Load()
-	now := time.Now()
-	return s != nil && !now.Before(s.observed) && now.Before(s.until)
-}
 func (r *OwnerObservationRuntime) Close() {
 	if r == nil {
 		return
@@ -241,7 +228,7 @@ type ownerObservationServing struct {
 }
 
 func newOwnerObservationServing(root context.Context, c OwnerObservationServingConfig, server *mtls.OwnerCredentials, gate *app.OwnerAuthenticator, concurrency int, phase *ownerStartupPhase) (*ownerObservationServing, error) {
-	if !c.Pin.Valid() || c.Workloads == nil || len(c.Peers) < 1 || len(c.Peers) > 16 || server == nil || gate == nil {
+	if !c.Pin.Valid() || c.Workloads == nil || len(c.Peers) > 16 || len(c.Peers) == 0 && c.Local == nil || server == nil || gate == nil {
 		return nil, value.ErrInvalid
 	}
 	p := c.Pin.Pool

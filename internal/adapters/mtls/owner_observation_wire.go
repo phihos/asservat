@@ -11,7 +11,6 @@ import (
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/fleet"
-	"asservat.local/asservat/internal/domain/identity"
 )
 
 func ownerObservationRequest(w contracts.OwnerObservationRequest, now time.Time) (value.OwnerObservationRequest, error) {
@@ -70,13 +69,6 @@ func ownerObservationConnection(s *tls.ConnectionState, r value.OwnerObservation
 	return out, nil
 }
 func ownerObservationHex(d artifact.Digest) string { return hex.EncodeToString(d[:]) }
-func ownerObservationTime(s string) time.Time {
-	t, e := time.Parse(time.RFC3339Nano, s)
-	if e != nil || t.Format(time.RFC3339Nano) != s {
-		return time.Time{}
-	}
-	return t
-}
 func ownerObservationReplyWire(v value.OwnerObservation) (contracts.OwnerObservationReply, error) {
 	pin, e := ownerObservationPinDigest(v.Workload.Pin)
 	if e != nil {
@@ -84,20 +76,4 @@ func ownerObservationReplyWire(v value.OwnerObservation) (contracts.OwnerObserva
 	}
 	f := func(t time.Time) string { return t.Format(time.RFC3339Nano) }
 	return contracts.OwnerObservationReply{Format: contracts.OwnerObservationFormat, Request: ownerObservationRequestWire(v.Request), ConnectionBinding: ownerObservationHex(v.ConnectionBinding), ConnectorLeaf: ownerObservationHex(v.Connector.Digest), OwnerLeaf: ownerObservationHex(v.Owner.Certificate.Digest), PinDigest: ownerObservationHex(pin), EnrollmentID: v.Owner.EnrollmentID, Pod: v.Owner.Pod, ReplicaSetUID: v.Owner.ReplicaSetUID, Configuration: contracts.APIContextRevision{UID: v.Owner.ConfigurationRevision.UID, Generation: v.Owner.ConfigurationRevision.Generation, Digest: ownerObservationHex(v.Owner.ConfigurationRevision.Digest)}, ProtectionDigest: ownerObservationHex(v.Owner.ProtectionDigest), WorkloadDigest: ownerObservationHex(v.Workload.WorkloadDigest), OwnerObservedAt: f(v.Owner.VerifiedAt), OwnerFreshUntil: f(v.Owner.ValidUntil), WorkloadObservedAt: f(v.Workload.ObservedAt), WorkloadFreshUntil: f(v.Workload.FreshUntil), ObservedAt: f(v.ObservedAt), FreshUntil: f(v.FreshUntil)}, nil
-}
-func parseOwnerObservationReply(w contracts.OwnerObservationReply, p value.OwnerObservationPin, peer value.PeerCertificate, owner value.OwnerCertificate, now time.Time) (value.OwnerObservation, error) {
-	var zero value.OwnerObservation
-	pin, e := ownerObservationPinDigest(p)
-	if e != nil || w.Format != contracts.OwnerObservationFormat || w.PinDigest != ownerObservationHex(pin) || w.ConnectorLeaf != ownerObservationHex(peer.Digest) || w.OwnerLeaf != ownerObservationHex(owner.Digest) {
-		return zero, value.ErrDenied
-	}
-	r, e := ownerObservationRequest(w.Request, now)
-	if e != nil {
-		return zero, e
-	}
-	out := value.OwnerObservation{Request: r, ConnectionBinding: contextStartDigest(w.ConnectionBinding), Connector: peer, Owner: value.AuthenticatedOwner{Certificate: owner, EnrollmentID: w.EnrollmentID, Pool: p.Pool, Pod: w.Pod, ReplicaSetUID: w.ReplicaSetUID, ConfigurationRevision: identity.Revision{UID: w.Configuration.UID, Generation: w.Configuration.Generation, Digest: contextStartDigest(w.Configuration.Digest)}, ProtectionDigest: contextStartDigest(w.ProtectionDigest), VerifiedAt: ownerObservationTime(w.OwnerObservedAt), ValidUntil: ownerObservationTime(w.OwnerFreshUntil)}, Workload: value.OwnerObservationWorkload{Pin: p, Binding: owner.Binding, Pod: w.Pod, ReplicaSetUID: w.ReplicaSetUID, WorkloadDigest: contextStartDigest(w.WorkloadDigest), ObservedAt: ownerObservationTime(w.WorkloadObservedAt), FreshUntil: ownerObservationTime(w.WorkloadFreshUntil)}, ObservedAt: ownerObservationTime(w.ObservedAt), FreshUntil: ownerObservationTime(w.FreshUntil)}
-	if !out.Valid(now) {
-		return zero, value.ErrDenied
-	}
-	return out, nil
 }

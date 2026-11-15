@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	audit "asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
@@ -63,12 +62,7 @@ func TestPublicRoutingRefusesUnknownAndCrossClusterTargets(t *testing.T) {
 	}
 }
 
-func TestPublicConnectorProfileIsPinnedToItsCluster(t *testing.T) {
-	source, _ := json.Marshal(contracts.ConnectorIdentityConfiguration{Format: contracts.ConnectorIdentityFormat, ClusterID: "10000000-0000-4000-8000-0000000000aa"})
-	v := contracts.OwnerPublicCluster{ClusterID: runtimeID, Connector: contracts.FederationPeer{SourceUID: runtimeID, Source: source}}
-	if _, e := publicConnectorProfile(v, runtimeID, runtimeID); e == nil {
-		t.Fatal("connector source of another cluster accepted")
-	}
+func TestPublicDigestRequiresCanonicalNonzeroHex(t *testing.T) {
 	if _, ok := publicDigest("00"); ok {
 		t.Fatal("short digest")
 	}

@@ -16,7 +16,6 @@ import (
 	"asservat.local/asservat/internal/adapters/kms"
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/mounts"
-	"asservat.local/asservat/internal/adapters/mtls"
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
 	auditapp "asservat.local/asservat/internal/application/audit"
@@ -245,9 +244,6 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	control := cfg.NamespaceRef{Name: c.Namespace.Name, UID: c.Namespace.UID}
 	capabilities, signers := publicCapabilities{}, publicSigners{}
 	limits := contextstart.RouterLimits{Standby: p.Standby, Captures: p.Captures}
-	// An empty catalog leaves this explicitly empty: the ingress then admits
-	// no connector (ADR-185).
-	admissions := []mtls.ContextStartConnectorAdmission{}
 	// ADR-185: the regional clusters come from the guarded catalog, read once
 	// at start before the native configuration (ADR-196 decision 7). Each
 	// entry still passes the SQL registry and guard checks below; an empty
@@ -260,18 +256,9 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	for _, v := range in.remoteEntries {
 		out.clusterIDs = append(out.clusterIDs, v.ClusterID)
 	}
-	// admit adds one cluster's connector admission, capability, work-trust
-	// signer and limits.
+	// admit adds one cluster's capability, work-trust signer and limits.
 	admit := func(v contracts.OwnerPublicCluster, capability *kube.ContextCapabilitySource, trust *kube.APIContextWorkTrustSource) error {
-		profile, err := publicConnectorProfile(v, root, installation)
-		if err != nil {
-			return err
-		}
-		registry, err := postgres.NewConnectorObservationRegistry(ctx, shared.nativeRead, profile)
-		if err != nil {
-			return mounts.ErrUnavailable
-		}
-		admissions = append(admissions, mtls.ContextStartConnectorAdmission{Profile: profile, Registry: registry})
+		var err error
 		capabilities[v.ClusterID] = capability
 		if signers[v.ClusterID], err = jose.NewAPIContextWorkSignatures(trust, s.KeyID, key.ForContext, time.Now); err != nil {
 			return mounts.ErrUnavailable
@@ -347,7 +334,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 		return nil, mounts.ErrUnavailable
 	}
 	*closers = append(*closers, router.Close)
-	out.starts = &OwnerContextStartRuntimeConfig{RootID: root, Router: router, Admissions: admissions, Connections: limits.Standby, Preflight: limits.Standby}
+	out.starts = &OwnerContextStartRuntimeConfig{RootID: root, Router: router, Connections: limits.Standby, Preflight: limits.Standby}
 
 	recovery := shared.guards.Recovery
 	if out.permissions, err = postgres.NewPermissions(ctx, sql["hub-metadata-read"], root); err != nil {
@@ -534,33 +521,6 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 		return nil, mounts.ErrUnavailable
 	}
 	return out, nil
-}
-
-// publicConnectorProfile decodes a workload cluster's pinned connector
-// identity source exactly as the federation does; its cluster is fixed.
-func publicConnectorProfile(v contracts.OwnerPublicCluster, root, installation string) (fleet.ConnectorCredentialProfile, error) {
-	profile, _, err := publicConnectorIdentity(v, root, installation)
-	return profile, err
-}
-
-// publicConnectorIdentity also returns the staged source's six duty roles.
-func publicConnectorIdentity(v contracts.OwnerPublicCluster, root, installation string) (fleet.ConnectorCredentialProfile, fleet.ConnectorIdentityRoles, error) {
-	var wire contracts.ConnectorIdentityConfiguration
-	if json.Unmarshal(v.Connector.Source, &wire) != nil || wire.ClusterID != v.ClusterID {
-		return fleet.ConnectorCredentialProfile{}, fleet.ConnectorIdentityRoles{}, mounts.ErrUnavailable
-	}
-	binding := fleet.PeerBinding{InstallationID: installation, ClusterID: wire.ClusterID, IssuerEpoch: wire.IssuerEpoch, PeerID: wire.PeerID, Role: fleet.ConnectorPeer}
-	config, _, err := kube.DecodeConnectorIdentityConfiguration(v.Connector.Source, v.Connector.SourceUID, root, binding, time.Now())
-	protection, ok := publicDigest(v.Connector.ProtectionDigest)
-	if err != nil || !ok {
-		return fleet.ConnectorCredentialProfile{}, fleet.ConnectorIdentityRoles{}, mounts.ErrUnavailable
-	}
-	profile := config.Source.Observation.Profile
-	profile.ProtectionDigest = protection
-	if !profile.Valid() || profile.Suspended {
-		return fleet.ConnectorCredentialProfile{}, fleet.ConnectorIdentityRoles{}, mounts.ErrUnavailable
-	}
-	return profile, config.Source.Roles, nil
 }
 
 // publicCatalog is the guarded cluster catalog as read at process start.

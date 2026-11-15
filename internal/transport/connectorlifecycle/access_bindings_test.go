@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"asservat.local/asservat/internal/contracts"
-	value "asservat.local/asservat/internal/domain/fleet"
 )
 
 type deliveryServices struct {
@@ -34,7 +33,6 @@ func (s *deliveryServices) AccessBindings(ctx context.Context, region *Region) e
 }
 
 type deliveringReader struct {
-	localReader
 	delivery contracts.AccessBindingDelivery
 }
 
@@ -62,9 +60,8 @@ func TestAccessBindingDeliveryOverRealHTTP2(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	process := value.ConnectorProcessIdentity{Binding: localReader{}.binding(), PodUID: "10000000-0000-4000-8000-000000000005", ProcessEpoch: "10000000-0000-4000-8000-000000000006"}
-	request := value.ConnectorProcessRequest{Process: process, ClientCSRDER: make([]byte, 64), ServerCSRDER: append(make([]byte, 63), 1)}
-	open := Opening{Purpose: PurposeAccessBindings, OperationID: "10000000-0000-4000-8000-000000000008", Request: request}
+	process := testProcess()
+	open := Opening{Purpose: PurposeAccessBindings, OperationID: "10000000-0000-4000-8000-000000000008", Process: process}
 	// About 4 MiB: above an ordinary conversation's read bound.
 	spec, _ := json.Marshal(map[string]string{"pad": strings.Repeat("x", 4<<10)})
 	delivery := contracts.AccessBindingDelivery{ResourceVersion: "7"}
@@ -87,7 +84,7 @@ func TestAccessBindingDeliveryOverRealHTTP2(t *testing.T) {
 	services.stored = ""
 	// A connector without the reader answers with an error.
 	services.items = 0
-	if _, err = client.Run(context.Background(), open, localReader{}); err == nil || services.items != 0 {
+	if _, err = client.Run(context.Background(), open, nil); err == nil || services.items != 0 {
 		t.Fatal("delivery without a local reader", err)
 	}
 	// A hub without the service refuses the purpose.

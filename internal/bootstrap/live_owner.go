@@ -59,7 +59,7 @@ func (r liveOwnerRoute) Begin(ctx context.Context, current liveapp.CurrentIdenti
 // construction. Only the existing protected runtime supplies peer/route inputs.
 func (d *OwnerDeployment) newLiveOwner(ctx context.Context, service *liveapp.Service, lookup liveOwnerLocator, rootID string) (*liveapp.RoutedService, error) {
 	r := d.Runtime
-	if ctx == nil || ctx.Err() != nil || r == nil || r.native == nil || r.native.handler == nil || lookup == nil || service == nil {
+	if ctx == nil || ctx.Err() != nil || r == nil || r.native == nil || lookup == nil || service == nil {
 		return nil, fmt.Errorf("%w: live_owner:62", v.ErrUnavailable)
 	}
 	peers, ok := r.native.hub.(*mtls.OwnerRequestPeers)

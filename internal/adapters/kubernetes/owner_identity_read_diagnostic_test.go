@@ -1,10 +1,11 @@
 package kubernetes
 
 import (
-	cfg "asservat.local/asservat/internal/domain/configuration"
 	"context"
 	"errors"
 	"testing"
+
+	cfg "asservat.local/asservat/internal/domain/configuration"
 )
 
 type ownerReadPrivateError struct{}

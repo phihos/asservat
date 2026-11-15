@@ -1,12 +1,14 @@
 package contextstart
 
 import (
-	deliveryapp "asservat.local/asservat/internal/application/delivery"
-	"asservat.local/asservat/internal/domain/identity"
 	"context"
 	"errors"
 	"testing"
 	"time"
+
+	deliveryapp "asservat.local/asservat/internal/application/delivery"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/identity"
 
 	app "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -141,8 +143,7 @@ func TestSourceWorkIsAQueryThatKeepsTheStandby(t *testing.T) {
 			ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
 			defer cancel()
 			hub, region := historyStreamPair(t, ctx, r)
-			hub.sources = NewSourceFeed(r.Channel.ExchangeID, time.Now)
-			region.local = freshConnectorSource{}
+			hub.capabilities = contracts.NewConnectorCapabilities(contracts.APIContextCapabilities())
 			region.targets = &countingLocal{}
 			queue := &sourceQueue{fail: mode == "queue-refusal"}
 			snapshots := &sourceSnapshotCanceller{fail: mode == "cancel-refused"}

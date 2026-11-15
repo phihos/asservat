@@ -1,17 +1,18 @@
 package bootstrap
 
 import (
-	"asservat.local/asservat/internal/adapters/gadget"
-	"asservat.local/asservat/internal/adapters/packets"
-	compiler "asservat.local/asservat/internal/application/planning"
-	"asservat.local/asservat/internal/domain/collector"
-	"asservat.local/asservat/internal/domain/planning"
 	"context"
 	"errors"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/adapters/gadget"
+	"asservat.local/asservat/internal/adapters/packets"
+	compiler "asservat.local/asservat/internal/application/planning"
+	"asservat.local/asservat/internal/domain/collector"
+	"asservat.local/asservat/internal/domain/planning"
 )
 
 func nodePermitWork(now time.Time) (collector.Work, collector.Identity) {

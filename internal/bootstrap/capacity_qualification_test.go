@@ -1,7 +1,6 @@
 package bootstrap
 
 import (
-	fleetapp "asservat.local/asservat/internal/application/fleet"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -97,39 +96,6 @@ func TestCapacityQualificationReplayIsIdentical(t *testing.T) {
 	}
 }
 
-// ADR-193: the connector backing derives from the role setup and satisfies
-// the prepaid-retirement validator; a replay is identical and oversized
-// profiles are refused.
-func TestConnectorBackingDerivation(t *testing.T) {
-	c := contracts.InstallerConnectorSettings{RetainedSeconds: 15000, PurgeLeases: 2,
-		Footprint: contracts.InstallerCapacityFootprint{RowBytes: 1 << 20, TransitionWALBytes: 1 << 20}}
-	backup := capacityProfileFixture().Backup
-	root, installation, setup := "30000000-0000-4000-8000-000000000003", "30000000-0000-4000-8000-000000000004", "30000000-0000-4000-8000-000000000001"
-	now := time.Date(2026, 10, 16, 12, 0, 0, 0, time.UTC)
-	b, err := buildConnectorBacking(c, backup, root, installation, "setup-account/v1", setup, now)
-	if err != nil || !b.Valid() || b.Policy.RootID != root || !b.Policy.ValidUntil.Equal(fleetapp.ConnectorBackingStanding) {
-		t.Fatal("connector backing", err)
-	}
-	again, _ := buildConnectorBacking(c, backup, root, installation, "setup-account/v1", setup, now)
-	x, _ := json.Marshal(b)
-	y, _ := json.Marshal(again)
-	if !bytes.Equal(x, y) {
-		t.Fatal("replay built a different backing")
-	}
-	for i, mutate := range []func(*contracts.InstallerConnectorSettings){
-		func(c *contracts.InstallerConnectorSettings) { c.Footprint.RowBytes = 1 << 10 },
-		// Continuation run 52: a 3600-second retention with a 3600-second
-		// backup horizon leaves no process run time for the regional shape.
-		func(c *contracts.InstallerConnectorSettings) { c.RetainedSeconds = 3600 },
-	} {
-		bad := c
-		mutate(&bad)
-		if _, err := buildConnectorBacking(bad, backup, root, installation, "setup-account/v1", setup, now); err == nil {
-			t.Fatalf("oversized or invalid connector profile %d accepted", i)
-		}
-	}
-}
-
 // The installed journey's profile (test/integration nativeCapacityProfile):
 // one-day admission, room for about 150 root renewals and enough normal-lane
 // records for repeated hold previews must still compile.
@@ -208,27 +174,4 @@ func TestProfileCapacityQualificationFundsRenewalsWithinFiniteEnvelope(t *testin
 		t.Fatal("underfunded renewal graph accepted")
 	}
 	t.Logf("installed complete root: accounts=%d records/account=%d SQL=%d backup=%d WAL=%d nativeWAL/workload=%d nativeBackup/workload=%d", p.Accounts, p.Records, totals.SQLBytes, totals.BackupBytes, totals.WALBytes, work.NativeWALBytes, work.NativeBackupBytes)
-}
-
-// ADR-332: the backing is standing (valid until replaced) at any setup time,
-// and its retention must still leave the regional shape a process run time.
-func TestConnectorBackingIsStanding(t *testing.T) {
-	c := contracts.InstallerConnectorSettings{RetainedSeconds: 3902, PurgeLeases: 2,
-		Footprint: contracts.InstallerCapacityFootprint{RowBytes: 1 << 20, TransitionWALBytes: 1 << 20}}
-	backup := contracts.InstallerCapacityBackup{HorizonSeconds: 1, CleanupBudgetSeconds: 60, ProofWindowSeconds: 60, BackupCopies: 1, WALCopies: 1}
-	d := capacityDerivedFixture()
-	now := time.Date(2026, 11, 11, 12, 0, 0, 123456789, time.FixedZone("synthetic", 19800))
-	accepted, err := buildConnectorBacking(c, backup, d.Root, d.Installation, d.AccountVersion, d.Root, now)
-	if err != nil || !accepted.Policy.ValidUntil.Equal(fleetapp.ConnectorBackingStanding) || accepted.ProcessRunSeconds() != 3600 {
-		t.Fatal("standing backing refused or bounded", err)
-	}
-	late, err := buildConnectorBacking(c, backup, d.Root, d.Installation, d.AccountVersion, d.Root, now.AddDate(3, 0, 0))
-	if err != nil || !late.Policy.ValidUntil.Equal(accepted.Policy.ValidUntil) {
-		t.Fatal("backing validity depends on the setup time", err)
-	}
-	short := c
-	short.RetainedSeconds = 1800 + 2*1 + 3*60 + 60 + 60 - 1
-	if _, err := buildConnectorBacking(short, backup, d.Root, d.Installation, d.AccountVersion, d.Root, now); err == nil {
-		t.Fatal("retention without a regional process run time accepted")
-	}
 }

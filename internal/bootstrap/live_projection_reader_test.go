@@ -1,12 +1,13 @@
 package bootstrap
 
 import (
-	"asservat.local/asservat/internal/domain/authorization"
-	"asservat.local/asservat/internal/domain/collector"
-	v "asservat.local/asservat/internal/domain/live"
 	"context"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/collector"
+	v "asservat.local/asservat/internal/domain/live"
 )
 
 type liveRemoteFunc func(context.Context, collector.LiveRead) (v.NodeReply, error)
