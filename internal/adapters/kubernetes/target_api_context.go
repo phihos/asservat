@@ -31,12 +31,8 @@ func (c *PodTargets) resolveAPIContextPodWithPacketNode(ctx context.Context, r v
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	start := c.client.now()
-	ns, err := c.client.namespace(ctx, r.Namespace)
-	if err != nil {
-		return value.PodResolution{}, "", targetReadError(err)
-	}
-	if ns.Deleting {
-		return value.PodResolution{}, "", value.ErrChanged
+	if err := c.targetNamespace(ctx, r.Namespace); err != nil {
+		return value.PodResolution{}, "", err
 	}
 	path := "/api/v1/namespaces/" + r.Namespace.Name + "/pods/" + r.PodName
 	first, err := c.object(ctx, path, "Pod", r.Namespace.Name, r.PodName, r.PodUID)
@@ -57,12 +53,8 @@ func (c *PodTargets) resolveAPIContextPodWithPacketNode(ctx context.Context, r v
 	if err != nil {
 		return value.PodResolution{}, "", err
 	}
-	ns, err = c.client.namespace(ctx, r.Namespace)
-	if err != nil {
-		return value.PodResolution{}, "", targetReadError(err)
-	}
-	if ns.Deleting {
-		return value.PodResolution{}, "", value.ErrChanged
+	if err = c.targetNamespace(ctx, r.Namespace); err != nil {
+		return value.PodResolution{}, "", err
 	}
 	out := value.PodResolution{ExecutionClass: artifact.ContextAPIExecution, Request: r, Pin: artifact.PinnedPod{Namespace: r.Namespace.Name, NamespaceUID: r.Namespace.UID, Name: r.PodName, UID: r.PodUID}, PodResourceVersion: last.ref.ResourceVersion, WorkloadResourceVersion: rv, ObservedAt: start, FreshUntil: start.Add(identity.AuthorityRecheckInterval)}
 	if last.owner != nil {

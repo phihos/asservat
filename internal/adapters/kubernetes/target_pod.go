@@ -3,6 +3,7 @@ package kubernetes
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"time"
 
 	"asservat.local/asservat/internal/contracts"
@@ -156,6 +157,24 @@ func (c *PodTargets) object(ctx context.Context, path, kind, namespace, name, ui
 	}
 	return out, nil
 }
+
+// targetNamespace reads the target's namespace and refuses one that is being
+// deleted or that capacity does not cover: kube-* system namespaces, the
+// release namespace and namespaces labelled asservat.io/evidence: disabled.
+func (c *PodTargets) targetNamespace(ctx context.Context, ref cfg.NamespaceRef) error {
+	ns, err := c.client.namespace(ctx, ref)
+	if err != nil {
+		return targetReadError(err)
+	}
+	if ns.Deleting {
+		return value.ErrChanged
+	}
+	if strings.HasPrefix(ns.Name, "kube-") || ns.Name == c.client.control.Name || ns.Labels["asservat.io/evidence"] == "disabled" {
+		return value.ErrEvidenceDisabled
+	}
+	return nil
+}
+
 func targetReadError(err error) error {
 	switch err {
 	case cfg.ErrDenied:
@@ -217,12 +236,8 @@ func (c *PodTargets) ResolvePod(ctx context.Context, r value.Request) (value.Pod
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	start := c.client.now()
-	ns, err := c.client.namespace(ctx, r.Namespace)
-	if err != nil {
-		return out, targetReadError(err)
-	}
-	if ns.Deleting {
-		return out, value.ErrChanged
+	if err := c.targetNamespace(ctx, r.Namespace); err != nil {
+		return out, err
 	}
 	path := "/api/v1/namespaces/" + r.Namespace.Name + "/pods/" + r.PodName
 	first, err := c.object(ctx, path, "Pod", r.Namespace.Name, r.PodName, r.PodUID)
@@ -260,12 +275,8 @@ func (c *PodTargets) ResolvePod(ctx context.Context, r value.Request) (value.Pod
 	if nodeAgain.bootID != node.bootID {
 		return out, value.ErrChanged
 	}
-	ns, err = c.client.namespace(ctx, r.Namespace)
-	if err != nil {
-		return out, targetReadError(err)
-	}
-	if ns.Deleting {
-		return out, value.ErrChanged
+	if err = c.targetNamespace(ctx, r.Namespace); err != nil {
+		return out, err
 	}
 	out = value.PodResolution{Request: r, Pin: artifact.PinnedPod{Namespace: r.Namespace.Name, NamespaceUID: r.Namespace.UID, Name: r.PodName, UID: r.PodUID, NodeName: last.node}, NodeUID: node.ref.UID, NodeBootID: node.bootID, PodResourceVersion: last.ref.ResourceVersion, WorkloadResourceVersion: workloadRV, ObservedAt: start, FreshUntil: start.Add(5 * time.Second)}
 	if last.owner != nil {

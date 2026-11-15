@@ -152,3 +152,33 @@ func TestPodTargetsPinEntireOwnershipAndNodeChain(t *testing.T) {
 		})
 	}
 }
+
+func TestPodTargetsRefuseNamespacesWithoutEvidence(t *testing.T) {
+	for name, ns := range map[string]cfg.NamespaceRef{"system": {Name: "kube-system", UID: "kube-uid"}, "release": permissionControl, "labelled": {Name: "payments", UID: "payments-uid"}} {
+		t.Run(name, func(t *testing.T) {
+			f := newPermissionFixture(t, func(w http.ResponseWriter, r *http.Request) bool {
+				switch r.URL.Path {
+				case "/api/v1/namespaces/kube-system":
+					permissionReply(w, permissionNamespace(ns.Name, ns.UID))
+				case "/api/v1/namespaces/payments":
+					object := permissionNamespace(ns.Name, ns.UID)
+					object["metadata"].(map[string]any)["labels"] = map[string]string{"asservat.io/evidence": "disabled"}
+					permissionReply(w, object)
+				default:
+					return false
+				}
+				return true
+			})
+			for _, api := range []bool{false, true} {
+				reader, _ := NewPodTargets(f.client)
+				if api {
+					reader, _ = NewAPIContextTargets(f.client)
+				}
+				request := value.Request{ClusterID: permissionCluster, Namespace: ns, Workload: cfg.WorkloadRef{Kind: "Deployment", Name: "app", UID: "root-uid"}, PodName: "app", PodUID: "pod-uid"}
+				if _, err := reader.ResolvePod(context.Background(), request); !errors.Is(err, value.ErrEvidenceDisabled) || !errors.Is(err, value.ErrDenied) {
+					t.Fatalf("api=%v: %v", api, err)
+				}
+			}
+		})
+	}
+}
