@@ -30,7 +30,6 @@ type fixture struct {
 	record       authapp.ContextDownloadEvidence
 	route        catalog.ContextCaseRoute
 	caseID       string
-	recovery     artifact.RecoveryProof
 	catalogReads int
 	store        *memoryStore
 }
@@ -54,9 +53,6 @@ func (f *fixture) ResolveContextCase(_ context.Context, q catalog.CaseRouteQuery
 		return catalog.ContextCaseRoutes{}, errors.New("unknown case")
 	}
 	return catalog.ContextCaseRoutes{CaseID: f.caseID, Routes: []catalog.ContextCaseRoute{f.route}, ObservedAt: f.now, ValidUntil: f.now.Add(5 * time.Second)}, nil
-}
-func (f *fixture) RecoveryState(context.Context) (artifact.RecoveryProof, error) {
-	return f.recovery, nil
 }
 
 // memoryStore is an in-memory share ledger with the SQL adapter's replay,
@@ -87,7 +83,7 @@ func (s *memoryStore) RecipientShares(_ context.Context, artifactID string, call
 	}
 	return out, nil
 }
-func (s *memoryStore) CreateShare(_ context.Context, r Request, _ artifact.RecoveryProof) (value.Share, bool, error) {
+func (s *memoryStore) CreateShare(_ context.Context, r Request) (value.Share, bool, error) {
 	for _, c := range s.created {
 		if c.IdempotencyKey == r.IdempotencyKey {
 			if c.RequestDigest != r.RequestDigest {
@@ -137,7 +133,7 @@ func (s *memoryStore) ReceivedShares(ctx context.Context, caller identity.Identi
 	}
 	return out, nil
 }
-func (s *memoryStore) RevokeShare(_ context.Context, r Revocation, _ artifact.RecoveryProof) (value.Share, bool, error) {
+func (s *memoryStore) RevokeShare(_ context.Context, r Revocation) (value.Share, bool, error) {
 	for i := range s.rows {
 		pinned := len(r.Managers) > 0
 		for _, id := range r.Managers {
@@ -182,7 +178,7 @@ func (s *memoryStore) AdministeredShares(_ context.Context, after ShareCursor, l
 
 // TransferShare mirrors the SQL adapter: pinned current managers only, the
 // latest transfer key replays, a stale revision conflicts.
-func (s *memoryStore) TransferShare(_ context.Context, t Transfer, _ artifact.RecoveryProof) (value.Share, bool, error) {
+func (s *memoryStore) TransferShare(_ context.Context, t Transfer) (value.Share, bool, error) {
 	for i := range s.rows {
 		if s.rows[i].ID != t.ShareID {
 			continue
@@ -229,11 +225,10 @@ func newFixture() (*fixture, Service) {
 		record: authapp.ContextDownloadEvidence{PurposeRef: "diagnostics", DataClass: "metadata", CaptureID: testID(4), Version: artifact.Digest{3}, Audience: []artifact.AudienceAssignment{reader, owner},
 			Retained:   privacy.RetainedArtifact{RootID: testID(1), Registration: reg, Input: privacy.Input{Target: target, PrivacyClass: "potentialPersonalData", EvidenceType: "context", RequestedSeconds: 3600, AnchorAt: reg.AnchorAt}, OriginPolicies: []artifact.RetentionRule{{UID: "baseline", Generation: 1, Digest: artifact.Digest{5}}}, Effective: dates},
 			ObservedAt: n, ValidUntil: n.Add(5 * time.Second)},
-		route:    catalog.ContextCaseRoute{CaptureID: testID(4), ArtifactID: testID(5), Target: target},
-		recovery: artifact.RecoveryProof{InstallationID: testID(3), IssuerEpoch: testID(22), Revision: rev, ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}}
+		route: catalog.ContextCaseRoute{CaptureID: testID(4), ArtifactID: testID(5), Target: target}}
 	f.store = &memoryStore{now: func() time.Time { return f.now }}
 	next := 50
-	return f, Service{RootID: testID(1), InstallationID: testID(3), Routes: f, Permissions: f, Catalog: f, Store: f.store, Recovery: f,
+	return f, Service{RootID: testID(1), InstallationID: testID(3), Routes: f, Permissions: f, Catalog: f, Store: f.store,
 		NewID: func() string { next++; return testID(next) }, Now: func() time.Time { return f.now }}
 }
 

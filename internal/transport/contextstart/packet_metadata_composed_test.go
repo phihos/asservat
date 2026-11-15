@@ -91,15 +91,6 @@ func (f *packetMetadataFixture) Permissions(_ context.Context, t auth.Target) (a
 	}
 	return p, nil
 }
-func (f *packetMetadataFixture) RecoveryState(ctx context.Context) (artifact.RecoveryProof, error) {
-	_, _, _, bound, _, _, _ := f.bounds()
-	now := time.Now()
-	until := originalBound(bound, now.Add(5*time.Second))
-	if ctx.Err() != nil || !now.Before(until) {
-		return artifact.RecoveryProof{}, capture.ErrUnavailable
-	}
-	return artifact.RecoveryProof{InstallationID: f.channel.Hub.InstallationID, IssuerEpoch: f.channel.Hub.IssuerEpoch, Revision: identity.Revision{UID: "recovery", Generation: 1, Digest: artifact.Digest{3}}, ObservedAt: now, FreshUntil: until}, nil
-}
 func (f *packetMetadataFixture) ContextCapability(_ context.Context, _ auth.Target) (planning.ContextCapability, error) {
 	now := time.Now()
 	return planning.ContextCapability{ExecutionClass: artifact.ContextAPIExecution, Enabled: true, Revision: identity.Revision{UID: "capability", Generation: 1, Digest: artifact.Digest{4}}, CollectorVersion: "synthetic-node", CollectorImageDigest: artifact.Digest{5}, ProjectionDigest: compiler.ProjectionDigest(), ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}, nil
@@ -129,9 +120,9 @@ func (f *packetMetadataFixture) ContextStorage(ctx context.Context, t auth.Targe
 	rev := identity.Revision{UID: "binding", Generation: 1, Digest: artifact.Digest{8}}
 	return captureapp.ContextStorageObservation{Selection: capture.ContextStorageSelection{StoreID: metadataID(42), AllocationID: metadataID(43), PoolRevision: 1, AllocationRevision: 1, BindingRevision: rev}, Binding: capture.StorageBinding{RootID: f.channel.RootID, ClusterID: t.ClusterID, NamespaceUID: t.NamespaceUID, WorkloadUID: t.WorkloadUID, AllocationID: metadataID(43), Revision: rev, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}}, nil
 }
-func (f *packetMetadataFixture) ContextProcessingCoverage(ctx context.Context, r capture.ProcessingCoverageRequest, recovery artifact.RecoveryProof) (capture.ProcessingCoverage, error) {
+func (f *packetMetadataFixture) ContextProcessingCoverage(ctx context.Context, r capture.ProcessingCoverageRequest) (capture.ProcessingCoverage, error) {
 	now := time.Now()
-	until := recovery.FreshUntil
+	until := now.Add(5 * time.Second)
 	if d, ok := ctx.Deadline(); ok && d.Before(until) {
 		until = d
 	}
@@ -324,7 +315,7 @@ func newPacketMetadataFixture(t *testing.T) *packetMetadataFixture {
 		router.Close()
 	})
 	targetPort := Targets{Router: router, Now: time.Now}
-	f.svc = captureapp.ContextInvestigation{RootID: f.channel.RootID, InstallationID: f.channel.Hub.InstallationID, Previews: f, Replay: f, Admission: f, Targets: targetPort, Recorders: targetPort, Eligibility: authapp.Evaluator{Permissions: f, Now: time.Now}, Capabilities: f, Retention: f, Storage: f, Processing: f, Recovery: f, Approvals: f, Grants: f, Lifetime: 120 * time.Second, Now: time.Now, NewID: func() string { return metadataID(100 + int(f.ids.Add(1))) }, ReportPreviewFailure: func(s string) { f.stages = append(f.stages, s) }}
+	f.svc = captureapp.ContextInvestigation{RootID: f.channel.RootID, InstallationID: f.channel.Hub.InstallationID, Previews: f, Replay: f, Admission: f, Targets: targetPort, Recorders: targetPort, Eligibility: authapp.Evaluator{Permissions: f, Now: time.Now}, Capabilities: f, Retention: f, Storage: f, Processing: f, Approvals: f, Grants: f, Lifetime: 120 * time.Second, Now: time.Now, NewID: func() string { return metadataID(100 + int(f.ids.Add(1))) }, ReportPreviewFailure: func(s string) { f.stages = append(f.stages, s) }}
 	return f
 }
 

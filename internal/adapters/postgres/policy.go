@@ -23,7 +23,6 @@ import (
 type Policies struct {
 	ledger             *Ledger
 	root, installation string
-	recovery           *RecoveryTransactionGuard
 }
 
 var _ app.PolicySourceWriter = (*Policies)(nil)
@@ -32,15 +31,14 @@ var _ authapp.AcceptedPolicyReader = (*Policies)(nil)
 var _ app.PolicyGrantAcceptanceReader = (*Policies)(nil)
 
 func NewPolicies(ctx context.Context, pool *pgxpool.Pool, root, installation string) (*Policies, error) {
-	guard, err := NewRecoveryTransactionGuard(root, installation)
-	if err != nil {
+	if !authorization.UUID(root) || !authorization.UUID(installation) {
 		return nil, value.ErrInvalid
 	}
 	l, err := New(ctx, pool)
 	if err != nil {
 		return nil, value.ErrUnavailable
 	}
-	return &Policies{l, root, installation, guard}, nil
+	return &Policies{l, root, installation}, nil
 }
 func policySource(row custodydb.PolicySource) value.PolicySource {
 	s := value.PolicySource{InstallationID: uid(row.InstallationID), ClusterID: uid(row.ClusterID), NamespaceUID: row.NamespaceUid, Name: row.Name, Revision: identity.Revision{UID: row.PolicyUid, Generation: row.Generation}, ResourceVersion: row.ResourceVersion, ObservedAt: row.ObservedAt.Time.UTC(), FreshUntil: row.FreshUntil.Time.UTC(), Deleted: row.Deleted, Suspended: row.Suspended, AuthoredGrantRef: row.AuthoredGrantRef}
@@ -100,7 +98,7 @@ func (s *Policies) ObservePolicy(ctx context.Context, in value.PolicySource) err
 	}))
 }
 
-// Request digest excludes refreshable identity/recovery proofs. Exact ambiguous
+// Request digest excludes refreshable identity proofs. Exact ambiguous
 // retries return the first immutable receipt and never renew scope or spending.
 func policyRequestDigest(a value.PolicyAdmission) []byte {
 	return digest(struct {
@@ -127,10 +125,6 @@ func (s *Policies) AcceptPolicy(ctx context.Context, in value.PolicyAdmission) (
 	}
 	request := policyRequestDigest(in)
 	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		trust, err := s.recovery.lock(ctx, q, s.root, in.Recovery)
-		if err != nil {
-			return err
-		}
 		stream, err := q.LockPermissionStream(ctx, id(s.root))
 		if err != nil {
 			return err
@@ -224,7 +218,7 @@ func (s *Policies) AcceptPolicy(ctx context.Context, in value.PolicyAdmission) (
 		if err != nil {
 			return err
 		}
-		record := value.PolicyAcceptance{ID: uid(event), RootID: s.root, Source: source, Submission: in.Submission, Authority: in.Authority, Submitter: in.Author.Principal, IdentityRevision: in.Author.Policy, PermissionRevision: current.Permissions.Revision, Recovery: in.Recovery, AcceptedAt: now.Time, IntentVersion: row.IntentVersion, Sharing: in.Sharing}
+		record := value.PolicyAcceptance{ID: uid(event), RootID: s.root, Source: source, Submission: in.Submission, Authority: in.Authority, Submitter: in.Author.Principal, IdentityRevision: in.Author.Policy, PermissionRevision: current.Permissions.Revision, AcceptedAt: now.Time, IntentVersion: row.IntentVersion, Sharing: in.Sharing}
 		if !record.Valid() {
 			return value.ErrInvalid
 		}
@@ -246,9 +240,6 @@ func (s *Policies) AcceptPolicy(ctx context.Context, in value.PolicyAdmission) (
 
 		_, err = q.InsertPolicyAcceptance(ctx, custodydb.InsertPolicyAcceptanceParams{ID: event, RootID: id(s.root), PolicyUid: source.Revision.UID, Generation: source.Revision.Generation, Nonce: id(in.Submission.Nonce), RequestDigest: request, RecordDigest: digest(record), Record: encoded, AcceptedAt: ts(record.AcceptedAt), ScopeDigest: record.Authority.ScopeDigest[:]})
 		if err != nil {
-			return err
-		}
-		if err = s.recovery.check(ctx, q, trust, s.root, in.Recovery); err != nil {
 			return err
 		}
 		now, err = q.CurrentTime(ctx)
@@ -282,8 +273,6 @@ func (s *Policies) AcceptedPolicyRecord(ctx context.Context, policy string) (aut
 		return out, record, value.ErrInvalid
 	}
 	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		// A restored database never makes accepted authority available until the
-		// current recovery producer has re-established installation trust.
 		trust, err := q.ShareFleetTrust(ctx, id(s.installation))
 		if err != nil {
 			return err
@@ -306,8 +295,8 @@ func (s *Policies) AcceptedPolicyRecord(ctx context.Context, policy string) (aut
 
 // acceptedPolicyIn checks the current acknowledged acceptance of one policy
 // source row inside the caller's transaction, which already holds the
-// recovery and permission-root locks (or shares them). The snapshot's
-// FreshUntil is the original source/recovery bound, never renewed here.
+// permission-root lock (or shares it). The snapshot's FreshUntil is the
+// original source bound, never renewed here.
 func acceptedPolicyIn(ctx context.Context, q *custodydb.Queries, root, installation string, trust custodydb.FleetCurrentTrust, row custodydb.PolicySource) (authorization.AcceptedPolicySnapshot, value.PolicyAcceptance, error) {
 	var zero authorization.AcceptedPolicySnapshot
 	source := policySource(row)
@@ -328,18 +317,14 @@ func acceptedPolicyIn(ctx context.Context, q *custodydb.Queries, root, installat
 		return zero, value.PolicyAcceptance{}, err
 	}
 	var receipt audit.Receipt
-	if !accepted.AcknowledgedAt.Valid || json.Unmarshal(accepted.ReceiptJson, &receipt) != nil || !receipt.ValidPolicyAcceptance(root, r.ID) || (r.IntentVersion != row.IntentVersion || r.Source.CollectionDigest != source.CollectionDigest) || !samePolicySourceIdentity(r.Source, source) || r.Recovery.IssuerEpoch != uid(trust.IssuerEpoch) {
+	if !accepted.AcknowledgedAt.Valid || json.Unmarshal(accepted.ReceiptJson, &receipt) != nil || !receipt.ValidPolicyAcceptance(root, r.ID) || (r.IntentVersion != row.IntentVersion || r.Source.CollectionDigest != source.CollectionDigest) || !samePolicySourceIdentity(r.Source, source) || trust.Suspended {
 		return zero, value.PolicyAcceptance{}, value.ErrUnavailable
 	}
 	now, err = q.CurrentTime(ctx)
 	if err != nil {
 		return zero, value.PolicyAcceptance{}, err
 	}
-	recovery, err := recoveryState(trust, now.Time, now.Time)
-	if err != nil {
-		return zero, value.PolicyAcceptance{}, err
-	}
-	until := identity.Earlier(source.FreshUntil, identity.Earlier(recovery.FreshUntil, r.Authority.NotAfter))
+	until := identity.Earlier(source.FreshUntil, r.Authority.NotAfter)
 	if now.Time.Before(started) || !source.Valid(now.Time) || !r.Authority.Valid(now.Time) || !now.Time.Before(until) {
 		return zero, value.PolicyAcceptance{}, value.ErrUnavailable
 	}

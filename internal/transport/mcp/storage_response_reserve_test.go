@@ -78,10 +78,6 @@ func (f *reserveFacts) DemandCapacityRefresh(ctx context.Context, _ targets.Requ
 	f.demands.Add(1)
 	return ctx.Err()
 }
-func (f *reserveFacts) RecoveryState(context.Context) (artifact.RecoveryProof, error) {
-	now := time.Now()
-	return artifact.RecoveryProof{InstallationID: reserveID(2), IssuerEpoch: reserveID(3), Revision: identity.Revision{UID: "recovery", Generation: 1, Digest: [32]byte{6}}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}, nil
-}
 func (f *reserveFacts) Resolve(_ context.Context, in privacy.Input) (privacy.Resolution, error) {
 	now := time.Now()
 	revision := identity.Revision{UID: reserveID(9), Generation: 1, Digest: [32]byte{7}}
@@ -89,7 +85,7 @@ func (f *reserveFacts) Resolve(_ context.Context, in privacy.Input) (privacy.Res
 	set.Proof = artifact.RetentionProof{RootID: reserveID(1), ClusterID: in.Target.ClusterID, NamespaceUID: in.Target.NamespaceUID, WorkloadUID: in.Target.WorkloadUID, PodUID: in.Target.PodUID, Topology: revision, Policy: revision, Selectors: revision, ObservedAt: now, ValidUntil: set.FreshUntil, SourceCount: 1, Sources: [2]artifact.RetentionSourceVersion{{ClusterID: in.Target.ClusterID, ControlNamespaceUID: "control", Epoch: reserveID(3), Hub: true, ProtectionDigest: artifact.Digest{1}, SnapshotDigest: artifact.Digest{2}, Acceptance: revision}}}
 	return privacy.Resolve(set, in, now)
 }
-func (f *reserveFacts) ContextProcessingCoverage(ctx context.Context, in value.ProcessingCoverageRequest, _ artifact.RecoveryProof) (value.ProcessingCoverage, error) {
+func (f *reserveFacts) ContextProcessingCoverage(ctx context.Context, in value.ProcessingCoverageRequest) (value.ProcessingCoverage, error) {
 	now := time.Now()
 	until := now.Add(5 * time.Second)
 	if deadline, ok := ctx.Deadline(); ok {
@@ -146,7 +142,7 @@ func TestStorageReadinessReserveDeliversAuditedHTTP2Preview(t *testing.T) {
 			server.EnableHTTP2 = true
 			server.StartTLS()
 			defer server.Close()
-			service := app.ContextInvestigation{RootID: reserveID(1), InstallationID: reserveID(2), Previews: facts, Replay: facts, Admission: facts, Targets: facts, Eligibility: access.Evaluator{Permissions: facts, Now: time.Now}, Capabilities: facts, Retention: facts, Storage: facts, Refresh: facts, Processing: facts, Recovery: facts, Lifetime: time.Minute, Now: time.Now, NewID: func() string { return reserveID(100 + int(facts.ids.Add(1))) }}
+			service := app.ContextInvestigation{RootID: reserveID(1), InstallationID: reserveID(2), Previews: facts, Replay: facts, Admission: facts, Targets: facts, Eligibility: access.Evaluator{Permissions: facts, Now: time.Now}, Capabilities: facts, Retention: facts, Storage: facts, Refresh: facts, Processing: facts, Lifetime: time.Minute, Now: time.Now, NewID: func() string { return reserveID(100 + int(facts.ids.Add(1))) }}
 			ops, err := presentation.NewContextOperations(presentation.ContextOperationsConfig{PublicOrigin: server.URL, CollectionEnabled: true, Now: time.Now, NewID: func() string { return reserveID(500) }}, service, &mcpCaptureFixture{})
 			if err != nil {
 				t.Fatal(err)

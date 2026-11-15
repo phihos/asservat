@@ -34,7 +34,7 @@ func (f *capacitySQLFixture) admitManagedContext(t *testing.T, root app.RootConf
 func (f *capacitySQLFixture) admitManagedContextRetention(t *testing.T, root app.RootConfiguration, enrollment app.Enrollment, retentionSeconds int64) (captureAdmissionScenario, capturevalue.Accepted) {
 	t.Helper()
 	s, publisher, policies := f.prepareManagedContext(t, root, enrollment, retentionSeconds)
-	f.checkManagedProcessingAdmission(t, s.s, s.recovery.guard, policies, s.a)
+	f.checkManagedProcessingAdmission(t, s.s, policies, s.a)
 	start := time.Now()
 	accepted, err := s.s.AdmitContext(f.ctx, s.a)
 	if err != nil {
@@ -61,22 +61,13 @@ func (f *capacitySQLFixture) prepareManagedContext(t *testing.T, root app.RootCo
 	if err != nil {
 		t.Fatal(err)
 	}
-	recovery.reader, err = postgres.NewRecoveryReader(f.ctx, f.fixturePool("peer_read_runtime", "synthetic-peer-read"), f.input.InstallationID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	recovery.guard, err = postgres.NewRecoveryTransactionGuard(f.input.PermissionRootID, f.input.InstallationID)
-	if err != nil {
-		t.Fatal(err)
-	}
 	material := f.setup.mac
 	mac, err := auditapp.NewOperationMAC(material.InputVersion, material.InputKey, material.AccountVersion, material.AccountKey)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(mac.Close)
-	guards := postgres.EffectTransactionGuards{Retention: retention.guard, Recovery: recovery.guard}
-	admission, err := postgres.NewAuditedContextAdmissions(f.ctx, f.roles["capture-admit"], f.input.PermissionRootID, mac, guards)
+	admission, err := postgres.NewAuditedContextAdmissions(f.ctx, f.roles["capture-admit"], f.input.PermissionRootID, f.input.InstallationID, mac, retention.guard)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,11 +136,7 @@ func (f *capacitySQLFixture) prepareManagedContext(t *testing.T, root app.RootCo
 		t.Fatal("request selected another workload account")
 	}
 	r := artifact.Registration{Location: artifact.Location{ClusterID: f.input.ControlClusterID, ArtifactID: custodyID(), AttemptID: custodyID()}, StoreID: selected.Selection.StoreID, AllocationID: selected.Selection.AllocationID, PoolRevision: selected.Selection.PoolRevision, AllocationRevision: selected.Selection.AllocationRevision, NativeLimit: 4096, AnchorAt: retained.AnchorAt, WriteUntil: plan.Input.Deadline, ExpiresAt: retained.ExpiresAt, DeleteBy: retained.DeleteBy}
-	proof, err := recovery.reader.RecoveryState(f.ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	request := capturevalue.Admission{Recovery: proof, RootID: f.input.PermissionRootID, IdempotencyKey: "capacity-managed-session", SubmissionDigest: artifact.Digest{24}, Plan: plan, Eligibility: eligibility, Storage: selected.Binding, Registration: r, CaseID: custodyID(), OccurrenceID: custodyID()}
+	request := capturevalue.Admission{RootID: f.input.PermissionRootID, IdempotencyKey: "capacity-managed-session", SubmissionDigest: artifact.Digest{24}, Plan: plan, Eligibility: eligibility, Storage: selected.Binding, Registration: r, CaseID: custodyID(), OccurrenceID: custodyID()}
 	return captureAdmissionScenario{p: f.permission, s: admission, batch: f.batch, a: request, poolID: f.qualification.Backends[0].PoolID, retention: retention, recovery: recovery}, publisher, policies
 }
 
@@ -162,12 +149,8 @@ func (f *capacitySQLFixture) currentManagedPublication(ctx context.Context, s ca
 	if err != nil {
 		return artifact.PublicationAuthority{}, err
 	}
-	recovery, err := s.recovery.reader.RecoveryState(ctx)
-	if err != nil {
-		return artifact.PublicationAuthority{}, err
-	}
 	n := time.Now().UTC()
-	return artifact.PublicationAuthority{Recovery: recovery, Retention: retained.Proof, RootID: s.a.RootID, CaptureID: e.CaptureUID, PermissionEpoch: p.Revision.UID, PermissionSequence: p.Revision.Generation, ProjectionDigest: artifact.Digest(p.Revision.Digest), ExpectationDigest: evidence.ContextExpectationDigest(e), AuthorityDigest: artifact.Digest{25}, CheckedAt: n, ValidUntil: identity.Earlier(retained.Proof.ValidUntil, identity.Earlier(p.FreshUntil, recovery.FreshUntil))}, nil
+	return artifact.PublicationAuthority{Retention: retained.Proof, RootID: s.a.RootID, CaptureID: e.CaptureUID, PermissionEpoch: p.Revision.UID, PermissionSequence: p.Revision.Generation, ProjectionDigest: artifact.Digest(p.Revision.Digest), ExpectationDigest: evidence.ContextExpectationDigest(e), AuthorityDigest: artifact.Digest{25}, CheckedAt: n, ValidUntil: identity.Earlier(retained.Proof.ValidUntil, p.FreshUntil)}, nil
 }
 
 // Inspect only the exact original managed account before beginning a new human

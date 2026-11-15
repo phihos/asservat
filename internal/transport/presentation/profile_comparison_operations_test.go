@@ -21,7 +21,7 @@ type pairedBridge struct {
 func (f *pairedBridge) ContextComparisonPlans(context.Context, value.ContextProjectionAuthority) ([2]value.ContextQueryPlan, error) {
 	return [2]value.ContextQueryPlan{f.baseline, f.p}, nil
 }
-func (f *pairedBridge) ResolveProjectionRoute(_ context.Context, caseID, artifactID string, _ identity.Identity, _ artifact.RecoveryProof) (value.ContextProjectionCandidate, error) {
+func (f *pairedBridge) ResolveProjectionRoute(_ context.Context, caseID, artifactID string, _ identity.Identity) (value.ContextProjectionCandidate, error) {
 	for _, s := range []value.ContextProjectionScope{f.a.Baseline.Scope, f.a.Scope} {
 		if s.CaseID == caseID && s.ArtifactID == artifactID {
 			c := s.Candidate()

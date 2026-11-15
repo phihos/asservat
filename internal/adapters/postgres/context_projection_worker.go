@@ -25,7 +25,7 @@ type ProjectionWorkers struct {
 var _ evidence.ProjectionWorkerLedger = (*ProjectionWorkers)(nil)
 
 func NewProjectionWorkers(queries *ContextQueries, profile value.DownloadWorkerProfile) (*ProjectionWorkers, error) {
-	if queries == nil || queries.ledger == nil || !profile.Valid() || queries.recovery.installation != profile.InstallationID {
+	if queries == nil || queries.ledger == nil || !profile.Valid() || queries.installation != profile.InstallationID {
 		return nil, query.ErrUnavailable
 	}
 	return &ProjectionWorkers{queries, profile}, nil
@@ -44,13 +44,13 @@ func (s *ProjectionWorkers) current(ctx context.Context, q query.ContextQuery, r
 		if e != nil || queryDecode(call.Request, 8192, &original) != nil || !sameAuditJSON(original, r) {
 			return queryRefusal("worker-call", e)
 		}
-		if _, e = currentWorkerConfiguration(ctx, tx, s.profile, q.RecoveryIssuerEpoch); e != nil {
+		if _, e = currentWorkerConfiguration(ctx, tx, s.profile); e != nil {
 			return queryRefusal("worker-configuration", e)
 		}
 		if e = f(ctx, tx); e != nil {
 			return queryRefusal("worker-effect", e)
 		}
-		if _, e = currentWorkerConfiguration(ctx, tx, s.profile, q.RecoveryIssuerEpoch); e != nil {
+		if _, e = currentWorkerConfiguration(ctx, tx, s.profile); e != nil {
 			return queryRefusal("worker-configuration-after", e)
 		}
 		return nil

@@ -32,10 +32,7 @@ func (f *capacityWorkFacts) step(ctx context.Context, name string) error {
 	}
 	return ctx.Err()
 }
-func (f *capacityWorkFacts) RecoveryState(ctx context.Context) (artifact.RecoveryProof, error) {
-	return f.recovery, f.step(ctx, "recovery")
-}
-func (f *capacityWorkFacts) ReadCapacityPermissions(ctx context.Context, _ artifact.RecoveryProof) (AcceptedCapacityPermissions, error) {
+func (f *capacityWorkFacts) ReadCapacityPermissions(ctx context.Context) (AcceptedCapacityPermissions, error) {
 	return f.permissions, f.step(ctx, "permissions")
 }
 func (f *capacityWorkFacts) CapacityNamespaceProtection(ctx context.Context) (CapacityNamespaceProtection, error) {
@@ -46,20 +43,20 @@ func (f *capacityWorkFacts) ReadCapacityWorkload(ctx context.Context, _ cfg.Name
 }
 
 func capacityWorkFixture() (*CapacityWorkReconciler, *capacityWorkFacts, AcceptedCapacitySource, CapacityClusterReaders, *enrollmentStore) {
-	a, g, w, p, old, original := enrollmentObservationFacts()
+	a, g, w, p, _, original := enrollmentObservationFacts()
 	n := time.Now().UTC().Truncate(time.Microsecond)
 	shift := n.Sub(original)
-	for _, pair := range [][2]*time.Time{{&a.ObservedAt, &a.FreshUntil}, {&a.Observation.Snapshot.ObservedAt, &a.Observation.Snapshot.FreshUntil}, {&g.ObservedAt, &g.FreshUntil}, {&w.ObservedAt, &w.FreshUntil}, {&w.Namespace.ObservedAt, &w.Namespace.FreshUntil}, {&p.ObservedAt, &p.FreshUntil}, {&old.Recovery.ObservedAt, &old.Recovery.FreshUntil}} {
+	for _, pair := range [][2]*time.Time{{&a.ObservedAt, &a.FreshUntil}, {&a.Observation.Snapshot.ObservedAt, &a.Observation.Snapshot.FreshUntil}, {&g.ObservedAt, &g.FreshUntil}, {&w.ObservedAt, &w.FreshUntil}, {&w.Namespace.ObservedAt, &w.Namespace.FreshUntil}, {&p.ObservedAt, &p.FreshUntil}} {
 		*pair[0] = pair[0].Add(shift)
 		*pair[1] = pair[1].Add(shift)
 	}
-	f := &capacityWorkFacts{now: n, workload: w, permissions: p, capacityRuntimeReader: capacityRuntimeReader{guard: g, recovery: old.Recovery}}
+	f := &capacityWorkFacts{now: n, workload: w, permissions: p, capacityRuntimeReader: capacityRuntimeReader{guard: g}}
 	q, _ := capacityQualificationFixture()
 	q.ID, q.Digest = a.QualificationID, a.QualificationDigest
 	q.RootBacking.RootID, q.RootBacking.InstallationID = a.RootID, a.InstallationID
 	q.RootBacking.QualificationID, q.RootBacking.QualificationDigest = q.ID, q.Digest
 	q.NamespaceGuards = []CapacityNamespaceQualification{{ClusterID: g.ClusterID, Digest: g.Digest, Keys: append([]string(nil), g.Keys...)}}
-	o, _, err := ComposeEnrollmentObservation(a, g, w, p, f.recovery, "original", n)
+	o, _, err := ComposeEnrollmentObservation(a, g, w, p, "original", n)
 	if err != nil {
 		panic(err)
 	}
@@ -69,25 +66,25 @@ func capacityWorkFixture() (*CapacityWorkReconciler, *capacityWorkFacts, Accepte
 	receipt.CaptureBackedAt, receipt.ReadyAt = &n, &n
 	store := &enrollmentStore{row: &receipt, now: &f.now}
 	now := func() time.Time { return f.now }
-	s := &CapacityWorkReconciler{Qualification: q, Recovery: f, Permissions: f, Bindings: store, Now: now,
+	s := &CapacityWorkReconciler{Qualification: q, Permissions: f, Bindings: store, Now: now,
 		Enrollment: &EnrollmentCoordinator{Store: store, Capture: store, Accounts: enrollmentAccounts{"original", receipt.AccountDigest}, Now: now}}
 	return s, f, a, CapacityClusterReaders{ClusterID: g.ClusterID, Guard: f, Workloads: f}, store
 }
 
 func TestCapacityWorkReconcilerRechecksDiscoveryAndEveryOriginalDeadline(t *testing.T) {
-	for _, mode := range []string{"ready", "recovery", "permissions", "guard", "workload", "read", "observe", "unknown-observe", "cancel-observe", "namespace-replaced", "workload-replaced", "foreign-guard", "unapproved-key"} {
+	for _, mode := range []string{"ready", "permissions", "guard", "workload", "read", "observe", "unknown-observe", "cancel-observe", "namespace-replaced", "workload-replaced", "foreign-guard", "unapproved-key"} {
 		t.Run(mode, func(t *testing.T) {
 			s, f, source, cluster, store := capacityWorkFixture()
 			namespace, candidate := f.workload.Namespace.Namespace, f.workload.Workload
 			until := f.now.Add(200 * time.Millisecond)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			f.recovery.FreshUntil = until
+			f.permissions.FreshUntil = until
 			f.phase = func(name string, ctx context.Context) {
-				if name != "recovery" {
+				if name != "permissions" {
 					d, ok := ctx.Deadline()
 					if !ok || d.After(until) {
-						t.Error("subsequent read lost original recovery bound")
+						t.Error("subsequent read lost original permission bound")
 					}
 				}
 				if name == mode {
@@ -97,7 +94,7 @@ func TestCapacityWorkReconcilerRechecksDiscoveryAndEveryOriginalDeadline(t *test
 			store.hook = func(name string, ctx context.Context) {
 				d, ok := ctx.Deadline()
 				if !ok || d.After(until) {
-					t.Error("SQL operation lost original recovery deadline")
+					t.Error("SQL operation lost original permission deadline")
 				}
 				if name == mode {
 					f.now = until

@@ -342,7 +342,6 @@ type ContextProjectionEnvironment struct {
 	Location                                artifact.Location
 	Principal                               identity.Principal
 	PolicyRevision                          identity.Revision
-	Recovery                                artifact.RecoveryProof
 	Processing                              artifact.DownloadProcessingProof
 	Path                                    ContextProjectionPath
 	ObservedAt, ValidUntil                  time.Time
@@ -352,7 +351,6 @@ func (e ContextProjectionEnvironment) Valid(now time.Time) bool {
 	return authorization.UUID(e.RootID) && authorization.UUID(e.InstallationID) && authorization.UUID(e.StoreID) &&
 		e.Location.Validate() == nil && e.Principal.Valid() && e.PolicyRevision.Valid() &&
 		identity.Fresh(e.ObservedAt, e.ValidUntil, now, identity.EvidenceReadRequestWindow) &&
-		e.Recovery.Valid(now) && e.Recovery.InstallationID == e.InstallationID && !e.ValidUntil.After(e.Recovery.FreshUntil) &&
 		e.Processing.Valid(now) && e.Processing.RootID == e.RootID && e.Processing.Location == e.Location &&
 		!e.ValidUntil.After(e.Processing.ValidUntil) && e.Path.Valid() && e.Region == e.Path.AcquisitionRegion &&
 		e.Path.TargetClusterID == e.Location.ClusterID && e.Path.StoreID == e.StoreID
@@ -391,8 +389,6 @@ func (a ContextProjectionAuthority) Valid(now time.Time) bool {
 		// Permission revisions identify the single root-wide accepted stream,
 		// not a target's selected assignments (postgres permissionProjection).
 		a.PermissionRevision == b.PermissionRevision && a.IdentityRevision == b.IdentityRevision &&
-		a.Environment.Recovery.IssuerEpoch == b.Environment.Recovery.IssuerEpoch &&
-		a.Environment.Recovery.Revision == b.Environment.Recovery.Revision &&
 		!a.CheckedAt.After(b.CheckedAt) && !a.ValidUntil.After(b.ValidUntil) &&
 		!a.AccessUntil.After(b.AccessUntil) && !a.DeleteBy.After(b.DeleteBy)
 }

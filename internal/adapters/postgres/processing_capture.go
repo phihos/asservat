@@ -10,7 +10,6 @@ import (
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	app "asservat.local/asservat/internal/application/capture"
-	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
@@ -19,8 +18,8 @@ import (
 
 var _ app.ContextProcessingCoverageReader = (*ProcessingReads)(nil)
 
-func processingCaptureCoverage(p custodydb.ProcessingRoot, rows []custodydb.ProcessingRule, in value.ProcessingCoverageRequest, installation, issuerEpoch string, now time.Time) error {
-	if !in.Valid() || in.AnchorAt.After(now) || uid(p.RootID) != in.RootID || !processingRootValid(p, installation, now) || uid(p.IssuerEpoch) != issuerEpoch ||
+func processingCaptureCoverage(p custodydb.ProcessingRoot, rows []custodydb.ProcessingRule, in value.ProcessingCoverageRequest, now time.Time) error {
+	if !in.Valid() || in.AnchorAt.After(now) || uid(p.RootID) != in.RootID || !processingRootValid(p, uid(p.InstallationID), now) ||
 		!authorization.UUID(uid(p.InitializationID)) || !authorization.UUID(uid(p.Epoch)) || !authorization.UUID(uid(p.SourceUid)) || p.Sequence < 1 || p.Sequence > 1<<60 || p.BackingRevision < 1 ||
 		len(p.ProtectionDigest) != 32 || bytes.Equal(p.ProtectionDigest, make([]byte, 32)) || p.Rules < int64(len(rows)) || p.Rules > p.MaxRules ||
 		p.RootTransitions < 1 || p.RootTransitions > p.MaxRootTransitions || p.InitializedAt.Time.After(now) || len(rows) > privacy.MaxProcessingRules {
@@ -51,7 +50,7 @@ func processingCaptureCoverage(p custodydb.ProcessingRoot, rows []custodydb.Proc
 	return nil
 }
 
-func readProcessingCaptureCoverage(ctx context.Context, q *custodydb.Queries, in value.ProcessingCoverageRequest, recovery artifact.RecoveryProof, started, until time.Time) (value.ProcessingCoverage, error) {
+func readProcessingCaptureCoverage(ctx context.Context, q *custodydb.Queries, in value.ProcessingCoverageRequest, started, until time.Time) (value.ProcessingCoverage, error) {
 	var zero value.ProcessingCoverage
 	p, err := q.ReadProcessingRoot(ctx, id(in.RootID))
 	if err != nil {
@@ -66,17 +65,17 @@ func readProcessingCaptureCoverage(ctx context.Context, q *custodydb.Queries, in
 		return zero, coverageStep("root-changed")
 	}
 	n, err := q.CurrentTime(ctx)
-	if err != nil || ctx.Err() != nil || !recovery.Valid(n.Time) || !identity.Fresh(started, until, n.Time, 5*time.Second) {
+	if err != nil || ctx.Err() != nil || !identity.Fresh(started, until, n.Time, 5*time.Second) {
 		return zero, coverageStep("fresh")
 	}
-	coverageErr := processingCaptureCoverage(last, rules, in, recovery.InstallationID, recovery.IssuerEpoch, n.Time)
+	coverageErr := processingCaptureCoverage(last, rules, in, n.Time)
 	// A bounded full inventory decode can cross the original cutoff too. Do not
 	// classify an expired observation as a current known coverage limitation.
 	n, err = q.CurrentTime(ctx)
-	if err != nil || ctx.Err() != nil || !recovery.Valid(n.Time) || !identity.Fresh(started, until, n.Time, 5*time.Second) {
+	if err != nil || ctx.Err() != nil || !identity.Fresh(started, until, n.Time, 5*time.Second) {
 		return zero, coverageStep("fresh-after")
 	}
-	if !processingRootValid(last, recovery.InstallationID, n.Time) {
+	if !processingRootValid(last, uid(last.InstallationID), n.Time) {
 		return zero, coverageStep("root-invalid")
 	}
 	if coverageErr != nil {
@@ -92,13 +91,13 @@ func readProcessingCaptureCoverage(ctx context.Context, q *custodydb.Queries, in
 	return o, nil
 }
 
-func (s *ProcessingReads) ContextProcessingCoverage(ctx context.Context, in value.ProcessingCoverageRequest, recovery artifact.RecoveryProof) (value.ProcessingCoverage, error) {
+func (s *ProcessingReads) ContextProcessingCoverage(ctx context.Context, in value.ProcessingCoverageRequest) (value.ProcessingCoverage, error) {
 	var out value.ProcessingCoverage
-	if s == nil || s.ledger == nil || s.recovery == nil || ctx == nil || ctx.Err() != nil || !in.Valid() || in.RootID != s.root || recovery.InstallationID != s.recovery.installation {
+	if s == nil || s.ledger == nil || ctx == nil || ctx.Err() != nil || !in.Valid() || in.RootID != s.root {
 		return out, value.ErrUnavailable
 	}
 	started := time.Now().UTC().Truncate(time.Microsecond)
-	until := identity.Earlier(started.Add(5*time.Second), recovery.FreshUntil)
+	until := started.Add(5 * time.Second)
 	if d, ok := ctx.Deadline(); ok {
 		until = identity.Earlier(until, d)
 	}
@@ -114,16 +113,9 @@ func (s *ProcessingReads) ContextProcessingCoverage(ctx context.Context, in valu
 				failed = step.step
 			}
 		}()
-		trust, err := s.recovery.lock(call, q, s.root, recovery)
-		if err != nil {
-			return coverageStepWith("recovery-lock", err)
-		}
-		out, err = readProcessingCaptureCoverage(call, q, in, recovery, started, until)
+		out, err = readProcessingCaptureCoverage(call, q, in, started, until)
 		if err != nil {
 			return err
-		}
-		if err = s.recovery.check(call, q, trust, s.root, recovery); err != nil {
-			return coverageStepWith("recovery-check", err)
 		}
 		n, err := q.CurrentTime(call)
 		if err != nil || call.Err() != nil || !out.Current(n.Time) {
@@ -157,10 +149,7 @@ type coverageStepError struct {
 	err  error
 }
 
-func coverageStep(step string) error { return coverageStepError{step, value.ErrUnavailable} }
-func coverageStepWith(step string, err error) error {
-	return coverageStepError{step, err}
-}
+func coverageStep(step string) error               { return coverageStepError{step, value.ErrUnavailable} }
 func (e coverageStepError) Error() string          { return e.err.Error() }
 func (e coverageStepError) Unwrap() error          { return e.err }
 func (e coverageStepError) ProcessingStep() string { return e.step }

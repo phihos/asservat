@@ -310,7 +310,6 @@ func TestComparisonCommonReaderComparesOnlyPhysicalPlacement(t *testing.T) {
 			}
 		})
 	}
-	b.Recovery, i.Recovery = artifact.RecoveryProof{}, artifact.RecoveryProof{}
 	b.Processing, i.Processing = artifact.DownloadProcessingProof{}, artifact.DownloadProcessingProof{}
 	if !CommonProfileComparisonReader(b, i) || b.Valid(b.ObservedAt) || i.Valid(i.ObservedAt) {
 		t.Fatal("structural helper was confused with current authority")

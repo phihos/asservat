@@ -44,11 +44,11 @@ func qualifyOperationAudits(t *testing.T, ctx context.Context, admin *pgxpool.Po
 			if e = config.ProvisionOperationAuditPool(ctx, app.OperationAuditPool{RootID: s.a.RootID, Lane: lane, AccountVersion: "accounts-v1", Accounts: 2, RecordsPerAccount: 2, RetainedSeconds: 3600, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), ValidUntil: now.Add(time.Hour)}); e != nil {
 				t.Fatal(e)
 			}
-			j, e := postgres.NewOperationJournal(ctx, journalPool, s.a.RootID, lane, s.recovery.guard)
+			j, e := postgres.NewOperationJournal(ctx, journalPool, s.a.RootID, lane, s.recovery.installation)
 			if e != nil {
 				t.Fatal(e)
 			}
-			a, e := postgres.NewOperationAcknowledgements(ctx, ackPool, s.a.RootID, lane, s.recovery.guard)
+			a, e := postgres.NewOperationAcknowledgements(ctx, ackPool, s.a.RootID, lane, s.recovery.installation)
 			if e != nil {
 				t.Fatal(e)
 			}
@@ -75,7 +75,7 @@ func qualifyOperationAudits(t *testing.T, ctx context.Context, admin *pgxpool.Po
 			if err != nil {
 				t.Fatal(err)
 			}
-			_, err = journalPool.Exec(ctx, "INSERT INTO operation_audit(id,root_id,lane,principal_digest,intent,request_until,write_until,retain_until,issuer_epoch) VALUES($1,$2,'normal',$3,$4,$5,$6,$7,$8)", invalid.ID, invalid.RootID, invalid.PrincipalDigest[:], body, invalid.RequestUntil, invalid.WriteUntil, invalid.RetainUntil, s.a.Recovery.IssuerEpoch)
+			_, err = journalPool.Exec(ctx, "INSERT INTO operation_audit(id,root_id,lane,principal_digest,intent,request_until,write_until,retain_until,issuer_epoch) VALUES($1,$2,'normal',$3,$4,$5,$6,$7,$8)", invalid.ID, invalid.RootID, invalid.PrincipalDigest[:], body, invalid.RequestUntil, invalid.WriteUntil, invalid.RetainUntil, s.recovery.observation.issuer)
 			var denied *pgconn.PgError
 			if !errors.As(err, &denied) || denied.Code != "23514" || denied.Message != "operation audit unavailable" {
 				t.Fatal("SQL accepted an overlong operation window or failed for another reason", tc.name, err)
@@ -119,7 +119,7 @@ func qualifyOperationAudits(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		if err != nil {
 			t.Fatal(err)
 		}
-		_, err = journalPool.Exec(ctx, "INSERT INTO operation_audit(id,root_id,lane,principal_digest,intent,request_until,write_until,retain_until,issuer_epoch) VALUES($1,$2,'normal',$3,$4,$5,$6,$7,$8)", rolledBack.ID, rolledBack.RootID, rolledBack.PrincipalDigest[:], body, rolledBack.RequestUntil, rolledBack.WriteUntil, rolledBack.RetainUntil, s.a.Recovery.IssuerEpoch)
+		_, err = journalPool.Exec(ctx, "INSERT INTO operation_audit(id,root_id,lane,principal_digest,intent,request_until,write_until,retain_until,issuer_epoch) VALUES($1,$2,'normal',$3,$4,$5,$6,$7,$8)", rolledBack.ID, rolledBack.RootID, rolledBack.PrincipalDigest[:], body, rolledBack.RequestUntil, rolledBack.WriteUntil, rolledBack.RetainUntil, s.recovery.observation.issuer)
 		var denied *pgconn.PgError
 		if !errors.As(err, &denied) || denied.Code != "23514" || denied.Message != "operation audit unavailable" {
 			t.Fatal("rollback did not restore original preview SQL window", err)
@@ -212,13 +212,6 @@ func qualifyOperationAudits(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		if e = gate.Begin(ctx, in(1, "get_capture")); e != nil {
 			t.Fatal("renewal did not preserve usable principal allowance", e)
 		}
-		// Exact recovery fencing remains required; audit is not an activation path.
-		if _, e = admin.Exec(ctx, "UPDATE fleet_trust SET suspended=true WHERE installation_id=$1", s.recovery.installation); e != nil {
-			t.Fatal(e)
-		}
-		if e = gates["resolution"].Begin(ctx, in(1, "resolve_capture_request")); !errors.Is(e, app.ErrUnavailable) {
-			t.Fatal("recovery blocked audit admitted", e)
-		}
 	})
 	t.Run("operation-audit-original-backing-deadline-after-account-lock", func(t *testing.T) {
 		s := create(t, 1)
@@ -235,7 +228,7 @@ func qualifyOperationAudits(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		}
 		jp := poolFor("operation_audit_runtime", "synthetic-operation-journal")
 		defer jp.Close()
-		journal, err := postgres.NewOperationJournal(ctx, jp, s.a.RootID, "normal", s.recovery.guard)
+		journal, err := postgres.NewOperationJournal(ctx, jp, s.a.RootID, "normal", s.recovery.installation)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -318,7 +311,7 @@ func qualifyOperationAudits(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		}
 		jp := poolFor("operation_audit_runtime", "synthetic-operation-journal")
 		defer jp.Close()
-		j, e := postgres.NewOperationJournal(ctx, jp, s.a.RootID, "normal", s.recovery.guard)
+		j, e := postgres.NewOperationJournal(ctx, jp, s.a.RootID, "normal", s.recovery.installation)
 		if e != nil {
 			t.Fatal(e)
 		}

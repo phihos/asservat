@@ -12,7 +12,6 @@ import (
 
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/fleet"
-	"asservat.local/asservat/internal/domain/identity"
 )
 
 // acceptTokens attributes the synthetic token to the test cluster.
@@ -38,15 +37,6 @@ type scriptedServices struct {
 func (s *scriptedServices) OwnerCandidates(context.Context, *Region) (value.APIContextOwnerCandidates, error) {
 	now := time.Now().UTC()
 	return value.APIContextOwnerCandidates{ObservedAt: now, ValidUntil: now.Add(time.Second)}, nil
-}
-
-func (s *scriptedServices) Recovery(_ context.Context, region *Region) (value.RecoveryState, error) {
-	now := time.Now().UTC()
-	installation := region.Presented().InstallationID
-	if s.foreign {
-		installation = "10000000-0000-4000-8000-0000000000ee" // another installation's state
-	}
-	return value.RecoveryState{InstallationID: installation, IssuerEpoch: installation, Revision: identity.Revision{UID: "recovery", Generation: 1, Digest: artifact.Digest{1}}, ObservedAt: now, FreshUntil: now.Add(time.Second)}, nil
 }
 
 func (s *scriptedServices) AuthenticateOwner(_ context.Context, _ *Region, c value.OwnerCertificate) (OwnerAuthentication, error) {
@@ -115,14 +105,6 @@ func TestDelegatedLifecycleChannelOverRealHTTP2(t *testing.T) {
 	if result, err = client.Run(context.Background(), ownerOpening(PurposeOwnerCandidates, nil), nil); err != nil || result.Kind != "result" || result.Owners == nil {
 		t.Fatal("owner candidates", result, err)
 	}
-	if result, err = client.Run(context.Background(), ownerOpening(PurposeRecovery, nil), nil); err != nil || result.Kind != "result" || result.Recovery == nil {
-		t.Fatal("recovery state", result, err)
-	}
-	services.foreign = true
-	if result, err = client.Run(context.Background(), ownerOpening(PurposeRecovery, nil), nil); err != nil || result.Kind != "failure" {
-		t.Fatal("another installation's recovery state returned", result, err)
-	}
-	services.foreign = false
 	ownerCert := value.OwnerCertificate{Binding: value.OwnerBinding{InstallationID: process.Binding.InstallationID}, Usage: "server", Digest: artifact.Digest{7}}
 	if result, err = client.Run(context.Background(), ownerOpening(PurposeOwnerAuthentication, &ownerCert), nil); err != nil || result.Kind != "result" || result.Owner == nil || result.Owner.Owner.Certificate != ownerCert {
 		t.Fatal("owner authentication", result, err)
@@ -134,7 +116,7 @@ func TestDelegatedLifecycleChannelOverRealHTTP2(t *testing.T) {
 	services.foreign = false
 	clientCert := ownerCert
 	clientCert.Usage = "client"
-	for _, bad := range []Opening{ownerOpening(PurposeOwnerAuthentication, nil), ownerOpening(PurposeOwnerAuthentication, &clientCert), ownerOpening(PurposeOwnerCandidates, &ownerCert), ownerOpening(PurposeRecovery, &ownerCert)} {
+	for _, bad := range []Opening{ownerOpening(PurposeOwnerAuthentication, nil), ownerOpening(PurposeOwnerAuthentication, &clientCert), ownerOpening(PurposeOwnerCandidates, &ownerCert)} {
 		if _, err = client.Run(context.Background(), bad, nil); err == nil {
 			t.Fatal("owner opening without a server certificate, or one on another purpose, accepted")
 		}

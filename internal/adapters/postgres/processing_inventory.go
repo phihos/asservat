@@ -15,14 +15,14 @@ import (
 )
 
 // ProcessingInventory reuses the processing-decision duty's exact existing
-// table grants and recovery/source transaction. It adds no pool or SQL role.
+// table grants and source transaction. It adds no pool or SQL role.
 type ProcessingInventory struct{ decisions *ProcessingDecisions }
 
 var _ app.ProcessingInventoryReader = (*ProcessingInventory)(nil)
 var _ app.ProcessingArtifactScopes = (*ProcessingInventory)(nil)
 
-func NewProcessingInventory(ctx context.Context, pool *pgxpool.Pool, root string, recovery *RecoveryTransactionGuard) (*ProcessingInventory, error) {
-	decisions, err := NewProcessingDecisions(ctx, pool, root, recovery)
+func NewProcessingInventory(ctx context.Context, pool *pgxpool.Pool, root string) (*ProcessingInventory, error) {
+	decisions, err := NewProcessingDecisions(ctx, pool, root)
 	if err != nil {
 		return nil, err
 	}

@@ -70,10 +70,6 @@ func (s *ContextDownloadPlans) ContextDownloadPlan(ctx context.Context, source e
 		if e != nil {
 			return e
 		}
-		trust, e := q.ShareFleetTrust(call, id(s.installation))
-		if e != nil {
-			return e
-		}
 		rows, e := q.ReadContextDownloadAllocations(call, custodydb.ReadContextDownloadAllocationsParams{RootID: id(s.root), ClusterID: id(scope.ClusterID), NamespaceUid: scope.NamespaceUID, WorkloadUid: scope.WorkloadUID})
 		if e != nil || len(rows) != 1 {
 			return artifact.ErrDownloadUnavailable
@@ -98,19 +94,11 @@ func (s *ContextDownloadPlans) ContextDownloadPlan(ctx context.Context, source e
 		if e != nil {
 			return e
 		}
-		now, e := q.CurrentTime(call)
-		if e != nil {
-			return e
-		}
-		current, e := recoveryState(trust, start.Time, now.Time)
-		if e != nil {
-			return e
-		}
 		until, e := s.configuration.CurrentWorkerConfiguration(call, s.profile)
 		if e != nil {
 			return e
 		}
-		now, e = q.CurrentTime(call)
+		now, e := q.CurrentTime(call)
 		if e != nil {
 			return e
 		}
@@ -120,8 +108,8 @@ func (s *ContextDownloadPlans) ContextDownloadPlan(ctx context.Context, source e
 		// Every contributing original deadline survives the configuration and SQL
 		// waits. This snapshot grants no effect; reservation rechecks current backing.
 		hard := identity.Earlier(allocation.ValidUntil, identity.Earlier(control.ValidUntil.Time, identity.Earlier(native.ValidUntil.Time, pool.ValidUntil.Time)))
-		out = evidence.ContextDownloadPlan{HardUntil: hard, Allocation: allocation, OutputLimit: limits.OutputLimit, ReadLimit: limits.ReadLimit, RequestLimit: limits.RequestLimit, Duration: limits.Duration, ObservedAt: start.Time, ValidUntil: downloadObservationDeadline(call, start.Time, original, until, current.FreshUntil, hard)}
-		if !current.Valid(now.Time) || !out.Valid(scope, now.Time) || call.Err() != nil {
+		out = evidence.ContextDownloadPlan{HardUntil: hard, Allocation: allocation, OutputLimit: limits.OutputLimit, ReadLimit: limits.ReadLimit, RequestLimit: limits.RequestLimit, Duration: limits.Duration, ObservedAt: start.Time, ValidUntil: downloadObservationDeadline(call, start.Time, original, until, hard)}
+		if !out.Valid(scope, now.Time) || call.Err() != nil {
 			return artifact.ErrDownloadUnavailable
 		}
 		return nil

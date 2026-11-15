@@ -23,7 +23,6 @@ import (
 )
 
 type ownerReadDiagnosticQuery struct {
-	trust    custodydb.FleetCurrentTrust
 	head     custodydb.HubOwnerConfiguration
 	revision custodydb.HubOwnerConfigurationRevision
 	now      pgtype.Timestamptz
@@ -63,10 +62,6 @@ func (q *ownerReadDiagnosticQuery) QueryRow(_ context.Context, sql string, args 
 	}
 	var values, wantArgs []any
 	switch name {
-	case "ShareFleetTrust":
-		v := q.trust
-		values = []any{v.InstallationID, v.IssuerEpoch, v.SourceUid, v.SourceGeneration, v.SourceDigest, v.Suspended, v.RecoveryBlocked, v.ObservedAt, v.FreshUntil}
-		wantArgs = []any{q.head.InstallationID}
 	case "ShareOwnerConfiguration":
 		v := q.head
 		values = []any{v.InstallationID, v.ClusterID, v.SourceUid, v.Generation, v.ObservedAt, v.FreshUntil}
@@ -103,7 +98,6 @@ func ownerReadDiagnosticFixture(t *testing.T) (*OwnerConfigurations, *ownerReadD
 	a, _ := json.Marshal(r)
 	s := &OwnerConfigurations{installation: uid(1), cluster: uid(2), namespace: uid(4), source: uid(8)}
 	q := &ownerReadDiagnosticQuery{
-		trust:    custodydb.FleetCurrentTrust{InstallationID: id(uid(1)), IssuerEpoch: id(uid(3)), SourceUid: uid(9), SourceGeneration: 1, SourceDigest: []byte{1}, ObservedAt: ts(at.Add(-time.Second)), FreshUntil: ts(at.Add(4 * time.Second))},
 		head:     custodydb.HubOwnerConfiguration{InstallationID: id(uid(1)), ClusterID: id(uid(2)), SourceUid: id(uid(8)), Generation: 1, ObservedAt: ts(at.Add(-time.Second)), FreshUntil: ts(at.Add(3 * time.Second))},
 		revision: custodydb.HubOwnerConfigurationRevision{InstallationID: id(uid(1)), ClusterID: id(uid(2)), SourceUid: id(uid(8)), Generation: 1, SnapshotJson: b, AuditReceiptJson: a}, now: ts(at),
 	}
@@ -116,65 +110,36 @@ func TestOwnerConfigurationReadDiagnosticPredicatesAndSingleClock(t *testing.T) 
 		queries             int
 		change              func(*ownerReadDiagnosticQuery, *value.OwnerConfiguration)
 	}{
-		{"valid", "transaction", "unspecified", 4, func(*ownerReadDiagnosticQuery, *value.OwnerConfiguration) {}},
-		{"head-source-before-generation", "head-source", "predicate", 2, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
+		{"valid", "transaction", "unspecified", 3, func(*ownerReadDiagnosticQuery, *value.OwnerConfiguration) {}},
+		{"head-source-before-generation", "head-source", "predicate", 1, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
 			q.head.SourceUid = pgtype.UUID{}
 			q.head.Generation = 0
 		}},
-		{"head-generation", "head-generation", "predicate", 2, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) { q.head.Generation = 0 }},
-		{"decode-before-audit", "snapshot-decode", "predicate", 3, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
+		{"head-generation", "head-generation", "predicate", 1, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) { q.head.Generation = 0 }},
+		{"decode-before-audit", "snapshot-decode", "predicate", 2, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
 			q.revision.SnapshotJson = []byte("{")
 			q.revision.AuditReceiptJson = nil
 		}},
-		{"binding-before-suspension", "snapshot-binding", "predicate", 3, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) { c.Pool.Port = 0; c.Suspended = true }},
-		{"suspension-before-generation", "snapshot-suspended", "predicate", 3, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
+		{"binding-before-suspension", "snapshot-binding", "predicate", 2, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) { c.Pool.Port = 0; c.Suspended = true }},
+		{"suspension-before-generation", "snapshot-suspended", "predicate", 2, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
 			c.Suspended = true
 			c.Revision.Generation = 2
 		}},
-		{"generation-before-issuer", "snapshot-generation", "predicate", 3, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
+		{"generation-before-audit", "snapshot-generation", "predicate", 2, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
 			c.Revision.Generation = 2
-			q.trust.IssuerEpoch = id(c.Pool.ClusterID)
-		}},
-		{"issuer-before-audit", "snapshot-issuer", "predicate", 3, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
-			q.trust.IssuerEpoch = id(c.Pool.ClusterID)
 			q.revision.AuditReceiptJson = nil
 		}},
-		{"audit-decode-before-recovery", "audit-decode", "predicate", 3, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
+		{"audit-decode", "audit-decode", "predicate", 2, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
 			q.revision.AuditReceiptJson = nil
-			q.trust.Suspended = true
 		}},
-		{"audit-binding-before-recovery", "audit-binding", "predicate", 3, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
+		{"audit-binding", "audit-binding", "predicate", 2, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
 			q.revision.AuditReceiptJson = []byte("{}")
-			q.trust.Suspended = true
 		}},
-		{"suspended-before-expiry", "recovery-suspended", "predicate", 4, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
-			q.trust.Suspended = true
-			q.trust.FreshUntil = q.now
-		}},
-		{"fleet-future-before-closed", "fleet-interval", "future-start", 4, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
-			q.trust.ObservedAt = ts(q.now.Time.Add(time.Second))
-			q.trust.FreshUntil = q.now
-		}},
-		{"fleet-closed-before-expired", "fleet-interval", "closed-interval", 4, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
-			q.trust.FreshUntil = q.trust.ObservedAt
-		}},
-		{"fleet-overlong", "fleet-interval", "overlong-interval", 4, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
-			q.trust.FreshUntil = ts(q.trust.ObservedAt.Time.Add(31 * time.Second))
-		}},
-		{"fleet-expired-at-equality", "fleet-interval", "expired-interval", 4, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) { q.trust.FreshUntil = q.now }},
-		{"recovery-identity-before-owner-expiry", "recovery-identity", "predicate", 4, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
-			q.trust.SourceUid = ""
-			q.head.ObservedAt = ts(q.now.Time.Add(-6 * time.Second))
-		}},
-		{"owner-start-expired-in-recovery", "recovery-proof-interval", "expired-interval", 4, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
-			q.head.ObservedAt = ts(q.now.Time.Add(-5 * time.Second))
-			q.head.FreshUntil = q.now
-		}},
-		{"owner-start-future-in-recovery", "recovery-proof-interval", "future-start", 4, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
+		{"owner-start-future", "owner-interval", "future-start", 3, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
 			q.head.ObservedAt = ts(q.now.Time.Add(time.Second))
 		}},
-		{"owner-cutoff-expired-at-equality", "owner-interval", "expired-interval", 4, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) { q.head.FreshUntil = q.now }},
-		{"owner-cutoff-fenced", "owner-interval", "closed-interval", 4, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) { q.head.FreshUntil = q.head.ObservedAt }},
+		{"owner-cutoff-expired-at-equality", "owner-interval", "expired-interval", 3, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) { q.head.FreshUntil = q.now }},
+		{"owner-cutoff-fenced", "owner-interval", "closed-interval", 3, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) { q.head.FreshUntil = q.head.ObservedAt }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			s, q, c := ownerReadDiagnosticFixture(t)
@@ -185,7 +150,7 @@ func TestOwnerConfigurationReadDiagnosticPredicatesAndSingleClock(t *testing.T) 
 			}
 			var d ownerConfigurationReadDiagnostic
 			out, err := s.readOwnerConfiguration(context.Background(), custodydb.New(q), &d)
-			want := []string{"ShareFleetTrust", "ShareOwnerConfiguration", "ReadOwnerConfigurationRevision", "CurrentTime"}[:tc.queries]
+			want := []string{"ShareOwnerConfiguration", "ReadOwnerConfigurationRevision", "CurrentTime"}[:tc.queries]
 			if !slices.Equal(q.calls, want) || d.check.String() != tc.check || d.reason.String() != tc.reason {
 				t.Fatalf("changed query/diagnostic sequence calls=%v check=%s reason=%s", q.calls, d.check, d.reason)
 			}
@@ -207,7 +172,7 @@ func TestOwnerConfigurationReadDiagnosticPredicatesAndSingleClock(t *testing.T) 
 }
 
 func TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset(t *testing.T) {
-	for _, statement := range []string{"ShareFleetTrust", "ShareOwnerConfiguration", "ReadOwnerConfigurationRevision", "CurrentTime"} {
+	for _, statement := range []string{"ShareOwnerConfiguration", "ReadOwnerConfigurationRevision", "CurrentTime"} {
 		for _, tc := range []struct {
 			name, reason string
 			err          error
@@ -230,7 +195,7 @@ func TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset(t *testing.T)
 				if err != tc.err || d.reason.String() != tc.reason {
 					t.Fatal("raw callback result or diagnostic changed", d.check, d.reason)
 				}
-				checks := map[string]OwnerConfigurationReadCheck{"ShareFleetTrust": ownerReadFleet, "ShareOwnerConfiguration": ownerReadHead, "ReadOwnerConfigurationRevision": ownerReadRevision, "CurrentTime": ownerReadClock}
+				checks := map[string]OwnerConfigurationReadCheck{"ShareOwnerConfiguration": ownerReadHead, "ReadOwnerConfigurationRevision": ownerReadRevision, "CurrentTime": ownerReadClock}
 				want := checks[statement]
 				if tc.reason == "unspecified" {
 					want = ownerReadTransaction
@@ -270,7 +235,7 @@ func TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset(t *testing.T)
 	}
 }
 
-func TestOwnerConfigurationReadDiagnosticRecoveryParityAndErrorIdentity(t *testing.T) {
+func TestOwnerConfigurationReadDiagnosticIntervalParityAndErrorIdentity(t *testing.T) {
 	_, q, _ := ownerReadDiagnosticFixture(t)
 	now := q.now.Time
 	for _, start := range []time.Time{{}, now.Add(-6 * time.Second), now.Add(-5 * time.Second), now.Add(-time.Second), now, now.Add(time.Second)} {
@@ -280,18 +245,6 @@ func TestOwnerConfigurationReadDiagnosticRecoveryParityAndErrorIdentity(t *testi
 				if (ownerReadIntervalFailure(start, until, now, maximum) == ownerReadUnspecified) != valid {
 					t.Fatal("interval classification diverged from original predicate")
 				}
-			}
-		}
-		for mask := 0; mask < 4; mask++ {
-			row := q.trust
-			row.Suspended = mask&1 != 0
-			if mask&2 != 0 {
-				row.SourceUid = ""
-			}
-			_, err := recoveryState(row, start, now)
-			d := ownerReadRecoveryFailure(row, start, now)
-			if (err == nil) != (d.check == ownerReadRecoveryOther) {
-				t.Fatal("recovery diagnostic diverged from original helper", mask, d.check)
 			}
 		}
 	}

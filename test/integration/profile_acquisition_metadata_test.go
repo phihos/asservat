@@ -175,7 +175,7 @@ func qualifyProfileAcquisitionAfterPublication(t *testing.T, f *capacitySQLFixtu
 	}
 	pool := f.fixturePool("context_catalog_read_runtime", "synthetic-context-read")
 	defer pool.Close()
-	catalog, err := postgres.NewContextPublications(ctx, pool, s.a.RootID, postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard})
+	catalog, err := postgres.NewContextPublications(ctx, pool, s.a.RootID, s.retention.guard)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -189,7 +189,7 @@ func qualifyProfileAcquisitionAfterPublication(t *testing.T, f *capacitySQLFixtu
 	}
 	progressPool := f.fixturePool("context_progress_read_runtime", "synthetic-context-progress-read")
 	defer progressPool.Close()
-	progress, err := postgres.NewContextProgressReads(ctx, progressPool, s.a.RootID, s.recovery.guard)
+	progress, err := postgres.NewContextProgressReads(ctx, progressPool, s.a.RootID)
 	if err != nil {
 		t.Fatal(err)
 	}

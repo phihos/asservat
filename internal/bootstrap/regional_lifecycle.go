@@ -25,21 +25,7 @@ type RegionalLifecycle struct {
 	// Timing, when set, is called as each conversation starts and returns
 	// the func its success calls (ADR-197 spike diagnostics; never content).
 	Timing func(connectorlifecycle.Purpose) func()
-
-	// recoveryMu serializes recovery fetches so concurrent readers share one
-	// hub round trip; recovery is the last observation, reused only while
-	// recoveryReuseMargin of its own original validity remains.
-	recoveryMu ctxMutex
-	recovery   *value.RecoveryState
 }
-
-// recoveryReuseMargin is the least remaining validity a cached recovery
-// observation needs to be reused instead of fetched again.
-// Three seconds, like the owner route: a start's receiver/recovery bound is
-// the earliest reused observation, and with two seconds a start could begin
-// with under one second left for preparation headroom (installed incident
-// runs 41301126897, 41299848255, 41284876053).
-const recoveryReuseMargin = 3 * time.Second
 
 // Closed causes kept alongside ErrUnavailable for operator diagnostics only.
 var (
@@ -93,36 +79,6 @@ func (r *RegionalLifecycle) ReadContextStartOwners(ctx context.Context) (value.A
 		return value.APIContextOwnerCandidates{}, unavailable(err)
 	}
 	return *frame.Owners, nil
-}
-
-var _ fleetapp.RecoveryReader = (*RegionalLifecycle)(nil)
-
-// RecoveryState asks the hub for its current recovery state, presented by this
-// process. It only feeds verify-only work trust; it can
-// never clear or change recovery.
-//
-// Work verification reads it four times per source work; each read was its
-// own hub conversation (native run 41206952018 refused source work at the
-// second trust read). Reuse keeps the observation's original interval.
-func (r *RegionalLifecycle) RecoveryState(ctx context.Context) (value.RecoveryState, error) {
-	if ctx == nil {
-		return value.RecoveryState{}, value.ErrUnavailable
-	}
-	if !r.recoveryMu.lock(ctx) {
-		return value.RecoveryState{}, value.ErrUnavailable
-	}
-	defer r.recoveryMu.unlock()
-	if c := r.recovery; c != nil && c.Valid(r.Now().Add(recoveryReuseMargin)) && c.InstallationID == r.Process.Binding.InstallationID && ctx.Err() == nil {
-		return *c, nil
-	}
-	r.recovery = nil
-	frame, err := r.run(ctx, connectorlifecycle.PurposeRecovery)
-	if err != nil || frame.Recovery == nil || !frame.Recovery.Valid(r.Now()) || frame.Recovery.InstallationID != r.Process.Binding.InstallationID {
-		return value.RecoveryState{}, unavailable(err)
-	}
-	cached := *frame.Recovery
-	r.recovery = &cached
-	return cached, nil
 }
 
 // AuthenticateOwner authenticates the owner of an actual TLS session: the hub

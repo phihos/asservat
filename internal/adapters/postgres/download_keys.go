@@ -20,7 +20,7 @@ import (
 
 // Binding and resolution use independently credentialed instances. Only the
 // download coordinator may insert bindings; A-KEY can consume three slots but
-// cannot create bindings, sessions, audit receipts, permissions or recovery.
+// cannot create bindings, sessions, audit receipts or permissions.
 type DownloadKeys struct {
 	downloads *Downloads
 	scope     authorization.KeyScope
@@ -29,26 +29,26 @@ type DownloadKeys struct {
 var _ evidence.DownloadKeyBindingLedger = (*DownloadKeys)(nil)
 var _ authapp.KeyOperationAuthorizer = (*DownloadKeys)(nil)
 
-func NewDownloadKeys(ctx context.Context, pool *pgxpool.Pool, root string, scope authorization.KeyScope, guards DownloadTransactionGuards) (*DownloadKeys, error) {
-	if !scope.Valid() || scope.Purpose != "artifact" || guards.Recovery == nil || guards.Retention == nil || guards.Recovery.installation != scope.InstallationID {
+func NewDownloadKeys(ctx context.Context, pool *pgxpool.Pool, root string, scope authorization.KeyScope, retention *RetentionTransactionGuard) (*DownloadKeys, error) {
+	if !scope.Valid() || scope.Purpose != "artifact" || retention == nil {
 		return nil, artifact.ErrInvalid
 	}
-	d, err := NewDownloads(ctx, pool, root, guards)
+	d, err := NewDownloads(ctx, pool, root, retention)
 	if err != nil {
 		return nil, err
 	}
 	return &DownloadKeys{d, scope}, nil
 }
 
-// The same original batch, permission, recovery, retention and disclosure fence
-// encloses key-binding/spend. Lock order remains recovery, permission, session,
-// child key record; callbacks perform no network I/O.
+// The same original batch, permission, retention and disclosure fence
+// encloses key-binding/spend. Lock order remains permission, session, child
+// key record; callbacks perform no network I/O.
 func (s *Downloads) withKeyBatch(ctx context.Context, session string, a artifact.DownloadAuthority, batch string, generation int64, effect func(*custodydb.Queries, artifact.DownloadSession, time.Time) error) error {
 	// Preparation-batch keys never serve a started response (ADR-312).
 	if a.Started() {
 		return artifact.ErrDownloadExpired
 	}
-	if s == nil || s.retention == nil || s.recovery == nil || !authorization.UUID(session) || !authorization.UUID(batch) || generation < 1 || a.Scope.RootID != s.root {
+	if s == nil || s.retention == nil || !authorization.UUID(session) || !authorization.UUID(batch) || generation < 1 || a.Scope.RootID != s.root {
 		return artifact.ErrInvalid
 	}
 	topology, err := s.downloadTopology(ctx, a)
@@ -56,10 +56,6 @@ func (s *Downloads) withKeyBatch(ctx context.Context, session string, a artifact
 		return err
 	}
 	return s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		recovery, err := s.lockDownloadRecovery(ctx, q, a.Scope.RootID, a)
-		if err != nil {
-			return err
-		}
 		p, err := q.LockPermissionStream(ctx, id(s.root))
 		if err != nil {
 			return err
@@ -73,7 +69,7 @@ func (s *Downloads) withKeyBatch(ctx context.Context, session string, a artifact
 			return err
 		}
 		check := func() (time.Time, error) {
-			if err := s.downloadFence(ctx, q, p, a, topology, recovery); err != nil {
+			if err := s.downloadFence(ctx, q, p, a, topology); err != nil {
 				return time.Time{}, err
 			}
 			now, err := q.CurrentTime(ctx)

@@ -17,11 +17,11 @@ import (
 // This uses the actual fixed purpose15/40 credentials and managed SQL54 account.
 // It creates no audit object, runs no collector and never mutates backing to
 // make a negative pass. Original human/target/source setup remains synthetic.
-func (f *capacitySQLFixture) checkManagedProcessingAdmission(t *testing.T, admissions *postgres.ContextAdmissions, recovery *postgres.RecoveryTransactionGuard, policies privacy.PolicySet, original value.Admission) {
+func (f *capacitySQLFixture) checkManagedProcessingAdmission(t *testing.T, admissions *postgres.ContextAdmissions, policies privacy.PolicySet, original value.Admission) {
 	t.Helper()
 	ctx, end := context.WithDeadline(f.ctx, original.Eligibility.VerifiedIdentity.ValidUntil)
 	defer end()
-	reader, err := postgres.NewProcessingReads(ctx, f.roles["hub-runtime"], f.input.PermissionRootID, recovery)
+	reader, err := postgres.NewProcessingReads(ctx, f.roles["hub-runtime"], f.input.PermissionRootID, f.input.InstallationID)
 	if err != nil {
 		t.Fatal("fixed processing-read constructor", err)
 	}
@@ -70,7 +70,7 @@ func (f *capacitySQLFixture) checkManagedProcessingAdmission(t *testing.T, admis
 	}
 	before := snapshot()
 	t.Run("processing-read-rejects-uncovered-retention", func(t *testing.T) {
-		out, err := reader.ContextProcessingCoverage(ctx, query, original.Recovery)
+		out, err := reader.ContextProcessingCoverage(ctx, query)
 		if !errors.Is(err, value.ErrProcessingCoverage) || out != (value.ProcessingCoverage{}) {
 			t.Fatal("known original horizon not rejected by purpose15", err)
 		}
@@ -127,7 +127,7 @@ func (f *capacitySQLFixture) checkManagedProcessingAdmission(t *testing.T, admis
 	query.Location = original.Registration.Location
 	query.AnchorAt = original.Registration.AnchorAt
 	query.DeleteBy = original.Registration.DeleteBy
-	if out, err := reader.ContextProcessingCoverage(ctx, query, original.Recovery); err != nil || !out.Current(time.Now()) || out.Request != query {
+	if out, err := reader.ContextProcessingCoverage(ctx, query); err != nil || !out.Current(time.Now()) || out.Request != query {
 		t.Fatal("current short retention coverage unavailable", err)
 	}
 }

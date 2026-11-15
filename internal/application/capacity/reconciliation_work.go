@@ -12,7 +12,7 @@ import (
 
 // These are the existing independent processing configuration and exact local
 // metadata facets. Capacity configuration does not initialize processing state
-// or acquire a human permission, collector credential, or recovery authority.
+// or acquire a human permission or collector credential.
 type CapacityProcessingReader interface {
 	DownloadPolicy(context.Context) (privacy.DownloadPolicy, error)
 }
@@ -81,7 +81,6 @@ type CapacityGuardedWorkloadReader interface {
 // protected facts under one original interval before the existing SQL phases.
 type CapacityWorkReconciler struct {
 	Qualification CapacityQualification
-	Recovery      CapacityRecoveryReader
 	Permissions   CapacityPermissionReader
 	Processing    CapacityProcessingReader
 	Root          *RootBackingCoordinator
@@ -137,7 +136,7 @@ func (l *capacityWorkInterval) narrow(until time.Time) bool {
 }
 
 func (s *CapacityWorkReconciler) sourceValid(v AcceptedCapacitySource) bool {
-	return s != nil && s.Now != nil && s.Recovery != nil && s.Qualification.Valid() && v.Valid(s.Now()) &&
+	return s != nil && s.Now != nil && s.Qualification.Valid() && v.Valid(s.Now()) &&
 		v.RootID == s.Qualification.RootBacking.RootID && v.InstallationID == s.Qualification.RootBacking.InstallationID &&
 		v.QualificationID == s.Qualification.ID && v.QualificationDigest == s.Qualification.Digest
 }
@@ -151,15 +150,11 @@ func (s *CapacityWorkReconciler) ReconcileRoot(ctx context.Context, source Accep
 		return err
 	}
 	defer func() { l.end() }()
-	recovery, err := s.Recovery.RecoveryState(l.ctx)
-	if err != nil || !recovery.Valid(s.Now()) || !l.narrow(recovery.FreshUntil) {
-		return cfg.ErrUnavailable
-	}
 	policy, err := s.Processing.DownloadPolicy(l.ctx)
 	if err != nil || !policy.Valid(s.Now()) || !l.narrow(policy.FreshUntil) {
 		return cfg.ErrUnavailable
 	}
-	observation, err := NewRootBackingObservation(s.Qualification, source, policy, recovery, s.Now())
+	observation, err := NewRootBackingObservation(s.Qualification, source, policy, s.Now())
 	if err != nil || !l.narrow(observation.FreshUntil) {
 		return cfg.ErrUnavailable
 	}
@@ -180,7 +175,7 @@ type CapacityGuardedFacts struct {
 // ReadGuardedCandidate performs a regional cluster's combined guard and
 // workload read under the qualification's pinned keys, bounded only by ctx.
 // It confers nothing: ReconcileGuardedWorkload checks the facts like a read
-// made inside the source interval, after current recovery and permissions.
+// made inside the source interval, after current permissions.
 func (s *CapacityWorkReconciler) ReadGuardedCandidate(ctx context.Context, cluster CapacityClusterReaders, namespace cfg.NamespaceRef, candidate cfg.WorkloadRef) (CapacityGuardedFacts, error) {
 	var zero CapacityGuardedFacts
 	if s == nil || ctx == nil || ctx.Err() != nil || cluster.Guarded == nil {
@@ -254,11 +249,7 @@ func (s *CapacityWorkReconciler) reconcile(ctx context.Context, source AcceptedC
 		return capacityStage("interval", err)
 	}
 	defer func() { l.end() }()
-	recovery, err := s.Recovery.RecoveryState(l.ctx)
-	if err != nil || !recovery.Valid(s.Now()) || recovery.InstallationID != source.InstallationID || !l.narrow(recovery.FreshUntil) {
-		return capacityStage("recovery", cfg.ErrUnavailable)
-	}
-	permissions, err := s.Permissions.ReadCapacityPermissions(l.ctx, recovery)
+	permissions, err := s.Permissions.ReadCapacityPermissions(l.ctx)
 	if err != nil || !permissions.Valid(s.Now()) || permissions.RootID != source.RootID || !l.narrow(permissions.FreshUntil) {
 		return capacityStage("permissions", cfg.ErrUnavailable)
 	}
@@ -290,7 +281,7 @@ func (s *CapacityWorkReconciler) reconcile(ctx context.Context, source AcceptedC
 		return capacityStage("workload-fresh", cfg.ErrUnavailable)
 	}
 	workload.Namespace.Labels = EligibleNamespace(namespace.Name, cluster.ReleaseNamespace, workload.Namespace.Labels)
-	observation, _, err := ComposeEnrollmentObservation(source, guard, workload, permissions, recovery, s.Enrollment.Accounts.AccountVersion(), s.Now())
+	observation, _, err := ComposeEnrollmentObservation(source, guard, workload, permissions, s.Enrollment.Accounts.AccountVersion(), s.Now())
 	if err != nil {
 		return capacityStage("compose", err)
 	}

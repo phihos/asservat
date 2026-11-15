@@ -19,11 +19,10 @@ const MaxContextCaseArtifacts = 100
 type CaseRouteQuery struct {
 	RootID, CaseID string
 	Identity       identity.Identity
-	Recovery       artifact.RecoveryProof
 }
 
 func (q CaseRouteQuery) Valid(now time.Time) bool {
-	return authorization.UUID(q.RootID) && authorization.UUID(q.CaseID) && q.Identity.Valid(now) && slices.Contains(q.Identity.Scopes, "evidence:read") && q.Recovery.Valid(now)
+	return authorization.UUID(q.RootID) && authorization.UUID(q.CaseID) && q.Identity.Valid(now) && slices.Contains(q.Identity.Scopes, "evidence:read")
 }
 
 // ContextCaseRoute contains published-only lookup keys. It is not a public DTO

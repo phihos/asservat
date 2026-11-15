@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"asservat.local/asservat/internal/domain/artifact"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/privacy"
 )
@@ -57,7 +56,6 @@ type capacityRuntimeReader struct {
 	pages            []CapacityWorkloadPage
 	page             int
 	guard            CapacityNamespaceProtection
-	recovery         artifact.RecoveryProof
 }
 
 func (f *capacityRuntimeReader) DiscoverCapacityNamespaces(ctx context.Context, _ string) (CapacityNamespacePage, error) {
@@ -83,7 +81,7 @@ func (f *capacityRuntimeReader) ReadCapacityWorkload(context.Context, cfg.Namesp
 func (f *capacityRuntimeReader) CapacityNamespaceProtection(ctx context.Context) (CapacityNamespaceProtection, error) {
 	return f.guard, ctx.Err()
 }
-func (f *capacityRuntimeReader) ReadCapacityPermissions(context.Context, artifact.RecoveryProof) (AcceptedCapacityPermissions, error) {
+func (f *capacityRuntimeReader) ReadCapacityPermissions(context.Context) (AcceptedCapacityPermissions, error) {
 	return AcceptedCapacityPermissions{}, cfg.ErrUnavailable
 }
 func (f *capacityRuntimeReader) DownloadPolicy(context.Context) (privacy.DownloadPolicy, error) {
@@ -91,9 +89,6 @@ func (f *capacityRuntimeReader) DownloadPolicy(context.Context) (privacy.Downloa
 }
 func (f *capacityRuntimeReader) RefreshCapacityEnrollment(context.Context, EnrollmentObservation, Enrollment) error {
 	return cfg.ErrUnavailable
-}
-func (f *capacityRuntimeReader) RecoveryState(ctx context.Context) (artifact.RecoveryProof, error) {
-	return f.recovery, ctx.Err()
 }
 
 func TestCapacityDiscoveryBoundsPagesAndRejectsChangedContinuation(t *testing.T) {
@@ -264,8 +259,8 @@ func TestCapacityReconcilerCancellationJoinsBlockedDiscoveryOwner(t *testing.T) 
 	q.ID, q.Digest = f.accepted.QualificationID, f.accepted.QualificationDigest
 	q.RootBacking.RootID, q.RootBacking.InstallationID = f.accepted.RootID, f.accepted.InstallationID
 	q.RootBacking.QualificationID, q.RootBacking.QualificationDigest = q.ID, q.Digest
-	reader := &capacityRuntimeReader{entered: make(chan struct{}), release: make(chan struct{}), recovery: f.recovery}
-	work := &CapacityWorkReconciler{Qualification: q, Recovery: reader, Permissions: reader, Processing: reader, Root: &RootBackingCoordinator{}, Enrollment: &EnrollmentCoordinator{}, Bindings: reader, Now: func() time.Time { return f.now }}
+	reader := &capacityRuntimeReader{entered: make(chan struct{}), release: make(chan struct{})}
+	work := &CapacityWorkReconciler{Qualification: q, Permissions: reader, Processing: reader, Root: &RootBackingCoordinator{}, Enrollment: &EnrollmentCoordinator{}, Bindings: reader, Now: func() time.Time { return f.now }}
 	runner := CapacityReconciler{Source: source, Work: work, Clusters: []CapacityClusterReaders{{ClusterID: q.NamespaceGuards[0].ClusterID, Workloads: reader, Guard: reader}}}
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
@@ -305,8 +300,8 @@ func TestCapacityReconcilerPacesRegionalClusterIterations(t *testing.T) {
 		q.ID, q.Digest = f.accepted.QualificationID, f.accepted.QualificationDigest
 		q.RootBacking.RootID, q.RootBacking.InstallationID = f.accepted.RootID, f.accepted.InstallationID
 		q.RootBacking.QualificationID, q.RootBacking.QualificationDigest = q.ID, q.Digest
-		reader := &capacityRuntimeReader{recovery: f.recovery}
-		work := &CapacityWorkReconciler{Qualification: q, Recovery: reader, Permissions: reader, Processing: reader, Root: &RootBackingCoordinator{}, Enrollment: &EnrollmentCoordinator{}, Bindings: reader, Now: func() time.Time { return f.now }}
+		reader := &capacityRuntimeReader{}
+		work := &CapacityWorkReconciler{Qualification: q, Permissions: reader, Processing: reader, Root: &RootBackingCoordinator{}, Enrollment: &EnrollmentCoordinator{}, Bindings: reader, Now: func() time.Time { return f.now }}
 		runner := CapacityReconciler{Source: source, Work: work, Clusters: []CapacityClusterReaders{{ClusterID: q.NamespaceGuards[0].ClusterID, Workloads: reader, Guard: reader, Pace: pace}}}
 		ctx, cancel := context.WithTimeout(context.Background(), 1200*time.Millisecond)
 		_ = runner.Run(ctx)
@@ -338,8 +333,8 @@ func TestCapacityReconcilerDemandLaneReconcilesDemandedWorkload(t *testing.T) {
 		q.ID, q.Digest = f.accepted.QualificationID, f.accepted.QualificationDigest
 		q.RootBacking.RootID, q.RootBacking.InstallationID = f.accepted.RootID, f.accepted.InstallationID
 		q.RootBacking.QualificationID, q.RootBacking.QualificationDigest = q.ID, q.Digest
-		reader := &capacityRuntimeReader{recovery: f.recovery}
-		work := &CapacityWorkReconciler{Qualification: q, Recovery: reader, Permissions: reader, Processing: reader, Root: &RootBackingCoordinator{}, Enrollment: &EnrollmentCoordinator{}, Bindings: reader, Now: func() time.Time { return f.now }}
+		reader := &capacityRuntimeReader{}
+		work := &CapacityWorkReconciler{Qualification: q, Permissions: reader, Processing: reader, Root: &RootBackingCoordinator{}, Enrollment: &EnrollmentCoordinator{}, Bindings: reader, Now: func() time.Time { return f.now }}
 		cluster := q.NamespaceGuards[0].ClusterID
 		demand := CapacityRefreshDemand{ClusterID: cluster, Namespace: cfg.NamespaceRef{Name: "payments", UID: "ns-uid"}, Workload: cfg.WorkloadRef{Kind: "Deployment", Name: "api", UID: "api-uid"}, NotAfter: f.now.Add(time.Minute)}
 		if !known {

@@ -18,7 +18,7 @@ import (
 
 // ADR-180: the hub reads a workload cluster's work trust from its own control
 // namespace; the trust names that cluster and its keys, never the reader's.
-// Real loopback TLS; recovery and clock are synthetic. The server has no
+// Real loopback TLS; the clock is synthetic. The server has no
 // admission policy, review or dry-run endpoint: plain read under RBAC.
 func TestAPIContextWorkTrustIsHubHeldForAWorkloadCluster(t *testing.T) {
 	for _, mode := range []string{"hub-held", "changed"} {
@@ -66,7 +66,7 @@ func TestAPIContextWorkTrustIsHubHeldForAWorkloadCluster(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			source, err := NewAPIContextWorkTrustSource(observer, guard, &capabilityRecovery{clock: clock}, "api-context-work-trust", ownerID(7), installed)
+			source, err := NewAPIContextWorkTrustSource(observer, guard, "api-context-work-trust", ownerID(7), installed)
 			if err != nil {
 				t.Fatal("hub-held trust of another cluster refused", err)
 			}

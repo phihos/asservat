@@ -1,16 +1,17 @@
 package evidence
 
 import (
+	"context"
+	"time"
+
 	auditapp "asservat.local/asservat/internal/application/audit"
 	query "asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
 	value "asservat.local/asservat/internal/domain/authorization"
-	"context"
-	"time"
 )
 
-// Identity effects use the admitted query parent, current configuration/recovery
+// Identity effects use the admitted query parent, current configuration
 // and original worker lifetime. They do not grant ReadApproved or consume a
 // human request; query/native/key effects keep their independent current gates.
 type ProjectionEnrollmentEffects interface {

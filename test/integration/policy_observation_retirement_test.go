@@ -145,13 +145,6 @@ func qualifyPolicyObservationRetirement(t *testing.T, ctx context.Context, admin
 	if err != nil {
 		t.Fatal(err)
 	}
-	proof := func() artifact.RecoveryProof {
-		p, err := s.recovery.reader.RecoveryState(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return p
-	}
 	type balances struct {
 		Accepted, Grant, Bytes, Objects, Full, Replay int64
 		State                                         string
@@ -202,7 +195,7 @@ func qualifyPolicyObservationRetirement(t *testing.T, ctx context.Context, admin
 	if err = retention.TightenRetention(ctx, retentionTestDecision(t, ctx, retention, reg.Location, cutoff, deleteBy)); err != nil {
 		t.Fatal(err)
 	}
-	work, err := cleaner.BeginContextDeletion(ctx, reg.Location, proof())
+	work, err := cleaner.BeginContextDeletion(ctx, reg.Location)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -213,13 +206,13 @@ func qualifyPolicyObservationRetirement(t *testing.T, ctx context.Context, admin
 	if err = bound.PurgeAttempt(ctx, reg); err != nil {
 		t.Fatal("actual complete backend purge", err)
 	}
-	checkpoint, err := cleaner.RecordContextPurge(ctx, work, time.Now().UTC().Truncate(time.Microsecond), proof())
+	checkpoint, err := cleaner.RecordContextPurge(ctx, work, time.Now().UTC().Truncate(time.Microsecond))
 	if err != nil {
 		t.Fatal(err)
 	}
 	purged := original
 	purged.State = string(artifact.Deleting)
-	if err = finalizer.FinalizeContextDeletion(ctx, checkpoint, proof()); err == nil {
+	if err = finalizer.FinalizeContextDeletion(ctx, checkpoint); err == nil {
 		t.Fatal("unacknowledged deletion released custody")
 	}
 	if got := read(); got != purged {
@@ -239,13 +232,13 @@ func qualifyPolicyObservationRetirement(t *testing.T, ctx context.Context, admin
 	if err != nil {
 		t.Fatal("actual signed/encrypted deletion audit", err)
 	}
-	if err = auditor.AcknowledgeContextDeletion(ctx, checkpoint, receipt, proof()); err != nil {
+	if err = auditor.AcknowledgeContextDeletion(ctx, checkpoint, receipt); err != nil {
 		t.Fatal(err)
 	}
 	if !time.Now().Before(in.Permit.LeaseUntil) {
 		t.Fatal("fixture missed the original early-retirement window")
 	}
-	if err = finalizer.FinalizeContextDeletion(ctx, checkpoint, proof()); err == nil {
+	if err = finalizer.FinalizeContextDeletion(ctx, checkpoint); err == nil {
 		t.Fatal("acknowledged deletion retired a live observation lease")
 	}
 	if got := read(); got != purged {
@@ -275,7 +268,7 @@ func qualifyPolicyObservationRetirement(t *testing.T, ctx context.Context, admin
 		t.Fatal("expired wrong-XID refusal changed original charges", got, purged)
 	}
 	sample("purged-audited-before-retire")
-	if err = finalizer.FinalizeContextDeletion(ctx, checkpoint, proof()); err != nil {
+	if err = finalizer.FinalizeContextDeletion(ctx, checkpoint); err != nil {
 		t.Fatal("actual narrow audited finalizer", err)
 	}
 	expected := original
@@ -286,7 +279,7 @@ func qualifyPolicyObservationRetirement(t *testing.T, ctx context.Context, admin
 	if got := read(); got != expected {
 		t.Fatal("wrong child/charge/spend retirement", got, expected)
 	}
-	if err = finalizer.FinalizeContextDeletion(ctx, checkpoint, proof()); err != nil {
+	if err = finalizer.FinalizeContextDeletion(ctx, checkpoint); err != nil {
 		t.Fatal("finalizer replay", err)
 	}
 	if got := read(); got != expected {

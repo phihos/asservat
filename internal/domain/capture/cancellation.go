@@ -1,10 +1,10 @@
 package capture
 
 import (
-	"asservat.local/asservat/internal/domain/artifact"
+	"time"
+
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
-	"time"
 )
 
 type CancellationRequest struct {
@@ -21,12 +21,11 @@ type CancellationCheck struct {
 	RootID                string
 	Request               CancellationRequest
 	Identity              identity.Identity
-	Recovery              artifact.RecoveryProof
 	CheckedAt, ValidUntil time.Time
 }
 
 func (c CancellationCheck) Valid(now time.Time) bool {
-	return authorization.UUID(c.RootID) && c.Request.Valid() && c.Identity.Valid(now) && c.Recovery.Valid(now) && identity.Fresh(c.CheckedAt, c.ValidUntil, now, 5*time.Second) && !c.ValidUntil.After(c.Identity.ValidUntil) && !c.ValidUntil.After(c.Recovery.FreshUntil)
+	return authorization.UUID(c.RootID) && c.Request.Valid() && c.Identity.Valid(now) && identity.Fresh(c.CheckedAt, c.ValidUntil, now, 5*time.Second) && !c.ValidUntil.After(c.Identity.ValidUntil)
 }
 
 // Cancellation records intent to stop remaining capture work. It is not a

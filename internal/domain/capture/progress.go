@@ -3,7 +3,6 @@ package capture
 import (
 	"time"
 
-	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
 )
@@ -14,11 +13,10 @@ const MaxProgressRevision int64 = 1000000000
 type ProgressQuery struct {
 	RootID, CaptureID string
 	Identity          identity.Identity
-	Recovery          artifact.RecoveryProof
 }
 
 func (q ProgressQuery) Valid(now time.Time) bool {
-	return authorization.UUID(q.RootID) && authorization.UUID(q.CaptureID) && q.Identity.Valid(now) && q.Recovery.Valid(now)
+	return authorization.UUID(q.RootID) && authorization.UUID(q.CaptureID) && q.Identity.Valid(now)
 }
 
 // ContextProgressObservation is private authorized control metadata. Candidate

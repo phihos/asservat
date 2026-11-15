@@ -22,7 +22,7 @@ import (
 
 // ConfigurationRuntimeRoleRoot belongs only to the prior purpose-fixed
 // configuration installer. Its actual source proof is independent of accepted
-// SQL configuration; it grants no serving/recovery/activation authority.
+// SQL configuration; it grants no serving or activation authority.
 type ConfigurationRuntimeRoleRoot struct {
 	client       *PermissionClient
 	source       *ConfigurationRoleSource

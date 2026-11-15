@@ -1,13 +1,14 @@
 package execution
 
 import (
-	"asservat.local/asservat/internal/application/evidence"
-	identities "asservat.local/asservat/internal/application/identity"
-	value "asservat.local/asservat/internal/domain/execution"
 	"context"
 	"encoding/json"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/application/evidence"
+	identities "asservat.local/asservat/internal/application/identity"
+	value "asservat.local/asservat/internal/domain/execution"
 
 	deliveryapp "asservat.local/asservat/internal/application/delivery"
 	compiler "asservat.local/asservat/internal/application/planning"
@@ -85,14 +86,14 @@ func TestAPIContextSnapshotRecompilesOnlyAdmittedSource(t *testing.T) {
 func snapshotRecompilesOnlyAdmittedSource(t *testing.T, nativeType string) {
 	f, runner, current := snapshotExecutionFixtureFor(t, nativeType)
 	b := *f.work.SourceBinding
-	check, _, err := runner.checkObserved(t.Context(), current, f.work, f.actor.ValidUntil, nil, nil)
+	check, _, err := runner.checkObserved(t.Context(), current, f.work, f.actor.ValidUntil, nil)
 	if err != nil || !check.Valid(f.now) || check.Plan.Input.Snapshot == nil || check.Plan.Input.Recorder != nil {
 		t.Fatal("admitted source snapshot cannot reach typed API check", err)
 	}
 	replacement := b
 	replacement.Fence = contextID(69)
 	f.work.SourceBinding = &replacement
-	if _, _, err = runner.checkObserved(t.Context(), current, f.work, f.actor.ValidUntil, nil, nil); err == nil {
+	if _, _, err = runner.checkObserved(t.Context(), current, f.work, f.actor.ValidUntil, nil); err == nil {
 		t.Fatal("different source fence inherited admitted snapshot")
 	}
 }
@@ -108,7 +109,7 @@ type snapshotCompletionFixture struct {
 	snapshotCompletions int
 }
 
-func (s *snapshotCompletionFixture) RecordAPIStoredSnapshotCompletion(_ context.Context, r value.APIExecution, _ artifact.ContextWriterCompletion, _ artifact.SourceSnapshotCoverage, _ value.APIProcessObservation, _ artifact.RecoveryProof) (value.APIExecution, error) {
+func (s *snapshotCompletionFixture) RecordAPIStoredSnapshotCompletion(_ context.Context, r value.APIExecution, _ artifact.ContextWriterCompletion, _ artifact.SourceSnapshotCoverage, _ value.APIProcessObservation) (value.APIExecution, error) {
 	s.snapshotCompletions++
 	return r, nil
 }

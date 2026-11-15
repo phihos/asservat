@@ -10,7 +10,7 @@ import (
 const RootConfigurationFormat = "protected-capacity-configuration/v1"
 
 // RootConfiguration is a receipt of transactional configuration only. It never
-// authorizes a capture, disclosure, key effect or recovery transition. The
+// authorizes a capture, disclosure, or key effect. The
 // original root attempt and its first interval survive every configuration
 // revision; each revision separately retains its original planning interval.
 // A fresh observation can finish missing compatible SQL effects, not edit any

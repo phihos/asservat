@@ -25,12 +25,10 @@ import (
 // three keyset roles at most once, before the execution's original deadline
 // and before any start object exists. Spend is irreversible and never refunded.
 type ContextKeyWraps struct {
-	ledger   *Ledger
-	root     string
-	epoch    string // the protected key configuration's recovery epoch
-	scope    authorization.KeyScope
-	recovery *RecoveryReader
-	guard    *RecoveryTransactionGuard
+	ledger *Ledger
+	root   string
+	epoch  string // the protected key configuration's recovery epoch
+	scope  authorization.KeyScope
 }
 
 var _ authapp.KeyOperationAuthorizer = (*ContextKeyWraps)(nil)
@@ -45,15 +43,7 @@ func NewContextKeyWraps(ctx context.Context, pool *pgxpool.Pool, root, epoch str
 	if err != nil {
 		return nil, err
 	}
-	recovery, err := NewRecoveryReader(ctx, pool, scope.InstallationID)
-	if err != nil {
-		return nil, err
-	}
-	guard, err := NewRecoveryTransactionGuard(root, scope.InstallationID)
-	if err != nil {
-		return nil, err
-	}
-	return &ContextKeyWraps{ledger: ledger, root: root, epoch: epoch, scope: scope, recovery: recovery, guard: guard}, nil
+	return &ContextKeyWraps{ledger: ledger, root: root, epoch: epoch, scope: scope}, nil
 }
 
 var contextKeyRoles = []string{"data-key", "index-key", "manifest-key"}
@@ -66,12 +56,8 @@ func (s *ContextKeyWraps) Resolve(ctx context.Context, peer authorization.KeyPee
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	start := time.Now()
-	proof, err := s.recovery.RecoveryState(ctx)
-	if err != nil || proof.InstallationID != s.scope.InstallationID {
-		return out, authapp.ErrKeyDenied
-	}
-	err = s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		trust, err := s.guard.lock(ctx, q, s.root, proof)
+	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
+		trust, _, err := currentTrust(ctx, q, s.scope.InstallationID)
 		if err != nil {
 			return err
 		}
@@ -128,12 +114,9 @@ func (s *ContextKeyWraps) Resolve(ctx context.Context, peer authorization.KeyPee
 		if err != nil || affected != 1 {
 			return authapp.ErrKeyDenied
 		}
-		if err = s.guard.check(ctx, q, trust, s.root, proof); err != nil {
-			return err
-		}
 		end := identity.Earlier(exec.NotAfter.Time, peer.NotAfter)
-		end = identity.Earlier(end, identity.Earlier(start.Add(5*time.Second), proof.FreshUntil))
-		out = authorization.KeyOperationPermit{AuthorityID: r.AuthorityID, RecoveryEpoch: s.epoch, Revision: uint64(max(proof.Revision.Generation, 1)), Certificate: peer.Certificate, RequestDigest: r.RequestDigest, ObservedAt: now.Time, ValidUntil: end}
+		end = identity.Earlier(end, start.Add(5*time.Second))
+		out = authorization.KeyOperationPermit{AuthorityID: r.AuthorityID, RecoveryEpoch: s.epoch, Revision: uint64(max(trust.SourceGeneration, 1)), Certificate: peer.Certificate, RequestDigest: r.RequestDigest, ObservedAt: now.Time, ValidUntil: end}
 		after, err := q.CurrentTime(ctx)
 		if err != nil || !out.Valid(peer, r, after.Time) {
 			return authapp.ErrKeyDenied

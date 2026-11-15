@@ -70,10 +70,10 @@ func newManualSnapshotWorkflow(t *testing.T, ctx context.Context, f *capacitySQL
 		t.Fatal("workflow has no retained sources")
 	}
 	first := parts[0]
-	process := value.APIProcessBinding{InstallationID: policy.Authority.InstallationID, ClusterID: policy.Authority.ClusterID, IssuerEpoch: first.Admission.Recovery.IssuerEpoch, NamespaceUID: custodyID(), AccountUID: custodyID(), PodUID: custodyID(), ProcessEpoch: custodyID(), StartupDigest: artifact.Digest{1}, ImageDigest: first.Admission.Plan.Input.Capability.CollectorImageDigest}
+	process := value.APIProcessBinding{InstallationID: policy.Authority.InstallationID, ClusterID: policy.Authority.ClusterID, IssuerEpoch: policy.Scenario.recovery.observation.issuer, NamespaceUID: custodyID(), AccountUID: custodyID(), PodUID: custodyID(), ProcessEpoch: custodyID(), StartupDigest: artifact.Digest{1}, ImageDigest: first.Admission.Plan.Input.Capability.CollectorImageDigest}
 	facts := &manualSnapshotWorkflowFacts{parts: parts, process: process}
-	guards := postgres.EffectTransactionGuards{Recovery: policy.Scenario.recovery.guard, Retention: policy.Scenario.retention.guard}
-	executions, err := postgres.NewAPIContextExecutions(ctx, f.roles["hub-runtime"], first.Admission.RootID, guards)
+	guards := policy.Scenario.retention.guard
+	executions, err := postgres.NewAPIContextExecutions(ctx, f.roles["hub-runtime"], first.Admission.RootID, policy.Authority.InstallationID, guards)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +85,7 @@ func newManualSnapshotWorkflow(t *testing.T, ctx context.Context, f *capacitySQL
 	retained := privacyapp.AcceptedRetentionReader{Topology: policy.Scenario.retention.topology, Sources: policy.Scenario.retention.reader, Now: workflowNow}
 	retention := privacyapp.RetentionResolver{Policies: &retained, RetainedPolicies: &retained, Now: workflowNow}
 	w := &manualSnapshotWorkflow{Facts: facts, Executions: executions, Eligibility: eligibility, Retention: retention, t: t, f: f, policy: policy, nodes: map[manualSnapshotNodeKey]*manualSnapshotNode{}, stages: map[string]*sourceSnapshotCompletionState{}}
-	w.Runner = executionapp.APIContextRunner{Read: executions, Prepare: executions, Record: executions, Process: facts, Targets: facts, Eligibility: eligibility, Capabilities: facts, Retention: retention, Recovery: policy.Scenario.recovery.reader, Output: w, Collector: manualWorkflowNoCapture{}, Now: workflowNow}
+	w.Runner = executionapp.APIContextRunner{Read: executions, Prepare: executions, Record: executions, Process: facts, Targets: facts, Eligibility: eligibility, Capabilities: facts, Retention: retention, Output: w, Collector: manualWorkflowNoCapture{}, Now: workflowNow}
 	for _, part := range parts {
 		b := part.Source.Binding
 		if _, ok := w.nodes[manualSnapshotKey(b)]; ok {
@@ -238,20 +238,13 @@ func (w *manualSnapshotWorkflow) Complete(t *testing.T, ctx context.Context, par
 	}
 	// These fixture-only reads serve completion inspection, not enqueue. Keep
 	// them outside the request's original start interval.
-	recovery, err := w.policy.Scenario.recovery.reader.RecoveryState(ctx)
-	if err != nil {
-		t.Fatal("completion recovery", err)
-	}
-	_, stage.Execution, err = w.Executions.ReadRecordingWork(ctx, part.Accepted.CaptureID, recovery)
+	var err error
+	_, stage.Execution, err = w.Executions.ReadRecordingWork(ctx, part.Accepted.CaptureID)
 	if err != nil {
 		t.Fatal("original started child before completion", err)
 	}
 	stage.RecordStored = func(ctx context.Context, c evidence.RecordingCollection, _ artifact.SourceSnapshotOutcome) (value.APIExecution, error) {
-		recovery, err := w.policy.Scenario.recovery.reader.RecoveryState(ctx)
-		if err != nil {
-			return value.APIExecution{}, err
-		}
-		work, started, err := w.Executions.ReadRecordingWork(ctx, part.Accepted.CaptureID, recovery)
+		work, started, err := w.Executions.ReadRecordingWork(ctx, part.Accepted.CaptureID)
 		if err != nil {
 			return value.APIExecution{}, err
 		}

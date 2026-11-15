@@ -35,10 +35,9 @@ func processingCoverageFixture(t *testing.T) (custodydb.ProcessingRoot, capture.
 }
 
 func TestProcessingCaptureCoverageOriginalRootBounds(t *testing.T) {
-	for _, name := range []string{"covered", "exact-boundary", "one-microsecond-too-long", "expired", "missing-initialization", "wrong-installation", "wrong-issuer", "wrong-root", "malformed-backing", "zero-protection", "overflow-rules", "future-anchor"} {
+	for _, name := range []string{"covered", "exact-boundary", "one-microsecond-too-long", "expired", "missing-initialization", "wrong-root", "malformed-backing", "zero-protection", "overflow-rules", "future-anchor"} {
 		t.Run(name, func(t *testing.T) {
 			p, r, n := processingCoverageFixture(t)
-			installation, issuer := uid(p.InstallationID), uid(p.IssuerEpoch)
 			var want error
 			switch name {
 			case "exact-boundary":
@@ -51,12 +50,6 @@ func TestProcessingCaptureCoverageOriginalRootBounds(t *testing.T) {
 				want = capture.ErrUnavailable
 			case "missing-initialization":
 				p.InitializationID.Valid = false
-				want = capture.ErrUnavailable
-			case "wrong-installation":
-				installation = processingCoverageID(100)
-				want = capture.ErrUnavailable
-			case "wrong-issuer":
-				issuer = processingCoverageID(100)
 				want = capture.ErrUnavailable
 			case "wrong-root":
 				r.RootID = processingCoverageID(100)
@@ -74,7 +67,7 @@ func TestProcessingCaptureCoverageOriginalRootBounds(t *testing.T) {
 				r.AnchorAt = n.Add(time.Microsecond)
 				want = capture.ErrUnavailable
 			}
-			if err := processingCaptureCoverage(p, nil, r, installation, issuer, n); !errors.Is(err, want) {
+			if err := processingCaptureCoverage(p, nil, r, n); !errors.Is(err, want) {
 				t.Fatalf("coverage error=%v want=%v", err, want)
 			}
 		})
@@ -141,7 +134,7 @@ func TestProcessingCaptureCoverageRetainsEachOriginalRule(t *testing.T) {
 				p.Rules = 0
 				want = capture.ErrUnavailable
 			}
-			if err := processingCaptureCoverage(p, rows, r, uid(p.InstallationID), uid(p.IssuerEpoch), n); !errors.Is(err, want) {
+			if err := processingCaptureCoverage(p, rows, r, n); !errors.Is(err, want) {
 				t.Fatalf("coverage error=%v want=%v", err, want)
 			}
 		})

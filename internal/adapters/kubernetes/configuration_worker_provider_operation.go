@@ -11,7 +11,7 @@ import (
 // ConfigurationWorkerProviderOperation owns one initial/final native pair.
 // Only this reader can create it. It does not implement a general source port,
 // accept caller-built facts or renew its original interval. Credential control
-// belongs between the two actual brackets, with separate current SQL recovery.
+// belongs between the two actual brackets.
 type ConfigurationWorkerProviderOperation struct {
 	self     *ConfigurationWorkerProviderOperation
 	reader   *ConfigurationWorkerProviderReader

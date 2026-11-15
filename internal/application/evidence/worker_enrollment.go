@@ -1,13 +1,14 @@
 package evidence
 
 import (
+	"context"
+	"time"
+
 	auditapp "asservat.local/asservat/internal/application/audit"
 	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
 	value "asservat.local/asservat/internal/domain/authorization"
-	"context"
-	"time"
 )
 
 type WorkerEnrollmentBindings interface {
@@ -111,7 +112,7 @@ func (s *WorkerEnrollmentCoordinator) enrollChecked(ctx context.Context, session
 
 // EnrollAdmitted issues identity for an already admitted worker. The caller is
 // the worker's own finite HTTP request; SQL effects independently check current
-// parent/configuration/recovery. The certificate confers no evidence rights.
+// parent/configuration. The certificate confers no evidence rights.
 func (s *WorkerEnrollmentCoordinator) EnrollAdmitted(ctx context.Context, session, worker string, csr []byte) (value.WorkerCertificate, error) {
 	return s.enrollAdmitted(ctx, ctx, session, worker, csr)
 }

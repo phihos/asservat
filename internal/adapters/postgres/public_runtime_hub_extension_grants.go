@@ -648,7 +648,7 @@ var publicRuntimeHubExtensionGrantTable = map[string][]publicRuntimeGrant{
 	},
 	// ADR-210: a privacy operator's processing decisions, exactly the
 	// component role processing_decision_runtime: decision and rule rows and
-	// the lock order recovery, permission, processing root (ADR-127).
+	// the lock order permission, processing root (ADR-127).
 	"processing-decision": {
 		{"schema", "public", "", "USAGE"},
 		{"table", "context_catalog", "", "SELECT"},

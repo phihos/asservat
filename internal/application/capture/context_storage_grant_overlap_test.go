@@ -147,7 +147,7 @@ func TestRecordingStorageHintOverlapsGrantBeforeFreshConsumption(t *testing.T) {
 }
 
 func TestRecordingStorageHintRetainsOriginalConsumptionBounds(t *testing.T) {
-	for _, mode := range []string{"request", "identity", "recovery", "grant"} {
+	for _, mode := range []string{"request", "identity", "grant"} {
 		t.Run(mode, func(t *testing.T) {
 			f, p, grants := recordingOverlapFixture(t)
 			ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
@@ -160,8 +160,6 @@ func TestRecordingStorageHintRetainsOriginalConsumptionBounds(t *testing.T) {
 			switch mode {
 			case "identity":
 				source = &shortenedContinuationIdentity{source: source, until: bound}
-			case "recovery":
-				f.svc.Recovery = consumptionRecovery{f.investigationFixture, bound}
 			case "grant":
 				grants.grant.ExpiresAt = bound
 			}
@@ -229,14 +227,10 @@ func TestStorageHintAcceptedReplayStartsNoWait(t *testing.T) {
 }
 
 func TestRecordingStorageHintSkipsKnownChangedPreview(t *testing.T) {
-	for _, mode := range []string{"epoch", "rules"} {
+	for _, mode := range []string{"rules"} {
 		t.Run(mode, func(t *testing.T) {
 			f, p, _ := recordingOverlapFixture(t)
-			if mode == "epoch" {
-				p.IssuerEpoch = "ffffffff-ffff-4fff-8fff-ffffffffffff"
-			} else {
-				p.AssessmentRulesDigest[0] ^= 1
-			}
+			p.AssessmentRulesDigest[0] ^= 1
 			f.previews[p.ID] = p.Clone()
 			var reads, demands atomic.Int32
 			f.svc.Storage = consumptionStorageFunc(func(context.Context, authorization.Target) (ContextStorageObservation, error) {

@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
@@ -67,15 +66,11 @@ func (s *CapacityCaptureEnrollments) ReadCapacityEnrollment(ctx context.Context,
 }
 
 func (s *capacityEnrollmentReader) current(ctx context.Context, o app.EnrollmentObservation) (*app.Enrollment, error) {
-	if s == nil || s.ledger == nil || s.accounts == nil || ctx == nil || ctx.Err() != nil || o.Key.RootID != s.root || o.Recovery.InstallationID != s.installation || !o.Valid(time.Now()) || o.Plan.AccountVersion() != s.accounts.AccountVersion() {
+	if s == nil || s.ledger == nil || s.accounts == nil || ctx == nil || ctx.Err() != nil || o.Key.RootID != s.root || !o.Valid(time.Now()) || o.Plan.AccountVersion() != s.accounts.AccountVersion() {
 		return nil, cfg.ErrUnavailable
 	}
 	plan, pool, source, e := o.Plan.CanonicalValues()
 	if e != nil {
-		return nil, cfg.ErrUnavailable
-	}
-	observation, e := json.Marshal(o)
-	if e != nil || len(observation) > 128<<10 {
 		return nil, cfg.ErrUnavailable
 	}
 	// The immutable plan is transmitted directly, never reconstructed by a
@@ -95,8 +90,11 @@ func (s *capacityEnrollmentReader) current(ctx context.Context, o app.Enrollment
 		}
 	}()
 	e = s.ledger.transaction(live, func(q *custodydb.Queries) error {
+		observation, err := capacityObservationJSON(live, q, s.installation, o, 128<<10)
+		if err != nil {
+			return err
+		}
 		var raw []byte
-		var err error
 		if s.capture {
 			raw, err = q.ReadCapacityCaptureEnrollment(live, custodydb.ReadCapacityCaptureEnrollmentParams{RootID: id(s.root), ObservationValue: observation, PlanCanonical: plan, PoolCanonical: pool, SourceCanonical: source})
 		} else {

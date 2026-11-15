@@ -69,15 +69,7 @@ func TestProcessingReleaseProfilesWithRealPostgres(t *testing.T) {
 		if !bytes.Equal(left, right) || profiles.Processing.Policy.History.Layout != audit.ProcessingReleaseHistoryLayout || profiles.Processing.RetainedSeconds != retained || retained == profiles.Normal.RetainedSeconds {
 			t.Fatal("compiled profile read lost the exact private reserve or lane retention")
 		}
-		guard, err := postgres.NewRecoveryTransactionGuard(f.input.PermissionRootID, f.input.InstallationID)
-		if err != nil {
-			t.Fatal(err)
-		}
 		pool := f.roles["hub-runtime"]
-		recovery, err := postgres.NewRecoveryReader(ctx, pool, f.input.InstallationID)
-		if err != nil {
-			t.Fatal("compiled hub recovery reader", err)
-		}
 		buildAudit := func(p audit.OperationLifecyclePolicy) *auditapp.HealthyOperationAuditor {
 			t.Helper()
 			var journal *postgres.OperationJournal
@@ -85,20 +77,20 @@ func TestProcessingReleaseProfilesWithRealPostgres(t *testing.T) {
 			var lifecycle *postgres.OperationLifecycles
 			var err error
 			if p.Lane == "processing" {
-				journal, err = postgres.NewProcessingReleaseJournal(ctx, pool, p, guard)
+				journal, err = postgres.NewProcessingReleaseJournal(ctx, pool, p)
 				if err == nil {
-					ack, err = postgres.NewProcessingReleaseAcknowledgements(ctx, pool, p, guard)
+					ack, err = postgres.NewProcessingReleaseAcknowledgements(ctx, pool, p)
 				}
 				if err == nil {
-					lifecycle, err = postgres.NewProcessingReleaseLifecycles(ctx, pool, p, guard)
+					lifecycle, err = postgres.NewProcessingReleaseLifecycles(ctx, pool, p)
 				}
 			} else {
-				journal, err = postgres.NewHealthyOperationJournal(ctx, pool, p, guard)
+				journal, err = postgres.NewHealthyOperationJournal(ctx, pool, p)
 				if err == nil {
-					ack, err = postgres.NewOperationAcknowledgements(ctx, pool, p.RootID, p.Lane, guard)
+					ack, err = postgres.NewOperationAcknowledgements(ctx, pool, p.RootID, p.Lane, f.input.InstallationID)
 				}
 				if err == nil {
-					lifecycle, err = postgres.NewOperationLifecycles(ctx, pool, p.RootID, p.Lane, guard)
+					lifecycle, err = postgres.NewOperationLifecycles(ctx, pool, p.RootID, p.Lane, f.input.InstallationID)
 				}
 			}
 			if err != nil {
@@ -120,12 +112,12 @@ func TestProcessingReleaseProfilesWithRealPostgres(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer mac.Close()
-		decisions, err := postgres.NewProcessingDecisions(ctx, pool, f.input.PermissionRootID, guard)
+		decisions, err := postgres.NewProcessingDecisions(ctx, pool, f.input.PermissionRootID)
 		if err != nil {
 			t.Fatal("compiled hub processing decisions", err)
 		}
 		actor := processingTestIdentity{value: identity.Identity{Principal: identity.Principal{Issuer: "https://id.example.test", Subject: "capacity-privacy-operator", ClientID: "console", Kind: identity.Human}, Groups: []string{"operators"}, Scopes: []string{"evidence:privacy"}, Policy: identity.Revision{UID: "synthetic-privacy-identity", Generation: 1, Digest: artifact.Digest{28}}}}
-		service := privacyapp.ProcessingChanges{RootID: f.input.PermissionRootID, InstallationID: f.input.InstallationID, Policies: processingTestPolicy{value: f.processingPolicy}, Recovery: recovery, Decisions: decisions,
+		service := privacyapp.ProcessingChanges{RootID: f.input.PermissionRootID, InstallationID: f.input.InstallationID, Policies: processingTestPolicy{value: f.processingPolicy}, Decisions: decisions,
 			Audit: buildAudit(profiles.Normal.Policy), ReleaseAudit: buildAudit(profiles.Processing.Policy), MAC: mac, AuditPolicy: profiles.Normal.Policy, ReleaseAuditPolicy: profiles.Processing.Policy, RetainedSeconds: profiles.Normal.RetainedSeconds, Now: time.Now}
 		change := func(in privacy.ProcessingChange, want string) privacy.ProcessingReceipt {
 			t.Helper()

@@ -14,21 +14,17 @@ import (
 type DownloadPolicyReader interface {
 	DownloadPolicy(context.Context) (privacy.DownloadPolicy, error)
 }
-type DownloadRecoveryReader interface {
-	RecoveryState(context.Context) (artifact.RecoveryProof, error)
-}
 type DownloadProcessingReader interface {
-	ContextProcessing(context.Context, ContextDownloadEvidence, artifact.RecoveryProof) (artifact.DownloadProcessingProof, error)
+	ContextProcessing(context.Context, ContextDownloadEvidence) (artifact.DownloadProcessingProof, error)
 }
 
-// CurrentDownloadEnvironment composes protected deployment policy with actual
-// recovery and complete durable processing decisions. It never supplies a
+// CurrentDownloadEnvironment composes protected deployment policy with
+// complete durable processing decisions. It never supplies a
 // region default, infers processing approval from storage registration, or
 // resolves another principal from a token. Browser and MCP use the same service.
 type CurrentDownloadEnvironment struct {
 	RootID, InstallationID string
 	Policies               DownloadPolicyReader
-	Recovery               DownloadRecoveryReader
 	Processing             DownloadProcessingReader
 	Now                    func() time.Time
 }
@@ -37,7 +33,7 @@ var _ DownloadEnvironmentReader = CurrentDownloadEnvironment{}
 
 func (s CurrentDownloadEnvironment) DownloadEnvironment(ctx context.Context, r ContextDownloadEvidence, actor identity.Principal) (artifact.DownloadEnvironment, error) {
 	var zero artifact.DownloadEnvironment
-	if ctx == nil || ctx.Err() != nil || s.Policies == nil || s.Recovery == nil || s.Processing == nil || s.Now == nil || !actor.Valid() || !r.Retained.Valid() || r.Retained.RootID != s.RootID || !identity.Text(r.PurposeRef, 128) || !artifact.DownloadEvidenceType(r.Retained.Input.EvidenceType) || r.Retained.Input.PrivacyClass != "potentialPersonalData" {
+	if ctx == nil || ctx.Err() != nil || s.Policies == nil || s.Processing == nil || s.Now == nil || !actor.Valid() || !r.Retained.Valid() || r.Retained.RootID != s.RootID || !identity.Text(r.PurposeRef, 128) || !artifact.DownloadEvidenceType(r.Retained.Input.EvidenceType) || r.Retained.Input.PrivacyClass != "potentialPersonalData" {
 		return zero, downloadRefused("configuration", nil)
 	}
 	class, ok := downloadClass(r)
@@ -45,9 +41,9 @@ func (s CurrentDownloadEnvironment) DownloadEnvironment(ctx context.Context, r C
 		return zero, downloadRefused("configuration", nil)
 	}
 	start := s.Now()
-	// One policy, recovery and processing read per check (ADR-311). A change
-	// after these reads is refused by the SQL effect fences (recovery trust,
-	// audit request window, ledger compare-and-set) and observed by the next
+	// One policy and processing read per check (ADR-311). A change after
+	// these reads is refused by the SQL effect fences (audit request window,
+	// ledger compare-and-set) and observed by the next
 	// check; no read here renews an original deadline.
 	until := identity.Earlier(start.Add(identity.AuthorityRecheckInterval), identity.Earlier(r.ValidUntil, r.Retained.Effective.ExpiresAt))
 	if d, ok := ctx.Deadline(); ok {
@@ -69,17 +65,10 @@ func (s CurrentDownloadEnvironment) DownloadEnvironment(ctx context.Context, r C
 	}
 	until = identity.Earlier(until, p.FreshUntil)
 	// Nested contexts only shorten. A later source observation cannot renew the
-	// original catalog, policy, request or recovery deadline.
+	// original catalog, policy or request deadline.
 	call, stopPolicy := context.WithDeadline(call, until)
 	defer stopPolicy()
-	recovery, e := s.Recovery.RecoveryState(call)
-	if e != nil || !recovery.Valid(s.Now()) || recovery.InstallationID != s.InstallationID || recovery.IssuerEpoch != p.RecoveryEpoch {
-		return zero, downloadRefused("recovery", e)
-	}
-	until = identity.Earlier(until, recovery.FreshUntil)
-	call, stopRecovery := context.WithDeadline(call, until)
-	defer stopRecovery()
-	processing, e := s.Processing.ContextProcessing(call, r, recovery)
+	processing, e := s.Processing.ContextProcessing(call, r)
 	if e != nil || !processing.Valid(s.Now()) || processing.RootID != s.RootID || processing.CaptureID != r.CaptureID || processing.Location != r.Retained.Registration.Location {
 		return zero, downloadRefused("processing", e)
 	}
@@ -101,8 +90,8 @@ func (s CurrentDownloadEnvironment) DownloadEnvironment(ctx context.Context, r C
 	}
 	policy := p.Revision
 	policy.Digest = sha256.Sum256(b)
-	out := artifact.DownloadEnvironment{RootID: s.RootID, InstallationID: s.InstallationID, Region: path.AcquisitionRegion, StoreID: r.Retained.Registration.StoreID, RecoveryEpoch: recovery.IssuerEpoch, Location: r.Retained.Registration.Location, Principal: actor, Revision: policy, RecoveryRevision: recovery.Revision, Path: path, Processing: processing, ObservedAt: start, ValidUntil: until}
-	if call.Err() != nil || !out.CurrentValid(s.Now()) || !p.DownloadValid(s.Now()) || !recovery.Valid(s.Now()) || !processing.Valid(s.Now()) {
+	out := artifact.DownloadEnvironment{RootID: s.RootID, InstallationID: s.InstallationID, Region: path.AcquisitionRegion, StoreID: r.Retained.Registration.StoreID, RecoveryEpoch: p.RecoveryEpoch, Location: r.Retained.Registration.Location, Principal: actor, Revision: policy, Path: path, Processing: processing, ObservedAt: start, ValidUntil: until}
+	if call.Err() != nil || !out.CurrentValid(s.Now()) || !p.DownloadValid(s.Now()) || !processing.Valid(s.Now()) {
 		return zero, downloadRefusedAs("expired", artifact.ErrDownloadExpired)
 	}
 	return out, nil

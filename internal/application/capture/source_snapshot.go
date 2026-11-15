@@ -166,11 +166,6 @@ func (s ContextInvestigation) prepareSourceSnapshotPreview(ctx context.Context, 
 		return zero, planning.ContextPlan{}, err
 	}
 	selected.Request.RequireApproval = required
-	step = "recovery"
-	recovery, err := s.currentRecovery(ctx)
-	if err != nil {
-		return zero, planning.ContextPlan{}, err
-	}
 	step = "resolve"
 	var target targets.PodResolution
 	observed := resolved
@@ -206,7 +201,7 @@ func (s ContextInvestigation) prepareSourceSnapshotPreview(ctx context.Context, 
 		}
 	}
 	step = "facts"
-	wait := s.beginStorageWait(ctx, target, identity.Earlier(i.ValidUntil, recovery.FreshUntil), value.ContextStorageSelection{})
+	wait := s.beginStorageWait(ctx, target, i.ValidUntil, value.ContextStorageSelection{})
 	defer wait.close()
 	f, err := s.factsWithStorageWait(ctx, current, a.Executor, intent, target, artifact.SourceSnapshotAnchor(request), wait, *observed)
 	if err != nil {
@@ -218,7 +213,7 @@ func (s ContextInvestigation) prepareSourceSnapshotPreview(ctx context.Context, 
 	if !selected.Request.Valid() {
 		return zero, planning.ContextPlan{}, value.ErrAcquisitionClosed
 	}
-	preview := value.ContextPreview{ExecutionClass: target.ExecutionClass, ID: s.NewID(), RootID: s.RootID, InstallationID: s.InstallationID, IssuerEpoch: recovery.IssuerEpoch, CaptureID: s.NewID(), CaseID: s.NewID(), OccurrenceID: s.NewID(), ArtifactID: s.NewID(), AttemptID: s.NewID(), AssessmentID: s.NewID(), AssessmentRulesDigest: compiler.SourceSnapshotAssessmentRulesDigest(), Actor: i.Principal, Intent: intent, Target: target.Request, Pin: target.Pin, Storage: f.storage.Selection, Retention: retentionReview(f.retention), Audience: slices.Clone(f.eligibility.DefaultAudience), CreatedAt: now, Deadline: selected.Request.ProcessingUntil, SelectionUntil: now.Add(min(s.Lifetime, time.Minute))}
+	preview := value.ContextPreview{ExecutionClass: target.ExecutionClass, ID: s.NewID(), RootID: s.RootID, InstallationID: s.InstallationID, CaptureID: s.NewID(), CaseID: s.NewID(), OccurrenceID: s.NewID(), ArtifactID: s.NewID(), AttemptID: s.NewID(), AssessmentID: s.NewID(), AssessmentRulesDigest: compiler.SourceSnapshotAssessmentRulesDigest(), Actor: i.Principal, Intent: intent, Target: target.Request, Pin: target.Pin, Storage: f.storage.Selection, Retention: retentionReview(f.retention), Audience: slices.Clone(f.eligibility.DefaultAudience), CreatedAt: now, Deadline: selected.Request.ProcessingUntil, SelectionUntil: now.Add(min(s.Lifetime, time.Minute))}
 	preview.Actor = actor
 	if manual != nil && manual.GroupParent != nil {
 		g := manual.GroupParent
@@ -252,7 +247,7 @@ func (s ContextInvestigation) prepareSourceSnapshotPreview(ctx context.Context, 
 		return zero, planning.ContextPlan{}, err
 	}
 	step = "coverage"
-	coverage, err := s.processingCoverage(ctx, preview, f, recovery, i.ValidUntil)
+	coverage, err := s.processingCoverage(ctx, preview, f, i.ValidUntil)
 	if err != nil {
 		return zero, planning.ContextPlan{}, err
 	}
@@ -262,7 +257,7 @@ func (s ContextInvestigation) prepareSourceSnapshotPreview(ctx context.Context, 
 			return zero, planning.ContextPlan{}, err
 		}
 	}
-	if !ValidContextPreview(preview) || !s.factsCurrent(f, s.Now()) || !coverage.Current(s.Now()) || !recovery.Valid(s.Now()) {
+	if !ValidContextPreview(preview) || !s.factsCurrent(f, s.Now()) || !coverage.Current(s.Now()) {
 		return zero, planning.ContextPlan{}, previewFailure("snapshot/before-store", value.ErrChanged)
 	}
 	step = "store"
@@ -277,7 +272,7 @@ func (s ContextInvestigation) prepareSourceSnapshotPreview(ctx context.Context, 
 		fresh = s.Eligibility.ContextEligibilityCurrent(ctx, current, target.Target())
 		freshAudience, err = SnapshotAudience(selected, fresh.DefaultAudience)
 	}
-	if err != nil || !fresh.Eligible || !fresh.VerifiedIdentity.Valid(s.Now()) || !fresh.VerifiedIdentity.ValidUntil.After(s.Now()) || !slices.Equal(freshAudience, preview.Audience) || !s.factsCurrent(f, s.Now()) || !coverage.Current(s.Now()) || !recovery.Valid(s.Now()) || ctx.Err() != nil {
+	if err != nil || !fresh.Eligible || !fresh.VerifiedIdentity.Valid(s.Now()) || !fresh.VerifiedIdentity.ValidUntil.After(s.Now()) || !slices.Equal(freshAudience, preview.Audience) || !s.factsCurrent(f, s.Now()) || !coverage.Current(s.Now()) || ctx.Err() != nil {
 		return zero, planning.ContextPlan{}, previewFailure("snapshot/after-store", value.ErrChanged)
 	}
 	step = "initiator"

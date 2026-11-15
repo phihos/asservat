@@ -25,7 +25,7 @@ func TestCapacityRolePlansKeepClosedRPCsAndPurposeFixedPeerReads(t *testing.T) {
 				if purpose == "capacity" && slices.Contains(capacityExpectedOwnerReadGrants(), g) {
 					continue
 				}
-				if g.object != "goose_db_version" || g.privilege != "SELECT" || g.column != "" {
+				if g.object != "goose_db_version" && g.object != "fleet_current_trust" || g.privilege != "SELECT" || g.column != "" {
 					t.Fatal("capacity acquired direct state access", purpose, g.key())
 				}
 			case "function":
@@ -40,7 +40,7 @@ func TestCapacityRolePlansKeepClosedRPCsAndPurposeFixedPeerReads(t *testing.T) {
 		// ADR-219 shares root/allocation publication with query backing; the
 		// Helm-native hub-worker initializes the root and reads its qualification
 		// and qualifies the joined mode=cluster clusters (ADR-331).
-		want := 22
+		want := 21
 		if purpose == "capacity-capture" {
 			want = 5
 		}
@@ -65,8 +65,6 @@ func TestCapacityRolePlansKeepClosedRPCsAndPurposeFixedPeerReads(t *testing.T) {
 // silently ride the prerequisite needed for current server authentication.
 func capacityExpectedOwnerReadGrants() []publicRuntimeGrant {
 	return []publicRuntimeGrant{
-		{"table", "fleet_current_trust", "", "SELECT"},
-		{"table", "fleet_current_trust", "installation_id", "UPDATE"},
 		{"table", "hub_owner_configuration", "", "SELECT"},
 		{"table", "hub_owner_configuration", "source_uid", "UPDATE"},
 		{"table", "hub_owner_configuration_revision", "", "SELECT"},
@@ -95,7 +93,7 @@ func TestCapacityRoleCanAuthenticateOwnerWithoutPeerEffects(t *testing.T) {
 		}
 	}
 	for _, grant := range general {
-		if grant.kind == "table" && grant.object != "goose_db_version" && !slices.Contains(capacityExpectedOwnerReadGrants(), grant) {
+		if grant.kind == "table" && grant.object != "goose_db_version" && grant.object != "fleet_current_trust" && !slices.Contains(capacityExpectedOwnerReadGrants(), grant) {
 			t.Fatalf("unapproved direct SQL authority: %s", grant.key())
 		}
 	}

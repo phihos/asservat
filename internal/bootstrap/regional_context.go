@@ -177,12 +177,11 @@ func newRegionalContext(ctx context.Context, c regionalConfig, in *providerInput
 	closers = append(closers, keyTransport.CloseIdleConnections)
 	out.output = regionalArtifactOutput{store: custody, endpoint: c.keys.Endpoint, scope: authorization.KeyScope{InstallationID: c.binding.InstallationID, Purpose: "artifact", KeyID: c.keys.KeyID}, client: &http.Client{Transport: keyTransport, Timeout: 5 * time.Second}, token: hubToken, now: time.Now}
 	out.output.recordings = NewConnectorRecordings(nil, out.collector, time.Now, eventLog(os.Stderr, "regional collection"))
-	// Recovery is the hub's delegated read; the trust source only verifies.
 	settings, err := kube.ConnectorWorkTrustSettings(c.offer, c.ClusterID)
 	if err != nil {
 		return nil, closers, mounts.ErrUnavailable
 	}
-	trust, err := kube.NewConnectorWorkTrust(observer, owners, c.ClusterID, settings)
+	trust, err := kube.NewConnectorWorkTrust(observer, c.ClusterID, settings)
 	if err != nil {
 		return nil, closers, mounts.ErrUnavailable
 	}

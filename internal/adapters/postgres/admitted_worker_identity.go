@@ -51,10 +51,10 @@ func (s *admittedWorkerIdentity) withCurrent(ctx context.Context, parent value.A
 	})
 }
 
-// The caller owns one transaction. Preserve recovery -> parent -> accepted
-// configuration -> worker lock order; never acquire a second pool connection.
+// The caller owns one transaction. Preserve parent -> accepted configuration ->
+// worker lock order; never acquire a second pool connection.
 func (s *admittedWorkerIdentity) current(ctx context.Context, tx *custodydb.Queries, parent value.AcquisitionParent, workerID string, started time.Time, effect func(context.Context, *custodydb.Queries, admittedWorkerCheck, time.Time) error) error {
-	trust, err := tx.ShareFleetTrust(ctx, id(s.profile.InstallationID))
+	trust, _, err := currentTrust(ctx, tx, s.profile.InstallationID)
 	if err != nil {
 		return err
 	}
@@ -78,14 +78,14 @@ func (s *admittedWorkerIdentity) current(ctx context.Context, tx *custodydb.Quer
 			return e
 		}
 		projection, err = queryFromRow(row)
-		if err != nil || row.Uncertain || projection.ID != parent.ID || projection.WorkerID != workerID || projection.Plan.InstallationID != s.profile.InstallationID || projection.RecoveryIssuerEpoch != uid(trust.IssuerEpoch) {
+		if err != nil || row.Uncertain || projection.ID != parent.ID || projection.WorkerID != workerID || projection.Plan.InstallationID != s.profile.InstallationID {
 			return artifact.ErrDownloadExpired
 		}
 		parentUntil = identity.Earlier(projection.Deadline, projection.CredentialUntil)
 	default:
 		return artifact.ErrInvalid
 	}
-	configurationUntil, err := currentWorkerConfiguration(ctx, tx, s.profile, uid(trust.IssuerEpoch))
+	configurationUntil, err := currentWorkerConfiguration(ctx, tx, s.profile)
 	if err != nil {
 		return err
 	}
@@ -100,11 +100,11 @@ func (s *admittedWorkerIdentity) current(ctx context.Context, tx *custodydb.Quer
 	switch parent.Purpose {
 	case value.AcquisitionDownload:
 		checked.download, err = currentAuditedWorker(row)
-		if err != nil || checked.download.Intent.SessionID != parent.ID || checked.download.Intent.Authority.Scope != download.Scope || checked.download.Intent.Authority.Environment.RecoveryEpoch != checked.recoveryEpoch {
+		if err != nil || checked.download.Intent.SessionID != parent.ID || checked.download.Intent.Authority.Scope != download.Scope {
 			return artifact.ErrDownloadExpired
 		}
 		// The old authority is immutable audit provenance. Only its admitted
-		// scope and recovery epoch are compared, never restamped or reused.
+		// scope is compared, never restamped or reused.
 		checked.worker = checked.download.Acquisition()
 		latest, e := tx.LatestDownloadWorker(ctx, custodydb.LatestDownloadWorkerParams{SessionID: id(parent.ID), RootID: id(s.root)})
 		if e != nil || latest.ID != row.ID {
@@ -121,7 +121,7 @@ func (s *admittedWorkerIdentity) current(ctx context.Context, tx *custodydb.Quer
 		return artifact.ErrDownloadExpired
 	}
 	checked.freshUntil = identity.Earlier(started.Add(5*time.Second), identity.Earlier(parentUntil, checked.worker.Intent.RunUntil))
-	checked.freshUntil = identity.Earlier(checked.freshUntil, identity.Earlier(configurationUntil, trust.FreshUntil.Time))
+	checked.freshUntil = identity.Earlier(checked.freshUntil, configurationUntil)
 	if until, ok := ctx.Deadline(); ok {
 		checked.freshUntil = identity.Earlier(checked.freshUntil, until)
 	}
@@ -130,11 +130,8 @@ func (s *admittedWorkerIdentity) current(ctx context.Context, tx *custodydb.Quer
 		if e != nil {
 			return time.Time{}, e
 		}
-		if ctx.Err() != nil || !identity.Fresh(started, checked.freshUntil, n.Time, 5*time.Second) || uid(trust.InstallationID) != s.profile.InstallationID {
+		if ctx.Err() != nil || !identity.Fresh(started, checked.freshUntil, n.Time, 5*time.Second) {
 			return n.Time, artifact.ErrDownloadExpired
-		}
-		if _, e = recoveryState(trust, started, n.Time); e != nil {
-			return n.Time, e
 		}
 		return n.Time, nil
 	}

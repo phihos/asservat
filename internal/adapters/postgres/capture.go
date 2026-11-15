@@ -29,11 +29,11 @@ import (
 )
 
 type ContextAdmissions struct {
-	ledger    *Ledger
-	root      string
-	retention *RetentionTransactionGuard
-	recovery  *RecoveryTransactionGuard
-	auditMAC  *auditapp.OperationMAC
+	ledger       *Ledger
+	root         string
+	installation string
+	retention    *RetentionTransactionGuard
+	auditMAC     *auditapp.OperationMAC
 }
 
 var _ captureapp.AdmissionTransaction = (*ContextAdmissions)(nil)
@@ -41,8 +41,8 @@ var _ captureapp.ReviewedAdmissionTransaction = (*ContextAdmissions)(nil)
 var _ captureapp.ContextAdmissionReplay = (*ContextAdmissions)(nil)
 var _ capacity.ContextStorageBindings = (*ContextAdmissions)(nil)
 
-func NewContextAdmissions(ctx context.Context, pool *pgxpool.Pool, root string, guards ...EffectTransactionGuards) (*ContextAdmissions, error) {
-	if !authorization.UUID(root) {
+func NewContextAdmissions(ctx context.Context, pool *pgxpool.Pool, root, installation string, guards ...*RetentionTransactionGuard) (*ContextAdmissions, error) {
+	if !authorization.UUID(root) || !authorization.UUID(installation) {
 		return nil, value.ErrInvalid
 	}
 	l, err := New(ctx, pool)
@@ -54,21 +54,21 @@ func NewContextAdmissions(ctx context.Context, pool *pgxpool.Pool, root string, 
 	if why := schemaCompatible(ctx, pool); why != "" {
 		return nil, schemaRefusal(value.ErrUnavailable, why)
 	}
-	guard, err := effectGuardsFor(root, guards)
+	guard, err := retentionGuardFor(root, guards)
 	if err != nil {
 		return nil, err
 	}
-	return &ContextAdmissions{ledger: l, root: root, retention: guard.Retention, recovery: guard.Recovery}, nil
+	return &ContextAdmissions{ledger: l, root: root, installation: installation, retention: guard}, nil
 }
 
 // NewAuditedContextAdmissions explicitly selects atomic private intent backing.
 // Legacy construction remains unchanged and cannot adopt configured private
 // allocations. The protected pool/account producer must run independently.
-func NewAuditedContextAdmissions(ctx context.Context, pool *pgxpool.Pool, root string, mac *auditapp.OperationMAC, guards ...EffectTransactionGuards) (*ContextAdmissions, error) {
+func NewAuditedContextAdmissions(ctx context.Context, pool *pgxpool.Pool, root, installation string, mac *auditapp.OperationMAC, guards ...*RetentionTransactionGuard) (*ContextAdmissions, error) {
 	if mac == nil || mac.AccountVersion() == "" || mac.Version() == "" {
 		return nil, value.ErrInvalid
 	}
-	s, e := NewContextAdmissions(ctx, pool, root, guards...)
+	s, e := NewContextAdmissions(ctx, pool, root, installation, guards...)
 	if e != nil {
 		return nil, e
 	}
@@ -207,7 +207,7 @@ func (s *ContextAdmissions) currentCaptureEligibilityWithPermissions(ctx context
 	}
 	// A policy executor re-checks its accepted policy and team delegation
 	// after these locks (ADR-228); a human is evaluated as before.
-	fresh := contextEligibilityInWithPermissions(ctx, q, stream, trust, s.root, s.recovery.installationID(), a.Eligibility.VerifiedIdentity, p, a.Eligibility.Target, n.Time, permissions)
+	fresh := contextEligibilityInWithPermissions(ctx, q, stream, trust, s.root, s.installation, a.Eligibility.VerifiedIdentity, p, a.Eligibility.Target, n.Time, permissions)
 	if !fresh.Eligible || !n.Time.Before(a.Eligibility.ValidUntil) {
 		return fresh, value.ErrDenied
 	}
@@ -225,15 +225,14 @@ func (s *ContextAdmissions) currentCaptureEligibilityWithPermissions(ctx context
 }
 
 // LookupContextAdmission resolves the original operation before a caller loads
-// a preview or resolves a live Pod. Only newly checked recovery and current SQL
-// permissions authorize the response; stored capture facts are routing/scope,
+// a preview or resolves a live Pod. Only current SQL permissions authorize the response; stored capture facts are routing/scope,
 // never renewed collection authority. A lost COMMIT reply therefore recovers
 // the same accepted IDs even after the preview or Pod has disappeared.
 func (s *ContextAdmissions) LookupContextAdmission(ctx context.Context, in value.ReplayQuery) (value.Accepted, bool, error) {
 	if s == nil {
 		return value.Accepted{}, false, value.ErrUnavailable
 	}
-	d, err := resolveContextRequest(ctx, s.ledger, s.root, s.recovery, in, false)
+	d, err := resolveContextRequest(ctx, s.ledger, s.root, s.installation, in, false)
 	if err != nil {
 		return value.Accepted{}, false, err
 	}
@@ -275,7 +274,7 @@ func (s *ContextAdmissions) admitContext(ctx context.Context, previewID string, 
 }
 
 // contextAdmissionGroupOptions is private transaction-owned composition. The
-// parent has locked recovery/root/policy, resolved replay, validated the single
+// parent has locked root/policy, resolved replay, validated the single
 // protected group and reserved shared budgets. This helper never commits it.
 type contextAdmissionGroupOptions struct {
 	Recovery          custodydb.FleetCurrentTrust
@@ -307,11 +306,11 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 	}
 	r := normalized(a.Registration)
 	err := func() error {
-		var recovery custodydb.FleetCurrentTrust
+		var trust custodydb.FleetCurrentTrust
 		var stream custodydb.PermissionStream
 		var err error
 		if group == nil {
-			recovery, err = s.recovery.lock(ctx, q, s.root, a.Recovery)
+			trust, _, err = currentTrust(ctx, q, s.installation)
 			if err != nil {
 				return err
 			}
@@ -320,7 +319,7 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 				return err
 			}
 		} else {
-			recovery, stream = group.Recovery, group.Stream
+			trust, stream = group.Recovery, group.Stream
 			if (group.PolicyReservation == nil) != group.Composition || !group.reviewedGroupChild(a) {
 				return value.ErrChanged
 			}
@@ -334,7 +333,7 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 			if group != nil {
 				permissions = group.Permissions
 			}
-			fresh, err := s.currentCaptureEligibilityWithPermissions(ctx, q, stream, recovery, a, permissions)
+			fresh, err := s.currentCaptureEligibilityWithPermissions(ctx, q, stream, trust, a, permissions)
 			if err != nil || a.Plan.Input.Snapshot == nil {
 				return fresh, err
 			}
@@ -376,25 +375,22 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 				if err != nil {
 					return err
 				}
-				if err = s.recovery.check(ctx, q, recovery, s.root, a.Recovery); err != nil {
-					return err
-				}
 				now, err := q.CurrentTime(ctx)
 				if err != nil {
 					return err
 				}
-				if !now.Time.Before(fresh.ValidUntil) || !now.Time.Before(a.Eligibility.ValidUntil) || !a.Recovery.Valid(now.Time) {
+				if !now.Time.Before(fresh.ValidUntil) || !now.Time.Before(a.Eligibility.ValidUntil) {
 					return value.ErrDenied
 				}
 				out.Replay = true
-				out.MetadataValidUntil = contextMetadataDeadline(ctx, fresh.ValidUntil, a.Eligibility.ValidUntil, a.Eligibility.VerifiedIdentity.ValidUntil, a.Recovery.FreshUntil)
+				out.MetadataValidUntil = contextMetadataDeadline(ctx, fresh.ValidUntil, a.Eligibility.ValidUntil, a.Eligibility.VerifiedIdentity.ValidUntil)
 				return nil // no new storage, deadline, audience or acquisition on replay
 			}
 			if !errors.Is(err, pgx.ErrNoRows) {
 				return err
 			}
 			if previewID != "" {
-				query := value.ReplayQuery{RootID: s.root, PreviewID: previewID, IdempotencyKey: a.IdempotencyKey, SubmissionDigest: a.SubmissionDigest, Identity: a.Eligibility.VerifiedIdentity, Recovery: a.Recovery}
+				query := value.ReplayQuery{RootID: s.root, PreviewID: previewID, IdempotencyKey: a.IdempotencyKey, SubmissionDigest: a.SubmissionDigest, Identity: a.Eligibility.VerifiedIdentity}
 				if a.RecordingSave != nil {
 					query.Identity = a.RecordingSave.Initiator.VerifiedIdentity
 				}
@@ -413,17 +409,14 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 					if err != nil {
 						return err
 					}
-					if err = s.recovery.check(ctx, q, recovery, s.root, a.Recovery); err != nil {
-						return err
-					}
 					n, err := q.CurrentTime(ctx)
 					if err != nil {
 						return err
 					}
-					if !n.Time.Before(fresh.ValidUntil) || !n.Time.Before(a.Eligibility.ValidUntil) || !a.Recovery.Valid(n.Time) {
+					if !n.Time.Before(fresh.ValidUntil) || !n.Time.Before(a.Eligibility.ValidUntil) {
 						return value.ErrDenied
 					}
-					out.MetadataValidUntil = contextMetadataDeadline(ctx, fresh.ValidUntil, a.Eligibility.ValidUntil, a.Eligibility.VerifiedIdentity.ValidUntil, a.Recovery.FreshUntil)
+					out.MetadataValidUntil = contextMetadataDeadline(ctx, fresh.ValidUntil, a.Eligibility.ValidUntil, a.Eligibility.VerifiedIdentity.ValidUntil)
 					return ctx.Err()
 				}
 				reviewed, err = readReviewedContext(ctx, q, previewID, a)
@@ -448,7 +441,7 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 		}
 		var policyReservation *policyCaptureReservation
 		if group == nil {
-			policyReservation, err = lockPolicyCaptureReservation(ctx, q, recovery, a, s.recovery.installationID())
+			policyReservation, err = lockPolicyCaptureReservation(ctx, q, trust, a, s.installation)
 			if err != nil {
 				return err
 			}
@@ -535,9 +528,9 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 			if e != nil {
 				return e
 			}
-			until := contextMetadataDeadline(ctx, n.Time.Add(5*time.Second), capacityUntil.Time, a.Recovery.FreshUntil, a.Eligibility.ValidUntil, a.Eligibility.VerifiedIdentity.ValidUntil, a.Storage.FreshUntil)
+			until := contextMetadataDeadline(ctx, n.Time.Add(5*time.Second), capacityUntil.Time, a.Eligibility.ValidUntil, a.Eligibility.VerifiedIdentity.ValidUntil, a.Storage.FreshUntil)
 			in := value.ProcessingCoverageRequest{RootID: s.root, Location: r.Location, Target: a.Plan.Input.Target.Target(), AnchorAt: r.AnchorAt, DeleteBy: r.DeleteBy}
-			processing, err = readProcessingCaptureCoverage(ctx, q, in, a.Recovery, n.Time, until)
+			processing, err = readProcessingCaptureCoverage(ctx, q, in, n.Time, until)
 			if err != nil {
 				return err
 			}
@@ -553,9 +546,6 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 		check := func() error {
 			if group != nil {
 				defer auditapp.MarkStep(ctx, "ga-check", time.Now())
-			}
-			if err := s.recovery.check(ctx, q, recovery, s.root, a.Recovery); err != nil {
-				return err
 			}
 			if err := s.retention.check(ctx, q, topology, a.Plan.Input.Retention.Proof, a.Plan.Input.Target.Target()); err != nil {
 				return err
@@ -592,16 +582,12 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 			if err := current(ctx, q, p, allocation, r, r.ExpiresAt); err != nil {
 				return err
 			}
-			if err := s.recovery.check(ctx, q, recovery, s.root, a.Recovery); err != nil {
-				return err
-			}
-			// One final database instant bounds every earlier read. A later
-			// recovery query cannot extend shorter deny, target or storage facts.
+			// One final database instant bounds every earlier read.
 			n, err = q.CurrentTime(ctx)
 			if err != nil {
 				return err
 			}
-			if !a.Recovery.Valid(n.Time) || !n.Time.Before(fresh.ValidUntil) || !n.Time.Before(a.Eligibility.ValidUntil) {
+			if !n.Time.Before(fresh.ValidUntil) || !n.Time.Before(a.Eligibility.ValidUntil) {
 				return value.ErrDenied
 			}
 			if policyReservation != nil && !n.Time.Before(policyReservation.until) {
@@ -746,7 +732,7 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 			if a.RecordingSave != nil {
 				lineage = a.RecordingSave.Initiator.VerifiedIdentity
 			}
-			sourceCapture, _, e := historyAuthorizedCapture(ctx, q, s.root, s.recovery.installationID(), a.RepeatedFrom.CaptureID, lineage, stream, recovery, false)
+			sourceCapture, _, e := historyAuthorizedCapture(ctx, q, s.root, s.installation, a.RepeatedFrom.CaptureID, lineage, stream, trust, false)
 			if e != nil {
 				return e
 			}
@@ -796,7 +782,7 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 			if capacityUntil.InfinityModifier == 0 {
 				managedUntil = capacityUntil.Time
 			}
-			bound := contextMetadataDeadline(ctx, managedUntil, auditUntil, fresh.ValidUntil, a.Eligibility.ValidUntil, a.Eligibility.VerifiedIdentity.ValidUntil, a.Recovery.FreshUntil, controlUntil, a.Storage.FreshUntil, binding.FreshUntil.Time, p.ValidUntil.Time, allocation.ValidUntil.Time, in.Deadline)
+			bound := contextMetadataDeadline(ctx, managedUntil, auditUntil, fresh.ValidUntil, a.Eligibility.ValidUntil, a.Eligibility.VerifiedIdentity.ValidUntil, controlUntil, a.Storage.FreshUntil, binding.FreshUntil.Time, p.ValidUntil.Time, allocation.ValidUntil.Time, in.Deadline)
 			requestUntil := bound
 			if group != nil && group.RequestBounds != nil {
 				requestUntil, e = recordingGroupAuditUntil(*group.RequestBounds, a, intent, auditHardUntil, controlUntil, p.ValidUntil.Time, allocation.ValidUntil.Time)
@@ -833,7 +819,7 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 		}
 		out, err = admittedRecord(row)
 		if err == nil {
-			out.MetadataValidUntil = contextMetadataDeadline(ctx, fresh.ValidUntil, a.Eligibility.ValidUntil, a.Eligibility.VerifiedIdentity.ValidUntil, a.Recovery.FreshUntil)
+			out.MetadataValidUntil = contextMetadataDeadline(ctx, fresh.ValidUntil, a.Eligibility.ValidUntil, a.Eligibility.VerifiedIdentity.ValidUntil)
 			if capacityUntil.InfinityModifier == pgtype.Finite {
 				out.MetadataValidUntil = contextMetadataDeadline(ctx, out.MetadataValidUntil, capacityUntil.Time)
 			}

@@ -21,28 +21,20 @@ import (
 func (f *capacitySQLFixture) initializeManagedProcessing(t *testing.T, root app.RootConfiguration) {
 	t.Helper()
 	f.fresh(t)
-	guard, err := postgres.NewRecoveryTransactionGuard(f.input.PermissionRootID, f.input.InstallationID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	recovery, err := postgres.NewRecoveryReader(f.ctx, f.fixturePool("peer_read_runtime", "synthetic-peer-read"), f.input.InstallationID)
-	if err != nil {
-		t.Fatal(err)
-	}
 	accepted := f.readAuditProfiles(t)
 	policy := accepted.Normal.Policy
 	if policy.BackingRevision != root.Revision || !policy.ValidUntil.Equal(root.PlannedUntil) {
 		t.Fatal("normal profile differs from original Ready root")
 	}
-	journal, err := postgres.NewHealthyOperationJournal(f.ctx, f.fixturePool("operation_audit_runtime", "synthetic-operation-journal"), policy, guard)
+	journal, err := postgres.NewHealthyOperationJournal(f.ctx, f.fixturePool("operation_audit_runtime", "synthetic-operation-journal"), policy)
 	if err != nil {
 		t.Fatal(err)
 	}
-	ack, err := postgres.NewOperationAcknowledgements(f.ctx, f.fixturePool("operation_audit_ack_runtime", "synthetic-operation-ack"), policy.RootID, "normal", guard)
+	ack, err := postgres.NewOperationAcknowledgements(f.ctx, f.fixturePool("operation_audit_ack_runtime", "synthetic-operation-ack"), policy.RootID, "normal", f.input.InstallationID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	lifecycle, err := postgres.NewOperationLifecycles(f.ctx, f.fixturePool("operation_audit_runtime", "synthetic-operation-journal"), policy.RootID, "normal", guard)
+	lifecycle, err := postgres.NewOperationLifecycles(f.ctx, f.fixturePool("operation_audit_runtime", "synthetic-operation-journal"), policy.RootID, "normal", f.input.InstallationID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,12 +52,12 @@ func (f *capacitySQLFixture) initializeManagedProcessing(t *testing.T, root app.
 		t.Fatal(err)
 	}
 	defer mac.Close()
-	decisions, err := postgres.NewProcessingDecisions(f.ctx, f.fixturePool("processing_decision_runtime", "synthetic-processing-decision"), f.input.PermissionRootID, guard)
+	decisions, err := postgres.NewProcessingDecisions(f.ctx, f.fixturePool("processing_decision_runtime", "synthetic-processing-decision"), f.input.PermissionRootID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	actor := processingTestIdentity{value: identity.Identity{Principal: identity.Principal{Issuer: "https://id.example.test", Subject: "capacity-privacy-operator", ClientID: "console", Kind: identity.Human}, Groups: []string{"operators"}, Scopes: []string{"evidence:privacy"}, Policy: identity.Revision{UID: "synthetic-privacy-identity", Generation: 1, Digest: artifact.Digest{28}}}}
-	service := privacyapp.ProcessingChanges{RootID: f.input.PermissionRootID, InstallationID: f.input.InstallationID, Policies: processingTestPolicy{value: f.processingPolicy}, Recovery: recovery, Decisions: decisions, Audit: auditor, MAC: mac, AuditPolicy: policy, RetainedSeconds: accepted.Normal.RetainedSeconds, Now: time.Now}
+	service := privacyapp.ProcessingChanges{RootID: f.input.PermissionRootID, InstallationID: f.input.InstallationID, Policies: processingTestPolicy{value: f.processingPolicy}, Decisions: decisions, Audit: auditor, MAC: mac, AuditPolicy: policy, RetainedSeconds: accepted.Normal.RetainedSeconds, Now: time.Now}
 	if _, err = service.Change(f.ctx, actor, privacy.ProcessingChange{RequestID: custodyID(), Action: "initialize_processing"}); err != nil {
 		t.Fatal("independent managed processing initialization", err)
 	}

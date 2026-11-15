@@ -13,7 +13,6 @@ import (
 	"asservat.local/asservat/internal/application/capacity"
 	"asservat.local/asservat/internal/domain/collector"
 	"asservat.local/asservat/internal/domain/fleet"
-	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/migrations"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
@@ -47,7 +46,7 @@ func qualifyCapacitySourceResourcesSQL(t *testing.T, ctx context.Context, admin 
 		t.Fatal("root publication", err)
 	}
 	before := f.accounting(t)
-	original, _ := f.fresh(t)
+	original := f.fresh(t)
 	policy := original.Observation.Snapshot.Policies[0].Resource.Name
 	poolName := original.Observation.Snapshot.Pools[0].Resource.Name
 	poolBefore, _, err := capacity.CanonicalProtectedPoolPlan(original.Observation.Snapshot, poolName)
@@ -66,7 +65,7 @@ func qualifyCapacitySourceResourcesSQL(t *testing.T, ctx context.Context, admin 
 	// unchanged synthetic complete SpecDigest pins the same original declaration.
 	limits := capacity.SourceResourceLimits{Node: collector.PolicyLimits{RingBytes: 64 << 20, FrozenBytes: 32 << 20, SourceLimits: collector.SourceLimits{MaxActiveSources: 4, InputBytesPerSecond: 2 << 20, InputBurstBytes: 1 << 20}}, Workload: collector.SourceLimits{MaxActiveSources: 2}}
 	f.template.Policies[0].SourceResources = &limits
-	enriched, _ := f.fresh(t)
+	enriched := f.fresh(t)
 	if enriched.Revision != original.Revision+1 {
 		t.Fatal("enrichment must advance exactly once", original.Revision, enriched.Revision)
 	}
@@ -94,7 +93,7 @@ func qualifyCapacitySourceResourcesSQL(t *testing.T, ctx context.Context, admin 
 	if existing, err := f.roots.ReadCapacityRoot(ctx, currentRoot); err != nil || existing == nil || !existing.AdmissionReady(time.Now()) {
 		t.Fatal("existing finite root unavailable after resource enrichment", err)
 	}
-	stable, _ := f.fresh(t)
+	stable := f.fresh(t)
 	if stable.Revision != enriched.Revision {
 		t.Fatal("identical projection advanced revision")
 	}
@@ -222,11 +221,7 @@ func qualifyCapacitySourceResourcesSQL(t *testing.T, ctx context.Context, admin 
 	// to change an already typed cap at the same original source generation.
 	t.Run("actual-typed-mutation-fences-without-refund", func(t *testing.T) {
 		f.refreshBase(t)
-		recovery, err := f.source.RecoveryState(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
-		revision, err := f.source.ReadCapacitySourceRevision(ctx, recovery)
+		revision, err := f.source.ReadCapacitySourceRevision(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -238,8 +233,8 @@ func qualifyCapacitySourceResourcesSQL(t *testing.T, ctx context.Context, admin 
 		altered.Node.MaxActiveSources = 3
 		f.template.Policies[0].SourceResources = &altered
 		n := time.Now().UTC().Truncate(time.Microsecond)
-		observation := capacityNativeSource(t, f.template, n, identity.Earlier(n.Add(5*time.Second), recovery.FreshUntil))
-		in := capacity.CapacitySourceAcceptance{RootID: f.input.PermissionRootID, InstallationID: f.input.InstallationID, QualificationID: f.qualification.ID, QualificationDigest: f.qualification.Digest, ExpectedRevision: revision, Observation: observation, Protection: protection, Recovery: recovery}
+		observation := capacityNativeSource(t, f.template, n, n.Add(5*time.Second))
+		in := capacity.CapacitySourceAcceptance{RootID: f.input.PermissionRootID, InstallationID: f.input.InstallationID, QualificationID: f.qualification.ID, QualificationDigest: f.qualification.Digest, ExpectedRevision: revision, Observation: observation, Protection: protection}
 		if _, err = f.source.AcceptCapacitySource(ctx, in); err == nil {
 			t.Fatal("typed mutation accepted")
 		}

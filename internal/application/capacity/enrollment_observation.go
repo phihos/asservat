@@ -3,7 +3,6 @@ package capacity
 import (
 	"time"
 
-	"asservat.local/asservat/internal/domain/artifact"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
 )
@@ -13,10 +12,10 @@ import (
 // version; a caller cannot substitute a bare digest or an allocation identity.
 // SQL verifies the complete plan and every accepted source fence again.
 // A new global source heartbeat alone cannot refresh namespace/workload facts.
-func ComposeEnrollmentObservation(source AcceptedCapacitySource, guard CapacityNamespaceProtection, workload CapacityWorkloadObservation, permissions AcceptedCapacityPermissions, recovery artifact.RecoveryProof, accountVersion string, now time.Time) (EnrollmentObservation, SelectedBudget, error) {
+func ComposeEnrollmentObservation(source AcceptedCapacitySource, guard CapacityNamespaceProtection, workload CapacityWorkloadObservation, permissions AcceptedCapacityPermissions, accountVersion string, now time.Time) (EnrollmentObservation, SelectedBudget, error) {
 	var zero EnrollmentObservation
 	var noBudget SelectedBudget
-	if !source.Valid(now) || !guard.Valid(now) || !workload.Valid(now) || !permissions.Valid(now) || !recovery.Valid(now) || !identity.Text(accountVersion, 64) || source.InstallationID != recovery.InstallationID || source.RootID != permissions.RootID || guard.ClusterID != workload.Namespace.ClusterID {
+	if !source.Valid(now) || !guard.Valid(now) || !workload.Valid(now) || !permissions.Valid(now) || !identity.Text(accountVersion, 64) || source.RootID != permissions.RootID || guard.ClusterID != workload.Namespace.ClusterID {
 		return zero, noBudget, capacityStage("inputs", cfg.ErrUnavailable)
 	}
 	k := WorkloadCapacityKey{source.RootID, workload.Namespace.ClusterID, workload.Namespace.Namespace.UID, workload.Workload.UID}
@@ -49,7 +48,7 @@ func ComposeEnrollmentObservation(source AcceptedCapacitySource, guard CapacityN
 		}
 	}
 	start, end := source.ObservedAt, source.FreshUntil
-	for _, interval := range [][2]time.Time{{guard.ObservedAt, guard.FreshUntil}, {workload.ObservedAt, workload.FreshUntil}, {workload.Namespace.ObservedAt, workload.Namespace.FreshUntil}, {permissions.ObservedAt, permissions.FreshUntil}, {recovery.ObservedAt, recovery.FreshUntil}, {selected.ObservedAt, selected.FreshUntil}} {
+	for _, interval := range [][2]time.Time{{guard.ObservedAt, guard.FreshUntil}, {workload.ObservedAt, workload.FreshUntil}, {workload.Namespace.ObservedAt, workload.Namespace.FreshUntil}, {permissions.ObservedAt, permissions.FreshUntil}, {selected.ObservedAt, selected.FreshUntil}} {
 		if interval[0].After(start) {
 			start = interval[0]
 		}
@@ -61,7 +60,7 @@ func ComposeEnrollmentObservation(source AcceptedCapacitySource, guard CapacityN
 		start = start.Truncate(time.Microsecond).Add(time.Microsecond)
 	}
 	end = end.Truncate(time.Microsecond)
-	out := EnrollmentObservation{Key: k, SourceRevision: source.Revision, SourceDigest: digest, PlanDigest: plan.Digest(), Plan: plan, NamespaceLabels: labels, NamespaceGuardDigest: guard.Digest, NamespaceResourceVersion: workload.Namespace.ResourceVersion, WorkloadResourceVersion: workload.WorkloadResourceVersion, PermissionEpoch: permissions.Epoch, PermissionSequence: permissions.Sequence, PermissionTrust: permissions.TrustDigest, Recovery: recovery, ObservedAt: start, FreshUntil: end}
+	out := EnrollmentObservation{Key: k, SourceRevision: source.Revision, SourceDigest: digest, PlanDigest: plan.Digest(), Plan: plan, NamespaceLabels: labels, NamespaceGuardDigest: guard.Digest, NamespaceResourceVersion: workload.Namespace.ResourceVersion, WorkloadResourceVersion: workload.WorkloadResourceVersion, PermissionEpoch: permissions.Epoch, PermissionSequence: permissions.Sequence, PermissionTrust: permissions.TrustDigest, ObservedAt: start, FreshUntil: end}
 	if !out.Valid(now) {
 		return zero, noBudget, cfg.ErrUnavailable
 	}

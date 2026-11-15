@@ -17,17 +17,12 @@ import (
 )
 
 type processingDiscoveryFixture struct {
-	policy   value.DownloadPolicy
-	recovery artifact.RecoveryProof
-	read     func(value.ProcessingAuthority, value.ProcessingDiscoveryQuery) value.ProcessingDiscoveryPage
+	policy value.DownloadPolicy
+	read   func(value.ProcessingAuthority, value.ProcessingDiscoveryQuery) value.ProcessingDiscoveryPage
 }
 
 func (f processingDiscoveryFixture) DownloadPolicy(context.Context) (value.DownloadPolicy, error) {
 	return f.policy, nil
-}
-
-func (f processingDiscoveryFixture) RecoveryState(context.Context) (artifact.RecoveryProof, error) {
-	return f.recovery, nil
 }
 
 func (f processingDiscoveryFixture) ReadProcessingDiscovery(_ context.Context, authority value.ProcessingAuthority, q value.ProcessingDiscoveryQuery) (value.ProcessingDiscoveryPage, error) {
@@ -50,7 +45,7 @@ func TestAuditedProcessingDiscoveryGuardsMetadataAndFitsOutputBound(t *testing.T
 			policy := value.DownloadPolicy{RootID: root, InstallationID: root, RecoveryEpoch: epoch, Revision: caller.i.Policy, ProtectionDigest: artifact.Digest{1}, PermittedRegions: []string{}, Paths: []artifact.DownloadPath{}, Clients: []value.DownloadClient{},
 				Operators: []value.ProcessingOperator{{Issuer: caller.i.Principal.Issuer, ClientID: caller.i.Principal.ClientID, Kind: "Group", ID: "privacy"}}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
 			reads := 0
-			fixture := processingDiscoveryFixture{policy: policy, recovery: artifact.RecoveryProof{InstallationID: root, IssuerEpoch: epoch, Revision: caller.i.Policy, ObservedAt: now, FreshUntil: policy.FreshUntil}}
+			fixture := processingDiscoveryFixture{policy: policy}
 			fixture.read = func(a value.ProcessingAuthority, q value.ProcessingDiscoveryQuery) value.ProcessingDiscoveryPage {
 				reads++
 				if len(audit.intents) != 1 || !a.Valid(now) {
@@ -69,7 +64,7 @@ func TestAuditedProcessingDiscoveryGuardsMetadataAndFitsOutputBound(t *testing.T
 				return page
 			}
 			base := s.inner.(*InvestigationOperations)
-			ops, err := NewProcessingDiscoveryOperations(base.origin, s.config.Now, s.config.NewID, privacyapp.ProcessingEvidenceDiscovery{RootID: root, InstallationID: root, Policies: fixture, Recovery: fixture, Discovery: fixture, Now: s.config.Now}, nil, nil)
+			ops, err := NewProcessingDiscoveryOperations(base.origin, s.config.Now, s.config.NewID, privacyapp.ProcessingEvidenceDiscovery{RootID: root, InstallationID: root, Policies: fixture, Discovery: fixture, Now: s.config.Now}, nil, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -124,8 +119,7 @@ func TestAuditedProcessingErasureStatusUsesExactRequestAndPrivacyAuthority(t *te
 				ProtectionDigest: artifact.Digest{1}, PermittedRegions: []string{}, Paths: []artifact.DownloadPath{}, Clients: []value.DownloadClient{},
 				Operators:  []value.ProcessingOperator{{Issuer: caller.i.Principal.Issuer, ClientID: caller.i.Principal.ClientID, Kind: "Group", ID: "privacy"}},
 				ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
-			fixture := processingDiscoveryFixture{policy: policy, recovery: artifact.RecoveryProof{InstallationID: root, IssuerEpoch: epoch,
-				Revision: caller.i.Policy, ObservedAt: now, FreshUntil: policy.FreshUntil}}
+			fixture := processingDiscoveryFixture{policy: policy}
 			requestID, artifactID := discoveryID(15), discoveryID(16)
 			reads := 0
 			reader := erasureStatusReaderFunc(func(a value.ProcessingAuthority, id string) value.ProcessingErasureStatus {
@@ -140,8 +134,8 @@ func TestAuditedProcessingErasureStatusUsesExactRequestAndPrivacyAuthority(t *te
 			})
 			base := s.inner.(*InvestigationOperations)
 			ops, err := NewProcessingDiscoveryOperations(base.origin, s.config.Now, s.config.NewID,
-				privacyapp.ProcessingEvidenceDiscovery{RootID: root, InstallationID: root, Policies: fixture, Recovery: fixture, Discovery: fixture, Now: s.config.Now},
-				&privacyapp.ProcessingErasureStatus{RootID: root, InstallationID: root, Policies: fixture, Recovery: fixture, Status: reader, Now: s.config.Now}, nil)
+				privacyapp.ProcessingEvidenceDiscovery{RootID: root, InstallationID: root, Policies: fixture, Discovery: fixture, Now: s.config.Now},
+				&privacyapp.ProcessingErasureStatus{RootID: root, InstallationID: root, Policies: fixture, Status: reader, Now: s.config.Now}, nil)
 			if err != nil {
 				t.Fatal(err)
 			}

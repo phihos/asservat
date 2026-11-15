@@ -24,15 +24,14 @@ import (
 // shares and revocations only; it never decides readership. Every read
 // returns rows bounded to five seconds of observation.
 type EvidenceShares struct {
-	ledger   *Ledger
-	root     string
-	recovery *RecoveryTransactionGuard
+	ledger *Ledger
+	root   string
 }
 
 var _ sharing.Store = (*EvidenceShares)(nil)
 
-func NewEvidenceShares(ctx context.Context, pool *pgxpool.Pool, root string, recovery *RecoveryTransactionGuard) (*EvidenceShares, error) {
-	if !authorization.UUID(root) || recovery == nil || recovery.root != root {
+func NewEvidenceShares(ctx context.Context, pool *pgxpool.Pool, root string) (*EvidenceShares, error) {
+	if !authorization.UUID(root) {
 		return nil, value.ErrInvalid
 	}
 	l, err := New(ctx, pool)
@@ -44,7 +43,7 @@ func NewEvidenceShares(ctx context.Context, pool *pgxpool.Pool, root string, rec
 	if why := schemaCompatible(ctx, pool); why != "" {
 		return nil, schemaRefusal(value.ErrUnavailable, why)
 	}
-	return &EvidenceShares{ledger: l, root: root, recovery: recovery}, nil
+	return &EvidenceShares{ledger: l, root: root}, nil
 }
 
 type shareRecipientWire struct {
@@ -255,12 +254,11 @@ func (s *EvidenceShares) ReceivedShares(ctx context.Context, caller identity.Ide
 	return out, nil
 }
 
-// CreateShare inserts one share under the recovery fence and a per-artifact
-// lock: a replayed creator key returns the original row (replay) when the
+// CreateShare inserts one share under a per-artifact lock: a replayed creator key returns the original row (replay) when the
 // request digest matches and Conflict otherwise; a 33rd active share of the
 // artifact is Capacity. The insert copies case and target from the published
 // case locator and requires them to equal the prepared share.
-func (s *EvidenceShares) CreateShare(ctx context.Context, r sharing.Request, recovery artifact.RecoveryProof) (authorization.Share, bool, error) {
+func (s *EvidenceShares) CreateShare(ctx context.Context, r sharing.Request) (authorization.Share, bool, error) {
 	var zero authorization.Share
 	v := r.Share
 	if s == nil || ctx == nil || ctx.Err() != nil || v.RootID != s.root || !authorization.UUID(v.ID) || !authorization.UUID(r.OperationID) || !identity.Text(r.IdempotencyKey, 128) || r.RequestDigest == (artifact.Digest{}) {
@@ -290,10 +288,6 @@ func (s *EvidenceShares) CreateShare(ctx context.Context, r sharing.Request, rec
 	replay := false
 	err = s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
 		replay = false
-		trust, err := s.recovery.lock(ctx, q, s.root, recovery)
-		if err != nil {
-			return err
-		}
 		effect, err := s.beginEffect(ctx, q, r.OperationID, "create_share", v.Creator, v.ID)
 		if err != nil {
 			return err
@@ -342,9 +336,6 @@ func (s *EvidenceShares) CreateShare(ctx context.Context, r sharing.Request, rec
 			return err
 		}
 		out = got[0]
-		if err = s.recovery.check(ctx, q, trust, s.root, recovery); err != nil {
-			return err
-		}
 		return ctx.Err()
 	})
 	if err != nil {
@@ -359,7 +350,7 @@ func (s *EvidenceShares) CreateShare(ctx context.Context, r sharing.Request, rec
 // for an administrator the service checked (ADR-238). The same key after
 // success is a replay; another key or a stale expected revision is Conflict;
 // any other share (or none) is Denied without saying which.
-func (s *EvidenceShares) RevokeShare(ctx context.Context, r sharing.Revocation, recovery artifact.RecoveryProof) (authorization.Share, bool, error) {
+func (s *EvidenceShares) RevokeShare(ctx context.Context, r sharing.Revocation) (authorization.Share, bool, error) {
 	var zero authorization.Share
 	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(r.ShareID) || !authorization.UUID(r.OperationID) || !r.Actor.Valid() || len(r.Managers) > authorization.ShareMaxManagers || !identity.Text(r.IdempotencyKey, 128) || r.ExpectedRevision < 1 {
 		return zero, false, value.ErrInvalid
@@ -368,10 +359,6 @@ func (s *EvidenceShares) RevokeShare(ctx context.Context, r sharing.Revocation, 
 	replay := false
 	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
 		replay = false
-		trust, err := s.recovery.lock(ctx, q, s.root, recovery)
-		if err != nil {
-			return err
-		}
 		effect, err := s.beginEffect(ctx, q, r.OperationID, "revoke_share", r.Actor, r.ShareID)
 		if err != nil {
 			return err
@@ -404,9 +391,6 @@ func (s *EvidenceShares) RevokeShare(ctx context.Context, r sharing.Revocation, 
 			return err
 		}
 		out = got[0]
-		if err = s.recovery.check(ctx, q, trust, s.root, recovery); err != nil {
-			return err
-		}
 		return ctx.Err()
 	})
 	if err != nil {
@@ -421,7 +405,7 @@ func (s *EvidenceShares) RevokeShare(ctx context.Context, r sharing.Revocation, 
 // latest transfer only); the same key for another request, another key at a
 // stale revision or a revoked share is Conflict; an expired, unknown or not
 // managed share is Denied.
-func (s *EvidenceShares) TransferShare(ctx context.Context, r sharing.Transfer, recovery artifact.RecoveryProof) (authorization.Share, bool, error) {
+func (s *EvidenceShares) TransferShare(ctx context.Context, r sharing.Transfer) (authorization.Share, bool, error) {
 	var zero authorization.Share
 	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(r.ShareID) || !authorization.UUID(r.OperationID) || !r.Actor.Valid() || len(r.Managers) < 1 && !r.Administrator || len(r.Managers) > authorization.ShareMaxManagers ||
 		len(r.Management) < 1 || len(r.Management) > authorization.ShareMaxManagers || !identity.Text(r.IdempotencyKey, 128) || r.RequestDigest == (artifact.Digest{}) || r.ExpectedRevision < 1 {
@@ -435,10 +419,6 @@ func (s *EvidenceShares) TransferShare(ctx context.Context, r sharing.Transfer, 
 	replay := false
 	err = s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
 		replay = false
-		trust, err := s.recovery.lock(ctx, q, s.root, recovery)
-		if err != nil {
-			return err
-		}
 		effect, err := s.beginEffect(ctx, q, r.OperationID, "transfer_share", r.Actor, r.ShareID)
 		if err != nil {
 			return err
@@ -479,9 +459,6 @@ func (s *EvidenceShares) TransferShare(ctx context.Context, r sharing.Transfer, 
 			return err
 		}
 		out = got[0]
-		if err = s.recovery.check(ctx, q, trust, s.root, recovery); err != nil {
-			return err
-		}
 		return ctx.Err()
 	})
 	if err != nil {

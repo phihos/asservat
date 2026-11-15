@@ -46,7 +46,7 @@ func recordingGroupPhase(actions []value.ContextActionProgress) (string, string)
 	return "Failed", "GroupNoEvidence"
 }
 
-func (s *ContextProgressReads) readRecordingGroupProgress(ctx context.Context, q *custodydb.Queries, header custodydb.RecordingSaveGroup, request value.ProgressQuery, recovery custodydb.FleetCurrentTrust, stream custodydb.PermissionStream, observedAt time.Time) (value.ContextProgressObservation, error) {
+func (s *ContextProgressReads) readRecordingGroupProgress(ctx context.Context, q *custodydb.Queries, header custodydb.RecordingSaveGroup, request value.ProgressQuery, stream custodydb.PermissionStream, observedAt time.Time) (value.ContextProgressObservation, error) {
 	var zero value.ContextProgressObservation
 	accepted, err := recordingGroupAccepted(ctx, q, header)
 	if err != nil {
@@ -60,11 +60,11 @@ func (s *ContextProgressReads) readRecordingGroupProgress(ctx context.Context, q
 	if header.GroupKind == "composition" {
 		operation = "collect" // ADR-276: one Pod, several recorders
 	}
-	out := value.ContextProgressObservation{CaptureID: uid(header.ID), CandidateCaseID: accepted.Group.CaseID, Operation: operation, Revision: header.ProgressRevision, CreatedAt: header.AcceptedAt.Time.UTC(), Deadline: header.Deadline.Time.UTC(), ObservedAt: observedAt, ValidUntil: identity.Earlier(observedAt.Add(5*time.Second), request.Recovery.FreshUntil), CancellationRequested: header.CancelRequestedAt.Valid, HistoryState: "unavailable"}
+	out := value.ContextProgressObservation{CaptureID: uid(header.ID), CandidateCaseID: accepted.Group.CaseID, Operation: operation, Revision: header.ProgressRevision, CreatedAt: header.AcceptedAt.Time.UTC(), Deadline: header.Deadline.Time.UTC(), ObservedAt: observedAt, ValidUntil: observedAt.Add(5 * time.Second), CancellationRequested: header.CancelRequestedAt.Valid, HistoryState: "unavailable"}
 	for n, row := range rows {
 		childRequest := request
 		childRequest.CaptureID = uid(row.ID)
-		child, err := s.readContextProgressInTransaction(ctx, q, row, childRequest, recovery, stream, observedAt)
+		child, err := s.readContextProgressInTransaction(ctx, q, row, childRequest, stream, observedAt)
 		if err != nil {
 			return zero, err
 		}
@@ -98,9 +98,6 @@ func (s *ContextProgressReads) readRecordingGroupProgress(ctx context.Context, q
 			out.HistoryState = "available"
 		}
 	} else if !errors.Is(err, pgx.ErrNoRows) {
-		return zero, err
-	}
-	if err := s.recovery.check(ctx, q, recovery, s.root, request.Recovery); err != nil {
 		return zero, err
 	}
 	now, err := q.CurrentTime(ctx)

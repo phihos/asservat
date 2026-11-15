@@ -1,7 +1,6 @@
 # Hand-built authority validity sites per file (scripts/check-authority-windows.go).
 # Only shrinks: convert sites to identity.Window, then run it with -write.
 internal/adapters/jose/remote_operation_retirement.go 1
-internal/adapters/kms/initial_provider.go 1
 internal/adapters/kubernetes/acquisition_peer.go 1
 internal/adapters/kubernetes/api_context_trust.go 1
 internal/adapters/kubernetes/api_execution_identity.go 2
@@ -20,11 +19,6 @@ internal/adapters/kubernetes/download_peer.go 2
 internal/adapters/kubernetes/fleet_protection.go 1
 internal/adapters/kubernetes/fleet_settings.go 1
 internal/adapters/kubernetes/identity_policy.go 1
-internal/adapters/kubernetes/initial_bootstrap_manager.go 1
-internal/adapters/kubernetes/initial_preparation.go 1
-internal/adapters/kubernetes/initial_preparer.go 1
-internal/adapters/kubernetes/initial_preparer_handover_current.go 1
-internal/adapters/kubernetes/installation_witness.go 1
 internal/adapters/kubernetes/owner_configuration.go 1
 internal/adapters/kubernetes/owner_endpoint.go 1
 internal/adapters/kubernetes/owner_enrollment.go 1
@@ -57,7 +51,6 @@ internal/adapters/mtls/owner_observation_ingress.go 1
 internal/adapters/packets/ring.go 1
 internal/adapters/postgres/admitted_worker_identity.go 2
 internal/adapters/postgres/api_context_publication.go 1
-internal/adapters/postgres/bootstrap_reservation.go 1
 internal/adapters/postgres/browser.go 2
 internal/adapters/postgres/browser_settings.go 1
 internal/adapters/postgres/capacity_audit_profiles.go 1
@@ -66,7 +59,6 @@ internal/adapters/postgres/capture_audit.go 1
 internal/adapters/postgres/capture_audit_backing.go 1
 internal/adapters/postgres/capture_audit_read.go 1
 internal/adapters/postgres/capture_history.go 2
-internal/adapters/postgres/cluster_credentials.go 1
 internal/adapters/postgres/connector_registry.go 1
 internal/adapters/postgres/context_case.go 1
 internal/adapters/postgres/context_control.go 3
@@ -80,8 +72,6 @@ internal/adapters/postgres/current_owner_configuration_audit.go 1
 internal/adapters/postgres/custody.go 1
 internal/adapters/postgres/download_stop.go 1
 internal/adapters/postgres/download_stop_lifecycle.go 7
-internal/adapters/postgres/enrollment.go 1
-internal/adapters/postgres/enrollment_signing.go 2
 internal/adapters/postgres/evidence_share.go 1
 internal/adapters/postgres/fleet_observation.go 1
 internal/adapters/postgres/history_parameters.go 1
@@ -89,7 +79,6 @@ internal/adapters/postgres/live_manual.go 1
 internal/adapters/postgres/live_watch.go 1
 internal/adapters/postgres/operation_audit.go 3
 internal/adapters/postgres/operation_lifecycle.go 2
-internal/adapters/postgres/owner_configuration_read_diagnostic.go 3
 internal/adapters/postgres/peer.go 2
 internal/adapters/postgres/policy_sources.go 3
 internal/adapters/postgres/processing.go 2
@@ -102,8 +91,6 @@ internal/adapters/postgres/retention_observation.go 2
 internal/adapters/postgres/snapshot_cancellation.go 1
 internal/adapters/postgres/worker_configuration.go 1
 internal/adapters/postgres/worker_routing.go 2
-internal/adapters/providerconfig/owner_provider_setup.go 1
-internal/adapters/providerconfig/setup_reader.go 1
 internal/application/audit/capture_exact.go 1
 internal/application/audit/capture_operation.go 2
 internal/application/authorization/download.go 2
@@ -155,7 +142,6 @@ internal/domain/analysis/context_query.go 1
 internal/domain/artifact/download.go 1
 internal/domain/artifact/download_environment.go 1
 internal/domain/audit/authority.go 1
-internal/domain/audit/bootstrap.go 1
 internal/domain/audit/capacity_profiles.go 1
 internal/domain/audit/connector_retirement.go 1
 internal/domain/authorization/acquisition_enrollment.go 2
@@ -183,10 +169,8 @@ internal/domain/configuration/acceptance.go 1
 internal/domain/configuration/access_preview.go 1
 internal/domain/configuration/bootstrap.go 2
 internal/domain/execution/go_profile.go 1
-internal/domain/fleet/administration.go 2
+internal/domain/fleet/administration.go 1
 internal/domain/fleet/api_context_work.go 1
-internal/domain/fleet/bootstrap.go 1
-internal/domain/fleet/cluster_credential.go 1
 internal/domain/fleet/cluster_observation.go 2
 internal/domain/fleet/cluster_observation_caller.go 1
 internal/domain/fleet/cluster_observation_routing.go 1
@@ -196,7 +180,6 @@ internal/domain/fleet/connector_observation.go 2
 internal/domain/fleet/connector_process.go 1
 internal/domain/fleet/connector_retirement_proof.go 2
 internal/domain/fleet/enrollment.go 1
-internal/domain/fleet/installation_witness.go 1
 internal/domain/fleet/observation_basis.go 2
 internal/domain/fleet/observation_operation.go 2
 internal/domain/fleet/owner.go 1

@@ -1,11 +1,12 @@
 package catalog
 
 import (
+	"context"
+	"testing"
+
 	permissions "asservat.local/asservat/internal/application/authorization"
 	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/domain/artifact"
-	"context"
-	"testing"
 )
 
 type rawSyscallSelector interface {
@@ -26,7 +27,7 @@ func TestRawSyscallSelectionUsesCurrentRawRightsWithoutDownload(t *testing.T) {
 				f.record.NativeType = artifact.RawPCAPNGArtifact
 				f.record.Retained.Input.EvidenceType = "packetCapture"
 			case "changed-identity":
-				f.afterFinalRecovery = func() { f.i.Principal.ClientID = "other" }
+				f.afterFinalProcessing = func() { f.i.Principal.ClientID = "other" }
 			}
 			selector, ok := any(s).(rawSyscallSelector)
 			if !ok {

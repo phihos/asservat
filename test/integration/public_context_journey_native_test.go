@@ -158,7 +158,7 @@ func newPublicJourneyNative(t *testing.T, ctx context.Context, s captureAdmissio
 	t.Helper()
 	open := func(r, p string) *pgxpool.Pool { v := poolFor(r, p); t.Cleanup(v.Close); return v }
 	root, installation := s.a.RootID, s.recovery.installation
-	g := postgres.DownloadTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard}
+	g := s.retention.guard
 	f := &publicJourneyNative{keys: artifactKeys, store: store, storeID: s.a.Registration.StoreID, jobs: &publicJourneyJobs{}, enrollmentTrace: &journeyEnrollmentTrace{}}
 	makeDownloads := func(r, p string) *postgres.Downloads {
 		v, e := postgres.NewDownloads(ctx, open(r, p), root, g)
@@ -178,12 +178,12 @@ func newPublicJourneyNative(t *testing.T, ctx context.Context, s captureAdmissio
 	catalogPool := open("context_catalog_read_runtime", "synthetic-context-read")
 	catalog, e := postgres.NewContextPublications(ctx, catalogPool, root)
 	publicJourneyRequire(t, "download catalog", e)
-	processing, e := postgres.NewProcessingReads(ctx, catalogPool, root, s.recovery.guard)
+	processing, e := postgres.NewProcessingReads(ctx, catalogPool, root, s.recovery.installation)
 	publicJourneyRequire(t, "download processing", e)
 	path := syntheticDownloadPlacement(s.a.Registration)
 	path.AcquisitionClusterID, path.ConnectorClusterID, path.WorkerConfiguration = f.profile.ClusterID, f.profile.ClusterID, f.profile.Configuration
-	policy := processingTestPolicy{privacyvalue.DownloadPolicy{RootID: root, InstallationID: installation, RecoveryEpoch: s.a.Recovery.IssuerEpoch, Revision: identity.Revision{UID: path.ID, Generation: 1, Digest: artifact.Digest{87}}, ProtectionDigest: artifact.Digest{88}, PermittedRegions: []string{"synthetic-region"}, Paths: []privacyvalue.DownloadPath{path}, Clients: []privacyvalue.DownloadClient{{Issuer: actor.Principal.Issuer, ID: actor.Principal.ClientID, Kind: actor.Principal.Kind, DataClasses: []string{"metadata"}, PrivacyClasses: []string{"potentialPersonalData"}, EvidenceTypes: []string{"context"}, Purposes: []string{"diagnostics"}, PathIDs: []string{path.ID}}}, Operators: []privacyvalue.ProcessingOperator{{Issuer: actor.Principal.Issuer, ClientID: actor.Principal.ClientID, Kind: "Group", ID: "synthetic-privacy"}}}}
-	f.gate = f.gateTrace.Wrap(authapp.ContextDownloadAuthority{RootID: root, Identities: nativeDownloadTestIdentity{actor, loginUntil}, Permissions: s.p, Catalog: catalog, Retention: privacyapp.RetentionResolver{RetainedPolicies: nativeFixtureAcceptedRetention(s), Now: time.Now}, Environment: authapp.CurrentDownloadEnvironment{RootID: root, InstallationID: installation, Policies: policy, Recovery: s.recovery.reader, Processing: processing, Now: time.Now}, Now: time.Now})
+	policy := processingTestPolicy{privacyvalue.DownloadPolicy{RootID: root, InstallationID: installation, RecoveryEpoch: s.recovery.observation.issuer, Revision: identity.Revision{UID: path.ID, Generation: 1, Digest: artifact.Digest{87}}, ProtectionDigest: artifact.Digest{88}, PermittedRegions: []string{"synthetic-region"}, Paths: []privacyvalue.DownloadPath{path}, Clients: []privacyvalue.DownloadClient{{Issuer: actor.Principal.Issuer, ID: actor.Principal.ClientID, Kind: actor.Principal.Kind, DataClasses: []string{"metadata"}, PrivacyClasses: []string{"potentialPersonalData"}, EvidenceTypes: []string{"context"}, Purposes: []string{"diagnostics"}, PathIDs: []string{path.ID}}}, Operators: []privacyvalue.ProcessingOperator{{Issuer: actor.Principal.Issuer, ClientID: actor.Principal.ClientID, Kind: "Group", ID: "synthetic-privacy"}}}}
+	f.gate = f.gateTrace.Wrap(authapp.ContextDownloadAuthority{RootID: root, Identities: nativeDownloadTestIdentity{actor, loginUntil}, Permissions: s.p, Catalog: catalog, Retention: privacyapp.RetentionResolver{RetainedPolicies: nativeFixtureAcceptedRetention(s), Now: time.Now}, Environment: authapp.CurrentDownloadEnvironment{RootID: root, InstallationID: installation, Policies: policy, Processing: processing, Now: time.Now}, Now: time.Now})
 	f.gateTrace.probe = func(c context.Context) string {
 		// Fixture-admin timestamps only; classifies which stream predicate lapsed.
 		var stale, lease, suspended, window bool
@@ -202,7 +202,7 @@ func newPublicJourneyNative(t *testing.T, ctx context.Context, s captureAdmissio
 		}
 		return "current-at-probe"
 	}
-	_, configuration, observer, _ := acceptedWorkerConfiguration(t, ctx, poolFor, store, keys, f.profile, s.a.Recovery.IssuerEpoch)
+	_, configuration, observer, _ := acceptedWorkerConfiguration(t, ctx, poolFor, store, keys, f.profile, s.recovery.observation.issuer)
 	s.nativeSources.SetWorker(t, observer.Observe)
 	makeWorkers := func(r, p string) *postgres.DownloadWorkers {
 		v, e := postgres.NewDownloadWorkers(ctx, open(r, p), root, f.profile, g)
@@ -212,7 +212,7 @@ func newPublicJourneyNative(t *testing.T, ctx context.Context, s captureAdmissio
 	workers := makeWorkers("download_worker_runtime", "synthetic-download-worker")
 	workerAck := makeWorkers("download_worker_audit_runtime", "synthetic-download-worker-audit")
 	dispatch := &evidence.DownloadDispatcher{Ledger: workers, Jobs: f.jobs, Audit: &objectstore.DownloadWorkerAuditObjects{Store: store, Seal: keys, Open: keys}, Acknowledgements: workerAck, Authority: f.gate, CurrentAuthority: f.gate, Profile: f.profile, Now: time.Now}
-	bindContextNativeStopFixture(t, ctx, config, f.allocation, installation, f.storeID, g, poolFor)
+	bindContextNativeStopFixture(t, ctx, config, f.allocation, installation, f.storeID, poolFor)
 	nativeSQLRoles(t, ctx, admin)
 	contextNativeSQLRoles(t, ctx, admin)
 	owners, e := postgres.NewNativeOwners(ctx, open("native_owner_runtime", "synthetic-native-owner"), root, f.profile, g)
@@ -261,18 +261,18 @@ func newPublicJourneyNative(t *testing.T, ctx context.Context, s captureAdmissio
 	publicJourneyRequire(t, "content audit", e)
 	plans, e := postgres.NewContextDownloadPlans(ctx, open("native_plan_runtime", "synthetic-native-plan"), root, installation, f.profile, configuration, postgres.ContextDownloadPlanLimits{OutputLimit: 8192, ReadLimit: 8 << 20, RequestLimit: 4, Duration: time.Minute})
 	publicJourneyRequire(t, "download plans", e)
-	f.coordinator = evidence.ContextDownloadCoordinator{RootID: root, InstallationID: installation, Recovery: s.recovery.reader, Routes: f.runtime, Sources: f.runtime, Authority: f.gate, Sessions: f.runtime, Plans: plans, Now: time.Now, NewID: custodyID}
-	stopLedger, e := postgres.NewDownloadStops(ctx, open("download_stop_runtime", "synthetic-download-stop"), root)
+	f.coordinator = evidence.ContextDownloadCoordinator{RootID: root, InstallationID: installation, Routes: f.runtime, Sources: f.runtime, Authority: f.gate, Sessions: f.runtime, Plans: plans, Now: time.Now, NewID: custodyID}
+	stopLedger, e := postgres.NewDownloadStops(ctx, open("download_stop_runtime", "synthetic-download-stop"), root, "")
 	publicJourneyRequire(t, "stop restrictions", e)
 	stopWriterPool := open("download_stop_writer_runtime", "synthetic-download-stop-writer")
-	stopWriter, e := postgres.NewDownloadStops(ctx, stopWriterPool, root, s.recovery.guard)
+	stopWriter, e := postgres.NewDownloadStops(ctx, stopWriterPool, root, s.recovery.installation)
 	publicJourneyRequire(t, "stop writer", e)
-	stopAck, e := postgres.NewDownloadStops(ctx, open("download_stop_ack_runtime", "synthetic-download-stop-ack"), root, s.recovery.guard)
+	stopAck, e := postgres.NewDownloadStops(ctx, open("download_stop_ack_runtime", "synthetic-download-stop-ack"), root, s.recovery.installation)
 	publicJourneyRequire(t, "stop acknowledgements", e)
 	// Migration 47 requires the writer's positive lifecycle completion before the
 	// Stop acknowledgement; compose exactly as the lifecycle suite does, using
 	// the same writer role. Native33-35 used the legacy objects alone (23514).
-	stopCompletions, e := postgres.NewDownloadStopLifecycles(ctx, stopWriterPool, root, s.recovery.guard)
+	stopCompletions, e := postgres.NewDownloadStopLifecycles(ctx, stopWriterPool, root, s.recovery.installation)
 	publicJourneyRequire(t, "stop lifecycle completions", e)
 	closedStops, e := objectstore.NewClosedDownloadStopObjects(store, f.storeID, keys, keys)
 	publicJourneyRequire(t, "closed stop objects", e)

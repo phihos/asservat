@@ -112,16 +112,16 @@ func enrollmentObservationFacts() (AcceptedCapacitySource, CapacityNamespaceProt
 	prior.Key.ClusterID = capacityTestCluster
 	prior.Key.NamespaceUID = ns.Namespace.UID
 	o := sourceObservationFixture(s)
-	a := AcceptedCapacitySource{Format: CapacityAcceptedSourceFormat, RootID: prior.Key.RootID, InstallationID: prior.Recovery.InstallationID, QualificationID: prior.Recovery.InstallationID, Revision: 1, QualificationDigest: artifact.Digest{4}, ProtectionDigest: artifact.Digest{5}, Observation: o, ObservedAt: now, FreshUntil: s.FreshUntil}
+	a := AcceptedCapacitySource{Format: CapacityAcceptedSourceFormat, RootID: prior.Key.RootID, InstallationID: capacityTestInstallation, QualificationID: capacityTestInstallation, Revision: 1, QualificationDigest: artifact.Digest{4}, ProtectionDigest: artifact.Digest{5}, Observation: o, ObservedAt: now, FreshUntil: s.FreshUntil}
 	g := CapacityNamespaceProtection{ClusterID: capacityTestCluster, Digest: artifact.Digest{6}, Keys: []string{EligibilityLabel}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
 	w := CapacityWorkloadObservation{Namespace: ns, Workload: cfg.WorkloadRef{Kind: "Deployment", Name: "app", UID: prior.Key.WorkloadUID}, WorkloadResourceVersion: "workload-rv", ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
 	p := AcceptedCapacityPermissions{RootID: prior.Key.RootID, Epoch: prior.PermissionEpoch, Sequence: prior.PermissionSequence, TrustDigest: prior.PermissionTrust, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), Scopes: []AcceptedCapacityScope{{BasisKey: "accepted-basis", BasisUID: "basis-uid", ClusterID: capacityTestCluster, NamespaceUID: ns.Namespace.UID, ScopeDigest: artifact.Digest{7}}}}
 	return a, g, w, p, prior, now
 }
 func TestCapacityEnrollmentCompositionPreservesEveryOriginalBound(t *testing.T) {
-	for _, phase := range []string{"source", "namespace-guard", "namespace", "workload", "permissions", "recovery"} {
+	for _, phase := range []string{"source", "namespace-guard", "namespace", "workload", "permissions"} {
 		t.Run(phase, func(t *testing.T) {
-			a, g, w, p, prior, now := enrollmentObservationFacts()
+			a, g, w, p, _, now := enrollmentObservationFacts()
 			end := now.Add(21 * time.Millisecond)
 			switch phase {
 			case "source":
@@ -135,14 +135,12 @@ func TestCapacityEnrollmentCompositionPreservesEveryOriginalBound(t *testing.T) 
 				w.FreshUntil = end
 			case "permissions":
 				p.FreshUntil = end
-			case "recovery":
-				prior.Recovery.FreshUntil = end
 			}
-			o, _, e := ComposeEnrollmentObservation(a, g, w, p, prior.Recovery, "original", now)
+			o, _, e := ComposeEnrollmentObservation(a, g, w, p, "original", now)
 			if e != nil || !o.FreshUntil.Equal(end) {
 				t.Fatalf("original %s deadline lost: %v", phase, e)
 			}
-			if _, _, e = ComposeEnrollmentObservation(a, g, w, p, prior.Recovery, "original", end); e == nil {
+			if _, _, e = ComposeEnrollmentObservation(a, g, w, p, "original", end); e == nil {
 				t.Fatal("expired phase renewed by other current observations")
 			}
 		})
@@ -150,24 +148,24 @@ func TestCapacityEnrollmentCompositionPreservesEveryOriginalBound(t *testing.T) 
 }
 func TestCapacityEnrollmentHeartbeatCannotRefreshWorkloadOrPermission(t *testing.T) {
 	a, g, w, p, prior, now := enrollmentObservationFacts()
-	if _, _, e := ComposeEnrollmentObservation(a, g, w, p, prior.Recovery, "original", now); e != nil {
+	if _, _, e := ComposeEnrollmentObservation(a, g, w, p, "original", now); e != nil {
 		t.Fatal(e)
 	}
 	w.Workload.UID = "replacement"
 	p.Scopes[0].WorkloadUIDs = []string{prior.Key.WorkloadUID}
-	if _, _, e := ComposeEnrollmentObservation(a, g, w, p, prior.Recovery, "original", now); e == nil {
+	if _, _, e := ComposeEnrollmentObservation(a, g, w, p, "original", now); e == nil {
 		t.Fatal("old accepted exact-workload scope covered replacement")
 	}
 	w.Workload.UID = prior.Key.WorkloadUID
 	p.Scopes[0].NamespaceUID = "other"
-	if _, _, e := ComposeEnrollmentObservation(a, g, w, p, prior.Recovery, "original", now); e == nil {
+	if _, _, e := ComposeEnrollmentObservation(a, g, w, p, "original", now); e == nil {
 		t.Fatal("foreign namespace enrollment accepted")
 	}
 	p.Scopes[0].NamespaceUID = w.Namespace.Namespace.UID
 	w.ObservedAt = now.Add(-6 * time.Second)
 	w.FreshUntil = now.Add(-time.Second)
 	a.Revision++
-	if _, _, e := ComposeEnrollmentObservation(a, g, w, p, prior.Recovery, "original", now); e == nil {
+	if _, _, e := ComposeEnrollmentObservation(a, g, w, p, "original", now); e == nil {
 		t.Fatal("new source sequence refreshed old workload observation")
 	}
 }

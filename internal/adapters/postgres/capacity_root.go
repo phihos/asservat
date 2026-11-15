@@ -144,12 +144,9 @@ func (s *capacityRootScope) run(ctx context.Context, o app.RootBackingObservatio
 	if (phase == "capture" || phase == "publish" || phase == "renew") != (expected != nil) {
 		return nil, cfg.ErrUnavailable
 	}
-	observation, e := json.Marshal(o)
-	if e != nil || len(observation) > 16<<10 {
-		return nil, cfg.ErrUnavailable
-	}
 	plan, pool := o.CanonicalValues()
 	var prior []byte
+	var e error
 	if expected != nil {
 		prior, e = json.Marshal(expected)
 		if e != nil || len(prior) > 8192 {
@@ -171,8 +168,11 @@ func (s *capacityRootScope) run(ctx context.Context, o app.RootBackingObservatio
 		}
 	}()
 	e = s.ledger.transaction(live, func(q *custodydb.Queries) error {
+		observation, err := capacityObservationJSON(live, q, s.installation, o, 16<<10)
+		if err != nil {
+			return err
+		}
 		var raw []byte
-		var err error
 		switch phase {
 		case "read":
 			raw, err = q.ReadCapacityRoot(live, custodydb.ReadCapacityRootParams{RootID: id(s.root), ObservationValue: observation, PlanCanonical: plan, PoolCanonical: pool})

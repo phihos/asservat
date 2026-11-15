@@ -22,17 +22,17 @@ import (
 // spend; it never decides who may approve. SQL re-checks self-approval,
 // review window, decision, revocation, expiry and pool bounds.
 type AccessGrants struct {
-	ledger   *Ledger
-	root     string
-	recovery *RecoveryTransactionGuard
+	ledger       *Ledger
+	root         string
+	installation string
 }
 
 var _ authapp.GrantStore = (*AccessGrants)(nil)
 var _ authapp.PolicyGrantRequestReader = (*AccessGrants)(nil)
 var _ authapp.PolicyApprovalSettingsReader = (*AccessGrants)(nil)
 
-func NewAccessGrants(ctx context.Context, pool *pgxpool.Pool, root string, recovery *RecoveryTransactionGuard) (*AccessGrants, error) {
-	if !authorization.UUID(root) || recovery == nil || recovery.root != root {
+func NewAccessGrants(ctx context.Context, pool *pgxpool.Pool, root, installation string) (*AccessGrants, error) {
+	if !authorization.UUID(root) || !authorization.UUID(installation) {
 		return nil, authorization.ErrGrantInvalid
 	}
 	l, err := New(ctx, pool)
@@ -44,7 +44,7 @@ func NewAccessGrants(ctx context.Context, pool *pgxpool.Pool, root string, recov
 	if why := schemaCompatible(ctx, pool); why != "" {
 		return nil, schemaRefusal(authapp.ErrGrantUnavailable, why)
 	}
-	return &AccessGrants{ledger: l, root: root, recovery: recovery}, nil
+	return &AccessGrants{ledger: l, root: root, installation: installation}, nil
 }
 
 type grantReasonWire struct {
@@ -163,17 +163,17 @@ func grantError(err error) error {
 	return authapp.ErrGrantUnavailable
 }
 
-func (s *AccessGrants) RequestGrant(ctx context.Context, r authapp.StoredGrantRequest, recovery artifact.RecoveryProof) (authorization.Grant, bool, error) {
+func (s *AccessGrants) RequestGrant(ctx context.Context, r authapp.StoredGrantRequest) (authorization.Grant, bool, error) {
 	var zero authorization.Grant
 	g := r.Grant
 	if s == nil || ctx == nil || ctx.Err() != nil || g.RootID != s.root || g.Decision != nil || !g.RevokedAt.IsZero() || !identity.Text(r.IdempotencyKey, 128) || r.RequestDigest == (artifact.Digest{}) {
 		return zero, false, authorization.ErrGrantInvalid
 	}
 	if g.Kind == authorization.GrantPolicy {
-		return s.requestPolicyGrant(ctx, r, recovery)
+		return s.requestPolicyGrant(ctx, r)
 	}
 	if g.Kind == authorization.GrantRawQuery {
-		return s.requestRawQueryGrant(ctx, r, recovery)
+		return s.requestRawQueryGrant(ctx, r)
 	}
 	reasons := make([]grantReasonWire, 0, len(g.Reasons))
 	for _, x := range g.Reasons {
@@ -203,10 +203,6 @@ func (s *AccessGrants) RequestGrant(ctx context.Context, r authapp.StoredGrantRe
 	replay := false
 	err = s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
 		replay = false
-		trust, err := s.recovery.lock(ctx, q, s.root, recovery)
-		if err != nil {
-			return err
-		}
 		row, err := q.ReadGrantByKey(ctx, custodydb.ReadGrantByKeyParams{RootID: id(s.root), RequesterIssuer: g.Requester.Issuer, RequesterSubject: g.Requester.Subject, IdempotencyKey: r.IdempotencyKey})
 		switch {
 		case err == nil:
@@ -229,9 +225,6 @@ func (s *AccessGrants) RequestGrant(ctx context.Context, r authapp.StoredGrantRe
 			return err
 		}
 		if out, err = s.grant(row); err != nil {
-			return err
-		}
-		if err = s.recovery.check(ctx, q, trust, s.root, recovery); err != nil {
 			return err
 		}
 		return ctx.Err()
@@ -332,18 +325,18 @@ func grantText(s string) pgtype.Text { return pgtype.Text{String: s, Valid: true
 // same key and decision returns the recorded row as a replay; any other
 // update of a decided, revoked or lapsed request is ErrGrantNotPending, and
 // the database refuses self-approval even if a caller skipped the service.
-func (s *AccessGrants) DecideGrant(ctx context.Context, in authapp.GrantDecisionInput, recovery artifact.RecoveryProof) (authorization.Grant, bool, error) {
+func (s *AccessGrants) DecideGrant(ctx context.Context, in authapp.GrantDecisionInput) (authorization.Grant, bool, error) {
 	var zero authorization.Grant
 	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(in.GrantID) || !in.Approver.Valid() || in.Approver.Kind != identity.Human || !identity.Text(in.Reason, 512) || !identity.Text(in.IdempotencyKey, 128) {
 		return zero, false, authorization.ErrGrantInvalid
 	}
 	// Carry the caller's original effect deadline through the database clock;
 	// row-lock waits cannot turn a stale reviewer/step-up into a decision.
-	until := recovery.FreshUntil
-	if deadline, ok := ctx.Deadline(); ok {
-		until = identity.Earlier(until, deadline)
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		return zero, false, authorization.ErrGrantInvalid
 	}
-	until = until.UTC().Truncate(time.Microsecond)
+	until := deadline.UTC().Truncate(time.Microsecond)
 	decision := "denied"
 	params := custodydb.DecideGrantParams{EffectUntil: ts(until), RootID: id(s.root), ID: id(in.GrantID), ApproverIssuer: in.Approver.Issuer, ApproverSubject: in.Approver.Subject, ApproverClient: in.Approver.ClientID, DecisionReason: in.Reason, DecisionKey: in.IdempotencyKey}
 	stepped := identity.Text(in.ACR, 128) && !in.AuthTime.IsZero()
@@ -358,10 +351,6 @@ func (s *AccessGrants) DecideGrant(ctx context.Context, in authapp.GrantDecision
 	replay := false
 	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
 		replay = false
-		trust, err := s.recovery.lock(ctx, q, s.root, recovery)
-		if err != nil {
-			return err
-		}
 		current, err := q.ReadGrantForUpdate(ctx, custodydb.ReadGrantForUpdateParams{RootID: id(s.root), ID: id(in.GrantID)})
 		if errors.Is(err, pgx.ErrNoRows) {
 			return authapp.ErrGrantNotFound
@@ -392,9 +381,6 @@ func (s *AccessGrants) DecideGrant(ctx context.Context, in authapp.GrantDecision
 		if out, err = s.grant(current); err != nil {
 			return err
 		}
-		if err = s.recovery.check(ctx, q, trust, s.root, recovery); err != nil {
-			return err
-		}
 		return ctx.Err()
 	})
 	if err != nil {
@@ -405,7 +391,7 @@ func (s *AccessGrants) DecideGrant(ctx context.Context, in authapp.GrantDecision
 
 // RevokeGrant revokes once at the expected revision. A retry by the same
 // revoker and key is a replay; another revision is ErrGrantConflict.
-func (s *AccessGrants) RevokeGrant(ctx context.Context, in authapp.GrantRevocationInput, recovery artifact.RecoveryProof) (authorization.Grant, bool, error) {
+func (s *AccessGrants) RevokeGrant(ctx context.Context, in authapp.GrantRevocationInput) (authorization.Grant, bool, error) {
 	var zero authorization.Grant
 	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(in.GrantID) || !in.Revoker.Valid() || in.ExpectedRevision < 1 || in.ExpectedRevision > authorization.GrantMaxRevision || !identity.Text(in.IdempotencyKey, 128) {
 		return zero, false, authorization.ErrGrantInvalid
@@ -414,10 +400,6 @@ func (s *AccessGrants) RevokeGrant(ctx context.Context, in authapp.GrantRevocati
 	replay := false
 	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
 		replay = false
-		trust, err := s.recovery.lock(ctx, q, s.root, recovery)
-		if err != nil {
-			return err
-		}
 		current, err := q.ReadGrantForUpdate(ctx, custodydb.ReadGrantForUpdateParams{RootID: id(s.root), ID: id(in.GrantID)})
 		if errors.Is(err, pgx.ErrNoRows) {
 			return authapp.ErrGrantNotFound
@@ -439,9 +421,6 @@ func (s *AccessGrants) RevokeGrant(ctx context.Context, in authapp.GrantRevocati
 			}
 		}
 		if out, err = s.grant(current); err != nil {
-			return err
-		}
-		if err = s.recovery.check(ctx, q, trust, s.root, recovery); err != nil {
 			return err
 		}
 		return ctx.Err()
@@ -506,7 +485,7 @@ func childFromRow(record any, parent authorization.Grant, groups ...*authorizati
 // client in one transaction: parent row lock, current decision, revocation,
 // expiry and scope, the published locator of exactly this capture and
 // target, the distinct-artifact count and the idempotent child insert.
-func (s *AccessGrants) MaterializeGrantChild(ctx context.Context, in authapp.GrantChildRequest, recovery artifact.RecoveryProof) (authorization.GrantChild, bool, error) {
+func (s *AccessGrants) MaterializeGrantChild(ctx context.Context, in authapp.GrantChildRequest) (authorization.GrantChild, bool, error) {
 	var zero authorization.GrantChild
 	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(in.ChildID) || !authorization.UUID(in.ParentID) || !in.Output.Valid() || !identity.Text(in.ClientID, 256) {
 		return zero, false, authorization.ErrGrantInvalid
@@ -515,10 +494,6 @@ func (s *AccessGrants) MaterializeGrantChild(ctx context.Context, in authapp.Gra
 	replay := false
 	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
 		replay = false
-		trust, err := s.recovery.lock(ctx, q, s.root, recovery)
-		if err != nil {
-			return err
-		}
 		row, err := q.ReadGrantForUpdate(ctx, custodydb.ReadGrantForUpdateParams{RootID: id(s.root), ID: id(in.ParentID)})
 		if errors.Is(err, pgx.ErrNoRows) {
 			return authapp.ErrGrantNotFound
@@ -553,7 +528,7 @@ func (s *AccessGrants) MaterializeGrantChild(ctx context.Context, in authapp.Gra
 			if err != nil {
 				return err
 			}
-			return s.recovery.check(ctx, q, trust, s.root, recovery)
+			return nil
 		} else if !errors.Is(err, pgx.ErrNoRows) {
 			return err
 		}
@@ -596,9 +571,6 @@ func (s *AccessGrants) MaterializeGrantChild(ctx context.Context, in authapp.Gra
 			return err
 		}
 		if out, err = childFromRow(child, parent, group); err != nil {
-			return err
-		}
-		if err = s.recovery.check(ctx, q, trust, s.root, recovery); err != nil {
 			return err
 		}
 		return ctx.Err()
@@ -680,7 +652,7 @@ func (s *AccessGrants) GrantChild(ctx context.Context, childID string) (authoriz
 // the parent row lock, so a concurrent revocation or another reservation is
 // serialized: after a revocation commits no reservation can succeed, and the
 // pool is never exceeded. A retry with the same use ID charges nothing.
-func (s *AccessGrants) ReserveGrantUse(ctx context.Context, in authapp.GrantUseRequest, recovery artifact.RecoveryProof) (authorization.Grant, bool, error) {
+func (s *AccessGrants) ReserveGrantUse(ctx context.Context, in authapp.GrantUseRequest) (authorization.Grant, bool, error) {
 	var zero authorization.Grant
 	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(in.UseID) || !authorization.UUID(in.ParentID) || !authorization.UUID(in.ChildID) || (in.Use.Operation != authorization.GrantDownloadOperation && in.Use.Operation != authorization.GrantPacketQueryOperation && in.Use.Operation != authorization.GrantSyscallQueryOperation) || in.Use.Bytes < 0 || in.Use.Operations < 0 || in.Use.Bytes+in.Use.Operations == 0 {
 		return zero, false, authorization.ErrGrantInvalid
@@ -688,16 +660,9 @@ func (s *AccessGrants) ReserveGrantUse(ctx context.Context, in authapp.GrantUseR
 	var out authorization.Grant
 	replay := false
 	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		replay = false
-		trust, err := s.recovery.lock(ctx, q, s.root, recovery)
-		if err != nil {
-			return err
-		}
+		var err error
 		out, replay, err = s.reserveGrantUse(ctx, q, in)
 		if err != nil {
-			return err
-		}
-		if err = s.recovery.check(ctx, q, trust, s.root, recovery); err != nil {
 			return err
 		}
 		return ctx.Err()
@@ -713,7 +678,7 @@ func grantUseMatches(previous custodydb.AccessGrantUse, in authapp.GrantUseReque
 	return uid(previous.ParentID) == in.ParentID && uid(previous.ChildID) == in.ChildID && previous.Operation == in.Use.Operation && previous.Bytes == in.Use.Bytes && previous.Operations == in.Use.Operations
 }
 
-// reserveGrantUse performs SQL only, within its caller's existing recovery-fenced
+// reserveGrantUse performs SQL only, within its caller's existing
 // transaction. Batch admission uses it before inserting the exact paid batch.
 func (s *AccessGrants) reserveGrantUse(ctx context.Context, q *custodydb.Queries, in authapp.GrantUseRequest) (authorization.Grant, bool, error) {
 	var out authorization.Grant

@@ -146,7 +146,7 @@ func (f *capacitySQLFixture) qualifyRegionalExtension(t *testing.T, first app.En
 		namespace := cfg.NamespaceRef{Name: "reviewed-apps", UID: custodyID()}
 		workload := cfg.WorkloadRef{Kind: "Deployment", Name: "reviewed-app", UID: custodyID()}
 		f.addReviewScope(t, regional, namespace, workload)
-		permissions, err := f.permissionRead.ReadCapacityPermissions(f.ctx, func() artifact.RecoveryProof { _, r := f.fresh(t); return r }())
+		permissions, err := f.permissionRead.ReadCapacityPermissions(f.ctx)
 		if err != nil {
 			t.Fatal(err)
 		}

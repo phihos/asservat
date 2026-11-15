@@ -1,9 +1,10 @@
 package capture
 
 import (
-	planvalue "asservat.local/asservat/internal/domain/planning"
 	"context"
 	"time"
+
+	planvalue "asservat.local/asservat/internal/domain/planning"
 
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
@@ -23,7 +24,6 @@ type PolicySourceCheck struct {
 	Authority                                                       authorization.AcceptedPolicyAuthority
 	Target                                                          targets.PodResolution
 	Node                                                            targets.PacketSourceObservation
-	Recovery                                                        artifact.RecoveryProof
 	Retention                                                       privacy.Resolution
 	Settings                                                        identity.Policy
 	SourceID, Fence                                                 string

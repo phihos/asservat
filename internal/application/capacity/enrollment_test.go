@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/identity"
 )
 
 type enrollmentAccounts struct {
@@ -91,14 +90,13 @@ func (s *enrollmentStore) ContinueCapacityPublication(ctx context.Context, o Enr
 
 func enrollmentFixture(n time.Time) (EnrollmentObservation, Enrollment) {
 	key := WorkloadCapacityKey{"30000000-0000-4000-8000-000000000001", capacityTestCluster, "namespace-uid", "workload-uid"}
-	rev := identity.Revision{UID: "trust-uid", Generation: 1, Digest: artifact.Digest{3}}
-	o := EnrollmentObservation{Key: key, SourceRevision: 1, SourceDigest: artifact.Digest{1}, PlanDigest: artifact.Digest{2}, NamespaceGuardDigest: artifact.Digest{5}, NamespaceResourceVersion: "namespace-rv", WorkloadResourceVersion: "workload-rv", PermissionEpoch: "30000000-0000-4000-8000-000000000003", PermissionSequence: 2, PermissionTrust: artifact.Digest{3}, ObservedAt: n, FreshUntil: n.Add(4 * time.Second), Recovery: artifact.RecoveryProof{InstallationID: "30000000-0000-4000-8000-000000000004", IssuerEpoch: "30000000-0000-4000-8000-000000000005", Revision: rev, ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}}
+	o := EnrollmentObservation{Key: key, SourceRevision: 1, SourceDigest: artifact.Digest{1}, PlanDigest: artifact.Digest{2}, NamespaceGuardDigest: artifact.Digest{5}, NamespaceResourceVersion: "namespace-rv", WorkloadResourceVersion: "workload-rv", PermissionEpoch: "30000000-0000-4000-8000-000000000003", PermissionSequence: 2, PermissionTrust: artifact.Digest{3}, ObservedAt: n, FreshUntil: n.Add(4 * time.Second)}
 	source, namespace, _ := capacitySelectionFixture()
 	source.ObservedAt = n
 	source.FreshUntil = n.Add(4 * time.Second)
 	namespace.ObservedAt = n
 	namespace.FreshUntil = n.Add(4 * time.Second)
-	accepted := AcceptedCapacitySource{Format: CapacityAcceptedSourceFormat, RootID: key.RootID, InstallationID: o.Recovery.InstallationID, QualificationID: o.Recovery.InstallationID, Revision: 1, QualificationDigest: artifact.Digest{4}, ProtectionDigest: artifact.Digest{5}, Observation: sourceObservationFixture(source), ObservedAt: n, FreshUntil: source.FreshUntil}
+	accepted := AcceptedCapacitySource{Format: CapacityAcceptedSourceFormat, RootID: key.RootID, InstallationID: capacityTestInstallation, QualificationID: capacityTestInstallation, Revision: 1, QualificationDigest: artifact.Digest{4}, ProtectionDigest: artifact.Digest{5}, Observation: sourceObservationFixture(source), ObservedAt: n, FreshUntil: source.FreshUntil}
 	selected, e := SelectBudget(source, namespace, []string{EligibilityLabel}, n)
 	if e != nil {
 		panic("invalid synthetic capacity selection")
@@ -225,7 +223,7 @@ func TestCapacityEnrollmentLostCommitResolvesExactOriginalPhase(t *testing.T) {
 				t.Fatal("fixture did not commit before losing reply")
 			}
 			original := *s.row
-			// This is an independent current source/recovery observation. The old
+			// This is an independent current source observation. The old
 			// request grant has elapsed and remains unchanged in the stored receipt.
 			n = n.Add(time.Minute)
 			fresh, _ := enrollmentFixture(n)

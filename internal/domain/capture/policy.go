@@ -62,7 +62,6 @@ type PolicyAdmission struct {
 	// Workload is the real future-replica scope of a recorder policy. It is
 	// mutually exclusive with the legacy concrete target projection.
 	Workload *authorization.WorkloadTarget
-	Recovery artifact.RecoveryProof
 	// Sharing is the activation's recurring sharing decision (ADR-239).
 	Sharing *PolicyShareInstruction
 }
@@ -73,7 +72,7 @@ func (a PolicyAdmission) Valid(now time.Time) bool {
 	if a.Workload != nil {
 		targetValid = a.Target == (authorization.Target{}) && a.Workload.Valid() && a.Workload.ClusterID == p.ClusterID && a.Workload.NamespaceUID == p.NamespaceUID && a.Workload.WorkloadUID == p.WorkloadUID
 	}
-	return authorization.UUID(a.RootID) && s.Valid(now) && a.Verification.Valid(now) && a.Verification.Submission == s && a.Verification.RootID == a.RootID && a.Verification.InstallationID == p.InstallationID && a.Verification.IssuerEpoch == a.Recovery.IssuerEpoch && a.Author.Valid(now) && a.Author.Principal == s.Actor && p.Valid(now) && targetValid && s.Source.UID == p.PolicyUID && s.ScopeDigest == p.ScopeDigest && a.Recovery.Valid(now) && a.Recovery.InstallationID == p.InstallationID && (a.Sharing == nil || a.Sharing.Valid() && a.Sharing.Creator == a.Author.Principal && a.Sharing.NotAfter.After(now))
+	return authorization.UUID(a.RootID) && s.Valid(now) && a.Verification.Valid(now) && a.Verification.Submission == s && a.Verification.RootID == a.RootID && a.Verification.InstallationID == p.InstallationID && a.Author.Valid(now) && a.Author.Principal == s.Actor && p.Valid(now) && targetValid && s.Source.UID == p.PolicyUID && s.ScopeDigest == p.ScopeDigest && (a.Sharing == nil || a.Sharing.Valid() && a.Sharing.Creator == a.Author.Principal && a.Sharing.NotAfter.After(now))
 }
 
 // PolicyAcceptance is immutable provenance, not a permit or current eligibility.
@@ -86,7 +85,6 @@ type PolicyAcceptance struct {
 	Authority                            authorization.AcceptedPolicyAuthority
 	Submitter                            identity.Principal
 	IdentityRevision, PermissionRevision identity.Revision
-	Recovery                             artifact.RecoveryProof
 	IntentVersion                        int64
 	AcceptedAt                           time.Time
 	// Sharing is the immutable recurring sharing instruction (ADR-239); its
@@ -96,7 +94,7 @@ type PolicyAcceptance struct {
 
 func (r PolicyAcceptance) Valid() bool {
 	a, s := r.Authority, r.Submission
-	return authorization.UUID(r.ID) && authorization.UUID(r.RootID) && r.Source.Valid(r.AcceptedAt) && !r.Source.Deleted && !r.Source.Suspended && r.IntentVersion > 0 && s.Valid(r.AcceptedAt) && a.Valid(r.AcceptedAt) && r.Submitter == s.Actor && r.IdentityRevision.Valid() && r.PermissionRevision.Valid() && r.Recovery.Valid(r.AcceptedAt) && r.Source.InstallationID == a.InstallationID && r.Recovery.InstallationID == a.InstallationID && r.Source.Revision == s.Source && s.Source.UID == a.PolicyUID && r.Source.ClusterID == s.ClusterID && r.Source.NamespaceUID == s.NamespaceUID && r.Source.Name == s.Name && a.ScopeDigest == s.ScopeDigest && (r.Sharing == nil || r.Sharing.Valid() && r.Sharing.Creator == r.Submitter)
+	return authorization.UUID(r.ID) && authorization.UUID(r.RootID) && r.Source.Valid(r.AcceptedAt) && !r.Source.Deleted && !r.Source.Suspended && r.IntentVersion > 0 && s.Valid(r.AcceptedAt) && a.Valid(r.AcceptedAt) && r.Submitter == s.Actor && r.IdentityRevision.Valid() && r.PermissionRevision.Valid() && r.Source.InstallationID == a.InstallationID && r.Source.Revision == s.Source && s.Source.UID == a.PolicyUID && r.Source.ClusterID == s.ClusterID && r.Source.NamespaceUID == s.NamespaceUID && r.Source.Name == s.Name && a.ScopeDigest == s.ScopeDigest && (r.Sharing == nil || r.Sharing.Valid() && r.Sharing.Creator == r.Submitter)
 }
 
 type AcceptedPolicy struct {

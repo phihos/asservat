@@ -93,15 +93,8 @@ func TestCaptureCleanupFullPolicyConstructorRetainsValidation(t *testing.T) {
 	in := captureCleanupScopedIntent(t, time.Now().UTC().Truncate(time.Microsecond), 1)
 	p := in.Lifecycle.Policy
 	p.History = nil
-	recovery, err := NewRecoveryTransactionGuard(p.RootID, p.InstallationID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err = NewCaptureOperationLifecycles(context.Background(), nil, p, recovery); err != app.ErrUnavailable {
+	if _, err := NewCaptureOperationLifecycles(context.Background(), nil, p); err != app.ErrUnavailable {
 		t.Fatal("full-policy constructor skipped historical backing validation", err)
-	}
-	if _, err = NewScopedCaptureOperationLifecycles(context.Background(), nil, p.RootID, p.InstallationID, p.StoreID, nil); err != app.ErrUnavailable {
-		t.Fatal("scope accepted missing recovery", err)
 	}
 }
 

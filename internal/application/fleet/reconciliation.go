@@ -10,7 +10,7 @@ import (
 
 // ConfigurationReconciler runs independent serial observation loops. A leader
 // lease schedules this work; only the observers and their SQL transactions can
-// accept state. Neither loop has a recovery activation method.
+// accept state.
 type ConfigurationReconciler struct {
 	Fleet   *TrustObserver
 	Owner   *OwnerConfigurationObserver

@@ -30,16 +30,17 @@ import (
 // APIContextExecutions supplies three typed facets from one installed credential
 // and pool. It has no key-unwrapping, capture-admission or publication rights.
 type APIContextExecutions struct {
-	ledger *Ledger
-	root   string
-	guards EffectTransactionGuards
+	ledger       *Ledger
+	root         string
+	installation string
+	retention    *RetentionTransactionGuard
 }
 
-func NewAPIContextExecutions(ctx context.Context, pool *pgxpool.Pool, root string, guards EffectTransactionGuards) (*APIContextExecutions, error) {
-	if !authorization.UUID(root) {
+func NewAPIContextExecutions(ctx context.Context, pool *pgxpool.Pool, root, installation string, retention *RetentionTransactionGuard) (*APIContextExecutions, error) {
+	if !authorization.UUID(root) || !authorization.UUID(installation) {
 		return nil, value.ErrInvalid
 	}
-	g, err := effectGuardsFor(root, []EffectTransactionGuards{guards})
+	g, err := retentionGuardFor(root, []*RetentionTransactionGuard{retention})
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +48,7 @@ func NewAPIContextExecutions(ctx context.Context, pool *pgxpool.Pool, root strin
 	if err != nil {
 		return nil, err
 	}
-	return &APIContextExecutions{l, root, g}, nil
+	return &APIContextExecutions{l, root, installation, g}, nil
 }
 func apiWork(c custodydb.ContextCapture) (app.APIContextWork, error) {
 	var out app.APIContextWork
@@ -130,18 +131,18 @@ func apiExecution(row custodydb.ContextExecution) (value.APIExecution, error) {
 	}
 	return r, nil
 }
-func (s *APIContextExecutions) ReadAPIContextWork(ctx context.Context, captureID string, i identity.Identity, recovery artifact.RecoveryProof) (app.APIContextWork, error) {
+func (s *APIContextExecutions) ReadAPIContextWork(ctx context.Context, captureID string, i identity.Identity) (app.APIContextWork, error) {
 	var out app.APIContextWork
-	if !authorization.UUID(captureID) || !i.Valid(i.VerifiedAt) || !recovery.Valid(recovery.ObservedAt) {
+	if !authorization.UUID(captureID) || !i.Valid(i.VerifiedAt) {
 		return out, value.ErrInvalid
 	}
 	// The ledger normalizes errors returned through it; keep the step beside it.
 	failed := ""
 	fail := func(step string, e error) error { failed = step; return e }
 	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		trust, err := s.guards.Recovery.lock(ctx, q, s.root, recovery)
+		trust, _, err := currentTrust(ctx, q, s.installation)
 		if err != nil {
-			return fail("recovery-lock", err)
+			return fail("trust", err)
 		}
 		stream, err := q.LockPermissionStream(ctx, id(s.root))
 		if err != nil {
@@ -165,14 +166,11 @@ func (s *APIContextExecutions) ReadAPIContextWork(ctx context.Context, captureID
 		if err != nil {
 			return fail("permission", value.ErrDenied)
 		}
-		if err = s.guards.Recovery.check(ctx, q, trust, s.root, recovery); err != nil {
-			return fail("recovery-check", err)
-		}
 		now, err := q.CurrentTime(ctx)
 		if err != nil {
 			return fail("time", err)
 		}
-		eligible := contextEligibilityIn(ctx, q, stream, trust, s.root, s.guards.Recovery.installationID(), i, projection, projection.Target, now.Time)
+		eligible := contextEligibilityIn(ctx, q, stream, trust, s.root, s.installation, i, projection, projection.Target, now.Time)
 		if !eligible.Eligible {
 			return fail("eligibility", value.ErrDenied)
 		}
@@ -190,12 +188,12 @@ func (s *APIContextExecutions) ReadAPIContextWork(ctx context.Context, captureID
 	return out, nil
 }
 
-// check locks recovery -> permission -> pool/allocation -> attempt -> capture,
+// check locks permission -> pool/allocation -> attempt -> capture,
 // re-evaluating the same ordinary evaluator after every blocking SQL wait.
 func (s *APIContextExecutions) checked(ctx context.Context, q *custodydb.Queries, c app.APIExecutionCheck, topology privacyvalue.PolicyTopology, effectUntil *time.Time, fn func(custodydb.ContextCapture, *policyCaptureGrantState) error) error {
-	trust, err := s.guards.Recovery.lock(ctx, q, s.root, c.Recovery)
+	trust, _, err := currentTrust(ctx, q, s.installation)
 	if err != nil {
-		return sqlStep{"recovery-lock", err}
+		return sqlStep{"trust", err}
 	}
 	stream, err := q.LockPermissionStream(ctx, id(s.root))
 	if err != nil {
@@ -241,10 +239,7 @@ func (s *APIContextExecutions) checked(ctx context.Context, q *custodydb.Queries
 		if err != nil {
 			return sqlStep{"approval", err}
 		}
-		if err := s.guards.Recovery.check(ctx, q, trust, s.root, c.Recovery); err != nil {
-			return sqlStep{"recovery-check", err}
-		}
-		if err := s.guards.Retention.check(ctx, q, topology, c.Plan.Input.Retention.Proof, c.Plan.Input.Target.Target()); err != nil {
+		if err := s.retention.check(ctx, q, topology, c.Plan.Input.Retention.Proof, c.Plan.Input.Target.Target()); err != nil {
 			return sqlStep{"retention-check", err}
 		}
 		projection, err := permissionProjection(ctx, q, stream, c.Eligibility.Target)
@@ -255,7 +250,7 @@ func (s *APIContextExecutions) checked(ctx context.Context, q *custodydb.Queries
 		if err != nil {
 			return sqlStep{"time", err}
 		}
-		eligible := contextEligibilityIn(ctx, q, stream, trust, s.root, s.guards.Recovery.installationID(), c.Eligibility.VerifiedIdentity, projection, c.Eligibility.Target, now.Time)
+		eligible := contextEligibilityIn(ctx, q, stream, trust, s.root, s.installation, c.Eligibility.VerifiedIdentity, projection, c.Eligibility.Target, now.Time)
 		if e.Snapshot != nil && eligible.Eligible {
 			if w.SourceBinding == nil {
 				return sqlStep{"snapshot-source-audience", value.ErrDenied}
@@ -315,7 +310,7 @@ func (s *APIContextExecutions) prepareAPIExecution(ctx context.Context, c app.AP
 	if !authorization.UUID(c.Work.Accepted.CaptureID) || c.Work.Accepted.Expectation.ExecutionClass != artifact.ContextAPIExecution {
 		return out, false, value.ErrInvalid
 	}
-	topology, err := s.guards.Retention.observe(ctx, c.Work.Target.ClusterID)
+	topology, err := s.retention.observe(ctx, c.Work.Target.ClusterID)
 	if err != nil {
 		return out, false, err
 	}
@@ -477,7 +472,7 @@ func (s *APIContextExecutions) changeAPIStart(ctx context.Context, c app.APIExec
 	if !r.Valid() || r.RootID != s.root || r.Process != c.Process.Binding {
 		return out, value.ErrInvalid
 	}
-	topology, err := s.guards.Retention.observe(ctx, c.Work.Target.ClusterID)
+	topology, err := s.retention.observe(ctx, c.Work.Target.ClusterID)
 	if err != nil {
 		return out, err
 	}
@@ -518,38 +513,30 @@ func (s *APIContextExecutions) RecordAPIOutcome(ctx context.Context, r value.API
 	if r.Phase == "cancelled" || r.WriterProtocol == artifact.ContextWriterProtocol && r.Phase == "stored" {
 		return value.APIExecution{}, value.ErrDenied
 	}
-	return s.recordAPIOutcome(ctx, r, process, nil, nil, artifact.RecoveryProof{})
+	return s.recordAPIOutcome(ctx, r, process, nil, nil)
 }
-func (s *APIContextExecutions) RecordAPIStoredCompletion(ctx context.Context, r value.APIExecution, c artifact.ContextWriterCompletion, process value.APIProcessObservation, recovery artifact.RecoveryProof) (value.APIExecution, error) {
-	if r.WriterProtocol != artifact.ContextWriterProtocol || r.Phase != "stored" || c.Copies != r.Copies || !c.StoredAt.Equal(r.CompletedAt) || recovery.InstallationID != r.Process.InstallationID || recovery.IssuerEpoch != r.Process.IssuerEpoch {
+func (s *APIContextExecutions) RecordAPIStoredCompletion(ctx context.Context, r value.APIExecution, c artifact.ContextWriterCompletion, process value.APIProcessObservation) (value.APIExecution, error) {
+	if r.WriterProtocol != artifact.ContextWriterProtocol || r.Phase != "stored" || c.Copies != r.Copies || !c.StoredAt.Equal(r.CompletedAt) {
 		return value.APIExecution{}, value.ErrInvalid
 	}
-	return s.recordAPIOutcome(ctx, r, process, &c, nil, recovery)
+	return s.recordAPIOutcome(ctx, r, process, &c, nil)
 }
 
 // RecordAPIStoredSnapshotCompletion retains authenticated final coverage separately
 // from the accepted execution digest. The same transaction joins writer closure.
-func (s *APIContextExecutions) RecordAPIStoredSnapshotCompletion(ctx context.Context, r value.APIExecution, c artifact.ContextWriterCompletion, coverage artifact.SourceSnapshotCoverage, process value.APIProcessObservation, recovery artifact.RecoveryProof) (value.APIExecution, error) {
-	if r.WriterProtocol != artifact.ContextWriterProtocol || r.Phase != "stored" || c.Copies != r.Copies || !c.StoredAt.Equal(r.CompletedAt) || recovery.InstallationID != r.Process.InstallationID || recovery.IssuerEpoch != r.Process.IssuerEpoch {
+func (s *APIContextExecutions) RecordAPIStoredSnapshotCompletion(ctx context.Context, r value.APIExecution, c artifact.ContextWriterCompletion, coverage artifact.SourceSnapshotCoverage, process value.APIProcessObservation) (value.APIExecution, error) {
+	if r.WriterProtocol != artifact.ContextWriterProtocol || r.Phase != "stored" || c.Copies != r.Copies || !c.StoredAt.Equal(r.CompletedAt) {
 		return value.APIExecution{}, value.ErrInvalid
 	}
-	return s.recordAPIOutcome(ctx, r, process, &c, &coverage, recovery)
+	return s.recordAPIOutcome(ctx, r, process, &c, &coverage)
 }
 
-func (s *APIContextExecutions) recordAPIOutcome(ctx context.Context, r value.APIExecution, process value.APIProcessObservation, completion *artifact.ContextWriterCompletion, snapshot *artifact.SourceSnapshotCoverage, recovery artifact.RecoveryProof) (value.APIExecution, error) {
+func (s *APIContextExecutions) recordAPIOutcome(ctx context.Context, r value.APIExecution, process value.APIProcessObservation, completion *artifact.ContextWriterCompletion, snapshot *artifact.SourceSnapshotCoverage) (value.APIExecution, error) {
 	var out value.APIExecution
 	if !r.Valid() || r.RootID != s.root || r.Phase == "prepared" || r.Phase == "started" || process.Binding != r.Process {
 		return out, value.ErrInvalid
 	}
 	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		var trust custodydb.FleetCurrentTrust
-		if completion != nil {
-			var err error
-			trust, err = s.guards.Recovery.lock(ctx, q, s.root, recovery)
-			if err != nil {
-				return err
-			}
-		}
 		if _, err := q.LockPermissionStream(ctx, id(s.root)); err != nil {
 			return err
 		}
@@ -593,15 +580,12 @@ func (s *APIContextExecutions) recordAPIOutcome(ctx context.Context, r value.API
 				if !bytes.Equal(w.CompletionDigest, want[:]) {
 					return value.ErrConflict
 				}
-				if err = s.guards.Recovery.check(ctx, q, trust, s.root, recovery); err != nil {
-					return err
-				}
 			}
 			now, err := q.CurrentTime(ctx)
 			if err != nil {
 				return err
 			}
-			if !process.Valid(now.Time) || completion != nil && !recovery.Valid(now.Time) {
+			if !process.Valid(now.Time) {
 				return value.ErrExpired
 			}
 			return ctx.Err()
@@ -663,14 +647,18 @@ func (s *APIContextExecutions) recordAPIOutcome(ctx context.Context, r value.API
 		if err != nil {
 			return err
 		}
-		if !process.Valid(now.Time) || completion != nil && !recovery.Valid(now.Time) {
+		if !process.Valid(now.Time) {
 			return value.ErrExpired
 		}
 		if completion != nil {
 			if completion.ClosedAt.After(now.Time) {
 				return value.ErrInvalid
 			}
-			incarnation, err := q.ReadContextDatabaseIncarnation(ctx, id(recovery.InstallationID))
+			trust, _, err := currentTrust(ctx, q, s.installation)
+			if err != nil {
+				return err
+			}
+			incarnation, err := q.ReadContextDatabaseIncarnation(ctx, id(s.installation))
 			if err != nil {
 				return err
 			}
@@ -682,18 +670,15 @@ func (s *APIContextExecutions) recordAPIOutcome(ctx context.Context, r value.API
 			}
 			ed := app.APIExecutionDigest(r)
 			cd := privacyapp.ContextWriterDigest(*completion)
-			err = q.InsertContextWriterCompletion(ctx, custodydb.InsertContextWriterCompletionParams{RootID: id(s.root), CaptureID: c.ID, AttemptID: c.AttemptID, RegistrationDigest: completion.RegistrationDigest[:], ExpectationDigest: completion.ExpectationDigest[:], CopiesDigest: digest(r.Copies), ExecutionDigest: ed[:], CompletionDigest: cd[:], InstallationID: id(recovery.InstallationID), IssuerEpoch: id(recovery.IssuerEpoch), PostmasterAt: incarnation.PostmasterAt, DatabaseOid: incarnation.DatabaseOid, StoredAt: ts(completion.StoredAt), ClosedAt: ts(completion.ClosedAt)})
+			err = q.InsertContextWriterCompletion(ctx, custodydb.InsertContextWriterCompletionParams{RootID: id(s.root), CaptureID: c.ID, AttemptID: c.AttemptID, RegistrationDigest: completion.RegistrationDigest[:], ExpectationDigest: completion.ExpectationDigest[:], CopiesDigest: digest(r.Copies), ExecutionDigest: ed[:], CompletionDigest: cd[:], InstallationID: id(s.installation), IssuerEpoch: trust.IssuerEpoch, PostmasterAt: incarnation.PostmasterAt, DatabaseOid: incarnation.DatabaseOid, StoredAt: ts(completion.StoredAt), ClosedAt: ts(completion.ClosedAt)})
 			if err != nil {
-				return err
-			}
-			if err = s.guards.Recovery.check(ctx, q, trust, s.root, recovery); err != nil {
 				return err
 			}
 			now, err = q.CurrentTime(ctx)
 			if err != nil {
 				return err
 			}
-			if !process.Valid(now.Time) || completion != nil && !recovery.Valid(now.Time) {
+			if !process.Valid(now.Time) {
 				return value.ErrExpired
 			}
 		}

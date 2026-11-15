@@ -18,7 +18,7 @@ import (
 
 // ContextPreviews stores private passive review state. Possessing a row grants
 // no collection authority: current identity, targets, permissions, retention,
-// storage and recovery must be resolved again by the submission coordinator.
+// storage must be resolved again by the submission coordinator.
 type ContextPreviews struct {
 	ledger *Ledger
 	root   string

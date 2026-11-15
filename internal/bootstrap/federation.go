@@ -27,8 +27,8 @@ import (
 )
 
 // Federation is the ADR-170 hub process for connector-facing duties. It
-// answers the connectors' ADR-172 owner discovery, authentication and
-// recovery reads and stores their AccessBinding and capacity deliveries. It
+// answers the connectors' ADR-172 owner discovery and authentication
+// reads and stores their AccessBinding and capacity deliveries. It
 // holds no browser, MCP, evidence, signing, audit or recovery-activation
 // authority.
 type Federation struct {
@@ -133,10 +133,6 @@ func NewFederation(ctx context.Context, files, ids *os.Root) (f *Federation, err
 		pools[purpose] = pool
 		f.closers = append(f.closers, pool.Close)
 	}
-	recovery, err := postgres.NewRecoveryReader(startup, pools["connector-read"], c.InstallationID)
-	if err != nil {
-		return f, mounts.ErrUnavailable
-	}
 	owners, err := federationOwnerReads(startup, c, pools["connector-owner-read"])
 	if err != nil {
 		return f, err
@@ -157,7 +153,7 @@ func NewFederation(ctx context.Context, files, ids *os.Root) (f *Federation, err
 	if err != nil {
 		return f, mounts.ErrUnavailable
 	}
-	duties := connectorlifecycle.Duties{Owners: owners, Recoverer: recovery}
+	duties := connectorlifecycle.Duties{Owners: owners}
 	f.handler, err = connectorlifecycle.NewHandler(tokens, federationServices{duties, c.ServiceIDs, &federationBindings{decoder, remote}, capacity}, c.Concurrency)
 	if err != nil {
 		return f, mounts.ErrUnavailable

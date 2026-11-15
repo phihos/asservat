@@ -63,5 +63,5 @@ func (v AcceptedCapacityPermissions) Valid(now time.Time) bool {
 }
 
 type CapacityPermissionReader interface {
-	ReadCapacityPermissions(context.Context, artifact.RecoveryProof) (AcceptedCapacityPermissions, error)
+	ReadCapacityPermissions(context.Context) (AcceptedCapacityPermissions, error)
 }

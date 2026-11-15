@@ -13,26 +13,26 @@ type captureLifecycleQueries struct{ *custodydb.Queries }
 
 // Capture cleanup uses only the private filtered views and the existing fixed
 // retirement functions. Source acceptance and role grants are separate duties.
-func NewCaptureOperationLifecycles(ctx context.Context, pool *pgxpool.Pool, policy value.OperationLifecyclePolicy, recovery *RecoveryTransactionGuard) (*OperationLifecycles, error) {
+func NewCaptureOperationLifecycles(ctx context.Context, pool *pgxpool.Pool, policy value.OperationLifecyclePolicy) (*OperationLifecycles, error) {
 	if !value.CaptureOperationPolicy(policy) {
 		return nil, app.ErrUnavailable
 	}
-	return NewScopedCaptureOperationLifecycles(ctx, pool, policy.RootID, policy.InstallationID, policy.StoreID, recovery)
+	return NewScopedCaptureOperationLifecycles(ctx, pool, policy.RootID, policy.InstallationID, policy.StoreID)
 }
 
-// The installed cleanup compartment pins storage and recovery identity, not a
+// The installed cleanup compartment pins storage and installation identity, not a
 // newly selected policy. Every historical row still supplies and validates its
 // own original immutable lifecycle in the existing locked transaction.
-func NewScopedCaptureOperationLifecycles(ctx context.Context, pool *pgxpool.Pool, root, installation, store string, recovery *RecoveryTransactionGuard) (*OperationLifecycles, error) {
+func NewScopedCaptureOperationLifecycles(ctx context.Context, pool *pgxpool.Pool, root, installation, store string) (*OperationLifecycles, error) {
 	scope := captureLifecycleScope{root, installation, store}
-	if !scope.valid() || recovery == nil || recovery.root != root || recovery.installation != installation {
+	if !scope.valid() {
 		return nil, app.ErrUnavailable
 	}
 	l, e := New(ctx, pool)
 	if e != nil {
 		return nil, e
 	}
-	j := &OperationJournal{ledger: l, root: root, lane: "capture", recovery: recovery}
+	j := &OperationJournal{ledger: l, root: root, lane: "capture", installation: installation}
 	return &OperationLifecycles{journal: j, capture: true, captureScope: scope}, nil
 }
 

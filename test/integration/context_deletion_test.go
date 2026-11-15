@@ -13,7 +13,6 @@ import (
 	"asservat.local/asservat/internal/adapters/jose"
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
-	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/capture"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -28,7 +27,7 @@ func qualifyPositiveContextDeletion(t *testing.T, ctx context.Context, admin *pg
 	auditPool := newPool("context_cleanup_audit_runtime", "synthetic-context-cleanup-audit")
 	finalPool := newPool("context_cleanup_finalize_runtime", "synthetic-context-cleanup-finalize")
 	facet := func(p *pgxpool.Pool) *postgres.ContextDeletions {
-		v, err := postgres.NewContextDeletions(ctx, p, s.a.RootID, s.a.Recovery.InstallationID)
+		v, err := postgres.NewContextDeletions(ctx, p, s.a.RootID, s.recovery.installation)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -36,16 +35,9 @@ func qualifyPositiveContextDeletion(t *testing.T, ctx context.Context, admin *pg
 	}
 	cleanup, ack, finalize := facet(cleanupPool), facet(auditPool), facet(finalPool)
 	if !t.Run("due-pages-pass-persistent-failures-and-wrap", func(t *testing.T) {
-		qualifyContextDeletionPaging(t, ctx, cleanupPool, s.a.RootID, s.a.Recovery.InstallationID)
+		qualifyContextDeletionPaging(t, ctx, cleanupPool, s.a.RootID, s.recovery.installation)
 	}) {
 		t.FailNow()
-	}
-	recovery := func() artifact.RecoveryProof {
-		p, err := s.recovery.reader.RecoveryState(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return p
 	}
 	registration := accepted.Expectation.Registration
 	loc := registration.Location
@@ -58,7 +50,7 @@ func qualifyPositiveContextDeletion(t *testing.T, ctx context.Context, admin *pg
 		}
 		return slices.Contains(due, loc)
 	}
-	if _, err := cleanup.BeginContextDeletion(ctx, loc, recovery()); err == nil {
+	if _, err := cleanup.BeginContextDeletion(ctx, loc); err == nil {
 		t.Fatal("cleanup began before read cutoff")
 	}
 	if listed() {
@@ -105,7 +97,7 @@ func qualifyPositiveContextDeletion(t *testing.T, ctx context.Context, admin *pg
 	if !listed() {
 		t.Fatal("attempt past its effective cutoff without a lease not listed")
 	}
-	work, err := cleanup.BeginContextDeletion(ctx, loc, recovery())
+	work, err := cleanup.BeginContextDeletion(ctx, loc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,7 +118,7 @@ func qualifyPositiveContextDeletion(t *testing.T, ctx context.Context, admin *pg
 	}
 	bad := work
 	bad.Deletion.Registration.StoreID = custodyID()
-	if _, err = cleanup.RecordContextPurge(ctx, bad, time.Now(), recovery()); err == nil {
+	if _, err = cleanup.RecordContextPurge(ctx, bad, time.Now()); err == nil {
 		t.Fatal("different backend became purge proof")
 	}
 	if err = bound.PurgeAttempt(ctx, registration); err != nil {
@@ -148,9 +140,8 @@ func qualifyPositiveContextDeletion(t *testing.T, ctx context.Context, admin *pg
 		t.Fatal(err)
 	}
 	waiting := make(chan error, 1)
-	beforeWait := recovery()
 	purgedAt := time.Now().UTC().Truncate(time.Microsecond)
-	go func() { _, e := cleanup.RecordContextPurge(ctx, work, purgedAt, beforeWait); waiting <- e }()
+	go func() { _, e := cleanup.RecordContextPurge(ctx, work, purgedAt); waiting <- e }()
 	time.Sleep(time.Until(shortUntil) + 10*time.Millisecond)
 	if err = blocked.Commit(ctx); err != nil {
 		t.Fatal(err)
@@ -165,21 +156,21 @@ func qualifyPositiveContextDeletion(t *testing.T, ctx context.Context, admin *pg
 	if !listed() {
 		t.Fatal("attempt with an ended deletion lease not listed")
 	}
-	work, err = cleanup.BeginContextDeletion(ctx, loc, recovery())
+	work, err = cleanup.BeginContextDeletion(ctx, loc)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err = bound.PurgeAttempt(ctx, registration); err != nil {
 		t.Fatal("reconciled complete empty inventory", err)
 	}
-	result, err := cleanup.RecordContextPurge(ctx, work, time.Now().UTC().Truncate(time.Microsecond), recovery())
+	result, err := cleanup.RecordContextPurge(ctx, work, time.Now().UTC().Truncate(time.Microsecond))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = finalize.FinalizeContextDeletion(ctx, result, recovery()); err == nil {
+	if err = finalize.FinalizeContextDeletion(ctx, result); err == nil {
 		t.Fatal("unacknowledged audit released evidence storage")
 	}
-	if again, found, err := cleanup.ReadContextDeletion(ctx, loc, recovery()); err != nil || !found || again != result {
+	if again, found, err := cleanup.ReadContextDeletion(ctx, loc); err != nil || !found || again != result {
 		t.Fatal("durable purge result changed", err)
 	}
 	// A successfully purged checkpoint still needs its independent audit. Once
@@ -206,7 +197,7 @@ func qualifyPositiveContextDeletion(t *testing.T, ctx context.Context, admin *pg
 	}
 	changed := result
 	changed.DatabaseOID++
-	if err = finalize.FinalizeContextDeletion(ctx, changed, recovery()); err == nil {
+	if err = finalize.FinalizeContextDeletion(ctx, changed); err == nil {
 		t.Fatal("checkpoint crossed database incarnation")
 	}
 	pub, private, err := ed25519.GenerateKey(rand.Reader)
@@ -223,12 +214,12 @@ func qualifyPositiveContextDeletion(t *testing.T, ctx context.Context, admin *pg
 	if err != nil {
 		t.Fatal("encrypted deletion audit", err)
 	}
-	if err = ack.AcknowledgeContextDeletion(ctx, result, receipt, recovery()); err != nil {
+	if err = ack.AcknowledgeContextDeletion(ctx, result, receipt); err != nil {
 		t.Fatal(err)
 	}
 	changedReceipt := receipt
 	changedReceipt.SHA256[0]++
-	if err = ack.AcknowledgeContextDeletion(ctx, result, changedReceipt, recovery()); err == nil {
+	if err = ack.AcknowledgeContextDeletion(ctx, result, changedReceipt); err == nil {
 		t.Fatal("immutable audit receipt replaced")
 	}
 	denied(genericPool, "UPDATE context_deletion_checkpoint SET finalization_xid=pg_current_xact_id() WHERE attempt_id=$1", "42501")
@@ -243,43 +234,10 @@ func qualifyPositiveContextDeletion(t *testing.T, ctx context.Context, admin *pg
 	if err = generic.FinishDeletion(ctx, work.Deletion); err == nil {
 		t.Fatal("generic facet adopted dedicated audited checkpoint")
 	}
-	originalProof := recovery()
-	recoveryChange, err := admin.Begin(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err = recoveryChange.Exec(ctx, "UPDATE fleet_trust SET suspended=true WHERE installation_id=$1", originalProof.InstallationID); err != nil {
-		_ = recoveryChange.Rollback(ctx)
-		t.Fatal(err)
-	}
-	finalResult := make(chan error, 1)
-	go func() { finalResult <- finalize.FinalizeContextDeletion(ctx, result, originalProof) }()
-	select {
-	case err = <-finalResult:
-		_ = recoveryChange.Rollback(ctx)
-		t.Fatal("dedicated finalizer did not wait for current recovery", err)
-	case <-time.After(30 * time.Millisecond):
-	}
-	if err = recoveryChange.Commit(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if err = <-finalResult; err == nil {
-		t.Fatal("finalizer consumed stale recovery snapshot")
-	}
-	if err = finalize.FinalizeContextDeletion(ctx, result, originalProof); err == nil {
-		t.Fatal("recovery fence ignored by deletion finalization")
-	}
-	if _, err = admin.Exec(ctx, "UPDATE fleet_trust SET suspended=false WHERE installation_id=$1", originalProof.InstallationID); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := replaceSyntheticFleetObservationAfterActivation(ctx, admin, originalProof.InstallationID); err != nil {
-		t.Fatal(err)
-	}
-	current := recovery()
 	var wg sync.WaitGroup
 	results := make(chan error, 2)
 	for range 2 {
-		wg.Go(func() { results <- finalize.FinalizeContextDeletion(ctx, result, current) })
+		wg.Go(func() { results <- finalize.FinalizeContextDeletion(ctx, result) })
 	}
 	wg.Wait()
 	close(results)

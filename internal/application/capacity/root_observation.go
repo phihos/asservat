@@ -23,16 +23,15 @@ type RootBackingObservation struct {
 	RootID, InstallationID, QualificationID       string
 	QualificationDigest, PlanDigest, SourceDigest artifact.Digest
 	SourceRevision                                int64
-	Recovery                                      artifact.RecoveryProof
 	Processing                                    RootProcessingObservation
 	ObservedAt, FreshUntil                        time.Time
 	Plan                                          RootBackingPlan `json:"-"`
 	poolCanonical                                 string
 }
 
-func NewRootBackingObservation(q CapacityQualification, source AcceptedCapacitySource, processing privacy.DownloadPolicy, recovery artifact.RecoveryProof, now time.Time) (RootBackingObservation, error) {
+func NewRootBackingObservation(q CapacityQualification, source AcceptedCapacitySource, processing privacy.DownloadPolicy, now time.Time) (RootBackingObservation, error) {
 	var zero RootBackingObservation
-	if !q.Valid() || !source.Valid(now) || !processing.Valid(now) || processing.Suspended || !recovery.Valid(now) || source.RootID != q.RootBacking.RootID || source.InstallationID != q.RootBacking.InstallationID || source.QualificationID != q.ID || source.QualificationDigest != q.Digest || processing.RootID != source.RootID || processing.InstallationID != source.InstallationID || processing.RecoveryEpoch != recovery.IssuerEpoch || recovery.InstallationID != source.InstallationID || processing.Revision.UID != q.RootBacking.ProcessingSourceUID || processing.ProtectionDigest != q.RootBacking.ProcessingProtectionDigest {
+	if !q.Valid() || !source.Valid(now) || !processing.Valid(now) || processing.Suspended || source.RootID != q.RootBacking.RootID || source.InstallationID != q.RootBacking.InstallationID || source.QualificationID != q.ID || source.QualificationDigest != q.Digest || processing.RootID != source.RootID || processing.InstallationID != source.InstallationID || processing.Revision.UID != q.RootBacking.ProcessingSourceUID || processing.ProtectionDigest != q.RootBacking.ProcessingProtectionDigest {
 		return zero, cfg.ErrUnavailable
 	}
 	name := ""
@@ -58,8 +57,8 @@ func NewRootBackingObservation(q CapacityQualification, source AcceptedCapacityS
 	}
 	_, digest := plan.Canonical()
 	start := now.UTC().Truncate(time.Microsecond)
-	until := identity.Earlier(source.FreshUntil, identity.Earlier(processing.FreshUntil, recovery.FreshUntil)).Truncate(time.Microsecond)
-	out := RootBackingObservation{RootID: source.RootID, InstallationID: source.InstallationID, QualificationID: q.ID, QualificationDigest: q.Digest, PlanDigest: digest, SourceDigest: source.Observation.Digest, SourceRevision: source.Revision, Recovery: recovery, Processing: RootProcessingObservation{processing.Revision, processing.ProtectionDigest, processing.ObservedAt, processing.FreshUntil}, ObservedAt: start, FreshUntil: until, Plan: plan, poolCanonical: string(pool)}
+	until := identity.Earlier(source.FreshUntil, processing.FreshUntil).Truncate(time.Microsecond)
+	out := RootBackingObservation{RootID: source.RootID, InstallationID: source.InstallationID, QualificationID: q.ID, QualificationDigest: q.Digest, PlanDigest: digest, SourceDigest: source.Observation.Digest, SourceRevision: source.Revision, Processing: RootProcessingObservation{processing.Revision, processing.ProtectionDigest, processing.ObservedAt, processing.FreshUntil}, ObservedAt: start, FreshUntil: until, Plan: plan, poolCanonical: string(pool)}
 	if !out.Valid(now) {
 		return zero, cfg.ErrUnavailable
 	}
@@ -67,7 +66,7 @@ func NewRootBackingObservation(q CapacityQualification, source AcceptedCapacityS
 }
 
 func (o RootBackingObservation) Valid(now time.Time) bool {
-	if o.Plan.canonical == "" || o.poolCanonical == "" || o.SourceDigest == (artifact.Digest{}) || o.SourceRevision < 1 || o.SourceRevision >= 1<<60 || !o.Recovery.Valid(now) || o.Recovery.InstallationID != o.InstallationID || !o.Processing.Revision.Valid() || o.Processing.ProtectionDigest == (artifact.Digest{}) || !identity.Fresh(o.Processing.ObservedAt, o.Processing.FreshUntil, now, CapacitySourceInterval) || !identity.Fresh(o.ObservedAt, o.FreshUntil, now, CapacitySourceInterval) || !capacityMicro(o.ObservedAt) || !capacityMicro(o.FreshUntil) || o.FreshUntil.After(o.Processing.FreshUntil) || o.FreshUntil.After(o.Recovery.FreshUntil) || o.Plan.digest != o.PlanDigest {
+	if o.Plan.canonical == "" || o.poolCanonical == "" || o.SourceDigest == (artifact.Digest{}) || o.SourceRevision < 1 || o.SourceRevision >= 1<<60 || !o.Processing.Revision.Valid() || o.Processing.ProtectionDigest == (artifact.Digest{}) || !identity.Fresh(o.Processing.ObservedAt, o.Processing.FreshUntil, now, CapacitySourceInterval) || !identity.Fresh(o.ObservedAt, o.FreshUntil, now, CapacitySourceInterval) || !capacityMicro(o.ObservedAt) || !capacityMicro(o.FreshUntil) || o.FreshUntil.After(o.Processing.FreshUntil) || o.Plan.digest != o.PlanDigest {
 		return false
 	}
 	var wire struct {

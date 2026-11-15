@@ -24,7 +24,7 @@ func qualifyProcessingDiscovery(t *testing.T, ctx context.Context, admin *pgxpoo
 	})
 	pool := poolFor(role, password)
 	defer pool.Close()
-	reader, err := postgres.NewProcessingInventory(ctx, pool, s.a.RootID, s.recovery.guard)
+	reader, err := postgres.NewProcessingInventory(ctx, pool, s.a.RootID)
 	if err != nil {
 		t.Fatal("compiled discovery constructor", err)
 	}
@@ -39,11 +39,7 @@ func qualifyProcessingDiscovery(t *testing.T, ctx context.Context, admin *pgxpoo
 		if err != nil {
 			t.Fatal("discovery fixture policy", err)
 		}
-		r, err := s.recovery.reader.RecoveryState(ctx)
-		if err != nil {
-			t.Fatal("discovery fixture recovery", err)
-		}
-		return value.ProcessingAuthority{Identity: i, Policy: p, Recovery: r, ObservedAt: started, ValidUntil: identity.Earlier(started.Add(5*time.Second), identity.Earlier(i.ValidUntil, identity.Earlier(p.FreshUntil, r.FreshUntil)))}
+		return value.ProcessingAuthority{Identity: i, Policy: p, ObservedAt: started, ValidUntil: identity.Earlier(started.Add(5*time.Second), identity.Earlier(i.ValidUntil, p.FreshUntil))}
 	}
 	read := func(q value.ProcessingDiscoveryQuery) value.ProcessingDiscoveryPage {
 		t.Helper()
@@ -110,15 +106,9 @@ func qualifyProcessingDiscovery(t *testing.T, ctx context.Context, admin *pgxpoo
 		t.Fatal("discovery included exclusive upper time bound", page)
 	}
 	q = value.ProcessingDiscoveryQuery{CaseID: first.CaseID, Limit: 1}
-	for _, mode := range []string{"source", "recovery"} {
-		a := authority()
-		if mode == "source" {
-			a.Policy.Revision.UID = custodyID()
-		} else {
-			a.Recovery.Revision.Digest[0]++
-		}
-		if page, err = reader.ReadProcessingDiscovery(ctx, a, q); err == nil || len(page.Candidates) != 0 {
-			t.Fatal("discovery bypassed SQL authority fence", mode, page, err)
-		}
+	a := authority()
+	a.Policy.Revision.UID = custodyID()
+	if page, err = reader.ReadProcessingDiscovery(ctx, a, q); err == nil || len(page.Candidates) != 0 {
+		t.Fatal("discovery bypassed SQL authority fence", page, err)
 	}
 }

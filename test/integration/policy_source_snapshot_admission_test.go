@@ -38,8 +38,7 @@ func admitPolicySourceSnapshotFixture(t *testing.T, ctx context.Context, hub *pg
 	t.Helper()
 	var out policySourceSnapshotAdmissionFixture
 	s := accepted.Scenario
-	guards := postgres.EffectTransactionGuards{Recovery: s.recovery.guard, Retention: s.retention.guard}
-	ledger, err := postgres.NewPolicySources(ctx, hub, s.a.RootID, fresh.Recovery.InstallationID, guards)
+	ledger, err := postgres.NewPolicySources(ctx, hub, s.a.RootID, fresh.Authority.InstallationID, s.retention.guard)
 	if err != nil {
 		t.Fatal("snapshot source reader", err)
 	}
@@ -64,7 +63,7 @@ func admitPolicySourceSnapshotFixture(t *testing.T, ctx context.Context, hub *pg
 	}
 	bound, end := context.WithDeadline(ctx, fresh.ValidUntil)
 	defer end()
-	trigger, err := postgres.NewPolicyTriggers(bound, hub, s.a.RootID, fresh.Recovery.InstallationID)
+	trigger, err := postgres.NewPolicyTriggers(bound, hub, s.a.RootID, fresh.Authority.InstallationID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +80,7 @@ func admitPolicySourceSnapshotFixture(t *testing.T, ctx context.Context, hub *pg
 		t.Fatal("real original snapshot occurrence/T0", occurrences, err)
 	}
 	occurrence := occurrences[0]
-	current, err := postgres.NewAutomationAuthorities(bound, hub, s.a.RootID, fresh.Recovery.InstallationID)
+	current, err := postgres.NewAutomationAuthorities(bound, hub, s.a.RootID, fresh.Authority.InstallationID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,15 +150,11 @@ func admitPolicySourceSnapshotFixture(t *testing.T, ctx context.Context, hub *pg
 	if err != nil {
 		t.Fatal("real source snapshot accepted plan", err)
 	}
-	recovery, err := s.recovery.reader.RecoveryState(bound)
-	if err != nil {
-		t.Fatal(err)
-	}
 	a := s.a
-	a.Plan, a.Eligibility, a.Storage, a.Recovery = plan, eligible, storage.Binding, recovery
+	a.Plan, a.Eligibility, a.Storage = plan, eligible, storage.Binding
 	a.CaseID, a.OccurrenceID, a.IdempotencyKey = input.CaseID, occurrence.ID, occurrence.ID
 	a.Registration = artifact.Registration{Location: artifact.Location{ClusterID: source.ClusterID, ArtifactID: custodyID(), AttemptID: custodyID()}, StoreID: storage.Selection.StoreID, AllocationID: storage.Selection.AllocationID, PoolRevision: storage.Selection.PoolRevision, AllocationRevision: storage.Selection.AllocationRevision, NativeLimit: maximumBytes, AnchorAt: resolution.AnchorAt, WriteUntil: request.ProcessingUntil, ExpiresAt: resolution.ExpiresAt, DeleteBy: resolution.DeleteBy}
-	p := capturevalue.ContextPreview{ID: custodyID(), AssessmentID: custodyID(), AssessmentRulesDigest: planningapp.SourceSnapshotAssessmentRulesDigest(), RootID: a.RootID, InstallationID: recovery.InstallationID, IssuerEpoch: recovery.IssuerEpoch, CaptureID: input.CaptureID, CaseID: a.CaseID, OccurrenceID: a.OccurrenceID, ArtifactID: a.Registration.Location.ArtifactID, AttemptID: a.Registration.Location.AttemptID, Actor: input.Executor, ExecutionClass: artifact.ContextAPIExecution, Intent: capturevalue.ContextIntent{Snapshot: selected, Target: targets.WorkloadRequest{ClusterID: source.ClusterID, Namespace: source.Target.Request.Namespace.Name, Kind: "Pod", Name: source.Target.Request.PodName}, RequestedSeconds: accepted.Compiled.RetentionSeconds}, Target: source.Target.Request, Pin: source.Target.Pin, Storage: storage.Selection, Retention: capturevalue.ContextRetentionReview{PurposeRef: resolution.PurposeRef, RequestedSeconds: resolution.RequestedSeconds, MaximumSeconds: resolution.MaximumSeconds, DeletionBudgetSeconds: resolution.DeletionBudgetSeconds, Policies: slices.Clone(resolution.Policies)}, Audience: slices.Clone(eligible.DefaultAudience), CanonicalScope: slices.Clone(plan.CanonicalScope), ScopeDigest: plan.ScopeDigest, CreatedAt: now, Deadline: input.Deadline, SelectionUntil: identity.Earlier(now.Add(time.Minute), input.Deadline)}
+	p := capturevalue.ContextPreview{ID: custodyID(), AssessmentID: custodyID(), AssessmentRulesDigest: planningapp.SourceSnapshotAssessmentRulesDigest(), RootID: a.RootID, InstallationID: fresh.Authority.InstallationID, CaptureID: input.CaptureID, CaseID: a.CaseID, OccurrenceID: a.OccurrenceID, ArtifactID: a.Registration.Location.ArtifactID, AttemptID: a.Registration.Location.AttemptID, Actor: input.Executor, ExecutionClass: artifact.ContextAPIExecution, Intent: capturevalue.ContextIntent{Snapshot: selected, Target: targets.WorkloadRequest{ClusterID: source.ClusterID, Namespace: source.Target.Request.Namespace.Name, Kind: "Pod", Name: source.Target.Request.PodName}, RequestedSeconds: accepted.Compiled.RetentionSeconds}, Target: source.Target.Request, Pin: source.Target.Pin, Storage: storage.Selection, Retention: capturevalue.ContextRetentionReview{PurposeRef: resolution.PurposeRef, RequestedSeconds: resolution.RequestedSeconds, MaximumSeconds: resolution.MaximumSeconds, DeletionBudgetSeconds: resolution.DeletionBudgetSeconds, Policies: slices.Clone(resolution.Policies)}, Audience: slices.Clone(eligible.DefaultAudience), CanonicalScope: slices.Clone(plan.CanonicalScope), ScopeDigest: plan.ScopeDigest, CreatedAt: now, Deadline: input.Deadline, SelectionUntil: identity.Earlier(now.Add(time.Minute), input.Deadline)}
 	if !captureapp.ValidContextPreview(p) {
 		t.Fatal("protected snapshot preview structure")
 	}

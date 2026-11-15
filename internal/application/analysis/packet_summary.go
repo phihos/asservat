@@ -1,13 +1,14 @@
 package analysis
 
 import (
+	"context"
+	"encoding/json"
+	"errors"
+
 	identities "asservat.local/asservat/internal/application/identity"
 	value "asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/identity"
-	"context"
-	"encoding/json"
-	"errors"
 )
 
 type packetSummaryPreAdmissionRefusal struct{ cause error }
@@ -36,23 +37,23 @@ type PacketSummaryReads struct {
 // independently match the exact published source. Legacy routes remain
 // metadata-only and cannot enable raw aggregates.
 type ContextPacketProjectionRouteReader interface {
-	ResolvePacketProjectionRoute(context.Context, string, string, identity.Identity, artifact.RecoveryProof) (value.ContextProjectionCandidate, error)
+	ResolvePacketProjectionRoute(context.Context, string, string, identity.Identity) (value.ContextProjectionCandidate, error)
 }
 
 func (s PacketSummaryReads) Begin(ctx context.Context, current identities.CurrentIdentity, invocation ContextQueryInvocation, request value.PacketSummaryRequest) (*ContextProjectionDelivery, error) {
 	var d *ContextProjectionDelivery
 	err := queryStepped("configuration", value.ErrUnavailable)
 	if request.Valid() && s.Routes != nil {
-		d, err = s.Service.begin(ctx, current, invocation, "get_pcap_summary", ContextQueryInput{Packet: request}, func(ctx context.Context, caller identity.Identity, recovery artifact.RecoveryProof) (value.ContextProjectionCandidate, error) {
+		d, err = s.Service.begin(ctx, current, invocation, "get_pcap_summary", ContextQueryInput{Packet: request}, func(ctx context.Context, caller identity.Identity) (value.ContextProjectionCandidate, error) {
 			var c value.ContextProjectionCandidate
 			var err error
 			if routes, ok := s.Routes.(ContextPacketProjectionRouteReader); ok {
-				c, err = routes.ResolvePacketProjectionRoute(ctx, request.CaseID, request.ArtifactID, caller, recovery)
+				c, err = routes.ResolvePacketProjectionRoute(ctx, request.CaseID, request.ArtifactID, caller)
 				if c.NativeType != artifact.PCAPNGArtifact && c.NativeType != artifact.RawPCAPNGArtifact {
 					return value.ContextProjectionCandidate{}, errors.Join(value.ErrUnavailable, err)
 				}
 			} else {
-				c, err = s.Routes.ResolveProjectionRoute(ctx, request.CaseID, request.ArtifactID, caller, recovery)
+				c, err = s.Routes.ResolveProjectionRoute(ctx, request.CaseID, request.ArtifactID, caller)
 				if c.NativeType != "" {
 					return value.ContextProjectionCandidate{}, errors.Join(value.ErrUnavailable, err)
 				}

@@ -19,29 +19,24 @@ import (
 )
 
 type manualCatalogFacts struct {
-	rows                                        []executionapp.LiveManualWork
-	recovery                                    artifact.RecoveryProof
-	reads, recoveries, holderBatches, nodeReads int
-	holder                                      reportedTargets
-	afterNode                                   func()
-	captured                                    []collector.LiveRead
-	now                                         time.Time
-	nodeDuration                                time.Duration
+	rows                            []executionapp.LiveManualWork
+	reads, holderBatches, nodeReads int
+	holder                          reportedTargets
+	afterNode                       func()
+	captured                        []collector.LiveRead
+	now                             time.Time
+	nodeDuration                    time.Duration
 }
 
-func (f *manualCatalogFacts) RecoveryState(context.Context) (artifact.RecoveryProof, error) {
-	f.recoveries++
-	return f.recovery, nil
-}
 func (f *manualCatalogFacts) LiveManualTarget(context.Context, string) (authorization.Target, error) {
 	e := f.rows[0].Work.Accepted.Expectation
 	return authorization.Target{ClusterID: e.Registration.Location.ClusterID, NamespaceUID: e.NamespaceUID, WorkloadUID: e.WorkloadUID, PodUID: e.PodUID}, nil
 }
-func (f *manualCatalogFacts) ReadLiveManualWork(context.Context, []string, artifact.RecoveryProof) ([]executionapp.LiveManualWork, error) {
+func (f *manualCatalogFacts) ReadLiveManualWork(context.Context, []string) ([]executionapp.LiveManualWork, error) {
 	f.reads++
 	return append([]executionapp.LiveManualWork(nil), f.rows...), nil
 }
-func (f *manualCatalogFacts) ListLiveManualWork(context.Context, authorization.WorkloadTarget, string, int, artifact.RecoveryProof) ([]executionapp.LiveManualWork, string, error) {
+func (f *manualCatalogFacts) ListLiveManualWork(context.Context, authorization.WorkloadTarget, string, int) ([]executionapp.LiveManualWork, string, error) {
 	f.reads++
 	return append([]executionapp.LiveManualWork(nil), f.rows...), "", nil
 }
@@ -84,7 +79,7 @@ func newManualCatalogFacts(t *testing.T, count int) (liveManualCatalog, *manualC
 	t.Helper()
 	base, _, _ := newRegionalObservationFixture(t)
 	now := base.now
-	f := &manualCatalogFacts{now: now, recovery: base.recovery}
+	f := &manualCatalogFacts{now: now}
 	holder := NewConnectorRecordings(f, fakePodNodes{}, func() time.Time { return now }, func(string) {})
 	f.holder = reportedTargets{recordings: holder}
 	for n := 0; n < count; n++ {
@@ -110,7 +105,7 @@ func newManualCatalogFacts(t *testing.T, count int) (liveManualCatalog, *manualC
 		f.rows = append(f.rows, executionapp.LiveManualWork{Work: w, Execution: r, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)})
 		holder.held[e.CaptureUID] = &heldRecording{expectation: e, digest: r.ExpectationDigest, nodeUID: regionalObservationID(70), workID: regionalObservationID(500 + n), queued: now.Add(-2 * time.Second), outcome: evidence.RecordingCollection{State: evidence.RecordingPending}}
 	}
-	return liveManualCatalog{root: base.receiver.Channel.RootID, works: f, recovery: f, holders: f, now: func() time.Time { return now }}, f
+	return liveManualCatalog{root: base.receiver.Channel.RootID, works: f, holders: f, now: func() time.Time { return now }}, f
 }
 func TestLiveManualCatalogUsesOriginalStartedHolderAndBatchesAtOneAndSixteen(t *testing.T) {
 	for _, count := range []int{1, 16} {
@@ -133,11 +128,11 @@ func TestLiveManualCatalogUsesOriginalStartedHolderAndBatchesAtOneAndSixteen(t *
 						t.Fatal("invented session or preparation bound used", r)
 					}
 				}
-				if f.reads != phase || f.recoveries != phase || f.holderBatches != phase || f.nodeReads != phase*count {
-					t.Fatal("nonbatched manual authority", f.reads, f.recoveries, f.holderBatches, f.nodeReads)
+				if f.reads != phase || f.holderBatches != phase || f.nodeReads != phase*count {
+					t.Fatal("nonbatched manual authority", f.reads, f.holderBatches, f.nodeReads)
 				}
 			}
-			t.Logf("%d sources/two phases: SQL batch=%d recovery=%d regional batch=%d node reads=%d; no new collection or old human identity", count, f.reads, f.recoveries, f.holderBatches, f.nodeReads)
+			t.Logf("%d sources/two phases: SQL batch=%d regional batch=%d node reads=%d; no new collection or old human identity", count, f.reads, f.holderBatches, f.nodeReads)
 		})
 	}
 }

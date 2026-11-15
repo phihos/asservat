@@ -175,7 +175,7 @@ func (s *PolicySubmissions) VerifyPolicySubmission(ctx context.Context, encoded 
 		return out, value.ErrDenied
 	}
 	proof := value.VerifiedPolicySubmission{ReplacesID: expected.ReplacesID, Nonce: expected.Nonce, Actor: expected.Actor, Source: expected.Source, ClusterID: expected.ClusterID, NamespaceUID: expected.NamespaceUID, Name: expected.Name, ScopeDigest: expected.ScopeDigest, EnvelopeDigest: artifact.Digest(sha256.Sum256(want)), IssuedAt: expected.IssuedAt.UTC(), ExpiresAt: expected.ExpiresAt.UTC()}
-	out = value.SubmissionCheck{Submission: proof, RootID: s.root, InstallationID: s.installation, IssuerEpoch: s.epoch, KeyID: key.ID, TrustRevision: trust.Revision, VerifiedAt: now, ValidUntil: identity.Earlier(trust.FreshUntil, identity.Earlier(expected.ExpiresAt, key.NotAfter))}
+	out = value.SubmissionCheck{Submission: proof, RootID: s.root, InstallationID: s.installation, KeyID: key.ID, TrustRevision: trust.Revision, VerifiedAt: now, ValidUntil: identity.Earlier(trust.FreshUntil, identity.Earlier(expected.ExpiresAt, key.NotAfter))}
 	if !out.Valid(now) {
 		return value.SubmissionCheck{}, value.ErrDenied
 	}

@@ -25,7 +25,7 @@ import (
 // the recording was authorized at its start, and collecting acquires,
 // discloses and spends nothing new.
 type RegionalRecordingCollect struct {
-	Runner     executionapp.APIContextRunner // Record, Recovery, Capabilities, Now
+	Runner     executionapp.APIContextRunner // Record, Capabilities, Now
 	Recordings executionapp.RecordingExecutions
 	Signer     fleetapp.APIContextWorkSigner
 	Router     *contextstart.Router
@@ -44,7 +44,7 @@ const (
 
 func (s RegionalRecordingCollect) valid() bool {
 	r := s.Runner
-	return r.Record != nil && r.Recovery != nil && r.Capabilities != nil && s.Recordings != nil && s.Signer != nil && s.Router != nil && s.Now != nil
+	return r.Record != nil && r.Capabilities != nil && s.Recordings != nil && s.Signer != nil && s.Router != nil && s.Now != nil
 }
 
 // Run collects until ctx ends.
@@ -95,7 +95,7 @@ func (s RegionalRecordingCollect) Collect(ctx context.Context, captureID string)
 		return "", execution.ErrInvalid
 	}
 	// step names the failing collect step for the fixed refusal report.
-	step := "recovery"
+	step := "work"
 	defer func() {
 		var fixed interface{ FixedStep() string }
 		if err != nil && !errors.As(err, &fixed) {
@@ -105,12 +105,7 @@ func (s RegionalRecordingCollect) Collect(ctx context.Context, captureID string)
 	started := s.Now().UTC().Truncate(time.Microsecond)
 	call, cancel := context.WithDeadline(ctx, started.Add(5*time.Second))
 	defer cancel()
-	recovery, err := s.Runner.Recovery.RecoveryState(call)
-	if err != nil || !recovery.Valid(s.Now()) {
-		return "", execution.ErrUnavailable
-	}
-	step = "work"
-	w, exec, err := s.Recordings.ReadRecordingWork(call, captureID, recovery)
+	w, exec, err := s.Recordings.ReadRecordingWork(call, captureID)
 	if err != nil {
 		return "", err
 	}
@@ -131,7 +126,7 @@ func (s RegionalRecordingCollect) Collect(ctx context.Context, captureID string)
 	if !w.CancellationRequested && s.Now().Before(readyAt) {
 		return "Recording", nil
 	}
-	until := identity.Earlier(started.Add(5*time.Second), recovery.FreshUntil)
+	until := started.Add(5 * time.Second)
 	target := authorization.Target{ClusterID: w.Target.ClusterID, NamespaceUID: w.Target.Namespace.UID, WorkloadUID: w.Target.Workload.UID, PodUID: w.Target.PodUID}
 	step = "capability"
 	capability, err := s.Runner.Capabilities.ContextCapability(call, target)
@@ -152,9 +147,6 @@ func (s RegionalRecordingCollect) Collect(ctx context.Context, captureID string)
 		return "", execution.ErrUnavailable
 	}
 	until = identity.Earlier(until, receiver.Window.Until())
-	if receiver.Channel.Connector.Binding.InstallationID != recovery.InstallationID || receiver.Channel.Connector.Binding.IssuerEpoch != recovery.IssuerEpoch {
-		return "", execution.ErrDenied
-	}
 	step = "sign"
 	work, err := executionapp.NewAPIContextWork(w, receiver.Channel, capability, started, until, s.Now())
 	if err != nil {

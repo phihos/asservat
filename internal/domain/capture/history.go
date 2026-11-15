@@ -59,11 +59,10 @@ type HistoryQuery struct {
 	After          *HistoryCursor
 	Limit          int
 	Identity       identity.Identity
-	Recovery       artifact.RecoveryProof
 }
 
 func (q HistoryQuery) Valid(now time.Time) bool {
-	if !authorization.UUID(q.RootID) || !q.Target.Valid() || len(q.Origins) < 1 || len(q.Origins) > 3 || q.Limit < 1 || q.Limit > MaxHistoryPage || !q.Identity.Valid(now) || !q.Recovery.Valid(now) {
+	if !authorization.UUID(q.RootID) || !q.Target.Valid() || len(q.Origins) < 1 || len(q.Origins) > 3 || q.Limit < 1 || q.Limit > MaxHistoryPage || !q.Identity.Valid(now) {
 		return false
 	}
 	for _, o := range q.Origins {
@@ -103,11 +102,10 @@ type HistoryPage struct {
 type SettingsQuery struct {
 	RootID, CaptureID string
 	Identity          identity.Identity
-	Recovery          artifact.RecoveryProof
 }
 
 func (q SettingsQuery) Valid(now time.Time) bool {
-	return authorization.UUID(q.RootID) && authorization.UUID(q.CaptureID) && q.Identity.Valid(now) && q.Recovery.Valid(now)
+	return authorization.UUID(q.RootID) && authorization.UUID(q.CaptureID) && q.Identity.Valid(now)
 }
 
 // CaptureSettings is the immutable repeatable projection of an accepted

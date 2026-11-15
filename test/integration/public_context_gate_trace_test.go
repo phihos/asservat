@@ -9,7 +9,6 @@ import (
 
 	auditapp "asservat.local/asservat/internal/application/audit"
 	"asservat.local/asservat/internal/application/evidence"
-	fleetapp "asservat.local/asservat/internal/application/fleet"
 	privacyapp "asservat.local/asservat/internal/application/privacy"
 	auditvalue "asservat.local/asservat/internal/domain/audit"
 	fleetvalue "asservat.local/asservat/internal/domain/fleet"
@@ -28,7 +27,7 @@ import (
 // gate maps every failure to one unavailable result; this records which
 // dependency refused, with fixed labels, counts and durations only. Results
 // and errors pass through unchanged; no read, retry or deadline is added.
-var journeyGateNames = [...]string{"permissions", "catalog", "retention", "environment", "publication-recovery", "publication-retained-policies", "stop-claim", "stop-object", "stop-acknowledgement"}
+var journeyGateNames = [...]string{"permissions", "catalog", "retention", "environment", "publication-retained-policies", "stop-claim", "stop-object", "stop-acknowledgement"}
 
 type journeyGateTrace struct {
 	mu              sync.Mutex
@@ -204,18 +203,6 @@ func TestPublicJourneyGateTraceLabelsOnly(t *testing.T) {
 	}
 }
 
-type journeyGateRecovery struct {
-	fleetapp.RecoveryReader
-	trace *journeyGateTrace
-}
-
-func (d journeyGateRecovery) RecoveryState(c context.Context) (fleetvalue.RecoveryState, error) {
-	started, remaining := time.Now(), journeyGateRemaining(c)
-	v, e := d.RecoveryReader.RecoveryState(c)
-	d.trace.record(4, c, started, remaining, e)
-	return v, e
-}
-
 type journeyGateRetainedPolicies struct {
 	privacyapp.RetainedPolicyReader
 	trace *journeyGateTrace
@@ -224,7 +211,7 @@ type journeyGateRetainedPolicies struct {
 func (d journeyGateRetainedPolicies) RetainedRetentionPolicies(c context.Context, target value.Target, rules []artifact.RetentionRule) (privacy.PolicySet, error) {
 	started, remaining := time.Now(), journeyGateRemaining(c)
 	v, e := d.RetainedPolicyReader.RetainedRetentionPolicies(c, target, rules)
-	d.trace.record(5, c, started, remaining, e)
+	d.trace.record(4, c, started, remaining, e)
 	return v, e
 }
 
@@ -244,7 +231,7 @@ type journeyStopLedger struct {
 func (d journeyStopLedger) ClaimDownloadStopWrite(c context.Context, x artifact.DownloadStopDecision) (bool, error) {
 	started, remaining := time.Now(), journeyGateRemaining(c)
 	v, e := d.DownloadStopLedger.ClaimDownloadStopWrite(c, x)
-	d.trace.record(6, c, started, remaining, e)
+	d.trace.record(5, c, started, remaining, e)
 	return v, e
 }
 
@@ -256,7 +243,7 @@ type journeyStopObjects struct {
 func (d journeyStopObjects) CreateDownloadStop(c context.Context, x artifact.DownloadStopDecision) (auditvalue.Receipt, error) {
 	started, remaining := time.Now(), journeyGateRemaining(c)
 	v, e := d.DownloadStopObjects.CreateDownloadStop(c, x)
-	d.trace.record(7, c, started, remaining, e)
+	d.trace.record(6, c, started, remaining, e)
 	return v, e
 }
 
@@ -268,6 +255,6 @@ type journeyStopAcks struct {
 func (d journeyStopAcks) AcknowledgeDownloadStop(c context.Context, x artifact.DownloadStopDecision, r auditvalue.Receipt) error {
 	started, remaining := time.Now(), journeyGateRemaining(c)
 	e := d.DownloadStopAcknowledgements.AcknowledgeDownloadStop(c, x, r)
-	d.trace.record(8, c, started, remaining, e)
+	d.trace.record(7, c, started, remaining, e)
 	return e
 }

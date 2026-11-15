@@ -16,7 +16,7 @@ type FirstContextPreparations struct{ *Downloads }
 var _ evidence.DownloadSessions = (*FirstContextPreparations)(nil)
 
 func NewFirstContextPreparations(s *Downloads) (*FirstContextPreparations, error) {
-	if s == nil || s.ledger == nil || s.retention == nil || s.recovery == nil {
+	if s == nil || s.ledger == nil || s.retention == nil {
 		return nil, artifact.ErrInvalid
 	}
 	return &FirstContextPreparations{s}, nil

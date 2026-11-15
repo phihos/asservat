@@ -26,11 +26,11 @@ var _ evidence.DownloadWorkerLedger = (*DownloadWorkers)(nil)
 var _ evidence.DownloadWorkerBindings = (*DownloadWorkers)(nil)
 var _ auditapp.DownloadWorkerAcknowledgements = (*DownloadWorkers)(nil)
 
-func NewDownloadWorkers(ctx context.Context, pool *pgxpool.Pool, root string, profile value.DownloadWorkerProfile, guards DownloadTransactionGuards) (*DownloadWorkers, error) {
-	if !profile.Valid() || guards.Recovery == nil || guards.Recovery.installation != profile.InstallationID {
+func NewDownloadWorkers(ctx context.Context, pool *pgxpool.Pool, root string, profile value.DownloadWorkerProfile, guards ...*RetentionTransactionGuard) (*DownloadWorkers, error) {
+	if !profile.Valid() {
 		return nil, artifact.ErrInvalid
 	}
-	d, e := NewDownloads(ctx, pool, root, guards)
+	d, e := NewDownloads(ctx, pool, root, guards...)
 	if e != nil {
 		return nil, e
 	}
@@ -66,10 +66,6 @@ func (s *DownloadWorkers) withSession(ctx context.Context, session string, a art
 		return e
 	}
 	return d.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		recovery, e := d.lockDownloadRecovery(ctx, q, d.root, a)
-		if e != nil {
-			return sqlStep{"native-session-recovery", e}
-		}
 		root, e := q.LockPermissionStream(ctx, id(d.root))
 		if e != nil {
 			return sqlStep{"native-session-permission", e}
@@ -83,7 +79,7 @@ func (s *DownloadWorkers) withSession(ctx context.Context, session string, a art
 			return sqlStep{"native-session-parent", e}
 		}
 		check := func() (time.Time, error) {
-			if e := d.downloadFence(ctx, q, root, a, top, recovery); e != nil {
+			if e := d.downloadFence(ctx, q, root, a, top); e != nil {
 				return time.Time{}, sqlStep{"native-session-fence", e}
 			}
 			if a.Environment.Path.AcquisitionClusterID != s.profile.ClusterID || a.Environment.Path.WorkerConfiguration != s.profile.Configuration {
@@ -92,7 +88,7 @@ func (s *DownloadWorkers) withSession(ctx context.Context, session string, a art
 			// A started response keeps the worker configuration it started under
 			// (ADR-312); its worker certificate and native owner remain fenced.
 			if !a.Started() {
-				if _, e := currentWorkerConfiguration(ctx, q, s.profile, a.Environment.RecoveryEpoch); e != nil {
+				if _, e := currentWorkerConfiguration(ctx, q, s.profile); e != nil {
 					return time.Time{}, sqlStep{"native-session-configuration", e}
 				}
 			}

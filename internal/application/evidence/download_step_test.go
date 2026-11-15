@@ -11,7 +11,7 @@ import (
 // The coordinator reports a refused prepare once, naming the refusing stage,
 // and returns the same error class as before.
 func TestContextDownloadRefusalNamesPreparationStage(t *testing.T) {
-	for fail, want := range map[string]string{"recovery": "recovery", "lookup-key": "key-lookup", "route": "route", "authority": "authority", "plan": "plan", "reserve": "reserve", "source": "source", "continue": "continue"} {
+	for fail, want := range map[string]string{"lookup-key": "key-lookup", "route": "route", "authority": "authority", "plan": "plan", "reserve": "reserve", "source": "source", "continue": "continue"} {
 		t.Run(fail, func(t *testing.T) {
 			f, s := newDownloadControlFixture(t)
 			f.fail = fail

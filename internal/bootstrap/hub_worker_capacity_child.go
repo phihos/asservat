@@ -465,8 +465,8 @@ func (w *hubWorker) capacityReconciler(ctx, run context.Context, q app.CapacityQ
 		return nil, errors.Join(mounts.ErrUnavailable, err)
 	}
 	return &app.CapacityReconciler{
-		Source: &app.CapacitySourceObserver{RootID: root, InstallationID: installation, QualificationID: q.ID, QualificationDigest: q.Digest, Source: source, Protection: protection, Recovery: journal, Journal: journal, Now: time.Now},
-		Work: &app.CapacityWorkReconciler{Qualification: q, Recovery: journal, Permissions: permissions, Processing: processing, Root: &app.RootBackingCoordinator{Store: rootStore, Capture: rootCapture, Now: time.Now},
+		Source: &app.CapacitySourceObserver{RootID: root, InstallationID: installation, QualificationID: q.ID, QualificationDigest: q.Digest, Source: source, Protection: protection, Journal: journal, Now: time.Now},
+		Work: &app.CapacityWorkReconciler{Qualification: q, Permissions: permissions, Processing: processing, Root: &app.RootBackingCoordinator{Store: rootStore, Capture: rootCapture, Now: time.Now},
 			Enrollment: &app.EnrollmentCoordinator{Store: enroll, Capture: captureEnroll, Accounts: accounts, Now: time.Now}, Bindings: enroll, Now: time.Now, Regional: regional},
 		Clusters:     clusters,
 		SourceReport: capacitySourceReporter("capacity source: "), RootReport: capacitySourceReporter("capacity root: "),

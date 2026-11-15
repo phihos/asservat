@@ -69,23 +69,22 @@ func decodeCapacitySourceAcknowledgement(raw []byte) (capacitySourceAcknowledgem
 	}
 	return out, nil
 }
-func (s *CapacitySourceJournal) ReadCapacitySourceRevision(ctx context.Context, recovery artifact.RecoveryProof) (int64, error) {
-	if s == nil || ctx == nil || ctx.Err() != nil || recovery.InstallationID != s.installation || !recovery.Valid(time.Now()) {
+func (s *CapacitySourceJournal) ReadCapacitySourceRevision(ctx context.Context) (int64, error) {
+	if s == nil || ctx == nil || ctx.Err() != nil {
 		return 0, cfg.ErrUnavailable
 	}
-	live, end := context.WithDeadline(ctx, identity.Earlier(time.Now().Add(app.CapacitySourceInterval), recovery.FreshUntil))
+	live, end := context.WithDeadline(ctx, time.Now().Add(app.CapacitySourceInterval))
 	defer end()
-	b, e := json.Marshal(recovery)
-	if e != nil {
-		return 0, cfg.ErrUnavailable
-	}
 	var revision int64
-	e = s.ledger.transaction(live, func(q *custodydb.Queries) error {
-		var err error
+	e := s.ledger.transaction(live, func(q *custodydb.Queries) error {
+		b, err := capacityTrustJSON(live, q, s.installation)
+		if err != nil {
+			return err
+		}
 		revision, err = q.ReadCapacitySourceRevision(live, custodydb.ReadCapacitySourceRevisionParams{RootID: id(s.root), RecoveryValue: b})
 		return err
 	})
-	if e != nil || live.Err() != nil || !recovery.Valid(time.Now()) || revision < 0 || revision >= 1<<60 {
+	if e != nil || live.Err() != nil || revision < 0 || revision >= 1<<60 {
 		return 0, cfg.ErrUnavailable
 	}
 	return revision, nil
@@ -101,12 +100,10 @@ func (s *CapacitySourceJournal) AcceptCapacitySource(ctx context.Context, in app
 	in.Observation.Snapshot.FreshUntil = in.Observation.Snapshot.FreshUntil.Truncate(time.Microsecond)
 	in.Protection.ObservedAt = capacityObservedMicro(in.Protection.ObservedAt)
 	in.Protection.FreshUntil = in.Protection.FreshUntil.Truncate(time.Microsecond)
-	in.Recovery.ObservedAt = capacityObservedMicro(in.Recovery.ObservedAt)
-	in.Recovery.FreshUntil = in.Recovery.FreshUntil.Truncate(time.Microsecond)
 	if !in.Valid(time.Now()) {
 		return zero, cfg.ErrUnavailable
 	}
-	until := identity.Earlier(in.Observation.Snapshot.FreshUntil, identity.Earlier(in.Protection.FreshUntil, in.Recovery.FreshUntil))
+	until := identity.Earlier(in.Observation.Snapshot.FreshUntil, in.Protection.FreshUntil)
 	live, end := context.WithDeadline(ctx, until)
 	defer end()
 	observation, e := json.Marshal(in.Observation)
@@ -123,10 +120,6 @@ func (s *CapacitySourceJournal) AcceptCapacitySource(ctx context.Context, in app
 	if e != nil {
 		return zero, cfg.ErrUnavailable
 	}
-	recovery, e := json.Marshal(in.Recovery)
-	if e != nil {
-		return zero, cfg.ErrUnavailable
-	}
 	var ack capacitySourceAcknowledgement
 	var narrow *time.Timer
 	var joined chan struct{}
@@ -136,7 +129,11 @@ func (s *CapacitySourceJournal) AcceptCapacitySource(ctx context.Context, in app
 		}
 	}()
 	e = s.ledger.transaction(live, func(q *custodydb.Queries) error {
-		raw, err := q.AcceptCapacitySource(live, custodydb.AcceptCapacitySourceParams{RootID: id(s.root), ExpectedRevision: in.ExpectedRevision, ObservationValue: observation, ProtectionValue: protection, RecoveryValue: recovery, QualificationID: id(s.qualification), QualificationDigest: s.digest[:]})
+		trust, err := capacityTrustJSON(live, q, s.installation)
+		if err != nil {
+			return err
+		}
+		raw, err := q.AcceptCapacitySource(live, custodydb.AcceptCapacitySourceParams{RootID: id(s.root), ExpectedRevision: in.ExpectedRevision, ObservationValue: observation, ProtectionValue: protection, RecoveryValue: trust, QualificationID: id(s.qualification), QualificationDigest: s.digest[:]})
 		if err != nil {
 			return err
 		}
@@ -176,18 +173,18 @@ func capacityObservedMicro(v time.Time) time.Time {
 	}
 	return t
 }
-func (s *CapacitySourceJournal) InvalidateCapacitySource(ctx context.Context, root string, expected int64, recovery artifact.RecoveryProof, observed, until time.Time) error {
-	if s == nil || ctx == nil || ctx.Err() != nil || root != s.root || expected < 0 || expected >= 1<<60 || recovery.InstallationID != s.installation || !recovery.Valid(time.Now()) || !identity.Fresh(observed, until, time.Now(), app.CapacitySourceInterval) {
+func (s *CapacitySourceJournal) InvalidateCapacitySource(ctx context.Context, root string, expected int64, observed, until time.Time) error {
+	if s == nil || ctx == nil || ctx.Err() != nil || root != s.root || expected < 0 || expected >= 1<<60 || !identity.Fresh(observed, until, time.Now(), app.CapacitySourceInterval) {
 		return cfg.ErrUnavailable
 	}
-	live, end := context.WithDeadline(ctx, identity.Earlier(until, recovery.FreshUntil))
+	live, end := context.WithDeadline(ctx, until)
 	defer end()
-	b, e := json.Marshal(recovery)
-	if e != nil {
-		return cfg.ErrUnavailable
-	}
-	e = s.ledger.transaction(live, func(q *custodydb.Queries) error {
-		_, err := q.InvalidateCapacitySource(live, custodydb.InvalidateCapacitySourceParams{RootID: id(root), ExpectedRevision: expected, RecoveryValue: b, ObservedAt: ts(observed), FreshUntil: ts(until)})
+	e := s.ledger.transaction(live, func(q *custodydb.Queries) error {
+		b, err := capacityTrustJSON(live, q, s.installation)
+		if err != nil {
+			return err
+		}
+		_, err = q.InvalidateCapacitySource(live, custodydb.InvalidateCapacitySourceParams{RootID: id(root), ExpectedRevision: expected, RecoveryValue: b, ObservedAt: ts(observed), FreshUntil: ts(until)})
 		return err
 	})
 	if e != nil || live.Err() != nil || !identity.Fresh(observed, until, time.Now(), app.CapacitySourceInterval) {

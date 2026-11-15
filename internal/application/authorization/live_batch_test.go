@@ -1,14 +1,15 @@
 package authorization
 
 import (
-	value "asservat.local/asservat/internal/domain/authorization"
-	"asservat.local/asservat/internal/domain/live"
-	"asservat.local/asservat/internal/domain/privacy"
 	"context"
 	"errors"
 	"fmt"
 	"testing"
 	"time"
+
+	value "asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/live"
+	"asservat.local/asservat/internal/domain/privacy"
 )
 
 type livePhaseFixture struct {
@@ -61,8 +62,6 @@ func TestLiveAuthorizationPhasesShareOnlyCommonObservationsAtOneAndSixteenSource
 			environment.now = base.now
 			environment.policy.ObservedAt = base.now
 			environment.policy.FreshUntil = base.now.Add(5 * time.Second)
-			environment.recovery.ObservedAt = base.now
-			environment.recovery.FreshUntil = base.now.Add(5 * time.Second)
 			environment.policy.RootID = base.record.Source.Root()
 			environment.policy.Paths[0].TargetClusterID = base.record.Source.Target.ClusterID
 			actor := base.i.Principal
@@ -70,7 +69,7 @@ func TestLiveAuthorizationPhasesShareOnlyCommonObservationsAtOneAndSixteenSource
 			environment.policy.LiveRead = &privacy.LiveRead{Root: root, Projections: []string{live.Packet}, Clients: []privacy.LiveClient{{Issuer: actor.Issuer, ID: actor.ClientID, Kind: actor.Kind, PathIDs: []string{environment.policy.Paths[0].ID}}}, Ceilings: []privacy.LiveCeiling{{ClusterID: base.record.Source.Target.ClusterID, Limits: privacy.LiveLimits{Duration: 60, Output: 1 << 20, Rate: 16 << 10, Rows: 10, Buffer: 64 << 10, RowAge: 10, Replay: 2}}}}
 			s.Catalog = f
 			s.Permissions = f
-			s.Environment = CurrentLiveEnvironment{RootID: s.RootID, InstallationID: environment.policy.InstallationID, AcceptedRoot: root, Policies: environment, Recovery: environment, Now: func() time.Time { return environment.now }}
+			s.Environment = CurrentLiveEnvironment{RootID: s.RootID, InstallationID: environment.policy.InstallationID, AcceptedRoot: root, Policies: environment, Now: func() time.Time { return environment.now }}
 			expected := make([]live.Source, count)
 			for n := range expected {
 				record := base.record
@@ -82,8 +81,8 @@ func TestLiveAuthorizationPhasesShareOnlyCommonObservationsAtOneAndSixteenSource
 			}
 			for phase := 1; phase <= 2; phase++ {
 				got, end, err := s.CheckSources(t.Context(), f, expected, live.Packet)
-				if err != nil || len(got) != count || !end.After(base.now) || f.podReads != count*phase || f.batchReads != phase || environment.policyReads != phase || environment.recoveryReads != phase {
-					t.Fatalf("sources=%d phase=%d result=%d error=%v pod=%d sourcebatch=%d policy=%d recovery=%d", count, phase, len(got), err, f.podReads, f.batchReads, environment.policyReads, environment.recoveryReads)
+				if err != nil || len(got) != count || !end.After(base.now) || f.podReads != count*phase || f.batchReads != phase || environment.policyReads != phase {
+					t.Fatalf("sources=%d phase=%d result=%d error=%v pod=%d sourcebatch=%d policy=%d", count, phase, len(got), err, f.podReads, f.batchReads, environment.policyReads)
 				}
 			}
 			for _, observation := range []string{"record", "permission"} {

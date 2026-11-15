@@ -83,9 +83,6 @@ func (s *publicJourneyDiagnostics) Runner(in executionapp.APIContextRunner) exec
 	if in.Read != nil {
 		in.Read = p
 	}
-	if in.Recovery != nil {
-		in.Recovery = p
-	}
 	if in.Targets != nil {
 		in.Targets = p
 	}
@@ -115,13 +112,8 @@ func (s *publicJourneyDiagnostics) Runner(in executionapp.APIContextRunner) exec
 	}
 	return in
 }
-func (s *publicJourneyRunnerDiagnostics) RecoveryState(c context.Context) (artifact.RecoveryProof, error) {
-	v, e := s.in.Recovery.RecoveryState(c)
-	s.trace.record(journeyRunnerRecovery, journeyRegionalCode(e))
-	return v, e
-}
-func (s *publicJourneyRunnerDiagnostics) ReadAPIContextWork(c context.Context, id string, i identity.Identity, r artifact.RecoveryProof) (executionapp.APIContextWork, error) {
-	v, e := s.in.Read.ReadAPIContextWork(c, id, i, r)
+func (s *publicJourneyRunnerDiagnostics) ReadAPIContextWork(c context.Context, id string, i identity.Identity) (executionapp.APIContextWork, error) {
+	v, e := s.in.Read.ReadAPIContextWork(c, id, i)
 	s.trace.record(journeyRunnerRead, journeyRegionalCode(e))
 	return v, e
 }
@@ -195,16 +187,12 @@ type journeyDiagnosticRunnerSources struct {
 	executionapp.APIContextRetention
 	evidence.ContextProducer
 	executionapp.ContextCollector
-	read     func(context.Context, string, identity.Identity, artifact.RecoveryProof) (executionapp.APIContextWork, error)
-	recovery func(context.Context) (artifact.RecoveryProof, error)
-	target   func(context.Context, targets.Request) (targets.PodResolution, error)
+	read   func(context.Context, string, identity.Identity) (executionapp.APIContextWork, error)
+	target func(context.Context, targets.Request) (targets.PodResolution, error)
 }
 
-func (s *journeyDiagnosticRunnerSources) ReadAPIContextWork(c context.Context, id string, i identity.Identity, r artifact.RecoveryProof) (executionapp.APIContextWork, error) {
-	return s.read(c, id, i, r)
-}
-func (s *journeyDiagnosticRunnerSources) RecoveryState(c context.Context) (artifact.RecoveryProof, error) {
-	return s.recovery(c)
+func (s *journeyDiagnosticRunnerSources) ReadAPIContextWork(c context.Context, id string, i identity.Identity) (executionapp.APIContextWork, error) {
+	return s.read(c, id, i)
 }
 func (s *journeyDiagnosticRunnerSources) ResolvePod(c context.Context, r targets.Request) (targets.PodResolution, error) {
 	return s.target(c, r)
@@ -278,14 +266,10 @@ func TestPublicJourneyDiagnosticsOriginalRegionalRunner(t *testing.T) {
 			target := targets.Request{ClusterID: "original-cluster"}
 			var readContext context.Context
 			f := &journeyDiagnosticRunnerSources{}
-			f.recovery = func(c context.Context) (artifact.RecoveryProof, error) {
+			f.read = func(c context.Context, got string, i identity.Identity) (executionapp.APIContextWork, error) {
 				check(c)
 				readContext = c
-				return artifact.RecoveryProof{}, nil
-			}
-			f.read = func(c context.Context, got string, i identity.Identity, r artifact.RecoveryProof) (executionapp.APIContextWork, error) {
-				check(c)
-				if c != readContext || got != id || !reflect.DeepEqual(i, actor) || r != (artifact.RecoveryProof{}) {
+				if got != id || !reflect.DeepEqual(i, actor) {
 					t.Fatal("original read input changed")
 				}
 				if stopAt == "read" {
@@ -306,7 +290,7 @@ func TestPublicJourneyDiagnosticsOriginalRegionalRunner(t *testing.T) {
 				}
 				return targets.PodResolution{}, private
 			}
-			runner := executionapp.APIContextRunner{Read: f, Prepare: f, Record: f, Process: f, Targets: f, Eligibility: f, Capabilities: f, Retention: f, Recovery: f, Output: f, Collector: f, Now: func() time.Time { return now }}
+			runner := executionapp.APIContextRunner{Read: f, Prepare: f, Record: f, Process: f, Targets: f, Eligibility: f, Capabilities: f, Retention: f, Output: f, Collector: f, Now: func() time.Time { return now }}
 			identityCalls := 0
 			result, e := trace.Runner(runner).Execute(ctx, journeyDiagnosticRunnerIdentity(func(c context.Context) (identity.Identity, error) { check(c); identityCalls++; return actor, nil }), id)
 			expectedStage := journeyRunnerRead
@@ -315,7 +299,7 @@ func TestPublicJourneyDiagnosticsOriginalRegionalRunner(t *testing.T) {
 			}
 			// The runner's fixed-step wrapper must retain this exact private
 			// cause, not erase it or require an unwrapped top-level error.
-			if !errors.Is(e, private) || !reflect.DeepEqual(result, executionapp.ContextResult{}) || identityCalls != 1 || trace.first != expectedStage+1 || trace.reasons[expectedStage] != 9 || trace.calls[journeyRunnerRecovery] != 1 || trace.calls[journeyRunnerRead] != 1 || trace.calls[journeyRunnerPrepare] != 0 || trace.calls[journeyRunnerKeys] != 0 {
+			if !errors.Is(e, private) || !reflect.DeepEqual(result, executionapp.ContextResult{}) || identityCalls != 1 || trace.first != expectedStage+1 || trace.reasons[expectedStage] != 9 || trace.calls[journeyRunnerRead] != 1 || trace.calls[journeyRunnerPrepare] != 0 || trace.calls[journeyRunnerKeys] != 0 {
 				t.Fatal("actual runner changed original stopping behavior")
 			}
 			if (trace.calls[journeyRunnerTarget] == 1) != (stopAt == "target") {

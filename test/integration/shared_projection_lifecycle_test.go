@@ -59,8 +59,8 @@ func qualifySharedProjectionLifecycleClient(t *testing.T, f *queryLedgerFixture,
 		}
 		return pool
 	}
-	guards := postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard}
-	ledger, err := postgres.NewContextQueries(ctx, compiled("hub-runtime"), root, guards, f.current, nil)
+	guards := s.retention.guard
+	ledger, err := postgres.NewContextQueries(ctx, compiled("hub-runtime"), root, s.recovery.installation, guards, f.current, nil)
 	if err != nil {
 		t.Fatal("compiled query ledger", err)
 	}
@@ -79,7 +79,7 @@ func qualifySharedProjectionLifecycleClient(t *testing.T, f *queryLedgerFixture,
 	if err != nil {
 		t.Fatal("compiled key-service backing", err)
 	}
-	keyLedger, err := postgres.NewContextQueries(ctx, keyPool, root, guards, keyPlans, nil)
+	keyLedger, err := postgres.NewContextQueries(ctx, keyPool, root, s.recovery.installation, guards, keyPlans, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,7 +93,7 @@ func qualifySharedProjectionLifecycleClient(t *testing.T, f *queryLedgerFixture,
 	}
 	// Match key-service startup's actual closed dispatcher. Calling the
 	// projection delegate alone misses classification of compact child IDs.
-	keys, err := postgres.NewNativeKeyAuthority(ctx, keyPool, root, profile, keyScope, postgres.DownloadTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard})
+	keys, err := postgres.NewNativeKeyAuthority(ctx, keyPool, root, profile, keyScope, s.retention.guard)
 	if err != nil || keys.WithProjectionKeys(projectionKeys) != nil {
 		t.Fatal("compiled native key authority composition", err)
 	}
@@ -102,11 +102,11 @@ func qualifySharedProjectionLifecycleClient(t *testing.T, f *queryLedgerFixture,
 	if err != nil {
 		t.Fatal(err)
 	}
-	processing, err := postgres.NewProcessingReads(ctx, metadata, root, s.recovery.guard)
+	processing, err := postgres.NewProcessingReads(ctx, metadata, root, s.recovery.installation)
 	if err != nil {
 		t.Fatal(err)
 	}
-	gate := authapp.ContextProjectionAuthority{RootID: root, Permissions: s.p, Catalog: catalog, Retention: privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, Environment: authapp.CurrentProjectionEnvironment{RootID: root, InstallationID: base.input.InstallationID, Policies: f.policies, Recovery: s.recovery.reader, Processing: processing, Now: time.Now}, Now: time.Now}
+	gate := authapp.ContextProjectionAuthority{RootID: root, Permissions: s.p, Catalog: catalog, Retention: privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, Environment: authapp.CurrentProjectionEnvironment{RootID: root, InstallationID: base.input.InstallationID, Policies: f.policies, Processing: processing, Now: time.Now}, Now: time.Now}
 	expected := f.published.Expectation
 	scope := query.ContextProjectionScope{RootID: root, CaseID: expected.CaseID, CaptureID: expected.CaptureUID, ArtifactID: expected.Registration.Location.ArtifactID, ClusterID: expected.Registration.Location.ClusterID, NamespaceUID: expected.NamespaceUID, WorkloadUID: expected.WorkloadUID, PodUID: expected.PodUID, Version: evidence.ContextCopiesDigest(f.published.Copies), SourceProjectionDigest: query.ContextSourceProjectionDigest(), SourceFormat: artifact.ContextFormat, DisplayVersion: query.ContextDisplayVersion, Selection: query.LineSelection{LineStart: 1, MaxLines: 14}, Principal: s.a.Plan.Input.Executor}
 	if client != "" {
@@ -129,15 +129,15 @@ func qualifySharedProjectionLifecycleClient(t *testing.T, f *queryLedgerFixture,
 		}
 	}
 	policy := f.audit.Normal.Policy
-	journal, err := postgres.NewHealthyOperationJournal(ctx, compiled("hub-runtime"), policy, s.recovery.guard)
+	journal, err := postgres.NewHealthyOperationJournal(ctx, compiled("hub-runtime"), policy)
 	if err != nil {
 		t.Fatal(err)
 	}
-	acknowledgements, err := postgres.NewOperationAcknowledgements(ctx, compiled("hub-runtime"), root, "normal", s.recovery.guard)
+	acknowledgements, err := postgres.NewOperationAcknowledgements(ctx, compiled("hub-runtime"), root, "normal", s.recovery.installation)
 	if err != nil {
 		t.Fatal(err)
 	}
-	completions, err := postgres.NewOperationLifecycles(ctx, compiled("hub-runtime"), root, "normal", s.recovery.guard)
+	completions, err := postgres.NewOperationLifecycles(ctx, compiled("hub-runtime"), root, "normal", s.recovery.installation)
 	if err != nil {
 		t.Fatal(err)
 	}

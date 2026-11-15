@@ -17,7 +17,7 @@ import (
 // The Lease is not effect authority. Bounded serial loops separately observe
 // the source, maintain root backing, and enumerate/enroll each cluster's
 // workloads (one loop per cluster, at most CapacityRegionalLoopLimit regional).
-// SQL retains every current source/recovery/permission fence after its locks.
+// SQL retains every current source/permission fence after its locks.
 // No candidate or caller credential survives this process lifetime.
 type CapacityReconciler struct {
 	Source   *CapacitySourceObserver
@@ -175,7 +175,7 @@ func (s *CapacityReconciler) RunWithSourceInvocation(ctx context.Context, source
 }
 
 func (s *CapacityReconciler) run(ctx context.Context, source CapacitySourceInvocation) error {
-	if s == nil || ctx == nil || ctx.Err() != nil || s.Source == nil || s.Source.Now == nil || s.Source.Source == nil || s.Source.Protection == nil || s.Source.Recovery == nil || s.Source.Journal == nil || s.Work == nil || s.Work.Now == nil || s.Work.Recovery == nil || s.Work.Permissions == nil || s.Work.Processing == nil || s.Work.Root == nil || s.Work.Enrollment == nil || s.Work.Bindings == nil || !s.Work.Qualification.Valid() || s.Source.RootID != s.Work.Qualification.RootBacking.RootID || s.Source.InstallationID != s.Work.Qualification.RootBacking.InstallationID || s.Source.QualificationID != s.Work.Qualification.ID || s.Source.QualificationDigest != s.Work.Qualification.Digest || len(s.Clusters) != len(s.Work.Qualification.NamespaceGuards)+len(s.Work.Regional) {
+	if s == nil || ctx == nil || ctx.Err() != nil || s.Source == nil || s.Source.Now == nil || s.Source.Source == nil || s.Source.Protection == nil || s.Source.Journal == nil || s.Work == nil || s.Work.Now == nil || s.Work.Permissions == nil || s.Work.Processing == nil || s.Work.Root == nil || s.Work.Enrollment == nil || s.Work.Bindings == nil || !s.Work.Qualification.Valid() || s.Source.RootID != s.Work.Qualification.RootBacking.RootID || s.Source.InstallationID != s.Work.Qualification.RootBacking.InstallationID || s.Source.QualificationID != s.Work.Qualification.ID || s.Source.QualificationDigest != s.Work.Qualification.Digest || len(s.Clusters) != len(s.Work.Qualification.NamespaceGuards)+len(s.Work.Regional) {
 		return cfg.ErrInvalid
 	}
 	if len(s.Work.Regional) > CapacityRegionalLoopLimit {

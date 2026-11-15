@@ -50,21 +50,14 @@ func (s *Downloads) ResolveContextDownload(ctx context.Context, request artifact
 		if !request.Valid(first.Time) {
 			return sqlStep{"request", artifact.ErrDownloadUnavailable}
 		}
-		recovery, err := s.recovery.lock(ctx, q, s.root, request.Recovery)
-		if err != nil {
-			return sqlStep{"recovery-lock", err}
-		}
 		row, err := q.ReadContextDownloadRoute(ctx, custodydb.ReadContextDownloadRouteParams{RootID: id(s.root), ArtifactID: id(request.ArtifactID)})
 		if err != nil || len(row.CopiesDigest) != 32 {
 			return sqlStep{"row", artifact.ErrDownloadUnavailable}
 		}
 		scope := artifact.DownloadScope{RootID: uid(row.RootID), ArtifactID: uid(row.ArtifactID), CaptureID: uid(row.CaptureID), ClusterID: uid(row.ClusterID), NamespaceUID: row.NamespaceUid, WorkloadUID: row.WorkloadUid, PodUID: row.PodUid, Principal: request.Identity.Principal, Version: artifact.Digest(row.CopiesDigest)}
-		out = artifact.DownloadRoute{Scope: scope, ObservedAt: first.Time, ValidUntil: downloadObservationDeadline(ctx, first.Time, request.Identity.ValidUntil, request.Recovery.FreshUntil)}
+		out = artifact.DownloadRoute{Scope: scope, ObservedAt: first.Time, ValidUntil: downloadObservationDeadline(ctx, first.Time, request.Identity.ValidUntil)}
 		if scope.RootID != s.root || scope.ArtifactID != request.ArtifactID {
 			return sqlStep{"scope", artifact.ErrDownloadUnavailable}
-		}
-		if err = s.recovery.check(ctx, q, recovery, s.root, request.Recovery); err != nil {
-			return sqlStep{"recovery-check", err}
 		}
 		now, err := q.CurrentTime(ctx)
 		if err != nil {
@@ -102,12 +95,8 @@ func (s *Downloads) LookupDownloadKey(ctx context.Context, request artifact.Down
 		if !request.Valid(first.Time) {
 			return artifact.ErrDownloadUnavailable
 		}
-		recovery, err := s.recovery.lock(ctx, q, s.root, request.Recovery)
-		if err != nil {
-			return err
-		}
 		row, err := q.FindDownloadSession(ctx, custodydb.FindDownloadSessionParams{RootID: id(s.root), ActorKey: digest(request.Identity.Principal), IdempotencyDigest: request.Key[:]})
-		out = artifact.DownloadKeyLookup{ObservedAt: first.Time, ValidUntil: downloadObservationDeadline(ctx, first.Time, request.Identity.ValidUntil, request.Recovery.FreshUntil)}
+		out = artifact.DownloadKeyLookup{ObservedAt: first.Time, ValidUntil: downloadObservationDeadline(ctx, first.Time, request.Identity.ValidUntil)}
 		if err == nil {
 			out.Found = true
 			out.Session, err = loadDownload(ctx, q, row)
@@ -118,9 +107,6 @@ func (s *Downloads) LookupDownloadKey(ctx context.Context, request artifact.Down
 				return artifact.ErrDownloadUnavailable
 			}
 		} else if !errors.Is(err, pgx.ErrNoRows) {
-			return err
-		}
-		if err = s.recovery.check(ctx, q, recovery, s.root, request.Recovery); err != nil {
 			return err
 		}
 		now, err := q.CurrentTime(ctx)
@@ -154,15 +140,11 @@ func (s *Downloads) ReadContextDownloadSource(ctx context.Context, a artifact.Do
 		if err != nil {
 			return err
 		}
-		recovery, err := s.lockDownloadRecovery(ctx, q, s.root, a)
-		if err != nil {
-			return err
-		}
 		p, err := q.LockPermissionStream(ctx, id(s.root))
 		if err != nil {
 			return err
 		}
-		if err = s.downloadFence(ctx, q, p, a, topology, recovery); err != nil {
+		if err = s.downloadFence(ctx, q, p, a, topology); err != nil {
 			return err
 		}
 		row, err := q.ReadPublishedContext(ctx, custodydb.ReadPublishedContextParams{ArtifactID: id(a.Scope.ArtifactID), RootID: id(s.root)})
@@ -186,7 +168,7 @@ func (s *Downloads) ReadContextDownloadSource(ctx context.Context, a artifact.Do
 			return privacy.ErrFence
 		}
 		out = evidence.ContextDownloadSource{Scope: a.Scope, Expectation: expected, Copies: stored.Copies, ObservedAt: first.Time, ValidUntil: downloadObservationDeadline(ctx, first.Time, a.ValidUntil)}
-		if err = s.downloadFence(ctx, q, p, a, topology, recovery); err != nil {
+		if err = s.downloadFence(ctx, q, p, a, topology); err != nil {
 			return err
 		}
 		now, err := q.CurrentTime(ctx)
@@ -231,10 +213,6 @@ func (s *Downloads) ObserveDownload(ctx context.Context, sessionID string, a art
 		if err != nil {
 			return err
 		}
-		recovery, err := s.lockDownloadRecovery(ctx, q, s.root, a)
-		if err != nil {
-			return err
-		}
 		p, err := q.LockPermissionStream(ctx, id(s.root))
 		if err != nil {
 			return err
@@ -250,7 +228,7 @@ func (s *Downloads) ObserveDownload(ctx context.Context, sessionID string, a art
 		if session.Scope != a.Scope {
 			return privacy.ErrFence
 		}
-		if err = s.downloadFence(ctx, q, p, a, topology, recovery); err != nil {
+		if err = s.downloadFence(ctx, q, p, a, topology); err != nil {
 			return err
 		}
 		if preparation != nil {
@@ -269,7 +247,7 @@ func (s *Downloads) ObserveDownload(ctx context.Context, sessionID string, a art
 			}
 		}
 		out = artifact.DownloadObservation{Session: session, ObservedAt: first.Time, ValidUntil: downloadObservationDeadline(ctx, first.Time, a.ValidUntil)}
-		if err = s.downloadFence(ctx, q, p, a, topology, recovery); err != nil {
+		if err = s.downloadFence(ctx, q, p, a, topology); err != nil {
 			return err
 		}
 		now, err := q.CurrentTime(ctx)

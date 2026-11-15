@@ -17,14 +17,14 @@ import (
 )
 
 // Construct distinct instances with producer, cleanup, verifier and finalizer
-// SQL credentials. None provisions policy or accepts a database recovery.
+// SQL credentials. None provisions policy.
 type DownloadStopLifecycles struct{ stop *DownloadStops }
 
-func NewDownloadStopLifecycles(ctx context.Context, pool *pgxpool.Pool, root string, recovery *RecoveryTransactionGuard) (*DownloadStopLifecycles, error) {
-	if recovery == nil {
+func NewDownloadStopLifecycles(ctx context.Context, pool *pgxpool.Pool, root, installation string) (*DownloadStopLifecycles, error) {
+	if installation == "" {
 		return nil, artifact.ErrDownloadUnavailable
 	}
-	s, e := NewDownloadStops(ctx, pool, root, recovery)
+	s, e := NewDownloadStops(ctx, pool, root, installation)
 	if e != nil {
 		return nil, e
 	}
@@ -142,10 +142,6 @@ func (s *DownloadStopLifecycles) transaction(ctx context.Context, download strin
 	ctx, cancel := context.WithDeadline(ctx, until)
 	defer cancel()
 	e := s.stop.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		trust, start, e := s.stop.auditTrust(ctx, q)
-		if e != nil {
-			return e
-		}
 		locator, e := q.ReadDownloadStop(ctx, custodydb.ReadDownloadStopParams{DownloadID: id(download), RootID: id(s.stop.root)})
 		if e != nil {
 			return e
@@ -165,14 +161,14 @@ func (s *DownloadStopLifecycles) transaction(ctx context.Context, download strin
 			return e
 		}
 		state, e := stopLifecycleState(row, l)
-		if e != nil || l.InstallationID != trust.InstallationID || l.IssuerEpoch != trust.IssuerEpoch {
+		if e != nil || uid(l.InstallationID) != s.stop.installation {
 			return artifact.ErrDownloadUnavailable
 		}
 		n, e := q.CurrentTime(ctx)
 		if e != nil {
 			return e
 		}
-		if e = auditCurrent(ctx, q, trust, start, until); e != nil {
+		if e = auditCurrent(ctx, q, until); e != nil {
 			return e
 		}
 		bound, e := fn(ctx, q, row, l, state, n.Time)
@@ -182,7 +178,7 @@ func (s *DownloadStopLifecycles) transaction(ctx context.Context, download strin
 		if !bound.IsZero() {
 			until = identity.Earlier(until, bound)
 		}
-		return auditCurrent(ctx, q, trust, start, until)
+		return auditCurrent(ctx, q, until)
 	})
 	if e != nil {
 		return artifact.ErrDownloadUnavailable
@@ -491,15 +487,11 @@ func (s *DownloadStopLifecycles) RetireDownloadStop(ctx context.Context, downloa
 	ctx, cancel := context.WithDeadline(ctx, until)
 	defer cancel()
 	return s.stop.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		trust, start, e := s.stop.auditTrust(ctx, q)
+		_, e := q.FinishDownloadStopRetirement(ctx, custodydb.FinishDownloadStopRetirementParams{R: id(s.stop.root), I: id(download), Installation: id(s.stop.installation)})
 		if e != nil {
 			return e
 		}
-		_, e = q.FinishDownloadStopRetirement(ctx, custodydb.FinishDownloadStopRetirementParams{R: id(s.stop.root), I: id(download), Installation: id(s.stop.recovery.installation)})
-		if e != nil {
-			return e
-		}
-		return auditCurrent(ctx, q, trust, start, until)
+		return auditCurrent(ctx, q, until)
 	})
 }
 func (s *DownloadStopLifecycles) DueDownloadStopHistory(ctx context.Context) ([]value.DownloadStopHistoryKey, error) {
@@ -511,17 +503,13 @@ func (s *DownloadStopLifecycles) DueDownloadStopHistory(ctx context.Context) ([]
 	defer cancel()
 	var out []value.DownloadStopHistoryKey
 	e := s.stop.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		trust, start, e := s.stop.auditTrust(ctx, q)
-		if e != nil {
-			return e
-		}
 		rows, e := q.ListDueDownloadStopHistory(ctx, id(s.stop.root))
 		if e != nil || len(rows) > 16 {
 			return artifact.ErrDownloadUnavailable
 		}
 		for _, r := range rows {
 			k := value.DownloadStopHistoryKey{RootID: uid(r.RootID), AllocationID: uid(r.AllocationID), ReleaseAt: r.ReleaseAt.Time, DeleteBy: r.DeleteBy.Time}
-			if len(r.PolicyDigest) != 32 || r.InstallationID != trust.InstallationID || r.IssuerEpoch != trust.IssuerEpoch {
+			if len(r.PolicyDigest) != 32 || uid(r.InstallationID) != s.stop.installation {
 				return artifact.ErrDownloadUnavailable
 			}
 			copy(k.PolicyDigest[:], r.PolicyDigest)
@@ -530,7 +518,7 @@ func (s *DownloadStopLifecycles) DueDownloadStopHistory(ctx context.Context) ([]
 			}
 			out = append(out, k)
 		}
-		return auditCurrent(ctx, q, trust, start, until)
+		return auditCurrent(ctx, q, until)
 	})
 	if e != nil {
 		return nil, artifact.ErrDownloadUnavailable
@@ -546,16 +534,12 @@ func (s *DownloadStopLifecycles) ReleaseDownloadStopHistory(ctx context.Context,
 	ctx, cancel := context.WithDeadline(ctx, until)
 	defer cancel()
 	e := s.stop.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		trust, start, e := s.stop.auditTrust(ctx, q)
-		if e != nil {
-			return e
-		}
-		r, e := q.FinishDownloadStopHistory(ctx, custodydb.FinishDownloadStopHistoryParams{R: id(k.RootID), A: id(k.AllocationID), P: k.PolicyDigest[:], Releases: ts(k.ReleaseAt), Deletes: ts(k.DeleteBy), Installation: id(s.stop.recovery.installation)})
+		r, e := q.FinishDownloadStopHistory(ctx, custodydb.FinishDownloadStopHistoryParams{R: id(k.RootID), A: id(k.AllocationID), P: k.PolicyDigest[:], Releases: ts(k.ReleaseAt), Deletes: ts(k.DeleteBy), Installation: id(s.stop.installation)})
 		if e != nil || r.Records < 0 {
 			return artifact.ErrDownloadUnavailable
 		}
 		out = value.OperationHistoryRelease{Records: r.Records, Overdue: r.Overdue}
-		return auditCurrent(ctx, q, trust, start, until)
+		return auditCurrent(ctx, q, until)
 	})
 	if e != nil {
 		return value.OperationHistoryRelease{}, artifact.ErrDownloadUnavailable
@@ -566,17 +550,13 @@ func (s *DownloadStopLifecycles) ReleaseDownloadStopHistory(ctx context.Context,
 // Accepted installation source only. Configure before the first download; no
 // historical row is upgraded. Source renewal remains BindDownloadStopBacking.
 func (s *DownloadStopLifecycles) Configure(ctx context.Context, p value.DownloadStopLifecyclePolicy, observed, validUntil time.Time) error {
-	if s == nil || s.stop == nil || ctx == nil || !p.Valid() || p.RootID != s.stop.root || p.InstallationID != s.stop.recovery.installation {
+	if s == nil || s.stop == nil || ctx == nil || !p.Valid() || p.RootID != s.stop.root || p.InstallationID != s.stop.installation {
 		return artifact.ErrDownloadUnavailable
 	}
 	until := identity.Earlier(observed.Add(5*time.Second), validUntil)
 	ctx, cancel := context.WithDeadline(ctx, until)
 	defer cancel()
 	return s.stop.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		trust, start, e := s.stop.auditTrust(ctx, q)
-		if e != nil {
-			return e
-		}
 		pool, e := q.LockDownloadStopPool(ctx, id(s.stop.root))
 		if e != nil {
 			return e
@@ -593,6 +573,6 @@ func (s *DownloadStopLifecycles) Configure(ctx context.Context, p value.Download
 				return artifact.ErrDownloadUnavailable
 			}
 		}
-		return auditCurrent(ctx, q, trust, start, until)
+		return auditCurrent(ctx, q, until)
 	})
 }

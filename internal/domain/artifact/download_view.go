@@ -11,11 +11,10 @@ import (
 type DownloadRouteQuery struct {
 	ArtifactID string
 	Identity   identity.Identity
-	Recovery   RecoveryProof
 }
 
 func (q DownloadRouteQuery) Valid(now time.Time) bool {
-	return uuid(q.ArtifactID) && q.Identity.Valid(now) && q.Recovery.Valid(now)
+	return uuid(q.ArtifactID) && q.Identity.Valid(now)
 }
 
 type DownloadRoute struct {
@@ -29,12 +28,11 @@ func (r DownloadRoute) Valid(now time.Time) bool {
 
 type DownloadKeyQuery struct {
 	Identity identity.Identity
-	Recovery RecoveryProof
 	Key      Digest
 }
 
 func (q DownloadKeyQuery) Valid(now time.Time) bool {
-	return q.Identity.Valid(now) && q.Recovery.Valid(now) && q.Key != (Digest{})
+	return q.Identity.Valid(now) && q.Key != (Digest{})
 }
 
 // Found=false is only a bounded observation. Admission must check the key again

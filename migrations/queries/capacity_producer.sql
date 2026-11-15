@@ -1,9 +1,6 @@
 -- name: ReadCapacityPermissionScopes :one
 SELECT read_capacity_permission_scopes(sqlc.arg(root_id)::uuid,sqlc.arg(recovery_value)::jsonb)::jsonb AS scope_json;
 
--- name: ReadCapacityRecovery :one
-SELECT read_capacity_recovery(sqlc.arg(root_id)::uuid,sqlc.arg(observed_at)::timestamptz,sqlc.arg(fresh_until)::timestamptz)::jsonb AS recovery;
-
 -- name: ReadCapacityRuntimeScope :one
 SELECT read_capacity_runtime_scope(sqlc.arg(root_id)::uuid,sqlc.arg(expected_value)::jsonb,sqlc.arg(qualification_value)::jsonb,sqlc.arg(observed_at)::timestamptz,sqlc.arg(fresh_until)::timestamptz)::timestamptz AS until_at;
 

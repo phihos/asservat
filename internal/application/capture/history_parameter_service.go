@@ -1,6 +1,13 @@
 package capture
 
 import (
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"encoding/json"
+	"errors"
+	"time"
+
 	auditapp "asservat.local/asservat/internal/application/audit"
 	fleetapp "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -8,12 +15,6 @@ import (
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
 	privacy "asservat.local/asservat/internal/domain/privacy"
-	"bytes"
-	"context"
-	"crypto/sha256"
-	"encoding/json"
-	"errors"
-	"time"
 )
 
 type HistoryParameterLedger interface {
@@ -42,7 +43,6 @@ type HistoryParameterService struct {
 	Regional               fleetapp.HistoryDispatcher
 	Codec                  HistoryParameterCodec
 	Keys                   HistoryKeys
-	Recovery               fleetapp.RecoveryReader
 	Retention              HistoryMetadataRetention
 	Legacy                 ContextHistoryReader
 	Limits                 value.HistoryLimits
@@ -56,7 +56,7 @@ type HistoryParameterService struct {
 }
 
 func (s HistoryParameterService) configured() bool {
-	return authorization.UUID(s.RootID) && authorization.UUID(s.InstallationID) && s.Ledger != nil && s.Regional != nil && s.Codec != nil && s.Keys != nil && s.Recovery != nil && s.Retention != nil && s.Limits.Valid() && s.NewID != nil && s.Now != nil
+	return authorization.UUID(s.RootID) && authorization.UUID(s.InstallationID) && s.Ledger != nil && s.Regional != nil && s.Codec != nil && s.Keys != nil && s.Retention != nil && s.Limits.Valid() && s.NewID != nil && s.Now != nil
 }
 
 func (s HistoryParameterService) Persist(ctx context.Context, accepted value.Accepted, i identity.Identity, p value.HistoryParameters, source *value.HistoryLineage) (failure error) {
@@ -104,11 +104,6 @@ func (s HistoryParameterService) Persist(ctx context.Context, accepted value.Acc
 	if err != nil {
 		return err
 	}
-	stage = markHistoryStage(ctx, "hw-", stage, "recovery", &began)
-	recovery, err := s.Recovery.RecoveryState(ctx)
-	if err != nil || recovery.InstallationID != s.InstallationID || !recovery.Valid(s.Now()) {
-		return value.ErrHistoryUnavailable
-	}
 	target := authorization.Target{ClusterID: p.Target.ClusterID, NamespaceUID: p.NamespaceUID, WorkloadUID: p.WorkloadUID, PodUID: original.PodUID}
 	// The actual retained member is a metadata-selector witness only. Current
 	// retention selectors cover namespace/workload; all children independently
@@ -141,7 +136,7 @@ func (s HistoryParameterService) Persist(ctx context.Context, accepted value.Acc
 		return value.ErrSettingsUnavailable
 	}
 	stage = markHistoryStage(ctx, "hw-", stage, "reserve", &began)
-	storage, err := s.Ledger.ReserveHistoryParameters(ctx, value.HistoryReservation{Expectation: e, Identity: i, Recovery: recovery, Limits: s.Limits, SummaryExpiresAt: retention.ExpiresAt, Retention: retention, Source: source})
+	storage, err := s.Ledger.ReserveHistoryParameters(ctx, value.HistoryReservation{Expectation: e, Identity: i, Limits: s.Limits, SummaryExpiresAt: retention.ExpiresAt, Retention: retention, Source: source})
 	if err != nil {
 		return err
 	}
@@ -168,14 +163,8 @@ func (s HistoryParameterService) Persist(ctx context.Context, accepted value.Acc
 	if err != nil {
 		return err
 	}
-	// Reserve, seal and the attach consumed time: the claim's authority ends
-	// with the recovery observation it uses, so use a current one.
-	stage = markHistoryStage(ctx, "hw-", stage, "recovery-claim", &began)
-	if recovery, err = s.currentRecovery(operation); err != nil {
-		return err
-	}
 	stage = markHistoryStage(ctx, "hw-", stage, "claim", &began)
-	authority, err := s.Ledger.ClaimHistoryWrite(operation, value.HistoryWriteRequest{Storage: storage, Identity: i, Recovery: recovery, RequestID: s.NewID(), ExecutorEpoch: session.ExecutorEpoch(), BundleDigest: bundleDigest})
+	authority, err := s.Ledger.ClaimHistoryWrite(operation, value.HistoryWriteRequest{Storage: storage, Identity: i, RequestID: s.NewID(), ExecutorEpoch: session.ExecutorEpoch(), BundleDigest: bundleDigest})
 	if err != nil {
 		return err
 	}
@@ -210,21 +199,8 @@ func (s HistoryParameterService) Persist(ctx context.Context, accepted value.Acc
 			return artifact.ErrIntegrity
 		}
 	}
-	stage = markHistoryStage(ctx, "hw-", stage, "recovery-settle", &began)
-	if recovery, err = s.currentRecovery(ctx); err != nil {
-		return err
-	}
 	stage = markHistoryStage(ctx, "hw-", stage, "settle", &began)
-	return s.Ledger.CompleteHistoryWrite(ctx, value.HistoryWriteResult{Authority: authority, Copies: reply.Copies, Completion: *reply.WriterCompletion, Recovery: recovery})
-}
-
-// currentRecovery reads a current recovery observation with Persist's checks.
-func (s HistoryParameterService) currentRecovery(ctx context.Context) (artifact.RecoveryProof, error) {
-	recovery, err := s.Recovery.RecoveryState(ctx)
-	if err != nil || recovery.InstallationID != s.InstallationID || !recovery.Valid(s.Now()) {
-		return recovery, value.ErrHistoryUnavailable
-	}
-	return recovery, nil
+	return s.Ledger.CompleteHistoryWrite(ctx, value.HistoryWriteResult{Authority: authority, Copies: reply.Copies, Completion: *reply.WriterCompletion})
 }
 
 func (s HistoryParameterService) ListCaptureHistory(ctx context.Context, q value.HistoryQuery) (value.HistoryPage, error) {
@@ -310,9 +286,9 @@ func (s HistoryParameterService) ReadCaptureSettings(ctx context.Context, q valu
 
 type HistoryRetirementLedger interface {
 	HistoryRetirementCandidates(context.Context, time.Time, string) ([]value.HistoryRetirementCandidate, error)
-	ExpireHistorySummaries(context.Context, artifact.RecoveryProof) error
+	ExpireHistorySummaries(context.Context) error
 	ClaimHistoryDeletion(context.Context, value.HistoryDeleteRequest) (value.HistoryDeletePermission, error)
-	FinishHistoryDeletion(context.Context, value.HistoryOperationAuthority, value.HistoryDeleteCompletion, artifact.RecoveryProof) error
+	FinishHistoryDeletion(context.Context, value.HistoryOperationAuthority, value.HistoryDeleteCompletion) error
 }
 
 // Sweep reuses the supervised hub maintenance cadence and live outbound
@@ -335,11 +311,7 @@ func (s HistoryParameterService) sweep(ctx context.Context, after string) (strin
 	if err != nil || len(rows) == 0 {
 		return "", false, err
 	}
-	recovery, err := s.Recovery.RecoveryState(ctx)
-	if err != nil || recovery.InstallationID != s.InstallationID || !recovery.Valid(s.Now()) {
-		return after, false, value.ErrUnavailable
-	}
-	if err = ledger.ExpireHistorySummaries(ctx, recovery); err != nil {
+	if err = ledger.ExpireHistorySummaries(ctx); err != nil {
 		return after, false, err
 	}
 	var first error
@@ -361,10 +333,6 @@ func (s HistoryParameterService) sweep(ctx context.Context, after string) (strin
 	return next, len(rows) == 16 && first == nil, first
 }
 func (s HistoryParameterService) retire(ctx context.Context, ledger HistoryRetirementLedger, row value.HistoryRetirementCandidate) error {
-	recovery, err := s.Recovery.RecoveryState(ctx)
-	if err != nil || recovery.InstallationID != s.InstallationID || !recovery.Valid(s.Now()) {
-		return value.ErrUnavailable
-	}
 	session, err := s.Regional.PrepareHistory(ctx, row.ClusterID, row.CaptureID)
 	if err != nil {
 		return err
@@ -372,7 +340,7 @@ func (s HistoryParameterService) retire(ctx context.Context, ledger HistoryRetir
 	defer session.Close()
 	operation, cancel := context.WithDeadline(ctx, session.NotAfter())
 	defer cancel()
-	permission, err := ledger.ClaimHistoryDeletion(operation, value.HistoryDeleteRequest{CaptureID: row.CaptureID, RequestID: s.NewID(), ExecutorEpoch: session.ExecutorEpoch(), Recovery: recovery})
+	permission, err := ledger.ClaimHistoryDeletion(operation, value.HistoryDeleteRequest{CaptureID: row.CaptureID, RequestID: s.NewID(), ExecutorEpoch: session.ExecutorEpoch()})
 	if err != nil {
 		return err
 	}
@@ -383,7 +351,7 @@ func (s HistoryParameterService) retire(ctx context.Context, ledger HistoryRetir
 	if reply.DeleteCompletion == nil || !reply.DeleteCompletion.Valid(permission.Authority) {
 		return artifact.ErrIntegrity
 	}
-	return ledger.FinishHistoryDeletion(operation, permission.Authority, *reply.DeleteCompletion, recovery)
+	return ledger.FinishHistoryDeletion(operation, permission.Authority, *reply.DeleteCompletion)
 }
 
 // Run is owned and joined by the existing hub supervisor. One bounded SQL

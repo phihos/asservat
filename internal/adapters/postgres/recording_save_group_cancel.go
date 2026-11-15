@@ -65,9 +65,6 @@ func (s *APIContextExecutions) requestGroupCancellation(ctx context.Context, q *
 	}
 	phase, _ := recordingGroupPhase(actions)
 	work.Decision = value.Cancellation{CaptureID: uid(header.ID), Phase: phase, Revision: header.ProgressRevision, Requested: header.CancelRequestedAt.Valid, ObservedAt: observed, ValidUntil: until}
-	if err := s.guards.Recovery.check(ctx, q, trust, s.root, in.Recovery); err != nil {
-		return zero, err
-	}
 	now, err := q.CurrentTime(ctx)
 	if err != nil || !in.Valid(now.Time) || !work.Decision.Valid(now.Time) {
 		return zero, value.ErrDenied

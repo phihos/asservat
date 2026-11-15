@@ -20,24 +20,22 @@ import (
 // Stop, audit acknowledgement and configuration use separate role-bound pools.
 // This safe-stop facet does not read catalog/native metadata or current permits.
 type DownloadStops struct {
-	ledger   *Ledger
-	root     string
-	recovery *RecoveryTransactionGuard
+	ledger       *Ledger
+	root         string
+	installation string
 }
 
-func NewDownloadStops(ctx context.Context, pool *pgxpool.Pool, root string, guards ...*RecoveryTransactionGuard) (*DownloadStops, error) {
-	if !authorization.UUID(root) || len(guards) > 1 || len(guards) == 1 && (guards[0] == nil || guards[0].root != root) {
+// NewDownloadStops takes an empty installation for the stop-only facet; the
+// audit writer and acknowledgement facets need the installation.
+func NewDownloadStops(ctx context.Context, pool *pgxpool.Pool, root, installation string) (*DownloadStops, error) {
+	if !authorization.UUID(root) || installation != "" && !authorization.UUID(installation) {
 		return nil, artifact.ErrInvalid
 	}
 	l, e := New(ctx, pool)
 	if e != nil {
 		return nil, e
 	}
-	out := &DownloadStops{ledger: l, root: root}
-	if len(guards) == 1 {
-		out.recovery = guards[0]
-	}
-	return out, nil
+	return &DownloadStops{ledger: l, root: root, installation: installation}, nil
 }
 func stopSnapshot(row custodydb.DownloadStop, observed, until time.Time) (evidence.DownloadStopSnapshot, error) {
 	var out evidence.DownloadStopSnapshot
@@ -134,41 +132,19 @@ func (s *DownloadStops) StopDownload(ctx context.Context, i identity.Identity, d
 	return out, nil
 }
 
-// Audit I/O uses current independently accepted recovery, before the Stop row
-// lock. Restriction itself deliberately does not require this effect authority.
-func (s *DownloadStops) auditTrust(ctx context.Context, q *custodydb.Queries) (custodydb.FleetCurrentTrust, time.Time, error) {
-	start, e := q.CurrentTime(ctx)
-	if e != nil {
-		return custodydb.FleetCurrentTrust{}, time.Time{}, e
-	}
-	trust, e := q.ShareFleetTrust(ctx, id(s.recovery.installation))
-	if e != nil {
-		return trust, start.Time, e
-	}
-	now, e := q.CurrentTime(ctx)
-	if e != nil {
-		return trust, start.Time, e
-	}
-	_, e = recoveryState(trust, start.Time, now.Time)
-	return trust, start.Time, e
-}
-
 func (s *DownloadStops) ClaimDownloadStopWrite(ctx context.Context, d artifact.DownloadStopDecision) (bool, error) {
-	if s == nil || s.recovery == nil || !d.Valid() || d.RootID != s.root {
+	if s == nil || s.installation == "" || !d.Valid() || d.RootID != s.root {
 		return false, artifact.ErrDownloadUnavailable
 	}
 	fresh := false
 	e := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		trust, start, e := s.auditTrust(ctx, q)
+		start, e := q.CurrentTime(ctx)
 		if e != nil {
 			return e
 		}
 		row, e := q.LockDownloadStop(ctx, custodydb.LockDownloadStopParams{DownloadID: id(d.DownloadID), RootID: id(s.root)})
 		if e != nil {
 			return e
-		}
-		if uid(row.InstallationID) != s.recovery.installation || row.IssuerEpoch != trust.IssuerEpoch {
-			return artifact.ErrDownloadUnavailable
 		}
 		body, e := json.Marshal(d)
 		if e != nil {
@@ -194,7 +170,7 @@ func (s *DownloadStops) ClaimDownloadStopWrite(ctx context.Context, d artifact.D
 		if changed != 1 {
 			return artifact.ErrDownloadUnavailable
 		}
-		return auditCurrent(ctx, q, trust, start, identity.Earlier(start.Add(5*time.Second), d.RetainUntil))
+		return auditCurrent(ctx, q, identity.Earlier(start.Time.Add(5*time.Second), d.RetainUntil))
 	})
 	if e != nil {
 		return false, artifact.ErrDownloadUnavailable
@@ -202,20 +178,17 @@ func (s *DownloadStops) ClaimDownloadStopWrite(ctx context.Context, d artifact.D
 	return fresh, nil
 }
 func (s *DownloadStops) AcknowledgeDownloadStop(ctx context.Context, d artifact.DownloadStopDecision, r audit.Receipt) error {
-	if s == nil || s.recovery == nil || !d.Valid() || d.RootID != s.root || !stopReceipt(d, r) {
+	if s == nil || s.installation == "" || !d.Valid() || d.RootID != s.root || !stopReceipt(d, r) {
 		return artifact.ErrDownloadUnavailable
 	}
 	return s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		trust, start, e := s.auditTrust(ctx, q)
+		start, e := q.CurrentTime(ctx)
 		if e != nil {
 			return e
 		}
 		row, e := q.LockDownloadStop(ctx, custodydb.LockDownloadStopParams{DownloadID: id(d.DownloadID), RootID: id(s.root)})
 		if e != nil {
 			return e
-		}
-		if uid(row.InstallationID) != s.recovery.installation || row.IssuerEpoch != trust.IssuerEpoch {
-			return artifact.ErrDownloadUnavailable
 		}
 		snap, e := stopSnapshot(row, time.Now(), time.Now().Add(time.Second))
 		if e != nil || !sameStopDecision(snap.Decision, d) || !snap.WriteStarted {
@@ -225,7 +198,7 @@ func (s *DownloadStops) AcknowledgeDownloadStop(ctx context.Context, d artifact.
 			if *snap.Receipt != r {
 				return artifact.ErrDownloadUnavailable
 			}
-			return auditCurrent(ctx, q, trust, start, identity.Earlier(start.Add(5*time.Second), d.RetainUntil))
+			return auditCurrent(ctx, q, identity.Earlier(start.Time.Add(5*time.Second), d.RetainUntil))
 		}
 		decision, e := json.Marshal(d)
 		if e != nil {
@@ -242,14 +215,14 @@ func (s *DownloadStops) AcknowledgeDownloadStop(ctx context.Context, d artifact.
 		if n != 1 {
 			return artifact.ErrDownloadUnavailable
 		}
-		return auditCurrent(ctx, q, trust, start, identity.Earlier(start.Add(5*time.Second), d.RetainUntil))
+		return auditCurrent(ctx, q, identity.Earlier(start.Time.Add(5*time.Second), d.RetainUntil))
 	})
 }
 
 // Installation configuration provides independently accepted finite backing;
 // no public caller can provision or rotate it. Renewal preserves every charge.
 func (s *Downloads) BindDownloadStopBacking(ctx context.Context, b artifact.DownloadStopBacking) error {
-	if s == nil || s.recovery == nil || !b.Valid() || b.RootID != s.root || b.InstallationID != s.recovery.installation {
+	if s == nil || !b.Valid() || b.RootID != s.root {
 		return artifact.ErrInvalid
 	}
 	return s.ledger.transaction(ctx, func(q *custodydb.Queries) error {

@@ -10,7 +10,6 @@ import (
 	"time"
 
 	authapp "asservat.local/asservat/internal/application/authorization"
-	fleetapp "asservat.local/asservat/internal/application/fleet"
 	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
@@ -71,7 +70,6 @@ type PolicyActivation struct {
 	GrantAttachments   authapp.PolicyGrantAttachmentStore
 	Acceptor           PolicyAcceptor
 	Audit              PolicyAuditPublisher
-	Recovery           fleetapp.RecoveryReader
 	Now                func() time.Time
 	// Report receives a fixed refusal stage; diagnostics only.
 	Report func(string)
@@ -111,7 +109,7 @@ var ErrPolicyDeactivated = errors.New("policy revision deactivated")
 var ErrPolicyDelegation = errors.New("policy delegation required")
 
 func (s PolicyActivation) configured() bool {
-	return authorization.UUID(s.RootID) && authorization.UUID(s.InstallationID) && s.RecipeName != "" && s.RecipeDigest != (artifact.Digest{}) && s.Documents != nil && s.Sources != nil && s.Observer != nil && s.Ledger != nil && s.Permissions != nil && s.Automation != nil && s.Acceptor != nil && s.Audit != nil && s.Recovery != nil && s.Now != nil
+	return authorization.UUID(s.RootID) && authorization.UUID(s.InstallationID) && s.RecipeName != "" && s.RecipeDigest != (artifact.Digest{}) && s.Documents != nil && s.Sources != nil && s.Observer != nil && s.Ledger != nil && s.Permissions != nil && s.Automation != nil && s.Acceptor != nil && s.Audit != nil && s.Now != nil
 }
 
 // policyNonce derives the submission nonce from the authenticated actor, the
@@ -159,10 +157,6 @@ func (s PolicyActivation) Activate(ctx context.Context, current identities.Curre
 	if err != nil || !author.Valid(s.Now()) || author.Principal.Kind != identity.Human {
 		return zero, value.ErrDenied
 	}
-	recovery, err := s.Recovery.RecoveryState(ctx)
-	if err != nil || !recovery.Valid(s.Now()) || recovery.InstallationID != s.InstallationID {
-		return zero, value.ErrUnavailable
-	}
 	source, spec, err := s.Documents.ReadPolicy(ctx, name, "")
 	if err != nil {
 		return zero, s.refused("source", err)
@@ -205,7 +199,7 @@ func (s PolicyActivation) Activate(ctx context.Context, current identities.Curre
 	if !source.Valid(s.Now()) || !observed.Valid(s.Now()) || !observed.Answers(partial.Request()) || observed.ClusterID != partial.ClusterID || observed.Namespace.Name != partial.Namespace || observed.Workload.Kind != partial.WorkloadKind || observed.Workload.Name != partial.WorkloadName {
 		return zero, value.ErrChanged
 	}
-	compileUntil := identity.Earlier(author.ValidUntil, identity.Earlier(recovery.FreshUntil, identity.Earlier(source.FreshUntil, observed.FreshUntil)))
+	compileUntil := identity.Earlier(author.ValidUntil, identity.Earlier(source.FreshUntil, observed.FreshUntil))
 	bounded, stop := context.WithDeadline(ctx, compileUntil)
 	defer stop()
 	ctx = bounded
@@ -234,7 +228,7 @@ func (s PolicyActivation) Activate(ctx context.Context, current identities.Curre
 		return zero, s.refused("status", err)
 	}
 	if compiled.Recorder != nil {
-		return s.activateRecorderPolicy(ctx, author, recovery, source, compiled, observed, status, nonce, sharingReviewed, basis)
+		return s.activateRecorderPolicy(ctx, author, source, compiled, observed, status, nonce, sharingReviewed, basis)
 	}
 	target := authorization.Target{ClusterID: compiled.ClusterID, NamespaceUID: observed.Namespace.UID, WorkloadUID: observed.Workload.UID, PodUID: observed.Workload.UID}
 	delegation, err := s.Ledger.Delegation(ctx, target)
@@ -322,11 +316,11 @@ func (s PolicyActivation) Activate(ctx context.Context, current identities.Curre
 	submission := value.VerifiedPolicySubmission{ReplacesID: status.ActiveID, Nonce: nonce, Actor: author.Principal, Source: source.Revision, ClusterID: source.ClusterID, NamespaceUID: source.NamespaceUID, Name: source.Name, ScopeDigest: authority.ScopeDigest, IssuedAt: now, ExpiresAt: now.Add(30 * time.Second)}
 	submitted, _ := json.Marshal(submission)
 	submission.EnvelopeDigest = artifact.Digest(sha256.Sum256(submitted))
-	until := identity.Earlier(identity.Earlier(now.Add(5*time.Second), author.ValidUntil), recovery.FreshUntil)
-	check := value.SubmissionCheck{Submission: submission, RootID: s.RootID, InstallationID: s.InstallationID, IssuerEpoch: recovery.IssuerEpoch, KeyID: "hub-api-authenticated-session", TrustRevision: author.Policy, VerifiedAt: now, ValidUntil: until.UTC().Truncate(time.Microsecond)}
+	until := identity.Earlier(now.Add(5*time.Second), author.ValidUntil)
+	check := value.SubmissionCheck{Submission: submission, RootID: s.RootID, InstallationID: s.InstallationID, KeyID: "hub-api-authenticated-session", TrustRevision: author.Policy, VerifiedAt: now, ValidUntil: until.UTC().Truncate(time.Microsecond)}
 	call, cancel := context.WithDeadline(ctx, check.ValidUntil)
 	defer cancel()
-	accepted, err := s.Acceptor.AcceptPolicy(call, value.PolicyAdmission{RootID: s.RootID, Submission: submission, Verification: check, Author: author, Authority: authority, Target: target, Recovery: recovery, Sharing: sharing})
+	accepted, err := s.Acceptor.AcceptPolicy(call, value.PolicyAdmission{RootID: s.RootID, Submission: submission, Verification: check, Author: author, Authority: authority, Target: target, Sharing: sharing})
 	if err != nil {
 		return zero, s.refused("accept", err)
 	}
@@ -378,7 +372,7 @@ func (s PolicyActivation) ActivateWithGrant(ctx context.Context, current identit
 		return s.Activate(ctx, current, name, key, sharingReviewed)
 	}
 	var zero PolicyActivationResult
-	if ctx == nil || current == nil || s.GrantAttachments == nil || s.Documents == nil || s.Sources == nil || s.Ledger == nil || s.Recovery == nil || s.Now == nil || !authorization.UUID(grantID) || !identity.Text(name, 253) || !identity.Text(key, 128) {
+	if ctx == nil || current == nil || s.GrantAttachments == nil || s.Documents == nil || s.Sources == nil || s.Ledger == nil || s.Now == nil || !authorization.UUID(grantID) || !identity.Text(name, 253) || !identity.Text(key, 128) {
 		return zero, value.ErrUnavailable
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -401,11 +395,7 @@ func (s PolicyActivation) ActivateWithGrant(ctx context.Context, current identit
 	if err != nil || status.ActiveID == "" || !s.Now().Before(status.NotAfter) {
 		return zero, value.ErrUnavailable
 	}
-	recovery, err := s.Recovery.RecoveryState(ctx)
-	if err != nil || recovery.InstallationID != s.InstallationID || !recovery.Valid(s.Now()) {
-		return zero, value.ErrUnavailable
-	}
-	receipt, replay, err := s.GrantAttachments.AttachPolicyGrant(ctx, authapp.PolicyGrantAttachmentInput{ID: policyNonce(actor.Principal, status.PolicyUID, key), PolicyUID: status.PolicyUID, GrantID: grantID, IdempotencyKey: key, Actor: actor, Recovery: recovery})
+	receipt, replay, err := s.GrantAttachments.AttachPolicyGrant(ctx, authapp.PolicyGrantAttachmentInput{ID: policyNonce(actor.Principal, status.PolicyUID, key), PolicyUID: status.PolicyUID, GrantID: grantID, IdempotencyKey: key, Actor: actor})
 	if err != nil {
 		return zero, err
 	}
@@ -413,7 +403,7 @@ func (s PolicyActivation) ActivateWithGrant(ctx context.Context, current identit
 		return zero, value.ErrConflict
 	}
 	fresh, err := current.ResolveIdentity(ctx)
-	if err != nil || ctx.Err() != nil || !fresh.Valid(s.Now()) || fresh.Principal != actor.Principal || fresh.Policy != actor.Policy || !samePolicyActorSet(fresh.Groups, actor.Groups) || !samePolicyActorSet(fresh.Scopes, actor.Scopes) || !s.Now().Before(actor.ValidUntil) || !s.Now().Before(recovery.FreshUntil) || !s.Now().Before(source.FreshUntil) || !s.Now().Before(status.NotAfter) {
+	if err != nil || ctx.Err() != nil || !fresh.Valid(s.Now()) || fresh.Principal != actor.Principal || fresh.Policy != actor.Policy || !samePolicyActorSet(fresh.Groups, actor.Groups) || !samePolicyActorSet(fresh.Scopes, actor.Scopes) || !s.Now().Before(actor.ValidUntil) || !s.Now().Before(source.FreshUntil) || !s.Now().Before(status.NotAfter) {
 		return zero, identity.ErrDenied
 	}
 	// Receipt replay is historical control provenance: the store never restores

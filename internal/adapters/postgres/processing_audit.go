@@ -11,8 +11,8 @@ import (
 // acknowledgement, cleanup and finalizer credentials retain the existing audit
 // facets; SQL additionally requires the exact prepared privacy decision and
 // retained rule/account reserve. They do not grant a human privacy permission.
-func NewProcessingReleaseJournal(ctx context.Context, pool *pgxpool.Pool, policy value.OperationLifecyclePolicy, recovery *RecoveryTransactionGuard) (*OperationJournal, error) {
-	if !policy.CertificateVerificationBacked() || policy.Lane != "processing" || policy.History.Layout != value.ProcessingReleaseHistoryLayout || recovery == nil || recovery.root != policy.RootID || recovery.installation != policy.InstallationID {
+func NewProcessingReleaseJournal(ctx context.Context, pool *pgxpool.Pool, policy value.OperationLifecyclePolicy) (*OperationJournal, error) {
+	if !policy.CertificateVerificationBacked() || policy.Lane != "processing" || policy.History.Layout != value.ProcessingReleaseHistoryLayout {
 		return nil, app.ErrUnavailable
 	}
 	l, e := New(ctx, pool)
@@ -21,17 +21,17 @@ func NewProcessingReleaseJournal(ctx context.Context, pool *pgxpool.Pool, policy
 	}
 	copied := *policy.History
 	policy.History = &copied
-	return &OperationJournal{ledger: l, root: policy.RootID, lane: "processing", recovery: recovery, lifecycle: &policy}, nil
+	return &OperationJournal{ledger: l, root: policy.RootID, lane: "processing", installation: policy.InstallationID, lifecycle: &policy}, nil
 }
-func NewProcessingReleaseAcknowledgements(ctx context.Context, pool *pgxpool.Pool, policy value.OperationLifecyclePolicy, recovery *RecoveryTransactionGuard) (*OperationAcknowledgements, error) {
-	j, e := NewProcessingReleaseJournal(ctx, pool, policy, recovery)
+func NewProcessingReleaseAcknowledgements(ctx context.Context, pool *pgxpool.Pool, policy value.OperationLifecyclePolicy) (*OperationAcknowledgements, error) {
+	j, e := NewProcessingReleaseJournal(ctx, pool, policy)
 	if e != nil {
 		return nil, e
 	}
 	return &OperationAcknowledgements{j}, nil
 }
-func NewProcessingReleaseLifecycles(ctx context.Context, pool *pgxpool.Pool, policy value.OperationLifecyclePolicy, recovery *RecoveryTransactionGuard) (*OperationLifecycles, error) {
-	j, e := NewProcessingReleaseJournal(ctx, pool, policy, recovery)
+func NewProcessingReleaseLifecycles(ctx context.Context, pool *pgxpool.Pool, policy value.OperationLifecyclePolicy) (*OperationLifecycles, error) {
+	j, e := NewProcessingReleaseJournal(ctx, pool, policy)
 	if e != nil {
 		return nil, e
 	}

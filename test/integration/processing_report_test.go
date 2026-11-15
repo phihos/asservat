@@ -31,11 +31,11 @@ func reportFixtureProcessors() []value.ProcessingOrganization {
 // remain the existing explicit synthetic service-fixture authority.
 func qualifyProcessingReport(t *testing.T, ctx context.Context, hub *pgxpool.Pool, s captureAdmissionScenario, f *processingTestFixture, e artifact.ContextExpectation, custodyState, unknownOperation string) {
 	t.Helper()
-	reader, err := postgres.NewProcessingInventory(ctx, hub, s.a.RootID, s.recovery.guard)
+	reader, err := postgres.NewProcessingInventory(ctx, hub, s.a.RootID)
 	if err != nil {
 		t.Fatal("compiled processing report source", err)
 	}
-	service := privacyapp.ProcessingReport{RootID: s.a.RootID, InstallationID: s.recovery.installation, Policies: f.policy, Recovery: s.recovery.reader, Reports: reader, Now: time.Now}
+	service := privacyapp.ProcessingReport{RootID: s.a.RootID, InstallationID: s.recovery.installation, Policies: f.policy, Reports: reader, Now: time.Now}
 	var records []value.ProcessingReportRecord
 	sections := []string{}
 	query := value.ProcessingReportQuery{Section: "artifacts", Limit: 1}

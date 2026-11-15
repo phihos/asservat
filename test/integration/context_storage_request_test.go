@@ -11,7 +11,6 @@ import (
 	authapp "asservat.local/asservat/internal/application/authorization"
 	app "asservat.local/asservat/internal/application/capture"
 	identities "asservat.local/asservat/internal/application/identity"
-	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/targets"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -39,14 +38,11 @@ func (s storageRequestTarget) ResolvePod(c context.Context, r targets.Request) (
 
 type storageRequestProcessing struct{}
 
-func (storageRequestProcessing) ContextProcessingCoverage(c context.Context, r value.ProcessingCoverageRequest, recovery artifact.RecoveryProof) (value.ProcessingCoverage, error) {
+func (storageRequestProcessing) ContextProcessingCoverage(c context.Context, r value.ProcessingCoverageRequest) (value.ProcessingCoverage, error) {
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	until := now.Add(5 * time.Second)
 	if deadline, ok := c.Deadline(); ok && deadline.Before(until) {
 		until = deadline
-	}
-	if recovery.FreshUntil.Before(until) {
-		until = recovery.FreshUntil
 	}
 	return value.ProcessingCoverage{Request: r, ObservedAt: now, FreshUntil: until}, c.Err()
 }
@@ -90,7 +86,7 @@ func qualifyContextStorageRequest(t *testing.T, ctx context.Context, admin *pgxp
 				if err != nil {
 					t.Fatal(err)
 				}
-				service := app.ContextInvestigation{RootID: s.a.RootID, InstallationID: s.recovery.installation, Previews: previews, Replay: s.s, Admission: s.s, Targets: storageRequestTarget{s.a.Plan.Input.Target}, Eligibility: authapp.Evaluator{Permissions: s.p, Now: time.Now}, Capabilities: nativeAPICapability{s.a.Plan.Input.Capability}, Retention: nativeAPIRetention{s.retention}, Storage: storage, Processing: storageRequestProcessing{}, Recovery: s.recovery.reader, Lifetime: 30 * time.Second, Now: time.Now, NewID: custodyID}
+				service := app.ContextInvestigation{RootID: s.a.RootID, InstallationID: s.recovery.installation, Previews: previews, Replay: s.s, Admission: s.s, Targets: storageRequestTarget{s.a.Plan.Input.Target}, Eligibility: authapp.Evaluator{Permissions: s.p, Now: time.Now}, Capabilities: nativeAPICapability{s.a.Plan.Input.Capability}, Retention: nativeAPIRetention{s.retention}, Storage: storage, Processing: storageRequestProcessing{}, Lifetime: 30 * time.Second, Now: time.Now, NewID: custodyID}
 				human := s.a.Eligibility.VerifiedIdentity
 				human.VerifiedAt = time.Now().UTC().Truncate(time.Microsecond)
 				human.ValidUntil = human.VerifiedAt.Add(5 * time.Second)
@@ -196,23 +192,3 @@ func qualifyContextStorageRequest(t *testing.T, ctx context.Context, admin *pgxp
 }
 
 var _ app.ContextStorageReader = (*postgres.ContextStorageReader)(nil)
-
-func TestStorageRequestProcessingPreservesOriginalBounds(t *testing.T) {
-	for _, contextFirst := range []bool{false, true} {
-		t.Run(map[bool]string{false: "recovery-first", true: "caller-first"}[contextFirst], func(t *testing.T) {
-			now := time.Now().UTC().Truncate(time.Microsecond)
-			caller, recovery := now.Add(time.Second), now.Add(750*time.Millisecond)
-			if contextFirst {
-				caller, recovery = recovery, caller
-			}
-			c, cancel := context.WithDeadline(t.Context(), caller)
-			defer cancel()
-			r := value.ProcessingCoverageRequest{RootID: custodyID(), Location: artifact.Location{ClusterID: custodyID(), ArtifactID: custodyID(), AttemptID: custodyID()}, AnchorAt: now, DeleteBy: now.Add(time.Hour)}
-			r.Target.ClusterID, r.Target.NamespaceUID, r.Target.WorkloadUID, r.Target.PodUID = r.Location.ClusterID, custodyID(), custodyID(), custodyID()
-			got, err := (storageRequestProcessing{}).ContextProcessingCoverage(c, r, artifact.RecoveryProof{FreshUntil: recovery})
-			if err != nil || !got.Current(time.Now()) || got.Request != r || got.FreshUntil.After(caller) || got.FreshUntil.After(recovery) {
-				t.Fatal("synthetic processing exceeded original consumer proof bounds", err)
-			}
-		})
-	}
-}

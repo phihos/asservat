@@ -17,7 +17,7 @@ func TestOwnerCertificateAttemptSurvivesJSONClockRepresentation(t *testing.T) {
 	c := OwnerConfiguration{Pool: pool, Revision: identity.Revision{UID: id, Generation: 1, Digest: artifact.Digest{1}}, ProtectionDigest: artifact.Digest{2}, IssuerRoots: [][]byte{{3}}}
 	epoch, until, _ := OwnerCertificateWindow(start)
 	e := OwnerEnrollment{ID: id, Binding: b, Usage: "server", Pool: pool, SourceUID: id, Pod: "hub-pod", ReplicaSet: "hub-rs", ReplicaSetUID: id, PublicKeyDigest: artifact.Digest{4}, InitialTokenDigest: artifact.Digest{5}, InitialWorkloadDigest: artifact.Digest{6}, InitialProtectionDigest: artifact.Digest{7}, ClaimedAt: start.UTC(), InitialHoldUntil: until.Add(OwnerRegistrationGrace)}
-	p := OwnerCertificatePermit{ID: id, Binding: b, Usage: e.Usage, PublicKeyDigest: e.PublicKeyDigest, EnrollmentAudit: artifact.Digest{8}, Configuration: OwnerConfigurationObservation{Configuration: c, ObservedAt: start, FreshUntil: start.Add(5 * time.Second)}, Recovery: RecoveryState{InstallationID: id, IssuerEpoch: id, Revision: c.Revision, ObservedAt: start, FreshUntil: start.Add(5 * time.Second)}, Epoch: epoch, Ordinal: 1, CheckedAt: start.UTC(), SignBefore: start.Add(5 * time.Second), CertificateNotAfter: until}
+	p := OwnerCertificatePermit{ID: id, Binding: b, Usage: e.Usage, PublicKeyDigest: e.PublicKeyDigest, EnrollmentAudit: artifact.Digest{8}, Configuration: OwnerConfigurationObservation{Configuration: c, ObservedAt: start, FreshUntil: start.Add(5 * time.Second)}, Epoch: epoch, Ordinal: 1, CheckedAt: start.UTC(), SignBefore: start.Add(5 * time.Second), CertificateNotAfter: until}
 	a := OwnerCertificateAttempt{Enrollment: e, Permit: p, TokenDigest: e.InitialTokenDigest, WorkloadDigest: e.InitialWorkloadDigest, ProtectionDigest: e.InitialProtectionDigest, ProofObservedAt: start, ProofFreshUntil: start.Add(5 * time.Second)}
 	if !a.Valid(start) {
 		t.Fatal("invalid original attempt")
@@ -32,24 +32,6 @@ func TestOwnerCertificateAttemptSurvivesJSONClockRepresentation(t *testing.T) {
 	}
 	if !a.Equal(stored) || !stored.Equal(a) {
 		t.Fatal("durable round trip changed equality despite identical identity and wall-clock deadlines")
-	}
-	for _, mode := range []string{"installation", "issuer", "revision", "observed", "until"} {
-		changed := stored.Clone()
-		switch mode {
-		case "installation":
-			changed.Permit.Recovery.InstallationID = "22222222-2222-4222-8222-222222222222"
-		case "issuer":
-			changed.Permit.Recovery.IssuerEpoch = "22222222-2222-4222-8222-222222222222"
-		case "revision":
-			changed.Permit.Recovery.Revision.Generation++
-		case "observed":
-			changed.Permit.Recovery.ObservedAt = changed.Permit.Recovery.ObservedAt.Add(time.Nanosecond)
-		case "until":
-			changed.Permit.Recovery.FreshUntil = changed.Permit.Recovery.FreshUntil.Add(time.Nanosecond)
-		}
-		if a.Equal(changed) {
-			t.Fatal("changed recovery accepted", mode)
-		}
 	}
 }
 

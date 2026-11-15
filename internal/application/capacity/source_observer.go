@@ -11,26 +11,21 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 )
 
-type CapacityRecoveryReader interface {
-	RecoveryState(context.Context) (artifact.RecoveryProof, error)
-}
-
 // CapacitySourceObserver performs one bounded source reconciliation. Scheduling
 // belongs to the existing installed reconciliation owner. It creates no goroutine,
-// retry queue, recovery authority, workload observation or allocation by itself.
+// retry queue, workload observation or allocation by itself.
 type CapacitySourceObserver struct {
 	RootID, InstallationID, QualificationID string
 	QualificationDigest                     artifact.Digest
 	Source                                  CapacitySourceReader
 	Protection                              CapacitySourceProtectionReader
-	Recovery                                CapacityRecoveryReader
 	Journal                                 CapacitySourceJournal
 	Now                                     func() time.Time
 }
 
 func (s *CapacitySourceObserver) Observe(ctx context.Context) (AcceptedCapacitySource, error) {
 	var zero AcceptedCapacitySource
-	if s == nil || ctx == nil || ctx.Err() != nil || s.Now == nil || s.Source == nil || s.Protection == nil || s.Recovery == nil || s.Journal == nil || !authorization.UUID(s.RootID) || !authorization.UUID(s.InstallationID) || !authorization.UUID(s.QualificationID) || s.QualificationDigest == (artifact.Digest{}) {
+	if s == nil || ctx == nil || ctx.Err() != nil || s.Now == nil || s.Source == nil || s.Protection == nil || s.Journal == nil || !authorization.UUID(s.RootID) || !authorization.UUID(s.InstallationID) || !authorization.UUID(s.QualificationID) || s.QualificationDigest == (artifact.Digest{}) {
 		return zero, cfg.ErrUnavailable
 	}
 	started := s.Now()
@@ -55,11 +50,7 @@ func (s *CapacitySourceObserver) Observe(ctx context.Context) (AcceptedCapacityS
 	// Fixed step labels name the refusing phase (ADR-197 CI continuation
 	// run 18b lost its source without any logged cause).
 	stage := func(step string, e error) error { return capacityStage(step, errors.Join(cfg.ErrUnavailable, e)) }
-	r, e := s.Recovery.RecoveryState(live)
-	if e != nil || !r.Valid(s.Now()) || r.InstallationID != s.InstallationID || !narrow(r.FreshUntil) {
-		return zero, stage("recovery", e)
-	}
-	revision, e := s.Journal.ReadCapacitySourceRevision(live, r)
+	revision, e := s.Journal.ReadCapacitySourceRevision(live)
 	if e != nil || revision < 0 || revision >= 1<<60 || !narrow(until) {
 		return zero, stage("revision", e)
 	}
@@ -69,14 +60,14 @@ func (s *CapacitySourceObserver) Observe(ctx context.Context) (AcceptedCapacityS
 		if errors.Is(e, cfg.ErrWorkerTokenRotated) {
 			return zero, stage(step, e)
 		}
-		if live.Err() == nil && r.Valid(s.Now()) && s.Now().Before(until) {
+		if live.Err() == nil && s.Now().Before(until) {
 			at := started
 			if at.Nanosecond()%1000 != 0 {
 				at = at.Truncate(time.Microsecond).Add(time.Microsecond)
 			}
 			end := until.Truncate(time.Microsecond)
 			if !at.After(s.Now()) && end.After(at) {
-				_ = s.Journal.InvalidateCapacitySource(live, s.RootID, revision, r, at, end)
+				_ = s.Journal.InvalidateCapacitySource(live, s.RootID, revision, at, end)
 			}
 		}
 		return zero, stage(step, e)
@@ -95,7 +86,7 @@ func (s *CapacitySourceObserver) Observe(ctx context.Context) (AcceptedCapacityS
 	if !narrow(observation.Snapshot.FreshUntil) {
 		return failed("read-expired", nil)
 	}
-	input := CapacitySourceAcceptance{RootID: s.RootID, InstallationID: s.InstallationID, QualificationID: s.QualificationID, QualificationDigest: s.QualificationDigest, ExpectedRevision: revision, Observation: observation, Protection: protection, Recovery: r}
+	input := CapacitySourceAcceptance{RootID: s.RootID, InstallationID: s.InstallationID, QualificationID: s.QualificationID, QualificationDigest: s.QualificationDigest, ExpectedRevision: revision, Observation: observation, Protection: protection}
 	if !input.Valid(s.Now()) || live.Err() != nil {
 		return failed("input", live.Err())
 	}
@@ -103,7 +94,7 @@ func (s *CapacitySourceObserver) Observe(ctx context.Context) (AcceptedCapacityS
 	if e != nil {
 		return zero, stage("accept", e)
 	} // unknown commit remains lookup/CAS-only
-	if !out.Valid(s.Now()) || out.RootID != s.RootID || out.InstallationID != s.InstallationID || out.QualificationID != s.QualificationID || out.QualificationDigest != s.QualificationDigest || out.ProtectionDigest != protection.Digest || out.Observation.Digest != observation.Digest || out.Revision < revision || out.Revision > revision+1 || out.FreshUntil.After(until) || out.ObservedAt.Before(protection.ObservedAt) || out.ObservedAt.Before(r.ObservedAt) || !narrow(out.FreshUntil) {
+	if !out.Valid(s.Now()) || out.RootID != s.RootID || out.InstallationID != s.InstallationID || out.QualificationID != s.QualificationID || out.QualificationDigest != s.QualificationDigest || out.ProtectionDigest != protection.Digest || out.Observation.Digest != observation.Digest || out.Revision < revision || out.Revision > revision+1 || out.FreshUntil.After(until) || out.ObservedAt.Before(protection.ObservedAt) || !narrow(out.FreshUntil) {
 		return zero, stage("result", nil)
 	}
 	return out, nil

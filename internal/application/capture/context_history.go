@@ -5,7 +5,6 @@ import (
 	"slices"
 	"time"
 
-	fleetapp "asservat.local/asservat/internal/application/fleet"
 	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
@@ -15,7 +14,7 @@ import (
 )
 
 // ContextHistoryReader reads accepted-capture history under current SQL
-// permissions after recovery and permission locks. It never reads evidence.
+// permissions after permission locks. It never reads evidence.
 type ContextHistoryReader interface {
 	ListCaptureHistory(context.Context, value.HistoryQuery) (value.HistoryPage, error)
 	ReadCaptureSettings(context.Context, value.SettingsQuery) (value.CaptureSettings, error)
@@ -43,12 +42,11 @@ type ContextHistoryService struct {
 	// ADR-228), so history of a workload scaled to zero stays readable.
 	Workloads RestartObserver
 	Previews  ContextRepeatPreview
-	Recovery  fleetapp.RecoveryReader
 	Now       func() time.Time
 }
 
 func (s ContextHistoryService) configured() bool {
-	return authorization.UUID(s.RootID) && authorization.UUID(s.InstallationID) && s.Reader != nil && s.Targets != nil && s.Workloads != nil && s.Previews != nil && s.Recovery != nil && s.Now != nil
+	return authorization.UUID(s.RootID) && authorization.UUID(s.InstallationID) && s.Reader != nil && s.Targets != nil && s.Workloads != nil && s.Previews != nil && s.Now != nil
 }
 
 // workload resolves the named target to its current object identity: a
@@ -111,10 +109,6 @@ func (s ContextHistoryService) List(ctx context.Context, source identities.Curre
 	if err != nil {
 		return zero, err
 	}
-	r, err := s.Recovery.RecoveryState(ctx)
-	if err != nil || r.InstallationID != s.InstallationID || !r.Valid(s.Now()) {
-		return zero, value.ErrUnavailable
-	}
 	// The name resolves to the workload's current UIDs before any history
 	// lookup; an absent or unauthorized workload is the uniform refusal.
 	target, observedUntil, err := s.workload(ctx, ref)
@@ -136,12 +130,12 @@ func (s ContextHistoryService) List(ctx context.Context, source identities.Curre
 	if after != nil && !after.SnapshotBefore.IsZero() {
 		snapshot = after.SnapshotBefore
 	}
-	page, err := s.Reader.ListCaptureHistory(ctx, value.HistoryQuery{SelectorKey: selectorKey, SnapshotBefore: snapshot, RootID: s.RootID, Target: target, Origins: origins, After: after, Limit: limit, Identity: i, Recovery: r})
+	page, err := s.Reader.ListCaptureHistory(ctx, value.HistoryQuery{SelectorKey: selectorKey, SnapshotBefore: snapshot, RootID: s.RootID, Target: target, Origins: origins, After: after, Limit: limit, Identity: i})
 	if err != nil {
 		return zero, err
 	}
 	page.Target = target
-	until := identity.Earlier(identity.Earlier(page.ValidUntil, i.ValidUntil), identity.Earlier(r.FreshUntil, observedUntil))
+	until := identity.Earlier(identity.Earlier(page.ValidUntil, i.ValidUntil), observedUntil)
 	if page.ValidUntil, err = s.finish(ctx, source, i, until); err != nil {
 		return zero, err
 	}
@@ -163,18 +157,14 @@ func (s ContextHistoryService) Settings(ctx context.Context, source identities.C
 	if err != nil {
 		return zero, err
 	}
-	r, err := s.Recovery.RecoveryState(ctx)
-	if err != nil || r.InstallationID != s.InstallationID || !r.Valid(s.Now()) {
-		return zero, value.ErrUnavailable
-	}
-	settings, err := s.Reader.ReadCaptureSettings(ctx, value.SettingsQuery{RootID: s.RootID, CaptureID: captureID, Identity: i, Recovery: r})
+	settings, err := s.Reader.ReadCaptureSettings(ctx, value.SettingsQuery{RootID: s.RootID, CaptureID: captureID, Identity: i})
 	if err != nil {
 		return zero, err
 	}
 	if settings.CaptureID != captureID {
 		return zero, value.ErrUnavailable
 	}
-	until := identity.Earlier(identity.Earlier(settings.ValidUntil, i.ValidUntil), r.FreshUntil)
+	until := identity.Earlier(settings.ValidUntil, i.ValidUntil)
 	if settings.ValidUntil, err = s.finish(ctx, source, i, until); err != nil {
 		return zero, err
 	}

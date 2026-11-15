@@ -10,7 +10,6 @@ import (
 	"time"
 
 	identities "asservat.local/asservat/internal/application/identity"
-	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/planning"
@@ -35,9 +34,6 @@ func (p failedPreviewPort) Resolve(context.Context, privacy.Input) (privacy.Reso
 func (p failedPreviewPort) ContextStorage(context.Context, authorization.Target) (ContextStorageObservation, error) {
 	return ContextStorageObservation{}, p.err
 }
-func (p failedPreviewPort) RecoveryState(context.Context) (artifact.RecoveryProof, error) {
-	return artifact.RecoveryProof{}, p.err
-}
 func (p failedPreviewPort) CreateContextPreview(context.Context, value.ContextPreview) error {
 	return p.err
 }
@@ -54,15 +50,13 @@ func (untrustedPreviewError) FixedStep() string { return "private-provider-token
 func (e untrustedPreviewError) Unwrap() error   { return e.error }
 
 func TestContextPreviewFailureReportsFixedDependencyAndPreservesCause(t *testing.T) {
-	for _, stage := range []string{"recovery", "target", "facts/capability", "facts/retention", "facts/storage", "processing/read", "store"} {
+	for _, stage := range []string{"target", "facts/capability", "facts/retention", "facts/storage", "processing/read", "store"} {
 		t.Run(stage, func(t *testing.T) {
 			f := newInvestigationFixture()
 			ctx := t.Context()
 			cause := errors.New("private-provider-token-and-target")
 			port := failedPreviewPort{investigationFixture: f, err: untrustedPreviewError{fmt.Errorf("%w: %w", value.ErrUnavailable, cause)}}
 			switch stage {
-			case "recovery":
-				f.svc.Recovery = port
 			case "target":
 				f.svc.Targets = port
 			case "facts/capability":

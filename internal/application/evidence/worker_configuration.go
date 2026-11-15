@@ -1,12 +1,13 @@
 package evidence
 
 import (
+	"context"
+	"time"
+
 	auditapp "asservat.local/asservat/internal/application/audit"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
 	value "asservat.local/asservat/internal/domain/authorization"
-	"context"
-	"time"
 )
 
 type WorkerConfigurationReader interface {
@@ -21,7 +22,7 @@ type WorkerConfigurationGuard interface {
 }
 
 // A constructor profile does not activate dispatch. This observer requires
-// qualified Kubernetes input, current SQL recovery and separate encrypted audit.
+// qualified Kubernetes input and separate encrypted audit.
 type WorkerConfigurationObserver struct {
 	Reader           WorkerConfigurationReader
 	Ledger           WorkerConfigurationLedger

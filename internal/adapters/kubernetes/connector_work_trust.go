@@ -14,11 +14,9 @@ import (
 
 // ConnectorWorkTrust is a region's verify-only work trust: the hub's public
 // work key from the regional offer for this cluster (ADR-196 decision 7).
-// Each observation keeps the hub's delegated recovery read around it; no
-// Kubernetes source or guard is read.
+// No Kubernetes source or guard is read.
 type ConnectorWorkTrust struct {
 	client    *PermissionClient
-	recovery  app.RecoveryReader
 	uid       string
 	installed contracts.APIContextWorkTrustSettings
 
@@ -37,8 +35,8 @@ func ConnectorWorkTrustSettings(offer contracts.RegionalOffer, clusterID string)
 	return contracts.APIContextWorkTrustSettings{Format: contracts.APIContextTrustFormat, RootID: offer.PermissionRootID, InstallationID: offer.InstallationID, ClusterID: clusterID, IssuerEpoch: offer.IssuerEpoch, Revision: 1, Enabled: true, Keys: []contracts.APIContextWorkPublicKey{*offer.WorkKey}}, nil
 }
 
-func NewConnectorWorkTrust(c *PermissionClient, recovery app.RecoveryReader, uid string, installed contracts.APIContextWorkTrustSettings) (*ConnectorWorkTrust, error) {
-	if c == nil || recovery == nil || installed.ClusterID != c.clusterID {
+func NewConnectorWorkTrust(c *PermissionClient, uid string, installed contracts.APIContextWorkTrustSettings) (*ConnectorWorkTrust, error) {
+	if c == nil || installed.ClusterID != c.clusterID {
 		return nil, cfg.ErrInvalid
 	}
 	n := c.now()
@@ -46,7 +44,7 @@ func NewConnectorWorkTrust(c *PermissionClient, recovery app.RecoveryReader, uid
 		return nil, e
 	}
 	installed.Keys = slices.Clone(installed.Keys)
-	return &ConnectorWorkTrust{client: c, recovery: recovery, uid: uid, installed: installed}, nil
+	return &ConnectorWorkTrust{client: c, uid: uid, installed: installed}, nil
 }
 
 func (s *ConnectorWorkTrust) APIContextWorkTrust(ctx context.Context) (fleet.APIContextWorkTrust, error) {
@@ -76,20 +74,8 @@ func (s *ConnectorWorkTrust) APIContextWorkTrust(ctx context.Context) (fleet.API
 func (s *ConnectorWorkTrust) read(ctx context.Context) (fleet.APIContextWorkTrust, error) {
 	var zero fleet.APIContextWorkTrust
 	start := s.client.now()
-	until := identity.Check(start, identity.SQLFenced).Until()
-	valid := start.Add(identity.AuthorityRecheckInterval)
-	if d, ok := ctx.Deadline(); ok {
-		until = identity.Earlier(until, d)
-	}
-	call, cancel := context.WithDeadline(ctx, until)
-	defer cancel()
-	recovery, e := s.recovery.RecoveryState(call)
-	if e != nil || !recovery.Valid(s.client.now()) || recovery.InstallationID != s.installed.InstallationID || recovery.IssuerEpoch != s.installed.IssuerEpoch {
-		return zero, trustStep{"recovery", cfg.ErrUnavailable}
-	}
-	valid = identity.Earlier(valid, recovery.FreshUntil)
-	out, e := apiWorkTrustValue(s.installed, s.uid, start, valid)
-	if e != nil || call.Err() != nil || !out.Valid(s.client.now()) {
+	out, e := apiWorkTrustValue(s.installed, s.uid, start, start.Add(identity.AuthorityRecheckInterval))
+	if e != nil || ctx.Err() != nil || !out.Valid(s.client.now()) {
 		return zero, trustStep{"value", cfg.ErrUnavailable}
 	}
 	return out, nil

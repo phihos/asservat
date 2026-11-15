@@ -1,17 +1,18 @@
 package privacy
 
 import (
+	"context"
+	"errors"
+	"fmt"
+	"testing"
+	"time"
+
 	auditapp "asservat.local/asservat/internal/application/audit"
 	"asservat.local/asservat/internal/domain/artifact"
 	auditvalue "asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
 	value "asservat.local/asservat/internal/domain/privacy"
-	"context"
-	"errors"
-	"fmt"
-	"testing"
-	"time"
 )
 
 func processingID(n int) string { return fmt.Sprintf("00000000-0000-4000-8000-%012d", n) }
@@ -19,16 +20,15 @@ func processingID(n int) string { return fmt.Sprintf("00000000-0000-4000-8000-%0
 // Synthetic current source and durable journal fixture. No test value qualifies
 // deployment regions, identity groups, SQL completeness or backend capacity.
 type processingFixture struct {
-	now                                      time.Time
-	i                                        identity.Identity
-	p                                        value.DownloadPolicy
-	recovery                                 artifact.RecoveryProof
-	prepared                                 *ProcessingDecision
-	receipt                                  *value.ProcessingReceipt
-	begins, finishes, applies                int
-	policyObservations, recoveryObservations int
-	lost                                     bool
-	afterFinish, afterApply                  func()
+	now                       time.Time
+	i                         identity.Identity
+	p                         value.DownloadPolicy
+	prepared                  *ProcessingDecision
+	receipt                   *value.ProcessingReceipt
+	begins, finishes, applies int
+	policyObservations        int
+	lost                      bool
+	afterFinish, afterApply   func()
 }
 
 func (f *processingFixture) ResolveIdentity(context.Context) (identity.Identity, error) {
@@ -37,10 +37,6 @@ func (f *processingFixture) ResolveIdentity(context.Context) (identity.Identity,
 func (f *processingFixture) DownloadPolicy(context.Context) (value.DownloadPolicy, error) {
 	f.policyObservations++
 	return f.p, nil
-}
-func (f *processingFixture) RecoveryState(context.Context) (artifact.RecoveryProof, error) {
-	f.recoveryObservations++
-	return f.recovery, nil
 }
 func (f *processingFixture) PrepareProcessing(_ context.Context, a value.ProcessingAuthority, d ProcessingDecision) (ProcessingPrepared, error) {
 	if !a.Valid(f.now) {
@@ -102,7 +98,7 @@ func newProcessingFixture(t *testing.T) (*processingFixture, ProcessingChanges, 
 	root := processingID(1)
 	rev := identity.Revision{UID: processingID(2), Generation: 1, Digest: artifact.Digest{1}}
 	i := identity.Identity{Principal: identity.Principal{Issuer: "https://identity.invalid", ClientID: "console", Subject: "privacy-operator", Kind: identity.Human}, Groups: []string{"privacy"}, Scopes: []string{"evidence:read"}, Policy: rev, VerifiedAt: n, ValidUntil: n.Add(5 * time.Second)}
-	f := &processingFixture{now: n, i: i, p: value.DownloadPolicy{RootID: root, InstallationID: root, RecoveryEpoch: processingID(3), Revision: rev, ProtectionDigest: artifact.Digest{2}, PermittedRegions: []string{}, Paths: []artifact.DownloadPath{}, Clients: []value.DownloadClient{}, Operators: []value.ProcessingOperator{{Issuer: i.Principal.Issuer, ClientID: i.Principal.ClientID, Kind: "Group", ID: "privacy"}}, ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}, recovery: artifact.RecoveryProof{InstallationID: root, IssuerEpoch: processingID(3), Revision: rev, ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}}
+	f := &processingFixture{now: n, i: i, p: value.DownloadPolicy{RootID: root, InstallationID: root, RecoveryEpoch: processingID(3), Revision: rev, ProtectionDigest: artifact.Digest{2}, PermittedRegions: []string{}, Paths: []artifact.DownloadPath{}, Clients: []value.DownloadClient{}, Operators: []value.ProcessingOperator{{Issuer: i.Principal.Issuer, ClientID: i.Principal.ClientID, Kind: "Group", ID: "privacy"}}, ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}}
 	key, account := make([]byte, 32), make([]byte, 32)
 	key[0] = 1
 	account[0] = 2
@@ -116,7 +112,7 @@ func newProcessingFixture(t *testing.T) (*processingFixture, ProcessingChanges, 
 	b, w := policy.History.SlotBacking(policy.MaxPurgeLeases)
 	policy.BackupReservedBytes = b * policy.MetadataSlots
 	policy.WALReservedBytes = w * policy.MetadataSlots
-	service := ProcessingChanges{RootID: root, InstallationID: root, Policies: f, Recovery: f, Decisions: f, Audit: f, MAC: mac, AuditPolicy: policy, RetainedSeconds: 3600, Now: func() time.Time { return f.now }}
+	service := ProcessingChanges{RootID: root, InstallationID: root, Policies: f, Decisions: f, Audit: f, MAC: mac, AuditPolicy: policy, RetainedSeconds: 3600, Now: func() time.Time { return f.now }}
 	return f, service, value.ProcessingChange{RequestID: processingID(4), Action: "initialize_processing"}
 }
 func TestProcessingDecisionAuditsPreparedUnknownBeforeCAS(t *testing.T) {
@@ -125,8 +121,8 @@ func TestProcessingDecisionAuditsPreparedUnknownBeforeCAS(t *testing.T) {
 	if e != nil || !out.Valid(f.now) || out.State != "initialized" || f.begins != 1 || f.finishes != 1 || f.applies != 1 || f.prepared.Outcome.Effect != "unknown" {
 		t.Fatal("prepared decision/CAS", out, e, f.begins, f.finishes, f.applies)
 	}
-	if f.policyObservations != 1 || f.recoveryObservations != 1 {
-		t.Fatal("change stacked complete authority observations", f.policyObservations, f.recoveryObservations)
+	if f.policyObservations != 1 {
+		t.Fatal("change stacked complete authority observations", f.policyObservations)
 	}
 }
 
@@ -176,8 +172,8 @@ func TestProcessingUnknownCASReplyRecoversOriginalWithoutAuditSpend(t *testing.T
 	if e != nil || out.OperationID != c.RequestID || f.begins != 1 || f.finishes != 1 || f.applies != 1 {
 		t.Fatal("replay allocated new work", out, e, f.begins, f.finishes, f.applies)
 	}
-	if f.policyObservations != 2 || f.recoveryObservations != 2 {
-		t.Fatal("retry must observe authority once per operation", f.policyObservations, f.recoveryObservations)
+	if f.policyObservations != 2 {
+		t.Fatal("retry must observe authority once per operation", f.policyObservations)
 	}
 }
 func TestProcessingNoReleaseFromOrdinaryApprovalAndNoAuthorityAfterWait(t *testing.T) {
@@ -204,8 +200,8 @@ func TestProcessingNoReleaseFromOrdinaryApprovalAndNoAuthorityAfterWait(t *testi
 				t.Fatal("CAS after lost authority")
 			}
 			if why == "ordinary-owner" || why == "client" {
-				if !errors.Is(e, identity.ErrDenied) || f.recoveryObservations != 0 || f.prepared != nil || f.begins != 0 || f.finishes != 0 {
-					t.Fatal("known operator denial reached recovery, decision or mutation audit", e)
+				if !errors.Is(e, identity.ErrDenied) || f.prepared != nil || f.begins != 0 || f.finishes != 0 {
+					t.Fatal("known operator denial reached decision or mutation audit", e)
 				}
 			}
 		})

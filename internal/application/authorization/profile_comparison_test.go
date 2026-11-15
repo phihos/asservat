@@ -169,7 +169,7 @@ func TestProfileComparisonEachSourceKeepsOrdinaryRightsAndCurrentBounds(t *testi
 }
 
 func TestProfileComparisonRechecksFixedBaselineAfterBlockingIncident(t *testing.T) {
-	for _, mode := range []string{"deny", "version", "expiry", "cancel", "recovery"} {
+	for _, mode := range []string{"deny", "version", "expiry", "cancel"} {
 		t.Run(mode, func(t *testing.T) {
 			f, s, pair := newComparisonAuthorizationFixture()
 			ctx, cancel := context.WithCancel(t.Context())
@@ -187,8 +187,6 @@ func TestProfileComparisonRechecksFixedBaselineAfterBlockingIncident(t *testing.
 					f.now = f.now.Add(6 * time.Second)
 				case "cancel":
 					cancel()
-				case "recovery":
-					f.baseline.environment.Recovery.IssuerEpoch = projectionTestID(999)
 				}
 			}
 			if out, err := s.ResolveProjectionCurrent(ctx, f, pair.Candidate()); !errors.Is(err, analysis.ErrUnavailable) || out != (analysis.ContextProjectionAuthority{}) {
@@ -322,7 +320,7 @@ func TestProfileComparisonIdentityStillReadsCurrentAndNeverRenewsAnEarlierBound(
 }
 
 func TestProfileComparisonRequiresCommonPhysicalReaderAndGlobalRevisions(t *testing.T) {
-	for _, mode := range []string{"same-reader-cross-target", "store", "installation", "worker-config", "permission-stream", "identity-policy", "recovery-epoch", "recovery-revision"} {
+	for _, mode := range []string{"same-reader-cross-target", "store", "installation", "worker-config", "permission-stream", "identity-policy"} {
 		t.Run(mode, func(t *testing.T) {
 			f, s, pair := newComparisonAuthorizationFixture()
 			switch mode {
@@ -332,17 +330,12 @@ func TestProfileComparisonRequiresCommonPhysicalReaderAndGlobalRevisions(t *test
 				f.incident.environment.Path.StoreID = projectionTestID(999)
 			case "installation":
 				f.incident.environment.InstallationID = projectionTestID(999)
-				f.incident.environment.Recovery.InstallationID = projectionTestID(999)
 			case "worker-config":
 				f.incident.environment.Path.WorkerConfiguration.Generation++
 			case "permission-stream":
 				f.incident.permission.Revision.Generation++
 			case "identity-policy":
 				f.incident.environment.Principal.ClientID = "other"
-			case "recovery-epoch":
-				f.incident.environment.Recovery.IssuerEpoch = projectionTestID(999)
-			case "recovery-revision":
-				f.incident.environment.Recovery.Revision.Generation++
 			}
 			out, err := s.CheckProjectionCurrent(t.Context(), f, pair)
 			if mode == "same-reader-cross-target" {
@@ -398,15 +391,15 @@ func TestProfileComparisonNamesEarliestIncidentOrRecheckedBaseline(t *testing.T)
 		shortenBaseline     bool
 		want, baselineBound string
 	}{
-		{"incident-earlier", 2 * time.Second, false, "comparison/incident/environment/recovery", "request"},
+		{"incident-earlier", 2 * time.Second, false, "comparison/incident/environment/processing", "request"},
 		{"original-baseline-wins-tie", 3 * time.Second, false, "comparison/baseline/catalog", "catalog"},
 		{"baseline-recheck-shorter", 2500 * time.Millisecond, true, "comparison/baseline/retention", "retention"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			f, s, pair := newComparisonAuthorizationFixture()
 			f.baseline.record.ValidUntil = f.now.Add(3 * time.Second)
-			f.incident.environment.Recovery.FreshUntil = f.now.Add(tc.incident)
-			f.incident.environment.ValidUntil = f.incident.environment.Recovery.FreshUntil
+			f.incident.environment.Processing.ValidUntil = f.now.Add(tc.incident)
+			f.incident.environment.ValidUntil = f.incident.environment.Processing.ValidUntil
 			if tc.shortenBaseline {
 				f.incident.on = func(_ context.Context, step string, n int) {
 					if step == "environment" && n == 2 {

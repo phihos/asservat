@@ -63,7 +63,7 @@ func (s ContextInvestigation) childRetention(ctx context.Context, f contextFacts
 // previewCompositionGroup is PreviewComposition for a manual packet +
 // syscall composition (ADR-276): one child single recording per component,
 // all on the target's node recorders, under one parent review.
-func (s ContextInvestigation) previewCompositionGroup(ctx context.Context, source identities.CurrentIdentity, intent value.ContextIntent, i identity.Identity, recovery artifact.RecoveryProof, target targets.PodResolution, created time.Time) (RecorderPreviewResult, error) {
+func (s ContextInvestigation) previewCompositionGroup(ctx context.Context, source identities.CurrentIdentity, intent value.ContextIntent, i identity.Identity, target targets.PodResolution, created time.Time) (RecorderPreviewResult, error) {
 	var zero RecorderPreviewResult
 	if _, _, policy := authorization.PolicyExecutor(i.Principal); policy || intent.RepeatedFrom != nil {
 		return zero, previewFailure("composition", value.ErrInvalid)
@@ -94,7 +94,7 @@ func (s ContextInvestigation) previewCompositionGroup(ctx context.Context, sourc
 	}
 	first := intent
 	first.Composition = &parts[0]
-	f, err := s.facts(ctx, source, i.Principal, first, target, created, identity.Earlier(i.ValidUntil, recovery.FreshUntil))
+	f, err := s.facts(ctx, source, i.Principal, first, target, created, i.ValidUntil)
 	if err != nil {
 		return zero, previewFailure("facts", err)
 	}
@@ -102,7 +102,7 @@ func (s ContextInvestigation) previewCompositionGroup(ctx context.Context, sourc
 	if err != nil {
 		return zero, previewFailure("approvals", err)
 	}
-	p := value.ContextPreview{ID: s.NewID(), RootID: s.RootID, InstallationID: s.InstallationID, IssuerEpoch: recovery.IssuerEpoch, CaptureID: s.NewID(), CaseID: s.NewID(), OccurrenceID: s.NewID(), ArtifactID: s.NewID(), AttemptID: s.NewID(), AssessmentID: s.NewID(), Actor: i.Principal, Intent: intent, Target: target.Request, Pin: target.Pin, Storage: f.storage.Selection, Retention: retentionReview(f.retention), Audience: slices.Clone(f.eligibility.DefaultAudience), CreatedAt: created, Deadline: created.Add(s.Lifetime), CompositionGroup: &value.CompositionGroupPreview{}}
+	p := value.ContextPreview{ID: s.NewID(), RootID: s.RootID, InstallationID: s.InstallationID, CaptureID: s.NewID(), CaseID: s.NewID(), OccurrenceID: s.NewID(), ArtifactID: s.NewID(), AttemptID: s.NewID(), AssessmentID: s.NewID(), Actor: i.Principal, Intent: intent, Target: target.Request, Pin: target.Pin, Storage: f.storage.Selection, Retention: retentionReview(f.retention), Audience: slices.Clone(f.eligibility.DefaultAudience), CreatedAt: created, Deadline: created.Add(s.Lifetime), CompositionGroup: &value.CompositionGroupPreview{}}
 	p.Intent.Composition = intent.Composition.Clone()
 	p.ExecutionClass = target.ExecutionClass
 	p.AssessmentRulesDigest = compiler.RecorderAssessmentRulesDigest()
@@ -169,7 +169,7 @@ func (s ContextInvestigation) previewCompositionGroup(ctx context.Context, sourc
 	coverageUntil := time.Time{}
 	for n := range parts {
 		cp := compositionChild(p, n)
-		coverage, err := s.processingCoverage(ctx, cp, facts[n], recovery, i.ValidUntil)
+		coverage, err := s.processingCoverage(ctx, cp, facts[n], i.ValidUntil)
 		if err != nil {
 			return zero, previewFailure("processing", err)
 		}
@@ -185,17 +185,17 @@ func (s ContextInvestigation) previewCompositionGroup(ctx context.Context, sourc
 	if !ValidContextPreview(p) || !p.Current(s.Now()) {
 		return zero, previewFailure("blueprint", value.ErrInvalid)
 	}
-	if _, err = s.currentIdentity(ctx, source, i.Principal, i.ValidUntil); err != nil || !s.factsCurrent(f, s.Now()) || !s.Now().Before(coverageUntil) || !recovery.Valid(s.Now()) {
+	if _, err = s.currentIdentity(ctx, source, i.Principal, i.ValidUntil); err != nil || !s.factsCurrent(f, s.Now()) || !s.Now().Before(coverageUntil) {
 		return zero, previewFailure("before-store/current", value.ErrChanged)
 	}
 	if err = s.Previews.CreateContextPreview(ctx, p.Clone()); err != nil {
 		return zero, previewFailure("store", err)
 	}
 	current := s.Eligibility.ContextEligibilityCurrent(ctx, source, t)
-	if !current.Eligible || current.Target != t || current.Principal != i.Principal || !current.VerifiedIdentity.Valid(s.Now()) || !i.Valid(s.Now()) || !slices.Equal(current.DefaultAudience, p.Audience) || !s.Now().Before(current.ValidUntil) || !s.factsCurrent(f, s.Now()) || !s.Now().Before(coverageUntil) || !recovery.Valid(s.Now()) || ctx.Err() != nil {
+	if !current.Eligible || current.Target != t || current.Principal != i.Principal || !current.VerifiedIdentity.Valid(s.Now()) || !i.Valid(s.Now()) || !slices.Equal(current.DefaultAudience, p.Audience) || !s.Now().Before(current.ValidUntil) || !s.factsCurrent(f, s.Now()) || !s.Now().Before(coverageUntil) || ctx.Err() != nil {
 		return zero, previewFailure("after-store/current", value.ErrChanged)
 	}
-	until := identity.Earlier(i.ValidUntil, recovery.FreshUntil)
+	until := i.ValidUntil
 	for _, bound := range []time.Time{current.ValidUntil, current.VerifiedIdentity.ValidUntil, f.eligibility.ValidUntil, assessment.ValidUntil, display.ValidUntil, f.storage.Binding.FreshUntil, coverageUntil} {
 		until = identity.Earlier(until, bound)
 	}
@@ -208,7 +208,7 @@ func (s ContextInvestigation) previewCompositionGroup(ctx context.Context, sourc
 // requestCompositionGroup is Request for a reviewed composition group: one
 // approval gate for the parent, both node recorders resolved for the same
 // Pod, and one atomic admission of every child (ADR-276).
-func (s ContextInvestigation) requestCompositionGroup(ctx context.Context, source identities.CurrentIdentity, p value.ContextPreview, key string, i identity.Identity, recovery artifact.RecoveryProof) (value.Accepted, error) {
+func (s ContextInvestigation) requestCompositionGroup(ctx context.Context, source identities.CurrentIdentity, p value.ContextPreview, key string, i identity.Identity) (value.Accepted, error) {
 	var zero value.Accepted
 	admit, ok := s.Admission.(CompositionGroupAdmissions)
 	if !ok {
@@ -236,14 +236,14 @@ func (s ContextInvestigation) requestCompositionGroup(ctx context.Context, sourc
 		}
 		reviewedActions = append(reviewedActions, actions...)
 	}
-	if p.IssuerEpoch != recovery.IssuerEpoch || p.AssessmentRulesDigest != compiler.RecorderAssessmentRulesFor(reviewedActions) {
+	if p.AssessmentRulesDigest != compiler.RecorderAssessmentRulesFor(reviewedActions) {
 		return zero, s.requestChanged("epoch")
 	}
 	// As for a single recording: warm the reviewed storage selection while
 	// the grant gate does I/O. The hint confers no authority.
 	var wait *contextStorageWait
 	if p.Storage != (value.ContextStorageSelection{}) {
-		wait = s.beginStorageWait(ctx, targets.PodResolution{Request: p.Target}, identity.Earlier(i.ValidUntil, recovery.FreshUntil), p.Storage)
+		wait = s.beginStorageWait(ctx, targets.PodResolution{Request: p.Target}, i.ValidUntil, p.Storage)
 		defer wait.close()
 	}
 	grant, err := s.recorderRequest(ctx, source, p, key, nil)
@@ -318,7 +318,7 @@ func (s ContextInvestigation) requestCompositionGroup(ctx context.Context, sourc
 		return zero, s.requestChanged("audience")
 	}
 	digest := ContextRequestDigest(p.ID)
-	request := value.RecordingSaveGroupAdmission{Preview: p.Clone(), RootID: s.RootID, IdempotencyKey: key, SubmissionDigest: digest, Recovery: recovery}
+	request := value.RecordingSaveGroupAdmission{Preview: p.Clone(), RootID: s.RootID, IdempotencyKey: key, SubmissionDigest: digest}
 	coverageUntil := time.Time{}
 	for n, c := range children {
 		cp := compositionChild(p, n)
@@ -329,7 +329,7 @@ func (s ContextInvestigation) requestCompositionGroup(ctx context.Context, sourc
 		if !reflect.DeepEqual(retentionReview(fc.retention), c.Retention) {
 			return zero, s.requestChanged("retention")
 		}
-		coverage, err := s.processingCoverage(ctx, cp, fc, recovery, i.ValidUntil)
+		coverage, err := s.processingCoverage(ctx, cp, fc, i.ValidUntil)
 		if err != nil {
 			return zero, err
 		}
@@ -372,13 +372,13 @@ func (s ContextInvestigation) requestCompositionGroup(ctx context.Context, sourc
 				return zero, value.ErrAcquisitionClosed
 			}
 		}
-		request.Children = append(request.Children, value.Admission{Recovery: recovery, RootID: s.RootID, IdempotencyKey: key, SubmissionDigest: digest, Plan: plan, Storage: f.storage.Binding, Registration: r, CaseID: p.CaseID, OccurrenceID: c.OccurrenceID})
+		request.Children = append(request.Children, value.Admission{RootID: s.RootID, IdempotencyKey: key, SubmissionDigest: digest, Plan: plan, Storage: f.storage.Binding, Registration: r, CaseID: p.CaseID, OccurrenceID: c.OccurrenceID})
 	}
 	final := s.Eligibility.ContextEligibilityCurrent(ctx, source, target.Target())
 	final.ValidUntil = identity.Earlier(final.ValidUntil, f.eligibility.ValidUntil)
 	final.VerifiedIdentity.ValidUntil = identity.Earlier(final.VerifiedIdentity.ValidUntil, i.ValidUntil)
 	now := s.Now()
-	if !final.Eligible || final.Target != target.Target() || final.Principal != p.Actor || final.VerifiedIdentity.Principal != p.Actor || !final.VerifiedIdentity.Valid(now) || !slices.Equal(final.DefaultAudience, p.Audience) || !now.Before(final.ValidUntil) || !s.factsCurrent(f, now) || !now.Before(coverageUntil) || !p.Current(now) || !recovery.Valid(now) || ctx.Err() != nil {
+	if !final.Eligible || final.Target != target.Target() || final.Principal != p.Actor || final.VerifiedIdentity.Principal != p.Actor || !final.VerifiedIdentity.Valid(now) || !slices.Equal(final.DefaultAudience, p.Audience) || !now.Before(final.ValidUntil) || !s.factsCurrent(f, now) || !now.Before(coverageUntil) || !p.Current(now) || ctx.Err() != nil {
 		return zero, s.requestChanged("eligibility")
 	}
 	for n := range request.Children {
@@ -394,11 +394,11 @@ func (s ContextInvestigation) requestCompositionGroup(ctx context.Context, sourc
 	if !acceptedContext(a, digest) || a.CaptureID != p.CaptureID || a.ScopeDigest != p.ScopeDigest {
 		return zero, value.ErrUnavailable
 	}
-	if _, err = s.currentIdentity(ctx, source, i.Principal, i.ValidUntil); err != nil || !recovery.Valid(s.Now()) {
+	if _, err = s.currentIdentity(ctx, source, i.Principal, i.ValidUntil); err != nil {
 		return zero, previewFailure("request/identity-after", value.ErrDenied)
 	}
 	// ADR-276 v1: no parent history entry; repeating needs a new preview.
-	a.MetadataValidUntil = identity.Earlier(a.MetadataValidUntil, identity.Earlier(i.ValidUntil, recovery.FreshUntil))
+	a.MetadataValidUntil = identity.Earlier(a.MetadataValidUntil, i.ValidUntil)
 	a.MetadataValidUntil = identity.Earlier(a.MetadataValidUntil, identity.Earlier(final.ValidUntil, final.VerifiedIdentity.ValidUntil))
 	if !s.Now().Before(a.MetadataValidUntil) {
 		return zero, previewFailure("request/metadata", value.ErrDenied)

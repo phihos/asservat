@@ -7,7 +7,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"slices"
-	"strings"
 	"time"
 
 	app "asservat.local/asservat/internal/application/fleet"
@@ -36,7 +35,6 @@ func NewAPIContextWorkTrustProtection(observer, probe *PermissionClient, p cfg.C
 type APIContextWorkTrustSource struct {
 	client     *PermissionClient
 	protection *APIContextWorkTrustProtection
-	recovery   app.RecoveryReader
 	name, uid  string
 	installed  contracts.APIContextWorkTrustSettings
 	canonical  []byte
@@ -53,7 +51,7 @@ type APIContextWorkTrustSource struct {
 // read is a guarded ConfigMap observation with its own proofs (native run
 // 41208314967: the first work operation spent up to two seconds there and
 // source work was refused at its second read).
-// Three seconds, like the owner route: a start's receiver/recovery bound is
+// Three seconds, like the owner route: a start's receiver bound is
 // the earliest reused observation, and with two seconds a start could begin
 // with under one second left for preparation headroom (installed incident
 // runs 41301126897, 41299848255, 41284876053).
@@ -92,8 +90,8 @@ func apiWorkTrustValue(p contracts.APIContextWorkTrustSettings, uid string, now,
 // cluster whose works it verifies. The hub holds every workload cluster's
 // trust in its control namespace (ADR-180); a region pins its own cluster in
 // its deployment validation.
-func NewAPIContextWorkTrustSource(c *PermissionClient, p *APIContextWorkTrustProtection, recovery app.RecoveryReader, name, uid string, installed contracts.APIContextWorkTrustSettings) (*APIContextWorkTrustSource, error) {
-	if c == nil || p == nil || p.configMapProtection == nil || p.observer != c || p.plan.SourceName != name || recovery == nil || !installationRefValid(name, uid) {
+func NewAPIContextWorkTrustSource(c *PermissionClient, p *APIContextWorkTrustProtection, name, uid string, installed contracts.APIContextWorkTrustSettings) (*APIContextWorkTrustSource, error) {
+	if c == nil || p == nil || p.configMapProtection == nil || p.observer != c || p.plan.SourceName != name || !installationRefValid(name, uid) {
 		return nil, cfg.ErrInvalid
 	}
 	n := c.now()
@@ -105,14 +103,13 @@ func NewAPIContextWorkTrustSource(c *PermissionClient, p *APIContextWorkTrustPro
 		return nil, e
 	}
 	installed.Keys = slices.Clone(installed.Keys)
-	return &APIContextWorkTrustSource{client: c, protection: p, recovery: recovery, name: name, uid: uid, installed: installed, canonical: canonical}, nil
+	return &APIContextWorkTrustSource{client: c, protection: p, name: name, uid: uid, installed: installed, canonical: canonical}, nil
 }
 
 // NewLocalAPIContextWorkTrustSource serves the hub's own work trust for its
 // combined-mode local cluster (no ConfigMap); uid names its revision.
-// Recovery is checked on every read as for a guarded source.
-func NewLocalAPIContextWorkTrustSource(c *PermissionClient, recovery app.RecoveryReader, uid string, installed contracts.APIContextWorkTrustSettings) (*APIContextWorkTrustSource, error) {
-	if c == nil || recovery == nil || !authorization.UUID(uid) {
+func NewLocalAPIContextWorkTrustSource(c *PermissionClient, uid string, installed contracts.APIContextWorkTrustSettings) (*APIContextWorkTrustSource, error) {
+	if c == nil || !authorization.UUID(uid) {
 		return nil, cfg.ErrInvalid
 	}
 	n := c.now()
@@ -124,7 +121,7 @@ func NewLocalAPIContextWorkTrustSource(c *PermissionClient, recovery app.Recover
 		return nil, e
 	}
 	installed.Keys = slices.Clone(installed.Keys)
-	return &APIContextWorkTrustSource{client: c, recovery: recovery, uid: uid, installed: installed, canonical: canonical}, nil
+	return &APIContextWorkTrustSource{client: c, uid: uid, installed: installed, canonical: canonical}, nil
 }
 
 func (s *APIContextWorkTrustSource) snapshot(ctx context.Context) error {
@@ -171,11 +168,9 @@ func (s *APIContextWorkTrustSource) APIContextWorkTrust(ctx context.Context) (fl
 	// original interval: one transient guard read otherwise denied every
 	// work verification until the next success (native run 41246065147
 	// refused a Save's collect work at "trust"). Nothing is extended.
-	// A known change, or any recovery refusal, never falls back to the earlier
-	// observation; only guard/snapshot read failures do.
-	var step trustStep
-	recoveryStep := errors.As(err, &step) && strings.HasPrefix(step.step, "recovery")
-	if previous != nil && !recoveryStep && !errors.Is(err, cfg.ErrChanged) && previous.Valid(s.client.now()) && ctx.Err() == nil {
+	// A known change never falls back to the earlier observation; only
+	// guard/snapshot read failures do.
+	if previous != nil && !errors.Is(err, cfg.ErrChanged) && previous.Valid(s.client.now()) && ctx.Err() == nil {
 		s.cached = previous
 		kept := *previous
 		kept.Trust.Keys = slices.Clone(previous.Trust.Keys)
@@ -188,7 +183,7 @@ func (s *APIContextWorkTrustSource) readTrust(ctx context.Context) (fleet.APICon
 	var zero fleet.APIContextWorkTrust
 	start := s.client.now()
 	// until bounds this check's reads (five seconds); valid is the ADR-311
-	// interval the completed trust check may be used for, never past recovery.
+	// interval the completed trust check may be used for.
 	until := start.Add(5 * time.Second)
 	valid := start.Add(identity.AuthorityRecheckInterval)
 	if d, ok := ctx.Deadline(); ok {
@@ -196,24 +191,11 @@ func (s *APIContextWorkTrustSource) readTrust(ctx context.Context) (fleet.APICon
 	}
 	call, cancel := context.WithDeadline(ctx, until)
 	defer cancel()
-	recovery, e := s.recovery.RecoveryState(call)
-	if e != nil || !recovery.Valid(s.client.now()) || recovery.InstallationID != s.installed.InstallationID || recovery.IssuerEpoch != s.installed.IssuerEpoch {
-		return zero, trustStep{"recovery", cfg.ErrUnavailable}
-	}
-	until = identity.Earlier(until, recovery.FreshUntil)
-	valid = identity.Earlier(valid, recovery.FreshUntil)
-	call, stopRecovery := context.WithDeadline(call, until)
-	defer stopRecovery()
-	if e = s.snapshot(call); e != nil {
+	if e := s.snapshot(call); e != nil {
 		return zero, trustStep{"snapshot", e}
 	}
-	last, e := s.recovery.RecoveryState(call)
-	if e != nil || !last.Valid(s.client.now()) || last.InstallationID != recovery.InstallationID || last.IssuerEpoch != recovery.IssuerEpoch || last.Revision != recovery.Revision {
-		return zero, trustStep{"recovery-final", cfg.ErrChanged}
-	}
-	valid = identity.Earlier(valid, last.FreshUntil)
 	out, e := apiWorkTrustValue(s.installed, s.uid, start, valid)
-	if e != nil || call.Err() != nil || !out.Valid(s.client.now()) || !recovery.Valid(s.client.now()) || s.client.now().Before(start) {
+	if e != nil || call.Err() != nil || !out.Valid(s.client.now()) || s.client.now().Before(start) {
 		return zero, trustStep{"value", cfg.ErrUnavailable}
 	}
 	return out, nil

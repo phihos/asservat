@@ -29,9 +29,6 @@ const (
 	// and the hub's authentication facts for one observed owner certificate.
 	PurposeOwnerCandidates     Purpose = "owner-candidates"
 	PurposeOwnerAuthentication Purpose = "owner-authentication"
-	// PurposeRecovery asks for the hub's current recovery state, which the
-	// region's verify-only work-trust reader requires. It is read-only.
-	PurposeRecovery Purpose = "recovery"
 	// PurposeAccessBindings delivers the connector's complete AccessBinding
 	// LIST of its cluster (ADR-329). The hub asks for it only after the
 	// presentation verified; the delivery is attributed to that cluster.
@@ -63,11 +60,10 @@ type Opening struct {
 
 // HubFrame drives the conversation; exactly one of its payloads is set.
 type HubFrame struct {
-	Kind     string                           // access-bindings, capacity, result, failure
-	Owners   *value.APIContextOwnerCandidates `json:",omitempty"`
-	Owner    *OwnerAuthentication             `json:",omitempty"`
-	Recovery *value.RecoveryState             `json:",omitempty"`
-	Failure  string                           `json:",omitempty"`
+	Kind    string                           // access-bindings, capacity, result, failure
+	Owners  *value.APIContextOwnerCandidates `json:",omitempty"`
+	Owner   *OwnerAuthentication             `json:",omitempty"`
+	Failure string                           `json:",omitempty"`
 	// Digest is the hub's stored delivery digest of an "access-bindings" or
 	// "capacity" request; the connector answers Unchanged when its current
 	// delivery has the same digest (ADR-329, ADR-331).

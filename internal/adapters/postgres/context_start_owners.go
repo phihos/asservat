@@ -11,7 +11,7 @@ import (
 )
 
 // ReadContextStartOwners reuses the existing current read facet/credential.
-// It acquires recovery before the owner configuration shared lock. No writes,
+// It takes the owner configuration shared lock. No writes,
 // addresses, certificate claims or human authority are produced by discovery.
 func (s *OwnerEnrollments) ReadContextStartOwners(ctx context.Context) (value.APIContextOwnerCandidates, error) {
 	var out value.APIContextOwnerCandidates
@@ -22,7 +22,7 @@ func (s *OwnerEnrollments) ReadContextStartOwners(ctx context.Context) (value.AP
 	call, stop := context.WithDeadline(ctx, start.Add(5*time.Second))
 	defer stop()
 	original, _ := call.Deadline()
-	err := s.current(call, false, start, func(q *custodydb.Queries, c value.OwnerConfigurationObservation, r value.RecoveryState, n time.Time) error {
+	err := s.current(call, false, start, func(q *custodydb.Queries, c value.OwnerConfigurationObservation, n time.Time) error {
 		if c.Configuration.Pool.NativePort == 0 {
 			return value.ErrUnavailable
 		}
@@ -36,7 +36,7 @@ func (s *OwnerEnrollments) ReadContextStartOwners(ctx context.Context) (value.AP
 		if len(rows) > 16 {
 			return value.ErrUnavailable
 		}
-		until := identity.Earlier(original, identity.Earlier(c.FreshUntil, r.FreshUntil))
+		until := identity.Earlier(original, c.FreshUntil)
 		out = value.APIContextOwnerCandidates{Pool: c.Configuration.Pool, ObservedAt: start, ValidUntil: until}
 		for _, row := range rows {
 			out.Owners = append(out.Owners, value.OwnerBinding{InstallationID: out.Pool.InstallationID, ClusterID: out.Pool.ClusterID, IssuerEpoch: out.Pool.IssuerEpoch, PodUID: uid(row.PodUid), ProcessEpoch: uid(row.ProcessEpoch)})

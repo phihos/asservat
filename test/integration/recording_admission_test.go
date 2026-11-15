@@ -192,8 +192,8 @@ func qualifyRecordingTransactions(t *testing.T, ctx context.Context, admin *pgxp
 				reserved.Close()
 			}
 		})
-		guards := postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard}
-		executions, err := postgres.NewAPIContextExecutions(ctx, sharedPools.ordinary, s.a.RootID, guards)
+		guards := s.retention.guard
+		executions, err := postgres.NewAPIContextExecutions(ctx, sharedPools.ordinary, s.a.RootID, s.recovery.installation, guards)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -213,11 +213,11 @@ func qualifyRecordingTransactions(t *testing.T, ctx context.Context, admin *pgxp
 		}
 		verified := s.a.Eligibility.VerifiedIdentity
 		verified.VerifiedAt, verified.ValidUntil = n, n.Add(30*time.Second)
-		recovery, err := s.recovery.reader.RecoveryState(ctx)
-		if err != nil {
+		var issuerEpoch string
+		if err = admin.QueryRow(ctx, "SELECT issuer_epoch FROM fleet_trust WHERE installation_id=$1", s.recovery.installation).Scan(&issuerEpoch); err != nil {
 			t.Fatal(err)
 		}
-		work, err := executions.ReadAPIContextWork(ctx, accepted.CaptureID, verified, recovery)
+		work, err := executions.ReadAPIContextWork(ctx, accepted.CaptureID, verified)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -248,14 +248,14 @@ func qualifyRecordingTransactions(t *testing.T, ctx context.Context, admin *pgxp
 		}
 		verified.VerifiedAt, verified.ValidUntil = n, n.Add(30*time.Second)
 		eligible = authorization.ContextEligibility(verified, projection, s.a.Eligibility.Target, time.Now())
-		process := value.APIProcessObservation{Binding: value.APIProcessBinding{InstallationID: recovery.InstallationID, ClusterID: current.Target.Target().ClusterID, IssuerEpoch: recovery.IssuerEpoch, NamespaceUID: custodyID(), AccountUID: custodyID(), PodUID: custodyID(), ProcessEpoch: custodyID(), StartupDigest: artifact.Digest{1}, ImageDigest: e.CollectorImageDigest}, CheckedAt: n, ValidUntil: n.Add(30 * time.Second)}
+		process := value.APIProcessObservation{Binding: value.APIProcessBinding{InstallationID: s.recovery.installation, ClusterID: current.Target.Target().ClusterID, IssuerEpoch: issuerEpoch, NamespaceUID: custodyID(), AccountUID: custodyID(), PodUID: custodyID(), ProcessEpoch: custodyID(), StartupDigest: artifact.Digest{1}, ImageDigest: e.CollectorImageDigest}, CheckedAt: n, ValidUntil: n.Add(30 * time.Second)}
 		until := n.Add(30 * time.Second)
-		for _, d := range []time.Time{eligible.ValidUntil, plan.ValidUntil, recovery.FreshUntil, process.ValidUntil} {
+		for _, d := range []time.Time{eligible.ValidUntil, plan.ValidUntil, process.ValidUntil} {
 			if d.Before(until) {
 				until = d
 			}
 		}
-		check := executionapp.APIExecutionCheck{Work: work, Plan: plan, Eligibility: eligible, Recovery: recovery, Process: process, CheckedAt: n, ValidUntil: until.Truncate(time.Microsecond)}
+		check := executionapp.APIExecutionCheck{Work: work, Plan: plan, Eligibility: eligible, Process: process, CheckedAt: n, ValidUntil: until.Truncate(time.Microsecond)}
 		if !check.Valid(time.Now()) {
 			t.Fatal("invalid recording execution check")
 		}
@@ -312,11 +312,11 @@ func qualifyRecordingTransactions(t *testing.T, ctx context.Context, admin *pgxp
 		if err = holder.DeliverPacket(ctx, collector.Identity{NodeName: "worker", NodeUID: "node-uid"}, result, bytes.NewReader(native)); err == nil {
 			t.Fatal("a second delivery was stored")
 		}
-		readWork, readExecution, err := executions.ReadRecordingWork(ctx, accepted.CaptureID, recovery)
+		readWork, readExecution, err := executions.ReadRecordingWork(ctx, accepted.CaptureID)
 		if err != nil || readExecution.Phase != "started" || readWork.Accepted.CaptureID != accepted.CaptureID {
 			t.Fatal("read recording work", err)
 		}
-		runner := executionapp.APIContextRunner{Record: executions, Process: &recordingProcess{process}, Recovery: s.recovery.reader, Now: time.Now}
+		runner := executionapp.APIContextRunner{Record: executions, Process: &recordingProcess{process}, Now: time.Now}
 		got, err := runner.CollectRecording(ctx, readWork, readExecution, recordingCollect{holder, signed})
 		if err != nil || got.State != "StoredPendingVerification" {
 			t.Fatal("collect", got, err)
@@ -340,7 +340,7 @@ func qualifyRecordingTransactions(t *testing.T, ctx context.Context, admin *pgxp
 		verify := publication("context_verify_runtime", "synthetic-context-verify")
 		audit := publication("context_verification_audit_runtime", "synthetic-context-audit")
 		publish := publication("context_publish_runtime", "synthetic-context-publish")
-		gate, err := postgres.NewAPIContextPublicationGate(ctx, pool("api_publication_gate_runtime", "synthetic-api-publication-gate"), s.a.RootID, guards, privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, s.recovery.reader)
+		gate, err := postgres.NewAPIContextPublicationGate(ctx, pool("api_publication_gate_runtime", "synthetic-api-publication-gate"), s.a.RootID, guards, privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now})
 		if err != nil {
 			t.Fatal(err)
 		}

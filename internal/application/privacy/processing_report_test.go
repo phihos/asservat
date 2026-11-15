@@ -55,7 +55,7 @@ func TestProcessingReportPreservesOperatorSourceAndOriginalBounds(t *testing.T) 
 				}
 				return page, nil
 			})
-			service := ProcessingReport{RootID: changes.RootID, InstallationID: changes.InstallationID, Policies: fixture, Recovery: fixture, Reports: reader, Now: changes.Now}
+			service := ProcessingReport{RootID: changes.RootID, InstallationID: changes.InstallationID, Policies: fixture, Reports: reader, Now: changes.Now}
 			if name == "invalid-section" {
 				query.Section = "arbitrary-sql"
 			}
@@ -64,8 +64,8 @@ func TestProcessingReportPreservesOperatorSourceAndOriginalBounds(t *testing.T) 
 			}
 			page, err := service.Get(t.Context(), fixture, query)
 			if name == "allowed" {
-				if err != nil || !page.Valid(query, fixture.now) || !page.ValidUntil.Equal(wantUntil) || reads != 1 || fixture.policyObservations != 1 || fixture.recoveryObservations != 1 {
-					t.Fatal("report renewed authority or failed its original identity cutoff", err, reads, fixture.policyObservations, fixture.recoveryObservations)
+				if err != nil || !page.Valid(query, fixture.now) || !page.ValidUntil.Equal(wantUntil) || reads != 1 || fixture.policyObservations != 1 {
+					t.Fatal("report renewed authority or failed its original identity cutoff", err, reads, fixture.policyObservations)
 				}
 				return
 			}

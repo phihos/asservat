@@ -122,6 +122,7 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 		batch                       cfg.PermissionBatch
 		observation                 capture.PolicySource
 		input                       capture.PolicyAdmission
+		issuerEpoch                 string
 	}
 	flushPermissions := func(t *testing.T, p *postgres.Permissions) {
 		t.Helper()
@@ -162,8 +163,8 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 		}
 		actor := identity.Principal{Issuer: basis.Subjects[0].Issuer, Subject: "developer", ClientID: "console", Kind: identity.Human}
 		authority := authorization.AcceptedPolicyAuthority{InstallationID: installation, PolicyUID: policy, Creator: actor, Executor: authorization.PolicyPrincipal(installation, policy), ScopeDigest: artifact.Digest{10}, ClusterID: cluster, NamespaceUID: ns, WorkloadUID: workload, Delegation: identity.Revision{UID: basis.Resource.UID, Generation: 1, Digest: basis.Resource.SpecDigest}, Owners: []artifact.AudienceAssignment{projection.Allows[0].Audience}, Actions: []string{"packetCapture"}, Limits: authorization.AutomationLimits{MaxExecutions: 10, MaxBytes: maxOutput, MaxObservedBytes: 2000}, IssuedAt: now, NotAfter: now.Add(time.Hour)}
-		rproof := artifact.RecoveryProof{InstallationID: installation, IssuerEpoch: custodyID(), Revision: identity.Revision{UID: "recovery", Generation: 1, Digest: artifact.Digest{4}}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
-		if _, err = admin.Exec(ctx, `INSERT INTO fleet_trust(activated_postmaster_at,activated_database_oid,installation_id,issuer_epoch,source_uid,source_generation,source_digest,suspended,observed_at,fresh_until) VALUES(pg_catalog.pg_postmaster_start_time(),(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()),$1,$2,'recovery',1,$3,false,$4,$5)`, installation, rproof.IssuerEpoch, rproof.Revision.Digest[:], now, now.Add(30*time.Second)); err != nil {
+		issuerEpoch := custodyID()
+		if _, err = admin.Exec(ctx, `INSERT INTO fleet_trust(activated_postmaster_at,activated_database_oid,installation_id,issuer_epoch,source_uid,source_generation,source_digest,suspended,observed_at,fresh_until) VALUES(pg_catalog.pg_postmaster_start_time(),(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()),$1,$2,'synthetic-trust',1,$3,false,$4,$5)`, installation, issuerEpoch, bytes.Repeat([]byte{4}, 32), now, now.Add(30*time.Second)); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := seedSyntheticFleetObservation(ctx, admin, installation); err != nil {
@@ -176,7 +177,7 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 			}
 			return r
 		}
-		s := setup{p: p, source: factory(sourcePool), accept: factory(acceptPool), audit: factory(auditPool), read: factory(readPool), batch: batch}
+		s := setup{p: p, source: factory(sourcePool), accept: factory(acceptPool), audit: factory(auditPool), read: factory(readPool), batch: batch, issuerEpoch: issuerEpoch}
 		s.current, err = postgres.NewAutomationAuthorities(ctx, readPool, root, installation)
 		if err != nil {
 			t.Fatal(err)
@@ -185,7 +186,7 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 		if err = s.source.ObservePolicy(ctx, s.observation); err != nil {
 			t.Fatal(err)
 		}
-		s.input = capture.PolicyAdmission{RootID: root, Recovery: rproof, Target: target, Authority: authority, Author: identity.Identity{Principal: actor, Scopes: []string{"evidence:capture"}, Groups: []string{"team-a"}, Policy: identity.Revision{UID: "identity", Generation: 1, Digest: artifact.Digest{7}}, VerifiedAt: now, ValidUntil: now.Add(30 * time.Second)}, Submission: capture.VerifiedPolicySubmission{Nonce: custodyID(), Actor: actor, Source: s.observation.Revision, ClusterID: cluster, NamespaceUID: ns, Name: s.observation.Name, ScopeDigest: authority.ScopeDigest, EnvelopeDigest: artifact.Digest{8}, IssuedAt: now, ExpiresAt: now.Add(30 * time.Second)}}
+		s.input = capture.PolicyAdmission{RootID: root, Target: target, Authority: authority, Author: identity.Identity{Principal: actor, Scopes: []string{"evidence:capture"}, Groups: []string{"team-a"}, Policy: identity.Revision{UID: "identity", Generation: 1, Digest: artifact.Digest{7}}, VerifiedAt: now, ValidUntil: now.Add(30 * time.Second)}, Submission: capture.VerifiedPolicySubmission{Nonce: custodyID(), Actor: actor, Source: s.observation.Revision, ClusterID: cluster, NamespaceUID: ns, Name: s.observation.Name, ScopeDigest: authority.ScopeDigest, EnvelopeDigest: artifact.Digest{8}, IssuedAt: now, ExpiresAt: now.Add(30 * time.Second)}}
 		s.input.Verification = syntheticSubmissionCheck(s.input, now)
 		return s
 	}
@@ -243,7 +244,7 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 		s.input.Verification = syntheticSubmissionCheck(s.input, clock())
 		r := accept(t, s)
 		flush(t, s)
-		qualifyPolicyGrantPersistence(t, ctx, admin, poolFor, s.source, s.observation, s.input.Author, s.input.RootID, s.input.Authority, r.Record.ID, scope, s.input.Recovery)
+		qualifyPolicyGrantPersistence(t, ctx, admin, poolFor, s.source, s.observation, s.input.Author, s.input.RootID, s.input.Authority, r.Record.ID, scope)
 	})
 
 	t.Run("policy-grants-public-request-review-attachment-audit", func(t *testing.T) {
@@ -561,7 +562,7 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 			t.Fatal("audited edited authority rejected")
 		}
 	})
-	for _, name := range []string{"deleted", "expired-source", "recovery-blocked", "issuer-epoch", "scope-tamper", "departed-at-acceptance", "actor-substitution", "removed-envelope", "team-deny"} {
+	for _, name := range []string{"deleted", "expired-source", "suspended", "scope-tamper", "departed-at-acceptance", "actor-substitution", "removed-envelope", "team-deny"} {
 		t.Run(name, func(t *testing.T) {
 			s := newSetup(t)
 			if name == "departed-at-acceptance" {
@@ -597,12 +598,8 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 				if _, err = admin.Exec(ctx, "UPDATE policy_source SET observed_at=$2,fresh_until=$3 WHERE root_id=$1", s.input.RootID, observed, observed.Add(5*time.Second)); err != nil {
 					t.Fatal(err)
 				}
-			case "recovery-blocked":
+			case "suspended":
 				if _, err = admin.Exec(ctx, "UPDATE fleet_trust SET suspended=true WHERE installation_id=$1", s.input.Authority.InstallationID); err != nil {
-					t.Fatal(err)
-				}
-			case "issuer-epoch":
-				if _, err = admin.Exec(ctx, "UPDATE fleet_trust SET issuer_epoch=$2 WHERE installation_id=$1", s.input.Authority.InstallationID, custodyID()); err != nil {
 					t.Fatal(err)
 				}
 			case "scope-tamper":
@@ -672,7 +669,7 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 			t.Fatal(e)
 		}
 		x := s.input.Submission
-		expected := capture.PolicySubmissionIntent{RootID: s.input.RootID, InstallationID: s.input.Authority.InstallationID, IssuerEpoch: s.input.Recovery.IssuerEpoch, ReplacesID: x.ReplacesID, Nonce: x.Nonce, Actor: x.Actor, Source: x.Source, ClusterID: x.ClusterID, NamespaceUID: x.NamespaceUID, Name: x.Name, ScopeDigest: x.ScopeDigest, IssuedAt: x.IssuedAt, ExpiresAt: x.ExpiresAt}
+		expected := capture.PolicySubmissionIntent{RootID: s.input.RootID, InstallationID: s.input.Authority.InstallationID, IssuerEpoch: s.issuerEpoch, ReplacesID: x.ReplacesID, Nonce: x.Nonce, Actor: x.Actor, Source: x.Source, ClusterID: x.ClusterID, NamespaceUID: x.NamespaceUID, Name: x.Name, ScopeDigest: x.ScopeDigest, IssuedAt: x.IssuedAt, ExpiresAt: x.ExpiresAt}
 		trust := &submissionFixtureTrust{value: capture.SubmissionTrust{RootID: expected.RootID, InstallationID: expected.InstallationID, IssuerEpoch: expected.IssuerEpoch, Revision: identity.Revision{UID: "synthetic-signature-trust", Generation: 1, Digest: artifact.Digest{92}}, Keys: []capture.SubmissionKey{{ID: "test-key", PublicKey: pub, NotBefore: clock().Add(-time.Minute), NotAfter: clock().Add(time.Hour)}}}}
 		protocol, e := jose.NewPolicySubmissions(expected.RootID, expected.InstallationID, expected.IssuerEpoch, "test-key", trust, func(context.Context) crypto.Signer { return key }, clock)
 		if e != nil {
@@ -701,7 +698,7 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 			t.Fatal("revoked key reached acceptance service")
 		}
 	})
-	for _, mode := range []string{"missing", "changed-envelope", "wrong-installation", "wrong-epoch"} {
+	for _, mode := range []string{"missing", "changed-envelope", "wrong-installation"} {
 		t.Run("submission-verification/"+mode, func(t *testing.T) {
 			s := newSetup(t)
 			switch mode {
@@ -711,8 +708,6 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 				s.input.Verification.Submission.EnvelopeDigest[0]++
 			case "wrong-installation":
 				s.input.Verification.InstallationID = custodyID()
-			case "wrong-epoch":
-				s.input.Verification.IssuerEpoch = custodyID()
 			}
 			if _, e := s.accept.AcceptPolicy(ctx, s.input); e == nil {
 				t.Fatal("unverified submission accepted")
@@ -808,7 +803,6 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 		observe(t, &second)
 		second.input.Submission.IssuedAt = clock()
 		second.input.Submission.ExpiresAt = second.input.Submission.IssuedAt.Add(30 * time.Second)
-		second.input.Recovery.ObservedAt, second.input.Recovery.FreshUntil = clock(), clock().Add(5*time.Second)
 		second.input.Author.VerifiedAt, second.input.Author.ValidUntil = clock(), clock().Add(30*time.Second)
 		second.input.Verification = syntheticSubmissionCheck(second.input, clock())
 		accept(t, second)
@@ -1422,7 +1416,6 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 		s.input.Submission.ReplacesID = ""
 		s.input.Submission.IssuedAt = clock()
 		s.input.Submission.ExpiresAt = s.input.Submission.IssuedAt.Add(30 * time.Second)
-		s.input.Recovery.ObservedAt, s.input.Recovery.FreshUntil = clock(), clock().Add(5*time.Second)
 		s.input.Author.VerifiedAt, s.input.Author.ValidUntil = clock(), clock().Add(30*time.Second)
 		s.input.Verification = syntheticSubmissionCheck(s.input, clock())
 		if _, err := s.accept.AcceptPolicy(ctx, s.input); err == nil {
@@ -1472,5 +1465,5 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 // Only a fixture value for the SQL component boundary. The real cryptographic
 // and provider composition is independently exercised by identity-integration.
 func syntheticSubmissionCheck(a capture.PolicyAdmission, now time.Time) capture.SubmissionCheck {
-	return capture.SubmissionCheck{Submission: a.Submission, RootID: a.RootID, InstallationID: a.Authority.InstallationID, IssuerEpoch: a.Recovery.IssuerEpoch, KeyID: "synthetic-signature-key", TrustRevision: identity.Revision{UID: "synthetic-signing-trust", Generation: 1, Digest: artifact.Digest{91}}, VerifiedAt: now, ValidUntil: identity.Earlier(now.Add(5*time.Second), a.Submission.ExpiresAt)}
+	return capture.SubmissionCheck{Submission: a.Submission, RootID: a.RootID, InstallationID: a.Authority.InstallationID, KeyID: "synthetic-signature-key", TrustRevision: identity.Revision{UID: "synthetic-signing-trust", Generation: 1, Digest: artifact.Digest{91}}, VerifiedAt: now, ValidUntil: identity.Earlier(now.Add(5*time.Second), a.Submission.ExpiresAt)}
 }

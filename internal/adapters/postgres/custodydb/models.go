@@ -1621,7 +1621,6 @@ type FleetCurrentTrust struct {
 	SourceGeneration int64
 	SourceDigest     []byte
 	Suspended        bool
-	RecoveryBlocked  bool
 	ObservedAt       pgtype.Timestamptz
 	FreshUntil       pgtype.Timestamptz
 }

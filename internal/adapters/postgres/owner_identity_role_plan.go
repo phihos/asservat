@@ -78,7 +78,6 @@ func ownerIdentityDutyGrants(purpose string) ([]publicRuntimeGrant, bool) {
 	add("hub_owner_configuration", "UPDATE", "source_uid") // row locks only
 	if purpose != "audit" {
 		add("fleet_current_trust", "SELECT")
-		add("fleet_current_trust", "UPDATE", "installation_id") // recovery lock
 		add("hub_owner_configuration_revision", "SELECT")
 	}
 	switch purpose {

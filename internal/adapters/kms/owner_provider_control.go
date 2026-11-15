@@ -17,7 +17,7 @@ import (
 )
 
 // This concrete control client is private until the installed profile selects
-// it together with current native/source/recovery checks and the fixed token
+// it together with current native/source checks and the fixed token
 // owner. No constructor, receipt or provider token grants those authorities.
 type ownerProviderControl struct {
 	http            *http.Client

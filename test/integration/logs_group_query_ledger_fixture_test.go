@@ -82,11 +82,6 @@ func admitLogsMixedGroup(t *testing.T, f *queryLedgerFixture) logsMixedAccepted 
 	if !s.a.Eligibility.Eligible {
 		t.Fatal("mixed independent current identity", s.a.Eligibility.Reason)
 	}
-	recovery, err := s.recovery.reader.RecoveryState(ctx)
-	if err != nil || recovery.InstallationID != s.a.Recovery.InstallationID || recovery.IssuerEpoch != s.a.Recovery.IssuerEpoch || recovery.Revision != s.a.Recovery.Revision {
-		t.Fatal("mixed original accepted recovery changed", err)
-	}
-	s.a.Recovery = recovery
 	storage, err := postgres.NewContextStorageReader(ctx, b.roles["hub-runtime"], s.a.RootID)
 	if err != nil {
 		t.Fatal(err)
@@ -151,7 +146,7 @@ func admitLogsMixedGroup(t *testing.T, f *queryLedgerFixture) logsMixedAccepted 
 	if err != nil {
 		t.Fatal("actual mixed group scope", err)
 	}
-	p := capture.ContextPreview{ID: custodyID(), AssessmentID: custodyID(), AssessmentRulesDigest: planning.RecorderAssessmentRulesFor(reviewedActions), RootID: s.a.RootID, InstallationID: s.a.Recovery.InstallationID, IssuerEpoch: s.a.Recovery.IssuerEpoch, CaptureID: parentID, CaseID: s.a.CaseID, OccurrenceID: custodyID(), ArtifactID: custodyID(), AttemptID: custodyID(), Actor: in.Executor, ExecutionClass: artifact.ContextAPIExecution,
+	p := capture.ContextPreview{ID: custodyID(), AssessmentID: custodyID(), AssessmentRulesDigest: planning.RecorderAssessmentRulesFor(reviewedActions), RootID: s.a.RootID, InstallationID: s.recovery.installation, CaptureID: parentID, CaseID: s.a.CaseID, OccurrenceID: custodyID(), ArtifactID: custodyID(), AttemptID: custodyID(), Actor: in.Executor, ExecutionClass: artifact.ContextAPIExecution,
 		Intent: capture.ContextIntent{Target: targets.WorkloadRequest{ClusterID: in.Target.Request.ClusterID, Namespace: in.Target.Request.Namespace.Name, Kind: in.Target.Request.Workload.Kind, Name: in.Target.Request.Workload.Name}, Composition: &composition}, Target: in.Target.Request, Pin: in.Target.Pin,
 		Storage: capture.ContextStorageSelection{StoreID: s.a.Registration.StoreID, AllocationID: s.a.Registration.AllocationID, PoolRevision: s.a.Registration.PoolRevision, AllocationRevision: s.a.Registration.AllocationRevision, BindingRevision: s.a.Storage.Revision}, Retention: group.Children[0].Retention, Audience: s.a.Eligibility.DefaultAudience, CanonicalScope: scope, ScopeDigest: digest, CreatedAt: now, Deadline: deadline, CompositionGroup: group}
 	if !captureapp.ValidContextPreview(p) {
@@ -164,7 +159,7 @@ func admitLogsMixedGroup(t *testing.T, f *queryLedgerFixture) logsMixedAccepted 
 	if err = previews.CreateContextPreview(ctx, p); err != nil {
 		t.Fatal("persist mixed preview under compiled hub role", err)
 	}
-	grants, err := postgres.NewAccessGrants(ctx, b.roles["hub-runtime"], p.RootID, s.recovery.guard)
+	grants, err := postgres.NewAccessGrants(ctx, b.roles["hub-runtime"], p.RootID, s.recovery.installation)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,13 +167,13 @@ func admitLogsMixedGroup(t *testing.T, f *queryLedgerFixture) logsMixedAccepted 
 	g.ResultAccess = &authorization.ResultAccess{ActionIDs: []string{group.Children[logsIndex].ActionID}, Operations: []string{authorization.GrantDownloadOperation, authorization.GrantLogQueryOperation}, ClientIDs: []string{p.Actor.ClientID}, MaxArtifacts: 1, MaxBytes: 2 * query.ContextResultBytes, MaxOperations: 2, NotAfter: now.Add(time.Hour)}
 	g.ResultAccessDigest = authapp.ResultAccessDigest(g.CaptureID, g.ExecutionDigest, *g.ResultAccess)
 	g.ReviewDigest = authapp.ReviewDigest(g, g.Review)
-	g, _, err = grants.RequestGrant(ctx, authapp.StoredGrantRequest{Grant: g, IdempotencyKey: "mixed-logs-review", RequestDigest: sha256.Sum256([]byte("synthetic-reviewed-mixed-logs"))}, s.a.Recovery)
+	g, _, err = grants.RequestGrant(ctx, authapp.StoredGrantRequest{Grant: g, IdempotencyKey: "mixed-logs-review", RequestDigest: sha256.Sum256([]byte("synthetic-reviewed-mixed-logs"))})
 	if err != nil {
 		t.Fatal("compiled role parent review", err)
 	}
 	reviewer := p.Actor
 	reviewer.Subject = "synthetic-independent-mixed-reviewer"
-	g, _, err = grants.DecideGrant(ctx, authapp.GrantDecisionInput{GrantID: g.ID, Approve: true, Approver: reviewer, Reason: "synthetic reviewed mixed logs and metadata", ACR: "gold", AuthTime: time.Now().Add(-time.Second), IdempotencyKey: "approve-mixed-logs"}, s.a.Recovery)
+	g, _, err = grants.DecideGrant(ctx, authapp.GrantDecisionInput{GrantID: g.ID, Approve: true, Approver: reviewer, Reason: "synthetic reviewed mixed logs and metadata", ACR: "gold", AuthTime: time.Now().Add(-time.Second), IdempotencyKey: "approve-mixed-logs"})
 	if err != nil {
 		t.Fatal("independent parent decision", err)
 	}
@@ -192,7 +187,7 @@ func admitLogsMixedGroup(t *testing.T, f *queryLedgerFixture) logsMixedAccepted 
 	}
 	at := time.Now().UTC().Truncate(time.Microsecond)
 	p.CreatedAt, p.Deadline = at, identity.Earlier(at.Add(time.Minute), g.ExpiresAt)
-	request := capture.RecordingSaveGroupAdmission{Preview: p, RootID: p.RootID, IdempotencyKey: "mixed-logs-admission", SubmissionDigest: captureapp.ContextRequestDigest(p.ID), Recovery: s.a.Recovery}
+	request := capture.RecordingSaveGroupAdmission{Preview: p, RootID: p.RootID, IdempotencyKey: "mixed-logs-admission", SubmissionDigest: captureapp.ContextRequestDigest(p.ID)}
 	scenarios := make([]captureAdmissionScenario, len(parts))
 	for n, c := range group.Children {
 		ci := in
@@ -284,7 +279,7 @@ func admitLogsMixedGroup(t *testing.T, f *queryLedgerFixture) logsMixedAccepted 
 			t.Fatal("mixed acknowledged child intent binding changed", n, encodeErr)
 		}
 	}
-	execSQL, err := postgres.NewAPIContextExecutions(ctx, b.roles["hub-runtime"], p.RootID, postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard})
+	execSQL, err := postgres.NewAPIContextExecutions(ctx, b.roles["hub-runtime"], p.RootID, s.recovery.installation, s.retention.guard)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -331,10 +326,6 @@ func assertMixedLogGrantAssociation(t *testing.T, f *queryLedgerFixture, m logsM
 	if !group.Matches(m.grant, output) {
 		t.Fatal("test association not valid")
 	}
-	recovery, err := m.scenario.recovery.reader.RecoveryState(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
 	snapshot := func() string {
 		var v string
 		if err := f.base.admin.QueryRow(ctx, `SELECT jsonb_build_object('children',(SELECT count(*) FROM access_grant_child WHERE parent_id=$1),'spend',(SELECT jsonb_build_array(artifacts_spent,bytes_spent,operations_spent) FROM access_grant WHERE id=$1))::text`, m.grant.ID).Scan(&v); err != nil {
@@ -372,7 +363,7 @@ func assertMixedLogGrantAssociation(t *testing.T, f *queryLedgerFixture, m logsM
 				o.ArtifactDigest = evidence.ContextCopiesDigest(standalone.Copies)
 				o.ExecutionDigest = standalone.Expectation.PlanDigest
 			}
-			_, _, err := m.grants.MaterializeGrantChild(ctx, authapp.GrantChildRequest{ChildID: custodyID(), ParentID: m.grant.ID, ClientID: m.grant.Requester.ClientID, Output: o, Group: &g}, recovery)
+			_, _, err := m.grants.MaterializeGrantChild(ctx, authapp.GrantChildRequest{ChildID: custodyID(), ParentID: m.grant.ID, ClientID: m.grant.Requester.ClientID, Output: o, Group: &g})
 			if !errors.Is(err, authorization.ErrGrantScope) {
 				t.Fatal("unassociated output materialized", kind, err)
 			}
@@ -381,18 +372,18 @@ func assertMixedLogGrantAssociation(t *testing.T, f *queryLedgerFixture, m logsM
 			}
 		})
 	}
-	child, replay, err := m.grants.MaterializeGrantChild(ctx, authapp.GrantChildRequest{ChildID: custodyID(), ParentID: m.grant.ID, ClientID: m.grant.Requester.ClientID, Output: output, Group: &group}, recovery)
+	child, replay, err := m.grants.MaterializeGrantChild(ctx, authapp.GrantChildRequest{ChildID: custodyID(), ParentID: m.grant.ID, ClientID: m.grant.Requester.ClientID, Output: output, Group: &group})
 	if err != nil || replay || child.Group == nil || *child.Group != group || child.Output != output {
 		t.Fatal("exact child was relabeled or not materialized", err)
 	}
-	again, replay, err := m.grants.MaterializeGrantChild(ctx, authapp.GrantChildRequest{ChildID: custodyID(), ParentID: m.grant.ID, ClientID: m.grant.Requester.ClientID, Output: output, Group: &group}, recovery)
+	again, replay, err := m.grants.MaterializeGrantChild(ctx, authapp.GrantChildRequest{ChildID: custodyID(), ParentID: m.grant.ID, ClientID: m.grant.Requester.ClientID, Output: output, Group: &group})
 	if err != nil || !replay || again.ID != child.ID {
 		t.Fatal("exact materialization replay", err)
 	}
 	after := snapshot()
 	bad := group
 	bad.ChildIndex = (bad.ChildIndex + 1) % 3
-	if _, _, err = m.grants.MaterializeGrantChild(ctx, authapp.GrantChildRequest{ChildID: custodyID(), ParentID: m.grant.ID, ClientID: m.grant.Requester.ClientID, Output: output, Group: &bad}, recovery); !errors.Is(err, authorization.ErrGrantScope) || snapshot() != after {
+	if _, _, err = m.grants.MaterializeGrantChild(ctx, authapp.GrantChildRequest{ChildID: custodyID(), ParentID: m.grant.ID, ClientID: m.grant.Requester.ClientID, Output: output, Group: &bad}); !errors.Is(err, authorization.ErrGrantScope) || snapshot() != after {
 		t.Fatal("stale replay assertion accepted/charged", err)
 	}
 }
@@ -401,19 +392,15 @@ func assertMixedLogProgress(t *testing.T, f *queryLedgerFixture, m logsMixedAcce
 	t.Helper()
 	ctx := f.base.ctx
 	f.refresh(t)
-	recovery, err := m.scenario.recovery.reader.RecoveryState(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	human := m.scenario.a.Eligibility.VerifiedIdentity
 	human.Scopes = append(slices.Clone(human.Scopes), "evidence:read")
 	human.VerifiedAt, human.ValidUntil = now, now.Add(5*time.Second)
-	reader, err := postgres.NewContextProgressReads(ctx, f.base.roles["hub-runtime"], m.grant.RootID, m.scenario.recovery.guard)
+	reader, err := postgres.NewContextProgressReads(ctx, f.base.roles["hub-runtime"], m.grant.RootID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	p, err := reader.ReadContextProgress(ctx, capture.ProgressQuery{RootID: m.grant.RootID, CaptureID: m.parent.CaptureID, Identity: human, Recovery: recovery})
+	p, err := reader.ReadContextProgress(ctx, capture.ProgressQuery{RootID: m.grant.RootID, CaptureID: m.parent.CaptureID, Identity: human})
 	if err != nil || p.Phase != want || len(p.Actions) != 3 || p.CanCancel || p.Target.PodUID != m.parent.Group.Children[0].Expectation.PodUID || p.CandidateArtifactID != "" {
 		t.Fatal("mixed progress erased child/fabricated parent artifact/Stop", want, p, err)
 	}
@@ -424,7 +411,7 @@ func assertMixedLogProgress(t *testing.T, f *queryLedgerFixture, m logsMixedAcce
 	if n[m.parent.Group.Children[m.logsIndex].CaptureID] != "Succeeded" {
 		t.Fatal("verified logs child not independently successful", n)
 	}
-	check := capture.CancellationCheck{RootID: m.grant.RootID, Identity: human, Recovery: recovery, CheckedAt: now, ValidUntil: identity.Earlier(human.ValidUntil, recovery.FreshUntil), Request: capture.CancellationRequest{CaptureID: m.parent.CaptureID, ExpectedRevision: p.Revision, IdempotencyKey: "no-composition-stop"}}
+	check := capture.CancellationCheck{RootID: m.grant.RootID, Identity: human, CheckedAt: now, ValidUntil: human.ValidUntil, Request: capture.CancellationRequest{CaptureID: m.parent.CaptureID, ExpectedRevision: p.Revision, IdempotencyKey: "no-composition-stop"}}
 	if _, err = m.execution.RequestCaptureCancellation(ctx, check); !errors.Is(err, capture.ErrDenied) {
 		t.Fatal("composition parent Stop gained authority", err)
 	}

@@ -356,23 +356,6 @@ func (q *Queries) ReadCapacityPermissionScopes(ctx context.Context, arg ReadCapa
 	return scope_json, err
 }
 
-const readCapacityRecovery = `-- name: ReadCapacityRecovery :one
-SELECT read_capacity_recovery($1::uuid,$2::timestamptz,$3::timestamptz)::jsonb AS recovery
-`
-
-type ReadCapacityRecoveryParams struct {
-	RootID     pgtype.UUID
-	ObservedAt pgtype.Timestamptz
-	FreshUntil pgtype.Timestamptz
-}
-
-func (q *Queries) ReadCapacityRecovery(ctx context.Context, arg ReadCapacityRecoveryParams) ([]byte, error) {
-	row := q.db.QueryRow(ctx, readCapacityRecovery, arg.RootID, arg.ObservedAt, arg.FreshUntil)
-	var recovery []byte
-	err := row.Scan(&recovery)
-	return recovery, err
-}
-
 const readCapacityRefreshDemands = `-- name: ReadCapacityRefreshDemands :one
 SELECT read_capacity_refresh_demands($1::uuid)::jsonb AS demands
 `

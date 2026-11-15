@@ -13,12 +13,10 @@ import (
 	value "asservat.local/asservat/internal/domain/fleet"
 )
 
-// Services answers the presenting connector's read-only owner and recovery
-// questions.
+// Services answers the presenting connector's read-only owner questions.
 type Services interface {
 	OwnerCandidates(context.Context, *Region) (value.APIContextOwnerCandidates, error)
 	AuthenticateOwner(context.Context, *Region, value.OwnerCertificate) (OwnerAuthentication, error)
-	Recovery(context.Context, *Region) (value.RecoveryState, error)
 }
 
 // TokenVerifier attributes a connector's projected ServiceAccount token to
@@ -114,13 +112,6 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var owners value.APIContextOwnerCandidates
 		owners, err = h.services.OwnerCandidates(ctx, region)
 		result.Owners = &owners
-	case PurposeRecovery:
-		var recovery value.RecoveryState
-		recovery, err = h.services.Recovery(ctx, region)
-		if err == nil && recovery.InstallationID != region.Presented().InstallationID {
-			err = ErrChannel // only the presenting installation's own state
-		}
-		result.Recovery = &recovery
 	case PurposeOwnerAuthentication:
 		var owner OwnerAuthentication
 		owner, err = h.services.AuthenticateOwner(ctx, region, *opening.Owner)
@@ -156,7 +147,7 @@ func admit(o Opening, p value.ConnectorCluster) bool {
 		return false
 	}
 	switch o.Purpose {
-	case PurposeOwnerCandidates, PurposeRecovery, PurposeAccessBindings, PurposeCapacity:
+	case PurposeOwnerCandidates, PurposeAccessBindings, PurposeCapacity:
 		if o.Owner != nil {
 			return false
 		}
@@ -299,8 +290,7 @@ func (p presentedOwner) VerifyCurrentOwner(c value.OwnerConfigurationObservation
 
 // Duties are the hub's read-only answers for every presenting connector.
 type Duties struct {
-	Owners    OwnerReads
-	Recoverer app.RecoveryReader
+	Owners OwnerReads
 }
 
 func (d Duties) OwnerCandidates(ctx context.Context, _ *Region) (value.APIContextOwnerCandidates, error) {
@@ -320,11 +310,4 @@ func (d Duties) AuthenticateOwner(ctx context.Context, _ *Region, c value.OwnerC
 		return OwnerAuthentication{}, err
 	}
 	return OwnerAuthentication{Owner: owner, Configuration: configuration}, nil
-}
-
-func (d Duties) Recovery(ctx context.Context, _ *Region) (value.RecoveryState, error) {
-	if d.Recoverer == nil {
-		return value.RecoveryState{}, ErrChannel
-	}
-	return d.Recoverer.RecoveryState(ctx)
 }

@@ -104,7 +104,7 @@ type sourceSnapshotCompletionState struct {
 	Retention         *privacyapp.RetentionResolver
 }
 
-func qualifySourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capacitySQLFixture, policy policySourceAcceptedFixture, snapshot policySourceSnapshotAdmissionFixture, intents auditapp.CaptureOperationPublication, beforeStored ...func(*postgres.APIContextExecutions, executionvalue.APIExecution, executionvalue.APIProcessObservation, artifact.RecoveryProof)) {
+func qualifySourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capacitySQLFixture, policy policySourceAcceptedFixture, snapshot policySourceSnapshotAdmissionFixture, intents auditapp.CaptureOperationPublication, beforeStored ...func(*postgres.APIContextExecutions, executionvalue.APIExecution, executionvalue.APIProcessObservation)) {
 	stage := startSourceSnapshotCompletion(t, ctx, f, policy, snapshot, intents)
 	defer stage.Close()
 	completeSourceSnapshotCompletion(t, ctx, f, policy, snapshot, stage, beforeStored...)
@@ -131,9 +131,8 @@ func startSourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capacit
 	if _, err := intents.AcknowledgedCaptureIntent(ctx, accepted.CaptureID); err != nil {
 		t.Fatal("audited exact snapshot intent", err)
 	}
-	guards := postgres.EffectTransactionGuards{Recovery: s.recovery.guard, Retention: s.retention.guard}
 	hub := f.roles["hub-runtime"]
-	executions, err := postgres.NewAPIContextExecutions(ctx, hub, admission.RootID, guards)
+	executions, err := postgres.NewAPIContextExecutions(ctx, hub, admission.RootID, policy.Authority.InstallationID, s.retention.guard)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +140,7 @@ func startSourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capacit
 	if err != nil {
 		t.Fatal(err)
 	}
-	process := executionvalue.APIProcessBinding{InstallationID: policy.Authority.InstallationID, ClusterID: policy.Authority.ClusterID, IssuerEpoch: admission.Recovery.IssuerEpoch, NamespaceUID: custodyID(), AccountUID: custodyID(), PodUID: custodyID(), ProcessEpoch: custodyID(), StartupDigest: artifact.Digest{1}, ImageDigest: e.CollectorImageDigest}
+	process := executionvalue.APIProcessBinding{InstallationID: policy.Authority.InstallationID, ClusterID: policy.Authority.ClusterID, IssuerEpoch: fixtureIssuerEpoch(t, ctx, f.admin, policy.Authority.InstallationID), NamespaceUID: custodyID(), AccountUID: custodyID(), PodUID: custodyID(), ProcessEpoch: custodyID(), StartupDigest: artifact.Digest{1}, ImageDigest: e.CollectorImageDigest}
 	refresh := func() executionapp.APIExecutionCheck {
 		t.Helper()
 		f.refreshBase(t)
@@ -156,11 +155,7 @@ func startSourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capacit
 		if err != nil || !eligibility.Eligible {
 			t.Fatal("current source snapshot audience", err)
 		}
-		recovery, err := s.recovery.reader.RecoveryState(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
-		work, err := executions.ReadAPIContextWork(ctx, accepted.CaptureID, verified, recovery)
+		work, err := executions.ReadAPIContextWork(ctx, accepted.CaptureID, verified)
 		if err != nil {
 			t.Fatal("retained source API work", err)
 		}
@@ -192,8 +187,8 @@ func startSourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capacit
 			t.Fatal("same immutable source plan", err)
 		}
 		checked := clock()
-		until = identity.Earlier(until, identity.Earlier(eligibility.ValidUntil, identity.Earlier(plan.ValidUntil, recovery.FreshUntil)))
-		out := executionapp.APIExecutionCheck{Work: work, Plan: plan, Eligibility: eligibility, Recovery: recovery, Process: executionvalue.APIProcessObservation{Binding: process, CheckedAt: now, ValidUntil: now.Add(5 * time.Second)}, CheckedAt: checked, ValidUntil: until}
+		until = identity.Earlier(until, identity.Earlier(eligibility.ValidUntil, plan.ValidUntil))
+		out := executionapp.APIExecutionCheck{Work: work, Plan: plan, Eligibility: eligibility, Process: executionvalue.APIProcessObservation{Binding: process, CheckedAt: now, ValidUntil: now.Add(5 * time.Second)}, CheckedAt: checked, ValidUntil: until}
 		if admission.RecordingSave != nil {
 			human := admission.RecordingSave.Initiator.VerifiedIdentity
 			permissions, err := s.p.Permissions(ctx, admission.Eligibility.Target)
@@ -275,7 +270,7 @@ func startSourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capacit
 	return &sourceSnapshotCompletionState{ObservationBefore: observationBefore, Executions: executions, Execution: execution, Process: process, Bound: bound, Channel: channel, Peer: peer, Holder: holder, Work: work[0], Close: prepared.Close}
 }
 
-func completeSourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capacitySQLFixture, policy policySourceAcceptedFixture, snapshot policySourceSnapshotAdmissionFixture, stage *sourceSnapshotCompletionState, beforeStored ...func(*postgres.APIContextExecutions, executionvalue.APIExecution, executionvalue.APIProcessObservation, artifact.RecoveryProof)) {
+func completeSourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capacitySQLFixture, policy policySourceAcceptedFixture, snapshot policySourceSnapshotAdmissionFixture, stage *sourceSnapshotCompletionState, beforeStored ...func(*postgres.APIContextExecutions, executionvalue.APIExecution, executionvalue.APIProcessObservation)) {
 	t.Helper()
 	s, accepted, admission := policy.Scenario, snapshot.Accepted, snapshot.Admission
 	e := accepted.Expectation
@@ -284,7 +279,6 @@ func completeSourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capa
 	bound, channel, peer, holder := stage.Bound, stage.Channel, stage.Peer, stage.Holder
 	work := []collector.Work{stage.Work}
 	b, observationBefore := snapshot.Source.Binding, stage.ObservationBefore
-	guards := postgres.EffectTransactionGuards{Recovery: s.recovery.guard, Retention: s.retention.guard}
 	hub := f.roles["hub-runtime"]
 	var err error
 
@@ -337,30 +331,26 @@ func completeSourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capa
 	execution.Phase, execution.AcquiredAt, execution.CompletedAt = "stored", collected.Acquired, completion.StoredAt
 	now := clock()
 	processObservation := executionvalue.APIProcessObservation{Binding: process, CheckedAt: now, ValidUntil: now.Add(5 * time.Second)}
-	recovery, err := s.recovery.reader.RecoveryState(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err = executions.RecordAPIStoredCompletion(ctx, execution, completion, processObservation, recovery); err == nil {
+	if _, err = executions.RecordAPIStoredCompletion(ctx, execution, completion, processObservation); err == nil {
 		t.Fatal("snapshot used finite completion")
 	}
 	for _, hook := range beforeStored {
-		hook(executions, execution, processObservation, recovery)
+		hook(executions, execution, processObservation)
 	}
 	if stage.RecordStored != nil {
 		execution, err = stage.RecordStored(ctx, collected, outcome)
 	} else {
-		execution, err = executions.RecordAPIStoredSnapshotCompletion(ctx, execution, completion, outcome.SourceSnapshotCoverage, processObservation, recovery)
+		execution, err = executions.RecordAPIStoredSnapshotCompletion(ctx, execution, completion, outcome.SourceSnapshotCoverage, processObservation)
 	}
 	if err != nil {
 		t.Fatal("atomic snapshot completion", err)
 	}
-	if _, err = executions.RecordAPIStoredSnapshotCompletion(ctx, execution, completion, outcome.SourceSnapshotCoverage, processObservation, recovery); err != nil {
+	if _, err = executions.RecordAPIStoredSnapshotCompletion(ctx, execution, completion, outcome.SourceSnapshotCoverage, processObservation); err != nil {
 		t.Fatal("exact completion replay", err)
 	}
 	changed := outcome.SourceSnapshotCoverage
 	changed.Retained++
-	if _, err = executions.RecordAPIStoredSnapshotCompletion(ctx, execution, completion, changed, processObservation, recovery); err == nil {
+	if _, err = executions.RecordAPIStoredSnapshotCompletion(ctx, execution, completion, changed, processObservation); err == nil {
 		t.Fatal("completion replay replaced actual coverage")
 	}
 	var originalRaw, recordedDigest, writerDigest []byte
@@ -377,7 +367,7 @@ func completeSourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capa
 		t.Fatal("immutable coverage replacement", err)
 	}
 	publications := func(purpose string) *postgres.ContextPublications {
-		p, err := postgres.NewContextPublications(ctx, f.roles[purpose], admission.RootID, guards)
+		p, err := postgres.NewContextPublications(ctx, f.roles[purpose], admission.RootID, s.retention.guard)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -391,7 +381,7 @@ func completeSourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capa
 	if stage.Retention != nil {
 		retentionResolver = *stage.Retention
 	}
-	gate, err := postgres.NewAPIContextPublicationGate(ctx, f.roles["publication-gate"], admission.RootID, guards, retentionResolver, s.recovery.reader)
+	gate, err := postgres.NewAPIContextPublicationGate(ctx, f.roles["publication-gate"], admission.RootID, s.retention.guard, retentionResolver)
 	if err != nil {
 		t.Fatal(err)
 	}

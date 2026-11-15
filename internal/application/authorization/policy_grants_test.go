@@ -627,14 +627,14 @@ type blockedPolicyRevokeStore struct {
 	release chan struct{}
 }
 
-func (s blockedPolicyRevokeStore) RevokeGrant(ctx context.Context, in GrantRevocationInput, r artifact.RecoveryProof) (value.Grant, bool, error) {
+func (s blockedPolicyRevokeStore) RevokeGrant(ctx context.Context, in GrantRevocationInput) (value.Grant, bool, error) {
 	close(s.entered)
 	select {
 	case <-s.release:
 	case <-ctx.Done():
 		return value.Grant{}, false, ctx.Err()
 	}
-	return s.GrantStore.RevokeGrant(ctx, in, r)
+	return s.GrantStore.RevokeGrant(ctx, in)
 }
 
 type policyReplayIdentity struct{ i identity.Identity }
@@ -697,14 +697,14 @@ type blockedPolicyRequestStore struct {
 	entered, release chan struct{}
 }
 
-func (s blockedPolicyRequestStore) RequestGrant(ctx context.Context, in StoredGrantRequest, r artifact.RecoveryProof) (value.Grant, bool, error) {
+func (s blockedPolicyRequestStore) RequestGrant(ctx context.Context, in StoredGrantRequest) (value.Grant, bool, error) {
 	close(s.entered)
 	select {
 	case <-s.release:
 	case <-ctx.Done():
 		return value.Grant{}, false, ctx.Err()
 	}
-	return s.GrantStore.RequestGrant(ctx, in, r)
+	return s.GrantStore.RequestGrant(ctx, in)
 }
 func TestPolicyGrantRequestNeverDisclosesAfterBlockedCallerGroupLoss(t *testing.T) {
 	for _, mode := range []string{"fresh", "replay"} {
@@ -764,14 +764,14 @@ type blockedPolicyDecisionStore struct {
 	entered, release chan struct{}
 }
 
-func (s blockedPolicyDecisionStore) DecideGrant(ctx context.Context, in GrantDecisionInput, r artifact.RecoveryProof) (value.Grant, bool, error) {
+func (s blockedPolicyDecisionStore) DecideGrant(ctx context.Context, in GrantDecisionInput) (value.Grant, bool, error) {
 	close(s.entered)
 	select {
 	case <-s.release:
 	case <-ctx.Done():
 		return value.Grant{}, false, ctx.Err()
 	}
-	return s.GrantStore.DecideGrant(ctx, in, r)
+	return s.GrantStore.DecideGrant(ctx, in)
 }
 func TestPolicyGrantDecisionRetainsReviewerAfterBlockedFreshAndReplay(t *testing.T) {
 	for _, mode := range []string{"fresh", "replay"} {

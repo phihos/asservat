@@ -191,7 +191,7 @@ func qualifyDownloadWorkerPod(t *testing.T, nativeMode bool) {
 	actor := identity.Principal{Issuer: "https://synthetic.invalid", Subject: "developer", ClientID: "console", Kind: identity.Human}
 	scope := artifact.DownloadScope{RootID: u, ArtifactID: custodyID(), CaptureID: custodyID(), ClusterID: custodyID(), NamespaceUID: "source-namespace", WorkloadUID: "source-workload", PodUID: "source-pod", Version: artifact.Digest{1}, Principal: actor}
 	a := artifact.DownloadAuthority{Scope: scope, PermissionEpoch: custodyID(), PermissionSequence: 1, ProjectionDigest: artifact.Digest{1}, DecisionDigest: artifact.Digest{2}, IdentityRevision: rev, CheckedAt: now, ValidUntil: now.Add(5 * time.Second), AccessUntil: now.Add(time.Hour), DeleteBy: now.Add(2 * time.Hour)}
-	a.Environment = artifact.DownloadEnvironment{RootID: u, InstallationID: p.InstallationID, Region: "fixture", StoreID: custodyID(), RecoveryEpoch: recoveryEpoch, Location: artifact.Location{ClusterID: scope.ClusterID, ArtifactID: scope.ArtifactID, AttemptID: custodyID()}, Principal: actor, Revision: rev, RecoveryRevision: rev, ObservedAt: now, ValidUntil: a.ValidUntil}
+	a.Environment = artifact.DownloadEnvironment{RootID: u, InstallationID: p.InstallationID, Region: "fixture", StoreID: custodyID(), RecoveryEpoch: recoveryEpoch, Location: artifact.Location{ClusterID: scope.ClusterID, ArtifactID: scope.ArtifactID, AttemptID: custodyID()}, Principal: actor, Revision: rev, ObservedAt: now, ValidUntil: a.ValidUntil}
 	i := value.DownloadWorkerIntent{ID: custodyID(), SessionID: custodyID(), Generation: 1, Profile: p, Authority: a, CreatedAt: now, RunUntil: now.Add(time.Minute)}
 	if !i.Valid() {
 		t.Fatal("synthetic dispatch authority invalid")

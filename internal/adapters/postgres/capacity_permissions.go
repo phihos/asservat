@@ -10,7 +10,6 @@ import (
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	app "asservat.local/asservat/internal/application/capacity"
-	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
@@ -61,22 +60,22 @@ func decodeCapacityPermissions(raw []byte) (app.AcceptedCapacityPermissions, err
 	}
 	return out, nil
 }
-func (s *CapacityPermissions) ReadCapacityPermissions(ctx context.Context, recovery artifact.RecoveryProof) (app.AcceptedCapacityPermissions, error) {
+func (s *CapacityPermissions) ReadCapacityPermissions(ctx context.Context) (app.AcceptedCapacityPermissions, error) {
 	var out app.AcceptedCapacityPermissions
-	if s == nil || s.ledger == nil || ctx == nil || ctx.Err() != nil || recovery.InstallationID != s.installation || !recovery.Valid(time.Now()) {
+	if s == nil || s.ledger == nil || ctx == nil || ctx.Err() != nil {
 		return out, cfg.ErrUnavailable
 	}
-	until := identity.Earlier(time.Now().Add(app.CapacitySourceInterval), recovery.FreshUntil)
+	until := time.Now().Add(app.CapacitySourceInterval)
 	if d, ok := ctx.Deadline(); ok {
 		until = identity.Earlier(until, d)
 	}
 	live, end := context.WithDeadline(ctx, until)
 	defer end()
-	b, e := json.Marshal(recovery)
-	if e != nil {
-		return out, cfg.ErrUnavailable
-	}
-	e = s.ledger.transaction(live, func(q *custodydb.Queries) error {
+	e := s.ledger.transaction(live, func(q *custodydb.Queries) error {
+		b, err := capacityTrustJSON(live, q, s.installation)
+		if err != nil {
+			return err
+		}
 		raw, err := q.ReadCapacityPermissionScopes(live, custodydb.ReadCapacityPermissionScopesParams{RootID: id(s.root), RecoveryValue: b})
 		if err != nil {
 			return err

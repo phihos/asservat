@@ -69,7 +69,7 @@ func newPublicProjection(ctx context.Context, d *OwnerDeployment, policy authapp
 	if err != nil {
 		return nil, err
 	}
-	ledger, err := postgres.NewContextQueries(ctx, pool, root, d.shared.guards, plans, nil)
+	ledger, err := postgres.NewContextQueries(ctx, pool, root, installation, d.shared.retention, plans, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -89,15 +89,13 @@ func newPublicProjection(ctx context.Context, d *OwnerDeployment, policy authapp
 	if err != nil {
 		return nil, err
 	}
-	routes, err := postgres.NewContextCaseReads(ctx, metadata, root, d.shared.guards.Recovery)
+	routes, err := postgres.NewContextCaseReads(ctx, metadata, root)
 	if err != nil {
 		return nil, err
 	}
 	pc := d.publicContext
-	// Evidence reads observe recovery for up to the evidence-read window.
-	recovery := pc.recovery.ForEvidenceReads()
 	authority := authapp.ContextProjectionAuthority{RootID: root, Permissions: pc.permissions, Catalog: pc.catalog, Retention: pc.retention,
-		Environment: authapp.CurrentProjectionEnvironment{RootID: root, InstallationID: installation, Policies: policies, Recovery: recovery, Processing: processing, Now: time.Now}, Shares: pc.shares, Reviews: pc.reviews, PacketGrants: pc.grants, SyscallGrants: pc.grants, LogGrants: pc.grants, Now: time.Now}
+		Environment: authapp.CurrentProjectionEnvironment{RootID: root, InstallationID: installation, Policies: policies, Processing: processing, Now: time.Now}, Shares: pc.shares, Reviews: pc.reviews, PacketGrants: pc.grants, SyscallGrants: pc.grants, LogGrants: pc.grants, Now: time.Now}
 	origins := d.shared.origins
 	origins.Projection = operations
 	client := d.shared.workers[ownerNativeAPIKey{profile.ClusterID, profile.NamespaceUID}]
@@ -119,7 +117,7 @@ func newPublicProjection(ctx context.Context, d *OwnerDeployment, policy authapp
 	reader := publicProjectionReader{ledger, runtime}
 	service := &analysisapp.ContextProjectionService{Results: analysisapp.ContextProjectionResults{RootID: root, InstallationID: installation, HubProcessEpoch: d.Runtime.binding.ProcessEpoch,
 		Authority: authority, Ledger: ledger, Reader: reader, Now: time.Now, NewID: ownerRandomID,
-		Refused: downloadRefusalReport(timedEventLog(os.Stderr, "query refused"), time.Now)}, Recovery: recovery, Routes: routes, HeaderRoutes: routes, Plans: plans,
+		Refused: downloadRefusalReport(timedEventLog(os.Stderr, "query refused"), time.Now)}, Routes: routes, HeaderRoutes: routes, Plans: plans,
 		Workers: publicProjectionAdmission{&evidence.ProjectionWorkerAdmission{Cleanup: cleanup, Ledger: workers, Jobs: jobs, Audit: audit.projectionWorkerObjects(), Now: time.Now}}}
 	// Existing accepted worker and per-query backing gates remain mandatory.
 	// Old smaller transient profiles still serve older tools; summary admission

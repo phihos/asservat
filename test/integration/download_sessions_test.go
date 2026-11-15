@@ -35,7 +35,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// Identity and current regional/recovery qualification are explicitly synthetic.
+// Identity and current regional qualification are explicitly synthetic.
 // The gate, catalog, permission, retained-policy and SQL effect checks are real.
 type downloadTestIdentity struct{ value identity.Identity }
 
@@ -68,7 +68,6 @@ func (i nativeDownloadTestIdentity) Resolve(ctx context.Context, credential stri
 type downloadTestEnvironment struct {
 	root, installation, epoch string
 	registration              artifact.Registration
-	recovery                  *postgres.RecoveryReader
 	processing                *postgres.ProcessingReads
 	path                      *artifact.DownloadPath
 }
@@ -79,22 +78,20 @@ func (e downloadTestEnvironment) DownloadEnvironment(ctx context.Context, record
 		return artifact.DownloadEnvironment{}, artifact.ErrDownloadUnavailable
 	}
 	// Only the independently accepted installation input is synthetic here.
-	// The policy evaluator, recovery reads and durable processing checks use
+	// The policy evaluator and durable processing checks use
 	// the actual production composition, including its final rereads.
 	policy := processingTestPolicy{privacyvalue.DownloadPolicy{RootID: e.root, InstallationID: e.installation, RecoveryEpoch: e.epoch, Revision: identity.Revision{UID: e.path.ID, Generation: 1, Digest: artifact.Digest{87}}, ProtectionDigest: artifact.Digest{88}, PermittedRegions: []string{"synthetic-region"}, Paths: []privacyvalue.DownloadPath{*e.path}, Clients: []privacyvalue.DownloadClient{{Issuer: p.Issuer, ID: p.ClientID, Kind: p.Kind, DataClasses: []string{"metadata"}, PrivacyClasses: []string{"potentialPersonalData"}, EvidenceTypes: []string{"context"}, Purposes: []string{record.PurposeRef}, PathIDs: []string{e.path.ID}}}, Operators: []privacyvalue.ProcessingOperator{{Issuer: p.Issuer, ClientID: p.ClientID, Kind: "Group", ID: "synthetic-privacy"}}}}
-	return (authorizationapp.CurrentDownloadEnvironment{RootID: e.root, InstallationID: e.installation, Policies: policy, Recovery: e.recovery, Processing: e.processing, Now: time.Now}).DownloadEnvironment(ctx, record, p)
+	return (authorizationapp.CurrentDownloadEnvironment{RootID: e.root, InstallationID: e.installation, Policies: policy, Processing: e.processing, Now: time.Now}).DownloadEnvironment(ctx, record, p)
 }
 
 // Real PostgreSQL/S3/encrypted audit against actual published synthetic context.
-// Human identity, protected installation observations, regional/recovery
+// Human identity, protected installation observations, regional
 // authorization and capacities remain fixture inputs. This does not confer public download authority or qualify HTTP relay.
 func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, create func(*testing.T, func(string) (evidence.KeySealer, evidence.KeyOpener)) (captureAdmissionScenario, artifact.PublishedContext), releaseIdle func()) {
 	t.Helper()
 	runtimePool := poolFor("download_runtime", "synthetic-download")
 	auditPool := poolFor("download_audit_runtime", "synthetic-download-audit")
 	configPool := poolFor("download_config_runtime", "synthetic-download-config")
-	recoveryPool := poolFor("peer_read_runtime", "synthetic-peer-read")
-	defer recoveryPool.Close()
 	catalogPool := poolFor("context_catalog_read_runtime", "synthetic-context-read")
 	defer catalogPool.Close()
 	defer runtimePool.Close()
@@ -110,8 +107,6 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 		{runtimePool, "UPDATE fleet_trust SET issuer_epoch=issuer_epoch"},
 		{runtimePool, "UPDATE fleet_trust SET fresh_until=clock_timestamp()"},
 		{runtimePool, "UPDATE fleet_observation SET fresh_until=fresh_until"},
-		{recoveryPool, "UPDATE fleet_observation SET fresh_until=fresh_until"},
-		{recoveryPool, "UPDATE fleet_trust SET suspended=false"},
 		{runtimePool, "UPDATE download_batch SET audit_acknowledged_at=clock_timestamp()"},
 		{runtimePool, "UPDATE download_allocation SET output_limit=output_limit"},
 		{auditPool, "UPDATE artifact_download SET charged_output=0"},
@@ -129,7 +124,7 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 		allocation             artifact.DownloadAllocation
 		authority              func() artifact.DownloadAuthority
 		gate                   authorizationapp.ContextDownloadAuthority
-		guards                 postgres.DownloadTransactionGuards
+		guards                 *postgres.RetentionTransactionGuard
 		installation           string
 	}
 	setupWithKeys := func(t *testing.T, provider func(string) (evidence.KeySealer, evidence.KeyOpener)) fixture {
@@ -140,7 +135,7 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 			ctx = s.nativeSources.ctx
 		}
 		f := fixture{s: s, p: p, installation: s.recovery.installation}
-		f.guards = postgres.DownloadTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard}
+		f.guards = s.retention.guard
 		for _, pair := range []struct {
 			pool *pgxpool.Pool
 			dst  **postgres.Downloads
@@ -224,7 +219,7 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 			// cases): the native exchange below alone needs about 40 of the
 			// unchanged 48 server connections.
 			releaseIdle()
-			for _, p := range []*pgxpool.Pool{runtimePool, auditPool, configPool, recoveryPool, catalogPool} {
+			for _, p := range []*pgxpool.Pool{runtimePool, auditPool, configPool, catalogPool} {
 				p.Reset()
 			}
 			if f.s.nativeSources != nil {
@@ -299,7 +294,7 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 				r.Session.ReadLimit = 12 << 20
 			}
 			if strings.HasPrefix(mode, "native-") && mode != "native-exchange" && mode != "native-owner-renewal" {
-				bindContextNativeStopFixture(t, ctx, f.config, f.allocation, f.installation, f.p.Expectation.Registration.StoreID, f.guards, poolFor)
+				bindContextNativeStopFixture(t, ctx, f.config, f.allocation, f.installation, f.p.Expectation.Registration.StoreID, poolFor)
 				r.Session.StopProtocol = artifact.DownloadStopProtocol
 			}
 			session, e := f.runtime.ReserveDownload(ctx, r)
@@ -764,7 +759,7 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 				var content *nativeContextFixture
 				if mode != "native-exchange" && mode != "native-owner-renewal" {
 					service.CurrentAuthority = f.gate
-					content = &nativeContextFixture{mode: mode, dispatcher: service, workers: ledger, configuration: configurationReader, recovery: f.s.recovery.reader}
+					content = &nativeContextFixture{mode: mode, dispatcher: service, workers: ledger, configuration: configurationReader}
 				}
 				qualifyNativeExchange(t, ctx, nativeExchangeFixture{renewOnly: mode == "native-owner-renewal", topologySource: f.s.retention.topology.source, content: content, worker: w, enrollment: enrollment, published: f.p, runtime: f.runtime, audit: f.audit, config: f.config, allocation: f.allocation, gate: f.gate, guards: f.guards, authority: f.authority, store: store, keys: keys, keyScope: nativeScope, keyBackend: nativeBackend, admin: admin, poolFor: poolFor})
 				return
@@ -916,82 +911,6 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 		return s
 	}
 
-	for _, change := range []struct{ name, sql string }{
-		{"blocked", "UPDATE fleet_trust SET suspended=true WHERE installation_id=$1"},
-		{"suspended", "UPDATE fleet_trust SET suspended=true WHERE installation_id=$1"},
-		{"epoch", "UPDATE fleet_trust SET issuer_epoch=gen_random_uuid() WHERE installation_id=$1"},
-		{"revision", "UPDATE fleet_trust SET source_generation=source_generation+1 WHERE installation_id=$1"},
-		{"expired", "UPDATE fleet_observation SET observed_at=statement_timestamp()-interval '31 seconds',fresh_until=statement_timestamp()-interval '1 second' WHERE installation_id=$1"},
-	} {
-		t.Run("download-recovery-"+change.name+"-fences-prepaid-output", func(t *testing.T) {
-			f := setup(t)
-			a := f.authority()
-			s := prepare(t, f, request(f, a))
-			b := artifact.DownloadBatch{ID: custodyID(), Purpose: artifact.DownloadContent, OutputBytes: 1024, ReadBytes: 2 << 20}
-			i, err := f.runtime.BeginDownloadBatch(ctx, s.ID, a, b)
-			if err != nil {
-				t.Fatal(err)
-			}
-			ackIntent(t, f, i)
-			if _, err = admin.Exec(ctx, change.sql, f.installation); err != nil {
-				t.Fatal(err)
-			}
-			if err = f.runtime.PermitDownloadBatch(ctx, s.ID, a, b.ID, i.Batch.Generation); err == nil {
-				t.Fatal("old recovery proof emitted")
-			}
-			if _, err = f.runtime.ReserveDownload(ctx, request(f, a)); err == nil {
-				t.Fatal("old recovery proof reserved")
-			}
-			got, err := f.runtime.LookupDownload(ctx, s.ID, a.Scope.Principal)
-			if err != nil || got.ChargedOutput != 1024 || got.EmittedBytes != 0 {
-				t.Fatal("recovery rejection changed uncertain spend", got, err)
-			}
-			if change.name == "blocked" || change.name == "suspended" || change.name == "expired" {
-				if _, err = f.gate.CheckDownload(ctx, "synthetic-reference", a.Scope); err == nil {
-					t.Fatal("unready recovery produced new authority")
-				}
-			}
-		})
-	}
-	t.Run("download-recovery-waiter-expiry-and-installation-binding", func(t *testing.T) {
-		f := setup(t)
-		a := f.authority()
-		s, err := f.runtime.ReserveDownload(ctx, request(f, a))
-		if err != nil {
-			t.Fatal(err)
-		}
-		bad := a
-		bad.Environment.InstallationID = custodyID()
-		if _, err = f.runtime.ReserveDownload(ctx, request(f, bad)); err == nil {
-			t.Fatal("caller selected recovery installation")
-		}
-		tx, err := admin.Begin(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer tx.Rollback(ctx)
-		if _, err = tx.Exec(ctx, "SELECT installation_id FROM fleet_trust WHERE installation_id=$1 FOR UPDATE", f.installation); err != nil {
-			t.Fatal(err)
-		}
-		a.CheckedAt = time.Now().UTC()
-		a.ValidUntil = a.CheckedAt.Add(100 * time.Millisecond)
-		done := make(chan error, 1)
-		go func() {
-			_, e := f.runtime.BeginDownloadBatch(ctx, s.ID, a, artifact.DownloadBatch{ID: custodyID(), Purpose: artifact.DownloadMetadata, ReadBytes: 2 << 20})
-			done <- e
-		}()
-		time.Sleep(200 * time.Millisecond)
-		if err = tx.Commit(ctx); err != nil {
-			t.Fatal(err)
-		}
-		if err = <-done; err == nil {
-			t.Fatal("recovery lock wait extended authority")
-		}
-		got, err := f.runtime.LookupDownload(ctx, s.ID, a.Scope.Principal)
-		if err != nil || got.ChargedRead != 0 {
-			t.Fatal("expired waiter changed spend", got, err)
-		}
-	})
 	t.Run("download-retention-source-fences-prepaid-output", func(t *testing.T) {
 		f := setup(t)
 		a := f.authority()
@@ -1183,7 +1102,7 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 			t.Fatal("refunded uncertain spend")
 		}
 	})
-	for _, mode := range []string{"three-slots", "parallel-slot", "unaudited", "peer-mismatch", "foreign-artifact", "cancelled", "recovery-blocked", "permission-changed", "retention-shortened", "crypto-failure-keeps-spend", "expired-after-lock", "missing-worker-proof", "expired-worker-proof", "different-worker-proof", "worker-expired-after-lock", "worker-expired-after-child-lock", "legacy-worker-proof"} {
+	for _, mode := range []string{"three-slots", "parallel-slot", "unaudited", "peer-mismatch", "foreign-artifact", "cancelled", "permission-changed", "retention-shortened", "crypto-failure-keeps-spend", "expired-after-lock", "missing-worker-proof", "expired-worker-proof", "different-worker-proof", "worker-expired-after-lock", "worker-expired-after-child-lock", "legacy-worker-proof"} {
 		t.Run("download-key-"+mode, func(t *testing.T) {
 			f := setup(t)
 			scope, wrapping, backend := localDownloadKeys(t, f.installation)
@@ -1319,11 +1238,6 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 			}
 			if mode == "cancelled" {
 				if _, err = f.runtime.CancelDownload(ctx, session.ID, a.Scope.Principal); err != nil {
-					t.Fatal(err)
-				}
-			}
-			if mode == "recovery-blocked" {
-				if _, err = admin.Exec(ctx, "UPDATE fleet_trust SET suspended=true WHERE installation_id=$1", f.installation); err != nil {
 					t.Fatal(err)
 				}
 			}

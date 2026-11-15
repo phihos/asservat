@@ -19,19 +19,18 @@ func (d downloadReportIdentity) ResolveIdentity(context.Context) (identity.Ident
 	return d.i, nil
 }
 
-type downloadReportRecovery struct{ err error }
-
-func (d downloadReportRecovery) RecoveryState(context.Context) (artifact.RecoveryProof, error) {
-	return artifact.RecoveryProof{}, d.err
-}
-
-// Unused ports panic if reached: a refused recovery read precedes them.
+// Unused ports panic if reached: a refused key lookup precedes them.
 type downloadReportPorts struct {
 	evidence.ContextDownloadRoutes
 	evidence.ContextDownloadSources
 	evidence.CurrentDownloadAuthority
 	evidence.ContextDownloadControlLedger
 	evidence.ContextDownloadPlans
+	err error
+}
+
+func (d downloadReportPorts) LookupDownloadKey(context.Context, artifact.DownloadKeyQuery) (artifact.DownloadKeyLookup, error) {
+	return artifact.DownloadKeyLookup{}, d.err
 }
 
 // A refusal from one injected preparation sub-step names that stage, its
@@ -44,13 +43,13 @@ func TestDownloadRefusalReportNamesTheRefusingStage(t *testing.T) {
 		cause error
 		want  string
 	}{
-		{errors.New("private recovery endpoint token"), "prepare/recovery (unavailable) left@>=2s"},
-		{fmt.Errorf("private: %w", context.DeadlineExceeded), "prepare/recovery (cancelled) left@>=2s"},
+		{errors.New("private key endpoint token"), "prepare/key-lookup (unavailable) left@>=2s"},
+		{fmt.Errorf("private: %w", context.DeadlineExceeded), "prepare/key-lookup (cancelled) left@>=2s"},
 	} {
 		var lines []string
-		ports := downloadReportPorts{}
+		ports := downloadReportPorts{err: c.cause}
 		s := evidence.ContextDownloadCoordinator{RootID: "00000000-0000-4000-8000-000000000001", InstallationID: "00000000-0000-4000-8000-000000000002",
-			Recovery: downloadReportRecovery{c.cause}, Routes: ports, Sources: ports, Authority: ports, Sessions: ports, Plans: ports,
+			Routes: ports, Sources: ports, Authority: ports, Sessions: ports, Plans: ports,
 			Refused: downloadRefusalReport(func(line, _ string) { lines = append(lines, line) }, time.Now), Now: time.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000003" }}
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		_, err := s.PrepareContextDownload(ctx, current, "00000000-0000-4000-8000-000000000004", "key")

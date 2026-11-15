@@ -14,7 +14,6 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/fleet"
-	"asservat.local/asservat/internal/domain/identity"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -86,17 +85,17 @@ func qualifyPacketEvidenceMigration(t *testing.T, ctx context.Context, admin *pg
 	f.assertLegacyAdmission(t, small, true) // retain an actual uncertain reservation
 	packetNamespace := cfg.NamespaceRef{Name: "packet-apps", UID: custodyID()}
 	f.addPermissionScope(t, scope.ClusterID, packetNamespace)
-	source, recovery := f.fresh(t)
-	permissions, err := f.permissionRead.ReadCapacityPermissions(ctx, recovery)
+	source := f.fresh(t)
+	permissions, err := f.permissionRead.ReadCapacityPermissions(ctx)
 	if err != nil {
 		t.Fatal("packet permission scope", err)
 	}
 	n := time.Now().UTC().Truncate(time.Microsecond)
-	until := identity.Earlier(n.Add(5*time.Second), recovery.FreshUntil)
+	until := n.Add(5 * time.Second)
 	guard := app.CapacityNamespaceProtection{ClusterID: scope.ClusterID, Digest: f.qualification.NamespaceGuards[0].Digest, Keys: []string{"team"}, ObservedAt: n, FreshUntil: until}
 	workload := capacityNativeWorkload(scope.ClusterID, packetNamespace, f.workloads[1], n, until)
 	workload.Namespace.Labels["team"] = "packet"
-	packetObservation, _, err := app.ComposeEnrollmentObservation(source, guard, workload, permissions, recovery, f.input.AccountVersion, time.Now())
+	packetObservation, _, err := app.ComposeEnrollmentObservation(source, guard, workload, permissions, f.input.AccountVersion, time.Now())
 	if err != nil {
 		t.Fatal("packet observation", err)
 	}

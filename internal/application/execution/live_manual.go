@@ -1,12 +1,12 @@
 package execution
 
 import (
-	"asservat.local/asservat/internal/domain/artifact"
+	"context"
+	"time"
+
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/collector"
 	value "asservat.local/asservat/internal/domain/execution"
-	"context"
-	"time"
 )
 
 // LiveManualWork is the original accepted finite work and its actual started
@@ -23,7 +23,7 @@ type LiveManualWork struct {
 
 type LiveManualWorks interface {
 	LiveManualTarget(context.Context, string) (authorization.Target, error)
-	ReadLiveManualWork(context.Context, []string, artifact.RecoveryProof) ([]LiveManualWork, error)
+	ReadLiveManualWork(context.Context, []string) ([]LiveManualWork, error)
 	// UUID cursor is the last CaptureID. More pages never create source state.
-	ListLiveManualWork(context.Context, authorization.WorkloadTarget, string, int, artifact.RecoveryProof) ([]LiveManualWork, string, error)
+	ListLiveManualWork(context.Context, authorization.WorkloadTarget, string, int) ([]LiveManualWork, string, error)
 }

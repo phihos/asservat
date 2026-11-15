@@ -16,7 +16,6 @@ type ProcessingErasureStatusReader interface {
 type ProcessingErasureStatus struct {
 	RootID, InstallationID string
 	Policies               ProcessingPolicyReader
-	Recovery               ProcessingRecoveryReader
 	Status                 ProcessingErasureStatusReader
 	Now                    func() time.Time
 }
@@ -24,7 +23,7 @@ type ProcessingErasureStatus struct {
 func (s ProcessingErasureStatus) Get(ctx context.Context, current ProcessingIdentity, requestID string) (value.ProcessingErasureStatus, error) {
 	var zero value.ProcessingErasureStatus
 	if ctx == nil || ctx.Err() != nil || current == nil || !authorization.UUID(requestID) ||
-		!authorization.UUID(s.RootID) || !authorization.UUID(s.InstallationID) || s.Policies == nil || s.Recovery == nil || s.Status == nil || s.Now == nil {
+		!authorization.UUID(s.RootID) || !authorization.UUID(s.InstallationID) || s.Policies == nil || s.Status == nil || s.Now == nil {
 		return zero, value.ErrUnavailable
 	}
 	started := s.Now().UTC().Truncate(time.Microsecond)
@@ -34,7 +33,7 @@ func (s ProcessingErasureStatus) Get(ctx context.Context, current ProcessingIden
 	}
 	call, stop := context.WithDeadline(ctx, window.Until())
 	defer stop()
-	changes := ProcessingChanges{RootID: s.RootID, InstallationID: s.InstallationID, Policies: s.Policies, Recovery: s.Recovery, Now: s.Now}
+	changes := ProcessingChanges{RootID: s.RootID, InstallationID: s.InstallationID, Policies: s.Policies, Now: s.Now}
 	authority, err := changes.authority(call, current, started, window.Until())
 	if err != nil {
 		return zero, err

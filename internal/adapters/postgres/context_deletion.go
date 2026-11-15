@@ -20,40 +20,31 @@ import (
 )
 
 // ContextDeletions is constructed separately for cleanup, audit and finalization.
-// Each facet requires exact current installation recovery, never human rights.
+// No facet needs human rights.
 type ContextDeletions struct {
-	ledger   *Ledger
-	root     string
-	recovery *RecoveryTransactionGuard
+	ledger             *Ledger
+	root, installation string
 }
 
 func NewContextDeletions(ctx context.Context, pool *pgxpool.Pool, root, installation string) (*ContextDeletions, error) {
-	g, err := NewRecoveryTransactionGuard(root, installation)
-	if err != nil {
-		return nil, err
+	if !authorization.UUID(root) || !authorization.UUID(installation) {
+		return nil, artifact.ErrInvalid
 	}
 	l, err := New(ctx, pool)
 	if err != nil {
 		return nil, err
 	}
-	return &ContextDeletions{l, root, g}, nil
+	return &ContextDeletions{l, root, installation}, nil
 }
-func (s *ContextDeletions) transaction(ctx context.Context, p artifact.RecoveryProof, body func(*custodydb.Queries) error) error {
-	return s.transactionUntil(ctx, p, time.Time{}, body)
+func (s *ContextDeletions) transaction(ctx context.Context, body func(*custodydb.Queries) error) error {
+	return s.transactionUntil(ctx, time.Time{}, body)
 }
-func (s *ContextDeletions) transactionUntil(ctx context.Context, p artifact.RecoveryProof, originalUntil time.Time, body func(*custodydb.Queries) error) error {
+func (s *ContextDeletions) transactionUntil(ctx context.Context, originalUntil time.Time, body func(*custodydb.Queries) error) error {
 	return s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		trust, err := s.recovery.lock(ctx, q, s.root, p)
-		if err != nil {
+		if _, err := q.LockPermissionStream(ctx, id(s.root)); err != nil {
 			return err
 		}
-		if _, err = q.LockPermissionStream(ctx, id(s.root)); err != nil {
-			return err
-		}
-		if err = body(q); err != nil {
-			return err
-		}
-		if err = s.recovery.check(ctx, q, trust, s.root, p); err != nil {
+		if err := body(q); err != nil {
 			return err
 		}
 		if !originalUntil.IsZero() {
@@ -61,14 +52,14 @@ func (s *ContextDeletions) transactionUntil(ctx context.Context, p artifact.Reco
 			if err != nil {
 				return err
 			}
-			if !now.Time.Before(originalUntil) || !p.Valid(now.Time) {
+			if !now.Time.Before(originalUntil) {
 				return app.ErrExpired
 			}
 		}
 		return ctx.Err()
 	})
 }
-func (s *ContextDeletions) writer(ctx context.Context, q *custodydb.Queries, loc artifact.Location, p artifact.RecoveryProof) (custodydb.ContextWriterCompletion, error) {
+func (s *ContextDeletions) writer(ctx context.Context, q *custodydb.Queries, loc artifact.Location) (custodydb.ContextWriterCompletion, error) {
 	w, err := q.ReadContextWriterCompletion(ctx, custodydb.ReadContextWriterCompletionParams{RootID: id(s.root), AttemptID: id(loc.AttemptID)})
 	if err != nil {
 		return w, err
@@ -82,11 +73,11 @@ func (s *ContextDeletions) writer(ctx context.Context, q *custodydb.Queries, loc
 		return w, err
 	}
 	d := execapp.APIExecutionDigest(execution)
-	inc, err := q.ReadContextDatabaseIncarnation(ctx, id(p.InstallationID))
+	inc, err := q.ReadContextDatabaseIncarnation(ctx, id(s.installation))
 	if err != nil {
 		return w, err
 	}
-	if execution.WriterProtocol != artifact.ContextWriterProtocol || execution.Phase != "stored" || execution.Binding.AttemptID != loc.AttemptID || execution.Binding.ClusterID != loc.ClusterID || !bytes.Equal(w.ExecutionDigest, d[:]) || !bytes.Equal(w.CopiesDigest, digest(execution.Copies)) || uid(w.InstallationID) != p.InstallationID || uid(w.IssuerEpoch) != p.IssuerEpoch || !inc.PostmasterAt.Valid || !inc.DatabaseOid.Valid || !w.PostmasterAt.Time.Equal(inc.PostmasterAt.Time) || w.DatabaseOid != inc.DatabaseOid {
+	if execution.WriterProtocol != artifact.ContextWriterProtocol || execution.Phase != "stored" || execution.Binding.AttemptID != loc.AttemptID || execution.Binding.ClusterID != loc.ClusterID || !bytes.Equal(w.ExecutionDigest, d[:]) || !bytes.Equal(w.CopiesDigest, digest(execution.Copies)) || uid(w.InstallationID) != s.installation || !inc.PostmasterAt.Valid || !inc.DatabaseOid.Valid || !w.PostmasterAt.Time.Equal(inc.PostmasterAt.Time) || w.DatabaseOid != inc.DatabaseOid {
 		return w, app.ErrFence
 	}
 	return w, nil
@@ -103,11 +94,11 @@ func deletionRecord(row custodydb.ContextDeletionCheckpoint) (value.ContextDelet
 	}
 	return r, nil
 }
-func (s *ContextDeletions) matchRecord(ctx context.Context, q *custodydb.Queries, r value.ContextDeletionCheckpoint, p artifact.RecoveryProof) error {
+func (s *ContextDeletions) matchRecord(ctx context.Context, q *custodydb.Queries, r value.ContextDeletionCheckpoint) error {
 	if !r.Valid() || r.RootID != s.root {
 		return app.ErrConflict
 	}
-	w, err := s.writer(ctx, q, r.Location, p)
+	w, err := s.writer(ctx, q, r.Location)
 	if err != nil {
 		return err
 	}
@@ -116,13 +107,13 @@ func (s *ContextDeletions) matchRecord(ctx context.Context, q *custodydb.Queries
 	}
 	return nil
 }
-func (s *ContextDeletions) ReadContextDeletion(ctx context.Context, loc artifact.Location, p artifact.RecoveryProof) (value.ContextDeletionCheckpoint, bool, error) {
+func (s *ContextDeletions) ReadContextDeletion(ctx context.Context, loc artifact.Location) (value.ContextDeletionCheckpoint, bool, error) {
 	var out value.ContextDeletionCheckpoint
 	found := false
 	if loc.Validate() != nil {
 		return out, false, artifact.ErrInvalid
 	}
-	err := s.transaction(ctx, p, func(q *custodydb.Queries) error {
+	err := s.transaction(ctx, func(q *custodydb.Queries) error {
 		row, err := q.ReadContextDeletion(ctx, custodydb.ReadContextDeletionParams{RootID: id(s.root), AttemptID: id(loc.AttemptID)})
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
@@ -137,7 +128,7 @@ func (s *ContextDeletions) ReadContextDeletion(ctx context.Context, loc artifact
 		if out.Location != loc {
 			return app.ErrConflict
 		}
-		if err = s.matchRecord(ctx, q, out, p); err != nil {
+		if err = s.matchRecord(ctx, q, out); err != nil {
 			return err
 		}
 		found = true
@@ -184,7 +175,7 @@ func (s *ContextDeletions) DueContextDeletions(ctx context.Context) ([]artifact.
 }
 
 // DueContextDeletionPage lists current candidates with the cleaner's reads
-// alone. BeginContextDeletion still checks cutoff, lease and recovery under its
+// alone. BeginContextDeletion still checks cutoff and lease under its
 // own locks. Purged but unaudited checkpoints remain eligible for safe retry.
 func (s *ContextDeletions) DueContextDeletionPage(ctx context.Context, cursor ContextDeletionCursor) (ContextDeletionPage, error) {
 	if s == nil || s.ledger == nil || ctx == nil || ctx.Err() != nil {
@@ -262,17 +253,17 @@ func lockDeletionAttempt(ctx context.Context, q *custodydb.Queries, loc artifact
 	}
 	return row, pool, allocation, err
 }
-func (s *ContextDeletions) BeginContextDeletion(ctx context.Context, loc artifact.Location, p artifact.RecoveryProof) (app.ContextDeletionWork, error) {
+func (s *ContextDeletions) BeginContextDeletion(ctx context.Context, loc artifact.Location) (app.ContextDeletionWork, error) {
 	var out app.ContextDeletionWork
 	if loc.Validate() != nil {
 		return out, artifact.ErrInvalid
 	}
-	err := s.transaction(ctx, p, func(q *custodydb.Queries) error {
+	err := s.transaction(ctx, func(q *custodydb.Queries) error {
 		row, pool, _, err := lockDeletionAttempt(ctx, q, loc)
 		if err != nil {
 			return err
 		}
-		w, err := s.writer(ctx, q, loc, p)
+		w, err := s.writer(ctx, q, loc)
 		if err != nil {
 			return err
 		}
@@ -304,7 +295,7 @@ func (s *ContextDeletions) BeginContextDeletion(ctx context.Context, loc artifac
 		if err != nil {
 			return err
 		}
-		r := value.ContextDeletionCheckpoint{RootID: s.root, CaptureID: uid(w.CaptureID), Location: loc, StoreID: rec.Registration.StoreID, InstallationID: p.InstallationID, IssuerEpoch: p.IssuerEpoch, PostmasterAt: w.PostmasterAt.Time.UTC(), DatabaseOID: w.DatabaseOid.Uint32, PurgeFence: fence}
+		r := value.ContextDeletionCheckpoint{RootID: s.root, CaptureID: uid(w.CaptureID), Location: loc, StoreID: rec.Registration.StoreID, InstallationID: uid(w.InstallationID), IssuerEpoch: uid(w.IssuerEpoch), PostmasterAt: w.PostmasterAt.Time.UTC(), DatabaseOID: w.DatabaseOid.Uint32, PurgeFence: fence}
 		copy(r.RegistrationDigest[:], w.RegistrationDigest)
 		copy(r.WriterDigest[:], w.CompletionDigest)
 		out = app.ContextDeletionWork{Deletion: app.Deletion{Registration: rec.Registration, Effective: rec.Effective, Fence: fence, LeaseUntil: until}, Checkpoint: r}
@@ -315,18 +306,18 @@ func (s *ContextDeletions) BeginContextDeletion(ctx context.Context, loc artifac
 	}
 	return out, nil
 }
-func (s *ContextDeletions) RecordContextPurge(ctx context.Context, work app.ContextDeletionWork, done time.Time, p artifact.RecoveryProof) (value.ContextDeletionCheckpoint, error) {
+func (s *ContextDeletions) RecordContextPurge(ctx context.Context, work app.ContextDeletionWork, done time.Time) (value.ContextDeletionCheckpoint, error) {
 	r := work.Checkpoint
 	r.PurgedAt = done.UTC().Truncate(time.Microsecond)
 	if !r.Valid() || work.Deletion.Registration.Validate() != nil || r.Location != work.Deletion.Registration.Location || r.StoreID != work.Deletion.Registration.StoreID || r.RegistrationDigest != app.RegistrationDigest(work.Deletion.Registration) || r.PurgeFence != work.Deletion.Fence || !done.Before(work.Deletion.LeaseUntil) {
 		return value.ContextDeletionCheckpoint{}, artifact.ErrInvalid
 	}
-	err := s.transactionUntil(ctx, p, work.Deletion.LeaseUntil, func(q *custodydb.Queries) error {
+	err := s.transactionUntil(ctx, work.Deletion.LeaseUntil, func(q *custodydb.Queries) error {
 		row, pool, _, err := lockDeletionAttempt(ctx, q, r.Location)
 		if err != nil {
 			return err
 		}
-		if err = s.matchRecord(ctx, q, r, p); err != nil {
+		if err = s.matchRecord(ctx, q, r); err != nil {
 			return err
 		}
 		old, err := q.ReadContextDeletion(ctx, custodydb.ReadContextDeletionParams{RootID: id(s.root), AttemptID: row.ID})
@@ -369,12 +360,12 @@ func (s *ContextDeletions) RecordContextPurge(ctx context.Context, work app.Cont
 	}
 	return r, nil
 }
-func (s *ContextDeletions) AcknowledgeContextDeletion(ctx context.Context, r value.ContextDeletionCheckpoint, receipt audit.Receipt, p artifact.RecoveryProof) error {
+func (s *ContextDeletions) AcknowledgeContextDeletion(ctx context.Context, r value.ContextDeletionCheckpoint, receipt audit.Receipt) error {
 	if !r.Valid() || !receipt.ValidContextDeletion(r.RootID, r.Location.AttemptID) {
 		return artifact.ErrInvalid
 	}
-	return s.transaction(ctx, p, func(q *custodydb.Queries) error {
-		if err := s.matchRecord(ctx, q, r, p); err != nil {
+	return s.transaction(ctx, func(q *custodydb.Queries) error {
+		if err := s.matchRecord(ctx, q, r); err != nil {
 			return err
 		}
 		row, err := q.LockContextDeletion(ctx, custodydb.LockContextDeletionParams{RootID: id(s.root), AttemptID: id(r.Location.AttemptID)})
@@ -405,16 +396,16 @@ func (s *ContextDeletions) AcknowledgeContextDeletion(ctx context.Context, r val
 		return nil
 	})
 }
-func (s *ContextDeletions) FinalizeContextDeletion(ctx context.Context, r value.ContextDeletionCheckpoint, p artifact.RecoveryProof) error {
+func (s *ContextDeletions) FinalizeContextDeletion(ctx context.Context, r value.ContextDeletionCheckpoint) error {
 	if !r.Valid() {
 		return artifact.ErrInvalid
 	}
-	return s.transaction(ctx, p, func(q *custodydb.Queries) error {
+	return s.transaction(ctx, func(q *custodydb.Queries) error {
 		row, _, allocation, err := lockDeletionAttempt(ctx, q, r.Location)
 		if err != nil {
 			return err
 		}
-		if err = s.matchRecord(ctx, q, r, p); err != nil {
+		if err = s.matchRecord(ctx, q, r); err != nil {
 			return err
 		}
 		d, err := q.LockContextDeletion(ctx, custodydb.LockContextDeletionParams{RootID: id(s.root), AttemptID: row.ID})

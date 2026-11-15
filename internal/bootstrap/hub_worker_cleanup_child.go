@@ -107,10 +107,6 @@ func (w *hubWorker) openCleanup(ctx context.Context) (_ *hubWorkerCleanupDeploym
 	startup, end := context.WithTimeout(ctx, 30*time.Second)
 	defer end()
 	root, installation := w.ids.PermissionRootID, w.ids.InstallationID
-	recovery, err := postgres.NewRecoveryTransactionGuard(root, installation)
-	if err != nil {
-		return nil, &cleanupConfigError{"ids"}
-	}
 	step = "sql"
 	purposes := contracts.PublicRuntimeCaptureCleanupPurposes()
 	var store string
@@ -130,7 +126,7 @@ func (w *hubWorker) openCleanup(ctx context.Context) (_ *hubWorkerCleanupDeploym
 			}
 			step = "sql"
 		}
-		ledger, e := postgres.NewScopedWorkerOperationLifecycles(startup, pool, root, installation, store, recovery)
+		ledger, e := postgres.NewScopedWorkerOperationLifecycles(startup, pool, root, installation, store)
 		if e != nil {
 			return nil, e
 		}

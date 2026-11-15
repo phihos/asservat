@@ -24,7 +24,7 @@ func previewTestValue(t *testing.T) value.ContextPreview {
 	now := time.Date(2026, 10, 11, 12, 0, 0, 0, time.UTC)
 	scope := []byte(`{"format":"synthetic-passive-review"}`)
 	p := value.ContextPreview{
-		ID: uuid(1), RootID: uuid(2), InstallationID: uuid(3), IssuerEpoch: uuid(4), CaptureID: uuid(5), CaseID: uuid(6), OccurrenceID: uuid(7), ArtifactID: uuid(8), AttemptID: uuid(9), AssessmentID: uuid(10), AssessmentRulesDigest: artifact.Digest{10},
+		ID: uuid(1), RootID: uuid(2), InstallationID: uuid(3), CaptureID: uuid(5), CaseID: uuid(6), OccurrenceID: uuid(7), ArtifactID: uuid(8), AttemptID: uuid(9), AssessmentID: uuid(10), AssessmentRulesDigest: artifact.Digest{10},
 		Actor:          identity.Principal{Issuer: "https://id.example.test", Subject: "developer", ClientID: "browser", Kind: identity.Human},
 		Intent:         value.ContextIntent{Target: targets.WorkloadRequest{ClusterID: uuid(11), Namespace: "app", Kind: "Deployment", Name: "api"}, Diagnostic: value.ContextDiagnosticName, RequestedSeconds: 3600},
 		Target:         targets.Request{ClusterID: uuid(11), Namespace: cfg.NamespaceRef{Name: "app", UID: "namespace"}, Workload: cfg.WorkloadRef{Kind: "Deployment", Name: "api", UID: "workload"}, PodName: "api-one", PodUID: "pod"},

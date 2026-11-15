@@ -11,8 +11,8 @@ import (
 )
 
 func TestCapacityEnrollmentPlanCarriesCompleteImmutableCompilerInput(t *testing.T) {
-	a, g, w, p, prior, n := enrollmentObservationFacts()
-	o, _, e := ComposeEnrollmentObservation(a, g, w, p, prior.Recovery, "original", n)
+	a, g, w, p, _, n := enrollmentObservationFacts()
+	o, _, e := ComposeEnrollmentObservation(a, g, w, p, "original", n)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -91,7 +91,7 @@ func TestCapacityEnrollmentPlanRejectsChangedSelectionAndQualification(t *testin
 }
 
 func TestCapacityEnrollmentDigestAloneCannotReachAnEffect(t *testing.T) {
-	for _, mode := range []string{"missing-body", "changed-digest", "changed-source", "foreign-root", "foreign-cluster", "foreign-installation", "wrong-account-key"} {
+	for _, mode := range []string{"missing-body", "changed-digest", "changed-source", "foreign-root", "foreign-cluster", "wrong-account-key"} {
 		t.Run(mode, func(t *testing.T) {
 			n := time.Now().UTC().Truncate(time.Microsecond)
 			o, _ := enrollmentFixture(n)
@@ -108,8 +108,6 @@ func TestCapacityEnrollmentDigestAloneCannotReachAnEffect(t *testing.T) {
 				o.Key.RootID = "30000000-0000-4000-8000-000000000022"
 			case "foreign-cluster":
 				o.Key.ClusterID = "30000000-0000-4000-8000-000000000023"
-			case "foreign-installation":
-				o.Recovery.InstallationID = "30000000-0000-4000-8000-000000000024"
 			case "wrong-account-key":
 				version = "different"
 			}

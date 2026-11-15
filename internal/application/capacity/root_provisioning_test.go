@@ -24,8 +24,7 @@ func rootProvisioningFixture(now time.Time) (RootBackingObservation, RootConfigu
 		panic(e)
 	}
 	_, d := plan.Canonical()
-	recovery := artifact.RecoveryProof{InstallationID: in.InstallationID, IssuerEpoch: in.RootID, Revision: identity.Revision{UID: in.RootID, Generation: 1, Digest: artifact.Digest{1}}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
-	o := RootBackingObservation{RootID: in.RootID, InstallationID: in.InstallationID, QualificationID: in.QualificationID, QualificationDigest: in.QualificationDigest, PlanDigest: d, SourceDigest: artifact.Digest{2}, SourceRevision: 1, Recovery: recovery, Processing: RootProcessingObservation{Revision: identity.Revision{UID: in.ProcessingSourceUID, Generation: 1, Digest: artifact.Digest{3}}, ProtectionDigest: in.ProcessingProtectionDigest, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), Plan: plan, poolCanonical: "synthetic unit source"}
+	o := RootBackingObservation{RootID: in.RootID, InstallationID: in.InstallationID, QualificationID: in.QualificationID, QualificationDigest: in.QualificationDigest, PlanDigest: d, SourceDigest: artifact.Digest{2}, SourceRevision: 1, Processing: RootProcessingObservation{Revision: identity.Revision{UID: in.ProcessingSourceUID, Generation: 1, Digest: artifact.Digest{3}}, ProtectionDigest: in.ProcessingProtectionDigest, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), Plan: plan, poolCanonical: "synthetic unit source"}
 	v := RootConfiguration{Format: RootConfigurationFormat, RootID: in.RootID, AttemptID: "80000000-0000-4000-8000-000000000008", PlanDigest: d, Revision: 1, InitialObservedAt: now, InitialUntil: o.FreshUntil, RevisionObservedAt: now, RevisionUntil: o.FreshUntil, PlannedUntil: in.Capture.Policy.ValidUntil, ReservedAt: now}
 	return o, v
 }
@@ -129,13 +128,11 @@ func TestCapacityRootUnknownReplyContinuesOnlyExactCommittedSQLPhase(t *testing.
 			if s.row == nil || s.row.AttemptID != first.AttemptID {
 				t.Fatal("committed original identity missing")
 			}
-			// Independently current source/recovery can finish SQL configuration past
+			// Independently current source can finish SQL configuration past
 			// the first permit, without changing any original first interval/date.
 			now = now.Add(6 * time.Second)
 			o.ObservedAt = now
 			o.FreshUntil = now.Add(5 * time.Second)
-			o.Recovery.ObservedAt = now
-			o.Recovery.FreshUntil = o.FreshUntil
 			o.Processing.ObservedAt = now
 			o.Processing.FreshUntil = o.FreshUntil
 			s.lost = ""

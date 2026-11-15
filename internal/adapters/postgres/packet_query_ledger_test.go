@@ -40,7 +40,7 @@ func TestPacketQueryLedgerRowPinsCallerKeyAndGrant(t *testing.T) {
 	if q.Current(changedAuthority, q.CreatedAt) {
 		t.Fatal("current authority substituted original child")
 	}
-	row := custodydb.ContextQuery{ID: id(q.ID), RootID: id(q.Scope.RootID), AllocationID: id(q.Plan.AllocationID), AccountID: id(q.Plan.AccountID), PrincipalKey: principalKey(q.Scope.Principal), Actor: comparisonJSON(t, q.Scope.Principal), Query: comparisonJSON(t, q), OperationID: id(q.OperationID), WorkerID: id(q.WorkerID), CreatedAt: ts(q.CreatedAt), Deadline: ts(q.Deadline), CleanupUntil: ts(q.CleanupUntil), RetireBy: ts(q.Plan.RetireBy), IssuerEpoch: id(q.RecoveryIssuerEpoch), InvocationKey: nullableString(q.InvocationKey.Key), RequestDigest: queryInvocationDigest(q)}
+	row := custodydb.ContextQuery{ID: id(q.ID), RootID: id(q.Scope.RootID), AllocationID: id(q.Plan.AllocationID), AccountID: id(q.Plan.AccountID), PrincipalKey: principalKey(q.Scope.Principal), Actor: comparisonJSON(t, q.Scope.Principal), Query: comparisonJSON(t, q), OperationID: id(q.OperationID), WorkerID: id(q.WorkerID), CreatedAt: ts(q.CreatedAt), Deadline: ts(q.Deadline), CleanupUntil: ts(q.CleanupUntil), RetireBy: ts(q.Plan.RetireBy), IssuerEpoch: id(q.Plan.InstallationID), InvocationKey: nullableString(q.InvocationKey.Key), RequestDigest: queryInvocationDigest(q)}
 	if got, err := queryFromRow(row); err != nil || !got.Equal(q) {
 		t.Fatal("original caller-key row refused", err)
 	}

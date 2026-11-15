@@ -11,7 +11,6 @@ func publicRuntimeCapacityGrants(purpose string) ([]publicRuntimeGrant, bool) {
 	case "capacity":
 		signatures = []string{
 			"read_capacity_runtime_scope(uuid,jsonb,jsonb,timestamptz,timestamptz)",
-			"read_capacity_recovery(uuid,timestamptz,timestamptz)",
 			"read_capacity_permission_scopes(uuid,jsonb)",
 			"read_capacity_source_revision(uuid,jsonb)",
 			"accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea)",
@@ -49,18 +48,17 @@ func publicRuntimeCapacityGrants(purpose string) ([]publicRuntimeGrant, bool) {
 	default:
 		return nil, false
 	}
-	out := []publicRuntimeGrant{{"schema", "public", "", "USAGE"}, {"table", "goose_db_version", "", "SELECT"}}
+	// Both facets read the fleet trust row for the SQL functions' trust input.
+	out := []publicRuntimeGrant{{"schema", "public", "", "USAGE"}, {"table", "goose_db_version", "", "SELECT"}, {"table", "fleet_current_trust", "", "SELECT"}}
 	if purpose == "capacity" {
 		// Exact read graph of OwnerEnrollments.current(false),
-		// ReadContextStartOwners and ReadOwnerRegistration. The two column
-		// UPDATE grants permit existing FOR SHARE locks; immutable-key and
-		// recovery guards remain enforced. No certificate/configuration effect
-		// column, enrollment INSERT, DELETE or activation function is granted.
-		for _, table := range []string{"fleet_current_trust", "hub_owner_configuration", "hub_owner_configuration_revision", "hub_owner_enrollment", "hub_owner_certificate"} {
+		// ReadContextStartOwners and ReadOwnerRegistration. The column UPDATE
+		// grant permits the existing FOR SHARE lock. No certificate/configuration
+		// effect column, enrollment INSERT, DELETE or activation function is granted.
+		for _, table := range []string{"hub_owner_configuration", "hub_owner_configuration_revision", "hub_owner_enrollment", "hub_owner_certificate"} {
 			out = append(out, publicRuntimeGrant{"table", table, "", "SELECT"})
 		}
 		out = append(out,
-			publicRuntimeGrant{"table", "fleet_current_trust", "installation_id", "UPDATE"},
 			publicRuntimeGrant{"table", "hub_owner_configuration", "source_uid", "UPDATE"},
 			// ADR-331: the joined clusters' delivered capacity observations.
 			publicRuntimeGrant{"table", "remote_capacity_delivery", "", "SELECT"})

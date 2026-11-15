@@ -18,14 +18,13 @@ type ProcessingDiscoveryReader interface {
 type ProcessingEvidenceDiscovery struct {
 	RootID, InstallationID string
 	Policies               ProcessingPolicyReader
-	Recovery               ProcessingRecoveryReader
 	Discovery              ProcessingDiscoveryReader
 	Now                    func() time.Time
 }
 
 func (s ProcessingEvidenceDiscovery) Search(ctx context.Context, caller ProcessingIdentity, q value.ProcessingDiscoveryQuery) (value.ProcessingDiscoveryPage, error) {
 	var zero value.ProcessingDiscoveryPage
-	if ctx == nil || ctx.Err() != nil || caller == nil || !q.Valid() || !authorization.UUID(s.RootID) || !authorization.UUID(s.InstallationID) || s.Policies == nil || s.Recovery == nil || s.Discovery == nil || s.Now == nil {
+	if ctx == nil || ctx.Err() != nil || caller == nil || !q.Valid() || !authorization.UUID(s.RootID) || !authorization.UUID(s.InstallationID) || s.Policies == nil || s.Discovery == nil || s.Now == nil {
 		return zero, value.ErrUnavailable
 	}
 	started := s.Now().UTC().Truncate(time.Microsecond)
@@ -35,7 +34,7 @@ func (s ProcessingEvidenceDiscovery) Search(ctx context.Context, caller Processi
 	}
 	call, stop := context.WithDeadline(ctx, window.Until())
 	defer stop()
-	processing := ProcessingChanges{RootID: s.RootID, InstallationID: s.InstallationID, Policies: s.Policies, Recovery: s.Recovery, Now: s.Now}
+	processing := ProcessingChanges{RootID: s.RootID, InstallationID: s.InstallationID, Policies: s.Policies, Now: s.Now}
 	authority, err := processing.authority(call, caller, started, window.Until())
 	if err != nil {
 		return zero, err

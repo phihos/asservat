@@ -326,11 +326,7 @@ func groupAuditedPolicyFixture(t *testing.T) (*groupProjectionSQL, *custodydb.Qu
 	src := value.PolicySource{InstallationID: a.InstallationID, ClusterID: a.ClusterID, NamespaceUID: a.NamespaceUID, Name: "policy", Revision: identity.Revision{UID: a.PolicyUID, Generation: 1, Digest: artifact.Digest{2}}, ResourceVersion: "1", ObservedAt: db.now.Add(-time.Second), FreshUntil: db.now.Add(3 * time.Second), CollectionDigest: artifact.Digest{7}}
 	submission := value.VerifiedPolicySubmission{Nonce: "99999999-9999-4999-8999-999999999999", Actor: a.Creator, Source: src.Revision, ClusterID: src.ClusterID, NamespaceUID: src.NamespaceUID, Name: src.Name, ScopeDigest: a.ScopeDigest, EnvelopeDigest: artifact.Digest{8}, IssuedAt: db.now, ExpiresAt: db.now.Add(20 * time.Second)}
 	trust := custodydb.FleetCurrentTrust{InstallationID: id(a.InstallationID), IssuerEpoch: id("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"), SourceUid: "fleet", SourceGeneration: 1, SourceDigest: append([]byte{1}, make([]byte, 31)...), ObservedAt: ts(db.now.Add(-time.Second)), FreshUntil: ts(db.now.Add(4 * time.Second))}
-	recovery, err := recoveryState(trust, db.now, db.now)
-	if err != nil {
-		t.Fatal(err)
-	}
-	record := value.PolicyAcceptance{ID: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", RootID: uid(stream.ID), Source: src, Submission: submission, Authority: a, Submitter: a.Creator, IdentityRevision: identity.Revision{UID: "identity", Generation: 1, Digest: artifact.Digest{1}}, PermissionRevision: identity.Revision{UID: uid(stream.Epoch), Generation: 1, Digest: artifact.Digest{1}}, Recovery: recovery, IntentVersion: 1, AcceptedAt: db.now}
+	record := value.PolicyAcceptance{ID: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", RootID: uid(stream.ID), Source: src, Submission: submission, Authority: a, Submitter: a.Creator, IdentityRevision: identity.Revision{UID: "identity", Generation: 1, Digest: artifact.Digest{1}}, PermissionRevision: identity.Revision{UID: uid(stream.Epoch), Generation: 1, Digest: artifact.Digest{1}}, IntentVersion: 1, AcceptedAt: db.now}
 	if !record.Valid() {
 		t.Fatal("invalid accepted-policy fixture")
 	}

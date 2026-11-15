@@ -93,7 +93,7 @@ func newProcessingTestFixture(t *testing.T, ctx context.Context, poolFor func(st
 	path := syntheticDownloadPlacement(e.Registration)
 	actor := s.a.Eligibility.VerifiedIdentity
 	f.actor = processingTestIdentity{actor}
-	f.policy = processingTestPolicy{privacyvalue.DownloadPolicy{RootID: s.a.RootID, InstallationID: s.recovery.installation, RecoveryEpoch: s.a.Recovery.IssuerEpoch, Revision: identity.Revision{UID: custodyID(), Generation: 1, Digest: artifact.Digest{3}}, ProtectionDigest: artifact.Digest{4}, PermittedRegions: []string{"synthetic-region"}, Paths: []privacyvalue.DownloadPath{path}, Clients: []privacyvalue.DownloadClient{}, Operators: []privacyvalue.ProcessingOperator{{Issuer: actor.Principal.Issuer, ClientID: actor.Principal.ClientID, Kind: "User", ID: actor.Principal.Subject}}}}
+	f.policy = processingTestPolicy{privacyvalue.DownloadPolicy{RootID: s.a.RootID, InstallationID: s.recovery.installation, RecoveryEpoch: s.recovery.observation.issuer, Revision: identity.Revision{UID: custodyID(), Generation: 1, Digest: artifact.Digest{3}}, ProtectionDigest: artifact.Digest{4}, PermittedRegions: []string{"synthetic-region"}, Paths: []privacyvalue.DownloadPath{path}, Clients: []privacyvalue.DownloadClient{}, Operators: []privacyvalue.ProcessingOperator{{Issuer: actor.Principal.Issuer, ClientID: actor.Principal.ClientID, Kind: "User", ID: actor.Principal.Subject}}}}
 	f.backing = privacyvalue.ProcessingBacking{RootID: s.a.RootID, InstallationID: s.recovery.installation, PolicyID: custodyID(), BackupIdentity: custodyID(), PolicyDigest: artifact.Digest{1}, BackupDigest: artifact.Digest{2}, History: privacyvalue.ProcessingHistoryQualification{Format: privacyvalue.ProcessingHistoryFormat, ID: custodyID(), Digest: artifact.Digest{5}, RowBytes: 128 << 10, TransitionWALBytes: 128 << 10, BackupCopies: 2, WALCopies: 2}, MaxCaptures: 128, MaxRules: 16, MaxRootTransitions: 64, BackupHorizonSeconds: 2, CleanupSeconds: 5, ValidUntil: until, RetireBy: until.Add(9 * time.Second)}
 	var ok bool
 	f.backing.BackupBytes, f.backing.WALBytes, ok = f.backing.RequiredBytes()
@@ -154,20 +154,20 @@ func newProcessingTestFixture(t *testing.T, ctx context.Context, poolFor func(st
 		var a *postgres.OperationAcknowledgements
 		var l *postgres.OperationLifecycles
 		if p.Lane == "processing" {
-			j, err = postgres.NewProcessingReleaseJournal(ctx, jp, p, s.recovery.guard)
+			j, err = postgres.NewProcessingReleaseJournal(ctx, jp, p)
 			if err == nil {
-				a, err = postgres.NewProcessingReleaseAcknowledgements(ctx, ap, p, s.recovery.guard)
+				a, err = postgres.NewProcessingReleaseAcknowledgements(ctx, ap, p)
 			}
 			if err == nil {
-				l, err = postgres.NewProcessingReleaseLifecycles(ctx, jp, p, s.recovery.guard)
+				l, err = postgres.NewProcessingReleaseLifecycles(ctx, jp, p)
 			}
 		} else {
-			j, err = postgres.NewHealthyOperationJournal(ctx, jp, p, s.recovery.guard)
+			j, err = postgres.NewHealthyOperationJournal(ctx, jp, p)
 			if err == nil {
-				a, err = postgres.NewOperationAcknowledgements(ctx, ap, p.RootID, "normal", s.recovery.guard)
+				a, err = postgres.NewOperationAcknowledgements(ctx, ap, p.RootID, "normal", s.recovery.installation)
 			}
 			if err == nil {
-				l, err = postgres.NewOperationLifecycles(ctx, jp, p.RootID, "normal", s.recovery.guard)
+				l, err = postgres.NewOperationLifecycles(ctx, jp, p.RootID, "normal", s.recovery.installation)
 			}
 		}
 		if err != nil {
@@ -191,13 +191,13 @@ func newProcessingTestFixture(t *testing.T, ctx context.Context, poolFor func(st
 	if err != nil {
 		t.Fatal(err)
 	}
-	decisions, err := postgres.NewProcessingDecisions(ctx, decisionPool, s.a.RootID, s.recovery.guard)
+	decisions, err := postgres.NewProcessingDecisions(ctx, decisionPool, s.a.RootID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.service = privacyapp.ProcessingChanges{RootID: s.a.RootID, InstallationID: s.recovery.installation, Policies: f.policy, Recovery: s.recovery.reader, Decisions: decisions, Audit: makeAudit(normalPolicy, normalPool, normalAck), ReleaseAudit: makeAudit(releasePolicy, releasePool, releaseAck), MAC: f.mac, AuditPolicy: normalPolicy, ReleaseAuditPolicy: releasePolicy, RetainedSeconds: normalRetained, Now: time.Now}
+	f.service = privacyapp.ProcessingChanges{RootID: s.a.RootID, InstallationID: s.recovery.installation, Policies: f.policy, Decisions: decisions, Audit: makeAudit(normalPolicy, normalPool, normalAck), ReleaseAudit: makeAudit(releasePolicy, releasePool, releaseAck), MAC: f.mac, AuditPolicy: normalPolicy, ReleaseAuditPolicy: releasePolicy, RetainedSeconds: normalRetained, Now: time.Now}
 	epoch := custodyID()
-	config, err := postgres.NewProcessingConfiguration(ctx, configPool, f.backing, releasePolicy, epoch, f.policy.value.Revision.UID, f.policy.value.ProtectionDigest, s.recovery.guard)
+	config, err := postgres.NewProcessingConfiguration(ctx, configPool, f.backing, releasePolicy, epoch, f.policy.value.Revision.UID, f.policy.value.ProtectionDigest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -205,11 +205,7 @@ func newProcessingTestFixture(t *testing.T, ctx context.Context, poolFor func(st
 	if err != nil {
 		t.Fatal(err)
 	}
-	r, err := s.recovery.reader.RecoveryState(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err = config.AcceptCurrent(ctx, p, r, 0); err != nil {
+	if err = config.AcceptCurrent(ctx, p, 0); err != nil {
 		t.Fatal("accept processing backing", err)
 	}
 	f.renew = func() error {
@@ -229,7 +225,7 @@ func newProcessingTestFixture(t *testing.T, ctx context.Context, poolFor func(st
 		if err := auditConfig.ProvisionProcessingReleaseAuditPool(ctx, pool, releasePolicy); err != nil {
 			return err
 		}
-		updated, err := postgres.NewProcessingConfiguration(ctx, configPool, next, releasePolicy, epoch, f.policy.value.Revision.UID, f.policy.value.ProtectionDigest, s.recovery.guard)
+		updated, err := postgres.NewProcessingConfiguration(ctx, configPool, next, releasePolicy, epoch, f.policy.value.Revision.UID, f.policy.value.ProtectionDigest)
 		if err != nil {
 			return err
 		}
@@ -237,11 +233,7 @@ func newProcessingTestFixture(t *testing.T, ctx context.Context, poolFor func(st
 		if err != nil {
 			return err
 		}
-		r, err := s.recovery.reader.RecoveryState(ctx)
-		if err != nil {
-			return err
-		}
-		if err = updated.AcceptCurrent(ctx, p, r, releasePolicy.BackingRevision-1); err != nil {
+		if err = updated.AcceptCurrent(ctx, p, releasePolicy.BackingRevision-1); err != nil {
 			return err
 		}
 		f.backing = next
@@ -269,12 +261,12 @@ func syntheticDownloadPlacement(r artifact.Registration) artifact.DownloadPath {
 }
 func newDownloadTestEnvironment(t *testing.T, ctx context.Context, pool *pgxpool.Pool, s captureAdmissionScenario, r artifact.Registration) downloadTestEnvironment {
 	t.Helper()
-	reader, err := postgres.NewProcessingReads(ctx, pool, s.a.RootID, s.recovery.guard)
+	reader, err := postgres.NewProcessingReads(ctx, pool, s.a.RootID, s.recovery.installation)
 	if err != nil {
 		t.Fatal(err)
 	}
 	path := syntheticDownloadPlacement(r)
-	return downloadTestEnvironment{root: s.a.RootID, installation: s.recovery.installation, epoch: s.a.Recovery.IssuerEpoch, registration: r, recovery: s.recovery.reader, processing: reader, path: &path}
+	return downloadTestEnvironment{root: s.a.RootID, installation: s.recovery.installation, epoch: s.recovery.observation.issuer, registration: r, processing: reader, path: &path}
 }
 
 var _ authorizationapp.DownloadEnvironmentReader = downloadTestEnvironment{}

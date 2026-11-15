@@ -67,7 +67,7 @@ func qualifyApprovedRecording(t *testing.T, ctx context.Context, admin *pgxpool.
 		if err != nil {
 			t.Fatal(err)
 		}
-		p := capture.ContextPreview{ID: custodyID(), AssessmentID: custodyID(), AssessmentRulesDigest: planning.RecorderAssessmentRulesDigest(), RootID: s.a.RootID, InstallationID: s.a.Recovery.InstallationID, IssuerEpoch: s.a.Recovery.IssuerEpoch, CaptureID: in.CaptureID, CaseID: s.a.CaseID, OccurrenceID: s.a.OccurrenceID, ArtifactID: s.a.Registration.Location.ArtifactID, AttemptID: s.a.Registration.Location.AttemptID, Actor: in.Executor, ExecutionClass: artifact.ContextAPIExecution,
+		p := capture.ContextPreview{ID: custodyID(), AssessmentID: custodyID(), AssessmentRulesDigest: planning.RecorderAssessmentRulesDigest(), RootID: s.a.RootID, InstallationID: s.recovery.installation, CaptureID: in.CaptureID, CaseID: s.a.CaseID, OccurrenceID: s.a.OccurrenceID, ArtifactID: s.a.Registration.Location.ArtifactID, AttemptID: s.a.Registration.Location.AttemptID, Actor: in.Executor, ExecutionClass: artifact.ContextAPIExecution,
 			Intent: capture.ContextIntent{Target: targets.WorkloadRequest{ClusterID: in.Target.Request.ClusterID, Namespace: in.Target.Request.Namespace.Name, Kind: in.Target.Request.Workload.Kind, Name: in.Target.Request.Workload.Name}, Composition: &composition, RequestedSeconds: in.Retention.RequestedSeconds}, Target: in.Target.Request, Pin: in.Target.Pin,
 			Storage: capture.ContextStorageSelection{StoreID: s.a.Registration.StoreID, AllocationID: s.a.Registration.AllocationID, PoolRevision: s.a.Registration.PoolRevision, AllocationRevision: s.a.Registration.AllocationRevision, BindingRevision: s.a.Storage.Revision}, Retention: capture.ContextRetentionReview{PurposeRef: in.Retention.PurposeRef, RequestedSeconds: in.Retention.RequestedSeconds, MaximumSeconds: in.Retention.MaximumSeconds, DeletionBudgetSeconds: in.Retention.DeletionBudgetSeconds, Policies: in.Retention.Policies}, Audience: s.a.Eligibility.DefaultAudience, CanonicalScope: reviewed.CanonicalScope, ScopeDigest: reviewed.ScopeDigest, CreatedAt: now, Deadline: oldDeadline}
 		previewPool := poolFor("context_preview_runtime", "synthetic-context-preview")
@@ -88,13 +88,13 @@ func qualifyApprovedRecording(t *testing.T, ctx context.Context, admin *pgxpool.
 		})
 		grantPool := poolFor(role, "synthetic-approved-grant")
 		defer grantPool.Close()
-		grants, err := postgres.NewAccessGrants(ctx, grantPool, s.a.RootID, s.recovery.guard)
+		grants, err := postgres.NewAccessGrants(ctx, grantPool, s.a.RootID, s.recovery.installation)
 		if err != nil {
 			t.Fatal(err)
 		}
 		g := authorization.Grant{ID: custodyID(), RootID: s.a.RootID, Kind: authorization.GrantAdHocCapture, PreviewID: p.ID, CaptureID: p.CaptureID, Target: in.Target.Target(), Requester: p.Actor, ExecutionDigest: p.ScopeDigest, Scope: p.CanonicalScope, Review: []byte(`{}`), DataClass: "extract", Reasons: []authorization.SensitiveReason{{ActionID: reviewed.Actions[0].ID, Code: planvalue.ReasonRecordingApproval}}, Lifetime: time.Hour, Revision: 1}
 		g.ReviewDigest = authapp.ReviewDigest(g, g.Review)
-		g, _, err = grants.RequestGrant(ctx, authapp.StoredGrantRequest{Grant: g, IdempotencyKey: "approval", RequestDigest: sha256.Sum256([]byte("synthetic-request"))}, s.a.Recovery)
+		g, _, err = grants.RequestGrant(ctx, authapp.StoredGrantRequest{Grant: g, IdempotencyKey: "approval", RequestDigest: sha256.Sum256([]byte("synthetic-request"))})
 		if err != nil {
 			t.Fatal("persist grant", err)
 		}
@@ -112,7 +112,7 @@ func qualifyApprovedRecording(t *testing.T, ctx context.Context, admin *pgxpool.
 		}
 		approver := p.Actor
 		approver.Subject = "synthetic-independent-reviewer"
-		g, _, err = grants.DecideGrant(ctx, authapp.GrantDecisionInput{GrantID: g.ID, Approve: true, Approver: approver, Reason: "synthetic reviewed recording", ACR: "gold", AuthTime: time.Now().Add(-time.Second), IdempotencyKey: "approve"}, s.a.Recovery)
+		g, _, err = grants.DecideGrant(ctx, authapp.GrantDecisionInput{GrantID: g.ID, Approve: true, Approver: approver, Reason: "synthetic reviewed recording", ACR: "gold", AuthTime: time.Now().Add(-time.Second), IdempotencyKey: "approve"})
 		if err != nil {
 			t.Fatal("decision", err)
 		}
@@ -155,7 +155,7 @@ func qualifyApprovedRecording(t *testing.T, ctx context.Context, admin *pgxpool.
 		}
 		done := make(chan error, 1)
 		go func() {
-			_, _, e := grants.RevokeGrant(ctx, authapp.GrantRevocationInput{GrantID: g.ID, Revoker: p.Actor, ExpectedRevision: g.Revision, IdempotencyKey: "revoke"}, s.a.Recovery)
+			_, _, e := grants.RevokeGrant(ctx, authapp.GrantRevocationInput{GrantID: g.ID, Revoker: p.Actor, ExpectedRevision: g.Revision, IdempotencyKey: "revoke"})
 			done <- e
 		}()
 		select {
@@ -231,7 +231,7 @@ func qualifyCompositionGroup(t *testing.T, ctx context.Context, admin *pgxpool.P
 	if err != nil {
 		t.Fatal("group scope", err)
 	}
-	p := capture.ContextPreview{ID: custodyID(), AssessmentID: custodyID(), AssessmentRulesDigest: planning.RecorderAssessmentRulesDigest(), RootID: s.a.RootID, InstallationID: s.a.Recovery.InstallationID, IssuerEpoch: s.a.Recovery.IssuerEpoch, CaptureID: parentID, CaseID: s.a.CaseID, OccurrenceID: custodyID(), ArtifactID: custodyID(), AttemptID: custodyID(), Actor: in.Executor, ExecutionClass: artifact.ContextAPIExecution,
+	p := capture.ContextPreview{ID: custodyID(), AssessmentID: custodyID(), AssessmentRulesDigest: planning.RecorderAssessmentRulesDigest(), RootID: s.a.RootID, InstallationID: s.recovery.installation, CaptureID: parentID, CaseID: s.a.CaseID, OccurrenceID: custodyID(), ArtifactID: custodyID(), AttemptID: custodyID(), Actor: in.Executor, ExecutionClass: artifact.ContextAPIExecution,
 		Intent: capture.ContextIntent{Target: targets.WorkloadRequest{ClusterID: in.Target.Request.ClusterID, Namespace: in.Target.Request.Namespace.Name, Kind: in.Target.Request.Workload.Kind, Name: in.Target.Request.Workload.Name}, Composition: &composition}, Target: in.Target.Request, Pin: in.Target.Pin,
 		Storage: capture.ContextStorageSelection{StoreID: s.a.Registration.StoreID, AllocationID: s.a.Registration.AllocationID, PoolRevision: s.a.Registration.PoolRevision, AllocationRevision: s.a.Registration.AllocationRevision, BindingRevision: s.a.Storage.Revision}, Retention: group.Children[0].Retention, Audience: s.a.Eligibility.DefaultAudience, CanonicalScope: scope, ScopeDigest: digest, CreatedAt: now, Deadline: deadline, CompositionGroup: group}
 	if !captureapp.ValidContextPreview(p) {
@@ -258,24 +258,24 @@ func qualifyCompositionGroup(t *testing.T, ctx context.Context, admin *pgxpool.P
 	})
 	grantPool := poolFor(role, "synthetic-group-grant")
 	defer grantPool.Close()
-	grants, err := postgres.NewAccessGrants(ctx, grantPool, s.a.RootID, s.recovery.guard)
+	grants, err := postgres.NewAccessGrants(ctx, grantPool, s.a.RootID, s.recovery.installation)
 	if err != nil {
 		t.Fatal(err)
 	}
 	g := authorization.Grant{ID: custodyID(), RootID: s.a.RootID, Kind: authorization.GrantAdHocCapture, PreviewID: p.ID, CaptureID: p.CaptureID, Target: in.Target.Target(), Requester: p.Actor, ExecutionDigest: p.ScopeDigest, Scope: p.CanonicalScope, Review: []byte(`{}`), DataClass: "extract", Reasons: reasons, Lifetime: time.Hour, Revision: 1}
 	g.ReviewDigest = authapp.ReviewDigest(g, g.Review)
-	g, _, err = grants.RequestGrant(ctx, authapp.StoredGrantRequest{Grant: g, IdempotencyKey: "group-approval", RequestDigest: sha256.Sum256([]byte("synthetic-group-request"))}, s.a.Recovery)
+	g, _, err = grants.RequestGrant(ctx, authapp.StoredGrantRequest{Grant: g, IdempotencyKey: "group-approval", RequestDigest: sha256.Sum256([]byte("synthetic-group-request"))})
 	if err != nil {
 		t.Fatal("persist grant", err)
 	}
 	approver := p.Actor
 	approver.Subject = "synthetic-independent-reviewer"
-	if g, _, err = grants.DecideGrant(ctx, authapp.GrantDecisionInput{GrantID: g.ID, Approve: true, Approver: approver, Reason: "synthetic reviewed group", ACR: "gold", AuthTime: time.Now().Add(-time.Second), IdempotencyKey: "approve"}, s.a.Recovery); err != nil {
+	if g, _, err = grants.DecideGrant(ctx, authapp.GrantDecisionInput{GrantID: g.ID, Approve: true, Approver: approver, Reason: "synthetic reviewed group", ACR: "gold", AuthTime: time.Now().Add(-time.Second), IdempotencyKey: "approve"}); err != nil {
 		t.Fatal("decision", err)
 	}
 	acceptedAt := time.Now().UTC().Truncate(time.Microsecond)
 	p.CreatedAt, p.Deadline = acceptedAt, acceptedAt.Add(time.Minute)
-	request := capture.RecordingSaveGroupAdmission{Preview: p, RootID: s.a.RootID, IdempotencyKey: "composition-group", SubmissionDigest: captureapp.ContextRequestDigest(p.ID), Recovery: s.a.Recovery}
+	request := capture.RecordingSaveGroupAdmission{Preview: p, RootID: s.a.RootID, IdempotencyKey: "composition-group", SubmissionDigest: captureapp.ContextRequestDigest(p.ID)}
 	for n, c := range group.Children {
 		ci := in
 		ci.CaptureID, ci.Deadline = c.CaptureID, p.Deadline
@@ -318,7 +318,7 @@ func qualifyCompositionGroup(t *testing.T, ctx context.Context, admin *pgxpool.P
 	// another key for the same preview; nothing new is admitted.
 	other := request
 	other.IdempotencyKey = "another-key"
-	if _, _, err = grants.RevokeGrant(ctx, authapp.GrantRevocationInput{GrantID: g.ID, Revoker: p.Actor, ExpectedRevision: g.Revision, IdempotencyKey: "revoke"}, s.a.Recovery); err != nil {
+	if _, _, err = grants.RevokeGrant(ctx, authapp.GrantRevocationInput{GrantID: g.ID, Revoker: p.Actor, ExpectedRevision: g.Revision, IdempotencyKey: "revoke"}); err != nil {
 		t.Fatal("revoke", err)
 	}
 	if again, err = s.s.AdmitRecordingCompositionGroup(ctx, other); err != nil || !again.Replay || again.CaptureID != parentID {
@@ -352,7 +352,7 @@ func qualifyAdHocObservationPool(t *testing.T, ctx context.Context, admin *pgxpo
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := capture.ContextPreview{ID: custodyID(), AssessmentID: custodyID(), AssessmentRulesDigest: planning.RecorderAssessmentRulesDigest(), RootID: s.a.RootID, InstallationID: s.a.Recovery.InstallationID, IssuerEpoch: s.a.Recovery.IssuerEpoch, CaptureID: in.CaptureID, CaseID: s.a.CaseID, OccurrenceID: s.a.OccurrenceID, ArtifactID: s.a.Registration.Location.ArtifactID, AttemptID: s.a.Registration.Location.AttemptID, Actor: in.Executor, ExecutionClass: artifact.ContextAPIExecution,
+	p := capture.ContextPreview{ID: custodyID(), AssessmentID: custodyID(), AssessmentRulesDigest: planning.RecorderAssessmentRulesDigest(), RootID: s.a.RootID, InstallationID: s.recovery.installation, CaptureID: in.CaptureID, CaseID: s.a.CaseID, OccurrenceID: s.a.OccurrenceID, ArtifactID: s.a.Registration.Location.ArtifactID, AttemptID: s.a.Registration.Location.AttemptID, Actor: in.Executor, ExecutionClass: artifact.ContextAPIExecution,
 		Intent: capture.ContextIntent{Target: targets.WorkloadRequest{ClusterID: in.Target.Request.ClusterID, Namespace: in.Target.Request.Namespace.Name, Kind: in.Target.Request.Workload.Kind, Name: in.Target.Request.Workload.Name}, Composition: &composition, RequestedSeconds: in.Retention.RequestedSeconds}, Target: in.Target.Request, Pin: in.Target.Pin,
 		Storage: capture.ContextStorageSelection{StoreID: s.a.Registration.StoreID, AllocationID: s.a.Registration.AllocationID, PoolRevision: s.a.Registration.PoolRevision, AllocationRevision: s.a.Registration.AllocationRevision, BindingRevision: s.a.Storage.Revision}, Retention: reviewOf(in.Retention), Audience: s.a.Eligibility.DefaultAudience, CanonicalScope: reviewed.CanonicalScope, ScopeDigest: reviewed.ScopeDigest, CreatedAt: now, Deadline: now.Add(time.Minute)}
 	previewPool := poolFor("context_preview_runtime", "synthetic-context-preview")
@@ -373,7 +373,7 @@ func qualifyAdHocObservationPool(t *testing.T, ctx context.Context, admin *pgxpo
 	})
 	grantPool := poolFor(role, "synthetic-adhoc-pool")
 	defer grantPool.Close()
-	grants, err := postgres.NewAccessGrants(ctx, grantPool, s.a.RootID, s.recovery.guard)
+	grants, err := postgres.NewAccessGrants(ctx, grantPool, s.a.RootID, s.recovery.installation)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -388,7 +388,7 @@ func qualifyAdHocObservationPool(t *testing.T, ctx context.Context, admin *pgxpo
 		g.ResultAccessDigest = authapp.ResultAccessDigest(g.CaptureID, g.ExecutionDigest, *g.ResultAccess)
 	}
 	g.ReviewDigest = authapp.ReviewDigest(g, g.Review)
-	g, _, err = grants.RequestGrant(ctx, authapp.StoredGrantRequest{Grant: g, IdempotencyKey: "raw", RequestDigest: sha256.Sum256([]byte("synthetic-raw-request"))}, s.a.Recovery)
+	g, _, err = grants.RequestGrant(ctx, authapp.StoredGrantRequest{Grant: g, IdempotencyKey: "raw", RequestDigest: sha256.Sum256([]byte("synthetic-raw-request"))})
 	if err != nil {
 		t.Fatal("persist grant", err)
 	}
@@ -416,7 +416,7 @@ func qualifyAdHocObservationPool(t *testing.T, ctx context.Context, admin *pgxpo
 	}
 	approver := p.Actor
 	approver.Subject = "synthetic-independent-reviewer"
-	if g, _, err = grants.DecideGrant(ctx, authapp.GrantDecisionInput{GrantID: g.ID, Approve: true, Approver: approver, Reason: "synthetic raw review", ACR: "gold", AuthTime: time.Now().Add(-time.Second), IdempotencyKey: "approve"}, s.a.Recovery); err != nil {
+	if g, _, err = grants.DecideGrant(ctx, authapp.GrantDecisionInput{GrantID: g.ID, Approve: true, Approver: approver, Reason: "synthetic raw review", ACR: "gold", AuthTime: time.Now().Add(-time.Second), IdempotencyKey: "approve"}); err != nil {
 		t.Fatal("decision", err)
 	}
 	if mode == "expiry" {
@@ -473,7 +473,7 @@ func qualifyAdHocObservationPool(t *testing.T, ctx context.Context, admin *pgxpo
 	if _, err := admin.Exec(ctx, "DELETE FROM adhoc_observation_spend WHERE grant_id=$1", g.ID); err == nil {
 		t.Fatal("spend deleted")
 	}
-	if _, _, err = grants.RevokeGrant(ctx, authapp.GrantRevocationInput{GrantID: g.ID, Revoker: p.Actor, ExpectedRevision: g.Revision, IdempotencyKey: "revoke"}, s.a.Recovery); err != nil {
+	if _, _, err = grants.RevokeGrant(ctx, authapp.GrantRevocationInput{GrantID: g.ID, Revoker: p.Actor, ExpectedRevision: g.Revision, IdempotencyKey: "revoke"}); err != nil {
 		t.Fatal("revoke", err)
 	}
 	if spend(0) || spend(1) || spendEvents(1, 1) {

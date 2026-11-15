@@ -203,15 +203,7 @@ func qualifyPolicyGrantPublicOperations(t *testing.T, ctx context.Context, admin
 	if e != nil {
 		t.Fatal(e)
 	}
-	guard, e := postgres.NewRecoveryTransactionGuard(root, a.InstallationID)
-	if e != nil {
-		t.Fatal(e)
-	}
-	grants, e := postgres.NewAccessGrants(ctx, hub, root, guard)
-	if e != nil {
-		t.Fatal(e)
-	}
-	recovery, e := postgres.NewRecoveryReader(ctx, hub, a.InstallationID)
+	grants, e := postgres.NewAccessGrants(ctx, hub, root, a.InstallationID)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -245,11 +237,11 @@ func qualifyPolicyGrantPublicOperations(t *testing.T, ctx context.Context, admin
 	objects := &publicPolicyAuditObjects{OperationObjects: &objectstore.OperationAuditObjects{Store: store, Seal: keys, Open: keys}}
 	gates := map[string]auditapp.OperationAuditor{}
 	for _, lane := range []string{"normal", "resolution"} {
-		j, e := postgres.NewOperationJournal(ctx, journalPool, root, lane, guard)
+		j, e := postgres.NewOperationJournal(ctx, journalPool, root, lane, a.InstallationID)
 		if e != nil {
 			t.Fatal(e)
 		}
-		ack, e := postgres.NewOperationAcknowledgements(ctx, ackPool, root, lane, guard)
+		ack, e := postgres.NewOperationAcknowledgements(ctx, ackPool, root, lane, a.InstallationID)
 		if e != nil {
 			t.Fatal(e)
 		}
@@ -284,7 +276,7 @@ func qualifyPolicyGrantPublicOperations(t *testing.T, ctx context.Context, admin
 	reviewer.i.Assurance = identity.Assurance{ACR: "fixture-mfa", AuthenticatedAt: clock().Add(-time.Minute), StepUpUntil: clock().Add(4 * time.Minute)}
 	docs := publicPolicyDocuments{observation: &observation, spec: spec}
 	plans := captureapp.PolicyGrantPlans{Accepted: policyStore, Documents: docs, Sources: source, CompileRecorder: publicPolicyCompile, RecipeName: planningapp.ContextRecipeName, RecipeDigest: planningapp.RecipeDigest(), Now: clock}
-	service := authapp.GrantService{RootID: root, InstallationID: a.InstallationID, Permissions: currentPermissions, WorkloadPermissions: currentPermissions, PolicyPlans: plans, PolicyRequests: grants, ApprovalSettings: grants, Store: grants, Recovery: recovery, NewID: custodyID, Now: clock}
+	service := authapp.GrantService{RootID: root, InstallationID: a.InstallationID, Permissions: currentPermissions, WorkloadPermissions: currentPermissions, PolicyPlans: plans, PolicyRequests: grants, ApprovalSettings: grants, Store: grants, NewID: custodyID, Now: clock}
 	const origin = "https://asservat.example.invalid"
 	grantOps, e := presentation.NewGrantOperations(origin, clock, custodyID, service)
 	if e != nil {
@@ -303,9 +295,9 @@ func qualifyPolicyGrantPublicOperations(t *testing.T, ctx context.Context, admin
 	if e != nil {
 		t.Fatal(e)
 	}
-	activation := captureapp.PolicyActivation{RootID: root, InstallationID: a.InstallationID, Documents: docs, Sources: source, Ledger: statuses, GrantAttachments: policyStore, Recovery: recovery, Now: clock}
-	status := captureapp.PolicyStatusService{RootID: root, InstallationID: a.InstallationID, Documents: docs, Ledger: statuses, Permissions: currentPermissions, Recovery: recovery, Now: clock}
-	stop := captureapp.PolicyDeactivation{RootID: root, InstallationID: a.InstallationID, Documents: docs, Ledger: statuses, Permissions: currentPermissions, Recovery: recovery, Now: clock}
+	activation := captureapp.PolicyActivation{RootID: root, InstallationID: a.InstallationID, Documents: docs, Sources: source, Ledger: statuses, GrantAttachments: policyStore, Now: clock}
+	status := captureapp.PolicyStatusService{RootID: root, InstallationID: a.InstallationID, Documents: docs, Ledger: statuses, Permissions: currentPermissions, Now: clock}
+	stop := captureapp.PolicyDeactivation{RootID: root, InstallationID: a.InstallationID, Documents: docs, Ledger: statuses, Permissions: currentPermissions, Now: clock}
 	policyOps, e := presentation.NewPolicyOperations(origin, clock, custodyID, activation, status, stop)
 	if e != nil {
 		t.Fatal(e)

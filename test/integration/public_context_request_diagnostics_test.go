@@ -10,7 +10,6 @@ import (
 	executionapp "asservat.local/asservat/internal/application/execution"
 	fleetapp "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/bootstrap"
-	"asservat.local/asservat/internal/domain/artifact"
 	auditvalue "asservat.local/asservat/internal/domain/audit"
 	capturevalue "asservat.local/asservat/internal/domain/capture"
 	fleetvalue "asservat.local/asservat/internal/domain/fleet"
@@ -152,8 +151,8 @@ func (s *publicJourneyDiagnostics) Regional(in bootstrap.RegionalAPIContextStart
 	}
 	return in
 }
-func (s publicJourneyRegionalDiagnostics) ReadAPIContextWork(c context.Context, id string, actor identity.Identity, recovery artifact.RecoveryProof) (executionapp.APIContextWork, error) {
-	v, e := s.APIExecutionReader.ReadAPIContextWork(c, id, actor, recovery)
+func (s publicJourneyRegionalDiagnostics) ReadAPIContextWork(c context.Context, id string, actor identity.Identity) (executionapp.APIContextWork, error) {
+	v, e := s.APIExecutionReader.ReadAPIContextWork(c, id, actor)
 	s.trace.record(journeyRegionalRead, journeyDiagnosticError(e))
 	return v, e
 }

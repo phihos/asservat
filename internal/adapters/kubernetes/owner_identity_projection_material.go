@@ -7,7 +7,7 @@ import (
 )
 
 // Implemented by the fixed administrator SQL producer. It performs current
-// recovery/role verification only, never creation or provider effects.
+// role verification only, never creation or provider effects.
 type OwnerIdentityRoleVerification interface {
 	VerifyOwnerIdentityRoles(context.Context) (contracts.OwnerIdentityRoleSnapshot, error)
 }

@@ -7,7 +7,6 @@ import (
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	"asservat.local/asservat/internal/application/evidence"
 	executionapp "asservat.local/asservat/internal/application/execution"
-	fleetapp "asservat.local/asservat/internal/application/fleet"
 	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
@@ -53,23 +52,22 @@ func currentVerificationRecord(ctx context.Context, q *custodydb.Queries, c cust
 }
 
 // APIContextPublicationGate uses completed acquisition history plus current SQL
-// permission, recovery and retained policy fences. It has no collector or live
+// permission and retained policy fences. It has no collector or live
 // target reader, and cannot start or repeat a missing acquisition.
 type APIContextPublicationGate struct {
 	publications *ContextPublications
 	retention    privacyapp.RetentionResolver
-	recovery     fleetapp.RecoveryReader
 }
 
-func NewAPIContextPublicationGate(ctx context.Context, pool *pgxpool.Pool, root string, guards EffectTransactionGuards, retention privacyapp.RetentionResolver, recovery fleetapp.RecoveryReader) (*APIContextPublicationGate, error) {
-	if retention.RetainedPolicies == nil || retention.Now == nil || recovery == nil {
+func NewAPIContextPublicationGate(ctx context.Context, pool *pgxpool.Pool, root string, guard *RetentionTransactionGuard, retention privacyapp.RetentionResolver) (*APIContextPublicationGate, error) {
+	if retention.RetainedPolicies == nil || retention.Now == nil {
 		return nil, artifact.ErrInvalid
 	}
-	p, err := NewContextPublications(ctx, pool, root, guards)
+	p, err := NewContextPublications(ctx, pool, root, guard)
 	if err != nil {
 		return nil, err
 	}
-	return &APIContextPublicationGate{p, retention, recovery}, nil
+	return &APIContextPublicationGate{p, retention}, nil
 }
 func (s *APIContextPublicationGate) CheckContextPublication(ctx context.Context, e artifact.ContextExpectation) (artifact.PublicationAuthority, error) {
 	var out artifact.PublicationAuthority
@@ -84,20 +82,12 @@ func (s *APIContextPublicationGate) CheckContextPublication(ctx context.Context,
 	if err != nil {
 		return out, err
 	}
-	recovery, err := s.recovery.RecoveryState(ctx)
-	if err != nil {
-		return out, err
-	}
 	topology, err := s.publications.retention.observe(ctx, target.ClusterID)
 	if err != nil {
 		return out, err
 	}
 	err = s.publications.ledger.transaction(ctx, func(q *custodydb.Queries) error {
 		out = artifact.PublicationAuthority{}
-		trust, err := s.publications.recovery.lock(ctx, q, s.publications.root, recovery)
-		if err != nil {
-			return err
-		}
 		stream, err := q.LockPermissionStream(ctx, id(s.publications.root))
 		if err != nil {
 			return err
@@ -110,25 +100,20 @@ func (s *APIContextPublicationGate) CheckContextPublication(ctx context.Context,
 		if err != nil || !validCompletedAPICapture(r, e, row.ContextCapture) {
 			return privacyapp.ErrFence
 		}
-		// The original protected process/issuer must match the installation for which
-		// this completed result was admitted; restoration cannot revive old effects.
-		if r.Process.InstallationID != recovery.InstallationID || r.Process.IssuerEpoch != recovery.IssuerEpoch {
-			return privacyapp.ErrFence
-		}
 		now, err := q.CurrentTime(ctx)
 		if err != nil {
 			return err
 		}
 		until := identity.Earlier(now.Time.Add(5*time.Second), retained.ValidUntil)
-		for _, end := range []time.Time{recovery.FreshUntil, stream.FreshUntil.Time, stream.LeaseUntil.Time, e.Registration.WriteUntil, retained.ExpiresAt} {
+		for _, end := range []time.Time{stream.FreshUntil.Time, stream.LeaseUntil.Time, e.Registration.WriteUntil, retained.ExpiresAt} {
 			until = identity.Earlier(until, end)
 		}
 		if deadline, ok := ctx.Deadline(); ok {
 			until = identity.Earlier(until, deadline)
 		}
-		out = artifact.PublicationAuthority{RootID: s.publications.root, CaptureID: e.CaptureUID, PermissionEpoch: uid(stream.Epoch), PermissionSequence: stream.Sequence, ExpectationDigest: evidence.ContextExpectationDigest(e), AuthorityDigest: executionapp.APIExecutionDigest(r), CheckedAt: now.Time, ValidUntil: until, Retention: retained.Proof, Recovery: recovery}
+		out = artifact.PublicationAuthority{RootID: s.publications.root, CaptureID: e.CaptureUID, PermissionEpoch: uid(stream.Epoch), PermissionSequence: stream.Sequence, ExpectationDigest: evidence.ContextExpectationDigest(e), AuthorityDigest: executionapp.APIExecutionDigest(r), CheckedAt: now.Time, ValidUntil: until, Retention: retained.Proof}
 		copy(out.ProjectionDigest[:], stream.ProjectionDigest)
-		if err = s.publications.publicationFence(ctx, q, stream, e, out, topology, trust); err != nil {
+		if err = s.publications.publicationFence(ctx, q, stream, e, out, topology); err != nil {
 			return err
 		}
 		return ctx.Err()

@@ -17,26 +17,25 @@ import (
 )
 
 type ProcessingDecisions struct {
-	ledger   *Ledger
-	root     string
-	recovery *RecoveryTransactionGuard
+	ledger *Ledger
+	root   string
 }
 
 var _ app.ProcessingDecisions = (*ProcessingDecisions)(nil)
 
-func NewProcessingDecisions(ctx context.Context, pool *pgxpool.Pool, root string, recovery *RecoveryTransactionGuard) (*ProcessingDecisions, error) {
-	if recovery == nil || recovery.root != root || !authorization.UUID(root) {
+func NewProcessingDecisions(ctx context.Context, pool *pgxpool.Pool, root string) (*ProcessingDecisions, error) {
+	if !authorization.UUID(root) {
 		return nil, value.ErrUnavailable
 	}
 	l, e := New(ctx, pool)
 	if e != nil {
 		return nil, value.ErrUnavailable
 	}
-	return &ProcessingDecisions{l, root, recovery}, nil
+	return &ProcessingDecisions{l, root}, nil
 }
 func processingConfigured(p custodydb.ProcessingRoot, a value.ProcessingAuthority, now time.Time) bool {
 	var backing value.ProcessingBacking
-	return a.Valid(now) && a.Recovery.IssuerEpoch == uid(p.IssuerEpoch) && a.Policy.RootID == uid(p.RootID) && a.Policy.InstallationID == uid(p.InstallationID) && a.Policy.Revision.UID == uid(p.SourceUid) && bytes.Equal(a.Policy.ProtectionDigest[:], p.ProtectionDigest) && now.Before(p.ValidUntil.Time) && json.Unmarshal(p.Backing, &backing) == nil && backing.Valid() && backing.RootID == uid(p.RootID) && backing.InstallationID == uid(p.InstallationID) && backing.ValidUntil.Equal(p.ValidUntil.Time) && backing.RetireBy.Equal(p.RetireBy.Time)
+	return a.Valid(now) && a.Policy.RootID == uid(p.RootID) && a.Policy.InstallationID == uid(p.InstallationID) && a.Policy.Revision.UID == uid(p.SourceUid) && bytes.Equal(a.Policy.ProtectionDigest[:], p.ProtectionDigest) && now.Before(p.ValidUntil.Time) && json.Unmarshal(p.Backing, &backing) == nil && backing.Valid() && backing.RootID == uid(p.RootID) && backing.InstallationID == uid(p.InstallationID) && backing.ValidUntil.Equal(p.ValidUntil.Time) && backing.RetireBy.Equal(p.RetireBy.Time)
 }
 func processingSeed(d app.ProcessingDecision) ([]byte, []byte, error) {
 	i, e := json.Marshal(d.Intent)
@@ -106,17 +105,13 @@ func processingReceipt(row custodydb.ProcessingDecision, p custodydb.ProcessingR
 	return out, nil
 }
 func (s *ProcessingDecisions) transaction(ctx context.Context, a value.ProcessingAuthority, fn func(context.Context, *custodydb.Queries, custodydb.ProcessingRoot, time.Time) error) error {
-	if s == nil || ctx == nil || ctx.Err() != nil || s.recovery == nil || a.Policy.RootID != s.root {
+	if s == nil || ctx == nil || ctx.Err() != nil || a.Policy.RootID != s.root {
 		return value.ErrUnavailable
 	}
 	call, stop := context.WithDeadline(ctx, a.ValidUntil)
 	defer stop()
 	return s.ledger.transaction(call, func(q *custodydb.Queries) error {
-		trust, e := s.recovery.lock(call, q, s.root, a.Recovery)
-		if e != nil {
-			return e
-		}
-		if _, e = q.LockPermissionStream(call, id(s.root)); e != nil {
+		if _, e := q.LockPermissionStream(call, id(s.root)); e != nil {
 			return e
 		}
 		p, e := q.LockProcessingRoot(call, id(s.root))
@@ -128,9 +123,6 @@ func (s *ProcessingDecisions) transaction(ctx context.Context, a value.Processin
 			return value.ErrUnavailable
 		}
 		if e = fn(call, q, p, now.Time); e != nil {
-			return e
-		}
-		if e = s.recovery.check(call, q, trust, s.root, a.Recovery); e != nil {
 			return e
 		}
 		final, e := q.CurrentTime(call)

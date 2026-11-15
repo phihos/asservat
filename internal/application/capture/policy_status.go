@@ -5,7 +5,6 @@ import (
 	"time"
 
 	authapp "asservat.local/asservat/internal/application/authorization"
-	fleetapp "asservat.local/asservat/internal/application/fleet"
 	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
@@ -27,7 +26,6 @@ type PolicyStatusService struct {
 	Documents              PolicyDocuments
 	Ledger                 PolicyStatusLedger
 	Permissions            PolicyPermissions
-	Recovery               fleetapp.RecoveryReader
 	Now                    func() time.Time
 	CompileRecorder        PolicyRecorderCompiler
 	RecipeName             string
@@ -36,7 +34,7 @@ type PolicyStatusService struct {
 
 func (s PolicyStatusService) Get(ctx context.Context, current identities.CurrentIdentity, name string) (value.PolicyStatus, time.Time, error) {
 	var zero value.PolicyStatus
-	if ctx == nil || current == nil || s.Documents == nil || s.Ledger == nil || s.Permissions == nil || s.Recovery == nil || s.Now == nil || !authorization.UUID(s.RootID) || !authorization.UUID(s.InstallationID) {
+	if ctx == nil || current == nil || s.Documents == nil || s.Ledger == nil || s.Permissions == nil || s.Now == nil || !authorization.UUID(s.RootID) || !authorization.UUID(s.InstallationID) {
 		return zero, time.Time{}, value.ErrUnavailable
 	}
 	if !identity.Text(name, 253) {
@@ -47,10 +45,6 @@ func (s PolicyStatusService) Get(ctx context.Context, current identities.Current
 	i, err := current.ResolveIdentity(ctx)
 	if err != nil || !i.Valid(s.Now()) {
 		return zero, time.Time{}, value.ErrDenied
-	}
-	recovery, err := s.Recovery.RecoveryState(ctx)
-	if err != nil || recovery.InstallationID != s.InstallationID || !recovery.Valid(s.Now()) {
-		return zero, time.Time{}, value.ErrUnavailable
 	}
 	source, spec, err := s.Documents.ReadPolicy(ctx, name, "")
 	if err != nil {
@@ -82,7 +76,7 @@ func (s PolicyStatusService) Get(ctx context.Context, current identities.Current
 	status.MaxGrantStarts = 0
 	if s.CompileRecorder != nil && status.ActiveID != "" && status.AcceptedIntentVersion > 0 && source.Valid(s.Now()) && !source.Suspended && !source.Deleted && source.InstallationID == status.Authority.InstallationID && source.Revision.UID == status.PolicyUID && status.Authority.Valid(s.Now()) {
 		catalogTarget, scopeErr := policyAcceptedCatalogTarget(spec, status.Authority)
-		compileUntil := minPolicyDeadline(source.FreshUntil, status.Authority.NotAfter, r.ValidUntil, i.ValidUntil, recovery.FreshUntil)
+		compileUntil := minPolicyDeadline(source.FreshUntil, status.Authority.NotAfter, r.ValidUntil, i.ValidUntil)
 		compileCtx, endCompile := context.WithDeadline(ctx, compileUntil)
 		defer endCompile()
 		var compiled value.RestartPolicy
@@ -103,7 +97,7 @@ func (s PolicyStatusService) Get(ctx context.Context, current identities.Current
 	if err != nil || fresh.Principal != i.Principal || fresh.Policy != i.Policy || !fresh.Valid(s.Now()) {
 		return zero, time.Time{}, value.ErrDenied
 	}
-	until := identity.Earlier(identity.Earlier(r.ValidUntil, fresh.ValidUntil), recovery.FreshUntil)
+	until := identity.Earlier(r.ValidUntil, fresh.ValidUntil)
 	if status.MaxGrantStarts > 0 {
 		until = identity.Earlier(until, source.FreshUntil)
 	}

@@ -118,7 +118,7 @@ func TestPolicyStatusGrantStartsUsesExistingAcceptedInputsAndOneLocalCompile(t *
 	a := f.accepted[0].Authority
 	f.status = value.PolicyStatus{PolicyUID: a.PolicyUID, ActiveID: accepted.AcceptanceID, AcceptedIntentVersion: 1, Authority: a, NotAfter: a.NotAfter, MaxExecutions: a.Limits.MaxExecutions}
 	calls := 0
-	service := PolicyStatusService{RootID: activationRoot, InstallationID: activationInstallation, Documents: f, Ledger: f, Permissions: f.activationFixture, Recovery: f, Now: func() time.Time { return f.now }, RecipeName: "builtin-pod-status-v1", RecipeDigest: testRecipe, CompileRecorder: SingleRecorder(func(raw json.RawMessage) (planvalue.PolicyRecorderConfiguration, error) {
+	service := PolicyStatusService{RootID: activationRoot, InstallationID: activationInstallation, Documents: f, Ledger: f, Permissions: f.activationFixture, Now: func() time.Time { return f.now }, RecipeName: "builtin-pod-status-v1", RecipeDigest: testRecipe, CompileRecorder: SingleRecorder(func(raw json.RawMessage) (planvalue.PolicyRecorderConfiguration, error) {
 		calls++
 		return ongoingSaveCompilerOne(raw)
 	})}

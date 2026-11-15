@@ -1,23 +1,22 @@
 package authorization
 
 import (
-	"asservat.local/asservat/internal/domain/identity"
-	"asservat.local/asservat/internal/domain/live"
-	"asservat.local/asservat/internal/domain/privacy"
 	"context"
 	"fmt"
 	"time"
+
+	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/domain/live"
+	"asservat.local/asservat/internal/domain/privacy"
 )
 
-// CurrentLiveEnvironment reuses the existing protected delivery configuration
-// and recovery reader. Live opt-in is independent from native-download clients.
+// CurrentLiveEnvironment reuses the existing protected delivery configuration. Live opt-in is independent from native-download clients.
 type CurrentLiveEnvironment struct {
 	RootID, InstallationID string
 	// AcceptedRoot pins the same protected config snapshot used for SQL accounting.
 	// Numeric root changes require a new guarded process; scoped lowerings remain current.
 	AcceptedRoot privacy.LiveRootLimits
 	Policies     DownloadPolicyReader
-	Recovery     DownloadRecoveryReader
 	Now          func() time.Time
 }
 
@@ -32,10 +31,10 @@ func (s CurrentLiveEnvironment) LiveSourceRead(ctx context.Context, source live.
 	return out[0], nil
 }
 
-// LiveSourceReads shares only source-independent policy/recovery observations
+// LiveSourceReads shares only source-independent policy observations
 // within this phase. A later phase calls it again; no authority is cached.
 func (s CurrentLiveEnvironment) LiveSourceReads(ctx context.Context, sources []live.Source, projection string, actor identity.Principal) ([]LiveEnvironmentDecision, error) {
-	if ctx == nil || ctx.Err() != nil || s.Policies == nil || s.Recovery == nil || s.Now == nil || !actor.Valid() || len(sources) < 1 || len(sources) > 100 {
+	if ctx == nil || ctx.Err() != nil || s.Policies == nil || s.Now == nil || !actor.Valid() || len(sources) < 1 || len(sources) > 100 {
 		return nil, fmt.Errorf("%w: live environment input", live.ErrDenied)
 	}
 	until := s.Now().Add(identity.AuthorityRecheckInterval) // ADR-311
@@ -65,20 +64,9 @@ func (s CurrentLiveEnvironment) LiveSourceReads(ctx context.Context, sources []l
 		}
 	}
 	until = identity.Earlier(until, p.FreshUntil)
-	bounded, cancel := context.WithDeadline(call, until)
-	defer cancel()
-	recovery, e := s.Recovery.RecoveryState(bounded)
-	if e != nil {
-		return nil, fmt.Errorf("%w: live_environment:recovery-read: %v", live.ErrUnavailable, e)
-	}
-	if !recovery.Valid(s.Now()) || recovery.InstallationID != s.InstallationID || recovery.IssuerEpoch != p.RecoveryEpoch {
-		return nil, fmt.Errorf("%w: live_environment:recovery", live.ErrDenied)
-	}
-	// One policy and one recovery observation per phase: the decision is
-	// valid only until the earlier of their original freshness bounds, so a
-	// change takes effect within that window without a confirming re-read.
-	until = identity.Earlier(until, recovery.FreshUntil)
-	if bounded.Err() != nil || !s.Now().Before(until) {
+	// One policy observation per phase: the decision is valid only until its
+	// original freshness bound.
+	if call.Err() != nil || !s.Now().Before(until) {
 		return nil, fmt.Errorf("%w: live environment deadline", live.ErrDenied)
 	}
 	out := make([]LiveEnvironmentDecision, len(sources))

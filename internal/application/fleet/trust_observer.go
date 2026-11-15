@@ -9,7 +9,7 @@ import (
 )
 
 // FleetTrustProjection observes current protected configuration. It has no
-// recovery-clear, epoch-rotation, enrollment, certificate or revocation port.
+// epoch-rotation, enrollment, certificate or revocation port.
 type FleetTrustProjection interface {
 	ReadAdministrationBasis(context.Context) (value.ObservationBasis, error)
 	ObserveAdministration(context.Context, value.ObservationBasis, value.Administration) error
@@ -24,7 +24,7 @@ type TrustObserver struct {
 
 // Reconcile refreshes only within the reader's original observation interval.
 // A failed read fences prior observations; a newer successful read wins over a
-// delayed failure. Recovery remains blocked until its separate protocol passes.
+// delayed failure.
 func (s TrustObserver) Reconcile(ctx context.Context) error {
 	if ctx == nil || ctx.Err() != nil || s.Settings == nil || s.Projection == nil || s.Now == nil {
 		return value.ErrUnavailable

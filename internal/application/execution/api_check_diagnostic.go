@@ -27,7 +27,7 @@ func (c APIExecutionCheck) limit(original, now time.Time) string {
 	for _, b := range []struct {
 		name string
 		at   time.Time
-	}{{"interval", c.CheckedAt.Add(identity.AuthorityRecheckInterval)}, {"target", in.Target.FreshUntil}, {"capability", in.Capability.FreshUntil}, {"retention", in.Retention.ValidUntil}, {"deadline", in.Deadline}, {"eligibility", c.Eligibility.ValidUntil}, {"recovery", c.Recovery.FreshUntil}, {"process", c.Process.ValidUntil}, {"write", c.Work.Accepted.Expectation.Registration.WriteUntil}} {
+	}{{"interval", c.CheckedAt.Add(identity.AuthorityRecheckInterval)}, {"target", in.Target.FreshUntil}, {"capability", in.Capability.FreshUntil}, {"retention", in.Retention.ValidUntil}, {"deadline", in.Deadline}, {"eligibility", c.Eligibility.ValidUntil}, {"process", c.Process.ValidUntil}, {"write", c.Work.Accepted.Expectation.Registration.WriteUntil}} {
 		if !b.at.IsZero() && b.at.Before(until) {
 			name, until = b.name, b.at
 		}

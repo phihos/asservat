@@ -19,7 +19,7 @@ import (
 )
 
 // This private composition has no runtime selector. Its eventual installed
-// constructor must supply the concrete original native/source/recovery proof.
+// constructor must supply the concrete original native/source proof.
 // All four adapters and lifetime owners derive from this same validated recipe;
 // an unrelated already-authenticated slot cannot be inserted by a caller.
 type ownerProviderEffects struct {

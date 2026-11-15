@@ -200,10 +200,10 @@ func newNativeAPIEnvironment(t *testing.T, ctx context.Context, f fixture) *nati
 	return n
 }
 
-func (n *nativeAPIEnvironment) protect(t *testing.T, ctx context.Context, recovery artifact.RecoveryProof) {
+func (n *nativeAPIEnvironment) protect(t *testing.T, ctx context.Context, installation, issuer string) {
 	t.Helper()
-	n.plan.InstallationID = recovery.InstallationID
-	n.plan.IssuerEpoch = recovery.IssuerEpoch
+	n.plan.InstallationID = installation
+	n.plan.IssuerEpoch = issuer
 	policy, binding, err := kube.APIExecutionAdmission(n.plan)
 	if err != nil {
 		t.Fatal(err)
@@ -334,11 +334,7 @@ func qualifyNativeAPIExecution(t *testing.T, ctx context.Context, f fixture, adm
 	n := newNativeAPIEnvironment(t, ctx, f)
 	source := func(c context.Context) (targets.PodResolution, error) { return n.resolver.ResolveWorkload(c, n.target) }
 	s := create(t, 1, source, n.image)
-	recovery, err := s.recovery.reader.RecoveryState(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	n.protect(t, ctx, recovery)
+	n.protect(t, ctx, s.recovery.installation, s.recovery.observation.issuer)
 	refreshPermissions := func() {
 		now := time.Now().UTC().Truncate(time.Microsecond)
 		s.batch.Initial = nil
@@ -375,10 +371,6 @@ func qualifyNativeAPIExecution(t *testing.T, ctx context.Context, f fixture, adm
 	if err != nil {
 		t.Fatal(err)
 	}
-	s.a.Recovery, err = s.recovery.reader.RecoveryState(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	// All fixture authority/backing is established before the human admission.
 	// Processing initialization only needs the installation storage placement;
@@ -390,9 +382,8 @@ func qualifyNativeAPIExecution(t *testing.T, ctx context.Context, f fixture, adm
 		poolFor = journeyPools.Open
 	}
 	p := func(user, password string) *pgxpool.Pool { return poolFor(user, password) }
-	guards := postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard}
 	x := func(user, password string) *postgres.APIContextExecutions {
-		v, e := postgres.NewAPIContextExecutions(ctx, p(user, password), s.a.RootID, guards)
+		v, e := postgres.NewAPIContextExecutions(ctx, p(user, password), s.a.RootID, s.recovery.installation, s.retention.guard)
 		if e != nil {
 			t.Fatal(e)
 		}
@@ -419,7 +410,7 @@ func qualifyNativeAPIExecution(t *testing.T, ctx context.Context, f fixture, adm
 	if err != nil {
 		t.Fatal(err)
 	}
-	runner := executionapp.APIContextRunner{Read: read, Prepare: prepare, Record: execute, Process: n.process, Targets: n.resolver, Eligibility: authapp.Evaluator{Permissions: s.p, Now: time.Now}, Capabilities: nativeAPICapability{s.a.Plan.Input.Capability}, Retention: nativeAPIRetention{s.retention}, Recovery: s.recovery.reader, Output: producer, Collector: collector, Now: time.Now}
+	runner := executionapp.APIContextRunner{Read: read, Prepare: prepare, Record: execute, Process: n.process, Targets: n.resolver, Eligibility: authapp.Evaluator{Permissions: s.p, Now: time.Now}, Capabilities: nativeAPICapability{s.a.Plan.Input.Capability}, Retention: nativeAPIRetention{s.retention}, Output: producer, Collector: collector, Now: time.Now}
 	if regionalMode == "journey" {
 		qualifyPublicContextJourney(t, ctx, f, n, s, admin, poolFor, store, keys, journeyKeys, runner, collector, journeyPools)
 		return
@@ -570,14 +561,14 @@ func qualifyNativeAPIExecution(t *testing.T, ctx context.Context, f fixture, adm
 	}
 	refreshPermissions()
 	publication := func(user, password string) *postgres.ContextPublications {
-		r, e := postgres.NewContextPublications(ctx, p(user, password), s.a.RootID, guards)
+		r, e := postgres.NewContextPublications(ctx, p(user, password), s.a.RootID, s.retention.guard)
 		if e != nil {
 			t.Fatal(e)
 		}
 		return r
 	}
 	verify, audit, publish := publication("context_verify_runtime", "synthetic-context-verify"), publication("context_verification_audit_runtime", "synthetic-context-audit"), publication("context_publish_runtime", "synthetic-context-publish")
-	gate, err := postgres.NewAPIContextPublicationGate(ctx, p("api_publication_gate_runtime", "synthetic-api-publication-gate"), s.a.RootID, guards, privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, s.recovery.reader)
+	gate, err := postgres.NewAPIContextPublicationGate(ctx, p("api_publication_gate_runtime", "synthetic-api-publication-gate"), s.a.RootID, s.retention.guard, privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now})
 	if err != nil {
 		t.Fatal(err)
 	}

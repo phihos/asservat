@@ -19,56 +19,37 @@ import (
 // ordinary poll traffic cannot occupy all protected resolution resources.
 // Journal and acknowledgements use separate roles; neither provisions backing.
 type OperationJournal struct {
-	ledger     *Ledger
-	root, lane string
-	recovery   *RecoveryTransactionGuard
-	lifecycle  *audit.OperationLifecyclePolicy
+	ledger       *Ledger
+	root, lane   string
+	installation string
+	lifecycle    *audit.OperationLifecyclePolicy
 }
 type OperationAcknowledgements struct{ journal *OperationJournal }
 
 var _ app.OperationJournal = (*OperationJournal)(nil)
 var _ app.OperationAcknowledgements = (*OperationAcknowledgements)(nil)
 
-func NewOperationJournal(ctx context.Context, pool *pgxpool.Pool, root, lane string, recovery *RecoveryTransactionGuard) (*OperationJournal, error) {
-	if !authorization.UUID(root) || (lane != "normal" && lane != "resolution") || recovery == nil || recovery.root != root {
+func NewOperationJournal(ctx context.Context, pool *pgxpool.Pool, root, lane, installation string) (*OperationJournal, error) {
+	if !authorization.UUID(root) || (lane != "normal" && lane != "resolution") || !authorization.UUID(installation) {
 		return nil, app.ErrUnavailable
 	}
 	l, err := New(ctx, pool)
 	if err != nil {
 		return nil, app.ErrUnavailable
 	}
-	return &OperationJournal{ledger: l, root: root, lane: lane, recovery: recovery}, nil
+	return &OperationJournal{ledger: l, root: root, lane: lane, installation: installation}, nil
 }
-func NewOperationAcknowledgements(ctx context.Context, pool *pgxpool.Pool, root, lane string, recovery *RecoveryTransactionGuard) (*OperationAcknowledgements, error) {
-	j, err := NewOperationJournal(ctx, pool, root, lane, recovery)
+func NewOperationAcknowledgements(ctx context.Context, pool *pgxpool.Pool, root, lane, installation string) (*OperationAcknowledgements, error) {
+	j, err := NewOperationJournal(ctx, pool, root, lane, installation)
 	if err != nil {
 		return nil, app.ErrUnavailable
 	}
 	return &OperationAcknowledgements{j}, nil
 }
 func (s *OperationJournal) valid(in audit.OperationIntent) bool {
-	return s != nil && s.ledger != nil && s.recovery != nil && in.Valid() && in.RootID == s.root && audit.OperationLane(in.Name) == s.lane
+	return s != nil && s.ledger != nil && in.Valid() && in.RootID == s.root && audit.OperationLane(in.Name) == s.lane
 }
 
-// Recovery is read from the accepted SQL projection, locked before the journal.
-// These are audit effects only. It supplies no human/capture authority, and new
-// writes cannot cross the original database/issuer incarnation after restore.
-func (s *OperationJournal) trust(ctx context.Context, q *custodydb.Queries) (custodydb.FleetCurrentTrust, time.Time, error) {
-	start, e := q.CurrentTime(ctx)
-	if e != nil {
-		return custodydb.FleetCurrentTrust{}, time.Time{}, e
-	}
-	row, e := q.ShareFleetTrust(ctx, id(s.recovery.installation))
-	if e != nil {
-		return row, time.Time{}, e
-	}
-	now, e := q.CurrentTime(ctx)
-	if e != nil {
-		return row, start.Time, e
-	}
-	_, e = recoveryState(row, start.Time, now.Time)
-	return row, start.Time, e
-}
 func auditRow(row custodydb.OperationAudit, in audit.OperationIntent) (audit.OperationSnapshot, error) {
 	var out audit.OperationSnapshot
 	if json.Unmarshal(row.Intent, &out.Intent) != nil || !sameAuditJSON(out.Intent, in) || uid(row.ID) != in.ID || uid(row.RootID) != in.RootID || row.Lane != audit.OperationLane(in.Name) || !bytes.Equal(row.PrincipalDigest, in.PrincipalDigest[:]) || !row.RequestUntil.Time.Equal(in.RequestUntil) || !row.WriteUntil.Time.Equal(in.WriteUntil) || !row.RetainUntil.Time.Equal(in.RetainUntil) {
@@ -107,7 +88,7 @@ func sameAuditJSON(a, b any) bool {
 	y, e := json.Marshal(b)
 	return e == nil && bytes.Equal(x, y)
 }
-func auditCurrent(ctx context.Context, q *custodydb.Queries, trust custodydb.FleetCurrentTrust, start, until time.Time) error {
+func auditCurrent(ctx context.Context, q *custodydb.Queries, until time.Time) error {
 	now, e := q.CurrentTime(ctx)
 	if e != nil {
 		return e
@@ -115,8 +96,7 @@ func auditCurrent(ctx context.Context, q *custodydb.Queries, trust custodydb.Fle
 	if ctx.Err() != nil || !now.Time.Before(until) {
 		return app.ErrUnavailable
 	}
-	_, e = recoveryState(trust, start, now.Time)
-	return e
+	return nil
 }
 func (s *OperationJournal) ReserveOperation(ctx context.Context, in audit.OperationIntent) (audit.OperationSnapshot, error) {
 	var out audit.OperationSnapshot
@@ -131,7 +111,7 @@ func (s *OperationJournal) ReserveOperation(ctx context.Context, in audit.Operat
 		return out, app.ErrUnavailable
 	}
 	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		trust, start, e := s.trust(ctx, q)
+		trust, _, e := currentTrust(ctx, q, s.installation)
 		if e != nil {
 			return e
 		}
@@ -152,14 +132,14 @@ func (s *OperationJournal) ReserveOperation(ctx context.Context, in audit.Operat
 			if in.Lifecycle != nil {
 				policy := in.Lifecycle.Policy
 				reservationUntil = identity.Earlier(reservationUntil, policy.ValidUntil)
-				if policy.InstallationID != s.recovery.installation || policy.BackingRevision != pool.Revision || policy.MetadataSlots < pool.AccountLimit*pool.RecordsPerAccount {
+				if policy.InstallationID != s.installation || policy.BackingRevision != pool.Revision || policy.MetadataSlots < pool.AccountLimit*pool.RecordsPerAccount {
 					return app.ErrUnavailable
 				}
 			}
 			if pool.Paused || pool.AccountVersion != in.AccountVersion || !in.CreatedAt.Before(pool.ValidUntil.Time) || in.RetainUntil.After(in.CreatedAt.Add(time.Duration(pool.RetainedSeconds)*time.Second)) {
 				return app.ErrUnavailable
 			}
-			if e = auditCurrent(ctx, q, trust, start, reservationUntil); e != nil {
+			if e = auditCurrent(ctx, q, reservationUntil); e != nil {
 				return e
 			}
 			row, e = q.InsertOperationAudit(ctx, custodydb.InsertOperationAuditParams{ID: id(in.ID), RootID: id(s.root), Lane: s.lane, PrincipalDigest: in.PrincipalDigest[:], Intent: b, RequestUntil: ts(in.RequestUntil), WriteUntil: ts(in.WriteUntil), RetainUntil: ts(in.RetainUntil), IssuerEpoch: trust.IssuerEpoch})
@@ -167,14 +147,11 @@ func (s *OperationJournal) ReserveOperation(ctx context.Context, in audit.Operat
 				return e
 			}
 		}
-		if row.IssuerEpoch != trust.IssuerEpoch {
-			return app.ErrUnavailable
-		}
 		out, e = auditRow(row, in)
 		if e != nil {
 			return e
 		}
-		return auditCurrent(ctx, q, trust, start, reservationUntil)
+		return auditCurrent(ctx, q, reservationUntil)
 	})
 	if err != nil || ctx.Err() != nil {
 		return audit.OperationSnapshot{}, app.ErrUnavailable
@@ -188,23 +165,19 @@ func (s *OperationJournal) ClaimOperationWrite(ctx context.Context, in audit.Ope
 	fresh := false
 	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
 		fresh = false
-		trust, start, e := s.trust(ctx, q)
-		if e != nil {
-			return e
-		}
 		row, e := q.LockOperationAudit(ctx, custodydb.LockOperationAuditParams{ID: id(in.ID), RootID: id(s.root)})
 		if e != nil {
 			return e
 		}
 		snap, e := auditRow(row, in)
-		if e != nil || row.IssuerEpoch != trust.IssuerEpoch {
+		if e != nil {
 			return app.ErrUnavailable
 		}
 		until := in.WriteUntil
 		if phase == "intent" {
 			until = in.RequestUntil
 		}
-		if e = auditCurrent(ctx, q, trust, start, until); e != nil {
+		if e = auditCurrent(ctx, q, until); e != nil {
 			return e
 		}
 		var n int64
@@ -224,7 +197,7 @@ func (s *OperationJournal) ClaimOperationWrite(ctx context.Context, in audit.Ope
 			return e
 		}
 		fresh = n == 1
-		return auditCurrent(ctx, q, trust, start, until)
+		return auditCurrent(ctx, q, until)
 	})
 	if err != nil || ctx.Err() != nil {
 		return false, app.ErrUnavailable
@@ -241,19 +214,15 @@ func (s *OperationJournal) FreezeOperationOutcome(ctx context.Context, in audit.
 		return out, app.ErrUnavailable
 	}
 	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		trust, start, e := s.trust(ctx, q)
-		if e != nil {
-			return e
-		}
 		row, e := q.LockOperationAudit(ctx, custodydb.LockOperationAuditParams{ID: id(in.Intent.ID), RootID: id(s.root)})
 		if e != nil {
 			return e
 		}
 		out, e = auditRow(row, in.Intent)
-		if e != nil || row.IssuerEpoch != trust.IssuerEpoch || out.IntentReceipt == nil {
+		if e != nil || out.IntentReceipt == nil {
 			return app.ErrUnavailable
 		}
-		if e = auditCurrent(ctx, q, trust, start, in.Intent.WriteUntil); e != nil {
+		if e = auditCurrent(ctx, q, in.Intent.WriteUntil); e != nil {
 			return e
 		}
 		if out.Outcome != nil {
@@ -270,7 +239,7 @@ func (s *OperationJournal) FreezeOperationOutcome(ctx context.Context, in audit.
 				return e
 			}
 		}
-		return auditCurrent(ctx, q, trust, start, in.Intent.WriteUntil)
+		return auditCurrent(ctx, q, in.Intent.WriteUntil)
 	})
 	if err != nil || ctx.Err() != nil {
 		return audit.OperationSnapshot{}, app.ErrUnavailable
@@ -287,19 +256,15 @@ func (s *OperationAcknowledgements) AcknowledgeOperation(ctx context.Context, in
 		return app.ErrUnavailable
 	}
 	err := j.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		trust, start, e := j.trust(ctx, q)
-		if e != nil {
-			return e
-		}
 		row, e := q.LockOperationAudit(ctx, custodydb.LockOperationAuditParams{ID: id(in.ID), RootID: id(j.root)})
 		if e != nil {
 			return e
 		}
 		snap, e := auditRow(row, in)
-		if e != nil || row.IssuerEpoch != trust.IssuerEpoch {
+		if e != nil {
 			return app.ErrUnavailable
 		}
-		if e = auditCurrent(ctx, q, trust, start, in.WriteUntil); e != nil {
+		if e = auditCurrent(ctx, q, in.WriteUntil); e != nil {
 			return e
 		}
 		var n int64
@@ -323,7 +288,7 @@ func (s *OperationAcknowledgements) AcknowledgeOperation(ctx context.Context, in
 		if e != nil || n != 1 {
 			return app.ErrUnavailable
 		}
-		return auditCurrent(ctx, q, trust, start, in.WriteUntil)
+		return auditCurrent(ctx, q, in.WriteUntil)
 	})
 	if err != nil || ctx.Err() != nil {
 		return app.ErrUnavailable
@@ -402,11 +367,11 @@ func (l *Ledger) provisionOperationAuditPool(ctx context.Context, in app.Operati
 // The optional lifecycle can only be selected by accepted private composition.
 // Legacy construction rejects lifecycle-bearing admission; exact later reads
 // and acknowledgements still consume the immutable stored binding.
-func NewHealthyOperationJournal(ctx context.Context, pool *pgxpool.Pool, policy audit.OperationLifecyclePolicy, recovery *RecoveryTransactionGuard) (*OperationJournal, error) {
-	if !policy.CertificateVerificationBacked() || recovery == nil || policy.InstallationID != recovery.installation {
+func NewHealthyOperationJournal(ctx context.Context, pool *pgxpool.Pool, policy audit.OperationLifecyclePolicy) (*OperationJournal, error) {
+	if !policy.CertificateVerificationBacked() {
 		return nil, app.ErrUnavailable
 	}
-	j, e := NewOperationJournal(ctx, pool, policy.RootID, policy.Lane, recovery)
+	j, e := NewOperationJournal(ctx, pool, policy.RootID, policy.Lane, policy.InstallationID)
 	if e != nil {
 		return nil, e
 	}

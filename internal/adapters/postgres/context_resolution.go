@@ -22,29 +22,29 @@ import (
 // ContextRequestResolutions uses a separate credential with no custody or
 // accepted-capture writes. Closing an unaccepted preview is its only effect.
 type ContextRequestResolutions struct {
-	ledger   *Ledger
-	root     string
-	recovery *RecoveryTransactionGuard
+	ledger       *Ledger
+	root         string
+	installation string
 }
 
 var _ app.ContextRequestResolution = (*ContextRequestResolutions)(nil)
 
-func NewContextRequestResolutions(ctx context.Context, pool *pgxpool.Pool, root string, recovery *RecoveryTransactionGuard) (*ContextRequestResolutions, error) {
-	if !authorization.UUID(root) || recovery == nil || recovery.root != root {
+func NewContextRequestResolutions(ctx context.Context, pool *pgxpool.Pool, root, installation string) (*ContextRequestResolutions, error) {
+	if !authorization.UUID(root) || !authorization.UUID(installation) {
 		return nil, value.ErrInvalid
 	}
 	l, err := New(ctx, pool)
 	if err != nil {
 		return nil, value.ErrUnavailable
 	}
-	return &ContextRequestResolutions{ledger: l, root: root, recovery: recovery}, nil
+	return &ContextRequestResolutions{ledger: l, root: root, installation: installation}, nil
 }
 
 func (s *ContextRequestResolutions) ResolveOrCloseContextRequest(ctx context.Context, in value.ReplayQuery) (value.ContextRequestDisposition, error) {
 	if s == nil {
 		return value.ContextRequestDisposition{}, value.ErrUnavailable
 	}
-	return resolveContextRequest(ctx, s.ledger, s.root, s.recovery, in, true)
+	return resolveContextRequest(ctx, s.ledger, s.root, s.installation, in, true)
 }
 
 // requestRecordScope strictly validates private canonical historical ownership
@@ -132,9 +132,9 @@ func findContextRequest(ctx context.Context, q *custodydb.Queries, in value.Repl
 	return zero, false, nil
 }
 
-func resolveContextRequest(ctx context.Context, l *Ledger, root string, guard *RecoveryTransactionGuard, in value.ReplayQuery, closeMissing bool) (value.ContextRequestDisposition, error) {
+func resolveContextRequest(ctx context.Context, l *Ledger, root, installation string, in value.ReplayQuery, closeMissing bool) (value.ContextRequestDisposition, error) {
 	var out value.ContextRequestDisposition
-	if l == nil || guard == nil || !contextRequestQueryShape(root, in) {
+	if l == nil || !contextRequestQueryShape(root, in) {
 		return out, value.ErrInvalid
 	}
 	if closeMissing && !slices.Contains(in.Identity.Scopes, "evidence:read") {
@@ -144,7 +144,7 @@ func resolveContextRequest(ctx context.Context, l *Ledger, root string, guard *R
 	in.Identity.Scopes = slices.Clone(in.Identity.Scopes)
 	err := l.transaction(ctx, func(q *custodydb.Queries) error {
 		out = value.ContextRequestDisposition{}
-		recovery, err := guard.lock(ctx, q, root, in.Recovery)
+		trust, _, err := currentTrust(ctx, q, installation)
 		if err != nil {
 			return err
 		}
@@ -154,9 +154,6 @@ func resolveContextRequest(ctx context.Context, l *Ledger, root string, guard *R
 		}
 		var permissionUntil time.Time
 		check := func() error {
-			if err := guard.check(ctx, q, recovery, root, in.Recovery); err != nil {
-				return err
-			}
 			n, err := q.CurrentTime(ctx)
 			if err != nil {
 				return err
@@ -186,7 +183,7 @@ func resolveContextRequest(ctx context.Context, l *Ledger, root string, guard *R
 					permissionUntil = identity.Earlier(permissionUntil, eligible.ValidUntil)
 				}
 			} else {
-				eligible := contextEligibilityIn(ctx, q, stream, recovery, root, guard.installationID(), in.Identity, p, target, n.Time)
+				eligible := contextEligibilityIn(ctx, q, stream, trust, root, installation, in.Identity, p, target, n.Time)
 				if !eligible.Eligible {
 					return value.ErrDenied
 				}
@@ -199,7 +196,7 @@ func resolveContextRequest(ctx context.Context, l *Ledger, root string, guard *R
 			return check()
 		}
 		deadline := func() time.Time {
-			until := contextMetadataDeadline(ctx, in.Identity.ValidUntil, in.Recovery.FreshUntil)
+			until := contextMetadataDeadline(ctx, in.Identity.ValidUntil)
 			if !permissionUntil.IsZero() {
 				until = identity.Earlier(until, permissionUntil)
 			}
@@ -342,10 +339,8 @@ func closeMissingContextPreview(ctx context.Context, q *custodydb.Queries, in va
 	return err
 }
 
-// Structural validation uses each observation's own original instant. Identity
-// is normally checked before recovery; comparing newer recovery to the older
-// identity start would reject every legitimate sequential request. SQL-now is
-// the common freshness instant inside the locked transaction.
+// Structural validation uses the identity observation's own original instant.
+// SQL-now is the common freshness instant inside the locked transaction.
 func contextRequestQueryShape(root string, in value.ReplayQuery) bool {
-	return in.RootID == root && authorization.UUID(root) && authorization.UUID(in.PreviewID) && identity.Text(in.IdempotencyKey, 128) && in.SubmissionDigest == app.ContextRequestDigest(in.PreviewID) && in.Identity.Valid(in.Identity.VerifiedAt) && in.Recovery.Valid(in.Recovery.ObservedAt)
+	return in.RootID == root && authorization.UUID(root) && authorization.UUID(in.PreviewID) && identity.Text(in.IdempotencyKey, 128) && in.SubmissionDigest == app.ContextRequestDigest(in.PreviewID) && in.Identity.Valid(in.Identity.VerifiedAt)
 }

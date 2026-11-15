@@ -18,11 +18,11 @@ import (
 
 // ProjectionNativeOperations composes the existing query ledger with the shared
 // worker registry. Every read/key operation consumes actual ReadApproved and
-// processing/recovery/retention/permission fences; no download row is created.
+// processing/retention/permission fences; no download row is created.
 type ProjectionNativeOperations struct{ queries *ContextQueries }
 
 func NewProjectionNativeOperations(q *ContextQueries) (*ProjectionNativeOperations, error) {
-	if q == nil || q.ledger == nil || q.recovery == nil {
+	if q == nil || q.ledger == nil {
 		return nil, query.ErrUnavailable
 	}
 	return &ProjectionNativeOperations{queries: q}, nil
@@ -47,7 +47,7 @@ func (s *ProjectionNativeOperations) ReadAcquisitionEnrollment(ctx context.Conte
 	if s == nil || s.queries == nil || parent.Purpose != value.AcquisitionProjection {
 		return value.AcquisitionWorkerIdentity{}, query.ErrUnavailable
 	}
-	routing := &WorkerRouting{ledger: s.queries.ledger, root: s.queries.root, installation: s.queries.recovery.installation}
+	routing := &WorkerRouting{ledger: s.queries.ledger, root: s.queries.root, installation: s.queries.installation}
 	return routing.ReadAcquisitionEnrollment(ctx, parent, worker)
 }
 func (s *ProjectionNativeOperations) ReadProjectionWorkerCertificate(ctx context.Context, queryID, worker string, leaf []byte) (value.WorkerCertificate, error) {
@@ -98,7 +98,7 @@ func projectionNativeWorker(ctx context.Context, tx *custodydb.Queries, q query.
 	if e != nil || !state.Audited || !state.Worker.Valid() {
 		return value.AcquisitionEnrollment{}, query.ErrUnavailable
 	}
-	if _, e = currentWorkerConfiguration(ctx, tx, state.Worker.Intent.Profile, q.RecoveryIssuerEpoch); e != nil {
+	if _, e = currentWorkerConfiguration(ctx, tx, state.Worker.Intent.Profile); e != nil {
 		return value.AcquisitionEnrollment{}, e
 	}
 	en, e := currentAuditedAcquisitionEnrollment(ctx, tx, state.Worker)
@@ -162,7 +162,7 @@ func (s *ProjectionNativeOperations) ObserveProjectionNativeOperation(ctx contex
 }
 func (s *ProjectionNativeOperations) LocateProjectionNativeOperation(ctx context.Context, installation, queryID, worker string, peer value.KeyPeer) (value.NativeLease, error) {
 	var zero value.NativeLease
-	if s == nil || ctx == nil || installation != s.queries.recovery.installation || peer.InstallationID != installation {
+	if s == nil || ctx == nil || installation != s.queries.installation || peer.InstallationID != installation {
 		return zero, query.ErrUnavailable
 	}
 	observed, e := s.ReadAcquisitionEnrollment(ctx, value.AcquisitionParent{Purpose: value.AcquisitionProjection, ID: queryID}, worker)

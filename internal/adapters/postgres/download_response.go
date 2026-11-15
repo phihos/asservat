@@ -85,10 +85,6 @@ func (s *Downloads) responseTransaction(ctx context.Context, sessionID string, a
 		return e
 	}
 	return s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		recovery, e := s.lockDownloadRecovery(ctx, q, s.root, a)
-		if e != nil {
-			return e
-		}
 		p, e := q.LockPermissionStream(ctx, id(s.root))
 		if e != nil {
 			return e
@@ -104,7 +100,7 @@ func (s *Downloads) responseTransaction(ctx context.Context, sessionID string, a
 		if current.Scope != a.Scope {
 			return privacy.ErrFence
 		}
-		if e = s.downloadFence(ctx, q, p, a, topology, recovery); e != nil {
+		if e = s.downloadFence(ctx, q, p, a, topology); e != nil {
 			return e
 		}
 		now, e := q.CurrentTime(ctx)
@@ -120,7 +116,7 @@ func (s *Downloads) responseTransaction(ctx context.Context, sessionID string, a
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		return s.downloadFence(ctx, q, p, a, topology, recovery)
+		return s.downloadFence(ctx, q, p, a, topology)
 	})
 }
 func responseBusy(ctx context.Context, q *custodydb.Queries, s artifact.DownloadSession, now time.Time) error {

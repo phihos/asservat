@@ -12,13 +12,11 @@ import (
 
 	auditapp "asservat.local/asservat/internal/application/audit"
 	captureapp "asservat.local/asservat/internal/application/capture"
-	fleetapp "asservat.local/asservat/internal/application/fleet"
 	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/domain/artifact"
 	auditvalue "asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
 	capturevalue "asservat.local/asservat/internal/domain/capture"
-	"asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/planning"
 	"asservat.local/asservat/internal/domain/privacy"
 	"asservat.local/asservat/internal/domain/targets"
@@ -30,7 +28,7 @@ import (
 // performs no additional SQL/API/time read. Every decorator delegates once and
 // returns the original values and error. Report runs only after the call ends.
 const (
-	journeyRequestLookup = 19 + iota
+	journeyRequestLookup = 18 + iota
 	journeyRequestPreview
 	journeyRequestAdmit
 	journeyCaptureCompleted
@@ -54,7 +52,6 @@ const (
 	journeyRegionalRead
 	journeyRegionalSign
 	journeyRegionalVerify
-	journeyRunnerRecovery
 	journeyRunnerRead
 	journeyRunnerTarget
 	journeyRunnerEligibility
@@ -71,14 +68,14 @@ const (
 var journeyDiagnosticNames = [journeyDiagnosticStages]string{
 	"audit-reserve", "audit-claim-intent", "audit-write-intent", "audit-complete-intent", "audit-ack-intent",
 	"audit-freeze", "audit-claim-outcome", "audit-write-outcome", "audit-complete-outcome", "audit-ack-outcome",
-	"preview-recovery", "preview-workload", "preview-pod", "preview-eligibility", "preview-capability",
+	"preview-workload", "preview-pod", "preview-eligibility", "preview-capability",
 	"preview-retention", "preview-storage", "preview-processing", "preview-create",
 	"request-lookup", "request-preview-read", "request-admit",
 	"capture-completed", "capture-journal", "capture-claim-intent", "capture-write-intent", "capture-complete-intent", "capture-ack-intent", "capture-freeze",
 	"capture-claim-outcome", "capture-write-outcome", "capture-complete-outcome", "capture-ack-outcome", "capture-ack-pair",
 	"capture-reconcile-claim-intent", "capture-reconcile-claim-outcome", "capture-find-intent", "capture-find-outcome", "capture-reconcile-ack-intent", "capture-reconcile-ack-outcome",
 	"regional-read", "regional-sign",
-	"regional-verify", "runner-recovery", "runner-read", "runner-target", "runner-eligibility", "runner-capability", "runner-retention", "runner-process", "runner-prepare", "runner-keys", "runner-record-start", "runner-eligibility-identity",
+	"regional-verify", "runner-read", "runner-target", "runner-eligibility", "runner-capability", "runner-retention", "runner-process", "runner-prepare", "runner-keys", "runner-record-start", "runner-eligibility-identity",
 }
 
 type publicJourneyDiagnostics struct {
@@ -246,7 +243,7 @@ func (s publicJourneyAuditDiagnostics) RecordOperationCompletion(c context.Conte
 // preview starts a fresh request, never replays to manufacture a diagnostic.
 
 func (s *publicJourneyDiagnostics) Investigation(in captureapp.ContextInvestigation) captureapp.ContextInvestigation {
-	p := publicJourneyPreviewDiagnostics{ContextAdmissionReplay: in.Replay, ReviewedAdmissionTransaction: in.Admission, ContextTargets: in.Targets, ContextEligibilityReader: in.Eligibility, ContextCapabilityReader: in.Capabilities, ContextRetentionResolver: in.Retention, ContextStorageReader: in.Storage, ContextProcessingCoverageReader: in.Processing, ContextPreviewStore: in.Previews, RecoveryReader: in.Recovery, trace: s}
+	p := publicJourneyPreviewDiagnostics{ContextAdmissionReplay: in.Replay, ReviewedAdmissionTransaction: in.Admission, ContextTargets: in.Targets, ContextEligibilityReader: in.Eligibility, ContextCapabilityReader: in.Capabilities, ContextRetentionResolver: in.Retention, ContextStorageReader: in.Storage, ContextProcessingCoverageReader: in.Processing, ContextPreviewStore: in.Previews, trace: s}
 	if in.Replay != nil {
 		in.Replay = p
 	}
@@ -274,9 +271,6 @@ func (s *publicJourneyDiagnostics) Investigation(in captureapp.ContextInvestigat
 	if in.Previews != nil {
 		in.Previews = p
 	}
-	if in.Recovery != nil {
-		in.Recovery = p
-	}
 	return in
 }
 
@@ -290,23 +284,17 @@ type publicJourneyPreviewDiagnostics struct {
 	captureapp.ContextStorageReader
 	captureapp.ContextProcessingCoverageReader
 	captureapp.ContextPreviewStore
-	fleetapp.RecoveryReader
 	trace *publicJourneyDiagnostics
 }
 
-func (s publicJourneyPreviewDiagnostics) RecoveryState(c context.Context) (fleet.RecoveryState, error) {
-	v, e := s.RecoveryReader.RecoveryState(c)
-	s.trace.record(10, journeyDiagnosticError(e))
-	return v, e
-}
 func (s publicJourneyPreviewDiagnostics) ResolveWorkload(c context.Context, r targets.WorkloadRequest) (targets.PodResolution, error) {
 	v, e := s.ContextTargets.ResolveWorkload(c, r)
-	s.trace.record(11, journeyDiagnosticError(e))
+	s.trace.record(10, journeyDiagnosticError(e))
 	return v, e
 }
 func (s publicJourneyPreviewDiagnostics) ResolvePod(c context.Context, r targets.Request) (targets.PodResolution, error) {
 	v, e := s.ContextTargets.ResolvePod(c, r)
-	s.trace.record(12, journeyDiagnosticError(e))
+	s.trace.record(11, journeyDiagnosticError(e))
 	return v, e
 }
 func (s publicJourneyPreviewDiagnostics) ContextEligibilityCurrent(c context.Context, i identities.CurrentIdentity, t authorization.Target) authorization.CaptureEligibility {
@@ -315,32 +303,32 @@ func (s publicJourneyPreviewDiagnostics) ContextEligibilityCurrent(c context.Con
 	if !v.Eligible {
 		code = 3
 	}
-	s.trace.record(13, code)
+	s.trace.record(12, code)
 	return v
 }
 func (s publicJourneyPreviewDiagnostics) ContextCapability(c context.Context, t authorization.Target) (planning.ContextCapability, error) {
 	v, e := s.ContextCapabilityReader.ContextCapability(c, t)
-	s.trace.record(14, journeyDiagnosticError(e))
+	s.trace.record(13, journeyDiagnosticError(e))
 	return v, e
 }
 func (s publicJourneyPreviewDiagnostics) Resolve(c context.Context, in privacy.Input) (privacy.Resolution, error) {
 	v, e := s.ContextRetentionResolver.Resolve(c, in)
-	s.trace.record(15, journeyDiagnosticError(e))
+	s.trace.record(14, journeyDiagnosticError(e))
 	return v, e
 }
 func (s publicJourneyPreviewDiagnostics) ContextStorage(c context.Context, t authorization.Target) (captureapp.ContextStorageObservation, error) {
 	v, e := s.ContextStorageReader.ContextStorage(c, t)
-	s.trace.record(16, journeyDiagnosticError(e))
+	s.trace.record(15, journeyDiagnosticError(e))
 	return v, e
 }
-func (s publicJourneyPreviewDiagnostics) ContextProcessingCoverage(c context.Context, r capturevalue.ProcessingCoverageRequest, p artifact.RecoveryProof) (capturevalue.ProcessingCoverage, error) {
-	v, e := s.ContextProcessingCoverageReader.ContextProcessingCoverage(c, r, p)
-	s.trace.record(17, journeyDiagnosticError(e))
+func (s publicJourneyPreviewDiagnostics) ContextProcessingCoverage(c context.Context, r capturevalue.ProcessingCoverageRequest) (capturevalue.ProcessingCoverage, error) {
+	v, e := s.ContextProcessingCoverageReader.ContextProcessingCoverage(c, r)
+	s.trace.record(16, journeyDiagnosticError(e))
 	return v, e
 }
 func (s publicJourneyPreviewDiagnostics) CreateContextPreview(c context.Context, v capturevalue.ContextPreview) error {
 	e := s.ContextPreviewStore.CreateContextPreview(c, v)
-	s.trace.record(18, journeyDiagnosticError(e))
+	s.trace.record(17, journeyDiagnosticError(e))
 	return e
 }
 
@@ -518,7 +506,7 @@ func TestPublicJourneyDiagnosticsOriginalAuditDispatch(t *testing.T) {
 			if !reflect.DeepEqual(got, expected) || trace.first != stage+1 || trace.refusals[stage] != 1 || trace.reasons[stage] != 9 {
 				t.Fatal("actual dispatch/first refusal changed")
 			}
-			trace.record(18, 4)
+			trace.record(17, 4)
 			if trace.first != stage+1 {
 				t.Fatal("later refusal overwrote original")
 			}
@@ -562,11 +550,11 @@ func TestPublicJourneyDiagnosticsOriginalPreviewDelegate(t *testing.T) {
 			}}
 			trace := &publicJourneyDiagnostics{}
 			wrapped := trace.Investigation(captureapp.ContextInvestigation{Storage: inner})
-			if wrapped.Targets != nil || wrapped.Previews != nil || wrapped.Recovery != nil {
+			if wrapped.Targets != nil || wrapped.Previews != nil {
 				t.Fatal("diagnostics filled absent authority")
 			}
 			got, err := wrapped.Storage.ContextStorage(c, target)
-			if calls != 1 || err != want || got != result || trace.first != 17 || trace.calls[16] != 1 || trace.refusals[16] != 1 {
+			if calls != 1 || err != want || got != result || trace.first != 16 || trace.calls[15] != 1 || trace.refusals[15] != 1 {
 				t.Fatal("original storage dispatch changed")
 			}
 			trace.Report(t)

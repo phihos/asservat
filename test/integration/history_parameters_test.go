@@ -38,7 +38,7 @@ func qualifyHistoryParameters(t *testing.T, ctx context.Context, admin *pgxpool.
 		})
 		pool := poolFor(role, "synthetic-history")
 		defer pool.Close()
-		ledger, err := postgres.NewHistoryParameters(ctx, pool, s.a.RootID, postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard})
+		ledger, err := postgres.NewHistoryParameters(ctx, pool, s.a.RootID, s.recovery.installation, s.retention.guard)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -51,13 +51,6 @@ func qualifyHistoryParameters(t *testing.T, ctx context.Context, admin *pgxpool.
 			t.Fatal(err)
 		}
 		defer mac.Close()
-		recovery := func() artifact.RecoveryProof {
-			r, e := s.recovery.reader.RecoveryState(ctx)
-			if e != nil {
-				t.Fatal(e)
-			}
-			return r
-		}
 		policies := func() privacy.PolicySet {
 			if _, e := s.retention.policies(ctx); e != nil {
 				t.Fatal(e)
@@ -99,7 +92,7 @@ func qualifyHistoryParameters(t *testing.T, ctx context.Context, admin *pgxpool.
 				}
 			}
 			expect := capture.HistoryExpectation{RootID: s.a.RootID, CaptureID: a.CaptureID, Registration: r, SelectorKey: selector, SettingsKey: settings, MACVersion: mac.AccountVersion(), OriginalExecutionDigest: a.ScopeDigest}
-			return capture.HistoryReservation{Expectation: expect, Identity: s.a.Eligibility.VerifiedIdentity, Recovery: recovery(), Limits: capture.HistoryLimits{PerSelector: 1, PerInstallation: 2}, SummaryExpiresAt: retention.ExpiresAt, Retention: retention, Source: a.RepeatedFrom}, p
+			return capture.HistoryReservation{Expectation: expect, Identity: s.a.Eligibility.VerifiedIdentity, Limits: capture.HistoryLimits{PerSelector: 1, PerInstallation: 2}, SummaryExpiresAt: retention.ExpiresAt, Retention: retention, Source: a.RepeatedFrom}, p
 		}
 		reserve := func(a capture.Accepted) (capture.HistoryStorage, capture.HistoryParameters) {
 			in, p := reservation(a)
@@ -123,7 +116,7 @@ func qualifyHistoryParameters(t *testing.T, ctx context.Context, admin *pgxpool.
 		if err != nil {
 			t.Fatal(err)
 		}
-		write, err := ledger.ClaimHistoryWrite(ctx, capture.HistoryWriteRequest{Storage: h, Identity: s.a.Eligibility.VerifiedIdentity, Recovery: recovery(), RequestID: custodyID(), ExecutorEpoch: custodyID(), BundleDigest: digest})
+		write, err := ledger.ClaimHistoryWrite(ctx, capture.HistoryWriteRequest{Storage: h, Identity: s.a.Eligibility.VerifiedIdentity, RequestID: custodyID(), ExecutorEpoch: custodyID(), BundleDigest: digest})
 		if err != nil {
 			t.Fatal("claim writer", err)
 		}
@@ -152,7 +145,7 @@ func qualifyHistoryParameters(t *testing.T, ctx context.Context, admin *pgxpool.
 		if !bytes.Equal(storedDigest, normalizedDigest[:]) {
 			t.Fatal("history registration digest retained timestamp representation instead of UTC identity")
 		}
-		if err = ledger.CompleteHistoryWrite(ctx, capture.HistoryWriteResult{Authority: write, Copies: copies, Completion: completion, Recovery: recovery()}); err != nil {
+		if err = ledger.CompleteHistoryWrite(ctx, capture.HistoryWriteResult{Authority: write, Copies: copies, Completion: completion}); err != nil {
 			t.Fatal("complete writer", err)
 		}
 		set := policies()
@@ -160,7 +153,7 @@ func qualifyHistoryParameters(t *testing.T, ctx context.Context, admin *pgxpool.
 		if err != nil {
 			t.Fatal(err)
 		}
-		permission, err := ledger.AuthorizeHistoryRead(ctx, capture.HistoryReadRequest{Query: capture.SettingsQuery{RootID: s.a.RootID, CaptureID: first.CaptureID, Identity: s.a.Eligibility.VerifiedIdentity, Recovery: recovery()}, RequestID: custodyID(), ExecutorEpoch: custodyID(), Retention: retained})
+		permission, err := ledger.AuthorizeHistoryRead(ctx, capture.HistoryReadRequest{Query: capture.SettingsQuery{RootID: s.a.RootID, CaptureID: first.CaptureID, Identity: s.a.Eligibility.VerifiedIdentity}, RequestID: custodyID(), ExecutorEpoch: custodyID(), Retention: retained})
 		if err != nil {
 			t.Fatal("current history read", err)
 		}
@@ -212,7 +205,6 @@ func qualifyHistoryParameters(t *testing.T, ctx context.Context, admin *pgxpool.
 			t.Fatal(err)
 		}
 		secondInput.Eligibility = authorization.ContextEligibility(s.a.Eligibility.VerifiedIdentity, projection, s.a.Eligibility.Target, time.Now().UTC().Truncate(time.Microsecond))
-		secondInput.Recovery = recovery()
 		// A source ID is never authority and cannot extend the saved settings.
 		bad := secondInput
 		bad.IdempotencyKey = "source-expiry-extension"
@@ -275,14 +267,14 @@ func qualifyHistoryParameters(t *testing.T, ctx context.Context, admin *pgxpool.
 		if h2.Expectation.Registration.ExpiresAt.After(h.Expectation.Registration.ExpiresAt) {
 			t.Fatal("repeat settings extended source lifetime")
 		}
-		if _, required, e := ledger.ReadHistoryStorage(ctx, capture.SettingsQuery{RootID: s.a.RootID, CaptureID: first.CaptureID, Identity: s.a.Eligibility.VerifiedIdentity, Recovery: recovery()}); e == nil || !required {
+		if _, required, e := ledger.ReadHistoryStorage(ctx, capture.SettingsQuery{RootID: s.a.RootID, CaptureID: first.CaptureID, Identity: s.a.Eligibility.VerifiedIdentity}); e == nil || !required {
 			t.Fatal("evicted snapshot fell back to execution scope", e, required)
 		}
-		legacy, e := postgres.NewContextProgressReads(ctx, pool, s.a.RootID, s.recovery.guard)
+		legacy, e := postgres.NewContextProgressReads(ctx, pool, s.a.RootID)
 		if e != nil {
 			t.Fatal(e)
 		}
-		if settings, e := legacy.ReadCaptureSettings(ctx, capture.SettingsQuery{RootID: s.a.RootID, CaptureID: first.CaptureID, Identity: s.a.Eligibility.VerifiedIdentity, Recovery: recovery()}); e == nil || settings.CaptureID != "" {
+		if settings, e := legacy.ReadCaptureSettings(ctx, capture.SettingsQuery{RootID: s.a.RootID, CaptureID: first.CaptureID, Identity: s.a.Eligibility.VerifiedIdentity}); e == nil || settings.CaptureID != "" {
 			t.Fatal("new recorder-capable capture reconstructed plaintext settings", e)
 		}
 
@@ -312,11 +304,10 @@ func qualifyHistoryParameters(t *testing.T, ctx context.Context, admin *pgxpool.
 		}
 		retire := func(storage capture.HistoryStorage) {
 			t.Helper()
-			r := recovery()
 			deadline := time.Now().Add(4*time.Second + 123*time.Nanosecond)
 			bounded, cancel := context.WithDeadline(ctx, deadline)
 			defer cancel()
-			claim, e := ledger.ClaimHistoryDeletion(bounded, capture.HistoryDeleteRequest{CaptureID: storage.Expectation.CaptureID, RequestID: custodyID(), ExecutorEpoch: custodyID(), Recovery: r})
+			claim, e := ledger.ClaimHistoryDeletion(bounded, capture.HistoryDeleteRequest{CaptureID: storage.Expectation.CaptureID, RequestID: custodyID(), ExecutorEpoch: custodyID()})
 			if e != nil {
 				t.Fatal("history deletion claim", e)
 			}
@@ -327,10 +318,10 @@ func qualifyHistoryParameters(t *testing.T, ctx context.Context, admin *pgxpool.
 				t.Fatal(e)
 			}
 			c := capture.HistoryDeleteCompletion{RootID: s.a.RootID, CaptureID: storage.Expectation.CaptureID, AttemptID: storage.Expectation.Registration.Location.AttemptID, OperationID: claim.Authority.RequestID, ProcessEpoch: claim.Authority.ExecutorEpoch, ExpectationDigest: capture.HistoryExpectationDigest(storage.Expectation), CopiesDigest: claim.Authority.CopiesDigest, DeletionFence: claim.Authority.DeletionFence, CompletedAt: time.Now().UTC().Truncate(time.Microsecond), NotAfter: claim.Authority.NotAfter}
-			if e = ledger.FinishHistoryDeletion(bounded, claim.Authority, c, r); e != nil {
+			if e = ledger.FinishHistoryDeletion(bounded, claim.Authority, c); e != nil {
 				t.Fatal("history charge settlement", e)
 			}
-			if e = ledger.FinishHistoryDeletion(bounded, claim.Authority, c, r); e != nil {
+			if e = ledger.FinishHistoryDeletion(bounded, claim.Authority, c); e != nil {
 				t.Fatal("settlement replay", e)
 			}
 		}
@@ -342,7 +333,7 @@ func qualifyHistoryParameters(t *testing.T, ctx context.Context, admin *pgxpool.
 		// empty-receipt inventory suffice; no idle timer invents writer completion.
 		time.Sleep(time.Until(h2.SummaryExpiresAt) + 10*time.Millisecond)
 		retire(h2)
-		if err = ledger.ExpireHistorySummaries(ctx, recovery()); err != nil {
+		if err = ledger.ExpireHistorySummaries(ctx); err != nil {
 			t.Fatal(err)
 		}
 		var used int

@@ -74,8 +74,7 @@ func policyRawCompileOne(raw json.RawMessage) (value.PolicyRecorderConfiguration
 func qualifyPolicyObservationCompanion(t *testing.T, ctx context.Context, admin, hub *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, s captureAdmissionScenario, admissions *postgres.ContextAdmissions, current *postgres.AutomationAuthorities, authority authorization.AcceptedPolicyAuthority, admission capture.Admission, accepted capture.Accepted, acceptance, grant string, before *policyObservationGraphSample, protected ...policyRecorderProtectedCase) {
 	t.Helper()
 	clock := func() time.Time { return time.Now().UTC().Truncate(time.Microsecond) }
-	guard := postgres.EffectTransactionGuards{Recovery: s.recovery.guard, Retention: s.retention.guard}
-	executions, err := postgres.NewAPIContextExecutions(ctx, hub, s.a.RootID, guard)
+	executions, err := postgres.NewAPIContextExecutions(ctx, hub, s.a.RootID, authority.InstallationID, s.retention.guard)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +95,7 @@ func qualifyPolicyObservationCompanion(t *testing.T, ctx context.Context, admin,
 	}
 	e := accepted.Expectation
 	program := admission.Plan.Input.Recorder.Filters[0].Filter.Program
-	process := executionvalue.APIProcessBinding{InstallationID: authority.InstallationID, ClusterID: authority.ClusterID, IssuerEpoch: admission.Recovery.IssuerEpoch, NamespaceUID: custodyID(), AccountUID: custodyID(), PodUID: custodyID(), ProcessEpoch: custodyID(), StartupDigest: artifact.Digest{1}, ImageDigest: e.CollectorImageDigest}
+	process := executionvalue.APIProcessBinding{InstallationID: authority.InstallationID, ClusterID: authority.ClusterID, IssuerEpoch: fixtureIssuerEpoch(t, ctx, admin, authority.InstallationID), NamespaceUID: custodyID(), AccountUID: custodyID(), PodUID: custodyID(), ProcessEpoch: custodyID(), StartupDigest: artifact.Digest{1}, ImageDigest: e.CollectorImageDigest}
 	node, boot, collectorPod, epoch := custodyID(), custodyID(), custodyID(), custodyID()
 	// The actual queue is exercised with explicitly synthetic attestation and
 	// issuance. No native collector, certificate or Kubernetes proof is claimed.
@@ -137,19 +136,15 @@ func qualifyPolicyObservationCompanion(t *testing.T, ctx context.Context, admin,
 		if !eligible.Eligible {
 			t.Fatal("companion accepted team eligibility", eligible.Reason)
 		}
-		recovery, err := s.recovery.reader.RecoveryState(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
 		if !replayChecked {
-			replay, found, err := admissions.LookupContextAdmission(ctx, capture.ReplayQuery{RootID: s.a.RootID, PreviewID: previewID, IdempotencyKey: admission.IdempotencyKey, SubmissionDigest: admission.SubmissionDigest, Identity: verified, Recovery: recovery})
+			replay, found, err := admissions.LookupContextAdmission(ctx, capture.ReplayQuery{RootID: s.a.RootID, PreviewID: previewID, IdempotencyKey: admission.IdempotencyKey, SubmissionDigest: admission.SubmissionDigest, Identity: verified})
 			if err != nil || !found || !replay.Replay || replay.CaptureID != accepted.CaptureID || replay.ScopeDigest != accepted.ScopeDigest || !replay.Deadline.Equal(accepted.Deadline) || replay.Expectation.Recording == nil || replay.Expectation.Recording.RequireApproval {
 				t.Fatal("actual raw policy admission replay with require-all false", found, err)
 			}
 			replayChecked = true
 			t.Log("actual raw policy admission replay retained capture/scope/deadline and require-all=false")
 		}
-		work, err := executions.ReadAPIContextWork(ctx, accepted.CaptureID, verified, recovery)
+		work, err := executions.ReadAPIContextWork(ctx, accepted.CaptureID, verified)
 		if err != nil {
 			t.Fatal("actual raw API work", err)
 		}
@@ -176,10 +171,10 @@ func qualifyPolicyObservationCompanion(t *testing.T, ctx context.Context, admin,
 		observed := executionvalue.APIProcessObservation{Binding: process, CheckedAt: targetAt, ValidUntil: targetAt.Add(5 * time.Second)}
 		checked := clock()
 		until := checked.Add(5 * time.Second)
-		for _, bound := range []time.Time{eligible.ValidUntil, plan.ValidUntil, recovery.FreshUntil, observed.ValidUntil} {
+		for _, bound := range []time.Time{eligible.ValidUntil, plan.ValidUntil, observed.ValidUntil} {
 			until = identity.Earlier(until, bound)
 		}
-		check := executionapp.APIExecutionCheck{Work: work, Plan: plan, Eligibility: eligible, Recovery: recovery, Process: observed, CheckedAt: checked, ValidUntil: until}
+		check := executionapp.APIExecutionCheck{Work: work, Plan: plan, Eligibility: eligible, Process: observed, CheckedAt: checked, ValidUntil: until}
 		source := targets.PacketSourceObservation{PodUID: e.PodUID, NodeUID: node, BootID: boot, CollectorPodUID: collectorPod, CollectorEpoch: epoch, ObservedAt: targetAt, FreshUntil: until}
 		if !check.Valid(clock()) || !source.Valid(clock()) || source.FreshUntil.After(input.Target.FreshUntil) {
 			t.Fatal("assembled actual raw companion preflight invalid")
@@ -359,18 +354,14 @@ func qualifyPolicyObservationCompanion(t *testing.T, ctx context.Context, admin,
 	if err != nil || collected.State != evidence.RecordingStored || !collected.Completion.Valid(e.Registration) {
 		t.Fatal("actual stored/joined completion", collected, err)
 	}
-	// Outcome facts refresh only this same process/recovery observation. They do
+	// Outcome facts refresh only this same process observation. They do
 	// not reissue the grant, source, lease, packet action or observation credit.
 	processAt := clock()
-	currentRecovery, err := s.recovery.reader.RecoveryState(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
 	r.CompletedAt = collected.Completion.StoredAt
 	r.Phase = "stored"
 	r.Copies = collected.Completion.Copies
 	r.AcquiredAt = collected.Acquired
-	r, err = executions.RecordAPIStoredCompletion(ctx, r, collected.Completion, executionvalue.APIProcessObservation{Binding: process, CheckedAt: processAt, ValidUntil: processAt.Add(5 * time.Second)}, currentRecovery)
+	r, err = executions.RecordAPIStoredCompletion(ctx, r, collected.Completion, executionvalue.APIProcessObservation{Binding: process, CheckedAt: processAt, ValidUntil: processAt.Add(5 * time.Second)})
 	if err != nil {
 		t.Fatal("actual finite stored completion ACK", err)
 	}

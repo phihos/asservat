@@ -27,8 +27,8 @@ const publisherProviderBorrows = 4
 // InstalledPublisherProviderEffects owns the publisher's three provider
 // lifetimes (ADR-203): Kubernetes-auth logins with the projected publisher
 // token for audit wrap/unwrap and verifier leaf signing. Each login and
-// renewal runs only under the composition's current proof; effects borrow a
-// token and never trigger a login.
+// renewal is bounded by its caller deadline; effects borrow a token and never
+// trigger a login.
 type InstalledPublisherProviderEffects struct {
 	files              *os.Root
 	wrap, unwrap, sign *ownerProviderLifetime
@@ -50,11 +50,9 @@ type PublisherProviderKeys struct {
 	AuditMount, AuditKey, PKIMount, VerifierRole string
 }
 
-// NewInstalledPublisherProviderEffects composes the three lifetimes. proof is
-// the publisher's current recovery observation; its returned time bounds
-// every login, renewal and borrowed effect.
-func NewInstalledPublisherProviderEffects(ctx context.Context, installation string, login ProviderLogin, k PublisherProviderKeys, files *os.Root, proof func(context.Context) (time.Time, error)) (*InstalledPublisherProviderEffects, error) {
-	if ctx == nil || ctx.Err() != nil || files == nil || proof == nil || !value.UUID(installation) || !login.valid(providerconfig.PublisherProviderPurposes[:]...) ||
+// NewInstalledPublisherProviderEffects composes the three lifetimes.
+func NewInstalledPublisherProviderEffects(ctx context.Context, installation string, login ProviderLogin, k PublisherProviderKeys, files *os.Root) (*InstalledPublisherProviderEffects, error) {
+	if ctx == nil || ctx.Err() != nil || files == nil || !value.UUID(installation) || !login.valid(providerconfig.PublisherProviderPurposes[:]...) ||
 		!keyName.MatchString(k.AuditMount) || !keyName.MatchString(k.AuditKey) || !keyName.MatchString(k.PKIMount) || !keyName.MatchString(k.VerifierRole) || k.AuditMount == k.PKIMount {
 		return nil, ErrKeyService
 	}
@@ -73,7 +71,7 @@ func NewInstalledPublisherProviderEffects(ctx context.Context, installation stri
 		if err != nil {
 			return nil, err
 		}
-		slot, err := newOwnerProviderLifetime(root, control, s.projectedJWT, ownerProviderCurrent(proof), publisherProviderBorrows)
+		slot, err := newOwnerProviderLifetime(root, control, s.projectedJWT, callerDeadline, publisherProviderBorrows)
 		if err != nil {
 			control.close()
 			return nil, err

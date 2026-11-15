@@ -127,23 +127,23 @@ func qualifyPublicContextJourney(t *testing.T, parent context.Context, fixture f
 	diagnostic := &publicJourneyDiagnostics{}
 	investigation = diagnostic.Investigation(investigation)
 	intents = diagnostic.Publication(intents)
-	investigation.Resolution, e = postgres.NewContextRequestResolutions(ctx, open("context_request_resolution_runtime", "synthetic-context-request-resolution"), s.a.RootID, s.recovery.guard)
+	investigation.Resolution, e = postgres.NewContextRequestResolutions(ctx, open("context_request_resolution_runtime", "synthetic-context-request-resolution"), s.a.RootID, s.recovery.installation)
 	publicJourneyRequire(t, "request resolution", e)
-	progress, e := postgres.NewContextProgressReads(ctx, open("context_progress_read_runtime", "synthetic-context-progress-read"), s.a.RootID, s.recovery.guard)
+	progress, e := postgres.NewContextProgressReads(ctx, open("context_progress_read_runtime", "synthetic-context-progress-read"), s.a.RootID)
 	publicJourneyRequire(t, "progress", e)
 	casePool := open("context_case_read_runtime", "synthetic-context-case-read")
-	routes, e := postgres.NewContextCaseReads(ctx, casePool, s.a.RootID, s.recovery.guard)
+	routes, e := postgres.NewContextCaseReads(ctx, casePool, s.a.RootID)
 	publicJourneyRequire(t, "case routes", e)
-	processing, e := postgres.NewProcessingReads(ctx, casePool, s.a.RootID, s.recovery.guard)
+	processing, e := postgres.NewProcessingReads(ctx, casePool, s.a.RootID, s.recovery.installation)
 	publicJourneyRequire(t, "case processing", e)
 	catalog, e := postgres.NewContextPublications(ctx, open("context_catalog_read_runtime", "synthetic-context-read"), s.a.RootID)
 	publicJourneyRequire(t, "case catalog", e)
 	cases := catalogapp.ContextCaseService{RootID: s.a.RootID, InstallationID: s.recovery.installation, Routes: routes, Permissions: s.p, Catalog: catalog, Retention: retention, Processing: processing, Now: time.Now}
 	bridge := diagnostic.Regional(regional.bridge)
 	// ADR-171: the hub runs the runner, so its hub ports are traced here. The
-	// public assembly supplies the shared capability, recovery and clock.
+	// public assembly supplies the shared capability and clock.
 	bridge.Runner = diagnostic.Runner(bridge.Runner)
-	bridge.Runner.Capabilities, bridge.Runner.Recovery, bridge.Runner.Now = nil, nil, nil
+	bridge.Runner.Capabilities, bridge.Runner.Now = nil, nil
 	server := httptest.NewUnstartedServer(nil)
 	server.EnableHTTP2 = true
 	t.Cleanup(server.Close)
@@ -153,7 +153,7 @@ func qualifyPublicContextJourney(t *testing.T, parent context.Context, fixture f
 	// Fund the finite whole journey up front, preserving processing revision and
 	// spend. No replenishment is performed once the first public operation begins.
 	pools.Snapshot(ctx, admin, "before-audit")
-	shared := nativeOperationAuditServices(t, t, ctx, s.a.RootID, s.recovery.installation, s.a.Registration.StoreID, postgres.DownloadTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard}, admin, poolFor, store, keys, operations, 32, diagnostic)
+	shared := nativeOperationAuditServices(t, t, ctx, s.a.RootID, s.recovery.installation, s.a.Registration.StoreID, admin, poolFor, store, keys, operations, 32, diagnostic)
 	pools.Snapshot(ctx, admin, "assembly-ready")
 	handler, e := browser.NewDownloadContentHandler(browser.DownloadContentConfig{PublicOrigin: origin, Issuer: actor.Principal.Issuer, MaxConcurrent: 2, MaxPerIdentity: 2, MaxDuration: time.Minute, Now: time.Now, NewID: custodyID}, browser.SessionHandler{Origin: origin, Issuer: actor.Principal.Issuer, Sessions: sessions}, nativeContentDeniedBearer{}, shared, native.services.Runtime, native.services.Transfer)
 	publicJourneyRequire(t, "shared authenticated native GET", e)
@@ -218,15 +218,15 @@ func qualifyPublicContextJourney(t *testing.T, parent context.Context, fixture f
 	clear(encoded)
 	bound, e := store.ForCustody(s.a.Registration.StoreID)
 	publicJourneyRequire(t, "original custody", e)
-	guards := postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard}
+	guard := s.retention.guard
 	pools.Snapshot(ctx, admin, "before-publication")
-	publication := newPublicJourneyPublication(ctx, pools, s.a.RootID, guards)
+	publication := newPublicJourneyPublication(ctx, pools, s.a.RootID, guard)
 	defer publication.Close()
 	gatePool := open("api_publication_gate_runtime", "synthetic-api-publication-gate")
 	defer gatePool.Close()
 	publicationRetention := retention
 	publicationRetention.RetainedPolicies = journeyGateRetainedPolicies{retention.RetainedPolicies, &native.gateTrace}
-	gate, e := postgres.NewAPIContextPublicationGate(ctx, gatePool, s.a.RootID, guards, publicationRetention, journeyGateRecovery{s.recovery.reader, &native.gateTrace})
+	gate, e := postgres.NewAPIContextPublicationGate(ctx, gatePool, s.a.RootID, guard, publicationRetention)
 	publicJourneyRequire(t, "independent publication gate", e)
 	verifier, e := objectstore.NewContextVerifier(bound, artifactKeys.seal)
 	publicJourneyRequire(t, "original artifact verifier", e)

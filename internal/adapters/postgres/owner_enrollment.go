@@ -40,9 +40,9 @@ func NewOwnerEnrollments(ctx context.Context, pool *pgxpool.Pool, installation, 
 	return &OwnerEnrollments{c, newID}, nil
 }
 
-// All changing facets serialize on the pinned pool head, after recovery. No
+// All changing facets serialize on the pinned pool head. No
 // network I/O is performed in these transactions. Readers only share the head.
-func (s *OwnerEnrollments) current(ctx context.Context, write bool, original time.Time, f func(*custodydb.Queries, value.OwnerConfigurationObservation, value.RecoveryState, time.Time) error) error {
+func (s *OwnerEnrollments) current(ctx context.Context, write bool, original time.Time, f func(*custodydb.Queries, value.OwnerConfigurationObservation, time.Time) error) error {
 	if s == nil || ctx == nil {
 		return value.ErrInvalid
 	}
@@ -54,10 +54,6 @@ func (s *OwnerEnrollments) current(ctx context.Context, write bool, original tim
 		}
 		if original.IsZero() {
 			original = start.Time
-		}
-		trust, e := q.ShareFleetTrust(ctx, id(c.installation))
-		if e != nil {
-			return e
 		}
 		var h custodydb.HubOwnerConfiguration
 		if write {
@@ -80,41 +76,40 @@ func (s *OwnerEnrollments) current(ctx context.Context, write bool, original tim
 		if json.Unmarshal(row.SnapshotJson, &config) != nil || !c.matches(config) || config.Revision.Generation != h.Generation || config.Suspended || json.Unmarshal(row.AuditReceiptJson, &receipt) != nil || !receipt.ValidOwnerConfiguration(config) {
 			return value.ErrUnavailable
 		}
-		check := func() (value.OwnerConfigurationObservation, value.RecoveryState, time.Time, error) {
+		check := func() (value.OwnerConfigurationObservation, time.Time, error) {
 			n, e := q.CurrentTime(ctx)
 			if e != nil {
-				return value.OwnerConfigurationObservation{}, value.RecoveryState{}, time.Time{}, e
+				return value.OwnerConfigurationObservation{}, time.Time{}, e
 			}
-			recovery, e := recoveryState(trust, original, n.Time)
-			observation := value.OwnerConfigurationObservation{Configuration: config, ObservedAt: h.ObservedAt.Time, FreshUntil: identity.Earlier(h.FreshUntil.Time, recovery.FreshUntil)}
-			if e != nil || !observation.Valid(n.Time) || recovery.IssuerEpoch != config.Pool.IssuerEpoch {
-				return observation, recovery, n.Time, value.ErrUnavailable
+			observation := value.OwnerConfigurationObservation{Configuration: config, ObservedAt: h.ObservedAt.Time, FreshUntil: h.FreshUntil.Time}
+			if !observation.Valid(n.Time) {
+				return observation, n.Time, value.ErrUnavailable
 			}
-			return observation, recovery, n.Time, nil
+			return observation, n.Time, nil
 		}
-		observation, recovery, now, e := check()
+		observation, now, e := check()
 		if e != nil {
 			return e
 		}
-		if e = f(q, observation, recovery, now); e != nil {
+		if e = f(q, observation, now); e != nil {
 			return e
 		}
-		_, _, _, e = check()
+		_, _, e = check()
 		return e
 	})
 }
-func (s *OwnerEnrollments) withProof(ctx context.Context, p value.OwnerEnrollmentProof, f func(*custodydb.Queries, value.RecoveryState, time.Time) error) error {
+func (s *OwnerEnrollments) withProof(ctx context.Context, p value.OwnerEnrollmentProof, f func(*custodydb.Queries, time.Time) error) error {
 	if ctx == nil || !p.WellFormed() {
 		return value.ErrInvalid
 	}
 	p = p.Clone()
 	ctx, end := context.WithDeadline(ctx, p.FreshUntil)
 	defer end()
-	return s.current(ctx, true, p.ObservedAt, func(q *custodydb.Queries, c value.OwnerConfigurationObservation, r value.RecoveryState, n time.Time) error {
+	return s.current(ctx, true, p.ObservedAt, func(q *custodydb.Queries, c value.OwnerConfigurationObservation, n time.Time) error {
 		if !p.Valid(n) || !p.Configuration.Configuration.Equal(c.Configuration) || p.FreshUntil.After(c.FreshUntil) {
 			return value.ErrUnavailable
 		}
-		if e := f(q, r, n); e != nil {
+		if e := f(q, n); e != nil {
 			return e
 		}
 		now, e := q.CurrentTime(ctx)
@@ -159,7 +154,7 @@ func (s *OwnerEnrollments) ClaimOwnerEnrollment(ctx context.Context, p value.Own
 	var out value.OwnerEnrollment
 	var receipt audit.Receipt
 	var ack bool
-	err := s.withProof(ctx, p, func(q *custodydb.Queries, _ value.RecoveryState, now time.Time) error {
+	err := s.withProof(ctx, p, func(q *custodydb.Queries, now time.Time) error {
 		out, receipt, ack = value.OwnerEnrollment{}, audit.Receipt{}, false
 		if e := s.prune(ctx, q); e != nil {
 			return e
@@ -239,7 +234,7 @@ func (s *OwnerEnrollments) provenEnrollment(ctx context.Context, q *custodydb.Qu
 }
 func (s *OwnerEnrollments) PrepareOwnerCertificate(ctx context.Context, p value.OwnerEnrollmentProof) (value.OwnerCertificateProgress, error) {
 	var out value.OwnerCertificateProgress
-	err := s.withProof(ctx, p, func(q *custodydb.Queries, recovery value.RecoveryState, now time.Time) error {
+	err := s.withProof(ctx, p, func(q *custodydb.Queries, now time.Time) error {
 		out = value.OwnerCertificateProgress{}
 		row, enrollment, receipt, e := s.provenEnrollment(ctx, q, p)
 		if e != nil {
@@ -268,7 +263,7 @@ func (s *OwnerEnrollments) PrepareOwnerCertificate(ctx context.Context, p value.
 			if e != nil {
 				return e
 			}
-			if a.Enrollment != enrollment || a.Permit.EnrollmentAudit != receipt.SHA256 || a.Permit.Recovery.Revision != recovery.Revision {
+			if a.Enrollment != enrollment || a.Permit.EnrollmentAudit != receipt.SHA256 {
 				return value.ErrDenied
 			}
 			out.Attempt = a
@@ -287,7 +282,7 @@ func (s *OwnerEnrollments) PrepareOwnerCertificate(ctx context.Context, p value.
 				return value.ErrCapacity
 			}
 		}
-		permit := value.OwnerCertificatePermit{ID: s.newID(), Binding: p.Binding, Usage: p.Usage, PublicKeyDigest: p.PublicKeyDigest, EnrollmentAudit: receipt.SHA256, Configuration: p.Configuration, Recovery: recovery, Epoch: epoch, Ordinal: len(rows) + 1, CheckedAt: now.UTC(), SignBefore: identity.Earlier(p.FreshUntil, identity.Earlier(recovery.FreshUntil, identity.Earlier(now.Add(5*time.Second), until))), CertificateNotAfter: until}
+		permit := value.OwnerCertificatePermit{ID: s.newID(), Binding: p.Binding, Usage: p.Usage, PublicKeyDigest: p.PublicKeyDigest, EnrollmentAudit: receipt.SHA256, Configuration: p.Configuration, Epoch: epoch, Ordinal: len(rows) + 1, CheckedAt: now.UTC(), SignBefore: identity.Earlier(p.FreshUntil, identity.Earlier(now.Add(5*time.Second), until)), CertificateNotAfter: until}
 		a := value.OwnerCertificateAttempt{Enrollment: enrollment, Permit: permit, TokenDigest: p.TokenDigest, WorkloadDigest: p.WorkloadDigest, ProtectionDigest: p.ProtectionDigest, ProofObservedAt: p.ObservedAt, ProofFreshUntil: p.FreshUntil}
 		if !a.Valid(now) {
 			return value.ErrUnavailable
@@ -315,12 +310,12 @@ func (s *OwnerEnrollments) StoreOwnerCertificate(ctx context.Context, a value.Ow
 	if e != nil || len(b) > 64<<10 {
 		return value.ErrInvalid
 	}
-	return s.withProof(ctx, a.Proof(), func(q *custodydb.Queries, r value.RecoveryState, now time.Time) error {
+	return s.withProof(ctx, a.Proof(), func(q *custodydb.Queries, now time.Time) error {
 		_, enrollment, receipt, e := s.provenEnrollment(ctx, q, a.Proof())
 		if e != nil {
 			return e
 		}
-		if enrollment != a.Enrollment || receipt.SHA256 != a.Permit.EnrollmentAudit || !a.Valid(now) || !c.Certificate.Valid(now) || r.Revision != a.Permit.Recovery.Revision {
+		if enrollment != a.Enrollment || receipt.SHA256 != a.Permit.EnrollmentAudit || !a.Valid(now) || !c.Certificate.Valid(now) {
 			return value.ErrUnavailable
 		}
 		row, e := q.ReadOwnerCertificate(ctx, custodydb.ReadOwnerCertificateParams{ID: id(a.Permit.ID), EnrollmentID: id(enrollment.ID)})
@@ -359,12 +354,12 @@ func (s *OwnerEnrollments) ActivateOwnerCertificate(ctx context.Context, p value
 	if !a.Valid(a.Permit.CheckedAt) || !a.Enrollment.Matches(p) {
 		return out, value.ErrInvalid
 	}
-	err := s.withProof(ctx, p, func(q *custodydb.Queries, recovery value.RecoveryState, now time.Time) error {
+	err := s.withProof(ctx, p, func(q *custodydb.Queries, now time.Time) error {
 		_, enrollment, receipt, e := s.provenEnrollment(ctx, q, p)
 		if e != nil {
 			return e
 		}
-		if enrollment != a.Enrollment || receipt.SHA256 != a.Permit.EnrollmentAudit || recovery.Revision != a.Permit.Recovery.Revision {
+		if enrollment != a.Enrollment || receipt.SHA256 != a.Permit.EnrollmentAudit {
 			return value.ErrDenied
 		}
 		row, e := q.ReadOwnerCertificate(ctx, custodydb.ReadOwnerCertificateParams{ID: id(a.Permit.ID), EnrollmentID: id(enrollment.ID)})
@@ -407,7 +402,7 @@ func (s *OwnerEnrollments) ActivateOwnerCertificate(ctx context.Context, p value
 	return out.Clone(), nil
 }
 
-// Audit and retirement can finish after source/recovery unavailability. They
+// Audit and retirement can finish after source unavailability. They
 // cannot refresh authority, alter identities or refund possible live issuance.
 func (s *OwnerEnrollments) historical(ctx context.Context, f func(*custodydb.Queries) error) error {
 	if s == nil || ctx == nil {
@@ -538,7 +533,7 @@ func (s *OwnerEnrollments) ReadOwnerRegistration(ctx context.Context, certificat
 	if !certificate.Valid(certificate.NotBefore) {
 		return out, value.ErrInvalid
 	}
-	err := s.current(ctx, false, time.Time{}, func(q *custodydb.Queries, c value.OwnerConfigurationObservation, recovery value.RecoveryState, now time.Time) error {
+	err := s.current(ctx, false, time.Time{}, func(q *custodydb.Queries, c value.OwnerConfigurationObservation, now time.Time) error {
 		row, e := s.readEnrollment(ctx, q, certificate.Binding, certificate.Usage)
 		if e != nil {
 			return e
@@ -556,7 +551,7 @@ func (s *OwnerEnrollments) ReadOwnerRegistration(ctx context.Context, certificat
 			return e
 		}
 		a, e := decodeOwnerAttempt(leaf)
-		if e != nil || a.Enrollment != enrollment || a.Permit.EnrollmentAudit != r.SHA256 || a.Permit.Recovery.Revision != recovery.Revision {
+		if e != nil || a.Enrollment != enrollment || a.Permit.EnrollmentAudit != r.SHA256 {
 			return value.ErrDenied
 		}
 		cert, e := decodeOwnerCertificate(leaf, a)
@@ -567,7 +562,7 @@ func (s *OwnerEnrollments) ReadOwnerRegistration(ctx context.Context, certificat
 		if json.Unmarshal(leaf.AuditReceiptJson, &ack) != nil || !ack.ValidOwnerCertificate(audit.OwnerCertificate{Attempt: a, Certificate: certificate}) {
 			return value.ErrDenied
 		}
-		out = value.OwnerRegistrationObservation{Enrollment: enrollment, Certificate: certificate, Configuration: c, ObservedAt: recovery.ObservedAt, FreshUntil: identity.Earlier(c.FreshUntil, identity.Earlier(recovery.FreshUntil, certificate.NotAfter))}
+		out = value.OwnerRegistrationObservation{Enrollment: enrollment, Certificate: certificate, Configuration: c, ObservedAt: c.ObservedAt, FreshUntil: identity.Earlier(c.FreshUntil, certificate.NotAfter)}
 		n, e := q.CurrentTime(ctx)
 		if e != nil {
 			return e

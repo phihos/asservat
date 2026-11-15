@@ -65,7 +65,7 @@ func capacityEnrollmentOriginal(a, b app.Enrollment) bool {
 func (s *capacityEnrollmentReader) effect(ctx context.Context, o app.EnrollmentObservation, expected *app.Enrollment, phase string) (app.Enrollment, error) {
 	var zero app.Enrollment
 	capture := phase == "capture" || phase == "continue-capture"
-	if s == nil || s.ledger == nil || s.accounts == nil || ctx == nil || ctx.Err() != nil || s.capture != capture || o.Key.RootID != s.root || o.Recovery.InstallationID != s.installation || !o.Valid(time.Now()) || o.Plan.AccountVersion() != s.accounts.AccountVersion() {
+	if s == nil || s.ledger == nil || s.accounts == nil || ctx == nil || ctx.Err() != nil || s.capture != capture || o.Key.RootID != s.root || !o.Valid(time.Now()) || o.Plan.AccountVersion() != s.accounts.AccountVersion() {
 		return zero, cfg.ErrUnavailable
 	}
 	if phase != "reserve" && phase != "publish" && phase != "continue-publish" && phase != "observe" && !capture {
@@ -85,10 +85,6 @@ func (s *capacityEnrollmentReader) effect(ctx context.Context, o app.EnrollmentO
 	}
 	plan, pool, source, e := o.Plan.CanonicalValues()
 	if e != nil {
-		return zero, cfg.ErrUnavailable
-	}
-	observation, e := json.Marshal(o)
-	if e != nil || len(observation) > 128<<10 {
 		return zero, cfg.ErrUnavailable
 	}
 	var receipt []byte
@@ -124,8 +120,11 @@ func (s *capacityEnrollmentReader) effect(ctx context.Context, o app.EnrollmentO
 		}
 	}()
 	e = s.ledger.transaction(live, func(q *custodydb.Queries) error {
+		observation, err := capacityObservationJSON(live, q, s.installation, o, 128<<10)
+		if err != nil {
+			return err
+		}
 		var raw []byte
-		var err error
 		switch phase {
 		case "reserve":
 			mac, err := s.accounts.CaptureAccount(s.root, candidates[2].String())

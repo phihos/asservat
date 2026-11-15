@@ -14,7 +14,7 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 )
 
-func (f *bridgeFixture) ResolveSyscallProjectionRoute(context.Context, string, string, identity.Identity, artifact.RecoveryProof) (value.ContextProjectionCandidate, error) {
+func (f *bridgeFixture) ResolveSyscallProjectionRoute(context.Context, string, string, identity.Identity) (value.ContextProjectionCandidate, error) {
 	c := f.a.Scope.Candidate()
 	c.Syscalls = value.SyscallWindow{}
 	return c, nil

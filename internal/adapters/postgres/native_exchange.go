@@ -25,7 +25,7 @@ type NativeOwners struct{ workers *DownloadWorkers }
 var _ evidence.NativeOperations = (*NativeOwners)(nil)
 var _ evidence.NativeOperationRenewer = (*NativeOwners)(nil)
 
-func NewNativeOwners(ctx context.Context, pool *pgxpool.Pool, root string, p value.DownloadWorkerProfile, g DownloadTransactionGuards) (*NativeOwners, error) {
+func NewNativeOwners(ctx context.Context, pool *pgxpool.Pool, root string, p value.DownloadWorkerProfile, g *RetentionTransactionGuard) (*NativeOwners, error) {
 	w, e := NewDownloadWorkers(ctx, pool, root, p, g)
 	if e != nil {
 		return nil, e

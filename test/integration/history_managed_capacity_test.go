@@ -52,7 +52,7 @@ func qualifyHistoryManagedCapacity(t *testing.T, f *queryLedgerFixture) {
 	})
 	pool := b.fixturePool(role, "synthetic-managed-history")
 	defer pool.Close()
-	ledger, err := postgres.NewHistoryParameters(b.ctx, pool, s.a.RootID, postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard})
+	ledger, err := postgres.NewHistoryParameters(b.ctx, pool, s.a.RootID, s.recovery.installation, s.retention.guard)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,15 +125,11 @@ func qualifyHistoryManagedCapacity(t *testing.T, f *queryLedgerFixture) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		recovery, err := s.recovery.reader.RecoveryState(b.ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
 		actor := s.a.Eligibility.VerifiedIdentity
 		actor.VerifiedAt, actor.ValidUntil = now, now.Add(5*time.Second)
 		expected := e
 		expected.Registration.ExpiresAt, expected.Registration.DeleteBy = retention.ExpiresAt, retention.DeleteBy
-		return capture.HistoryReservation{Expectation: expected, Identity: actor, Recovery: recovery, Limits: capture.HistoryLimits{PerSelector: 2, PerInstallation: 4}, SummaryExpiresAt: retention.ExpiresAt, Retention: retention}
+		return capture.HistoryReservation{Expectation: expected, Identity: actor, Limits: capture.HistoryLimits{PerSelector: 2, PerInstallation: 4}, SummaryExpiresAt: retention.ExpiresAt, Retention: retention}
 	}
 	accounting := func() historyManagedAccounting {
 		var v historyManagedAccounting
@@ -155,7 +151,7 @@ func qualifyHistoryManagedCapacity(t *testing.T, f *queryLedgerFixture) {
 	before := accounting()
 	checkInput := func(in capture.HistoryReservation) {
 		now := time.Now()
-		if !in.Expectation.Valid() || in.Expectation.Registration.ExpiresAt.After(in.SummaryExpiresAt) || !now.Before(in.Expectation.Registration.WriteUntil) || !in.Identity.Valid(now) || !in.Recovery.Valid(now) || !in.Retention.Proof.Valid(now) {
+		if !in.Expectation.Valid() || in.Expectation.Registration.ExpiresAt.After(in.SummaryExpiresAt) || !now.Before(in.Expectation.Registration.WriteUntil) || !in.Identity.Valid(now) || !in.Retention.Proof.Valid(now) {
 			t.Fatal("history fixture input expired or exceeds original accepted dates", time.Until(in.Expectation.Registration.WriteUntil))
 		}
 	}

@@ -58,7 +58,7 @@ func newProfileGrantPlanFixture(t *testing.T) (*workloadActivationFixture, *acce
 	}
 	in := f.accepted[0]
 	source, _, _ := f.ReadPolicy(t.Context(), "restarts", "policy-uid")
-	record := value.PolicyAcceptance{ID: "99999999-9999-4999-8999-999999999999", RootID: activationRoot, Source: source, Submission: in.Submission, Authority: in.Authority, Submitter: f.author.Principal, IdentityRevision: f.author.Policy, PermissionRevision: f.projection.Revision, Recovery: in.Recovery, IntentVersion: 1, AcceptedAt: f.now}
+	record := value.PolicyAcceptance{ID: "99999999-9999-4999-8999-999999999999", RootID: activationRoot, Source: source, Submission: in.Submission, Authority: in.Authority, Submitter: f.author.Principal, IdentityRevision: f.author.Policy, PermissionRevision: f.projection.Revision, IntentVersion: 1, AcceptedAt: f.now}
 	if !record.Valid() {
 		t.Fatal("profile acceptance fixture invalid")
 	}

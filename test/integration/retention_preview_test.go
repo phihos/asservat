@@ -20,8 +20,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// retentionPreviewAuthority stands in for the browser identity, the protected
-// fleet administration and the recovery proof; the catalog read and the
+// retentionPreviewAuthority stands in for the browser identity and the protected
+// fleet administration; the catalog read and the
 // EvidenceRetentionPolicy decoder are the production adapters.
 type retentionPreviewAuthority struct {
 	installation string
@@ -35,10 +35,6 @@ func (a retentionPreviewAuthority) FleetAdministration(context.Context) (fleet.A
 	n := time.Now().UTC()
 	return fleet.Administration{InstallationID: a.installation, IssuerEpoch: a.installation, Issuer: "https://id.example.invalid", Revision: identity.Revision{UID: "fleet", Generation: 1, Digest: artifact.Digest{2}}, ObservedAt: n, FreshUntil: n.Add(5 * time.Second),
 		Clients: []string{"console"}, Groups: []string{"platform-admins"}, DeliveryProfiles: []string{"kv"}, MaxActiveBootstraps: 1, MaxBootstrapHistory: 1, MaxClusters: 1}, nil
-}
-func (a retentionPreviewAuthority) RecoveryState(context.Context) (artifact.RecoveryProof, error) {
-	n := time.Now().UTC()
-	return artifact.RecoveryProof{InstallationID: a.installation, IssuerEpoch: a.installation, Revision: identity.Revision{UID: "recovery", Generation: 1, Digest: artifact.Digest{3}}, ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}, nil
 }
 
 // retentionPreviewSpec is a hub baseline EvidenceRetentionPolicy spec with
@@ -137,7 +133,7 @@ func qualifyRetentionPreview(t *testing.T, ctx context.Context, admin *pgxpool.P
 			t.Fatal(err)
 		}
 		installation := s.recovery.installation
-		previewer := privacyapp.RetentionPreviewer{InstallationID: installation, Administration: retentionPreviewAuthority{installation: installation}, Catalog: catalog, Decoder: decoder, Recovery: retentionPreviewAuthority{installation: installation}, Now: time.Now}
+		previewer := privacyapp.RetentionPreviewer{InstallationID: installation, Administration: retentionPreviewAuthority{installation: installation}, Catalog: catalog, Decoder: decoder, Now: time.Now}
 		authority := retentionPreviewAuthority{installation: installation}
 		anchor := registrations[0].AnchorAt
 		for _, r := range registrations {

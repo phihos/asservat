@@ -145,10 +145,10 @@ func newConsoleProcessing(t *testing.T, erasure bool) (string, string, *consoleP
 	rootID := consoleCaptureID(41)
 	var status *privacyapp.ProcessingErasureStatus
 	if erasure {
-		status = &privacyapp.ProcessingErasureStatus{RootID: rootID, InstallationID: rootID, Policies: facts, Recovery: facts, Status: facts, Now: time.Now}
+		status = &privacyapp.ProcessingErasureStatus{RootID: rootID, InstallationID: rootID, Policies: facts, Status: facts, Now: time.Now}
 	}
 	discovery, err := presentation.NewProcessingDiscoveryOperations(origin, time.Now, custodyID, privacyapp.ProcessingEvidenceDiscovery{
-		RootID: rootID, InstallationID: rootID, Policies: facts, Recovery: facts, Discovery: facts, Now: time.Now,
+		RootID: rootID, InstallationID: rootID, Policies: facts, Discovery: facts, Now: time.Now,
 	}, status, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -303,12 +303,6 @@ func (s *consoleProcessingFacts) DownloadPolicy(context.Context) (value.Download
 		Revision: identity.Revision{UID: "synthetic-privacy-policy", Generation: 1, Digest: artifact.Digest{1}}, ProtectionDigest: artifact.Digest{2},
 		PermittedRegions: []string{}, Paths: []artifact.DownloadPath{}, Clients: []value.DownloadClient{},
 		Operators: []value.ProcessingOperator{{Issuer: "https://identity.invalid", ClientID: "console", Kind: "Group", ID: "maintainers"}}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}, nil
-}
-
-func (s *consoleProcessingFacts) RecoveryState(context.Context) (artifact.RecoveryProof, error) {
-	now := time.Now().UTC().Truncate(time.Microsecond)
-	return artifact.RecoveryProof{InstallationID: consoleCaptureID(41), IssuerEpoch: consoleCaptureID(42),
-		Revision: identity.Revision{UID: "synthetic-recovery", Generation: 1, Digest: artifact.Digest{3}}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}, nil
 }
 
 func (s *consoleProcessingFacts) ReadProcessingDiscovery(ctx context.Context, authority value.ProcessingAuthority, query value.ProcessingDiscoveryQuery) (value.ProcessingDiscoveryPage, error) {

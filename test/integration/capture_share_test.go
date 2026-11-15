@@ -66,7 +66,7 @@ func qualifyCaptureShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool,
 		}
 		a, in := s.a, s.a.Plan.Input
 		p := capture.ContextPreview{
-			ID: custodyID(), AssessmentID: custodyID(), RootID: a.RootID, InstallationID: a.Recovery.InstallationID, IssuerEpoch: a.Recovery.IssuerEpoch,
+			ID: custodyID(), AssessmentID: custodyID(), RootID: a.RootID, InstallationID: s.recovery.installation,
 			CaptureID: in.CaptureID, CaseID: a.CaseID, OccurrenceID: a.OccurrenceID, ArtifactID: a.Registration.Location.ArtifactID, AttemptID: a.Registration.Location.AttemptID,
 			Actor:  in.Executor,
 			Intent: capture.ContextIntent{Target: targets.WorkloadRequest{ClusterID: in.Target.Request.ClusterID, Namespace: in.Target.Request.Namespace.Name, Kind: in.Target.Request.Workload.Kind, Name: in.Target.Request.Workload.Name}, Diagnostic: capture.ContextDiagnosticName, RequestedSeconds: in.Retention.RequestedSeconds, Sharing: &capture.ContextSharing{Recipients: recipient(in.Executor.Issuer), NotAfter: notAfter}},
@@ -139,7 +139,7 @@ func qualifyCaptureShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool,
 		t.Helper()
 		pool := poolFor("context_progress_read_runtime", "synthetic-context-progress-read")
 		defer pool.Close()
-		r, err := postgres.NewContextProgressReads(ctx, pool, s.a.RootID, s.recovery.guard)
+		r, err := postgres.NewContextProgressReads(ctx, pool, s.a.RootID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -194,7 +194,7 @@ func qualifyCaptureShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool,
 		if again := shares(t, s.a.RootID); len(again) != 1 || again[0].ID != shareID {
 			t.Fatal("publication replay created another share", again)
 		}
-		store, err := postgres.NewEvidenceShares(ctx, hubPool, s.a.RootID, s.recovery.guard)
+		store, err := postgres.NewEvidenceShares(ctx, hubPool, s.a.RootID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -202,15 +202,15 @@ func qualifyCaptureShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool,
 			t.Fatal("hub grants cannot see the materialized share", exists, err)
 		}
 		// The materialized row is an ordinary share: its recipient reads the case.
-		routes, err := postgres.NewContextCaseReads(ctx, hubPool, s.a.RootID, s.recovery.guard)
+		routes, err := postgres.NewContextCaseReads(ctx, hubPool, s.a.RootID)
 		if err != nil {
 			t.Fatal(err)
 		}
-		processing, err := postgres.NewProcessingReads(ctx, hubPool, s.a.RootID, s.recovery.guard)
+		processing, err := postgres.NewProcessingReads(ctx, hubPool, s.a.RootID, s.recovery.installation)
 		if err != nil {
 			t.Fatal(err)
 		}
-		cases := catalogapp.ContextCaseService{RootID: s.a.RootID, InstallationID: s.recovery.installation, Routes: routes, Permissions: s.p, Catalog: f.reader, Retention: privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, Recovery: s.recovery.reader, Processing: processing, Shares: store, Now: time.Now}
+		cases := catalogapp.ContextCaseService{RootID: s.a.RootID, InstallationID: s.recovery.installation, Routes: routes, Permissions: s.p, Catalog: f.reader, Retention: privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, Processing: processing, Shares: store, Now: time.Now}
 		b := s.batch
 		b.Initial = nil
 		now := time.Now().UTC().Truncate(time.Microsecond)

@@ -56,7 +56,7 @@ func qualifyAPIExecutionPreparationBoundaries(t *testing.T, ctx context.Context,
 			}
 			sharedPools, role := compiledOrdinaryHubPools(t, ctx, admin, poolFor)
 			sharedPool := sharedPools.ordinary
-			executionSQL, err := postgres.NewAPIContextExecutions(ctx, sharedPool, s.a.RootID, postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard})
+			executionSQL, err := postgres.NewAPIContextExecutions(ctx, sharedPool, s.a.RootID, s.recovery.installation, s.retention.guard)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -80,11 +80,7 @@ func qualifyAPIExecutionPreparationBoundaries(t *testing.T, ctx context.Context,
 				}
 				i := s.a.Eligibility.VerifiedIdentity
 				i.VerifiedAt, i.ValidUntil = n, n.Add(window)
-				recovery, err := s.recovery.reader.RecoveryState(ctx)
-				if err != nil {
-					t.Fatal(err)
-				}
-				work, err := read.ReadAPIContextWork(ctx, accepted.CaptureID, i, recovery)
+				work, err := read.ReadAPIContextWork(ctx, accepted.CaptureID, i)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -109,13 +105,13 @@ func qualifyAPIExecutionPreparationBoundaries(t *testing.T, ctx context.Context,
 				if err != nil {
 					t.Fatal(err)
 				}
-				process.InstallationID, process.ClusterID, process.IssuerEpoch = recovery.InstallationID, input.Target.Target().ClusterID, recovery.IssuerEpoch
+				process.InstallationID, process.ClusterID, process.IssuerEpoch = s.recovery.installation, input.Target.Target().ClusterID, s.recovery.observation.issuer
 				observation := value.APIProcessObservation{Binding: process, CheckedAt: n, ValidUntil: n.Add(window)}
 				until := n.Add(window)
-				for _, d := range []time.Time{eligible.ValidUntil, plan.ValidUntil, recovery.FreshUntil, observation.ValidUntil, accepted.Expectation.Registration.WriteUntil} {
+				for _, d := range []time.Time{eligible.ValidUntil, plan.ValidUntil, observation.ValidUntil, accepted.Expectation.Registration.WriteUntil} {
 					until = identity.Earlier(until, d)
 				}
-				c := executionapp.APIExecutionCheck{Work: work, Plan: plan, Eligibility: eligible, Recovery: recovery, Process: observation, CheckedAt: n, ValidUntil: until.Truncate(time.Microsecond)}
+				c := executionapp.APIExecutionCheck{Work: work, Plan: plan, Eligibility: eligible, Process: observation, CheckedAt: n, ValidUntil: until.Truncate(time.Microsecond)}
 				if !c.Valid(time.Now()) {
 					t.Fatal("invalid current synthetic execution facts")
 				}
@@ -372,15 +368,12 @@ func (f *apiPreparationFacts) Resolve(ctx context.Context, in privacy.Input) (pr
 	}
 	return f.c.Plan.Input.Retention, ctx.Err()
 }
-func (f *apiPreparationFacts) RecoveryState(ctx context.Context) (artifact.RecoveryProof, error) {
-	return f.c.Recovery, ctx.Err()
-}
 func (f *apiPreparationFacts) ReadAPIProcess(ctx context.Context) (value.APIProcessObservation, error) {
 	return f.c.Process, ctx.Err()
 }
 
 func apiPreparationRunner(read, prepare *postgres.APIContextExecutions, facts *apiPreparationFacts, effects *apiPreparationNoEffects) executionapp.APIContextRunner {
-	return executionapp.APIContextRunner{Read: read, Prepare: prepare, Record: effects, Process: facts, Targets: facts, Eligibility: facts, Capabilities: facts, Retention: facts, Recovery: facts, Output: effects, Collector: effects, Now: time.Now}
+	return executionapp.APIContextRunner{Read: read, Prepare: prepare, Record: effects, Process: facts, Targets: facts, Eligibility: facts, Capabilities: facts, Retention: facts, Output: effects, Collector: effects, Now: time.Now}
 }
 
 type apiPreparationNoEffects struct{ calls int }
@@ -397,7 +390,7 @@ func (f *apiPreparationNoEffects) RecordAPIOutcome(context.Context, value.APIExe
 	f.calls++
 	return value.APIExecution{}, value.ErrUnavailable
 }
-func (f *apiPreparationNoEffects) RecordAPIStoredCompletion(context.Context, value.APIExecution, artifact.ContextWriterCompletion, value.APIProcessObservation, artifact.RecoveryProof) (value.APIExecution, error) {
+func (f *apiPreparationNoEffects) RecordAPIStoredCompletion(context.Context, value.APIExecution, artifact.ContextWriterCompletion, value.APIProcessObservation) (value.APIExecution, error) {
 	f.calls++
 	return value.APIExecution{}, value.ErrUnavailable
 }

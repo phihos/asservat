@@ -17,7 +17,6 @@ import (
 	"asservat.local/asservat/internal/adapters/kms"
 	"asservat.local/asservat/internal/adapters/mounts"
 	"asservat.local/asservat/internal/adapters/mtls"
-	"asservat.local/asservat/internal/adapters/postgres"
 	"asservat.local/asservat/internal/adapters/providerconfig"
 	auditapp "asservat.local/asservat/internal/application/audit"
 	"asservat.local/asservat/internal/contracts"
@@ -180,16 +179,4 @@ func readPKIRoots(ctx context.Context, endpoint string, providerRoots [][]byte, 
 		return nil, &fixedStepError{"pki/" + mount, err}
 	}
 	return roots, nil
-}
-
-// recoveryProof bounds provider logins and renewals by the current recovery
-// observation; the recovery fence is the only remaining startup proof.
-func recoveryProof(recovery *postgres.RecoveryReader) func(context.Context) (time.Time, error) {
-	return func(ctx context.Context) (time.Time, error) {
-		r, err := recovery.RecoveryState(ctx)
-		if err != nil || !r.Valid(time.Now()) {
-			return time.Time{}, mounts.ErrUnavailable
-		}
-		return r.FreshUntil, nil
-	}
 }

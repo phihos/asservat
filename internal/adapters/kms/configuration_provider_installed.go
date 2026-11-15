@@ -11,11 +11,8 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/adapters/mounts"
-	"asservat.local/asservat/internal/adapters/postgres"
 	fleetapp "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/contracts"
-	"asservat.local/asservat/internal/domain/fleet"
-	"asservat.local/asservat/internal/domain/identity"
 )
 
 // ConfigurationProviderInput is the hub-worker's Helm-rendered OpenBao
@@ -37,14 +34,12 @@ type ConfigurationProviderInput struct {
 func (in ConfigurationProviderInput) cleanup() bool { return in.Roles.CleanupWrap != "" }
 
 // InstalledConfigurationProviderEffects owns the worker's fixed finite
-// provider credentials. Every login and renewal is bounded by a current SQL
-// recovery observation; the audit object-store credential is the mounted
-// Secret file. Files and the SQL pool remain owned by the enclosing worker
+// provider credentials. Every login and renewal is bounded by its caller
+// deadline; the audit object-store credential is the mounted Secret file. Files and the SQL pool remain owned by the enclosing worker
 // until CloseAndJoin returns after actual local completion.
 type InstalledConfigurationProviderEffects struct {
 	input           ConfigurationProviderInput
 	files           *os.Root
-	recovery        *postgres.RecoveryReader
 	effects         *configurationProviderEffects
 	admission       *fleetapp.WorkerRuntimeAdmission
 	root            context.Context
@@ -56,15 +51,15 @@ type InstalledConfigurationProviderEffects struct {
 	closeDone       chan struct{}
 }
 
-func NewInstalledConfigurationProviderEffects(ctx context.Context, input ConfigurationProviderInput, files *os.Root, recovery *postgres.RecoveryReader, admission *fleetapp.WorkerRuntimeAdmission) (*InstalledConfigurationProviderEffects, error) {
-	if ctx == nil || ctx.Err() != nil || files == nil || recovery == nil || admission == nil || !keyName.MatchString(input.AuditMount) || !keyName.MatchString(input.AuditKey) ||
+func NewInstalledConfigurationProviderEffects(ctx context.Context, input ConfigurationProviderInput, files *os.Root, admission *fleetapp.WorkerRuntimeAdmission) (*InstalledConfigurationProviderEffects, error) {
+	if ctx == nil || ctx.Err() != nil || files == nil || admission == nil || !keyName.MatchString(input.AuditMount) || !keyName.MatchString(input.AuditKey) ||
 		input.TokenFile == "" || input.AuditCredentialFile == "" || input.Roles.AuditWrap == "" || input.Roles.AuditUnwrap == "" ||
 		input.cleanup() && (input.Roles.CleanupOpen == "" || input.Roles.CleanupVerify == "" || input.Roles.CleanupSign == "" || input.ContextDeletionSigning == (contracts.OwnerPublicTransit{})) {
 		return nil, ErrKeyService
 	}
 	input.Roots = slices.Clone(input.Roots)
 	root, cancel := context.WithCancel(ctx)
-	s := &InstalledConfigurationProviderEffects{input: input, files: files, recovery: recovery, admission: admission, root: root, cancel: cancel, closeDone: make(chan struct{})}
+	s := &InstalledConfigurationProviderEffects{input: input, files: files, admission: admission, root: root, cancel: cancel, closeDone: make(chan struct{})}
 	base := &http.Client{Transport: &http.Transport{}, Timeout: 5 * time.Second}
 	var err error
 	s.effects, err = newConfigurationProviderEffects(root, input, s.projectedJWT, s.current, base, time.Now)
@@ -164,16 +159,6 @@ func (s *InstalledConfigurationProviderEffects) projectedJWT(ctx context.Context
 	return b, nil
 }
 
-// recoveryCurrent is one committed read-only recovery observation. No SQL
-// lock is retained across provider HTTP or credential effects.
-func (s *InstalledConfigurationProviderEffects) recoveryCurrent(ctx context.Context) (fleet.RecoveryState, error) {
-	r, err := s.recovery.RecoveryState(ctx)
-	if err != nil || !r.Valid(time.Now()) || r.InstallationID != s.input.InstallationID {
-		return fleet.RecoveryState{}, ErrKeyService
-	}
-	return r, nil
-}
-
 // auditCredential reads the mounted audit object-store credential.
 func (s *InstalledConfigurationProviderEffects) auditCredential(ctx context.Context) (contracts.OwnerStorageCredential, error) {
 	b, err := mounts.Read(ctx, s.files, s.input.AuditCredentialFile, 32<<10)
@@ -188,26 +173,18 @@ func (s *InstalledConfigurationProviderEffects) auditCredential(ctx context.Cont
 	return c, nil
 }
 
-// currentMaterial brackets the mounted credential read with two recovery
-// observations of the same revision; the earlier freshness bounds its use.
+// currentMaterial reads the mounted credential; the caller deadline bounds its use.
 func (s *InstalledConfigurationProviderEffects) currentMaterial(ctx context.Context) (contracts.OwnerStorageCredential, time.Time, error) {
 	var zero contracts.OwnerStorageCredential
 	if s == nil || ctx == nil || ctx.Err() != nil || s.root.Err() != nil {
 		return zero, time.Time{}, ErrKeyService
 	}
-	first, err := s.recoveryCurrent(ctx)
-	if err != nil {
-		return zero, time.Time{}, err
+	until, ok := ctx.Deadline()
+	if !ok {
+		return zero, time.Time{}, ErrKeyService
 	}
-	call, end := context.WithDeadline(ctx, first.FreshUntil)
-	defer end()
-	credential, err := s.auditCredential(call)
-	if err != nil {
-		return zero, time.Time{}, err
-	}
-	last, err := s.recoveryCurrent(call)
-	until := identity.Earlier(first.FreshUntil, last.FreshUntil)
-	if err != nil || !configurationProviderSameRecovery(first, last, time.Now()) || call.Err() != nil || !time.Now().Before(until) {
+	credential, err := s.auditCredential(ctx)
+	if err != nil || ctx.Err() != nil || !time.Now().Before(until) {
 		return zero, time.Time{}, ErrKeyService
 	}
 	return credential, until, nil
@@ -217,8 +194,7 @@ func (s *InstalledConfigurationProviderEffects) current(ctx context.Context) (ti
 	return until, err
 }
 
-// ReadAuditCredentials reads the mounted audit credential under a current
-// recovery observation.
+// ReadAuditCredentials reads the mounted audit credential.
 func (s *InstalledConfigurationProviderEffects) ReadAuditCredentials(ctx context.Context) (contracts.OwnerStorageCredential, time.Time, error) {
 	var zero contracts.OwnerStorageCredential
 	call, end, err := s.borrow(ctx)
@@ -230,8 +206,8 @@ func (s *InstalledConfigurationProviderEffects) ReadAuditCredentials(ctx context
 }
 
 // Start beside the independent fleet source loop, never before it as a blocking
-// prerequisite: a missing current recovery observation keeps this pair unusable
-// while fleet reconciliation can still refresh its own original accepted source.
+// prerequisite: fleet reconciliation refreshes its own original accepted source
+// independently.
 func (s *InstalledConfigurationProviderEffects) Run(ctx context.Context) error {
 	if s == nil || ctx == nil {
 		return ErrKeyService

@@ -5,22 +5,16 @@ import (
 	"context"
 	"testing"
 
-	"asservat.local/asservat/internal/adapters/postgres"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// Only completed protected recovery activation is synthesized. The ordinary
-// read role and final effect checks must use the product adapters.
+// recoveryEffectFixture seeds the installation's trust row and fleet observation.
 type recoveryEffectFixture struct {
 	installation string
 	observation  syntheticFleetBinding
-	reader       *postgres.RecoveryReader
-	guard        *postgres.RecoveryTransactionGuard
 }
 
-func newRecoveryEffectFixtures(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool) (func(*testing.T, string) *recoveryEffectFixture, func()) {
-	pool := poolFor("peer_read_runtime", "synthetic-peer-read")
-	t.Cleanup(pool.Close)
+func newRecoveryEffectFixtures(t *testing.T, ctx context.Context, admin *pgxpool.Pool) func(*testing.T, string) *recoveryEffectFixture {
 	return func(t *testing.T, root string) *recoveryEffectFixture {
 		t.Helper()
 		f := &recoveryEffectFixture{installation: custodyID()}
@@ -32,14 +26,16 @@ func newRecoveryEffectFixtures(t *testing.T, ctx context.Context, admin *pgxpool
 		if err != nil {
 			t.Fatal(err)
 		}
-		f.reader, err = postgres.NewRecoveryReader(ctx, pool, f.installation)
-		if err != nil {
-			t.Fatal(err)
-		}
-		f.guard, err = postgres.NewRecoveryTransactionGuard(root, f.installation)
-		if err != nil {
-			t.Fatal(err)
-		}
 		return f
-	}, pool.Reset
+	}
+}
+
+// fixtureIssuerEpoch reads the seeded installation's issuer epoch.
+func fixtureIssuerEpoch(t *testing.T, ctx context.Context, admin *pgxpool.Pool, installation string) string {
+	t.Helper()
+	var epoch string
+	if e := admin.QueryRow(ctx, "SELECT issuer_epoch::text FROM fleet_trust WHERE installation_id=$1", installation).Scan(&epoch); e != nil {
+		t.Fatal(e)
+	}
+	return epoch
 }

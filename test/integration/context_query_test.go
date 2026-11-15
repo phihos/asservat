@@ -121,7 +121,7 @@ func qualifyContextQueries(t *testing.T, f *queryLedgerFixture) {
 		principal := s.a.Plan.Input.Executor
 		backing := &querySQLBacking{current: f.current}
 		worker := &querySQLWorker{}
-		ledger, err := postgres.NewContextQueries(ctx, runtime, rootID, postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard}, backing, worker)
+		ledger, err := postgres.NewContextQueries(ctx, runtime, rootID, s.recovery.installation, s.retention.guard, backing, worker)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -129,11 +129,11 @@ func qualifyContextQueries(t *testing.T, f *queryLedgerFixture) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		processing, err := postgres.NewProcessingReads(ctx, catalogPool, rootID, s.recovery.guard)
+		processing, err := postgres.NewProcessingReads(ctx, catalogPool, rootID, s.recovery.installation)
 		if err != nil {
 			t.Fatal(err)
 		}
-		environment := authapp.CurrentProjectionEnvironment{RootID: rootID, InstallationID: f.base.input.InstallationID, Policies: f.policies, Recovery: s.recovery.reader, Processing: processing, Now: time.Now}
+		environment := authapp.CurrentProjectionEnvironment{RootID: rootID, InstallationID: f.base.input.InstallationID, Policies: f.policies, Processing: processing, Now: time.Now}
 		authorityGate := authapp.ContextProjectionAuthority{RootID: rootID, Permissions: s.p, Catalog: catalog, Retention: privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, Environment: environment, Now: time.Now}
 		scope := value.ContextProjectionScope{RootID: rootID, CaseID: e.CaseID, CaptureID: e.CaptureUID, ArtifactID: e.Registration.Location.ArtifactID, ClusterID: e.Registration.Location.ClusterID, NamespaceUID: e.NamespaceUID, WorkloadUID: e.WorkloadUID, PodUID: e.PodUID, Version: evidence.ContextCopiesDigest(published.Copies), SourceProjectionDigest: value.ContextSourceProjectionDigest(), SourceFormat: artifact.ContextFormat, DisplayVersion: value.ContextDisplayVersion, Selection: value.LineSelection{LineStart: 1, MaxLines: 14}, Principal: principal}
 		profileSummary := e.NativeType == artifact.PprofArtifact
@@ -170,15 +170,15 @@ func qualifyContextQueries(t *testing.T, f *queryLedgerFixture) {
 			t.Fatal("actual accepted query plan", err)
 		}
 		policy := f.audit.Normal.Policy
-		journal, err := postgres.NewHealthyOperationJournal(ctx, journalPool, policy, s.recovery.guard)
+		journal, err := postgres.NewHealthyOperationJournal(ctx, journalPool, policy)
 		if err != nil {
 			t.Fatal(err)
 		}
-		ack, err := postgres.NewOperationAcknowledgements(ctx, ackPool, plan.RootID, "normal", s.recovery.guard)
+		ack, err := postgres.NewOperationAcknowledgements(ctx, ackPool, plan.RootID, "normal", s.recovery.installation)
 		if err != nil {
 			t.Fatal(err)
 		}
-		completions, err := postgres.NewOperationLifecycles(ctx, journalPool, plan.RootID, "normal", s.recovery.guard)
+		completions, err := postgres.NewOperationLifecycles(ctx, journalPool, plan.RootID, "normal", s.recovery.installation)
 		if err != nil {
 			t.Fatal(err)
 		}

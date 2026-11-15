@@ -17,7 +17,7 @@ var ErrKeyDenied = errors.New("key operation denied")
 var ErrKeyUnavailable = errors.New("key operation unavailable")
 
 type KeyOperationAuthorizer interface {
-	// Resolve must consult current accepted authority, recovery, original
+	// Resolve must consult current accepted authority, original
 	// operation deadlines and exact artifact/session/signature scope. It must
 	// never turn a role, certificate or caller-supplied UUID into a grant.
 	Resolve(context.Context, value.KeyPeer, value.KeyRequestInfo) (value.KeyOperationPermit, error)

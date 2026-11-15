@@ -47,7 +47,7 @@ func (s *AccessGrants) RawQueryRequest(ctx context.Context, p identity.Principal
 	out.IdempotencyKey = key
 	return out, nil
 }
-func (s *AccessGrants) requestRawQueryGrant(ctx context.Context, in app.StoredGrantRequest, recovery artifact.RecoveryProof) (value.Grant, bool, error) {
+func (s *AccessGrants) requestRawQueryGrant(ctx context.Context, in app.StoredGrantRequest) (value.Grant, bool, error) {
 	var out value.Grant
 	g := in.Grant
 	if !g.RequestedAt.IsZero() || !g.ReviewUntil.IsZero() || g.Spent != (value.GrantSpend{}) || !app.RawQueryScopeMatches(g) {
@@ -74,10 +74,6 @@ func (s *AccessGrants) requestRawQueryGrant(ctx context.Context, in app.StoredGr
 	replay := false
 	err = s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
 		replay = false
-		trust, err := s.recovery.lock(ctx, q, s.root, recovery)
-		if err != nil {
-			return err
-		}
 		row, err := q.ReadRawQueryByKey(ctx, rawQueryKey(s.root, g.Requester, in.IdempotencyKey))
 		if errors.Is(err, pgx.ErrNoRows) {
 			if !probe.Valid() {
@@ -99,9 +95,6 @@ func (s *AccessGrants) requestRawQueryGrant(ctx context.Context, in app.StoredGr
 		}
 		out, err = s.grant(row)
 		if err != nil {
-			return err
-		}
-		if err = s.recovery.check(ctx, q, trust, s.root, recovery); err != nil {
 			return err
 		}
 		return ctx.Err()

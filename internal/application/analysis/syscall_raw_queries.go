@@ -1,14 +1,15 @@
 package analysis
 
 import (
-	identities "asservat.local/asservat/internal/application/identity"
-	value "asservat.local/asservat/internal/domain/analysis"
-	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/identity"
 	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
+
+	identities "asservat.local/asservat/internal/application/identity"
+	value "asservat.local/asservat/internal/domain/analysis"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/identity"
 )
 
 type rawSyscallApprovalRefusal struct{ cause error }
@@ -42,8 +43,8 @@ func (s RawSyscallReads) Begin(ctx context.Context, current identities.CurrentId
 	if !r.Valid() || s.Routes == nil {
 		return nil, value.ErrInvalid
 	}
-	return s.Service.begin(ctx, current, invocation, "syscall_query", ContextQueryInput{RawSyscalls: r}, func(ctx context.Context, i identity.Identity, recovery artifact.RecoveryProof) (value.ContextProjectionCandidate, error) {
-		c, e := s.Routes.ResolveSyscallProjectionRoute(ctx, r.CaseID, r.ArtifactID, i, recovery)
+	return s.Service.begin(ctx, current, invocation, "syscall_query", ContextQueryInput{RawSyscalls: r}, func(ctx context.Context, i identity.Identity) (value.ContextProjectionCandidate, error) {
+		c, e := s.Routes.ResolveSyscallProjectionRoute(ctx, r.CaseID, r.ArtifactID, i)
 		if e != nil {
 			return c, e
 		}

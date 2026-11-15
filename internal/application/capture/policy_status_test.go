@@ -31,9 +31,9 @@ func TestPolicyStatusSharedBudgetsRequireCurrentViewerAfterCreatorDeparture(t *t
 	f.status = value.PolicyStatus{PolicyUID: a.PolicyUID, ActiveID: result.AcceptanceID, Authority: a, NotAfter: a.NotAfter, ExecutionsSpent: 5, MaxExecutions: a.Limits.MaxExecutions, CollectedBytesSpent: 16384, MaxCollectedBytes: a.Limits.MaxBytes, ObservedBytesSpent: 0, MaxObservedBytes: a.Limits.MaxObservedBytes}
 	// The creator has left; another current team maintainer reads the same pool.
 	f.author.Principal.Subject = "current-maintainer"
-	service := PolicyStatusService{RootID: activationRoot, InstallationID: activationInstallation, Documents: f, Ledger: f, Permissions: f, Recovery: f, Now: time.Now}
+	service := PolicyStatusService{RootID: activationRoot, InstallationID: activationInstallation, Documents: f, Ledger: f, Permissions: f, Now: time.Now}
 	status, until, err := service.Get(context.Background(), f, "restarts")
-	if err != nil || status.CollectedBytesSpent != 16384 || status.ExecutionsSpent != 5 || status.MaxCollectedBytes != a.Limits.MaxBytes || status.ObservedBytesSpent != 0 || until.After(f.now.Add(5*time.Second)) {
+	if err != nil || status.CollectedBytesSpent != 16384 || status.ExecutionsSpent != 5 || status.MaxCollectedBytes != a.Limits.MaxBytes || status.ObservedBytesSpent != 0 || until.After(f.now.Add(30*time.Second)) {
 		t.Fatal("current manager shared status", status, until, err)
 	}
 	f.author.Groups = []string{"unrelated"}

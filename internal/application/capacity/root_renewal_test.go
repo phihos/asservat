@@ -9,7 +9,6 @@ import (
 
 func currentRootObservation(o RootBackingObservation, now time.Time) RootBackingObservation {
 	o.ObservedAt, o.FreshUntil = now, now.Add(5*time.Second)
-	o.Recovery.ObservedAt, o.Recovery.FreshUntil = o.ObservedAt, o.FreshUntil
 	o.Processing.ObservedAt, o.Processing.FreshUntil = o.ObservedAt, o.FreshUntil
 	return o
 }

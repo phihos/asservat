@@ -8,13 +8,12 @@ import (
 	app "asservat.local/asservat/internal/application/analysis"
 	identities "asservat.local/asservat/internal/application/identity"
 	query "asservat.local/asservat/internal/domain/analysis"
-	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/identity"
 )
 
 type logsReplayNoEffects struct{ replayCompositionNoEffects }
 
-func (p *logsReplayNoEffects) ResolveLogProjectionRoute(context.Context, string, string, identity.Identity, artifact.RecoveryProof) (query.ContextProjectionCandidate, error) {
+func (p *logsReplayNoEffects) ResolveLogProjectionRoute(context.Context, string, string, identity.Identity) (query.ContextProjectionCandidate, error) {
 	p.calls = append(p.calls, "logs-route")
 	return query.ContextProjectionCandidate{}, query.ErrUnavailable
 }
@@ -22,7 +21,7 @@ func logsQueryReplayRequest(scope query.ContextProjectionScope, key string) quer
 	return query.RawLogQueryRequest{CaseID: scope.CaseID, ArtifactID: scope.ArtifactID, GrantID: scope.RawGrantID, IdempotencyKey: key, Selection: scope.Logs}
 }
 
-func qualifyLogsQueryReplayApplication(t *testing.T, ctx context.Context, q query.ContextQuery, r query.ContextQueryRequest, input query.RawLogQueryRequest, caller identities.CurrentIdentity, ledger app.ContextQueryLedger, authority app.CurrentContextProjectionAuthority, recovery app.ContextProjectionRecovery) {
+func qualifyLogsQueryReplayApplication(t *testing.T, ctx context.Context, q query.ContextQuery, r query.ContextQueryRequest, input query.RawLogQueryRequest, caller identities.CurrentIdentity, ledger app.ContextQueryLedger, authority app.CurrentContextProjectionAuthority) {
 	t.Helper()
 	if input.IdempotencyKey != q.InvocationKey.Key || app.RawLogQueryRequestDigest(input) != q.InvocationKey.RequestDigest {
 		t.Fatal("replay fixture does not bind original normalized request")
@@ -35,7 +34,7 @@ func qualifyLogsQueryReplayApplication(t *testing.T, ctx context.Context, q quer
 			return r.OwnerID
 		}
 		return custodyID()
-	}}, Recovery: recovery, PacketRoutes: unused, PacketCompiler: unused, Plans: unused, Workers: unused}
+	}}, PacketRoutes: unused, PacketCompiler: unused, Plans: unused, Workers: unused}
 	service.LogRoutes = unused
 	reads, ok := service.RawLogQueries()
 	if !ok {

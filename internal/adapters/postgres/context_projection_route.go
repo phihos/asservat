@@ -22,11 +22,11 @@ var (
 // ResolveContextProjection uses only the bounded private case locator. It does
 // not read source content or provide an authorization decision; C-03 must check
 // current target eligibility before resolving the protected publication facts.
-func (s *ContextCaseReads) ResolveContextProjection(ctx context.Context, selection analysis.ContextExcerptSelection, caller identity.Identity, recovery artifact.RecoveryProof) (analysis.ContextProjectionCandidate, error) {
+func (s *ContextCaseReads) ResolveContextProjection(ctx context.Context, selection analysis.ContextExcerptSelection, caller identity.Identity) (analysis.ContextProjectionCandidate, error) {
 	if !selection.Valid() {
 		return analysis.ContextProjectionCandidate{}, analysis.ErrUnavailable
 	}
-	out, err := s.ResolveProjectionRoute(ctx, selection.CaseID, selection.ArtifactID, caller, recovery)
+	out, err := s.ResolveProjectionRoute(ctx, selection.CaseID, selection.ArtifactID, caller)
 	if err != nil {
 		return analysis.ContextProjectionCandidate{}, err
 	}
@@ -39,36 +39,36 @@ func (s *ContextCaseReads) ResolveContextProjection(ctx context.Context, selecti
 
 // ResolveProjectionRoute returns the routing facts of one case artifact
 // without a source or selection (ADR-282 reuses it for httpHeaders reads).
-func (s *ContextCaseReads) ResolveProjectionRoute(ctx context.Context, caseID, artifactID string, caller identity.Identity, recovery artifact.RecoveryProof) (analysis.ContextProjectionCandidate, error) {
-	return s.resolveProjectionRoute(ctx, caseID, artifactID, caller, recovery, "")
+func (s *ContextCaseReads) ResolveProjectionRoute(ctx context.Context, caseID, artifactID string, caller identity.Identity) (analysis.ContextProjectionCandidate, error) {
+	return s.resolveProjectionRoute(ctx, caseID, artifactID, caller, "")
 }
 
 // ResolveSyscallProjectionRoute selects a closed native discriminator from the
 // same bounded private locator read. The observation is never read authority;
 // C-03 independently resolves current rights and protected published facts.
-func (s *ContextCaseReads) ResolveSyscallProjectionRoute(ctx context.Context, caseID, artifactID string, caller identity.Identity, recovery artifact.RecoveryProof) (analysis.ContextProjectionCandidate, error) {
-	return s.resolveProjectionRoute(ctx, caseID, artifactID, caller, recovery, "syscalls")
+func (s *ContextCaseReads) ResolveSyscallProjectionRoute(ctx context.Context, caseID, artifactID string, caller identity.Identity) (analysis.ContextProjectionCandidate, error) {
+	return s.resolveProjectionRoute(ctx, caseID, artifactID, caller, "syscalls")
 }
 
 // ResolvePacketProjectionRoute reads the same bounded locator once, exposing
 // only the closed native discriminator. Current protected publication facts
 // and ordinary authority are checked independently by C-03.
-func (s *ContextCaseReads) ResolvePacketProjectionRoute(ctx context.Context, caseID, artifactID string, caller identity.Identity, recovery artifact.RecoveryProof) (analysis.ContextProjectionCandidate, error) {
-	return s.resolveProjectionRoute(ctx, caseID, artifactID, caller, recovery, "packets")
+func (s *ContextCaseReads) ResolvePacketProjectionRoute(ctx context.Context, caseID, artifactID string, caller identity.Identity) (analysis.ContextProjectionCandidate, error) {
+	return s.resolveProjectionRoute(ctx, caseID, artifactID, caller, "packets")
 }
 
 // ResolveLogProjectionRoute exposes only the exact logs discriminator from
 // the same bounded locator. Protected publication and current rights follow.
-func (s *ContextCaseReads) ResolveLogProjectionRoute(ctx context.Context, caseID, artifactID string, caller identity.Identity, recovery artifact.RecoveryProof) (analysis.ContextProjectionCandidate, error) {
-	return s.resolveProjectionRoute(ctx, caseID, artifactID, caller, recovery, "logs")
+func (s *ContextCaseReads) ResolveLogProjectionRoute(ctx context.Context, caseID, artifactID string, caller identity.Identity) (analysis.ContextProjectionCandidate, error) {
+	return s.resolveProjectionRoute(ctx, caseID, artifactID, caller, "logs")
 }
 
-func (s *ContextCaseReads) resolveProjectionRoute(ctx context.Context, caseID, artifactID string, caller identity.Identity, recovery artifact.RecoveryProof, family string) (analysis.ContextProjectionCandidate, error) {
+func (s *ContextCaseReads) resolveProjectionRoute(ctx context.Context, caseID, artifactID string, caller identity.Identity, family string) (analysis.ContextProjectionCandidate, error) {
 	var out analysis.ContextProjectionCandidate
 	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(caseID) || !authorization.UUID(artifactID) {
 		return out, analysis.ErrUnavailable
 	}
-	routes, err := s.ResolveContextCase(ctx, catalog.CaseRouteQuery{RootID: s.root, CaseID: caseID, Identity: caller, Recovery: recovery})
+	routes, err := s.ResolveContextCase(ctx, catalog.CaseRouteQuery{RootID: s.root, CaseID: caseID, Identity: caller})
 	if err != nil || routes.CaseID != caseID || !routes.Valid(time.Now()) {
 		return out, analysis.ErrUnavailable
 	}

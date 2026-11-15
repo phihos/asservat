@@ -6,7 +6,6 @@ import (
 
 	identities "asservat.local/asservat/internal/application/identity"
 	value "asservat.local/asservat/internal/domain/analysis"
-	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/identity"
 )
 
@@ -15,12 +14,8 @@ type CurrentContextProjectionAuthority interface {
 	CheckProjectionCurrent(context.Context, identities.CurrentIdentity, value.ContextProjectionScope) (value.ContextProjectionAuthority, error)
 }
 
-type ContextProjectionRecovery interface {
-	RecoveryState(context.Context) (artifact.RecoveryProof, error)
-}
-
 type ContextProjectionRoutes interface {
-	ResolveContextProjection(context.Context, value.ContextExcerptSelection, identity.Identity, artifact.RecoveryProof) (value.ContextProjectionCandidate, error)
+	ResolveContextProjection(context.Context, value.ContextExcerptSelection, identity.Identity) (value.ContextProjectionCandidate, error)
 }
 
 type ContextQueryPlans interface {

@@ -54,9 +54,6 @@ func newActivationFixture(t *testing.T) *activationFixture {
 func (f *activationFixture) ResolveIdentity(context.Context) (identity.Identity, error) {
 	return f.author, nil
 }
-func (f *activationFixture) RecoveryState(context.Context) (artifact.RecoveryProof, error) {
-	return artifact.RecoveryProof{InstallationID: activationInstallation, IssuerEpoch: "88888888-8888-4888-8888-888888888888", Revision: identity.Revision{UID: "recovery", Generation: 1, Digest: artifact.Digest{6}}, ObservedAt: f.now, FreshUntil: f.now.Add(5 * time.Second)}, nil
-}
 func (f *activationFixture) ReadPolicy(context.Context, string, string) (value.PolicySource, []byte, error) {
 	spec := restartSpec()
 	spec["target"].(map[string]any)["cluster"] = activationCluster
@@ -123,7 +120,7 @@ func (f *activationFixture) AcceptPolicy(_ context.Context, in value.PolicyAdmis
 func (f *activationFixture) PublishPolicyAcceptances(context.Context) error { return nil }
 
 func (f *activationFixture) activation() PolicyActivation {
-	return PolicyActivation{RootID: activationRoot, InstallationID: activationInstallation, RecipeName: "builtin-pod-status-v1", RecipeDigest: testRecipe, Documents: f, Sources: f, Observer: f, Ledger: f, Permissions: f, Automation: f, Acceptor: f, Audit: f, Recovery: f, Now: time.Now}
+	return PolicyActivation{RootID: activationRoot, InstallationID: activationInstallation, RecipeName: "builtin-pod-status-v1", RecipeDigest: testRecipe, Documents: f, Sources: f, Observer: f, Ledger: f, Permissions: f, Automation: f, Acceptor: f, Audit: f, Now: time.Now}
 }
 
 func TestPolicyActivationAcceptsTheTeamScopeWithEnvelopeLimits(t *testing.T) {
@@ -197,7 +194,7 @@ func (f *activationFixture) DeactivatePolicy(_ context.Context, policy, acceptan
 }
 
 func (f *activationFixture) deactivation() PolicyDeactivation {
-	return PolicyDeactivation{RootID: activationRoot, InstallationID: activationInstallation, Documents: f, Ledger: f, Permissions: f, Recovery: f, Now: time.Now}
+	return PolicyDeactivation{RootID: activationRoot, InstallationID: activationInstallation, Documents: f, Ledger: f, Permissions: f, Now: time.Now}
 }
 
 func TestPolicyDeactivationIsIdempotentAndBlocksReactivationOfTheSameScope(t *testing.T) {

@@ -9,7 +9,7 @@ import (
 )
 
 // Notices are scheduling hints from the concrete fleet SQL observer. They do
-// not implement RecoveryReader, return a proof, or permit any effect. Keeping
+// not return a proof or permit any effect. Keeping
 // the complete public value detects same-revision mutation before blocked SQL.
 func sameWorkerFleetValue(a, b value.Administration) bool {
 	return a.InstallationID == b.InstallationID && a.IssuerEpoch == b.IssuerEpoch && a.Issuer == b.Issuer && a.Revision == b.Revision && a.Suspended == b.Suspended &&
@@ -79,7 +79,7 @@ func (s *WorkerRuntimeAdmission) invalidateFleetLocked() {
 }
 
 // InvalidateFleetNotice is called before the concrete negative SQL call, and
-// also on an unknown/failed observation. It never writes SQL or clears recovery.
+// also on an unknown/failed observation. It never writes SQL.
 func (s *WorkerRuntimeAdmission) InvalidateFleetNotice() {
 	if s == nil || s.self != s {
 		return
@@ -94,11 +94,10 @@ func (s *WorkerRuntimeAdmission) InvalidateFleetNotice() {
 type workerRuntimeLeaseKey struct{}
 
 // AwaitFleetObservation is solely for provider maintenance and audited work,
-// before selecting any recovery proof, provider permit or audit candidate. It
+// before selecting any provider permit or audit candidate. It
 // waits for one independent source read begun after FIFO admission. The total
 // scheduling wait (queue plus this wait) has a fixed original five-second end.
-// The successful hint only shortens the lease to that original source end;
-// the caller still performs exactly one actual RecoveryState selection.
+// The successful hint only shortens the lease to that original source end.
 func (p *WorkerRuntimeAdmissionLease) AwaitFleetObservation() error {
 	if p == nil || p.self != p || p.owner == nil {
 		return value.ErrUnavailable

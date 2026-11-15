@@ -113,8 +113,6 @@ type ContextQuery struct {
 	Scope                                             ContextProjectionScope
 	Plan                                              ContextQueryPlan
 	BaselinePlan                                      ContextQueryPlan `json:",omitzero"`
-	RecoveryIssuerEpoch                               string
-	RecoveryRevision                                  identity.Revision
 	CreatedAt, Deadline, WorkerUntil, CredentialUntil time.Time
 	ProviderUntil, CleanupUntil                       time.Time
 	Grant                                             ContextQueryGrant         `json:",omitzero"`
@@ -147,7 +145,7 @@ func (q ContextQuery) Valid() bool {
 	}
 
 	if !authorization.UUID(q.ID) || !authorization.UUID(q.OperationID) || !authorization.UUID(q.WorkerID) ||
-		!q.plansMatch() || !authorization.UUID(q.RecoveryIssuerEpoch) || !q.RecoveryRevision.Valid() || q.CreatedAt.IsZero() ||
+		!q.plansMatch() || q.CreatedAt.IsZero() ||
 		!q.Deadline.After(q.CreatedAt) || q.Deadline.After(q.CreatedAt.Add(q.Plan.Profile.Lifetime)) ||
 		q.Deadline.After(q.Plan.HardUntil) ||
 		(q.Scope.Comparison != (ProfileComparisonWindow{}) && q.Deadline.After(q.BaselinePlan.HardUntil)) {
@@ -170,7 +168,7 @@ func (q ContextQuery) Valid() bool {
 
 func NewContextQuery(id, operationID, workerID string, a ContextProjectionAuthority, p ContextQueryPlan, now time.Time, invocationKeys ...ContextQueryInvocationKey) (ContextQuery, error) {
 	q := ContextQuery{ID: id, OperationID: operationID, WorkerID: workerID, Scope: a.Scope, Plan: p,
-		Grant: a.Grant, RecoveryIssuerEpoch: a.Environment.Recovery.IssuerEpoch, RecoveryRevision: a.Environment.Recovery.Revision, CreatedAt: contextQueryTime(now)}
+		Grant: a.Grant, CreatedAt: contextQueryTime(now)}
 	if len(invocationKeys) > 1 {
 		return ContextQuery{}, ErrInvalid
 	}
@@ -241,8 +239,7 @@ func (q ContextQuery) plansMatch() bool {
 func (q ContextQuery) Current(a ContextProjectionAuthority, now time.Time) bool {
 	return q.Valid() && a.Valid(now) && q.Scope == a.Scope && q.Grant == a.Grant &&
 		(q.Scope.Comparison == (ProfileComparisonWindow{}) || q.BaselinePlan.InstallationID == a.Baseline.Environment.InstallationID && q.BaselinePlan.Profile.Path == a.Baseline.Environment.Path) && now.Before(q.Deadline) &&
-		q.Plan.InstallationID == a.Environment.InstallationID && q.Plan.Profile.Path == a.Environment.Path &&
-		q.RecoveryIssuerEpoch == a.Environment.Recovery.IssuerEpoch && q.RecoveryRevision == a.Environment.Recovery.Revision
+		q.Plan.InstallationID == a.Environment.InstallationID && q.Plan.Profile.Path == a.Environment.Path
 }
 
 type ContextQueryWorker struct {

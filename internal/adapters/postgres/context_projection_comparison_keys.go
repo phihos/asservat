@@ -107,7 +107,11 @@ func (s *ProjectionKeys) resolveComparisonKeyChild(ctx context.Context, peer val
 		if e != nil || count != 1 {
 			return auth.ErrKeyDenied
 		}
-		out = value.KeyOperationPermit{AuthorityID: child.ID, RecoveryEpoch: actual.Environment.Recovery.IssuerEpoch, Revision: uint64(b.Generation), Certificate: peer.Certificate, RequestDigest: r.RequestDigest, ObservedAt: now.Time, ValidUntil: identity.Earlier(now.Time.Add(5*time.Second), identity.Earlier(child.Until, peer.NotAfter))}
+		trust, _, e := currentTrust(ctx, tx, s.scope.InstallationID)
+		if e != nil {
+			return e
+		}
+		out = value.KeyOperationPermit{AuthorityID: child.ID, RecoveryEpoch: uid(trust.IssuerEpoch), Revision: uint64(b.Generation), Certificate: peer.Certificate, RequestDigest: r.RequestDigest, ObservedAt: now.Time, ValidUntil: identity.Earlier(now.Time.Add(5*time.Second), identity.Earlier(child.Until, peer.NotAfter))}
 		after, e := tx.CurrentTime(ctx)
 		if e != nil || !out.Valid(peer, r, after.Time) || !child.Valid(current, b, actual, after.Time) {
 			return auth.ErrKeyDenied

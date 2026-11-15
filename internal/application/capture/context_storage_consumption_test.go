@@ -9,7 +9,6 @@ import (
 	"time"
 
 	identities "asservat.local/asservat/internal/application/identity"
-	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/planning"
@@ -75,17 +74,6 @@ func (f consumptionRefreshFunc) DemandCapacityRefresh(ctx context.Context, targe
 	return f(ctx, target)
 }
 
-type consumptionRecovery struct {
-	*investigationFixture
-	until time.Time
-}
-
-func (r consumptionRecovery) RecoveryState(ctx context.Context) (artifact.RecoveryProof, error) {
-	out, err := r.investigationFixture.RecoveryState(ctx)
-	out.FreshUntil = r.until
-	return out, err
-}
-
 type consumptionTarget struct {
 	*investigationFixture
 	until time.Time
@@ -98,7 +86,7 @@ func (r consumptionTarget) ResolvePod(ctx context.Context, target targets.Reques
 }
 
 func TestContextStorageConsumptionRetainsEachAuthorityBound(t *testing.T) {
-	for _, bound := range []string{"identity", "recovery", "target", "eligibility", "eligibility-identity", "capability", "retention", "retention-proof"} {
+	for _, bound := range []string{"identity", "target", "eligibility", "eligibility-identity", "capability", "retention", "retention-proof"} {
 		t.Run(bound, func(t *testing.T) {
 			f := newInvestigationFixture()
 			p := f.preview(t)
@@ -109,8 +97,6 @@ func TestContextStorageConsumptionRetainsEachAuthorityBound(t *testing.T) {
 			switch bound {
 			case "identity":
 				source = &shortenedContinuationIdentity{source: source, until: until}
-			case "recovery":
-				f.svc.Recovery = consumptionRecovery{f, until}
 			case "target":
 				f.svc.Targets = consumptionTarget{f, until}
 			}
@@ -394,7 +380,7 @@ func TestContextStorageConsumptionTailRetainsCallerDeadline(t *testing.T) {
 
 func TestContextStorageConsumptionPreviewAndDiagnostic(t *testing.T) {
 	for _, mode := range []string{"preview", "diagnostic"} {
-		for _, initial := range []string{"live", "identity", "recovery"} {
+		for _, initial := range []string{"live", "identity"} {
 			t.Run(mode+"/"+initial, func(t *testing.T) {
 				f := newInvestigationFixture()
 				var advance atomic.Int64
@@ -404,8 +390,6 @@ func TestContextStorageConsumptionPreviewAndDiagnostic(t *testing.T) {
 				switch initial {
 				case "identity":
 					source = &shortenedContinuationIdentity{source: source, until: until}
-				case "recovery":
-					f.svc.Recovery = consumptionRecovery{f, until}
 				}
 				refresh := &countingRefresh{}
 				f.svc.Refresh = refresh

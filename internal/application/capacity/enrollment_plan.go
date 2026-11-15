@@ -85,8 +85,8 @@ func CompileEnrollmentPlan(source AcceptedCapacitySource, selected SelectedBudge
 
 func (p EnrollmentPlan) Digest() artifact.Digest { return p.digest }
 func (p EnrollmentPlan) AccountVersion() string  { return p.value.AccountVersion }
-func (p EnrollmentPlan) Matches(key WorkloadCapacityKey, installation string, source, digest artifact.Digest) bool {
-	return len(p.canonical) > 0 && len(p.canonical) <= CapacityEnrollmentPlanBytes && len(p.poolCanonical) > 0 && len(p.poolCanonical) <= ProtectedPoolPlanBytes && len(p.sourceCanonical) > 0 && len(p.sourceCanonical) <= CapacitySourceBytes && p.digest != (artifact.Digest{}) && p.digest == digest && p.value.SourceDigest == source && p.value.RootID == key.RootID && p.value.ClusterID == key.ClusterID && p.value.InstallationID == installation
+func (p EnrollmentPlan) Matches(key WorkloadCapacityKey, source, digest artifact.Digest) bool {
+	return len(p.canonical) > 0 && len(p.canonical) <= CapacityEnrollmentPlanBytes && len(p.poolCanonical) > 0 && len(p.poolCanonical) <= ProtectedPoolPlanBytes && len(p.sourceCanonical) > 0 && len(p.sourceCanonical) <= CapacitySourceBytes && p.digest != (artifact.Digest{}) && p.digest == digest && p.value.SourceDigest == source && p.value.RootID == key.RootID && p.value.ClusterID == key.ClusterID
 }
 
 // CanonicalValues returns copies for the purpose-fixed SQL RPC. The small plan

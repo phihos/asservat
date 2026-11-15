@@ -20,7 +20,7 @@ import (
 
 type logBridgeRoutes struct{ *bridgeFixture }
 
-func (f logBridgeRoutes) ResolveLogProjectionRoute(context.Context, string, string, identity.Identity, artifact.RecoveryProof) (value.ContextProjectionCandidate, error) {
+func (f logBridgeRoutes) ResolveLogProjectionRoute(context.Context, string, string, identity.Identity) (value.ContextProjectionCandidate, error) {
 	c := f.a.Scope.Candidate()
 	c.Logs = value.LogWindow{}
 	c.RawGrantID = ""

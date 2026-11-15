@@ -12,7 +12,7 @@ import (
 
 type rawPacketBridgeRoutes struct{ *bridgeFixture }
 
-func (r rawPacketBridgeRoutes) ResolvePacketProjectionRoute(context.Context, string, string, identity.Identity, artifact.RecoveryProof) (value.ContextProjectionCandidate, error) {
+func (r rawPacketBridgeRoutes) ResolvePacketProjectionRoute(context.Context, string, string, identity.Identity) (value.ContextProjectionCandidate, error) {
 	return r.a.Scope.Candidate(), nil
 }
 

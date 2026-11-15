@@ -150,19 +150,19 @@ func (s ContextInvestigation) recordingPlan(ctx context.Context, p value.Context
 // facts (capability, retention for the recorder's evidence type, storage,
 // processing coverage), then the recorder plan with acceptance nodeRecorder.
 // A plan this release cannot record falls back to the ADR-243 refusal.
-func (s ContextInvestigation) previewRecording(ctx context.Context, source identities.CurrentIdentity, intent value.ContextIntent, i identity.Identity, recovery artifact.RecoveryProof, target targets.PodResolution, created time.Time, storageWait *contextStorageWait) (RecorderPreviewResult, error) {
+func (s ContextInvestigation) previewRecording(ctx context.Context, source identities.CurrentIdentity, intent value.ContextIntent, i identity.Identity, target targets.PodResolution, created time.Time, storageWait *contextStorageWait) (RecorderPreviewResult, error) {
 	var zero RecorderPreviewResult
 	var f contextFacts
 	var err error
 	if storageWait == nil {
-		f, err = s.facts(ctx, source, i.Principal, intent, target, created, identity.Earlier(i.ValidUntil, recovery.FreshUntil))
+		f, err = s.facts(ctx, source, i.Principal, intent, target, created, i.ValidUntil)
 	} else {
 		f, err = s.factsWithStorageWait(ctx, source, i.Principal, intent, target, created, storageWait)
 	}
 	if err != nil {
 		return zero, previewFailure("facts", err)
 	}
-	p := value.ContextPreview{ID: s.NewID(), RootID: s.RootID, InstallationID: s.InstallationID, IssuerEpoch: recovery.IssuerEpoch, CaptureID: s.NewID(), CaseID: s.NewID(), OccurrenceID: s.NewID(), ArtifactID: s.NewID(), AttemptID: s.NewID(), Actor: i.Principal, Intent: intent, Target: target.Request, Pin: target.Pin, Storage: f.storage.Selection, Retention: retentionReview(f.retention), Audience: slices.Clone(f.eligibility.DefaultAudience), CreatedAt: created, Deadline: created.Add(s.Lifetime)}
+	p := value.ContextPreview{ID: s.NewID(), RootID: s.RootID, InstallationID: s.InstallationID, CaptureID: s.NewID(), CaseID: s.NewID(), OccurrenceID: s.NewID(), ArtifactID: s.NewID(), AttemptID: s.NewID(), Actor: i.Principal, Intent: intent, Target: target.Request, Pin: target.Pin, Storage: f.storage.Selection, Retention: retentionReview(f.retention), Audience: slices.Clone(f.eligibility.DefaultAudience), CreatedAt: created, Deadline: created.Add(s.Lifetime)}
 	p.Intent.Composition = intent.Composition.Clone()
 	p.ExecutionClass = target.ExecutionClass
 	if intent.RepeatedFrom != nil {
@@ -211,7 +211,7 @@ func (s ContextInvestigation) previewRecording(ctx context.Context, source ident
 		return zero, errRecordingNotAcceptable
 	}
 	processingStarted := time.Now()
-	coverage, err := s.processingCoverage(ctx, p, f, recovery, i.ValidUntil)
+	coverage, err := s.processingCoverage(ctx, p, f, i.ValidUntil)
 	auditapp.MarkStep(ctx, "p-processing", processingStarted)
 	if err != nil {
 		return zero, previewFailure("processing", err)
@@ -230,7 +230,7 @@ func (s ContextInvestigation) previewRecording(ctx context.Context, source ident
 	if !ValidContextPreview(p) || !p.Current(s.Now()) {
 		return zero, previewFailure("blueprint", value.ErrInvalid)
 	}
-	if _, err = s.currentIdentity(ctx, source, i.Principal, i.ValidUntil); err != nil || !s.factsCurrent(f, s.Now()) || !coverage.Current(s.Now()) || !recovery.Valid(s.Now()) {
+	if _, err = s.currentIdentity(ctx, source, i.Principal, i.ValidUntil); err != nil || !s.factsCurrent(f, s.Now()) || !coverage.Current(s.Now()) {
 		return zero, previewFailure("before-store/current", value.ErrChanged)
 	}
 	mark = time.Now()
@@ -240,10 +240,10 @@ func (s ContextInvestigation) previewRecording(ctx context.Context, source ident
 		return zero, previewFailure("store", err)
 	}
 	current := s.Eligibility.ContextEligibilityCurrent(ctx, source, target.Target())
-	if !current.Eligible || current.Target != target.Target() || current.Principal != i.Principal || !current.VerifiedIdentity.Valid(s.Now()) || !i.Valid(s.Now()) || !slices.Equal(current.DefaultAudience, p.Audience) || !s.Now().Before(current.ValidUntil) || !s.factsCurrent(f, s.Now()) || !coverage.Current(s.Now()) || !recovery.Valid(s.Now()) || ctx.Err() != nil || s.Now().Before(created) {
+	if !current.Eligible || current.Target != target.Target() || current.Principal != i.Principal || !current.VerifiedIdentity.Valid(s.Now()) || !i.Valid(s.Now()) || !slices.Equal(current.DefaultAudience, p.Audience) || !s.Now().Before(current.ValidUntil) || !s.factsCurrent(f, s.Now()) || !coverage.Current(s.Now()) || ctx.Err() != nil || s.Now().Before(created) {
 		return zero, previewFailure("after-store/current", value.ErrChanged)
 	}
-	until := identity.Earlier(i.ValidUntil, recovery.FreshUntil)
+	until := i.ValidUntil
 	for _, bound := range []time.Time{current.ValidUntil, current.VerifiedIdentity.ValidUntil, f.eligibility.ValidUntil, f.eligibility.VerifiedIdentity.ValidUntil, assessment.ValidUntil, plan.ValidUntil, f.storage.Binding.FreshUntil, coverage.FreshUntil} {
 		until = identity.Earlier(until, bound)
 	}

@@ -13,7 +13,7 @@ import (
 )
 
 // GoProfileGuard checks the original admitted profile attempt, current rights,
-// recovery/deny/source/target state and retained conflicting-runtime slot. It
+// deny/source/target state and retained conflicting-runtime slot. It
 // cannot create a start, renew a permit, change parameters or refund spend.
 // There is deliberately no fixture/default implementation in production.
 type GoProfileGuard interface {

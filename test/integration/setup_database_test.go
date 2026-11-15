@@ -150,9 +150,9 @@ func TestCustodySetupDatabaseWithRealPostgres(t *testing.T) {
 	if e = postgres.SeedInstallation(ctx, config, a); e != nil {
 		t.Fatal("seed", e)
 	}
-	var blocked, suspended bool
-	if e = owned.QueryRow(ctx, "SELECT recovery_blocked,suspended FROM public.fleet_current_trust WHERE installation_id=$1", installation).Scan(&blocked, &suspended); e != nil || blocked || suspended {
-		t.Fatal("seeded trust not current", blocked, suspended, e)
+	var suspended bool
+	if e = owned.QueryRow(ctx, "SELECT suspended FROM public.fleet_current_trust WHERE installation_id=$1", installation).Scan(&suspended); e != nil || suspended {
+		t.Fatal("seeded trust not current", suspended, e)
 	}
 	if e = postgres.SeedInstallation(ctx, config, a); e != nil {
 		t.Fatal("seed rerun", e)

@@ -9,7 +9,6 @@ import (
 
 	access "asservat.local/asservat/internal/application/authorization"
 	identities "asservat.local/asservat/internal/application/identity"
-	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
@@ -23,10 +22,10 @@ import (
 // observation; the clock advances with real blocking work, never a frozen now.
 type repeatBudgetPorts struct {
 	*investigationFixture
-	now                                func() time.Time
-	mode                               string
-	readyAt                            atomic.Int64
-	demands, recoveries, recorderReads atomic.Int32
+	now                    func() time.Time
+	mode                   string
+	readyAt                atomic.Int64
+	demands, recorderReads atomic.Int32
 }
 
 func (p *repeatBudgetPorts) snapshot() *investigationFixture {
@@ -69,27 +68,6 @@ func (p *repeatBudgetPorts) PacketRecorder(context.Context, targets.PodResolutio
 func (p *repeatBudgetPorts) ResolvePacketRecorder(context.Context, targets.Request) (targets.PodResolution, error) {
 	return targets.PodResolution{}, targets.ErrUnsupported
 }
-func (p *repeatBudgetPorts) RecoveryState(ctx context.Context) (artifact.RecoveryProof, error) {
-	n := p.recoveries.Add(1)
-	f := p.snapshot()
-	if n == 2 && p.mode == "recovery-old" {
-		f.now = p.investigationFixture.now
-	}
-	out, err := f.RecoveryState(ctx)
-	if n == 2 {
-		switch p.mode {
-		case "recovery-epoch":
-			out.IssuerEpoch = fixtureID(999)
-		case "recovery-uid":
-			out.Revision.UID = "changed"
-		case "recovery-generation":
-			out.Revision.Generation++
-		case "recovery-digest":
-			out.Revision.Digest[0]++
-		}
-	}
-	return out, err
-}
 func (p *repeatBudgetPorts) Permissions(ctx context.Context, t authorization.Target) (authorization.Projection, error) {
 	f := p.snapshot()
 	if p.mode == "labels-policy-old" {
@@ -107,8 +85,8 @@ func (p *repeatBudgetPorts) Resolve(ctx context.Context, in privacy.Input) (priv
 	}
 	return f.Resolve(ctx, in)
 }
-func (p *repeatBudgetPorts) ContextProcessingCoverage(ctx context.Context, in value.ProcessingCoverageRequest, r artifact.RecoveryProof) (value.ProcessingCoverage, error) {
-	out, err := p.snapshot().ContextProcessingCoverage(ctx, in, r)
+func (p *repeatBudgetPorts) ContextProcessingCoverage(ctx context.Context, in value.ProcessingCoverageRequest) (value.ProcessingCoverage, error) {
+	out, err := p.snapshot().ContextProcessingCoverage(ctx, in)
 	if until, ok := ctx.Deadline(); ok {
 		out.FreshUntil = identity.Earlier(out.FreshUntil, until)
 	}
@@ -149,7 +127,7 @@ func (r repeatBudgetIdentity) Resolve(ctx context.Context, _ string) (identity.I
 // shorten that source observation or become storage authority. The namespace
 // heap fixture follows the same shared Go-profile repeat path as runtimeTrace.
 func TestProfileRepeatMeasuredReadinessBudget(t *testing.T) {
-	for _, mode := range []string{"success", "target-old", "target-replaced", "recovery-old", "recovery-epoch", "recovery-uid", "recovery-generation", "recovery-digest", "labels-policy-old", "retention-old", "parent", "history", "unsupported-late", "unsupported-warm", "late-catalog"} {
+	for _, mode := range []string{"success", "target-old", "target-replaced", "labels-policy-old", "retention-old", "parent", "history", "unsupported-late", "unsupported-warm", "late-catalog"} {
 		t.Run(mode, func(t *testing.T) {
 			t.Parallel()
 			measuredProfileRepeat(t, mode)
@@ -167,7 +145,6 @@ func measuredProfileRepeat(t *testing.T, mode string) {
 	f.svc.Now = now
 	f.svc.Targets = p
 	f.svc.Recorders = p
-	f.svc.Recovery = p
 	f.svc.Storage = p
 	f.svc.Refresh = p
 	f.svc.Eligibility = access.Evaluator{Permissions: p, Now: now}
@@ -206,22 +183,22 @@ func measuredProfileRepeat(t *testing.T, mode string) {
 		}
 		return
 	}
-	if mode == "late-catalog" && (p.recoveries.Load() != 1 || p.recorderReads.Load() != 0) {
-		t.Fatal("expired classification advanced into final observations", p.recoveries.Load(), p.recorderReads.Load())
+	if mode == "late-catalog" && p.recorderReads.Load() != 0 {
+		t.Fatal("expired classification advanced into final observations", p.recorderReads.Load())
 	}
 	if mode != "success" {
 		if err == nil || result.Recorder != nil || len(x.f.seen) != 0 || len(x.grants.requests) != 0 {
 			t.Fatalf("%s accepted stale/changed original authority", mode)
 		}
-		if p.demands.Load() > 1 || p.recorderReads.Load() > 1 || p.recoveries.Load() > 2 {
+		if p.demands.Load() > 1 || p.recorderReads.Load() > 1 {
 			t.Fatal("refusal retried observations")
 		}
 		return
 	}
 	if err != nil || result.Recorder == nil || !result.Recorder.Recordable {
-		t.Fatalf("measured4.5s source readiness refused after %s (demands=%d recovery=%d recorder=%d): %v", time.Since(start), p.demands.Load(), p.recoveries.Load(), p.recorderReads.Load(), err)
+		t.Fatalf("measured4.5s source readiness refused after %s (demands=%d recorder=%d): %v", time.Since(start), p.demands.Load(), p.recorderReads.Load(), err)
 	}
-	if p.demands.Load() != 1 || p.recoveries.Load() != 2 || p.recorderReads.Load() != 1 || reviews.calls.Load() != 1 || len(x.f.seen) != 0 || len(x.grants.requests) != 0 {
+	if p.demands.Load() != 1 || p.recorderReads.Load() != 1 || reviews.calls.Load() != 1 || len(x.f.seen) != 0 || len(x.grants.requests) != 0 {
 		t.Fatal("extra observations, review, acquisition or approval")
 	}
 	if !result.Preview.Target.Valid() || result.Preview.Target != f.target.Request || result.Preview.Storage != f.store.Selection {

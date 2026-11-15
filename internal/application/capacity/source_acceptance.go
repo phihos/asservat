@@ -149,7 +149,7 @@ func (s CapacitySourceObservation) Valid(now time.Time) bool {
 
 // AcceptedCapacitySource is returned only by the fixed protected source writer.
 // This is still a current observation, not acquisition authority. SQL checks its
-// own source/permission/recovery state under locks for every configuration effect.
+// own source/permission state under locks for every configuration effect.
 type AcceptedCapacitySource struct {
 	Format, RootID, InstallationID, QualificationID string
 	Revision                                        int64
@@ -195,21 +195,20 @@ type CapacitySourceAcceptance struct {
 	ExpectedRevision                        int64
 	Observation                             CapacitySourceObservation
 	Protection                              CapacitySourceProtection
-	Recovery                                artifact.RecoveryProof
 }
 
 func (s CapacitySourceAcceptance) Valid(now time.Time) bool {
-	return authorization.UUID(s.RootID) && authorization.UUID(s.InstallationID) && authorization.UUID(s.QualificationID) && s.QualificationDigest != (artifact.Digest{}) && s.ExpectedRevision >= 0 && s.ExpectedRevision < 1<<60 && s.Observation.Valid(now) && s.Protection.Valid(now) && s.Recovery.Valid(now) && s.Recovery.InstallationID == s.InstallationID && s.Protection.ClusterID == s.Observation.Snapshot.ClusterID && s.Protection.ControlNamespaceUID == s.Observation.Snapshot.ControlNamespace.UID
+	return authorization.UUID(s.RootID) && authorization.UUID(s.InstallationID) && authorization.UUID(s.QualificationID) && s.QualificationDigest != (artifact.Digest{}) && s.ExpectedRevision >= 0 && s.ExpectedRevision < 1<<60 && s.Observation.Valid(now) && s.Protection.Valid(now) && s.Protection.ClusterID == s.Observation.Snapshot.ClusterID && s.Protection.ControlNamespaceUID == s.Observation.Snapshot.ControlNamespace.UID
 }
 
 type CapacitySourceJournal interface {
 	// Returns only the current CAS sequence, including when suspended/expired.
 	// It neither refreshes the source nor authorizes an enrollment effect.
-	ReadCapacitySourceRevision(context.Context, artifact.RecoveryProof) (int64, error)
+	ReadCapacitySourceRevision(context.Context) (int64, error)
 	AcceptCapacitySource(context.Context, CapacitySourceAcceptance) (AcceptedCapacitySource, error)
 	// A known failed/changed observation fences new effects without removing
 	// accepted membership, hierarchy rows, charges or original phase facts.
-	InvalidateCapacitySource(context.Context, string, int64, artifact.RecoveryProof, time.Time, time.Time) error
+	InvalidateCapacitySource(context.Context, string, int64, time.Time, time.Time) error
 }
 
 // SelectedCapacitySourceDigest binds the selected pool and every assigned

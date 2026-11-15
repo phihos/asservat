@@ -24,7 +24,7 @@ type CaptureAccounts interface {
 }
 
 // EnrollmentObservation is a current observation, not a persisted permit. SQL
-// independently checks this exact accepted source, permission and recovery
+// independently checks this exact accepted source and permission
 // fence after acquiring the original account/parent locks.
 type EnrollmentObservation struct {
 	Key                                               WorkloadCapacityKey
@@ -37,7 +37,6 @@ type EnrollmentObservation struct {
 	PermissionEpoch                                   string
 	PermissionSequence                                int64
 	PermissionTrust                                   artifact.Digest
-	Recovery                                          artifact.RecoveryProof
 	ObservedAt, FreshUntil                            time.Time
 }
 
@@ -50,7 +49,7 @@ func (v EnrollmentObservation) Valid(now time.Time) bool {
 			return false
 		}
 	}
-	return v.Key.Valid() && v.SourceRevision > 0 && v.SourceRevision < 1<<60 && v.SourceDigest != (artifact.Digest{}) && v.Plan.Matches(v.Key, v.Recovery.InstallationID, v.SourceDigest, v.PlanDigest) && v.NamespaceGuardDigest != (artifact.Digest{}) && identity.Text(v.NamespaceResourceVersion, 128) && identity.Text(v.WorkloadResourceVersion, 128) && authorization.UUID(v.PermissionEpoch) && v.PermissionSequence >= 0 && v.PermissionTrust != (artifact.Digest{}) && v.Recovery.Valid(now) && identity.Fresh(v.ObservedAt, v.FreshUntil, now, CapacitySourceInterval) && !v.FreshUntil.After(v.Recovery.FreshUntil) && v.ObservedAt.Nanosecond()%1000 == 0 && v.FreshUntil.Nanosecond()%1000 == 0
+	return v.Key.Valid() && v.SourceRevision > 0 && v.SourceRevision < 1<<60 && v.SourceDigest != (artifact.Digest{}) && v.Plan.Matches(v.Key, v.SourceDigest, v.PlanDigest) && v.NamespaceGuardDigest != (artifact.Digest{}) && identity.Text(v.NamespaceResourceVersion, 128) && identity.Text(v.WorkloadResourceVersion, 128) && authorization.UUID(v.PermissionEpoch) && v.PermissionSequence >= 0 && v.PermissionTrust != (artifact.Digest{}) && identity.Fresh(v.ObservedAt, v.FreshUntil, now, CapacitySourceInterval) && v.ObservedAt.Nanosecond()%1000 == 0 && v.FreshUntil.Nanosecond()%1000 == 0
 }
 
 // Enrollment retains three once-set configuration facts. InitialUntil always

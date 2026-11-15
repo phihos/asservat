@@ -17,15 +17,11 @@ import (
 
 func progressQuery(t *testing.T, ctx context.Context, s captureAdmissionScenario) capture.ProgressQuery {
 	t.Helper()
-	r, err := s.recovery.reader.RecoveryState(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
 	i := s.a.Eligibility.VerifiedIdentity
 	i.Scopes = []string{"evidence:read"}
 	i.VerifiedAt = time.Now().UTC()
 	i.ValidUntil = i.VerifiedAt.Add(5 * time.Second)
-	return capture.ProgressQuery{RootID: s.a.RootID, CaptureID: s.a.Plan.Input.CaptureID, Identity: i, Recovery: r}
+	return capture.ProgressQuery{RootID: s.a.RootID, CaptureID: s.a.Plan.Input.CaptureID, Identity: i}
 }
 func qualifyContextProgress(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, create func(*testing.T, int64) captureAdmissionScenario) {
 	t.Helper()
@@ -38,7 +34,7 @@ func qualifyContextProgress(t *testing.T, ctx context.Context, admin *pgxpool.Po
 	defer cleanupPool.Close()
 	reader := func(t *testing.T, s captureAdmissionScenario) *postgres.ContextProgressReads {
 		t.Helper()
-		r, err := postgres.NewContextProgressReads(ctx, readPool, s.a.RootID, s.recovery.guard)
+		r, err := postgres.NewContextProgressReads(ctx, readPool, s.a.RootID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -96,7 +92,7 @@ func qualifyContextProgress(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		if err != nil {
 			t.Fatal(err)
 		}
-		if first.MetadataValidUntil.IsZero() || replay.MetadataValidUntil.IsZero() || replay.MetadataValidUntil.After(s.a.Eligibility.ValidUntil) || replay.MetadataValidUntil.After(s.a.Recovery.FreshUntil) {
+		if first.MetadataValidUntil.IsZero() || replay.MetadataValidUntil.IsZero() || replay.MetadataValidUntil.After(s.a.Eligibility.ValidUntil) {
 			t.Fatal("replay metadata authority was renewed")
 		}
 		if first.Expectation.ExecutionClass != artifact.ContextAPIExecution || first.Expectation.NodeUID != "" || first.Expectation.NodeBootID != "" || first.Pin.NodeName != "" || replay.Expectation.ExecutionClass != artifact.ContextAPIExecution || !replay.Replay || replay.CaptureID != first.CaptureID {

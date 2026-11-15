@@ -29,7 +29,7 @@ import (
 func fixtureID(n int) string { return fmt.Sprintf("00000000-0000-4000-8000-%012d", n) }
 
 // These test-only ports model effects and blocking changes. They are not SQL,
-// Kubernetes, recovery or permission source qualification. Eligibility uses the
+// Kubernetes or permission source qualification. Eligibility uses the
 // actual shared evaluator and identity uses an actual request-owned handle.
 type investigationFixture struct {
 	now                                                   time.Time
@@ -40,7 +40,7 @@ type investigationFixture struct {
 	cap                                                   planning.ContextCapability
 	store                                                 ContextStorageObservation
 	epoch                                                 string
-	denied, missing, recoveryBlocked, noProof             bool
+	denied, missing, noProof                              bool
 	unknownCommit, unknownPreview                         bool
 	afterStore, afterStorage, afterAdmission, afterReplay func()
 	identityChange                                        string
@@ -58,7 +58,7 @@ func newInvestigationFixture() *investigationFixture {
 	f.audience = artifact.AudienceAssignment{Kind: "User", Issuer: f.actor.Issuer, SubjectID: f.actor.Subject, Role: "workload-maintainer", BasisKind: "AccessBinding", BasisUID: "binding", AssignmentID: fixtureID(6), BasisDigest: artifact.Digest{1}}
 	f.cap = planning.ContextCapability{Enabled: true, Revision: identity.Revision{UID: "capability", Generation: 1, Digest: [32]byte{2}}, CollectorVersion: "test-1", CollectorImageDigest: artifact.Digest{3}, ProjectionDigest: compiler.ProjectionDigest()}
 	f.store = ContextStorageObservation{Selection: value.ContextStorageSelection{StoreID: fixtureID(7), AllocationID: fixtureID(8), PoolRevision: 1, AllocationRevision: 1, BindingRevision: identity.Revision{UID: "binding", Generation: 1, Digest: [32]byte{4}}}, Binding: value.StorageBinding{RootID: fixtureID(1), ClusterID: fixtureID(4), NamespaceUID: "ns", WorkloadUID: "deployment", AllocationID: fixtureID(8), Revision: identity.Revision{UID: "binding", Generation: 1, Digest: [32]byte{4}}}}
-	f.svc = ContextInvestigation{RootID: fixtureID(1), InstallationID: fixtureID(2), Previews: f, Replay: f, Admission: f, Resolution: f, Targets: f, Eligibility: access.Evaluator{Permissions: f, Now: func() time.Time { return f.now }}, Capabilities: f, Retention: f, Storage: f, Processing: f, Recovery: f, Lifetime: 5 * time.Minute, Now: func() time.Time { return f.now }, NewID: func() string { return fixtureID(100 + int(f.newIDs.Add(1))) }}
+	f.svc = ContextInvestigation{RootID: fixtureID(1), InstallationID: fixtureID(2), Previews: f, Replay: f, Admission: f, Resolution: f, Targets: f, Eligibility: access.Evaluator{Permissions: f, Now: func() time.Time { return f.now }}, Capabilities: f, Retention: f, Storage: f, Processing: f, Lifetime: 5 * time.Minute, Now: func() time.Time { return f.now }, NewID: func() string { return fixtureID(100 + int(f.newIDs.Add(1))) }}
 	return f
 }
 
@@ -131,12 +131,6 @@ func (f *investigationFixture) ContextStorage(context.Context, authorization.Tar
 	}
 	return s, nil
 }
-func (f *investigationFixture) RecoveryState(context.Context) (artifact.RecoveryProof, error) {
-	if f.recoveryBlocked {
-		return artifact.RecoveryProof{}, value.ErrUnavailable
-	}
-	return artifact.RecoveryProof{InstallationID: fixtureID(2), IssuerEpoch: f.epoch, Revision: identity.Revision{UID: "recovery", Generation: 1, Digest: [32]byte{6}}, ObservedAt: f.now, FreshUntil: f.now.Add(5 * time.Second)}, nil
-}
 func (f *investigationFixture) Resolve(_ context.Context, in privacy.Input) (privacy.Resolution, error) {
 	r := identity.Revision{UID: fixtureID(9), Generation: 1, Digest: [32]byte{7}}
 	set := privacy.PolicySet{Target: in.Target, Revision: r, Complete: true, ObservedAt: f.now, FreshUntil: f.now.Add(5 * time.Second), Policies: []privacy.Policy{{Revision: identity.Revision{UID: "baseline", Generation: f.policyGeneration, Digest: [32]byte{8}}, Baseline: true, PurposeRef: "diagnostics", DefaultSeconds: 60, MaximumSeconds: 3600, DeletionBudgetSeconds: 10}}}
@@ -186,7 +180,7 @@ func (f *investigationFixture) LookupContextAdmission(_ context.Context, q value
 	if f.afterReplay != nil {
 		f.afterReplay()
 	}
-	a.MetadataValidUntil = identity.Earlier(q.Identity.ValidUntil, q.Recovery.FreshUntil)
+	a.MetadataValidUntil = identity.Earlier(q.Identity.ValidUntil, f.now.Add(5*time.Second))
 	return a, ok, nil
 }
 func (f *investigationFixture) AdmitReviewedContext(_ context.Context, previewID string, a value.Admission) (value.Accepted, error) {
@@ -195,7 +189,7 @@ func (f *investigationFixture) AdmitReviewedContext(_ context.Context, previewID
 	key := fixtureKey(a.Plan.Input.Executor, a.IdempotencyKey)
 	if old, ok := f.accepted[key]; ok {
 		old.Replay = true
-		old.MetadataValidUntil = identity.Earlier(a.Eligibility.ValidUntil, a.Recovery.FreshUntil)
+		old.MetadataValidUntil = identity.Earlier(a.Eligibility.ValidUntil, f.now.Add(5*time.Second))
 		return old, nil
 	}
 	p, ok := f.previews[previewID]
@@ -212,7 +206,7 @@ func (f *investigationFixture) AdmitReviewedContext(_ context.Context, previewID
 	in := a.Plan.Input
 	t, r := in.Target, in.Retention
 	e := artifact.ContextExpectation{ExecutionClass: t.ExecutionClass, Registration: a.Registration, CaseID: a.CaseID, OccurrenceID: a.OccurrenceID, NodeUID: t.NodeUID, NodeBootID: t.NodeBootID, PodUID: t.Request.PodUID, Namespace: t.Request.Namespace.Name, NamespaceUID: t.Request.Namespace.UID, WorkloadUID: t.Request.Workload.UID, CollectorVersion: in.Capability.CollectorVersion, CollectorImageDigest: in.Capability.CollectorImageDigest, RecipeDigest: a.Plan.RecipeDigest, PlanDigest: a.Plan.ScopeDigest, CaptureUID: in.CaptureID, ActionID: "pod-status", DataClass: "metadata", PurposeRef: r.PurposeRef, Audience: slices.Clone(a.Eligibility.DefaultAudience), RequestedAgeSeconds: r.RequestedSeconds, MaximumAgeSeconds: r.MaximumSeconds, DeletionBudgetSeconds: r.DeletionBudgetSeconds, RetentionRules: slices.Clone(r.Policies), TriggeredAt: a.Registration.AnchorAt}
-	out := value.Accepted{MetadataValidUntil: identity.Earlier(a.Eligibility.ValidUntil, a.Recovery.FreshUntil), CaptureID: in.CaptureID, State: value.PendingAudit, ScopeDigest: a.Plan.ScopeDigest, SubmissionDigest: a.SubmissionDigest, Expectation: e, Pin: t.Pin, CreatedAt: f.now, Deadline: in.Deadline}
+	out := value.Accepted{MetadataValidUntil: identity.Earlier(a.Eligibility.ValidUntil, f.now.Add(5*time.Second)), CaptureID: in.CaptureID, State: value.PendingAudit, ScopeDigest: a.Plan.ScopeDigest, SubmissionDigest: a.SubmissionDigest, Expectation: e, Pin: t.Pin, CreatedAt: f.now, Deadline: in.Deadline}
 	f.accepted[key] = out
 	if f.afterAdmission != nil {
 		f.afterAdmission()
@@ -252,7 +246,7 @@ func TestContextPreviewPassiveAndAssessment(t *testing.T) {
 	if json.Unmarshal(b, &object) != nil {
 		t.Fatal("invalid preview")
 	}
-	for _, key := range []string{"Identity", "VerifiedIdentity", "Recovery", "Proof", "Assessment", "AnchorAt", "ExpiresAt"} {
+	for _, key := range []string{"Identity", "VerifiedIdentity", "Proof", "Assessment", "AnchorAt", "ExpiresAt"} {
 		if _, ok := object[key]; ok {
 			t.Fatalf("persisted runtime authority %s", key)
 		}
@@ -319,13 +313,12 @@ func TestContextMaterialChangesRequireReview(t *testing.T) {
 			f.target.Request.PodUID = "replacement"
 			f.target.Pin.UID = "replacement"
 		},
-		"node reboot":          func(f *investigationFixture, _ value.ContextPreview) { f.target.NodeBootID = fixtureID(33) },
-		"collector":            func(f *investigationFixture, _ value.ContextPreview) { f.cap.CollectorImageDigest[0]++ },
-		"ceiling":              func(f *investigationFixture, _ value.ContextPreview) { f.cap.Revision.Digest[0]++ },
-		"retention":            func(f *investigationFixture, _ value.ContextPreview) { f.policyGeneration++ },
-		"audience":             func(f *investigationFixture, _ value.ContextPreview) { f.audience.AssignmentID = fixtureID(34) },
-		"allocation":           func(f *investigationFixture, _ value.ContextPreview) { f.store.Selection.PoolRevision++ },
-		"recovery incarnation": func(f *investigationFixture, _ value.ContextPreview) { f.epoch = fixtureID(35) },
+		"node reboot": func(f *investigationFixture, _ value.ContextPreview) { f.target.NodeBootID = fixtureID(33) },
+		"collector":   func(f *investigationFixture, _ value.ContextPreview) { f.cap.CollectorImageDigest[0]++ },
+		"ceiling":     func(f *investigationFixture, _ value.ContextPreview) { f.cap.Revision.Digest[0]++ },
+		"retention":   func(f *investigationFixture, _ value.ContextPreview) { f.policyGeneration++ },
+		"audience":    func(f *investigationFixture, _ value.ContextPreview) { f.audience.AssignmentID = fixtureID(34) },
+		"allocation":  func(f *investigationFixture, _ value.ContextPreview) { f.store.Selection.PoolRevision++ },
 		"assessment rules": func(f *investigationFixture, p value.ContextPreview) {
 			p.AssessmentRulesDigest[0]++
 			f.previews[p.ID] = p
@@ -442,13 +435,6 @@ func TestContextRequiresProtectedAuthorityAndNoDetachedContext(t *testing.T) {
 		f.noProof = true
 		if _, err := f.svc.Preview(context.Background(), f.source(t, context.Background()), f.intent()); err == nil {
 			t.Fatal("arithmetic authorized acquisition")
-		}
-	})
-	t.Run("recovery", func(t *testing.T) {
-		f := newInvestigationFixture()
-		f.recoveryBlocked = true
-		if _, err := f.svc.Preview(context.Background(), f.source(t, context.Background()), f.intent()); err == nil || f.targetReads.Load() != 0 {
-			t.Fatal("blocked recovery allowed preview")
 		}
 	})
 	t.Run("canceled owner", func(t *testing.T) {
@@ -599,10 +585,10 @@ func (f *investigationFixture) ResolveOrCloseContextRequest(_ context.Context, q
 		if a.SubmissionDigest != q.SubmissionDigest {
 			return value.ContextRequestDisposition{}, value.ErrConflict
 		}
-		a.MetadataValidUntil = identity.Earlier(q.Identity.ValidUntil, q.Recovery.FreshUntil)
+		a.MetadataValidUntil = identity.Earlier(q.Identity.ValidUntil, f.now.Add(5*time.Second))
 		return value.ContextRequestDisposition{State: value.RequestAccepted, Accepted: &a, ValidUntil: a.MetadataValidUntil}, nil
 	}
 	// Test-only negative marker; the SQL adapter qualifies durable close semantics.
 	delete(f.previews, q.PreviewID)
-	return value.ContextRequestDisposition{State: value.RequestClosed, ValidUntil: identity.Earlier(q.Identity.ValidUntil, q.Recovery.FreshUntil)}, nil
+	return value.ContextRequestDisposition{State: value.RequestClosed, ValidUntil: identity.Earlier(q.Identity.ValidUntil, f.now.Add(5*time.Second))}, nil
 }

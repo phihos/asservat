@@ -98,7 +98,7 @@ func TestHTTPSourceLedgerWithRealServices(t *testing.T) {
 		option := policyRecorderProtectedCase{Hub: f.roles["hub-runtime"], Admissions: seed.s, Filters: pcap.NewCompiler(), Expression: "tcp port 8080", Subjects: []cfg.Subject{{Kind: "Group", Issuer: "https://id.example.test", ID: "maintainers"}}, Ongoing: true, Retention: "31s", SourceComposition: httpSourceCompositionWire(), SourceCompiler: httpSourceCompiler(t, seed.a.Plan.Input.Target.Request.ClusterID, seed.a.Plan.Input.Target.Request.Namespace.UID), PermissionsAccepted: func(batch cfg.PermissionBatch) { f.batch = policyRecorderCloneBatch(batch) }}
 		option.SourceAccepted = func(t *testing.T, accepted policySourceAcceptedFixture) {
 			s := accepted.Scenario
-			ledger, err := postgres.NewPolicySources(ctx, f.roles["hub-runtime"], s.a.RootID, s.recovery.installation, postgres.EffectTransactionGuards{Recovery: s.recovery.guard, Retention: s.retention.guard})
+			ledger, err := postgres.NewPolicySources(ctx, f.roles["hub-runtime"], s.a.RootID, s.recovery.installation, s.retention.guard)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -106,7 +106,7 @@ func TestHTTPSourceLedgerWithRealServices(t *testing.T) {
 			sourceID, fence, nodeID, bootID, collectorID, epoch := custodyID(), custodyID(), custodyID(), custodyID(), custodyID(), custodyID()
 			fresh := func() captureapp.PolicySourceCheck {
 				t.Helper()
-				_, recovery := f.fresh(t)
+				f.fresh(t)
 				if err := f.enrollments.RefreshCapacityEnrollment(ctx, f.workloadObservation(t, 0), enrollment); err != nil {
 					t.Fatal(err)
 				}
@@ -130,7 +130,7 @@ func TestHTTPSourceLedgerWithRealServices(t *testing.T) {
 					t.Fatal(err)
 				}
 				settings := identity.Policy{Revision: identity.Revision{UID: "synthetic-settings", Generation: 1, Digest: [32]byte{1}}, Issuer: accepted.Authority.Creator.Issuer, ObservedAt: n, FreshUntil: n.Add(5 * time.Second), Clients: []identity.Client{{ID: accepted.Authority.Creator.ClientID, Kind: identity.Human, ClassQualified: true}}, EligibleGroups: []string{"maintainers"}, GroupsAtIssueQualified: true, GroupMaxAge: time.Minute}
-				return captureapp.PolicySourceCheck{Policy: accepted.Compiled, Authority: accepted.Authority, Target: target, Node: targets.PacketSourceObservation{PodUID: target.Pin.UID, NodeUID: nodeID, BootID: bootID, CollectorPodUID: collectorID, CollectorEpoch: epoch, ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}, Recovery: recovery, Retention: resolved, Settings: settings, SourceID: sourceID, Fence: fence, BytesPerSecond: 4 << 20, SourceSlots: 4, ObservedAt: n, ValidUntil: n.Add(5 * time.Second)}
+				return captureapp.PolicySourceCheck{Policy: accepted.Compiled, Authority: accepted.Authority, Target: target, Node: targets.PacketSourceObservation{PodUID: target.Pin.UID, NodeUID: nodeID, BootID: bootID, CollectorPodUID: collectorID, CollectorEpoch: epoch, ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}, Retention: resolved, Settings: settings, SourceID: sourceID, Fence: fence, BytesPerSecond: 4 << 20, SourceSlots: 4, ObservedAt: n, ValidUntil: n.Add(5 * time.Second)}
 			}
 			in := fresh()
 			in.Initial = true
@@ -186,11 +186,7 @@ func TestHTTPSourceLedgerWithRealServices(t *testing.T) {
 			if p, g := snapshot(); p != 2<<20 || g != 2<<20 {
 				t.Fatal("credit delta not charged exactly once", p, g)
 			}
-			guard, err := postgres.NewRecoveryTransactionGuard(s.a.RootID, s.recovery.installation)
-			if err != nil {
-				t.Fatal(err)
-			}
-			grants, err := postgres.NewAccessGrants(ctx, f.roles["hub-runtime"], s.a.RootID, guard)
+			grants, err := postgres.NewAccessGrants(ctx, f.roles["hub-runtime"], s.a.RootID, s.recovery.installation)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -207,11 +203,7 @@ func TestHTTPSourceLedgerWithRealServices(t *testing.T) {
 				t.Fatal("reviewed concurrency ceiling ignored actual active source count")
 			}
 
-			proof, err := s.recovery.reader.RecoveryState(ctx)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if _, _, err = grants.RevokeGrant(ctx, authapp.GrantRevocationInput{GrantID: grantID, Revoker: accepted.Authority.Creator, ExpectedRevision: g.Revision, IdempotencyKey: "revoke-http-source"}, proof); err != nil {
+			if _, _, err = grants.RevokeGrant(ctx, authapp.GrantRevocationInput{GrantID: grantID, Revoker: accepted.Authority.Creator, ExpectedRevision: g.Revision, IdempotencyKey: "revoke-http-source"}); err != nil {
 				t.Fatal(err)
 			}
 			if _, err = grants.ReadLiveSourceObservation(ctx, sourceID, grantID); err == nil {

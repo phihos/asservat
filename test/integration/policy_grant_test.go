@@ -22,7 +22,7 @@ import (
 // Component proof: actual grant/settings transactions and compiled role grants,
 // with the parent's real acceptance/audit and explicit synthetic source/KMS.
 // It does not qualify public requester/reviewer authentication or recording.
-func qualifyPolicyGrantPersistence(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, source *postgres.Policies, observation capture.PolicySource, manager identity.Identity, root string, authority authorization.AcceptedPolicyAuthority, acceptance string, scope []byte, recovery artifact.RecoveryProof) {
+func qualifyPolicyGrantPersistence(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, source *postgres.Policies, observation capture.PolicySource, manager identity.Identity, root string, authority authorization.AcceptedPolicyAuthority, acceptance string, scope []byte) {
 	t.Helper()
 	rolePool := func(purpose, prefix string) *pgxpool.Pool {
 		t.Helper()
@@ -43,11 +43,7 @@ func qualifyPolicyGrantPersistence(t *testing.T, ctx context.Context, admin *pgx
 	if err != nil {
 		t.Fatal("settings facet", err)
 	}
-	guard, err := postgres.NewRecoveryTransactionGuard(root, authority.InstallationID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	store, err := postgres.NewAccessGrants(ctx, hub, root, guard)
+	store, err := postgres.NewAccessGrants(ctx, hub, root, authority.InstallationID)
 	if err != nil {
 		t.Fatal("grant facet", err)
 	}
@@ -72,7 +68,7 @@ func qualifyPolicyGrantPersistence(t *testing.T, ctx context.Context, admin *pgx
 		return app.StoredGrantRequest{Grant: g, IdempotencyKey: input.IdempotencyKey, RequestDigest: app.PolicyGrantRequestDigest(actor, input)}
 	}
 	original := request(authority.Creator)
-	g, replay, err := store.RequestGrant(ctx, original, recovery)
+	g, replay, err := store.RequestGrant(ctx, original)
 	if err != nil || replay || !g.Valid() || g.Target != (authorization.Target{}) || g.Policy == nil || g.ResultAccess != nil ||
 		!g.PolicyNotAfter.Equal(g.RequestedAt.Add(original.Grant.Lifetime)) {
 		t.Fatal("original policy request", g, replay, err)
@@ -114,7 +110,7 @@ func qualifyPolicyGrantPersistence(t *testing.T, ctx context.Context, admin *pgx
 		{Issuer: authority.Creator.Issuer, Subject: authority.Creator.Subject, ClientID: authority.Creator.ClientID, Kind: identity.Workload},
 		{Issuer: "https://id.example.test", Subject: "développeur-支付", ClientID: "console-é-支付", Kind: identity.Human},
 	} {
-		x, replay, err := store.RequestGrant(ctx, request(actor), recovery)
+		x, replay, err := store.RequestGrant(ctx, request(actor))
 		if err != nil || replay || x.ID == g.ID || x.Requester != actor {
 			t.Fatal("different full principal inherited original journal", x, replay, err)
 		}
@@ -132,7 +128,7 @@ func qualifyPolicyGrantPersistence(t *testing.T, ctx context.Context, admin *pgx
 	}
 	conflict := original
 	conflict.RequestDigest[0]++
-	if _, _, err = store.RequestGrant(ctx, conflict, recovery); !errors.Is(err, app.ErrGrantConflict) {
+	if _, _, err = store.RequestGrant(ctx, conflict); !errors.Is(err, app.ErrGrantConflict) {
 		t.Fatal("changed original caller choices did not conflict", err)
 	}
 	// Let the original request age before approving under its original maximum.
@@ -145,11 +141,11 @@ func qualifyPolicyGrantPersistence(t *testing.T, ctx context.Context, admin *pgx
 	case <-timer.C:
 	}
 	approver := identity.Principal{Issuer: authority.Creator.Issuer, Subject: "independent-reviewer", ClientID: "review-console", Kind: identity.Human}
-	g, replay, err = store.DecideGrant(ctx, app.GrantDecisionInput{GrantID: g.ID, Approver: approver, Approve: true, Reason: "synthetic SQL component review", ACR: "fixture-step-up", AuthTime: now, IdempotencyKey: "one-review"}, recovery)
+	g, replay, err = store.DecideGrant(ctx, app.GrantDecisionInput{GrantID: g.ID, Approver: approver, Approve: true, Reason: "synthetic SQL component review", ACR: "fixture-step-up", AuthTime: now, IdempotencyKey: "one-review"})
 	if err != nil || replay || !g.ExpiresAt.Equal(g.PolicyNotAfter) {
 		t.Fatal("decision must retain original request anchor", g, replay, err)
 	}
-	qualifyPolicyGrantAttachmentControl(t, ctx, admin, hub, source, observation, manager, g, recovery)
+	qualifyPolicyGrantAttachmentControl(t, ctx, admin, hub, source, observation, manager, g)
 	settings.Revision.Generation++
 	settings.Revision.Digest[0]++
 	settings.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
@@ -171,7 +167,7 @@ func qualifyPolicyGrantPersistence(t *testing.T, ctx context.Context, admin *pgx
 	if err = projection.AcceptPolicyGrantSettings(ctx, settings); err != nil {
 		t.Fatal("later maximum raise", err)
 	}
-	restarted, err := postgres.NewAccessGrants(ctx, hub, root, guard)
+	restarted, err := postgres.NewAccessGrants(ctx, hub, root, authority.InstallationID)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -10,6 +10,7 @@ import (
 )
 
 const capacityTestCluster = "10000000-0000-4000-8000-000000000001"
+const capacityTestInstallation = "30000000-0000-4000-8000-000000000004"
 
 func capacitySelectionFixture() (CapacitySnapshot, cfg.NamespaceMetadata, time.Time) {
 	now := time.Date(2026, 10, 12, 12, 0, 0, 0, time.UTC)

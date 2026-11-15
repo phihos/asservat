@@ -229,7 +229,6 @@ type contextDeletionWorker struct {
 	root      string
 	facets    []*postgres.ContextDeletions
 	deadlines captureapp.ContextDeadlineObserver
-	recovery  *postgres.RecoveryReader
 	// prepare builds the cleaner; it is retried each sweep until it succeeds.
 	prepare func(context.Context) (*privacyapp.ContextCleaner, []func(), error)
 	cleaner *privacyapp.ContextCleaner
@@ -259,9 +258,6 @@ func (w *hubWorker) openContextDeletion(ctx context.Context, v contracts.HubWork
 			return nil, &fixedStepError{"sql/" + purpose, mounts.ErrUnavailable}
 		}
 		d.facets = append(d.facets, f)
-	}
-	if d.recovery, err = postgres.NewRecoveryReader(ctx, pools["context-cleanup"], installation); err != nil {
-		return nil, &fixedStepError{"recovery", mounts.ErrUnavailable}
 	}
 	// ADR-223: the cleaner's login also marks elapsed capture deadlines.
 	if d.deadlines, err = postgres.NewContextDeadlineObserver(ctx, pools["context-cleanup"], root); err != nil {
@@ -327,7 +323,7 @@ func prepareContextCleaner(v contracts.ContextDeletionDeployment, storeID, root 
 		return nil, closers, &fixedStepError{"signing", mounts.ErrUnavailable}
 	}
 	objects := &installedContextDeletionAudit{authority: authority, audit: writer, signatures: signatures}
-	return &privacyapp.ContextCleaner{Ledger: d.facets[0], Audit: d.facets[1], Finalize: d.facets[2], Purger: purger, Objects: objects, Recovery: d.recovery, Now: time.Now}, closers, nil
+	return &privacyapp.ContextCleaner{Ledger: d.facets[0], Audit: d.facets[1], Finalize: d.facets[2], Purger: purger, Objects: objects, Now: time.Now}, closers, nil
 }
 
 // run sweeps until the Lease ends, logging each outcome when it changes from

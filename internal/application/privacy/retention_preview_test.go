@@ -21,7 +21,6 @@ type retentionPreviewFixture struct {
 	caller   identity.Identity
 	admin    fleet.Administration
 	adminErr error
-	recovery artifact.RecoveryProof
 	catalog  value.PreviewCatalog
 	reads    int
 	decodes  int
@@ -40,9 +39,6 @@ func (f *retentionPreviewFixture) ResolveIdentity(context.Context) (identity.Ide
 }
 func (f *retentionPreviewFixture) FleetAdministration(context.Context) (fleet.Administration, error) {
 	return f.admin, f.adminErr
-}
-func (f *retentionPreviewFixture) RecoveryState(context.Context) (artifact.RecoveryProof, error) {
-	return f.recovery, nil
 }
 func (f *retentionPreviewFixture) RetentionPreviewCatalog(_ context.Context, limit int) (value.PreviewCatalog, error) {
 	f.reads++
@@ -66,22 +62,21 @@ func newRetentionPreviewFixture() (*retentionPreviewFixture, RetentionPreviewer)
 	f.caller = identity.Identity{Principal: identity.Principal{Issuer: "https://id.example.invalid", Subject: "admin", ClientID: "console", Kind: identity.Human}, Groups: []string{"platform-admins"}, Policy: rev, VerifiedAt: n, ValidUntil: n.Add(30 * time.Second)}
 	f.admin = fleet.Administration{InstallationID: retentionPreviewInstallation, IssuerEpoch: retentionPreviewInstallation, Issuer: f.caller.Principal.Issuer, Revision: rev, ObservedAt: n, FreshUntil: n.Add(5 * time.Second),
 		Clients: []string{"console"}, Groups: []string{"platform-admins"}, DeliveryProfiles: []string{"kv"}, MaxActiveBootstraps: 1, MaxBootstrapHistory: 1, MaxClusters: 1}
-	f.recovery = artifact.RecoveryProof{InstallationID: retentionPreviewInstallation, IssuerEpoch: retentionPreviewInstallation, Revision: rev, ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}
 	baseline := value.ScopedPolicy{Name: "baseline", Policy: value.Policy{Revision: identity.Revision{UID: "baseline", Generation: 1, Digest: artifact.Digest{1}}, Baseline: true, PurposeRef: "diagnostics", DefaultSeconds: 600, MaximumSeconds: 7200, DeletionBudgetSeconds: 300}, CaseDefaultSeconds: 3600, CaseMaximumSeconds: 7200, AuditDefaultSeconds: 3600, AuditMaximumSeconds: 7200, LegalExceptions: "disabled"}
 	snapshot := value.PolicySnapshot{SourceClusterID: retentionPreviewCluster, ControlNamespaceUID: "control", Hub: true, Revision: rev, ObservedAt: n, FreshUntil: n.Add(5 * time.Second), Policies: []value.ScopedPolicy{baseline}}
 	f.catalog = value.PreviewCatalog{Sources: []value.PreviewSource{{Ref: value.PolicySourceRef{ClusterID: retentionPreviewCluster, ControlNamespaceUID: "control", Hub: true}, Ready: true, Current: &snapshot}}}
-	return f, RetentionPreviewer{InstallationID: retentionPreviewInstallation, Administration: f, Catalog: f, Decoder: f, Recovery: f, Now: time.Now}
+	return f, RetentionPreviewer{InstallationID: retentionPreviewInstallation, Administration: f, Catalog: f, Decoder: f, Now: time.Now}
 }
 
 var shortenBaseline = []ProposedRetentionChange{{Action: "update", UID: "baseline", Spec: []byte(`{"maxima":"short"}`)}}
 
 // ADR-240: a current fleet operator previews a proposed change over the
-// catalog; the reply deadline never exceeds identity, administration or
-// recovery freshness.
+// catalog; the reply deadline never exceeds identity or administration
+// freshness.
 func TestRetentionPreviewFleetOperator(t *testing.T) {
 	f, s := newRetentionPreviewFixture()
 	got, until, err := s.Preview(context.Background(), f, shortenBaseline)
-	if err != nil || f.reads != 1 || !got.Complete() || got.Scanned != 0 || until.After(f.admin.FreshUntil) || until.After(f.recovery.FreshUntil) || f.resolved != 2 {
+	if err != nil || f.reads != 1 || !got.Complete() || got.Scanned != 0 || until.After(f.admin.FreshUntil) || f.resolved != 2 {
 		t.Fatalf("%+v %v %v reads=%d", got, until, err, f.reads)
 	}
 }
@@ -114,7 +109,7 @@ func TestRetentionPreviewNonOperatorRefused(t *testing.T) {
 	}
 }
 
-func TestRetentionPreviewRefusesInvalidProposalAndRecovery(t *testing.T) {
+func TestRetentionPreviewRefusesInvalidProposal(t *testing.T) {
 	f, s := newRetentionPreviewFixture()
 	if _, _, err := s.Preview(context.Background(), f, []ProposedRetentionChange{{Action: "update", UID: "baseline", Spec: []byte(`{}`)}}); !errors.Is(err, value.ErrInvalid) || f.reads != 0 {
 		t.Fatal(err)
@@ -127,11 +122,6 @@ func TestRetentionPreviewRefusesInvalidProposalAndRecovery(t *testing.T) {
 	}
 	// A local source's spec is decoded as local (never a baseline).
 	if _, _, err := s.Preview(context.Background(), f, []ProposedRetentionChange{{Action: "create", SourceClusterID: retentionPreviewCluster, Spec: []byte(`{"maxima":"short"}`)}}); !errors.Is(err, value.ErrInvalid) {
-		t.Fatal(err)
-	}
-	f, s = newRetentionPreviewFixture()
-	f.recovery.InstallationID = retentionPreviewCluster
-	if _, _, err := s.Preview(context.Background(), f, shortenBaseline); !errors.Is(err, identity.ErrUnavailable) || f.reads != 0 {
 		t.Fatal(err)
 	}
 }

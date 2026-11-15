@@ -102,7 +102,7 @@ func recordingSavePolicyCompiler(filters planningapp.FilterCompiler, profiles ca
 // nested RecordingSaveEnabled value is insufficient. No observation is created.
 func packetSourceCompositionReady(c PublicContextOperationsConfig, s PublicContextOperationServices) bool {
 	r, i := s.ongoingSources, s.Investigation
-	if !c.CollectionEnabled || r == nil || r.Ledger == nil || r.Dispatcher == nil || r.Observer == nil || r.Recovery == nil || r.Retention == nil || r.Settings == nil || r.Now == nil || r.NewID == nil || i.RecordingPolicies == nil || i.PolicyAccepted == nil || i.RecordingSources == nil || i.RecordingGroups == nil || i.Approvals == nil {
+	if !c.CollectionEnabled || r == nil || r.Ledger == nil || r.Dispatcher == nil || r.Observer == nil || r.Retention == nil || r.Settings == nil || r.Now == nil || r.NewID == nil || i.RecordingPolicies == nil || i.PolicyAccepted == nil || i.RecordingSources == nil || i.RecordingGroups == nil || i.Approvals == nil {
 		return false
 	}
 	_, snapshots := i.Targets.(captureapp.SourceSnapshotGroupTargets)
@@ -120,5 +120,5 @@ func (p *publicContext) packetSourceRuntime(now func() time.Time, newID func() s
 	if !ok {
 		return nil
 	}
-	return &captureapp.PolicySourceRuntime{Ledger: p.policySources, Dispatcher: p.sourceDispatch, Observer: observer, Recovery: p.investigation.Recovery, Retention: p.investigation.Retention, Settings: p.investigation.Approvals, Storage: p.investigation.Storage, Refresh: p.investigation.Refresh, Now: now, NewID: newID}
+	return &captureapp.PolicySourceRuntime{Ledger: p.policySources, Dispatcher: p.sourceDispatch, Observer: observer, Retention: p.investigation.Retention, Settings: p.investigation.Approvals, Storage: p.investigation.Storage, Refresh: p.investigation.Refresh, Now: now, NewID: newID}
 }

@@ -8,7 +8,6 @@ import (
 
 	"asservat.local/asservat/internal/adapters/postgres"
 	app "asservat.local/asservat/internal/application/authorization"
-	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
@@ -17,7 +16,7 @@ import (
 
 // Actual SQL semantic control, explicitly below the public audited boundary.
 // Synthetic current identity/protected observations remain fixture inputs.
-func qualifyPolicyGrantAttachmentControl(t *testing.T, ctx context.Context, admin, hub *pgxpool.Pool, source *postgres.Policies, observation capture.PolicySource, actor identity.Identity, grant authorization.Grant, recovery artifact.RecoveryProof) {
+func qualifyPolicyGrantAttachmentControl(t *testing.T, ctx context.Context, admin, hub *pgxpool.Pool, source *postgres.Policies, observation capture.PolicySource, actor identity.Identity, grant authorization.Grant) {
 	t.Helper()
 	control, err := postgres.NewPolicies(ctx, hub, grant.RootID, grant.Policy.Authority.InstallationID)
 	if err != nil {
@@ -25,7 +24,7 @@ func qualifyPolicyGrantAttachmentControl(t *testing.T, ctx context.Context, admi
 	}
 	actor.Principal.Subject = "new-current-team-maintainer"
 	actor.Scopes = []string{"evidence:read", "evidence:capture"}
-	in := app.PolicyGrantAttachmentInput{ID: custodyID(), PolicyUID: observation.Revision.UID, GrantID: grant.ID, IdempotencyKey: "explicit-current-manager-attachment", Actor: actor, Recovery: recovery}
+	in := app.PolicyGrantAttachmentInput{ID: custodyID(), PolicyUID: observation.Revision.UID, GrantID: grant.ID, IdempotencyKey: "explicit-current-manager-attachment", Actor: actor}
 	a, replay, err := control.AttachPolicyGrant(ctx, in)
 	if err != nil || replay || !a.Valid() || a.Actor != actor.Principal || a.Actor == grant.Requester || a.GrantID != grant.ID {
 		t.Fatal("current manager could not attach original team grant", a, replay, err)

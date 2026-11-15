@@ -61,7 +61,7 @@ func TestGroupCancellationValidatesCohortAndKeepsUnknownChildrenPending(t *testi
 			case "invalid-last-child":
 				p.work.Group.Targets[1].Snapshot.AttemptID = ""
 			}
-			s := CaptureCancellation{RootID: fixtureID(1), InstallationID: fixtureID(2), Ledger: p, Dispatcher: p, Recovery: f, Now: func() time.Time { return f.now }}
+			s := CaptureCancellation{RootID: fixtureID(1), InstallationID: fixtureID(2), Ledger: p, Dispatcher: p, Now: func() time.Time { return f.now }}
 			out, err := s.Cancel(t.Context(), fixtureIdentityResolverHandle{f}, value.CancellationRequest{CaptureID: parent, ExpectedRevision: 1, IdempotencyKey: "parent-stop"})
 			if name == "unknown-first-delivery" {
 				if !errors.Is(err, lost) || p.calls != 2 || !out.Requested || out.Phase != "Running" || out.CaptureID != parent {

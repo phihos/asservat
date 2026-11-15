@@ -30,7 +30,7 @@ func (s *APIContextExecutions) RequestCaptureCancellation(ctx context.Context, i
 		return out, value.ErrInvalid
 	}
 	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		trust, err := s.guards.Recovery.lock(ctx, q, s.root, in.Recovery)
+		trust, _, err := currentTrust(ctx, q, s.installation)
 		if err != nil {
 			return err
 		}
@@ -52,17 +52,13 @@ func (s *APIContextExecutions) RequestCaptureCancellation(ctx context.Context, i
 	return out, captureError(err)
 }
 
-func (s *APIContextExecutions) RecordAPISnapshotCancellation(ctx context.Context, r execution.APIExecution, proof artifact.SourceSnapshotCancellation, process execution.APIProcessObservation, recovery artifact.RecoveryProof) (execution.APIExecution, error) {
+func (s *APIContextExecutions) RecordAPISnapshotCancellation(ctx context.Context, r execution.APIExecution, proof artifact.SourceSnapshotCancellation, process execution.APIProcessObservation) (execution.APIExecution, error) {
 	var out execution.APIExecution
 	if s == nil || !r.Valid() || r.RootID != s.root || r.Phase != "cancelled" || !proof.Valid() || !r.CompletedAt.Equal(proof.JoinedAt) || process.Binding != r.Process {
 		return out, execution.ErrInvalid
 	}
 	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		trust, err := s.guards.Recovery.lock(ctx, q, s.root, recovery)
-		if err != nil {
-			return err
-		}
-		if _, err = q.LockPermissionStream(ctx, id(s.root)); err != nil {
+		if _, err := q.LockPermissionStream(ctx, id(s.root)); err != nil {
 			return err
 		}
 		capture, err := q.LockContextCapture(ctx, custodydb.LockContextCaptureParams{RootID: id(s.root), ID: id(r.Binding.CaptureID)})
@@ -121,7 +117,7 @@ func (s *APIContextExecutions) RecordAPISnapshotCancellation(ctx context.Context
 		if err != nil {
 			return err
 		}
-		return s.guards.Recovery.check(ctx, q, trust, s.root, recovery)
+		return nil
 	})
 	return out, captureError(err)
 }
@@ -226,9 +222,6 @@ func (s *APIContextExecutions) requestSnapshotCancellationInTransaction(ctx cont
 				out.ClusterID = accepted.Expectation.Registration.Location.ClusterID
 				out.Snapshot = &collector.SourceSnapshot{Binding: *w.SourceBinding, CaptureID: accepted.CaptureID, AttemptID: accepted.Expectation.Registration.Location.AttemptID, WriterPodUID: old.Process.PodUID, WriterEpoch: old.Process.ProcessEpoch, ExpectationDigest: [32]byte(evidence.ContextExpectationDigest(accepted.Expectation)), Request: *accepted.Expectation.Snapshot}
 			}
-		}
-		if err = s.guards.Recovery.check(ctx, q, trust, s.root, in.Recovery); err != nil {
-			return err
 		}
 		now, err = q.CurrentTime(ctx)
 		if err != nil {

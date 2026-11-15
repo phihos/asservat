@@ -86,7 +86,6 @@ type ConnectorCredentialPermit struct {
 	Configuration                              ConnectorCredentialObservation
 	CurrentPeer                                AuthenticatedPeer
 	ProcessProof                               *ConnectorProcessProof `json:",omitempty"`
-	Recovery                                   RecoveryState
 	IntentDigest                               artifact.Digest
 	Epoch                                      int64
 	Ordinal                                    int

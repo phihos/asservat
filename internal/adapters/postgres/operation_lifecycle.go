@@ -13,7 +13,7 @@ import (
 )
 
 // Construct separate instances with producer, cleanup, independent verifier and
-// finalizer credentials. No facet provisions policy, capacity or recovery.
+// finalizer credentials. No facet provisions policy or capacity.
 type OperationLifecycles struct {
 	journal      *OperationJournal
 	connector    bool
@@ -22,8 +22,8 @@ type OperationLifecycles struct {
 	captureScope captureLifecycleScope
 }
 
-func NewOperationLifecycles(ctx context.Context, pool *pgxpool.Pool, root, lane string, recovery *RecoveryTransactionGuard) (*OperationLifecycles, error) {
-	j, e := NewOperationJournal(ctx, pool, root, lane, recovery)
+func NewOperationLifecycles(ctx context.Context, pool *pgxpool.Pool, root, lane, installation string) (*OperationLifecycles, error) {
+	j, e := NewOperationJournal(ctx, pool, root, lane, installation)
 	if e != nil {
 		return nil, e
 	}
@@ -154,7 +154,7 @@ func (s *OperationLifecycles) transaction(ctx context.Context, operation string,
 	}
 	j := s.journal
 	e := j.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		trust, start, e := j.trust(ctx, q)
+		start, e := q.CurrentTime(ctx)
 		if e != nil {
 			return e
 		}
@@ -188,15 +188,15 @@ func (s *OperationLifecycles) transaction(ctx context.Context, operation string,
 		if s.connector && !sameAuditJSON(state.Intent.Lifecycle.Policy, *j.lifecycle) {
 			return app.ErrUnavailable
 		}
-		incarnation, e := q.ReadContextDatabaseIncarnation(ctx, id(j.recovery.installation))
+		incarnation, e := q.ReadContextDatabaseIncarnation(ctx, id(j.installation))
 		if e != nil {
 			return e
 		}
-		if !operationLifecycleIncarnation(d, trust, incarnation, j.recovery.installation) {
+		if !operationLifecycleIncarnation(d, incarnation, j.installation) {
 			return app.ErrUnavailable
 		}
-		until := identity.Earlier(start.Add(5*time.Second), trust.FreshUntil.Time)
-		if e = auditCurrent(ctx, q, trust, start, until); e != nil {
+		until := start.Time.Add(5 * time.Second)
+		if e = auditCurrent(ctx, q, until); e != nil {
 			return e
 		}
 		now, e := q.CurrentTime(ctx)
@@ -210,7 +210,7 @@ func (s *OperationLifecycles) transaction(ctx context.Context, operation string,
 		if !extra.IsZero() {
 			until = identity.Earlier(until, extra)
 		}
-		return auditCurrent(ctx, q, trust, start, until)
+		return auditCurrent(ctx, q, until)
 	})
 	if e != nil || ctx.Err() != nil {
 		return app.ErrUnavailable
@@ -421,8 +421,8 @@ func (s *OperationLifecycles) RecordCertificateCompletion(ctx context.Context, r
 	})
 }
 
-// ClaimOperationCertificateVerification spends before provider I/O. The current
-// recovery observation, original caller interval and immutable certificate end
+// ClaimOperationCertificateVerification spends before provider I/O. The
+// original caller interval and immutable certificate end
 // all survive blocking locks. Unknown transaction replies never return a permit.
 func (s *OperationLifecycles) ClaimOperationCertificateVerification(ctx context.Context, r value.OperationRetirement, receipt value.Receipt) (time.Time, error) {
 	if ctx == nil || ctx.Err() != nil || !r.Valid() || !receipt.ValidOperationRetirement(r.RootID, r.OperationID) {
@@ -530,7 +530,7 @@ func (s *OperationLifecycles) RetireOperationAudit(ctx context.Context, operatio
 		if !state.TerminalAcknowledged || state.Terminal == nil && state.OverduePurge == nil || state.Lease == nil || !now.Before(state.Lease.Until) {
 			return time.Time{}, app.ErrUnavailable
 		}
-		ok, e := q.FinishOperationRetirement(ctx, custodydb.FinishOperationRetirementParams{R: id(s.journal.root), I: id(operation), Installation: id(s.journal.recovery.installation)})
+		ok, e := q.FinishOperationRetirement(ctx, custodydb.FinishOperationRetirementParams{R: id(s.journal.root), I: id(operation), Installation: id(s.journal.installation)})
 		if e != nil || !ok {
 			return time.Time{}, app.ErrUnavailable
 		}
@@ -548,7 +548,7 @@ func (s *OperationLifecycles) DueOperationHistory(ctx context.Context) ([]value.
 	j := s.journal
 	var out []value.OperationHistoryKey
 	err := j.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		trust, start, e := j.trust(ctx, q)
+		start, e := q.CurrentTime(ctx)
 		if e != nil {
 			return e
 		}
@@ -568,7 +568,7 @@ func (s *OperationLifecycles) DueOperationHistory(ctx context.Context) ([]value.
 			}
 			out = append(out, k)
 		}
-		return auditCurrent(ctx, q, trust, start, identity.Earlier(start.Add(5*time.Second), trust.FreshUntil.Time))
+		return auditCurrent(ctx, q, start.Time.Add(5*time.Second))
 	})
 	if err != nil || ctx.Err() != nil {
 		return nil, app.ErrUnavailable
@@ -582,13 +582,13 @@ func (s *OperationLifecycles) ReleaseOperationHistory(ctx context.Context, k val
 	}
 	j := s.journal
 	err := j.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		trust, start, e := j.trust(ctx, q)
+		start, e := q.CurrentTime(ctx)
 		if e != nil {
 			return e
 		}
-		// The fixed function uses the same recovery->pool->account->history order,
+		// The fixed function uses the same pool->account->history order,
 		// verifies the original admission incarnation, and drains exactly once.
-		r, e := s.queries(q).FinishOperationHistory(ctx, custodydb.FinishOperationHistoryParams{R: id(k.RootID), L: k.Lane, P: k.PrincipalDigest[:], Releases: ts(k.ReleaseAt), Deletes: ts(k.DeleteBy), Installation: id(j.recovery.installation)})
+		r, e := s.queries(q).FinishOperationHistory(ctx, custodydb.FinishOperationHistoryParams{R: id(k.RootID), L: k.Lane, P: k.PrincipalDigest[:], Releases: ts(k.ReleaseAt), Deletes: ts(k.DeleteBy), Installation: id(j.installation)})
 		if e != nil {
 			return e
 		}
@@ -596,7 +596,7 @@ func (s *OperationLifecycles) ReleaseOperationHistory(ctx context.Context, k val
 			return app.ErrUnavailable
 		}
 		out = value.OperationHistoryRelease{Records: r.Records, Overdue: r.Overdue}
-		return auditCurrent(ctx, q, trust, start, identity.Earlier(start.Add(5*time.Second), trust.FreshUntil.Time))
+		return auditCurrent(ctx, q, start.Time.Add(5*time.Second))
 	})
 	if err != nil || ctx.Err() != nil {
 		return value.OperationHistoryRelease{}, app.ErrUnavailable
@@ -604,6 +604,6 @@ func (s *OperationLifecycles) ReleaseOperationHistory(ctx context.Context, k val
 	return out, nil
 }
 
-func operationLifecycleIncarnation(d custodydb.OperationAuditLifecycle, t custodydb.FleetCurrentTrust, current custodydb.ReadContextDatabaseIncarnationRow, installation string) bool {
-	return uid(d.InstallationID) == installation && d.IssuerEpoch == t.IssuerEpoch && d.PostmasterAt.Valid && current.PostmasterAt.Valid && d.PostmasterAt.Time.Equal(current.PostmasterAt.Time) && d.DatabaseOid.Valid && d.DatabaseOid == current.DatabaseOid
+func operationLifecycleIncarnation(d custodydb.OperationAuditLifecycle, current custodydb.ReadContextDatabaseIncarnationRow, installation string) bool {
+	return uid(d.InstallationID) == installation && d.PostmasterAt.Valid && current.PostmasterAt.Valid && d.PostmasterAt.Time.Equal(current.PostmasterAt.Time) && d.DatabaseOid.Valid && d.DatabaseOid == current.DatabaseOid
 }

@@ -213,7 +213,7 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 				})
 				admitPool := poolFor(admitRole, "synthetic-policy-recorder-admit")
 				defer admitPool.Close()
-				admissions, err = postgres.NewContextAdmissions(ctx, admitPool, root, postgres.EffectTransactionGuards{Recovery: s.recovery.guard, Retention: s.retention.guard})
+				admissions, err = postgres.NewContextAdmissions(ctx, admitPool, root, installation, s.retention.guard)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -332,10 +332,6 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 			if err = sources.ObservePolicy(ctx, source); err != nil {
 				t.Fatal(err)
 			}
-			recovery, err := s.recovery.reader.RecoveryState(ctx)
-			if err != nil {
-				t.Fatal(err)
-			}
 			author := s.a.Eligibility.VerifiedIdentity
 			if recurringSharing != nil {
 				author = policyRecorderRecurringSharingAuthor(author)
@@ -352,7 +348,7 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 					t.Fatal("recurring sharing author preflight", eligible.Reason)
 				}
 			}
-			accepted := capture.PolicyAdmission{RootID: root, Recovery: recovery, Authority: authority, Author: author, Workload: &workload, Submission: capture.VerifiedPolicySubmission{Nonce: custodyID(), Actor: creator, Source: source.Revision, ClusterID: source.ClusterID, NamespaceUID: source.NamespaceUID, Name: source.Name, ScopeDigest: authority.ScopeDigest, EnvelopeDigest: artifact.Digest{92}, IssuedAt: now, ExpiresAt: now.Add(30 * time.Second)}}
+			accepted := capture.PolicyAdmission{RootID: root, Authority: authority, Author: author, Workload: &workload, Submission: capture.VerifiedPolicySubmission{Nonce: custodyID(), Actor: creator, Source: source.Revision, ClusterID: source.ClusterID, NamespaceUID: source.NamespaceUID, Name: source.Name, ScopeDigest: authority.ScopeDigest, EnvelopeDigest: artifact.Digest{92}, IssuedAt: now, ExpiresAt: now.Add(30 * time.Second)}}
 			accepted.Sharing = recurringSharing
 			accepted.Verification = syntheticSubmissionCheck(accepted, now)
 			record, err := acceptor.AcceptPolicy(ctx, accepted)
@@ -444,10 +440,6 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 
 			a.Plan.Input = in
 			a.Eligibility, a.IdempotencyKey = eligible, rows[0].ID
-			a.Recovery, err = s.recovery.reader.RecoveryState(ctx)
-			if err != nil {
-				t.Fatal(err)
-			}
 			a, preview := buildPolicyRecorderAdmissionFixture(t, a, compiled.Recorder.Composition, filters, !companionSQL && !argumentCompanion, clock(), endpoint)
 			requirePolicyRecorderAdmissionFixture(t, a, preview, clock())
 			previews, err := postgres.NewContextPreviews(ctx, hub, root)
@@ -487,7 +479,7 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 			if err != nil {
 				t.Fatal("accepted budget status", err)
 			}
-			grantStore, err := postgres.NewAccessGrants(ctx, hub, root, s.recovery.guard)
+			grantStore, err := postgres.NewAccessGrants(ctx, hub, root, s.recovery.installation)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -607,7 +599,7 @@ func buildPolicyRecorderAdmissionFixture(t testing.TB, a capture.Admission, comp
 		t.Fatal(err)
 	}
 	a.Registration.WriteUntil, a.Registration.ExpiresAt, a.Registration.DeleteBy = in.Deadline, in.Retention.ExpiresAt, in.Retention.DeleteBy
-	p := capture.ContextPreview{ID: custodyID(), AssessmentID: custodyID(), AssessmentRulesDigest: planning.RecorderAssessmentRulesFor(reviewed.Actions), RootID: a.RootID, InstallationID: a.Recovery.InstallationID, IssuerEpoch: a.Recovery.IssuerEpoch, CaptureID: in.CaptureID, CaseID: a.CaseID, OccurrenceID: a.OccurrenceID, ArtifactID: a.Registration.Location.ArtifactID, AttemptID: a.Registration.Location.AttemptID, Actor: in.Executor, ExecutionClass: in.Target.ExecutionClass,
+	p := capture.ContextPreview{ID: custodyID(), AssessmentID: custodyID(), AssessmentRulesDigest: planning.RecorderAssessmentRulesFor(reviewed.Actions), RootID: a.RootID, InstallationID: strings.TrimPrefix(in.Executor.Issuer, "urn:asservat:installation:"), CaptureID: in.CaptureID, CaseID: a.CaseID, OccurrenceID: a.OccurrenceID, ArtifactID: a.Registration.Location.ArtifactID, AttemptID: a.Registration.Location.AttemptID, Actor: in.Executor, ExecutionClass: in.Target.ExecutionClass,
 		Intent: capture.ContextIntent{Target: targets.WorkloadRequest{ClusterID: in.Target.Request.ClusterID, Namespace: in.Target.Request.Namespace.Name, Kind: "Pod", Name: in.Target.Request.PodName}, Composition: composition.Clone(), RequestedSeconds: in.Retention.RequestedSeconds}, Target: in.Target.Request, Pin: in.Target.Pin,
 		Storage:   capture.ContextStorageSelection{StoreID: a.Registration.StoreID, AllocationID: a.Registration.AllocationID, PoolRevision: a.Registration.PoolRevision, AllocationRevision: a.Registration.AllocationRevision, BindingRevision: a.Storage.Revision},
 		Retention: capture.ContextRetentionReview{PurposeRef: in.Retention.PurposeRef, RequestedSeconds: in.Retention.RequestedSeconds, MaximumSeconds: in.Retention.MaximumSeconds, DeletionBudgetSeconds: in.Retention.DeletionBudgetSeconds, Policies: in.Retention.Policies}, Audience: append([]artifact.AudienceAssignment(nil), a.Eligibility.DefaultAudience...), CanonicalScope: reviewed.CanonicalScope, ScopeDigest: reviewed.ScopeDigest, CreatedAt: now, Deadline: in.Deadline}
@@ -639,7 +631,6 @@ func requirePolicyRecorderAdmissionFixture(t testing.TB, a capture.Admission, p 
 		"eligible-principal":         e.Principal == in.Executor && e.VerifiedIdentity.Principal == in.Executor,
 		"eligible-identity-revision": e.IdentityRevision == e.VerifiedIdentity.Policy && e.VerifiedIdentity.Valid(now),
 		"permission-revision":        e.PermissionRevision.Valid(),
-		"current-recovery":           a.Recovery.Valid(now),
 		"actual-preview":             captureapp.ValidContextPreview(p) && p.Current(now),
 		"reviewed-request-digest":    a.SubmissionDigest == captureapp.ContextRequestDigest(p.ID),
 		"preview-scope":              p.ScopeDigest == a.Plan.ScopeDigest && bytes.Equal(p.CanonicalScope, a.Plan.CanonicalScope),
@@ -711,7 +702,7 @@ func policyRecorderOfflineAdmission(t testing.TB, now time.Time) capture.Admissi
 	verified := identity.Identity{Principal: actor, Policy: identity.Revision{UID: "policy-recorder", Generation: 1, Digest: artifact.Digest{4}}, Scopes: []string{"evidence:capture"}, VerifiedAt: now, ValidUntil: now.Add(5 * time.Second)}
 	eligible := authorization.CaptureEligibility{Result: authorization.Result{Eligible: true, Principal: actor, IdentityRevision: verified.Policy, PermissionRevision: identity.Revision{UID: "permissions", Generation: 1, Digest: artifact.Digest{5}}, ValidUntil: verified.ValidUntil}, Target: target.Target(), VerifiedIdentity: verified, DefaultAudience: []artifact.AudienceAssignment{owner}}
 	allocation := custodyID()
-	return capture.Admission{RootID: root, IdempotencyKey: custodyID(), Plan: planvalue.ContextPlan{Input: in}, Eligibility: eligible, Recovery: artifact.RecoveryProof{InstallationID: installation, IssuerEpoch: custodyID(), Revision: identity.Revision{UID: "recovery", Generation: 1, Digest: artifact.Digest{6}}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}, Storage: capture.StorageBinding{RootID: root, ClusterID: cluster, NamespaceUID: target.Target().NamespaceUID, WorkloadUID: target.Target().WorkloadUID, AllocationID: allocation, Revision: identity.Revision{UID: "storage", Generation: 1, Digest: artifact.Digest{7}}, ObservedAt: now, FreshUntil: now.Add(30 * time.Second)}, Registration: artifact.Registration{Location: artifact.Location{ClusterID: cluster, ArtifactID: custodyID(), AttemptID: custodyID()}, StoreID: custodyID(), AllocationID: allocation, PoolRevision: 1, AllocationRevision: 1, NativeLimit: artifact.RecordingNativeLimit, AnchorAt: retained.AnchorAt}, CaseID: custodyID(), OccurrenceID: custodyID()}
+	return capture.Admission{RootID: root, IdempotencyKey: custodyID(), Plan: planvalue.ContextPlan{Input: in}, Eligibility: eligible, Storage: capture.StorageBinding{RootID: root, ClusterID: cluster, NamespaceUID: target.Target().NamespaceUID, WorkloadUID: target.Target().WorkloadUID, AllocationID: allocation, Revision: identity.Revision{UID: "storage", Generation: 1, Digest: artifact.Digest{7}}, ObservedAt: now, FreshUntil: now.Add(30 * time.Second)}, Registration: artifact.Registration{Location: artifact.Location{ClusterID: cluster, ArtifactID: custodyID(), AttemptID: custodyID()}, StoreID: custodyID(), AllocationID: allocation, PoolRevision: 1, AllocationRevision: 1, NativeLimit: artifact.RecordingNativeLimit, AnchorAt: retained.AnchorAt}, CaseID: custodyID(), OccurrenceID: custodyID()}
 }
 
 func policyMetadataCompile(filters planning.FilterCompiler) captureapp.PolicyRecorderCompiler {

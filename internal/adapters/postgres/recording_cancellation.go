@@ -15,17 +15,13 @@ import (
 
 var _ executionapp.APIRecordingCancellationRecorder = (*APIContextExecutions)(nil)
 
-func (s *APIContextExecutions) RecordAPIRecordingCancellation(ctx context.Context, r execution.APIExecution, proof artifact.RecordingCancellation, process execution.APIProcessObservation, recovery artifact.RecoveryProof) (execution.APIExecution, error) {
+func (s *APIContextExecutions) RecordAPIRecordingCancellation(ctx context.Context, r execution.APIExecution, proof artifact.RecordingCancellation, process execution.APIProcessObservation) (execution.APIExecution, error) {
 	var out execution.APIExecution
 	if s == nil || !r.Valid() || r.RootID != s.root || r.Phase != "cancelled" || !proof.Valid() || !r.CompletedAt.Equal(proof.JoinedAt) || process.Binding != r.Process {
 		return out, execution.ErrInvalid
 	}
 	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		trust, err := s.guards.Recovery.lock(ctx, q, s.root, recovery)
-		if err != nil {
-			return err
-		}
-		if _, err = q.LockPermissionStream(ctx, id(s.root)); err != nil {
+		if _, err := q.LockPermissionStream(ctx, id(s.root)); err != nil {
 			return err
 		}
 		capture, err := q.LockContextCapture(ctx, custodydb.LockContextCaptureParams{RootID: id(s.root), ID: id(r.Binding.CaptureID)})
@@ -84,7 +80,7 @@ func (s *APIContextExecutions) RecordAPIRecordingCancellation(ctx context.Contex
 		if err != nil {
 			return err
 		}
-		return s.guards.Recovery.check(ctx, q, trust, s.root, recovery)
+		return nil
 	})
 	return out, captureError(err)
 }

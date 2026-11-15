@@ -101,7 +101,6 @@ type publicContext struct {
 	retention   privacyapp.RetentionResolver
 	permissions *postgres.Permissions
 	catalog     *postgres.ContextPublications
-	recovery    *postgres.RecoveryReader
 	mac         *auditapp.OperationMAC
 	// clusters is the guarded cluster catalog read at start and its digest
 	// (ADR-196 decision 3): a later change restarts the process.
@@ -177,7 +176,7 @@ type publicAuditStore struct {
 // effect guards; the public layer uses the identical instances.
 type publicShared struct {
 	topologies configapp.RetentionTopologyReader
-	guards     postgres.EffectTransactionGuards
+	retention  *postgres.RetentionTransactionGuard
 	nativeRead *pgxpool.Pool
 	// workers are the pinned worker-namespace clients of Native.WorkerAPIs;
 	// origins the native download-peer origins over them.
@@ -215,9 +214,6 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 		return nil, err
 	}
 	out := &publicContext{}
-	if out.recovery, err = postgres.NewRecoveryReader(ctx, sql["identity-read"], installation); err != nil {
-		return nil, mounts.ErrUnavailable
-	}
 	if out.mac, err = newPublicOperationMAC(ctx, files, in.config.InstallationID); err != nil {
 		return nil, mounts.ErrUnavailable
 	}
@@ -275,7 +271,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 		if err != nil {
 			return nil, mounts.ErrUnavailable
 		}
-		capability, err := kube.NewContextCapabilitySource(observer, capGuard, out.recovery, v.Capability.Source.Name, v.Capability.Source.UID, v.Settings)
+		capability, err := kube.NewContextCapabilitySource(observer, capGuard, v.Capability.Source.Name, v.Capability.Source.UID, v.Settings)
 		if err != nil {
 			return nil, mounts.ErrUnavailable
 		}
@@ -284,7 +280,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 		if err != nil {
 			return nil, mounts.ErrUnavailable
 		}
-		trust, err := kube.NewAPIContextWorkTrustSource(observer, trustGuard, out.recovery, v.WorkTrust.Source.Name, v.WorkTrust.Source.UID, v.Trust)
+		trust, err := kube.NewAPIContextWorkTrustSource(observer, trustGuard, v.WorkTrust.Source.Name, v.WorkTrust.Source.UID, v.Trust)
 		if err != nil {
 			return nil, mounts.ErrUnavailable
 		}
@@ -307,11 +303,11 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 		} else if _, dup := capabilities[v.ClusterID]; dup {
 			return nil, &fixedStepError{step + "-duplicate", mounts.ErrUnavailable}
 		}
-		capability, err := kube.NewLocalContextCapabilitySource(observer, out.recovery, v.Connector.SourceUID, v.Settings)
+		capability, err := kube.NewLocalContextCapabilitySource(observer, v.Connector.SourceUID, v.Settings)
 		if err != nil {
 			return nil, &fixedStepError{step + "-capability", mounts.ErrUnavailable}
 		}
-		trust, err := kube.NewLocalAPIContextWorkTrustSource(observer, out.recovery, v.Connector.SourceUID, v.Trust)
+		trust, err := kube.NewLocalAPIContextWorkTrustSource(observer, v.Connector.SourceUID, v.Trust)
 		if err != nil {
 			return nil, &fixedStepError{step + "-trust", mounts.ErrUnavailable}
 		}
@@ -336,7 +332,6 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	*closers = append(*closers, router.Close)
 	out.starts = &OwnerContextStartRuntimeConfig{RootID: root, Router: router, Connections: limits.Standby, Preflight: limits.Standby}
 
-	recovery := shared.guards.Recovery
 	if out.permissions, err = postgres.NewPermissions(ctx, sql["hub-metadata-read"], root); err != nil {
 		return nil, mounts.ErrUnavailable
 	}
@@ -348,11 +343,11 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	// ADR-179: no selector reader; selector policies refuse new collection.
 	accepted := privacyapp.AcceptedRetentionReader{Topology: shared.topologies, Sources: sources, Now: time.Now}
 	out.retention = privacyapp.RetentionResolver{Policies: accepted, RetainedPolicies: accepted, Now: time.Now}
-	historySQL, err := postgres.NewHistoryParameters(ctx, sql["capture-history"], root, shared.guards)
+	historySQL, err := postgres.NewHistoryParameters(ctx, sql["capture-history"], root, installation, shared.retention)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	out.history = &captureapp.HistoryParameterService{RootID: root, InstallationID: installation, Ledger: historySQL, Regional: RegionalHistoryDispatch{Router: router, Signer: signers, Now: time.Now, Report: timedEventLog(os.Stderr, "history dispatch")}, Codec: objectstore.HistoryCodec{Sealer: a.seal, Opener: a.open, Keys: out.mac}, Keys: out.mac, Recovery: out.recovery, Retention: out.retention, Limits: historyBounds, ReportFailure: eventLog(os.Stderr, "history unavailable"), ReportTiming: timedEventLog(os.Stderr, "history timing")}
+	out.history = &captureapp.HistoryParameterService{RootID: root, InstallationID: installation, Ledger: historySQL, Regional: RegionalHistoryDispatch{Router: router, Signer: signers, Now: time.Now, Report: timedEventLog(os.Stderr, "history dispatch")}, Codec: objectstore.HistoryCodec{Sealer: a.seal, Opener: a.open, Keys: out.mac}, Keys: out.mac, Retention: out.retention, Limits: historyBounds, ReportFailure: eventLog(os.Stderr, "history unavailable"), ReportTiming: timedEventLog(os.Stderr, "history timing")}
 
 	// ADR-228: policy captures share the investigation; the eligibility port
 	// evaluates a policy executor through its acceptance and team delegation.
@@ -365,7 +360,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	if out.policyTriggers, err = postgres.NewPolicyTriggers(ctx, sql["policy-automation"], root, installation); err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	if out.policySources, err = postgres.NewPolicySources(ctx, sql["policy-automation"], root, installation, shared.guards); err != nil {
+	if out.policySources, err = postgres.NewPolicySources(ctx, sql["policy-automation"], root, installation, shared.retention); err != nil {
 		return nil, mounts.ErrUnavailable
 	}
 	out.sourceDispatch = RegionalSourceDispatch{Router: router, Signer: signers, Now: time.Now}
@@ -390,11 +385,11 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	admissionsSQL, err := postgres.NewAuditedContextAdmissions(ctx, sql["capture-admit"], root, out.mac, shared.guards)
+	admissionsSQL, err := postgres.NewAuditedContextAdmissions(ctx, sql["capture-admit"], root, installation, out.mac, shared.retention)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	resolution, err := postgres.NewContextRequestResolutions(ctx, sql["capture-resolution"], root, recovery)
+	resolution, err := postgres.NewContextRequestResolutions(ctx, sql["capture-resolution"], root, installation)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
@@ -402,7 +397,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	processing, err := postgres.NewProcessingReads(ctx, sql["hub-metadata-read"], root, recovery)
+	processing, err := postgres.NewProcessingReads(ctx, sql["hub-metadata-read"], root, installation)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
@@ -420,7 +415,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	out.reviews = authapp.AccessReviews{Store: reviewStore, Reviewer: queries, Now: time.Now}
 	out.investigation = captureapp.ContextInvestigation{RootID: root, InstallationID: installation, Previews: previews, Replay: admissionsSQL, Admission: admissionsSQL, Resolution: resolution,
 		ReportPreviewFailure: eventLog(os.Stderr, "public preview refused"),
-		Targets:              queries, Eligibility: eligibility, Capabilities: capabilities, Retention: out.retention, Storage: storage, Refresh: refresh, Processing: processing, Recovery: out.recovery, Reviews: out.reviews,
+		Targets:              queries, Eligibility: eligibility, Capabilities: capabilities, Retention: out.retention, Storage: storage, Refresh: refresh, Processing: processing, Reviews: out.reviews,
 		// ADR-243: libpcap only in a hub build with the libpcap tag; otherwise a stub.
 		Filters: newPublicRecorderCompiler(),
 		// ADR-283 PR 2: the target's region resolves Kubernetes peers.
@@ -455,14 +450,14 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	}
 	out.intents = auditapp.CaptureOperationPublication{RootID: root, Completed: completed, Journal: journal, Acknowledgements: acks, Writer: writer, Reader: reader, MAC: out.mac}
 
-	executionSQL, err := postgres.NewAPIContextExecutions(ctx, sql["api-execution"], root, shared.guards)
+	executionSQL, err := postgres.NewAPIContextExecutions(ctx, sql["api-execution"], root, installation, shared.retention)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
 	// One governed pool/credential, retaining the three typed runner ports.
 	runner := executionapp.APIContextRunner{Read: executionSQL, Prepare: executionSQL, Record: executionSQL, Eligibility: eligibility, Retention: out.retention, Profiles: profiles}
 	out.regional = RegionalAPIContextStart{Runner: runner, Signer: signers, Router: router, Report: eventLog(os.Stderr, "context start run refused")}
-	out.collect = RegionalRecordingCollect{Runner: executionapp.APIContextRunner{Record: executionSQL, Capabilities: capabilities, Recovery: out.recovery, Now: time.Now}, Recordings: executionSQL, Signer: signers, Router: router, Now: time.Now, Report: eventLog(os.Stderr, "recording collect refused")}
+	out.collect = RegionalRecordingCollect{Runner: executionapp.APIContextRunner{Record: executionSQL, Capabilities: capabilities, Now: time.Now}, Recordings: executionSQL, Signer: signers, Router: router, Now: time.Now, Report: eventLog(os.Stderr, "recording collect refused")}
 	out.investigation.ReasonCipher = reasonCipher
 	// ADR-248: node recorder availability is a regional pre-work query.
 	out.investigation.Recorders = queries
@@ -474,34 +469,34 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	out.investigation.RecordingPolicies, out.investigation.PolicyAccepted = recordingPolicies, out.policies
 	out.investigation.RecordingSources, out.investigation.RecordingGroups = previews, admissionsSQL
 	out.recordings = &captureapp.RecordingSaves{Targets: queries, Investigation: out.investigation, Inventory: captureapp.RecordingInventory{RootID: root, Permissions: out.permissions, Eligibility: eligibility, Candidates: previews, Policies: recordingPolicies, Selections: previews, Accepted: out.policies, Now: time.Now, NewID: ownerRandomID}}
-	out.cancellations = &captureapp.CaptureCancellation{RootID: root, InstallationID: installation, Ledger: executionSQL, Dispatcher: out.sourceDispatch, Recovery: out.recovery, Now: time.Now}
+	out.cancellations = &captureapp.CaptureCancellation{RootID: root, InstallationID: installation, Ledger: executionSQL, Dispatcher: out.sourceDispatch, Now: time.Now}
 
-	progress, err := postgres.NewContextProgressReads(ctx, sql["hub-metadata-read"], root, recovery)
+	progress, err := postgres.NewContextProgressReads(ctx, sql["hub-metadata-read"], root)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
 	out.progress = captureapp.ContextProgressService{Reasons: captureapp.StoredCaptureReasons{Records: journal, Cipher: reasonCipher}, RootID: root, InstallationID: installation, Reader: progress, Reviews: out.reviews}
-	routes, err := postgres.NewContextCaseReads(ctx, sql["hub-metadata-read"], root, recovery)
+	routes, err := postgres.NewContextCaseReads(ctx, sql["hub-metadata-read"], root)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
 	if out.catalog, err = postgres.NewContextPublications(ctx, sql["hub-metadata-read"], root); err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	if out.shares, err = postgres.NewEvidenceShares(ctx, sql["evidence-share"], root, recovery); err != nil {
+	if out.shares, err = postgres.NewEvidenceShares(ctx, sql["evidence-share"], root); err != nil {
 		return nil, mounts.ErrUnavailable
 	}
 	out.progress.Shares = out.shares // ADR-235: get_capture's sharing status
 	// ADR-249: the grant ledger shares the authorization duty's credential.
-	grantStore, err := postgres.NewAccessGrants(ctx, sql["evidence-share"], root, recovery)
+	grantStore, err := postgres.NewAccessGrants(ctx, sql["evidence-share"], root, installation)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
 	out.grants = authapp.GrantService{RootID: root, InstallationID: installation, Permissions: out.permissions, WorkloadPermissions: out.permissions, Store: grantStore, RawStore: grantStore, PolicyRequests: grantStore, ApprovalSettings: grantStore,
 		PolicyPlans: captureapp.PolicyGrantPlans{Accepted: out.policies, Sources: out.policies, Documents: out.hubPolicies, CompileRecorder: publicPolicyRecorderCompiler(out.investigation.Filters, out.investigation.Profiles, out.investigation.ProfileEndpoints), RecipeName: planningapp.ContextRecipeName, RecipeDigest: planningapp.RecipeDigest(), Now: time.Now},
-		Recovery:    out.recovery, NewID: ownerRandomID, Now: time.Now}
+		NewID:       ownerRandomID, Now: time.Now}
 	out.caseRoutes = routes
-	out.cases = catalogapp.ContextCaseService{RootID: root, InstallationID: installation, Routes: routes, Permissions: out.permissions, Catalog: out.catalog, Retention: out.retention, Processing: processing, Shares: out.shares, Reviews: out.reviews, Recovery: out.recovery, Now: time.Now}
+	out.cases = catalogapp.ContextCaseService{RootID: root, InstallationID: installation, Routes: routes, Permissions: out.permissions, Catalog: out.catalog, Retention: out.retention, Processing: processing, Shares: out.shares, Reviews: out.reviews, Now: time.Now}
 	// Freeze a fully initialized read service, never the earlier partial case value.
 	out.grants.RawSelections = out.cases
 	out.investigation.Grants = out.grants

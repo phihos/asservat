@@ -15,7 +15,7 @@ import (
 // Actual Request/review/current facts/admission, with synthetic ports. A legal
 // 30s observation naturally expires; only an independent read can replace it.
 func TestContextStorageRequestExpiredSourceUsesExistingRefresh(t *testing.T) {
-	for _, mode := range []string{"fresh", "hint-already-demanded", "expired-revision", "fresh-revision", "expired-pool", "fresh-pool", "hint-failed-demand", "invalid-interval", "wrong-target", "future", "missing-metadata", "generic-changed", "failed-demand", "original-recovery"} {
+	for _, mode := range []string{"fresh", "hint-already-demanded", "expired-revision", "fresh-revision", "expired-pool", "fresh-pool", "hint-failed-demand", "invalid-interval", "wrong-target", "future", "missing-metadata", "generic-changed", "failed-demand"} {
 		t.Run(mode, func(t *testing.T) {
 			f := newInvestigationFixture()
 			p := f.preview(t)
@@ -29,9 +29,6 @@ func TestContextStorageRequestExpiredSourceUsesExistingRefresh(t *testing.T) {
 				}
 				return nil
 			})
-			if mode == "original-recovery" {
-				f.svc.Recovery = consumptionRecovery{f, f.now.Add(1500 * time.Millisecond)}
-			}
 			admit := &consumptionAdmission{investigationFixture: f}
 			f.svc.Admission = admit
 			var independent ContextStorageObservation

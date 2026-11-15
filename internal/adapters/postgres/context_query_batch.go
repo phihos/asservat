@@ -207,12 +207,8 @@ func (s *ContextQueries) CompleteReadBatch(ctx context.Context, b value.ContextR
 		return closed.WithProjectionClosed(bound, b, callback)
 	}, func(joined context.Context) error {
 		return s.ledger.transaction(joined, func(tx *custodydb.Queries) error {
-			// Historical closure records no new access/effect. Original incarnation
-			// still binds all writes; restored state needs independent reconciliation.
-			trust, e := tx.ShareFleetTrust(joined, id(q.Plan.InstallationID))
-			if e != nil || uid(trust.IssuerEpoch) != q.RecoveryIssuerEpoch {
-				return value.ErrUnavailable
-			}
+			// Historical closure records no new access or effect.
+			var e error
 			if _, e = tx.LockPermissionStream(joined, id(s.root)); e != nil {
 				return e
 			}

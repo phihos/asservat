@@ -82,19 +82,19 @@ func (f *queryLedgerFixture) downloadWithoutWorkloadObservation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	processing, err := postgres.NewProcessingReads(b.ctx, catalogPool, s.a.RootID, s.recovery.guard)
+	processing, err := postgres.NewProcessingReads(b.ctx, catalogPool, s.a.RootID, s.recovery.installation)
 	if err != nil {
 		t.Fatal(err)
 	}
 	actor := s.a.Eligibility.VerifiedIdentity
 	actor.Scopes = []string{"evidence:read", "evidence:download"}
-	gate := authapp.ContextDownloadAuthority{RootID: s.a.RootID, Identities: nativeDownloadTestIdentity{value: actor, expires: time.Now().Add(2 * time.Minute)}, Permissions: s.p, Catalog: catalog, Retention: privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, Environment: authapp.CurrentDownloadEnvironment{RootID: s.a.RootID, InstallationID: b.input.InstallationID, Policies: processingTestPolicy{value: b.processingPolicy}, Recovery: s.recovery.reader, Processing: processing, Now: time.Now}, Now: time.Now}
+	gate := authapp.ContextDownloadAuthority{RootID: s.a.RootID, Identities: nativeDownloadTestIdentity{value: actor, expires: time.Now().Add(2 * time.Minute)}, Permissions: s.p, Catalog: catalog, Retention: privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, Environment: authapp.CurrentDownloadEnvironment{RootID: s.a.RootID, InstallationID: b.input.InstallationID, Policies: processingTestPolicy{value: b.processingPolicy}, Processing: processing, Now: time.Now}, Now: time.Now}
 	scope := artifact.DownloadScope{RootID: s.a.RootID, ArtifactID: e.Registration.Location.ArtifactID, CaptureID: e.CaptureUID, ClusterID: e.Registration.Location.ClusterID, NamespaceUID: e.NamespaceUID, WorkloadUID: e.WorkloadUID, PodUID: e.PodUID, Version: evidence.ContextCopiesDigest(f.published.Copies), Principal: actor.Principal}
 	authority, err := gate.CheckDownload(b.ctx, "synthetic-reference", scope)
 	if err != nil {
 		t.Fatal("download authority without workload observation", err)
 	}
-	downloads, err := postgres.NewDownloads(b.ctx, pool("download_runtime", "synthetic-download"), s.a.RootID, postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard})
+	downloads, err := postgres.NewDownloads(b.ctx, pool("download_runtime", "synthetic-download"), s.a.RootID, s.retention.guard)
 	if err != nil {
 		t.Fatal(err)
 	}

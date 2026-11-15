@@ -26,10 +26,10 @@ func (s ProfileComparisonReads) Begin(ctx context.Context, current identities.Cu
 	var d *ContextProjectionDelivery
 	err := queryStepped("configuration", value.ErrUnavailable)
 	if request.Valid() && s.Routes != nil {
-		d, err = s.Service.begin(ctx, current, invocation, "compare_profiles", ContextQueryInput{Comparison: request}, func(ctx context.Context, caller identity.Identity, recovery artifact.RecoveryProof) (value.ContextProjectionCandidate, error) {
+		d, err = s.Service.begin(ctx, current, invocation, "compare_profiles", ContextQueryInput{Comparison: request}, func(ctx context.Context, caller identity.Identity) (value.ContextProjectionCandidate, error) {
 			var routes [2]value.ContextProjectionCandidate
 			for i, selection := range [2][2]string{{request.BaselineCaseID, request.BaselineArtifactID}, {request.CaseID, request.ArtifactID}} {
-				c, e := s.Routes.ResolveProjectionRoute(ctx, selection[0], selection[1], caller, recovery)
+				c, e := s.Routes.ResolveProjectionRoute(ctx, selection[0], selection[1], caller)
 				if e != nil || !c.RouteValid() || c.RootID != s.Service.Results.RootID || c.Principal != caller.Principal || c.CaseID != selection[0] || c.ArtifactID != selection[1] || !cleanProfileComparisonRoute(c) {
 					return value.ContextProjectionCandidate{}, errors.Join(value.ErrUnavailable, e)
 				}

@@ -20,18 +20,17 @@ import (
 func caseID(n int) string { return fmt.Sprintf("00000000-0000-4000-8000-%012d", n) }
 
 type caseFixture struct {
-	now                                                                                     time.Time
-	i                                                                                       identity.Identity
-	p                                                                                       authorization.Projection
-	recovery                                                                                artifact.RecoveryProof
-	routes                                                                                  value.ContextCaseRoutes
-	record                                                                                  permissions.ContextDownloadEvidence
-	retained                                                                                privacy.RetainedResolution
-	identityReads, routeReads, permissionReads, catalogReads, retentionReads, recoveryReads int
-	fail                                                                                    string
-	processingReads                                                                         int
-	processingChange                                                                        bool
-	afterRetention, afterFinalRecovery, afterFinalPermissions                               func()
+	now                                                                      time.Time
+	i                                                                        identity.Identity
+	p                                                                        authorization.Projection
+	routes                                                                   value.ContextCaseRoutes
+	record                                                                   permissions.ContextDownloadEvidence
+	retained                                                                 privacy.RetainedResolution
+	identityReads, routeReads, permissionReads, catalogReads, retentionReads int
+	fail                                                                     string
+	processingReads                                                          int
+	processingChange                                                         bool
+	afterRetention, afterFinalProcessing, afterFinalPermissions              func()
 }
 
 func (f *caseFixture) ResolveIdentity(ctx context.Context) (identity.Identity, error) {
@@ -43,16 +42,6 @@ func (f *caseFixture) ResolveIdentity(ctx context.Context) (identity.Identity, e
 }
 func (f *caseFixture) Resolve(ctx context.Context, _ string) (identity.Identity, error) {
 	return f.ResolveIdentity(ctx)
-}
-func (f *caseFixture) RecoveryState(context.Context) (artifact.RecoveryProof, error) {
-	f.recoveryReads++
-	if f.recoveryReads > 1 && f.afterFinalRecovery != nil {
-		f.afterFinalRecovery()
-	}
-	if f.fail == "recovery" {
-		return artifact.RecoveryProof{}, errors.New("private recovery")
-	}
-	return f.recovery, nil
 }
 func (f *caseFixture) ResolveContextCase(_ context.Context, q value.CaseRouteQuery) (value.ContextCaseRoutes, error) {
 	f.routeReads++
@@ -99,8 +88,8 @@ func newCaseFixture() (*caseFixture, ContextCaseService) {
 	dates := privacy.Deadlines{AnchorAt: reg.AnchorAt, ExpiresAt: reg.ExpiresAt, DeleteBy: reg.DeleteBy}
 	refs := []artifact.RetentionRule{{UID: "baseline", Generation: 1, Digest: artifact.Digest{5}}}
 	proof := artifact.RetentionProof{RootID: caseID(1), ClusterID: target.ClusterID, NamespaceUID: target.NamespaceUID, WorkloadUID: target.WorkloadUID, PodUID: target.PodUID, Topology: rev, Policy: rev, Selectors: rev, SourceCount: 1, ObservedAt: n, ValidUntil: n.Add(5 * time.Second), Sources: [2]artifact.RetentionSourceVersion{{ClusterID: target.ClusterID, ControlNamespaceUID: "control", Epoch: caseID(22), Hub: true, ProtectionDigest: artifact.Digest{1}, SnapshotDigest: artifact.Digest{2}, Acceptance: rev}}}
-	f := &caseFixture{now: n, i: i, p: p, recovery: artifact.RecoveryProof{InstallationID: caseID(2), IssuerEpoch: caseID(22), Revision: rev, ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}, routes: value.ContextCaseRoutes{CaseID: caseID(9), Routes: []value.ContextCaseRoute{{CaptureID: caseID(4), ArtifactID: caseID(5), Target: target}}, ObservedAt: n, ValidUntil: n.Add(5 * time.Second)}, record: permissions.ContextDownloadEvidence{PurposeRef: "diagnostics", DataClass: "metadata", CaptureID: caseID(4), Version: artifact.Digest{3}, Audience: []artifact.AudienceAssignment{a}, Retained: privacy.RetainedArtifact{RootID: caseID(1), Registration: reg, Input: privacy.Input{Target: target, PrivacyClass: "potentialPersonalData", EvidenceType: "context", RequestedSeconds: 3600, AnchorAt: reg.AnchorAt}, OriginPolicies: refs, Effective: dates}, ObservedAt: n, ValidUntil: n.Add(5 * time.Second)}, retained: privacy.RetainedResolution{Target: target, PolicyRevision: rev, PurposeRef: "diagnostics", Policies: refs, Deadlines: dates, ValidUntil: n.Add(5 * time.Second), Proof: proof}}
-	return f, ContextCaseService{RootID: caseID(1), InstallationID: caseID(2), Routes: f, Permissions: f, Catalog: f, Retention: f, Recovery: f, Processing: f, Now: func() time.Time { return f.now }}
+	f := &caseFixture{now: n, i: i, p: p, routes: value.ContextCaseRoutes{CaseID: caseID(9), Routes: []value.ContextCaseRoute{{CaptureID: caseID(4), ArtifactID: caseID(5), Target: target}}, ObservedAt: n, ValidUntil: n.Add(5 * time.Second)}, record: permissions.ContextDownloadEvidence{PurposeRef: "diagnostics", DataClass: "metadata", CaptureID: caseID(4), Version: artifact.Digest{3}, Audience: []artifact.AudienceAssignment{a}, Retained: privacy.RetainedArtifact{RootID: caseID(1), Registration: reg, Input: privacy.Input{Target: target, PrivacyClass: "potentialPersonalData", EvidenceType: "context", RequestedSeconds: 3600, AnchorAt: reg.AnchorAt}, OriginPolicies: refs, Effective: dates}, ObservedAt: n, ValidUntil: n.Add(5 * time.Second)}, retained: privacy.RetainedResolution{Target: target, PolicyRevision: rev, PurposeRef: "diagnostics", Policies: refs, Deadlines: dates, ValidUntil: n.Add(5 * time.Second), Proof: proof}}
+	return f, ContextCaseService{RootID: caseID(1), InstallationID: caseID(2), Routes: f, Permissions: f, Catalog: f, Retention: f, Processing: f, Now: func() time.Time { return f.now }}
 }
 func TestContextCaseReadUsesOrdinaryAudienceAndEffectiveDates(t *testing.T) {
 	f, s := newCaseFixture()
@@ -111,7 +100,7 @@ func TestContextCaseReadUsesOrdinaryAudienceAndEffectiveDates(t *testing.T) {
 	if err != nil || !got.Valid(f.now) || len(got.Artifacts) != 1 || got.Artifacts[0].Version != f.record.Version || !got.Artifacts[0].ExpiresAt.Equal(f.retained.ExpiresAt) || !got.Artifacts[0].DeleteBy.Equal(f.retained.DeleteBy) || !got.ValidUntil.Equal(f.routes.ValidUntil) {
 		t.Fatalf("ordinary case: %+v %v", got, err)
 	}
-	if f.catalogReads != 1 || f.retentionReads != 1 || f.permissionReads != 2 || f.recoveryReads != 2 || f.identityReads != 3 {
+	if f.catalogReads != 1 || f.retentionReads != 1 || f.permissionReads != 2 || f.identityReads != 3 {
 		t.Fatal("missing independent final checks", f)
 	}
 }
@@ -159,7 +148,6 @@ func TestContextCaseRejectsWrongLineageAndFreshContraryFacts(t *testing.T) {
 				f.routes.Routes = append(f.routes.Routes, r)
 			}
 		}},
-		{"foreign-installation", func(f *caseFixture, s *ContextCaseService) { f.recovery.InstallationID = caseID(99) }},
 		{"wrong-capture", func(f *caseFixture, s *ContextCaseService) { f.record.CaptureID = caseID(99) }},
 		{"wrong-target", func(f *caseFixture, s *ContextCaseService) { f.record.Retained.Input.Target.PodUID = "other" }},
 		{"different-artifact", func(f *caseFixture, s *ContextCaseService) {
@@ -189,12 +177,9 @@ func TestContextCaseRejectsWrongLineageAndFreshContraryFacts(t *testing.T) {
 				f.retained.Proof.ValidUntil = f.retained.ValidUntil
 			}
 		}},
-		{"recovery-changes-last", func(f *caseFixture, s *ContextCaseService) {
-			f.afterFinalRecovery = func() { f.recovery.Revision.Generation++ }
-		}},
-		{"identity-lost-last", func(f *caseFixture, s *ContextCaseService) { f.afterFinalRecovery = func() { f.fail = "identity" } }},
-		{"groups-lost-last", func(f *caseFixture, s *ContextCaseService) { f.afterFinalRecovery = func() { f.i.Groups = nil } }},
-		{"scope-lost-last", func(f *caseFixture, s *ContextCaseService) { f.afterFinalRecovery = func() { f.i.Scopes = nil } }},
+		{"identity-lost-last", func(f *caseFixture, s *ContextCaseService) { f.afterFinalProcessing = func() { f.fail = "identity" } }},
+		{"groups-lost-last", func(f *caseFixture, s *ContextCaseService) { f.afterFinalProcessing = func() { f.i.Groups = nil } }},
+		{"scope-lost-last", func(f *caseFixture, s *ContextCaseService) { f.afterFinalProcessing = func() { f.i.Scopes = nil } }},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -206,7 +191,7 @@ func TestContextCaseRejectsWrongLineageAndFreshContraryFacts(t *testing.T) {
 			}
 		})
 	}
-	for _, name := range []string{"routes", "permissions", "catalog", "retention", "recovery"} {
+	for _, name := range []string{"routes", "permissions", "catalog", "retention"} {
 		t.Run("failure-"+name, func(t *testing.T) {
 			f, s := newCaseFixture()
 			f.fail = name
@@ -224,7 +209,7 @@ func TestContextCaseRequestOwnerCancellationCannotDetach(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.afterFinalRecovery = cancel
+	f.afterFinalProcessing = cancel
 	got, err := s.GetContextCase(context.Background(), source, caseID(9))
 	if err != value.ErrUnavailable || got.CaseID != "" {
 		t.Fatal("detached request disclosed", got, err)
@@ -232,10 +217,13 @@ func TestContextCaseRequestOwnerCancellationCannotDetach(t *testing.T) {
 }
 
 // Synthetic processing authority in a component fixture; production composes
-// the recovery-bound SQL reader, not this fixture.
-func (f *caseFixture) ContextProcessing(_ context.Context, r permissions.ContextDownloadEvidence, recovery artifact.RecoveryProof) (artifact.DownloadProcessingProof, error) {
+// the SQL reader, not this fixture.
+func (f *caseFixture) ContextProcessing(_ context.Context, r permissions.ContextDownloadEvidence) (artifact.DownloadProcessingProof, error) {
 	f.processingReads++
-	if f.fail == "processing" || !reflect.DeepEqual(r, f.record) || recovery != f.recovery {
+	if f.processingReads > 1 && f.afterFinalProcessing != nil {
+		f.afterFinalProcessing()
+	}
+	if f.fail == "processing" || !reflect.DeepEqual(r, f.record) {
 		return artifact.DownloadProcessingProof{}, errors.New("restricted")
 	}
 	p := artifact.DownloadProcessingProof{RootID: caseID(1), Epoch: caseID(30), CaptureID: r.CaptureID, Location: r.Retained.Registration.Location, Sequence: 1, StateDigest: artifact.Digest{6}, ObservedAt: f.now, ValidUntil: f.now.Add(5 * time.Second)}

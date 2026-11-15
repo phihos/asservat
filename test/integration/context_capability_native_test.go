@@ -29,17 +29,9 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-// Recovery acceptance and image qualification are fixture facts. Admission,
-// source identities, scoped credentials and all observations below use the
-// actual owned Kubernetes API. This does not qualify an installed collector.
-type capabilityNativeRecovery struct{ proof artifact.RecoveryProof }
-
-func (r *capabilityNativeRecovery) RecoveryState(ctx context.Context) (artifact.RecoveryProof, error) {
-	p := r.proof
-	p.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
-	p.FreshUntil = p.ObservedAt.Add(5 * time.Second)
-	return p, ctx.Err()
-}
+// Image qualification is a fixture fact. Admission, source identities, scoped
+// credentials and all observations below use the actual owned Kubernetes API.
+// This does not qualify an installed collector.
 
 func TestContextCapabilityWithRealKubernetes(t *testing.T) {
 	path := os.Getenv("ASSERVAT_CONTEXT_FIXTURES")
@@ -141,8 +133,7 @@ func TestContextCapabilityWithRealKubernetes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	recovery := &capabilityNativeRecovery{artifact.RecoveryProof{InstallationID: installed.InstallationID, IssuerEpoch: installed.IssuerEpoch, Revision: identity.Revision{UID: custodyID(), Generation: 1, Digest: artifact.Digest{1}}}}
-	source, err := kube.NewContextCapabilitySource(reader, guard, recovery, object.Name, string(object.UID), installed)
+	source, err := kube.NewContextCapabilitySource(reader, guard, object.Name, string(object.UID), installed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,11 +147,8 @@ func TestContextCapabilityWithRealKubernetes(t *testing.T) {
 		t.Fatal("native capability protection never became available", err)
 	}
 	first, err := source.ContextCapability(ctx, target)
-	// ADR-311: a completed check is valid for the recheck interval, capped by
-	// the recovery observation it read (this fixture's five seconds from its
-	// own, slightly later read), not five seconds from the check's start; the
-	// one-second slack still rejects an uncapped 30-second interval.
-	if err != nil || !first.Valid(time.Now()) || first.Revision.UID != string(object.UID) || first.ProjectionDigest != projection || first.FreshUntil.Sub(first.ObservedAt) > 6*time.Second {
+	// ADR-311: a completed check is valid for the recheck interval.
+	if err != nil || !first.Valid(time.Now()) || first.Revision.UID != string(object.UID) || first.ProjectionDigest != projection || first.FreshUntil.Sub(first.ObservedAt) > identity.AuthorityRecheckInterval {
 		t.Fatal("original capability observation", err)
 	}
 	unchanged := func() {
@@ -182,14 +170,9 @@ func TestContextCapabilityWithRealKubernetes(t *testing.T) {
 	if _, err = source.ContextCapability(ctx, foreign); err == nil {
 		t.Fatal("foreign target accepted")
 	}
-	recovery.proof.IssuerEpoch = custodyID()
-	if _, err = source.ContextCapability(ctx, target); err == nil {
-		t.Fatal("changed recovery epoch accepted")
-	}
-	recovery.proof.IssuerEpoch = installed.IssuerEpoch
 	wrongImage := installed
 	wrongImage.CollectorImageDigest = strings.Repeat("f", 64)
-	other, err := kube.NewContextCapabilitySource(reader, guard, recovery, object.Name, string(object.UID), wrongImage)
+	other, err := kube.NewContextCapabilitySource(reader, guard, object.Name, string(object.UID), wrongImage)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -228,7 +211,7 @@ func TestContextCapabilityWithRealKubernetes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	source, err = kube.NewContextCapabilitySource(reader, guard, recovery, object.Name, string(object.UID), installed)
+	source, err = kube.NewContextCapabilitySource(reader, guard, object.Name, string(object.UID), installed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -251,5 +234,5 @@ func TestContextCapabilityWithRealKubernetes(t *testing.T) {
 	if _, err = source.ContextCapability(ctx, target); err == nil {
 		t.Fatal("same-name source replacement accepted")
 	}
-	t.Log("actual native capability guard, separate RBAC/probe, immutable source/image/cluster/epoch pins and replacement denial passed; image/recovery acceptance remain synthetic")
+	t.Log("actual native capability guard, separate RBAC/probe, immutable source/image/cluster/epoch pins and replacement denial passed; image acceptance remains synthetic")
 }

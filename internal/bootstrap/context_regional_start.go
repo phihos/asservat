@@ -61,7 +61,7 @@ const (
 // deadline is renewed, and a prepared, denied, expired or uncertain run is
 // never repeated (ADR-250).
 func (s RegionalAPIContextStart) StartContext(ctx context.Context, current identities.CurrentIdentity, id string) error {
-	if ctx == nil || ctx.Err() != nil || current == nil || !authorization.UUID(id) || s.Runner.Read == nil || s.Runner.Capabilities == nil || s.Runner.Recovery == nil || s.Signer == nil || s.Router == nil || s.Now == nil {
+	if ctx == nil || ctx.Err() != nil || current == nil || !authorization.UUID(id) || s.Runner.Read == nil || s.Runner.Capabilities == nil || s.Signer == nil || s.Router == nil || s.Now == nil {
 		return execution.ErrInvalid
 	}
 	window, cancel := context.WithDeadline(ctx, s.Now().UTC().Truncate(time.Microsecond).Add(identity.AuthorityRecheckInterval)) // ADR-311
@@ -127,13 +127,8 @@ func (s RegionalAPIContextStart) startOnce(ctx context.Context, current identiti
 		return execution.ErrDenied
 	}
 	narrow("identity", caller.ValidUntil)
-	recovery, e := s.Runner.Recovery.RecoveryState(call)
-	if e != nil || !recovery.Valid(s.Now()) {
-		return notStarted
-	}
-	narrow("recovery", recovery.FreshUntil)
 	mark = time.Now()
-	accepted, e := s.Runner.Read.ReadAPIContextWork(call, id, caller, recovery)
+	accepted, e := s.Runner.Read.ReadAPIContextWork(call, id, caller)
 	auditapp.MarkStep(ctx, "st-read", mark)
 	if e != nil {
 		return e
@@ -177,9 +172,6 @@ func (s RegionalAPIContextStart) startOnce(ctx context.Context, current identiti
 		return notStarted
 	}
 	narrow("receiver", receiver.Window.Until())
-	if receiver.Channel.Connector.Binding.InstallationID != recovery.InstallationID || receiver.Channel.Connector.Binding.IssuerEpoch != recovery.IssuerEpoch {
-		return execution.ErrDenied
-	}
 	work, e := executionapp.NewAPIContextWork(accepted, receiver.Channel, capability, started, until, s.Now())
 	if e != nil {
 		return e
@@ -203,7 +195,7 @@ func (s RegionalAPIContextStart) startOnce(ctx context.Context, current identiti
 		r := s.Runner
 		r.Process, r.Targets, r.Output, r.Collector = ops, ops, ops, ops
 		r.Prepare = gatedPreparer{r.Prepare, gate}
-		result, err := r.ExecuteObserved(ctx, current, caller, accepted, capability, recovery)
+		result, err := r.ExecuteObserved(ctx, current, caller, accepted, capability)
 		gate.finish(err)
 		if err != nil && s.Report != nil {
 			step := "execute"

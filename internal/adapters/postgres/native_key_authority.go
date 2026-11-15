@@ -23,7 +23,7 @@ type NativeKeyAuthority struct {
 	projection  *ProjectionKeys
 }
 
-func NewNativeKeyAuthority(ctx context.Context, pool *pgxpool.Pool, root string, profile value.DownloadWorkerProfile, scope value.KeyScope, guards DownloadTransactionGuards) (*NativeKeyAuthority, error) {
+func NewNativeKeyAuthority(ctx context.Context, pool *pgxpool.Pool, root string, profile value.DownloadWorkerProfile, scope value.KeyScope, guards *RetentionTransactionGuard) (*NativeKeyAuthority, error) {
 	preparation, e := NewDownloadKeys(ctx, pool, root, scope, guards)
 	if e != nil {
 		return nil, e

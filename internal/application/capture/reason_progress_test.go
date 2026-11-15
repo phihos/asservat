@@ -22,7 +22,7 @@ func TestReasonDisplayUsesExistingFinalMetadataAuthority(t *testing.T) {
 			calls := 0
 			metadata := &value.CaptureReasonMetadata{RootID: fixtureID(1), CaptureID: fixtureID(30), AuditCaptureID: fixtureID(30), Reference: value.ProtectedReasonRef{ID: fixtureID(44), CiphertextDigest: artifact.Digest{3}}, Requester: f.actor, ScopeDigest: artifact.Digest{4}}
 			p := value.ContextProgressObservation{ReasonMetadata: metadata, CaptureID: fixtureID(30), CandidateCaseID: fixtureID(31), CandidateArtifactID: fixtureID(32), Target: f.target.Target(), Revision: 4, Phase: "Pending", ActionPhase: "Pending", ReasonCode: "DispatchUnconfirmed", CreatedAt: f.now.Add(-time.Minute), Deadline: f.now.Add(time.Minute), ObservedAt: f.now, ValidUntil: f.now.Add(2 * time.Second)}
-			s := ContextProgressService{RootID: fixtureID(1), InstallationID: fixtureID(2), Recovery: f, Now: func() time.Time { return f.now }}
+			s := ContextProgressService{RootID: fixtureID(1), InstallationID: fixtureID(2), Now: func() time.Time { return f.now }}
 			s.Reader = progressReadFunc(func(context.Context, value.ProgressQuery) (value.ContextProgressObservation, error) {
 				if mode == "denied-before-open" {
 					return value.ContextProgressObservation{}, value.ErrDenied

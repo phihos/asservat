@@ -1,18 +1,19 @@
 package analysis
 
 import (
+	"context"
+	"testing"
+
 	value "asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/identity"
-	"context"
-	"testing"
 )
 
 type logRouteFixture struct {
 	candidate value.ContextProjectionCandidate
 }
 
-func (r logRouteFixture) ResolveLogProjectionRoute(context.Context, string, string, identity.Identity, artifact.RecoveryProof) (value.ContextProjectionCandidate, error) {
+func (r logRouteFixture) ResolveLogProjectionRoute(context.Context, string, string, identity.Identity) (value.ContextProjectionCandidate, error) {
 	return r.candidate, nil
 }
 func rawLogAdmissionFixture(t *testing.T) (*projectionFixture, *packetQueryLedgerFixture, value.RawLogQueryRequest) {

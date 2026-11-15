@@ -82,8 +82,8 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 		}
 		return pool
 	}
-	guards := postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard}
-	ledger, err := postgres.NewContextQueries(ctx, compiled("hub-runtime"), root, guards, f.current, nil)
+	guards := s.retention.guard
+	ledger, err := postgres.NewContextQueries(ctx, compiled("hub-runtime"), root, base.input.InstallationID, guards, f.current, nil)
 	if err != nil {
 		t.Fatal("compiled query ledger", err)
 	}
@@ -102,7 +102,7 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 	if err != nil {
 		t.Fatal("compiled key-service backing", err)
 	}
-	keyLedger, err := postgres.NewContextQueries(ctx, keyPool, root, guards, keyPlans, nil)
+	keyLedger, err := postgres.NewContextQueries(ctx, keyPool, root, base.input.InstallationID, guards, keyPlans, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +116,7 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 	}
 	// Match key-service startup's actual closed dispatcher. Calling the
 	// projection delegate alone misses classification of compact child IDs.
-	keys, err := postgres.NewNativeKeyAuthority(ctx, keyPool, root, profile, keyScope, postgres.DownloadTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard})
+	keys, err := postgres.NewNativeKeyAuthority(ctx, keyPool, root, profile, keyScope, s.retention.guard)
 	if err != nil || keys.WithProjectionKeys(projectionKeys) != nil {
 		t.Fatal("compiled native key authority composition", err)
 	}
@@ -125,23 +125,19 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	processing, err := postgres.NewProcessingReads(ctx, metadata, root, s.recovery.guard)
+	processing, err := postgres.NewProcessingReads(ctx, metadata, root, s.recovery.installation)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// This closed workflow's fixture client declares raw results as well as
 	// fixed extracts. The shared summary-only producer intentionally declares
 	// extract only and remains unchanged.
-	recovery, e := s.recovery.reader.RecoveryState(ctx)
-	if e != nil {
-		t.Fatal(e)
-	}
-	policySource := packetQueryFixturePolicy{querySQLPolicy{root: root, installation: base.input.InstallationID, epoch: recovery.IssuerEpoch, path: f.profile.Path, packet: f.published.Expectation.NativeType != artifact.SyscallArgumentsArtifact, syscall: f.published.Expectation.NativeType == artifact.SyscallArgumentsArtifact, logs: f.published.Expectation.NativeType == artifact.LogsArtifact}}
+	policySource := packetQueryFixturePolicy{querySQLPolicy{root: root, installation: base.input.InstallationID, epoch: s.recovery.observation.issuer, path: f.profile.Path, packet: f.published.Expectation.NativeType != artifact.SyscallArgumentsArtifact, syscall: f.published.Expectation.NativeType == artifact.SyscallArgumentsArtifact, logs: f.published.Expectation.NativeType == artifact.LogsArtifact}}
 	queryPolicies, e := authapp.NewContextProjectionPolicies(policySource, time.Now)
 	if e != nil {
 		t.Fatal(e)
 	}
-	gate := authapp.ContextProjectionAuthority{RootID: root, Permissions: s.p, Catalog: catalog, Retention: privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, Environment: authapp.CurrentProjectionEnvironment{RootID: root, InstallationID: base.input.InstallationID, Policies: queryPolicies, Recovery: s.recovery.reader, Processing: processing, Now: time.Now}, Now: time.Now}
+	gate := authapp.ContextProjectionAuthority{RootID: root, Permissions: s.p, Catalog: catalog, Retention: privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, Environment: authapp.CurrentProjectionEnvironment{RootID: root, InstallationID: base.input.InstallationID, Policies: queryPolicies, Processing: processing, Now: time.Now}, Now: time.Now}
 	expected := f.published.Expectation
 	scope := query.ContextProjectionScope{RootID: root, CaseID: expected.CaseID, CaptureID: expected.CaptureUID, ArtifactID: expected.Registration.Location.ArtifactID, ClusterID: expected.Registration.Location.ClusterID, NamespaceUID: expected.NamespaceUID, WorkloadUID: expected.WorkloadUID, PodUID: expected.PodUID, Version: evidence.ContextCopiesDigest(f.published.Copies), SourceProjectionDigest: query.ContextSourceProjectionDigest(), SourceFormat: artifact.ContextFormat, DisplayVersion: query.ContextDisplayVersion, Selection: query.LineSelection{LineStart: 1, MaxLines: 14}, Principal: s.a.Plan.Input.Executor}
 
@@ -164,7 +160,7 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 	rawPacket := expected.NativeType == artifact.RawPCAPNGArtifact || expected.NativeType == artifact.SyscallArgumentsArtifact || expected.NativeType == artifact.LogsArtifact
 	var grantStore *postgres.AccessGrants
 	if rawPacket {
-		grantStore, err = postgres.NewAccessGrants(ctx, compiled("hub-runtime"), root, s.recovery.guard)
+		grantStore, err = postgres.NewAccessGrants(ctx, compiled("hub-runtime"), root, s.recovery.installation)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -172,7 +168,7 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 		if scope.RawGrantID == "" {
 			scope.RawGrantID = packetQueryManagedGrant(t, f, grantStore, scope.Principal, scope.Version, 2*query.ContextResultBytes, 2)
 		}
-		grantService := authapp.GrantService{RootID: root, InstallationID: base.input.InstallationID, Permissions: s.p, Store: grantStore, Recovery: s.recovery.reader, Now: time.Now, NewID: custodyID}
+		grantService := authapp.GrantService{RootID: root, InstallationID: base.input.InstallationID, Permissions: s.p, Store: grantStore, Now: time.Now, NewID: custodyID}
 		if expected.NativeType == artifact.LogsArtifact {
 			gate.LogGrants = grantService
 		} else if expected.NativeType == artifact.SyscallArgumentsArtifact {
@@ -182,15 +178,15 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 		}
 	}
 	policy := f.audit.Normal.Policy
-	journal, err := postgres.NewHealthyOperationJournal(ctx, compiled("hub-runtime"), policy, s.recovery.guard)
+	journal, err := postgres.NewHealthyOperationJournal(ctx, compiled("hub-runtime"), policy)
 	if err != nil {
 		t.Fatal(err)
 	}
-	acknowledgements, err := postgres.NewOperationAcknowledgements(ctx, compiled("hub-runtime"), root, "normal", s.recovery.guard)
+	acknowledgements, err := postgres.NewOperationAcknowledgements(ctx, compiled("hub-runtime"), root, "normal", s.recovery.installation)
 	if err != nil {
 		t.Fatal(err)
 	}
-	completions, err := postgres.NewOperationLifecycles(ctx, compiled("hub-runtime"), root, "normal", s.recovery.guard)
+	completions, err := postgres.NewOperationLifecycles(ctx, compiled("hub-runtime"), root, "normal", s.recovery.installation)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -344,11 +340,11 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 	}
 	whoReplay.VerifiedAt, whoReplay.ValidUntil = replayOwner.request.Call.StartedAt, replayOwner.request.Call.Until
 	if expected.NativeType == artifact.LogsArtifact {
-		qualifyLogsQueryReplayApplication(t, replayOwner.ctx, q, replayOwner.request, logsRequest, querySQLIdentity{whoReplay}, ledger, gate, s.recovery.reader)
+		qualifyLogsQueryReplayApplication(t, replayOwner.ctx, q, replayOwner.request, logsRequest, querySQLIdentity{whoReplay}, ledger, gate)
 	} else if expected.NativeType == artifact.SyscallArgumentsArtifact {
-		qualifyRawSyscallQueryReplayApplication(t, replayOwner.ctx, q, replayOwner.request, syscallRequest, querySQLIdentity{whoReplay}, ledger, gate, s.recovery.reader)
+		qualifyRawSyscallQueryReplayApplication(t, replayOwner.ctx, q, replayOwner.request, syscallRequest, querySQLIdentity{whoReplay}, ledger, gate)
 	} else {
-		qualifyPacketQueryReplayApplication(t, replayOwner.ctx, q, replayOwner.request, publicRequest, querySQLIdentity{whoReplay}, ledger, gate, s.recovery.reader)
+		qualifyPacketQueryReplayApplication(t, replayOwner.ctx, q, replayOwner.request, publicRequest, querySQLIdentity{whoReplay}, ledger, gate)
 	}
 	assertPacketReplayDelta(t, beforeReplay, readPacketReplayState(t, ctx, base.admin, q), 1)
 	qualifyPacketReplayBindings(t, ctx, base.admin, compiled("hub-runtime"), ledger, q, replayOwner.request, replayOwner.authority, auditor, replayIntent)
@@ -553,11 +549,7 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 		assertPacketQueryUses(t, f, q.Grant.ParentID, 2*query.ContextResultBytes, 2)
 		// Exhausted disclosure does not erase the exact original child/query. A
 		// separately named native use competes on the SAME pool and must be denied.
-		recovery, e := s.recovery.reader.RecoveryState(ctx)
-		if e != nil {
-			t.Fatal(e)
-		}
-		_, _, e = grantStore.ReserveGrantUse(ctx, authapp.GrantUseRequest{UseID: custodyID(), ParentID: q.Grant.ParentID, ChildID: q.Grant.ChildID, Use: value.GrantUse{Operation: value.GrantDownloadOperation, Bytes: 1, Operations: 1}}, recovery)
+		_, _, e = grantStore.ReserveGrantUse(ctx, authapp.GrantUseRequest{UseID: custodyID(), ParentID: q.Grant.ParentID, ChildID: q.Grant.ChildID, Use: value.GrantUse{Operation: value.GrantDownloadOperation, Bytes: 1, Operations: 1}})
 		if e == nil {
 			t.Fatal("native disclosure did not compete with spent packet-page pool")
 		}
@@ -567,10 +559,6 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 		if e := keyPool.QueryRow(ctx, "SELECT context_packet_query_grant_current($1,$2,$3)", root, q.ID, lastBatch.ID).Scan(&live); e != nil || !live {
 			t.Fatal("spent batch not current before revoke", e)
 		}
-		currentRecovery, e := s.recovery.reader.RecoveryState(ctx)
-		if e != nil {
-			t.Fatal(e)
-		}
 		revokedReplay, revokedReplayIntent, stopRevokedReplay := request(scope.BeginTool(), true)
 		if !q.Current(revokedReplay.authority, time.Now()) || !revokedReplay.request.Valid(time.Now()) {
 			t.Fatal("revocation replay control not current")
@@ -579,7 +567,7 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 		if e != nil {
 			t.Fatal(e)
 		}
-		revoked, _, e := grantStore.RevokeGrant(ctx, authapp.GrantRevocationInput{GrantID: currentParent.ID, Revoker: scope.Principal, ExpectedRevision: currentParent.Revision, IdempotencyKey: "revoke-query-original"}, currentRecovery)
+		revoked, _, e := grantStore.RevokeGrant(ctx, authapp.GrantRevocationInput{GrantID: currentParent.ID, Revoker: scope.Principal, ExpectedRevision: currentParent.Revision, IdempotencyKey: "revoke-query-original"})
 		if e != nil || revoked.RevokedAt.IsZero() {
 			t.Fatal("original query grant revoke", e)
 		}
@@ -613,28 +601,24 @@ func packetQueryManagedGrant(t *testing.T, f *queryLedgerFixture, store *postgre
 	t.Helper()
 	ctx := f.base.ctx
 	e := f.published.Expectation
-	recovery, err := f.scenario.recovery.reader.RecoveryState(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	output := value.VerifiedOutput{CaptureID: e.CaptureUID, ActionID: e.ActionID, ArtifactID: e.Registration.Location.ArtifactID, ExecutionDigest: e.PlanDigest, ArtifactDigest: version, Target: value.Target{ClusterID: e.Registration.Location.ClusterID, NamespaceUID: e.NamespaceUID, WorkloadUID: e.WorkloadUID, PodUID: e.PodUID}}
 	raw := value.RawQueryScope{CaseID: e.CaseID, Artifacts: []value.RawQueryArtifact{{Output: output, NativeBytes: 0, ExpiresAt: e.Registration.ExpiresAt}}, Operations: []string{value.GrantDownloadOperation, packetQueryFixtureOperation(f)}, Reason: "Review existing synthetic packet source", MaxBytes: maxBytes, MaxOperations: ops, NotAfter: now.Add(time.Minute)}
 	// Derive immutable verified length from the already published verification row.
-	if err = f.base.admin.QueryRow(ctx, "SELECT native_bytes FROM context_verification WHERE root_id=$1 AND capture_id=$2", f.base.input.PermissionRootID, e.CaptureUID).Scan(&raw.Artifacts[0].NativeBytes); err != nil {
+	if err := f.base.admin.QueryRow(ctx, "SELECT native_bytes FROM context_verification WHERE root_id=$1 AND capture_id=$2", f.base.input.PermissionRootID, e.CaptureUID).Scan(&raw.Artifacts[0].NativeBytes); err != nil {
 		t.Fatal(err)
 	}
 	g := value.Grant{ID: custodyID(), RootID: f.base.input.PermissionRootID, Kind: value.GrantRawQuery, RawQuery: &raw, DataClass: "raw", Requester: actor, Lifetime: time.Minute, Revision: 1, Reasons: []value.SensitiveReason{{ActionID: packetQueryFixtureOperation(f), Code: "rawDisclosure"}}}
 	g.Scope, g.ExecutionDigest = authapp.RawQueryScopeBytes(raw)
 	g.Review = []byte(`{"fixture":"exact accepted saved packet"}`)
 	g.ReviewDigest = authapp.ReviewDigest(g, g.Review)
-	pending, _, err := store.RequestGrant(ctx, authapp.StoredGrantRequest{Grant: g, IdempotencyKey: "packet-query-grant", RequestDigest: artifact.Digest{73}}, recovery)
+	pending, _, err := store.RequestGrant(ctx, authapp.StoredGrantRequest{Grant: g, IdempotencyKey: "packet-query-grant", RequestDigest: artifact.Digest{73}})
 	if err != nil {
 		t.Fatal("actual raw query review request", err)
 	}
 	lead := actor
 	lead.Subject += "-independent-reviewer"
-	approved, _, err := store.DecideGrant(ctx, authapp.GrantDecisionInput{GrantID: pending.ID, Approve: true, Approver: lead, Reason: "independent exact source/query/download review", ACR: "synthetic-stepup", AuthTime: now, IdempotencyKey: "approve-packet-query"}, recovery)
+	approved, _, err := store.DecideGrant(ctx, authapp.GrantDecisionInput{GrantID: pending.ID, Approve: true, Approver: lead, Reason: "independent exact source/query/download review", ACR: "synthetic-stepup", AuthTime: now, IdempotencyKey: "approve-packet-query"})
 	if err != nil {
 		t.Fatal("independent packet query decision", err)
 	}

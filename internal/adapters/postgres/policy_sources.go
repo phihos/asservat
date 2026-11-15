@@ -32,20 +32,20 @@ import (
 type PolicySources struct {
 	ledger             *Ledger
 	root, installation string
-	guards             EffectTransactionGuards
+	retention          *RetentionTransactionGuard
 }
 
 var _ app.PolicySourceLedger = (*PolicySources)(nil)
 
-func NewPolicySources(ctx context.Context, pool *pgxpool.Pool, root, installation string, guards EffectTransactionGuards) (*PolicySources, error) {
-	if !authorization.UUID(root) || !authorization.UUID(installation) || guards.Recovery == nil || guards.Retention == nil || guards.Recovery.root != root || guards.Retention.root != root || guards.Recovery.installation != installation {
+func NewPolicySources(ctx context.Context, pool *pgxpool.Pool, root, installation string, retention *RetentionTransactionGuard) (*PolicySources, error) {
+	if !authorization.UUID(root) || !authorization.UUID(installation) || retention == nil || retention.root != root {
 		return nil, value.ErrInvalid
 	}
 	l, err := New(ctx, pool)
 	if err != nil {
 		return nil, err
 	}
-	return &PolicySources{l, root, installation, guards}, nil
+	return &PolicySources{l, root, installation, retention}, nil
 }
 
 func sourceCheckCurrent(in app.PolicySourceCheck, now time.Time) bool {
@@ -65,7 +65,7 @@ func sourceCheckCurrent(in app.PolicySourceCheck, now time.Time) bool {
 		!compiler.RawBytePredicate(p.Action.Filter) && in.Authority.Valid(now) &&
 		in.Target.ExecutionClass == artifact.ContextAPIExecution && in.Target.Valid(now) && in.Node.Valid(now) &&
 		in.Target.Request.ClusterID == in.Authority.ClusterID && in.Target.Request.Namespace.UID == in.Authority.NamespaceUID && in.Target.Request.Workload.UID == in.Authority.WorkloadUID &&
-		in.Target.Request.PodUID == in.Node.PodUID && in.Recovery.Valid(now) && in.Settings.Validate(now) == nil &&
+		in.Target.Request.PodUID == in.Node.PodUID && in.Settings.Validate(now) == nil &&
 		identity.Fresh(in.ObservedAt, in.ValidUntil, now, 5*time.Second) && now.Before(in.Retention.ValidUntil) && in.Retention.Target == in.Target.Target() && in.Retention.Proof.Valid(now) &&
 		authorization.UUID(in.SourceID) && authorization.UUID(in.Fence) && in.BytesPerSecond > 0 && in.BytesPerSecond <= collector.MaxInputRate && in.SourceSlots > 0 && in.SourceSlots <= collector.MaxActiveSources &&
 		in.InitialCredit >= 0 && in.ExpectedCredit >= 0 && in.AdditionalCredit >= 0 && in.ExpectedCredit <= math.MaxInt64-in.AdditionalCredit &&
@@ -86,7 +86,6 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 	}
 	narrow("target", in.Target.FreshUntil)
 	narrow("node", in.Node.FreshUntil)
-	narrow("recovery", in.Recovery.FreshUntil)
 	narrow("retention", in.Retention.ValidUntil)
 	narrow("settings", in.Settings.FreshUntil)
 	call, end := context.WithDeadline(ctx, until)
@@ -102,15 +101,15 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 	defer stopCutoff()
 	// step names the bounded admission step for content-free failure counters.
 	step := "topology"
-	topology, err := s.guards.Retention.observe(call, in.Authority.ClusterID)
+	topology, err := s.retention.observe(call, in.Authority.ClusterID)
 	if err != nil {
 		return out, app.StagedSourceError("admit-"+step, err)
 	}
 	err = s.ledger.transaction(call, func(q *custodydb.Queries) error {
-		step = "recovery"
+		step = "trust"
 		out = app.PolicySourceAdmission{}
 		stopCutoff()
-		trust, err := s.guards.Recovery.lock(call, q, s.root, in.Recovery)
+		trust, _, err := currentTrust(call, q, s.installation)
 		if err != nil {
 			return err
 		}
@@ -278,10 +277,7 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 				binding.ClusterID != id(a.ClusterID) || binding.NamespaceUid != a.NamespaceUID || binding.WorkloadUid != a.WorkloadUID || binding.AllocationID != allocation.ID || allocation.ServiceClass != "context" || allocation.Paused || pool.Paused || !n.Time.Before(storage.CapacityUntil.Time) || !controlPool.Configured || !account.Configured || controlPool.Paused || account.Paused || account.ChargedFull > account.FullLimit || account.ChargedReplay > account.ReplayLimit {
 				return value.ErrChanged
 			}
-			if err = s.guards.Recovery.check(call, q, trust, s.root, in.Recovery); err != nil {
-				return err
-			}
-			return s.guards.Retention.check(call, q, topology, in.Retention.Proof, in.Target.Target())
+			return s.retention.check(call, q, topology, in.Retention.Proof, in.Target.Target())
 		}
 		step = "check"
 		if err = check(); err != nil {

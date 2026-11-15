@@ -319,14 +319,10 @@ func (f *capacitySQLFixture) open(t *testing.T) {
 	}
 }
 
-func (f *capacitySQLFixture) fresh(t *testing.T) (app.AcceptedCapacitySource, artifact.RecoveryProof) {
+func (f *capacitySQLFixture) fresh(t *testing.T) app.AcceptedCapacitySource {
 	t.Helper()
 	f.refreshBase(t)
-	recovery, err := f.source.RecoveryState(f.ctx)
-	if err != nil {
-		t.Fatal("actual recovery read", err)
-	}
-	revision, err := f.source.ReadCapacitySourceRevision(f.ctx, recovery)
+	revision, err := f.source.ReadCapacitySourceRevision(f.ctx)
 	if err != nil {
 		t.Fatal("actual source revision read", err)
 	}
@@ -335,21 +331,21 @@ func (f *capacitySQLFixture) fresh(t *testing.T) (app.AcceptedCapacitySource, ar
 		t.Fatal(err)
 	}
 	n := time.Now().UTC().Truncate(time.Microsecond)
-	observation := capacityNativeSource(t, f.template, n, identity.Earlier(n.Add(5*time.Second), recovery.FreshUntil))
-	accepted, err := f.source.AcceptCapacitySource(f.ctx, app.CapacitySourceAcceptance{RootID: f.input.PermissionRootID, InstallationID: f.input.InstallationID, QualificationID: f.qualification.ID, QualificationDigest: f.qualification.Digest, ExpectedRevision: revision, Observation: observation, Protection: protection, Recovery: recovery})
+	observation := capacityNativeSource(t, f.template, n, n.Add(5*time.Second))
+	accepted, err := f.source.AcceptCapacitySource(f.ctx, app.CapacitySourceAcceptance{RootID: f.input.PermissionRootID, InstallationID: f.input.InstallationID, QualificationID: f.qualification.ID, QualificationDigest: f.qualification.Digest, ExpectedRevision: revision, Observation: observation, Protection: protection})
 	if err != nil {
 		t.Fatal("actual source acceptance", err)
 	}
-	return accepted, recovery
+	return accepted
 }
 
 func (f *capacitySQLFixture) rootObservation(t *testing.T) app.RootBackingObservation {
 	t.Helper()
-	source, recovery := f.fresh(t)
+	source := f.fresh(t)
 	n := time.Now().UTC().Truncate(time.Microsecond)
 	p := f.processingPolicy
 	p.ObservedAt, p.FreshUntil = n, n.Add(5*time.Second)
-	o, err := app.NewRootBackingObservation(f.qualification, source, p, recovery, time.Now())
+	o, err := app.NewRootBackingObservation(f.qualification, source, p, time.Now())
 	if err != nil {
 		t.Fatal("composed root observation", err)
 	}
@@ -427,15 +423,15 @@ func (f *capacitySQLFixture) addReviewScope(t *testing.T, cluster string, namesp
 // under that cluster's qualified namespace guard (ADR-197).
 func (f *capacitySQLFixture) regionalObservation(t *testing.T, cluster string, digest artifact.Digest, namespace cfg.NamespaceRef, workload cfg.WorkloadRef) app.EnrollmentObservation {
 	t.Helper()
-	source, recovery := f.fresh(t)
-	permissions, err := f.permissionRead.ReadCapacityPermissions(f.ctx, recovery)
+	source := f.fresh(t)
+	permissions, err := f.permissionRead.ReadCapacityPermissions(f.ctx)
 	if err != nil {
 		t.Fatal("regional maintainer scope", err)
 	}
 	n := time.Now().UTC().Truncate(time.Microsecond)
-	until := identity.Earlier(n.Add(5*time.Second), recovery.FreshUntil)
+	until := n.Add(5 * time.Second)
 	guard := app.CapacityNamespaceProtection{ClusterID: cluster, Digest: digest, Keys: []string{"team"}, ObservedAt: n, FreshUntil: until}
-	o, _, err := app.ComposeEnrollmentObservation(source, guard, capacityNativeWorkload(cluster, namespace, workload, n, until), permissions, recovery, f.input.AccountVersion, time.Now())
+	o, _, err := app.ComposeEnrollmentObservation(source, guard, capacityNativeWorkload(cluster, namespace, workload, n, until), permissions, f.input.AccountVersion, time.Now())
 	if err != nil {
 		t.Fatal("composed regional workload observation", err)
 	}
@@ -444,16 +440,16 @@ func (f *capacitySQLFixture) regionalObservation(t *testing.T, cluster string, d
 
 func (f *capacitySQLFixture) workloadObservation(t *testing.T, index int) app.EnrollmentObservation {
 	t.Helper()
-	source, recovery := f.fresh(t)
-	permissions, err := f.permissionRead.ReadCapacityPermissions(f.ctx, recovery)
+	source := f.fresh(t)
+	permissions, err := f.permissionRead.ReadCapacityPermissions(f.ctx)
 	if err != nil {
 		t.Fatal("actual accepted maintainer scope", err)
 	}
 	n := time.Now().UTC().Truncate(time.Microsecond)
-	until := identity.Earlier(n.Add(5*time.Second), recovery.FreshUntil)
+	until := n.Add(5 * time.Second)
 	guard := app.CapacityNamespaceProtection{ClusterID: f.input.ControlClusterID, Digest: f.qualification.NamespaceGuards[0].Digest, Keys: []string{"team"}, ObservedAt: n, FreshUntil: until}
 	workload := capacityNativeWorkload(f.input.ControlClusterID, f.namespace, f.workloads[index], n, until)
-	o, _, err := app.ComposeEnrollmentObservation(source, guard, workload, permissions, recovery, f.input.AccountVersion, time.Now())
+	o, _, err := app.ComposeEnrollmentObservation(source, guard, workload, permissions, f.input.AccountVersion, time.Now())
 	if err != nil {
 		t.Fatal("composed exact workload observation", err)
 	}

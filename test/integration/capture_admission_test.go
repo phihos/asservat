@@ -198,7 +198,7 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 		t.Fatal(err)
 	}
 	seedRetention, resetRetention := newRetentionEffectFixtures(t, ctx, poolFor, store, keys)
-	seedRecovery, resetRecovery := newRecoveryEffectFixtures(t, ctx, admin, poolFor)
+	seedRecovery := newRecoveryEffectFixtures(t, ctx, admin)
 	if native == nil {
 		// Every pool opened below the shared fixtures above must be closed by
 		// its own subtest or helper; leaked idle connections exhausted the
@@ -325,15 +325,11 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 		if err = controlBacking.ProvisionContextControlAllocation(ctx, capacity.ContextControlAllocation{ObservedAt: controlNow, FreshUntil: controlNow.Add(5 * time.Second), RootID: root, AllocationID: allocationID, PoolRevision: 1, Revision: 1, FullRecords: full, ReplayRecords: replay, ValidUntil: now.Add(30 * time.Minute)}); err != nil {
 			t.Fatal(err)
 		}
-		recoveryState, err := recoveryFixture.reader.RecoveryState(ctx)
+		s, err := postgres.NewContextAdmissions(ctx, capturePool, root, recoveryFixture.installation, retentionFixture.guard)
 		if err != nil {
 			t.Fatal(err)
 		}
-		s, err := postgres.NewContextAdmissions(ctx, capturePool, root, postgres.EffectTransactionGuards{Retention: retentionFixture.guard, Recovery: recoveryFixture.guard})
-		if err != nil {
-			t.Fatal(err)
-		}
-		return scenario{p, s, batch, capture.Admission{Recovery: recoveryState, RootID: root, IdempotencyKey: "synthetic-request", SubmissionDigest: artifact.Digest{10}, Plan: plan, Eligibility: eligibility, Storage: storage, Registration: r, CaseID: caseID, OccurrenceID: custodyID()}, poolID, retentionFixture, recoveryFixture, nil}
+		return scenario{p, s, batch, capture.Admission{RootID: root, IdempotencyKey: "synthetic-request", SubmissionDigest: artifact.Digest{10}, Plan: plan, Eligibility: eligibility, Storage: storage, Registration: r, CaseID: caseID, OccurrenceID: custodyID()}, poolID, retentionFixture, recoveryFixture, nil}
 	}
 	createForTarget := func(t *testing.T, slots int64, source func(context.Context) (targets.PodResolution, error), image artifact.Digest) scenario {
 		return createForTargetWithControl(t, slots, max(slots, 1)*2, max(slots, 1)*2, source, image)
@@ -379,15 +375,6 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 			t.Fatal("suspended installation admitted new capture")
 		}
 	})
-	t.Run("database-change-invalidates-already-read-recovery-proof", func(t *testing.T) {
-		s := create(t, 1)
-		if _, err := admin.Exec(ctx, "UPDATE fleet_trust SET activated_postmaster_at=activated_postmaster_at-interval '1 microsecond' WHERE installation_id=$1", s.recovery.installation); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := s.s.AdmitContext(ctx, s.a); err == nil {
-			t.Fatal("old recovery proof admitted a capture against a changed database")
-		}
-	})
 	qualifyOperationAudits(t, ctx, admin, poolFor, store, keys, create)
 	qualifyOperationAuditLifecycle(t, ctx, admin, poolFor, store, keys, s3admin, bucket, create)
 	qualifyCaptureIntentLifecycle(t, ctx, admin, poolFor, store, keys, s3admin, bucket, create)
@@ -417,7 +404,6 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 		controlPool.Reset()
 		auditPool.Reset()
 		resetRetention()
-		resetRecovery()
 	})
 	qualifyRetentionCatchup(t, ctx, admin, poolFor, store, keys, create)
 	qualifyRetentionPreview(t, ctx, admin, poolFor, store, keys, create)
@@ -453,7 +439,7 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 			if !r.Replay {
 				fresh++
 			}
-			if r.MetadataValidUntil.IsZero() || r.MetadataValidUntil.After(s.a.Eligibility.ValidUntil) || r.MetadataValidUntil.After(s.a.Recovery.FreshUntil) {
+			if r.MetadataValidUntil.IsZero() || r.MetadataValidUntil.After(s.a.Eligibility.ValidUntil) {
 				t.Fatal("accepted reply lost original metadata authority deadline")
 			}
 			if r.State != capture.PendingAudit || r.CaptureID != s.a.Plan.Input.CaptureID || !r.Deadline.Equal(s.a.Plan.Input.Deadline) || len(r.Expectation.Audience) != 2 || r.Expectation.Validate() != nil {
@@ -479,10 +465,6 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 		change func(*capture.Admission)
 		want   error
 	}{
-		{"missing-recovery-proof", func(a *capture.Admission) { a.Recovery = artifact.RecoveryProof{} }, capture.ErrUnavailable},
-		{"wrong-recovery-installation", func(a *capture.Admission) { a.Recovery.InstallationID = custodyID() }, capture.ErrUnavailable},
-		{"wrong-recovery-epoch", func(a *capture.Admission) { a.Recovery.IssuerEpoch = custodyID() }, capture.ErrUnavailable},
-		{"wrong-recovery-revision", func(a *capture.Admission) { a.Recovery.Revision.Generation++ }, capture.ErrUnavailable},
 		{"wrong-target", func(a *capture.Admission) { a.Eligibility.Target.WorkloadUID = "other" }, capture.ErrInvalid},
 		{"forged-audience", func(a *capture.Admission) { a.Eligibility.DefaultAudience = a.Eligibility.DefaultAudience[:1] }, capture.ErrChanged},
 		{"wrong-store", func(a *capture.Admission) { a.Registration.StoreID = custodyID() }, capture.ErrChanged},
@@ -511,7 +493,7 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 
 	t.Run("capture-retention-proof-required-and-current", func(t *testing.T) {
 		s := create(t, 1)
-		unguarded, err := postgres.NewContextAdmissions(ctx, capturePool, s.a.RootID)
+		unguarded, err := postgres.NewContextAdmissions(ctx, capturePool, s.a.RootID, s.recovery.installation)
 		if err != nil {
 			t.Fatal(err)
 		}

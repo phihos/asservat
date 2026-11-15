@@ -23,7 +23,7 @@ import (
 // ConfigurationRoleSource is only the actual protected credential-bootstrap
 // source reader. It cannot supply an accepted OwnerConfiguration or update SQL
 // freshness. Its concrete sources cannot be replaced with an installation JSON
-// callback. Original activation/recovery checks remain in the SQL producer.
+// callback. Original activation checks remain in the SQL producer.
 type ConfigurationRoleSource struct {
 	client     *PermissionClient
 	protection *OwnerWorkloadProtection

@@ -37,9 +37,9 @@ func manualCancellationExecution(t *testing.T, ctx context.Context, f *capacityS
 	if _, err := intents.AcknowledgedCaptureIntent(ctx, accepted.CaptureID); err != nil {
 		t.Fatal("audited exact snapshot intent", err)
 	}
-	guards := postgres.EffectTransactionGuards{Recovery: s.recovery.guard, Retention: s.retention.guard}
+	guards := s.retention.guard
 	hub := f.roles["hub-runtime"]
-	executions, err := postgres.NewAPIContextExecutions(ctx, hub, admission.RootID, guards)
+	executions, err := postgres.NewAPIContextExecutions(ctx, hub, admission.RootID, policy.Authority.InstallationID, guards)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +47,7 @@ func manualCancellationExecution(t *testing.T, ctx context.Context, f *capacityS
 	if err != nil {
 		t.Fatal(err)
 	}
-	process := executionvalue.APIProcessBinding{InstallationID: policy.Authority.InstallationID, ClusterID: policy.Authority.ClusterID, IssuerEpoch: admission.Recovery.IssuerEpoch, NamespaceUID: custodyID(), AccountUID: custodyID(), PodUID: custodyID(), ProcessEpoch: custodyID(), StartupDigest: artifact.Digest{1}, ImageDigest: e.CollectorImageDigest}
+	process := executionvalue.APIProcessBinding{InstallationID: policy.Authority.InstallationID, ClusterID: policy.Authority.ClusterID, IssuerEpoch: policy.Scenario.recovery.observation.issuer, NamespaceUID: custodyID(), AccountUID: custodyID(), PodUID: custodyID(), ProcessEpoch: custodyID(), StartupDigest: artifact.Digest{1}, ImageDigest: e.CollectorImageDigest}
 	refresh := func() executionapp.APIExecutionCheck {
 		t.Helper()
 		f.refreshBase(t)
@@ -62,11 +62,7 @@ func manualCancellationExecution(t *testing.T, ctx context.Context, f *capacityS
 		if err != nil || !eligibility.Eligible {
 			t.Fatal("current source snapshot audience", err)
 		}
-		recovery, err := s.recovery.reader.RecoveryState(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
-		work, err := executions.ReadAPIContextWork(ctx, accepted.CaptureID, verified, recovery)
+		work, err := executions.ReadAPIContextWork(ctx, accepted.CaptureID, verified)
 		if err != nil {
 			t.Fatal("retained source API work", err)
 		}
@@ -93,8 +89,8 @@ func manualCancellationExecution(t *testing.T, ctx context.Context, f *capacityS
 			t.Fatal("same immutable source plan", err)
 		}
 		checked := clock()
-		until = identity.Earlier(until, identity.Earlier(eligibility.ValidUntil, identity.Earlier(plan.ValidUntil, recovery.FreshUntil)))
-		out := executionapp.APIExecutionCheck{Work: work, Plan: plan, Eligibility: eligibility, Recovery: recovery, Process: executionvalue.APIProcessObservation{Binding: process, CheckedAt: now, ValidUntil: now.Add(5 * time.Second)}, CheckedAt: checked, ValidUntil: until}
+		until = identity.Earlier(until, identity.Earlier(eligibility.ValidUntil, plan.ValidUntil))
+		out := executionapp.APIExecutionCheck{Work: work, Plan: plan, Eligibility: eligibility, Process: executionvalue.APIProcessObservation{Binding: process, CheckedAt: now, ValidUntil: now.Add(5 * time.Second)}, CheckedAt: checked, ValidUntil: until}
 		if admission.RecordingSave != nil {
 			human := admission.RecordingSave.Initiator.VerifiedIdentity
 			permissions, err := s.p.Permissions(ctx, admission.Eligibility.Target)
@@ -153,7 +149,7 @@ func qualifyManualRecordingSaveCancellation(t *testing.T, ctx context.Context, f
 				t.Fatal(err)
 			}
 			now := time.Now().UTC().Truncate(time.Microsecond)
-			cancel := value.CancellationCheck{RootID: snapshot.Admission.RootID, Identity: snapshot.Admission.RecordingSave.Initiator.VerifiedIdentity, Recovery: check.Recovery, CheckedAt: now, ValidUntil: identity.Earlier(check.ValidUntil, now.Add(5*time.Second)), Request: value.CancellationRequest{CaptureID: snapshot.Accepted.CaptureID, ExpectedRevision: revision, IdempotencyKey: "cancel-original"}}
+			cancel := value.CancellationCheck{RootID: snapshot.Admission.RootID, Identity: snapshot.Admission.RecordingSave.Initiator.VerifiedIdentity, CheckedAt: now, ValidUntil: identity.Earlier(check.ValidUntil, now.Add(5*time.Second)), Request: value.CancellationRequest{CaptureID: snapshot.Accepted.CaptureID, ExpectedRevision: revision, IdempotencyKey: "cancel-original"}}
 			work, err := executions.RequestCaptureCancellation(ctx, cancel)
 			if err != nil || !work.Decision.Requested || work.Decision.Revision <= revision {
 				t.Fatal("durable cancellation request", work.Decision, err)
@@ -203,17 +199,17 @@ func qualifyManualRecordingSaveCancellation(t *testing.T, ctx context.Context, f
 				cancelled.CompletedAt = proof.JoinedAt
 				wrong := proof
 				wrong.AttemptID = custodyID()
-				if _, err := executions.RecordAPISnapshotCancellation(ctx, cancelled, wrong, check.Process, check.Recovery); err == nil {
+				if _, err := executions.RecordAPISnapshotCancellation(ctx, cancelled, wrong, check.Process); err == nil {
 					t.Fatal("foreign attempt cancellation proof accepted")
 				}
 				if _, err := executions.RecordAPIOutcome(ctx, cancelled, check.Process); err == nil {
 					t.Fatal("generic outcome bypassed dedicated joined proof")
 				}
-				done, err := executions.RecordAPISnapshotCancellation(ctx, cancelled, proof, check.Process, check.Recovery)
+				done, err := executions.RecordAPISnapshotCancellation(ctx, cancelled, proof, check.Process)
 				if err != nil || done.Phase != "cancelled" {
 					t.Fatal("exact joined proof did not cancel", done.Phase, err)
 				}
-				again, err := executions.RecordAPISnapshotCancellation(ctx, cancelled, proof, check.Process, check.Recovery)
+				again, err := executions.RecordAPISnapshotCancellation(ctx, cancelled, proof, check.Process)
 				if err != nil || !reflect.DeepEqual(again, done) {
 					t.Fatal("exact joined proof replay changed execution", err)
 				}

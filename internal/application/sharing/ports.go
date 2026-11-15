@@ -58,19 +58,18 @@ type Transfer struct {
 	RequestDigest    artifact.Digest
 }
 
-// Store is the SQL share ledger. Create, revoke and transfer run under the
-// current recovery fence; a replayed key returns the original row and
-// replay=true. OwnedShares returns the caller's own shares and the
+// Store is the SQL share ledger. A replayed create, revoke or transfer key
+// returns the original row and replay=true. OwnedShares returns the caller's own shares and the
 // unrevoked, unexpired shares pinning a management assignment of one of the
 // caller's keys (candidates: the service checks current management).
 type Store interface {
 	authapp.ShareReader
-	CreateShare(context.Context, Request, artifact.RecoveryProof) (authorization.Share, bool, error)
+	CreateShare(context.Context, Request) (authorization.Share, bool, error)
 	Share(ctx context.Context, shareID string) (authorization.Share, error)
 	OwnedShares(ctx context.Context, caller identity.Identity, limit int) ([]authorization.Share, error)
 	ReceivedShares(ctx context.Context, caller identity.Identity, limit int) ([]authorization.Share, error)
-	RevokeShare(context.Context, Revocation, artifact.RecoveryProof) (authorization.Share, bool, error)
-	TransferShare(context.Context, Transfer, artifact.RecoveryProof) (authorization.Share, bool, error)
+	RevokeShare(context.Context, Revocation) (authorization.Share, bool, error)
+	TransferShare(context.Context, Transfer) (authorization.Share, bool, error)
 	// AdministeredShares is the administrator's management-only page of all
 	// shares, newest first, strictly after the keyset position (zero: the
 	// first page).
@@ -122,6 +121,6 @@ type PolicyRevocation struct {
 // the same key after success is a replay.
 type PolicySharingStore interface {
 	PolicySharing(ctx context.Context, acceptanceID string) (PolicySharing, error)
-	RevokePolicySharing(context.Context, PolicyRevocation, artifact.RecoveryProof) (revoked int, replay bool, err error)
-	StopPolicySharing(context.Context, PolicyRevocation, artifact.RecoveryProof) (replay bool, err error)
+	RevokePolicySharing(context.Context, PolicyRevocation) (revoked int, replay bool, err error)
+	StopPolicySharing(context.Context, PolicyRevocation) (replay bool, err error)
 }

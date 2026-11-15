@@ -17,7 +17,7 @@ import (
 )
 
 // No SQL, Kubernetes, provider or environment input is opened by these tests.
-// Accepted source/recovery/permission facts below are explicitly synthetic;
+// Accepted source/permission facts below are explicitly synthetic;
 // this preflight only prevents malformed fixture recipes reaching a native lab.
 func TestCapacityNativeInputsProtectedBacking(t *testing.T) {
 	q, source := capacityNativeQualification(t, custodyID(), custodyID(), custodyID(), custodyID(), "synthetic-account-v1")
@@ -60,10 +60,9 @@ func TestCapacityNativeInputsSourceEnrollmentAndRenewal(t *testing.T) {
 	n := time.Now().UTC().Truncate(time.Microsecond)
 	until := n.Add(5 * time.Second)
 	root, installation, cluster := q.RootBacking.RootID, q.RootBacking.InstallationID, template.ClusterID
-	recovery := artifact.RecoveryProof{InstallationID: installation, IssuerEpoch: custodyID(), Revision: identity.Revision{UID: custodyID(), Generation: 1, Digest: artifact.Digest{1}}, ObservedAt: n, FreshUntil: until}
 	observation := capacityNativeSource(t, template, n, until)
 	guard := app.CapacitySourceProtection{ClusterID: cluster, ControlNamespaceUID: template.ControlNamespace.UID, Digest: artifact.Digest{14}, ObservedAt: n, FreshUntil: until}
-	acceptance := app.CapacitySourceAcceptance{RootID: root, InstallationID: installation, QualificationID: q.ID, QualificationDigest: q.Digest, Observation: observation, Protection: guard, Recovery: recovery}
+	acceptance := app.CapacitySourceAcceptance{RootID: root, InstallationID: installation, QualificationID: q.ID, QualificationDigest: q.Digest, Observation: observation, Protection: guard}
 	if !acceptance.Valid(n) {
 		t.Fatal("native source acceptance shape invalid")
 	}
@@ -71,12 +70,12 @@ func TestCapacityNativeInputsSourceEnrollmentAndRenewal(t *testing.T) {
 	if !source.Valid(n) {
 		t.Fatal("native accepted source shape invalid")
 	}
-	policy := capacityNativeProcessingPolicy(q, recovery.IssuerEpoch)
+	policy := capacityNativeProcessingPolicy(q, custodyID())
 	policy.ObservedAt, policy.FreshUntil = n, until
 	if !policy.Valid(n) {
 		t.Fatal("native independent processing policy shape invalid")
 	}
-	original, err := app.NewRootBackingObservation(q, source, policy, recovery, n)
+	original, err := app.NewRootBackingObservation(q, source, policy, n)
 	if err != nil || !original.Valid(n) {
 		t.Fatal("native root observation invalid", err)
 	}
@@ -95,7 +94,7 @@ func TestCapacityNativeInputsSourceEnrollmentAndRenewal(t *testing.T) {
 		}
 		t.Run(fmt.Sprintf("account-%02d-%s", i, kind), func(t *testing.T) {
 			work := capacityNativeWorkload(cluster, namespace, cfg.WorkloadRef{Kind: kind, Name: fmt.Sprintf("envelope-%d", i), UID: custodyID()}, n, until)
-			enrolled, selected, err := app.ComposeEnrollmentObservation(source, metadataGuard, work, permissions, recovery, q.RootBacking.AccountVersion, n)
+			enrolled, selected, err := app.ComposeEnrollmentObservation(source, metadataGuard, work, permissions, q.RootBacking.AccountVersion, n)
 			if err != nil || !enrolled.Valid(n) {
 				t.Fatal("native workload composition invalid", err)
 			}
@@ -119,9 +118,8 @@ func TestCapacityNativeInputsSourceEnrollmentAndRenewal(t *testing.T) {
 	later := cutoff.Add(time.Second)
 	source.Observation = capacityNativeSource(t, template, later, later.Add(5*time.Second))
 	source.ObservedAt, source.FreshUntil = later, later.Add(5*time.Second)
-	recovery.ObservedAt, recovery.FreshUntil = later, source.FreshUntil
 	policy.ObservedAt, policy.FreshUntil = later, source.FreshUntil
-	renewal, err := app.NewRootBackingObservation(q, source, policy, recovery, later)
+	renewal, err := app.NewRootBackingObservation(q, source, policy, later)
 	if err != nil {
 		t.Fatal("native renewal observation invalid", err)
 	}

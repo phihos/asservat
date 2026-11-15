@@ -17,7 +17,6 @@ import (
 	"asservat.local/asservat/internal/adapters/postgres"
 	auditapp "asservat.local/asservat/internal/application/audit"
 	captureapp "asservat.local/asservat/internal/application/capture"
-	fleetapp "asservat.local/asservat/internal/application/fleet"
 	identities "asservat.local/asservat/internal/application/identity"
 	planningapp "asservat.local/asservat/internal/application/planning"
 	privacyapp "asservat.local/asservat/internal/application/privacy"
@@ -67,13 +66,13 @@ type dispatchPortSample struct {
 }
 type dispatchPortTimes struct {
 	mu    sync.Mutex
-	ports [5]dispatchPortSample
+	ports [4]dispatchPortSample
 }
 
 func (s *dispatchPortTimes) reset() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.ports = [5]dispatchPortSample{}
+	s.ports = [4]dispatchPortSample{}
 }
 func (s *dispatchPortTimes) add(port int, began time.Time) {
 	d := time.Since(began)
@@ -90,7 +89,7 @@ func (s *dispatchPortTimes) report(t *testing.T) {
 	s.mu.Lock()
 	snapshot := s.ports
 	s.mu.Unlock()
-	for n, name := range [5]string{"recovery", "approvals", "eligibility-policy", "eligibility-human", "eligibility-unknown"} {
+	for n, name := range [4]string{"approvals", "eligibility-policy", "eligibility-human", "eligibility-unknown"} {
 		p := snapshot[n]
 		if p.count > 0 {
 			t.Logf("actual_investigation_port kind=%s count=%d inclusive_sum_us=%d max_us=%d", name, p.count, p.sum.Microseconds(), p.max.Microseconds())
@@ -106,12 +105,12 @@ type dispatchTimedEligibility struct {
 func (s dispatchTimedEligibility) ContextEligibilityCurrent(ctx context.Context, current identities.CurrentIdentity, target authorization.Target) authorization.CaptureEligibility {
 	began := time.Now()
 	out := s.base.ContextEligibilityCurrent(ctx, current, target)
-	port := 4
+	port := 3
 	if out.Principal.Valid() {
 		if _, _, policy := authorization.PolicyExecutor(out.Principal); policy {
-			port = 2
+			port = 1
 		} else if out.Principal.Kind == identity.Human {
-			port = 3
+			port = 2
 		}
 	}
 	s.times.add(port, began)
@@ -126,18 +125,6 @@ type dispatchTimedApprovals struct {
 func (s dispatchTimedApprovals) IdentityPolicy(ctx context.Context, issuer string) (identity.Policy, error) {
 	began := time.Now()
 	out, err := s.base.IdentityPolicy(ctx, issuer)
-	s.times.add(1, began)
-	return out, err
-}
-
-type dispatchTimedRecovery struct {
-	base  fleetapp.RecoveryReader
-	times *dispatchPortTimes
-}
-
-func (s dispatchTimedRecovery) RecoveryState(ctx context.Context) (artifact.RecoveryProof, error) {
-	began := time.Now()
-	out, err := s.base.RecoveryState(ctx)
 	s.times.add(0, began)
 	return out, err
 }
@@ -283,15 +270,15 @@ func newDispatchWorkflowOperations(t *testing.T, ctx context.Context, f *capacit
 	}
 	t.Cleanup(mac.Close)
 	for _, p := range []audit.OperationLifecyclePolicy{profiles.Normal.Policy, profiles.Resolution.Policy} {
-		journal, err := postgres.NewHealthyOperationJournal(ctx, journalPool, p, policy.Scenario.recovery.guard)
+		journal, err := postgres.NewHealthyOperationJournal(ctx, journalPool, p)
 		if err != nil {
 			t.Fatal(err)
 		}
-		ack, err := postgres.NewOperationAcknowledgements(ctx, ackPool, p.RootID, p.Lane, policy.Scenario.recovery.guard)
+		ack, err := postgres.NewOperationAcknowledgements(ctx, ackPool, p.RootID, p.Lane, policy.Scenario.recovery.installation)
 		if err != nil {
 			t.Fatal(err)
 		}
-		lifecycle, err := postgres.NewOperationLifecycles(ctx, journalPool, p.RootID, p.Lane, policy.Scenario.recovery.guard)
+		lifecycle, err := postgres.NewOperationLifecycles(ctx, journalPool, p.RootID, p.Lane, policy.Scenario.recovery.installation)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -313,7 +300,7 @@ func newDispatchWorkflowOperations(t *testing.T, ctx context.Context, f *capacit
 	if err != nil {
 		t.Fatal(err)
 	}
-	processing, err := postgres.NewProcessingReads(ctx, f.roles["hub-runtime"], policy.Scenario.a.RootID, policy.Scenario.recovery.guard)
+	processing, err := postgres.NewProcessingReads(ctx, f.roles["hub-runtime"], policy.Scenario.a.RootID, policy.Scenario.recovery.installation)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -324,16 +311,16 @@ func newDispatchWorkflowOperations(t *testing.T, ctx context.Context, f *capacit
 	if _, err := approvals.IdentityPolicy(ctx, policy.Authority.Creator.Issuer); err != nil {
 		t.Fatal("bounded synthetic approval settings", err)
 	}
-	investigation := captureapp.ContextInvestigation{RootID: policy.Scenario.a.RootID, InstallationID: policy.Authority.InstallationID, Previews: previews, Replay: admissions, Admission: admissions, Targets: workflow.Facts, Eligibility: dispatchTimedEligibility{base: workflow.Eligibility, times: times}, Capabilities: workflow.Facts, Retention: workflow.Retention, Storage: storage, Processing: processing, Recovery: dispatchTimedRecovery{base: policy.Scenario.recovery.reader, times: times}, PolicyAccepted: policy.Reader, RecordingSources: previews, RecordingGroups: groupRequests, RecordingPolicies: captureapp.CurrentRecordingPolicies{Documents: dispatchPolicyDocuments{policy}, Accepted: policy.Reader, CompileRecorder: policySourceCompile(pcap.NewCompiler()), RecipeName: planningapp.ContextRecipeName, RecipeDigest: planningapp.RecipeDigest(), Now: time.Now}, Approvals: dispatchTimedApprovals{base: approvals, times: times}, RecordingSaveEnabled: true, Lifetime: time.Minute, Now: time.Now, NewID: custodyID}
+	investigation := captureapp.ContextInvestigation{RootID: policy.Scenario.a.RootID, InstallationID: policy.Authority.InstallationID, Previews: previews, Replay: admissions, Admission: admissions, Targets: workflow.Facts, Eligibility: dispatchTimedEligibility{base: workflow.Eligibility, times: times}, Capabilities: workflow.Facts, Retention: workflow.Retention, Storage: storage, Processing: processing, PolicyAccepted: policy.Reader, RecordingSources: previews, RecordingGroups: groupRequests, RecordingPolicies: captureapp.CurrentRecordingPolicies{Documents: dispatchPolicyDocuments{policy}, Accepted: policy.Reader, CompileRecorder: policySourceCompile(pcap.NewCompiler()), RecipeName: planningapp.ContextRecipeName, RecipeDigest: planningapp.RecipeDigest(), Now: time.Now}, Approvals: dispatchTimedApprovals{base: approvals, times: times}, RecordingSaveEnabled: true, Lifetime: time.Minute, Now: time.Now, NewID: custodyID}
 	submission := captureapp.ContextSubmission{ContextInvestigation: investigation, Intents: intents, Start: workflow}
 	if history != nil {
 		submission.History = history
 	}
-	reads, err := postgres.NewContextProgressReads(ctx, f.roles["hub-runtime"], investigation.RootID, policy.Scenario.recovery.guard)
+	reads, err := postgres.NewContextProgressReads(ctx, f.roles["hub-runtime"], investigation.RootID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	progress := captureapp.ContextProgressService{RootID: investigation.RootID, InstallationID: investigation.InstallationID, Reader: reads, Recovery: investigation.Recovery, Now: time.Now}
+	progress := captureapp.ContextProgressService{RootID: investigation.RootID, InstallationID: investigation.InstallationID, Reader: reads, Now: time.Now}
 	captures, err := presentation.NewContextOperations(presentation.ContextOperationsConfig{PublicOrigin: "https://workflow.fixture.invalid", CollectionEnabled: true, Now: time.Now, NewID: custodyID}, submission, progress)
 	if err != nil {
 		t.Fatal(err)
@@ -475,24 +462,18 @@ func qualifyManualRecordingSaveDispatch(t *testing.T, ctx context.Context, f *ca
 	workflow := newManualSnapshotWorkflow(t, ctx, f, policy, parts)
 	workflow.KeyServices = keyServices
 	operations := newDispatchWorkflowOperations(t, ctx, f, policy, admissions, intents, workflow, parts[0].Admission.RecordingSave.Initiator.VerifiedIdentity, checks[0].Settings, history)
-	var shortID string
 	if !t.Run("legacy-five-second-normal-audit-downgrade", func(t *testing.T) {
 		before := readManualSaveCounters(t, ctx, f, policy)
-		reply, id, err := operations.call(ctx, 5*time.Second, custodyID(), "missing-reviewed-preview", false)
+		reply, _, err := operations.call(ctx, 5*time.Second, custodyID(), "missing-reviewed-preview", false)
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer clear(reply.Body)
 		dispatchWorkflowEnvelope(t, reply, "error")
-		shortID = id
 		if readManualSaveCounters(t, ctx, f, policy) != before {
 			t.Fatal("missingpreview audit changedcollectionspend")
 		}
-		qualifyRecordingSaveDispatchLegacyDowngrade(t, ctx, f.admin, shortID)
 	}) {
-		return
-	}
-	if requestMode && !t.Run("empty-group112-down-up-before-request", func(t *testing.T) { qualifyRecordingSaveGroupBoundsEmptyDownUp(t, ctx, f.admin) }) {
 		return
 	}
 	// The real positive request starts only after setup and the compatible audit.
@@ -590,12 +571,6 @@ func qualifyManualRecordingSaveDispatch(t *testing.T, ctx context.Context, f *ca
 		if err = f.admin.QueryRow(ctx, `SELECT root_id::text,intent->>'InputFormat',(intent->>'CreatedAt')::timestamptz,request_until FROM operation_audit WHERE id=$1 AND lane='normal' AND intent->>'Name'='request_capture'`, longID).Scan(&actualRoot, &format, &created, &until); err != nil || actualRoot != group.RootID || format != "context-input/v1" || !until.After(created.Add(5*time.Second)) || until.After(created.Add(identity.RecordingSaveRequestWindow)) {
 			t.Fatal("real public invocation did not persist its prospective15s window", err, until.Sub(created))
 		}
-		qualifyRecordingSaveDispatchPopulatedDowngrade(t, ctx, f.admin, longID, shortID)
-	}) {
-		return
-	}
-	if requestMode && !t.Run("populated-group112-downgrade-refusal", func(t *testing.T) {
-		qualifyRecordingSaveGroupBoundsPopulatedDowngrade(t, ctx, f.admin, accepted.CaptureID)
 	}) {
 		return
 	}

@@ -41,7 +41,7 @@ func qualifyDownloadStop(t *testing.T, ctx context.Context, admin *pgxpool.Pool,
 		defer configPool.Close()
 		catalogPool := poolFor("context_catalog_read_runtime", "synthetic-context-read")
 		defer catalogPool.Close()
-		guards := postgres.EffectTransactionGuards{Retention: scenario.retention.guard, Recovery: scenario.recovery.guard}
+		guards := scenario.retention.guard
 		ledger, err := postgres.NewDownloads(ctx, runtimePool, root, guards)
 		if err != nil {
 			t.Fatal(err)
@@ -121,15 +121,15 @@ func qualifyDownloadStop(t *testing.T, ctx context.Context, admin *pgxpool.Pool,
 		defer writerPool.Close()
 		ackPool := poolFor("download_stop_ack_runtime", "synthetic-download-stop-ack")
 		defer ackPool.Close()
-		stops, err := postgres.NewDownloadStops(ctx, stopPool, root)
+		stops, err := postgres.NewDownloadStops(ctx, stopPool, root, "")
 		if err != nil {
 			t.Fatal(err)
 		}
-		writer, err := postgres.NewDownloadStops(ctx, writerPool, root, scenario.recovery.guard)
+		writer, err := postgres.NewDownloadStops(ctx, writerPool, root, scenario.recovery.installation)
 		if err != nil {
 			t.Fatal(err)
 		}
-		stopAck, err := postgres.NewDownloadStops(ctx, ackPool, root, scenario.recovery.guard)
+		stopAck, err := postgres.NewDownloadStops(ctx, ackPool, root, scenario.recovery.installation)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -160,7 +160,7 @@ func qualifyDownloadStop(t *testing.T, ctx context.Context, admin *pgxpool.Pool,
 			if err = auditConfig.ProvisionOperationAuditPool(ctx, auditapp.OperationAuditPool{RootID: root, Lane: "normal", AccountVersion: "accounts-v1", ExpectedRevision: revision, Accounts: 1, RecordsPerAccount: 1, RetainedSeconds: 3600, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), ValidUntil: validUntil}); err != nil {
 				t.Fatal(err)
 			}
-			journal, err := postgres.NewOperationJournal(ctx, auditJournalPool, root, "normal", scenario.recovery.guard)
+			journal, err := postgres.NewOperationJournal(ctx, auditJournalPool, root, "normal", scenario.recovery.installation)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -214,29 +214,6 @@ func qualifyDownloadStop(t *testing.T, ctx context.Context, admin *pgxpool.Pool,
 			if !errors.As(err, &denied) || denied.Code != "42501" {
 				t.Fatal("stop role did not produce exact privilege denial", q, err)
 			}
-		}
-		// An actual incarnation mismatch blocks new audit provider attempts while
-		// the restrictive Stop transaction remains available to its current actor.
-		request.Session.ID = custodyID()
-		request.Session.CreatedAt = time.Now().UTC()
-		request.Session.Deadline = time.Now().UTC().Add(20 * time.Second).Truncate(time.Microsecond)
-		request.IdempotencyDigest = evidence.ContextDownloadKeyDigest("fenced-stop")
-		request.Authority = current()
-		fenced, err := ledger.ReserveDownload(ctx, request)
-		if err != nil {
-			t.Fatal("fenced-stop reservation", err)
-		}
-		if _, err = admin.Exec(ctx, "UPDATE fleet_trust SET activated_postmaster_at=activated_postmaster_at-interval '1 microsecond' WHERE installation_id=$1", scenario.recovery.installation); err != nil {
-			t.Fatal(err)
-		}
-		currentActor.i.VerifiedAt = time.Now()
-		currentActor.i.ValidUntil = currentActor.i.VerifiedAt.Add(5 * time.Second)
-		pending, err := service.CancelContextDownload(ctx, currentActor, fenced.ID, "fenced-stop", custodyID())
-		if err != nil || pending.State != "Cancelled" || pending.AuditState != "pending" {
-			t.Fatal("recovery must fence audit, not Stop", pending, err)
-		}
-		if err = admin.QueryRow(ctx, "SELECT write_started::int,lookup_attempts FROM download_stop WHERE download_id=$1", fenced.ID).Scan(&writes, &lookups); err != nil || writes != 0 || lookups != 0 {
-			t.Fatal("recovery allowed audit spend", writes, lookups, err)
 		}
 		// A public restriction and its audit must never alter the source artifact.
 		var state string

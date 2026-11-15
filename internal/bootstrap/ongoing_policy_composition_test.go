@@ -145,7 +145,7 @@ func TestTrustedOngoingCompositionBindsRuntimeAndSaveWithoutEffects(t *testing.T
 	s.Investigation.Targets = ports
 	s.Investigation.RecordingPolicies, s.Investigation.PolicyAccepted = ports, ports
 	s.Investigation.RecordingSources, s.Investigation.RecordingGroups, s.Investigation.Approvals = ports, ports, ports
-	runtime := &captureapp.PolicySourceRuntime{Ledger: ports, Dispatcher: ports, Observer: ports, Recovery: s.Investigation.Recovery, Retention: s.Investigation.Retention, Settings: ports, Now: c.Now, NewID: c.NewID}
+	runtime := &captureapp.PolicySourceRuntime{Ledger: ports, Dispatcher: ports, Observer: ports, Retention: s.Investigation.Retention, Settings: ports, Now: c.Now, NewID: c.NewID}
 	s.ongoingSources = runtime
 	got, err := composePublicContextUseCases(c, s)
 	if err != nil || !got.submission.RecordingSaveEnabled || got.submission.Targets != ports || s.Investigation.RecordingSaveEnabled {

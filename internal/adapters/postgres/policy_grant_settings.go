@@ -104,7 +104,7 @@ func (s *AccessGrants) PolicyApprovalSettings(ctx context.Context) (app.Accepted
 			return err
 		}
 		o := policyGrantSettingsObservation(row)
-		if uid(row.InstallationID) != s.recovery.installation || !o.Valid(now.Time) {
+		if uid(row.InstallationID) != s.installation || !o.Valid(now.Time) {
 			return identity.ErrDenied
 		}
 		out = app.AcceptedPolicyApprovalSettings{Values: authorization.PolicyApprovalSettings(o.Values), Revision: o.Revision, ObservedAt: o.ObservedAt, FreshUntil: o.FreshUntil}

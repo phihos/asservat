@@ -70,7 +70,7 @@ func (r *admittedIdentityRows) QueryRow(ctx context.Context, sql string, args ..
 	var row any
 	var want []any
 	switch name {
-	case "ShareFleetTrust":
+	case "ReadFleetTrust":
 		row = r.trust
 		want = []any{r.trust.InstallationID}
 	case "LockDownloadSession":
@@ -130,9 +130,8 @@ func admittedIdentityFixture(t *testing.T) (*admittedWorkerIdentity, *admittedId
 		t.Fatal("invalid current configuration receipt")
 	}
 	p := w.Intent.Profile
-	rev := w.Intent.Authority.Environment.RecoveryRevision
 	r := &admittedIdentityRows{
-		trust:  custodydb.FleetCurrentTrust{InstallationID: id(p.InstallationID), IssuerEpoch: id(cfg.RecoveryEpoch), SourceUid: rev.UID, SourceGeneration: rev.Generation, SourceDigest: rev.Digest[:], ObservedAt: ts(started.Add(-time.Second)), FreshUntil: ts(started.Add(4 * time.Second))},
+		trust:  custodydb.FleetCurrentTrust{InstallationID: id(p.InstallationID), IssuerEpoch: id(cfg.RecoveryEpoch), ObservedAt: ts(started.Add(-time.Second)), FreshUntil: ts(started.Add(4 * time.Second))},
 		parent: parent, worker: worker, latest: worker, now: started,
 		head:     custodydb.DownloadWorkerConfiguration{InstallationID: id(p.InstallationID), ClusterID: id(p.ClusterID), SourceUid: id(p.Configuration.UID), Generation: p.Configuration.Generation, ObservedAt: ts(started), FreshUntil: ts(started.Add(3 * time.Second))},
 		revision: custodydb.DownloadWorkerConfigurationRevision{InstallationID: id(p.InstallationID), ClusterID: id(p.ClusterID), SourceUid: id(p.Configuration.UID), Generation: p.Configuration.Generation, SnapshotJson: encode(cfg), AuditReceiptJson: encode(receipt)},
@@ -151,7 +150,7 @@ func TestAdmittedWorkerIdentityUsesAdmissionWithoutRenewingHumanAuthority(t *tes
 		}
 		return nil
 	})
-	want := []string{"ShareFleetTrust", "LockDownloadSession", "ShareWorkerConfiguration", "ReadWorkerConfigurationRevision", "CurrentTime", "LockDownloadWorker", "LatestDownloadWorker", "CurrentTime", "CurrentTime"}
+	want := []string{"ReadFleetTrust", "CurrentTime", "LockDownloadSession", "ShareWorkerConfiguration", "ReadWorkerConfigurationRevision", "CurrentTime", "LockDownloadWorker", "LatestDownloadWorker", "CurrentTime", "CurrentTime"}
 	if err != nil || effects != 1 || !slices.Equal(rows.calls, want) {
 		t.Fatalf("identity enrollment: err=%v effects=%d calls=%v", err, effects, rows.calls)
 	}
@@ -161,7 +160,7 @@ func TestAdmittedWorkerIdentityUsesAdmissionWithoutRenewingHumanAuthority(t *tes
 }
 
 func TestAdmittedWorkerIdentityRefusesCurrentFencesAfterBlockingWork(t *testing.T) {
-	for _, mode := range []string{"stopped-parent", "expired-parent", "recovery-expired-after-worker-lock", "configuration-suspended", "configuration-replaced", "configuration-expired-after-worker-lock", "wrong-issuer-epoch", "terminated-worker", "retired-worker", "replacement-worker", "missing-worker-audit", "caller-cancelled-after-worker-lock", "original-operation-expired-after-worker-lock", "cutoff-after-effect"} {
+	for _, mode := range []string{"stopped-parent", "expired-parent", "configuration-suspended", "configuration-replaced", "configuration-expired-after-worker-lock", "terminated-worker", "retired-worker", "replacement-worker", "missing-worker-audit", "caller-cancelled-after-worker-lock", "original-operation-expired-after-worker-lock", "cutoff-after-effect"} {
 		t.Run(mode, func(t *testing.T) {
 			s, rows, w, started := admittedIdentityFixture(t)
 			ctx, cancel := context.WithCancel(context.Background())
@@ -171,10 +170,6 @@ func TestAdmittedWorkerIdentityRefusesCurrentFencesAfterBlockingWork(t *testing.
 				rows.parent.State = string(artifact.DownloadCancelled)
 			case "expired-parent":
 				rows.parent.Deadline = ts(started)
-			case "recovery-expired-after-worker-lock":
-				rows.head.FreshUntil = ts(started.Add(5 * time.Second))
-			case "wrong-issuer-epoch":
-				rows.trust.IssuerEpoch = id("10000000-0000-4000-8000-000000000002")
 			case "configuration-suspended", "configuration-replaced":
 				var c value.DownloadWorkerConfiguration
 				if json.Unmarshal(rows.revision.SnapshotJson, &c) != nil {
@@ -200,8 +195,6 @@ func TestAdmittedWorkerIdentityRefusesCurrentFencesAfterBlockingWork(t *testing.
 					return
 				}
 				switch mode {
-				case "recovery-expired-after-worker-lock":
-					rows.now = rows.trust.FreshUntil.Time
 				case "configuration-expired-after-worker-lock":
 					rows.now = rows.head.FreshUntil.Time
 				case "original-operation-expired-after-worker-lock":
@@ -260,7 +253,7 @@ func admittedProjectionIdentityFixture(t *testing.T) (*admittedWorkerIdentity, *
 		ObservedAt: created, ValidUntil: created.Add(5 * time.Second), HardUntil: created.Add(time.Minute), EffectsUntil: created.Add(3 * time.Minute),
 		CleanupUntil: created.Add(4 * time.Minute), RetireBy: created.Add(time.Hour)}
 	q := query.ContextQuery{ID: original.Intent.SessionID, OperationID: original.Intent.ID, WorkerID: original.Intent.ID,
-		Scope: scope, Plan: plan, RecoveryIssuerEpoch: a.Environment.RecoveryEpoch, RecoveryRevision: a.Environment.RecoveryRevision,
+		Scope: scope, Plan: plan,
 		CreatedAt: created, Deadline: created.Add(query.ContextDefaultQueryTime), WorkerUntil: created.Add(time.Minute),
 		CredentialUntil: created.Add(2 * time.Minute), ProviderUntil: created.Add(time.Minute), CleanupUntil: created.Add(3 * time.Minute)}
 	w := original.Acquisition()
@@ -281,7 +274,7 @@ func admittedProjectionIdentityFixture(t *testing.T) (*admittedWorkerIdentity, *
 	rows.query = custodydb.ContextQuery{ID: id(q.ID), RootID: id(q.Scope.RootID), AllocationID: id(q.Plan.AllocationID),
 		AccountID: id(q.Plan.AccountID), PrincipalKey: principalKey(q.Scope.Principal), Actor: encode(q.Scope.Principal), Query: encode(q),
 		OperationID: id(q.OperationID), WorkerID: id(q.WorkerID), CreatedAt: ts(q.CreatedAt), Deadline: ts(q.Deadline),
-		CleanupUntil: ts(q.CleanupUntil), RetireBy: ts(q.Plan.RetireBy), IssuerEpoch: id(q.RecoveryIssuerEpoch)}
+		CleanupUntil: ts(q.CleanupUntil), RetireBy: ts(q.Plan.RetireBy), IssuerEpoch: id(a.Environment.RecoveryEpoch)}
 	receipt := audit.Receipt{Key: audit.ProjectionWorkerKey(i), Version: "original", ETag: "original", Bytes: 17, SHA256: artifact.Digest{8}}
 	rows.worker.SessionID, rows.worker.AllocationID = pgtype.UUID{}, pgtype.UUID{}
 	rows.worker.QueryID, rows.worker.QueryAllocationID = id(q.ID), id(q.Plan.AllocationID)
@@ -291,7 +284,7 @@ func admittedProjectionIdentityFixture(t *testing.T) (*admittedWorkerIdentity, *
 }
 
 func TestAdmittedWorkerIdentityUsesExactQueryParentWithoutPublicCall(t *testing.T) {
-	for _, mode := range []string{"valid", "uncertain", "wrong-worker", "wrong-epoch", "expired-query", "mixed-parent", "missing-audit", "unclaimed", "terminated", "retired", "expired-after-worker-lock"} {
+	for _, mode := range []string{"valid", "uncertain", "wrong-worker", "expired-query", "mixed-parent", "missing-audit", "unclaimed", "terminated", "retired", "expired-after-worker-lock"} {
 		t.Run(mode, func(t *testing.T) {
 			s, rows, w, started := admittedProjectionIdentityFixture(t)
 			var q query.ContextQuery
@@ -304,9 +297,6 @@ func TestAdmittedWorkerIdentityUsesExactQueryParentWithoutPublicCall(t *testing.
 			case "wrong-worker":
 				q.WorkerID = "10000000-0000-4000-8000-000000000002"
 				rows.query.WorkerID = id(q.WorkerID)
-			case "wrong-epoch":
-				q.RecoveryIssuerEpoch = "10000000-0000-4000-8000-000000000002"
-				rows.query.IssuerEpoch = id(q.RecoveryIssuerEpoch)
 			case "expired-query":
 				q.Deadline, rows.query.Deadline = started, ts(started)
 			case "mixed-parent":
@@ -320,7 +310,7 @@ func TestAdmittedWorkerIdentityUsesExactQueryParentWithoutPublicCall(t *testing.
 			case "retired":
 				rows.worker.RetiredProofJson = []byte(`{}`)
 			case "expired-after-worker-lock":
-				rows.head.FreshUntil, rows.trust.FreshUntil = ts(started.Add(5*time.Second)), ts(started.Add(5*time.Second))
+				rows.head.FreshUntil = ts(started.Add(5 * time.Second))
 				rows.hook = func(name string) {
 					if name == "LockDownloadWorker" {
 						rows.now = q.Deadline
@@ -337,13 +327,13 @@ func TestAdmittedWorkerIdentityUsesExactQueryParentWithoutPublicCall(t *testing.
 			effects := 0
 			err := s.current(context.Background(), custodydb.New(rows), w.Intent.Parent, w.Intent.ID, started, func(_ context.Context, _ *custodydb.Queries, c admittedWorkerCheck, _ time.Time) error {
 				effects++
-				if c.worker != w || c.download != (value.DownloadWorker{}) || c.recoveryEpoch != q.RecoveryIssuerEpoch {
+				if c.worker != w || c.download != (value.DownloadWorker{}) || c.recoveryEpoch != uid(rows.trust.IssuerEpoch) {
 					t.Fatal("query identity converted into download authority")
 				}
 				return nil
 			})
 			if mode == "valid" {
-				want := []string{"ShareFleetTrust", "LockContextQuery", "ShareWorkerConfiguration", "ReadWorkerConfigurationRevision", "CurrentTime", "LockDownloadWorker", "CurrentTime", "CurrentTime"}
+				want := []string{"ReadFleetTrust", "CurrentTime", "LockContextQuery", "ShareWorkerConfiguration", "ReadWorkerConfigurationRevision", "CurrentTime", "LockDownloadWorker", "CurrentTime", "CurrentTime"}
 				if err != nil || effects != 1 || !slices.Equal(rows.calls, want) {
 					t.Fatal("query identity failed or requested public authority", err, effects, rows.calls)
 				}

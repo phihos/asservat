@@ -44,7 +44,7 @@ func qualifyContextControlCapacity(t *testing.T, ctx context.Context, admin, cap
 	create = func(t *testing.T, slots, full, replay int64) captureAdmissionScenario {
 		t.Helper()
 		s := createOriginal(t, slots, full, replay)
-		admissions, err := postgres.NewContextAdmissions(ctx, capturePool, s.a.RootID, postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard})
+		admissions, err := postgres.NewContextAdmissions(ctx, capturePool, s.a.RootID, s.recovery.installation, s.retention.guard)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -219,11 +219,8 @@ func withProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *p
 	profile.Configuration = f.qualification.ContextQuery.Profile.Source
 	profile.StoreCredentialSecret, profile.StoreCredentialSecretUID = "query-fixture-store", custodyID()
 	query.workerProfile = profile
-	recovery, err := f.source.RecoveryState(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	query.workerConfig, _, query.workerObserver, _ = acceptedWorkerConfiguration(t, ctx, f.fixturePool, f.store, f.keys, profile, recovery.IssuerEpoch)
+	epoch := fixtureIssuerEpoch(t, ctx, f.admin, f.input.InstallationID)
+	query.workerConfig, _, query.workerObserver, _ = acceptedWorkerConfiguration(t, ctx, f.fixturePool, f.store, f.keys, profile, epoch)
 	path := value.ContextProjectionPath{Purpose: value.ContextProjectionPurpose, ID: f.qualification.ContextQuery.Profile.ID, TargetClusterID: scope.ClusterID, StoreID: f.qualification.Backends[0].EvidenceStoreID, StorageRegion: "local", AcquisitionClusterID: profile.ClusterID, AcquisitionRegion: "local", ConnectorClusterID: profile.ClusterID, ConnectorRegion: "local", HubClusterID: scope.ClusterID, HubRegion: "local", WorkerConfiguration: profile.Configuration, HubConfiguration: profile.Configuration}
 	query.profile, err = f.qualification.ContextQuery.Profile.WithSharedPath(path)
 	if err != nil {
@@ -233,7 +230,7 @@ func withProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *p
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw := querySQLPolicy{root: f.input.PermissionRootID, installation: f.input.InstallationID, epoch: recovery.IssuerEpoch, path: path, profile: isProfile, packet: isPacket, syscall: rawSyscall, logs: isLogs}
+	raw := querySQLPolicy{root: f.input.PermissionRootID, installation: f.input.InstallationID, epoch: epoch, path: path, profile: isProfile, packet: isPacket, syscall: rawSyscall, logs: isLogs}
 	query.policies, err = authapp.NewContextProjectionPolicies(raw, time.Now)
 	if err != nil {
 		t.Fatal(err)
@@ -375,7 +372,7 @@ func publishPreparedQueryLedgerContext(t *testing.T, f *capacitySQLFixture, s ca
 		started.Copies, started.Phase, started.AcquiredAt, started.CompletedAt = copies, "stored", at.Truncate(time.Microsecond), stored
 		c := refresh()
 		completion := artifact.ContextWriterCompletion{RegistrationDigest: privacyapp.RegistrationDigest(e.Registration), ExpectationDigest: evidence.ContextExpectationDigest(e), Copies: copies, StoredAt: stored, ClosedAt: stored}
-		if _, err = profileSQL.RecordAPIStoredCompletion(f.ctx, started, completion, c.Process, c.Recovery); err != nil {
+		if _, err = profileSQL.RecordAPIStoredCompletion(f.ctx, started, completion, c.Process); err != nil {
 			t.Fatal("managed profile stored completion", err)
 		}
 
@@ -423,7 +420,7 @@ func publishPreparedQueryLedgerContext(t *testing.T, f *capacitySQLFixture, s ca
 	} else if profileSource {
 		verifier.WithStreamCheck(artifact.PprofArtifact, func(artifact.ContextExpectation) objectstore.StreamCheck { return diagnostics.NewPprofCheck() })
 	}
-	guards := postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard}
+	guards := s.retention.guard
 	var publicationPools []*pgxpool.Pool
 	defer func() {
 		for _, p := range publicationPools {
@@ -449,7 +446,7 @@ func publishPreparedQueryLedgerContext(t *testing.T, f *capacitySQLFixture, s ca
 	if profileSource || packetSource || rawSyscall || isLogs {
 		gatePool := f.fixturePool("api_publication_gate_runtime", "synthetic-api-publication-gate")
 		defer gatePool.Close()
-		gate, err := postgres.NewAPIContextPublicationGate(f.ctx, gatePool, s.a.RootID, guards, privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, s.recovery.reader)
+		gate, err := postgres.NewAPIContextPublicationGate(f.ctx, gatePool, s.a.RootID, guards, privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now})
 		if err != nil {
 			t.Fatal(err)
 		}

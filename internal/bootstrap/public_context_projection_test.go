@@ -15,7 +15,6 @@ type publicProjectionPorts struct {
 	analysisapp.CurrentContextProjectionAuthority
 	analysisapp.ContextQueryLedger
 	analysisapp.ContextProjectionReader
-	analysisapp.ContextProjectionRecovery
 	analysisapp.ContextProjectionRoutes
 	analysisapp.ContextProjectionRouteReader
 	analysisapp.SyscallProjectionRouteReader
@@ -26,8 +25,8 @@ type publicProjectionPorts struct {
 func publicProjectionFixture(c PublicContextOperationsConfig) *analysisapp.ContextProjectionService {
 	p := &publicProjectionPorts{}
 	return &analysisapp.ContextProjectionService{
-		Results:  analysisapp.ContextProjectionResults{RootID: c.RootID, InstallationID: c.InstallationID, HubProcessEpoch: c.NewID(), Authority: p, Ledger: p, Reader: p, Now: c.Now, NewID: c.NewID},
-		Recovery: p, Routes: p, Plans: p, Workers: p,
+		Results: analysisapp.ContextProjectionResults{RootID: c.RootID, InstallationID: c.InstallationID, HubProcessEpoch: c.NewID(), Authority: p, Ledger: p, Reader: p, Now: c.Now, NewID: c.NewID},
+		Routes:  p, Plans: p, Workers: p,
 	}
 }
 func TestPublicContextProjectionRegistersOnlyCompleteInstalledComposition(t *testing.T) {
@@ -115,7 +114,6 @@ func TestPublicContextProjectionRejectsPartialOrForeignServices(t *testing.T) {
 		"reader":    func(s *analysisapp.ContextProjectionService) { s.Results.Reader = nil },
 		"clock":     func(s *analysisapp.ContextProjectionService) { s.Results.Now = nil },
 		"id":        func(s *analysisapp.ContextProjectionService) { s.Results.NewID = nil },
-		"recovery":  func(s *analysisapp.ContextProjectionService) { s.Recovery = nil },
 		"routes":    func(s *analysisapp.ContextProjectionService) { s.Routes = nil },
 		"plans":     func(s *analysisapp.ContextProjectionService) { s.Plans = nil },
 		"workers":   func(s *analysisapp.ContextProjectionService) { s.Workers = nil },

@@ -68,7 +68,7 @@ GRANT SELECT ON artifact_download,download_control_allocation,download_native_ba
 	if err != nil {
 		t.Fatal(err)
 	}
-	guards := postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard}
+	guards := s.retention.guard
 	publications := func(role, password string) *postgres.ContextPublications {
 		p, err := postgres.NewContextPublications(f.ctx, f.fixturePool(role, password), s.a.RootID, guards)
 		if err != nil {
@@ -88,13 +88,13 @@ GRANT SELECT ON artifact_download,download_control_allocation,download_native_ba
 		t.Fatal("managed independent verification/publication", err)
 	}
 	f.qualifySharedMetadataReaders(t, s, e, enrollment)
-	processing, err := postgres.NewProcessingReads(f.ctx, f.fixturePool("context_catalog_read_runtime", "synthetic-context-read"), s.a.RootID, s.recovery.guard)
+	processing, err := postgres.NewProcessingReads(f.ctx, f.fixturePool("context_catalog_read_runtime", "synthetic-context-read"), s.a.RootID, s.recovery.installation)
 	if err != nil {
 		t.Fatal(err)
 	}
 	actor := s.a.Eligibility.VerifiedIdentity
 	actor.Scopes = []string{"evidence:read", "evidence:download"}
-	gate := authapp.ContextDownloadAuthority{RootID: s.a.RootID, Identities: nativeDownloadTestIdentity{value: actor, expires: time.Now().Add(2 * time.Minute)}, Permissions: s.p, Catalog: catalog, Retention: privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, Environment: authapp.CurrentDownloadEnvironment{RootID: s.a.RootID, InstallationID: f.input.InstallationID, Policies: processingTestPolicy{value: f.processingPolicy}, Recovery: s.recovery.reader, Processing: processing, Now: time.Now}, Now: time.Now}
+	gate := authapp.ContextDownloadAuthority{RootID: s.a.RootID, Identities: nativeDownloadTestIdentity{value: actor, expires: time.Now().Add(2 * time.Minute)}, Permissions: s.p, Catalog: catalog, Retention: privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, Environment: authapp.CurrentDownloadEnvironment{RootID: s.a.RootID, InstallationID: f.input.InstallationID, Policies: processingTestPolicy{value: f.processingPolicy}, Processing: processing, Now: time.Now}, Now: time.Now}
 	observation := f.workloadObservation(t, 0)
 	if err = f.enrollments.RefreshCapacityEnrollment(f.ctx, observation, enrollment); err != nil {
 		t.Fatal(err)

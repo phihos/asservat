@@ -17,7 +17,7 @@ import (
 
 // AutomationAuthorities is a read-only eligibility facet. The installation/root
 // association comes from private composition, not an authored policy field.
-// Final effect transactions still need recovery, privacy, grant and quota fences.
+// Final effect transactions still need privacy, grant and quota fences.
 type AutomationAuthorities struct {
 	permissions  *Permissions
 	installation string

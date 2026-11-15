@@ -30,7 +30,7 @@ func recordingGroupSizePreview(t *testing.T, n int) value.ContextPreview {
 	a.PolicyUID = strings.Repeat("p", 64)
 	a.Executor = authorization.PolicyPrincipal(a.InstallationID, a.PolicyUID)
 	a.NamespaceUID, a.WorkloadUID = strings.Repeat("n", 64), strings.Repeat("w", 64)
-	p := value.ContextPreview{Group: &value.RecordingSaveGroupPreview{Executor: a.Executor, PolicyName: strings.Repeat("p", 63), PolicyUID: a.PolicyUID, ExecutionDigest: a.ScopeDigest}, ID: f.svc.NewID(), RootID: f.svc.RootID, InstallationID: f.svc.InstallationID, IssuerEpoch: f.epoch, CaptureID: f.svc.NewID(), CaseID: f.svc.NewID(), AssessmentID: f.svc.NewID(), AssessmentRulesDigest: compiler.SourceSnapshotAssessmentRulesDigest(), Actor: actor, Storage: f.store.Selection, CreatedAt: now, Deadline: now.Add(15 * time.Second), SelectionUntil: now.Add(15 * time.Second)}
+	p := value.ContextPreview{Group: &value.RecordingSaveGroupPreview{Executor: a.Executor, PolicyName: strings.Repeat("p", 63), PolicyUID: a.PolicyUID, ExecutionDigest: a.ScopeDigest}, ID: f.svc.NewID(), RootID: f.svc.RootID, InstallationID: f.svc.InstallationID, CaptureID: f.svc.NewID(), CaseID: f.svc.NewID(), AssessmentID: f.svc.NewID(), AssessmentRulesDigest: compiler.SourceSnapshotAssessmentRulesDigest(), Actor: actor, Storage: f.store.Selection, CreatedAt: now, Deadline: now.Add(15 * time.Second), SelectionUntil: now.Add(15 * time.Second)}
 	p.Intent.Target = targets.WorkloadRequest{ClusterID: a.ClusterID, Namespace: strings.Repeat("n", 63), Kind: "Deployment", Name: strings.Repeat("w", 63)}
 	p.Target = x.rows[0].Source.Target.Request
 	p.Target.Namespace.Name, p.Target.Namespace.UID = p.Intent.Target.Namespace, a.NamespaceUID

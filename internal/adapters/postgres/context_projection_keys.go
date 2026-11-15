@@ -92,7 +92,7 @@ type ProjectionKeys struct {
 }
 
 func NewProjectionKeys(q *ContextQueries, scope value.KeyScope) (*ProjectionKeys, error) {
-	if q == nil || q.ledger == nil || !scope.Valid() || scope.Purpose != "artifact" || scope.InstallationID != q.recovery.installation {
+	if q == nil || q.ledger == nil || !scope.Valid() || scope.Purpose != "artifact" || scope.InstallationID != q.installation {
 		return nil, auth.ErrKeyDenied
 	}
 	return &ProjectionKeys{q, scope}, nil
@@ -158,7 +158,11 @@ func (s *ProjectionKeys) Resolve(ctx context.Context, peer value.KeyPeer, r valu
 		if e != nil || count != 1 {
 			return auth.ErrKeyDenied
 		}
-		out = value.KeyOperationPermit{AuthorityID: r.AuthorityID, RecoveryEpoch: a.Environment.Recovery.IssuerEpoch, Revision: uint64(binding.Batch.Generation), Certificate: peer.Certificate, RequestDigest: r.RequestDigest, ObservedAt: now.Time, ValidUntil: identity.Earlier(now.Time.Add(5*time.Second), identity.Earlier(binding.Until, peer.NotAfter))}
+		trust, _, e := currentTrust(ctx, tx, s.scope.InstallationID)
+		if e != nil {
+			return e
+		}
+		out = value.KeyOperationPermit{AuthorityID: r.AuthorityID, RecoveryEpoch: uid(trust.IssuerEpoch), Revision: uint64(binding.Batch.Generation), Certificate: peer.Certificate, RequestDigest: r.RequestDigest, ObservedAt: now.Time, ValidUntil: identity.Earlier(now.Time.Add(5*time.Second), identity.Earlier(binding.Until, peer.NotAfter))}
 		after, e := tx.CurrentTime(ctx)
 		if e != nil || !out.Valid(peer, r, after.Time) || !binding.Valid(q, after.Time) {
 			return auth.ErrKeyDenied

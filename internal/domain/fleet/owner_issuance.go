@@ -1,11 +1,12 @@
 package fleet
 
 import (
+	"bytes"
+	"time"
+
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
-	"bytes"
-	"time"
 )
 
 const OwnerCertificatePeriod = 20 * time.Minute
@@ -31,7 +32,6 @@ type OwnerCertificatePermit struct {
 	Usage                                      string
 	PublicKeyDigest, EnrollmentAudit           artifact.Digest
 	Configuration                              OwnerConfigurationObservation
-	Recovery                                   RecoveryState
 	Epoch                                      int64
 	Ordinal                                    int
 	CheckedAt, SignBefore, CertificateNotAfter time.Time
@@ -40,7 +40,7 @@ type OwnerCertificatePermit struct {
 func (p OwnerCertificatePermit) Valid(now time.Time) bool {
 	epoch, until, err := OwnerCertificateWindow(p.CheckedAt)
 	b, c := p.Binding, p.Configuration.Configuration
-	return err == nil && authorization.UUID(p.ID) && b.Valid() && (p.Usage == "server" || p.Usage == "client") && p.PublicKeyDigest != (artifact.Digest{}) && p.EnrollmentAudit != (artifact.Digest{}) && p.Configuration.Valid(now) && !c.Suspended && b.InstallationID == c.Pool.InstallationID && b.ClusterID == c.Pool.ClusterID && b.IssuerEpoch == c.Pool.IssuerEpoch && p.Recovery.Valid(now) && p.Recovery.InstallationID == b.InstallationID && p.Recovery.IssuerEpoch == b.IssuerEpoch && p.Epoch == epoch && p.Ordinal >= 1 && p.Ordinal <= 2 && p.CertificateNotAfter.Equal(until) && identity.Fresh(p.CheckedAt, p.SignBefore, now, 5*time.Second) && !p.SignBefore.After(p.Configuration.FreshUntil) && !p.SignBefore.After(p.Recovery.FreshUntil) && !p.SignBefore.After(until)
+	return err == nil && authorization.UUID(p.ID) && b.Valid() && (p.Usage == "server" || p.Usage == "client") && p.PublicKeyDigest != (artifact.Digest{}) && p.EnrollmentAudit != (artifact.Digest{}) && p.Configuration.Valid(now) && !c.Suspended && b.InstallationID == c.Pool.InstallationID && b.ClusterID == c.Pool.ClusterID && b.IssuerEpoch == c.Pool.IssuerEpoch && p.Epoch == epoch && p.Ordinal >= 1 && p.Ordinal <= 2 && p.CertificateNotAfter.Equal(until) && identity.Fresh(p.CheckedAt, p.SignBefore, now, 5*time.Second) && !p.SignBefore.After(p.Configuration.FreshUntil) && !p.SignBefore.After(until)
 }
 
 type IssuedOwnerCertificate struct {

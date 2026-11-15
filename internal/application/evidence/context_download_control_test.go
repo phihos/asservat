@@ -40,9 +40,6 @@ func (f *downloadControlFixture) step(name string) error {
 func (f *downloadControlFixture) ResolveIdentity(context.Context) (identity.Identity, error) {
 	return f.i, f.step("identity")
 }
-func (f *downloadControlFixture) RecoveryState(context.Context) (artifact.RecoveryProof, error) {
-	return f.a.Environment.Recovery(), f.step("recovery")
-}
 func (f *downloadControlFixture) ResolveContextDownload(context.Context, artifact.DownloadRouteQuery) (artifact.DownloadRoute, error) {
 	return artifact.DownloadRoute{Scope: f.a.Scope, ObservedAt: f.now, ValidUntil: f.now.Add(5 * time.Second)}, f.step("route")
 }
@@ -136,7 +133,7 @@ func newDownloadControlFixture(t *testing.T) (*downloadControlFixture, ContextDo
 	rev := base.a.IdentityRevision
 	proof := artifact.RetentionProof{RootID: p.RootID, ClusterID: p.ClusterID, NamespaceUID: p.NamespaceUID, WorkloadUID: p.WorkloadUID, PodUID: p.PodUID, Topology: rev, Policy: rev, Selectors: rev, SourceCount: 1, Sources: [2]artifact.RetentionSourceVersion{{ClusterID: p.ClusterID, ControlNamespaceUID: "control", Epoch: p.RootID, Hub: true, ProtectionDigest: artifact.Digest{1}, SnapshotDigest: artifact.Digest{2}, Acceptance: identity.Revision{UID: p.RootID, Generation: 1, Digest: artifact.Digest{3}}}}}
 	f := &downloadControlFixture{now: n, a: base.a, runtimeAvailable: true, pending: true}
-	f.a.Environment = artifact.DownloadEnvironment{RootID: p.RootID, InstallationID: p.RootID, Region: "synthetic", StoreID: r.Expectation.Registration.StoreID, RecoveryEpoch: p.RootID, Location: r.Expectation.Registration.Location, Principal: p.Principal, Revision: rev, RecoveryRevision: rev}
+	f.a.Environment = artifact.DownloadEnvironment{RootID: p.RootID, InstallationID: p.RootID, Region: "synthetic", StoreID: r.Expectation.Registration.StoreID, RecoveryEpoch: p.RootID, Location: r.Expectation.Registration.Location, Principal: p.Principal, Revision: rev}
 	f.a.Retention = proof
 	f.i = identity.Identity{Principal: p.Principal, Policy: rev, Scopes: []string{"evidence:read", "evidence:download"}}
 	f.source = ContextDownloadSource{Scope: p, Expectation: r.Expectation, Copies: r.Copies}
@@ -145,7 +142,7 @@ func newDownloadControlFixture(t *testing.T) (*downloadControlFixture, ContextDo
 	if !f.a.Valid(n) || !f.source.Valid(n) || !f.plan.Valid(p, n) {
 		t.Fatal("invalid synthetic control fixture")
 	}
-	return f, ContextDownloadCoordinator{RootID: p.RootID, InstallationID: p.RootID, Recovery: f, Routes: f, Sources: f, Authority: f, Sessions: f, Plans: f, Runtime: f, Now: func() time.Time { return f.now }, NewID: func() string { return "22222222-2222-4222-8222-222222222222" }}
+	return f, ContextDownloadCoordinator{RootID: p.RootID, InstallationID: p.RootID, Routes: f, Sources: f, Authority: f, Sessions: f, Plans: f, Runtime: f, Now: func() time.Time { return f.now }, NewID: func() string { return "22222222-2222-4222-8222-222222222222" }}
 }
 func countDownloadCalls(f *downloadControlFixture, name string) int {
 	n := 0

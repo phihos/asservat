@@ -52,7 +52,6 @@ type regionalObservationFixture struct {
 	work                    executionapp.APIContextWork
 	target                  targets.PodResolution
 	retention               privacy.Resolution
-	recovery                artifact.RecoveryProof
 	process                 value.APIProcessObservation
 	receiver                fleet.APIContextReceiver
 	workReads, preparations int
@@ -63,12 +62,9 @@ type regionalObservationFixture struct {
 func (f *regionalObservationFixture) Resolve(ctx context.Context, _ string) (identity.Identity, error) {
 	return f.identity, ctx.Err()
 }
-func (f *regionalObservationFixture) RecoveryState(ctx context.Context) (artifact.RecoveryProof, error) {
-	return f.recovery, ctx.Err()
-}
-func (f *regionalObservationFixture) ReadAPIContextWork(ctx context.Context, id string, who identity.Identity, recovery artifact.RecoveryProof) (executionapp.APIContextWork, error) {
+func (f *regionalObservationFixture) ReadAPIContextWork(ctx context.Context, id string, who identity.Identity) (executionapp.APIContextWork, error) {
 	f.workReads++
-	if id != f.work.Accepted.CaptureID || who.Principal != f.identity.Principal || recovery != f.recovery {
+	if id != f.work.Accepted.CaptureID || who.Principal != f.identity.Principal {
 		f.t.Fatal("changed accepted-read inputs")
 	}
 	return f.work, ctx.Err()
@@ -181,7 +177,6 @@ func newRegionalObservationFixture(t *testing.T) (*regionalObservationFixture, p
 	rev := identity.Revision{UID: id(40), Generation: 1, Digest: [32]byte{40}}
 	f := &regionalObservationFixture{t: t, now: now}
 	f.identity = identity.Identity{Principal: identity.Principal{Issuer: "https://identity.example.test", Subject: "dev", ClientID: "console", Kind: identity.Human}, Policy: rev, Scopes: []string{"evidence:capture"}, Groups: []string{"team"}, VerifiedAt: now, ValidUntil: now.Add(5 * time.Second)}
-	f.recovery = artifact.RecoveryProof{InstallationID: id(44), IssuerEpoch: id(3), Revision: rev, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
 	image := artifact.Digest{6}
 	projection := compiler.ProjectionDigest()
 	settings := contracts.ContextCapabilitySettings{Format: contracts.ContextCapabilityFormat, RootID: id(41), InstallationID: id(44), ClusterID: id(2), IssuerEpoch: id(3), Revision: 1, Enabled: true, ExecutionClass: string(artifact.ContextAPIExecution), CollectorVersion: "synthetic", CollectorImageDigest: hex.EncodeToString(image[:]), ProjectionDigest: hex.EncodeToString(projection[:])}
@@ -251,7 +246,7 @@ func regionalObservationCapability(t *testing.T, f *regionalObservationFixture, 
 	if err != nil {
 		t.Fatal(err)
 	}
-	source, err := kube.NewContextCapabilitySource(observer, guard, f, plan.SourceName, id(49), settings)
+	source, err := kube.NewContextCapabilitySource(observer, guard, plan.SourceName, id(49), settings)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -302,7 +297,7 @@ func TestRegionalStartReusesPreludeBeforeFirstPreparation(t *testing.T) {
 	stream := &regionalObservationStream{f: f, ctx: ctx}
 	done := make(chan error, 1)
 	go func() { defer standby.Finish(); done <- standby.Serve(stream, time.Now) }()
-	start := RegionalAPIContextStart{Runner: executionapp.APIContextRunner{Read: f, Prepare: f, Record: f, Eligibility: access.Evaluator{Permissions: f, Now: time.Now}, Capabilities: capability, Retention: regionalObservationRetention{f}, Recovery: f, Now: time.Now}, Signer: f, Router: router, Now: time.Now, Report: func(s string) { t.Log(s) }}
+	start := RegionalAPIContextStart{Runner: executionapp.APIContextRunner{Read: f, Prepare: f, Record: f, Eligibility: access.Evaluator{Permissions: f, Now: time.Now}, Capabilities: capability, Retention: regionalObservationRetention{f}, Now: time.Now}, Signer: f, Router: router, Now: time.Now, Report: func(s string) { t.Log(s) }}
 	began := time.Now()
 	err = start.StartContext(ctx, current, f.work.Accepted.CaptureID)
 	elapsed := time.Since(began)

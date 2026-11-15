@@ -32,7 +32,7 @@ import (
 
 // Actual mounted-input composition runs outside the protected pause Pod in this
 // fixture. Kubernetes authority, SQL role grants and scoped providers are real;
-// initial recovery acceptance and the mount provisioner remain fixture-owned.
+// initial source acceptance and the mount provisioner remain fixture-owned.
 func exerciseNativeOwnerDeployment(t *testing.T, ctx context.Context, f fixture, admin kubernetes.Interface, kubeConfig *rest.Config, pool value.OwnerPool, accepted app.OwnerConfigurationReader, pod core.Pod, token []byte, listener net.Listener) {
 	t.Helper()
 	current, err := accepted.ReadOwnerConfiguration(ctx)
@@ -157,7 +157,7 @@ func exerciseNativeOwnerDeployment(t *testing.T, ctx context.Context, f fixture,
 		clear(b)
 	}
 	// Only the fixture observer maintains these independently qualified current
-	// source observations. The loader has no acceptance/recovery-write credential.
+	// source observations. The loader has no acceptance-write credential.
 	observe, stopObserve := context.WithCancel(ctx)
 	observed := make(chan struct{})
 	go func() {
@@ -256,5 +256,5 @@ func exerciseNativeOwnerDeployment(t *testing.T, ctx context.Context, f fixture,
 	if d.Runtime.Ready() {
 		t.Fatal("stopped mounted runtime stayed ready")
 	}
-	t.Log("mounted scoped SQL/Kubernetes/S3/OpenBao providers established pre-Ready owner identity, current token loss/recovery and joined catalog-failure shutdown; initial recovery and mount delivery remain fixture-owned")
+	t.Log("mounted scoped SQL/Kubernetes/S3/OpenBao providers established pre-Ready owner identity, current token loss/recovery and joined catalog-failure shutdown; initial acceptance and mount delivery remain fixture-owned")
 }

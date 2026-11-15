@@ -42,7 +42,7 @@ type ProjectionRetentionResolver interface {
 }
 
 // ContextProjectionEnvironmentReader must independently accept the query's
-// current recovery, processing and protected delivery path. Download policy or
+// current processing and protected delivery path. Download policy or
 // successful storage access alone cannot implement this port.
 type ContextProjectionEnvironmentReader interface {
 	ProjectionEnvironment(context.Context, ContextProjectionEvidence, identity.Principal) (analysis.ContextProjectionEnvironment, error)
@@ -399,7 +399,6 @@ func sameProjectionRetention(a, b privacy.RetainedResolution) bool {
 
 func sameProjectionEnvironment(a, b analysis.ContextProjectionEnvironment) bool {
 	a.ObservedAt, b.ObservedAt, a.ValidUntil, b.ValidUntil = time.Time{}, time.Time{}, time.Time{}, time.Time{}
-	a.Recovery.ObservedAt, b.Recovery.ObservedAt, a.Recovery.FreshUntil, b.Recovery.FreshUntil = time.Time{}, time.Time{}, time.Time{}, time.Time{}
 	a.Processing.ObservedAt, b.Processing.ObservedAt, a.Processing.ValidUntil, b.Processing.ValidUntil = time.Time{}, time.Time{}, time.Time{}, time.Time{}
 	return a == b
 }
@@ -407,8 +406,6 @@ func sameProjectionEnvironment(a, b analysis.ContextProjectionEnvironment) bool 
 // environmentBound names the environment component whose interval ends it.
 func environmentBound(e analysis.ContextProjectionEnvironment) string {
 	switch {
-	case e.ValidUntil.Equal(e.Recovery.FreshUntil):
-		return "environment/recovery"
 	case e.ValidUntil.Equal(e.Processing.ValidUntil):
 		return "environment/processing"
 	default:

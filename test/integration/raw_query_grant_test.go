@@ -38,17 +38,9 @@ func qualifyRawQueryGrants(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 	})
 	pool := poolFor(role, "synthetic-raw-grant")
 	t.Cleanup(pool.Close)
-	store, err := postgres.NewAccessGrants(ctx, pool, s.a.RootID, s.recovery.guard)
+	store, err := postgres.NewAccessGrants(ctx, pool, s.a.RootID, s.recovery.installation)
 	if err != nil {
 		t.Fatal(err)
-	}
-	proof := func() artifact.RecoveryProof {
-		t.Helper()
-		r, err := s.recovery.reader.RecoveryState(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return r
 	}
 	actor := s.a.Eligibility.VerifiedIdentity.Principal
 	output := value.VerifiedOutput{CaptureID: e.CaptureUID, ActionID: e.ActionID, ArtifactID: e.Registration.Location.ArtifactID, ExecutionDigest: e.PlanDigest, ArtifactDigest: version, Target: value.Target{ClusterID: e.Registration.Location.ClusterID, NamespaceUID: e.NamespaceUID, WorkloadUID: e.WorkloadUID, PodUID: e.PodUID}}
@@ -69,14 +61,13 @@ func qualifyRawQueryGrants(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 	}
 	requested := make(chan requestResult, 4)
 	var wg sync.WaitGroup
-	r := proof()
 	for i := 0; i < 4; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			attempt := in
 			attempt.Grant.ID = custodyID()
-			g, replay, err := store.RequestGrant(ctx, attempt, r)
+			g, replay, err := store.RequestGrant(ctx, attempt)
 			requested <- requestResult{g, replay, err}
 		}()
 	}
@@ -109,28 +100,28 @@ func qualifyRawQueryGrants(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 	}
 	changed := in
 	changed.RequestDigest[0]++
-	if _, _, err = store.RequestGrant(ctx, changed, proof()); !errors.Is(err, app.ErrGrantConflict) {
+	if _, _, err = store.RequestGrant(ctx, changed); !errors.Is(err, app.ErrGrantConflict) {
 		t.Fatal("changed input replay", err)
 	}
 	lead := actor
 	lead.Subject += "-independent-reviewer"
 	approve := func(g value.Grant) value.Grant {
 		t.Helper()
-		approved, _, err := store.DecideGrant(ctx, app.GrantDecisionInput{GrantID: g.ID, Approve: true, Approver: lead, Reason: "exact files reviewed", ACR: "synthetic-step-up", AuthTime: time.Now().Add(-time.Minute), IdempotencyKey: "approve"}, proof())
+		approved, _, err := store.DecideGrant(ctx, app.GrantDecisionInput{GrantID: g.ID, Approve: true, Approver: lead, Reason: "exact files reviewed", ACR: "synthetic-step-up", AuthTime: time.Now().Add(-time.Minute), IdempotencyKey: "approve"})
 		if err != nil {
 			t.Fatal("approve", err)
 		}
 		return approved
 	}
-	if _, _, err = store.DecideGrant(ctx, app.GrantDecisionInput{GrantID: pending.ID, Approve: true, Approver: actor, Reason: "self", ACR: "synthetic", AuthTime: time.Now(), IdempotencyKey: "self"}, proof()); !errors.Is(err, value.ErrSelfApproval) {
+	if _, _, err = store.DecideGrant(ctx, app.GrantDecisionInput{GrantID: pending.ID, Approve: true, Approver: actor, Reason: "self", ACR: "synthetic", AuthTime: time.Now(), IdempotencyKey: "self"}); !errors.Is(err, value.ErrSelfApproval) {
 		t.Fatal("self approval", err)
 	}
 	approved := approve(pending)
-	child, _, err := store.MaterializeGrantChild(ctx, app.GrantChildRequest{ChildID: custodyID(), ParentID: approved.ID, ClientID: actor.ClientID, Output: output}, proof())
+	child, _, err := store.MaterializeGrantChild(ctx, app.GrantChildRequest{ChildID: custodyID(), ParentID: approved.ID, ClientID: actor.ClientID, Output: output})
 	if err != nil || child.Output != output {
 		t.Fatal("exact published child", err)
 	}
-	again, replay, err := store.MaterializeGrantChild(ctx, app.GrantChildRequest{ChildID: custodyID(), ParentID: approved.ID, ClientID: actor.ClientID, Output: output}, proof())
+	again, replay, err := store.MaterializeGrantChild(ctx, app.GrantChildRequest{ChildID: custodyID(), ParentID: approved.ID, ClientID: actor.ClientID, Output: output})
 	if err != nil || !replay || again.ID != child.ID {
 		t.Fatal("child replay", err)
 	}
@@ -143,7 +134,7 @@ func qualifyRawQueryGrants(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 	legacy.ResultAccess = &normalizedAccess
 	legacy.ResultAccessDigest = app.ResultAccessDigest(legacy.CaptureID, legacy.ExecutionDigest, *legacy.ResultAccess)
 	legacy.ReviewDigest = app.ReviewDigest(legacy, legacy.Review)
-	legacy, _, err = store.RequestGrant(ctx, app.StoredGrantRequest{Grant: legacy, IdempotencyKey: "legacy-selection-capacity", RequestDigest: artifact.Digest{9, 1}}, proof())
+	legacy, _, err = store.RequestGrant(ctx, app.StoredGrantRequest{Grant: legacy, IdempotencyKey: "legacy-selection-capacity", RequestDigest: artifact.Digest{9, 1}})
 	if err != nil {
 		t.Fatal("legacy capacity request", err)
 	}
@@ -151,7 +142,7 @@ func qualifyRawQueryGrants(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 	legacyOutput := output
 	legacyOutput.ExecutionDigest = legacy.ExecutionDigest
 	for _, client := range legacy.ResultAccess.ClientIDs {
-		if _, _, err = store.MaterializeGrantChild(ctx, app.GrantChildRequest{ChildID: custodyID(), ParentID: legacy.ID, ClientID: client, Output: legacyOutput}, proof()); err != nil {
+		if _, _, err = store.MaterializeGrantChild(ctx, app.GrantChildRequest{ChildID: custodyID(), ParentID: legacy.ID, ClientID: client, Output: legacyOutput}); err != nil {
 			t.Fatal("legacy client child", err)
 		}
 	}
@@ -226,13 +217,12 @@ func qualifyRawQueryGrants(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 		err error
 	}
 	uses := make(chan useResult, 6)
-	r = proof()
 	for i := 0; i < 6; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			use := app.GrantUseRequest{UseID: custodyID(), ParentID: approved.ID, ChildID: child.ID, Use: value.GrantUse{Operation: value.GrantDownloadOperation, Bytes: nativeBytes, Operations: 1}}
-			_, _, err := store.ReserveGrantUse(ctx, use, r)
+			_, _, err := store.ReserveGrantUse(ctx, use)
 			uses <- useResult{use, err}
 		}()
 	}
@@ -259,7 +249,7 @@ func qualifyRawQueryGrants(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 	// Raw-only review supports the documented 64-artifact presentation bound.
 	newerIn.Grant.Review = []byte(`{"synthetic":"` + strings.Repeat("x", 40000) + `"}`)
 	newerIn.Grant.ReviewDigest = app.ReviewDigest(newerIn.Grant, newerIn.Grant.Review)
-	newer, _, err := store.RequestGrant(ctx, newerIn, proof())
+	newer, _, err := store.RequestGrant(ctx, newerIn)
 	if err != nil {
 		t.Fatal("1TiB raw ceiling", err)
 	}
@@ -272,7 +262,7 @@ func qualifyRawQueryGrants(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 	if err != nil || originalUse != previous {
 		t.Fatal("new approval rehomed prior use", err)
 	}
-	if after, replay, err := store.ReserveGrantUse(ctx, previous, proof()); err != nil || !replay || after.Spent != spent.Spent {
+	if after, replay, err := store.ReserveGrantUse(ctx, previous); err != nil || !replay || after.Spent != spent.Spent {
 		t.Fatal("uncertain retry charged again", err)
 	}
 	for _, sql := range []string{`UPDATE access_grant SET raw_query=jsonb_set(raw_query,'{MaxBytes}','1') WHERE id=$1`, `UPDATE access_grant SET bytes_spent=0 WHERE id=$1`, `UPDATE access_grant SET scope=scope || '\x20'::bytea WHERE id=$1`} {
@@ -281,7 +271,7 @@ func qualifyRawQueryGrants(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 		}
 	}
 	// Revocation never rehomes a known use to the newer covering approval.
-	if _, _, err = store.RevokeGrant(ctx, app.GrantRevocationInput{GrantID: approved.ID, Revoker: actor, ExpectedRevision: 2, IdempotencyKey: "revoke"}, proof()); err != nil {
+	if _, _, err = store.RevokeGrant(ctx, app.GrantRevocationInput{GrantID: approved.ID, Revoker: actor, ExpectedRevision: 2, IdempotencyKey: "revoke"}); err != nil {
 		t.Fatal(err)
 	}
 	originalUse, err = store.GrantUseByID(ctx, previous.UseID)
@@ -292,7 +282,7 @@ func qualifyRawQueryGrants(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 	expiringIn.Grant.RawQuery.NotAfter = time.Now().UTC().Truncate(time.Microsecond).Add(time.Second)
 	expiringIn.Grant.Scope, expiringIn.Grant.ExecutionDigest = app.RawQueryScopeBytes(*expiringIn.Grant.RawQuery)
 	expiringIn.Grant.ReviewDigest = app.ReviewDigest(expiringIn.Grant, expiringIn.Grant.Review)
-	expiring, _, err := store.RequestGrant(ctx, expiringIn, proof())
+	expiring, _, err := store.RequestGrant(ctx, expiringIn)
 	if err != nil {
 		t.Fatal("finite expiring request", err)
 	}
@@ -303,11 +293,11 @@ func qualifyRawQueryGrants(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 		t.Fatal(ctx.Err())
 	case <-timer.C:
 	}
-	if _, _, err = store.DecideGrant(ctx, app.GrantDecisionInput{GrantID: expiring.ID, Approve: true, Approver: lead, Reason: "late", ACR: "synthetic", AuthTime: time.Now().Add(-time.Minute), IdempotencyKey: "late"}, proof()); !errors.Is(err, value.ErrGrantNotPending) {
+	if _, _, err = store.DecideGrant(ctx, app.GrantDecisionInput{GrantID: expiring.ID, Approve: true, Approver: lead, Reason: "late", ACR: "synthetic", AuthTime: time.Now().Add(-time.Minute), IdempotencyKey: "late"}); !errors.Is(err, value.ErrGrantNotPending) {
 		t.Fatal("late raw approval", err)
 	}
 	// Historical request lookup/replay retains the old end after expiration.
-	expiredReplay, wasReplay, err := store.RequestGrant(ctx, expiringIn, proof())
+	expiredReplay, wasReplay, err := store.RequestGrant(ctx, expiringIn)
 	if err != nil || !wasReplay || !expiredReplay.RawQuery.NotAfter.Equal(expiring.RawQuery.NotAfter) {
 		t.Fatal("expired request replay renewed scope", err)
 	}

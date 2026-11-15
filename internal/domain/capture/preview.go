@@ -130,7 +130,7 @@ type ContextPreview struct {
 	// CompositionGroup is a manual packet + syscall composition (ADR-276).
 	CompositionGroup                                       *CompositionGroupPreview       `json:",omitempty"`
 	ExecutionClass                                         artifact.ContextExecutionClass `json:",omitempty"`
-	ID, RootID, InstallationID, IssuerEpoch                string
+	ID, RootID, InstallationID                             string
 	CaptureID, CaseID, OccurrenceID, ArtifactID, AttemptID string
 	AssessmentID                                           string
 	AssessmentRulesDigest                                  artifact.Digest
@@ -175,7 +175,7 @@ func (p ContextPreview) Valid() bool {
 	if p.Intent.Snapshot != nil && (!previewTime(p.SelectionUntil) || !p.SelectionUntil.After(p.CreatedAt) || p.SelectionUntil.After(p.CreatedAt.Add(time.Minute)) || !p.Intent.Snapshot.Request.ProcessingUntil.Equal(p.Deadline)) || p.Intent.Snapshot == nil && !p.SelectionUntil.IsZero() {
 		return false
 	}
-	if len(p.ReasonEnvelope) > 16<<10 || (p.Intent.RepeatedFrom != nil && p.Deadline.After(p.Intent.RepeatedFrom.ExpiresAt)) || !authorization.UUID(p.RootID) || !authorization.UUID(p.InstallationID) || !authorization.UUID(p.IssuerEpoch) || !p.Actor.Valid() || !p.Intent.Valid() || !p.Target.Valid() || !p.storageValid() || !p.Retention.Valid() || !previewTime(p.CreatedAt) || !previewTime(p.Deadline) || !p.Deadline.After(p.CreatedAt) || (p.Intent.Snapshot == nil && p.Deadline.After(p.CreatedAt.Add(5*time.Minute))) {
+	if len(p.ReasonEnvelope) > 16<<10 || (p.Intent.RepeatedFrom != nil && p.Deadline.After(p.Intent.RepeatedFrom.ExpiresAt)) || !authorization.UUID(p.RootID) || !authorization.UUID(p.InstallationID) || !p.Actor.Valid() || !p.Intent.Valid() || !p.Target.Valid() || !p.storageValid() || !p.Retention.Valid() || !previewTime(p.CreatedAt) || !previewTime(p.Deadline) || !p.Deadline.After(p.CreatedAt) || (p.Intent.Snapshot == nil && p.Deadline.After(p.CreatedAt.Add(5*time.Minute))) {
 		return false
 	}
 	seen := map[string]bool{}
@@ -254,9 +254,8 @@ type ReplayQuery struct {
 	RootID, PreviewID, IdempotencyKey string
 	SubmissionDigest                  artifact.Digest
 	Identity                          identity.Identity
-	Recovery                          artifact.RecoveryProof
 }
 
 func (q ReplayQuery) Valid(now time.Time) bool {
-	return authorization.UUID(q.RootID) && authorization.UUID(q.PreviewID) && identity.Text(q.IdempotencyKey, 128) && q.SubmissionDigest != (artifact.Digest{}) && q.Identity.Valid(now) && q.Recovery.Valid(now)
+	return authorization.UUID(q.RootID) && authorization.UUID(q.PreviewID) && identity.Text(q.IdempotencyKey, 128) && q.SubmissionDigest != (artifact.Digest{}) && q.Identity.Valid(now)
 }

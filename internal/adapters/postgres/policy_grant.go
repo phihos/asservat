@@ -59,7 +59,7 @@ func (s *AccessGrants) LookupPolicyGrantRequest(ctx context.Context, in app.Poli
 	return out, err == nil, err
 }
 
-func (s *AccessGrants) requestPolicyGrant(ctx context.Context, in app.StoredGrantRequest, recovery artifact.RecoveryProof) (authorization.Grant, bool, error) {
+func (s *AccessGrants) requestPolicyGrant(ctx context.Context, in app.StoredGrantRequest) (authorization.Grant, bool, error) {
 	g := in.Grant
 	if g.Policy == nil || !g.Requester.Valid() || !authorization.UUID(g.ID) || !g.RequestedAt.IsZero() || !g.PolicyNotAfter.IsZero() {
 		return authorization.Grant{}, false, authorization.ErrGrantInvalid
@@ -79,7 +79,7 @@ func (s *AccessGrants) requestPolicyGrant(ctx context.Context, in app.StoredGran
 	var out authorization.Grant
 	var replay bool
 	err = s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		trust, err := s.recovery.lock(ctx, q, s.root, recovery)
+		trust, _, err := currentTrust(ctx, q, s.installation)
 		if err != nil {
 			return err
 		}
@@ -98,7 +98,7 @@ func (s *AccessGrants) requestPolicyGrant(ctx context.Context, in app.StoredGran
 			if err != nil {
 				return err
 			}
-			_, accepted, err := acceptedPolicyIn(ctx, q, s.root, s.recovery.installation, trust, source)
+			_, accepted, err := acceptedPolicyIn(ctx, q, s.root, s.installation, trust, source)
 			if err != nil {
 				return err
 			}
@@ -120,9 +120,6 @@ func (s *AccessGrants) requestPolicyGrant(ctx context.Context, in app.StoredGran
 			return err
 		}
 		if out, err = s.grant(row); err != nil {
-			return err
-		}
-		if err = s.recovery.check(ctx, q, trust, s.root, recovery); err != nil {
 			return err
 		}
 		return ctx.Err()

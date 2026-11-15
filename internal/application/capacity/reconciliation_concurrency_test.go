@@ -21,9 +21,9 @@ func TestCapacityReconcilerClustersDiscoverConcurrently(t *testing.T) {
 	other := q.NamespaceGuards[0]
 	other.ClusterID = "00000000-0000-4000-8000-0000000000b2"
 	q.NamespaceGuards = append(q.NamespaceGuards, other)
-	blocked := &capacityRuntimeReader{entered: make(chan struct{}), release: make(chan struct{}), recovery: f.recovery}
-	free := &capacityRuntimeReader{recovery: f.recovery}
-	work := &CapacityWorkReconciler{Qualification: q, Recovery: blocked, Permissions: blocked, Processing: blocked, Root: &RootBackingCoordinator{}, Enrollment: &EnrollmentCoordinator{}, Bindings: blocked, Now: func() time.Time { return f.now }}
+	blocked := &capacityRuntimeReader{entered: make(chan struct{}), release: make(chan struct{})}
+	free := &capacityRuntimeReader{}
+	work := &CapacityWorkReconciler{Qualification: q, Permissions: blocked, Processing: blocked, Root: &RootBackingCoordinator{}, Enrollment: &EnrollmentCoordinator{}, Bindings: blocked, Now: func() time.Time { return f.now }}
 	runner := CapacityReconciler{Source: source, Work: work, Clusters: []CapacityClusterReaders{
 		{ClusterID: q.NamespaceGuards[0].ClusterID, Workloads: blocked, Guard: blocked},
 		{ClusterID: other.ClusterID, Workloads: free, Guard: free},
@@ -132,9 +132,9 @@ func TestCapacityReconcilerDemandHasPriorityOverSameClusterDiscovery(t *testing.
 	other := q.NamespaceGuards[0]
 	other.ClusterID = "00000000-0000-4000-8000-0000000000b2"
 	q.NamespaceGuards = append(q.NamespaceGuards, other)
-	demanded := &capacityGuardedRuntime{capacityRuntimeReader: &capacityRuntimeReader{recovery: f.recovery}}
-	free := &capacityGuardedRuntime{capacityRuntimeReader: &capacityRuntimeReader{recovery: f.recovery}}
-	work := &CapacityWorkReconciler{Qualification: q, Recovery: demanded, Permissions: demanded, Processing: demanded, Root: &RootBackingCoordinator{}, Enrollment: &EnrollmentCoordinator{}, Bindings: demanded, Now: func() time.Time { return f.now }}
+	demanded := &capacityGuardedRuntime{capacityRuntimeReader: &capacityRuntimeReader{}}
+	free := &capacityGuardedRuntime{capacityRuntimeReader: &capacityRuntimeReader{}}
+	work := &CapacityWorkReconciler{Qualification: q, Permissions: demanded, Processing: demanded, Root: &RootBackingCoordinator{}, Enrollment: &EnrollmentCoordinator{}, Bindings: demanded, Now: func() time.Time { return f.now }}
 	cluster := q.NamespaceGuards[0].ClusterID
 	var reports atomic.Int32
 	runner := CapacityReconciler{Source: source, Work: work, Clusters: []CapacityClusterReaders{
@@ -165,12 +165,12 @@ func TestCapacityReconcilerDemandDefersDiscoveryOnlyBoundedly(t *testing.T) {
 	q.ID, q.Digest = f.accepted.QualificationID, f.accepted.QualificationDigest
 	q.RootBacking.RootID, q.RootBacking.InstallationID = f.accepted.RootID, f.accepted.InstallationID
 	q.RootBacking.QualificationID, q.RootBacking.QualificationDigest = q.ID, q.Digest
-	demanded := &capacityGuardedRuntime{capacityRuntimeReader: &capacityRuntimeReader{recovery: f.recovery}}
+	demanded := &capacityGuardedRuntime{capacityRuntimeReader: &capacityRuntimeReader{}}
 	start := time.Now()
 	// Thirty simulated seconds per real second: 1.6 s is 48 s, one bound,
 	// inside the one-minute demand, which stays valid for the whole run.
 	now := func() time.Time { return f.now.Add(30 * time.Since(start)) }
-	work := &CapacityWorkReconciler{Qualification: q, Recovery: demanded, Permissions: demanded, Processing: demanded, Root: &RootBackingCoordinator{}, Enrollment: &EnrollmentCoordinator{}, Bindings: demanded, Now: now}
+	work := &CapacityWorkReconciler{Qualification: q, Permissions: demanded, Processing: demanded, Root: &RootBackingCoordinator{}, Enrollment: &EnrollmentCoordinator{}, Bindings: demanded, Now: now}
 	cluster := q.NamespaceGuards[0].ClusterID
 	runner := CapacityReconciler{Source: source, Work: work, Clusters: []CapacityClusterReaders{
 		{ClusterID: cluster, Workloads: demanded, Guard: demanded, Guarded: demanded},

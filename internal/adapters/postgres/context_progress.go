@@ -21,24 +21,23 @@ import (
 )
 
 // ContextProgressReads has no effect or evidence-disclosure methods. Its SQL
-// credential can only read and take the existing recovery/permission root locks.
+// credential can only read and take the existing permission root lock.
 type ContextProgressReads struct {
-	ledger   *Ledger
-	root     string
-	recovery *RecoveryTransactionGuard
+	ledger *Ledger
+	root   string
 }
 
 var _ app.ContextProgressReader = (*ContextProgressReads)(nil)
 
-func NewContextProgressReads(ctx context.Context, pool *pgxpool.Pool, root string, recovery *RecoveryTransactionGuard) (*ContextProgressReads, error) {
-	if !authorization.UUID(root) || recovery == nil || recovery.root != root {
+func NewContextProgressReads(ctx context.Context, pool *pgxpool.Pool, root string) (*ContextProgressReads, error) {
+	if !authorization.UUID(root) {
 		return nil, value.ErrInvalid
 	}
 	l, err := New(ctx, pool)
 	if err != nil {
 		return nil, value.ErrUnavailable
 	}
-	return &ContextProgressReads{ledger: l, root: root, recovery: recovery}, nil
+	return &ContextProgressReads{ledger: l, root: root}, nil
 }
 
 // progressFacts projects a single MVCC snapshot of immutable admission, custody,
@@ -201,17 +200,13 @@ func progressFacts(f custodydb.ReadContextProgressFactsRow, executions ...execut
 
 func (s *ContextProgressReads) ReadContextProgress(ctx context.Context, request value.ProgressQuery) (value.ContextProgressObservation, error) {
 	var out value.ContextProgressObservation
-	if s == nil || s.ledger == nil || request.RootID != s.root || !authorization.UUID(request.CaptureID) || !request.Identity.Valid(request.Identity.VerifiedAt) || !request.Recovery.Valid(request.Recovery.ObservedAt) {
+	if s == nil || s.ledger == nil || request.RootID != s.root || !authorization.UUID(request.CaptureID) || !request.Identity.Valid(request.Identity.VerifiedAt) {
 		return out, value.ErrInvalid
 	}
 	request.Identity.Groups = slices.Clone(request.Identity.Groups)
 	request.Identity.Scopes = slices.Clone(request.Identity.Scopes)
 	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
 		out = value.ContextProgressObservation{} // definitely-aborted transaction retry
-		recovery, err := s.recovery.lock(ctx, q, s.root, request.Recovery)
-		if err != nil {
-			return err
-		}
 		stream, err := q.LockPermissionStream(ctx, id(s.root))
 		if err != nil {
 			return err
@@ -225,7 +220,7 @@ func (s *ContextProgressReads) ReadContextProgress(ctx context.Context, request 
 		}
 		group, groupErr := q.LockRecordingSaveGroup(ctx, custodydb.LockRecordingSaveGroupParams{RootID: id(s.root), ID: id(request.CaptureID)})
 		if groupErr == nil {
-			out, err = s.readRecordingGroupProgress(ctx, q, group, request, recovery, stream, first.Time)
+			out, err = s.readRecordingGroupProgress(ctx, q, group, request, stream, first.Time)
 			return err
 		}
 		if !errors.Is(groupErr, pgx.ErrNoRows) {
@@ -240,7 +235,7 @@ func (s *ContextProgressReads) ReadContextProgress(ctx context.Context, request 
 		if err != nil {
 			return err
 		}
-		out, err = s.readContextProgressInTransaction(ctx, q, c, request, recovery, stream, first.Time)
+		out, err = s.readContextProgressInTransaction(ctx, q, c, request, stream, first.Time)
 		return err
 	})
 	if err != nil {
@@ -292,7 +287,7 @@ func (s *ContextDeadlines) ObserveOverdueContextCaptures(ctx context.Context, li
 	return count, nil
 }
 
-func (s *ContextProgressReads) readContextProgressInTransaction(ctx context.Context, q *custodydb.Queries, c custodydb.ContextCapture, request value.ProgressQuery, recovery custodydb.FleetCurrentTrust, stream custodydb.PermissionStream, observedAt time.Time) (value.ContextProgressObservation, error) {
+func (s *ContextProgressReads) readContextProgressInTransaction(ctx context.Context, q *custodydb.Queries, c custodydb.ContextCapture, request value.ProgressQuery, stream custodydb.PermissionStream, observedAt time.Time) (value.ContextProgressObservation, error) {
 	var out value.ContextProgressObservation
 	err := func() error {
 		intent, err := captureIntent(c)
@@ -354,10 +349,7 @@ func (s *ContextProgressReads) readContextProgressInTransaction(ctx context.Cont
 			}
 		}
 		out.ObservedAt = observedAt
-		out.ValidUntil = identity.Earlier(observedAt.Add(5*time.Second), identity.Earlier(eligible.ValidUntil, request.Recovery.FreshUntil))
-		if err = s.recovery.check(ctx, q, recovery, s.root, request.Recovery); err != nil {
-			return err
-		}
+		out.ValidUntil = identity.Earlier(observedAt.Add(5*time.Second), eligible.ValidUntil)
 		n, err = q.CurrentTime(ctx)
 		if err != nil {
 			return err

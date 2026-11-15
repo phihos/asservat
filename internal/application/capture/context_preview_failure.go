@@ -61,7 +61,7 @@ const coldStorageRetryRoom = 2 * time.Second
 // retryColdStorage runs one more complete preview attempt when the first
 // ended at the readiness tail: its binding had expired and the refresh it
 // demanded had not landed yet (ADR-314). The second attempt reads identity,
-// recovery, target and every other fact again under its own bounds; nothing
+// target and every other fact again under its own bounds; nothing
 // from the first attempt is reused and the caller's deadline is unchanged.
 func retryColdStorage[T any](ctx context.Context, attempt func() (T, error)) (T, error) {
 	r, err := attempt()

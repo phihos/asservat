@@ -50,7 +50,6 @@ func (f *bridgeFixture) refresh(now time.Time) {
 	f.i.VerifiedAt, f.i.ValidUntil = now, until
 	f.a.CheckedAt, f.a.ValidUntil = now, until
 	f.a.Environment.ObservedAt, f.a.Environment.ValidUntil = now, until
-	f.a.Environment.Recovery.ObservedAt, f.a.Environment.Recovery.FreshUntil = now, until
 	f.a.Environment.Processing.ObservedAt, f.a.Environment.Processing.ValidUntil = now, until
 	f.a.Retention.ObservedAt, f.a.Retention.ValidUntil = now, until
 	f.p.ObservedAt, f.p.ValidUntil = now, until
@@ -69,7 +68,6 @@ func newBridgeFixture(t *testing.T) *bridgeFixture {
 		HubClusterID: bridgeID, HubRegion: "region", WorkerConfiguration: rev, HubConfiguration: rev}
 	f.a = value.ContextProjectionAuthority{Scope: scope, Environment: value.ContextProjectionEnvironment{RootID: bridgeID, InstallationID: bridgeID,
 		Region: "region", StoreID: bridgeID, Location: location, Principal: principal, PolicyRevision: rev, Path: path,
-		Recovery:   artifact.RecoveryProof{InstallationID: bridgeID, IssuerEpoch: bridgeID, Revision: rev},
 		Processing: artifact.DownloadProcessingProof{RootID: bridgeID, Epoch: bridgeID, CaptureID: bridgeID, Location: location, Sequence: 1, StateDigest: artifact.Digest{1}}},
 		Retention: artifact.RetentionProof{RootID: bridgeID, ClusterID: bridgeID, NamespaceUID: "namespace", WorkloadUID: "workload", PodUID: "pod",
 			Topology: rev, Policy: rev, Selectors: rev, SourceCount: 1}, PermissionRevision: rev, IdentityRevision: rev, DecisionDigest: artifact.Digest{1},
@@ -88,7 +86,7 @@ func newBridgeFixture(t *testing.T) *bridgeFixture {
 		HardUntil: f.now.Add(time.Minute), EffectsUntil: f.now.Add(3 * time.Minute), CleanupUntil: f.now.Add(4 * time.Minute), RetireBy: f.now.Add(time.Hour)}
 	f.refresh(f.now)
 	f.s = analysisapp.ContextProjectionService{Results: analysisapp.ContextProjectionResults{RootID: bridgeID, InstallationID: bridgeID, HubProcessEpoch: bridgeID,
-		Authority: f, Ledger: f, Reader: f, Now: func() time.Time { return f.now }, NewID: f.next}, Recovery: f, Routes: f, Plans: f, Workers: f}
+		Authority: f, Ledger: f, Reader: f, Now: func() time.Time { return f.now }, NewID: f.next}, Routes: f, Plans: f, Workers: f}
 	if !f.a.Valid(f.now) || !f.p.Valid(f.a.Scope, f.now) {
 		t.Fatal("invalid fixture")
 	}
@@ -100,16 +98,13 @@ func (f *bridgeFixture) ResolveIdentity(ctx context.Context) (identity.Identity,
 	}
 	return f.i, nil
 }
-func (f *bridgeFixture) RecoveryState(context.Context) (artifact.RecoveryProof, error) {
-	return f.a.Environment.Recovery, nil
-}
-func (f *bridgeFixture) ResolveContextProjection(ctx context.Context, _ value.ContextExcerptSelection, _ identity.Identity, _ artifact.RecoveryProof) (value.ContextProjectionCandidate, error) {
+func (f *bridgeFixture) ResolveContextProjection(ctx context.Context, _ value.ContextExcerptSelection, _ identity.Identity) (value.ContextProjectionCandidate, error) {
 	if f.routeHook != nil {
 		f.routeHook(ctx)
 	}
 	return f.a.Scope.Candidate(), nil
 }
-func (f *bridgeFixture) ResolveProjectionRoute(context.Context, string, string, identity.Identity, artifact.RecoveryProof) (value.ContextProjectionCandidate, error) {
+func (f *bridgeFixture) ResolveProjectionRoute(context.Context, string, string, identity.Identity) (value.ContextProjectionCandidate, error) {
 	c := f.a.Scope.Candidate()
 	c.Selection, c.NativeType, c.Headers, c.Profile = value.LineSelection{}, "", value.HTTPHeaderWindow{}, value.ProfileSummarySelection{}
 	return c, nil

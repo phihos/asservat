@@ -14,7 +14,7 @@ import (
 // The route supplies source type as internal routing observation only. C-03
 // independently checks current rights before protected source verification.
 type SyscallProjectionRouteReader interface {
-	ResolveSyscallProjectionRoute(context.Context, string, string, identity.Identity, artifact.RecoveryProof) (value.ContextProjectionCandidate, error)
+	ResolveSyscallProjectionRoute(context.Context, string, string, identity.Identity) (value.ContextProjectionCandidate, error)
 }
 type SyscallReads struct {
 	Service ContextProjectionService
@@ -32,8 +32,8 @@ func (s SyscallReads) Begin(ctx context.Context, current identities.CurrentIdent
 		if request.Selection.View == value.SyscallEventsView {
 			tool = "get_syscall_events"
 		}
-		d, err = s.Service.begin(ctx, current, invocation, tool, ContextQueryInput{Syscalls: request}, func(ctx context.Context, caller identity.Identity, recovery artifact.RecoveryProof) (value.ContextProjectionCandidate, error) {
-			c, err := s.Routes.ResolveSyscallProjectionRoute(ctx, request.CaseID, request.ArtifactID, caller, recovery)
+		d, err = s.Service.begin(ctx, current, invocation, tool, ContextQueryInput{Syscalls: request}, func(ctx context.Context, caller identity.Identity) (value.ContextProjectionCandidate, error) {
+			c, err := s.Routes.ResolveSyscallProjectionRoute(ctx, request.CaseID, request.ArtifactID, caller)
 			if err != nil || !c.RouteValid() || c.CaseID != request.CaseID || c.ArtifactID != request.ArtifactID || c.Selection != (value.LineSelection{}) || c.Headers != (value.HTTPHeaderWindow{}) || c.Profile != (value.ProfileSummarySelection{}) || c.Syscalls != (value.SyscallWindow{}) || c.NativeType != artifact.SyscallRecordsArtifact && c.NativeType != artifact.SyscallArgumentsArtifact {
 				return value.ContextProjectionCandidate{}, errors.Join(value.ErrUnavailable, err)
 			}

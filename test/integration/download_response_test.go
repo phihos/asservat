@@ -52,7 +52,7 @@ func qualifyDownloadResponses(t *testing.T, ctx context.Context, admin *pgxpool.
 		defer configPool.Close()
 		catalogPool := poolFor("context_catalog_read_runtime", "synthetic-context-read")
 		defer catalogPool.Close()
-		guards := postgres.EffectTransactionGuards{Retention: scenario.retention.guard, Recovery: scenario.recovery.guard}
+		guards := scenario.retention.guard
 		ledger, err := postgres.NewDownloads(ctx, runtimePool, root, guards)
 		if err != nil {
 			t.Fatal(err)

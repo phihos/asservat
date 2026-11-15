@@ -28,7 +28,6 @@ type ContextPublications struct {
 	ledger    *Ledger
 	root      string
 	retention *RetentionTransactionGuard
-	recovery  *RecoveryTransactionGuard
 }
 
 var _ evidence.ContextPublicationLedger = (*ContextPublications)(nil)
@@ -36,7 +35,7 @@ var _ authorizationapp.AudienceReader = (*ContextPublications)(nil)
 
 // Instantiate each facet with separate verification, audit, publish or SELECT
 // credentials. Sharing a Go implementation does not combine runtime SQL roles.
-func NewContextPublications(ctx context.Context, pool *pgxpool.Pool, root string, guards ...EffectTransactionGuards) (*ContextPublications, error) {
+func NewContextPublications(ctx context.Context, pool *pgxpool.Pool, root string, guards ...*RetentionTransactionGuard) (*ContextPublications, error) {
 	if !authorization.UUID(root) {
 		return nil, artifact.ErrInvalid
 	}
@@ -49,11 +48,11 @@ func NewContextPublications(ctx context.Context, pool *pgxpool.Pool, root string
 	if why := schemaCompatible(ctx, pool); why != "" {
 		return nil, schemaRefusal(privacy.ErrUnavailable, why)
 	}
-	guard, err := effectGuardsFor(root, guards)
+	guard, err := retentionGuardFor(root, guards)
 	if err != nil {
 		return nil, err
 	}
-	return &ContextPublications{ledger: l, root: root, retention: guard.Retention, recovery: guard.Recovery}, nil
+	return &ContextPublications{ledger: l, root: root, retention: guard}, nil
 }
 
 // historicalPublication checks original durable structure without conferring
@@ -85,10 +84,7 @@ func (s *ContextPublications) AcceptedContextForPublication(ctx context.Context,
 	})
 	return out, err
 }
-func (s *ContextPublications) publicationFence(ctx context.Context, q *custodydb.Queries, stream custodydb.PermissionStream, e artifact.ContextExpectation, a artifact.PublicationAuthority, topology privacyvalue.PolicyTopology, recovery custodydb.FleetCurrentTrust) error {
-	if err := s.recovery.check(ctx, q, recovery, s.root, a.Recovery); err != nil {
-		return err
-	}
+func (s *ContextPublications) publicationFence(ctx context.Context, q *custodydb.Queries, stream custodydb.PermissionStream, e artifact.ContextExpectation, a artifact.PublicationAuthority, topology privacyvalue.PolicyTopology) error {
 	if err := s.retention.check(ctx, q, topology, a.Retention, authorization.Target{ClusterID: e.Registration.Location.ClusterID, NamespaceUID: e.NamespaceUID, WorkloadUID: e.WorkloadUID, PodUID: e.PodUID}); err != nil {
 		return err
 	}
@@ -108,12 +104,12 @@ func (s *ContextPublications) publicationFence(ctx context.Context, q *custodydb
 			return privacy.ErrFence
 		}
 	}
-	return s.recovery.check(ctx, q, recovery, s.root, a.Recovery)
+	return nil
 }
 
-// Canonical order: recovery root -> permission root -> storage pool/allocation -> attempt ->
+// Canonical order: permission root -> storage pool/allocation -> attempt ->
 // capture -> verification/catalog. No external work occurs while locks are held.
-func (s *ContextPublications) publicationLocks(ctx context.Context, q *custodydb.Queries, e artifact.ContextExpectation, c artifact.Copies, a artifact.PublicationAuthority, topology privacyvalue.PolicyTopology, recovery custodydb.FleetCurrentTrust) (custodydb.PermissionStream, custodydb.CustodyPool, custodydb.CustodyAllocation, custodydb.CustodyAttempt, custodydb.ContextCapture, error) {
+func (s *ContextPublications) publicationLocks(ctx context.Context, q *custodydb.Queries, e artifact.ContextExpectation, c artifact.Copies, a artifact.PublicationAuthority, topology privacyvalue.PolicyTopology) (custodydb.PermissionStream, custodydb.CustodyPool, custodydb.CustodyAllocation, custodydb.CustodyAttempt, custodydb.ContextCapture, error) {
 	var stream custodydb.PermissionStream
 	var pool custodydb.CustodyPool
 	var allocation custodydb.CustodyAllocation
@@ -154,7 +150,7 @@ func (s *ContextPublications) publicationLocks(ctx context.Context, q *custodydb
 		err = current(ctx, q, pool, allocation, e.Registration, attempt.EffectiveExpiresAt.Time)
 	}
 	if err == nil {
-		err = s.publicationFence(ctx, q, stream, e, a, topology, recovery)
+		err = s.publicationFence(ctx, q, stream, e, a, topology)
 	}
 	return stream, pool, allocation, attempt, accepted, err
 }
@@ -217,11 +213,7 @@ func (s *ContextPublications) RecordContextVerification(ctx context.Context, e a
 		return out, err
 	}
 	err = s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		recovery, err := s.recovery.lock(ctx, q, s.root, a.Recovery)
-		if err != nil {
-			return err
-		}
-		stream, pool, allocation, attempt, accepted, err := s.publicationLocks(ctx, q, e, c, a, topology, recovery)
+		stream, pool, allocation, attempt, accepted, err := s.publicationLocks(ctx, q, e, c, a, topology)
 		if err != nil {
 			return err
 		}
@@ -271,7 +263,7 @@ func (s *ContextPublications) RecordContextVerification(ctx context.Context, e a
 		if err = current(ctx, q, pool, allocation, e.Registration, attempt.EffectiveExpiresAt.Time); err != nil {
 			return err
 		}
-		return s.publicationFence(ctx, q, stream, e, a, topology, recovery)
+		return s.publicationFence(ctx, q, stream, e, a, topology)
 	})
 	if err != nil {
 		return audit.ContextVerification{}, err
@@ -329,11 +321,7 @@ func (s *ContextPublications) PublishContext(ctx context.Context, e artifact.Con
 		return out, err
 	}
 	err = s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		recovery, err := s.recovery.lock(ctx, q, s.root, a.Recovery)
-		if err != nil {
-			return err
-		}
-		stream, pool, allocation, attempt, accepted, err := s.publicationLocks(ctx, q, e, c, a, topology, recovery)
+		stream, pool, allocation, attempt, accepted, err := s.publicationLocks(ctx, q, e, c, a, topology)
 		if err != nil {
 			return err
 		}
@@ -365,7 +353,7 @@ func (s *ContextPublications) PublishContext(ctx context.Context, e artifact.Con
 		if err = current(ctx, q, pool, allocation, e.Registration, attempt.EffectiveExpiresAt.Time); err != nil {
 			return err
 		}
-		return s.publicationFence(ctx, q, stream, e, a, topology, recovery)
+		return s.publicationFence(ctx, q, stream, e, a, topology)
 	})
 	if err != nil {
 		return artifact.PublishedContext{}, err

@@ -197,6 +197,6 @@ func TestProfileSummaryUnknownAndPostAdmissionErrorsRemainTransportUnavailable(t
 
 type summaryUnavailableRoute struct{}
 
-func (summaryUnavailableRoute) ResolveProjectionRoute(context.Context, string, string, identity.Identity, artifact.RecoveryProof) (value.ContextProjectionCandidate, error) {
+func (summaryUnavailableRoute) ResolveProjectionRoute(context.Context, string, string, identity.Identity) (value.ContextProjectionCandidate, error) {
 	return value.ContextProjectionCandidate{}, errors.New("private route unavailable")
 }

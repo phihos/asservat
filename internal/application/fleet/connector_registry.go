@@ -24,7 +24,7 @@ type ConnectorLeafRegistry interface {
 // ConnectorLeafRegistryAt is an optional read-only registration composition
 // inside the executor's original source bracket. The caller owns a complete
 // opening source proof and must perform its complete closing proof after this
-// lookup before using the result. The registry retains current SQL/recovery
+// lookup before using the result. The registry retains current SQL
 // checks and the original source/caller bounds; it cannot renew the source or
 // use it for enrollment, signing, acceptance or a later conversation.
 type ConnectorLeafRegistryAt interface {

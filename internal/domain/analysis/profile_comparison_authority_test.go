@@ -48,8 +48,6 @@ func TestProfileComparisonAuthorityRequiresExactlyOneMatchingLegacyChild(t *test
 		"child-route":       func(a *ContextProjectionAuthority) { a.Baseline.Scope.CaseID = queryTestID },
 		"identity-policy":   func(a *ContextProjectionAuthority) { a.Baseline.IdentityRevision.Generation++ },
 		"permission-stream": func(a *ContextProjectionAuthority) { a.Baseline.PermissionRevision.Generation++ },
-		"recovery-epoch":    func(a *ContextProjectionAuthority) { a.Baseline.Environment.Recovery.IssuerEpoch = queryOtherID },
-		"recovery-revision": func(a *ContextProjectionAuthority) { a.Baseline.Environment.Recovery.Revision.Generation++ },
 		"physical-config":   func(a *ContextProjectionAuthority) { a.Baseline.Environment.Path.WorkerConfiguration.Generation++ },
 		"first-checked-at":  func(a *ContextProjectionAuthority) { a.CheckedAt = a.CheckedAt.Add(time.Nanosecond) },
 		"first-deadline":    func(a *ContextProjectionAuthority) { a.Baseline.ValidUntil = a.ValidUntil.Add(-time.Nanosecond) },
@@ -144,8 +142,6 @@ func maximumComparisonAuthority() ContextProjectionAuthority {
 		p.StorageRegion, p.AcquisitionRegion, p.ConnectorRegion, p.HubRegion = text(63), text(63), text(63), text(63)
 		p.WorkerConfiguration, p.HubConfiguration = revision(true), revision(true)
 		v.Environment.ObservedAt, v.Environment.ValidUntil = start, start.Add(4*time.Second)
-		v.Environment.Recovery.Revision = revision(false)
-		v.Environment.Recovery.ObservedAt, v.Environment.Recovery.FreshUntil = start, start.Add(4*time.Second)
 		v.Environment.Processing.Sequence = 1 << 60
 		v.Environment.Processing.StateDigest = digest
 		v.Environment.Processing.ObservedAt, v.Environment.Processing.ValidUntil = start, start.Add(4*time.Second)
@@ -229,7 +225,7 @@ func TestProfileComparisonMaximumAuthorityEncoding(t *testing.T) {
 	query := struct {
 		ContextQuery
 		BaselinePlan ContextQueryPlan `json:",omitzero"`
-	}{ContextQuery: ContextQuery{ID: queryTestID, OperationID: queryTestID, WorkerID: queryTestID, Scope: a.Scope, Plan: ip, RecoveryIssuerEpoch: a.Environment.Recovery.IssuerEpoch, RecoveryRevision: a.Environment.Recovery.Revision, CreatedAt: start, Deadline: ip.HardUntil, WorkerUntil: ip.EffectsUntil, CredentialUntil: ip.EffectsUntil, ProviderUntil: ip.EffectsUntil, CleanupUntil: ip.CleanupUntil}, BaselinePlan: bp}
+	}{ContextQuery: ContextQuery{ID: queryTestID, OperationID: queryTestID, WorkerID: queryTestID, Scope: a.Scope, Plan: ip, CreatedAt: start, Deadline: ip.HardUntil, WorkerUntil: ip.EffectsUntil, CredentialUntil: ip.EffectsUntil, ProviderUntil: ip.EffectsUntil, CleanupUntil: ip.CleanupUntil}, BaselinePlan: bp}
 	planJSON, err := json.Marshal(ip)
 	if err != nil {
 		t.Fatal(err)

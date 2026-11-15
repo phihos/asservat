@@ -30,8 +30,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-// Only this fixture renews the independently supplied installation recovery
-// observation. It never clears suspension/recovery_blocked or changes epochs.
+// Only this fixture renews the independently supplied installation trust
+// observation. It never clears suspension or changes epochs.
 type nativeOwnerConfiguration struct {
 	current      app.OwnerConfigurationReader
 	lab          *ownerConfigLab

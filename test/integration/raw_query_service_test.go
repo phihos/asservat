@@ -79,7 +79,7 @@ func qualifyRawQueryService(t *testing.T, ctx context.Context, s captureAdmissio
 		return current
 	}
 	selections := 0
-	service := authapp.GrantService{RootID: s.a.RootID, InstallationID: s.recovery.installation, Permissions: s.p, Store: store, RawStore: store, Recovery: s.recovery.reader, NewID: custodyID, Now: time.Now}
+	service := authapp.GrantService{RootID: s.a.RootID, InstallationID: s.recovery.installation, Permissions: s.p, Store: store, RawStore: store, NewID: custodyID, Now: time.Now}
 	service.RawSelections = rawQueryServiceSelection(func(_ context.Context, _ identities.CurrentIdentity, caseID string, versions []artifact.Digest) (authapp.RawQuerySelection, error) {
 		selections++
 		if caseID != e.CaseID || !slices.Equal(versions, []artifact.Digest{output.ArtifactDigest}) {
