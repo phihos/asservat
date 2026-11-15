@@ -171,7 +171,7 @@ GRANT SELECT ON fleet_trust,permission_stream,authority_audit,context_catalog,co
 GRANT UPDATE(installation_id) ON fleet_trust TO download_worker_runtime;
 GRANT UPDATE(id) ON permission_stream,artifact_download TO download_worker_runtime;
 GRANT UPDATE(root_id) ON retention_source TO download_worker_runtime;
-GRANT INSERT(id,session_id,root_id,installation_id,allocation_id,principal_key,generation,intent_json,run_until) ON download_worker TO download_worker_runtime;
+GRANT INSERT(id,session_id,root_id,installation_id,allocation_id,generation,intent_json,run_until) ON download_worker TO download_worker_runtime;
 GRANT UPDATE(claimed_at,job_json,binding_json,termination_json,retired_proof_json) ON download_worker TO download_worker_runtime;
 -- The shared acquisition capacity count matches workload identity through either purpose parent.
 GRANT SELECT ON download_allocation,context_query_allocation TO download_worker_runtime;

@@ -278,7 +278,7 @@ func admittedProjectionIdentityFixture(t *testing.T) (*admittedWorkerIdentity, *
 	receipt := audit.Receipt{Key: audit.ProjectionWorkerKey(i), Version: "original", ETag: "original", Bytes: 17, SHA256: artifact.Digest{8}}
 	rows.worker.SessionID, rows.worker.AllocationID = pgtype.UUID{}, pgtype.UUID{}
 	rows.worker.QueryID, rows.worker.QueryAllocationID = id(q.ID), id(q.Plan.AllocationID)
-	rows.worker.PrincipalKey, rows.worker.RunUntil, rows.worker.ClaimedAt = principalKey(q.Scope.Principal), ts(w.Intent.RunUntil), ts(created)
+	rows.worker.RunUntil, rows.worker.ClaimedAt = ts(w.Intent.RunUntil), ts(created)
 	rows.worker.IntentJson, rows.worker.JobJson, rows.worker.BindingJson, rows.worker.AuditReceiptJson = encode(i), encode(w.Job), encode(w.Binding), encode(receipt)
 	return s, rows, w, started
 }

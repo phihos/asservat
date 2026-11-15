@@ -158,7 +158,7 @@ func (s *DownloadWorkers) ReserveDownloadWorker(ctx context.Context, session, at
 		if json.Unmarshal(b, &out) != nil {
 			return artifact.ErrInvalid
 		}
-		return q.InsertDownloadWorker(ctx, custodydb.InsertDownloadWorkerParams{ID: id(attempt), SessionID: id(session), RootID: id(s.downloads.root), InstallationID: id(p.InstallationID), AllocationID: id(parent.AllocationID), PrincipalKey: principalKey(a.Scope.Principal), Generation: generation, IntentJson: b, RunUntil: ts(until)})
+		return q.InsertDownloadWorker(ctx, custodydb.InsertDownloadWorkerParams{ID: id(attempt), SessionID: id(session), RootID: id(s.downloads.root), InstallationID: id(p.InstallationID), AllocationID: id(parent.AllocationID), Generation: generation, IntentJson: b, RunUntil: ts(until)})
 	})
 	if e != nil {
 		return value.DownloadWorkerIntent{}, e

@@ -1073,7 +1073,6 @@ type DownloadWorker struct {
 	RootID                    pgtype.UUID
 	InstallationID            pgtype.UUID
 	AllocationID              pgtype.UUID
-	PrincipalKey              []byte
 	Generation                int64
 	IntentJson                []byte
 	RunUntil                  pgtype.Timestamptz
