@@ -32,8 +32,8 @@ import (
 // scopes. Payloads, target process and transport joins remain synthetic. This
 // fixture is independent of installed Kubernetes capture and browser proof.
 func TestLogsMixedGroupQueryLifecycleWithRealServices(t *testing.T) {
-	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects) {
-		withProtectedContextQueryLedger(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, qualifyLogsMixedGroup, false, false, false, false, false, false, true, true)
+	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.AuthorityObjects) {
+		withProtectedContextQueryLedger(t, ctx, admin, address, tlsConfig, scope, claim, objects, qualifyLogsMixedGroup, false, false, false, false, false, false, true, true)
 	})
 }
 

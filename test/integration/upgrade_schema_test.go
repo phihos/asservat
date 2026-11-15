@@ -87,9 +87,17 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 		t.Fatal(e)
 	}
 	defer conn.Close(context.Background())
-	now := time.Now().UTC().Truncate(time.Microsecond)
-	if _, e = conn.Exec(ctx, `INSERT INTO fleet_trust(installation_id,issuer_epoch,source_uid,source_generation,source_digest,observed_at,fresh_until,activated_postmaster_at,activated_database_oid)
- VALUES($1,$2,'synthetic-upgrade',1,$3,$4,$5,pg_postmaster_start_time(),(SELECT oid FROM pg_database WHERE datname=current_database()))`, custodyID(), custodyID(), make([]byte, 32), now, now.Add(time.Second)); e != nil {
+	// Migration 185 removed the observation columns.
+	trustInsert := `INSERT INTO fleet_trust(installation_id,issuer_epoch,source_uid,source_generation,source_digest,activated_postmaster_at,activated_database_oid)
+ VALUES($1,$2,'synthetic-upgrade',1,$3,pg_postmaster_start_time(),(SELECT oid FROM pg_database WHERE datname=current_database()))`
+	trustArgs := []any{custodyID(), custodyID(), make([]byte, 32)}
+	if head-1 < 185 {
+		now := time.Now().UTC().Truncate(time.Microsecond)
+		trustInsert = `INSERT INTO fleet_trust(installation_id,issuer_epoch,source_uid,source_generation,source_digest,observed_at,fresh_until,activated_postmaster_at,activated_database_oid)
+ VALUES($1,$2,'synthetic-upgrade',1,$3,$4,$5,pg_postmaster_start_time(),(SELECT oid FROM pg_database WHERE datname=current_database()))`
+		trustArgs = append(trustArgs, now, now.Add(time.Second))
+	}
+	if _, e = conn.Exec(ctx, trustInsert, trustArgs...); e != nil {
 		t.Fatal("synthetic activated installation", e)
 	}
 

@@ -25,8 +25,8 @@ import (
 // uses its actual compiled capacity-profile-read credential. Protected source,
 // privacy identity and physical-history qualification remain synthetic inputs.
 func TestProcessingReleaseProfilesWithRealPostgres(t *testing.T) {
-	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects) {
-		f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, func(f *capacitySQLFixture) {
+	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.AuthorityObjects) {
+		f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, objects, func(f *capacitySQLFixture) {
 			// This dedicated qualification funds exactly initialize+restrict on
 			// the human's normal account. The release reserve stays unchanged.
 			normal := &f.qualification.RootBacking.Normal

@@ -7,8 +7,6 @@ import (
 	"time"
 
 	fleetapp "asservat.local/asservat/internal/application/fleet"
-	fleetvalue "asservat.local/asservat/internal/domain/fleet"
-	"asservat.local/asservat/internal/domain/identity"
 )
 
 // Cold maintenance must use real cleanup admission before selecting native/SQL
@@ -35,26 +33,8 @@ func TestConfigurationCleanupColdRefreshReachesRequiredNativeProof(t *testing.T)
 	worker := &InstalledConfigurationProviderEffects{input: in, effects: effects, admission: gate, root: t.Context()}
 	call, cancel := context.WithTimeout(t.Context(), time.Second)
 	defer cancel()
-	notified := make(chan struct{})
-	go func() {
-		defer close(notified)
-		ticker := time.NewTicker(time.Millisecond)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-call.Done():
-				return
-			case <-ticker.C:
-				now := time.Now().UTC()
-				notice := fleetvalue.Administration{InstallationID: in.InstallationID, IssuerEpoch: in.ClusterID, Revision: identity.Revision{UID: in.ClusterID, Generation: 1, Digest: [32]byte{1}}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
-				gate.NoteFleetObservation(notice)
-				gate.NoteFleetCommitted(call, notice)
-			}
-		}
-	}()
 	err = worker.RefreshCleanup(call)
 	cancel()
-	<-notified
 	var step interface{ FixedStep() string }
 	if !errors.Is(err, ErrKeyService) || !errors.As(err, &step) || step.FixedStep() != "proof" {
 		t.Fatal("cold cleanup failed before mandatory native proof", err)

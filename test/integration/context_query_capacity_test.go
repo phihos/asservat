@@ -41,8 +41,8 @@ func syntheticQueryCapacityQualification(t *testing.T, f *capacitySQLFixture) {
 	}
 }
 
-func qualifyContextQueryCapacitySQL(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects) {
-	f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, func(f *capacitySQLFixture) { syntheticQueryCapacityQualification(t, f) })
+func qualifyContextQueryCapacitySQL(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.AuthorityObjects) {
+	f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, objects, func(f *capacitySQLFixture) { syntheticQueryCapacityQualification(t, f) })
 	body, _ := json.Marshal(f.qualification.ContextQuery)
 	base, _ := json.Marshal(f.qualification.RootBacking)
 	for _, mode := range []string{"original", "legacy-layout", "root-selected-target", "short-rows", "missing-worker-intent-audit", "missing-identity-wal", "unfunded", "unknown-field"} {

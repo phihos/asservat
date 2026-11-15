@@ -22,8 +22,8 @@ import (
 // Real protected admission/publication and compiled query/key roles. The native
 // payload, process/Job/Pod/issuer and positive transport joins are synthetic.
 func TestLogsQueryLifecycleWithRealServices(t *testing.T) {
-	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects) {
-		withProtectedContextQueryLedger(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, qualifyPacketQueryManagedLifecycle, false, false, false, false, false, false, true)
+	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.AuthorityObjects) {
+		withProtectedContextQueryLedger(t, ctx, admin, address, tlsConfig, scope, claim, objects, qualifyPacketQueryManagedLifecycle, false, false, false, false, false, false, true)
 	})
 }
 func logsQueryComposition() planvalue.ProfileComposition {

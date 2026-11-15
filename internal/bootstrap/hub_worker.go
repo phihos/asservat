@@ -252,8 +252,10 @@ func newHubWorker(ctx context.Context, files, idFiles *os.Root) (_ *hubWorker, e
 	}
 
 	at = "sql"
-	var pools [3]*pgxpool.Pool
-	for i, purpose := range contracts.ConfigurationRuntimeRolePurposes() {
+	// The configuration-fleet login only waits for the schema; the fleet
+	// trust row is static (ADR-330 D13) and needs no observer pool.
+	var pools [2]*pgxpool.Pool
+	for i, purpose := range contracts.ConfigurationRuntimeRolePurposes()[1:] {
 		name, known := postgres.ConfigurationRuntimeRoleName(w.ids.InstallationID, purpose)
 		if !known {
 			return nil, mounts.ErrUnavailable
@@ -270,15 +272,11 @@ func newHubWorker(ctx context.Context, files, idFiles *os.Root) (_ *hubWorker, e
 	w.closers = append(w.closers, w.admission.Close)
 	w.authority = newAuthorityAuditTurn(w.admission)
 	at = "stores"
-	fleetStore, err := postgres.NewFleetObservation(startup, pools[0], w.ids.InstallationID)
+	ownerStore, err := postgres.NewOwnerConfigurations(startup, pools[0], w.ids.InstallationID, w.ids.ClusterID, nsUID, w.ownerUID)
 	if err != nil {
 		return nil, err
 	}
-	ownerStore, err := postgres.NewOwnerConfigurations(startup, pools[1], w.ids.InstallationID, w.ids.ClusterID, nsUID, w.ownerUID)
-	if err != nil {
-		return nil, err
-	}
-	ack, err := postgres.NewCurrentOwnerConfigurationAcknowledgements(startup, pools[2], w.ids.InstallationID, w.ids.ClusterID, nsUID, w.ownerUID)
+	ack, err := postgres.NewCurrentOwnerConfigurationAcknowledgements(startup, pools[1], w.ids.InstallationID, w.ids.ClusterID, nsUID, w.ownerUID)
 	if err != nil {
 		return nil, err
 	}
@@ -308,7 +306,6 @@ func newHubWorker(ctx context.Context, files, idFiles *os.Root) (_ *hubWorker, e
 		return nil, err
 	}
 	w.reconciler = &app.ConfigurationReconciler{
-		Fleet: &app.TrustObserver{Settings: installationTrust{w.ids.InstallationID, w.ids.IssuerEpoch}, Projection: &configurationRuntimeFleetProjection{actual: fleetStore, admission: w.admission}, Now: time.Now},
 		Owner: &app.OwnerConfigurationObserver{Reader: ownerSource, Ledger: ownerStore, Audit: w.audit, Acknowledgements: ack, Now: time.Now},
 	}
 	at = "leader"

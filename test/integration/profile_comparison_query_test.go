@@ -52,9 +52,9 @@ func TestProfileComparisonLedgerOriginalQualification(t *testing.T) {
 // C14 ownership/worker pins are explicit fixture facts. Direct key-role writes
 // below qualify SQL masks only, never mTLS/key-service use or native delivery.
 func TestProfileComparisonQueryLedgerWithRealPostgres(t *testing.T) {
-	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects) {
+	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.AuthorityObjects) {
 		t.Run("profile-comparison-source-and-ledger", func(t *testing.T) {
-			withProtectedContextQueryLedger(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, qualifyProfileComparisonQueries, true, true)
+			withProtectedContextQueryLedger(t, ctx, admin, address, tlsConfig, scope, claim, objects, qualifyProfileComparisonQueries, true, true)
 		})
 	})
 }

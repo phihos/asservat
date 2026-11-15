@@ -67,7 +67,7 @@ type sourceSnapshotQualificationMode struct {
 
 func qualifySourceSnapshotServicesMode(t *testing.T, mode sourceSnapshotQualificationMode) {
 	manual, cancellation, requireApproval, reason, groupCount := mode.manual, mode.cancellation, mode.requireApproval, mode.reason, mode.groupCount
-	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects) {
+	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.AuthorityObjects) {
 		t.Run("empty-provenance-down-up", func(t *testing.T) {
 			provider, closeProvider := source107MigrationProvider(t, admin)
 			defer closeProvider()
@@ -78,7 +78,7 @@ func qualifySourceSnapshotServicesMode(t *testing.T, mode sourceSnapshotQualific
 				t.Fatal("Up107 empty", err)
 			}
 		})
-		f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, func(f *capacitySQLFixture) {
+		f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, objects, func(f *capacitySQLFixture) {
 			if manual {
 				configureManualSourceCapacity(f)
 			}
@@ -91,12 +91,6 @@ func qualifySourceSnapshotServicesMode(t *testing.T, mode sourceSnapshotQualific
 		})
 		sourceCeiling := int64(max(4, groupCount))
 		root, enrollment := f.setup(t)
-		stop := f.keepFleetCurrent()
-		defer func() {
-			if err := stop(); err != nil {
-				t.Error(err)
-			}
-		}()
 		seed, intents, _ := f.prepareManagedContext(t, root, enrollment, policySourceFixtureRetentionSeconds)
 		option := policyRecorderProtectedCase{Hub: f.roles["hub-runtime"], Admissions: seed.s, Filters: pcap.NewCompiler(), Expression: "tcp dst port 80", Subjects: []cfg.Subject{{Kind: "Group", Issuer: "https://id.example.test", ID: "maintainers"}}, Ongoing: true, RecordingSaves: manual, RecurringSharing: manual, OrdinaryGrant: requireApproval, Retention: "31s", PermissionsAccepted: func(batch cfg.PermissionBatch) { f.batch = policyRecorderCloneBatch(batch) }}
 		if groupCount > 0 {

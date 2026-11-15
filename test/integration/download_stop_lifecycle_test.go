@@ -268,7 +268,6 @@ func qualifyDownloadStopLifecycle(t *testing.T, ctx context.Context, admin *pgxp
 		})
 		for _, g := range groups {
 			wait(g.records[0].state.Binding.OriginalPurgeAt)
-			refreshAuditFixtureRecovery(t, ctx, admin, g.scenario.recovery.observation, 30*time.Second)
 			reset(g)
 			var connectionCount int
 			var connectionRoles string
@@ -342,7 +341,6 @@ func qualifyDownloadStopLifecycle(t *testing.T, ctx context.Context, admin *pgxp
 		}
 		for _, g := range groups {
 			wait(g.records[0].state.Binding.CertificatePurgeAt)
-			refreshAuditFixtureRecovery(t, ctx, admin, g.scenario.recovery.observation, 30*time.Second)
 			for _, r := range g.records {
 				if r.mode == "unknown" {
 					continue
@@ -411,7 +409,6 @@ func qualifyDownloadStopLifecycle(t *testing.T, ctx context.Context, admin *pgxp
 				continue
 			}
 			wait(g.records[0].state.Binding.HistoryReleaseAt)
-			refreshAuditFixtureRecovery(t, ctx, admin, g.scenario.recovery.observation, 30*time.Second)
 			keys, e := g.finalizer.DueDownloadStopHistory(ctx)
 			if e != nil || len(keys) != 1 {
 				t.Fatal("bounded due history", len(keys), e)

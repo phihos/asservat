@@ -266,7 +266,6 @@ func qualifyOperationAuditLifecycle(t *testing.T, ctx context.Context, admin *pg
 				}
 			}
 			wait(all[len(all)-1].Lifecycle.OriginalPurgeAt)
-			refreshAuditFixtureRecovery(t, ctx, admin, s.recovery.observation, 30*time.Second)
 			// Deleting both originals is positively observed BEFORE issuing the one
 			// certificate claim. The original record charge is retained throughout.
 
@@ -311,10 +310,8 @@ func qualifyOperationAuditLifecycle(t *testing.T, ctx context.Context, admin *pg
 					mode = "concurrent"
 				} else if in.ID == a2.ID {
 					mode = "unknown-claim"
-				} else if in.ID == b.ID {
-					mode = "blocked-expiry"
 				}
-				qualifyOperationCertificateVerification(t, ctx, admin, ap, verified, verifier, r, c.Receipt, mode, s.recovery.observation)
+				qualifyOperationCertificateVerification(t, ctx, admin, ap, verified, verifier, r, c.Receipt, mode)
 
 				observed(in, 1)
 				if !time.Now().Add(time.Duration(policy.ProofWindowSeconds) * time.Second).Before(r.CertificatePurgeAt) {
@@ -329,7 +326,6 @@ func qualifyOperationAuditLifecycle(t *testing.T, ctx context.Context, admin *pg
 				t.Fatal("released original charges early", charged, e)
 			}
 			wait(all[len(all)-1].Lifecycle.CertificatePurgeAt)
-			refreshAuditFixtureRecovery(t, ctx, admin, s.recovery.observation, 30*time.Second)
 			for _, in := range all {
 				cleanup, verified, finalizer := cleanup, verified, finalizer
 				if in.Name == "resolve_capture_request" {
@@ -338,7 +334,6 @@ func qualifyOperationAuditLifecycle(t *testing.T, ctx context.Context, admin *pg
 
 				if historySeconds > 0 && in.ID == b.ID {
 					wait(in.Lifecycle.LiveRetireBy.Add(100 * time.Millisecond))
-					refreshAuditFixtureRecovery(t, ctx, admin, s.recovery.observation, 30*time.Second)
 				}
 				lease, e := cleanup.BeginOperationPurge(ctx, in.ID, "terminal")
 				if e != nil {
@@ -549,7 +544,6 @@ func qualifyOperationAuditLifecycle(t *testing.T, ctx context.Context, admin *pg
 					t.Fatal(e)
 				}
 				wait(due)
-				refreshAuditFixtureRecovery(t, ctx, admin, s.recovery.observation, 30*time.Second)
 				remainingHealthyA := int64(2)
 				for _, key := range keysToDrain {
 					var wg sync.WaitGroup
@@ -688,12 +682,4 @@ func (s *closedAuditLostReply) CreateClosedOperationIntent(ctx context.Context, 
 		return value.OperationWriteCompletion{}, e
 	}
 	return value.OperationWriteCompletion{}, app.ErrUnavailable
-}
-
-func refreshAuditFixtureRecovery(t *testing.T, ctx context.Context, admin *pgxpool.Pool, binding syntheticFleetBinding, valid time.Duration) {
-	t.Helper()
-	// Synthetic observation refresh only.
-	if e := renewSyntheticFleetObservation(ctx, admin, binding, valid, false); e != nil {
-		t.Fatal(e)
-	}
 }

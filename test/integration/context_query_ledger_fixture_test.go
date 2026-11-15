@@ -42,9 +42,9 @@ func TestContextQueryLedgerWithRealPostgres(t *testing.T) {
 }
 
 func TestProfileSummaryQueryLedgerWithRealPostgres(t *testing.T) {
-	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects) {
+	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.AuthorityObjects) {
 		t.Run("profile-summary-source-and-ledger", func(t *testing.T) {
-			withProtectedContextQueryLedger(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, qualifyContextQueries, true)
+			withProtectedContextQueryLedger(t, ctx, admin, address, tlsConfig, scope, claim, objects, qualifyContextQueries, true)
 		})
 	})
 }
@@ -111,11 +111,11 @@ func queryLedgerQualification(t *testing.T, f *capacitySQLFixture) {
 	}
 }
 
-func qualifyProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects) {
-	withProtectedContextQueryLedger(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, qualifyContextQueries)
+func qualifyProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.AuthorityObjects) {
+	withProtectedContextQueryLedger(t, ctx, admin, address, tlsConfig, scope, claim, objects, qualifyContextQueries)
 }
 
-func withProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects, qualify func(*testing.T, *queryLedgerFixture), profileSource ...bool) {
+func withProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.AuthorityObjects, qualify func(*testing.T, *queryLedgerFixture), profileSource ...bool) {
 	isProfile := len(profileSource) > 0 && profileSource[0]
 	isComparison := len(profileSource) > 1 && profileSource[1]
 	legacyTiming := len(profileSource) > 2 && profileSource[2]
@@ -124,7 +124,7 @@ func withProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *p
 	rawSyscall := len(profileSource) > 5 && profileSource[5]
 	isLogs := len(profileSource) > 6 && profileSource[6]
 	logsGroup := len(profileSource) > 7 && profileSource[7]
-	f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, func(f *capacitySQLFixture) {
+	f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, objects, func(f *capacitySQLFixture) {
 		queryLedgerQualification(t, f)
 		if isLogs {
 			logsLedgerFunding(t, f, logsGroup)

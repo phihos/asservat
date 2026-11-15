@@ -652,13 +652,11 @@ func qualifyCaptureIntentLifecycle(t *testing.T, ctx context.Context, admin *pgx
 					})
 				}
 				wait(in.Lifecycle.OriginalPurgeAt)
-				refreshAuditFixtureRecovery(t, ctx, admin, s.s.recovery.observation, 30*time.Second)
 				if e = life.Advance(ctx, in.ID); !errors.Is(e, app.ErrUnavailable) || app.OperationCleanupFailureStep(e) != "terminal-lease" {
 					t.Fatal("early terminal phase", e)
 				}
 				observed(t, in, 1)
 				wait(in.Lifecycle.CertificatePurgeAt)
-				refreshAuditFixtureRecovery(t, ctx, admin, s.s.recovery.observation, 30*time.Second)
 				if e = life.Advance(ctx, in.ID); e != nil {
 					t.Fatal("positive private retirement", e)
 				}
@@ -680,7 +678,6 @@ func qualifyCaptureIntentLifecycle(t *testing.T, ctx context.Context, admin *pgx
 						t.Fatal(e)
 					}
 					wait(at)
-					refreshAuditFixtureRecovery(t, ctx, admin, s.s.recovery.observation, 30*time.Second)
 					if _, e = (app.OperationHistoryCleanup{Journal: retire, Finalizer: retire}).Sweep(ctx); e != nil {
 						t.Fatal("history drain", e)
 					}

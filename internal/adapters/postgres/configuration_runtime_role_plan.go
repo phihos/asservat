@@ -34,16 +34,11 @@ func configurationRuntimeRoleGrants(purpose string) ([]publicRuntimeGrant, bool)
 			out = append(out, publicRuntimeGrant{"table", table, column, privilege})
 		}
 	}
-	// Derived from FleetObservation, OwnerConfigurations' source/read graph and
+	// Derived from OwnerConfigurations' source/read graph and
 	// CurrentOwnerConfigurationAcknowledgements, not a union of fixture roles.
 	add("fleet_current_trust", "SELECT")
 	add("fleet_current_trust", "UPDATE", "installation_id")
 	switch purpose {
-	case "configuration-fleet":
-		add("fleet_trust", "SELECT")
-		out = append(out,
-			publicRuntimeGrant{"function", "observe_fleet_administration(uuid,bigint,timestamptz,oid,timestamptz,uuid,text,bigint,bytea,boolean,timestamptz,timestamptz)", "", "EXECUTE"},
-			publicRuntimeGrant{"function", "fence_fleet_observation(uuid,bigint,timestamptz,oid,timestamptz)", "", "EXECUTE"})
 	case "configuration-source", "configuration-audit":
 		add("hub_owner_configuration", "SELECT")
 		add("hub_owner_configuration_revision", "SELECT")

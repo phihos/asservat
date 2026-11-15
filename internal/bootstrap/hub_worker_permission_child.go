@@ -369,7 +369,7 @@ func (p *permissionWorker) publish(ctx context.Context) {
 	last := "ok"
 	for ctx.Err() == nil {
 		if lease, release, err := p.authority.wait(ctx); err == nil {
-			if lease.AwaitFleetObservation() == nil {
+			if lease.Schedule() == nil {
 				if p.retention != nil && turn%2 == 1 {
 					p.retention.publish(lease.Context(), turn%4 == 3)
 				} else if outcome := regionalOutcome(p.publisher.PublishAuthority(lease.Context())); outcome != last && ctx.Err() == nil {

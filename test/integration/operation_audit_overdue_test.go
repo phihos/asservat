@@ -159,7 +159,6 @@ func qualifyOperationAuditOverdue(t *testing.T, ctx context.Context, admin *pgxp
 			wait := func(at time.Time) {
 				t.Helper()
 				waitOnly(at)
-				refreshAuditFixtureRecovery(t, ctx, admin, s.recovery.observation, 30*time.Second)
 			}
 			wait(c.Lifecycle.OriginalPurgeAt.Add(10 * time.Millisecond))
 			var prepared value.OperationRetirement

@@ -21,7 +21,6 @@ CREATE ROLE peer_read_runtime LOGIN PASSWORD 'synthetic-peer-read'; GRANT CONNEC
 
 
 
-CREATE ROLE fleet_observe_runtime LOGIN PASSWORD 'synthetic-fleet-observe'; GRANT CONNECT ON DATABASE custody_test TO fleet_observe_runtime; GRANT USAGE ON SCHEMA public TO fleet_observe_runtime; GRANT SELECT ON goose_db_version,fleet_trust TO fleet_observe_runtime; GRANT EXECUTE ON FUNCTION observe_fleet_administration(uuid,bigint,timestamptz,oid,timestamptz,uuid,text,bigint,bytea,boolean,timestamptz,timestamptz),fence_fleet_observation(uuid,bigint,timestamptz,oid,timestamptz) TO fleet_observe_runtime;
 
 CREATE ROLE context_verify_runtime LOGIN PASSWORD 'synthetic-context-verify'; GRANT CONNECT ON DATABASE custody_test TO context_verify_runtime; GRANT USAGE ON SCHEMA public TO context_verify_runtime;
 GRANT SELECT ON goose_db_version,permission_stream,authority_audit,context_capture,custody_pool,custody_allocation,custody_attempt,custody_copy,context_verification TO context_verify_runtime;
@@ -277,8 +276,7 @@ GRANT UPDATE(source_uid) ON download_worker_configuration TO worker_routing_read
 
 -- Effective recovery is computed from this PostgreSQL process/database.
 -- Runtime roles cannot set either activation field or mutate the derived flag.
-GRANT UPDATE(installation_id) ON fleet_current_trust TO fleet_observe_runtime;
-GRANT SELECT ON fleet_current_trust TO capture_runtime,context_publish_runtime,context_verify_runtime,download_key_bind_runtime,download_key_read_runtime,download_runtime,download_worker_identity_runtime,download_worker_runtime,fleet_observe_runtime,local_keys_runtime,owner_configuration_audit_runtime,owner_configuration_read_runtime,owner_configuration_runtime,owner_enrollment_activate_runtime,owner_enrollment_read_runtime,owner_enrollment_runtime,peer_read_runtime,policy_accept_runtime,policy_read_runtime,worker_configuration_audit_runtime,worker_configuration_read_runtime,worker_configuration_runtime,worker_enrollment_activate_runtime,worker_enrollment_runtime,worker_owner_runtime,worker_routing_read_runtime;
+GRANT SELECT ON fleet_current_trust TO capture_runtime,context_publish_runtime,context_verify_runtime,download_key_bind_runtime,download_key_read_runtime,download_runtime,download_worker_identity_runtime,download_worker_runtime,local_keys_runtime,owner_configuration_audit_runtime,owner_configuration_read_runtime,owner_configuration_runtime,owner_enrollment_activate_runtime,owner_enrollment_read_runtime,owner_enrollment_runtime,peer_read_runtime,policy_accept_runtime,policy_read_runtime,worker_configuration_audit_runtime,worker_configuration_read_runtime,worker_configuration_runtime,worker_enrollment_activate_runtime,worker_enrollment_runtime,worker_owner_runtime,worker_routing_read_runtime;
 
 -- Private passive previews: no evidence, admission, audit or key authority.
 CREATE ROLE context_preview_runtime LOGIN PASSWORD 'synthetic-context-preview';

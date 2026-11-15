@@ -150,7 +150,7 @@ func TestAdmittedWorkerIdentityUsesAdmissionWithoutRenewingHumanAuthority(t *tes
 		}
 		return nil
 	})
-	want := []string{"ReadFleetTrust", "CurrentTime", "LockDownloadSession", "ShareWorkerConfiguration", "ReadWorkerConfigurationRevision", "CurrentTime", "LockDownloadWorker", "LatestDownloadWorker", "CurrentTime", "CurrentTime"}
+	want := []string{"ReadFleetTrust", "LockDownloadSession", "ShareWorkerConfiguration", "ReadWorkerConfigurationRevision", "CurrentTime", "LockDownloadWorker", "LatestDownloadWorker", "CurrentTime", "CurrentTime"}
 	if err != nil || effects != 1 || !slices.Equal(rows.calls, want) {
 		t.Fatalf("identity enrollment: err=%v effects=%d calls=%v", err, effects, rows.calls)
 	}
@@ -333,7 +333,7 @@ func TestAdmittedWorkerIdentityUsesExactQueryParentWithoutPublicCall(t *testing.
 				return nil
 			})
 			if mode == "valid" {
-				want := []string{"ReadFleetTrust", "CurrentTime", "LockContextQuery", "ShareWorkerConfiguration", "ReadWorkerConfigurationRevision", "CurrentTime", "LockDownloadWorker", "CurrentTime", "CurrentTime"}
+				want := []string{"ReadFleetTrust", "LockContextQuery", "ShareWorkerConfiguration", "ReadWorkerConfigurationRevision", "CurrentTime", "LockDownloadWorker", "CurrentTime", "CurrentTime"}
 				if err != nil || effects != 1 || !slices.Equal(rows.calls, want) {
 					t.Fatal("query identity failed or requested public authority", err, effects, rows.calls)
 				}
