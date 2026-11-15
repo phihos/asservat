@@ -87,7 +87,7 @@ CREATE OR REPLACE FUNCTION capacity_apply(r uuid,cluster uuid,namespace_uid text
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
 DECLARE s public.capacity_settings;installation uuid:=(q->'RootBacking'->>'InstallationID')::uuid;i jsonb:=q->'RootBacking';b jsonb:=q->'Backends'->0;
  standing timestamptz:=public.capacity_standing();pool uuid;available bigint;prefix text;oids oid[]:='{}';o oid;k integer;lane_name text;lane jsonb;stop jsonb;slots bigint:=100000;
- retire timestamptz;
+ retire timestamptz;share bigint;
 BEGIN
  IF r IS NULL OR installation IS NULL OR (i->>'RootID')::uuid IS DISTINCT FROM r OR jsonb_array_length(q->'Backends')<>1 OR
   (v->>'EvidenceBytes')::bigint IS NULL OR (v->>'LimitBytes')::bigint IS NULL THEN RAISE EXCEPTION 'capacity settings invalid' USING ERRCODE='23514';END IF;
@@ -128,10 +128,20 @@ BEGIN
   IF q ? 'ContextQuery' THEN PERFORM public.ensure_shared_context_query_capacity(r);END IF;
  ELSE
   available:=(v->>'EvidenceBytes')::bigint-(v->>'ReserveBytes')::bigint;
-  UPDATE public.custody_pool SET byte_limit=GREATEST(available,allocated_bytes) WHERE id=s.pool_id;
+  PERFORM 1 FROM public.custody_pool WHERE id=s.pool_id FOR UPDATE;
   UPDATE public.capacity_settings SET evidence_bytes=(v->>'EvidenceBytes')::bigint,reserve_bytes=(v->>'ReserveBytes')::bigint,share_bytes=NULLIF((v->>'ShareBytes')::bigint,0),limit_bytes=(v->>'LimitBytes')::bigint,
    namespace_limit_bytes=NULLIF((v->>'NamespaceLimitBytes')::bigint,0),max_concurrent_expensive=(v->>'MaxConcurrentExpensive')::integer,on_full=v->>'OnFull',revision=revision+1
    WHERE root_id=r RETURNING * INTO s;
+  -- ADR-335 D2/D3: a helm upgrade carries the new share to every enrolled
+  -- account. A lower share never drops below the bytes already charged; those
+  -- stay used and capacity_charge refuses new charges above the hard limit.
+  SELECT count(*) INTO slots FROM public.capacity_account WHERE root_id=r;
+  share:=COALESCE(s.share_bytes,available/GREATEST(8,slots));
+  UPDATE public.capacity_account SET protected_bytes=share WHERE root_id=r;
+  UPDATE public.custody_allocation a SET byte_limit=GREATEST(a.charged_bytes,share)
+   FROM public.capacity_account c WHERE c.allocation_id=a.id AND c.root_id=r;
+  UPDATE public.custody_pool SET allocated_bytes=(SELECT COALESCE(sum(a.byte_limit),0) FROM public.custody_allocation a WHERE a.pool_id=s.pool_id) WHERE id=s.pool_id;
+  UPDATE public.custody_pool SET byte_limit=GREATEST(available,allocated_bytes) WHERE id=s.pool_id;
  END IF;
  RETURN jsonb_build_object('Qualification',s.qualification,'Revision',s.revision);
 END $$;

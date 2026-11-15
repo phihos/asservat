@@ -26,7 +26,7 @@ func TestPolicyMetadataBackingWithRealPostgres(t *testing.T) {
 	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects) {
 		profile := nativeCapacityProfile()
 		f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, func(f *capacitySQLFixture) {
-			policyMetadataProfile(&f.qualification, &f.template)
+			policyMetadataProfile(&f.qualification, &f.values)
 		})
 		root, enrollment := f.setup(t)
 		stop := f.keepFleetCurrent()
@@ -135,7 +135,7 @@ func TestPolicyMetadataBackingWithRealPostgres(t *testing.T) {
 	})
 }
 
-func policyMetadataProfile(q *app.CapacityQualification, snapshot *app.CapacitySnapshot) {
+func policyMetadataProfile(q *app.CapacityQualification, values *app.CapacityValues) {
 	profile := nativeCapacityProfile()
 	// Match the actual installed metadata/copy profile. The pre-existing
 	// fixture still has THREE incident slots, explicitly not native's FOUR.
@@ -146,12 +146,7 @@ func policyMetadataProfile(q *app.CapacityQualification, snapshot *app.CapacityS
 	// Keep exactly three records/native children. Bytes can cover PCAPNG;
 	// objects remain the independent three-record ceiling (no row increase).
 	bytes := (artifact.Registration{NativeLimit: artifact.RecordingNativeLimit}).ReservedBytes() * 3
-	budget := (*snapshot).Policies[0].Budget
-	budget.Protected.Bytes = bytes
-	budget.Hard.Bytes = bytes
-	budget.Context.Bytes = bytes
-	budget.NamespaceMaximum.Bytes = bytes * budget.NamespaceAccounts
-	(*snapshot).Pools[0].Budget.Slots[0].Protected.Bytes = bytes
+	values.ShareBytes, values.LimitBytes = bytes, bytes
 }
 
 // Convert one NEW pod-status seed into a NEW packet case before compilation.

@@ -94,13 +94,14 @@ func capacityValues(c contracts.CapacityValues) (app.CapacityValues, error) {
 		return out, err
 	}
 	if out.LimitBytes == 0 {
-		out.LimitBytes = out.EvidenceBytes / 10
+		// Default 10%, never below an explicit share.
+		out.LimitBytes = max(out.EvidenceBytes/10, out.ShareBytes)
 	}
 	if out.NamespaceLimitBytes, err = bytes(c.NamespaceLimit); err != nil {
 		return out, err
 	}
 	if !out.SettingsValid() {
-		return out, fmt.Errorf("%w: workload share above the usable evidence storage", errHubWorkerCapacityConfig)
+		return out, fmt.Errorf("%w: workload share above its limit or the usable evidence storage", errHubWorkerCapacityConfig)
 	}
 	return out, nil
 }

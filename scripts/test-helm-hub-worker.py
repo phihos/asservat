@@ -180,6 +180,13 @@ class HubWorkerChart(unittest.TestCase):
             self.assertEqual(files[path], ("asservat-provider-roots", key))
         self.assertEqual(json.loads(w["asservat-fleet"]["data"]["fleet.json"])["clients"], ["console"])
 
+    def test_capacity_share_above_limit_refused(self):
+        values = copy.deepcopy(self.bundled)
+        values["capacity"] = {"evidenceStorage": "128Gi", "workload": {"share": "16Gi", "limit": "10%"}}
+        self.assertIn("capacity.workload.share must not exceed capacity.workload.limit", self.render(values, ok=False))
+        values["capacity"]["workload"]["limit"] = "20%"
+        self.render(values)
+
     def test_capacity_cleanup_deletion_and_retention(self):
         values = copy.deepcopy(self.bundled)
         values["capacity"] = {"evidenceStorage": "8Gi", "workload": {"share": "256Mi"}}
