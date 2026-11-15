@@ -94,13 +94,9 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 	}
 	clear(b)
 	ctx := context.Background()
-	if native != nil || os.Getenv("ASSERVAT_CONNECTOR_RETIREMENT_REALTIME") == "1" {
-		limit := 3 * time.Minute
-		if os.Getenv("ASSERVAT_CONNECTOR_RETIREMENT_REALTIME") == "1" {
-			limit = 39 * time.Minute
-		}
+	if native != nil {
 		var stop context.CancelFunc
-		ctx, stop = context.WithTimeout(ctx, limit)
+		ctx, stop = context.WithTimeout(ctx, 3*time.Minute)
 		defer stop()
 	}
 	admin, err := pgxpool.New(ctx, f.Postgres)

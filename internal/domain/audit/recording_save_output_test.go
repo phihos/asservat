@@ -1,16 +1,14 @@
 package audit
 
 import (
-	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/identity"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/domain/artifact"
 )
 
 func TestRecordingSavePreviewOutputCountIsNamedAndFinite(t *testing.T) {
-	in := connectorAuditIntent()
-	in.Name, in.InputFormat, in.Peer = "preview_recording_save", "context-input/v1", nil
-	in.Actor = identity.Principal{Issuer: "https://identity.invalid", Subject: "maintainer", ClientID: "console", Kind: identity.Human}
+	in := humanAuditIntent("preview_recording_save", "context-input/v1")
 	out := OperationOutcome{Intent: in, Status: "success", Reason: "prepared", Effect: "none", ClientReceipt: "unknown", OutputDigest: artifact.Digest{4}, OutputBytes: OperationRecordingSavePreviewOutputLimit, MetadataUntil: in.RequestUntil, RecordedAt: in.CreatedAt.Add(time.Second)}
 	if !out.Valid() {
 		t.Fatal("named128KiB metadata count refused")

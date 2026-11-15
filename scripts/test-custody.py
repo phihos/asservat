@@ -16,8 +16,6 @@ ROOT = Path(__file__).resolve().parents[1]
 POSTGRES = "postgres@sha256:afc7e2d441324c0388fa80c3d24f733b4194a4eb7f47dd8ee2b08eb1a24a647c"
 BAO = "quay.io/openbao/openbao@sha256:6d2b93856e3fcf7b18ad855a0b51eaba474dc8b79cf554379ea32034797d2acf"
 SEAWEED = "chrislusf/seaweedfs@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d"
-CONNECTOR_RETIREMENT_TEST = "TestContextAdmissionWithRealServices/connector-identity-real-time-retirement"
-CONNECTOR_RETIREMENT_ENV = "ASSERVAT_CONNECTOR_RETIREMENT_REALTIME"
 SCOPED_AUDIT_ENV = "ASSERVAT_SCOPED_AUDIT_STORAGE"
 SCOPED_AUDIT_ID = "a9a9b231-0d4c-4d72-89aa-1a4516be9e9c"
 SCOPED_AUDIT_BUCKET = "synthetic-scoped-audit"
@@ -99,23 +97,17 @@ def passed_test_names(output, pattern):
         names = [name for name in names if "/" in name]
     return names
 
-def passed_test_elapsed(output, name):
-    """Require the selected Go test's duration, excluding compilation/startup."""
-    matches = re.findall(r"^\s*--- PASS: " + re.escape(name) + r" \(([0-9]+(?:\.[0-9]+)?)s\)$", output, re.MULTILINE)
-    return float(matches[0]) if len(matches) == 1 else None
 
-def main(fleet=False, test_pattern=None, connector_retirement=False, scoped_audit=False, owner_audit_inventory=False, result_name=None, native_statistics=False):
-    if native_statistics and (test_pattern != "^TestNativePacingSQLWithRealPostgres$" or any((fleet, connector_retirement, scoped_audit, owner_audit_inventory))):
+def main(fleet=False, test_pattern=None, scoped_audit=False, owner_audit_inventory=False, result_name=None, native_statistics=False):
+    if native_statistics and (test_pattern != "^TestNativePacingSQLWithRealPostgres$" or any((fleet, scoped_audit, owner_audit_inventory))):
         raise ValueError("Native statistics owns its exact SQL-only fixture/test selection")
     installed_evidence_delete = installed_evidence_delete_selection(test_pattern)
-    if installed_evidence_delete and (fleet or connector_retirement or scoped_audit or owner_audit_inventory):
+    if installed_evidence_delete and (fleet or scoped_audit or owner_audit_inventory):
         raise ValueError("Installed evidence deletion owns its exact fixture/test selection")
-    if owner_audit_inventory and (fleet or test_pattern or connector_retirement or scoped_audit):
+    if owner_audit_inventory and (fleet or test_pattern or scoped_audit):
         raise ValueError("Owner audit inventory owns its exact fixture/test selection")
-    if scoped_audit and (fleet or test_pattern or connector_retirement):
+    if scoped_audit and (fleet or test_pattern):
         raise ValueError("Scoped audit qualification owns its exact fixture/test selection")
-    if connector_retirement and (fleet or test_pattern):
-        raise ValueError("Connector retirement owns its exact fixture/test selection")
     cache = Path.home()/".cache/asservat-build"
     cache.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="custody-", dir=cache) as temp:
@@ -188,15 +180,12 @@ def main(fleet=False, test_pattern=None, connector_retirement=False, scoped_audi
             env = os.environ.copy()
             # An inherited opt-in must never lengthen an ordinary suite or a
             # caller-selected test into a 31-minute qualification unexpectedly.
-            env.pop(CONNECTOR_RETIREMENT_ENV, None)
             env.pop(SCOPED_AUDIT_ENV, None)
             env.pop(OWNER_AUDIT_INVENTORY_ENV, None)
             if owner_audit_inventory:
                 env[OWNER_AUDIT_INVENTORY_ENV] = "1"
             if scoped_audit:
                 env[SCOPED_AUDIT_ENV] = "1"
-            if connector_retirement:
-                env[CONNECTOR_RETIREMENT_ENV] = "1"
             env.update({"GOOSE_DRIVER": "postgres", "GOOSE_DBSTRING": dsn, "TMPDIR": str(work)})
             report["gooseVersion"] = run([goose, "-version"])
             report["migration"] = run([goose, "-dir", str(ROOT/"migrations"), "up"], env=env)
@@ -225,9 +214,6 @@ def main(fleet=False, test_pattern=None, connector_retirement=False, scoped_audi
                 report["scope"] = "read-only exact historical owner audit physical inventory with LIST-only scoped credentials and independent exact byte/count checks; no installed reserve, retirement, release or complete pagination qualification"
             if installed_evidence_delete:
                 report["scope"] = "actual pinned S3 List-only evidence cleaner permissions: scoped inventory, administrator-upload abort and version/marker deletion, with read/write/configuration and foreign-prefix denial; synthetic fixture provisioning, no installed lifecycle, accounting or capacity qualification"
-            if connector_retirement:
-                pattern = "^TestContextAdmissionWithRealServices$/^connector-identity-real-time-retirement$"
-                report["scope"] = "connector identity retirement with configured 30-second ordinary admission, original 30-minute process/certificate lifetime and 2100-second retention; synthetic protected source/proof setup, no maximum admission-window, installed connector or provider migration qualification"
             report["testPattern"] = pattern
             # The full growing component matrix exceeded its original aggregate
             # two-minute limit while individual bounded cases were still passing.
@@ -245,9 +231,8 @@ def main(fleet=False, test_pattern=None, connector_retirement=False, scoped_audi
             # (context admission 806.77 seconds, the 256 MiB custody case still
             # running; 2026-10-27). Full and targeted aggregate runs get 1050
             # seconds, keeping them within 20 minutes; CI shards stay far below it.
-            full_custody = not (fleet or connector_retirement or scoped_audit or owner_audit_inventory)
-            test_timeout = 2400 if connector_retirement else (1050 if full_custody else 300)
-            report["connectorRetirementRealtime"] = connector_retirement
+            full_custody = not (fleet or scoped_audit or owner_audit_inventory)
+            test_timeout = 1050 if full_custody else 300
             report["goTestTimeoutSeconds"] = test_timeout
             report["harnessTestTimeoutSeconds"] = test_timeout + 60
             report["phases"] = []
@@ -269,12 +254,6 @@ def main(fleet=False, test_pattern=None, connector_retirement=False, scoped_audi
                 if exit_code == 0 and not passed:
                     print("No selected tests passed; refusing empty integration evidence", flush=True)
                     exit_code = 1
-                if connector_retirement:
-                    selected_elapsed = passed_test_elapsed(log_path.read_text(), CONNECTOR_RETIREMENT_TEST)
-                    phase_report["selectedTestElapsedSeconds"] = selected_elapsed
-                    if exit_code == 0 and (CONNECTOR_RETIREMENT_TEST not in passed or test_elapsed < 1860 or selected_elapsed is None or selected_elapsed < 1860):
-                        print("Missing exact real-time retirement pass or actual 31-minute test interval", flush=True)
-                        exit_code = 1
                 if owner_audit_inventory and exit_code == 0 and OWNER_AUDIT_INVENTORY_TEST not in passed:
                     print("Missing exact owner inventory top-level pass", flush=True)
                     exit_code = 1
@@ -323,7 +302,6 @@ def main(fleet=False, test_pattern=None, connector_retirement=False, scoped_audi
 if __name__ == "__main__":
     parser=argparse.ArgumentParser()
     parser.add_argument("--fleet",action="store_true")
-    parser.add_argument("--connector-retirement",action="store_true",help="Opt in to actual connector retirement timing (at least 31 minutes; 40-minute Go budget)")
     parser.add_argument("--scoped-audit", action="store_true", help="Qualify prefix-scoped immutable audit versions and independent retirement")
     parser.add_argument("--owner-audit-inventory", action="store_true", help="Qualify read-only historical owner audit version/marker/upload inventory")
     parser.add_argument("--native-statistics", action="store_true", help="Owned PostgreSQL-only numeric statistics case; requires its exact --run selection")
@@ -332,10 +310,9 @@ if __name__ == "__main__":
     parser.add_argument("--result-name", help="test/results file prefix, so two local runs (for example two shards) do not share a log")
     args=parser.parse_args()
     if args.shard:
-        if args.run or args.fleet or args.connector_retirement or args.scoped_audit or args.owner_audit_inventory or args.native_statistics: parser.error("--shard owns its exact test selection")
+        if args.run or args.fleet or args.scoped_audit or args.owner_audit_inventory or args.native_statistics: parser.error("--shard owns its exact test selection")
         args.run, args.result_name = CUSTODY_SHARDS[args.shard], args.result_name or "custody-" + args.shard
     if args.result_name and not re.fullmatch(r"[a-z0-9][a-z0-9-]*", args.result_name): parser.error("--result-name must be lowercase letters, digits and hyphens")
-    if args.connector_retirement and (args.fleet or args.run): parser.error("--connector-retirement owns its exact long-fixture selection")
-    if args.scoped_audit and (args.fleet or args.run or args.connector_retirement): parser.error("--scoped-audit owns its exact fixture/test selection")
-    if args.owner_audit_inventory and (args.fleet or args.run or args.connector_retirement or args.scoped_audit): parser.error("--owner-audit-inventory owns its exact fixture/test selection")
-    raise SystemExit(main(args.fleet, args.run, args.connector_retirement, args.scoped_audit, args.owner_audit_inventory, args.result_name, args.native_statistics))
+    if args.scoped_audit and (args.fleet or args.run): parser.error("--scoped-audit owns its exact fixture/test selection")
+    if args.owner_audit_inventory and (args.fleet or args.run or args.scoped_audit): parser.error("--owner-audit-inventory owns its exact fixture/test selection")
+    raise SystemExit(main(args.fleet, args.run, args.scoped_audit, args.owner_audit_inventory, args.result_name, args.native_statistics))

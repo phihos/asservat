@@ -160,13 +160,6 @@ func (f *packetMetadataFixture) Covering(ctx context.Context, _ identities.Curre
 	}
 	return auth.Grant{ID: metadataID(44), ExpiresAt: until}, until, nil
 }
-func (f *packetMetadataFixture) ReadConnectorIdentitySource(ctx context.Context) (fleet.ConnectorIdentitySource, error) {
-	if ctx.Err() != nil {
-		return fleet.ConnectorIdentitySource{}, fleet.ErrUnavailable
-	}
-	now := time.Now()
-	return fleet.ConnectorIdentitySource{Observation: fleet.ConnectorCredentialObservation{ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}}, nil
-}
 func (f *packetMetadataFixture) ResolvePod(ctx context.Context, r targets.Request) (targets.PodResolution, error) {
 	return f.api.ResolvePod(ctx, r)
 }

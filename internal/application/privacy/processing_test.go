@@ -247,7 +247,7 @@ func TestProcessingReleaseUsesReservedLaneAndActualHuman(t *testing.T) {
 	}
 }
 func TestProcessingReleaseRejectsPublicOrWrongPrivateQualification(t *testing.T) {
-	for _, layout := range []string{auditvalue.OperationVerificationHistoryLayout, auditvalue.ConnectorOperationHistoryLayout} {
+	for _, layout := range []string{auditvalue.OperationVerificationHistoryLayout} {
 		f, s, c := newProcessingFixture(t)
 		s.ReleaseAudit = f
 		p := s.AuditPolicy

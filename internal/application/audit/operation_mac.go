@@ -1,16 +1,16 @@
 package audit
 
 import (
-	"asservat.local/asservat/internal/domain/artifact"
-	auditvalue "asservat.local/asservat/internal/domain/audit"
-	"asservat.local/asservat/internal/domain/authorization"
-	"asservat.local/asservat/internal/domain/fleet"
-	"asservat.local/asservat/internal/domain/identity"
 	"crypto/hmac"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/json"
 	"sync"
+
+	"asservat.local/asservat/internal/domain/artifact"
+	auditvalue "asservat.local/asservat/internal/domain/audit"
+	"asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/identity"
 )
 
 // OperationMAC keeps stable account identity separate from rotatable input/output
@@ -69,7 +69,7 @@ func (m *OperationMAC) RecordingSavePreviewResultDigest(b []byte) (artifact.Dige
 }
 
 func (m *OperationMAC) digest(domain string, b []byte, limit int) (artifact.Digest, error) {
-	if m == nil || len(b) > limit || (domain != "context-query-input/v1" && domain != "native-content-input/v1" && domain != "native-content-result/v1" && domain != "context-input/v1" && domain != "invalid-input/v1" && domain != "mcp-result/v1" && domain != "operation-error/v1" && domain != "principal/v1" && domain != "processing-input/v1" && domain != "processing-result/v1" && domain != "capture-intent/v2" && domain != "capture-intent-reason/v1" && domain != "capture-intent-result/v1" && domain != "connector-retirement/v1" && domain != "connector-backing/v1" && domain != "connector-process/v1" && domain != "connector-credential/v1" && domain != "connector-result/v1") {
+	if m == nil || len(b) > limit || (domain != "context-query-input/v1" && domain != "native-content-input/v1" && domain != "native-content-result/v1" && domain != "context-input/v1" && domain != "invalid-input/v1" && domain != "mcp-result/v1" && domain != "operation-error/v1" && domain != "principal/v1" && domain != "processing-input/v1" && domain != "processing-result/v1" && domain != "capture-intent/v2" && domain != "capture-intent-reason/v1" && domain != "capture-intent-result/v1") {
 		return artifact.Digest{}, ErrUnavailable
 	}
 	m.mu.Lock()
@@ -102,34 +102,6 @@ func (m *OperationMAC) Principal(p identity.Principal) (artifact.Digest, error) 
 	}
 	defer clear(b)
 	return m.Digest("principal/v1", b)
-}
-
-// ConnectorAccount keeps one charged account across leaf, process and issuer
-// rotation. It does not admit a peer or a signing operation. The new purpose has
-// its own domain separator; a human account can never collide by choosing names.
-func (m *OperationMAC) ConnectorAccount(p fleet.PeerBinding) (artifact.Digest, error) {
-	if m == nil || !p.Valid() || p.Role != fleet.ConnectorPeer {
-		return artifact.Digest{}, ErrUnavailable
-	}
-	b, e := json.Marshal(struct {
-		InstallationID, ClusterID, PeerID string
-		Role                              fleet.PeerRole
-	}{p.InstallationID, p.ClusterID, p.PeerID, p.Role})
-	if e != nil {
-		return artifact.Digest{}, ErrUnavailable
-	}
-	defer clear(b)
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if len(m.accountKey) != 32 {
-		return artifact.Digest{}, ErrUnavailable
-	}
-	h := hmac.New(sha256.New, m.accountKey)
-	_, _ = h.Write([]byte("asservat-operation-audit/connector-account/v1\x00"))
-	_, _ = h.Write(b)
-	var d artifact.Digest
-	copy(d[:], h.Sum(nil))
-	return d, nil
 }
 
 // ProcessingAccount reserves capacity for a fixed rule, independently of which

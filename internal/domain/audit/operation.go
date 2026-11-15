@@ -1,11 +1,12 @@
 package audit
 
 import (
+	"slices"
+	"time"
+
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
-	"slices"
-	"time"
 )
 
 const OperationCipherLimit = 64 << 10
@@ -39,8 +40,6 @@ func OperationLane(name string) string {
 	switch name {
 	case "persist_capture_intent":
 		return "capture"
-	case "connector_client_certificate", "connector_server_certificate", "connector_process_enrollment", "connector_backing_acceptance", "connector_retirement":
-		return "identity"
 	case "initialize_processing", "restrict_processing", "request_early_erasure":
 		return "normal"
 	case "release_processing":
@@ -96,11 +95,7 @@ func (r OperationIntent) requestWindow() time.Duration {
 type OperationIntent struct {
 	ReasonEnvelope                                                     *CaptureReasonEnvelope `json:",omitempty"`
 	ID, RootID, TraceID, Name, InputFormat, MACVersion, AccountVersion string
-	Actor                                                              identity.Principal              `json:",omitzero"`
-	Peer                                                               *OperationPeerActor             `json:",omitempty"`
-	Process                                                            *OperationConnectorProcessActor `json:",omitempty"`
-	ConnectorReservations                                              *ConnectorRetirementSet         `json:",omitempty"`
-	RetirementOrigin                                                   *ConnectorRetirementOrigin      `json:",omitempty"`
+	Actor                                                              identity.Principal `json:",omitzero"`
 	PrincipalDigest, InputDigest                                       artifact.Digest
 	CreatedAt, RequestUntil, WriteUntil, RetainUntil                   time.Time
 	Lifecycle                                                          *OperationLifecycleBinding `json:",omitempty"`
@@ -114,7 +109,7 @@ func (r OperationIntent) Valid() bool {
 		}
 	}
 	return (r.Lifecycle == nil || r.Lifecycle.Valid(r)) && authorization.UUID(r.ID) && authorization.UUID(r.RootID) && authorization.UUID(r.TraceID) && OperationLane(r.Name) != "" &&
-		r.actorValid() && r.connectorReservationsValid() && r.capturePayloadValid() && identity.Text(r.MACVersion, 64) && identity.Text(r.AccountVersion, 64) &&
+		r.Actor.Valid() && humanOperationInputValid(r.Name, r.InputFormat) && r.capturePayloadValid() && identity.Text(r.MACVersion, 64) && identity.Text(r.AccountVersion, 64) &&
 		r.PrincipalDigest != (artifact.Digest{}) && r.InputDigest != (artifact.Digest{}) &&
 		identity.Fresh(r.CreatedAt, r.RequestUntil, r.CreatedAt, r.requestWindow()) && r.WriteUntil.After(r.CreatedAt) && !r.WriteUntil.After(r.CreatedAt.Add(30*time.Second)) &&
 		!r.RequestUntil.After(r.WriteUntil) && r.RetainUntil.After(r.WriteUntil) && !r.RetainUntil.After(r.CreatedAt.Add(3660*24*time.Hour))
@@ -129,7 +124,6 @@ type OperationOutcome struct {
 	OutputDigest                          artifact.Digest
 	OutputBytes                           int64
 	MetadataUntil, RecordedAt             time.Time
-	Credential                            *OperationCredentialOutcome `json:",omitempty"`
 }
 
 func (r OperationOutcome) Valid() bool {
@@ -140,10 +134,10 @@ func (r OperationOutcome) Valid() bool {
 		r.MetadataUntil.Before(r.Intent.CreatedAt) || r.MetadataUntil.After(r.Intent.RequestUntil) {
 		return false
 	}
-	if !r.credentialValid() || !r.captureOutcomeValid() {
+	if !r.captureOutcomeValid() {
 		return false
 	}
-	if r.Effect != "none" && !r.Intent.connectorOperation() && !r.Intent.processingOperation() && r.Intent.Name != "persist_capture_intent" && r.Intent.Name != "cancel_capture" && r.Intent.Name != "request_capture" && r.Intent.Name != "resolve_capture_request" && r.Intent.Name != "prepare_artifact_download" && r.Intent.Name != "get_file_excerpt" && r.Intent.Name != "get_http_headers" && r.Intent.Name != "get_profile_summary" && r.Intent.Name != "get_pcap_summary" && r.Intent.Name != "pcap_query" && r.Intent.Name != "compare_profiles" && r.Intent.Name != "get_syscall_summary" && r.Intent.Name != "get_syscall_events" && r.Intent.Name != "get_logs" && r.Intent.Name != "syscall_query" && r.Intent.Name != "get_query_result" && r.Intent.Name != "activate_policy" && r.Intent.Name != "deactivate_policy" && r.Intent.Name != "create_share" && r.Intent.Name != "revoke_share" && r.Intent.Name != "transfer_share" && r.Intent.Name != "stop_future_sharing" && r.Intent.Name != "decide_review" && r.Intent.Name != "revoke_grant" && r.Intent.Name != "request_policy_grant" && r.Intent.Name != "request_raw_access" && r.Intent.Name != "open_live_watch" && r.Intent.Name != "read_live_watch" && r.Intent.Name != "update_live_watch" && r.Intent.Name != "close_live_watch" {
+	if r.Effect != "none" && !r.Intent.processingOperation() && r.Intent.Name != "persist_capture_intent" && r.Intent.Name != "cancel_capture" && r.Intent.Name != "request_capture" && r.Intent.Name != "resolve_capture_request" && r.Intent.Name != "prepare_artifact_download" && r.Intent.Name != "get_file_excerpt" && r.Intent.Name != "get_http_headers" && r.Intent.Name != "get_profile_summary" && r.Intent.Name != "get_pcap_summary" && r.Intent.Name != "pcap_query" && r.Intent.Name != "compare_profiles" && r.Intent.Name != "get_syscall_summary" && r.Intent.Name != "get_syscall_events" && r.Intent.Name != "get_logs" && r.Intent.Name != "syscall_query" && r.Intent.Name != "get_query_result" && r.Intent.Name != "activate_policy" && r.Intent.Name != "deactivate_policy" && r.Intent.Name != "create_share" && r.Intent.Name != "revoke_share" && r.Intent.Name != "transfer_share" && r.Intent.Name != "stop_future_sharing" && r.Intent.Name != "decide_review" && r.Intent.Name != "revoke_grant" && r.Intent.Name != "request_policy_grant" && r.Intent.Name != "request_raw_access" && r.Intent.Name != "open_live_watch" && r.Intent.Name != "read_live_watch" && r.Intent.Name != "update_live_watch" && r.Intent.Name != "close_live_watch" {
 		return false
 	}
 	if r.Status != "success" && (len(r.CaseIDs) > 0 || len(r.ArtifactIDs) > 0 || len(r.CaptureIDs) > 0) {
@@ -178,4 +172,25 @@ type OperationSnapshot struct {
 	IntentStarted, OutcomeStarted bool
 	IntentReceipt, OutcomeReceipt *Receipt
 	Outcome                       *OperationOutcome
+}
+
+// Closed internal classification, separate from public tool discovery. Keeping
+// this branch explicit prevents a private peer operation accepting human data.
+func humanOperationInputValid(name, format string) bool {
+	switch name {
+	case "get_file_excerpt", "get_http_headers", "get_profile_summary", "get_pcap_summary", "pcap_query", "compare_profiles", "get_syscall_summary", "get_syscall_events", "syscall_query", "get_logs", "get_query_result":
+		return format == "context-query-input/v1"
+	case "search_processing_evidence", "get_processing_erasure", "get_processing_report":
+		return format == "context-input/v1"
+	case "download_artifact_content":
+		return format == "native-content-input/v1"
+	case "persist_capture_intent":
+		return format == CaptureOperationInputFormat || format == CaptureReasonInputFormat
+	case "initialize_processing", "restrict_processing", "release_processing", "request_early_erasure":
+		return format == "processing-input/v1"
+	case "cancel_capture", "list_recordings", "preview_recording_save", "list_diagnostics", "preview_capture", "request_capture", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "resolve_capture_request", "invalid_operation", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "preview_retention_change", "get_grant", "list_reviews", "decide_review", "revoke_grant", "request_policy_grant", "request_raw_access", "list_capture_profiles", "get_capture_profile", "list_live_sources", "open_live_watch", "read_live_watch", "update_live_watch", "close_live_watch":
+		return format == "context-input/v1" || format == "invalid-input/v1"
+	default:
+		return false
+	}
 }

@@ -5,14 +5,11 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/identity"
 )
 
 func TestContextQueryAuditNamesFormatsAndEffects(t *testing.T) {
 	for _, name := range []string{"get_file_excerpt", "get_http_headers", "get_profile_summary", "get_pcap_summary", "pcap_query", "compare_profiles", "get_syscall_summary", "get_syscall_events", "syscall_query", "get_query_result"} {
-		in := connectorAuditIntent()
-		in.Name, in.InputFormat, in.Peer = name, "context-query-input/v1", nil
-		in.Actor = identity.Principal{Issuer: "https://identity.invalid", Subject: "reader", ClientID: "console", Kind: identity.Human}
+		in := humanAuditIntent(name, "context-query-input/v1")
 		if OperationLane(name) != "normal" || !in.Valid() {
 			t.Fatalf("query audit rejected: %s", name)
 		}

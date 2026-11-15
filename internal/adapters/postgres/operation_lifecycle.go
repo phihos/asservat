@@ -16,7 +16,6 @@ import (
 // finalizer credentials. No facet provisions policy or capacity.
 type OperationLifecycles struct {
 	journal      *OperationJournal
-	connector    bool
 	capture      bool
 	worker       bool
 	captureScope captureLifecycleScope
@@ -183,9 +182,6 @@ func (s *OperationLifecycles) transaction(ctx context.Context, operation string,
 			return e
 		}
 		if s.capture && !s.captureScope.matches(state.Intent) || s.worker && !s.captureScope.matchesWorker(state.Intent) {
-			return app.ErrUnavailable
-		}
-		if s.connector && !sameAuditJSON(state.Intent.Lifecycle.Policy, *j.lifecycle) {
 			return app.ErrUnavailable
 		}
 		incarnation, e := q.ReadContextDatabaseIncarnation(ctx, id(j.installation))

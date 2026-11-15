@@ -1,9 +1,10 @@
 package audit
 
 import (
-	"asservat.local/asservat/internal/domain/artifact"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/domain/artifact"
 )
 
 func TestOperationVerificationQualificationIsVersionedAndPrepaid(t *testing.T) {
@@ -108,7 +109,6 @@ func TestShareBusinessWALIsPrepaidPerGenerationAndCopy(t *testing.T) {
 	}{
 		{OperationHistoryLayout, 16}, {OperationOverdueHistoryLayout, 19}, {OperationVerificationHistoryLayout, 21},
 		{CaptureOperationHistoryLayout, 32}, {ShareCaptureOperationHistoryLayout, 34}, {ProcessingReleaseHistoryLayout, 32},
-		{ConnectorOperationHistoryLayout, 32}, {ConnectorRetirementHistoryLayout, 40},
 	} {
 		q.Layout = tc.layout
 		_, got := q.SlotBacking(4)

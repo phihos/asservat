@@ -3,14 +3,10 @@ package integration
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"os"
 	"strconv"
 	"testing"
-	"time"
 
-	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgxpool"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -19,55 +15,6 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/utils/ptr"
 )
-
-// One read-only snapshot of this exact bootstrap/peer names the last durable
-// checkpoint. Only fixed labels, booleans and counts leave SQL: never records,
-// identifiers, credentials, certificate bytes, payload digests or raw errors.
-func regionalEnrollmentDiagnostics(t *testing.T, ctx context.Context, admin *pgxpool.Pool, installation, root, peer string) {
-	t.Helper()
-	call, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-	var state []byte
-	err := admin.QueryRow(call, `WITH
- profile AS (SELECT accepted_id,suspended,fenced,blocked FROM connector_identity_profile WHERE root_id=$2 AND peer_id=$3),
- processes AS (SELECT id,accepted_at,serving,retired_at,run_until FROM connector_identity_process WHERE root_id=$2 AND peer_id=$3),
- leaves AS (SELECT usage,provider_started,issued IS NOT NULL AS certificate_issued,activated_at,detached_at,certificate_not_after FROM connector_credential_attempt WHERE root_id=$2 AND peer_id=$3),
- checkpoints AS (SELECT
-  EXISTS(SELECT 1 FROM profile) AS profile_present,
-  EXISTS(SELECT 1 FROM profile WHERE accepted_id IS NOT NULL AND NOT suspended AND NOT fenced AND NOT blocked) AS profile_accepted,
-  EXISTS(SELECT 1 FROM processes WHERE accepted_at IS NOT NULL AND retired_at IS NULL AND clock_timestamp()<run_until) AS process_accepted,
-  EXISTS(SELECT 1 FROM leaves WHERE usage='client' AND activated_at IS NOT NULL AND detached_at IS NULL AND clock_timestamp()<certificate_not_after) AS client_leaf_active,
-  EXISTS(SELECT 1 FROM leaves WHERE usage='server' AND activated_at IS NOT NULL AND detached_at IS NULL AND clock_timestamp()<certificate_not_after) AS server_leaf_active)
- SELECT jsonb_build_object(
-  'stage',CASE WHEN NOT profile_accepted THEN 'profile-acceptance-pending' WHEN NOT process_accepted THEN 'process-admission-pending'
-   WHEN NOT client_leaf_active THEN 'client-leaf-pending' WHEN NOT server_leaf_active THEN 'server-leaf-pending'
-   ELSE 'paired-process-not-observed' END,
-  'fleet_trust_current',EXISTS(SELECT 1 FROM fleet_current_trust WHERE installation_id=$1 AND NOT suspended AND clock_timestamp()<fresh_until),
-  'profile_present',profile_present,'profile_accepted',profile_accepted,
-  'profile_suspended',EXISTS(SELECT 1 FROM profile WHERE suspended),
-  'profile_fenced',EXISTS(SELECT 1 FROM profile WHERE fenced),'profile_blocked',EXISTS(SELECT 1 FROM profile WHERE blocked),
-  'source_capacity',(SELECT jsonb_build_object('root_present',true,'root_current',clock_timestamp()<valid_until,
-    'profiles',profiles,'profile_limit',profile_limit,'source_transitions',source_transitions,
-    'source_transition_limit',source_transition_limit,'backing_pending',pending_id IS NOT NULL)
-    FROM connector_identity_root WHERE root_id=$2),
-  'processes',(SELECT count(*) FROM processes),'process_accepted',process_accepted,
-  'serving_processes',(SELECT count(*) FROM processes WHERE serving AND retired_at IS NULL),
-  'client_sign_attempts',(SELECT count(*) FROM leaves WHERE usage='client'),
-  'server_sign_attempts',(SELECT count(*) FROM leaves WHERE usage='server'),
-  'provider_started',(SELECT count(*) FROM leaves WHERE provider_started),
-  'certificates_issued',(SELECT count(*) FROM leaves WHERE certificate_issued),
-  'client_leaf_active',client_leaf_active,'server_leaf_active',server_leaf_active) FROM checkpoints`, installation, root, peer).Scan(&state)
-	if err != nil {
-		code := "unavailable"
-		var sqlError *pgconn.PgError
-		if errors.As(err, &sqlError) {
-			code = sqlError.Code
-		}
-		t.Logf("regional enrollment checkpoint: diagnostic=%s canceled=%v", code, call.Err() != nil)
-		return
-	}
-	t.Logf("regional enrollment checkpoint: %s", state)
-}
 
 // regionalBudget is the operator's capacity configuration for one workload
 // cluster on the hub: its budget policy with a slot in the existing pool, and

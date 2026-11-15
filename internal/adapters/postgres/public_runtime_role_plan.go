@@ -393,16 +393,12 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("local_key_version", "INSERT")
 		add("local_key_configuration", "UPDATE", "snapshot_json")
 	case "key-wrap":
-		// ContextKeyWrapGrantSQL, plus the staged connector profile the key
-		// service's peer resolver reads (ADR-198).
+		// ContextKeyWrapGrantSQL.
 		read("fleet_current_trust", "context_key_wrap")
 		add("fleet_current_trust", "UPDATE", "installation_id")
 		add("context_execution", "SELECT", "capture_id", "root_id", "attempt_id", "process_json", "expectation_digest", "not_after", "phase", "object_uid")
 		add("context_execution", "UPDATE", "capture_id")
 		add("context_capture", "SELECT", "id", "root_id", "expectation_json")
-		add("connector_credential_attempt", "SELECT", "process_id", "root_id", "peer_id", "certificate_digest", "usage", "activated_at", "detached_at", "certificate_not_after")
-		add("connector_identity_process", "SELECT", "id", "root_id", "pod_uid", "process_epoch", "serving", "retired_at")
-		add("connector_identity_profile", "SELECT", "root_id", "peer_id", "cluster_id", "installation_id", "configuration", "suspended", "blocked")
 		add("context_key_wrap", "INSERT", "attempt_id", "root_id", "certificate_sha256", "used_roles")
 		add("context_key_wrap", "UPDATE", "used_roles")
 	case "key-verify":
